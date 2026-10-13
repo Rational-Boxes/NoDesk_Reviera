@@ -285,6 +285,7 @@ On open, Reviera checks:
    - constraints that use them are removed
    - view element overrides that use them are removed
 4. **Elements without data.** New elements with no `Reviera_Element` (created by other tools) are imported as **non-parametric** elements: selectable, editable as IFC geometry, schedulable.
+   - **Datums that IFC fully describes** (grid axes) are the exception to steps 2 and 4: the IFC data wins without a choice, and axes added by other tools become Reviera grids (DM-IFC-006).
 5. **Report.** A reconciliation report appears in the Warnings dialog and is stored as `project/reconcile_log`.
 
 ## 8. BIMserver Mode

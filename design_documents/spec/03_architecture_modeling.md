@@ -422,8 +422,9 @@ Dragging a control issues the matching command once, on mouse-up. The preview du
 
 **Data (IFC mapping).**
 - **`IfcGrid`** is contained in the ground story. By default Reviera writes one per scope box plus one for the grids that have no scope box. Each grid line is an **`IfcGridAxis`** with `AxisTag` = Name, `AxisCurve` set to `IfcPolyline` / `IfcTrimmedCurve` / `IfcCompositeCurve` (for multi-segment grids), and `SameSense`.
-- **U/V assignment.** Reviera clusters the axes by direction: the largest cluster becomes `UAxes`, the cluster most nearly at right angles to it becomes `VAxes`, and everything else (radial and multi-segment axes) goes to `WAxes`. IFC4 requires `VAxes` to be non-empty; see Open questions.
-- **Per-axis data** goes in RXD element data (`recipe.datum`) on the `IfcGrid`, keyed by the named sub-reference `#axis:<uuid>`, with the `AxisTag` as a cross-check. It holds the type reference, the 3D extent, the per-view 2D extents, bubble flags, elbow offsets and the scope box.
+- **U/V assignment** follows DM-IFC-006: lines within ±45° of project X are `UAxes`, the others `VAxes`, and arcs and multi-segment grids `WAxes`. IFC4 requires `VAxes` to be non-empty; see Open questions.
+- **Per-axis data** is RXD, as DM-IFC-006 specifies: one RXD document per grid line, `model/datums/<axis GlobalId>`, holding the grid system's GlobalId, the curve, bubble flags, the type reference, the 3D and per-view 2D extents, elbow offsets and the scope box. The grid's name is the `AxisTag`. The `IfcGrid`'s own `Reviera_Element` data only marks it as a Reviera grid system.
+- **Edits by other tools.** On open, the `IfcGridAxis` entities win over the RXD records (DM-IFC-006): moved, retagged, added and removed axes move, rename, add and remove grids.
 - **Grid type:** `IfcTypeObject` (`ApplicableOccurrence = "IfcGrid"`) whose graphic parameters are stored as properties on the type.
 
 **Commands.**

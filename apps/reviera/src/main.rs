@@ -145,6 +145,9 @@ fn summary(app: &mut App, file: &str) -> ExitCode {
     for problem in &report.problems {
         println!("  warning: {problem}");
     }
+    for note in &report.reconciled {
+        println!("  from IFC: {note}");
+    }
     ExitCode::SUCCESS
 }
 

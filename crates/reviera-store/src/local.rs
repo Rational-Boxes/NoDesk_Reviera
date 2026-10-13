@@ -14,7 +14,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use reviera_core::{Document, ElementId, GlobalId, ModelVersion, NewElement, grids, levels, walls};
+use reviera_core::grids as core_grids;
+use reviera_core::{Document, ElementId, GlobalId, ModelVersion, NewElement, levels, walls};
 use reviera_ifc::{AttrValue, IfcModel, Schema, StepId};
 use reviera_rxd::{
     DOC_PSET_PREFIX, DecodeLimits, ELEMENT_PSET, ElementData, IdentityDoc, MANIFEST_PSET,
@@ -24,7 +25,7 @@ use serde_json::{Value, json};
 
 use crate::psets::{self, Pset, PsetWriter, identifier, integer, label, text, unsupported};
 use crate::{Result, StoreError};
-use crate::{geometry, params};
+use crate::{geometry, grids, params};
 
 /// What opening a file found.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -36,6 +37,9 @@ pub struct OpenReport {
     pub ids_assigned: usize,
     /// Data that could not be used, by property set or element.
     pub problems: Vec<String>,
+    /// Changes taken from the IFC data because another tool edited it (grids moved, renamed,
+    /// added or removed); written back with the next save.
+    pub reconciled: Vec<String>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -278,6 +282,9 @@ impl LocalProject {
         }
         report.elements = elements.len();
         elements.extend(rxd_elements);
+        // Grids edited by other tools: the IFC axes win (DM-IFC-006).
+        let reconciled = grids::reconcile(&ifc, &mut elements, &steps, &mut next, length_scale)?;
+        report.reconciled = reconciled.notes;
         let doc = Document::from_loaded(elements, next)?;
 
         let data_id = manifest
@@ -303,8 +310,8 @@ impl LocalProject {
             data_id,
             data_revision,
             pending_identity,
-            forced_changed: BTreeSet::new(),
-            forced_deleted: BTreeSet::new(),
+            forced_changed: reconciled.changed,
+            forced_deleted: reconciled.deleted,
             synced: doc.version(),
             saved_params,
             sets,
@@ -425,7 +432,7 @@ impl LocalProject {
         let mut report = SaveReport::default();
         let mut dirty: BTreeSet<ElementId> = self.pending_identity.iter().copied().collect();
         // Grid lines are RXD records; their IFC axes belong to the grid system's `IfcGrid`.
-        let grid_path = grids::CLASS_PREFIX
+        let grid_path = core_grids::CLASS_PREFIX
             .strip_prefix("rxd:")
             .expect("an RXD class");
         let grids_touched = deleted.iter().any(|id| {
@@ -435,7 +442,7 @@ impl LocalProject {
         }) || changed.iter().any(|id| {
             doc.store()
                 .get(*id)
-                .is_some_and(|e| grids::is_grid(e) || grids::is_system(e))
+                .is_some_and(|e| core_grids::is_grid(e) || core_grids::is_system(e))
         });
 
         for id in &deleted {
@@ -462,7 +469,7 @@ impl LocalProject {
             {
                 geometry::remove_wall(&mut self.ifc, step)?;
             }
-            if saved.contains_key(grids::SYSTEM_KEY) {
+            if saved.contains_key(core_grids::SYSTEM_KEY) {
                 geometry::remove_grid_axes(&mut self.ifc, step)?;
             }
             // The element's own property and quantity sets go with it.
@@ -679,8 +686,8 @@ impl LocalProject {
             .first()
             .and_then(|l| self.steps.get(&l.id).copied());
         let owner_history = self.new_owner_history()?;
-        let all = grids::list(store);
-        for system in store.iter().filter(|e| grids::is_system(e)) {
+        let all = core_grids::list(store);
+        for system in store.iter().filter(|e| core_grids::is_system(e)) {
             let Some(&step) = self.steps.get(&system.id()) else {
                 continue;
             };

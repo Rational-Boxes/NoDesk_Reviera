@@ -261,3 +261,124 @@ fn grids_save_as_one_ifc_grid_and_reopen_with_their_identity() {
     let after = grids::list(reopened.store());
     assert_eq!(after, before);
 }
+
+/// The axis of `grid` tagged `tag`, and the list attribute that holds it.
+fn axis_by_tag(ifc: &IfcModel, grid: StepId, tag: &str) -> (StepId, &'static str) {
+    let g = entity(ifc, grid);
+    for attr in ["UAxes", "VAxes", "WAxes"] {
+        for a in g.refs(attr) {
+            if entity(ifc, a).string("AxisTag") == Some(tag) {
+                return (a, attr);
+            }
+        }
+    }
+    panic!("no axis {tag}");
+}
+
+#[test]
+fn grids_edited_by_another_tool_follow_the_ifc_axes() {
+    let dir = tempfile::tempdir().unwrap();
+    let (mut project, mut doc, path) = new_project(dir.path());
+    let r = registry();
+    for k in 0..3 {
+        let x = f64::from(k) * 6.0;
+        grid(&r, &mut doc, [x, -1.0], [x, 13.0]);
+    }
+    let a = grid(&r, &mut doc, [-1.0, 0.0], [13.0, 0.0]);
+    run(
+        &r,
+        &mut doc,
+        "grid.rename",
+        json!({ "grid_id": a.0, "name": "A" }),
+    )
+    .unwrap();
+    grid(&r, &mut doc, [-1.0, 6.0], [13.0, 6.0]);
+    project.save(&doc).unwrap();
+    let before = grids::list(doc.store());
+    let id_of = |name: &str| before.iter().find(|g| g.name == name).unwrap().id;
+
+    // Another tool: moves 2, renames B to B1, removes 3 and adds C.
+    let mut ifc = IfcModel::open(&path).unwrap();
+    let grid_step = ifc.entities_of_type("IfcGrid").unwrap()[0].id;
+    let (two, _) = axis_by_tag(&ifc, grid_step, "2");
+    let curve = entity(&ifc, two).refs("AxisCurve")[0];
+    for (p, y) in entity(&ifc, curve)
+        .refs("Points")
+        .into_iter()
+        .zip([-1.0, 13.0])
+    {
+        let coords = AttrValue::List(vec![AttrValue::Real(7.0), AttrValue::Real(y)]);
+        ifc.set_attribute(p, "Coordinates", &coords).unwrap();
+    }
+    let (b, _) = axis_by_tag(&ifc, grid_step, "B");
+    ifc.set_attribute(b, "AxisTag", &AttrValue::String("B1".into()))
+        .unwrap();
+    let (three, list) = axis_by_tag(&ifc, grid_step, "3");
+    let kept: Vec<AttrValue> = entity(&ifc, grid_step)
+        .refs(list)
+        .into_iter()
+        .filter(|a| *a != three)
+        .map(|a| AttrValue::Ref(a.0))
+        .collect();
+    ifc.set_attribute(grid_step, list, &AttrValue::List(kept))
+        .unwrap();
+    ifc.remove(three).unwrap();
+    let mut points = Vec::new();
+    for xy in [[-1.0, 12.0], [13.0, 12.0]] {
+        let p = ifc.create("IfcCartesianPoint").unwrap();
+        let coords = AttrValue::List(xy.iter().map(|v| AttrValue::Real(*v)).collect());
+        ifc.set_attribute(p, "Coordinates", &coords).unwrap();
+        points.push(AttrValue::Ref(p.0));
+    }
+    let polyline = ifc.create("IfcPolyline").unwrap();
+    ifc.set_attribute(polyline, "Points", &AttrValue::List(points))
+        .unwrap();
+    let c = ifc.create("IfcGridAxis").unwrap();
+    ifc.set_attribute(c, "AxisTag", &AttrValue::String("C".into()))
+        .unwrap();
+    ifc.set_attribute(c, "AxisCurve", &AttrValue::Ref(polyline.0))
+        .unwrap();
+    ifc.set_attribute(c, "SameSense", &AttrValue::Bool(true))
+        .unwrap();
+    let mut u: Vec<AttrValue> = entity(&ifc, grid_step)
+        .refs("UAxes")
+        .into_iter()
+        .map(|a| AttrValue::Ref(a.0))
+        .collect();
+    u.push(AttrValue::Ref(c.0));
+    ifc.set_attribute(grid_step, "UAxes", &AttrValue::List(u))
+        .unwrap();
+    ifc.write(&path).unwrap();
+
+    let (mut project, doc, report) = LocalProject::open(&path).unwrap();
+    assert_eq!(report.reconciled.len(), 4, "{:?}", report.reconciled);
+    assert!(project.is_dirty(&doc));
+    let after = grids::list(doc.store());
+    let find = |name: &str| after.iter().find(|g| g.name == name);
+    // Moved, keeping its identity.
+    let g2 = find("2").unwrap();
+    assert_eq!((g2.id, g2.curve.start), (id_of("2"), [7.0, -1.0]));
+    // Renamed, keeping its identity.
+    assert_eq!(find("B1").unwrap().id, id_of("B"));
+    assert!(find("B").is_none() && find("3").is_none());
+    let c = find("C").expect("the added axis is a grid").clone();
+
+    // Saved and opened again: nothing more to reconcile, and the new grid keeps its identity.
+    project.save(&doc).unwrap();
+    let (_, again, report) = LocalProject::open(&path).unwrap();
+    assert!(report.reconciled.is_empty(), "{:?}", report.reconciled);
+    assert_eq!(grids::list(again.store()), after);
+    assert_eq!(
+        grids::list(again.store()).iter().find(|g| g.name == "C"),
+        Some(&c)
+    );
+
+    // Removing the IfcGrid removes Reviera's grids.
+    let mut ifc = IfcModel::open(&path).unwrap();
+    let grid_step = ifc.entities_of_type("IfcGrid").unwrap()[0].id;
+    ifc.remove(grid_step).unwrap();
+    ifc.write(&path).unwrap();
+    let (_, doc, report) = LocalProject::open(&path).unwrap();
+    assert!(grids::list(doc.store()).is_empty());
+    assert_eq!(report.reconciled.len(), 5);
+}

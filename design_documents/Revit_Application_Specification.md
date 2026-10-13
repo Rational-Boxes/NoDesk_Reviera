@@ -4401,12 +4401,21 @@ This chapter is the backbone of the Reviera specification. It defines what a Rev
   - each **grid system** (default: one per building, or one per user-defined grid group) is one `IfcGrid`, contained in the lowest storey, or in the building;
   - each Reviera grid line is one `IfcGridAxis` in `UAxes`, `VAxes` or `WAxes`. Reviera assigns U to lines within ±45° of project X, V to the rest, and W to arcs and multi-segment grids;
   - `IfcGridAxis.AxisTag` is the grid name, and `AxisCurve` is the 2D curve. Multi-segment grids use an `IfcCompositeCurve`.
-- `IfcGridAxis` is not an `IfcRoot`, so it has no GlobalId. Per-axis identity is kept in RXD document `model/datums`. Each record holds `{grid_guid, axis_tag, axis_guid, internal_id, grid_type, extents, bubble_visibility}`, keyed by the `IfcGrid` GlobalId plus the axis tag.
-- Renaming a grid updates `AxisTag` and the RXD key in the same transaction. The axis GUID is unchanged.
+- `IfcGridAxis` is not an `IfcRoot`, so it has no GlobalId. Per-axis identity is kept in RXD under `model/datums`: one RXD document per grid line, `model/datums/<axis_guid>`, so grid lines merge one by one. Each record holds `{grid_guid, axis_guid, internal_id, curve, grid_type, extents, bubble_visibility}`; the record's name is the axis tag.
+- Renaming a grid updates `AxisTag` and the record's name in the same transaction. The axis GUID is unchanged.
+- **Edits by other tools.** Everything that defines a grid line is also in IFC, so on open the `IfcGridAxis` entities of a Reviera grid system win over the RXD records, without asking (unlike recipes, Ch 2a §7). Records and axes are matched by tag:
+  - an axis whose curve differs from its record's moves the grid;
+  - an unmatched axis and an unmatched record with the same curve are a renamed grid;
+  - an unmatched axis is a grid added by another tool and becomes a Reviera grid; its `axis_guid` is derived from the `IfcGrid` GlobalId and the tag, so opening the same file again gives the same identity;
+  - an unmatched record is a grid another tool removed, as is every record of an `IfcGrid` that no longer exists;
+  - axes whose curve Reviera cannot read are left alone, with their records.
+
+  The changes are listed when the file opens (Ch 2a §7, step 5) and written back with the next save.
 
 **Acceptance criteria.**
 - [ ] Six orthogonal grid lines produce one `IfcGrid` with three U axes and three V axes, and a third-party viewer shows their tags.
 - [ ] After renaming a grid from "A" to "A1" and reopening, the grid keeps its GUID, and dimensions to it are still attached.
+- [ ] An axis moved, retagged, added or removed in a third-party tool moves, renames, adds or removes the Reviera grid on the next open; a moved or renamed grid keeps its GUID, and opening the file again reports nothing more.
 
 ### 2.3.7 Openings, voids and fillings
 **ID:** DM-IFC-007 · **Priority:** P0 · **Ref:** research/05 §2.2, §4.4; TECH_STACK §3.1
@@ -8505,6 +8514,7 @@ On open, Reviera checks:
    - constraints that use them are removed
    - view element overrides that use them are removed
 4. **Elements without data.** New elements with no `Reviera_Element` (created by other tools) are imported as **non-parametric** elements: selectable, editable as IFC geometry, schedulable.
+   - **Datums that IFC fully describes** (grid axes) are the exception to steps 2 and 4: the IFC data wins without a choice, and axes added by other tools become Reviera grids (DM-IFC-006).
 5. **Report.** A reconciliation report appears in the Warnings dialog and is stored as `project/reconcile_log`.
 
 ## 8. BIMserver Mode
@@ -9506,8 +9516,9 @@ Dragging a control issues the matching command once, on mouse-up. The preview du
 
 **Data (IFC mapping).**
 - **`IfcGrid`** is contained in the ground story. By default Reviera writes one per scope box plus one for the grids that have no scope box. Each grid line is an **`IfcGridAxis`** with `AxisTag` = Name, `AxisCurve` set to `IfcPolyline` / `IfcTrimmedCurve` / `IfcCompositeCurve` (for multi-segment grids), and `SameSense`.
-- **U/V assignment.** Reviera clusters the axes by direction: the largest cluster becomes `UAxes`, the cluster most nearly at right angles to it becomes `VAxes`, and everything else (radial and multi-segment axes) goes to `WAxes`. IFC4 requires `VAxes` to be non-empty; see Open questions.
-- **Per-axis data** goes in RXD element data (`recipe.datum`) on the `IfcGrid`, keyed by the named sub-reference `#axis:<uuid>`, with the `AxisTag` as a cross-check. It holds the type reference, the 3D extent, the per-view 2D extents, bubble flags, elbow offsets and the scope box.
+- **U/V assignment** follows DM-IFC-006: lines within ±45° of project X are `UAxes`, the others `VAxes`, and arcs and multi-segment grids `WAxes`. IFC4 requires `VAxes` to be non-empty; see Open questions.
+- **Per-axis data** is RXD, as DM-IFC-006 specifies: one RXD document per grid line, `model/datums/<axis GlobalId>`, holding the grid system's GlobalId, the curve, bubble flags, the type reference, the 3D and per-view 2D extents, elbow offsets and the scope box. The grid's name is the `AxisTag`. The `IfcGrid`'s own `Reviera_Element` data only marks it as a Reviera grid system.
+- **Edits by other tools.** On open, the `IfcGridAxis` entities win over the RXD records (DM-IFC-006): moved, retagged, added and removed axes move, rename, add and remove grids.
 - **Grid type:** `IfcTypeObject` (`ApplicableOccurrence = "IfcGrid"`) whose graphic parameters are stored as properties on the type.
 
 **Commands.**

@@ -387,6 +387,27 @@ impl Gui {
             .or_else(|| views.first())
             .map(|v| v.id);
         self.open_view(id, first);
+        // Grids another tool edited follow the IFC data; say what changed.
+        let reconciled = self
+            .app
+            .document(id)
+            .and_then(|d| d.open_report.as_ref())
+            .map(|r| r.reconciled.clone())
+            .unwrap_or_default();
+        if !reconciled.is_empty() {
+            let dialog = MessageDialog::builder(
+                frame,
+                &format!(
+                    "The file was edited by another tool since Reviera saved it. These changes \
+                     were taken from the IFC data and are saved with the next save:\n\n{}",
+                    reconciled.join("\n")
+                ),
+                "NoDesk Reviera",
+            )
+            .with_style(MessageDialogStyle::OK | MessageDialogStyle::IconInformation)
+            .build();
+            dialog.show_modal();
+        }
         let elements = self.app.document(id).map_or(0, |d| d.doc.store().len());
         frame.set_status_text(
             &format!(

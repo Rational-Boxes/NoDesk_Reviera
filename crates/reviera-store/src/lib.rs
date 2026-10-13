@@ -6,6 +6,7 @@
 
 pub mod commands;
 mod geometry;
+mod grids;
 mod local;
 pub mod params;
 mod psets;
