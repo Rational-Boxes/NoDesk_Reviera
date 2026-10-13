@@ -7,6 +7,7 @@
 //! (TECH_STACK §2, spec Ch 2). The element store can only be changed inside a [`Transaction`],
 //! and transactions are opened by the command executor (DM-CORE-001 rule 9).
 
+pub mod annotations;
 pub mod builtin;
 pub mod categories;
 pub mod change;

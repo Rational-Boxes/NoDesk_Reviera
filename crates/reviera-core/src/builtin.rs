@@ -60,6 +60,8 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(ViewCreatePlan),
         registry.add(ViewSetViewRange),
         registry.add(ViewGetViewRange),
+        registry.add(DimCreateAligned),
+        registry.add(AnnoList),
         registry.add(WallJoinsQuery),
     ];
     for r in results {
@@ -323,7 +325,8 @@ fn dependents_of(store: &crate::store::Store, id: ElementId) -> Vec<ElementId> {
     store
         .iter()
         .filter(|e| {
-            e.param("@type").and_then(serde_json::Value::as_str) == Some(guid.as_str())
+            crate::annotations::dimension_data(e).is_some_and(|d| d.view == guid)
+                || e.param("@type").and_then(serde_json::Value::as_str) == Some(guid.as_str())
                 || crate::views::view_data(e)
                     .is_some_and(|v| v.level.as_deref() == Some(guid.as_str()))
                 || crate::walls::wall_recipe(e).is_some_and(|r| {
@@ -1363,5 +1366,49 @@ impl Command for ViewGetViewRange {
 
     fn run(&self, cx: &mut CommandContext<'_>, p: GetViewRangeParams) -> Result<ViewRangeReport> {
         plans::get_view_range(cx.store(), &p.view_id)
+    }
+}
+
+use crate::annotations::{self, CreateAlignedParams, DimensionInfo, ListParams};
+
+#[derive(Debug)]
+struct DimCreateAligned;
+
+impl Command for DimCreateAligned {
+    type Params = CreateAlignedParams;
+    type Output = ElementId;
+    const META: CommandMeta = CommandMeta {
+        name: "dim.create_aligned",
+        version: 1,
+        summary: "Create an aligned dimension",
+        description: "Dimensions two or more parallel references in a view: Reviera wall faces (`face:ext`, \
+                      `face:int`) and location lines (`axis`), which follow the walls, or fixed `line`s. \
+                      `line_point` places the dimension line.",
+        effects: &[Effect::Edit],
+        transaction_name: "Dimension",
+    };
+
+    fn run(&self, cx: &mut CommandContext<'_>, p: CreateAlignedParams) -> Result<ElementId> {
+        annotations::create_aligned(cx.edit()?, p)
+    }
+}
+
+#[derive(Debug)]
+struct AnnoList;
+
+impl Command for AnnoList {
+    type Params = ListParams;
+    type Output = Vec<DimensionInfo>;
+    const META: CommandMeta = CommandMeta {
+        name: "anno.list",
+        version: 1,
+        summary: "List a view's annotation",
+        description: "The dimensions of a view, with their references and current values (metres).",
+        effects: &[Effect::Read],
+        transaction_name: "",
+    };
+
+    fn run(&self, cx: &mut CommandContext<'_>, p: ListParams) -> Result<Vec<DimensionInfo>> {
+        annotations::list(cx.store(), p)
     }
 }

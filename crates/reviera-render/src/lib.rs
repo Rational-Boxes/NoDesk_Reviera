@@ -10,6 +10,8 @@
 use glam::{Mat4, Vec3};
 use reviera_core::ElementId;
 
+pub mod annotation;
+pub mod font;
 pub mod plan;
 pub mod viewcube;
 

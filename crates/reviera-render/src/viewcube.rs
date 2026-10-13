@@ -417,7 +417,7 @@ impl Mesh {
 }
 
 /// Lays out `s` centred at `centre`, reading along `right` with `up` upward, letters `height`
-/// tall, as thin quads.
+/// tall, as thin quads (the strokes of [`crate::font`]).
 fn text(
     mesh: &mut Mesh,
     s: &str,
@@ -427,82 +427,23 @@ fn text(
     height: f32,
     color: [f32; 4],
 ) {
-    let unit = height / 6.0;
-    let advance = 5.5 * unit;
-    let width = advance * s.len() as f32 - 1.5 * unit;
-    let start = centre - right * (width / 2.0) - up * (height / 2.0);
-    let stroke = unit * 0.9;
+    let width = crate::font::width(s, height);
+    let origin = centre - right * (width / 2.0) - up * (height / 2.0);
+    let stroke = height / 6.0 * 0.9;
     let normal = right.cross(up);
-    for (k, c) in s.chars().enumerate() {
-        let origin = start + right * (advance * k as f32);
-        for line in glyph(c) {
-            for pair in line.windows(2) {
-                let a = origin + right * (pair[0].0 * unit) + up * (pair[0].1 * unit);
-                let b = origin + right * (pair[1].0 * unit) + up * (pair[1].1 * unit);
-                let along = (b - a).normalize_or_zero();
-                let side = normal.cross(along) * (stroke / 2.0);
-                let ext = along * (stroke / 2.0);
-                mesh.quad(
-                    [
-                        a - side - ext,
-                        b - side + ext,
-                        b + side + ext,
-                        a + side - ext,
-                    ],
-                    color,
-                );
-            }
-        }
-    }
-}
-
-/// Strokes of a capital letter on a 4 × 6 grid.
-fn glyph(c: char) -> &'static [&'static [(f32, f32)]] {
-    match c {
-        'A' => &[&[(0., 0.), (2., 6.), (4., 0.)], &[(1., 3.), (3., 3.)]],
-        'B' => &[
-            &[
-                (0., 0.),
-                (0., 6.),
-                (3., 6.),
-                (4., 5.),
-                (4., 4.),
-                (3., 3.),
-                (0., 3.),
+    for [a, b] in crate::font::strokes(s, origin, right, up, height) {
+        let along = (b - a).normalize_or_zero();
+        let side = normal.cross(along) * (stroke / 2.0);
+        let ext = along * (stroke / 2.0);
+        mesh.quad(
+            [
+                a - side - ext,
+                b - side + ext,
+                b + side + ext,
+                a + side - ext,
             ],
-            &[(3., 3.), (4., 2.), (4., 1.), (3., 0.), (0., 0.)],
-        ],
-        'C' => &[&[(4., 6.), (0., 6.), (0., 0.), (4., 0.)]],
-        'E' => &[
-            &[(4., 6.), (0., 6.), (0., 0.), (4., 0.)],
-            &[(0., 3.), (3., 3.)],
-        ],
-        'F' => &[&[(4., 6.), (0., 6.), (0., 0.)], &[(0., 3.), (3., 3.)]],
-        'G' => &[&[(4., 6.), (0., 6.), (0., 0.), (4., 0.), (4., 3.), (2., 3.)]],
-        'H' => &[
-            &[(0., 0.), (0., 6.)],
-            &[(4., 0.), (4., 6.)],
-            &[(0., 3.), (4., 3.)],
-        ],
-        'I' => &[
-            &[(2., 0.), (2., 6.)],
-            &[(1., 6.), (3., 6.)],
-            &[(1., 0.), (3., 0.)],
-        ],
-        'K' => &[&[(0., 0.), (0., 6.)], &[(4., 6.), (0., 3.), (4., 0.)]],
-        'L' => &[&[(0., 6.), (0., 0.), (4., 0.)]],
-        'M' => &[&[(0., 0.), (0., 6.), (2., 3.), (4., 6.), (4., 0.)]],
-        'N' => &[&[(0., 0.), (0., 6.), (4., 0.), (4., 6.)]],
-        'O' => &[&[(0., 0.), (4., 0.), (4., 6.), (0., 6.), (0., 0.)]],
-        'P' => &[&[(0., 0.), (0., 6.), (4., 6.), (4., 3.), (0., 3.)]],
-        'R' => &[
-            &[(0., 0.), (0., 6.), (4., 6.), (4., 3.), (0., 3.)],
-            &[(1., 3.), (4., 0.)],
-        ],
-        'S' => &[&[(4., 6.), (0., 6.), (0., 3.), (4., 3.), (4., 0.), (0., 0.)]],
-        'T' => &[&[(0., 6.), (4., 6.)], &[(2., 6.), (2., 0.)]],
-        'W' => &[&[(0., 6.), (1., 0.), (2., 3.), (3., 0.), (4., 6.)]],
-        _ => &[],
+            color,
+        );
     }
 }
 
