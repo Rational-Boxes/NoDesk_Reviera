@@ -582,3 +582,91 @@ fn roof_shapes_set_which_curves_slope() {
     .unwrap();
     assert_eq!(shape(&doc), None);
 }
+
+#[test]
+fn attach_walls_below_fills_the_gables() {
+    let dir = tempfile::tempdir().unwrap();
+    let (_, mut doc, _, level) = project(dir.path());
+    let r = registry();
+    let mut walls = Vec::new();
+    for i in 0..4 {
+        walls.push(id(run(
+            &r,
+            &mut doc,
+            "wall.create",
+            json!({
+                "curve": { "line": { "start": RECT[(i + 1) % 4], "end": RECT[i] } },
+                "base_level": level.0,
+                "top_constraint": { "unconnected": 3 },
+            }),
+        )
+        .unwrap()));
+    }
+    // A wall well outside the roof stays as it is.
+    let outside = id(run(
+        &r,
+        &mut doc,
+        "wall.create",
+        json!({
+            "curve": { "line": { "start": [20.0, 0.0], "end": [25.0, 0.0] } },
+            "base_level": level.0,
+            "top_constraint": { "unconnected": 3 },
+        }),
+    )
+    .unwrap());
+    // A drawn (not picked) hip roof over the walls, then made a gable.
+    let outer = [[-0.1, -0.1], [10.1, -0.1], [10.1, 6.1], [-0.1, 6.1]];
+    let roof = id(run(
+        &r,
+        &mut doc,
+        "roof.create_footprint",
+        json!({
+            "curves": curves(&outer, |_| json!({ "overhang": 0.4 })),
+            "level_id": level.0,
+            "base_offset": 3.0,
+            "slope": "45°",
+        }),
+    )
+    .unwrap());
+    run(
+        &r,
+        &mut doc,
+        "roof.set_shape",
+        json!({ "roof_id": roof.0, "shape": "gable" }),
+    )
+    .unwrap();
+    assert_eq!(
+        reviera_core::walls::attach::walls_below(doc.store(), roof),
+        walls
+    );
+    let attached = run(
+        &r,
+        &mut doc,
+        "roof.attach_walls",
+        json!({ "roof_id": roof.0 }),
+    )
+    .unwrap();
+    assert_eq!(
+        attached,
+        json!(walls.iter().map(|w| w.0).collect::<Vec<_>>())
+    );
+    // The gable ends now rise to the ridge; the outside wall is untouched.
+    let solved = reviera_core::walls::solve(doc.store());
+    let east = reviera_core::walls::attach::attached_body(
+        doc.store(),
+        walls[1],
+        &solved.bodies[&walls[1]],
+    )
+    .unwrap()
+    .unwrap();
+    assert!((east.z_max - 6.1).abs() < 1e-6, "{}", east.z_max);
+    let e = doc.store().get(outside).unwrap();
+    assert!(
+        reviera_core::walls::wall_recipe(e)
+            .unwrap()
+            .attach_top
+            .is_none()
+    );
+    // Nothing is left to attach.
+    assert!(reviera_core::walls::attach::walls_below(doc.store(), roof).is_empty());
+}

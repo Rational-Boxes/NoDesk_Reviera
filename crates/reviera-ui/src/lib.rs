@@ -3173,6 +3173,7 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
             focus(g);
         }),
         "wall.detach" => with(gui, Gui::detach_selection),
+        "roof.attach_walls" => with(gui, Gui::attach_walls_below),
         "sketch.defines_slope" => with(gui, |g| {
             g.set_draw_mode(sketch::DrawMode::DefinesSlope);
             focus(g);

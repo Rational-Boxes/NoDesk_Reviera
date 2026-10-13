@@ -85,7 +85,8 @@ The KIT FZK *AC20-Institute-Var-2* sample model (`test-data/ifc/`) open in Revie
   (`roof.create_footprint`, `roof.edit_footprint`, `roof.set_params`, `roof.set_edge`,
   `roof.set_slope`, `roof.set_shape`). Walls attach their tops to a roof (offered when a roof is made from picked
   walls, or Modify | Walls › Attach Top/Base, then click the roof), so gable walls rise to the
-  ridge. Saved as a faceted B-rep in the wall's own frame, so doors and windows stay cut
+  ridge. Modify | Roofs › Attach Walls attaches every wall under a roof at once, and a new roof
+  offers it however it was drawn (`roof.attach_walls`). Saved as a faceted B-rep in the wall's own frame, so doors and windows stay cut
   (`wall.attach`, `wall.detach`). Not yet: attaching bases or to floors and ceilings, slope
   arrows, and openings in roofs.
 - **Rooms**: Architecture › Room places a room in the region of wall faces under the cursor,

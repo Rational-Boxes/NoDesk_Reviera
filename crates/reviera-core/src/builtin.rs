@@ -65,6 +65,7 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(RoofSetEdge),
         registry.add(RoofSetSlope),
         registry.add(RoofSetShape),
+        registry.add(RoofAttachWalls),
         registry.add(StairCreate),
         registry.add(StairSetParams),
         registry.add(WallAttach),
@@ -2532,6 +2533,17 @@ modify_command!(
     crate::stairs::SetParams,
     (),
     crate::stairs::set_params
+);
+modify_command!(
+    RoofAttachWalls,
+    "roof.attach_walls",
+    "Attach the walls below a roof",
+    "Attaches the tops of every Reviera wall the roof covers (and that starts below it) to the roof, so gable \
+     walls rise to the ridge and the others meet the roof's underside. Returns the walls attached.",
+    "Attach Walls",
+    crate::walls::attach::AttachBelowParams,
+    Vec<ElementId>,
+    crate::walls::attach::attach_below
 );
 modify_command!(
     RoofSetShape,

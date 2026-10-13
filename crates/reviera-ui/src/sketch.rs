@@ -573,14 +573,14 @@ impl Gui {
         match self.app.execute(command, args, &super::user()) {
             Ok(out) => {
                 let made = s.host.or_else(|| out.result.as_u64().map(ElementId));
-                // A new roof on picked walls offers to attach them.
-                let attach: Vec<ElementId> = if s.kind == SketchKind::Roof && s.host.is_none() {
-                    s.curves
-                        .iter()
-                        .filter_map(|c| c.lock.as_ref().map(|l| l.0))
-                        .collect()
-                } else {
-                    Vec::new()
+                // A new roof offers to attach the walls under it, so gables fill.
+                let attach: Vec<ElementId> = match made {
+                    Some(roof) if s.kind == SketchKind::Roof && s.host.is_none() => self
+                        .app
+                        .document(self.doc.expect("a document"))
+                        .map(|d| reviera_core::walls::attach::walls_below(d.doc.store(), roof))
+                        .unwrap_or_default(),
+                    _ => Vec::new(),
                 };
                 self.sketch = None;
                 if let Some(v) = self.viewport() {

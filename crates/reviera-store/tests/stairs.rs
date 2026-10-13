@@ -110,6 +110,12 @@ fn a_stair_between_levels_is_saved_as_an_ifc_stair() {
     assert_eq!(geometry(&reopened, stair).risers, 16);
 
     // Deleting the top level deletes the stair that reaches it.
-    run(&r, &mut doc, "element.delete", json!({ "element_ids": [l2.0] })).unwrap();
+    run(
+        &r,
+        &mut doc,
+        "element.delete",
+        json!({ "element_ids": [l2.0] }),
+    )
+    .unwrap();
     assert!(doc.store().get(stair).is_none());
 }

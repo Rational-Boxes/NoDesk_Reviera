@@ -652,6 +652,12 @@ icon = "roof"
 help = "Roof by footprint: pick walls or sketch the outline; sloped edges rise, the others are gables"
 
 [[action]]
+id = "roof.attach_walls"
+label = "Attach Walls"
+icon = "attach"
+help = "Attach every wall under the roof to it: gable walls rise to the ridge, the rest meet the roof"
+
+[[action]]
 id = "roof.edit_footprint"
 label = "Edit Footprint"
 icon = "edit_boundary"
@@ -914,7 +920,10 @@ panels = [
 [[context]]
 category = "cat.roofs"
 label = "Roofs"
-panels = [{ label = "Mode", tools = [{ action = "roof.edit_footprint", size = "large" }] }]
+panels = [
+  { label = "Mode", tools = [{ action = "roof.edit_footprint", size = "large" }] },
+  { label = "Walls", tools = [{ action = "roof.attach_walls", size = "large" }] },
+]
 
 [[context]]
 category = "session.schedule"

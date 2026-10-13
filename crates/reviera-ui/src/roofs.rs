@@ -457,6 +457,43 @@ impl Gui {
         self.refresh_scene(&frame);
     }
 
+    /// Modify | Roofs › Attach Walls: attaches every wall under the selected roofs, so gable
+    /// walls rise to the roof and the rest meet its underside.
+    pub(crate) fn attach_walls_below(&mut self) {
+        let frame = self.frame;
+        let Some(store) = self
+            .doc
+            .and_then(|d| self.app.document(d))
+            .map(|d| d.doc.store().clone())
+        else {
+            return;
+        };
+        let selected: Vec<ElementId> = self
+            .selection()
+            .into_iter()
+            .filter(|id| store.get(*id).and_then(roofs::roof_recipe).is_some())
+            .collect();
+        if selected.is_empty() {
+            return frame.set_status_text("Select a roof to attach the walls under it", 0);
+        }
+        let mut n = 0;
+        for roof in selected {
+            match self.run("roof.attach_walls", json!({ "roof_id": roof })) {
+                Ok(v) => n += v.as_array().map_or(0, Vec::len),
+                Err(e) => return error(&frame, &format!("The walls were not attached:\n{e}")),
+            }
+        }
+        frame.set_status_text(
+            &if n == 0 {
+                "No walls under the roof are left to attach".to_owned()
+            } else {
+                format!("Attached {n} wall(s) to the roof")
+            },
+            0,
+        );
+        self.refresh_scene(&frame);
+    }
+
     /// Modify | Walls › Attach Top/Base: the next click picks the roof.
     pub(crate) fn start_attach(&mut self) {
         let walls = self.selected_walls();

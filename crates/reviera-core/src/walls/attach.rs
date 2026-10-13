@@ -343,6 +343,69 @@ pub(crate) fn attach(txn: &mut crate::txn::Transaction<'_>, p: AttachParams) -> 
     Ok(())
 }
 
+/// The Reviera walls under `roof` that are not attached to it yet: the roof covers each one's
+/// whole footprint, and its base is below the roof's lowest point over it (ARC-ROOF-001: the
+/// walls offered for attaching when a roof is finished).
+pub fn walls_below(store: &Store, roof: ElementId) -> Vec<ElementId> {
+    let Some(e) = store.get(roof) else {
+        return Vec::new();
+    };
+    let Ok(g) = roofs::regenerate(store, e) else {
+        return Vec::new();
+    };
+    let guid = e.guid().to_string();
+    let solved = super::solve(store);
+    let mut out: Vec<ElementId> = solved
+        .bodies
+        .iter()
+        .filter(|(id, _)| {
+            store
+                .get(**id)
+                .and_then(super::wall_recipe)
+                .is_some_and(|r| r.attach_top.as_deref() != Some(guid.as_str()))
+        })
+        .filter(|(_, body)| attach_to(&g, body).is_ok_and(|a| a.z_min > body.geometry.base_z + 0.1))
+        .map(|(id, _)| *id)
+        .collect();
+    out.sort();
+    out
+}
+
+#[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct AttachBelowParams {
+    pub roof_id: crate::id::ElementRef,
+}
+
+/// Attaches every wall under a roof to it, so gable walls rise to the roof and the rest meet
+/// its underside (`roof.attach_walls`). Returns the walls attached.
+pub(crate) fn attach_below(
+    txn: &mut crate::txn::Transaction<'_>,
+    p: AttachBelowParams,
+) -> Result<Vec<ElementId>> {
+    let store = txn.store().clone();
+    let roof = store
+        .resolve(&p.roof_id)
+        .filter(|r| store.get(*r).and_then(roofs::roof_recipe).is_some())
+        .ok_or_else(|| Error::new("element.not_found", "no such roof"))?;
+    let walls = walls_below(&store, roof);
+    if walls.is_empty() {
+        return Ok(walls);
+    }
+    attach(
+        txn,
+        AttachParams {
+            wall_ids: walls
+                .iter()
+                .map(|w| crate::id::ElementRef::Id(*w))
+                .collect(),
+            end: End::Top,
+            target_id: crate::id::ElementRef::Id(roof),
+        },
+    )?;
+    Ok(walls)
+}
+
 #[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct DetachParams {
