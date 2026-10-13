@@ -68,8 +68,63 @@ pub struct UndoItem {
 }
 
 impl UndoItem {
+    pub fn new(
+        name: impl Into<String>,
+        origin: Origin,
+        time: SystemTime,
+        changes: ChangeSet,
+    ) -> Self {
+        Self {
+            name: name.into(),
+            origin,
+            time,
+            changes,
+        }
+    }
+
     pub fn changes(&self) -> &ChangeSet {
         &self.changes
+    }
+}
+
+/// What happened to the model, reported to the observer (the live store, Ch 2b §4).
+#[derive(Debug, Clone)]
+pub enum DocEvent {
+    /// A transaction committed and became the newest undo item.
+    Committed {
+        version: ModelVersion,
+        item: UndoItem,
+    },
+    /// The newest `steps` undo items were undone, applying `changes`.
+    Undone {
+        version: ModelVersion,
+        steps: usize,
+        changes: ChangeSet,
+    },
+    /// The next `steps` redo items were redone, applying `changes`.
+    Redone {
+        version: ModelVersion,
+        steps: usize,
+        changes: ChangeSet,
+    },
+    /// The newest `count` undo items were merged into `item` (none if they cancelled out).
+    Assimilated {
+        count: usize,
+        item: Option<UndoItem>,
+    },
+    /// The newest `count` undo items were removed and their effect reverted by `changes`.
+    RolledBack {
+        version: ModelVersion,
+        count: usize,
+        changes: ChangeSet,
+    },
+}
+
+struct Observer(Box<dyn FnMut(&DocEvent) + Send>);
+
+impl std::fmt::Debug for Observer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Observer")
     }
 }
 
@@ -148,6 +203,7 @@ pub struct Document {
     redo: Vec<UndoItem>,
     max_undo_items: usize,
     group: Option<OpenGroup>,
+    observer: Option<Observer>,
 }
 
 impl Default for Document {
@@ -172,6 +228,7 @@ impl Document {
             redo: Vec::new(),
             max_undo_items: Self::DEFAULT_MAX_UNDO_ITEMS,
             group: None,
+            observer: None,
         }
     }
 
@@ -238,6 +295,32 @@ impl Document {
         self.trim_undo();
     }
 
+    /// Reports every commit, undo, redo and group end to `observer`, after it took effect.
+    pub fn set_observer(&mut self, observer: impl FnMut(&DocEvent) + Send + 'static) {
+        self.observer = Some(Observer(Box::new(observer)));
+    }
+
+    pub fn clear_observer(&mut self) {
+        self.observer = None;
+    }
+
+    /// Rebuilds the undo and redo stacks after recovery: `undo` oldest first, `redo` with the next
+    /// item to redo first. The items must describe how the current state was reached.
+    pub fn restore_history(&mut self, undo: Vec<UndoItem>, redo: Vec<UndoItem>) {
+        self.undo = undo.into();
+        self.redo = redo.into_iter().rev().collect();
+        self.trim_undo();
+    }
+
+    fn notify(&mut self, event: impl FnOnce(&Self) -> DocEvent) {
+        if self.observer.is_some() {
+            let event = event(self);
+            if let Some(o) = self.observer.as_mut() {
+                (o.0)(&event);
+            }
+        }
+    }
+
     /// Opens a transaction. Only one can be open at a time, which the borrow enforces.
     pub fn transaction(&mut self, name: impl Into<String>, origin: Origin) -> Transaction<'_> {
         Transaction::new(self, name.into(), origin)
@@ -293,7 +376,13 @@ impl Document {
             .iter()
             .fold(ChangeSet::default(), |acc, i| acc.then(i.changes.inverse()));
         self.redo.extend(items);
-        Ok(self.apply(changes, origin, Vec::new()))
+        let commit = self.apply(changes.clone(), origin, Vec::new());
+        self.notify(|d| DocEvent::Undone {
+            version: d.version(),
+            steps,
+            changes,
+        });
+        Ok(commit)
     }
 
     pub fn redo(&mut self, steps: usize, scope: &UndoScope, origin: &Origin) -> Result<Commit> {
@@ -304,7 +393,13 @@ impl Document {
             .fold(ChangeSet::default(), |acc, i| acc.then(i.changes.clone()));
         self.undo.extend(items);
         self.trim_undo();
-        Ok(self.apply(changes, origin, Vec::new()))
+        let commit = self.apply(changes.clone(), origin, Vec::new());
+        self.notify(|d| DocEvent::Redone {
+            version: d.version(),
+            steps,
+            changes,
+        });
+        Ok(commit)
     }
 
     pub fn group_begin(&mut self, name: impl Into<String>, origin: Origin) -> Result<()> {
@@ -335,21 +430,30 @@ impl Document {
         let result = match mode {
             GroupEnd::Commit => unchanged,
             GroupEnd::Assimilate => {
+                let count = self.undo.len().saturating_sub(group.mark);
                 let changes = self.drain_group(group.mark);
-                if !changes.is_empty() {
-                    let time = SystemTime::now();
-                    self.undo.push_back(UndoItem {
-                        name: group.name,
-                        origin: group.origin,
-                        time,
-                        changes,
-                    });
+                let item = (!changes.is_empty())
+                    .then(|| UndoItem::new(group.name, group.origin, SystemTime::now(), changes));
+                if let Some(item) = &item {
+                    self.undo.push_back(item.clone());
+                }
+                if count > 0 {
+                    self.notify(|_| DocEvent::Assimilated { count, item });
                 }
                 unchanged
             }
             GroupEnd::Rollback => {
-                let changes = self.drain_group(group.mark);
-                self.apply(changes.inverse(), &group.origin, Vec::new())
+                let count = self.undo.len().saturating_sub(group.mark);
+                let changes = self.drain_group(group.mark).inverse();
+                let commit = self.apply(changes.clone(), &group.origin, Vec::new());
+                if count > 0 {
+                    self.notify(|d| DocEvent::RolledBack {
+                        version: d.version(),
+                        count,
+                        changes,
+                    });
+                }
+                commit
             }
         };
         self.trim_undo();
@@ -360,6 +464,11 @@ impl Document {
         let id = ElementId(self.next_id);
         self.next_id += 1;
         id
+    }
+
+    /// Makes sure `id` is never handed out again.
+    pub(crate) fn reserve_id(&mut self, id: ElementId) {
+        self.next_id = self.next_id.max(id.0 + 1);
     }
 
     pub(crate) fn new_guid(&self) -> GlobalId {
@@ -389,13 +498,13 @@ impl Document {
         }
         let commit = self.apply(changes.clone(), &origin, warnings);
         self.redo.clear();
-        self.undo.push_back(UndoItem {
-            name,
-            origin,
-            time: SystemTime::now(),
-            changes,
-        });
+        let item = UndoItem::new(name, origin, SystemTime::now(), changes);
+        self.undo.push_back(item.clone());
         self.trim_undo();
+        self.notify(|d| DocEvent::Committed {
+            version: d.version(),
+            item,
+        });
         commit
     }
 

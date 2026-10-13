@@ -424,3 +424,28 @@ fn typed_property_values_and_inverse_references() {
             .is_err()
     );
 }
+
+#[test]
+fn step_rows_rebuild_the_written_file() {
+    let WallModel { model, wall, .. } = wall_model();
+    let dir = tempfile::tempdir().unwrap();
+    let (a, b) = (dir.path().join("a.ifc"), dir.path().join("b.ifc"));
+    model.write(&a).unwrap();
+    let rows = model.step_rows().unwrap();
+    assert_eq!(rows.len(), model.entity_count());
+    let w = rows
+        .iter()
+        .find(|r| r.global_id.as_deref() == Some(wall.as_str()))
+        .unwrap();
+    assert_eq!(w.class, "IFCWALL");
+    assert!(w.attributes.starts_with("('") && w.attributes.contains("'Wall 1'"));
+    std::fs::write(
+        &b,
+        reviera_ifc::spf_text(&model.header_text().unwrap(), &rows),
+    )
+    .unwrap();
+    assert_eq!(
+        std::fs::read_to_string(&a).unwrap(),
+        std::fs::read_to_string(&b).unwrap()
+    );
+}

@@ -73,7 +73,8 @@ clap = { version = "4.6.7", features = ["derive"] }
 tokio = { version = "1.53.2", features = ["rt-multi-thread", "macros", "sync", "time"] }
 reqwest = { version = "0.13.5", features = ["json"] }
 keyring = "4.2.0"
-rusqlite = { version = "0.40.2", features = ["bundled-sqlcipher-vendored-openssl"] }
+# SQLCipher (`bundled-sqlcipher-vendored-openssl`) arrives with encryption at rest, DM-LIVE-016.
+rusqlite = { version = "0.40.2", features = ["bundled"] }
 mlua = { version = "0.12.2", features = ["luajit"] }
 rmcp = "3.5.1"
 wxdragon = "0.9.22"

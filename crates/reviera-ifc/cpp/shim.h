@@ -19,6 +19,7 @@ namespace reviera_ifc {
 
 struct EntityInfo;
 struct Mesh;
+struct StepRow;
 
 class Model {
 public:
@@ -51,6 +52,8 @@ public:
     std::uint32_t create_entity(rust::Str class_name);
     void remove_entity(std::uint32_t id);
     void write(rust::Str path) const;
+    rust::String header_text() const;
+    rust::Vec<StepRow> step_rows() const;
 
     rust::Vec<Mesh> tessellate(std::uint32_t threads) const;
 

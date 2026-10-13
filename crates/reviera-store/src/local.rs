@@ -63,6 +63,10 @@ pub struct LocalProject {
     data_revision: i64,
     /// Elements whose identity data has not been written yet.
     pending_identity: HashSet<ElementId>,
+    /// Elements that differ from the IFC population although the document version says otherwise
+    /// (after recovery, Ch 2b §6.3).
+    forced_changed: BTreeSet<ElementId>,
+    forced_deleted: BTreeSet<ElementId>,
     /// Document version that the IFC population reflects.
     synced: ModelVersion,
 }
@@ -111,6 +115,8 @@ impl LocalProject {
             data_id: None,
             data_revision: 0,
             pending_identity: HashSet::from([ElementId::PROJECT]),
+            forced_changed: BTreeSet::new(),
+            forced_deleted: BTreeSet::new(),
             synced: doc.version(),
         };
         Ok((project, doc))
@@ -270,9 +276,52 @@ impl LocalProject {
             data_id,
             data_revision,
             pending_identity,
+            forced_changed: BTreeSet::new(),
+            forced_deleted: BTreeSet::new(),
             synced: doc.version(),
         };
         Ok((local, doc, report))
+    }
+
+    /// Rebuilds a project from `base`, an IFC file holding the state of the last open or save, and
+    /// `current`, the document recovered from the live store (Ch 2b §6.3). The project is bound to
+    /// `path`, and every element that differs from `base` is written on the next save.
+    pub fn restore(base: &Path, path: &Path, current: &Document) -> Result<(Self, OpenReport)> {
+        let (mut project, saved, report) = Self::open(base)?;
+        project.path = path.to_owned();
+        for e in current.store().iter() {
+            if saved.store().get(e.id()) != Some(e) {
+                project.forced_changed.insert(e.id());
+            }
+        }
+        for e in saved.store().iter() {
+            if !current.store().contains(e.id()) {
+                project.forced_deleted.insert(e.id());
+            }
+        }
+        project.synced = current.version();
+        Ok((project, report))
+    }
+
+    /// Whether saving would write anything.
+    pub fn is_dirty(&self, doc: &Document) -> bool {
+        let since = doc.changed_since(self.synced);
+        since.stale_episode
+            || !since.changed.is_empty()
+            || !since.deleted.is_empty()
+            || !self.pending_identity.is_empty()
+            || !self.forced_changed.is_empty()
+            || !self.forced_deleted.is_empty()
+    }
+
+    /// The `DataId` of the RXD set, once the project has been saved with Reviera.
+    pub fn data_id(&self) -> Option<&str> {
+        self.data_id.as_deref()
+    }
+
+    /// Binds the project to another file; the next save writes there.
+    pub fn set_path(&mut self, path: &Path) {
+        self.path = path.to_owned();
     }
 
     pub fn path(&self) -> &Path {
@@ -306,17 +355,27 @@ impl LocalProject {
     }
 
     pub fn save_as(&mut self, doc: &Document, path: &Path) -> Result<SaveReport> {
-        let since = doc.changed_since(self.synced);
+        let mut since = doc.changed_since(self.synced);
         if since.stale_episode {
             return Err(unsupported("the document was not opened from this project"));
         }
+        let changed: BTreeSet<_> = since
+            .changed
+            .drain(..)
+            .chain(self.forced_changed.iter().copied())
+            .collect();
+        let deleted: BTreeSet<_> = since
+            .deleted
+            .drain(..)
+            .chain(self.forced_deleted.iter().copied())
+            .collect();
         let project = self
             .project
             .ok_or_else(|| unsupported("the file has no IfcProject"))?;
         let mut report = SaveReport::default();
         let mut dirty: BTreeSet<ElementId> = self.pending_identity.iter().copied().collect();
 
-        for id in &since.deleted {
+        for id in &deleted {
             dirty.remove(id);
             self.element_data.remove(id);
             let Some(step) = self.steps.remove(id) else {
@@ -330,7 +389,7 @@ impl LocalProject {
             report.removed += 1;
         }
 
-        for id in &since.changed {
+        for id in &changed {
             let e = doc.store().get(*id).expect("changed elements exist");
             let step = match self.steps.get(id) {
                 Some(step) => {
@@ -417,6 +476,8 @@ impl LocalProject {
         self.data_revision = revision;
         self.path = path.to_owned();
         self.pending_identity.clear();
+        self.forced_changed.clear();
+        self.forced_deleted.clear();
         self.synced = doc.version();
         report.data_revision = revision;
         Ok(report)

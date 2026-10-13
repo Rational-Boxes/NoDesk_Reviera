@@ -100,6 +100,23 @@ impl<'d> Transaction<'d> {
         Ok(r)
     }
 
+    /// Sets an element to exactly `element`, creating it if it does not exist. For journal replay and
+    /// merges, where the ID and GUID come from the record.
+    pub fn put_element(&mut self, element: Element) -> Result<()> {
+        if let Some(other) = self.working.find_by_guid(element.guid())
+            && other != element.id()
+        {
+            return Err(Error::new(
+                "element.duplicate_guid",
+                format!("GlobalId {} belongs to element {other}", element.guid()),
+            ));
+        }
+        self.doc.reserve_id(element.id());
+        self.touched.insert(element.id());
+        self.working.put(Arc::new(element));
+        Ok(())
+    }
+
     pub fn set_param(
         &mut self,
         id: ElementId,

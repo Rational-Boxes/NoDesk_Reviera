@@ -114,6 +114,27 @@ impl Mesh {
     }
 }
 
+/// One entity instance as STEP text: `#<id>=<CLASS><attributes>;`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StepRow {
+    pub id: StepId,
+    /// Upper-case entity name, for example `IFCWALL`.
+    pub class: String,
+    pub global_id: Option<String>,
+    /// The attribute list, for example `('2O2Fr$t4X7Zf8NOew3FLOH',$,'Wall-001',$)`.
+    pub attributes: String,
+}
+
+/// Builds an IFC-SPF file from a header (as returned by [`IfcModel::header_text`]) and rows.
+pub fn spf_text<'a>(header: &str, rows: impl IntoIterator<Item = &'a StepRow>) -> String {
+    let mut out = String::from(header);
+    for r in rows {
+        out.push_str(&format!("#{}={}{};\n", r.id.0, r.class, r.attributes));
+    }
+    out.push_str("ENDSEC;\nEND-ISO-10303-21;\n");
+    out
+}
+
 /// The IfcOpenShell version linked into this build.
 pub fn ifcopenshell_version() -> String {
     bridge::ifcopenshell_version()
@@ -279,6 +300,27 @@ impl IfcModel {
     /// Writes the model as an IFC-SPF (`.ifc`) file.
     pub fn write(&self, path: &Path) -> Result<()> {
         Ok(self.inner.write(&path_str(path)?)?)
+    }
+
+    /// The file header up to and including `DATA;`.
+    pub fn header_text(&self) -> Result<String> {
+        Ok(self.inner.header_text()?)
+    }
+
+    /// Every entity instance as STEP text, in instance-number order. Together with
+    /// [`header_text`](Self::header_text) this is exactly what [`write`](Self::write) produces.
+    pub fn step_rows(&self) -> Result<Vec<StepRow>> {
+        Ok(self
+            .inner
+            .step_rows()?
+            .into_iter()
+            .map(|r| StepRow {
+                id: StepId(r.id),
+                class: r.class_name,
+                global_id: (!r.global_id.is_empty()).then_some(r.global_id),
+                attributes: r.attributes,
+            })
+            .collect())
     }
 
     /// Triangulates every product with OpenCASCADE, in world coordinates.

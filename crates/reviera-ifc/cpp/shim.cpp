@@ -4,6 +4,7 @@
 #include "reviera-ifc/cpp/shim.h"
 
 #include <cmath>
+#include <algorithm>
 #include <cstdio>
 #include <fstream>
 #include <mutex>
@@ -413,6 +414,39 @@ void Model::write(rust::Str path) const {
     if (!out) throw std::runtime_error("cannot write " + str(path));
     out << *file_;
     if (!out) throw std::runtime_error("failed writing " + str(path));
+}
+
+rust::String Model::header_text() const {
+    std::ostringstream out;
+    file_->header().write(out);
+    return out.str();
+}
+
+rust::Vec<StepRow> Model::step_rows() const {
+    std::vector<IfcUtil::IfcBaseClass*> sorted;
+    for (auto it = file_->begin(); it != file_->end(); ++it) sorted.push_back(it->second);
+    std::sort(sorted.begin(), sorted.end(), [](const auto* a, const auto* b) { return a->id() < b->id(); });
+    rust::Vec<StepRow> out;
+    for (auto* inst : sorted) {
+        const auto* ent = inst->declaration().as_entity();
+        if (!ent) continue;
+        std::ostringstream text;
+        inst->toString(text, true);
+        const std::string line = text.str();
+        const std::string& type = inst->declaration().name_uc();
+        // "#<id>=<TYPE>(...)": keep only the attribute list.
+        auto at = line.find('=');
+        StepRow row;
+        row.id = inst->id();
+        row.class_name = type;
+        row.attributes = line.substr(at + 1 + type.size());
+        if (ent->attribute_index("GlobalId") >= 0) {
+            auto g = inst->as<IfcUtil::IfcBaseEntity>()->get("GlobalId");
+            if (!g.isNull()) row.global_id = static_cast<std::string>(g);
+        }
+        out.push_back(std::move(row));
+    }
+    return out;
 }
 
 rust::Vec<Mesh> Model::tessellate(std::uint32_t threads) const {

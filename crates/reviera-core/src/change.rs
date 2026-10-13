@@ -8,9 +8,10 @@ use std::collections::BTreeMap;
 use std::collections::btree_map::Entry;
 use std::sync::Arc;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::element::Element;
+use crate::error::{Error, Result};
 use crate::id::ElementId;
 use crate::store::Store;
 
@@ -29,6 +30,14 @@ impl Change {
             _ => false,
         }
     }
+}
+
+/// A change in serialisable form, for journals (Ch 2b).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ChangeRecord {
+    pub id: ElementId,
+    pub before: Option<Element>,
+    pub after: Option<Element>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -58,6 +67,41 @@ impl ChangeSet {
             .filter(|(_, c)| !c.is_noop())
             .collect();
         Self { changes }
+    }
+
+    pub fn to_records(&self) -> Vec<ChangeRecord> {
+        self.iter()
+            .map(|(id, c)| ChangeRecord {
+                id,
+                before: c.before.as_deref().cloned(),
+                after: c.after.as_deref().cloned(),
+            })
+            .collect()
+    }
+
+    /// Rebuilds a change set from journal records. Each record's elements must carry its ID.
+    pub fn from_records(records: Vec<ChangeRecord>) -> Result<Self> {
+        let mut changes = BTreeMap::new();
+        for r in records {
+            if [&r.before, &r.after]
+                .into_iter()
+                .flatten()
+                .any(|e| e.id() != r.id)
+            {
+                return Err(Error::new(
+                    "journal.corrupt",
+                    format!("change record {} holds another element", r.id),
+                ));
+            }
+            changes.insert(
+                r.id,
+                Change {
+                    before: r.before.map(Arc::new),
+                    after: r.after.map(Arc::new),
+                },
+            );
+        }
+        Ok(Self { changes })
     }
 
     pub fn is_empty(&self) -> bool {

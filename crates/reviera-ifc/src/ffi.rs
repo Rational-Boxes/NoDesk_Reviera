@@ -21,6 +21,13 @@ pub(crate) mod bridge {
         faces: Vec<u32>,
     }
 
+    struct StepRow {
+        id: u32,
+        class_name: String,
+        global_id: String,
+        attributes: String,
+    }
+
     unsafe extern "C++" {
         include!("reviera-ifc/cpp/shim.h");
 
@@ -80,6 +87,8 @@ pub(crate) mod bridge {
         fn create_entity(self: Pin<&mut Model>, class_name: &str) -> Result<u32>;
         fn remove_entity(self: Pin<&mut Model>, id: u32) -> Result<()>;
         fn write(self: &Model, path: &str) -> Result<()>;
+        fn header_text(self: &Model) -> Result<String>;
+        fn step_rows(self: &Model) -> Result<Vec<StepRow>>;
 
         fn tessellate(self: &Model, threads: u32) -> Result<Vec<Mesh>>;
     }

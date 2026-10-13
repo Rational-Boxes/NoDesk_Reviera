@@ -585,3 +585,114 @@ fn undo_history_is_bounded() {
     assert_eq!(out.result.as_array().unwrap().len(), 3);
     assert_eq!(out.result[0]["origin"]["source"], "ui");
 }
+
+#[test]
+fn observer_sees_every_history_change() {
+    use reviera_core::DocEvent;
+    use std::sync::{Arc, Mutex};
+    let (r, mut d) = setup();
+    let log = Arc::new(Mutex::new(Vec::new()));
+    let sink = log.clone();
+    d.set_observer(move |e| {
+        sink.lock().unwrap().push(match e {
+            DocEvent::Committed { item, .. } => format!("commit {}", item.name),
+            DocEvent::Undone { steps, .. } => format!("undo {steps}"),
+            DocEvent::Redone { steps, .. } => format!("redo {steps}"),
+            DocEvent::Assimilated { count, item } => {
+                format!("assimilate {count} {}", item.as_ref().unwrap().name)
+            }
+            DocEvent::RolledBack { count, .. } => format!("rollback {count}"),
+        })
+    });
+    walls(&r, &mut d, 1);
+    r.execute(&mut d, "edit.undo", json!({}), &user()).unwrap();
+    r.execute(&mut d, "edit.redo", json!({}), &user()).unwrap();
+    d.group_begin("Stair", Origin::ui()).unwrap();
+    walls(&r, &mut d, 1);
+    walls(&r, &mut d, 1);
+    d.group_end(GroupEnd::Assimilate).unwrap();
+    d.group_begin("Try", Origin::ui()).unwrap();
+    walls(&r, &mut d, 1);
+    d.group_end(GroupEnd::Rollback).unwrap();
+    assert_eq!(
+        *log.lock().unwrap(),
+        [
+            "commit Wall",
+            "undo 1",
+            "redo 1",
+            "commit Wall",
+            "commit Wall",
+            "assimilate 2 Stair",
+            "commit Wall",
+            "rollback 1"
+        ]
+    );
+}
+
+#[test]
+fn change_records_round_trip_and_history_can_be_restored() {
+    use reviera_core::{ChangeSet, UndoItem};
+    let (r, mut d) = setup();
+    let ids = walls(&r, &mut d, 2);
+    r.execute(
+        &mut d,
+        "test.set_param",
+        json!({"id": ids[0], "name": "height", "value": 4.0}),
+        &user(),
+    )
+    .unwrap();
+    r.execute(&mut d, "edit.undo", json!({}), &user()).unwrap();
+
+    // Rebuild a document from the current elements and the serialised history.
+    let undo: Vec<UndoItem> = d
+        .undo_history()
+        .collect::<Vec<_>>()
+        .into_iter()
+        .rev()
+        .cloned()
+        .collect();
+    let redo: Vec<UndoItem> = d.redo_history().cloned().collect();
+    let records = |i: &UndoItem| serde_json::to_string(&i.changes().to_records()).unwrap();
+    let rebuild = |i: &UndoItem| {
+        let recs = serde_json::from_str(&records(i)).unwrap();
+        UndoItem::new(
+            i.name.clone(),
+            i.origin.clone(),
+            i.time,
+            ChangeSet::from_records(recs).unwrap(),
+        )
+    };
+    let elements = d.store().iter().map(|e| {
+        (
+            e.id(),
+            NewElement {
+                class: e.class.clone(),
+                name: e.name.clone(),
+                params: e.params.clone(),
+                guid: Some(e.guid().clone()),
+            },
+        )
+    });
+    let mut restored = Document::from_loaded(elements, d.next_id().0).unwrap();
+    restored.restore_history(
+        undo.iter().map(rebuild).collect(),
+        redo.iter().map(rebuild).collect(),
+    );
+
+    r.execute(&mut restored, "edit.redo", json!({}), &user())
+        .unwrap();
+    assert_eq!(
+        restored.store().get(ids[0]).unwrap().param("height"),
+        Some(&json!(4.0))
+    );
+    r.execute(&mut restored, "edit.undo", json!({"steps": 2}), &user())
+        .unwrap();
+    assert!(restored.store().is_empty());
+
+    let bad = vec![reviera_core::ChangeRecord {
+        id: ElementId(1),
+        before: None,
+        after: d.store().get(ids[1]).cloned(),
+    }];
+    assert!(ChangeSet::from_records(bad).is_err());
+}

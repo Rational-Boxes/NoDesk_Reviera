@@ -18,11 +18,11 @@ pub mod origin;
 pub mod store;
 pub mod txn;
 
-pub use change::{ChangeSet, ChangedSummary};
+pub use change::{ChangeRecord, ChangeSet, ChangedSummary};
 pub use command::{
     Command, CommandContext, CommandMeta, CommandRegistry, CommandSpec, Effect, Outcome,
 };
-pub use document::{Document, GroupEnd, ModelVersion, Snapshot, UndoScope};
+pub use document::{DocEvent, Document, GroupEnd, ModelVersion, Snapshot, UndoItem, UndoScope};
 pub use element::{Element, NewElement};
 pub use error::{Error, Result};
 pub use id::{ElementId, ElementRef, GlobalId};
