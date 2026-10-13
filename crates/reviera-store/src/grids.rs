@@ -15,7 +15,8 @@
 //!   `IfcGrid` that is gone.
 //!
 //! Axes whose curve Reviera cannot read (not a polyline) are left alone, and so are their
-//! records. The changes are written back with the next save.
+//! records. Grids without a grid type (added by another tool, or saved before grid types) get
+//! the default grid type. The changes are written back with the next save.
 
 use std::collections::{BTreeSet, HashMap};
 
@@ -256,7 +257,9 @@ pub(crate) fn reconcile(
                 kind: grids::KIND_GRID.into(),
                 system: system.clone(),
                 curve: axis.line,
-                bubbles: [false, true],
+                // Drawn in the default style until given a grid type.
+                type_guid: None,
+                bubbles: None,
             };
             let mut e = NewElement::new(format!("{}{}", grids::CLASS_PREFIX, guid.as_str()))
                 .guid(guid)
@@ -272,7 +275,60 @@ pub(crate) fn reconcile(
     }
     elements.retain(|(id, _)| !out.deleted.contains(id));
     elements.extend(added);
+    give_types(elements, next, &mut out);
     Ok(out)
+}
+
+/// Every grid has a grid type: grids without one (from before grid types, or added by another
+/// tool) get the default grid type, created if the project has none.
+fn give_types(elements: &mut Vec<(ElementId, NewElement)>, next: &mut u64, out: &mut Reconciled) {
+    let untyped: Vec<usize> = elements
+        .iter()
+        .enumerate()
+        .filter(|(_, (_, e))| record(e).is_some_and(|d| d.type_guid.is_none()))
+        .map(|(i, _)| i)
+        .collect();
+    if untyped.is_empty() {
+        return;
+    }
+    let is_type = |e: &NewElement| {
+        e.params
+            .get(reviera_core::walls::RECIPE_KEY)
+            .and_then(|r| r.get("kind"))
+            .is_some_and(|k| k == grids::TYPE_RECIPE)
+    };
+    let existing = elements
+        .iter()
+        .filter(|(_, e)| is_type(e))
+        .min_by_key(|(_, e)| e.name.as_deref() != Some(grids::DEFAULT_TYPE_NAME))
+        .and_then(|(_, e)| e.guid.clone());
+    let guid = match existing {
+        Some(g) => g,
+        None => {
+            // Derived from the first untyped grid, so the same file gives the same type.
+            let seed = elements[untyped[0]].1.guid.as_ref().map(GlobalId::to_string);
+            let guid = derived_guid(&seed.unwrap_or_default(), "grid type");
+            let id = ElementId(*next);
+            *next += 1;
+            let t = NewElement::new(grids::TYPE_CLASS)
+                .name(grids::DEFAULT_TYPE_NAME)
+                .guid(guid.clone())
+                .param(
+                    reviera_core::walls::RECIPE_KEY,
+                    serde_json::to_value(grids::GridType::default()).expect("serialises"),
+                );
+            elements.push((id, t));
+            out.changed.insert(id);
+            guid
+        }
+    };
+    for i in untyped {
+        let (id, e) = &mut elements[i];
+        let mut d = record(e).expect("a grid record");
+        d.type_guid = Some(guid.to_string());
+        set_record(e, &d);
+        out.changed.insert(*id);
+    }
 }
 
 #[cfg(test)]

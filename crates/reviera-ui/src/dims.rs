@@ -10,7 +10,7 @@ use glam::Vec2;
 use reviera_core::ElementId;
 use reviera_core::annotations;
 use reviera_render::RenderBackend;
-use reviera_render::annotation::{Dimension, GridMark, dimension_lines, grid_lines};
+use reviera_render::annotation::{Dimension, GridMark, GridStyle, dimension_lines, grid_lines};
 use reviera_render::plan::Lines;
 use serde_json::{Value, json};
 use wxdragon::prelude::*;
@@ -42,8 +42,9 @@ pub struct DimTool {
     cursor: Option<[f64; 2]>,
 }
 
-/// The grids of a model, ready to draw.
-fn grid_marks(store: &reviera_core::Store) -> Vec<(ElementId, GridMark)> {
+/// The grids of a model, ready to draw in their grid types' styles.
+pub(crate) fn grid_marks(store: &reviera_core::Store) -> Vec<(ElementId, GridMark)> {
+    let pens = reviera_core::standards::pen_set(store);
     reviera_core::grids::list(store)
         .into_iter()
         .map(|g| {
@@ -54,6 +55,7 @@ fn grid_marks(store: &reviera_core::Store) -> Vec<(ElementId, GridMark)> {
                     end: g.curve.end,
                     name: g.name,
                     bubbles: g.bubbles,
+                    style: GridStyle::of(&g.style, &|p| pens.annotation_width(p) as f32),
                 },
             )
         })
@@ -125,16 +127,20 @@ impl Gui {
             };
             target.segments.extend(dimension_lines(&d, plan.scale, z));
         }
-        // Grids show in every plan.
+        // Grids show in every plan, in their types' styles; selected ones highlighted.
+        let mut grids = Vec::new();
         for (id, mark) in grid_marks(&store) {
-            let target = if selected.contains(&id) {
-                &mut highlighted
-            } else {
-                &mut normal
-            };
-            target.segments.extend(grid_lines(&mark, plan.scale, z));
+            for mut l in grid_lines(&mark, plan.scale, z) {
+                if selected.contains(&id) {
+                    l.color = reviera_render::HIGHLIGHT;
+                }
+                grids.push(l);
+            }
         }
-        vec![normal, orphaned, highlighted]
+        let mut out = vec![normal, orphaned];
+        out.extend(grids);
+        out.push(highlighted);
+        out
     }
 
     /// The grid under pixel (`x`, `y`) of the active plan, if any (its line or a bubble).
@@ -146,7 +152,10 @@ impl Gui {
         let mut best: Option<(f32, ElementId)> = None;
         for (id, mut mark) in grid_marks(store) {
             mark.name.clear();
-            for s in grid_lines(&mark, plan.scale, z) {
+            for s in grid_lines(&mark, plan.scale, z)
+                .into_iter()
+                .flat_map(|l| l.segments)
+            {
                 let seg = [s[0], s[1]].map(|p| [f64::from(p[0]), f64::from(p[1])]);
                 let dist = self.pixel_distance(x, y, seg, z);
                 if dist <= PICK_PX && best.is_none_or(|b| dist < b.0) {

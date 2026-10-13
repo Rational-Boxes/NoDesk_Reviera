@@ -8,6 +8,7 @@
 use glam::{Vec2, Vec3};
 
 use crate::font;
+use crate::plan::Lines;
 
 /// Paper sizes in millimetres.
 pub const TEXT_HEIGHT_MM: f32 = 2.5;
@@ -139,6 +140,97 @@ pub const BUBBLE_MM: f32 = 8.0;
 const GRID_TEXT_MM: f32 = 3.5;
 const BUBBLE_SEGMENTS: usize = 32;
 
+/// Dash and gap lengths of a line pattern in paper millimetres (dash first); empty for solid.
+pub fn pattern_mm(name: &str) -> &'static [f32] {
+    match name {
+        "dash" => &[6.0, 3.0],
+        "center" => &[12.0, 3.0, 3.0, 3.0],
+        "dash_dot" => &[6.0, 2.0, 0.5, 2.0],
+        "dot" => &[0.5, 1.5],
+        _ => &[],
+    }
+}
+
+/// How one part of a grid line is drawn: colour, width and dash pattern on paper.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Stroke {
+    pub color: [f32; 4],
+    /// Paper millimetres.
+    pub width: f32,
+    /// Dash and gap lengths, paper millimetres; empty for solid.
+    pub pattern: Vec<f32>,
+}
+
+impl Stroke {
+    pub fn solid(color: [f32; 4], width: f32) -> Self {
+        Self {
+            color,
+            width,
+            pattern: Vec::new(),
+        }
+    }
+}
+
+/// How a grid is drawn (from its grid type, ARC-GRID-001).
+#[derive(Debug, Clone, PartialEq)]
+pub struct GridStyle {
+    /// Bubbles are drawn at all (the type's symbol).
+    pub symbol: bool,
+    /// The ends of the line; the whole line when `center` is `Continuous`.
+    pub end: Stroke,
+    pub center: CenterStroke,
+    /// Length of each end segment, paper millimetres.
+    pub end_length_mm: f32,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum CenterStroke {
+    Continuous,
+    /// A gap between the end segments.
+    None,
+    Custom(Stroke),
+}
+
+impl Default for GridStyle {
+    fn default() -> Self {
+        Self::of(&reviera_core::grids::GridType::default(), &|_| 0.18)
+    }
+}
+
+/// `#RRGGBB` to linear RGBA (black when malformed).
+pub fn hex_color(hex: &str) -> [f32; 4] {
+    let c = |i: usize| {
+        let v = hex
+            .get(i..i + 2)
+            .and_then(|h| u8::from_str_radix(h, 16).ok())
+            .unwrap_or(0);
+        (f32::from(v) / 255.0).powf(2.2)
+    };
+    [c(1), c(3), c(5), 1.0]
+}
+
+impl GridStyle {
+    /// The style of a grid type; `pen_width` gives an annotation pen's paper width.
+    pub fn of(t: &reviera_core::grids::GridType, pen_width: &dyn Fn(u8) -> f32) -> Self {
+        use reviera_core::grids::{CenterSegment, SegmentStyle, Symbol};
+        let stroke = |s: &SegmentStyle| Stroke {
+            color: hex_color(&s.colour),
+            width: pen_width(s.pen),
+            pattern: pattern_mm(&s.pattern).to_vec(),
+        };
+        Self {
+            symbol: t.symbol == Symbol::Bubble,
+            end: stroke(&t.end),
+            center: match t.center_segment {
+                CenterSegment::Continuous => CenterStroke::Continuous,
+                CenterSegment::None => CenterStroke::None,
+                CenterSegment::Custom => CenterStroke::Custom(stroke(&t.center)),
+            },
+            end_length_mm: t.end_length_mm as f32,
+        }
+    }
+}
+
 /// One grid line to draw.
 #[derive(Debug, Clone, PartialEq)]
 pub struct GridMark {
@@ -147,25 +239,84 @@ pub struct GridMark {
     pub name: String,
     /// A bubble with the name at the start and at the end.
     pub bubbles: [bool; 2],
+    pub style: GridStyle,
 }
 
-/// The lines of a grid (its line and bubbles) and its name labels, at elevation `z`, for a view
-/// at 1:`scale` (ARC-GRID-001). Each bubble sits beyond its end of the line, the line running
-/// to the bubble's edge, with the name centred in it.
-pub fn grid_parts(g: &GridMark, scale: f32, z: f32) -> (Vec<[[f32; 3]; 2]>, Vec<Label>) {
+/// The segments of `a`–`b` drawn with a dash pattern of model lengths (solid when empty). The
+/// pattern starts at `a`.
+fn dashed(a: Vec2, b: Vec2, pattern: &[f32], z: f32) -> Vec<[[f32; 3]; 2]> {
+    let at = |p: Vec2| [p.x, p.y, z];
+    let length = (b - a).length();
+    let total: f32 = pattern.iter().sum();
+    if pattern.is_empty() || total <= f32::EPSILON || length <= f32::EPSILON {
+        return vec![[at(a), at(b)]];
+    }
+    let dir = (b - a) / length;
+    let mut out = Vec::new();
+    let mut t = 0.0;
+    'outer: loop {
+        for (k, len) in pattern.iter().enumerate() {
+            let next = (t + len).min(length);
+            if k % 2 == 0 && next > t {
+                out.push([at(a + dir * t), at(a + dir * next)]);
+            }
+            t = next;
+            if t >= length {
+                break 'outer;
+            }
+        }
+    }
+    out
+}
+
+/// The lines of a grid, grouped by stroke (line, bubbles), and its name labels, at elevation
+/// `z`, for a view at 1:`scale` (ARC-GRID-001). Each bubble sits beyond its end of the line,
+/// with the name centred in it.
+pub fn grid_parts(g: &GridMark, scale: f32, z: f32) -> (Vec<Lines>, Vec<Label>) {
     let v = |p: [f64; 2]| Vec2::new(p[0] as f32, p[1] as f32);
     let (start, end) = (v(g.start), v(g.end));
-    let dir = (end - start).normalize_or_zero();
-    if dir == Vec2::ZERO {
+    let length = (end - start).length();
+    if length <= f32::EPSILON {
         return (Vec::new(), Vec::new());
     }
+    let dir = (end - start) / length;
     let at = |p: Vec2| [p.x, p.y, z];
     let mm = scale / 1000.0;
+    let model = |pattern: &[f32]| pattern.iter().map(|l| l * mm).collect::<Vec<f32>>();
+    let st = &g.style;
+    let mut ends = Lines {
+        color: st.end.color,
+        width: st.end.width,
+        segments: Vec::new(),
+    };
+    let mut lines = Vec::new();
+    match &st.center {
+        CenterStroke::Continuous => {
+            ends.segments
+                .extend(dashed(start, end, &model(&st.end.pattern), z));
+        }
+        center => {
+            let l = (st.end_length_mm * mm).min(length / 2.0);
+            let pattern = model(&st.end.pattern);
+            ends.segments
+                .extend(dashed(start, start + dir * l, &pattern, z));
+            ends.segments
+                .extend(dashed(end, end - dir * l, &pattern, z));
+            if let CenterStroke::Custom(c) = center
+                && length > 2.0 * l
+            {
+                lines.push(Lines {
+                    color: c.color,
+                    width: c.width,
+                    segments: dashed(start + dir * l, end - dir * l, &model(&c.pattern), z),
+                });
+            }
+        }
+    }
     let radius = BUBBLE_MM * mm / 2.0;
-    let mut lines = vec![[at(start), at(end)]];
     let mut labels = Vec::new();
     for (shown, point, outward) in [(g.bubbles[0], start, -dir), (g.bubbles[1], end, dir)] {
-        if !shown {
+        if !shown || !st.symbol {
             continue;
         }
         let centre = point + outward * radius;
@@ -175,7 +326,8 @@ pub fn grid_parts(g: &GridMark, scale: f32, z: f32) -> (Vec<[[f32; 3]; 2]>, Vec<
                 centre + Vec2::new(a.cos(), a.sin()) * radius
             })
             .collect();
-        lines.extend(ring.windows(2).map(|w| [at(w[0]), at(w[1])]));
+        ends.segments
+            .extend(ring.windows(2).map(|w| [at(w[0]), at(w[1])]));
         // Names read horizontally, centred in the bubble.
         let height = GRID_TEXT_MM * mm;
         let width = font::width(&g.name, height);
@@ -188,21 +340,25 @@ pub fn grid_parts(g: &GridMark, scale: f32, z: f32) -> (Vec<[[f32; 3]; 2]>, Vec<
             text: g.name.clone(),
         });
     }
+    lines.insert(0, ends);
     (lines, labels)
 }
 
-/// The lines of a grid with its names drawn in the stroke font.
-pub fn grid_lines(g: &GridMark, scale: f32, z: f32) -> Vec<[[f32; 3]; 2]> {
+/// The lines of a grid with its names drawn in the stroke font (with the end stroke).
+pub fn grid_lines(g: &GridMark, scale: f32, z: f32) -> Vec<Lines> {
     let (mut lines, labels) = grid_parts(g, scale, z);
     for l in labels {
-        for [p, q] in font::strokes(
+        let text = font::strokes(
             &l.text,
             l.origin.into(),
             l.right.into(),
             l.up.into(),
             l.height,
-        ) {
-            lines.push([p.to_array(), q.to_array()]);
+        );
+        if let Some(first) = lines.first_mut() {
+            first
+                .segments
+                .extend(text.into_iter().map(|[p, q]| [p.to_array(), q.to_array()]));
         }
     }
     lines
@@ -244,12 +400,15 @@ mod tests {
             end: [0.0, 10.0],
             name: "A".into(),
             bubbles: [false, true],
+            style: GridStyle::default(),
         };
         let (lines, labels) = grid_parts(&g, 100.0, 0.5);
-        assert_eq!(lines[0], [[0.0, 0.0, 0.5], [0.0, 10.0, 0.5]]);
-        assert_eq!(lines.len(), 1 + BUBBLE_SEGMENTS);
+        assert_eq!(lines.len(), 1);
+        let segs = &lines[0].segments;
+        assert_eq!(segs[0], [[0.0, 0.0, 0.5], [0.0, 10.0, 0.5]]);
+        assert_eq!(segs.len(), 1 + BUBBLE_SEGMENTS);
         // At 1:100 the bubble is 800 mm across, centred 400 mm past the end.
-        let ys: Vec<f32> = lines[1..].iter().map(|s| s[0][1]).collect();
+        let ys: Vec<f32> = segs[1..].iter().map(|s| s[0][1]).collect();
         let (lo, hi) = ys
             .iter()
             .fold((f32::MAX, f32::MIN), |(a, b), y| (a.min(*y), b.max(*y)));
@@ -259,6 +418,49 @@ mod tests {
         );
         assert_eq!(labels.len(), 1);
         assert!((labels[0].origin[1] + labels[0].height / 2.0 - 10.4).abs() < 1e-4);
-        assert!(grid_lines(&g, 100.0, 0.5).len() > lines.len());
+        assert!(grid_lines(&g, 100.0, 0.5)[0].segments.len() > segs.len());
+    }
+
+    #[test]
+    fn grid_types_gap_or_restyle_the_middle_and_can_drop_the_bubble() {
+        let mut t = reviera_core::grids::GridType {
+            center_segment: reviera_core::grids::CenterSegment::None,
+            symbol: reviera_core::grids::Symbol::None,
+            ..Default::default()
+        };
+        let g = GridMark {
+            start: [0.0, 0.0],
+            end: [0.0, 10.0],
+            name: "1".into(),
+            bubbles: [true, true],
+            style: GridStyle::of(&t, &|_| 0.25),
+        };
+        // 1:100: two 1.5 m end segments, no bubbles or labels.
+        let (lines, labels) = grid_parts(&g, 100.0, 0.0);
+        assert!(labels.is_empty());
+        assert_eq!(lines.len(), 1);
+        let total: f32 = lines[0]
+            .segments
+            .iter()
+            .map(|s| (s[1][1] - s[0][1]).abs())
+            .sum();
+        assert!((total - 3.0).abs() < 1e-4, "{total}");
+
+        // Custom: a dashed red middle on its own pen.
+        t.center_segment = reviera_core::grids::CenterSegment::Custom;
+        t.center.colour = "#FF0000".into();
+        t.center.pattern = "dash".into();
+        t.center.pen = 3;
+        let g = GridMark {
+            style: GridStyle::of(&t, &|p| f32::from(p) / 10.0),
+            ..g
+        };
+        let (lines, _) = grid_parts(&g, 100.0, 0.0);
+        assert_eq!(lines.len(), 2);
+        let middle = &lines[1];
+        assert_eq!(middle.color, [1.0, 0.0, 0.0, 1.0]);
+        assert!((middle.width - 0.3).abs() < 1e-6);
+        // 7 m of 0.6 m dashes and 0.3 m gaps.
+        assert_eq!(middle.segments.len(), 8);
     }
 }

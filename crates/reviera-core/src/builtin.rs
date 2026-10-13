@@ -75,6 +75,11 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(GridRename),
         registry.add(GridSetCurve),
         registry.add(GridList),
+        registry.add(TypeList),
+        registry.add(TypeDuplicate),
+        registry.add(TypeRename),
+        registry.add(TypeSetParam),
+        registry.add(ElementSetType),
     ];
     for r in results {
         r.expect("core commands are valid");
@@ -340,7 +345,9 @@ pub fn dependents_of(store: &crate::store::Store, id: ElementId) -> Vec<ElementI
         .filter(|e| {
             crate::annotations::dimension_data(e).is_some_and(|d| d.view == guid)
                 || e.param("@type").and_then(serde_json::Value::as_str) == Some(guid.as_str())
-                || crate::grids::grid_data(e).is_some_and(|g| g.system == guid)
+                || crate::grids::grid_data(e).is_some_and(|g| {
+                    g.system == guid || g.type_guid.as_deref() == Some(guid.as_str())
+                })
                 || crate::views::view_data(e)
                     .is_some_and(|v| v.level.as_deref() == Some(guid.as_str()))
                 || crate::walls::wall_recipe(e).is_some_and(|r| {
@@ -1503,6 +1510,117 @@ impl Command for GridList {
 
     fn run(&self, cx: &mut CommandContext<'_>, _: NoParams) -> Result<Vec<GridInfo>> {
         Ok(grids::list(cx.store()))
+    }
+}
+
+// ---- Types (Ch 2 DM-TYPE-001, Ch 3 ARC-TOOL-002) ----
+
+use crate::types::{self, TypeInfo};
+
+#[derive(Debug)]
+struct TypeList;
+
+impl Command for TypeList {
+    type Params = types::ListParams;
+    type Output = Vec<TypeInfo>;
+    const META: CommandMeta = CommandMeta {
+        name: "type.list",
+        version: 1,
+        summary: "List types",
+        description: "Lists the model's types with how many elements use each, optionally only one class \
+                      or Reviera recipe kind (`recipe.grid_type`, `recipe.wall_type`).",
+        effects: &[Effect::Read],
+        transaction_name: "",
+    };
+
+    fn run(&self, cx: &mut CommandContext<'_>, p: types::ListParams) -> Result<Vec<TypeInfo>> {
+        Ok(types::list(cx.store(), p))
+    }
+}
+
+#[derive(Debug)]
+struct TypeDuplicate;
+
+impl Command for TypeDuplicate {
+    type Params = types::DuplicateParams;
+    type Output = ElementId;
+    const META: CommandMeta = CommandMeta {
+        name: "type.duplicate",
+        version: 1,
+        summary: "Duplicate a type",
+        description: "Copies a type with every value under a new name (unique in its family; default \
+                      `<name> 2`).",
+        effects: &[Effect::Edit],
+        transaction_name: "Duplicate Type",
+    };
+
+    fn run(&self, cx: &mut CommandContext<'_>, p: types::DuplicateParams) -> Result<ElementId> {
+        types::duplicate(cx.edit()?, p)
+    }
+}
+
+#[derive(Debug)]
+struct TypeRename;
+
+impl Command for TypeRename {
+    type Params = types::RenameParams;
+    type Output = ();
+    const META: CommandMeta = CommandMeta {
+        name: "type.rename",
+        version: 1,
+        summary: "Rename a type",
+        description: "Renames a type; names are unique within its family.",
+        effects: &[Effect::Edit],
+        transaction_name: "Rename Type",
+    };
+
+    fn run(&self, cx: &mut CommandContext<'_>, p: types::RenameParams) -> Result<()> {
+        types::rename(cx.edit()?, p)
+    }
+}
+
+#[derive(Debug)]
+struct TypeSetParam;
+
+impl Command for TypeSetParam {
+    type Params = types::SetParamParams;
+    type Output = ();
+    const META: CommandMeta = CommandMeta {
+        name: "type.set_param",
+        version: 1,
+        summary: "Set a type parameter",
+        description: "Sets a value of a type; all its instances change. Grid types: symbol (bubble, none), \
+                      center_segment (continuous, none, custom), center_pen / end_pen (1-16), \
+                      center_colour / end_colour (#RRGGBB), center_pattern / end_pattern (solid, dash, \
+                      center, dash_dot, dot), end_length (paper mm), bubble_start, bubble_end. Wall \
+                      types: width. Other parameters as param.set.",
+        effects: &[Effect::Edit],
+        transaction_name: "Edit Type",
+    };
+
+    fn run(&self, cx: &mut CommandContext<'_>, p: types::SetParamParams) -> Result<()> {
+        types::set_param(cx.edit()?, p)
+    }
+}
+
+#[derive(Debug)]
+struct ElementSetType;
+
+impl Command for ElementSetType {
+    type Params = types::SetTypeParams;
+    type Output = ();
+    const META: CommandMeta = CommandMeta {
+        name: "element.set_type",
+        version: 1,
+        summary: "Change elements' type",
+        description: "Gives elements another type of their family: grids a grid type, Reviera walls a wall \
+                      type (they keep their location line).",
+        effects: &[Effect::Edit],
+        transaction_name: "Change Type",
+    };
+
+    fn run(&self, cx: &mut CommandContext<'_>, p: types::SetTypeParams) -> Result<()> {
+        types::set_type(cx.edit()?, p)
     }
 }
 

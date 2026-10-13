@@ -362,6 +362,9 @@ fn grids_edited_by_another_tool_follow_the_ifc_axes() {
     assert_eq!(find("B1").unwrap().id, id_of("B"));
     assert!(find("B").is_none() && find("3").is_none());
     let c = find("C").expect("the added axis is a grid").clone();
+    // It has the project's grid type, like the others.
+    assert_eq!(c.type_id, find("1").unwrap().type_id);
+    assert!(c.type_id.is_some());
 
     // Saved and opened again: nothing more to reconcile, and the new grid keeps its identity.
     project.save(&doc).unwrap();
@@ -381,4 +384,255 @@ fn grids_edited_by_another_tool_follow_the_ifc_axes() {
     let (_, doc, report) = LocalProject::open(&path).unwrap();
     assert!(grids::list(doc.store()).is_empty());
     assert_eq!(report.reconciled.len(), 5);
+}
+
+#[test]
+fn grid_types_are_duplicated_edited_and_swapped() {
+    let dir = tempfile::tempdir().unwrap();
+    let (mut project, mut doc, path) = new_project(dir.path());
+    let r = registry();
+    let g1 = grid(&r, &mut doc, [0.0, 0.0], [0.0, 10.0]);
+    let g2 = grid(&r, &mut doc, [6.0, 0.0], [6.0, 10.0]);
+    // The first grid created the default type.
+    let types = grids::types(doc.store());
+    assert_eq!(types.len(), 1);
+    let default = types[0].id;
+    assert_eq!(types[0].name, grids::DEFAULT_TYPE_NAME);
+    assert_eq!(types[0].instances, 2);
+
+    // Duplicate (default name "<name> 2"), rename, edit.
+    let dashed = run(
+        &r,
+        &mut doc,
+        "type.duplicate",
+        json!({ "type_id": default.0 }),
+    )
+    .unwrap();
+    let dashed = ElementId(dashed.as_u64().unwrap());
+    assert_eq!(
+        doc.store().get(dashed).unwrap().name.as_deref(),
+        Some("Grid - Continuous 2")
+    );
+    run(
+        &r,
+        &mut doc,
+        "type.rename",
+        json!({ "type_id": dashed.0, "name": "Gapped" }),
+    )
+    .unwrap();
+    let e = run(
+        &r,
+        &mut doc,
+        "type.rename",
+        json!({ "type_id": dashed.0, "name": grids::DEFAULT_TYPE_NAME }),
+    )
+    .unwrap_err();
+    assert_eq!(e.code, "type.name_taken");
+    for (param, value) in [
+        ("center_segment", json!("custom")),
+        ("center_pattern", json!("dash")),
+        ("center_colour", json!("#c00000")),
+        ("end_pen", json!(3)),
+        ("end_length", json!("20 mm")),
+        ("bubble_start", json!(true)),
+    ] {
+        run(
+            &r,
+            &mut doc,
+            "type.set_param",
+            json!({ "type_id": dashed.0, "param": param, "value": value }),
+        )
+        .unwrap();
+    }
+    for (param, value, code) in [
+        ("end_pen", json!(17), "type.invalid_value"),
+        ("center_pattern", json!("zigzag"), "type.invalid_value"),
+        ("center_colour", json!("red"), "type.invalid_value"),
+        ("weight", json!(1), "type.unknown_param"),
+    ] {
+        let e = run(
+            &r,
+            &mut doc,
+            "type.set_param",
+            json!({ "type_id": dashed.0, "param": param, "value": value }),
+        )
+        .unwrap_err();
+        assert_eq!(e.code, code, "{param}");
+    }
+
+    // Swap one grid to the new type: its style and bubbles follow the type.
+    run(
+        &r,
+        &mut doc,
+        "element.set_type",
+        json!({ "element_ids": [g2.0], "type_id": dashed.0 }),
+    )
+    .unwrap();
+    let list = grids::list(doc.store());
+    let (a, b) = (&list[0], &list[1]);
+    assert_eq!(
+        (a.id, a.type_id, a.bubbles),
+        (g1, Some(default), [false, true])
+    );
+    assert_eq!(
+        (b.id, b.type_id, b.bubbles),
+        (g2, Some(dashed), [true, true])
+    );
+    assert_eq!(b.style.center_segment, grids::CenterSegment::Custom);
+    assert_eq!(b.style.center.colour, "#C00000");
+    assert_eq!((b.style.end.pen, b.style.end_length_mm), (3, 20.0));
+    // A type of another family is refused.
+    let e = run(
+        &r,
+        &mut doc,
+        "element.set_type",
+        json!({ "element_ids": [g1.0], "type_id": default.0 + 999 }),
+    )
+    .unwrap_err();
+    assert_eq!(e.code, "element.not_found");
+
+    // The Grid tool's choice: new grids of a given type.
+    let g3 = run(
+        &r,
+        &mut doc,
+        "grid.create",
+        json!({ "curve": { "line": { "start": [12, 0], "end": [12, 10] } }, "type_id": dashed.0 }),
+    )
+    .unwrap();
+    let g3 = ElementId(g3.as_u64().unwrap());
+    let listed = run(
+        &r,
+        &mut doc,
+        "type.list",
+        json!({ "recipe": grids::TYPE_RECIPE }),
+    )
+    .unwrap();
+    let counts: Vec<(String, u64)> = listed
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|t| {
+            (
+                t["name"].as_str().unwrap().to_owned(),
+                t["instances"].as_u64().unwrap(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        counts,
+        [
+            ("Gapped".to_owned(), 2),
+            (grids::DEFAULT_TYPE_NAME.to_owned(), 1)
+        ]
+    );
+
+    // Saved: the types are IfcTypeObjects for IfcGrid, and everything comes back.
+    project.save(&doc).unwrap();
+    let ifc = IfcModel::open(&path).unwrap();
+    let saved: Vec<Entity> = ifc
+        .entities_of_type("IfcTypeObject")
+        .unwrap()
+        .into_iter()
+        .map(|t| entity(&ifc, t.id))
+        .filter(|t| t.class == "IfcTypeObject")
+        .collect();
+    assert_eq!(saved.len(), 2);
+    assert!(
+        saved
+            .iter()
+            .all(|t| t.string("ApplicableOccurrence") == Some("IfcGrid"))
+    );
+    let (_, reopened, _) = LocalProject::open(&path).unwrap();
+    assert_eq!(grids::list(reopened.store()), grids::list(doc.store()));
+    assert_eq!(grids::types(reopened.store()), grids::types(doc.store()));
+
+    // Deleting a type takes its grids with it.
+    let deleted = run(
+        &r,
+        &mut doc,
+        "element.delete",
+        json!({ "element_ids": [dashed.0] }),
+    )
+    .unwrap();
+    let deleted: Vec<u64> = serde_json::from_value(deleted).unwrap();
+    assert!(deleted.contains(&g2.0) && deleted.contains(&g3.0) && !deleted.contains(&g1.0));
+}
+
+#[test]
+fn wall_types_use_the_same_type_commands() {
+    let dir = tempfile::tempdir().unwrap();
+    let (_, mut doc, _) = new_project(dir.path());
+    let r = registry();
+    let level = doc
+        .store()
+        .iter()
+        .find(|e| e.class == "IfcBuildingStorey")
+        .unwrap()
+        .id();
+    let wall = run(
+        &r,
+        &mut doc,
+        "wall.create",
+        json!({
+            "curve": { "line": { "start": [0, 0], "end": [5, 0] } },
+            "base_level": level.0,
+            "top_constraint": { "unconnected": 3 },
+        }),
+    )
+    .unwrap();
+    let wall = wall.as_u64().unwrap();
+    let wall_type = doc
+        .store()
+        .iter()
+        .find(|e| e.class == "IfcWallType")
+        .unwrap()
+        .id();
+    let thick = run(
+        &r,
+        &mut doc,
+        "type.duplicate",
+        json!({ "type_id": wall_type.0, "new_name": "Generic - 300mm" }),
+    )
+    .unwrap();
+    // Wall widths live in the type's recipe; other values are type parameters.
+    let thick = ElementId(thick.as_u64().unwrap());
+    run(
+        &r,
+        &mut doc,
+        "type.set_param",
+        json!({ "type_id": thick.0, "param": "width", "value": "300 mm" }),
+    )
+    .unwrap();
+    run(
+        &r,
+        &mut doc,
+        "type.set_param",
+        json!({ "type_id": thick.0, "param": "Type Mark", "value": "W3" }),
+    )
+    .unwrap();
+    run(
+        &r,
+        &mut doc,
+        "element.set_type",
+        json!({ "element_ids": [wall], "type_id": thick.0 }),
+    )
+    .unwrap();
+    let e = doc.store().get(ElementId(wall)).unwrap();
+    assert_eq!(
+        e.param("@type").and_then(Value::as_str),
+        Some(doc.store().get(thick).unwrap().guid().as_str())
+    );
+    let g = reviera_core::walls::regenerate(doc.store(), e).unwrap();
+    assert!((g.width - 0.3).abs() < 1e-9);
+    // A grid type is not a wall type.
+    grid(&r, &mut doc, [0.0, 2.0], [5.0, 2.0]);
+    let gt = grids::types(doc.store())[0].id;
+    let e = run(
+        &r,
+        &mut doc,
+        "element.set_type",
+        json!({ "element_ids": [wall], "type_id": gt.0 }),
+    )
+    .unwrap_err();
+    assert_eq!(e.code, "type.wrong_family");
 }

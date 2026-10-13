@@ -41,7 +41,13 @@ operation can be driven by Lua scripts and by AI agents through the Model Contex
   the series (1, 2, 3 …; rename one to A and the next are B, C). Grids show in every plan and in
   PDF output with their bubbles, can be selected, renamed in Properties and dimensioned; dimensions
   follow a moved grid. Saved as one `IfcGrid` with an `IfcGridAxis` per line (`grid.create`,
-  `grid.rename`, `grid.set_curve`, `grid.list`).
+  `grid.rename`, `grid.set_curve`, `grid.list`). Axes moved, retagged, added or removed in
+  another tool are taken over when the file opens.
+- **Grid types**: each grid has a type that sets its bubble symbol, a continuous, gapped or
+  custom centre segment, and the pen, colour and line pattern of its centre and end segments.
+  Choose, duplicate and edit types in Properties (also for the Grid tool); `type.duplicate`,
+  `type.rename`, `type.set_param`, `type.list` and `element.set_type` work for grid and wall
+  types alike.
 - **Dimensions**: Annotate › Aligned Dimension (DI) in plans dimensions parallel wall faces,
   centrelines and cut edges; dimensions to Reviera walls follow them when they move
   (`dim.create_aligned`, `anno.list`). The Wall tool snaps to cut edges in plans.

@@ -161,6 +161,10 @@ struct Gui {
     tool: Option<WallTool>,
     dim_tool: Option<dims::DimTool>,
     grid_tool: Option<grids::GridTool>,
+    /// The grid type chosen for the Grid tool.
+    grid_type: Option<ElementId>,
+    /// The grid type whose values the palette shows.
+    type_rows: Option<ElementId>,
     /// Drives animated view changes and walking.
     timer: Option<Timer<Frame>>,
     /// Models being opened in the background, and the timer that animates their tabs.
@@ -1206,7 +1210,8 @@ impl Gui {
         self.rows.clear();
         let Some(doc) = self.doc else { return };
         let ids = self.selection();
-        if ids.is_empty() && self.view_properties(grid) {
+        self.type_rows = None;
+        if ids.is_empty() && (self.grid_tool_properties(grid) || self.view_properties(grid)) {
             return;
         }
         if ids.len() != 1 {
@@ -1284,9 +1289,26 @@ impl Gui {
                 grid.append(Property::string(label, "grid_name", value));
                 continue;
             }
+            // A grid's type is chosen below, with its values.
+            if is_grid && label == "Type" {
+                continue;
+            }
             let name = format!("e{i}");
             grid.append(Property::string(label, &name, value));
             grid.set_property_read_only(&name, true);
+        }
+        if is_grid {
+            let current = self
+                .app
+                .document(doc)
+                .and_then(|d| {
+                    reviera_core::grids::list(d.doc.store())
+                        .into_iter()
+                        .find(|g| g.id == id)
+                })
+                .and_then(|g| g.type_id);
+            self.grid_type_rows(grid, current);
+            return;
         }
         if let Some(d) = dimension {
             let store = self.app.document(doc).expect("open").doc.store().clone();
@@ -1443,6 +1465,9 @@ impl Gui {
             if let (Some(level), Some(name)) = (level, text) {
                 self.rename_level(level, Some(name));
             }
+            return;
+        }
+        if self.grid_type_edit(property, text.clone()) {
             return;
         }
         if property == "grid_name" {
@@ -2114,6 +2139,8 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 tool: None,
                 dim_tool: None,
                 grid_tool: None,
+                grid_type: None,
+                type_rows: None,
                 timer: Some(Timer::new(&frame)),
                 loading: Vec::new(),
                 load_timer: Some(Timer::new(&frame)),

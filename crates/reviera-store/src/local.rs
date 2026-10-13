@@ -557,6 +557,13 @@ impl LocalProject {
                 .apply(step, is_type, &before, &e.params)?;
                 self.saved_params.insert(*id, e.params.clone());
             }
+            if core_grids::is_grid_type(e) {
+                let applies = AttrValue::String(core_grids::SYSTEM_CLASS.into());
+                if self.ifc.attribute(step, "ApplicableOccurrence")? != applies {
+                    self.ifc
+                        .set_attribute(step, "ApplicableOccurrence", &applies)?;
+                }
+            }
             if e.class == levels::CLASS {
                 let owner_history = self.new_owner_history()?;
                 let elevation = levels::elevation(e) / self.length_scale;

@@ -302,8 +302,8 @@ fn by_key(key: &str) -> Option<&'static Category> {
 
 /// Whether an element is a type (family type) rather than an occurrence.
 pub fn is_type(e: &Element) -> bool {
-    // IFC2X3 also has door and window "styles".
-    e.class.ends_with("Type") || e.class.ends_with("Style")
+    // IFC2X3 also has door and window "styles"; grid types are plain `IfcTypeObject`s.
+    e.class.ends_with("Type") || e.class.ends_with("Style") || e.class == "IfcTypeObject"
 }
 
 fn text<'a>(e: &'a Element, key: &str) -> Option<&'a str> {
@@ -312,7 +312,7 @@ fn text<'a>(e: &'a Element, key: &str) -> Option<&'a str> {
 
 /// The category of an element (occurrence or type), inferred from its IFC class and attributes.
 pub fn category_of(e: &Element) -> Option<&'static Category> {
-    if crate::grids::is_grid(e) {
+    if crate::grids::is_grid(e) || crate::grids::is_grid_type(e) {
         return category("cat.grids");
     }
     let class = e.class.strip_suffix("StandardCase").unwrap_or(&e.class);

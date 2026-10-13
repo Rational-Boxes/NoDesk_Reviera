@@ -24,6 +24,7 @@ pub mod plans;
 pub mod standards;
 pub mod store;
 pub mod txn;
+pub mod types;
 pub mod units;
 pub mod views;
 pub mod walls;
