@@ -54,6 +54,8 @@ impl Gui {
         }
         self.end_tool(&frame);
         self.end_dim_tool();
+        self.end_insert_tool();
+        self.end_modify();
         self.leave_walk();
         self.grid_tool = Some(GridTool::default());
         self.update_grid_snaps();

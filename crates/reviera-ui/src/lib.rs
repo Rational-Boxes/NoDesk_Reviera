@@ -17,6 +17,7 @@ mod icons;
 mod inserts;
 mod levels;
 mod loading;
+mod modify;
 mod native;
 mod nav;
 mod plans;
@@ -72,6 +73,16 @@ enum Drag {
     /// Dragging a selected door or window along its wall, from a plan point.
     MoveInsert {
         id: ElementId,
+        from: [f64; 2],
+    },
+    /// Dragging an end grip of a selected wall or grid (the other end stays).
+    Grip {
+        id: ElementId,
+        end: usize,
+        other: [f64; 2],
+    },
+    /// Dragging the selected walls and grids, from a plan point.
+    MoveSelection {
         from: [f64; 2],
     },
 }
@@ -145,6 +156,9 @@ struct Gui {
     dim_tool: Option<dims::DimTool>,
     grid_tool: Option<grids::GridTool>,
     insert_tool: Option<inserts::InsertTool>,
+    modify_tool: Option<modify::ModifyTool>,
+    /// The Offset tool's distance (metres), kept for the session.
+    offset_distance: f64,
     /// The door and window types chosen for the tools, by IFC class.
     insert_types: std::collections::HashMap<&'static str, ElementId>,
     /// The grid type chosen for the Grid tool.
@@ -340,11 +354,35 @@ impl Gui {
                 self.start_insert_tool(reviera_core::inserts::Kind::Door);
                 true
             }
+            "MV" | "CO" | "CC" | "RO" | "MM" | "DM" | "AL" | "OF" | "TR" | "SL" => {
+                let action = match self.keys.0.as_str() {
+                    "MV" => "element.move",
+                    "CO" | "CC" => "element.copy",
+                    "RO" => "element.rotate",
+                    "MM" => "element.mirror_pick",
+                    "DM" => "element.mirror_draw",
+                    "AL" => "element.align",
+                    "OF" => "element.offset",
+                    "TR" => "element.trim_corner",
+                    _ => "element.split",
+                };
+                if let Some(kind) = modify::Kind::of_action(action) {
+                    self.start_modify(kind);
+                }
+                true
+            }
+            "PN" | "UP" => {
+                let pin = self.keys.0 == "PN";
+                self.pin_selection(pin);
+                true
+            }
             "WN" => {
                 self.start_insert_tool(reviera_core::inserts::Kind::Window);
                 true
             }
-            "Z" | "W" | "P" | "D" | "L" | "G" => false,
+            "Z" | "W" | "P" | "D" | "L" | "G" | "M" | "C" | "R" | "A" | "O" | "T" | "S" | "U" => {
+                false
+            }
             _ => {
                 self.keys.0.clear();
                 false
@@ -535,6 +573,7 @@ impl Gui {
             self.end_dim_tool();
             self.end_grid_tool();
             self.end_insert_tool();
+            self.end_modify();
             self.active = Some(id);
             self.doc = Some(doc);
             let _ = self.app.activate(doc);
@@ -773,6 +812,7 @@ impl Gui {
         self.end_dim_tool();
         self.end_grid_tool();
         self.end_insert_tool();
+        self.end_modify();
         let Some(doc) = self.doc.and_then(|id| self.app.document(id)) else {
             return frame.set_status_text("Open or create a project first (File > New)", 0);
         };
@@ -1233,6 +1273,13 @@ impl Gui {
             "wall.flip",
             "insert.flip_hand",
             "insert.flip_facing",
+            "element.move",
+            "element.copy",
+            "element.rotate",
+            "element.mirror_pick",
+            "element.mirror_draw",
+            "element.pin",
+            "element.unpin",
         ] {
             self.ribbon.enable(action, !ids.is_empty());
         }
@@ -1240,6 +1287,7 @@ impl Gui {
 
     fn selection_changed(&mut self) {
         self.update_ribbon_context();
+        self.update_grips();
         let ids = self.selection();
         if let Some(v) = self.viewport() {
             v.set_highlight(&ids);
@@ -1701,16 +1749,19 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                     }
                     let walking = g.active_view().is_some_and(|v| v.nav.walk.is_some());
                     let plan = g.in_plan();
-                    let moving = if button == 0 && cube.is_none() {
-                        g.insert_drag_start(x, y, &p)
-                    } else {
+                    let left = button == 0 && cube.is_none();
+                    let editing = if !left {
                         None
+                    } else if let Some((id, from)) = g.insert_drag_start(x, y, &p) {
+                        Some(Drag::MoveInsert { id, from })
+                    } else if let Some((id, end, other)) = g.grip_at(x, y) {
+                        Some(Drag::Grip { id, end, other })
+                    } else {
+                        g.selection_drag_start(x, y, &p)
+                            .map(|from| Drag::MoveSelection { from })
                     };
                     let kind = match (button, cube) {
-                        _ if moving.is_some() => {
-                            let (id, from) = moving.expect("checked");
-                            Drag::MoveInsert { id, from }
-                        }
+                        _ if editing.is_some() => editing.expect("checked"),
                         _ if plan => Drag::Pan,
                         (0, Some(hit)) => {
                             if let Some(v) = g.active_view_mut() {
@@ -1759,11 +1810,26 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                 let click = press.is_some_and(|(x0, y0)| {
                     (x - x0).abs() <= CLICK_SLOP && (y - y0).abs() <= CLICK_SLOP
                 });
-                if let Some((Drag::MoveInsert { id: insert, from }, _, _)) = drag {
-                    g.insert_drag_end(insert, from, x, y, click);
-                    if !click {
-                        return;
+                match drag {
+                    Some((Drag::MoveInsert { id: insert, from }, _, _)) => {
+                        g.insert_drag_end(insert, from, x, y, click);
+                        if !click {
+                            return;
+                        }
                     }
+                    Some((Drag::Grip { id: e, end, other }, _, _)) => {
+                        g.grip_drag_end(e, end, other, x, y, click);
+                        if !click {
+                            return;
+                        }
+                    }
+                    Some((Drag::MoveSelection { from }, _, _)) => {
+                        g.selection_drag_end(from, x, y, click);
+                        if !click {
+                            return;
+                        }
+                    }
+                    _ => {}
                 }
                 if button != 0 || !click {
                     return;
@@ -1773,6 +1839,7 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                     None if g.dim_tool.is_some() => g.dim_click(x, y),
                     None if g.grid_tool.is_some() => g.grid_click(x, y),
                     None if g.insert_tool.is_some() => g.insert_click(x, y),
+                    None if g.modify_tool.is_some() => g.modify_click(x, y),
                     None if g.active_view().is_some_and(|v| v.nav.walk.is_some()) => {}
                     None if g.tool.is_some() => g.wall_click(x, y, &p, &f),
                     None => g.pick(x, y, &p),
@@ -1812,16 +1879,33 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                         g.insert_motion(x, y);
                         redraw = true;
                     }
+                    if g.modify_tool.is_some() {
+                        g.modify_motion(x, y);
+                        redraw = true;
+                    }
                     if g.tool.is_some() {
                         g.wall_motion(x, y, &p, &f);
                         redraw = true;
                     }
                     return;
                 };
-                if let Drag::MoveInsert { id: insert, from } = kind {
-                    g.insert_drag_motion(insert, from, x, y);
-                    redraw = true;
-                    return;
+                match kind {
+                    Drag::MoveInsert { id: insert, from } => {
+                        g.insert_drag_motion(insert, from, x, y);
+                        redraw = true;
+                        return;
+                    }
+                    Drag::Grip { id: e, end, other } => {
+                        g.grip_drag_motion(e, end, other, x, y);
+                        redraw = true;
+                        return;
+                    }
+                    Drag::MoveSelection { from } => {
+                        g.selection_drag_motion(from, x, y);
+                        redraw = true;
+                        return;
+                    }
+                    _ => {}
                 }
                 let v = g.views.iter_mut().find(|v| v.id == id).expect("found");
                 let (dx, dy) = ((x - x0) as f32, (y - y0) as f32);
@@ -1834,7 +1918,7 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                         let h = p.get_client_size().height as f32;
                         v.camera.pan(dx, dy, h);
                     }
-                    Drag::MoveInsert { .. } => {}
+                    Drag::MoveInsert { .. } | Drag::Grip { .. } | Drag::MoveSelection { .. } => {}
                 }
                 v.drag = Some((kind, x, y));
                 redraw = true;
@@ -1920,6 +2004,8 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                             g.grid_escape();
                         } else if g.insert_tool.is_some() {
                             g.end_insert_tool();
+                        } else if g.modify_tool.is_some() {
+                            g.modify_escape();
                         } else {
                             g.escape(&f);
                         }
@@ -1929,6 +2015,9 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                 Some(key) => {
                     with_view(&gui, id, |g| {
                         used = g.walk_key(key, true, shift);
+                        if !used && matches!(key, WXK_BACK | WXK_RETURN | WXK_NUMPAD_ENTER) {
+                            used = g.modify_key(key);
+                        }
                         if !used {
                             used = g.insert_key(key);
                         }
@@ -1984,8 +2073,9 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                         used = true;
                         return;
                     }
-                    used = g.wall_key(key, &f);
-                    let typing = g.tool.as_ref().is_some_and(|t| !t.typed.is_empty());
+                    used = g.modify_key(key) || g.wall_key(key, &f);
+                    let typing =
+                        g.tool.as_ref().is_some_and(|t| !t.typed.is_empty()) || g.modify_typing();
                     if !used
                         && !typing
                         && let Some(c) = u32::try_from(key).ok().and_then(char::from_u32)
@@ -2144,6 +2234,8 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 dim_tool: None,
                 grid_tool: None,
                 insert_tool: None,
+                modify_tool: None,
+                offset_distance: 1.0,
                 insert_types: std::collections::HashMap::new(),
                 grid_type: None,
                 type_rows: None,
@@ -2422,10 +2514,16 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
             g.end_dim_tool();
             g.end_grid_tool();
             g.end_insert_tool();
+            g.end_modify();
             g.leave_walk();
             g.update_ribbon_context();
         }),
         "element.delete" => with(gui, Gui::delete_selection),
+        "element.pin" | "element.unpin" => with(gui, |g| g.pin_selection(action == "element.pin")),
+        a if modify::Kind::of_action(a).is_some() => with(gui, |g| {
+            g.start_modify(modify::Kind::of_action(a).expect("checked"));
+            focus(g);
+        }),
         "wall.create" => with(gui, |g| {
             g.start_wall_tool(f);
             focus(g);

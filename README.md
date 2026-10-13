@@ -11,6 +11,17 @@ operation can be driven by Lua scripts and by AI agents through the Model Contex
 > **Status: early development.** The specification is complete as a draft. The application
 > core is being built, and the first window shows models in an interactive 3D viewport.
 
+## Working with CADCraft
+
+Reviera is meant to work alongside [CADCraft](https://github.com/storytold/cadcraft), an
+open-source 2D drafting application in Rust. The goal is a two-way exchange through DWG and
+DXF files: drawings made in CADCraft (site plans, surveys, details, consultant drawings) come
+into Reviera as imported or linked CAD, and Reviera's plans and views go back to CADCraft as
+DXF or DWG. Both applications read these files with the same library (`acadrust`), so a
+drawing is read the same way in each. A corpus of CADCraft-made drawings will check
+compatibility continuously, in both directions. The requirements are DM-IMP-013 and DM-IMP-014
+in the specification (Chapter 2, §2.11.10–2.11.11). CAD import is not built yet.
+
 ## What works today
 
 - **Native IFC** through IfcOpenShell and OpenCASCADE: open, edit, save and tessellate IFC2X3,
@@ -70,6 +81,15 @@ operation can be driven by Lua scripts and by AI agents through the Model Contex
   above it, and a contextual *Modify | <category>* tab while elements are selected (for
   example Flip Hand and Flip Facing for doors). The ribbon, toolbar and menus are built from
   one catalog, `ribbon-default.toml`, checked against the command registry.
+- **Editing**: the Modify tools Align (AL), Offset (OF), Mirror by picked or drawn axis (MM,
+  DM), Move (MV), Copy (CO), Rotate (RO), Trim/Extend to Corner (TR), Trim/Extend to a
+  boundary, Split (SL), Pin (PN) and Unpin (UP), in plans, with previews, snapping, and typed
+  distances and angles. Selected walls and grids show end grips to drag, and can be dragged
+  to move; doors and windows slide along their wall. Walls carry their doors and windows when
+  they move, are copied or are mirrored, and reshaping a wall leaves its doors in place
+  (`element.move`, `element.copy`, `element.rotate`, `element.mirror`, `element.offset`,
+  `element.split`, `element.trim_corner`, `element.trim_extend`, `element.align`,
+  `element.pin`, `element.unpin`).
 - **Navigation**: an Orientation Cube in each 3D view (26 click regions, compass, Home, and a
   PERSP/ISO projection toggle), standard and isometric views with animated transitions, wheel
   zoom about the cursor, orbit about the selection, Previous/Next pan/zoom, and walk mode

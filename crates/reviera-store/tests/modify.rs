@@ -381,3 +381,54 @@ fn align_moves_a_wall_face_onto_a_grid_and_pins_refuse_edits() {
     )
     .unwrap();
 }
+
+#[test]
+fn reshaping_a_wall_keeps_its_doors_in_place() {
+    let (_d, mut doc, level) = project();
+    let r = registry();
+    // Drawn right to left: its start is the right end.
+    let w = wall(&r, &mut doc, level, [10.0, 0.0], [0.0, 0.0]);
+    let door = ElementId(
+        run(
+            &r,
+            &mut doc,
+            "door.place",
+            json!({ "host_wall_id": w.0, "point_along": 3 }),
+        )
+        .unwrap()
+        .as_u64()
+        .unwrap(),
+    );
+    let at = |doc: &Document| {
+        let p = inserts::resolve(doc.store(), doc.store().get(door).unwrap()).unwrap();
+        let c = p.world([0.0, 0.0, 0.0]);
+        [c[0], c[1]]
+    };
+    assert!(close(at(&doc), [7.0, 0.0]));
+    // Dragging the start end out by 2 m.
+    run(
+        &r,
+        &mut doc,
+        "wall.set_location",
+        json!({ "wall_id": w.0, "curve": { "line": { "start": [12, 0], "end": [0, 0] } } }),
+    )
+    .unwrap();
+    assert!(close(at(&doc), [7.0, 0.0]));
+    // Trimming the start back to a grid at x = 9.
+    let g = run(
+        &r,
+        &mut doc,
+        "grid.create",
+        json!({ "curve": { "line": { "start": [9, -3], "end": [9, 3] } } }),
+    )
+    .unwrap();
+    run(
+        &r,
+        &mut doc,
+        "element.trim_extend",
+        json!({ "boundary": g, "target": { "element_id": w.0, "keep_point": [4, 0] } }),
+    )
+    .unwrap();
+    assert!(close(curve(&doc, w).start, [9.0, 0.0]));
+    assert!(close(at(&doc), [7.0, 0.0]));
+}

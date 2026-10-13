@@ -317,9 +317,13 @@ fn reshape_wall(txn: &mut Transaction<'_>, id: ElementId, curve: Line) -> Result
     if curve.length() < walls::TOL_SHORT {
         return Err(Error::new("wall.too_short", "Wall is too short"));
     }
-    let mut r = walls::wall_recipe(txn.store().get(id).expect("exists")).expect("a wall");
+    let e = txn.store().get(id).expect("exists");
+    let guid = e.guid().to_string();
+    let mut r = walls::wall_recipe(e).expect("a wall");
+    let old = r.curve;
     r.curve = curve;
     set_recipe(txn, id, &r)?;
+    inserts::keep_in_place(txn, &guid, old, curve)?;
     drop_misfits(txn, id)
 }
 

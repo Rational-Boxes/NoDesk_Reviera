@@ -759,6 +759,41 @@ pub(crate) fn toggle_facing(
     Ok(())
 }
 
+/// Keeps the doors and windows of `wall` (GlobalId) where they are in the model when its
+/// location line changes from `old` to `new` (dragging or trimming an end): each one's distance
+/// along the wall is measured again from the new start.
+pub(crate) fn keep_in_place(
+    txn: &mut crate::txn::Transaction<'_>,
+    wall: &str,
+    old: walls::Line,
+    new: walls::Line,
+) -> Result<()> {
+    let unit = |l: walls::Line| {
+        let len = l.length().max(f64::EPSILON);
+        [(l.end[0] - l.start[0]) / len, (l.end[1] - l.start[1]) / len]
+    };
+    let (u0, u1) = (unit(old), unit(new));
+    for id in hosted_by(txn.store(), wall) {
+        let Some(mut r) = txn.store().get(id).and_then(insert_recipe) else {
+            continue;
+        };
+        let w = [
+            old.start[0] + u0[0] * r.along,
+            old.start[1] + u0[1] * r.along,
+        ];
+        let along = (w[0] - new.start[0]) * u1[0] + (w[1] - new.start[1]) * u1[1];
+        if (along - r.along).abs() < 1e-12 {
+            continue;
+        }
+        r.along = along;
+        let value = serde_json::to_value(&r).expect("serialises");
+        txn.modify(id, |e| {
+            e.params.insert(RECIPE_KEY.into(), value);
+        })?;
+    }
+    Ok(())
+}
+
 /// The doors and windows hosted by `wall` (GlobalId).
 pub fn hosted_by(store: &Store, wall: &str) -> Vec<ElementId> {
     store

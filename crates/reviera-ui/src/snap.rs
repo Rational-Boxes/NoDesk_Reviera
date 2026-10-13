@@ -23,7 +23,8 @@ impl SnapKind {
             SnapKind::Endpoint => "Endpoint".into(),
             SnapKind::Midpoint => "Midpoint".into(),
             SnapKind::Nearest => "Nearest".into(),
-            SnapKind::Angle(a) => format!("{a:.0}°"),
+            // `+ 0.0` turns -0 into 0.
+            SnapKind::Angle(a) => format!("{:.0}°", a.round() + 0.0),
             SnapKind::None => String::new(),
         }
     }

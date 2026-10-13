@@ -40,6 +40,8 @@ pub const UI_ACTIONS: &[&str] = &[
     "window.tab_all",
     "window.close",
     "view.default_3d",
+    "element.mirror_pick",
+    "element.mirror_draw",
 ];
 
 /// First wx id of the catalog's actions (one id per action, in catalog order).

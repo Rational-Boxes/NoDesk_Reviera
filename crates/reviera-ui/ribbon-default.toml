@@ -253,6 +253,89 @@ label = "Flip Facing"
 icon = "flip"
 help = "Turn the selected doors and windows to face the wall's other side"
 
+[[action]]
+id = "element.align"
+label = "Align"
+icon = "align"
+keys = "AL"
+help = "Line elements up with a reference line: pick the reference, then the line to move"
+
+[[action]]
+id = "element.offset"
+label = "Offset"
+icon = "offset"
+keys = "OF"
+help = "Copy a wall or grid parallel to itself, toward the cursor"
+
+[[action]]
+id = "element.mirror_pick"
+label = "Mirror - Pick Axis"
+icon = "mirror_pick"
+keys = "MM"
+help = "Mirror copies of the selection about a picked wall or grid"
+
+[[action]]
+id = "element.mirror_draw"
+label = "Mirror - Draw Axis"
+icon = "mirror_draw"
+keys = "DM"
+help = "Mirror copies of the selection about an axis drawn with two clicks"
+
+[[action]]
+id = "element.move"
+label = "Move"
+icon = "move"
+keys = "MV"
+help = "Move the selection: click a start point and an end point, or type a distance"
+
+[[action]]
+id = "element.copy"
+label = "Copy"
+icon = "copy"
+keys = "CO"
+help = "Copy the selection: click a start point and an end point, or type a distance"
+
+[[action]]
+id = "element.rotate"
+label = "Rotate"
+icon = "rotate"
+keys = "RO"
+help = "Rotate the selection about its centre: click two rays, or type an angle"
+
+[[action]]
+id = "element.trim_corner"
+label = "Trim/Extend to Corner"
+icon = "trim"
+keys = "TR"
+help = "Trim or extend two walls to make a corner; click the parts to keep"
+
+[[action]]
+id = "element.trim_extend"
+label = "Trim/Extend Single Element"
+icon = "trim_single"
+help = "Trim or extend walls to a boundary wall or grid"
+
+[[action]]
+id = "element.split"
+label = "Split Element"
+icon = "split"
+keys = "SL"
+help = "Split a wall in two where you click"
+
+[[action]]
+id = "element.pin"
+label = "Pin"
+icon = "pin"
+keys = "PN"
+help = "Pin the selection so it cannot be moved or deleted"
+
+[[action]]
+id = "element.unpin"
+label = "Unpin"
+icon = "unpin"
+keys = "UP"
+help = "Unpin the selection"
+
 # ---- Quick Access Toolbar ----
 
 [quick_access]
@@ -354,7 +437,21 @@ tools = [{ action = "ui.pane.properties", size = "large" }]
 
 [[tab.panel]]
 label = "Modify"
-tools = [{ action = "element.delete", size = "small" }]
+tools = [
+  { action = "element.align", size = "large" },
+  { action = "element.offset", size = "small" },
+  { action = "element.mirror_pick", size = "small" },
+  { action = "element.mirror_draw", size = "small" },
+  { action = "element.move", size = "small" },
+  { action = "element.copy", size = "small" },
+  { action = "element.rotate", size = "small" },
+  { action = "element.trim_corner", size = "small" },
+  { action = "element.trim_extend", size = "small" },
+  { action = "element.split", size = "small" },
+  { action = "element.pin", size = "small" },
+  { action = "element.unpin", size = "small" },
+  { action = "element.delete", size = "small" },
+]
 
 [[tab.panel]]
 label = "Measure"
@@ -409,7 +506,14 @@ items = ["dim.create_aligned"]
 
 [[menu]]
 label = "&Modify"
-items = ["tool.modify", "-", "element.delete", "-", "wall.flip", "insert.flip_hand", "insert.flip_facing"]
+items = [
+  "tool.modify", "-",
+  "element.align", "element.offset", "element.mirror_pick", "element.mirror_draw", "-",
+  "element.move", "element.copy", "element.rotate", "-",
+  "element.trim_corner", "element.trim_extend", "element.split", "-",
+  "element.pin", "element.unpin", "element.delete", "-",
+  "wall.flip", "insert.flip_hand", "insert.flip_facing",
+]
 
 [[menu]]
 label = "&Window"

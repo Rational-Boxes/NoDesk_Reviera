@@ -400,11 +400,15 @@ pub(crate) fn set_location(
     if length < TOL_SHORT || length < width {
         return Err(Error::new("wall.too_short", "Wall is too short"));
     }
+    let old = recipe.curve;
     recipe.curve = p.curve.line;
     let value = serde_json::to_value(&recipe).expect("recipes serialise");
     txn.modify(id, |e| {
         e.params.insert(RECIPE_KEY.into(), value);
-    })
+    })?;
+    // Doors and windows stay where they are in the model.
+    let guid = wall.guid().to_string();
+    crate::inserts::keep_in_place(txn, &guid, old, p.curve.line)
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]

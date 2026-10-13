@@ -74,6 +74,7 @@ impl Gui {
         self.end_dim_tool();
         self.end_grid_tool();
         self.end_insert_tool();
+        self.end_modify();
         self.leave_walk();
         self.insert_tool = Some(InsertTool {
             kind,

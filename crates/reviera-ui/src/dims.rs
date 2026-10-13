@@ -26,12 +26,13 @@ const PREVIEW_COLOR: [f32; 4] = [0.05, 0.35, 0.95, 1.0];
 
 /// A reference the tool can pick: the `dim.create_aligned` argument and its line in plan.
 #[derive(Debug, Clone, PartialEq)]
-struct Candidate {
-    arg: Value,
-    point: [f64; 2],
-    direction: [f64; 2],
+pub(crate) struct Candidate {
+    /// The reference argument (`dim.create_aligned` refs, `element.align`).
+    pub arg: Value,
+    pub point: [f64; 2],
+    pub direction: [f64; 2],
     /// The segment to highlight.
-    segment: [[f64; 2]; 2],
+    pub segment: [[f64; 2]; 2],
 }
 
 /// The Dimension tool.
@@ -231,6 +232,8 @@ impl Gui {
         let f = self.frame;
         self.end_tool(&f);
         self.end_grid_tool();
+        self.end_insert_tool();
+        self.end_modify();
         self.leave_walk();
         self.dim_tool = Some(DimTool::default());
         self.clear_selection();
@@ -310,15 +313,26 @@ impl Gui {
         (a + ab * t - c).length()
     }
 
-    /// The reference under the cursor: Reviera wall faces and location lines on the plan's
-    /// level and grids, else cut edges; parallel to the first picked reference if there is one.
+    /// The reference under the cursor, parallel to the first picked one if there is one.
     fn dim_candidate(&self, x: i32, y: i32) -> Option<Candidate> {
+        let first = self.dim_tool.as_ref()?.picked.first().map(|c| c.direction);
+        self.reference_at(x, y, first)
+    }
+
+    /// The reference line under pixel (`x`, `y`) of the active plan, parallel to `first` if
+    /// given: Reviera wall faces and location lines on the plan's level and grids, else cut
+    /// edges.
+    pub(crate) fn reference_at(
+        &self,
+        x: i32,
+        y: i32,
+        first: Option<[f64; 2]>,
+    ) -> Option<Candidate> {
         let v = self.active_view()?;
         let plan = v.plan.as_ref()?;
         let store = self.app.document(v.doc)?.doc.store();
         let level_guid = store.get(plan.level)?.guid().to_string();
         let z = plan.range.cut as f32;
-        let first = self.dim_tool.as_ref()?.picked.first().map(|c| c.direction);
         let parallel = |d: [f64; 2]| first.is_none_or(|f| cross(f, d).abs() < 1e-3);
         let near = |seg: [[f64; 2]; 2]| self.pixel_distance(x, y, seg, z);
         let cursor = self.plan_xy(x, y)?;
