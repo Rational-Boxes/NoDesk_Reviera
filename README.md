@@ -257,7 +257,10 @@ The KIT FZK *AC20-Institute-Var-2* sample model (`test-data/ifc/`) open in Revie
 The first milestone continues with railings on stairs, a deck design subsystem (ARC-DECK-001: the deck's outline,
 board-by-board layout with end joints on joists and staggered, picture frames and breakers, the
 framing beneath, and a cut list), roof openings (below dormers,
-skylights and shafts), and layered wall types. After that come general shape and CSG modelling tools,
+skylights and shafts), and layered wall types. Then come curved forms: smooth arched roofs (including vaults that taper over trapezoidal
+footprints, ARC-ROOF-008), dome roofs (ARC-ROOF-009), spline-curved walls (ARC-WALL-002), and
+boolean intersect, subtract and union between elements (ARC-MOD-028). After that come general
+shape and CSG modelling tools,
 CADCraft drawing exchange, and the current NBIMS-US COBie layout.
 
 ### Working with CADCraft

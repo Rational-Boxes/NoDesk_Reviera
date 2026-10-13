@@ -623,7 +623,7 @@ Dragging a control issues the matching command once, on mouse-up. The preview du
 1. The user starts Architecture › Build › Wall › *Wall: Architectural* (`WA`) in a plan or 3D view. Slanted and tapered types can also be drawn in elevation and section views.
 2. The user chooses a type and, optionally, edits the *New Walls* instance properties (Base Constraint, Location Line, Room Bounding and so on).
 3. The user sets the contextual-tab options listed in the table below.
-4. The user draws with Line, Rectangle, Inscribed or Circumscribed Polygon, Circle, the arc tools, Ellipse, Partial Ellipse, **Pick Lines** (model lines, reference planes and element edges; Tab picks a chain) or **Pick Faces** (vertical mass or generic-model faces; Tab picks all of them).
+4. The user draws with Line, Rectangle, Inscribed or Circumscribed Polygon, Circle, the arc tools, Ellipse, Partial Ellipse, **Spline** (model lines, reference planes and element edges; Tab picks a chain) or **Pick Faces** (vertical mass or generic-model faces; Tab picks all of them).
 5. Spacebar flips the exterior side while drawing. With no flip, the **exterior is on the left** of the drawing direction, so a wall drawn from left to right has its exterior face on the upper side in plan.
 6. The user finishes with Esc or *Modify*.
 
@@ -646,6 +646,13 @@ Dragging a control issues the matching command once, on mouse-up. The preview du
 
 **Behaviour & rules.**
 - Each drawn segment becomes one wall. In a chain, consecutive walls are joined end to end (ARC-JOIN-001). A *Radius* value inserts an arc wall between each pair of segments.
+- **Spline walls** (*owner clarification, 2026-10-13*):
+  - Drawing: the user clicks control points (open, or closed with *Close*), or picks a spline model line. The wall's location line is a cubic B-spline through the points (interpolating), or by control points (*By Control Points* option).
+  - Editing: grips on the points edit the curve, and Tab inserts a point.
+  - Geometry: the faces are offset curves of the location line (`Geom2d_OffsetCurve`), approximated by B-splines within 0.01 mm. Where the offset would self-intersect, the curvature radius is below half the width, and the wall is refused with *"Curve too tight for the wall's width"* and the point marked.
+  - Wall behaviour: spline walls join, host inserts (an insert's along-position is measured on the arc length, and its opening follows the curve), attach to roofs and floors, and appear in schedules with their arc length.
+  - IFC: the body is an `IfcSweptAreaSolid` along an `IfcBSplineCurveWithKnots` axis (or a faceted B-rep when a consumer needs it), and the `Axis` representation is the B-spline curve.
+  - Command: `wall.create` takes `curve: Spline{ctrl, knots, degree}` or `{through: [points], closed?}`.
 - Ellipse and partial-ellipse walls require Location Line = Wall Centerline and ignore Spacebar.
 - A wall shorter than `TOL_SHORT`, or shorter than its own width when Join Status is Allow, is rejected with "Wall is too short".
 - Pick Faces creates walls whose location line lies on the face, according to the Location Line option, and records *Related to Mass* (ARC-MASS-003).
@@ -2175,6 +2182,59 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
   - rebuilding when the main roof changes;
   - hipped-gable fronts.
 
+### 3.6.8b Arched and vaulted roofs
+**ID:** ARC-ROOF-008 · **Priority:** P1 · **Ref:** owner requirement (2026-10-13); Reviera's own design (Appendix A.2a)
+
+**Purpose.** Smooth arched (barrel and segmental) roofs over a footprint, including **tapering vaults** whose arch widens or narrows from one end to the other to fit a trapezoidal footprint.
+
+**Workflow.**
+1. Architecture › Roof › **Arched Roof**.
+2. The user picks or sketches a four-sided footprint and the **spring edges**: the two edges the arch springs from. The other two are the arch's ends.
+3. The user sets the arch: **rise** (or a constant radius), the profile (*circular segment*, *semicircle*, *elliptical* or *catenary*), the spring height, the thickness from the type, and the overhangs (along the spring edges and at the ends).
+
+**Behaviour & rules.**
+- **Constant section** (parallel spring edges): the profile is swept straight along the spring edges' direction (a barrel or segmental vault).
+- **Tapering vault** (spring edges not parallel, as in a trapezoid): at each end the span is the distance between the spring edges there.
+  - *Constant rise*: every section rises the same height, so the radius changes along the vault.
+  - *Constant slope at the springing*: every section meets the spring edges at the same angle, so the rise scales with the span.
+  - The surface is ruled between corresponding points of the end sections (equal parameters along each profile). It is built with `BRepOffsetAPI_ThruSections` through end sections and intermediate sections every 500 mm, so it stays smooth.
+- **Thickness** is offset along the surface normal, giving a constant thickness; ends are cut vertically.
+- **Walls attach** to the underside of an arched roof like any roof (ARC-WALL-008). The end walls fill up to the arch, the gable infill of ARC-ROOF-001.
+- **Display:** smooth shading in 3D. Plans show the outline and the crown line dashed.
+
+**Data (IFC mapping).** `IfcRoof` with `PredefinedType = BARREL_ROOF`. Its body is an `IfcExtrudedAreaSolid` of the profile for constant sections, or an `IfcAdvancedBrep` (B-spline faces; a faceted B-rep where a consumer needs one) for tapering vaults. The recipe is RXD element data (`recipe.roof`, kind `arched`).
+
+**Commands.** `roof.create_arched(footprint: [4 points] | curves, spring_edges: [k1, k2], level_id, base_offset?, rise?, radius?, profile?: segment|semicircle|elliptical|catenary, taper?: constant_rise|constant_slope, overhang?, end_overhang?, type_id?) -> element_id` and `roof.set_arch(roof_id, rise?, radius?, profile?, taper?) -> ()`.
+
+**Acceptance criteria.**
+- [ ] A 6 m-wide, 10 m-long footprint with a 1.5 m rise gives a circular-segment barrel roof of radius 3.75 m. Its crown is 1.5 m above the springing all along.
+- [ ] A trapezoid whose span narrows from 6 m to 4 m along 8 m, with constant rise, gives a smooth vault. Every section is a circular segment of rise 1.5 m, with a radius of 3.75 m at the wide end and 2.08 m at the narrow end, and the surface has no creases.
+- [ ] With constant slope at the springing instead, the narrow end's rise is 1.0 m.
+- [ ] End walls attached to an arched roof reach the arch exactly.
+
+### 3.6.8c Dome roofs
+**ID:** ARC-ROOF-009 · **Priority:** P1 · **Ref:** owner requirement (2026-10-13); Reviera's own design (Appendix A.2a)
+
+**Purpose.** Domes over circular, elliptical and polygonal plans.
+
+**Workflow.** Architecture › Roof › **Dome**: the user picks a circle, an ellipse or a regular polygon (sketched, or picked from walls), then sets the rise and the profile.
+
+**Behaviour & rules.**
+- **Profiles:** *hemisphere* (rise equals the radius), *segmental* (a rise below the radius), *pointed* (two arcs meeting at the crown, given the ratio of their radius to the span) and *onion* (a spline profile with a bulge ratio).
+- **Plans:** over a circle the profile is revolved (`BRepPrimAPI_MakeRevol`). Over an ellipse the revolved dome is scaled in plan. Over a regular polygon it is a **cloister vault** (each side a cylindrical segment meeting at the hips), or a **polygonal dome** with flat facets, by option.
+- **Oculus:** an optional opening at the crown, of a given diameter, with or without a lantern curb.
+- **Drum:** domes sit on walls (a drum) attached to their springing. Walls attached under a dome follow its underside.
+- **Thickness** is constant, offset along the normal.
+
+**Data (IFC mapping).** `IfcRoof` with `PredefinedType = DOME_ROOF`. The body is an `IfcRevolvedAreaSolid` for circular domes, otherwise an `IfcAdvancedBrep` or faceted B-rep. The recipe is RXD element data (`recipe.roof`, kind `dome`).
+
+**Commands.** `roof.create_dome(plan: Circle{center, radius} | Ellipse{...} | Polygon{center, radius, sides, rotation}, level_id, base_offset?, rise?, profile?: hemisphere|segmental|pointed|onion, oculus?, polygon_mode?: cloister|faceted, type_id?) -> element_id` and `roof.set_dome(roof_id, ...) -> ()`.
+
+**Acceptance criteria.**
+- [ ] A hemisphere over a 4 m-radius circle has its crown 4 m above the springing, and the volume of its shell matches 2/3·π·(R₂³ − R₁³) within 0.5%.
+- [ ] An octagonal cloister vault has eight cylindrical faces meeting at straight hips in plan.
+- [ ] An oculus of 1 m leaves a 1 m circular opening at the crown.
+
 ### 3.6.9 Join/Unjoin Roof
 **ID:** ARC-ROOF-006 · **Priority:** P1 · **Ref:** research/02 §7.4, §9
 
@@ -3648,6 +3708,7 @@ These tools are on the **Modify** tab and are repeated on every `Modify | <Eleme
 | ARC-MOD-015 | **Match Type Properties** | P1 | MA | A paintbrush cursor: the user clicks the source, then targets of the same category. Only the **type** is copied. *Select Multiple* lets the user box-select and then Finish. Esc once empties the brush; Esc twice exits. Works across tiled views, and a type in the Project Browser can be the source | `element.match_type(source_id, target_ids)` |
 | ARC-MOD-016 | **Cut Geometry / Uncut** | P1 | — | *Multiple Cut*. The user picks the element to be cut, then the cutting element. Allowed pairs: toposolid, floors, ceilings, roofs, slab edges, fascias, gutters, soffits, walls, wall sweeps, structural foundations and mass voids; family voids flagged *Cut with Voids When Loaded* cut hosts. Creates a `cut` edge, and `BRepAlgoAPI_Cut` runs at regeneration. Stored in RXD document `model/constraints`, and in IFC as `IfcRelInterferesElements` (`InterferenceType = "Cut"`, `ImpliedOrder = TRUE`) | `geometry.cut(target_id, cutter_ids)`, `geometry.uncut(target_id, cutter_ids?)` |
 | ARC-MOD-017 | **Join Geometry / Unjoin / Switch Join Order** | P0 | — | *Multiple Join*. Joining removes the visible edge between the elements and gives them a shared cut-pattern display. One element cuts the other, according to this precedence table: walls cut columns (architectural); structural elements cut non-structural hosts; floors, ceilings and roofs cut walls; gutters, fascias and slab edges cut their hosts; otherwise the first element picked cuts the second. *Switch Join Order* swaps them. The material of the first pick is applied to both in the merged cut display. In IFC: `IfcRelConnectsElements` (Name "JoinGeometry") plus `IfcRelInterferesElements` for the cut direction | `geometry.join(a_id, b_ids)`, `geometry.unjoin(a_id, b_ids?)`, `geometry.switch_join_order(a_id, b_id)` |
+| ARC-MOD-028 | **Boolean geometry between elements** (owner clarification, 2026-10-13) | P1 | — | Beyond Cut and Join: **Intersect** keeps only the volume two elements share (for example a vault cut to a room's footprint), **Subtract** removes one element's volume from another's and **Union** fuses elements into one body. The first pick is the target and keeps its category, type and parameters; the others are *tools*. A tool may be hidden afterwards (*Hide tool*), deleted (*Consume tool*) or kept. The operation is a `csg` edge in the regeneration graph (`BRepAlgoAPI_Common`, `_Cut`, `_Fuse`), re-run whenever either element changes, and stored in RXD document `model/constraints`. In IFC the target's body is the result (as `IfcBooleanResult` of the two bodies where both are swept or CSG solids, otherwise a faceted B-rep), with `IfcRelInterferesElements` (`InterferenceType` "Intersect", "Subtract" or "Union"). Undoable, and *Remove Boolean* restores the target | `geometry.boolean(target_id, tool_ids, op: intersect\|subtract\|union, tools?: keep\|hide\|consume)`, `geometry.remove_boolean(target_id, tool_ids?)` |
 | ARC-MOD-018 | **Wall Joins** | P0 | — | Modify › Geometry › **Wall Joins**: hover a join (its node is marked by a square) and click it, or window-select several nodes. The contextual tab then offers *Butt*, *Miter* and *Square Off* (L joins only), *Previous* / *Next* to cycle which wall runs through (one node only), *Display* (*Use View Setting*, *Clean Join*, *Don't Clean Join*) and *Allow* / *Disallow Join*. Changes apply immediately and the tool stays on the node until Esc. Options that do not suit the selected nodes are disabled. The geometry rules, join limits and IFC mapping are in ARC-JOIN-001 | `wall.join_set_type(node_ref \| wall_end_refs, type: Butt\|Miter\|SquareOff)`, `wall.join_cycle_order(node_ref, step: +1\|-1)`, `wall.join_set_display(node_ref, display: ViewSetting\|Clean\|DontClean)`, `wall.set_join_allowed(wall_id, end: Start\|End, allowed: bool)` |
 | ARC-MOD-019 | **Split Face** | P1 | SF | The user picks a face (Tab cycles), sketches a closed loop inside it or an open chain ending on its edges, and presses Finish. The face is divided into regions that can be painted separately. The element's structure is unchanged. Not available on arc or elliptical walls. Deleting a split region removes it. Family instances (except columns) must be split in the family editor. OCCT: `BRepFeat_SplitShape` with the projected sketch edges | `face.split(face_ref, curves: [curve]) -> [face_key]` |
 | ARC-MOD-020 | **Paint / Remove Paint** | P1 | PT | The Material Browser is available while Paint is active. The user hovers a face (Tab cycles) and clicks to apply a material. The status bar shows existing paint. Works on walls, floors, roofs, masses, columns and in-place families. Does not work on loadable component instances. Painting a face that has a model pattern makes the pattern lines dimensionable and alignable. Paint is stored per face sub-reference in RXD element data (`paint`), and exported as an `IfcStyledItem` on the faces, which IFC supports only per representation item: Reviera splits the painted faces into their own `IfcFacetedBrep` item when exporting | `face.paint(face_refs, material_id)`, `face.remove_paint(face_refs)` |
@@ -4173,6 +4234,12 @@ All commands below are registered once in the command registry and exposed autom
 | `dormer.create` | roof_id, point, style: gable\|hip\|shed\|flat, width, front_height, slope?, overhang?, setback?, wall_type_id? | element_id | Yes | ARC-ROOF-007 |
 | `dormer.set` | dormer_id, style?, width?, front_height?, slope?, overhang?, setback? | — | Yes | ARC-ROOF-007 |
 | `dormer.move` | dormer_id, point | — | Yes | ARC-ROOF-007 |
+| `roof.create_arched` | footprint \| curves, spring_edges, level_id, base_offset?, rise?, radius?, profile?, taper?, overhang?, end_overhang?, type_id? | element_id | Yes | ARC-ROOF-008 |
+| `roof.set_arch` | roof_id, rise?, radius?, profile?, taper? | — | Yes | ARC-ROOF-008 |
+| `roof.create_dome` | plan, level_id, base_offset?, rise?, profile?, oculus?, polygon_mode?, type_id? | element_id | Yes | ARC-ROOF-009 |
+| `roof.set_dome` | roof_id, rise?, profile?, oculus?, polygon_mode? | — | Yes | ARC-ROOF-009 |
+| `geometry.boolean` | target_id, tool_ids, op: intersect\|subtract\|union, tools?: keep\|hide\|consume | — | Yes | ARC-MOD-028 |
+| `geometry.remove_boolean` | target_id, tool_ids? | — | Yes | ARC-MOD-028 |
 | `railing.create_on_edges` | type_id, host_id, edges?: [curve_key]\|all_open, setback? | [element_id] | Yes | ARC-RAIL-001 |
 | `deck.create` | outline: loops, level_id, height?, type_id?, start_edge?, direction? | element_id | Yes | ARC-DECK-001 |
 | `deck.set_boards` | deck_id, width?, thickness?, gap?, direction?, stock_lengths?, picture_frame?, breakers?, stagger?, balance_courses?, seed? | — | Yes | ARC-DECK-001 |
