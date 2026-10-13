@@ -311,3 +311,122 @@ fn saved_floors_are_slabs_with_a_profile_and_holes() {
             .is_empty()
     );
 }
+
+#[test]
+fn automatic_ceilings_fill_the_room_and_follow_its_walls() {
+    let dir = tempfile::tempdir().unwrap();
+    let (mut project, mut doc, path, level) = project(dir.path());
+    let r = registry();
+    // Two rooms of a 10 × 7 house, split at x = 5 (200 mm walls on their centrelines).
+    let mut walls = Vec::new();
+    for (a, b) in [
+        ([0.0, 0.0], [10.0, 0.0]),
+        ([10.0, 0.0], [10.0, 7.0]),
+        ([10.0, 7.0], [0.0, 7.0]),
+        ([0.0, 7.0], [0.0, 0.0]),
+        ([5.0, 0.0], [5.0, 7.0]),
+    ] {
+        walls.push(id(run(
+            &r,
+            &mut doc,
+            "wall.create",
+            json!({ "curve": { "line": { "start": a, "end": b } }, "base_level": level.0, "top_constraint": { "unconnected": 3 } }),
+        )
+        .unwrap()));
+    }
+    // A click in the left room: its edges are the walls' finish faces (ARC-CEIL-001).
+    let c = id(run(
+        &r,
+        &mut doc,
+        "ceiling.create_auto",
+        json!({ "level_id": level.0, "point": [2, 3] }),
+    )
+    .unwrap());
+    let g = geometry(&doc, c);
+    assert!((g.area() - 4.8 * 6.8).abs() < 1e-6, "{}", g.area());
+    // 25 mm thick, bottom at 2600 mm.
+    assert!((g.top - g.thickness - 2.6).abs() < 1e-9 && (g.thickness - 0.025).abs() < 1e-9);
+    assert_eq!(doc.store().get(c).unwrap().class, "IfcCovering");
+    // Moving the partition 1 m to the right widens the room's ceiling.
+    run(
+        &r,
+        &mut doc,
+        "element.move",
+        json!({ "element_ids": [walls[4].0], "vector": [1, 0, 0] }),
+    )
+    .unwrap();
+    assert!(
+        (geometry(&doc, c).area() - 5.8 * 6.8).abs() < 1e-6,
+        "{}",
+        geometry(&doc, c).area()
+    );
+    // Outside every room there is no loop.
+    let e = run(
+        &r,
+        &mut doc,
+        "ceiling.create_auto",
+        json!({ "level_id": level.0, "point": [20, 3] }),
+    )
+    .unwrap_err();
+    assert_eq!(e.code, "ceiling.no_loop");
+    // A ceiling type is not a floor type.
+    let ft = doc
+        .store()
+        .iter()
+        .find(|e| e.class == "IfcCoveringType")
+        .unwrap()
+        .id();
+    run(
+        &r,
+        &mut doc,
+        "floor.create",
+        json!({ "loops": [ring(&[[0.0, 0.0], [1.0, 0.0], [1.0, 1.0]])], "level_id": level.0 }),
+    )
+    .unwrap();
+    let floor = doc
+        .store()
+        .iter()
+        .find(|e| e.class == "IfcSlab")
+        .unwrap()
+        .id();
+    let e = run(
+        &r,
+        &mut doc,
+        "element.set_type",
+        json!({ "element_ids": [floor.0], "type_id": ft.0 }),
+    )
+    .unwrap_err();
+    assert_eq!(e.code, "type.wrong_family");
+
+    // Saved as IfcCovering(CEILING) with a body, in the level.
+    project.save(&doc).unwrap();
+    let ifc = IfcModel::open(&path).unwrap();
+    let cov = ifc.entities_of_type("IfcCovering").unwrap()[0].id;
+    assert_eq!(
+        ifc.referenced_by(cov, "IfcRelContainedInSpatialStructure")
+            .unwrap()
+            .len(),
+        1
+    );
+    let meshes = ifc.tessellate(1).unwrap();
+    let m = meshes.iter().find(|m| m.class == "IfcCovering").unwrap();
+    assert!((volume(&m.verts, &m.faces).abs() - 5.8 * 6.8 * 0.025).abs() < 1e-6);
+
+    // Ceiling plans look up from 2300 mm.
+    let v = run(
+        &r,
+        &mut doc,
+        "view.create_plan",
+        json!({ "kind": "ceiling_plan", "level_ids": [level.0] }),
+    )
+    .unwrap();
+    let range = run(
+        &r,
+        &mut doc,
+        "view.get_view_range",
+        json!({ "view_id": v[0] }),
+    )
+    .unwrap();
+    assert_eq!(range["resolved_elevations"]["cut"], json!(2.3));
+    assert_eq!(range["resolved_elevations"]["top"], json!(4.0));
+}

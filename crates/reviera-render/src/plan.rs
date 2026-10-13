@@ -288,8 +288,9 @@ fn fill(loops: &[Vec<[f32; 2]>], z: f32, element: Option<reviera_core::ElementId
     mesh
 }
 
-/// The plan graphics of `scene` cut at `cut`, showing geometry down to `bottom`. `edges` are the
-/// scene's [`feature_edges`] (computed once per scene).
+/// The plan graphics of `scene` cut at `cut`, showing geometry down to `bottom` (or up to it,
+/// when it is above the cut: a reflected ceiling plan). `edges` are the scene's
+/// [`feature_edges`] (computed once per scene).
 pub fn plan_graphics(
     scene: &RenderScene,
     edges: &[Edge],
@@ -336,15 +337,22 @@ pub fn plan_graphics(
             poche.push(filled);
         }
     }
+    // Projection between `bottom` and the cut, or, when `bottom` is above the cut (a ceiling
+    // plan, looking up), between the cut and it.
+    let (lo, hi) = if bottom <= cut {
+        (bottom, cut)
+    } else {
+        (cut, bottom)
+    };
     for (element, segment) in edges {
         let width = weights(*element).projection;
-        for s in clip_segments(&[*segment], bottom, cut) {
+        for s in clip_segments(&[*segment], lo, hi) {
             add(PROJECTION_LINE, width, s);
         }
     }
     PlanGraphics {
-        top: cut,
-        bottom,
+        top: hi,
+        bottom: lo,
         poche,
         lines: groups,
         scale,

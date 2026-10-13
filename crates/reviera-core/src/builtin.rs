@@ -99,6 +99,9 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(FloorCreate),
         registry.add(FloorEditBoundary),
         registry.add(FloorSetLevel),
+        registry.add(CeilingCreate),
+        registry.add(CeilingCreateAuto),
+        registry.add(CeilingEditBoundary),
     ];
     for r in results {
         r.expect("core commands are valid");
@@ -366,7 +369,7 @@ pub fn dependents_of(store: &crate::store::Store, id: ElementId) -> Vec<ElementI
             crate::annotations::dimension_data(e).is_some_and(|d| d.view == guid)
                 || e.param("@type").and_then(serde_json::Value::as_str) == Some(guid.as_str())
                 || crate::inserts::insert_recipe(e).is_some_and(|r| r.host == guid)
-                || crate::floors::floor_recipe(e).is_some_and(|r| r.level == guid)
+                || crate::floors::slab_recipe(e).is_some_and(|(_, r)| r.level == guid)
                 || crate::inserts::opening_of(e).is_some_and(|i| i == guid)
                 || crate::grids::grid_data(e).is_some_and(|g| {
                     g.system == guid || g.type_guid.as_deref() == Some(guid.as_str())
@@ -1942,6 +1945,39 @@ modify_command!(
     floors::SetLevelParams,
     (),
     floors::set_level
+);
+
+modify_command!(
+    CeilingCreate,
+    "ceiling.create",
+    "Create a ceiling",
+    "Creates a sketched ceiling from boundary curves (as floor.create): its bottom is `offset` above the \
+     level (default 2600 mm) and it builds up by its type's thickness.",
+    "Ceiling",
+    floors::CreateParams,
+    ElementId,
+    |t, p| floors::create_kind(t, floors::SlabKind::Ceiling, p)
+);
+modify_command!(
+    CeilingCreateAuto,
+    "ceiling.create_auto",
+    "Create an automatic ceiling",
+    "Creates a ceiling in the room around `point`: its boundary is the loop of wall faces around the point \
+     at the ceiling's height, locked to those faces so the ceiling follows the walls.",
+    "Ceiling",
+    floors::CreateAutoParams,
+    ElementId,
+    floors::create_auto
+);
+modify_command!(
+    CeilingEditBoundary,
+    "ceiling.edit_boundary",
+    "Edit a ceiling's boundary",
+    "Replaces a ceiling's boundary curves (as floor.edit_boundary, with `ceiling_id`).",
+    "Edit Boundary",
+    floors::EditBoundaryParams,
+    (),
+    floors::edit_boundary
 );
 
 use crate::plans::{self, CreatePlanParams, SetViewRangeParams, ViewRangeReport};

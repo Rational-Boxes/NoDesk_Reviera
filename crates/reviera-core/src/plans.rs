@@ -19,6 +19,15 @@ use crate::store::Store;
 use crate::views::{self, CLASS_PREFIX, VIEW_KEY, ViewData};
 
 pub const KIND_PLAN: &str = "view.plan";
+/// A reflected ceiling plan: cut at its cut plane, looking up to the top of its range.
+pub const KIND_CEILING_PLAN: &str = "view.ceiling_plan";
+/// Default cut plane height of a ceiling plan above the level.
+pub const DEFAULT_CEILING_CUT: f64 = 2.3;
+
+/// Whether a view kind is a plan (floor or ceiling plan).
+pub fn is_plan(kind: &str) -> bool {
+    kind == KIND_PLAN || kind == KIND_CEILING_PLAN
+}
 /// Default cut plane height above the level (DOC-VR-001).
 pub const DEFAULT_CUT: f64 = 1.2;
 /// Default top of the range when there is no level above.
@@ -53,6 +62,22 @@ pub struct ViewRange {
 }
 
 impl ViewRange {
+    /// The defaults of a new ceiling plan: cut 2300 mm above the level, looking up to the level
+    /// above (or 4 m up without one).
+    pub fn ceiling_plan_default(has_level_above: bool) -> Self {
+        let top = if has_level_above {
+            Plane::new("above", 0.0)
+        } else {
+            Plane::new("associated", 4.0)
+        };
+        Self {
+            top: top.clone(),
+            cut: Plane::new("associated", DEFAULT_CEILING_CUT),
+            bottom: Plane::new("associated", DEFAULT_CEILING_CUT),
+            depth: top,
+        }
+    }
+
     /// The defaults of a new floor plan.
     pub fn floor_plan_default(has_level_above: bool) -> Self {
         Self {
@@ -143,7 +168,21 @@ pub fn plan_range(store: &Store, view: ElementId) -> Option<Resolved> {
     resolve(store, data.level.as_deref()?, data.view_range.as_ref()?).ok()
 }
 
-fn check_order(r: &Resolved) -> Result<()> {
+fn check_order(r: &Resolved, ceiling: bool) -> Result<()> {
+    if ceiling {
+        // A ceiling plan looks up from its cut plane to its top.
+        return if r.top >= r.cut {
+            Ok(())
+        } else {
+            Err(Error::new(
+                "view_range.invalid_order",
+                format!(
+                    "a ceiling plan's top must be at or above its cut plane (resolved: {}, {})",
+                    r.top, r.cut
+                ),
+            ))
+        };
+    }
     if r.top >= r.cut && r.cut >= r.bottom && r.bottom >= r.depth {
         Ok(())
     } else {
@@ -186,12 +225,16 @@ pub(crate) fn create_plan(
     txn: &mut crate::txn::Transaction<'_>,
     p: CreatePlanParams,
 ) -> Result<Vec<ElementId>> {
-    if p.kind != PlanKind::FloorPlan {
-        return Err(Error::new(
-            "view.unsupported_kind",
-            "only floor plans can be created so far",
-        ));
-    }
+    let kind = match p.kind {
+        PlanKind::FloorPlan => KIND_PLAN,
+        PlanKind::CeilingPlan => KIND_CEILING_PLAN,
+        _ => {
+            return Err(Error::new(
+                "view.unsupported_kind",
+                "only floor and ceiling plans can be created so far",
+            ));
+        }
+    };
     let mut created = Vec::new();
     for r in &p.level_ids {
         let store = txn.store().clone();
@@ -211,7 +254,7 @@ pub(crate) fn create_plan(
             .iter()
             .filter_map(|e| {
                 let d = views::view_data(e)?;
-                (d.kind == KIND_PLAN).then(|| (e.name.clone().unwrap_or_default(), d.level))
+                (d.kind == kind).then(|| (e.name.clone().unwrap_or_default(), d.level))
             })
             .collect();
         if !p.allow_duplicates
@@ -235,11 +278,15 @@ pub(crate) fn create_plan(
         let all = levels(&store);
         let index = all.iter().position(|l| l.1 == guid).unwrap_or(0);
         let data = ViewData {
-            kind: KIND_PLAN.into(),
+            kind: kind.into(),
             camera: None,
             home: None,
             level: Some(guid),
-            view_range: Some(ViewRange::floor_plan_default(index + 1 < all.len())),
+            view_range: Some(if kind == KIND_CEILING_PLAN {
+                ViewRange::ceiling_plan_default(index + 1 < all.len())
+            } else {
+                ViewRange::floor_plan_default(index + 1 < all.len())
+            }),
         };
         let mut value = serde_json::to_value(&data).expect("view data serialises");
         if let Some(scale) = p.scale {
@@ -314,7 +361,7 @@ fn plan_view(store: &Store, r: &ElementRef) -> Result<(ElementId, ViewData, Stri
     let level = data
         .level
         .clone()
-        .filter(|_| data.kind == KIND_PLAN)
+        .filter(|_| is_plan(&data.kind))
         .ok_or_else(|| Error::new("view.not_a_plan", format!("view {id} is not a plan")))?;
     Ok((id, data, level))
 }
@@ -331,7 +378,10 @@ pub(crate) fn set_view_range(
         bottom: plane_of(&store, &p.bottom)?,
         depth: plane_of(&store, &p.depth)?,
     };
-    check_order(&resolve(&store, &level, &range)?)?;
+    check_order(
+        &resolve(&store, &level, &range)?,
+        data.kind == KIND_CEILING_PLAN,
+    )?;
     data.view_range = Some(range);
     let value = serde_json::to_value(&data).expect("view data serialises");
     txn.modify(id, |e| {

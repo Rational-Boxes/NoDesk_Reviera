@@ -280,11 +280,11 @@ pub(crate) fn set_type(txn: &mut crate::txn::Transaction<'_>, p: SetTypeParams) 
             })?;
             let placed = inserts::resolve(txn.store(), txn.store().get(id).expect("exists"))?;
             inserts::check_fit(txn.store(), &placed)?;
-        } else if crate::floors::floor_recipe(e).is_some() {
-            if crate::floors::type_thickness(ty).is_none() {
+        } else if let Some((kind, _)) = crate::floors::slab_recipe(e) {
+            if crate::floors::type_kind(ty) != Some(kind) {
                 return Err(Error::new(
                     "type.wrong_family",
-                    format!("floor {id} needs a floor type"),
+                    format!("{} {id} needs a {} type", kind.noun(), kind.noun()),
                 ));
             }
             let guid = ty.guid().to_string();

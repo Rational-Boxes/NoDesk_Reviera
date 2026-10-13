@@ -484,7 +484,10 @@ impl LocalProject {
             ) {
                 geometry::remove_boxes(&mut self.ifc, step)?;
             }
-            if recipe_kind == Some(floors::FLOOR_RECIPE) {
+            if matches!(
+                recipe_kind,
+                Some(floors::FLOOR_RECIPE | floors::CEILING_RECIPE)
+            ) {
                 geometry::remove_slab(&mut self.ifc, step)?;
             }
             // The element's own property and quantity sets go with it.
@@ -841,8 +844,8 @@ impl LocalProject {
                 depth: f.thickness,
             };
             geometry::write_slab(&mut self.ifc, step, &body, self.length_scale, contexts)?;
-            let storey = floors::floor_recipe(store.get(*id).expect("listed"))
-                .and_then(|r| GlobalId::parse(&r.level))
+            let storey = floors::slab_recipe(store.get(*id).expect("listed"))
+                .and_then(|(_, r)| GlobalId::parse(&r.level))
                 .and_then(|g| store.find_by_guid(&g))
                 .and_then(|l| self.steps.get(&l).copied());
             if let Some(storey) = storey {

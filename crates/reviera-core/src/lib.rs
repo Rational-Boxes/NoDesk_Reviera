@@ -8,6 +8,7 @@
 //! and transactions are opened by the command executor (DM-CORE-001 rule 9).
 
 pub mod annotations;
+pub mod arrangement;
 pub mod builtin;
 pub mod categories;
 pub mod change;

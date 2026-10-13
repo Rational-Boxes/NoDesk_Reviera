@@ -48,7 +48,7 @@ impl App {
             .get(view)
             .ok_or_else(|| Error::new("view.not_found", format!("no view {view}")))?;
         views::view_data(e)
-            .filter(|d| d.kind == plans::KIND_PLAN)
+            .filter(|d| plans::is_plan(&d.kind))
             .ok_or_else(|| Error::new("view.not_a_plan", format!("view {view} is not a plan")))?;
         let range = plans::plan_range(store, view)
             .ok_or_else(|| Error::new("view.no_range", "the plan's range cannot be resolved"))?;

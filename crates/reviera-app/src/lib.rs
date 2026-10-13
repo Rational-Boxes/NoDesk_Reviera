@@ -334,7 +334,7 @@ impl App {
             .filter(|m| match m.element {
                 Some(e) => store.get(e).is_some_and(|e| {
                     walls::wall_recipe(e).is_none()
-                        && reviera_core::floors::floor_recipe(e).is_none()
+                        && reviera_core::floors::slab_recipe(e).is_none()
                         && reviera_core::inserts::kind_of(e).is_none()
                         && reviera_core::inserts::opening_of(e).is_none()
                 }),
@@ -363,15 +363,18 @@ impl App {
                 indices,
             });
         }
-        // Floors: each outer boundary with its holes, hanging down from the top.
+        // Floors and ceilings: each outer boundary with its holes, between bottom and top.
         for (id, f) in reviera_core::floors::all(store) {
+            let class = store
+                .get(id)
+                .map_or("IfcSlab".to_owned(), |e| e.class.clone());
             for p in &f.profiles {
                 let (positions, indices) =
                     reviera_render::solid::extrude(&p.outer, &p.holes, f.top - f.thickness, f.top);
                 meshes.push(reviera_render::SceneMesh {
                     element: Some(id),
-                    color: reviera_render::class_color("IfcSlab"),
-                    class: "IfcSlab".into(),
+                    color: reviera_render::class_color(&class),
+                    class: class.clone(),
                     positions,
                     indices,
                 });
