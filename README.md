@@ -30,6 +30,8 @@ The KIT FZK *AC20-Institute-Var-2* sample model (`test-data/ifc/`) open in Revie
 
 ![The Erdgeschoss floor plan: cut walls, stairs and furniture](design_documents/application_screenshots/plan-view.png)
 
+![A section box cutting the Institute model open, in isometric projection](design_documents/application_screenshots/section-box.png)
+
 ## What works today
 
 - **Native IFC** through IfcOpenShell and OpenCASCADE: open, edit, save and tessellate IFC2X3,
