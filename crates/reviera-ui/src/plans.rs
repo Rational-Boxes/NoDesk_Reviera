@@ -127,6 +127,16 @@ impl Gui {
         }
     }
 
+    /// Redraws the plans of `doc` (annotation or selection changed; the model did not).
+    pub(crate) fn plans_redraw(&mut self, doc: DocumentId) {
+        for v in self.views.iter_mut().filter(|v| v.doc == doc) {
+            if let Some(p) = &mut v.plan {
+                p.stale = true;
+                v.panel.refresh(false, None);
+            }
+        }
+    }
+
     /// Marks the plans of `doc` for rebuilding (the model changed).
     pub(crate) fn plans_stale(&mut self, doc: DocumentId) {
         self.plan_edges.remove(&doc);

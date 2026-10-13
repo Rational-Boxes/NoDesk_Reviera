@@ -48,7 +48,7 @@ fn cross(a: [f64; 2], b: [f64; 2]) -> f64 {
 
 impl Gui {
     /// Formats a length in project units.
-    fn format_length(&mut self, v: f64) -> String {
+    pub(crate) fn format_length(&mut self, v: f64) -> String {
         self.run("units.format", json!({ "value": v, "data_type": "length" }))
             .ok()
             .and_then(|v| v.as_str().map(str::to_owned))
@@ -76,12 +76,18 @@ impl Gui {
             width,
             segments: Vec::new(),
         };
+        let selected: std::collections::HashSet<ElementId> = self.selection().into_iter().collect();
+        let mut highlighted = Lines {
+            color: reviera_render::HIGHLIGHT,
+            width,
+            segments: Vec::new(),
+        };
         let mut orphaned = Lines {
             color: ORPHAN_COLOR,
             width,
             segments: Vec::new(),
         };
-        for (_, data) in annotations::of_view(&store, view.guid().as_str()) {
+        for (id, data) in annotations::of_view(&store, view.guid().as_str()) {
             let Some(m) = annotations::measure(&store, &data) else {
                 continue;
             };
@@ -92,14 +98,65 @@ impl Gui {
                 line: data.line,
                 texts,
             };
-            let target = if m.orphaned.iter().any(|o| *o) {
+            let target = if selected.contains(&id) {
+                &mut highlighted
+            } else if m.orphaned.iter().any(|o| *o) {
                 &mut orphaned
             } else {
                 &mut normal
             };
             target.segments.extend(dimension_lines(&d, plan.scale, z));
         }
-        vec![normal, orphaned]
+        vec![normal, orphaned, highlighted]
+    }
+
+    /// The dimension under pixel (`x`, `y`) of the active plan, if any.
+    pub(crate) fn dim_at(&self, x: i32, y: i32) -> Option<ElementId> {
+        let v = self.active_view()?;
+        let plan = v.plan.as_ref()?;
+        let store = self.app.document(v.doc)?.doc.store();
+        let view = store.get(v.element?)?;
+        let z = plan.range.cut as f32;
+        let mut best: Option<(f32, ElementId)> = None;
+        for (id, data) in annotations::of_view(store, view.guid().as_str()) {
+            let Some(m) = annotations::measure(store, &data) else {
+                continue;
+            };
+            // The text is not needed to hit the lines.
+            let d = Dimension {
+                points: m.points,
+                along: m.along,
+                line: data.line,
+                texts: Vec::new(),
+            };
+            for s in dimension_lines(&d, plan.scale, z) {
+                let seg = [s[0], s[1]].map(|p| [f64::from(p[0]), f64::from(p[1])]);
+                let dist = self.pixel_distance(x, y, seg, z);
+                if dist <= PICK_PX && best.is_none_or(|b| dist < b.0) {
+                    best = Some((dist, id));
+                }
+            }
+        }
+        best.map(|b| b.1)
+    }
+
+    /// Deletes the selection (Delete key), as one undoable step.
+    pub(crate) fn delete_selection(&mut self) {
+        let ids = self.selection();
+        if ids.is_empty() {
+            return;
+        }
+        let frame = self.frame;
+        match self.run("element.delete", json!({ "element_ids": ids })) {
+            Ok(v) => {
+                let n = v.as_array().map_or(0, Vec::len);
+                frame.set_status_text(&format!("Deleted {n} element(s)"), 0);
+                let _ = self.run("selection.clear", json!({}));
+                self.refresh_scene(&frame);
+                self.selection_changed();
+            }
+            Err(e) => frame.set_status_text(&e, 0),
+        }
     }
 
     // ---- The tool ----

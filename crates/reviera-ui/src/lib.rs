@@ -1119,10 +1119,12 @@ impl Gui {
             .active_view()
             .and_then(|v| v.plan.as_ref())
             .map_or((f32::NEG_INFINITY, f32::INFINITY), plans::PlanState::drawn);
-        let hit = self
-            .scene()
-            .pick_within(origin, dir, bottom, top)
-            .and_then(|(i, _)| self.scene().meshes[i].element);
+        // In plans, dimensions are picked before the model.
+        let hit = self.dim_at(x, y).or_else(|| {
+            self.scene()
+                .pick_within(origin, dir, bottom, top)
+                .and_then(|(i, _)| self.scene().meshes[i].element)
+        });
         let result = match hit {
             Some(id) => self.run("selection.set", json!({ "ids": [id] })),
             None => self.run("selection.clear", json!({})),
@@ -1142,6 +1144,10 @@ impl Gui {
         let ids = self.selection();
         if let Some(v) = self.viewport() {
             v.set_highlight(&ids);
+        }
+        // Plans draw selected annotation highlighted.
+        if let Some(doc) = self.doc {
+            self.plans_redraw(doc);
         }
         self.properties_stale = true;
     }
@@ -1192,8 +1198,11 @@ impl Gui {
             return;
         };
         let store = &self.app.document(doc).expect("open").doc;
+        let dimension = reviera_core::annotations::dimension_data(&e);
         let category = reviera_core::categories::category_of(&e)
-            .map_or("—".to_owned(), |c| c.name.to_owned());
+            .map(|c| c.name.to_owned())
+            .or_else(|| dimension.as_ref().map(|_| "Dimensions".to_owned()))
+            .unwrap_or_else(|| "—".to_owned());
         let type_name = e
             .param("@type")
             .and_then(Value::as_str)
@@ -1217,6 +1226,18 @@ impl Gui {
             let name = format!("e{i}");
             grid.append(Property::string(label, &name, value));
             grid.set_property_read_only(&name, true);
+        }
+        if let Some(d) = dimension {
+            let store = self.app.document(doc).expect("open").doc.store().clone();
+            grid.append(Property::category("Dimension", "c_dim"));
+            let measured = reviera_core::annotations::measure(&store, &d);
+            for (i, v) in measured.iter().flat_map(|m| m.values.clone()).enumerate() {
+                let name = format!("d{i}");
+                let text = self.format_length(v);
+                grid.append(Property::string(format!("Segment {}", i + 1), &name, text));
+                grid.set_property_read_only(&name, true);
+            }
+            return;
         }
 
         let defs = self
@@ -1682,6 +1703,15 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                 // Ctrl+Tab / Ctrl+Shift+Tab switch views (GTK menus cannot bind them).
                 Some(WXK_TAB) if ctrl => {
                     with(&gui, |g| g.cycle_view(if shift { -1 } else { 1 }));
+                    used = true;
+                }
+                Some(WXK_DELETE) => {
+                    with_view(&gui, id, |g| {
+                        let typing = g.tool.as_ref().is_some_and(|t| !t.typed.is_empty());
+                        if !typing {
+                            g.delete_selection();
+                        }
+                    });
                     used = true;
                 }
                 Some(WXK_ESCAPE) => {
