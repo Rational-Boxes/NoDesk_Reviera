@@ -1,0 +1,250 @@
+<title>Reviera Application Specification</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+<style>
+/* Layout: a drawing-set index. Sticky sheet index on the left, a title block up top, chapters read like sheets. */
+:root {
+  --paper: #f3f6f5;
+  --panel: #e7eceb;
+  --surface: #ffffff;
+  --ink: #1b2326;
+  --muted: #56666b;
+  --rule: #c8d2d0;
+  --accent: #1d5e86;
+  --accent-soft: #dde9f1;
+  --p0: #b3342b;
+  --p1: #9a6310;
+  --p2: #3f6878;
+  --p3: #7f8b8f;
+  --code-bg: #e9eeed;
+  --f-display: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
+  --f-body: "IBM Plex Sans", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --side: 300px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #111618; --panel: #172024; --surface: #161d20; --ink: #dce4e5; --muted: #93a2a6; --rule: #2b383c;
+    --accent: #72b2da; --accent-soft: #1b3240; --p0: #e46a5f; --p1: #d8a145; --p2: #8db3c2; --p3: #77858a; --code-bg: #1e282b;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #111618; --panel: #172024; --surface: #161d20; --ink: #dce4e5; --muted: #93a2a6; --rule: #2b383c;
+  --accent: #72b2da; --accent-soft: #1b3240; --p0: #e46a5f; --p1: #d8a145; --p2: #8db3c2; --p3: #77858a; --code-bg: #1e282b;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { scroll-padding-top: calc(env(safe-area-inset-top, 0px) + 72px); }
+body { background: var(--paper); color: var(--ink); font: 15px/1.6 var(--f-body); margin: 0; }
+a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+a:focus-visible, button:focus-visible, input:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+
+.app { display: grid; grid-template-columns: var(--side) minmax(0, 1fr); min-height: 100vh; }
+
+/* Sidebar: sheet index */
+.side { position: sticky; top: env(safe-area-inset-top, 0px); height: 100vh; overflow-y: auto; background: var(--panel); border-right: 1px solid var(--rule); padding-block: 20px 40px; padding-inline: 16px; }
+.brand { font: 700 22px/1 var(--f-display); letter-spacing: .02em; text-transform: uppercase; margin: 0 0 4px; }
+.brand-sub { color: var(--muted); font-size: 12px; margin: 0 0 16px; }
+.search { position: relative; margin-bottom: 16px; }
+.search label { display: block; font: 600 11px/1 var(--f-body); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+.search input { width: 100%; font: 14px var(--f-body); padding: 8px 10px; border: 1px solid var(--rule); border-radius: 4px; background: var(--surface); color: var(--ink); }
+.results { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 2px; }
+.results a { display: grid; grid-template-columns: auto minmax(0,1fr); gap: 8px; align-items: baseline; padding: 6px 8px; border-radius: 4px; text-decoration: none; color: var(--ink); font-size: 13px; line-height: 1.35; }
+.results a:hover { background: var(--accent-soft); }
+.results .tag { font: 500 11px var(--f-mono); color: var(--muted); }
+.results-note { color: var(--muted); font-size: 12px; margin: 8px 0 0; }
+.nav { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.nav details > summary { list-style: none; cursor: pointer; display: flex; border-radius: 4px; }
+.nav details > summary::-webkit-details-marker { display: none; }
+.nav summary a { display: grid; grid-template-columns: 44px minmax(0,1fr); gap: 8px; align-items: baseline; padding: 7px 8px; text-decoration: none; color: var(--ink); width: 100%; border-radius: 4px; }
+.nav summary a:hover, .nav summary a.active { background: var(--accent-soft); }
+.ch-no { font: 600 13px var(--f-display); letter-spacing: .04em; text-transform: uppercase; color: var(--accent); }
+.ch-name { font-size: 13.5px; font-weight: 500; line-height: 1.3; }
+.nav ol { list-style: none; margin: 2px 0 8px; padding: 0 0 0 52px; display: grid; gap: 1px; }
+.nav ol a { display: block; padding: 3px 6px; font-size: 12.5px; line-height: 1.35; color: var(--muted); text-decoration: none; border-radius: 3px; }
+.nav ol a:hover { color: var(--ink); background: var(--accent-soft); }
+.nav ol a.active { color: var(--accent); font-weight: 500; }
+
+/* Top bar (phone) */
+.topbar { display: none; }
+
+/* Main */
+.main { min-width: 0; padding-block: 32px 96px; padding-inline: clamp(16px, 4vw, 56px); }
+.doc { max-width: 900px; margin: 0 auto; }
+
+/* Title block */
+.titleblock { border: 2px solid var(--ink); background: var(--surface); display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; margin-bottom: 20px; }
+.tb-cell { border-right: 1px solid var(--ink); border-bottom: 1px solid var(--ink); padding: 8px 12px; min-width: 0; }
+.tb-cell:nth-child(4n) { border-right: 0; }
+.tb-cell.last-row { border-bottom: 0; }
+.tb-label { display: block; font: 600 10.5px/1.2 var(--f-body); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin-bottom: 3px; }
+.tb-value { font: 600 17px/1.2 var(--f-display); letter-spacing: .02em; }
+.tb-title { grid-row: span 2; display: flex; flex-direction: column; justify-content: space-between; gap: 10px; }
+.tb-title h1 { font: 700 clamp(30px, 5vw, 44px)/0.95 var(--f-display); text-transform: uppercase; letter-spacing: .01em; margin: 0; text-wrap: balance; }
+.tb-num { font-variant-numeric: tabular-nums; }
+.tb-pri { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.notice { font-size: 13px; color: var(--muted); border-left: 3px solid var(--rule); padding: 2px 0 2px 12px; margin: 0 0 40px; max-width: 70ch; }
+
+/* Chapters */
+.chapter { padding-top: 24px; margin-top: 40px; border-top: 2px solid var(--ink); }
+.chapter:first-of-type { margin-top: 0; }
+.chapter h1 { display: flex; gap: 14px; align-items: center; font: 700 clamp(28px, 4vw, 38px)/1.05 var(--f-display); text-transform: uppercase; letter-spacing: .01em; margin: 0 0 20px; text-wrap: balance; }
+.bubble { flex: none; width: 54px; height: 54px; border: 2px solid var(--ink); border-radius: 50%; display: grid; grid-template-rows: 1fr 1fr; overflow: hidden; text-align: center; background: var(--surface); }
+.bubble b { font: 700 19px/26px var(--f-display); border-bottom: 1.5px solid var(--ink); }
+.bubble i { font: 600 10px/24px var(--f-display); font-style: normal; letter-spacing: .08em; color: var(--muted); }
+h2, h3, h4 { text-wrap: balance; scroll-margin-top: 16px; }
+.chapter h2 { font: 600 26px/1.15 var(--f-display); letter-spacing: .01em; margin: 44px 0 12px; padding-bottom: 6px; border-bottom: 1px solid var(--rule); }
+.chapter h3 { font: 600 18px/1.3 var(--f-body); margin: 32px 0 8px; }
+.chapter h4 { font: 600 15.5px/1.35 var(--f-body); margin: 24px 0 6px; }
+.chapter h5, .chapter h6 { font: 600 14px/1.4 var(--f-body); margin: 18px 0 4px; color: var(--muted); }
+.chapter p, .chapter li { max-width: 72ch; }
+.chapter p { margin: 0 0 12px; }
+.chapter ul, .chapter ol { padding-left: 22px; margin: 0 0 12px; }
+.chapter li { margin: 3px 0; }
+.chapter blockquote { margin: 12px 0; padding: 10px 14px; background: var(--accent-soft); border-left: 3px solid var(--accent); border-radius: 0 4px 4px 0; }
+.chapter blockquote p:last-child { margin: 0; }
+code { font: 0.88em var(--f-mono); background: var(--code-bg); padding: 1px 4px; border-radius: 3px; overflow-wrap: anywhere; }
+pre { background: var(--code-bg); border: 1px solid var(--rule); border-radius: 4px; padding: 12px 14px; overflow-x: auto; font-size: 13px; line-height: 1.45; }
+pre code { background: none; padding: 0; overflow-wrap: normal; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.rid { color: var(--accent); background: var(--accent-soft); font-weight: 500; scroll-margin-top: 80px; }
+.rid:target { outline: 2px solid var(--accent); }
+
+.tbl { overflow-x: auto; margin: 8px 0 18px; border: 1px solid var(--rule); border-radius: 4px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 13.5px; line-height: 1.45; font-variant-numeric: tabular-nums; }
+th, td { text-align: left; vertical-align: top; padding: 7px 10px; border-bottom: 1px solid var(--rule); }
+th { font: 600 11.5px/1.3 var(--f-body); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); background: var(--panel); position: sticky; top: 0; }
+tr:last-child td { border-bottom: 0; }
+td code { white-space: nowrap; }
+
+.pri { display: inline-block; font: 600 11px/1 var(--f-mono); padding: 3px 6px; border-radius: 3px; border: 1px solid currentColor; letter-spacing: .03em; }
+.pri-p0 { color: var(--p0); } .pri-p1 { color: var(--p1); } .pri-p2 { color: var(--p2); } .pri-p3 { color: var(--p3); }
+.ac { list-style: none; position: relative; }
+.chapter ul:has(> .ac) { padding-left: 4px; }
+.box { display: inline-block; width: 12px; height: 12px; border: 1.5px solid var(--muted); border-radius: 2px; margin-right: 8px; vertical-align: -1px; }
+
+.theme-btn { font: 500 12px var(--f-body); color: var(--muted); background: none; border: 1px solid var(--rule); border-radius: 4px; padding: 5px 9px; cursor: pointer; margin-top: 20px; }
+
+@media (max-width: 920px) {
+  .app { grid-template-columns: minmax(0, 1fr); }
+  .side { position: fixed; inset: 0 auto 0 0; width: min(88vw, 340px); z-index: 20; transform: translateX(-102%); transition: transform .2s ease; padding-top: calc(env(safe-area-inset-top, 0px) + 20px); box-shadow: 0 0 40px rgba(0,0,0,.25); }
+  .side.open { transform: none; }
+  .topbar { display: flex; align-items: center; gap: 12px; position: sticky; top: env(safe-area-inset-top, 0px); z-index: 10; background: var(--panel); border-bottom: 1px solid var(--rule); padding: 10px 16px; }
+  .topbar button { font: 600 13px var(--f-body); background: var(--surface); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; padding: 6px 10px; cursor: pointer; }
+  .topbar span { font: 700 18px/1 var(--f-display); text-transform: uppercase; letter-spacing: .02em; }
+  .scrim { position: fixed; inset: 0; background: rgba(0,0,0,.35); z-index: 15; }
+  .titleblock { grid-template-columns: 1fr 1fr; }
+  .tb-title { grid-column: 1 / -1; grid-row: auto; }
+  .tb-cell { border-right: 1px solid var(--ink); }
+  .tb-cell:nth-child(4n) { border-right: 1px solid var(--ink); }
+  .tb-cell:nth-child(2n+1):not(.tb-title) { border-right: 0; }
+}
+@media (prefers-reduced-motion: reduce) { .side { transition: none; } html { scroll-behavior: auto; } }
+</style>
+
+<div class="topbar"><button type="button" id="navToggle" aria-controls="side" aria-expanded="false">Contents</button><span>Reviera Spec</span></div>
+<div class="scrim" id="scrim" hidden></div>
+<div class="app">
+  <aside class="side" id="side" aria-label="Specification contents">
+    <p class="brand">Reviera</p>
+    <p class="brand-sub">Application Specification · v0.1 draft</p>
+    <div class="search">
+      <label for="q">Find a section or requirement</label>
+      <input id="q" type="search" placeholder="e.g. view range, ARC-WALL-001" autocomplete="off">
+      <ul class="results" id="results" hidden></ul>
+      <p class="results-note" id="resultsNote" hidden></p>
+    </div>
+    <ol class="nav" id="nav">{{NAV}}</ol>
+    <button type="button" class="theme-btn" id="themeBtn">Theme: system</button>
+  </aside>
+
+  <main class="main">
+    <div class="doc">
+      <header class="titleblock" aria-label="Document title block">
+        <div class="tb-cell tb-title">
+          <span class="tb-label">Project</span>
+          <h1>Reviera Application Specification</h1>
+          <span class="tb-label" style="margin:0">Open-source BIM authoring · functional reference: Autodesk® Revit® 2026/2027</span>
+        </div>
+        <div class="tb-cell"><span class="tb-label">Sheet</span><span class="tb-value">SPEC-000</span></div>
+        <div class="tb-cell"><span class="tb-label">Revision</span><span class="tb-value">0.1 · Draft</span></div>
+        <div class="tb-cell"><span class="tb-label">Date</span><span class="tb-value tb-num">2026-10-12</span></div>
+        <div class="tb-cell"><span class="tb-label">Requirements</span><span class="tb-value tb-num">{{REQS}}</span></div>
+        <div class="tb-cell"><span class="tb-label">Commands</span><span class="tb-value tb-num">{{CMDS}}</span></div>
+        <div class="tb-cell"><span class="tb-label">Licence</span><span class="tb-value">GPL-3.0-or-later</span></div>
+        <div class="tb-cell last-row"><span class="tb-label">Stack</span><span class="tb-value">IFC · Rust · OCCT · wx · LuaJIT · MCP</span></div>
+        <div class="tb-cell last-row" style="grid-column: span 3"><span class="tb-label">By priority</span>
+          <span class="tb-pri"><span class="pri pri-p0">P0</span><span class="tb-num">{{P0}} MVP</span><span class="pri pri-p1">P1</span><span class="tb-num">{{P1}} v1.0</span><span class="pri pri-p2">P2</span><span class="tb-num">{{P2}} later</span><span class="pri pri-p3">P3</span><span class="tb-num">{{P3}} deferred</span></span>
+        </div>
+      </header>
+      <p class="notice">This is a clean-room functional specification, written only from publicly available sources, which are listed with access checks in the project's source register. Autodesk and Revit are trademarks of Autodesk, Inc. They are named only to identify the functional reference. Reviera is not affiliated with or endorsed by Autodesk. Screenshot paths in "Ref" lines point to internal reference material and are not reproduced here.</p>
+      {{CONTENT}}
+    </div>
+  </main>
+</div>
+
+<script id="idx" type="application/json">{{INDEX}}</script>
+<script>
+(function () {
+  var idx = JSON.parse(document.getElementById('idx').textContent);
+  var q = document.getElementById('q'), results = document.getElementById('results'), note = document.getElementById('resultsNote'), nav = document.getElementById('nav');
+  var side = document.getElementById('side'), scrim = document.getElementById('scrim'), toggle = document.getElementById('navToggle');
+
+  function closeNav() { side.classList.remove('open'); scrim.hidden = true; toggle.setAttribute('aria-expanded', 'false'); }
+  toggle.addEventListener('click', function () { var o = !side.classList.contains('open'); side.classList.toggle('open', o); scrim.hidden = !o; toggle.setAttribute('aria-expanded', String(o)); });
+  scrim.addEventListener('click', closeNav);
+  side.addEventListener('click', function (e) { if (e.target.closest('a') && window.matchMedia('(max-width: 920px)').matches) closeNav(); });
+
+  // Requirement IDs are searchable alongside headings.
+  document.querySelectorAll('code.rid').forEach(function (c) {
+    var h = c.closest('section'), lbl = h ? (h.querySelector('h1 .bubble b') || {}).textContent || '' : '';
+    idx.push([c.id, c.id, 5, lbl]);
+  });
+
+  function esc(s) { return s.replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  q.addEventListener('input', function () {
+    var v = q.value.trim().toLowerCase();
+    if (!v) { results.hidden = true; note.hidden = true; nav.hidden = false; return; }
+    var terms = v.split(/\s+/), hits = [];
+    for (var i = 0; i < idx.length && hits.length < 60; i++) {
+      var t = idx[i][0].toLowerCase(), ok = true;
+      for (var k = 0; k < terms.length; k++) if (t.indexOf(terms[k]) < 0) { ok = false; break; }
+      if (ok) hits.push(idx[i]);
+    }
+    results.innerHTML = hits.map(function (h) {
+      var tag = h[2] === 5 ? 'req' : (String(h[3]).replace(/^(Chapter|Appendix)\s*/, '') || '');
+      return '<li><a href="#' + encodeURIComponent(h[1]) + '"><span class="tag">' + esc(tag) + '</span><span>' + esc(h[0]) + '</span></a></li>';
+    }).join('');
+    results.hidden = !hits.length; nav.hidden = true;
+    note.hidden = false;
+    note.textContent = hits.length ? (hits.length >= 60 ? 'Showing the first 60 matches. Add a word to narrow it down.' : hits.length + (hits.length === 1 ? ' match' : ' matches')) : 'No section or requirement matches "' + q.value.trim() + '".';
+  });
+
+  // Highlight the chapter and section in view.
+  var links = {};
+  nav.querySelectorAll('a').forEach(function (a) { links[decodeURIComponent(a.getAttribute('href').slice(1))] = a; });
+  var current = null;
+  if ('IntersectionObserver' in window) {
+    var obs = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) {
+        if (!en.isIntersecting) return;
+        var a = links[en.target.id]; if (!a) return;
+        if (current) current.classList.remove('active');
+        a.classList.add('active'); current = a;
+        var d = a.closest('details'); if (d && !d.open) { nav.querySelectorAll('details[open]').forEach(function (o) { if (o !== d) o.open = false; }); d.open = true; }
+      });
+    }, { rootMargin: '0px 0px -75% 0px' });
+    document.querySelectorAll('.chapter h1[id], .chapter h2[id]').forEach(function (h) { obs.observe(h); });
+  }
+
+  // Theme toggle: system -> light -> dark.
+  var btn = document.getElementById('themeBtn'), modes = ['system', 'light', 'dark'], mode = 'system';
+  try { mode = localStorage.getItem('reviera-spec-theme') || 'system'; } catch (e) {}
+  function apply() { if (mode === 'system') document.documentElement.removeAttribute('data-theme'); else document.documentElement.setAttribute('data-theme', mode); btn.textContent = 'Theme: ' + mode; }
+  apply();
+  btn.addEventListener('click', function () { mode = modes[(modes.indexOf(mode) + 1) % 3]; try { localStorage.setItem('reviera-spec-theme', mode); } catch (e) {} apply(); });
+})();
+</script>

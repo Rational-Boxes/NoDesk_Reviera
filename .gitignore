@@ -1,0 +1,25 @@
+# Internal clean-room reference material: never publish (see design_documents/RESEARCH_LOG.md).
+# Screenshots are third-party images kept for internal reference only.
+design_documents/screenshots/
+# Raw research notes quote vendor help text; the specification paraphrases them.
+design_documents/research/
+
+# IDE and editor files
+.idea/
+*.iml
+.vscode/
+.fleet/
+.zed/
+*.code-workspace
+*.sublime-project
+*.sublime-workspace
+*.swp
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Python
+__pycache__/
+*.pyc
