@@ -129,5 +129,36 @@ fn wx_shim(os: &str) {
         }
     }
     build.warnings(false).compile("reviera_ui_wx");
-    // The shim's wxWidgets symbols resolve against the libraries wxdragon-sys links (core, aui).
+    // The shim's wxWidgets symbols resolve against the libraries wxdragon-sys links (core, aui),
+    // apart from the ribbon library, which wxdragon-sys builds but does not link.
+    link_ribbon(&dir);
+}
+
+/// Links the wxWidgets ribbon library built next to the others (its name depends on the port).
+fn link_ribbon(dir: &Path) {
+    for sub in ["lib64", "lib"] {
+        let lib = dir.join(sub);
+        let Ok(entries) = std::fs::read_dir(&lib) else {
+            continue;
+        };
+        for entry in entries.flatten() {
+            let name = entry.file_name().to_string_lossy().into_owned();
+            if !name.contains("ribbon") {
+                continue;
+            }
+            let stem = name
+                .strip_suffix(".a")
+                .map(|n| n.strip_prefix("lib").unwrap_or(n))
+                .or_else(|| name.strip_suffix(".lib"));
+            if let Some(stem) = stem {
+                println!("cargo:rustc-link-search=native={}", lib.display());
+                println!("cargo:rustc-link-lib=static={stem}");
+                return;
+            }
+        }
+    }
+    println!(
+        "cargo::warning=the wxWidgets ribbon library was not found under {}",
+        dir.display()
+    );
 }

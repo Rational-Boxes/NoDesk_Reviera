@@ -20,6 +20,7 @@ reviera-render.workspace = true
 reviera-render-wgpu.workspace = true
 raw-window-handle.workspace = true
 serde_json.workspace = true
+toml_edit = "0.25"
 
 [build-dependencies]
 cc.workspace = true

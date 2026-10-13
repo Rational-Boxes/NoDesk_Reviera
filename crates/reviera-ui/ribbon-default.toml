@@ -1,0 +1,419 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Reviera contributors
+#
+# Reviera's default ribbon, Quick Access Toolbar and menus (spec Ch 1 §1.7–1.9, UI-RIBCAT-001).
+#
+# Every tool runs one action. An action is a registered command or a UI action of the window
+# (reviera-ui `ribbon::UI_ACTIONS`); a test checks that each one exists. Labels and help texts
+# are Reviera's own.
+#
+# Sizes: "large" (icon above label) or "small" (icon beside label, stacked). Keys are the
+# keyboard sequences typed in a view (§1.26.5), shown in tooltips and menus.
+
+# ---- Actions ----
+
+[[action]]
+id = "file.new"
+label = "New"
+icon = "new"
+accel = "Ctrl+N"
+help = "Create a project from the built-in template"
+
+[[action]]
+id = "file.open"
+label = "Open..."
+icon = "open"
+accel = "Ctrl+O"
+help = "Open an IFC project"
+
+[[action]]
+id = "file.save"
+label = "Save"
+icon = "save"
+accel = "Ctrl+S"
+help = "Save the project"
+
+[[action]]
+id = "file.save_as"
+label = "Save As..."
+icon = "save_as"
+accel = "Ctrl+Shift+S"
+help = "Save the project to a new file"
+
+[[action]]
+id = "export.pdf"
+label = "Export PDF..."
+icon = "pdf"
+accel = "Ctrl+P"
+help = "Export the active plan as vector PDF at its scale"
+
+[[action]]
+id = "app.exit"
+label = "Exit"
+icon = "exit"
+help = "Close Reviera"
+
+[[action]]
+id = "edit.undo"
+label = "Undo"
+icon = "undo"
+accel = "Ctrl+Z"
+help = "Undo the last change"
+
+[[action]]
+id = "edit.redo"
+label = "Redo"
+icon = "redo"
+accel = "Ctrl+Y"
+help = "Redo the last undone change"
+
+[[action]]
+id = "tool.modify"
+label = "Modify"
+icon = "modify"
+keys = "MD"
+help = "End the running tool and select elements"
+
+[[action]]
+id = "element.delete"
+label = "Delete"
+icon = "delete"
+keys = "DE"
+help = "Delete the selection, with what depends on it"
+
+[[action]]
+id = "wall.create"
+label = "Wall"
+icon = "wall"
+keys = "WA"
+help = "Draw walls on a level: click points, or type lengths"
+
+[[action]]
+id = "door.place"
+label = "Door"
+icon = "door"
+keys = "DR"
+help = "Place doors in walls; the cursor's side is the swing side"
+
+[[action]]
+id = "window.place"
+label = "Window"
+icon = "window"
+keys = "WN"
+help = "Place windows in walls"
+
+[[action]]
+id = "level.create"
+label = "Level"
+icon = "level"
+keys = "LL"
+help = "Add a level at an elevation, with its floor plan"
+
+[[action]]
+id = "grid.create"
+label = "Grid"
+icon = "grid"
+keys = "GR"
+help = "Draw grid lines in a plan"
+
+[[action]]
+id = "dim.create_aligned"
+label = "Aligned Dimension"
+icon = "dimension"
+keys = "DI"
+help = "Dimension parallel walls, grids and edges in a plan"
+
+[[action]]
+id = "view.create_plan"
+label = "Floor Plan"
+icon = "plan"
+help = "Create floor plans of levels"
+
+[[action]]
+id = "view.default_3d"
+label = "Default 3D View"
+icon = "view3d"
+help = "Open the model's default 3D view"
+
+[[action]]
+id = "view.create_3d"
+label = "New 3D View"
+icon = "view_new"
+help = "Open another 3D view of the model"
+
+[[action]]
+id = "view.zoom_fit"
+label = "Zoom to Fit"
+icon = "zoom_fit"
+keys = "ZF"
+help = "Show the whole model, or the selection"
+
+[[action]]
+id = "view.zoom_previous"
+label = "Previous Pan/Zoom"
+icon = "zoom_prev"
+keys = "ZP"
+help = "Go back to the previous view"
+
+[[action]]
+id = "view.zoom_next"
+label = "Next Pan/Zoom"
+icon = "zoom_next"
+keys = "ZN"
+help = "Go forward again"
+
+[[action]]
+id = "view.home"
+label = "Home"
+icon = "home"
+accel = "Alt+Home"
+help = "Go to the view's home orientation"
+
+[[action]]
+id = "view.set_home"
+label = "Set as Home"
+icon = "set_home"
+help = "Make the current orientation the view's home"
+
+[[action]]
+id = "view.set_projection"
+label = "Perspective / Isometric"
+icon = "perspective"
+keys = "PI"
+help = "Switch between perspective and isometric (parallel) projection"
+
+[[action]]
+id = "view.walk"
+label = "Walk"
+icon = "walk"
+keys = "WK"
+help = "Walk through the model at eye height"
+
+[[action]]
+id = "window.close"
+label = "Close View"
+icon = "close_view"
+accel = "Ctrl+W"
+help = "Close the active view"
+
+[[action]]
+id = "window.next"
+label = "Next View"
+icon = "next_view"
+accel = "Ctrl+PgDn"
+help = "Activate the next view"
+
+[[action]]
+id = "window.previous"
+label = "Previous View"
+icon = "prev_view"
+accel = "Ctrl+PgUp"
+help = "Activate the previous view"
+
+[[action]]
+id = "window.tile"
+label = "Tile Views"
+icon = "tile"
+help = "Show every view at once"
+
+[[action]]
+id = "window.tab_all"
+label = "Tab Views"
+icon = "tab_all"
+help = "Put every view back in one tab group"
+
+[[action]]
+id = "ui.pane.properties"
+label = "Properties"
+icon = "properties"
+keys = "PP"
+help = "Show or hide the Properties palette"
+
+[[action]]
+id = "ui.pane.browser"
+label = "Project Browser"
+icon = "browser"
+help = "Show or hide the Project Browser"
+
+[[action]]
+id = "wall.flip"
+label = "Flip Wall"
+icon = "flip"
+help = "Swap the selected walls' exterior and interior sides (Spacebar)"
+
+[[action]]
+id = "insert.flip_hand"
+label = "Flip Hand"
+icon = "flip_hand"
+help = "Move the selected doors' hinges to the other side (Spacebar)"
+
+[[action]]
+id = "insert.flip_facing"
+label = "Flip Facing"
+icon = "flip"
+help = "Turn the selected doors and windows to face the wall's other side"
+
+# ---- Quick Access Toolbar ----
+
+[quick_access]
+actions = ["file.open", "file.save", "edit.undo", "edit.redo", "view.default_3d", "window.close"]
+
+# ---- Ribbon tabs (default order, §1.8.1) ----
+
+[[tab]]
+id = "architecture"
+label = "Architecture"
+
+[[tab.panel]]
+label = "Select"
+tools = [{ action = "tool.modify", size = "large" }]
+
+[[tab.panel]]
+label = "Build"
+tools = [
+  { action = "wall.create", size = "large" },
+  { action = "door.place", size = "large" },
+  { action = "window.place", size = "large" },
+]
+
+[[tab.panel]]
+label = "Datum"
+tools = [
+  { action = "level.create", size = "small" },
+  { action = "grid.create", size = "small" },
+]
+
+[[tab]]
+id = "annotate"
+label = "Annotate"
+
+[[tab.panel]]
+label = "Select"
+tools = [{ action = "tool.modify", size = "large" }]
+
+[[tab.panel]]
+label = "Dimension"
+tools = [{ action = "dim.create_aligned", size = "large" }]
+
+[[tab]]
+id = "view"
+label = "View"
+
+[[tab.panel]]
+label = "Select"
+tools = [{ action = "tool.modify", size = "large" }]
+
+[[tab.panel]]
+label = "Create"
+tools = [
+  { action = "view.create_plan", size = "large" },
+  { action = "view.default_3d", size = "large" },
+  { action = "view.create_3d", size = "small" },
+]
+
+[[tab.panel]]
+label = "Navigate"
+tools = [
+  { action = "view.zoom_fit", size = "small" },
+  { action = "view.zoom_previous", size = "small" },
+  { action = "view.zoom_next", size = "small" },
+  { action = "view.home", size = "small" },
+  { action = "view.set_home", size = "small" },
+  { action = "view.set_projection", size = "small" },
+  { action = "view.walk", size = "small" },
+]
+
+[[tab.panel]]
+label = "Windows"
+tools = [
+  { action = "window.close", size = "small" },
+  { action = "window.next", size = "small" },
+  { action = "window.previous", size = "small" },
+  { action = "window.tile", size = "small" },
+  { action = "window.tab_all", size = "small" },
+]
+
+[[tab.panel]]
+label = "User Interface"
+tools = [
+  { action = "ui.pane.properties", size = "small" },
+  { action = "ui.pane.browser", size = "small" },
+]
+
+[[tab]]
+id = "modify"
+label = "Modify"
+
+[[tab.panel]]
+label = "Select"
+tools = [{ action = "tool.modify", size = "large" }]
+
+[[tab.panel]]
+label = "Properties"
+tools = [{ action = "ui.pane.properties", size = "large" }]
+
+[[tab.panel]]
+label = "Modify"
+tools = [{ action = "element.delete", size = "small" }]
+
+[[tab.panel]]
+label = "Measure"
+tools = [{ action = "dim.create_aligned", size = "small" }]
+
+# ---- Contextual tabs (§1.9): "Modify | <category>" while elements of one category are
+# selected: the Modify tab's panels, then the category's own. ----
+
+[[context]]
+category = "cat.walls"
+label = "Walls"
+panels = [{ label = "Wall", tools = [{ action = "wall.flip", size = "large" }] }]
+
+[[context]]
+category = "cat.doors"
+label = "Doors"
+panels = [{ label = "Door", tools = [
+  { action = "insert.flip_hand", size = "large" },
+  { action = "insert.flip_facing", size = "large" },
+] }]
+
+[[context]]
+category = "cat.windows"
+label = "Windows"
+panels = [{ label = "Window", tools = [{ action = "insert.flip_facing", size = "large" }] }]
+
+# ---- Menus (the menu bar; on macOS also the native application menu) ----
+
+[[menu]]
+label = "&File"
+items = ["file.new", "file.open", "file.save", "file.save_as", "-", "export.pdf", "-", "app.exit"]
+
+[[menu]]
+label = "&Edit"
+items = ["edit.undo", "edit.redo", "-", "element.delete"]
+
+[[menu]]
+label = "&View"
+items = [
+  "view.default_3d", "view.create_plan", "-",
+  "view.zoom_fit", "view.zoom_previous", "view.zoom_next", "-",
+  "view.home", "view.set_home", "@orient", "view.set_projection", "-", "view.walk",
+]
+
+[[menu]]
+label = "&Architecture"
+items = ["wall.create", "door.place", "window.place", "-", "grid.create", "level.create"]
+
+[[menu]]
+label = "A&nnotate"
+items = ["dim.create_aligned"]
+
+[[menu]]
+label = "&Modify"
+items = ["tool.modify", "-", "element.delete", "-", "wall.flip", "insert.flip_hand", "insert.flip_facing"]
+
+[[menu]]
+label = "&Window"
+items = [
+  "view.create_3d", "window.close", "-", "window.next", "window.previous", "-",
+  "window.tile", "window.tab_all", "-", "ui.pane.properties", "ui.pane.browser",
+]

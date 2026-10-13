@@ -13,12 +13,14 @@
 mod browser;
 mod dims;
 mod grids;
+mod icons;
 mod inserts;
 mod levels;
 mod loading;
 mod native;
 mod nav;
 mod plans;
+mod ribbon;
 mod snap;
 mod wx;
 
@@ -34,41 +36,14 @@ use reviera_render_wgpu::{Gpu, WgpuViewport};
 use serde_json::{Value, json};
 use wxdragon::prelude::*;
 
-const ID_OPEN: i32 = ID_HIGHEST + 1;
-const ID_SAVE_FILE: i32 = ID_HIGHEST + 2;
-const ID_FIT: i32 = ID_HIGHEST + 3;
-const ID_NEW: i32 = ID_HIGHEST + 4;
-const ID_UNDO: i32 = ID_HIGHEST + 5;
-const ID_REDO: i32 = ID_HIGHEST + 6;
-const ID_WALL: i32 = ID_HIGHEST + 7;
-const ID_SAVE_AS: i32 = ID_HIGHEST + 8;
-const ID_NEW_VIEW: i32 = ID_HIGHEST + 9;
-const ID_CLOSE_VIEW: i32 = ID_HIGHEST + 10;
-const ID_NEXT_VIEW: i32 = ID_HIGHEST + 11;
-const ID_PREV_VIEW: i32 = ID_HIGHEST + 12;
-const ID_TILE: i32 = ID_HIGHEST + 13;
-const ID_TAB_ALL: i32 = ID_HIGHEST + 14;
-const ID_SHOW_PROPERTIES: i32 = ID_HIGHEST + 15;
 const ID_HOME: i32 = ID_HIGHEST + 16;
 const ID_SET_HOME: i32 = ID_HIGHEST + 17;
 const ID_PERSPECTIVE: i32 = ID_HIGHEST + 18;
-const ID_ZOOM_PREV: i32 = ID_HIGHEST + 19;
-const ID_ZOOM_NEXT: i32 = ID_HIGHEST + 20;
-const ID_WALK: i32 = ID_HIGHEST + 21;
-const ID_DEFAULT_3D: i32 = ID_HIGHEST + 22;
-const ID_SHOW_BROWSER: i32 = ID_HIGHEST + 23;
 const ID_BROWSER_OPEN: i32 = ID_HIGHEST + 24;
 const ID_BROWSER_RENAME: i32 = ID_HIGHEST + 25;
 const ID_BROWSER_DUPLICATE: i32 = ID_HIGHEST + 26;
 const ID_BROWSER_DELETE: i32 = ID_HIGHEST + 27;
-const ID_NEW_PLAN: i32 = ID_HIGHEST + 28;
-const ID_DIMENSION: i32 = ID_HIGHEST + 29;
-const ID_EXPORT_PDF: i32 = ID_HIGHEST + 30;
-const ID_LEVEL: i32 = ID_HIGHEST + 31;
 const ID_BROWSER_ELEVATION: i32 = ID_HIGHEST + 32;
-const ID_GRID: i32 = ID_HIGHEST + 33;
-const ID_DOOR: i32 = ID_HIGHEST + 34;
-const ID_WINDOW: i32 = ID_HIGHEST + 35;
 /// The orientation presets of `nav::PRESETS`, one id each.
 const ID_ORIENT_FIRST: i32 = ID_HIGHEST + 40;
 
@@ -183,6 +158,8 @@ struct Gui {
     load_timer: Option<Timer<Frame>>,
     /// The Project Browser.
     browser: TreeCtrl,
+    /// The ribbon (built, like the menus and the Quick Access Toolbar, from the catalog).
+    ribbon: ribbon::Ribbon,
     browser_stale: bool,
     /// The view a Project Browser context menu acts on.
     browser_target: Option<ElementId>,
@@ -431,6 +408,7 @@ impl Gui {
             .build();
             dialog.show_modal();
         }
+        self.update_ribbon_context();
         let elements = self.app.document(id).map_or(0, |d| d.doc.store().len());
         frame.set_status_text(
             &format!(
@@ -1211,7 +1189,57 @@ impl Gui {
         }
     }
 
+    /// Shows the contextual "Modify | <category>" tab while elements are selected (§1.9.1).
+    fn update_ribbon_context(&mut self) {
+        let ids = self.selection();
+        let store = self
+            .doc
+            .and_then(|d| self.app.document(d))
+            .map(|d| d.doc.store().clone());
+        let context = store.filter(|_| !ids.is_empty()).map(|store| {
+            let cats: Vec<Option<&'static str>> = ids
+                .iter()
+                .map(|id| {
+                    store.get(*id).and_then(|e| {
+                        if reviera_core::annotations::dimension_data(e).is_some() {
+                            return Some("cat.dimensions");
+                        }
+                        reviera_core::categories::category_of(e).map(|c| c.key)
+                    })
+                })
+                .collect();
+            let one = cats
+                .first()
+                .copied()
+                .flatten()
+                .filter(|c| cats.iter().all(|x| *x == Some(*c)));
+            let label = match one {
+                Some("cat.dimensions") => "Dimensions".to_owned(),
+                Some(k) => self
+                    .ribbon
+                    .context_label(Some(k))
+                    .or_else(|| reviera_core::categories::category(k).map(|c| c.name.to_owned()))
+                    .unwrap_or_else(|| "Multi-Select".to_owned()),
+                None => "Multi-Select".to_owned(),
+            };
+            (label, one)
+        });
+        self.ribbon
+            .set_context(context.as_ref().map(|(l, c)| (l.as_str(), *c)));
+        // Tools that act on the selection are disabled without one (UI-RIB-001: they stay
+        // visible).
+        for action in [
+            "element.delete",
+            "wall.flip",
+            "insert.flip_hand",
+            "insert.flip_facing",
+        ] {
+            self.ribbon.enable(action, !ids.is_empty());
+        }
+    }
+
     fn selection_changed(&mut self) {
+        self.update_ribbon_context();
         let ids = self.selection();
         if let Some(v) = self.viewport() {
             v.set_highlight(&ids);
@@ -1993,157 +2021,66 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
             .with_size(Size::new(1400, 860))
             .build();
 
-        let file_menu = Menu::builder()
-            .append_item(ID_NEW, "&New\tCtrl+N", "Create a project")
-            .append_item(ID_OPEN, "&Open...\tCtrl+O", "Open an IFC project")
-            .append_item(ID_SAVE_FILE, "&Save\tCtrl+S", "Save the project")
-            .append_item(
-                ID_SAVE_AS,
-                "Save &As...\tCtrl+Shift+S",
-                "Save the project to a new file",
-            )
-            .append_separator()
-            .append_item(
-                ID_EXPORT_PDF,
-                "Export &PDF...\tCtrl+P",
-                "Export the active plan as PDF at its scale",
-            )
-            .append_separator()
-            .append_item(ID_EXIT, "E&xit", "Close Reviera")
-            .build();
-        let mut orient_menu = Menu::builder();
-        for (k, (label, _)) in nav::PRESETS.iter().enumerate() {
-            orient_menu = orient_menu.append_item(ID_ORIENT_FIRST + k as i32, label, "");
-        }
-        let edit_menu = Menu::builder()
-            .append_item(ID_UNDO, "&Undo\tCtrl+Z", "Undo the last change")
-            .append_item(ID_REDO, "&Redo\tCtrl+Y", "Redo the last undone change")
-            .build();
-        // Keyboard sequences (ZF, ZP, ...) are typed in the view (§1.26.4); single-letter menu
-        // accelerators would take letters away from typed lengths.
-        let view_menu = Menu::builder()
-            .append_item(
-                ID_DEFAULT_3D,
-                "&Default 3D View",
-                "Open the model's default 3D view",
-            )
-            .append_item(
-                ID_NEW_PLAN,
-                "New Floor &Plan...",
-                "Create floor plans of levels",
-            )
-            .append_separator()
-            .append_item(
-                ID_FIT,
-                "Zoom to &Fit (ZF)",
-                "Show the whole model, or the selection",
-            )
-            .append_item(
-                ID_ZOOM_PREV,
-                "&Previous Pan/Zoom (ZP)",
-                "Go back to the previous view",
-            )
-            .append_item(ID_ZOOM_NEXT, "&Next Pan/Zoom (ZN)", "Go forward again")
-            .append_separator()
-            .append_item(
-                ID_HOME,
-                "&Home\tAlt+Home",
-                "Go to the view's home orientation",
-            )
-            .append_item(ID_SET_HOME, "Set Current View as Home", "")
-            .build();
-        view_menu.append_submenu(
-            orient_menu.build(),
-            "&Orient",
-            "Standard and isometric views",
-        );
-        view_menu.append(
-            ID_PERSPECTIVE,
-            "Perspective / &Isometric (PI)",
-            "Switch between perspective and isometric (parallel) projection",
-            ItemKind::Normal,
-        );
-        view_menu.append_separator();
-        view_menu.append(
-            ID_WALK,
-            "&Walk (WK)",
-            "Walk through the model at eye height",
-            ItemKind::Normal,
-        );
-        let architecture_menu = Menu::builder()
-            .append_item(ID_WALL, "&Wall (WA)", "Draw walls on the lowest level")
-            .append_item(ID_DOOR, "&Door (DR)", "Place doors in walls")
-            .append_item(ID_WINDOW, "Wi&ndow (WN)", "Place windows in walls")
-            .append_separator()
-            .append_item(ID_GRID, "&Grid (GR)", "Draw grid lines in a plan")
-            .append_item(
-                ID_LEVEL,
-                "&Level... (LL)",
-                "Add a level at an elevation, with its floor plan",
-            )
-            .build();
-        let annotate_menu = Menu::builder()
-            .append_item(
-                ID_DIMENSION,
-                "Aligned &Dimension (DI)",
-                "Dimension parallel walls and edges in a plan",
-            )
-            .build();
-        let window_menu = Menu::builder()
-            .append_item(
-                ID_NEW_VIEW,
-                "New &3D View",
-                "Open another 3D view of the model",
-            )
-            .append_item(
-                ID_CLOSE_VIEW,
-                "&Close View\tCtrl+W",
-                "Close the active view",
-            )
-            .append_separator()
-            .append_item(
-                ID_NEXT_VIEW,
-                "&Next View\tCtrl+PgDn",
-                "Activate the next view",
-            )
-            .append_item(
-                ID_PREV_VIEW,
-                "&Previous View\tCtrl+PgUp",
-                "Activate the previous view",
-            )
-            .append_separator()
-            .append_item(ID_TILE, "&Tile Views", "Show every view at once")
-            .append_item(
-                ID_TAB_ALL,
-                "T&ab Views",
-                "Put every view back in one tab group",
-            )
-            .append_separator()
-            .append_item(
-                ID_SHOW_PROPERTIES,
-                "&Properties",
-                "Show or hide the Properties palette",
-            )
-            .append_item(
-                ID_SHOW_BROWSER,
-                "Project &Browser",
-                "Show or hide the Project Browser",
-            )
-            .build();
-        let menu_bar = MenuBar::builder()
-            .append(file_menu, "&File")
-            .append(edit_menu, "&Edit")
-            .append(view_menu, "&View")
-            .append(architecture_menu, "&Architecture")
-            .append(annotate_menu, "A&nnotate")
-            .append(window_menu, "&Window")
-            .build();
+        // Menus, the Quick Access Toolbar and the ribbon come from one catalog (UI-RIBCAT-001).
+        let catalog = ribbon::Catalog::parse(ribbon::DEFAULT).expect("the built-in ribbon catalog");
+        let menu_bar = ribbon::menu_bar(&catalog, &|name| {
+            (name == "orient").then(|| {
+                let mut orient_menu = Menu::builder();
+                for (k, (label, _)) in nav::PRESETS.iter().enumerate() {
+                    orient_menu = orient_menu.append_item(ID_ORIENT_FIRST + k as i32, label, "");
+                }
+                (orient_menu.build(), "&Orient".to_owned())
+            })
+        });
         frame.set_menu_bar(menu_bar);
         frame.create_status_bar(2, 0, -1, "status");
         frame.set_status_text("Open an IFC file to begin (File > Open)", 0);
 
-        // Docking layout: Properties on the left, view tabs in the centre (Ch 1 §1.4).
+        // Docking layout: Quick Access Toolbar and ribbon on top, Properties on the left, view
+        // tabs in the centre (Ch 1 §1.4).
         let aui = AuiManager::builder(&frame).build();
+        let qat = ribbon::quick_access(&frame, &catalog);
+        aui.add_pane_with_info(
+            &qat,
+            AuiPaneInfo::new()
+                .with_name("quick_access")
+                .toolbar_pane()
+                .top()
+                .layer(2)
+                .row(0)
+                .gripper(false)
+                .floatable(false)
+                .dockable(false)
+                .movable(false),
+        );
+        // Ribbon clicks reach the window's dispatcher once it exists.
+        let dispatch: Rc<RefCell<Option<Dispatch>>> = Rc::new(RefCell::new(None));
+        let ribbon_panel = Panel::builder(&frame).build();
+        let ribbon_bar = {
+            let dispatch = dispatch.clone();
+            ribbon::Ribbon::new(&ribbon_panel, catalog.clone(), move |id| {
+                if let Ok(d) = dispatch.try_borrow()
+                    && let Some(d) = d.as_ref()
+                {
+                    d(id);
+                }
+            })
+        };
+        aui.add_pane_with_info(
+            &ribbon_panel,
+            AuiPaneInfo::new()
+                .with_name("ribbon")
+                .top()
+                .layer(2)
+                .row(1)
+                .caption_visible(false)
+                .pane_border(false)
+                .floatable(false)
+                .dockable(false)
+                .movable(false)
+                .resizable(false)
+                .min_size(-1, ribbon_bar.height()),
+        );
         let grid = PropertyGrid::builder(&frame)
             .with_style(PropertyGridStyle::Tooltips)
             .build();
@@ -2214,6 +2151,7 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 loading: Vec::new(),
                 load_timer: Some(Timer::new(&frame)),
                 browser,
+                ribbon: ribbon_bar,
                 browser_stale: true,
                 browser_target: None,
                 plan_edges: HashMap::new(),
@@ -2354,160 +2292,30 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
             });
         }
         {
-            let (gui, f) = (gui.clone(), frame);
+            let gui = gui.clone();
+            {
+                let (gui, f, catalog) = (gui.clone(), frame, catalog.clone());
+                *dispatch.borrow_mut() = Some(Box::new(move |id| {
+                    if let Some(a) = catalog.action_of(id) {
+                        perform(&gui, &f, &a.id);
+                    }
+                }));
+            }
+            let dispatch = dispatch.clone();
             frame.on_menu(move |e| match e.get_id() {
-                ID_OPEN => {
-                    let dialog = FileDialog::builder(&f)
-                        .with_message("Open IFC project")
-                        .with_wildcard("IFC files (*.ifc)|*.ifc;*.IFC|All files (*.*)|*.*")
-                        .build();
-                    if dialog.show_modal() == ID_OK
-                        && let Some(path) = dialog.get_path()
+                id if id >= ribbon::ID_ACTION_FIRST => {
+                    if let Ok(d) = dispatch.try_borrow()
+                        && let Some(d) = d.as_ref()
                     {
-                        with(&gui, |g| g.open(Path::new(&path), &f));
+                        d(id);
                     }
                 }
-                ID_NEW => with(&gui, |g| g.new_project(&f)),
-                ID_SAVE_FILE | ID_SAVE_AS => {
-                    // A project that was never saved has no file yet: Save asks for one.
-                    let mut current = None;
-                    with(&gui, |g| {
-                        if g.doc.is_some() {
-                            current = Some(g.current_path());
-                        }
-                    });
-                    let Some(current) = current else { return };
-                    if e.get_id() == ID_SAVE_FILE && current.is_some() {
-                        return with(&gui, |g| {
-                            g.save(&f);
-                            g.update_captions();
-                        });
-                    }
-                    let name = current
-                        .as_ref()
-                        .and_then(|p| p.file_name())
-                        .map_or("Untitled.ifc".into(), |n| n.to_string_lossy().into_owned());
-                    let mut dialog = FileDialog::builder(&f)
-                        .with_message("Save IFC project as")
-                        .with_wildcard("IFC files (*.ifc)|*.ifc;*.IFC")
-                        .with_style(FileDialogStyle::Save | FileDialogStyle::OverwritePrompt)
-                        .with_default_file(&name);
-                    if let Some(dir) = current.as_ref().and_then(|p| p.parent()) {
-                        dialog = dialog.with_default_dir(&dir.to_string_lossy());
-                    }
-                    let dialog = dialog.build();
-                    if dialog.show_modal() == ID_OK
-                        && let Some(path) = dialog.get_path()
-                    {
-                        with(&gui, |g| {
-                            g.save_as(Path::new(&path), &f);
-                            g.update_captions();
-                        });
-                    }
-                }
-                ID_UNDO | ID_REDO => {
-                    let command = if e.get_id() == ID_UNDO {
-                        "edit.undo"
-                    } else {
-                        "edit.redo"
-                    };
-                    with(&gui, |g| g.undo_redo(command, &f));
-                }
-                ID_WALL => with(&gui, |g| {
-                    g.start_wall_tool(&f);
-                    if let Some(v) = g.active_view() {
-                        v.panel.set_focus();
-                    }
-                }),
-                ID_LEVEL => with(&gui, Gui::new_level),
-                ID_DOOR | ID_WINDOW => {
-                    let kind = if e.get_id() == ID_DOOR {
-                        reviera_core::inserts::Kind::Door
-                    } else {
-                        reviera_core::inserts::Kind::Window
-                    };
-                    with(&gui, |g| {
-                        g.start_insert_tool(kind);
-                        if let Some(v) = g.active_view() {
-                            v.panel.set_focus();
-                        }
-                    });
-                }
-                ID_GRID => with(&gui, |g| {
-                    g.start_grid_tool();
-                    if let Some(v) = g.active_view() {
-                        v.panel.set_focus();
-                    }
-                }),
-                ID_FIT => with(&gui, Gui::zoom_to_fit),
-                ID_ZOOM_PREV => with(&gui, |g| g.history(true)),
-                ID_ZOOM_NEXT => with(&gui, |g| g.history(false)),
-                ID_HOME => with(&gui, Gui::go_home),
-                ID_SET_HOME => with(&gui, Gui::set_home),
-                ID_PERSPECTIVE => with(&gui, Gui::toggle_perspective),
-                ID_WALK => with(&gui, Gui::toggle_walk),
                 id if (ID_ORIENT_FIRST..ID_ORIENT_FIRST + nav::PRESETS.len() as i32)
                     .contains(&id) =>
                 {
                     let dir = nav::PRESETS[(id - ID_ORIENT_FIRST) as usize].1;
                     with(&gui, |g| g.orient(glam::Vec3::from(dir)));
                 }
-                ID_NEW_VIEW => with(&gui, Gui::new_3d_view),
-                ID_DEFAULT_3D => with(&gui, Gui::default_3d_view),
-                ID_NEW_PLAN => with(&gui, Gui::new_floor_plans),
-                ID_EXPORT_PDF => {
-                    let mut target = None;
-                    with(&gui, |g| {
-                        target = g
-                            .active_view()
-                            .filter(|v| v.plan.is_some())
-                            .and_then(|v| Some((v.element?, g.view_name(v), g.current_path())));
-                    });
-                    let Some((view, name, model_path)) = target else {
-                        return error(
-                            &f,
-                            "Open a floor plan to export it as PDF (View › New Floor Plan).",
-                        );
-                    };
-                    let mut dialog = FileDialog::builder(&f)
-                        .with_message("Export PDF")
-                        .with_wildcard("PDF files (*.pdf)|*.pdf")
-                        .with_style(FileDialogStyle::Save | FileDialogStyle::OverwritePrompt)
-                        .with_default_file(&format!("{name}.pdf"));
-                    if let Some(dir) = model_path.as_ref().and_then(|p| p.parent()) {
-                        dialog = dialog.with_default_dir(&dir.to_string_lossy());
-                    }
-                    let dialog = dialog.build();
-                    if dialog.show_modal() == ID_OK
-                        && let Some(path) = dialog.get_path()
-                    {
-                        let mut path = PathBuf::from(path);
-                        if path.extension().is_none() {
-                            path.set_extension("pdf");
-                        }
-                        with(&gui, |g| {
-                            let args =
-                                json!({ "range": { "views": [view] }, "path_or_folder": path });
-                            match g.run("export.pdf", args) {
-                                Ok(v) => f.set_status_text(
-                                    &format!(
-                                        "Exported {} ({})",
-                                        path.display(),
-                                        v["sheets"][0].as_str().unwrap_or_default()
-                                    ),
-                                    0,
-                                ),
-                                Err(e) => error(&f, &format!("The PDF was not written:\n{e}")),
-                            }
-                        });
-                    }
-                }
-                ID_DIMENSION => with(&gui, |g| {
-                    g.start_dim_tool(&f);
-                    if let Some(v) = g.active_view() {
-                        v.panel.set_focus();
-                    }
-                }),
                 ID_BROWSER_OPEN | ID_BROWSER_RENAME | ID_BROWSER_DUPLICATE | ID_BROWSER_DELETE
                 | ID_BROWSER_ELEVATION => {
                     let id = e.get_id();
@@ -2531,28 +2339,6 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                         }
                     });
                 }
-                ID_CLOSE_VIEW => with(&gui, |g| {
-                    if let Some(v) = g.active {
-                        g.close_view(v);
-                    }
-                }),
-                ID_NEXT_VIEW => with(&gui, |g| g.cycle_view(1)),
-                ID_PREV_VIEW => with(&gui, |g| g.cycle_view(-1)),
-                ID_TILE => with(&gui, Gui::tile),
-                ID_TAB_ALL => with(&gui, Gui::tab_all),
-                ID_SHOW_PROPERTIES | ID_SHOW_BROWSER => {
-                    let pane = if e.get_id() == ID_SHOW_PROPERTIES {
-                        "properties"
-                    } else {
-                        "browser"
-                    };
-                    with(&gui, |g| {
-                        let shown = g.aui.is_pane_shown(pane);
-                        g.aui.set_pane_shown(pane, !shown);
-                        g.aui.update();
-                    });
-                }
-                ID_EXIT => f.close(false),
                 _ => e.skip(true),
             });
         }
@@ -2564,4 +2350,216 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
         }
     })
     .map_err(|e| e.to_string())
+}
+
+/// Runs the action of a wx id (ribbon, Quick Access Toolbar and menus share one dispatcher).
+type Dispatch = Box<dyn Fn(i32)>;
+
+/// Runs a catalog action (from the ribbon, the Quick Access Toolbar or a menu).
+fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
+    let focus = |g: &mut Gui| {
+        if let Some(v) = g.active_view() {
+            v.panel.set_focus();
+        }
+    };
+    match action {
+        "file.open" => {
+            let dialog = FileDialog::builder(f)
+                .with_message("Open IFC project")
+                .with_wildcard("IFC files (*.ifc)|*.ifc;*.IFC|All files (*.*)|*.*")
+                .build();
+            if dialog.show_modal() == ID_OK
+                && let Some(path) = dialog.get_path()
+            {
+                with(gui, |g| g.open(Path::new(&path), f));
+            }
+        }
+        "file.new" => with(gui, |g| g.new_project(f)),
+        "file.save" | "file.save_as" => {
+            // A project that was never saved has no file yet: Save asks for one.
+            let mut current = None;
+            with(gui, |g| {
+                if g.doc.is_some() {
+                    current = Some(g.current_path());
+                }
+            });
+            let Some(current) = current else { return };
+            if action == "file.save" && current.is_some() {
+                return with(gui, |g| {
+                    g.save(f);
+                    g.update_captions();
+                });
+            }
+            let name = current
+                .as_ref()
+                .and_then(|p| p.file_name())
+                .map_or("Untitled.ifc".into(), |n| n.to_string_lossy().into_owned());
+            let mut dialog = FileDialog::builder(f)
+                .with_message("Save IFC project as")
+                .with_wildcard("IFC files (*.ifc)|*.ifc;*.IFC")
+                .with_style(FileDialogStyle::Save | FileDialogStyle::OverwritePrompt)
+                .with_default_file(&name);
+            if let Some(dir) = current.as_ref().and_then(|p| p.parent()) {
+                dialog = dialog.with_default_dir(&dir.to_string_lossy());
+            }
+            let dialog = dialog.build();
+            if dialog.show_modal() == ID_OK
+                && let Some(path) = dialog.get_path()
+            {
+                with(gui, |g| {
+                    g.save_as(Path::new(&path), f);
+                    g.update_captions();
+                });
+            }
+        }
+        "export.pdf" => export_pdf(gui, f),
+        "app.exit" => {
+            f.close(false);
+        }
+        "edit.undo" | "edit.redo" => with(gui, |g| g.undo_redo(action, f)),
+        "tool.modify" => with(gui, |g| {
+            g.end_tool(f);
+            g.end_dim_tool();
+            g.end_grid_tool();
+            g.end_insert_tool();
+            g.leave_walk();
+            g.update_ribbon_context();
+        }),
+        "element.delete" => with(gui, Gui::delete_selection),
+        "wall.create" => with(gui, |g| {
+            g.start_wall_tool(f);
+            focus(g);
+        }),
+        "door.place" | "window.place" => {
+            let kind = if action == "door.place" {
+                reviera_core::inserts::Kind::Door
+            } else {
+                reviera_core::inserts::Kind::Window
+            };
+            with(gui, |g| {
+                g.start_insert_tool(kind);
+                focus(g);
+            });
+        }
+        "level.create" => with(gui, Gui::new_level),
+        "grid.create" => with(gui, |g| {
+            g.start_grid_tool();
+            focus(g);
+        }),
+        "dim.create_aligned" => with(gui, |g| {
+            g.start_dim_tool(f);
+            focus(g);
+        }),
+        "wall.flip" | "insert.flip_hand" | "insert.flip_facing" => with(gui, |g| {
+            let ids = g.selection();
+            let key = if action == "wall.flip" {
+                "wall_ids"
+            } else {
+                "element_ids"
+            };
+            let store = g
+                .doc
+                .and_then(|d| g.app.document(d))
+                .map(|d| d.doc.store().clone());
+            let ids: Vec<ElementId> = ids
+                .into_iter()
+                .filter(|id| {
+                    store.as_ref().and_then(|s| s.get(*id)).is_some_and(|e| {
+                        if action == "wall.flip" {
+                            reviera_core::walls::wall_recipe(e).is_some()
+                        } else {
+                            reviera_core::inserts::kind_of(e).is_some()
+                        }
+                    })
+                })
+                .collect();
+            if ids.is_empty() {
+                return f.set_status_text("Select the elements to flip first", 0);
+            }
+            if let Err(e) = g.run(action, json!({ key: ids })) {
+                f.set_status_text(&e, 0);
+            }
+            g.refresh_scene(f);
+        }),
+        "view.zoom_fit" => with(gui, Gui::zoom_to_fit),
+        "view.zoom_previous" => with(gui, |g| g.history(true)),
+        "view.zoom_next" => with(gui, |g| g.history(false)),
+        "view.home" => with(gui, Gui::go_home),
+        "view.set_home" => with(gui, Gui::set_home),
+        "view.set_projection" => with(gui, Gui::toggle_perspective),
+        "view.walk" => with(gui, Gui::toggle_walk),
+        "view.create_3d" => with(gui, Gui::new_3d_view),
+        "view.default_3d" => with(gui, Gui::default_3d_view),
+        "view.create_plan" => with(gui, Gui::new_floor_plans),
+        "window.close" => with(gui, |g| {
+            if let Some(v) = g.active {
+                g.close_view(v);
+            }
+        }),
+        "window.next" => with(gui, |g| g.cycle_view(1)),
+        "window.previous" => with(gui, |g| g.cycle_view(-1)),
+        "window.tile" => with(gui, Gui::tile),
+        "window.tab_all" => with(gui, Gui::tab_all),
+        "ui.pane.properties" | "ui.pane.browser" => {
+            let pane = if action == "ui.pane.properties" {
+                "properties"
+            } else {
+                "browser"
+            };
+            with(gui, |g| {
+                let shown = g.aui.is_pane_shown(pane);
+                g.aui.set_pane_shown(pane, !shown);
+                g.aui.update();
+            });
+        }
+        other => f.set_status_text(&format!("{other} is not available yet"), 0),
+    }
+}
+
+/// File › Export PDF: the active plan, at its scale, to a chosen file.
+fn export_pdf(gui: &Rc<RefCell<Gui>>, f: &Frame) {
+    let mut target = None;
+    with(gui, |g| {
+        target = g
+            .active_view()
+            .filter(|v| v.plan.is_some())
+            .and_then(|v| Some((v.element?, g.view_name(v), g.current_path())));
+    });
+    let Some((view, name, model_path)) = target else {
+        return error(
+            f,
+            "Open a floor plan to export it as PDF (View › New Floor Plan).",
+        );
+    };
+    let mut dialog = FileDialog::builder(f)
+        .with_message("Export PDF")
+        .with_wildcard("PDF files (*.pdf)|*.pdf")
+        .with_style(FileDialogStyle::Save | FileDialogStyle::OverwritePrompt)
+        .with_default_file(&format!("{name}.pdf"));
+    if let Some(dir) = model_path.as_ref().and_then(|p| p.parent()) {
+        dialog = dialog.with_default_dir(&dir.to_string_lossy());
+    }
+    let dialog = dialog.build();
+    if dialog.show_modal() == ID_OK
+        && let Some(path) = dialog.get_path()
+    {
+        let mut path = PathBuf::from(path);
+        if path.extension().is_none() {
+            path.set_extension("pdf");
+        }
+        with(gui, |g| {
+            let args = json!({ "range": { "views": [view] }, "path_or_folder": path });
+            match g.run("export.pdf", args) {
+                Ok(v) => f.set_status_text(
+                    &format!(
+                        "Exported {} ({})",
+                        path.display(),
+                        v["sheets"][0].as_str().unwrap_or_default()
+                    ),
+                    0,
+                ),
+                Err(e) => error(f, &format!("The PDF was not written:\n{e}")),
+            }
+        });
+    }
 }

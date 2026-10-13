@@ -1,0 +1,181 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Reviera contributors
+
+//! Reviera's own tool icons (UI-ARCH-005: SVG through `wxBitmapBundle::FromSVG`): simple line
+//! drawings on a 32 × 32 grid, in one ink colour with a blue accent and a pale fill, in a light
+//! and a dark variant. They are drawn for Reviera; no third-party icon set is used (NFR-CR-001).
+
+/// Ink, accent, fill and paper colours for light or dark chrome.
+fn palette(dark: bool) -> [&'static str; 4] {
+    if dark {
+        ["#d5dee8", "#5aa7f0", "#33475c", "#1f2a36"]
+    } else {
+        ["#2f3d4c", "#2e7fd6", "#d7e5f2", "#ffffff"]
+    }
+}
+
+/// The body of an icon (SVG elements), by name.
+fn body(name: &str, dark: bool) -> Option<String> {
+    let [i, a, f, paper] = palette(dark);
+    let s = format!(
+        r#"fill="none" stroke="{i}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round""#
+    );
+    let sa = format!(
+        r#"fill="none" stroke="{a}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round""#
+    );
+    Some(match name {
+        "new" => format!(
+            r#"<path d="M8 3h11l6 6v20H8z" fill="{f}" {s}/><path d="M19 3v6h6" {s}/><path d="M16 15v10M11 20h10" {sa}/>"#
+        ),
+        "open" => format!(
+            r#"<path d="M3 8h9l3 3h13v4" {s}/><path d="M3 8v19h22l5-12H8L3 27" fill="{f}" {s}/>"#
+        ),
+        "save" => format!(
+            r#"<path d="M5 4h19l4 4v20H5z" fill="{f}" {s}/><path d="M10 4v7h11V4" {s}/><rect x="9" y="17" width="15" height="11" fill="{paper}" {s}/><path d="M12 21h9M12 24h9" {sa}/>"#
+        ),
+        "save_as" => format!(
+            r#"<path d="M5 4h17l4 4v9" {s}/><path d="M5 4v24h10" {s}/><path d="M10 4v7h11V4" {s}/><path d="M18 28l2-6 8-8 4 4-8 8z" fill="{f}" {sa}/>"#
+        ),
+        "pdf" => format!(
+            r#"<path d="M7 3h12l6 6v20H7z" fill="{f}" {s}/><path d="M19 3v6h6" {s}/><path d="M11 22v-6h3a2 2 0 010 4h-3" {sa}/><path d="M19 16v6" {sa}/>"#
+        ),
+        "exit" => {
+            format!(r#"<path d="M14 5H6v22h8" {s}/><path d="M13 16h15M23 11l5 5-5 5" {sa}/>"#)
+        }
+        "undo" => {
+            format!(r#"<path d="M9 13h12a6 6 0 010 12H12" {s}/><path d="M13 8l-5 5 5 5" {sa}/>"#)
+        }
+        "redo" => {
+            format!(r#"<path d="M23 13H11a6 6 0 000 12h9" {s}/><path d="M19 8l5 5-5 5" {sa}/>"#)
+        }
+        "modify" => format!(r#"<path d="M8 4l16 13-7 1 4 9-3 1-4-9-6 5z" fill="{f}" {s}/>"#),
+        "delete" => format!(
+            r#"<path d="M6 9h20M12 9V5h8v4" {s}/><path d="M8 9l2 19h12l2-19" fill="{f}" {s}/><path d="M13 14v10M19 14v10" {sa}/>"#
+        ),
+        "wall" => format!(
+            r#"<path d="M3 24l8-6h18l-8 6z" fill="{f}" {s}/><path d="M3 24V10l8-6h18v14" {s}/><path d="M3 10h18v14M21 10l8-6" {s}/><path d="M6 15h12M6 20h12" {sa}/>"#
+        ),
+        "door" => format!(
+            r#"<path d="M4 28h24" {s}/><rect x="8" y="4" width="16" height="24" fill="{f}" {s}/><path d="M12 8h8v20h-8z" fill="{paper}" {s}/><circle cx="18" cy="18" r="1.4" fill="{a}"/>"#
+        ),
+        "window" => format!(
+            r#"<rect x="5" y="6" width="22" height="20" fill="{f}" {s}/><path d="M16 6v20M5 16h22" {s}/><path d="M9 10l4-1M20 10l4-1" {sa}/>"#
+        ),
+        "grid" => format!(
+            r#"<path d="M10 9v20M22 9v20M4 15h24M4 25h24" {s} stroke-dasharray="4 2"/><circle cx="10" cy="5" r="3.5" fill="{paper}" {sa}/><circle cx="22" cy="5" r="3.5" fill="{paper}" {sa}/>"#
+        ),
+        "level" => format!(
+            r#"<path d="M3 12h18M3 24h18" {s} stroke-dasharray="5 2"/><path d="M21 12l4-4 4 4-4 4z" fill="{f}" {sa}/><path d="M21 24l4-4 4 4-4 4z" fill="{f}" {sa}/>"#
+        ),
+        "dimension" => format!(
+            r#"<path d="M5 8v18M27 8v18" {s}/><path d="M5 16h22" {sa}/><path d="M3 18l4-4M25 18l4-4" {sa}/><path d="M12 11h8" {s}/>"#
+        ),
+        "plan" => format!(
+            r#"<rect x="4" y="5" width="24" height="22" fill="{f}" {s}/><path d="M4 16h10v11M18 5v8h10" {s}/><path d="M14 16a5 5 0 015 5" {sa}/>"#
+        ),
+        "view3d" => format!(
+            r#"<path d="M16 4l11 6v12l-11 6-11-6V10z" fill="{f}" {s}/><path d="M5 10l11 6 11-6M16 16v12" {s}/><path d="M16 16l11-6" {sa}/>"#
+        ),
+        "view_new" => format!(
+            r#"<path d="M14 6l9 5v10l-9 5-9-5V11z" fill="{f}" {s}/><path d="M5 11l9 5 9-5M14 16v10" {s}/><path d="M26 3v8M22 7h8" {sa}/>"#
+        ),
+        "zoom_fit" => format!(
+            r#"<circle cx="14" cy="14" r="8" fill="{f}" {s}/><path d="M20 20l7 7" {s}/><path d="M10 12V10h3M18 12V10h-3M10 16v2h3M18 16v2h-3" {sa}/>"#
+        ),
+        "zoom_prev" => format!(
+            r#"<circle cx="16" cy="14" r="8" fill="{f}" {s}/><path d="M22 20l6 6" {s}/><path d="M18 10l-4 4 4 4" {sa}/>"#
+        ),
+        "zoom_next" => format!(
+            r#"<circle cx="16" cy="14" r="8" fill="{f}" {s}/><path d="M22 20l6 6" {s}/><path d="M14 10l4 4-4 4" {sa}/>"#
+        ),
+        "home" => format!(
+            r#"<path d="M4 16L16 5l12 11" {s}/><path d="M8 13v14h16V13" fill="{f}" {s}/><path d="M14 27v-7h4v7" {sa}/>"#
+        ),
+        "set_home" => format!(
+            r#"<path d="M4 16L16 5l12 11" {s}/><path d="M8 13v14h16V13" fill="{f}" {s}/><path d="M12 20l3 3 6-6" {sa}/>"#
+        ),
+        "perspective" => format!(
+            r#"<path d="M4 26l8-18h8l8 18z" fill="{f}" {s}/><path d="M12 8l-2 18M20 8l2 18M7 19h18" {sa}/>"#
+        ),
+        "walk" => format!(
+            r#"<circle cx="17" cy="5" r="2.6" fill="{a}"/><path d="M16 10l-4 8 5 3-2 8M16 10l4 6 5 1M13 14l-5 2M12 18l-5 9" {s}/>"#
+        ),
+        "close_view" => format!(
+            r#"<rect x="4" y="6" width="24" height="20" fill="{f}" {s}/><path d="M4 11h24" {s}/><path d="M12 15l8 8M20 15l-8 8" {sa}/>"#
+        ),
+        "next_view" => format!(
+            r#"<rect x="3" y="7" width="18" height="18" fill="{f}" {s}/><path d="M17 16h12M24 11l5 5-5 5" {sa}/>"#
+        ),
+        "prev_view" => format!(
+            r#"<rect x="11" y="7" width="18" height="18" fill="{f}" {s}/><path d="M15 16H3M8 11l-5 5 5 5" {sa}/>"#
+        ),
+        "tile" => format!(
+            r#"<rect x="4" y="4" width="11" height="11" fill="{f}" {s}/><rect x="17" y="4" width="11" height="11" fill="{f}" {s}/><rect x="4" y="17" width="11" height="11" fill="{f}" {s}/><rect x="17" y="17" width="11" height="11" fill="{f}" {s}/>"#
+        ),
+        "tab_all" => format!(
+            r#"<path d="M4 10h8l2-4h6l2 4h6v18H4z" fill="{f}" {s}/><path d="M4 10h24" {sa}/>"#
+        ),
+        "properties" => format!(
+            r#"<rect x="5" y="4" width="22" height="24" fill="{f}" {s}/><path d="M9 10h6M9 16h6M9 22h6" {s}/><path d="M18 10h5M18 16h5M18 22h5" {sa}/>"#
+        ),
+        "browser" => format!(
+            r#"<path d="M6 5v22M6 10h6M6 18h6M6 26h6" {s}/><rect x="12" y="7" width="15" height="6" fill="{f}" {s}/><rect x="12" y="15" width="15" height="6" fill="{f}" {s}/><rect x="12" y="23" width="15" height="6" fill="{f}" {sa}/>"#
+        ),
+        "move" => format!(
+            r#"<path d="M16 3v26M3 16h26" {s}/><path d="M12 7l4-4 4 4M12 25l4 4 4-4M7 12l-4 4 4 4M25 12l4 4-4 4" {sa}/>"#
+        ),
+        "copy" => format!(
+            r#"<rect x="4" y="4" width="15" height="15" fill="{paper}" {s}/><rect x="13" y="13" width="15" height="15" fill="{f}" {sa}/>"#
+        ),
+        "rotate" => format!(
+            r#"<path d="M27 16a11 11 0 11-4-8.5" {s}/><path d="M24 3v6h-6" {sa}/><circle cx="16" cy="16" r="2" fill="{a}"/>"#
+        ),
+        "mirror_pick" => format!(
+            r#"<path d="M16 3v26" {sa} stroke-dasharray="4 2"/><path d="M13 8L4 24h9z" fill="{f}" {s}/><path d="M19 8l9 16h-9z" fill="{paper}" {s}/>"#
+        ),
+        "mirror_draw" => format!(
+            r#"<path d="M16 7v22" {sa} stroke-dasharray="4 2"/><path d="M13 12L4 26h9z" fill="{f}" {s}/><path d="M19 12l9 14h-9z" fill="{paper}" {s}/><path d="M12 4h8" {sa}/>"#
+        ),
+        "align" => format!(
+            r#"<path d="M5 4v24" {sa}/><rect x="9" y="7" width="14" height="6" fill="{f}" {s}/><rect x="9" y="19" width="19" height="6" fill="{f}" {s}/>"#
+        ),
+        "offset" => format!(r#"<path d="M4 22L14 8h14" {s}/><path d="M4 28l12-16h12" {sa}/>"#),
+        "trim" => format!(
+            r#"<path d="M6 26V10M6 26h16" {s}/><path d="M6 10V5M22 26h5" {sa} stroke-dasharray="2 2"/><circle cx="6" cy="26" r="2.4" fill="{a}"/>"#
+        ),
+        "trim_single" => format!(
+            r#"<path d="M24 4v24" {sa}/><path d="M4 16h20" {s}/><path d="M24 16h4" {s} stroke-dasharray="2 2"/>"#
+        ),
+        "split" => format!(r#"<path d="M3 16h10M19 16h10" {s}/><path d="M14 8l4 16" {sa}/>"#),
+        "pin" => format!(
+            r#"<path d="M12 4h8l-1 8 4 4H9l4-4z" fill="{f}" {s}/><path d="M16 16v12" {sa}/>"#
+        ),
+        "unpin" => format!(
+            r#"<path d="M12 4h8l-1 8 4 4H9l4-4z" fill="{f}" {s}/><path d="M16 16v12" {s}/><path d="M6 6l20 20" {sa}/>"#
+        ),
+        "flip" => format!(
+            r#"<path d="M4 16h24" {s}/><path d="M16 4v8M12 8l4-4 4 4M16 28v-8M12 24l4 4 4-4" {sa}/>"#
+        ),
+        "flip_hand" => format!(
+            r#"<path d="M16 6v20" {s}/><path d="M4 16h8M8 12l-4 4 4 4M28 16h-8M24 12l4 4-4 4" {sa}/>"#
+        ),
+        _ => return None,
+    })
+}
+
+/// The SVG of an icon for light or dark chrome (a placeholder square for unknown names).
+pub fn svg(name: &str, dark: bool) -> String {
+    let [ink, _, fill, _] = palette(dark);
+    let body = body(name, dark).unwrap_or_else(|| {
+        format!(r#"<rect x="6" y="6" width="20" height="20" fill="{fill}" stroke="{ink}" stroke-width="2"/>"#)
+    });
+    format!(
+        r#"<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">{body}</svg>"#
+    )
+}
+
+/// Whether an icon exists.
+#[cfg(test)]
+pub fn exists(name: &str) -> bool {
+    body(name, false).is_some()
+}

@@ -65,6 +65,11 @@ operation can be driven by Lua scripts and by AI agents through the Model Contex
 - **PDF**: File › Export PDF writes plan views as vector PDF at their scale on the smallest ISO
   sheet (A4–A0), with pen widths in paper millimetres, dimension values as real text and a title
   strip (`export.pdf`).
+- **Ribbon and menus**: a tool ribbon with Architecture, Annotate, View and Modify tabs (large
+  and small icon buttons in titled panels, the Select panel first), a Quick Access Toolbar
+  above it, and a contextual *Modify | <category>* tab while elements are selected (for
+  example Flip Hand and Flip Facing for doors). The ribbon, toolbar and menus are built from
+  one catalog, `ribbon-default.toml`, checked against the command registry.
 - **Navigation**: an Orientation Cube in each 3D view (26 click regions, compass, Home, and a
   PERSP/ISO projection toggle), standard and isometric views with animated transitions, wheel
   zoom about the cursor, orbit about the selection, Previous/Next pan/zoom, and walk mode
