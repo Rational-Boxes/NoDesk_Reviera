@@ -514,3 +514,31 @@ fn joined_walls_save_as_polygons_with_connections() {
         "only the remaining axis"
     );
 }
+
+#[test]
+fn flipping_and_typed_lengths_with_units() {
+    let dir = tempfile::tempdir().unwrap();
+    let (_, mut doc, _) = new_project(dir.path());
+    let r = registry();
+    let l1 = level(&doc, "Level 1");
+    let id = create_wall(&r, &mut doc, l1, [0.0, 0.0], [4.0, 0.0]);
+    run(&r, &mut doc, "wall.flip", json!({"wall_ids": [id.0]})).unwrap();
+    let recipe = walls::wall_recipe(doc.store().get(id).unwrap()).unwrap();
+    assert!(recipe.flip);
+    // The Wall tool parses typed lengths in project units.
+    run(
+        &r,
+        &mut doc,
+        "units.set_preset",
+        json!({"preset": "imperial_ft_in"}),
+    )
+    .unwrap();
+    let v = run(
+        &r,
+        &mut doc,
+        "units.parse",
+        json!({"text": "12' 6\"", "data_type": "length"}),
+    )
+    .unwrap();
+    assert!((v.as_f64().unwrap() - 3.81).abs() < 1e-9, "{v}");
+}

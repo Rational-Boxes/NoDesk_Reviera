@@ -24,7 +24,9 @@ operation can be driven by Lua scripts and by AI agents through the Model Contex
 - **3D viewport**: a wxWidgets window (through wxDragon) with a `wgpu` view of the model;
   click to select, drag with the left mouse button to orbit, with the middle or right button
   to pan, and use the wheel to zoom.
-- **Walls**: *Architecture > Wall* draws chains of straight walls on a level; they appear at once,
+- **Walls**: *Architecture > Wall* draws chains of straight walls on a level, snapping to wall ends,
+  midpoints, wall lines and 15° angles; type a length (`4.5 m`, `12' 6"`) and press Enter, and
+  Spacebar flips the exterior side. Walls appear at once,
   regenerated from their recipe (`wall.create`, `wall.set_location`). Walls that meet join at
   mitred L corners and T junctions (`wall.set_join_allowed` turns a join off). Saving writes standard IFC
   (`IfcWall` with an `Axis` and a `SweptSolid` body, typed, contained in its storey and

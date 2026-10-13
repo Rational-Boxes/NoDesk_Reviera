@@ -50,6 +50,7 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(WallCreate),
         registry.add(WallSetLocation),
         registry.add(WallSetJoinAllowed),
+        registry.add(WallFlip),
         registry.add(WallJoinsQuery),
     ];
     for r in results {
@@ -1041,7 +1042,9 @@ impl Command for ParamSetIfcHome {
 
 // ---- Walls (Ch 3 ARC-WALL-002) ----
 
-use crate::walls::{self, CreateParams, JoinsQueryParams, SetJoinAllowedParams, SetLocationParams};
+use crate::walls::{
+    self, CreateParams, FlipParams, JoinsQueryParams, SetJoinAllowedParams, SetLocationParams,
+};
 
 #[derive(Debug)]
 struct WallCreate;
@@ -1121,5 +1124,25 @@ impl Command for WallJoinsQuery {
 
     fn run(&self, cx: &mut CommandContext<'_>, p: JoinsQueryParams) -> Result<Vec<walls::Join>> {
         walls::joins_query(cx.store(), p)
+    }
+}
+
+#[derive(Debug)]
+struct WallFlip;
+
+impl Command for WallFlip {
+    type Params = FlipParams;
+    type Output = ();
+    const META: CommandMeta = CommandMeta {
+        name: "wall.flip",
+        version: 1,
+        summary: "Flip walls",
+        description: "Moves the exterior of each wall to the other side of its location line.",
+        effects: &[Effect::Edit],
+        transaction_name: "Flip Wall",
+    };
+
+    fn run(&self, cx: &mut CommandContext<'_>, p: FlipParams) -> Result<()> {
+        walls::flip(cx.edit()?, p)
     }
 }

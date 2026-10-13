@@ -10,6 +10,7 @@
 //! through `App::execute`, like Lua and MCP. The ribbon, browsers and view tabs come next.
 
 mod native;
+mod snap;
 
 use std::cell::RefCell;
 use std::path::{Path, PathBuf};
@@ -36,6 +37,8 @@ const WALL_HEIGHT: f64 = 3.0;
 
 /// The colour of a wall being drawn (linear RGBA).
 const PREVIEW: [f32; 4] = [0.1, 0.45, 0.95, 0.45];
+/// The colour of snap markers and the exterior-side arrow.
+const SNAP: [f32; 4] = [0.95, 0.55, 0.05, 1.0];
 
 /// A press that moves less than this many pixels is a click (select), not a drag.
 const CLICK_SLOP: i32 = 3;
@@ -55,6 +58,14 @@ struct WallTool {
     top: Option<ElementId>,
     /// The end of the last wall, where the next one starts.
     last: Option<[f64; 2]>,
+    /// The (snapped) point under the cursor.
+    cursor: Option<snap::Snap>,
+    /// Exterior on the right of the drawing direction (Spacebar).
+    flip: bool,
+    /// A length being typed, committed with Enter.
+    typed: String,
+    /// Location lines of the walls on the level, for snapping.
+    lines: Vec<([f64; 2], [f64; 2])>,
 }
 
 /// The parameter behind one palette row.
@@ -298,13 +309,11 @@ impl Gui {
             .filter(|e| e.class == "IfcBuildingStorey")
             .map(|e| {
                 let z = e.param("@Elevation").and_then(Value::as_f64).unwrap_or(0.0);
-                (
-                    z,
-                    e.id(),
-                    e.name
-                        .clone()
-                        .unwrap_or_else(|| format!("Level {}", e.id())),
-                )
+                let name = e
+                    .name
+                    .clone()
+                    .unwrap_or_else(|| format!("Level {}", e.id()));
+                (z, e.id(), name)
             })
             .collect();
         levels.sort_by(|a, b| a.0.total_cmp(&b.0));
@@ -318,26 +327,65 @@ impl Gui {
             elevation,
             top,
             last: None,
+            cursor: None,
+            flip: false,
+            typed: String::new(),
+            lines: Vec::new(),
         });
+        self.update_wall_lines();
         self.clear_selection();
         self.tool_prompt(frame);
     }
 
-    fn tool_prompt(&self, frame: &Frame) {
-        if let Some(t) = &self.tool {
-            let step = if t.last.is_none() {
-                "Click the start point"
-            } else {
-                "Click the next point"
-            };
-            frame.set_status_text(
-                &format!(
-                    "Wall on {}: {step}. Esc ends the chain; Esc again ends the tool.",
-                    t.level_name
-                ),
-                0,
-            );
-        }
+    /// Caches the location lines of the walls on the tool's level, for snapping.
+    fn update_wall_lines(&mut self) {
+        let Some(t) = &self.tool else { return };
+        let Some(doc) = self.doc.and_then(|id| self.app.document(id)) else {
+            return;
+        };
+        let store = doc.doc.store();
+        let level_guid = store.get(t.level).map(|e| e.guid().as_str().to_owned());
+        let lines = store
+            .iter()
+            .filter_map(reviera_core::walls::wall_recipe)
+            .filter(|r| Some(&r.base_level) == level_guid.as_ref())
+            .map(|r| (r.curve.start, r.curve.end))
+            .collect();
+        self.tool.as_mut().expect("tool").lines = lines;
+    }
+
+    fn tool_prompt(&mut self, frame: &Frame) {
+        let Some(t) = &self.tool else { return };
+        let exterior = if t.flip { "right" } else { "left" };
+        let text = if !t.typed.is_empty() {
+            format!("Wall length: {}_  (Enter to place, Esc to cancel)", t.typed)
+        } else if t.last.is_none() {
+            format!(
+                "Wall on {}: click the start point. Exterior on the {exterior} (Spacebar flips).",
+                t.level_name
+            )
+        } else {
+            let mut text = String::from("Click the next point or type a length");
+            if let (Some(start), Some(c)) = (t.last, t.cursor) {
+                let length = (c.point[0] - start[0]).hypot(c.point[1] - start[1]);
+                let shown = self
+                    .app
+                    .execute(
+                        "units.format",
+                        json!({"value": length, "data_type": "length"}),
+                        &user(),
+                    )
+                    .ok()
+                    .and_then(|o| o.result.as_str().map(str::to_owned))
+                    .unwrap_or_else(|| format!("{length:.3} m"));
+                text = format!("Length {shown}");
+                if c.kind != snap::SnapKind::None {
+                    text += &format!(" · {}", c.kind.label());
+                }
+            }
+            format!("{text}. Exterior on the {exterior} (Spacebar flips). Esc ends the chain.")
+        };
+        frame.set_status_text(&text, 0);
     }
 
     fn end_tool(&mut self, frame: &Frame) {
@@ -349,14 +397,17 @@ impl Gui {
         }
     }
 
-    /// Esc: ends the wall chain, then the tool; without a tool, clears the selection.
+    /// Esc: clears a typed length, then ends the wall chain, then the tool; without a tool, clears
+    /// the selection.
     fn escape(&mut self, frame: &Frame) {
         match &mut self.tool {
+            Some(t) if !t.typed.is_empty() => {
+                t.typed.clear();
+                self.tool_prompt(frame);
+            }
             Some(t) if t.last.is_some() => {
                 t.last = None;
-                if let Some(v) = &mut self.viewport {
-                    v.set_overlay(&[]);
-                }
+                self.update_overlay();
                 self.tool_prompt(frame);
             }
             Some(_) => self.end_tool(frame),
@@ -377,83 +428,229 @@ impl Gui {
         let s = (t.elevation as f32 - o.z) / d.z;
         (s > 0.0).then(|| {
             let p = o + d * s;
-            // Millimetre precision, so typed and drawn walls agree.
-            let mm = |v: f32| (f64::from(v) * 1000.0).round() / 1000.0;
-            [mm(p.x), mm(p.y)]
+            [f64::from(p.x), f64::from(p.y)]
         })
     }
 
+    /// The snapped point under pixel (`x`, `y`).
+    fn snapped(&self, x: i32, y: i32, panel: &Panel) -> Option<snap::Snap> {
+        let t = self.tool.as_ref()?;
+        let raw = self.plane_point(x, y, panel)?;
+        let size = panel.get_client_size();
+        let (w, h) = (size.width as f32, size.height as f32);
+        let z = t.elevation as f32;
+        let to_screen = |p: [f64; 2]| {
+            self.camera
+                .project(glam::Vec3::new(p[0] as f32, p[1] as f32, z), w, h)
+        };
+        let mut s = snap::snap(raw, (x as f32, y as f32), t.last, &t.lines, to_screen);
+        if s.kind == snap::SnapKind::None {
+            // Free points to the millimetre.
+            s.point = s.point.map(|v| (v * 1000.0).round() / 1000.0);
+        }
+        Some(s)
+    }
+
+    /// Mouse movement in the Wall tool: snap, preview and prompt.
+    fn wall_motion(&mut self, x: i32, y: i32, panel: &Panel, frame: &Frame) {
+        let cursor = self.snapped(x, y, panel);
+        let Some(t) = &mut self.tool else { return };
+        t.cursor = cursor;
+        self.update_overlay();
+        self.tool_prompt(frame);
+    }
+
     fn wall_click(&mut self, x: i32, y: i32, panel: &Panel, frame: &Frame) {
-        let Some(p) = self.plane_point(x, y, panel) else {
+        let Some(p) = self.snapped(x, y, panel) else {
             return;
         };
-        let Some(t) = &self.tool else { return };
-        let Some(start) = t.last else {
-            self.tool.as_mut().expect("tool").last = Some(p);
+        let Some(t) = &mut self.tool else { return };
+        t.cursor = Some(p);
+        if t.last.is_none() {
+            t.last = Some(p.point);
+            self.update_overlay();
             return self.tool_prompt(frame);
-        };
+        }
+        self.place_wall(p.point, frame);
+    }
+
+    /// Creates a wall from the chain's last point to `end`, and continues the chain from `end`.
+    fn place_wall(&mut self, end: [f64; 2], frame: &Frame) {
+        let Some(t) = &self.tool else { return };
+        let Some(start) = t.last else { return };
         let top = match t.top {
             Some(level) => json!({ "level": level }),
             None => json!({ "unconnected": WALL_HEIGHT }),
         };
         let args = json!({
-            "curve": {"line": {"start": start, "end": p}},
+            "curve": {"line": {"start": start, "end": end}},
             "base_level": t.level,
             "top_constraint": top,
+            "flip": t.flip,
         });
         match self.run("wall.create", args) {
             Ok(_) => {
-                self.tool.as_mut().expect("tool").last = Some(p);
-                if let Some(v) = &mut self.viewport {
-                    v.set_overlay(&[]);
-                }
+                let t = self.tool.as_mut().expect("tool");
+                t.last = Some(end);
+                t.typed.clear();
+                self.update_wall_lines();
                 self.refresh_scene(frame);
+                self.update_overlay();
                 self.tool_prompt(frame);
             }
             Err(e) => frame.set_status_text(&e, 0),
         }
     }
 
-    /// Shows the wall that the next click would create.
-    fn wall_preview(&mut self, x: i32, y: i32, panel: &Panel) {
+    /// Keys in the Wall tool: Spacebar flips, digits and units type a length, Enter places it,
+    /// Backspace edits it. Returns whether the key was used.
+    fn wall_key(&mut self, key: i32, frame: &Frame) -> bool {
+        let Some(t) = &mut self.tool else {
+            // Without a tool, Spacebar flips the selected walls.
+            if key == WXK_SPACE && self.doc.is_some() {
+                let ids = self.selection();
+                if !ids.is_empty() {
+                    match self.run("wall.flip", json!({ "wall_ids": ids })) {
+                        Ok(_) => frame.set_status_text("Flipped", 0),
+                        Err(e) => frame.set_status_text(&e, 0),
+                    }
+                    self.refresh_scene(frame);
+                    return true;
+                }
+            }
+            return false;
+        };
+        match key {
+            WXK_SPACE if t.typed.is_empty() => {
+                t.flip = !t.flip;
+                self.update_overlay();
+            }
+            WXK_BACK if !t.typed.is_empty() => {
+                t.typed.pop();
+            }
+            WXK_RETURN | WXK_NUMPAD_ENTER if !t.typed.is_empty() => {
+                self.commit_typed_length(frame);
+                return true;
+            }
+            _ => {
+                let Some(c) = u32::try_from(key).ok().and_then(char::from_u32) else {
+                    return false;
+                };
+                // A length can start with a digit or a decimal point; after that, units and
+                // separators too (`4.5 m`, `12' 6 1/2"`).
+                let starts = c.is_ascii_digit() || c == '.';
+                let continues = !t.typed.is_empty() && (c.is_ascii_graphic() || c == ' ');
+                if t.last.is_none() || !(starts || continues) {
+                    return false;
+                }
+                t.typed.push(c);
+            }
+        }
+        self.tool_prompt(frame);
+        true
+    }
+
+    /// Places a wall of the typed length toward the cursor.
+    fn commit_typed_length(&mut self, frame: &Frame) {
         let Some(t) = &self.tool else { return };
-        let (Some(start), Some(end)) = (t.last, self.plane_point(x, y, panel)) else {
+        let (Some(start), Some(cursor)) = (t.last, t.cursor) else {
             return;
         };
-        let height = t
-            .top
-            .and_then(|l| {
-                self.doc
-                    .and_then(|d| self.app.document(d))?
-                    .doc
-                    .store()
-                    .get(l)?
-                    .param("@Elevation")?
-                    .as_f64()
-            })
-            .map_or(WALL_HEIGHT, |z| z - t.elevation);
-        let g = reviera_core::walls::WallGeometry {
-            start,
-            end,
-            base_z: t.elevation,
-            height,
-            width: 0.2,
+        let text = t.typed.clone();
+        let length = match self.run("units.parse", json!({"text": text, "data_type": "length"})) {
+            Ok(v) => v.as_f64().unwrap_or_default(),
+            Err(e) => return frame.set_status_text(&format!("Invalid length: {e}"), 0),
         };
-        let overlay = if g.length() > reviera_core::walls::TOL_SHORT {
-            let (verts, indices) = g.mesh();
-            vec![reviera_render::SceneMesh {
-                element: None,
-                class: "IfcWall".into(),
-                positions: verts
-                    .iter()
-                    .map(|[x, y, z]| [*x as f32, *y as f32, *z as f32])
-                    .collect(),
-                indices,
-                color: PREVIEW,
-            }]
-        } else {
-            Vec::new()
+        let (dx, dy) = (cursor.point[0] - start[0], cursor.point[1] - start[1]);
+        let d = dx.hypot(dy);
+        if d < 1e-9 {
+            return frame
+                .set_status_text("Move the cursor to show the direction, then press Enter", 0);
+        }
+        let end = [start[0] + dx / d * length, start[1] + dy / d * length];
+        self.place_wall(end.map(|v| (v * 1e6).round() / 1e6), frame);
+    }
+
+    /// The transient geometry of the Wall tool: the wall to be placed, its exterior side, and the
+    /// snap marker.
+    fn update_overlay(&mut self) {
+        let Some(t) = &self.tool else { return };
+        let mut overlay = Vec::new();
+        let mesh = |(verts, indices): (Vec<[f64; 3]>, Vec<u32>), color| reviera_render::SceneMesh {
+            element: None,
+            class: "IfcWall".into(),
+            positions: verts
+                .iter()
+                .map(|[x, y, z]| [*x as f32, *y as f32, *z as f32])
+                .collect(),
+            indices,
+            color,
         };
+        let marker = f64::from(self.camera.distance) * 0.008;
+        if let Some(c) = t.cursor {
+            let [x, y] = c.point;
+            let size = if c.kind == snap::SnapKind::None {
+                marker * 0.5
+            } else {
+                marker
+            };
+            let square = [
+                [x - size, y - size],
+                [x + size, y - size],
+                [x + size, y + size],
+                [x - size, y + size],
+            ];
+            let color = if c.kind == snap::SnapKind::None {
+                PREVIEW
+            } else {
+                SNAP
+            };
+            overlay.push(mesh(
+                reviera_core::walls::prism(&square, t.elevation, t.elevation + size),
+                color,
+            ));
+        }
+        if let (Some(start), Some(c)) = (t.last, t.cursor)
+            && t.typed.is_empty()
+        {
+            let height = t
+                .top
+                .and_then(|l| {
+                    self.doc
+                        .and_then(|d| self.app.document(d))?
+                        .doc
+                        .store()
+                        .get(l)?
+                        .param("@Elevation")?
+                        .as_f64()
+                })
+                .map_or(WALL_HEIGHT, |z| z - t.elevation);
+            let g = reviera_core::walls::WallGeometry {
+                start,
+                end: c.point,
+                base_z: t.elevation,
+                height,
+                width: 0.2,
+            };
+            if g.length() > reviera_core::walls::TOL_SHORT {
+                overlay.push(mesh(g.mesh(), PREVIEW));
+                // A flat arrow at mid-length on the exterior face.
+                let side = if t.flip { -1.0 } else { 1.0 };
+                let [nx, ny] = g.normal().map(|v| v * side);
+                let [ux, uy] = g.direction();
+                let mid = [(start[0] + c.point[0]) / 2.0, (start[1] + c.point[1]) / 2.0];
+                let base = [mid[0] + nx * 0.1, mid[1] + ny * 0.1];
+                let a = 0.25f64.min(g.length() / 4.0);
+                let tip = [base[0] + nx * a, base[1] + ny * a];
+                let z = t.elevation + 0.01;
+                let positions = [
+                    [base[0] - ux * a, base[1] - uy * a, z],
+                    [base[0] + ux * a, base[1] + uy * a, z],
+                    [tip[0], tip[1], z],
+                ];
+                overlay.push(mesh((positions.to_vec(), vec![0, 1, 2, 0, 2, 1]), SNAP));
+            }
+        }
         if let Some(v) = &mut self.viewport {
             v.set_overlay(&overlay);
         }
@@ -871,7 +1068,7 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
             };
         }
         {
-            let (gui, p) = (gui.clone(), panel);
+            let (gui, p, f) = (gui.clone(), panel, frame);
             panel.on_mouse_motion(move |e| {
                 let Some((x, y)) = position(&e) else { return };
                 let Ok(mut g) = gui.try_borrow_mut() else {
@@ -879,7 +1076,7 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 };
                 let Some((kind, x0, y0)) = g.drag else {
                     if g.tool.is_some() {
-                        g.wall_preview(x, y, &p);
+                        g.wall_motion(x, y, &p, &f);
                         drop(g);
                         p.refresh(false, None);
                     }
@@ -909,10 +1106,42 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
         {
             let (gui, p, f) = (gui.clone(), panel, frame);
             panel.on_key_down(move |e| {
-                if let WindowEventData::Keyboard(k) = &e
-                    && k.get_key_code() == Some(WXK_ESCAPE)
-                {
-                    with(&gui, |g| g.escape(&f));
+                let code = match &e {
+                    WindowEventData::Keyboard(k) => k.get_key_code(),
+                    _ => None,
+                };
+                let used = match code {
+                    Some(WXK_ESCAPE) => {
+                        with(&gui, |g| g.escape(&f));
+                        true
+                    }
+                    Some(key @ (WXK_SPACE | WXK_BACK | WXK_RETURN | WXK_NUMPAD_ENTER)) => {
+                        let mut used = false;
+                        with(&gui, |g| used = g.wall_key(key, &f));
+                        used
+                    }
+                    _ => false,
+                };
+                if used {
+                    p.refresh(false, None);
+                } else {
+                    // Lets the character event follow (typed lengths).
+                    e.skip(true);
+                }
+            });
+        }
+        {
+            let (gui, p, f) = (gui.clone(), panel, frame);
+            panel.on_char(move |e| {
+                let key = match &e {
+                    WindowEventData::Keyboard(k) => k.get_unicode_key(),
+                    _ => None,
+                };
+                let mut used = false;
+                if let Some(key) = key.filter(|k| *k > 32 && *k != 127) {
+                    with(&gui, |g| used = g.wall_key(key, &f));
+                }
+                if used {
                     p.refresh(false, None);
                 } else {
                     e.skip(true);

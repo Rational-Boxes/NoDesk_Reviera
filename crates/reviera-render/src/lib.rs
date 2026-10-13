@@ -167,6 +167,17 @@ impl Camera {
         (near, (far - near).normalize())
     }
 
+    /// The pixel position of a world point in a `width` × `height` viewport, or `None` when it is
+    /// behind the camera. The inverse of [`Camera::ray`].
+    pub fn project(&self, p: Vec3, width: f32, height: f32) -> Option<(f32, f32)> {
+        let clip = self.view_proj(width / height.max(1.0)) * p.extend(1.0);
+        if clip.w <= 1e-6 {
+            return None;
+        }
+        let ndc = clip.truncate() / clip.w;
+        Some(((ndc.x + 1.0) * 0.5 * width, (1.0 - ndc.y) * 0.5 * height))
+    }
+
     /// Orbits by a mouse drag in pixels.
     pub fn orbit(&mut self, dx: f32, dy: f32) {
         self.yaw -= dx * 0.008;
@@ -214,6 +225,17 @@ mod tests {
         assert!(
             ndc.x.abs() < 1e-4 && ndc.y.abs() < 1e-4 && (0.0..1.0).contains(&ndc.z),
             "{ndc}"
+        );
+        let (px, py) = cam.project(Vec3::new(5.0, 4.0, 3.0), 600.0, 400.0).unwrap();
+        assert!(
+            (px - 300.0).abs() < 1e-2 && (py - 200.0).abs() < 1e-2,
+            "{px} {py}"
+        );
+        let (o, d) = cam.ray(150.0, 80.0, 600.0, 400.0);
+        let (px, py) = cam.project(o + d * 7.0, 600.0, 400.0).unwrap();
+        assert!(
+            (px - 150.0).abs() < 1e-2 && (py - 80.0).abs() < 1e-2,
+            "{px} {py}"
         );
         // The ray through the centre pixel hits a box centred in view.
         let (o, d) = cam.ray(300.0, 200.0, 600.0, 400.0);

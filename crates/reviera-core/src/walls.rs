@@ -438,3 +438,25 @@ pub(crate) fn joins_query(store: &Store, p: JoinsQueryParams) -> Result<Vec<Join
     let id = resolve(store, &p.wall_id, "wall")?;
     Ok(solve(store).joins_of(id))
 }
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct FlipParams {
+    pub wall_ids: Vec<ElementRef>,
+}
+
+/// Flips walls about their location line: the exterior moves to the other side (ARC-WALL-002).
+pub(crate) fn flip(txn: &mut crate::txn::Transaction<'_>, p: FlipParams) -> Result<()> {
+    let store = txn.store().clone();
+    for r in &p.wall_ids {
+        let id = resolve(&store, r, "wall")?;
+        let mut recipe = wall_recipe(store.get(id).expect("resolved"))
+            .ok_or_else(|| Error::new("wall.not_reviera", "only Reviera walls can be flipped"))?;
+        recipe.flip = !recipe.flip;
+        let value = serde_json::to_value(&recipe).expect("recipes serialise");
+        txn.modify(id, |e| {
+            e.params.insert(RECIPE_KEY.into(), value);
+        })?;
+    }
+    Ok(())
+}
