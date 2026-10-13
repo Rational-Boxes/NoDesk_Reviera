@@ -138,6 +138,16 @@ The KIT FZK *AC20-Institute-Var-2* sample model (`test-data/ifc/`) open in Revie
   CSV or tab-separated text with formulas escaped (`schedule.create`, `schedule.get_table`,
   `schedule.set_fields`, `schedule.set_sort`, `schedule.set_cell`, `schedule.export`). Not yet:
   filters, group headers and footers, calculated fields, and schedules on sheets.
+- **COBie handover**: File › Export COBie writes the model's facility-management data as a COBie
+  2.4 workbook (XLSX, one sheet per table) or as one CSV file per table. Contact comes from the
+  project's COBie settings. Facility, Floor and Space come from the building, levels and rooms.
+  Type and Component come from the doors, windows, furniture and equipment, each component placed
+  in its room. Attribute carries every parameter. The other sheets are written with their
+  headers. Every record carries its IFC class and GlobalId; values are in metres; missing required
+  values are "n/a", never invented. Validation reports missing contacts, repeated names (or makes
+  them unique on request) and components with no space or type; formulas are kept as text
+  (`export.cobie`, `cobie.validate`, `cobie.set_settings`). Not yet: the current NBIMS-US table
+  layout, systems and zones from IFC groups, and a settings dialog.
 - **Dimensions**: Annotate › Aligned Dimension (DI) in plans dimensions parallel wall faces,
   centrelines and cut edges; dimensions to Reviera walls follow them when they move
   (`dim.create_aligned`, `anno.list`). The Wall tool snaps to cut edges in plans.
@@ -192,16 +202,7 @@ The KIT FZK *AC20-Institute-Var-2* sample model (`test-data/ifc/`) open in Revie
 
 The first milestone continues with tags and text, sheets with title blocks, stairs and
 railings, and layered wall types. After that come general shape and CSG modelling tools,
-CADCraft drawing exchange and COBie handover.
-
-### COBie handover
-
-Reviera is to export the model's facility-management metadata as a COBie data set (the
-current NBIMS-US tables, or the COBie 2.4 layout). The tables are Company, Facility, Level,
-Space, Zone, Type, Component, System, Attribute and the rest. The export is a workbook or one
-CSV file per table, with validation of required data, unique names and references, and the
-same objects and GlobalIds as the IFC handover export (spec DOC-OUT-015). It is not built yet;
-it will build on the schedule engine, which is.
+CADCraft drawing exchange, and the current NBIMS-US COBie layout.
 
 ### Working with CADCraft
 

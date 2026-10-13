@@ -344,6 +344,95 @@ impl Gui {
         self.refresh_schedules();
     }
 
+    /// File › Export COBie: the facility-management data set as a COBie 2.4 workbook. Asks for
+    /// the creating contact the first time.
+    pub(crate) fn export_cobie(&mut self) {
+        let frame = self.frame;
+        let Some(doc) = self.doc else { return };
+        let Some(store) = self.app.document(doc).map(|d| d.doc.store().clone()) else {
+            return;
+        };
+        let mut settings = reviera_core::cobie::settings(&store);
+        if settings.contacts.is_empty() {
+            let email = TextEntryDialog::builder(
+                &frame,
+                "E-mail address of the company creating the COBie data set:",
+                "COBie Contact",
+            )
+            .build();
+            if email.show_modal() != ID_OK {
+                return;
+            }
+            let email = email.get_value().unwrap_or_default();
+            let company =
+                TextEntryDialog::builder(&frame, "Company name:", "COBie Contact").build();
+            let company = if company.show_modal() == ID_OK {
+                company.get_value().unwrap_or_default()
+            } else {
+                String::new()
+            };
+            settings.contacts.push(reviera_core::cobie::Contact {
+                email,
+                company,
+                ..Default::default()
+            });
+            if let Err(e) = self.run("cobie.set_settings", json!({ "settings": settings })) {
+                return error(&frame, &format!("The contact was not saved:\n{e}"));
+            }
+        }
+        let name = self
+            .current_path()
+            .and_then(|p| p.file_stem().map(|s| s.to_string_lossy().into_owned()))
+            .unwrap_or_else(|| "Project".into());
+        let dialog = FileDialog::builder(&frame)
+            .with_message("Export COBie")
+            .with_wildcard("Excel workbook (*.xlsx)|*.xlsx")
+            .with_style(FileDialogStyle::Save | FileDialogStyle::OverwritePrompt)
+            .with_default_file(&format!("{name} COBie.xlsx"))
+            .build();
+        if dialog.show_modal() != ID_OK {
+            return;
+        }
+        let Some(path) = dialog.get_path() else {
+            return;
+        };
+        match self.run("export.cobie", json!({ "path": path, "overwrite": true })) {
+            Ok(r) => {
+                let count = |t: &str| {
+                    r["tables"]
+                        .as_array()
+                        .and_then(|a| a.iter().find(|x| x["name"] == t))
+                        .and_then(|x| x["rows"].as_u64())
+                        .unwrap_or(0)
+                };
+                let warnings = r["warnings"].as_array().cloned().unwrap_or_default();
+                let mut text = format!(
+                    "Exported {} floors, {} spaces, {} types and {} components to\n{path}",
+                    count("Floor"),
+                    count("Space"),
+                    count("Type"),
+                    count("Component")
+                );
+                if !warnings.is_empty() {
+                    text.push_str(&format!("\n\n{} problems to review:", warnings.len()));
+                    for w in warnings.iter().take(12) {
+                        text.push_str(&format!(
+                            "\n• {} \"{}\": {}",
+                            w["table"].as_str().unwrap_or(""),
+                            w["record"].as_str().unwrap_or(""),
+                            w["message"].as_str().unwrap_or("")
+                        ));
+                    }
+                }
+                MessageDialog::builder(&frame, &text, "COBie Export")
+                    .with_style(MessageDialogStyle::OK)
+                    .build()
+                    .show_modal();
+            }
+            Err(e) => error(&frame, &format!("COBie was not exported:\n{e}")),
+        }
+    }
+
     /// Modify Schedule › Export: the schedule as CSV.
     pub(crate) fn export_schedule(&mut self) {
         let frame = self.frame;

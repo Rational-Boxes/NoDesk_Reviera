@@ -22202,6 +22202,16 @@ All output commands work on an immutable **model snapshot** taken when the comma
 - **Consistency with IFC.** The *Basic FM Handover* IFC export setup (DOC-OUT-006) writes the same spaces, zones, systems, types, classifications and properties. A COBie data set and an IFC file exported from one model state describe the same objects with the same GlobalIds.
 - **Performance and safety.** The export runs as a background job (DOC-OUT-013) on a snapshot of the model. Text values are escaped as for schedule export (DOC-SCH-012), so no cell can run as a formula.
 
+**Implementation notes (2026-10-13).**
+- As built:
+  - The COBie 2.4 layout, as an XLSX workbook (`rust_xlsxwriter`, MIT/Apache, all cells text) or a CSV per table.
+  - `export.cobie(path, version?: v2_4|current, format?: xlsx|csv, overwrite?)`, `cobie.validate()` and `cobie.set_settings(settings)`.
+  - The settings are stored on an RXD-only element `rxd:project/cobie`.
+  - Values are written in SI units (meters, square meters, cubic meters), as the Facility sheet states, rather than in project units.
+- `version: current` is refused until its column order is confirmed against the published standard. The public NIBS page gives the tables but not the column order, and its Annex A was unreachable.
+- Components are named by their Mark, which is numbered per category. Doors and windows can therefore share a name, which validation reports.
+- Systems, IFC zones, documents, coordinates and the File › Export dialog's options (version, format, categories, attribute selection) come later; the window asks only for the contact.
+
 **Data (RXD).** `project/cobie`: the settings (version, format, contacts, component categories, classification system, zone source, attribute selection, *Make names unique*) and the date of the last export.
 
 **Commands.**

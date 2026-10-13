@@ -63,6 +63,7 @@ rayon = "1.12.0"
 schemars = { version = "1.2.3", features = ["uuid1"] }
 jsonschema = { version = "0.58.6", default-features = false }
 earcut = "0.4.11"
+rust_xlsxwriter = { version = "0.99", default-features = false }
 imbl = "7.0.2"
 pdf-writer = "0.15"
 glam = "0.34.1"

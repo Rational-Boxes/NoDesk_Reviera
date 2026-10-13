@@ -40723,6 +40723,15 @@ Deleting an instance uses <code>element.delete</code> (Chapter 2).</p>
 <li><strong>Consistency with IFC.</strong> The <em>Basic FM Handover</em> IFC export setup (DOC-OUT-006) writes the same spaces, zones, systems, types, classifications and properties. A COBie data set and an IFC file exported from one model state describe the same objects with the same GlobalIds.</li>
 <li><strong>Performance and safety.</strong> The export runs as a background job (DOC-OUT-013) on a snapshot of the model. Text values are escaped as for schedule export (DOC-SCH-012), so no cell can run as a formula.</li>
 </ul>
+<p><strong>Implementation notes (2026-10-13).</strong>
+- As built:
+  - The COBie 2.4 layout, as an XLSX workbook (<code>rust_xlsxwriter</code>, MIT/Apache, all cells text) or a CSV per table.
+  - <code>export.cobie(path, version?: v2_4|current, format?: xlsx|csv, overwrite?)</code>, <code>cobie.validate()</code> and <code>cobie.set_settings(settings)</code>.
+  - The settings are stored on an RXD-only element <code>rxd:project/cobie</code>.
+  - Values are written in SI units (meters, square meters, cubic meters), as the Facility sheet states, rather than in project units.
+- <code>version: current</code> is refused until its column order is confirmed against the published standard. The public NIBS page gives the tables but not the column order, and its Annex A was unreachable.
+- Components are named by their Mark, which is numbered per category. Doors and windows can therefore share a name, which validation reports.
+- Systems, IFC zones, documents, coordinates and the File › Export dialog's options (version, format, categories, attribute selection) come later; the window asks only for the contact.</p>
 <p><strong>Data (RXD).</strong> <code>project/cobie</code>: the settings (version, format, contacts, component categories, classification system, zone source, attribute selection, <em>Make names unique</em>) and the date of the last export.</p>
 <p><strong>Commands.</strong>
 - <code>export.cobie(path, version?: current|v2_4, format?: xlsx|csv, options?) -&gt; {tables: {name, rows}[], warnings[], path}</code>

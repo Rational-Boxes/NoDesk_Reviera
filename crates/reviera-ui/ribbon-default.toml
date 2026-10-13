@@ -48,6 +48,12 @@ accel = "Ctrl+P"
 help = "Export the active plan as vector PDF at its scale"
 
 [[action]]
+id = "export.cobie"
+label = "Export COBie..."
+icon = "export_csv"
+help = "Export the facility-management data (spaces, types, components) as a COBie workbook"
+
+[[action]]
 id = "app.exit"
 label = "Exit"
 icon = "exit"
@@ -880,7 +886,7 @@ panels = [{ label = "Window", tools = [{ action = "insert.flip_facing", size = "
 
 [[menu]]
 label = "&File"
-items = ["file.new", "file.open", "file.save", "file.save_as", "-", "export.pdf", "-", "app.exit"]
+items = ["file.new", "file.open", "file.save", "file.save_as", "-", "export.pdf", "export.cobie", "-", "app.exit"]
 
 [[menu]]
 label = "&Edit"

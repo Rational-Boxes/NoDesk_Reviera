@@ -3022,6 +3022,7 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "schedule.edit_sort" => with(gui, Gui::schedule_sort),
         "schedule.itemize" => with(gui, Gui::schedule_itemize),
         "schedule.export" => with(gui, Gui::export_schedule),
+        "export.cobie" => with(gui, Gui::export_cobie),
         "room.place" => with(gui, |g| {
             g.start_room_tool();
             focus(g);

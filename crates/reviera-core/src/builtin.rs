@@ -66,6 +66,7 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(RoofSetSlope),
         registry.add(WallAttach),
         registry.add(ScheduleCreate),
+        registry.add(CobieSetSettings),
         registry.add(ScheduleSetFields),
         registry.add(ScheduleSetSort),
         registry.add(ScheduleSetCell),
@@ -2051,6 +2052,19 @@ modify_command!(
 );
 
 use crate::roofs;
+
+modify_command!(
+    CobieSetSettings,
+    "cobie.set_settings",
+    "Set the project's COBie settings",
+    "Stores the COBie settings (DOC-OUT-015): contacts (the first creates the data set), the categories \
+     exported as components, the room parameters giving zones and space types, and whether repeated names \
+     are made unique.",
+    "COBie Settings",
+    crate::cobie::SetSettingsParams,
+    (),
+    crate::cobie::set_settings
+);
 
 modify_command!(
     ScheduleCreate,

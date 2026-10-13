@@ -12,6 +12,7 @@ pub mod arrangement;
 pub mod builtin;
 pub mod categories;
 pub mod change;
+pub mod cobie;
 pub mod command;
 pub mod document;
 pub mod element;

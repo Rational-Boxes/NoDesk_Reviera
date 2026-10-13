@@ -530,7 +530,7 @@ pub fn write_pdf(drawings: &[(PlanDrawing, PageInfo)], path: &Path) -> Result<Ve
 }
 
 /// Today's date as YYYY-MM-DD (UTC).
-fn today() -> String {
+pub(crate) fn today() -> String {
     let days = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map_or(0, |d| d.as_secs() / 86_400) as i64;
