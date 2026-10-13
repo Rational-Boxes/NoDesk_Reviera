@@ -1865,6 +1865,7 @@ The following context panels are part of the default layout. Owners are authorit
 - **Switch Windows** lists open views grouped by model with a check mark on the active one.
 - **Tile grid rule.** For *n* docked view windows, Tile uses `c = ceil(sqrt(n))` columns and `r = ceil(n / c)` rows, filled left to right in tab order; the last row's tiles share the full width. Each tile keeps its own View Control Bar and zoom. Tiling 1 view does nothing; tiling more than 16 views is allowed but each tile is clamped to a minimum of 240 × 180 logical pixels, and tiles beyond what fits stay as tabs in the last tile.
 - **Tab Views** keeps the active view active and orders tabs as they were before tiling.
+- **Tile memory.** Tab Views remembers the tiled arrangement it leaves: the tab groups, which views are in each, and the divider positions. The next Tile Views restores that arrangement exactly while the same views are open (views closed since are dropped). If views were opened since, Tile Views tiles afresh by the grid rule. This is session state of the window, not saved with the model. (Owner requirement, 2026-10-13.)
 - **Zoom All to Fit** applies Zoom to Fit to every visible tile (including floating frames), not to hidden tabs; it adds one entry to each view's navigation history.
 - **Close Inactive Views** never closes a view with an active edit mode or tool session, and never closes the last view of a family editor document. Views it closes keep their RXD navigation state (§1.29.2). It shows "Closed n views" in the status bar.
 - **Switch Windows** with more than 30 open views adds a search field at the top of the list.
@@ -1874,6 +1875,7 @@ The following context panels are part of the default layout. Owners are authorit
 
 **Acceptance criteria.**
 - [ ] With 4 views open, Tile Views shows a 2 × 2 grid; Tab Views restores a single tab group.
+- [ ] Tile two views, drag the divider to 75 %, Tab Views, then Tile Views: the divider is back at 75 %.
 - [ ] Close Inactive Views with 2 models open leaves at least one view per model.
 - [ ] With 5 views open, Tile Views gives 3 columns over 2 rows, and the two tiles in the second row share its full width.
 - [ ] Close Inactive Views does not close a view in which a floor sketch is active.

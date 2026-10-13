@@ -9,6 +9,7 @@
 
 #include <wx/wx.h>
 #include <wx/aui/auibook.h>
+#include <wx/aui/serializer.h>
 #include <wx/aui/auibar.h>
 #include <wx/bmpbndl.h>
 #include <wx/ribbon/bar.h>
@@ -60,6 +61,116 @@ void reviera_nb_split(void* notebook, size_t page, int direction) {
 // Merges every tab group back into one.
 void reviera_nb_unsplit_all(void* notebook) {
     static_cast<wxAuiNotebook*>(notebook)->UnsplitAll();
+}
+
+// ---- Saved tile layouts: tab groups with their pages (by window) and dock sizes ----
+
+namespace {
+struct TabGroup {
+    wxAuiTabLayoutInfo info;
+    std::vector<wxWindow*> pages;
+    std::vector<wxWindow*> pinned;
+    wxWindow* active = nullptr;
+};
+
+struct BookLayout {
+    std::vector<TabGroup> groups;
+};
+
+class LayoutSaver : public wxAuiBookSerializer {
+public:
+    LayoutSaver(wxAuiNotebook* book, BookLayout* out) : m_book(book), m_out(out) {}
+    void BeforeSaveNotebook(const wxString&) override {}
+    void SaveNotebookTabControl(const wxAuiTabLayoutInfo& tab) override {
+        TabGroup g;
+        g.info = tab;
+        auto window = [&](int i) -> wxWindow* {
+            return i >= 0 && size_t(i) < m_book->GetPageCount() ? m_book->GetPage(i) : nullptr;
+        };
+        if (tab.pages.empty()) {
+            for (size_t i = 0; i < m_book->GetPageCount(); ++i)
+                g.pages.push_back(m_book->GetPage(i));
+        } else {
+            for (int i : tab.pages)
+                if (auto* w = window(i)) g.pages.push_back(w);
+        }
+        for (int i : tab.pinned)
+            if (auto* w = window(i)) g.pinned.push_back(w);
+        g.active = window(tab.active);
+        m_out->groups.push_back(g);
+    }
+
+private:
+    wxAuiNotebook* m_book;
+    BookLayout* m_out;
+};
+
+class LayoutLoader : public wxAuiBookDeserializer {
+public:
+    LayoutLoader(wxAuiNotebook* book, const BookLayout* in) : m_book(book), m_in(in) {}
+    std::vector<wxAuiTabLayoutInfo> LoadNotebookTabs(const wxString&) override {
+        std::vector<wxAuiTabLayoutInfo> out;
+        for (const auto& g : m_in->groups) {
+            wxAuiTabLayoutInfo info = g.info;
+            info.pages.clear();
+            info.pinned.clear();
+            for (auto* w : g.pages) {
+                int i = m_book->GetPageIndex(w);
+                if (i != wxNOT_FOUND) info.pages.push_back(i);
+            }
+            if (info.pages.empty()) continue;
+            for (auto* w : g.pinned) {
+                int i = m_book->GetPageIndex(w);
+                if (i != wxNOT_FOUND) info.pinned.push_back(i);
+            }
+            int active = g.active ? m_book->GetPageIndex(g.active) : wxNOT_FOUND;
+            info.active = active != wxNOT_FOUND ? active : info.pages.front();
+            out.push_back(info);
+        }
+        return out;
+    }
+
+private:
+    wxAuiNotebook* m_book;
+    const BookLayout* m_in;
+};
+}
+
+// The notebook's current layout (tab groups, their pages and sizes), and how many tab groups it
+// has. Free it with reviera_nb_free_layout.
+void* reviera_nb_save_layout(void* notebook, int* groups) {
+    auto* book = static_cast<wxAuiNotebook*>(notebook);
+    auto* layout = new BookLayout;
+    LayoutSaver saver(book, layout);
+    book->SaveLayout("views", saver);
+    *groups = int(layout->groups.size());
+    return layout;
+}
+
+// Whether every page of the notebook is in a saved layout.
+int reviera_nb_layout_covers(void* notebook, const void* layout) {
+    auto* book = static_cast<wxAuiNotebook*>(notebook);
+    auto* l = static_cast<const BookLayout*>(layout);
+    for (size_t i = 0; i < book->GetPageCount(); ++i) {
+        wxWindow* w = book->GetPage(i);
+        bool found = false;
+        for (const auto& g : l->groups)
+            for (auto* p : g.pages)
+                found = found || p == w;
+        if (!found) return 0;
+    }
+    return 1;
+}
+
+// Restores a saved layout: tab groups, page order and divider positions.
+void reviera_nb_load_layout(void* notebook, const void* layout) {
+    auto* book = static_cast<wxAuiNotebook*>(notebook);
+    LayoutLoader loader(book, static_cast<const BookLayout*>(layout));
+    book->LoadLayout("views", loader);
+}
+
+void reviera_nb_free_layout(void* layout) {
+    delete static_cast<BookLayout*>(layout);
 }
 
 // The index of `page`, or -1.

@@ -16,6 +16,46 @@ unsafe extern "C" {
     fn reviera_nb_split(notebook: *mut c_void, page: usize, direction: c_int);
     fn reviera_nb_unsplit_all(notebook: *mut c_void);
     fn reviera_nb_page_index(notebook: *mut c_void, page: *mut c_void) -> c_int;
+    fn reviera_nb_save_layout(notebook: *mut c_void, groups: *mut c_int) -> *mut c_void;
+    fn reviera_nb_layout_covers(notebook: *mut c_void, layout: *const c_void) -> c_int;
+    fn reviera_nb_load_layout(notebook: *mut c_void, layout: *const c_void);
+    fn reviera_nb_free_layout(layout: *mut c_void);
+}
+
+/// A saved arrangement of the view tabs: tab groups, their pages and divider positions.
+#[derive(Debug)]
+pub struct Layout {
+    raw: *mut c_void,
+    /// How many tab groups it has (1 when the views are all tabs).
+    pub groups: usize,
+}
+
+impl Drop for Layout {
+    fn drop(&mut self) {
+        unsafe { reviera_nb_free_layout(self.raw) }
+    }
+}
+
+/// The notebook's current layout.
+pub fn save_layout(notebook: &AuiNotebook) -> Layout {
+    let mut groups: c_int = 0;
+    let raw = unsafe { reviera_nb_save_layout(ptr(notebook), &mut groups) };
+    Layout {
+        raw,
+        groups: usize::try_from(groups).unwrap_or(0),
+    }
+}
+
+impl Layout {
+    /// Whether every page now in the notebook is in this layout.
+    pub fn covers(&self, notebook: &AuiNotebook) -> bool {
+        unsafe { reviera_nb_layout_covers(ptr(notebook), self.raw) != 0 }
+    }
+
+    /// Restores the layout (pages it does not know join the main group).
+    pub fn restore(&self, notebook: &AuiNotebook) {
+        unsafe { reviera_nb_load_layout(ptr(notebook), self.raw) }
+    }
 }
 
 /// A notebook event: the page index it concerns.

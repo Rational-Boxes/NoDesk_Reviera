@@ -197,6 +197,8 @@ struct Gui {
     keys: (String, std::time::Instant),
     /// A slice tool waiting for its click.
     slice_pick: Option<inspect::SliceKind>,
+    /// The tiled arrangement Tab Views left, for Tile to restore.
+    tiled: Option<wx::Layout>,
     /// Walls waiting for the roof they attach to (Attach Top/Base).
     attach_pick: Option<Vec<ElementId>>,
     /// The Model Tree pane (UI-TREE-001) and its state.
@@ -766,6 +768,14 @@ impl Gui {
 
     /// Tile Views: every view visible at once, in columns, then rows (UI-VIEWWIN-002).
     fn tile(&mut self) {
+        // The tiling last left by Tab Views, with its dividers, while the same views are open.
+        if let Some(l) = &self.tiled
+            && l.covers(&self.notebook)
+        {
+            wx::unsplit_all(&self.notebook);
+            l.restore(&self.notebook);
+            return;
+        }
         wx::unsplit_all(&self.notebook);
         let n = self.notebook.page_count();
         if n < 2 {
@@ -784,8 +794,13 @@ impl Gui {
         }
     }
 
-    /// Tab Views: every view back in one tab group.
+    /// Tab Views: every view back in one tab group. A tiled arrangement is kept, so Tile can
+    /// bring it back with its dividers where they were.
     fn tab_all(&mut self) {
+        let layout = wx::save_layout(&self.notebook);
+        if layout.groups > 1 {
+            self.tiled = Some(layout);
+        }
         wx::unsplit_all(&self.notebook);
     }
 
@@ -2472,6 +2487,7 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 plan_edges: HashMap::new(),
                 keys: (String::new(), std::time::Instant::now()),
                 slice_pick: None,
+                tiled: None,
                 attach_pick: None,
                 model_tree,
                 tree: inspect::ModelTree {
