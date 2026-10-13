@@ -110,8 +110,25 @@ fn instance() -> wgpu::Instance {
     wgpu::Instance::new(wgpu::InstanceDescriptor::new_without_display_handle_from_env())
 }
 
+/// A graphics device shared by every viewport of the application (one per view window).
+#[derive(Clone)]
+pub struct Gpu {
+    instance: wgpu::Instance,
+    adapter: wgpu::Adapter,
+    device: wgpu::Device,
+    queue: wgpu::Queue,
+}
+
+impl std::fmt::Debug for Gpu {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Gpu")
+            .field("adapter", &self.adapter.get_info().name)
+            .finish()
+    }
+}
+
 impl WgpuViewport {
-    /// A viewport drawing into a native window.
+    /// A viewport drawing into a native window, with its own graphics device.
     ///
     /// # Safety
     /// The handles must stay valid for the life of the viewport.
@@ -121,30 +138,58 @@ impl WgpuViewport {
         width: u32,
         height: u32,
     ) -> Result<Self, String> {
-        let instance = instance();
+        unsafe { Self::for_window_shared(&mut None, display, window, width, height) }
+    }
+
+    /// A viewport drawing into a native window. The first viewport creates the graphics device in
+    /// `gpu`, choosing an adapter that can present to its window; later ones share it.
+    ///
+    /// # Safety
+    /// The handles must stay valid for the life of the viewport.
+    pub unsafe fn for_window_shared(
+        gpu: &mut Option<Gpu>,
+        display: RawDisplayHandle,
+        window: RawWindowHandle,
+        width: u32,
+        height: u32,
+    ) -> Result<Self, String> {
+        let instance = gpu.as_ref().map_or_else(instance, |g| g.instance.clone());
         let target = wgpu::SurfaceTargetUnsafe::RawHandle {
             raw_display_handle: Some(display),
             raw_window_handle: window,
         };
         let surface =
             unsafe { instance.create_surface_unsafe(target) }.map_err(|e| e.to_string())?;
-        let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
-            compatible_surface: Some(&surface),
-            ..Default::default()
-        }))
-        .map_err(|e| e.to_string())?;
-        let (device, queue) =
-            pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor::default()))
-                .map_err(|e| e.to_string())?;
+        let shared = match gpu {
+            Some(g) => g.clone(),
+            None => {
+                let adapter =
+                    pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
+                        compatible_surface: Some(&surface),
+                        ..Default::default()
+                    }))
+                    .map_err(|e| e.to_string())?;
+                let (device, queue) =
+                    pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor::default()))
+                        .map_err(|e| e.to_string())?;
+                gpu.insert(Gpu {
+                    instance,
+                    adapter,
+                    device,
+                    queue,
+                })
+                .clone()
+            }
+        };
         let config = surface
-            .get_default_config(&adapter, width.max(1), height.max(1))
+            .get_default_config(&shared.adapter, width.max(1), height.max(1))
             .ok_or("the window surface is not supported by the graphics adapter")?;
-        surface.configure(&device, &config);
+        surface.configure(&shared.device, &config);
         let format = config.format;
-        let info = adapter.get_info();
+        let info = shared.adapter.get_info();
         Ok(Self::build(
-            device,
-            queue,
+            shared.device,
+            shared.queue,
             Target::Surface { surface, config },
             format,
             (width.max(1), height.max(1)),

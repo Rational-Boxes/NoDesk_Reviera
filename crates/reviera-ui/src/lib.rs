@@ -3,23 +3,26 @@
 
 //! wxWidgets UI shell through wxDragon (spec Ch 1).
 //!
-//! The main window: File, Edit, View and Architecture menus, a status bar, the Properties palette
-//! (a property grid) and the 3D viewport (`wgpu`, through `reviera-render-wgpu`). Clicking selects
+//! The main window (UI-VIEWWIN-001/002): menus, a status bar, the Properties palette as a dockable
+//! pane, and view windows as tabs in the centre (`wxAuiNotebook`), several models side by side.
+//! Each view has its own camera and `wgpu` surface; all share one graphics device. Clicking selects
 //! an element and shows its parameters; edits in the palette go through `param.set`. The Wall tool
 //! draws chains of walls on a level with `wall.create`, and they show at once. Every action goes
-//! through `App::execute`, like Lua and MCP. The ribbon, browsers and view tabs come next.
+//! through `App::execute`, like Lua and MCP. The ribbon and browsers come next.
 
 mod native;
 mod snap;
+mod wx;
 
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::rc::Rc;
+use std::rc::{Rc, Weak};
 
 use reviera_app::{App, AppConfig, DocumentId};
 use reviera_core::{Caller, ElementId};
 use reviera_render::{Camera, RenderBackend, RenderScene};
-use reviera_render_wgpu::WgpuViewport;
+use reviera_render_wgpu::{Gpu, WgpuViewport};
 use serde_json::{Value, json};
 use wxdragon::prelude::*;
 
@@ -31,6 +34,13 @@ const ID_UNDO: i32 = ID_HIGHEST + 5;
 const ID_REDO: i32 = ID_HIGHEST + 6;
 const ID_WALL: i32 = ID_HIGHEST + 7;
 const ID_SAVE_AS: i32 = ID_HIGHEST + 8;
+const ID_NEW_VIEW: i32 = ID_HIGHEST + 9;
+const ID_CLOSE_VIEW: i32 = ID_HIGHEST + 10;
+const ID_NEXT_VIEW: i32 = ID_HIGHEST + 11;
+const ID_PREV_VIEW: i32 = ID_HIGHEST + 12;
+const ID_TILE: i32 = ID_HIGHEST + 13;
+const ID_TAB_ALL: i32 = ID_HIGHEST + 14;
+const ID_SHOW_PROPERTIES: i32 = ID_HIGHEST + 15;
 
 /// Height of walls drawn on the top level (they reach the level above otherwise).
 const WALL_HEIGHT: f64 = 3.0;
@@ -75,21 +85,44 @@ struct Row {
     data_type: String,
 }
 
-struct Gui {
-    app: App,
-    doc: Option<DocumentId>,
-    scene: RenderScene,
+/// A view window: one tab showing a 3D view of a model.
+struct View {
+    id: u32,
+    doc: DocumentId,
+    name: String,
+    panel: Panel,
     viewport: Option<WgpuViewport>,
     /// The native surface under the viewport; declared after it so it is dropped after it.
     native: Option<native::NativeView>,
-    viewport_error: Option<String>,
+    error: Option<String>,
     camera: Camera,
     drag: Option<(Drag, i32, i32)>,
     press: Option<(i32, i32)>,
+}
+
+struct Gui {
+    app: App,
+    /// The shared handle of this state, for handlers of new views.
+    this: Weak<RefCell<Gui>>,
+    frame: Frame,
+    notebook: AuiNotebook,
+    aui: AuiManager,
+    /// The document of the active view.
+    doc: Option<DocumentId>,
+    views: Vec<View>,
+    active: Option<u32>,
+    next_view: u32,
+    gpu: Option<Gpu>,
+    /// The scene of each open document, shared by its views.
+    scenes: HashMap<DocumentId, RenderScene>,
     rows: Vec<Row>,
     properties_stale: bool,
     tool: Option<WallTool>,
 }
+
+/// An empty scene and a default camera, for when no view is open.
+static EMPTY: std::sync::LazyLock<RenderScene> = std::sync::LazyLock::new(RenderScene::default);
+static DEFAULT_CAMERA: std::sync::LazyLock<Camera> = std::sync::LazyLock::new(Camera::default);
 
 fn user() -> Caller {
     Caller::user()
@@ -103,38 +136,89 @@ impl Gui {
             .map_err(|e| e.to_string())
     }
 
-    /// Draws the viewport, creating it on first use (the panel must be realised by then).
-    fn draw(&mut self, panel: &Panel, frame: &Frame) {
-        let size = panel.get_client_size();
-        if self.viewport.is_none() && self.viewport_error.is_none() {
-            let created = native::NativeView::new(panel.get_handle()).and_then(|view| {
-                let scale = view.scale_factor();
-                let (w, h) = physical(size, scale);
-                let viewport =
-                    unsafe { WgpuViewport::for_window(view.display, view.window, w, h) }?;
-                Ok((view, viewport))
+    fn view(&self, id: u32) -> Option<&View> {
+        self.views.iter().find(|v| v.id == id)
+    }
+
+    fn active_view(&self) -> Option<&View> {
+        self.active.and_then(|id| self.view(id))
+    }
+
+    fn active_view_mut(&mut self) -> Option<&mut View> {
+        self.active
+            .and_then(|id| self.views.iter_mut().find(|v| v.id == id))
+    }
+
+    /// The camera of the active view.
+    fn camera(&self) -> &Camera {
+        self.active_view().map_or(&DEFAULT_CAMERA, |v| &v.camera)
+    }
+
+    /// The viewport of the active view.
+    fn viewport(&mut self) -> Option<&mut WgpuViewport> {
+        self.active_view_mut()?.viewport.as_mut()
+    }
+
+    /// The scene of the active model.
+    fn scene(&self) -> &RenderScene {
+        self.doc.and_then(|d| self.scenes.get(&d)).unwrap_or(&EMPTY)
+    }
+
+    /// Draws a view, creating its surface on first use (the panel must be realised by then).
+    fn draw(&mut self, id: u32) {
+        let frame = self.frame;
+        let Some(index) = self.views.iter().position(|v| v.id == id) else {
+            return;
+        };
+        let doc = self.views[index].doc;
+        let needs_surface =
+            self.views[index].viewport.is_none() && self.views[index].error.is_none();
+        let (scene, highlight) = if needs_surface {
+            let highlight = if Some(doc) == self.doc {
+                self.selection()
+            } else {
+                Vec::new()
+            };
+            (
+                self.scenes.get(&doc).cloned().unwrap_or_default(),
+                highlight,
+            )
+        } else {
+            (RenderScene::default(), Vec::new())
+        };
+        let gpu = &mut self.gpu;
+        let view = &mut self.views[index];
+        let size = view.panel.get_client_size();
+        if needs_surface {
+            let created = native::NativeView::new(view.panel.get_handle()).and_then(|native| {
+                let (w, h) = physical(size, native.scale_factor());
+                let viewport = unsafe {
+                    WgpuViewport::for_window_shared(gpu, native.display, native.window, w, h)
+                }?;
+                Ok((native, viewport))
             });
             match created {
-                Ok((view, mut v)) => {
-                    v.set_scene(&self.scene);
+                Ok((native, mut v)) => {
+                    v.set_scene(&scene);
+                    v.set_highlight(&highlight);
                     frame.set_status_text(
-                        &format!("Graphics: {} on {}", v.adapter(), surface_kind(&view)),
+                        &format!("Graphics: {} on {}", v.adapter(), surface_kind(&native)),
                         1,
                     );
-                    self.viewport = Some(v);
-                    self.native = Some(view);
+                    view.viewport = Some(v);
+                    view.native = Some(native);
                 }
                 Err(e) => {
                     frame.set_status_text(&format!("3D viewport unavailable: {e}"), 0);
-                    self.viewport_error = Some(e);
+                    view.error = Some(e);
                 }
             }
         }
-        if let (Some(v), Some(view)) = (&mut self.viewport, &self.native) {
-            view.update();
-            let (w, h) = physical(size, view.scale_factor());
+        if let (Some(v), Some(native)) = (&mut view.viewport, &view.native) {
+            native.update();
+            let (w, h) = physical(size, native.scale_factor());
             v.resize(w, h);
-            if let Err(e) = v.render(&self.camera) {
+            if let Err(e) = v.render(&view.camera) {
                 frame.set_status_text(&e, 0);
             }
         }
@@ -192,41 +276,252 @@ impl Gui {
         }
     }
 
+    /// Shows a newly opened model: its scene, and a 3D view tab.
     fn show_document(&mut self, id: DocumentId, frame: &Frame) {
-        self.end_tool(frame);
-        self.doc = Some(id);
-        self.scene = match self.app.render_scene(id) {
+        let scene = match self.app.render_scene(id) {
             Ok(s) => s,
             Err(e) => return error(frame, &format!("Could not display the model:\n{e}")),
         };
-        if let Some(v) = &mut self.viewport {
-            v.set_scene(&self.scene);
-            v.set_highlight(&[]);
-        }
-        self.fit();
-        let info = self.app.documents().into_iter().find(|d| d.id == id);
-        let title = info.as_ref().map_or("Untitled".into(), |d| d.title.clone());
-        let read_only = info.is_some_and(|d| d.read_only);
-        frame.set_title(&format!(
-            "{title}{} - NoDesk Reviera",
-            if read_only { " (read-only)" } else { "" }
-        ));
-        if self.scene.meshes.is_empty() {
-            // An empty project: look at the origin from above at an angle.
-            self.camera.fit((
-                glam::Vec3::new(-10.0, -10.0, 0.0),
-                glam::Vec3::new(10.0, 10.0, 3.0),
-            ));
-        }
+        let triangles = scene.triangle_count();
+        self.scenes.insert(id, scene);
+        self.open_view(id);
         let elements = self.app.document(id).map_or(0, |d| d.doc.store().len());
         frame.set_status_text(
             &format!(
-                "{title}: {elements} elements, {} triangles",
-                self.scene.triangle_count()
+                "{}: {elements} elements, {triangles} triangles",
+                self.doc_title(id)
             ),
             0,
         );
-        self.properties_stale = true;
+    }
+
+    fn doc_info(&self, id: DocumentId) -> Option<reviera_app::DocumentInfo> {
+        self.app.documents().into_iter().find(|d| d.id == id)
+    }
+
+    fn doc_title(&self, id: DocumentId) -> String {
+        self.doc_info(id).map_or("Untitled".into(), |d| d.title)
+    }
+
+    /// The tab caption of a view: `{3D} - Model`, with `*` for unsaved changes.
+    fn caption(&self, view: &View) -> String {
+        let dirty = self.doc_info(view.doc).is_some_and(|d| d.dirty);
+        format!(
+            "{} - {}{}",
+            view.name,
+            self.doc_title(view.doc),
+            if dirty { " *" } else { "" }
+        )
+    }
+
+    /// Opens a new 3D view of `doc` in a tab and activates it.
+    fn open_view(&mut self, doc: DocumentId) {
+        let taken: Vec<&str> = self
+            .views
+            .iter()
+            .filter(|v| v.doc == doc)
+            .map(|v| v.name.as_str())
+            .collect();
+        let name = (1..)
+            .map(|n| {
+                if n == 1 {
+                    "{3D}".to_owned()
+                } else {
+                    format!("{{3D {n}}}")
+                }
+            })
+            .find(|n| !taken.contains(&n.as_str()))
+            .expect("a free name");
+        let panel = Panel::builder(&self.notebook).build();
+        panel.set_background_style(BackgroundStyle::Paint);
+        let id = self.next_view;
+        self.next_view += 1;
+        let mut camera = Camera::default();
+        match self.scenes.get(&doc).and_then(RenderScene::bounds) {
+            Some(b) => camera.fit(b),
+            // An empty project: look at the origin from above at an angle.
+            None => camera.fit((
+                glam::Vec3::new(-10.0, -10.0, 0.0),
+                glam::Vec3::new(10.0, 10.0, 3.0),
+            )),
+        }
+        let view = View {
+            id,
+            doc,
+            name,
+            panel,
+            viewport: None,
+            native: None,
+            error: None,
+            camera,
+            drag: None,
+            press: None,
+        };
+        let caption = self.caption(&view);
+        self.views.push(view);
+        if let Some(gui) = self.this.upgrade() {
+            attach_view_handlers(&gui, id, panel, self.frame);
+        }
+        self.notebook.add_page(&panel, &caption, true);
+        self.activate_view(id);
+    }
+
+    /// Makes a view the active one; its model becomes the active document.
+    fn activate_view(&mut self, id: u32) {
+        let Some(doc) = self.view(id).map(|v| v.doc) else {
+            return;
+        };
+        let frame = self.frame;
+        if self.active != Some(id) {
+            if self.doc != Some(doc) {
+                self.end_tool(&frame);
+            }
+            self.active = Some(id);
+            self.doc = Some(doc);
+            let _ = self.app.activate(doc);
+            self.update_title(&frame);
+            self.properties_stale = true;
+        }
+        if let Some(i) = self
+            .view(id)
+            .and_then(|v| wx::page_index(&self.notebook, &v.panel))
+            && self.notebook.get_selection() != i as i32
+        {
+            self.notebook.set_selection(i);
+        }
+    }
+
+    /// Updates the tab captions (titles and unsaved-changes marks).
+    fn update_captions(&self) {
+        for v in &self.views {
+            if let Some(i) = wx::page_index(&self.notebook, &v.panel) {
+                let caption = self.caption(v);
+                if self.notebook.get_page_text(i) != caption {
+                    self.notebook.set_page_text(i, &caption);
+                }
+            }
+        }
+    }
+
+    /// Closes a view. Closing the last view of a model closes the model, asking to save unsaved
+    /// changes first. Returns `false` when the user cancelled.
+    fn close_view(&mut self, id: u32) -> bool {
+        let frame = self.frame;
+        let Some(doc) = self.view(id).map(|v| v.doc) else {
+            return true;
+        };
+        if self.views.iter().filter(|v| v.doc == doc).count() == 1 {
+            let info = self.doc_info(doc);
+            let mut save = "no";
+            if info.as_ref().is_some_and(|d| d.dirty) {
+                let message = format!("Save changes to {} before closing?", self.doc_title(doc));
+                let dialog = MessageDialog::builder(&frame, &message, "NoDesk Reviera")
+                    .with_style(
+                        MessageDialogStyle::YesNo
+                            | MessageDialogStyle::Cancel
+                            | MessageDialogStyle::IconQuestion,
+                    )
+                    .build();
+                match dialog.show_modal() {
+                    ID_YES => save = "yes",
+                    ID_NO => {}
+                    _ => return false,
+                }
+                if save == "yes" && info.as_ref().is_some_and(|d| d.path.is_none()) {
+                    error(&frame, "Save the new project with File > Save As first.");
+                    return false;
+                }
+            }
+            if let Err(e) = self.run("file.close", json!({ "document_id": doc, "save": save })) {
+                error(&frame, &format!("Could not close the model:\n{e}"));
+                return false;
+            }
+            self.scenes.remove(&doc);
+        }
+        if self.active == Some(id) {
+            self.end_tool(&frame);
+            self.active = None;
+            self.doc = None;
+        }
+        let index = self
+            .views
+            .iter()
+            .position(|v| v.id == id)
+            .expect("the view exists");
+        // The surface goes before its window.
+        let view = self.views.remove(index);
+        let panel = view.panel;
+        drop(view);
+        if let Some(i) = wx::page_index(&self.notebook, &panel) {
+            self.notebook.delete_page(i);
+        }
+        // The notebook selects a neighbour: make it the active view.
+        let selected = usize::try_from(self.notebook.get_selection()).ok();
+        match selected.and_then(|i| self.view_at(i)) {
+            Some(v) => self.activate_view(v),
+            None if self.views.is_empty() => {
+                frame.set_title("NoDesk Reviera");
+                self.properties_stale = true;
+            }
+            None => {}
+        }
+        true
+    }
+
+    /// Closes every view; `false` when the user cancelled.
+    fn close_all(&mut self) -> bool {
+        while let Some(id) = self.views.last().map(|v| v.id) {
+            if !self.close_view(id) {
+                return false;
+            }
+        }
+        true
+    }
+
+    /// The view on notebook page `index`.
+    fn view_at(&self, index: usize) -> Option<u32> {
+        self.views
+            .iter()
+            .find(|v| wx::page_index(&self.notebook, &v.panel) == Some(index))
+            .map(|v| v.id)
+    }
+
+    /// Activates the next (`step` 1) or previous (-1) view in tab order.
+    fn cycle_view(&mut self, step: i32) {
+        let n = self.notebook.page_count() as i32;
+        if n < 2 {
+            return;
+        }
+        let current = self.notebook.get_selection().max(0);
+        let next = (current + step).rem_euclid(n) as usize;
+        if let Some(v) = self.view_at(next) {
+            self.activate_view(v);
+        }
+    }
+
+    /// Tile Views: every view visible at once, in columns, then rows (UI-VIEWWIN-002).
+    fn tile(&mut self) {
+        wx::unsplit_all(&self.notebook);
+        let n = self.notebook.page_count();
+        if n < 2 {
+            return;
+        }
+        let columns = (n as f64).sqrt().ceil() as usize;
+        // Splitting moves a page into a new tab group; going from the last page keeps the
+        // indices of the pages still to move.
+        for k in (1..n).rev() {
+            let side = if k < columns {
+                wx::Side::Right
+            } else {
+                wx::Side::Bottom
+            };
+            wx::split(&self.notebook, k, side);
+        }
+    }
+
+    /// Tab Views: every view back in one tab group.
+    fn tab_all(&mut self) {
+        wx::unsplit_all(&self.notebook);
     }
 
     /// The active document's file, or `None` when it has never been saved.
@@ -270,20 +565,25 @@ impl Gui {
         ));
     }
 
-    /// Rebuilds the scene after the model changed (edits, undo, redo).
+    /// Rebuilds the active model's scene after it changed (edits, undo, redo), in all its views.
     fn refresh_scene(&mut self, frame: &Frame) {
         let Some(id) = self.doc else { return };
-        match self.app.render_scene(id) {
-            Ok(scene) => self.scene = scene,
+        let scene = match self.app.render_scene(id) {
+            Ok(scene) => scene,
             Err(e) => {
                 return frame.set_status_text(&format!("Could not display the model: {e}"), 0);
             }
-        }
+        };
         let ids = self.selection();
-        if let Some(v) = &mut self.viewport {
-            v.set_scene(&self.scene);
-            v.set_highlight(&ids);
+        for view in self.views.iter_mut().filter(|v| v.doc == id) {
+            if let Some(v) = &mut view.viewport {
+                v.set_scene(&scene);
+                v.set_highlight(&ids);
+            }
+            view.panel.refresh(false, None);
         }
+        self.scenes.insert(id, scene);
+        self.update_captions();
         self.properties_stale = true;
     }
 
@@ -390,7 +690,7 @@ impl Gui {
 
     fn end_tool(&mut self, frame: &Frame) {
         if self.tool.take().is_some() {
-            if let Some(v) = &mut self.viewport {
+            if let Some(v) = self.viewport() {
                 v.set_overlay(&[]);
             }
             frame.set_status_text("Ready", 0);
@@ -420,7 +720,7 @@ impl Gui {
         let t = self.tool.as_ref()?;
         let size = panel.get_client_size();
         let (o, d) = self
-            .camera
+            .camera()
             .ray(x as f32, y as f32, size.width as f32, size.height as f32);
         if d.z.abs() < 1e-6 {
             return None;
@@ -440,7 +740,7 @@ impl Gui {
         let (w, h) = (size.width as f32, size.height as f32);
         let z = t.elevation as f32;
         let to_screen = |p: [f64; 2]| {
-            self.camera
+            self.camera()
                 .project(glam::Vec3::new(p[0] as f32, p[1] as f32, z), w, h)
         };
         let mut s = snap::snap(raw, (x as f32, y as f32), t.last, &t.lines, to_screen);
@@ -586,7 +886,7 @@ impl Gui {
             indices,
             color,
         };
-        let marker = f64::from(self.camera.distance) * 0.008;
+        let marker = f64::from(self.camera().distance) * 0.008;
         if let Some(c) = t.cursor {
             let [x, y] = c.point;
             let size = if c.kind == snap::SnapKind::None {
@@ -651,14 +951,16 @@ impl Gui {
                 overlay.push(mesh((positions.to_vec(), vec![0, 1, 2, 0, 2, 1]), SNAP));
             }
         }
-        if let Some(v) = &mut self.viewport {
+        if let Some(v) = self.viewport() {
             v.set_overlay(&overlay);
         }
     }
 
     fn fit(&mut self) {
-        if let Some(b) = self.scene.bounds() {
-            self.camera.fit(b);
+        if let Some(b) = self.scene().bounds()
+            && let Some(v) = self.active_view_mut()
+        {
+            v.camera.fit(b);
         }
     }
 
@@ -676,12 +978,12 @@ impl Gui {
         }
         let size = panel.get_client_size();
         let (origin, dir) =
-            self.camera
+            self.camera()
                 .ray(x as f32, y as f32, size.width as f32, size.height as f32);
         let hit = self
-            .scene
+            .scene()
             .pick(origin, dir)
-            .and_then(|(i, _)| self.scene.meshes[i].element);
+            .and_then(|(i, _)| self.scene().meshes[i].element);
         let result = match hit {
             Some(id) => self.run("selection.set", json!({ "ids": [id] })),
             None => self.run("selection.clear", json!({})),
@@ -699,7 +1001,7 @@ impl Gui {
 
     fn selection_changed(&mut self) {
         let ids = self.selection();
-        if let Some(v) = &mut self.viewport {
+        if let Some(v) = self.viewport() {
             v.set_highlight(&ids);
         }
         self.properties_stale = true;
@@ -938,7 +1240,187 @@ fn wheel(data: &WindowEventData) -> i32 {
     }
 }
 
-/// Runs the main window until it is closed, optionally opening `file`.
+/// Runs `f` on the view `id` made active first (input in a view applies to that view).
+fn with_view(gui: &Rc<RefCell<Gui>>, id: u32, f: impl FnOnce(&mut Gui)) {
+    with(gui, |g| {
+        if g.view(id).is_some() {
+            g.activate_view(id);
+            f(g);
+        }
+    });
+}
+
+/// Mouse, keyboard and paint handlers of one view's panel.
+fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Frame) {
+    {
+        let (gui, p) = (gui.clone(), panel);
+        panel.on_paint(move |_| {
+            let _dc = PaintDC::new(&p);
+            with(&gui, |g| g.draw(id));
+        });
+    }
+    {
+        let p = panel;
+        panel.on_size(move |e| {
+            p.refresh(false, None);
+            e.skip(true);
+        });
+    }
+    for (button, kind) in [(0, Drag::Orbit), (1, Drag::Pan), (2, Drag::Pan)] {
+        let (gui, p) = (gui.clone(), panel);
+        let handler = move |e: WindowEventData| {
+            if let Some((x, y)) = position(&e) {
+                with_view(&gui, id, |g| {
+                    if let Some(v) = g.active_view_mut() {
+                        v.drag = Some((kind, x, y));
+                        if button == 0 {
+                            v.press = Some((x, y));
+                        }
+                    }
+                });
+            }
+            p.set_focus();
+        };
+        match button {
+            0 => panel.on_mouse_left_down(handler),
+            1 => panel.on_mouse_middle_down(handler),
+            _ => panel.on_mouse_right_down(handler),
+        };
+    }
+    for button in 0..3 {
+        let (gui, p, f) = (gui.clone(), panel, frame);
+        let handler = move |e: WindowEventData| {
+            with_view(&gui, id, |g| {
+                let Some(v) = g.active_view_mut() else { return };
+                v.drag = None;
+                let press = v.press.take();
+                if button == 0
+                    && let (Some((x0, y0)), Some((x, y))) = (press, position(&e))
+                    && (x - x0).abs() <= CLICK_SLOP
+                    && (y - y0).abs() <= CLICK_SLOP
+                {
+                    if g.tool.is_some() {
+                        g.wall_click(x, y, &p, &f);
+                    } else {
+                        g.pick(x, y, &p);
+                    }
+                }
+            });
+            p.refresh(false, None);
+        };
+        match button {
+            0 => panel.on_mouse_left_up(handler),
+            1 => panel.on_mouse_middle_up(handler),
+            _ => panel.on_mouse_right_up(handler),
+        };
+    }
+    {
+        let (gui, p, f) = (gui.clone(), panel, frame);
+        panel.on_mouse_motion(move |e| {
+            let Some((x, y)) = position(&e) else { return };
+            let mut redraw = false;
+            with(&gui, |g| {
+                let Some(v) = g.views.iter_mut().find(|v| v.id == id) else {
+                    return;
+                };
+                let Some((kind, x0, y0)) = v.drag else {
+                    if g.tool.is_some() && g.active == Some(id) {
+                        g.wall_motion(x, y, &p, &f);
+                        redraw = true;
+                    }
+                    return;
+                };
+                let (dx, dy) = ((x - x0) as f32, (y - y0) as f32);
+                match kind {
+                    Drag::Orbit => v.camera.orbit(dx, dy),
+                    Drag::Pan => {
+                        let h = p.get_client_size().height as f32;
+                        v.camera.pan(dx, dy, h);
+                    }
+                }
+                v.drag = Some((kind, x, y));
+                redraw = true;
+            });
+            if redraw {
+                p.refresh(false, None);
+            }
+        });
+    }
+    {
+        let (gui, p) = (gui.clone(), panel);
+        panel.on_mouse_wheel(move |e| {
+            let steps = wheel(&e) as f32 / 120.0;
+            with(&gui, |g| {
+                if let Some(v) = g.views.iter_mut().find(|v| v.id == id) {
+                    v.camera.zoom(steps);
+                }
+            });
+            p.refresh(false, None);
+        });
+    }
+    {
+        let (gui, p, f) = (gui.clone(), panel, frame);
+        panel.on_key_down(move |e| {
+            let (code, ctrl, shift) = match &e {
+                WindowEventData::Keyboard(k) => {
+                    (k.get_key_code(), k.control_down(), k.shift_down())
+                }
+                _ => (None, false, false),
+            };
+            let mut used = false;
+            match code {
+                // Ctrl+Tab / Ctrl+Shift+Tab switch views (GTK menus cannot bind them).
+                Some(WXK_TAB) if ctrl => {
+                    with(&gui, |g| g.cycle_view(if shift { -1 } else { 1 }));
+                    used = true;
+                }
+                Some(WXK_ESCAPE) => {
+                    with_view(&gui, id, |g| g.escape(&f));
+                    used = true;
+                }
+                Some(key @ (WXK_SPACE | WXK_BACK | WXK_RETURN | WXK_NUMPAD_ENTER)) => {
+                    with_view(&gui, id, |g| used = g.wall_key(key, &f));
+                }
+                _ => {}
+            }
+            if used {
+                p.refresh(false, None);
+            } else {
+                // Lets the character event follow (typed lengths).
+                e.skip(true);
+            }
+        });
+    }
+    {
+        let (gui, p, f) = (gui.clone(), panel, frame);
+        panel.on_char(move |e| {
+            let key = match &e {
+                WindowEventData::Keyboard(k) => k.get_unicode_key(),
+                _ => None,
+            };
+            let mut used = false;
+            if let Some(key) = key.filter(|k| *k > 32 && *k != 127) {
+                with_view(&gui, id, |g| used = g.wall_key(key, &f));
+            }
+            if used {
+                p.refresh(false, None);
+            } else {
+                e.skip(true);
+            }
+        });
+    }
+}
+
+impl Gui {
+    /// Redraws the active view.
+    fn refresh_active(&self) {
+        if let Some(v) = self.active_view() {
+            v.panel.refresh(false, None);
+        }
+    }
+}
+
+/// Runs the main window until it is closed, opening `file` if given.
 pub fn run(file: Option<PathBuf>) -> Result<(), String> {
     wxdragon::main(move |_| {
         let frame = Frame::builder()
@@ -968,184 +1450,112 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
         let architecture_menu = Menu::builder()
             .append_item(ID_WALL, "&Wall", "Draw walls on the lowest level")
             .build();
+        let window_menu = Menu::builder()
+            .append_item(
+                ID_NEW_VIEW,
+                "New &3D View",
+                "Open another 3D view of the model",
+            )
+            .append_item(
+                ID_CLOSE_VIEW,
+                "&Close View\tCtrl+W",
+                "Close the active view",
+            )
+            .append_separator()
+            .append_item(
+                ID_NEXT_VIEW,
+                "&Next View\tCtrl+PgDn",
+                "Activate the next view",
+            )
+            .append_item(
+                ID_PREV_VIEW,
+                "&Previous View\tCtrl+PgUp",
+                "Activate the previous view",
+            )
+            .append_separator()
+            .append_item(ID_TILE, "&Tile Views", "Show every view at once")
+            .append_item(
+                ID_TAB_ALL,
+                "T&ab Views",
+                "Put every view back in one tab group",
+            )
+            .append_separator()
+            .append_item(
+                ID_SHOW_PROPERTIES,
+                "&Properties",
+                "Show or hide the Properties palette",
+            )
+            .build();
         let menu_bar = MenuBar::builder()
             .append(file_menu, "&File")
             .append(edit_menu, "&Edit")
             .append(view_menu, "&View")
             .append(architecture_menu, "&Architecture")
+            .append(window_menu, "&Window")
             .build();
         frame.set_menu_bar(menu_bar);
         frame.create_status_bar(2, 0, -1, "status");
         frame.set_status_text("Open an IFC file to begin (File > Open)", 0);
 
-        let splitter = SplitterWindow::builder(&frame).build();
-        let grid = PropertyGrid::builder(&splitter)
+        // Docking layout: Properties on the left, view tabs in the centre (Ch 1 §1.4).
+        let aui = AuiManager::builder(&frame).build();
+        let grid = PropertyGrid::builder(&frame)
             .with_style(PropertyGridStyle::Tooltips)
             .build();
-        let panel = Panel::builder(&splitter).build();
-        panel.set_background_style(BackgroundStyle::Paint);
-        splitter.split_vertically(&grid, &panel, 340);
-        splitter.set_minimum_pane_size(200);
-        let sizer = BoxSizer::builder(Orientation::Vertical).build();
-        sizer.add(&splitter, 1, SizerFlag::Expand, 0);
-        frame.set_sizer(sizer, true);
+        let notebook = AuiNotebook::builder(&frame).build();
+        aui.add_pane_with_info(
+            &grid,
+            AuiPaneInfo::new()
+                .with_name("properties")
+                .with_caption("Properties")
+                .left()
+                .layer(1)
+                .best_size(340, 600)
+                .min_size(220, 200)
+                .close_button(true)
+                .floatable(true),
+        );
+        aui.add_pane_with_info(
+            &notebook,
+            AuiPaneInfo::new().with_name("views").center_pane(),
+        );
+        aui.update();
 
-        let gui = Rc::new(RefCell::new(Gui {
-            app: App::new(AppConfig::default()),
-            doc: None,
-            scene: RenderScene::default(),
-            viewport: None,
-            native: None,
-            viewport_error: None,
-            camera: Camera::default(),
-            drag: None,
-            press: None,
-            rows: Vec::new(),
-            properties_stale: true,
-            tool: None,
-        }));
+        let gui = Rc::new_cyclic(|this| {
+            RefCell::new(Gui {
+                app: App::new(AppConfig::default()),
+                this: this.clone(),
+                frame,
+                notebook,
+                aui,
+                doc: None,
+                views: Vec::new(),
+                active: None,
+                next_view: 1,
+                gpu: None,
+                scenes: HashMap::new(),
+                rows: Vec::new(),
+                properties_stale: true,
+                tool: None,
+            })
+        });
 
         {
-            let (gui, p, f) = (gui.clone(), panel, frame);
-            panel.on_paint(move |_| {
-                let _dc = PaintDC::new(&p);
-                with(&gui, |g| g.draw(&p, &f));
-            });
-        }
-        {
-            let p = panel;
-            panel.on_size(move |e| {
-                p.refresh(false, None);
-                e.skip(true);
-            });
-        }
-        for (button, kind) in [(0, Drag::Orbit), (1, Drag::Pan), (2, Drag::Pan)] {
-            let (gui, p) = (gui.clone(), panel);
-            let handler = move |e: WindowEventData| {
-                if let Some((x, y)) = position(&e) {
-                    let Ok(mut g) = gui.try_borrow_mut() else {
-                        return;
-                    };
-                    g.drag = Some((kind, x, y));
-                    if button == 0 {
-                        g.press = Some((x, y));
+            let gui = gui.clone();
+            wx::on_tab_event(&notebook, move |event| {
+                with(&gui, |g| match event {
+                    wx::TabEvent::Changed(i) => {
+                        if let Some(v) = g.view_at(i) {
+                            g.activate_view(v);
+                        }
                     }
-                }
-                p.set_focus();
-            };
-            match button {
-                0 => panel.on_mouse_left_down(handler),
-                1 => panel.on_mouse_middle_down(handler),
-                _ => panel.on_mouse_right_down(handler),
-            };
-        }
-        for button in 0..3 {
-            let (gui, p, f) = (gui.clone(), panel, frame);
-            let handler = move |e: WindowEventData| {
-                let Ok(mut g) = gui.try_borrow_mut() else {
-                    return;
-                };
-                g.drag = None;
-                let press = g.press.take();
-                if button == 0
-                    && let (Some((x0, y0)), Some((x, y))) = (press, position(&e))
-                    && (x - x0).abs() <= CLICK_SLOP
-                    && (y - y0).abs() <= CLICK_SLOP
-                {
-                    if g.tool.is_some() {
-                        g.wall_click(x, y, &p, &f);
-                    } else {
-                        g.pick(x, y, &p);
+                    wx::TabEvent::Close(i) | wx::TabEvent::MiddleClick(i) => {
+                        if let Some(v) = g.view_at(i) {
+                            g.close_view(v);
+                        }
                     }
-                    drop(g);
-                    p.refresh(false, None);
-                }
-            };
-            match button {
-                0 => panel.on_mouse_left_up(handler),
-                1 => panel.on_mouse_middle_up(handler),
-                _ => panel.on_mouse_right_up(handler),
-            };
-        }
-        {
-            let (gui, p, f) = (gui.clone(), panel, frame);
-            panel.on_mouse_motion(move |e| {
-                let Some((x, y)) = position(&e) else { return };
-                let Ok(mut g) = gui.try_borrow_mut() else {
-                    return;
-                };
-                let Some((kind, x0, y0)) = g.drag else {
-                    if g.tool.is_some() {
-                        g.wall_motion(x, y, &p, &f);
-                        drop(g);
-                        p.refresh(false, None);
-                    }
-                    return;
-                };
-                let (dx, dy) = ((x - x0) as f32, (y - y0) as f32);
-                match kind {
-                    Drag::Orbit => g.camera.orbit(dx, dy),
-                    Drag::Pan => {
-                        let h = p.get_client_size().height as f32;
-                        g.camera.pan(dx, dy, h);
-                    }
-                }
-                g.drag = Some((kind, x, y));
-                drop(g);
-                p.refresh(false, None);
-            });
-        }
-        {
-            let (gui, p) = (gui.clone(), panel);
-            panel.on_mouse_wheel(move |e| {
-                let steps = wheel(&e) as f32 / 120.0;
-                with(&gui, |g| g.camera.zoom(steps));
-                p.refresh(false, None);
-            });
-        }
-        {
-            let (gui, p, f) = (gui.clone(), panel, frame);
-            panel.on_key_down(move |e| {
-                let code = match &e {
-                    WindowEventData::Keyboard(k) => k.get_key_code(),
-                    _ => None,
-                };
-                let used = match code {
-                    Some(WXK_ESCAPE) => {
-                        with(&gui, |g| g.escape(&f));
-                        true
-                    }
-                    Some(key @ (WXK_SPACE | WXK_BACK | WXK_RETURN | WXK_NUMPAD_ENTER)) => {
-                        let mut used = false;
-                        with(&gui, |g| used = g.wall_key(key, &f));
-                        used
-                    }
-                    _ => false,
-                };
-                if used {
-                    p.refresh(false, None);
-                } else {
-                    // Lets the character event follow (typed lengths).
-                    e.skip(true);
-                }
-            });
-        }
-        {
-            let (gui, p, f) = (gui.clone(), panel, frame);
-            panel.on_char(move |e| {
-                let key = match &e {
-                    WindowEventData::Keyboard(k) => k.get_unicode_key(),
-                    _ => None,
-                };
-                let mut used = false;
-                if let Some(key) = key.filter(|k| *k > 32 && *k != 127) {
-                    with(&gui, |g| used = g.wall_key(key, &f));
-                }
-                if used {
-                    p.refresh(false, None);
-                } else {
-                    e.skip(true);
-                }
+                    wx::TabEvent::RightClick(_) => {}
+                });
             });
         }
         {
@@ -1165,12 +1575,25 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                     && gui.properties_stale
                 {
                     gui.show_properties(&g);
+                    gui.update_captions();
                 }
                 e.skip(true);
             });
         }
         {
-            let (gui, f, p) = (gui.clone(), frame, panel);
+            let gui = gui.clone();
+            frame.on_close(move |e| {
+                let mut closed = false;
+                with(&gui, |g| closed = g.close_all());
+                if closed {
+                    e.skip(true);
+                } else if let WindowEventData::General(e) = &e {
+                    e.veto();
+                }
+            });
+        }
+        {
+            let (gui, f) = (gui.clone(), frame);
             frame.on_menu(move |e| match e.get_id() {
                 ID_OPEN => {
                     let dialog = FileDialog::builder(&f)
@@ -1181,20 +1604,23 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                         && let Some(path) = dialog.get_path()
                     {
                         with(&gui, |g| g.open(Path::new(&path), &f));
-                        p.refresh(false, None);
                     }
                 }
-                ID_NEW => {
-                    with(&gui, |g| g.new_project(&f));
-                    p.refresh(false, None);
-                }
+                ID_NEW => with(&gui, |g| g.new_project(&f)),
                 ID_SAVE_FILE | ID_SAVE_AS => {
                     // A project that was never saved has no file yet: Save asks for one.
                     let mut current = None;
-                    with(&gui, |g| current = Some(g.current_path()));
+                    with(&gui, |g| {
+                        if g.doc.is_some() {
+                            current = Some(g.current_path());
+                        }
+                    });
                     let Some(current) = current else { return };
                     if e.get_id() == ID_SAVE_FILE && current.is_some() {
-                        return with(&gui, |g| g.save(&f));
+                        return with(&gui, |g| {
+                            g.save(&f);
+                            g.update_captions();
+                        });
                     }
                     let name = current
                         .as_ref()
@@ -1212,7 +1638,10 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                     if dialog.show_modal() == ID_OK
                         && let Some(path) = dialog.get_path()
                     {
-                        with(&gui, |g| g.save_as(Path::new(&path), &f));
+                        with(&gui, |g| {
+                            g.save_as(Path::new(&path), &f);
+                            g.update_captions();
+                        });
                     }
                 }
                 ID_UNDO | ID_REDO => {
@@ -1222,16 +1651,36 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                         "edit.redo"
                     };
                     with(&gui, |g| g.undo_redo(command, &f));
-                    p.refresh(false, None);
                 }
-                ID_WALL => {
-                    with(&gui, |g| g.start_wall_tool(&f));
-                    p.set_focus();
-                }
-                ID_FIT => {
-                    with(&gui, Gui::fit);
-                    p.refresh(false, None);
-                }
+                ID_WALL => with(&gui, |g| {
+                    g.start_wall_tool(&f);
+                    if let Some(v) = g.active_view() {
+                        v.panel.set_focus();
+                    }
+                }),
+                ID_FIT => with(&gui, |g| {
+                    g.fit();
+                    g.refresh_active();
+                }),
+                ID_NEW_VIEW => with(&gui, |g| {
+                    if let Some(doc) = g.doc {
+                        g.open_view(doc);
+                    }
+                }),
+                ID_CLOSE_VIEW => with(&gui, |g| {
+                    if let Some(v) = g.active {
+                        g.close_view(v);
+                    }
+                }),
+                ID_NEXT_VIEW => with(&gui, |g| g.cycle_view(1)),
+                ID_PREV_VIEW => with(&gui, |g| g.cycle_view(-1)),
+                ID_TILE => with(&gui, Gui::tile),
+                ID_TAB_ALL => with(&gui, Gui::tab_all),
+                ID_SHOW_PROPERTIES => with(&gui, |g| {
+                    let shown = g.aui.is_pane_shown("properties");
+                    g.aui.set_pane_shown("properties", !shown);
+                    g.aui.update();
+                }),
                 ID_EXIT => f.close(false),
                 _ => e.skip(true),
             });
@@ -1241,7 +1690,6 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
         frame.centre();
         if let Some(path) = &file {
             gui.borrow_mut().open(path, &frame);
-            panel.refresh(false, None);
         }
     })
     .map_err(|e| e.to_string())

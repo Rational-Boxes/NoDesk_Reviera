@@ -21,7 +21,9 @@ operation can be driven by Lua scripts and by AI agents through the Model Contex
   permission level and attribution (user, script or agent).
 - **Crash recovery.** Every change is mirrored to an encrypted SQLite live store (SQLCipher, with
   the key kept in the OS keyring). After a crash, unsaved work and its undo history come back.
-- **3D viewport**: a wxWidgets window (through wxDragon) with a `wgpu` view of the model;
+- **Tabbed views**: several models open side by side, each view in its own tab with a `wgpu`
+  3D viewport (Window › New 3D View, Tile Views, Tab Views, Ctrl+Tab); a dockable Properties
+  palette. In the views:
   click to select, drag with the left mouse button to orbit, with the middle or right button
   to pan, and use the wheel to zoom.
 - **Walls**: *Architecture > Wall* draws chains of straight walls on a level, snapping to wall ends,
