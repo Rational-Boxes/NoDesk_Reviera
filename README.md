@@ -9,27 +9,9 @@ structure and MEP. IFC is its native file format, so there is no proprietary con
 operation can be driven by Lua scripts and by AI agents through the Model Context Protocol (MCP).
 
 > **Status: early development.** The specification is complete as a draft. The application
-> core is being built, and the first window shows models in an interactive 3D viewport.
-
-## COBie handover (planned)
-
-Reviera is to export the model's facility-management metadata as a COBie data set (the
-current NBIMS-US tables, or the COBie 2.4 layout). The tables are Company, Facility, Level,
-Space, Zone, Type, Component, System, Attribute and the rest. The export is a workbook or one
-CSV file per table, with validation of required data, unique names and references, and the
-same objects and GlobalIds as the IFC handover export (spec DOC-OUT-015). It is not built yet;
-it will build on the schedule engine.
-
-## Working with CADCraft
-
-Reviera is meant to work alongside [CADCraft](https://github.com/storytold/cadcraft), an
-open-source 2D drafting application in Rust. The goal is a two-way exchange through DWG and
-DXF files: drawings made in CADCraft (site plans, surveys, details, consultant drawings) come
-into Reviera as imported or linked CAD, and Reviera's plans and views go back to CADCraft as
-DXF or DWG. Both applications read these files with the same library (`acadrust`), so a
-drawing is read the same way in each. A corpus of CADCraft-made drawings will check
-compatibility continuously, in both directions. The requirements are DM-IMP-013 and DM-IMP-014
-in the specification (Chapter 2, §2.11.10–2.11.11). CAD import is not built yet.
+> models walls, doors and windows, floors, ceilings, roofs, rooms, levels and grids; draws plans,
+> ceiling plans, sections and elevations to PDF; and has a ribbon-based window with 3D
+> inspection tools. Schedules, sheets and more building elements are in progress.
 
 ## Screenshots
 
@@ -43,6 +25,8 @@ The KIT FZK *AC20-Institute-Var-2* sample model (`test-data/ifc/`) open in Revie
 
 ## What works today
 
+### Platform
+
 - **Native IFC** through IfcOpenShell and OpenCASCADE: open, edit, save and tessellate IFC2X3,
   IFC4 and IFC4X3_ADD2 models, with lossless round trips of files from other tools.
 - **Element identity** that survives save and reopen. Reviera's own data is embedded in the IFC
@@ -51,16 +35,63 @@ The KIT FZK *AC20-Institute-Var-2* sample model (`test-data/ifc/`) open in Revie
   permission level and attribution (user, script or agent).
 - **Crash recovery.** Every change is mirrored to an encrypted SQLite live store (SQLCipher, with
   the key kept in the OS keyring). After a crash, unsaved work and its undo history come back.
-- **Tabbed views**: several models open side by side, each view in its own tab with a `wgpu`
-  3D viewport (Window › New 3D View, Tile Views, Tab Views, Ctrl+Tab); a dockable Properties
-  palette.
-- **Views as model objects**: 3D views are saved in the IFC file (RXD), with a Project Browser
-  to open, rename, duplicate and delete them; each view's camera and Home come back on reopen.
-  `view.*` commands (create, list, rename, orient, set_camera, open, …) work from MCP too.
-- **Floor plans**: View › New Floor Plan creates a plan per level, drawn as a top-down cut at
-  the view range's cut plane with cut poché and lines on white; the cut plane is editable in
-  Properties, and the Wall tool draws on the plan's level (`view.create_plan`,
-  `view.set_view_range`, `view.get_view_range`).
+- **Units and parameters**: SI storage with project display units (metric and imperial,
+  feet-and-inches), built-in, project and shared parameters routed to types or instances.
+- **MCP server** for AI agents: every command is a tool, with toolsets, preview and confirm for
+  destructive changes, and resources for documents and elements.
+
+### Modelling
+
+- **Walls**: *Architecture > Wall* draws chains of straight walls on a level, snapping to wall ends,
+  midpoints, wall lines and 15° angles; type a length (`4.5 m`, `12' 6"`) and press Enter, and
+  Spacebar flips the exterior side. Walls appear at once,
+  regenerated from their recipe (`wall.create`, `wall.set_location`). Walls that meet join at
+  mitred L corners and T junctions (`wall.set_join_allowed` turns a join off). Saving writes standard IFC
+  (`IfcWall` with an `Axis` and a `SweptSolid` body, typed, contained in its storey and
+  connected to its neighbours with `IfcRelConnectsPathElements`), so other
+  tools see them, and Reviera reopens them as editable walls.
+- **Doors and windows**: Architecture › Door (DR) and Window (WN) place them in Reviera walls in
+  plans or 3D: the preview follows the cursor along the wall, the cursor's side sets the facing
+  and Spacebar flips a door's hand. Walls are cut, plans show door swings, and each new door or
+  window gets the next Mark. Drag a selected one along its wall; edit its sill height, flips
+  and type (with door and window types to duplicate and resize) in Properties. Saved as
+  `IfcDoor`/`IfcWindow` filling an `IfcOpeningElement` that voids the wall (`door.place`,
+  `window.place`, `insert.flip_hand`, `insert.flip_facing`, `insert.set_sill_height`,
+  `element.move`).
+- **Floors**: Architecture › Floor (FL) opens sketch mode on a contextual *Modify | Create Floor
+  Boundary* tab: Pick Walls (the face on the cursor's side, locked so the floor follows the
+  wall; Tab picks a chain of joined walls), Line and Rectangle, then Finish or Cancel. The
+  sketch is checked (open ends, branches, crossings and overlaps are marked), inner loops make
+  holes, and Edit Boundary changes it later. Floors have types with a thickness, a height
+  offset, and area, perimeter and volume in Properties; they are saved as `IfcSlab` with an
+  extruded profile (`floor.create`, `floor.edit_boundary`, `floor.set_level`).
+- **Ceilings and ceiling plans**: Architecture › Ceiling places an automatic ceiling in the room
+  under the cursor (its edges follow the walls' finish faces, and move with them), or Sketch
+  Ceiling. Ceilings have types with a thickness and sit 2600 mm above their level by default.
+  View › Ceiling Plan makes reflected ceiling plans, cut at 2300 mm and looking up. Saved as
+  `IfcCovering` (CEILING) (`ceiling.create_auto`, `ceiling.create`, `ceiling.edit_boundary`).
+- **Roofs**: Architecture › Roof sketches a footprint in a plan. Pick Walls takes the walls'
+  exterior faces (Tab takes the whole chain) with a 600 mm overhang and puts the roof on the
+  walls' tops. Line and Rectangle work too. Defines Slope switches curves between sloping and
+  gable. A weighted straight skeleton makes hip, gable, shed, pavilion and cut-off (mansard)
+  roofs from any simple footprint, including different slopes per edge, and each face gets a
+  mitred slab of the roof type's thickness. Properties edit the base offset, slope, cutoff and
+  type, and Edit Footprint reopens the sketch. Saved as `IfcRoof` with a faceted B-rep body
+  (`roof.create_footprint`, `roof.edit_footprint`, `roof.set_params`, `roof.set_edge`,
+  `roof.set_slope`). Walls attach their tops to a roof (offered when a roof is made from picked
+  walls, or Modify | Walls › Attach Top/Base, then click the roof), so gable walls rise to the
+  ridge. Saved as a faceted B-rep in the wall's own frame, so doors and windows stay cut
+  (`wall.attach`, `wall.detach`). Not yet: attaching bases or to floors and ceilings, slope
+  arrows, and openings in roofs.
+- **Rooms**: Architecture › Room places a room in the region of wall faces under the cursor,
+  shown as you hover. Place Rooms Automatically fills every enclosed region of the plan's level,
+  numbered in reading order. Rooms measure to the walls' finish faces and leave out islands such
+  as free-standing walls. A door does not join the rooms on its two sides. A room follows its
+  walls, and becomes Not Enclosed if they open up. Plans label each room with its name, number
+  and area (in PDF too); click a label to select the room. Saved as `IfcSpace` (Name = Number,
+  LongName = Name) under its storey, with a body up to its limit (`room.place`,
+  `room.place_automatically`, `room.set`). Not yet: room separation lines, room tags as
+  elements, other area rules, and volumes clipped by floors and roofs.
 - **Levels**: Architecture › Level (LL) adds a level at an elevation with its floor plan, named
   after the level below (*Level 2* → *Level 3*). Levels are listed in the Project Browser; their
   Name and Elevation are edited in Properties. Moving a level moves the walls on it and stretches
@@ -78,18 +109,16 @@ The KIT FZK *AC20-Institute-Var-2* sample model (`test-data/ifc/`) open in Revie
   Choose, duplicate and edit types in Properties (also for the Grid tool); `type.duplicate`,
   `type.rename`, `type.set_param`, `type.list` and `element.set_type` work for grid and wall
   types alike.
-- **Floors**: Architecture › Floor (FL) opens sketch mode on a contextual *Modify | Create Floor
-  Boundary* tab: Pick Walls (the face on the cursor's side, locked so the floor follows the
-  wall; Tab picks a chain of joined walls), Line and Rectangle, then Finish or Cancel. The
-  sketch is checked (open ends, branches, crossings and overlaps are marked), inner loops make
-  holes, and Edit Boundary changes it later. Floors have types with a thickness, a height
-  offset, and area, perimeter and volume in Properties; they are saved as `IfcSlab` with an
-  extruded profile (`floor.create`, `floor.edit_boundary`, `floor.set_level`).
-- **Ceilings and ceiling plans**: Architecture › Ceiling places an automatic ceiling in the room
-  under the cursor (its edges follow the walls' finish faces, and move with them), or Sketch
-  Ceiling. Ceilings have types with a thickness and sit 2600 mm above their level by default.
-  View › Ceiling Plan makes reflected ceiling plans, cut at 2300 mm and looking up. Saved as
-  `IfcCovering` (CEILING) (`ceiling.create_auto`, `ceiling.create`, `ceiling.edit_boundary`).
+
+### Views and documentation
+
+- **Views as model objects**: 3D views are saved in the IFC file (RXD), with a Project Browser
+  to open, rename, duplicate and delete them; each view's camera and Home come back on reopen.
+  `view.*` commands (create, list, rename, orient, set_camera, open, …) work from MCP too.
+- **Floor plans**: View › New Floor Plan creates a plan per level, drawn as a top-down cut at
+  the view range's cut plane with cut poché and lines on white; the cut plane is editable in
+  Properties, and the Wall tool draws on the plan's level (`view.create_plan`,
+  `view.set_view_range`, `view.get_view_range`).
 - **Sections and elevations**: View › Section draws a section line in a plan with two clicks
   (the view looks to the line's right). Building Elevations makes North, South, East and West
   elevations around the model. These views draw like plans of the model turned into their frame:
@@ -99,28 +128,18 @@ The KIT FZK *AC20-Institute-Var-2* sample model (`test-data/ifc/`) open in Revie
   export to PDF (`view.create_section`, `view.create_elevation`, `section.edit`). Not yet:
   crop regions, jogged sections, multi-direction and interior elevation markers, and opening a
   view from its marker.
-- **Rooms**: Architecture › Room places a room in the region of wall faces under the cursor,
-  shown as you hover. Place Rooms Automatically fills every enclosed region of the plan's level,
-  numbered in reading order. Rooms measure to the walls' finish faces and leave out islands such
-  as free-standing walls. A door does not join the rooms on its two sides. A room follows its
-  walls, and becomes Not Enclosed if they open up. Plans label each room with its name, number
-  and area (in PDF too); click a label to select the room. Saved as `IfcSpace` (Name = Number,
-  LongName = Name) under its storey, with a body up to its limit (`room.place`,
-  `room.place_automatically`, `room.set`). Not yet: room separation lines, room tags as
-  elements, other area rules, and volumes clipped by floors and roofs.
-- **Roofs**: Architecture › Roof sketches a footprint in a plan. Pick Walls takes the walls'
-  exterior faces (Tab takes the whole chain) with a 600 mm overhang and puts the roof on the
-  walls' tops. Line and Rectangle work too. Defines Slope switches curves between sloping and
-  gable. A weighted straight skeleton makes hip, gable, shed, pavilion and cut-off (mansard)
-  roofs from any simple footprint, including different slopes per edge, and each face gets a
-  mitred slab of the roof type's thickness. Properties edit the base offset, slope, cutoff and
-  type, and Edit Footprint reopens the sketch. Saved as `IfcRoof` with a faceted B-rep body
-  (`roof.create_footprint`, `roof.edit_footprint`, `roof.set_params`, `roof.set_edge`,
-  `roof.set_slope`). Walls attach their tops to a roof (offered when a roof is made from picked
-  walls, or Modify | Walls › Attach Top/Base, then click the roof), so gable walls rise to the
-  ridge. Saved as a faceted B-rep in the wall's own frame, so doors and windows stay cut
-  (`wall.attach`, `wall.detach`). Not yet: attaching bases or to floors and ceilings, slope
-  arrows, and openings in roofs.
+- **Dimensions**: Annotate › Aligned Dimension (DI) in plans dimensions parallel wall faces,
+  centrelines and cut edges; dimensions to Reviera walls follow them when they move
+  (`dim.create_aligned`, `anno.list`). The Wall tool snaps to cut edges in plans.
+- **Line weights**: plans draw cut and projection lines with each category's pens
+  (`objectstyle.set`) at paper widths for the view scale (`lineweight.set`, `add_scale`),
+  so a plan on screen at 100 % matches its print.
+- **PDF**: File › Export PDF writes plans, ceiling plans, sections and elevations as vector PDF
+  at their scale on the smallest ISO sheet (A4–A0), with pen widths in paper millimetres,
+  dimension values, room labels and level names as real text, and a title strip (`export.pdf`).
+
+### Inspecting and editing
+
 - **Inspecting the model**: View › Section Box clips a 3D view to a box whose face grips drag in
   real time; Selection Box (BX) fits it around the selection. Horizontal and Vertical Slice cut
   the view at a clicked point (up to eight planes, each with a grip). Cut solids are capped.
@@ -132,28 +151,6 @@ The KIT FZK *AC20-Institute-Var-2* sample model (`test-data/ifc/`) open in Revie
   storeys › categories › elements, with hosted elements under their hosts, and hides, isolates or
   boxes whole branches from its context menu (`view.set_section_box`, `view.set_slice_planes`,
   `view.fit_section_box`, `view.temp_*`, `model.tree`).
-- **Doors and windows**: Architecture › Door (DR) and Window (WN) place them in Reviera walls in
-  plans or 3D: the preview follows the cursor along the wall, the cursor's side sets the facing
-  and Spacebar flips a door's hand. Walls are cut, plans show door swings, and each new door or
-  window gets the next Mark. Drag a selected one along its wall; edit its sill height, flips
-  and type (with door and window types to duplicate and resize) in Properties. Saved as
-  `IfcDoor`/`IfcWindow` filling an `IfcOpeningElement` that voids the wall (`door.place`,
-  `window.place`, `insert.flip_hand`, `insert.flip_facing`, `insert.set_sill_height`,
-  `element.move`).
-- **Dimensions**: Annotate › Aligned Dimension (DI) in plans dimensions parallel wall faces,
-  centrelines and cut edges; dimensions to Reviera walls follow them when they move
-  (`dim.create_aligned`, `anno.list`). The Wall tool snaps to cut edges in plans.
-- **Line weights**: plans draw cut and projection lines with each category's pens
-  (`objectstyle.set`) at paper widths for the view scale (`lineweight.set`, `add_scale`),
-  so a plan on screen at 100 % matches its print.
-- **PDF**: File › Export PDF writes plan views as vector PDF at their scale on the smallest ISO
-  sheet (A4–A0), with pen widths in paper millimetres, dimension values as real text and a title
-  strip (`export.pdf`).
-- **Ribbon and menus**: a tool ribbon with Architecture, Annotate, View and Modify tabs (large
-  and small icon buttons in titled panels, the Select panel first), a Quick Access Toolbar
-  above it, and a contextual *Modify | <category>* tab while elements are selected (for
-  example Flip Hand and Flip Facing for doors). The ribbon, toolbar and menus are built from
-  one catalog, `ribbon-default.toml`, checked against the command registry.
 - **Editing**: the Modify tools Align (AL), Offset (OF), Mirror by picked or drawn axis (MM,
   DM), Move (MV), Copy (CO), Rotate (RO), Trim/Extend to Corner (TR), Trim/Extend to a
   boundary, Split (SL), Pin (PN) and Unpin (UP), in plans, with previews, snapping, and typed
@@ -163,23 +160,49 @@ The KIT FZK *AC20-Institute-Var-2* sample model (`test-data/ifc/`) open in Revie
   (`element.move`, `element.copy`, `element.rotate`, `element.mirror`, `element.offset`,
   `element.split`, `element.trim_corner`, `element.trim_extend`, `element.align`,
   `element.pin`, `element.unpin`).
+
+### Interface
+
+- **Tabbed views**: several models open side by side, each view in its own tab with a `wgpu`
+  3D viewport (Window › New 3D View, Tile Views, Tab Views, Ctrl+Tab). Tab Views remembers a tiled
+  arrangement, and Tile Views brings it back with its dividers where they were. Dockable
+  Properties, Project Browser and Model Tree panes.
+- **Ribbon and menus**: a tool ribbon with Architecture, Annotate, View and Modify tabs (large
+  and small icon buttons in titled panels, the Select panel first), a Quick Access Toolbar
+  above it, and a contextual *Modify | <category>* tab while elements are selected (for
+  example Flip Hand and Flip Facing for doors). The ribbon, toolbar and menus are built from
+  one catalog, `ribbon-default.toml`, checked against the command registry.
 - **Navigation**: an Orientation Cube in each 3D view (26 click regions, compass, Home, and a
   PERSP/ISO projection toggle), standard and isometric views with animated transitions, wheel
   zoom about the cursor, orbit about the selection, Previous/Next pan/zoom, and walk mode
   (View › Walk: WASD or arrow keys, drag to look). Click to select; drag to orbit; middle or right
   button to pan.
-- **Walls**: *Architecture > Wall* draws chains of straight walls on a level, snapping to wall ends,
-  midpoints, wall lines and 15° angles; type a length (`4.5 m`, `12' 6"`) and press Enter, and
-  Spacebar flips the exterior side. Walls appear at once,
-  regenerated from their recipe (`wall.create`, `wall.set_location`). Walls that meet join at
-  mitred L corners and T junctions (`wall.set_join_allowed` turns a join off). Saving writes standard IFC
-  (`IfcWall` with an `Axis` and a `SweptSolid` body, typed, contained in its storey and
-  connected to its neighbours with `IfcRelConnectsPathElements`), so other
-  tools see them, and Reviera reopens them as editable walls.
-- **Units and parameters**: SI storage with project display units (metric and imperial,
-  feet-and-inches), built-in, project and shared parameters routed to types or instances.
-- **MCP server** for AI agents: every command is a tool, with toolsets, preview and confirm for
-  destructive changes, and resources for documents and elements.
+
+## Planned next
+
+The first milestone continues with schedules, tags and text, sheets with title blocks, stairs and
+railings, and layered wall types. After that come general shape and CSG modelling tools,
+CADCraft drawing exchange and COBie handover.
+
+### COBie handover
+
+Reviera is to export the model's facility-management metadata as a COBie data set (the
+current NBIMS-US tables, or the COBie 2.4 layout). The tables are Company, Facility, Level,
+Space, Zone, Type, Component, System, Attribute and the rest. The export is a workbook or one
+CSV file per table, with validation of required data, unique names and references, and the
+same objects and GlobalIds as the IFC handover export (spec DOC-OUT-015). It is not built yet;
+it will build on the schedule engine.
+
+### Working with CADCraft
+
+Reviera is meant to work alongside [CADCraft](https://github.com/storytold/cadcraft), an
+open-source 2D drafting application in Rust. The goal is a two-way exchange through DWG and
+DXF files: drawings made in CADCraft (site plans, surveys, details, consultant drawings) come
+into Reviera as imported or linked CAD, and Reviera's plans and views go back to CADCraft as
+DXF or DWG. Both applications read these files with the same library (`acadrust`), so a
+drawing is read the same way in each. A corpus of CADCraft-made drawings will check
+compatibility continuously, in both directions. The requirements are DM-IMP-013 and DM-IMP-014
+in the specification (Chapter 2, §2.11.10–2.11.11). CAD import is not built yet.
 
 ## Building
 
@@ -226,9 +249,12 @@ Permission levels are `read_only` (the default), `model_edit` and `full_scriptin
 | `crates/reviera-rxd` | Reviera Extension Data encoding |
 | `crates/reviera-store` | Local `.ifc` projects with embedded RXD |
 | `crates/reviera-livestore` | Encrypted live store and crash recovery |
-| `crates/reviera-app` | Application session and file, live-store and recovery commands |
+| `crates/reviera-app` | Application session: documents, file, view-state, inspection, output and recovery commands |
 | `crates/reviera-mcp` | MCP server |
-| `crates/…` | Rendering, Godot, UI, Lua, BIMserver and OpenCDE crates (placeholders) |
+| `crates/reviera-render` | Render Scene, plan and section graphics, annotation, stroke font |
+| `crates/reviera-render-wgpu` | The built-in `wgpu` viewport |
+| `crates/reviera-ui` | The main window (wxWidgets through wxDragon): ribbon, views, tools, panes |
+| `crates/…` | Geometry, Godot, Lua, network, BIMserver and OpenCDE crates (placeholders) |
 | `design_documents/` | The specification (`spec/`), technology stack, research log and source register |
 | `schemas/`, `clients/rsp/` | Open data formats and protocol clients (MIT) |
 | `test-data/ifc/` | Sample IFC models for tests (see their README for provenance) |
