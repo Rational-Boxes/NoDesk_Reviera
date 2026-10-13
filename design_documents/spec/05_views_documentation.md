@@ -1884,6 +1884,29 @@ All annotation tools are on the **Annotate** tab, in the panels Dimension, Detai
 **Acceptance criteria.**
 - [ ] A material tag on the insulation layer of a wall in section shows the insulation material's name.
 
+**Implementation notes (2026-10-13), DOC-ANN-009…011.**
+- As built:
+  - `tag.create(view_id, host_ref, position?, tag_type_id?, orientation?, leader?)`, `tag.create_room(view_id, room_id, position?, tag_type_id?)` and `tag.tag_all(view_id, categories[], scope: view|selection, element_ids?, leader?, orientation?)`.
+  - `tag.set_leader(annotation_id, end_mode: none|attached|free, points?)`, `tag.set_type(annotation_ids[], tag_type_id, orientation?)`, `tag.set_default_type(category, tag_type_id)` and `tag.list(view_id)`.
+  - `text.create(view_id, position, content, type_id?, width?, rotation?)`, `text.set_content(annotation_id, content)`, `text.set(annotation_ids[], type_id?, width?, rotation?)`, `text.add_leader(annotation_id, side?, attach?, points[], shape?)`, `text.remove_leaders(annotation_id)` and `text.list(view_id)`.
+- Storage: tags and notes are `anno.tag` and `anno.text` objects under the view's annotation prefix, like dimensions. Deleting a view deletes them.
+- Tag types are built in, until tag families exist:
+  - Door Tag (Mark, box) and Window Tag (Mark, hexagon).
+  - Room Tag (name and number) and Room Tag With Area.
+  - Wall Tag (type name) and Multi-Category Tag (Mark).
+- Tag text: a tag type's fields are schedule fields (`param:elem.mark`, `type`, `room.area`, …), so tags and schedules always show the same values. Editing a tag's value in Properties writes the host's parameter (`schedule.set_cell`).
+- Tag placement:
+  - A tag keeps its head at an offset from its host's anchor (an insert's centre, a wall's midpoint, a room's tag point), so it follows the host.
+  - Moving a tag together with its host moves it once. A tag whose host is deleted is orphaned: drawn in orange, and kept.
+- Tag All tags the Reviera walls, doors, windows and rooms on the plan's level. Imported elements are tagged one by one with Tag by Category.
+- Text notes:
+  - Plain text: `\n` separates lines, and the text wraps at the type's size within an optional width.
+  - Types: Text 2.5, 3.5 and 5 mm. Leaders are straight, with a closed arrowhead.
+  - The window asks for the text in a multi-line box. Properties edit the text, type, width and rotation.
+- Room labels: until now rooms were labelled automatically in plans. A room with a room tag in the view now shows the tag instead.
+- Output: the window and PDF use the same layout. The window draws in the stroke font, and the PDF prints real text.
+- Later: tags and text in sections, elevations and sheets; rich text and the in-place editor; spell check; find and replace; text types as standards; tag families and material tags; free leader points by dragging; and tag placement that avoids overlaps.
+
 ### Tag by example
 **ID:** DOC-ANN-012 · **Priority:** P2 · **Ref:** research/04 §4.3 *Tag by Example*
 
@@ -3438,6 +3461,8 @@ Every command below is registered once in the command registry and is therefore 
 | `text.set_content` | annotation_id, content | () | Yes | DOC-ANN-009 |
 | `text.add_leader` | annotation_id, side, attach, points[], shape?: straight\|arc | () | Yes | DOC-ANN-009 |
 | `text.remove_leaders` | annotation_id | () | Yes | DOC-ANN-009 |
+| `text.set` | annotation_ids[], type_id?, width?, rotation? | () | Yes | DOC-ANN-009 |
+| `text.list` | view_id | text_info[] | No | DOC-ANN-009 |
 | `text.find_replace` | scope, find, replace, match_case?, whole_word? | count | Yes | DOC-ANN-009 |
 | `texttype.create` | name, properties | type_id | Yes | DOC-ANN-009 |
 | `texttype.edit` | type_id? | () | No | DOC-ANN-009 |
@@ -3446,6 +3471,8 @@ Every command below is registered once in the command registry and is therefore 
 | `tag.tag_all` | view_id, categories[], scope: view\|selection, include_links?, leader?, orientation? | annotation_id[] | Yes | DOC-ANN-010 |
 | `tag.set_default_type` | category, tag_type_id | () | Yes | DOC-ANN-010 |
 | `tag.set_leader` | annotation_id, start_mode?, end_mode?, points? | () | Yes | DOC-ANN-010 |
+| `tag.set_type` | annotation_ids[], tag_type_id, orientation? | () | Yes | DOC-ANN-010 |
+| `tag.list` | view_id | tag_info[] | No | DOC-ANN-010 |
 | `tag.create_material` | view_id, element_ref, layer_ref, position, tag_type_id? | annotation_id | Yes | DOC-ANN-011 |
 | `tag.create_room` | view_id, room_id, position?, tag_type_id? | annotation_id | Yes | DOC-ANN-011 |
 | `tag.by_example` | view_id, reference_tag_id, targets: all\|selection\|filter, filter_id?, replace_existing? | annotation_id[] | Yes | DOC-ANN-012 |

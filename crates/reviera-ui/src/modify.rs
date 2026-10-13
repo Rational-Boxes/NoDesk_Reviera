@@ -785,6 +785,7 @@ impl Gui {
             || self.grid_tool.is_some()
             || self.insert_tool.is_some()
             || self.modify_tool.is_some()
+            || self.note_tool.is_some()
     }
 
     /// Shows the grips of the selection (or nothing).
@@ -925,7 +926,10 @@ impl Gui {
             .clone();
         let movable = |id: &ElementId| {
             store.get(*id).is_some_and(|e| {
-                reviera_core::walls::wall_recipe(e).is_some() || reviera_core::grids::is_grid(e)
+                reviera_core::walls::wall_recipe(e).is_some()
+                    || reviera_core::grids::is_grid(e)
+                    || reviera_core::notes::tag_data(e).is_some()
+                    || reviera_core::notes::text_data(e).is_some()
             })
         };
         if !selected.iter().all(movable) {

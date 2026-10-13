@@ -185,8 +185,22 @@ impl Gui {
             return Vec::new();
         };
         let z = plan.range.cut as f32 + 0.003;
+        // A room tagged in the view shows its tag instead of the interim label.
+        let tagged = v
+            .element
+            .and_then(|e| store.get(e))
+            .map(|view| reviera_app::notes::tagged_rooms(&store, view))
+            .unwrap_or_default();
         let mut out = Vec::new();
-        for r in rooms::all(&store).into_iter().filter(|r| r.level == level) {
+        for r in rooms::all(&store)
+            .into_iter()
+            .filter(|r| r.level == level)
+            .filter(|r| {
+                store
+                    .get(r.id)
+                    .is_none_or(|e| !tagged.contains(e.guid().as_str()))
+            })
+        {
             let area = if r.geometry.enclosed() {
                 self.run(
                     "units.format",

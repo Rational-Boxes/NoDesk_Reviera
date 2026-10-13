@@ -11,8 +11,8 @@ operation can be driven by Lua scripts and by AI agents through the Model Contex
 > **Status: early development.** The specification is complete as a draft. The application
 > models walls, doors and windows, floors, ceilings, roofs, rooms, levels and grids; draws plans,
 > ceiling plans, sections and elevations; lays them out with schedules on sheets with title blocks
-> and prints them to PDF; keeps live schedules; and has a ribbon-based window with 3D inspection
-> tools. Tags, text and more building elements are in progress.
+> and prints them to PDF; tags and annotates plans; keeps live schedules; and has a ribbon-based
+> window with 3D inspection tools. Stairs, railings and layered walls are next.
 
 ## Screenshots
 
@@ -76,14 +76,16 @@ The KIT FZK *AC20-Institute-Var-2* sample model (`test-data/ifc/`) open in Revie
   walls' tops. Line and Rectangle work too. Defines Slope switches curves between sloping and
   gable. A weighted straight skeleton makes hip, gable, shed, pavilion and cut-off (mansard)
   roofs from any simple footprint, including different slopes per edge, and each face gets a
-  mitred slab of the roof type's thickness. Properties edit the base offset, slope, cutoff and
-  type, and Edit Footprint reopens the sketch. Saved as `IfcRoof` with a faceted B-rep body
+  mitred slab of the roof type's thickness. Properties choose the Roof Shape (Hip, Gable,
+  Gable rotated, Shed, Shed reversed or Flat), the overhang all round, the base offset, slope,
+  cutoff level and type, and Edit Footprint reopens the sketch. Saved as `IfcRoof` with a faceted B-rep body
   (`roof.create_footprint`, `roof.edit_footprint`, `roof.set_params`, `roof.set_edge`,
-  `roof.set_slope`). Walls attach their tops to a roof (offered when a roof is made from picked
+  `roof.set_slope`, `roof.set_shape`). Walls attach their tops to a roof (offered when a roof is made from picked
   walls, or Modify | Walls › Attach Top/Base, then click the roof), so gable walls rise to the
   ridge. Saved as a faceted B-rep in the wall's own frame, so doors and windows stay cut
   (`wall.attach`, `wall.detach`). Not yet: attaching bases or to floors and ceilings, slope
-  arrows, and openings in roofs.
+  arrows, openings in roofs, and editing single footprint edges on the model (grips, or moving
+  and deleting one edge in Edit Footprint).
 - **Rooms**: Architecture › Room places a room in the region of wall faces under the cursor,
   shown as you hover. Place Rooms Automatically fills every enclosed region of the plan's level,
   numbered in reading order. Rooms measure to the walls' finish faces and leave out islands such
@@ -159,6 +161,18 @@ The KIT FZK *AC20-Institute-Var-2* sample model (`test-data/ifc/`) open in Revie
   them unique on request) and components with no space or type; formulas are kept as text
   (`export.cobie`, `cobie.validate`, `cobie.set_settings`). Not yet: the current NBIMS-US table
   layout, systems and zones from IFC groups, and a settings dialog.
+- **Tags and text**: Annotate › Tag by Category (TG) tags the door, window, room, wall or other
+  element clicked, with values read live from it: a door's or window's Mark, a room's name,
+  number and area, a wall's type. Room Tag (RT) tags rooms, and Tag All Not Tagged tags whole
+  categories on the plan's level without duplicates. Tags follow their elements; a tag whose
+  element is deleted stays, in orange. Editing a tag's value in Properties changes the element's
+  parameter, and Properties also set the tag type, leader and orientation. Text (TX) places a
+  note (2.5, 3.5 or 5 mm, optionally wrapped, rotated, and with leaders). Tags and notes are
+  selected, dragged and deleted like other elements, and print to PDF (`tag.create`,
+  `tag.create_room`, `tag.tag_all`, `tag.set_type`, `tag.set_leader`, `tag.set_default_type`,
+  `tag.list`, `text.create`, `text.set_content`, `text.set`, `text.add_leader`,
+  `text.remove_leaders`, `text.list`). Not yet: tags and text in sections and on sheets, rich
+  text, spell check, tag families and material tags.
 - **Dimensions**: Annotate › Aligned Dimension (DI) in plans dimensions parallel wall faces,
   centrelines and cut edges; dimensions to Reviera walls follow them when they move
   (`dim.create_aligned`, `anno.list`). The Wall tool snaps to cut edges in plans.
@@ -212,8 +226,7 @@ The KIT FZK *AC20-Institute-Var-2* sample model (`test-data/ifc/`) open in Revie
 
 ## Planned next
 
-The first milestone continues with tags and text, stairs and railings, and layered wall
-types. After that come general shape and CSG modelling tools,
+The first milestone continues with stairs and railings, and layered wall types. After that come general shape and CSG modelling tools,
 CADCraft drawing exchange, and the current NBIMS-US COBie layout.
 
 ### Working with CADCraft

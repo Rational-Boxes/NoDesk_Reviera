@@ -21,6 +21,7 @@ mod loading;
 mod modify;
 mod native;
 mod nav;
+mod notes;
 mod plans;
 mod ribbon;
 mod roofs;
@@ -184,6 +185,8 @@ struct Gui {
     ceiling_tool: Option<sketch::CeilingTool>,
     room_tool: Option<rooms::RoomTool>,
     section_tool: Option<sections::SectionTool>,
+    /// The Tag, Room Tag or Text tool.
+    note_tool: Option<notes::NoteTool>,
     /// The floor type new floors take.
     floor_type: Option<ElementId>,
     /// The last pointer position in the active view (Tab in sketch mode picks there).
@@ -1106,6 +1109,9 @@ impl Gui {
         if self.end_section_tool() {
             return frame.set_status_text("Section cancelled", 0);
         }
+        if self.end_note_tool() {
+            return frame.set_status_text("Ready", 0);
+        }
         if self.attach_pick.take().is_some() {
             return frame.set_status_text("Attach cancelled", 0);
         }
@@ -1404,8 +1410,9 @@ impl Gui {
             .active_view()
             .and_then(|v| v.plan.as_ref())
             .map_or((f32::NEG_INFINITY, f32::INFINITY), plans::PlanState::drawn);
-        // In plans, dimensions, grids, doors and windows are picked before the model.
-        self.dim_at(x, y)
+        // In plans, annotation, grids, doors and windows are picked before the model.
+        self.note_at(x, y)
+            .or_else(|| self.dim_at(x, y))
             .or_else(|| self.grid_at(x, y))
             .or_else(|| self.insert_at(x, y))
             .or_else(|| {
@@ -1491,6 +1498,12 @@ impl Gui {
                         if reviera_core::annotations::dimension_data(e).is_some() {
                             return Some("cat.dimensions");
                         }
+                        if reviera_core::notes::tag_data(e).is_some() {
+                            return Some("cat.tags");
+                        }
+                        if reviera_core::notes::text_data(e).is_some() {
+                            return Some("cat.text_notes");
+                        }
                         reviera_core::categories::category_of(e).map(|c| c.key)
                     })
                 })
@@ -1502,6 +1515,8 @@ impl Gui {
                 .filter(|c| cats.iter().all(|x| *x == Some(*c)));
             let label = match one {
                 Some("cat.dimensions") => "Dimensions".to_owned(),
+                Some("cat.tags") => "Tags".to_owned(),
+                Some("cat.text_notes") => "Text Notes".to_owned(),
                 Some(k) => self
                     .ribbon
                     .context_label(Some(k))
@@ -1601,6 +1616,11 @@ impl Gui {
         let category = reviera_core::categories::category_of(&e)
             .map(|c| c.name.to_owned())
             .or_else(|| dimension.as_ref().map(|_| "Dimensions".to_owned()))
+            .or_else(|| {
+                reviera_core::notes::tag_data(&e)
+                    .map(|_| "Tags".to_owned())
+                    .or_else(|| reviera_core::notes::text_data(&e).map(|_| "Text Notes".to_owned()))
+            })
             .unwrap_or_else(|| "—".to_owned());
         let type_name = e
             .param("@type")
@@ -1677,6 +1697,9 @@ impl Gui {
         }
         if reviera_core::rooms::room_recipe(&e).is_some() {
             self.room_rows(grid, id);
+            return;
+        }
+        if self.note_rows(grid, id) {
             return;
         }
         if let Some(d) = dimension {
@@ -1887,6 +1910,7 @@ impl Gui {
             || self.room_edit(property, text.clone())
             || self.section_view_edit(property, text.clone())
             || self.sheet_view_edit(property, text.clone())
+            || self.note_edit(property, text.clone())
         {
             return;
         }
@@ -2167,6 +2191,7 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                     None if g.ceiling_tool.is_some() => g.ceiling_click(x, y),
                     None if g.room_tool.is_some() => g.room_click(x, y),
                     None if g.section_tool.is_some() => g.section_click(x, y),
+                    None if g.note_tool.is_some() => g.note_click(x, y, &p),
                     None if g.dim_tool.is_some() => g.dim_click(x, y),
                     None if g.grid_tool.is_some() => g.grid_click(x, y),
                     None if g.insert_tool.is_some() => g.insert_click(x, y),
@@ -2652,6 +2677,7 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 ceiling_tool: None,
                 room_tool: None,
                 section_tool: None,
+                note_tool: None,
                 floor_type: None,
                 mouse: (0, 0),
                 offset_distance: 1.0,
@@ -2836,6 +2862,13 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                     gui.update_captions();
                 }
                 if let Ok(mut gui) = gui.try_borrow_mut() {
+                    // A view that has never drawn missed its first paint (for example while
+                    // a dialog ran inside a command); it is drawn now.
+                    for v in &gui.views {
+                        if v.viewport.is_none() && v.error.is_none() && v.schedule.is_none() {
+                            v.panel.refresh(false, None);
+                        }
+                    }
                     gui.sync_views();
                     if gui.browser_stale {
                         gui.rebuild_browser();
@@ -3062,6 +3095,19 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "view.building_elevations" => with(gui, Gui::building_elevations),
         "view.new_schedule" => with(gui, Gui::new_schedule),
         "view.new_sheet" => with(gui, Gui::new_sheet),
+        "tag.create" => with(gui, |g| {
+            g.start_note_tool(notes::NoteTool::Tag);
+            focus(g);
+        }),
+        "tag.create_room" => with(gui, |g| {
+            g.start_note_tool(notes::NoteTool::RoomTag);
+            focus(g);
+        }),
+        "text.create" => with(gui, |g| {
+            g.start_note_tool(notes::NoteTool::Text);
+            focus(g);
+        }),
+        "tag.tag_all" => with(gui, Gui::tag_all),
         "sheet.place_view" => with(gui, Gui::place_view_on_sheet),
         "sheet.place_schedule" => with(gui, Gui::place_schedule_on_sheet),
         "sheet.open_view" => with(gui, Gui::open_sheet_view),

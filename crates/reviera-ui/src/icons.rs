@@ -225,6 +225,18 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "open_view" => format!(
             r#"<rect x="3" y="6" width="20" height="16" fill="{f}" {s}/><path d="M7 10h9v8H7z" {s} stroke-width="1.2"/><path d="M18 20l9 7M27 21v6h-6" {sa}/>"#
         ),
+        "text" => format!(
+            r#"<path d="M6 7h20M16 7v19M11 26h10" {s} stroke-width="2.6"/><path d="M6 7v3M26 7v3" {sa}/>"#
+        ),
+        "tag" => format!(
+            r#"<rect x="3" y="9" width="17" height="11" fill="{f}" {s}/><path d="M7 15h9" {s}/><path d="M20 14l9 9" {sa}/><circle cx="29" cy="23" r="1.5" fill="{a}"/>"#
+        ),
+        "room_tag" => format!(
+            r#"<path d="M3 3h26v26H3z" {s}/><path d="M9 12h14M11 17h10M12 22h8" {sa}/>"#
+        ),
+        "tag_all" => format!(
+            r#"<rect x="3" y="4" width="13" height="8" fill="{f}" {s}/><rect x="16" y="13" width="13" height="8" fill="{f}" {s}/><rect x="3" y="22" width="13" height="8" fill="{f}" {s}/><path d="M7 8h5M20 17h5M7 26h5" {sa}/>"#
+        ),
         "fields" => format!(
             r#"<rect x="4" y="5" width="24" height="22" fill="{f}" {s}/><path d="M12 5v22M20 5v22" {s}/><path d="M23 13l3 3-3 3" {sa}/>"#
         ),

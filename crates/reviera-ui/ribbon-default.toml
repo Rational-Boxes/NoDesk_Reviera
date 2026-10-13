@@ -123,6 +123,33 @@ keys = "GR"
 help = "Draw grid lines in a plan"
 
 [[action]]
+id = "text.create"
+label = "Text"
+icon = "text"
+keys = "TX"
+help = "Place a text note in a plan: click where its top-left corner goes, then type"
+
+[[action]]
+id = "tag.create"
+label = "Tag by Category"
+icon = "tag"
+keys = "TG"
+help = "Tag doors, windows, rooms, walls and other elements with values read live from them"
+
+[[action]]
+id = "tag.create_room"
+label = "Room Tag"
+icon = "room_tag"
+keys = "RT"
+help = "Tag a room with its name, number and area"
+
+[[action]]
+id = "tag.tag_all"
+label = "Tag All Not Tagged"
+icon = "tag_all"
+help = "Tag every door, window, room or wall on the plan's level that has no tag yet"
+
+[[action]]
 id = "dim.create_aligned"
 label = "Aligned Dimension"
 icon = "dimension"
@@ -699,6 +726,18 @@ tools = [{ action = "tool.modify", size = "large" }]
 [[tab.panel]]
 label = "Dimension"
 tools = [{ action = "dim.create_aligned", size = "large" }]
+
+[[tab.panel]]
+label = "Text"
+tools = [{ action = "text.create", size = "large" }]
+
+[[tab.panel]]
+label = "Tag"
+tools = [
+  { action = "tag.create", size = "large" },
+  { action = "tag.create_room", size = "large" },
+  { action = "tag.tag_all", size = "large" },
+]
 
 [[tab]]
 id = "view"

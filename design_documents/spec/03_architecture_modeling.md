@@ -1915,6 +1915,7 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 - `roof.set_slope(roof_id, slope, edge_keys?)`
 - `roof.set_params(roof_ids[], level_id?, base_offset?, slope?, cutoff_level_id?|null, cutoff_offset?)` (the instance parameters in one undo step)
 - `roof.set_edge(roof_id, keys[], defines_slope?, slope?|null, overhang?)` (footprint curve properties after the sketch is finished)
+- `roof.set_shape(roof_id, shape: hip|gable|gable_rotated|shed|shed_reversed|flat, overhang?)` (sets which footprint curves slope from a named shape)
 
 **Implementation notes (2026-10-13).**
 - As built, `roof.create_footprint` takes `curves: [{line, lock?, defines_slope?, slope?, overhang?}]` (keyed 1, 2, … in order) and `level_id`, like the other sketch-based commands. Plate offsets, rafter cuts other than plumb, slope arrows, holes, Align Eaves and `attach_walls` come later.
@@ -1922,6 +1923,16 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 - Per-edge eave heights are handled by extending each face from the plate down its own plane along the corner trajectories to its eave line, so steeper edges reach lower eaves.
 - Each face slab is mitred against its neighbours by the plane through the shared edge halfway between the two face normals, and cut plumb at eaves and rakes.
 - A new roof whose footprint was picked from walls sets its base offset to the walls' tops (Reviera's default; the user can change it).
+- A roof drawn with lines on the highest level (no level above it) also starts at the tops of the walls on that level, rather than at floor height inside them.
+- **Roof shape** (Properties, `roof.set_shape`):
+  - Hip: every curve slopes.
+  - Gable: the curves along the longest one slope; the ends are gables.
+  - Gable (rotated): the curves across the longest one slope.
+  - Shed: only the longest curve slopes. Shed (reversed): only the curve opposite it.
+  - Flat: no curve slopes.
+  - "Along" means within 10° of the longest curve's direction. A roof whose curves match no shape shows *Custom*. Slopes and overhangs are kept.
+- Properties also set the **Overhang** of every curve (*Varies* when they differ), and **Cutoff Level** is chosen from the levels.
+- Still to come: editing single footprint curves on the model (grips, and moving or deleting one curve in Edit Footprint), and per-curve Properties during the sketch.
 
 **Acceptance criteria.**
 - [ ] A 10 m × 6 m rectangle with all four edges at 30° gives a hip roof whose ridge is 4 m long, at a height of 3·tan 30° = 1.732 m above the plate.

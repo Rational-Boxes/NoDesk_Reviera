@@ -159,7 +159,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**1945 unique commands** in 400 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**1949 unique commands** in 400 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -519,10 +519,10 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `system_type` | 2 |
 | `system_zone` | 3 |
 | `systems_analysis` | 2 |
-| `tag` | 12 |
+| `tag` | 14 |
 | `tempdim` | 4 |
 | `template` | 7 |
-| `text` | 8 |
+| `text` | 10 |
 | `texttype` | 2 |
 | `titleblock` | 4 |
 | `tool` | 10 |
@@ -2058,9 +2058,11 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `tag.create` | 5 | view_id, host_ref, position?, tag_type_id?, orientation?, leader? | annotation_id | Yes | DOC-ANN-010 |
 | `tag.create_material` | 5 | view_id, element_ref, layer_ref, position, tag_type_id? | annotation_id | Yes | DOC-ANN-011 |
 | `tag.create_room` | 5 | view_id, room_id, position?, tag_type_id? | annotation_id | Yes | DOC-ANN-011 |
+| `tag.list` | 5 | view_id | tag_info[] | No | DOC-ANN-010 |
 | `tag.reinforcement_symbol` | 5 | view_id, system_id, kind: area\ | path\ | fabric, type_id?, position? | annotation_id |
 | `tag.set_default_type` | 5 | category, tag_type_id | () | Yes | DOC-ANN-010 |
 | `tag.set_leader` | 5 | annotation_id, start_mode?, end_mode?, points? | () | Yes | DOC-ANN-010 |
+| `tag.set_type` | 5 | annotation_ids[], tag_type_id, orientation? | () | Yes | DOC-ANN-010 |
 | `tag.stair_numbers` | 5 | view_id, run_ids[], start?, direction? | annotation_id[] | Yes | DOC-ANN-013 |
 | `tag.stair_path` | 5 | view_id, stair_id, type_id? | annotation_id | Yes | DOC-ANN-013 |
 | `tag.tag_all` | 5 | view_id, categories[], scope: view\ | selection, include_links?, leader?, orientation? | annotation_id[] | Yes |
@@ -2081,7 +2083,9 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `text.create` | 5 | view_id, position, content, type_id?, width?, rotation? | annotation_id | Yes | DOC-ANN-009 |
 | `text.find_replace` | 5 | scope, find, replace, match_case?, whole_word? | count | Yes | DOC-ANN-009 |
 | `text.format` | 5 | style: bold\ | italic\ | underline\ | all_caps\ |
+| `text.list` | 5 | view_id | text_info[] | No | DOC-ANN-009 |
 | `text.remove_leaders` | 5 | annotation_id | () | Yes | DOC-ANN-009 |
+| `text.set` | 5 | annotation_ids[], type_id?, width?, rotation? | () | Yes | DOC-ANN-009 |
 | `text.set_content` | 5 | annotation_id, content | () | Yes | DOC-ANN-009 |
 | `texttype.create` | 5 | name, properties | type_id | Yes | DOC-ANN-009 |
 | `texttype.edit` | 5 | type_id? | () | No | DOC-ANN-009 |
