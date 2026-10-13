@@ -10,7 +10,7 @@ use glam::Vec2;
 use reviera_core::ElementId;
 use reviera_core::annotations;
 use reviera_render::RenderBackend;
-use reviera_render::annotation::{Dimension, dimension_lines};
+use reviera_render::annotation::{Dimension, GridMark, dimension_lines, grid_lines};
 use reviera_render::plan::Lines;
 use serde_json::{Value, json};
 use wxdragon::prelude::*;
@@ -40,6 +40,24 @@ pub struct DimTool {
     picked: Vec<Candidate>,
     hover: Option<Candidate>,
     cursor: Option<[f64; 2]>,
+}
+
+/// The grids of a model, ready to draw.
+fn grid_marks(store: &reviera_core::Store) -> Vec<(ElementId, GridMark)> {
+    reviera_core::grids::list(store)
+        .into_iter()
+        .map(|g| {
+            (
+                g.id,
+                GridMark {
+                    start: g.curve.start,
+                    end: g.curve.end,
+                    name: g.name,
+                    bubbles: g.bubbles,
+                },
+            )
+        })
+        .collect()
 }
 
 fn cross(a: [f64; 2], b: [f64; 2]) -> f64 {
@@ -107,7 +125,36 @@ impl Gui {
             };
             target.segments.extend(dimension_lines(&d, plan.scale, z));
         }
+        // Grids show in every plan.
+        for (id, mark) in grid_marks(&store) {
+            let target = if selected.contains(&id) {
+                &mut highlighted
+            } else {
+                &mut normal
+            };
+            target.segments.extend(grid_lines(&mark, plan.scale, z));
+        }
         vec![normal, orphaned, highlighted]
+    }
+
+    /// The grid under pixel (`x`, `y`) of the active plan, if any (its line or a bubble).
+    pub(crate) fn grid_at(&self, x: i32, y: i32) -> Option<ElementId> {
+        let v = self.active_view()?;
+        let plan = v.plan.as_ref()?;
+        let store = self.app.document(v.doc)?.doc.store();
+        let z = plan.range.cut as f32;
+        let mut best: Option<(f32, ElementId)> = None;
+        for (id, mut mark) in grid_marks(store) {
+            mark.name.clear();
+            for s in grid_lines(&mark, plan.scale, z) {
+                let seg = [s[0], s[1]].map(|p| [f64::from(p[0]), f64::from(p[1])]);
+                let dist = self.pixel_distance(x, y, seg, z);
+                if dist <= PICK_PX && best.is_none_or(|b| dist < b.0) {
+                    best = Some((dist, id));
+                }
+            }
+        }
+        best.map(|b| b.1)
     }
 
     /// The dimension under pixel (`x`, `y`) of the active plan, if any.
@@ -174,6 +221,7 @@ impl Gui {
         }
         let f = self.frame;
         self.end_tool(&f);
+        self.end_grid_tool();
         self.leave_walk();
         self.dim_tool = Some(DimTool::default());
         self.clear_selection();
@@ -219,7 +267,7 @@ impl Gui {
     }
 
     /// The plan point under pixel (`x`, `y`) of the active view.
-    fn plan_xy(&self, x: i32, y: i32) -> Option<[f64; 2]> {
+    pub(crate) fn plan_xy(&self, x: i32, y: i32) -> Option<[f64; 2]> {
         let v = self.active_view()?;
         let size = v.panel.get_client_size();
         let (o, _) = v
@@ -254,7 +302,7 @@ impl Gui {
     }
 
     /// The reference under the cursor: Reviera wall faces and location lines on the plan's
-    /// level, else cut edges; parallel to the first picked reference if there is one.
+    /// level and grids, else cut edges; parallel to the first picked reference if there is one.
     fn dim_candidate(&self, x: i32, y: i32) -> Option<Candidate> {
         let v = self.active_view()?;
         let plan = v.plan.as_ref()?;
@@ -307,6 +355,31 @@ impl Gui {
                     },
                 ));
             }
+        }
+        // Grids, by their line.
+        for (id, g) in grid_marks(store) {
+            let seg = [g.start, g.end];
+            let (dx, dy) = (seg[1][0] - seg[0][0], seg[1][1] - seg[0][1]);
+            let len = dx.hypot(dy);
+            if len < 1e-9 {
+                continue;
+            }
+            let dir = [dx / len, dy / len];
+            let d = near(seg);
+            if d > PICK_PX || !parallel(dir) || best.as_ref().is_some_and(|b| b.0 <= d) {
+                continue;
+            }
+            let t = (cursor[0] - seg[0][0]) * dir[0] + (cursor[1] - seg[0][1]) * dir[1];
+            let point = [seg[0][0] + dir[0] * t, seg[0][1] + dir[1] * t];
+            best = Some((
+                d,
+                Candidate {
+                    arg: json!({ "element": id, "sub": "axis", "point": point }),
+                    point,
+                    direction: dir,
+                    segment: seg,
+                },
+            ));
         }
         if best.is_some() {
             return best.map(|b| b.1);

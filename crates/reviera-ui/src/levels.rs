@@ -163,6 +163,10 @@ impl Gui {
         let mut counts: BTreeMap<String, usize> = BTreeMap::new();
         for id in all.iter().filter(|id| !ids.contains(id)) {
             let Some(e) = store.get(*id) else { continue };
+            // The grid system goes with its last line, unseen.
+            if reviera_core::grids::is_system(e) {
+                continue;
+            }
             let label = if reviera_core::views::view_data(e).is_some() {
                 "Views".to_owned()
             } else if reviera_core::annotations::dimension_data(e).is_some() {

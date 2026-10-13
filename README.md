@@ -37,6 +37,11 @@ operation can be driven by Lua scripts and by AI agents through the Model Contex
   the walls up to it, keeping offsets; renaming one renames its plans. Deleting a level lists
   what goes with it first. Saved as `IfcBuildingStorey` aggregated under the building
   (`level.create`, `level.set_elevation`, `level.rename`, `level.list`).
+- **Grids**: Architecture › Grid (GR) draws grid lines in plans with snapping; names continue
+  the series (1, 2, 3 …; rename one to A and the next are B, C). Grids show in every plan and in
+  PDF output with their bubbles, can be selected, renamed in Properties and dimensioned; dimensions
+  follow a moved grid. Saved as one `IfcGrid` with an `IfcGridAxis` per line (`grid.create`,
+  `grid.rename`, `grid.set_curve`, `grid.list`).
 - **Dimensions**: Annotate › Aligned Dimension (DI) in plans dimensions parallel wall faces,
   centrelines and cut edges; dimensions to Reviera walls follow them when they move
   (`dim.create_aligned`, `anno.list`). The Wall tool snaps to cut edges in plans.

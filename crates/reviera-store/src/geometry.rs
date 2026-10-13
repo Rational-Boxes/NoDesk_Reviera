@@ -789,3 +789,104 @@ fn building_of_storeys(ifc: &IfcModel, except: StepId) -> Result<Option<StepId>>
     }
     Ok(ifc.entities_of_type("IfcBuilding")?.first().map(|b| b.id))
 }
+
+/// One grid line to write as an `IfcGridAxis`: its tag and its line in plan (metres).
+pub(crate) struct GridAxis<'a> {
+    pub tag: &'a str,
+    pub start: [f64; 2],
+    pub end: [f64; 2],
+}
+
+/// Writes the axes of a grid system written by Reviera (DM-IFC-006): an absolute placement,
+/// containment in `storey`, and one `IfcGridAxis` per line with an `IfcPolyline` curve. Lines
+/// within ±45° of project X are `UAxes`, the others `VAxes`; when every line runs one way, the
+/// last goes to the other list, which IFC4 requires to be non-empty. Earlier axes are replaced.
+pub(crate) fn write_grid(
+    ifc: &mut IfcModel,
+    grid: StepId,
+    axes: &[GridAxis<'_>],
+    scale: f64,
+    storey: Option<StepId>,
+    owner_history: Option<StepId>,
+) -> Result<()> {
+    remove_grid_axes(ifc, grid)?;
+    if ifc.attribute(grid, "ObjectPlacement")? == AttrValue::Null {
+        let point = create_with(
+            ifc,
+            "IfcCartesianPoint",
+            &[("Coordinates", reals(&[0.0, 0.0, 0.0]))],
+        )?;
+        let axes = create_with(
+            ifc,
+            "IfcAxis2Placement3D",
+            &[("Location", AttrValue::Ref(point.0))],
+        )?;
+        let placement = create_with(
+            ifc,
+            "IfcLocalPlacement",
+            &[("RelativePlacement", AttrValue::Ref(axes.0))],
+        )?;
+        ifc.set_attribute(grid, "ObjectPlacement", &AttrValue::Ref(placement.0))?;
+    }
+    let (mut u, mut v): (Vec<&GridAxis<'_>>, Vec<&GridAxis<'_>>) = axes
+        .iter()
+        .partition(|a| (a.end[0] - a.start[0]).abs() >= (a.end[1] - a.start[1]).abs());
+    if v.is_empty() && u.len() > 1 {
+        v.extend(u.pop());
+    } else if u.is_empty() && v.len() > 1 {
+        u.extend(v.pop());
+    }
+    for (attr, list) in [("UAxes", u), ("VAxes", v)] {
+        let mut refs = Vec::new();
+        for a in list {
+            let points = [a.start, a.end]
+                .into_iter()
+                .map(|p| {
+                    create_with(
+                        ifc,
+                        "IfcCartesianPoint",
+                        &[("Coordinates", reals(&[p[0] / scale, p[1] / scale]))],
+                    )
+                    .map(|id| AttrValue::Ref(id.0))
+                })
+                .collect::<Result<Vec<_>>>()?;
+            let curve = create_with(ifc, "IfcPolyline", &[("Points", AttrValue::List(points))])?;
+            let axis = create_with(
+                ifc,
+                "IfcGridAxis",
+                &[
+                    ("AxisTag", AttrValue::String(a.tag.to_owned())),
+                    ("AxisCurve", AttrValue::Ref(curve.0)),
+                    ("SameSense", AttrValue::Bool(true)),
+                ],
+            )?;
+            refs.push(AttrValue::Ref(axis.0));
+        }
+        ifc.set_attribute(grid, attr, &AttrValue::List(refs))?;
+    }
+    if let Some(storey) = storey {
+        contain(ifc, grid, storey, owner_history)?;
+    }
+    Ok(())
+}
+
+/// Removes the axes of a grid written by [`write_grid`], with their curves and points.
+pub(crate) fn remove_grid_axes(ifc: &mut IfcModel, grid: StepId) -> Result<()> {
+    let e = entity(ifc, grid)?;
+    for attr in ["UAxes", "VAxes", "WAxes"] {
+        for axis in e.refs(attr) {
+            let a = entity(ifc, axis)?;
+            for curve in a.refs("AxisCurve") {
+                let points = entity(ifc, curve)?.refs("Points");
+                ifc.remove(curve)?;
+                for p in points {
+                    if ifc.referenced_by(p, "IfcRepresentationItem")?.is_empty() {
+                        ifc.remove(p)?;
+                    }
+                }
+            }
+            ifc.remove(axis)?;
+        }
+    }
+    Ok(())
+}

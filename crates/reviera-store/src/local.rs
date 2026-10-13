@@ -14,7 +14,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use reviera_core::{Document, ElementId, GlobalId, ModelVersion, NewElement, levels, walls};
+use reviera_core::{Document, ElementId, GlobalId, ModelVersion, NewElement, grids, levels, walls};
 use reviera_ifc::{AttrValue, IfcModel, Schema, StepId};
 use reviera_rxd::{
     DOC_PSET_PREFIX, DecodeLimits, ELEMENT_PSET, ElementData, IdentityDoc, MANIFEST_PSET,
@@ -424,6 +424,19 @@ impl LocalProject {
             .ok_or_else(|| unsupported("the file has no IfcProject"))?;
         let mut report = SaveReport::default();
         let mut dirty: BTreeSet<ElementId> = self.pending_identity.iter().copied().collect();
+        // Grid lines are RXD records; their IFC axes belong to the grid system's `IfcGrid`.
+        let grid_path = grids::CLASS_PREFIX
+            .strip_prefix("rxd:")
+            .expect("an RXD class");
+        let grids_touched = deleted.iter().any(|id| {
+            self.rxd_paths
+                .get(id)
+                .is_some_and(|p| p.starts_with(grid_path))
+        }) || changed.iter().any(|id| {
+            doc.store()
+                .get(*id)
+                .is_some_and(|e| grids::is_grid(e) || grids::is_system(e))
+        });
 
         for id in &deleted {
             dirty.remove(id);
@@ -448,6 +461,9 @@ impl LocalProject {
                 .is_some_and(|k| k == walls::WALL_RECIPE)
             {
                 geometry::remove_wall(&mut self.ifc, step)?;
+            }
+            if saved.contains_key(grids::SYSTEM_KEY) {
+                geometry::remove_grid_axes(&mut self.ifc, step)?;
             }
             // The element's own property and quantity sets go with it.
             params::remove_all(&mut self.ifc, &mut self.sets, step)?;
@@ -563,6 +579,9 @@ impl LocalProject {
         }
         let touched: BTreeSet<ElementId> = changed.union(&deleted).copied().collect();
         self.write_regenerated(doc, &touched)?;
+        if grids_touched {
+            self.write_grids(doc)?;
+        }
 
         for id in dirty {
             let Some(&step) = self.steps.get(&id) else {
@@ -651,6 +670,40 @@ impl LocalProject {
             .filter_map(|j| Some((*self.steps.get(&j.wall)?, *j, *self.steps.get(&j.other)?)))
             .collect();
         geometry::write_connections(&mut self.ifc, &wall_steps, &joins, owner_history)
+    }
+
+    /// Writes the axes of every Reviera grid system, contained in the lowest level.
+    fn write_grids(&mut self, doc: &Document) -> Result<()> {
+        let store = doc.store();
+        let lowest = levels::list(store)
+            .first()
+            .and_then(|l| self.steps.get(&l.id).copied());
+        let owner_history = self.new_owner_history()?;
+        let all = grids::list(store);
+        for system in store.iter().filter(|e| grids::is_system(e)) {
+            let Some(&step) = self.steps.get(&system.id()) else {
+                continue;
+            };
+            let guid = system.guid().to_string();
+            let axes: Vec<geometry::GridAxis<'_>> = all
+                .iter()
+                .filter(|g| g.system == guid)
+                .map(|g| geometry::GridAxis {
+                    tag: &g.name,
+                    start: g.curve.start,
+                    end: g.curve.end,
+                })
+                .collect();
+            geometry::write_grid(
+                &mut self.ifc,
+                step,
+                &axes,
+                self.length_scale,
+                lowest,
+                owner_history,
+            )?;
+        }
+        Ok(())
     }
 
     /// Owner history for new rooted entities: required in IFC2X3, left unset in IFC4.

@@ -71,6 +71,10 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(LevelSetElevation),
         registry.add(LevelRename),
         registry.add(LevelList),
+        registry.add(GridCreate),
+        registry.add(GridRename),
+        registry.add(GridSetCurve),
+        registry.add(GridList),
     ];
     for r in results {
         r.expect("core commands are valid");
@@ -336,6 +340,7 @@ pub fn dependents_of(store: &crate::store::Store, id: ElementId) -> Vec<ElementI
         .filter(|e| {
             crate::annotations::dimension_data(e).is_some_and(|d| d.view == guid)
                 || e.param("@type").and_then(serde_json::Value::as_str) == Some(guid.as_str())
+                || crate::grids::grid_data(e).is_some_and(|g| g.system == guid)
                 || crate::views::view_data(e)
                     .is_some_and(|v| v.level.as_deref() == Some(guid.as_str()))
                 || crate::walls::wall_recipe(e).is_some_and(|r| {
@@ -349,19 +354,25 @@ pub fn dependents_of(store: &crate::store::Store, id: ElementId) -> Vec<ElementI
 }
 
 /// Everything `element.delete` removes with `ids`: the elements and, transitively, their
-/// dependents.
+/// dependents, and grid systems whose last line goes.
 pub fn delete_closure(
     store: &crate::store::Store,
     ids: &[ElementId],
 ) -> std::collections::BTreeSet<ElementId> {
     let mut queue = ids.to_vec();
     let mut deleted = std::collections::BTreeSet::new();
-    while let Some(id) = queue.pop() {
-        if deleted.insert(id) {
-            queue.extend(dependents_of(store, id));
+    loop {
+        while let Some(id) = queue.pop() {
+            if deleted.insert(id) {
+                queue.extend(dependents_of(store, id));
+            }
+        }
+        // A grid system goes with its last line.
+        queue = crate::grids::emptied_systems(store, &deleted);
+        if queue.is_empty() {
+            return deleted;
         }
     }
-    deleted
 }
 
 #[derive(Debug)]
@@ -1407,6 +1418,91 @@ impl Command for LevelList {
 
     fn run(&self, cx: &mut CommandContext<'_>, _: NoParams) -> Result<Vec<LevelInfo>> {
         Ok(levels::list(cx.store()))
+    }
+}
+
+// ---- Grids (Ch 3 ARC-GRID-001) ----
+
+use crate::grids::{self, GridInfo};
+
+#[derive(Debug)]
+struct GridCreate;
+
+impl Command for GridCreate {
+    type Params = grids::CreateParams;
+    type Output = ElementId;
+    const META: CommandMeta = CommandMeta {
+        name: "grid.create",
+        version: 1,
+        summary: "Create a grid",
+        description: "Creates a straight grid line along `curve.line` (plan, metres). Without a name it \
+                      continues the series of the last grid (1 → 2, A → B). Names are unique among grids.",
+        effects: &[Effect::Edit],
+        transaction_name: "Grid",
+    };
+
+    fn run(&self, cx: &mut CommandContext<'_>, p: grids::CreateParams) -> Result<ElementId> {
+        grids::create(cx.edit()?, p)
+    }
+}
+
+#[derive(Debug)]
+struct GridRename;
+
+impl Command for GridRename {
+    type Params = grids::RenameParams;
+    type Output = ();
+    const META: CommandMeta = CommandMeta {
+        name: "grid.rename",
+        version: 1,
+        summary: "Rename a grid",
+        description: "Renames a grid line (its IFC axis tag); the grid keeps its GlobalId and dimensions.",
+        effects: &[Effect::Edit],
+        transaction_name: "Rename Grid",
+    };
+
+    fn run(&self, cx: &mut CommandContext<'_>, p: grids::RenameParams) -> Result<()> {
+        grids::rename(cx.edit()?, p)
+    }
+}
+
+#[derive(Debug)]
+struct GridSetCurve;
+
+impl Command for GridSetCurve {
+    type Params = grids::SetCurveParams;
+    type Output = ();
+    const META: CommandMeta = CommandMeta {
+        name: "grid.set_curve",
+        version: 1,
+        summary: "Move a grid",
+        description: "Replaces the grid's line; dimensions to it follow.",
+        effects: &[Effect::Edit],
+        transaction_name: "Move Grid",
+    };
+
+    fn run(&self, cx: &mut CommandContext<'_>, p: grids::SetCurveParams) -> Result<()> {
+        grids::set_curve(cx.edit()?, p)
+    }
+}
+
+#[derive(Debug)]
+struct GridList;
+
+impl Command for GridList {
+    type Params = NoParams;
+    type Output = Vec<GridInfo>;
+    const META: CommandMeta = CommandMeta {
+        name: "grid.list",
+        version: 1,
+        summary: "List grids",
+        description: "Lists the grid lines in creation order, with their lines in plan (metres).",
+        effects: &[Effect::Read],
+        transaction_name: "",
+    };
+
+    fn run(&self, cx: &mut CommandContext<'_>, _: NoParams) -> Result<Vec<GridInfo>> {
+        Ok(grids::list(cx.store()))
     }
 }
 

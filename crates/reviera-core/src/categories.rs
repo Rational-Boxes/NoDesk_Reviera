@@ -312,6 +312,9 @@ fn text<'a>(e: &'a Element, key: &str) -> Option<&'a str> {
 
 /// The category of an element (occurrence or type), inferred from its IFC class and attributes.
 pub fn category_of(e: &Element) -> Option<&'static Category> {
+    if crate::grids::is_grid(e) {
+        return category("cat.grids");
+    }
     let class = e.class.strip_suffix("StandardCase").unwrap_or(&e.class);
     let class = match class {
         "IfcDoorStyle" => "IfcDoorType",

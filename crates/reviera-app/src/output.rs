@@ -15,8 +15,8 @@ use pdf_writer::{Content, Finish, Name, Pdf, Rect, Ref, Str, TextStr};
 use reviera_core::{
     Caller, CommandMeta, Effect, ElementId, ElementRef, Error, HostCommand, Result,
 };
-use reviera_core::{annotations, plans, standards, units, views};
-use reviera_render::annotation::{Dimension, Label, dimension_parts};
+use reviera_core::{annotations, grids, plans, standards, units, views};
+use reviera_render::annotation::{Dimension, GridMark, Label, dimension_parts, grid_parts};
 use reviera_render::plan::{Lines, PlanGraphics, Weights, feature_edges, plan_graphics};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -101,6 +101,18 @@ impl App {
                 texts,
             };
             let (l, t) = dimension_parts(&dim, scale as f32, range.cut as f32);
+            lines.segments.extend(l);
+            labels.extend(t);
+        }
+        // Grids show in every plan (ARC-GRID-001), with annotation pen 1 too.
+        for g in grids::list(store) {
+            let mark = GridMark {
+                start: g.curve.start,
+                end: g.curve.end,
+                name: g.name,
+                bubbles: g.bubbles,
+            };
+            let (l, t) = grid_parts(&mark, scale as f32, range.cut as f32);
             lines.segments.extend(l);
             labels.extend(t);
         }

@@ -134,6 +134,80 @@ pub fn dimension_parts(d: &Dimension, scale: f32, z: f32) -> (Vec<[[f32; 3]; 2]>
     (out, labels)
 }
 
+/// Grid bubble diameter and name height, in paper millimetres.
+pub const BUBBLE_MM: f32 = 8.0;
+const GRID_TEXT_MM: f32 = 3.5;
+const BUBBLE_SEGMENTS: usize = 32;
+
+/// One grid line to draw.
+#[derive(Debug, Clone, PartialEq)]
+pub struct GridMark {
+    pub start: [f64; 2],
+    pub end: [f64; 2],
+    pub name: String,
+    /// A bubble with the name at the start and at the end.
+    pub bubbles: [bool; 2],
+}
+
+/// The lines of a grid (its line and bubbles) and its name labels, at elevation `z`, for a view
+/// at 1:`scale` (ARC-GRID-001). Each bubble sits beyond its end of the line, the line running
+/// to the bubble's edge, with the name centred in it.
+pub fn grid_parts(g: &GridMark, scale: f32, z: f32) -> (Vec<[[f32; 3]; 2]>, Vec<Label>) {
+    let v = |p: [f64; 2]| Vec2::new(p[0] as f32, p[1] as f32);
+    let (start, end) = (v(g.start), v(g.end));
+    let dir = (end - start).normalize_or_zero();
+    if dir == Vec2::ZERO {
+        return (Vec::new(), Vec::new());
+    }
+    let at = |p: Vec2| [p.x, p.y, z];
+    let mm = scale / 1000.0;
+    let radius = BUBBLE_MM * mm / 2.0;
+    let mut lines = vec![[at(start), at(end)]];
+    let mut labels = Vec::new();
+    for (shown, point, outward) in [(g.bubbles[0], start, -dir), (g.bubbles[1], end, dir)] {
+        if !shown {
+            continue;
+        }
+        let centre = point + outward * radius;
+        let ring: Vec<Vec2> = (0..=BUBBLE_SEGMENTS)
+            .map(|k| {
+                let a = k as f32 / BUBBLE_SEGMENTS as f32 * std::f32::consts::TAU;
+                centre + Vec2::new(a.cos(), a.sin()) * radius
+            })
+            .collect();
+        lines.extend(ring.windows(2).map(|w| [at(w[0]), at(w[1])]));
+        // Names read horizontally, centred in the bubble.
+        let height = GRID_TEXT_MM * mm;
+        let width = font::width(&g.name, height);
+        let origin = centre - Vec2::new(width / 2.0, height / 2.0);
+        labels.push(Label {
+            origin: at(origin),
+            right: [1.0, 0.0, 0.0],
+            up: [0.0, 1.0, 0.0],
+            height,
+            text: g.name.clone(),
+        });
+    }
+    (lines, labels)
+}
+
+/// The lines of a grid with its names drawn in the stroke font.
+pub fn grid_lines(g: &GridMark, scale: f32, z: f32) -> Vec<[[f32; 3]; 2]> {
+    let (mut lines, labels) = grid_parts(g, scale, z);
+    for l in labels {
+        for [p, q] in font::strokes(
+            &l.text,
+            l.origin.into(),
+            l.right.into(),
+            l.up.into(),
+            l.height,
+        ) {
+            lines.push([p.to_array(), q.to_array()]);
+        }
+    }
+    lines
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -161,5 +235,30 @@ mod tests {
             .fold((f32::MAX, f32::MIN), |(a, b), x| (a.min(*x), b.max(*x)));
         assert!((hi - lo - 0.25).abs() < 0.02, "{lo} {hi}");
         assert!(lines.iter().all(|s| s[0][2] == 1.2));
+    }
+
+    #[test]
+    fn a_grid_has_its_line_a_bubble_beyond_the_end_and_its_name() {
+        let g = GridMark {
+            start: [0.0, 0.0],
+            end: [0.0, 10.0],
+            name: "A".into(),
+            bubbles: [false, true],
+        };
+        let (lines, labels) = grid_parts(&g, 100.0, 0.5);
+        assert_eq!(lines[0], [[0.0, 0.0, 0.5], [0.0, 10.0, 0.5]]);
+        assert_eq!(lines.len(), 1 + BUBBLE_SEGMENTS);
+        // At 1:100 the bubble is 800 mm across, centred 400 mm past the end.
+        let ys: Vec<f32> = lines[1..].iter().map(|s| s[0][1]).collect();
+        let (lo, hi) = ys
+            .iter()
+            .fold((f32::MAX, f32::MIN), |(a, b), y| (a.min(*y), b.max(*y)));
+        assert!(
+            (lo - 10.0).abs() < 1e-4 && (hi - 10.8).abs() < 1e-4,
+            "{lo} {hi}"
+        );
+        assert_eq!(labels.len(), 1);
+        assert!((labels[0].origin[1] + labels[0].height / 2.0 - 10.4).abs() < 1e-4);
+        assert!(grid_lines(&g, 100.0, 0.5).len() > lines.len());
     }
 }

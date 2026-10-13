@@ -12,6 +12,7 @@
 
 mod browser;
 mod dims;
+mod grids;
 mod levels;
 mod loading;
 mod native;
@@ -64,6 +65,7 @@ const ID_DIMENSION: i32 = ID_HIGHEST + 29;
 const ID_EXPORT_PDF: i32 = ID_HIGHEST + 30;
 const ID_LEVEL: i32 = ID_HIGHEST + 31;
 const ID_BROWSER_ELEVATION: i32 = ID_HIGHEST + 32;
+const ID_GRID: i32 = ID_HIGHEST + 33;
 /// The orientation presets of `nav::PRESETS`, one id each.
 const ID_ORIENT_FIRST: i32 = ID_HIGHEST + 40;
 
@@ -158,6 +160,7 @@ struct Gui {
     properties_stale: bool,
     tool: Option<WallTool>,
     dim_tool: Option<dims::DimTool>,
+    grid_tool: Option<grids::GridTool>,
     /// Drives animated view changes and walking.
     timer: Option<Timer<Frame>>,
     /// Models being opened in the background, and the timer that animates their tabs.
@@ -337,7 +340,11 @@ impl Gui {
                 self.new_level();
                 true
             }
-            "Z" | "W" | "P" | "D" | "L" => false,
+            "GR" => {
+                self.start_grid_tool();
+                true
+            }
+            "Z" | "W" | "P" | "D" | "L" | "G" => false,
             _ => {
                 self.keys.0.clear();
                 false
@@ -504,6 +511,7 @@ impl Gui {
                 self.browser_stale = true;
             }
             self.end_dim_tool();
+            self.end_grid_tool();
             self.active = Some(id);
             self.doc = Some(doc);
             let _ = self.app.activate(doc);
@@ -740,6 +748,7 @@ impl Gui {
     fn start_wall_tool(&mut self, frame: &Frame) {
         self.leave_walk();
         self.end_dim_tool();
+        self.end_grid_tool();
         let Some(doc) = self.doc.and_then(|id| self.app.document(id)) else {
             return frame.set_status_text("Open or create a project first (File > New)", 0);
         };
@@ -1127,12 +1136,15 @@ impl Gui {
             .active_view()
             .and_then(|v| v.plan.as_ref())
             .map_or((f32::NEG_INFINITY, f32::INFINITY), plans::PlanState::drawn);
-        // In plans, dimensions are picked before the model.
-        let hit = self.dim_at(x, y).or_else(|| {
-            self.scene()
-                .pick_within(origin, dir, bottom, top)
-                .and_then(|(i, _)| self.scene().meshes[i].element)
-        });
+        // In plans, dimensions and grids are picked before the model.
+        let hit = self
+            .dim_at(x, y)
+            .or_else(|| self.grid_at(x, y))
+            .or_else(|| {
+                self.scene()
+                    .pick_within(origin, dir, bottom, top)
+                    .and_then(|(i, _)| self.scene().meshes[i].element)
+            });
         let result = match hit {
             Some(id) => self.run("selection.set", json!({ "ids": [id] })),
             None => self.run("selection.clear", json!({})),
@@ -1221,9 +1233,18 @@ impl Gui {
             .unwrap_or_default();
         grid.append(Property::category("Element", "c_element"));
         let is_level = e.class == reviera_core::levels::CLASS;
+        let is_grid = reviera_core::grids::is_grid(&e);
         for (i, (label, value)) in [
             ("Category", category),
-            ("IFC class", e.class.clone()),
+            // A grid line is written as an axis of the grid system.
+            (
+                "IFC class",
+                if is_grid {
+                    "IfcGridAxis".to_owned()
+                } else {
+                    e.class.clone()
+                },
+            ),
             ("Name", e.name.clone().unwrap_or_default()),
             ("Type", type_name),
             ("ID", id.to_string()),
@@ -1235,6 +1256,11 @@ impl Gui {
             // A level's name is edited here (`level.rename`).
             if is_level && label == "Name" {
                 grid.append(Property::string(label, "level_name", value));
+                continue;
+            }
+            // So is a grid's (`grid.rename`).
+            if is_grid && label == "Name" {
+                grid.append(Property::string(label, "grid_name", value));
                 continue;
             }
             let name = format!("e{i}");
@@ -1395,6 +1421,16 @@ impl Gui {
             let level = self.selection().first().copied();
             if let (Some(level), Some(name)) = (level, text) {
                 self.rename_level(level, Some(name));
+            }
+            return;
+        }
+        if property == "grid_name" {
+            let target = self.selection().first().copied();
+            if let (Some(g), Some(name)) = (target, text) {
+                if let Err(e) = self.run("grid.rename", json!({ "grid_id": g, "name": name })) {
+                    error(frame, &format!("The grid was not renamed:\n{e}"));
+                }
+                self.refresh_scene(frame);
             }
             return;
         }
@@ -1612,6 +1648,7 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                 match cube {
                     Some(hit) => g.cube_click(hit),
                     None if g.dim_tool.is_some() => g.dim_click(x, y),
+                    None if g.grid_tool.is_some() => g.grid_click(x, y),
                     None if g.active_view().is_some_and(|v| v.nav.walk.is_some()) => {}
                     None if g.tool.is_some() => g.wall_click(x, y, &p, &f),
                     None => g.pick(x, y, &p),
@@ -1641,6 +1678,10 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                     redraw |= g.cube_hover(Some((x, y)));
                     if g.dim_tool.is_some() {
                         g.dim_motion(x, y);
+                        redraw = true;
+                    }
+                    if g.grid_tool.is_some() {
+                        g.grid_motion(x, y);
                         redraw = true;
                     }
                     if g.tool.is_some() {
@@ -1741,6 +1782,8 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                             g.toggle_walk();
                         } else if g.dim_tool.is_some() {
                             g.dim_escape();
+                        } else if g.grid_tool.is_some() {
+                            g.grid_escape();
                         } else {
                             g.escape(&f);
                         }
@@ -1919,6 +1962,7 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
         let architecture_menu = Menu::builder()
             .append_item(ID_WALL, "&Wall (WA)", "Draw walls on the lowest level")
             .append_separator()
+            .append_item(ID_GRID, "&Grid (GR)", "Draw grid lines in a plan")
             .append_item(
                 ID_LEVEL,
                 "&Level... (LL)",
@@ -2048,6 +2092,7 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 properties_stale: true,
                 tool: None,
                 dim_tool: None,
+                grid_tool: None,
                 timer: Some(Timer::new(&frame)),
                 loading: Vec::new(),
                 load_timer: Some(Timer::new(&frame)),
@@ -2258,6 +2303,12 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                     }
                 }),
                 ID_LEVEL => with(&gui, Gui::new_level),
+                ID_GRID => with(&gui, |g| {
+                    g.start_grid_tool();
+                    if let Some(v) = g.active_view() {
+                        v.panel.set_focus();
+                    }
+                }),
                 ID_FIT => with(&gui, Gui::zoom_to_fit),
                 ID_ZOOM_PREV => with(&gui, |g| g.history(true)),
                 ID_ZOOM_NEXT => with(&gui, |g| g.history(false)),

@@ -9,6 +9,7 @@
 //!
 //! A dimension references model geometry by stable sub-references: for Reviera walls,
 //! `face:ext`, `face:int` and `axis` (the location line), which follow the wall when it moves.
+//! Grids are referenced by their line (`axis`), which follows the grid.
 //! Other geometry (cut edges of imported elements) is referenced as `line` with the line kept in
 //! the reference. A reference whose element no longer exists is *orphaned*: the dimension keeps
 //! its last position (DOC-ANN-000).
@@ -34,7 +35,7 @@ pub struct DimRef {
     /// The model element (GlobalId), if any.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub element: Option<String>,
-    /// `face:ext`, `face:int`, `axis` (Reviera walls), or `line`.
+    /// `face:ext`, `face:int`, `axis` (Reviera walls; `axis` for grids too), or `line`.
     pub sub: String,
     /// A point on the reference line where it was picked (metres, plan).
     pub point: [f64; 2],
@@ -96,6 +97,15 @@ pub fn resolve_ref(store: &Store, r: &DimRef) -> Option<([f64; 2], [f64; 2])> {
     let e = store.get(store.find_by_guid(&GlobalId::parse(guid)?)?)?;
     if r.sub == "line" {
         return Some((r.point, r.direction));
+    }
+    if let Some(g) = crate::grids::grid_data(e) {
+        let c = g.curve;
+        let length = c.length().max(f64::EPSILON);
+        let dir = [
+            (c.end[0] - c.start[0]) / length,
+            (c.end[1] - c.start[1]) / length,
+        ];
+        return (r.sub == "axis").then_some((c.start, dir));
     }
     let g = walls::regenerate(store, e).ok()?;
     let recipe = walls::wall_recipe(e)?;
