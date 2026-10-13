@@ -29,6 +29,10 @@ pub struct PlanState {
     pub range: plans::Resolved,
     /// The plan graphics must be rebuilt (model or range changed).
     pub stale: bool,
+    /// Cut edges of the current graphics with their element (snapping, dimension references).
+    pub cut_edges: Rc<Vec<reviera_render::plan::CutEdge>>,
+    /// The drawing scale denominator (100 for 1:100).
+    pub scale: f32,
 }
 
 impl PlanState {
@@ -60,6 +64,11 @@ impl Gui {
             elevation: level.0,
             range,
             stale: true,
+            cut_edges: Rc::default(),
+            scale: store
+                .get(element?)
+                .and_then(|e| e.param(views::VIEW_KEY)?.get("scale")?.as_f64())
+                .unwrap_or(100.0) as f32,
         })
     }
 
@@ -85,13 +94,16 @@ impl Gui {
             .entry(doc)
             .or_insert_with(|| Rc::new(reviera_render::plan::feature_edges(scene)))
             .clone();
-        let graphics = reviera_render::plan::plan_graphics(scene, &edges, cut, bottom);
+        let mut graphics = reviera_render::plan::plan_graphics(scene, &edges, cut, bottom);
+        let cut_edges = Rc::new(std::mem::take(&mut graphics.cut_edges));
+        graphics.lines.extend(self.annotation_lines(index));
         let v = &mut self.views[index];
         if let Some(viewport) = &mut v.viewport {
             viewport.set_plan(Some(graphics));
         }
         if let Some(p) = &mut v.plan {
             p.stale = false;
+            p.cut_edges = cut_edges;
         }
     }
 
@@ -114,7 +126,10 @@ impl Gui {
             };
             let v = &mut self.views[i];
             if let Some(old) = &v.plan {
-                let same = old.range == fresh.range && old.elevation == fresh.elevation;
+                fresh.cut_edges = old.cut_edges.clone();
+                let same = old.range == fresh.range
+                    && old.elevation == fresh.elevation
+                    && old.scale == fresh.scale;
                 fresh.stale = old.stale || !same;
                 if same && !old.stale {
                     continue;

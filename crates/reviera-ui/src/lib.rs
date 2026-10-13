@@ -11,6 +11,7 @@
 //! through `App::execute`, like Lua and MCP. The ribbon and browsers come next.
 
 mod browser;
+mod dims;
 mod loading;
 mod native;
 mod nav;
@@ -58,6 +59,7 @@ const ID_BROWSER_RENAME: i32 = ID_HIGHEST + 25;
 const ID_BROWSER_DUPLICATE: i32 = ID_HIGHEST + 26;
 const ID_BROWSER_DELETE: i32 = ID_HIGHEST + 27;
 const ID_NEW_PLAN: i32 = ID_HIGHEST + 28;
+const ID_DIMENSION: i32 = ID_HIGHEST + 29;
 /// The orientation presets of `nav::PRESETS`, one id each.
 const ID_ORIENT_FIRST: i32 = ID_HIGHEST + 40;
 
@@ -151,6 +153,7 @@ struct Gui {
     rows: Vec<Row>,
     properties_stale: bool,
     tool: Option<WallTool>,
+    dim_tool: Option<dims::DimTool>,
     /// Drives animated view changes and walking.
     timer: Option<Timer<Frame>>,
     /// Models being opened in the background, and the timer that animates their tabs.
@@ -322,7 +325,11 @@ impl Gui {
                 self.toggle_perspective();
                 true
             }
-            "Z" | "W" | "P" => false,
+            "DI" => {
+                self.start_dim_tool(&frame);
+                true
+            }
+            "Z" | "W" | "P" | "D" => false,
             _ => {
                 self.keys.0.clear();
                 false
@@ -362,6 +369,7 @@ impl Gui {
                     .iter()
                     .find(|v| v.kind == reviera_core::views::KIND_3D)
             })
+            .or_else(|| views.first())
             .map(|v| v.id);
         self.open_view(id, first);
         let elements = self.app.document(id).map_or(0, |d| d.doc.store().len());
@@ -487,6 +495,7 @@ impl Gui {
             if self.doc != Some(doc) {
                 self.browser_stale = true;
             }
+            self.end_dim_tool();
             self.active = Some(id);
             self.doc = Some(doc);
             let _ = self.app.activate(doc);
@@ -722,6 +731,7 @@ impl Gui {
     /// Starts the Wall tool on the lowest level.
     fn start_wall_tool(&mut self, frame: &Frame) {
         self.leave_walk();
+        self.end_dim_tool();
         let Some(doc) = self.doc.and_then(|id| self.app.document(id)) else {
             return frame.set_status_text("Open or create a project first (File > New)", 0);
         };
@@ -773,12 +783,17 @@ impl Gui {
         };
         let store = doc.doc.store();
         let level_guid = store.get(t.level).map(|e| e.guid().as_str().to_owned());
-        let lines = store
+        let mut lines: Vec<([f64; 2], [f64; 2])> = store
             .iter()
             .filter_map(reviera_core::walls::wall_recipe)
             .filter(|r| Some(&r.base_level) == level_guid.as_ref())
             .map(|r| (r.curve.start, r.curve.end))
             .collect();
+        // In a plan, the cut edges of every element too (imported walls, columns, ...).
+        if let Some(plan) = self.active_view().and_then(|v| v.plan.as_ref()) {
+            let p = |q: [f32; 2]| [f64::from(q[0]), f64::from(q[1])];
+            lines.extend(plan.cut_edges.iter().map(|(_, s)| (p(s[0]), p(s[1]))));
+        }
         self.tool.as_mut().expect("tool").lines = lines;
     }
 
@@ -1554,6 +1569,7 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                 }
                 match cube {
                     Some(hit) => g.cube_click(hit),
+                    None if g.dim_tool.is_some() => g.dim_click(x, y),
                     None if g.active_view().is_some_and(|v| v.nav.walk.is_some()) => {}
                     None if g.tool.is_some() => g.wall_click(x, y, &p, &f),
                     None => g.pick(x, y, &p),
@@ -1581,6 +1597,10 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                         return;
                     }
                     redraw |= g.cube_hover(Some((x, y)));
+                    if g.dim_tool.is_some() {
+                        g.dim_motion(x, y);
+                        redraw = true;
+                    }
                     if g.tool.is_some() {
                         g.wall_motion(x, y, &p, &f);
                         redraw = true;
@@ -1668,6 +1688,8 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                     with_view(&gui, id, |g| {
                         if g.active_view().is_some_and(|v| v.nav.walk.is_some()) {
                             g.toggle_walk();
+                        } else if g.dim_tool.is_some() {
+                            g.dim_escape();
                         } else {
                             g.escape(&f);
                         }
@@ -1840,6 +1862,13 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
         let architecture_menu = Menu::builder()
             .append_item(ID_WALL, "&Wall (WA)", "Draw walls on the lowest level")
             .build();
+        let annotate_menu = Menu::builder()
+            .append_item(
+                ID_DIMENSION,
+                "Aligned &Dimension (DI)",
+                "Dimension parallel walls and edges in a plan",
+            )
+            .build();
         let window_menu = Menu::builder()
             .append_item(
                 ID_NEW_VIEW,
@@ -1886,6 +1915,7 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
             .append(edit_menu, "&Edit")
             .append(view_menu, "&View")
             .append(architecture_menu, "&Architecture")
+            .append(annotate_menu, "A&nnotate")
             .append(window_menu, "&Window")
             .build();
         frame.set_menu_bar(menu_bar);
@@ -1951,6 +1981,7 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 rows: Vec::new(),
                 properties_stale: true,
                 tool: None,
+                dim_tool: None,
                 timer: Some(Timer::new(&frame)),
                 loading: Vec::new(),
                 load_timer: Some(Timer::new(&frame)),
@@ -2167,6 +2198,12 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 ID_NEW_VIEW => with(&gui, Gui::new_3d_view),
                 ID_DEFAULT_3D => with(&gui, Gui::default_3d_view),
                 ID_NEW_PLAN => with(&gui, Gui::new_floor_plans),
+                ID_DIMENSION => with(&gui, |g| {
+                    g.start_dim_tool(&f);
+                    if let Some(v) = g.active_view() {
+                        v.panel.set_focus();
+                    }
+                }),
                 ID_BROWSER_OPEN | ID_BROWSER_RENAME | ID_BROWSER_DUPLICATE | ID_BROWSER_DELETE => {
                     let id = e.get_id();
                     with(&gui, |g| {

@@ -109,6 +109,9 @@ fn a_dimension_between_wall_faces_follows_the_walls() {
 
     // Saved with the model, and orphaned (not deleted) when a wall goes.
     project.save(&doc).unwrap();
+    if let Ok(copy) = std::env::var("REVIERA_DUMP_DIMS_IFC") {
+        std::fs::copy(&path, copy).unwrap();
+    }
     let (_, mut reopened, _) = LocalProject::open(&path).unwrap();
     assert_eq!(values(&r, &mut reopened, &plan), [4.8, 0.1]);
     run(&r, &mut doc, "element.delete", json!({"element_ids": [b]})).unwrap();

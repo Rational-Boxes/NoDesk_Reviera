@@ -423,6 +423,8 @@ pub trait RenderBackend {
     /// Transient geometry drawn over the scene, such as the preview of a wall being drawn.
     /// Cheap to replace on every mouse move; the scene is not uploaded again.
     fn set_overlay(&mut self, meshes: &[SceneMesh]);
+    /// Transient lines drawn over the scene (tool previews in plans), unlit.
+    fn set_overlay_lines(&mut self, lines: &[plan::Lines]);
 }
 
 #[cfg(test)]

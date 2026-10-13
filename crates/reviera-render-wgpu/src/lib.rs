@@ -126,6 +126,7 @@ pub struct WgpuViewport {
     opaque: Option<(wgpu::Buffer, u32)>,
     transparent: Option<(wgpu::Buffer, u32)>,
     overlay: Option<(wgpu::Buffer, u32)>,
+    overlay_lines: Option<(wgpu::Buffer, u32)>,
     gizmo_pipeline: wgpu::RenderPipeline,
     /// Uniforms of the gizmo's lit geometry and of its flat (clip-space) geometry.
     gizmo_uniforms: [(wgpu::Buffer, wgpu::BindGroup); 2],
@@ -418,6 +419,7 @@ impl WgpuViewport {
             scene: RenderScene::default(),
             highlight: Default::default(),
             overlay: None,
+            overlay_lines: None,
             gizmo_pipeline,
             gizmo_uniforms,
             gizmo: None,
@@ -527,6 +529,22 @@ fn msaa_view(
         .create_view(&Default::default())
 }
 
+/// Line vertices of line sets (two per segment).
+fn line_vertices(lines: &[reviera_render::plan::Lines]) -> Vec<Vertex> {
+    lines
+        .iter()
+        .flat_map(|l| {
+            l.segments.iter().flat_map(move |s| {
+                s.iter().map(move |p| Vertex {
+                    position: *p,
+                    normal: [0.0, 0.0, 1.0],
+                    color: l.color,
+                })
+            })
+        })
+        .collect()
+}
+
 fn depth_view(device: &wgpu::Device, (w, h): (u32, u32)) -> wgpu::TextureView {
     device
         .create_texture(&wgpu::TextureDescriptor {
@@ -610,23 +628,16 @@ impl RenderBackend for WgpuViewport {
         self.overlay = self.buffer(&opaque);
     }
 
+    fn set_overlay_lines(&mut self, lines: &[reviera_render::plan::Lines]) {
+        let v = line_vertices(lines);
+        self.overlay_lines = self.buffer(&v);
+    }
+
     fn set_plan(&mut self, plan: Option<reviera_render::plan::PlanGraphics>) {
         self.plan = plan.map(|g| {
             let (mut poche, t) = vertices(&g.poche, &self.highlight);
             poche.extend(t);
-            let lines: Vec<Vertex> = g
-                .lines
-                .iter()
-                .flat_map(|l| {
-                    l.segments.iter().flat_map(move |s| {
-                        s.iter().map(move |p| Vertex {
-                            position: *p,
-                            normal: [0.0, 0.0, 1.0],
-                            color: l.color,
-                        })
-                    })
-                })
-                .collect();
+            let lines = line_vertices(&g.lines);
             PlanGpu {
                 top: g.top,
                 bottom: g.bottom,
@@ -839,11 +850,18 @@ impl WgpuViewport {
                     pass.draw(0..*count, 0..1);
                 }
             }
-            if let Some(plan) = &self.plan {
-                pass.set_bind_group(0, &self.plan_uniforms.1, &[]);
+            // Plan poché and lines, then tool preview lines: unlit, unclipped.
+            pass.set_bind_group(0, &self.plan_uniforms.1, &[]);
+            let none = None;
+            let (poche, lines) = match &self.plan {
+                Some(p) => (&p.poche, &p.lines),
+                None => (&none, &none),
+            };
+            {
                 for (pipeline, mesh) in [
-                    (&self.opaque_pipeline, &plan.poche),
-                    (&self.line_pipeline, &plan.lines),
+                    (&self.opaque_pipeline, poche),
+                    (&self.line_pipeline, lines),
+                    (&self.line_pipeline, &self.overlay_lines),
                 ] {
                     if let Some((buffer, count)) = mesh {
                         pass.set_pipeline(pipeline);

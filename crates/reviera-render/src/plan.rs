@@ -23,6 +23,9 @@ pub struct Lines {
     pub segments: Vec<[[f32; 3]; 2]>,
 }
 
+/// A cut edge in plan and the element it belongs to.
+pub type CutEdge = (Option<reviera_core::ElementId>, [[f32; 2]; 2]);
+
 /// What a plan view draws over and instead of the shaded model.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct PlanGraphics {
@@ -33,6 +36,8 @@ pub struct PlanGraphics {
     /// Filled section regions at the cut plane.
     pub poche: Vec<SceneMesh>,
     pub lines: Vec<Lines>,
+    /// The cut edges with their element, for snapping and annotation references.
+    pub cut_edges: Vec<CutEdge>,
 }
 
 pub const POCHE: [f32; 4] = [0.035, 0.038, 0.045, 1.0];
@@ -274,6 +279,7 @@ pub fn plan_graphics(
 ) -> PlanGraphics {
     let mut poche = Vec::new();
     let mut cut_lines = Vec::new();
+    let mut cut_edges = Vec::new();
     for m in &scene.meshes {
         let segments = slice(m, cut);
         if segments.is_empty() {
@@ -284,6 +290,7 @@ pub fn plan_graphics(
                 .iter()
                 .map(|[a, b]| [[a[0], a[1], cut], [b[0], b[1], cut]]),
         );
+        cut_edges.extend(segments.iter().map(|s| (m.element, *s)));
         let (loops, _) = chains(&segments);
         let filled = fill(&loops, cut, m.element);
         if !filled.indices.is_empty() {
@@ -304,6 +311,7 @@ pub fn plan_graphics(
                 segments: cut_lines,
             },
         ],
+        cut_edges,
     }
 }
 
