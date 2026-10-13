@@ -22059,7 +22059,7 @@ All output commands work on an immutable **model snapshot** taken when the comma
 
 **Purpose.** IFC is Reviera's native format, so "IFC export" means writing a *derived* IFC file tailored to a recipient: a different schema or model view definition, a filtered subset, or a clean file without Reviera data.
 
-**Workflow.** File › Export › IFC: file name; setup (in-session, or named setups including built-in ones for IFC4 Reference View, IFC4 Design Transfer View, IFC2X3 Coordination View 2.0, IFC4X3, and a handover/COBie-style setup); *Modify setup…*; *Export linked models as separate files* or *federate into one file*.
+**Workflow.** File › Export › IFC: file name; setup (in-session, or named setups including built-in ones for IFC4 Reference View, IFC4 Design Transfer View, IFC2X3 Coordination View 2.0, IFC4X3, and a *Basic FM Handover* setup consistent with COBie export, DOC-OUT-015); *Modify setup…*; *Export linked models as separate files* or *federate into one file*.
 
 **Behaviour & rules.** Setup tabs:
 - **General:** schema (IFC2X3, IFC4, IFC4X3); model view definition (Reference View writes tessellated geometry such as `IfcTriangulatedFaceSet`; Design Transfer View keeps parametric geometry such as extrusions and Boolean results); file type (`.ifc`, `.ifcXML`, `.ifczip`); phase to export (sets the standard `Status` property, DOC-GFX-017); space boundaries (none, first level, second level); coordinate base (internal origin, project base point, shared coordinates; Chapter 6, COL-POS-003); split walls, columns and ducts by storey; file header (author, organisation, authorisation).
@@ -22138,6 +22138,74 @@ All output commands work on an immutable **model snapshot** taken when the comma
 
 **Acceptance criteria.**
 - [ ] A SQLite export contains one row per door in the Doors table, with one column per scheduled door parameter.
+
+### COBie export
+**ID:** DOC-OUT-015 · **Priority:** P1 · **Ref:** owner requirement (2026-10-13); public standard NBIMS-US V3 §4.2 COBie (nibs.org, S0702); buildingSMART Basic FM Handover view (DOC-OUT-006)
+
+**Purpose.** Hand over the model's facility-management metadata as a COBie (Construction Operations Building information exchange) data set: the spaces, levels, types, components, systems and their attributes, in the tables and columns an owner's maintenance systems import.
+
+**Workflow.**
+1. File › Export › COBie (also Manage › Settings › COBie Setup for the stored settings).
+2. The dialog has these parts:
+   - **Version:** *COBie (NBIMS-US current)*, the default, or *COBie 2.4 (legacy layout)*.
+   - **Format:** *Workbook (.xlsx)*, the SpreadsheetML deliverable, or *One delimited file per table*.
+   - **Contacts:** the company and person records, with the one that created the data set. They are kept with the project.
+   - **Component categories:** the categories whose elements are maintainable assets. Defaults: doors, windows, furniture, casework, specialty equipment, plumbing fixtures, mechanical and electrical equipment, lighting fixtures, air terminals, fire protection and communication devices.
+   - **Classification system** for the Category columns (for example OmniClass or Uniclass), read from the elements' classification references (Chapter 2).
+   - **Zones** from: room Department, an IFC zone (`IfcZone`), or a chosen room parameter.
+   - **Attributes:** all instance and type parameters, the scheduled ones only, or a chosen list.
+3. **Validate** checks the data set without writing it (see Validation). **Export** writes it and opens the report.
+
+**Behaviour & rules.**
+- **Table mapping (current version).**
+
+| COBie table | Source in the model |
+|---|---|
+| Instruction | Export date and time, units, classification systems, Reviera and the COBie version |
+| Company | The contacts of the COBie settings |
+| Facility | Project and building: names, project number, site, units, phase, `ExtIdentifier` = the building's GlobalId |
+| Level | Levels (`IfcBuildingStorey`): name, elevation, height to the next level; the site as a level of category "Site" when spaces are placed on it |
+| SpaceType | The distinct values of the room parameter chosen as space type (default: Occupancy) |
+| Space | Placed rooms (`IfcSpace`): Number and Name, level, space type, net area, net height, and room finishes, read from the room's computed geometry (ARC-ROOM-002) |
+| Zone | One record per zone value and room, or per `IfcZone` membership |
+| Type | Element types of the component categories: name, category (classification), manufacturer, model, warranty and replacement-cost parameters where present |
+| Component | Elements of the component categories: name (Mark, else a generated unique name), type, the space that contains them (for doors, the From/To room), serial and tag numbers, installation date |
+| System | MEP systems (`IfcSystem`, Chapter 4) and their components |
+| Document | Documents linked to elements (DM document links), as file references |
+| Attribute | One record per exported parameter of every Facility, Level, Space, Type and Component record: name, value, unit, category, and the sheet and row it describes |
+| Coordinate | Optional: the location point (and bounding box) of each component and space |
+| PickList | The pick-list values the data set uses (categories, units, asset types) |
+| Resource, Job, Event, Package, Risk | Written with headers and no rows, unless the project has operations data in RXD for them (not specified yet) |
+
+- **COBie 2.4 (legacy layout)** writes the same data under the earlier names and columns: Contact (for Company), Floor (for Level) and the 2.4 worksheet order. It has Assembly, Connection, Spare, Impact and Issue sheets with headers only. SpaceType values go to the Space sheet's Category column.
+- **Identity columns.** Every record carries `ExtSystem` = "NoDesk Reviera <version>", `ExtObject` = the IFC class, and `ExtIdentifier` = the element's IFC GlobalId. A data set exported twice from an unchanged model is identical except for the Instruction table's date, so re-exports can be compared.
+- **Names.** COBie requires a unique Name within each table. Duplicates are reported by validation. With *Make names unique* on, the export suffixes them (" (2)", " (3)") and lists every renamed record in the report; the model is not changed.
+- **Units.** Values are written in the project's units, with the unit names in the Instruction table and the PickList.
+- **Required and optional data.** Columns that COBie requires but the model has no value for are written as "n/a". The export never invents values. The report lists each "n/a" by table and column, so the team can fill them in (typically through a schedule, DOC-SCH-010).
+- **Validation** (`cobie.validate`) checks every rule below, before writing or on demand, and reports each problem with the element it comes from (selectable in the canvas).
+  - Required columns are present.
+  - Names are unique within each table.
+  - References resolve: every Component's Space and Type exists, and every Space's Level exists.
+  - Components are in a space.
+  - Values belong to their pick lists.
+  - Types have components.
+- **Consistency with IFC.** The *Basic FM Handover* IFC export setup (DOC-OUT-006) writes the same spaces, zones, systems, types, classifications and properties. A COBie data set and an IFC file exported from one model state describe the same objects with the same GlobalIds.
+- **Performance and safety.** The export runs as a background job (DOC-OUT-013) on a snapshot of the model. Text values are escaped as for schedule export (DOC-SCH-012), so no cell can run as a formula.
+
+**Data (RXD).** `project/cobie`: the settings (version, format, contacts, component categories, classification system, zone source, attribute selection, *Make names unique*) and the date of the last export.
+
+**Commands.**
+- `export.cobie(path, version?: current|v2_4, format?: xlsx|csv, options?) -> {tables: {name, rows}[], warnings[], path}`
+- `cobie.validate(version?) -> issues[]` (each `{table, column?, record, element_id?, rule, message}`; query)
+- `cobie.set_settings(settings) -> ()` (undoable; part of the project)
+
+**Acceptance criteria.**
+- [ ] On a model with two levels, six rooms, eight doors and four windows, the current-version workbook has Facility 1 row, Level 2, Space 6, Type and Component rows for the doors and windows, and Attribute rows for their parameters. Every Component row names its Space and Type, and every ExtIdentifier is the element's IFC GlobalId.
+- [ ] Two doors with the same Mark are reported by validation. With *Make names unique* they export as "D1" and "D1 (2)", and the report lists the rename.
+- [ ] The COBie 2.4 layout writes the same records on Contact, Floor, Space, Type and Component sheets, in the 2.4 sheet order.
+- [ ] Exporting an unchanged model twice gives files that differ only in the export date.
+- [ ] A room name starting with "=" is written as text.
+- [ ] Every element in the COBie Component table is present, with the same GlobalId, in a Basic FM Handover IFC export of the same model state.
 
 ### Background jobs
 **ID:** DOC-OUT-013 · **Priority:** P1 · **Ref:** research/04 §6.2 *Export in background*
@@ -22593,6 +22661,9 @@ Every command below is registered once in the command registry and is therefore 
 | `export.step` | path, view_id_or_element_ids, schema?: ap214\|ap242 | job_id | No | DOC-OUT-007 |
 | `export.gbxml` | path, source: rooms\|spaces\|energy_model, options? | job_id | No | DOC-OUT-008 |
 | `export.database` | path, format: sqlite\|csv, categories[]? | job_id | No | DOC-OUT-009 |
+| `export.cobie` | path, version?: current\|v2_4, format?: xlsx\|csv, options? | {tables[], warnings[], path} | No | DOC-OUT-015 |
+| `cobie.validate` | version? | issues[] | No | DOC-OUT-015 |
+| `cobie.set_settings` | settings | () | Yes | DOC-OUT-015 |
 | `export.room_report` | path, scope? | job_id | No | DOC-OUT-009 |
 | `job.status` | job_id | status | No | DOC-OUT-013 |
 | `job.wait` | job_id, timeout? | status | No | DOC-OUT-013 |
@@ -24883,10 +24954,10 @@ Generated by `tools/build_spec.py` from the chapter command catalogs and require
 | STR | 0 | 14 | 47 | 0 | 61 |
 | MEP | 0 | 28 | 42 | 0 | 70 |
 | ANA | 0 | 1 | 21 | 0 | 22 |
-| DOC | 68 | 39 | 12 | 1 | 120 |
+| DOC | 68 | 40 | 12 | 1 | 121 |
 | COL | 8 | 45 | 6 | 1 | 60 |
 | ADV | 0 | 0 | 4 | 1 | 5 |
-| **Total** | **318** | **269** | **173** | **7** | **767** |
+| **Total** | **318** | **270** | **173** | **7** | **768** |
 
 Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver)"), it is counted under the first. The non-functional requirements (NFR-…) are in Chapter 0 §0.7 and are not counted here.
 
@@ -24941,7 +25012,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.2a Reviera-originated features
 
-81 requirements are Reviera's own design: owner directives, the technology stack (IFC/RXD storage, live store, BIMserver, MCP, scripting) and extensions beyond the reference product's feature set. Their Ref lines cite no research on the reference product. Listing them separately keeps the clean-room provenance clear: every other requirement traces to public research on the reference product.
+82 requirements are Reviera's own design: owner directives, the technology stack (IFC/RXD storage, live store, BIMserver, MCP, scripting) and extensions beyond the reference product's feature set. Their Ref lines cite no research on the reference product. Listing them separately keeps the clean-room provenance clear: every other requirement traces to public research on the reference product.
 
 | Requirement | Ch | Feature |
 |-------------|----|---------|
@@ -25015,6 +25086,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | DOC-VIEW-013 | 5 | Blueprint mode (3D slice to 2D drawing) |
 | DOC-RBE-001 | 5 | Pluggable render backends |
 | DOC-RBE-002 | 5 | Backend hosting and licensing |
+| DOC-OUT-015 | 5 | COBie export |
 | COL-BIM-001 | 6 | Server profiles and login |
 | COL-BIM-002 | 6 | Project and revision browser |
 | COL-BIM-003 | 6 | Open and download |
@@ -25029,7 +25101,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**1942 unique commands** in 399 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**1945 unique commands** in 400 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -25089,6 +25161,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `classification` | 3 |
 | `clipboard` | 3 |
 | `cme` | 12 |
+| `cobie` | 2 |
 | `colorlegend` | 1 |
 | `colorscheme` | 5 |
 | `column` | 7 |
@@ -25147,7 +25220,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `energy_settings` | 3 |
 | `equipment_load` | 1 |
 | `equipment_set` | 1 |
-| `export` | 24 |
+| `export` | 25 |
 | `external_props` | 2 |
 | `fabric_area` | 1 |
 | `fabric_sheet` | 2 |
@@ -25658,6 +25731,8 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `cme.repeat` | 2 | adaptive_instance_id | element_id | Yes | DM-CME-004 |
 | `cme.surface.apply_component` | 2 | divided_surface_id, panel_type_id | — | Yes | DM-CME-003 |
 | `cme.surface.set_pattern` | 2 | divided_surface_id, pattern, border_tiles? | — | Yes | DM-CME-003 |
+| `cobie.set_settings` | 5 | settings | () | Yes | DOC-OUT-015 |
+| `cobie.validate` | 5 | version? | issues[] | No | DOC-OUT-015 |
 | `colorlegend.place` | 5 | view_id, scheme_id, position | annotation_id | Yes | DOC-ANN-022 |
 | `colorscheme.create` | 3 | name, category, parameter, mode: value\ | range, ranges? | scheme_id | Yes |
 | `colorscheme.duplicate` | 3 | scheme_id, name | id | Yes | ARC-CLR-001 |
@@ -25900,6 +25975,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `export.batch` | 2 | set_name \ | set | report | No |
 | `export.cad_setup_load_layer_standard` | 5 | setup_id, standard | () | Yes | DOC-OUT-005 |
 | `export.cad_setup_save` | 5 | name, settings | setup_id | Yes | DOC-OUT-005 |
+| `export.cobie` | 5 | path, version?: current\ | v2_4, format?: xlsx\ | csv, options? | {tables[], warnings[], path} |
 | `export.database` | 5 | path, format: sqlite\ | csv, categories[]? | job_id | No |
 | `export.dwg` | 2 | range, set_id?, setup_id?, folder, naming?, version?, xrefs? | job_id | No | DM-EXP-004 |
 | `export.dxf` | 2 | range, set_id?, setup_id?, folder, naming?, version?, xrefs? | job_id | No | DM-EXP-003 |

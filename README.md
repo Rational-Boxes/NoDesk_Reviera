@@ -11,6 +11,15 @@ operation can be driven by Lua scripts and by AI agents through the Model Contex
 > **Status: early development.** The specification is complete as a draft. The application
 > core is being built, and the first window shows models in an interactive 3D viewport.
 
+## COBie handover (planned)
+
+Reviera is to export the model's facility-management metadata as a COBie data set (the
+current NBIMS-US tables, or the COBie 2.4 layout). The tables are Company, Facility, Level,
+Space, Zone, Type, Component, System, Attribute and the rest. The export is a workbook or one
+CSV file per table, with validation of required data, unique names and references, and the
+same objects and GlobalIds as the IFC handover export (spec DOC-OUT-015). It is not built yet;
+it will build on the schedule engine.
+
 ## Working with CADCraft
 
 Reviera is meant to work alongside [CADCraft](https://github.com/storytold/cadcraft), an

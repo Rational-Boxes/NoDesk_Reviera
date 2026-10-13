@@ -25,7 +25,8 @@ Excluded from the register: two help-site directory roots and one URL template p
 | community-wiki | 2 |
 | open-standard / open-source | 4 |
 | standards-body blog | 1 |
-| **Total** | **701** |
+| standards-body | 1 |
+| **Total** | **702** |
 
 ## Flagged for review
 
@@ -37,7 +38,7 @@ Excluded from the register: two help-site directory roots and one URL template p
 | Gap-fill sources S0578 onward marked "search summary" in the agents' notes (two COL help pages) | Facts taken from public search-result summaries of public help pages | The pages themselves are public (HTTP 200 on re-check). |
 | `research/03` | Quotes Autodesk Help text heavily | Kept internal. The specification paraphrases it (conventions rule 1.1). |
 
-## A. Sources (701)
+## A. Sources (702)
 
 | ID | Area | Type | URL | Status | Public-availability test |
 |----|------|------|-----|--------|--------------------------|
@@ -742,6 +743,7 @@ Excluded from the register: two help-site directory roots and one URL template p
 | S0699 | COL | open-standard / open-source | https://github.com/buildingSMART/BCF-API | 200 | PASS: public (HTTP 200, unauthenticated) |
 | S0700 | COL | open-standard / open-source | https://github.com/buildingSMART/foundation-API | 200 | PASS: public (HTTP 200, unauthenticated) |
 | S0701 | COL | open-standard / open-source | https://github.com/buildingSMART/documents-API | 200 | PASS: public (HTTP 200, unauthenticated) |
+| S0702 | DOC | standards-body | https://nibs.org/nbims/v3/cobie/4-2/ | 200 | PASS: public (HTTP 200, unauthenticated) |
 
 ## B. Screenshots (142) — internal reference only
 
