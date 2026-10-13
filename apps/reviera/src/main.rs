@@ -1,40 +1,149 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Reviera contributors
 
-use std::path::Path;
+//! Command-line entry point until the wxWidgets shell exists.
+//!
+//! - `reviera`: lists unsaved work left by a crash.
+//! - `reviera FILE`: opens an IFC file and prints a summary.
+//! - `reviera shell [FILE]`: reads `<command> [JSON arguments]` lines and runs them as the user.
+
+use std::io::{BufRead, Write};
 use std::process::ExitCode;
 
-use reviera_core::CommandRegistry;
-use reviera_store::LocalProject;
+use reviera_app::{App, AppConfig};
+use reviera_core::Caller;
+use serde_json::{Value, json};
 
 fn main() -> ExitCode {
-    let registry = CommandRegistry::with_core();
+    let mut app = App::new(AppConfig::default());
+    let args: Vec<String> = std::env::args().skip(1).collect();
     println!(
-        "NoDesk Reviera {} ({} commands registered)",
+        "NoDesk Reviera {} ({} commands)",
         env!("CARGO_PKG_VERSION"),
-        registry.len()
+        app.registry().len()
     );
-    let Some(path) = std::env::args().nth(1) else {
-        return ExitCode::SUCCESS;
-    };
-    match LocalProject::open(Path::new(&path)) {
-        Ok((project, doc, report)) => {
-            println!(
-                "{path}: {} schema, {} elements ({} IDs from RXD, {} assigned), next ID {}",
-                project.ifc().schema(),
-                report.elements,
-                report.ids_from_rxd,
-                report.ids_assigned,
-                doc.next_id()
-            );
-            for problem in &report.problems {
-                println!("  warning: {problem}");
-            }
-            ExitCode::SUCCESS
-        }
-        Err(e) => {
-            eprintln!("{path}: {e}");
+    match args.as_slice() {
+        [] => report_recoverable(&app),
+        [cmd, rest @ ..] if cmd == "shell" => shell(&mut app, rest.first()),
+        [file] => summary(&mut app, file),
+        _ => {
+            eprintln!("usage: reviera [FILE] | reviera shell [FILE]");
             ExitCode::FAILURE
         }
     }
+}
+
+fn report_recoverable(app: &App) -> ExitCode {
+    match app.recoverable() {
+        Ok(found) if found.is_empty() => ExitCode::SUCCESS,
+        Ok(found) => {
+            println!(
+                "Unsaved work from an earlier session (restore with `recovery.restore` in `reviera shell`):"
+            );
+            for r in found {
+                let path = r
+                    .project_path
+                    .map(|p| p.display().to_string())
+                    .unwrap_or_else(|| "Untitled".into());
+                let changes = r
+                    .unsaved_changes
+                    .map_or("unknown".into(), |n| n.to_string());
+                println!(
+                    "  {}  {path}  {changes} changes  {}",
+                    r.key,
+                    r.last_labels.join(" · ")
+                );
+            }
+            ExitCode::SUCCESS
+        }
+        Err(e) => fail(&e.to_string()),
+    }
+}
+
+fn summary(app: &mut App, file: &str) -> ExitCode {
+    let user = Caller::user();
+    let id = match app.execute("file.open", json!({"path": file, "read_only": true}), &user) {
+        Ok(o) => o.result.as_u64().unwrap_or_default(),
+        Err(e) => return fail(&e.to_string()),
+    };
+    let open = app.document(id).expect("just opened");
+    let report = open.open_report.clone().unwrap_or_default();
+    println!(
+        "{file}: {} schema, {} elements ({} IDs from RXD, {} assigned), next ID {}",
+        open.project.ifc().schema(),
+        report.elements,
+        report.ids_from_rxd,
+        report.ids_assigned,
+        open.doc.next_id()
+    );
+    for problem in &report.problems {
+        println!("  warning: {problem}");
+    }
+    ExitCode::SUCCESS
+}
+
+fn shell(app: &mut App, file: Option<&String>) -> ExitCode {
+    let user = Caller::user();
+    if let Some(f) = file
+        && let Err(e) = app.execute("file.open", json!({ "path": f }), &user)
+    {
+        return fail(&e.to_string());
+    }
+    println!("Type `<command> [JSON arguments]`, `:commands [prefix]`, `:docs` or `:quit`.");
+    let stdin = std::io::stdin();
+    loop {
+        print!("> ");
+        let _ = std::io::stdout().flush();
+        let mut line = String::new();
+        if stdin.lock().read_line(&mut line).unwrap_or(0) == 0 {
+            // End of input: keep unsaved work recoverable rather than discarding it.
+            app.flush_all();
+            if app.documents().iter().any(|d| d.dirty) {
+                println!("\nUnsaved work is kept for recovery.");
+            }
+            return ExitCode::SUCCESS;
+        }
+        let line = line.trim();
+        let (cmd, rest) = line.split_once(char::is_whitespace).unwrap_or((line, ""));
+        match cmd {
+            "" => continue,
+            ":quit" => match app.execute("app.exit", Value::Null, &user) {
+                Ok(_) => return ExitCode::SUCCESS,
+                Err(e) => println!("{e} (save, or use `app.exit {{\"force\": true}}`)"),
+            },
+            ":docs" => print_json(&json!(app.documents())),
+            ":commands" => {
+                for s in app
+                    .registry()
+                    .iter()
+                    .filter(|s| s.name.starts_with(rest.trim()))
+                {
+                    println!("  {:<28} {}", s.name, s.summary);
+                }
+            }
+            _ => {
+                let args = if rest.trim().is_empty() {
+                    Ok(Value::Null)
+                } else {
+                    serde_json::from_str(rest)
+                };
+                match args {
+                    Ok(args) => match app.execute(cmd, args, &user) {
+                        Ok(outcome) => print_json(&json!(outcome)),
+                        Err(e) => print_json(&json!({ "error": e })),
+                    },
+                    Err(e) => println!("arguments are not valid JSON: {e}"),
+                }
+            }
+        }
+    }
+}
+
+fn print_json(v: &Value) {
+    println!("{}", serde_json::to_string_pretty(v).unwrap_or_default());
+}
+
+fn fail(msg: &str) -> ExitCode {
+    eprintln!("{msg}");
+    ExitCode::FAILURE
 }

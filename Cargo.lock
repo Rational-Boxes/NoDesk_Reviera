@@ -878,8 +878,24 @@ checksum = "d6f6ff9a378485b298a5286656da665ba74413d36db0979633275d2e708145d4"
 name = "reviera"
 version = "0.1.0"
 dependencies = [
+ "reviera-app",
  "reviera-core",
+ "serde_json",
+]
+
+[[package]]
+name = "reviera-app"
+version = "0.1.0"
+dependencies = [
+ "reviera-core",
+ "reviera-ifc",
+ "reviera-livestore",
  "reviera-store",
+ "schemars",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "uuid",
 ]
 
 [[package]]
@@ -940,6 +956,7 @@ dependencies = [
  "reviera-ifc",
  "reviera-store",
  "rusqlite",
+ "schemars",
  "serde",
  "serde_json",
  "sha2",

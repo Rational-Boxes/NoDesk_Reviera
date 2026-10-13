@@ -5,6 +5,7 @@
 //! surfaced automatically to the ribbon and shortcuts, to Lua as `reviera.<command>(...)` and to MCP
 //! as one tool per command. [`CommandRegistry::execute`] is the one execution path for every caller.
 
+use std::any::Any;
 use std::collections::BTreeMap;
 use std::fmt;
 use std::panic::{AssertUnwindSafe, catch_unwind};
@@ -254,13 +255,36 @@ impl<'a> CommandContext<'a> {
     }
 }
 
-type Handler = Box<dyn Fn(&mut CommandContext<'_>, Value) -> Result<Value> + Send + Sync>;
+type DocHandler = Box<dyn Fn(&mut CommandContext<'_>, Value) -> Result<Value> + Send + Sync>;
+type HostHandler = Box<dyn Fn(&mut dyn Any, &Caller, Value) -> Result<Value> + Send + Sync>;
+
+enum Handler {
+    /// Runs against one document, in a transaction when it edits.
+    Document { run: DocHandler, direct: bool },
+    /// Runs against the application (open, save, close, recovery …).
+    Host(HostHandler),
+}
 
 struct Entry {
     spec: CommandSpec,
     validator: jsonschema::Validator,
     handler: Handler,
-    direct: bool,
+}
+
+/// A command that acts on the application rather than on one document, such as `file.open`. The
+/// application passes itself as the host to [`CommandRegistry::execute_host`].
+pub trait HostCommand: Send + Sync + 'static {
+    type Host: 'static;
+    type Params: DeserializeOwned + JsonSchema;
+    type Output: Serialize + JsonSchema;
+    const META: CommandMeta;
+
+    fn run(
+        &self,
+        host: &mut Self::Host,
+        caller: &Caller,
+        params: Self::Params,
+    ) -> Result<Self::Output>;
 }
 
 #[derive(Default)]
@@ -297,6 +321,22 @@ impl CommandRegistry {
         self.add_typed(command, true)
     }
 
+    /// Registers an application-level command.
+    pub fn add_host<C: HostCommand>(&mut self, command: C) -> Result<()> {
+        let spec = typed_spec::<C::Params, C::Output>(C::META, false);
+        let handler: HostHandler = Box::new(move |host, caller, args| {
+            let host = host.downcast_mut::<C::Host>().ok_or_else(|| {
+                Error::new(
+                    "internal",
+                    format!("`{}` was given the wrong host", C::META.name),
+                )
+            })?;
+            let params = parse_params::<C::Params>(C::META.name, args)?;
+            to_result(command.run(host, caller, params)?)
+        });
+        self.insert(spec, Handler::Host(handler))
+    }
+
     /// Registers a command defined at run time by an add-in, named `<addin-id>.<verb>`.
     pub fn register_addin(
         &mut self,
@@ -310,11 +350,24 @@ impl CommandRegistry {
                 format!("`{}` uses the reserved domain `{domain}`", spec.name),
             ));
         }
-        self.insert(spec, Box::new(handler), false)
+        self.insert(
+            spec,
+            Handler::Document {
+                run: Box::new(handler),
+                direct: false,
+            },
+        )
     }
 
     pub fn get(&self, name: &str) -> Option<&CommandSpec> {
         self.commands.get(name).map(|e| &e.spec)
+    }
+
+    /// Whether `name` is an application-level command, run with [`execute_host`](Self::execute_host).
+    pub fn is_host(&self, name: &str) -> bool {
+        self.commands
+            .get(name)
+            .is_some_and(|e| matches!(e.handler, Handler::Host(_)))
     }
 
     /// Commands in name order.
@@ -330,7 +383,7 @@ impl CommandRegistry {
         self.commands.is_empty()
     }
 
-    /// Runs a command: checks permission, validates the arguments, opens a transaction for
+    /// Runs a document command: checks permission, validates the arguments, opens a transaction for
     /// editing commands, and commits on success or rolls back on error or panic.
     pub fn execute(
         &self,
@@ -339,6 +392,64 @@ impl CommandRegistry {
         args: Value,
         caller: &Caller,
     ) -> Result<Outcome> {
+        let (entry, args) = self.prepare(name, args, caller)?;
+        let Handler::Document { run, direct } = &entry.handler else {
+            return Err(Error::new(
+                "registry.host_command",
+                format!("`{name}` acts on the application, not a document"),
+            ));
+        };
+        let state = if *direct {
+            State::Direct(doc)
+        } else if entry.spec.edits() {
+            State::Edit(doc.transaction(entry.spec.transaction_name.clone(), caller.origin.clone()))
+        } else {
+            State::Read(doc)
+        };
+        let mut cx = CommandContext {
+            registry: self,
+            caller,
+            state,
+            direct_commit: None,
+        };
+        let result = guard(name, || run(&mut cx, args))?;
+        let commit = match cx.state {
+            State::Edit(txn) => Some(txn.commit()),
+            _ => cx.direct_commit,
+        };
+        let (warnings, changed) = commit.map(|c| (c.warnings, c.changed)).unwrap_or_default();
+        Ok(Outcome {
+            result,
+            warnings,
+            changed,
+        })
+    }
+
+    /// Runs an application-level command against `host` (the application), with the same
+    /// permission and argument checks as [`execute`](Self::execute).
+    pub fn execute_host(
+        &self,
+        host: &mut dyn Any,
+        name: &str,
+        args: Value,
+        caller: &Caller,
+    ) -> Result<Outcome> {
+        let (entry, args) = self.prepare(name, args, caller)?;
+        let Handler::Host(run) = &entry.handler else {
+            return Err(Error::new(
+                "registry.document_command",
+                format!("`{name}` acts on a document"),
+            ));
+        };
+        let result = guard(name, || run(host, caller, args))?;
+        Ok(Outcome {
+            result,
+            warnings: Vec::new(),
+            changed: ChangedSummary::default(),
+        })
+    }
+
+    fn prepare(&self, name: &str, args: Value, caller: &Caller) -> Result<(&Entry, Value)> {
         let entry = self.commands.get(name).ok_or_else(|| {
             Error::new(
                 "registry.unknown_command",
@@ -365,72 +476,19 @@ impl CommandRegistry {
                     .with_details(json!({ "errors": problems })),
             );
         }
-
-        let state = if entry.direct {
-            State::Direct(doc)
-        } else if entry.spec.edits() {
-            State::Edit(doc.transaction(entry.spec.transaction_name.clone(), caller.origin.clone()))
-        } else {
-            State::Read(doc)
-        };
-        let mut cx = CommandContext {
-            registry: self,
-            caller,
-            state,
-            direct_commit: None,
-        };
-        let result = catch_unwind(AssertUnwindSafe(|| (entry.handler)(&mut cx, args)))
-            .unwrap_or_else(|panic| {
-                let msg = panic
-                    .downcast_ref::<&str>()
-                    .map(|s| s.to_string())
-                    .or_else(|| panic.downcast_ref::<String>().cloned())
-                    .unwrap_or_default();
-                Err(Error::new(
-                    "command.panicked",
-                    format!("`{name}` failed: {msg}"),
-                ))
-            })?;
-
-        let commit = match cx.state {
-            State::Edit(txn) => Some(txn.commit()),
-            _ => cx.direct_commit,
-        };
-        let (warnings, changed) = commit.map(|c| (c.warnings, c.changed)).unwrap_or_default();
-        Ok(Outcome {
-            result,
-            warnings,
-            changed,
-        })
+        Ok((entry, args))
     }
 
     fn add_typed<C: Command>(&mut self, command: C, direct: bool) -> Result<()> {
-        let m = C::META;
-        let spec = CommandSpec {
-            name: m.name.into(),
-            version: m.version,
-            summary: m.summary.into(),
-            description: m.description.into(),
-            params: schema_value(schemars::schema_for!(C::Params)),
-            result: schema_value(schemars::schema_for!(C::Output)),
-            effects: m.effects.to_vec(),
-            undoable: m.effects.contains(&Effect::Edit) && !direct,
-            transaction_name: m.transaction_name.into(),
-        };
-        let handler: Handler = Box::new(move |cx, args| {
-            let params: C::Params = serde_json::from_value(args).map_err(|e| {
-                Error::new(
-                    "args.invalid",
-                    format!("invalid arguments for `{}`: {e}", C::META.name),
-                )
-            })?;
-            let output = command.run(cx, params)?;
-            serde_json::to_value(output).map_err(|e| Error::new("internal", e.to_string()))
+        let spec = typed_spec::<C::Params, C::Output>(C::META, direct);
+        let run: DocHandler = Box::new(move |cx, args| {
+            let params = parse_params::<C::Params>(C::META.name, args)?;
+            to_result(command.run(cx, params)?)
         });
-        self.insert(spec, handler, direct)
+        self.insert(spec, Handler::Document { run, direct })
     }
 
-    fn insert(&mut self, spec: CommandSpec, handler: Handler, direct: bool) -> Result<()> {
+    fn insert(&mut self, spec: CommandSpec, handler: Handler) -> Result<()> {
         if !valid_name(&spec.name) {
             return Err(Error::new(
                 "registry.invalid_name",
@@ -451,11 +509,53 @@ impl CommandRegistry {
                 spec,
                 validator,
                 handler,
-                direct,
             },
         );
         Ok(())
     }
+}
+
+fn typed_spec<P: JsonSchema, O: JsonSchema>(m: CommandMeta, direct: bool) -> CommandSpec {
+    CommandSpec {
+        name: m.name.into(),
+        version: m.version,
+        summary: m.summary.into(),
+        description: m.description.into(),
+        params: schema_value(schemars::schema_for!(P)),
+        result: schema_value(schemars::schema_for!(O)),
+        effects: m.effects.to_vec(),
+        undoable: m.effects.contains(&Effect::Edit) && !direct,
+        transaction_name: m.transaction_name.into(),
+    }
+}
+
+fn parse_params<P: DeserializeOwned>(name: &str, args: Value) -> Result<P> {
+    serde_json::from_value(args).map_err(|e| {
+        Error::new(
+            "args.invalid",
+            format!("invalid arguments for `{name}`: {e}"),
+        )
+    })
+}
+
+fn to_result<O: Serialize>(output: O) -> Result<Value> {
+    serde_json::to_value(output).map_err(|e| Error::new("internal", e.to_string()))
+}
+
+/// Turns a panic inside a command into an error; for editing commands the transaction is dropped,
+/// which rolls it back.
+fn guard(name: &str, f: impl FnOnce() -> Result<Value>) -> Result<Value> {
+    catch_unwind(AssertUnwindSafe(f)).unwrap_or_else(|panic| {
+        let msg = panic
+            .downcast_ref::<&str>()
+            .map(|s| s.to_string())
+            .or_else(|| panic.downcast_ref::<String>().cloned())
+            .unwrap_or_default();
+        Err(Error::new(
+            "command.panicked",
+            format!("`{name}` failed: {msg}"),
+        ))
+    })
 }
 
 fn schema_value(schema: schemars::Schema) -> Value {

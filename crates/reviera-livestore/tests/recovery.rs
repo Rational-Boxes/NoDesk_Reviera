@@ -119,19 +119,25 @@ fn crash_after_creating_a_wall_is_restored_and_undoable() {
     let mut r = reviera_livestore::restore(&found[0].key, None, &opts).unwrap();
     assert_eq!(r.report.source, RestoreSource::Materialised);
     assert_eq!(r.report.last.as_ref().map(|l| l.0.as_str()), Some("Wall 1"));
-    assert_eq!(names(&r.doc), ["Project", "Wall 1"]);
+    assert_eq!(
+        names(&r.doc),
+        ["Building", "Level 1", "Project", "Site", "Wall 1"]
+    );
     assert!(r.project.is_dirty(&r.doc), "a recovered project is unsaved");
 
     // Undo still works after recovery, and redo brings the wall back.
     r.doc.undo(1, &UndoScope::All, &Origin::ui()).unwrap();
-    assert_eq!(names(&r.doc), ["Project"]);
+    assert_eq!(names(&r.doc), ["Building", "Level 1", "Project", "Site"]);
     r.doc.redo(1, &UndoScope::All, &Origin::ui()).unwrap();
     r.project.save(&r.doc).unwrap();
     r.store.saved(&r.project, &r.doc).unwrap();
     r.store.close(&mut r.doc).unwrap();
 
     let (_, reopened, _) = LocalProject::open(&dir.path().join("project.ifc")).unwrap();
-    assert_eq!(names(&reopened), ["Project", "Wall 1"]);
+    assert_eq!(
+        names(&reopened),
+        ["Building", "Level 1", "Project", "Site", "Wall 1"]
+    );
     assert!(
         reviera_livestore::scan(&opts.dir).unwrap().is_empty(),
         "a clean close leaves nothing to recover"
@@ -154,7 +160,7 @@ fn untitled_project_with_twenty_edits_is_recovered_and_saved_as_a_copy() {
 
     let copy = dir.path().join("copy.ifc");
     let mut r = reviera_livestore::restore(&found[0].key, Some(&copy), &opts).unwrap();
-    assert_eq!(r.doc.store().len(), 21);
+    assert_eq!(r.doc.store().len(), 24);
     assert_eq!(
         r.report.transactions, 18,
         "17 single edits and one assimilated group"
@@ -162,13 +168,13 @@ fn untitled_project_with_twenty_edits_is_recovered_and_saved_as_a_copy() {
 
     // The group is one undo step.
     r.doc.undo(1, &UndoScope::All, &Origin::ui()).unwrap();
-    assert_eq!(r.doc.store().len(), 18);
+    assert_eq!(r.doc.store().len(), 21);
     r.doc.redo(1, &UndoScope::All, &Origin::ui()).unwrap();
 
     r.project.save(&r.doc).unwrap();
     r.store.close(&mut r.doc).unwrap();
     let (_, reopened, _) = LocalProject::open(&copy).unwrap();
-    assert_eq!(reopened.store().len(), 21);
+    assert_eq!(reopened.store().len(), 24);
     assert!(!dir.path().join("untitled.ifc").exists());
 }
 
@@ -200,8 +206,11 @@ fn damaged_store_falls_back_to_base_ifc_and_journal_replay() {
     assert_eq!(r.report.source, RestoreSource::BaseIfcReplay);
     assert!(!r.report.problems.is_empty());
     assert!(r.report.transactions <= 3);
-    let mut expected = vec!["Project".to_owned()];
+    let mut expected: Vec<String> = ["Building", "Level 1", "Project", "Site"]
+        .map(String::from)
+        .into();
     expected.extend((0..r.report.transactions).map(|i| format!("Proxy {i}")));
+    expected.sort();
     assert_eq!(names(&r.doc), expected);
     if let Some((label, _)) = &r.report.last {
         assert_eq!(label, &format!("Proxy {}", r.report.transactions - 1));
@@ -257,7 +266,7 @@ fn journal_never_holds_credentials_and_mirrors_history() {
     let elements: i64 = conn
         .query_row("SELECT count(*) FROM element", [], |r| r.get(0))
         .unwrap();
-    assert_eq!(elements, 3);
+    assert_eq!(elements, 6, "the four template elements plus A and C");
     drop(conn);
     store.close(&mut doc).unwrap();
 }

@@ -15,6 +15,7 @@ reviera-ifc.workspace = true
 reviera-store.workspace = true
 rusqlite.workspace = true
 serde.workspace = true
+schemars.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
 uuid.workspace = true

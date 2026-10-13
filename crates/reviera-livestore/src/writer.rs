@@ -5,7 +5,9 @@
 //! group-commit window into one SQLite transaction, and keeps the lock heartbeat fresh.
 
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc::{Receiver, RecvTimeoutError, SyncSender};
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use reviera_ifc::StepRow;
@@ -77,7 +79,24 @@ pub(crate) enum Msg {
     Close,
 }
 
+/// What the writer has made durable, for `live.status`.
+#[derive(Debug, Clone, Default)]
+pub(crate) struct Durable {
+    pub head: i64,
+    pub saved: i64,
+    pub last_commit_at: Option<String>,
+}
+
+impl Msg {
+    /// Whether the message carries model data (counted as pending until written).
+    pub fn is_data(&self) -> bool {
+        !matches!(self, Msg::Flush(_) | Msg::Close)
+    }
+}
+
 pub(crate) struct Writer {
+    pub durable: Arc<Mutex<Durable>>,
+    pub pending: Arc<AtomicUsize>,
     pub conn: Connection,
     pub rx: Receiver<Msg>,
     pub window: Duration,
@@ -116,6 +135,8 @@ impl Writer {
                 }
             }
 
+            let data = batch.iter().filter(|m| m.is_data()).count();
+            let mut saved_seq = None;
             let tx = self.conn.transaction()?;
             let mut flushes = Vec::new();
             let mut close = false;
@@ -125,7 +146,10 @@ impl Writer {
                     Msg::Flush(reply) => flushes.push(reply),
                     Msg::Close => close = true,
                     msg => {
-                        saved |= matches!(msg, Msg::Saved { .. });
+                        if let Msg::Saved { saved_seq: s, .. } = &msg {
+                            saved = true;
+                            saved_seq = Some(*s);
+                        }
                         apply(&tx, msg, &mut self.head)?;
                     }
                 }
@@ -134,6 +158,13 @@ impl Writer {
                 set_meta(&tx, "clean_shutdown", "1")?;
             }
             tx.commit()?;
+            self.pending.fetch_sub(data, Ordering::SeqCst);
+            if data > 0 {
+                let mut d = self.durable.lock().unwrap();
+                d.head = self.head;
+                d.saved = saved_seq.unwrap_or(d.saved);
+                d.last_commit_at = Some(crate::time::iso8601(std::time::SystemTime::now()));
+            }
             if saved || close {
                 self.conn
                     .execute_batch("PRAGMA wal_checkpoint(TRUNCATE);")?;
@@ -229,6 +260,9 @@ fn apply(tx: &Transaction<'_>, msg: Msg, head: &mut i64) -> rusqlite::Result<()>
                 set_meta(tx, k, v)?;
             }
             set_meta(tx, "saved_seq", &saved_seq.to_string())?;
+            let last: i64 =
+                tx.query_row("SELECT coalesce(max(seq), 0) FROM txn", [], |r| r.get(0))?;
+            set_meta(tx, "saved_txn_seq", &last.to_string())?;
         }
         Msg::Flush(_) | Msg::Close => {}
     }

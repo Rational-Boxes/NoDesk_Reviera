@@ -21,7 +21,9 @@ mod writer;
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc::{self, SyncSender};
+use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
 use std::time::Duration;
 
@@ -31,12 +33,14 @@ use reviera_core::{
 use reviera_ifc::StepRow;
 use reviera_store::LocalProject;
 use rusqlite::Connection;
+use schemars::JsonSchema;
+use serde::Serialize;
 use sha2::{Digest, Sha256};
 
 pub use lock::LockInfo;
 pub use schema::Synchronous;
 
-use writer::{ElementRow, Msg, StateDelta, TxnRow, Writer};
+use writer::{Durable, ElementRow, Msg, StateDelta, TxnRow, Writer};
 
 #[derive(Debug, thiserror::Error)]
 pub enum LiveError {
@@ -143,6 +147,32 @@ pub struct LiveStore {
     dir: PathBuf,
     tx: SyncSender<Msg>,
     writer: Option<JoinHandle<rusqlite::Result<()>>>,
+    durable: Arc<Mutex<Durable>>,
+    pending: Arc<AtomicUsize>,
+}
+
+/// `live.status` (§2).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
+pub struct LiveStatus {
+    pub path: PathBuf,
+    pub head_seq: i64,
+    pub saved_seq: i64,
+    /// Change sets queued but not yet written.
+    pub pending: usize,
+    pub last_commit_at: Option<String>,
+    /// Bytes on disk, including the WAL.
+    pub size: u64,
+}
+
+/// One journal entry.
+#[derive(Debug, Clone, PartialEq, Serialize, JsonSchema)]
+pub struct TxnSummary {
+    pub seq: i64,
+    pub at: String,
+    pub origin: Origin,
+    pub name: String,
+    /// On the redo stack.
+    pub undone: bool,
 }
 
 impl LiveStore {
@@ -240,7 +270,15 @@ impl LiveStore {
         tx.commit()?;
 
         let (sender, rx) = mpsc::sync_channel(64);
+        let durable = Arc::new(Mutex::new(Durable {
+            head,
+            saved,
+            last_commit_at: None,
+        }));
+        let pending = Arc::new(AtomicUsize::new(0));
         let writer = Writer {
+            durable: durable.clone(),
+            pending: pending.clone(),
             conn,
             rx,
             window: options.group_commit,
@@ -251,12 +289,19 @@ impl LiveStore {
         let handle = std::thread::Builder::new()
             .name(format!("live-{key}"))
             .spawn(move || writer.run())?;
-        doc.set_observer(observer(sender.clone(), seq, doc.next_id().0 as i64));
+        doc.set_observer(observer(
+            sender.clone(),
+            pending.clone(),
+            seq,
+            doc.next_id().0 as i64,
+        ));
         Ok(Self {
             key,
             dir,
             tx: sender,
             writer: Some(handle),
+            durable,
+            pending,
         })
     }
 
@@ -266,6 +311,34 @@ impl LiveStore {
 
     pub fn path(&self) -> PathBuf {
         db_path(&self.dir, &self.key)
+    }
+
+    pub fn status(&self) -> LiveStatus {
+        let d = self.durable.lock().unwrap().clone();
+        let path = self.path();
+        let size = companions(&self.dir, &self.key)[..2]
+            .iter()
+            .filter_map(|f| fs::metadata(f).ok())
+            .map(|m| m.len())
+            .sum();
+        LiveStatus {
+            path,
+            head_seq: d.head,
+            saved_seq: d.saved,
+            pending: self.pending.load(Ordering::SeqCst),
+            last_commit_at: d.last_commit_at,
+            size,
+        }
+    }
+
+    /// Journal entries, oldest first; `origin` matches a source (`ui`, `mcp`, …) or a full label
+    /// (`mcp:agent`) (DM-LIVE-006).
+    pub fn history(&self, since_seq: Option<i64>, origin: Option<&str>) -> Result<Vec<TxnSummary>> {
+        let rows = journal(&self.path(), since_seq.unwrap_or(0))?;
+        Ok(rows
+            .into_iter()
+            .filter(|t| origin.is_none_or(|o| origin_matches(&t.origin, o)))
+            .collect())
     }
 
     /// Forces the pending group commit and returns the head sequence once it is durable (DM-LIVE-003).
@@ -301,6 +374,7 @@ impl LiveStore {
             header: project.ifc().header_text()?,
             rows: project.ifc().step_rows()?,
         };
+        self.pending.fetch_add(1, Ordering::SeqCst);
         self.tx.send(msg).map_err(|_| LiveError::WriterStopped)?;
         self.flush().map(|_| ())
     }
@@ -367,6 +441,7 @@ fn txn_row(seq: i64, item: &UndoItem) -> TxnRow {
 /// thread; a full channel blocks the commit briefly (back-pressure, §4).
 fn observer(
     tx: SyncSender<Msg>,
+    pending: Arc<AtomicUsize>,
     mut seq: i64,
     mut next_id: i64,
 ) -> impl FnMut(&DocEvent) + Send + 'static {
@@ -424,12 +499,64 @@ fn observer(
             },
         };
         // If the writer has died the store simply stops updating; the project itself is unaffected.
-        let _ = tx.send(msg);
+        pending.fetch_add(1, Ordering::SeqCst);
+        if tx.send(msg).is_err() {
+            pending.fetch_sub(1, Ordering::SeqCst);
+        }
     }
 }
 
+fn journal(db: &Path, since_seq: i64) -> Result<Vec<TxnSummary>> {
+    let conn = Connection::open(db)?;
+    let mut stmt =
+        conn.prepare("SELECT seq, at, origin, name, undone FROM txn WHERE seq > ?1 ORDER BY seq")?;
+    let rows = stmt.query_map([since_seq], |r| {
+        Ok((
+            r.get::<_, i64>(0)?,
+            r.get::<_, String>(1)?,
+            r.get::<_, String>(2)?,
+            r.get::<_, String>(3)?,
+            r.get::<_, i64>(4)?,
+        ))
+    })?;
+    rows.map(|row| {
+        let (seq, at, origin, name, undone) = row?;
+        let origin =
+            serde_json::from_str(&origin).map_err(|e| LiveError::Journal(e.to_string()))?;
+        Ok(TxnSummary {
+            seq,
+            at,
+            origin,
+            name,
+            undone: undone != 0,
+        })
+    })
+    .collect()
+}
+
+fn origin_matches(origin: &Origin, filter: &str) -> bool {
+    let label = origin.label();
+    label == filter
+        || serde_json::to_value(origin.source)
+            .ok()
+            .and_then(|v| v.as_str().map(|s| s == filter))
+            .unwrap_or(false)
+}
+
+/// The transactions in store `key` made since the project was last saved (`recovery.show_changes`).
+pub fn show_changes(key: &str, dir: &Path) -> Result<Vec<TxnSummary>> {
+    let db = db_path(dir, key);
+    let since = {
+        let conn = Connection::open(&db)?;
+        schema::get_meta(&conn, "saved_txn_seq")?
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(0)
+    };
+    journal(&db, since)
+}
+
 /// A store left behind by a session that did not close cleanly (§6.1, the recovery dialog's rows).
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
 pub struct Recoverable {
     pub key: String,
     pub project_path: Option<PathBuf>,
@@ -531,7 +658,8 @@ pub fn scan(dir: &Path) -> Result<Vec<Recoverable>> {
     Ok(out)
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
 pub enum RestoreSource {
     /// Loaded from the materialised tables; no replay needed.
     Materialised,
@@ -539,7 +667,7 @@ pub enum RestoreSource {
     BaseIfcReplay,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
 pub struct RestoreReport {
     pub source: RestoreSource,
     /// Journal entries recovered: undo and redo items, or replayed transactions.

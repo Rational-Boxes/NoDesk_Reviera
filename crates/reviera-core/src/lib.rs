@@ -20,7 +20,8 @@ pub mod txn;
 
 pub use change::{ChangeRecord, ChangeSet, ChangedSummary};
 pub use command::{
-    Command, CommandContext, CommandMeta, CommandRegistry, CommandSpec, Effect, Outcome,
+    Command, CommandContext, CommandMeta, CommandRegistry, CommandSpec, Effect, HostCommand,
+    Outcome,
 };
 pub use document::{DocEvent, Document, GroupEnd, ModelVersion, Snapshot, UndoItem, UndoScope};
 pub use element::{Element, NewElement};

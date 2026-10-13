@@ -1,0 +1,26 @@
+[package]
+name = "reviera-app"
+description = "Application session: open documents, file commands, live store and recovery"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+reviera-core.workspace = true
+reviera-ifc.workspace = true
+reviera-store.workspace = true
+reviera-livestore.workspace = true
+schemars.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true

@@ -36,19 +36,19 @@ fn ten_thousand_elements_keep_guids_and_ids_across_two_saves() {
     let report = project.save(&doc).unwrap();
     assert_eq!(
         (report.created, report.element_data_written),
-        (10_000, 10_001)
+        (10_000, 10_004)
     );
     let before = identities(&doc);
 
     let (mut project, doc2, open) = LocalProject::open(&path).unwrap();
     assert_eq!(
         (open.ids_from_rxd, open.ids_assigned),
-        (10_001, 0),
+        (10_004, 0),
         "{:?}",
         open.problems
     );
     assert_eq!(identities(&doc2), before);
-    assert_eq!(doc2.next_id(), ElementId(11_000));
+    assert_eq!(doc2.next_id(), ElementId(11_003));
     project.save(&doc2).unwrap();
 
     let (_, doc3, _) = LocalProject::open(&path).unwrap();
@@ -176,6 +176,34 @@ fn resaving_an_unchanged_project_writes_identical_payloads() {
     let (second, doc2, _) = LocalProject::open(&path).unwrap();
     assert_eq!(payloads(&second, &doc2), before);
     assert_eq!(second.data_revision(), 2);
+}
+
+#[test]
+fn new_projects_start_with_site_building_and_level_1() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("new.ifc");
+    let (mut project, doc) = LocalProject::new(Schema::Ifc4, &path).unwrap();
+    let mut names: Vec<_> = doc
+        .store()
+        .iter()
+        .map(|e| (e.class.clone(), e.name.clone().unwrap()))
+        .collect();
+    names.sort();
+    assert_eq!(
+        names,
+        [
+            ("IfcBuilding", "Building"),
+            ("IfcBuildingStorey", "Level 1"),
+            ("IfcProject", "Project"),
+            ("IfcSite", "Site")
+        ]
+        .map(|(c, n)| (c.to_owned(), n.to_owned()))
+    );
+    project.save(&doc).unwrap();
+    let saved = IfcModel::open(&path).unwrap();
+    assert_eq!(saved.schema(), "IFC4");
+    assert_eq!(saved.entities_of_type("IfcRelAggregates").unwrap().len(), 3);
+    assert_eq!(saved.entities_of_type("IfcSIUnit").unwrap().len(), 4);
 }
 
 #[test]

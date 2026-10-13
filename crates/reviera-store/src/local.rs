@@ -82,48 +82,23 @@ impl std::fmt::Debug for LocalProject {
 }
 
 impl LocalProject {
-    /// A new project with only an `IfcProject`, to be saved at `path`.
+    /// A new project from the built-in template, to be saved at `path`: SI units, a 3D model
+    /// context, and Site › Building › "Level 1" (DM-FILE-006).
     pub fn new(schema: Schema, path: &Path) -> Result<(Self, Document)> {
         if schema == Schema::Ifc2x3 {
             return Err(unsupported(
                 "new projects are IFC4 or IFC4X3_ADD2; IFC2X3 is read-only",
             ));
         }
-        let mut ifc = IfcModel::new(schema)?;
-        let guid = GlobalId::new();
-        let step = ifc.create_rooted("IfcProject", &guid)?;
-        ifc.set_attribute(step, "Name", &AttrValue::String("Project".into()))?;
-        let doc = Document::from_loaded(
-            [(
-                ElementId::PROJECT,
-                NewElement::new("IfcProject").name("Project").guid(guid),
-            )],
-            ElementId::FIRST.0,
-        )?;
-        let project = Self {
-            ifc,
-            path: path.to_owned(),
-            steps: HashMap::from([(ElementId::PROJECT, step)]),
-            types: HashSet::new(),
-            element_psets: HashMap::new(),
-            element_data: HashMap::new(),
-            doc_psets: BTreeMap::new(),
-            manifest: None,
-            project: Some(step),
-            owner_history: None,
-            identity: IdentityDoc::default(),
-            data_id: None,
-            data_revision: 0,
-            pending_identity: HashSet::from([ElementId::PROJECT]),
-            forced_changed: BTreeSet::new(),
-            forced_deleted: BTreeSet::new(),
-            synced: doc.version(),
-        };
+        let (project, doc, _) = Self::from_model(template(schema)?, path)?;
         Ok((project, doc))
     }
 
     pub fn open(path: &Path) -> Result<(Self, Document, OpenReport)> {
-        let ifc = IfcModel::open(path)?;
+        Self::from_model(IfcModel::open(path)?, path)
+    }
+
+    fn from_model(ifc: IfcModel, path: &Path) -> Result<(Self, Document, OpenReport)> {
         let mut report = OpenReport::default();
         let limits = DecodeLimits::default();
 
@@ -640,6 +615,82 @@ impl LocalProject {
         }
         Ok(())
     }
+}
+
+/// The built-in project template.
+fn template(schema: Schema) -> Result<IfcModel> {
+    let mut m = IfcModel::new(schema)?;
+    let s = |v: &str| AttrValue::String(v.into());
+    let e = |v: &str| AttrValue::Enum(v.into());
+    let r = |id: StepId| AttrValue::Ref(id.0);
+    let reals = |v: &[f64]| AttrValue::List(v.iter().copied().map(AttrValue::Real).collect());
+    let create = |m: &mut IfcModel, class: &str, attrs: &[(&str, AttrValue)]| -> Result<StepId> {
+        let id = m.create(class)?;
+        for (name, value) in attrs {
+            m.set_attribute(id, name, value)?;
+        }
+        Ok(id)
+    };
+    let mut units = Vec::new();
+    for (unit_type, name) in [
+        ("LENGTHUNIT", "METRE"),
+        ("AREAUNIT", "SQUARE_METRE"),
+        ("VOLUMEUNIT", "CUBIC_METRE"),
+        ("PLANEANGLEUNIT", "RADIAN"),
+    ] {
+        units.push(r(create(
+            &mut m,
+            "IfcSIUnit",
+            &[("UnitType", e(unit_type)), ("Name", e(name))],
+        )?));
+    }
+    let units = create(
+        &mut m,
+        "IfcUnitAssignment",
+        &[("Units", AttrValue::List(units))],
+    )?;
+    let origin = create(
+        &mut m,
+        "IfcCartesianPoint",
+        &[("Coordinates", reals(&[0.0, 0.0, 0.0]))],
+    )?;
+    let axes = create(&mut m, "IfcAxis2Placement3D", &[("Location", r(origin))])?;
+    let context = create(
+        &mut m,
+        "IfcGeometricRepresentationContext",
+        &[
+            ("ContextType", s("Model")),
+            ("CoordinateSpaceDimension", AttrValue::Int(3)),
+            ("Precision", AttrValue::Real(1e-5)),
+            ("WorldCoordinateSystem", r(axes)),
+        ],
+    )?;
+    let project = m.create_rooted("IfcProject", &GlobalId::new())?;
+    m.set_attribute(project, "Name", &s("Project"))?;
+    m.set_attribute(
+        project,
+        "RepresentationContexts",
+        &AttrValue::List(vec![r(context)]),
+    )?;
+    m.set_attribute(project, "UnitsInContext", &r(units))?;
+    let mut parent = project;
+    for (class, name) in [
+        ("IfcSite", "Site"),
+        ("IfcBuilding", "Building"),
+        ("IfcBuildingStorey", "Level 1"),
+    ] {
+        let child = m.create_rooted(class, &GlobalId::new())?;
+        m.set_attribute(child, "Name", &s(name))?;
+        m.set_attribute(child, "CompositionType", &e("ELEMENT"))?;
+        if class == "IfcBuildingStorey" {
+            m.set_attribute(child, "Elevation", &AttrValue::Real(0.0))?;
+        }
+        let rel = m.create_rooted("IfcRelAggregates", &GlobalId::new())?;
+        m.set_attribute(rel, "RelatingObject", &r(parent))?;
+        m.set_attribute(rel, "RelatedObjects", &AttrValue::List(vec![r(child)]))?;
+        parent = child;
+    }
+    Ok(m)
 }
 
 fn millis(t: SystemTime) -> u64 {

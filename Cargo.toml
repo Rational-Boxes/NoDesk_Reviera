@@ -4,6 +4,7 @@ resolver = "3"
 members = [
     "apps/reviera",
     "crates/reviera-core",
+    "crates/reviera-app",
     "crates/reviera-ifc",
     "crates/reviera-geom",
     "crates/reviera-rxd",
@@ -34,6 +35,7 @@ publish = false
 [workspace.dependencies]
 # Internal crates
 reviera-core = { path = "crates/reviera-core" }
+reviera-app = { path = "crates/reviera-app" }
 reviera-ifc = { path = "crates/reviera-ifc" }
 reviera-geom = { path = "crates/reviera-geom" }
 reviera-rxd = { path = "crates/reviera-rxd" }
