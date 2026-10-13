@@ -1,0 +1,372 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Reviera contributors
+
+//! Roofs by footprint: creation, slopes, gables and overhangs, edits, walls the footprint is
+//! locked to, and the saved IfcRoof (spec Ch 3 §3.6.4, ARC-ROOF-001).
+
+use std::path::{Path, PathBuf};
+
+use reviera_core::roofs;
+use reviera_core::{Caller, CommandRegistry, Document, ElementId};
+use reviera_ifc::{IfcModel, Schema};
+use reviera_store::LocalProject;
+use serde_json::{Value, json};
+
+fn registry() -> CommandRegistry {
+    let mut r = CommandRegistry::with_core();
+    reviera_store::commands::register(&mut r);
+    r
+}
+
+fn run(
+    r: &CommandRegistry,
+    doc: &mut Document,
+    name: &str,
+    args: Value,
+) -> reviera_core::Result<Value> {
+    r.execute(doc, name, args, &Caller::user())
+        .map(|o| o.result)
+}
+
+fn id(v: Value) -> ElementId {
+    ElementId(v.as_u64().expect("an element id"))
+}
+
+fn project(dir: &Path) -> (LocalProject, Document, PathBuf, ElementId) {
+    let path = dir.join("roofs.ifc");
+    let (project, doc) = LocalProject::new(Schema::Ifc4, &path).unwrap();
+    let level = doc
+        .store()
+        .iter()
+        .find(|e| e.class == "IfcBuildingStorey")
+        .unwrap()
+        .id();
+    (project, doc, path, level)
+}
+
+fn curves(pts: &[[f64; 2]], extra: impl Fn(usize) -> Value) -> Value {
+    Value::Array(
+        (0..pts.len())
+            .map(|i| {
+                let mut c = json!({ "line": { "start": pts[i], "end": pts[(i + 1) % pts.len()] } });
+                if let (Value::Object(c), Value::Object(x)) = (&mut c, extra(i)) {
+                    c.extend(x);
+                }
+                c
+            })
+            .collect(),
+    )
+}
+
+fn geometry(doc: &Document, id: ElementId) -> roofs::RoofGeometry {
+    roofs::regenerate(doc.store(), doc.store().get(id).unwrap()).unwrap()
+}
+
+fn volume(verts: &[f64], faces: &[u32]) -> f64 {
+    let p = |k: u32| {
+        [
+            verts[3 * k as usize],
+            verts[3 * k as usize + 1],
+            verts[3 * k as usize + 2],
+        ]
+    };
+    faces
+        .chunks(3)
+        .map(|t| {
+            let [a, b, c] = [p(t[0]), p(t[1]), p(t[2])];
+            (a[0] * (b[1] * c[2] - b[2] * c[1]) - a[1] * (b[0] * c[2] - b[2] * c[0])
+                + a[2] * (b[0] * c[1] - b[1] * c[0]))
+                / 6.0
+        })
+        .sum()
+}
+
+const RECT: [[f64; 2]; 4] = [[0.0, 0.0], [10.0, 0.0], [10.0, 6.0], [0.0, 6.0]];
+
+#[test]
+fn a_gable_roof_is_saved_as_an_ifc_roof_with_a_brep_body() {
+    let dir = tempfile::tempdir().unwrap();
+    let (mut project, mut doc, path, level) = project(dir.path());
+    let r = registry();
+    let roof = id(run(
+        &r,
+        &mut doc,
+        "roof.create_footprint",
+        json!({
+            "curves": curves(&RECT, |i| if i % 2 == 0 {
+                json!({ "overhang": "500 mm" })
+            } else {
+                json!({ "defines_slope": false, "overhang": 0.3 })
+            }),
+            "level_id": level.0,
+            "base_offset": "3000 mm",
+            "slope": "45°",
+        }),
+    )
+    .unwrap());
+    let e = doc.store().get(roof).unwrap();
+    assert_eq!(e.class, "IfcRoof");
+    assert_eq!(e.param("@PredefinedType").unwrap(), "GABLE_ROOF");
+    let g = geometry(&doc, roof);
+    assert!((g.plate - 3.0).abs() < 1e-9);
+    assert_eq!(g.faces.len(), 2);
+    // The ridge: half the 6 m span at 45° above the plate.
+    assert!((g.underside([5.0, 3.0]).unwrap() - 6.0).abs() < 1e-6);
+    assert!((g.projected_area() - 10.6 * 7.0).abs() < 1e-6);
+
+    project.save(&doc).unwrap();
+    let ifc = IfcModel::open(&path).unwrap();
+    let roofs_in_file = ifc.entities_of_type("IfcRoof").unwrap();
+    assert_eq!(roofs_in_file.len(), 1);
+    assert_eq!(ifc.entities_of_type("IfcFacetedBrep").unwrap().len(), 2);
+    assert_eq!(ifc.entities_of_type("IfcRoofType").unwrap().len(), 1);
+    assert_eq!(
+        ifc.referenced_by(roofs_in_file[0].id, "IfcRelContainedInSpatialStructure")
+            .unwrap()
+            .len(),
+        1
+    );
+    // The geometry engine reads two closed slabs of 300 mm on the sloped faces.
+    let meshes = ifc.tessellate(1).unwrap();
+    let m = meshes.iter().find(|m| m.class == "IfcRoof").unwrap();
+    let v = volume(&m.verts, &m.faces).abs();
+    let want = g.area() * 0.3;
+    assert!((v - want).abs() / want < 0.05, "{v} vs {want}");
+    let top = m.verts.chunks(3).map(|c| c[2]).fold(f64::MIN, f64::max);
+    assert!(top > 6.0 && top < 6.0 + 0.3 * 2f64.sqrt() + 1e-6, "{top}");
+
+    // Saving again writes nothing new; reopened, the roof is the same.
+    let count = ifc.entity_count();
+    project.save(&doc).unwrap();
+    assert_eq!(IfcModel::open(&path).unwrap().entity_count(), count);
+    let (mut project, mut reopened, _) = LocalProject::open(&path).unwrap();
+    assert_eq!(geometry(&reopened, roof), g);
+
+    // Deleting the roof removes its body.
+    run(
+        &r,
+        &mut reopened,
+        "element.delete",
+        json!({ "element_ids": [roof.0] }),
+    )
+    .unwrap();
+    project.save(&reopened).unwrap();
+    let ifc = IfcModel::open(&path).unwrap();
+    assert!(ifc.entities_of_type("IfcRoof").unwrap().is_empty());
+    assert!(ifc.entities_of_type("IfcFacetedBrep").unwrap().is_empty());
+}
+
+#[test]
+fn edits_change_slopes_gables_cutoff_and_level() {
+    let dir = tempfile::tempdir().unwrap();
+    let (_, mut doc, _, level) = project(dir.path());
+    let r = registry();
+    let roof = id(run(
+        &r,
+        &mut doc,
+        "roof.create_footprint",
+        json!({ "curves": curves(&RECT, |_| json!({})), "level_id": level.0, "slope": "45°" }),
+    )
+    .unwrap());
+    assert_eq!(geometry(&doc, roof).predefined, "HIP_ROOF");
+    // Ends become gables: a gable roof.
+    run(
+        &r,
+        &mut doc,
+        "roof.set_edge",
+        json!({ "roof_id": roof.0, "keys": [2, 4], "defines_slope": false }),
+    )
+    .unwrap();
+    let g = geometry(&doc, roof);
+    assert_eq!(g.predefined, "GABLE_ROOF");
+    assert_eq!(
+        doc.store()
+            .get(roof)
+            .unwrap()
+            .param("@PredefinedType")
+            .unwrap(),
+        "GABLE_ROOF"
+    );
+    // A steeper south slope moves the ridge north.
+    run(
+        &r,
+        &mut doc,
+        "roof.set_edge",
+        json!({ "roof_id": roof.0, "keys": [1], "slope": "60°" }),
+    )
+    .unwrap();
+    let g = geometry(&doc, roof);
+    let t60 = 60f64.to_radians().tan();
+    // The faces meet where y tan 60° = (6 − y) tan 45°.
+    let ridge_y = 6.0 / (t60 + 1.0);
+    assert!((g.underside([5.0, ridge_y]).unwrap() - ridge_y * t60).abs() < 1e-6);
+    // The roof's slope resets every curve's own.
+    run(
+        &r,
+        &mut doc,
+        "roof.set_params",
+        json!({ "roof_ids": [roof.0], "slope": "30°" }),
+    )
+    .unwrap();
+    let t30 = 30f64.to_radians().tan();
+    assert!((geometry(&doc, roof).underside([5.0, 3.0]).unwrap() - 3.0 * t30).abs() < 1e-6);
+    // A second level as cutoff: a flat top at 1 m.
+    let upper = id(run(&r, &mut doc, "level.create", json!({ "elevation": 1.0 })).unwrap());
+    run(
+        &r,
+        &mut doc,
+        "roof.set_params",
+        json!({ "roof_ids": [roof.0], "cutoff_level_id": upper.0 }),
+    )
+    .unwrap();
+    let g = geometry(&doc, roof);
+    assert!((g.underside([5.0, 3.0]).unwrap() - 1.0).abs() < 1e-9);
+    // Bad values are refused and change nothing.
+    let steep = json!({ "roof_ids": [roof.0], "slope": "90°" });
+    assert!(run(&r, &mut doc, "roof.set_params", steep).is_err());
+    run(
+        &r,
+        &mut doc,
+        "roof.set_params",
+        json!({ "roof_ids": [roof.0], "cutoff_level_id": null, "base_offset": 2.5 }),
+    )
+    .unwrap();
+    let g = geometry(&doc, roof);
+    assert!((g.plate - 2.5).abs() < 1e-12);
+    assert!(g.faces.iter().all(|f| f.key.is_some()));
+    // Undo steps back through the edits.
+    run(&r, &mut doc, "edit.undo", json!({})).unwrap();
+    assert!((geometry(&doc, roof).underside([5.0, 3.0]).unwrap() - 1.0).abs() < 1e-9);
+    // Deleting the cutoff level deletes the roof that depends on it.
+    let deleted = run(
+        &r,
+        &mut doc,
+        "element.delete",
+        json!({ "element_ids": [upper.0] }),
+    )
+    .unwrap();
+    assert!(deleted.as_array().unwrap().iter().any(|v| v == roof.0));
+}
+
+#[test]
+fn a_footprint_locked_to_walls_follows_them_and_moves() {
+    let dir = tempfile::tempdir().unwrap();
+    let (_, mut doc, _, level) = project(dir.path());
+    let r = registry();
+    // Four walls on their centrelines, drawn clockwise so their exterior faces are outside;
+    // the footprint follows those faces.
+    let mut walls = Vec::new();
+    for i in 0..4 {
+        walls.push(id(run(
+            &r,
+            &mut doc,
+            "wall.create",
+            json!({
+                "curve": { "line": { "start": RECT[(i + 1) % 4], "end": RECT[i] } },
+                "base_level": level.0,
+                "top_constraint": { "unconnected": 3 },
+            }),
+        )
+        .unwrap()));
+    }
+    let faces: Vec<Value> = (0..4)
+        .map(|i| {
+            let (a, b) = (RECT[i], RECT[(i + 1) % 4]);
+            let d = [b[0] - a[0], b[1] - a[1]];
+            let l = d[0].hypot(d[1]);
+            let out = [d[1] / l * 0.1, -d[0] / l * 0.1];
+            json!({
+                "line": { "start": [a[0] + out[0], a[1] + out[1]], "end": [b[0] + out[0], b[1] + out[1]] },
+                "lock": { "element": walls[i].0, "sub": "face:ext" },
+                "overhang": 0.4,
+            })
+        })
+        .collect();
+    let roof = id(run(
+        &r,
+        &mut doc,
+        "roof.create_footprint",
+        json!({ "curves": faces, "level_id": level.0, "base_offset": 3.0 }),
+    )
+    .unwrap());
+    let before = geometry(&doc, roof);
+    assert!(
+        (before.projected_area() - 11.0 * 7.0).abs() < 1e-6,
+        "{}",
+        before.projected_area()
+    );
+    // Moving the south wall south by 1 m: the roof's footprint follows.
+    run(
+        &r,
+        &mut doc,
+        "element.move",
+        json!({ "element_ids": [walls[0].0], "vector": [0.0, -1.0, 0.0] }),
+    )
+    .unwrap();
+    let after = geometry(&doc, roof);
+    assert!(
+        (after.projected_area() - 11.0 * 8.0).abs() < 1e-6,
+        "{}",
+        after.projected_area()
+    );
+    // Moving the roof itself moves its footprint (and unlocks it).
+    run(
+        &r,
+        &mut doc,
+        "element.move",
+        json!({ "element_ids": [roof.0], "vector": [20.0, 0.0, 0.0] }),
+    )
+    .unwrap();
+    let moved = geometry(&doc, roof);
+    assert!(moved.footprint.iter().all(|p| p[0] > 19.0));
+}
+
+#[test]
+fn bad_footprints_are_refused() {
+    let dir = tempfile::tempdir().unwrap();
+    let (_, mut doc, _, level) = project(dir.path());
+    let r = registry();
+    // Every edge a gable: nothing slopes, so the roof is flat (allowed).
+    let flat = run(
+        &r,
+        &mut doc,
+        "roof.create_footprint",
+        json!({ "curves": curves(&RECT, |_| json!({ "defines_slope": false })), "level_id": level.0 }),
+    )
+    .unwrap();
+    assert_eq!(
+        doc.store()
+            .get(id(flat))
+            .unwrap()
+            .param("@PredefinedType")
+            .unwrap(),
+        "FLAT_ROOF"
+    );
+    // An open footprint fails sketch validation.
+    let open = json!({
+        "curves": [
+            { "line": { "start": [0, 0], "end": [5, 0] } },
+            { "line": { "start": [5, 0], "end": [5, 5] } },
+        ],
+        "level_id": level.0,
+    });
+    assert!(run(&r, &mut doc, "roof.create_footprint", open).is_err());
+    // Two loops are not one footprint.
+    let mut two = curves(&RECT, |_| json!({}));
+    let far: Vec<[f64; 2]> = RECT.iter().map(|p| [p[0] + 20.0, p[1]]).collect();
+    two.as_array_mut().unwrap().extend(
+        curves(&far, |_| json!({}))
+            .as_array()
+            .unwrap()
+            .iter()
+            .cloned(),
+    );
+    let e = run(
+        &r,
+        &mut doc,
+        "roof.create_footprint",
+        json!({ "curves": two, "level_id": level.0 }),
+    )
+    .unwrap_err();
+    assert_eq!(e.code, "roof.one_loop");
+}

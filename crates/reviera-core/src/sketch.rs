@@ -445,24 +445,7 @@ fn current(store: &Store, c: &SketchCurve) -> ([f64; 2], [f64; 2]) {
 /// The profiles of a sketch now: each loop's corners where neighbouring curves' current lines
 /// meet, grouped into outer boundaries and their holes.
 pub fn profiles(store: &Store, sketch: &Sketch) -> Vec<Profile> {
-    let by_key = |k: u32| sketch.curves.iter().find(|c| c.key == k);
-    let rings: Vec<Vec<[f64; 2]>> = sketch
-        .loops
-        .iter()
-        .map(|lp| {
-            let curves: Vec<&SketchCurve> = lp.iter().filter_map(|k| by_key(*k)).collect();
-            let lines: Vec<([f64; 2], [f64; 2])> =
-                curves.iter().map(|c| current(store, c)).collect();
-            (0..curves.len())
-                .map(|i| {
-                    let prev = (i + curves.len() - 1) % curves.len();
-                    let (p, d) = lines[prev];
-                    let (q, e) = lines[i];
-                    meet(p, d, q, e).unwrap_or(curves[i].line.start)
-                })
-                .collect()
-        })
-        .collect();
+    let rings: Vec<Vec<[f64; 2]>> = rings(store, sketch).into_iter().map(|(r, _)| r).collect();
     let mut out: Vec<Profile> = Vec::new();
     let depth = |i: usize| {
         rings
@@ -487,6 +470,30 @@ pub fn profiles(store: &Store, sketch: &Sketch) -> Vec<Profile> {
         });
     }
     out
+}
+
+/// Each loop of a sketch now: its corners (where neighbouring curves' current lines meet), and
+/// the key of the curve from each corner to the next.
+pub fn rings(store: &Store, sketch: &Sketch) -> Vec<(Vec<[f64; 2]>, Vec<u32>)> {
+    let by_key = |k: u32| sketch.curves.iter().find(|c| c.key == k);
+    sketch
+        .loops
+        .iter()
+        .map(|lp| {
+            let curves: Vec<&SketchCurve> = lp.iter().filter_map(|k| by_key(*k)).collect();
+            let lines: Vec<([f64; 2], [f64; 2])> =
+                curves.iter().map(|c| current(store, c)).collect();
+            let corners = (0..curves.len())
+                .map(|i| {
+                    let prev = (i + curves.len() - 1) % curves.len();
+                    let (p, d) = lines[prev];
+                    let (q, e) = lines[i];
+                    meet(p, d, q, e).unwrap_or(curves[i].line.start)
+                })
+                .collect();
+            (corners, curves.iter().map(|c| c.key).collect())
+        })
+        .collect()
 }
 
 /// The sketch of an element, if it has one.

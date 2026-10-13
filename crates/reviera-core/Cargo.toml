@@ -17,6 +17,7 @@ uuid.workspace = true
 schemars.workspace = true
 jsonschema.workspace = true
 imbl.workspace = true
+earcut.workspace = true
 
 [dev-dependencies]
 schemars.workspace = true

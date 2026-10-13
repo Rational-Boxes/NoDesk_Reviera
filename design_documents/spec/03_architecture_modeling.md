@@ -1911,6 +1911,15 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 - `roof.edit_footprint(roof_id, ...)` (same parameters)
 - `roof.align_eaves(roof_id, edge_keys, mode: AdjustHeight|AdjustOverhang)`
 - `roof.set_slope(roof_id, slope, edge_keys?)`
+- `roof.set_params(roof_ids[], level_id?, base_offset?, slope?, cutoff_level_id?|null, cutoff_offset?)` (the instance parameters in one undo step)
+- `roof.set_edge(roof_id, keys[], defines_slope?, slope?|null, overhang?)` (footprint curve properties after the sketch is finished)
+
+**Implementation notes (2026-10-13).**
+- As built, `roof.create_footprint` takes `curves: [{line, lock?, defines_slope?, slope?, overhang?}]` (keyed 1, 2, … in order) and `level_id`, like the other sketch-based commands. Plate offsets, rafter cuts other than plumb, slope arrows, holes, Align Eaves and `attach_walls` come later.
+- The body is the `IfcRoof`'s own `Brep` representation, one `IfcFacetedBrep` per face slab (IFC allows a roof either to have its own body or to be decomposed). Aggregated `IfcSlab` parts come later with layered roof types.
+- Per-edge eave heights are handled by extending each face from the plate down its own plane along the corner trajectories to its eave line, so steeper edges reach lower eaves.
+- Each face slab is mitred against its neighbours by the plane through the shared edge halfway between the two face normals, and cut plumb at eaves and rakes.
+- A new roof whose footprint was picked from walls sets its base offset to the walls' tops (Reviera's default; the user can change it).
 
 **Acceptance criteria.**
 - [ ] A 10 m × 6 m rectangle with all four edges at 30° gives a hip roof whose ridge is 4 m long, at a height of 3·tan 30° = 1.732 m above the plate.

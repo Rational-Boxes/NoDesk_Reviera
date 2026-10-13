@@ -59,6 +59,11 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(ViewSetCamera),
         registry.add(ViewSetSectionBox),
         registry.add(ViewSetSlicePlanes),
+        registry.add(RoofCreate),
+        registry.add(RoofEditFootprint),
+        registry.add(RoofSetParams),
+        registry.add(RoofSetEdge),
+        registry.add(RoofSetSlope),
         registry.add(ViewCreatePlan),
         registry.add(ViewSetViewRange),
         registry.add(ViewGetViewRange),
@@ -372,6 +377,9 @@ pub fn dependents_of(store: &crate::store::Store, id: ElementId) -> Vec<ElementI
                 || e.param("@type").and_then(serde_json::Value::as_str) == Some(guid.as_str())
                 || crate::inserts::insert_recipe(e).is_some_and(|r| r.host == guid)
                 || crate::floors::slab_recipe(e).is_some_and(|(_, r)| r.level == guid)
+                || crate::roofs::roof_recipe(e).is_some_and(|r| {
+                    r.level == guid || r.cutoff.as_ref().is_some_and(|c| c.level == guid)
+                })
                 || crate::inserts::opening_of(e).is_some_and(|i| i == guid)
                 || crate::grids::grid_data(e).is_some_and(|g| {
                     g.system == guid || g.type_guid.as_deref() == Some(guid.as_str())
@@ -2024,6 +2032,67 @@ modify_command!(
     floors::EditBoundaryParams,
     (),
     floors::edit_boundary
+);
+
+use crate::roofs;
+
+modify_command!(
+    RoofCreate,
+    "roof.create_footprint",
+    "Create a roof by footprint",
+    "Creates a roof from a closed footprint of curves (each `{line, lock?, defines_slope?, slope?, \
+     overhang?}`; curves are keyed 1, 2, ... in order). Slope-defining curves rise inward at their slope \
+     (default the roof's `slope`, 30°); the others are gables. The plate is `base_offset` above the level; \
+     overhangs reach past the curves and down their slope. An optional cutoff level ends the roof flat. \
+     Footprints that cannot be roofed are refused with roof.cannot_generate.",
+    "Roof",
+    roofs::CreateParams,
+    ElementId,
+    roofs::create
+);
+modify_command!(
+    RoofEditFootprint,
+    "roof.edit_footprint",
+    "Edit a roof's footprint",
+    "Replaces a roof's footprint curves and their slope and overhang data (as roof.create_footprint's curves).",
+    "Edit Footprint",
+    roofs::EditFootprintParams,
+    (),
+    roofs::edit_footprint
+);
+modify_command!(
+    RoofSetParams,
+    "roof.set_params",
+    "Set roofs' level, offset, slope and cutoff",
+    "Sets roofs' base level, base offset (plate height above the level), slope (every slope-defining \
+     curve; curves' own slopes are cleared) and cutoff level and offset (`cutoff_level_id: null` removes \
+     the cutoff). Lengths and angles accept units.",
+    "Roof Properties",
+    roofs::SetParams,
+    (),
+    roofs::set_params
+);
+modify_command!(
+    RoofSetSlope,
+    "roof.set_slope",
+    "Set a roof's slope",
+    "Sets the slope of a roof (radians or text such as \"35°\"): of the curves `edge_keys` only, or of \
+     every slope-defining curve when they are omitted.",
+    "Roof Slope",
+    roofs::SetSlopeParams,
+    (),
+    roofs::set_slope
+);
+modify_command!(
+    RoofSetEdge,
+    "roof.set_edge",
+    "Set roof footprint curves' slope and overhang",
+    "Sets footprint curves' Defines Slope, own Slope (`null` returns to the roof's) and Overhang, by curve \
+     key.",
+    "Roof Edge",
+    roofs::SetEdgeParams,
+    (),
+    roofs::set_edge
 );
 
 use crate::plans::{self, CreatePlanParams, SetViewRangeParams, ViewRangeReport};

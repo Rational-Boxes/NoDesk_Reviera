@@ -1480,3 +1480,199 @@ pub(crate) fn remove_slab(ifc: &mut IfcModel, element: StepId) -> Result<()> {
     }
     Ok(())
 }
+
+/// A polyhedron: points (metres) and faces as loops of point indices, each counter-clockwise
+/// seen from outside.
+pub(crate) struct Polyhedron {
+    pub points: Vec<[f64; 3]>,
+    pub faces: Vec<Vec<usize>>,
+}
+
+impl Polyhedron {
+    fn signature(&self, scale: f64) -> Vec<f64> {
+        let mut s = vec![self.faces.len() as f64];
+        for f in &self.faces {
+            s.push(f.len() as f64);
+            for i in f {
+                s.extend(self.points[*i].map(|v| v / scale));
+            }
+        }
+        s
+    }
+}
+
+/// The entities of a body written by [`write_breps`] and its geometry in file units.
+struct BrepShape {
+    entities: Vec<StepId>,
+    signature: Vec<f64>,
+}
+
+impl BrepShape {
+    fn read(ifc: &IfcModel, element: StepId) -> Result<Option<Self>> {
+        let e = entity(ifc, element)?;
+        let one = |e: &Entity, attr: &str| e.refs(attr).first().copied();
+        macro_rules! get {
+            ($v:expr) => {
+                match $v {
+                    Some(v) => v,
+                    None => return Ok(None),
+                }
+            };
+        }
+        let placement = get!(one(&e, "ObjectPlacement"));
+        let axes = get!(one(&entity(ifc, placement)?, "RelativePlacement"));
+        let location = get!(one(&entity(ifc, axes)?, "Location"));
+        let shape = get!(one(&e, "Representation"));
+        let reps = entity(ifc, shape)?.refs("Representations");
+        if reps.len() != 1 {
+            return Ok(None);
+        }
+        let mut entities = vec![placement, axes, location, shape, reps[0]];
+        let breps = entity(ifc, reps[0])?.refs("Items");
+        let mut signature = Vec::new();
+        for b in breps {
+            let be = entity(ifc, b)?;
+            if !be.class.eq_ignore_ascii_case("IfcFacetedBrep") {
+                return Ok(None);
+            }
+            let shell = get!(one(&be, "Outer"));
+            let faces = entity(ifc, shell)?.refs("CfsFaces");
+            entities.extend([b, shell]);
+            signature.push(faces.len() as f64);
+            let mut points = Vec::new();
+            for f in faces {
+                let bound = get!(one(&entity(ifc, f)?, "Bounds"));
+                let poly = get!(one(&entity(ifc, bound)?, "Bound"));
+                let pts = entity(ifc, poly)?.refs("Polygon");
+                entities.extend([f, bound, poly]);
+                signature.push(pts.len() as f64);
+                for p in &pts {
+                    if let AttrValue::List(c) = ifc.attribute(*p, "Coordinates")? {
+                        signature.extend(c.iter().filter_map(|v| match v {
+                            AttrValue::Real(r) => Some(*r),
+                            _ => None,
+                        }));
+                    }
+                }
+                points.extend(pts);
+            }
+            entities.extend(points);
+        }
+        entities.sort_by_key(|s| s.0);
+        entities.dedup();
+        Ok(Some(Self {
+            entities,
+            signature,
+        }))
+    }
+}
+
+/// Writes an element's body as faceted B-reps (a Reviera roof), placed at the origin, unless it
+/// already has exactly this geometry.
+pub(crate) fn write_breps(
+    ifc: &mut IfcModel,
+    element: StepId,
+    solids: &[Polyhedron],
+    scale: f64,
+    contexts: Contexts,
+) -> Result<()> {
+    let existing = BrepShape::read(ifc, element)?;
+    let target: Vec<f64> = solids.iter().flat_map(|s| s.signature(scale)).collect();
+    if let Some(e) = &existing
+        && e.signature.len() == target.len()
+        && e.signature
+            .iter()
+            .zip(&target)
+            .all(|(a, b)| (a - b).abs() < 1e-9)
+    {
+        return Ok(());
+    }
+    if let Some(old) = existing {
+        for id in old.entities {
+            ifc.remove(id)?;
+        }
+    } else {
+        remove_slab(ifc, element)?;
+    }
+    let r = |id: StepId| AttrValue::Ref(id.0);
+    let location = create_with(
+        ifc,
+        "IfcCartesianPoint",
+        &[("Coordinates", reals(&[0.0, 0.0, 0.0]))],
+    )?;
+    let axes = create_with(ifc, "IfcAxis2Placement3D", &[("Location", r(location))])?;
+    let placement = create_with(ifc, "IfcLocalPlacement", &[("RelativePlacement", r(axes))])?;
+    let mut items = Vec::new();
+    for s in solids {
+        let points = s
+            .points
+            .iter()
+            .map(|p| {
+                create_with(
+                    ifc,
+                    "IfcCartesianPoint",
+                    &[("Coordinates", reals(&p.map(|v| v / scale)))],
+                )
+            })
+            .collect::<Result<Vec<_>>>()?;
+        let mut faces = Vec::new();
+        for f in &s.faces {
+            let poly = create_with(
+                ifc,
+                "IfcPolyLoop",
+                &[(
+                    "Polygon",
+                    AttrValue::List(f.iter().map(|i| r(points[*i])).collect()),
+                )],
+            )?;
+            let bound = create_with(
+                ifc,
+                "IfcFaceOuterBound",
+                &[("Bound", r(poly)), ("Orientation", AttrValue::Bool(true))],
+            )?;
+            faces.push(r(create_with(
+                ifc,
+                "IfcFace",
+                &[("Bounds", AttrValue::List(vec![r(bound)]))],
+            )?));
+        }
+        let shell = create_with(
+            ifc,
+            "IfcClosedShell",
+            &[("CfsFaces", AttrValue::List(faces))],
+        )?;
+        items.push(r(create_with(
+            ifc,
+            "IfcFacetedBrep",
+            &[("Outer", r(shell))],
+        )?));
+    }
+    let rep = create_with(
+        ifc,
+        "IfcShapeRepresentation",
+        &[
+            ("ContextOfItems", r(contexts.body)),
+            ("RepresentationIdentifier", AttrValue::String("Body".into())),
+            ("RepresentationType", AttrValue::String("Brep".into())),
+            ("Items", AttrValue::List(items)),
+        ],
+    )?;
+    let shape = create_with(
+        ifc,
+        "IfcProductDefinitionShape",
+        &[("Representations", AttrValue::List(vec![r(rep)]))],
+    )?;
+    ifc.set_attribute(element, "ObjectPlacement", &r(placement))?;
+    ifc.set_attribute(element, "Representation", &r(shape))?;
+    Ok(())
+}
+
+/// Removes a body written by [`write_breps`] (before the element itself is removed).
+pub(crate) fn remove_breps(ifc: &mut IfcModel, element: StepId) -> Result<()> {
+    if let Some(shape) = BrepShape::read(ifc, element)? {
+        for id in shape.entities {
+            ifc.remove(id)?;
+        }
+    }
+    Ok(())
+}

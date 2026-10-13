@@ -222,7 +222,8 @@ pub(crate) fn transform(
                 inserts::move_by(txn, id, v)?;
                 out.push(id);
             }
-        } else if crate::floors::slab_recipe(e).is_some() {
+        } else if crate::floors::slab_recipe(e).is_some() || crate::roofs::roof_recipe(e).is_some()
+        {
             let target = if copy { txn.create(copied(e))? } else { id };
             crate::floors::translate(txn, target, &|p| x.point(p), x.reflects())?;
             out.push(target);

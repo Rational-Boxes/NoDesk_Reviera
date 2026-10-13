@@ -2490,6 +2490,7 @@ dependencies = [
 name = "reviera-core"
 version = "0.1.0"
 dependencies = [
+ "earcut",
  "imbl",
  "jsonschema",
  "schemars",

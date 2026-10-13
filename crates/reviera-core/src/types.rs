@@ -208,7 +208,9 @@ pub(crate) fn set_param(txn: &mut crate::txn::Transaction<'_>, p: SetParamParams
     if inserts::insert_type(e).is_some() {
         return inserts::set_type_param(txn, id, &p.param, &p.value);
     }
-    if crate::floors::type_thickness(e).is_some() && p.param == "thickness" {
+    if (crate::floors::type_thickness(e).is_some() || crate::roofs::is_roof_type(e))
+        && p.param == "thickness"
+    {
         return crate::floors::set_type_thickness(txn, id, &p.value);
     }
     // A Reviera wall type's width is part of its recipe.
@@ -280,6 +282,17 @@ pub(crate) fn set_type(txn: &mut crate::txn::Transaction<'_>, p: SetTypeParams) 
             })?;
             let placed = inserts::resolve(txn.store(), txn.store().get(id).expect("exists"))?;
             inserts::check_fit(txn.store(), &placed)?;
+        } else if crate::roofs::roof_recipe(e).is_some() {
+            if !crate::roofs::is_roof_type(ty) {
+                return Err(Error::new(
+                    "type.wrong_family",
+                    format!("roof {id} needs a roof type"),
+                ));
+            }
+            let guid = ty.guid().to_string();
+            txn.modify(id, |w| {
+                w.params.insert("@type".into(), Value::String(guid));
+            })?;
         } else if let Some((kind, _)) = crate::floors::slab_recipe(e) {
             if crate::floors::type_kind(ty) != Some(kind) {
                 return Err(Error::new(

@@ -24486,7 +24486,15 @@ CREATE TABLE base_rxd (
 - <code>roof.create_footprint(type_id, loop: [{curve, defines_slope, slope?, overhang?, plate_offset?, offset_from_base?, extend_to_core?, lock_ref?}], holes?, base_level, base_offset?, cutoff?: {level_id, offset}, rafter_cut?, fascia_depth?, rafter_or_truss?, slope_arrows?: [SlopeArrow], attach_walls?: bool) -&gt; element_id</code>
 - <code>roof.edit_footprint(roof_id, ...)</code> (same parameters)
 - <code>roof.align_eaves(roof_id, edge_keys, mode: AdjustHeight|AdjustOverhang)</code>
-- <code>roof.set_slope(roof_id, slope, edge_keys?)</code></p>
+- <code>roof.set_slope(roof_id, slope, edge_keys?)</code>
+- <code>roof.set_params(roof_ids[], level_id?, base_offset?, slope?, cutoff_level_id?|null, cutoff_offset?)</code> (the instance parameters in one undo step)
+- <code>roof.set_edge(roof_id, keys[], defines_slope?, slope?|null, overhang?)</code> (footprint curve properties after the sketch is finished)</p>
+<p><strong>Implementation notes (2026-10-13).</strong>
+- As built, <code>roof.create_footprint</code> takes <code>curves: [{line, lock?, defines_slope?, slope?, overhang?}]</code> (keyed 1, 2, … in order) and <code>level_id</code>, like the other sketch-based commands. Plate offsets, rafter cuts other than plumb, slope arrows, holes, Align Eaves and <code>attach_walls</code> come later.
+- The body is the <code>IfcRoof</code>'s own <code>Brep</code> representation, one <code>IfcFacetedBrep</code> per face slab (IFC allows a roof either to have its own body or to be decomposed). Aggregated <code>IfcSlab</code> parts come later with layered roof types.
+- Per-edge eave heights are handled by extending each face from the plate down its own plane along the corner trajectories to its eave line, so steeper edges reach lower eaves.
+- Each face slab is mitred against its neighbours by the plane through the shared edge halfway between the two face normals, and cut plumb at eaves and rakes.
+- A new roof whose footprint was picked from walls sets its base offset to the walls' tops (Reviera's default; the user can change it).</p>
 <p><strong>Acceptance criteria.</strong>
 - [ ] A 10 m × 6 m rectangle with all four edges at 30° gives a hip roof whose ridge is 4 m long, at a height of 3·tan 30° = 1.732 m above the plate.
 - [ ] The same rectangle with the two short edges as gables gives a gable roof whose 10 m ridge is at 1.732 m.

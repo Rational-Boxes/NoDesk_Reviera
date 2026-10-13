@@ -340,6 +340,7 @@ impl App {
                 Some(e) => store.get(e).is_some_and(|e| {
                     walls::wall_recipe(e).is_none()
                         && reviera_core::floors::slab_recipe(e).is_none()
+                        && reviera_core::roofs::roof_recipe(e).is_none()
                         && reviera_core::inserts::kind_of(e).is_none()
                         && reviera_core::inserts::opening_of(e).is_none()
                 }),
@@ -382,6 +383,23 @@ impl App {
                     class: class.clone(),
                     positions,
                     indices,
+                });
+            }
+        }
+        // Roofs: one closed slab per face.
+        for (id, g) in reviera_core::roofs::all(store) {
+            for f in &g.faces {
+                meshes.push(reviera_render::SceneMesh {
+                    element: Some(id),
+                    color: reviera_render::class_color("IfcRoof"),
+                    class: "IfcRoof".into(),
+                    positions: f
+                        .slab
+                        .0
+                        .iter()
+                        .map(|[x, y, z]| [*x as f32, *y as f32, *z as f32])
+                        .collect(),
+                    indices: f.slab.1.clone(),
                 });
             }
         }

@@ -210,6 +210,15 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "tree" => format!(
             r#"<rect x="4" y="3" width="10" height="6" fill="{f}" {s}/><path d="M9 9v17h7M9 17h7" {s}/><rect x="16" y="14" width="12" height="6" {sa}/><rect x="16" y="23" width="12" height="6" {sa}/>"#
         ),
+        "roof" => format!(
+            r#"<path d="M2 18L16 6l14 12" {s}/><path d="M5 16l11-9 11 9v2H5z" fill="{f}" {s}/><path d="M7 18v9h18v-9" {s}/><path d="M16 6v4" {sa}/>"#
+        ),
+        "slope" => format!(
+            r#"<path d="M4 26h24" {s}/><path d="M6 26L26 10v16z" fill="{f}" {s}/><path d="M13 21l3-4 3 4z" fill="{a}" {sa}/>"#
+        ),
+        "overhang" => format!(
+            r#"<path d="M3 15L16 6l13 9" {s}/><path d="M9 14v13M23 14v13" {s}/><path d="M23 19h6M26 17l3 2-3 2" {sa}/>"#
+        ),
         "ceiling_plan" => format!(
             r#"<rect x="4" y="5" width="24" height="22" fill="{f}" {s}/><path d="M4 12h24M4 19h24M12 5v22M20 5v22" {sa} stroke-width="1.2"/>"#
         ),

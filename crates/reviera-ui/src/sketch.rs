@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Reviera contributors
 
-//! Sketch mode (Ch 3 §3.1.3, ARC-SKCH-001) for floor and ceiling boundaries, and the Ceiling
-//! tool (ARC-CEIL-001: an automatic ceiling in the room under the cursor, or a sketch).
+//! Sketch mode (Ch 3 §3.1.3, ARC-SKCH-001) for floor and ceiling boundaries and roof footprints
+//! (ARC-ROOF-001), and the Ceiling tool (ARC-CEIL-001: an automatic ceiling in the room under
+//! the cursor, or a sketch).
 //!
 //! Sketch mode: a modal session in a plan with
 //! its own contextual tab (Draw: Pick Walls, Line, Rectangle; Mode: Finish, Cancel).
@@ -12,6 +13,8 @@
 //! - **Line** draws chained lines, snapping like the drawing tools; clicking the chain's first
 //!   point closes it.
 //! - **Rectangle** takes two corners.
+//! - **Defines Slope** (roofs) switches the clicked curve between sloping and gable. Slope-defining
+//!   curves show a triangle. Walls picked for a roof take the session's overhang.
 //!
 //! Delete removes the last curve. Finish validates (ARC-SKCH-002): a failed Finish keeps the
 //! session open and marks the problem points; Cancel discards the session.
@@ -35,20 +38,50 @@ pub enum DrawMode {
     PickWalls,
     Line,
     Rectangle,
+    /// Click a roof footprint curve to switch it between sloping and gable.
+    DefinesSlope,
 }
 
-/// A sketch curve: a line, and the wall face it was picked from.
+/// What a sketch makes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SketchKind {
+    Slab(SlabKind),
+    Roof,
+}
+
+/// A sketch curve: a line, the wall face it was picked from, and for roofs whether it is a
+/// gable, its overhang and its own slope.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Curve {
     pub line: Line,
     pub lock: Option<(ElementId, String)>,
+    pub gable: bool,
+    pub overhang: f64,
+    pub slope: Option<f64>,
 }
+
+impl Curve {
+    pub fn new(line: Line, lock: Option<(ElementId, String)>) -> Self {
+        Self {
+            line,
+            lock,
+            gable: false,
+            overhang: 0.0,
+            slope: None,
+        }
+    }
+}
+
+/// The overhang walls picked for a roof take, metres.
+pub const ROOF_OVERHANG: f64 = 0.6;
 
 /// A sketch session.
 #[derive(Debug)]
 pub struct SketchSession {
-    /// Floor or ceiling.
-    pub kind: SlabKind,
+    /// Floor, ceiling or roof.
+    pub kind: SketchKind,
+    /// The overhang of walls picked for a roof.
+    pub overhang: f64,
     /// The floor or ceiling being edited (Edit Boundary); `None` for a new one.
     pub host: Option<ElementId>,
     pub level: ElementId,
@@ -78,7 +111,7 @@ impl Gui {
             return frame
                 .set_status_text("Floors are sketched in plan views (View › Floor Plan)", 0);
         };
-        self.begin_sketch(SlabKind::Floor, None, level, Vec::new());
+        self.begin_sketch(SketchKind::Slab(SlabKind::Floor), None, level, Vec::new());
     }
 
     /// Sketch Ceiling: a new ceiling boundary on the plan's level.
@@ -92,7 +125,7 @@ impl Gui {
             return frame.set_status_text("Ceilings are placed in plan views", 0);
         };
         self.end_ceiling_tool();
-        self.begin_sketch(SlabKind::Ceiling, None, level, Vec::new());
+        self.begin_sketch(SketchKind::Slab(SlabKind::Ceiling), None, level, Vec::new());
     }
 
     /// Edit Boundary of the selected floor or ceiling.
@@ -125,21 +158,23 @@ impl Gui {
         let curves = sketch
             .curves
             .iter()
-            .map(|c| Curve {
-                line: c.line,
-                lock: c.lock.as_ref().and_then(|l| {
-                    let id = reviera_core::GlobalId::parse(&l.element)
-                        .and_then(|g| store.find_by_guid(&g))?;
-                    Some((id, l.sub.clone()))
-                }),
+            .map(|c| {
+                Curve::new(
+                    c.line,
+                    c.lock.as_ref().and_then(|l| {
+                        let id = reviera_core::GlobalId::parse(&l.element)
+                            .and_then(|g| store.find_by_guid(&g))?;
+                        Some((id, l.sub.clone()))
+                    }),
+                )
             })
             .collect();
-        self.begin_sketch(kind, Some(floor), level, curves);
+        self.begin_sketch(SketchKind::Slab(kind), Some(floor), level, curves);
     }
 
-    fn begin_sketch(
+    pub(crate) fn begin_sketch(
         &mut self,
-        kind: SlabKind,
+        kind: SketchKind,
         host: Option<ElementId>,
         level: ElementId,
         curves: Vec<Curve>,
@@ -154,6 +189,7 @@ impl Gui {
         self.end_ceiling_tool();
         self.sketch = Some(SketchSession {
             kind,
+            overhang: ROOF_OVERHANG,
             host,
             level,
             curves,
@@ -207,11 +243,14 @@ impl Gui {
             }
             DrawMode::Rectangle if s.corner.is_none() => "Rectangle: click the first corner",
             DrawMode::Rectangle => "Rectangle: click the opposite corner",
+            DrawMode::DefinesSlope => "Defines Slope: click a curve to make it slope or a gable",
         };
         let verb = match (s.host, s.kind) {
+            (Some(_), SketchKind::Roof) => "Edit Footprint",
             (Some(_), _) => "Edit Boundary",
-            (None, SlabKind::Floor) => "Floor",
-            (None, SlabKind::Ceiling) => "Ceiling",
+            (None, SketchKind::Slab(SlabKind::Floor)) => "Floor",
+            (None, SketchKind::Slab(SlabKind::Ceiling)) => "Ceiling",
+            (None, SketchKind::Roof) => "Roof by Footprint",
         };
         let text = format!(
             "{verb} · {what} · {} curves · Finish ✓ or Cancel ✗ on the ribbon (Delete removes the last curve)",
@@ -235,13 +274,13 @@ impl Gui {
         let n = g.normal();
         let s = if plus_side { 1.0 } else { -1.0 } * g.width / 2.0;
         let shift = |p: [f64; 2]| [p[0] + n[0] * s, p[1] + n[1] * s];
-        Some(Curve {
-            line: Line {
+        Some(Curve::new(
+            Line {
                 start: shift(g.start),
                 end: shift(g.end),
             },
-            lock: Some((wall, sub.to_owned())),
-        })
+            Some((wall, sub.to_owned())),
+        ))
     }
 
     /// The walls joined end to end with `wall`, in a chain (Tab).
@@ -365,10 +404,7 @@ impl Gui {
                         s.chain_start = Some(p);
                     }
                     Some(a) if a != p => {
-                        s.curves.push(Curve {
-                            line: Line { start: a, end: p },
-                            lock: None,
-                        });
+                        s.curves.push(Curve::new(Line { start: a, end: p }, None));
                         let closed = s.chain_start == Some(p);
                         s.last = (!closed).then_some(p);
                         if closed {
@@ -376,6 +412,24 @@ impl Gui {
                         }
                     }
                     Some(_) => {}
+                }
+            }
+            DrawMode::DefinesSlope => {
+                let Some(p) = self.plan_xy(x, y) else { return };
+                let reach = self
+                    .active_view()
+                    .and_then(|v| v.plan.as_ref())
+                    .map_or(0.3, |plan| 3.0 * f64::from(plan.scale) / 1000.0);
+                let s = self.sketch.as_mut().expect("checked");
+                let nearest = s
+                    .curves
+                    .iter()
+                    .enumerate()
+                    .map(|(i, c)| (i, distance(p, c.line)))
+                    .filter(|(_, d)| *d <= reach)
+                    .min_by(|a, b| a.1.total_cmp(&b.1));
+                if let Some((i, _)) = nearest {
+                    s.curves[i].gable = !s.curves[i].gable;
                 }
             }
             DrawMode::Rectangle => {
@@ -386,13 +440,13 @@ impl Gui {
                     Some(a) if a[0] != p[0] && a[1] != p[1] => {
                         let c = [a, [p[0], a[1]], p, [a[0], p[1]]];
                         for k in 0..4 {
-                            s.curves.push(Curve {
-                                line: Line {
+                            s.curves.push(Curve::new(
+                                Line {
                                     start: c[k],
                                     end: c[(k + 1) % 4],
                                 },
-                                lock: None,
-                            });
+                                None,
+                            ));
                         }
                     }
                     Some(a) => s.corner = Some(a),
@@ -408,7 +462,11 @@ impl Gui {
 
     fn add_curves(&mut self, picks: Vec<Curve>) {
         let Some(s) = &mut self.sketch else { return };
-        for c in picks {
+        for mut c in picks {
+            // Walls picked for a roof take the overhang.
+            if s.kind == SketchKind::Roof {
+                c.overhang = s.overhang;
+            }
             // A wall face already in the sketch is not taken twice.
             if c.lock.is_some() && s.curves.iter().any(|k| k.lock == c.lock) {
                 continue;
@@ -465,22 +523,41 @@ impl Gui {
                 if let Some((e, sub)) = &c.lock {
                     v["lock"] = json!({ "element": e, "sub": sub });
                 }
+                if s.kind == SketchKind::Roof {
+                    v["defines_slope"] = json!(!c.gable);
+                    v["overhang"] = json!(c.overhang);
+                    if let Some(a) = c.slope {
+                        v["slope"] = json!(a);
+                    }
+                }
                 v
             })
             .collect();
         let (command, args) = match (s.host, s.kind) {
+            (Some(r), SketchKind::Roof) => (
+                "roof.edit_footprint",
+                json!({ "roof_id": r, "curves": curves }),
+            ),
+            (None, SketchKind::Roof) => {
+                let mut a = json!({ "curves": curves, "level_id": s.level });
+                // A roof on picked walls sits on their tops.
+                if let Some(top) = self.picked_wall_top(s) {
+                    a["base_offset"] = json!(top);
+                }
+                ("roof.create_footprint", a)
+            }
             (Some(f), _) => (
                 "floor.edit_boundary",
                 json!({ "floor_id": f, "loops": [curves] }),
             ),
-            (None, SlabKind::Floor) => {
+            (None, SketchKind::Slab(SlabKind::Floor)) => {
                 let mut a = json!({ "loops": [curves], "level_id": s.level });
                 if let Some(t) = self.floor_type {
                     a["type_id"] = json!(t);
                 }
                 ("floor.create", a)
             }
-            (None, SlabKind::Ceiling) => (
+            (None, SketchKind::Slab(SlabKind::Ceiling)) => (
                 "ceiling.create",
                 json!({ "loops": [curves], "level_id": s.level }),
             ),
@@ -533,6 +610,28 @@ impl Gui {
         };
         for c in &s.curves {
             sketch.segments.push(seg(c.line.start, c.line.end));
+            // A roof's slope-defining curves show a triangle on their left (inside a
+            // counter-clockwise footprint).
+            if s.kind == SketchKind::Roof && !c.gable {
+                let (a, b) = (c.line.start, c.line.end);
+                let l = (b[0] - a[0]).hypot(b[1] - a[1]).max(1e-9);
+                let (u, n) = (
+                    [(b[0] - a[0]) / l, (b[1] - a[1]) / l],
+                    [-(b[1] - a[1]) / l, (b[0] - a[0]) / l],
+                );
+                let m = [(a[0] + b[0]) / 2.0, (a[1] + b[1]) / 2.0];
+                let (w, h) = (2.5 * mm, 3.0 * mm);
+                let at = |along: f64, out: f64| {
+                    [
+                        m[0] + u[0] * along + n[0] * out,
+                        m[1] + u[1] * along + n[1] * out,
+                    ]
+                };
+                let tri = [at(-w, 1.0 * mm), at(w, 1.0 * mm), at(0.0, 1.0 * mm + h)];
+                for k in 0..3 {
+                    sketch.segments.push(seg(tri[k], tri[(k + 1) % 3]));
+                }
+            }
             // Locked curves show a small padlock square at their middle.
             if c.lock.is_some() {
                 let m = [
@@ -596,7 +695,33 @@ impl Gui {
     }
 }
 
-const DUPLICATE: &str = "Duplicate Type…";
+impl Gui {
+    /// The height above the session's level of the highest top among the walls its curves are
+    /// locked to.
+    fn picked_wall_top(&self, s: &SketchSession) -> Option<f64> {
+        let store = self.doc.and_then(|d| self.app.document(d))?.doc.store();
+        let level = crate::levels_elevation(store, s.level)?;
+        s.curves
+            .iter()
+            .filter_map(|c| {
+                let (wall, _) = c.lock.as_ref()?;
+                let g = reviera_core::walls::regenerate(store, store.get(*wall)?).ok()?;
+                Some(g.base_z + g.height - level)
+            })
+            .reduce(f64::max)
+    }
+}
+
+/// The distance from point `p` to the segment `l`.
+fn distance(p: [f64; 2], l: Line) -> f64 {
+    let (a, b) = (l.start, l.end);
+    let d = [b[0] - a[0], b[1] - a[1]];
+    let len2 = (d[0] * d[0] + d[1] * d[1]).max(1e-18);
+    let t = (((p[0] - a[0]) * d[0] + (p[1] - a[1]) * d[1]) / len2).clamp(0.0, 1.0);
+    (p[0] - a[0] - d[0] * t).hypot(p[1] - a[1] - d[1] * t)
+}
+
+pub(crate) const DUPLICATE: &str = "Duplicate Type…";
 
 impl Gui {
     /// Properties of a selected floor: level, height offset, area, perimeter, volume, and its

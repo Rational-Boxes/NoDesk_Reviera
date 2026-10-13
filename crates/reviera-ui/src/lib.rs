@@ -23,6 +23,7 @@ mod native;
 mod nav;
 mod plans;
 mod ribbon;
+mod roofs;
 mod sketch;
 mod snap;
 mod wx;
@@ -1307,13 +1308,20 @@ impl Gui {
     fn update_ribbon_context(&mut self) {
         self.update_view_actions();
         if let Some(s) = &self.sketch {
-            let label = match (s.host, s.kind) {
-                (Some(_), _) => "Edit Boundary",
-                (None, reviera_core::floors::SlabKind::Floor) => "Create Floor Boundary",
-                (None, reviera_core::floors::SlabKind::Ceiling) => "Create Ceiling Boundary",
+            use reviera_core::floors::SlabKind;
+            use sketch::SketchKind;
+            let (label, session) = match (s.host, s.kind) {
+                (Some(_), SketchKind::Roof) => ("Edit Footprint", "session.roof_sketch"),
+                (None, SketchKind::Roof) => ("Create Roof Footprint", "session.roof_sketch"),
+                (Some(_), _) => ("Edit Boundary", "session.floor_sketch"),
+                (None, SketchKind::Slab(SlabKind::Floor)) => {
+                    ("Create Floor Boundary", "session.floor_sketch")
+                }
+                (None, SketchKind::Slab(SlabKind::Ceiling)) => {
+                    ("Create Ceiling Boundary", "session.floor_sketch")
+                }
             };
-            self.ribbon
-                .set_context(Some((label, Some("session.floor_sketch"))));
+            self.ribbon.set_context(Some((label, Some(session))));
             return;
         }
         if self.ceiling_tool.is_some() {
@@ -1514,6 +1522,10 @@ impl Gui {
             self.floor_rows(grid, id);
             return;
         }
+        if reviera_core::roofs::roof_recipe(&e).is_some() {
+            self.roof_rows(grid, id);
+            return;
+        }
         if let Some(d) = dimension {
             let store = self.app.document(doc).expect("open").doc.store().clone();
             grid.append(Property::category("Dimension", "c_dim"));
@@ -1701,6 +1713,7 @@ impl Gui {
         if self.grid_type_edit(property, text.clone())
             || self.insert_edit(property, text.clone())
             || self.floor_edit(property, text.clone())
+            || self.roof_edit(property, text.clone())
         {
             return;
         }
@@ -2713,6 +2726,11 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
 /// Runs the action of a wx id (ribbon, Quick Access Toolbar and menus share one dispatcher).
 type Dispatch = Box<dyn Fn(i32)>;
 
+/// The elevation of a level element.
+fn levels_elevation(store: &reviera_core::Store, level: ElementId) -> Option<f64> {
+    store.get(level).map(reviera_core::levels::elevation)
+}
+
 /// Runs a catalog action (from the ribbon, the Quick Access Toolbar or a menu).
 fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
     // `REVIERA_TRACE_ACTIONS=1` logs every action the ribbon, toolbar and menus run.
@@ -2828,6 +2846,22 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
             focus(g);
         }),
         "view.create_ceiling_plan" => with(gui, Gui::new_ceiling_plans),
+        "roof.create_footprint" => with(gui, |g| {
+            g.start_roof_sketch();
+            focus(g);
+        }),
+        "roof.edit_footprint" => with(gui, |g| {
+            g.edit_roof_footprint();
+            focus(g);
+        }),
+        "sketch.defines_slope" => with(gui, |g| {
+            g.set_draw_mode(sketch::DrawMode::DefinesSlope);
+            focus(g);
+        }),
+        "sketch.overhang" => with(gui, |g| {
+            g.set_roof_overhang();
+            focus(g);
+        }),
         "floor.edit_boundary" | "ceiling.edit_boundary" => with(gui, |g| {
             g.edit_floor_boundary();
             focus(g);
