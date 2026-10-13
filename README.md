@@ -25,8 +25,10 @@ operation can be driven by Lua scripts and by AI agents through the Model Contex
   click to select, drag with the left mouse button to orbit, with the middle or right button
   to pan, and use the wheel to zoom.
 - **Walls**: *Architecture > Wall* draws chains of straight walls on a level; they appear at once,
-  regenerated from their recipe (`wall.create`, `wall.set_location`). Saving writes standard IFC
-  (`IfcWall` with an `Axis` and a `SweptSolid` body, typed and contained in its storey), so other
+  regenerated from their recipe (`wall.create`, `wall.set_location`). Walls that meet join at
+  mitred L corners and T junctions (`wall.set_join_allowed` turns a join off). Saving writes standard IFC
+  (`IfcWall` with an `Axis` and a `SweptSolid` body, typed, contained in its storey and
+  connected to its neighbours with `IfcRelConnectsPathElements`), so other
   tools see them, and Reviera reopens them as editable walls.
 - **Units and parameters**: SI storage with project display units (metric and imperial,
   feet-and-inches), built-in, project and shared parameters routed to types or instances.

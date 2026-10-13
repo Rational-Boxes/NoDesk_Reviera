@@ -55,6 +55,7 @@ pub(crate) mod bridge {
         fn set_ref(self: Pin<&mut Model>, id: u32, attr: &str, target: u32) -> Result<()>;
         fn set_ref_list(self: Pin<&mut Model>, id: u32, attr: &str, targets: &[u32]) -> Result<()>;
         fn set_real_list(self: Pin<&mut Model>, id: u32, attr: &str, values: &[f64]) -> Result<()>;
+        fn set_int_list(self: Pin<&mut Model>, id: u32, attr: &str, values: &[i32]) -> Result<()>;
         fn set_typed_string(
             self: Pin<&mut Model>,
             id: u32,

@@ -391,6 +391,11 @@ void Model::set_real_list(std::uint32_t id, rust::Str attr, rust::Slice<const do
     inst->set_attribute_value(attr_index(inst, attr), std::vector<double>(values.begin(), values.end()));
 }
 
+void Model::set_int_list(std::uint32_t id, rust::Str attr, rust::Slice<const std::int32_t> values) {
+    auto* inst = instance(*file_, id);
+    inst->set_attribute_value(attr_index(inst, attr), std::vector<int>(values.begin(), values.end()));
+}
+
 void Model::set_typed_string(std::uint32_t id, rust::Str attr, rust::Str type_name, rust::Str value) {
     auto* inst = instance(*file_, id);
     inst->set_attribute_value(attr_index(inst, attr), typed_value(*file_, type_name, str(value)));

@@ -534,7 +534,8 @@ impl LocalProject {
             }
             dirty.insert(*id);
         }
-        self.write_regenerated(doc, &changed)?;
+        let touched: BTreeSet<ElementId> = changed.union(&deleted).copied().collect();
+        self.write_regenerated(doc, &touched)?;
 
         for id in dirty {
             let Some(&step) = self.steps.get(&id) else {
@@ -587,41 +588,34 @@ impl LocalProject {
     /// Writes the IFC geometry of Reviera walls that changed, or whose type or levels changed.
     fn write_regenerated(&mut self, doc: &Document, changed: &BTreeSet<ElementId>) -> Result<()> {
         let store = doc.store();
-        let by_guid = |g: Option<&str>| {
-            g.and_then(GlobalId::parse)
-                .and_then(|g| store.find_by_guid(&g))
-        };
-        let mut contexts = None;
-        for e in store.iter() {
-            let Some(recipe) = walls::wall_recipe(e) else {
-                continue;
-            };
-            let base = by_guid(Some(&recipe.base_level));
-            let depends = [
-                Some(e.id()),
-                by_guid(e.param(params::TYPE_KEY).and_then(Value::as_str)),
-                base,
-                by_guid(recipe.top.get("level").and_then(Value::as_str)),
-            ];
-            if !depends.iter().flatten().any(|id| changed.contains(id)) {
-                continue;
-            }
-            let (Some(&step), Some(storey)) = (
-                self.steps.get(&e.id()),
-                base.and_then(|b| self.steps.get(&b).copied()),
-            ) else {
-                continue;
-            };
-            let g = walls::regenerate(store, e)?;
-            let ctx = match contexts {
-                Some(c) => c,
-                None => *contexts.insert(geometry::Contexts::find(&self.ifc)?),
-            };
-            geometry::write_wall(&mut self.ifc, step, &g, self.length_scale, ctx)?;
-            let owner_history = self.new_owner_history()?;
-            geometry::contain(&mut self.ifc, step, storey, owner_history)?;
+        // Joins tie walls to their neighbours, so all walls are solved together. Values that did
+        // not change are not rewritten, so unaffected walls keep identical bytes.
+        if changed.is_empty() || !store.iter().any(|e| walls::wall_recipe(e).is_some()) {
+            return Ok(());
         }
-        Ok(())
+        let solved = walls::solve(store);
+        let contexts = geometry::Contexts::find(&self.ifc)?;
+        let owner_history = self.new_owner_history()?;
+        let mut wall_steps = HashSet::new();
+        for (id, body) in &solved.bodies {
+            let e = store.get(*id).expect("solved walls exist");
+            let recipe = walls::wall_recipe(e).expect("solved walls have recipes");
+            let storey = GlobalId::parse(&recipe.base_level)
+                .and_then(|g| store.find_by_guid(&g))
+                .and_then(|b| self.steps.get(&b).copied());
+            let (Some(&step), Some(storey)) = (self.steps.get(id), storey) else {
+                continue;
+            };
+            geometry::write_wall(&mut self.ifc, step, body, self.length_scale, contexts)?;
+            geometry::contain(&mut self.ifc, step, storey, owner_history)?;
+            wall_steps.insert(step);
+        }
+        let joins: Vec<_> = solved
+            .joins
+            .iter()
+            .filter_map(|j| Some((*self.steps.get(&j.wall)?, *j, *self.steps.get(&j.other)?)))
+            .collect();
+        geometry::write_connections(&mut self.ifc, &wall_steps, &joins, owner_history)
     }
 
     /// Owner history for new rooted entities: required in IFC2X3, left unset in IFC4.

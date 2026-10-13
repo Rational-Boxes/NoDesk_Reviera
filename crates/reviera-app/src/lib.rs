@@ -280,20 +280,15 @@ impl App {
             })
             .cloned()
             .collect();
-        for e in store.iter() {
-            if walls::wall_recipe(e).is_none() {
-                continue;
-            }
-            // A wall that cannot regenerate (for example, its level was deleted outside a
-            // command) is not drawn.
-            let Ok(g) = walls::regenerate(store, e) else {
-                continue;
-            };
-            let (verts, indices) = g.mesh();
+        // Walls are regenerated and joined together; one that cannot regenerate (for example,
+        // its level was deleted outside a command) is not drawn.
+        for (id, body) in walls::solve(store).bodies {
+            let class = store.get(id).map_or("IfcWall".into(), |e| e.class.clone());
+            let (verts, indices) = body.mesh();
             meshes.push(reviera_render::SceneMesh {
-                element: Some(e.id()),
-                class: e.class.clone(),
-                color: reviera_render::class_color(&e.class),
+                element: Some(id),
+                color: reviera_render::class_color(&class),
+                class,
                 positions: verts
                     .iter()
                     .map(|[x, y, z]| [*x as f32, *y as f32, *z as f32])

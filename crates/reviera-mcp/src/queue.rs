@@ -4,15 +4,38 @@
 //! The command queue (TECH_STACK §3.3): one thread owns the [`App`], and requests from agents run
 //! on it in order, so only one transaction is ever open.
 
-use std::sync::mpsc;
+use std::sync::{Arc, Mutex, mpsc};
+use std::thread::JoinHandle;
 
 use reviera_app::App;
 
 type Job = Box<dyn FnOnce(&mut App) + Send>;
 
+/// A handle to the application thread. When the last handle is dropped, the thread finishes the
+/// queued jobs, flushes unsaved work and stops before the drop returns, so the process never exits
+/// in the middle of a write.
 #[derive(Debug, Clone)]
 pub struct AppHandle {
-    tx: mpsc::Sender<Job>,
+    inner: Arc<Inner>,
+}
+
+#[derive(Debug)]
+struct Inner {
+    tx: Option<mpsc::Sender<Job>>,
+    thread: Mutex<Option<JoinHandle<()>>>,
+}
+
+impl Drop for Inner {
+    fn drop(&mut self) {
+        // Closing the queue ends the thread's loop.
+        self.tx.take();
+        let thread = self.thread.lock().unwrap_or_else(|e| e.into_inner()).take();
+        if let Some(t) = thread
+            && t.thread().id() != std::thread::current().id()
+        {
+            let _ = t.join();
+        }
+    }
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -23,7 +46,7 @@ impl AppHandle {
     /// Starts the application thread. `make` builds the app on that thread.
     pub fn spawn(make: impl FnOnce() -> App + Send + 'static) -> Self {
         let (tx, rx) = mpsc::channel::<Job>();
-        std::thread::Builder::new()
+        let thread = std::thread::Builder::new()
             .name("reviera-app".into())
             .spawn(move || {
                 let mut app = make();
@@ -34,7 +57,12 @@ impl AppHandle {
                 app.flush_all();
             })
             .expect("the application thread starts");
-        Self { tx }
+        Self {
+            inner: Arc::new(Inner {
+                tx: Some(tx),
+                thread: Mutex::new(Some(thread)),
+            }),
+        }
     }
 
     /// Runs `f` on the application thread and waits for its result.
@@ -43,7 +71,10 @@ impl AppHandle {
         f: impl FnOnce(&mut App) -> R + Send + 'static,
     ) -> Result<R, Stopped> {
         let (reply, rx) = tokio::sync::oneshot::channel();
-        self.tx
+        self.inner
+            .tx
+            .as_ref()
+            .ok_or(Stopped)?
             .send(Box::new(move |app| {
                 let _ = reply.send(f(app));
             }))

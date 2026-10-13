@@ -77,6 +77,9 @@ pub(crate) enum Msg {
     },
     Flush(SyncSender<i64>),
     Close,
+    /// The store was dropped without a clean close: write what is queued, leave the store
+    /// unclean (recoverable) and stop.
+    Detach,
 }
 
 /// What the writer has made durable, for `live.status`.
@@ -90,7 +93,7 @@ pub(crate) struct Durable {
 impl Msg {
     /// Whether the message carries model data (counted as pending until written).
     pub fn is_data(&self) -> bool {
-        !matches!(self, Msg::Flush(_) | Msg::Close)
+        !matches!(self, Msg::Flush(_) | Msg::Close | Msg::Detach)
     }
 }
 
@@ -124,7 +127,7 @@ impl Writer {
             let deadline = Instant::now() + self.window;
             while !matches!(
                 batch.last(),
-                Some(Msg::Flush(_) | Msg::Close | Msg::Saved { .. })
+                Some(Msg::Flush(_) | Msg::Close | Msg::Detach | Msg::Saved { .. })
             ) {
                 match self
                     .rx
@@ -140,11 +143,13 @@ impl Writer {
             let tx = self.conn.transaction()?;
             let mut flushes = Vec::new();
             let mut close = false;
+            let mut detach = false;
             let mut saved = false;
             for msg in batch {
                 match msg {
                     Msg::Flush(reply) => flushes.push(reply),
                     Msg::Close => close = true,
+                    Msg::Detach => detach = true,
                     msg => {
                         if let Msg::Saved { saved_seq: s, .. } = &msg {
                             saved = true;
@@ -174,6 +179,9 @@ impl Writer {
             }
             if close {
                 let _ = std::fs::remove_file(&self.lock_path);
+                return Ok(());
+            }
+            if detach {
                 return Ok(());
             }
             if last_beat.elapsed() >= HEARTBEAT {
@@ -264,7 +272,7 @@ fn apply(tx: &Transaction<'_>, msg: Msg, head: &mut i64) -> rusqlite::Result<()>
                 tx.query_row("SELECT coalesce(max(seq), 0) FROM txn", [], |r| r.get(0))?;
             set_meta(tx, "saved_txn_seq", &last.to_string())?;
         }
-        Msg::Flush(_) | Msg::Close => {}
+        Msg::Flush(_) | Msg::Close | Msg::Detach => {}
     }
     Ok(())
 }

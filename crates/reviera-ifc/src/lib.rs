@@ -298,6 +298,14 @@ impl IfcModel {
                     }
                 }) {
                     m.set_ref_list(id.0, name, &refs)?
+                } else if let Some(ints) = all(items, |v| {
+                    if let AttrValue::Int(i) = v {
+                        i32::try_from(*i).ok()
+                    } else {
+                        None
+                    }
+                }) {
+                    m.set_int_list(id.0, name, &ints)?
                 } else if let Some(reals) = all(items, |v| {
                     if let AttrValue::Real(r) = v {
                         Some(*r)

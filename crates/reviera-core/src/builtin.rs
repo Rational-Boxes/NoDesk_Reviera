@@ -49,6 +49,8 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(ParamSetIfcHome),
         registry.add(WallCreate),
         registry.add(WallSetLocation),
+        registry.add(WallSetJoinAllowed),
+        registry.add(WallJoinsQuery),
     ];
     for r in results {
         r.expect("core commands are valid");
@@ -1039,7 +1041,7 @@ impl Command for ParamSetIfcHome {
 
 // ---- Walls (Ch 3 ARC-WALL-002) ----
 
-use crate::walls::{self, CreateParams, SetLocationParams};
+use crate::walls::{self, CreateParams, JoinsQueryParams, SetJoinAllowedParams, SetLocationParams};
 
 #[derive(Debug)]
 struct WallCreate;
@@ -1079,5 +1081,45 @@ impl Command for WallSetLocation {
 
     fn run(&self, cx: &mut CommandContext<'_>, p: SetLocationParams) -> Result<()> {
         walls::set_location(cx.edit()?, p)
+    }
+}
+
+#[derive(Debug)]
+struct WallSetJoinAllowed;
+
+impl Command for WallSetJoinAllowed {
+    type Params = SetJoinAllowedParams;
+    type Output = ();
+    const META: CommandMeta = CommandMeta {
+        name: "wall.set_join_allowed",
+        version: 1,
+        summary: "Allow or disallow a wall end's join",
+        description: "Sets the Join Status of one end of a wall. A disallowed end stops square at its location point.",
+        effects: &[Effect::Edit],
+        transaction_name: "Allow/Disallow Join",
+    };
+
+    fn run(&self, cx: &mut CommandContext<'_>, p: SetJoinAllowedParams) -> Result<()> {
+        walls::set_join_allowed(cx.edit()?, p)
+    }
+}
+
+#[derive(Debug)]
+struct WallJoinsQuery;
+
+impl Command for WallJoinsQuery {
+    type Params = JoinsQueryParams;
+    type Output = Vec<walls::Join>;
+    const META: CommandMeta = CommandMeta {
+        name: "wall.joins_query",
+        version: 1,
+        summary: "List a wall's joins",
+        description: "Returns the joins of a wall: L joins name the other wall's end, T joins have `other_end` null.",
+        effects: &[Effect::Read],
+        transaction_name: "",
+    };
+
+    fn run(&self, cx: &mut CommandContext<'_>, p: JoinsQueryParams) -> Result<Vec<walls::Join>> {
+        walls::joins_query(cx.store(), p)
     }
 }

@@ -9,8 +9,13 @@
 //! flip. Geometry is regenerated from the recipe and the levels it references, so the viewport shows
 //! a new or moved wall at once; saving writes the IFC placement, axis and swept-solid body.
 //!
-//! Built so far: straight walls on the wall centreline. Joins, layered types, other location lines,
-//! arcs and profiles come with the rest of Chapter 3.
+//! Built so far: straight walls on the wall centreline, with L and T joins of single-layer walls
+//! (see [`joins`]). Layered types, other location lines, arcs and profiles come with the rest of
+//! Chapter 3.
+
+pub mod joins;
+
+pub use joins::{End, Join, Solved, WallBody, solve};
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -82,6 +87,13 @@ pub struct WallRecipe {
     pub top_offset: f64,
     pub location_line: LocationLine,
     pub flip: bool,
+    /// Join status of the start and end (Allow = `true`, ARC-JOIN-001).
+    #[serde(default = "both_allowed")]
+    pub join_allowed: [bool; 2],
+}
+
+fn both_allowed() -> [bool; 2] {
+    [true, true]
 }
 
 /// Regenerated wall geometry in project coordinates.
@@ -108,25 +120,37 @@ impl WallGeometry {
         ]
     }
 
-    /// The body as a closed box: 8 corners and 12 triangles (outward winding).
-    pub fn mesh(&self) -> (Vec<[f64; 3]>, Vec<u32>) {
+    /// Unit normal to the left of the direction: the exterior side (+Y local).
+    pub fn normal(&self) -> [f64; 2] {
         let [ux, uy] = self.direction();
-        // Exterior is on the left of the location curve (+Y local).
-        let (nx, ny) = (-uy * self.width / 2.0, ux * self.width / 2.0);
-        let (z0, z1) = (self.base_z, self.base_z + self.height);
-        let [sx, sy] = self.start;
-        let [ex, ey] = self.end;
-        let p = |x: f64, y: f64, z: f64| [x, y, z];
-        let v = vec![
-            p(sx - nx, sy - ny, z0),
-            p(ex - nx, ey - ny, z0),
-            p(ex + nx, ey + ny, z0),
-            p(sx + nx, sy + ny, z0),
-            p(sx - nx, sy - ny, z1),
-            p(ex - nx, ey - ny, z1),
-            p(ex + nx, ey + ny, z1),
-            p(sx + nx, sy + ny, z1),
-        ];
+        [-uy, ux]
+    }
+
+    /// The unjoined plan outline: start-interior, end-interior, end-exterior, start-exterior.
+    pub fn footprint(&self) -> [[f64; 2]; 4] {
+        let [nx, ny] = self.normal().map(|v| v * self.width / 2.0);
+        let ([sx, sy], [ex, ey]) = (self.start, self.end);
+        [
+            [sx - nx, sy - ny],
+            [ex - nx, ey - ny],
+            [ex + nx, ey + ny],
+            [sx + nx, sy + ny],
+        ]
+    }
+
+    /// The unjoined body as a closed box: 8 corners and 12 triangles (outward winding).
+    pub fn mesh(&self) -> (Vec<[f64; 3]>, Vec<u32>) {
+        prism(&self.footprint(), self.base_z, self.base_z + self.height)
+    }
+}
+
+/// A vertical prism over a convex plan quadrilateral ordered as [`WallGeometry::footprint`].
+pub fn prism(f: &[[f64; 2]; 4], z0: f64, z1: f64) -> (Vec<[f64; 3]>, Vec<u32>) {
+    {
+        let v: Vec<[f64; 3]> = [z0, z1]
+            .into_iter()
+            .flat_map(|z| f.iter().map(move |[x, y]| [*x, *y, z]))
+            .collect();
         let i = vec![
             0, 2, 1, 0, 3, 2, // bottom
             4, 5, 6, 4, 6, 7, // top
@@ -333,6 +357,7 @@ pub(crate) fn create(txn: &mut crate::txn::Transaction<'_>, p: CreateParams) -> 
         top_offset: p.top_offset,
         location_line: p.location_line,
         flip: p.flip,
+        join_allowed: both_allowed(),
     };
     let id = txn.create(
         NewElement::new("IfcWall")
@@ -378,4 +403,38 @@ pub(crate) fn set_location(
     txn.modify(id, |e| {
         e.params.insert(RECIPE_KEY.into(), value);
     })
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SetJoinAllowedParams {
+    pub wall_id: ElementRef,
+    pub end: End,
+    pub allowed: bool,
+}
+
+pub(crate) fn set_join_allowed(
+    txn: &mut crate::txn::Transaction<'_>,
+    p: SetJoinAllowedParams,
+) -> Result<()> {
+    let store = txn.store().clone();
+    let id = resolve(&store, &p.wall_id, "wall")?;
+    let mut recipe = wall_recipe(store.get(id).expect("resolved"))
+        .ok_or_else(|| Error::new("wall.not_reviera", "only Reviera walls have join settings"))?;
+    recipe.join_allowed[p.end.index()] = p.allowed;
+    let value = serde_json::to_value(&recipe).expect("recipes serialise");
+    txn.modify(id, |e| {
+        e.params.insert(RECIPE_KEY.into(), value);
+    })
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct JoinsQueryParams {
+    pub wall_id: ElementRef,
+}
+
+pub(crate) fn joins_query(store: &Store, p: JoinsQueryParams) -> Result<Vec<Join>> {
+    let id = resolve(store, &p.wall_id, "wall")?;
+    Ok(solve(store).joins_of(id))
 }

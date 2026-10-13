@@ -437,6 +437,20 @@ impl LiveStore {
     }
 }
 
+impl Drop for LiveStore {
+    /// Without [`LiveStore::close`] the store stays unclean (recoverable), but the writer still
+    /// finishes what was sent to it before the drop returns.
+    fn drop(&mut self) {
+        let Some(writer) = self.writer.take() else {
+            return;
+        };
+        // The document's observer may still hold a sender, so stop the writer explicitly.
+        if self.tx.send(Msg::Detach).is_ok() {
+            let _ = writer.join();
+        }
+    }
+}
+
 fn element_row(e: &Element) -> ElementRow {
     ElementRow {
         id: e.id().0 as i64,

@@ -15,7 +15,7 @@
 //! not have this shape (written by another tool) is replaced.
 
 use reviera_core::GlobalId;
-use reviera_core::walls::WallGeometry;
+use reviera_core::walls::{End, Join, WallBody};
 use reviera_ifc::{AttrValue, Entity, IfcModel, StepId};
 
 use crate::Result;
@@ -81,10 +81,40 @@ struct WallShape {
     axis_points: [StepId; 2],
     body_rep: StepId,
     solid: StepId,
+    /// An `IfcRectangleProfileDef` (unjoined walls) or an `IfcArbitraryClosedProfileDef` with an
+    /// `IfcPolyline` outline (joined walls).
     profile: StepId,
-    profile_axes: StepId,
-    profile_location: StepId,
     extrusion: StepId,
+}
+
+/// The entities of a profile written by [`WallShape`], with the profile itself first.
+fn profile_entities(ifc: &IfcModel, profile: StepId) -> Result<Option<Vec<StepId>>> {
+    let p = entity(ifc, profile)?;
+    let mut ids = vec![profile];
+    if p.class.eq_ignore_ascii_case("IfcRectangleProfileDef") {
+        let Some(axes) = p.refs("Position").first().copied() else {
+            return Ok(None);
+        };
+        ids.push(axes);
+        ids.extend(entity(ifc, axes)?.refs("Location"));
+    } else if p.class.eq_ignore_ascii_case("IfcArbitraryClosedProfileDef") {
+        let Some(curve) = p.refs("OuterCurve").first().copied() else {
+            return Ok(None);
+        };
+        let c = entity(ifc, curve)?;
+        if !c.class.eq_ignore_ascii_case("IfcPolyline") {
+            return Ok(None);
+        }
+        ids.push(curve);
+        let mut points = c.refs("Points");
+        points.dedup();
+        points.sort();
+        points.dedup();
+        ids.extend(points);
+    } else {
+        return Ok(None);
+    }
+    Ok(Some(ids))
 }
 
 impl WallShape {
@@ -139,9 +169,7 @@ impl WallShape {
         let solid = get!(one(&br, "Items"));
         let so = get!(class_is(solid, "IfcExtrudedAreaSolid")?);
         let profile = get!(one(&so, "SweptArea"));
-        let pr = get!(class_is(profile, "IfcRectangleProfileDef")?);
-        let profile_axes = get!(one(&pr, "Position"));
-        let pa = get!(class_is(profile_axes, "IfcAxis2Placement2D")?);
+        get!(profile_entities(ifc, profile)?);
         Ok(Some(Self {
             placement,
             axes,
@@ -155,8 +183,6 @@ impl WallShape {
             body_rep,
             solid,
             profile,
-            profile_axes,
-            profile_location: get!(one(&pa, "Location")),
             extrusion: get!(one(&so, "ExtrudedDirection")),
         }))
     }
@@ -215,17 +241,14 @@ impl WallShape {
             ],
         )?;
 
-        let profile_location = new("IfcCartesianPoint", &[("Coordinates", reals(&[0.0, 0.0]))])?;
-        let profile_axes = new("IfcAxis2Placement2D", &[("Location", r(profile_location))])?;
-        let profile = new(
-            "IfcRectangleProfileDef",
-            &[
-                ("ProfileType", AttrValue::Enum("AREA".into())),
-                ("Position", r(profile_axes)),
-                ("XDim", AttrValue::Real(1.0)),
-                ("YDim", AttrValue::Real(1.0)),
-            ],
-        )?;
+        let profile = new_rectangle(ifc)?;
+        let mut new = |class: &str, attrs: &[(&str, AttrValue)]| -> Result<StepId> {
+            let id = ifc.create(class)?;
+            for (name, value) in attrs {
+                ifc.set_attribute(id, name, value)?;
+            }
+            Ok(id)
+        };
         let solid_origin = new(
             "IfcCartesianPoint",
             &[("Coordinates", reals(&[0.0, 0.0, 0.0]))],
@@ -273,14 +296,14 @@ impl WallShape {
             body_rep,
             solid,
             profile,
-            profile_axes,
-            profile_location,
             extrusion,
         })
     }
 
-    /// Sets the values of the shape from the geometry (in file units).
-    fn update(&self, ifc: &mut IfcModel, g: &WallGeometry, scale: f64) -> Result<()> {
+    /// Sets the values of the shape from the body (in file units). The profile is replaced when
+    /// the wall changes between unjoined (rectangle) and joined (polygon).
+    fn update(&mut self, ifc: &mut IfcModel, body: &WallBody, scale: f64) -> Result<()> {
+        let g = &body.geometry;
         let [ux, uy] = g.direction();
         let (l, w, h) = (g.length() / scale, g.width / scale, g.height / scale);
         let set = |ifc: &mut IfcModel, id: StepId, attr: &str, v: AttrValue| -> Result<()> {
@@ -300,14 +323,44 @@ impl WallShape {
         )?;
         set(ifc, self.axis_points[0], "Coordinates", reals(&[0.0, 0.0]))?;
         set(ifc, self.axis_points[1], "Coordinates", reals(&[l, 0.0]))?;
-        set(
-            ifc,
-            self.profile_location,
-            "Coordinates",
-            reals(&[l / 2.0, 0.0]),
-        )?;
-        set(ifc, self.profile, "XDim", AttrValue::Real(l))?;
-        set(ifc, self.profile, "YDim", AttrValue::Real(w))?;
+        let rectangle = body.is_rectangular();
+        let class = ifc.class_of(self.profile)?;
+        let polyline = match ifc.attribute(self.profile, "OuterCurve") {
+            Ok(AttrValue::Ref(c)) => Some(entity(ifc, StepId(c))?.refs("Points")),
+            _ => None,
+        };
+        let fits = if rectangle {
+            class.eq_ignore_ascii_case("IfcRectangleProfileDef")
+        } else {
+            polyline
+                .as_ref()
+                .is_some_and(|p| p.len() == 5 && p[0] == p[4])
+        };
+        if !fits {
+            let old = profile_entities(ifc, self.profile)?.unwrap_or_default();
+            self.profile = if rectangle {
+                new_rectangle(ifc)?
+            } else {
+                new_polygon(ifc)?
+            };
+            ifc.set_attribute(self.solid, "SweptArea", &AttrValue::Ref(self.profile.0))?;
+            for id in old {
+                ifc.remove(id)?;
+            }
+        }
+        if rectangle {
+            let axes = entity(ifc, self.profile)?.refs("Position")[0];
+            let location = entity(ifc, axes)?.refs("Location")[0];
+            set(ifc, location, "Coordinates", reals(&[l / 2.0, 0.0]))?;
+            set(ifc, self.profile, "XDim", AttrValue::Real(l))?;
+            set(ifc, self.profile, "YDim", AttrValue::Real(w))?;
+        } else {
+            let curve = entity(ifc, self.profile)?.refs("OuterCurve")[0];
+            let points = entity(ifc, curve)?.refs("Points");
+            for (point, [x, y]) in points.iter().zip(body.local_footprint()) {
+                set(ifc, *point, "Coordinates", reals(&[x / scale, y / scale]))?;
+            }
+        }
         set(
             ifc,
             self.extrusion,
@@ -333,11 +386,9 @@ impl WallShape {
             self.axis_points[1],
             self.body_rep,
             self.solid,
-            self.profile,
-            self.profile_axes,
-            self.profile_location,
             self.extrusion,
         ];
+        ids.extend(profile_entities(ifc, self.profile)?.unwrap_or_default());
         if let Some(axes) = entity(ifc, self.solid)?.refs("Position").first() {
             ids.push(*axes);
             ids.extend(entity(ifc, *axes)?.refs("Location"));
@@ -346,16 +397,68 @@ impl WallShape {
     }
 }
 
+fn create_with(ifc: &mut IfcModel, class: &str, attrs: &[(&str, AttrValue)]) -> Result<StepId> {
+    let id = ifc.create(class)?;
+    for (name, value) in attrs {
+        ifc.set_attribute(id, name, value)?;
+    }
+    Ok(id)
+}
+
+/// A rectangle profile centred on its position (values are set by [`WallShape::update`]).
+fn new_rectangle(ifc: &mut IfcModel) -> Result<StepId> {
+    let location = create_with(
+        ifc,
+        "IfcCartesianPoint",
+        &[("Coordinates", reals(&[0.0, 0.0]))],
+    )?;
+    let axes = create_with(
+        ifc,
+        "IfcAxis2Placement2D",
+        &[("Location", AttrValue::Ref(location.0))],
+    )?;
+    create_with(
+        ifc,
+        "IfcRectangleProfileDef",
+        &[
+            ("ProfileType", AttrValue::Enum("AREA".into())),
+            ("Position", AttrValue::Ref(axes.0)),
+            ("XDim", AttrValue::Real(1.0)),
+            ("YDim", AttrValue::Real(1.0)),
+        ],
+    )
+}
+
+/// A closed four-sided polyline profile; the first point closes the outline.
+fn new_polygon(ifc: &mut IfcModel) -> Result<StepId> {
+    let mut points = Vec::new();
+    for c in [[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]] {
+        points.push(AttrValue::Ref(
+            create_with(ifc, "IfcCartesianPoint", &[("Coordinates", reals(&c))])?.0,
+        ));
+    }
+    points.push(points[0].clone());
+    let curve = create_with(ifc, "IfcPolyline", &[("Points", AttrValue::List(points))])?;
+    create_with(
+        ifc,
+        "IfcArbitraryClosedProfileDef",
+        &[
+            ("ProfileType", AttrValue::Enum("AREA".into())),
+            ("OuterCurve", AttrValue::Ref(curve.0)),
+        ],
+    )
+}
+
 /// Writes a wall's placement and representations, updating its existing shape in place.
 pub(crate) fn write_wall(
     ifc: &mut IfcModel,
     wall: StepId,
-    g: &WallGeometry,
+    body: &WallBody,
     scale: f64,
     contexts: Contexts,
 ) -> Result<()> {
     let e = entity(ifc, wall)?;
-    let shape = match WallShape::read(ifc, &e)? {
+    let mut shape = match WallShape::read(ifc, &e)? {
         Some(s) => s,
         None => {
             let s = WallShape::create(ifc, contexts)?;
@@ -364,11 +467,14 @@ pub(crate) fn write_wall(
             s
         }
     };
-    shape.update(ifc, g, scale)
+    shape.update(ifc, body, scale)
 }
 
 /// Removes the shape of a wall written by [`write_wall`] (before the wall itself is removed).
 pub(crate) fn remove_wall(ifc: &mut IfcModel, wall: StepId) -> Result<()> {
+    for rel in ifc.referenced_by(wall, "IfcRelConnectsPathElements")? {
+        ifc.remove(rel)?;
+    }
     let e = entity(ifc, wall)?;
     if let Some(shape) = WallShape::read(ifc, &e)? {
         for id in shape.entities(ifc)? {
@@ -472,4 +578,77 @@ fn si_prefix(p: &str) -> f64 {
         "MICRO" => 1e-6,
         _ => 1.0,
     }
+}
+
+/// Writes the connections between Reviera walls as `IfcRelConnectsPathElements` (ARC-JOIN-001):
+/// L joins connect `ATSTART`/`ATEND` to `ATSTART`/`ATEND`, T joins an end to `ATPATH`.
+/// Connections between `walls` that are no longer joined are removed; others are left alone.
+pub(crate) fn write_connections(
+    ifc: &mut IfcModel,
+    walls: &std::collections::HashSet<StepId>,
+    joins: &[(StepId, Join, StepId)],
+    owner_history: Option<StepId>,
+) -> Result<()> {
+    const REL: &str = "IfcRelConnectsPathElements";
+    let kind = |e: Option<End>| match e {
+        Some(End::Start) => "ATSTART",
+        Some(End::End) => "ATEND",
+        None => "ATPATH",
+    };
+    let key = |a: StepId, ka: &str, b: StepId, kb: &str| (a, ka.to_owned(), b, kb.to_owned());
+    let mut wanted: std::collections::BTreeSet<_> = joins
+        .iter()
+        .map(|(a, j, b)| key(*a, kind(Some(j.end)), *b, kind(j.other_end)))
+        .collect();
+    let existing: Vec<StepId> = ifc
+        .entities_of_type(REL)?
+        .into_iter()
+        .map(|e| e.id)
+        .collect();
+    for (rel, e) in existing.iter().zip(ifc.attributes_many(&existing)?) {
+        let (Some(a), Some(b)) = (
+            e.refs("RelatingElement").first().copied(),
+            e.refs("RelatedElement").first().copied(),
+        ) else {
+            continue;
+        };
+        if !walls.contains(&a) || !walls.contains(&b) {
+            continue;
+        }
+        let enum_of = |name: &str| match e.get(name) {
+            AttrValue::Enum(v) => v.clone(),
+            _ => String::new(),
+        };
+        let k = key(
+            a,
+            &enum_of("RelatingConnectionType"),
+            b,
+            &enum_of("RelatedConnectionType"),
+        );
+        if !wanted.remove(&k) {
+            ifc.remove(*rel)?;
+        }
+    }
+    for (a, ka, b, kb) in wanted {
+        let rel = ifc.create_rooted(REL, &GlobalId::new())?;
+        if let Some(oh) = owner_history {
+            ifc.set_attribute(rel, "OwnerHistory", &AttrValue::Ref(oh.0))?;
+        }
+        ifc.set_attribute(rel, "RelatingElement", &AttrValue::Ref(a.0))?;
+        ifc.set_attribute(rel, "RelatedElement", &AttrValue::Ref(b.0))?;
+        // One layer each, and it passes through the join.
+        ifc.set_attribute(
+            rel,
+            "RelatingPriorities",
+            &AttrValue::List(vec![AttrValue::Int(0)]),
+        )?;
+        ifc.set_attribute(
+            rel,
+            "RelatedPriorities",
+            &AttrValue::List(vec![AttrValue::Int(0)]),
+        )?;
+        ifc.set_attribute(rel, "RelatingConnectionType", &AttrValue::Enum(ka))?;
+        ifc.set_attribute(rel, "RelatedConnectionType", &AttrValue::Enum(kb))?;
+    }
+    Ok(())
 }
