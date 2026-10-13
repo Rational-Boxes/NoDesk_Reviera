@@ -1066,3 +1066,48 @@ fn a_courtyard_building_is_roofed_around_its_courtyard() {
     let v = volume(&roof_mesh.verts, &roof_mesh.faces).abs();
     assert!((v - g.volume()).abs() / g.volume() < 1e-3, "{v}");
 }
+
+/// Scripts and agents edit footprints like the window's grips (`sketch.move_curve`,
+/// `sketch.move_corner`), each one undoable step.
+#[test]
+fn footprint_edges_and_corners_move_by_command() {
+    let dir = tempfile::tempdir().unwrap();
+    let (_, mut doc, _, level) = project(dir.path());
+    let r = registry();
+    let roof = id(run(
+        &r,
+        &mut doc,
+        "roof.create_footprint",
+        json!({ "curves": curves(&RECT, |_| json!({})), "level_id": level.0, "base_offset": 3.0 }),
+    )
+    .unwrap());
+    assert!((geometry(&doc, roof).projected_area() - 60.0).abs() < 1e-6);
+    // Curve 2 is the east side (x = 10): out by 2 m; the along part of the vector is ignored.
+    run(
+        &r,
+        &mut doc,
+        "sketch.move_curve",
+        json!({ "element_id": roof.0, "key": 2, "vector": [2.0, 7.0] }),
+    )
+    .unwrap();
+    assert!((geometry(&doc, roof).projected_area() - 72.0).abs() < 1e-6);
+    // The north-east corner pulled in makes a trapezoid.
+    run(
+        &r,
+        &mut doc,
+        "sketch.move_corner",
+        json!({ "element_id": roof.0, "from": [12.0, 6.0], "to": [10.0, 6.0] }),
+    )
+    .unwrap();
+    assert!((geometry(&doc, roof).projected_area() - 66.0).abs() < 1e-6);
+    let err = run(
+        &r,
+        &mut doc,
+        "sketch.move_corner",
+        json!({ "element_id": roof.0, "from": [50.0, 50.0], "to": [0.0, 0.0] }),
+    )
+    .unwrap_err();
+    assert_eq!(err.code, "sketch.no_such_corner");
+    run(&r, &mut doc, "edit.undo", json!({})).unwrap();
+    assert!((geometry(&doc, roof).projected_area() - 72.0).abs() < 1e-6);
+}

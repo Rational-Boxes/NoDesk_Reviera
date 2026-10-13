@@ -48,22 +48,21 @@ pub fn toolset_of(command: &str) -> String {
         "element" | "edit" | "model" | "registry" | "param" | "global" | "pset" | "qto"
         | "warnings" | "failure" | "regen" | "snaps" | "selection" | "graph" => "core",
         "wall" | "floor" | "roof" | "door" | "window" | "stair" | "modify" | "str" | "mep"
-        | "site" | "cme" | "host" | "numbering" | "decal" | "spatial" | "building" | "assembly"
-        | "part" => "modeling",
-        "view" | "sheet" | "schedule" | "annotate" | "render" | "walkthrough" | "xr" | "ui" => {
-            "documentation"
-        }
+        | "level" | "grid" | "room" | "ceiling" | "insert" | "sketch" | "site" | "cme" | "host"
+        | "numbering" | "decal" | "spatial" | "building" | "assembly" | "part" => "modeling",
+        "view" | "sheet" | "schedule" | "annotate" | "render" | "walkthrough" | "xr" | "ui"
+        | "tag" | "text" | "anno" | "dim" | "viewport" | "section" | "inspect" => "documentation",
         "family" | "family_doc" | "type" | "instance" | "library" | "formula" | "subcategory" => {
             "families"
         }
         "material" | "object_style" | "line_pattern" | "line_style" | "line_weight"
-        | "fill_pattern" | "image" => "materials",
+        | "fill_pattern" | "image" | "objectstyle" | "lineweight" => "materials",
         "project" | "location" | "coordinates" | "position" | "phase" | "standards" | "units"
         | "purge" | "classification" | "keynotes" | "paramlib" | "external_props" => {
             "project_setup"
         }
         "file" | "import" | "export" | "live" | "recovery" | "validate" | "rxd" | "journal"
-        | "history" | "snapshot" => "io",
+        | "history" | "snapshot" | "cobie" => "io",
         "bimserver" | "link" | "workset" | "bcf" | "cde" | "api" | "http" => "collaboration",
         "analysis" => "analysis",
         "script" | "addin" | "lua" => "scripting",
@@ -87,5 +86,19 @@ mod tests {
             "addin:org.example.roomtools"
         );
         assert_eq!(toolset_of("test.thing"), "other");
+    }
+
+    /// Every built-in command (the core's, the store's and the application's) is in a named
+    /// toolset, so agents find the high-level tools (tags, stairs, sheets, …) where they look.
+    #[test]
+    fn every_built_in_command_has_a_toolset() {
+        let app = reviera_app::App::new(reviera_app::AppConfig::default());
+        let loose: Vec<String> = app
+            .registry()
+            .iter()
+            .map(|c| c.name.clone())
+            .filter(|n| toolset_of(n) == "other")
+            .collect();
+        assert!(loose.is_empty(), "commands without a toolset: {loose:?}");
     }
 }

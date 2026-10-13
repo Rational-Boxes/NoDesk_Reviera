@@ -66,6 +66,8 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(RoofSetSlope),
         registry.add(RoofSetShape),
         registry.add(RoofAttachWalls),
+        registry.add(SketchMoveCurve),
+        registry.add(SketchMoveCorner),
         registry.add(StairCreate),
         registry.add(StairSetParams),
         registry.add(WallAttach),
@@ -2533,6 +2535,29 @@ modify_command!(
     crate::stairs::SetParams,
     (),
     crate::stairs::set_params
+);
+modify_command!(
+    SketchMoveCurve,
+    "sketch.move_curve",
+    "Move a footprint curve",
+    "Moves one curve of a roof's, floor's or ceiling's footprint across itself by `vector` (only the part \
+     across the curve counts); its neighbours keep their directions and stretch or shorten to meet it. \
+     The moved curve leaves the wall it was locked to. Keys are the curves' 1-based order.",
+    "Move Footprint Edge",
+    crate::sketch_edit::MoveCurveParams,
+    (),
+    crate::sketch_edit::move_curve_command
+);
+modify_command!(
+    SketchMoveCorner,
+    "sketch.move_corner",
+    "Move a footprint corner",
+    "Moves the corner of a roof's, floor's or ceiling's footprint at `from` to `to`; the curves ending \
+     there follow and leave the walls they were locked to.",
+    "Move Footprint Corner",
+    crate::sketch_edit::MoveCornerParams,
+    (),
+    crate::sketch_edit::move_corner_command
 );
 modify_command!(
     RoofAttachWalls,

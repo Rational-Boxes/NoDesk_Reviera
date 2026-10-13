@@ -652,6 +652,13 @@ icon = "roof"
 help = "Roof by footprint: pick walls or sketch the outline; sloped edges rise, the others are gables"
 
 [[action]]
+id = "stair.create"
+label = "Stair"
+icon = "stair"
+keys = "ST"
+help = "Draw a stair in a plan: click the start and end of each run; landings join the runs"
+
+[[action]]
 id = "roof.attach_walls"
 label = "Attach Walls"
 icon = "attach"
@@ -719,6 +726,10 @@ tools = [
   { action = "room.place", size = "large" },
   { action = "room.place_automatically", size = "small" },
 ]
+
+[[tab.panel]]
+label = "Circulation"
+tools = [{ action = "stair.create", size = "large" }]
 
 [[tab.panel]]
 label = "Datum"

@@ -1,113 +1,43 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Reviera contributors
 
-//! Editing sketch curves in place (ARC-SKCH-001): moving one curve parallel to itself with its
-//! neighbours stretched or shortened to meet it, moving a corner shared by curves, and changing
-//! a curve's length. Shared by the sketch session and the footprint grips of roofs, floors and
-//! ceilings.
+//! Editing sketch curves in place (ARC-SKCH-001) for the sketch session and the footprint
+//! grips: the core's edits (`reviera_core::sketch_edit`, also the `sketch.move_*` commands) on
+//! the session's curves, which drop their locks when they leave their line; and picking.
 
 use reviera_core::walls::Line;
 
 use crate::sketch::Curve;
 
-/// Points closer than this (metres) are the same corner.
-const SAME: f64 = 1e-6;
-
-fn close(a: [f64; 2], b: [f64; 2]) -> bool {
-    (a[0] - b[0]).hypot(a[1] - b[1]) < SAME
-}
-
-fn unit(l: Line) -> [f64; 2] {
-    let d = [l.end[0] - l.start[0], l.end[1] - l.start[1]];
-    let len = d[0].hypot(d[1]).max(1e-12);
-    [d[0] / len, d[1] / len]
-}
-
-/// Where the infinite lines through `a` and `b` cross; `None` when they are parallel.
-fn crossing(a: Line, b: Line) -> Option<[f64; 2]> {
-    let (u, v) = (unit(a), unit(b));
-    let den = u[0] * v[1] - u[1] * v[0];
-    if den.abs() < 1e-9 {
-        return None;
+/// Runs a core edit on the curves' lines; the curves that left their line drop their locks.
+fn edit(curves: &mut [Curve], f: impl FnOnce(&mut [Line]) -> Vec<usize>) {
+    let mut lines: Vec<Line> = curves.iter().map(|c| c.line).collect();
+    let moved = f(&mut lines);
+    for (c, l) in curves.iter_mut().zip(lines) {
+        c.line = l;
     }
-    let w = [b.start[0] - a.start[0], b.start[1] - a.start[1]];
-    let t = (w[0] * v[1] - w[1] * v[0]) / den;
-    Some([a.start[0] + u[0] * t, a.start[1] + u[1] * t])
+    for i in moved {
+        curves[i].lock = None;
+    }
 }
 
-/// Moves curve `i` by the part of `v` across it (it stays on its own direction). Each curve
-/// meeting it at a corner keeps its direction and is stretched or shortened to meet it again.
-/// The moved curve leaves the wall it was locked to; the neighbours keep theirs, since they
-/// stay on their lines.
+/// Moves curve `i` across itself by `v`; its neighbours stretch or shorten to meet it.
 pub fn move_curve(curves: &mut [Curve], i: usize, v: [f64; 2]) {
-    let old = curves[i].line;
-    let u = unit(old);
-    let n = [-u[1], u[0]];
-    let d = v[0] * n[0] + v[1] * n[1];
-    if d.abs() < 1e-12 {
-        return;
-    }
-    let shift = |p: [f64; 2]| [p[0] + n[0] * d, p[1] + n[1] * d];
-    let line = Line {
-        start: shift(old.start),
-        end: shift(old.end),
-    };
-    let mut new = line;
-    for (j, c) in curves.iter_mut().enumerate() {
-        if j == i {
-            continue;
-        }
-        for (k, corner) in [old.start, old.end].into_iter().enumerate() {
-            let moved = if k == 0 { line.start } else { line.end };
-            let at = crossing(c.line, line).unwrap_or(moved);
-            let mut met = false;
-            if close(c.line.start, corner) {
-                c.line.start = at;
-                met = true;
-            }
-            if close(c.line.end, corner) {
-                c.line.end = at;
-                met = true;
-            }
-            // The moved curve ends where its neighbour now meets it.
-            if met {
-                if k == 0 {
-                    new.start = at;
-                } else {
-                    new.end = at;
-                }
-            }
-        }
-    }
-    curves[i].line = new;
-    curves[i].lock = None;
+    edit(curves, |l| reviera_core::sketch_edit::move_curve(l, i, v));
 }
 
-/// Moves the corner at `from` to `to`: every curve ending there follows, and those leave the
-/// walls they were locked to.
+/// Moves the corner at `from` to `to`, with every curve ending there.
 pub fn move_corner(curves: &mut [Curve], from: [f64; 2], to: [f64; 2]) {
-    for c in curves.iter_mut() {
-        let mut moved = false;
-        if close(c.line.start, from) {
-            c.line.start = to;
-            moved = true;
-        }
-        if close(c.line.end, from) {
-            c.line.end = to;
-            moved = true;
-        }
-        if moved {
-            c.lock = None;
-        }
-    }
+    edit(curves, |l| {
+        reviera_core::sketch_edit::move_corner(l, from, to)
+    });
 }
 
-/// Changes curve `i`'s length, keeping its start; the corner at its end moves along it.
+/// Changes curve `i`'s length, keeping its start.
 pub fn set_length(curves: &mut [Curve], i: usize, length: f64) {
-    let l = curves[i].line;
-    let u = unit(l);
-    let to = [l.start[0] + u[0] * length, l.start[1] + u[1] * length];
-    move_corner(curves, l.end, to);
+    edit(curves, |l| {
+        reviera_core::sketch_edit::set_length(l, i, length)
+    });
 }
 
 /// The curve nearest to `p` within `reach`, and the corner of it within `reach` if any.

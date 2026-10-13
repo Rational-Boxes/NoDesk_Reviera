@@ -33,6 +33,7 @@ mod sheets;
 mod sketch;
 mod sketch_edit;
 mod snap;
+mod stairs;
 mod wx;
 
 use std::cell::RefCell;
@@ -193,6 +194,8 @@ struct Gui {
     section_tool: Option<sections::SectionTool>,
     /// The Tag, Room Tag or Text tool.
     note_tool: Option<notes::NoteTool>,
+    /// The Stair tool.
+    stair_tool: Option<stairs::StairTool>,
     /// The floor type new floors take.
     floor_type: Option<ElementId>,
     /// The last pointer position in the active view (Tab in sketch mode picks there).
@@ -1098,6 +1101,7 @@ impl Gui {
     }
 
     fn end_tool(&mut self, frame: &Frame) {
+        self.end_stair_tool();
         if self.tool.take().is_some() {
             if let Some(v) = self.viewport() {
                 v.set_overlay(&[]);
@@ -1117,6 +1121,9 @@ impl Gui {
         }
         if self.end_note_tool() {
             return frame.set_status_text("Ready", 0);
+        }
+        if self.stair_tool.is_some() {
+            return self.stair_escape();
         }
         if self.attach_pick.take().is_some() {
             return frame.set_status_text("Attach cancelled", 0);
@@ -1708,7 +1715,7 @@ impl Gui {
             self.room_rows(grid, id);
             return;
         }
-        if self.note_rows(grid, id) {
+        if self.note_rows(grid, id) || self.stair_rows(grid, id) {
             return;
         }
         if let Some(d) = dimension {
@@ -1921,6 +1928,7 @@ impl Gui {
             || self.sheet_view_edit(property, text.clone())
             || self.note_edit(property, text.clone())
             || self.sketch_edit(property, text.clone())
+            || self.stair_edit(property, text.clone())
         {
             return;
         }
@@ -2216,6 +2224,7 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                     None if g.room_tool.is_some() => g.room_click(x, y),
                     None if g.section_tool.is_some() => g.section_click(x, y),
                     None if g.note_tool.is_some() => g.note_click(x, y, &p),
+                    None if g.stair_tool.is_some() => g.stair_click(x, y),
                     None if g.dim_tool.is_some() => g.dim_click(x, y),
                     None if g.grid_tool.is_some() => g.grid_click(x, y),
                     None if g.insert_tool.is_some() => g.insert_click(x, y),
@@ -2263,6 +2272,10 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                     }
                     if g.section_tool.is_some() {
                         g.section_motion(x, y);
+                        redraw = true;
+                    }
+                    if g.stair_tool.is_some() {
+                        g.stair_motion(x, y);
                         redraw = true;
                     }
                     if g.dim_tool.is_some() {
@@ -2714,6 +2727,7 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 room_tool: None,
                 section_tool: None,
                 note_tool: None,
+                stair_tool: None,
                 floor_type: None,
                 mouse: (0, 0),
                 offset_distance: 1.0,
@@ -3144,6 +3158,10 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
             focus(g);
         }),
         "tag.tag_all" => with(gui, Gui::tag_all),
+        "stair.create" => with(gui, |g| {
+            g.start_stair_tool();
+            focus(g);
+        }),
         "sheet.place_view" => with(gui, Gui::place_view_on_sheet),
         "sheet.place_schedule" => with(gui, Gui::place_schedule_on_sheet),
         "sheet.open_view" => with(gui, Gui::open_sheet_view),

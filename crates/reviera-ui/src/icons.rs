@@ -237,6 +237,9 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "tag_all" => format!(
             r#"<rect x="3" y="4" width="13" height="8" fill="{f}" {s}/><rect x="16" y="13" width="13" height="8" fill="{f}" {s}/><rect x="3" y="22" width="13" height="8" fill="{f}" {s}/><path d="M7 8h5M20 17h5M7 26h5" {sa}/>"#
         ),
+        "stair" => format!(
+            r#"<path d="M3 27h6v-5h6v-5h6v-5h6v-5h3" fill="none" {s} stroke-width="2"/><path d="M3 27h27V7" fill="{f}" opacity="0.5"/><path d="M8 12l6-6M14 6h-4M14 6v4" {sa}/>"#
+        ),
         "fields" => format!(
             r#"<rect x="4" y="5" width="24" height="22" fill="{f}" {s}/><path d="M12 5v22M20 5v22" {s}/><path d="M23 13l3 3-3 3" {sa}/>"#
         ),

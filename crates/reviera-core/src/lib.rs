@@ -34,6 +34,7 @@ pub mod schedules;
 pub mod sections;
 pub mod sheets;
 pub mod sketch;
+pub mod sketch_edit;
 pub mod stairs;
 pub mod standards;
 pub mod store;

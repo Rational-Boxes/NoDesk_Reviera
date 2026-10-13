@@ -71,6 +71,9 @@ fn raw_parent(store: &Store, e: &Element, imported: &Imported) -> Option<Element
     if let Some(r) = crate::rooms::room_recipe(e) {
         return by_guid(&r.level);
     }
+    if let Some(r) = crate::stairs::stair_recipe(e) {
+        return by_guid(&r.base_level);
+    }
     if let Some(r) = crate::inserts::insert_recipe(e) {
         return by_guid(&r.host);
     }
