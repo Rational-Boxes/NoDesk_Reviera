@@ -592,6 +592,7 @@ impl Gui {
             self.app.set_active_view(doc, element);
             self.update_title(&frame);
             self.properties_stale = true;
+            self.update_view_actions();
         }
         if let Some(i) = self
             .view(id)
@@ -1241,7 +1242,16 @@ impl Gui {
     }
 
     /// Shows the contextual "Modify | <category>" tab while elements are selected (§1.9.1).
+    /// Enables the actions that depend on the active view (3D-only navigation).
+    fn update_view_actions(&mut self) {
+        let three_d = self.active_view().is_some_and(|v| v.plan.is_none());
+        for action in ["view.set_projection", "view.walk"] {
+            self.ribbon.enable(action, three_d);
+        }
+    }
+
     fn update_ribbon_context(&mut self) {
+        self.update_view_actions();
         if let Some(s) = &self.sketch {
             let label = if s.host.is_some() {
                 "Edit Boundary"
@@ -2191,7 +2201,7 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
         // Ribbon clicks reach the window's dispatcher once it exists.
         let dispatch: Rc<RefCell<Option<Dispatch>>> = Rc::new(RefCell::new(None));
         let ribbon_panel = Panel::builder(&frame).build();
-        let ribbon_bar = {
+        let mut ribbon_bar = {
             let dispatch = dispatch.clone();
             ribbon::Ribbon::new(&ribbon_panel, catalog.clone(), move |id| {
                 if let Ok(d) = dispatch.try_borrow()
@@ -2216,6 +2226,10 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 .resizable(false)
                 .min_size(-1, ribbon_bar.height()),
         );
+        // Menu items follow the ribbon's enabled state.
+        if let Some(bar) = frame.get_menu_bar() {
+            ribbon_bar.set_menu_bar(bar);
+        }
         let grid = PropertyGrid::builder(&frame)
             .with_style(PropertyGridStyle::Tooltips)
             .build();
@@ -2497,6 +2511,23 @@ type Dispatch = Box<dyn Fn(i32)>;
 
 /// Runs a catalog action (from the ribbon, the Quick Access Toolbar or a menu).
 fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
+    // `REVIERA_TRACE_ACTIONS=1` logs every action the ribbon, toolbar and menus run.
+    if std::env::var_os("REVIERA_TRACE_ACTIONS").is_some() {
+        let mut view = String::new();
+        with(gui, |g| {
+            view = g
+                .active_view()
+                .map(|v| {
+                    format!(
+                        "{} ({})",
+                        g.view_name(v),
+                        if v.plan.is_some() { "plan" } else { "3D" }
+                    )
+                })
+                .unwrap_or_default();
+        });
+        eprintln!("action {action} in view {view}");
+    }
     // While a sketch is open, only sketch, view and file actions run.
     let mut sketching = false;
     with(gui, |g| sketching = g.sketch.is_some());

@@ -338,6 +338,7 @@ pub struct Ribbon {
     context_key: Option<String>,
     /// The page that was active before the contextual tab appeared.
     previous: i32,
+    menu_bar: Option<MenuBar>,
 }
 
 impl Ribbon {
@@ -358,6 +359,7 @@ impl Ribbon {
             context_index: 0,
             context_key: None,
             previous: 0,
+            menu_bar: None,
         };
         for tab in r.catalog.tabs.clone() {
             let page = unsafe { reviera_rb_page(bar, c(&tab.label).as_ptr()) };
@@ -461,10 +463,19 @@ impl Ribbon {
         cx.map(|c| c.label.clone())
     }
 
+    /// Enables or disables an action's ribbon buttons and menu items.
     pub fn enable(&self, action: &str, enable: bool) {
         if let Some(id) = self.catalog.id_of(action) {
             unsafe { reviera_rb_enable(id, c_int::from(enable)) }
+            if let Some(bar) = &self.menu_bar {
+                bar.enable_item(id, enable);
+            }
         }
+    }
+
+    /// The menu bar whose items follow the ribbon's enabled state.
+    pub fn set_menu_bar(&mut self, bar: MenuBar) {
+        self.menu_bar = Some(bar);
     }
 }
 

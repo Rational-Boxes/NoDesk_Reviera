@@ -173,7 +173,10 @@ impl Gui {
 
     pub(crate) fn toggle_perspective(&mut self) {
         if self.in_plan() {
-            return;
+            return self.frame.set_status_text(
+                "Perspective and isometric apply to 3D views; this is a plan",
+                0,
+            );
         }
         self.leave_walk();
         let Some(v) = self.active_view_mut() else {
@@ -186,6 +189,7 @@ impl Gui {
             "Isometric (parallel projection)"
         };
         self.frame.set_status_text(text, 0);
+        self.properties_stale = true;
         self.refresh_active();
     }
 
