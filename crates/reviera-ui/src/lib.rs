@@ -25,6 +25,7 @@ mod plans;
 mod ribbon;
 mod roofs;
 mod rooms;
+mod schedules;
 mod sections;
 mod sketch;
 mod snap;
@@ -133,6 +134,8 @@ struct View {
     plan: Option<plans::PlanState>,
     /// Set for section and elevation views.
     section: Option<sections::SectionState>,
+    /// Set for schedule views (a grid instead of a viewport).
+    schedule: Option<schedules::ScheduleState>,
     panel: Panel,
     viewport: Option<WgpuViewport>,
     /// The native surface under the viewport; declared after it so it is dropped after it.
@@ -269,6 +272,10 @@ impl Gui {
         let Some(index) = self.views.iter().position(|v| v.id == id) else {
             return;
         };
+        // A schedule is a grid, not a viewport.
+        if self.views[index].schedule.is_some() {
+            return;
+        }
         let doc = self.views[index].doc;
         let needs_surface =
             self.views[index].viewport.is_none() && self.views[index].error.is_none();
@@ -594,6 +601,9 @@ impl Gui {
         }
         let plan = self.plan_info(doc, element);
         let section = self.section_info(doc, element);
+        let schedule = self
+            .is_schedule(doc, element)
+            .then(|| Gui::schedule_grid(&panel));
         if plan.is_some() || section.is_some() {
             camera.perspective = false;
             camera.orient(glam::Vec3::Z);
@@ -640,6 +650,7 @@ impl Gui {
             synced: saved,
             plan,
             section,
+            schedule,
             panel,
             viewport: None,
             native: None,
@@ -651,11 +662,31 @@ impl Gui {
             nav,
         };
         let caption = self.caption(&view);
+        let grid = view.schedule.as_ref().map(|s| s.grid);
         self.views.push(view);
         if let Some(gui) = self.this.upgrade() {
             attach_view_handlers(&gui, id, panel, self.frame);
+            if let Some(grid) = grid {
+                let g = gui.clone();
+                grid.on_cell_changed(move |e| {
+                    let (row, col) = (e.get_row(), e.get_col());
+                    if let Ok(mut gui) = g.try_borrow_mut() {
+                        gui.schedule_cell_changed(id, row, col);
+                    }
+                });
+                let g = gui.clone();
+                grid.on_select_cell(move |e| {
+                    let row = e.get_row();
+                    if let Ok(mut gui) = g.try_borrow_mut() {
+                        gui.schedule_row_selected(id, row);
+                    }
+                });
+            }
         }
         self.notebook.add_page(&panel, &caption, true);
+        if grid.is_some() {
+            self.fill_schedule(id);
+        }
         self.activate_view(id);
         self.browser_stale = true;
     }
@@ -689,7 +720,7 @@ impl Gui {
             self.slice_pick = None;
             self.update_title(&frame);
             self.properties_stale = true;
-            self.update_view_actions();
+            self.update_ribbon_context();
         }
         if let Some(i) = self
             .view(id)
@@ -920,6 +951,7 @@ impl Gui {
         self.browser_stale = true;
         self.tree.stale = true;
         self.sync_views();
+        self.refresh_schedules();
     }
 
     fn undo_redo(&mut self, command: &str, frame: &Frame) {
@@ -1379,7 +1411,9 @@ impl Gui {
     /// Shows the contextual "Modify | <category>" tab while elements are selected (§1.9.1).
     /// Enables the actions that depend on the active view (3D-only navigation).
     fn update_view_actions(&mut self) {
-        let three_d = self.active_view().is_some_and(|v| !v.is_2d());
+        let three_d = self
+            .active_view()
+            .is_some_and(|v| !v.is_2d() && v.schedule.is_none());
         for action in ["view.set_projection", "view.walk"] {
             self.ribbon.enable(action, three_d);
         }
@@ -1387,6 +1421,11 @@ impl Gui {
 
     fn update_ribbon_context(&mut self) {
         self.update_view_actions();
+        if self.active_view().is_some_and(|v| v.schedule.is_some()) {
+            self.ribbon
+                .set_context(Some(("Schedule", Some("session.schedule"))));
+            return;
+        }
         if let Some(s) = &self.sketch {
             use reviera_core::floors::SlabKind;
             use sketch::SketchKind;
@@ -1690,6 +1729,20 @@ impl Gui {
     /// The active view's properties; `false` when the active view is not a model view.
     fn view_properties(&mut self, grid: &PropertyGrid) -> bool {
         if self.section_view_rows(grid) {
+            return true;
+        }
+        if let Some(v) = self.active_view().filter(|v| v.schedule.is_some()) {
+            let name = self.view_name(v);
+            let category = v
+                .element
+                .and_then(|e| self.app.document(v.doc)?.doc.store().get(e).cloned())
+                .and_then(|e| reviera_core::schedules::schedule_def(&e))
+                .and_then(|d| reviera_core::categories::category(&d.category))
+                .map_or(String::new(), |c| c.name.to_owned());
+            grid.append(Property::category("Schedule", "c_view"));
+            grid.append(Property::string("View Name", "view_name", name));
+            grid.append(Property::string("Category", "sch_cat", category));
+            grid.set_property_read_only("sch_cat", true);
             return true;
         }
         let Some(v) = self.active_view() else {
@@ -2964,6 +3017,11 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
             focus(g);
         }),
         "view.building_elevations" => with(gui, Gui::building_elevations),
+        "view.new_schedule" => with(gui, Gui::new_schedule),
+        "schedule.edit_fields" => with(gui, Gui::schedule_fields),
+        "schedule.edit_sort" => with(gui, Gui::schedule_sort),
+        "schedule.itemize" => with(gui, Gui::schedule_itemize),
+        "schedule.export" => with(gui, Gui::export_schedule),
         "room.place" => with(gui, |g| {
             g.start_room_tool();
             focus(g);

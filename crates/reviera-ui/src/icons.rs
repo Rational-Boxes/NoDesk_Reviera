@@ -210,6 +210,21 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "tree" => format!(
             r#"<rect x="4" y="3" width="10" height="6" fill="{f}" {s}/><path d="M9 9v17h7M9 17h7" {s}/><rect x="16" y="14" width="12" height="6" {sa}/><rect x="16" y="23" width="12" height="6" {sa}/>"#
         ),
+        "schedule" => format!(
+            r#"<rect x="4" y="5" width="24" height="22" fill="{f}" {s}/><path d="M4 11h24M4 17h24M4 22h24M13 5v22" {s} stroke-width="1.4"/><path d="M4 5h24v6H4z" fill="{a}" opacity="0.5"/>"#
+        ),
+        "fields" => format!(
+            r#"<rect x="4" y="5" width="24" height="22" fill="{f}" {s}/><path d="M12 5v22M20 5v22" {s}/><path d="M23 13l3 3-3 3" {sa}/>"#
+        ),
+        "sort" => format!(
+            r#"<path d="M9 5v22M5 23l4 4 4-4" {sa}/><path d="M16 8h12M16 14h9M16 20h6M16 26h3" {s}/>"#
+        ),
+        "itemize" => format!(
+            r#"<path d="M5 7h22M5 13h22M5 19h22M5 25h22" {s}/><path d="M24 4v24" {sa} stroke-dasharray="2 2"/>"#
+        ),
+        "export_csv" => format!(
+            r#"<path d="M7 3h12l6 6v20H7z" fill="{f}" {s}/><path d="M11 15h10M11 19h10M11 23h6" {s} stroke-width="1.4"/><path d="M22 14v10M18 20l4 4 4-4" {sa}/>"#
+        ),
         "section" => format!(
             r#"<path d="M4 16h24" {s} stroke-dasharray="5 2 1 2"/><path d="M4 9v7M28 9v7" {s}/><path d="M4 22l3-5 3 5zM22 22l3-5 3 5z" fill="{a}" {sa}/>"#
         ),

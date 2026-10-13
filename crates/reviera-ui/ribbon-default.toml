@@ -540,6 +540,36 @@ icon = "elevation"
 help = "Create North, South, East and West elevations around the model"
 
 [[action]]
+id = "view.new_schedule"
+label = "Schedules"
+icon = "schedule"
+help = "Create a schedule of a category: one row per element, kept up to date with the model"
+
+[[action]]
+id = "schedule.edit_fields"
+label = "Fields..."
+icon = "fields"
+help = "Choose the schedule's columns"
+
+[[action]]
+id = "schedule.edit_sort"
+label = "Sort..."
+icon = "sort"
+help = "Sort the schedule by a column"
+
+[[action]]
+id = "schedule.itemize"
+label = "Itemize"
+icon = "itemize"
+help = "Switch between one row per element and one row per group of identical sorted values"
+
+[[action]]
+id = "schedule.export"
+label = "Export..."
+icon = "export_csv"
+help = "Export the schedule as CSV or tab-separated text"
+
+[[action]]
 id = "room.place"
 label = "Room"
 icon = "room"
@@ -655,6 +685,7 @@ tools = [
   { action = "view.create_ceiling_plan", size = "large" },
   { action = "view.create_section", size = "large" },
   { action = "view.building_elevations", size = "small" },
+  { action = "view.new_schedule", size = "large" },
   { action = "view.default_3d", size = "large" },
   { action = "view.create_3d", size = "small" },
 ]
@@ -806,6 +837,16 @@ label = "Roofs"
 panels = [{ label = "Mode", tools = [{ action = "roof.edit_footprint", size = "large" }] }]
 
 [[context]]
+category = "session.schedule"
+label = "Schedule"
+panels = [{ label = "Schedule", tools = [
+  { action = "schedule.edit_fields", size = "large" },
+  { action = "schedule.edit_sort", size = "large" },
+  { action = "schedule.itemize", size = "large" },
+  { action = "schedule.export", size = "large" },
+] }]
+
+[[context]]
 category = "session.room"
 label = "Place Room"
 panels = [{ label = "Room", tools = [
@@ -849,7 +890,7 @@ items = ["edit.undo", "edit.redo", "-", "element.delete"]
 label = "&View"
 items = [
   "view.default_3d", "view.create_plan", "view.create_ceiling_plan", "view.create_section",
-  "view.building_elevations", "-",
+  "view.building_elevations", "view.new_schedule", "-",
   "view.zoom_fit", "view.zoom_previous", "view.zoom_next", "-",
   "view.home", "view.set_home", "@orient", "view.set_projection", "-", "view.walk", "-",
   "inspect.section_box", "inspect.selection_box", "inspect.slice_horizontal",

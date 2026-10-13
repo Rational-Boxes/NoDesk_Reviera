@@ -2184,6 +2184,16 @@ Schedules are tabular views of live model data. Every schedule definition is an 
 
 **Commands.** `schedule.create(kind, category, name, phase_id?, include_links?, key_name?) -> schedule_id`; `schedule.get_table(schedule_id, include_hidden?) -> table` (query; also MCP resource `reviera://schedule/{id}`)
 
+**Implementation notes (2026-10-13).**
+- As built:
+  - `schedule.create(category, name?, fields?)`, `schedule.set_fields(schedule_id, fields)` and `schedule.set_sort(schedule_id, levels, itemize?, grand_totals?)`.
+  - `schedule.set_cell(element_ids, field, value)`, `schedule.get_table(schedule_id)` and `schedule.fields(category)`.
+  - `schedule.export(schedule_id, path, format: csv|tsv, overwrite?)`.
+- Schedules are RXD-only elements (`rxd:schedules/<guid>`) with the definition in `rxd:schedule`.
+- Fields are computed fields (count, type, level, IFC class and GlobalId, room, insert, wall, slab and roof quantities) or `param:<reference>` for any parameter of the category.
+- The view is a grid tab with a Schedule contextual tab (Fields, Sort, Itemize, Export).
+- Filters, header and footer groups, calculated and combined fields, key schedules, phases and links come later.
+
 **Acceptance criteria.**
 - [ ] A door schedule lists every door of the schedule's phase and gains a row when a door is placed.
 - [ ] `schedule.get_table` returns the same cell text the schedule view shows, including totals.

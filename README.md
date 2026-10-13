@@ -10,8 +10,8 @@ operation can be driven by Lua scripts and by AI agents through the Model Contex
 
 > **Status: early development.** The specification is complete as a draft. The application
 > models walls, doors and windows, floors, ceilings, roofs, rooms, levels and grids; draws plans,
-> ceiling plans, sections and elevations to PDF; and has a ribbon-based window with 3D
-> inspection tools. Schedules, sheets and more building elements are in progress.
+> ceiling plans, sections and elevations to PDF; keeps live schedules; and has a ribbon-based window with 3D
+> inspection tools. Sheets, tags and more building elements are in progress.
 
 ## Screenshots
 
@@ -128,6 +128,16 @@ The KIT FZK *AC20-Institute-Var-2* sample model (`test-data/ifc/`) open in Revie
   export to PDF (`view.create_section`, `view.create_elevation`, `section.edit`). Not yet:
   crop regions, jogged sections, multi-direction and interior elevation markers, and opening a
   view from its marker.
+- **Schedules**: View › Schedules makes a schedule of doors, windows, rooms, walls, floors,
+  ceilings or roofs that opens as a grid in its own tab and stays up to date with the model.
+  It has one row per element (or, with Itemize off, one per group of identical sorted values,
+  with its count), natural and unit-aware sorting, and grand totals that add up areas, volumes,
+  lengths and counts. Editing a cell writes the parameter (undoable); computed cells are grey.
+  Selecting a row selects its elements. The Schedule tab chooses fields (computed ones such as
+  Level, Type, Area and Width, and every parameter of the category) and sorting, and exports
+  CSV or tab-separated text with formulas escaped (`schedule.create`, `schedule.get_table`,
+  `schedule.set_fields`, `schedule.set_sort`, `schedule.set_cell`, `schedule.export`). Not yet:
+  filters, group headers and footers, calculated fields, and schedules on sheets.
 - **Dimensions**: Annotate › Aligned Dimension (DI) in plans dimensions parallel wall faces,
   centrelines and cut edges; dimensions to Reviera walls follow them when they move
   (`dim.create_aligned`, `anno.list`). The Wall tool snaps to cut edges in plans.
@@ -180,7 +190,7 @@ The KIT FZK *AC20-Institute-Var-2* sample model (`test-data/ifc/`) open in Revie
 
 ## Planned next
 
-The first milestone continues with schedules, tags and text, sheets with title blocks, stairs and
+The first milestone continues with tags and text, sheets with title blocks, stairs and
 railings, and layered wall types. After that come general shape and CSG modelling tools,
 CADCraft drawing exchange and COBie handover.
 
@@ -191,7 +201,7 @@ current NBIMS-US tables, or the COBie 2.4 layout). The tables are Company, Facil
 Space, Zone, Type, Component, System, Attribute and the rest. The export is a workbook or one
 CSV file per table, with validation of required data, unique names and references, and the
 same objects and GlobalIds as the IFC handover export (spec DOC-OUT-015). It is not built yet;
-it will build on the schedule engine.
+it will build on the schedule engine, which is.
 
 ### Working with CADCraft
 

@@ -46,6 +46,8 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add_host(crate::inspect::ViewGetTempState),
         registry.add_host(crate::inspect::ModelTree),
         registry.add_host(crate::inspect::ViewFitSectionBox),
+        registry.add_host(crate::schedules::ScheduleGetTable),
+        registry.add_host(crate::schedules::ScheduleExport),
         registry.add_host(crate::output::ExportPdf),
         registry.add_host(SelectionAdd),
         registry.add_host(SelectionRemove),

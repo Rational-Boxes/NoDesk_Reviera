@@ -65,6 +65,11 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(RoofSetEdge),
         registry.add(RoofSetSlope),
         registry.add(WallAttach),
+        registry.add(ScheduleCreate),
+        registry.add(ScheduleSetFields),
+        registry.add(ScheduleSetSort),
+        registry.add(ScheduleSetCell),
+        registry.add(ScheduleFields),
         registry.add(ViewCreateSection),
         registry.add(ViewCreateElevation),
         registry.add(SectionEdit),
@@ -2046,6 +2051,75 @@ modify_command!(
 );
 
 use crate::roofs;
+
+modify_command!(
+    ScheduleCreate,
+    "schedule.create",
+    "Create a schedule",
+    "Creates a component schedule of a category (`cat.doors`, `cat.rooms`, …) with the given field keys, or \
+     the category's usual fields, sorted by the first field. schedule.fields lists the field keys.",
+    "New Schedule",
+    crate::schedules::CreateParams,
+    ElementId,
+    crate::schedules::create
+);
+modify_command!(
+    ScheduleSetFields,
+    "schedule.set_fields",
+    "Set a schedule's fields",
+    "Sets a schedule's columns (field keys in order); sort levels on removed fields are dropped.",
+    "Schedule Fields",
+    crate::schedules::SetFieldsParams,
+    (),
+    crate::schedules::set_fields
+);
+modify_command!(
+    ScheduleSetSort,
+    "schedule.set_sort",
+    "Set a schedule's sorting",
+    "Sets a schedule's sort levels (`Sort by`, then `Then by`, each ascending or descending), Itemize every \
+     instance, and grand totals.",
+    "Schedule Sorting",
+    crate::schedules::SetSortParams,
+    (),
+    crate::schedules::set_sort
+);
+modify_command!(
+    ScheduleSetCell,
+    "schedule.set_cell",
+    "Edit a schedule cell",
+    "Writes a schedule cell: the field's parameter on the row's elements (text with units for measures). \
+     Computed fields cannot be edited.",
+    "Edit Schedule",
+    crate::schedules::SetCellParams,
+    (),
+    crate::schedules::set_cell
+);
+
+#[derive(Debug)]
+struct ScheduleFields;
+
+impl Command for ScheduleFields {
+    type Params = crate::schedules::FieldsParams;
+    type Output = Vec<crate::schedules::FieldInfo>;
+    const META: CommandMeta = CommandMeta {
+        name: "schedule.fields",
+        version: 1,
+        summary: "The fields a category's schedules can show",
+        description: "Lists the field keys and names a schedule of the category can show: computed fields \
+                      (count, type, level, areas, sizes) and every parameter of the category.",
+        effects: &[Effect::Read],
+        transaction_name: "",
+    };
+
+    fn run(
+        &self,
+        cx: &mut CommandContext<'_>,
+        p: crate::schedules::FieldsParams,
+    ) -> Result<Vec<crate::schedules::FieldInfo>> {
+        Ok(crate::schedules::fields(cx.store(), p))
+    }
+}
 
 modify_command!(
     ViewCreateSection,

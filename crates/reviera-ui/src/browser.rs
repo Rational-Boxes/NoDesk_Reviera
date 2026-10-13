@@ -64,6 +64,37 @@ impl Gui {
                 }
             }
         }
+        // Schedules (DOC-SCH-001).
+        let schedules: Vec<(ElementId, String)> = self
+            .app
+            .document(doc)
+            .map(|d| {
+                let mut v: Vec<(ElementId, String)> = d
+                    .doc
+                    .store()
+                    .iter()
+                    .filter(|e| reviera_core::schedules::is_schedule(e))
+                    .map(|e| (e.id(), e.name.clone().unwrap_or_default()))
+                    .collect();
+                v.sort_by(|a, b| reviera_core::schedules::natural(&a.1, &b.1));
+                v
+            })
+            .unwrap_or_default();
+        if !schedules.is_empty()
+            && let Some(group) = self
+                .browser
+                .append_item(&root, "Schedules/Quantities", None, None)
+        {
+            for (id, name) in schedules {
+                if let Some(item) = self
+                    .browser
+                    .append_item_with_data(&group, &name, id.0, None, None)
+                    && open.contains(&id)
+                {
+                    self.browser.set_item_bold(&item, true);
+                }
+            }
+        }
         let Some(group) = self.browser.append_item(&root, "3D Views", None, None) else {
             return;
         };
