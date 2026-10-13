@@ -411,3 +411,41 @@ fn views_are_model_objects_and_navigation_is_session_state() {
         1
     );
 }
+
+#[test]
+fn models_load_on_another_thread_and_attach_on_this_one() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = app(dir.path());
+    let file = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data/ifc/AC20-FZK-Haus.ifc");
+    let stages = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    let seen = stages.clone();
+    let path = file.clone();
+    let loaded = std::thread::spawn(move || {
+        reviera_app::load(&path, &|s| seen.lock().unwrap().push(s)).unwrap()
+    })
+    .join()
+    .unwrap();
+    assert_eq!(
+        *stages.lock().unwrap(),
+        [
+            reviera_app::LoadStage::Reading,
+            reviera_app::LoadStage::Geometry
+        ]
+    );
+    let id = app.open_loaded(loaded, true).unwrap();
+    assert_eq!(app.active(), Some(id));
+    // The geometry made on the other thread is used as it is.
+    let start = std::time::Instant::now();
+    let scene = app.render_scene(id).unwrap();
+    assert!(scene.meshes.len() > 50);
+    assert!(
+        start.elapsed() < Duration::from_secs(1),
+        "{:?}",
+        start.elapsed()
+    );
+    // A file already open is reported, with its document.
+    let again = reviera_app::load(&file, &|_| {}).unwrap();
+    let e = app.open_loaded(again, true).unwrap_err();
+    assert_eq!(e.code, "file.already_open");
+    assert_eq!(app.document_at(&file), Some(id));
+}

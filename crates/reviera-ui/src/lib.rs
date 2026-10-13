@@ -11,6 +11,7 @@
 //! through `App::execute`, like Lua and MCP. The ribbon and browsers come next.
 
 mod browser;
+mod loading;
 mod native;
 mod nav;
 mod plans;
@@ -152,6 +153,9 @@ struct Gui {
     tool: Option<WallTool>,
     /// Drives animated view changes and walking.
     timer: Option<Timer<Frame>>,
+    /// Models being opened in the background, and the timer that animates their tabs.
+    loading: Vec<loading::Loading>,
+    load_timer: Option<Timer<Frame>>,
     /// The Project Browser.
     browser: TreeCtrl,
     browser_items: Vec<(u64, ElementId)>,
@@ -329,51 +333,6 @@ impl Gui {
             self.keys.0.clear();
         }
         done
-    }
-
-    fn open(&mut self, path: &Path, frame: &Frame) {
-        let mut opened = self
-            .app
-            .execute("file.open", json!({ "path": path }), &user());
-        // Unsaved work from a session that ended unexpectedly: offer to restore it (DM-LIVE-004).
-        if let Err(e) = &opened
-            && e.code == "recovery.pending"
-        {
-            let key = e.details["store_key"]
-                .as_str()
-                .unwrap_or_default()
-                .to_owned();
-            let message = format!(
-                "{} has unsaved work from a session that ended unexpectedly.\n\nRestore it? (No discards it.)",
-                path.display()
-            );
-            opened = if ask(frame, &message) {
-                self.app
-                    .execute("recovery.restore", json!({ "store_key": key }), &user())
-                    .map(|mut o| {
-                        o.result = o.result["model_id"].clone();
-                        o
-                    })
-            } else {
-                let _ = self
-                    .app
-                    .execute("recovery.discard", json!({ "store_key": key }), &user());
-                self.app
-                    .execute("file.open", json!({ "path": path }), &user())
-            };
-        }
-        if opened.as_ref().is_err_and(|e| e.code == "file.locked") {
-            opened = self.app.execute(
-                "file.open",
-                json!({ "path": path, "read_only": true }),
-                &user(),
-            );
-        }
-        let id = match opened {
-            Ok(o) => o.result.as_u64().unwrap_or_default(),
-            Err(e) => return error(frame, &format!("Could not open {}:\n{e}", path.display())),
-        };
-        self.show_document(id, frame);
     }
 
     fn new_project(&mut self, frame: &Frame) {
@@ -1994,6 +1953,8 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 properties_stale: true,
                 tool: None,
                 timer: Some(Timer::new(&frame)),
+                loading: Vec::new(),
+                load_timer: Some(Timer::new(&frame)),
                 browser,
                 browser_items: Vec::new(),
                 browser_stale: true,
@@ -2002,6 +1963,23 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 keys: (String::new(), std::time::Instant::now()),
             })
         });
+        {
+            let g = gui.clone();
+            let state = gui.borrow();
+            state
+                .load_timer
+                .as_ref()
+                .expect("created")
+                .on_tick(move |_| {
+                    with(&g, |g| {
+                        if !g.poll_loading()
+                            && let Some(t) = &g.load_timer
+                        {
+                            t.stop();
+                        }
+                    });
+                });
+        }
         {
             let g = gui.clone();
             let timer = gui.borrow();
@@ -2028,6 +2006,8 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                     wx::TabEvent::Close(i) | wx::TabEvent::MiddleClick(i) => {
                         if let Some(v) = g.view_at(i) {
                             g.close_view(v);
+                        } else {
+                            g.cancel_loading(i);
                         }
                     }
                     wx::TabEvent::RightClick(_) => {}

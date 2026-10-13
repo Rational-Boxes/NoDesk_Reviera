@@ -81,41 +81,7 @@ impl OpenDocument {
         {
             return Ok(meshes.clone());
         }
-        let threads = std::thread::available_parallelism().map_or(1, |n| n.get() as u32);
-        let meshes = self
-            .project
-            .ifc()
-            .tessellate(threads)
-            .map_err(|e| err("render.tessellation_failed", e))?;
-        let ids: std::collections::HashMap<_, _> = self
-            .doc
-            .store()
-            .iter()
-            .map(|e| (e.guid().clone(), e.id()))
-            .collect();
-        let meshes: Vec<_> = meshes
-            .into_iter()
-            .filter(|m| {
-                m.class != "IfcSpace" && m.class != "IfcOpeningElement" && !m.faces.is_empty()
-            })
-            .filter_map(|m| {
-                let element = ids.get(m.global_id.as_ref()?).copied();
-                Some(reviera_render::SceneMesh {
-                    element,
-                    color: reviera_render::class_color(&m.class),
-                    positions: m
-                        .verts
-                        .as_chunks::<3>()
-                        .0
-                        .iter()
-                        .map(|[x, y, z]| [*x as f32, *y as f32, *z as f32])
-                        .collect(),
-                    indices: m.faces,
-                    class: m.class,
-                })
-            })
-            .collect();
-        let meshes = std::sync::Arc::new(meshes);
+        let meshes = Arc::new(scene_meshes(tessellate(&self.project)?, &self.doc));
         *cache = Some((revision, meshes.clone()));
         Ok(meshes)
     }
@@ -123,7 +89,91 @@ impl OpenDocument {
     pub fn is_dirty(&self) -> bool {
         self.untitled || self.project.is_dirty(&self.doc)
     }
+}
 
+/// Tessellates a project's IFC geometry with OpenCASCADE, on every core.
+fn tessellate(project: &LocalProject) -> Result<Vec<reviera_ifc::Mesh>> {
+    let threads = std::thread::available_parallelism().map_or(1, |n| n.get() as u32);
+    project
+        .ifc()
+        .tessellate(threads)
+        .map_err(|e| err("render.tessellation_failed", e))
+}
+
+/// Scene meshes of tessellated IFC geometry, mapped to the document's elements. Spaces and
+/// openings are left out of the default 3D view.
+fn scene_meshes(meshes: Vec<reviera_ifc::Mesh>, doc: &Document) -> Vec<reviera_render::SceneMesh> {
+    let ids: std::collections::HashMap<_, _> = doc
+        .store()
+        .iter()
+        .map(|e| (e.guid().clone(), e.id()))
+        .collect();
+    meshes
+        .into_iter()
+        .filter(|m| m.class != "IfcSpace" && m.class != "IfcOpeningElement" && !m.faces.is_empty())
+        .filter_map(|m| {
+            let element = ids.get(m.global_id.as_ref()?).copied();
+            Some(reviera_render::SceneMesh {
+                element,
+                color: reviera_render::class_color(&m.class),
+                positions: m
+                    .verts
+                    .as_chunks::<3>()
+                    .0
+                    .iter()
+                    .map(|[x, y, z]| [*x as f32, *y as f32, *z as f32])
+                    .collect(),
+                indices: m.faces,
+                class: m.class,
+            })
+        })
+        .collect()
+}
+
+/// A model read off the GUI thread: parsed, and its geometry tessellated (the slow parts of
+/// opening). [`App::open_loaded`] then attaches it on the application thread.
+pub struct Loaded {
+    pub path: PathBuf,
+    project: LocalProject,
+    doc: Document,
+    report: reviera_store::OpenReport,
+    meshes: Vec<reviera_render::SceneMesh>,
+}
+
+impl std::fmt::Debug for Loaded {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Loaded")
+            .field("path", &self.path)
+            .field("meshes", &self.meshes.len())
+            .finish()
+    }
+}
+
+/// The stage a background load has reached.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LoadStage {
+    Reading = 0,
+    Geometry = 1,
+}
+
+/// Reads and tessellates a model; safe to run on any thread. `stage` is told when each stage
+/// starts.
+pub fn load(path: &Path, stage: &dyn Fn(LoadStage)) -> Result<Loaded> {
+    stage(LoadStage::Reading);
+    let (project, doc, report) =
+        LocalProject::open(path).map_err(|e| err("file.open_failed", e))?;
+    stage(LoadStage::Geometry);
+    let meshes = scene_meshes(tessellate(&project)?, &doc);
+    Ok(Loaded {
+        path: path.to_owned(),
+        project,
+        doc,
+        report,
+        meshes,
+    })
+}
+
+impl OpenDocument {
     pub fn live(&self) -> Option<&LiveStore> {
         self.live.as_ref()
     }
@@ -341,6 +391,37 @@ impl App {
         let (project, doc) =
             LocalProject::new(schema, &path).map_err(|e| err("file.new_failed", e))?;
         self.add(project, doc, false, true)
+    }
+
+    /// Attaches a model read by [`load`], like `file.open` (live store, recovery and lock checks).
+    pub fn open_loaded(&mut self, loaded: Loaded, read_only: bool) -> Result<DocumentId> {
+        self.check_not_open(&loaded.path)?;
+        let revision = loaded.project.data_revision();
+        let id = self.add(loaded.project, loaded.doc, read_only, false)?;
+        let open = self.get_mut(id)?;
+        open.open_report = Some(loaded.report);
+        *open.tessellation.lock().unwrap_or_else(|e| e.into_inner()) =
+            Some((revision, Arc::new(loaded.meshes)));
+        Ok(id)
+    }
+
+    /// The document already open from `path`, if any.
+    pub fn document_at(&self, path: &Path) -> Option<DocumentId> {
+        self.docs
+            .iter()
+            .find(|(_, d)| !d.untitled && d.project.path() == path)
+            .map(|(id, _)| *id)
+    }
+
+    fn check_not_open(&self, path: &Path) -> Result<()> {
+        match self.document_at(path) {
+            Some(id) => Err(Error::new(
+                "file.already_open",
+                format!("{} is already open", path.display()),
+            )
+            .with_details(serde_json::json!({ "document_id": id }))),
+            None => Ok(()),
+        }
     }
 
     pub(crate) fn open(&mut self, path: &Path, read_only: bool) -> Result<DocumentId> {
