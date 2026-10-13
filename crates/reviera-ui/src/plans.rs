@@ -91,6 +91,11 @@ impl Gui {
         self.active_view().is_some_and(|v| v.plan.is_some())
     }
 
+    /// Whether the active view is a 2D drawing (plan, section or elevation).
+    pub(crate) fn in_2d(&self) -> bool {
+        self.active_view().is_some_and(super::View::is_2d)
+    }
+
     /// Rebuilds the plan graphics of view `index` when stale.
     pub(crate) fn update_plan_graphics(&mut self, index: usize) {
         let v = &self.views[index];
@@ -151,6 +156,7 @@ impl Gui {
         let cut_edges = Rc::new(std::mem::take(&mut graphics.cut_edges));
         graphics.lines.extend(self.annotation_lines(index));
         graphics.lines.extend(self.room_lines(index));
+        graphics.lines.extend(self.section_markers(index));
         graphics.lines.extend(self.insert_symbol_lines(index));
         let v = &mut self.views[index];
         if let Some(viewport) = &mut v.viewport {

@@ -289,6 +289,7 @@ pub(crate) fn create_plan(
             }),
             section_box: None,
             slice_planes: Vec::new(),
+            section: None,
         };
         let mut value = serde_json::to_value(&data).expect("view data serialises");
         if let Some(scale) = p.scale {

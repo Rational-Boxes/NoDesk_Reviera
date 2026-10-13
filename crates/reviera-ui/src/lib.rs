@@ -25,6 +25,7 @@ mod plans;
 mod ribbon;
 mod roofs;
 mod rooms;
+mod sections;
 mod sketch;
 mod snap;
 mod wx;
@@ -130,6 +131,8 @@ struct View {
     synced: Option<reviera_core::views::ViewCamera>,
     /// Set for plan views.
     plan: Option<plans::PlanState>,
+    /// Set for section and elevation views.
+    section: Option<sections::SectionState>,
     panel: Panel,
     viewport: Option<WgpuViewport>,
     /// The native surface under the viewport; declared after it so it is dropped after it.
@@ -169,6 +172,7 @@ struct Gui {
     sketch: Option<sketch::SketchSession>,
     ceiling_tool: Option<sketch::CeilingTool>,
     room_tool: Option<rooms::RoomTool>,
+    section_tool: Option<sections::SectionTool>,
     /// The floor type new floors take.
     floor_type: Option<ElementId>,
     /// The last pointer position in the active view (Tab in sketch mode picks there).
@@ -206,6 +210,13 @@ struct Gui {
     /// The Model Tree pane (UI-TREE-001) and its state.
     model_tree: TreeCtrl,
     tree: inspect::ModelTree,
+}
+
+impl View {
+    /// A plan, section or elevation: a 2D drawing navigated by pan and zoom.
+    fn is_2d(&self) -> bool {
+        self.plan.is_some() || self.section.is_some()
+    }
 }
 
 /// An empty scene and a default camera, for when no view is open.
@@ -311,6 +322,7 @@ impl Gui {
             v.resize(w, h);
         }
         self.update_plan_graphics(index);
+        self.update_section_graphics(index);
         self.update_inspection(index);
         self.update_gizmo(index, scale);
         let view = &mut self.views[index];
@@ -581,8 +593,35 @@ impl Gui {
             )),
         }
         let plan = self.plan_info(doc, element);
-        if plan.is_some() {
+        let section = self.section_info(doc, element);
+        if plan.is_some() || section.is_some() {
             camera.perspective = false;
+            camera.orient(glam::Vec3::Z);
+        }
+        // A section or elevation frames the model as seen in its own frame.
+        if let (Some(s), Some((lo, hi))) = (
+            &section,
+            self.scenes.get(&doc).and_then(RenderScene::bounds),
+        ) {
+            let f = s.def.frame();
+            let corners: Vec<[f64; 3]> = (0..8)
+                .map(|k| {
+                    let pick = |bit: usize, a: f32, b: f32| {
+                        f64::from(if k >> bit & 1 == 1 { b } else { a })
+                    };
+                    f.to_local([
+                        pick(0, lo.x, hi.x),
+                        pick(1, lo.y, hi.y),
+                        pick(2, lo.z, hi.z),
+                    ])
+                })
+                .collect();
+            let min = |i: usize| corners.iter().map(|c| c[i]).fold(f64::MAX, f64::min) as f32;
+            let max = |i: usize| corners.iter().map(|c| c[i]).fold(f64::MIN, f64::max) as f32;
+            camera.fit((
+                glam::Vec3::new(min(0).max(-1.0), min(1) - 1.0, -1.0),
+                glam::Vec3::new(max(0).min(f.width as f32 + 1.0), max(1) + 2.0, 0.0),
+            ));
             camera.orient(glam::Vec3::Z);
         }
         let saved = element.and_then(|e| self.app.view_camera(doc, e));
@@ -600,6 +639,7 @@ impl Gui {
             name: reviera_core::views::DEFAULT_3D.into(),
             synced: saved,
             plan,
+            section,
             panel,
             viewport: None,
             native: None,
@@ -863,7 +903,10 @@ impl Gui {
         };
         let ids = self.selection();
         for view in self.views.iter_mut().filter(|v| v.doc == id) {
-            if let Some(v) = &mut view.viewport {
+            if let Some(s) = &mut view.section {
+                // Sections draw the model in their own frame, rebuilt when drawn.
+                s.stale = true;
+            } else if let Some(v) = &mut view.viewport {
                 v.set_scene(&scene);
                 v.set_highlight(&ids);
             }
@@ -1009,6 +1052,9 @@ impl Gui {
     fn escape(&mut self, frame: &Frame) {
         if self.slice_pick.take().is_some() {
             return frame.set_status_text("Slice cancelled", 0);
+        }
+        if self.end_section_tool() {
+            return frame.set_status_text("Section cancelled", 0);
         }
         if self.attach_pick.take().is_some() {
             return frame.set_status_text("Attach cancelled", 0);
@@ -1297,6 +1343,9 @@ impl Gui {
 
     /// The element under pixel (`x`, `y`): in plans dimensions and grids first, then the model.
     fn element_at(&self, x: i32, y: i32, panel: &Panel) -> Option<ElementId> {
+        if self.active_view().is_some_and(|v| v.section.is_some()) {
+            return self.section_pick(x, y);
+        }
         let size = panel.get_client_size();
         let (origin, dir) =
             self.camera()
@@ -1330,7 +1379,7 @@ impl Gui {
     /// Shows the contextual "Modify | <category>" tab while elements are selected (§1.9.1).
     /// Enables the actions that depend on the active view (3D-only navigation).
     fn update_view_actions(&mut self) {
-        let three_d = self.active_view().is_some_and(|v| v.plan.is_none());
+        let three_d = self.active_view().is_some_and(|v| !v.is_2d());
         for action in ["view.set_projection", "view.walk"] {
             self.ribbon.enable(action, three_d);
         }
@@ -1640,6 +1689,9 @@ impl Gui {
 
     /// The active view's properties; `false` when the active view is not a model view.
     fn view_properties(&mut self, grid: &PropertyGrid) -> bool {
+        if self.section_view_rows(grid) {
+            return true;
+        }
         let Some(v) = self.active_view() else {
             return false;
         };
@@ -1755,6 +1807,7 @@ impl Gui {
             || self.floor_edit(property, text.clone())
             || self.roof_edit(property, text.clone())
             || self.room_edit(property, text.clone())
+            || self.section_view_edit(property, text.clone())
         {
             return;
         }
@@ -1926,7 +1979,7 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                         return;
                     }
                     let walking = g.active_view().is_some_and(|v| v.nav.walk.is_some());
-                    let plan = g.in_plan();
+                    let plan = g.in_2d();
                     let left = button == 0 && cube.is_none();
                     let editing = if !left {
                         None
@@ -2028,6 +2081,7 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                     None if g.sketch.is_some() => g.sketch_click(x, y),
                     None if g.ceiling_tool.is_some() => g.ceiling_click(x, y),
                     None if g.room_tool.is_some() => g.room_click(x, y),
+                    None if g.section_tool.is_some() => g.section_click(x, y),
                     None if g.dim_tool.is_some() => g.dim_click(x, y),
                     None if g.grid_tool.is_some() => g.grid_click(x, y),
                     None if g.insert_tool.is_some() => g.insert_click(x, y),
@@ -2070,6 +2124,10 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                     }
                     if g.room_tool.is_some() {
                         g.room_motion(x, y);
+                        redraw = true;
+                    }
+                    if g.section_tool.is_some() {
+                        g.section_motion(x, y);
                         redraw = true;
                     }
                     if g.dim_tool.is_some() {
@@ -2501,6 +2559,7 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 sketch: None,
                 ceiling_tool: None,
                 room_tool: None,
+                section_tool: None,
                 floor_type: None,
                 mouse: (0, 0),
                 offset_distance: 1.0,
@@ -2900,6 +2959,11 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
             focus(g);
         }),
         "view.create_ceiling_plan" => with(gui, Gui::new_ceiling_plans),
+        "view.create_section" => with(gui, |g| {
+            g.start_section_tool();
+            focus(g);
+        }),
+        "view.building_elevations" => with(gui, Gui::building_elevations),
         "room.place" => with(gui, |g| {
             g.start_room_tool();
             focus(g);
@@ -3050,14 +3114,11 @@ fn export_pdf(gui: &Rc<RefCell<Gui>>, f: &Frame) {
     with(gui, |g| {
         target = g
             .active_view()
-            .filter(|v| v.plan.is_some())
+            .filter(|v| v.is_2d())
             .and_then(|v| Some((v.element?, g.view_name(v), g.current_path())));
     });
     let Some((view, name, model_path)) = target else {
-        return error(
-            f,
-            "Open a floor plan to export it as PDF (View › New Floor Plan).",
-        );
+        return error(f, "Open a plan, section or elevation to export it as PDF.");
     };
     let mut dialog = FileDialog::builder(f)
         .with_message("Export PDF")

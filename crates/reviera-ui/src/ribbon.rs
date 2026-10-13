@@ -49,6 +49,7 @@ pub const UI_ACTIONS: &[&str] = &[
     "sketch.cancel",
     "ceiling.sketch",
     "sketch.defines_slope",
+    "view.building_elevations",
     "sketch.overhang",
     "view.create_ceiling_plan",
     "inspect.section_box",

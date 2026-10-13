@@ -116,7 +116,7 @@ impl Gui {
 
     /// Looks at the active view's target from `dir`, keeping the projection and distance.
     pub(crate) fn orient(&mut self, dir: Vec3) {
-        if self.in_plan() {
+        if self.in_2d() {
             return self
                 .frame
                 .set_status_text("Plans always look straight down", 0);
@@ -147,7 +147,7 @@ impl Gui {
     }
 
     pub(crate) fn go_home(&mut self) {
-        if self.in_plan() {
+        if self.in_2d() {
             return self.zoom_to_fit();
         }
         if let Some(c) = self.home_camera() {
@@ -172,7 +172,7 @@ impl Gui {
     }
 
     pub(crate) fn toggle_perspective(&mut self) {
-        if self.in_plan() {
+        if self.in_2d() {
             return self.frame.set_status_text(
                 "Perspective and isometric apply to 3D views; this is a plan",
                 0,
@@ -252,7 +252,7 @@ impl Gui {
     /// The cube part under pixel (`x`, `y`) of the active view.
     pub(crate) fn cube_pick(&self, x: i32, y: i32) -> Option<CubeHit> {
         let v = self.active_view()?;
-        if v.nav.walk.is_some() || v.plan.is_some() {
+        if v.nav.walk.is_some() || v.is_2d() {
             return None;
         }
         let size = v.panel.get_client_size();
@@ -327,7 +327,7 @@ impl Gui {
 
     /// Enters or leaves walk mode in the active view.
     pub(crate) fn toggle_walk(&mut self) {
-        if self.in_plan() {
+        if self.in_2d() {
             return self.frame.set_status_text("Walk mode is for 3D views", 0);
         }
         if self.leave_walk() {
@@ -520,7 +520,7 @@ impl Gui {
         let Some(viewport) = &mut v.viewport else {
             return;
         };
-        if v.nav.walk.is_some() || v.plan.is_some() {
+        if v.nav.walk.is_some() || v.plan.is_some() || v.section.is_some() {
             viewport.set_gizmo(None);
             return;
         }

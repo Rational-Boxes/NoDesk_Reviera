@@ -210,6 +210,12 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "tree" => format!(
             r#"<rect x="4" y="3" width="10" height="6" fill="{f}" {s}/><path d="M9 9v17h7M9 17h7" {s}/><rect x="16" y="14" width="12" height="6" {sa}/><rect x="16" y="23" width="12" height="6" {sa}/>"#
         ),
+        "section" => format!(
+            r#"<path d="M4 16h24" {s} stroke-dasharray="5 2 1 2"/><path d="M4 9v7M28 9v7" {s}/><path d="M4 22l3-5 3 5zM22 22l3-5 3 5z" fill="{a}" {sa}/>"#
+        ),
+        "elevation" => format!(
+            r#"<rect x="9" y="9" width="14" height="14" fill="{f}" {s}/><path d="M16 3l5 6H11z" fill="{a}" {sa}/><path d="M4 28h24" {s}/>"#
+        ),
         "room" => format!(
             r#"<path d="M4 4h24v24H4z" {s}/><path d="M7 7h18v18H7z" fill="{f}" {s} stroke-width="1"/><path d="M11 14h10M13 19h6" {sa}/>"#
         ),

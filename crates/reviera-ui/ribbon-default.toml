@@ -528,6 +528,18 @@ keys = "MT"
 help = "Show or hide the Model Tree"
 
 [[action]]
+id = "view.create_section"
+label = "Section"
+icon = "section"
+help = "Draw a section line in a plan: two clicks; the view looks to the line's right"
+
+[[action]]
+id = "view.building_elevations"
+label = "Building Elevations"
+icon = "elevation"
+help = "Create North, South, East and West elevations around the model"
+
+[[action]]
 id = "room.place"
 label = "Room"
 icon = "room"
@@ -641,6 +653,8 @@ label = "Create"
 tools = [
   { action = "view.create_plan", size = "large" },
   { action = "view.create_ceiling_plan", size = "large" },
+  { action = "view.create_section", size = "large" },
+  { action = "view.building_elevations", size = "small" },
   { action = "view.default_3d", size = "large" },
   { action = "view.create_3d", size = "small" },
 ]
@@ -834,7 +848,8 @@ items = ["edit.undo", "edit.redo", "-", "element.delete"]
 [[menu]]
 label = "&View"
 items = [
-  "view.default_3d", "view.create_plan", "view.create_ceiling_plan", "-",
+  "view.default_3d", "view.create_plan", "view.create_ceiling_plan", "view.create_section",
+  "view.building_elevations", "-",
   "view.zoom_fit", "view.zoom_previous", "view.zoom_next", "-",
   "view.home", "view.set_home", "@orient", "view.set_projection", "-", "view.walk", "-",
   "inspect.section_box", "inspect.selection_box", "inspect.slice_horizontal",

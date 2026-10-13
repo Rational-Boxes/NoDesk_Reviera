@@ -19520,6 +19520,19 @@ These principles apply to every requirement in this chapter.
 `section.flip(view_id) -> ()`
 `view.set_reference_label(view_id_or_marker_id, label?) -> ()`
 
+**Implementation notes (2026-10-13).**
+- As built:
+  - `view.create_section(start, end, far_offset?, name?)`.
+  - `view.create_elevation(point, look, width?, far_offset?, name?)` makes one elevation (no marker element yet).
+  - `section.edit(view_id, start?, end?, far_offset?, flip?)` covers moving the line, the far clip and `section.flip`.
+- The definition is the view's `section` block: `start`, `end`, `far` and `flipped`.
+- How drawings are made:
+  - The model is transformed into the view's frame (x to the viewer's right, y up, z toward the viewer).
+  - The plan cut/projection pipeline then draws it, with the cut at the view plane and the far clip as the bottom.
+  - Levels are drawn as lines with name and elevation.
+  - A grid is drawn where its line, extended, meets the view plane, if part of it lies within the view's depth.
+- Crop regions, jogs, gap modes, reference sections and markers in other views (beyond plans) come later.
+
 **Acceptance criteria.**
 - [ ] Drawing a section across a building creates a section view showing cut walls, floors and roofs, and elevation linework of what lies beyond, up to the far clip.
 - [ ] Splitting a segment and dragging it 2 m produces one view with a jog line where the two cuts meet.

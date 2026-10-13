@@ -81,6 +81,15 @@ The KIT FZK *AC20-Institute-Var-2* sample model (`test-data/ifc/`) open in Revie
   Ceiling. Ceilings have types with a thickness and sit 2600 mm above their level by default.
   View › Ceiling Plan makes reflected ceiling plans, cut at 2300 mm and looking up. Saved as
   `IfcCovering` (CEILING) (`ceiling.create_auto`, `ceiling.create`, `ceiling.edit_boundary`).
+- **Sections and elevations**: View › Section draws a section line in a plan with two clicks
+  (the view looks to the line's right). Building Elevations makes North, South, East and West
+  elevations around the model. These views draw like plans of the model turned into their frame:
+  cut walls and floors as poché, everything up to the far clip in projection (door panels
+  included), level lines with names and elevations, and grid lines with their bubbles. Plans show
+  section lines and elevation markers. Properties set the far clip and flip the view; the views
+  export to PDF (`view.create_section`, `view.create_elevation`, `section.edit`). Not yet:
+  crop regions, jogged sections, multi-direction and interior elevation markers, and opening a
+  view from its marker.
 - **Rooms**: Architecture › Room places a room in the region of wall faces under the cursor,
   shown as you hover. Place Rooms Automatically fills every enclosed region of the plan's level,
   numbered in reading order. Rooms measure to the walls' finish faces and leave out islands such

@@ -128,6 +128,9 @@ pub struct ViewData {
     /// The slice planes of a 3D view (DOC-VIEW-014).
     #[serde(default, rename = "slicePlanes", skip_serializing_if = "Vec::is_empty")]
     pub slice_planes: Vec<SlicePlane>,
+    /// The line and depth of a section or elevation (DOC-VIEW-003/004).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub section: Option<crate::sections::SectionDef>,
 }
 
 /// A section box (DOC-VIEW-008): `min`..`max` in the box's own coordinates, placed by
@@ -321,6 +324,7 @@ pub(crate) fn create_3d(
         view_range: None,
         section_box: None,
         slice_planes: Vec::new(),
+        section: None,
     };
     txn.create(
         NewElement::new(format!("{CLASS_PREFIX}{}", guid.as_str()))

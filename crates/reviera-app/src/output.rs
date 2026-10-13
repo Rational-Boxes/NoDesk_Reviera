@@ -177,6 +177,163 @@ impl App {
     }
 }
 
+/// A section's or elevation's drawing in its own frame (DOC-VIEW-003/004): the model turned so
+/// the view looks down its z, the cut and projection graphics of that model, and the levels and
+/// the grids crossing the view plane.
+#[derive(Debug, Clone)]
+pub struct SectionParts {
+    /// The model in the section frame (for the viewport).
+    pub scene: reviera_render::RenderScene,
+    pub graphics: PlanGraphics,
+    pub annotation: Vec<Lines>,
+    pub labels: Vec<Label>,
+}
+
+/// The parts of a section of `scene` along `def`, at 1:`scale`. `shown` filters elements
+/// (temporary hiding).
+pub fn section_parts(
+    store: &reviera_core::Store,
+    scene: &reviera_render::RenderScene,
+    def: &reviera_core::sections::SectionDef,
+    scale: f32,
+    shown: &dyn Fn(Option<ElementId>) -> bool,
+) -> SectionParts {
+    let frame = def.frame();
+    // The model in the frame. Door panels hidden in plans show in sections.
+    let meshes: Vec<reviera_render::SceneMesh> = scene
+        .meshes
+        .iter()
+        .filter(|m| shown(m.element))
+        .map(|m| reviera_render::SceneMesh {
+            element: m.element,
+            class: m
+                .class
+                .strip_suffix(reviera_render::PLAN_HIDDEN)
+                .unwrap_or(&m.class)
+                .to_owned(),
+            positions: m
+                .positions
+                .iter()
+                .map(|p| {
+                    let q = frame.to_local([f64::from(p[0]), f64::from(p[1]), f64::from(p[2])]);
+                    [q[0] as f32, q[1] as f32, q[2] as f32]
+                })
+                .collect(),
+            indices: m.indices.clone(),
+            color: m.color,
+        })
+        .collect();
+    let local = reviera_render::RenderScene { meshes };
+    let pens = standards::pen_set(store);
+    let styles = standards::object_styles(store);
+    let weights = |element: Option<ElementId>| {
+        let (cut, projection) =
+            standards::element_widths(store, &pens, &styles, element, f64::from(scale));
+        Weights {
+            cut: cut.map(|w| w as f32),
+            projection: projection as f32,
+        }
+    };
+    let edges = feature_edges(&local);
+    let graphics = plan_graphics(&local, &edges, 0.0, -frame.far as f32, scale, &weights);
+    // Levels: a line across the view at each elevation, with the name and elevation at the
+    // right end.
+    let mm = f64::from(scale) / 1000.0;
+    let settings = units::settings_of(store);
+    let z = 0.002f32;
+    let levels = reviera_core::levels::list(store);
+    let mut level_lines = Lines {
+        color: [0.0, 0.0, 0.0, 1.0],
+        width: pens.annotation_width(1) as f32,
+        segments: Vec::new(),
+    };
+    let mut labels = Vec::new();
+    let (x0, x1) = (-5.0 * mm, frame.width + 5.0 * mm);
+    for l in &levels {
+        let y = l.elevation as f32;
+        level_lines
+            .segments
+            .push([[x0 as f32, y, z], [x1 as f32, y, z]]);
+        let height = (2.5 * mm) as f32;
+        let elevation = units::format(l.elevation, "length", &settings, None)
+            .unwrap_or_else(|_| format!("{:.3}", l.elevation));
+        for (k, text) in [l.name.clone(), elevation].into_iter().enumerate() {
+            labels.push(Label {
+                origin: [
+                    (x1 + 1.5 * mm) as f32,
+                    y + (1.0 * mm) as f32 - k as f32 * (4.0 * mm) as f32,
+                    z,
+                ],
+                right: [1.0, 0.0, 0.0],
+                up: [0.0, 1.0, 0.0],
+                height,
+                text,
+            });
+        }
+    }
+    let mut annotation = vec![level_lines];
+    // Grids crossing the view plane: vertical lines with a bubble at the top.
+    // From below the lowest level to above the highest of the levels and the model.
+    let model = local.bounds();
+    let (lo, hi) = levels
+        .iter()
+        .map(|l| l.elevation)
+        .chain(model.map(|(a, b)| f64::from(a.y).min(f64::from(b.y))))
+        .chain(model.map(|(_, b)| f64::from(b.y)))
+        .fold((0.0f64, 0.0f64), |(a, b), e| (a.min(e), b.max(e)));
+    for g in grids::list(store) {
+        let Some(x) = frame.grid_crossing(g.curve.start, g.curve.end) else {
+            continue;
+        };
+        let mark = GridMark {
+            start: [x, lo - 5.0 * mm],
+            end: [x, hi + 12.0 * mm],
+            name: g.name,
+            bubbles: [false, true],
+            style: GridStyle::of(&g.style, &|p| pens.annotation_width(p) as f32),
+        };
+        let (l, t) = grid_parts(&mark, scale, z);
+        annotation.extend(l);
+        labels.extend(t);
+    }
+    SectionParts {
+        scene: local,
+        graphics,
+        annotation,
+        labels,
+    }
+}
+
+impl App {
+    /// The drawing of section or elevation view `view` of `doc`, for output.
+    pub fn section_drawing(&self, doc: DocumentId, view: ElementId) -> Result<PlanDrawing> {
+        let scene = self.render_scene(doc)?;
+        let open = self.get(doc)?;
+        let store = open.doc.store();
+        let e = store
+            .get(view)
+            .ok_or_else(|| Error::new("view.not_found", format!("no view {view}")))?;
+        let (_, def) = reviera_core::sections::section_of(e).ok_or_else(|| {
+            Error::new(
+                "view.not_a_section",
+                format!("view {view} is not a section"),
+            )
+        })?;
+        let scale = e
+            .param(views::VIEW_KEY)
+            .and_then(|v| v.get("scale")?.as_f64())
+            .unwrap_or(100.0) as f32;
+        let parts = section_parts(store, &scene, &def, scale, &|_| true);
+        Ok(PlanDrawing {
+            name: e.name.clone().unwrap_or_default(),
+            scale,
+            graphics: parts.graphics,
+            annotation: parts.annotation,
+            labels: parts.labels,
+        })
+    }
+}
+
 /// ISO A sheets, landscape, in millimetres.
 const SHEETS: [(&str, f32, f32); 5] = [
     ("A4", 297.0, 210.0),
@@ -447,7 +604,7 @@ impl HostCommand for ExportPdf {
         name: "export.pdf",
         version: 1,
         summary: "Export views as PDF",
-        description: "Writes plan views as vector PDF at their scale, one page per view on the smallest ISO \
+        description: "Writes plan, section and elevation views as vector PDF at their scale, one page per view on the smallest ISO \
                       sheet that holds it: `range` is \"current\" or {\"views\": [...]}.",
         effects: &[Effect::FileWrite],
         transaction_name: "",
@@ -485,7 +642,18 @@ impl HostCommand for ExportPdf {
         };
         let drawings: Vec<(PlanDrawing, PageInfo)> = ids
             .iter()
-            .map(|v| Ok((app.plan_drawing(doc, *v)?, info.clone())))
+            .map(|v| {
+                let section = store
+                    .get(*v)
+                    .and_then(reviera_core::sections::section_of)
+                    .is_some();
+                let d = if section {
+                    app.section_drawing(doc, *v)?
+                } else {
+                    app.plan_drawing(doc, *v)?
+                };
+                Ok((d, info.clone()))
+            })
             .collect::<Result<_>>()?;
         let mut files = Vec::new();
         let mut sheets = Vec::new();

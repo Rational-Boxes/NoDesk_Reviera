@@ -65,6 +65,9 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(RoofSetEdge),
         registry.add(RoofSetSlope),
         registry.add(WallAttach),
+        registry.add(ViewCreateSection),
+        registry.add(ViewCreateElevation),
+        registry.add(SectionEdit),
         registry.add(RoomPlace),
         registry.add(RoomPlaceAutomatically),
         registry.add(RoomSet),
@@ -2043,6 +2046,41 @@ modify_command!(
 );
 
 use crate::roofs;
+
+modify_command!(
+    ViewCreateSection,
+    "view.create_section",
+    "Create a section view",
+    "Creates a section view along the line `start`–`end` (plan, metres). The view looks to the line's \
+     right-hand side and sees `far_offset` beyond it (default 30 m): what the line's plane cuts draws as cut, \
+     what lies beyond in projection.",
+    "Section",
+    crate::sections::CreateSectionParams,
+    ElementId,
+    crate::sections::create_section
+);
+modify_command!(
+    ViewCreateElevation,
+    "view.create_elevation",
+    "Create an elevation view",
+    "Creates an elevation view whose view plane passes through `point` and looks along `look` (plan), \
+     `width` wide (default 60 m) and seeing `far_offset` deep (default 120 m).",
+    "Elevation",
+    crate::sections::CreateElevationParams,
+    ElementId,
+    crate::sections::create_elevation
+);
+modify_command!(
+    SectionEdit,
+    "section.edit",
+    "Move, deepen or flip a section or elevation",
+    "Changes a section's or elevation's line (`start`, `end`), its far clip (`far_offset`), or turns it to \
+     look the other way (`flip: true`).",
+    "Edit Section",
+    crate::sections::EditParams,
+    (),
+    crate::sections::edit
+);
 
 modify_command!(
     RoomPlace,

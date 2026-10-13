@@ -125,7 +125,7 @@ impl Gui {
     /// The section box and slice planes a view shows: those being dragged, else its own (3D
     /// views only).
     pub(crate) fn view_clip(&self, v: &View) -> (Option<SectionBox>, Vec<SlicePlane>) {
-        if v.plan.is_some() {
+        if v.is_2d() {
             return (None, Vec::new());
         }
         if let Some(e) = &v.clip_edit {
@@ -235,7 +235,7 @@ impl Gui {
     /// The section box or slice plane grip under pixel (`x`, `y`) of the active 3D view.
     pub(crate) fn clip_grip_at(&self, x: i32, y: i32) -> Option<ClipGrip> {
         let v = self.active_view()?;
-        if v.plan.is_some() || v.element.is_none() {
+        if v.is_2d() || v.element.is_none() {
             return None;
         }
         let size = v.panel.get_client_size();
@@ -376,7 +376,7 @@ impl Gui {
     /// with a message.
     fn active_3d(&mut self) -> Option<ElementId> {
         let v = self.active_view()?;
-        if v.plan.is_some() {
+        if v.is_2d() {
             self.frame.set_status_text(
                 "Section boxes and slice planes belong to 3D views: open a 3D view first",
                 0,
@@ -629,9 +629,13 @@ impl Gui {
     fn after_temp_change(&mut self) {
         if let Some(id) = self.active
             && let Some(v) = self.views.iter_mut().find(|v| v.id == id)
-            && let Some(p) = &mut v.plan
         {
-            p.stale = true;
+            if let Some(p) = &mut v.plan {
+                p.stale = true;
+            }
+            if let Some(s) = &mut v.section {
+                s.stale = true;
+            }
         }
         self.tree.stale = true;
         self.update_captions();
