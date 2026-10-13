@@ -196,6 +196,9 @@ pub trait RenderBackend {
     fn render(&mut self, camera: &Camera) -> Result<(), String>;
     /// Draws these elements in the highlight colour.
     fn set_highlight(&mut self, elements: &[ElementId]);
+    /// Transient geometry drawn over the scene, such as the preview of a wall being drawn.
+    /// Cheap to replace on every mouse move; the scene is not uploaded again.
+    fn set_overlay(&mut self, meshes: &[SceneMesh]);
 }
 
 #[cfg(test)]

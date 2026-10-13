@@ -28,6 +28,7 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(ElementChangedSince),
         registry.add(ElementGetIds),
         registry.add(ElementFindByGuid),
+        registry.add(ElementDelete),
         registry.add(RegistryList),
         registry.add(RegistryDescribe),
         registry.add(UnitsGet),
@@ -46,6 +47,8 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(ParamProjectModify),
         registry.add(ParamProjectRemove),
         registry.add(ParamSetIfcHome),
+        registry.add(WallCreate),
+        registry.add(WallSetLocation),
     ];
     for r in results {
         r.expect("core commands are valid");
@@ -283,6 +286,96 @@ impl Command for ElementFindByGuid {
 
     fn run(&self, cx: &mut CommandContext<'_>, p: FindByGuidParams) -> Result<Option<ElementId>> {
         Ok(cx.store().find_by_guid(&p.guid))
+    }
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct DeleteParams {
+    pub element_ids: Vec<ElementRef>,
+    /// Also delete the elements that cannot exist without these (instances of a deleted type,
+    /// walls on a deleted level). With `false`, the command fails if there are any.
+    #[serde(default = "yes")]
+    pub confirm_dependents: bool,
+}
+
+fn yes() -> bool {
+    true
+}
+
+/// Elements that depend on `id`: instances of a type, and walls based on or bounded by a level.
+fn dependents_of(store: &crate::store::Store, id: ElementId) -> Vec<ElementId> {
+    let Some(guid) = store.get(id).map(|e| e.guid().as_str().to_owned()) else {
+        return Vec::new();
+    };
+    store
+        .iter()
+        .filter(|e| {
+            e.param("@type").and_then(serde_json::Value::as_str) == Some(guid.as_str())
+                || crate::walls::wall_recipe(e).is_some_and(|r| {
+                    r.base_level == guid
+                        || r.top.get("level").and_then(serde_json::Value::as_str)
+                            == Some(guid.as_str())
+                })
+        })
+        .map(|e| e.id())
+        .collect()
+}
+
+#[derive(Debug)]
+struct ElementDelete;
+
+impl Command for ElementDelete {
+    type Params = DeleteParams;
+    type Output = Vec<ElementId>;
+    const META: CommandMeta = CommandMeta {
+        name: "element.delete",
+        version: 1,
+        summary: "Delete elements",
+        description: "Deletes elements and returns every deleted ID, including dependents (instances of a \
+                      deleted type, walls on a deleted level). The project and its settings cannot be deleted.",
+        effects: &[Effect::Edit, Effect::Destructive],
+        transaction_name: "Delete",
+    };
+
+    fn run(&self, cx: &mut CommandContext<'_>, p: DeleteParams) -> Result<Vec<ElementId>> {
+        let txn = cx.edit()?;
+        let mut queue = Vec::new();
+        for r in &p.element_ids {
+            let id = txn
+                .store()
+                .resolve(r)
+                .ok_or_else(|| Error::new("element.not_found", format!("no element {r:?}")))?;
+            if id.0 < ElementId::FIRST.0 {
+                return Err(Error::new(
+                    "element.protected",
+                    format!("element {id} is part of the project and cannot be deleted"),
+                ));
+            }
+            queue.push(id);
+        }
+        let explicit: std::collections::BTreeSet<ElementId> = queue.iter().copied().collect();
+        let mut deleted = std::collections::BTreeSet::new();
+        while let Some(id) = queue.pop() {
+            if !deleted.insert(id) {
+                continue;
+            }
+            for d in dependents_of(txn.store(), id) {
+                if !p.confirm_dependents && !explicit.contains(&d) {
+                    return Err(Error::new(
+                        "element.has_dependents",
+                        format!(
+                            "element {d} depends on element {id}; pass confirm_dependents to delete it too"
+                        ),
+                    ));
+                }
+                queue.push(d);
+            }
+        }
+        for id in &deleted {
+            txn.delete(*id)?;
+        }
+        Ok(deleted.into_iter().collect())
     }
 }
 
@@ -941,5 +1034,50 @@ impl Command for ParamSetIfcHome {
             &p.pset_name,
             &p.property_name,
         )
+    }
+}
+
+// ---- Walls (Ch 3 ARC-WALL-002) ----
+
+use crate::walls::{self, CreateParams, SetLocationParams};
+
+#[derive(Debug)]
+struct WallCreate;
+
+impl Command for WallCreate {
+    type Params = CreateParams;
+    type Output = ElementId;
+    const META: CommandMeta = CommandMeta {
+        name: "wall.create",
+        version: 1,
+        summary: "Create a wall",
+        description: "Creates a straight wall along `curve.line` (plan coordinates in metres), from `base_level` \
+                      plus `base_offset` up to a level or an unconnected height. Lengths accept units (\"3 m\").",
+        effects: &[Effect::Edit],
+        transaction_name: "Wall",
+    };
+
+    fn run(&self, cx: &mut CommandContext<'_>, p: CreateParams) -> Result<ElementId> {
+        walls::create(cx.edit()?, p)
+    }
+}
+
+#[derive(Debug)]
+struct WallSetLocation;
+
+impl Command for WallSetLocation {
+    type Params = SetLocationParams;
+    type Output = ();
+    const META: CommandMeta = CommandMeta {
+        name: "wall.set_location",
+        version: 1,
+        summary: "Move a wall's location line",
+        description: "Replaces the wall's location curve; the wall regenerates.",
+        effects: &[Effect::Edit],
+        transaction_name: "Move wall",
+    };
+
+    fn run(&self, cx: &mut CommandContext<'_>, p: SetLocationParams) -> Result<()> {
+        walls::set_location(cx.edit()?, p)
     }
 }

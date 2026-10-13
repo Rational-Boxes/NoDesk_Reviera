@@ -14,7 +14,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use reviera_core::{Document, ElementId, GlobalId, ModelVersion, NewElement};
+use reviera_core::{Document, ElementId, GlobalId, ModelVersion, NewElement, walls};
 use reviera_ifc::{AttrValue, IfcModel, Schema, StepId};
 use reviera_rxd::{
     DOC_PSET_PREFIX, DecodeLimits, ELEMENT_PSET, ElementData, IdentityDoc, MANIFEST_PSET,
@@ -22,9 +22,9 @@ use reviera_rxd::{
 };
 use serde_json::{Value, json};
 
-use crate::params;
 use crate::psets::{self, Pset, PsetWriter, identifier, integer, label, text, unsupported};
 use crate::{Result, StoreError};
+use crate::{geometry, params};
 
 /// What opening a file found.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -76,6 +76,8 @@ pub struct LocalProject {
     rxd_paths: HashMap<ElementId, String>,
     /// Document version that the IFC population reflects.
     synced: ModelVersion,
+    /// Metres per length unit of the file.
+    length_scale: f64,
 }
 
 impl std::fmt::Debug for LocalProject {
@@ -111,7 +113,8 @@ impl LocalProject {
 
         let mut objects = ifc.entities_of_type("IfcObjectDefinition")?;
         objects.sort_by_key(|e| e.id);
-        let (mut values, sets) = params::load(&ifc, &objects)?;
+        let length_scale = geometry::length_scale(&ifc)?;
+        let (mut values, sets) = params::load(&ifc, &objects, length_scale)?;
         let types: HashSet<StepId> = ifc
             .entities_of_type("IfcTypeObject")?
             .into_iter()
@@ -246,12 +249,19 @@ impl LocalProject {
                 pending_identity.remove(&id);
                 continue;
             };
+            let mut element_params = values.remove(&e.id).unwrap_or_default();
             if let Some((data, pset)) = data_by_step.remove(&e.id) {
+                // RXD sections other than identity are element parameters (`rxd:<section>`).
+                for (name, value) in data.sections() {
+                    if name != ElementData::IDENTITY {
+                        element_params
+                            .insert(format!("{}{name}", params::RXD_PREFIX), value.clone());
+                    }
+                }
                 element_data.insert(id, data);
                 element_psets.insert(id, pset);
             }
             steps.insert(id, e.id);
-            let element_params = values.remove(&e.id).unwrap_or_default();
             saved_params.insert(id, element_params.clone());
             elements.push((
                 id,
@@ -296,6 +306,7 @@ impl LocalProject {
             saved_params,
             sets,
             rxd_paths,
+            length_scale,
         };
         Ok((local, doc, report))
     }
@@ -408,14 +419,24 @@ impl LocalProject {
             if let Some(pset) = self.element_psets.remove(id) {
                 self.remove_element_pset(&pset, step)?;
             }
+            let saved = self.saved_params.remove(id).unwrap_or_default();
+            if saved
+                .get(walls::RECIPE_KEY)
+                .and_then(|r| r.get("kind"))
+                .is_some_and(|k| k == walls::WALL_RECIPE)
+            {
+                geometry::remove_wall(&mut self.ifc, step)?;
+            }
             // The element's own property and quantity sets go with it.
-            self.saved_params.remove(id);
             params::remove_all(&mut self.ifc, &mut self.sets, step)?;
             self.types.remove(&step);
             self.ifc.remove(step)?;
             report.removed += 1;
         }
 
+        // New IFC entities first, so relationships between new elements (a wall and its new type)
+        // are written whatever their order.
+        let mut ifc_changed = Vec::new();
         for id in &changed {
             let e = doc.store().get(*id).expect("changed elements exist");
             if let Some(path) = e.class.strip_prefix("rxd:") {
@@ -469,6 +490,11 @@ impl LocalProject {
                     step
                 }
             };
+            ifc_changed.push((*id, step));
+        }
+        for (id, step) in ifc_changed {
+            let id = &id;
+            let e = doc.store().get(*id).expect("changed elements exist");
             let name = e.name.clone().map_or(AttrValue::Null, AttrValue::String);
             if self.ifc.attribute(step, "Name")? != name {
                 self.ifc.set_attribute(step, "Name", &name)?;
@@ -481,12 +507,34 @@ impl LocalProject {
                     ifc: &mut self.ifc,
                     index: &mut self.sets,
                     owner_history,
+                    length_scale: self.length_scale,
                 }
                 .apply(step, is_type, &before, &e.params)?;
                 self.saved_params.insert(*id, e.params.clone());
             }
+            // `rxd:<section>` parameters are sections of the element's RXD data.
+            let data = self.element_data.entry(*id).or_default();
+            let stale: Vec<String> = data
+                .sections()
+                .map(|(name, _)| name.clone())
+                .filter(|name| {
+                    name != ElementData::IDENTITY
+                        && !e
+                            .params
+                            .contains_key(&format!("{}{name}", params::RXD_PREFIX))
+                })
+                .collect();
+            for name in stale {
+                data.set_section(&name, None);
+            }
+            for (key, value) in &e.params {
+                if let Some(name) = key.strip_prefix(params::RXD_PREFIX) {
+                    data.set_section(name, Some(value.clone()));
+                }
+            }
             dirty.insert(*id);
         }
+        self.write_regenerated(doc, &changed)?;
 
         for id in dirty {
             let Some(&step) = self.steps.get(&id) else {
@@ -534,6 +582,46 @@ impl LocalProject {
         self.synced = doc.version();
         report.data_revision = revision;
         Ok(report)
+    }
+
+    /// Writes the IFC geometry of Reviera walls that changed, or whose type or levels changed.
+    fn write_regenerated(&mut self, doc: &Document, changed: &BTreeSet<ElementId>) -> Result<()> {
+        let store = doc.store();
+        let by_guid = |g: Option<&str>| {
+            g.and_then(GlobalId::parse)
+                .and_then(|g| store.find_by_guid(&g))
+        };
+        let mut contexts = None;
+        for e in store.iter() {
+            let Some(recipe) = walls::wall_recipe(e) else {
+                continue;
+            };
+            let base = by_guid(Some(&recipe.base_level));
+            let depends = [
+                Some(e.id()),
+                by_guid(e.param(params::TYPE_KEY).and_then(Value::as_str)),
+                base,
+                by_guid(recipe.top.get("level").and_then(Value::as_str)),
+            ];
+            if !depends.iter().flatten().any(|id| changed.contains(id)) {
+                continue;
+            }
+            let (Some(&step), Some(storey)) = (
+                self.steps.get(&e.id()),
+                base.and_then(|b| self.steps.get(&b).copied()),
+            ) else {
+                continue;
+            };
+            let g = walls::regenerate(store, e)?;
+            let ctx = match contexts {
+                Some(c) => c,
+                None => *contexts.insert(geometry::Contexts::find(&self.ifc)?),
+            };
+            geometry::write_wall(&mut self.ifc, step, &g, self.length_scale, ctx)?;
+            let owner_history = self.new_owner_history()?;
+            geometry::contain(&mut self.ifc, step, storey, owner_history)?;
+        }
+        Ok(())
     }
 
     /// Owner history for new rooted entities: required in IFC2X3, left unset in IFC4.

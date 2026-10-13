@@ -20,6 +20,7 @@ pub mod parameters;
 pub mod store;
 pub mod txn;
 pub mod units;
+pub mod walls;
 
 pub use change::{ChangeRecord, ChangeSet, ChangedSummary};
 pub use command::{

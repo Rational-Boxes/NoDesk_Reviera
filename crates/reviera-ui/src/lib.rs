@@ -3,10 +3,11 @@
 
 //! wxWidgets UI shell through wxDragon (spec Ch 1).
 //!
-//! The main window: File and View menus, a status bar, the Properties palette (a property grid)
-//! and the 3D viewport (`wgpu`, through `reviera-render-wgpu`). Clicking selects an element and
-//! shows its parameters; edits in the palette go through `param.set`. Every action goes through
-//! `App::execute`, like Lua and MCP. The ribbon, browsers and view tabs come next.
+//! The main window: File, Edit, View and Architecture menus, a status bar, the Properties palette
+//! (a property grid) and the 3D viewport (`wgpu`, through `reviera-render-wgpu`). Clicking selects
+//! an element and shows its parameters; edits in the palette go through `param.set`. The Wall tool
+//! draws chains of walls on a level with `wall.create`, and they show at once. Every action goes
+//! through `App::execute`, like Lua and MCP. The ribbon, browsers and view tabs come next.
 
 mod native;
 
@@ -24,6 +25,16 @@ use wxdragon::prelude::*;
 const ID_OPEN: i32 = ID_HIGHEST + 1;
 const ID_SAVE_FILE: i32 = ID_HIGHEST + 2;
 const ID_FIT: i32 = ID_HIGHEST + 3;
+const ID_NEW: i32 = ID_HIGHEST + 4;
+const ID_UNDO: i32 = ID_HIGHEST + 5;
+const ID_REDO: i32 = ID_HIGHEST + 6;
+const ID_WALL: i32 = ID_HIGHEST + 7;
+
+/// Height of walls drawn on the top level (they reach the level above otherwise).
+const WALL_HEIGHT: f64 = 3.0;
+
+/// The colour of a wall being drawn (linear RGBA).
+const PREVIEW: [f32; 4] = [0.1, 0.45, 0.95, 0.45];
 
 /// A press that moves less than this many pixels is a click (select), not a drag.
 const CLICK_SLOP: i32 = 3;
@@ -32,6 +43,17 @@ const CLICK_SLOP: i32 = 3;
 enum Drag {
     Orbit,
     Pan,
+}
+
+/// The Wall tool: clicks on the level's plane add walls end to end.
+struct WallTool {
+    level: ElementId,
+    level_name: String,
+    elevation: f64,
+    /// The level above, which new walls reach.
+    top: Option<ElementId>,
+    /// The end of the last wall, where the next one starts.
+    last: Option<[f64; 2]>,
 }
 
 /// The parameter behind one palette row.
@@ -54,6 +76,7 @@ struct Gui {
     press: Option<(i32, i32)>,
     rows: Vec<Row>,
     properties_stale: bool,
+    tool: Option<WallTool>,
 }
 
 fn user() -> Caller {
@@ -147,6 +170,18 @@ impl Gui {
             Ok(o) => o.result.as_u64().unwrap_or_default(),
             Err(e) => return error(frame, &format!("Could not open {}:\n{e}", path.display())),
         };
+        self.show_document(id, frame);
+    }
+
+    fn new_project(&mut self, frame: &Frame) {
+        match self.run("file.new", json!({})) {
+            Ok(id) => self.show_document(id.as_u64().unwrap_or_default(), frame),
+            Err(e) => error(frame, &format!("Could not create a project:\n{e}")),
+        }
+    }
+
+    fn show_document(&mut self, id: DocumentId, frame: &Frame) {
+        self.end_tool(frame);
         self.doc = Some(id);
         self.scene = match self.app.render_scene(id) {
             Ok(s) => s,
@@ -164,6 +199,13 @@ impl Gui {
             "{title}{} - NoDesk Reviera",
             if read_only { " (read-only)" } else { "" }
         ));
+        if self.scene.meshes.is_empty() {
+            // An empty project: look at the origin from above at an angle.
+            self.camera.fit((
+                glam::Vec3::new(-10.0, -10.0, 0.0),
+                glam::Vec3::new(10.0, 10.0, 3.0),
+            ));
+        }
         let elements = self.app.document(id).map_or(0, |d| d.doc.store().len());
         frame.set_status_text(
             &format!(
@@ -182,6 +224,206 @@ impl Gui {
                 0,
             ),
             Err(e) => error(frame, &format!("Could not save:\n{e}")),
+        }
+    }
+
+    /// Rebuilds the scene after the model changed (edits, undo, redo).
+    fn refresh_scene(&mut self, frame: &Frame) {
+        let Some(id) = self.doc else { return };
+        match self.app.render_scene(id) {
+            Ok(scene) => self.scene = scene,
+            Err(e) => {
+                return frame.set_status_text(&format!("Could not display the model: {e}"), 0);
+            }
+        }
+        let ids = self.selection();
+        if let Some(v) = &mut self.viewport {
+            v.set_scene(&self.scene);
+            v.set_highlight(&ids);
+        }
+        self.properties_stale = true;
+    }
+
+    fn undo_redo(&mut self, command: &str, frame: &Frame) {
+        if self.doc.is_none() {
+            return;
+        }
+        match self.run(command, json!({})) {
+            Ok(_) => self.refresh_scene(frame),
+            Err(e) => frame.set_status_text(&e, 0),
+        }
+    }
+
+    /// Starts the Wall tool on the lowest level.
+    fn start_wall_tool(&mut self, frame: &Frame) {
+        let Some(doc) = self.doc.and_then(|id| self.app.document(id)) else {
+            return frame.set_status_text("Open or create a project first (File > New)", 0);
+        };
+        let mut levels: Vec<(f64, ElementId, String)> = doc
+            .doc
+            .store()
+            .iter()
+            .filter(|e| e.class == "IfcBuildingStorey")
+            .map(|e| {
+                let z = e.param("@Elevation").and_then(Value::as_f64).unwrap_or(0.0);
+                (
+                    z,
+                    e.id(),
+                    e.name
+                        .clone()
+                        .unwrap_or_else(|| format!("Level {}", e.id())),
+                )
+            })
+            .collect();
+        levels.sort_by(|a, b| a.0.total_cmp(&b.0));
+        let Some((elevation, level, level_name)) = levels.first().cloned() else {
+            return frame.set_status_text("The model has no levels to draw walls on", 0);
+        };
+        let top = levels.iter().find(|l| l.0 > elevation + 1e-6).map(|l| l.1);
+        self.tool = Some(WallTool {
+            level,
+            level_name,
+            elevation,
+            top,
+            last: None,
+        });
+        self.clear_selection();
+        self.tool_prompt(frame);
+    }
+
+    fn tool_prompt(&self, frame: &Frame) {
+        if let Some(t) = &self.tool {
+            let step = if t.last.is_none() {
+                "Click the start point"
+            } else {
+                "Click the next point"
+            };
+            frame.set_status_text(
+                &format!(
+                    "Wall on {}: {step}. Esc ends the chain; Esc again ends the tool.",
+                    t.level_name
+                ),
+                0,
+            );
+        }
+    }
+
+    fn end_tool(&mut self, frame: &Frame) {
+        if self.tool.take().is_some() {
+            if let Some(v) = &mut self.viewport {
+                v.set_overlay(&[]);
+            }
+            frame.set_status_text("Ready", 0);
+        }
+    }
+
+    /// Esc: ends the wall chain, then the tool; without a tool, clears the selection.
+    fn escape(&mut self, frame: &Frame) {
+        match &mut self.tool {
+            Some(t) if t.last.is_some() => {
+                t.last = None;
+                if let Some(v) = &mut self.viewport {
+                    v.set_overlay(&[]);
+                }
+                self.tool_prompt(frame);
+            }
+            Some(_) => self.end_tool(frame),
+            None => self.clear_selection(),
+        }
+    }
+
+    /// The point on the tool's level plane under pixel (`x`, `y`).
+    fn plane_point(&self, x: i32, y: i32, panel: &Panel) -> Option<[f64; 2]> {
+        let t = self.tool.as_ref()?;
+        let size = panel.get_client_size();
+        let (o, d) = self
+            .camera
+            .ray(x as f32, y as f32, size.width as f32, size.height as f32);
+        if d.z.abs() < 1e-6 {
+            return None;
+        }
+        let s = (t.elevation as f32 - o.z) / d.z;
+        (s > 0.0).then(|| {
+            let p = o + d * s;
+            // Millimetre precision, so typed and drawn walls agree.
+            let mm = |v: f32| (f64::from(v) * 1000.0).round() / 1000.0;
+            [mm(p.x), mm(p.y)]
+        })
+    }
+
+    fn wall_click(&mut self, x: i32, y: i32, panel: &Panel, frame: &Frame) {
+        let Some(p) = self.plane_point(x, y, panel) else {
+            return;
+        };
+        let Some(t) = &self.tool else { return };
+        let Some(start) = t.last else {
+            self.tool.as_mut().expect("tool").last = Some(p);
+            return self.tool_prompt(frame);
+        };
+        let top = match t.top {
+            Some(level) => json!({ "level": level }),
+            None => json!({ "unconnected": WALL_HEIGHT }),
+        };
+        let args = json!({
+            "curve": {"line": {"start": start, "end": p}},
+            "base_level": t.level,
+            "top_constraint": top,
+        });
+        match self.run("wall.create", args) {
+            Ok(_) => {
+                self.tool.as_mut().expect("tool").last = Some(p);
+                if let Some(v) = &mut self.viewport {
+                    v.set_overlay(&[]);
+                }
+                self.refresh_scene(frame);
+                self.tool_prompt(frame);
+            }
+            Err(e) => frame.set_status_text(&e, 0),
+        }
+    }
+
+    /// Shows the wall that the next click would create.
+    fn wall_preview(&mut self, x: i32, y: i32, panel: &Panel) {
+        let Some(t) = &self.tool else { return };
+        let (Some(start), Some(end)) = (t.last, self.plane_point(x, y, panel)) else {
+            return;
+        };
+        let height = t
+            .top
+            .and_then(|l| {
+                self.doc
+                    .and_then(|d| self.app.document(d))?
+                    .doc
+                    .store()
+                    .get(l)?
+                    .param("@Elevation")?
+                    .as_f64()
+            })
+            .map_or(WALL_HEIGHT, |z| z - t.elevation);
+        let g = reviera_core::walls::WallGeometry {
+            start,
+            end,
+            base_z: t.elevation,
+            height,
+            width: 0.2,
+        };
+        let overlay = if g.length() > reviera_core::walls::TOL_SHORT {
+            let (verts, indices) = g.mesh();
+            vec![reviera_render::SceneMesh {
+                element: None,
+                class: "IfcWall".into(),
+                positions: verts
+                    .iter()
+                    .map(|[x, y, z]| [*x as f32, *y as f32, *z as f32])
+                    .collect(),
+                indices,
+                color: PREVIEW,
+            }]
+        } else {
+            Vec::new()
+        };
+        if let Some(v) = &mut self.viewport {
+            v.set_overlay(&overlay);
         }
     }
 
@@ -387,7 +629,8 @@ impl Gui {
         if let Err(e) = self.run("param.set", args) {
             error(frame, &format!("The value was not changed:\n{e}"));
         }
-        self.properties_stale = true;
+        // A level's elevation or a type's values can move walls.
+        self.refresh_scene(frame);
     }
 }
 
@@ -475,17 +718,27 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
             .build();
 
         let file_menu = Menu::builder()
+            .append_item(ID_NEW, "&New\tCtrl+N", "Create a project")
             .append_item(ID_OPEN, "&Open...\tCtrl+O", "Open an IFC project")
             .append_item(ID_SAVE_FILE, "&Save\tCtrl+S", "Save the project")
             .append_separator()
             .append_item(ID_EXIT, "E&xit", "Close Reviera")
             .build();
+        let edit_menu = Menu::builder()
+            .append_item(ID_UNDO, "&Undo\tCtrl+Z", "Undo the last change")
+            .append_item(ID_REDO, "&Redo\tCtrl+Y", "Redo the last undone change")
+            .build();
         let view_menu = Menu::builder()
             .append_item(ID_FIT, "Zoom to &Fit\tF", "Show the whole model")
             .build();
+        let architecture_menu = Menu::builder()
+            .append_item(ID_WALL, "&Wall", "Draw walls on the lowest level")
+            .build();
         let menu_bar = MenuBar::builder()
             .append(file_menu, "&File")
+            .append(edit_menu, "&Edit")
             .append(view_menu, "&View")
+            .append(architecture_menu, "&Architecture")
             .build();
         frame.set_menu_bar(menu_bar);
         frame.create_status_bar(2, 0, -1, "status");
@@ -515,6 +768,7 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
             press: None,
             rows: Vec::new(),
             properties_stale: true,
+            tool: None,
         }));
 
         {
@@ -552,7 +806,7 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
             };
         }
         for button in 0..3 {
-            let (gui, p) = (gui.clone(), panel);
+            let (gui, p, f) = (gui.clone(), panel, frame);
             let handler = move |e: WindowEventData| {
                 let Ok(mut g) = gui.try_borrow_mut() else {
                     return;
@@ -564,7 +818,11 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                     && (x - x0).abs() <= CLICK_SLOP
                     && (y - y0).abs() <= CLICK_SLOP
                 {
-                    g.pick(x, y, &p);
+                    if g.tool.is_some() {
+                        g.wall_click(x, y, &p, &f);
+                    } else {
+                        g.pick(x, y, &p);
+                    }
                     drop(g);
                     p.refresh(false, None);
                 }
@@ -582,7 +840,14 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 let Ok(mut g) = gui.try_borrow_mut() else {
                     return;
                 };
-                let Some((kind, x0, y0)) = g.drag else { return };
+                let Some((kind, x0, y0)) = g.drag else {
+                    if g.tool.is_some() {
+                        g.wall_preview(x, y, &p);
+                        drop(g);
+                        p.refresh(false, None);
+                    }
+                    return;
+                };
                 let (dx, dy) = ((x - x0) as f32, (y - y0) as f32);
                 match kind {
                     Drag::Orbit => g.camera.orbit(dx, dy),
@@ -605,12 +870,12 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
             });
         }
         {
-            let (gui, p) = (gui.clone(), panel);
+            let (gui, p, f) = (gui.clone(), panel, frame);
             panel.on_key_down(move |e| {
                 if let WindowEventData::Keyboard(k) = &e
                     && k.get_key_code() == Some(WXK_ESCAPE)
                 {
-                    with(&gui, Gui::clear_selection);
+                    with(&gui, |g| g.escape(&f));
                     p.refresh(false, None);
                 } else {
                     e.skip(true);
@@ -653,7 +918,24 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                         p.refresh(false, None);
                     }
                 }
+                ID_NEW => {
+                    with(&gui, |g| g.new_project(&f));
+                    p.refresh(false, None);
+                }
                 ID_SAVE_FILE => with(&gui, |g| g.save(&f)),
+                ID_UNDO | ID_REDO => {
+                    let command = if e.get_id() == ID_UNDO {
+                        "edit.undo"
+                    } else {
+                        "edit.redo"
+                    };
+                    with(&gui, |g| g.undo_redo(command, &f));
+                    p.refresh(false, None);
+                }
+                ID_WALL => {
+                    with(&gui, |g| g.start_wall_tool(&f));
+                    p.set_focus();
+                }
                 ID_FIT => {
                     with(&gui, Gui::fit);
                     p.refresh(false, None);

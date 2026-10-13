@@ -11,7 +11,9 @@
 //! | `<QtoName>.<Quantity>` | `{"type": "IfcQuantityLength", "value": 5.0}` | `IfcElementQuantity` (read-only) |
 //! | `<PsetName>.<Property>` | `{"kind": "IfcPropertyEnumeratedValue", …}` | other property kinds (read-only for now) |
 //! | `@Description`, `@Tag`, `@ObjectType`, `@PredefinedType` | string | direct IFC attributes (`@Tag` is Mark) |
+//! | `@Elevation` | number, metres | storey elevation (`IfcBuildingStorey.Elevation`) |
 //! | `@type` | GlobalId of the type | `IfcRelDefinesByType` |
+//! | `rxd:<section>` | JSON | a section of the element's RXD data (`Reviera_Element`), not an IFC value |
 //!
 //! Instance values come from property sets on the occurrence; a type's own values are parameters
 //! of the type element. The value's IFC measure type is kept, so values round-trip unchanged.
@@ -30,7 +32,11 @@ pub type Params = BTreeMap<String, Value>;
 
 /// Direct attributes exposed as parameters.
 pub const ATTRIBUTES: &[&str] = &["Description", "Tag", "ObjectType", "PredefinedType"];
+/// Direct attributes that are lengths, exposed in metres.
+pub const LENGTH_ATTRIBUTES: &[&str] = &["Elevation"];
 pub const TYPE_KEY: &str = "@type";
+/// Prefix of keys that hold RXD element-data sections.
+pub const RXD_PREFIX: &str = "rxd:";
 
 /// One property or quantity set on one owner.
 #[derive(Debug, Clone)]
@@ -59,6 +65,7 @@ pub(crate) struct SetIndex {
 pub(crate) fn load(
     ifc: &IfcModel,
     objects: &[EntityInfo],
+    length_scale: f64,
 ) -> Result<(HashMap<StepId, Params>, SetIndex)> {
     let mut params: HashMap<StepId, BTreeMap<String, Value>> = HashMap::new();
     let ids: Vec<StepId> = objects.iter().map(|e| e.id).collect();
@@ -80,6 +87,11 @@ pub(crate) fn load(
                     p.insert(format!("@{name}"), json!(e));
                 }
                 _ => {}
+            }
+        }
+        for name in LENGTH_ATTRIBUTES {
+            if let AttrValue::Real(r) = entity.get(name) {
+                p.insert(format!("@{name}"), json!(r * length_scale));
             }
         }
         for set in entity.refs("HasPropertySets") {
@@ -296,6 +308,8 @@ pub(crate) struct ValueWriter<'a> {
     pub ifc: &'a mut IfcModel,
     pub index: &'a mut SetIndex,
     pub owner_history: Option<StepId>,
+    /// Metres per file length unit.
+    pub length_scale: f64,
 }
 
 impl ValueWriter<'_> {
@@ -314,10 +328,12 @@ impl ValueWriter<'_> {
             if old == new {
                 continue;
             }
+            if key.starts_with(RXD_PREFIX) {
+                continue;
+            }
             if key == TYPE_KEY {
-                return Err(unsupported(
-                    "changing an element's type is not supported yet",
-                ));
+                self.set_type(owner, new)?;
+                continue;
             }
             if let Some(attr) = key.strip_prefix('@') {
                 self.set_attribute(owner, attr, new)?;
@@ -356,7 +372,91 @@ impl ValueWriter<'_> {
         split_key(key).map(|(s, p)| (s.to_owned(), p.to_owned()))
     }
 
+    /// Moves `owner` into the `IfcRelDefinesByType` of the type with GlobalId `value` (or out of
+    /// any type with `None`).
+    fn set_type(&mut self, owner: StepId, value: Option<&Value>) -> Result<()> {
+        let new_type = match value {
+            None | Some(Value::Null) => None,
+            Some(Value::String(g)) => Some(
+                GlobalId::parse(g)
+                    .and_then(|g| self.ifc.find_by_guid(&g))
+                    .ok_or_else(|| unsupported(format!("type {g} is not in the file")))?,
+            ),
+            Some(other) => {
+                return Err(unsupported(format!(
+                    "`@type` must be a GlobalId, not {other}"
+                )));
+            }
+        };
+        for rel in self.ifc.referenced_by(owner, "IfcRelDefinesByType")? {
+            let e = &self.ifc.attributes_many(&[rel])?[0];
+            if !e.refs("RelatedObjects").contains(&owner) {
+                continue;
+            }
+            if new_type.is_some_and(|t| e.refs("RelatingType") == [t]) {
+                return Ok(());
+            }
+            let kept: Vec<_> = e
+                .refs("RelatedObjects")
+                .into_iter()
+                .filter(|o| *o != owner)
+                .map(|o| AttrValue::Ref(o.0))
+                .collect();
+            if kept.is_empty() {
+                self.ifc.remove(rel)?;
+            } else {
+                self.ifc
+                    .set_attribute(rel, "RelatedObjects", &AttrValue::List(kept))?;
+            }
+        }
+        let Some(t) = new_type else { return Ok(()) };
+        let existing = self
+            .ifc
+            .referenced_by(t, "IfcRelDefinesByType")?
+            .into_iter()
+            .find(|r| {
+                self.ifc
+                    .attribute(*r, "RelatingType")
+                    .is_ok_and(|v| v == AttrValue::Ref(t.0))
+            });
+        let (rel, mut objects) = match existing {
+            Some(rel) => (
+                rel,
+                self.ifc.attributes_many(&[rel])?[0].refs("RelatedObjects"),
+            ),
+            None => {
+                let rel = self
+                    .ifc
+                    .create_rooted("IfcRelDefinesByType", &GlobalId::new())?;
+                if let Some(oh) = self.owner_history {
+                    self.ifc
+                        .set_attribute(rel, "OwnerHistory", &AttrValue::Ref(oh.0))?;
+                }
+                self.ifc
+                    .set_attribute(rel, "RelatingType", &AttrValue::Ref(t.0))?;
+                (rel, Vec::new())
+            }
+        };
+        objects.push(owner);
+        let list = AttrValue::List(objects.into_iter().map(|o| AttrValue::Ref(o.0)).collect());
+        Ok(self.ifc.set_attribute(rel, "RelatedObjects", &list)?)
+    }
+
     fn set_attribute(&mut self, owner: StepId, attr: &str, value: Option<&Value>) -> Result<()> {
+        if LENGTH_ATTRIBUTES.contains(&attr) {
+            let v = match value {
+                None | Some(Value::Null) => AttrValue::Null,
+                Some(Value::Number(n)) => {
+                    AttrValue::Real(n.as_f64().unwrap_or_default() / self.length_scale)
+                }
+                Some(other) => {
+                    return Err(unsupported(format!(
+                        "`@{attr}` must be a length, not {other}"
+                    )));
+                }
+            };
+            return Ok(self.ifc.set_attribute(owner, attr, &v)?);
+        }
         if !ATTRIBUTES.contains(&attr) {
             return Err(unsupported(format!(
                 "`@{attr}` is not a writable attribute"

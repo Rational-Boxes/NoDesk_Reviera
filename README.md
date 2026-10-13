@@ -22,7 +22,12 @@ operation can be driven by Lua scripts and by AI agents through the Model Contex
 - **Crash recovery.** Every change is mirrored to an encrypted SQLite live store (SQLCipher, with
   the key kept in the OS keyring). After a crash, unsaved work and its undo history come back.
 - **3D viewport**: a wxWidgets window (through wxDragon) with a `wgpu` view of the model;
-  orbit with the left mouse button, pan with the middle or right button, zoom with the wheel.
+  click to select, drag with the left mouse button to orbit, with the middle or right button
+  to pan, and use the wheel to zoom.
+- **Walls**: *Architecture > Wall* draws chains of straight walls on a level; they appear at once,
+  regenerated from their recipe (`wall.create`, `wall.set_location`). Saving writes standard IFC
+  (`IfcWall` with an `Axis` and a `SweptSolid` body, typed and contained in its storey), so other
+  tools see them, and Reviera reopens them as editable walls.
 - **Units and parameters**: SI storage with project display units (metric and imperial,
   feet-and-inches), built-in, project and shared parameters routed to types or instances.
 - **MCP server** for AI agents: every command is a tool, with toolsets, preview and confirm for

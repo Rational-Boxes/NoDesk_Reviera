@@ -135,21 +135,67 @@ pub fn convert_arguments(
     args: &mut serde_json::Value,
     settings: &UnitSettings,
 ) -> Result<()> {
-    let (Some(props), Some(map)) = (
-        schema.get("properties").and_then(|p| p.as_object()),
-        args.as_object_mut(),
-    ) else {
-        return Ok(());
+    convert_at(schema, schema, args, settings, "")
+}
+
+/// Converts the unit strings in `value` against `schema`, following `$ref`s into `$defs`,
+/// nested properties, array items and `oneOf`/`anyOf`/`allOf` variants.
+fn convert_at(
+    root: &serde_json::Value,
+    schema: &serde_json::Value,
+    value: &mut serde_json::Value,
+    settings: &UnitSettings,
+    path: &str,
+) -> Result<()> {
+    use serde_json::Value;
+    let schema = match schema.get("$ref").and_then(Value::as_str) {
+        Some(r) => r
+            .strip_prefix("#/")
+            .map(|p| p.split('/').fold(root, |s, part| &s[part]))
+            .unwrap_or(&Value::Null),
+        None => schema,
     };
-    for (name, prop) in props {
-        let Some(dt) = prop.get("x-reviera-data-type").and_then(|d| d.as_str()) else {
-            continue;
-        };
-        if let Some(serde_json::Value::String(text)) = map.get(name) {
-            let si = parse(text, dt, settings)
-                .map_err(|e| Error::new("args.invalid", format!("`{name}`: {}", e.message)))?;
-            map.insert(name.clone(), serde_json::json!(si));
+    if let (Some(dt), Value::String(text)) = (
+        schema.get("x-reviera-data-type").and_then(Value::as_str),
+        &*value,
+    ) {
+        let si = parse(text, dt, settings).map_err(|e| {
+            Error::new(
+                "args.invalid",
+                format!("`{}`: {}", path.trim_start_matches('.'), e.message),
+            )
+        })?;
+        *value = serde_json::json!(si);
+        return Ok(());
+    }
+    for key in ["oneOf", "anyOf", "allOf"] {
+        for variant in schema
+            .get(key)
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+        {
+            convert_at(root, variant, value, settings, path)?;
         }
+    }
+    match value {
+        Value::Object(map) => {
+            if let Some(props) = schema.get("properties").and_then(Value::as_object) {
+                for (name, prop) in props {
+                    if let Some(v) = map.get_mut(name) {
+                        convert_at(root, prop, v, settings, &format!("{path}.{name}"))?;
+                    }
+                }
+            }
+        }
+        Value::Array(items) => {
+            if let Some(item) = schema.get("items") {
+                for (i, v) in items.iter_mut().enumerate() {
+                    convert_at(root, item, v, settings, &format!("{path}[{i}]"))?;
+                }
+            }
+        }
+        _ => {}
     }
     Ok(())
 }

@@ -483,6 +483,7 @@ impl HostCommand for RecoveryRestore {
                 untitled,
                 open_report: None,
                 selection: Default::default(),
+                tessellation: Default::default(),
             },
         );
         app.active = Some(id);

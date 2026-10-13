@@ -2629,6 +2629,7 @@ name = "reviera-ui"
 version = "0.1.0"
 dependencies = [
  "cc",
+ "glam",
  "pkg-config",
  "raw-window-handle",
  "reviera-app",

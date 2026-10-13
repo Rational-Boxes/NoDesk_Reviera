@@ -90,6 +90,7 @@ pub struct WgpuViewport {
     depth: wgpu::TextureView,
     opaque: Option<(wgpu::Buffer, u32)>,
     transparent: Option<(wgpu::Buffer, u32)>,
+    overlay: Option<(wgpu::Buffer, u32)>,
     size: (u32, u32),
     adapter: String,
     scene: RenderScene,
@@ -273,6 +274,7 @@ impl WgpuViewport {
             adapter: format!("{} ({:?})", info.name, info.backend),
             scene: RenderScene::default(),
             highlight: Default::default(),
+            overlay: None,
         }
     }
 
@@ -375,11 +377,11 @@ fn depth_view(device: &wgpu::Device, (w, h): (u32, u32)) -> wgpu::TextureView {
 /// Expands indexed meshes into flat-shaded triangles, split by transparency; highlighted elements
 /// are drawn opaque in the highlight colour.
 fn vertices(
-    scene: &RenderScene,
+    meshes: &[reviera_render::SceneMesh],
     highlight: &std::collections::HashSet<reviera_core::ElementId>,
 ) -> (Vec<Vertex>, Vec<Vertex>) {
     let (mut opaque, mut transparent) = (Vec::new(), Vec::new());
-    for m in &scene.meshes {
+    for m in meshes {
         let lit = m.element.is_some_and(|e| highlight.contains(&e));
         let color = if lit {
             reviera_render::HIGHLIGHT
@@ -427,6 +429,12 @@ impl RenderBackend for WgpuViewport {
         self.upload();
     }
 
+    fn set_overlay(&mut self, meshes: &[reviera_render::SceneMesh]) {
+        let (mut opaque, transparent) = vertices(meshes, &Default::default());
+        opaque.extend(transparent);
+        self.overlay = self.buffer(&opaque);
+    }
+
     fn resize(&mut self, width: u32, height: u32) {
         self.resize_target(width, height);
     }
@@ -437,22 +445,23 @@ impl RenderBackend for WgpuViewport {
 }
 
 impl WgpuViewport {
+    fn buffer(&self, v: &[Vertex]) -> Option<(wgpu::Buffer, u32)> {
+        (!v.is_empty()).then(|| {
+            let buffer = self
+                .device
+                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some("scene"),
+                    contents: bytemuck::cast_slice(v),
+                    usage: wgpu::BufferUsages::VERTEX,
+                });
+            (buffer, v.len() as u32)
+        })
+    }
+
     fn upload(&mut self) {
-        let (opaque, transparent) = vertices(&self.scene, &self.highlight);
-        let upload = |v: &[Vertex]| {
-            (!v.is_empty()).then(|| {
-                let buffer = self
-                    .device
-                    .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                        label: Some("scene"),
-                        contents: bytemuck::cast_slice(v),
-                        usage: wgpu::BufferUsages::VERTEX,
-                    });
-                (buffer, v.len() as u32)
-            })
-        };
-        self.opaque = upload(&opaque);
-        self.transparent = upload(&transparent);
+        let (opaque, transparent) = vertices(&self.scene.meshes, &self.highlight);
+        self.opaque = self.buffer(&opaque);
+        self.transparent = self.buffer(&transparent);
     }
 
     fn resize_target(&mut self, width: u32, height: u32) {
@@ -523,6 +532,7 @@ impl WgpuViewport {
             for (pipeline, mesh) in [
                 (&self.opaque_pipeline, &self.opaque),
                 (&self.transparent_pipeline, &self.transparent),
+                (&self.transparent_pipeline, &self.overlay),
             ] {
                 if let Some((buffer, count)) = mesh {
                     pass.set_pipeline(pipeline);

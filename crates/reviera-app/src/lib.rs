@@ -14,7 +14,7 @@ use std::fmt::Display;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use reviera_core::{Caller, CommandRegistry, Document, Error, Outcome, Result};
+use reviera_core::{Caller, CommandRegistry, Document, Error, Outcome, Result, walls};
 use reviera_ifc::Schema;
 use reviera_livestore::{LiveError, LiveStore, Options as LiveOptions, Recoverable};
 use reviera_store::LocalProject;
@@ -61,9 +61,60 @@ pub struct OpenDocument {
     pub open_report: Option<reviera_store::OpenReport>,
     /// The current selection (session state, not saved or undone).
     pub selection: std::collections::BTreeSet<reviera_core::ElementId>,
+    /// Tessellated IFC geometry and the data revision it was made at.
+    tessellation: std::sync::Mutex<Option<(i64, std::sync::Arc<Vec<reviera_render::SceneMesh>>)>>,
 }
 
 impl OpenDocument {
+    /// The IFC geometry of the file as last opened or saved, tessellated once per save.
+    /// Meshes of IFC objects that are not elements of the document are left out.
+    fn tessellation(&self) -> Result<std::sync::Arc<Vec<reviera_render::SceneMesh>>> {
+        let revision = self.project.data_revision();
+        let mut cache = self.tessellation.lock().unwrap_or_else(|e| e.into_inner());
+        if let Some((r, meshes)) = &*cache
+            && *r == revision
+        {
+            return Ok(meshes.clone());
+        }
+        let threads = std::thread::available_parallelism().map_or(1, |n| n.get() as u32);
+        let meshes = self
+            .project
+            .ifc()
+            .tessellate(threads)
+            .map_err(|e| err("render.tessellation_failed", e))?;
+        let ids: std::collections::HashMap<_, _> = self
+            .doc
+            .store()
+            .iter()
+            .map(|e| (e.guid().clone(), e.id()))
+            .collect();
+        let meshes: Vec<_> = meshes
+            .into_iter()
+            .filter(|m| {
+                m.class != "IfcSpace" && m.class != "IfcOpeningElement" && !m.faces.is_empty()
+            })
+            .filter_map(|m| {
+                let element = ids.get(m.global_id.as_ref()?).copied();
+                Some(reviera_render::SceneMesh {
+                    element,
+                    color: reviera_render::class_color(&m.class),
+                    positions: m
+                        .verts
+                        .as_chunks::<3>()
+                        .0
+                        .iter()
+                        .map(|[x, y, z]| [*x as f32, *y as f32, *z as f32])
+                        .collect(),
+                    indices: m.faces,
+                    class: m.class,
+                })
+            })
+            .collect();
+        let meshes = std::sync::Arc::new(meshes);
+        *cache = Some((revision, meshes.clone()));
+        Ok(meshes)
+    }
+
     pub fn is_dirty(&self) -> bool {
         self.untitled || self.project.is_dirty(&self.doc)
     }
@@ -211,37 +262,45 @@ impl App {
         }
     }
 
-    /// The Render Scene of a document: its IFC geometry, tessellated with OpenCASCADE, coloured by
-    /// class. Spaces are left out of the default 3D view. Geometry reflects the IFC population, so
-    /// edits show after they are saved (regeneration comes with the modelling tools).
+    /// The Render Scene of a document, coloured by class. Elements built from a Reviera recipe
+    /// (walls) are regenerated from the current model, so edits show at once. Other elements come
+    /// from the IFC population, tessellated with OpenCASCADE and cached until the next save;
+    /// deleted elements disappear at once. Spaces and openings are left out of the default 3D view.
     pub fn render_scene(&self, id: DocumentId) -> Result<reviera_render::RenderScene> {
         let open = self.get(id)?;
-        let threads = std::thread::available_parallelism().map_or(1, |n| n.get() as u32);
-        let meshes = open
-            .project
-            .ifc()
-            .tessellate(threads)
-            .map_err(|e| err("render.tessellation_failed", e))?;
         let store = open.doc.store();
-        let meshes = meshes
-            .into_iter()
-            .filter(|m| {
-                m.class != "IfcSpace" && m.class != "IfcOpeningElement" && !m.faces.is_empty()
+        let mut meshes: Vec<reviera_render::SceneMesh> = open
+            .tessellation()?
+            .iter()
+            .filter(|m| match m.element {
+                Some(e) => store
+                    .get(e)
+                    .is_some_and(|e| walls::wall_recipe(e).is_none()),
+                None => true,
             })
-            .map(|m| reviera_render::SceneMesh {
-                element: m.global_id.as_ref().and_then(|g| store.find_by_guid(g)),
-                color: reviera_render::class_color(&m.class),
-                positions: m
-                    .verts
-                    .as_chunks::<3>()
-                    .0
+            .cloned()
+            .collect();
+        for e in store.iter() {
+            if walls::wall_recipe(e).is_none() {
+                continue;
+            }
+            // A wall that cannot regenerate (for example, its level was deleted outside a
+            // command) is not drawn.
+            let Ok(g) = walls::regenerate(store, e) else {
+                continue;
+            };
+            let (verts, indices) = g.mesh();
+            meshes.push(reviera_render::SceneMesh {
+                element: Some(e.id()),
+                class: e.class.clone(),
+                color: reviera_render::class_color(&e.class),
+                positions: verts
                     .iter()
                     .map(|[x, y, z]| [*x as f32, *y as f32, *z as f32])
                     .collect(),
-                indices: m.faces,
-                class: m.class,
-            })
-            .collect();
+                indices,
+            });
+        }
         Ok(reviera_render::RenderScene { meshes })
     }
 
@@ -341,6 +400,7 @@ impl App {
                 untitled,
                 open_report: None,
                 selection: Default::default(),
+                tessellation: Default::default(),
             },
         );
         self.active = Some(id);

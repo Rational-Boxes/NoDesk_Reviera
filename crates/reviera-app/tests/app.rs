@@ -282,3 +282,43 @@ fn selection_is_session_state_of_the_active_document() {
     // Selecting is not a model change.
     assert_eq!(run(&mut app, "model.version", json!({})), version);
 }
+
+#[test]
+fn new_walls_appear_in_the_scene_before_saving() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = app(dir.path());
+    run(&mut app, "file.new", json!({}));
+    let doc = app.active().unwrap();
+    let level = app
+        .document(doc)
+        .unwrap()
+        .doc
+        .store()
+        .iter()
+        .find(|e| e.class == "IfcBuildingStorey")
+        .unwrap()
+        .id();
+    assert!(app.render_scene(doc).unwrap().meshes.is_empty());
+
+    let wall = run(
+        &mut app,
+        "wall.create",
+        json!({"curve": {"line": {"start": [0, 0], "end": [4, 0]}}, "base_level": level.0, "top_constraint": {"unconnected": 3}}),
+    );
+    let wall = ElementId(wall.as_u64().unwrap());
+    let scene = app.render_scene(doc).unwrap();
+    assert_eq!(scene.meshes.len(), 1);
+    assert_eq!(scene.meshes[0].element, Some(wall));
+    let bounds = scene.bounds().unwrap();
+    assert_eq!((bounds.0[0], bounds.1[0], bounds.1[2]), (0.0, 4.0, 3.0));
+
+    // After saving, the wall is still drawn once (from its recipe, not also from the IFC).
+    run(
+        &mut app,
+        "file.save_as",
+        json!({"path": dir.path().join("w.ifc")}),
+    );
+    assert_eq!(app.render_scene(doc).unwrap().meshes.len(), 1);
+    run(&mut app, "edit.undo", json!({}));
+    assert!(app.render_scene(doc).unwrap().meshes.is_empty());
+}

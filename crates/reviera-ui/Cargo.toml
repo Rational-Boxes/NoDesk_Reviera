@@ -10,6 +10,7 @@ repository.workspace = true
 publish.workspace = true
 
 [dependencies]
+glam.workspace = true
 reviera-core.workspace = true
 wxdragon = { workspace = true, features = ["aui"] }
 reviera-app.workspace = true

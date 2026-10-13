@@ -62,6 +62,19 @@ impl ElementData {
         self.sections.get(name)
     }
 
+    /// The sections by name, in sorted order.
+    pub fn sections(&self) -> impl Iterator<Item = (&String, &Value)> {
+        self.sections.iter()
+    }
+
+    /// Sets a section, or removes it with `None`.
+    pub fn set_section(&mut self, name: &str, value: Option<Value>) {
+        match value {
+            Some(v) => self.sections.insert(name.into(), v),
+            None => self.sections.remove(name),
+        };
+    }
+
     pub fn identity(&self) -> Result<Option<IdentitySection>, RxdError> {
         self.sections
             .get(Self::IDENTITY)
