@@ -565,6 +565,15 @@ impl Gui {
         match self.app.execute(command, args, &super::user()) {
             Ok(out) => {
                 let made = s.host.or_else(|| out.result.as_u64().map(ElementId));
+                // A new roof on picked walls offers to attach them.
+                let attach: Vec<ElementId> = if s.kind == SketchKind::Roof && s.host.is_none() {
+                    s.curves
+                        .iter()
+                        .filter_map(|c| c.lock.as_ref().map(|l| l.0))
+                        .collect()
+                } else {
+                    Vec::new()
+                };
                 self.sketch = None;
                 if let Some(v) = self.viewport() {
                     v.set_overlay_lines(&[]);
@@ -575,6 +584,9 @@ impl Gui {
                 }
                 self.selection_changed();
                 frame.set_status_text("Finished", 0);
+                if let Some(roof) = made.filter(|_| !attach.is_empty()) {
+                    self.offer_attach(roof, attach);
+                }
             }
             Err(e) => {
                 let points: Vec<[f64; 2]> =

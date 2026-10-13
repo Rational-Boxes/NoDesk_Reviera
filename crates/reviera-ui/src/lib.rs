@@ -197,6 +197,8 @@ struct Gui {
     keys: (String, std::time::Instant),
     /// A slice tool waiting for its click.
     slice_pick: Option<inspect::SliceKind>,
+    /// Walls waiting for the roof they attach to (Attach Top/Base).
+    attach_pick: Option<Vec<ElementId>>,
     /// The Model Tree pane (UI-TREE-001) and its state.
     model_tree: TreeCtrl,
     tree: inspect::ModelTree,
@@ -985,6 +987,9 @@ impl Gui {
     fn escape(&mut self, frame: &Frame) {
         if self.slice_pick.take().is_some() {
             return frame.set_status_text("Slice cancelled", 0);
+        }
+        if self.attach_pick.take().is_some() {
+            return frame.set_status_text("Attach cancelled", 0);
         }
         match &mut self.tool {
             Some(t) if !t.typed.is_empty() => {
@@ -1983,6 +1988,7 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                 match cube {
                     Some(hit) => g.cube_click(hit),
                     None if g.slice_pick.is_some() => g.slice_click(x, y),
+                    None if g.attach_pick.is_some() => g.attach_click(x, y, &p),
                     None if g.sketch.is_some() => g.sketch_click(x, y),
                     None if g.ceiling_tool.is_some() => g.ceiling_click(x, y),
                     None if g.dim_tool.is_some() => g.dim_click(x, y),
@@ -2466,6 +2472,7 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 plan_edges: HashMap::new(),
                 keys: (String::new(), std::time::Instant::now()),
                 slice_pick: None,
+                attach_pick: None,
                 model_tree,
                 tree: inspect::ModelTree {
                     stale: true,
@@ -2854,6 +2861,11 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
             g.edit_roof_footprint();
             focus(g);
         }),
+        "wall.attach" => with(gui, |g| {
+            g.start_attach();
+            focus(g);
+        }),
+        "wall.detach" => with(gui, Gui::detach_selection),
         "sketch.defines_slope" => with(gui, |g| {
             g.set_draw_mode(sketch::DrawMode::DefinesSlope);
             focus(g);

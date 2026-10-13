@@ -13,6 +13,7 @@
 //! (see [`joins`]). Layered types, other location lines, arcs and profiles come with the rest of
 //! Chapter 3.
 
+pub mod attach;
 pub mod joins;
 pub mod openings;
 
@@ -91,6 +92,9 @@ pub struct WallRecipe {
     /// Join status of the start and end (Allow = `true`, ARC-JOIN-001).
     #[serde(default = "both_allowed")]
     pub join_allowed: [bool; 2],
+    /// The roof the top is attached to (GlobalId, ARC-WALL-008).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub attach_top: Option<String>,
 }
 
 fn both_allowed() -> [bool; 2] {
@@ -359,6 +363,7 @@ pub(crate) fn create(txn: &mut crate::txn::Transaction<'_>, p: CreateParams) -> 
         location_line: p.location_line,
         flip: p.flip,
         join_allowed: both_allowed(),
+        attach_top: None,
     };
     let id = txn.create(
         NewElement::new("IfcWall")

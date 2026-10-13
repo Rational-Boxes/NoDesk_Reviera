@@ -10260,6 +10260,8 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Î£ táµ
 
 **Data (IFC mapping).** An `IfcRelConnectsElements` with `Name = "AttachTop"` or `"AttachBase"` (RelatingElement = target, RelatedElement = wall). The clipped body is written as an `IfcBooleanClippingResult` when the target is planar (with an `IfcHalfSpaceSolid` or `IfcPolygonalBoundedHalfSpace`), and as a Brep otherwise. The attach relation is also stored in RXD document `model/constraints`, which is authoritative.
 
+**Implementation notes (2026-10-13).** As built, tops attach to Reviera roofs. The wall's footprint is split by the roof's faces (each piece's top on its face's plane), and the roof must cover the whole footprint (`wall.attach_not_covered`). The body is a faceted B-rep in the wall's own placement frame, so openings placed relative to the wall keep their place. The attach target is stored in the wall's recipe (`attach_top`) until `model/constraints` exists, and the `IfcRelConnectsElements` comes later. The viewport draws the wall cut by its openings up to the roof's lowest point over it, with the part above as a separate solid. Deleting the roof detaches its walls.
+
 **Commands.**
 - `wall.attach(wall_ids, end: Top|Base, target_id)`
 - `wall.detach(wall_ids, end: Top|Base, target_ids? )` (no targets means Detach All)

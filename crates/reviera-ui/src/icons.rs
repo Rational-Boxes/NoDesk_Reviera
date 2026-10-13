@@ -210,6 +210,12 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "tree" => format!(
             r#"<rect x="4" y="3" width="10" height="6" fill="{f}" {s}/><path d="M9 9v17h7M9 17h7" {s}/><rect x="16" y="14" width="12" height="6" {sa}/><rect x="16" y="23" width="12" height="6" {sa}/>"#
         ),
+        "attach" => format!(
+            r#"<path d="M3 14L16 5l13 9" {s}/><path d="M8 13v14h16V13" fill="{f}" {s}/><path d="M16 22v-9M12 17l4-4 4 4" {sa}/>"#
+        ),
+        "detach" => format!(
+            r#"<path d="M3 10L16 2l13 8" {s}/><path d="M8 16v11h16V16" fill="{f}" {s}/><path d="M16 9v6M12 12l4 4 4-4" {sa}/>"#
+        ),
         "roof" => format!(
             r#"<path d="M2 18L16 6l14 12" {s}/><path d="M5 16l11-9 11 9v2H5z" fill="{f}" {s}/><path d="M7 18v9h18v-9" {s}/><path d="M16 6v4" {sa}/>"#
         ),

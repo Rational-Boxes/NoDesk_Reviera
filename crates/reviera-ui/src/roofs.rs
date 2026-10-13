@@ -346,4 +346,91 @@ impl Gui {
         self.refresh_scene(&frame);
         true
     }
+
+    /// After a roof is made from picked walls, offers to attach those walls to it.
+    pub(crate) fn offer_attach(&mut self, roof: ElementId, walls: Vec<ElementId>) {
+        let frame = self.frame;
+        if walls.is_empty()
+            || !ask(
+                &frame,
+                &format!("Attach the {} walls under the roof to it?", walls.len()),
+            )
+        {
+            return;
+        }
+        match self.run(
+            "wall.attach",
+            json!({ "wall_ids": walls, "target_id": roof }),
+        ) {
+            Ok(_) => frame.set_status_text("Walls attached to the roof", 0),
+            Err(e) => error(&frame, &format!("The walls were not attached:\n{e}")),
+        }
+        self.refresh_scene(&frame);
+    }
+
+    /// Modify | Walls › Attach Top/Base: the next click picks the roof.
+    pub(crate) fn start_attach(&mut self) {
+        let walls = self.selected_walls();
+        if walls.is_empty() {
+            return self
+                .frame
+                .set_status_text("Select the walls to attach first", 0);
+        }
+        self.attach_pick = Some(walls);
+        self.frame.set_status_text(
+            "Attach Top: click the roof the walls attach to (Esc cancels)",
+            0,
+        );
+    }
+
+    pub(crate) fn attach_click(&mut self, x: i32, y: i32, panel: &Panel) {
+        let frame = self.frame;
+        let Some(walls) = self.attach_pick.take() else {
+            return;
+        };
+        let Some(target) = self.element_at(x, y, panel) else {
+            return frame.set_status_text("Nothing to attach to there", 0);
+        };
+        match self.run(
+            "wall.attach",
+            json!({ "wall_ids": walls, "target_id": target }),
+        ) {
+            Ok(_) => frame.set_status_text("Walls attached", 0),
+            Err(e) => error(&frame, &format!("The walls were not attached:\n{e}")),
+        }
+        self.refresh_scene(&frame);
+    }
+
+    /// Modify | Walls › Detach Top/Base: the selected walls return to their own tops.
+    pub(crate) fn detach_selection(&mut self) {
+        let frame = self.frame;
+        let walls = self.selected_walls();
+        if walls.is_empty() {
+            return frame.set_status_text("Select the walls to detach first", 0);
+        }
+        match self.run("wall.detach", json!({ "wall_ids": walls })) {
+            Ok(_) => frame.set_status_text("Walls detached", 0),
+            Err(e) => error(&frame, &format!("The walls were not detached:\n{e}")),
+        }
+        self.refresh_scene(&frame);
+    }
+
+    fn selected_walls(&mut self) -> Vec<ElementId> {
+        let ids = self.selection();
+        let Some(store) = self
+            .doc
+            .and_then(|d| self.app.document(d))
+            .map(|d| d.doc.store().clone())
+        else {
+            return Vec::new();
+        };
+        ids.into_iter()
+            .filter(|i| {
+                store
+                    .get(*i)
+                    .and_then(reviera_core::walls::wall_recipe)
+                    .is_some()
+            })
+            .collect()
+    }
 }

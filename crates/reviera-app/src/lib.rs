@@ -352,8 +352,25 @@ impl App {
         // that cannot regenerate (for example, its level was deleted outside a command) is not
         // drawn.
         let cuts = reviera_core::inserts::cuts_by_host(store);
-        for (id, body) in walls::solve(store).bodies {
+        for (id, mut body) in walls::solve(store).bodies {
             let class = store.get(id).map_or("IfcWall".into(), |e| e.class.clone());
+            // A wall attached to a roof: cut by its openings up to the roof's lowest point over
+            // it, with the part above following the roof (ARC-WALL-008).
+            if let Some(Ok(a)) = walls::attach::attached_body(store, id, &body) {
+                body.geometry.height = a.z_min - body.geometry.base_z;
+                meshes.push(reviera_render::SceneMesh {
+                    element: Some(id),
+                    color: reviera_render::class_color(&class),
+                    class: class.clone(),
+                    positions: a
+                        .cap
+                        .0
+                        .iter()
+                        .map(|[x, y, z]| [*x as f32, *y as f32, *z as f32])
+                        .collect(),
+                    indices: a.cap.1,
+                });
+            }
             let (verts, indices) = match cuts.get(&id) {
                 Some(c) => walls::openings::cut_mesh(&body, c),
                 None => body.mesh(),

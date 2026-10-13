@@ -89,7 +89,11 @@ The KIT FZK *AC20-Institute-Var-2* sample model (`test-data/ifc/`) open in Revie
   mitred slab of the roof type's thickness. Properties edit the base offset, slope, cutoff and
   type, and Edit Footprint reopens the sketch. Saved as `IfcRoof` with a faceted B-rep body
   (`roof.create_footprint`, `roof.edit_footprint`, `roof.set_params`, `roof.set_edge`,
-  `roof.set_slope`). Not yet: walls attaching to roofs, slope arrows, and openings in roofs.
+  `roof.set_slope`). Walls attach their tops to a roof (offered when a roof is made from picked
+  walls, or Modify | Walls › Attach Top/Base, then click the roof), so gable walls rise to the
+  ridge. Saved as a faceted B-rep in the wall's own frame, so doors and windows stay cut
+  (`wall.attach`, `wall.detach`). Not yet: attaching bases or to floors and ceilings, slope
+  arrows, and openings in roofs.
 - **Inspecting the model**: View › Section Box clips a 3D view to a box whose face grips drag in
   real time; Selection Box (BX) fits it around the selection. Horizontal and Vertical Slice cut
   the view at a clicked point (up to eight planes, each with a grip). Cut solids are capped.

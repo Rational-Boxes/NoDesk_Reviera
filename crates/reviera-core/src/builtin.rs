@@ -64,6 +64,8 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(RoofSetParams),
         registry.add(RoofSetEdge),
         registry.add(RoofSetSlope),
+        registry.add(WallAttach),
+        registry.add(WallDetach),
         registry.add(ViewCreatePlan),
         registry.add(ViewSetViewRange),
         registry.add(ViewGetViewRange),
@@ -2035,6 +2037,30 @@ modify_command!(
 );
 
 use crate::roofs;
+
+modify_command!(
+    WallAttach,
+    "wall.attach",
+    "Attach walls' tops to a roof",
+    "Attaches the walls' tops (`end: top`) to a roof (`target_id`): each wall's top follows the roof's \
+     underside over the wall, rising to the ridge. Walls the roof does not wholly cover are refused \
+     (wall.attach_not_covered). Bases, floors, ceilings and reference planes come later.",
+    "Attach Top/Base",
+    crate::walls::attach::AttachParams,
+    (),
+    crate::walls::attach::attach
+);
+modify_command!(
+    WallDetach,
+    "wall.detach",
+    "Detach walls' tops",
+    "Detaches the walls' tops from the given targets (`target_ids`), or from all of them; each wall returns \
+     to its own top constraint.",
+    "Detach Top/Base",
+    crate::walls::attach::DetachParams,
+    (),
+    crate::walls::attach::detach
+);
 
 modify_command!(
     RoofCreate,

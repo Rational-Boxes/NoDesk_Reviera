@@ -540,6 +540,18 @@ icon = "edit_boundary"
 help = "Edit the selected roof's footprint, slopes and gables"
 
 [[action]]
+id = "wall.attach"
+label = "Attach Top/Base"
+icon = "attach"
+help = "Attach the selected walls' tops to a roof: click the roof next"
+
+[[action]]
+id = "wall.detach"
+label = "Detach Top/Base"
+icon = "detach"
+help = "Detach the selected walls; they return to their own tops"
+
+[[action]]
 id = "sketch.defines_slope"
 label = "Defines Slope"
 icon = "slope"
@@ -707,7 +719,11 @@ tools = [{ action = "dim.create_aligned", size = "small" }]
 [[context]]
 category = "cat.walls"
 label = "Walls"
-panels = [{ label = "Wall", tools = [{ action = "wall.flip", size = "large" }] }]
+panels = [{ label = "Wall", tools = [
+  { action = "wall.flip", size = "large" },
+  { action = "wall.attach", size = "large" },
+  { action = "wall.detach", size = "large" },
+] }]
 
 [[context]]
 category = "cat.doors"
@@ -820,7 +836,7 @@ items = [
   "element.move", "element.copy", "element.rotate", "-",
   "element.trim_corner", "element.trim_extend", "element.split", "-",
   "element.pin", "element.unpin", "element.delete", "-",
-  "wall.flip", "insert.flip_hand", "insert.flip_facing",
+  "wall.flip", "wall.attach", "wall.detach", "insert.flip_hand", "insert.flip_facing",
 ]
 
 [[menu]]

@@ -370,3 +370,151 @@ fn bad_footprints_are_refused() {
     .unwrap_err();
     assert_eq!(e.code, "roof.one_loop");
 }
+
+#[test]
+fn walls_attach_to_a_gable_roof_and_detach() {
+    let dir = tempfile::tempdir().unwrap();
+    let (mut project, mut doc, path, level) = project(dir.path());
+    let r = registry();
+    // Four 3 m walls, clockwise, and a door in the south wall.
+    let mut walls = Vec::new();
+    for i in 0..4 {
+        walls.push(id(run(
+            &r,
+            &mut doc,
+            "wall.create",
+            json!({
+                "curve": { "line": { "start": RECT[(i + 1) % 4], "end": RECT[i] } },
+                "base_level": level.0,
+                "top_constraint": { "unconnected": 3 },
+            }),
+        )
+        .unwrap()));
+    }
+    run(
+        &r,
+        &mut doc,
+        "door.place",
+        json!({ "host_wall_id": walls[0].0, "point_along": 5.0 }),
+    )
+    .unwrap();
+    // A gable roof on the walls' outer faces (x = −0.1 … 10.1, y = −0.1 … 6.1) at 3 m, 45°.
+    let outer = [[-0.1, -0.1], [10.1, -0.1], [10.1, 6.1], [-0.1, 6.1]];
+    let roof = id(run(
+        &r,
+        &mut doc,
+        "roof.create_footprint",
+        json!({
+            "curves": curves(&outer, |i| if i % 2 == 0 {
+                json!({ "overhang": 0.5 })
+            } else {
+                json!({ "defines_slope": false, "overhang": 0.3 })
+            }),
+            "level_id": level.0,
+            "base_offset": 3.0,
+            "slope": "45°",
+        }),
+    )
+    .unwrap());
+    let ids: Vec<u64> = walls.iter().map(|w| w.0).collect();
+    run(
+        &r,
+        &mut doc,
+        "wall.attach",
+        json!({ "wall_ids": ids, "target_id": roof.0 }),
+    )
+    .unwrap();
+    // The east gable wall reaches the ridge, 3.1 m above the plate in the middle.
+    let solved = reviera_core::walls::solve(doc.store());
+    let east = reviera_core::walls::attach::attached_body(
+        doc.store(),
+        walls[1],
+        &solved.bodies[&walls[1]],
+    )
+    .unwrap()
+    .unwrap();
+    assert!((east.z_max - 6.1).abs() < 1e-6, "{}", east.z_max);
+
+    project.save(&doc).unwrap();
+    let ifc = IfcModel::open(&path).unwrap();
+    // Four walls as B-reps, plus the roof's two face slabs.
+    assert_eq!(ifc.entities_of_type("IfcFacetedBrep").unwrap().len(), 6);
+    let meshes = ifc.tessellate(1).unwrap();
+    let wall_volume: f64 = meshes
+        .iter()
+        .filter(|m| m.class.starts_with("IfcWall"))
+        .map(|m| volume(&m.verts, &m.faces).abs())
+        .sum();
+    // The walls' attached solids, less the door's opening that IfcOpenShell cuts out.
+    let gross: f64 = walls
+        .iter()
+        .map(|w| {
+            let a = reviera_core::walls::attach::attached_body(doc.store(), *w, &solved.bodies[w])
+                .unwrap()
+                .unwrap();
+            let flat: Vec<f64> = a.solid.0.iter().flatten().copied().collect();
+            volume(&flat, &a.solid.1)
+        })
+        .sum();
+    assert!(
+        wall_volume < gross - 0.2 && wall_volume > gross - 1.0,
+        "{wall_volume} vs {gross}"
+    );
+    // The door's opening stays where it was: relative to its wall's frame.
+    let door = meshes.iter().find(|m| m.class == "IfcDoor").unwrap();
+    let xs: Vec<f64> = door.verts.chunks(3).map(|c| c[0]).collect();
+    let mid = (xs.iter().cloned().fold(f64::MAX, f64::min)
+        + xs.iter().cloned().fold(f64::MIN, f64::max))
+        / 2.0;
+    assert!((mid - 5.0).abs() < 0.05, "{mid}");
+
+    // Detaching returns the walls to extrusions; deleting the roof also frees them.
+    run(
+        &r,
+        &mut doc,
+        "wall.detach",
+        json!({ "wall_ids": [walls[1].0] }),
+    )
+    .unwrap();
+    project.save(&doc).unwrap();
+    let ifc = IfcModel::open(&path).unwrap();
+    assert_eq!(ifc.entities_of_type("IfcFacetedBrep").unwrap().len(), 5);
+    run(
+        &r,
+        &mut doc,
+        "element.delete",
+        json!({ "element_ids": [roof.0] }),
+    )
+    .unwrap();
+    project.save(&doc).unwrap();
+    let ifc = IfcModel::open(&path).unwrap();
+    assert!(ifc.entities_of_type("IfcFacetedBrep").unwrap().is_empty());
+    assert!(ifc.entities_of_type("IfcExtrudedAreaSolid").unwrap().len() >= 4);
+    // A wall outside the roof cannot attach.
+    let far = id(run(
+        &r,
+        &mut doc,
+        "wall.create",
+        json!({
+            "curve": { "line": { "start": [30, 0], "end": [40, 0] } },
+            "base_level": level.0,
+            "top_constraint": { "unconnected": 3 },
+        }),
+    )
+    .unwrap());
+    let roof2 = id(run(
+        &r,
+        &mut doc,
+        "roof.create_footprint",
+        json!({ "curves": curves(&outer, |_| json!({})), "level_id": level.0, "base_offset": 3.0 }),
+    )
+    .unwrap());
+    let e = run(
+        &r,
+        &mut doc,
+        "wall.attach",
+        json!({ "wall_ids": [far.0], "target_id": roof2.0 }),
+    )
+    .unwrap_err();
+    assert_eq!(e.code, "wall.attach_not_covered");
+}

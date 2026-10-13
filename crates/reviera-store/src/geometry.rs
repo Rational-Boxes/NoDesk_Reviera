@@ -475,6 +475,13 @@ pub(crate) fn remove_wall(ifc: &mut IfcModel, wall: StepId) -> Result<()> {
     for rel in ifc.referenced_by(wall, "IfcRelConnectsPathElements")? {
         ifc.remove(rel)?;
     }
+    remove_breps(ifc, wall)?;
+    remove_wall_shape(ifc, wall)
+}
+
+/// Removes a wall's extruded shape written by [`write_wall`], keeping its connections (the wall
+/// gets a B-rep body when it attaches to a roof).
+pub(crate) fn remove_wall_shape(ifc: &mut IfcModel, wall: StepId) -> Result<()> {
     let e = entity(ifc, wall)?;
     if let Some(shape) = WallShape::read(ifc, &e)? {
         for id in shape.entities(ifc)? {
@@ -1521,7 +1528,8 @@ impl BrepShape {
         }
         let placement = get!(one(&e, "ObjectPlacement"));
         let axes = get!(one(&entity(ifc, placement)?, "RelativePlacement"));
-        let location = get!(one(&entity(ifc, axes)?, "Location"));
+        let ae = entity(ifc, axes)?;
+        let location = get!(one(&ae, "Location"));
         let shape = get!(one(&e, "Representation"));
         let reps = entity(ifc, shape)?.refs("Representations");
         if reps.len() != 1 {
@@ -1529,7 +1537,34 @@ impl BrepShape {
         }
         let mut entities = vec![placement, axes, location, shape, reps[0]];
         let breps = entity(ifc, reps[0])?.refs("Items");
-        let mut signature = Vec::new();
+        let mut signature: Vec<f64> = match ifc.attribute(location, "Coordinates")? {
+            AttrValue::List(c) => c
+                .iter()
+                .filter_map(|v| match v {
+                    AttrValue::Real(r) => Some(*r),
+                    _ => None,
+                })
+                .collect(),
+            _ => Vec::new(),
+        };
+        let mut x_dir = [1.0, 0.0];
+        if let Some(d) = one(&ae, "RefDirection") {
+            if let AttrValue::List(c) = ifc.attribute(d, "DirectionRatios")? {
+                let v: Vec<f64> = c
+                    .iter()
+                    .filter_map(|v| match v {
+                        AttrValue::Real(r) => Some(*r),
+                        _ => None,
+                    })
+                    .collect();
+                if v.len() >= 2 {
+                    x_dir = [v[0], v[1]];
+                }
+            }
+            entities.push(d);
+        }
+        entities.extend(one(&ae, "Axis"));
+        signature.extend(x_dir);
         for b in breps {
             let be = entity(ifc, b)?;
             if !be.class.eq_ignore_ascii_case("IfcFacetedBrep") {
@@ -1567,17 +1602,35 @@ impl BrepShape {
     }
 }
 
-/// Writes an element's body as faceted B-reps (a Reviera roof), placed at the origin, unless it
-/// already has exactly this geometry.
+/// Where a B-rep body is placed: its origin (metres) and X direction in plan. Solids are given
+/// in this frame.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct BrepFrame {
+    pub origin: [f64; 3],
+    pub x_dir: [f64; 2],
+}
+
+impl BrepFrame {
+    pub const WORLD: BrepFrame = BrepFrame {
+        origin: [0.0; 3],
+        x_dir: [1.0, 0.0],
+    };
+}
+
+/// Writes an element's body as faceted B-reps (a Reviera roof, or a wall attached to one)
+/// placed in `frame`, unless it already has exactly this geometry.
 pub(crate) fn write_breps(
     ifc: &mut IfcModel,
     element: StepId,
+    frame: BrepFrame,
     solids: &[Polyhedron],
     scale: f64,
     contexts: Contexts,
 ) -> Result<()> {
     let existing = BrepShape::read(ifc, element)?;
-    let target: Vec<f64> = solids.iter().flat_map(|s| s.signature(scale)).collect();
+    let mut target: Vec<f64> = frame.origin.iter().map(|v| v / scale).collect();
+    target.extend(frame.x_dir);
+    target.extend(solids.iter().flat_map(|s| s.signature(scale)));
     if let Some(e) = &existing
         && e.signature.len() == target.len()
         && e.signature
@@ -1598,9 +1651,34 @@ pub(crate) fn write_breps(
     let location = create_with(
         ifc,
         "IfcCartesianPoint",
-        &[("Coordinates", reals(&[0.0, 0.0, 0.0]))],
+        &[("Coordinates", reals(&frame.origin.map(|v| v / scale)))],
     )?;
-    let axes = create_with(ifc, "IfcAxis2Placement3D", &[("Location", r(location))])?;
+    let axes = if frame.x_dir == [1.0, 0.0] {
+        create_with(ifc, "IfcAxis2Placement3D", &[("Location", r(location))])?
+    } else {
+        let up = create_with(
+            ifc,
+            "IfcDirection",
+            &[("DirectionRatios", reals(&[0.0, 0.0, 1.0]))],
+        )?;
+        let x = create_with(
+            ifc,
+            "IfcDirection",
+            &[(
+                "DirectionRatios",
+                reals(&[frame.x_dir[0], frame.x_dir[1], 0.0]),
+            )],
+        )?;
+        create_with(
+            ifc,
+            "IfcAxis2Placement3D",
+            &[
+                ("Location", r(location)),
+                ("Axis", r(up)),
+                ("RefDirection", r(x)),
+            ],
+        )?
+    };
     let placement = create_with(ifc, "IfcLocalPlacement", &[("RelativePlacement", r(axes))])?;
     let mut items = Vec::new();
     for s in solids {

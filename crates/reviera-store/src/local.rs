@@ -717,7 +717,47 @@ impl LocalProject {
             let (Some(&step), Some(storey)) = (self.steps.get(id), storey) else {
                 continue;
             };
-            geometry::write_wall(&mut self.ifc, step, body, self.length_scale, contexts)?;
+            // A wall attached to a roof gets a B-rep body in its own frame (where its openings are
+            // placed); others keep their extruded body.
+            match walls::attach::attached_body(store, *id, body) {
+                Some(Ok(a)) => {
+                    let g = &body.geometry;
+                    let (u, n) = (g.direction(), g.normal());
+                    let local = |p: &[f64; 3]| {
+                        let d = [p[0] - g.start[0], p[1] - g.start[1]];
+                        [
+                            d[0] * u[0] + d[1] * u[1],
+                            d[0] * n[0] + d[1] * n[1],
+                            p[2] - g.base_z,
+                        ]
+                    };
+                    let solid = geometry::Polyhedron {
+                        points: a.solid.0.iter().map(local).collect(),
+                        faces: a
+                            .solid
+                            .1
+                            .chunks(3)
+                            .map(|t| t.iter().map(|i| *i as usize).collect())
+                            .collect(),
+                    };
+                    geometry::remove_wall_shape(&mut self.ifc, step)?;
+                    geometry::write_breps(
+                        &mut self.ifc,
+                        step,
+                        geometry::BrepFrame {
+                            origin: [g.start[0], g.start[1], g.base_z],
+                            x_dir: u,
+                        },
+                        &[solid],
+                        self.length_scale,
+                        contexts,
+                    )?;
+                }
+                _ => {
+                    geometry::remove_breps(&mut self.ifc, step)?;
+                    geometry::write_wall(&mut self.ifc, step, body, self.length_scale, contexts)?;
+                }
+            }
             geometry::contain(&mut self.ifc, step, storey, owner_history)?;
             wall_steps.insert(step);
         }
@@ -892,7 +932,14 @@ impl LocalProject {
                     }
                 })
                 .collect();
-            geometry::write_breps(&mut self.ifc, step, &solids, self.length_scale, contexts)?;
+            geometry::write_breps(
+                &mut self.ifc,
+                step,
+                geometry::BrepFrame::WORLD,
+                &solids,
+                self.length_scale,
+                contexts,
+            )?;
             let storey = roofs::roof_recipe(store.get(*id).expect("listed"))
                 .and_then(|r| GlobalId::parse(&r.level))
                 .and_then(|g| store.find_by_guid(&g))
