@@ -289,7 +289,7 @@ fn level_guid(store: &Store, id: ElementId) -> Result<String> {
 }
 
 /// The project's default wall type, created when first needed.
-fn default_type(txn: &mut crate::txn::Transaction<'_>) -> Result<ElementId> {
+pub(crate) fn default_type(txn: &mut crate::txn::Transaction<'_>) -> Result<ElementId> {
     let existing = txn
         .store()
         .iter()

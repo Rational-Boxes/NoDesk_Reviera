@@ -212,6 +212,23 @@ impl RoofGeometry {
     }
 
     /// The height of the roof's underside above plan point `p`, if the roof covers it.
+    /// The sloped or flat face over plan point `p` (the lowest, where faces overlap).
+    pub fn face_at(&self, p: [f64; 2]) -> Option<&RoofFace> {
+        self.faces
+            .iter()
+            .filter(|f| {
+                let ring: Vec<[f64; 2]> = f.bottom.iter().map(|q| [q[0], q[1]]).collect();
+                inside(p, &ring) || on_edge(p, &ring)
+            })
+            .min_by(|a, b| {
+                let z = |f: &RoofFace| {
+                    let (n, q) = (f.normal, f.bottom[0]);
+                    q[2] - (n[0] * (p[0] - q[0]) + n[1] * (p[1] - q[1])) / n[2]
+                };
+                z(a).total_cmp(&z(b))
+            })
+    }
+
     pub fn underside(&self, p: [f64; 2]) -> Option<f64> {
         self.faces
             .iter()

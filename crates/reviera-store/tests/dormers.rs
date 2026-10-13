@@ -1,0 +1,233 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Reviera contributors
+
+//! Dormers (ARC-ROOF-007): gable, hipped, shed and flat dormers on a sloped roof face, their
+//! gap walls filling down to the main roof, edits rebuilding them, and their parts going with
+//! them.
+
+use reviera_core::{Caller, CommandRegistry, Document, ElementId, dormers, roofs, walls};
+use reviera_ifc::{IfcModel, Schema};
+use reviera_store::LocalProject;
+use serde_json::{Value, json};
+
+fn registry() -> CommandRegistry {
+    let mut r = CommandRegistry::with_core();
+    reviera_store::commands::register(&mut r);
+    r
+}
+
+fn run(
+    r: &CommandRegistry,
+    doc: &mut Document,
+    name: &str,
+    args: Value,
+) -> reviera_core::Result<Value> {
+    r.execute(doc, name, args, &Caller::user())
+        .map(|o| o.result)
+}
+
+fn id(v: Value) -> ElementId {
+    ElementId(v.as_u64().expect("an element id"))
+}
+
+/// The dormer's parts: its roof and its walls.
+fn parts(doc: &Document, dormer: ElementId) -> (ElementId, Vec<ElementId>) {
+    let r = dormers::dormer_recipe(doc.store().get(dormer).unwrap()).unwrap();
+    let ids: Vec<ElementId> = r
+        .parts
+        .iter()
+        .map(|g| {
+            doc.store()
+                .find_by_guid(&reviera_core::GlobalId::parse(g).unwrap())
+                .unwrap()
+        })
+        .collect();
+    let roof = *ids
+        .iter()
+        .find(|i| roofs::roof_recipe(doc.store().get(**i).unwrap()).is_some())
+        .unwrap();
+    let ws = ids.into_iter().filter(|i| *i != roof).collect();
+    (roof, ws)
+}
+
+#[test]
+fn dormers_of_every_style_fill_their_gaps() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("dormers.ifc");
+    let (mut project, mut doc) = LocalProject::new(Schema::Ifc4, &path).unwrap();
+    let r = registry();
+    let level = doc
+        .store()
+        .iter()
+        .find(|e| e.class == "IfcBuildingStorey")
+        .unwrap()
+        .id();
+    // A 10 × 6 m gable roof at 45° on a 3 m plate: the south face rises northward.
+    let outer = [[-0.1, -0.1], [10.1, -0.1], [10.1, 6.1], [-0.1, 6.1]];
+    let curves: Vec<Value> = (0..4)
+        .map(|i| {
+            json!({
+                "line": { "start": outer[i], "end": outer[(i + 1) % 4] },
+                "defines_slope": i % 2 == 0,
+            })
+        })
+        .collect();
+    let main = id(run(
+        &r,
+        &mut doc,
+        "roof.create_footprint",
+        json!({ "curves": curves, "level_id": level.0, "base_offset": 3.0, "slope": "45°" }),
+    )
+    .unwrap());
+    let main_g = roofs::regenerate(doc.store(), doc.store().get(main).unwrap()).unwrap();
+    // The main roof's top surface over a point of the south face.
+    let main_top = |p: [f64; 2]| main_g.underside(p).unwrap() + main_g.thickness * 2f64.sqrt();
+
+    // Placed too high, the dormer would run over the ridge: refused.
+    let err = run(
+        &r,
+        &mut doc,
+        "dormer.create",
+        json!({
+            "roof_id": main.0, "point": [5.0, 1.0], "style": "gable",
+            "width": 2.0, "front_height": 1.2,
+        }),
+    )
+    .unwrap_err();
+    assert_eq!(err.code, "dormer.does_not_fit");
+    // A gable dormer 2 m wide, its eave 1.2 m above the roof, at 45°.
+    let dormer = id(run(
+        &r,
+        &mut doc,
+        "dormer.create",
+        json!({
+            "roof_id": main.0, "point": [5.0, 0.5], "style": "gable",
+            "width": 2.0, "front_height": 1.2,
+        }),
+    )
+    .unwrap());
+    let (droof, ws) = parts(&doc, dormer);
+    assert_eq!(ws.len(), 3);
+    let g = roofs::regenerate(doc.store(), doc.store().get(droof).unwrap()).unwrap();
+    assert_eq!(g.predefined, "GABLE_ROOF");
+    let z_eave = main_top([5.0, 0.5]) + 1.2;
+    assert!((g.plate - z_eave).abs() < 1e-6);
+    // The ridge, 1 m above the eave (half the width at 45°), runs back until it meets the main
+    // roof's top surface.
+    let p = dormers::placement(doc.store(), doc.store().get(main).unwrap(), [5.0, 0.5]).unwrap();
+    let (depth, cheek) = dormers::depths(
+        &dormers::dormer_recipe(doc.store().get(dormer).unwrap()).unwrap(),
+        &p,
+        0.3,
+    )
+    .unwrap();
+    let back = [5.0, 0.5 + depth];
+    assert!((g.underside([5.0, 0.5 + depth - 1e-6]).unwrap() - main_top(back)).abs() < 1e-4);
+    // The gap walls: tops on the dormer roof (the front gable reaching the ridge), bases under
+    // the main roof.
+    let solved = walls::solve(doc.store());
+    for w in &ws {
+        let body = &solved.bodies[w];
+        let a = walls::attach::attached_body(doc.store(), *w, body)
+            .unwrap()
+            .unwrap();
+        assert!(body.geometry.base_z < main_top([5.0, 0.5]));
+        assert!(a.z_min >= z_eave - 1e-6, "{} below the eave", a.z_min);
+    }
+    let front_top = ws
+        .iter()
+        .map(|w| {
+            walls::attach::attached_body(doc.store(), *w, &solved.bodies[w])
+                .unwrap()
+                .unwrap()
+                .z_max
+        })
+        .fold(f64::MIN, f64::max);
+    assert!((front_top - (z_eave + 1.0)).abs() < 0.11, "{front_top}");
+    // The cheek walls end where the dormer eave meets the main roof.
+    assert!((main_top([5.0, 0.5 + cheek]) - z_eave).abs() < 1e-6);
+
+    // The other styles.
+    for (style, kind) in [
+        ("hip", "HIPPED_GABLE_ROOF"),
+        ("shed", "SHED_ROOF"),
+        ("flat", "FLAT_ROOF"),
+    ] {
+        run(
+            &r,
+            &mut doc,
+            "dormer.set",
+            json!({ "dormer_id": dormer.0, "style": style }),
+        )
+        .unwrap();
+        let (droof, ws) = parts(&doc, dormer);
+        assert_eq!(ws.len(), 3, "{style}");
+        let g = roofs::regenerate(doc.store(), doc.store().get(droof).unwrap()).unwrap();
+        assert_eq!(g.predefined, kind, "{style}");
+        let solved = walls::solve(doc.store());
+        for w in &ws {
+            walls::attach::attached_body(doc.store(), *w, &solved.bodies[w])
+                .unwrap()
+                .unwrap();
+        }
+    }
+    // Only one set of parts exists at a time.
+    let count = doc
+        .store()
+        .iter()
+        .filter(|e| dormers::dormer_of(e).is_some())
+        .count();
+    assert_eq!(count, 4);
+    // A shed steeper than the roof is refused, and the dormer stays as it was.
+    let err = run(
+        &r,
+        &mut doc,
+        "dormer.set",
+        json!({ "dormer_id": dormer.0, "style": "shed", "slope": "50°" }),
+    )
+    .unwrap_err();
+    assert_eq!(err.code, "dormer.shed_too_steep");
+    // Off the roof is refused.
+    let err = run(
+        &r,
+        &mut doc,
+        "dormer.create",
+        json!({ "roof_id": main.0, "point": [30.0, 1.0] }),
+    )
+    .unwrap_err();
+    assert_eq!(err.code, "dormer.off_roof");
+
+    // Saved and reopened, the parts are there.
+    project.save(&doc).unwrap();
+    let ifc = IfcModel::open(&path).unwrap();
+    assert_eq!(ifc.entities_of_type("IfcRoof").unwrap().len(), 2);
+    assert_eq!(ifc.entities_of_type("IfcElementAssembly").unwrap().len(), 1);
+    let (_, reopened, _) = LocalProject::open(&path).unwrap();
+    assert_eq!(parts(&reopened, dormer).1.len(), 3);
+
+    // Deleting the dormer deletes its parts; deleting the roof deletes its dormers.
+    run(
+        &r,
+        &mut doc,
+        "element.delete",
+        json!({ "element_ids": [dormer.0] }),
+    )
+    .unwrap();
+    assert!(doc.store().iter().all(|e| dormers::dormer_of(e).is_none()));
+    let again = id(run(
+        &r,
+        &mut doc,
+        "dormer.create",
+        json!({ "roof_id": main.0, "point": [3.0, 0.5], "style": "shed" }),
+    )
+    .unwrap());
+    run(
+        &r,
+        &mut doc,
+        "element.delete",
+        json!({ "element_ids": [main.0] }),
+    )
+    .unwrap();
+    assert!(doc.store().get(again).is_none());
+    assert!(doc.store().iter().all(|e| dormers::dormer_of(e).is_none()));
+}

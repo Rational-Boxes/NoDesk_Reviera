@@ -11352,6 +11352,32 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 - [ ] The main roof has an opening exactly inside the dormer walls' interior faces. Deleting the dormer closes it.
 - [ ] `dormer.create` from Lua or MCP gives the same model as the window tool.
 
+**Implementation notes (2026-10-13).**
+- As built:
+  - `dormer.create(roof_id, point, style?, width?, front_height?, slope?, overhang?)`, `dormer.set(dormer_id, style?, width?, front_height?, slope?, overhang?)` and `dormer.move(dormer_id, point)`.
+  - Defaults: 1.8 m wide, eave 0.9 m above the main roof, the main roof's slope (a shed takes a third of it), 300 mm overhang. Front setback and wall type choice come later.
+- **The dormer roof** is a Reviera footprint roof on the dormer's outline, using the main roof's type. Its edges are set by style:
+  - gable: sides slope, front gable;
+  - hip: front slopes too;
+  - shed: front only;
+  - flat: none.
+- **Depth:** the dormer runs back until its ridge (gable, hip), its plane (shed) or its top (flat) meets the main roof's top surface. The whole outline must lie on the face it was placed on (`dormer.does_not_fit`).
+- **Gap walls:** a front wall and two cheek walls (the project's default wall type), their outer faces on the outline.
+  - They run from just below the main roof's underside at the front, and their tops are attached to the dormer roof (ARC-WALL-008). The front gable and the cheeks therefore fill exactly to the dormer roof.
+  - The cheek walls end where the dormer eave meets the main roof (for a shed, where its plane does).
+  - Their bases are level, not yet following the main roof's slope, so the part below the main roof stays inside the building.
+- **Parts and ownership:**
+  - The dormer is an `IfcElementAssembly` (ObjectType "DORMER"), with RXD `recipe.dormer`.
+  - Its parts carry `rxd:dormer` and go with it: deleting the dormer deletes them, and deleting the main roof deletes its dormers.
+  - Edits rebuild the parts. The Model Tree shows the parts under the dormer, and the dormer under its roof.
+- **Window:** Modify | Roofs › Dormer asks for the style, then each click on the selected roof places one, in a plan or on the roof in 3D. Selecting any part shows the dormer's own properties (style, width, front height, overhang, slope).
+- Later:
+  - the opening in the main roof (with ARC-OPEN-005);
+  - wall bases on the main roof's slope;
+  - aggregation of the parts in IFC;
+  - rebuilding when the main roof changes;
+  - hipped-gable fronts.
+
 ### 3.6.9 Join/Unjoin Roof
 **ID:** ARC-ROOF-006 · **Priority:** P1 · **Ref:** research/02 §7.4, §9
 

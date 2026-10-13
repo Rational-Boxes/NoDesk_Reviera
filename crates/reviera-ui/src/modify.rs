@@ -787,6 +787,7 @@ impl Gui {
             || self.modify_tool.is_some()
             || self.note_tool.is_some()
             || self.stair_tool.is_some()
+            || self.dormer_tool.is_some()
     }
 
     /// Shows the grips of the selection (or nothing).

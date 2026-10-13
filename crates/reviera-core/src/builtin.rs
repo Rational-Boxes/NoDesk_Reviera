@@ -66,6 +66,9 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(RoofSetSlope),
         registry.add(RoofSetShape),
         registry.add(RoofAttachWalls),
+        registry.add(DormerCreate),
+        registry.add(DormerSet),
+        registry.add(DormerMove),
         registry.add(SketchMoveCurve),
         registry.add(SketchMoveCorner),
         registry.add(StairCreate),
@@ -422,6 +425,8 @@ pub fn dependents_of(store: &crate::store::Store, id: ElementId) -> Vec<ElementI
                 || crate::rooms::room_recipe(e).is_some_and(|r| {
                     r.level == guid || r.upper_level.as_deref() == Some(guid.as_str())
                 })
+                || crate::dormers::dormer_of(e) == Some(guid.as_str())
+                || crate::dormers::dormer_recipe(e).is_some_and(|r| r.roof == guid)
                 || crate::stairs::stair_recipe(e).is_some_and(|r| {
                     r.base_level == guid || r.top == crate::stairs::StairTop::Level(guid.clone())
                 })
@@ -2558,6 +2563,40 @@ modify_command!(
     crate::sketch_edit::MoveCornerParams,
     (),
     crate::sketch_edit::move_corner_command
+);
+modify_command!(
+    DormerCreate,
+    "dormer.create",
+    "Add a dormer to a roof",
+    "Places a dormer on a sloped face of a Reviera footprint roof, its front's middle at `point`, running up the \
+     face (ARC-ROOF-007). Styles: `gable` (pitched, ridge into the roof), `hip`, `shed` (a flat lift \
+     shallower than the roof) and `flat`. Makes the dormer roof and the front and cheek walls that fill \
+     the gap down to the main roof (their tops attached to the dormer roof). Defaults: 1.8 m wide, eave \
+     0.9 m above the roof, the main roof's slope (a shed a third of it), 300 mm overhang.",
+    "Dormer",
+    crate::dormers::CreateParams,
+    ElementId,
+    crate::dormers::create
+);
+modify_command!(
+    DormerSet,
+    "dormer.set",
+    "Change a dormer",
+    "Changes a dormer's style, width, front height, slope or overhang; its roof and walls are rebuilt.",
+    "Dormer",
+    crate::dormers::SetParams,
+    (),
+    crate::dormers::set
+);
+modify_command!(
+    DormerMove,
+    "dormer.move",
+    "Move a dormer",
+    "Moves a dormer to `point` (the middle of its front) on its roof; its roof and walls are rebuilt there.",
+    "Move Dormer",
+    crate::dormers::MoveParams,
+    (),
+    crate::dormers::move_dormer
 );
 modify_command!(
     RoofAttachWalls,

@@ -74,6 +74,13 @@ fn raw_parent(store: &Store, e: &Element, imported: &Imported) -> Option<Element
     if let Some(r) = crate::stairs::stair_recipe(e) {
         return by_guid(&r.base_level);
     }
+    // A dormer's parts sit in the dormer; the dormer on its roof.
+    if let Some(d) = crate::dormers::dormer_of(e) {
+        return by_guid(d);
+    }
+    if let Some(r) = crate::dormers::dormer_recipe(e) {
+        return by_guid(&r.roof);
+    }
     if let Some(r) = crate::inserts::insert_recipe(e) {
         return by_guid(&r.host);
     }

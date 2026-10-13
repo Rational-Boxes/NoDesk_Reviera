@@ -12,6 +12,7 @@
 
 mod browser;
 mod dims;
+mod dormers;
 mod footprint;
 mod grids;
 mod icons;
@@ -196,6 +197,8 @@ struct Gui {
     note_tool: Option<notes::NoteTool>,
     /// The Stair tool.
     stair_tool: Option<stairs::StairTool>,
+    /// The Dormer tool.
+    dormer_tool: Option<dormers::DormerTool>,
     /// The floor type new floors take.
     floor_type: Option<ElementId>,
     /// The last pointer position in the active view (Tab in sketch mode picks there).
@@ -1102,6 +1105,7 @@ impl Gui {
 
     fn end_tool(&mut self, frame: &Frame) {
         self.end_stair_tool();
+        self.end_dormer_tool();
         if self.tool.take().is_some() {
             if let Some(v) = self.viewport() {
                 v.set_overlay(&[]);
@@ -1124,6 +1128,9 @@ impl Gui {
         }
         if self.stair_tool.is_some() {
             return self.stair_escape();
+        }
+        if self.end_dormer_tool() {
+            return frame.set_status_text("Ready", 0);
         }
         if self.attach_pick.take().is_some() {
             return frame.set_status_text("Attach cancelled", 0);
@@ -1687,6 +1694,8 @@ impl Gui {
             grid.append(Property::string(label, &name, value));
             grid.set_property_read_only(&name, true);
         }
+        // A dormer's parts show the dormer's own rows, which rebuild it.
+        self.dormer_rows(grid, id);
         if is_grid {
             let current = self
                 .app
@@ -1929,6 +1938,7 @@ impl Gui {
             || self.note_edit(property, text.clone())
             || self.sketch_edit(property, text.clone())
             || self.stair_edit(property, text.clone())
+            || self.dormer_edit(property, text.clone())
         {
             return;
         }
@@ -2225,6 +2235,7 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                     None if g.section_tool.is_some() => g.section_click(x, y),
                     None if g.note_tool.is_some() => g.note_click(x, y, &p),
                     None if g.stair_tool.is_some() => g.stair_click(x, y),
+                    None if g.dormer_tool.is_some() => g.dormer_click(x, y, &p),
                     None if g.dim_tool.is_some() => g.dim_click(x, y),
                     None if g.grid_tool.is_some() => g.grid_click(x, y),
                     None if g.insert_tool.is_some() => g.insert_click(x, y),
@@ -2728,6 +2739,7 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 section_tool: None,
                 note_tool: None,
                 stair_tool: None,
+                dormer_tool: None,
                 floor_type: None,
                 mouse: (0, 0),
                 offset_distance: 1.0,
@@ -3192,6 +3204,10 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         }),
         "wall.detach" => with(gui, Gui::detach_selection),
         "roof.attach_walls" => with(gui, Gui::attach_walls_below),
+        "dormer.create" => with(gui, |g| {
+            g.start_dormer_tool();
+            focus(g);
+        }),
         "sketch.defines_slope" => with(gui, |g| {
             g.set_draw_mode(sketch::DrawMode::DefinesSlope);
             focus(g);

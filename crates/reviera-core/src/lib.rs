@@ -15,6 +15,7 @@ pub mod change;
 pub mod cobie;
 pub mod command;
 pub mod document;
+pub mod dormers;
 pub mod element;
 pub mod error;
 pub mod floors;

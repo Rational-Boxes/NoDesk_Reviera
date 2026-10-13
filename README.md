@@ -92,6 +92,13 @@ The KIT FZK *AC20-Institute-Var-2* sample model (`test-data/ifc/`) open in Revie
   arrows, and openings in roofs. Footprints may have courtyards: a building around a central
   courtyard gets a roof that falls to the street and to the courtyard (or a flat slab with the
   courtyard as a hole).
+- **Dormers**: with a roof selected, Modify | Roofs › Dormer places gable, hipped, shed (flat
+  lift) or flat dormers where you click on the roof (in a plan or in 3D). Each comes with its
+  roof, a front wall and cheek walls that fill the gaps down to the main roof, and runs up the
+  slope until it meets the main roof. A dormer that would run off its roof face is refused.
+  Properties change the style, width, front height, slope and overhang, and the dormer rebuilds;
+  deleting it (or its roof) removes its parts (`dormer.create`, `dormer.set`, `dormer.move`).
+  Not yet: the opening in the main roof below the dormer.
 - **Stairs**: Architecture › Stair (ST) draws a cast-in-place stair in a plan: click the start
   and end of each run while the status bar counts the risers down; the next run starts after an
   automatic landing (straight, L and U arrangements). The riser count is the fewest that keep
@@ -240,9 +247,8 @@ The KIT FZK *AC20-Institute-Var-2* sample model (`test-data/ifc/`) open in Revie
 
 ## Planned next
 
-The first milestone continues with spiral stairs and railings, the dormer tool (gable, hipped,
-shed and flat dormers with their gap walls filled automatically, ARC-ROOF-007), and layered wall
-types. After that come general shape and CSG modelling tools,
+The first milestone continues with spiral stairs and railings, roof openings (below dormers,
+skylights and shafts), and layered wall types. After that come general shape and CSG modelling tools,
 CADCraft drawing exchange, and the current NBIMS-US COBie layout.
 
 ### Working with CADCraft

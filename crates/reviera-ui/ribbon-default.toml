@@ -659,6 +659,12 @@ keys = "ST"
 help = "Draw a stair in a plan: click the start and end of each run; landings join the runs"
 
 [[action]]
+id = "dormer.create"
+label = "Dormer"
+icon = "dormer"
+help = "Add dormers to the selected roof: gable, hipped, shed or flat, with their walls filling the gaps"
+
+[[action]]
 id = "roof.attach_walls"
 label = "Attach Walls"
 icon = "attach"
@@ -934,6 +940,7 @@ label = "Roofs"
 panels = [
   { label = "Mode", tools = [{ action = "roof.edit_footprint", size = "large" }] },
   { label = "Walls", tools = [{ action = "roof.attach_walls", size = "large" }] },
+  { label = "Dormer", tools = [{ action = "dormer.create", size = "large" }] },
 ]
 
 [[context]]
