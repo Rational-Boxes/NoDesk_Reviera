@@ -392,6 +392,38 @@ impl CommandRegistry {
         args: Value,
         caller: &Caller,
     ) -> Result<Outcome> {
+        self.run_document(doc, name, args, caller, true)
+    }
+
+    /// Runs a document command in a transaction that is then rolled back, and reports what it would
+    /// have changed (MCP `preview`, confirm mode). The model is left untouched.
+    pub fn preview(
+        &self,
+        doc: &mut Document,
+        name: &str,
+        args: Value,
+        caller: &Caller,
+    ) -> Result<Outcome> {
+        if matches!(
+            self.commands.get(name).map(|e| &e.handler),
+            Some(Handler::Document { direct: true, .. })
+        ) {
+            return Err(Error::new(
+                "preview.unsupported",
+                format!("`{name}` cannot be previewed"),
+            ));
+        }
+        self.run_document(doc, name, args, caller, false)
+    }
+
+    fn run_document(
+        &self,
+        doc: &mut Document,
+        name: &str,
+        args: Value,
+        caller: &Caller,
+        commit: bool,
+    ) -> Result<Outcome> {
         let (entry, args) = self.prepare(name, args, caller)?;
         let Handler::Document { run, direct } = &entry.handler else {
             return Err(Error::new(
@@ -413,6 +445,18 @@ impl CommandRegistry {
             direct_commit: None,
         };
         let result = guard(name, || run(&mut cx, args))?;
+        if !commit {
+            let (warnings, changed) = match &cx.state {
+                State::Edit(txn) => (txn.warnings().to_vec(), txn.pending_changes()),
+                _ => Default::default(),
+            };
+            // Dropping the context drops the transaction, which rolls it back.
+            return Ok(Outcome {
+                result,
+                warnings,
+                changed,
+            });
+        }
         let commit = match cx.state {
             State::Edit(txn) => Some(txn.commit()),
             _ => cx.direct_commit,

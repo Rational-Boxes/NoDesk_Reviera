@@ -132,6 +132,43 @@ impl App {
         registry.execute(&mut open.doc, name, args, caller)
     }
 
+    /// Runs a document command and rolls it back, reporting what it would change.
+    pub fn preview(
+        &mut self,
+        name: &str,
+        args: serde_json::Value,
+        caller: &Caller,
+    ) -> Result<Outcome> {
+        if self.registry.is_host(name) {
+            return Err(Error::new(
+                "preview.unsupported",
+                format!("`{name}` acts on the application and cannot be previewed"),
+            ));
+        }
+        let registry = self.registry.clone();
+        let open = self.active_mut()?;
+        registry.preview(&mut open.doc, name, args, caller)
+    }
+
+    /// Starts a transaction group on the active document, so one undo reverts several calls.
+    pub fn group_begin(&mut self, name: &str, origin: reviera_core::Origin) -> Result<()> {
+        self.active_mut()?.doc.group_begin(name, origin)
+    }
+
+    pub fn group_end(
+        &mut self,
+        mode: reviera_core::GroupEnd,
+    ) -> Result<reviera_core::ChangedSummary> {
+        Ok(self.active_mut()?.doc.group_end(mode)?.changed)
+    }
+
+    fn active_mut(&mut self) -> Result<&mut OpenDocument> {
+        let id = self
+            .active
+            .ok_or_else(|| Error::new("document.none", "no document is open"))?;
+        self.get_mut(id)
+    }
+
     pub fn active(&self) -> Option<DocumentId> {
         self.active
     }

@@ -159,6 +159,21 @@ impl<'d> Transaction<'d> {
         Ok(())
     }
 
+    /// What committing now would change, without committing.
+    pub fn pending_changes(&self) -> crate::change::ChangedSummary {
+        ChangeSet::diff(
+            self.doc.store(),
+            &self.working,
+            self.touched.iter().copied(),
+        )
+        .summary()
+    }
+
+    /// Warnings raised so far.
+    pub fn warnings(&self) -> &[Warning] {
+        &self.warnings
+    }
+
     /// Commits the transaction. A transaction whose edits cancel out changes nothing and adds no undo item.
     pub fn commit(self) -> Commit {
         let changes = ChangeSet::diff(self.doc.store(), &self.working, self.touched);

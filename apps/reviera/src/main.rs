@@ -6,6 +6,8 @@
 //! - `reviera`: lists unsaved work left by a crash.
 //! - `reviera FILE`: opens an IFC file and prints a summary.
 //! - `reviera shell [FILE]`: reads `<command> [JSON arguments]` lines and runs them as the user.
+//! - `reviera --mcp-stdio [--permission LEVEL] [--toolsets a,b] [FILE]`: headless MCP server on
+//!   stdin/stdout (spec DM-MCP-002). LEVEL is `read_only` (default), `model_edit` or `full_scripting`.
 
 use std::io::{BufRead, Write};
 use std::process::ExitCode;
@@ -15,8 +17,11 @@ use reviera_core::Caller;
 use serde_json::{Value, json};
 
 fn main() -> ExitCode {
-    let mut app = App::new(AppConfig::default());
     let args: Vec<String> = std::env::args().skip(1).collect();
+    if args.first().map(String::as_str) == Some("--mcp-stdio") {
+        return mcp_stdio(&args[1..]);
+    }
+    let mut app = App::new(AppConfig::default());
     println!(
         "NoDesk Reviera {} ({} commands)",
         env!("CARGO_PKG_VERSION"),
@@ -30,6 +35,58 @@ fn main() -> ExitCode {
             eprintln!("usage: reviera [FILE] | reviera shell [FILE]");
             ExitCode::FAILURE
         }
+    }
+}
+
+fn mcp_stdio(args: &[String]) -> ExitCode {
+    use reviera_core::Permission;
+    let mut permission = Permission::ReadOnly;
+    let mut toolsets = Vec::new();
+    let mut file = None;
+    let mut it = args.iter();
+    while let Some(arg) = it.next() {
+        match arg.as_str() {
+            "--permission" => {
+                permission = match it.next().map(String::as_str) {
+                    Some("read_only") => Permission::ReadOnly,
+                    Some("model_edit") => Permission::ModelEdit,
+                    Some("full_scripting") => Permission::FullScripting,
+                    other => return fail(&format!("unknown permission level {other:?}")),
+                }
+            }
+            "--toolsets" => {
+                toolsets = it
+                    .next()
+                    .map(|t| t.split(',').map(str::to_owned).collect())
+                    .unwrap_or_default()
+            }
+            f if !f.starts_with("--") => file = Some(f.to_owned()),
+            other => return fail(&format!("unknown option {other}")),
+        }
+    }
+    // stdout carries the protocol; everything else goes to stderr.
+    eprintln!(
+        "NoDesk Reviera {} MCP server (stdio, {permission:?})",
+        env!("CARGO_PKG_VERSION")
+    );
+    let app = reviera_mcp::AppHandle::spawn(move || {
+        let mut app = App::new(AppConfig::default());
+        if let Some(f) = file
+            && let Err(e) = app.execute("file.open", json!({ "path": f }), &Caller::user())
+        {
+            eprintln!("{f}: {e}");
+        }
+        app
+    });
+    let mut config = reviera_mcp::McpConfig::new(permission);
+    config.toolsets.extend(toolsets);
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .expect("tokio runtime");
+    match runtime.block_on(reviera_mcp::run_stdio(app, config)) {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(e) => fail(&e.to_string()),
     }
 }
 
