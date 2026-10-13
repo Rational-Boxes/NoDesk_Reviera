@@ -92,6 +92,8 @@ pub struct WgpuViewport {
     transparent: Option<(wgpu::Buffer, u32)>,
     size: (u32, u32),
     adapter: String,
+    scene: RenderScene,
+    highlight: std::collections::HashSet<reviera_core::ElementId>,
 }
 
 impl std::fmt::Debug for WgpuViewport {
@@ -269,6 +271,8 @@ impl WgpuViewport {
             transparent: None,
             size,
             adapter: format!("{} ({:?})", info.name, info.backend),
+            scene: RenderScene::default(),
+            highlight: Default::default(),
         }
     }
 
@@ -368,11 +372,21 @@ fn depth_view(device: &wgpu::Device, (w, h): (u32, u32)) -> wgpu::TextureView {
         .create_view(&Default::default())
 }
 
-/// Expands indexed meshes into flat-shaded triangles, split by transparency.
-fn vertices(scene: &RenderScene) -> (Vec<Vertex>, Vec<Vertex>) {
+/// Expands indexed meshes into flat-shaded triangles, split by transparency; highlighted elements
+/// are drawn opaque in the highlight colour.
+fn vertices(
+    scene: &RenderScene,
+    highlight: &std::collections::HashSet<reviera_core::ElementId>,
+) -> (Vec<Vertex>, Vec<Vertex>) {
     let (mut opaque, mut transparent) = (Vec::new(), Vec::new());
     for m in &scene.meshes {
-        let out = if m.color[3] < 0.99 {
+        let lit = m.element.is_some_and(|e| highlight.contains(&e));
+        let color = if lit {
+            reviera_render::HIGHLIGHT
+        } else {
+            m.color
+        };
+        let out = if color[3] < 0.99 {
             &mut transparent
         } else {
             &mut opaque
@@ -390,7 +404,7 @@ fn vertices(scene: &RenderScene) -> (Vec<Vertex>, Vec<Vertex>) {
                 out.push(Vertex {
                     position: q.to_array(),
                     normal,
-                    color: m.color,
+                    color,
                 });
             }
         }
@@ -404,7 +418,27 @@ impl RenderBackend for WgpuViewport {
     }
 
     fn set_scene(&mut self, scene: &RenderScene) {
-        let (opaque, transparent) = vertices(scene);
+        self.scene = scene.clone();
+        self.upload();
+    }
+
+    fn set_highlight(&mut self, elements: &[reviera_core::ElementId]) {
+        self.highlight = elements.iter().copied().collect();
+        self.upload();
+    }
+
+    fn resize(&mut self, width: u32, height: u32) {
+        self.resize_target(width, height);
+    }
+
+    fn render(&mut self, camera: &Camera) -> Result<(), String> {
+        self.draw(camera)
+    }
+}
+
+impl WgpuViewport {
+    fn upload(&mut self) {
+        let (opaque, transparent) = vertices(&self.scene, &self.highlight);
         let upload = |v: &[Vertex]| {
             (!v.is_empty()).then(|| {
                 let buffer = self
@@ -421,7 +455,7 @@ impl RenderBackend for WgpuViewport {
         self.transparent = upload(&transparent);
     }
 
-    fn resize(&mut self, width: u32, height: u32) {
+    fn resize_target(&mut self, width: u32, height: u32) {
         let size = (width.max(1), height.max(1));
         if size == self.size {
             return;
@@ -440,7 +474,7 @@ impl RenderBackend for WgpuViewport {
         self.depth = depth_view(&self.device, size);
     }
 
-    fn render(&mut self, camera: &Camera) -> Result<(), String> {
+    fn draw(&mut self, camera: &Camera) -> Result<(), String> {
         let aspect = self.size.0 as f32 / self.size.1 as f32;
         let u = Uniforms {
             view_proj: camera.view_proj(aspect).to_cols_array_2d(),

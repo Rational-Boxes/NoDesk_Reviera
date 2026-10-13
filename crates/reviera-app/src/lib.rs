@@ -59,6 +59,8 @@ pub struct OpenDocument {
     pub untitled: bool,
     /// What opening the file found (RXD problems are listed before editing begins).
     pub open_report: Option<reviera_store::OpenReport>,
+    /// The current selection (session state, not saved or undone).
+    pub selection: std::collections::BTreeSet<reviera_core::ElementId>,
 }
 
 impl OpenDocument {
@@ -163,7 +165,7 @@ impl App {
         Ok(self.active_mut()?.doc.group_end(mode)?.changed)
     }
 
-    fn active_mut(&mut self) -> Result<&mut OpenDocument> {
+    pub(crate) fn active_mut(&mut self) -> Result<&mut OpenDocument> {
         let id = self
             .active
             .ok_or_else(|| Error::new("document.none", "no document is open"))?;
@@ -338,6 +340,7 @@ impl App {
                 read_only,
                 untitled,
                 open_report: None,
+                selection: Default::default(),
             },
         );
         self.active = Some(id);

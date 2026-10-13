@@ -249,3 +249,36 @@ fn permissions_and_exit() {
         assert!(names.iter().any(|x| x == n), "{n}");
     }
 }
+
+#[test]
+fn selection_is_session_state_of_the_active_document() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = app(dir.path());
+    run(&mut app, "file.new", json!({}));
+    let a = run(&mut app, "test.add_proxy", json!({"name": "A"}));
+    let b = run(&mut app, "test.add_proxy", json!({"name": "B"}));
+    let version = run(&mut app, "model.version", json!({}));
+
+    let info = run(&mut app, "selection.set", json!({"ids": [a]}));
+    assert_eq!(info["ids"], json!([a]));
+    assert_eq!(info["by_category"], json!({"cat.generic_models": 1}));
+    run(&mut app, "selection.add", json!({"element_ids": [b]}));
+    assert_eq!(
+        run(&mut app, "selection.get", json!({}))["ids"],
+        json!([a, b])
+    );
+    run(
+        &mut app,
+        "selection.set",
+        json!({"ids": [a], "mode": "remove"}),
+    );
+    assert_eq!(run(&mut app, "selection.get", json!({}))["ids"], json!([b]));
+    run(&mut app, "selection.clear", json!({}));
+    assert_eq!(run(&mut app, "selection.get", json!({}))["ids"], json!([]));
+    assert_eq!(
+        fails(&mut app, "selection.set", json!({"ids": [999999]})),
+        "element.not_found"
+    );
+    // Selecting is not a model change.
+    assert_eq!(run(&mut app, "model.version", json!({})), version);
+}

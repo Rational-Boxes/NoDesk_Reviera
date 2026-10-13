@@ -3,9 +3,10 @@
 
 //! wxWidgets UI shell through wxDragon (spec Ch 1).
 //!
-//! First increment: the main window with a File and View menu, a status bar and the 3D viewport
-//! (`wgpu`, through `reviera-render-wgpu`). Every action goes through `App::execute`, like Lua and
-//! MCP. The ribbon, browsers, properties palette and view tabs come next.
+//! The main window: File and View menus, a status bar, the Properties palette (a property grid)
+//! and the 3D viewport (`wgpu`, through `reviera-render-wgpu`). Clicking selects an element and
+//! shows its parameters; edits in the palette go through `param.set`. Every action goes through
+//! `App::execute`, like Lua and MCP. The ribbon, browsers and view tabs come next.
 
 mod native;
 
@@ -14,20 +15,30 @@ use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
 use reviera_app::{App, AppConfig, DocumentId};
-use reviera_core::Caller;
+use reviera_core::{Caller, ElementId};
 use reviera_render::{Camera, RenderBackend, RenderScene};
 use reviera_render_wgpu::WgpuViewport;
-use serde_json::json;
+use serde_json::{Value, json};
 use wxdragon::prelude::*;
 
 const ID_OPEN: i32 = ID_HIGHEST + 1;
 const ID_SAVE_FILE: i32 = ID_HIGHEST + 2;
 const ID_FIT: i32 = ID_HIGHEST + 3;
 
+/// A press that moves less than this many pixels is a click (select), not a drag.
+const CLICK_SLOP: i32 = 3;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Drag {
     Orbit,
     Pan,
+}
+
+/// The parameter behind one palette row.
+struct Row {
+    element: ElementId,
+    reference: String,
+    data_type: String,
 }
 
 struct Gui {
@@ -38,9 +49,23 @@ struct Gui {
     viewport_error: Option<String>,
     camera: Camera,
     drag: Option<(Drag, i32, i32)>,
+    press: Option<(i32, i32)>,
+    rows: Vec<Row>,
+    properties_stale: bool,
+}
+
+fn user() -> Caller {
+    Caller::user()
 }
 
 impl Gui {
+    fn run(&mut self, name: &str, args: Value) -> Result<Value, String> {
+        self.app
+            .execute(name, args, &user())
+            .map(|o| o.result)
+            .map_err(|e| e.to_string())
+    }
+
     /// Draws the viewport, creating it on first use (the panel must be realised by then).
     fn draw(&mut self, panel: &Panel, frame: &Frame) {
         let size = panel.get_client_size();
@@ -70,22 +95,13 @@ impl Gui {
         }
     }
 
-    fn open(&mut self, path: &Path, frame: &Frame, panel: &Panel) {
-        let user = Caller::user();
-        let mut opened = self
-            .app
-            .execute("file.open", json!({ "path": path }), &user);
-        if let Err(e) = &opened
-            && e.code == "file.locked"
-        {
-            opened = self.app.execute(
-                "file.open",
-                json!({ "path": path, "read_only": true }),
-                &user,
-            );
+    fn open(&mut self, path: &Path, frame: &Frame) {
+        let mut opened = self.run("file.open", json!({ "path": path }));
+        if opened.as_ref().is_err_and(|e| e.starts_with("file.locked")) {
+            opened = self.run("file.open", json!({ "path": path, "read_only": true }));
         }
         let id = match opened {
-            Ok(o) => o.result.as_u64().unwrap_or_default(),
+            Ok(v) => v.as_u64().unwrap_or_default(),
             Err(e) => return error(frame, &format!("Could not open {}:\n{e}", path.display())),
         };
         self.doc = Some(id);
@@ -95,6 +111,7 @@ impl Gui {
         };
         if let Some(v) = &mut self.viewport {
             v.set_scene(&self.scene);
+            v.set_highlight(&[]);
         }
         self.fit();
         let info = self.app.documents().into_iter().find(|d| d.id == id);
@@ -112,13 +129,13 @@ impl Gui {
             ),
             0,
         );
-        panel.refresh(false, None);
+        self.properties_stale = true;
     }
 
     fn save(&mut self, frame: &Frame) {
-        match self.app.execute("file.save", json!({}), &Caller::user()) {
-            Ok(o) => frame.set_status_text(
-                &format!("Saved {}", o.result["path"].as_str().unwrap_or_default()),
+        match self.run("file.save", json!({})) {
+            Ok(v) => frame.set_status_text(
+                &format!("Saved {}", v["path"].as_str().unwrap_or_default()),
                 0,
             ),
             Err(e) => error(frame, &format!("Could not save:\n{e}")),
@@ -130,6 +147,218 @@ impl Gui {
             self.camera.fit(b);
         }
     }
+
+    fn selection(&mut self) -> Vec<ElementId> {
+        self.run("selection.get", json!({}))
+            .ok()
+            .and_then(|v| serde_json::from_value(v["ids"].clone()).ok())
+            .unwrap_or_default()
+    }
+
+    /// Selects what is under pixel (`x`, `y`), or clears the selection over empty space.
+    fn pick(&mut self, x: i32, y: i32, panel: &Panel) {
+        if self.doc.is_none() {
+            return;
+        }
+        let size = panel.get_client_size();
+        let (origin, dir) =
+            self.camera
+                .ray(x as f32, y as f32, size.width as f32, size.height as f32);
+        let hit = self
+            .scene
+            .pick(origin, dir)
+            .and_then(|(i, _)| self.scene.meshes[i].element);
+        let result = match hit {
+            Some(id) => self.run("selection.set", json!({ "ids": [id] })),
+            None => self.run("selection.clear", json!({})),
+        };
+        if result.is_ok() {
+            self.selection_changed();
+        }
+    }
+
+    fn clear_selection(&mut self) {
+        if self.doc.is_some() && self.run("selection.clear", json!({})).is_ok() {
+            self.selection_changed();
+        }
+    }
+
+    fn selection_changed(&mut self) {
+        let ids = self.selection();
+        if let Some(v) = &mut self.viewport {
+            v.set_highlight(&ids);
+        }
+        self.properties_stale = true;
+    }
+
+    /// Fills the Properties palette for the current selection.
+    fn show_properties(&mut self, grid: &PropertyGrid) {
+        self.properties_stale = false;
+        grid.clear();
+        self.rows.clear();
+        let Some(doc) = self.doc else { return };
+        let ids = self.selection();
+        if ids.len() != 1 {
+            let label = if ids.is_empty() {
+                "No selection".to_owned()
+            } else {
+                format!("{} elements selected", ids.len())
+            };
+            grid.append(Property::category(label, "c_sel"));
+            if let Ok(info) = self.run("selection.get", json!({})) {
+                for (i, (cat, n)) in info["by_category"]
+                    .as_object()
+                    .into_iter()
+                    .flatten()
+                    .enumerate()
+                {
+                    let name = format!("s{i}");
+                    grid.append(Property::string(category_label(cat), &name, n.to_string()));
+                    grid.set_property_read_only(&name, true);
+                }
+            }
+            return;
+        }
+        let id = ids[0];
+        let Some(e) = self
+            .app
+            .document(doc)
+            .and_then(|d| d.doc.store().get(id).cloned())
+        else {
+            return;
+        };
+        let store = &self.app.document(doc).expect("open").doc;
+        let category = reviera_core::categories::category_of(&e)
+            .map_or("—".to_owned(), |c| c.name.to_owned());
+        let type_name = e
+            .param("@type")
+            .and_then(Value::as_str)
+            .and_then(reviera_core::GlobalId::parse)
+            .and_then(|g| store.store().find_by_guid(&g))
+            .and_then(|t| store.store().get(t))
+            .and_then(|t| t.name.clone())
+            .unwrap_or_default();
+        grid.append(Property::category("Element", "c_element"));
+        for (i, (label, value)) in [
+            ("Category", category),
+            ("IFC class", e.class.clone()),
+            ("Name", e.name.clone().unwrap_or_default()),
+            ("Type", type_name),
+            ("ID", id.to_string()),
+            ("GlobalId", e.guid().to_string()),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let name = format!("e{i}");
+            grid.append(Property::string(label, &name, value));
+            grid.set_property_read_only(&name, true);
+        }
+
+        let defs = self
+            .run("param.list", json!({ "element_id": id }))
+            .unwrap_or(json!([]));
+        let mut groups: Vec<(String, Vec<Value>)> = Vec::new();
+        for d in defs.as_array().into_iter().flatten() {
+            let group = d["group"].as_str().unwrap_or("other").to_owned();
+            match groups.iter_mut().find(|(g, _)| *g == group) {
+                Some((_, list)) => list.push(d.clone()),
+                None => groups.push((group, vec![d.clone()])),
+            }
+        }
+        for (gi, (group, list)) in groups.into_iter().enumerate() {
+            let mut header_added = false;
+            for d in list {
+                let reference = d["ref"].as_str().unwrap_or_default().to_owned();
+                // Type parameters of an element without a type, and the like, are not shown.
+                let Ok(value) = self.run(
+                    "param.get",
+                    json!({ "element_id": id, "param_ref": reference }),
+                ) else {
+                    continue;
+                };
+                if !header_added {
+                    grid.append(Property::category(category_label(&group), format!("g{gi}")));
+                    header_added = true;
+                }
+                let data_type = d["data_type"].as_str().unwrap_or("text").to_owned();
+                let mut label = d["name"].as_str().unwrap_or_default().to_owned();
+                if d["binding"] == "type" {
+                    label.push_str(" (type)");
+                }
+                let name = format!("p{}", self.rows.len());
+                let property = match (&value["value"], data_type.as_str()) {
+                    (Value::Bool(b), _) => Property::boolean(&label, &name, *b),
+                    (Value::Null, "yes_no") => Property::boolean(&label, &name, false),
+                    _ => Property::string(
+                        &label,
+                        &name,
+                        value["display"].as_str().unwrap_or_default(),
+                    ),
+                };
+                grid.append(property);
+                if d["read_only"].as_bool() == Some(true)
+                    || value["read_only"].as_bool() == Some(true)
+                {
+                    grid.set_property_read_only(&name, true);
+                }
+                if let Some(tip) = d["tooltip"].as_str() {
+                    grid.set_help_string(&name, tip);
+                }
+                self.rows.push(Row {
+                    element: id,
+                    reference,
+                    data_type,
+                });
+            }
+        }
+    }
+
+    /// Applies an edit made in the palette.
+    fn edit(&mut self, property: &str, text: Option<String>, frame: &Frame) {
+        let Some(index) = property
+            .strip_prefix('p')
+            .and_then(|i| i.parse::<usize>().ok())
+        else {
+            return;
+        };
+        let Some(row) = self.rows.get(index) else {
+            return;
+        };
+        let text = text.unwrap_or_default();
+        let value = match row.data_type.as_str() {
+            _ if text.trim().is_empty() => Value::Null,
+            "yes_no" => json!(matches!(text.to_lowercase().as_str(), "true" | "1" | "yes")),
+            "integer" => text.trim().parse::<i64>().map_or(json!(text), |n| json!(n)),
+            "number" => text.trim().parse::<f64>().map_or(json!(text), |n| json!(n)),
+            _ => json!(text),
+        };
+        let args =
+            json!({ "element_ids": [row.element], "param_ref": row.reference, "value": value });
+        if let Err(e) = self.run("param.set", args) {
+            error(frame, &format!("The value was not changed:\n{e}"));
+        }
+        self.properties_stale = true;
+    }
+}
+
+/// A display name for a category key or parameter group (`identity_data` → "Identity Data").
+fn category_label(key: &str) -> String {
+    if let Some(c) = reviera_core::categories::category(key) {
+        return c.name.to_owned();
+    }
+    if key.contains(' ') || key.chars().any(|c| c.is_uppercase()) {
+        return key.to_owned();
+    }
+    key.split('_')
+        .map(|w| {
+            let mut c = w.chars();
+            c.next().map_or(String::new(), |f| {
+                f.to_uppercase().collect::<String>() + c.as_str()
+            })
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 fn error(frame: &Frame, message: &str) {
@@ -163,7 +392,7 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
     wxdragon::main(move |_| {
         let frame = Frame::builder()
             .with_title("NoDesk Reviera")
-            .with_size(Size::new(1280, 800))
+            .with_size(Size::new(1400, 860))
             .build();
 
         let file_menu = Menu::builder()
@@ -183,10 +412,16 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
         frame.create_status_bar(2, 0, -1, "status");
         frame.set_status_text("Open an IFC file to begin (File > Open)", 0);
 
-        let panel = Panel::builder(&frame).build();
+        let splitter = SplitterWindow::builder(&frame).build();
+        let grid = PropertyGrid::builder(&splitter)
+            .with_style(PropertyGridStyle::Tooltips)
+            .build();
+        let panel = Panel::builder(&splitter).build();
         panel.set_background_style(BackgroundStyle::Paint);
+        splitter.split_vertically(&grid, &panel, 340);
+        splitter.set_minimum_pane_size(200);
         let sizer = BoxSizer::builder(Orientation::Vertical).build();
-        sizer.add(&panel, 1, SizerFlag::Expand, 0);
+        sizer.add(&splitter, 1, SizerFlag::Expand, 0);
         frame.set_sizer(sizer, true);
 
         let gui = Rc::new(RefCell::new(Gui {
@@ -197,6 +432,9 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
             viewport_error: None,
             camera: Camera::default(),
             drag: None,
+            press: None,
+            rows: Vec::new(),
+            properties_stale: true,
         }));
 
         {
@@ -213,23 +451,41 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 e.skip(true);
             });
         }
-        for (button_down, kind) in [(0, Drag::Orbit), (1, Drag::Pan), (2, Drag::Pan)] {
-            let gui = gui.clone();
+        for (button, kind) in [(0, Drag::Orbit), (1, Drag::Pan), (2, Drag::Pan)] {
+            let (gui, p) = (gui.clone(), panel);
             let handler = move |e: WindowEventData| {
                 if let Some((x, y)) = position(&e) {
-                    gui.borrow_mut().drag = Some((kind, x, y));
+                    let mut g = gui.borrow_mut();
+                    g.drag = Some((kind, x, y));
+                    if button == 0 {
+                        g.press = Some((x, y));
+                    }
                 }
+                p.set_focus();
             };
-            match button_down {
+            match button {
                 0 => panel.on_mouse_left_down(handler),
                 1 => panel.on_mouse_middle_down(handler),
                 _ => panel.on_mouse_right_down(handler),
             };
         }
-        for up in 0..3 {
-            let gui = gui.clone();
-            let handler = move |_: WindowEventData| gui.borrow_mut().drag = None;
-            match up {
+        for button in 0..3 {
+            let (gui, p) = (gui.clone(), panel);
+            let handler = move |e: WindowEventData| {
+                let mut g = gui.borrow_mut();
+                g.drag = None;
+                let press = g.press.take();
+                if button == 0
+                    && let (Some((x0, y0)), Some((x, y))) = (press, position(&e))
+                    && (x - x0).abs() <= CLICK_SLOP
+                    && (y - y0).abs() <= CLICK_SLOP
+                {
+                    g.pick(x, y, &p);
+                    drop(g);
+                    p.refresh(false, None);
+                }
+            };
+            match button {
                 0 => panel.on_mouse_left_up(handler),
                 1 => panel.on_mouse_middle_up(handler),
                 _ => panel.on_mouse_right_up(handler),
@@ -263,6 +519,39 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
             });
         }
         {
+            let (gui, p) = (gui.clone(), panel);
+            panel.on_key_down(move |e| {
+                if let WindowEventData::Keyboard(k) = &e
+                    && k.get_key_code() == Some(WXK_ESCAPE)
+                {
+                    gui.borrow_mut().clear_selection();
+                    p.refresh(false, None);
+                } else {
+                    e.skip(true);
+                }
+            });
+        }
+        {
+            let (gui, f, g) = (gui.clone(), frame, grid);
+            grid.on_changed(move |e| {
+                if let Some(name) = e.property_name() {
+                    let text = g.get_value_as_string(&name);
+                    gui.borrow_mut().edit(&name, text, &f);
+                }
+            });
+        }
+        {
+            // Refresh the palette outside its own event handlers.
+            let (gui, g) = (gui.clone(), grid);
+            frame.on_idle(move |e| {
+                let stale = gui.borrow().properties_stale;
+                if stale {
+                    gui.borrow_mut().show_properties(&g);
+                }
+                e.skip(true);
+            });
+        }
+        {
             let (gui, f, p) = (gui.clone(), frame, panel);
             frame.on_menu(move |e| match e.get_id() {
                 ID_OPEN => {
@@ -273,7 +562,8 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                     if dialog.show_modal() == ID_OK
                         && let Some(path) = dialog.get_path()
                     {
-                        gui.borrow_mut().open(Path::new(&path), &f, &p);
+                        gui.borrow_mut().open(Path::new(&path), &f);
+                        p.refresh(false, None);
                     }
                 }
                 ID_SAVE_FILE => gui.borrow_mut().save(&f),
@@ -289,7 +579,8 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
         frame.show(true);
         frame.centre();
         if let Some(path) = &file {
-            gui.borrow_mut().open(path, &frame, &panel);
+            gui.borrow_mut().open(path, &frame);
+            panel.refresh(false, None);
         }
     })
     .map_err(|e| e.to_string())

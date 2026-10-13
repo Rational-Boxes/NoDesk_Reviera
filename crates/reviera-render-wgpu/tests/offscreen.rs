@@ -68,6 +68,24 @@ fn fzk_haus_renders_offscreen() {
     );
     assert!(share > 0.10 && share < 0.95, "{share}");
 
+    // Picking through the centre of the view finds an element; highlighting it changes the picture.
+    let (origin, dir) = camera.ray(320.0, 200.0, 640.0, 400.0);
+    let (hit, _) = scene
+        .pick(origin, dir)
+        .expect("the centre of the view shows the house");
+    let element = scene.meshes[hit]
+        .element
+        .expect("picked meshes map to elements");
+    viewport.set_highlight(&[element]);
+    viewport.render(&camera).unwrap();
+    let highlighted = viewport.read_pixels().unwrap();
+    let changed = pixels
+        .iter()
+        .zip(&highlighted)
+        .filter(|(a, b)| a != b)
+        .count();
+    assert!(changed > 100, "{changed} bytes changed");
+
     if let Some(out) = std::env::var_os("REVIERA_RENDER_PNG") {
         let file = std::fs::File::create(out).unwrap();
         let mut png = png::Encoder::new(std::io::BufWriter::new(file), 640, 400);

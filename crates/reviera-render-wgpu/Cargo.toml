@@ -11,6 +11,7 @@ publish.workspace = true
 
 [dependencies]
 reviera-render.workspace = true
+reviera-core.workspace = true
 wgpu.workspace = true
 raw-window-handle.workspace = true
 pollster.workspace = true

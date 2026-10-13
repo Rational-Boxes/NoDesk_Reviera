@@ -44,6 +44,49 @@ impl RenderScene {
     }
 }
 
+impl RenderScene {
+    /// The nearest mesh hit by a ray, with the distance along it (Möller–Trumbore per triangle).
+    pub fn pick(&self, origin: Vec3, dir: Vec3) -> Option<(usize, f32)> {
+        let mut best: Option<(usize, f32)> = None;
+        for (i, m) in self.meshes.iter().enumerate() {
+            for tri in m.indices.as_chunks::<3>().0 {
+                let [a, b, c] = tri.map(|k| Vec3::from(m.positions[k as usize]));
+                if let Some(t) = ray_triangle(origin, dir, a, b, c)
+                    && best.is_none_or(|(_, d)| t < d)
+                {
+                    best = Some((i, t));
+                }
+            }
+        }
+        best
+    }
+}
+
+fn ray_triangle(origin: Vec3, dir: Vec3, a: Vec3, b: Vec3, c: Vec3) -> Option<f32> {
+    let (e1, e2) = (b - a, c - a);
+    let p = dir.cross(e2);
+    let det = e1.dot(p);
+    if det.abs() < 1e-12 {
+        return None;
+    }
+    let inv = 1.0 / det;
+    let s = origin - a;
+    let u = s.dot(p) * inv;
+    if !(0.0..=1.0).contains(&u) {
+        return None;
+    }
+    let q = s.cross(e1);
+    let v = dir.dot(q) * inv;
+    if v < 0.0 || u + v > 1.0 {
+        return None;
+    }
+    let t = e2.dot(q) * inv;
+    (t > 1e-6).then_some(t)
+}
+
+/// The selection highlight colour.
+pub const HIGHLIGHT: [f32; 4] = [0.15, 0.45, 0.95, 1.0];
+
 /// Default display colours by IFC class, until object styles and materials drive them.
 pub fn class_color(class: &str) -> [f32; 4] {
     let c = class.strip_suffix("StandardCase").unwrap_or(class);
@@ -114,6 +157,16 @@ impl Camera {
         self.distance = radius / (self.fov * 0.5).sin() * 1.1;
     }
 
+    /// The ray through pixel (`x`, `y`) of a `width` × `height` viewport: origin and direction.
+    pub fn ray(&self, x: f32, y: f32, width: f32, height: f32) -> (Vec3, Vec3) {
+        let inv = self.view_proj(width / height.max(1.0)).inverse();
+        let ndc_x = 2.0 * x / width.max(1.0) - 1.0;
+        let ndc_y = 1.0 - 2.0 * y / height.max(1.0);
+        let near = inv.project_point3(Vec3::new(ndc_x, ndc_y, 0.0));
+        let far = inv.project_point3(Vec3::new(ndc_x, ndc_y, 1.0));
+        (near, (far - near).normalize())
+    }
+
     /// Orbits by a mouse drag in pixels.
     pub fn orbit(&mut self, dx: f32, dy: f32) {
         self.yaw -= dx * 0.008;
@@ -141,6 +194,8 @@ pub trait RenderBackend {
     fn set_scene(&mut self, scene: &RenderScene);
     fn resize(&mut self, width: u32, height: u32);
     fn render(&mut self, camera: &Camera) -> Result<(), String>;
+    /// Draws these elements in the highlight colour.
+    fn set_highlight(&mut self, elements: &[ElementId]);
 }
 
 #[cfg(test)]
@@ -157,6 +212,27 @@ mod tests {
             ndc.x.abs() < 1e-4 && ndc.y.abs() < 1e-4 && (0.0..1.0).contains(&ndc.z),
             "{ndc}"
         );
+        // The ray through the centre pixel hits a box centred in view.
+        let (o, d) = cam.ray(300.0, 200.0, 600.0, 400.0);
+        let tri = |p: [[f32; 3]; 3]| SceneMesh {
+            element: None,
+            class: "IfcWall".into(),
+            positions: p.to_vec(),
+            indices: vec![0, 1, 2],
+            color: [1.0; 4],
+        };
+        let scene = RenderScene {
+            meshes: vec![
+                tri([[0.0, 0.0, 3.0], [10.0, 0.0, 3.0], [0.0, 8.0, 3.0]]),
+                tri([[10.0, 0.0, 3.0], [10.0, 8.0, 3.0], [0.0, 8.0, 3.0]]),
+            ],
+        };
+        let (hit, dist) = scene
+            .pick(o, d)
+            .expect("the centre ray hits the plane at z = 3");
+        assert!(hit <= 1 && dist > 0.0);
+        let (o, d) = cam.ray(0.0, 0.0, 600.0, 400.0);
+        assert!(scene.pick(o, d).is_none() || scene.pick(o, d).unwrap().1 > 0.0);
         let before = cam.target;
         cam.pan(100.0, 0.0, 600.0);
         assert!(cam.target.distance(before) > 0.0);

@@ -30,6 +30,11 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add_host(RecoveryRestore),
         registry.add_host(RecoveryShowChanges),
         registry.add_host(RecoveryDiscard),
+        registry.add_host(SelectionGet),
+        registry.add_host(SelectionSet),
+        registry.add_host(SelectionClear),
+        registry.add_host(SelectionAdd),
+        registry.add_host(SelectionRemove),
     ];
     for r in results {
         r.expect("application commands are valid");
@@ -477,6 +482,7 @@ impl HostCommand for RecoveryRestore {
                 read_only: false,
                 untitled,
                 open_report: None,
+                selection: Default::default(),
             },
         );
         app.active = Some(id);
@@ -533,5 +539,168 @@ impl HostCommand for RecoveryDiscard {
             ));
         }
         reviera_livestore::discard(&p.store_key, &options.dir).map_err(|e| err("file.io", e))
+    }
+}
+
+// ---- Selection (Ch 1 UI-SEL-002, Ch 3 ARC-SEL-001): session state of the active document ----
+
+use reviera_core::{ElementId, ElementRef};
+
+fn resolve_all(app: &App, refs: &[ElementRef]) -> Result<Vec<ElementId>> {
+    let open = app.get(app.resolve(None)?)?;
+    refs.iter()
+        .map(|r| {
+            open.doc.store().resolve(r).ok_or_else(|| {
+                Error::new("element.not_found", "no such element")
+                    .with_details(serde_json::json!({ "ref": r }))
+            })
+        })
+        .collect()
+}
+
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct SelectionInfo {
+    pub ids: Vec<ElementId>,
+    /// Selected elements per category key (`uncategorised` when none applies).
+    pub by_category: std::collections::BTreeMap<String, usize>,
+}
+
+fn selection_info(app: &App) -> Result<SelectionInfo> {
+    let open = app.get(app.resolve(None)?)?;
+    let mut by_category = std::collections::BTreeMap::new();
+    for id in &open.selection {
+        let key = open
+            .doc
+            .store()
+            .get(*id)
+            .and_then(reviera_core::categories::category_of)
+            .map_or("uncategorised", |c| c.key);
+        *by_category.entry(key.to_owned()).or_insert(0) += 1;
+    }
+    Ok(SelectionInfo {
+        ids: open.selection.iter().copied().collect(),
+        by_category,
+    })
+}
+
+struct SelectionGet;
+
+impl HostCommand for SelectionGet {
+    type Host = App;
+    type Params = NoParams;
+    type Output = SelectionInfo;
+    const META: CommandMeta = meta(
+        "selection.get",
+        "The selected elements of the active document",
+        &[Effect::Read],
+    );
+
+    fn run(&self, app: &mut App, _: &Caller, _: NoParams) -> Result<SelectionInfo> {
+        selection_info(app)
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum SelectMode {
+    #[default]
+    Replace,
+    Add,
+    Remove,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SelectionSetParams {
+    /// Internal IDs or GlobalIds.
+    pub ids: Vec<ElementRef>,
+    #[serde(default)]
+    pub mode: SelectMode,
+}
+
+struct SelectionSet;
+
+impl HostCommand for SelectionSet {
+    type Host = App;
+    type Params = SelectionSetParams;
+    type Output = SelectionInfo;
+    const META: CommandMeta = meta(
+        "selection.set",
+        "Set, extend or reduce the selection",
+        &[Effect::Ui],
+    );
+
+    fn run(&self, app: &mut App, _: &Caller, p: SelectionSetParams) -> Result<SelectionInfo> {
+        let ids = resolve_all(app, &p.ids)?;
+        let open = app.active_mut()?;
+        match p.mode {
+            SelectMode::Replace => open.selection = ids.into_iter().collect(),
+            SelectMode::Add => open.selection.extend(ids),
+            SelectMode::Remove => ids.iter().for_each(|i| {
+                open.selection.remove(i);
+            }),
+        }
+        selection_info(app)
+    }
+}
+
+struct SelectionClear;
+
+impl HostCommand for SelectionClear {
+    type Host = App;
+    type Params = NoParams;
+    type Output = ();
+    const META: CommandMeta = meta("selection.clear", "Clear the selection", &[Effect::Ui]);
+
+    fn run(&self, app: &mut App, _: &Caller, _: NoParams) -> Result<()> {
+        app.active_mut()?.selection.clear();
+        Ok(())
+    }
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SelectionIdsParams {
+    pub element_ids: Vec<ElementRef>,
+}
+
+struct SelectionAdd;
+
+impl HostCommand for SelectionAdd {
+    type Host = App;
+    type Params = SelectionIdsParams;
+    type Output = ();
+    const META: CommandMeta = meta(
+        "selection.add",
+        "Add elements to the selection",
+        &[Effect::Ui],
+    );
+
+    fn run(&self, app: &mut App, _: &Caller, p: SelectionIdsParams) -> Result<()> {
+        let ids = resolve_all(app, &p.element_ids)?;
+        app.active_mut()?.selection.extend(ids);
+        Ok(())
+    }
+}
+
+struct SelectionRemove;
+
+impl HostCommand for SelectionRemove {
+    type Host = App;
+    type Params = SelectionIdsParams;
+    type Output = ();
+    const META: CommandMeta = meta(
+        "selection.remove",
+        "Remove elements from the selection",
+        &[Effect::Ui],
+    );
+
+    fn run(&self, app: &mut App, _: &Caller, p: SelectionIdsParams) -> Result<()> {
+        let ids = resolve_all(app, &p.element_ids)?;
+        let open = app.active_mut()?;
+        for id in ids {
+            open.selection.remove(&id);
+        }
+        Ok(())
     }
 }
