@@ -11148,7 +11148,9 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
   - Flat: no curve slopes.
   - "Along" means within 10° of the longest curve's direction. A roof whose curves match no shape shows *Custom*. Slopes and overhangs are kept.
 - Properties also set the **Overhang** of every curve (*Varies* when they differ), and **Cutoff Level** is chosen from the levels.
-- **Attach Walls** (`roof.attach_walls`, Modify | Roofs): attaches every Reviera wall that the roof covers and that starts below it. Gable walls fill up to the ridge, and the others meet the roof's underside.
+- **Attach Walls** (`roof.attach_walls`, Modify | Roofs): attaches the Reviera **perimeter** walls that the roof covers and that start below it. Gable walls fill up to the ridge, and eave walls meet the roof's underside.
+  - A wall is on the perimeter when, just beside one of its faces at its middle, there is no enclosed region of its level.
+  - Interior walls are left alone; Attach Top attaches them by hand.
   - This is offered after any new roof, however its footprint was made, not only one from picked walls.
   - Attached walls follow later shape and footprint changes.
 - Still to come: editing single footprint curves on the model (grips, and moving or deleting one curve in Edit Footprint), and per-curve Properties during the sketch.

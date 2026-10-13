@@ -602,6 +602,18 @@ fn attach_walls_below_fills_the_gables() {
         )
         .unwrap()));
     }
+    // An interior partition under the roof is not a gable: it stays as it is.
+    let partition = id(run(
+        &r,
+        &mut doc,
+        "wall.create",
+        json!({
+            "curve": { "line": { "start": [5.0, 0.0], "end": [5.0, 6.0] } },
+            "base_level": level.0,
+            "top_constraint": { "unconnected": 3 },
+        }),
+    )
+    .unwrap());
     // A wall well outside the roof stays as it is.
     let outside = id(run(
         &r,
@@ -660,13 +672,15 @@ fn attach_walls_below_fills_the_gables() {
     .unwrap()
     .unwrap();
     assert!((east.z_max - 6.1).abs() < 1e-6, "{}", east.z_max);
-    let e = doc.store().get(outside).unwrap();
-    assert!(
-        reviera_core::walls::wall_recipe(e)
-            .unwrap()
-            .attach_top
-            .is_none()
-    );
+    for w in [outside, partition] {
+        let e = doc.store().get(w).unwrap();
+        assert!(
+            reviera_core::walls::wall_recipe(e)
+                .unwrap()
+                .attach_top
+                .is_none()
+        );
+    }
     // Nothing is left to attach.
     assert!(reviera_core::walls::attach::walls_below(doc.store(), roof).is_empty());
 }

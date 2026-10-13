@@ -442,7 +442,10 @@ impl Gui {
         if walls.is_empty()
             || !ask(
                 &frame,
-                &format!("Attach the {} walls under the roof to it?", walls.len()),
+                &format!(
+                    "Attach the {} perimeter walls under the roof to it (their gables fill)?",
+                    walls.len()
+                ),
             )
         {
             return;

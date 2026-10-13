@@ -343,9 +343,10 @@ pub(crate) fn attach(txn: &mut crate::txn::Transaction<'_>, p: AttachParams) -> 
     Ok(())
 }
 
-/// The Reviera walls under `roof` that are not attached to it yet: the roof covers each one's
-/// whole footprint, and its base is below the roof's lowest point over it (ARC-ROOF-001: the
-/// walls offered for attaching when a roof is finished).
+/// The Reviera walls under `roof` that are not attached to it yet: perimeter walls (one side
+/// outside every enclosed region of their level) that the roof covers whole and that start
+/// below its lowest point over them (ARC-ROOF-001: the walls whose gables fill when a roof is
+/// finished). Interior walls are left to be attached by hand.
 pub fn walls_below(store: &Store, roof: ElementId) -> Vec<ElementId> {
     let Some(e) = store.get(roof) else {
         return Vec::new();
@@ -367,8 +368,33 @@ pub fn walls_below(store: &Store, roof: ElementId) -> Vec<ElementId> {
         .filter(|(_, body)| attach_to(&g, body).is_ok_and(|a| a.z_min > body.geometry.base_z + 0.1))
         .map(|(id, _)| *id)
         .collect();
+    // Enclosed regions by the height they are taken at (each wall's base, a little up).
+    let mut regions: Vec<(i64, Vec<crate::arrangement::Region>)> = Vec::new();
+    out.retain(|id| {
+        let geometry = &solved.bodies[id].geometry;
+        let z = geometry.base_z + 0.05;
+        let key = (z * 1000.0).round() as i64;
+        if !regions.iter().any(|(k, _)| *k == key) {
+            let edges = crate::arrangement::wall_edges(store, z);
+            regions.push((key, crate::arrangement::regions(&edges)));
+        }
+        let rs = &regions.iter().find(|(k, _)| *k == key).expect("added").1;
+        is_perimeter(geometry, rs)
+    });
     out.sort();
     out
+}
+
+/// Whether a wall is on the perimeter: just beside one of its faces, at its middle, lies no
+/// enclosed region.
+fn is_perimeter(g: &super::WallGeometry, regions: &[crate::arrangement::Region]) -> bool {
+    let m = [(g.start[0] + g.end[0]) / 2.0, (g.start[1] + g.end[1]) / 2.0];
+    let n = g.normal();
+    let d = g.width / 2.0 + 0.05;
+    [1.0, -1.0].iter().any(|s| {
+        let p = [m[0] + n[0] * d * s, m[1] + n[1] * d * s];
+        !regions.iter().any(|r| r.contains(p))
+    })
 }
 
 #[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
