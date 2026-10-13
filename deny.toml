@@ -3,6 +3,11 @@
 
 [advisories]
 version = 2
+ignore = [
+    # `paste` (unmaintained, no known vulnerability) is a compile-time macro used by wxDragon. A
+    # switch to a maintained fork is a candidate upstream patch (TECH_STACK §3.4).
+    { id = "RUSTSEC-2024-0436", reason = "compile-time macro dependency of wxDragon; upstream patch candidate" },
+]
 
 [licenses]
 version = 2

@@ -1,0 +1,69 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Linux CI: build, lint and test on Fedora 43 (the development platform).
+# Windows and macOS jobs are deferred by owner decision (2026-10-12).
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  linux:
+    name: Linux (Fedora 43)
+    runs-on: ubuntu-latest
+    container: fedora:43
+    timeout-minutes: 300
+    steps:
+      - name: System packages
+        run: >
+          dnf install -y --setopt=install_weak_deps=False
+          git tar zstd unzip curl gcc gcc-c++ clang clang-devel cmake ninja-build make
+          pkgconf-pkg-config perl perl-FindBin perl-IPC-Cmd perl-Time-Piece python3 rustup
+          opencascade-devel boost-devel eigen3-devel libxml2-devel json-devel
+          gtk3-devel wayland-devel libsecret-devel luajit-devel openxr-devel
+          mesa-vulkan-drivers vulkan-loader
+
+      - uses: actions/checkout@v4
+
+      - name: Rust toolchain (from rust-toolchain.toml)
+        run: |
+          rustup-init -y --default-toolchain none --profile minimal
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+          "$HOME/.cargo/bin/rustup" show
+
+      - name: Cache IfcOpenShell
+        id: ifcos
+        uses: actions/cache@v4
+        with:
+          path: third_party/install
+          key: ifcopenshell-fedora43-${{ hashFiles('tools/build-ifcopenshell.sh') }}
+
+      - name: Build IfcOpenShell
+        if: steps.ifcos.outputs.cache-hit != 'true'
+        run: IFCOS_JOBS=4 tools/build-ifcopenshell.sh
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-all-crates: true
+          cache-on-failure: true
+
+      - name: Format
+        run: cargo fmt --all --check
+
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Test
+        run: cargo test --workspace
+
+  licenses:
+    name: Licences and advisories
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: EmbarkStudios/cargo-deny-action@v2
