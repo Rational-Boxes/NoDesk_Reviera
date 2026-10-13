@@ -582,6 +582,7 @@ pub struct SetCurveParams {
 pub(crate) fn set_curve(txn: &mut crate::txn::Transaction<'_>, p: SetCurveParams) -> Result<()> {
     check_curve(&p.curve.line)?;
     let (id, mut d) = resolve_grid(txn.store(), &p.grid_id)?;
+    crate::modify::check_unpinned(txn.store(), id)?;
     d.curve = p.curve.line;
     write(txn, id, &d)
 }

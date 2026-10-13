@@ -387,6 +387,7 @@ pub(crate) fn set_location(
 ) -> Result<()> {
     let store = txn.store().clone();
     let id = resolve(&store, &p.wall_id, "wall")?;
+    crate::modify::check_unpinned(&store, id)?;
     let wall = store.get(id).expect("resolved");
     let mut recipe = wall_recipe(wall).ok_or_else(|| {
         Error::new(
@@ -451,6 +452,7 @@ pub(crate) fn flip(txn: &mut crate::txn::Transaction<'_>, p: FlipParams) -> Resu
     let store = txn.store().clone();
     for r in &p.wall_ids {
         let id = resolve(&store, r, "wall")?;
+        crate::modify::check_unpinned(&store, id)?;
         let mut recipe = wall_recipe(store.get(id).expect("resolved"))
             .ok_or_else(|| Error::new("wall.not_reviera", "only Reviera walls can be flipped"))?;
         recipe.flip = !recipe.flip;

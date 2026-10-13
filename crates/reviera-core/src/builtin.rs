@@ -86,6 +86,16 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(InsertFlipFacing),
         registry.add(InsertSetSill),
         registry.add(ElementMove),
+        registry.add(ElementCopy),
+        registry.add(ElementRotate),
+        registry.add(ElementMirror),
+        registry.add(ElementOffset),
+        registry.add(ElementSplit),
+        registry.add(ElementTrimCorner),
+        registry.add(ElementTrimExtend),
+        registry.add(ElementAlign),
+        registry.add(ElementPin),
+        registry.add(ElementUnpin),
     ];
     for r in results {
         r.expect("core commands are valid");
@@ -415,6 +425,7 @@ impl Command for ElementDelete {
                 .store()
                 .resolve(r)
                 .ok_or_else(|| Error::new("element.not_found", format!("no element {r:?}")))?;
+            crate::modify::check_unpinned(txn.store(), id)?;
             if id.0 < ElementId::FIRST.0 {
                 return Err(Error::new(
                     "element.protected",
@@ -1742,77 +1753,154 @@ impl Command for InsertSetSill {
     }
 }
 
-#[derive(Debug, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub struct MoveParams {
-    pub element_ids: Vec<ElementRef>,
-    /// Metres (x, y, and z for doors and windows).
-    pub vector: [f64; 3],
-}
+// ---- Modify tools (Ch 3 §3.12, ARC-MOD-001 … 013) ----
 
-#[derive(Debug)]
-struct ElementMove;
+use crate::modify;
 
-impl Command for ElementMove {
-    type Params = MoveParams;
-    type Output = Vec<ElementId>;
-    const META: CommandMeta = CommandMeta {
-        name: "element.move",
-        version: 1,
-        summary: "Move elements",
-        description: "Moves elements by a vector: Reviera walls and grids in plan (their doors and windows go \
-                      with them); doors and windows along their host by the vector's component along the \
-                      wall, and up or down by its z.",
-        effects: &[Effect::Edit],
-        transaction_name: "Move",
-    };
+macro_rules! modify_command {
+    ($ty:ident, $name:literal, $summary:literal, $desc:literal, $txn:literal, $params:ty, $out:ty, $f:expr) => {
+        #[derive(Debug)]
+        struct $ty;
 
-    fn run(&self, cx: &mut CommandContext<'_>, p: MoveParams) -> Result<Vec<ElementId>> {
-        let txn = cx.edit()?;
-        let mut moved = Vec::new();
-        for r in &p.element_ids {
-            let store = txn.store().clone();
-            let id = store
-                .resolve(r)
-                .ok_or_else(|| Error::new("element.not_found", format!("no element {r:?}")))?;
-            let e = store.get(id).expect("resolved");
-            let shift = |l: crate::walls::Line| crate::walls::Line {
-                start: [l.start[0] + p.vector[0], l.start[1] + p.vector[1]],
-                end: [l.end[0] + p.vector[0], l.end[1] + p.vector[1]],
+        impl Command for $ty {
+            type Params = $params;
+            type Output = $out;
+            const META: CommandMeta = CommandMeta {
+                name: $name,
+                version: 1,
+                summary: $summary,
+                description: $desc,
+                effects: &[Effect::Edit],
+                transaction_name: $txn,
             };
-            if inserts::kind_of(e).is_some() {
-                inserts::move_by(txn, id, p.vector)?;
-            } else if let Some(w) = crate::walls::wall_recipe(e) {
-                walls::set_location(
-                    txn,
-                    SetLocationParams {
-                        wall_id: ElementRef::Id(id),
-                        curve: crate::walls::CurveArg {
-                            line: shift(w.curve),
-                        },
-                    },
-                )?;
-            } else if let Some(g) = crate::grids::grid_data(e) {
-                grids::set_curve(
-                    txn,
-                    grids::SetCurveParams {
-                        grid_id: ElementRef::Id(id),
-                        curve: crate::walls::CurveArg {
-                            line: shift(g.curve),
-                        },
-                    },
-                )?;
-            } else {
-                return Err(Error::new(
-                    "element.not_movable",
-                    format!("element {id} ({}) cannot be moved yet", e.class),
-                ));
+
+            fn run(&self, cx: &mut CommandContext<'_>, p: $params) -> Result<$out> {
+                let f: fn(&mut crate::txn::Transaction<'_>, $params) -> Result<$out> = $f;
+                f(cx.edit()?, p)
             }
-            moved.push(id);
         }
-        Ok(moved)
-    }
+    };
 }
+
+modify_command!(
+    ElementMove,
+    "element.move",
+    "Move elements",
+    "Moves elements by a vector (metres): Reviera walls and grids in plan (their doors and windows go with \
+     them); doors and windows along their host by the vector's component along the wall, and up or down by \
+     its z. Pinned elements are refused.",
+    "Move",
+    modify::MoveParams,
+    Vec<ElementId>,
+    modify::move_
+);
+modify_command!(
+    ElementCopy,
+    "element.copy",
+    "Copy elements",
+    "Copies elements by each vector; returns one list of copies per vector. Copied walls take their doors \
+     and windows; copied doors and windows stay in their wall; copied grids get the next name.",
+    "Copy",
+    modify::CopyParams,
+    Vec<Vec<ElementId>>,
+    modify::copy
+);
+modify_command!(
+    ElementRotate,
+    "element.rotate",
+    "Rotate elements",
+    "Rotates walls and grids about a plan point, counter-clockwise by `angle` (accepts \"30°\"); with \
+     `copy`, rotates copies.",
+    "Rotate",
+    modify::RotateParams,
+    Vec<ElementId>,
+    modify::rotate
+);
+modify_command!(
+    ElementMirror,
+    "element.mirror",
+    "Mirror elements",
+    "Mirrors walls and grids about an axis: two plan points `{start, end}` or `{element}` (a wall's \
+     location line or a grid). Copies by default; mirrored walls keep their exterior on the mirrored side \
+     and their doors turn with them.",
+    "Mirror",
+    modify::MirrorParams,
+    Vec<ElementId>,
+    modify::mirror
+);
+modify_command!(
+    ElementOffset,
+    "element.offset",
+    "Offset elements",
+    "Offsets walls and grids by `distance` toward `side_point`, as copies by default.",
+    "Offset",
+    modify::OffsetParams,
+    Vec<ElementId>,
+    modify::offset
+);
+modify_command!(
+    ElementSplit,
+    "element.split",
+    "Split a wall",
+    "Splits a Reviera wall at a point into two walls of the same type; doors and windows go to the part \
+     that contains them. Returns both walls.",
+    "Split",
+    modify::SplitParams,
+    Vec<ElementId>,
+    modify::split
+);
+modify_command!(
+    ElementTrimCorner,
+    "element.trim_corner",
+    "Trim/extend to corner",
+    "Trims or extends two walls to their intersection, keeping the parts with the picked points, making \
+     an L corner. Doors and windows left outside a wall are deleted with a warning.",
+    "Trim/Extend to Corner",
+    modify::TrimCornerParams,
+    (),
+    modify::trim_corner
+);
+modify_command!(
+    ElementTrimExtend,
+    "element.trim_extend",
+    "Trim/extend to a boundary",
+    "Trims or extends a wall to a boundary (a wall's location line or a grid), keeping the picked part.",
+    "Trim/Extend",
+    modify::TrimExtendParams,
+    (),
+    modify::trim_extend
+);
+modify_command!(
+    ElementAlign,
+    "element.align",
+    "Align",
+    "Moves elements so that each target line (a wall face or location line, a grid) lies on the parallel \
+     reference line. References are as for dim.create_aligned.",
+    "Align",
+    modify::AlignParams,
+    Vec<ElementId>,
+    modify::align
+);
+modify_command!(
+    ElementPin,
+    "element.pin",
+    "Pin elements",
+    "Pins elements: they refuse moves, rotations, mirrors, flips and deletes until unpinned.",
+    "Pin",
+    modify::PinParams,
+    (),
+    |t, p| modify::pin(t, p, true)
+);
+modify_command!(
+    ElementUnpin,
+    "element.unpin",
+    "Unpin elements",
+    "Unpins elements.",
+    "Unpin",
+    modify::PinParams,
+    (),
+    |t, p| modify::pin(t, p, false)
+);
 
 use crate::plans::{self, CreatePlanParams, SetViewRangeParams, ViewRangeReport};
 

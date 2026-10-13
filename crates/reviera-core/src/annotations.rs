@@ -183,6 +183,46 @@ pub struct DimRefArg {
     pub direction: Option<[f64; 2]>,
 }
 
+/// A stored reference from its argument: the element's GlobalId, and the direction taken from
+/// the element (or normalised, for a `line`).
+pub fn ref_of(store: &Store, a: &DimRefArg) -> Result<DimRef> {
+    let element = match &a.element {
+        Some(r) => {
+            let id = store
+                .resolve(r)
+                .ok_or_else(|| Error::new("element.not_found", "no such element"))?;
+            Some(store.get(id).expect("resolved").guid().to_string())
+        }
+        None => None,
+    };
+    let mut r = DimRef {
+        element,
+        sub: a.sub.clone(),
+        point: a.point,
+        direction: a.direction.unwrap_or([1.0, 0.0]),
+    };
+    if r.sub != "line" {
+        let (_, dir) = resolve_ref(store, &r).ok_or_else(|| {
+            Error::new(
+                "dim.bad_ref",
+                format!("`{}` is not a reference of that element", r.sub),
+            )
+        })?;
+        r.direction = dir;
+    } else {
+        let d = r.direction;
+        let len = d[0].hypot(d[1]);
+        if len < 1e-9 {
+            return Err(Error::new(
+                "dim.bad_ref",
+                "a line reference needs a direction",
+            ));
+        }
+        r.direction = [d[0] / len, d[1] / len];
+    }
+    Ok(r)
+}
+
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct CreateAlignedParams {
@@ -205,44 +245,11 @@ pub(crate) fn create_aligned(
             "a dimension needs at least two references",
         ));
     }
-    let mut refs = Vec::new();
-    for a in &p.refs {
-        let element = match &a.element {
-            Some(r) => {
-                let id = store
-                    .resolve(r)
-                    .ok_or_else(|| Error::new("element.not_found", "no such element"))?;
-                Some(store.get(id).expect("resolved").guid().to_string())
-            }
-            None => None,
-        };
-        let mut r = DimRef {
-            element,
-            sub: a.sub.clone(),
-            point: a.point,
-            direction: a.direction.unwrap_or([1.0, 0.0]),
-        };
-        if r.sub != "line" {
-            let (_, dir) = resolve_ref(&store, &r).ok_or_else(|| {
-                Error::new(
-                    "dim.bad_ref",
-                    format!("`{}` is not a reference of that element", r.sub),
-                )
-            })?;
-            r.direction = dir;
-        } else {
-            let d = r.direction;
-            let len = d[0].hypot(d[1]);
-            if len < 1e-9 {
-                return Err(Error::new(
-                    "dim.bad_ref",
-                    "a line reference needs a direction",
-                ));
-            }
-            r.direction = [d[0] / len, d[1] / len];
-        }
-        refs.push(r);
-    }
+    let refs = p
+        .refs
+        .iter()
+        .map(|a| ref_of(&store, a))
+        .collect::<Result<Vec<_>>>()?;
     let along = refs[0].direction;
     if refs
         .iter()

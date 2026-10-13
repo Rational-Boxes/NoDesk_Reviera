@@ -698,6 +698,76 @@ pub(crate) fn place(
     Ok(id)
 }
 
+/// Copies a door or window into `host` (GlobalId) at `along`, with its type, sill and flips (the
+/// facing flipped with `flip_facing`), a new opening and the next Mark.
+pub(crate) fn copy_to(
+    txn: &mut crate::txn::Transaction<'_>,
+    insert: ElementId,
+    host: &str,
+    along: f64,
+    flip_facing: bool,
+) -> Result<ElementId> {
+    let store = txn.store().clone();
+    let e = store.get(insert).expect("checked by the caller");
+    let kind = kind_of(e).expect("an insert");
+    let mut recipe = insert_recipe(e).expect("an insert");
+    recipe.host = host.to_owned();
+    recipe.along = along;
+    recipe.flip_facing ^= flip_facing;
+    let mark = next_mark(&store, kind);
+    let mut copy = NewElement::new(kind.class());
+    copy.params = e
+        .params
+        .iter()
+        .filter(|(k, _)| k.as_str() != "rxd:identity")
+        .map(|(k, v)| (k.clone(), v.clone()))
+        .collect();
+    copy.params.insert("@Tag".into(), mark.into());
+    copy.params.insert(
+        RECIPE_KEY.into(),
+        serde_json::to_value(&recipe).expect("serialises"),
+    );
+    let id = txn.create(copy)?;
+    let guid = txn.store().get(id).expect("created").guid().to_string();
+    txn.create(
+        NewElement::new("IfcOpeningElement")
+            .param("@PredefinedType", "OPENING")
+            .param(
+                RECIPE_KEY,
+                json!({ "kind": OPENING_RECIPE, "insert": guid }),
+            ),
+    )?;
+    Ok(id)
+}
+
+/// Turns doors and windows to face the other side of their wall (after their host is mirrored).
+pub(crate) fn toggle_facing(
+    txn: &mut crate::txn::Transaction<'_>,
+    ids: &[ElementId],
+) -> Result<()> {
+    for id in ids {
+        let store = txn.store().clone();
+        let Some(mut recipe) = store.get(*id).and_then(insert_recipe) else {
+            continue;
+        };
+        recipe.flip_facing = !recipe.flip_facing;
+        let value = serde_json::to_value(&recipe).expect("serialises");
+        txn.modify(*id, |e| {
+            e.params.insert(RECIPE_KEY.into(), value);
+        })?;
+    }
+    Ok(())
+}
+
+/// The doors and windows hosted by `wall` (GlobalId).
+pub fn hosted_by(store: &Store, wall: &str) -> Vec<ElementId> {
+    store
+        .iter()
+        .filter(|e| insert_recipe(e).is_some_and(|r| r.host == wall))
+        .map(Element::id)
+        .collect()
+}
+
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct FlipParams {
@@ -711,6 +781,7 @@ pub(crate) fn flip(txn: &mut crate::txn::Transaction<'_>, p: FlipParams, hand: b
         let id = store
             .resolve(r)
             .ok_or_else(|| Error::new("element.not_found", format!("no element {r:?}")))?;
+        crate::modify::check_unpinned(&store, id)?;
         let mut recipe = insert_recipe(store.get(id).expect("resolved")).ok_or_else(|| {
             Error::new(
                 "insert.not_insert",
