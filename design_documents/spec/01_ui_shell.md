@@ -1065,6 +1065,15 @@ Server-mode tools are hidden in Local mode except Connect and Publish to Server 
 | Presentation | VR / AR ▾ (Start VR, Start AR, Tabletop) | Sp | `xr.start{vr\|ar\|tabletop}` | ADV | — | P2 (VR), P3 (AR) |
 | Presentation | Render Backends | S | `render.backend.list` (opens the backends dialog: installed backends, capabilities, defaults, test, connect info) | DOC | — | P2 |
 | Presentation | Cloud rendering | — | not provided | — | — | P3 |
+| Inspect | Section Box | L T | `view.set_section_box{toggle}` | DOC | SX | P0 |
+| Inspect | Selection Box | S | `view.fit_section_box` | DOC | BX | P1 |
+| Inspect | Slice Plane › Horizontal; Vertical; On Face | Sp | `view.set_slice_planes` | DOC | — | P1 |
+| Inspect | Clear Slices | S | `view.set_slice_planes{[]}` | DOC | — | P1 |
+| Inspect | Hide ▾ (Element, Element and Children, Category, Type) | Sp | `view.temp_hide{by}` | UI | HH, HC | P0 |
+| Inspect | Isolate ▾ (Element, Element and Children, Category, Type, Ghost Others) | Sp | `view.temp_isolate{by}` | UI | HI, IC, HG | P0 |
+| Inspect | Translucent ▾ (Element, Element and Children, Category, Type) | Sp | `view.temp_translucent{by}` | UI | HT | P1 |
+| Inspect | Reset Temporary Hide/Isolate | S | `view.temp_reset` | UI | HR | P0 |
+| Inspect | Model Tree | S T | `ui.pane.toggle{model_tree}` | UI | MT | P1 |
 | Create | 3D View › Default 3D View | Sp | `view.create_3d{default}` | DOC | 3D | P0 |
 | Create | 3D View › Camera | Sp | `view.create_camera` | DOC | — | P1 |
 | Create | 3D View › Walkthrough | Sp | `view.create_walkthrough` | DOC | — | P2 |
@@ -1542,6 +1551,38 @@ The following context panels are part of the default layout. Owners are authorit
 
 ---
 
+## 1.14a Model Tree
+
+### 1.14a.1 Model Tree pane
+**ID:** UI-TREE-001 · **Priority:** P1 · **Ref:** owner requirement (2026-10-13); builds on DOC-GFX-008
+
+**Purpose.** Show the model's elements as a tree, so whole branches can be selected, hidden, isolated or made translucent for inspection.
+
+**UI.**
+- A dockable pane (View › User Interface › Model Tree, or MT), docked with the Project Browser by default.
+- Tree: **Project › Site › Building › storeys**, in elevation order; under each storey, one node per category ("Walls (12)"), then the elements by name or mark; under a host element, the elements it hosts (a wall's doors and windows); under an aggregate, its parts. Elements with no storey are listed under *Not on a level*, and views, types and other non-physical objects are left out.
+- Each node shows its temporary state in the active view: hidden nodes are greyed, translucent nodes are in italics (or marked "(translucent)" where the toolkit has no italics), and isolated nodes are bold.
+- A search box filters by name, mark or category.
+
+**Interactions.**
+- Clicking a node selects its element (or, for storey and category nodes, every element below it) in the canvas; selecting in the canvas reveals and highlights the node.
+- Right-click: Hide, Isolate, Isolate (Ghost Others), Translucent, Show, each acting on the node *with its children*; Zoom to (fits the view to the branch); Section Box (fits the active 3D view's section box to the branch, BX).
+- Double-click on an element zooms the active view to it.
+
+**Behaviour & rules.**
+- The tree reflects the current model: Reviera elements are placed by their own data (a wall under its base level, a door under its host wall, a floor or ceiling under its level, a grid line under its grid system); elements read from IFC are placed by the file's spatial containment, aggregation, voiding and filling relationships.
+- The tree updates after each committed transaction, keeping expansion and scroll position.
+- Hiding a storey node hides everything below it, and so on for every node: the tree's actions use the *subtree* scope of DOC-GFX-008.
+
+**Commands.** `model.tree(depth?) -> tree` (nodes: `{id?, label, kind: project|site|building|storey|category|element, children[]}`); visibility uses the `view.temp_*` commands (UI-VCB-001).
+
+**Acceptance criteria.**
+- [ ] On the FZK house sample, the tree lists two storeys with their walls, slabs, doors and windows, and each door appears under the wall that hosts it.
+- [ ] Right-click › Isolate on "Level 1" leaves only the elements of Level 1 in the active view; the other views are unchanged.
+- [ ] Creating a wall adds it under its level within one second, without collapsing the tree.
+
+---
+
 ## 1.15 Docking
 
 ### 1.15.1 Dockable panes
@@ -1718,7 +1759,7 @@ The following context panels are part of the default layout. Owners are authorit
 | 7 | Crop View | Toggle cropping | `view.set_property(…"CropEnabled")` (DOC) | P0 |
 | 8 | Show Crop Region | Toggle crop boundary visibility | `view.set_property(…"CropVisible")` (DOC) | P0 |
 | 9 | Lock 3D View | Save Orientation and Lock / Restore Orientation and Lock / Unlock | `view.lock_3d`, `view.restore_orientation` (DOC) | P1 |
-| 10 | Temporary Hide/Isolate | With a selection: Isolate Category (IC), Hide Category (HC), Isolate Element (HI), Hide Element (HH). While active: Reset (HR), Apply to View | `view.temp_isolate`, `view.temp_hide`, `view.temp_reset` (UI); `view.temp_apply` (UI → DOC `view.hide_elements`) | P0 |
+| 10 | Temporary Hide/Isolate | With a selection: Isolate Category (IC), Hide Category (HC), Isolate Element (HI), Hide Element (HH), Translucent Element (HT), Isolate, Ghost Others (HG), and the same with children or by type (DOC-GFX-008 scopes). While active: Reset (HR), Apply to View | `view.temp_isolate`, `view.temp_hide`, `view.temp_translucent`, `view.temp_show`, `view.temp_reset` (UI); `view.temp_apply` (UI → DOC `view.hide_elements`) | P0 |
 | 11 | Reveal Hidden Elements | Toggles reveal mode with its contextual tab | `view.reveal_hidden.toggle` (UI) | P0 |
 | 12 | Collaboration Display | BIMserver mode only: Off, Ownership Status, Owners, Model Updates (changed since my last Get Latest), Worksets, Settings… | `view.set_worksharing_display(mode)` (COL) | P1 |
 | 13 | Temporary View Properties | Enable, Temporarily Apply Template…, Restore View Properties, recent templates | `view.temp_properties.*` (DOC) | P1 |
@@ -1732,7 +1773,7 @@ The following context panels are part of the default layout. Owners are authorit
 - **Reveal hidden mode** draws hidden elements in `canvas.reveal_hidden`, adds the "Reveal Hidden Elements" contextual tab (§1.9.2), and is session state.
 - The bar's buttons are keyboard reachable (F6 cycles focus between ribbon, panes, canvas and the View Control Bar; arrow keys move within it).
 
-**Commands.** `view.temp_isolate(view_id?, element_ids|category_ids, by: element|category)`, `view.temp_hide(view_id?, element_ids|category_ids, by)`, `view.temp_reset(view_id? (default: active)) -> ()`, `view.temp_apply(view_id? (default: active)) -> ()`, `view.reveal_hidden.toggle(view_id?)`, `view.reveal_constraints.toggle(view_id?)`, `view.get_temp_state(view_id?) -> {hidden[], isolated[], reveal, constraints}`.
+**Commands.** `view.temp_isolate(view_id?, element_ids[], by: element|subtree|category|type, ghost_others?)`, `view.temp_hide(view_id?, element_ids[], by)`, `view.temp_translucent(view_id?, element_ids[], by, opacity?)`, `view.temp_show(view_id?, element_ids[], by)`, `view.temp_reset(view_id? (default: active)) -> ()`, `view.temp_apply(view_id? (default: active)) -> ()`, `view.reveal_hidden.toggle(view_id?)`, `view.reveal_constraints.toggle(view_id?)`, `view.get_temp_state(view_id?) -> {hidden[], isolated[], translucent[], ghost_others, reveal, constraints}`.
 
 **Acceptance criteria.**
 - [ ] HI on two selected walls isolates them in the active view only; printing that view prints all elements.
@@ -2421,6 +2462,8 @@ These bindings are fixed and cannot be reassigned (Ctrl reads Cmd on macOS):
 | HH | `view.temp_hide{by=element}` | HI | `view.temp_isolate{by=element}` |
 | HC | `view.temp_hide{by=category}` | IC | `view.temp_isolate{by=category}` |
 | HR | `view.temp_reset` | RH | `view.reveal_hidden.toggle` |
+| HT | `view.temp_translucent{by=element}` | HG | `view.temp_isolate{by=element, ghost_others}` |
+| MT | `ui.pane.toggle{model_tree}` | SX | `view.set_section_box{toggle}` |
 | EH | `view.hide_elements` | VH | `view.set_category_visibility` |
 | EU | `view.unhide_elements` | VU | `view.set_category_visibility` |
 | EOD | `view.override_elements` | EOH | `view.override_elements{halftone_toggle}` |

@@ -22,6 +22,14 @@ drawing is read the same way in each. A corpus of CADCraft-made drawings will ch
 compatibility continuously, in both directions. The requirements are DM-IMP-013 and DM-IMP-014
 in the specification (Chapter 2, §2.11.10–2.11.11). CAD import is not built yet.
 
+## Screenshots
+
+The KIT FZK *AC20-Institute-Var-2* sample model (`test-data/ifc/`) open in Reviera, October 2026.
+
+![A door selected in the 3D view, with the contextual Modify | Doors tab](design_documents/application_screenshots/3D-view.png)
+
+![The Erdgeschoss floor plan: cut walls, stairs and furniture](design_documents/application_screenshots/plan-view.png)
+
 ## What works today
 
 - **Native IFC** through IfcOpenShell and OpenCASCADE: open, edit, save and tessellate IFC2X3,

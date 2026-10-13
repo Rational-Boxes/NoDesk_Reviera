@@ -530,8 +530,9 @@ These principles apply to every requirement in this chapter.
 - The box is an oriented box (a transform plus extents). The GPU viewport clips with six clip planes and fills cut faces with caps (DOC-HLR-006); hidden-line output cuts solids with OCCT and draws section poché on the cut faces when the view's *Show cut faces* property is on (default on).
 - The box outline is an annotation category (*Section Boxes*) that can be hidden; when hidden, it can still be selected by Tab or by the Properties checkbox.
 - Turning the box off keeps its last extents for when it is turned on again.
+- The box's six face grips are shown while the box is selected, and also whenever the *Section Box* toggle on View tab › Inspect is on, so the box can be resized without selecting it first. A face cannot be dragged past the opposite face (the box keeps at least 10 mm in every direction).
 
-**Data (RXD).** `sectionBox` block of a `view.3d` payload: `enabled`, `transform` (4×3 matrix), `min`, `max`, `showCutFaces`.
+**Data (RXD).** `sectionBox` block of a `view.3d` payload: `enabled`, `transform` (4×3 matrix: the box's x, y and z axes, then its origin, in model coordinates; identity when absent), `min`, `max` (in the box's coordinates, metres), `showCutFaces`.
 
 **Commands.**
 `view.set_section_box(view_id, enabled, transform?, min?, max?) -> ()`
@@ -540,6 +541,34 @@ These principles apply to every requirement in this chapter.
 **Acceptance criteria.**
 - [ ] Dragging a face grip updates the viewport at interactive frame rates (at least 30 fps on the reference model, Chapter 1 performance targets).
 - [ ] *Selection Box* on one room's furniture produces a box that contains all of it with the default margin (300 mm).
+
+### Slice planes
+**ID:** DOC-VIEW-014 · **Priority:** P1 · **Ref:** owner requirement (2026-10-13); builds on DOC-VIEW-008 and DOC-HLR-006
+
+**Purpose.** Cut a 3D view open along any plane to look inside the model, with or without a section box.
+
+**Workflow.**
+1. View tab › Inspect › Slice Plane ▾: *Horizontal* (at the elevation of the point clicked in the view, or at a level's cut plane chosen from the drop-down), *Vertical* (through the clicked point, facing the camera, snapped to the nearest model axis when within 10°), or *On Face* (the plane of the picked planar face, keeping the side the camera is on).
+2. Each slice plane shows a translucent outline over the model bounds and an arrow grip at its origin. Dragging the grip moves the plane along its normal in real time; Ctrl+drag rotates it about the vertical. Clicking the arrow flips which side is kept.
+3. Inspect › Clear Slices removes them; Properties › Extents › Slice Planes lists them, each with an *Enabled* check box.
+
+**Behaviour & rules.**
+- A 3D view has at most eight slice planes, in addition to the six planes of its section box (DOC-HLR-006 raises its clip-plane budget to fifteen: six box, eight slice, one far clip). Eight covers the clipping planes of BCF viewpoints in practice; a viewpoint with more is restored with the first eight and a warning. A slice plane removes everything on its far side; several planes intersect (what remains is kept by all of them).
+- Cut faces are capped exactly as for the section box (DOC-HLR-006), and hidden-line output cuts the solids in the same way.
+- Slice planes apply to 3D views only. In Blueprint mode (DOC-VIEW-013) the blueprint slice is drawn as one more slice plane while it is being dragged.
+- Picking ignores the parts of elements that a slice plane or the section box removes: a click passes through the removed part to what is behind it.
+- **BCF.** Section boxes and slice planes are what BCF viewpoints carry as clipping planes (COL-BCF-003), including the viewpoints of issues raised by the owner's FileEngine project, so the mapping is exact in both directions. A BCF clipping plane's direction points to the side that is hidden, so it is the negated slice normal. On capture, an enabled section box becomes six planes and each enabled slice plane one more. On restore, six planes that pair up as opposite, mutually perpendicular faces become the section box (its axes and extents recovered within 1 mm and 0.01°), and every other plane becomes a slice plane. Capturing a restored viewpoint gives back the same planes, up to order.
+- Slice planes are part of the view definition (saved, undoable). Dragging a grip is one undo step, committed on release.
+
+**Data (RXD).** `slicePlanes[]` of a `view.3d` payload: `origin` ([x, y, z], metres), `normal` (unit vector pointing to the kept side), `enabled`.
+
+**Commands.**
+`view.set_slice_planes(view_id, planes[{origin, normal, enabled?}]) -> ()` (replaces the list; more than eight fails with `view.too_many_slices`; a zero normal fails with `view.bad_plane`)
+
+**Acceptance criteria.**
+- [ ] A horizontal slice at 1.2 m above Level 1 shows the walls of Level 1 cut and capped at that height, with the door heads above the cut removed.
+- [ ] With a section box and two slice planes, the view keeps only what is inside the box and on the kept side of both planes, and a click on a removed part of a wall selects the element behind it.
+- [ ] Dragging the grip and releasing makes one undo step; Undo restores the plane's previous position.
 
 ### Blueprint mode (3D slice to 2D drawing)
 **ID:** DOC-VIEW-013 · **Priority:** P1 · **Ref:** owner requirement (2026-10-12); builds on DOC-VIEW-002, DOC-VR-001, DOC-VIEW-008 and §5.12
@@ -1042,11 +1071,18 @@ Further rules:
 - View Control Bar glasses menu: Hide Element (HH), Isolate Element (HI), Hide Category (HC), Isolate Category (IC), Reset (HR), Apply Hide/Isolate to View. While active, the view has a coloured border and label.
 - Temporary state does not print or export, and is not saved.
 - *Apply Hide/Isolate to View* converts the temporary state into permanent element or category hiding (layer 3).
+- **Scope.** Each tool acts on the picked elements *by element*, *by element and its children* (subtree), *by category* or *by type*. The children of an element come from the model tree (UI-TREE-001): a storey's children are the elements it contains, a host's children are the elements it hosts (a wall's doors and windows), an assembly's or aggregate's children are its parts, and a grid system's children are its grid lines. Scopes are resolved when the tool runs: elements created later are not included, except that isolating keeps showing new elements created in the view while it is isolated, so new work does not vanish.
+- **Temporary translucency** (Translucent Element, HT): the elements stay visible and selectable, drawn at the translucency opacity (default 25 %, set in Options › Graphics), without edges. Picking prefers opaque elements: a click on a translucent element selects it only when nothing opaque is behind it under the cursor.
+- **Isolate, ghost others** (HG): isolates like Isolate Element, but draws everything else translucent instead of hiding it, for context.
+- Hide wins over translucent, and isolate applies first: an isolated element that is also hidden is hidden. Showing (unhiding) an element clears any temporary state it has.
 - **Reveal Hidden Elements** (light-bulb icon, RH): shows elements hidden by any layer in a highlight colour (default magenta), with the view framed in that colour; *Unhide Element* / *Unhide Category* act on the picked items and say which layer hid them.
 - **Isolate Annotations:** model elements are halftoned and unselectable so the user can work on annotation; an *Include categories* list (persisting per user across views) keeps chosen model categories selectable.
 
 **Commands.**
-`view.temp_hide_isolate(view_id, mode: hide_element|isolate_element|hide_category|isolate_category, element_ids_or_categories[]) -> ()`
+`view.temp_hide(view_id?, element_ids[], by: element|subtree|category|type) -> ()` (UI-VCB-001)
+`view.temp_isolate(view_id?, element_ids[], by, ghost_others?: bool) -> ()`
+`view.temp_translucent(view_id?, element_ids[], by, opacity?) -> ()`
+`view.temp_show(view_id?, element_ids[], by) -> ()` (clears temporary hiding and translucency of those elements, and adds them to an active isolation)
 `view.temp_reset(view_id? (default: active)) -> ()`
 `view.temp_apply(view_id? (default: active)) -> ()`
 `view.reveal_hidden(view_id, on) -> ()`
@@ -1054,6 +1090,8 @@ Further rules:
 
 **Acceptance criteria.**
 - [ ] Temporarily isolating three walls, then printing, prints the full view.
+- [ ] Hide Element and Children on Level 2 in the model tree hides every wall, floor, door and window on Level 2 in that view only; Reset shows them again.
+- [ ] Making a wall translucent shows its doors through it, and clicking where the door is selects the door.
 - [ ] In reveal-hidden mode, an element hidden by a filter shows in magenta and *Unhide* reports "hidden by filter <name>".
 
 ### Line weights, halftone and underlay settings
@@ -1471,7 +1509,8 @@ The reference product's rendering engine is not documented publicly, so this sec
 - Stencil parity needs closed (watertight) meshes. Elements whose tessellation is not closed (for example some imported Reference View geometry) are drawn clipped but uncapped, and the Graphics Inspector reports "not capped: open mesh". The exact print path caps them when OCCT can build a closed section, and otherwise leaves them open in print too.
 - Caps take the cut line and cut pattern of DOC-GFX-001 (so filters and overrides apply), and are drawn only when the 3D view's *Show cut faces* property is on (DOC-VIEW-008).
 - Caps are generated for host-model elements and for linked-model elements alike; transparent elements get transparent caps with the same alpha.
-- Up to six section-box planes plus one far-clip plane are supported per view; a single element cut by several planes gets one cap per plane, trimmed by the other planes.
+- Up to six section-box planes, eight slice planes (DOC-VIEW-014) and one far-clip plane are supported per view; a single element cut by several planes gets one cap per plane, trimmed by the other planes.
+- *Interim implementation:* until stencil-parity capping lands, the viewport caps closed meshes by drawing the inside of the solid (its back faces, seen through the cut) flat in the cap colour. This looks the same as a cap for elements that do not overlap; meshes whose winding cannot be made consistent are drawn uncapped.
 
 **Acceptance criteria.**
 - [ ] Cutting a wall with a section box shows a closed cap with the wall's cut pattern, with no gaps at layer boundaries.
