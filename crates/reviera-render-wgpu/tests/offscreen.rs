@@ -159,7 +159,18 @@ fn a_floor_plan_shows_cut_walls_dark_on_white() {
     let scene = app.render_scene(id).unwrap();
     let ground = reviera_core::plans::levels(app.document(id).unwrap().doc.store())[0].0 as f32;
     let edges = reviera_render::plan::feature_edges(&scene);
-    let plan = reviera_render::plan::plan_graphics(&scene, &edges, ground + 1.2, ground - 1.22);
+    let weights = |_| reviera_render::plan::Weights {
+        cut: Some(0.5),
+        projection: 0.18,
+    };
+    let plan = reviera_render::plan::plan_graphics(
+        &scene,
+        &edges,
+        ground + 1.2,
+        ground - 1.22,
+        100.0,
+        &weights,
+    );
     assert!(plan.poche.len() > 5, "walls are cut: {}", plan.poche.len());
 
     let mut camera = Camera {

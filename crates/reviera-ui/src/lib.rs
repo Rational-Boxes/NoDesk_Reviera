@@ -165,7 +165,7 @@ struct Gui {
     /// The view a Project Browser context menu acts on.
     browser_target: Option<ElementId>,
     /// Feature edges of each model's scene, for plan graphics (computed when a plan needs them).
-    plan_edges: HashMap<DocumentId, Rc<Vec<[[f32; 3]; 2]>>>,
+    plan_edges: HashMap<DocumentId, Rc<Vec<reviera_render::plan::Edge>>>,
     /// Letters typed toward a keyboard sequence such as `ZF` (§1.26.4), and when.
     keys: (String, std::time::Instant),
 }

@@ -62,6 +62,10 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(ViewGetViewRange),
         registry.add(DimCreateAligned),
         registry.add(AnnoList),
+        registry.add(LineWeightSet),
+        registry.add(LineWeightAddScale),
+        registry.add(LineWeightRemoveScale),
+        registry.add(ObjectStyleSet),
         registry.add(WallJoinsQuery),
     ];
     for r in results {
@@ -1412,3 +1416,67 @@ impl Command for AnnoList {
         annotations::list(cx.store(), p)
     }
 }
+
+use crate::standards::{self, ScaleParams, SetLineWeightParams, SetObjectStyleParams};
+
+macro_rules! standards_command {
+    ($ty:ident, $name:literal, $summary:literal, $desc:literal, $txn:literal, $params:ty, $f:path) => {
+        #[derive(Debug)]
+        struct $ty;
+
+        impl Command for $ty {
+            type Params = $params;
+            type Output = ();
+            const META: CommandMeta = CommandMeta {
+                name: $name,
+                version: 1,
+                summary: $summary,
+                description: $desc,
+                effects: &[Effect::Edit],
+                transaction_name: $txn,
+            };
+
+            fn run(&self, cx: &mut CommandContext<'_>, p: $params) -> Result<()> {
+                $f(cx.edit()?, p)
+            }
+        }
+    };
+}
+
+standards_command!(
+    LineWeightSet,
+    "lineweight.set",
+    "Set a pen width",
+    "Sets the paper width (mm) of a pen (1–16) in the model table (per scale column), the perspective \
+     table or the annotation table.",
+    "Line Weights",
+    SetLineWeightParams,
+    standards::set_line_weight
+);
+standards_command!(
+    LineWeightAddScale,
+    "lineweight.add_scale",
+    "Add a scale column to the model pens",
+    "Adds a view scale column to the model pen table, starting as a copy of the nearest column.",
+    "Line Weights",
+    ScaleParams,
+    standards::add_scale
+);
+standards_command!(
+    LineWeightRemoveScale,
+    "lineweight.remove_scale",
+    "Remove a scale column from the model pens",
+    "Removes a view scale column; views at that scale use the nearest remaining column.",
+    "Line Weights",
+    ScaleParams,
+    standards::remove_scale
+);
+standards_command!(
+    ObjectStyleSet,
+    "objectstyle.set",
+    "Set a category's line weights",
+    "Sets the projection and cut pens (1–16) of a category, for example `cat.walls`.",
+    "Object Styles",
+    SetObjectStyleParams,
+    standards::set_object_style
+);

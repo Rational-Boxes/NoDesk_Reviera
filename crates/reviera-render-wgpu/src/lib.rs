@@ -12,6 +12,21 @@ use raw_window_handle::{RawDisplayHandle, RawWindowHandle};
 use reviera_render::{Camera, RenderBackend, RenderScene};
 use wgpu::util::DeviceExt;
 
+const VERTEX_ATTRIBUTES: [wgpu::VertexAttribute; 3] =
+    wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x3, 2 => Float32x4];
+const LINE_ATTRIBUTES: [wgpu::VertexAttribute; 4] =
+    wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x3, 2 => Float32x4, 3 => Float32];
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy, Pod, Zeroable)]
+struct LineInstance {
+    a: [f32; 3],
+    b: [f32; 3],
+    color: [f32; 4],
+    /// Paper millimetres.
+    width: f32,
+}
+
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Pod, Zeroable)]
 struct Vertex {
@@ -25,6 +40,8 @@ struct Vertex {
 struct Uniforms {
     view_proj: [[f32; 4]; 4],
     eye: [f32; 4],
+    /// Viewport width and height in pixels, and pixels per paper millimetre (line widths).
+    screen: [f32; 4],
     /// Clipping and plan style: top and bottom elevations kept, lightening toward white.
     clip: [f32; 4],
 }
@@ -35,7 +52,7 @@ const NO_CLIP: [f32; 4] = [1e30, -1e30, 0.0, 0.0];
 const PLAN_LIGHTEN: f32 = 0.55;
 
 const SHADER: &str = r#"
-struct U { view_proj: mat4x4<f32>, eye: vec4<f32>, clip: vec4<f32> };
+struct U { view_proj: mat4x4<f32>, eye: vec4<f32>, screen: vec4<f32>, clip: vec4<f32> };
 @group(0) @binding(0) var<uniform> u: U;
 
 struct VOut {
@@ -59,11 +76,39 @@ fn transform(p: vec3<f32>, n: vec3<f32>, c: vec4<f32>) -> VOut {
     return o;
 }
 
-// Lines: drawn a little toward the camera so they win over the faces they lie on.
+// Thick lines: each instance is a segment expanded into a screen-space quad (two triangles),
+// `width` paper millimetres wide (at least one pixel), drawn a little toward the camera so it wins
+// over the faces it lies on.
 @vertex
-fn vs_line(@location(0) p: vec3<f32>, @location(1) n: vec3<f32>, @location(2) c: vec4<f32>) -> VOut {
-    var o = transform(p, n, c);
-    o.pos.z = o.pos.z - 2e-6 * o.pos.w;
+fn vs_thick(
+    @builtin(vertex_index) vi: u32,
+    @location(0) a: vec3<f32>,
+    @location(1) b: vec3<f32>,
+    @location(2) c: vec4<f32>,
+    @location(3) width: f32,
+) -> VOut {
+    let ends = array<f32, 6>(0.0, 1.0, 1.0, 0.0, 1.0, 0.0);
+    let sides = array<f32, 6>(-1.0, -1.0, 1.0, -1.0, 1.0, 1.0);
+    let end = ends[vi];
+    let side = sides[vi];
+    let ca = u.view_proj * vec4<f32>(a, 1.0);
+    let cb = u.view_proj * vec4<f32>(b, 1.0);
+    let px = max(u.screen.xy, vec2<f32>(1.0, 1.0));
+    var dir = (cb.xy / cb.w - ca.xy / ca.w) * px;
+    if (length(dir) < 1e-6) {
+        dir = vec2<f32>(1.0, 0.0);
+    }
+    dir = normalize(dir);
+    let normal = vec2<f32>(-dir.y, dir.x);
+    let w = max(1.0, width * u.screen.z);
+    // Half the width each side and half past each end, in clip units per pixel (2 / px).
+    let offset = (normal * side + dir * (end * 2.0 - 1.0)) * w / px;
+    let base = select(ca, cb, end > 0.5);
+    var o: VOut;
+    o.pos = vec4<f32>(base.xy + offset * base.w, base.z - 2e-6 * base.w, base.w);
+    o.normal = vec3<f32>(0.0, 0.0, 1.0);
+    o.color = c;
+    o.world = mix(a, b, end);
     return o;
 }
 
@@ -155,6 +200,7 @@ impl std::fmt::Debug for WgpuViewport {
 struct PlanGpu {
     top: f32,
     bottom: f32,
+    scale: f32,
     poche: Option<(wgpu::Buffer, u32)>,
     lines: Option<(wgpu::Buffer, u32)>,
     /// The graphics, kept to rebuild the poché with a new highlight.
@@ -330,16 +376,30 @@ impl WgpuViewport {
         // hides what is behind it, and fades as a whole).
         let pipeline = |transparent: bool, gizmo: bool, line: bool| {
             device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-                label: Some(if gizmo { "gizmo" } else if transparent { "transparent" } else { "opaque" }),
+                label: Some(if gizmo {
+                    "gizmo"
+                } else if transparent {
+                    "transparent"
+                } else {
+                    "opaque"
+                }),
                 layout: Some(&pipeline_layout),
                 vertex: wgpu::VertexState {
                     module: &shader,
-                    entry_point: Some(if line { "vs_line" } else { "vs" }),
+                    entry_point: Some(if line { "vs_thick" } else { "vs" }),
                     compilation_options: Default::default(),
-                    buffers: &[Some(wgpu::VertexBufferLayout {
-                        array_stride: std::mem::size_of::<Vertex>() as u64,
-                        step_mode: wgpu::VertexStepMode::Vertex,
-                        attributes: &wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x3, 2 => Float32x4],
+                    buffers: &[Some(if line {
+                        wgpu::VertexBufferLayout {
+                            array_stride: std::mem::size_of::<LineInstance>() as u64,
+                            step_mode: wgpu::VertexStepMode::Instance,
+                            attributes: &LINE_ATTRIBUTES,
+                        }
+                    } else {
+                        wgpu::VertexBufferLayout {
+                            array_stride: std::mem::size_of::<Vertex>() as u64,
+                            step_mode: wgpu::VertexStepMode::Vertex,
+                            attributes: &VERTEX_ATTRIBUTES,
+                        }
                     })],
                 },
                 fragment: Some(wgpu::FragmentState {
@@ -353,11 +413,7 @@ impl WgpuViewport {
                     })],
                 }),
                 primitive: wgpu::PrimitiveState {
-                    topology: if line {
-                        wgpu::PrimitiveTopology::LineList
-                    } else {
-                        wgpu::PrimitiveTopology::TriangleList
-                    },
+                    topology: wgpu::PrimitiveTopology::TriangleList,
                     cull_mode: None,
                     ..Default::default()
                 },
@@ -529,17 +585,16 @@ fn msaa_view(
         .create_view(&Default::default())
 }
 
-/// Line vertices of line sets (two per segment).
-fn line_vertices(lines: &[reviera_render::plan::Lines]) -> Vec<Vertex> {
+/// Line instances of line sets (one per segment).
+fn line_vertices(lines: &[reviera_render::plan::Lines]) -> Vec<LineInstance> {
     lines
         .iter()
         .flat_map(|l| {
-            l.segments.iter().flat_map(move |s| {
-                s.iter().map(move |p| Vertex {
-                    position: *p,
-                    normal: [0.0, 0.0, 1.0],
-                    color: l.color,
-                })
+            l.segments.iter().map(move |s| LineInstance {
+                a: s[0],
+                b: s[1],
+                color: l.color,
+                width: l.width,
             })
         })
         .collect()
@@ -641,6 +696,7 @@ impl RenderBackend for WgpuViewport {
             PlanGpu {
                 top: g.top,
                 bottom: g.bottom,
+                scale: g.scale,
                 poche: self.buffer(&poche),
                 lines: self.buffer(&lines),
                 graphics: g,
@@ -675,7 +731,7 @@ impl RenderBackend for WgpuViewport {
 }
 
 impl WgpuViewport {
-    fn buffer(&self, v: &[Vertex]) -> Option<(wgpu::Buffer, u32)> {
+    fn buffer<T: Pod>(&self, v: &[T]) -> Option<(wgpu::Buffer, u32)> {
         (!v.is_empty()).then(|| {
             let buffer = self
                 .device
@@ -712,6 +768,7 @@ impl WgpuViewport {
             let u = Uniforms {
                 view_proj: view_proj.to_cols_array_2d(),
                 eye,
+                screen: [0.0; 4],
                 clip: NO_CLIP,
             };
             self.queue
@@ -781,14 +838,26 @@ impl WgpuViewport {
             Some(p) => [p.top + 1e-4, p.bottom, PLAN_LIGHTEN, 0.0],
             None => NO_CLIP,
         };
+        // Pixels per paper millimetre: pixels per metre at the target, times metres per paper
+        // millimetre at the drawing scale (1:100 when there is no plan).
+        let scale = self.plan.as_ref().map_or(100.0, |p| p.scale);
+        let px_per_m = self.size.1 as f32 / (2.0 * camera.half_height()).max(1e-6);
+        let screen = [
+            self.size.0 as f32,
+            self.size.1 as f32,
+            px_per_m * scale / 1000.0,
+            0.0,
+        ];
         let u = Uniforms {
             view_proj,
             eye: camera.eye().extend(1.0).to_array(),
+            screen,
             clip,
         };
         let flat = Uniforms {
             view_proj,
             eye: [0.0, 0.0, 1.0, 0.0],
+            screen,
             clip: NO_CLIP,
         };
         self.queue
@@ -866,7 +935,12 @@ impl WgpuViewport {
                     if let Some((buffer, count)) = mesh {
                         pass.set_pipeline(pipeline);
                         pass.set_vertex_buffer(0, buffer.slice(..));
-                        pass.draw(0..*count, 0..1);
+                        if std::ptr::eq(pipeline, &self.line_pipeline) {
+                            // Six vertices (two triangles) per segment instance.
+                            pass.draw(0..6, 0..*count);
+                        } else {
+                            pass.draw(0..*count, 0..1);
+                        }
                     }
                 }
             }

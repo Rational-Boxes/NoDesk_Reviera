@@ -20,7 +20,20 @@ use crate::{RenderScene, SceneMesh};
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Lines {
     pub color: [f32; 4],
+    /// Width in paper millimetres (drawn at least one pixel wide).
+    pub width: f32,
     pub segments: Vec<[[f32; 3]; 2]>,
+}
+
+/// An edge of the model and the element it belongs to.
+pub type Edge = (Option<reviera_core::ElementId>, [[f32; 3]; 2]);
+
+/// Line widths of an element in paper millimetres: cut lines (`None` if its category is not cut)
+/// and projection lines.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Weights {
+    pub cut: Option<f32>,
+    pub projection: f32,
 }
 
 /// A cut edge in plan and the element it belongs to.
@@ -36,6 +49,8 @@ pub struct PlanGraphics {
     /// Filled section regions at the cut plane.
     pub poche: Vec<SceneMesh>,
     pub lines: Vec<Lines>,
+    /// The drawing scale denominator (paper widths become model widths with it).
+    pub scale: f32,
     /// The cut edges with their element, for snapping and annotation references.
     pub cut_edges: Vec<CutEdge>,
 }
@@ -54,7 +69,7 @@ fn key(p: [f32; 3]) -> (i64, i64, i64) {
 }
 
 /// The feature edges of a scene: boundary edges and creases between faces.
-pub fn feature_edges(scene: &RenderScene) -> Vec<[[f32; 3]; 2]> {
+pub fn feature_edges(scene: &RenderScene) -> Vec<Edge> {
     let mut out = Vec::new();
     let cos = CREASE_DEGREES.to_radians().cos();
     for m in &scene.meshes {
@@ -90,7 +105,7 @@ pub fn feature_edges(scene: &RenderScene) -> Vec<[[f32; 3]; 2]> {
                 _ => true,
             };
             if feature {
-                out.push([points[a as usize], points[b as usize]]);
+                out.push((m.element, [points[a as usize], points[b as usize]]));
             }
         }
     }
@@ -273,23 +288,39 @@ fn fill(loops: &[Vec<[f32; 2]>], z: f32, element: Option<reviera_core::ElementId
 /// scene's [`feature_edges`] (computed once per scene).
 pub fn plan_graphics(
     scene: &RenderScene,
-    edges: &[[[f32; 3]; 2]],
+    edges: &[Edge],
     cut: f32,
     bottom: f32,
+    scale: f32,
+    weights: &dyn Fn(Option<reviera_core::ElementId>) -> Weights,
 ) -> PlanGraphics {
     let mut poche = Vec::new();
-    let mut cut_lines = Vec::new();
     let mut cut_edges = Vec::new();
+    // Lines grouped by colour and width.
+    let mut groups: Vec<Lines> = Vec::new();
+    let mut add = |color: [f32; 4], width: f32, segment: [[f32; 3]; 2]| match groups
+        .iter_mut()
+        .find(|l| l.color == color && l.width == width)
+    {
+        Some(l) => l.segments.push(segment),
+        None => groups.push(Lines {
+            color,
+            width,
+            segments: vec![segment],
+        }),
+    };
     for m in &scene.meshes {
         let segments = slice(m, cut);
         if segments.is_empty() {
             continue;
         }
-        cut_lines.extend(
-            segments
-                .iter()
-                .map(|[a, b]| [[a[0], a[1], cut], [b[0], b[1], cut]]),
-        );
+        // Elements whose category is not cut are drawn in projection only.
+        let Some(cut_width) = weights(m.element).cut else {
+            continue;
+        };
+        for [a, b] in &segments {
+            add(CUT_LINE, cut_width, [[a[0], a[1], cut], [b[0], b[1], cut]]);
+        }
         cut_edges.extend(segments.iter().map(|s| (m.element, *s)));
         let (loops, _) = chains(&segments);
         let filled = fill(&loops, cut, m.element);
@@ -297,20 +328,18 @@ pub fn plan_graphics(
             poche.push(filled);
         }
     }
+    for (element, segment) in edges {
+        let width = weights(*element).projection;
+        for s in clip_segments(&[*segment], bottom, cut) {
+            add(PROJECTION_LINE, width, s);
+        }
+    }
     PlanGraphics {
         top: cut,
         bottom,
         poche,
-        lines: vec![
-            Lines {
-                color: PROJECTION_LINE,
-                segments: clip_segments(edges, bottom, cut),
-            },
-            Lines {
-                color: CUT_LINE,
-                segments: cut_lines,
-            },
-        ],
+        lines: groups,
+        scale,
         cut_edges,
     }
 }
@@ -318,6 +347,11 @@ pub fn plan_graphics(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    const WEIGHTS: fn(Option<reviera_core::ElementId>) -> Weights = |_| Weights {
+        cut: Some(0.5),
+        projection: 0.18,
+    };
 
     /// A closed box as a mesh (8 corners, 12 triangles).
     fn cube(lo: [f32; 3], hi: [f32; 3]) -> SceneMesh {
@@ -373,12 +407,19 @@ mod tests {
             12,
             "a box has 12 edges; face diagonals are not drawn"
         );
-        let g = plan_graphics(&scene, &edges, 1.2, 0.0);
+        let g = plan_graphics(&scene, &edges, 1.2, 0.0, 100.0, &WEIGHTS);
         assert_eq!(g.poche.len(), 1);
         assert!((filled_area(&g.poche[0]) - 1.0).abs() < 1e-4);
         assert!(g.poche[0].positions.iter().all(|p| p[2] == 1.2));
         // Projection edges stop at the cut: the four verticals are clipped, the top is gone.
-        let projection = &g.lines[0].segments;
+        let projection = &g
+            .lines
+            .iter()
+            .find(|l| l.color == PROJECTION_LINE)
+            .unwrap()
+            .segments;
+        let cut_width = g.lines.iter().find(|l| l.color == CUT_LINE).unwrap().width;
+        assert_eq!(cut_width, 0.5);
         assert!(
             projection
                 .iter()
@@ -390,7 +431,7 @@ mod tests {
             meshes: vec![cube([0.0, 0.0, 0.0], [5.0, 0.2, 0.9])],
         };
         assert!(
-            plan_graphics(&low, &feature_edges(&low), 1.2, 0.0)
+            plan_graphics(&low, &feature_edges(&low), 1.2, 0.0, 100.0, &WEIGHTS)
                 .poche
                 .is_empty()
         );
@@ -418,7 +459,7 @@ mod tests {
             ring.indices.extend(c.indices.into_iter().map(|i| i + base));
         }
         let scene = RenderScene { meshes: vec![ring] };
-        let g = plan_graphics(&scene, &[], 1.0, 0.0);
+        let g = plan_graphics(&scene, &[], 1.0, 0.0, 100.0, &WEIGHTS);
         // Four separate boxes give four filled rectangles: 4 + 4 + 2 + 2 = 12 m².
         let total: f32 = g.poche.iter().map(filled_area).sum();
         assert!((total - 12.0).abs() < 1e-3, "{total}");

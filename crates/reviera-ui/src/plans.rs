@@ -94,7 +94,27 @@ impl Gui {
             .entry(doc)
             .or_insert_with(|| Rc::new(reviera_render::plan::feature_edges(scene)))
             .clone();
-        let mut graphics = reviera_render::plan::plan_graphics(scene, &edges, cut, bottom);
+        let scale = plan.scale;
+        // Pens of each element's category (DOC-GFX-002, DOC-GFX-009).
+        let Some(store) = self.app.document(doc).map(|d| d.doc.store().clone()) else {
+            return;
+        };
+        let pens = reviera_core::standards::pen_set(&store);
+        let styles = reviera_core::standards::object_styles(&store);
+        let weights = |element: Option<ElementId>| {
+            let category = element
+                .and_then(|e| store.get(e))
+                .and_then(reviera_core::categories::category_of)
+                .map_or("", |c| c.key);
+            let style = styles.style(category);
+            let width = |pen: u8| pens.model_width(pen, f64::from(scale)) as f32;
+            reviera_render::plan::Weights {
+                cut: style.cut_pen.map(width),
+                projection: width(style.projection_pen),
+            }
+        };
+        let mut graphics =
+            reviera_render::plan::plan_graphics(scene, &edges, cut, bottom, scale, &weights);
         let cut_edges = Rc::new(std::mem::take(&mut graphics.cut_edges));
         graphics.lines.extend(self.annotation_lines(index));
         let v = &mut self.views[index];

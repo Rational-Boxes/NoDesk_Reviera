@@ -154,3 +154,78 @@ fn floor_plans_per_level_with_a_resolved_view_range() {
         .collect();
     assert!(deleted.contains(&plans[1].as_u64().unwrap()));
 }
+
+#[test]
+fn line_weights_and_object_styles_are_project_standards() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("pens.ifc");
+    let (mut project, mut doc) = LocalProject::new(reviera_ifc::Schema::Ifc4, &path).unwrap();
+    let r = registry();
+    use reviera_core::standards::{object_styles, pen_set};
+    // Defaults: walls cut heavier than they project.
+    let walls = object_styles(doc.store()).style("cat.walls");
+    assert!(walls.cut_pen.unwrap() > walls.projection_pen);
+
+    run(
+        &r,
+        &mut doc,
+        "objectstyle.set",
+        json!({"category": "cat.walls", "cut_weight": 7}),
+    )
+    .unwrap();
+    assert_eq!(
+        object_styles(doc.store()).style("cat.walls").cut_pen,
+        Some(7)
+    );
+    let e = run(
+        &r,
+        &mut doc,
+        "objectstyle.set",
+        json!({"category": "cat.furniture", "cut_weight": 3}),
+    )
+    .unwrap_err();
+    assert_eq!(e.code, "objectstyle.not_cuttable");
+    let e = run(
+        &r,
+        &mut doc,
+        "objectstyle.set",
+        json!({"category": "cat.nothing"}),
+    )
+    .unwrap_err();
+    assert_eq!(e.code, "objectstyle.bad_category");
+
+    run(&r, &mut doc, "lineweight.add_scale", json!({"scale": 75})).unwrap();
+    run(
+        &r,
+        &mut doc,
+        "lineweight.set",
+        json!({"table": "model", "pen": 5, "width_mm": 0.6, "scale": 75}),
+    )
+    .unwrap();
+    assert_eq!(pen_set(doc.store()).model_width(5, 75.0), 0.6);
+    let e = run(
+        &r,
+        &mut doc,
+        "lineweight.set",
+        json!({"table": "model", "pen": 5, "width_mm": 0.6}),
+    )
+    .unwrap_err();
+    assert_eq!(e.code, "lineweight.no_scale");
+    let e = run(
+        &r,
+        &mut doc,
+        "lineweight.set",
+        json!({"table": "annotation", "pen": 17, "width_mm": 0.6}),
+    )
+    .unwrap_err();
+    assert_eq!(e.code, "lineweight.bad_pen");
+
+    // Saved with the project.
+    project.save(&doc).unwrap();
+    let (_, reopened, _) = LocalProject::open(&path).unwrap();
+    assert_eq!(
+        object_styles(reopened.store()).style("cat.walls").cut_pen,
+        Some(7)
+    );
+    assert_eq!(pen_set(reopened.store()).model_width(5, 75.0), 0.6);
+}

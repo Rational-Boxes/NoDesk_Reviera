@@ -69,12 +69,16 @@ impl Gui {
             return Vec::new();
         };
         let z = plan.range.cut as f32 + 0.002;
+        // Dimensions use annotation pen 1 (DOC-GFX-009).
+        let width = reviera_core::standards::pen_set(&store).annotation_width(1) as f32;
         let mut normal = Lines {
             color: DIM_COLOR,
+            width,
             segments: Vec::new(),
         };
         let mut orphaned = Lines {
             color: ORPHAN_COLOR,
+            width,
             segments: Vec::new(),
         };
         for (_, data) in annotations::of_view(&store, view.guid().as_str()) {
@@ -336,6 +340,7 @@ impl Gui {
         let seg3 = |s: [[f64; 2]; 2]| s.map(|p| [p[0] as f32, p[1] as f32, z]);
         let mut lines = Lines {
             color: PREVIEW_COLOR,
+            width: 0.25,
             segments: Vec::new(),
         };
         for c in t.picked.iter().chain(t.hover.iter()) {
