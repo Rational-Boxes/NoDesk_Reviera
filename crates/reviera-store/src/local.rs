@@ -16,8 +16,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use reviera_core::grids as core_grids;
 use reviera_core::{
-    Document, ElementId, GlobalId, ModelVersion, NewElement, floors, inserts, levels, roofs, rooms,
-    stairs, walls,
+    Document, ElementId, GlobalId, ModelVersion, NewElement, floors, inserts, levels, railings,
+    roofs, rooms, stairs, walls,
 };
 use reviera_ifc::{AttrValue, IfcModel, Schema, StepId};
 use reviera_rxd::{
@@ -497,7 +497,9 @@ impl LocalProject {
             ) {
                 geometry::remove_slab(&mut self.ifc, step)?;
             }
-            if recipe_kind == Some(roofs::ROOF_RECIPE) || recipe_kind == Some(stairs::STAIR_RECIPE)
+            if recipe_kind == Some(roofs::ROOF_RECIPE)
+                || recipe_kind == Some(stairs::STAIR_RECIPE)
+                || recipe_kind == Some(railings::RAILING_RECIPE)
             {
                 geometry::remove_breps(&mut self.ifc, step)?;
             }
@@ -641,6 +643,7 @@ impl LocalProject {
             self.write_floors(doc)?;
             self.write_roofs(doc)?;
             self.write_stairs(doc)?;
+            self.write_railings(doc)?;
             self.write_rooms(doc)?;
         }
         if grids_touched {
@@ -1008,6 +1011,63 @@ impl LocalProject {
             )?;
             let storey = stairs::stair_recipe(store.get(*id).expect("listed"))
                 .and_then(|r| GlobalId::parse(&r.base_level))
+                .and_then(|g| store.find_by_guid(&g))
+                .and_then(|l| self.steps.get(&l).copied());
+            if let Some(storey) = storey {
+                geometry::contain(&mut self.ifc, step, storey, owner_history)?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Writes every Reviera railing (ARC-RAIL-001): one faceted B-rep per rail, post and
+    /// baluster, contained in its level (a free railing's, or its host's).
+    fn write_railings(&mut self, doc: &Document) -> Result<()> {
+        let store = doc.store();
+        let all = railings::all(store);
+        if all.is_empty() {
+            return Ok(());
+        }
+        let contexts = geometry::Contexts::find(&self.ifc)?;
+        let owner_history = self.new_owner_history()?;
+        for (id, g) in &all {
+            let Some(&step) = self.steps.get(id) else {
+                continue;
+            };
+            let solids: Vec<geometry::Polyhedron> = g
+                .parts
+                .iter()
+                .map(|(points, _)| {
+                    let n = points.len() / 2;
+                    let mut faces = vec![(0..n).rev().collect::<Vec<_>>(), (n..2 * n).collect()];
+                    faces.extend((0..n).map(|i| vec![i, (i + 1) % n, n + (i + 1) % n, n + i]));
+                    geometry::Polyhedron {
+                        points: points.clone(),
+                        faces,
+                    }
+                })
+                .collect();
+            geometry::write_breps(
+                &mut self.ifc,
+                step,
+                geometry::BrepFrame::WORLD,
+                &solids,
+                self.length_scale,
+                contexts,
+            )?;
+            let level = railings::railing_recipe(store.get(*id).expect("listed")).and_then(|r| {
+                match r.path {
+                    railings::RailPath::Free { level, .. } => GlobalId::parse(&level),
+                    railings::RailPath::Host { host, .. } => {
+                        let h = store.get(store.find_by_guid(&GlobalId::parse(&host)?)?)?;
+                        let level = reviera_core::floors::slab_recipe(h)
+                            .map(|(_, r)| r.level)
+                            .or_else(|| roofs::roof_recipe(h).map(|r| r.level))?;
+                        GlobalId::parse(&level)
+                    }
+                }
+            });
+            let storey = level
                 .and_then(|g| store.find_by_guid(&g))
                 .and_then(|l| self.steps.get(&l).copied());
             if let Some(storey) = storey {

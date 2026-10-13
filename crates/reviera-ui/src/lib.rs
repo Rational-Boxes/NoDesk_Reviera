@@ -25,6 +25,7 @@ mod native;
 mod nav;
 mod notes;
 mod plans;
+mod railings;
 mod ribbon;
 mod roofs;
 mod rooms;
@@ -199,6 +200,8 @@ struct Gui {
     stair_tool: Option<stairs::StairTool>,
     /// The Dormer tool.
     dormer_tool: Option<dormers::DormerTool>,
+    /// The Railing tool.
+    railing_tool: Option<railings::RailingTool>,
     /// The floor type new floors take.
     floor_type: Option<ElementId>,
     /// The last pointer position in the active view (Tab in sketch mode picks there).
@@ -1106,6 +1109,7 @@ impl Gui {
     fn end_tool(&mut self, frame: &Frame) {
         self.end_stair_tool();
         self.end_dormer_tool();
+        self.end_railing_tool();
         if self.tool.take().is_some() {
             if let Some(v) = self.viewport() {
                 v.set_overlay(&[]);
@@ -1131,6 +1135,9 @@ impl Gui {
         }
         if self.end_dormer_tool() {
             return frame.set_status_text("Ready", 0);
+        }
+        if self.railing_tool.is_some() {
+            return self.railing_escape();
         }
         if self.attach_pick.take().is_some() {
             return frame.set_status_text("Attach cancelled", 0);
@@ -2236,6 +2243,7 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                     None if g.note_tool.is_some() => g.note_click(x, y, &p),
                     None if g.stair_tool.is_some() => g.stair_click(x, y),
                     None if g.dormer_tool.is_some() => g.dormer_click(x, y, &p),
+                    None if g.railing_tool.is_some() => g.railing_click(x, y),
                     None if g.dim_tool.is_some() => g.dim_click(x, y),
                     None if g.grid_tool.is_some() => g.grid_click(x, y),
                     None if g.insert_tool.is_some() => g.insert_click(x, y),
@@ -2287,6 +2295,10 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                     }
                     if g.stair_tool.is_some() {
                         g.stair_motion(x, y);
+                        redraw = true;
+                    }
+                    if g.railing_tool.is_some() {
+                        g.railing_motion(x, y);
                         redraw = true;
                     }
                     if g.dim_tool.is_some() {
@@ -2740,6 +2752,7 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 note_tool: None,
                 stair_tool: None,
                 dormer_tool: None,
+                railing_tool: None,
                 floor_type: None,
                 mouse: (0, 0),
                 offset_distance: 1.0,
@@ -3174,6 +3187,11 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
             g.start_stair_tool(false);
             focus(g);
         }),
+        "railing.create" => with(gui, |g| {
+            g.start_railing_tool();
+            focus(g);
+        }),
+        "railing.create_on_edges" => with(gui, Gui::guard_edges),
         "stair.spiral" => with(gui, |g| {
             g.start_stair_tool(true);
             focus(g);

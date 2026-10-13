@@ -242,6 +242,10 @@ pub(crate) fn transform(
             };
             crate::rooms::translate(txn, target, &|p| x.point(p))?;
             out.push(target);
+        } else if crate::railings::railing_recipe(e).is_some() {
+            let target = if copy { txn.create(copied(e))? } else { id };
+            crate::railings::transform(txn, target, &|p| x.point(p))?;
+            out.push(target);
         } else if crate::stairs::stair_recipe(e).is_some() {
             let target = if copy { txn.create(copied(e))? } else { id };
             crate::stairs::transform(txn, target, &|p| x.point(p))?;

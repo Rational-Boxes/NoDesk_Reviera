@@ -11891,6 +11891,21 @@ These are view annotation and are specified in the DOC chapter. This chapter req
 - [ ] *Guard all open edges* on an L-shaped deck against a house wall puts railings on the four edges away from the wall and none along it. It leaves a gap where the deck stair lands, and the railings follow when the deck's outline is edited.
 - [ ] A railing picked along a flat roof's perimeter sits on the roof's top, set in by its setback, with posts at the corners.
 
+**Implementation notes (2026-10-13), ARC-RAIL-001/002.**
+- As built:
+  - `railing.create(type_id?, path, closed?, base_level, base_offset?)` (Sketch Path).
+  - `railing.create_on_edges(type_id?, host_id, edges?, setback?)` (Pick Edges and Guard all open edges) for floors, decks and flat roofs.
+- **Hosted paths:** a hosted railing keeps its host and the host's curve keys. Its path is those curves moved in by the setback and met at the corners, at the host's top, so it follows the host's outline.
+- **Open edges:** an edge is open when no Reviera wall runs along it (parallel, its centreline within half its width plus 150 mm). Each run of open edges is one railing; a whole loop is a closed one.
+- **Default type** "Guard Rail - 1000mm" (`IfcRailingType`): 1 m to the top of a 50 × 50 mm top rail, a 40 × 40 mm bottom rail 80 mm up, 20 mm balusters at 120 mm, and 80 mm posts reserving 50 mm on each side.
+- **Balusters** follow ARC-RAIL-002 with one pattern row:
+  - the pattern breaks at every segment end, is justified at its beginning, and has no excess fill;
+  - posts go at the start, the end and every corner, and remove the balusters within their reserved space.
+  - The specified 3.05 m case gives 24 balusters.
+- **IFC:** an `IfcRailing` (GUARDRAIL) with one faceted B-rep per rail, post and baluster, contained in its level or its host's. Deleting the host or the level deletes the railing.
+- **Window:** Architecture › Railing (click the points; the first point closes the path; Esc finishes) and Modify | Floors / Roofs › Guard Edges.
+- **Later:** railings on stairs (By Host heights), continuous handrails and their extensions, baluster families and multi-row patterns, sloped segments, stair gaps in guarded edges, and editing paths.
+
 ### 3.7.8 Baluster placement
 **ID:** ARC-RAIL-002 · **Priority:** P0 · **Ref:** research/02 §8.5 (Edit Baluster Placement), §17.9
 

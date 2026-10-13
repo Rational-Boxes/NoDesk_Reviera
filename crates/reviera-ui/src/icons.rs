@@ -243,6 +243,12 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "spiral_stair" => format!(
             r#"<circle cx="16" cy="16" r="12" fill="{f}" {s}/><circle cx="16" cy="16" r="3" {s}/><path d="M16 13V4M18.5 14.5l7-6M19 16h9M18.5 17.5l7 6" {s} stroke-width="1.2"/><path d="M8 22a10 10 0 0 1 0-12" {sa}/>"#
         ),
+        "railing" => format!(
+            r#"<path d="M3 9h26M3 25h26" {s} stroke-width="2.4"/><path d="M5 9v16M27 9v16" {s} stroke-width="2.6"/><path d="M10 9v16M14 9v16M18 9v16M22 9v16" {sa} stroke-width="1.2"/>"#
+        ),
+        "guard_edges" => format!(
+            r#"<path d="M3 26h26l-6-8H9z" fill="{f}" {s}/><path d="M9 18V9h14v9M9 12h14" {sa}/><path d="M13 12v6M17 12v6" {sa} stroke-width="1.2"/>"#
+        ),
         "dormer" => format!(
             r#"<path d="M2 26L16 8l14 18z" fill="{f}" {s}/><path d="M11 22v-6h6v6" {sa}/><path d="M10 16l4-4 4 4" {sa}/>"#
         ),

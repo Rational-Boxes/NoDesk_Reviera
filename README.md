@@ -92,6 +92,12 @@ The KIT FZK *AC20-Institute-Var-2* sample model (`test-data/ifc/`) open in Revie
   arrows, and openings in roofs. Footprints may have courtyards: a building around a central
   courtyard gets a roof that falls to the street and to the courtyard (or a flat slab with the
   courtyard as a hole).
+- **Railings**: Architecture › Railing sketches a guard railing's path in a plan, and Modify |
+  Floors / Roofs › Guard Edges puts railings along every open edge of a deck, patio, floor or
+  flat roof (edges with a wall along them are left out). Each has a top and a bottom rail, posts
+  at the ends and corners, and balusters spaced by the type. Railings on edges follow the host's
+  outline (`railing.create`, `railing.create_on_edges`). Not yet: railings on stairs, continuous
+  handrails and baluster families.
 - **Dormers**: with a roof selected, Modify | Roofs › Dormer places gable, hipped, shed (flat
   lift) or flat dormers where you click on the roof (in a plan or in 3D). Each comes with its
   roof, a front wall and cheek walls that fill the gaps down to the main roof, and runs up the
@@ -248,8 +254,7 @@ The KIT FZK *AC20-Institute-Var-2* sample model (`test-data/ifc/`) open in Revie
 
 ## Planned next
 
-The first milestone continues with railings (on stairs, and along the open edges of decks,
-patios and flat roofs, ARC-RAIL-001), a deck design subsystem (ARC-DECK-001: the deck's outline,
+The first milestone continues with railings on stairs, a deck design subsystem (ARC-DECK-001: the deck's outline,
 board-by-board layout with end joints on joists and staggered, picture frames and breakers, the
 framing beneath, and a cut list), roof openings (below dormers,
 skylights and shafts), and layered wall types. After that come general shape and CSG modelling tools,

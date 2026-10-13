@@ -71,6 +71,12 @@ fn raw_parent(store: &Store, e: &Element, imported: &Imported) -> Option<Element
     if let Some(r) = crate::rooms::room_recipe(e) {
         return by_guid(&r.level);
     }
+    if let Some(r) = crate::railings::railing_recipe(e) {
+        return match r.path {
+            crate::railings::RailPath::Free { level, .. } => by_guid(&level),
+            crate::railings::RailPath::Host { host, .. } => by_guid(&host),
+        };
+    }
     if let Some(r) = crate::stairs::stair_recipe(e) {
         return by_guid(&r.base_level);
     }

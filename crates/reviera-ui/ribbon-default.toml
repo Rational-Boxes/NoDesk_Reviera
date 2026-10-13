@@ -659,6 +659,18 @@ keys = "ST"
 help = "Draw a stair in a plan: click the start and end of each run; landings join the runs"
 
 [[action]]
+id = "railing.create"
+label = "Railing"
+icon = "railing"
+help = "Sketch a railing's path in a plan: click its points; click the first to close it, Esc to finish"
+
+[[action]]
+id = "railing.create_on_edges"
+label = "Guard Edges"
+icon = "guard_edges"
+help = "Place railings along every open edge of the selected floors, decks or flat roofs"
+
+[[action]]
 id = "stair.spiral"
 label = "Spiral Stair"
 icon = "spiral_stair"
@@ -744,6 +756,7 @@ label = "Circulation"
 tools = [
   { action = "stair.create", size = "large" },
   { action = "stair.spiral", size = "large" },
+  { action = "railing.create", size = "large" },
 ]
 
 [[tab.panel]]
@@ -912,7 +925,10 @@ panels = [{ label = "Door", tools = [
 [[context]]
 category = "cat.floors"
 label = "Floors"
-panels = [{ label = "Mode", tools = [{ action = "floor.edit_boundary", size = "large" }] }]
+panels = [
+  { label = "Mode", tools = [{ action = "floor.edit_boundary", size = "large" }] },
+  { label = "Railing", tools = [{ action = "railing.create_on_edges", size = "large" }] },
+]
 
 [[context]]
 category = "cat.ceilings"
@@ -950,6 +966,7 @@ panels = [
   { label = "Mode", tools = [{ action = "roof.edit_footprint", size = "large" }] },
   { label = "Walls", tools = [{ action = "roof.attach_walls", size = "large" }] },
   { label = "Dormer", tools = [{ action = "dormer.create", size = "large" }] },
+  { label = "Railing", tools = [{ action = "railing.create_on_edges", size = "large" }] },
 ]
 
 [[context]]

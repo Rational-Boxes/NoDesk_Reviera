@@ -72,6 +72,8 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(SketchMoveCurve),
         registry.add(SketchMoveCorner),
         registry.add(StairCreate),
+        registry.add(RailingCreate),
+        registry.add(RailingCreateOnEdges),
         registry.add(StairSetParams),
         registry.add(WallAttach),
         registry.add(ScheduleCreate),
@@ -424,6 +426,10 @@ pub fn dependents_of(store: &crate::store::Store, id: ElementId) -> Vec<ElementI
                 || crate::floors::slab_recipe(e).is_some_and(|(_, r)| r.level == guid)
                 || crate::rooms::room_recipe(e).is_some_and(|r| {
                     r.level == guid || r.upper_level.as_deref() == Some(guid.as_str())
+                })
+                || crate::railings::railing_recipe(e).is_some_and(|r| match r.path {
+                    crate::railings::RailPath::Free { level, .. } => level == guid,
+                    crate::railings::RailPath::Host { host, .. } => host == guid,
                 })
                 || crate::dormers::dormer_of(e) == Some(guid.as_str())
                 || crate::dormers::dormer_recipe(e).is_some_and(|r| r.roof == guid)
@@ -2515,6 +2521,30 @@ impl Command for AnnoList {
     }
 }
 
+modify_command!(
+    RailingCreate,
+    "railing.create",
+    "Create a railing along a path",
+    "Creates a guard railing along `path` (plan points; `closed` joins the last to the first) at `base_level` \
+     plus `base_offset`: a top and a bottom rail, posts at the ends and corners, and balusters at the type's \
+     spacing (ARC-RAIL-001/002).",
+    "Railing",
+    crate::railings::CreateParams,
+    ElementId,
+    crate::railings::create
+);
+modify_command!(
+    RailingCreateOnEdges,
+    "railing.create_on_edges",
+    "Railings along a floor's, deck's or flat roof's edges",
+    "Creates railings along a host's footprint edges (`edges`: curve keys in order along one chain), set in by \
+     `setback` (default 50 mm), on the host's top. Without `edges`, guards every open edge: one railing per \
+     chain of edges with no wall along them. The railings follow the host's outline.",
+    "Railing",
+    crate::railings::CreateOnEdgesParams,
+    Vec<ElementId>,
+    crate::railings::create_on_edges
+);
 modify_command!(
     StairCreate,
     "stair.create",

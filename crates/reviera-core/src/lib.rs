@@ -29,6 +29,7 @@ pub mod notes;
 pub mod origin;
 pub mod parameters;
 pub mod plans;
+pub mod railings;
 pub mod roofs;
 pub mod rooms;
 pub mod schedules;

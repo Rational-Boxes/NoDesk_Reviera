@@ -346,6 +346,7 @@ impl App {
                         && reviera_core::floors::slab_recipe(e).is_none()
                         && reviera_core::roofs::roof_recipe(e).is_none()
                         && reviera_core::stairs::stair_recipe(e).is_none()
+                        && reviera_core::railings::railing_recipe(e).is_none()
                         && reviera_core::inserts::kind_of(e).is_none()
                         && reviera_core::inserts::opening_of(e).is_none()
                 }),
@@ -422,6 +423,21 @@ impl App {
                         .map(|[x, y, z]| [*x as f32, *y as f32, *z as f32])
                         .collect(),
                     indices: f.slab.1.clone(),
+                });
+            }
+        }
+        // Railings: rails, posts and balusters.
+        for (id, g) in reviera_core::railings::all(store) {
+            for (positions, indices) in &g.parts {
+                meshes.push(reviera_render::SceneMesh {
+                    element: Some(id),
+                    color: reviera_render::class_color("IfcRailing"),
+                    class: "IfcRailing".into(),
+                    positions: positions
+                        .iter()
+                        .map(|[x, y, z]| [*x as f32, *y as f32, *z as f32])
+                        .collect(),
+                    indices: indices.clone(),
                 });
             }
         }
