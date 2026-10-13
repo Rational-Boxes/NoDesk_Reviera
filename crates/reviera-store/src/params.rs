@@ -10,7 +10,7 @@
 //! | `<PsetName>.<Property>` | `{"type": "IfcLabel", "value": "EI 60"}` | `IfcPropertySingleValue` in a property set |
 //! | `<QtoName>.<Quantity>` | `{"type": "IfcQuantityLength", "value": 5.0}` | `IfcElementQuantity` (read-only) |
 //! | `<PsetName>.<Property>` | `{"kind": "IfcPropertyEnumeratedValue", …}` | other property kinds (read-only for now) |
-//! | `@Description`, `@Tag`, `@ObjectType`, `@PredefinedType` | string | direct IFC attributes (`@Tag` is Mark) |
+//! | `@Description`, `@Tag`, `@ObjectType`, `@PredefinedType`, `@LongName` | string | direct IFC attributes (`@Tag` is Mark; `@LongName` a space's or storey's long name) |
 //! | `@Elevation` | number, metres | storey elevation (`IfcBuildingStorey.Elevation`) |
 //! | `@type` | GlobalId of the type | `IfcRelDefinesByType` |
 //! | `rxd:<section>` | JSON | a section of the element's RXD data (`Reviera_Element`), not an IFC value |
@@ -31,7 +31,13 @@ use crate::psets::unsupported;
 pub type Params = BTreeMap<String, Value>;
 
 /// Direct attributes exposed as parameters.
-pub const ATTRIBUTES: &[&str] = &["Description", "Tag", "ObjectType", "PredefinedType"];
+pub const ATTRIBUTES: &[&str] = &[
+    "Description",
+    "Tag",
+    "ObjectType",
+    "PredefinedType",
+    "LongName",
+];
 /// Direct attributes that are lengths, exposed in metres.
 pub const LENGTH_ATTRIBUTES: &[&str] = &["Elevation"];
 pub const TYPE_KEY: &str = "@type";

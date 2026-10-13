@@ -16,7 +16,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use reviera_core::grids as core_grids;
 use reviera_core::{
-    Document, ElementId, GlobalId, ModelVersion, NewElement, floors, inserts, levels, roofs, walls,
+    Document, ElementId, GlobalId, ModelVersion, NewElement, floors, inserts, levels, roofs, rooms,
+    walls,
 };
 use reviera_ifc::{AttrValue, IfcModel, Schema, StepId};
 use reviera_rxd::{
@@ -499,6 +500,9 @@ impl LocalProject {
             if recipe_kind == Some(roofs::ROOF_RECIPE) {
                 geometry::remove_breps(&mut self.ifc, step)?;
             }
+            if recipe_kind == Some(rooms::ROOM_RECIPE) {
+                geometry::remove_slab(&mut self.ifc, step)?;
+            }
             // The element's own property and quantity sets go with it.
             params::remove_all(&mut self.ifc, &mut self.sets, step)?;
             self.types.remove(&step);
@@ -635,6 +639,7 @@ impl LocalProject {
             self.write_inserts(doc)?;
             self.write_floors(doc)?;
             self.write_roofs(doc)?;
+            self.write_rooms(doc)?;
         }
         if grids_touched {
             self.write_grids(doc)?;
@@ -946,6 +951,44 @@ impl LocalProject {
                 .and_then(|l| self.steps.get(&l).copied());
             if let Some(storey) = storey {
                 geometry::contain(&mut self.ifc, step, storey, owner_history)?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Writes every Reviera room (ARC-ROOM-001) as an `IfcSpace` aggregated under its level:
+    /// enclosed rooms get a body from their base to their upper limit; others have none.
+    fn write_rooms(&mut self, doc: &Document) -> Result<()> {
+        let store = doc.store();
+        let all = rooms::all(store);
+        if all.is_empty() {
+            return Ok(());
+        }
+        let contexts = geometry::Contexts::find(&self.ifc)?;
+        let owner_history = self.new_owner_history()?;
+        for room in &all {
+            let Some(&step) = self.steps.get(&room.id) else {
+                continue;
+            };
+            let g = &room.geometry;
+            match &g.region {
+                Some(region) => {
+                    let outer = region.outer_ring();
+                    let holes = region.hole_rings();
+                    let body = geometry::SlabBody {
+                        rings: vec![(outer.as_slice(), holes.iter().map(Vec::as_slice).collect())],
+                        top: g.z_top,
+                        depth: g.unbounded_height(),
+                    };
+                    geometry::write_slab(&mut self.ifc, step, &body, self.length_scale, contexts)?;
+                }
+                None => geometry::remove_slab(&mut self.ifc, step)?,
+            }
+            let storey = GlobalId::parse(&room.level)
+                .and_then(|g| store.find_by_guid(&g))
+                .and_then(|l| self.steps.get(&l).copied());
+            if let Some(storey) = storey {
+                geometry::aggregate(&mut self.ifc, step, storey, owner_history)?;
             }
         }
         Ok(())

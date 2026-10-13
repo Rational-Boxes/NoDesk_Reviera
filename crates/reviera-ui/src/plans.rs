@@ -150,6 +150,7 @@ impl Gui {
             reviera_render::plan::plan_graphics(scene, &edges, cut, bottom, scale, &weights);
         let cut_edges = Rc::new(std::mem::take(&mut graphics.cut_edges));
         graphics.lines.extend(self.annotation_lines(index));
+        graphics.lines.extend(self.room_lines(index));
         graphics.lines.extend(self.insert_symbol_lines(index));
         let v = &mut self.views[index];
         if let Some(viewport) = &mut v.viewport {

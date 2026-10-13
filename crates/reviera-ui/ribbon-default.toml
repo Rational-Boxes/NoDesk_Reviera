@@ -528,6 +528,19 @@ keys = "MT"
 help = "Show or hide the Model Tree"
 
 [[action]]
+id = "room.place"
+label = "Room"
+icon = "room"
+keys = "RM"
+help = "Place rooms: click inside regions enclosed by walls"
+
+[[action]]
+id = "room.place_automatically"
+label = "Place Rooms Automatically"
+icon = "auto_room"
+help = "Place a room in every enclosed region of the plan's level that has none"
+
+[[action]]
 id = "roof.create_footprint"
 label = "Roof"
 icon = "roof"
@@ -587,6 +600,13 @@ tools = [
   { action = "floor.create", size = "large" },
   { action = "ceiling.create", size = "large" },
   { action = "roof.create_footprint", size = "large" },
+]
+
+[[tab.panel]]
+label = "Room & Area"
+tools = [
+  { action = "room.place", size = "large" },
+  { action = "room.place_automatically", size = "small" },
 ]
 
 [[tab.panel]]
@@ -772,6 +792,14 @@ label = "Roofs"
 panels = [{ label = "Mode", tools = [{ action = "roof.edit_footprint", size = "large" }] }]
 
 [[context]]
+category = "session.room"
+label = "Place Room"
+panels = [{ label = "Room", tools = [
+  { action = "room.place", size = "large" },
+  { action = "room.place_automatically", size = "large" },
+] }]
+
+[[context]]
 category = "session.roof_sketch"
 label = "Create Roof Footprint"
 panels = [
@@ -821,6 +849,7 @@ label = "&Architecture"
 items = [
   "wall.create", "door.place", "window.place", "floor.create", "floor.edit_boundary",
   "ceiling.create", "ceiling.edit_boundary", "roof.create_footprint", "roof.edit_footprint", "-",
+  "room.place", "room.place_automatically", "-",
   "grid.create", "level.create",
 ]
 

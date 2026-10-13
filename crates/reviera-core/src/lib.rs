@@ -27,6 +27,7 @@ pub mod origin;
 pub mod parameters;
 pub mod plans;
 pub mod roofs;
+pub mod rooms;
 pub mod sketch;
 pub mod standards;
 pub mod store;

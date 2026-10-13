@@ -2759,6 +2759,16 @@ These are view annotation and are specified in the DOC chapter. This chapter req
 - `roomtag.move_to_reference(tag_ids)`
 - `room.highlight_boundaries(view_id) -> [element_id]` *(query)*
 
+**Implementation notes (2026-10-13).**
+- As built:
+  - Rooms are bounded by walls at their finish faces, cut 1 mm above the level.
+  - `room.place` takes `level_id`, `point`, `upper_limit?`, `limit_offset?`, `base_offset?`, `name?` and `number?`.
+  - `room.set` sets Number, Name, upper limit and offsets.
+  - Place Rooms Automatically numbers rooms in reading order (top row first, left to right).
+- Until room tag elements exist (DOC-ANN-011), plans draw each room's Name, Number and Area at its tag point. These labels select the room.
+- The volume is area × unbounded height; clipped volumes come later.
+- Separation lines, unplaced rooms, phases, `IfcRelSpaceBoundary` and `Qto_SpaceBaseQuantities` come later.
+
 **Acceptance criteria.**
 - [ ] Place Rooms Automatically on a level with six enclosed regions creates six rooms numbered 1–6, and none for a 0.01 m² gap.
 - [ ] Deleting a placed room in plan makes it *Not Placed* in the room schedule. Placing it again keeps its Number and Name.

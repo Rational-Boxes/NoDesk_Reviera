@@ -222,6 +222,16 @@ pub(crate) fn transform(
                 inserts::move_by(txn, id, v)?;
                 out.push(id);
             }
+        } else if crate::rooms::room_recipe(e).is_some() {
+            let target = if copy {
+                let mut n = copied(e);
+                n.name = Some(crate::rooms::next_number(txn.store()));
+                txn.create(n)?
+            } else {
+                id
+            };
+            crate::rooms::translate(txn, target, &|p| x.point(p))?;
+            out.push(target);
         } else if crate::floors::slab_recipe(e).is_some() || crate::roofs::roof_recipe(e).is_some()
         {
             let target = if copy { txn.create(copied(e))? } else { id };

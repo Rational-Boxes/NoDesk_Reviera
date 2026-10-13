@@ -24,6 +24,7 @@ mod nav;
 mod plans;
 mod ribbon;
 mod roofs;
+mod rooms;
 mod sketch;
 mod snap;
 mod wx;
@@ -167,6 +168,7 @@ struct Gui {
     /// A sketch session (floor boundaries).
     sketch: Option<sketch::SketchSession>,
     ceiling_tool: Option<sketch::CeilingTool>,
+    room_tool: Option<rooms::RoomTool>,
     /// The floor type new floors take.
     floor_type: Option<ElementId>,
     /// The last pointer position in the active view (Tab in sketch mode picks there).
@@ -424,6 +426,10 @@ impl Gui {
                 self.temp_reset();
                 true
             }
+            "RM" => {
+                self.start_room_tool();
+                true
+            }
             "BX" => {
                 self.selection_box();
                 true
@@ -633,6 +639,7 @@ impl Gui {
             self.end_modify();
             self.cancel_sketch();
             self.end_ceiling_tool();
+            self.end_room_tool();
             self.active = Some(id);
             self.doc = Some(doc);
             let _ = self.app.activate(doc);
@@ -1274,7 +1281,11 @@ impl Gui {
         if self.doc.is_none() {
             return;
         }
-        let hit = self.element_at(x, y, panel);
+        // In plans a room is picked by its label, or by its inside where nothing else is.
+        let hit = self
+            .room_label_at(x, y)
+            .or_else(|| self.element_at(x, y, panel))
+            .or_else(|| self.room_inside(x, y));
         let result = match hit {
             Some(id) => self.run("selection.set", json!({ "ids": [id] })),
             None => self.run("selection.clear", json!({})),
@@ -1347,6 +1358,11 @@ impl Gui {
         if self.ceiling_tool.is_some() {
             self.ribbon
                 .set_context(Some(("Place Ceiling", Some("session.ceiling"))));
+            return;
+        }
+        if self.room_tool.is_some() {
+            self.ribbon
+                .set_context(Some(("Place Room", Some("session.room"))));
             return;
         }
         let ids = self.selection();
@@ -1546,6 +1562,10 @@ impl Gui {
             self.roof_rows(grid, id);
             return;
         }
+        if reviera_core::rooms::room_recipe(&e).is_some() {
+            self.room_rows(grid, id);
+            return;
+        }
         if let Some(d) = dimension {
             let store = self.app.document(doc).expect("open").doc.store().clone();
             grid.append(Property::category("Dimension", "c_dim"));
@@ -1734,6 +1754,7 @@ impl Gui {
             || self.insert_edit(property, text.clone())
             || self.floor_edit(property, text.clone())
             || self.roof_edit(property, text.clone())
+            || self.room_edit(property, text.clone())
         {
             return;
         }
@@ -2006,6 +2027,7 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                     None if g.attach_pick.is_some() => g.attach_click(x, y, &p),
                     None if g.sketch.is_some() => g.sketch_click(x, y),
                     None if g.ceiling_tool.is_some() => g.ceiling_click(x, y),
+                    None if g.room_tool.is_some() => g.room_click(x, y),
                     None if g.dim_tool.is_some() => g.dim_click(x, y),
                     None if g.grid_tool.is_some() => g.grid_click(x, y),
                     None if g.insert_tool.is_some() => g.insert_click(x, y),
@@ -2044,6 +2066,10 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                     }
                     if g.ceiling_tool.is_some() {
                         g.ceiling_motion(x, y);
+                        redraw = true;
+                    }
+                    if g.room_tool.is_some() {
+                        g.room_motion(x, y);
                         redraw = true;
                     }
                     if g.dim_tool.is_some() {
@@ -2194,6 +2220,9 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                             g.sketch_key(WXK_ESCAPE, mx, my);
                         } else if g.ceiling_tool.is_some() {
                             g.end_ceiling_tool();
+                            f.set_status_text("Ready", 0);
+                        } else if g.room_tool.is_some() {
+                            g.end_room_tool();
                             f.set_status_text("Ready", 0);
                         } else if g.dim_tool.is_some() {
                             g.dim_escape();
@@ -2471,6 +2500,7 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 modify_tool: None,
                 sketch: None,
                 ceiling_tool: None,
+                room_tool: None,
                 floor_type: None,
                 mouse: (0, 0),
                 offset_distance: 1.0,
@@ -2848,6 +2878,7 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
             g.end_grid_tool();
             g.end_insert_tool();
             g.end_modify();
+            g.end_room_tool();
             g.leave_walk();
             g.update_ribbon_context();
         }),
@@ -2869,6 +2900,14 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
             focus(g);
         }),
         "view.create_ceiling_plan" => with(gui, Gui::new_ceiling_plans),
+        "room.place" => with(gui, |g| {
+            g.start_room_tool();
+            focus(g);
+        }),
+        "room.place_automatically" => with(gui, |g| {
+            g.place_rooms_automatically();
+            focus(g);
+        }),
         "roof.create_footprint" => with(gui, |g| {
             g.start_roof_sketch();
             focus(g);

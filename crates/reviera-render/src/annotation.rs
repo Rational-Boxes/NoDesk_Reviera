@@ -135,6 +135,74 @@ pub fn dimension_parts(d: &Dimension, scale: f32, z: f32) -> (Vec<[[f32; 3]; 2]>
     (out, labels)
 }
 
+/// Room tag text height and line spacing, in paper millimetres.
+pub const ROOM_TEXT_MM: f32 = 2.5;
+const ROOM_LINE_MM: f32 = 4.0;
+
+/// The labels of a room tag (ARC-ROOM-001): its lines of text centred on `point`, top line
+/// first, at elevation `z` in a view at 1:`scale`.
+pub fn room_tag_labels(point: [f64; 2], lines: &[String], scale: f32, z: f32) -> Vec<Label> {
+    let mm = scale / 1000.0;
+    let height = ROOM_TEXT_MM * mm;
+    let step = ROOM_LINE_MM * mm;
+    let n = lines.len() as f32;
+    lines
+        .iter()
+        .enumerate()
+        .map(|(k, text)| {
+            let w = font::width(text, height);
+            // Lines stack downward around the point.
+            let y = point[1] as f32 + (n - 1.0) * step / 2.0 - k as f32 * step - height / 2.0;
+            Label {
+                origin: [point[0] as f32 - w / 2.0, y, z],
+                right: [1.0, 0.0, 0.0],
+                up: [0.0, 1.0, 0.0],
+                height,
+                text: text.clone(),
+            }
+        })
+        .collect()
+}
+
+/// The plan extent of labels: lower-left and upper-right corners.
+pub fn labels_extent(labels: &[Label]) -> Option<([f32; 2], [f32; 2])> {
+    labels
+        .iter()
+        .map(|l| {
+            let w = font::width(&l.text, l.height);
+            (
+                [l.origin[0], l.origin[1]],
+                [
+                    l.origin[0] + w * l.right[0] + l.height * l.up[0],
+                    l.origin[1] + w * l.right[1] + l.height * l.up[1],
+                ],
+            )
+        })
+        .reduce(|(a, b), (c, d)| {
+            (
+                [a[0].min(c[0]).min(d[0]), a[1].min(c[1]).min(d[1])],
+                [b[0].max(d[0]).max(c[0]), b[1].max(d[1]).max(c[1])],
+            )
+        })
+}
+
+/// Labels drawn in the stroke font, as line segments.
+pub fn label_strokes(labels: &[Label]) -> Vec<[[f32; 3]; 2]> {
+    let mut out = Vec::new();
+    for l in labels {
+        for [p, q] in font::strokes(
+            &l.text,
+            l.origin.into(),
+            l.right.into(),
+            l.up.into(),
+            l.height,
+        ) {
+            out.push([p.to_array(), q.to_array()]);
+        }
+    }
+    out
+}
+
 /// Grid bubble diameter and name height, in paper millimetres.
 pub const BUBBLE_MM: f32 = 8.0;
 const GRID_TEXT_MM: f32 = 3.5;

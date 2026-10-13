@@ -65,6 +65,9 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(RoofSetEdge),
         registry.add(RoofSetSlope),
         registry.add(WallAttach),
+        registry.add(RoomPlace),
+        registry.add(RoomPlaceAutomatically),
+        registry.add(RoomSet),
         registry.add(WallDetach),
         registry.add(ViewCreatePlan),
         registry.add(ViewSetViewRange),
@@ -379,6 +382,9 @@ pub fn dependents_of(store: &crate::store::Store, id: ElementId) -> Vec<ElementI
                 || e.param("@type").and_then(serde_json::Value::as_str) == Some(guid.as_str())
                 || crate::inserts::insert_recipe(e).is_some_and(|r| r.host == guid)
                 || crate::floors::slab_recipe(e).is_some_and(|(_, r)| r.level == guid)
+                || crate::rooms::room_recipe(e).is_some_and(|r| {
+                    r.level == guid || r.upper_level.as_deref() == Some(guid.as_str())
+                })
                 || crate::roofs::roof_recipe(e).is_some_and(|r| {
                     r.level == guid || r.cutoff.as_ref().is_some_and(|c| c.level == guid)
                 })
@@ -2037,6 +2043,42 @@ modify_command!(
 );
 
 use crate::roofs;
+
+modify_command!(
+    RoomPlace,
+    "room.place",
+    "Place a room",
+    "Places a room in the region of wall faces around `point` on a level (ARC-ROOM-001). The room reaches \
+     `limit_offset` (default 4000 mm) above its upper limit (default its own level). Number defaults to one \
+     more than the highest in use, Name to \"Room\". A point inside a wall is refused; an open region gives \
+     a Not Enclosed room with a warning, and a second room in a region a Redundant one.",
+    "Room",
+    crate::rooms::PlaceParams,
+    ElementId,
+    crate::rooms::place
+);
+modify_command!(
+    RoomPlaceAutomatically,
+    "room.place_automatically",
+    "Place rooms in every enclosed region of a level",
+    "Places a room in every region of a level enclosed by walls that has no room yet and is larger than \
+     0.023 m², numbered in sequence. Returns the new rooms.",
+    "Place Rooms Automatically",
+    crate::rooms::PlaceAutoParams,
+    Vec<ElementId>,
+    crate::rooms::place_automatically
+);
+modify_command!(
+    RoomSet,
+    "room.set",
+    "Set rooms' number, name and limits",
+    "Sets rooms' Number (one room at a time), Name, upper limit level (`null`: the room's own level), limit \
+     offset and base offset (lengths accept units).",
+    "Room Properties",
+    crate::rooms::SetParams,
+    (),
+    crate::rooms::set
+);
 
 modify_command!(
     WallAttach,

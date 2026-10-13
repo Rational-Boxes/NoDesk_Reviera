@@ -128,6 +128,26 @@ impl App {
         }
         // Door swings of the doors in walls on the plan's level, in the doors' projection pen.
         let level = views::view_data(e).and_then(|d| d.level);
+        // Room labels on the plan's level: Name, Number and Area (ARC-ROOM-001).
+        if !ceiling {
+            for r in reviera_core::rooms::all(store)
+                .into_iter()
+                .filter(|r| Some(&r.level) == level.as_ref())
+            {
+                let area = if r.geometry.enclosed() {
+                    units::format(r.geometry.area(), "area", &settings, None)
+                        .unwrap_or_else(|_| format!("{:.2} m²", r.geometry.area()))
+                } else {
+                    "Not Enclosed".to_owned()
+                };
+                labels.extend(reviera_render::annotation::room_tag_labels(
+                    r.geometry.tag_point,
+                    &[r.name, r.number, area],
+                    scale as f32,
+                    range.cut as f32,
+                ));
+            }
+        }
         for p in reviera_core::inserts::placed(store) {
             let on_level = store
                 .get(p.host)

@@ -540,6 +540,70 @@ pub(crate) fn contain(
     Ok(ifc.set_attribute(rel, "RelatedElements", &list)?)
 }
 
+/// Makes `element` a part of `whole` (`IfcRelAggregates`: a space under its storey), taking it
+/// out of any other aggregate or spatial container.
+pub(crate) fn aggregate(
+    ifc: &mut IfcModel,
+    element: StepId,
+    whole: StepId,
+    owner_history: Option<StepId>,
+) -> Result<()> {
+    const REL: &str = "IfcRelAggregates";
+    // A space is never also contained.
+    for rel in ifc.referenced_by(element, "IfcRelContainedInSpatialStructure")? {
+        let e = entity(ifc, rel)?;
+        let kept: Vec<_> = e
+            .refs("RelatedElements")
+            .into_iter()
+            .filter(|o| *o != element)
+            .map(|o| AttrValue::Ref(o.0))
+            .collect();
+        if kept.is_empty() {
+            ifc.remove(rel)?;
+        } else {
+            ifc.set_attribute(rel, "RelatedElements", &AttrValue::List(kept))?;
+        }
+    }
+    for rel in ifc.referenced_by(element, REL)? {
+        let e = entity(ifc, rel)?;
+        if !e.refs("RelatedObjects").contains(&element) {
+            continue;
+        }
+        if e.refs("RelatingObject") == [whole] {
+            return Ok(());
+        }
+        let kept: Vec<_> = e
+            .refs("RelatedObjects")
+            .into_iter()
+            .filter(|o| *o != element)
+            .map(|o| AttrValue::Ref(o.0))
+            .collect();
+        if kept.is_empty() {
+            ifc.remove(rel)?;
+        } else {
+            ifc.set_attribute(rel, "RelatedObjects", &AttrValue::List(kept))?;
+        }
+    }
+    let existing = ifc.referenced_by(whole, REL)?.into_iter().find(|r| {
+        ifc.attribute(*r, "RelatingObject")
+            .is_ok_and(|v| v == AttrValue::Ref(whole.0))
+    });
+    let (rel, mut parts) = match existing {
+        Some(rel) => (rel, entity(ifc, rel)?.refs("RelatedObjects")),
+        None => {
+            let rel = ifc.create_rooted(REL, &GlobalId::new())?;
+            if let Some(oh) = owner_history {
+                ifc.set_attribute(rel, "OwnerHistory", &AttrValue::Ref(oh.0))?;
+            }
+            ifc.set_attribute(rel, "RelatingObject", &AttrValue::Ref(whole.0))?;
+            (rel, Vec::new())
+        }
+    };
+    parts.push(element);
+    let list = AttrValue::List(parts.into_iter().map(|o| AttrValue::Ref(o.0)).collect());
+    Ok(ifc.set_attribute(rel, "RelatedObjects", &list)?)
+}
+
 /// Metres per length unit of the file (from its `IfcUnitAssignment`; 1 when not stated).
 pub(crate) fn length_scale(ifc: &IfcModel) -> Result<f64> {
     let Some(project) = ifc.entities_of_type("IfcProject")?.first().map(|e| e.id) else {

@@ -221,6 +221,110 @@ pub fn loop_around(edges: &[Edge], p: [f64; 2]) -> Option<Vec<Edge>> {
         .into_iter()
         .filter(|(a, lp)| *a > 0.0 && inside(p, lp))
         .min_by(|a, b| a.0.total_cmp(&b.0))?;
+    Some(merge(lp))
+}
+
+/// A face of the arrangement: its outer loop (counter-clockwise) and the loops of islands inside
+/// it (clockwise), with collinear pieces of one wall face merged.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Region {
+    pub outer: Vec<Edge>,
+    pub holes: Vec<Vec<Edge>>,
+}
+
+fn ring(lp: &[Edge]) -> Vec<[f64; 2]> {
+    lp.iter().map(|e| e.line.start).collect()
+}
+
+impl Region {
+    /// Area of the outer loop less the islands.
+    pub fn area(&self) -> f64 {
+        crate::sketch::signed_area(&ring(&self.outer)).abs()
+            - self
+                .holes
+                .iter()
+                .map(|h| crate::sketch::signed_area(&ring(h)).abs())
+                .sum::<f64>()
+    }
+
+    /// Length of every loop.
+    pub fn perimeter(&self) -> f64 {
+        std::iter::once(&self.outer)
+            .chain(&self.holes)
+            .flat_map(|l| l.iter())
+            .map(|e| e.line.length())
+            .sum()
+    }
+
+    pub fn outer_ring(&self) -> Vec<[f64; 2]> {
+        ring(&self.outer)
+    }
+
+    pub fn hole_rings(&self) -> Vec<Vec<[f64; 2]>> {
+        self.holes.iter().map(|h| ring(h)).collect()
+    }
+
+    /// Whether `p` is inside the region (inside the outer loop, outside every island).
+    pub fn contains(&self, p: [f64; 2]) -> bool {
+        inside(p, &self.outer) && !self.holes.iter().any(|h| inside(p, h))
+    }
+}
+
+/// The bounded faces of the arrangement with their islands. A clockwise cycle is the island of
+/// the smallest face around a point just beside it.
+pub fn regions(edges: &[Edge]) -> Vec<Region> {
+    let all = faces(edges);
+    let positive: Vec<&(f64, Vec<Edge>)> = all.iter().filter(|(a, _)| *a > 0.0).collect();
+    let smallest = |p: [f64; 2]| {
+        positive
+            .iter()
+            .enumerate()
+            .filter(|(_, (_, lp))| inside(p, lp))
+            .min_by(|a, b| a.1.0.total_cmp(&b.1.0))
+            .map(|(i, _)| i)
+    };
+    let mut out: Vec<Region> = positive
+        .iter()
+        .map(|(_, lp)| Region {
+            outer: merge(lp.clone()),
+            holes: Vec::new(),
+        })
+        .collect();
+    for (a, lp) in &all {
+        if *a >= 0.0 || lp.is_empty() {
+            continue;
+        }
+        // The face is on the left of the cycle's edges: probe just beside the longest one.
+        let e = lp
+            .iter()
+            .max_by(|x, y| x.line.length().total_cmp(&y.line.length()))
+            .expect("not empty");
+        let (s, t) = (e.line.start, e.line.end);
+        let l = e.line.length().max(1e-12);
+        let probe = [
+            (s[0] + t[0]) / 2.0 - (t[1] - s[1]) / l * 1e-5,
+            (s[1] + t[1]) / 2.0 + (t[0] - s[0]) / l * 1e-5,
+        ];
+        if let Some(i) = smallest(probe) {
+            out[i].holes.push(merge(lp.clone()));
+        }
+    }
+    out
+}
+
+/// The region of the arrangement around `p`, with its islands.
+pub fn region_around(edges: &[Edge], p: [f64; 2]) -> Option<Region> {
+    regions(edges)
+        .into_iter()
+        .filter(|r| inside(p, &r.outer))
+        .min_by(|a, b| {
+            crate::sketch::signed_area(&a.outer_ring())
+                .total_cmp(&crate::sketch::signed_area(&b.outer_ring()))
+        })
+}
+
+/// Merges consecutive collinear pieces of one wall face.
+fn merge(lp: Vec<Edge>) -> Vec<Edge> {
     let mut merged: Vec<Edge> = Vec::new();
     for e in lp {
         if let Some(last) = merged.last_mut() {
@@ -251,7 +355,7 @@ pub fn loop_around(edges: &[Edge], p: [f64; 2]) -> Option<Vec<Edge>> {
             merged.pop();
         }
     }
-    Some(merged)
+    merged
 }
 
 #[cfg(test)]
@@ -280,5 +384,28 @@ mod tests {
         assert!((crate::sketch::signed_area(&ring) - 35.0).abs() < 1e-9);
         assert_eq!(lp.len(), 4);
         assert!(loop_around(&edges, [20.0, 3.0]).is_none());
+    }
+
+    #[test]
+    fn islands_are_holes_of_the_face_around_them() {
+        // A 10 × 10 room with a 1 × 1 column in the middle.
+        let sq = |x0: f64, y0: f64, s: f64| {
+            vec![
+                e([x0, y0], [x0 + s, y0]),
+                e([x0 + s, y0], [x0 + s, y0 + s]),
+                e([x0 + s, y0 + s], [x0, y0 + s]),
+                e([x0, y0 + s], [x0, y0]),
+            ]
+        };
+        let mut edges = sq(0.0, 0.0, 10.0);
+        edges.extend(sq(4.5, 4.5, 1.0));
+        let r = region_around(&edges, [2.0, 2.0]).unwrap();
+        assert_eq!(r.holes.len(), 1);
+        assert!((r.area() - 99.0).abs() < 1e-9);
+        assert!((r.perimeter() - 44.0).abs() < 1e-9);
+        assert!(!r.contains([5.0, 5.0]));
+        // Inside the column, the column's own face.
+        let c = region_around(&edges, [5.0, 5.0]).unwrap();
+        assert!((c.area() - 1.0).abs() < 1e-9);
     }
 }

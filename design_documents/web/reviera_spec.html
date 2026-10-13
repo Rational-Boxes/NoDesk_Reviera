@@ -25235,6 +25235,15 @@ CREATE TABLE base_rxd (
 - <code>room.recenter_reference(room_ids)</code>
 - <code>roomtag.move_to_reference(tag_ids)</code>
 - <code>room.highlight_boundaries(view_id) -&gt; [element_id]</code> <em>(query)</em></p>
+<p><strong>Implementation notes (2026-10-13).</strong>
+- As built:
+  - Rooms are bounded by walls at their finish faces, cut 1 mm above the level.
+  - <code>room.place</code> takes <code>level_id</code>, <code>point</code>, <code>upper_limit?</code>, <code>limit_offset?</code>, <code>base_offset?</code>, <code>name?</code> and <code>number?</code>.
+  - <code>room.set</code> sets Number, Name, upper limit and offsets.
+  - Place Rooms Automatically numbers rooms in reading order (top row first, left to right).
+- Until room tag elements exist (DOC-ANN-011), plans draw each room's Name, Number and Area at its tag point. These labels select the room.
+- The volume is area × unbounded height; clipped volumes come later.
+- Separation lines, unplaced rooms, phases, <code>IfcRelSpaceBoundary</code> and <code>Qto_SpaceBaseQuantities</code> come later.</p>
 <p><strong>Acceptance criteria.</strong>
 - [ ] Place Rooms Automatically on a level with six enclosed regions creates six rooms numbered 1–6, and none for a 0.01 m² gap.
 - [ ] Deleting a placed room in plan makes it <em>Not Placed</em> in the room schedule. Placing it again keeps its Number and Name.

@@ -81,6 +81,15 @@ The KIT FZK *AC20-Institute-Var-2* sample model (`test-data/ifc/`) open in Revie
   Ceiling. Ceilings have types with a thickness and sit 2600 mm above their level by default.
   View › Ceiling Plan makes reflected ceiling plans, cut at 2300 mm and looking up. Saved as
   `IfcCovering` (CEILING) (`ceiling.create_auto`, `ceiling.create`, `ceiling.edit_boundary`).
+- **Rooms**: Architecture › Room places a room in the region of wall faces under the cursor,
+  shown as you hover. Place Rooms Automatically fills every enclosed region of the plan's level,
+  numbered in reading order. Rooms measure to the walls' finish faces and leave out islands such
+  as free-standing walls. A door does not join the rooms on its two sides. A room follows its
+  walls, and becomes Not Enclosed if they open up. Plans label each room with its name, number
+  and area (in PDF too); click a label to select the room. Saved as `IfcSpace` (Name = Number,
+  LongName = Name) under its storey, with a body up to its limit (`room.place`,
+  `room.place_automatically`, `room.set`). Not yet: room separation lines, room tags as
+  elements, other area rules, and volumes clipped by floors and roofs.
 - **Roofs**: Architecture › Roof sketches a footprint in a plan. Pick Walls takes the walls'
   exterior faces (Tab takes the whole chain) with a 600 mm overhang and puts the roof on the
   walls' tops. Line and Rectangle work too. Defines Slope switches curves between sloping and
