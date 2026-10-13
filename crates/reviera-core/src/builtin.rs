@@ -36,6 +36,16 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(UnitsSetNumberFormat),
         registry.add(UnitsFormat),
         registry.add(UnitsParse),
+        registry.add(ParamGet),
+        registry.add(ParamSet),
+        registry.add(ParamSetMany),
+        registry.add(ParamClear),
+        registry.add(ParamList),
+        registry.add(ParamDefinition),
+        registry.add(ParamProjectAdd),
+        registry.add(ParamProjectModify),
+        registry.add(ParamProjectRemove),
+        registry.add(ParamSetIfcHome),
     ];
     for r in results {
         r.expect("core commands are valid");
@@ -584,5 +594,352 @@ impl Command for UnitsParse {
 
     fn run(&self, cx: &mut CommandContext<'_>, p: ParseParams) -> Result<f64> {
         units::parse(&p.text, &p.data_type, &units::settings_of(cx.store()))
+    }
+}
+
+// ---- Parameters (§2.9.1–§2.9.3, DM-PARAM-001…003) ----
+
+use crate::parameters::{
+    self, Changes, Definition, GroupBehavior, ModifyReport, NewDefinition, ParamValue,
+};
+use serde_json::Value;
+
+fn resolve_ref(cx: &CommandContext<'_>, r: &ElementRef) -> Result<ElementId> {
+    cx.store().resolve(r).ok_or_else(|| {
+        Error::new("element.not_found", "no such element")
+            .with_details(serde_json::json!({ "ref": r }))
+    })
+}
+
+fn resolve_refs(cx: &CommandContext<'_>, refs: &[ElementRef]) -> Result<Vec<ElementId>> {
+    refs.iter().map(|r| resolve_ref(cx, r)).collect()
+}
+
+const PARAM_EDIT: &[Effect] = &[Effect::Edit];
+const PROJECT_PARAM_EDIT: &[Effect] = &[Effect::Edit, Effect::Settings];
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ParamGetParams {
+    pub element_id: ElementRef,
+    /// Built-in key (`elem.mark`), project parameter name or GUID, or `<Pset>.<Property>`.
+    pub param_ref: String,
+}
+
+#[derive(Debug)]
+struct ParamGet;
+
+impl Command for ParamGet {
+    type Params = ParamGetParams;
+    type Output = ParamValue;
+    const META: CommandMeta = CommandMeta {
+        name: "param.get",
+        version: 1,
+        summary: "Get a parameter value",
+        description: "Returns the value (SI for measures), its display text and where it comes from: \
+                      instance, type, override (an occurrence masking its type) or computed.",
+        effects: &[Effect::Read],
+        transaction_name: "",
+    };
+
+    fn run(&self, cx: &mut CommandContext<'_>, p: ParamGetParams) -> Result<ParamValue> {
+        let id = resolve_ref(cx, &p.element_id)?;
+        parameters::get(cx.store(), id, &p.param_ref)
+    }
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ParamSetParams {
+    pub element_ids: Vec<ElementRef>,
+    pub param_ref: String,
+    /// Text, number, boolean, or a value with units ("2400 mm"); null stores an empty value.
+    pub value: Value,
+}
+
+#[derive(Debug)]
+struct ParamSet;
+
+impl Command for ParamSet {
+    type Params = ParamSetParams;
+    type Output = Vec<ElementId>;
+    const META: CommandMeta = CommandMeta {
+        name: "param.set",
+        version: 1,
+        summary: "Set a parameter on elements",
+        description: "Type parameters are written to each element's type (once per type). Returns the \
+                      elements written. Computed parameters fail with param.read_only.",
+        effects: PARAM_EDIT,
+        transaction_name: "Modify parameter",
+    };
+
+    fn run(&self, cx: &mut CommandContext<'_>, p: ParamSetParams) -> Result<Vec<ElementId>> {
+        let ids = resolve_refs(cx, &p.element_ids)?;
+        parameters::set(cx.edit()?, &ids, &p.param_ref, Some(&p.value))
+    }
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ParamChange {
+    pub element_id: ElementRef,
+    pub param_ref: String,
+    pub value: Value,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ParamSetManyParams {
+    pub changes: Vec<ParamChange>,
+}
+
+#[derive(Debug)]
+struct ParamSetMany;
+
+impl Command for ParamSetMany {
+    type Params = ParamSetManyParams;
+    type Output = Vec<ElementId>;
+    const META: CommandMeta = CommandMeta {
+        name: "param.set_many",
+        version: 1,
+        summary: "Set several parameter values in one step",
+        description: "All changes are one undo item; if any fails, none is applied.",
+        effects: PARAM_EDIT,
+        transaction_name: "Modify parameters",
+    };
+
+    fn run(&self, cx: &mut CommandContext<'_>, p: ParamSetManyParams) -> Result<Vec<ElementId>> {
+        let mut written = Vec::new();
+        for c in &p.changes {
+            let id = resolve_ref(cx, &c.element_id)?;
+            written.extend(parameters::set(
+                cx.edit()?,
+                &[id],
+                &c.param_ref,
+                Some(&c.value),
+            )?);
+        }
+        written.sort();
+        written.dedup();
+        Ok(written)
+    }
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ParamClearParams {
+    pub element_ids: Vec<ElementRef>,
+    pub param_ref: String,
+}
+
+#[derive(Debug)]
+struct ParamClear;
+
+impl Command for ParamClear {
+    type Params = ParamClearParams;
+    type Output = Vec<ElementId>;
+    const META: CommandMeta = CommandMeta {
+        name: "param.clear",
+        version: 1,
+        summary: "Clear a parameter on elements",
+        description: "Removes the stored value (for type parameters, from the type).",
+        effects: PARAM_EDIT,
+        transaction_name: "Clear parameter",
+    };
+
+    fn run(&self, cx: &mut CommandContext<'_>, p: ParamClearParams) -> Result<Vec<ElementId>> {
+        let ids = resolve_refs(cx, &p.element_ids)?;
+        parameters::set(cx.edit()?, &ids, &p.param_ref, None)
+    }
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ParamListParams {
+    /// A category key such as `cat.walls`.
+    pub category: Option<String>,
+    pub element_id: Option<ElementRef>,
+}
+
+#[derive(Debug)]
+struct ParamList;
+
+impl Command for ParamList {
+    type Params = ParamListParams;
+    type Output = Vec<Definition>;
+    const META: CommandMeta = CommandMeta {
+        name: "param.list",
+        version: 1,
+        summary: "List parameter definitions",
+        description: "Built-in, project and shared parameters for a category or element, with data type and \
+                      IFC home; for an element, also its IFC-native properties.",
+        effects: &[Effect::Read],
+        transaction_name: "",
+    };
+
+    fn run(&self, cx: &mut CommandContext<'_>, p: ParamListParams) -> Result<Vec<Definition>> {
+        let element = p
+            .element_id
+            .as_ref()
+            .map(|r| resolve_ref(cx, r))
+            .transpose()?;
+        parameters::list(cx.store(), p.category.as_deref(), element)
+    }
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ParamRefParams {
+    pub param_ref: String,
+}
+
+#[derive(Debug)]
+struct ParamDefinition;
+
+impl Command for ParamDefinition {
+    type Params = ParamRefParams;
+    type Output = Definition;
+    const META: CommandMeta = CommandMeta {
+        name: "param.definition",
+        version: 1,
+        summary: "Get a parameter definition",
+        description: "",
+        effects: &[Effect::Read],
+        transaction_name: "",
+    };
+
+    fn run(&self, cx: &mut CommandContext<'_>, p: ParamRefParams) -> Result<Definition> {
+        parameters::definition(cx.store(), &p.param_ref)
+    }
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ProjectAddParams {
+    pub def: NewDefinition,
+    pub categories: Vec<String>,
+    pub is_instance: bool,
+    #[serde(default)]
+    pub group_behavior: GroupBehavior,
+    /// Defaults to "<Project name> Parameters".
+    pub pset_name: Option<String>,
+}
+
+#[derive(Debug)]
+struct ParamProjectAdd;
+
+impl Command for ParamProjectAdd {
+    type Params = ProjectAddParams;
+    type Output = String;
+    const META: CommandMeta = CommandMeta {
+        name: "param.project.add",
+        version: 1,
+        summary: "Add a project or shared parameter",
+        description: "Binds a new parameter to categories as a type or instance parameter; returns its GUID. \
+                      A name that clashes with a built-in or existing parameter of those categories is refused.",
+        effects: PROJECT_PARAM_EDIT,
+        transaction_name: "Project Parameters",
+    };
+
+    fn run(&self, cx: &mut CommandContext<'_>, p: ProjectAddParams) -> Result<String> {
+        parameters::project_add(
+            cx.edit()?,
+            p.def,
+            p.categories,
+            p.is_instance,
+            p.group_behavior,
+            p.pset_name,
+        )
+    }
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ProjectModifyParams {
+    pub param_id: String,
+    pub changes: Changes,
+}
+
+#[derive(Debug)]
+struct ParamProjectModify;
+
+impl Command for ParamProjectModify {
+    type Params = ProjectModifyParams;
+    type Output = ModifyReport;
+    const META: CommandMeta = CommandMeta {
+        name: "param.project.modify",
+        version: 1,
+        summary: "Change a project parameter's binding",
+        description: "Renames, regroups, rebinds or switches between type and instance, moving values. \
+                      Switching to type when instances differ needs a resolution: most_common, first or clear.",
+        effects: PROJECT_PARAM_EDIT,
+        transaction_name: "Project Parameters",
+    };
+
+    fn run(&self, cx: &mut CommandContext<'_>, p: ProjectModifyParams) -> Result<ModifyReport> {
+        parameters::project_modify(cx.edit()?, &p.param_id, p.changes)
+    }
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ProjectRemoveParams {
+    pub param_id: String,
+}
+
+#[derive(Debug)]
+struct ParamProjectRemove;
+
+impl Command for ParamProjectRemove {
+    type Params = ProjectRemoveParams;
+    type Output = usize;
+    const META: CommandMeta = CommandMeta {
+        name: "param.project.remove",
+        version: 1,
+        summary: "Remove a project parameter and its values",
+        description: "Returns the number of values removed.",
+        effects: &[Effect::Edit, Effect::Settings, Effect::Destructive],
+        transaction_name: "Project Parameters",
+    };
+
+    fn run(&self, cx: &mut CommandContext<'_>, p: ProjectRemoveParams) -> Result<usize> {
+        parameters::project_remove(cx.edit()?, &p.param_id)
+    }
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SetIfcHomeParams {
+    pub param_ref: String,
+    /// Omit to map every bound category.
+    pub category: Option<String>,
+    pub pset_name: String,
+    pub property_name: String,
+}
+
+#[derive(Debug)]
+struct ParamSetIfcHome;
+
+impl Command for ParamSetIfcHome {
+    type Params = SetIfcHomeParams;
+    type Output = usize;
+    const META: CommandMeta = CommandMeta {
+        name: "param.set_ifc_home",
+        version: 1,
+        summary: "Map a parameter onto an IFC property",
+        description: "For example a shared Fire Rating onto Pset_WallCommon.FireRating for walls. Existing \
+                      values move; returns how many.",
+        effects: PROJECT_PARAM_EDIT,
+        transaction_name: "Project Parameters",
+    };
+
+    fn run(&self, cx: &mut CommandContext<'_>, p: SetIfcHomeParams) -> Result<usize> {
+        parameters::set_ifc_home(
+            cx.edit()?,
+            &p.param_ref,
+            p.category.as_deref(),
+            &p.pset_name,
+            &p.property_name,
+        )
     }
 }

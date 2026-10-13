@@ -23,6 +23,8 @@ impl ElementId {
     pub const PROJECT: ElementId = ElementId(1);
     /// Project settings (units and other display settings), stored as RXD `project/settings`.
     pub const PROJECT_SETTINGS: ElementId = ElementId(2);
+    /// Project and shared parameter definitions, stored as RXD `standards/parameters`.
+    pub const PARAMETERS: ElementId = ElementId(3);
     pub const FIRST: ElementId = ElementId(1000);
 }
 

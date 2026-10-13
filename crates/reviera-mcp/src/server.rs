@@ -270,6 +270,9 @@ impl McpServer {
                     .call(move |app| -> Result<Value, Value> {
                         let doc = active_doc(app)?;
                         let class = args2.get("class").and_then(Value::as_str);
+                        let category = args2.get("category").and_then(Value::as_str);
+                        // A category query returns occurrences unless types are asked for (DM-ELEM-001).
+                        let want_types = args2.get("types").and_then(Value::as_bool);
                         let name_contains = args2
                             .get("name_contains")
                             .and_then(Value::as_str)
@@ -285,6 +288,19 @@ impl McpServer {
                             .store()
                             .iter()
                             .filter(|e| class.is_none_or(|c| e.class.eq_ignore_ascii_case(c)))
+                            .filter(|e| {
+                                category.is_none_or(|k| {
+                                    reviera_core::categories::category_of(e)
+                                        .is_some_and(|c| c.key == k)
+                                })
+                            })
+                            .filter(|e| {
+                                let t = reviera_core::categories::is_type(e);
+                                match want_types {
+                                    Some(w) => t == w,
+                                    None => category.is_none() || !t,
+                                }
+                            })
                             .filter(|e| {
                                 name_contains.as_ref().is_none_or(|n| {
                                     e.name.as_deref().unwrap_or("").to_lowercase().contains(n)
@@ -531,6 +547,8 @@ fn summary(doc: &reviera_core::Document, e: &Element) -> Value {
         "id": e.id(),
         "guid": e.guid(),
         "class": e.class,
+        "category": reviera_core::categories::category_of(e).map(|c| c.key),
+        "is_type": reviera_core::categories::is_type(e),
         "name": e.name,
         "params": params,
         "last_modified": stamp,
@@ -575,8 +593,8 @@ fn session_tools() -> Vec<Tool> {
         Tool::new("undo", "Undo this session's most recent operations.", schema(json!({"steps": {"type": "integer", "minimum": 1}}), &[])).with_annotations(rw()),
         Tool::new("redo", "Redo this session's undone operations.", schema(json!({"steps": {"type": "integer", "minimum": 1}}), &[])).with_annotations(rw()),
         Tool::new("history", "The undo history with the origin of each item.", schema(json!({}), &[])).with_annotations(ro()),
-        Tool::new("query_elements", "Find elements by IFC class and name, with paging.",
-            schema(json!({"class": {"type": "string"}, "name_contains": {"type": "string"}, "limit": {"type": "integer", "minimum": 1, "maximum": 1000}, "offset": {"type": "integer", "minimum": 0}}), &[])).with_annotations(ro()),
+        Tool::new("query_elements", "Find elements by category (cat.doors …), IFC class and name, with paging. Category queries return occurrences unless types=true.",
+            schema(json!({"category": {"type": "string"}, "types": {"type": "boolean"}, "class": {"type": "string"}, "name_contains": {"type": "string"}, "limit": {"type": "integer", "minimum": 1, "maximum": 1000}, "offset": {"type": "integer", "minimum": 0}}), &[])).with_annotations(ro()),
         Tool::new("get_element", "One element's summary: class, name, parameters and last change.",
             schema(json!({"id_or_guid": {"type": ["integer", "string"]}}), &["id_or_guid"])).with_annotations(ro()),
         Tool::new("session.begin_group", "Group the next calls so that one undo reverts them all.",

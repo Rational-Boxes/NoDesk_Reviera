@@ -8,6 +8,7 @@
 //! and transactions are opened by the command executor (DM-CORE-001 rule 9).
 
 pub mod builtin;
+pub mod categories;
 pub mod change;
 pub mod command;
 pub mod document;
@@ -15,6 +16,7 @@ pub mod element;
 pub mod error;
 pub mod id;
 pub mod origin;
+pub mod parameters;
 pub mod store;
 pub mod txn;
 pub mod units;
