@@ -1857,10 +1857,17 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 1. The user starts Architecture › Build › Roof › **Roof by Footprint** in a plan or reflected ceiling plan view. If the active level is the lowest level, Reviera offers to move the roof to the level above.
 2. The user draws the footprint with Pick Walls (default), lines or shapes, and optionally slope arrows. Options: **Defines slope** (applies to each new line), **Overhang** (Pick Walls) and **Extend to wall core**.
 3. The footprint must be one closed outer loop, with optional inner loops for openings. A triangle symbol marks each slope-defining edge. Edges that do not define slope become gables.
-4. On **Finish**, Reviera offers to attach the walls under the roof.
+4. On **Finish**, Reviera offers to attach the **perimeter** walls under the roof, so that gable ends fill up to the roof and eave walls meet its underside (*gable infill*; see Behaviour & rules).
 
 **Behaviour & rules.**
 - **Footprint curve properties:** Defines Roof Slope, Slope, Overhang, Plate Offset from Base, Offset from Roof Base, Extend into wall (to core) and Length.
+- **Roof shape presets** (instance property *Roof Shape*; `roof.set_shape`): Hip, Gable, Gable (rotated), Shed, Shed (reversed) and Flat set which footprint edges define slope, measured against the longest edge (edges within 10° of its direction count as along it). Courtyard edges follow the same rule. A roof whose edges match no preset shows *Custom*. One *Overhang* property sets every edge's overhang. *(Owner clarification, 2026-10-13: more controls for roof geometry, flat and gabled forms.)*
+- **Gable infill** (*Attach Walls*, `roof.attach_walls`; offered on Finish whatever the footprint was drawn with, and on the Modify | Roofs tab):
+  - It attaches the tops of the **perimeter** walls the roof covers whole and that start below it. Gable walls rise to the roof, and eave walls meet its underside.
+  - **Interior walls are never attached automatically**; the user attaches them with Attach Top/Base (ARC-WALL-008).
+  - A wall is on the perimeter when, beside one of its faces at its middle, there is no enclosed region of its level, or the region there reaches out from under the roof (a courtyard).
+  - *(Owner clarification, 2026-10-13: automatic gable infill, perimeter walls only.)*
+- **Editing the footprint on the model** (ARC-SKCH-001): the selected roof shows grips at the footprint's corners and edge middles. Dragging an edge moves it across itself, with its neighbours stretched or shortened to meet it; dragging a corner moves it. Each drag is one undoable edit (`sketch.move_curve`, `sketch.move_corner`).
 - **Instance parameters:** Base Level, **Base Offset From Level**, Room Bounding, Related to Mass, **Cutoff Level**, **Cutoff Offset**, **Rafter Cut** (Plumb Cut, Two Cut – Plumb, Two Cut – Square), **Fascia Depth** (between 0 and the thickness), **Rafter or Truss**, Maximum Ridge Height (RO), Slope (applied to every slope-defining edge), Thickness (RO), Volume, Area, Comments, Mark and phasing.
 - **Type parameters:** Structure, Default Thickness, coarse fill and analytical properties.
 - **Align Eaves** (in the sketch): the user selects eave lines and chooses *Adjust Height* (each edge's plate offset is changed) or *Adjust Overhang*. Reviera then computes the change for each edge so that all the selected eave lines end at the same height.
@@ -1884,7 +1891,7 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
    - Each footprint edge `e` produces one **roof face**: the region swept by its active edge, which lies on `P_e`. Gable edges produce vertical gable faces, which become the gable walls' attach target and are not part of the roof's top surface.
    - **Reference implementations.** The classic straight-skeleton event algorithm (Aichholzer and Aurenhammer, and its weighted generalisation) and the procedural-extrusion model by Kelly and Wonka (2011) are published references for this approach. Reviera implements it itself in Rust. CGAL's straight-skeleton package is GPL-3.0-or-later and compatible, but it is not a required dependency.
    - **Convex footprints.** For a convex footprint with all edges slope-defining and no arrows, the result must equal the lower envelope `z(p) = min_e P_e(p)`. The test suite uses this as a cross-check.
-5. **Inner loops (openings).** Inner loops cut vertical holes through the finished roof. Their edges do not take part in the skeleton.
+5. **Inner loops (courtyards).** An inner loop of the footprint is a **courtyard**. Its edges are footprint edges like the outline's: slope-defining by default (the roof falls toward the courtyard), or gables. They take part in the skeleton as further wavefronts: the outline runs counter-clockwise and each courtyard clockwise, and a reflex vertex of one wavefront may meet an edge of another, joining them. A flat roof gets a slab with holes. Openings through a finished roof (shafts, skylights, dormers) are made with the opening tools (ARC-OPEN-*), not with footprint loops. *(Owner clarification, 2026-10-13: full-loop buildings with a central courtyard.)*
 6. **Surface to solid.**
    - The skeleton faces form the roof's **reference surface**: the underside of the roof at the plate line.
    - Each layer is the shell between this surface offset by `T_{j−1}` and by `T_j` along the face normals (upward). OCCT builds these with `BRepOffsetAPI_MakeThickSolid` / `BRepOffsetAPI_MakeOffsetShape` using `GeomAbs_Intersection` joins, so hip and valley seams stay planar intersections.
@@ -1960,6 +1967,16 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 - [ ] A cutoff at 1.0 m above the plate on a 30° hip produces a flat top face, and `PredefinedType = MANSARD_ROOF`.
 - [ ] Two footprint roofs at different plate heights joined with Join/Unjoin Roof reproduce the figure in `screenshots/architecture/roof_different_eave_heights_render.png` (different eave heights on one building).
 - [ ] For convex footprints, the faces match the lower-envelope cross-check within 0.01 mm on 1 000 randomly generated cases.
+- [ ] **L-shaped buildings** (owner clarification, 2026-10-13), with the inner corner in either orientation, as a hip roof and as a gable roof:
+  - The roof's projected area equals the L grown by the overhang exactly. The concave (inner) corner is neither missed nor doubled, and every convex corner is covered.
+  - All six perimeter walls attach, the two at the inner corner included. Each wall's top follows the roof's underside along its length and never dips below the plate.
+  - A gable end wall rises to its ridge.
+- [ ] A **square building** gives a **pyramid** (hip roof, four faces meeting at one apex over the middle). As a gable, two walls become gable ends that reach the ridge.
+- [ ] A **courtyard building** (a full loop around a central courtyard):
+  - The ring is roofed once, with its ridge halfway across the ring, and the courtyard stays open. Both the street and the courtyard walls attach.
+  - As a flat roof, the slab has the courtyard as a hole, and the saved IFC body has the same volume.
+- [ ] Changing a roof from Hip to Gable keeps its attached walls attached, and the gable walls follow to the new ridge.
+- [ ] Attach Walls on a building with an interior partition attaches the perimeter walls and leaves the partition at its own height.
 
 ### 3.6.5 Roof by extrusion
 **ID:** ARC-ROOF-002 · **Priority:** P0 · **Ref:** research/02 §7.4
@@ -2086,6 +2103,51 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 - [ ] A dormer made with two arrows from the ends of a 3 m segment to its midpoint, rising 1 m, gives two triangular faces that meet the main roof faces without gaps.
 - [ ] On a 10 × 6 m footprint with only the two long edges slope-defining, an arrow from the middle of one short edge to the ridge with *Specify = Slope* 30° turns that gable into a hip plane at 30°.
 - [ ] An arrow whose tail is not on a boundary edge, or that sits on a slope-defining edge, is reported on Finish and the sketch stays open.
+
+### 3.6.8a Dormers (automated)
+**ID:** ARC-ROOF-007 · **Priority:** P1 · **Ref:** owner requirement (2026-10-13); Reviera's own design (Appendix A.2a)
+
+**Purpose.** Add a dormer to a sloped roof in one step, with its roof, its walls, the walls that fill the gaps down to the main roof, and the opening in the main roof. This automates the manual sequence of ARC-OPEN-005 (dormer walls and roof, Join/Unjoin Roof, Dormer opening).
+
+**Workflow.**
+1. The user selects a footprint roof and starts Modify | Roofs › **Dormer**, or Architecture › Roof › Dormer.
+2. In the contextual tab or Properties, the user chooses the **style**:
+   - *Gable (pitched)*: a ridge running into the main roof, with a gable front;
+   - *Hipped (pitched)*: the front is hipped too;
+   - *Shed (flat lift)*: one plane falling to the front, at a shallower slope than the main roof;
+   - *Flat*: a flat lifted roof.
+3. The user sets the **width**, the **front wall height** (from the main roof's plate or a level), the dormer roof's slope (pitched styles), its overhang, and the wall type (default: the type of the wall below the eave).
+4. The user clicks on a sloped face of the main roof. The click gives the dormer's centre line, which runs up the face's fall line. The front stands at the click point, or set back by the *Front setback* option from the eave line below.
+5. Reviera previews the dormer. A second click (or Enter) places it.
+
+**Behaviour & rules.**
+- **Generated parts** (one dormer *assembly* that owns them):
+  - the **front wall**;
+  - the two **cheek walls**, which fill the gap between the dormer roof and the main roof (*gap walls*);
+  - the **dormer roof** (a footprint roof joined to the main roof, ARC-ROOF-006);
+  - a **dormer opening** cutting the main roof inside the dormer walls (ARC-OPEN-005).
+- **Gap walls.** Each cheek wall's base follows the main roof's top surface along the wall, so it sits on the slope. Its top follows the dormer roof's underside. The front wall runs from the main roof up to the dormer eave (gable styles: to the gable). Openings (a window) can be hosted in the front wall.
+- **Depth.** The dormer runs back up the main roof until its roof meets the main roof's surface:
+  - for pitched styles, at the dormer ridge's height;
+  - for shed and flat styles, at the dormer roof's back edge.
+  - The cheek walls end where they meet the main roof.
+- **Editing.** Width, height, style, slope, overhang and setback stay editable. Moving the dormer slides it on the main roof face, and every part regenerates. Deleting the dormer deletes its parts and closes the opening.
+- **Validation.**
+  - A dormer must fit on one face of the main roof (between its eave, ridge and hips), or the user is told which edge it crosses.
+  - A dormer roof slope steeper than the main roof's (shed style) is refused.
+
+**Data (IFC mapping).** The dormer is an `IfcElementAssembly` (ObjectType "DORMER") aggregating its `IfcWall`s, its `IfcRoof` and the `IfcOpeningElement` that voids the main roof (`IfcRelVoidsElement`). The recipe is RXD element data (`recipe.dormer`).
+
+**Commands.**
+- `dormer.create(roof_id, point, style: gable|hip|shed|flat, width, front_height, slope?, overhang?, setback?, wall_type_id?) -> element_id`
+- `dormer.set(dormer_id, style?, width?, front_height?, slope?, overhang?, setback?) -> ()`
+- `dormer.move(dormer_id, point) -> ()`
+
+**Acceptance criteria.**
+- [ ] A gable dormer 2 m wide with a 1.2 m front wall on a 45° roof face has two cheek walls whose bases lie on the main roof's top surface and whose tops meet the dormer roof, with no gap greater than `TOL_POINT`. The dormer ridge meets the main roof face.
+- [ ] A shed (flat-lift) dormer at 15° on a 45° roof ends where its roof meets the main roof, and its cheek walls are trapezoids filling the gap.
+- [ ] The main roof has an opening exactly inside the dormer walls' interior faces. Deleting the dormer closes it.
+- [ ] `dormer.create` from Lua or MCP gives the same model as the window tool.
 
 ### 3.6.9 Join/Unjoin Roof
 **ID:** ARC-ROOF-006 · **Priority:** P1 · **Ref:** research/02 §7.4, §9
@@ -2356,6 +2418,8 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 
 ### 3.7.2 Creating stairs by component
 **ID:** ARC-STAIR-002 · **Priority:** P0 · **Ref:** research/02 §8.2 · screenshots/architecture/stair_direct_manipulation_controls.png
+
+*Owner clarification (2026-10-13): both **simple** stairs (straight runs with landings: straight, L and U arrangements) and **spiral** stairs (full-step and centre-ends) are required.*
 
 **Workflow.**
 1. The user starts Architecture › Circulation › **Stair** in a plan or 3D view. Tiling a plan view and a 3D view side by side is recommended.
@@ -3968,6 +4032,13 @@ All commands below are registered once in the command registry and exposed autom
 | `roof.create_footprint` | type_id, loop: [{curve, defines_slope, slope?, overhang?, plate_offset?, offset_from_base?, extend_to_core?, lock_ref?}], holes?, base_level, base_offset?, cutoff?: {level_id, offset}, rafter_cut?, fascia_depth?, rafter_or_truss?, slope_arrows?: [SlopeArrow], attach_walls?: bool | element_id | Yes | ARC-ROOF-001 |
 | `roof.edit_footprint` | roof_id, ... | — | Yes | ARC-ROOF-001 |
 | `roof.align_eaves` | roof_id, edge_keys, mode: AdjustHeight\|AdjustOverhang | — | Yes | ARC-ROOF-001 |
+| `roof.set_shape` | roof_id, shape: hip\|gable\|gable_rotated\|shed\|shed_reversed\|flat, overhang? | — | Yes | ARC-ROOF-001 |
+| `roof.attach_walls` | roof_id | wall_ids[] | Yes | ARC-ROOF-001 |
+| `sketch.move_curve` | element_id, key, vector | — | Yes | ARC-SKCH-001 |
+| `sketch.move_corner` | element_id, from, to | — | Yes | ARC-SKCH-001 |
+| `dormer.create` | roof_id, point, style: gable\|hip\|shed\|flat, width, front_height, slope?, overhang?, setback?, wall_type_id? | element_id | Yes | ARC-ROOF-007 |
+| `dormer.set` | dormer_id, style?, width?, front_height?, slope?, overhang?, setback? | — | Yes | ARC-ROOF-007 |
+| `dormer.move` | dormer_id, point | — | Yes | ARC-ROOF-007 |
 | `roof.set_slope` | roof_id, slope, edge_keys? | — | Yes | ARC-ROOF-001 |
 | `roof.create_extrusion` | type_id, work_plane, profile: [curve], ref_level, level_offset?, start, end | element_id | Yes | ARC-ROOF-002 |
 | `roof.create_by_face` | type_id, face_refs, location: Top\|Bottom, level_id | element_id | Yes | ARC-ROOF-003 |

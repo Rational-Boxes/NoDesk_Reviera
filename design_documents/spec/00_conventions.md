@@ -13,6 +13,9 @@ These rules apply to every chapter of the Reviera Application Specification.
 - **Data and storage.** Native IFC through IfcOpenShell. The default project schema is IFC4 (ADD2 TC1); IFC4X3 is optional. Anything IFC can't express is **Reviera Extension Data (RXD)**: refer to it as "RXD document `<name>`" or "RXD element data (`<kind>`)". The storage carrier (embedded `Reviera_*` Psets by default, or an external sidecar) is defined only in `spec/02a_extension_data_format.md`.
 - **Application and modes.** The core is written in Rust and uses multiple cores. Geometry uses OpenCASCADE, the UI uses wxWidgets, and scripting uses LuaJIT.
 - **Shared commands.** Every operation is a command in a single registry. That registry automatically exposes it to the UI, to Lua and to an MCP server for AI agents.
+  - **High-level tools too.** Automation tools (stairs, roof shapes, gable infill, dormers, tag-all, footprint edits and the like) must be equally available to Lua and MCP. Their logic is a registered command, and the window only gathers input and calls it. A behaviour that exists only in the window is a defect.
+  - **Discoverability.** Every command domain belongs to an MCP toolset (DM-MCP-003).
+  - *(Owner clarification, 2026-10-13.)*
 - **Operating modes.** **Local** (an `.ifc` file) and **BIMserver client** (Open Source BIMserver over its JSON API).
 - **Licence.** GPL-3.0-or-later. Distributed add-ins must be GPL-compatible.
 

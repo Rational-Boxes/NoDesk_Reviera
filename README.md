@@ -89,7 +89,17 @@ The KIT FZK *AC20-Institute-Var-2* sample model (`test-data/ifc/`) open in Revie
   stay as they are), and a new roof
   offers it however it was drawn (`roof.attach_walls`). Saved as a faceted B-rep in the wall's own frame, so doors and windows stay cut
   (`wall.attach`, `wall.detach`). Not yet: attaching bases or to floors and ceilings, slope
-  arrows, and openings in roofs.
+  arrows, and openings in roofs. Footprints may have courtyards: a building around a central
+  courtyard gets a roof that falls to the street and to the courtyard (or a flat slab with the
+  courtyard as a hole).
+- **Stairs**: Architecture › Stair (ST) draws a cast-in-place stair in a plan: click the start
+  and end of each run while the status bar counts the risers down; the next run starts after an
+  automatic landing (straight, L and U arrangements). The riser count is the fewest that keep
+  each riser within the type's maximum (180 mm by default; 3 m makes 17 risers), and runs hold
+  what their length allows at the tread depth. Properties set the desired risers, tread depth and
+  width and show the actual riser height and warnings. Saved as `IfcStair` (`stair.create`,
+  `stair.set_params`). Not yet: spiral and winder runs, railings, supports, and editing runs
+  with handles.
 - **Rooms**: Architecture › Room places a room in the region of wall faces under the cursor,
   shown as you hover. Place Rooms Automatically fills every enclosed region of the plan's level,
   numbered in reading order. Rooms measure to the walls' finish faces and leave out islands such
@@ -230,7 +240,9 @@ The KIT FZK *AC20-Institute-Var-2* sample model (`test-data/ifc/`) open in Revie
 
 ## Planned next
 
-The first milestone continues with stairs and railings, and layered wall types. After that come general shape and CSG modelling tools,
+The first milestone continues with spiral stairs and railings, the dormer tool (gable, hipped,
+shed and flat dormers with their gap walls filled automatically, ARC-ROOF-007), and layered wall
+types. After that come general shape and CSG modelling tools,
 CADCraft drawing exchange, and the current NBIMS-US COBie layout.
 
 ### Working with CADCraft
