@@ -237,16 +237,6 @@ static BUILT_INS: &[BuiltIn] = &[
         Applies::WithCommonPset,
     ),
     bi(
-        "type.acoustic_rating",
-        "Acoustic Rating",
-        "text",
-        "identity_data",
-        Type,
-        false,
-        Home::Common("AcousticRating"),
-        Applies::WithCommonPset,
-    ),
-    bi(
         "type.manufacturer",
         "Manufacturer",
         "text",
@@ -1320,6 +1310,31 @@ pub fn set_ifc_home(
         }
         None => old.categories.clone(),
     };
+    // No two parameters may share an IFC home within a category (§2.9.2, No collisions).
+    let key = format!("{pset}.{property}");
+    for c in &cats {
+        let cat = categories::category(c).expect("bound categories exist");
+        if let Some(b) = BUILT_INS.iter().find(|b| {
+            b.applies_to(cat) && b.home(Some(cat)).and_then(|h| h.key()).as_deref() == Some(&key)
+        }) {
+            return Err(Error::new(
+                "param.home_clash",
+                format!(
+                    "{key} is the home of built-in {} ({}) for {}",
+                    b.name, b.key, cat.name
+                ),
+            ));
+        }
+        if let Some(p) = project_parameters(&store)
+            .iter()
+            .find(|p| p.guid != old.guid && p.categories.contains(c) && p.key(c) == key)
+        {
+            return Err(Error::new(
+                "param.home_clash",
+                format!("{key} is already used by {} for {}", p.name, cat.name),
+            ));
+        }
+    }
     for c in cats {
         new.homes.insert(
             c,

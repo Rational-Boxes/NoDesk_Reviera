@@ -222,29 +222,36 @@ fn shared_parameters_map_onto_standard_properties() {
     let (_, mut doc, _) = LocalProject::open(&fzk_haus()).unwrap();
     let guid = "6f1c2c1e-6c0a-4d5e-9b1c-2a3b4c5d6e7f";
     run(&r, &mut doc, "param.project.add", json!({
-        "def": {"name": "Fire Class", "data_type": "text", "guid": guid}, "categories": ["cat.walls", "cat.doors"], "is_instance": true
+        "def": {"name": "Acoustic Rating", "data_type": "text", "guid": guid}, "categories": ["cat.walls", "cat.doors"], "is_instance": true
     })).unwrap();
-    run(&r, &mut doc, "param.set_ifc_home", json!({"param_ref": guid, "category": "cat.walls", "pset_name": "Pset_WallCommon", "property_name": "FireRating"})).unwrap();
-    run(&r, &mut doc, "param.set_ifc_home", json!({"param_ref": guid, "category": "cat.doors", "pset_name": "Pset_DoorCommon", "property_name": "FireRating"})).unwrap();
+    run(&r, &mut doc, "param.set_ifc_home", json!({"param_ref": guid, "category": "cat.walls", "pset_name": "Pset_WallCommon", "property_name": "AcousticRating"})).unwrap();
+    run(&r, &mut doc, "param.set_ifc_home", json!({"param_ref": guid, "category": "cat.doors", "pset_name": "Pset_DoorCommon", "property_name": "AcousticRating"})).unwrap();
     let wall = of_category(&doc, "cat.walls", false)[0];
     let door = of_category(&doc, "cat.doors", false)[0];
     run(
         &r,
         &mut doc,
         "param.set",
-        json!({"element_ids": [wall, door], "param_ref": "Fire Class", "value": "REI 90"}),
+        json!({"element_ids": [wall, door], "param_ref": "Acoustic Rating", "value": "Rw 52 dB"}),
     )
     .unwrap();
     assert_eq!(
-        doc.store().get(wall).unwrap().params["Pset_WallCommon.FireRating"]["value"],
-        "REI 90"
+        doc.store().get(wall).unwrap().params["Pset_WallCommon.AcousticRating"]["value"],
+        "Rw 52 dB"
     );
     assert_eq!(
-        doc.store().get(door).unwrap().params["Pset_DoorCommon.FireRating"]["value"],
-        "REI 90"
+        doc.store().get(door).unwrap().params["Pset_DoorCommon.AcousticRating"]["value"],
+        "Rw 52 dB"
     );
     let def = run(&r, &mut doc, "param.definition", json!({"param_ref": guid})).unwrap();
     assert_eq!(def["kind"], "shared");
+
+    // A built-in's IFC home cannot be taken.
+    let e = r
+        .execute(&mut doc, "param.set_ifc_home", json!({"param_ref": guid, "category": "cat.walls", "pset_name": "Pset_WallCommon", "property_name": "FireRating"}), &Caller::user())
+        .unwrap_err();
+    assert_eq!(e.code, "param.home_clash");
+    assert!(e.message.contains("Fire Rating"), "{}", e.message);
 }
 
 #[test]
