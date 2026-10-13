@@ -65,6 +65,8 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(RoofSetEdge),
         registry.add(RoofSetSlope),
         registry.add(RoofSetShape),
+        registry.add(StairCreate),
+        registry.add(StairSetParams),
         registry.add(WallAttach),
         registry.add(ScheduleCreate),
         registry.add(CobieSetSettings),
@@ -416,6 +418,9 @@ pub fn dependents_of(store: &crate::store::Store, id: ElementId) -> Vec<ElementI
                 || crate::floors::slab_recipe(e).is_some_and(|(_, r)| r.level == guid)
                 || crate::rooms::room_recipe(e).is_some_and(|r| {
                     r.level == guid || r.upper_level.as_deref() == Some(guid.as_str())
+                })
+                || crate::stairs::stair_recipe(e).is_some_and(|r| {
+                    r.base_level == guid || r.top == crate::stairs::StairTop::Level(guid.clone())
                 })
                 || crate::roofs::roof_recipe(e).is_some_and(|r| {
                     r.level == guid || r.cutoff.as_ref().is_some_and(|c| c.level == guid)
@@ -2502,6 +2507,32 @@ impl Command for AnnoList {
     }
 }
 
+modify_command!(
+    StairCreate,
+    "stair.create",
+    "Create a stair",
+    "Creates a cast-in-place stair of straight runs from `base_level` to `top` (a level, default the next \
+     one up, or `{\"unconnected\": height}`). Each run goes from `start` (the middle of its first riser) \
+     toward `end` and holds as many risers as its length allows at the tread depth (or `risers`); an \
+     automatic landing joins each run to the next. The riser count is the fewest that keep each riser \
+     at most the type's maximum (or `desired_risers`); the riser height is the height over that count.",
+    "Stair",
+    crate::stairs::CreateParams,
+    ElementId,
+    crate::stairs::create
+);
+modify_command!(
+    StairSetParams,
+    "stair.set_params",
+    "Set stairs' levels, risers, tread depth and width",
+    "Sets stairs' base and top (level or unconnected height) with offsets, the desired number of risers \
+     (0 for the fewest allowed), the tread depth and the width of every run. When the riser count \
+     changes, the last run takes the difference (unless `rebalance` is false).",
+    "Stair Properties",
+    crate::stairs::SetParams,
+    (),
+    crate::stairs::set_params
+);
 modify_command!(
     RoofSetShape,
     "roof.set_shape",
