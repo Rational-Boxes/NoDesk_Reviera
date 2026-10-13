@@ -29,6 +29,7 @@ const ID_NEW: i32 = ID_HIGHEST + 4;
 const ID_UNDO: i32 = ID_HIGHEST + 5;
 const ID_REDO: i32 = ID_HIGHEST + 6;
 const ID_WALL: i32 = ID_HIGHEST + 7;
+const ID_SAVE_AS: i32 = ID_HIGHEST + 8;
 
 /// Height of walls drawn on the top level (they reach the level above otherwise).
 const WALL_HEIGHT: f64 = 3.0;
@@ -217,6 +218,12 @@ impl Gui {
         self.properties_stale = true;
     }
 
+    /// The active document's file, or `None` when it has never been saved.
+    fn current_path(&self) -> Option<PathBuf> {
+        let id = self.doc?;
+        self.app.documents().into_iter().find(|d| d.id == id)?.path
+    }
+
     fn save(&mut self, frame: &Frame) {
         match self.run("file.save", json!({})) {
             Ok(v) => frame.set_status_text(
@@ -225,6 +232,31 @@ impl Gui {
             ),
             Err(e) => error(frame, &format!("Could not save:\n{e}")),
         }
+    }
+
+    fn save_as(&mut self, path: &Path, frame: &Frame) {
+        let mut path = path.to_owned();
+        if path.extension().is_none() {
+            path.set_extension("ifc");
+        }
+        match self.run("file.save_as", json!({ "path": path })) {
+            Ok(_) => {
+                self.update_title(frame);
+                frame.set_status_text(&format!("Saved {}", path.display()), 0);
+            }
+            Err(e) => error(frame, &format!("Could not save:\n{e}")),
+        }
+    }
+
+    fn update_title(&self, frame: &Frame) {
+        let Some(id) = self.doc else { return };
+        let info = self.app.documents().into_iter().find(|d| d.id == id);
+        let title = info.as_ref().map_or("Untitled".into(), |d| d.title.clone());
+        let read_only = info.is_some_and(|d| d.read_only);
+        frame.set_title(&format!(
+            "{title}{} - NoDesk Reviera",
+            if read_only { " (read-only)" } else { "" }
+        ));
     }
 
     /// Rebuilds the scene after the model changed (edits, undo, redo).
@@ -721,6 +753,11 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
             .append_item(ID_NEW, "&New\tCtrl+N", "Create a project")
             .append_item(ID_OPEN, "&Open...\tCtrl+O", "Open an IFC project")
             .append_item(ID_SAVE_FILE, "&Save\tCtrl+S", "Save the project")
+            .append_item(
+                ID_SAVE_AS,
+                "Save &As...\tCtrl+Shift+S",
+                "Save the project to a new file",
+            )
             .append_separator()
             .append_item(ID_EXIT, "E&xit", "Close Reviera")
             .build();
@@ -922,7 +959,33 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                     with(&gui, |g| g.new_project(&f));
                     p.refresh(false, None);
                 }
-                ID_SAVE_FILE => with(&gui, |g| g.save(&f)),
+                ID_SAVE_FILE | ID_SAVE_AS => {
+                    // A project that was never saved has no file yet: Save asks for one.
+                    let mut current = None;
+                    with(&gui, |g| current = Some(g.current_path()));
+                    let Some(current) = current else { return };
+                    if e.get_id() == ID_SAVE_FILE && current.is_some() {
+                        return with(&gui, |g| g.save(&f));
+                    }
+                    let name = current
+                        .as_ref()
+                        .and_then(|p| p.file_name())
+                        .map_or("Untitled.ifc".into(), |n| n.to_string_lossy().into_owned());
+                    let mut dialog = FileDialog::builder(&f)
+                        .with_message("Save IFC project as")
+                        .with_wildcard("IFC files (*.ifc)|*.ifc;*.IFC")
+                        .with_style(FileDialogStyle::Save | FileDialogStyle::OverwritePrompt)
+                        .with_default_file(&name);
+                    if let Some(dir) = current.as_ref().and_then(|p| p.parent()) {
+                        dialog = dialog.with_default_dir(&dir.to_string_lossy());
+                    }
+                    let dialog = dialog.build();
+                    if dialog.show_modal() == ID_OK
+                        && let Some(path) = dialog.get_path()
+                    {
+                        with(&gui, |g| g.save_as(Path::new(&path), &f));
+                    }
+                }
                 ID_UNDO | ID_REDO => {
                     let command = if e.get_id() == ID_UNDO {
                         "edit.undo"
