@@ -44,6 +44,7 @@ pub(crate) mod bridge {
         fn entity_class(self: &Model, id: u32) -> Result<String>;
         fn attribute_names(self: &Model, id: u32) -> Result<Vec<String>>;
         fn attributes_json(self: &Model, id: u32) -> Result<String>;
+        fn attributes_json_many(self: &Model, ids: &[u32]) -> Result<String>;
 
         fn set_null(self: Pin<&mut Model>, id: u32, attr: &str) -> Result<()>;
         fn set_string(self: Pin<&mut Model>, id: u32, attr: &str, value: &str) -> Result<()>;

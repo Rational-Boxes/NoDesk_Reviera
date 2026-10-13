@@ -33,6 +33,7 @@ public:
     rust::String entity_class(std::uint32_t id) const;
     rust::Vec<rust::String> attribute_names(std::uint32_t id) const;
     rust::String attributes_json(std::uint32_t id) const;
+    rust::String attributes_json_many(rust::Slice<const std::uint32_t> ids) const;
 
     void set_null(std::uint32_t id, rust::Str attr);
     void set_string(std::uint32_t id, rust::Str attr, rust::Str value);

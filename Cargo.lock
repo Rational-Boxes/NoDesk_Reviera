@@ -1635,6 +1635,8 @@ dependencies = [
  "reviera-core",
  "reviera-ifc",
  "reviera-rxd",
+ "schemars",
+ "serde",
  "serde_json",
  "tempfile",
  "thiserror",

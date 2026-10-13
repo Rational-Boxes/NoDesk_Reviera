@@ -88,6 +88,44 @@ pub enum AttrValue {
     List(Vec<AttrValue>),
 }
 
+/// An entity's class and attributes by name (from [`IfcModel::attributes_many`]).
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+pub struct Entity {
+    pub class: String,
+    pub attributes: std::collections::BTreeMap<String, AttrValue>,
+}
+
+impl Entity {
+    pub fn get(&self, name: &str) -> &AttrValue {
+        self.attributes.get(name).unwrap_or(&AttrValue::Null)
+    }
+
+    /// The entity references in a list attribute (or a single reference).
+    pub fn refs(&self, name: &str) -> Vec<StepId> {
+        match self.get(name) {
+            AttrValue::Ref(r) => vec![StepId(*r)],
+            AttrValue::List(items) => items
+                .iter()
+                .filter_map(|v| {
+                    if let AttrValue::Ref(r) = v {
+                        Some(StepId(*r))
+                    } else {
+                        None
+                    }
+                })
+                .collect(),
+            _ => Vec::new(),
+        }
+    }
+
+    pub fn string(&self, name: &str) -> Option<&str> {
+        match self.get(name) {
+            AttrValue::String(s) => Some(s),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EntityInfo {
     pub id: StepId,
@@ -211,6 +249,14 @@ impl IfcModel {
         let values: Vec<AttrValue> = serde_json::from_str(&self.inner.attributes_json(id.0)?)
             .map_err(|e| IfcError::Native(format!("undecodable attribute values on {id}: {e}")))?;
         Ok(names.into_iter().zip(values).collect())
+    }
+
+    /// Class and named attributes of many entities in one call (bulk reads of property sets).
+    pub fn attributes_many(&self, ids: &[StepId]) -> Result<Vec<Entity>> {
+        let raw: Vec<u32> = ids.iter().map(|i| i.0).collect();
+        let json = self.inner.attributes_json_many(&raw)?;
+        serde_json::from_str(&json)
+            .map_err(|e| IfcError::Native(format!("undecodable attribute values: {e}")))
     }
 
     pub fn attribute(&self, id: StepId, name: &str) -> Result<AttrValue> {

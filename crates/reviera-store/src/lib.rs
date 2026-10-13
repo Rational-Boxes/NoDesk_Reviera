@@ -4,7 +4,9 @@
 //! Model stores (TECH_STACK §3.7). Local mode keeps the project in one `.ifc` file with embedded
 //! RXD; BIMserver mode will add a server-backed store behind the same operations.
 
+pub mod commands;
 mod local;
+pub mod params;
 mod psets;
 
 pub use local::{LocalProject, OpenReport, SaveReport};

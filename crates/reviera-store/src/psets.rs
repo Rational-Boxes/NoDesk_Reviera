@@ -216,10 +216,22 @@ impl PsetWriter<'_> {
             .iter()
             .map(|(n, v)| self.create_prop(n, v))
             .collect::<Result<Vec<_>>>()?;
+        self.create_with(name, target, target_is_type, &refs(&ids))
+    }
+
+    /// Creates a property set holding the properties in `has_properties` and attaches it.
+    pub fn create_with(
+        &mut self,
+        name: &str,
+        target: StepId,
+        target_is_type: bool,
+        has_properties: &AttrValue,
+    ) -> Result<StepId> {
         let pset = self.create_rooted("IfcPropertySet")?;
         self.ifc
             .set_attribute(pset, "Name", &AttrValue::String(name.into()))?;
-        self.ifc.set_attribute(pset, "HasProperties", &refs(&ids))?;
+        self.ifc
+            .set_attribute(pset, "HasProperties", has_properties)?;
         if target_is_type {
             let mut list = match self.ifc.attribute(target, "HasPropertySets")? {
                 AttrValue::List(items) => items,

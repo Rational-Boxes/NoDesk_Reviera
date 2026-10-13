@@ -96,6 +96,7 @@ impl App {
     pub fn new(config: AppConfig) -> Self {
         let mut registry = CommandRegistry::with_core();
         commands::register(&mut registry);
+        reviera_store::commands::register(&mut registry);
         Self {
             registry: Arc::new(registry),
             docs: BTreeMap::new(),

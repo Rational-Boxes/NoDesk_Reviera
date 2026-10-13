@@ -22,6 +22,7 @@ use reviera_rxd::{
 };
 use serde_json::{Value, json};
 
+use crate::params;
 use crate::psets::{self, Pset, PsetWriter, identifier, integer, label, text, unsupported};
 use crate::{Result, StoreError};
 
@@ -67,6 +68,10 @@ pub struct LocalProject {
     /// (after recovery, Ch 2b §6.3).
     forced_changed: BTreeSet<ElementId>,
     forced_deleted: BTreeSet<ElementId>,
+    /// Parameter values as they are in the IFC population, by element.
+    saved_params: HashMap<ElementId, BTreeMap<String, serde_json::Value>>,
+    /// Property and quantity sets by owner.
+    sets: params::SetIndex,
     /// Document version that the IFC population reflects.
     synced: ModelVersion,
 }
@@ -104,6 +109,7 @@ impl LocalProject {
 
         let mut objects = ifc.entities_of_type("IfcObjectDefinition")?;
         objects.sort_by_key(|e| e.id);
+        let (mut values, sets) = params::load(&ifc, &objects)?;
         let types: HashSet<StepId> = ifc
             .entities_of_type("IfcTypeObject")?
             .into_iter()
@@ -200,6 +206,7 @@ impl LocalProject {
         let mut element_data = HashMap::new();
         let mut seen_guids = HashSet::new();
         let mut elements = Vec::new();
+        let mut saved_params = HashMap::new();
         for e in objects {
             let id = ids[&e.id];
             let Some(guid) = e.global_id.filter(|g| seen_guids.insert(g.clone())) else {
@@ -215,12 +222,14 @@ impl LocalProject {
                 element_psets.insert(id, pset);
             }
             steps.insert(id, e.id);
+            let element_params = values.remove(&e.id).unwrap_or_default();
+            saved_params.insert(id, element_params.clone());
             elements.push((
                 id,
                 NewElement {
                     class: e.class,
                     name: e.name,
-                    params: BTreeMap::new(),
+                    params: element_params,
                     guid: Some(guid),
                 },
             ));
@@ -254,6 +263,8 @@ impl LocalProject {
             forced_changed: BTreeSet::new(),
             forced_deleted: BTreeSet::new(),
             synced: doc.version(),
+            saved_params,
+            sets,
         };
         Ok((local, doc, report))
     }
@@ -359,6 +370,9 @@ impl LocalProject {
             if let Some(pset) = self.element_psets.remove(id) {
                 self.remove_element_pset(&pset, step)?;
             }
+            // The element's own property and quantity sets go with it.
+            self.saved_params.remove(id);
+            params::remove_all(&mut self.ifc, &mut self.sets, step)?;
             self.types.remove(&step);
             self.ifc.remove(step)?;
             report.removed += 1;
@@ -406,6 +420,18 @@ impl LocalProject {
             let name = e.name.clone().map_or(AttrValue::Null, AttrValue::String);
             if self.ifc.attribute(step, "Name")? != name {
                 self.ifc.set_attribute(step, "Name", &name)?;
+            }
+            let before = self.saved_params.get(id).cloned().unwrap_or_default();
+            if before != e.params {
+                let owner_history = self.new_owner_history()?;
+                let is_type = self.types.contains(&step);
+                params::ValueWriter {
+                    ifc: &mut self.ifc,
+                    index: &mut self.sets,
+                    owner_history,
+                }
+                .apply(step, is_type, &before, &e.params)?;
+                self.saved_params.insert(*id, e.params.clone());
             }
             dirty.insert(*id);
         }

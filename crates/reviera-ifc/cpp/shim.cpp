@@ -318,6 +318,30 @@ rust::String Model::attributes_json(std::uint32_t id) const {
     return out.str();
 }
 
+rust::String Model::attributes_json_many(rust::Slice<const std::uint32_t> ids) const {
+    std::ostringstream out;
+    out << '[';
+    bool first = true;
+    for (auto id : ids) {
+        if (!first) out << ',';
+        first = false;
+        auto* inst = instance(*file_, id);
+        const auto attrs = entity_decl(inst).all_attributes();
+        out << "{\"class\":";
+        json_string(out, inst->declaration().name());
+        out << ",\"attributes\":{";
+        for (std::size_t i = 0; i < attrs.size(); ++i) {
+            if (i) out << ',';
+            json_string(out, attrs[i]->name());
+            out << ':';
+            inst->get_attribute_value(i).apply_visitor(Encoder{out});
+        }
+        out << "}}";
+    }
+    out << ']';
+    return out.str();
+}
+
 void Model::set_null(std::uint32_t id, rust::Str attr) {
     auto* inst = instance(*file_, id);
     inst->unset_attribute_value(attr_index(inst, attr));
