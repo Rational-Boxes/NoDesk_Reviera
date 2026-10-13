@@ -248,8 +248,10 @@ The KIT FZK *AC20-Institute-Var-2* sample model (`test-data/ifc/`) open in Revie
 
 ## Planned next
 
-The first milestone continues with railings (on stairs, decks, patios and flat roofs), a deck
-design subsystem (board layout and framing), roof openings (below dormers,
+The first milestone continues with railings (on stairs, and along the open edges of decks,
+patios and flat roofs, ARC-RAIL-001), a deck design subsystem (ARC-DECK-001: the deck's outline,
+board-by-board layout with end joints on joists and staggered, picture frames and breakers, the
+framing beneath, and a cut list), roof openings (below dormers,
 skylights and shafts), and layered wall types. After that come general shape and CSG modelling tools,
 CADCraft drawing exchange, and the current NBIMS-US COBie layout.
 

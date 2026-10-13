@@ -11831,6 +11831,11 @@ These are view annotation and are specified in the DOC chapter. This chapter req
   3. Canvas controls: *Toggle Sketch Orientation* (swaps start and end) and, for closed loops, *Move Beginning to Next Corner*.
   4. **Finish**.
 - **Place on Stair/Ramp.** The user picks a stair or ramp, and the railing is hosted on the **Treads** or the **Stringer**.
+- **Pick Edges** (patios, decks, balconies and flat roofs; *owner clarification, 2026-10-13*):
+  - The user picks open edges of a floor, slab, deck (ARC-DECK-001), flat roof or toposolid sub-region. **Tab** picks the whole perimeter chain, and walls along an edge break it.
+  - The railing follows the picked edges, set in by the *Edge Setback* (default 50 mm, or the deck's fascia for decks).
+  - Its base sits on the host's top surface (on a flat roof, on the roof's top or its parapet). Its path is kept in step with the host: when the host's outline changes, the railing follows.
+  - *Guard all open edges* places one railing along every edge of the host that has no wall, and leaves openings at the stairs that land on the host.
 - Railings are also created automatically with stairs and ramps (ARC-STAIR-002, ARC-RAMP-001).
 
 **Behaviour & rules.**
@@ -11872,6 +11877,7 @@ These are view annotation and are specified in the DOC chapter. This chapter req
 **Commands.**
 - `railing.create(type_id, path: [curve], host_ref?, base_level?, base_offset?, offset_from_path?, segment_slopes?: [ByHost|Flat|Sloped], height_corrections?: [f64|ByType]) -> element_id`
 - `railing.place_on_host(type_id, host_id, position: Treads|Stringer) -> [element_id]`
+- `railing.create_on_edges(type_id, host_id, edges?: [curve_key] | all_open, setback?) -> [element_id]` (Pick Edges; with no edges, every open edge)
 - `railing.edit_path(railing_id, path, ...)`
 - `railing.flip_path(railing_id)`
 - `railing.set_rail_join(railing_id, join_ref, mode: ByType|Fillet|Miter|Flush)`
@@ -11882,6 +11888,8 @@ These are view annotation and are specified in the DOC chapter. This chapter req
 - [ ] A railing on a straight stair run with By Host follows the nosing line at a constant vertical height. On the landing it is flat, and the join is made with a vertical segment when Angled Joins = Add Vertical/Horizontal Segments.
 - [ ] A top rail with Fillet joins of radius 50 mm has continuous tangents at every corner.
 - [ ] A handrail with Position = Left and Right on a two-run stair produces two handrails, with wall extensions of the configured length at the bottom and the top.
+- [ ] *Guard all open edges* on an L-shaped deck against a house wall puts railings on the four edges away from the wall and none along it. It leaves a gap where the deck stair lands, and the railings follow when the deck's outline is edited.
+- [ ] A railing picked along a flat roof's perimeter sits on the roof's top, set in by its setback, with posts at the corners.
 
 ### 3.7.8 Baluster placement
 **ID:** ARC-RAIL-002 · **Priority:** P0 · **Ref:** research/02 §8.5 (Edit Baluster Placement), §17.9
@@ -11917,6 +11925,73 @@ These are view annotation and are specified in the DOC chapter. This chapter req
 - [ ] A 3.05 m straight path with a one-row pattern (Distance from previous = 0.12 m, so P = 0.12 m), Beginning justification, Excess fill = None, and start and end posts with Space 0.05 m: the candidate positions are 0.12, 0.24 … 3.00 (25 positions). The one at 3.00 lies inside the end post's reserved interval [3.00, 3.10] and is removed, leaving 24 balusters.
 - [ ] Spread Pattern to Fit on a 3.05 m path with P = 0.12 gives 25 patterns of 0.122 m.
 - [ ] With 2 balusters per tread on 0.28 m treads, balusters sit 0.07 m and 0.21 m behind each nosing.
+
+### 3.7.8a Decks
+**ID:** ARC-DECK-001 · **Priority:** P1 · **Ref:** owner requirement (2026-10-13); Reviera's own design (Appendix A.2a)
+
+**Purpose.** Design decks and patios: the outline, the framing beneath, and the boards laid out one by one, so that quantities and a cut list come from the model. *(Owner requirement, 2026-10-13: "a bespoke deck design subsystem for mapping out the deck boards".)*
+
+**Workflow.**
+1. Architecture › Deck: the user sketches the deck's outline in a plan (ARC-SKCH-001), with cut-outs for trees or hatches as inner loops. Pick Walls takes a wall's exterior face for a deck *ledgered* to the house.
+2. The user sets the deck height (relative to a level, or as a top elevation) and chooses a **deck type** (board and framing settings, below).
+3. **Finish** lays out the framing and the boards. The Deck contextual tab offers Edit Outline, Board Layout, Framing, Stairs and Guard Open Edges (ARC-RAIL-001).
+
+**Behaviour & rules.**
+- **Boards (deck type, overridable per deck):**
+  - board profile: width, thickness, material and finish;
+  - **gap** between boards, and end gap;
+  - **direction** (an angle, default perpendicular to the ledger or to the longest edge);
+  - **stock lengths** available (for example 3.6, 4.2 and 4.8 m);
+  - **picture frame**: n border boards around the outline, mitred at corners;
+  - **breaker boards** (boards across the field, at set positions or splitting the field into bays);
+  - **fascia** boards on the outer faces;
+  - **fastening**: face screws per joist crossing, or hidden clips.
+- **Board layout algorithm (deterministic):**
+  1. Build the field: the outline less the picture frame and breaker bays, less any cut-outs.
+  2. Lay courses perpendicular to the direction, at board width plus gap, starting from the *start edge* (the ledger, or the edge the user picks). The first course is full width. The last course is ripped to fit and flagged when narrower than a set minimum (default a third of the board width); *Balance courses* instead centres the field so both edge courses are equal.
+  3. Clip each course to the field. A course is broken into boards where it meets cut-outs and breakers.
+  4. Split each board run into pieces no longer than the longest stock length. **Every end joint lands on a joist centre** (or a doubled joist / blocking when *Joints on doubled joists* is set).
+  5. **Stagger:** joints in adjacent courses are at least the *minimum stagger* apart (default two joist spaces), and no joint repeats on the same joist within *n* courses (default 3). Patterns: *Random* (seeded, so the layout is repeatable), *Stair-step* or *Thirds*.
+  6. **Stock optimisation:** each piece is assigned to the shortest stock length it fits, by a first-fit-decreasing cut plan. Offcuts long enough are reused.
+  7. Boards are numbered course by course from the start edge.
+- **Framing:**
+  - a **ledger** on the house wall (or free-standing *beams* at both ends);
+  - **joists** at a set spacing (default 400 mm centres) perpendicular to the boards, sized from a span table in the type, with doubled joists under breakers and picture frames, and **blocking** where joints need it;
+  - **beams/bearers** across the joists at a set spacing;
+  - **posts** on **footings**, at a maximum spacing along the beams.
+  - The framing regenerates with the outline, and the board layout follows it.
+- **Height:** the boards' top is the deck height. The framing hangs below it, and posts run to the footings (on the toposolid or a level).
+- **Quantities and cut list:**
+  - `deck.cut_list` gives each board's course, length, stock length and the offcut;
+  - it also gives totals per stock length, fastener counts, joist, beam, post and footing counts and lengths, and the board area;
+  - a deck schedule (DOC-SCH-001) lists the boards and the framing.
+- **Editing:** single boards can be selected (Tab) to override their length or joint, or to be removed. The overrides survive a regeneration where the board still exists.
+- **Stairs and railings:** stairs (ARC-STAIR-002) can start from a deck edge. *Guard Open Edges* places railings along the open edges (ARC-RAIL-001).
+
+**Data (IFC mapping).**
+- The deck is an **`IfcSlab`** (`PredefinedType = FLOOR`, ObjectType "DECK") whose body is the board field. It aggregates:
+  - the boards as **`IfcCovering(FLOORING)`** pieces, or, by option, one covering with the boards as representation items;
+  - joists and ledgers as **`IfcMember(JOIST)`**, beams as **`IfcBeam`**, posts as **`IfcColumn`** and footings as **`IfcFooting(PAD_FOOTING)`**.
+- The layout settings and per-board overrides are RXD element data (`recipe.deck`); the deck type is RXD type data (`recipe.deck_type`).
+
+**Commands.**
+- `deck.create(outline: loops, level_id, height?, type_id?, start_edge?, direction?) -> element_id`
+- `deck.set_boards(deck_id, width?, thickness?, gap?, direction?, stock_lengths?, picture_frame?, breakers?, stagger?: {pattern, min, repeat_after}, balance_courses?, seed?)`
+- `deck.set_framing(deck_id, joist_spacing?, joist_size?, beam_spacing?, post_spacing?, ledger_wall_id?)`
+- `deck.boards(deck_id) -> [board]` (query: course, start, end, length, stock length)
+- `deck.cut_list(deck_id) -> cut_list` (query)
+- `deck.override_board(deck_id, board_key, length?, joint?, removed?)`
+
+**Acceptance criteria.**
+- [ ] A 4.0 × 6.0 m deck with 140 mm boards and a 5 mm gap, boards along the 6 m side, gives 28 courses, the last ripped to fit.
+  - With stock lengths of 3.6 and 4.8 m and joists at 400 mm centres, every end joint is on a joist centre.
+  - No two adjacent courses have joints within 800 mm.
+- [ ] *Balance courses* on the same deck makes the first and last courses equal.
+- [ ] A one-board picture frame gives mitred border boards at all four corners, a doubled joist under the frame's inner edge, and a field one board narrower on each side.
+- [ ] The cut list's total board length equals the sum of the boards' lengths, and each stock length's count covers the pieces assigned to it.
+- [ ] Editing the outline (moving an edge 600 mm) regenerates the courses, the joists and the cut list. A board override on a board that still exists is kept.
+- [ ] `deck.create` and `deck.cut_list` from Lua or MCP give the same deck and list as the window.
+
 
 ### 3.7.9 Ramps
 **ID:** ARC-RAMP-001 · **Priority:** P1 · **Ref:** research/02 §8.6
@@ -13286,6 +13361,13 @@ All commands below are registered once in the command registry and exposed autom
 | `dormer.create` | roof_id, point, style: gable\|hip\|shed\|flat, width, front_height, slope?, overhang?, setback?, wall_type_id? | element_id | Yes | ARC-ROOF-007 |
 | `dormer.set` | dormer_id, style?, width?, front_height?, slope?, overhang?, setback? | — | Yes | ARC-ROOF-007 |
 | `dormer.move` | dormer_id, point | — | Yes | ARC-ROOF-007 |
+| `railing.create_on_edges` | type_id, host_id, edges?: [curve_key]\|all_open, setback? | [element_id] | Yes | ARC-RAIL-001 |
+| `deck.create` | outline: loops, level_id, height?, type_id?, start_edge?, direction? | element_id | Yes | ARC-DECK-001 |
+| `deck.set_boards` | deck_id, width?, thickness?, gap?, direction?, stock_lengths?, picture_frame?, breakers?, stagger?, balance_courses?, seed? | — | Yes | ARC-DECK-001 |
+| `deck.set_framing` | deck_id, joist_spacing?, joist_size?, beam_spacing?, post_spacing?, ledger_wall_id? | — | Yes | ARC-DECK-001 |
+| `deck.boards` | deck_id | [board] | No | ARC-DECK-001 |
+| `deck.cut_list` | deck_id | cut_list | No | ARC-DECK-001 |
+| `deck.override_board` | deck_id, board_key, length?, joint?, removed? | — | Yes | ARC-DECK-001 |
 | `roof.set_slope` | roof_id, slope, edge_keys? | — | Yes | ARC-ROOF-001 |
 | `roof.create_extrusion` | type_id, work_plane, profile: [curve], ref_level, level_offset?, start, end | element_id | Yes | ARC-ROOF-002 |
 | `roof.create_by_face` | type_id, face_refs, location: Top\|Bottom, level_id | element_id | Yes | ARC-ROOF-003 |
@@ -25165,14 +25247,14 @@ Generated by `tools/build_spec.py` from the chapter command catalogs and require
 |------|---:|---:|---:|---:|------:|
 | UI | 76 | 37 | 7 | 0 | 120 |
 | DM | 91 | 57 | 24 | 3 | 175 |
-| ARC | 75 | 49 | 10 | 1 | 135 |
+| ARC | 75 | 50 | 10 | 1 | 136 |
 | STR | 0 | 14 | 47 | 0 | 61 |
 | MEP | 0 | 28 | 42 | 0 | 70 |
 | ANA | 0 | 1 | 21 | 0 | 22 |
 | DOC | 68 | 40 | 12 | 1 | 121 |
 | COL | 8 | 45 | 6 | 1 | 60 |
 | ADV | 0 | 0 | 4 | 1 | 5 |
-| **Total** | **318** | **271** | **173** | **7** | **769** |
+| **Total** | **318** | **272** | **173** | **7** | **770** |
 
 Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver)"), it is counted under the first. The non-functional requirements (NFR-…) are in Chapter 0 §0.7 and are not counted here.
 
@@ -25227,7 +25309,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.2a Reviera-originated features
 
-83 requirements are Reviera's own design: owner directives, the technology stack (IFC/RXD storage, live store, BIMserver, MCP, scripting) and extensions beyond the reference product's feature set. Their Ref lines cite no research on the reference product. Listing them separately keeps the clean-room provenance clear: every other requirement traces to public research on the reference product.
+84 requirements are Reviera's own design: owner directives, the technology stack (IFC/RXD storage, live store, BIMserver, MCP, scripting) and extensions beyond the reference product's feature set. Their Ref lines cite no research on the reference product. Listing them separately keeps the clean-room provenance clear: every other requirement traces to public research on the reference product.
 
 | Requirement | Ch | Feature |
 |-------------|----|---------|
@@ -25298,6 +25380,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | DM-LIVE-019 | 2b | In BIMserver mode, the History panel shall show one combined timeline of local … |
 | DM-LIVE-020 | 2b | Users shall be able to publish named snapshots to BIMserver without changing the … |
 | ARC-ROOF-007 | 3 | 3.6.8a Dormers (automated) |
+| ARC-DECK-001 | 3 | 3.7.8a Decks |
 | DOC-VIEW-014 | 5 | Slice planes |
 | DOC-VIEW-013 | 5 | Blueprint mode (3D slice to 2D drawing) |
 | DOC-RBE-001 | 5 | Pluggable render backends |
@@ -25317,7 +25400,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**1956 unique commands** in 401 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**1963 unique commands** in 402 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -25404,6 +25487,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `daylight` | 2 |
 | `decal` | 4 |
 | `decaltype` | 1 |
+| `deck` | 6 |
 | `demand_factor` | 2 |
 | `designoption` | 9 |
 | `detail` | 9 |
@@ -25585,7 +25669,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `publish` | 1 |
 | `purge` | 2 |
 | `qto` | 1 |
-| `railing` | 5 |
+| `railing` | 6 |
 | `railingtype` | 5 |
 | `ramp` | 2 |
 | `rebar` | 24 |
@@ -26057,6 +26141,12 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `decal.type.edit` | 2 | type_id, attributes | — | Yes | DM-DECAL-001 |
 | `decal.types` | 2 | — | — | No | DM-DECAL-001 |
 | `decaltype.create` | 5 | name, image_asset_or_path, attributes? | type_id | Yes | DOC-OUT-011 |
+| `deck.boards` | 3 | deck_id | [board] | No | ARC-DECK-001 |
+| `deck.create` | 3 | outline: loops, level_id, height?, type_id?, start_edge?, direction? | element_id | Yes | ARC-DECK-001 |
+| `deck.cut_list` | 3 | deck_id | cut_list | No | ARC-DECK-001 |
+| `deck.override_board` | 3 | deck_id, board_key, length?, joint?, removed? | — | Yes | ARC-DECK-001 |
+| `deck.set_boards` | 3 | deck_id, width?, thickness?, gap?, direction?, stock_lengths?, picture_frame?, breakers?, stagger?, balance_courses?, seed? | — | Yes | ARC-DECK-001 |
+| `deck.set_framing` | 3 | deck_id, joist_spacing?, joist_size?, beam_spacing?, post_spacing?, ledger_wall_id? | — | Yes | ARC-DECK-001 |
 | `demand_factor.create` | 4 | name, method, ranges[], incremental?: bool | id | Yes | MEP-ELEC-010 |
 | `demand_factor.evaluate` | 4 | id, loads[] | demand | No | MEP-ELEC-010 |
 | `designoption.accept_primary` | 5 | set_id | () | Yes | DOC-GFX-018 |
@@ -26837,6 +26927,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `purge.run` | 2 | item_ids[], compact_undo=false | report | Yes | DM-PURGE-001 |
 | `qto.recompute` | 2 | element_ids?[] | — | Yes | DM-IFC-003 |
 | `railing.create` | 3 | type_id, path: [curve], host_ref?, base_level?, base_offset?, offset_from_path?, segment_slopes?: [ByHost\ | Flat\ | Sloped], height_corrections?: [f64\ | ByType] |
+| `railing.create_on_edges` | 3 | type_id, host_id, edges?: [curve_key]\ | all_open, setback? | [element_id] | Yes |
 | `railing.edit_path` | 3 | railing_id, path, ... | — | Yes | ARC-RAIL-001 |
 | `railing.flip_path` | 3 | railing_id | — | Yes | ARC-RAIL-001 |
 | `railing.place_on_host` | 3 | type_id, host_id, position: Treads\ | Stringer | [element_id] | Yes |
