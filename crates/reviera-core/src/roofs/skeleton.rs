@@ -300,9 +300,33 @@ enum Event {
 /// The skeleton of a counter-clockwise polygon whose edges move at the given speeds, stopping at
 /// `cutoff` (a time) if given. Consecutive edges must meet (`a` of each is `b` of the one before).
 pub fn skeleton(edges: &[SkelEdge], cutoff: Option<f64>) -> Result<Skeleton, String> {
+    skeleton_loops(&[edges.len()], edges, cutoff)
+}
+
+/// The skeleton of a polygon with holes: `edges` holds the loops one after another, their
+/// lengths in `loops`. The outer loop runs counter-clockwise and each hole clockwise, so every
+/// edge moves into the polygon (a courtyard's edges move away from the courtyard). Faces come
+/// out one per edge, in input order, as for [`skeleton`].
+pub fn skeleton_loops(
+    loops: &[usize],
+    edges: &[SkelEdge],
+    cutoff: Option<f64>,
+) -> Result<Skeleton, String> {
     let n = edges.len();
-    if n < 3 {
-        return Err("a roof footprint needs at least three edges".into());
+    if n < 3 || loops.iter().any(|l| *l < 3) || loops.iter().sum::<usize>() != n {
+        return Err("a roof footprint needs loops of at least three edges".into());
+    }
+    // The previous and next edge of each edge, within its loop.
+    let mut prev = vec![0; n];
+    let mut next = vec![0; n];
+    let mut start = 0;
+    for &len in loops {
+        for k in 0..len {
+            let i = start + k;
+            prev[i] = start + (k + len - 1) % len;
+            next[i] = start + (k + 1) % len;
+        }
+        start += len;
     }
     let mut wave = Wave {
         lines: Vec::with_capacity(n),
@@ -322,10 +346,10 @@ pub fn skeleton(edges: &[SkelEdge], cutoff: Option<f64>) -> Result<Skeleton, Str
         wave.lines.push((normal, dot(normal, e.a), e.speed));
     }
     for (i, e) in edges.iter().enumerate() {
-        wave.add((i + n - 1) % n, i, e.a, 0.0);
+        wave.add(prev[i], i, e.a, 0.0);
     }
-    for i in 0..n {
-        wave.link(i, (i + 1) % n);
+    for (i, &nx) in next.iter().enumerate() {
+        wave.link(i, nx);
     }
     for i in 0..n {
         wave.settle(i, 0.0);
@@ -380,7 +404,11 @@ pub fn skeleton(edges: &[SkelEdge], cutoff: Option<f64>) -> Result<Skeleton, Str
             if cross(dl, dr) >= -1e-12 {
                 continue;
             }
-            for &u in wave.cycle(v).iter() {
+            // Edges of the vertex's own wavefront, and of the others (a courtyard's wavefront
+            // meets the outer one).
+            let own = wave.cycle(v);
+            for &u in &alive {
+                let other = !own.contains(&u);
                 let e = wave.verts[u].right;
                 if e == x.left || e == x.right || u == v || wave.verts[u].next == v {
                     continue;
@@ -402,7 +430,13 @@ pub fn skeleton(edges: &[SkelEdge], cutoff: Option<f64>) -> Result<Skeleton, Str
                 }
                 let s = dot(sub(h, a), ab) / l2;
                 let slack = TOL / l2.sqrt();
-                if s > slack && s < 1.0 - slack {
+                // Another wavefront is joined where the vertex reaches it, ends included.
+                let within = if other {
+                    s > -slack && s < 1.0 + slack
+                } else {
+                    s > slack && s < 1.0 - slack
+                };
+                if within {
                     consider(t, 1, v * n + u, Event::Split { v, u, p: h });
                 }
             }
@@ -559,6 +593,59 @@ fn chain(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn face_area(f: &Face) -> f64 {
+        let q = &f.points;
+        (0..q.len())
+            .map(|k| {
+                let (a, b) = (q[k], q[(k + 1) % q.len()]);
+                a[0] * b[1] - b[0] * a[1]
+            })
+            .sum::<f64>()
+            .abs()
+            / 2.0
+    }
+
+    #[test]
+    fn a_courtyard_ring_has_its_ridge_halfway() {
+        // A 10 m square (counter-clockwise) with a 4 m courtyard (clockwise) in the middle.
+        let mut edges = poly(
+            &[[0.0, 0.0], [10.0, 0.0], [10.0, 10.0], [0.0, 10.0]],
+            &[1.0],
+        );
+        edges.extend(poly(
+            &[[3.0, 3.0], [3.0, 7.0], [7.0, 7.0], [7.0, 3.0]],
+            &[1.0],
+        ));
+        let s = skeleton_loops(&[4, 4], &edges, None).unwrap();
+        assert_eq!(s.faces.len(), 8);
+        // The ring is covered once: 100 − 16.
+        let area: f64 = s.faces.iter().map(face_area).sum();
+        assert!((area - 84.0).abs() < 1e-6, "{area}");
+        // The ridge runs halfway across the 3 m ring, 1.5 up; eaves at 0 on both sides.
+        for p in [[1.5, 5.0], [5.0, 1.5], [8.5, 5.0], [5.0, 8.5]] {
+            assert!((height(&s, p).unwrap() - 1.5).abs() < 1e-6, "{p:?}");
+        }
+        for p in [[0.01, 5.0], [2.99, 5.0], [5.0, 7.01]] {
+            assert!(height(&s, p).unwrap() < 0.02, "{p:?}");
+        }
+        // Nothing over the courtyard.
+        assert!(height(&s, [5.0, 5.0]).is_none());
+        // An off-centre courtyard: the narrow side's ridge is lower.
+        let mut edges = poly(
+            &[[0.0, 0.0], [12.0, 0.0], [12.0, 10.0], [0.0, 10.0]],
+            &[1.0],
+        );
+        edges.extend(poly(
+            &[[2.0, 3.0], [2.0, 7.0], [7.0, 7.0], [7.0, 3.0]],
+            &[1.0],
+        ));
+        let s = skeleton_loops(&[4, 4], &edges, None).unwrap();
+        let area: f64 = s.faces.iter().map(face_area).sum();
+        assert!((area - 100.0).abs() < 1e-6, "{area}");
+        assert!((height(&s, [1.0, 5.0]).unwrap() - 1.0).abs() < 1e-6);
+        assert!((height(&s, [9.5, 5.0]).unwrap() - 2.5).abs() < 1e-6);
+    }
 
     fn poly(pts: &[[f64; 2]], speeds: &[f64]) -> Vec<SkelEdge> {
         (0..pts.len())

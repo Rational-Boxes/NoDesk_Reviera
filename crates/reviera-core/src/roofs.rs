@@ -157,6 +157,8 @@ pub struct RoofFace {
     pub normal: [f64; 3],
     /// The slab of the roof's thickness on this face, as a closed mesh.
     pub slab: Mesh,
+    /// Courtyards through a flat roof (clockwise), on the underside's plane.
+    pub holes: Vec<Vec<[f64; 3]>>,
 }
 
 /// A roof as it is now.
@@ -176,7 +178,10 @@ pub struct RoofGeometry {
 impl RoofGeometry {
     /// The sloped area of the roof's underside.
     pub fn area(&self) -> f64 {
-        self.faces.iter().map(|f| face_area(&f.bottom)).sum()
+        self.faces
+            .iter()
+            .map(|f| face_area(&f.bottom) - f.holes.iter().map(|h| face_area(h)).sum::<f64>())
+            .sum()
     }
 
     /// The area seen from above.
@@ -184,8 +189,11 @@ impl RoofGeometry {
         self.faces
             .iter()
             .map(|f| {
-                let ring: Vec<[f64; 2]> = f.bottom.iter().map(|p| [p[0], p[1]]).collect();
-                sketch::signed_area(&ring).abs()
+                let flat = |q: &[[f64; 3]]| {
+                    let ring: Vec<[f64; 2]> = q.iter().map(|p| [p[0], p[1]]).collect();
+                    sketch::signed_area(&ring).abs()
+                };
+                flat(&f.bottom) - f.holes.iter().map(|h| flat(h)).sum::<f64>()
             })
             .sum()
     }
@@ -209,7 +217,12 @@ impl RoofGeometry {
             .iter()
             .filter(|f| {
                 let ring: Vec<[f64; 2]> = f.bottom.iter().map(|q| [q[0], q[1]]).collect();
-                inside(p, &ring)
+                // A point on a hip or valley line belongs to the faces on both sides of it.
+                let in_hole = f.holes.iter().any(|h| {
+                    let h: Vec<[f64; 2]> = h.iter().map(|q| [q[0], q[1]]).collect();
+                    inside(p, &h)
+                });
+                (inside(p, &ring) || on_edge(p, &ring)) && !in_hole
             })
             .map(|f| {
                 let n = f.normal;
@@ -218,6 +231,20 @@ impl RoofGeometry {
             })
             .reduce(f64::min)
     }
+}
+
+/// Whether `p` lies on an edge of `ring` (within a micrometre).
+fn on_edge(p: [f64; 2], ring: &[[f64; 2]]) -> bool {
+    (0..ring.len()).any(|i| {
+        let (a, b) = (ring[i], ring[(i + 1) % ring.len()]);
+        let d = [b[0] - a[0], b[1] - a[1]];
+        let len2 = d[0] * d[0] + d[1] * d[1];
+        if len2 < 1e-18 {
+            return false;
+        }
+        let t = (((p[0] - a[0]) * d[0] + (p[1] - a[1]) * d[1]) / len2).clamp(0.0, 1.0);
+        (p[0] - a[0] - d[0] * t).hypot(p[1] - a[1] - d[1] * t) < 1e-6
+    })
 }
 
 fn inside(p: [f64; 2], ring: &[[f64; 2]]) -> bool {
@@ -391,18 +418,48 @@ pub fn regenerate(store: &Store, e: &Element) -> Result<RoofGeometry> {
         ),
         None => None,
     };
-    let rings = sketch::rings(store, &sketch);
-    let (ring, keys) = rings
+    // The outer loop (the largest), then the courtyards inside it.
+    let mut rings: Vec<(Vec<[f64; 2]>, Vec<u32>)> = sketch::rings(store, &sketch)
         .into_iter()
         .filter(|(r, _)| r.len() >= 3)
-        .max_by(|a, b| {
-            sketch::signed_area(&a.0)
-                .abs()
-                .total_cmp(&sketch::signed_area(&b.0).abs())
-        })
-        .ok_or_else(|| Error::new("roof.no_sketch", "the roof has no footprint"))?;
+        .collect();
+    rings.sort_by(|a, b| {
+        sketch::signed_area(&b.0)
+            .abs()
+            .total_cmp(&sketch::signed_area(&a.0).abs())
+    });
+    let Some((outer, _)) = rings.first().cloned() else {
+        return Err(Error::new("roof.no_sketch", "the roof has no footprint"));
+    };
+    let mut loops = Vec::new();
+    let (mut ring, mut keys) = (Vec::new(), Vec::new());
+    for (k, (r, ks)) in rings.into_iter().enumerate() {
+        if k > 0 && !inside(r[0], &outer) {
+            continue;
+        }
+        // The outer loop counter-clockwise, courtyards clockwise.
+        let (r, ks) = oriented(r, ks, k == 0);
+        loops.push(r.len());
+        ring.extend(r);
+        keys.extend(ks);
+    }
     let edges: Vec<RoofEdge> = keys.iter().map(|k| r.edge(*k)).collect();
-    generate(&ring, &keys, &edges, r.slope, plate, cutoff, thickness)
+    generate_loops(
+        &loops, &ring, &keys, &edges, r.slope, plate, cutoff, thickness,
+    )
+}
+
+/// A loop turned counter-clockwise (or clockwise when `ccw` is false), each corner still
+/// starting the curve after it.
+fn oriented(ring: Vec<[f64; 2]>, keys: Vec<u32>, ccw: bool) -> (Vec<[f64; 2]>, Vec<u32>) {
+    if (sketch::signed_area(&ring) > 0.0) == ccw {
+        return (ring, keys);
+    }
+    let n = ring.len();
+    // Reversed, corner j is old corner −j, and the curve after it is old curve −j−1.
+    let r = (0..n).map(|j| ring[(n - j) % n]).collect();
+    let k = (0..n).map(|j| keys[(2 * n - j - 1) % n]).collect();
+    (r, k)
 }
 
 /// The roof over the counter-clockwise footprint `ring` (corner `i` starts curve `keys[i]`, with
@@ -416,7 +473,45 @@ pub fn generate(
     cutoff: Option<f64>,
     thickness: f64,
 ) -> Result<RoofGeometry> {
+    generate_loops(
+        &[ring.len()],
+        ring,
+        keys,
+        edges,
+        default_slope,
+        plate,
+        cutoff,
+        thickness,
+    )
+}
+
+/// The roof over a footprint with courtyards: `ring` holds the loops one after another (their
+/// lengths in `loops`), the outer one counter-clockwise first, then each courtyard clockwise.
+/// A courtyard's edges slope down toward it like the outer eaves.
+#[allow(clippy::too_many_arguments)]
+pub fn generate_loops(
+    loops: &[usize],
+    ring: &[[f64; 2]],
+    keys: &[u32],
+    edges: &[RoofEdge],
+    default_slope: f64,
+    plate: f64,
+    cutoff: Option<f64>,
+    thickness: f64,
+) -> Result<RoofGeometry> {
     let n = ring.len();
+    // The previous and next corner of each corner, within its loop.
+    let mut prev_of = vec![0; n];
+    let mut next_of = vec![0; n];
+    let mut first = 0;
+    for &len in loops {
+        for k in 0..len {
+            prev_of[first + k] = first + (k + len - 1) % len;
+            next_of[first + k] = first + (k + 1) % len;
+        }
+        first += len;
+    }
+    let outer_len = loops.first().copied().unwrap_or(n);
     let fail = |msg: String| Error::new("roof.cannot_generate", msg);
     // Slopes: the edge's own, else the roof's; gables have none.
     let mut slopes: Vec<Option<f64>> = Vec::with_capacity(n);
@@ -441,7 +536,7 @@ pub fn generate(
         slopes.push(Some(s));
     }
     let dir = |i: usize| {
-        let (a, b) = (ring[i], ring[(i + 1) % n]);
+        let (a, b) = (ring[i], ring[next_of[i]]);
         let d = [b[0] - a[0], b[1] - a[1]];
         let l = d[0].hypot(d[1]).max(1e-30);
         [d[0] / l, d[1] / l]
@@ -468,33 +563,55 @@ pub fn generate(
     };
     let corners: Vec<[f64; 2]> = (0..n)
         .map(|i| {
-            let prev = (i + n - 1) % n;
+            let prev = prev_of[i];
             let (p, d) = line(prev);
             let (q, e) = line(i);
             meet(p, d, q, e).unwrap_or(q)
         })
         .collect();
     if flat {
-        let bottom: Vec<[f64; 3]> = corners.iter().map(|c| [c[0], c[1], plate]).collect();
         let normal = [0.0, 0.0, 1.0];
-        let cuts: Vec<[f64; 3]> = (0..n)
-            .map(|i| {
-                let d = dir(i);
-                [d[1], -d[0], 0.0]
-            })
-            .collect();
-        let slab = slab(&bottom, normal, &cuts, thickness);
+        let mut holes = Vec::new();
+        let mut first = outer_len;
+        for &len in &loops[1..] {
+            holes.push(
+                corners[first..first + len]
+                    .iter()
+                    .map(|c| [c[0], c[1], plate])
+                    .collect(),
+            );
+            first += len;
+        }
+        let (bottom, slab) = if loops.len() > 1 {
+            // A flat roof around courtyards: one slab with holes.
+            let bottom: Vec<[f64; 3]> = corners[..outer_len]
+                .iter()
+                .map(|c| [c[0], c[1], plate])
+                .collect();
+            (bottom, flat_slab(loops, &corners, plate, thickness))
+        } else {
+            let bottom: Vec<[f64; 3]> = corners.iter().map(|c| [c[0], c[1], plate]).collect();
+            let cuts: Vec<[f64; 3]> = (0..n)
+                .map(|i| {
+                    let d = dir(i);
+                    [d[1], -d[0], 0.0]
+                })
+                .collect();
+            let slab = slab(&bottom, normal, &cuts, thickness);
+            (bottom, slab)
+        };
         return Ok(RoofGeometry {
             faces: vec![RoofFace {
                 key: None,
                 bottom,
                 normal,
                 slab,
+                holes,
             }],
             plate,
             thickness,
-            footprint: ring.to_vec(),
-            keys: keys.to_vec(),
+            footprint: ring[..outer_len].to_vec(),
+            keys: keys[..outer_len].to_vec(),
             predefined: "FLAT_ROOF",
         });
     }
@@ -506,12 +623,16 @@ pub fn generate(
     let skel_edges: Vec<SkelEdge> = (0..n)
         .map(|i| SkelEdge {
             a: corners[i],
-            b: corners[(i + 1) % n],
+            b: corners[next_of[i]],
             speed: speed(i),
         })
         .collect();
-    let skel = skeleton::skeleton(&skel_edges, cutoff.map(|c| c - plate).filter(|t| *t > 0.0))
-        .map_err(|e| fail(format!("Roof cannot be generated from this footprint: {e}")))?;
+    let skel = skeleton::skeleton_loops(
+        loops,
+        &skel_edges,
+        cutoff.map(|c| c - plate).filter(|t| *t > 0.0),
+    )
+    .map_err(|e| fail(format!("Roof cannot be generated from this footprint: {e}")))?;
     // Plane normals (up) of each sloped face: the face rises at tan(slope) inward.
     let normal = |i: usize| -> [f64; 3] {
         match slopes[i] {
@@ -528,7 +649,7 @@ pub fn generate(
     };
     // The trajectory of corner i (between edges i-1 and i) per unit of time (rise).
     let velocity = |i: usize| -> Option<[f64; 2]> {
-        let prev = (i + n - 1) % n;
+        let prev = prev_of[i];
         let (na, nb) = (inward(prev), inward(i));
         let det = cross2(na, nb);
         if det.abs() < 1e-12 {
@@ -559,7 +680,7 @@ pub fn generate(
         }
         // The skeleton face: corner i, corner i+1, then around. Extend it below the plate to the
         // eave: [c_e, ..., c_s, Q_s, (E_s), (E_e), Q_e].
-        let (prev, next) = ((i + n - 1) % n, (i + 1) % n);
+        let (prev, next) = (prev_of[i], next_of[i]);
         let ta = eave_t(i);
         let mut pts: Vec<[f64; 3]> = Vec::new();
         let mut across: Vec<Across> = Vec::new();
@@ -659,6 +780,7 @@ pub fn generate(
             bottom,
             normal: up,
             slab,
+            holes: Vec::new(),
         });
     }
     for top in &skel.tops {
@@ -677,6 +799,7 @@ pub fn generate(
             bottom,
             normal: up,
             slab,
+            holes: Vec::new(),
         });
     }
     let predefined = classify(&slopes, &faces, cutoff.is_some() && !skel.tops.is_empty());
@@ -684,10 +807,55 @@ pub fn generate(
         faces,
         plate,
         thickness,
-        footprint: ring.to_vec(),
-        keys: keys.to_vec(),
+        footprint: ring[..outer_len].to_vec(),
+        keys: keys[..outer_len].to_vec(),
         predefined,
     })
+}
+
+/// A flat slab over loops (the outer counter-clockwise, holes clockwise), `thickness` thick
+/// from `z` up: earcut caps and plumb sides around every loop.
+fn flat_slab(loops: &[usize], corners: &[[f64; 2]], z: f64, thickness: f64) -> Mesh {
+    let n = corners.len();
+    let mut holes: Vec<u32> = Vec::new();
+    let mut first = 0;
+    for (k, len) in loops.iter().enumerate() {
+        if k > 0 {
+            holes.push(first as u32);
+        }
+        first += len;
+    }
+    let mut tris: Vec<u32> = Vec::new();
+    earcut::Earcut::new().earcut(corners.iter().copied(), &holes, &mut tris);
+    let mut positions: Vec<[f64; 3]> = corners.iter().map(|c| [c[0], c[1], z]).collect();
+    positions.extend(corners.iter().map(|c| [c[0], c[1], z + thickness]));
+    let nn = n as u32;
+    let mut indices = Vec::new();
+    for t in tris.chunks(3) {
+        let (a, b, c) = (
+            corners[t[0] as usize],
+            corners[t[1] as usize],
+            corners[t[2] as usize],
+        );
+        let ccw = cross2([b[0] - a[0], b[1] - a[1]], [c[0] - a[0], c[1] - a[1]]) > 0.0;
+        let (a, b, c) = if ccw {
+            (t[0], t[1], t[2])
+        } else {
+            (t[0], t[2], t[1])
+        };
+        indices.extend([a, c, b]);
+        indices.extend([nn + a, nn + b, nn + c]);
+    }
+    let mut first = 0u32;
+    for &len in loops {
+        let len = len as u32;
+        for k in 0..len {
+            let (i, j) = (first + k, first + (k + 1) % len);
+            indices.extend([i, j, nn + j, i, nn + j, nn + i]);
+        }
+        first += len;
+    }
+    (positions, indices)
 }
 
 /// The outward normal of the side plane through each edge of a face: a mitre halfway to a
@@ -889,11 +1057,11 @@ fn footprint(
         })
         .collect();
     let sketch = sketch::from_args(store, &args)?;
-    let outer = sketch.loops.iter().filter(|lp| lp.len() >= 3).count();
-    if outer != 1 {
+    // One outline, with any courtyards inside it.
+    if sketch::profiles(store, &sketch).len() != 1 {
         return Err(Error::new(
             "roof.one_loop",
-            "a roof footprint is one closed loop (openings in roofs come later)",
+            "a roof footprint is one closed outline, with any courtyards inside it",
         ));
     }
     let mut edges = BTreeMap::new();
@@ -1224,10 +1392,12 @@ pub const ROOF_SHAPES: &[(RoofShape, &str)] = &[
 /// Which outer footprint curves (by key) slope for `shape`; `None` when the footprint has no
 /// curve opposite its longest one (Shed reversed).
 pub fn shape_slopes(sketch: &sketch::Sketch, shape: RoofShape) -> Option<Vec<(u32, bool)>> {
+    // Courtyards' curves take the same rule as the outline's (the longest curve is the
+    // outline's longest, as every loop's curves are among those compared).
     let outer: Vec<&sketch::SketchCurve> = sketch
         .loops
-        .first()?
         .iter()
+        .flatten()
         .filter_map(|k| sketch.curves.iter().find(|c| c.key == *k))
         .collect();
     let dir = |c: &sketch::SketchCurve| {

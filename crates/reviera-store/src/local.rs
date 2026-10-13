@@ -930,6 +930,18 @@ impl LocalProject {
                 .faces
                 .iter()
                 .map(|f| {
+                    // A slab with courtyards through it is written as its triangles.
+                    if !f.holes.is_empty() {
+                        return geometry::Polyhedron {
+                            points: f.slab.0.clone(),
+                            faces: f
+                                .slab
+                                .1
+                                .chunks(3)
+                                .map(|t| t.iter().map(|i| *i as usize).collect())
+                                .collect(),
+                        };
+                    }
                     let n = f.slab.0.len() / 2;
                     let mut faces = vec![(0..n).rev().collect::<Vec<_>>(), (n..2 * n).collect()];
                     faces.extend((0..n).map(|i| vec![i, (i + 1) % n, n + (i + 1) % n, n + i]));

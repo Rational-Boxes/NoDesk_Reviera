@@ -684,3 +684,385 @@ fn attach_walls_below_fills_the_gables() {
     // Nothing is left to attach.
     assert!(reviera_core::walls::attach::walls_below(doc.store(), roof).is_empty());
 }
+
+/// Each attached wall's top follows the roof's underside along its centreline (give or take the
+/// slope across its 200 mm), and nowhere dips below the 3 m plate.
+fn check_tops(doc: &Document, walls: &[ElementId], g: &roofs::RoofGeometry) {
+    let solved = reviera_core::walls::solve(doc.store());
+    for w in walls {
+        let body = &solved.bodies[w];
+        let a = reviera_core::walls::attach::attached_body(doc.store(), *w, body)
+            .unwrap()
+            .unwrap();
+        let (s, e) = (body.geometry.start, body.geometry.end);
+        let highest = (0..=20)
+            .map(|k| {
+                let t = f64::from(k) / 20.0;
+                let p = [s[0] + (e[0] - s[0]) * t, s[1] + (e[1] - s[1]) * t];
+                g.underside(p).expect("the roof covers the wall")
+            })
+            .fold(f64::MIN, f64::max);
+        assert!(
+            a.z_max >= highest - 1e-6 && a.z_max - highest < 0.15,
+            "wall {w}: top {} vs roof {highest}",
+            a.z_max
+        );
+        assert!(
+            a.z_min >= 3.0 - 1e-6,
+            "wall {w} dips below the plate: {}",
+            a.z_min
+        );
+    }
+}
+
+/// A square building: a pyramid (every side slopes) whose apex is over the middle, then a gable;
+/// all four walls attach both times.
+#[test]
+fn a_square_building_takes_a_pyramid_and_a_gable() {
+    let dir = tempfile::tempdir().unwrap();
+    let (_, mut doc, _, level) = project(dir.path());
+    let r = registry();
+    let c = [[0.0, 0.0], [8.0, 0.0], [8.0, 8.0], [0.0, 8.0]];
+    let mut walls = Vec::new();
+    for i in 0..4 {
+        walls.push(id(run(
+            &r,
+            &mut doc,
+            "wall.create",
+            json!({
+                "curve": { "line": { "start": c[(i + 1) % 4], "end": c[i] } },
+                "base_level": level.0,
+                "top_constraint": { "unconnected": 3 },
+            }),
+        )
+        .unwrap()));
+    }
+    walls.sort();
+    let outer = [[-0.1, -0.1], [8.1, -0.1], [8.1, 8.1], [-0.1, 8.1]];
+    let roof = id(run(
+        &r,
+        &mut doc,
+        "roof.create_footprint",
+        json!({
+            "curves": curves(&outer, |_| json!({ "overhang": 0.5 })),
+            "level_id": level.0,
+            "base_offset": 3.0,
+            "slope": "45°",
+        }),
+    )
+    .unwrap());
+    // A pyramid: four faces meeting at one apex over the middle, 4.1 m above the plate.
+    let g = geometry(&doc, roof);
+    assert_eq!(g.faces.len(), 4);
+    assert!((g.underside([4.0, 4.0]).unwrap() - 7.1).abs() < 1e-6);
+    assert!((g.max_height() - 4.1).abs() < 1e-6 || g.max_height() > 4.0);
+    assert!((g.projected_area() - 9.2 * 9.2).abs() < 1e-6);
+    run(
+        &r,
+        &mut doc,
+        "roof.attach_walls",
+        json!({ "roof_id": roof.0 }),
+    )
+    .unwrap();
+    check_tops(&doc, &walls, &g);
+    // Every wall of a pyramid is an eave wall: none rises above the plate by more than the
+    // slope across its width.
+    let solved = reviera_core::walls::solve(doc.store());
+    for w in &walls {
+        let a = reviera_core::walls::attach::attached_body(doc.store(), *w, &solved.bodies[w])
+            .unwrap()
+            .unwrap();
+        assert!(a.z_max < 3.0 + 0.25, "{}", a.z_max);
+    }
+    // As a gable, two walls become gable ends reaching the ridge, 4.1 m up.
+    run(
+        &r,
+        &mut doc,
+        "roof.set_shape",
+        json!({ "roof_id": roof.0, "shape": "gable" }),
+    )
+    .unwrap();
+    let g = geometry(&doc, roof);
+    assert_eq!(g.faces.len(), 2);
+    check_tops(&doc, &walls, &g);
+    let solved = reviera_core::walls::solve(doc.store());
+    let ends = walls
+        .iter()
+        .filter(|w| {
+            let a = reviera_core::walls::attach::attached_body(doc.store(), **w, &solved.bodies[w])
+                .unwrap()
+                .unwrap();
+            (a.z_max - 7.1).abs() < 1e-6
+        })
+        .count();
+    assert_eq!(ends, 2);
+}
+
+/// An L-shaped building (ARC-ROOF-001, owner request): the roof over the walls' outer faces
+/// fills the footprint at the convex and the concave (inner) corner alike, and every perimeter
+/// wall, those meeting at the inner corner included, attaches with its top on the roof.
+fn roof_an_l(l: [[f64; 2]; 6], outer: [[f64; 2]; 6], east_x: f64, ridge: f64) {
+    let dir = tempfile::tempdir().unwrap();
+    let (_, mut doc, _, level) = project(dir.path());
+    let r = registry();
+    // Walls drawn clockwise so their exterior faces are outside.
+    let mut walls = Vec::new();
+    for i in 0..6 {
+        walls.push(id(run(
+            &r,
+            &mut doc,
+            "wall.create",
+            json!({
+                "curve": { "line": { "start": l[(i + 1) % 6], "end": l[i] } },
+                "base_level": level.0,
+                "top_constraint": { "unconnected": 3 },
+            }),
+        )
+        .unwrap()));
+    }
+    walls.sort();
+    let roof = id(run(
+        &r,
+        &mut doc,
+        "roof.create_footprint",
+        json!({
+            "curves": curves(&outer, |_| json!({ "overhang": 0.5 })),
+            "level_id": level.0,
+            "base_offset": 3.0,
+            "slope": "45°",
+        }),
+    )
+    .unwrap());
+
+    // The hip roof covers the L grown by the overhang (0.6 m from the centrelines), the inner
+    // corner neither missed nor doubled: both Ls are 11.2 × 5.2 + 5.2 × 4.0.
+    let g = geometry(&doc, roof);
+    assert!(
+        (g.projected_area() - 79.04).abs() < 1e-6,
+        "{}",
+        g.projected_area()
+    );
+    // Over every corner, just inside, the roof is there and above the plate.
+    for (i, c) in l.iter().enumerate() {
+        let (prev, next) = (l[(i + 5) % 6], l[(i + 1) % 6]);
+        let toward = |q: [f64; 2]| {
+            let d = [q[0] - c[0], q[1] - c[1]];
+            let n = d[0].hypot(d[1]);
+            [d[0] / n * 0.3, d[1] / n * 0.3]
+        };
+        let (a, b) = (toward(prev), toward(next));
+        // At a convex corner the inside is between the two walls; at the concave (inner)
+        // corner it is the other way.
+        let turn = (c[0] - prev[0]) * (next[1] - c[1]) - (c[1] - prev[1]) * (next[0] - c[0]);
+        let k = if turn > 0.0 { 1.0 } else { -1.0 };
+        let p = [c[0] + k * (a[0] + b[0]), c[1] + k * (a[1] + b[1])];
+        let z = g
+            .underside(p)
+            .unwrap_or_else(|| panic!("no roof over {p:?}"));
+        assert!(z >= 3.0 - 1e-9, "{p:?}: {z}");
+    }
+
+    // Every wall is on the perimeter and fits under the roof, the two at the inner corner too.
+    let below = reviera_core::walls::attach::walls_below(doc.store(), roof);
+    assert_eq!(below, walls);
+    run(
+        &r,
+        &mut doc,
+        "roof.attach_walls",
+        json!({ "roof_id": roof.0 }),
+    )
+    .unwrap();
+    check_tops(&doc, &walls, &g);
+
+    // As a gable: the curves along the long side slope, the ends are gables. The walls stay
+    // attached and follow, and the east end wall rises to the wing's ridge, 2.1 m up (half
+    // the wing's 4.2 m width at 45°).
+    run(
+        &r,
+        &mut doc,
+        "roof.set_shape",
+        json!({ "roof_id": roof.0, "shape": "gable" }),
+    )
+    .unwrap();
+    let g = geometry(&doc, roof);
+    check_tops(&doc, &walls, &g);
+    let solved = reviera_core::walls::solve(doc.store());
+    let east = walls
+        .iter()
+        .find(|w| {
+            let b = &solved.bodies[w].geometry;
+            (b.start[0] - east_x).abs() < 1e-9 && (b.end[0] - east_x).abs() < 1e-9
+        })
+        .unwrap();
+    let a = reviera_core::walls::attach::attached_body(doc.store(), *east, &solved.bodies[east])
+        .unwrap()
+        .unwrap();
+    assert!((a.z_max - ridge).abs() < 1e-6, "{}", a.z_max);
+}
+
+#[test]
+fn an_l_shaped_building_is_roofed_and_its_walls_attach() {
+    // Centrelines of the L, counter-clockwise; the inner corner is at (4, 4). The roof's
+    // footprint is on the walls' outer faces, 0.1 m out.
+    roof_an_l(
+        [
+            [0.0, 0.0],
+            [10.0, 0.0],
+            [10.0, 4.0],
+            [4.0, 4.0],
+            [4.0, 8.0],
+            [0.0, 8.0],
+        ],
+        [
+            [-0.1, -0.1],
+            [10.1, -0.1],
+            [10.1, 4.1],
+            [4.1, 4.1],
+            [4.1, 8.1],
+            [-0.1, 8.1],
+        ],
+        10.0,
+        5.1,
+    );
+}
+
+#[test]
+fn an_l_opening_the_other_way_is_roofed_too() {
+    // The L turned so its inner corner is at (6, 4): the wing runs up the east side, and the
+    // walls meet the concave corner the other way round.
+    roof_an_l(
+        [
+            [0.0, 0.0],
+            [10.0, 0.0],
+            [10.0, 8.0],
+            [6.0, 8.0],
+            [6.0, 4.0],
+            [0.0, 4.0],
+        ],
+        [
+            [-0.1, -0.1],
+            [10.1, -0.1],
+            [10.1, 8.1],
+            [5.9, 8.1],
+            [5.9, 4.1],
+            [-0.1, 4.1],
+        ],
+        10.0,
+        // As a gable, the whole east side (8.2 m deep) is one gable end: the slopes from the
+        // south and north eaves meet 4.1 m up.
+        7.1,
+    )
+}
+
+/// A building around a central courtyard (owner request): the roof's footprint is the outline
+/// and the courtyard. Every edge slopes, outward to the street and inward to the courtyard; the
+/// ring is roofed once, the courtyard stays open, and the outer and courtyard walls attach.
+#[test]
+fn a_courtyard_building_is_roofed_around_its_courtyard() {
+    let dir = tempfile::tempdir().unwrap();
+    let (mut project, mut doc, path, level) = project(dir.path());
+    let r = registry();
+    // Outer walls on a 12 × 12 square and courtyard walls on a 4 × 4 square in the middle.
+    let outer = [[0.0, 0.0], [12.0, 0.0], [12.0, 12.0], [0.0, 12.0]];
+    let court = [[4.0, 4.0], [8.0, 4.0], [8.0, 8.0], [4.0, 8.0]];
+    let mut walls = Vec::new();
+    // Outer walls clockwise (exterior outside); courtyard walls counter-clockwise (exterior
+    // toward the courtyard).
+    for i in 0..4 {
+        walls.push(id(run(
+            &r,
+            &mut doc,
+            "wall.create",
+            json!({
+                "curve": { "line": { "start": outer[(i + 1) % 4], "end": outer[i] } },
+                "base_level": level.0,
+                "top_constraint": { "unconnected": 3 },
+            }),
+        )
+        .unwrap()));
+        walls.push(id(run(
+            &r,
+            &mut doc,
+            "wall.create",
+            json!({
+                "curve": { "line": { "start": court[i], "end": court[(i + 1) % 4] } },
+                "base_level": level.0,
+                "top_constraint": { "unconnected": 3 },
+            }),
+        )
+        .unwrap()));
+    }
+    walls.sort();
+    // The footprint on the outer walls' outer faces and the courtyard walls' courtyard faces.
+    let ring = [[-0.1, -0.1], [12.1, -0.1], [12.1, 12.1], [-0.1, 12.1]];
+    let hole = [[4.1, 4.1], [7.9, 4.1], [7.9, 7.9], [4.1, 7.9]];
+    let mut all = curves(&ring, |_| json!({ "overhang": 0.4 }));
+    if let (Value::Array(a), Value::Array(b)) =
+        (&mut all, curves(&hole, |_| json!({ "overhang": 0.4 })))
+    {
+        a.extend(b);
+    }
+    let roof = id(run(
+        &r,
+        &mut doc,
+        "roof.create_footprint",
+        json!({ "curves": all, "level_id": level.0, "base_offset": 3.0, "slope": "45°" }),
+    )
+    .unwrap());
+    let g = geometry(&doc, roof);
+    assert_eq!(g.faces.len(), 8);
+    // The ring is roofed once: the outline grown by the overhang (13.0 m square) less the
+    // courtyard shrunk by it (3.0 m square).
+    assert!(
+        (g.projected_area() - (13.0 * 13.0 - 3.0 * 3.0)).abs() < 1e-6,
+        "{}",
+        g.projected_area()
+    );
+    // The courtyard is open; the ridge runs around halfway across the 4.2 m ring, 2.1 up.
+    assert!(g.underside([6.0, 6.0]).is_none());
+    for p in [[2.0, 6.0], [6.0, 2.0], [10.0, 6.0], [6.0, 10.0]] {
+        assert!((g.underside(p).unwrap() - 5.1).abs() < 1e-6, "{p:?}");
+    }
+    // Both the street walls and the courtyard walls are on the perimeter and attach.
+    assert_eq!(
+        reviera_core::walls::attach::walls_below(doc.store(), roof),
+        walls
+    );
+    run(
+        &r,
+        &mut doc,
+        "roof.attach_walls",
+        json!({ "roof_id": roof.0 }),
+    )
+    .unwrap();
+    check_tops(&doc, &walls, &g);
+
+    // As a flat roof, the courtyard is a hole through one slab.
+    run(
+        &r,
+        &mut doc,
+        "roof.set_shape",
+        json!({ "roof_id": roof.0, "shape": "flat" }),
+    )
+    .unwrap();
+    let g = geometry(&doc, roof);
+    assert_eq!(g.predefined, "FLAT_ROOF");
+    assert!(g.underside([6.0, 6.0]).is_none());
+    assert!(
+        (g.volume() - (13.0 * 13.0 - 3.0 * 3.0) * 0.3).abs() < 1e-6,
+        "{}",
+        g.volume()
+    );
+    // The slab with its hole is closed: its mesh's volume is the same.
+    let m = &g.faces[0].slab;
+    let flat: Vec<f64> = m.0.iter().flatten().copied().collect();
+    let v = volume(&flat, &m.1);
+    assert!((v - g.volume()).abs() < 1e-6, "{v}");
+    // Saved, the geometry engine reads the same slab, hole and all.
+    project.save(&doc).unwrap();
+    let ifc = IfcModel::open(&path).unwrap();
+    let meshes = ifc.tessellate(1).unwrap();
+    let roof_mesh = meshes.iter().find(|m| m.class == "IfcRoof").unwrap();
+    let v = volume(&roof_mesh.verts, &roof_mesh.faces).abs();
+    assert!((v - g.volume()).abs() / g.volume() < 1e-3, "{v}");
+}

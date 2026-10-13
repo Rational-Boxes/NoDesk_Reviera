@@ -379,21 +379,33 @@ pub fn walls_below(store: &Store, roof: ElementId) -> Vec<ElementId> {
             regions.push((key, crate::arrangement::regions(&edges)));
         }
         let rs = &regions.iter().find(|(k, _)| *k == key).expect("added").1;
-        is_perimeter(geometry, rs)
+        is_perimeter(geometry, rs, &g)
     });
     out.sort();
     out
 }
 
-/// Whether a wall is on the perimeter: just beside one of its faces, at its middle, lies no
-/// enclosed region.
-fn is_perimeter(g: &super::WallGeometry, regions: &[crate::arrangement::Region]) -> bool {
+/// Whether a wall is on the perimeter: beside one of its faces, at its middle, lies no enclosed
+/// region, or the region there reaches out from under the roof (a courtyard).
+fn is_perimeter(
+    g: &super::WallGeometry,
+    regions: &[crate::arrangement::Region],
+    roof: &RoofGeometry,
+) -> bool {
     let m = [(g.start[0] + g.end[0]) / 2.0, (g.start[1] + g.end[1]) / 2.0];
     let n = g.normal();
     let d = g.width / 2.0 + 0.05;
     [1.0, -1.0].iter().any(|s| {
-        let p = [m[0] + n[0] * d * s, m[1] + n[1] * d * s];
-        !regions.iter().any(|r| r.contains(p))
+        let at = |k: f64| [m[0] + n[0] * s * (d + k), m[1] + n[1] * s * (d + k)];
+        let p = at(0.0);
+        let Some(r) = regions.iter().find(|r| r.contains(p)) else {
+            return true;
+        };
+        // Walk away from the wall within the region: a spot the roof leaves open is outdoors.
+        (1..=200)
+            .map(|k| at(0.25 * f64::from(k)))
+            .take_while(|q| r.contains(*q))
+            .any(|q| roof.underside(q).is_none())
     })
 }
 
