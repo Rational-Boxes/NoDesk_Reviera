@@ -96,6 +96,9 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(ElementAlign),
         registry.add(ElementPin),
         registry.add(ElementUnpin),
+        registry.add(FloorCreate),
+        registry.add(FloorEditBoundary),
+        registry.add(FloorSetLevel),
     ];
     for r in results {
         r.expect("core commands are valid");
@@ -363,6 +366,7 @@ pub fn dependents_of(store: &crate::store::Store, id: ElementId) -> Vec<ElementI
             crate::annotations::dimension_data(e).is_some_and(|d| d.view == guid)
                 || e.param("@type").and_then(serde_json::Value::as_str) == Some(guid.as_str())
                 || crate::inserts::insert_recipe(e).is_some_and(|r| r.host == guid)
+                || crate::floors::floor_recipe(e).is_some_and(|r| r.level == guid)
                 || crate::inserts::opening_of(e).is_some_and(|i| i == guid)
                 || crate::grids::grid_data(e).is_some_and(|g| {
                     g.system == guid || g.type_guid.as_deref() == Some(guid.as_str())
@@ -1900,6 +1904,44 @@ modify_command!(
     modify::PinParams,
     (),
     |t, p| modify::pin(t, p, false)
+);
+
+// ---- Floors (Ch 3 ARC-FLR-001) ----
+
+use crate::floors;
+
+modify_command!(
+    FloorCreate,
+    "floor.create",
+    "Create a floor",
+    "Creates a floor from boundary curves (`loops`; each `{line, lock?}`): outer loops are the floor, \
+     inner loops holes. Its top is `offset` above the level and it hangs down by its type's thickness. \
+     Curves picked from walls are trimmed or extended to meet; with `lock: {element, sub}` they follow \
+     the wall face. Invalid sketches are refused (sketch.open, sketch.intersect, ...) with the points.",
+    "Floor",
+    floors::CreateParams,
+    ElementId,
+    floors::create
+);
+modify_command!(
+    FloorEditBoundary,
+    "floor.edit_boundary",
+    "Edit a floor's boundary",
+    "Replaces a floor's boundary curves (as floor.create's loops).",
+    "Edit Boundary",
+    floors::EditBoundaryParams,
+    (),
+    floors::edit_boundary
+);
+modify_command!(
+    FloorSetLevel,
+    "floor.set_level",
+    "Set floors' level and offset",
+    "Sets floors' level and/or the height offset of their top above it (accepts units).",
+    "Floor Level",
+    floors::SetLevelParams,
+    (),
+    floors::set_level
 );
 
 use crate::plans::{self, CreatePlanParams, SetViewRangeParams, ViewRangeReport};

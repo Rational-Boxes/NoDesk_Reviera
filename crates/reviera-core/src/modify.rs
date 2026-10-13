@@ -222,6 +222,10 @@ pub(crate) fn transform(
                 inserts::move_by(txn, id, v)?;
                 out.push(id);
             }
+        } else if crate::floors::floor_recipe(e).is_some() {
+            let target = if copy { txn.create(copied(e))? } else { id };
+            crate::floors::translate(txn, target, &|p| x.point(p), x.reflects())?;
+            out.push(target);
         } else {
             return Err(Error::new(
                 "element.not_movable",

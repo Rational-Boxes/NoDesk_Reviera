@@ -13,6 +13,7 @@ use reviera_core::ElementId;
 pub mod annotation;
 pub mod font;
 pub mod plan;
+pub mod solid;
 pub mod viewcube;
 
 /// Class suffix of meshes drawn in 3D but not in plans (a door's closed panel, whose plan symbol

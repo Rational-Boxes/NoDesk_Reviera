@@ -334,6 +334,7 @@ impl App {
             .filter(|m| match m.element {
                 Some(e) => store.get(e).is_some_and(|e| {
                     walls::wall_recipe(e).is_none()
+                        && reviera_core::floors::floor_recipe(e).is_none()
                         && reviera_core::inserts::kind_of(e).is_none()
                         && reviera_core::inserts::opening_of(e).is_none()
                 }),
@@ -361,6 +362,20 @@ impl App {
                     .collect(),
                 indices,
             });
+        }
+        // Floors: each outer boundary with its holes, hanging down from the top.
+        for (id, f) in reviera_core::floors::all(store) {
+            for p in &f.profiles {
+                let (positions, indices) =
+                    reviera_render::solid::extrude(&p.outer, &p.holes, f.top - f.thickness, f.top);
+                meshes.push(reviera_render::SceneMesh {
+                    element: Some(id),
+                    color: reviera_render::class_color("IfcSlab"),
+                    class: "IfcSlab".into(),
+                    positions,
+                    indices,
+                });
+            }
         }
         // Doors and windows: frames and glass; a door's closed panel is drawn in 3D only (plans
         // show its swing).

@@ -1238,3 +1238,245 @@ pub(crate) fn relate_one(
     }
     Ok(())
 }
+
+/// The entities of a slab body written by [`write_slab`], and its geometry in file units
+/// (placement height, depth, and each solid's rings of points) to compare with.
+struct SlabShape {
+    entities: Vec<StepId>,
+    signature: Vec<f64>,
+}
+
+impl SlabShape {
+    fn read(ifc: &IfcModel, element: StepId) -> Result<Option<Self>> {
+        let e = entity(ifc, element)?;
+        let one = |e: &Entity, attr: &str| e.refs(attr).first().copied();
+        macro_rules! get {
+            ($v:expr) => {
+                match $v {
+                    Some(v) => v,
+                    None => return Ok(None),
+                }
+            };
+        }
+        let coords = |id: StepId| -> Result<Vec<f64>> {
+            Ok(match ifc.attribute(id, "Coordinates")? {
+                AttrValue::List(c) => c
+                    .iter()
+                    .filter_map(|v| match v {
+                        AttrValue::Real(r) => Some(*r),
+                        _ => None,
+                    })
+                    .collect(),
+                _ => Vec::new(),
+            })
+        };
+        let placement = get!(one(&e, "ObjectPlacement"));
+        let axes = get!(one(&entity(ifc, placement)?, "RelativePlacement"));
+        let location = get!(one(&entity(ifc, axes)?, "Location"));
+        let shape = get!(one(&e, "Representation"));
+        let reps = entity(ifc, shape)?.refs("Representations");
+        if reps.len() != 1 {
+            return Ok(None);
+        }
+        let mut entities = vec![placement, axes, location, shape, reps[0]];
+        let z = coords(location)?.get(2).copied().unwrap_or(0.0);
+        let mut signature = vec![z];
+        let solids = entity(ifc, reps[0])?.refs("Items");
+        signature.push(solids.len() as f64);
+        for solid in solids {
+            let s = entity(ifc, solid)?;
+            if !s.class.eq_ignore_ascii_case("IfcExtrudedAreaSolid") {
+                return Ok(None);
+            }
+            let profile = get!(one(&s, "SweptArea"));
+            let pr = entity(ifc, profile)?;
+            let position = get!(one(&s, "Position"));
+            let position_location = get!(one(&entity(ifc, position)?, "Location"));
+            let direction = get!(one(&s, "ExtrudedDirection"));
+            entities.extend([solid, profile, position, position_location, direction]);
+            if let AttrValue::Real(d) = s.get("Depth") {
+                signature.push(*d);
+            }
+            let curves: Vec<StepId> = pr
+                .refs("OuterCurve")
+                .into_iter()
+                .chain(pr.refs("InnerCurves"))
+                .collect();
+            signature.push(curves.len() as f64);
+            for c in curves {
+                let points = entity(ifc, c)?.refs("Points");
+                entities.push(c);
+                signature.push(points.len() as f64);
+                for p in &points {
+                    signature.extend(coords(*p)?);
+                }
+                entities.extend(points);
+            }
+        }
+        entities.sort_by_key(|s| s.0);
+        entities.dedup();
+        Ok(Some(Self {
+            entities,
+            signature,
+        }))
+    }
+}
+
+/// An outer boundary and its holes (points in metres).
+pub(crate) type Rings<'a> = (&'a [[f64; 2]], Vec<&'a [[f64; 2]]>);
+
+/// A slab's body: one solid per outer boundary (points in metres, rings closed by repeating the
+/// first point), extruded down by `depth` from a placement at `top`.
+pub(crate) struct SlabBody<'a> {
+    pub rings: Vec<Rings<'a>>,
+    pub top: f64,
+    pub depth: f64,
+}
+
+impl SlabBody<'_> {
+    fn signature(&self, scale: f64) -> Vec<f64> {
+        let mut s = vec![self.top / scale, self.rings.len() as f64];
+        for (outer, holes) in &self.rings {
+            s.push(self.depth / scale);
+            s.push(1.0 + holes.len() as f64);
+            for ring in std::iter::once(outer).chain(holes.iter()) {
+                s.push(ring.len() as f64 + 1.0);
+                for p in ring.iter().chain(ring.first()) {
+                    s.extend([p[0] / scale, p[1] / scale]);
+                }
+            }
+        }
+        s
+    }
+}
+
+/// Writes a slab's placement and body (a Reviera floor), unless it already has exactly this
+/// geometry.
+pub(crate) fn write_slab(
+    ifc: &mut IfcModel,
+    element: StepId,
+    body: &SlabBody<'_>,
+    scale: f64,
+    contexts: Contexts,
+) -> Result<()> {
+    let existing = SlabShape::read(ifc, element)?;
+    let target = body.signature(scale);
+    if let Some(e) = &existing
+        && e.signature.len() == target.len()
+        && e.signature
+            .iter()
+            .zip(&target)
+            .all(|(a, b)| (a - b).abs() < 1e-9)
+    {
+        return Ok(());
+    }
+    if let Some(old) = existing {
+        for id in old.entities {
+            ifc.remove(id)?;
+        }
+    }
+    let r = |id: StepId| AttrValue::Ref(id.0);
+    let location = create_with(
+        ifc,
+        "IfcCartesianPoint",
+        &[("Coordinates", reals(&[0.0, 0.0, body.top / scale]))],
+    )?;
+    let axes = create_with(ifc, "IfcAxis2Placement3D", &[("Location", r(location))])?;
+    let placement = create_with(ifc, "IfcLocalPlacement", &[("RelativePlacement", r(axes))])?;
+    let mut solids = Vec::new();
+    for (outer, holes) in &body.rings {
+        let polyline = |ifc: &mut IfcModel, ring: &[[f64; 2]]| -> Result<StepId> {
+            let points = ring
+                .iter()
+                .chain(ring.first())
+                .map(|p| {
+                    create_with(
+                        ifc,
+                        "IfcCartesianPoint",
+                        &[("Coordinates", reals(&[p[0] / scale, p[1] / scale]))],
+                    )
+                    .map(r)
+                })
+                .collect::<Result<Vec<_>>>()?;
+            create_with(ifc, "IfcPolyline", &[("Points", AttrValue::List(points))])
+        };
+        let outer_curve = polyline(ifc, outer)?;
+        let profile = if holes.is_empty() {
+            create_with(
+                ifc,
+                "IfcArbitraryClosedProfileDef",
+                &[
+                    ("ProfileType", AttrValue::Enum("AREA".into())),
+                    ("OuterCurve", r(outer_curve)),
+                ],
+            )?
+        } else {
+            let inner = holes
+                .iter()
+                .map(|h| polyline(ifc, h).map(r))
+                .collect::<Result<Vec<_>>>()?;
+            create_with(
+                ifc,
+                "IfcArbitraryProfileDefWithVoids",
+                &[
+                    ("ProfileType", AttrValue::Enum("AREA".into())),
+                    ("OuterCurve", r(outer_curve)),
+                    ("InnerCurves", AttrValue::List(inner)),
+                ],
+            )?
+        };
+        let position_location = create_with(
+            ifc,
+            "IfcCartesianPoint",
+            &[("Coordinates", reals(&[0.0, 0.0, 0.0]))],
+        )?;
+        let position = create_with(
+            ifc,
+            "IfcAxis2Placement3D",
+            &[("Location", r(position_location))],
+        )?;
+        let direction = create_with(
+            ifc,
+            "IfcDirection",
+            &[("DirectionRatios", reals(&[0.0, 0.0, -1.0]))],
+        )?;
+        solids.push(r(create_with(
+            ifc,
+            "IfcExtrudedAreaSolid",
+            &[
+                ("SweptArea", r(profile)),
+                ("Position", r(position)),
+                ("ExtrudedDirection", r(direction)),
+                ("Depth", AttrValue::Real(body.depth / scale)),
+            ],
+        )?));
+    }
+    let rep = create_with(
+        ifc,
+        "IfcShapeRepresentation",
+        &[
+            ("ContextOfItems", r(contexts.body)),
+            ("RepresentationIdentifier", AttrValue::String("Body".into())),
+            ("RepresentationType", AttrValue::String("SweptSolid".into())),
+            ("Items", AttrValue::List(solids)),
+        ],
+    )?;
+    let shape = create_with(
+        ifc,
+        "IfcProductDefinitionShape",
+        &[("Representations", AttrValue::List(vec![r(rep)]))],
+    )?;
+    ifc.set_attribute(element, "ObjectPlacement", &r(placement))?;
+    ifc.set_attribute(element, "Representation", &r(shape))?;
+    Ok(())
+}
+
+/// Removes a slab body written by [`write_slab`] (before the slab itself is removed).
+pub(crate) fn remove_slab(ifc: &mut IfcModel, element: StepId) -> Result<()> {
+    if let Some(shape) = SlabShape::read(ifc, element)? {
+        for id in shape.entities {
+            ifc.remove(id)?;
+        }
+    }
+    Ok(())
+}

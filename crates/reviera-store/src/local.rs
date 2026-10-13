@@ -16,7 +16,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use reviera_core::grids as core_grids;
 use reviera_core::{
-    Document, ElementId, GlobalId, ModelVersion, NewElement, inserts, levels, walls,
+    Document, ElementId, GlobalId, ModelVersion, NewElement, floors, inserts, levels, walls,
 };
 use reviera_ifc::{AttrValue, IfcModel, Schema, StepId};
 use reviera_rxd::{
@@ -484,6 +484,9 @@ impl LocalProject {
             ) {
                 geometry::remove_boxes(&mut self.ifc, step)?;
             }
+            if recipe_kind == Some(floors::FLOOR_RECIPE) {
+                geometry::remove_slab(&mut self.ifc, step)?;
+            }
             // The element's own property and quantity sets go with it.
             params::remove_all(&mut self.ifc, &mut self.sets, step)?;
             self.types.remove(&step);
@@ -618,6 +621,7 @@ impl LocalProject {
         self.write_regenerated(doc, &touched)?;
         if !touched.is_empty() {
             self.write_inserts(doc)?;
+            self.write_floors(doc)?;
         }
         if grids_touched {
             self.write_grids(doc)?;
@@ -803,6 +807,46 @@ impl LocalProject {
                 if self.ifc.attribute(step, attr)? != v {
                     self.ifc.set_attribute(step, attr, &v)?;
                 }
+            }
+        }
+        Ok(())
+    }
+
+    /// Writes every Reviera floor (ARC-FLR-001): its body, extruded down from its top, contained
+    /// in its level. Floors whose geometry did not change are left as they are.
+    fn write_floors(&mut self, doc: &Document) -> Result<()> {
+        let store = doc.store();
+        let all = floors::all(store);
+        if all.is_empty() {
+            return Ok(());
+        }
+        let contexts = geometry::Contexts::find(&self.ifc)?;
+        let owner_history = self.new_owner_history()?;
+        for (id, f) in &all {
+            let Some(&step) = self.steps.get(id) else {
+                continue;
+            };
+            let body = geometry::SlabBody {
+                rings: f
+                    .profiles
+                    .iter()
+                    .map(|p| {
+                        (
+                            p.outer.as_slice(),
+                            p.holes.iter().map(Vec::as_slice).collect(),
+                        )
+                    })
+                    .collect(),
+                top: f.top,
+                depth: f.thickness,
+            };
+            geometry::write_slab(&mut self.ifc, step, &body, self.length_scale, contexts)?;
+            let storey = floors::floor_recipe(store.get(*id).expect("listed"))
+                .and_then(|r| GlobalId::parse(&r.level))
+                .and_then(|g| store.find_by_guid(&g))
+                .and_then(|l| self.steps.get(&l).copied());
+            if let Some(storey) = storey {
+                geometry::contain(&mut self.ifc, step, storey, owner_history)?;
             }
         }
         Ok(())
