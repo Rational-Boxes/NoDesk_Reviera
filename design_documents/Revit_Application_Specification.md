@@ -11650,6 +11650,24 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 
 *Owner clarification (2026-10-13): both **simple** stairs (straight runs with landings: straight, L and U arrangements) and **spiral** stairs (full-step and centre-ends) are required.*
 
+**Implementation notes (2026-10-13), ARC-STAIR-001…005.**
+- As built:
+  - `stair.create(type_id?, base_level, top?, base_offset?, top_offset?, desired_risers?, tread_depth?, width?, runs[{start, end?, center?, ccw?, width?, risers?}])` and `stair.set_params(stair_ids[], base_level?, base_offset?, top?, top_offset?, desired_risers?, tread_depth?, width?, rebalance?)`.
+  - A run with `center` is a spiral about it, its walking line through `start`. It turns toward `end`, or with no `end` it places every remaining riser (full-step).
+  - The top defaults to the next level up.
+- Calculation follows ARC-STAIR-003, with *Begin and End with Riser* on: `N = ceil(H / R_max)` or the desired count, and `k − 1` treads per run of `k` risers. Runs keep their riser counts, and `stair.set_params` gives the last run the difference.
+- Geometry:
+  - **Straight runs** are monolithic: the profile of the steps, with a smooth underside at the structural depth square to the pitch line, pushed across the run's width.
+  - **Spiral treads** are annular sectors (wedges when the inner radius reaches the centre), one tread depth along the walking line each. Each is a solid down by a riser and the structural depth; the first stands on the floor.
+  - **Automatic landings** are the convex hull of the adjoining run ends (extended by the width at turns), at the shared height and the type's landing thickness.
+- The type is "Cast-In-Place Stair" (`IfcStairType`): maximum riser 180 mm, minimum tread 280 mm, minimum width 1 m, structural depth 150 mm, landing 200 mm.
+- **IFC:** `IfcStair` with its predefined type from the arrangement (`SPIRAL_STAIR` for a spiral); one faceted B-rep per run, landing or spiral tread, contained in the base level. Aggregated flights and landings come later.
+- **Window:**
+  - **Stair (ST)**: click each run's start and end, with the riser countdown; landings join the runs.
+  - **Spiral Stair**: click the centre, then a point on the walking line.
+  - Properties edit the desired risers, tread depth and width, and show the actual values and warnings.
+- **Later:** winders, centre-ends spiral by clicks, assembled runs and nosings, supports, direct-manipulation handles, multistory stairs, plan symbols above the cut, and the generated railings (ARC-RAIL-001).
+
 **Workflow.**
 1. The user starts Architecture › Circulation › **Stair** in a plan or 3D view. Tiling a plan view and a 3D view side by side is recommended.
 2. In the Components panel, **Run** is selected. The Draw gallery offers Straight, Full-Step Spiral, Center-Ends Spiral, L-Shape Winder, U-Shape Winder and **Create Sketch**.

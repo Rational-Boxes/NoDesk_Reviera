@@ -105,8 +105,9 @@ The KIT FZK *AC20-Institute-Var-2* sample model (`test-data/ifc/`) open in Revie
   each riser within the type's maximum (180 mm by default; 3 m makes 17 risers), and runs hold
   what their length allows at the tread depth. Properties set the desired risers, tread depth and
   width and show the actual riser height and warnings. Saved as `IfcStair` (`stair.create`,
-  `stair.set_params`). Not yet: spiral and winder runs, railings, supports, and editing runs
-  with handles.
+  `stair.set_params`). Architecture › Spiral Stair makes a full-step spiral from its centre and a
+  point on its walking line (a run with a `center` in `stair.create`). Not yet: winders,
+  railings, supports, and editing runs with handles.
 - **Rooms**: Architecture › Room places a room in the region of wall faces under the cursor,
   shown as you hover. Place Rooms Automatically fills every enclosed region of the plan's level,
   numbered in reading order. Rooms measure to the walls' finish faces and leave out islands such
@@ -247,7 +248,8 @@ The KIT FZK *AC20-Institute-Var-2* sample model (`test-data/ifc/`) open in Revie
 
 ## Planned next
 
-The first milestone continues with spiral stairs and railings, roof openings (below dormers,
+The first milestone continues with railings (on stairs, decks, patios and flat roofs), a deck
+design subsystem (board layout and framing), roof openings (below dormers,
 skylights and shafts), and layered wall types. After that come general shape and CSG modelling tools,
 CADCraft drawing exchange, and the current NBIMS-US COBie layout.
 

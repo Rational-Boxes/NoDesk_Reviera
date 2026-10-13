@@ -21,6 +21,8 @@ use super::{Gui, error};
 const PREVIEW: [f32; 4] = [0.85, 0.0, 0.75, 1.0];
 /// Width of new stair runs, metres.
 const WIDTH: f64 = 1.2;
+/// Width of a new spiral stair's treads, metres.
+const SPIRAL_WIDTH: f64 = 1.0;
 /// Height of a stair on the highest level (no level above to reach), metres.
 const UNCONNECTED: f64 = 3.0;
 
@@ -36,6 +38,8 @@ pub struct StairTool {
     runs: Vec<([f64; 2], [f64; 2], u32)>,
     start: Option<[f64; 2]>,
     cursor: Option<[f64; 2]>,
+    /// A spiral: the first click is the centre, the second a point on the walking line.
+    spiral: bool,
 }
 
 impl StairTool {
@@ -59,7 +63,7 @@ impl StairTool {
 
 impl Gui {
     /// Architecture › Stair.
-    pub(crate) fn start_stair_tool(&mut self) {
+    pub(crate) fn start_stair_tool(&mut self, spiral: bool) {
         let frame = self.frame;
         if !self.ensure_plan(false) {
             return;
@@ -99,6 +103,7 @@ impl Gui {
             runs: Vec::new(),
             start: None,
             cursor: None,
+            spiral,
         });
         let _ = self.run("selection.clear", json!({}));
         self.selection_changed();
@@ -123,6 +128,13 @@ impl Gui {
             _ => 0,
         };
         let text = match t.start {
+            None if t.spiral => format!(
+                "Spiral Stair: click the centre · {} risers (Esc cancels)",
+                t.risers
+            ),
+            Some(_) if t.spiral => {
+                "Spiral Stair: click a point on the walking line (the middle of the treads); it turns counter-clockwise going up".to_owned()
+            }
             None if t.runs.is_empty() => format!(
                 "Stair: click the start of the first run · {} risers to place (Esc cancels)",
                 t.risers
@@ -160,6 +172,7 @@ impl Gui {
         };
         match t.start {
             None => t.start = Some(p),
+            Some(c) if t.spiral => return self.finish_spiral(c, p),
             Some(a) => {
                 let Some((end, k)) = t.run(a, p) else { return };
                 t.runs.push((a, end, k));
@@ -187,6 +200,38 @@ impl Gui {
             return self.frame.set_status_text("Stair cancelled", 0);
         }
         self.finish_stair();
+    }
+
+    /// A full-step spiral about `center` through `start`, with every riser.
+    fn finish_spiral(&mut self, center: [f64; 2], start: [f64; 2]) {
+        let frame = self.frame;
+        let Some(t) = self.stair_tool.take() else {
+            return;
+        };
+        if let Some(v) = self.viewport() {
+            v.set_overlay_lines(&[]);
+        }
+        let mut args = json!({
+            "base_level": t.level,
+            "width": SPIRAL_WIDTH,
+            "tread_depth": t.tread,
+            "runs": [{ "start": start, "center": center }],
+        });
+        match t.top {
+            Some(l) => args["top"] = json!({ "level": l }),
+            None => args["top"] = json!({ "unconnected": UNCONNECTED }),
+        }
+        match self.run("stair.create", args) {
+            Ok(v) => {
+                self.refresh_scene(&frame);
+                if let Some(id) = v.as_u64() {
+                    let _ = self.run("selection.set", json!({ "ids": [id] }));
+                    self.selection_changed();
+                }
+                frame.set_status_text("Spiral stair created", 0);
+            }
+            Err(e) => error(&frame, &format!("The stair was not created:\n{e}")),
+        }
     }
 
     fn finish_stair(&mut self) {
@@ -245,6 +290,28 @@ impl Gui {
             width: 0.35,
             segments: Vec::new(),
         };
+        // A spiral: the walking line and the treads' inner and outer circles.
+        if t.spiral {
+            if let (Some(c), Some(p)) = (t.start, t.cursor) {
+                let r = (p[0] - c[0]).hypot(p[1] - c[1]);
+                for rad in [r, (r - SPIRAL_WIDTH / 2.0).max(0.0), r + SPIRAL_WIDTH / 2.0] {
+                    let pts: Vec<[f64; 2]> = (0..=72)
+                        .map(|k| {
+                            let a = f64::from(k) / 72.0 * std::f64::consts::TAU;
+                            [c[0] + rad * a.cos(), c[1] + rad * a.sin()]
+                        })
+                        .collect();
+                    for w in pts.windows(2) {
+                        lines.segments.push(seg(w[0], w[1]));
+                    }
+                }
+                lines.segments.push(seg(c, p));
+            }
+            if let Some(v) = self.viewport() {
+                v.set_overlay_lines(&[lines]);
+            }
+            return;
+        }
         let mut runs = t.runs.clone();
         if let (Some(a), Some(c)) = (t.start, t.cursor)
             && let Some((end, k)) = t.run(a, c)

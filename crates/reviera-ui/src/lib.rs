@@ -3171,7 +3171,11 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         }),
         "tag.tag_all" => with(gui, Gui::tag_all),
         "stair.create" => with(gui, |g| {
-            g.start_stair_tool();
+            g.start_stair_tool(false);
+            focus(g);
+        }),
+        "stair.spiral" => with(gui, |g| {
+            g.start_stair_tool(true);
             focus(g);
         }),
         "sheet.place_view" => with(gui, Gui::place_view_on_sheet),

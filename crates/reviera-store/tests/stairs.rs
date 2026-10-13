@@ -119,3 +119,61 @@ fn a_stair_between_levels_is_saved_as_an_ifc_stair() {
     .unwrap();
     assert!(doc.store().get(stair).is_none());
 }
+
+#[test]
+fn a_spiral_stair_by_command() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("spiral.ifc");
+    let (mut project, mut doc) = LocalProject::new(Schema::Ifc4, &path).unwrap();
+    let r = registry();
+    let l1 = doc
+        .store()
+        .iter()
+        .find(|e| e.class == "IfcBuildingStorey")
+        .unwrap()
+        .id();
+    run(&r, &mut doc, "level.create", json!({ "elevation": 3.0 })).unwrap();
+    // A full-step spiral about (5, 5), its walking line 1 m out, 1 m wide: every riser in one run.
+    let stair = id(run(
+        &r,
+        &mut doc,
+        "stair.create",
+        json!({
+            "base_level": l1.0, "width": 1.0,
+            "runs": [{ "start": [6.0, 5.0], "center": [5.0, 5.0] }],
+        }),
+    )
+    .unwrap());
+    let e = doc.store().get(stair).unwrap();
+    assert_eq!(e.param("@PredefinedType").unwrap(), "SPIRAL_STAIR");
+    let g = geometry(&doc, stair);
+    assert_eq!(g.risers, 17);
+    assert_eq!(g.runs.len(), 16);
+    // Too tight a spiral is refused.
+    let err = run(
+        &r,
+        &mut doc,
+        "stair.create",
+        json!({
+            "base_level": l1.0, "width": 1.0,
+            "runs": [{ "start": [5.4, 5.0], "center": [5.0, 5.0] }],
+        }),
+    )
+    .unwrap_err();
+    assert_eq!(err.code, "stair.spiral_too_tight");
+    // Mirrored, it turns the other way about the mirrored centre.
+    run(
+        &r,
+        &mut doc,
+        "element.mirror",
+        json!({ "element_ids": [stair.0], "axis": { "start": [0.0, 0.0], "end": [0.0, 1.0] }, "copy": false }),
+    )
+    .unwrap();
+    let recipe = stairs::stair_recipe(doc.store().get(stair).unwrap()).unwrap();
+    let sp = recipe.runs[0].spiral.unwrap();
+    assert_eq!(sp.center, [-5.0, 5.0]);
+    assert!(!sp.ccw);
+    project.save(&doc).unwrap();
+    let ifc = IfcModel::open(&path).unwrap();
+    assert_eq!(ifc.entities_of_type("IfcFacetedBrep").unwrap().len(), 16);
+}

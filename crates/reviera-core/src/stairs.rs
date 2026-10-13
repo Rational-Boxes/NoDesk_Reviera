@@ -64,15 +64,26 @@ impl Default for StairType {
     }
 }
 
-/// One straight run.
+/// One run: straight, or a spiral about a centre.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct Run {
     /// The start of the run's path (plan, metres): the middle of its first riser.
     pub start: [f64; 2],
-    /// The up direction (unit).
+    /// The up direction at the start (unit): a spiral's tangent there.
     pub direction: [f64; 2],
     pub width: f64,
     pub risers: u32,
+    /// A spiral run turns about `center`; its path (the walking line) is the circle through
+    /// `start`, and each tread is the tread depth along it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub spiral: Option<Spiral>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct Spiral {
+    pub center: [f64; 2],
+    /// Turning counter-clockwise going up.
+    pub ccw: bool,
 }
 
 /// What a stair reaches.
@@ -299,13 +310,30 @@ fn left(d: [f64; 2]) -> [f64; 2] {
 }
 
 impl Run {
-    /// The run's plan length at tread depth `tread`.
+    /// The run's plan length along its path at tread depth `tread`.
     pub fn length(&self, tread: f64) -> f64 {
         f64::from(self.risers.saturating_sub(1)) * tread
     }
 
+    /// A spiral's walking-line radius, start angle and turn per tread (signed).
+    fn turn(&self, s: &Spiral, tread: f64) -> (f64, f64, f64) {
+        let d = [self.start[0] - s.center[0], self.start[1] - s.center[1]];
+        let r = d[0].hypot(d[1]).max(1e-6);
+        let sign = if s.ccw { 1.0 } else { -1.0 };
+        (r, d[1].atan2(d[0]), sign * tread / r)
+    }
+
+    /// The point of a spiral's walking line at angle `a`.
+    fn on_circle(s: &Spiral, r: f64, a: f64) -> [f64; 2] {
+        [s.center[0] + r * a.cos(), s.center[1] + r * a.sin()]
+    }
+
     /// The end of the run's path.
     pub fn end(&self, tread: f64) -> [f64; 2] {
+        if let Some(s) = &self.spiral {
+            let (r, a0, step) = self.turn(s, tread);
+            return Self::on_circle(s, r, a0 + step * f64::from(self.risers.saturating_sub(1)));
+        }
         let l = self.length(tread);
         [
             self.start[0] + self.direction[0] * l,
@@ -313,9 +341,30 @@ impl Run {
         ]
     }
 
-    /// The two ends of an edge across the run at path point `p`.
-    fn edge(&self, p: [f64; 2]) -> [[f64; 2]; 2] {
-        let n = left(self.direction);
+    /// The up direction at the end of the path.
+    pub fn end_direction(&self, tread: f64) -> [f64; 2] {
+        match &self.spiral {
+            Some(s) => {
+                let (_, a0, step) = self.turn(s, tread);
+                let a = a0 + step * f64::from(self.risers.saturating_sub(1));
+                let k = if s.ccw { 1.0 } else { -1.0 };
+                [-a.sin() * k, a.cos() * k]
+            }
+            None => self.direction,
+        }
+    }
+
+    /// The edge across the run at its start and at its end.
+    fn start_edge(&self) -> [[f64; 2]; 2] {
+        self.edge_at(self.start, self.direction)
+    }
+
+    fn end_edge(&self, tread: f64) -> [[f64; 2]; 2] {
+        self.edge_at(self.end(tread), self.end_direction(tread))
+    }
+
+    fn edge_at(&self, p: [f64; 2], d: [f64; 2]) -> [[f64; 2]; 2] {
+        let n = left(d);
         let h = self.width / 2.0;
         [
             [p[0] + n[0] * h, p[1] + n[1] * h],
@@ -397,17 +446,15 @@ pub fn generate(r: &StairRecipe, z_base: f64, z_top: f64, t: &StairType) -> Resu
         // A landing from the previous run to this one, at this run's base.
         if i > 0 {
             let prev = r.runs[i - 1];
-            let a = prev.edge(prev.end(r.tread_depth));
-            let b = run.edge(run.start);
-            let turn =
-                (prev.direction[0] * run.direction[1] - prev.direction[1] * run.direction[0]).abs()
-                    > 1e-6
-                    || prev.direction[0] * run.direction[0] + prev.direction[1] * run.direction[1]
-                        < 0.0;
+            let a = prev.end_edge(r.tread_depth);
+            let b = run.start_edge();
+            let pd = prev.end_direction(r.tread_depth);
+            let turn = (pd[0] * run.direction[1] - pd[1] * run.direction[0]).abs() > 1e-6
+                || pd[0] * run.direction[0] + pd[1] * run.direction[1] < 0.0;
             let mut pts = vec![a[0], a[1], b[0], b[1]];
             if turn {
                 let w = prev.width.max(run.width);
-                let (u, v) = (prev.direction, run.direction);
+                let (u, v) = (pd, run.direction);
                 pts.extend(a.iter().map(|p| [p[0] + u[0] * w, p[1] + u[1] * w]));
                 pts.extend(b.iter().map(|p| [p[0] - v[0] * w, p[1] - v[1] * w]));
             }
@@ -421,6 +468,14 @@ pub fn generate(r: &StairRecipe, z_base: f64, z_top: f64, t: &StairType) -> Resu
                     [0.0, 0.0, t.landing_thickness],
                 ));
             }
+        }
+        if let Some(sp) = &run.spiral {
+            let (steps, lines) =
+                spiral_steps(run, sp, z0, riser, r.tread_depth, t.structural_depth);
+            runs.extend(steps);
+            treads.extend(lines);
+            done += run.risers;
+            continue;
         }
         let profile = run_profile(run.risers, riser, r.tread_depth, t.structural_depth, i == 0);
         let u = [run.direction[0], run.direction[1], 0.0];
@@ -444,9 +499,9 @@ pub fn generate(r: &StairRecipe, z_base: f64, z_top: f64, t: &StairType) -> Resu
                 run.start[0] + run.direction[0] * s,
                 run.start[1] + run.direction[1] * s,
             ];
-            treads.push(run.edge(p));
+            treads.push(run.edge_at(p, run.direction));
         }
-        treads.push(run.edge(run.start));
+        treads.push(run.start_edge());
         done += run.risers;
     }
     let predefined = classify(&r.runs);
@@ -465,8 +520,66 @@ pub fn generate(r: &StairRecipe, z_base: f64, z_top: f64, t: &StairType) -> Resu
     })
 }
 
+/// A spiral run's steps: each tread an annular sector (a wedge where the inner radius reaches
+/// the centre), as a solid from its top down by the riser height and the structural depth (the
+/// first stands on the floor); and the radial tread lines.
+fn spiral_steps(
+    run: &Run,
+    s: &Spiral,
+    z0: f64,
+    riser: f64,
+    tread: f64,
+    depth: f64,
+) -> (Vec<Mesh>, Vec<[[f64; 2]; 2]>) {
+    let (r, a0, step) = run.turn(s, tread);
+    let (r_in, r_out) = ((r - run.width / 2.0).max(0.0), r + run.width / 2.0);
+    let k = run.risers.max(1);
+    let at = |rad: f64, a: f64| [s.center[0] + rad * a.cos(), s.center[1] + rad * a.sin()];
+    let mut solids = Vec::new();
+    let mut lines = Vec::new();
+    // k risers, k − 1 treads: tread i spans the angle from i · step to (i + 1) · step and stands
+    // at the top of riser i + 1. A single riser gets one tread.
+    let treads = k.saturating_sub(1).max(1);
+    for i in 0..treads {
+        let (a, b) = (a0 + step * f64::from(i), a0 + step * f64::from(i + 1));
+        let segs = ((b - a).abs().to_degrees() / 5.0).ceil().max(2.0) as usize;
+        let mut poly: Vec<[f64; 2]> = (0..=segs)
+            .map(|j| at(r_out, a + (b - a) * j as f64 / segs as f64))
+            .collect();
+        if r_in < 1e-3 {
+            poly.push(s.center);
+        } else {
+            poly.extend(
+                (0..=segs)
+                    .rev()
+                    .map(|j| at(r_in, a + (b - a) * j as f64 / segs as f64)),
+            );
+        }
+        let top = z0 + riser * f64::from(i + 1);
+        let bottom = (top - riser - depth).max(z0);
+        solids.push(prism(
+            &poly,
+            [0.0, 0.0, bottom],
+            [1.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0],
+            [0.0, 0.0, top - bottom],
+        ));
+        lines.push([at(r_in, a), at(r_out, a)]);
+    }
+    let end = a0 + step * f64::from(treads);
+    lines.push([at(r_in, end), at(r_out, end)]);
+    (solids, lines)
+}
+
 /// `IfcStair.PredefinedType` from the runs' arrangement.
 fn classify(runs: &[Run]) -> &'static str {
+    if runs.iter().any(|r| r.spiral.is_some()) {
+        return if runs.len() == 1 {
+            "SPIRAL_STAIR"
+        } else {
+            "USERDEFINED"
+        };
+    }
     match runs {
         [_] => "STRAIGHT_RUN_STAIR",
         [a, b] => {
@@ -613,12 +726,19 @@ pub enum TopArg {
     Unconnected(Value),
 }
 
-/// A straight run: from the middle of its first riser toward `end`.
+/// A run: straight from the middle of its first riser toward `end`; or, with `center`, a spiral
+/// about it whose walking line passes through `start`, turning toward `end` (or placing every
+/// remaining riser when `end` is omitted: a full-step spiral).
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct RunArg {
     pub start: [f64; 2],
-    pub end: [f64; 2],
+    /// Required for a straight run.
+    pub end: Option<[f64; 2]>,
+    /// A spiral's centre.
+    pub center: Option<[f64; 2]>,
+    /// A spiral turns counter-clockwise going up (default true).
+    pub ccw: Option<bool>,
     /// Default the stair's width.
     #[schemars(extend("x-reviera-data-type" = "length"))]
     pub width: Option<Value>,
@@ -716,7 +836,53 @@ pub(crate) fn create(txn: &mut crate::txn::Transaction<'_>, p: CreateParams) -> 
         .unwrap_or_else(|| min_risers(z1 - z0, t.max_riser));
     let mut left_over = n;
     for (i, a) in p.runs.iter().enumerate() {
-        let d = [a.end[0] - a.start[0], a.end[1] - a.start[1]];
+        let width = num(&a.width, "length", "the run width")?.unwrap_or(width);
+        if let Some(c) = a.center {
+            let d = [a.start[0] - c[0], a.start[1] - c[1]];
+            let rad = d[0].hypot(d[1]);
+            if rad < width / 2.0 + 0.05 {
+                return Err(Error::new(
+                    "stair.spiral_too_tight",
+                    format!(
+                        "run {}: the walking line's radius must be over half the width plus 50 mm",
+                        i + 1
+                    ),
+                ));
+            }
+            let ccw = a.ccw.unwrap_or(true);
+            let sign = if ccw { 1.0 } else { -1.0 };
+            // The turn toward `end` (in the run's direction), else all that is left.
+            let risers = match (a.risers, a.end) {
+                (Some(k), _) => k,
+                (None, Some(e)) => {
+                    let a0 = d[1].atan2(d[0]);
+                    let a1 = (e[1] - c[1]).atan2(e[0] - c[0]);
+                    let mut turn = (a1 - a0) * sign;
+                    while turn <= 1e-9 {
+                        turn += std::f64::consts::TAU;
+                    }
+                    risers_for_length(turn * rad, tread).min(left_over.max(1))
+                }
+                (None, None) => left_over.max(1),
+            };
+            left_over = left_over.saturating_sub(risers);
+            let u = [d[0] / rad, d[1] / rad];
+            recipe.runs.push(Run {
+                start: a.start,
+                direction: [-u[1] * sign, u[0] * sign],
+                width,
+                risers,
+                spiral: Some(Spiral { center: c, ccw }),
+            });
+            continue;
+        }
+        let end = a.end.ok_or_else(|| {
+            Error::new(
+                "stair.bad_run",
+                format!("run {} needs an `end` (or a `center` for a spiral)", i + 1),
+            )
+        })?;
+        let d = [end[0] - a.start[0], end[1] - a.start[1]];
         let len = d[0].hypot(d[1]);
         if len < 1e-6 {
             return Err(Error::new(
@@ -731,8 +897,9 @@ pub(crate) fn create(txn: &mut crate::txn::Transaction<'_>, p: CreateParams) -> 
         recipe.runs.push(Run {
             start: a.start,
             direction: [d[0] / len, d[1] / len],
-            width: num(&a.width, "length", "the run width")?.unwrap_or(width),
+            width,
             risers,
+            spiral: None,
         });
     }
     generate(&recipe, z0, z1, &t)?;
@@ -878,6 +1045,13 @@ pub(crate) fn transform(
         let len = d[0].hypot(d[1]).max(1e-12);
         run.start = a;
         run.direction = [d[0] / len, d[1] / len];
+        // A spiral keeps turning the way its tangent goes about its (moved) centre; a mirror
+        // reverses it.
+        if let Some(s) = &mut run.spiral {
+            s.center = point(s.center);
+            let r = [a[0] - s.center[0], a[1] - s.center[1]];
+            s.ccw = r[0] * run.direction[1] - r[1] * run.direction[0] > 0.0;
+        }
     }
     let value = serde_json::to_value(&recipe).expect("serialises");
     txn.modify(id, |e| {
@@ -930,6 +1104,7 @@ mod tests {
             direction: [1.0, 0.0],
             width: 1.2,
             risers: 17,
+            spiral: None,
         }]);
         let g = generate(&r, 0.0, 3.0, &StairType::default()).unwrap();
         assert_eq!(g.risers, 17);
@@ -949,6 +1124,48 @@ mod tests {
     }
 
     #[test]
+    fn a_full_step_spiral() {
+        // 3 m at 180 mm: 17 risers and 16 treads of 280 mm along a 1 m walking line, 1 m wide.
+        let run = Run {
+            start: [1.0, 0.0],
+            direction: [0.0, 1.0],
+            width: 1.0,
+            risers: 17,
+            spiral: Some(Spiral {
+                center: [0.0, 0.0],
+                ccw: true,
+            }),
+        };
+        let g = generate(&recipe(vec![run]), 0.0, 3.0, &StairType::default()).unwrap();
+        assert_eq!(g.predefined, "SPIRAL_STAIR");
+        assert_eq!(g.runs.len(), 16);
+        assert!(g.warnings.is_empty(), "{:?}", g.warnings);
+        // Each tread is a sector of 0.28 rad between radii 0.5 and 1.5 (0.28 m²); the first stands
+        // on the floor, the rest are a riser and the structural depth deep.
+        let r = 3.0 / 17.0;
+        let expected = 0.28 * (r + 15.0 * (r + 0.15));
+        let v: f64 = g.runs.iter().map(closed_volume).sum();
+        assert!((v - expected).abs() / expected < 0.01, "{v} vs {expected}");
+        // The run ends 16 treads round, and the top tread is 16 risers up.
+        let end = run.end(0.28);
+        let a = 16.0_f64 * 0.28;
+        assert!((end[0] - a.cos()).abs() < 1e-9 && (end[1] - a.sin()).abs() < 1e-9);
+        let top = g.runs[15].0.iter().map(|p| p[2]).fold(f64::MIN, f64::max);
+        assert!((top - 16.0 * r).abs() < 1e-9);
+        // Clockwise turns the other way.
+        let cw = Run {
+            spiral: Some(Spiral {
+                center: [0.0, 0.0],
+                ccw: false,
+            }),
+            direction: [0.0, -1.0],
+            ..run
+        };
+        let e = cw.end(0.28);
+        assert!((e[0] - (-a).cos()).abs() < 1e-9 && (e[1] - (-a).sin()).abs() < 1e-9);
+    }
+
+    #[test]
     fn two_runs_with_a_landing_and_a_turn() {
         // 9 risers east, then 8 north from a quarter-turn landing.
         let a = Run {
@@ -956,12 +1173,14 @@ mod tests {
             direction: [1.0, 0.0],
             width: 1.2,
             risers: 9,
+            spiral: None,
         };
         let b = Run {
             start: [8.0 * 0.28 + 0.6, 0.6],
             direction: [0.0, 1.0],
             width: 1.2,
             risers: 8,
+            spiral: None,
         };
         let g = generate(&recipe(vec![a, b]), 0.0, 3.0, &StairType::default()).unwrap();
         assert_eq!(g.predefined, "QUARTER_TURN_STAIR");

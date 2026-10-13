@@ -659,6 +659,12 @@ keys = "ST"
 help = "Draw a stair in a plan: click the start and end of each run; landings join the runs"
 
 [[action]]
+id = "stair.spiral"
+label = "Spiral Stair"
+icon = "spiral_stair"
+help = "Draw a spiral stair in a plan: click its centre, then a point on its walking line"
+
+[[action]]
 id = "dormer.create"
 label = "Dormer"
 icon = "dormer"
@@ -735,7 +741,10 @@ tools = [
 
 [[tab.panel]]
 label = "Circulation"
-tools = [{ action = "stair.create", size = "large" }]
+tools = [
+  { action = "stair.create", size = "large" },
+  { action = "stair.spiral", size = "large" },
+]
 
 [[tab.panel]]
 label = "Datum"
