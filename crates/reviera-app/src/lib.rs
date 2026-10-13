@@ -12,6 +12,7 @@ mod commands;
 pub mod inspect;
 pub mod output;
 pub mod schedules;
+pub mod sheets;
 pub mod views;
 
 use std::collections::BTreeMap;

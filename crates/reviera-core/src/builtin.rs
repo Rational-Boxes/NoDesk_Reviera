@@ -71,6 +71,13 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(ScheduleSetSort),
         registry.add(ScheduleSetCell),
         registry.add(ScheduleFields),
+        registry.add(SheetCreate),
+        registry.add(SheetSet),
+        registry.add(SheetDelete),
+        registry.add(SheetPlaceView),
+        registry.add(SheetPlaceSchedule),
+        registry.add(ViewportMove),
+        registry.add(ViewportRemove),
         registry.add(ViewCreateSection),
         registry.add(ViewCreateElevation),
         registry.add(SectionEdit),
@@ -1323,7 +1330,8 @@ impl Command for ViewRename {
         name: "view.rename",
         version: 1,
         summary: "Rename a view",
-        description: "View names are unique within a view kind; a duplicate name is refused.",
+        description: "View names are unique within a view kind; a duplicate name is refused. Schedules and sheets are renamed \
+                      the same way.",
         effects: &[Effect::Edit],
         transaction_name: "Rename View",
     };
@@ -1363,7 +1371,7 @@ impl Command for ViewDelete {
         name: "view.delete",
         version: 1,
         summary: "Delete views",
-        description: "Deletes views (not model elements).",
+        description: "Deletes views, schedules and sheets (not model elements). The viewports of a deleted view go with it.",
         effects: &[Effect::Edit, Effect::Destructive],
         transaction_name: "Delete View",
     };
@@ -2135,6 +2143,80 @@ impl Command for ScheduleFields {
     }
 }
 
+modify_command!(
+    SheetCreate,
+    "sheet.create",
+    "Create a sheet",
+    "Creates a sheet with Reviera's ISO title block (`A0` … `A4`, landscape; default `A1`). The number \
+     defaults to the last sheet number incremented (A101 → A102).",
+    "New Sheet",
+    crate::sheets::CreateParams,
+    ElementId,
+    crate::sheets::create
+);
+modify_command!(
+    SheetSet,
+    "sheet.set_parameter",
+    "Set a sheet's number, name, size or title-block values",
+    "Sets a sheet's number (unique), name, paper size and title-block values (`Issue Date`, `Designed By`, \
+     `Drawn By`, `Checked By`, `Approved By`; an empty text clears one).",
+    "Sheet Properties",
+    crate::sheets::SetParams,
+    (),
+    crate::sheets::set
+);
+modify_command!(
+    SheetDelete,
+    "sheet.delete",
+    "Delete sheets",
+    "Deletes sheets with their viewports and placed schedules; the views and schedules are kept.",
+    "Delete Sheet",
+    crate::sheets::DeleteParams,
+    (),
+    crate::sheets::delete
+);
+modify_command!(
+    SheetPlaceView,
+    "sheet.place_view",
+    "Place a view on a sheet",
+    "Places a plan, section or elevation on a sheet at its view scale, centred at `position` (paper \
+     millimetres from the lower-left corner). A view can be on one sheet only. Returns the viewport id.",
+    "Place View",
+    crate::sheets::PlaceViewParams,
+    u32,
+    crate::sheets::place_view
+);
+modify_command!(
+    SheetPlaceSchedule,
+    "sheet.place_schedule",
+    "Place a schedule on a sheet",
+    "Places a schedule's table on a sheet with its top-left corner at `position` (paper millimetres). A \
+     schedule may be placed on several sheets. Returns the placed schedule's id.",
+    "Place Schedule",
+    crate::sheets::PlaceScheduleParams,
+    u32,
+    crate::sheets::place_schedule
+);
+modify_command!(
+    ViewportMove,
+    "viewport.move",
+    "Move a viewport on its sheet",
+    "Moves a viewport (its centre) or a placed schedule (its top-left corner) to `position`, paper millimetres.",
+    "Move Viewport",
+    crate::sheets::MoveParams,
+    (),
+    crate::sheets::move_viewport
+);
+modify_command!(
+    ViewportRemove,
+    "viewport.remove",
+    "Remove viewports from a sheet",
+    "Removes viewports or placed schedules from a sheet; the views and schedules themselves are kept.",
+    "Remove from Sheet",
+    crate::sheets::RemoveParams,
+    (),
+    crate::sheets::remove_viewports
+);
 modify_command!(
     ViewCreateSection,
     "view.create_section",

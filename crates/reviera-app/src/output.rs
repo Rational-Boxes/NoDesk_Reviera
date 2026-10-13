@@ -5,7 +5,7 @@
 //!
 //! Each view is one page: the smallest ISO landscape sheet that holds the drawing at its scale,
 //! cut poché filled, lines at their pens' paper widths, dimension values as real (searchable)
-//! text, and a title strip. The geometry is the plan drawing of the GPU viewport (the exact
+//! text, and a title strip. A sheet is one page exactly its paper size (see `sheets`). The geometry is the plan drawing of the GPU viewport (the exact
 //! OCCT hidden-line drawing of §5.12 replaces it later).
 
 use std::path::{Path, PathBuf};
@@ -36,12 +36,32 @@ pub struct PlanDrawing {
     pub graphics: PlanGraphics,
     pub annotation: Vec<Lines>,
     pub labels: Vec<Label>,
+    /// A sheet: the paper's name and size (mm). The drawing is in paper metres from the lower-left
+    /// corner at scale 1 and fills the page exactly, without a title strip.
+    pub paper: Option<Paper>,
+}
+
+/// A sheet's paper.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Paper {
+    pub size: &'static str,
+    pub width: f32,
+    pub height: f32,
 }
 
 impl App {
     /// The drawing of plan view `view` of `doc`.
     pub fn plan_drawing(&self, doc: DocumentId, view: ElementId) -> Result<PlanDrawing> {
-        let scene = self.render_scene(doc)?;
+        self.plan_drawing_of(&self.render_scene(doc)?, doc, view)
+    }
+
+    /// The drawing of plan view `view` of `doc` with its model `scene`.
+    pub(crate) fn plan_drawing_of(
+        &self,
+        scene: &reviera_render::RenderScene,
+        doc: DocumentId,
+        view: ElementId,
+    ) -> Result<PlanDrawing> {
         let open = self.get(doc)?;
         let store = open.doc.store();
         let e = store
@@ -73,9 +93,9 @@ impl App {
                 projection: projection as f32,
             }
         };
-        let edges = feature_edges(&scene);
+        let edges = feature_edges(scene);
         let graphics = plan_graphics(
-            &scene,
+            scene,
             &edges,
             range.cut as f32,
             bottom as f32,
@@ -173,6 +193,7 @@ impl App {
             graphics,
             annotation,
             labels,
+            paper: None,
         })
     }
 }
@@ -307,7 +328,16 @@ pub fn section_parts(
 impl App {
     /// The drawing of section or elevation view `view` of `doc`, for output.
     pub fn section_drawing(&self, doc: DocumentId, view: ElementId) -> Result<PlanDrawing> {
-        let scene = self.render_scene(doc)?;
+        self.section_drawing_of(&self.render_scene(doc)?, doc, view)
+    }
+
+    /// The drawing of section or elevation view `view` of `doc` with its model `scene`.
+    pub(crate) fn section_drawing_of(
+        &self,
+        scene: &reviera_render::RenderScene,
+        doc: DocumentId,
+        view: ElementId,
+    ) -> Result<PlanDrawing> {
         let open = self.get(doc)?;
         let store = open.doc.store();
         let e = store
@@ -323,13 +353,14 @@ impl App {
             .param(views::VIEW_KEY)
             .and_then(|v| v.get("scale")?.as_f64())
             .unwrap_or(100.0) as f32;
-        let parts = section_parts(store, &scene, &def, scale, &|_| true);
+        let parts = section_parts(store, scene, &def, scale, &|_| true);
         Ok(PlanDrawing {
             name: e.name.clone().unwrap_or_default(),
             scale,
             graphics: parts.graphics,
             annotation: parts.annotation,
             labels: parts.labels,
+            paper: None,
         })
     }
 }
@@ -355,7 +386,7 @@ fn srgb(c: f32) -> f32 {
 }
 
 /// The plan extents of a drawing: (min, max) of x and y.
-fn extents(d: &PlanDrawing) -> Option<([f32; 2], [f32; 2])> {
+pub(crate) fn extents(d: &PlanDrawing) -> Option<([f32; 2], [f32; 2])> {
     let mut points = d
         .graphics
         .poche
@@ -400,7 +431,9 @@ pub fn write_pdf(drawings: &[(PlanDrawing, PageInfo)], path: &Path) -> Result<Ve
     pdf.pages(tree)
         .kids(pages.iter().map(|p| p.0))
         .count(pages.len() as i32);
-    pdf.type1_font(font).base_font(Name(b"Helvetica"));
+    pdf.type1_font(font)
+        .base_font(Name(b"Helvetica"))
+        .encoding_predefined(Name(b"WinAnsiEncoding"));
     let title = drawings
         .first()
         .map_or("Reviera drawing".to_owned(), |(d, i)| {
@@ -416,17 +449,28 @@ pub fn write_pdf(drawings: &[(PlanDrawing, PageInfo)], path: &Path) -> Result<Ve
         let (lo, hi) = extents(d).unwrap_or(([0.0, 0.0], [1.0, 1.0]));
         let mm_per_m = 1000.0 / d.scale;
         let (w_mm, h_mm) = ((hi[0] - lo[0]) * mm_per_m, (hi[1] - lo[1]) * mm_per_m);
-        let (sheet, paper_w, paper_h) = SHEETS
-            .iter()
-            .copied()
-            .find(|(_, pw, ph)| {
-                w_mm + 2.0 * MARGIN_MM <= *pw && h_mm + 2.0 * MARGIN_MM + TITLE_MM <= *ph
-            })
-            .unwrap_or(SHEETS[SHEETS.len() - 1]);
+        let (sheet, paper_w, paper_h) = match &d.paper {
+            Some(p) => (p.size, p.width, p.height),
+            None => SHEETS
+                .iter()
+                .copied()
+                .find(|(_, pw, ph)| {
+                    w_mm + 2.0 * MARGIN_MM <= *pw && h_mm + 2.0 * MARGIN_MM + TITLE_MM <= *ph
+                })
+                .unwrap_or(SHEETS[SHEETS.len() - 1]),
+        };
         sheets.push(sheet);
-        // Model (x, y) in metres to page points, the drawing centred above the title strip.
-        let (cx, cy) = ((lo[0] + hi[0]) / 2.0, (lo[1] + hi[1]) / 2.0);
-        let (ox, oy) = (paper_w / 2.0, (paper_h + TITLE_MM) / 2.0);
+        // Model (x, y) in metres to page points, the drawing centred above the title strip; a
+        // sheet's paper metres map onto the page as they are.
+        let (cx, cy, ox, oy) = match d.paper {
+            Some(_) => (0.0, 0.0, 0.0, 0.0),
+            None => (
+                (lo[0] + hi[0]) / 2.0,
+                (lo[1] + hi[1]) / 2.0,
+                paper_w / 2.0,
+                (paper_h + TITLE_MM) / 2.0,
+            ),
+        };
         let to_page = move |x: f32, y: f32| {
             (
                 ((x - cx) * mm_per_m + ox) * PT_PER_MM,
@@ -481,35 +525,11 @@ pub fn write_pdf(drawings: &[(PlanDrawing, PageInfo)], path: &Path) -> Result<Ve
             c.begin_text()
                 .set_font(Name(b"F1"), size)
                 .set_text_matrix([l.right[0], l.right[1], l.up[0], l.up[1], x, y])
-                .show(Str(l.text.as_bytes()))
+                .show(Str(&win_ansi(&l.text)))
                 .end_text();
         }
-        // Title strip along the bottom.
-        let (sx, sy) = (MARGIN_MM * PT_PER_MM, MARGIN_MM * PT_PER_MM);
-        let strip_w = (paper_w - 2.0 * MARGIN_MM) * PT_PER_MM;
-        let strip_h = (TITLE_MM - 4.0) * PT_PER_MM;
-        c.set_stroke_rgb(0.0, 0.0, 0.0)
-            .set_line_width(0.5 * PT_PER_MM);
-        c.rect(sx, sy, strip_w, strip_h).stroke();
-        let lines = [
-            (12.0, format!("{}  -  {}", page_info.project, d.name)),
-            (
-                8.0,
-                format!(
-                    "Scale 1:{}    {}    {}    NoDesk Reviera",
-                    d.scale, sheet, page_info.date
-                ),
-            ),
-        ];
-        for (k, (size, text)) in lines.iter().enumerate() {
-            c.begin_text()
-                .set_font(Name(b"F1"), *size)
-                .next_line(
-                    sx + 4.0 * PT_PER_MM,
-                    sy + strip_h - (k as f32 + 1.0) * 5.5 * PT_PER_MM,
-                )
-                .show(Str(text.as_bytes()))
-                .end_text();
+        if d.paper.is_none() {
+            title_strip(&mut c, d, page_info, sheet, paper_w);
         }
         let mut page = pdf.page(*page_id);
         page.media_box(Rect::new(
@@ -527,6 +547,50 @@ pub fn write_pdf(drawings: &[(PlanDrawing, PageInfo)], path: &Path) -> Result<Ve
     std::fs::write(path, pdf.finish())
         .map_err(|e| Error::new("export.write_failed", format!("{}: {e}", path.display())))?;
     Ok(sheets)
+}
+
+/// A view page's title strip along the bottom.
+fn title_strip(c: &mut Content, d: &PlanDrawing, page_info: &PageInfo, sheet: &str, paper_w: f32) {
+    let (sx, sy) = (MARGIN_MM * PT_PER_MM, MARGIN_MM * PT_PER_MM);
+    let strip_w = (paper_w - 2.0 * MARGIN_MM) * PT_PER_MM;
+    let strip_h = (TITLE_MM - 4.0) * PT_PER_MM;
+    c.set_stroke_rgb(0.0, 0.0, 0.0)
+        .set_line_width(0.5 * PT_PER_MM);
+    c.rect(sx, sy, strip_w, strip_h).stroke();
+    let lines = [
+        (12.0, format!("{}  -  {}", page_info.project, d.name)),
+        (
+            8.0,
+            format!(
+                "Scale 1:{}    {}    {}    NoDesk Reviera",
+                d.scale, sheet, page_info.date
+            ),
+        ),
+    ];
+    for (k, (size, text)) in lines.iter().enumerate() {
+        c.begin_text()
+            .set_font(Name(b"F1"), *size)
+            .next_line(
+                sx + 4.0 * PT_PER_MM,
+                sy + strip_h - (k as f32 + 1.0) * 5.5 * PT_PER_MM,
+            )
+            .show(Str(&win_ansi(text)))
+            .end_text();
+    }
+}
+
+/// Text in the Windows-1252 encoding the PDF's Helvetica uses; other characters become `?`.
+fn win_ansi(text: &str) -> Vec<u8> {
+    const HIGH: &str = "€\u{81}‚ƒ„…†‡ˆ‰Š‹Œ\u{8d}Ž\u{8f}\u{90}‘’“”•–—˜™š›œ\u{9d}žŸ";
+    text.chars()
+        .map(|ch| match ch as u32 {
+            0x20..=0x7e | 0xa0..=0xff => ch as u8,
+            _ => HIGH
+                .chars()
+                .position(|h| h == ch)
+                .map_or(b'?', |i| 0x80 + i as u8),
+        })
+        .collect()
 }
 
 /// Today's date as YYYY-MM-DD (UTC).
@@ -605,7 +669,8 @@ impl HostCommand for ExportPdf {
         version: 1,
         summary: "Export views as PDF",
         description: "Writes plan, section and elevation views as vector PDF at their scale, one page per view on the smallest ISO \
-                      sheet that holds it: `range` is \"current\" or {\"views\": [...]}.",
+                      sheet that holds it, and sheets one page each at their paper size: `range` is \"current\" or \
+                      {\"views\": [...]} (views and sheets).",
         effects: &[Effect::FileWrite],
         transaction_name: "",
     };
@@ -643,11 +708,11 @@ impl HostCommand for ExportPdf {
         let drawings: Vec<(PlanDrawing, PageInfo)> = ids
             .iter()
             .map(|v| {
-                let section = store
-                    .get(*v)
-                    .and_then(reviera_core::sections::section_of)
-                    .is_some();
-                let d = if section {
+                let e = store.get(*v);
+                let section = e.and_then(reviera_core::sections::section_of).is_some();
+                let d = if e.is_some_and(reviera_core::sheets::is_sheet) {
+                    app.sheet_drawing(doc, *v)?.drawing
+                } else if section {
                     app.section_drawing(doc, *v)?
                 } else {
                     app.plan_drawing(doc, *v)?

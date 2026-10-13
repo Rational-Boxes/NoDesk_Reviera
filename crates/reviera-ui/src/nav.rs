@@ -212,6 +212,19 @@ impl Gui {
 
     /// Frames the model, or the selection when there is one (Zoom to Fit).
     pub(crate) fn zoom_to_fit(&mut self) {
+        // A sheet fits its paper.
+        if let Some(v) = self.active_view()
+            && let Some(s) = &v.sheet
+        {
+            let size = v.panel.get_client_size();
+            let mut to = v.camera;
+            super::sheets::fit_paper(
+                &mut to,
+                s.paper,
+                size.width.max(1) as f32 / size.height.max(1) as f32,
+            );
+            return self.animate_to(to);
+        }
         let bounds = self.selection_bounds().or_else(|| self.scene().bounds());
         let (Some(b), Some(v)) = (bounds, self.active_view()) else {
             return;
@@ -517,10 +530,11 @@ impl Gui {
     /// The gizmo of view `index` for its current camera (none in walk mode).
     pub(crate) fn update_gizmo(&mut self, index: usize, scale: f64) {
         let v = &mut self.views[index];
+        let flat = v.nav.walk.is_some() || v.is_2d();
         let Some(viewport) = &mut v.viewport else {
             return;
         };
-        if v.nav.walk.is_some() || v.plan.is_some() || v.section.is_some() {
+        if flat {
             viewport.set_gizmo(None);
             return;
         }

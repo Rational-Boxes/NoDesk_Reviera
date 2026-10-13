@@ -27,6 +27,7 @@ mod roofs;
 mod rooms;
 mod schedules;
 mod sections;
+mod sheets;
 mod sketch;
 mod snap;
 mod wx;
@@ -93,6 +94,11 @@ enum Drag {
     },
     /// Dragging a section box face or a slice plane (3D views).
     Clip(inspect::ClipGrip),
+    /// Dragging a viewport or schedule on a sheet, from a paper point (metres).
+    SheetItem {
+        item: u32,
+        from: [f64; 2],
+    },
 }
 
 /// The Wall tool: clicks on the level's plane add walls end to end.
@@ -136,6 +142,8 @@ struct View {
     section: Option<sections::SectionState>,
     /// Set for schedule views (a grid instead of a viewport).
     schedule: Option<schedules::ScheduleState>,
+    /// Set for sheet views.
+    sheet: Option<sheets::SheetState>,
     panel: Panel,
     viewport: Option<WgpuViewport>,
     /// The native surface under the viewport; declared after it so it is dropped after it.
@@ -216,9 +224,9 @@ struct Gui {
 }
 
 impl View {
-    /// A plan, section or elevation: a 2D drawing navigated by pan and zoom.
+    /// A plan, section, elevation or sheet: a 2D drawing navigated by pan and zoom.
     fn is_2d(&self) -> bool {
-        self.plan.is_some() || self.section.is_some()
+        self.plan.is_some() || self.section.is_some() || self.sheet.is_some()
     }
 }
 
@@ -330,6 +338,7 @@ impl Gui {
         }
         self.update_plan_graphics(index);
         self.update_section_graphics(index);
+        self.update_sheet_graphics(index);
         self.update_inspection(index);
         self.update_gizmo(index, scale);
         let view = &mut self.views[index];
@@ -561,13 +570,13 @@ impl Gui {
     fn view_name(&self, view: &View) -> String {
         view.element
             .and_then(|e| {
-                self.app
-                    .document(view.doc)?
-                    .doc
-                    .store()
-                    .get(e)?
-                    .name
-                    .clone()
+                let e = self.app.document(view.doc)?.doc.store().get(e)?;
+                let name = e.name.clone()?;
+                // A sheet is known by its number and name.
+                Some(match reviera_core::sheets::sheet_data(e) {
+                    Some(d) => format!("{} - {name}", d.number),
+                    None => name,
+                })
             })
             .unwrap_or_else(|| view.name.clone())
     }
@@ -601,12 +610,17 @@ impl Gui {
         }
         let plan = self.plan_info(doc, element);
         let section = self.section_info(doc, element);
+        let sheet = self.sheet_info(doc, element);
         let schedule = self
             .is_schedule(doc, element)
             .then(|| Gui::schedule_grid(&panel));
-        if plan.is_some() || section.is_some() {
+        if plan.is_some() || section.is_some() || sheet.is_some() {
             camera.perspective = false;
             camera.orient(glam::Vec3::Z);
+        }
+        // A sheet shows its whole paper.
+        if let Some(s) = &sheet {
+            sheets::fit_paper(&mut camera, s.paper, aspect);
         }
         // A section or elevation frames the model as seen in its own frame.
         if let (Some(s), Some((lo, hi))) = (
@@ -651,6 +665,7 @@ impl Gui {
             plan,
             section,
             schedule,
+            sheet,
             panel,
             viewport: None,
             native: None,
@@ -936,6 +951,9 @@ impl Gui {
         for view in self.views.iter_mut().filter(|v| v.doc == id) {
             if let Some(s) = &mut view.section {
                 // Sections draw the model in their own frame, rebuilt when drawn.
+                s.stale = true;
+            } else if let Some(s) = &mut view.sheet {
+                // Sheets draw their viewports, rebuilt when drawn.
                 s.stale = true;
             } else if let Some(v) = &mut view.viewport {
                 v.set_scene(&scene);
@@ -1426,6 +1444,13 @@ impl Gui {
                 .set_context(Some(("Schedule", Some("session.schedule"))));
             return;
         }
+        if self.in_sheet() {
+            self.ribbon
+                .set_context(Some(("Sheet", Some("session.sheet"))));
+            let selected = self.sheet_item_selected();
+            self.ribbon.enable("sheet.open_view", selected);
+            return;
+        }
         if let Some(s) = &self.sketch {
             use reviera_core::floors::SlabKind;
             use sketch::SketchKind;
@@ -1728,7 +1753,7 @@ impl Gui {
 
     /// The active view's properties; `false` when the active view is not a model view.
     fn view_properties(&mut self, grid: &PropertyGrid) -> bool {
-        if self.section_view_rows(grid) {
+        if self.section_view_rows(grid) || self.sheet_view_rows(grid) {
             return true;
         }
         if let Some(v) = self.active_view().filter(|v| v.schedule.is_some()) {
@@ -1861,6 +1886,7 @@ impl Gui {
             || self.roof_edit(property, text.clone())
             || self.room_edit(property, text.clone())
             || self.section_view_edit(property, text.clone())
+            || self.sheet_view_edit(property, text.clone())
         {
             return;
         }
@@ -2036,6 +2062,8 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                     let left = button == 0 && cube.is_none();
                     let editing = if !left {
                         None
+                    } else if let Some((item, from)) = g.sheet_drag_start(x, y) {
+                        Some(Drag::SheetItem { item, from })
                     } else if let Some(grip) = g.clip_grip_at(x, y) {
                         g.clip_drag_start(grip, x, y);
                         Some(Drag::Clip(grip))
@@ -2122,6 +2150,10 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                             return;
                         }
                     }
+                    Some((Drag::SheetItem { item, from }, _, _)) => {
+                        g.sheet_drag_end(item, from, x, y, click);
+                        return;
+                    }
                     _ => {}
                 }
                 if button != 0 || !click {
@@ -2141,6 +2173,7 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                     None if g.modify_tool.is_some() => g.modify_click(x, y),
                     None if g.active_view().is_some_and(|v| v.nav.walk.is_some()) => {}
                     None if g.tool.is_some() => g.wall_click(x, y, &p, &f),
+                    None if g.in_sheet() => g.sheet_click(x, y),
                     None => g.pick(x, y, &p),
                 }
             });
@@ -2226,6 +2259,11 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                         redraw = true;
                         return;
                     }
+                    Drag::SheetItem { item, from } => {
+                        g.sheet_drag_motion(item, from, x, y);
+                        redraw = true;
+                        return;
+                    }
                     _ => {}
                 }
                 let v = g.views.iter_mut().find(|v| v.id == id).expect("found");
@@ -2242,7 +2280,8 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                     Drag::MoveInsert { .. }
                     | Drag::Grip { .. }
                     | Drag::MoveSelection { .. }
-                    | Drag::Clip(_) => {}
+                    | Drag::Clip(_)
+                    | Drag::SheetItem { .. } => {}
                 }
                 v.drag = Some((kind, x, y));
                 redraw = true;
@@ -2316,7 +2355,7 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                             // In sketch mode Delete removes the last curve.
                             let (mx, my) = g.mouse;
                             g.sketch_key(WXK_DELETE, mx, my);
-                        } else if !typing {
+                        } else if !typing && !g.sheet_delete() {
                             g.delete_selection();
                         }
                     });
@@ -2994,7 +3033,11 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
             g.leave_walk();
             g.update_ribbon_context();
         }),
-        "element.delete" => with(gui, Gui::delete_selection),
+        "element.delete" => with(gui, |g| {
+            if !g.sheet_delete() {
+                g.delete_selection();
+            }
+        }),
         "floor.create" => with(gui, |g| {
             g.start_floor_sketch();
             focus(g);
@@ -3018,6 +3061,10 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         }),
         "view.building_elevations" => with(gui, Gui::building_elevations),
         "view.new_schedule" => with(gui, Gui::new_schedule),
+        "view.new_sheet" => with(gui, Gui::new_sheet),
+        "sheet.place_view" => with(gui, Gui::place_view_on_sheet),
+        "sheet.place_schedule" => with(gui, Gui::place_schedule_on_sheet),
+        "sheet.open_view" => with(gui, Gui::open_sheet_view),
         "schedule.edit_fields" => with(gui, Gui::schedule_fields),
         "schedule.edit_sort" => with(gui, Gui::schedule_sort),
         "schedule.itemize" => with(gui, Gui::schedule_itemize),

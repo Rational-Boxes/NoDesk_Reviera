@@ -51,6 +51,8 @@ pub const UI_ACTIONS: &[&str] = &[
     "sketch.defines_slope",
     "view.building_elevations",
     "view.new_schedule",
+    "view.new_sheet",
+    "sheet.open_view",
     "schedule.edit_fields",
     "schedule.edit_sort",
     "schedule.itemize",

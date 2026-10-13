@@ -346,6 +346,17 @@ pub struct RenameParams {
 
 pub(crate) fn rename(txn: &mut crate::txn::Transaction<'_>, p: RenameParams) -> Result<()> {
     let store = txn.store().clone();
+    // Schedules and sheets are listed with the views and renamed the same way.
+    if let Some(id) = store.resolve(&p.view_id).filter(|id| {
+        store
+            .get(*id)
+            .is_some_and(|e| crate::schedules::is_schedule(e) || crate::sheets::is_sheet(e))
+    }) {
+        if p.new_name.trim().is_empty() {
+            return Err(Error::new("view.bad_name", "a name is needed"));
+        }
+        return txn.modify(id, |e| e.name = Some(p.new_name));
+    }
     let (id, data) = resolve_view(&store, &p.view_id)?;
     check_name(&store, &data.kind, &p.new_name, Some(id))?;
     txn.modify(id, |e| e.name = Some(p.new_name))
@@ -424,9 +435,18 @@ pub struct ViewIdsParams {
 pub(crate) fn delete(txn: &mut crate::txn::Transaction<'_>, p: ViewIdsParams) -> Result<()> {
     let store = txn.store().clone();
     for r in &p.view_ids {
-        let (id, _) = resolve_view(&store, r)?;
+        // Schedules and sheets are deleted like views.
+        let id = match store.resolve(r).filter(|id| {
+            store
+                .get(*id)
+                .is_some_and(|e| crate::schedules::is_schedule(e) || crate::sheets::is_sheet(e))
+        }) {
+            Some(id) => id,
+            None => resolve_view(&store, r)?.0,
+        };
         txn.delete(id)?;
     }
+    crate::sheets::drop_missing_viewports(txn)?;
     Ok(())
 }
 

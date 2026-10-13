@@ -552,6 +552,30 @@ icon = "schedule"
 help = "Create a schedule of a category: one row per element, kept up to date with the model"
 
 [[action]]
+id = "view.new_sheet"
+label = "Sheet"
+icon = "sheet"
+help = "Create a sheet with a title block, to place plans, sections, elevations and schedules on"
+
+[[action]]
+id = "sheet.place_view"
+label = "Place View"
+icon = "place_view"
+help = "Place a plan, section or elevation on the sheet at its scale (a view can be on one sheet only)"
+
+[[action]]
+id = "sheet.place_schedule"
+label = "Place Schedule"
+icon = "place_schedule"
+help = "Place a schedule's table on the sheet"
+
+[[action]]
+id = "sheet.open_view"
+label = "Open View"
+icon = "open_view"
+help = "Open the selected viewport's view"
+
+[[action]]
 id = "schedule.edit_fields"
 label = "Fields..."
 icon = "fields"
@@ -695,6 +719,10 @@ tools = [
   { action = "view.default_3d", size = "large" },
   { action = "view.create_3d", size = "small" },
 ]
+
+[[tab.panel]]
+label = "Sheet Composition"
+tools = [{ action = "view.new_sheet", size = "large" }]
 
 [[tab.panel]]
 label = "Navigate"
@@ -853,6 +881,15 @@ panels = [{ label = "Schedule", tools = [
 ] }]
 
 [[context]]
+category = "session.sheet"
+label = "Sheet"
+panels = [{ label = "Sheet", tools = [
+  { action = "sheet.place_view", size = "large" },
+  { action = "sheet.place_schedule", size = "large" },
+  { action = "sheet.open_view", size = "large" },
+] }]
+
+[[context]]
 category = "session.room"
 label = "Place Room"
 panels = [{ label = "Room", tools = [
@@ -896,7 +933,7 @@ items = ["edit.undo", "edit.redo", "-", "element.delete"]
 label = "&View"
 items = [
   "view.default_3d", "view.create_plan", "view.create_ceiling_plan", "view.create_section",
-  "view.building_elevations", "view.new_schedule", "-",
+  "view.building_elevations", "view.new_schedule", "view.new_sheet", "-",
   "view.zoom_fit", "view.zoom_previous", "view.zoom_next", "-",
   "view.home", "view.set_home", "@orient", "view.set_projection", "-", "view.walk", "-",
   "inspect.section_box", "inspect.selection_box", "inspect.slice_horizontal",

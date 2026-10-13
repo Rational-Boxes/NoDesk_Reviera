@@ -213,6 +213,18 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "schedule" => format!(
             r#"<rect x="4" y="5" width="24" height="22" fill="{f}" {s}/><path d="M4 11h24M4 17h24M4 22h24M13 5v22" {s} stroke-width="1.4"/><path d="M4 5h24v6H4z" fill="{a}" opacity="0.5"/>"#
         ),
+        "sheet" => format!(
+            r#"<rect x="3" y="6" width="26" height="20" fill="{f}" {s}/><rect x="6" y="9" width="12" height="9" {s} stroke-width="1"/><path d="M19 20h7v4h-7z" fill="{a}" {sa}/>"#
+        ),
+        "place_view" => format!(
+            r#"<rect x="3" y="6" width="26" height="20" fill="{f}" {s}/><path d="M8 11h10v8H8zM8 15h10M13 11v8" {s} stroke-width="1.2"/><path d="M22 10v8M18 14h8" {sa}/>"#
+        ),
+        "place_schedule" => format!(
+            r#"<rect x="3" y="6" width="26" height="20" fill="{f}" {s}/><path d="M7 10h11v9H7zM7 13h11M7 16h11M11 10v9" {s} stroke-width="1.1"/><path d="M23 10v8M19 14h8" {sa}/>"#
+        ),
+        "open_view" => format!(
+            r#"<rect x="3" y="6" width="20" height="16" fill="{f}" {s}/><path d="M7 10h9v8H7z" {s} stroke-width="1.2"/><path d="M18 20l9 7M27 21v6h-6" {sa}/>"#
+        ),
         "fields" => format!(
             r#"<rect x="4" y="5" width="24" height="22" fill="{f}" {s}/><path d="M12 5v22M20 5v22" {s}/><path d="M23 13l3 3-3 3" {sa}/>"#
         ),

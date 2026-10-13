@@ -31,6 +31,7 @@ pub mod roofs;
 pub mod rooms;
 pub mod schedules;
 pub mod sections;
+pub mod sheets;
 pub mod sketch;
 pub mod standards;
 pub mod store;

@@ -26,6 +26,9 @@ impl Gui {
             return;
         };
         self.add_levels(&top);
+        let open: Vec<ElementId> = self.views.iter().filter_map(|v| v.element).collect();
+        let active = self.active_view().and_then(|v| v.element);
+        self.add_sheets(&top, &open, active);
         let Some(root) = self
             .browser
             .insert_item_before(&top, 0, "Views (all)", None, None)
@@ -37,8 +40,6 @@ impl Gui {
             .document(doc)
             .map(|d| views::list(d.doc.store()))
             .unwrap_or_default();
-        let open: Vec<ElementId> = self.views.iter().filter_map(|v| v.element).collect();
-        let active = self.active_view().and_then(|v| v.element);
         for (kind, title) in [
             (reviera_core::plans::KIND_PLAN, "Floor Plans"),
             (reviera_core::plans::KIND_CEILING_PLAN, "Ceiling Plans"),
@@ -126,6 +127,57 @@ impl Gui {
             }
         }
         self.browser.expand_all();
+    }
+
+    /// The Sheets group (DOC-SHT-001): each sheet, with the views placed on it.
+    fn add_sheets(&mut self, top: &TreeItemId, open: &[ElementId], active: Option<ElementId>) {
+        let Some(store) = self
+            .doc
+            .and_then(|d| self.app.document(d))
+            .map(|d| d.doc.store().clone())
+        else {
+            return;
+        };
+        let mut list: Vec<(ElementId, reviera_core::sheets::SheetData, String)> = store
+            .iter()
+            .filter_map(|e| {
+                Some((
+                    e.id(),
+                    reviera_core::sheets::sheet_data(e)?,
+                    e.name.clone().unwrap_or_default(),
+                ))
+            })
+            .collect();
+        if list.is_empty() {
+            return;
+        }
+        list.sort_by(|a, b| reviera_core::schedules::natural(&a.1.number, &b.1.number));
+        let Some(group) = self.browser.append_item(top, "Sheets (all)", None, None) else {
+            return;
+        };
+        for (id, data, name) in list {
+            let label = format!("{} - {name}", data.number);
+            let Some(item) = self
+                .browser
+                .append_item_with_data(&group, &label, id.0, None, None)
+            else {
+                continue;
+            };
+            if open.contains(&id) {
+                self.browser.set_item_bold(&item, true);
+            }
+            if active == Some(id) {
+                self.browser.select_item(&item);
+            }
+            for (_, view) in reviera_core::sheets::live_viewports(&store, &data) {
+                let name = store
+                    .get(view)
+                    .and_then(|e| e.name.clone())
+                    .unwrap_or_default();
+                self.browser
+                    .append_item_with_data(&item, &name, view.0, None, None);
+            }
+        }
     }
 
     /// The Levels group: each level with its elevation; activating one selects it.

@@ -10,8 +10,9 @@ operation can be driven by Lua scripts and by AI agents through the Model Contex
 
 > **Status: early development.** The specification is complete as a draft. The application
 > models walls, doors and windows, floors, ceilings, roofs, rooms, levels and grids; draws plans,
-> ceiling plans, sections and elevations to PDF; keeps live schedules; and has a ribbon-based window with 3D
-> inspection tools. Sheets, tags and more building elements are in progress.
+> ceiling plans, sections and elevations; lays them out with schedules on sheets with title blocks
+> and prints them to PDF; keeps live schedules; and has a ribbon-based window with 3D inspection
+> tools. Tags, text and more building elements are in progress.
 
 ## Screenshots
 
@@ -137,7 +138,17 @@ The KIT FZK *AC20-Institute-Var-2* sample model (`test-data/ifc/`) open in Revie
   Level, Type, Area and Width, and every parameter of the category) and sorting, and exports
   CSV or tab-separated text with formulas escaped (`schedule.create`, `schedule.get_table`,
   `schedule.set_fields`, `schedule.set_sort`, `schedule.set_cell`, `schedule.export`). Not yet:
-  filters, group headers and footers, calculated fields, and schedules on sheets.
+  filters, group headers and footers, and calculated fields.
+- **Sheets**: View › Sheet makes an ISO A0–A4 sheet, numbered A101, A102, … with Reviera's title
+  block. The title block shows the project name and number, the sheet's name, number, date and
+  people, and the scale (*As indicated* when scales differ). Place View puts a plan, section or
+  elevation on the sheet at its scale, with a numbered view title; a view can be on one sheet
+  only. Place Schedule adds a schedule's live table. Viewports and tables are dragged to move
+  them and removed with Delete; Properties edit the title-block values. The Project Browser lists
+  the sheets with their views, and File › Export PDF prints a sheet on a page of its size
+  (`sheet.create`, `sheet.set_parameter`, `sheet.place_view`, `sheet.place_schedule`,
+  `viewport.move`, `viewport.remove`, `sheet.delete`). Not yet: title block families, crop
+  regions, revisions, sheet collections, guide grids and drag and drop from the browser.
 - **COBie handover**: File › Export COBie writes the model's facility-management data as a COBie
   2.4 workbook (XLSX, one sheet per table) or as one CSV file per table. Contact comes from the
   project's COBie settings. Facility, Floor and Space come from the building, levels and rooms.
@@ -156,7 +167,8 @@ The KIT FZK *AC20-Institute-Var-2* sample model (`test-data/ifc/`) open in Revie
   so a plan on screen at 100 % matches its print.
 - **PDF**: File › Export PDF writes plans, ceiling plans, sections and elevations as vector PDF
   at their scale on the smallest ISO sheet (A4–A0), with pen widths in paper millimetres,
-  dimension values, room labels and level names as real text, and a title strip (`export.pdf`).
+  dimension values, room labels and level names as real text, and a title strip. Sheets print
+  on a page of their own size (`export.pdf`).
 
 ### Inspecting and editing
 
@@ -200,8 +212,8 @@ The KIT FZK *AC20-Institute-Var-2* sample model (`test-data/ifc/`) open in Revie
 
 ## Planned next
 
-The first milestone continues with tags and text, sheets with title blocks, stairs and
-railings, and layered wall types. After that come general shape and CSG modelling tools,
+The first milestone continues with tags and text, stairs and railings, and layered wall
+types. After that come general shape and CSG modelling tools,
 CADCraft drawing exchange, and the current NBIMS-US COBie layout.
 
 ### Working with CADCraft

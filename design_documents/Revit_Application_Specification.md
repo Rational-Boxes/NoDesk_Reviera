@@ -21627,6 +21627,30 @@ Sheets are paper-space views stored as RXD documents `sheets/index` and `sheets/
 - [ ] Swapping a viewport's view keeps its sheet position when both views share the same view origin.
 - [ ] *Remove from Sheet* on a section's viewport keeps the section view and changes its marker head to placeholder dashes.
 
+**Implementation notes (2026-10-13), DOC-SHT-001…003 and DOC-SCH-011.**
+- As built:
+  - `sheet.create(number?, name?, size?)` (ISO `A0`…`A4`, landscape; default `A1`), numbered from the last sheet number (A101 → A102).
+  - `sheet.set_parameter(sheet_id, number?, name?, size?, parameters{})` and `sheet.delete(sheet_ids[])`.
+  - `sheet.place_view(sheet_id, view_id, position?)` and `sheet.place_schedule(sheet_id, schedule_id, position?)`.
+  - `viewport.move(sheet_id, viewport_id, position)` and `viewport.remove(sheet_id, viewport_ids[])`. Viewport ids are per sheet, so these take the sheet too.
+- Storage: sheets are RXD-only elements (`rxd:sheets/<guid>`) with their data in `rxd:sheet`: number, size, title-block values, viewports and placed schedules.
+- Title block: until title block families exist, every sheet has Reviera's built-in ISO title block.
+  - The border has a 20 mm binding margin and 10 mm elsewhere.
+  - A 180 × 48 mm information panel holds the project name and number (from `IfcProject`), sheet name and number, the five sheet values, the date, and the scale (*As indicated* when the viewports' scales differ).
+- Viewports:
+  - Plans, sections and elevations can be placed (3D views and legends come later), each on one sheet only. `view.already_on_sheet` names the sheet that holds it.
+  - A viewport draws its view's whole drawing (crop regions come later) at the view scale, centred on its position.
+  - Under it sits a view title: detail number in a circle, the view name underlined, and the scale.
+  - Deleting a view removes its viewports.
+- Schedules on sheets are ruled tables of the live schedule: title, headings, rows and totals, with numbers right-aligned.
+- Window:
+  - The sheet view draws on paper, through the same pipeline as plans.
+  - A click selects a viewport or schedule, dragging moves it, and Delete removes it.
+  - The Sheet contextual tab has Place View, Place Schedule and Open View.
+  - The Project Browser lists *Sheets (all)* with the views on each sheet. Rename and Delete there work on sheets and schedules too.
+- PDF: `export.pdf` prints a sheet as one page exactly its paper size. Text is WinAnsi-encoded, so `m²` prints.
+- Later: duplicating, collections, placeholders, revisions, guide grids and saved positions, viewport types and rotation, activating views on sheets, and drag and drop from the browser.
+
 ### Viewport types and view titles
 **ID:** DOC-SHT-004 · **Priority:** P0 · **Ref:** research/04 §5.4 · screenshots/documentation/viewport_types_view_titles_sheet.png
 
