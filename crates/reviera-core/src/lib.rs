@@ -14,6 +14,7 @@ pub mod categories;
 pub mod change;
 pub mod cobie;
 pub mod command;
+pub mod decks;
 pub mod document;
 pub mod dormers;
 pub mod element;

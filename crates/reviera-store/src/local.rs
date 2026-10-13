@@ -496,6 +496,8 @@ impl LocalProject {
                 Some(floors::FLOOR_RECIPE | floors::CEILING_RECIPE)
             ) {
                 geometry::remove_slab(&mut self.ifc, step)?;
+                // A deck's body is its boards and framing.
+                geometry::remove_breps(&mut self.ifc, step)?;
             }
             if recipe_kind == Some(roofs::ROOF_RECIPE)
                 || recipe_kind == Some(stairs::STAIR_RECIPE)
@@ -889,6 +891,45 @@ impl LocalProject {
             let Some(&step) = self.steps.get(id) else {
                 continue;
             };
+            // A deck (ARC-DECK-001): one faceted B-rep per board, joist, beam, post and footing.
+            let e = store.get(*id).expect("listed");
+            if reviera_core::decks::deck_settings(e).is_some() {
+                if let Ok(g) = reviera_core::decks::regenerate(store, e) {
+                    geometry::remove_slab(&mut self.ifc, step)?;
+                    let solids: Vec<geometry::Polyhedron> = g
+                        .parts
+                        .iter()
+                        .map(|(points, _)| {
+                            let n = points.len() / 2;
+                            let mut faces =
+                                vec![(0..n).rev().collect::<Vec<_>>(), (n..2 * n).collect()];
+                            faces.extend(
+                                (0..n).map(|i| vec![i, (i + 1) % n, n + (i + 1) % n, n + i]),
+                            );
+                            geometry::Polyhedron {
+                                points: points.clone(),
+                                faces,
+                            }
+                        })
+                        .collect();
+                    geometry::write_breps(
+                        &mut self.ifc,
+                        step,
+                        geometry::BrepFrame::WORLD,
+                        &solids,
+                        self.length_scale,
+                        contexts,
+                    )?;
+                }
+                let storey = floors::slab_recipe(e)
+                    .and_then(|(_, r)| GlobalId::parse(&r.level))
+                    .and_then(|g| store.find_by_guid(&g))
+                    .and_then(|l| self.steps.get(&l).copied());
+                if let Some(storey) = storey {
+                    geometry::contain(&mut self.ifc, step, storey, owner_history)?;
+                }
+                continue;
+            }
             let body = geometry::SlabBody {
                 rings: f
                     .profiles

@@ -659,6 +659,12 @@ keys = "ST"
 help = "Draw a stair in a plan: click the start and end of each run; landings join the runs"
 
 [[action]]
+id = "deck.create"
+label = "Deck"
+icon = "deck"
+help = "Sketch a deck's outline in a plan: its boards are laid out one by one over joists, beams and posts"
+
+[[action]]
 id = "railing.create"
 label = "Railing"
 icon = "railing"
@@ -757,6 +763,7 @@ tools = [
   { action = "stair.create", size = "large" },
   { action = "stair.spiral", size = "large" },
   { action = "railing.create", size = "large" },
+  { action = "deck.create", size = "large" },
 ]
 
 [[tab.panel]]

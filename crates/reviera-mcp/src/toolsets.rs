@@ -49,8 +49,8 @@ pub fn toolset_of(command: &str) -> String {
         | "warnings" | "failure" | "regen" | "snaps" | "selection" | "graph" => "core",
         "wall" | "floor" | "roof" | "door" | "window" | "stair" | "modify" | "str" | "mep"
         | "level" | "grid" | "room" | "ceiling" | "insert" | "sketch" | "dormer" | "railing"
-        | "site" | "cme" | "host" | "numbering" | "decal" | "spatial" | "building" | "assembly"
-        | "part" => "modeling",
+        | "deck" | "site" | "cme" | "host" | "numbering" | "decal" | "spatial" | "building"
+        | "assembly" | "part" => "modeling",
         "view" | "sheet" | "schedule" | "annotate" | "render" | "walkthrough" | "xr" | "ui"
         | "tag" | "text" | "anno" | "dim" | "viewport" | "section" | "inspect" => "documentation",
         "family" | "family_doc" | "type" | "instance" | "library" | "formula" | "subcategory" => {

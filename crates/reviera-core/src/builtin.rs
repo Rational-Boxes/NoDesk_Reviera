@@ -73,6 +73,11 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(SketchMoveCorner),
         registry.add(StairCreate),
         registry.add(RailingCreate),
+        registry.add(DeckCreate),
+        registry.add(DeckSetBoards),
+        registry.add(DeckSetFraming),
+        registry.add(DeckBoards),
+        registry.add(DeckCutList),
         registry.add(RailingCreateOnEdges),
         registry.add(StairSetParams),
         registry.add(WallAttach),
@@ -2518,6 +2523,94 @@ impl Command for AnnoList {
 
     fn run(&self, cx: &mut CommandContext<'_>, p: ListParams) -> Result<Vec<DimensionInfo>> {
         annotations::list(cx.store(), p)
+    }
+}
+
+modify_command!(
+    DeckCreate,
+    "deck.create",
+    "Create a deck",
+    "Creates a deck (ARC-DECK-001): a floor `height` above the level (default 600 mm) over `outline` (loops of \
+     curves, as for floors), with its boards laid out one by one (courses, joints on joists, staggered, \
+     picture frame) and its framing (joists, beams, posts, footings). `settings` overrides the defaults: \
+     boardWidth, boardThickness, gap, direction (radians), stockLengths, pictureFrame, balanceCourses, \
+     stagger (longest|stair_step|random), minStagger, repeatAfter, seed, joistSpacing, joist, \
+     beamSpacing, beam, postSpacing, post, footing.",
+    "Deck",
+    crate::decks::CreateParams,
+    ElementId,
+    crate::decks::create
+);
+modify_command!(
+    DeckSetBoards,
+    "deck.set_boards",
+    "Change a deck's board layout",
+    "Changes a deck's board settings (`settings`: the fields to change, as in deck.create); the boards are laid \
+     out again.",
+    "Deck Boards",
+    crate::decks::SetParams,
+    (),
+    crate::decks::set
+);
+modify_command!(
+    DeckSetFraming,
+    "deck.set_framing",
+    "Change a deck's framing",
+    "Changes a deck's framing settings (joistSpacing, joist, beamSpacing, beam, postSpacing, post, footing); the \
+     framing and the board joints follow.",
+    "Deck Framing",
+    crate::decks::SetParams,
+    (),
+    crate::decks::set
+);
+
+#[derive(Debug)]
+struct DeckBoards;
+
+impl Command for DeckBoards {
+    type Params = crate::decks::QueryParams;
+    type Output = Vec<crate::decks::Board>;
+    const META: CommandMeta = CommandMeta {
+        name: "deck.boards",
+        version: 1,
+        summary: "A deck's boards",
+        description: "Every board of a deck: its key, course (none for frame boards), outline, length, width, the \
+                      stock length it is cut from and the board whose offcut it uses.",
+        effects: &[Effect::Read],
+        transaction_name: "",
+    };
+
+    fn run(
+        &self,
+        cx: &mut CommandContext<'_>,
+        p: crate::decks::QueryParams,
+    ) -> Result<Vec<crate::decks::Board>> {
+        crate::decks::boards(cx.store(), p)
+    }
+}
+
+#[derive(Debug)]
+struct DeckCutList;
+
+impl Command for DeckCutList {
+    type Params = crate::decks::QueryParams;
+    type Output = crate::decks::CutList;
+    const META: CommandMeta = CommandMeta {
+        name: "deck.cut_list",
+        version: 1,
+        summary: "A deck's cut list and quantities",
+        description: "The board count and total length, the stock lengths to buy, the area, the joists, beams, posts \
+                      and footings, the screws, and any layout warnings.",
+        effects: &[Effect::Read],
+        transaction_name: "",
+    };
+
+    fn run(
+        &self,
+        cx: &mut CommandContext<'_>,
+        p: crate::decks::QueryParams,
+    ) -> Result<crate::decks::CutList> {
+        crate::decks::cut_list(cx.store(), p)
     }
 }
 

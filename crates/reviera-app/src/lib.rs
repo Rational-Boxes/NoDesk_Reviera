@@ -393,7 +393,36 @@ impl App {
             });
         }
         // Floors and ceilings: each outer boundary with its holes, between bottom and top.
-        for (id, f) in reviera_core::floors::all(store) {
+        // Decks: boards and framing instead of a slab.
+        for (id, g) in reviera_core::decks::all(store) {
+            let n_boards = g.boards.len();
+            for (k, (positions, indices)) in g.parts.iter().enumerate() {
+                let class = if k < n_boards {
+                    "IfcCovering"
+                } else {
+                    "IfcMember"
+                };
+                meshes.push(reviera_render::SceneMesh {
+                    element: Some(id),
+                    color: reviera_render::class_color(class),
+                    class: class.into(),
+                    positions: positions
+                        .iter()
+                        .map(|[x, y, z]| [*x as f32, *y as f32, *z as f32])
+                        .collect(),
+                    indices: indices.clone(),
+                });
+            }
+        }
+        for (id, f) in reviera_core::floors::all(store)
+            .into_iter()
+            .filter(|(id, _)| {
+                store
+                    .get(*id)
+                    .and_then(reviera_core::decks::deck_settings)
+                    .is_none()
+            })
+        {
             let class = store
                 .get(id)
                 .map_or("IfcSlab".to_owned(), |e| e.class.clone());

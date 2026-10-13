@@ -11,6 +11,7 @@
 //! through `App::execute`, like Lua and MCP. The ribbon and browsers come next.
 
 mod browser;
+mod decks;
 mod dims;
 mod dormers;
 mod footprint;
@@ -1498,6 +1499,7 @@ impl Gui {
                 (None, SketchKind::Slab(SlabKind::Ceiling)) => {
                     ("Create Ceiling Boundary", "session.floor_sketch")
                 }
+                (None, SketchKind::Deck) => ("Create Deck Outline", "session.floor_sketch"),
             };
             self.ribbon.set_context(Some((label, Some(session))));
             return;
@@ -1718,6 +1720,9 @@ impl Gui {
         }
         if is_insert {
             self.insert_rows(grid, id);
+        }
+        if self.deck_rows(grid, id) {
+            return;
         }
         if reviera_core::floors::slab_recipe(&e).is_some() {
             self.floor_rows(grid, id);
@@ -1946,6 +1951,7 @@ impl Gui {
             || self.sketch_edit(property, text.clone())
             || self.stair_edit(property, text.clone())
             || self.dormer_edit(property, text.clone())
+            || self.deck_edit(property, text.clone())
         {
             return;
         }
@@ -3185,6 +3191,10 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "tag.tag_all" => with(gui, Gui::tag_all),
         "stair.create" => with(gui, |g| {
             g.start_stair_tool(false);
+            focus(g);
+        }),
+        "deck.create" => with(gui, |g| {
+            g.start_deck_sketch();
             focus(g);
         }),
         "railing.create" => with(gui, |g| {

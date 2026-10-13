@@ -11281,6 +11281,49 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 - [ ] A gutter picked along the four eaves of a hip roof forms one continuous mitered sweep, and it exports as `IfcPipeSegment(GUTTER)`.
 - [ ] A soffit made with Pick Roof Edges follows the eave when the roof overhang changes.
 
+### 3.6.7a Eaves and wall bearing
+**ID:** ARC-ROOF-010 · **Priority:** P0 · **Ref:** owner requirement (2026-10-13); Reviera's own design (Appendix A.2a)
+
+**Purpose.** Define a roof's eaves as a construction that meets the perimeter walls correctly, not only as an overhang of the roof plane. *(Owner clarification, 2026-10-13: "the overhang tool… needs to implement the correct methods to join with perimeter walls".)*
+
+**Workflow.**
+1. The user selects a roof and chooses Modify | Roofs › **Eaves**.
+2. The user picks eave edges (Tab picks all of them), or chooses *All eaves*. The settings below apply to the picked edges and are kept per edge.
+
+**Behaviour & rules.**
+- **Bearing:** where the roof's plate line sits on the wall below each eave:
+  - the wall's *exterior face* (the default for picked walls), its *core centre* or its *interior face*;
+  - a **heel height**: the vertical depth of the roof construction measured at the bearing line.
+  - The roof's plate height is the wall's top at the bearing. The roof edge is the bearing line, so the overhang is measured from the wall's **exterior face** whatever the bearing.
+- **Overhang:** a horizontal distance beyond the wall's exterior face. The roof plane continues down its slope to the eave line.
+- **Rafter cut** (eave end): *plumb*, *square* (perpendicular to the roof) or *two-cut* (a plumb cut of the fascia depth, then a level cut), with the **fascia depth**.
+- **Fascia:** optional, a host sweep along the eave (ARC-ROOF-004).
+- **Soffit** (the underside closure):
+  - *boxed* (horizontal, from the bottom of the fascia back to the wall's exterior face),
+  - *sloped* (following the roof's underside back to the wall),
+  - or *open* (none).
+  - The soffit **returns to the wall face** and is trimmed against it, so there is no gap between the soffit and the wall.
+- **Gutter:** optional, along the eave (ARC-ROOF-004).
+- **Wall join at the eave:**
+  - The walls under an eave are **attached** to the roof (ARC-WALL-008). Their tops follow the roof's underside across the wall's thickness (a birdsmouth-like top: high at the interior face, low at the exterior face), and stop at the soffit where there is one.
+  - A gable wall under a gable edge rises to the roof's underside (gable infill). The roof's rake overhang is measured from that wall's exterior face too.
+  - Wall finishes (cladding layers) run up to the soffit.
+- **Consistency:** each eave's settings regenerate with the roof. Moving a wall the footprint is locked to moves the bearing line, so the eave, fascia, soffit and attachment all follow.
+- **Defaults:** a roof made with Pick Walls gets eaves on its slope-defining edges: exterior-face bearing, the overhang given in the tool, a plumb cut, a boxed soffit, and walls attached.
+
+**Data (IFC mapping).** The eave settings are RXD element data on the roof (`recipe.roof`, per edge). Fascia, soffit and gutter are written as in ARC-ROOF-004, and the attachment as in ARC-WALL-008.
+
+**Commands.** `roof.set_eaves(roof_id, edges: [curve_key] | all, bearing?: exterior|core|interior, heel?, overhang?, cut?: plumb|square|two_cut, fascia_depth?, fascia?: bool|type_id, soffit?: boxed|sloped|open, gutter?: bool|type_id, attach_walls?: bool) -> ()`
+
+**Acceptance criteria.**
+- [ ] A 45° hip roof on 300 mm walls with exterior-face bearing, a 500 mm overhang and a boxed soffit:
+  - every wall top meets the roof's underside across its full thickness;
+  - the soffit runs from the fascia's bottom to the wall's exterior face with no gap;
+  - the eave line is 500 mm out from the exterior face.
+- [ ] Changing the bearing to the core centre keeps the overhang measured from the exterior face, and raises the roof by the slope across half the wall.
+- [ ] A two-cut eave with a 200 mm fascia depth has a 200 mm plumb face and a level underside at the eave.
+- [ ] Moving a locked eave wall 300 mm outward moves the eave, the fascia and the soffit with it, and the wall stays attached.
+
 ### 3.6.8 Slope arrows in roofs
 **ID:** ARC-ROOF-005 · **Priority:** P1 · **Ref:** research/02 §7.4 · web: Slope Arrow Properties
 
@@ -12001,6 +12044,43 @@ These are view annotation and are specified in the DOC chapter. This chapter req
 - [ ] Spread Pattern to Fit on a 3.05 m path with P = 0.12 gives 25 patterns of 0.122 m.
 - [ ] With 2 balusters per tread on 0.28 m treads, balusters sit 0.07 m and 0.21 m behind each nosing.
 
+### 3.7.8b Railing openings and gates
+**ID:** ARC-RAIL-003 · **Priority:** P1 · **Ref:** owner requirement (2026-10-13); Reviera's own design (Appendix A.2a)
+
+**Purpose.** Openings and gates in a railing, added the way dormers are added to a roof. The user lays out the railing first, then selects it and adds features through its Modify tab. *(Owner clarifications, 2026-10-13: "Rails should also include gates, conceptually an opening or door"; "simple openings in the rail system and with a gate, single and double door"; "same Modify enhancement model as adding dormers to a roof".)*
+
+**Workflow.**
+1. Select a railing. Modify | Railings offers **Opening** and **Gate** (*Single* or *Double*).
+2. Click on the railing where the opening or gate is centred. The width comes from the tool's options: an opening's clear width, or the gate type's leaf widths.
+3. A selected opening or gate shows its width, its position along the path, and for a gate the hinge side, swing direction and leaf count. Handles drag it along the railing and change its width.
+
+**Behaviour & rules.**
+- **Opening:** a gap in the railing's rails and balusters, of a clear width between the inner faces of two posts. A post is added on each side of the gap (or an existing post is used when one is within the post's reserved space). Balusters inside the gap and the posts' reserved spaces are removed (ARC-RAIL-002). Rails stop at the posts.
+- **Gate:** an opening filled by a gate:
+  - **single** (one leaf, hinged on one side) or **double** (two leaves meeting in the middle);
+  - leaves as frames with the railing's balusters or infill;
+  - a **swing direction** (in or out, from a reference side), a hinge side, and an optional latch post.
+  - The gate is a hosted insert of the railing, the way a door is hosted by a wall. It moves with the railing's path and keeps its position along it.
+- Openings and gates are kept by their **position along the path** (distance from the path's start). When the path changes, they keep that distance, clamped to the path's length.
+- Openings cannot overlap each other or a corner. One that would is refused, with the conflicting feature or corner named.
+- **Plan symbol:** gates show their swing arc, like doors.
+
+**Data (IFC mapping).**
+- **Opening:** the railing's rails are broken at the opening, with no IFC opening element (a railing has no voidable body). The opening is RXD data on the railing.
+- **Gate:** an `IfcDoor` (`PredefinedType = GATE`), with an `IfcDoorType` (`OperationType = SINGLE_SWING_LEFT`/`RIGHT`, or `DOUBLE_DOOR_SINGLE_SWING`), contained in the railing's storey. It is related to the railing through `IfcRelConnectsElements` (Name "Gate").
+
+**Commands.**
+- `railing.add_opening(railing_id, at, width) -> key`
+- `railing.add_gate(railing_id, at, leaves: 1|2, width?, swing?: in|out, hinge?: left|right) -> element_id`
+- `railing.move_feature(railing_id, key, at?, width?)`
+- `railing.remove_feature(railing_id, key)`
+
+**Acceptance criteria.**
+- [ ] A 900 mm opening in a 6 m deck railing has a post on each side, no balusters or rails across the gap, and stays 900 mm clear.
+- [ ] A double gate of 1.2 m places two leaves of 600 mm, swinging outward, and exports as `IfcDoor(GATE)` with `DOUBLE_DOOR_SINGLE_SWING`.
+- [ ] Moving the railing's path keeps the gate the same distance from the path's start.
+- [ ] `railing.add_gate` from Lua or MCP gives the same model as the window tool.
+
 ### 3.7.8a Decks
 **ID:** ARC-DECK-001 · **Priority:** P1 · **Ref:** owner requirement (2026-10-13); Reviera's own design (Appendix A.2a)
 
@@ -12066,6 +12146,25 @@ These are view annotation and are specified in the DOC chapter. This chapter req
 - [ ] The cut list's total board length equals the sum of the boards' lengths, and each stock length's count covers the pieces assigned to it.
 - [ ] Editing the outline (moving an edge 600 mm) regenerates the courses, the joists and the cut list. A board override on a board that still exists is kept.
 - [ ] `deck.create` and `deck.cut_list` from Lua or MCP give the same deck and list as the window.
+
+**Implementation notes (2026-10-13).**
+- As built, a deck is a **floor** carrying deck settings (`rxd:deck`, ObjectType "DECK"). Its outline, level and height are the floor's, so Edit Boundary, the footprint grips, `sketch.move_*` and Guard Edges railings all work on it.
+- **Commands:**
+  - `deck.create(outline, level_id, height?, settings?)`;
+  - `deck.set_boards` and `deck.set_framing` (`deck_id`, plus the fields to change);
+  - `deck.boards` and `deck.cut_list`.
+  - Per-board overrides (`deck.override_board`) and a deck type come later.
+- **Layout, as specified:**
+  - picture frame rows mitred at the corners;
+  - courses from the field's lowest edge across the boards (or balanced), each where its centre line is inside the field;
+  - pieces no longer than the longest stock, with every joint on a joist;
+  - stagger (*longest*, *stair-step* or seeded *random*) keeping joints in neighbouring courses at least the minimum apart, and not repeating a joist within *n* courses;
+  - first-fit-decreasing stock assignment with offcut reuse.
+  - The default direction runs along the outline's longest edge.
+- **Framing:** joists at the spacing with rims at both ends (doubled inside a picture frame), beams across them, and posts on the beams on pad footings at the level. A deck too low for its framing is flagged.
+- **Body:** boards and framing as solids (in IFC, one faceted B-rep each) instead of the floor's slab.
+- **Properties:** the board and framing settings, and the cut list (boards, length, stock to buy, area, joists, beams, posts and footings, screws, warnings).
+- **Later:** a ledger on the house wall, the span table, breaker boards, blocking under joints, hidden fasteners, board overrides, stairs from deck edges, and aggregated IFC members.
 
 
 ### 3.7.9 Ramps
@@ -13449,6 +13548,11 @@ All commands below are registered once in the command registry and exposed autom
 | `deck.set_framing` | deck_id, joist_spacing?, joist_size?, beam_spacing?, post_spacing?, ledger_wall_id? | — | Yes | ARC-DECK-001 |
 | `deck.boards` | deck_id | [board] | No | ARC-DECK-001 |
 | `deck.cut_list` | deck_id | cut_list | No | ARC-DECK-001 |
+| `roof.set_eaves` | roof_id, edges, bearing?, heel?, overhang?, cut?, fascia_depth?, fascia?, soffit?, gutter?, attach_walls? | — | Yes | ARC-ROOF-010 |
+| `railing.add_opening` | railing_id, at, width | key | Yes | ARC-RAIL-003 |
+| `railing.add_gate` | railing_id, at, leaves: 1\|2, width?, swing?, hinge? | element_id | Yes | ARC-RAIL-003 |
+| `railing.move_feature` | railing_id, key, at?, width? | — | Yes | ARC-RAIL-003 |
+| `railing.remove_feature` | railing_id, key | — | Yes | ARC-RAIL-003 |
 | `deck.override_board` | deck_id, board_key, length?, joint?, removed? | — | Yes | ARC-DECK-001 |
 | `roof.set_slope` | roof_id, slope, edge_keys? | — | Yes | ARC-ROOF-001 |
 | `roof.create_extrusion` | type_id, work_plane, profile: [curve], ref_level, level_offset?, start, end | element_id | Yes | ARC-ROOF-002 |
@@ -25329,14 +25433,14 @@ Generated by `tools/build_spec.py` from the chapter command catalogs and require
 |------|---:|---:|---:|---:|------:|
 | UI | 76 | 37 | 7 | 0 | 120 |
 | DM | 91 | 57 | 24 | 3 | 175 |
-| ARC | 75 | 53 | 10 | 1 | 139 |
+| ARC | 76 | 54 | 10 | 1 | 141 |
 | STR | 0 | 14 | 47 | 0 | 61 |
 | MEP | 0 | 28 | 42 | 0 | 70 |
 | ANA | 0 | 1 | 21 | 0 | 22 |
 | DOC | 68 | 40 | 12 | 1 | 121 |
 | COL | 8 | 45 | 6 | 1 | 60 |
 | ADV | 0 | 0 | 4 | 1 | 5 |
-| **Total** | **318** | **275** | **173** | **7** | **773** |
+| **Total** | **319** | **276** | **173** | **7** | **775** |
 
 Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver)"), it is counted under the first. The non-functional requirements (NFR-…) are in Chapter 0 §0.7 and are not counted here.
 
@@ -25391,7 +25495,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.2a Reviera-originated features
 
-86 requirements are Reviera's own design: owner directives, the technology stack (IFC/RXD storage, live store, BIMserver, MCP, scripting) and extensions beyond the reference product's feature set. Their Ref lines cite no research on the reference product. Listing them separately keeps the clean-room provenance clear: every other requirement traces to public research on the reference product.
+88 requirements are Reviera's own design: owner directives, the technology stack (IFC/RXD storage, live store, BIMserver, MCP, scripting) and extensions beyond the reference product's feature set. Their Ref lines cite no research on the reference product. Listing them separately keeps the clean-room provenance clear: every other requirement traces to public research on the reference product.
 
 | Requirement | Ch | Feature |
 |-------------|----|---------|
@@ -25461,9 +25565,11 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | DM-LIVE-018 | 2b | Keyframe snapshots and the retention policy (§7, §8.5) shall keep every retained point … |
 | DM-LIVE-019 | 2b | In BIMserver mode, the History panel shall show one combined timeline of local … |
 | DM-LIVE-020 | 2b | Users shall be able to publish named snapshots to BIMserver without changing the … |
+| ARC-ROOF-010 | 3 | 3.6.7a Eaves and wall bearing |
 | ARC-ROOF-007 | 3 | 3.6.8a Dormers (automated) |
 | ARC-ROOF-008 | 3 | 3.6.8b Arched and vaulted roofs |
 | ARC-ROOF-009 | 3 | 3.6.8c Dome roofs |
+| ARC-RAIL-003 | 3 | 3.7.8b Railing openings and gates |
 | ARC-DECK-001 | 3 | 3.7.8a Decks |
 | DOC-VIEW-014 | 5 | Slice planes |
 | DOC-VIEW-013 | 5 | Blueprint mode (3D slice to 2D drawing) |
@@ -25484,7 +25590,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**1969 unique commands** in 402 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**1974 unique commands** in 402 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -25753,7 +25859,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `publish` | 1 |
 | `purge` | 2 |
 | `qto` | 1 |
-| `railing` | 6 |
+| `railing` | 10 |
 | `railingtype` | 5 |
 | `ramp` | 2 |
 | `rebar` | 24 |
@@ -25780,7 +25886,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `revcloud` | 2 |
 | `revision` | 8 |
 | `revisionsequence` | 1 |
-| `roof` | 14 |
+| `roof` | 15 |
 | `room` | 8 |
 | `roomseparator` | 1 |
 | `roomtag` | 1 |
@@ -27012,11 +27118,15 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `purge.list` | 2 | include_unplaced_views=false | {kind, items[]}[] | No | DM-PURGE-001 |
 | `purge.run` | 2 | item_ids[], compact_undo=false | report | Yes | DM-PURGE-001 |
 | `qto.recompute` | 2 | element_ids?[] | — | Yes | DM-IFC-003 |
+| `railing.add_gate` | 3 | railing_id, at, leaves: 1\ | 2, width?, swing?, hinge? | element_id | Yes |
+| `railing.add_opening` | 3 | railing_id, at, width | key | Yes | ARC-RAIL-003 |
 | `railing.create` | 3 | type_id, path: [curve], host_ref?, base_level?, base_offset?, offset_from_path?, segment_slopes?: [ByHost\ | Flat\ | Sloped], height_corrections?: [f64\ | ByType] |
 | `railing.create_on_edges` | 3 | type_id, host_id, edges?: [curve_key]\ | all_open, setback? | [element_id] | Yes |
 | `railing.edit_path` | 3 | railing_id, path, ... | — | Yes | ARC-RAIL-001 |
 | `railing.flip_path` | 3 | railing_id | — | Yes | ARC-RAIL-001 |
+| `railing.move_feature` | 3 | railing_id, key, at?, width? | — | Yes | ARC-RAIL-003 |
 | `railing.place_on_host` | 3 | type_id, host_id, position: Treads\ | Stringer | [element_id] | Yes |
+| `railing.remove_feature` | 3 | railing_id, key | — | Yes | ARC-RAIL-003 |
 | `railing.set_rail_join` | 3 | railing_id, join_ref, mode: ByType\ | Fillet\ | Miter\ | Flush |
 | `railingtype.set_baluster_pattern` | 3 | type_id, rows, break_at, angle?, justify, excess_fill, excess_family?, excess_spacing? | — | Yes | ARC-RAIL-002 |
 | `railingtype.set_continuous_rail` | 3 | type_id, which: Top\ | Handrail1\ | Handrail2, props | — |
@@ -27123,6 +27233,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `roof.join` | 3 | roof_id, edge_ref, target_ref | — | Yes | ARC-ROOF-006 |
 | `roof.set_arch` | 3 | roof_id, rise?, radius?, profile?, taper? | — | Yes | ARC-ROOF-008 |
 | `roof.set_dome` | 3 | roof_id, rise?, profile?, oculus?, polygon_mode? | — | Yes | ARC-ROOF-009 |
+| `roof.set_eaves` | 3 | roof_id, edges, bearing?, heel?, overhang?, cut?, fascia_depth?, fascia?, soffit?, gutter?, attach_walls? | — | Yes | ARC-ROOF-010 |
 | `roof.set_shape` | 3 | roof_id, shape: hip\ | gable\ | gable_rotated\ | shed\ |
 | `roof.set_slope` | 3 | roof_id, slope, edge_keys? | — | Yes | ARC-ROOF-001 |
 | `roof.unjoin` | 3 | roof_id, edge_ref? | — | Yes | ARC-ROOF-006 |

@@ -98,6 +98,15 @@ The KIT FZK *AC20-Institute-Var-2* sample model (`test-data/ifc/`) open in Revie
   at the ends and corners, and balusters spaced by the type. Railings on edges follow the host's
   outline (`railing.create`, `railing.create_on_edges`). Not yet: railings on stairs, continuous
   handrails and baluster families.
+- **Decks**: Architecture › Deck sketches a deck's outline. Its boards are laid out one by one:
+  courses across from the start edge (the last ripped, or balanced), every end joint on a joist
+  and staggered, picture-frame borders mitred at the corners, and pieces cut from the shortest
+  stock length that fits, with offcuts reused. The framing is laid out too: joists, beams, posts
+  and footings. Properties change the board width, gap, direction, stock lengths, frame, stagger
+  and spacings and show the cut list (boards, stock to buy, framing, screws). A deck is a floor,
+  so its outline grips, Edit Boundary and Guard Edges railings work on it (`deck.create`,
+  `deck.set_boards`, `deck.set_framing`, `deck.boards`, `deck.cut_list`). Not yet: a ledger,
+  span tables, breakers and board overrides.
 - **Dormers**: with a roof selected, Modify | Roofs › Dormer places gable, hipped, shed (flat
   lift) or flat dormers where you click on the roof (in a plan or in 3D). Each comes with its
   roof, a front wall and cheek walls that fill the gaps down to the main roof, and runs up the
@@ -254,9 +263,9 @@ The KIT FZK *AC20-Institute-Var-2* sample model (`test-data/ifc/`) open in Revie
 
 ## Planned next
 
-The first milestone continues with railings on stairs, a deck design subsystem (ARC-DECK-001: the deck's outline,
-board-by-board layout with end joints on joists and staggered, picture frames and breakers, the
-framing beneath, and a cut list), roof openings (below dormers,
+The first milestone continues with roof eaves that join the walls properly (ARC-ROOF-010:
+bearing, overhang from the wall face, rafter cuts, fascia, soffit and gutter), railing openings
+and gates (ARC-RAIL-003), railings on stairs, roof openings (below dormers,
 skylights and shafts), and layered wall types. Then come curved forms: smooth arched roofs (including vaults that taper over trapezoidal
 footprints, ARC-ROOF-008), dome roofs (ARC-ROOF-009), spline-curved walls (ARC-WALL-002), and
 boolean intersect, subtract and union between elements (ARC-MOD-028). After that come general

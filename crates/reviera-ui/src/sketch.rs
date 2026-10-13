@@ -53,6 +53,8 @@ pub enum DrawMode {
 pub enum SketchKind {
     Slab(SlabKind),
     Roof,
+    /// A deck's outline (a deck is a floor with boards and framing, ARC-DECK-001).
+    Deck,
 }
 
 /// A sketch curve: a line, the wall face it was picked from, and for roofs whether it is a
@@ -132,6 +134,24 @@ impl Gui {
                 .set_status_text("Floors are sketched in plan views (View › Floor Plan)", 0);
         };
         self.begin_sketch(SketchKind::Slab(SlabKind::Floor), None, level, Vec::new());
+    }
+
+    /// Architecture › Deck: a new deck's outline on the plan's level.
+    pub(crate) fn start_deck_sketch(&mut self) {
+        let frame = self.frame;
+        if !self.ensure_plan(false) {
+            return;
+        }
+        let Some(level) = self
+            .active_view()
+            .and_then(|v| v.plan.as_ref())
+            .map(|p| p.level)
+        else {
+            return frame.set_status_text("Decks are sketched in plan views", 0);
+        };
+        self.begin_sketch(SketchKind::Deck, None, level, Vec::new());
+        // A deck usually starts against the house: draw it with lines or a rectangle.
+        self.set_draw_mode(DrawMode::Rectangle);
     }
 
     /// Sketch Ceiling: a new ceiling boundary on the plan's level.
@@ -264,6 +284,7 @@ impl Gui {
             (None, SketchKind::Slab(SlabKind::Floor)) => "Floor",
             (None, SketchKind::Slab(SlabKind::Ceiling)) => "Ceiling",
             (None, SketchKind::Roof) => "Roof by Footprint",
+            (None, SketchKind::Deck) => "Deck",
         };
         let text = format!(
             "{verb} · {what} · {} curves · Finish ✓ or Cancel ✗ on the ribbon",
@@ -568,6 +589,10 @@ impl Gui {
             (None, SketchKind::Slab(SlabKind::Ceiling)) => (
                 "ceiling.create",
                 json!({ "loops": [curves], "level_id": s.level }),
+            ),
+            (None, SketchKind::Deck) => (
+                "deck.create",
+                json!({ "outline": [curves], "level_id": s.level }),
             ),
         };
         match self.app.execute(command, args, &super::user()) {
@@ -958,7 +983,7 @@ pub(crate) fn edit_command(
             "roof.edit_footprint",
             json!({ "roof_id": host, "curves": curves }),
         ),
-        SketchKind::Slab(_) => (
+        SketchKind::Slab(_) | SketchKind::Deck => (
             "floor.edit_boundary",
             json!({ "floor_id": host, "loops": [curves] }),
         ),
