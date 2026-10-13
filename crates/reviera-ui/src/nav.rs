@@ -105,6 +105,7 @@ impl Gui {
 
     /// Animates the active view to `to` (the change is remembered for Previous).
     pub(crate) fn animate_to(&mut self, to: Camera) {
+        self.leave_walk();
         self.remember();
         let Some(v) = self.active_view_mut() else {
             return;
@@ -147,20 +148,26 @@ impl Gui {
     }
 
     pub(crate) fn set_home(&mut self) {
+        let mut saved = None;
         if let Some(v) = self.active_view_mut() {
             v.nav.home = Some(v.camera);
+            let size = v.panel.get_client_size();
+            let aspect = size.width.max(1) as f32 / size.height.max(1) as f32;
+            saved = v.element.map(|e| (v.doc, e, v.camera.to_view(aspect)));
+        }
+        // Home is view state of the session, saved with the next save.
+        if let Some((doc, element, home)) = saved {
+            self.app.set_view_home(doc, element, home);
         }
         self.frame
             .set_status_text("The current view is now Home", 0);
     }
 
     pub(crate) fn toggle_perspective(&mut self) {
+        self.leave_walk();
         let Some(v) = self.active_view_mut() else {
             return;
         };
-        if v.nav.walk.is_some() {
-            return;
-        }
         v.camera.perspective = !v.camera.perspective;
         let text = if v.camera.perspective {
             "Perspective"
@@ -173,6 +180,7 @@ impl Gui {
 
     /// Previous (`back`) or Next pan/zoom.
     pub(crate) fn history(&mut self, back: bool) {
+        self.leave_walk();
         let Some(v) = self.active_view_mut() else {
             return;
         };
@@ -304,22 +312,15 @@ impl Gui {
 
     /// Enters or leaves walk mode in the active view.
     pub(crate) fn toggle_walk(&mut self) {
+        if self.leave_walk() {
+            return;
+        }
         let floor = self.walk_floor();
         let frame = self.frame;
         self.end_tool(&frame);
         let Some(v) = self.active_view_mut() else {
             return;
         };
-        if v.nav.walk.take().is_some() {
-            // Back to orbiting about a point ahead of the eye.
-            let eye = v.camera.eye();
-            let ahead = -v.camera.direction();
-            v.camera.distance = 10.0;
-            v.camera.target = eye + ahead * 10.0;
-            frame.set_status_text("Ready", 0);
-            v.panel.refresh(false, None);
-            return;
-        }
         v.nav.back.push(v.camera);
         // Stand at the view's target, at eye height above the level below it, looking level.
         let mut c = v.camera;
@@ -344,6 +345,26 @@ impl Gui {
              wheel for speed, Esc to stop",
             0,
         );
+    }
+
+    /// Leaves walk mode in the active view, back to orbiting about a point ahead of the eye, with
+    /// the Orientation Cube shown again. Returns whether the view was in walk mode.
+    pub(crate) fn leave_walk(&mut self) -> bool {
+        let frame = self.frame;
+        let Some(v) = self.active_view_mut() else {
+            return false;
+        };
+        if v.nav.walk.take().is_none() {
+            return false;
+        }
+        let eye = v.camera.eye();
+        let ahead = -v.camera.direction();
+        v.camera.distance = 10.0;
+        v.camera.target = eye + ahead * 10.0;
+        v.nav.hover = None;
+        v.panel.refresh(false, None);
+        frame.set_status_text("Ready", 0);
+        true
     }
 
     /// The elevation of the level at or below the active view's target (0 without levels).

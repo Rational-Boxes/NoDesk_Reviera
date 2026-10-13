@@ -6942,7 +6942,7 @@ td code { white-space: nowrap; }
 - Zoom commands: Zoom In Region (ZR), Zoom Out 2× (ZO), Zoom to Fit (ZF), Zoom All to Fit (ZA), Zoom Sheet Size (ZS), Previous Pan/Zoom (ZP), Next Pan/Zoom (ZN, Reviera addition).
 - Each view keeps a navigation history of up to 50 states for Previous/Next.
 - <strong>3D mice</strong> (6-DoF devices) are supported through the open device protocol available on each platform (for example spacenavd on Linux) with modes 2D, Object, Walk and Fly (P2).
-- Navigation does <strong>not</strong> create undo entries and does <strong>not</strong> mark the model modified. The latest camera of each view is kept as view state: it goes to the live store at once (Ch. 2b), and is written into the view's RXD along with the next save that happens for any other reason. Closing a model whose only changes are navigation does not prompt to save. An explicit <code>view.set_camera</code> call (from a script, an agent, or <em>Save Orientation</em>) is an ordinary undoable edit that marks the model modified. In BIMserver mode, navigation never causes a check-in, and the default 3D view is per user.</p>
+- Navigation does <strong>not</strong> create undo entries and does <strong>not</strong> mark the model modified. The latest camera of each view is kept as view state: it goes to the live store at once (Ch. 2b), and is written to the RXD document <code>views/state</code> (latest camera and Home per view, by view id) along with the next save that happens for any other reason. A view's saved camera in <code>views/&lt;viewId&gt;</code> changes only through edits such as <code>view.set_camera</code>; when it changes after the latest navigation, the saved camera wins. Closing a model whose only changes are navigation does not prompt to save. An explicit <code>view.set_camera</code> call (from a script, an agent, or <em>Save Orientation</em>) is an ordinary undoable edit that marks the model modified. In BIMserver mode, navigation never causes a check-in, and the default 3D view is per user.</p>
 <p><strong>Commands.</strong> <code>view.zoom(view_id?, mode: in_region|out|fit|all_fit|sheet_size|previous|next, rect?)</code>, <code>view.pan(view_id?, dx, dy)</code>, <code>view.orbit(view_id?, yaw_deg, pitch_deg, pivot?)</code>, <code>view.set_camera(view_id, eye, target, up, projection?: orthographic|perspective, fov?) -&gt; ()</code>, <code>view.get_camera(view_id) -&gt; Camera</code>, <code>view.set_pivot(view_id, point)</code>, <code>view.zoom_to_elements(view_id?, element_ids)</code>.</p>
 <p><strong>Acceptance criteria.</strong>
 - [ ] Wheel zoom keeps the model point under the cursor fixed to within one pixel.
@@ -37674,6 +37674,11 @@ No IFC equivalent.
 <td>Views (all kinds), view range, crop, camera, section box, per-view overrides, hidden elements</td>
 <td>RXD documents <code>views/index</code> and <code>views/&lt;viewId&gt;</code></td>
 <td>One document per view, loaded lazily when the view opens.</td>
+</tr>
+<tr>
+<td>Navigation state: each view's latest camera and Home (UI-NAV-001)</td>
+<td>RXD document <code>views/state</code></td>
+<td>Written with the next save; never makes the model modified.</td>
 </tr>
 <tr>
 <td>View templates, view filters, selection sets</td>

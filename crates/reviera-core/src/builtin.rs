@@ -51,6 +51,12 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(WallSetLocation),
         registry.add(WallSetJoinAllowed),
         registry.add(WallFlip),
+        registry.add(ViewCreate3d),
+        registry.add(ViewList),
+        registry.add(ViewRename),
+        registry.add(ViewDuplicate),
+        registry.add(ViewDelete),
+        registry.add(ViewSetCamera),
         registry.add(WallJoinsQuery),
     ];
     for r in results {
@@ -1144,5 +1150,142 @@ impl Command for WallFlip {
 
     fn run(&self, cx: &mut CommandContext<'_>, p: FlipParams) -> Result<()> {
         walls::flip(cx.edit()?, p)
+    }
+}
+
+use crate::views::{
+    self, Create3dParams, DuplicateParams, RenameParams, SetCameraParams, ViewIdsParams,
+    ViewSummary,
+};
+
+#[derive(Debug)]
+struct ViewCreate3d;
+
+impl Command for ViewCreate3d {
+    type Params = Create3dParams;
+    type Output = ElementId;
+    const META: CommandMeta = CommandMeta {
+        name: "view.create_3d",
+        version: 1,
+        summary: "Create a 3D view",
+        description: "`kind: default` returns the default 3D view `{3D}`, creating it if needed; `kind: named` \
+                      creates a new 3D view (`name`, or `{3D 2}`, `{3D 3}`, …).",
+        effects: &[Effect::Edit],
+        transaction_name: "3D View",
+    };
+
+    fn run(&self, cx: &mut CommandContext<'_>, p: Create3dParams) -> Result<ElementId> {
+        views::create_3d(cx.edit()?, p)
+    }
+}
+
+#[derive(Debug, Default, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ViewListParams {
+    /// Only views of this kind (for example `view.3d`).
+    pub kind: Option<String>,
+}
+
+#[derive(Debug)]
+struct ViewList;
+
+impl Command for ViewList {
+    type Params = ViewListParams;
+    type Output = Vec<ViewSummary>;
+    const META: CommandMeta = CommandMeta {
+        name: "view.list",
+        version: 1,
+        summary: "List views",
+        description: "Every view of the model, by kind and name.",
+        effects: &[Effect::Read],
+        transaction_name: "",
+    };
+
+    fn run(&self, cx: &mut CommandContext<'_>, p: ViewListParams) -> Result<Vec<ViewSummary>> {
+        Ok(views::list(cx.store())
+            .into_iter()
+            .filter(|v| p.kind.as_ref().is_none_or(|k| *k == v.kind))
+            .collect())
+    }
+}
+
+#[derive(Debug)]
+struct ViewRename;
+
+impl Command for ViewRename {
+    type Params = RenameParams;
+    type Output = ();
+    const META: CommandMeta = CommandMeta {
+        name: "view.rename",
+        version: 1,
+        summary: "Rename a view",
+        description: "View names are unique within a view kind; a duplicate name is refused.",
+        effects: &[Effect::Edit],
+        transaction_name: "Rename View",
+    };
+
+    fn run(&self, cx: &mut CommandContext<'_>, p: RenameParams) -> Result<()> {
+        views::rename(cx.edit()?, p)
+    }
+}
+
+#[derive(Debug)]
+struct ViewDuplicate;
+
+impl Command for ViewDuplicate {
+    type Params = DuplicateParams;
+    type Output = ElementId;
+    const META: CommandMeta = CommandMeta {
+        name: "view.duplicate",
+        version: 1,
+        summary: "Duplicate a view",
+        description: "Copies a view with its settings and saved camera, as `<name> Copy` unless named.",
+        effects: &[Effect::Edit],
+        transaction_name: "Duplicate View",
+    };
+
+    fn run(&self, cx: &mut CommandContext<'_>, p: DuplicateParams) -> Result<ElementId> {
+        views::duplicate(cx.edit()?, p)
+    }
+}
+
+#[derive(Debug)]
+struct ViewDelete;
+
+impl Command for ViewDelete {
+    type Params = ViewIdsParams;
+    type Output = ();
+    const META: CommandMeta = CommandMeta {
+        name: "view.delete",
+        version: 1,
+        summary: "Delete views",
+        description: "Deletes views (not model elements).",
+        effects: &[Effect::Edit, Effect::Destructive],
+        transaction_name: "Delete View",
+    };
+
+    fn run(&self, cx: &mut CommandContext<'_>, p: ViewIdsParams) -> Result<()> {
+        views::delete(cx.edit()?, p)
+    }
+}
+
+#[derive(Debug)]
+struct ViewSetCamera;
+
+impl Command for ViewSetCamera {
+    type Params = SetCameraParams;
+    type Output = ();
+    const META: CommandMeta = CommandMeta {
+        name: "view.set_camera",
+        version: 1,
+        summary: "Set a view's saved camera",
+        description: "Stores the view's camera (eye and target in metres, projection, horizontal field of \
+                      view). Unlike navigation, this is an undoable edit that marks the model modified.",
+        effects: &[Effect::Edit],
+        transaction_name: "View Camera",
+    };
+
+    fn run(&self, cx: &mut CommandContext<'_>, p: SetCameraParams) -> Result<()> {
+        views::set_camera(cx.edit()?, p)
     }
 }

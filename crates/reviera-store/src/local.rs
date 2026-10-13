@@ -78,6 +78,9 @@ pub struct LocalProject {
     synced: ModelVersion,
     /// Metres per length unit of the file.
     length_scale: f64,
+    /// Project-level RXD documents to write with the next save (view state and the like), by
+    /// path. Setting them does not make the project dirty.
+    pending_docs: BTreeMap<String, Value>,
 }
 
 impl std::fmt::Debug for LocalProject {
@@ -307,6 +310,7 @@ impl LocalProject {
             sets,
             rxd_paths,
             length_scale,
+            pending_docs: BTreeMap::new(),
         };
         Ok((local, doc, report))
     }
@@ -371,6 +375,24 @@ impl LocalProject {
     /// The payload chunks of an element's `Reviera_Element` (or `Reviera_Type`) property set.
     pub fn element_payload(&self, id: ElementId) -> Option<Vec<String>> {
         self.element_psets.get(&id).map(Pset::chunks)
+    }
+
+    /// A project-level RXD document that is not an element (for example `views/state`): the
+    /// version to be saved if one is pending, else the one in the file.
+    pub fn document(&self, path: &str) -> Option<Value> {
+        if let Some(v) = self.pending_docs.get(path) {
+            return Some(v.clone());
+        }
+        self.doc_psets
+            .get(path)?
+            .decode(DecodeLimits::default())
+            .ok()
+    }
+
+    /// Sets a project-level RXD document, written with the next save. It does not make the
+    /// project dirty: saving for another reason writes it (UI-NAV-001 view state).
+    pub fn set_document(&mut self, path: &str, value: Value) {
+        self.pending_docs.insert(path.to_owned(), value);
     }
 
     pub fn data_revision(&self) -> i64 {
@@ -558,6 +580,14 @@ impl LocalProject {
             let pset = self.upsert_payload(existing, name, step, is_type, &kind, &value)?;
             self.element_psets.insert(id, pset);
             report.element_data_written += 1;
+        }
+
+        for (path, value) in std::mem::take(&mut self.pending_docs) {
+            let existing = self.doc_psets.get(&path).cloned();
+            let name = format!("{DOC_PSET_PREFIX}{path}");
+            let kind = path.replace('/', ".");
+            let pset = self.upsert_payload(existing, &name, project, false, &kind, &value)?;
+            self.doc_psets.insert(path, pset);
         }
 
         let identity = IdentityDoc {

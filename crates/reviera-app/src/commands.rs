@@ -33,6 +33,11 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add_host(SelectionGet),
         registry.add_host(SelectionSet),
         registry.add_host(SelectionClear),
+        registry.add_host(crate::views::ViewGetCamera),
+        registry.add_host(crate::views::ViewOrient),
+        registry.add_host(crate::views::ViewSetProjection),
+        registry.add_host(crate::views::ViewSetHome),
+        registry.add_host(crate::views::ViewOpen),
         registry.add_host(SelectionAdd),
         registry.add_host(SelectionRemove),
     ];
@@ -473,6 +478,7 @@ impl HostCommand for RecoveryRestore {
         let untitled = !restored.project.path().exists() && p.as_copy_path.is_none();
         let id = app.next_doc;
         app.next_doc += 1;
+        let view_states = crate::views::load(&restored.project);
         app.docs.insert(
             id,
             crate::OpenDocument {
@@ -483,6 +489,8 @@ impl HostCommand for RecoveryRestore {
                 untitled,
                 open_report: None,
                 selection: Default::default(),
+                view_states,
+                active_view: None,
                 tessellation: Default::default(),
             },
         );

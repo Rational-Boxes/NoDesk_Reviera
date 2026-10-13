@@ -322,3 +322,92 @@ fn new_walls_appear_in_the_scene_before_saving() {
     run(&mut app, "edit.undo", json!({}));
     assert!(app.render_scene(doc).unwrap().meshes.is_empty());
 }
+
+#[test]
+fn views_are_model_objects_and_navigation_is_session_state() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = app(dir.path());
+    run(&mut app, "file.new", json!({}));
+    let doc = app.active().unwrap();
+    let view = ElementId(run(&mut app, "view.create_3d", json!({})).as_u64().unwrap());
+    // The default view is reused, and names are unique per kind.
+    assert_eq!(run(&mut app, "view.create_3d", json!({})), json!(view.0));
+    let second = run(&mut app, "view.create_3d", json!({"kind": "named"}));
+    assert_eq!(
+        fails(
+            &mut app,
+            "view.rename",
+            json!({"view_id": second, "new_name": "{3D}"})
+        ),
+        "view.name_taken"
+    );
+    let list = run(&mut app, "view.list", json!({}));
+    let names: Vec<_> = list
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|v| v["name"].as_str().unwrap().to_owned())
+        .collect();
+    assert_eq!(names, ["{3D 2}", "{3D}"]);
+    let path = dir.path().join("views.ifc");
+    run(&mut app, "file.save_as", json!({"path": path}));
+    assert!(!app.documents()[0].dirty);
+
+    // Navigation: no undo entry, not a model change.
+    let mut cam = reviera_core::views::ViewCamera::fitting([0.0; 3], [10.0, 8.0, 3.0]);
+    cam.perspective = false;
+    app.set_view_camera(doc, view, cam);
+    run(
+        &mut app,
+        "view.orient",
+        json!({"view_id": view.0, "preset": "top"}),
+    );
+    let top = app.view_camera(doc, view).unwrap();
+    assert!(!top.perspective);
+    assert!((top.eye[0] - top.target[0]).abs() < 1e-9 && top.eye[2] > top.target[2]);
+    assert!(!app.documents()[0].dirty);
+    // Two view creations; navigation added nothing.
+    assert_eq!(
+        run(&mut app, "edit.history", json!({}))
+            .as_array()
+            .map(Vec::len),
+        Some(2)
+    );
+
+    // Saved with the next save, and back on reopen.
+    run(&mut app, "test.add_proxy", json!({"name": "P"}));
+    run(&mut app, "file.save", json!({}));
+    run(&mut app, "file.close", json!({"document_id": doc}));
+    let doc = run(&mut app, "file.open", json!({"path": path}))
+        .as_u64()
+        .unwrap();
+    assert_eq!(app.view_camera(doc, view), Some(top));
+
+    // A script's saved camera wins over older navigation.
+    run(
+        &mut app,
+        "view.set_camera",
+        json!({"view_id": view.0, "eye": [20, -20, 15], "target": [0, 0, 0], "projection": "perspective"}),
+    );
+    let c = app.view_camera(doc, view).unwrap();
+    assert_eq!((c.eye, c.perspective), ([20.0, -20.0, 15.0], true));
+    assert_eq!(
+        run(&mut app, "view.get_camera", json!({"view_id": view.0}))["eye"],
+        json!([20.0, -20.0, 15.0])
+    );
+
+    // view.open asks the UI to show the view.
+    run(&mut app, "view.open", json!({"view_id": second}));
+    assert_eq!(
+        app.take_view_requests(),
+        [(doc, ElementId(second.as_u64().unwrap()))]
+    );
+    run(&mut app, "view.delete", json!({"view_ids": [second]}));
+    assert_eq!(
+        run(&mut app, "view.list", json!({}))
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+}

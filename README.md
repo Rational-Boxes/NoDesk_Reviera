@@ -24,6 +24,9 @@ operation can be driven by Lua scripts and by AI agents through the Model Contex
 - **Tabbed views**: several models open side by side, each view in its own tab with a `wgpu`
   3D viewport (Window › New 3D View, Tile Views, Tab Views, Ctrl+Tab); a dockable Properties
   palette.
+- **Views as model objects**: 3D views are saved in the IFC file (RXD), with a Project Browser
+  to open, rename, duplicate and delete them; each view's camera and Home come back on reopen.
+  `view.*` commands (create, list, rename, orient, set_camera, open, …) work from MCP too.
 - **Navigation**: an Orientation Cube in each 3D view (26 click regions, compass, Home, and a
   PERSP/ISO projection toggle), standard and isometric views with animated transitions, wheel
   zoom about the cursor, orbit about the selection, Previous/Next pan/zoom, and walk mode

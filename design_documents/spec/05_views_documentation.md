@@ -53,6 +53,7 @@ These principles apply to every requirement in this chapter.
 | Elements, types, materials, levels, grids, spatial structure, standard Psets/Qtos, parameter values | IFC entities | Chapter 2. Never duplicated in RXD. |
 | Element-scoped documentation data (phase created/demolished, design option membership, per-element display flags) | element-scoped RXD on the element (Chapter 2a) | Also written as the standard `Status` property on export (DOC-GFX-017). |
 | Views (all kinds), view range, crop, camera, section box, per-view overrides, hidden elements | RXD documents `views/index` and `views/<viewId>` | One document per view, loaded lazily when the view opens. |
+| Navigation state: each view's latest camera and Home (UI-NAV-001) | RXD document `views/state` | Written with the next save; never makes the model modified. |
 | View templates, view filters, selection sets | RXD documents `views/templates`, `views/filters`, `model/selection_sets` | |
 | View-owned annotation (dimensions, spot dimensions, text, tags, keynotes, symbols, detail lines, regions, detail components, repeating details, insulation, revision clouds, plan regions, colour fill legends, matchlines, view references, elevation markers, legend components) | RXD document `views/annotation/<viewId>` | Kinds `anno.*`. |
 | Object styles, line weights, line styles, line patterns, fill patterns, text/dimension/tag styles, halftone settings, detail-level map, discipline profiles | RXD documents `standards/*` | |

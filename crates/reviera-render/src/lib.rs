@@ -315,6 +315,43 @@ impl Camera {
         };
     }
 
+    /// The stored form of this camera (DOC-VIEW-006) for a view `aspect` (width / height) wide:
+    /// eye, target, up, projection, horizontal field of view and parallel scale.
+    pub fn to_view(&self, aspect: f32) -> reviera_core::views::ViewCamera {
+        let v = |p: Vec3| p.to_array().map(f64::from);
+        let horizontal = 2.0 * ((self.fov * 0.5).tan() * aspect.max(1e-3)).atan();
+        reviera_core::views::ViewCamera {
+            eye: v(self.eye()),
+            target: v(self.target),
+            up: v(self.up()),
+            perspective: self.perspective,
+            field_of_view: f64::from(horizontal),
+            parallel_scale: f64::from(self.half_height()),
+        }
+    }
+
+    /// A camera from its stored form, for a view `aspect` wide. The horizontal field of view is
+    /// kept, so a view shows the same width in any window; parallel views keep their scale.
+    pub fn from_view(c: &reviera_core::views::ViewCamera, aspect: f32) -> Camera {
+        let p = |a: [f64; 3]| Vec3::new(a[0] as f32, a[1] as f32, a[2] as f32);
+        let (eye, target) = (p(c.eye), p(c.target));
+        let fov = 2.0 * (((c.field_of_view as f32) * 0.5).tan() / aspect.max(1e-3)).atan();
+        let mut cam = Camera {
+            target,
+            distance: (eye - target).length().max(0.01),
+            fov: fov.clamp(0.05, 3.0),
+            perspective: c.perspective,
+            ..Camera::default()
+        };
+        cam.orient(eye - target);
+        if !c.perspective {
+            // Same visible height: the half-height comes from the distance.
+            cam.distance = (c.parallel_scale as f32 / (cam.fov * 0.5).tan()).max(0.01);
+            cam.target = target;
+        }
+        cam
+    }
+
     /// The camera a fraction `t` (0..1) of the way from `self` to `to`, for animated
     /// transitions: the yaw turns the short way and the distance changes geometrically.
     pub fn lerp(&self, to: &Camera, t: f32) -> Camera {
@@ -474,5 +511,22 @@ mod tests {
         assert_eq!(cam.lerp(&side, 1.0).direction(), side.direction());
         let mid = cam.lerp(&side, 0.5).direction();
         assert!(mid.z > 0.1 && mid.y < -0.1, "{mid}");
+    }
+
+    #[test]
+    fn stored_cameras_round_trip() {
+        for perspective in [true, false] {
+            let mut cam = Camera {
+                perspective,
+                ..Camera::default()
+            };
+            cam.fit((Vec3::ZERO, Vec3::new(12.0, 9.0, 6.0)));
+            cam.orbit(30.0, -12.0);
+            let back = Camera::from_view(&cam.to_view(1.5), 1.5);
+            assert!((back.eye() - cam.eye()).length() < 1e-3, "{perspective}");
+            assert!((back.target - cam.target).length() < 1e-3);
+            assert!((back.fov - cam.fov).abs() < 1e-5 && back.perspective == perspective);
+            assert!((back.half_height() - cam.half_height()).abs() < 1e-3);
+        }
     }
 }

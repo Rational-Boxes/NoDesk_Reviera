@@ -8,6 +8,7 @@
 //! application commands act on the [`App`]; every other command acts on the active document.
 
 mod commands;
+pub mod views;
 
 use std::collections::BTreeMap;
 use std::fmt::Display;
@@ -61,6 +62,10 @@ pub struct OpenDocument {
     pub open_report: Option<reviera_store::OpenReport>,
     /// The current selection (session state, not saved or undone).
     pub selection: std::collections::BTreeSet<reviera_core::ElementId>,
+    /// The latest camera and Home of each view (session state, saved with the next save).
+    pub view_states: views::ViewStates,
+    /// The view the UI shows as active.
+    pub active_view: Option<reviera_core::ElementId>,
     /// Tessellated IFC geometry and the data revision it was made at.
     tessellation: std::sync::Mutex<Option<(i64, std::sync::Arc<Vec<reviera_render::SceneMesh>>)>>,
 }
@@ -143,6 +148,8 @@ pub struct App {
     next_doc: DocumentId,
     active: Option<DocumentId>,
     config: AppConfig,
+    /// Views that commands asked the UI to open.
+    view_requests: Vec<(DocumentId, reviera_core::ElementId)>,
 }
 
 impl App {
@@ -156,6 +163,7 @@ impl App {
             next_doc: 1,
             active: None,
             config,
+            view_requests: Vec::new(),
         }
     }
 
@@ -385,6 +393,7 @@ impl App {
         };
         let id = self.next_doc;
         self.next_doc += 1;
+        let view_states = views::load(&project);
         self.docs.insert(
             id,
             OpenDocument {
@@ -395,6 +404,8 @@ impl App {
                 untitled,
                 open_report: None,
                 selection: Default::default(),
+                view_states,
+                active_view: None,
                 tessellation: Default::default(),
             },
         );
@@ -408,6 +419,7 @@ impl App {
         path: Option<&Path>,
     ) -> Result<reviera_store::SaveReport> {
         let live_options = self.config.live.clone();
+        self.stage_view_state(id)?;
         let open = self.get_mut(id)?;
         let target = match path {
             Some(p) => p.to_owned(),

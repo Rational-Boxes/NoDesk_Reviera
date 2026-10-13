@@ -10,6 +10,7 @@
 //! draws chains of walls on a level with `wall.create`, and they show at once. Every action goes
 //! through `App::execute`, like Lua and MCP. The ribbon and browsers come next.
 
+mod browser;
 mod native;
 mod nav;
 mod snap;
@@ -48,6 +49,12 @@ const ID_PERSPECTIVE: i32 = ID_HIGHEST + 18;
 const ID_ZOOM_PREV: i32 = ID_HIGHEST + 19;
 const ID_ZOOM_NEXT: i32 = ID_HIGHEST + 20;
 const ID_WALK: i32 = ID_HIGHEST + 21;
+const ID_DEFAULT_3D: i32 = ID_HIGHEST + 22;
+const ID_SHOW_BROWSER: i32 = ID_HIGHEST + 23;
+const ID_BROWSER_OPEN: i32 = ID_HIGHEST + 24;
+const ID_BROWSER_RENAME: i32 = ID_HIGHEST + 25;
+const ID_BROWSER_DUPLICATE: i32 = ID_HIGHEST + 26;
+const ID_BROWSER_DELETE: i32 = ID_HIGHEST + 27;
 /// The orientation presets of `nav::PRESETS`, one id each.
 const ID_ORIENT_FIRST: i32 = ID_HIGHEST + 40;
 
@@ -105,7 +112,11 @@ struct Row {
 struct View {
     id: u32,
     doc: DocumentId,
+    /// The model view shown; `None` for the unsaved `{3D}` view of a model that has no views.
+    element: Option<ElementId>,
     name: String,
+    /// The camera last exchanged with the session's view state.
+    synced: Option<reviera_core::views::ViewCamera>,
     panel: Panel,
     viewport: Option<WgpuViewport>,
     /// The native surface under the viewport; declared after it so it is dropped after it.
@@ -137,6 +148,12 @@ struct Gui {
     tool: Option<WallTool>,
     /// Drives animated view changes and walking.
     timer: Option<Timer<Frame>>,
+    /// The Project Browser.
+    browser: TreeCtrl,
+    browser_items: Vec<(u64, ElementId)>,
+    browser_stale: bool,
+    /// The view a Project Browser context menu acts on.
+    browser_target: Option<ElementId>,
     /// Letters typed toward a keyboard sequence such as `ZF` (§1.26.4), and when.
     keys: (String, std::time::Instant),
 }
@@ -250,6 +267,16 @@ impl Gui {
         {
             frame.set_status_text(&e, 0);
         }
+        // Navigation is view state of the session, saved with the next save (UI-NAV-001).
+        let aspect = size.width.max(1) as f32 / size.height.max(1) as f32;
+        let stored = view.camera.to_view(aspect);
+        if let Some(element) = view.element
+            && view.synced != Some(stored)
+        {
+            view.synced = Some(stored);
+            let doc = view.doc;
+            self.app.set_view_camera(doc, element, stored);
+        }
     }
 
     /// A keyboard sequence letter (§1.26.4); returns whether it completed a known sequence.
@@ -357,7 +384,21 @@ impl Gui {
         };
         let triangles = scene.triangle_count();
         self.scenes.insert(id, scene);
-        self.open_view(id);
+        let views = self
+            .app
+            .document(id)
+            .map(|d| reviera_core::views::list(d.doc.store()))
+            .unwrap_or_default();
+        let first = views
+            .iter()
+            .find(|v| v.name == reviera_core::views::DEFAULT_3D)
+            .or_else(|| {
+                views
+                    .iter()
+                    .find(|v| v.kind == reviera_core::views::KIND_3D)
+            })
+            .map(|v| v.id);
+        self.open_view(id, first);
         let elements = self.app.document(id).map_or(0, |d| d.doc.store().len());
         frame.set_status_text(
             &format!(
@@ -381,34 +422,45 @@ impl Gui {
         let dirty = self.doc_info(view.doc).is_some_and(|d| d.dirty);
         format!(
             "{} - {}{}",
-            view.name,
+            self.view_name(view),
             self.doc_title(view.doc),
             if dirty { " *" } else { "" }
         )
     }
 
-    /// Opens a new 3D view of `doc` in a tab and activates it.
-    fn open_view(&mut self, doc: DocumentId) {
-        let taken: Vec<&str> = self
-            .views
-            .iter()
-            .filter(|v| v.doc == doc)
-            .map(|v| v.name.as_str())
-            .collect();
-        let name = (1..)
-            .map(|n| {
-                if n == 1 {
-                    "{3D}".to_owned()
-                } else {
-                    format!("{{3D {n}}}")
-                }
+    /// A view's name: its model view's name, or `{3D}` for an unsaved one.
+    fn view_name(&self, view: &View) -> String {
+        view.element
+            .and_then(|e| {
+                self.app
+                    .document(view.doc)?
+                    .doc
+                    .store()
+                    .get(e)?
+                    .name
+                    .clone()
             })
-            .find(|n| !taken.contains(&n.as_str()))
-            .expect("a free name");
+            .unwrap_or_else(|| view.name.clone())
+    }
+
+    /// Opens `element` (a model view of `doc`) in a tab and activates it; an open view's tab is
+    /// brought to the front. `None` opens an unsaved `{3D}` view.
+    fn open_view(&mut self, doc: DocumentId, element: Option<ElementId>) {
+        if let Some(e) = element
+            && let Some(id) = self
+                .views
+                .iter()
+                .find(|v| v.element == Some(e))
+                .map(|v| v.id)
+        {
+            return self.activate_view(id);
+        }
         let panel = Panel::builder(&self.notebook).build();
         panel.set_background_style(BackgroundStyle::Paint);
         let id = self.next_view;
         self.next_view += 1;
+        // A window's shape is not known before it is shown; views keep their horizontal extent.
+        let aspect = 1.6;
         let mut camera = Camera::default();
         match self.scenes.get(&doc).and_then(RenderScene::bounds) {
             Some(b) => camera.fit(b),
@@ -418,10 +470,20 @@ impl Gui {
                 glam::Vec3::new(10.0, 10.0, 3.0),
             )),
         }
+        let saved = element.and_then(|e| self.app.view_camera(doc, e));
+        if let Some(c) = &saved {
+            camera = Camera::from_view(c, aspect);
+        }
+        let mut nav = nav::Nav::default();
+        nav.home = element
+            .and_then(|e| self.app.view_home(doc, e))
+            .map(|h| Camera::from_view(&h, aspect));
         let view = View {
             id,
             doc,
-            name,
+            element,
+            name: reviera_core::views::DEFAULT_3D.into(),
+            synced: saved,
             panel,
             viewport: None,
             native: None,
@@ -429,7 +491,7 @@ impl Gui {
             camera,
             drag: None,
             press: None,
-            nav: nav::Nav::default(),
+            nav,
         };
         let caption = self.caption(&view);
         self.views.push(view);
@@ -438,6 +500,7 @@ impl Gui {
         }
         self.notebook.add_page(&panel, &caption, true);
         self.activate_view(id);
+        self.browser_stale = true;
     }
 
     /// Makes a view the active one; its model becomes the active document.
@@ -450,9 +513,14 @@ impl Gui {
             if self.doc != Some(doc) {
                 self.end_tool(&frame);
             }
+            if self.doc != Some(doc) {
+                self.browser_stale = true;
+            }
             self.active = Some(id);
             self.doc = Some(doc);
             let _ = self.app.activate(doc);
+            let element = self.view(id).and_then(|v| v.element);
+            self.app.set_active_view(doc, element);
             self.update_title(&frame);
             self.properties_stale = true;
         }
@@ -512,16 +580,21 @@ impl Gui {
             }
             self.scenes.remove(&doc);
         }
+        self.close_tab(id);
+        true
+    }
+
+    /// Closes a view's tab (the model stays open).
+    fn close_tab(&mut self, id: u32) {
+        let frame = self.frame;
         if self.active == Some(id) {
             self.end_tool(&frame);
             self.active = None;
             self.doc = None;
         }
-        let index = self
-            .views
-            .iter()
-            .position(|v| v.id == id)
-            .expect("the view exists");
+        let Some(index) = self.views.iter().position(|v| v.id == id) else {
+            return;
+        };
         // The surface goes before its window.
         let view = self.views.remove(index);
         let panel = view.panel;
@@ -539,7 +612,7 @@ impl Gui {
             }
             None => {}
         }
-        true
+        self.browser_stale = true;
     }
 
     /// Closes every view; `false` when the user cancelled.
@@ -659,6 +732,8 @@ impl Gui {
         self.scenes.insert(id, scene);
         self.update_captions();
         self.properties_stale = true;
+        self.browser_stale = true;
+        self.sync_views();
     }
 
     fn undo_redo(&mut self, command: &str, frame: &Frame) {
@@ -673,6 +748,7 @@ impl Gui {
 
     /// Starts the Wall tool on the lowest level.
     fn start_wall_tool(&mut self, frame: &Frame) {
+        self.leave_walk();
         let Some(doc) = self.doc.and_then(|id| self.app.document(id)) else {
             return frame.set_status_text("Open or create a project first (File > New)", 0);
         };
@@ -1086,6 +1162,9 @@ impl Gui {
         self.rows.clear();
         let Some(doc) = self.doc else { return };
         let ids = self.selection();
+        if ids.is_empty() && self.view_properties(grid) {
+            return;
+        }
         if ids.len() != 1 {
             let label = if ids.is_empty() {
                 "No selection".to_owned()
@@ -1202,8 +1281,55 @@ impl Gui {
         }
     }
 
+    /// The active view's properties; `false` when the active view is not a model view.
+    fn view_properties(&mut self, grid: &PropertyGrid) -> bool {
+        let Some(v) = self.active_view() else {
+            return false;
+        };
+        let Some(element) = v.element else {
+            return false;
+        };
+        let name = self.view_name(v);
+        let camera = v.camera;
+        grid.append(Property::category("3D View", "c_view"));
+        grid.append(Property::string("View Name", "view_name", name));
+        let projection = if camera.perspective {
+            "Perspective"
+        } else {
+            "Isometric (parallel)"
+        };
+        for (i, (label, value)) in [
+            ("Projection", projection.to_owned()),
+            (
+                "Field of View",
+                format!("{:.0}° vertical", camera.fov.to_degrees()),
+            ),
+            ("ID", element.to_string()),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let key = format!("v{i}");
+            grid.append(Property::string(label, &key, value));
+            grid.set_property_read_only(&key, true);
+        }
+        true
+    }
+
     /// Applies an edit made in the palette.
     fn edit(&mut self, property: &str, text: Option<String>, frame: &Frame) {
+        if property == "view_name" {
+            let element = self.active_view().and_then(|v| v.element);
+            if let (Some(view), Some(name)) = (element, text) {
+                if let Err(e) =
+                    self.run("view.rename", json!({ "view_id": view, "new_name": name }))
+                {
+                    error(frame, &format!("The view was not renamed:\n{e}"));
+                }
+                self.after_view_change();
+            }
+            return;
+        }
         let Some(index) = property
             .strip_prefix('p')
             .and_then(|i| i.parse::<usize>().ok())
@@ -1568,6 +1694,13 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
             if let Some(key) = key.filter(|k| *k > 32 && *k != 127) {
                 with_view(&gui, id, |g| {
                     if g.active_view().is_some_and(|v| v.nav.walk.is_some()) {
+                        // Movement keys are handled on key down; other letters may end the
+                        // walk with a sequence (WK, ZF, ...).
+                        if let Some(c) = u32::try_from(key).ok().and_then(char::from_u32)
+                            && c.is_ascii_alphabetic()
+                        {
+                            g.sequence_key(c);
+                        }
                         used = true;
                         return;
                     }
@@ -1631,6 +1764,12 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
         // Keyboard sequences (ZF, ZP, ...) are typed in the view (§1.26.4); single-letter menu
         // accelerators would take letters away from typed lengths.
         let view_menu = Menu::builder()
+            .append_item(
+                ID_DEFAULT_3D,
+                "&Default 3D View",
+                "Open the model's default 3D view",
+            )
+            .append_separator()
             .append_item(
                 ID_FIT,
                 "Zoom to &Fit (ZF)",
@@ -1706,6 +1845,11 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 "&Properties",
                 "Show or hide the Properties palette",
             )
+            .append_item(
+                ID_SHOW_BROWSER,
+                "Project &Browser",
+                "Show or hide the Project Browser",
+            )
             .build();
         let menu_bar = MenuBar::builder()
             .append(file_menu, "&File")
@@ -1724,6 +1868,11 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
             .with_style(PropertyGridStyle::Tooltips)
             .build();
         let notebook = AuiNotebook::builder(&frame).build();
+        let browser = TreeCtrl::builder(&frame)
+            .with_style(
+                TreeCtrlStyle::Default | TreeCtrlStyle::HasButtons | TreeCtrlStyle::LinesAtRoot,
+            )
+            .build();
         aui.add_pane_with_info(
             &grid,
             AuiPaneInfo::new()
@@ -1733,6 +1882,20 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 .layer(1)
                 .best_size(340, 600)
                 .min_size(220, 200)
+                .close_button(true)
+                .floatable(true),
+        );
+        aui.add_pane_with_info(
+            &browser,
+            AuiPaneInfo::new()
+                .with_name("browser")
+                .with_caption("Project Browser")
+                .left()
+                .layer(1)
+                .row(0)
+                .position(1)
+                .best_size(340, 260)
+                .min_size(220, 120)
                 .close_button(true)
                 .floatable(true),
         );
@@ -1759,6 +1922,10 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 properties_stale: true,
                 tool: None,
                 timer: Some(Timer::new(&frame)),
+                browser,
+                browser_items: Vec::new(),
+                browser_stale: true,
+                browser_target: None,
                 keys: (String::new(), std::time::Instant::now()),
             })
         });
@@ -1795,6 +1962,39 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
             });
         }
         {
+            let gui = gui.clone();
+            browser.on_item_activated(move |e| {
+                if let Some(item) = e.get_item() {
+                    with(&gui, |g| {
+                        if let Some(view) = g.browser_view(&item) {
+                            g.open_model_view(view);
+                        }
+                    });
+                }
+            });
+        }
+        {
+            let (gui, b) = (gui.clone(), browser);
+            browser.on_item_right_click(move |e| {
+                let Some(item) = e.get_item() else { return };
+                let mut target = None;
+                with(&gui, |g| {
+                    target = g.browser_view(&item);
+                    g.browser_target = target;
+                });
+                if target.is_some() {
+                    let mut menu = Menu::builder()
+                        .append_item(ID_BROWSER_OPEN, "&Open", "")
+                        .append_item(ID_BROWSER_RENAME, "&Rename...", "")
+                        .append_item(ID_BROWSER_DUPLICATE, "&Duplicate", "")
+                        .append_separator()
+                        .append_item(ID_BROWSER_DELETE, "De&lete", "")
+                        .build();
+                    b.popup_menu(&mut menu, None);
+                }
+            });
+        }
+        {
             let (gui, f, g) = (gui.clone(), frame, grid);
             grid.on_changed(move |e| {
                 if let Some(name) = e.property_name() {
@@ -1812,6 +2012,12 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 {
                     gui.show_properties(&g);
                     gui.update_captions();
+                }
+                if let Ok(mut gui) = gui.try_borrow_mut() {
+                    gui.sync_views();
+                    if gui.browser_stale {
+                        gui.rebuild_browser();
+                    }
                 }
                 e.skip(true);
             });
@@ -1907,11 +2113,22 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                     let dir = nav::PRESETS[(id - ID_ORIENT_FIRST) as usize].1;
                     with(&gui, |g| g.orient(glam::Vec3::from(dir)));
                 }
-                ID_NEW_VIEW => with(&gui, |g| {
-                    if let Some(doc) = g.doc {
-                        g.open_view(doc);
-                    }
-                }),
+                ID_NEW_VIEW => with(&gui, Gui::new_3d_view),
+                ID_DEFAULT_3D => with(&gui, Gui::default_3d_view),
+                ID_BROWSER_OPEN | ID_BROWSER_RENAME | ID_BROWSER_DUPLICATE | ID_BROWSER_DELETE => {
+                    let id = e.get_id();
+                    with(&gui, |g| {
+                        let Some(view) = g.browser_target.take() else {
+                            return;
+                        };
+                        match id {
+                            ID_BROWSER_OPEN => g.open_model_view(view),
+                            ID_BROWSER_RENAME => g.rename_view(view),
+                            ID_BROWSER_DUPLICATE => g.duplicate_view(view),
+                            _ => g.delete_view(view),
+                        }
+                    });
+                }
                 ID_CLOSE_VIEW => with(&gui, |g| {
                     if let Some(v) = g.active {
                         g.close_view(v);
@@ -1921,11 +2138,18 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 ID_PREV_VIEW => with(&gui, |g| g.cycle_view(-1)),
                 ID_TILE => with(&gui, Gui::tile),
                 ID_TAB_ALL => with(&gui, Gui::tab_all),
-                ID_SHOW_PROPERTIES => with(&gui, |g| {
-                    let shown = g.aui.is_pane_shown("properties");
-                    g.aui.set_pane_shown("properties", !shown);
-                    g.aui.update();
-                }),
+                ID_SHOW_PROPERTIES | ID_SHOW_BROWSER => {
+                    let pane = if e.get_id() == ID_SHOW_PROPERTIES {
+                        "properties"
+                    } else {
+                        "browser"
+                    };
+                    with(&gui, |g| {
+                        let shown = g.aui.is_pane_shown(pane);
+                        g.aui.set_pane_shown(pane, !shown);
+                        g.aui.update();
+                    });
+                }
                 ID_EXIT => f.close(false),
                 _ => e.skip(true),
             });
