@@ -10,6 +10,7 @@
 use glam::{Mat4, Vec3};
 use reviera_core::ElementId;
 
+pub mod plan;
 pub mod viewcube;
 
 /// One element's triangulated geometry, in world coordinates (metres, Z up).
@@ -49,11 +50,24 @@ impl RenderScene {
 impl RenderScene {
     /// The nearest mesh hit by a ray, with the distance along it (Möller–Trumbore per triangle).
     pub fn pick(&self, origin: Vec3, dir: Vec3) -> Option<(usize, f32)> {
+        self.pick_within(origin, dir, f32::NEG_INFINITY, f32::INFINITY)
+    }
+
+    /// Like [`RenderScene::pick`], ignoring hits outside `bottom..=top` (elevations): what a
+    /// plan cut away cannot be picked.
+    pub fn pick_within(
+        &self,
+        origin: Vec3,
+        dir: Vec3,
+        bottom: f32,
+        top: f32,
+    ) -> Option<(usize, f32)> {
         let mut best: Option<(usize, f32)> = None;
         for (i, m) in self.meshes.iter().enumerate() {
             for tri in m.indices.as_chunks::<3>().0 {
                 let [a, b, c] = tri.map(|k| Vec3::from(m.positions[k as usize]));
                 if let Some(t) = ray_triangle(origin, dir, a, b, c)
+                    && (bottom..=top).contains(&(origin + dir * t).z)
                     && best.is_none_or(|(_, d)| t < d)
                 {
                     best = Some((i, t));
@@ -396,6 +410,9 @@ pub trait RenderBackend {
     fn set_scene(&mut self, scene: &RenderScene);
     fn resize(&mut self, width: u32, height: u32);
     fn render(&mut self, camera: &Camera) -> Result<(), String>;
+    /// Draws the scene as a plan: clipped to the plan's range, cut poché and lines over a light
+    /// projection on white; `None` draws the shaded model.
+    fn set_plan(&mut self, plan: Option<plan::PlanGraphics>);
     /// A gizmo drawn in a corner over the scene with its own camera, such as the Orientation
     /// Cube; `None` hides it.
     fn set_gizmo(&mut self, gizmo: Option<Gizmo>);

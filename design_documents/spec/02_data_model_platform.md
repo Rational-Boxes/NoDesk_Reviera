@@ -2980,6 +2980,46 @@ Coordinates ▾: *Acquire Coordinates* (from a link), *Publish Coordinates* (to 
 - [ ] A project with RXD 2.0 opened in a 1.x release keeps all 2.0 RXD documents byte-identical through an edit and save of building elements.
 - [ ] Each migration step has a test that migrates a sample file, and checks the result against the target JSON Schema.
 
+### 2.11.9 Remote file locations (WebDAV)
+**ID:** DM-FILE-007 · **Priority:** P3 · **Ref:** owner requirement (2026-10-12); RFC 4918 (HTTP Extensions for WebDAV)
+
+**Purpose.** Open and save models directly on a WebDAV server, without a sync client or a mapped drive. This allows direct integration with document servers that speak WebDAV, including the owner's FileEngine project, as well as common cloud and NAS file services.
+
+**Workflow.**
+1. **File › Open › From Server…** (or a *Places* entry in the Open dialog) lists configured WebDAV locations. **Add Location…** asks for a URL (`https://…` or `webdav://…`), a display name and the credentials.
+2. The user browses folders on the server, which are listed with `PROPFIND`, and opens a `.ifc` or `.ifczip` file.
+3. **Save** writes back to the same URL. **Save As** can choose another folder on any configured location, or a local path.
+
+**Behaviour & rules.**
+- **Transport.**
+  - WebDAV over HTTPS (class 1 and 2: `PROPFIND`, `GET`, `PUT`, `MKCOL`, `MOVE`, `DELETE`, `LOCK`, `UNLOCK`).
+  - Plain `http://` is refused unless the location is explicitly marked as trusted on a local network.
+  - Certificates are checked against the OS trust store.
+- **Working copy.**
+  - Opening downloads the file to a local working copy in the session folder. The model is opened from that copy, and the live store and crash recovery (Ch 2b) work exactly as for local files.
+  - Saving writes the copy locally first (atomic, §2.11.2), then uploads it with `PUT` and `If-Match` set to the ETag seen at open or last save.
+- **Conflicts.**
+  - If the server's ETag has changed (someone else saved), the upload is refused (412). Reviera then offers to save the local version to another name or to overwrite after confirmation; it never merges silently.
+  - With a server that supports `LOCK`, Reviera takes an exclusive write lock while the model is open for editing, renews it before it expires, and releases it on close. A file locked by someone else opens read-only, like a locked local file (§2.11.1).
+- **Credentials.**
+  - Basic (over HTTPS only), Digest and Bearer token authentication.
+  - Credentials and tokens are stored in the OS keyring (like the live-store key, Ch 2b), never in settings files, RXD or logs.
+  - Locations are per-user settings: URL, name, authentication kind and keyring reference.
+- **Offline.** A model whose server cannot be reached opens from its last working copy only when the user asks for it explicitly, with a banner saying it is offline. Saving while offline keeps the working copy and retries the upload when the server is reachable again, and the status bar shows the pending upload.
+- **Paths everywhere.** `file.open`, `file.save_as`, recent files, links and the Lua and MCP APIs accept `https://` and `webdav://` URLs wherever they accept a path.
+- **Integrations.** Server-specific behaviour (for example FileEngine metadata, sharing or version history) is out of scope here. It belongs in an add-in built on the same location API.
+
+**Data (storage).** Locations live in the user's settings, with credentials in the keyring. Nothing about the server is written into the IFC file, apart from the usual `Reviera_Manifest` fields.
+
+**Commands.** `file.location.add(url, name?, auth: none|basic|digest|bearer, trusted_http?: bool) -> location_id`; `file.location.list() -> location[]`; `file.location.remove(location_id) -> ()`; `file.location.browse(location_id, path?) -> entry[]` (query). `file.open` and `file.save_as` accept URLs.
+
+**Acceptance criteria.**
+- [ ] A model opened from a WebDAV folder, edited and saved, is updated on the server, and its ETag changes.
+- [ ] If another client saves the same file in between, Save is refused with a conflict message, and *Save As* to a new name succeeds.
+- [ ] With a server that supports `LOCK`, a second Reviera session opening the same file gets it read-only.
+- [ ] Killing Reviera while a WebDAV model has unsaved work offers recovery on restart, as for a local file.
+- [ ] No password or token appears in settings files, logs or the saved IFC.
+
 ---
 
 ## 2.12 The command registry
@@ -4064,6 +4104,10 @@ All commands defined in this chapter. Every command in this table is also a Lua 
 | `file.backups` | document_id | backup[] | No | DM-FILE-002 |
 | `file.restore_backup` | document_id, backup_id | — | No | DM-FILE-002 |
 | `file.convert_schema` | document_id, target: "IFC4"\|"IFC4X3_ADD2" | report | No (clears undo) | DM-FILE-003 |
+| `file.location.add` | url, name?, auth: none\|basic\|digest\|bearer, trusted_http? | location_id | No | DM-FILE-007 |
+| `file.location.list` | — | location[] | No | DM-FILE-007 |
+| `file.location.remove` | location_id | — | No | DM-FILE-007 |
+| `file.location.browse` | location_id, path? | entry[] | No | DM-FILE-007 |
 | `export.ifc` | path, setup? (name, id or inline settings), settings_override?, schema?, strip_rxd?=false, documentation?, background? | job_id (the job result carries the export report) | No | DM-FILE-004 |
 | `export.ifc_setup.save` | setup | — | No | DM-FILE-004 |
 | `export.ifc_setup.delete` | name | — | No | DM-FILE-004 |

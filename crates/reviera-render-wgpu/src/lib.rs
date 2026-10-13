@@ -25,10 +25,17 @@ struct Vertex {
 struct Uniforms {
     view_proj: [[f32; 4]; 4],
     eye: [f32; 4],
+    /// Clipping and plan style: top and bottom elevations kept, lightening toward white.
+    clip: [f32; 4],
 }
 
+/// No clipping, no lightening.
+const NO_CLIP: [f32; 4] = [1e30, -1e30, 0.0, 0.0];
+/// How far plan projection is lightened toward white.
+const PLAN_LIGHTEN: f32 = 0.55;
+
 const SHADER: &str = r#"
-struct U { view_proj: mat4x4<f32>, eye: vec4<f32> };
+struct U { view_proj: mat4x4<f32>, eye: vec4<f32>, clip: vec4<f32> };
 @group(0) @binding(0) var<uniform> u: U;
 
 struct VOut {
@@ -40,6 +47,10 @@ struct VOut {
 
 @vertex
 fn vs(@location(0) p: vec3<f32>, @location(1) n: vec3<f32>, @location(2) c: vec4<f32>) -> VOut {
+    return transform(p, n, c);
+}
+
+fn transform(p: vec3<f32>, n: vec3<f32>, c: vec4<f32>) -> VOut {
     var o: VOut;
     o.pos = u.view_proj * vec4<f32>(p, 1.0);
     o.normal = n;
@@ -48,21 +59,40 @@ fn vs(@location(0) p: vec3<f32>, @location(1) n: vec3<f32>, @location(2) c: vec4
     return o;
 }
 
+// Lines: drawn a little toward the camera so they win over the faces they lie on.
+@vertex
+fn vs_line(@location(0) p: vec3<f32>, @location(1) n: vec3<f32>, @location(2) c: vec4<f32>) -> VOut {
+    var o = transform(p, n, c);
+    o.pos.z = o.pos.z - 2e-6 * o.pos.w;
+    return o;
+}
+
 @fragment
 fn fs(i: VOut) -> @location(0) vec4<f32> {
+    if (i.world.z > u.clip.x || i.world.z < u.clip.y) {
+        discard;
+    }
     let n = normalize(i.normal);
     let v = normalize(u.eye.xyz - i.world);
     let key = normalize(vec3<f32>(0.4, 0.3, 0.85));
     // Two-sided: faces lit whichever way they point. `eye.w` 0 draws unlit (overlay labels).
     let lit = 0.25 + 0.40 * abs(dot(n, v)) + 0.35 * abs(dot(n, key));
     let light = select(1.0, lit, u.eye.w > 0.5);
-    return vec4<f32>(i.color.rgb * light, i.color.a);
+    let rgb = mix(i.color.rgb * light, vec3<f32>(1.0, 1.0, 1.0), u.clip.z);
+    return vec4<f32>(rgb, i.color.a);
 }
 "#;
 
 const DEPTH: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
 /// Multisampling (anti-aliasing); 4 is supported for every renderable format in WebGPU.
 const SAMPLES: u32 = 4;
+/// Background of plan views: paper white.
+const PAPER: wgpu::Color = wgpu::Color {
+    r: 1.0,
+    g: 1.0,
+    b: 1.0,
+    a: 1.0,
+};
 /// Background: a light blue-grey.
 const CLEAR: wgpu::Color = wgpu::Color {
     r: 0.80,
@@ -101,6 +131,11 @@ pub struct WgpuViewport {
     gizmo_uniforms: [(wgpu::Buffer, wgpu::BindGroup); 2],
     /// The gizmo: pixel rectangle, matrices, and vertex buffers (lit, flat).
     gizmo: Option<GizmoGpu>,
+    /// Plan graphics: clipping range, cut poché and lines (DOC-VIEW-002, interim GPU drawing).
+    plan: Option<PlanGpu>,
+    line_pipeline: wgpu::RenderPipeline,
+    /// Uniforms of unlit, unclipped plan graphics.
+    plan_uniforms: (wgpu::Buffer, wgpu::BindGroup),
     size: (u32, u32),
     adapter: String,
     scene: RenderScene,
@@ -114,6 +149,15 @@ impl std::fmt::Debug for WgpuViewport {
             .field("size", &self.size)
             .finish()
     }
+}
+
+struct PlanGpu {
+    top: f32,
+    bottom: f32,
+    poche: Option<(wgpu::Buffer, u32)>,
+    lines: Option<(wgpu::Buffer, u32)>,
+    /// The graphics, kept to rebuild the poché with a new highlight.
+    graphics: reviera_render::plan::PlanGraphics,
 }
 
 struct GizmoGpu {
@@ -283,13 +327,13 @@ impl WgpuViewport {
         });
         // `gizmo`: blended like transparent geometry, but writing depth (the Orientation Cube
         // hides what is behind it, and fades as a whole).
-        let pipeline = |transparent: bool, gizmo: bool| {
+        let pipeline = |transparent: bool, gizmo: bool, line: bool| {
             device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
                 label: Some(if gizmo { "gizmo" } else if transparent { "transparent" } else { "opaque" }),
                 layout: Some(&pipeline_layout),
                 vertex: wgpu::VertexState {
                     module: &shader,
-                    entry_point: Some("vs"),
+                    entry_point: Some(if line { "vs_line" } else { "vs" }),
                     compilation_options: Default::default(),
                     buffers: &[Some(wgpu::VertexBufferLayout {
                         array_stride: std::mem::size_of::<Vertex>() as u64,
@@ -307,7 +351,15 @@ impl WgpuViewport {
                         write_mask: wgpu::ColorWrites::ALL,
                     })],
                 }),
-                primitive: wgpu::PrimitiveState { cull_mode: None, ..Default::default() },
+                primitive: wgpu::PrimitiveState {
+                    topology: if line {
+                        wgpu::PrimitiveTopology::LineList
+                    } else {
+                        wgpu::PrimitiveTopology::TriangleList
+                    },
+                    cull_mode: None,
+                    ..Default::default()
+                },
                 depth_stencil: Some(wgpu::DepthStencilState {
                     format: DEPTH,
                     depth_write_enabled: Some(!transparent || gizmo),
@@ -323,9 +375,10 @@ impl WgpuViewport {
                 cache: None,
             })
         };
-        let opaque_pipeline = pipeline(false, false);
-        let transparent_pipeline = pipeline(true, false);
-        let gizmo_pipeline = pipeline(true, true);
+        let opaque_pipeline = pipeline(false, false, false);
+        let transparent_pipeline = pipeline(true, false, false);
+        let gizmo_pipeline = pipeline(true, true, false);
+        let line_pipeline = pipeline(false, false, true);
         let uniform_set = || {
             let buffer = device.create_buffer(&wgpu::BufferDescriptor {
                 label: Some("gizmo uniforms"),
@@ -344,6 +397,7 @@ impl WgpuViewport {
             (buffer, group)
         };
         let gizmo_uniforms = [uniform_set(), uniform_set()];
+        let plan_uniforms = uniform_set();
         let depth = depth_view(&device, size);
         let msaa = msaa_view(&device, format, size);
         Self {
@@ -367,6 +421,9 @@ impl WgpuViewport {
             gizmo_pipeline,
             gizmo_uniforms,
             gizmo: None,
+            plan: None,
+            line_pipeline,
+            plan_uniforms,
         }
     }
 
@@ -542,12 +599,42 @@ impl RenderBackend for WgpuViewport {
     fn set_highlight(&mut self, elements: &[reviera_core::ElementId]) {
         self.highlight = elements.iter().copied().collect();
         self.upload();
+        if let Some(g) = self.plan.take().map(|p| p.graphics) {
+            self.set_plan(Some(g));
+        }
     }
 
     fn set_overlay(&mut self, meshes: &[reviera_render::SceneMesh]) {
         let (mut opaque, transparent) = vertices(meshes, &Default::default());
         opaque.extend(transparent);
         self.overlay = self.buffer(&opaque);
+    }
+
+    fn set_plan(&mut self, plan: Option<reviera_render::plan::PlanGraphics>) {
+        self.plan = plan.map(|g| {
+            let (mut poche, t) = vertices(&g.poche, &self.highlight);
+            poche.extend(t);
+            let lines: Vec<Vertex> = g
+                .lines
+                .iter()
+                .flat_map(|l| {
+                    l.segments.iter().flat_map(move |s| {
+                        s.iter().map(move |p| Vertex {
+                            position: *p,
+                            normal: [0.0, 0.0, 1.0],
+                            color: l.color,
+                        })
+                    })
+                })
+                .collect();
+            PlanGpu {
+                top: g.top,
+                bottom: g.bottom,
+                poche: self.buffer(&poche),
+                lines: self.buffer(&lines),
+                graphics: g,
+            }
+        });
     }
 
     fn set_gizmo(&mut self, gizmo: Option<reviera_render::Gizmo>) {
@@ -614,6 +701,7 @@ impl WgpuViewport {
             let u = Uniforms {
                 view_proj: view_proj.to_cols_array_2d(),
                 eye,
+                clip: NO_CLIP,
             };
             self.queue
                 .write_buffer(&self.gizmo_uniforms[k].0, 0, bytemuck::bytes_of(&u));
@@ -677,10 +765,23 @@ impl WgpuViewport {
 
     fn draw(&mut self, camera: &Camera) -> Result<(), String> {
         let aspect = self.size.0 as f32 / self.size.1 as f32;
-        let u = Uniforms {
-            view_proj: camera.view_proj(aspect).to_cols_array_2d(),
-            eye: camera.eye().extend(1.0).to_array(),
+        let view_proj = camera.view_proj(aspect).to_cols_array_2d();
+        let clip = match &self.plan {
+            Some(p) => [p.top + 1e-4, p.bottom, PLAN_LIGHTEN, 0.0],
+            None => NO_CLIP,
         };
+        let u = Uniforms {
+            view_proj,
+            eye: camera.eye().extend(1.0).to_array(),
+            clip,
+        };
+        let flat = Uniforms {
+            view_proj,
+            eye: [0.0, 0.0, 1.0, 0.0],
+            clip: NO_CLIP,
+        };
+        self.queue
+            .write_buffer(&self.plan_uniforms.0, 0, bytemuck::bytes_of(&flat));
         self.queue
             .write_buffer(&self.uniforms, 0, bytemuck::bytes_of(&u));
 
@@ -708,7 +809,7 @@ impl WgpuViewport {
                     depth_slice: None,
                     resolve_target: resolve,
                     ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(CLEAR),
+                        load: wgpu::LoadOp::Clear(if self.plan.is_some() { PAPER } else { CLEAR }),
                         store: if resolve.is_some() {
                             wgpu::StoreOp::Discard
                         } else {
@@ -736,6 +837,19 @@ impl WgpuViewport {
                     pass.set_pipeline(pipeline);
                     pass.set_vertex_buffer(0, buffer.slice(..));
                     pass.draw(0..*count, 0..1);
+                }
+            }
+            if let Some(plan) = &self.plan {
+                pass.set_bind_group(0, &self.plan_uniforms.1, &[]);
+                for (pipeline, mesh) in [
+                    (&self.opaque_pipeline, &plan.poche),
+                    (&self.line_pipeline, &plan.lines),
+                ] {
+                    if let Some((buffer, count)) = mesh {
+                        pass.set_pipeline(pipeline);
+                        pass.set_vertex_buffer(0, buffer.slice(..));
+                        pass.draw(0..*count, 0..1);
+                    }
                 }
             }
         }

@@ -13,6 +13,7 @@
 mod browser;
 mod native;
 mod nav;
+mod plans;
 mod snap;
 mod wx;
 
@@ -55,6 +56,7 @@ const ID_BROWSER_OPEN: i32 = ID_HIGHEST + 24;
 const ID_BROWSER_RENAME: i32 = ID_HIGHEST + 25;
 const ID_BROWSER_DUPLICATE: i32 = ID_HIGHEST + 26;
 const ID_BROWSER_DELETE: i32 = ID_HIGHEST + 27;
+const ID_NEW_PLAN: i32 = ID_HIGHEST + 28;
 /// The orientation presets of `nav::PRESETS`, one id each.
 const ID_ORIENT_FIRST: i32 = ID_HIGHEST + 40;
 
@@ -117,6 +119,8 @@ struct View {
     name: String,
     /// The camera last exchanged with the session's view state.
     synced: Option<reviera_core::views::ViewCamera>,
+    /// Set for plan views.
+    plan: Option<plans::PlanState>,
     panel: Panel,
     viewport: Option<WgpuViewport>,
     /// The native surface under the viewport; declared after it so it is dropped after it.
@@ -154,6 +158,8 @@ struct Gui {
     browser_stale: bool,
     /// The view a Project Browser context menu acts on.
     browser_target: Option<ElementId>,
+    /// Feature edges of each model's scene, for plan graphics (computed when a plan needs them).
+    plan_edges: HashMap<DocumentId, Rc<Vec<[[f32; 3]; 2]>>>,
     /// Letters typed toward a keyboard sequence such as `ZF` (§1.26.4), and when.
     keys: (String, std::time::Instant),
 }
@@ -260,6 +266,7 @@ impl Gui {
             let (w, h) = physical(size, scale);
             v.resize(w, h);
         }
+        self.update_plan_graphics(index);
         self.update_gizmo(index, scale);
         let view = &mut self.views[index];
         if let Some(v) = &mut view.viewport
@@ -470,6 +477,11 @@ impl Gui {
                 glam::Vec3::new(10.0, 10.0, 3.0),
             )),
         }
+        let plan = self.plan_info(doc, element);
+        if plan.is_some() {
+            camera.perspective = false;
+            camera.orient(glam::Vec3::Z);
+        }
         let saved = element.and_then(|e| self.app.view_camera(doc, e));
         if let Some(c) = &saved {
             camera = Camera::from_view(c, aspect);
@@ -484,6 +496,7 @@ impl Gui {
             element,
             name: reviera_core::views::DEFAULT_3D.into(),
             synced: saved,
+            plan,
             panel,
             viewport: None,
             native: None,
@@ -730,6 +743,8 @@ impl Gui {
             view.panel.refresh(false, None);
         }
         self.scenes.insert(id, scene);
+        self.plans_stale(id);
+        self.refresh_plan_states();
         self.update_captions();
         self.properties_stale = true;
         self.browser_stale = true;
@@ -767,7 +782,12 @@ impl Gui {
             })
             .collect();
         levels.sort_by(|a, b| a.0.total_cmp(&b.0));
-        let Some((elevation, level, level_name)) = levels.first().cloned() else {
+        let in_plan = self
+            .active_view()
+            .and_then(|v| v.plan.as_ref())
+            .map(|p| (p.elevation, p.level, p.level_name.clone()));
+        let chosen = in_plan.or_else(|| levels.first().cloned());
+        let Some((elevation, level, level_name)) = chosen else {
             return frame.set_status_text("The model has no levels to draw walls on", 0);
         };
         let top = levels.iter().find(|l| l.0 > elevation + 1e-6).map(|l| l.1);
@@ -1122,9 +1142,13 @@ impl Gui {
         let (origin, dir) =
             self.camera()
                 .ray(x as f32, y as f32, size.width as f32, size.height as f32);
+        let (bottom, top) = self
+            .active_view()
+            .and_then(|v| v.plan.as_ref())
+            .map_or((f32::NEG_INFINITY, f32::INFINITY), plans::PlanState::drawn);
         let hit = self
             .scene()
-            .pick(origin, dir)
+            .pick_within(origin, dir, bottom, top)
             .and_then(|(i, _)| self.scene().meshes[i].element);
         let result = match hit {
             Some(id) => self.run("selection.set", json!({ "ids": [id] })),
@@ -1291,6 +1315,41 @@ impl Gui {
         };
         let name = self.view_name(v);
         let camera = v.camera;
+        if let Some(plan) = v.plan.clone() {
+            grid.append(Property::category("Floor Plan", "c_view"));
+            grid.append(Property::string("View Name", "view_name", name));
+            let fmt = |g: &mut Gui, z: f64| {
+                if !z.is_finite() {
+                    return "Unlimited".to_owned();
+                }
+                g.run(
+                    "units.format",
+                    json!({ "value": z - plan.elevation, "data_type": "length" }),
+                )
+                .ok()
+                .and_then(|v| v.as_str().map(str::to_owned))
+                .unwrap_or_else(|| format!("{:.3} m", z - plan.elevation))
+            };
+            let cut = fmt(self, plan.range.cut);
+            grid.append(Property::string("Cut Plane", "view_cut", cut));
+            grid.set_help_string(
+                "view_cut",
+                "Height of the cut plane above the associated level",
+            );
+            let rows = [
+                ("Associated Level", plan.level_name.clone()),
+                ("Top", fmt(self, plan.range.top)),
+                ("Bottom", fmt(self, plan.range.bottom)),
+                ("View Depth", fmt(self, plan.range.depth)),
+                ("ID", element.to_string()),
+            ];
+            for (i, (label, value)) in rows.into_iter().enumerate() {
+                let key = format!("v{i}");
+                grid.append(Property::string(label, &key, value));
+                grid.set_property_read_only(&key, true);
+            }
+            return true;
+        }
         grid.append(Property::category("3D View", "c_view"));
         grid.append(Property::string("View Name", "view_name", name));
         let projection = if camera.perspective {
@@ -1318,6 +1377,12 @@ impl Gui {
 
     /// Applies an edit made in the palette.
     fn edit(&mut self, property: &str, text: Option<String>, frame: &Frame) {
+        if property == "view_cut" {
+            if let Some(t) = text {
+                self.set_cut_plane(&t, frame);
+            }
+            return;
+        }
         if property == "view_name" {
             let element = self.active_view().and_then(|v| v.element);
             if let (Some(view), Some(name)) = (element, text) {
@@ -1476,7 +1541,9 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                         return;
                     }
                     let walking = g.active_view().is_some_and(|v| v.nav.walk.is_some());
+                    let plan = g.in_plan();
                     let kind = match (button, cube) {
+                        _ if plan => Drag::Pan,
                         (0, Some(hit)) => {
                             if let Some(v) = g.active_view_mut() {
                                 v.nav.cube_press = Some(hit);
@@ -1769,6 +1836,11 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 "&Default 3D View",
                 "Open the model's default 3D view",
             )
+            .append_item(
+                ID_NEW_PLAN,
+                "New Floor &Plan...",
+                "Create floor plans of levels",
+            )
             .append_separator()
             .append_item(
                 ID_FIT,
@@ -1926,6 +1998,7 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 browser_items: Vec::new(),
                 browser_stale: true,
                 browser_target: None,
+                plan_edges: HashMap::new(),
                 keys: (String::new(), std::time::Instant::now()),
             })
         });
@@ -2115,6 +2188,7 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 }
                 ID_NEW_VIEW => with(&gui, Gui::new_3d_view),
                 ID_DEFAULT_3D => with(&gui, Gui::default_3d_view),
+                ID_NEW_PLAN => with(&gui, Gui::new_floor_plans),
                 ID_BROWSER_OPEN | ID_BROWSER_RENAME | ID_BROWSER_DUPLICATE | ID_BROWSER_DELETE => {
                     let id = e.get_id();
                     with(&gui, |g| {

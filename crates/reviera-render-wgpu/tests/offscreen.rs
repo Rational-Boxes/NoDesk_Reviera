@@ -131,3 +131,63 @@ fn the_orientation_cube_draws_in_its_corner() {
     assert_ne!(pixel(&with_cube, cx, cy), pixel(&empty, cx, cy));
     assert_eq!(pixel(&with_cube, 20.0, 380.0), pixel(&empty, 20.0, 380.0));
 }
+
+#[test]
+fn a_floor_plan_shows_cut_walls_dark_on_white() {
+    let mut viewport = match WgpuViewport::offscreen(800, 600) {
+        Ok(v) => v,
+        Err(e) => {
+            eprintln!("skipped: no graphics adapter ({e})");
+            return;
+        }
+    };
+    let mut app = App::new(AppConfig {
+        live: None,
+        untitled_dir: std::env::temp_dir(),
+    });
+    let file = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data/ifc/AC20-FZK-Haus.ifc");
+    let id = app
+        .execute(
+            "file.open",
+            json!({"path": file, "read_only": true}),
+            &Caller::user(),
+        )
+        .unwrap()
+        .result
+        .as_u64()
+        .unwrap();
+    let scene = app.render_scene(id).unwrap();
+    let ground = reviera_core::plans::levels(app.document(id).unwrap().doc.store())[0].0 as f32;
+    let edges = reviera_render::plan::feature_edges(&scene);
+    let plan = reviera_render::plan::plan_graphics(&scene, &edges, ground + 1.2, ground - 1.22);
+    assert!(plan.poche.len() > 5, "walls are cut: {}", plan.poche.len());
+
+    let mut camera = Camera {
+        perspective: false,
+        ..Camera::default()
+    };
+    camera.orient(glam::Vec3::Z);
+    camera.fit(scene.bounds().unwrap());
+    viewport.set_scene(&scene);
+    viewport.set_plan(Some(plan));
+    viewport.render(&camera).unwrap();
+    let pixels = viewport.read_pixels().unwrap();
+    if let Ok(path) = std::env::var("REVIERA_DUMP_PLAN") {
+        let mut out = b"P6 800 600 255\n".to_vec();
+        for px in pixels.chunks(4) {
+            out.extend_from_slice(&px[..3]);
+        }
+        std::fs::write(path, out).unwrap();
+    }
+    let px = pixels.as_chunks::<4>().0;
+    let white = px
+        .iter()
+        .filter(|p| p[0] > 245 && p[1] > 245 && p[2] > 245)
+        .count();
+    let dark = px
+        .iter()
+        .filter(|p| p[0] < 90 && p[1] < 90 && p[2] < 90)
+        .count();
+    assert!(white > px.len() / 3, "paper background: {white}");
+    assert!(dark > 1000, "cut poché and lines: {dark}");
+}

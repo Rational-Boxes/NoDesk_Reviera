@@ -31,7 +31,7 @@
 **Document:** Functional and technical specification of Reviera, an open-source BIM authoring application
 **Functional reference:** Autodesk® Revit® 2026/2027 (described from public sources only; see `RESEARCH_LOG.md`)
 **Licence of Reviera:** GPL-3.0-or-later
-**Version:** 0.1 (draft) · 2026-10-12 · **Size:** 762 numbered requirements (318 P0 · 265 P1 · 173 P2 · 6 P3), 1,938 commands
+**Version:** 0.1 (draft) · 2026-10-12 · **Size:** 763 numbered requirements (318 P0 · 265 P1 · 173 P2 · 7 P3), 1,942 commands
 
 > **Clean-room statement.** This specification describes features, workflows and behaviour in Reviera's own words. Every input was publicly available: vendor online help, public blogs and tutorials, public forums and open-source repositories. All of it is listed with URLs and access checks in `SOURCE_REGISTER.md`. No proprietary, confidential, leaked or NDA-covered information was used. No vendor code, binaries, file formats or assets were examined or copied. Autodesk and Revit are trademarks of Autodesk, Inc. They are used here only to identify the functional reference. Reviera is not affiliated with or endorsed by Autodesk.
 
@@ -60,7 +60,7 @@ This document covers:
 | 5 | Views, graphics, annotation, schedules, sheets, output |
 | 6 | Collaboration, linking and coordination (Local and BIMserver modes) |
 | 7 | Advanced features beyond the reference product: scene protocol, simulated walkthroughs, Godot translation layer for VR/AR, render bridges |
-| A | Appendix A: requirement summary, shared commands, consolidated command index (1,938 commands; 762 requirements) |
+| A | Appendix A: requirement summary, shared commands, consolidated command index (1,942 commands; 763 requirements) |
 
 Out of scope:
 - reproducing vendor-cloud services such as ACC/Forma and Autodesk Assistant (open alternatives are specified instead)
@@ -6910,6 +6910,46 @@ Coordinates ▾: *Acquire Coordinates* (from a link), *Publish Coordinates* (to 
 - [ ] A project with RXD 2.0 opened in a 1.x release keeps all 2.0 RXD documents byte-identical through an edit and save of building elements.
 - [ ] Each migration step has a test that migrates a sample file, and checks the result against the target JSON Schema.
 
+### 2.11.9 Remote file locations (WebDAV)
+**ID:** DM-FILE-007 · **Priority:** P3 · **Ref:** owner requirement (2026-10-12); RFC 4918 (HTTP Extensions for WebDAV)
+
+**Purpose.** Open and save models directly on a WebDAV server, without a sync client or a mapped drive. This allows direct integration with document servers that speak WebDAV, including the owner's FileEngine project, as well as common cloud and NAS file services.
+
+**Workflow.**
+1. **File › Open › From Server…** (or a *Places* entry in the Open dialog) lists configured WebDAV locations. **Add Location…** asks for a URL (`https://…` or `webdav://…`), a display name and the credentials.
+2. The user browses folders on the server, which are listed with `PROPFIND`, and opens a `.ifc` or `.ifczip` file.
+3. **Save** writes back to the same URL. **Save As** can choose another folder on any configured location, or a local path.
+
+**Behaviour & rules.**
+- **Transport.**
+  - WebDAV over HTTPS (class 1 and 2: `PROPFIND`, `GET`, `PUT`, `MKCOL`, `MOVE`, `DELETE`, `LOCK`, `UNLOCK`).
+  - Plain `http://` is refused unless the location is explicitly marked as trusted on a local network.
+  - Certificates are checked against the OS trust store.
+- **Working copy.**
+  - Opening downloads the file to a local working copy in the session folder. The model is opened from that copy, and the live store and crash recovery (Ch 2b) work exactly as for local files.
+  - Saving writes the copy locally first (atomic, §2.11.2), then uploads it with `PUT` and `If-Match` set to the ETag seen at open or last save.
+- **Conflicts.**
+  - If the server's ETag has changed (someone else saved), the upload is refused (412). Reviera then offers to save the local version to another name or to overwrite after confirmation; it never merges silently.
+  - With a server that supports `LOCK`, Reviera takes an exclusive write lock while the model is open for editing, renews it before it expires, and releases it on close. A file locked by someone else opens read-only, like a locked local file (§2.11.1).
+- **Credentials.**
+  - Basic (over HTTPS only), Digest and Bearer token authentication.
+  - Credentials and tokens are stored in the OS keyring (like the live-store key, Ch 2b), never in settings files, RXD or logs.
+  - Locations are per-user settings: URL, name, authentication kind and keyring reference.
+- **Offline.** A model whose server cannot be reached opens from its last working copy only when the user asks for it explicitly, with a banner saying it is offline. Saving while offline keeps the working copy and retries the upload when the server is reachable again, and the status bar shows the pending upload.
+- **Paths everywhere.** `file.open`, `file.save_as`, recent files, links and the Lua and MCP APIs accept `https://` and `webdav://` URLs wherever they accept a path.
+- **Integrations.** Server-specific behaviour (for example FileEngine metadata, sharing or version history) is out of scope here. It belongs in an add-in built on the same location API.
+
+**Data (storage).** Locations live in the user's settings, with credentials in the keyring. Nothing about the server is written into the IFC file, apart from the usual `Reviera_Manifest` fields.
+
+**Commands.** `file.location.add(url, name?, auth: none|basic|digest|bearer, trusted_http?: bool) -> location_id`; `file.location.list() -> location[]`; `file.location.remove(location_id) -> ()`; `file.location.browse(location_id, path?) -> entry[]` (query). `file.open` and `file.save_as` accept URLs.
+
+**Acceptance criteria.**
+- [ ] A model opened from a WebDAV folder, edited and saved, is updated on the server, and its ETag changes.
+- [ ] If another client saves the same file in between, Save is refused with a conflict message, and *Save As* to a new name succeeds.
+- [ ] With a server that supports `LOCK`, a second Reviera session opening the same file gets it read-only.
+- [ ] Killing Reviera while a WebDAV model has unsaved work offers recovery on restart, as for a local file.
+- [ ] No password or token appears in settings files, logs or the saved IFC.
+
 ---
 
 ## 2.12 The command registry
@@ -7994,6 +8034,10 @@ All commands defined in this chapter. Every command in this table is also a Lua 
 | `file.backups` | document_id | backup[] | No | DM-FILE-002 |
 | `file.restore_backup` | document_id, backup_id | — | No | DM-FILE-002 |
 | `file.convert_schema` | document_id, target: "IFC4"\|"IFC4X3_ADD2" | report | No (clears undo) | DM-FILE-003 |
+| `file.location.add` | url, name?, auth: none\|basic\|digest\|bearer, trusted_http? | location_id | No | DM-FILE-007 |
+| `file.location.list` | — | location[] | No | DM-FILE-007 |
+| `file.location.remove` | location_id | — | No | DM-FILE-007 |
+| `file.location.browse` | location_id, path? | entry[] | No | DM-FILE-007 |
 | `export.ifc` | path, setup? (name, id or inline settings), settings_override?, schema?, strip_rxd?=false, documentation?, background? | job_id (the job result carries the export report) | No | DM-FILE-004 |
 | `export.ifc_setup.save` | setup | — | No | DM-FILE-004 |
 | `export.ifc_setup.delete` | name | — | No | DM-FILE-004 |
@@ -24641,7 +24685,7 @@ Generated by `tools/build_spec.py` from the chapter command catalogs and require
 | Area | P0 | P1 | P2 | P3 | Total |
 |------|---:|---:|---:|---:|------:|
 | UI | 76 | 36 | 7 | 0 | 119 |
-| DM | 91 | 55 | 24 | 2 | 172 |
+| DM | 91 | 55 | 24 | 3 | 173 |
 | ARC | 75 | 48 | 10 | 1 | 134 |
 | STR | 0 | 14 | 47 | 0 | 61 |
 | MEP | 0 | 28 | 42 | 0 | 70 |
@@ -24649,7 +24693,7 @@ Generated by `tools/build_spec.py` from the chapter command catalogs and require
 | DOC | 68 | 38 | 12 | 1 | 119 |
 | COL | 8 | 45 | 6 | 1 | 60 |
 | ADV | 0 | 0 | 4 | 1 | 5 |
-| **Total** | **318** | **265** | **173** | **6** | **762** |
+| **Total** | **318** | **265** | **173** | **7** | **763** |
 
 Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver)"), it is counted under the first. The non-functional requirements (NFR-…) are in Chapter 0 §0.7 and are not counted here.
 
@@ -24704,7 +24748,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.2a Reviera-originated features
 
-76 requirements are Reviera's own design: owner directives, the technology stack (IFC/RXD storage, live store, BIMserver, MCP, scripting) and extensions beyond the reference product's feature set. Their Ref lines cite no research on the reference product. Listing them separately keeps the clean-room provenance clear: every other requirement traces to public research on the reference product.
+77 requirements are Reviera's own design: owner directives, the technology stack (IFC/RXD storage, live store, BIMserver, MCP, scripting) and extensions beyond the reference product's feature set. Their Ref lines cite no research on the reference product. Listing them separately keeps the clean-room provenance clear: every other requirement traces to public research on the reference product.
 
 | Requirement | Ch | Feature |
 |-------------|----|---------|
@@ -24734,6 +24778,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | UI-RECOV-001 | 1 | 1.33.9 Crash recovery and live-store status |
 | DM-RXD-003 | 2 | 2.4.3 Reconciliation |
 | DM-REGEN-004 | 2 | 2.6.5 OCCT threading rules |
+| DM-FILE-007 | 2 | 2.11.9 Remote file locations (WebDAV) |
 | DM-CMD-002 | 2 | 2.12.2 Command naming and stability |
 | DM-MCP-002 | 2 | 2.16.2 Transports and authentication |
 | DM-MCP-003 | 2 | 2.16.3 Tool catalogue: generation from the registry |
@@ -24787,7 +24832,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**1938 unique commands** in 399 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**1942 unique commands** in 399 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -24923,7 +24968,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `family_doc` | 58 |
 | `family_template` | 1 |
 | `fascia` | 1 |
-| `file` | 11 |
+| `file` | 15 |
 | `fill_pattern` | 5 |
 | `fillpattern` | 4 |
 | `filter` | 7 |
@@ -25798,6 +25843,10 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `file.convert_schema` | 2 | document_id, target: "IFC4"\ | "IFC4X3_ADD2" | report | No (clears undo) |
 | `file.ifc_open_options` | 2 | options? | options | No | DM-FILE-001 |
 | `file.locate_rxd` | 2a | path to an external `.reviera` file or folder | status | No | DM-RXD-004 |
+| `file.location.add` | 2 | url, name?, auth: none\ | basic\ | digest\ | bearer, trusted_http? |
+| `file.location.browse` | 2 | location_id, path? | entry[] | No | DM-FILE-007 |
+| `file.location.list` | 2 | — | location[] | No | DM-FILE-007 |
+| `file.location.remove` | 2 | location_id | — | No | DM-FILE-007 |
 | `file.new` | 2 | kind: model\ | model_template\ | family\ | title_block\ |
 | `file.open` | 2 | path, {partial?: {storeys?, classes?, worksets?}, read_only?} | document_id | No | DM-FILE-001 |
 | `file.restore_backup` | 2 | document_id, backup_id | — | No | DM-FILE-002 |

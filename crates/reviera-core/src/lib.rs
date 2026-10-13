@@ -17,6 +17,7 @@ pub mod error;
 pub mod id;
 pub mod origin;
 pub mod parameters;
+pub mod plans;
 pub mod store;
 pub mod txn;
 pub mod units;

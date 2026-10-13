@@ -112,6 +112,12 @@ pub struct ViewData {
     pub camera: Option<ViewCamera>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub home: Option<ViewCamera>,
+    /// The associated level of a plan (GlobalId of the `IfcBuildingStorey`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub level: Option<String>,
+    /// The view range of a plan (DOC-VR-001).
+    #[serde(default, rename = "viewRange", skip_serializing_if = "Option::is_none")]
+    pub view_range: Option<crate::plans::ViewRange>,
 }
 
 /// Whether an element is a view.
@@ -245,6 +251,8 @@ pub(crate) fn create_3d(
         kind: KIND_3D.into(),
         camera: p.camera,
         home: None,
+        level: None,
+        view_range: None,
     };
     txn.create(
         NewElement::new(format!("{CLASS_PREFIX}{}", guid.as_str()))

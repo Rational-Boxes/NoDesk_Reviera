@@ -57,6 +57,9 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(ViewDuplicate),
         registry.add(ViewDelete),
         registry.add(ViewSetCamera),
+        registry.add(ViewCreatePlan),
+        registry.add(ViewSetViewRange),
+        registry.add(ViewGetViewRange),
         registry.add(WallJoinsQuery),
     ];
     for r in results {
@@ -321,6 +324,8 @@ fn dependents_of(store: &crate::store::Store, id: ElementId) -> Vec<ElementId> {
         .iter()
         .filter(|e| {
             e.param("@type").and_then(serde_json::Value::as_str) == Some(guid.as_str())
+                || crate::views::view_data(e)
+                    .is_some_and(|v| v.level.as_deref() == Some(guid.as_str()))
                 || crate::walls::wall_recipe(e).is_some_and(|r| {
                     r.base_level == guid
                         || r.top.get("level").and_then(serde_json::Value::as_str)
@@ -1287,5 +1292,76 @@ impl Command for ViewSetCamera {
 
     fn run(&self, cx: &mut CommandContext<'_>, p: SetCameraParams) -> Result<()> {
         views::set_camera(cx.edit()?, p)
+    }
+}
+
+use crate::plans::{self, CreatePlanParams, SetViewRangeParams, ViewRangeReport};
+
+#[derive(Debug)]
+struct ViewCreatePlan;
+
+impl Command for ViewCreatePlan {
+    type Params = CreatePlanParams;
+    type Output = Vec<ElementId>;
+    const META: CommandMeta = CommandMeta {
+        name: "view.create_plan",
+        version: 1,
+        summary: "Create plan views",
+        description: "Creates one floor plan per level, named after the level, with the default view range \
+                      (cut 1200 mm above the level). Levels that already have a plan are skipped unless \
+                      `allow_duplicates`.",
+        effects: &[Effect::Edit],
+        transaction_name: "New Plan",
+    };
+
+    fn run(&self, cx: &mut CommandContext<'_>, p: CreatePlanParams) -> Result<Vec<ElementId>> {
+        plans::create_plan(cx.edit()?, p)
+    }
+}
+
+#[derive(Debug)]
+struct ViewSetViewRange;
+
+impl Command for ViewSetViewRange {
+    type Params = SetViewRangeParams;
+    type Output = ();
+    const META: CommandMeta = CommandMeta {
+        name: "view.set_view_range",
+        version: 1,
+        summary: "Set a plan's view range",
+        description: "Each plane is `{level_ref, offset}`; `level_ref` is `associated`, `above`, `below`, \
+                      `unlimited` (top and view depth) or a level. Top ≥ Cut ≥ Bottom ≥ View Depth.",
+        effects: &[Effect::Edit],
+        transaction_name: "View Range",
+    };
+
+    fn run(&self, cx: &mut CommandContext<'_>, p: SetViewRangeParams) -> Result<()> {
+        plans::set_view_range(cx.edit()?, p)
+    }
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct GetViewRangeParams {
+    pub view_id: ElementRef,
+}
+
+#[derive(Debug)]
+struct ViewGetViewRange;
+
+impl Command for ViewGetViewRange {
+    type Params = GetViewRangeParams;
+    type Output = ViewRangeReport;
+    const META: CommandMeta = CommandMeta {
+        name: "view.get_view_range",
+        version: 1,
+        summary: "A plan's view range",
+        description: "The four planes and their resolved elevations in metres (null for unlimited).",
+        effects: &[Effect::Read],
+        transaction_name: "",
+    };
+
+    fn run(&self, cx: &mut CommandContext<'_>, p: GetViewRangeParams) -> Result<ViewRangeReport> {
+        plans::get_view_range(cx.store(), &p.view_id)
     }
 }

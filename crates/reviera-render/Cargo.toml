@@ -11,6 +11,7 @@ publish.workspace = true
 
 [dependencies]
 reviera-core.workspace = true
+earcut.workspace = true
 glam.workspace = true
 
 [lints]

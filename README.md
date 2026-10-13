@@ -27,6 +27,10 @@ operation can be driven by Lua scripts and by AI agents through the Model Contex
 - **Views as model objects**: 3D views are saved in the IFC file (RXD), with a Project Browser
   to open, rename, duplicate and delete them; each view's camera and Home come back on reopen.
   `view.*` commands (create, list, rename, orient, set_camera, open, …) work from MCP too.
+- **Floor plans**: View › New Floor Plan creates a plan per level, drawn as a top-down cut at
+  the view range's cut plane with cut poché and lines on white; the cut plane is editable in
+  Properties, and the Wall tool draws on the plan's level (`view.create_plan`,
+  `view.set_view_range`, `view.get_view_range`).
 - **Navigation**: an Orientation Cube in each 3D view (26 click regions, compass, Home, and a
   PERSP/ISO projection toggle), standard and isometric views with animated transitions, wheel
   zoom about the cursor, orbit about the selection, Previous/Next pan/zoom, and walk mode
