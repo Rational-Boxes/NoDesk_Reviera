@@ -17,8 +17,8 @@ impl Gui {
     /// Rebuilds the Project Browser for the active model.
     pub(crate) fn rebuild_browser(&mut self) {
         self.browser_stale = false;
+        self.browser.cleanup_custom_data();
         self.browser.delete_all_items();
-        self.browser_items.clear();
         let Some(doc) = self.doc else { return };
         let Some(root) = self.browser.add_root("Views (all)", None, None) else {
             return;
@@ -38,14 +38,16 @@ impl Gui {
             && let Some(group) = self.browser.append_item(&root, "Floor Plans", None, None)
         {
             for v in plans {
-                if let Some(item) = self.browser.append_item(&group, &v.name, None, None) {
+                if let Some(item) = self
+                    .browser
+                    .append_item_with_data(&group, &v.name, v.id.0, None, None)
+                {
                     if open.contains(&v.id) {
                         self.browser.set_item_bold(&item, true);
                     }
                     if active == Some(v.id) {
                         self.browser.select_item(&item);
                     }
-                    self.browser_items.push((u64::from(&item), v.id));
                 }
             }
         }
@@ -53,14 +55,16 @@ impl Gui {
             return;
         };
         for v in list.iter().filter(|v| v.kind == KIND_3D) {
-            if let Some(item) = self.browser.append_item(&group, &v.name, None, None) {
+            if let Some(item) = self
+                .browser
+                .append_item_with_data(&group, &v.name, v.id.0, None, None)
+            {
                 if open.contains(&v.id) {
                     self.browser.set_item_bold(&item, true);
                 }
                 if active == Some(v.id) {
                     self.browser.select_item(&item);
                 }
-                self.browser_items.push((u64::from(&item), v.id));
             }
         }
         if !self
@@ -80,13 +84,10 @@ impl Gui {
         self.browser.expand_all();
     }
 
-    /// The view behind a browser item.
+    /// The view behind a browser item (its element id is the item's data).
     pub(crate) fn browser_view(&self, item: &TreeItemId) -> Option<ElementId> {
-        let key = u64::from(item);
-        self.browser_items
-            .iter()
-            .find(|(k, _)| *k == key)
-            .map(|(_, id)| *id)
+        let data = self.browser.get_custom_data(item)?;
+        data.downcast_ref::<u64>().map(|id| ElementId(*id))
     }
 
     /// Opens a model view of the active model (or brings its tab to the front).

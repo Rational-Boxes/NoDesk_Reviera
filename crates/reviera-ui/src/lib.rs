@@ -158,7 +158,6 @@ struct Gui {
     load_timer: Option<Timer<Frame>>,
     /// The Project Browser.
     browser: TreeCtrl,
-    browser_items: Vec<(u64, ElementId)>,
     browser_stale: bool,
     /// The view a Project Browser context menu acts on.
     browser_target: Option<ElementId>,
@@ -1956,7 +1955,6 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 loading: Vec::new(),
                 load_timer: Some(Timer::new(&frame)),
                 browser,
-                browser_items: Vec::new(),
                 browser_stale: true,
                 browser_target: None,
                 plan_edges: HashMap::new(),
