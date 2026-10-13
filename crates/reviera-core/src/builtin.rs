@@ -80,6 +80,12 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(TypeRename),
         registry.add(TypeSetParam),
         registry.add(ElementSetType),
+        registry.add(DoorPlace),
+        registry.add(WindowPlace),
+        registry.add(InsertFlipHand),
+        registry.add(InsertFlipFacing),
+        registry.add(InsertSetSill),
+        registry.add(ElementMove),
     ];
     for r in results {
         r.expect("core commands are valid");
@@ -335,7 +341,8 @@ fn yes() -> bool {
 }
 
 /// Elements that depend on `id`: instances of a type, walls based on or bounded by a level, the
-/// plan views of a level and the annotation of a view.
+/// plan views of a level, the annotation of a view, the doors and windows of a wall and the
+/// opening of a door or window.
 pub fn dependents_of(store: &crate::store::Store, id: ElementId) -> Vec<ElementId> {
     let Some(guid) = store.get(id).map(|e| e.guid().as_str().to_owned()) else {
         return Vec::new();
@@ -345,6 +352,8 @@ pub fn dependents_of(store: &crate::store::Store, id: ElementId) -> Vec<ElementI
         .filter(|e| {
             crate::annotations::dimension_data(e).is_some_and(|d| d.view == guid)
                 || e.param("@type").and_then(serde_json::Value::as_str) == Some(guid.as_str())
+                || crate::inserts::insert_recipe(e).is_some_and(|r| r.host == guid)
+                || crate::inserts::opening_of(e).is_some_and(|i| i == guid)
                 || crate::grids::grid_data(e).is_some_and(|g| {
                     g.system == guid || g.type_guid.as_deref() == Some(guid.as_str())
                 })
@@ -1621,6 +1630,187 @@ impl Command for ElementSetType {
 
     fn run(&self, cx: &mut CommandContext<'_>, p: types::SetTypeParams) -> Result<()> {
         types::set_type(cx.edit()?, p)
+    }
+}
+
+// ---- Doors and windows (Ch 3 ARC-DOOR-001, ARC-WIN-001, ARC-HOST-001) ----
+
+use crate::inserts::{self, Kind};
+
+#[derive(Debug)]
+struct DoorPlace;
+
+impl Command for DoorPlace {
+    type Params = inserts::PlaceParams;
+    type Output = ElementId;
+    const META: CommandMeta = CommandMeta {
+        name: "door.place",
+        version: 1,
+        summary: "Place a door",
+        description: "Places a door in a Reviera wall: its centre `point_along` the wall from its start (or \
+                      at `point` projected onto it), its bottom `sill_height` above the wall's base level \
+                      (default 0). Facing is the wall's exterior unless `flip_facing`. The door cuts the wall \
+                      and gets the next Mark.",
+        effects: &[Effect::Edit],
+        transaction_name: "Door",
+    };
+
+    fn run(&self, cx: &mut CommandContext<'_>, p: inserts::PlaceParams) -> Result<ElementId> {
+        inserts::place(cx.edit()?, Kind::Door, p)
+    }
+}
+
+#[derive(Debug)]
+struct WindowPlace;
+
+impl Command for WindowPlace {
+    type Params = inserts::PlaceParams;
+    type Output = ElementId;
+    const META: CommandMeta = CommandMeta {
+        name: "window.place",
+        version: 1,
+        summary: "Place a window",
+        description: "Places a window in a Reviera wall, like door.place; the sill defaults to the type's \
+                      Default Sill Height.",
+        effects: &[Effect::Edit],
+        transaction_name: "Window",
+    };
+
+    fn run(&self, cx: &mut CommandContext<'_>, p: inserts::PlaceParams) -> Result<ElementId> {
+        inserts::place(cx.edit()?, Kind::Window, p)
+    }
+}
+
+#[derive(Debug)]
+struct InsertFlipHand;
+
+impl Command for InsertFlipHand {
+    type Params = inserts::FlipParams;
+    type Output = ();
+    const META: CommandMeta = CommandMeta {
+        name: "insert.flip_hand",
+        version: 1,
+        summary: "Flip hand",
+        description: "Moves the hinge of doors to the other side.",
+        effects: &[Effect::Edit],
+        transaction_name: "Flip Hand",
+    };
+
+    fn run(&self, cx: &mut CommandContext<'_>, p: inserts::FlipParams) -> Result<()> {
+        inserts::flip(cx.edit()?, p, true)
+    }
+}
+
+#[derive(Debug)]
+struct InsertFlipFacing;
+
+impl Command for InsertFlipFacing {
+    type Params = inserts::FlipParams;
+    type Output = ();
+    const META: CommandMeta = CommandMeta {
+        name: "insert.flip_facing",
+        version: 1,
+        summary: "Flip facing",
+        description: "Turns doors and windows to face the wall's other side (a door's swing side).",
+        effects: &[Effect::Edit],
+        transaction_name: "Flip Facing",
+    };
+
+    fn run(&self, cx: &mut CommandContext<'_>, p: inserts::FlipParams) -> Result<()> {
+        inserts::flip(cx.edit()?, p, false)
+    }
+}
+
+#[derive(Debug)]
+struct InsertSetSill;
+
+impl Command for InsertSetSill {
+    type Params = inserts::SetSillParams;
+    type Output = ();
+    const META: CommandMeta = CommandMeta {
+        name: "insert.set_sill_height",
+        version: 1,
+        summary: "Set sill height",
+        description: "Moves doors and windows up or down: their bottom is `sill_height` above the host's base \
+                      level. They are not resized.",
+        effects: &[Effect::Edit],
+        transaction_name: "Sill Height",
+    };
+
+    fn run(&self, cx: &mut CommandContext<'_>, p: inserts::SetSillParams) -> Result<()> {
+        inserts::set_sill(cx.edit()?, p)
+    }
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct MoveParams {
+    pub element_ids: Vec<ElementRef>,
+    /// Metres (x, y, and z for doors and windows).
+    pub vector: [f64; 3],
+}
+
+#[derive(Debug)]
+struct ElementMove;
+
+impl Command for ElementMove {
+    type Params = MoveParams;
+    type Output = Vec<ElementId>;
+    const META: CommandMeta = CommandMeta {
+        name: "element.move",
+        version: 1,
+        summary: "Move elements",
+        description: "Moves elements by a vector: Reviera walls and grids in plan (their doors and windows go \
+                      with them); doors and windows along their host by the vector's component along the \
+                      wall, and up or down by its z.",
+        effects: &[Effect::Edit],
+        transaction_name: "Move",
+    };
+
+    fn run(&self, cx: &mut CommandContext<'_>, p: MoveParams) -> Result<Vec<ElementId>> {
+        let txn = cx.edit()?;
+        let mut moved = Vec::new();
+        for r in &p.element_ids {
+            let store = txn.store().clone();
+            let id = store
+                .resolve(r)
+                .ok_or_else(|| Error::new("element.not_found", format!("no element {r:?}")))?;
+            let e = store.get(id).expect("resolved");
+            let shift = |l: crate::walls::Line| crate::walls::Line {
+                start: [l.start[0] + p.vector[0], l.start[1] + p.vector[1]],
+                end: [l.end[0] + p.vector[0], l.end[1] + p.vector[1]],
+            };
+            if inserts::kind_of(e).is_some() {
+                inserts::move_by(txn, id, p.vector)?;
+            } else if let Some(w) = crate::walls::wall_recipe(e) {
+                walls::set_location(
+                    txn,
+                    SetLocationParams {
+                        wall_id: ElementRef::Id(id),
+                        curve: crate::walls::CurveArg {
+                            line: shift(w.curve),
+                        },
+                    },
+                )?;
+            } else if let Some(g) = crate::grids::grid_data(e) {
+                grids::set_curve(
+                    txn,
+                    grids::SetCurveParams {
+                        grid_id: ElementRef::Id(id),
+                        curve: crate::walls::CurveArg {
+                            line: shift(g.curve),
+                        },
+                    },
+                )?;
+            } else {
+                return Err(Error::new(
+                    "element.not_movable",
+                    format!("element {id} ({}) cannot be moved yet", e.class),
+                ));
+            }
+            moved.push(id);
+        }
+        Ok(moved)
     }
 }
 

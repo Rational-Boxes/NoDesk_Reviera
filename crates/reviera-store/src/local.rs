@@ -15,7 +15,9 @@ use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use reviera_core::grids as core_grids;
-use reviera_core::{Document, ElementId, GlobalId, ModelVersion, NewElement, levels, walls};
+use reviera_core::{
+    Document, ElementId, GlobalId, ModelVersion, NewElement, inserts, levels, walls,
+};
 use reviera_ifc::{AttrValue, IfcModel, Schema, StepId};
 use reviera_rxd::{
     DOC_PSET_PREFIX, DecodeLimits, ELEMENT_PSET, ElementData, IdentityDoc, MANIFEST_PSET,
@@ -472,6 +474,16 @@ impl LocalProject {
             if saved.contains_key(core_grids::SYSTEM_KEY) {
                 geometry::remove_grid_axes(&mut self.ifc, step)?;
             }
+            let recipe_kind = saved
+                .get(walls::RECIPE_KEY)
+                .and_then(|r| r.get("kind"))
+                .and_then(|k| k.as_str());
+            if matches!(
+                recipe_kind,
+                Some(inserts::INSERT_RECIPE | inserts::OPENING_RECIPE)
+            ) {
+                geometry::remove_boxes(&mut self.ifc, step)?;
+            }
             // The element's own property and quantity sets go with it.
             params::remove_all(&mut self.ifc, &mut self.sets, step)?;
             self.types.remove(&step);
@@ -557,6 +569,17 @@ impl LocalProject {
                 .apply(step, is_type, &before, &e.params)?;
                 self.saved_params.insert(*id, e.params.clone());
             }
+            // Attributes IFC4 requires of door and window types.
+            if let Some(t) = inserts::insert_type(e) {
+                let (attr, value) = match t.kind() {
+                    Some(inserts::Kind::Door) => ("OperationType", "NOTDEFINED"),
+                    _ => ("PartitioningType", "SINGLE_PANEL"),
+                };
+                if self.ifc.attribute(step, attr)? == AttrValue::Null {
+                    self.ifc
+                        .set_attribute(step, attr, &AttrValue::Enum(value.into()))?;
+                }
+            }
             if core_grids::is_grid_type(e) {
                 let applies = AttrValue::String(core_grids::SYSTEM_CLASS.into());
                 if self.ifc.attribute(step, "ApplicableOccurrence")? != applies {
@@ -593,6 +616,9 @@ impl LocalProject {
         }
         let touched: BTreeSet<ElementId> = changed.union(&deleted).copied().collect();
         self.write_regenerated(doc, &touched)?;
+        if !touched.is_empty() {
+            self.write_inserts(doc)?;
+        }
         if grids_touched {
             self.write_grids(doc)?;
         }
@@ -684,6 +710,102 @@ impl LocalProject {
             .filter_map(|j| Some((*self.steps.get(&j.wall)?, *j, *self.steps.get(&j.other)?)))
             .collect();
         geometry::write_connections(&mut self.ifc, &wall_steps, &joins, owner_history)
+    }
+
+    /// Writes every Reviera door and window (DM-IFC-007): its opening, placed relative to the
+    /// host wall and voiding it, and the insert, placed relative to its opening and filling it,
+    /// with its overall size and its frame, panel and glass as box solids. The wall's own body
+    /// stays uncut. Values that did not change are not rewritten.
+    fn write_inserts(&mut self, doc: &Document) -> Result<()> {
+        let store = doc.store();
+        let placed = inserts::placed(store);
+        if placed.is_empty() {
+            return Ok(());
+        }
+        let openings: HashMap<String, ElementId> = store
+            .iter()
+            .filter_map(|e| Some((inserts::opening_of(e)?, e.id())))
+            .collect();
+        let contexts = geometry::Contexts::find(&self.ifc)?;
+        let owner_history = self.new_owner_history()?;
+        let scale = self.length_scale;
+        let ifc4 = self.ifc.schema() != "IFC2X3";
+        for p in placed {
+            let guid = store.get(p.id).expect("placed").guid().to_string();
+            let (Some(&step), Some(&wall), Some(&opening)) = (
+                self.steps.get(&p.id),
+                self.steps.get(&p.host),
+                openings.get(&guid).and_then(|o| self.steps.get(o)),
+            ) else {
+                continue;
+            };
+            let placement_of = |ifc: &IfcModel, id: StepId| -> Result<Option<StepId>> {
+                Ok(match ifc.attribute(id, "ObjectPlacement")? {
+                    AttrValue::Ref(r) => Some(StepId(r)),
+                    _ => None,
+                })
+            };
+            let (half_w, half_t) = (p.ty.width / 2.0, p.wall.width / 2.0 + 0.001);
+            let frame = geometry::Frame {
+                relative_to: placement_of(&self.ifc, wall)?,
+                origin: [p.recipe.along / scale, 0.0, (p.z0 - p.wall.base_z) / scale],
+                x_dir: [1.0, 0.0],
+            };
+            let void = [[-half_w, half_w], [-half_t, half_t], [0.0, p.ty.height]];
+            geometry::write_boxes(&mut self.ifc, opening, &frame, &[void], scale, contexts)?;
+            let frame = geometry::Frame {
+                relative_to: placement_of(&self.ifc, opening)?,
+                origin: [0.0; 3],
+                x_dir: [1.0, 0.0],
+            };
+            let boxes: Vec<geometry::LocalBox> = p.boxes().into_iter().map(|(b, _)| b).collect();
+            geometry::write_boxes(&mut self.ifc, step, &frame, &boxes, scale, contexts)?;
+            geometry::relate_one(
+                &mut self.ifc,
+                "IfcRelVoidsElement",
+                "RelatingBuildingElement",
+                wall,
+                "RelatedOpeningElement",
+                opening,
+                owner_history,
+            )?;
+            geometry::relate_one(
+                &mut self.ifc,
+                "IfcRelFillsElement",
+                "RelatingOpeningElement",
+                opening,
+                "RelatedBuildingElement",
+                step,
+                owner_history,
+            )?;
+            let storey = walls::wall_recipe(store.get(p.host).expect("host"))
+                .and_then(|r| GlobalId::parse(&r.base_level))
+                .and_then(|g| store.find_by_guid(&g))
+                .and_then(|l| self.steps.get(&l).copied());
+            if let Some(storey) = storey {
+                geometry::contain(&mut self.ifc, step, storey, owner_history)?;
+            }
+            let mut attrs = vec![
+                ("OverallWidth", AttrValue::Real(p.ty.width / scale)),
+                ("OverallHeight", AttrValue::Real(p.ty.height / scale)),
+            ];
+            if ifc4 && p.kind == inserts::Kind::Door {
+                // Hinge on the left seen from the swing side.
+                let left = p.recipe.flip_hand == p.recipe.flip_facing;
+                let op = if left {
+                    "SINGLE_SWING_LEFT"
+                } else {
+                    "SINGLE_SWING_RIGHT"
+                };
+                attrs.push(("OperationType", AttrValue::Enum(op.into())));
+            }
+            for (attr, v) in attrs {
+                if self.ifc.attribute(step, attr)? != v {
+                    self.ifc.set_attribute(step, attr, &v)?;
+                }
+            }
+        }
+        Ok(())
     }
 
     /// Writes the axes of every Reviera grid system, contained in the lowest level.

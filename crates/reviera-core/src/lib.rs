@@ -17,6 +17,7 @@ pub mod element;
 pub mod error;
 pub mod grids;
 pub mod id;
+pub mod inserts;
 pub mod levels;
 pub mod origin;
 pub mod parameters;

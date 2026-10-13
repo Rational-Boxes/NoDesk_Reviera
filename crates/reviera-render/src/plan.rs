@@ -72,7 +72,11 @@ fn key(p: [f32; 3]) -> (i64, i64, i64) {
 pub fn feature_edges(scene: &RenderScene) -> Vec<Edge> {
     let mut out = Vec::new();
     let cos = CREASE_DEGREES.to_radians().cos();
-    for m in &scene.meshes {
+    for m in scene
+        .meshes
+        .iter()
+        .filter(|m| !m.class.ends_with(crate::PLAN_HIDDEN))
+    {
         // Welded vertex ids, so edges of separately listed triangles meet.
         let mut ids: HashMap<(i64, i64, i64), u32> = HashMap::new();
         let mut points: Vec<[f32; 3]> = Vec::new();
@@ -309,7 +313,11 @@ pub fn plan_graphics(
             segments: vec![segment],
         }),
     };
-    for m in &scene.meshes {
+    for m in scene
+        .meshes
+        .iter()
+        .filter(|m| !m.class.ends_with(crate::PLAN_HIDDEN))
+    {
         let segments = slice(m, cut);
         if segments.is_empty() {
             continue;

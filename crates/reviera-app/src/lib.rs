@@ -332,18 +332,25 @@ impl App {
             .tessellation()?
             .iter()
             .filter(|m| match m.element {
-                Some(e) => store
-                    .get(e)
-                    .is_some_and(|e| walls::wall_recipe(e).is_none()),
+                Some(e) => store.get(e).is_some_and(|e| {
+                    walls::wall_recipe(e).is_none()
+                        && reviera_core::inserts::kind_of(e).is_none()
+                        && reviera_core::inserts::opening_of(e).is_none()
+                }),
                 None => true,
             })
             .cloned()
             .collect();
-        // Walls are regenerated and joined together; one that cannot regenerate (for example,
-        // its level was deleted outside a command) is not drawn.
+        // Walls are regenerated and joined together, and cut by their doors and windows; one
+        // that cannot regenerate (for example, its level was deleted outside a command) is not
+        // drawn.
+        let cuts = reviera_core::inserts::cuts_by_host(store);
         for (id, body) in walls::solve(store).bodies {
             let class = store.get(id).map_or("IfcWall".into(), |e| e.class.clone());
-            let (verts, indices) = body.mesh();
+            let (verts, indices) = match cuts.get(&id) {
+                Some(c) => walls::openings::cut_mesh(&body, c),
+                None => body.mesh(),
+            };
             meshes.push(reviera_render::SceneMesh {
                 element: Some(id),
                 color: reviera_render::class_color(&class),
@@ -354,6 +361,27 @@ impl App {
                     .collect(),
                 indices,
             });
+        }
+        // Doors and windows: frames and glass; a door's closed panel is drawn in 3D only (plans
+        // show its swing).
+        for p in reviera_core::inserts::placed(store) {
+            let class = p.kind.class();
+            for ((verts, indices), panel) in p.meshes() {
+                meshes.push(reviera_render::SceneMesh {
+                    element: Some(p.id),
+                    color: reviera_render::class_color(class),
+                    class: if panel {
+                        format!("{class}{}", reviera_render::PLAN_HIDDEN)
+                    } else {
+                        class.to_owned()
+                    },
+                    positions: verts
+                        .iter()
+                        .map(|[x, y, z]| [*x as f32, *y as f32, *z as f32])
+                        .collect(),
+                    indices,
+                });
+            }
         }
         Ok(reviera_render::RenderScene { meshes })
     }

@@ -15,6 +15,10 @@ pub mod font;
 pub mod plan;
 pub mod viewcube;
 
+/// Class suffix of meshes drawn in 3D but not in plans (a door's closed panel, whose plan symbol
+/// is its swing).
+pub const PLAN_HIDDEN: &str = "/3d";
+
 /// One element's triangulated geometry, in world coordinates (metres, Z up).
 #[derive(Debug, Clone, PartialEq)]
 pub struct SceneMesh {

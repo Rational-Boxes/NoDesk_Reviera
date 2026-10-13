@@ -890,3 +890,351 @@ pub(crate) fn remove_grid_axes(ifc: &mut IfcModel, grid: StepId) -> Result<()> {
     }
     Ok(())
 }
+
+/// A box in an element's local frame: x, y and z intervals (metres).
+pub(crate) type LocalBox = [[f64; 2]; 3];
+
+/// The entities of a shape of boxes written by [`write_boxes`]: its placement and one
+/// `IfcExtrudedAreaSolid` of an `IfcRectangleProfileDef` per box.
+struct BoxShape {
+    placement: StepId,
+    axes: StepId,
+    location: StepId,
+    axis: StepId,
+    ref_direction: StepId,
+    shape: StepId,
+    body_rep: StepId,
+    items: Vec<BoxItem>,
+}
+
+struct BoxItem {
+    solid: StepId,
+    profile: StepId,
+    profile_axes: StepId,
+    profile_location: StepId,
+    axes: StepId,
+    location: StepId,
+    extrusion: StepId,
+}
+
+impl BoxShape {
+    /// The shape of `element` if it has this structure.
+    fn read(ifc: &IfcModel, element: StepId) -> Result<Option<Self>> {
+        let e = entity(ifc, element)?;
+        let one = |e: &Entity, attr: &str| e.refs(attr).first().copied();
+        macro_rules! get {
+            ($v:expr) => {
+                match $v {
+                    Some(v) => v,
+                    None => return Ok(None),
+                }
+            };
+        }
+        let placement = get!(one(&e, "ObjectPlacement"));
+        let p = entity(ifc, placement)?;
+        let axes = get!(one(&p, "RelativePlacement"));
+        let a = entity(ifc, axes)?;
+        let (location, axis, ref_direction) = (
+            get!(one(&a, "Location")),
+            get!(one(&a, "Axis")),
+            get!(one(&a, "RefDirection")),
+        );
+        let shape = get!(one(&e, "Representation"));
+        let reps = entity(ifc, shape)?.refs("Representations");
+        if reps.len() != 1 {
+            return Ok(None);
+        }
+        let body_rep = reps[0];
+        let mut items = Vec::new();
+        for solid in entity(ifc, body_rep)?.refs("Items") {
+            let s = entity(ifc, solid)?;
+            if !s.class.eq_ignore_ascii_case("IfcExtrudedAreaSolid") {
+                return Ok(None);
+            }
+            let profile = get!(one(&s, "SweptArea"));
+            let pr = entity(ifc, profile)?;
+            if !pr.class.eq_ignore_ascii_case("IfcRectangleProfileDef") {
+                return Ok(None);
+            }
+            let profile_axes = get!(one(&pr, "Position"));
+            let solid_axes = get!(one(&s, "Position"));
+            items.push(BoxItem {
+                solid,
+                profile,
+                profile_axes,
+                profile_location: get!(one(&entity(ifc, profile_axes)?, "Location")),
+                axes: solid_axes,
+                location: get!(one(&entity(ifc, solid_axes)?, "Location")),
+                extrusion: get!(one(&s, "ExtrudedDirection")),
+            });
+        }
+        Ok(Some(Self {
+            placement,
+            axes,
+            location,
+            axis,
+            ref_direction,
+            shape,
+            body_rep,
+            items,
+        }))
+    }
+
+    fn entities(&self) -> Vec<StepId> {
+        let mut ids = vec![
+            self.placement,
+            self.axes,
+            self.location,
+            self.axis,
+            self.ref_direction,
+            self.shape,
+            self.body_rep,
+        ];
+        for i in &self.items {
+            ids.extend([
+                i.solid,
+                i.profile,
+                i.profile_axes,
+                i.profile_location,
+                i.axes,
+                i.location,
+                i.extrusion,
+            ]);
+        }
+        ids
+    }
+
+    fn create(ifc: &mut IfcModel, element: StepId, count: usize, body: StepId) -> Result<Self> {
+        let r = |id: StepId| AttrValue::Ref(id.0);
+        let location = create_with(
+            ifc,
+            "IfcCartesianPoint",
+            &[("Coordinates", reals(&[0.0; 3]))],
+        )?;
+        let axis = create_with(
+            ifc,
+            "IfcDirection",
+            &[("DirectionRatios", reals(&[0.0, 0.0, 1.0]))],
+        )?;
+        let ref_direction = create_with(
+            ifc,
+            "IfcDirection",
+            &[("DirectionRatios", reals(&[1.0, 0.0, 0.0]))],
+        )?;
+        let axes = create_with(
+            ifc,
+            "IfcAxis2Placement3D",
+            &[
+                ("Location", r(location)),
+                ("Axis", r(axis)),
+                ("RefDirection", r(ref_direction)),
+            ],
+        )?;
+        let placement = create_with(ifc, "IfcLocalPlacement", &[("RelativePlacement", r(axes))])?;
+        let mut items = Vec::new();
+        for _ in 0..count {
+            let profile_location = create_with(
+                ifc,
+                "IfcCartesianPoint",
+                &[("Coordinates", reals(&[0.0, 0.0]))],
+            )?;
+            let profile_axes = create_with(
+                ifc,
+                "IfcAxis2Placement2D",
+                &[("Location", r(profile_location))],
+            )?;
+            let profile = create_with(
+                ifc,
+                "IfcRectangleProfileDef",
+                &[
+                    ("ProfileType", AttrValue::Enum("AREA".into())),
+                    ("Position", r(profile_axes)),
+                    ("XDim", AttrValue::Real(1.0)),
+                    ("YDim", AttrValue::Real(1.0)),
+                ],
+            )?;
+            let location = create_with(
+                ifc,
+                "IfcCartesianPoint",
+                &[("Coordinates", reals(&[0.0; 3]))],
+            )?;
+            let axes = create_with(ifc, "IfcAxis2Placement3D", &[("Location", r(location))])?;
+            let extrusion = create_with(
+                ifc,
+                "IfcDirection",
+                &[("DirectionRatios", reals(&[0.0, 0.0, 1.0]))],
+            )?;
+            let solid = create_with(
+                ifc,
+                "IfcExtrudedAreaSolid",
+                &[
+                    ("SweptArea", r(profile)),
+                    ("Position", r(axes)),
+                    ("ExtrudedDirection", r(extrusion)),
+                    ("Depth", AttrValue::Real(1.0)),
+                ],
+            )?;
+            items.push(BoxItem {
+                solid,
+                profile,
+                profile_axes,
+                profile_location,
+                axes,
+                location,
+                extrusion,
+            });
+        }
+        let body_rep = create_with(
+            ifc,
+            "IfcShapeRepresentation",
+            &[
+                ("ContextOfItems", r(body)),
+                ("RepresentationIdentifier", AttrValue::String("Body".into())),
+                ("RepresentationType", AttrValue::String("SweptSolid".into())),
+                (
+                    "Items",
+                    AttrValue::List(items.iter().map(|i| r(i.solid)).collect()),
+                ),
+            ],
+        )?;
+        let shape = create_with(
+            ifc,
+            "IfcProductDefinitionShape",
+            &[("Representations", AttrValue::List(vec![r(body_rep)]))],
+        )?;
+        ifc.set_attribute(element, "ObjectPlacement", &r(placement))?;
+        ifc.set_attribute(element, "Representation", &r(shape))?;
+        Ok(Self {
+            placement,
+            axes,
+            location,
+            axis,
+            ref_direction,
+            shape,
+            body_rep,
+            items,
+        })
+    }
+}
+
+/// Where a box shape is placed: relative to another placement (or absolute), at `origin` with
+/// its X axis along `x_dir` (file units for `origin`).
+pub(crate) struct Frame {
+    pub relative_to: Option<StepId>,
+    pub origin: [f64; 3],
+    pub x_dir: [f64; 2],
+}
+
+/// Writes an element's placement and a body of boxes (metres, in the placement's frame),
+/// updating the existing shape in place when it has the same number of boxes.
+pub(crate) fn write_boxes(
+    ifc: &mut IfcModel,
+    element: StepId,
+    frame: &Frame,
+    boxes: &[LocalBox],
+    scale: f64,
+    contexts: Contexts,
+) -> Result<()> {
+    let shape = match BoxShape::read(ifc, element)? {
+        Some(s) if s.items.len() == boxes.len() => s,
+        old => {
+            if let Some(old) = old {
+                for id in old.entities() {
+                    ifc.remove(id)?;
+                }
+            }
+            BoxShape::create(ifc, element, boxes.len(), contexts.body)?
+        }
+    };
+    let set = |ifc: &mut IfcModel, id: StepId, attr: &str, v: AttrValue| -> Result<()> {
+        if ifc.attribute(id, attr)? != v {
+            ifc.set_attribute(id, attr, &v)?;
+        }
+        Ok(())
+    };
+    let rel = frame
+        .relative_to
+        .map_or(AttrValue::Null, |p| AttrValue::Ref(p.0));
+    set(ifc, shape.placement, "PlacementRelTo", rel)?;
+    set(ifc, shape.location, "Coordinates", reals(&frame.origin))?;
+    set(ifc, shape.axis, "DirectionRatios", reals(&[0.0, 0.0, 1.0]))?;
+    set(
+        ifc,
+        shape.ref_direction,
+        "DirectionRatios",
+        reals(&[frame.x_dir[0], frame.x_dir[1], 0.0]),
+    )?;
+    for (item, [x, y, z]) in shape.items.iter().zip(boxes) {
+        let s = |v: f64| v / scale;
+        set(
+            ifc,
+            item.profile_location,
+            "Coordinates",
+            reals(&[s((x[0] + x[1]) / 2.0), s((y[0] + y[1]) / 2.0)]),
+        )?;
+        set(ifc, item.profile, "XDim", AttrValue::Real(s(x[1] - x[0])))?;
+        set(ifc, item.profile, "YDim", AttrValue::Real(s(y[1] - y[0])))?;
+        set(
+            ifc,
+            item.location,
+            "Coordinates",
+            reals(&[0.0, 0.0, s(z[0])]),
+        )?;
+        set(
+            ifc,
+            item.extrusion,
+            "DirectionRatios",
+            reals(&[0.0, 0.0, 1.0]),
+        )?;
+        set(ifc, item.solid, "Depth", AttrValue::Real(s(z[1] - z[0])))?;
+    }
+    Ok(())
+}
+
+/// Removes a shape written by [`write_boxes`] and the element's voids and fills relationships
+/// (before the element itself is removed).
+pub(crate) fn remove_boxes(ifc: &mut IfcModel, element: StepId) -> Result<()> {
+    for class in ["IfcRelVoidsElement", "IfcRelFillsElement"] {
+        for rel in ifc.referenced_by(element, class)? {
+            ifc.remove(rel)?;
+        }
+    }
+    if let Some(shape) = BoxShape::read(ifc, element)? {
+        for id in shape.entities() {
+            ifc.remove(id)?;
+        }
+    }
+    Ok(())
+}
+
+/// Makes `relating` the only relating element of the one-to-one relationship `class` that
+/// `related` takes part in (voids and fills), creating it when missing.
+pub(crate) fn relate_one(
+    ifc: &mut IfcModel,
+    class: &str,
+    relating_attr: &str,
+    relating: StepId,
+    related_attr: &str,
+    related: StepId,
+    owner_history: Option<StepId>,
+) -> Result<()> {
+    let existing = ifc.referenced_by(related, class)?.into_iter().find(|r| {
+        ifc.attribute(*r, related_attr)
+            .is_ok_and(|v| v == AttrValue::Ref(related.0))
+    });
+    let rel = match existing {
+        Some(rel) => rel,
+        None => {
+            let rel = ifc.create_rooted(class, &GlobalId::new())?;
+            if let Some(oh) = owner_history {
+                ifc.set_attribute(rel, "OwnerHistory", &AttrValue::Ref(oh.0))?;
+            }
+            ifc.set_attribute(rel, related_attr, &AttrValue::Ref(related.0))?;
+            rel
+        }
+    };
+    if ifc.attribute(rel, relating_attr)? != AttrValue::Ref(relating.0) {
+        ifc.set_attribute(rel, relating_attr, &AttrValue::Ref(relating.0))?;
+    }
+    Ok(())
+}

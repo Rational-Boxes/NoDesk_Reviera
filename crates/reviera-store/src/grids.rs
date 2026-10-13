@@ -306,7 +306,11 @@ fn give_types(elements: &mut Vec<(ElementId, NewElement)>, next: &mut u64, out: 
         Some(g) => g,
         None => {
             // Derived from the first untyped grid, so the same file gives the same type.
-            let seed = elements[untyped[0]].1.guid.as_ref().map(GlobalId::to_string);
+            let seed = elements[untyped[0]]
+                .1
+                .guid
+                .as_ref()
+                .map(GlobalId::to_string);
             let guid = derived_guid(&seed.unwrap_or_default(), "grid type");
             let id = ElementId(*next);
             *next += 1;

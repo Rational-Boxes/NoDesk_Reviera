@@ -14,6 +14,7 @@
 //! Chapter 3.
 
 pub mod joins;
+pub mod openings;
 
 pub use joins::{End, Join, Solved, WallBody, solve};
 

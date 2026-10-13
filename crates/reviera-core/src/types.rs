@@ -16,7 +16,7 @@ use crate::element::{Element, NewElement};
 use crate::error::{Error, Result};
 use crate::id::{ElementId, ElementRef};
 use crate::store::Store;
-use crate::{categories, grids, walls};
+use crate::{categories, grids, inserts, walls};
 
 /// The family of a type element: its class and recipe kind; `None` for non-types.
 pub fn family(e: &Element) -> Option<(String, Option<String>)> {
@@ -205,6 +205,9 @@ pub(crate) fn set_param(txn: &mut crate::txn::Transaction<'_>, p: SetParamParams
     if grids::is_grid_type(e) {
         return grids::set_type_param(txn, id, &p.param, &p.value);
     }
+    if inserts::insert_type(e).is_some() {
+        return inserts::set_type_param(txn, id, &p.param, &p.value);
+    }
     // A Reviera wall type's width is part of its recipe.
     if walls::type_width(e).is_some() && p.param == "width" {
         let width = match &p.value {
@@ -240,8 +243,9 @@ pub struct SetTypeParams {
     pub type_id: ElementRef,
 }
 
-/// Changes the type of elements (type swap): grids take another grid type, Reviera walls another
-/// wall type with a width (they keep their location line).
+/// Changes the type of elements (type swap): grids take another grid type, doors and windows
+/// another type of their kind (they must still fit), Reviera walls another wall type with a
+/// width (they keep their location line).
 pub(crate) fn set_type(txn: &mut crate::txn::Transaction<'_>, p: SetTypeParams) -> Result<()> {
     let store = txn.store().clone();
     let t = resolve_type(&store, &p.type_id)?;
@@ -260,6 +264,19 @@ pub(crate) fn set_type(txn: &mut crate::txn::Transaction<'_>, p: SetTypeParams) 
                 ));
             }
             grid_ids.push(id);
+        } else if let Some(kind) = inserts::kind_of(e) {
+            if inserts::insert_type(ty).and_then(|t| t.kind()) != Some(kind) {
+                return Err(Error::new(
+                    "type.wrong_family",
+                    format!("element {id} needs a {} type", kind.class()),
+                ));
+            }
+            let guid = ty.guid().to_string();
+            txn.modify(id, |w| {
+                w.params.insert("@type".into(), Value::String(guid));
+            })?;
+            let placed = inserts::resolve(txn.store(), txn.store().get(id).expect("exists"))?;
+            inserts::check_fit(txn.store(), &placed)?;
         } else if walls::wall_recipe(e).is_some() {
             if walls::type_width(ty).is_none() {
                 return Err(Error::new(
