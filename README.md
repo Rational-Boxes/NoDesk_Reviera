@@ -78,14 +78,16 @@ The KIT FZK *AC20-Institute-Var-2* sample model (`test-data/ifc/`) open in Revie
   roofs from any simple footprint, including different slopes per edge, and each face gets a
   mitred slab of the roof type's thickness. Properties choose the Roof Shape (Hip, Gable,
   Gable rotated, Shed, Shed reversed or Flat), the overhang all round, the base offset, slope,
-  cutoff level and type, and Edit Footprint reopens the sketch. Saved as `IfcRoof` with a faceted B-rep body
+  cutoff level and type, and Edit Footprint reopens the sketch. A selected
+  roof, floor or ceiling shows its outline with grips: drag an edge or corner to change the
+  footprint in place. In the sketch, Modify selects curves to drag, delete or edit (length,
+  slope, overhang). Saved as `IfcRoof` with a faceted B-rep body
   (`roof.create_footprint`, `roof.edit_footprint`, `roof.set_params`, `roof.set_edge`,
   `roof.set_slope`, `roof.set_shape`). Walls attach their tops to a roof (offered when a roof is made from picked
   walls, or Modify | Walls › Attach Top/Base, then click the roof), so gable walls rise to the
   ridge. Saved as a faceted B-rep in the wall's own frame, so doors and windows stay cut
   (`wall.attach`, `wall.detach`). Not yet: attaching bases or to floors and ceilings, slope
-  arrows, openings in roofs, and editing single footprint edges on the model (grips, or moving
-  and deleting one edge in Edit Footprint).
+  arrows, and openings in roofs.
 - **Rooms**: Architecture › Room places a room in the region of wall faces under the cursor,
   shown as you hover. Place Rooms Automatically fills every enclosed region of the plan's level,
   numbered in reading order. Rooms measure to the walls' finish faces and leave out islands such

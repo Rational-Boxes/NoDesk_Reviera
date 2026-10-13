@@ -12,6 +12,7 @@
 
 mod browser;
 mod dims;
+mod footprint;
 mod grids;
 mod icons;
 mod inserts;
@@ -30,6 +31,7 @@ mod schedules;
 mod sections;
 mod sheets;
 mod sketch;
+mod sketch_edit;
 mod snap;
 mod wx;
 
@@ -100,6 +102,10 @@ enum Drag {
         item: u32,
         from: [f64; 2],
     },
+    /// Dragging a sketch curve or corner (sketch Modify).
+    Sketch,
+    /// Dragging a footprint grip of a roof, floor or ceiling.
+    Footprint(footprint::FootprintDrag),
 }
 
 /// The Wall tool: clicks on the level's plane add walls end to end.
@@ -1575,6 +1581,9 @@ impl Gui {
         let Some(doc) = self.doc else { return };
         let ids = self.selection();
         self.type_rows = None;
+        if self.sketch_rows(grid) {
+            return;
+        }
         if ids.is_empty()
             && (self.grid_tool_properties(grid)
                 || self.insert_tool_properties(grid)
@@ -1911,6 +1920,7 @@ impl Gui {
             || self.section_view_edit(property, text.clone())
             || self.sheet_view_edit(property, text.clone())
             || self.note_edit(property, text.clone())
+            || self.sketch_edit(property, text.clone())
         {
             return;
         }
@@ -2086,6 +2096,8 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                     let left = button == 0 && cube.is_none();
                     let editing = if !left {
                         None
+                    } else if g.sketch.is_some() && g.sketch_drag_start(x, y).is_some() {
+                        Some(Drag::Sketch)
                     } else if let Some((item, from)) = g.sheet_drag_start(x, y) {
                         Some(Drag::SheetItem { item, from })
                     } else if let Some(grip) = g.clip_grip_at(x, y) {
@@ -2093,6 +2105,8 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                         Some(Drag::Clip(grip))
                     } else if let Some((id, from)) = g.insert_drag_start(x, y, &p) {
                         Some(Drag::MoveInsert { id, from })
+                    } else if let Some(d) = g.footprint_grip_at(x, y) {
+                        Some(Drag::Footprint(d))
                     } else if let Some((id, end, other)) = g.grip_at(x, y) {
                         Some(Drag::Grip { id, end, other })
                     } else {
@@ -2177,6 +2191,16 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                     Some((Drag::SheetItem { item, from }, _, _)) => {
                         g.sheet_drag_end(item, from, x, y, click);
                         return;
+                    }
+                    Some((Drag::Sketch, _, _)) => {
+                        g.sketch_drag_end(x, y, click);
+                        return;
+                    }
+                    Some((Drag::Footprint(d), _, _)) => {
+                        g.footprint_drag_end(d, x, y, click);
+                        if !click {
+                            return;
+                        }
                     }
                     _ => {}
                 }
@@ -2289,6 +2313,16 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                         redraw = true;
                         return;
                     }
+                    Drag::Sketch => {
+                        g.sketch_drag_motion(x, y);
+                        redraw = true;
+                        return;
+                    }
+                    Drag::Footprint(d) => {
+                        g.footprint_drag_motion(d, x, y);
+                        redraw = true;
+                        return;
+                    }
                     _ => {}
                 }
                 let v = g.views.iter_mut().find(|v| v.id == id).expect("found");
@@ -2306,7 +2340,9 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                     | Drag::Grip { .. }
                     | Drag::MoveSelection { .. }
                     | Drag::Clip(_)
-                    | Drag::SheetItem { .. } => {}
+                    | Drag::SheetItem { .. }
+                    | Drag::Sketch
+                    | Drag::Footprint(_) => {}
                 }
                 v.drag = Some((kind, x, y));
                 redraw = true;
@@ -3151,15 +3187,18 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         }),
         "sketch.finish" => with(gui, Gui::finish_sketch),
         "sketch.cancel" => with(gui, Gui::cancel_sketch),
-        "sketch.pick_walls" | "sketch.line" | "sketch.rectangle" => with(gui, |g| {
-            let mode = match action {
-                "sketch.pick_walls" => sketch::DrawMode::PickWalls,
-                "sketch.line" => sketch::DrawMode::Line,
-                _ => sketch::DrawMode::Rectangle,
-            };
-            g.set_draw_mode(mode);
-            focus(g);
-        }),
+        "sketch.select" | "sketch.pick_walls" | "sketch.line" | "sketch.rectangle" => {
+            with(gui, |g| {
+                let mode = match action {
+                    "sketch.select" => sketch::DrawMode::Select,
+                    "sketch.pick_walls" => sketch::DrawMode::PickWalls,
+                    "sketch.line" => sketch::DrawMode::Line,
+                    _ => sketch::DrawMode::Rectangle,
+                };
+                g.set_draw_mode(mode);
+                focus(g);
+            })
+        }
         "element.pin" | "element.unpin" => with(gui, |g| g.pin_selection(action == "element.pin")),
         a if modify::Kind::of_action(a).is_some() => with(gui, |g| {
             g.start_modify(modify::Kind::of_action(a).expect("checked"));

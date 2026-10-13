@@ -9,7 +9,7 @@ use reviera_core::roofs;
 use serde_json::{Value, json};
 use wxdragon::prelude::*;
 
-use super::sketch::{Curve, DUPLICATE, SketchKind};
+use super::sketch::{DUPLICATE, SketchKind};
 use super::{Gui, ask, error};
 
 impl Gui {
@@ -58,41 +58,13 @@ impl Gui {
         else {
             return;
         };
-        let Some((roof, recipe, sketch)) = self.selection().into_iter().find_map(|id| {
-            let e = store.get(id)?;
-            Some((
-                id,
-                roofs::roof_recipe(e)?,
-                reviera_core::sketch::sketch_of(e)?,
-            ))
+        let Some((roof, level, curves)) = self.selection().into_iter().find_map(|id| {
+            roofs::roof_recipe(store.get(id)?)?;
+            let (_, level, curves) = self.element_curves(id)?;
+            Some((id, level, curves))
         }) else {
             return frame.set_status_text("Select a roof to edit its footprint", 0);
         };
-        let level = reviera_core::GlobalId::parse(&recipe.level)
-            .and_then(|g| store.find_by_guid(&g))
-            .unwrap_or(ElementId(0));
-        // Curves in loop order, keeping each one's slope data.
-        let order: Vec<u32> = sketch.loops.iter().flatten().copied().collect();
-        let curves = order
-            .iter()
-            .filter_map(|k| sketch.curves.iter().find(|c| c.key == *k))
-            .map(|c| {
-                let edge = recipe.edge(c.key);
-                Curve {
-                    gable: !edge.defines_slope,
-                    overhang: edge.overhang,
-                    slope: edge.slope,
-                    ..Curve::new(
-                        c.line,
-                        c.lock.as_ref().and_then(|l| {
-                            let id = reviera_core::GlobalId::parse(&l.element)
-                                .and_then(|g| store.find_by_guid(&g))?;
-                            Some((id, l.sub.clone()))
-                        }),
-                    )
-                }
-            })
-            .collect();
         self.begin_sketch(SketchKind::Roof, Some(roof), level, curves);
     }
 

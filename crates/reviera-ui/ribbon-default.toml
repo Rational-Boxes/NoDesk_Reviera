@@ -383,6 +383,12 @@ icon = "edit_boundary"
 help = "Edit the selected floor's boundary sketch"
 
 [[action]]
+id = "sketch.select"
+label = "Modify"
+icon = "modify"
+help = "Select sketch curves: drag a curve or corner to move it, Delete removes it, Properties edit it"
+
+[[action]]
 id = "sketch.pick_walls"
 label = "Pick Walls"
 icon = "pick_walls"
@@ -898,6 +904,7 @@ panels = [
     { action = "sketch.cancel", size = "large" },
   ] },
   { label = "Draw", tools = [
+    { action = "sketch.select", size = "large" },
     { action = "sketch.pick_walls", size = "large" },
     { action = "sketch.line", size = "small" },
     { action = "sketch.rectangle", size = "small" },
@@ -945,6 +952,7 @@ panels = [
     { action = "sketch.cancel", size = "large" },
   ] },
   { label = "Draw", tools = [
+    { action = "sketch.select", size = "large" },
     { action = "sketch.pick_walls", size = "large" },
     { action = "sketch.line", size = "small" },
     { action = "sketch.rectangle", size = "small" },

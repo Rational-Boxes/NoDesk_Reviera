@@ -175,6 +175,19 @@ The behaviours in this section are implemented once, in the tool framework, and 
 - [ ] Cancelling an Edit Boundary session restores the previous boundary exactly.
 - [ ] Finish on an open loop leaves the session open and highlights the open ends.
 
+**Implementation notes (2026-10-13).**
+- As built, sketch sessions run in the window (floors, sketched ceilings, footprint roofs), not as `sketch.*` session commands. Callers without a window send whole curve sets to the create and edit commands.
+- **Modify** in the Draw panel, the default when editing a finished element:
+  - Selects a curve. Delete removes it; with nothing selected, Delete removes the last curve.
+  - Dragging a curve moves it across its own direction. Each neighbour keeps its direction and is stretched or shortened to meet it.
+  - Dragging a corner moves it, and every curve ending there follows.
+  - A moved curve leaves the wall it was locked to; neighbours keep their locks, since they stay on their lines.
+- **Curve Properties:** Length (editable: the end moves along the curve) and whether the curve follows a wall. Roofs add Defines Roof Slope, Slope and Overhang.
+- Editing sessions start from the element's current footprint: the corners where its curves' current (possibly wall-locked) lines meet.
+- **Footprint grips on the model:**
+  - A selected roof, floor or ceiling in a plan shows its footprint outline, with grips at the corners and edge middles.
+  - Dragging a grip moves the edge or corner by the same rules, without opening the sketch, as one undoable `roof.edit_footprint` or `floor.edit_boundary`.
+
 ### 3.1.4 Sketch validation
 **ID:** ARC-SKCH-002 · **Priority:** P0 · **Ref:** research/02 §2.3
 

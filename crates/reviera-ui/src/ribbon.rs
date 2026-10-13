@@ -44,6 +44,7 @@ pub const UI_ACTIONS: &[&str] = &[
     "element.mirror_draw",
     "sketch.pick_walls",
     "sketch.line",
+    "sketch.select",
     "sketch.rectangle",
     "sketch.finish",
     "sketch.cancel",

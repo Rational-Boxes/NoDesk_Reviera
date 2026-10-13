@@ -16,7 +16,11 @@
 //! - **Defines Slope** (roofs) switches the clicked curve between sloping and gable. Slope-defining
 //!   curves show a triangle. Walls picked for a roof take the session's overhang.
 //!
-//! Delete removes the last curve. Finish validates (ARC-SKCH-002): a failed Finish keeps the
+//! - **Modify** selects a curve: drag it to move it across (its neighbours stretch to meet
+//!   it), drag a corner to move it, Delete removes it; Properties show its length (editable)
+//!   and, for roofs, Defines Slope, Slope and Overhang. Editing a finished footprint starts here.
+//!
+//! Delete removes the selected curve, else the last curve. Finish validates (ARC-SKCH-002): a failed Finish keeps the
 //! session open and marks the problem points; Cancel discards the session.
 
 use reviera_core::ElementId;
@@ -35,6 +39,8 @@ const PROBLEM: [f32; 4] = [0.95, 0.1, 0.05, 1.0];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DrawMode {
+    /// Select, move and delete curves.
+    Select,
     PickWalls,
     Line,
     Rectangle,
@@ -97,6 +103,17 @@ pub struct SketchSession {
     hover: Vec<Curve>,
     /// Points of the last failed Finish.
     problems: Vec<[f64; 2]>,
+    /// The selected curve (Modify).
+    pub selected: Option<usize>,
+    /// A curve or corner being dragged: what, where the drag started, and the curves before it.
+    drag: Option<(SketchDrag, [f64; 2], Vec<Curve>)>,
+}
+
+/// What a drag in the sketch moves.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum SketchDrag {
+    Curve(usize),
+    Corner([f64; 2]),
 }
 
 impl Gui {
@@ -148,33 +165,13 @@ impl Gui {
         else {
             return;
         };
-        let Some((floor, (kind, recipe), sketch)) = ids.iter().find_map(|id| {
-            let e = store.get(*id)?;
-            Some((
-                *id,
-                reviera_core::floors::slab_recipe(e)?,
-                reviera_core::sketch::sketch_of(e)?,
-            ))
+        let Some((floor, kind, level, curves)) = ids.iter().find_map(|id| {
+            let (kind, _) = reviera_core::floors::slab_recipe(store.get(*id)?)?;
+            let (_, level, curves) = self.element_curves(*id)?;
+            Some((*id, kind, level, curves))
         }) else {
             return frame.set_status_text("Select a floor or ceiling to edit its boundary", 0);
         };
-        let level = reviera_core::GlobalId::parse(&recipe.level)
-            .and_then(|g| store.find_by_guid(&g))
-            .unwrap_or(ElementId(0));
-        let curves = sketch
-            .curves
-            .iter()
-            .map(|c| {
-                Curve::new(
-                    c.line,
-                    c.lock.as_ref().and_then(|l| {
-                        let id = reviera_core::GlobalId::parse(&l.element)
-                            .and_then(|g| store.find_by_guid(&g))?;
-                        Some((id, l.sub.clone()))
-                    }),
-                )
-            })
-            .collect();
         self.begin_sketch(SketchKind::Slab(kind), Some(floor), level, curves);
     }
 
@@ -199,13 +196,20 @@ impl Gui {
             host,
             level,
             curves,
-            mode: DrawMode::PickWalls,
+            // Editing a finished boundary starts by selecting; a new one by picking walls.
+            mode: if host.is_some() {
+                DrawMode::Select
+            } else {
+                DrawMode::PickWalls
+            },
             last: None,
             chain_start: None,
             corner: None,
             cursor: None,
             hover: Vec::new(),
             problems: Vec::new(),
+            selected: None,
+            drag: None,
         });
         let _ = self.run("selection.clear", json!({}));
         self.selection_changed();
@@ -240,6 +244,9 @@ impl Gui {
     fn sketch_prompt(&mut self) {
         let Some(s) = &self.sketch else { return };
         let what = match s.mode {
+            DrawMode::Select => {
+                "Modify: click a curve to select it, drag it or a corner to move it, Delete removes it"
+            }
             DrawMode::PickWalls => {
                 "Pick Walls: click a wall on the side to follow (Tab takes the joined chain)"
             }
@@ -259,7 +266,7 @@ impl Gui {
             (None, SketchKind::Roof) => "Roof by Footprint",
         };
         let text = format!(
-            "{verb} · {what} · {} curves · Finish ✓ or Cancel ✗ on the ribbon (Delete removes the last curve)",
+            "{verb} · {what} · {} curves · Finish ✓ or Cancel ✗ on the ribbon",
             s.curves.len()
         );
         self.frame.set_status_text(&text, 0);
@@ -420,6 +427,13 @@ impl Gui {
                     Some(_) => {}
                 }
             }
+            DrawMode::Select => {
+                let Some(p) = self.plan_xy(x, y) else { return };
+                let reach = self.sketch_reach();
+                let s = self.sketch.as_mut().expect("checked");
+                s.selected = crate::sketch_edit::nearest(&s.curves, p, reach).map(|n| n.0);
+                self.properties_stale = true;
+            }
             DrawMode::DefinesSlope => {
                 let Some(p) = self.plan_xy(x, y) else { return };
                 let reach = self
@@ -494,8 +508,16 @@ impl Gui {
                 self.add_curves(picks);
             }
             WXK_DELETE | WXK_BACK => {
-                s.curves.pop();
+                match s.selected.take() {
+                    Some(i) if i < s.curves.len() => {
+                        s.curves.remove(i);
+                    }
+                    _ => {
+                        s.curves.pop();
+                    }
+                }
                 s.problems.clear();
+                self.properties_stale = true;
             }
             WXK_ESCAPE => {
                 if s.last.is_none() && s.corner.is_none() {
@@ -521,29 +543,9 @@ impl Gui {
     pub(crate) fn finish_sketch(&mut self) {
         let frame = self.frame;
         let Some(s) = &self.sketch else { return };
-        let curves: Vec<Value> = s
-            .curves
-            .iter()
-            .map(|c| {
-                let mut v = json!({ "line": { "start": c.line.start, "end": c.line.end } });
-                if let Some((e, sub)) = &c.lock {
-                    v["lock"] = json!({ "element": e, "sub": sub });
-                }
-                if s.kind == SketchKind::Roof {
-                    v["defines_slope"] = json!(!c.gable);
-                    v["overhang"] = json!(c.overhang);
-                    if let Some(a) = c.slope {
-                        v["slope"] = json!(a);
-                    }
-                }
-                v
-            })
-            .collect();
+        let curves = curves_json(s.kind, &s.curves);
         let (command, args) = match (s.host, s.kind) {
-            (Some(r), SketchKind::Roof) => (
-                "roof.edit_footprint",
-                json!({ "roof_id": r, "curves": curves }),
-            ),
+            (Some(host), kind) => edit_command(kind, host, curves),
             (None, SketchKind::Roof) => {
                 let mut a = json!({ "curves": curves, "level_id": s.level });
                 // A roof on picked walls sits on their tops; so does one drawn on the top
@@ -556,10 +558,6 @@ impl Gui {
                 }
                 ("roof.create_footprint", a)
             }
-            (Some(f), _) => (
-                "floor.edit_boundary",
-                json!({ "floor_id": f, "loops": [curves] }),
-            ),
             (None, SketchKind::Slab(SlabKind::Floor)) => {
                 let mut a = json!({ "loops": [curves], "level_id": s.level });
                 if let Some(t) = self.floor_type {
@@ -672,6 +670,27 @@ impl Gui {
                 }
             }
         }
+        // The selected curve, with grips at its corners.
+        let mut selected = Lines {
+            color: reviera_render::HIGHLIGHT,
+            width: 0.7,
+            segments: Vec::new(),
+        };
+        if let Some(c) = s.selected.and_then(|i| s.curves.get(i)) {
+            selected.segments.push(seg(c.line.start, c.line.end));
+            let r = 1.2 * mm;
+            for p in [c.line.start, c.line.end] {
+                let q = [
+                    [p[0] - r, p[1] - r],
+                    [p[0] + r, p[1] - r],
+                    [p[0] + r, p[1] + r],
+                    [p[0] - r, p[1] + r],
+                ];
+                for k in 0..4 {
+                    selected.segments.push(seg(q[k], q[(k + 1) % 4]));
+                }
+            }
+        }
         let mut hover = Lines {
             color: HOVER,
             width: 0.35,
@@ -712,12 +731,166 @@ impl Gui {
             }
         }
         if let Some(v) = self.viewport() {
-            v.set_overlay_lines(&[sketch, hover, problems]);
+            v.set_overlay_lines(&[sketch, selected, hover, problems]);
         }
     }
 }
 
 impl Gui {
+    /// How near (metres) the cursor must be to pick a sketch curve: 3 mm on paper.
+    fn sketch_reach(&self) -> f64 {
+        self.active_view()
+            .and_then(|v| v.plan.as_ref())
+            .map_or(0.3, |plan| 3.0 * f64::from(plan.scale) / 1000.0)
+    }
+
+    /// A press in Modify: a corner or curve under the cursor starts to drag (and is selected).
+    pub(crate) fn sketch_drag_start(&mut self, x: i32, y: i32) -> Option<[f64; 2]> {
+        let p = self.plan_xy(x, y)?;
+        let reach = self.sketch_reach();
+        let s = self
+            .sketch
+            .as_mut()
+            .filter(|s| s.mode == DrawMode::Select)?;
+        let (i, corner) = crate::sketch_edit::nearest(&s.curves, p, reach)?;
+        let what = match corner {
+            Some(c) => SketchDrag::Corner(c),
+            None => SketchDrag::Curve(i),
+        };
+        s.selected = Some(i);
+        s.drag = Some((what, p, s.curves.clone()));
+        self.properties_stale = true;
+        self.sketch_preview();
+        Some(p)
+    }
+
+    /// Dragging: the curves are moved from where they were when the drag started.
+    pub(crate) fn sketch_drag_motion(&mut self, x: i32, y: i32) {
+        let from = self
+            .sketch
+            .as_ref()
+            .and_then(|s| s.drag.as_ref().map(|d| d.1));
+        let lines = self.snap_lines();
+        let Some(to) = self.snapped_at(x, y, from, &lines).map(|c| c.point) else {
+            return;
+        };
+        let Some(s) = &mut self.sketch else { return };
+        let Some((what, from, original)) = s.drag.clone() else {
+            return;
+        };
+        let mut curves = original;
+        match what {
+            SketchDrag::Curve(i) => {
+                crate::sketch_edit::move_curve(&mut curves, i, [to[0] - from[0], to[1] - from[1]]);
+            }
+            SketchDrag::Corner(c) => crate::sketch_edit::move_corner(&mut curves, c, to),
+        }
+        s.curves = curves;
+        s.problems.clear();
+        self.sketch_preview();
+    }
+
+    pub(crate) fn sketch_drag_end(&mut self, x: i32, y: i32, click: bool) {
+        if !click {
+            self.sketch_drag_motion(x, y);
+        }
+        if let Some(s) = &mut self.sketch {
+            if click && let Some((_, _, original)) = s.drag.take() {
+                // A click only selects.
+                s.curves = original;
+            }
+            s.drag = None;
+        }
+        self.properties_stale = true;
+        self.sketch_prompt();
+        self.sketch_preview();
+    }
+
+    /// Properties of the selected sketch curve; `false` when none is selected.
+    pub(crate) fn sketch_rows(&mut self, grid: &wxdragon::prelude::PropertyGrid) -> bool {
+        use wxdragon::prelude::Property;
+        let Some(s) = &self.sketch else { return false };
+        let roof = s.kind == SketchKind::Roof;
+        let Some(c) = s.selected.and_then(|i| s.curves.get(i)).cloned() else {
+            return false;
+        };
+        let line = c.line;
+        let length = (line.end[0] - line.start[0]).hypot(line.end[1] - line.start[1]);
+        grid.append(Property::category("Sketch Curve", "c_skc"));
+        let text = self.format_length(length);
+        grid.append(Property::string("Length", "skc_length", text));
+        let lock = if c.lock.is_some() {
+            "Locked to its wall"
+        } else {
+            "Free"
+        };
+        grid.append(Property::string("Follows Wall", "skc_lock", lock));
+        grid.set_property_read_only("skc_lock", true);
+        if roof {
+            grid.append(Property::boolean(
+                "Defines Roof Slope",
+                "skc_slopes",
+                !c.gable,
+            ));
+            let slope = c.slope.map_or_else(String::new, |a| {
+                self.run("units.format", json!({ "value": a, "data_type": "angle" }))
+                    .ok()
+                    .and_then(|v| v.as_str().map(str::to_owned))
+                    .unwrap_or_else(|| format!("{:.2}°", a.to_degrees()))
+            });
+            grid.append(Property::string("Slope", "skc_slope", slope));
+            grid.set_help_string("skc_slope", "This curve's own slope; empty uses the roof's");
+            let overhang = self.format_length(c.overhang);
+            grid.append(Property::string("Overhang", "skc_overhang", overhang));
+        }
+        true
+    }
+
+    /// An edit of the selected sketch curve's row; `false` if `property` is not one.
+    pub(crate) fn sketch_edit(&mut self, property: &str, text: Option<String>) -> bool {
+        let Some(i) = self.sketch.as_ref().and_then(|s| s.selected) else {
+            return false;
+        };
+        if !property.starts_with("skc_") {
+            return false;
+        }
+        let text = text.unwrap_or_default();
+        let parse = |g: &mut Gui, t: &str, data_type: &str| {
+            g.run("units.parse", json!({ "text": t, "data_type": data_type }))
+                .ok()
+                .and_then(|v| v.as_f64())
+        };
+        let value = match property {
+            "skc_length" | "skc_overhang" => parse(self, &text, "length"),
+            "skc_slope" if !text.trim().is_empty() => parse(self, &text, "angle"),
+            _ => None,
+        };
+        let frame = self.frame;
+        let Some(s) = &mut self.sketch else {
+            return true;
+        };
+        match property {
+            "skc_length" => match value {
+                Some(l) if l > 0.0 => crate::sketch_edit::set_length(&mut s.curves, i, l),
+                _ => super::error(&frame, "The length must be a positive length"),
+            },
+            "skc_overhang" => match value {
+                Some(o) if o >= 0.0 => s.curves[i].overhang = o,
+                _ => super::error(&frame, "The overhang must be a length of 0 or more"),
+            },
+            "skc_slope" if text.trim().is_empty() => s.curves[i].slope = None,
+            "skc_slope" => match value {
+                Some(a) if a > 0.0 && a < 89.9f64.to_radians() => s.curves[i].slope = Some(a),
+                _ => super::error(&frame, "The slope must be between 0° and 89.9°"),
+            },
+            "skc_slopes" => s.curves[i].gable = !(text.eq_ignore_ascii_case("true") || text == "1"),
+            _ => {}
+        }
+        self.properties_stale = true;
+        self.sketch_preview();
+        true
+    }
+
     /// The height above the session's level of the highest top among the walls its curves are
     /// locked to.
     fn picked_wall_top(&self, s: &SketchSession) -> Option<f64> {
@@ -750,6 +923,94 @@ impl Gui {
             .filter_map(|e| reviera_core::walls::regenerate(store, e).ok())
             .map(|g| g.base_z + g.height - z)
             .reduce(f64::max)
+    }
+}
+
+/// Sketch curves as the create and edit commands take them.
+pub(crate) fn curves_json(kind: SketchKind, curves: &[Curve]) -> Vec<Value> {
+    curves
+        .iter()
+        .map(|c| {
+            let mut v = json!({ "line": { "start": c.line.start, "end": c.line.end } });
+            if let Some((e, sub)) = &c.lock {
+                v["lock"] = json!({ "element": e, "sub": sub });
+            }
+            if kind == SketchKind::Roof {
+                v["defines_slope"] = json!(!c.gable);
+                v["overhang"] = json!(c.overhang);
+                if let Some(a) = c.slope {
+                    v["slope"] = json!(a);
+                }
+            }
+            v
+        })
+        .collect()
+}
+
+/// The command and arguments that give `host` (a roof, floor or ceiling) new curves.
+pub(crate) fn edit_command(
+    kind: SketchKind,
+    host: ElementId,
+    curves: Vec<Value>,
+) -> (&'static str, Value) {
+    match kind {
+        SketchKind::Roof => (
+            "roof.edit_footprint",
+            json!({ "roof_id": host, "curves": curves }),
+        ),
+        SketchKind::Slab(_) => (
+            "floor.edit_boundary",
+            json!({ "floor_id": host, "loops": [curves] }),
+        ),
+    }
+}
+
+impl Gui {
+    /// The curves of a roof, floor or ceiling as they are now (each loop's corners where its
+    /// curves' current lines meet), with their locks and a roof's edge data; and its kind and
+    /// level.
+    pub(crate) fn element_curves(
+        &self,
+        id: ElementId,
+    ) -> Option<(SketchKind, ElementId, Vec<Curve>)> {
+        let store = self.doc.and_then(|d| self.app.document(d))?.doc.store();
+        let e = store.get(id)?;
+        let sketch = reviera_core::sketch::sketch_of(e)?;
+        let roof = reviera_core::roofs::roof_recipe(e);
+        let (kind, level) = match (&roof, reviera_core::floors::slab_recipe(e)) {
+            (Some(r), _) => (SketchKind::Roof, r.level.clone()),
+            (None, Some((k, r))) => (SketchKind::Slab(k), r.level),
+            _ => return None,
+        };
+        let level = reviera_core::GlobalId::parse(&level)
+            .and_then(|g| store.find_by_guid(&g))
+            .unwrap_or(ElementId(0));
+        let mut curves = Vec::new();
+        for (corners, keys) in reviera_core::sketch::rings(store, &sketch) {
+            for (i, k) in keys.iter().enumerate() {
+                let Some(c) = sketch.curves.iter().find(|c| c.key == *k) else {
+                    continue;
+                };
+                let lock = c.lock.as_ref().and_then(|l| {
+                    let id = reviera_core::GlobalId::parse(&l.element)
+                        .and_then(|g| store.find_by_guid(&g))?;
+                    Some((id, l.sub.clone()))
+                });
+                let line = Line {
+                    start: corners[i],
+                    end: corners[(i + 1) % corners.len()],
+                };
+                let mut curve = Curve::new(line, lock);
+                if let Some(r) = &roof {
+                    let edge = r.edge(*k);
+                    curve.gable = !edge.defines_slope;
+                    curve.overhang = edge.overhang;
+                    curve.slope = edge.slope;
+                }
+                curves.push(curve);
+            }
+        }
+        Some((kind, level, curves))
     }
 }
 
