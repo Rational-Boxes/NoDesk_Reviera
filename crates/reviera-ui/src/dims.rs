@@ -286,7 +286,7 @@ impl Gui {
     }
 
     /// Pixel distance from (`x`, `y`) to a plan segment.
-    fn pixel_distance(&self, x: i32, y: i32, seg: [[f64; 2]; 2], z: f32) -> f32 {
+    pub(crate) fn pixel_distance(&self, x: i32, y: i32, seg: [[f64; 2]; 2], z: f32) -> f32 {
         let Some(v) = self.active_view() else {
             return f32::MAX;
         };

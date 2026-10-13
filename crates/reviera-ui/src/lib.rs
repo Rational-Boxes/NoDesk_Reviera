@@ -13,6 +13,7 @@
 mod browser;
 mod dims;
 mod grids;
+mod inserts;
 mod levels;
 mod loading;
 mod native;
@@ -66,6 +67,8 @@ const ID_EXPORT_PDF: i32 = ID_HIGHEST + 30;
 const ID_LEVEL: i32 = ID_HIGHEST + 31;
 const ID_BROWSER_ELEVATION: i32 = ID_HIGHEST + 32;
 const ID_GRID: i32 = ID_HIGHEST + 33;
+const ID_DOOR: i32 = ID_HIGHEST + 34;
+const ID_WINDOW: i32 = ID_HIGHEST + 35;
 /// The orientation presets of `nav::PRESETS`, one id each.
 const ID_ORIENT_FIRST: i32 = ID_HIGHEST + 40;
 
@@ -91,6 +94,11 @@ enum Drag {
     },
     /// Looking around in walk mode.
     Look,
+    /// Dragging a selected door or window along its wall, from a plan point.
+    MoveInsert {
+        id: ElementId,
+        from: [f64; 2],
+    },
 }
 
 /// The Wall tool: clicks on the level's plane add walls end to end.
@@ -161,6 +169,9 @@ struct Gui {
     tool: Option<WallTool>,
     dim_tool: Option<dims::DimTool>,
     grid_tool: Option<grids::GridTool>,
+    insert_tool: Option<inserts::InsertTool>,
+    /// The door and window types chosen for the tools, by IFC class.
+    insert_types: std::collections::HashMap<&'static str, ElementId>,
     /// The grid type chosen for the Grid tool.
     grid_type: Option<ElementId>,
     /// The grid type whose values the palette shows.
@@ -346,6 +357,14 @@ impl Gui {
             }
             "GR" => {
                 self.start_grid_tool();
+                true
+            }
+            "DR" => {
+                self.start_insert_tool(reviera_core::inserts::Kind::Door);
+                true
+            }
+            "WN" => {
+                self.start_insert_tool(reviera_core::inserts::Kind::Window);
                 true
             }
             "Z" | "W" | "P" | "D" | "L" | "G" => false,
@@ -537,6 +556,7 @@ impl Gui {
             }
             self.end_dim_tool();
             self.end_grid_tool();
+            self.end_insert_tool();
             self.active = Some(id);
             self.doc = Some(doc);
             let _ = self.app.activate(doc);
@@ -774,6 +794,7 @@ impl Gui {
         self.leave_walk();
         self.end_dim_tool();
         self.end_grid_tool();
+        self.end_insert_tool();
         let Some(doc) = self.doc.and_then(|id| self.app.document(id)) else {
             return frame.set_status_text("Open or create a project first (File > New)", 0);
         };
@@ -1153,6 +1174,18 @@ impl Gui {
         if self.doc.is_none() {
             return;
         }
+        let hit = self.element_at(x, y, panel);
+        let result = match hit {
+            Some(id) => self.run("selection.set", json!({ "ids": [id] })),
+            None => self.run("selection.clear", json!({})),
+        };
+        if result.is_ok() {
+            self.selection_changed();
+        }
+    }
+
+    /// The element under pixel (`x`, `y`): in plans dimensions and grids first, then the model.
+    fn element_at(&self, x: i32, y: i32, panel: &Panel) -> Option<ElementId> {
         let size = panel.get_client_size();
         let (origin, dir) =
             self.camera()
@@ -1161,22 +1194,15 @@ impl Gui {
             .active_view()
             .and_then(|v| v.plan.as_ref())
             .map_or((f32::NEG_INFINITY, f32::INFINITY), plans::PlanState::drawn);
-        // In plans, dimensions and grids are picked before the model.
-        let hit = self
-            .dim_at(x, y)
+        // In plans, dimensions, grids, doors and windows are picked before the model.
+        self.dim_at(x, y)
             .or_else(|| self.grid_at(x, y))
+            .or_else(|| self.insert_at(x, y))
             .or_else(|| {
                 self.scene()
                     .pick_within(origin, dir, bottom, top)
                     .and_then(|(i, _)| self.scene().meshes[i].element)
-            });
-        let result = match hit {
-            Some(id) => self.run("selection.set", json!({ "ids": [id] })),
-            None => self.run("selection.clear", json!({})),
-        };
-        if result.is_ok() {
-            self.selection_changed();
-        }
+            })
     }
 
     fn clear_selection(&mut self) {
@@ -1211,7 +1237,11 @@ impl Gui {
         let Some(doc) = self.doc else { return };
         let ids = self.selection();
         self.type_rows = None;
-        if ids.is_empty() && (self.grid_tool_properties(grid) || self.view_properties(grid)) {
+        if ids.is_empty()
+            && (self.grid_tool_properties(grid)
+                || self.insert_tool_properties(grid)
+                || self.view_properties(grid))
+        {
             return;
         }
         if ids.len() != 1 {
@@ -1260,6 +1290,7 @@ impl Gui {
         grid.append(Property::category("Element", "c_element"));
         let is_level = e.class == reviera_core::levels::CLASS;
         let is_grid = reviera_core::grids::is_grid(&e);
+        let is_insert = reviera_core::inserts::kind_of(&e).is_some();
         for (i, (label, value)) in [
             ("Category", category),
             // A grid line is written as an axis of the grid system.
@@ -1289,8 +1320,8 @@ impl Gui {
                 grid.append(Property::string(label, "grid_name", value));
                 continue;
             }
-            // A grid's type is chosen below, with its values.
-            if is_grid && label == "Type" {
+            // A grid's, door's or window's type is chosen below, with its values.
+            if (is_grid || is_insert) && label == "Type" {
                 continue;
             }
             let name = format!("e{i}");
@@ -1309,6 +1340,9 @@ impl Gui {
                 .and_then(|g| g.type_id);
             self.grid_type_rows(grid, current);
             return;
+        }
+        if is_insert {
+            self.insert_rows(grid, id);
         }
         if let Some(d) = dimension {
             let store = self.app.document(doc).expect("open").doc.store().clone();
@@ -1467,7 +1501,7 @@ impl Gui {
             }
             return;
         }
-        if self.grid_type_edit(property, text.clone()) {
+        if self.grid_type_edit(property, text.clone()) || self.insert_edit(property, text.clone()) {
             return;
         }
         if property == "grid_name" {
@@ -1639,7 +1673,16 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                     }
                     let walking = g.active_view().is_some_and(|v| v.nav.walk.is_some());
                     let plan = g.in_plan();
+                    let moving = if button == 0 && cube.is_none() {
+                        g.insert_drag_start(x, y, &p)
+                    } else {
+                        None
+                    };
                     let kind = match (button, cube) {
+                        _ if moving.is_some() => {
+                            let (id, from) = moving.expect("checked");
+                            Drag::MoveInsert { id, from }
+                        }
                         _ if plan => Drag::Pan,
                         (0, Some(hit)) => {
                             if let Some(v) = g.active_view_mut() {
@@ -1681,13 +1724,19 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
         let handler = move |e: WindowEventData| {
             with_view(&gui, id, |g| {
                 let Some(v) = g.active_view_mut() else { return };
-                v.drag = None;
+                let drag = v.drag.take();
                 let press = v.press.take();
                 let cube = v.nav.cube_press.take();
                 let Some((x, y)) = position(&e) else { return };
                 let click = press.is_some_and(|(x0, y0)| {
                     (x - x0).abs() <= CLICK_SLOP && (y - y0).abs() <= CLICK_SLOP
                 });
+                if let Some((Drag::MoveInsert { id: insert, from }, _, _)) = drag {
+                    g.insert_drag_end(insert, from, x, y, click);
+                    if !click {
+                        return;
+                    }
+                }
                 if button != 0 || !click {
                     return;
                 }
@@ -1695,6 +1744,7 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                     Some(hit) => g.cube_click(hit),
                     None if g.dim_tool.is_some() => g.dim_click(x, y),
                     None if g.grid_tool.is_some() => g.grid_click(x, y),
+                    None if g.insert_tool.is_some() => g.insert_click(x, y),
                     None if g.active_view().is_some_and(|v| v.nav.walk.is_some()) => {}
                     None if g.tool.is_some() => g.wall_click(x, y, &p, &f),
                     None => g.pick(x, y, &p),
@@ -1730,12 +1780,21 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                         g.grid_motion(x, y);
                         redraw = true;
                     }
+                    if g.insert_tool.is_some() {
+                        g.insert_motion(x, y);
+                        redraw = true;
+                    }
                     if g.tool.is_some() {
                         g.wall_motion(x, y, &p, &f);
                         redraw = true;
                     }
                     return;
                 };
+                if let Drag::MoveInsert { id: insert, from } = kind {
+                    g.insert_drag_motion(insert, from, x, y);
+                    redraw = true;
+                    return;
+                }
                 let v = g.views.iter_mut().find(|v| v.id == id).expect("found");
                 let (dx, dy) = ((x - x0) as f32, (y - y0) as f32);
                 match kind {
@@ -1747,6 +1806,7 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                         let h = p.get_client_size().height as f32;
                         v.camera.pan(dx, dy, h);
                     }
+                    Drag::MoveInsert { .. } => {}
                 }
                 v.drag = Some((kind, x, y));
                 redraw = true;
@@ -1830,6 +1890,8 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                             g.dim_escape();
                         } else if g.grid_tool.is_some() {
                             g.grid_escape();
+                        } else if g.insert_tool.is_some() {
+                            g.end_insert_tool();
                         } else {
                             g.escape(&f);
                         }
@@ -1839,6 +1901,9 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                 Some(key) => {
                     with_view(&gui, id, |g| {
                         used = g.walk_key(key, true, shift);
+                        if !used {
+                            used = g.insert_key(key);
+                        }
                         if !used
                             && matches!(key, WXK_SPACE | WXK_BACK | WXK_RETURN | WXK_NUMPAD_ENTER)
                         {
@@ -2007,6 +2072,8 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
         );
         let architecture_menu = Menu::builder()
             .append_item(ID_WALL, "&Wall (WA)", "Draw walls on the lowest level")
+            .append_item(ID_DOOR, "&Door (DR)", "Place doors in walls")
+            .append_item(ID_WINDOW, "Wi&ndow (WN)", "Place windows in walls")
             .append_separator()
             .append_item(ID_GRID, "&Grid (GR)", "Draw grid lines in a plan")
             .append_item(
@@ -2139,6 +2206,8 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 tool: None,
                 dim_tool: None,
                 grid_tool: None,
+                insert_tool: None,
+                insert_types: std::collections::HashMap::new(),
                 grid_type: None,
                 type_rows: None,
                 timer: Some(Timer::new(&frame)),
@@ -2351,6 +2420,19 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                     }
                 }),
                 ID_LEVEL => with(&gui, Gui::new_level),
+                ID_DOOR | ID_WINDOW => {
+                    let kind = if e.get_id() == ID_DOOR {
+                        reviera_core::inserts::Kind::Door
+                    } else {
+                        reviera_core::inserts::Kind::Window
+                    };
+                    with(&gui, |g| {
+                        g.start_insert_tool(kind);
+                        if let Some(v) = g.active_view() {
+                            v.panel.set_focus();
+                        }
+                    });
+                }
                 ID_GRID => with(&gui, |g| {
                     g.start_grid_tool();
                     if let Some(v) = g.active_view() {

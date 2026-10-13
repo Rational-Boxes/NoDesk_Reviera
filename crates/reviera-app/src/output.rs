@@ -120,6 +120,27 @@ impl App {
             annotation.extend(l);
             labels.extend(t);
         }
+        // Door swings of the doors in walls on the plan's level, in the doors' projection pen.
+        let level = views::view_data(e).and_then(|d| d.level);
+        for p in reviera_core::inserts::placed(store) {
+            let on_level = store
+                .get(p.host)
+                .and_then(reviera_core::walls::wall_recipe)
+                .is_some_and(|r| Some(&r.base_level) == level.as_ref());
+            let swing = p.swing();
+            if !on_level || swing.is_empty() {
+                continue;
+            }
+            let z = range.cut as f32;
+            annotation.push(Lines {
+                color: reviera_render::plan::PROJECTION_LINE,
+                width: weights(Some(p.id)).projection,
+                segments: swing
+                    .into_iter()
+                    .map(|s| s.map(|[x, y]| [x as f32, y as f32, z]))
+                    .collect(),
+            });
+        }
         Ok(PlanDrawing {
             name: e.name.clone().unwrap_or_default(),
             scale: scale as f32,

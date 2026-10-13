@@ -359,6 +359,50 @@ pub fn resolve(store: &Store, e: &Element) -> Result<Placed> {
     })
 }
 
+/// A door or window as it would be placed (for tool previews): `kind` of type `type_id` (or
+/// the default values) in `host` with its centre `along` it, and the type's default sill.
+pub fn preview(
+    store: &Store,
+    kind: Kind,
+    type_id: Option<ElementId>,
+    host: ElementId,
+    along: f64,
+    flip_hand: bool,
+    flip_facing: bool,
+) -> Option<Placed> {
+    let host_e = store.get(host)?;
+    let wall = walls::regenerate(store, host_e).ok()?;
+    let level = walls::wall_recipe(host_e)?.base_level;
+    let level_z = find(store, &level)
+        .and_then(|l| store.get(l))
+        .map_or(wall.base_z, crate::levels::elevation);
+    let ty = type_id
+        .and_then(|t| store.get(t))
+        .and_then(insert_type)
+        .filter(|t| t.kind() == Some(kind))
+        .unwrap_or_else(|| InsertType::default_for(kind));
+    let sill = match kind {
+        Kind::Door => 0.0,
+        Kind::Window => ty.default_sill,
+    };
+    Some(Placed {
+        id: ElementId(0),
+        kind,
+        host,
+        wall,
+        z0: level_z + sill,
+        ty,
+        recipe: InsertRecipe {
+            kind: INSERT_RECIPE.into(),
+            host: host_e.guid().to_string(),
+            along,
+            sill,
+            flip_hand,
+            flip_facing,
+        },
+    })
+}
+
 /// The doors and windows of a model that resolve.
 pub fn placed(store: &Store) -> Vec<Placed> {
     store
