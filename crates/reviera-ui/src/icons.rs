@@ -165,6 +165,51 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "auto_ceiling" => format!(
             r#"<rect x="4" y="5" width="24" height="22" fill="{f}" {s}/><path d="M7 8h18v16H7z" {sa}/><path d="M16 12l3 6h-6z" fill="{a}"/>"#
         ),
+        "section_box" => format!(
+            r#"<path d="M6 11l8-5h12v15l-8 5H6z" fill="{f}" {s}/><path d="M6 11h12v15M18 11l8-5" {s}/><path d="M10 20l3-3 3 3" {sa}/><circle cx="12" cy="18.5" r="1.6" fill="{a}"/>"#
+        ),
+        "selection_box" => format!(
+            r#"<path d="M5 10l7-5h15v14l-7 5H5z" {s} stroke-dasharray="3 2"/><rect x="10" y="11" width="8" height="8" fill="{f}" {sa}/>"#
+        ),
+        "slice_h" => format!(
+            r#"<path d="M8 6h16v20H8z" fill="{f}" {s}/><path d="M3 16h26" {sa}/><path d="M8 6h16v10H8z" fill="{paper}" {s} stroke-dasharray="2 2"/>"#
+        ),
+        "slice_v" => format!(
+            r#"<path d="M6 8h20v16H6z" fill="{f}" {s}/><path d="M16 3v26" {sa}/><path d="M16 8h10v16H16z" fill="{paper}" {s} stroke-dasharray="2 2"/>"#
+        ),
+        "clear_slices" => format!(
+            r#"<path d="M8 8h16v16H8z" fill="{f}" {s}/><path d="M3 16h12" {sa} stroke-dasharray="2 2"/><path d="M19 19l8 8M27 19l-8 8" {sa}/>"#
+        ),
+        "hide" => format!(
+            r#"<path d="M3 16c4-6 9-9 13-9s9 3 13 9c-4 6-9 9-13 9S7 22 3 16z" fill="{f}" {s}/><circle cx="16" cy="16" r="4" {s}/><path d="M5 27L27 5" {sa}/>"#
+        ),
+        "hide_tree" => format!(
+            r#"<rect x="4" y="4" width="8" height="6" fill="{f}" {s}/><path d="M8 10v14h6M8 17h6" {s}/><rect x="14" y="14" width="8" height="6" {s}/><rect x="14" y="21" width="8" height="6" {s}/><path d="M18 30L30 12" {sa}/>"#
+        ),
+        "hide_category" => format!(
+            r#"<rect x="4" y="5" width="10" height="10" fill="{f}" {s}/><rect x="18" y="5" width="10" height="10" fill="{f}" {s}/><rect x="4" y="18" width="10" height="10" fill="{f}" {s}/><path d="M17 29L29 17" {sa}/>"#
+        ),
+        "isolate" => format!(
+            r#"<rect x="4" y="4" width="24" height="24" {s} stroke-dasharray="3 3"/><rect x="11" y="11" width="10" height="10" fill="{f}" {sa}/>"#
+        ),
+        "isolate_tree" => format!(
+            r#"<rect x="3" y="3" width="26" height="26" {s} stroke-dasharray="3 3"/><rect x="8" y="7" width="8" height="5" fill="{f}" {sa}/><path d="M12 12v12h5M12 18h5" {sa}/><rect x="17" y="16" width="7" height="4" {sa}/><rect x="17" y="22" width="7" height="4" {sa}/>"#
+        ),
+        "isolate_category" => format!(
+            r#"<rect x="3" y="3" width="26" height="26" {s} stroke-dasharray="3 3"/><rect x="7" y="7" width="8" height="8" fill="{f}" {sa}/><rect x="17" y="7" width="8" height="8" fill="{f}" {sa}/><rect x="7" y="17" width="8" height="8" {s}/>"#
+        ),
+        "ghost" => format!(
+            r#"<rect x="4" y="4" width="24" height="24" {s} stroke-dasharray="3 3" opacity="0.5"/><rect x="11" y="11" width="10" height="10" fill="{f}" {sa}/><path d="M4 4l7 7M28 4l-7 7M4 28l7-7M28 28l-7-7" {s} opacity="0.5"/>"#
+        ),
+        "translucent" => format!(
+            r#"<rect x="4" y="8" width="16" height="16" fill="{f}" {s}/><rect x="12" y="4" width="16" height="16" fill="{f}" fill-opacity="0.45" {sa}/>"#
+        ),
+        "reset_temp" => format!(
+            r#"<path d="M3 16c4-6 9-9 13-9s9 3 13 9c-4 6-9 9-13 9S7 22 3 16z" fill="{f}" {s}/><circle cx="16" cy="16" r="4" {sa}/>"#
+        ),
+        "tree" => format!(
+            r#"<rect x="4" y="3" width="10" height="6" fill="{f}" {s}/><path d="M9 9v17h7M9 17h7" {s}/><rect x="16" y="14" width="12" height="6" {sa}/><rect x="16" y="23" width="12" height="6" {sa}/>"#
+        ),
         "ceiling_plan" => format!(
             r#"<rect x="4" y="5" width="24" height="22" fill="{f}" {s}/><path d="M4 12h24M4 19h24M12 5v22M20 5v22" {sa} stroke-width="1.2"/>"#
         ),

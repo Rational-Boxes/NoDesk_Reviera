@@ -100,14 +100,32 @@ impl Gui {
         }
         let doc = v.doc;
         let (cut, bottom) = (plan.range.cut as f32, plan.far());
+        let visibility = self.view_visibility(v);
         let Some(scene) = self.scenes.get(&doc) else {
             return;
         };
-        let edges = self
+        let mut edges = self
             .plan_edges
             .entry(doc)
             .or_insert_with(|| Rc::new(reviera_render::plan::feature_edges(scene)))
             .clone();
+        // Temporarily hidden elements are left out of the plan (DOC-GFX-008).
+        let filtered;
+        let scene = if visibility.is_empty() {
+            scene
+        } else {
+            let shown = |e: Option<ElementId>| visibility.opacity(e).is_some();
+            edges = Rc::new(edges.iter().filter(|(e, _)| shown(*e)).cloned().collect());
+            filtered = reviera_render::RenderScene {
+                meshes: scene
+                    .meshes
+                    .iter()
+                    .filter(|m| shown(m.element))
+                    .cloned()
+                    .collect(),
+            };
+            &filtered
+        };
         let scale = plan.scale;
         // Pens of each element's category (DOC-GFX-002, DOC-GFX-009).
         let Some(store) = self.app.document(doc).map(|d| d.doc.store().clone()) else {

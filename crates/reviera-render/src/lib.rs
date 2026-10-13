@@ -7,6 +7,8 @@
 //! built-in viewport (`reviera-render-wgpu`) is one backend; external engines will receive the
 //! same scene through the Reviera Scene Protocol.
 
+use std::collections::{HashMap, HashSet};
+
 use glam::{Mat4, Vec3};
 use reviera_core::ElementId;
 
@@ -54,7 +56,126 @@ impl RenderScene {
     }
 }
 
+/// Temporary visibility of a view's elements (DOC-GFX-008): hidden, isolated (optionally with
+/// the others ghosted) and translucent elements.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct Visibility {
+    pub hidden: HashSet<ElementId>,
+    /// Translucent elements and their opacity (0..1).
+    pub translucent: HashMap<ElementId, f32>,
+    pub isolated: Option<Isolation>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Isolation {
+    pub elements: HashSet<ElementId>,
+    /// Elements with this id or a later one were created after isolating, and stay visible.
+    pub after: ElementId,
+    /// The opacity of the other elements when they are ghosted rather than hidden.
+    pub ghost: Option<f32>,
+}
+
+impl Visibility {
+    pub fn is_empty(&self) -> bool {
+        self.hidden.is_empty() && self.translucent.is_empty() && self.isolated.is_none()
+    }
+
+    /// How an element draws: `None` when it is hidden, else its opacity factor (1 is unchanged).
+    /// Geometry of no element counts as not isolated.
+    pub fn opacity(&self, element: Option<ElementId>) -> Option<f32> {
+        if element.is_some_and(|e| self.hidden.contains(&e)) {
+            return None;
+        }
+        if let Some(i) = &self.isolated
+            && !element.is_some_and(|e| i.elements.contains(&e) || e >= i.after)
+        {
+            return i.ghost;
+        }
+        Some(
+            element
+                .and_then(|e| self.translucent.get(&e).copied())
+                .unwrap_or(1.0),
+        )
+    }
+}
+
+/// Clip planes of a 3D view: its section box and slice planes (DOC-VIEW-008, DOC-VIEW-014).
+/// Each plane is `[nx, ny, nz, d]` with a unit normal; a point `p` is kept when `n · p >= d`.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct Clipping {
+    pub planes: Vec<[f32; 4]>,
+    /// Draw the cut faces closed (DOC-HLR-006).
+    pub caps: bool,
+}
+
+/// The most clip planes a view draws with: six for the box, eight slice planes, and room for a
+/// far clip (DOC-HLR-006).
+pub const MAX_CLIP_PLANES: usize = 15;
+
+impl Clipping {
+    pub fn keeps(&self, p: Vec3) -> bool {
+        self.planes
+            .iter()
+            .all(|[x, y, z, d]| Vec3::new(*x, *y, *z).dot(p) >= *d - 1e-6)
+    }
+
+    /// The clip planes of a 3D view: its section box and slice planes, where enabled.
+    pub fn of(
+        section_box: Option<&reviera_core::views::SectionBox>,
+        slices: &[reviera_core::views::SlicePlane],
+    ) -> Clipping {
+        let mut planes = Vec::new();
+        let mut caps = true;
+        let f = |n: [f64; 3], d: f64| [n[0] as f32, n[1] as f32, n[2] as f32, d as f32];
+        if let Some(b) = section_box.filter(|b| b.enabled) {
+            caps = b.show_cut_faces;
+            planes.extend(b.planes().iter().map(|(n, d)| f(*n, *d)));
+        }
+        for s in slices.iter().filter(|s| s.enabled) {
+            let d =
+                s.normal[0] * s.origin[0] + s.normal[1] * s.origin[1] + s.normal[2] * s.origin[2];
+            planes.push(f(s.normal, d));
+        }
+        planes.truncate(MAX_CLIP_PLANES);
+        Clipping { planes, caps }
+    }
+}
+
 impl RenderScene {
+    /// The nearest hit along a ray among what a view shows: points the clipping removes and
+    /// hidden elements are passed through, and translucent elements are hit only when nothing
+    /// opaque is behind them (DOC-GFX-008, DOC-VIEW-014). Returns the mesh and distance.
+    pub fn pick_visible(
+        &self,
+        origin: Vec3,
+        dir: Vec3,
+        keep: &dyn Fn(Vec3) -> bool,
+        visibility: &Visibility,
+    ) -> Option<(usize, f32)> {
+        let mut opaque: Option<(usize, f32)> = None;
+        let mut faint: Option<(usize, f32)> = None;
+        for (i, m) in self.meshes.iter().enumerate() {
+            let Some(alpha) = visibility.opacity(m.element) else {
+                continue;
+            };
+            let best = if alpha < 0.99 {
+                &mut faint
+            } else {
+                &mut opaque
+            };
+            for tri in m.indices.as_chunks::<3>().0 {
+                let [a, b, c] = tri.map(|k| Vec3::from(m.positions[k as usize]));
+                if let Some(t) = ray_triangle(origin, dir, a, b, c)
+                    && best.is_none_or(|(_, d)| t < d)
+                    && keep(origin + dir * t)
+                {
+                    *best = Some((i, t));
+                }
+            }
+        }
+        opaque.or(faint)
+    }
+
     /// The nearest mesh hit by a ray, with the distance along it (Möller–Trumbore per triangle).
     pub fn pick(&self, origin: Vec3, dir: Vec3) -> Option<(usize, f32)> {
         self.pick_within(origin, dir, f32::NEG_INFINITY, f32::INFINITY)
@@ -431,6 +552,13 @@ pub trait RenderBackend {
     fn set_overlay(&mut self, meshes: &[SceneMesh]);
     /// Transient lines drawn over the scene (tool previews in plans), unlit.
     fn set_overlay_lines(&mut self, lines: &[plan::Lines]);
+    /// Lines that belong to the view rather than to a tool (the section box and slice planes
+    /// with their grips), drawn over the scene, unlit and unclipped.
+    fn set_view_lines(&mut self, lines: &[plan::Lines]);
+    /// Temporary hide, isolate and translucency (DOC-GFX-008).
+    fn set_visibility(&mut self, visibility: &Visibility);
+    /// The section box and slice planes of a 3D view (DOC-VIEW-008, DOC-VIEW-014).
+    fn set_clipping(&mut self, clipping: &Clipping);
 }
 
 #[cfg(test)]
@@ -482,6 +610,62 @@ mod tests {
         let before = cam.target;
         cam.pan(100.0, 0.0, 600.0);
         assert!(cam.target.distance(before) > 0.0);
+    }
+
+    #[test]
+    fn picking_skips_what_is_hidden_clipped_or_translucent_in_front() {
+        let quad = |id: u64, x: f32| SceneMesh {
+            element: Some(ElementId(id)),
+            class: "IfcWall".into(),
+            positions: vec![
+                [x, -1.0, -1.0],
+                [x, 1.0, -1.0],
+                [x, 1.0, 1.0],
+                [x, -1.0, 1.0],
+            ],
+            indices: vec![0, 1, 2, 0, 2, 3],
+            color: [1.0; 4],
+        };
+        // Three walls across the +X ray at x = 1, 2, 3.
+        let scene = RenderScene {
+            meshes: vec![quad(1, 1.0), quad(2, 2.0), quad(3, 3.0)],
+        };
+        let hit = |keep: &dyn Fn(Vec3) -> bool, v: &Visibility| {
+            scene
+                .pick_visible(Vec3::ZERO, Vec3::X, keep, v)
+                .map(|(i, _)| i)
+        };
+        let all = |_: Vec3| true;
+        assert_eq!(hit(&all, &Visibility::default()), Some(0));
+        let mut v = Visibility::default();
+        v.hidden.insert(ElementId(1));
+        assert_eq!(hit(&all, &v), Some(1));
+        v.translucent.insert(ElementId(2), 0.25);
+        assert_eq!(hit(&all, &v), Some(2), "the opaque wall behind wins");
+        v.hidden.insert(ElementId(3));
+        assert_eq!(
+            hit(&all, &v),
+            Some(1),
+            "translucent when nothing opaque is behind"
+        );
+        // A slice keeping x >= 1.5 removes the first wall.
+        let clip = Clipping {
+            planes: vec![[1.0, 0.0, 0.0, 1.5]],
+            caps: true,
+        };
+        assert_eq!(hit(&|p| clip.keeps(p), &Visibility::default()), Some(1));
+        // Isolating wall 3 ghosts or hides the others; later elements stay visible.
+        let iso = Visibility {
+            isolated: Some(Isolation {
+                elements: [ElementId(3)].into_iter().collect(),
+                after: ElementId(10),
+                ghost: None,
+            }),
+            ..Visibility::default()
+        };
+        assert_eq!(hit(&all, &iso), Some(2));
+        assert_eq!(iso.opacity(Some(ElementId(11))), Some(1.0));
+        assert_eq!(iso.opacity(None), None);
     }
 
     #[test]

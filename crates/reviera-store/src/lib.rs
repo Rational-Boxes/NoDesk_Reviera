@@ -10,6 +10,7 @@ mod grids;
 mod local;
 pub mod params;
 mod psets;
+mod spatial;
 
 pub use local::{LocalProject, OpenReport, SaveReport};
 

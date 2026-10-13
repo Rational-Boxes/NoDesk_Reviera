@@ -409,6 +409,124 @@ label = "Ceiling Plan"
 icon = "ceiling_plan"
 help = "Create reflected ceiling plans of levels"
 
+[[action]]
+id = "inspect.section_box"
+label = "Section Box"
+icon = "section_box"
+keys = "SX"
+help = "Clip the 3D view to a box; drag its face grips to resize it"
+
+[[action]]
+id = "inspect.selection_box"
+label = "Selection Box"
+icon = "selection_box"
+keys = "BX"
+help = "Fit the 3D view's section box around the selected elements"
+
+[[action]]
+id = "inspect.slice_horizontal"
+label = "Horizontal Slice"
+icon = "slice_h"
+help = "Click a point: cut the 3D view at its height, keeping what is below"
+
+[[action]]
+id = "inspect.slice_vertical"
+label = "Vertical Slice"
+icon = "slice_v"
+help = "Click a point: cut the 3D view through it, facing you"
+
+[[action]]
+id = "inspect.clear_slices"
+label = "Clear Slices"
+icon = "clear_slices"
+help = "Remove the 3D view's slice planes"
+
+[[action]]
+id = "inspect.hide"
+label = "Hide Element"
+icon = "hide"
+keys = "HH"
+help = "Hide the selected elements in this view for now"
+
+[[action]]
+id = "inspect.hide_subtree"
+label = "Hide with Children"
+icon = "hide_tree"
+help = "Hide the selected elements and everything they contain or host"
+
+[[action]]
+id = "inspect.hide_category"
+label = "Hide Category"
+icon = "hide_category"
+keys = "HC"
+help = "Hide every element of the selected elements' categories"
+
+[[action]]
+id = "inspect.hide_type"
+label = "Hide Type"
+icon = "hide_category"
+help = "Hide every instance of the selected elements' types"
+
+[[action]]
+id = "inspect.isolate"
+label = "Isolate Element"
+icon = "isolate"
+keys = "HI"
+help = "Show only the selected elements in this view for now"
+
+[[action]]
+id = "inspect.isolate_subtree"
+label = "Isolate with Children"
+icon = "isolate_tree"
+help = "Show only the selected elements and what they contain or host"
+
+[[action]]
+id = "inspect.isolate_category"
+label = "Isolate Category"
+icon = "isolate_category"
+keys = "IC"
+help = "Show only the selected elements' categories"
+
+[[action]]
+id = "inspect.isolate_type"
+label = "Isolate Type"
+icon = "isolate_category"
+help = "Show only the instances of the selected elements' types"
+
+[[action]]
+id = "inspect.ghost_others"
+label = "Isolate, Ghost Others"
+icon = "ghost"
+keys = "HG"
+help = "Show the selected elements, and everything else translucent"
+
+[[action]]
+id = "inspect.translucent"
+label = "Translucent"
+icon = "translucent"
+keys = "HT"
+help = "Draw the selected elements translucent in this view for now"
+
+[[action]]
+id = "inspect.translucent_subtree"
+label = "Translucent with Children"
+icon = "translucent"
+help = "Draw the selected elements and what they contain or host translucent"
+
+[[action]]
+id = "inspect.reset"
+label = "Reset Hide/Isolate"
+icon = "reset_temp"
+keys = "HR"
+help = "Show everything again in this view"
+
+[[action]]
+id = "ui.pane.model_tree"
+label = "Model Tree"
+icon = "tree"
+keys = "MT"
+help = "Show or hide the Model Tree"
+
 # ---- Quick Access Toolbar ----
 
 [quick_access]
@@ -483,6 +601,30 @@ tools = [
 ]
 
 [[tab.panel]]
+label = "Section"
+tools = [
+  { action = "inspect.section_box", size = "large" },
+  { action = "inspect.selection_box", size = "small" },
+  { action = "inspect.slice_horizontal", size = "small" },
+  { action = "inspect.slice_vertical", size = "small" },
+  { action = "inspect.clear_slices", size = "small" },
+]
+
+[[tab.panel]]
+label = "Hide/Isolate"
+tools = [
+  { action = "inspect.hide", size = "small" },
+  { action = "inspect.hide_subtree", size = "small" },
+  { action = "inspect.hide_category", size = "small" },
+  { action = "inspect.isolate", size = "small" },
+  { action = "inspect.isolate_subtree", size = "small" },
+  { action = "inspect.isolate_category", size = "small" },
+  { action = "inspect.ghost_others", size = "small" },
+  { action = "inspect.translucent", size = "small" },
+  { action = "inspect.reset", size = "small" },
+]
+
+[[tab.panel]]
 label = "Windows"
 tools = [
   { action = "window.close", size = "small" },
@@ -497,6 +639,7 @@ label = "User Interface"
 tools = [
   { action = "ui.pane.properties", size = "small" },
   { action = "ui.pane.browser", size = "small" },
+  { action = "ui.pane.model_tree", size = "small" },
 ]
 
 [[tab]]
@@ -602,7 +745,12 @@ label = "&View"
 items = [
   "view.default_3d", "view.create_plan", "view.create_ceiling_plan", "-",
   "view.zoom_fit", "view.zoom_previous", "view.zoom_next", "-",
-  "view.home", "view.set_home", "@orient", "view.set_projection", "-", "view.walk",
+  "view.home", "view.set_home", "@orient", "view.set_projection", "-", "view.walk", "-",
+  "inspect.section_box", "inspect.selection_box", "inspect.slice_horizontal",
+  "inspect.slice_vertical", "inspect.clear_slices", "-",
+  "inspect.hide", "inspect.hide_subtree", "inspect.hide_category", "inspect.hide_type",
+  "inspect.isolate", "inspect.isolate_subtree", "inspect.isolate_category", "inspect.isolate_type",
+  "inspect.ghost_others", "inspect.translucent", "inspect.translucent_subtree", "inspect.reset",
 ]
 
 [[menu]]
@@ -632,5 +780,5 @@ items = [
 label = "&Window"
 items = [
   "view.create_3d", "window.close", "-", "window.next", "window.previous", "-",
-  "window.tile", "window.tab_all", "-", "ui.pane.properties", "ui.pane.browser",
+  "window.tile", "window.tab_all", "-", "ui.pane.properties", "ui.pane.browser", "ui.pane.model_tree",
 ]

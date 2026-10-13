@@ -13,7 +13,7 @@ use reviera_render::{Camera, RenderBackend, RenderScene};
 use wgpu::util::DeviceExt;
 
 const VERTEX_ATTRIBUTES: [wgpu::VertexAttribute; 3] =
-    wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x3, 2 => Float32x4];
+    wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x4, 2 => Float32x4];
 const LINE_ATTRIBUTES: [wgpu::VertexAttribute; 4] =
     wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x3, 2 => Float32x4, 3 => Float32];
 
@@ -31,7 +31,9 @@ struct LineInstance {
 #[derive(Debug, Clone, Copy, Pod, Zeroable)]
 struct Vertex {
     position: [f32; 3],
-    normal: [f32; 3],
+    /// The face normal, and 1 in `w` when the face belongs to a closed, outward-wound solid
+    /// whose inside may be shown as a cut face.
+    normal: [f32; 4],
     color: [f32; 4],
 }
 
@@ -44,7 +46,14 @@ struct Uniforms {
     screen: [f32; 4],
     /// Clipping and plan style: top and bottom elevations kept, lightening toward white.
     clip: [f32; 4],
+    /// The number of clip planes, and 1 to cap cut solids.
+    counts: [f32; 4],
+    /// Clip planes `[n, d]`: a point is kept when `n · p >= d` (DOC-VIEW-008, DOC-VIEW-014).
+    planes: [[f32; 4]; PLANES],
 }
+
+/// Clip plane slots in the uniforms.
+const PLANES: usize = 16;
 
 /// No clipping, no lightening.
 const NO_CLIP: [f32; 4] = [1e30, -1e30, 0.0, 0.0];
@@ -52,7 +61,10 @@ const NO_CLIP: [f32; 4] = [1e30, -1e30, 0.0, 0.0];
 const PLAN_LIGHTEN: f32 = 0.55;
 
 const SHADER: &str = r#"
-struct U { view_proj: mat4x4<f32>, eye: vec4<f32>, screen: vec4<f32>, clip: vec4<f32> };
+struct U {
+    view_proj: mat4x4<f32>, eye: vec4<f32>, screen: vec4<f32>, clip: vec4<f32>,
+    counts: vec4<f32>, planes: array<vec4<f32>, 16>,
+};
 @group(0) @binding(0) var<uniform> u: U;
 
 struct VOut {
@@ -60,19 +72,17 @@ struct VOut {
     @location(0) normal: vec3<f32>,
     @location(1) color: vec4<f32>,
     @location(2) world: vec3<f32>,
+    @location(3) solid: f32,
 };
 
 @vertex
-fn vs(@location(0) p: vec3<f32>, @location(1) n: vec3<f32>, @location(2) c: vec4<f32>) -> VOut {
-    return transform(p, n, c);
-}
-
-fn transform(p: vec3<f32>, n: vec3<f32>, c: vec4<f32>) -> VOut {
+fn vs(@location(0) p: vec3<f32>, @location(1) n: vec4<f32>, @location(2) c: vec4<f32>) -> VOut {
     var o: VOut;
     o.pos = u.view_proj * vec4<f32>(p, 1.0);
-    o.normal = n;
+    o.normal = n.xyz;
     o.color = c;
     o.world = p;
+    o.solid = n.w;
     return o;
 }
 
@@ -109,13 +119,26 @@ fn vs_thick(
     o.normal = vec3<f32>(0.0, 0.0, 1.0);
     o.color = c;
     o.world = mix(a, b, end);
+    o.solid = 0.0;
     return o;
 }
 
 @fragment
-fn fs(i: VOut) -> @location(0) vec4<f32> {
+fn fs(i: VOut, @builtin(front_facing) front: bool) -> @location(0) vec4<f32> {
     if (i.world.z > u.clip.x || i.world.z < u.clip.y) {
         discard;
+    }
+    let count = u32(u.counts.x);
+    for (var k = 0u; k < count; k = k + 1u) {
+        let pl = u.planes[k];
+        if (dot(pl.xyz, i.world) < pl.w - 1e-5) {
+            discard;
+        }
+    }
+    // Interim capping (DOC-HLR-006): where a clip plane opens a closed solid, its inside shows;
+    // drawn flat and darker it reads as the cut face.
+    if (count > 0u && u.counts.y > 0.5 && i.solid > 0.5 && !front) {
+        return vec4<f32>(i.color.rgb * 0.3, i.color.a);
     }
     let n = normalize(i.normal);
     let v = normalize(u.eye.xyz - i.world);
@@ -172,6 +195,7 @@ pub struct WgpuViewport {
     transparent: Option<(wgpu::Buffer, u32)>,
     overlay: Option<(wgpu::Buffer, u32)>,
     overlay_lines: Option<(wgpu::Buffer, u32)>,
+    view_lines: Option<(wgpu::Buffer, u32)>,
     gizmo_pipeline: wgpu::RenderPipeline,
     /// Uniforms of the gizmo's lit geometry and of its flat (clip-space) geometry.
     gizmo_uniforms: [(wgpu::Buffer, wgpu::BindGroup); 2],
@@ -185,7 +209,11 @@ pub struct WgpuViewport {
     size: (u32, u32),
     adapter: String,
     scene: RenderScene,
+    /// Per scene mesh: whether it is a closed solid, and whether its winding is inward.
+    solids: Vec<Option<bool>>,
     highlight: std::collections::HashSet<reviera_core::ElementId>,
+    visibility: reviera_render::Visibility,
+    clipping: reviera_render::Clipping,
 }
 
 impl std::fmt::Debug for WgpuViewport {
@@ -473,9 +501,13 @@ impl WgpuViewport {
             size,
             adapter: format!("{} ({:?})", info.name, info.backend),
             scene: RenderScene::default(),
+            solids: Vec::new(),
             highlight: Default::default(),
+            visibility: Default::default(),
+            clipping: Default::default(),
             overlay: None,
             overlay_lines: None,
+            view_lines: None,
             gizmo_pipeline,
             gizmo_uniforms,
             gizmo: None,
@@ -619,34 +651,77 @@ fn depth_view(device: &wgpu::Device, (w, h): (u32, u32)) -> wgpu::TextureView {
         .create_view(&Default::default())
 }
 
-/// Expands indexed meshes into flat-shaded triangles, split by transparency; highlighted elements
-/// are drawn opaque in the highlight colour.
+/// Whether a mesh is a closed solid with consistent winding: `Some(flip)` (its winding is
+/// inward when `flip`), `None` when it is open or inconsistent. Vertices are welded by position.
+pub fn solid(m: &reviera_render::SceneMesh) -> Option<bool> {
+    use std::collections::HashMap;
+    let mut weld: HashMap<[i64; 3], u32> = HashMap::new();
+    let ids: Vec<u32> = m
+        .positions
+        .iter()
+        .map(|p| {
+            let key = p.map(|v| (f64::from(v) * 1e5).round() as i64);
+            let n = weld.len() as u32;
+            *weld.entry(key).or_insert(n)
+        })
+        .collect();
+    let mut edges: HashMap<(u32, u32), u32> = HashMap::new();
+    let mut volume = 0.0f64;
+    for tri in m.indices.as_chunks::<3>().0 {
+        let [a, b, c] = tri.map(|k| ids[k as usize]);
+        if a == b || b == c || a == c {
+            continue;
+        }
+        for e in [(a, b), (b, c), (c, a)] {
+            *edges.entry(e).or_default() += 1;
+        }
+        let [p, q, r] = tri.map(|k| glam::DVec3::from(m.positions[k as usize].map(f64::from)));
+        volume += p.dot(q.cross(r));
+    }
+    let closed = !edges.is_empty()
+        && edges
+            .iter()
+            .all(|(&(a, b), &n)| n == 1 && edges.get(&(b, a)) == Some(&1));
+    (closed && volume.abs() > 1e-12).then_some(volume < 0.0)
+}
+
+/// Expands indexed meshes into flat-shaded triangles, split by transparency: highlighted
+/// elements are drawn in the highlight colour, hidden ones are left out and translucent ones
+/// fade (DOC-GFX-008). `solids` (per mesh, from [`solid`]) marks faces that can show a cut.
 fn vertices(
     meshes: &[reviera_render::SceneMesh],
+    solids: &[Option<bool>],
     highlight: &std::collections::HashSet<reviera_core::ElementId>,
+    visibility: &reviera_render::Visibility,
 ) -> (Vec<Vertex>, Vec<Vertex>) {
     let (mut opaque, mut transparent) = (Vec::new(), Vec::new());
-    for m in meshes {
+    for (k, m) in meshes.iter().enumerate() {
+        let Some(alpha) = visibility.opacity(m.element) else {
+            continue;
+        };
         let lit = m.element.is_some_and(|e| highlight.contains(&e));
-        let color = if lit {
+        let mut color = if lit {
             reviera_render::HIGHLIGHT
         } else {
             m.color
         };
+        color[3] *= alpha;
         let out = if color[3] < 0.99 {
             &mut transparent
         } else {
             &mut opaque
         };
+        let solid = solids.get(k).copied().flatten();
         for tri in m.indices.as_chunks::<3>().0 {
-            let p: Vec<glam::Vec3> = tri
+            let mut p: Vec<glam::Vec3> = tri
                 .iter()
                 .map(|&i| glam::Vec3::from(m.positions[i as usize]))
                 .collect();
-            let normal = (p[1] - p[0])
-                .cross(p[2] - p[0])
-                .normalize_or_zero()
-                .to_array();
+            if solid == Some(true) {
+                p.swap(1, 2);
+            }
+            let n = (p[1] - p[0]).cross(p[2] - p[0]).normalize_or_zero();
+            let normal = [n.x, n.y, n.z, f32::from(u8::from(solid.is_some()))];
             for q in p {
                 out.push(Vertex {
                     position: q.to_array(),
@@ -659,6 +734,16 @@ fn vertices(
     (opaque, transparent)
 }
 
+/// [`vertices`] of geometry that is never cut, hidden or capped (overlays, gizmos, plan poché).
+fn plain_vertices(
+    meshes: &[reviera_render::SceneMesh],
+    highlight: &std::collections::HashSet<reviera_core::ElementId>,
+) -> Vec<Vertex> {
+    let (mut v, t) = vertices(meshes, &[], highlight, &Default::default());
+    v.extend(t);
+    v
+}
+
 impl RenderBackend for WgpuViewport {
     fn name(&self) -> &str {
         "wgpu"
@@ -666,7 +751,24 @@ impl RenderBackend for WgpuViewport {
 
     fn set_scene(&mut self, scene: &RenderScene) {
         self.scene = scene.clone();
+        self.solids = self.scene.meshes.iter().map(solid).collect();
         self.upload();
+    }
+
+    fn set_view_lines(&mut self, lines: &[reviera_render::plan::Lines]) {
+        let v = line_vertices(lines);
+        self.view_lines = self.buffer(&v);
+    }
+
+    fn set_visibility(&mut self, visibility: &reviera_render::Visibility) {
+        if *visibility != self.visibility {
+            self.visibility = visibility.clone();
+            self.upload();
+        }
+    }
+
+    fn set_clipping(&mut self, clipping: &reviera_render::Clipping) {
+        self.clipping = clipping.clone();
     }
 
     fn set_highlight(&mut self, elements: &[reviera_core::ElementId]) {
@@ -678,9 +780,8 @@ impl RenderBackend for WgpuViewport {
     }
 
     fn set_overlay(&mut self, meshes: &[reviera_render::SceneMesh]) {
-        let (mut opaque, transparent) = vertices(meshes, &Default::default());
-        opaque.extend(transparent);
-        self.overlay = self.buffer(&opaque);
+        let v = plain_vertices(meshes, &Default::default());
+        self.overlay = self.buffer(&v);
     }
 
     fn set_overlay_lines(&mut self, lines: &[reviera_render::plan::Lines]) {
@@ -690,8 +791,7 @@ impl RenderBackend for WgpuViewport {
 
     fn set_plan(&mut self, plan: Option<reviera_render::plan::PlanGraphics>) {
         self.plan = plan.map(|g| {
-            let (mut poche, t) = vertices(&g.poche, &self.highlight);
-            poche.extend(t);
+            let poche = plain_vertices(&g.poche, &self.highlight);
             let lines = line_vertices(&g.lines);
             PlanGpu {
                 top: g.top,
@@ -707,9 +807,7 @@ impl RenderBackend for WgpuViewport {
     fn set_gizmo(&mut self, gizmo: Option<reviera_render::Gizmo>) {
         self.gizmo = gizmo.map(|g| {
             let expand = |meshes: &[reviera_render::SceneMesh]| {
-                let (mut v, t) = vertices(meshes, &Default::default());
-                v.extend(t);
-                self.buffer(&v)
+                self.buffer(&plain_vertices(meshes, &Default::default()))
             };
             GizmoGpu {
                 rect: g.rect,
@@ -745,7 +843,12 @@ impl WgpuViewport {
     }
 
     fn upload(&mut self) {
-        let (opaque, transparent) = vertices(&self.scene.meshes, &self.highlight);
+        let (opaque, transparent) = vertices(
+            &self.scene.meshes,
+            &self.solids,
+            &self.highlight,
+            &self.visibility,
+        );
         self.opaque = self.buffer(&opaque);
         self.transparent = self.buffer(&transparent);
     }
@@ -770,6 +873,8 @@ impl WgpuViewport {
                 eye,
                 screen: [0.0; 4],
                 clip: NO_CLIP,
+                counts: [0.0; 4],
+                planes: [[0.0; 4]; PLANES],
             };
             self.queue
                 .write_buffer(&self.gizmo_uniforms[k].0, 0, bytemuck::bytes_of(&u));
@@ -848,17 +953,35 @@ impl WgpuViewport {
             px_per_m * scale / 1000.0,
             0.0,
         ];
+        // Clip planes apply to 3D views only; plans have their own range.
+        let mut planes = [[0.0; 4]; PLANES];
+        let mut count = 0;
+        if self.plan.is_none() {
+            for (slot, p) in planes.iter_mut().zip(&self.clipping.planes) {
+                *slot = *p;
+                count += 1;
+            }
+        }
         let u = Uniforms {
             view_proj,
             eye: camera.eye().extend(1.0).to_array(),
             screen,
             clip,
+            counts: [
+                count as f32,
+                f32::from(u8::from(self.clipping.caps)),
+                0.0,
+                0.0,
+            ],
+            planes,
         };
         let flat = Uniforms {
             view_proj,
             eye: [0.0, 0.0, 1.0, 0.0],
             screen,
             clip: NO_CLIP,
+            counts: [0.0; 4],
+            planes: [[0.0; 4]; PLANES],
         };
         self.queue
             .write_buffer(&self.plan_uniforms.0, 0, bytemuck::bytes_of(&flat));
@@ -937,6 +1060,7 @@ impl WgpuViewport {
                     (&self.opaque_pipeline, poche),
                     (&self.line_pipeline, lines),
                     (&self.line_pipeline, &self.overlay_lines),
+                    (&self.line_pipeline, &self.view_lines),
                 ] {
                     if let Some((buffer, count)) = mesh {
                         pass.set_pipeline(pipeline);

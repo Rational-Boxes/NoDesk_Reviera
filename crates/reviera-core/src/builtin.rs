@@ -57,6 +57,8 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(ViewDuplicate),
         registry.add(ViewDelete),
         registry.add(ViewSetCamera),
+        registry.add(ViewSetSectionBox),
+        registry.add(ViewSetSlicePlanes),
         registry.add(ViewCreatePlan),
         registry.add(ViewSetViewRange),
         registry.add(ViewGetViewRange),
@@ -1364,6 +1366,50 @@ impl Command for ViewSetCamera {
 
     fn run(&self, cx: &mut CommandContext<'_>, p: SetCameraParams) -> Result<()> {
         views::set_camera(cx.edit()?, p)
+    }
+}
+
+#[derive(Debug)]
+struct ViewSetSectionBox;
+
+impl Command for ViewSetSectionBox {
+    type Params = views::SetSectionBoxParams;
+    type Output = ();
+    const META: CommandMeta = CommandMeta {
+        name: "view.set_section_box",
+        version: 1,
+        summary: "Turn a 3D view's section box on or off, or change its extents",
+        description: "Sets the section box of a 3D view (DOC-VIEW-008): enabled, its corners min and max \
+                      in the box's coordinates (metres) and an optional transform (x, y, z axes, origin). \
+                      Omitted values are kept; turning the box off keeps its extents.",
+        effects: &[Effect::Edit],
+        transaction_name: "Section Box",
+    };
+
+    fn run(&self, cx: &mut CommandContext<'_>, p: views::SetSectionBoxParams) -> Result<()> {
+        views::set_section_box(cx.edit()?, p)
+    }
+}
+
+#[derive(Debug)]
+struct ViewSetSlicePlanes;
+
+impl Command for ViewSetSlicePlanes {
+    type Params = views::SetSlicePlanesParams;
+    type Output = ();
+    const META: CommandMeta = CommandMeta {
+        name: "view.set_slice_planes",
+        version: 1,
+        summary: "Set the slice planes of a 3D view",
+        description: "Replaces the slice planes of a 3D view (DOC-VIEW-014), at most eight. Each plane has \
+                      an origin and a normal pointing to the side that is kept (metres), and may be \
+                      disabled. An empty list removes them.",
+        effects: &[Effect::Edit],
+        transaction_name: "Slice Planes",
+    };
+
+    fn run(&self, cx: &mut CommandContext<'_>, p: views::SetSlicePlanesParams) -> Result<()> {
+        views::set_slice_planes(cx.edit()?, p)
     }
 }
 

@@ -79,6 +79,17 @@ The KIT FZK *AC20-Institute-Var-2* sample model (`test-data/ifc/`) open in Revie
   Ceiling. Ceilings have types with a thickness and sit 2600 mm above their level by default.
   View › Ceiling Plan makes reflected ceiling plans, cut at 2300 mm and looking up. Saved as
   `IfcCovering` (CEILING) (`ceiling.create_auto`, `ceiling.create`, `ceiling.edit_boundary`).
+- **Inspecting the model**: View › Section Box clips a 3D view to a box whose face grips drag in
+  real time; Selection Box (BX) fits it around the selection. Horizontal and Vertical Slice cut
+  the view at a clicked point (up to eight planes, each with a grip). Cut solids are capped.
+  Section boxes and slice planes are saved with the view and map exactly to BCF clipping planes,
+  for issues raised by FileEngine. Hide, Isolate, Isolate with ghosting and Translucent work on
+  elements, on elements with their children (a storey's contents, a wall's doors and windows),
+  by category or by type (HH, HI, HC, IC, HG, HT; HR resets). This is temporary per-view state
+  that is never saved or printed. The Model Tree pane (MT) shows Project › Site › Building ›
+  storeys › categories › elements, with hosted elements under their hosts, and hides, isolates or
+  boxes whole branches from its context menu (`view.set_section_box`, `view.set_slice_planes`,
+  `view.fit_section_box`, `view.temp_*`, `model.tree`).
 - **Doors and windows**: Architecture › Door (DR) and Window (WN) place them in Reviera walls in
   plans or 3D: the preview follows the cursor along the wall, the cursor's side sets the facing
   and Spacebar flips a door's hand. Walls are cut, plans show door swings, and each new door or

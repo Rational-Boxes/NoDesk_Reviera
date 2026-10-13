@@ -8,6 +8,7 @@
 //! application commands act on the [`App`]; every other command acts on the active document.
 
 mod commands;
+pub mod inspect;
 pub mod output;
 pub mod views;
 
@@ -67,6 +68,10 @@ pub struct OpenDocument {
     pub view_states: views::ViewStates,
     /// The view the UI shows as active.
     pub active_view: Option<reviera_core::ElementId>,
+    /// Temporary hide, isolate and translucency of each view (session state, not saved).
+    pub temp: std::collections::HashMap<Option<reviera_core::ElementId>, inspect::TempState>,
+    /// The IFC file's parent relationships and the data revision they were read at.
+    spatial: std::sync::Mutex<Option<(i64, Arc<reviera_core::inspect::Imported>)>>,
     /// Tessellated IFC geometry and the data revision it was made at.
     tessellation: std::sync::Mutex<Option<(i64, std::sync::Arc<Vec<reviera_render::SceneMesh>>)>>,
 }
@@ -534,6 +539,8 @@ impl App {
                 selection: Default::default(),
                 view_states,
                 active_view: None,
+                temp: Default::default(),
+                spatial: Default::default(),
                 tessellation: Default::default(),
             },
         );

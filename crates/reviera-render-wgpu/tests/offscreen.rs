@@ -46,6 +46,18 @@ fn fzk_haus_renders_offscreen() {
         "meshes map back to elements"
     );
 
+    // Most building elements tessellate as closed solids, so section cuts can be capped.
+    let solids = scene
+        .meshes
+        .iter()
+        .filter(|m| reviera_render_wgpu::solid(m).is_some())
+        .count();
+    eprintln!(
+        "{solids} of {} meshes are closed solids",
+        scene.meshes.len()
+    );
+    assert!(solids * 2 > scene.meshes.len());
+
     let mut camera = Camera::default();
     camera.fit(scene.bounds().unwrap());
     viewport.set_scene(&scene);
@@ -201,4 +213,68 @@ fn a_floor_plan_shows_cut_walls_dark_on_white() {
         .count();
     assert!(white > px.len() / 3, "paper background: {white}");
     assert!(dark > 1000, "cut poché and lines: {dark}");
+}
+
+#[test]
+fn a_slice_plane_shows_a_capped_cut_and_hidden_elements_vanish() {
+    let mut viewport = match WgpuViewport::offscreen(400, 400) {
+        Ok(v) => v,
+        Err(e) => {
+            eprintln!("skipped: no graphics adapter ({e})");
+            return;
+        }
+    };
+    // A 2 m cube, red, looked at from above.
+    let square = [[-1.0, -1.0], [1.0, -1.0], [1.0, 1.0], [-1.0, 1.0]];
+    let (positions, indices) = reviera_render::solid::extrude(&square, &[], 0.0, 2.0);
+    let cube = reviera_render::SceneMesh {
+        element: Some(reviera_core::ElementId(7)),
+        class: "IfcWall".into(),
+        positions,
+        indices,
+        color: [0.8, 0.1, 0.1, 1.0],
+    };
+    let scene = reviera_render::RenderScene { meshes: vec![cube] };
+    let mut camera = Camera {
+        target: glam::Vec3::new(0.0, 0.0, 1.0),
+        distance: 8.0,
+        perspective: false,
+        ..Camera::default()
+    };
+    camera.orient(glam::Vec3::new(0.0, -0.3, 1.0));
+    viewport.set_scene(&scene);
+    let centre = |v: &mut WgpuViewport| {
+        v.render(&camera).unwrap();
+        let p = v.read_pixels().unwrap();
+        let i = (200 * 400 + 200) * 4;
+        [p[i], p[i + 1], p[i + 2]]
+    };
+    let top = centre(&mut viewport);
+    // Keep what is below 1 m: the camera now looks into the cube through the cut, at its inside.
+    viewport.set_clipping(&reviera_render::Clipping {
+        planes: vec![[0.0, 0.0, -1.0, -1.0]],
+        caps: true,
+    });
+    let cut = centre(&mut viewport);
+    eprintln!("top {top:?}, cut {cut:?}");
+    assert_ne!(top, cut, "the cut changes the picture");
+    // The cap is the solid's colour, darkened and unlit: red, and darker than the lit top.
+    assert!(cut[0] > 2 * cut[1] && cut[1] == cut[2], "{cut:?}");
+    assert!(u32::from(cut[0]) < u32::from(top[0]), "{cut:?} {top:?}");
+    // Hiding the element shows the background.
+    viewport.set_clipping(&reviera_render::Clipping::default());
+    let mut hidden = reviera_render::Visibility::default();
+    hidden.hidden.insert(reviera_core::ElementId(7));
+    viewport.set_visibility(&hidden);
+    let gone = centre(&mut viewport);
+    assert!(gone[2] > gone[0], "background blue-grey: {gone:?}");
+    // Translucent: lighter than opaque, still reddish.
+    let mut faint = reviera_render::Visibility::default();
+    faint.translucent.insert(reviera_core::ElementId(7), 0.25);
+    viewport.set_visibility(&faint);
+    let ghost = centre(&mut viewport);
+    assert!(
+        ghost != top && ghost != gone && ghost[0] > ghost[2],
+        "{ghost:?}"
+    );
 }

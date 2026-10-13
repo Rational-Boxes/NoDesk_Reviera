@@ -15,6 +15,7 @@ mod dims;
 mod grids;
 mod icons;
 mod inserts;
+mod inspect;
 mod levels;
 mod loading;
 mod modify;
@@ -86,6 +87,8 @@ enum Drag {
     MoveSelection {
         from: [f64; 2],
     },
+    /// Dragging a section box face or a slice plane (3D views).
+    Clip(inspect::ClipGrip),
 }
 
 /// The Wall tool: clicks on the level's plane add walls end to end.
@@ -134,6 +137,8 @@ struct View {
     drag: Option<(Drag, i32, i32)>,
     press: Option<(i32, i32)>,
     nav: nav::Nav,
+    /// A section box or slice plane being dragged.
+    clip_edit: Option<inspect::ClipEdit>,
 }
 
 struct Gui {
@@ -189,6 +194,11 @@ struct Gui {
     plan_edges: HashMap<DocumentId, Rc<Vec<reviera_render::plan::Edge>>>,
     /// Letters typed toward a keyboard sequence such as `ZF` (§1.26.4), and when.
     keys: (String, std::time::Instant),
+    /// A slice tool waiting for its click.
+    slice_pick: Option<inspect::SliceKind>,
+    /// The Model Tree pane (UI-TREE-001) and its state.
+    model_tree: TreeCtrl,
+    tree: inspect::ModelTree,
 }
 
 /// An empty scene and a default camera, for when no view is open.
@@ -294,6 +304,7 @@ impl Gui {
             v.resize(w, h);
         }
         self.update_plan_graphics(index);
+        self.update_inspection(index);
         self.update_gizmo(index, scale);
         let view = &mut self.views[index];
         if let Some(v) = &mut view.viewport
@@ -392,8 +403,36 @@ impl Gui {
                 self.start_insert_tool(reviera_core::inserts::Kind::Window);
                 true
             }
+            "HH" | "HC" | "HI" | "IC" | "HT" | "HG" => {
+                let action = match self.keys.0.as_str() {
+                    "HH" => "inspect.hide",
+                    "HC" => "inspect.hide_category",
+                    "HI" => "inspect.isolate",
+                    "IC" => "inspect.isolate_category",
+                    "HT" => "inspect.translucent",
+                    _ => "inspect.ghost_others",
+                };
+                self.temp_action(action);
+                true
+            }
+            "HR" => {
+                self.temp_reset();
+                true
+            }
+            "BX" => {
+                self.selection_box();
+                true
+            }
+            "SX" => {
+                self.toggle_section_box();
+                true
+            }
+            "MT" => {
+                self.toggle_pane("model_tree");
+                true
+            }
             "Z" | "W" | "P" | "D" | "L" | "G" | "M" | "C" | "R" | "A" | "O" | "T" | "S" | "U"
-            | "F" => false,
+            | "F" | "H" | "I" | "B" => false,
             _ => {
                 self.keys.0.clear();
                 false
@@ -480,10 +519,11 @@ impl Gui {
     fn caption(&self, view: &View) -> String {
         let dirty = self.doc_info(view.doc).is_some_and(|d| d.dirty);
         format!(
-            "{} - {}{}",
+            "{} - {}{}{}",
             self.view_name(view),
             self.doc_title(view.doc),
-            if dirty { " *" } else { "" }
+            if dirty { " *" } else { "" },
+            self.temp_mark(view),
         )
     }
 
@@ -555,6 +595,7 @@ impl Gui {
             error: None,
             camera,
             drag: None,
+            clip_edit: None,
             press: None,
             nav,
         };
@@ -592,6 +633,8 @@ impl Gui {
             let _ = self.app.activate(doc);
             let element = self.view(id).and_then(|v| v.element);
             self.app.set_active_view(doc, element);
+            self.tree.stale = true;
+            self.slice_pick = None;
             self.update_title(&frame);
             self.properties_stale = true;
             self.update_view_actions();
@@ -807,6 +850,7 @@ impl Gui {
         self.update_captions();
         self.properties_stale = true;
         self.browser_stale = true;
+        self.tree.stale = true;
         self.sync_views();
     }
 
@@ -938,6 +982,9 @@ impl Gui {
     /// Esc: clears a typed length, then ends the wall chain, then the tool; without a tool, clears
     /// the selection.
     fn escape(&mut self, frame: &Frame) {
+        if self.slice_pick.take().is_some() {
+            return frame.set_status_text("Slice cancelled", 0);
+        }
         match &mut self.tool {
             Some(t) if !t.typed.is_empty() => {
                 t.typed.clear();
@@ -1231,8 +1278,13 @@ impl Gui {
             .or_else(|| self.grid_at(x, y))
             .or_else(|| self.insert_at(x, y))
             .or_else(|| {
+                // What the view cuts away or hides cannot be picked.
+                let v = self.active_view()?;
+                let (b, slices) = self.view_clip(v);
+                let clipping = reviera_render::Clipping::of(b.as_ref(), &slices);
+                let keep = |p: glam::Vec3| (bottom..=top).contains(&p.z) && clipping.keeps(p);
                 self.scene()
-                    .pick_within(origin, dir, bottom, top)
+                    .pick_visible(origin, dir, &keep, &self.view_visibility(v))
                     .and_then(|(i, _)| self.scene().meshes[i].element)
             })
     }
@@ -1606,11 +1658,33 @@ impl Gui {
             grid.append(Property::string(label, &key, value));
             grid.set_property_read_only(&key, true);
         }
+        // Extents (DOC-VIEW-008, DOC-VIEW-014).
+        let (section_box, slices) = self.view_clip(self.active_view().expect("checked"));
+        grid.append(Property::category("Extents", "c_extents"));
+        grid.append(Property::boolean(
+            "Section Box",
+            "view_box",
+            section_box.is_some_and(|b| b.enabled),
+        ));
+        grid.set_help_string(
+            "view_box",
+            "Clip the view to a box (drag its grips to resize it)",
+        );
+        let count = slices.iter().filter(|s| s.enabled).count();
+        grid.append(Property::string(
+            "Slice Planes",
+            "view_slices",
+            count.to_string(),
+        ));
+        grid.set_property_read_only("view_slices", true);
         true
     }
 
     /// Applies an edit made in the palette.
     fn edit(&mut self, property: &str, text: Option<String>, frame: &Frame) {
+        if property == "view_box" {
+            return self.toggle_section_box();
+        }
         if property == "view_cut" {
             if let Some(t) = text {
                 self.set_cut_plane(&t, frame);
@@ -1802,6 +1876,9 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                     let left = button == 0 && cube.is_none();
                     let editing = if !left {
                         None
+                    } else if let Some(grip) = g.clip_grip_at(x, y) {
+                        g.clip_drag_start(grip, x, y);
+                        Some(Drag::Clip(grip))
                     } else if let Some((id, from)) = g.insert_drag_start(x, y, &p) {
                         Some(Drag::MoveInsert { id, from })
                     } else if let Some((id, end, other)) = g.grip_at(x, y) {
@@ -1879,6 +1956,12 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                             return;
                         }
                     }
+                    Some((Drag::Clip(_), _, _)) => {
+                        g.clip_drag_end(click);
+                        if !click {
+                            return;
+                        }
+                    }
                     _ => {}
                 }
                 if button != 0 || !click {
@@ -1886,6 +1969,7 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                 }
                 match cube {
                     Some(hit) => g.cube_click(hit),
+                    None if g.slice_pick.is_some() => g.slice_click(x, y),
                     None if g.sketch.is_some() => g.sketch_click(x, y),
                     None if g.ceiling_tool.is_some() => g.ceiling_click(x, y),
                     None if g.dim_tool.is_some() => g.dim_click(x, y),
@@ -1966,6 +2050,11 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                         redraw = true;
                         return;
                     }
+                    Drag::Clip(_) => {
+                        g.clip_drag_motion(x, y);
+                        redraw = true;
+                        return;
+                    }
                     _ => {}
                 }
                 let v = g.views.iter_mut().find(|v| v.id == id).expect("found");
@@ -1979,7 +2068,10 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                         let h = p.get_client_size().height as f32;
                         v.camera.pan(dx, dy, h);
                     }
-                    Drag::MoveInsert { .. } | Drag::Grip { .. } | Drag::MoveSelection { .. } => {}
+                    Drag::MoveInsert { .. }
+                    | Drag::Grip { .. }
+                    | Drag::MoveSelection { .. }
+                    | Drag::Clip(_) => {}
                 }
                 v.drag = Some((kind, x, y));
                 redraw = true;
@@ -2176,6 +2268,16 @@ impl Gui {
             v.panel.refresh(false, None);
         }
     }
+
+    /// Shows or hides a dockable pane.
+    fn toggle_pane(&mut self, pane: &str) {
+        let shown = self.aui.is_pane_shown(pane);
+        self.aui.set_pane_shown(pane, !shown);
+        self.aui.update();
+        if pane == "model_tree" && !shown {
+            self.tree.stale = true;
+        }
+    }
 }
 
 /// Runs the main window until it is closed, opening `file` if given.
@@ -2288,6 +2390,25 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 .close_button(true)
                 .floatable(true),
         );
+        let model_tree = TreeCtrl::builder(&frame)
+            .with_style(
+                TreeCtrlStyle::Default | TreeCtrlStyle::HasButtons | TreeCtrlStyle::LinesAtRoot,
+            )
+            .build();
+        aui.add_pane_with_info(
+            &model_tree,
+            AuiPaneInfo::new()
+                .with_name("model_tree")
+                .with_caption("Model Tree")
+                .left()
+                .layer(1)
+                .row(0)
+                .position(2)
+                .best_size(340, 260)
+                .min_size(220, 120)
+                .close_button(true)
+                .floatable(true),
+        );
         aui.add_pane_with_info(
             &notebook,
             AuiPaneInfo::new().with_name("views").center_pane(),
@@ -2331,6 +2452,12 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 browser_target: None,
                 plan_edges: HashMap::new(),
                 keys: (String::new(), std::time::Instant::now()),
+                slice_pick: None,
+                model_tree,
+                tree: inspect::ModelTree {
+                    stale: true,
+                    ..Default::default()
+                },
             })
         });
         {
@@ -2427,6 +2554,52 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
             });
         }
         {
+            let gui = gui.clone();
+            model_tree.on_selection_changed(move |e| {
+                if let Some(item) = e.get_item()
+                    && let Ok(mut g) = gui.try_borrow_mut()
+                    && let Some(node) = g.tree_elements(&item)
+                {
+                    g.tree_selected(node);
+                }
+            });
+        }
+        {
+            let gui = gui.clone();
+            model_tree.on_item_activated(move |e| {
+                if let Some(item) = e.get_item() {
+                    with(&gui, |g| {
+                        if let Some(node) = g.tree_elements(&item) {
+                            g.tree.target = Some(node);
+                            g.tree_command("zoom");
+                        }
+                    });
+                }
+            });
+        }
+        {
+            let (gui, t) = (gui.clone(), model_tree);
+            model_tree.on_item_right_click(move |e| {
+                let Some(item) = e.get_item() else { return };
+                let mut found = false;
+                with(&gui, |g| {
+                    g.tree.target = g.tree_elements(&item);
+                    found = g.tree.target.is_some();
+                });
+                if found {
+                    let mut menu = Menu::builder();
+                    for (i, (label, _)) in inspect::TREE_MENU.iter().enumerate() {
+                        menu = if *label == "-" {
+                            menu.append_separator()
+                        } else {
+                            menu.append_item(inspect::ID_TREE_FIRST + i as i32, label, "")
+                        };
+                    }
+                    t.popup_menu(&mut menu.build(), None);
+                }
+            });
+        }
+        {
             let (gui, f, g) = (gui.clone(), frame, grid);
             grid.on_changed(move |e| {
                 if let Some(name) = e.property_name() {
@@ -2449,6 +2622,9 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                     gui.sync_views();
                     if gui.browser_stale {
                         gui.rebuild_browser();
+                    }
+                    if gui.tree.stale && gui.aui.is_pane_shown("model_tree") {
+                        gui.rebuild_model_tree();
                     }
                 }
                 e.skip(true);
@@ -2490,6 +2666,13 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 {
                     let dir = nav::PRESETS[(id - ID_ORIENT_FIRST) as usize].1;
                     with(&gui, |g| g.orient(glam::Vec3::from(dir)));
+                }
+                id if (inspect::ID_TREE_FIRST
+                    ..inspect::ID_TREE_FIRST + inspect::TREE_MENU.len() as i32)
+                    .contains(&id) =>
+                {
+                    let what = inspect::TREE_MENU[(id - inspect::ID_TREE_FIRST) as usize].1;
+                    with(&gui, |g| g.tree_command(what));
                 }
                 ID_BROWSER_OPEN | ID_BROWSER_RENAME | ID_BROWSER_DUPLICATE | ID_BROWSER_DELETE
                 | ID_BROWSER_ELEVATION => {
@@ -2739,18 +2922,23 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "window.previous" => with(gui, |g| g.cycle_view(-1)),
         "window.tile" => with(gui, Gui::tile),
         "window.tab_all" => with(gui, Gui::tab_all),
-        "ui.pane.properties" | "ui.pane.browser" => {
-            let pane = if action == "ui.pane.properties" {
-                "properties"
-            } else {
-                "browser"
-            };
-            with(gui, |g| {
-                let shown = g.aui.is_pane_shown(pane);
-                g.aui.set_pane_shown(pane, !shown);
-                g.aui.update();
-            });
+        "ui.pane.properties" | "ui.pane.browser" | "ui.pane.model_tree" => {
+            let pane = action.trim_start_matches("ui.pane.");
+            with(gui, |g| g.toggle_pane(pane));
         }
+        "inspect.section_box" => with(gui, Gui::toggle_section_box),
+        "inspect.selection_box" => with(gui, Gui::selection_box),
+        "inspect.slice_horizontal" | "inspect.slice_vertical" => with(gui, |g| {
+            g.start_slice(if action == "inspect.slice_horizontal" {
+                inspect::SliceKind::Horizontal
+            } else {
+                inspect::SliceKind::Vertical
+            });
+            focus(g);
+        }),
+        "inspect.clear_slices" => with(gui, Gui::clear_slices),
+        "inspect.reset" => with(gui, Gui::temp_reset),
+        a if a.starts_with("inspect.") => with(gui, |g| g.temp_action(a)),
         other => f.set_status_text(&format!("{other} is not available yet"), 0),
     }
 }

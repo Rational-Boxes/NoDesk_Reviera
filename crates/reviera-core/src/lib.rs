@@ -20,6 +20,7 @@ pub mod floors;
 pub mod grids;
 pub mod id;
 pub mod inserts;
+pub mod inspect;
 pub mod levels;
 pub mod modify;
 pub mod origin;

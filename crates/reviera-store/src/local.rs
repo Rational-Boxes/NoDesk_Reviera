@@ -404,6 +404,12 @@ impl LocalProject {
         self.pending_docs.insert(path.to_owned(), value);
     }
 
+    /// The parent of each IFC object in the file as last opened or saved (spatial containment,
+    /// aggregation, voids and fills), by GlobalId (UI-TREE-001).
+    pub fn spatial_parents(&self) -> Result<HashMap<GlobalId, GlobalId>> {
+        crate::spatial::parents(&self.ifc)
+    }
+
     pub fn data_revision(&self) -> i64 {
         self.data_revision
     }
