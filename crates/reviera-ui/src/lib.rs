@@ -160,6 +160,7 @@ struct Gui {
     modify_tool: Option<modify::ModifyTool>,
     /// A sketch session (floor boundaries).
     sketch: Option<sketch::SketchSession>,
+    ceiling_tool: Option<sketch::CeilingTool>,
     /// The floor type new floors take.
     floor_type: Option<ElementId>,
     /// The last pointer position in the active view (Tab in sketch mode picks there).
@@ -585,6 +586,7 @@ impl Gui {
             self.end_insert_tool();
             self.end_modify();
             self.cancel_sketch();
+            self.end_ceiling_tool();
             self.active = Some(id);
             self.doc = Some(doc);
             let _ = self.app.activate(doc);
@@ -1253,13 +1255,18 @@ impl Gui {
     fn update_ribbon_context(&mut self) {
         self.update_view_actions();
         if let Some(s) = &self.sketch {
-            let label = if s.host.is_some() {
-                "Edit Boundary"
-            } else {
-                "Create Floor Boundary"
+            let label = match (s.host, s.kind) {
+                (Some(_), _) => "Edit Boundary",
+                (None, reviera_core::floors::SlabKind::Floor) => "Create Floor Boundary",
+                (None, reviera_core::floors::SlabKind::Ceiling) => "Create Ceiling Boundary",
             };
             self.ribbon
                 .set_context(Some((label, Some("session.floor_sketch"))));
+            return;
+        }
+        if self.ceiling_tool.is_some() {
+            self.ribbon
+                .set_context(Some(("Place Ceiling", Some("session.ceiling"))));
             return;
         }
         let ids = self.selection();
@@ -1451,7 +1458,7 @@ impl Gui {
         if is_insert {
             self.insert_rows(grid, id);
         }
-        if reviera_core::floors::floor_recipe(&e).is_some() {
+        if reviera_core::floors::slab_recipe(&e).is_some() {
             self.floor_rows(grid, id);
             return;
         }
@@ -1538,7 +1545,12 @@ impl Gui {
         let name = self.view_name(v);
         let camera = v.camera;
         if let Some(plan) = v.plan.clone() {
-            grid.append(Property::category("Floor Plan", "c_view"));
+            let title = if plan.ceiling {
+                "Ceiling Plan"
+            } else {
+                "Floor Plan"
+            };
+            grid.append(Property::category(title, "c_view"));
             grid.append(Property::string("View Name", "view_name", name));
             let fmt = |g: &mut Gui, z: f64| {
                 if !z.is_finite() {
@@ -1875,6 +1887,7 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                 match cube {
                     Some(hit) => g.cube_click(hit),
                     None if g.sketch.is_some() => g.sketch_click(x, y),
+                    None if g.ceiling_tool.is_some() => g.ceiling_click(x, y),
                     None if g.dim_tool.is_some() => g.dim_click(x, y),
                     None if g.grid_tool.is_some() => g.grid_click(x, y),
                     None if g.insert_tool.is_some() => g.insert_click(x, y),
@@ -1909,6 +1922,10 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                     g.mouse = (x, y);
                     if g.sketch.is_some() {
                         g.sketch_motion(x, y);
+                        redraw = true;
+                    }
+                    if g.ceiling_tool.is_some() {
+                        g.ceiling_motion(x, y);
                         redraw = true;
                     }
                     if g.dim_tool.is_some() {
@@ -2049,6 +2066,9 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                         } else if g.sketch.is_some() {
                             let (mx, my) = g.mouse;
                             g.sketch_key(WXK_ESCAPE, mx, my);
+                        } else if g.ceiling_tool.is_some() {
+                            g.end_ceiling_tool();
+                            f.set_status_text("Ready", 0);
                         } else if g.dim_tool.is_some() {
                             g.dim_escape();
                         } else if g.grid_tool.is_some() {
@@ -2295,6 +2315,7 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 insert_tool: None,
                 modify_tool: None,
                 sketch: None,
+                ceiling_tool: None,
                 floor_type: None,
                 mouse: (0, 0),
                 offset_distance: 1.0,
@@ -2611,7 +2632,20 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
             g.start_floor_sketch();
             focus(g);
         }),
-        "floor.edit_boundary" => with(gui, |g| {
+        "ceiling.create" => with(gui, |g| {
+            g.start_ceiling_tool();
+            focus(g);
+        }),
+        "ceiling.create_auto" => with(gui, |g| {
+            g.start_ceiling_tool();
+            focus(g);
+        }),
+        "ceiling.sketch" => with(gui, |g| {
+            g.start_ceiling_sketch();
+            focus(g);
+        }),
+        "view.create_ceiling_plan" => with(gui, Gui::new_ceiling_plans),
+        "floor.edit_boundary" | "ceiling.edit_boundary" => with(gui, |g| {
             g.edit_floor_boundary();
             focus(g);
         }),

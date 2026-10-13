@@ -379,6 +379,36 @@ label = "Cancel Edit Mode"
 icon = "cancel"
 help = "Leave the sketch without changing the model"
 
+[[action]]
+id = "ceiling.create"
+label = "Ceiling"
+icon = "ceiling"
+help = "Place ceilings: click inside a room enclosed by walls, or sketch one"
+
+[[action]]
+id = "ceiling.create_auto"
+label = "Automatic Ceiling"
+icon = "auto_ceiling"
+help = "Click inside a room: the ceiling follows its walls' faces"
+
+[[action]]
+id = "ceiling.sketch"
+label = "Sketch Ceiling"
+icon = "edit_boundary"
+help = "Sketch a ceiling's boundary"
+
+[[action]]
+id = "ceiling.edit_boundary"
+label = "Edit Boundary"
+icon = "edit_boundary"
+help = "Edit the selected ceiling's boundary sketch"
+
+[[action]]
+id = "view.create_ceiling_plan"
+label = "Ceiling Plan"
+icon = "ceiling_plan"
+help = "Create reflected ceiling plans of levels"
+
 # ---- Quick Access Toolbar ----
 
 [quick_access]
@@ -401,6 +431,7 @@ tools = [
   { action = "door.place", size = "large" },
   { action = "window.place", size = "large" },
   { action = "floor.create", size = "large" },
+  { action = "ceiling.create", size = "large" },
 ]
 
 [[tab.panel]]
@@ -434,6 +465,7 @@ tools = [{ action = "tool.modify", size = "large" }]
 label = "Create"
 tools = [
   { action = "view.create_plan", size = "large" },
+  { action = "view.create_ceiling_plan", size = "large" },
   { action = "view.default_3d", size = "large" },
   { action = "view.create_3d", size = "small" },
 ]
@@ -523,6 +555,19 @@ label = "Floors"
 panels = [{ label = "Mode", tools = [{ action = "floor.edit_boundary", size = "large" }] }]
 
 [[context]]
+category = "cat.ceilings"
+label = "Ceilings"
+panels = [{ label = "Mode", tools = [{ action = "ceiling.edit_boundary", size = "large" }] }]
+
+[[context]]
+category = "session.ceiling"
+label = "Place Ceiling"
+panels = [{ label = "Ceiling", tools = [
+  { action = "ceiling.create_auto", size = "large" },
+  { action = "ceiling.sketch", size = "large" },
+] }]
+
+[[context]]
 category = "session.floor_sketch"
 label = "Create Floor Boundary"
 panels = [
@@ -555,7 +600,7 @@ items = ["edit.undo", "edit.redo", "-", "element.delete"]
 [[menu]]
 label = "&View"
 items = [
-  "view.default_3d", "view.create_plan", "-",
+  "view.default_3d", "view.create_plan", "view.create_ceiling_plan", "-",
   "view.zoom_fit", "view.zoom_previous", "view.zoom_next", "-",
   "view.home", "view.set_home", "@orient", "view.set_projection", "-", "view.walk",
 ]
@@ -563,7 +608,8 @@ items = [
 [[menu]]
 label = "&Architecture"
 items = [
-  "wall.create", "door.place", "window.place", "floor.create", "floor.edit_boundary", "-",
+  "wall.create", "door.place", "window.place", "floor.create", "floor.edit_boundary",
+  "ceiling.create", "ceiling.edit_boundary", "-",
   "grid.create", "level.create",
 ]
 

@@ -47,6 +47,8 @@ pub const UI_ACTIONS: &[&str] = &[
     "sketch.rectangle",
     "sketch.finish",
     "sketch.cancel",
+    "ceiling.sketch",
+    "view.create_ceiling_plan",
 ];
 
 /// First wx id of the catalog's actions (one id per action, in catalog order).

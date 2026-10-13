@@ -39,23 +39,25 @@ impl Gui {
             .unwrap_or_default();
         let open: Vec<ElementId> = self.views.iter().filter_map(|v| v.element).collect();
         let active = self.active_view().and_then(|v| v.element);
-        let plans: Vec<_> = list
-            .iter()
-            .filter(|v| v.kind == reviera_core::plans::KIND_PLAN)
-            .collect();
-        if !plans.is_empty()
-            && let Some(group) = self.browser.append_item(&root, "Floor Plans", None, None)
-        {
-            for v in plans {
-                if let Some(item) = self
-                    .browser
-                    .append_item_with_data(&group, &v.name, v.id.0, None, None)
-                {
-                    if open.contains(&v.id) {
-                        self.browser.set_item_bold(&item, true);
-                    }
-                    if active == Some(v.id) {
-                        self.browser.select_item(&item);
+        for (kind, title) in [
+            (reviera_core::plans::KIND_PLAN, "Floor Plans"),
+            (reviera_core::plans::KIND_CEILING_PLAN, "Ceiling Plans"),
+        ] {
+            let plans: Vec<_> = list.iter().filter(|v| v.kind == kind).collect();
+            if !plans.is_empty()
+                && let Some(group) = self.browser.append_item(&root, title, None, None)
+            {
+                for v in plans {
+                    if let Some(item) = self
+                        .browser
+                        .append_item_with_data(&group, &v.name, v.id.0, None, None)
+                    {
+                        if open.contains(&v.id) {
+                            self.browser.set_item_bold(&item, true);
+                        }
+                        if active == Some(v.id) {
+                            self.browser.select_item(&item);
+                        }
                     }
                 }
             }

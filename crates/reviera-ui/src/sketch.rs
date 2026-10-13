@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Reviera contributors
 
-//! Sketch mode (Ch 3 §3.1.3, ARC-SKCH-001) for floor boundaries: a modal session in a plan with
+//! Sketch mode (Ch 3 §3.1.3, ARC-SKCH-001) for floor and ceiling boundaries, and the Ceiling
+//! tool (ARC-CEIL-001: an automatic ceiling in the room under the cursor, or a sketch).
+//!
+//! Sketch mode: a modal session in a plan with
 //! its own contextual tab (Draw: Pick Walls, Line, Rectangle; Mode: Finish, Cancel).
 //!
 //! - **Pick Walls** (the default) takes the face of the wall on the cursor's side, locked so the
@@ -14,6 +17,7 @@
 //! session open and marks the problem points; Cancel discards the session.
 
 use reviera_core::ElementId;
+use reviera_core::floors::SlabKind;
 use reviera_core::walls::Line;
 use reviera_render::RenderBackend;
 use reviera_render::plan::Lines;
@@ -43,7 +47,9 @@ pub struct Curve {
 /// A sketch session.
 #[derive(Debug)]
 pub struct SketchSession {
-    /// The floor being edited (Edit Boundary); `None` for a new floor.
+    /// Floor or ceiling.
+    pub kind: SlabKind,
+    /// The floor or ceiling being edited (Edit Boundary); `None` for a new one.
     pub host: Option<ElementId>,
     pub level: ElementId,
     pub curves: Vec<Curve>,
@@ -72,10 +78,24 @@ impl Gui {
             return frame
                 .set_status_text("Floors are sketched in plan views (View › Floor Plan)", 0);
         };
-        self.begin_sketch(None, level, Vec::new());
+        self.begin_sketch(SlabKind::Floor, None, level, Vec::new());
     }
 
-    /// Edit Boundary of the selected floor.
+    /// Sketch Ceiling: a new ceiling boundary on the plan's level.
+    pub(crate) fn start_ceiling_sketch(&mut self) {
+        let frame = self.frame;
+        let Some(level) = self
+            .active_view()
+            .and_then(|v| v.plan.as_ref())
+            .map(|p| p.level)
+        else {
+            return frame.set_status_text("Ceilings are placed in plan views", 0);
+        };
+        self.end_ceiling_tool();
+        self.begin_sketch(SlabKind::Ceiling, None, level, Vec::new());
+    }
+
+    /// Edit Boundary of the selected floor or ceiling.
     pub(crate) fn edit_floor_boundary(&mut self) {
         let frame = self.frame;
         if !self.in_plan() {
@@ -89,15 +109,15 @@ impl Gui {
         else {
             return;
         };
-        let Some((floor, recipe, sketch)) = ids.iter().find_map(|id| {
+        let Some((floor, (kind, recipe), sketch)) = ids.iter().find_map(|id| {
             let e = store.get(*id)?;
             Some((
                 *id,
-                reviera_core::floors::floor_recipe(e)?,
+                reviera_core::floors::slab_recipe(e)?,
                 reviera_core::sketch::sketch_of(e)?,
             ))
         }) else {
-            return frame.set_status_text("Select a floor to edit its boundary", 0);
+            return frame.set_status_text("Select a floor or ceiling to edit its boundary", 0);
         };
         let level = reviera_core::GlobalId::parse(&recipe.level)
             .and_then(|g| store.find_by_guid(&g))
@@ -114,10 +134,16 @@ impl Gui {
                 }),
             })
             .collect();
-        self.begin_sketch(Some(floor), level, curves);
+        self.begin_sketch(kind, Some(floor), level, curves);
     }
 
-    fn begin_sketch(&mut self, host: Option<ElementId>, level: ElementId, curves: Vec<Curve>) {
+    fn begin_sketch(
+        &mut self,
+        kind: SlabKind,
+        host: Option<ElementId>,
+        level: ElementId,
+        curves: Vec<Curve>,
+    ) {
         let frame = self.frame;
         self.end_tool(&frame);
         self.end_dim_tool();
@@ -125,7 +151,9 @@ impl Gui {
         self.end_insert_tool();
         self.end_modify();
         self.leave_walk();
+        self.end_ceiling_tool();
         self.sketch = Some(SketchSession {
+            kind,
             host,
             level,
             curves,
@@ -180,10 +208,10 @@ impl Gui {
             DrawMode::Rectangle if s.corner.is_none() => "Rectangle: click the first corner",
             DrawMode::Rectangle => "Rectangle: click the opposite corner",
         };
-        let verb = if s.host.is_some() {
-            "Edit Boundary"
-        } else {
-            "Floor"
+        let verb = match (s.host, s.kind) {
+            (Some(_), _) => "Edit Boundary",
+            (None, SlabKind::Floor) => "Floor",
+            (None, SlabKind::Ceiling) => "Ceiling",
         };
         let text = format!(
             "{verb} · {what} · {} curves · Finish ✓ or Cancel ✗ on the ribbon (Delete removes the last curve)",
@@ -440,18 +468,22 @@ impl Gui {
                 v
             })
             .collect();
-        let (command, args) = match s.host {
-            Some(f) => (
+        let (command, args) = match (s.host, s.kind) {
+            (Some(f), _) => (
                 "floor.edit_boundary",
                 json!({ "floor_id": f, "loops": [curves] }),
             ),
-            None => {
+            (None, SlabKind::Floor) => {
                 let mut a = json!({ "loops": [curves], "level_id": s.level });
                 if let Some(t) = self.floor_type {
                     a["type_id"] = json!(t);
                 }
                 ("floor.create", a)
             }
+            (None, SlabKind::Ceiling) => (
+                "ceiling.create",
+                json!({ "loops": [curves], "level_id": s.level }),
+            ),
         };
         match self.app.execute(command, args, &super::user()) {
             Ok(out) => {
@@ -465,7 +497,7 @@ impl Gui {
                     let _ = self.run("selection.set", json!({ "ids": [f] }));
                 }
                 self.selection_changed();
-                frame.set_status_text("Floor finished", 0);
+                frame.set_status_text("Finished", 0);
             }
             Err(e) => {
                 let points: Vec<[f64; 2]> =
@@ -580,7 +612,7 @@ impl Gui {
         };
         let Some(e) = store.get(id) else { return };
         let (Some(recipe), Ok(g)) = (
-            reviera_core::floors::floor_recipe(e),
+            reviera_core::floors::slab_recipe(e).map(|(_, r)| r),
             reviera_core::floors::regenerate(&store, e),
         ) else {
             return;
@@ -676,7 +708,7 @@ impl Gui {
                     store
                         .as_ref()
                         .and_then(|s| s.get(*i))
-                        .and_then(reviera_core::floors::floor_recipe)
+                        .and_then(reviera_core::floors::slab_recipe)
                         .is_some()
                 })
                 .collect()
@@ -754,5 +786,115 @@ impl Gui {
         self.properties_stale = true;
         self.refresh_scene(&frame);
         true
+    }
+}
+
+/// The Ceiling tool: an automatic ceiling in the room under the cursor (the default), or Sketch
+/// Ceiling from its contextual tab.
+#[derive(Debug, Default)]
+pub struct CeilingTool {
+    /// The loop of wall faces around the cursor at the ceiling's height.
+    hover: Vec<Line>,
+}
+
+impl Gui {
+    /// Architecture › Ceiling.
+    pub(crate) fn start_ceiling_tool(&mut self) {
+        let frame = self.frame;
+        if !self.in_plan() {
+            return frame.set_status_text(
+                "Ceilings are placed in plan views (ceiling plans are best)",
+                0,
+            );
+        }
+        self.end_tool(&frame);
+        self.end_dim_tool();
+        self.end_grid_tool();
+        self.end_insert_tool();
+        self.end_modify();
+        self.cancel_sketch();
+        self.leave_walk();
+        self.ceiling_tool = Some(CeilingTool::default());
+        let _ = self.run("selection.clear", json!({}));
+        self.selection_changed();
+        frame.set_status_text(
+            "Automatic Ceiling: click inside a room enclosed by walls (or Sketch Ceiling on the ribbon); Esc ends",
+            0,
+        );
+    }
+
+    pub(crate) fn end_ceiling_tool(&mut self) -> bool {
+        if self.ceiling_tool.take().is_none() {
+            return false;
+        }
+        if let Some(v) = self.viewport() {
+            v.set_overlay_lines(&[]);
+        }
+        self.update_ribbon_context();
+        true
+    }
+
+    /// The level and the room loop around pixel (`x`, `y`) at the default ceiling height.
+    fn ceiling_loop(&self, x: i32, y: i32) -> Option<(ElementId, [f64; 2], Vec<Line>)> {
+        let plan = self.active_view()?.plan.clone()?;
+        let p = self.plan_xy(x, y)?;
+        let store = self.app.document(self.doc?)?.doc.store();
+        let z = plan.elevation + reviera_core::floors::DEFAULT_CEILING_OFFSET;
+        let edges = reviera_core::arrangement::wall_edges(store, z);
+        let lp = reviera_core::arrangement::loop_around(&edges, p)?;
+        Some((plan.level, p, lp.into_iter().map(|e| e.line).collect()))
+    }
+
+    pub(crate) fn ceiling_motion(&mut self, x: i32, y: i32) {
+        let hover = self
+            .ceiling_loop(x, y)
+            .map(|(_, _, l)| l)
+            .unwrap_or_default();
+        if let Some(t) = &mut self.ceiling_tool {
+            t.hover = hover;
+        }
+        let Some(plan) = self.active_view().and_then(|v| v.plan.clone()) else {
+            return;
+        };
+        let z = plan.range.cut as f32 + 0.004;
+        let segments = self
+            .ceiling_tool
+            .as_ref()
+            .map(|t| {
+                t.hover
+                    .iter()
+                    .map(|l| {
+                        [
+                            [l.start[0] as f32, l.start[1] as f32, z],
+                            [l.end[0] as f32, l.end[1] as f32, z],
+                        ]
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+        if let Some(v) = self.viewport() {
+            v.set_overlay_lines(&[Lines {
+                color: HOVER,
+                width: 0.5,
+                segments,
+            }]);
+        }
+    }
+
+    pub(crate) fn ceiling_click(&mut self, x: i32, y: i32) {
+        let frame = self.frame;
+        let Some((level, point, _)) = self.ceiling_loop(x, y) else {
+            return frame.set_status_text("No room enclosed by walls here", 0);
+        };
+        match self.run(
+            "ceiling.create_auto",
+            json!({ "level_id": level, "point": point }),
+        ) {
+            Ok(_) => {
+                self.refresh_scene(&frame);
+                frame.set_status_text("Ceiling placed; click another room, or Esc", 0);
+            }
+            Err(e) => frame.set_status_text(&e, 0),
+        }
     }
 }

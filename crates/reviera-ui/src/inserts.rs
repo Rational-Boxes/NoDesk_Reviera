@@ -347,7 +347,7 @@ impl Gui {
     /// doors' projection pen (selected ones highlighted).
     pub(crate) fn insert_symbol_lines(&mut self, index: usize) -> Vec<Lines> {
         let v = &self.views[index];
-        let Some(plan) = v.plan.clone() else {
+        let Some(plan) = v.plan.clone().filter(|p| !p.ceiling) else {
             return Vec::new();
         };
         let Some(store) = self.app.document(v.doc).map(|d| d.doc.store().clone()) else {

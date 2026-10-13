@@ -908,11 +908,17 @@ impl WgpuViewport {
                 ..Default::default()
             });
             pass.set_bind_group(0, &self.bind_group, &[]);
-            for (pipeline, mesh) in [
-                (&self.opaque_pipeline, &self.opaque),
-                (&self.transparent_pipeline, &self.transparent),
-                (&self.transparent_pipeline, &self.overlay),
+            // A ceiling plan looks up: the model above its cut would hide the cut from the
+            // top-down camera, so only its plan graphics are drawn.
+            let look_up = self.plan.as_ref().is_some_and(|p| p.graphics.look_up);
+            for (pipeline, mesh, model) in [
+                (&self.opaque_pipeline, &self.opaque, true),
+                (&self.transparent_pipeline, &self.transparent, true),
+                (&self.transparent_pipeline, &self.overlay, false),
             ] {
+                if model && look_up {
+                    continue;
+                }
                 if let Some((buffer, count)) = mesh {
                     pass.set_pipeline(pipeline);
                     pass.set_vertex_buffer(0, buffer.slice(..));

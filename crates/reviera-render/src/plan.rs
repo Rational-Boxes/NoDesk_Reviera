@@ -53,6 +53,9 @@ pub struct PlanGraphics {
     pub scale: f32,
     /// The cut edges with their element, for snapping and annotation references.
     pub cut_edges: Vec<CutEdge>,
+    /// A reflected ceiling plan: it looks up, so the shaded model (above the cut, nearer the
+    /// top-down camera) is not drawn; projection lines show it.
+    pub look_up: bool,
 }
 
 pub const POCHE: [f32; 4] = [0.035, 0.038, 0.045, 1.0];
@@ -351,6 +354,7 @@ pub fn plan_graphics(
         }
     }
     PlanGraphics {
+        look_up: bottom > cut,
         top: hi,
         bottom: lo,
         poche,

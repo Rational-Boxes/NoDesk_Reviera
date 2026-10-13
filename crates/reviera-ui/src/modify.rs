@@ -780,6 +780,7 @@ impl Gui {
     pub(crate) fn any_tool(&self) -> bool {
         self.tool.is_some()
             || self.sketch.is_some()
+            || self.ceiling_tool.is_some()
             || self.dim_tool.is_some()
             || self.grid_tool.is_some()
             || self.insert_tool.is_some()

@@ -47,6 +47,7 @@ impl App {
         let e = store
             .get(view)
             .ok_or_else(|| Error::new("view.not_found", format!("no view {view}")))?;
+        let ceiling = views::view_data(e).is_some_and(|d| d.kind == plans::KIND_CEILING_PLAN);
         views::view_data(e)
             .filter(|d| plans::is_plan(&d.kind))
             .ok_or_else(|| Error::new("view.not_a_plan", format!("view {view} is not a plan")))?;
@@ -56,7 +57,12 @@ impl App {
             .param(views::VIEW_KEY)
             .and_then(|v| v.get("scale")?.as_f64())
             .unwrap_or(100.0);
-        let bottom = (range.bottom - FLOOR_TOLERANCE).min(range.depth).max(-1e6);
+        // A ceiling plan looks up from its cut plane to its top.
+        let bottom = if ceiling {
+            range.top.min(1e6)
+        } else {
+            (range.bottom - FLOOR_TOLERANCE).min(range.depth).max(-1e6)
+        };
         let pens = standards::pen_set(store);
         let styles = standards::object_styles(store);
         let weights = |element: Option<ElementId>| {
@@ -128,7 +134,7 @@ impl App {
                 .and_then(reviera_core::walls::wall_recipe)
                 .is_some_and(|r| Some(&r.base_level) == level.as_ref());
             let swing = p.swing();
-            if !on_level || swing.is_empty() {
+            if ceiling || !on_level || swing.is_empty() {
                 continue;
             }
             let z = range.cut as f32;

@@ -66,6 +66,11 @@ in the specification (Chapter 2, §2.11.10–2.11.11). CAD import is not built y
   holes, and Edit Boundary changes it later. Floors have types with a thickness, a height
   offset, and area, perimeter and volume in Properties; they are saved as `IfcSlab` with an
   extruded profile (`floor.create`, `floor.edit_boundary`, `floor.set_level`).
+- **Ceilings and ceiling plans**: Architecture › Ceiling places an automatic ceiling in the room
+  under the cursor (its edges follow the walls' finish faces, and move with them), or Sketch
+  Ceiling. Ceilings have types with a thickness and sit 2600 mm above their level by default.
+  View › Ceiling Plan makes reflected ceiling plans, cut at 2300 mm and looking up. Saved as
+  `IfcCovering` (CEILING) (`ceiling.create_auto`, `ceiling.create`, `ceiling.edit_boundary`).
 - **Doors and windows**: Architecture › Door (DR) and Window (WN) place them in Reviera walls in
   plans or 3D: the preview follows the cursor along the wall, the cursor's side sets the facing
   and Spacebar flips a door's hand. Walls are cut, plans show door swings, and each new door or

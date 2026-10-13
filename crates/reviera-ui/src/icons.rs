@@ -159,6 +159,15 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "flip_hand" => format!(
             r#"<path d="M16 6v20" {s}/><path d="M4 16h8M8 12l-4 4 4 4M28 16h-8M24 12l4 4-4 4" {sa}/>"#
         ),
+        "ceiling" => format!(
+            r#"<path d="M3 10l9-6h17l-9 6z" fill="{f}" {s}/><path d="M3 10v3h17v-3M20 13l9-6V4" {s}/><path d="M8 18v8M16 18v8M24 18v8" {sa} stroke-dasharray="2 2"/>"#
+        ),
+        "auto_ceiling" => format!(
+            r#"<rect x="4" y="5" width="24" height="22" fill="{f}" {s}/><path d="M7 8h18v16H7z" {sa}/><path d="M16 12l3 6h-6z" fill="{a}"/>"#
+        ),
+        "ceiling_plan" => format!(
+            r#"<rect x="4" y="5" width="24" height="22" fill="{f}" {s}/><path d="M4 12h24M4 19h24M12 5v22M20 5v22" {sa} stroke-width="1.2"/>"#
+        ),
         "floor" => format!(
             r#"<path d="M3 20l9-7h17l-9 7z" fill="{f}" {s}/><path d="M3 20v4h17v-4M20 24l9-7v-4" {s}/><path d="M8 18h12" {sa}/>"#
         ),

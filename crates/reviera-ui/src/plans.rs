@@ -33,13 +33,25 @@ pub struct PlanState {
     pub cut_edges: Rc<Vec<reviera_render::plan::CutEdge>>,
     /// The drawing scale denominator (100 for 1:100).
     pub scale: f32,
+    /// A reflected ceiling plan: it looks up from the cut plane.
+    pub ceiling: bool,
 }
 
 impl PlanState {
-    /// Elevations drawn: from the bottom (with the floor tolerance) to the cut plane.
+    /// Elevations drawn (low, high): from the bottom (with the floor tolerance) to the cut
+    /// plane, or for a ceiling plan from the cut plane up to the top.
     pub fn drawn(&self) -> (f32, f32) {
+        if self.ceiling {
+            return (self.range.cut as f32, self.range.top.min(1e6) as f32);
+        }
         let bottom = (self.range.bottom - FLOOR_TOLERANCE).min(self.range.depth);
         (bottom.max(-1e6) as f32, self.range.cut as f32)
+    }
+
+    /// The far end of what the plan shows (below the cut, or above it for a ceiling plan).
+    pub fn far(&self) -> f32 {
+        let (lo, hi) = self.drawn();
+        if self.ceiling { hi } else { lo }
     }
 }
 
@@ -52,9 +64,10 @@ impl Gui {
     ) -> Option<PlanState> {
         let store = self.app.document(doc)?.doc.store();
         let data = views::view_data(store.get(element?)?)?;
-        if data.kind != KIND_PLAN {
+        if !plans::is_plan(&data.kind) {
             return None;
         }
+        let ceiling = data.kind == plans::KIND_CEILING_PLAN;
         let guid = data.level.clone()?;
         let level = plans::levels(store).into_iter().find(|l| l.1 == guid)?;
         let range = plans::resolve(store, &guid, data.view_range.as_ref()?).ok()?;
@@ -69,6 +82,7 @@ impl Gui {
                 .get(element?)
                 .and_then(|e| e.param(views::VIEW_KEY)?.get("scale")?.as_f64())
                 .unwrap_or(100.0) as f32,
+            ceiling,
         })
     }
 
@@ -85,7 +99,7 @@ impl Gui {
             return;
         }
         let doc = v.doc;
-        let (bottom, cut) = plan.drawn();
+        let (cut, bottom) = (plan.range.cut as f32, plan.far());
         let Some(scene) = self.scenes.get(&doc) else {
             return;
         };
@@ -174,6 +188,20 @@ impl Gui {
 
     /// View › New Floor Plan: plans for the chosen levels, then the last one opens.
     pub(crate) fn new_floor_plans(&mut self) {
+        self.new_plans(false);
+    }
+
+    /// View › New Ceiling Plan: reflected ceiling plans for the chosen levels.
+    pub(crate) fn new_ceiling_plans(&mut self) {
+        self.new_plans(true);
+    }
+
+    fn new_plans(&mut self, ceiling: bool) {
+        let (kind, arg, title) = if ceiling {
+            (plans::KIND_CEILING_PLAN, "ceiling_plan", "New Ceiling Plan")
+        } else {
+            (KIND_PLAN, "floor_plan", "New Floor Plan")
+        };
         let frame = self.frame;
         let Some(doc) = self.doc else { return };
         let Some(store) = self.app.document(doc).map(|d| d.doc.store().clone()) else {
@@ -182,7 +210,7 @@ impl Gui {
         let planned: Vec<String> = store
             .iter()
             .filter_map(views::view_data)
-            .filter(|d| d.kind == KIND_PLAN)
+            .filter(|d| d.kind == kind)
             .filter_map(|d| d.level)
             .collect();
         // Levels that already have a plan are not listed (Do not duplicate existing views).
@@ -200,11 +228,20 @@ impl Gui {
             })
             .collect();
         if levels.is_empty() {
-            return frame.set_status_text("Every level already has a floor plan", 0);
+            return frame.set_status_text(
+                &format!(
+                    "Every level already has a {}",
+                    if ceiling {
+                        "ceiling plan"
+                    } else {
+                        "floor plan"
+                    }
+                ),
+                0,
+            );
         }
         let names: Vec<&str> = levels.iter().map(|l| l.1.as_str()).collect();
-        let dialog =
-            MultiChoiceDialog::builder(&frame, "Levels:", "New Floor Plan", &names).build();
+        let dialog = MultiChoiceDialog::builder(&frame, "Levels:", title, &names).build();
         dialog.set_selections(&(0..names.len() as i32).collect::<Vec<_>>());
         if dialog.show_modal() != ID_OK {
             return;
@@ -217,10 +254,7 @@ impl Gui {
         if ids.is_empty() {
             return;
         }
-        match self.run(
-            "view.create_plan",
-            json!({ "kind": "floor_plan", "level_ids": ids }),
-        ) {
+        match self.run("view.create_plan", json!({ "kind": arg, "level_ids": ids })) {
             Ok(v) => {
                 if let Some(last) = v.as_array().and_then(|a| a.last()).and_then(Value::as_u64) {
                     self.open_view(doc, Some(ElementId(last)));
