@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Reviera contributors
 
 fn main() {
-    let registry = reviera_core::command::CommandRegistry::new();
+    let registry = reviera_core::command::CommandRegistry::with_core();
     println!(
         "NoDesk Reviera {} ({} commands registered)",
         env!("CARGO_PKG_VERSION"),

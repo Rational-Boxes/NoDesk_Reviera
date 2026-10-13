@@ -1,49 +1,279 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Reviera contributors
 
-//! The single command registry. Each command is described once and surfaced automatically to the
-//! ribbon and shortcuts, to Lua as `reviera.<command>(...)`, and to MCP as one tool per command.
+//! The single command registry (DM-CMD-001, DM-CMD-002). Each command is described once and
+//! surfaced automatically to the ribbon and shortcuts, to Lua as `reviera.<command>(...)` and to MCP
+//! as one tool per command. [`CommandRegistry::execute`] is the one execution path for every caller.
 
 use std::collections::BTreeMap;
+use std::fmt;
+use std::panic::{AssertUnwindSafe, catch_unwind};
 
-use serde::Serialize;
+use schemars::JsonSchema;
+use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize};
+use serde_json::{Value, json};
 
-/// How a command interacts with the undo history.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+use crate::change::ChangedSummary;
+use crate::document::{Commit, Document};
+use crate::error::{Error, Result};
+use crate::origin::{Caller, Permission};
+use crate::store::Store;
+use crate::txn::{Transaction, Warning};
+
+/// What a command may do. Permissions and undo behaviour are derived from these.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
-pub enum UndoBehaviour {
-    /// Runs in a transaction and records one undo step.
-    Undoable,
-    /// Changes no model state (queries, view navigation).
-    ReadOnly,
-    /// Joins the enclosing transaction group of a multi-step tool.
-    Grouped,
+pub enum Effect {
+    Read,
+    Edit,
+    FileRead,
+    FileWrite,
+    Network,
+    Script,
+    Ui,
+    Destructive,
+    Settings,
 }
 
-/// Declarative description of a command, the source of its UI, Lua and MCP surfaces.
-#[derive(Debug, Clone, Serialize)]
+/// Domains reserved for Reviera's own commands; add-in commands cannot use them (DM-CMD-002).
+pub const RESERVED_DOMAINS: &[&str] = &[
+    "ui",
+    "view",
+    "sheet",
+    "schedule",
+    "annotate",
+    "wall",
+    "floor",
+    "roof",
+    "door",
+    "modify",
+    "str",
+    "mep",
+    "analysis",
+    "bimserver",
+    "link",
+    "workset",
+    "element",
+    "instance",
+    "type",
+    "family",
+    "family_doc",
+    "cme",
+    "param",
+    "paramlib",
+    "global",
+    "units",
+    "material",
+    "object_style",
+    "line_pattern",
+    "line_style",
+    "line_weight",
+    "fill_pattern",
+    "project",
+    "location",
+    "coordinates",
+    "position",
+    "site",
+    "building",
+    "spatial",
+    "phase",
+    "standards",
+    "purge",
+    "classification",
+    "keynotes",
+    "file",
+    "import",
+    "export",
+    "validate",
+    "rxd",
+    "edit",
+    "warnings",
+    "failure",
+    "regen",
+    "registry",
+    "script",
+    "addin",
+    "graph",
+    "mcp",
+    "model",
+    "settings",
+    "snaps",
+    "image",
+    "pset",
+    "qto",
+    "host",
+    "subcategory",
+    "formula",
+    "journal",
+    "external_props",
+    "library",
+    "numbering",
+    "decal",
+    "txn",
+];
+
+/// A command's published definition: the source of its UI, Lua, MCP and documentation surfaces.
+#[derive(Debug, Clone, PartialEq, Serialize, JsonSchema)]
 pub struct CommandSpec {
-    /// Dotted canonical name, e.g. `wall.create`.
-    pub name: &'static str,
-    pub summary: &'static str,
-    /// JSON Schema of the parameters.
-    pub params: serde_json::Value,
+    /// `domain.verb` or `domain.sub.verb`, lower snake case.
+    pub name: String,
+    /// Increased on any breaking change to parameters or result.
+    pub version: u32,
+    pub summary: String,
+    pub description: String,
+    /// JSON Schema (draft 2020-12) of the arguments.
+    pub params: Value,
     /// JSON Schema of the result.
-    pub returns: serde_json::Value,
-    pub undo: UndoBehaviour,
+    pub result: Value,
+    pub effects: Vec<Effect>,
+    pub undoable: bool,
+    pub transaction_name: String,
 }
 
-#[derive(Debug, thiserror::Error, PartialEq, Eq)]
-pub enum RegistryError {
-    #[error("command `{0}` is already registered")]
-    Duplicate(&'static str),
-    #[error("command name `{0}` is not a dotted lowercase identifier")]
-    InvalidName(&'static str),
+impl CommandSpec {
+    /// The lowest permission level that may run the command (DM-MCP-005). The `model_edit` limits on
+    /// `file_write` (output folder only) and `destructive` (confirm mode) are enforced by the MCP layer.
+    pub fn min_permission(&self) -> Permission {
+        use Effect::*;
+        if self.effects.iter().all(|e| *e == Read) {
+            Permission::ReadOnly
+        } else if self
+            .effects
+            .iter()
+            .all(|e| matches!(e, Read | Edit | Settings | Ui | FileWrite | Destructive))
+        {
+            Permission::ModelEdit
+        } else {
+            Permission::FullScripting
+        }
+    }
+
+    fn edits(&self) -> bool {
+        self.effects.contains(&Effect::Edit)
+    }
 }
 
-#[derive(Debug, Default)]
+/// Static description of a Rust command; the schemas come from its parameter and output types.
+#[derive(Debug, Clone, Copy)]
+pub struct CommandMeta {
+    pub name: &'static str,
+    pub version: u32,
+    pub summary: &'static str,
+    pub description: &'static str,
+    pub effects: &'static [Effect],
+    /// Undo name, for example "Wall" or "Modify type attributes".
+    pub transaction_name: &'static str,
+}
+
+/// A typed command implemented in Rust.
+pub trait Command: Send + Sync + 'static {
+    type Params: DeserializeOwned + JsonSchema;
+    type Output: Serialize + JsonSchema;
+    const META: CommandMeta;
+
+    fn run(&self, cx: &mut CommandContext<'_>, params: Self::Params) -> Result<Self::Output>;
+}
+
+/// The result of every command call: `{result, warnings[], changed}`.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct Outcome {
+    pub result: Value,
+    pub warnings: Vec<Warning>,
+    pub changed: ChangedSummary,
+}
+
+// One per command call, on the stack; boxing the transaction would only add an allocation.
+#[allow(clippy::large_enum_variant)]
+#[derive(Debug)]
+enum State<'a> {
+    Read(&'a Document),
+    Edit(Transaction<'a>),
+    /// Core commands that drive the document themselves (undo, redo).
+    Direct(&'a mut Document),
+}
+
+/// What a running command can see and do.
+#[derive(Debug)]
+pub struct CommandContext<'a> {
+    registry: &'a CommandRegistry,
+    caller: &'a Caller,
+    state: State<'a>,
+    pub(crate) direct_commit: Option<Commit>,
+}
+
+impl<'a> CommandContext<'a> {
+    pub fn caller(&self) -> &Caller {
+        self.caller
+    }
+
+    pub fn registry(&self) -> &CommandRegistry {
+        self.registry
+    }
+
+    /// The model as the command currently sees it, including its own uncommitted edits.
+    pub fn store(&self) -> &Store {
+        match &self.state {
+            State::Read(d) => d.store(),
+            State::Edit(t) => t.store(),
+            State::Direct(d) => d.store(),
+        }
+    }
+
+    /// The document, for read-only commands that need more than the store (versions, history).
+    pub fn document(&self) -> Result<&Document> {
+        match &self.state {
+            State::Read(d) => Ok(d),
+            State::Direct(d) => Ok(d),
+            State::Edit(_) => Err(Error::new(
+                "txn.open",
+                "the document is inside this command's transaction",
+            )),
+        }
+    }
+
+    /// The command's transaction. Only commands with the `edit` effect have one.
+    pub fn edit(&mut self) -> Result<&mut Transaction<'a>> {
+        match &mut self.state {
+            State::Edit(t) => Ok(t),
+            _ => Err(Error::new(
+                "effect.read_only",
+                "the command is not declared with the `edit` effect",
+            )),
+        }
+    }
+
+    pub(crate) fn document_mut(&mut self) -> Result<&mut Document> {
+        match &mut self.state {
+            State::Direct(d) => Ok(d),
+            _ => Err(Error::new(
+                "internal",
+                "the command has no direct document access",
+            )),
+        }
+    }
+}
+
+type Handler = Box<dyn Fn(&mut CommandContext<'_>, Value) -> Result<Value> + Send + Sync>;
+
+struct Entry {
+    spec: CommandSpec,
+    validator: jsonschema::Validator,
+    handler: Handler,
+    direct: bool,
+}
+
+#[derive(Default)]
 pub struct CommandRegistry {
-    commands: BTreeMap<&'static str, CommandSpec>,
+    commands: BTreeMap<String, Entry>,
+}
+
+impl fmt::Debug for CommandRegistry {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("CommandRegistry")
+            .field("commands", &self.commands.keys().collect::<Vec<_>>())
+            .finish()
+    }
 }
 
 impl CommandRegistry {
@@ -51,31 +281,45 @@ impl CommandRegistry {
         Self::default()
     }
 
-    pub fn register(&mut self, spec: CommandSpec) -> Result<(), RegistryError> {
-        let valid = spec.name.split('.').count() >= 2
-            && spec.name.split('.').all(|part| {
-                part.starts_with(|c: char| c.is_ascii_lowercase())
-                    && part
-                        .chars()
-                        .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
-            });
-        if !valid {
-            return Err(RegistryError::InvalidName(spec.name));
+    /// A registry holding the core commands defined in this crate.
+    pub fn with_core() -> Self {
+        let mut registry = Self::new();
+        crate::builtin::register(&mut registry);
+        registry
+    }
+
+    /// Registers a Rust command.
+    pub fn add<C: Command>(&mut self, command: C) -> Result<()> {
+        self.add_typed(command, false)
+    }
+
+    pub(crate) fn add_direct<C: Command>(&mut self, command: C) -> Result<()> {
+        self.add_typed(command, true)
+    }
+
+    /// Registers a command defined at run time by an add-in, named `<addin-id>.<verb>`.
+    pub fn register_addin(
+        &mut self,
+        spec: CommandSpec,
+        handler: impl Fn(&mut CommandContext<'_>, Value) -> Result<Value> + Send + Sync + 'static,
+    ) -> Result<()> {
+        let domain = spec.name.split('.').next().unwrap_or_default();
+        if RESERVED_DOMAINS.contains(&domain) {
+            return Err(Error::new(
+                "registry.reserved_domain",
+                format!("`{}` uses the reserved domain `{domain}`", spec.name),
+            ));
         }
-        if self.commands.contains_key(spec.name) {
-            return Err(RegistryError::Duplicate(spec.name));
-        }
-        self.commands.insert(spec.name, spec);
-        Ok(())
+        self.insert(spec, Box::new(handler), false)
     }
 
     pub fn get(&self, name: &str) -> Option<&CommandSpec> {
-        self.commands.get(name)
+        self.commands.get(name).map(|e| &e.spec)
     }
 
     /// Commands in name order.
     pub fn iter(&self) -> impl Iterator<Item = &CommandSpec> {
-        self.commands.values()
+        self.commands.values().map(|e| &e.spec)
     }
 
     pub fn len(&self) -> usize {
@@ -85,40 +329,171 @@ impl CommandRegistry {
     pub fn is_empty(&self) -> bool {
         self.commands.is_empty()
     }
+
+    /// Runs a command: checks permission, validates the arguments, opens a transaction for
+    /// editing commands, and commits on success or rolls back on error or panic.
+    pub fn execute(
+        &self,
+        doc: &mut Document,
+        name: &str,
+        args: Value,
+        caller: &Caller,
+    ) -> Result<Outcome> {
+        let entry = self.commands.get(name).ok_or_else(|| {
+            Error::new(
+                "registry.unknown_command",
+                format!("no command named `{name}`"),
+            )
+        })?;
+        let required = entry.spec.min_permission();
+        if caller.permission < required {
+            return Err(Error::new(
+                "permission.denied",
+                format!("`{name}` needs a higher permission level"),
+            )
+            .with_details(json!({ "required": required })));
+        }
+        let args = if args.is_null() { json!({}) } else { args };
+        let problems: Vec<String> = entry
+            .validator
+            .iter_errors(&args)
+            .map(|e| e.to_string())
+            .collect();
+        if !problems.is_empty() {
+            return Err(
+                Error::new("args.invalid", format!("invalid arguments for `{name}`"))
+                    .with_details(json!({ "errors": problems })),
+            );
+        }
+
+        let state = if entry.direct {
+            State::Direct(doc)
+        } else if entry.spec.edits() {
+            State::Edit(doc.transaction(entry.spec.transaction_name.clone(), caller.origin.clone()))
+        } else {
+            State::Read(doc)
+        };
+        let mut cx = CommandContext {
+            registry: self,
+            caller,
+            state,
+            direct_commit: None,
+        };
+        let result = catch_unwind(AssertUnwindSafe(|| (entry.handler)(&mut cx, args)))
+            .unwrap_or_else(|panic| {
+                let msg = panic
+                    .downcast_ref::<&str>()
+                    .map(|s| s.to_string())
+                    .or_else(|| panic.downcast_ref::<String>().cloned())
+                    .unwrap_or_default();
+                Err(Error::new(
+                    "command.panicked",
+                    format!("`{name}` failed: {msg}"),
+                ))
+            })?;
+
+        let commit = match cx.state {
+            State::Edit(txn) => Some(txn.commit()),
+            _ => cx.direct_commit,
+        };
+        let (warnings, changed) = commit.map(|c| (c.warnings, c.changed)).unwrap_or_default();
+        Ok(Outcome {
+            result,
+            warnings,
+            changed,
+        })
+    }
+
+    fn add_typed<C: Command>(&mut self, command: C, direct: bool) -> Result<()> {
+        let m = C::META;
+        let spec = CommandSpec {
+            name: m.name.into(),
+            version: m.version,
+            summary: m.summary.into(),
+            description: m.description.into(),
+            params: schema_value(schemars::schema_for!(C::Params)),
+            result: schema_value(schemars::schema_for!(C::Output)),
+            effects: m.effects.to_vec(),
+            undoable: m.effects.contains(&Effect::Edit) && !direct,
+            transaction_name: m.transaction_name.into(),
+        };
+        let handler: Handler = Box::new(move |cx, args| {
+            let params: C::Params = serde_json::from_value(args).map_err(|e| {
+                Error::new(
+                    "args.invalid",
+                    format!("invalid arguments for `{}`: {e}", C::META.name),
+                )
+            })?;
+            let output = command.run(cx, params)?;
+            serde_json::to_value(output).map_err(|e| Error::new("internal", e.to_string()))
+        });
+        self.insert(spec, handler, direct)
+    }
+
+    fn insert(&mut self, spec: CommandSpec, handler: Handler, direct: bool) -> Result<()> {
+        if !valid_name(&spec.name) {
+            return Err(Error::new(
+                "registry.invalid_name",
+                format!("`{}` is not a dotted lower-snake-case name", spec.name),
+            ));
+        }
+        if self.commands.contains_key(&spec.name) {
+            return Err(Error::new(
+                "registry.duplicate",
+                format!("`{}` is already registered", spec.name),
+            ));
+        }
+        let validator = jsonschema::validator_for(&spec.params)
+            .map_err(|e| Error::new("registry.invalid_schema", format!("`{}`: {e}", spec.name)))?;
+        self.commands.insert(
+            spec.name.clone(),
+            Entry {
+                spec,
+                validator,
+                handler,
+                direct,
+            },
+        );
+        Ok(())
+    }
+}
+
+fn schema_value(schema: schemars::Schema) -> Value {
+    serde_json::to_value(schema).expect("JSON Schemas always serialise")
+}
+
+fn valid_name(name: &str) -> bool {
+    name.split('.').count() >= 2
+        && name.split('.').all(|part| {
+            part.starts_with(|c: char| c.is_ascii_lowercase())
+                && part
+                    .chars()
+                    .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
+        })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json::json;
-
-    fn spec(name: &'static str) -> CommandSpec {
-        CommandSpec {
-            name,
-            summary: "",
-            params: json!({"type": "object"}),
-            returns: json!({}),
-            undo: UndoBehaviour::Undoable,
-        }
-    }
 
     #[test]
-    fn registers_and_rejects_duplicates() {
-        let mut r = CommandRegistry::new();
-        r.register(spec("wall.create")).unwrap();
-        assert_eq!(
-            r.register(spec("wall.create")),
-            Err(RegistryError::Duplicate("wall.create"))
-        );
-        assert_eq!(r.len(), 1);
-    }
-
-    #[test]
-    fn rejects_malformed_names() {
-        let mut r = CommandRegistry::new();
-        for bad in ["wall", "Wall.create", "wall..create", "wall.2d"] {
-            assert_eq!(r.register(spec(bad)), Err(RegistryError::InvalidName(bad)));
+    fn names_are_dotted_lower_snake_case() {
+        for good in [
+            "wall.create",
+            "view.set_scale",
+            "family_doc.form.extrusion",
+            "org.example.tools.renumber",
+        ] {
+            assert!(valid_name(good), "{good}");
         }
-        r.register(spec("view.set_scale")).unwrap();
+        for bad in [
+            "wall",
+            "Wall.create",
+            "wall..create",
+            "wall.2d",
+            "wall.create-new",
+        ] {
+            assert!(!valid_name(bad), "{bad}");
+        }
     }
 }
