@@ -3,7 +3,7 @@
 **Document:** Functional and technical specification of Reviera, an open-source BIM authoring application
 **Functional reference:** Autodesk® Revit® 2026/2027 (described from public sources only; see `RESEARCH_LOG.md`)
 **Licence of Reviera:** GPL-3.0-or-later
-**Version:** 0.1 (draft) · 2026-10-12 · **Size:** 761 numbered requirements (318 P0 · 264 P1 · 173 P2 · 6 P3), 1,934 commands
+**Version:** 0.1 (draft) · 2026-10-12 · **Size:** 762 numbered requirements (318 P0 · 265 P1 · 173 P2 · 6 P3), 1,938 commands
 
 > **Clean-room statement.** This specification describes features, workflows and behaviour in Reviera's own words. Every input was publicly available: vendor online help, public blogs and tutorials, public forums and open-source repositories. All of it is listed with URLs and access checks in `SOURCE_REGISTER.md`. No proprietary, confidential, leaked or NDA-covered information was used. No vendor code, binaries, file formats or assets were examined or copied. Autodesk and Revit are trademarks of Autodesk, Inc. They are used here only to identify the functional reference. Reviera is not affiliated with or endorsed by Autodesk.
 
@@ -32,7 +32,7 @@ This document covers:
 | 5 | Views, graphics, annotation, schedules, sheets, output |
 | 6 | Collaboration, linking and coordination (Local and BIMserver modes) |
 | 7 | Advanced features beyond the reference product: scene protocol, simulated walkthroughs, Godot translation layer for VR/AR, render bridges |
-| A | Appendix A: requirement summary, shared commands, consolidated command index (1,934 commands; 761 requirements) |
+| A | Appendix A: requirement summary, shared commands, consolidated command index (1,938 commands; 762 requirements) |
 
 Out of scope:
 - reproducing vendor-cloud services such as ACC/Forma and Autodesk Assistant (open alternatives are specified instead)

@@ -540,6 +540,65 @@ These principles apply to every requirement in this chapter.
 - [ ] Dragging a face grip updates the viewport at interactive frame rates (at least 30 fps on the reference model, Chapter 1 performance targets).
 - [ ] *Selection Box* on one room's furniture produces a box that contains all of it with the default margin (300 mm).
 
+### Blueprint mode (3D slice to 2D drawing)
+**ID:** DOC-VIEW-013 · **Priority:** P1 · **Ref:** owner requirement (2026-10-12); builds on DOC-VIEW-002, DOC-VR-001, DOC-VIEW-008 and §5.12
+
+**Purpose.** Go from the 3D model to a conventional 2D drawing in one step. The user slices the model where they want to look, and Reviera turns the slice into the drawing an architect would draw there: a horizontal slice through a storey becomes a floor plan, and a vertical slice becomes a section. The transition is continuous, so the user can see how the drawing comes out of the model.
+
+**Workflow.**
+1. In any 3D view the user turns on **Blueprint mode**: View Control Bar › Blueprint, or the default shortcut BP.
+2. Reviera proposes a slice:
+   - **Horizontal** (default): at the cut-plane height of the level nearest the camera target (the level's default view range, DOC-VR-001).
+   - **Vertical**: when the camera looks more horizontal than down (pitch below 30°), at the section box face or the plane through the camera target facing the camera.
+   
+   The slice plane shows as a translucent plane with a grip. Dragging the grip moves the cut, Tab cycles horizontal and vertical, and clicking a level in the Project Browser snaps the cut to that level's cut plane.
+3. The user confirms with Enter or by clicking **Convert to drawing**. The camera animates (about 0.6 s) to orthographic, looking straight at the slice: down onto a horizontal slice, or along the normal of a vertical one. The model above (or in front of) the cut is removed, and the graphics change to drawing conventions:
+   - cut elements show cut patterns (poché) and cut line weights;
+   - elements below the cut, within the view depth, show in projection;
+   - elements beyond the view depth are hidden, or shown as underlay as the view range says;
+   - hidden lines are removed (Hidden Line style, §5.12).
+4. While in Blueprint mode the view behaves as a plan (or section) view:
+   - annotation tools are available: dimensions, tags and text;
+   - modelling tools work on the slice plane (the level's work plane for horizontal slices).
+5. **Exit** (Esc, or the View Control Bar toggle) animates back to the previous 3D camera.
+6. **Save as view** creates a real plan view (DOC-VIEW-002), or a section (DOC-VIEW-004), with the slice's level, view range or section line. Annotation placed during the session moves to the new view. Without saving, annotation placed in Blueprint mode stays with the 3D view's blueprint state (see Data).
+
+**Behaviour & rules.**
+- **Drawing equivalence.** A horizontal blueprint of a level, with the level's default view range, produces the same draw list (§5.12) as a new floor plan of that level with the default plan view template. The draw list includes linework, cut patterns, line weights, hidden-line results and which categories show. The acceptance criteria compare the two.
+- **Slice choice.**
+  - A horizontal slice uses the level's view range: cut plane, top, bottom and view depth. The slice grip moves the cut plane only, and the other planes keep their offsets.
+  - A vertical slice uses a section-like range: far clip at the section box, or the model extents.
+- **Presentation style.** The drawing uses the view's graphics (object styles, overrides and filters) in black on white by default. An optional **Blueprint colour scheme** draws white and cyan linework on a blueprint-blue background. It is a display setting for the view; printing and export use the normal print colours unless the user chooses otherwise.
+- **Live model.**
+  - Edits made while in Blueprint mode regenerate the drawing at once: the GPU-assisted hidden-line path on screen, and the exact OCCT pipeline when printing.
+  - Undoing past the moment Blueprint mode was entered does not leave the mode.
+- **Navigation in the drawing.**
+  - Orbit is disabled. Pan and zoom work as in plan views.
+  - Orbiting with the mouse, or clicking the ViewCube, offers to exit Blueprint mode.
+- **Performance.** Converting the reference model's typical storey to a drawing takes under 1 s on the reference hardware (Chapter 1 targets), animation included. Moving the slice grip updates the cut at interactive rates, at least 20 fps, using GPU clip planes and caps (DOC-HLR-006) before the exact drawing is computed when the grip is released.
+
+**Data (RXD).** `blueprint` block of a `view.3d` payload:
+- `enabled`
+- `slice`: `{kind: horizontal, level_id, cut_offset}` or `{kind: vertical, origin, normal}`
+- `range` (the view range used)
+- `colourScheme`: `default` or `blueprint`
+- `savedCamera` (the camera to return to)
+- `annotations[]` (ids of annotation placed in blueprint mode and not yet moved to a saved view)
+
+**Commands.**
+`view.blueprint(view_id, on: bool, slice?: {kind, level_id?, cut_offset?, origin?, normal?}) -> ()`
+`view.blueprint_set_slice(view_id, slice) -> ()`
+`view.blueprint_save_as_view(view_id, name?) -> view_id`
+`view.blueprint_set_colour_scheme(view_id, scheme: default|blueprint) -> ()`
+
+**Acceptance criteria.**
+- [ ] In the default 3D view of a two-storey model, Blueprint mode on the ground floor shows a floor plan whose draw list equals that of a new floor plan of that level with the same view range: same linework and cut patterns, within drawing tolerance.
+- [ ] Dragging the slice grip from 1200 mm to 900 mm above the level updates the cut at 20 fps or more, and on release the drawing shows windows with sills above 900 mm in projection rather than cut.
+- [ ] *Save as view* creates a plan named after the level. Two dimensions placed in Blueprint mode appear in the new plan and no longer in the 3D view.
+- [ ] Esc returns to the exact previous 3D camera (eye, target and projection).
+- [ ] With a section box enabled and a horizontal camera, Blueprint mode proposes a vertical slice on the box face nearest the camera, and the drawing matches a section through the same plane.
+- [ ] `view.blueprint` from Lua and MCP turns the mode on and off with the same result as the UI.
+
 ### Displaced elements (exploded views)
 **ID:** DOC-VIEW-012 · **Priority:** P2 · **Ref:** research/04 §3.1 (modal display modes: *Highlight Displacement*); web: About Displacement Sets, About Displacement Set Paths, Create a Displacement Set, Edit a Displacement Set, Create Displacement Set Paths, Modify Displacement Set Path Style and Display, Reset a Displacement Set, Highlight Displacement Sets
 
@@ -3082,6 +3141,10 @@ Every command below is registered once in the command registry and is therefore 
 | `walkthrough.set_timing` | view_id, total_frames, fps, uniform_speed? | () | Yes | DOC-VIEW-007 |
 | `view.set_section_box` | view_id, enabled, transform?, min?, max? | () | Yes | DOC-VIEW-008 |
 | `view.fit_section_box` | element_ids[], view_id?, margin? | view_id | Yes | DOC-VIEW-008 |
+| `view.blueprint` | view_id, on: bool, slice? | () | No | DOC-VIEW-013 |
+| `view.blueprint_set_slice` | view_id, slice | () | No | DOC-VIEW-013 |
+| `view.blueprint_save_as_view` | view_id, name? | view_id | Yes | DOC-VIEW-013 |
+| `view.blueprint_set_colour_scheme` | view_id, scheme: default\|blueprint | () | No | DOC-VIEW-013 |
 | `view.create_drafting` | name, scale | view_id | Yes | DOC-VIEW-009 |
 | `view.insert_from_file` | path, view_names[]? | view_id[] | Yes | DOC-VIEW-009 |
 | `view.save_to_library` | view_ids[], path | () | No | DOC-VIEW-009 |
