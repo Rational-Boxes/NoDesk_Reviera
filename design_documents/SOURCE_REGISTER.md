@@ -18,11 +18,14 @@ Excluded from the register: two help-site directory roots and one URL template p
 | tutorial / reseller / press / data provider | 9 |
 | open-source / api-reference | 8 |
 | vendor-blog | 8 |
+| press | 8 |
 | vendor-web | 6 |
-| forum | 2 |
+| forum | 3 |
+| open-source project docs | 3 |
 | community-wiki | 2 |
-| open-standard / open-source | 1 |
-| **Total** | **685** |
+| open-standard / open-source | 4 |
+| standards-body blog | 1 |
+| **Total** | **701** |
 
 ## Flagged for review
 
@@ -34,7 +37,7 @@ Excluded from the register: two help-site directory roots and one URL template p
 | Gap-fill sources S0578 onward marked "search summary" in the agents' notes (two COL help pages) | Facts taken from public search-result summaries of public help pages | The pages themselves are public (HTTP 200 on re-check). |
 | `research/03` | Quotes Autodesk Help text heavily | Kept internal. The specification paraphrases it (conventions rule 1.1). |
 
-## A. Sources (685)
+## A. Sources (701)
 
 | ID | Area | Type | URL | Status | Public-availability test |
 |----|------|------|-----|--------|--------------------------|
@@ -723,6 +726,22 @@ Excluded from the register: two help-site directory roots and one URL template p
 | S0683 | COL | vendor-help | https://help.autodesk.com/cloudhelp/2022/ENU/Revit-Collaborate/files/GUID-17AB868B-03C9-473F-9951-03BE6A947968.htm | 200 | PASS: public (HTTP 200, unauthenticated) |
 | S0684 | COL | vendor-help | https://help.autodesk.com/cloudhelp/2025/ENU/Revit-Collaborate/files/GUID-AC3ADD25-CDBB-42BB-9C08-CED25E647B2B.htm | 200 | PASS: public (HTTP 200, unauthenticated) |
 | S0685 | COL | vendor-help | https://help.autodesk.com/cloudhelp/2014/ENU/Revit/files/GUID-FAE15E6C-81A8-42A2-A7F1-3FD22A362EDA.htm | 200 | PASS: public (HTTP 200, unauthenticated) |
+| S0686 | ADV | standards-body blog | https://www.khronos.org/blog/godot-openxr-integration-project-update-major-openxr-features-now-production-ready | 200 | PASS: public (HTTP 200, unauthenticated) |
+| S0687 | ADV | press | https://vr.org/articles/godot-4-7-xr-steam-frame-android-xr-open-source-2026 | 200 | PASS: public (HTTP 200, unauthenticated) |
+| S0688 | ADV | press | https://vr.org/articles/godot-openxr-vendors-plugin-v5-1-android-xr-may-2026 | 200 | PASS: public (HTTP 200, unauthenticated) |
+| S0689 | ADV | press | https://vr.org/articles/godot-46-xr-engine-meta-funding | 200 | PASS: public (HTTP 200, unauthenticated) |
+| S0690 | ADV | press | https://uploadvr.com/godot-now-supports-more-xr-features-builds-a-universal-openxr-apk | 200 | PASS: public (HTTP 200, unauthenticated) |
+| S0691 | ADV | open-source project docs | https://godotengine.org/article/godot-xr-update-oct-2024/ | 200 | PASS: public (HTTP 200, unauthenticated) |
+| S0692 | ADV | open-source project docs | https://godotengine.org/article/godot-openxr-vendors-plugin-400/ | 200 | PASS: public (HTTP 200, unauthenticated) |
+| S0693 | ADV | press | https://www.roadtovr.com/openxr-update-godot-unity-game-engine/ | 200 | PASS: public (HTTP 200, unauthenticated) |
+| S0694 | ADV | press | https://alternativeto.net/news/2026/1/godot-4-6-debuts-modern-theme-jolt-physics-node-ids-and-libgodot-embed | 403 | PASS: public page; automated access blocked or rate-limited (bot protection), no login required |
+| S0695 | ADV | press | https://www.phoronix.com/news/Godot-4.6-Released | 200 | PASS: public (HTTP 200, unauthenticated) |
+| S0696 | ADV | open-source project docs | https://godotengine.org/article/dev-snapshot-godot-4-6-dev-2/ | 200 | PASS: public (HTTP 200, unauthenticated) |
+| S0697 | ADV | forum | https://forum.godotengine.org/t/does-godot-4-support-ar-for-android-and-ios/88658 | 200 | PASS: public (HTTP 200, unauthenticated) |
+| S0698 | ADV | press | https://www.roadtovr.com/?p=172858 | 200 | PASS: public (HTTP 200, unauthenticated) |
+| S0699 | COL | open-standard / open-source | https://github.com/buildingSMART/BCF-API | 200 | PASS: public (HTTP 200, unauthenticated) |
+| S0700 | COL | open-standard / open-source | https://github.com/buildingSMART/foundation-API | 200 | PASS: public (HTTP 200, unauthenticated) |
+| S0701 | COL | open-standard / open-source | https://github.com/buildingSMART/documents-API | 200 | PASS: public (HTTP 200, unauthenticated) |
 
 ## B. Screenshots (142) — internal reference only
 

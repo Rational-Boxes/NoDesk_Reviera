@@ -1388,6 +1388,7 @@ The reference product's rendering engine is not documented publicly, so this sec
 
 **Behaviour & rules.**
 - The renderer uses `wgpu` (Vulkan, Metal, Direct3D 12, or OpenGL ES fallback), drawing into the native child window that the wxWidgets view frame provides (TECH_STACK §3.4).
+- It is the built-in **render backend** (DOC-RBE-001): it consumes the same Render Scene and deltas as any plug-in backend, and is always present for editing, selection and 2D views.
 - It draws per-element instanced meshes from the OCCT tessellation cache. Family instances that share a type share their mesh. Large models use frustum culling, a BVH, and occlusion culling from the previous frame's depth.
 - Per-element resolved graphics (colour, transparency, halftone, visibility) live in a GPU buffer updated from the graphics resolver; a filter or override change updates the buffer without re-tessellating.
 - Visual-style features: edges from the B-rep edge cache; silhouettes from a depth/normal edge-detection pass; shadows by cascaded shadow maps; ambient shadows by screen-space ambient occlusion; sketchy lines and depth cueing in shaders using the same deterministic noise as print (DOC-GFX-012); transparency by weighted blended order-independent transparency; physically based shading (metallic/roughness) for Realistic, with materials taken from `IfcSurfaceStyleRendering` and the material's RXD appearance data (Chapter 2).
@@ -1436,6 +1437,64 @@ The reference product's rendering engine is not documented publicly, so this sec
 - [ ] A shaded 3D view on a sheet prints as a 300 dpi image, while its title and the title block remain vector (selectable text in the PDF).
 - [ ] An A0 sheet with a shaded viewport at Presentation quality prints without visible tile seams.
 - [ ] Exporting the same shaded sheet twice gives identical raster data.
+
+---
+
+### Pluggable render backends
+**ID:** DOC-RBE-001 · **Priority:** P0 (interface, with the built-in viewport as its first implementation), P2 (third-party backends) · **Ref:** owner directive 2026-10-12 (pluggable renderer for future photo-real and game-engine walkthroughs); TECH_STACK §3.2
+
+**Purpose.** Keep 3D presentation open to other renderers. A realistic offline renderer, a game engine or Blender can show a Reviera model without changes to the core. The built-in `wgpu` viewport (DOC-HLR-005) is the first backend behind the same interface, not a special case.
+
+**Architecture.**
+```
+ model transactions ──► graphics resolver (DOC-GFX-001) ──► Render Scene (render-agnostic)
+                                                               │  snapshot + deltas
+            ┌──────────────────────────┬───────────────────────┼──────────────────────────────┐
+            ▼                          ▼                       ▼                              ▼
+   built-in wgpu viewport     in-process plug-in       out-of-process bridge          offline renderer
+   (always present; editing,  (Rust/C ABI; GPL-       (Reviera Scene Protocol,       (stills, animations;
+    picking, 2D views)         compatible only)        ADV-RSP-001; any engine)       DOC-OUT-011)
+```
+- **What is pluggable, and what is not.** Only the 3D *presentation* of a scene is pluggable. The 2D drawing pipeline (cut, exact HLR, draw lists, DOC-HLR-001…004), printing and export stay in the core, so drawings are identical whichever backend is installed. Editing, selection, in-canvas controls and annotation always use the built-in viewport.
+- **Render Scene.** The core keeps one render-agnostic scene per open model, built from the graphics resolver and the OCCT tessellation cache:
+  - nodes: one per visible element occurrence, with element GlobalId, category, sub-category, phase/design-option state and a world transform (relative to a tile origin, DOC-HLR-005)
+  - meshes: shared per type and detail level (instancing), with normals, UVs, and optional feature edges as line sets
+  - materials: the physically based description from Reviera appearance assets (base colour, metallic, roughness, transmission, IOR, emission, normal/bump/height maps, decals)
+  - lights: lighting-fixture light sources with IES LM-63 photometry and light groups, sun from the project location and time, sky model, environment image
+  - cameras: view cameras, section boxes and clip planes as metadata (a backend may ignore what it cannot show, see capabilities)
+  - per-element resolved graphics: visibility, colour override, transparency, halftone
+- **Deltas.** Each committed transaction produces a scene delta (nodes, meshes or materials added, changed or removed; graphics changes; light and sun changes). Deltas are coalesced per frame for the built-in viewport and per sync interval (default 250 ms) for external backends.
+- **Backend interface.** A backend implements: `describe() -> capabilities`, `open(scene_snapshot, target)`, `apply(delta)`, `set_camera(camera)`, `render(request) -> frames/tiles` (offline kinds), `pick(x, y) -> GlobalId?` (optional), and `close()`. A failing backend is unloaded, its views fall back to the built-in viewport, and the failure is reported. It never takes the model down with it.
+- **Capabilities** declared by each backend: kinds (`interactive`, `walkthrough`, `offline_still`, `offline_animation`, `vr`); clip planes and section boxes; feature-edge display; Reviera visual styles supported (DOC-GFX-011); IES lights; decals; picking; maximum scene size; colour pipeline (sRGB, HDR, ACES). The UI only offers a backend for tasks its capabilities cover. For example, a backend without clip planes is not offered for a view with an active section box, unless the user accepts "ignore section box".
+- **Selecting a backend.** Each 3D view has a *Presentation backend* property (default: built-in). Render (DOC-OUT-011) and walkthrough sessions (ADV-WALK-001) choose from the backends offering that kind. User preferences hold the default backend per kind.
+- **Discovery.** Backends are registered by add-in manifests (DM-ADDIN-001) with a `render_backend` entry (id, name, kinds, version, licence SPDX, entry point: library path or executable plus protocol version). `render.backend.list()` reports installed backends with their capabilities and health.
+
+**Commands.** `render.backend.list() -> backend_info[]` (query); `render.backend.set_default(kind, backend_id) -> ()`; `view.set_presentation_backend(view_id, backend_id?) -> ()` (none restores the built-in viewport); `render.backend.test(backend_id) -> report` (loads it against a sample scene and reports capabilities, timing and errors).
+
+**Acceptance criteria.**
+- [ ] The built-in viewport passes the same backend conformance suite as third-party backends (snapshot, 10 000 deltas, camera moves, picking).
+- [ ] Unloading or crashing a third-party backend returns its views to the built-in viewport within 2 s, with no model change and no lost undo history.
+- [ ] Printed and exported drawings are byte-identical whichever presentation backend the 3D views use.
+- [ ] A backend that lacks clip planes is not offered for a view with an active section box, unless the user explicitly accepts "ignore section box".
+
+### Backend hosting and licensing
+**ID:** DOC-RBE-002 · **Priority:** P2 · **Ref:** owner directive 2026-10-12; TECH_STACK §4.2
+
+**Purpose.** Allow backends under different licences while keeping the GPL boundary clean.
+
+**Behaviour & rules.**
+- **In-process plug-ins** (dynamic library with a versioned C ABI wrapped by a Rust trait) run inside Reviera and are add-ins. They must carry a GPL-compatible SPDX licence (TECH_STACK §4.2, DM-ADDIN-003). Suitable for renderers such as Cycles (Apache-2.0), LuxCoreRender (Apache-2.0) or Mitsuba 3 (BSD-3-Clause).
+- **Out-of-process bridges** are separate programs that talk to Reviera only through the documented Reviera Scene Protocol (ADV-RSP-001), in the same way as MCP clients. Reviera ships no code of theirs and loads none. This is how game engines and other applications attach, for example a Blender add-on (Blender is GPL), a Godot (MIT) or Bevy (MIT/Apache-2.0) walkthrough application, or a user-built bridge to an engine under a proprietary licence that the user installs themselves. Whether a particular bridge stays at arm's length is for its authors; Reviera's obligation is to keep the protocol public and the boundary process-based. *(Legal review recommended before any official bridge to a proprietary engine.)*
+- **Isolation.** An external bridge receives a *read-only* scene. It can send back only: camera and walk-pose updates, pick results (GlobalIds), viewpoint captures (for BCF, COL-BCF-001) and render results (images for the render gallery). It can never send model edits. A bridge that also wants to edit must use the MCP server with its own token and permission class (DM-MCP-002), subject to the usual approvals.
+- **Connection security.** Bridges connect to a local endpoint (Unix domain socket or named pipe; loopback TCP only if enabled). A per-session token is handed over at launch or shown in the *Connect backend* dialog. Remote connections are off by default. When enabled they require TLS and a token, and the scene stream can be limited to the active view's visible elements.
+- **Resource limits.** Per bridge: maximum scene upload rate, maximum texture resolution sent (default 4096 px), and an option to send simplified meshes (a coarser detail level) for large models.
+
+**Commands.** `render.bridge.launch(backend_id, view_id?, args?) -> session_id` (starts the configured executable with a session token); `render.bridge.connect_info() -> {endpoint, token}` (for bridges started by hand; the token is shown in the UI and is **never** exposed through MCP resources); `render.bridge.disconnect(session_id) -> ()`; `render.bridge.list_sessions() -> session_info[]` (query).
+
+**Acceptance criteria.**
+- [ ] An in-process plug-in whose manifest licence is not on the GPL-compatible allow-list is refused at load time, with the reason shown.
+- [ ] An external bridge that sends a model-edit message is disconnected and the attempt is logged. The model is unchanged.
+- [ ] With remote connections disabled (the default), connecting from another host fails.
 
 ---
 
@@ -2891,7 +2950,7 @@ All output commands work on an immutable **model snapshot** taken when the comma
 4. *Save to project* creates a rendering view (placeable on a sheet); *Export* writes PNG, JPEG, TIFF, or OpenEXR (high dynamic range).
 
 **Behaviour & rules.**
-- **Renderer back-ends** are optional plug-ins behind one Rust trait (scene in, image tiles out):
+- **Renderer back-ends** are render backends of kind `offline_still`/`offline_animation` (DOC-RBE-001). In-process ones are plug-ins behind the backend trait (scene in, image tiles out); external ones (for example a Blender bridge) attach through the Reviera Scene Protocol (ADV-RSP-001) and return images with `render.result`:
   - **Reviera path tracer** (built in, optional at build time): a progressive unidirectional path tracer in `wgpu` compute shaders, with a BVH built on the GPU, multiple importance sampling, and the same materials as the Realistic style. It also drives the *Path Traced* visual style (DOC-GFX-011).
   - **Cycles** (Apache-2.0), used as the standalone library, as an external render engine with CPU and GPU devices.
   - Others that fit the trait with GPL-compatible licences may be added, for example LuxCoreRender (Apache-2.0) or Mitsuba 3 (BSD-3-Clause).
@@ -3319,6 +3378,14 @@ Every command below is registered once in the command registry and is therefore 
 | `render.export` | job_id_or_view_id, path, format | () | No | DOC-OUT-011 |
 | `render.list_renderers` | — | renderer_info[] | No | DOC-OUT-011 |
 | `render.gallery` | — | () | No | DOC-OUT-011 |
+| `render.backend.list` | — | backend_info[] | No (query) | DOC-RBE-001 |
+| `render.backend.set_default` | kind, backend_id | () | No (user preference) | DOC-RBE-001 |
+| `render.backend.test` | backend_id | report | No | DOC-RBE-001 |
+| `view.set_presentation_backend` | view_id, backend_id? (none: built-in) | () | Yes | DOC-RBE-001 |
+| `render.bridge.launch` | backend_id, view_id?, args? | session_id | No | DOC-RBE-002 |
+| `render.bridge.connect_info` | — | {endpoint, token} (UI only; never exposed as an MCP resource) | No | DOC-RBE-002 |
+| `render.bridge.disconnect` | session_id | () | No | DOC-RBE-002 |
+| `render.bridge.list_sessions` | — | session_info[] | No (query) | DOC-RBE-002 |
 | `decal.place` | view_id, decal_type_id, face_ref, position, width?, height? | element_id | Yes | DOC-OUT-011 |
 | `decaltype.create` | name, image_asset_or_path, attributes? | type_id | Yes | DOC-OUT-011 |
 | `export.animation` | view_id, kind: walkthrough\|solar_study, path, frames?, fps?, size, style?, format: images\|webm\|mp4 | job_id | No | DOC-OUT-012 |
@@ -3348,6 +3415,7 @@ Every command below is registered once in the command registry and is therefore 
 | D5-15 | Assembly members | Whole system elements (beam systems, trusses, curtain walls, stairs, railings, reinforcement systems) may be members of an assembly as nested aggregates; parts are members through `IfcRelAssignsToProduct` (DOC-ASM-001). | The reference refuses complex structures; IFC allows nested `IfcElementAssembly`, and precast and steel shop assemblies need it. |
 | D5-16 | Assembly views after a type change | When an edited owner instance joins a type that already has views, the user chooses which set to keep (DOC-ASM-004). | The reference deletes one set without a choice. |
 | D5-17 | Render gallery | A local render history with exposure re-adjustment (DOC-OUT-011) replaces the reference's cloud render gallery. | Vendor cloud services are out of scope (P3). |
+| D5-19 | Pluggable presentation backends | The reference product has one built-in renderer plus a vendor cloud service. Reviera puts all 3D presentation behind an open backend interface (DOC-RBE-001…002). The scene protocol, walkthroughs, the Godot translation layer for VR/AR and the reference bridges are specified in Chapter 7. | Owner directive 2026-10-12: future photo-real, game-engine and Blender backends for simulated walkthroughs. |
 | D5-18 | Displaced elements | Displacement is a pure per-view transform, so constrained or hosted elements can be displaced; dimensions to displaced elements are refused instead (DOC-VIEW-012). | The model is never moved, so constraints cannot be violated; a dimension would report a false distance. |
 
 **Open questions.**
@@ -3424,6 +3492,7 @@ Every command below is registered once in the command registry and is therefore 
 | §6.6 (decals, cloud render gallery); web: Place a Decal in a View, Decal Type Properties, Decal Attributes | DOC-OUT-011 |
 | web: Define Sun Settings for a View | DOC-GFX-012 |
 | web: Filters Dialog | DOC-GFX-006 |
+| Owner directive 2026-10-12 (pluggable renderer; Godot translation layer for walkthrough and VR/AR); Khronos glTF 2.0 and OpenXR public specifications | DOC-RBE-001 … 002 (and Chapter 7) |
 | §10 Version change log | Version-specific behaviours folded into the requirements above (for example DOC-SHT-005, DOC-SHT-006, DOC-ANN-012, DOC-GFX-008) |
 
 Screenshots consulted (internal reference only, never used as Reviera assets): all files in `screenshots/documentation/` that are cited in the requirement headers above.

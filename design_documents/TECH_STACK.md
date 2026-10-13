@@ -73,6 +73,12 @@ This is how the requirement that *all* operations are exposed to AI agents is me
 - OCCT is C++ under **LGPL-2.1 with the OCCT exception**. Access will be through an FFI binding layer; the existing `opencascade-rs` crates are a possible starting point, but may need extending.
 - OCCT data structures are not uniformly thread-safe. Parallel regeneration should give each worker its own shapes and avoid sharing mutable `TopoDS` state across threads. Boolean operations support internal parallelism (`SetRunParallel`).
 - Rendering: tessellate in OCCT and render with a custom **`wgpu`** pipeline inside a wx-hosted native window, instead of OCCT's own AIS viewer (decided 2026-10-12; see §5.2). Exact 2D drawing output still comes from OCCT's hidden-line algorithms (spec Ch 5 §5.12).
+- **Pluggable presentation (owner directive, 2026-10-12).** All 3D presentation goes through a render backend interface fed by a render-agnostic *Render Scene* (snapshot plus per-transaction deltas). The `wgpu` viewport is the built-in backend. Other backends can be:
+  - in-process plug-ins, which must be GPL-compatible
+  - external programs speaking the open **Reviera Scene Protocol** (glTF 2.0 snapshot with a `REVIERA_scene` extension, plus streamed deltas). Blender, game engines and others connect this way.
+  - an **internal translation layer to Godot** (MIT) and similar engines, for desktop walkthroughs and full VR/AR through OpenXR.
+
+  Drawings, printing and export never depend on the chosen backend. See spec Ch 5 DOC-RBE-001…002 and Ch 7 (advanced features).
 
 ### 3.3 Rust core (multi-core)
 - **Live model store.** Every committed transaction's change set is passed to a dedicated writer thread. That thread group-commits it, every 250 ms, into a local SQLite database (WAL mode) holding the materialised IFC entities, the decoded RXD and the transaction journal. If Reviera crashes, the model and its undo history are restored from this database. The `.ifc` file stays the canonical saved format. See `spec/02b_live_model_store.md`.
@@ -174,6 +180,7 @@ Both modes sit behind one **`ModelStore` trait** in the Rust core. Editing, rege
 | Path | Licence | Reason |
 |------|---------|--------|
 | `schemas/rxd/` (RXD JSON Schemas, examples, format description) | **MIT** | So any tool can adopt the RXD format (owner decision, 2026-10-12; `spec/02a_extension_data_format.md` §12) |
+| `schemas/rsp/`, `clients/rsp/` (Reviera Scene Protocol schemas, `REVIERA_scene` glTF extension, reference client libraries) | **MIT** | So any renderer, engine or Blender add-on can implement a bridge (spec Ch 5 ADV-RSP-001) |
 | Everything else | GPL-3.0-or-later | Project licence |
 
 ### 4.1 Dependency compatibility
@@ -192,6 +199,9 @@ Both modes sit behind one **`ModelStore` trait** in the Rust core. Editing, rege
 | rmcp (MCP SDK) | Apache-2.0 | Yes | Apache-2.0 works with GPL-**3**, but not with GPL-2-only. |
 | wxDragon | MIT OR Apache-2.0 | Yes | Our patches are contributed under the same licence so upstream can take them |
 | wgpu | MIT OR Apache-2.0 | Yes | — |
+| Godot Engine (translation layer, ADV-XR-001) | MIT | Yes | Bundled, either embedded or as a supervised child process |
+| OpenXR loader | Apache-2.0 | Yes (GPL-3) | VR/AR runtime access |
+| External render bridges (Blender add-on, third-party engines) | Their own | n/a (separate programs) | They talk only over the public scene protocol; nothing of theirs is bundled or loaded in-process |
 
 ### 4.2 Implications
 

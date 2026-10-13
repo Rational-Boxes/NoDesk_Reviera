@@ -18,7 +18,7 @@ This chapter specifies how several people and several models work together in Re
 | COL-CORE-002 | **GlobalId is identity.** Every rooted IFC object keeps its GlobalId for life. Copies get new GlobalIds. Merges, links, monitors, clashes and BCF issues all refer to elements by GlobalId; RXD objects are referred to by their stable ids. Moving an element to another storey, workset or type never changes its GlobalId. An imported file with duplicate or malformed GlobalIds is repaired by *Audit* (COL-MNT-002) before it can be published to BIMserver; publishing is refused with `model.duplicate_globalid` until then. References into links use `link:<linkId>/ifc:<GlobalId>` (Chapter 2a). | P0 |
 | COL-CORE-003 | **Never lose work silently.** Every merge, conflict decision and ownership override is recorded in a sync report that the user can reopen (Collaborate › Show History › *Sync reports*; the last 50 are kept in the working copy). Changes that lose a conflict are kept in a recoverable *conflict stash* (COL-MRG-002) until the user discards them. Destructive actions on shared state (*Discard local changes*, *Force relinquish*, *Discard working copy*, *Unload for everyone*) need explicit confirmation naming what will be lost, and MCP agents may call them only with the model-edit permission and an explicit `confirm: true`. | P1 |
 | COL-CORE-004 | **Offline first.** In BIMserver mode a local working copy is always kept, so users can open, edit and save without a connection (COL-OFF-001). Losing the connection never interrupts an edit; only *Synchronise*, *Get latest*, link reloads from the server and new borrows become queued or disabled. Reconnection is automatic and never merges without the user's go-ahead. | P1 |
-| COL-CORE-005 | **Credentials never leak.** Server passwords and tokens (BIMserver and BCF API) are stored in the operating system's credential store. They are never written to RXD, IFC, the working-copy folder, logs, crash reports, sync reports, Lua-visible tables or MCP resources; log lines that would contain a token show `<redacted>`. MCP tools never accept a password or token as a parameter (COL-BIM-001). Signing out removes the stored token. | P0 |
+| COL-CORE-005 | **Credentials never leak.** Server passwords and tokens (BIMserver, BCF API, OpenCDE and other server profiles, COL-API-001) are stored in the operating system's credential store. They are never written to RXD, IFC, the working-copy folder, logs, crash reports, sync reports, Lua-visible tables or MCP resources; log lines that would contain a token show `<redacted>`. MCP tools never accept a password or token as a parameter (COL-BIM-001). Signing out removes the stored token. | P0 |
 
 **Acceptance criteria (principles).**
 - [ ] The same Lua script that creates and tags 100 doors produces identical IFC and RXD content in Local mode and in BIMserver mode (apart from the binding of the file to its server).
@@ -1286,23 +1286,123 @@ Common link fields: `id`, `name`, `source` (see each type), `pathType` (relative
 - [ ] Clicking a viewpoint thumbnail restores that viewpoint in a view.
 - [ ] Saving a topic with an empty title is refused.
 
-### BCF API client
-**ID:** COL-BCF-002 · **Priority:** P2 · **Ref:** research/04 §7.6 (multi-company issue exchange, as context)
+### BCF API client (OpenCDE)
+**ID:** COL-BCF-002 · **Priority:** P1 · **Ref:** research/04 §7.6 (multi-company issue exchange, as context); web: buildingSMART BCF-API (v3.0), OpenCDE Foundation API (v1.1), OpenCDE Documents API (v1.0) repositories (public, accessed 2026-10-12)
 
-**Purpose.** Synchronise issues with an issue server that implements the buildingSMART BCF API (part of the OpenCDE APIs).
+**Purpose.** Use any issue server that implements the buildingSMART **BCF API** as the shared issue tracker for a project, so issues move between Reviera and other BIM tools live, not only as files.
+
+**Workflow.**
+1. Collaborate › Issues › **Connect issue server…** (`bcf.api_connect`): enter the server URL. Reviera reads the server's supported versions and authentication methods through the OpenCDE Foundation API, then signs the user in (COL-API-001).
+2. Choose a project from the server's project list (`bcf.api_bind_project`). The Issues pane (COL-BCF-004) now shows the server's topics. Lists (types, statuses, priorities, labels, stages, users) come from the server's project extensions and are read-only locally.
+3. Work normally. Changes sync automatically (default every 2 minutes and on every local change, after 5 s of quiet) or with *Sync now*.
 
 **Behaviour & rules.**
-- **Connection:** the user adds a BCF server URL; Reviera reads its versions and authentication endpoints (the API's foundation services) and signs in with OAuth 2.0 authorisation code flow with PKCE in the system browser. Tokens are stored in the OS credential store (COL-CORE-005).
-- **Project binding:** the Reviera project is bound to a BCF API project chosen from the server's project list; the binding is client state.
-- **Synchronisation** (manual, or on a timer): fetch topics, comments, viewpoints, snapshots and document references changed since the last sync; push local new or changed items; resolve conflicts per field by modification date, showing a list of overwritten values. Server-side extensions (allowed statuses, types, labels, users) replace the local lists while bound.
-- **Mapping:** topics, comments and viewpoints map one to one onto the RXD issue objects of COL-BCF-001; each local object records its server GUID and last synchronised modification date.
-- Works in Local and BIMserver mode; it is independent of BIMserver.
+- **Versions:** BCF API **3.0** is the target; **2.1** is supported for older servers. The version is negotiated from the server's versions list. Behaviour that only exists in 3.0, such as events and some extension fields, is hidden on 2.1 servers.
+- **Coverage:**
+  - project details and extensions
+  - topics: create, read, update and delete
+  - comments
+  - viewpoints, with snapshots, bitmaps, components, colouring, visibility and clipping planes (mapped through COL-BCF-003)
+  - related topics
+  - document references, both internal documents and external URLs
+  - documents (upload and download)
+  - files information, which links a topic to the IFC model file and revision it refers to: the Reviera model's file name, IFC project GUID and, in BIMserver mode, the revision
+  - topic and comment events (audit history, shown in the topic's *History* tab)
+- **Server permissions:** the per-project, per-topic and per-comment action flags the server returns (for example `update`, `createComment`, `updateRelatedTopics`) drive the UI. Disallowed actions are disabled, with the server's restriction as the tooltip, and are never attempted.
+- **Paging and queries:** lists use the server's OData query options (`$filter`, `$orderby`, `$top`, `$skip`). Incremental sync filters on modification date. Paging continues until done, with a progress indicator for large projects.
+- **Sync and conflicts:**
+  - local edits are queued while offline and replayed in order when the connection returns
+  - each local object records its server GUID and the server modification date it last saw
+  - when a local change conflicts with a newer server value, the server value wins per field, the local value is kept in the topic's *Conflicts* list, and the user can re-apply it with one click
+  - nothing is silently lost
+- **Local copy:** server topics are cached in RXD (`coordination/issues`) for offline reading, so a model file carries a snapshot of its issues. When a project is bound, the server is the source of truth. Unbinding keeps the local copy as ordinary local issues.
+- **Several servers:** one project can be bound to one BCF API project at a time. Topics can be copied between bindings, or to and from BCF files.
+- **Agents:** MCP agents use the same `bcf.*` commands. Server credentials are never exposed to them (COL-CORE-005).
 
-**Commands.** `bcf.api_connect(url) -> connection_id`; `bcf.api_bind_project(connection_id, project_id) -> ()`; `bcf.api_sync(connection_id) -> sync_report`; `bcf.api_disconnect(connection_id) -> ()`
+**Data (IFC/RXD).** Cached topics in `coordination/issues` (kinds `issue.topic`, `issue.extensions`), each with `server: {connection, guid, modified}`. Connection profiles and tokens are client state (COL-API-001), never stored in the model.
+
+**Commands.** `bcf.api_connect(url, profile_name?) -> connection_id`; `bcf.api_list_projects(connection_id) -> project[]` (query); `bcf.api_bind_project(connection_id, project_id) -> ()`; `bcf.api_unbind(keep_local_copy=true) -> ()`; `bcf.api_sync(connection_id?) -> sync_report`; `bcf.api_status() -> {connection, last_sync, queued_changes, conflicts}` (query); `bcf.api_resolve_conflict(topic_id, field, use: server|local) -> ()`; `bcf.api_disconnect(connection_id) -> ()`.
 
 **Acceptance criteria.**
-- [ ] A topic created in Reviera appears on the BCF server after sync, and a comment added on the server appears in Reviera after the next sync.
-- [ ] Losing the connection mid-sync leaves both sides consistent; the next sync completes the transfer.
+- [ ] Against the open-source reference implementation of the OpenCDE APIs and at least one commercial BCF API server, a topic with two viewpoints, a snapshot and a comment created in Reviera appears on the server with its camera, components and image. A comment added on the server appears in Reviera after the next sync.
+- [ ] Losing the connection mid-sync leaves both sides consistent, and the next sync completes the transfer without duplicates.
+- [ ] Ten edits made offline are pushed in order when the connection returns.
+- [ ] An action the server forbids (for example editing a closed topic) is disabled in the pane and never sent.
+- [ ] A conflicting status change keeps both values visible: the server's in the topic, Reviera's in *Conflicts*.
+
+### Issue tracking workflow
+**ID:** COL-BCF-005 · **Priority:** P1 · **Ref:** research/04 §6.7 (*Integrated Issues*, as context), §8.5; web: buildingSMART BCF-API (v3.0); COL-BCF-001, COL-BCF-004
+
+**Purpose.** Make BCF issues a working tracker for coordination and design review, not only an exchange format.
+
+**Behaviour & rules.**
+- **Workflow rules** (optional, per project, in the issue lists):
+  - allowed status transitions, for example Open → In progress → Resolved → Closed, with Reopened allowed from Closed
+  - which statuses need an assignee or a due date
+  - which roles may close a topic
+
+  Invalid transitions are refused with the rule shown. When bound to a server, the server's rules and permissions take precedence (COL-BCF-002).
+- **Sources of issues:**
+  - manual capture (COL-BCF-001)
+  - clash results (COL-CLASH-002, one topic per clash group, with both elements as components)
+  - coordination review items (COL-CM-002)
+  - model warnings (COL-MNT-004)
+  - walkthrough and VR captures (Ch 7 ADV-WALK-001)
+  - view bookmarks (UI-SCEN-002)
+
+  Each topic records its source, and the pane can filter by it.
+- **Element linking:**
+  - selecting a topic highlights its components in all open views
+  - the Properties palette shows a count of open issues for the selected element, with a link
+  - deleting or replacing an element that open issues refer to warns first
+  - issues follow elements across Copy/Monitor by GlobalId
+- **Assignment and notifications:**
+  - assignees come from the project's user list
+  - in-app notifications are raised when a topic is assigned to the user, commented on, changed, or becomes overdue
+  - a daily summary is optional
+  - on a BCF API server, notifications follow server events
+  - e-mail and chat notifications are left to the server or to add-ins
+- **Due dates and stages:** overdue and due-this-week badges; stages (for example design phases) can be used to filter and report.
+- **Reports:**
+  - `bcf.report` produces a PDF or HTML issue report (cover, summary counts by status, assignee and type, then one section per topic with fields, comments and snapshots), a CSV or XLSX list, or a BCF file
+  - report templates are project settings
+  - a schedule-like issue list can be placed on a sheet
+- **Dashboard:** counts by status, assignee, type and age, with a trend of open issues over time (from topic events, or local history when offline), shown in the Issues pane's *Overview* tab.
+- **Bulk edit:** change status, assignee, priority, labels or due date for several selected topics in one step; one undo step for local issues.
+
+**Data (IFC/RXD).** Workflow rules and report templates in `coordination/issues` (kind `issue.extensions`, keys `workflow` and `reportTemplates`). Notification preferences are user settings.
+
+**Commands.** `bcf.set_workflow(rules) -> ()`; `bcf.bulk_update(topic_ids[], fields) -> ()`; `bcf.report(topic_ids[]? | filter?, format: pdf|html|csv|xlsx|bcf, template_id?, path) -> job_id`; `bcf.from_clash(clash_result_ids[], group_by?) -> topic_ids[]`; `bcf.issues_for_element(element_id) -> topic_summary[]` (query); `bcf.notifications(since?) -> notification[]` (query).
+
+**Acceptance criteria.**
+- [ ] With a workflow that forbids Open → Closed, closing an open topic is refused and the allowed next statuses are shown.
+- [ ] Creating topics from 12 clash results grouped by level produces one topic per level, each listing its clashing element pairs as components.
+- [ ] A PDF report of 50 topics contains every topic's fields, comments and first snapshot, with summary counts that match the list.
+- [ ] Selecting an element with two open issues shows "2 open issues" in Properties, and the link filters the pane to them.
+
+### OpenCDE Documents API client
+**ID:** COL-CDE-001 · **Priority:** P2 · **Ref:** web: buildingSMART OpenCDE Documents API (v1.0) and Foundation API (v1.1) repositories (public, accessed 2026-10-12)
+
+**Purpose.** Open models from, and publish models and drawings to, any common data environment (CDE) that implements the OpenCDE Documents API, without a vendor-specific connector.
+
+**Workflow.**
+1. **Open from CDE:** File › Open › *From CDE…* (`cde.select_documents`). Reviera starts a selection session. The CDE's own document picker opens in the system browser, and the user picks one or more files there. Reviera then downloads the chosen versions: IFC opens as a model, other files as links or attachments.
+2. **Publish to CDE:** File › Export › *Publish to CDE…* (`cde.upload_documents`). Reviera starts an upload session for the files to publish (the IFC model, a clean IFC export, PDF sheet sets, BCF). The user enters the CDE's metadata in its own web form, and Reviera uploads the binary data in the chunks the CDE specifies.
+3. **Stay current:** a document opened from a CDE remembers its document and version. Reviera polls the CDE's document-versions endpoint (with ETags) and shows "A newer version is available" with *Open newer version*.
+
+**Behaviour & rules.**
+- Sign-in and server profiles use COL-API-001. A CDE that also offers the BCF API can be bound for issues with the same profile (COL-BCF-002).
+- Downloads are verified against the CDE's reported size and hash where given. Partial downloads resume.
+- Publishing a model that has local unsaved changes asks whether to save first. Clean-IFC publishing uses `export.ifc{strip_rxd=true}`.
+- BCF *files information* and document references can point at CDE document versions, so issues link to the exact published file.
+- Works in Local mode. In BIMserver mode, the CDE is an additional publication target, and the BIMserver remains the model's working store.
+
+**Commands.** `cde.connect(url, profile_name?) -> connection_id`; `cde.select_documents(connection_id) -> selection_session_id`; `cde.download(selection_session_id, target_folder?) -> files[]`; `cde.upload_documents(connection_id, files[]) -> upload_session_id`; `cde.upload_status(upload_session_id) -> status` (query); `cde.check_versions(document_ids[]?) -> version_info[]` (query); `cde.disconnect(connection_id) -> ()`.
+
+**Acceptance criteria.**
+- [ ] Against the open-source reference implementation, a user can pick an IFC file in the CDE's browser UI and Reviera opens that exact version.
+- [ ] Publishing an IFC and a PDF sheet set creates two documents in the CDE with the metadata entered in its form.
+- [ ] After someone uploads a newer version in the CDE, Reviera shows the newer-version notice within the polling interval (default 5 minutes).
 
 ### Viewpoint mapping
 **ID:** COL-BCF-003 · **Priority:** P1 · **Ref:** research/04 §1.5 (3D views, section box), §3.5 (hide/isolate)
@@ -1317,6 +1417,46 @@ Common link fields: `id`, `name`, `source` (see each type), `pathType` (relative
 **Acceptance criteria.**
 - [ ] Restoring a viewpoint with a section box reproduces the box within 1 mm and the camera within 0.1°.
 - [ ] A viewpoint that isolates three elements shows only those three when restored.
+
+---
+
+## 6.9a Integration services
+
+### Shared REST and authentication client
+**ID:** COL-API-001 · **Priority:** P1 · **Ref:** TECH_STACK §3.7.1 (async HTTP client); web: OpenCDE Foundation API (v1.1) authentication conventions; COL-CORE-005
+
+**Purpose.** One network client for every server Reviera talks to (BIMserver JSON API, BCF API, OpenCDE Documents API, library and analysis services, add-ins), so authentication, proxies, security and reliability work the same everywhere.
+
+**Behaviour & rules.**
+- **Stack:** an asynchronous HTTP client (`reqwest` on `tokio`, TECH_STACK §3.7.1) running off the UI thread. The UI shows progress and allows cancelling any request that takes longer than 1 s.
+- **Server profiles:** each server is a named profile (URL, kind, authentication method, proxy override, certificate settings) kept in client state. Profiles can be exported, without secrets, for a team.
+- **Authentication:**
+  - OAuth 2.0 authorisation code flow with PKCE in the system browser, using a loopback redirect. This is the default for OpenCDE servers and follows the server's Foundation API authentication description.
+  - OAuth 2.0 device code flow, where offered, for headless and locked-down machines.
+  - API tokens.
+  - BIMserver session tokens (COL-BIM-001).
+  - Tokens are refreshed automatically. Secrets live only in the OS credential store and are never written to logs, the model, the live store, profile exports or MCP resources (COL-CORE-005).
+- **Network environment:** system proxy settings and PAC scripts are honoured, and a per-profile override is allowed. TLS uses the OS trust store; custom CA certificates can be added per profile. Disabling verification needs an explicit per-profile choice, with a red warning in the status bar.
+- **Reliability:**
+  - timeouts: 10 s to connect, 60 s to read, overridable per request
+  - retries with exponential backoff and jitter for idempotent requests and for 429/503 responses, honouring `Retry-After`
+  - ETag/`If-None-Match` caching for polling
+  - resumable chunked transfer for large files
+  - an offline queue for writes that can be replayed (used by COL-BCF-002)
+- **Paging helpers:** OData `$top`/`$skip`/`$filter`/`$orderby` and link-header paging, shared by all clients.
+- **Diagnostics:** a per-profile request log (method, URL path, status, timing; secrets and bodies redacted) under Help › Diagnostics, and `api.profile.test` checks reachability, TLS and authentication.
+- **Scripting:**
+  - Lua scripts get `reviera.http.request(...)` only at trust level `trusted` or `native` (DM-LUA-007), and only to hosts on the script's declared allow-list in its manifest.
+  - Requests made with a stored profile use that profile's authentication without exposing the token to the script.
+  - MCP agents have no raw HTTP access. They use the commands of the services above.
+
+**Commands.** `api.profile.add(name, url, kind, auth_method, options?) -> profile_id`; `api.profile.list() -> profile[]` (query, no secrets); `api.profile.remove(profile_id) -> ()`; `api.profile.test(profile_id) -> report`; `api.signin(profile_id) -> status`; `api.signout(profile_id) -> ()`; `api.log(profile_id, since?) -> entry[]` (query, redacted); `http.request(method, url, headers?, body?, profile_id?) -> response` (Lua at trusted/native trust only; not exposed to MCP).
+
+**Acceptance criteria.**
+- [ ] Behind an authenticating corporate proxy configured by PAC, BIMserver, BCF API and CDE connections all work with no per-service setup.
+- [ ] A server answering 429 with `Retry-After: 5` is retried after 5 s, and the user sees "waiting for server" rather than an error.
+- [ ] No token or password appears in the request log, the model file, the live store, a profile export or any MCP resource (checked by scanning for a known token value).
+- [ ] A Lua script at `standard` trust calling `reviera.http.request` is refused. At `trusted` trust, a call to a host not on its allow-list is refused.
 
 ---
 
@@ -1667,10 +1807,35 @@ Every command below is registered once and is available from the UI, Lua and MCP
 | `bcf.list` | filter? | topic_summary[] | No | COL-BCF-001 |
 | `bcf.issues_pane` | — | () | No | COL-BCF-004 |
 | `bcf.set_extensions` | lists{types?, statuses?, priorities?, labels?, stages?, users?}, replacements?{} | () | Yes | COL-BCF-004 |
-| `bcf.api_connect` | url | connection_id | No | COL-BCF-002 |
+| `bcf.api_connect` | url, profile_name? | connection_id | No | COL-BCF-002 |
+| `bcf.api_list_projects` | connection_id | project[] | No (query) | COL-BCF-002 |
 | `bcf.api_bind_project` | connection_id, project_id | () | No | COL-BCF-002 |
-| `bcf.api_sync` | connection_id | sync_report | No | COL-BCF-002 |
+| `bcf.api_unbind` | keep_local_copy=true | () | No | COL-BCF-002 |
+| `bcf.api_sync` | connection_id? | sync_report | No | COL-BCF-002 |
+| `bcf.api_status` | — | {connection, last_sync, queued_changes, conflicts} | No (query) | COL-BCF-002 |
+| `bcf.api_resolve_conflict` | topic_id, field, use: server\|local | () | Yes | COL-BCF-002 |
 | `bcf.api_disconnect` | connection_id | () | No | COL-BCF-002 |
+| `bcf.set_workflow` | rules | () | Yes | COL-BCF-005 |
+| `bcf.bulk_update` | topic_ids[], fields | () | Yes | COL-BCF-005 |
+| `bcf.report` | topic_ids[]? \| filter?, format: pdf\|html\|csv\|xlsx\|bcf, template_id?, path | job_id | No | COL-BCF-005 |
+| `bcf.from_clash` | clash_result_ids[], group_by? | topic_ids[] | Yes | COL-BCF-005 |
+| `bcf.issues_for_element` | element_id | topic_summary[] | No (query) | COL-BCF-005 |
+| `bcf.notifications` | since? | notification[] | No (query) | COL-BCF-005 |
+| `cde.connect` | url, profile_name? | connection_id | No | COL-CDE-001 |
+| `cde.select_documents` | connection_id | selection_session_id | No | COL-CDE-001 |
+| `cde.download` | selection_session_id, target_folder? | files[] | No | COL-CDE-001 |
+| `cde.upload_documents` | connection_id, files[] | upload_session_id | No | COL-CDE-001 |
+| `cde.upload_status` | upload_session_id | status | No (query) | COL-CDE-001 |
+| `cde.check_versions` | document_ids[]? | version_info[] | No (query) | COL-CDE-001 |
+| `cde.disconnect` | connection_id | () | No | COL-CDE-001 |
+| `api.profile.add` | name, url, kind, auth_method, options? | profile_id | No | COL-API-001 |
+| `api.profile.list` | — | profile[] (no secrets) | No (query) | COL-API-001 |
+| `api.profile.remove` | profile_id | () | No | COL-API-001 |
+| `api.profile.test` | profile_id | report | No | COL-API-001 |
+| `api.signin` | profile_id | status | No | COL-API-001 |
+| `api.signout` | profile_id | () | No | COL-API-001 |
+| `api.log` | profile_id, since? | entry[] (redacted) | No (query) | COL-API-001 |
+| `http.request` | method, url, headers?, body?, profile_id? | response (Lua at trusted/native trust only; not exposed to MCP) | No | COL-API-001 |
 | `bcf.apply_viewpoint` | viewpoint_id, target_view_id? | view_id | No | COL-BCF-003 |
 | `model.purge_preview` | — | purge_tree | No | COL-MNT-001 |
 | `model.purge` | item_ids[]?\|all? | count | Yes | COL-MNT-001 |
@@ -1704,7 +1869,7 @@ Every command below is registered once and is available from the UI, Lua and MCP
 | D7-8 | Point clouds | Open formats (E57, LAS/LAZ, COPC, PLY) indexed to COPC; no proprietary scan formats. | Licensing and openness. |
 | D7-9 | CAD formats | DXF and DWG (through LibreDWG) only; DGN, SAT, SKP, 3DM deferred (P3). | No GPL-compatible readers of sufficient quality for some formats. |
 | D7-10 | Clash detection | Basic interference check (P1) plus saved tests with tolerances, clearance, status tracking and grouping (P2), with BCF output. The reference's in-product check is hard-clash only. | Avoids depending on separate proprietary coordination products. |
-| D7-11 | Issues | BCF 2.1/3.0 files and the buildingSMART BCF API instead of a vendor issue service. | Open standard. |
+| D7-11 | Issues | BCF 2.1/3.0 files, the buildingSMART BCF API (3.0, with 2.1 fallback) and an issue-tracking workflow instead of a vendor issue service; OpenCDE Documents API for CDE exchange instead of a vendor cloud. | Open standards (buildingSMART OpenCDE APIs). |
 | D7-12 | Positioning storage | Shared coordinates stored as standard `IfcMapConversion` / `IfcProjectedCRS`, with grid and true north distinguished explicitly. | Standard georeferencing that other IFC tools read. |
 | D7-13 | Compaction | No compaction command: files are always written in full. | IFC files have no free-space fragmentation. |
 | D7-14 | Model history | Restore creates a new revision; history is never rewritten. | Auditable history; nothing is lost. |
@@ -1742,6 +1907,7 @@ Every command below is registered once and is available from the UI, Lua and MCP
 | §11 Data model summary (worksharing, links) | §6.11 |
 | TECH_STACK §3.7, §3.7.1–3.7.3, §5 | COL-CORE-001, COL-MODE-001 … 002, COL-BIM-001 … 008, COL-MRG-001 … 003, COL-OWN-001 … 004, COL-OFF-001 |
 | spec/02a (RXD format and merge rules) | COL-MRG-001, §6.11 |
+| buildingSMART BCF-API (v3.0), OpenCDE Foundation API (v1.1) and Documents API (v1.0) public repositories (SOURCE_REGISTER S0699–S0701) | COL-BCF-002, COL-BCF-005, COL-CDE-001, COL-API-001 |
 | spec/02 §2.7.4 (DM-FAIL-001, stored warnings) | COL-MRG-003, COL-MNT-004 |
 | web: Specify Coordination Settings (Autodesk public help, 2025) | COL-CM-004 |
 | web: Orphaned elements and the Reconcile Hosting browser (Autodesk public help, 2025) | COL-CM-003 |

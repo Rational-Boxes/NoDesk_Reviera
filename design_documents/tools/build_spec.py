@@ -19,8 +19,9 @@ CHAPTERS = [  # (file, chapter label used in indexes)
     ("04_structure_mep.md", "4"),
     ("05_views_documentation.md", "5"),
     ("06_collaboration_coordination.md", "6"),
+    ("07_advanced_features.md", "7"),
 ]
-AREAS = ["UI", "DM", "ARC", "STR", "MEP", "ANA", "DOC", "COL"]
+AREAS = ["UI", "DM", "ARC", "STR", "MEP", "ANA", "DOC", "COL", "ADV"]
 # Owner of a shared command's signature when it is not the first chapter that lists it.
 OWNERS = {"colorscheme.create": "5", "dim.make_permanent": "5", "export.dwg": "5", "export.dxf": "5",
           "export.gltf": "5", "export.image": "5", "export.obj": "5", "export.pdf": "5",
@@ -30,6 +31,7 @@ OWNERS = {"colorscheme.create": "5", "dim.make_permanent": "5", "export.dwg": "5
 def build_indexes():
     cmds, uses, reqs = collections.OrderedDict(), collections.defaultdict(list), {}
     sigs = collections.defaultdict(set)
+    originals = collections.OrderedDict()
     for fname, ch in CHAPTERS:
         text = (SPEC / fname).read_text()
         in_catalog = False
@@ -55,6 +57,13 @@ def build_indexes():
                     cmds.setdefault(name, (ch, *cells[1:5]))
         for m in re.finditer(r"\*\*ID:\*\*\s*([A-Z]+-[A-Z0-9]+-\d+)[^\n]*?\*\*Priority:\*\*\s*([^·\n]+)", text):
             reqs.setdefault(m.group(1), m.group(2))
+        # Reviera-originated features (owner directives, no reference-product counterpart).
+        # A requirement whose Ref line cites no reference-product research is Reviera's own design.
+        for m in re.finditer(r"^\*\*ID:\*\*\s*([A-Z]+-[A-Z0-9]+-\d+)([^\n]*)", text, re.M):
+            if "research/" in m.group(2) or "web:" in m.group(2):
+                continue
+            title = re.findall(r"^#{3,5} (.+)$", text[:m.start()], re.M)
+            originals.setdefault(m.group(1), (ch, re.sub(r"^[A-Z]+-[A-Z0-9]+-\d+ — ", "", title[-1]) if title else ""))
         # Ranged headers ("**ID:** DM-MAT-002 … 006"): count every ID in the range under the header's priority.
         for m in re.finditer(r"\*\*ID:\*\*\s*([A-Z]+-[A-Z0-9]+-)(\d+)\s*(?:…|\.\.\.|–|-)\s*(\d+)[^\n]*?\*\*Priority:\*\*\s*([^·\n]+)", text):
             pre, a, b, prio = m.group(1), int(m.group(2)), int(m.group(3)), m.group(4)
@@ -62,6 +71,11 @@ def build_indexes():
                 reqs.setdefault(f"{pre}{n:03d}", prio)
         for m in re.finditer(r"^\| ([A-Z]+-[A-Z0-9]+-\d+) \|(.*)\| (P\d[^|]*)\|\s*$", text, re.M):
             reqs.setdefault(m.group(1), m.group(3))
+        # Chapters 2a and 2b (RXD format, live store) are wholly Reviera's own design.
+        if ch in ("2a", "2b"):
+            for m in re.finditer(r"^\| ([A-Z]+-[A-Z0-9]+-\d+) \| ([^|]+)\|", text, re.M):
+                desc = re.sub(r"^Reviera shall ", "", m.group(2).strip().strip("*"))
+                originals.setdefault(m.group(1), (ch, (desc[:90].rsplit(" ", 1)[0] + " …") if len(desc) > 90 else desc))
         # Grouped requirements ("**Priority:** see table"): read the Priority column of tables keyed by ID.
         pri_col = None
         for line in text.split("\n"):
@@ -107,6 +121,13 @@ def build_indexes():
             + (f" ({', '.join('`' + k + '`' for k in mismatched)})." if mismatched else "."), "",
             "| Command | Chapters (owner first) | Signatures |", "|---------|------------------------|------------|"]
     out += [f"| `{k}` | {', '.join(v)} | {'identical' if ok else '**differ**'} |" for k, (v, ok) in sorted(shared.items())]
+    out += ["", "## A.2a Reviera-originated features", "",
+            f"{len(originals)} requirements are Reviera's own design: owner directives, the technology stack (IFC/RXD storage, "
+            "live store, BIMserver, MCP, scripting) and extensions beyond the reference product's feature set. Their Ref lines "
+            "cite no research on the reference product. Listing them separately keeps the clean-room provenance clear: every "
+            "other requirement traces to public research on the reference product.", "",
+            "| Requirement | Ch | Feature |", "|-------------|----|---------|"]
+    out += [f"| {r} | {c} | {t} |" for r, (c, t) in originals.items()]
     out += ["", "## A.3 Consolidated command index", "",
             f"**{len(cmds)} unique commands** in {len(domains)} domains. Every command is exposed automatically to the UI, "
             "to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.", "",

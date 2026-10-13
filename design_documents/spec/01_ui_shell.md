@@ -307,7 +307,7 @@ The chapter **does not** specify the modelling behaviour behind the tools that a
 | Item | Default (click) | Sub-items (right pane) | Commands (owner) | Pri |
 |---|---|---|---|---|
 | New | New Model dialog | Model; Family; Conceptual Mass Family; Title Block; Annotation Symbol; Model Template | `file.new(kind, template?)` (DM) | P0 (mass/title block/symbol P1) |
-| Open | Open dialog | Model (IFC/IFCZIP); Family; From Server…; Sample Files; IFC open options… | `file.open(path, options?)`, `family_doc.open`, `bimserver.open` (COL), `file.ifc_open_options` (DM) | P0 (server P1) |
+| Open | Open dialog | Model (IFC/IFCZIP); Family; From Server…; Sample Files; IFC open options… | `file.open(path, options?)`, `family_doc.open`, `bimserver.open` (COL), `cde.select_documents` (*From CDE…*, COL), `file.ifc_open_options` (DM) | P0 (server P1, CDE P2) |
 | Save | Save (writes the model using its current RXD carrier: embedded, or `.ifc` + `.reviera` sidecar written atomically) | — | `file.save(document_id? (default: active)) -> status` (DM) | P0 |
 | Save As | Save As dialog with an **Options…** button (RXD carrier, below) | Model; Family; Template; Library ▸ Family / Group / View | `file.save_as(document_id? (default: active), path, kind?, format?: ifc\|ifczip, carrier?: embedded\|external_file\|external_dir\|bundle) -> status`, `family.save_as`, `group.save`, `view.save_to_library` (DM) | P0 (library P1) |
 | Export | — | CAD ▸ DWG, DXF, DGN, SAT, STL; Images & Animations ▸ Image, Walkthrough, Sun Study; Reports ▸ Schedule, Room/Area Report; PDF; OBJ; FBX; glTF; gbXML; Family Types; Database (ODBC/SQLite); IFC ▸ (with Reviera data, Clean IFC (strip Reviera data), another schema or MVD); BCF; Export options ▸ (CAD export setups, IFC export setups) | `export.*` (DOC/DM) | PDF P0; CAD, image, schedule P1; others P2 |
@@ -1035,7 +1035,11 @@ Reviera gathers cast-in-place reinforcement and precast tools on one tab from th
 | Coordinate | Interference Check › Run | Sp | `clash.run` | COL | — | P1 |
 | Coordinate | Interference Check › Show Last Report | Sp | `clash.last_report` | COL | — | P1 |
 | Issues | BCF Issues | L | `bcf.issues_pane` | COL | — | P1 |
-| Issues | Import / Export BCF | S | `bcf.import`, `bcf.export` | COL | — | P2 |
+| Issues | Import / Export BCF | S | `bcf.import`, `bcf.export` | COL | — | P1 |
+| Issues | Connect Issue Server (BCF API) | S | `bcf.api_connect` | COL | — | P1 |
+| Issues | Sync Issues | S | `bcf.api_sync` | COL | — | P1 |
+| Issues | Issue Report | S | `bcf.report` | COL | — | P1 |
+| Issues | Server Profiles | S | `api.profile.list` (opens the server profiles dialog: BIMserver, BCF API, CDE; sign in or out, test, proxy and certificates) | COL | — | P1 |
 | Share | Vendor shared views | — | not provided (BCF viewpoints are the open alternative) | — | — | P3 |
 
 Server-mode tools are hidden in Local mode except Connect and Publish to Server (§1.32).
@@ -1057,6 +1061,9 @@ Server-mode tools are hidden in Local mode except Connect and Publish to Server 
 | Graphics | Graphic Display Options | Dl | `view.set_graphic_display` | DOC | GD | P0 |
 | Presentation | Render | L | `render.start` | DOC | RR | P2 |
 | Presentation | Render Gallery (local) | S | `render.gallery` | DOC | — | P2 |
+| Presentation | Walk Through | L | `walkthrough.start` | ADV | WT | P2 |
+| Presentation | VR / AR ▾ (Start VR, Start AR, Tabletop) | Sp | `xr.start{vr\|ar\|tabletop}` | ADV | — | P2 (VR), P3 (AR) |
+| Presentation | Render Backends | S | `render.backend.list` (opens the backends dialog: installed backends, capabilities, defaults, test, connect info) | DOC | — | P2 |
 | Presentation | Cloud rendering | — | not provided | — | — | P3 |
 | Create | 3D View › Default 3D View | Sp | `view.create_3d{default}` | DOC | 3D | P0 |
 | Create | 3D View › Camera | Sp | `view.create_camera` | DOC | — | P1 |

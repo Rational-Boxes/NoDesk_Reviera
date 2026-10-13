@@ -20,6 +20,7 @@
 | [Chapter 4](#chapter-4--structure-steel-concreteprecast-mep-systems-and-analysis) | Structure, Steel, Concrete/Precast, MEP Systems and Analysis | `spec/04_structure_mep.md` |
 | [Chapter 5](#chapter-5--views-graphics-annotation-schedules-sheets-and-output) | Views, Graphics, Annotation, Schedules, Sheets and Output | `spec/05_views_documentation.md` |
 | [Chapter 6](#chapter-6--collaboration-linking-and-coordination) | Collaboration, Linking and Coordination | `spec/06_collaboration_coordination.md` |
+| [Chapter 7](#chapter-7--advanced-features) | Advanced Features | `spec/07_advanced_features.md` |
 | [Appendix A](#appendix-a--consolidated-indexes) | Consolidated Indexes | `spec/A_indexes.md` |
 | [Appendix B](#appendix-b--specification-conventions) | Specification Conventions | `spec/00_conventions.md` |
 
@@ -30,7 +31,7 @@
 **Document:** Functional and technical specification of Reviera, an open-source BIM authoring application
 **Functional reference:** Autodesk® Revit® 2026/2027 (described from public sources only; see `RESEARCH_LOG.md`)
 **Licence of Reviera:** GPL-3.0-or-later
-**Version:** 0.1 (draft) · 2026-10-12 · **Size:** 751 numbered requirements (317 P0 · 261 P1 · 168 P2 · 5 P3), 1,886 commands
+**Version:** 0.1 (draft) · 2026-10-12 · **Size:** 761 numbered requirements (318 P0 · 264 P1 · 173 P2 · 6 P3), 1,933 commands
 
 > **Clean-room statement.** This specification describes features, workflows and behaviour in Reviera's own words. Every input was publicly available: vendor online help, public blogs and tutorials, public forums and open-source repositories. All of it is listed with URLs and access checks in `SOURCE_REGISTER.md`. No proprietary, confidential, leaked or NDA-covered information was used. No vendor code, binaries, file formats or assets were examined or copied. Autodesk and Revit are trademarks of Autodesk, Inc. They are used here only to identify the functional reference. Reviera is not affiliated with or endorsed by Autodesk.
 
@@ -58,7 +59,8 @@ This document covers:
 | 4 | Structure, steel, concrete/precast, MEP systems, analysis |
 | 5 | Views, graphics, annotation, schedules, sheets, output |
 | 6 | Collaboration, linking and coordination (Local and BIMserver modes) |
-| A | Appendix A: requirement summary, shared commands, consolidated command index (1,886 commands; 751 requirements) |
+| 7 | Advanced features beyond the reference product: scene protocol, simulated walkthroughs, Godot translation layer for VR/AR, render bridges |
+| A | Appendix A: requirement summary, shared commands, consolidated command index (1,933 commands; 761 requirements) |
 
 Out of scope:
 - reproducing vendor-cloud services such as ACC/Forma and Autodesk Assistant (open alternatives are specified instead)
@@ -510,7 +512,7 @@ The chapter **does not** specify the modelling behaviour behind the tools that a
 | Item | Default (click) | Sub-items (right pane) | Commands (owner) | Pri |
 |---|---|---|---|---|
 | New | New Model dialog | Model; Family; Conceptual Mass Family; Title Block; Annotation Symbol; Model Template | `file.new(kind, template?)` (DM) | P0 (mass/title block/symbol P1) |
-| Open | Open dialog | Model (IFC/IFCZIP); Family; From Server…; Sample Files; IFC open options… | `file.open(path, options?)`, `family_doc.open`, `bimserver.open` (COL), `file.ifc_open_options` (DM) | P0 (server P1) |
+| Open | Open dialog | Model (IFC/IFCZIP); Family; From Server…; Sample Files; IFC open options… | `file.open(path, options?)`, `family_doc.open`, `bimserver.open` (COL), `cde.select_documents` (*From CDE…*, COL), `file.ifc_open_options` (DM) | P0 (server P1, CDE P2) |
 | Save | Save (writes the model using its current RXD carrier: embedded, or `.ifc` + `.reviera` sidecar written atomically) | — | `file.save(document_id? (default: active)) -> status` (DM) | P0 |
 | Save As | Save As dialog with an **Options…** button (RXD carrier, below) | Model; Family; Template; Library ▸ Family / Group / View | `file.save_as(document_id? (default: active), path, kind?, format?: ifc\|ifczip, carrier?: embedded\|external_file\|external_dir\|bundle) -> status`, `family.save_as`, `group.save`, `view.save_to_library` (DM) | P0 (library P1) |
 | Export | — | CAD ▸ DWG, DXF, DGN, SAT, STL; Images & Animations ▸ Image, Walkthrough, Sun Study; Reports ▸ Schedule, Room/Area Report; PDF; OBJ; FBX; glTF; gbXML; Family Types; Database (ODBC/SQLite); IFC ▸ (with Reviera data, Clean IFC (strip Reviera data), another schema or MVD); BCF; Export options ▸ (CAD export setups, IFC export setups) | `export.*` (DOC/DM) | PDF P0; CAD, image, schedule P1; others P2 |
@@ -1238,7 +1240,11 @@ Reviera gathers cast-in-place reinforcement and precast tools on one tab from th
 | Coordinate | Interference Check › Run | Sp | `clash.run` | COL | — | P1 |
 | Coordinate | Interference Check › Show Last Report | Sp | `clash.last_report` | COL | — | P1 |
 | Issues | BCF Issues | L | `bcf.issues_pane` | COL | — | P1 |
-| Issues | Import / Export BCF | S | `bcf.import`, `bcf.export` | COL | — | P2 |
+| Issues | Import / Export BCF | S | `bcf.import`, `bcf.export` | COL | — | P1 |
+| Issues | Connect Issue Server (BCF API) | S | `bcf.api_connect` | COL | — | P1 |
+| Issues | Sync Issues | S | `bcf.api_sync` | COL | — | P1 |
+| Issues | Issue Report | S | `bcf.report` | COL | — | P1 |
+| Issues | Server Profiles | S | `api.profile.list` (opens the server profiles dialog: BIMserver, BCF API, CDE; sign in or out, test, proxy and certificates) | COL | — | P1 |
 | Share | Vendor shared views | — | not provided (BCF viewpoints are the open alternative) | — | — | P3 |
 
 Server-mode tools are hidden in Local mode except Connect and Publish to Server (§1.32).
@@ -1260,6 +1266,9 @@ Server-mode tools are hidden in Local mode except Connect and Publish to Server 
 | Graphics | Graphic Display Options | Dl | `view.set_graphic_display` | DOC | GD | P0 |
 | Presentation | Render | L | `render.start` | DOC | RR | P2 |
 | Presentation | Render Gallery (local) | S | `render.gallery` | DOC | — | P2 |
+| Presentation | Walk Through | L | `walkthrough.start` | ADV | WT | P2 |
+| Presentation | VR / AR ▾ (Start VR, Start AR, Tabletop) | Sp | `xr.start{vr\|ar\|tabletop}` | ADV | — | P2 (VR), P3 (AR) |
+| Presentation | Render Backends | S | `render.backend.list` (opens the backends dialog: installed backends, capabilities, defaults, test, connect info) | DOC | — | P2 |
 | Presentation | Cloud rendering | — | not provided | — | — | P3 |
 | Create | 3D View › Default 3D View | Sp | `view.create_3d{default}` | DOC | 3D | P0 |
 | Create | 3D View › Camera | Sp | `view.create_camera` | DOC | — | P1 |
@@ -20298,6 +20307,7 @@ The reference product's rendering engine is not documented publicly, so this sec
 
 **Behaviour & rules.**
 - The renderer uses `wgpu` (Vulkan, Metal, Direct3D 12, or OpenGL ES fallback), drawing into the native child window that the wxWidgets view frame provides (TECH_STACK §3.4).
+- It is the built-in **render backend** (DOC-RBE-001): it consumes the same Render Scene and deltas as any plug-in backend, and is always present for editing, selection and 2D views.
 - It draws per-element instanced meshes from the OCCT tessellation cache. Family instances that share a type share their mesh. Large models use frustum culling, a BVH, and occlusion culling from the previous frame's depth.
 - Per-element resolved graphics (colour, transparency, halftone, visibility) live in a GPU buffer updated from the graphics resolver; a filter or override change updates the buffer without re-tessellating.
 - Visual-style features: edges from the B-rep edge cache; silhouettes from a depth/normal edge-detection pass; shadows by cascaded shadow maps; ambient shadows by screen-space ambient occlusion; sketchy lines and depth cueing in shaders using the same deterministic noise as print (DOC-GFX-012); transparency by weighted blended order-independent transparency; physically based shading (metallic/roughness) for Realistic, with materials taken from `IfcSurfaceStyleRendering` and the material's RXD appearance data (Chapter 2).
@@ -20346,6 +20356,64 @@ The reference product's rendering engine is not documented publicly, so this sec
 - [ ] A shaded 3D view on a sheet prints as a 300 dpi image, while its title and the title block remain vector (selectable text in the PDF).
 - [ ] An A0 sheet with a shaded viewport at Presentation quality prints without visible tile seams.
 - [ ] Exporting the same shaded sheet twice gives identical raster data.
+
+---
+
+### Pluggable render backends
+**ID:** DOC-RBE-001 · **Priority:** P0 (interface, with the built-in viewport as its first implementation), P2 (third-party backends) · **Ref:** owner directive 2026-10-12 (pluggable renderer for future photo-real and game-engine walkthroughs); TECH_STACK §3.2
+
+**Purpose.** Keep 3D presentation open to other renderers. A realistic offline renderer, a game engine or Blender can show a Reviera model without changes to the core. The built-in `wgpu` viewport (DOC-HLR-005) is the first backend behind the same interface, not a special case.
+
+**Architecture.**
+```
+ model transactions ──► graphics resolver (DOC-GFX-001) ──► Render Scene (render-agnostic)
+                                                               │  snapshot + deltas
+            ┌──────────────────────────┬───────────────────────┼──────────────────────────────┐
+            ▼                          ▼                       ▼                              ▼
+   built-in wgpu viewport     in-process plug-in       out-of-process bridge          offline renderer
+   (always present; editing,  (Rust/C ABI; GPL-       (Reviera Scene Protocol,       (stills, animations;
+    picking, 2D views)         compatible only)        ADV-RSP-001; any engine)       DOC-OUT-011)
+```
+- **What is pluggable, and what is not.** Only the 3D *presentation* of a scene is pluggable. The 2D drawing pipeline (cut, exact HLR, draw lists, DOC-HLR-001…004), printing and export stay in the core, so drawings are identical whichever backend is installed. Editing, selection, in-canvas controls and annotation always use the built-in viewport.
+- **Render Scene.** The core keeps one render-agnostic scene per open model, built from the graphics resolver and the OCCT tessellation cache:
+  - nodes: one per visible element occurrence, with element GlobalId, category, sub-category, phase/design-option state and a world transform (relative to a tile origin, DOC-HLR-005)
+  - meshes: shared per type and detail level (instancing), with normals, UVs, and optional feature edges as line sets
+  - materials: the physically based description from Reviera appearance assets (base colour, metallic, roughness, transmission, IOR, emission, normal/bump/height maps, decals)
+  - lights: lighting-fixture light sources with IES LM-63 photometry and light groups, sun from the project location and time, sky model, environment image
+  - cameras: view cameras, section boxes and clip planes as metadata (a backend may ignore what it cannot show, see capabilities)
+  - per-element resolved graphics: visibility, colour override, transparency, halftone
+- **Deltas.** Each committed transaction produces a scene delta (nodes, meshes or materials added, changed or removed; graphics changes; light and sun changes). Deltas are coalesced per frame for the built-in viewport and per sync interval (default 250 ms) for external backends.
+- **Backend interface.** A backend implements: `describe() -> capabilities`, `open(scene_snapshot, target)`, `apply(delta)`, `set_camera(camera)`, `render(request) -> frames/tiles` (offline kinds), `pick(x, y) -> GlobalId?` (optional), and `close()`. A failing backend is unloaded, its views fall back to the built-in viewport, and the failure is reported. It never takes the model down with it.
+- **Capabilities** declared by each backend: kinds (`interactive`, `walkthrough`, `offline_still`, `offline_animation`, `vr`); clip planes and section boxes; feature-edge display; Reviera visual styles supported (DOC-GFX-011); IES lights; decals; picking; maximum scene size; colour pipeline (sRGB, HDR, ACES). The UI only offers a backend for tasks its capabilities cover. For example, a backend without clip planes is not offered for a view with an active section box, unless the user accepts "ignore section box".
+- **Selecting a backend.** Each 3D view has a *Presentation backend* property (default: built-in). Render (DOC-OUT-011) and walkthrough sessions (ADV-WALK-001) choose from the backends offering that kind. User preferences hold the default backend per kind.
+- **Discovery.** Backends are registered by add-in manifests (DM-ADDIN-001) with a `render_backend` entry (id, name, kinds, version, licence SPDX, entry point: library path or executable plus protocol version). `render.backend.list()` reports installed backends with their capabilities and health.
+
+**Commands.** `render.backend.list() -> backend_info[]` (query); `render.backend.set_default(kind, backend_id) -> ()`; `view.set_presentation_backend(view_id, backend_id?) -> ()` (none restores the built-in viewport); `render.backend.test(backend_id) -> report` (loads it against a sample scene and reports capabilities, timing and errors).
+
+**Acceptance criteria.**
+- [ ] The built-in viewport passes the same backend conformance suite as third-party backends (snapshot, 10 000 deltas, camera moves, picking).
+- [ ] Unloading or crashing a third-party backend returns its views to the built-in viewport within 2 s, with no model change and no lost undo history.
+- [ ] Printed and exported drawings are byte-identical whichever presentation backend the 3D views use.
+- [ ] A backend that lacks clip planes is not offered for a view with an active section box, unless the user explicitly accepts "ignore section box".
+
+### Backend hosting and licensing
+**ID:** DOC-RBE-002 · **Priority:** P2 · **Ref:** owner directive 2026-10-12; TECH_STACK §4.2
+
+**Purpose.** Allow backends under different licences while keeping the GPL boundary clean.
+
+**Behaviour & rules.**
+- **In-process plug-ins** (dynamic library with a versioned C ABI wrapped by a Rust trait) run inside Reviera and are add-ins. They must carry a GPL-compatible SPDX licence (TECH_STACK §4.2, DM-ADDIN-003). Suitable for renderers such as Cycles (Apache-2.0), LuxCoreRender (Apache-2.0) or Mitsuba 3 (BSD-3-Clause).
+- **Out-of-process bridges** are separate programs that talk to Reviera only through the documented Reviera Scene Protocol (ADV-RSP-001), in the same way as MCP clients. Reviera ships no code of theirs and loads none. This is how game engines and other applications attach, for example a Blender add-on (Blender is GPL), a Godot (MIT) or Bevy (MIT/Apache-2.0) walkthrough application, or a user-built bridge to an engine under a proprietary licence that the user installs themselves. Whether a particular bridge stays at arm's length is for its authors; Reviera's obligation is to keep the protocol public and the boundary process-based. *(Legal review recommended before any official bridge to a proprietary engine.)*
+- **Isolation.** An external bridge receives a *read-only* scene. It can send back only: camera and walk-pose updates, pick results (GlobalIds), viewpoint captures (for BCF, COL-BCF-001) and render results (images for the render gallery). It can never send model edits. A bridge that also wants to edit must use the MCP server with its own token and permission class (DM-MCP-002), subject to the usual approvals.
+- **Connection security.** Bridges connect to a local endpoint (Unix domain socket or named pipe; loopback TCP only if enabled). A per-session token is handed over at launch or shown in the *Connect backend* dialog. Remote connections are off by default. When enabled they require TLS and a token, and the scene stream can be limited to the active view's visible elements.
+- **Resource limits.** Per bridge: maximum scene upload rate, maximum texture resolution sent (default 4096 px), and an option to send simplified meshes (a coarser detail level) for large models.
+
+**Commands.** `render.bridge.launch(backend_id, view_id?, args?) -> session_id` (starts the configured executable with a session token); `render.bridge.connect_info() -> {endpoint, token}` (for bridges started by hand; the token is shown in the UI and is **never** exposed through MCP resources); `render.bridge.disconnect(session_id) -> ()`; `render.bridge.list_sessions() -> session_info[]` (query).
+
+**Acceptance criteria.**
+- [ ] An in-process plug-in whose manifest licence is not on the GPL-compatible allow-list is refused at load time, with the reason shown.
+- [ ] An external bridge that sends a model-edit message is disconnected and the attempt is logged. The model is unchanged.
+- [ ] With remote connections disabled (the default), connecting from another host fails.
 
 ---
 
@@ -21801,7 +21869,7 @@ All output commands work on an immutable **model snapshot** taken when the comma
 4. *Save to project* creates a rendering view (placeable on a sheet); *Export* writes PNG, JPEG, TIFF, or OpenEXR (high dynamic range).
 
 **Behaviour & rules.**
-- **Renderer back-ends** are optional plug-ins behind one Rust trait (scene in, image tiles out):
+- **Renderer back-ends** are render backends of kind `offline_still`/`offline_animation` (DOC-RBE-001). In-process ones are plug-ins behind the backend trait (scene in, image tiles out); external ones (for example a Blender bridge) attach through the Reviera Scene Protocol (ADV-RSP-001) and return images with `render.result`:
   - **Reviera path tracer** (built in, optional at build time): a progressive unidirectional path tracer in `wgpu` compute shaders, with a BVH built on the GPU, multiple importance sampling, and the same materials as the Realistic style. It also drives the *Path Traced* visual style (DOC-GFX-011).
   - **Cycles** (Apache-2.0), used as the standalone library, as an external render engine with CPU and GPU devices.
   - Others that fit the trait with GPL-compatible licences may be added, for example LuxCoreRender (Apache-2.0) or Mitsuba 3 (BSD-3-Clause).
@@ -22229,6 +22297,14 @@ Every command below is registered once in the command registry and is therefore 
 | `render.export` | job_id_or_view_id, path, format | () | No | DOC-OUT-011 |
 | `render.list_renderers` | — | renderer_info[] | No | DOC-OUT-011 |
 | `render.gallery` | — | () | No | DOC-OUT-011 |
+| `render.backend.list` | — | backend_info[] | No (query) | DOC-RBE-001 |
+| `render.backend.set_default` | kind, backend_id | () | No (user preference) | DOC-RBE-001 |
+| `render.backend.test` | backend_id | report | No | DOC-RBE-001 |
+| `view.set_presentation_backend` | view_id, backend_id? (none: built-in) | () | Yes | DOC-RBE-001 |
+| `render.bridge.launch` | backend_id, view_id?, args? | session_id | No | DOC-RBE-002 |
+| `render.bridge.connect_info` | — | {endpoint, token} (UI only; never exposed as an MCP resource) | No | DOC-RBE-002 |
+| `render.bridge.disconnect` | session_id | () | No | DOC-RBE-002 |
+| `render.bridge.list_sessions` | — | session_info[] | No (query) | DOC-RBE-002 |
 | `decal.place` | view_id, decal_type_id, face_ref, position, width?, height? | element_id | Yes | DOC-OUT-011 |
 | `decaltype.create` | name, image_asset_or_path, attributes? | type_id | Yes | DOC-OUT-011 |
 | `export.animation` | view_id, kind: walkthrough\|solar_study, path, frames?, fps?, size, style?, format: images\|webm\|mp4 | job_id | No | DOC-OUT-012 |
@@ -22258,6 +22334,7 @@ Every command below is registered once in the command registry and is therefore 
 | D5-15 | Assembly members | Whole system elements (beam systems, trusses, curtain walls, stairs, railings, reinforcement systems) may be members of an assembly as nested aggregates; parts are members through `IfcRelAssignsToProduct` (DOC-ASM-001). | The reference refuses complex structures; IFC allows nested `IfcElementAssembly`, and precast and steel shop assemblies need it. |
 | D5-16 | Assembly views after a type change | When an edited owner instance joins a type that already has views, the user chooses which set to keep (DOC-ASM-004). | The reference deletes one set without a choice. |
 | D5-17 | Render gallery | A local render history with exposure re-adjustment (DOC-OUT-011) replaces the reference's cloud render gallery. | Vendor cloud services are out of scope (P3). |
+| D5-19 | Pluggable presentation backends | The reference product has one built-in renderer plus a vendor cloud service. Reviera puts all 3D presentation behind an open backend interface (DOC-RBE-001…002). The scene protocol, walkthroughs, the Godot translation layer for VR/AR and the reference bridges are specified in Chapter 7. | Owner directive 2026-10-12: future photo-real, game-engine and Blender backends for simulated walkthroughs. |
 | D5-18 | Displaced elements | Displacement is a pure per-view transform, so constrained or hosted elements can be displaced; dimensions to displaced elements are refused instead (DOC-VIEW-012). | The model is never moved, so constraints cannot be violated; a dimension would report a false distance. |
 
 **Open questions.**
@@ -22334,6 +22411,7 @@ Every command below is registered once in the command registry and is therefore 
 | §6.6 (decals, cloud render gallery); web: Place a Decal in a View, Decal Type Properties, Decal Attributes | DOC-OUT-011 |
 | web: Define Sun Settings for a View | DOC-GFX-012 |
 | web: Filters Dialog | DOC-GFX-006 |
+| Owner directive 2026-10-12 (pluggable renderer; Godot translation layer for walkthrough and VR/AR); Khronos glTF 2.0 and OpenXR public specifications | DOC-RBE-001 … 002 (and Chapter 7) |
 | §10 Version change log | Version-specific behaviours folded into the requirements above (for example DOC-SHT-005, DOC-SHT-006, DOC-ANN-012, DOC-GFX-008) |
 
 Screenshots consulted (internal reference only, never used as Reviera assets): all files in `screenshots/documentation/` that are cited in the requirement headers above.
@@ -22363,7 +22441,7 @@ This chapter specifies how several people and several models work together in Re
 | COL-CORE-002 | **GlobalId is identity.** Every rooted IFC object keeps its GlobalId for life. Copies get new GlobalIds. Merges, links, monitors, clashes and BCF issues all refer to elements by GlobalId; RXD objects are referred to by their stable ids. Moving an element to another storey, workset or type never changes its GlobalId. An imported file with duplicate or malformed GlobalIds is repaired by *Audit* (COL-MNT-002) before it can be published to BIMserver; publishing is refused with `model.duplicate_globalid` until then. References into links use `link:<linkId>/ifc:<GlobalId>` (Chapter 2a). | P0 |
 | COL-CORE-003 | **Never lose work silently.** Every merge, conflict decision and ownership override is recorded in a sync report that the user can reopen (Collaborate › Show History › *Sync reports*; the last 50 are kept in the working copy). Changes that lose a conflict are kept in a recoverable *conflict stash* (COL-MRG-002) until the user discards them. Destructive actions on shared state (*Discard local changes*, *Force relinquish*, *Discard working copy*, *Unload for everyone*) need explicit confirmation naming what will be lost, and MCP agents may call them only with the model-edit permission and an explicit `confirm: true`. | P1 |
 | COL-CORE-004 | **Offline first.** In BIMserver mode a local working copy is always kept, so users can open, edit and save without a connection (COL-OFF-001). Losing the connection never interrupts an edit; only *Synchronise*, *Get latest*, link reloads from the server and new borrows become queued or disabled. Reconnection is automatic and never merges without the user's go-ahead. | P1 |
-| COL-CORE-005 | **Credentials never leak.** Server passwords and tokens (BIMserver and BCF API) are stored in the operating system's credential store. They are never written to RXD, IFC, the working-copy folder, logs, crash reports, sync reports, Lua-visible tables or MCP resources; log lines that would contain a token show `<redacted>`. MCP tools never accept a password or token as a parameter (COL-BIM-001). Signing out removes the stored token. | P0 |
+| COL-CORE-005 | **Credentials never leak.** Server passwords and tokens (BIMserver, BCF API, OpenCDE and other server profiles, COL-API-001) are stored in the operating system's credential store. They are never written to RXD, IFC, the working-copy folder, logs, crash reports, sync reports, Lua-visible tables or MCP resources; log lines that would contain a token show `<redacted>`. MCP tools never accept a password or token as a parameter (COL-BIM-001). Signing out removes the stored token. | P0 |
 
 **Acceptance criteria (principles).**
 - [ ] The same Lua script that creates and tags 100 doors produces identical IFC and RXD content in Local mode and in BIMserver mode (apart from the binding of the file to its server).
@@ -23631,23 +23709,123 @@ Common link fields: `id`, `name`, `source` (see each type), `pathType` (relative
 - [ ] Clicking a viewpoint thumbnail restores that viewpoint in a view.
 - [ ] Saving a topic with an empty title is refused.
 
-### BCF API client
-**ID:** COL-BCF-002 · **Priority:** P2 · **Ref:** research/04 §7.6 (multi-company issue exchange, as context)
+### BCF API client (OpenCDE)
+**ID:** COL-BCF-002 · **Priority:** P1 · **Ref:** research/04 §7.6 (multi-company issue exchange, as context); web: buildingSMART BCF-API (v3.0), OpenCDE Foundation API (v1.1), OpenCDE Documents API (v1.0) repositories (public, accessed 2026-10-12)
 
-**Purpose.** Synchronise issues with an issue server that implements the buildingSMART BCF API (part of the OpenCDE APIs).
+**Purpose.** Use any issue server that implements the buildingSMART **BCF API** as the shared issue tracker for a project, so issues move between Reviera and other BIM tools live, not only as files.
+
+**Workflow.**
+1. Collaborate › Issues › **Connect issue server…** (`bcf.api_connect`): enter the server URL. Reviera reads the server's supported versions and authentication methods through the OpenCDE Foundation API, then signs the user in (COL-API-001).
+2. Choose a project from the server's project list (`bcf.api_bind_project`). The Issues pane (COL-BCF-004) now shows the server's topics. Lists (types, statuses, priorities, labels, stages, users) come from the server's project extensions and are read-only locally.
+3. Work normally. Changes sync automatically (default every 2 minutes and on every local change, after 5 s of quiet) or with *Sync now*.
 
 **Behaviour & rules.**
-- **Connection:** the user adds a BCF server URL; Reviera reads its versions and authentication endpoints (the API's foundation services) and signs in with OAuth 2.0 authorisation code flow with PKCE in the system browser. Tokens are stored in the OS credential store (COL-CORE-005).
-- **Project binding:** the Reviera project is bound to a BCF API project chosen from the server's project list; the binding is client state.
-- **Synchronisation** (manual, or on a timer): fetch topics, comments, viewpoints, snapshots and document references changed since the last sync; push local new or changed items; resolve conflicts per field by modification date, showing a list of overwritten values. Server-side extensions (allowed statuses, types, labels, users) replace the local lists while bound.
-- **Mapping:** topics, comments and viewpoints map one to one onto the RXD issue objects of COL-BCF-001; each local object records its server GUID and last synchronised modification date.
-- Works in Local and BIMserver mode; it is independent of BIMserver.
+- **Versions:** BCF API **3.0** is the target; **2.1** is supported for older servers. The version is negotiated from the server's versions list. Behaviour that only exists in 3.0, such as events and some extension fields, is hidden on 2.1 servers.
+- **Coverage:**
+  - project details and extensions
+  - topics: create, read, update and delete
+  - comments
+  - viewpoints, with snapshots, bitmaps, components, colouring, visibility and clipping planes (mapped through COL-BCF-003)
+  - related topics
+  - document references, both internal documents and external URLs
+  - documents (upload and download)
+  - files information, which links a topic to the IFC model file and revision it refers to: the Reviera model's file name, IFC project GUID and, in BIMserver mode, the revision
+  - topic and comment events (audit history, shown in the topic's *History* tab)
+- **Server permissions:** the per-project, per-topic and per-comment action flags the server returns (for example `update`, `createComment`, `updateRelatedTopics`) drive the UI. Disallowed actions are disabled, with the server's restriction as the tooltip, and are never attempted.
+- **Paging and queries:** lists use the server's OData query options (`$filter`, `$orderby`, `$top`, `$skip`). Incremental sync filters on modification date. Paging continues until done, with a progress indicator for large projects.
+- **Sync and conflicts:**
+  - local edits are queued while offline and replayed in order when the connection returns
+  - each local object records its server GUID and the server modification date it last saw
+  - when a local change conflicts with a newer server value, the server value wins per field, the local value is kept in the topic's *Conflicts* list, and the user can re-apply it with one click
+  - nothing is silently lost
+- **Local copy:** server topics are cached in RXD (`coordination/issues`) for offline reading, so a model file carries a snapshot of its issues. When a project is bound, the server is the source of truth. Unbinding keeps the local copy as ordinary local issues.
+- **Several servers:** one project can be bound to one BCF API project at a time. Topics can be copied between bindings, or to and from BCF files.
+- **Agents:** MCP agents use the same `bcf.*` commands. Server credentials are never exposed to them (COL-CORE-005).
 
-**Commands.** `bcf.api_connect(url) -> connection_id`; `bcf.api_bind_project(connection_id, project_id) -> ()`; `bcf.api_sync(connection_id) -> sync_report`; `bcf.api_disconnect(connection_id) -> ()`
+**Data (IFC/RXD).** Cached topics in `coordination/issues` (kinds `issue.topic`, `issue.extensions`), each with `server: {connection, guid, modified}`. Connection profiles and tokens are client state (COL-API-001), never stored in the model.
+
+**Commands.** `bcf.api_connect(url, profile_name?) -> connection_id`; `bcf.api_list_projects(connection_id) -> project[]` (query); `bcf.api_bind_project(connection_id, project_id) -> ()`; `bcf.api_unbind(keep_local_copy=true) -> ()`; `bcf.api_sync(connection_id?) -> sync_report`; `bcf.api_status() -> {connection, last_sync, queued_changes, conflicts}` (query); `bcf.api_resolve_conflict(topic_id, field, use: server|local) -> ()`; `bcf.api_disconnect(connection_id) -> ()`.
 
 **Acceptance criteria.**
-- [ ] A topic created in Reviera appears on the BCF server after sync, and a comment added on the server appears in Reviera after the next sync.
-- [ ] Losing the connection mid-sync leaves both sides consistent; the next sync completes the transfer.
+- [ ] Against the open-source reference implementation of the OpenCDE APIs and at least one commercial BCF API server, a topic with two viewpoints, a snapshot and a comment created in Reviera appears on the server with its camera, components and image. A comment added on the server appears in Reviera after the next sync.
+- [ ] Losing the connection mid-sync leaves both sides consistent, and the next sync completes the transfer without duplicates.
+- [ ] Ten edits made offline are pushed in order when the connection returns.
+- [ ] An action the server forbids (for example editing a closed topic) is disabled in the pane and never sent.
+- [ ] A conflicting status change keeps both values visible: the server's in the topic, Reviera's in *Conflicts*.
+
+### Issue tracking workflow
+**ID:** COL-BCF-005 · **Priority:** P1 · **Ref:** research/04 §6.7 (*Integrated Issues*, as context), §8.5; web: buildingSMART BCF-API (v3.0); COL-BCF-001, COL-BCF-004
+
+**Purpose.** Make BCF issues a working tracker for coordination and design review, not only an exchange format.
+
+**Behaviour & rules.**
+- **Workflow rules** (optional, per project, in the issue lists):
+  - allowed status transitions, for example Open → In progress → Resolved → Closed, with Reopened allowed from Closed
+  - which statuses need an assignee or a due date
+  - which roles may close a topic
+
+  Invalid transitions are refused with the rule shown. When bound to a server, the server's rules and permissions take precedence (COL-BCF-002).
+- **Sources of issues:**
+  - manual capture (COL-BCF-001)
+  - clash results (COL-CLASH-002, one topic per clash group, with both elements as components)
+  - coordination review items (COL-CM-002)
+  - model warnings (COL-MNT-004)
+  - walkthrough and VR captures (Ch 7 ADV-WALK-001)
+  - view bookmarks (UI-SCEN-002)
+
+  Each topic records its source, and the pane can filter by it.
+- **Element linking:**
+  - selecting a topic highlights its components in all open views
+  - the Properties palette shows a count of open issues for the selected element, with a link
+  - deleting or replacing an element that open issues refer to warns first
+  - issues follow elements across Copy/Monitor by GlobalId
+- **Assignment and notifications:**
+  - assignees come from the project's user list
+  - in-app notifications are raised when a topic is assigned to the user, commented on, changed, or becomes overdue
+  - a daily summary is optional
+  - on a BCF API server, notifications follow server events
+  - e-mail and chat notifications are left to the server or to add-ins
+- **Due dates and stages:** overdue and due-this-week badges; stages (for example design phases) can be used to filter and report.
+- **Reports:**
+  - `bcf.report` produces a PDF or HTML issue report (cover, summary counts by status, assignee and type, then one section per topic with fields, comments and snapshots), a CSV or XLSX list, or a BCF file
+  - report templates are project settings
+  - a schedule-like issue list can be placed on a sheet
+- **Dashboard:** counts by status, assignee, type and age, with a trend of open issues over time (from topic events, or local history when offline), shown in the Issues pane's *Overview* tab.
+- **Bulk edit:** change status, assignee, priority, labels or due date for several selected topics in one step; one undo step for local issues.
+
+**Data (IFC/RXD).** Workflow rules and report templates in `coordination/issues` (kind `issue.extensions`, keys `workflow` and `reportTemplates`). Notification preferences are user settings.
+
+**Commands.** `bcf.set_workflow(rules) -> ()`; `bcf.bulk_update(topic_ids[], fields) -> ()`; `bcf.report(topic_ids[]? | filter?, format: pdf|html|csv|xlsx|bcf, template_id?, path) -> job_id`; `bcf.from_clash(clash_result_ids[], group_by?) -> topic_ids[]`; `bcf.issues_for_element(element_id) -> topic_summary[]` (query); `bcf.notifications(since?) -> notification[]` (query).
+
+**Acceptance criteria.**
+- [ ] With a workflow that forbids Open → Closed, closing an open topic is refused and the allowed next statuses are shown.
+- [ ] Creating topics from 12 clash results grouped by level produces one topic per level, each listing its clashing element pairs as components.
+- [ ] A PDF report of 50 topics contains every topic's fields, comments and first snapshot, with summary counts that match the list.
+- [ ] Selecting an element with two open issues shows "2 open issues" in Properties, and the link filters the pane to them.
+
+### OpenCDE Documents API client
+**ID:** COL-CDE-001 · **Priority:** P2 · **Ref:** web: buildingSMART OpenCDE Documents API (v1.0) and Foundation API (v1.1) repositories (public, accessed 2026-10-12)
+
+**Purpose.** Open models from, and publish models and drawings to, any common data environment (CDE) that implements the OpenCDE Documents API, without a vendor-specific connector.
+
+**Workflow.**
+1. **Open from CDE:** File › Open › *From CDE…* (`cde.select_documents`). Reviera starts a selection session. The CDE's own document picker opens in the system browser, and the user picks one or more files there. Reviera then downloads the chosen versions: IFC opens as a model, other files as links or attachments.
+2. **Publish to CDE:** File › Export › *Publish to CDE…* (`cde.upload_documents`). Reviera starts an upload session for the files to publish (the IFC model, a clean IFC export, PDF sheet sets, BCF). The user enters the CDE's metadata in its own web form, and Reviera uploads the binary data in the chunks the CDE specifies.
+3. **Stay current:** a document opened from a CDE remembers its document and version. Reviera polls the CDE's document-versions endpoint (with ETags) and shows "A newer version is available" with *Open newer version*.
+
+**Behaviour & rules.**
+- Sign-in and server profiles use COL-API-001. A CDE that also offers the BCF API can be bound for issues with the same profile (COL-BCF-002).
+- Downloads are verified against the CDE's reported size and hash where given. Partial downloads resume.
+- Publishing a model that has local unsaved changes asks whether to save first. Clean-IFC publishing uses `export.ifc{strip_rxd=true}`.
+- BCF *files information* and document references can point at CDE document versions, so issues link to the exact published file.
+- Works in Local mode. In BIMserver mode, the CDE is an additional publication target, and the BIMserver remains the model's working store.
+
+**Commands.** `cde.connect(url, profile_name?) -> connection_id`; `cde.select_documents(connection_id) -> selection_session_id`; `cde.download(selection_session_id, target_folder?) -> files[]`; `cde.upload_documents(connection_id, files[]) -> upload_session_id`; `cde.upload_status(upload_session_id) -> status` (query); `cde.check_versions(document_ids[]?) -> version_info[]` (query); `cde.disconnect(connection_id) -> ()`.
+
+**Acceptance criteria.**
+- [ ] Against the open-source reference implementation, a user can pick an IFC file in the CDE's browser UI and Reviera opens that exact version.
+- [ ] Publishing an IFC and a PDF sheet set creates two documents in the CDE with the metadata entered in its form.
+- [ ] After someone uploads a newer version in the CDE, Reviera shows the newer-version notice within the polling interval (default 5 minutes).
 
 ### Viewpoint mapping
 **ID:** COL-BCF-003 · **Priority:** P1 · **Ref:** research/04 §1.5 (3D views, section box), §3.5 (hide/isolate)
@@ -23662,6 +23840,46 @@ Common link fields: `id`, `name`, `source` (see each type), `pathType` (relative
 **Acceptance criteria.**
 - [ ] Restoring a viewpoint with a section box reproduces the box within 1 mm and the camera within 0.1°.
 - [ ] A viewpoint that isolates three elements shows only those three when restored.
+
+---
+
+## 6.9a Integration services
+
+### Shared REST and authentication client
+**ID:** COL-API-001 · **Priority:** P1 · **Ref:** TECH_STACK §3.7.1 (async HTTP client); web: OpenCDE Foundation API (v1.1) authentication conventions; COL-CORE-005
+
+**Purpose.** One network client for every server Reviera talks to (BIMserver JSON API, BCF API, OpenCDE Documents API, library and analysis services, add-ins), so authentication, proxies, security and reliability work the same everywhere.
+
+**Behaviour & rules.**
+- **Stack:** an asynchronous HTTP client (`reqwest` on `tokio`, TECH_STACK §3.7.1) running off the UI thread. The UI shows progress and allows cancelling any request that takes longer than 1 s.
+- **Server profiles:** each server is a named profile (URL, kind, authentication method, proxy override, certificate settings) kept in client state. Profiles can be exported, without secrets, for a team.
+- **Authentication:**
+  - OAuth 2.0 authorisation code flow with PKCE in the system browser, using a loopback redirect. This is the default for OpenCDE servers and follows the server's Foundation API authentication description.
+  - OAuth 2.0 device code flow, where offered, for headless and locked-down machines.
+  - API tokens.
+  - BIMserver session tokens (COL-BIM-001).
+  - Tokens are refreshed automatically. Secrets live only in the OS credential store and are never written to logs, the model, the live store, profile exports or MCP resources (COL-CORE-005).
+- **Network environment:** system proxy settings and PAC scripts are honoured, and a per-profile override is allowed. TLS uses the OS trust store; custom CA certificates can be added per profile. Disabling verification needs an explicit per-profile choice, with a red warning in the status bar.
+- **Reliability:**
+  - timeouts: 10 s to connect, 60 s to read, overridable per request
+  - retries with exponential backoff and jitter for idempotent requests and for 429/503 responses, honouring `Retry-After`
+  - ETag/`If-None-Match` caching for polling
+  - resumable chunked transfer for large files
+  - an offline queue for writes that can be replayed (used by COL-BCF-002)
+- **Paging helpers:** OData `$top`/`$skip`/`$filter`/`$orderby` and link-header paging, shared by all clients.
+- **Diagnostics:** a per-profile request log (method, URL path, status, timing; secrets and bodies redacted) under Help › Diagnostics, and `api.profile.test` checks reachability, TLS and authentication.
+- **Scripting:**
+  - Lua scripts get `reviera.http.request(...)` only at trust level `trusted` or `native` (DM-LUA-007), and only to hosts on the script's declared allow-list in its manifest.
+  - Requests made with a stored profile use that profile's authentication without exposing the token to the script.
+  - MCP agents have no raw HTTP access. They use the commands of the services above.
+
+**Commands.** `api.profile.add(name, url, kind, auth_method, options?) -> profile_id`; `api.profile.list() -> profile[]` (query, no secrets); `api.profile.remove(profile_id) -> ()`; `api.profile.test(profile_id) -> report`; `api.signin(profile_id) -> status`; `api.signout(profile_id) -> ()`; `api.log(profile_id, since?) -> entry[]` (query, redacted); `http.request(method, url, headers?, body?, profile_id?) -> response` (Lua at trusted/native trust only; not exposed to MCP).
+
+**Acceptance criteria.**
+- [ ] Behind an authenticating corporate proxy configured by PAC, BIMserver, BCF API and CDE connections all work with no per-service setup.
+- [ ] A server answering 429 with `Retry-After: 5` is retried after 5 s, and the user sees "waiting for server" rather than an error.
+- [ ] No token or password appears in the request log, the model file, the live store, a profile export or any MCP resource (checked by scanning for a known token value).
+- [ ] A Lua script at `standard` trust calling `reviera.http.request` is refused. At `trusted` trust, a call to a host not on its allow-list is refused.
 
 ---
 
@@ -24012,10 +24230,35 @@ Every command below is registered once and is available from the UI, Lua and MCP
 | `bcf.list` | filter? | topic_summary[] | No | COL-BCF-001 |
 | `bcf.issues_pane` | — | () | No | COL-BCF-004 |
 | `bcf.set_extensions` | lists{types?, statuses?, priorities?, labels?, stages?, users?}, replacements?{} | () | Yes | COL-BCF-004 |
-| `bcf.api_connect` | url | connection_id | No | COL-BCF-002 |
+| `bcf.api_connect` | url, profile_name? | connection_id | No | COL-BCF-002 |
+| `bcf.api_list_projects` | connection_id | project[] | No (query) | COL-BCF-002 |
 | `bcf.api_bind_project` | connection_id, project_id | () | No | COL-BCF-002 |
-| `bcf.api_sync` | connection_id | sync_report | No | COL-BCF-002 |
+| `bcf.api_unbind` | keep_local_copy=true | () | No | COL-BCF-002 |
+| `bcf.api_sync` | connection_id? | sync_report | No | COL-BCF-002 |
+| `bcf.api_status` | — | {connection, last_sync, queued_changes, conflicts} | No (query) | COL-BCF-002 |
+| `bcf.api_resolve_conflict` | topic_id, field, use: server\|local | () | Yes | COL-BCF-002 |
 | `bcf.api_disconnect` | connection_id | () | No | COL-BCF-002 |
+| `bcf.set_workflow` | rules | () | Yes | COL-BCF-005 |
+| `bcf.bulk_update` | topic_ids[], fields | () | Yes | COL-BCF-005 |
+| `bcf.report` | topic_ids[]? \| filter?, format: pdf\|html\|csv\|xlsx\|bcf, template_id?, path | job_id | No | COL-BCF-005 |
+| `bcf.from_clash` | clash_result_ids[], group_by? | topic_ids[] | Yes | COL-BCF-005 |
+| `bcf.issues_for_element` | element_id | topic_summary[] | No (query) | COL-BCF-005 |
+| `bcf.notifications` | since? | notification[] | No (query) | COL-BCF-005 |
+| `cde.connect` | url, profile_name? | connection_id | No | COL-CDE-001 |
+| `cde.select_documents` | connection_id | selection_session_id | No | COL-CDE-001 |
+| `cde.download` | selection_session_id, target_folder? | files[] | No | COL-CDE-001 |
+| `cde.upload_documents` | connection_id, files[] | upload_session_id | No | COL-CDE-001 |
+| `cde.upload_status` | upload_session_id | status | No (query) | COL-CDE-001 |
+| `cde.check_versions` | document_ids[]? | version_info[] | No (query) | COL-CDE-001 |
+| `cde.disconnect` | connection_id | () | No | COL-CDE-001 |
+| `api.profile.add` | name, url, kind, auth_method, options? | profile_id | No | COL-API-001 |
+| `api.profile.list` | — | profile[] (no secrets) | No (query) | COL-API-001 |
+| `api.profile.remove` | profile_id | () | No | COL-API-001 |
+| `api.profile.test` | profile_id | report | No | COL-API-001 |
+| `api.signin` | profile_id | status | No | COL-API-001 |
+| `api.signout` | profile_id | () | No | COL-API-001 |
+| `api.log` | profile_id, since? | entry[] (redacted) | No (query) | COL-API-001 |
+| `http.request` | method, url, headers?, body?, profile_id? | response (Lua at trusted/native trust only; not exposed to MCP) | No | COL-API-001 |
 | `bcf.apply_viewpoint` | viewpoint_id, target_view_id? | view_id | No | COL-BCF-003 |
 | `model.purge_preview` | — | purge_tree | No | COL-MNT-001 |
 | `model.purge` | item_ids[]?\|all? | count | Yes | COL-MNT-001 |
@@ -24049,7 +24292,7 @@ Every command below is registered once and is available from the UI, Lua and MCP
 | D7-8 | Point clouds | Open formats (E57, LAS/LAZ, COPC, PLY) indexed to COPC; no proprietary scan formats. | Licensing and openness. |
 | D7-9 | CAD formats | DXF and DWG (through LibreDWG) only; DGN, SAT, SKP, 3DM deferred (P3). | No GPL-compatible readers of sufficient quality for some formats. |
 | D7-10 | Clash detection | Basic interference check (P1) plus saved tests with tolerances, clearance, status tracking and grouping (P2), with BCF output. The reference's in-product check is hard-clash only. | Avoids depending on separate proprietary coordination products. |
-| D7-11 | Issues | BCF 2.1/3.0 files and the buildingSMART BCF API instead of a vendor issue service. | Open standard. |
+| D7-11 | Issues | BCF 2.1/3.0 files, the buildingSMART BCF API (3.0, with 2.1 fallback) and an issue-tracking workflow instead of a vendor issue service; OpenCDE Documents API for CDE exchange instead of a vendor cloud. | Open standards (buildingSMART OpenCDE APIs). |
 | D7-12 | Positioning storage | Shared coordinates stored as standard `IfcMapConversion` / `IfcProjectedCRS`, with grid and true north distinguished explicitly. | Standard georeferencing that other IFC tools read. |
 | D7-13 | Compaction | No compaction command: files are always written in full. | IFC files have no free-space fragmentation. |
 | D7-14 | Model history | Restore creates a new revision; history is never rewritten. | Auditable history; nothing is lost. |
@@ -24087,6 +24330,7 @@ Every command below is registered once and is available from the UI, Lua and MCP
 | §11 Data model summary (worksharing, links) | §6.11 |
 | TECH_STACK §3.7, §3.7.1–3.7.3, §5 | COL-CORE-001, COL-MODE-001 … 002, COL-BIM-001 … 008, COL-MRG-001 … 003, COL-OWN-001 … 004, COL-OFF-001 |
 | spec/02a (RXD format and merge rules) | COL-MRG-001, §6.11 |
+| buildingSMART BCF-API (v3.0), OpenCDE Foundation API (v1.1) and Documents API (v1.0) public repositories (SOURCE_REGISTER S0699–S0701) | COL-BCF-002, COL-BCF-005, COL-CDE-001, COL-API-001 |
 | spec/02 §2.7.4 (DM-FAIL-001, stored warnings) | COL-MRG-003, COL-MNT-004 |
 | web: Specify Coordination Settings (Autodesk public help, 2025) | COL-CM-004 |
 | web: Orphaned elements and the Reconcile Hosting browser (Autodesk public help, 2025) | COL-CM-003 |
@@ -24096,6 +24340,224 @@ Every command below is registered once and is available from the UI, Lua and MCP
 | web: Granted, Denied, and Retracted Requests (Autodesk public help, 2014) | COL-OWN-003 |
 
 Screenshots consulted (internal reference only, never used as Reviera assets): `screenshots/documentation/worksharing_central_local_diagram.png`, `worksets_dialog.png`, `synchronize_with_central_dialog.png`, `worksharing_display_worksets.png`, `worksharing_display_owners.png`, `editing_request_received.png`, `manage_links_new_dialog_type_filter.png`.
+
+
+---
+
+# Chapter 7 — Advanced Features
+
+**ID prefix:** `ADV` · **Status:** Draft 0.1 · 2026-10-12
+
+## 7.0 Scope and provenance
+
+This chapter collects capabilities that go **beyond the reference product's feature set**: features that are Reviera's own design, mostly from owner directives, built on open standards and open-source engines. It keeps the clean-room boundary visible. Chapters 1–6 describe behaviour traced to public research on the reference product (with Reviera's own architecture underneath). This chapter describes features that have no reference counterpart, or that extend one well beyond it, and cites only owner directives and public documentation of open standards and open-source projects.
+
+New features of this kind are added here, unless they are inseparable from a core chapter's mechanism. In that case they stay in the core chapter and are indexed in §7.2. The full list of requirements with no reference-product research behind them is generated in Appendix A.2a.
+
+**Principles.**
+1. **Nothing here is required to author or document a building.** Every feature is optional, behind capability checks, and the core works without it.
+2. **Same contracts as the core.** Every feature is driven by registered commands (UI, Lua, MCP), reads the model only through the core's interfaces, and never edits it outside a transaction.
+3. **Open standards first.** IFC, BCF, glTF and OpenXR are preferred over vendor SDKs. Engines and tools are bundled only under GPL-compatible licences; everything else attaches through public protocols (Ch 5 DOC-RBE-002).
+
+## 7.1 Immersive and real-time visualisation
+
+This section builds on the pluggable render backend interface in Chapter 5 (DOC-RBE-001 Render Scene and backend contract, DOC-RBE-002 hosting and licensing).
+
+### Reviera Scene Protocol (RSP)
+**ID:** ADV-RSP-001 · **Priority:** P2 · **Ref:** owner directive 2026-10-12; Khronos glTF 2.0 specification (public); DOC-OUT-007
+
+**Purpose.** One open, versioned protocol for streaming the Render Scene to any external renderer, so a bridge is written once per engine rather than once per Reviera release.
+
+**Behaviour & rules.**
+- **Snapshot** is a binary glTF 2.0 (GLB) document. Reviera information is carried in a vendor extension, `REVIERA_scene`:
+  - per node: element GlobalId, category key and sub-category, and phase and design-option state
+  - lights: `KHR_lights_punctual`, plus an extension block for IES profiles and light groups
+  - sun and sky: date and time, project location, and sky model
+  - other materials data: `KHR_materials_*` extensions where they exist (transmission, IOR, emissive strength, clearcoat, sheen, volume, texture transform)
+  - collision hints: for each node, whether it is walkable, a blocker or ignored. This is derived from category (floors, stairs and ramps are walkable; walls, columns and furniture block; openings, annotation and spaces are ignored) and can be overridden per category.
+- **Deltas** are messages on the same connection: `node.add/update/remove`, `mesh.add/remove`, `material.add/update`, `graphics.update` (visibility, override colour, transparency), `light.update`, `sun.update`, `camera.update`, `section.update`. Each carries a monotonically increasing sequence number. Large buffers (meshes, textures) travel as binary frames, or through shared memory when both sides are on one machine. A bridge that falls behind can ask for a fresh snapshot.
+- **Back-channel messages** (bridge → Reviera): `hello` (protocol version, capabilities), `camera.pose`, `pick` (GlobalId), `viewpoint.capture` (camera, image and optional comment, which becomes a BCF viewpoint or a saved view), `walk.path` (recorded path samples), `render.result` (image and metadata for the render gallery), and `log`.
+- **Versioning and publication.** RSP is versioned with semantic versioning, negotiated in `hello`, and described by JSON Schemas for the message envelopes plus the `REVIERA_scene` glTF extension schema. These are published under **MIT**, like the RXD schemas (02a §12), at `https://nodeskreviera.org/schemas/rsp/<major>.<minor>/`. A reference client library (Rust, MIT) and a Python client for Blender are part of the protocol deliverables.
+- **Offline use.** `render.export_scene` writes the same snapshot to a `.glb` file (with the extension), so engines can also import a static model without a live connection. OpenUSD output is a later option, subject to the licence check in Q-DM-09.
+
+**Commands.** `render.export_scene(path, view_id?, scope?: view|model, detail?: coarse|medium|fine, include_lights?, include_collision_hints?) -> report`; `render.protocol_info() -> {version, schema_urls}` (query).
+
+**Acceptance criteria.**
+- [ ] The snapshot of the sample project opens in a generic glTF viewer with correct geometry and materials, ignoring the unknown extension.
+- [ ] After 1 000 random edits streamed as deltas, a bridge's scene matches a fresh snapshot (same nodes, transforms, materials and visibility).
+- [ ] A bridge speaking an older minor protocol version keeps working; one speaking an unsupported major version is refused with a clear message.
+
+### Simulated walkthrough sessions
+**ID:** ADV-WALK-001 · **Priority:** P2 · **Ref:** owner directive 2026-10-12; research/04 §1.5 *Walkthrough* (context); DOC-OUT-012
+
+**Purpose.** Let designers and clients walk through the model interactively, at eye level with realistic movement, in the built-in viewport or a more photo-real backend. Paths and findings come back into the project.
+
+**Workflow.**
+1. View tab › Presentation › **Walk Through** (`walkthrough.start`), from a 3D, plan or camera view. The dialog chooses a backend (from those offering `walkthrough`), the start point (current camera, click a point in plan, or a named view) and the mode: *Walk* (gravity and collision) or *Fly*.
+2. The session opens in the backend's window (or in the view, for the built-in viewport). Reviera keeps a small *Walkthrough* panel with the position on a plan mini-map, the time-of-day slider and the record and capture buttons.
+3. The user walks with WASD or arrow keys and mouse-look, a game controller, or a VR headset where the backend supports OpenXR (full VR and AR: ADV-XR-001).
+4. *Record* captures the path. *Save path* turns it into a Reviera walkthrough view (`view.walkthrough`, DOC-OUT-012) that can be edited, animated and exported. *Capture* saves a viewpoint with an optional comment as a saved 3D view or a BCF issue.
+5. Model edits made in Reviera during the session appear in the backend after the next sync (ADV-RSP-001).
+
+**Behaviour & rules.**
+- **Movement defaults:** eye height 1.60 m (setting 0.5–2.5 m), walking speed 1.4 m/s (run ×2.5), turn rate by mouse sensitivity. Step-up height is 0.20 m, so stairs and ramps can be climbed and kerbs above that block. Gravity is on in *Walk* mode. Collision uses the RSP collision hints and the avatar capsule (radius 0.25 m).
+- **Doors:** in *Walk* mode, doors whose family declares an opening (swing or slide) open automatically when the avatar comes within 1.2 m and close behind it. This is presentation only and never changes the model. *Doors open* can be switched off.
+- **Lighting:** the time-of-day slider moves the sun (project location and date); light groups can be switched and dimmed for the session; changes are not saved unless the user saves them to the view's render settings.
+- **Phases and options:** the session shows the phase and design-option state of the source view, and can switch between design options for comparison if the backend supports live visibility changes.
+- **Measuring and info:** a pick (click, or controller trigger) shows the element's category, family, type and mark from Reviera, and can select the element back in Reviera (cross-highlight).
+- **Built-in fallback:** the built-in viewport offers the same walkthrough in its Realistic style, so the feature works with no external backend installed.
+- **Performance:** external backends receive a coarser detail level by default for models over 2 million triangles; the built-in viewport targets 60 fps at that size on the reference GPU.
+
+**Data (RXD).** Saved paths are walkthrough views (`view.walkthrough`, `views/<viewId>`). Captures are saved 3D views or BCF topics (`coordination/issues`). Per-session settings (eye height, speed, door behaviour) are user preferences and not stored in the model, except when saved into a walkthrough view.
+
+**Commands.** `walkthrough.start(view_id?, backend_id?, start?, mode?: walk|fly) -> session_id`; `walkthrough.stop(session_id) -> ()`; `walkthrough.record(session_id, on) -> ()`; `walkthrough.save_path(session_id, name) -> view_id`; `walkthrough.capture(session_id, comment?, as?: view|bcf) -> id`; `walkthrough.set_time(session_id, datetime) -> ()`; `walkthrough.set_option(session_id, key, value) -> ()`.
+
+**Acceptance criteria.**
+- [ ] In *Walk* mode the avatar climbs a stair of 175 mm risers and is stopped by a 250 mm step and by walls.
+- [ ] A recorded path saved as a walkthrough view exports as an animation with the same camera positions (within 1 mm and 0.1°).
+- [ ] A capture made in an external backend arrives in Reviera as a BCF issue with its viewpoint and image.
+- [ ] Moving a wall in Reviera during a session updates the backend within 1 s on the same machine.
+
+### Internal engine translation layer (walkthrough, VR and AR)
+**ID:** ADV-XR-001 · **Priority:** P2 (engine adapter and desktop walkthrough), P2 (VR), P3 (AR and multi-user review) · **Ref:** owner directive 2026-10-12 ("a translation layer to Godot and similar … to support walkthrough, full VR/AR"); DOC-RBE-001, ADV-WALK-001
+
+**Purpose.** Ship a first-party bridge inside Reviera between the Render Scene and a full game engine, so that immersive features (walkthrough, room-scale VR, mixed and augmented reality) come from a mature engine rather than being rebuilt in the core. Godot is the first target; the layer is designed so similar engines can be added.
+
+**Architecture.**
+- **Engine-neutral core, engine-specific adapters.** The layer has two parts:
+  - **Translator** (engine-neutral, Rust): turns the Render Scene and its deltas (DOC-RBE-001) into an *engine scene plan*. That covers node hierarchy, instanced meshes, physically based materials, lights and IES profiles, sun, sky and environment, collision shapes from the RSP collision hints, navigation surfaces (walkable floors, stairs and ramps), door-opening animations, and the level of detail per element.
+  - **Adapter** (one per engine): applies the plan through that engine's API. The Godot adapter builds Godot scene nodes, `MeshInstance3D`/`MultiMesh`, `StandardMaterial3D`, `OmniLight3D`/`SpotLight3D`/`DirectionalLight3D`, `WorldEnvironment`, physics bodies and a navigation mesh. It also maps element GlobalIds to node metadata so that picking and cross-selection work.
+- **Hosting.** The engine runs either **embedded** in the Reviera process (the engine as a library where the engine supports it; for Godot this is *LibGodot*, available since Godot 4.6 on Linux, Windows and macOS, ADV-XR-002, rendering into a wx-hosted native window like the built-in viewport), or as a **bundled child process** launched and supervised by Reviera and connected over the Reviera Scene Protocol (ADV-RSP-001). The adapter decides; both appear to the user as one backend with `walkthrough`, `vr` and (later) `ar` capabilities. A crash in a child process never affects the model (DOC-RBE-001).
+- **Licensing.** Only engines whose licences allow bundling with a GPL-3.0 program are integrated this way: Godot (MIT) is the first, and others under MIT, BSD, Apache-2.0 or similar may follow. The OpenXR loader is Apache-2.0. Engines under proprietary licences are never bundled; they can only attach as third-party external bridges (DOC-RBE-002).
+- **Same contract as every backend.** The layer is a render backend: read-only scene, no model edits except through commands, and capabilities declared through `describe()`. It is tested with the same conformance suite.
+
+**VR (OpenXR).**
+- Room-scale and seated modes on any OpenXR runtime, PC-tethered or standalone streaming, at 1:1 scale.
+- Locomotion: teleport (default, for comfort), smooth movement with optional vignette, snap turn, and a *walk* mode that respects collision and stairs as in ADV-WALK-001.
+- Interaction with controllers or hand tracking:
+  - point to pick an element (shows its category, type and mark)
+  - measure between two points
+  - capture a viewpoint with a voice or text note as a BCF issue
+  - switch design options, time of day and light groups from a wrist menu
+- Scale model mode: shrink the building to tabletop size and grab, rotate or section it with a hand-held section plane. Section planes are session-only.
+- Comfort and safety: the runtime's guardian or boundary is always respected, frame-rate targets are 72/90 Hz with automatic detail reduction, and a single *recentre* action is available.
+
+**AR and mixed reality (later).**
+- Headset passthrough (OpenXR passthrough extensions where the runtime offers them) shows the model over the real room or site.
+- **On-site placement** uses the project's survey point and true north (Chapter 6, COL-POS-001) with a manual two-point alignment. Model elements can occlude and be occluded where the device provides depth.
+- **Tabletop AR** places a scaled model on a detected surface.
+- Phone and tablet AR (ARCore/ARKit) is considered only through engines whose licences and export paths allow it. *Deferred.*
+
+**Multi-user review (later).** Several participants in one session (desktop, VR or AR), with avatars, a shared pointer and voice left to external tools. The session host streams the scene. *Deferred (P3).*
+
+**Data.** Nothing new in the model. Saved paths, captures and views use ADV-WALK-001's storage. Engine and adapter settings (quality preset, comfort options, controller bindings) are user preferences.
+
+**Commands.** The ADV-WALK-001 `walkthrough.*` commands, plus `xr.start(view_id?, backend_id?, mode: vr|ar|tabletop, start?) -> session_id`; `xr.stop(session_id) -> ()`; `xr.align(session_id, method: survey_point|two_point, points?) -> ()`; `xr.set_option(session_id, key, value) -> ()`; `xr.runtime_info() -> runtime_info` (query: OpenXR runtime, devices, supported extensions).
+
+**Acceptance criteria.**
+- [ ] With the Godot adapter, the sample project opens in a desktop walkthrough within 15 s and stays at 60 fps on the reference GPU.
+- [ ] In VR on a supported headset, the session holds 90 Hz on the sample project with automatic detail reduction enabled, and teleporting onto a stair landing places the user at landing height.
+- [ ] A pick in VR selects the same element in Reviera's Project Browser and Properties palette.
+- [ ] Killing the engine's child process mid-session leaves Reviera responsive, the model unchanged, and the session reported as ended.
+- [ ] Swapping the Godot adapter for a test adapter (the conformance client) needs no change to the translator or the core.
+
+### XR platform support baseline (Godot)
+**ID:** ADV-XR-002 · **Priority:** P2 · **Ref:** web: Godot OpenXR integration project update (Khronos blog); Godot 4.6 release notes (LibGodot); Godot 4.7 XR coverage; Godot OpenXR Vendors plugin releases; Godot XR updates (godotengine.org); visionOS contribution announcement (press); Godot forum on mobile AR. All public, accessed 2026-10-12 (SOURCE_REGISTER S0686–S0698).
+
+**Purpose.** Pin down which XR devices and features the Godot translation layer (ADV-XR-001) can rely on, and what Reviera must not promise yet. The findings below are a snapshot of public information as of 2026-10-12 and must be re-checked when the layer is built.
+
+**Findings (public sources, October 2026).**
+
+| Area | Status in Godot | Consequence for Reviera |
+|------|-----------------|-------------------------|
+| Embedding | *LibGodot* (Godot 4.6, January 2026) builds the engine as a library on Linux, Windows and macOS through a `GodotInstance` entry point | The **embedded** hosting option of ADV-XR-001 is realistic on all three desktop platforms; the child-process option remains the fallback |
+| XR standard | OpenXR is Godot's XR path; OpenXR 1.1 support including frame synthesis (4.6–4.7); foveated rendering through Vulkan subsampled images and better composition layers for sharp UI and text (4.7, June 2026) | Reviera targets **OpenXR only**; no vendor SDKs in the core. UI panels in VR use composition layers |
+| PC VR | Any conformant OpenXR runtime; controller *render models* shipped in 4.5 (SteamVR, PICO) | Desktop VR on Windows and Linux via the user's OpenXR runtime (for example SteamVR); macOS has no mainstream PC-VR runtime |
+| Standalone headsets | Meta Quest, PICO, HTC (Vive XR Elite, Focus Vision), Magic Leap 2, Samsung Galaxy XR / Android XR (production-ready with Vendors plugin 5.1, May 2026), Valve Steam Frame (day-one, Godot 4.7); a single universal Android OpenXR APK for all Android-based headsets (4.5/4.6) | Standalone headsets are reached by the *exported walkthrough package* (ADV-BRG-001), not by running Reviera on the headset. Streaming from the desktop (PC VR link) is the live-session path |
+| Vendor extras | OpenXR Vendors plugin (MIT): passthrough with filters and projected passthrough, and other vendor extensions | Use for passthrough and MR where available, behind capability flags |
+| Mixed reality | OpenXR Spatial Entities in 4.6: spatial anchors, plane detection, marker (QR) tracking; demonstrated on PICO | Supports ADV-XR-001's on-site alignment: QR markers at known survey points can supplement two-point alignment; anchors persist a placement between sessions |
+| Apple Vision Pro | Apple is contributing visionOS support upstream (windowed first, then immersive); no fixed timeline | Not promised; track upstream |
+| Phone and tablet AR | ARKit plugin exists only for Godot 3; ARCore support for Godot 4 is partial and in progress | Mobile AR stays **deferred** (P3), as ADV-XR-001 already says |
+| Renderer | Godot recommends its *Mobile* renderer for XR projects | The adapter's XR sessions default to the Mobile renderer; desktop walkthroughs may use the Forward+ renderer for quality |
+
+**Behaviour & rules.**
+- The adapter declares capabilities from what the active OpenXR runtime reports at session start (`xr.runtime_info`): passthrough, hand tracking, spatial anchors, plane detection, marker tracking, foveation. Features whose extension is missing are hidden, not shown as errors.
+- The minimum supported Godot version for the adapter is the first release with LibGodot and Spatial Entities (4.6). The adapter pins one tested Godot release per Reviera release.
+- On-site AR alignment order of preference: QR marker at a surveyed point (where marker tracking exists); then two-point manual alignment; then survey point plus compass (lowest accuracy, flagged in the UI).
+- Standalone-headset packages are built from an RSP snapshot (ADV-RSP-001) as a universal Android OpenXR APK, with no model editing and with captures saved locally for import into Reviera as BCF.
+
+**Acceptance criteria.**
+- [ ] On a runtime without passthrough, the AR modes are not offered and VR still works.
+- [ ] A universal walkthrough APK built from the sample project installs and runs on at least two different Android-based headsets.
+- [ ] A QR marker placed at a surveyed point aligns the model to within 20 mm of the surveyed position at 5 m distance.
+
+### Reference bridges
+**ID:** ADV-BRG-001 · **Priority:** P3 (deferred; candidates for after the initial version) · **Ref:** owner directive 2026-10-12
+
+**Purpose.** Prove the protocol with real engines, and give users ready-made photo-real options.
+
+**Behaviour & rules.** Candidate bridges, each a separate project that uses only the public RSP:
+- **Blender bridge:** a Blender add-on (GPL, Python) that keeps a live Blender scene in sync, maps Reviera materials to Principled BSDF and IES lights to Blender lights, renders with Cycles or EEVEE, and sends results to the render gallery (`render.result`). It also exports camera paths both ways.
+- **Godot:** integrated first-party through the internal translation layer (ADV-XR-001), not as an external bridge. A further option is a *standalone walkthrough package* for clients: a Godot export of a scene snapshot that runs without Reviera installed.
+- **Bevy viewer** (MIT/Apache-2.0): a Rust reference implementation, used as the protocol conformance test client.
+- Bridges to proprietary engines are left to third parties (DOC-RBE-002).
+
+**Acceptance criteria.**
+- [ ] Each official bridge passes the RSP conformance suite (ADV-RSP-001) before release.
+
+## 7.2 Advanced features specified in other chapters
+
+| Feature | Where | IDs |
+|---------|-------|-----|
+| Pluggable render backends and their hosting rules | Ch 5 §5.12 | DOC-RBE-001, DOC-RBE-002 |
+| Live SQLite model store: crash recovery, sketch-session recovery, encryption at rest, time travel, combined BIMserver timeline, shared snapshots | Ch 2b | DM-LIVE-001 … 020 |
+| Reviera Extension Data embedded in IFC | Ch 2a | DM-RXD-* |
+| Workspace customisation: layout bookmarks, workflow scenarios, view bookmarks | Ch 1 §1.29.4–§1.29.5 | UI-LAYOUT-001 … 007, UI-SCEN-001 … 004 |
+| Built-in MCP server and agent pane | Ch 2 §2.16, Ch 1 §1.31 | DM-MCP-*, UI-AGENT-* |
+| Embodied carbon analysis | Ch 4 | ANA-CARB-001 |
+
+## 7.3 Command catalog
+
+| Command | Parameters | Returns | Undoable | Req ID |
+|---------|------------|---------|----------|--------|
+| `render.export_scene` | path, view_id?, scope?: view\|model, detail?: coarse\|medium\|fine, include_lights?, include_collision_hints? | report | No | ADV-RSP-001 |
+| `render.protocol_info` | — | {version, schema_urls} | No (query) | ADV-RSP-001 |
+| `walkthrough.start` | view_id?, backend_id?, start?, mode?: walk\|fly | session_id | No | ADV-WALK-001 |
+| `walkthrough.stop` | session_id | () | No | ADV-WALK-001 |
+| `walkthrough.record` | session_id, on | () | No | ADV-WALK-001 |
+| `walkthrough.save_path` | session_id, name | view_id | Yes | ADV-WALK-001 |
+| `walkthrough.capture` | session_id, comment?, as?: view\|bcf | id | Yes | ADV-WALK-001 |
+| `walkthrough.set_time` | session_id, datetime | () | No (session state) | ADV-WALK-001 |
+| `walkthrough.set_option` | session_id, key, value | () | No (session state) | ADV-WALK-001 |
+| `xr.start` | view_id?, backend_id?, mode: vr\|ar\|tabletop, start? | session_id | No | ADV-XR-001 |
+| `xr.stop` | session_id | () | No | ADV-XR-001 |
+| `xr.align` | session_id, method: survey_point\|two_point, points? | () | No (session state) | ADV-XR-001 |
+| `xr.set_option` | session_id, key, value | () | No (session state) | ADV-XR-001 |
+| `xr.runtime_info` | — | runtime_info | No (query) | ADV-XR-001 |
+
+## 7.4 Open questions and deviations from the reference
+
+**Open questions.**
+
+| # | Question | Proposed handling |
+|---|----------|-------------------|
+| Q7-1 | Embedded (LibGodot) or child-process hosting as the default for the Godot adapter | Prototype both in the proof of concept; prefer embedded for latency, keep child process for crash isolation |
+| Q7-2 | Licensing and support of the exported standalone walkthrough package (Godot export templates, store distribution for headsets) | Check the export templates' licences and each headset store's terms before offering store distribution |
+| Q7-3 | visionOS and phone/tablet AR | Track upstream Godot work; revisit after the initial version |
+| Q7-4 | Multi-user review sessions (networking, identity, voice) | Deferred (P3); BIMserver identities are the likely basis |
+
+**Deviations.** Everything in this chapter is beyond the reference product, which offers a built-in renderer, a vendor cloud renderer, and walkthrough animation only (see Chapter 5 D5-19).
+
+## 7.5 Traceability
+
+| Source | Requirements |
+|--------|--------------|
+| Owner directive 2026-10-12: pluggable renderer for future photo-real, game-engine or Blender walkthroughs | ADV-RSP-001, ADV-WALK-001, ADV-BRG-001 (with Ch 5 DOC-RBE-001/002) |
+| Owner directive 2026-10-12: translation layer to Godot and similar engines for walkthrough and full VR/AR | ADV-XR-001 |
+| Owner request 2026-10-12: research on Godot VR/AR support; public Godot, Khronos and press sources (SOURCE_REGISTER S0686–S0698) | ADV-XR-002, ADV-XR-001 (hosting) |
+| Khronos glTF 2.0 and OpenXR public specifications (referenced by name) | ADV-RSP-001, ADV-XR-001 |
+
+No reference-product sources were used in this chapter.
 
 
 ---
@@ -24114,9 +24576,10 @@ Generated by `tools/build_spec.py` from the chapter command catalogs and require
 | STR | 0 | 14 | 47 | 0 | 61 |
 | MEP | 0 | 28 | 42 | 0 | 70 |
 | ANA | 0 | 1 | 21 | 0 | 22 |
-| DOC | 67 | 37 | 11 | 1 | 116 |
-| COL | 8 | 42 | 6 | 1 | 57 |
-| **Total** | **317** | **261** | **168** | **5** | **751** |
+| DOC | 68 | 37 | 12 | 1 | 118 |
+| COL | 8 | 45 | 6 | 1 | 60 |
+| ADV | 0 | 0 | 4 | 1 | 5 |
+| **Total** | **318** | **264** | **173** | **6** | **761** |
 
 Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver)"), it is counted under the first. The non-functional requirements (NFR-…) are in Chapter 0 §0.7 and are not counted here.
 
@@ -24169,9 +24632,91 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `warnings.export` | 2, 6 | identical |
 | `warnings.list` | 2, 6 | identical |
 
+## A.2a Reviera-originated features
+
+75 requirements are Reviera's own design: owner directives, the technology stack (IFC/RXD storage, live store, BIMserver, MCP, scripting) and extensions beyond the reference product's feature set. Their Ref lines cite no research on the reference product. Listing them separately keeps the clean-room provenance clear: every other requirement traces to public research on the reference product.
+
+| Requirement | Ch | Feature |
+|-------------|----|---------|
+| UI-ARCH-006 | 1 | 1.1.6 Threading and responsiveness |
+| UI-LAYOUT-002 | 1 | Built-in, organisation and personal layouts |
+| UI-LAYOUT-004 | 1 | Context-bound layouts (auto-switch) |
+| UI-LAYOUT-005 | 1 | Personal preference profile: export, import and sync |
+| UI-LAYOUT-006 | 1 | Recommended project layout (team standard) |
+| UI-SCEN-003 | 1 | Scenario triggers and precedence |
+| UI-SCEN-004 | 1 | Scenario editor, storage and portability |
+| UI-API-002 | 1 | 1.30.2 State queries |
+| UI-API-003 | 1 | 1.30.3 MCP resources and change notifications |
+| UI-API-004 | 1 | 1.30.4 Driving the UI |
+| UI-API-005 | 1 | 1.30.5 Interactive picks for scripts |
+| UI-API-006 | 1 | 1.30.6 Concurrency with the user |
+| UI-AGENT-002 | 1 | 1.31.2 Conversation UI |
+| UI-AGENT-003 | 1 | 1.31.3 Approval, safety and undo |
+| UI-SRV-001 | 1 | 1.32.1 Connect and log in |
+| UI-SRV-003 | 1 | 1.32.3 Check In |
+| UI-SRV-004 | 1 | 1.32.4 Get Latest and Sync |
+| UI-SRV-005 | 1 | 1.32.5 Connection indicator and notifications |
+| UI-SRV-006 | 1 | 1.32.6 Revision history |
+| UI-A11Y-002 | 1 | 1.33.2 Visual accessibility |
+| UI-DPI-001 | 1 | 1.33.3 HiDPI and multiple scale factors |
+| UI-A11Y-003 | 1 | 1.33.4 Assistive technology |
+| UI-L10N-001 | 1 | 1.33.5 Localisation |
+| UI-RECOV-001 | 1 | 1.33.9 Crash recovery and live-store status |
+| DM-RXD-003 | 2 | 2.4.3 Reconciliation |
+| DM-REGEN-004 | 2 | 2.6.5 OCCT threading rules |
+| DM-CMD-002 | 2 | 2.12.2 Command naming and stability |
+| DM-MCP-002 | 2 | 2.16.2 Transports and authentication |
+| DM-MCP-003 | 2 | 2.16.3 Tool catalogue: generation from the registry |
+| DM-MCP-004 | 2 | 2.16.4 Compound and session tools |
+| DM-MCP-005 | 2 | 2.16.5 Permissions and safety |
+| DM-MCP-006 | 2 | 2.16.6 Resource catalogue |
+| DM-RXD-001 | 2a | store non-IFC data only as RXD documents and element data, using the schemas defined in … |
+| DM-RXD-002 | 2a | By default, Reviera shall embed RXD in the IFC file using only `Reviera_*` property sets … |
+| DM-RXD-004 | 2a | support the external carrier (`.reviera` file or folder, `.rvb` bundle) holding identical … |
+| DM-RXD-005 | 2a | provide *Export clean IFC* and *Export IFC with documentation*. |
+| DM-RXD-006 | 2a | detect external edits (`GeomHash`), dangling references and missing data, and reconcile … |
+| DM-RXD-007 | 2a | Unknown RXD kinds, fields and extension namespaces shall survive a round trip unchanged. |
+| DM-RXD-008 | 2a | In BIMserver mode, RXD shall travel inside the IFC; ownership state shall use Extended … |
+| DM-RXD-009 | 2a | Project macros stored in RXD shall be disabled until trusted. `rxd.trust_scripts(scope: … |
+| DM-RXD-010 | 2a | The compatibility test suite (§10) shall run in CI on every release. |
+| DM-RXD-011 | 2a | The RXD JSON Schemas shall be published under the **MIT licence** (owner decision, … |
+| DM-LIVE-001 | 2b | keep a live SQLite store (schema §3) for every open project, including untitled ones, and … |
+| DM-LIVE-002 | 2b | Live-store writes shall run on a dedicated writer thread with group commit (default 250 … |
+| DM-LIVE-003 | 2b | With default settings, an application crash shall lose no transaction committed more than … |
+| DM-LIVE-004 | 2b | On startup or project open, Reviera shall detect unclean shutdowns (§6.1) and offer the … |
+| DM-LIVE-005 | 2b | Restore shall rebuild the model from the materialised state; if the database is damaged, … |
+| DM-LIVE-006 | 2b | Undo and redo history shall be available after recovery, up to the configured depth. |
+| DM-LIVE-007 | 2b | The live store shall default to a local per-user directory. A store placed on a network … |
+| DM-LIVE-008 | 2b | Only one process shall open a live store for writing; others are offered read-only or … |
+| DM-LIVE-009 | 2b | Save shall write the IFC atomically and then mark the store saved (`saved_seq`). The IFC … |
+| DM-LIVE-010 | 2b | Housekeeping (§7) shall prune the journal, enforce the disk quota, and never delete a … |
+| DM-LIVE-011 | 2b | Fast reopen from a matching clean store (§8.1). |
+| DM-LIVE-012 | 2b | In BIMserver mode, the live store shall hold the base revision for three-way merge, so … |
+| DM-LIVE-013 | 2b | Secrets shall never be written to the store (§10). |
+| DM-LIVE-014 | 2b | Durability, group-commit window, location, retention policy, quota and encryption shall … |
+| DM-LIVE-015 | 2b | Interactive sessions (sketch, multi-click tools, group edit, in-place and Family Editor … |
+| DM-LIVE-016 | 2b | The live store shall be encrypted at rest with SQLCipher by default, with its key held in … |
+| DM-LIVE-017 | 2b | provide a History panel for time travel: a timeline with filters, read-only historical … |
+| DM-LIVE-018 | 2b | Keyframe snapshots and the retention policy (§7, §8.5) shall keep every retained point … |
+| DM-LIVE-019 | 2b | In BIMserver mode, the History panel shall show one combined timeline of local … |
+| DM-LIVE-020 | 2b | Users shall be able to publish named snapshots to BIMserver without changing the … |
+| DOC-RBE-001 | 5 | Pluggable render backends |
+| DOC-RBE-002 | 5 | Backend hosting and licensing |
+| COL-BIM-001 | 6 | Server profiles and login |
+| COL-BIM-002 | 6 | Project and revision browser |
+| COL-BIM-003 | 6 | Open and download |
+| COL-BIM-004 | 6 | Check in |
+| COL-MRG-001 | 6 | Three-way merge by GlobalId and RXD id |
+| COL-OWN-002 | 6 | Live ownership document and sync lock |
+| COL-OWN-004 | 6 | Enforced ownership through a server plugin (optional) |
+| COL-OFF-001 | 6 | Working copy layout and offline editing |
+| ADV-RSP-001 | 7 | Reviera Scene Protocol (RSP) |
+| ADV-XR-001 | 7 | Internal engine translation layer (walkthrough, VR and AR) |
+| ADV-BRG-001 | 7 | Reference bridges |
+
 ## A.3 Consolidated command index
 
-**1886 unique commands** in 395 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**1933 unique commands** in 399 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -24196,6 +24741,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `analytical_segment` | 2 |
 | `analytical_water_loop` | 1 |
 | `anchor_pattern` | 1 |
+| `api` | 7 |
 | `app` | 1 |
 | `area` | 2 |
 | `area_reinforcement` | 2 |
@@ -24205,7 +24751,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `array` | 1 |
 | `assembly` | 16 |
 | `assemblytemplate` | 1 |
-| `bcf` | 15 |
+| `bcf` | 25 |
 | `beam` | 3 |
 | `beam_system` | 4 |
 | `bending_detail` | 1 |
@@ -24222,6 +24768,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `callout` | 1 |
 | `cam_writer` | 1 |
 | `category` | 1 |
+| `cde` | 7 |
 | `ceiling` | 3 |
 | `circuit` | 13 |
 | `circuit_naming_scheme` | 4 |
@@ -24336,6 +24883,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `host` | 1 |
 | `hosting` | 5 |
 | `hostsweep` | 4 |
+| `http` | 1 |
 | `hydraulic_separation` | 2 |
 | `hydronic` | 1 |
 | `image` | 8 |
@@ -24456,7 +25004,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `registry` | 3 |
 | `reinforcement_numbering` | 2 |
 | `reinforcement_settings` | 2 |
-| `render` | 6 |
+| `render` | 15 |
 | `results` | 4 |
 | `revcloud` | 2 |
 | `revision` | 8 |
@@ -24545,7 +25093,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `underlay` | 1 |
 | `units` | 6 |
 | `validate` | 2 |
-| `view` | 115 |
+| `view` | 116 |
 | `view_tag` | 1 |
 | `viewport` | 10 |
 | `viewporttype` | 1 |
@@ -24553,7 +25101,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `viewset` | 3 |
 | `viewtype` | 1 |
 | `voltage` | 1 |
-| `walkthrough` | 2 |
+| `walkthrough` | 9 |
 | `wall` | 27 |
 | `wall_foundation` | 1 |
 | `wallreveal` | 1 |
@@ -24569,6 +25117,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `workplane` | 3 |
 | `workset` | 11 |
 | `worksharing` | 1 |
+| `xr` | 5 |
 | `zone_equipment` | 1 |
 
 | Command | Ch | Parameters | Returns | Undoable | Req ID |
@@ -24631,6 +25180,13 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `analytical_segment.override` | 4 | segment_ref, params | — | Yes | MEP-CALC-002 |
 | `analytical_water_loop.create` | 4 | kind, params | id | Yes | ANA-SYS-001 |
 | `anchor_pattern.create` | 4 | ... | — | Yes | STR-STL-006 |
+| `api.log` | 6 | profile_id, since? | entry[] (redacted) | No (query) | COL-API-001 |
+| `api.profile.add` | 6 | name, url, kind, auth_method, options? | profile_id | No | COL-API-001 |
+| `api.profile.list` | 6 | — | profile[] (no secrets) | No (query) | COL-API-001 |
+| `api.profile.remove` | 6 | profile_id | () | No | COL-API-001 |
+| `api.profile.test` | 6 | profile_id | report | No | COL-API-001 |
+| `api.signin` | 6 | profile_id | status | No | COL-API-001 |
+| `api.signout` | 6 | profile_id | () | No | COL-API-001 |
 | `app.exit` | 1 | `force?: bool` | `()` | No | UI-FILE-001 |
 | `area.place` | 3 | view_id, point, area_type?, name?, number? | element_id | Yes | ARC-AREA-001 |
 | `area.unplace` | 3 | ids | — | Yes | ARC-AREA-001 |
@@ -24661,17 +25217,27 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `bcf.add_comment` | 6 | topic_id, text, viewpoint?: current\ | none | comment_id | Yes |
 | `bcf.add_viewpoint` | 6 | topic_id, view_id? | viewpoint_id | Yes | COL-BCF-001 |
 | `bcf.api_bind_project` | 6 | connection_id, project_id | () | No | COL-BCF-002 |
-| `bcf.api_connect` | 6 | url | connection_id | No | COL-BCF-002 |
+| `bcf.api_connect` | 6 | url, profile_name? | connection_id | No | COL-BCF-002 |
 | `bcf.api_disconnect` | 6 | connection_id | () | No | COL-BCF-002 |
-| `bcf.api_sync` | 6 | connection_id | sync_report | No | COL-BCF-002 |
+| `bcf.api_list_projects` | 6 | connection_id | project[] | No (query) | COL-BCF-002 |
+| `bcf.api_resolve_conflict` | 6 | topic_id, field, use: server\ | local | () | Yes |
+| `bcf.api_status` | 6 | — | {connection, last_sync, queued_changes, conflicts} | No (query) | COL-BCF-002 |
+| `bcf.api_sync` | 6 | connection_id? | sync_report | No | COL-BCF-002 |
+| `bcf.api_unbind` | 6 | keep_local_copy=true | () | No | COL-BCF-002 |
 | `bcf.apply_viewpoint` | 6 | viewpoint_id, target_view_id? | view_id | No | COL-BCF-003 |
+| `bcf.bulk_update` | 6 | topic_ids[], fields | () | Yes | COL-BCF-005 |
 | `bcf.create_topic` | 6 | title, description?, fields?, view_id?, element_ids[]? | topic_id | Yes | COL-BCF-001 |
 | `bcf.delete_topic` | 6 | topic_ids[] | () | Yes | COL-BCF-001 |
 | `bcf.export` | 6 | path, topic_ids[]?, version: 2.1\ | 3.0 | () | No |
+| `bcf.from_clash` | 6 | clash_result_ids[], group_by? | topic_ids[] | Yes | COL-BCF-005 |
 | `bcf.import` | 6 | path | import_report | Yes | COL-BCF-001 |
+| `bcf.issues_for_element` | 6 | element_id | topic_summary[] | No (query) | COL-BCF-005 |
 | `bcf.issues_pane` | 6 | — | () | No | COL-BCF-004 |
 | `bcf.list` | 6 | filter? | topic_summary[] | No | COL-BCF-001 |
+| `bcf.notifications` | 6 | since? | notification[] | No (query) | COL-BCF-005 |
+| `bcf.report` | 6 | topic_ids[]? \ | filter?, format: pdf\ | html\ | csv\ |
 | `bcf.set_extensions` | 6 | lists{types?, statuses?, priorities?, labels?, stages?, users?}, replacements?{} | () | Yes | COL-BCF-004 |
+| `bcf.set_workflow` | 6 | rules | () | Yes | COL-BCF-005 |
 | `bcf.update_topic` | 6 | topic_id, fields | () | Yes | COL-BCF-001 |
 | `beam.create` | 4 | type_id, curve, reference_level, usage?, orientation?, z_justification?, y_justification? | element_id | Yes | STR-BEAM-001 |
 | `beam.create_on_grids` | 4 | type_id, grid_ids[], level | element_id[] | Yes | STR-BEAM-001 |
@@ -24724,6 +25290,13 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `callout.set_head` | 5 | view_id, head_point, leader_points[] | () | Yes | DOC-VIEW-005 |
 | `cam_writer.list` | 4 | — | writers[] | No | STR-PRE-007 |
 | `category.set_view_range_behaviour` | 5 | category, cuttable?, above_cut?: hide\ | projection\ | overhead, floor_like? | () |
+| `cde.check_versions` | 6 | document_ids[]? | version_info[] | No (query) | COL-CDE-001 |
+| `cde.connect` | 6 | url, profile_name? | connection_id | No | COL-CDE-001 |
+| `cde.disconnect` | 6 | connection_id | () | No | COL-CDE-001 |
+| `cde.download` | 6 | selection_session_id, target_folder? | files[] | No | COL-CDE-001 |
+| `cde.select_documents` | 6 | connection_id | selection_session_id | No | COL-CDE-001 |
+| `cde.upload_documents` | 6 | connection_id, files[] | upload_session_id | No | COL-CDE-001 |
+| `cde.upload_status` | 6 | upload_session_id | status | No (query) | COL-CDE-001 |
 | `ceiling.create` | 3 | type_id, loops, level_id, offset?, slope? | element_id | Yes | ARC-CEIL-001 |
 | `ceiling.create_auto` | 3 | type_id, level_id, point, offset? | element_id | Yes | ARC-CEIL-001 |
 | `ceiling.edit_boundary` | 3 | ceiling_id, loops, slope? | — | Yes | ARC-CEIL-001 |
@@ -25274,6 +25847,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `hostsweep.flip` | 3 | id, axis: Horizontal\ | Vertical | — | Yes |
 | `hostsweep.remove_segments` | 3 | id, edge_refs | — | Yes | ARC-SLED-001 |
 | `hostsweep.set_mitering` | 3 | id, mode | — | Yes | ARC-ROOF-004 |
+| `http.request` | 6 | method, url, headers?, body?, profile_id? | response (Lua at trusted/native trust only; not exposed to MCP) | No | COL-API-001 |
 | `hydraulic_separation.add` | 4 | fitting_or_pipe_id | — | Yes | MEP-PIPE-008 |
 | `hydraulic_separation.remove` | 4 | id | — | Yes | MEP-PIPE-008 |
 | `hydronic.set_enabled` | 4 | bool | — | Yes | MEP-PIPE-008 |
@@ -25718,9 +26292,18 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `reinforcement_numbering.show` | 4 | partition? | — | No | STR-RBR-016 |
 | `reinforcement_settings.set` | 4 | key, value | — | Yes | STR-RBR-002 |
 | `reinforcement_settings.show` | 4 | — | — | No | STR-RBR-002 |
+| `render.backend.list` | 5 | — | backend_info[] | No (query) | DOC-RBE-001 |
+| `render.backend.set_default` | 5 | kind, backend_id | () | No (user preference) | DOC-RBE-001 |
+| `render.backend.test` | 5 | backend_id | report | No | DOC-RBE-001 |
+| `render.bridge.connect_info` | 5 | — | {endpoint, token} (UI only; never exposed as an MCP resource) | No | DOC-RBE-002 |
+| `render.bridge.disconnect` | 5 | session_id | () | No | DOC-RBE-002 |
+| `render.bridge.launch` | 5 | backend_id, view_id?, args? | session_id | No | DOC-RBE-002 |
+| `render.bridge.list_sessions` | 5 | — | session_info[] | No (query) | DOC-RBE-002 |
 | `render.export` | 5 | job_id_or_view_id, path, format | () | No | DOC-OUT-011 |
+| `render.export_scene` | 7 | path, view_id?, scope?: view\ | model, detail?: coarse\ | medium\ | fine, include_lights?, include_collision_hints? |
 | `render.gallery` | 5 | — | () | No | DOC-OUT-011 |
 | `render.list_renderers` | 5 | — | renderer_info[] | No | DOC-OUT-011 |
+| `render.protocol_info` | 7 | — | {version, schema_urls} | No (query) | ADV-RSP-001 |
 | `render.save_to_project` | 5 | job_id, name | view_id | Yes | DOC-OUT-011 |
 | `render.start` | 5 | view_id, settings, renderer?, region? | job_id | No | DOC-OUT-011 |
 | `render.stop` | 5 | job_id | () | No | DOC-OUT-011 |
@@ -26343,6 +26926,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `view.set_phase` | 5 | view_id, phase_id, phase_filter_id? | () | Yes | DOC-GFX-017 |
 | `view.set_pivot` | 1 | `view_id`, `point` (interactive pick when omitted) | `()` | No | UI-NAV-001 |
 | `view.set_pointcloud_display` | 6 | view_id, link_id, visible?, colour_mode?, regions? | () | Yes | COL-LNK-003 |
+| `view.set_presentation_backend` | 5 | view_id, backend_id? (none: built-in) | () | Yes | DOC-RBE-001 |
 | `view.set_projection` | 1 | `view_id?`, `perspective | orthographic` | `()` | No |
 | `view.set_property` | 5 | view_id, name, value | () | Yes | DOC-VIEW-001 |
 | `view.set_reference_label` | 5 | view_id_or_marker_id, label? | () | Yes | DOC-VIEW-004 |
@@ -26384,8 +26968,15 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `viewset.save` | 5 | name, view_and_sheet_ids[]?, rule? | set_id | Yes | DOC-OUT-001 |
 | `viewtype.create` | 5 | kind, name, default_template_id?, bind_new_views?, marker_type_id? | view_family_type_id | Yes | DOC-VIEW-001 |
 | `voltage.create` | 4 | name, value, min, max | id | Yes | MEP-SET-002 |
+| `walkthrough.capture` | 7 | session_id, comment?, as?: view\ | bcf | id | Yes |
+| `walkthrough.record` | 7 | session_id, on | () | No | ADV-WALK-001 |
+| `walkthrough.save_path` | 7 | session_id, name | view_id | Yes | ADV-WALK-001 |
 | `walkthrough.set_keyframe` | 5 | view_id, index, eye?, target?, time? | () | Yes | DOC-VIEW-007 |
+| `walkthrough.set_option` | 7 | session_id, key, value | () | No (session state) | ADV-WALK-001 |
+| `walkthrough.set_time` | 7 | session_id, datetime | () | No (session state) | ADV-WALK-001 |
 | `walkthrough.set_timing` | 5 | view_id, total_frames, fps, uniform_speed? | () | Yes | DOC-VIEW-007 |
+| `walkthrough.start` | 7 | view_id?, backend_id?, start?, mode?: walk\ | fly | session_id | No |
+| `walkthrough.stop` | 7 | session_id | () | No | ADV-WALK-001 |
 | `wall.attach` | 3 | wall_ids, end: Top\ | Base, target_id | — | Yes |
 | `wall.break_up` | 3 | stacked_wall_ids | [element_id] | Yes | ARC-STKW-001 |
 | `wall.create` | 3 | type_id, curve, base_level, top_constraint: Level(id) \ | Unconnected(height), base_offset?, top_offset?, location_line?, flip?: bool, structural?: bool, structural_usage?, room_bounding?: bool, join_status?: Allow\ | Disallow, auto_join?: Off\ | Join\ |
@@ -26458,6 +27049,11 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `workset.set_editable` | 6 | workset_ids[], editable | () | No | COL-WS-002 |
 | `workset.set_visible_by_default` | 6 | workset_id, visible | () | Yes | COL-WS-002 |
 | `worksharing.set_display_colours` | 6 | kind, key, colour | () | No | COL-WS-004 |
+| `xr.align` | 7 | session_id, method: survey_point\ | two_point, points? | () | No (session state) |
+| `xr.runtime_info` | 7 | — | runtime_info | No (query) | ADV-XR-001 |
+| `xr.set_option` | 7 | session_id, key, value | () | No (session state) | ADV-XR-001 |
+| `xr.start` | 7 | view_id?, backend_id?, mode: vr\ | ar\ | tabletop, start? | session_id |
+| `xr.stop` | 7 | session_id | () | No | ADV-XR-001 |
 | `zone_equipment.create` | 4 | kind, behavior, loop_ids[], air_system_id? | id | Yes | ANA-SYS-001 |
 
 
@@ -26497,6 +27093,7 @@ Format: `<AREA>-<FEATURE>-<NNN>`. Example: `ARC-WALL-001`.
 | ANA | Analysis |
 | DOC | Views, graphics, annotation, schedules, sheets, output |
 | COL | Collaboration, linking, coordination, BIMserver |
+| ADV | Advanced features beyond the reference product (Chapter 7) |
 
 ## 4. Priority tiers
 

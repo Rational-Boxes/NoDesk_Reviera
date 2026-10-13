@@ -32,6 +32,7 @@ Format: `<AREA>-<FEATURE>-<NNN>`. Example: `ARC-WALL-001`.
 | ANA | Analysis |
 | DOC | Views, graphics, annotation, schedules, sheets, output |
 | COL | Collaboration, linking, coordination, BIMserver |
+| ADV | Advanced features beyond the reference product (Chapter 7) |
 
 ## 4. Priority tiers
 
