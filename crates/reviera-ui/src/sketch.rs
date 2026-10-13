@@ -103,6 +103,9 @@ impl Gui {
     /// Architecture › Floor: a new floor boundary on the plan's level.
     pub(crate) fn start_floor_sketch(&mut self) {
         let frame = self.frame;
+        if !self.ensure_plan(false) {
+            return;
+        }
         let Some(level) = self
             .active_view()
             .and_then(|v| v.plan.as_ref())
@@ -117,6 +120,9 @@ impl Gui {
     /// Sketch Ceiling: a new ceiling boundary on the plan's level.
     pub(crate) fn start_ceiling_sketch(&mut self) {
         let frame = self.frame;
+        if !self.ensure_plan(true) {
+            return;
+        }
         let Some(level) = self
             .active_view()
             .and_then(|v| v.plan.as_ref())
@@ -540,8 +546,12 @@ impl Gui {
             ),
             (None, SketchKind::Roof) => {
                 let mut a = json!({ "curves": curves, "level_id": s.level });
-                // A roof on picked walls sits on their tops.
-                if let Some(top) = self.picked_wall_top(s) {
+                // A roof on picked walls sits on their tops; so does one drawn on the top
+                // level, which has no level above to sit on.
+                if let Some(top) = self
+                    .picked_wall_top(s)
+                    .or_else(|| self.top_level_wall_top(s.level))
+                {
                     a["base_offset"] = json!(top);
                 }
                 ("roof.create_footprint", a)
@@ -720,6 +730,25 @@ impl Gui {
                 let g = reviera_core::walls::regenerate(store, store.get(*wall)?).ok()?;
                 Some(g.base_z + g.height - level)
             })
+            .reduce(f64::max)
+    }
+}
+
+impl Gui {
+    /// The highest wall top above `level` among the walls based on it, when `level` is the
+    /// highest level (relative to the level, metres).
+    fn top_level_wall_top(&self, level: ElementId) -> Option<f64> {
+        if self.levels().last().map(|l| l.id) != Some(level) {
+            return None;
+        }
+        let store = self.doc.and_then(|d| self.app.document(d))?.doc.store();
+        let z = crate::levels_elevation(store, level)?;
+        let guid = store.get(level)?.guid().to_string();
+        store
+            .iter()
+            .filter(|e| reviera_core::walls::wall_recipe(e).is_some_and(|r| r.base_level == guid))
+            .filter_map(|e| reviera_core::walls::regenerate(store, e).ok())
+            .map(|g| g.base_z + g.height - z)
             .reduce(f64::max)
     }
 }
@@ -938,7 +967,7 @@ impl Gui {
     /// Architecture › Ceiling.
     pub(crate) fn start_ceiling_tool(&mut self) {
         let frame = self.frame;
-        if !self.in_plan() {
+        if !self.ensure_plan(true) {
             return frame.set_status_text(
                 "Ceilings are placed in plan views (ceiling plans are best)",
                 0,

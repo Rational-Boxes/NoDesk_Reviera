@@ -91,6 +91,55 @@ impl Gui {
         self.active_view().is_some_and(|v| v.plan.is_some())
     }
 
+    /// Before a tool that works in plans: switches to a plan of the active model when another
+    /// view is active (an open plan tab, else the first floor plan, or ceiling plan when
+    /// `ceiling`). `false`, with a message, when the model has no plan.
+    pub(crate) fn ensure_plan(&mut self, ceiling: bool) -> bool {
+        if self.in_plan() {
+            return true;
+        }
+        let Some(doc) = self.doc else { return false };
+        let open: Vec<(u32, bool)> = self
+            .views
+            .iter()
+            .filter(|v| v.doc == doc)
+            .filter_map(|v| Some((v.id, v.plan.as_ref()?.ceiling)))
+            .collect();
+        if let Some(&(id, _)) = open.iter().find(|(_, c)| *c == ceiling).or(open.first()) {
+            self.activate_view(id);
+            return self.in_plan();
+        }
+        let list = self
+            .app
+            .document(doc)
+            .map(|d| reviera_core::views::list(d.doc.store()))
+            .unwrap_or_default();
+        let wanted = if ceiling {
+            reviera_core::plans::KIND_CEILING_PLAN
+        } else {
+            reviera_core::plans::KIND_PLAN
+        };
+        let plan = list
+            .iter()
+            .find(|v| v.kind == wanted)
+            .or_else(|| list.iter().find(|v| reviera_core::plans::is_plan(&v.kind)))
+            .map(|v| v.id);
+        match plan {
+            Some(id) => {
+                self.open_view(doc, Some(id));
+                self.in_plan()
+            }
+            None => {
+                super::error(
+                    &self.frame,
+                    "This tool works in plan views, and the model has none yet.\n\
+                     Create one with View › Floor Plan.",
+                );
+                false
+            }
+        }
+    }
+
     /// Whether the active view is a 2D drawing (plan, section or elevation).
     pub(crate) fn in_2d(&self) -> bool {
         self.active_view().is_some_and(super::View::is_2d)

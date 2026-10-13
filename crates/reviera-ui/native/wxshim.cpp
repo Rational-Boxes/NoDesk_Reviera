@@ -205,8 +205,12 @@ void* reviera_rb_new(void* parent, reviera_rb_callback callback, void* user) {
     auto* sizer = new wxBoxSizer(wxVERTICAL);
     sizer->Add(bar, 1, wxEXPAND);
     panel->SetSizer(sizer);
-    bar->Bind(wxEVT_RIBBONBUTTONBAR_CLICKED,
-              [=](wxRibbonButtonBarEvent& e) { callback(user, e.GetId()); });
+    // An action may rebuild the contextual tab, destroying the button bar that sent the click
+    // while wx is still handling it; so actions run once the event is done.
+    bar->Bind(wxEVT_RIBBONBUTTONBAR_CLICKED, [=](wxRibbonButtonBarEvent& e) {
+        const int id = e.GetId();
+        bar->CallAfter([=] { callback(user, id); });
+    });
     return bar;
 }
 

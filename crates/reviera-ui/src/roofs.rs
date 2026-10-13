@@ -17,6 +17,9 @@ impl Gui {
     /// can go to the level above, where walls end.
     pub(crate) fn start_roof_sketch(&mut self) {
         let frame = self.frame;
+        if !self.ensure_plan(false) {
+            return;
+        }
         let Some(level) = self
             .active_view()
             .and_then(|v| v.plan.as_ref())

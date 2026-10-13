@@ -34,7 +34,7 @@ impl Gui {
     /// Architecture › Room.
     pub(crate) fn start_room_tool(&mut self) {
         let frame = self.frame;
-        if !self.in_plan() {
+        if !self.ensure_plan(false) {
             return frame.set_status_text("Rooms are placed in plan views (View › Floor Plan)", 0);
         }
         self.end_tool(&frame);
