@@ -47,6 +47,35 @@ pub(crate) mod bridge {
         fn set_ref(self: Pin<&mut Model>, id: u32, attr: &str, target: u32) -> Result<()>;
         fn set_ref_list(self: Pin<&mut Model>, id: u32, attr: &str, targets: &[u32]) -> Result<()>;
         fn set_real_list(self: Pin<&mut Model>, id: u32, attr: &str, values: &[f64]) -> Result<()>;
+        fn set_typed_string(
+            self: Pin<&mut Model>,
+            id: u32,
+            attr: &str,
+            type_name: &str,
+            value: &str,
+        ) -> Result<()>;
+        fn set_typed_real(
+            self: Pin<&mut Model>,
+            id: u32,
+            attr: &str,
+            type_name: &str,
+            value: f64,
+        ) -> Result<()>;
+        fn set_typed_int(
+            self: Pin<&mut Model>,
+            id: u32,
+            attr: &str,
+            type_name: &str,
+            value: i32,
+        ) -> Result<()>;
+        fn set_typed_bool(
+            self: Pin<&mut Model>,
+            id: u32,
+            attr: &str,
+            type_name: &str,
+            value: bool,
+        ) -> Result<()>;
+        fn referenced_by(self: &Model, id: u32, class_name: &str) -> Result<Vec<u32>>;
 
         fn create_entity(self: Pin<&mut Model>, class_name: &str) -> Result<u32>;
         fn remove_entity(self: Pin<&mut Model>, id: u32) -> Result<()>;

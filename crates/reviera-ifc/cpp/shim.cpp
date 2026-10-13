@@ -193,6 +193,28 @@ const IfcParse::enumeration_type* enum_type_of(const IfcParse::entity& e, std::s
     return en;
 }
 
+const IfcParse::declaration& declaration(const IfcParse::IfcFile& file, rust::Str name) {
+    const IfcParse::declaration* decl = nullptr;
+    try {
+        decl = file.schema()->declaration_by_name(str(name));
+    } catch (const IfcParse::IfcException&) {
+    }
+    if (!decl) throw std::runtime_error(str(name) + " is not in schema " + file.schema()->name());
+    return *decl;
+}
+
+// A defined-type value such as IfcText('x'), added to the file the way IfcOpenShell's own
+// create_entity() does.
+template <typename T>
+IfcUtil::IfcBaseClass* typed_value(IfcParse::IfcFile& file, rust::Str type_name, const T& value) {
+    const auto& decl = declaration(file, type_name);
+    if (decl.as_entity()) throw std::runtime_error(str(type_name) + " is an entity, not a defined type");
+    IfcEntityInstanceData data(in_memory_attribute_storage(1));
+    auto* inst = file.schema()->instantiate(&decl, std::move(data));
+    inst->set_attribute_value(0, value);
+    return file.addEntity(inst);
+}
+
 // IfcOpenShell builds each schema's tables on first use, which is not thread-safe; build them all
 // once before any file is opened or created.
 void init_schemas() {
@@ -344,14 +366,40 @@ void Model::set_real_list(std::uint32_t id, rust::Str attr, rust::Slice<const do
     inst->set_attribute_value(attr_index(inst, attr), std::vector<double>(values.begin(), values.end()));
 }
 
+void Model::set_typed_string(std::uint32_t id, rust::Str attr, rust::Str type_name, rust::Str value) {
+    auto* inst = instance(*file_, id);
+    inst->set_attribute_value(attr_index(inst, attr), typed_value(*file_, type_name, str(value)));
+}
+
+void Model::set_typed_real(std::uint32_t id, rust::Str attr, rust::Str type_name, double value) {
+    auto* inst = instance(*file_, id);
+    inst->set_attribute_value(attr_index(inst, attr), typed_value(*file_, type_name, value));
+}
+
+void Model::set_typed_int(std::uint32_t id, rust::Str attr, rust::Str type_name, std::int32_t value) {
+    auto* inst = instance(*file_, id);
+    inst->set_attribute_value(attr_index(inst, attr), typed_value(*file_, type_name, static_cast<int>(value)));
+}
+
+void Model::set_typed_bool(std::uint32_t id, rust::Str attr, rust::Str type_name, bool value) {
+    auto* inst = instance(*file_, id);
+    inst->set_attribute_value(attr_index(inst, attr), typed_value(*file_, type_name, value));
+}
+
+rust::Vec<std::uint32_t> Model::referenced_by(std::uint32_t id, rust::Str class_name) const {
+    instance(*file_, id);
+    rust::Vec<std::uint32_t> out;
+    auto list = file_->getInverse(static_cast<int>(id), &declaration(*file_, class_name), -1);
+    if (list) {
+        for (auto* inst : *list) out.push_back(inst->id());
+    }
+    return out;
+}
+
 std::uint32_t Model::create_entity(rust::Str class_name) {
     const auto* schema = file_->schema();
-    const IfcParse::declaration* decl = nullptr;
-    try {
-        decl = schema->declaration_by_name(str(class_name));
-    } catch (const IfcParse::IfcException&) {
-    }
-    if (!decl || !decl->as_entity()) throw std::runtime_error(str(class_name) + " is not an entity type");
+    const auto* decl = &declaration(*file_, class_name);
+    if (!decl->as_entity()) throw std::runtime_error(str(class_name) + " is not an entity type");
     IfcEntityInstanceData data(in_memory_attribute_storage(decl->as_entity()->attribute_count()));
     auto* inst = schema->instantiate(decl, std::move(data));
     if (auto* e = inst->as<IfcUtil::IfcBaseEntity>()) e->populate_derived();

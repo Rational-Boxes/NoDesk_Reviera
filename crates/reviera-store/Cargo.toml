@@ -11,6 +11,14 @@ publish.workspace = true
 
 [dependencies]
 reviera-core.workspace = true
+reviera-ifc.workspace = true
+reviera-rxd.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
 
 [lints]
 workspace = true

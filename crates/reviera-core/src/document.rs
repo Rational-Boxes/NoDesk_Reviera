@@ -5,12 +5,14 @@
 //! (DM-TXN-002) and transaction groups (DM-TXN-001).
 
 use std::collections::{BTreeMap, HashMap, VecDeque};
+use std::sync::Arc;
 use std::time::SystemTime;
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::change::{ChangeSet, ChangedSummary};
+use crate::element::{Element, NewElement};
 use crate::error::{Error, Result};
 use crate::id::{ElementId, GlobalId};
 use crate::origin::Origin;
@@ -175,6 +177,42 @@ impl Document {
 
     pub fn store(&self) -> &Store {
         &self.store
+    }
+
+    /// Builds a document from elements read from a file, keeping their IDs and GUIDs. Loading is not
+    /// a transaction: there is no undo item and the version counter starts at 0. The next new ID is
+    /// at least `next_id` and above every loaded ID.
+    pub fn from_loaded(
+        elements: impl IntoIterator<Item = (ElementId, NewElement)>,
+        next_id: u64,
+    ) -> Result<Self> {
+        let mut doc = Self::new();
+        doc.next_id = next_id.max(ElementId::FIRST.0);
+        for (id, init) in elements {
+            let guid = init.guid.clone().ok_or_else(|| {
+                Error::new("element.no_guid", format!("element {id} has no GlobalId"))
+            })?;
+            if id.0 == 0 || doc.store.contains(id) {
+                return Err(Error::new(
+                    "element.duplicate_id",
+                    format!("element ID {id} is zero or repeated"),
+                ));
+            }
+            if doc.store.find_by_guid(&guid).is_some() {
+                return Err(Error::new(
+                    "element.duplicate_guid",
+                    format!("GlobalId {guid} is repeated"),
+                ));
+            }
+            doc.next_id = doc.next_id.max(id.0 + 1);
+            doc.store.put(Arc::new(Element::new(id, guid, init)));
+        }
+        Ok(doc)
+    }
+
+    /// The ID the next created element will get.
+    pub fn next_id(&self) -> ElementId {
+        ElementId(self.next_id)
     }
 
     pub fn version(&self) -> ModelVersion {

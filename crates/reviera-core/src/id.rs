@@ -19,6 +19,8 @@ use serde::{Deserialize, Serialize};
 pub struct ElementId(pub u64);
 
 impl ElementId {
+    /// The project element (`IfcProject`), the first of the reserved singleton IDs 1–999.
+    pub const PROJECT: ElementId = ElementId(1);
     pub const FIRST: ElementId = ElementId(1000);
 }
 

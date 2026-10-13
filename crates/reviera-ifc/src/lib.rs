@@ -202,56 +202,62 @@ impl IfcModel {
 
     pub fn set_attribute(&mut self, id: StepId, name: &str, value: &AttrValue) -> Result<()> {
         let m = self.inner.pin_mut();
+        let unsupported =
+            || IfcError::Unsupported(format!("setting {value:?} on {name} is not supported yet"));
         match value {
             AttrValue::Null => m.set_null(id.0, name)?,
             AttrValue::String(s) => m.set_string(id.0, name, s)?,
             AttrValue::Real(r) => m.set_real(id.0, name, *r)?,
-            AttrValue::Int(i) => {
-                let i = i32::try_from(*i)
-                    .map_err(|_| IfcError::Unsupported(format!("{i} is out of range")))?;
-                m.set_int(id.0, name, i)?
-            }
+            AttrValue::Int(i) => m.set_int(id.0, name, to_i32(*i)?)?,
             AttrValue::Bool(b) => m.set_bool(id.0, name, *b)?,
             AttrValue::Enum(e) => m.set_enum(id.0, name, e)?,
             AttrValue::Ref(r) => m.set_ref(id.0, name, *r)?,
+            AttrValue::Typed {
+                type_name,
+                value: inner,
+            } => match inner.as_ref() {
+                AttrValue::String(s) => m.set_typed_string(id.0, name, type_name, s)?,
+                AttrValue::Real(r) => m.set_typed_real(id.0, name, type_name, *r)?,
+                AttrValue::Int(i) => m.set_typed_int(id.0, name, type_name, to_i32(*i)?)?,
+                AttrValue::Bool(b) => m.set_typed_bool(id.0, name, type_name, *b)?,
+                _ => return Err(unsupported()),
+            },
             AttrValue::List(items) => {
-                if let Some(refs) = items
-                    .iter()
-                    .map(|v| {
-                        if let AttrValue::Ref(r) = v {
-                            Some(*r)
-                        } else {
-                            None
-                        }
-                    })
-                    .collect::<Option<Vec<_>>>()
-                {
+                if let Some(refs) = all(items, |v| {
+                    if let AttrValue::Ref(r) = v {
+                        Some(*r)
+                    } else {
+                        None
+                    }
+                }) {
                     m.set_ref_list(id.0, name, &refs)?
-                } else if let Some(reals) = items
-                    .iter()
-                    .map(|v| {
-                        if let AttrValue::Real(r) = v {
-                            Some(*r)
-                        } else {
-                            None
-                        }
-                    })
-                    .collect::<Option<Vec<_>>>()
-                {
+                } else if let Some(reals) = all(items, |v| {
+                    if let AttrValue::Real(r) = v {
+                        Some(*r)
+                    } else {
+                        None
+                    }
+                }) {
                     m.set_real_list(id.0, name, &reals)?
                 } else {
-                    return Err(IfcError::Unsupported(format!(
-                        "setting mixed lists on {name} is not supported yet"
-                    )));
+                    return Err(unsupported());
                 }
             }
-            other => {
-                return Err(IfcError::Unsupported(format!(
-                    "setting {other:?} on {name} is not supported yet"
-                )));
+            AttrValue::Derived | AttrValue::Logical(_) | AttrValue::Binary(_) => {
+                return Err(unsupported());
             }
         }
         Ok(())
+    }
+
+    /// Instances of `class` (or its subtypes) that reference `id` in any attribute.
+    pub fn referenced_by(&self, id: StepId, class: &str) -> Result<Vec<StepId>> {
+        Ok(self
+            .inner
+            .referenced_by(id.0, class)?
+            .into_iter()
+            .map(StepId)
+            .collect())
     }
 
     /// Creates an entity with every attribute unset.
@@ -290,6 +296,16 @@ impl IfcModel {
             })
             .collect())
     }
+}
+
+fn to_i32(i: i64) -> Result<i32> {
+    i32::try_from(i)
+        .map_err(|_| IfcError::Unsupported(format!("{i} is out of range for an IFC INTEGER")))
+}
+
+/// `Some` if every item maps to `Some`.
+fn all<T>(items: &[AttrValue], f: impl Fn(&AttrValue) -> Option<T>) -> Option<Vec<T>> {
+    items.iter().map(f).collect()
 }
 
 fn path_str(path: &Path) -> Result<String> {

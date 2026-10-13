@@ -347,3 +347,80 @@ fn sample_models_round_trip_and_tessellate() {
         );
     }
 }
+
+#[test]
+fn typed_property_values_and_inverse_references() {
+    let WallModel {
+        mut model, wall, ..
+    } = wall_model();
+    let w = model.find_by_guid(&wall).unwrap();
+    let text = AttrValue::Typed {
+        type_name: "IfcText".into(),
+        value: Box::new(s("{\"identity\":{\"iid\":1000}}")),
+    };
+    let count = AttrValue::Typed {
+        type_name: "IfcInteger".into(),
+        value: Box::new(AttrValue::Int(7)),
+    };
+    let prop = create(
+        &mut model,
+        "IfcPropertySingleValue",
+        &[("Name", s("Data")), ("NominalValue", text.clone())],
+    );
+    let rev = create(
+        &mut model,
+        "IfcPropertySingleValue",
+        &[("Name", s("Rev")), ("NominalValue", count.clone())],
+    );
+    let pset = model
+        .create_rooted("IfcPropertySet", &GlobalId::new())
+        .unwrap();
+    model
+        .set_attribute(pset, "Name", &s("Reviera_Element"))
+        .unwrap();
+    model
+        .set_attribute(
+            pset,
+            "HasProperties",
+            &AttrValue::List(vec![r(prop), r(rev)]),
+        )
+        .unwrap();
+    let rel = model
+        .create_rooted("IfcRelDefinesByProperties", &GlobalId::new())
+        .unwrap();
+    model
+        .set_attribute(rel, "RelatedObjects", &AttrValue::List(vec![r(w)]))
+        .unwrap();
+    model
+        .set_attribute(rel, "RelatingPropertyDefinition", &r(pset))
+        .unwrap();
+    assert_eq!(
+        model
+            .referenced_by(pset, "IfcRelDefinesByProperties")
+            .unwrap(),
+        [rel]
+    );
+    assert_eq!(
+        model.referenced_by(w, "IfcRelDefinesByProperties").unwrap(),
+        [rel]
+    );
+
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("pset.ifc");
+    model.write(&path).unwrap();
+    let reopened = IfcModel::open(&path).unwrap();
+    assert_eq!(reopened.attribute(prop, "NominalValue").unwrap(), text);
+    assert_eq!(reopened.attribute(rev, "NominalValue").unwrap(), count);
+    assert!(
+        model
+            .set_attribute(
+                prop,
+                "NominalValue",
+                &AttrValue::Typed {
+                    type_name: "IfcWall".into(),
+                    value: Box::new(s("x"))
+                }
+            )
+            .is_err()
+    );
+}
