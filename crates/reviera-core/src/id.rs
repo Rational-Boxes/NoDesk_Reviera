@@ -21,6 +21,8 @@ pub struct ElementId(pub u64);
 impl ElementId {
     /// The project element (`IfcProject`), the first of the reserved singleton IDs 1–999.
     pub const PROJECT: ElementId = ElementId(1);
+    /// Project settings (units and other display settings), stored as RXD `project/settings`.
+    pub const PROJECT_SETTINGS: ElementId = ElementId(2);
     pub const FIRST: ElementId = ElementId(1000);
 }
 

@@ -349,3 +349,74 @@ fn shared_property_sets_are_copied_before_writing() {
         "B keeps the shared value"
     );
 }
+
+#[test]
+fn unit_settings_persist_and_measures_accept_units() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = dir.path().join("units.ifc");
+    let r = registry();
+    let (mut project, mut doc, _) = LocalProject::open(&fzk_haus()).unwrap();
+    run(
+        &r,
+        &mut doc,
+        "units.set_preset",
+        json!({"preset": "imperial_ft_in"}),
+    )
+    .unwrap();
+    let wall = walls(&doc)[0].id();
+    run(&r, &mut doc, "pset.set", json!({"element_id": wall, "pset_name": "Pset_WallCommon", "property_name": "Width", "value": "30 cm", "ifc_type": "IfcPositiveLengthMeasure"})).unwrap();
+    assert_eq!(
+        doc.store().get(wall).unwrap().params["Pset_WallCommon.Width"],
+        json!({"type": "IfcPositiveLengthMeasure", "value": 0.3})
+    );
+    project.save_as(&doc, &out).unwrap();
+
+    // The settings are an RXD document; they come back as the project-settings element.
+    let (mut p2, mut doc2, report) = LocalProject::open(&out).unwrap();
+    assert!(report.problems.is_empty(), "{:?}", report.problems);
+    let settings = doc2.store().get(ElementId::PROJECT_SETTINGS).unwrap();
+    assert_eq!(settings.class, "rxd:project/settings");
+    assert_eq!(
+        run(
+            &r,
+            &mut doc2,
+            "units.format",
+            json!({"value": 0.3, "data_type": "length"})
+        )
+        .unwrap(),
+        "0' - 11 13/16\""
+    );
+    let ifc = IfcModel::open(&out).unwrap();
+    assert!(
+        ifc.entities_of_type("IfcPropertySet")
+            .unwrap()
+            .iter()
+            .any(|s| s.name.as_deref() == Some("Reviera_Doc:project/settings"))
+    );
+
+    // Changing a display unit changes RXD only: element values are untouched.
+    run(
+        &r,
+        &mut doc2,
+        "units.set_preset",
+        json!({"preset": "metric_mm"}),
+    )
+    .unwrap();
+    let before = all_params(&doc2);
+    p2.save(&doc2).unwrap();
+    let (_, doc3, _) = LocalProject::open(&out).unwrap();
+    assert_eq!(
+        all_params(&doc3)
+            .into_iter()
+            .filter(|(id, _)| *id != ElementId::PROJECT_SETTINGS)
+            .collect::<BTreeMap<_, _>>(),
+        before
+            .into_iter()
+            .filter(|(id, _)| *id != ElementId::PROJECT_SETTINGS)
+            .collect::<BTreeMap<_, _>>()
+    );
+    assert_eq!(
+        reviera_core::units::settings_of(doc3.store()).formats["length"].unit,
+        "millimetre"
+    );
+}

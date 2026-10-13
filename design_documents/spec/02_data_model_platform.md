@@ -1957,6 +1957,7 @@ DN25,25,37.5,22,Copper
 `units.get() -> unit_settings` ·
 `units.set_format(data_type, format)` ·
 `units.set_preset(preset)` ·
+`units.set_number_format(decimal_symbol, digit_grouping, indian_grouping?)` ·
 `units.format(value, data_type, format?) -> text` ·
 `units.parse(text, data_type) -> value` ·
 `units.edit()` (opens the Project Units dialog)
@@ -3929,6 +3930,7 @@ All commands defined in this chapter. Every command in this table is also a Lua 
 | `units.get` | — | unit_settings | No | DM-UNIT-001 |
 | `units.set_format` | data_type, format | — | Yes | DM-UNIT-001 |
 | `units.set_preset` | preset | — | Yes | DM-UNIT-001 |
+| `units.set_number_format` | decimal_symbol, digit_grouping, indian_grouping? | — | Yes | DM-UNIT-001 |
 | `units.format` | value, data_type, format? | text | No | DM-UNIT-001 |
 | `units.parse` | text, data_type | value | No | DM-UNIT-001 |
 | `units.edit` | — | — | No | DM-UNIT-001 |

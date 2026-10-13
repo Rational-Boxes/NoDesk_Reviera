@@ -116,7 +116,19 @@ impl Command for PsetSet {
                 format!("`{ifc_type}` is not an IFC type"),
             ));
         }
-        let fits = match (category(&ifc_type), &p.value) {
+        // Measures accept unit strings ("30 cm"), stored in SI.
+        let mut value = p.value.clone();
+        if let Value::String(text) = &p.value
+            && category(&ifc_type) == "number"
+            && let Some(dt) = reviera_core::units::data_type_for_ifc(&ifc_type)
+        {
+            value = json!(reviera_core::units::parse(
+                text,
+                dt.key,
+                &reviera_core::units::settings_of(cx.store())
+            )?);
+        }
+        let fits = match (category(&ifc_type), &value) {
             (_, Value::Null) => true,
             ("string", Value::String(_))
             | ("boolean", Value::Bool(_))
@@ -130,7 +142,7 @@ impl Command for PsetSet {
                 format!("{} does not fit {ifc_type}", p.value),
             ));
         }
-        let value = json!({ "type": ifc_type, "value": p.value });
+        let value = json!({ "type": ifc_type, "value": value });
         cx.edit()?.modify(id, |e| {
             e.params.insert(key, value);
         })

@@ -357,6 +357,22 @@ async fn resources_expose_documents_elements_and_commands() {
         .unwrap()["items"][0]
         .clone();
     assert_eq!(storey["name"], "Level 1");
+    // Measures carry a display value in project units; unit strings are accepted.
+    h.call("run_command", json!({"name": "pset.set", "arguments": {
+        "element_id": storey["id"], "pset_name": "Pset_BuildingStoreyCommon", "property_name": "GrossHeight",
+        "value": "3 m", "ifc_type": "IfcLengthMeasure"}})).await.unwrap();
+    let got = h
+        .call("get_element", json!({"id_or_guid": storey["id"]}))
+        .await
+        .unwrap();
+    assert_eq!(
+        got["params"]["Pset_BuildingStoreyCommon.GrossHeight"]["value"],
+        3.0
+    );
+    assert_eq!(
+        got["params"]["Pset_BuildingStoreyCommon.GrossHeight"]["display"],
+        "3000"
+    );
     let by_guid = h
         .read(&format!(
             "reviera://element/{}",

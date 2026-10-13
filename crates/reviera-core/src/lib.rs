@@ -17,6 +17,7 @@ pub mod id;
 pub mod origin;
 pub mod store;
 pub mod txn;
+pub mod units;
 
 pub use change::{ChangeRecord, ChangeSet, ChangedSummary};
 pub use command::{

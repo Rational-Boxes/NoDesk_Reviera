@@ -424,7 +424,8 @@ impl CommandRegistry {
         caller: &Caller,
         commit: bool,
     ) -> Result<Outcome> {
-        let (entry, args) = self.prepare(name, args, caller)?;
+        let (entry, args) =
+            self.prepare(name, args, caller, &crate::units::settings_of(doc.store()))?;
         let Handler::Document { run, direct } = &entry.handler else {
             return Err(Error::new(
                 "registry.host_command",
@@ -478,7 +479,8 @@ impl CommandRegistry {
         args: Value,
         caller: &Caller,
     ) -> Result<Outcome> {
-        let (entry, args) = self.prepare(name, args, caller)?;
+        let (entry, args) =
+            self.prepare(name, args, caller, &crate::units::UnitSettings::default())?;
         let Handler::Host(run) = &entry.handler else {
             return Err(Error::new(
                 "registry.document_command",
@@ -493,7 +495,13 @@ impl CommandRegistry {
         })
     }
 
-    fn prepare(&self, name: &str, args: Value, caller: &Caller) -> Result<(&Entry, Value)> {
+    fn prepare(
+        &self,
+        name: &str,
+        args: Value,
+        caller: &Caller,
+        units: &crate::units::UnitSettings,
+    ) -> Result<(&Entry, Value)> {
         let entry = self.commands.get(name).ok_or_else(|| {
             Error::new(
                 "registry.unknown_command",
@@ -508,7 +516,8 @@ impl CommandRegistry {
             )
             .with_details(json!({ "required": required })));
         }
-        let args = if args.is_null() { json!({}) } else { args };
+        let mut args = if args.is_null() { json!({}) } else { args };
+        crate::units::convert_arguments(&entry.spec.params, &mut args, units)?;
         let problems: Vec<String> = entry
             .validator
             .iter_errors(&args)

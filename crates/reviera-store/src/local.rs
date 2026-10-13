@@ -72,6 +72,8 @@ pub struct LocalProject {
     saved_params: HashMap<ElementId, BTreeMap<String, serde_json::Value>>,
     /// Property and quantity sets by owner.
     sets: params::SetIndex,
+    /// RXD-only elements and their document paths.
+    rxd_paths: HashMap<ElementId, String>,
     /// Document version that the IFC population reflects.
     synced: ModelVersion,
 }
@@ -159,8 +161,35 @@ impl LocalProject {
             None => IdentityDoc::default(),
         };
 
-        // Internal IDs: persisted ones first; the rest in STEP order (DM-ID-001).
+        // Elements that exist only in RXD, one document each (class `rxd:<path>`).
         let mut used = HashSet::new();
+        let mut rxd_elements = Vec::new();
+        let mut rxd_paths = HashMap::new();
+        for (path, pset) in &doc_psets {
+            if path == IdentityDoc::PATH {
+                continue;
+            }
+            let Ok(payload) = pset.decode(limits) else {
+                report.problems.push(format!(
+                    "RXD document {path} could not be decoded; it is kept unchanged"
+                ));
+                continue;
+            };
+            let Some(record) = RxdRecord::from_value(&payload) else {
+                continue;
+            };
+            if !used.insert(record.iid) {
+                report.problems.push(format!(
+                    "RXD document {path}: internal ID {} is repeated; it is kept unchanged",
+                    record.iid
+                ));
+                continue;
+            }
+            rxd_paths.insert(ElementId(record.iid), path.clone());
+            rxd_elements.push((ElementId(record.iid), record.into_element(path)));
+        }
+
+        // Internal IDs: persisted ones first; the rest in STEP order (DM-ID-001).
         let mut ids: HashMap<StepId, ElementId> = HashMap::new();
         let mut needs_id = Vec::new();
         for e in &objects {
@@ -235,6 +264,7 @@ impl LocalProject {
             ));
         }
         report.elements = elements.len();
+        elements.extend(rxd_elements);
         let doc = Document::from_loaded(elements, next)?;
 
         let data_id = manifest
@@ -265,6 +295,7 @@ impl LocalProject {
             synced: doc.version(),
             saved_params,
             sets,
+            rxd_paths,
         };
         Ok((local, doc, report))
     }
@@ -363,6 +394,13 @@ impl LocalProject {
 
         for id in &deleted {
             dirty.remove(id);
+            if let Some(path) = self.rxd_paths.remove(id) {
+                if let Some(pset) = self.doc_psets.remove(&path) {
+                    self.remove_element_pset(&pset, project)?;
+                }
+                report.removed += 1;
+                continue;
+            }
             self.element_data.remove(id);
             let Some(step) = self.steps.remove(id) else {
                 continue;
@@ -380,6 +418,20 @@ impl LocalProject {
 
         for id in &changed {
             let e = doc.store().get(*id).expect("changed elements exist");
+            if let Some(path) = e.class.strip_prefix("rxd:") {
+                let value = RxdRecord::of(e).to_value();
+                let existing = self.doc_psets.get(path).cloned();
+                let name = format!("{DOC_PSET_PREFIX}{path}");
+                let pset =
+                    self.upsert_payload(existing, &name, project, false, "element", &value)?;
+                if self.rxd_paths.insert(*id, path.to_owned()).is_some() {
+                    report.updated += 1;
+                } else {
+                    report.created += 1;
+                }
+                self.doc_psets.insert(path.to_owned(), pset);
+                continue;
+            }
             let step = match self.steps.get(id) {
                 Some(step) => {
                     let class = self.ifc.class_of(*step)?;
@@ -395,7 +447,7 @@ impl LocalProject {
                 None => {
                     if !e.class.starts_with("Ifc") {
                         return Err(unsupported(format!(
-                            "element {id} ({}) has no IFC entity; RXD-only elements are not stored yet",
+                            "element {id} ({}) is neither an IFC entity nor an `rxd:` document",
                             e.class
                         )));
                     }
@@ -640,6 +692,47 @@ impl LocalProject {
             let _ = d.sync_all();
         }
         Ok(())
+    }
+}
+
+/// An RXD-only element as stored in its document: `{iid, guid, name, params}`.
+struct RxdRecord {
+    iid: u64,
+    guid: GlobalId,
+    name: Option<String>,
+    params: BTreeMap<String, Value>,
+}
+
+impl RxdRecord {
+    fn of(e: &reviera_core::Element) -> Self {
+        Self {
+            iid: e.id().0,
+            guid: e.guid().clone(),
+            name: e.name.clone(),
+            params: e.params.clone(),
+        }
+    }
+
+    fn from_value(v: &Value) -> Option<Self> {
+        Some(Self {
+            iid: v.get("iid")?.as_u64()?,
+            guid: GlobalId::parse(v.get("guid")?.as_str()?)?,
+            name: v.get("name").and_then(Value::as_str).map(str::to_owned),
+            params: serde_json::from_value(v.get("params")?.clone()).ok()?,
+        })
+    }
+
+    fn to_value(&self) -> Value {
+        json!({ "iid": self.iid, "guid": self.guid.as_str(), "name": self.name, "params": self.params })
+    }
+
+    fn into_element(self, path: &str) -> NewElement {
+        NewElement {
+            class: format!("rxd:{path}"),
+            name: self.name,
+            params: self.params,
+            guid: Some(self.guid),
+        }
     }
 }
 

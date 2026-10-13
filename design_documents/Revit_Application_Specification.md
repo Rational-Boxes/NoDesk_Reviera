@@ -31,7 +31,7 @@
 **Document:** Functional and technical specification of Reviera, an open-source BIM authoring application
 **Functional reference:** Autodesk® Revit® 2026/2027 (described from public sources only; see `RESEARCH_LOG.md`)
 **Licence of Reviera:** GPL-3.0-or-later
-**Version:** 0.1 (draft) · 2026-10-12 · **Size:** 761 numbered requirements (318 P0 · 264 P1 · 173 P2 · 6 P3), 1,933 commands
+**Version:** 0.1 (draft) · 2026-10-12 · **Size:** 761 numbered requirements (318 P0 · 264 P1 · 173 P2 · 6 P3), 1,934 commands
 
 > **Clean-room statement.** This specification describes features, workflows and behaviour in Reviera's own words. Every input was publicly available: vendor online help, public blogs and tutorials, public forums and open-source repositories. All of it is listed with URLs and access checks in `SOURCE_REGISTER.md`. No proprietary, confidential, leaked or NDA-covered information was used. No vendor code, binaries, file formats or assets were examined or copied. Autodesk and Revit are trademarks of Autodesk, Inc. They are used here only to identify the functional reference. Reviera is not affiliated with or endorsed by Autodesk.
 
@@ -60,7 +60,7 @@ This document covers:
 | 5 | Views, graphics, annotation, schedules, sheets, output |
 | 6 | Collaboration, linking and coordination (Local and BIMserver modes) |
 | 7 | Advanced features beyond the reference product: scene protocol, simulated walkthroughs, Godot translation layer for VR/AR, render bridges |
-| A | Appendix A: requirement summary, shared commands, consolidated command index (1,933 commands; 761 requirements) |
+| A | Appendix A: requirement summary, shared commands, consolidated command index (1,934 commands; 761 requirements) |
 
 Out of scope:
 - reproducing vendor-cloud services such as ACC/Forma and Autodesk Assistant (open alternatives are specified instead)
@@ -5886,6 +5886,7 @@ DN25,25,37.5,22,Copper
 `units.get() -> unit_settings` ·
 `units.set_format(data_type, format)` ·
 `units.set_preset(preset)` ·
+`units.set_number_format(decimal_symbol, digit_grouping, indian_grouping?)` ·
 `units.format(value, data_type, format?) -> text` ·
 `units.parse(text, data_type) -> value` ·
 `units.edit()` (opens the Project Units dialog)
@@ -7858,6 +7859,7 @@ All commands defined in this chapter. Every command in this table is also a Lua 
 | `units.get` | — | unit_settings | No | DM-UNIT-001 |
 | `units.set_format` | data_type, format | — | Yes | DM-UNIT-001 |
 | `units.set_preset` | preset | — | Yes | DM-UNIT-001 |
+| `units.set_number_format` | decimal_symbol, digit_grouping, indian_grouping? | — | Yes | DM-UNIT-001 |
 | `units.format` | value, data_type, format? | text | No | DM-UNIT-001 |
 | `units.parse` | text, data_type | value | No | DM-UNIT-001 |
 | `units.edit` | — | — | No | DM-UNIT-001 |
@@ -24717,7 +24719,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**1933 unique commands** in 399 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**1934 unique commands** in 399 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -25092,7 +25094,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `type` | 5 |
 | `ui` | 143 |
 | `underlay` | 1 |
-| `units` | 6 |
+| `units` | 7 |
 | `validate` | 2 |
 | `view` | 116 |
 | `view_tag` | 1 |
@@ -26832,6 +26834,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `units.get` | 2 | — | unit_settings | No | DM-UNIT-001 |
 | `units.parse` | 2 | text, data_type | value | No | DM-UNIT-001 |
 | `units.set_format` | 2 | data_type, format | — | Yes | DM-UNIT-001 |
+| `units.set_number_format` | 2 | decimal_symbol, digit_grouping, indian_grouping? | — | Yes | DM-UNIT-001 |
 | `units.set_preset` | 2 | preset | — | Yes | DM-UNIT-001 |
 | `validate.ids` | 2 | ids_path, scope? | report | No | DM-FILE-004 |
 | `validate.ifc` | 2 | path? | report | No | DM-FILE-004 |

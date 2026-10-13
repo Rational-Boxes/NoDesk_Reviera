@@ -152,7 +152,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**1933 unique commands** in 399 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**1934 unique commands** in 399 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -527,7 +527,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `type` | 5 |
 | `ui` | 143 |
 | `underlay` | 1 |
-| `units` | 6 |
+| `units` | 7 |
 | `validate` | 2 |
 | `view` | 116 |
 | `view_tag` | 1 |
@@ -2267,6 +2267,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `units.get` | 2 | — | unit_settings | No | DM-UNIT-001 |
 | `units.parse` | 2 | text, data_type | value | No | DM-UNIT-001 |
 | `units.set_format` | 2 | data_type, format | — | Yes | DM-UNIT-001 |
+| `units.set_number_format` | 2 | decimal_symbol, digit_grouping, indian_grouping? | — | Yes | DM-UNIT-001 |
 | `units.set_preset` | 2 | preset | — | Yes | DM-UNIT-001 |
 | `validate.ids` | 2 | ids_path, scope? | report | No | DM-FILE-004 |
 | `validate.ifc` | 2 | path? | report | No | DM-FILE-004 |

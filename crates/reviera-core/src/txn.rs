@@ -90,6 +90,21 @@ impl<'d> Transaction<'d> {
         Ok(id)
     }
 
+    /// Creates an element with a reserved ID (model singletons such as project settings).
+    pub(crate) fn create_with_id(&mut self, id: ElementId, init: NewElement) -> Result<()> {
+        if self.working.contains(id) {
+            return Err(Error::new(
+                "element.duplicate_id",
+                format!("element {id} already exists"),
+            ));
+        }
+        let guid = init.guid.clone().unwrap_or_else(|| self.doc.new_guid());
+        self.doc.reserve_id(id);
+        self.working.put(Arc::new(Element::new(id, guid, init)));
+        self.touched.insert(id);
+        Ok(())
+    }
+
     /// Edits an element's class, name or parameters.
     pub fn modify<R>(&mut self, id: ElementId, edit: impl FnOnce(&mut Element) -> R) -> Result<R> {
         let current = self.working.get_arc(id).ok_or_else(|| not_found(id))?;

@@ -696,3 +696,166 @@ fn change_records_round_trip_and_history_can_be_restored() {
     }];
     assert!(ChangeSet::from_records(bad).is_err());
 }
+
+#[derive(Debug, Deserialize, JsonSchema)]
+struct HeightParams {
+    #[schemars(extend("x-reviera-data-type" = "length"))]
+    height: f64,
+}
+
+struct SetHeight;
+
+impl Command for SetHeight {
+    type Params = HeightParams;
+    type Output = f64;
+    const META: CommandMeta = CommandMeta {
+        name: "test.height",
+        version: 1,
+        summary: "",
+        description: "",
+        effects: &[Effect::Edit],
+        transaction_name: "Height",
+    };
+
+    fn run(&self, cx: &mut CommandContext<'_>, p: HeightParams) -> Result<f64> {
+        let txn = cx.edit()?;
+        txn.create(NewElement::new("IfcWall").param("height", p.height))?;
+        Ok(p.height)
+    }
+}
+
+#[test]
+fn length_arguments_accept_unit_strings() {
+    let (mut r, mut d) = setup();
+    r.add(SetHeight).unwrap();
+    let a = r
+        .execute(&mut d, "test.height", json!({"height": "3000 mm"}), &user())
+        .unwrap()
+        .result;
+    let b = r
+        .execute(&mut d, "test.height", json!({"height": 3.0}), &user())
+        .unwrap()
+        .result;
+    let c = r
+        .execute(
+            &mut d,
+            "test.height",
+            json!({"height": "9' 10 1/8\""}),
+            &user(),
+        )
+        .unwrap()
+        .result;
+    assert_eq!(a, b);
+    assert!((c.as_f64().unwrap() - 118.125 * 0.0254).abs() < 1e-12);
+    let e = r
+        .execute(&mut d, "test.height", json!({"height": "3 kg"}), &user())
+        .unwrap_err();
+    assert_eq!(code(e), "args.invalid");
+    let schema = &r.get("test.height").unwrap().params;
+    assert_eq!(
+        schema["properties"]["height"]["x-reviera-data-type"],
+        "length"
+    );
+}
+
+#[test]
+fn project_units_commands() {
+    let (r, mut d) = setup();
+    let run = |d: &mut Document, n: &str, a: Value| r.execute(d, n, a, &user()).map(|o| o.result);
+    assert_eq!(
+        run(
+            &mut d,
+            "units.format",
+            json!({"value": 1.2345678, "data_type": "length"})
+        )
+        .unwrap(),
+        "1235"
+    );
+
+    run(
+        &mut d,
+        "units.set_format",
+        json!({"data_type": "length", "format": {"unit": "metre", "decimals": 3, "symbol": true}}),
+    )
+    .unwrap();
+    assert_eq!(d.undo_history().next().unwrap().name, "Project Units");
+    assert_eq!(
+        run(
+            &mut d,
+            "units.format",
+            json!({"value": 1.2345678, "data_type": "length"})
+        )
+        .unwrap(),
+        "1.235 m"
+    );
+    // Changing the display unit changes how bare numbers parse, not stored values.
+    assert_eq!(
+        run(
+            &mut d,
+            "units.parse",
+            json!({"text": "2", "data_type": "length"})
+        )
+        .unwrap(),
+        json!(2.0)
+    );
+
+    let e = r
+        .execute(
+            &mut d,
+            "units.set_number_format",
+            json!({"decimal_symbol": ",", "digit_grouping": ","}),
+            &user(),
+        )
+        .unwrap_err();
+    assert_eq!(code(e), "units.same_separators");
+    let e = r
+        .execute(
+            &mut d,
+            "units.set_format",
+            json!({"data_type": "length", "format": {"unit": "kilogram"}}),
+            &user(),
+        )
+        .unwrap_err();
+    assert_eq!(code(e), "units.wrong_dimension");
+
+    run(
+        &mut d,
+        "units.set_preset",
+        json!({"preset": "imperial_ft_in"}),
+    )
+    .unwrap();
+    run(&mut d, "units.set_format", json!({"data_type": "length", "format": {"unit": "feet_inches", "fraction": 16, "symbol": true}})).unwrap();
+    assert_eq!(
+        run(
+            &mut d,
+            "units.format",
+            json!({"value": 1.0, "data_type": "length"})
+        )
+        .unwrap(),
+        "3' - 3 3/8\""
+    );
+    let back = run(
+        &mut d,
+        "units.parse",
+        json!({"text": "5' 6\"", "data_type": "length"}),
+    )
+    .unwrap();
+    assert!((back.as_f64().unwrap() - 1.6764).abs() < 1e-12);
+
+    // Settings live on the project-settings element and undo like any change.
+    assert_eq!(
+        d.store().get(ElementId::PROJECT_SETTINGS).unwrap().class,
+        "rxd:project/settings"
+    );
+    r.execute(&mut d, "edit.undo", json!({"steps": 3}), &user())
+        .unwrap();
+    assert_eq!(
+        run(
+            &mut d,
+            "units.format",
+            json!({"value": 1.2345678, "data_type": "length"})
+        )
+        .unwrap(),
+        "1235"
+    );
+}

@@ -508,12 +508,31 @@ fn summary(doc: &reviera_core::Document, e: &Element) -> Value {
     let stamp = doc
         .stamp(e.id())
         .map(|s| json!({"counter": s.counter, "by": s.by}));
+    // Measures also get a display value in the project's units.
+    let units = reviera_core::units::settings_of(doc.store());
+    let params: serde_json::Map<String, Value> = e
+        .params
+        .iter()
+        .map(|(k, v)| {
+            let display = v
+                .get("type")
+                .and_then(Value::as_str)
+                .and_then(reviera_core::units::data_type_for_ifc)
+                .zip(v.get("value").and_then(Value::as_f64))
+                .and_then(|(dt, n)| reviera_core::units::format(n, dt.key, &units, None).ok());
+            let mut v = v.clone();
+            if let (Some(d), Some(obj)) = (display, v.as_object_mut()) {
+                obj.insert("display".into(), json!(d));
+            }
+            (k.clone(), v)
+        })
+        .collect();
     json!({
         "id": e.id(),
         "guid": e.guid(),
         "class": e.class,
         "name": e.name,
-        "params": e.params,
+        "params": params,
         "last_modified": stamp,
     })
 }

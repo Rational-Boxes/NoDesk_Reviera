@@ -173,7 +173,7 @@ td code { white-space: nowrap; }
         <div class="tb-cell"><span class="tb-label">Revision</span><span class="tb-value">0.1 · Draft</span></div>
         <div class="tb-cell"><span class="tb-label">Date</span><span class="tb-value tb-num">2026-10-12</span></div>
         <div class="tb-cell"><span class="tb-label">Requirements</span><span class="tb-value tb-num">761</span></div>
-        <div class="tb-cell"><span class="tb-label">Commands</span><span class="tb-value tb-num">1,933</span></div>
+        <div class="tb-cell"><span class="tb-label">Commands</span><span class="tb-value tb-num">1,934</span></div>
         <div class="tb-cell"><span class="tb-label">Licence</span><span class="tb-value">GPL-3.0-or-later</span></div>
         <div class="tb-cell last-row"><span class="tb-label">Stack</span><span class="tb-value">IFC · Rust · OCCT · wx · LuaJIT · MCP</span></div>
         <div class="tb-cell last-row" style="grid-column: span 3"><span class="tb-label">By priority</span>
@@ -185,7 +185,7 @@ td code { white-space: nowrap; }
 <p><strong>Document:</strong> Functional and technical specification of Reviera, an open-source BIM authoring application
 <strong>Functional reference:</strong> Autodesk® Revit® 2026/2027 (described from public sources only; see <code>RESEARCH_LOG.md</code>)
 <strong>Licence of Reviera:</strong> GPL-3.0-or-later
-<strong>Version:</strong> 0.1 (draft) · 2026-10-12 · <strong>Size:</strong> 761 numbered requirements (318 P0 · 264 P1 · 173 P2 · 6 P3), 1,933 commands</p>
+<strong>Version:</strong> 0.1 (draft) · 2026-10-12 · <strong>Size:</strong> 761 numbered requirements (318 P0 · 264 P1 · 173 P2 · 6 P3), 1,934 commands</p>
 <blockquote>
 <p><strong>Clean-room statement.</strong> This specification describes features, workflows and behaviour in Reviera's own words. Every input was publicly available: vendor online help, public blogs and tutorials, public forums and open-source repositories. All of it is listed with URLs and access checks in <code>SOURCE_REGISTER.md</code>. No proprietary, confidential, leaked or NDA-covered information was used. No vendor code, binaries, file formats or assets were examined or copied. Autodesk and Revit are trademarks of Autodesk, Inc. They are used here only to identify the functional reference. Reviera is not affiliated with or endorsed by Autodesk.</p>
 </blockquote>
@@ -249,7 +249,7 @@ td code { white-space: nowrap; }
 </tr>
 <tr>
 <td>A</td>
-<td>Appendix A: requirement summary, shared commands, consolidated command index (1,933 commands; 761 requirements)</td>
+<td>Appendix A: requirement summary, shared commands, consolidated command index (1,934 commands; 761 requirements)</td>
 </tr>
 </tbody>
 </table></div>
@@ -14788,6 +14788,7 @@ DN25,25,37.5,22,Copper
 <code>units.get() -&gt; unit_settings</code> ·
 <code>units.set_format(data_type, format)</code> ·
 <code>units.set_preset(preset)</code> ·
+<code>units.set_number_format(decimal_symbol, digit_grouping, indian_grouping?)</code> ·
 <code>units.format(value, data_type, format?) -&gt; text</code> ·
 <code>units.parse(text, data_type) -&gt; value</code> ·
 <code>units.edit()</code> (opens the Project Units dialog)</p>
@@ -18417,6 +18418,13 @@ key_id = &quot;minisign:&lt;publisher public key&gt;&quot;     # signature file:
 <tr>
 <td><code>units.set_preset</code></td>
 <td>preset</td>
+<td>—</td>
+<td>Yes</td>
+<td>DM-UNIT-001</td>
+</tr>
+<tr>
+<td><code>units.set_number_format</code></td>
+<td>decimal_symbol, digit_grouping, indian_grouping?</td>
 <td>—</td>
 <td>Yes</td>
 <td>DM-UNIT-001</td>
@@ -47553,7 +47561,7 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 </tbody>
 </table></div>
 <h2 id="a3-consolidated-command-index">A.3 Consolidated command index</h2>
-<p><strong>1933 unique commands</strong> in 399 domains. Every command is exposed automatically to the UI, to Lua (<code>reviera.&lt;domain&gt;.&lt;verb&gt;</code>) and to MCP (<code>&lt;domain&gt;_&lt;verb&gt;</code>), subject to its permission class.</p>
+<p><strong>1934 unique commands</strong> in 399 domains. Every command is exposed automatically to the UI, to Lua (<code>reviera.&lt;domain&gt;.&lt;verb&gt;</code>) and to MCP (<code>&lt;domain&gt;_&lt;verb&gt;</code>), subject to its permission class.</p>
 <div class="tbl"><table>
 <thead>
 <tr>
@@ -49048,7 +49056,7 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 </tr>
 <tr>
 <td><code>units</code></td>
-<td style="text-align: right;">6</td>
+<td style="text-align: right;">7</td>
 </tr>
 <tr>
 <td><code>validate</code></td>
@@ -62840,6 +62848,14 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 <td><code>units.set_format</code></td>
 <td>2</td>
 <td>data_type, format</td>
+<td>—</td>
+<td>Yes</td>
+<td>DM-UNIT-001</td>
+</tr>
+<tr>
+<td><code>units.set_number_format</code></td>
+<td>2</td>
+<td>decimal_symbol, digit_grouping, indian_grouping?</td>
 <td>—</td>
 <td>Yes</td>
 <td>DM-UNIT-001</td>
