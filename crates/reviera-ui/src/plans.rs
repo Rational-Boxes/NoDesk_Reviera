@@ -102,15 +102,16 @@ impl Gui {
         let pens = reviera_core::standards::pen_set(&store);
         let styles = reviera_core::standards::object_styles(&store);
         let weights = |element: Option<ElementId>| {
-            let category = element
-                .and_then(|e| store.get(e))
-                .and_then(reviera_core::categories::category_of)
-                .map_or("", |c| c.key);
-            let style = styles.style(category);
-            let width = |pen: u8| pens.model_width(pen, f64::from(scale)) as f32;
+            let (cut, projection) = reviera_core::standards::element_widths(
+                &store,
+                &pens,
+                &styles,
+                element,
+                f64::from(scale),
+            );
             reviera_render::plan::Weights {
-                cut: style.cut_pen.map(width),
-                projection: width(style.projection_pen),
+                cut: cut.map(|w| w as f32),
+                projection: projection as f32,
             }
         };
         let mut graphics =

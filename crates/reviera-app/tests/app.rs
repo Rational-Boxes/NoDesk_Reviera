@@ -449,3 +449,106 @@ fn models_load_on_another_thread_and_attach_on_this_one() {
     assert_eq!(e.code, "file.already_open");
     assert_eq!(app.document_at(&file), Some(id));
 }
+
+#[test]
+fn plans_export_as_vector_pdf_at_scale() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = app(dir.path());
+    run(&mut app, "file.new", json!({}));
+    let doc = app.active().unwrap();
+    let level = reviera_core::plans::levels(app.document(doc).unwrap().doc.store())[0].2;
+    let plan = run(
+        &mut app,
+        "view.create_plan",
+        json!({"level_ids": [level.0]}),
+    )[0]
+    .clone();
+    let mut walls = Vec::new();
+    for (s, e) in [
+        ([0, 0], [8, 0]),
+        ([8, 0], [8, 6]),
+        ([8, 6], [0, 6]),
+        ([0, 6], [0, 0]),
+    ] {
+        walls.push(run(
+            &mut app,
+            "wall.create",
+            json!({"curve": {"line": {"start": s, "end": e}}, "base_level": level.0, "top_constraint": {"unconnected": 3}}),
+        ));
+    }
+    run(
+        &mut app,
+        "dim.create_aligned",
+        json!({"view_id": plan,
+               // Counter-clockwise walls have their exterior inside: the outer faces are interior.
+               "refs": [{"element": walls[0], "sub": "face:int", "point": [4, -0.1]},
+                        {"element": walls[2], "sub": "face:int", "point": [4, 6.1]}],
+               "line_point": [10, 3]}),
+    );
+    let path = dir.path().join("plan.pdf");
+    let out = run(
+        &mut app,
+        "export.pdf",
+        json!({"range": {"views": [plan]}, "path_or_folder": path}),
+    );
+    assert_eq!(out["files"], json!([path]));
+    // 8.2 m × 6.2 m plus the dimension at 1:100 is 82 × 62 mm and more: an A4 sheet.
+    assert_eq!(out["sheets"], json!(["A4"]));
+    if let Ok(copy) = std::env::var("REVIERA_DUMP_PDF") {
+        std::fs::copy(&path, copy).unwrap();
+    }
+    let bytes = std::fs::read(&path).unwrap();
+    assert!(bytes.starts_with(b"%PDF-"));
+    let text = String::from_utf8_lossy(&bytes);
+    assert!(text.contains("Scale 1:100"), "title strip text");
+    assert!(text.contains("(6200)"), "the dimension value is real text");
+}
+
+#[test]
+fn a_model_exports_one_pdf_page_per_plan() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = app(dir.path());
+    let file = dir.path().join("fzk.ifc");
+    std::fs::copy(
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data/ifc/AC20-FZK-Haus.ifc"),
+        &file,
+    )
+    .unwrap();
+    run(&mut app, "file.open", json!({"path": file}));
+    let doc = app.active().unwrap();
+    let levels: Vec<u64> = reviera_core::plans::levels(app.document(doc).unwrap().doc.store())
+        .into_iter()
+        .map(|l| l.2.0)
+        .collect();
+    let plans = run(&mut app, "view.create_plan", json!({"level_ids": levels}));
+    let path = dir.path().join("fzk.pdf");
+    let out = run(
+        &mut app,
+        "export.pdf",
+        json!({"range": {"views": plans}, "path_or_folder": path}),
+    );
+    assert_eq!(out["sheets"].as_array().unwrap().len(), levels.len());
+    let text = String::from_utf8_lossy(&std::fs::read(&path).unwrap()).into_owned();
+    assert_eq!(
+        text.matches("/Type /Page\n").count() + text.matches("/Type /Page ").count(),
+        levels.len()
+    );
+    if let Ok(copy) = std::env::var("REVIERA_DUMP_FZK_PDF") {
+        std::fs::copy(&path, copy).unwrap();
+    }
+    // Separate files are named after the views.
+    let folder = dir.path().join("sheets");
+    let out = run(
+        &mut app,
+        "export.pdf",
+        json!({"range": {"views": plans}, "path_or_folder": folder, "combine": false}),
+    );
+    assert_eq!(out["files"].as_array().unwrap().len(), levels.len());
+    assert!(
+        out["files"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|f| Path::new(f.as_str().unwrap()).exists())
+    );
+}

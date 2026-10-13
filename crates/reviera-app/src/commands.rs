@@ -38,6 +38,7 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add_host(crate::views::ViewSetProjection),
         registry.add_host(crate::views::ViewSetHome),
         registry.add_host(crate::views::ViewOpen),
+        registry.add_host(crate::output::ExportPdf),
         registry.add_host(SelectionAdd),
         registry.add_host(SelectionRemove),
     ];

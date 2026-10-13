@@ -8,6 +8,7 @@
 //! application commands act on the [`App`]; every other command acts on the active document.
 
 mod commands;
+pub mod output;
 pub mod views;
 
 use std::collections::BTreeMap;

@@ -37,6 +37,9 @@ operation can be driven by Lua scripts and by AI agents through the Model Contex
 - **Line weights**: plans draw cut and projection lines with each category's pens
   (`objectstyle.set`) at paper widths for the view scale (`lineweight.set`, `add_scale`),
   so a plan on screen at 100 % matches its print.
+- **PDF**: File › Export PDF writes plan views as vector PDF at their scale on the smallest ISO
+  sheet (A4–A0), with pen widths in paper millimetres, dimension values as real text and a title
+  strip (`export.pdf`).
 - **Navigation**: an Orientation Cube in each 3D view (26 click regions, compass, Home, and a
   PERSP/ISO projection toggle), standard and isometric views with animated transitions, wheel
   zoom about the cursor, orbit about the selection, Previous/Next pan/zoom, and walk mode

@@ -60,6 +60,7 @@ const ID_BROWSER_DUPLICATE: i32 = ID_HIGHEST + 26;
 const ID_BROWSER_DELETE: i32 = ID_HIGHEST + 27;
 const ID_NEW_PLAN: i32 = ID_HIGHEST + 28;
 const ID_DIMENSION: i32 = ID_HIGHEST + 29;
+const ID_EXPORT_PDF: i32 = ID_HIGHEST + 30;
 /// The orientation presets of `nav::PRESETS`, one id each.
 const ID_ORIENT_FIRST: i32 = ID_HIGHEST + 40;
 
@@ -1828,6 +1829,12 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 "Save the project to a new file",
             )
             .append_separator()
+            .append_item(
+                ID_EXPORT_PDF,
+                "Export &PDF...\tCtrl+P",
+                "Export the active plan as PDF at its scale",
+            )
+            .append_separator()
             .append_item(ID_EXIT, "E&xit", "Close Reviera")
             .build();
         let mut orient_menu = Menu::builder();
@@ -2228,6 +2235,53 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 ID_NEW_VIEW => with(&gui, Gui::new_3d_view),
                 ID_DEFAULT_3D => with(&gui, Gui::default_3d_view),
                 ID_NEW_PLAN => with(&gui, Gui::new_floor_plans),
+                ID_EXPORT_PDF => {
+                    let mut target = None;
+                    with(&gui, |g| {
+                        target = g
+                            .active_view()
+                            .filter(|v| v.plan.is_some())
+                            .and_then(|v| Some((v.element?, g.view_name(v), g.current_path())));
+                    });
+                    let Some((view, name, model_path)) = target else {
+                        return error(
+                            &f,
+                            "Open a floor plan to export it as PDF (View › New Floor Plan).",
+                        );
+                    };
+                    let mut dialog = FileDialog::builder(&f)
+                        .with_message("Export PDF")
+                        .with_wildcard("PDF files (*.pdf)|*.pdf")
+                        .with_style(FileDialogStyle::Save | FileDialogStyle::OverwritePrompt)
+                        .with_default_file(&format!("{name}.pdf"));
+                    if let Some(dir) = model_path.as_ref().and_then(|p| p.parent()) {
+                        dialog = dialog.with_default_dir(&dir.to_string_lossy());
+                    }
+                    let dialog = dialog.build();
+                    if dialog.show_modal() == ID_OK
+                        && let Some(path) = dialog.get_path()
+                    {
+                        let mut path = PathBuf::from(path);
+                        if path.extension().is_none() {
+                            path.set_extension("pdf");
+                        }
+                        with(&gui, |g| {
+                            let args =
+                                json!({ "range": { "views": [view] }, "path_or_folder": path });
+                            match g.run("export.pdf", args) {
+                                Ok(v) => f.set_status_text(
+                                    &format!(
+                                        "Exported {} ({})",
+                                        path.display(),
+                                        v["sheets"][0].as_str().unwrap_or_default()
+                                    ),
+                                    0,
+                                ),
+                                Err(e) => error(&f, &format!("The PDF was not written:\n{e}")),
+                            }
+                        });
+                    }
+                }
                 ID_DIMENSION => with(&gui, |g| {
                     g.start_dim_tool(&f);
                     if let Some(v) = g.active_view() {

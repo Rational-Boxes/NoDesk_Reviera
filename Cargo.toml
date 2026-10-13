@@ -64,6 +64,7 @@ schemars = { version = "1.2.3", features = ["uuid1"] }
 jsonschema = { version = "0.58.6", default-features = false }
 earcut = "0.4.11"
 imbl = "7.0.2"
+pdf-writer = "0.15"
 glam = "0.34.1"
 zstd = "0.14.2"
 sha2 = "0.11.1"

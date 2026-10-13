@@ -1,0 +1,464 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Reviera contributors
+
+//! Output (spec Ch 5 §5.15): plan views as vector PDF at their scale (DOC-OUT-003).
+//!
+//! Each view is one page: the smallest ISO landscape sheet that holds the drawing at its scale,
+//! cut poché filled, lines at their pens' paper widths, dimension values as real (searchable)
+//! text, and a title strip. The geometry is the plan drawing of the GPU viewport (the exact
+//! OCCT hidden-line drawing of §5.12 replaces it later).
+
+use std::path::{Path, PathBuf};
+
+use pdf_writer::types::{LineCapStyle, LineJoinStyle};
+use pdf_writer::{Content, Finish, Name, Pdf, Rect, Ref, Str, TextStr};
+use reviera_core::{
+    Caller, CommandMeta, Effect, ElementId, ElementRef, Error, HostCommand, Result,
+};
+use reviera_core::{annotations, plans, standards, units, views};
+use reviera_render::annotation::{Dimension, Label, dimension_parts};
+use reviera_render::plan::{Lines, PlanGraphics, Weights, feature_edges, plan_graphics};
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
+
+use crate::{App, DocumentId};
+
+/// Floors and slabs below a plan's bottom still show within this depth (DOC-VR-002 step 6).
+pub const FLOOR_TOLERANCE: f64 = 1.22;
+
+/// A plan view's drawing: the plan graphics, its annotation lines and labels.
+#[derive(Debug, Clone)]
+pub struct PlanDrawing {
+    pub name: String,
+    pub scale: f32,
+    pub graphics: PlanGraphics,
+    pub annotation: Vec<Lines>,
+    pub labels: Vec<Label>,
+}
+
+impl App {
+    /// The drawing of plan view `view` of `doc`.
+    pub fn plan_drawing(&self, doc: DocumentId, view: ElementId) -> Result<PlanDrawing> {
+        let scene = self.render_scene(doc)?;
+        let open = self.get(doc)?;
+        let store = open.doc.store();
+        let e = store
+            .get(view)
+            .ok_or_else(|| Error::new("view.not_found", format!("no view {view}")))?;
+        views::view_data(e)
+            .filter(|d| d.kind == plans::KIND_PLAN)
+            .ok_or_else(|| Error::new("view.not_a_plan", format!("view {view} is not a plan")))?;
+        let range = plans::plan_range(store, view)
+            .ok_or_else(|| Error::new("view.no_range", "the plan's range cannot be resolved"))?;
+        let scale = e
+            .param(views::VIEW_KEY)
+            .and_then(|v| v.get("scale")?.as_f64())
+            .unwrap_or(100.0);
+        let bottom = (range.bottom - FLOOR_TOLERANCE).min(range.depth).max(-1e6);
+        let pens = standards::pen_set(store);
+        let styles = standards::object_styles(store);
+        let weights = |element: Option<ElementId>| {
+            let (cut, projection) =
+                standards::element_widths(store, &pens, &styles, element, scale);
+            Weights {
+                cut: cut.map(|w| w as f32),
+                projection: projection as f32,
+            }
+        };
+        let edges = feature_edges(&scene);
+        let graphics = plan_graphics(
+            &scene,
+            &edges,
+            range.cut as f32,
+            bottom as f32,
+            scale as f32,
+            &weights,
+        );
+        // Dimensions: annotation pen 1, values in project units.
+        let settings = units::settings_of(store);
+        let mut lines = Lines {
+            color: [0.0, 0.0, 0.0, 1.0],
+            width: pens.annotation_width(1) as f32,
+            segments: Vec::new(),
+        };
+        let mut labels = Vec::new();
+        for (_, d) in annotations::of_view(store, e.guid().as_str()) {
+            let Some(m) = annotations::measure(store, &d) else {
+                continue;
+            };
+            let texts = m
+                .values
+                .iter()
+                .map(|v| {
+                    units::format(*v, "length", &settings, None)
+                        .unwrap_or_else(|_| format!("{v:.3}"))
+                })
+                .collect();
+            let dim = Dimension {
+                points: m.points,
+                along: m.along,
+                line: d.line,
+                texts,
+            };
+            let (l, t) = dimension_parts(&dim, scale as f32, range.cut as f32);
+            lines.segments.extend(l);
+            labels.extend(t);
+        }
+        Ok(PlanDrawing {
+            name: e.name.clone().unwrap_or_default(),
+            scale: scale as f32,
+            graphics,
+            annotation: vec![lines],
+            labels,
+        })
+    }
+}
+
+/// ISO A sheets, landscape, in millimetres.
+const SHEETS: [(&str, f32, f32); 5] = [
+    ("A4", 297.0, 210.0),
+    ("A3", 420.0, 297.0),
+    ("A2", 594.0, 420.0),
+    ("A1", 841.0, 594.0),
+    ("A0", 1189.0, 841.0),
+];
+const MARGIN_MM: f32 = 10.0;
+const TITLE_MM: f32 = 18.0;
+const PT_PER_MM: f32 = 72.0 / 25.4;
+/// Helvetica: cap height and the average advance of digits, per em.
+const CAP_HEIGHT: f32 = 0.718;
+const DIGIT_ADVANCE: f32 = 0.556;
+
+/// Linear colour to the sRGB values PDF uses.
+fn srgb(c: f32) -> f32 {
+    c.clamp(0.0, 1.0).powf(1.0 / 2.2)
+}
+
+/// The plan extents of a drawing: (min, max) of x and y.
+fn extents(d: &PlanDrawing) -> Option<([f32; 2], [f32; 2])> {
+    let mut points = d
+        .graphics
+        .poche
+        .iter()
+        .flat_map(|m| m.positions.iter().map(|p| [p[0], p[1]]))
+        .chain(d.graphics.lines.iter().chain(&d.annotation).flat_map(|l| {
+            l.segments
+                .iter()
+                .flat_map(|s| [[s[0][0], s[0][1]], [s[1][0], s[1][1]]])
+        }))
+        .chain(d.labels.iter().map(|l| [l.origin[0], l.origin[1]]));
+    let first = points.next()?;
+    Some(points.fold((first, first), |(lo, hi), p| {
+        (
+            [lo[0].min(p[0]), lo[1].min(p[1])],
+            [hi[0].max(p[0]), hi[1].max(p[1])],
+        )
+    }))
+}
+
+/// What a page shows besides the drawing.
+#[derive(Debug, Clone)]
+pub struct PageInfo {
+    pub project: String,
+    pub date: String,
+}
+
+/// Writes drawings as a PDF, one page each. Returns the sheet name of each page.
+pub fn write_pdf(drawings: &[(PlanDrawing, PageInfo)], path: &Path) -> Result<Vec<&'static str>> {
+    let mut pdf = Pdf::new();
+    let catalog = Ref::new(1);
+    let tree = Ref::new(2);
+    let font = Ref::new(3);
+    let info = Ref::new(4);
+    let mut next = 5;
+    let mut alloc = || {
+        next += 1;
+        Ref::new(next - 1)
+    };
+    let pages: Vec<(Ref, Ref)> = drawings.iter().map(|_| (alloc(), alloc())).collect();
+    pdf.catalog(catalog).pages(tree);
+    pdf.pages(tree)
+        .kids(pages.iter().map(|p| p.0))
+        .count(pages.len() as i32);
+    pdf.type1_font(font).base_font(Name(b"Helvetica"));
+    let title = drawings
+        .first()
+        .map_or("Reviera drawing".to_owned(), |(d, i)| {
+            format!("{} - {}", i.project, d.name)
+        });
+    let creator = format!("NoDesk Reviera {}", env!("CARGO_PKG_VERSION"));
+    pdf.document_info(info)
+        .title(TextStr(&title))
+        .creator(TextStr(&creator))
+        .producer(TextStr(&creator));
+    let mut sheets = Vec::new();
+    for ((d, page_info), (page_id, content_id)) in drawings.iter().zip(&pages) {
+        let (lo, hi) = extents(d).unwrap_or(([0.0, 0.0], [1.0, 1.0]));
+        let mm_per_m = 1000.0 / d.scale;
+        let (w_mm, h_mm) = ((hi[0] - lo[0]) * mm_per_m, (hi[1] - lo[1]) * mm_per_m);
+        let (sheet, paper_w, paper_h) = SHEETS
+            .iter()
+            .copied()
+            .find(|(_, pw, ph)| {
+                w_mm + 2.0 * MARGIN_MM <= *pw && h_mm + 2.0 * MARGIN_MM + TITLE_MM <= *ph
+            })
+            .unwrap_or(SHEETS[SHEETS.len() - 1]);
+        sheets.push(sheet);
+        // Model (x, y) in metres to page points, the drawing centred above the title strip.
+        let (cx, cy) = ((lo[0] + hi[0]) / 2.0, (lo[1] + hi[1]) / 2.0);
+        let (ox, oy) = (paper_w / 2.0, (paper_h + TITLE_MM) / 2.0);
+        let to_page = move |x: f32, y: f32| {
+            (
+                ((x - cx) * mm_per_m + ox) * PT_PER_MM,
+                ((y - cy) * mm_per_m + oy) * PT_PER_MM,
+            )
+        };
+        let mut c = Content::new();
+        c.set_line_cap(LineCapStyle::RoundCap);
+        c.set_line_join(LineJoinStyle::RoundJoin);
+        // Cut poché, each triangle also stroked thinly so no seams show between them.
+        for m in &d.graphics.poche {
+            let [r, g, b, _] = m.color.map(srgb);
+            c.set_fill_rgb(r, g, b)
+                .set_stroke_rgb(r, g, b)
+                .set_line_width(0.1);
+            for t in m.indices.as_chunks::<3>().0 {
+                let p = t.map(|i| m.positions[i as usize]);
+                let (x0, y0) = to_page(p[0][0], p[0][1]);
+                c.move_to(x0, y0);
+                for q in &p[1..] {
+                    let (x, y) = to_page(q[0], q[1]);
+                    c.line_to(x, y);
+                }
+                c.close_path().fill_nonzero_and_stroke();
+            }
+        }
+        // Lines at their pens' paper widths.
+        for l in d.graphics.lines.iter().chain(&d.annotation) {
+            let [r, g, b, _] = l.color.map(srgb);
+            c.set_stroke_rgb(r, g, b)
+                .set_line_width(l.width.max(0.05) * PT_PER_MM);
+            for s in &l.segments {
+                let (x0, y0) = to_page(s[0][0], s[0][1]);
+                let (x1, y1) = to_page(s[1][0], s[1][1]);
+                c.move_to(x0, y0).line_to(x1, y1);
+            }
+            c.stroke();
+        }
+        // Dimension values as text, centred where the stroke-font text would be.
+        c.set_fill_rgb(0.0, 0.0, 0.0);
+        for l in &d.labels {
+            let height_mm = l.height * mm_per_m;
+            let size = height_mm / CAP_HEIGHT * PT_PER_MM;
+            let stroke_width = reviera_render::font::width(&l.text, l.height);
+            let text_width =
+                l.text.len() as f32 * DIGIT_ADVANCE * (height_mm / CAP_HEIGHT) / mm_per_m;
+            let shift = (stroke_width - text_width) / 2.0;
+            let (x, y) = to_page(
+                l.origin[0] + l.right[0] * shift,
+                l.origin[1] + l.right[1] * shift,
+            );
+            c.begin_text()
+                .set_font(Name(b"F1"), size)
+                .set_text_matrix([l.right[0], l.right[1], l.up[0], l.up[1], x, y])
+                .show(Str(l.text.as_bytes()))
+                .end_text();
+        }
+        // Title strip along the bottom.
+        let (sx, sy) = (MARGIN_MM * PT_PER_MM, MARGIN_MM * PT_PER_MM);
+        let strip_w = (paper_w - 2.0 * MARGIN_MM) * PT_PER_MM;
+        let strip_h = (TITLE_MM - 4.0) * PT_PER_MM;
+        c.set_stroke_rgb(0.0, 0.0, 0.0)
+            .set_line_width(0.5 * PT_PER_MM);
+        c.rect(sx, sy, strip_w, strip_h).stroke();
+        let lines = [
+            (12.0, format!("{}  -  {}", page_info.project, d.name)),
+            (
+                8.0,
+                format!(
+                    "Scale 1:{}    {}    {}    NoDesk Reviera",
+                    d.scale, sheet, page_info.date
+                ),
+            ),
+        ];
+        for (k, (size, text)) in lines.iter().enumerate() {
+            c.begin_text()
+                .set_font(Name(b"F1"), *size)
+                .next_line(
+                    sx + 4.0 * PT_PER_MM,
+                    sy + strip_h - (k as f32 + 1.0) * 5.5 * PT_PER_MM,
+                )
+                .show(Str(text.as_bytes()))
+                .end_text();
+        }
+        let mut page = pdf.page(*page_id);
+        page.media_box(Rect::new(
+            0.0,
+            0.0,
+            paper_w * PT_PER_MM,
+            paper_h * PT_PER_MM,
+        ))
+        .parent(tree)
+        .contents(*content_id);
+        page.resources().fonts().pair(Name(b"F1"), font);
+        page.finish();
+        pdf.stream(*content_id, &c.finish());
+    }
+    std::fs::write(path, pdf.finish())
+        .map_err(|e| Error::new("export.write_failed", format!("{}: {e}", path.display())))?;
+    Ok(sheets)
+}
+
+/// Today's date as YYYY-MM-DD (UTC).
+fn today() -> String {
+    let days = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_secs() / 86_400) as i64;
+    // Civil date from days since 1970-01-01 (Howard Hinnant's algorithm).
+    let z = days + 719_468;
+    let era = z.div_euclid(146_097);
+    let doe = z - era * 146_097;
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    let y = yoe + era * 400 + i64::from(m <= 2);
+    format!("{y:04}-{m:02}-{d:02}")
+}
+
+// ---- export.pdf ----
+
+/// The views to export.
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+#[serde(untagged)]
+pub enum ExportRange {
+    /// `"current"`: the active view.
+    Current(CurrentRange),
+    /// `{"views": [...]}`.
+    Views { views: Vec<ElementRef> },
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum CurrentRange {
+    Current,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ExportPdfParams {
+    pub range: ExportRange,
+    /// The PDF file (combined), or the folder for separate files.
+    pub path_or_folder: PathBuf,
+    /// One file with a page per view (default), or one file per view named after it.
+    #[serde(default = "yes")]
+    pub combine: bool,
+    /// Reserved: setups and naming rules come with the export dialog.
+    pub set_id: Option<String>,
+    pub setup_id: Option<String>,
+    pub naming_rule: Option<String>,
+    /// Exports run in the foreground for now.
+    pub background: Option<bool>,
+}
+
+fn yes() -> bool {
+    true
+}
+
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct ExportResult {
+    pub job_id: String,
+    pub files: Vec<PathBuf>,
+    /// The sheet size of each page (A4 to A0).
+    pub sheets: Vec<String>,
+}
+
+pub(crate) struct ExportPdf;
+
+impl HostCommand for ExportPdf {
+    type Host = App;
+    type Params = ExportPdfParams;
+    type Output = ExportResult;
+    const META: CommandMeta = CommandMeta {
+        name: "export.pdf",
+        version: 1,
+        summary: "Export views as PDF",
+        description: "Writes plan views as vector PDF at their scale, one page per view on the smallest ISO \
+                      sheet that holds it: `range` is \"current\" or {\"views\": [...]}.",
+        effects: &[Effect::FileWrite],
+        transaction_name: "",
+    };
+
+    fn run(&self, app: &mut App, _: &Caller, p: ExportPdfParams) -> Result<ExportResult> {
+        let doc = app
+            .active()
+            .ok_or_else(|| Error::new("document.none", "no document is open"))?;
+        let store = app.get(doc)?.doc.store();
+        let ids: Vec<ElementId> = match &p.range {
+            ExportRange::Current(_) => vec![
+                app.active_view(doc)
+                    .ok_or_else(|| Error::new("view.none", "no view is active"))?,
+            ],
+            ExportRange::Views { views } => views
+                .iter()
+                .map(|r| {
+                    store
+                        .resolve(r)
+                        .ok_or_else(|| Error::new("view.not_found", "no such view"))
+                })
+                .collect::<Result<_>>()?,
+        };
+        if ids.is_empty() {
+            return Err(Error::new("export.nothing", "no views to export"));
+        }
+        let info = PageInfo {
+            project: app
+                .documents()
+                .into_iter()
+                .find(|d| d.id == doc)
+                .map_or("Project".into(), |d| d.title),
+            date: today(),
+        };
+        let drawings: Vec<(PlanDrawing, PageInfo)> = ids
+            .iter()
+            .map(|v| Ok((app.plan_drawing(doc, *v)?, info.clone())))
+            .collect::<Result<_>>()?;
+        let mut files = Vec::new();
+        let mut sheets = Vec::new();
+        if p.combine {
+            sheets.extend(
+                write_pdf(&drawings, &p.path_or_folder)?
+                    .into_iter()
+                    .map(String::from),
+            );
+            files.push(p.path_or_folder.clone());
+        } else {
+            std::fs::create_dir_all(&p.path_or_folder).map_err(|e| {
+                Error::new(
+                    "export.write_failed",
+                    format!("{}: {e}", p.path_or_folder.display()),
+                )
+            })?;
+            for d in drawings {
+                let name: String =
+                    d.0.name
+                        .chars()
+                        .map(|c| if "/\\:*?\"<>|".contains(c) { '_' } else { c })
+                        .collect();
+                let path = p.path_or_folder.join(format!("{name}.pdf"));
+                sheets.extend(
+                    write_pdf(std::slice::from_ref(&d), &path)?
+                        .into_iter()
+                        .map(String::from),
+                );
+                files.push(path);
+            }
+        }
+        Ok(ExportResult {
+            job_id: uuid::Uuid::new_v4().to_string(),
+            files,
+            sheets,
+        })
+    }
+}

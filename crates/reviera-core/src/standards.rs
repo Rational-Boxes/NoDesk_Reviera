@@ -135,6 +135,26 @@ impl ObjectStyles {
     }
 }
 
+/// The paper widths (mm) of an element's cut lines (`None` if its category is not cut) and
+/// projection lines in a view at 1:`scale`.
+pub fn element_widths(
+    store: &Store,
+    pens: &PenSet,
+    styles: &ObjectStyles,
+    element: Option<crate::id::ElementId>,
+    scale: f64,
+) -> (Option<f64>, f64) {
+    let category = element
+        .and_then(|e| store.get(e))
+        .and_then(crate::categories::category_of)
+        .map_or("", |c| c.key);
+    let style = styles.style(category);
+    (
+        style.cut_pen.map(|p| pens.model_width(p, scale)),
+        pens.model_width(style.projection_pen, scale),
+    )
+}
+
 fn stored<T: serde::de::DeserializeOwned + Default>(store: &Store, class: &str) -> T {
     store
         .iter()

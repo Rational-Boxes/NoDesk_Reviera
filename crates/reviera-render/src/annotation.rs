@@ -30,7 +30,37 @@ pub struct Dimension {
 }
 
 /// The line segments of a dimension at elevation `z`, for a view at 1:`scale`.
+/// A text label: its baseline start, reading and up directions (unit), and height, in model
+/// units.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Label {
+    pub origin: [f32; 3],
+    pub right: [f32; 3],
+    pub up: [f32; 3],
+    pub height: f32,
+    pub text: String,
+}
+
+/// The line segments of a dimension at elevation `z`, for a view at 1:`scale`, with its values
+/// drawn in the stroke font.
 pub fn dimension_lines(d: &Dimension, scale: f32, z: f32) -> Vec<[[f32; 3]; 2]> {
+    let (mut lines, labels) = dimension_parts(d, scale, z);
+    for l in labels {
+        for [p, q] in font::strokes(
+            &l.text,
+            l.origin.into(),
+            l.right.into(),
+            l.up.into(),
+            l.height,
+        ) {
+            lines.push([p.to_array(), q.to_array()]);
+        }
+    }
+    lines
+}
+
+/// The lines of a dimension and its value labels, separately (output with real text).
+pub fn dimension_parts(d: &Dimension, scale: f32, z: f32) -> (Vec<[[f32; 3]; 2]>, Vec<Label>) {
     let mut out: Vec<[[f32; 3]; 2]> = Vec::new();
     let mut push = |a: Vec3, b: Vec3| out.push([a.to_array(), b.to_array()]);
     let mm = scale / 1000.0;
@@ -49,7 +79,7 @@ pub fn dimension_lines(d: &Dimension, scale: f32, z: f32) -> Vec<[[f32; 3]; 2]> 
         })
         .collect();
     let (Some(first), Some(last)) = (feet.first(), feet.last()) else {
-        return Vec::new();
+        return (Vec::new(), Vec::new());
     };
     // The dimension line, past the outer ticks.
     let dir = (*last - *first).normalize_or_zero();
@@ -85,6 +115,7 @@ pub fn dimension_lines(d: &Dimension, scale: f32, z: f32) -> Vec<[[f32; 3]; 2]> 
         reading = -reading;
     }
     let up = reading.perp();
+    let mut labels = Vec::new();
     for (k, text) in d.texts.iter().enumerate() {
         let (Some(a), Some(b)) = (feet.get(k), feet.get(k + 1)) else {
             break;
@@ -92,13 +123,15 @@ pub fn dimension_lines(d: &Dimension, scale: f32, z: f32) -> Vec<[[f32; 3]; 2]> 
         let mid = (*a + *b) / 2.0;
         let w = font::width(text, height);
         let origin = mid - reading * (w / 2.0) + up * (TEXT_OFFSET_MM * mm);
-        let r3 = Vec3::new(reading.x, reading.y, 0.0);
-        let u3 = Vec3::new(up.x, up.y, 0.0);
-        for [p, q] in font::strokes(text, at(origin), r3, u3, height) {
-            push(p, q);
-        }
+        labels.push(Label {
+            origin: at(origin).to_array(),
+            right: [reading.x, reading.y, 0.0],
+            up: [up.x, up.y, 0.0],
+            height,
+            text: text.clone(),
+        });
     }
-    out
+    (out, labels)
 }
 
 #[cfg(test)]
