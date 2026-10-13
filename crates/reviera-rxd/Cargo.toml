@@ -1,0 +1,16 @@
+[package]
+name = "reviera-rxd"
+description = "Reviera Extension Data (RXD) documents embedded in IFC"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+reviera-core.workspace = true
+
+[lints]
+workspace = true

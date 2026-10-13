@@ -1,0 +1,16 @@
+[package]
+name = "reviera-render-wgpu"
+description = "Built-in wgpu viewport backend"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+reviera-render.workspace = true
+
+[lints]
+workspace = true

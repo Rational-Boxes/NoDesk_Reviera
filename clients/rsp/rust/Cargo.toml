@@ -1,0 +1,17 @@
+[package]
+name = "reviera-rsp"
+description = "Reviera Scene Protocol types (glTF 2.0 + REVIERA_scene extension, streamed deltas)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license = "MIT"
+authors.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true

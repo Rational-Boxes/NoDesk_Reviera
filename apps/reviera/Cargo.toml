@@ -1,0 +1,20 @@
+[package]
+name = "reviera"
+description = "NoDesk Reviera: open-source BIM authoring on native IFC"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "reviera"
+path = "src/main.rs"
+
+[dependencies]
+reviera-core.workspace = true
+
+[lints]
+workspace = true

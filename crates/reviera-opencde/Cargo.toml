@@ -1,0 +1,17 @@
+[package]
+name = "reviera-opencde"
+description = "BCF API, Foundation API and Documents API clients"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+reviera-core.workspace = true
+reviera-net.workspace = true
+
+[lints]
+workspace = true

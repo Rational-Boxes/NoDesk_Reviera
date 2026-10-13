@@ -1,0 +1,91 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+[workspace]
+resolver = "3"
+members = [
+    "apps/reviera",
+    "crates/reviera-core",
+    "crates/reviera-ifc",
+    "crates/reviera-geom",
+    "crates/reviera-rxd",
+    "crates/reviera-store",
+    "crates/reviera-livestore",
+    "crates/reviera-net",
+    "crates/reviera-bimserver",
+    "crates/reviera-opencde",
+    "crates/reviera-render",
+    "crates/reviera-render-wgpu",
+    "crates/reviera-godot",
+    "crates/reviera-lua",
+    "crates/reviera-mcp",
+    "crates/reviera-ui",
+    "clients/rsp/rust",
+]
+default-members = ["apps/reviera"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.99"
+license = "GPL-3.0-or-later"
+authors = ["Reviera contributors"]
+repository = "https://github.com/Rational-Boxes/NoDesk_Reviera"
+publish = false
+
+[workspace.dependencies]
+# Internal crates
+reviera-core = { path = "crates/reviera-core" }
+reviera-ifc = { path = "crates/reviera-ifc" }
+reviera-geom = { path = "crates/reviera-geom" }
+reviera-rxd = { path = "crates/reviera-rxd" }
+reviera-store = { path = "crates/reviera-store" }
+reviera-livestore = { path = "crates/reviera-livestore" }
+reviera-net = { path = "crates/reviera-net" }
+reviera-bimserver = { path = "crates/reviera-bimserver" }
+reviera-opencde = { path = "crates/reviera-opencde" }
+reviera-render = { path = "crates/reviera-render" }
+reviera-render-wgpu = { path = "crates/reviera-render-wgpu" }
+reviera-godot = { path = "crates/reviera-godot" }
+reviera-lua = { path = "crates/reviera-lua" }
+reviera-mcp = { path = "crates/reviera-mcp" }
+reviera-ui = { path = "crates/reviera-ui" }
+reviera-rsp = { path = "clients/rsp/rust" }
+# Common
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+thiserror = "2.0.21"
+anyhow = "1.0.104"
+uuid = { version = "1.28.0", features = ["v4", "serde"] }
+tracing = "0.1.44"
+tracing-subscriber = "0.3.23"
+rayon = "1.12.0"
+schemars = "1.2.3"
+glam = "0.34.1"
+zstd = "0.14.2"
+clap = { version = "4.6.7", features = ["derive"] }
+
+# Integrations, adopted crate by crate as each one is implemented
+tokio = { version = "1.53.2", features = ["rt-multi-thread", "macros", "sync", "time"] }
+reqwest = { version = "0.13.5", features = ["json"] }
+keyring = "4.2.0"
+rusqlite = { version = "0.40.2", features = ["bundled-sqlcipher-vendored-openssl"] }
+mlua = { version = "0.12.2", features = ["luajit"] }
+rmcp = "3.5.1"
+wxdragon = "0.9.22"
+wgpu = "30.0.1"
+gltf = "1.4.1"
+cxx = "1.0.205"
+
+[workspace.lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
+missing_debug_implementations = "warn"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+
+[profile.dev.package."*"]
+# Dependencies (OCCT/IfcOpenShell glue, wgpu) are slow when unoptimised.
+opt-level = 2
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
