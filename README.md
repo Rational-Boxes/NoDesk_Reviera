@@ -9,7 +9,7 @@ structure and MEP. IFC is its native file format, so there is no proprietary con
 operation can be driven by Lua scripts and by AI agents through the Model Context Protocol (MCP).
 
 > **Status: early development.** The specification is complete as a draft. The application
-> core is being built; there is no graphical interface yet.
+> core is being built, and the first window shows models in an interactive 3D viewport.
 
 ## What works today
 
@@ -21,6 +21,10 @@ operation can be driven by Lua scripts and by AI agents through the Model Contex
   permission level and attribution (user, script or agent).
 - **Crash recovery.** Every change is mirrored to an encrypted SQLite live store (SQLCipher, with
   the key kept in the OS keyring). After a crash, unsaved work and its undo history come back.
+- **3D viewport**: a wxWidgets window (through wxDragon) with a `wgpu` view of the model;
+  orbit with the left mouse button, pan with the middle or right button, zoom with the wheel.
+- **Units and parameters**: SI storage with project display units (metric and imperial,
+  feet-and-inches), built-in, project and shared parameters routed to types or instances.
 - **MCP server** for AI agents: every command is a tool, with toolsets, preview and confirm for
   destructive changes, and resources for documents and elements.
 
@@ -34,6 +38,7 @@ sudo dnf install rustup cmake ninja-build gcc-c++ opencascade-devel boost-devel 
     libxml2-devel json-devel perl-FindBin perl-IPC-Cmd perl-Time-Piece
 rustup-init
 
+# The first build also downloads and compiles wxWidgets 3.3.3 (through wxDragon).
 # IfcOpenShell 0.8.5, built into third_party/ (about 15 minutes)
 tools/build-ifcopenshell.sh
 
@@ -44,6 +49,7 @@ cargo test --workspace
 ## Trying it
 
 ```sh
+cargo run -- gui model.ifc             # the main window with the 3D viewport
 cargo run -- model.ifc                 # open a file and print a summary
 cargo run -- shell model.ifc           # run commands: `:commands`, `file.save`, `edit.undo {"steps": 2}`
 cargo run                              # list unsaved work left by a crash

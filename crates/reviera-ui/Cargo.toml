@@ -11,7 +11,16 @@ publish.workspace = true
 
 [dependencies]
 reviera-core.workspace = true
+wxdragon = { workspace = true, features = ["aui"] }
+reviera-app.workspace = true
 reviera-render.workspace = true
+reviera-render-wgpu.workspace = true
+raw-window-handle.workspace = true
+serde_json.workspace = true
+
+[build-dependencies]
+cc.workspace = true
+pkg-config.workspace = true
 
 [lints]
 workspace = true

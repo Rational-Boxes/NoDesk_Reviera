@@ -209,6 +209,40 @@ impl App {
         }
     }
 
+    /// The Render Scene of a document: its IFC geometry, tessellated with OpenCASCADE, coloured by
+    /// class. Spaces are left out of the default 3D view. Geometry reflects the IFC population, so
+    /// edits show after they are saved (regeneration comes with the modelling tools).
+    pub fn render_scene(&self, id: DocumentId) -> Result<reviera_render::RenderScene> {
+        let open = self.get(id)?;
+        let threads = std::thread::available_parallelism().map_or(1, |n| n.get() as u32);
+        let meshes = open
+            .project
+            .ifc()
+            .tessellate(threads)
+            .map_err(|e| err("render.tessellation_failed", e))?;
+        let store = open.doc.store();
+        let meshes = meshes
+            .into_iter()
+            .filter(|m| {
+                m.class != "IfcSpace" && m.class != "IfcOpeningElement" && !m.faces.is_empty()
+            })
+            .map(|m| reviera_render::SceneMesh {
+                element: m.global_id.as_ref().and_then(|g| store.find_by_guid(g)),
+                color: reviera_render::class_color(&m.class),
+                positions: m
+                    .verts
+                    .as_chunks::<3>()
+                    .0
+                    .iter()
+                    .map(|[x, y, z]| [*x as f32, *y as f32, *z as f32])
+                    .collect(),
+                indices: m.faces,
+                class: m.class,
+            })
+            .collect();
+        Ok(reviera_render::RenderScene { meshes })
+    }
+
     /// Stores left by a crash, for the recovery dialog at start-up (DM-LIVE-004).
     pub fn recoverable(&self) -> Result<Vec<Recoverable>> {
         match &self.config.live {

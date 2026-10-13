@@ -5,6 +5,7 @@
 //!
 //! - `reviera`: lists unsaved work left by a crash.
 //! - `reviera FILE`: opens an IFC file and prints a summary.
+//! - `reviera gui [FILE]`: the main window with the 3D viewport.
 //! - `reviera shell [FILE]`: reads `<command> [JSON arguments]` lines and runs them as the user.
 //! - `reviera --mcp-stdio [--permission LEVEL] [--toolsets a,b] [FILE]`: headless MCP server on
 //!   stdin/stdout (spec DM-MCP-002). LEVEL is `read_only` (default), `model_edit` or `full_scripting`.
@@ -21,6 +22,12 @@ fn main() -> ExitCode {
     if args.first().map(String::as_str) == Some("--mcp-stdio") {
         return mcp_stdio(&args[1..]);
     }
+    if args.first().map(String::as_str) == Some("gui") {
+        return match reviera_ui::run(args.get(1).map(std::path::PathBuf::from)) {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(e) => fail(&e),
+        };
+    }
     let mut app = App::new(AppConfig::default());
     println!(
         "NoDesk Reviera {} ({} commands)",
@@ -32,7 +39,9 @@ fn main() -> ExitCode {
         [cmd, rest @ ..] if cmd == "shell" => shell(&mut app, rest.first()),
         [file] => summary(&mut app, file),
         _ => {
-            eprintln!("usage: reviera [FILE] | reviera shell [FILE]");
+            eprintln!(
+                "usage: reviera [FILE] | reviera shell [FILE] | reviera gui [FILE] | reviera --mcp-stdio [...]"
+            );
             ExitCode::FAILURE
         }
     }

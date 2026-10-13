@@ -82,9 +82,14 @@ mlua = { version = "0.12.2", features = ["luajit"] }
 rmcp = { version = "3.5.1", default-features = false, features = ["server", "transport-io"] }
 wxdragon = "0.9.22"
 wgpu = "30.0.1"
+raw-window-handle = "0.6"
+pollster = "1.0.1"
+bytemuck = "1"
 gltf = "1.4.1"
 cxx = "1.0.205"
 cxx-build = "1.0.205"
+cc = "1"
+pkg-config = "0.3"
 
 [workspace.lints.rust]
 unsafe_op_in_unsafe_fn = "deny"

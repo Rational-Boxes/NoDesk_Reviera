@@ -14,6 +14,7 @@ reviera-core.workspace = true
 reviera-ifc.workspace = true
 reviera-store.workspace = true
 reviera-livestore.workspace = true
+reviera-render.workspace = true
 schemars.workspace = true
 serde.workspace = true
 serde_json.workspace = true
