@@ -46,6 +46,8 @@ struct Gui {
     doc: Option<DocumentId>,
     scene: RenderScene,
     viewport: Option<WgpuViewport>,
+    /// The native surface under the viewport; declared after it so it is dropped after it.
+    native: Option<native::NativeView>,
     viewport_error: Option<String>,
     camera: Camera,
     drag: Option<(Drag, i32, i32)>,
@@ -69,17 +71,23 @@ impl Gui {
     /// Draws the viewport, creating it on first use (the panel must be realised by then).
     fn draw(&mut self, panel: &Panel, frame: &Frame) {
         let size = panel.get_client_size();
-        let (w, h) = (size.width.max(1) as u32, size.height.max(1) as u32);
         if self.viewport.is_none() && self.viewport_error.is_none() {
-            let created =
-                native::handles(panel.get_handle()).and_then(|(display, window)| unsafe {
-                    WgpuViewport::for_window(display, window, w, h)
-                });
+            let created = native::NativeView::new(panel.get_handle()).and_then(|view| {
+                let scale = view.scale_factor();
+                let (w, h) = physical(size, scale);
+                let viewport =
+                    unsafe { WgpuViewport::for_window(view.display, view.window, w, h) }?;
+                Ok((view, viewport))
+            });
             match created {
-                Ok(mut v) => {
+                Ok((view, mut v)) => {
                     v.set_scene(&self.scene);
-                    frame.set_status_text(&format!("Graphics: {}", v.adapter()), 1);
+                    frame.set_status_text(
+                        &format!("Graphics: {} on {}", v.adapter(), surface_kind(&view)),
+                        1,
+                    );
                     self.viewport = Some(v);
+                    self.native = Some(view);
                 }
                 Err(e) => {
                     frame.set_status_text(&format!("3D viewport unavailable: {e}"), 0);
@@ -87,7 +95,9 @@ impl Gui {
                 }
             }
         }
-        if let Some(v) = &mut self.viewport {
+        if let (Some(v), Some(view)) = (&mut self.viewport, &self.native) {
+            view.update();
+            let (w, h) = physical(size, view.scale_factor());
             v.resize(w, h);
             if let Err(e) = v.render(&self.camera) {
                 frame.set_status_text(&e, 0);
@@ -96,12 +106,45 @@ impl Gui {
     }
 
     fn open(&mut self, path: &Path, frame: &Frame) {
-        let mut opened = self.run("file.open", json!({ "path": path }));
-        if opened.as_ref().is_err_and(|e| e.starts_with("file.locked")) {
-            opened = self.run("file.open", json!({ "path": path, "read_only": true }));
+        let mut opened = self
+            .app
+            .execute("file.open", json!({ "path": path }), &user());
+        // Unsaved work from a session that ended unexpectedly: offer to restore it (DM-LIVE-004).
+        if let Err(e) = &opened
+            && e.code == "recovery.pending"
+        {
+            let key = e.details["store_key"]
+                .as_str()
+                .unwrap_or_default()
+                .to_owned();
+            let message = format!(
+                "{} has unsaved work from a session that ended unexpectedly.\n\nRestore it? (No discards it.)",
+                path.display()
+            );
+            opened = if ask(frame, &message) {
+                self.app
+                    .execute("recovery.restore", json!({ "store_key": key }), &user())
+                    .map(|mut o| {
+                        o.result = o.result["model_id"].clone();
+                        o
+                    })
+            } else {
+                let _ = self
+                    .app
+                    .execute("recovery.discard", json!({ "store_key": key }), &user());
+                self.app
+                    .execute("file.open", json!({ "path": path }), &user())
+            };
+        }
+        if opened.as_ref().is_err_and(|e| e.code == "file.locked") {
+            opened = self.app.execute(
+                "file.open",
+                json!({ "path": path, "read_only": true }),
+                &user(),
+            );
         }
         let id = match opened {
-            Ok(v) => v.as_u64().unwrap_or_default(),
+            Ok(o) => o.result.as_u64().unwrap_or_default(),
             Err(e) => return error(frame, &format!("Could not open {}:\n{e}", path.display())),
         };
         self.doc = Some(id);
@@ -193,6 +236,12 @@ impl Gui {
 
     /// Fills the Properties palette for the current selection.
     fn show_properties(&mut self, grid: &PropertyGrid) {
+        self.fill_properties(grid);
+        // Room for labels such as "Thermal Transmittance (type)".
+        grid.set_splitter_position(150, 0);
+    }
+
+    fn fill_properties(&mut self, grid: &PropertyGrid) {
         self.properties_stale = false;
         grid.clear();
         self.rows.clear();
@@ -342,6 +391,22 @@ impl Gui {
     }
 }
 
+/// The viewport's size in device pixels.
+fn physical(size: Size, scale: f64) -> (u32, u32) {
+    let px = |v: i32| ((v.max(1) as f64) * scale).round() as u32;
+    (px(size.width), px(size.height))
+}
+
+fn surface_kind(view: &native::NativeView) -> &'static str {
+    match view.window {
+        raw_window_handle::RawWindowHandle::Xlib(_) => "X11",
+        raw_window_handle::RawWindowHandle::Wayland(_) => "Wayland",
+        raw_window_handle::RawWindowHandle::Win32(_) => "Windows",
+        raw_window_handle::RawWindowHandle::AppKit(_) => "macOS",
+        _ => "native",
+    }
+}
+
 /// A display name for a category key or parameter group (`identity_data` → "Identity Data").
 fn category_label(key: &str) -> String {
     if let Some(c) = reviera_core::categories::category(key) {
@@ -359,6 +424,21 @@ fn category_label(key: &str) -> String {
         })
         .collect::<Vec<_>>()
         .join(" ")
+}
+
+/// Runs `f` on the UI state unless another handler is using it (modal dialogs run nested event
+/// loops, so paint and idle events can arrive while an action is in progress).
+fn with(gui: &Rc<RefCell<Gui>>, f: impl FnOnce(&mut Gui)) {
+    if let Ok(mut g) = gui.try_borrow_mut() {
+        f(&mut g);
+    }
+}
+
+fn ask(frame: &Frame, message: &str) -> bool {
+    let dialog = MessageDialog::builder(frame, message, "NoDesk Reviera")
+        .with_style(MessageDialogStyle::YesNo | MessageDialogStyle::IconQuestion)
+        .build();
+    dialog.show_modal() == ID_YES
 }
 
 fn error(frame: &Frame, message: &str) {
@@ -388,7 +468,6 @@ fn wheel(data: &WindowEventData) -> i32 {
 
 /// Runs the main window until it is closed, optionally opening `file`.
 pub fn run(file: Option<PathBuf>) -> Result<(), String> {
-    native::prefer_x11();
     wxdragon::main(move |_| {
         let frame = Frame::builder()
             .with_title("NoDesk Reviera")
@@ -429,6 +508,7 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
             doc: None,
             scene: RenderScene::default(),
             viewport: None,
+            native: None,
             viewport_error: None,
             camera: Camera::default(),
             drag: None,
@@ -441,7 +521,7 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
             let (gui, p, f) = (gui.clone(), panel, frame);
             panel.on_paint(move |_| {
                 let _dc = PaintDC::new(&p);
-                gui.borrow_mut().draw(&p, &f);
+                with(&gui, |g| g.draw(&p, &f));
             });
         }
         {
@@ -455,7 +535,9 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
             let (gui, p) = (gui.clone(), panel);
             let handler = move |e: WindowEventData| {
                 if let Some((x, y)) = position(&e) {
-                    let mut g = gui.borrow_mut();
+                    let Ok(mut g) = gui.try_borrow_mut() else {
+                        return;
+                    };
                     g.drag = Some((kind, x, y));
                     if button == 0 {
                         g.press = Some((x, y));
@@ -472,7 +554,9 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
         for button in 0..3 {
             let (gui, p) = (gui.clone(), panel);
             let handler = move |e: WindowEventData| {
-                let mut g = gui.borrow_mut();
+                let Ok(mut g) = gui.try_borrow_mut() else {
+                    return;
+                };
                 g.drag = None;
                 let press = g.press.take();
                 if button == 0
@@ -495,7 +579,9 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
             let (gui, p) = (gui.clone(), panel);
             panel.on_mouse_motion(move |e| {
                 let Some((x, y)) = position(&e) else { return };
-                let mut g = gui.borrow_mut();
+                let Ok(mut g) = gui.try_borrow_mut() else {
+                    return;
+                };
                 let Some((kind, x0, y0)) = g.drag else { return };
                 let (dx, dy) = ((x - x0) as f32, (y - y0) as f32);
                 match kind {
@@ -514,7 +600,7 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
             let (gui, p) = (gui.clone(), panel);
             panel.on_mouse_wheel(move |e| {
                 let steps = wheel(&e) as f32 / 120.0;
-                gui.borrow_mut().camera.zoom(steps);
+                with(&gui, |g| g.camera.zoom(steps));
                 p.refresh(false, None);
             });
         }
@@ -524,7 +610,7 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 if let WindowEventData::Keyboard(k) = &e
                     && k.get_key_code() == Some(WXK_ESCAPE)
                 {
-                    gui.borrow_mut().clear_selection();
+                    with(&gui, Gui::clear_selection);
                     p.refresh(false, None);
                 } else {
                     e.skip(true);
@@ -536,7 +622,7 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
             grid.on_changed(move |e| {
                 if let Some(name) = e.property_name() {
                     let text = g.get_value_as_string(&name);
-                    gui.borrow_mut().edit(&name, text, &f);
+                    with(&gui, |gui| gui.edit(&name, text, &f));
                 }
             });
         }
@@ -544,9 +630,10 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
             // Refresh the palette outside its own event handlers.
             let (gui, g) = (gui.clone(), grid);
             frame.on_idle(move |e| {
-                let stale = gui.borrow().properties_stale;
-                if stale {
-                    gui.borrow_mut().show_properties(&g);
+                if let Ok(mut gui) = gui.try_borrow_mut()
+                    && gui.properties_stale
+                {
+                    gui.show_properties(&g);
                 }
                 e.skip(true);
             });
@@ -562,13 +649,13 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                     if dialog.show_modal() == ID_OK
                         && let Some(path) = dialog.get_path()
                     {
-                        gui.borrow_mut().open(Path::new(&path), &f);
+                        with(&gui, |g| g.open(Path::new(&path), &f));
                         p.refresh(false, None);
                     }
                 }
-                ID_SAVE_FILE => gui.borrow_mut().save(&f),
+                ID_SAVE_FILE => with(&gui, |g| g.save(&f)),
                 ID_FIT => {
-                    gui.borrow_mut().fit();
+                    with(&gui, Gui::fit);
                     p.refresh(false, None);
                 }
                 ID_EXIT => f.close(false),

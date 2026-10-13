@@ -11,9 +11,15 @@ fn main() {
     let gtk = pkg_config::Config::new()
         .probe("gtk+-3.0")
         .expect("GTK 3 development files (gtk3-devel)");
+    // libwayland-client is present wherever GTK 3 was built with its Wayland backend.
+    let wayland = pkg_config::Config::new().probe("wayland-client").ok();
     let mut build = cc::Build::new();
     build.file("native/gtk.c");
-    for path in &gtk.include_paths {
+    for path in gtk
+        .include_paths
+        .iter()
+        .chain(wayland.iter().flat_map(|w| &w.include_paths))
+    {
         build.include(path);
     }
     build.compile("reviera_ui_native");
