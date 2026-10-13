@@ -10,13 +10,15 @@ use std::time::Duration;
 
 use reviera_core::{Document, GroupEnd, NewElement, Origin, UndoScope};
 use reviera_ifc::Schema;
-use reviera_livestore::{LiveError, LiveStore, Options, RestoreSource};
+use reviera_livestore::{Encryption, KeySource, LiveError, LiveStore, Options, RestoreSource};
 use reviera_store::LocalProject;
 
+/// Tests encrypt with a passphrase, so they exercise SQLCipher without touching the user's keyring.
 fn options(dir: &Path) -> Options {
     Options {
         dir: dir.join("live"),
         group_commit: Duration::from_millis(50),
+        encryption: Encryption::Passphrase("test passphrase".into()),
         ..Options::default()
     }
 }
@@ -29,7 +31,15 @@ fn create(doc: &mut Document, name: &str, class: &str) {
 
 /// Runs a scenario in a child process and waits for it to crash.
 fn crash(scenario: &str, dir: &Path) {
-    let status = Command::new(std::env::current_exe().unwrap())
+    crash_with(scenario, dir, false)
+}
+
+fn crash_with(scenario: &str, dir: &Path, keyring: bool) {
+    let mut cmd = Command::new(std::env::current_exe().unwrap());
+    if keyring {
+        cmd.env("REVIERA_LIVE_KEYRING", "1");
+    }
+    let status = cmd
         .args([
             "--exact",
             "child_process",
@@ -53,7 +63,10 @@ fn child_process() {
         return;
     };
     let dir = PathBuf::from(dir);
-    let opts = options(&dir);
+    let mut opts = options(&dir);
+    if std::env::var("REVIERA_LIVE_KEYRING").is_ok() {
+        opts.encryption = Encryption::OsKeyring;
+    }
     match scenario.as_str() {
         "wall" => {
             let (mut project, mut doc) =
@@ -107,7 +120,7 @@ fn crash_after_creating_a_wall_is_restored_and_undoable() {
     crash("wall", dir.path());
     let opts = options(dir.path());
 
-    let found = reviera_livestore::scan(&opts.dir).unwrap();
+    let found = reviera_livestore::scan(&opts).unwrap();
     assert_eq!(found.len(), 1);
     assert_eq!(found[0].last_labels, ["Wall 1"]);
     assert_eq!(found[0].unsaved_changes, Some(1));
@@ -139,7 +152,7 @@ fn crash_after_creating_a_wall_is_restored_and_undoable() {
         ["Building", "Level 1", "Project", "Site", "Wall 1"]
     );
     assert!(
-        reviera_livestore::scan(&opts.dir).unwrap().is_empty(),
+        reviera_livestore::scan(&opts).unwrap().is_empty(),
         "a clean close leaves nothing to recover"
     );
     assert!(
@@ -153,7 +166,7 @@ fn untitled_project_with_twenty_edits_is_recovered_and_saved_as_a_copy() {
     let dir = tempfile::tempdir().unwrap();
     crash("untitled", dir.path());
     let opts = options(dir.path());
-    let found = reviera_livestore::scan(&opts.dir).unwrap();
+    let found = reviera_livestore::scan(&opts).unwrap();
     assert_eq!(found.len(), 1);
     assert_eq!(found[0].unsaved_changes, Some(20));
     assert_eq!(found[0].last_labels[0], "Batch");
@@ -183,7 +196,7 @@ fn damaged_store_falls_back_to_base_ifc_and_journal_replay() {
     let dir = tempfile::tempdir().unwrap();
     crash("edits", dir.path());
     let opts = options(dir.path());
-    let key = reviera_livestore::scan(&opts.dir).unwrap()[0].key.clone();
+    let key = reviera_livestore::scan(&opts).unwrap()[0].key.clone();
 
     // "Truncate the .rvlive file to half its size."
     let db = opts.dir.join(format!("{key}.rvlive"));
@@ -195,7 +208,7 @@ fn damaged_store_falls_back_to_base_ifc_and_journal_replay() {
         .set_len(len / 2)
         .unwrap();
 
-    let found = reviera_livestore::scan(&opts.dir).unwrap();
+    let found = reviera_livestore::scan(&opts).unwrap();
     assert_eq!(
         found.len(),
         1,
@@ -242,7 +255,11 @@ fn a_second_instance_is_refused_while_the_store_is_open() {
 #[test]
 fn journal_never_holds_credentials_and_mirrors_history() {
     let dir = tempfile::tempdir().unwrap();
-    let opts = options(dir.path());
+    // Unencrypted, so the test can inspect the tables directly.
+    let opts = Options {
+        encryption: Encryption::Off,
+        ..options(dir.path())
+    };
     let (mut project, mut doc) =
         LocalProject::new(Schema::Ifc4, &dir.path().join("p.ifc")).unwrap();
     project.save(&doc).unwrap();
@@ -269,4 +286,114 @@ fn journal_never_holds_credentials_and_mirrors_history() {
     assert_eq!(elements, 6, "the four template elements plus A and C");
     drop(conn);
     store.close(&mut doc).unwrap();
+}
+
+#[test]
+fn stores_are_encrypted_and_unreadable_without_the_key() {
+    let dir = tempfile::tempdir().unwrap();
+    let opts = options(dir.path());
+    let (mut project, mut doc) =
+        LocalProject::new(Schema::Ifc4, &dir.path().join("secret.ifc")).unwrap();
+    project.save(&doc).unwrap();
+    let store = LiveStore::create(&project, &mut doc, &opts).unwrap();
+    create(&mut doc, "Hidden", "IfcWall");
+    store.flush().unwrap();
+    let status = store.encryption_status();
+    assert!(status.enabled);
+    assert_eq!(status.key_source, KeySource::Passphrase);
+
+    // "Open the .rvlive file with plain sqlite3: it fails with 'file is not a database'."
+    let conn = rusqlite::Connection::open(store.path()).unwrap();
+    let err = conn
+        .query_row("SELECT count(*) FROM txn", [], |r| r.get::<_, i64>(0))
+        .unwrap_err();
+    assert!(err.to_string().contains("file is not a database"), "{err}");
+    let raw = std::fs::read(store.path()).unwrap();
+    assert!(
+        !raw.windows(6).any(|w| w == b"Hidden"),
+        "no plaintext on disk"
+    );
+    store.close(&mut doc).unwrap();
+
+    // Policy can require encryption.
+    let off = Options {
+        encryption: Encryption::Off,
+        require_encryption: true,
+        ..opts
+    };
+    assert!(matches!(
+        LiveStore::create(&project, &mut doc, &off),
+        Err(LiveError::Key(_))
+    ));
+}
+
+/// Removes every keyring entry named by a key file under `dir` (the test's own stores only).
+fn forget_keys(dir: &Path) {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for e in entries.flatten() {
+        let path = e.path();
+        if path.is_dir() {
+            forget_keys(&path);
+        } else if path.to_string_lossy().ends_with(".keyid")
+            && let Ok(id) = std::fs::read_to_string(&path)
+            && let Ok(entry) = keyring::Entry::new("org.nodeskreviera.live", id.trim())
+        {
+            let _ = entry.delete_credential();
+        }
+    }
+}
+
+#[test]
+fn keyring_encrypted_store_recovers_and_a_lost_key_is_reported() {
+    if keyring::Entry::store_status().is_err() {
+        eprintln!("skipped: no OS credential store");
+        return;
+    }
+    let mut opts = options(Path::new("."));
+    opts.encryption = Encryption::OsKeyring;
+
+    // The key survives the crash, so restore needs no prompt.
+    let first = tempfile::tempdir().unwrap();
+    crash_with("wall", first.path(), true);
+    let o1 = Options {
+        dir: first.path().join("live"),
+        ..opts.clone()
+    };
+    let found = reviera_livestore::scan(&o1).unwrap();
+    assert!(found[0].readable);
+    let mut r = reviera_livestore::restore(&found[0].key, None, &o1).unwrap();
+    assert_eq!(
+        names(&r.doc),
+        ["Building", "Level 1", "Project", "Site", "Wall 1"]
+    );
+    assert_eq!(r.store.encryption_status().key_source, KeySource::OsStore);
+    r.store.close(&mut r.doc).unwrap();
+    forget_keys(first.path());
+
+    // With the credential store entry deleted, the data cannot be decrypted: say so, allow discard.
+    let second = tempfile::tempdir().unwrap();
+    crash_with("wall", second.path(), true);
+    let o2 = Options {
+        dir: second.path().join("live"),
+        ..opts
+    };
+    forget_keys(second.path());
+    let found = reviera_livestore::scan(&o2).unwrap();
+    assert_eq!(found.len(), 1);
+    assert!(!found[0].readable);
+    assert!(
+        found[0]
+            .reason
+            .as_deref()
+            .unwrap()
+            .contains("key is not available")
+    );
+    let err = reviera_livestore::restore(&found[0].key, None, &o2).unwrap_err();
+    assert!(matches!(err, LiveError::Key(_)), "{err}");
+    reviera_livestore::discard(&found[0].key, &o2.dir).unwrap();
+    assert!(reviera_livestore::scan(&o2).unwrap().is_empty());
+    // The saved IFC file is unaffected.
+    LocalProject::open(&second.path().join("project.ifc")).unwrap();
 }

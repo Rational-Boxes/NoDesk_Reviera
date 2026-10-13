@@ -14,6 +14,8 @@ reviera-core.workspace = true
 reviera-ifc.workspace = true
 reviera-store.workspace = true
 rusqlite.workspace = true
+keyring.workspace = true
+getrandom.workspace = true
 serde.workspace = true
 schemars.workspace = true
 serde_json.workspace = true
@@ -25,6 +27,7 @@ hex.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true
+keyring.workspace = true
 rusqlite.workspace = true
 
 [lints]

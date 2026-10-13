@@ -211,9 +211,7 @@ impl App {
     /// Stores left by a crash, for the recovery dialog at start-up (DM-LIVE-004).
     pub fn recoverable(&self) -> Result<Vec<Recoverable>> {
         match &self.config.live {
-            Some(live) => {
-                reviera_livestore::scan(&live.dir).map_err(|e| err("recovery.scan_failed", e))
-            }
+            Some(live) => reviera_livestore::scan(live).map_err(|e| err("recovery.scan_failed", e)),
             None => Ok(Vec::new()),
         }
     }

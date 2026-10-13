@@ -25,6 +25,7 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add_host(LiveStatusCmd),
         registry.add_host(LiveFlush),
         registry.add_host(LiveHistory),
+        registry.add_host(LiveEncryptionStatus),
         registry.add_host(RecoveryList),
         registry.add_host(RecoveryRestore),
         registry.add_host(RecoveryShowChanges),
@@ -388,6 +389,28 @@ impl HostCommand for LiveHistory {
     }
 }
 
+struct LiveEncryptionStatus;
+
+impl HostCommand for LiveEncryptionStatus {
+    type Host = App;
+    type Params = NoParams;
+    type Output = reviera_livestore::EncryptionStatus;
+    const META: CommandMeta = meta(
+        "live.encryption.status",
+        "Whether the active project's recovery data is encrypted, and with which key",
+        &[Effect::Read],
+    );
+
+    fn run(
+        &self,
+        app: &mut App,
+        _: &Caller,
+        _: NoParams,
+    ) -> Result<reviera_livestore::EncryptionStatus> {
+        Ok(active_live(app)?.encryption_status())
+    }
+}
+
 struct RecoveryList;
 
 impl HostCommand for RecoveryList {
@@ -484,7 +507,7 @@ impl HostCommand for RecoveryShowChanges {
 
     fn run(&self, app: &mut App, _: &Caller, p: StoreKeyParams) -> Result<Vec<TxnSummary>> {
         let options = live_options(app)?;
-        reviera_livestore::show_changes(&p.store_key, &options.dir)
+        reviera_livestore::show_changes(&p.store_key, &options)
             .map_err(|e| err("recovery.unreadable", e))
     }
 }

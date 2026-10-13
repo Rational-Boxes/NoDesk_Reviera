@@ -45,6 +45,7 @@ fn app(dir: &Path) -> App {
     let live = reviera_livestore::Options {
         dir: dir.join("live"),
         group_commit: Duration::from_millis(20),
+        encryption: reviera_livestore::Encryption::Passphrase("test passphrase".into()),
         ..Default::default()
     };
     let mut app = App::new(AppConfig {
@@ -179,6 +180,12 @@ fn live_store_commands_follow_edits_and_saves() {
     let agent_only = run(&mut app, "live.history", json!({"origin": "mcp:agent"}));
     assert_eq!(agent_only.as_array().unwrap().len(), 1);
     assert_eq!(agent_only[0]["origin"]["session_id"], "s1");
+
+    let enc = run(&mut app, "live.encryption.status", json!({}));
+    assert_eq!(
+        (enc["enabled"].clone(), enc["key_source"].clone()),
+        (json!(true), json!("passphrase"))
+    );
 
     run(&mut app, "file.save", json!({}));
     let status = run(&mut app, "live.status", json!({}));

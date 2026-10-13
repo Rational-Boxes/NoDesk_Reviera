@@ -13,6 +13,7 @@
 //! (DM-LIVE-015), housekeeping (DM-LIVE-010), time travel (DM-LIVE-017/018) and BIMserver base
 //! revisions (DM-LIVE-012).
 
+mod crypto;
 pub mod lock;
 mod schema;
 mod time;
@@ -32,11 +33,11 @@ use reviera_core::{
 };
 use reviera_ifc::StepRow;
 use reviera_store::LocalProject;
-use rusqlite::Connection;
 use schemars::JsonSchema;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 
+pub use crypto::{Encryption, EncryptionStatus, KeyError, KeySource};
 pub use lock::LockInfo;
 pub use schema::Synchronous;
 
@@ -64,6 +65,8 @@ pub enum LiveError {
     Core(#[from] reviera_core::Error),
     #[error("corrupt journal: {0}")]
     Journal(String),
+    #[error(transparent)]
+    Key(#[from] KeyError),
 }
 
 pub type Result<T, E = LiveError> = std::result::Result<T, E>;
@@ -77,6 +80,10 @@ pub struct Options {
     pub synchronous: Synchronous,
     /// Undo items rebuilt on recovery.
     pub undo_depth: usize,
+    /// How new stores are encrypted (default: a key in the OS credential store).
+    pub encryption: Encryption,
+    /// Policy: refuse to create a store without a usable key.
+    pub require_encryption: bool,
 }
 
 impl Default for Options {
@@ -86,6 +93,8 @@ impl Default for Options {
             group_commit: Duration::from_millis(250),
             synchronous: Synchronous::Normal,
             undo_depth: 200,
+            encryption: Encryption::default(),
+            require_encryption: false,
         }
     }
 }
@@ -129,7 +138,11 @@ fn lock_path(dir: &Path, key: &str) -> PathBuf {
     dir.join(format!("{key}.lock"))
 }
 
-fn companions(dir: &Path, key: &str) -> [PathBuf; 4] {
+fn key_id_path(dir: &Path, key: &str) -> PathBuf {
+    dir.join(format!("{key}.keyid"))
+}
+
+fn companions(dir: &Path, key: &str) -> [PathBuf; 5] {
     let db = db_path(dir, key);
     let suffixed = |s: &str| PathBuf::from(format!("{}{s}", db.display()));
     [
@@ -137,7 +150,17 @@ fn companions(dir: &Path, key: &str) -> [PathBuf; 4] {
         suffixed("-wal"),
         suffixed("-shm"),
         lock_path(dir, key),
+        key_id_path(dir, key),
     ]
+}
+
+/// The key of an existing store, from its key file and the options.
+fn existing_key(dir: &Path, key: &str, options: &Options) -> (crypto::StoreKey, bool) {
+    let key_id = crypto::read_key_id(&key_id_path(dir, key));
+    let store_key = crypto::existing_key(key_id.as_deref(), &options.encryption);
+    // A store with a key file but no key found: its key is lost (or the keyring is unavailable).
+    let lost = key_id.is_some() && store_key.source == KeySource::None;
+    (store_key, lost)
 }
 
 /// An open live store, attached to one document.
@@ -149,6 +172,8 @@ pub struct LiveStore {
     writer: Option<JoinHandle<rusqlite::Result<()>>>,
     durable: Arc<Mutex<Durable>>,
     pending: Arc<AtomicUsize>,
+    store_key: crypto::StoreKey,
+    required: bool,
 }
 
 /// `live.status` (§2).
@@ -194,12 +219,20 @@ impl LiveStore {
         }
         let db = db_path(&dir, &key);
         if db.exists() {
-            if needs_recovery(&dir, &key) {
+            if needs_recovery(&dir, &key, options) {
                 return Err(LiveError::NeedsRecovery(key));
+            }
+            if let Some(old) = crypto::read_key_id(&key_id_path(&dir, &key)) {
+                crypto::forget(&old);
             }
             for f in companions(&dir, &key) {
                 let _ = fs::remove_file(f);
             }
+        }
+        let key_id = format!("{key}:{}", uuid::Uuid::new_v4());
+        let store_key = crypto::new_key(&key_id, &options.encryption, options.require_encryption)?;
+        if store_key.source == KeySource::OsStore {
+            fs::write(key_id_path(&dir, &key), &key_id)?;
         }
         let now = lock::now_secs();
         let lock = LockInfo {
@@ -211,9 +244,9 @@ impl LiveStore {
         };
         lock::write(&lock_file, &lock)?;
 
-        let mut conn = Connection::open(&db)?;
+        let mut conn = store_key.open(&db)?;
         restrict_permissions(&db);
-        schema::configure(&conn, options.synchronous)?;
+        schema::configure(&conn, options.synchronous, store_key.encrypted())?;
         conn.execute_batch(schema::DDL)?;
         let head = doc.version().counter as i64;
         let saved = if project.is_dirty(doc) || !project.path().exists() {
@@ -302,7 +335,19 @@ impl LiveStore {
             writer: Some(handle),
             durable,
             pending,
+            store_key,
+            required: options.require_encryption,
         })
+    }
+
+    /// `live.encryption.status` (DM-LIVE-016).
+    pub fn encryption_status(&self) -> EncryptionStatus {
+        EncryptionStatus {
+            enabled: self.store_key.source != KeySource::None,
+            key_source: self.store_key.source,
+            required: self.required,
+            note: self.store_key.note.clone(),
+        }
     }
 
     pub fn key(&self) -> &str {
@@ -334,7 +379,7 @@ impl LiveStore {
     /// Journal entries, oldest first; `origin` matches a source (`ui`, `mcp`, …) or a full label
     /// (`mcp:agent`) (DM-LIVE-006).
     pub fn history(&self, since_seq: Option<i64>, origin: Option<&str>) -> Result<Vec<TxnSummary>> {
-        let rows = journal(&self.path(), since_seq.unwrap_or(0))?;
+        let rows = journal(&self.path(), &self.store_key, since_seq.unwrap_or(0))?;
         Ok(rows
             .into_iter()
             .filter(|t| origin.is_none_or(|o| origin_matches(&t.origin, o)))
@@ -506,8 +551,8 @@ fn observer(
     }
 }
 
-fn journal(db: &Path, since_seq: i64) -> Result<Vec<TxnSummary>> {
-    let conn = Connection::open(db)?;
+fn journal(db: &Path, key: &crypto::StoreKey, since_seq: i64) -> Result<Vec<TxnSummary>> {
+    let conn = key.open(db)?;
     let mut stmt =
         conn.prepare("SELECT seq, at, origin, name, undone FROM txn WHERE seq > ?1 ORDER BY seq")?;
     let rows = stmt.query_map([since_seq], |r| {
@@ -544,15 +589,16 @@ fn origin_matches(origin: &Origin, filter: &str) -> bool {
 }
 
 /// The transactions in store `key` made since the project was last saved (`recovery.show_changes`).
-pub fn show_changes(key: &str, dir: &Path) -> Result<Vec<TxnSummary>> {
-    let db = db_path(dir, key);
+pub fn show_changes(key: &str, options: &Options) -> Result<Vec<TxnSummary>> {
+    let (store_key, _) = existing_key(&options.dir, key, options);
+    let db = db_path(&options.dir, key);
     let since = {
-        let conn = Connection::open(&db)?;
+        let conn = store_key.open(&db)?;
         schema::get_meta(&conn, "saved_txn_seq")?
             .and_then(|v| v.parse().ok())
             .unwrap_or(0)
     };
-    journal(&db, since)
+    journal(&db, &store_key, since)
 }
 
 /// A store left behind by a session that did not close cleanly (§6.1, the recovery dialog's rows).
@@ -567,6 +613,8 @@ pub struct Recoverable {
     pub last_labels: Vec<String>,
     /// False when the database is damaged; restore then falls back to base IFC plus replay.
     pub readable: bool,
+    /// Why it cannot be read, for example a lost encryption key.
+    pub reason: Option<String>,
 }
 
 struct Summary {
@@ -578,8 +626,8 @@ struct Summary {
     last_labels: Vec<String>,
 }
 
-fn summary(db: &Path) -> rusqlite::Result<Summary> {
-    let conn = Connection::open(db)?;
+fn summary(db: &Path, key: &crypto::StoreKey) -> rusqlite::Result<Summary> {
+    let conn = key.open(db)?;
     let meta = |k: &str| schema::get_meta(&conn, k);
     let num = |k: &str| -> rusqlite::Result<i64> {
         Ok(meta(k)?.and_then(|v| v.parse().ok()).unwrap_or(0))
@@ -601,18 +649,24 @@ fn summary(db: &Path) -> rusqlite::Result<Summary> {
     })
 }
 
-fn needs_recovery(dir: &Path, key: &str) -> bool {
-    if LockInfo::read(&lock_path(dir, key)).is_some_and(|l| !l.is_stale()) {
-        return false;
+/// A store needs recovery when its session ended without a clean close (the lock file remains and
+/// is stale) and it holds unsaved work. Unreadable stores are offered too.
+fn needs_recovery(dir: &Path, key: &str, options: &Options) -> bool {
+    match LockInfo::read(&lock_path(dir, key)) {
+        None => return false,
+        Some(l) if !l.is_stale() => return false,
+        Some(_) => {}
     }
-    match summary(&db_path(dir, key)) {
+    let (store_key, _) = existing_key(dir, key, options);
+    match summary(&db_path(dir, key), &store_key) {
         Ok(s) => !s.clean && (s.head > s.saved || s.saved < 0),
         Err(_) => true,
     }
 }
 
 /// Stores in `dir` that need recovery. Stores held by a running process are skipped.
-pub fn scan(dir: &Path) -> Result<Vec<Recoverable>> {
+pub fn scan(options: &Options) -> Result<Vec<Recoverable>> {
+    let dir = &options.dir;
     let mut out = Vec::new();
     let Ok(entries) = fs::read_dir(dir) else {
         return Ok(out);
@@ -627,11 +681,12 @@ pub fn scan(dir: &Path) -> Result<Vec<Recoverable>> {
             .unwrap_or_default()
             .to_string_lossy()
             .into_owned();
-        if !needs_recovery(dir, &key) {
+        if !needs_recovery(dir, &key, options) {
             continue;
         }
         let lock_project = LockInfo::read(&lock_path(dir, &key)).and_then(|l| l.project_path);
-        out.push(match summary(&path) {
+        let (store_key, lost) = existing_key(dir, &key, options);
+        out.push(match summary(&path, &store_key) {
             Ok(s) => Recoverable {
                 key,
                 project_path: s.project_path.or(lock_project),
@@ -643,6 +698,7 @@ pub fn scan(dir: &Path) -> Result<Vec<Recoverable>> {
                 }),
                 last_labels: s.last_labels,
                 readable: true,
+                reason: None,
             },
             Err(_) => Recoverable {
                 key,
@@ -651,6 +707,11 @@ pub fn scan(dir: &Path) -> Result<Vec<Recoverable>> {
                 unsaved_changes: None,
                 last_labels: Vec::new(),
                 readable: false,
+                reason: Some(if lost {
+                    "the recovery data is encrypted and its key is not available".into()
+                } else {
+                    "the recovery data is damaged".into()
+                }),
             },
         });
     }
@@ -699,11 +760,19 @@ pub fn restore(key: &str, as_copy: Option<&Path>, options: &Options) -> Result<R
             host: l.host.clone(),
         });
     }
-    let (mut project, mut doc, report) = match restore_materialised(dir, key, options) {
+    let (store_key, lost) = existing_key(dir, key, options);
+    if lost {
+        // Without the key nothing in the store can be read; the saved IFC file is unaffected.
+        return Err(KeyError::Unavailable(
+            "the credential store has no entry for this store; discard it".into(),
+        )
+        .into());
+    }
+    let (mut project, mut doc, report) = match restore_materialised(dir, key, options, &store_key) {
         Ok(r) => r,
         Err(first) => {
             let base = lock_info.and_then(|l| l.project_path);
-            let mut r = restore_replay(dir, key, base)?;
+            let mut r = restore_replay(dir, key, base, &store_key)?;
             r.2.problems.insert(
                 0,
                 format!("the live store could not be used directly: {first}"),
@@ -728,8 +797,9 @@ fn restore_materialised(
     dir: &Path,
     key: &str,
     options: &Options,
+    store_key: &crypto::StoreKey,
 ) -> Result<(LocalProject, Document, RestoreReport)> {
-    let conn = Connection::open(db_path(dir, key))?;
+    let conn = store_key.open(&db_path(dir, key))?;
     let check: String = conn.query_row("PRAGMA integrity_check", [], |r| r.get(0))?;
     if check != "ok" {
         return Err(LiveError::Journal(check));
@@ -815,6 +885,7 @@ fn restore_replay(
     dir: &Path,
     key: &str,
     base: Option<PathBuf>,
+    store_key: &crypto::StoreKey,
 ) -> Result<(LocalProject, Document, RestoreReport)> {
     let unrecoverable = |reason: String| LiveError::Unrecoverable {
         key: key.into(),
@@ -825,11 +896,11 @@ fn restore_replay(
         .ok_or_else(|| unrecoverable("the project file is not available".into()))?;
     let mut problems = Vec::new();
     let mut rows = Vec::new();
-    match read_journal(&db_path(dir, key), &mut rows) {
+    match read_journal(&db_path(dir, key), store_key, &mut rows) {
         Ok(()) => {}
         Err(e) => problems.push(format!("journal read stopped: {e}")),
     }
-    if let Ok(conn) = Connection::open(db_path(dir, key))
+    if let Ok(conn) = store_key.open(&db_path(dir, key))
         && let Ok(Some(expected)) = schema::get_meta(&conn, "base_ifc_sha256")
         && !expected.is_empty()
         && file_sha256(&base).as_deref() != Some(expected.as_str())
@@ -872,9 +943,10 @@ fn restore_replay(
 
 fn read_journal(
     db: &Path,
+    key: &crypto::StoreKey,
     out: &mut Vec<(String, String, String, Vec<u8>)>,
 ) -> rusqlite::Result<()> {
-    let conn = Connection::open(db)?;
+    let conn = key.open(db)?;
     let mut stmt =
         conn.prepare("SELECT at, origin, name, forward FROM txn WHERE undone = 0 ORDER BY seq")?;
     let mut q = stmt.query([])?;

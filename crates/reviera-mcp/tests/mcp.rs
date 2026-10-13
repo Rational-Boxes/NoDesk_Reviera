@@ -81,6 +81,7 @@ impl Harness {
             let live = reviera_livestore::Options {
                 dir: live_dir,
                 group_commit: Duration::from_millis(20),
+                encryption: reviera_livestore::Encryption::Passphrase("test".into()),
                 ..Default::default()
             };
             let mut app = App::new(AppConfig {

@@ -75,8 +75,9 @@ clap = { version = "4.6.7", features = ["derive"] }
 tokio = { version = "1.53.2", features = ["rt-multi-thread", "macros", "sync", "time", "io-util", "io-std"] }
 reqwest = { version = "0.13.5", features = ["json"] }
 keyring = "4.2.0"
-# SQLCipher (`bundled-sqlcipher-vendored-openssl`) arrives with encryption at rest, DM-LIVE-016.
-rusqlite = { version = "0.40.2", features = ["bundled"] }
+getrandom = "0.4.3"
+# SQLCipher with vendored OpenSSL: encryption at rest for the live store (DM-LIVE-016).
+rusqlite = { version = "0.40.2", features = ["bundled-sqlcipher-vendored-openssl"] }
 mlua = { version = "0.12.2", features = ["luajit"] }
 rmcp = { version = "3.5.1", default-features = false, features = ["server", "transport-io"] }
 wxdragon = "0.9.22"

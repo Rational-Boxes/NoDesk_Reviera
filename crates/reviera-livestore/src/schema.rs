@@ -12,6 +12,9 @@ use rusqlite::Connection;
 
 pub const SCHEMA_VERSION: &str = "1";
 
+/// Database page size (§5). For encrypted stores it is set as `cipher_page_size` when unlocking.
+pub const PAGE_SIZE: u32 = 8192;
+
 pub const DDL: &str = r#"
 CREATE TABLE IF NOT EXISTS meta (
   key   TEXT PRIMARY KEY,
@@ -108,14 +111,20 @@ pub enum Synchronous {
     Full,
 }
 
-pub fn configure(conn: &Connection, synchronous: Synchronous) -> rusqlite::Result<()> {
+pub fn configure(
+    conn: &Connection,
+    synchronous: Synchronous,
+    encrypted: bool,
+) -> rusqlite::Result<()> {
+    if !encrypted {
+        conn.execute_batch(&format!("PRAGMA page_size = {PAGE_SIZE};"))?;
+    }
     let sync = match synchronous {
         Synchronous::Normal => "NORMAL",
         Synchronous::Full => "FULL",
     };
     conn.execute_batch(&format!(
-        "PRAGMA page_size = 8192;
-         PRAGMA journal_mode = WAL;
+        "PRAGMA journal_mode = WAL;
          PRAGMA synchronous = {sync};
          PRAGMA foreign_keys = ON;
          PRAGMA cache_size = -65536;
