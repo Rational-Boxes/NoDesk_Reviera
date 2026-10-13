@@ -147,6 +147,9 @@ impl Gui {
             return;
         }
         let frame = self.frame;
+        if !self.confirm_delete(&ids) {
+            return;
+        }
         match self.run("element.delete", json!({ "element_ids": ids })) {
             Ok(v) => {
                 let n = v.as_array().map_or(0, Vec::len);

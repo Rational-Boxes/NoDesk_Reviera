@@ -31,6 +31,12 @@ operation can be driven by Lua scripts and by AI agents through the Model Contex
   the view range's cut plane with cut poché and lines on white; the cut plane is editable in
   Properties, and the Wall tool draws on the plan's level (`view.create_plan`,
   `view.set_view_range`, `view.get_view_range`).
+- **Levels**: Architecture › Level (LL) adds a level at an elevation with its floor plan, named
+  after the level below (*Level 2* → *Level 3*). Levels are listed in the Project Browser; their
+  Name and Elevation are edited in Properties. Moving a level moves the walls on it and stretches
+  the walls up to it, keeping offsets; renaming one renames its plans. Deleting a level lists
+  what goes with it first. Saved as `IfcBuildingStorey` aggregated under the building
+  (`level.create`, `level.set_elevation`, `level.rename`, `level.list`).
 - **Dimensions**: Annotate › Aligned Dimension (DI) in plans dimensions parallel wall faces,
   centrelines and cut edges; dimensions to Reviera walls follow them when they move
   (`dim.create_aligned`, `anno.list`). The Wall tool snaps to cut edges in plans.

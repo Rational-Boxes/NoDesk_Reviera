@@ -187,6 +187,16 @@ use Binding::{Instance, Type};
 
 static BUILT_INS: &[BuiltIn] = &[
     bi(
+        "level.elevation",
+        "Elevation",
+        "length",
+        "constraints",
+        Instance,
+        false,
+        Home::Attr("Elevation"),
+        Applies::Cats(&["cat.levels"]),
+    ),
+    bi(
         "elem.mark",
         "Mark",
         "text",
@@ -810,7 +820,9 @@ pub fn set(
                 let data_type = def.data_type(holder.param(&key));
                 let plain = convert(&store, &data_type, v)?;
                 Some(if key.starts_with('@') {
-                    if !plain.is_string() && !plain.is_null() {
+                    // Direct attributes are text, apart from lengths such as a level's elevation.
+                    let measure = units::data_type(&data_type).is_some_and(|d| d.dim != Dim::None);
+                    if !plain.is_string() && !plain.is_null() && !(measure && plain.is_number()) {
                         return Err(Error::new("param.invalid_value", "this parameter is text"));
                     }
                     plain
@@ -830,6 +842,7 @@ pub fn set(
                 })
             }
         };
+        let moves_level = key == crate::levels::ELEVATION_KEY;
         txn.modify(t.element, |el| match stored {
             Some(v) => {
                 el.params.insert(key, v);
@@ -838,6 +851,9 @@ pub fn set(
                 el.params.remove(&key);
             }
         })?;
+        if moves_level {
+            crate::levels::check_walls(txn.store(), t.element)?;
+        }
     }
     Ok(written.into_iter().collect())
 }

@@ -12,6 +12,7 @@
 
 mod browser;
 mod dims;
+mod levels;
 mod loading;
 mod native;
 mod nav;
@@ -61,6 +62,8 @@ const ID_BROWSER_DELETE: i32 = ID_HIGHEST + 27;
 const ID_NEW_PLAN: i32 = ID_HIGHEST + 28;
 const ID_DIMENSION: i32 = ID_HIGHEST + 29;
 const ID_EXPORT_PDF: i32 = ID_HIGHEST + 30;
+const ID_LEVEL: i32 = ID_HIGHEST + 31;
+const ID_BROWSER_ELEVATION: i32 = ID_HIGHEST + 32;
 /// The orientation presets of `nav::PRESETS`, one id each.
 const ID_ORIENT_FIRST: i32 = ID_HIGHEST + 40;
 
@@ -330,7 +333,11 @@ impl Gui {
                 self.start_dim_tool(&frame);
                 true
             }
-            "Z" | "W" | "P" | "D" => false,
+            "LL" => {
+                self.new_level();
+                true
+            }
+            "Z" | "W" | "P" | "D" | "L" => false,
             _ => {
                 self.keys.0.clear();
                 false
@@ -1213,6 +1220,7 @@ impl Gui {
             .and_then(|t| t.name.clone())
             .unwrap_or_default();
         grid.append(Property::category("Element", "c_element"));
+        let is_level = e.class == reviera_core::levels::CLASS;
         for (i, (label, value)) in [
             ("Category", category),
             ("IFC class", e.class.clone()),
@@ -1224,6 +1232,11 @@ impl Gui {
         .into_iter()
         .enumerate()
         {
+            // A level's name is edited here (`level.rename`).
+            if is_level && label == "Name" {
+                grid.append(Property::string(label, "level_name", value));
+                continue;
+            }
             let name = format!("e{i}");
             grid.append(Property::string(label, &name, value));
             grid.set_property_read_only(&name, true);
@@ -1375,6 +1388,13 @@ impl Gui {
         if property == "view_cut" {
             if let Some(t) = text {
                 self.set_cut_plane(&t, frame);
+            }
+            return;
+        }
+        if property == "level_name" {
+            let level = self.selection().first().copied();
+            if let (Some(level), Some(name)) = (level, text) {
+                self.rename_level(level, Some(name));
             }
             return;
         }
@@ -1898,6 +1918,12 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
         );
         let architecture_menu = Menu::builder()
             .append_item(ID_WALL, "&Wall (WA)", "Draw walls on the lowest level")
+            .append_separator()
+            .append_item(
+                ID_LEVEL,
+                "&Level... (LL)",
+                "Add a level at an elevation, with its floor plan",
+            )
             .build();
         let annotate_menu = Menu::builder()
             .append_item(
@@ -1967,7 +1993,10 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
         let notebook = AuiNotebook::builder(&frame).build();
         let browser = TreeCtrl::builder(&frame)
             .with_style(
-                TreeCtrlStyle::Default | TreeCtrlStyle::HasButtons | TreeCtrlStyle::LinesAtRoot,
+                TreeCtrlStyle::Default
+                    | TreeCtrlStyle::HasButtons
+                    | TreeCtrlStyle::LinesAtRoot
+                    | TreeCtrlStyle::HideRoot,
             )
             .build();
         aui.add_pane_with_info(
@@ -2084,10 +2113,10 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
             let gui = gui.clone();
             browser.on_item_activated(move |e| {
                 if let Some(item) = e.get_item() {
-                    with(&gui, |g| {
-                        if let Some(view) = g.browser_view(&item) {
-                            g.open_model_view(view);
-                        }
+                    with(&gui, |g| match g.browser_view(&item) {
+                        Some(level) if g.is_level(level) => g.select_level(level),
+                        Some(view) => g.open_model_view(view),
+                        None => {}
                     });
                 }
             });
@@ -2096,12 +2125,21 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
             let (gui, b) = (gui.clone(), browser);
             browser.on_item_right_click(move |e| {
                 let Some(item) = e.get_item() else { return };
-                let mut target = None;
+                let (mut target, mut level) = (None, false);
                 with(&gui, |g| {
                     target = g.browser_view(&item);
+                    level = target.is_some_and(|t| g.is_level(t));
                     g.browser_target = target;
                 });
-                if target.is_some() {
+                if level {
+                    let mut menu = Menu::builder()
+                        .append_item(ID_BROWSER_RENAME, "&Rename...", "")
+                        .append_item(ID_BROWSER_ELEVATION, "Change &Elevation...", "")
+                        .append_separator()
+                        .append_item(ID_BROWSER_DELETE, "De&lete", "")
+                        .build();
+                    b.popup_menu(&mut menu, None);
+                } else if target.is_some() {
                     let mut menu = Menu::builder()
                         .append_item(ID_BROWSER_OPEN, "&Open", "")
                         .append_item(ID_BROWSER_RENAME, "&Rename...", "")
@@ -2219,6 +2257,7 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                         v.panel.set_focus();
                     }
                 }),
+                ID_LEVEL => with(&gui, Gui::new_level),
                 ID_FIT => with(&gui, Gui::zoom_to_fit),
                 ID_ZOOM_PREV => with(&gui, |g| g.history(true)),
                 ID_ZOOM_NEXT => with(&gui, |g| g.history(false)),
@@ -2288,12 +2327,21 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                         v.panel.set_focus();
                     }
                 }),
-                ID_BROWSER_OPEN | ID_BROWSER_RENAME | ID_BROWSER_DUPLICATE | ID_BROWSER_DELETE => {
+                ID_BROWSER_OPEN | ID_BROWSER_RENAME | ID_BROWSER_DUPLICATE | ID_BROWSER_DELETE
+                | ID_BROWSER_ELEVATION => {
                     let id = e.get_id();
                     with(&gui, |g| {
                         let Some(view) = g.browser_target.take() else {
                             return;
                         };
+                        if g.is_level(view) {
+                            return match id {
+                                ID_BROWSER_RENAME => g.rename_level(view, None),
+                                ID_BROWSER_ELEVATION => g.move_level(view),
+                                ID_BROWSER_DELETE => g.delete_level(view),
+                                _ => {}
+                            };
+                        }
                         match id {
                             ID_BROWSER_OPEN => g.open_model_view(view),
                             ID_BROWSER_RENAME => g.rename_view(view),

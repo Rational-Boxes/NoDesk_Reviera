@@ -652,3 +652,140 @@ pub(crate) fn write_connections(
     }
     Ok(())
 }
+
+/// Places a level written by Reviera (ARC-LVL-001): aggregates a new storey under the building
+/// of the other storeys (`IfcRelAggregates`), gives it a placement relative to the building at
+/// its elevation, and keeps that placement's height equal to the elevation (in file units) when
+/// nothing else is placed relative to it. Storeys of other tools with dependent placements keep
+/// theirs, so their contents do not move in other viewers while Reviera shows them in place.
+pub(crate) fn write_storey(
+    ifc: &mut IfcModel,
+    storey: StepId,
+    elevation: f64,
+    owner_history: Option<StepId>,
+) -> Result<()> {
+    const REL: &str = "IfcRelAggregates";
+    let aggregated = ifc
+        .referenced_by(storey, REL)?
+        .into_iter()
+        .any(|r| entity(ifc, r).is_ok_and(|e| e.refs("RelatedObjects").contains(&storey)));
+    let building = building_of_storeys(ifc, storey)?;
+    if !aggregated && let Some(building) = building {
+        let existing = ifc.referenced_by(building, REL)?.into_iter().find(|r| {
+            ifc.attribute(*r, "RelatingObject")
+                .is_ok_and(|v| v == AttrValue::Ref(building.0))
+        });
+        let (rel, mut objects) = match existing {
+            Some(rel) => (rel, entity(ifc, rel)?.refs("RelatedObjects")),
+            None => {
+                let rel = ifc.create_rooted(REL, &GlobalId::new())?;
+                if let Some(oh) = owner_history {
+                    ifc.set_attribute(rel, "OwnerHistory", &AttrValue::Ref(oh.0))?;
+                }
+                ifc.set_attribute(rel, "RelatingObject", &AttrValue::Ref(building.0))?;
+                (rel, Vec::new())
+            }
+        };
+        objects.push(storey);
+        let list = AttrValue::List(objects.into_iter().map(|o| AttrValue::Ref(o.0)).collect());
+        ifc.set_attribute(rel, "RelatedObjects", &list)?;
+    }
+    if ifc.attribute(storey, "CompositionType")? == AttrValue::Null {
+        ifc.set_attribute(
+            storey,
+            "CompositionType",
+            &AttrValue::Enum("ELEMENT".into()),
+        )?;
+    }
+
+    let placement = match ifc.attribute(storey, "ObjectPlacement")? {
+        AttrValue::Ref(p) => StepId(p),
+        _ => {
+            let point = create_with(
+                ifc,
+                "IfcCartesianPoint",
+                &[("Coordinates", reals(&[0.0, 0.0, elevation]))],
+            )?;
+            let axes = create_with(
+                ifc,
+                "IfcAxis2Placement3D",
+                &[("Location", AttrValue::Ref(point.0))],
+            )?;
+            let mut attrs = vec![("RelativePlacement", AttrValue::Ref(axes.0))];
+            if let Some(b) = building
+                && let AttrValue::Ref(rel_to) = ifc.attribute(b, "ObjectPlacement")?
+            {
+                attrs.push(("PlacementRelTo", AttrValue::Ref(rel_to)));
+            }
+            let placement = create_with(ifc, "IfcLocalPlacement", &attrs)?;
+            ifc.set_attribute(storey, "ObjectPlacement", &AttrValue::Ref(placement.0))?;
+            return Ok(());
+        }
+    };
+    if !ifc
+        .referenced_by(placement, "IfcLocalPlacement")?
+        .is_empty()
+    {
+        return Ok(());
+    }
+    let AttrValue::Ref(axes) = ifc.attribute(placement, "RelativePlacement")? else {
+        return Ok(());
+    };
+    let axes = StepId(axes);
+    if !ifc
+        .class_of(axes)?
+        .eq_ignore_ascii_case("IfcAxis2Placement3D")
+    {
+        return Ok(());
+    }
+    let AttrValue::Ref(point) = ifc.attribute(axes, "Location")? else {
+        return Ok(());
+    };
+    let point = StepId(point);
+    let AttrValue::List(coords) = ifc.attribute(point, "Coordinates")? else {
+        return Ok(());
+    };
+    let xyz: Vec<f64> = coords
+        .iter()
+        .filter_map(|c| match c {
+            AttrValue::Real(r) => Some(*r),
+            _ => None,
+        })
+        .collect();
+    let [x, y, z] = xyz[..] else {
+        return Ok(());
+    };
+    if z == elevation {
+        return Ok(());
+    }
+    let moved = reals(&[x, y, elevation]);
+    if ifc.referenced_by(point, "IfcRepresentationItem")?.len() == 1 {
+        ifc.set_attribute(point, "Coordinates", &moved)?;
+    } else {
+        let new = create_with(ifc, "IfcCartesianPoint", &[("Coordinates", moved)])?;
+        ifc.set_attribute(axes, "Location", &AttrValue::Ref(new.0))?;
+    }
+    Ok(())
+}
+
+/// The building that aggregates the model's storeys (other than `except`), else the first
+/// `IfcBuilding`.
+fn building_of_storeys(ifc: &IfcModel, except: StepId) -> Result<Option<StepId>> {
+    for s in ifc.entities_of_type("IfcBuildingStorey")? {
+        if s.id == except {
+            continue;
+        }
+        for rel in ifc.referenced_by(s.id, "IfcRelAggregates")? {
+            let e = entity(ifc, rel)?;
+            if !e.refs("RelatedObjects").contains(&s.id) {
+                continue;
+            }
+            if let Some(&parent) = e.refs("RelatingObject").first()
+                && ifc.class_of(parent)?.eq_ignore_ascii_case("IfcBuilding")
+            {
+                return Ok(Some(parent));
+            }
+        }
+    }
+    Ok(ifc.entities_of_type("IfcBuilding")?.first().map(|b| b.id))
+}

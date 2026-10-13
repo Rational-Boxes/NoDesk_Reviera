@@ -14,7 +14,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use reviera_core::{Document, ElementId, GlobalId, ModelVersion, NewElement, walls};
+use reviera_core::{Document, ElementId, GlobalId, ModelVersion, NewElement, levels, walls};
 use reviera_ifc::{AttrValue, IfcModel, Schema, StepId};
 use reviera_rxd::{
     DOC_PSET_PREFIX, DecodeLimits, ELEMENT_PSET, ElementData, IdentityDoc, MANIFEST_PSET,
@@ -533,6 +533,11 @@ impl LocalProject {
                 }
                 .apply(step, is_type, &before, &e.params)?;
                 self.saved_params.insert(*id, e.params.clone());
+            }
+            if e.class == levels::CLASS {
+                let owner_history = self.new_owner_history()?;
+                let elevation = levels::elevation(e) / self.length_scale;
+                geometry::write_storey(&mut self.ifc, step, elevation, owner_history)?;
             }
             // `rxd:<section>` parameters are sections of the element's RXD data.
             let data = self.element_data.entry(*id).or_default();

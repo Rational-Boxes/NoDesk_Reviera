@@ -3,7 +3,8 @@
 
 //! The Project Browser (DOC-VIEW-001) and the views of the window: opening, creating, renaming,
 //! duplicating and deleting views through the `view.*` commands, and keeping each tab in step
-//! with the session's view state (cameras changed by commands, undo and redo).
+//! with the session's view state (cameras changed by commands, undo and redo). Levels are listed
+//! in their own group (see `levels`).
 
 use reviera_core::ElementId;
 use reviera_core::views::{self, KIND_3D};
@@ -20,7 +21,15 @@ impl Gui {
         self.browser.cleanup_custom_data();
         self.browser.delete_all_items();
         let Some(doc) = self.doc else { return };
-        let Some(root) = self.browser.add_root("Views (all)", None, None) else {
+        // The root is hidden: views and levels are the top-level groups.
+        let Some(top) = self.browser.add_root("Project", None, None) else {
+            return;
+        };
+        self.add_levels(&top);
+        let Some(root) = self
+            .browser
+            .insert_item_before(&top, 0, "Views (all)", None, None)
+        else {
             return;
         };
         let list = self
@@ -84,7 +93,30 @@ impl Gui {
         self.browser.expand_all();
     }
 
-    /// The view behind a browser item (its element id is the item's data).
+    /// The Levels group: each level with its elevation; activating one selects it.
+    fn add_levels(&mut self, top: &TreeItemId) {
+        let levels = self.levels();
+        if levels.is_empty() {
+            return;
+        }
+        let Some(group) = self.browser.append_item(top, "Levels", None, None) else {
+            return;
+        };
+        let selected = self.selection();
+        // Highest first, as levels read in a section.
+        for l in levels.into_iter().rev() {
+            let label = format!("{} ({})", l.name, self.format_length(l.elevation));
+            if let Some(item) = self
+                .browser
+                .append_item_with_data(&group, &label, l.id.0, None, None)
+                && selected == [l.id]
+            {
+                self.browser.select_item(&item);
+            }
+        }
+    }
+
+    /// The view or level behind a browser item (its element id is the item's data).
     pub(crate) fn browser_view(&self, item: &TreeItemId) -> Option<ElementId> {
         let data = self.browser.get_custom_data(item)?;
         data.downcast_ref::<u64>().map(|id| ElementId(*id))

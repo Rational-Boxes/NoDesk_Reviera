@@ -67,6 +67,10 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(LineWeightRemoveScale),
         registry.add(ObjectStyleSet),
         registry.add(WallJoinsQuery),
+        registry.add(LevelCreate),
+        registry.add(LevelSetElevation),
+        registry.add(LevelRename),
+        registry.add(LevelList),
     ];
     for r in results {
         r.expect("core commands are valid");
@@ -321,8 +325,9 @@ fn yes() -> bool {
     true
 }
 
-/// Elements that depend on `id`: instances of a type, and walls based on or bounded by a level.
-fn dependents_of(store: &crate::store::Store, id: ElementId) -> Vec<ElementId> {
+/// Elements that depend on `id`: instances of a type, walls based on or bounded by a level, the
+/// plan views of a level and the annotation of a view.
+pub fn dependents_of(store: &crate::store::Store, id: ElementId) -> Vec<ElementId> {
     let Some(guid) = store.get(id).map(|e| e.guid().as_str().to_owned()) else {
         return Vec::new();
     };
@@ -341,6 +346,22 @@ fn dependents_of(store: &crate::store::Store, id: ElementId) -> Vec<ElementId> {
         })
         .map(|e| e.id())
         .collect()
+}
+
+/// Everything `element.delete` removes with `ids`: the elements and, transitively, their
+/// dependents.
+pub fn delete_closure(
+    store: &crate::store::Store,
+    ids: &[ElementId],
+) -> std::collections::BTreeSet<ElementId> {
+    let mut queue = ids.to_vec();
+    let mut deleted = std::collections::BTreeSet::new();
+    while let Some(id) = queue.pop() {
+        if deleted.insert(id) {
+            queue.extend(dependents_of(store, id));
+        }
+    }
+    deleted
 }
 
 #[derive(Debug)]
@@ -376,13 +397,12 @@ impl Command for ElementDelete {
             queue.push(id);
         }
         let explicit: std::collections::BTreeSet<ElementId> = queue.iter().copied().collect();
-        let mut deleted = std::collections::BTreeSet::new();
-        while let Some(id) = queue.pop() {
-            if !deleted.insert(id) {
-                continue;
-            }
-            for d in dependents_of(txn.store(), id) {
-                if !p.confirm_dependents && !explicit.contains(&d) {
+        if !p.confirm_dependents {
+            for &id in &explicit {
+                if let Some(d) = dependents_of(txn.store(), id)
+                    .into_iter()
+                    .find(|d| !explicit.contains(d))
+                {
                     return Err(Error::new(
                         "element.has_dependents",
                         format!(
@@ -390,9 +410,9 @@ impl Command for ElementDelete {
                         ),
                     ));
                 }
-                queue.push(d);
             }
         }
+        let deleted = delete_closure(txn.store(), &queue);
         for id in &deleted {
             txn.delete(*id)?;
         }
@@ -1299,6 +1319,94 @@ impl Command for ViewSetCamera {
 
     fn run(&self, cx: &mut CommandContext<'_>, p: SetCameraParams) -> Result<()> {
         views::set_camera(cx.edit()?, p)
+    }
+}
+
+// ---- Levels (Ch 3 ARC-LVL-001) ----
+
+use crate::levels::{self, LevelInfo};
+
+#[derive(Debug)]
+struct LevelCreate;
+
+impl Command for LevelCreate {
+    type Params = levels::CreateParams;
+    type Output = ElementId;
+    const META: CommandMeta = CommandMeta {
+        name: "level.create",
+        version: 1,
+        summary: "Create a level",
+        description: "Creates a story level at `elevation` (accepts units, \"3 m\"). Without a name it continues \
+                      the series of the level below (Level 2 → Level 3). With `make_plan_view` (default) \
+                      a floor plan named after the level is created too.",
+        effects: &[Effect::Edit],
+        transaction_name: "Level",
+    };
+
+    fn run(&self, cx: &mut CommandContext<'_>, p: levels::CreateParams) -> Result<ElementId> {
+        levels::create(cx.edit()?, p)
+    }
+}
+
+#[derive(Debug)]
+struct LevelSetElevation;
+
+impl Command for LevelSetElevation {
+    type Params = levels::SetElevationParams;
+    type Output = ();
+    const META: CommandMeta = CommandMeta {
+        name: "level.set_elevation",
+        version: 1,
+        summary: "Change a level's elevation",
+        description: "Moves the level. Walls based on it move with it and walls whose top is the level \
+                      change height, keeping their offsets; refused if a wall's top would reach its base.",
+        effects: &[Effect::Edit],
+        transaction_name: "Level Elevation",
+    };
+
+    fn run(&self, cx: &mut CommandContext<'_>, p: levels::SetElevationParams) -> Result<()> {
+        levels::set_elevation(cx.edit()?, p)
+    }
+}
+
+#[derive(Debug)]
+struct LevelRename;
+
+impl Command for LevelRename {
+    type Params = levels::RenameParams;
+    type Output = Vec<ElementId>;
+    const META: CommandMeta = CommandMeta {
+        name: "level.rename",
+        version: 1,
+        summary: "Rename a level",
+        description: "Renames a level (names are unique among levels). With `rename_views` (default) its \
+                      plan views named after it are renamed too; returns those views.",
+        effects: &[Effect::Edit],
+        transaction_name: "Rename Level",
+    };
+
+    fn run(&self, cx: &mut CommandContext<'_>, p: levels::RenameParams) -> Result<Vec<ElementId>> {
+        levels::rename(cx.edit()?, p)
+    }
+}
+
+#[derive(Debug)]
+struct LevelList;
+
+impl Command for LevelList {
+    type Params = NoParams;
+    type Output = Vec<LevelInfo>;
+    const META: CommandMeta = CommandMeta {
+        name: "level.list",
+        version: 1,
+        summary: "List levels",
+        description: "Lists the model's levels, lowest first, with elevations in metres.",
+        effects: &[Effect::Read],
+        transaction_name: "",
+    };
+
+    fn run(&self, cx: &mut CommandContext<'_>, _: NoParams) -> Result<Vec<LevelInfo>> {
+        Ok(levels::list(cx.store()))
     }
 }
 
