@@ -66,7 +66,8 @@ This is how the requirement that *all* operations are exposed to AI agents is me
 
 - Parametric intent and documentation can't be fully represented in standard IFC entities: constraints, family formulas, sketches, views, sheets and annotation. They are held in **Reviera Extension Data (RXD)**, a bespoke, versioned JSON format. By default it is **embedded in the IFC file as standard `Reviera_*` property sets** (IfcText payloads), so the file stays schema-valid and maximally compatible. An external `.reviera` sidecar is an alternative carrier. Full definition: `spec/02a_extension_data_format.md`.
 - IfcOpenShell is C++ (with Python bindings). It will be reached from Rust through a C/C++ FFI layer (`cxx`/`autocxx` or a thin C shim).
-- IfcOpenShell is LGPL-3.0. Linking to it must meet LGPL requirements: dynamic linking, or providing relinkable objects.
+- IfcOpenShell is LGPL-3.0; because Reviera is GPL-3.0, it may be linked statically (§4.2).
+- **Verified 2026-10-12:** IfcOpenShell 0.8.5 builds against OCCT 7.9.3 (Fedora 43) and is linked statically into `reviera-ifc` through a `cxx` shim (`tools/build-ifcopenshell.sh`). The FZK-Haus and Institute sample models round-trip without loss and tessellate. IfcOpenShell builds schema tables lazily and not thread-safely, so the shim builds them once at start-up.
 
 ### 3.2 OpenCASCADE
 - IfcOpenShell already uses OCCT as its geometry backend, so it fits naturally: IFC geometry goes to OCCT shapes, and both share one kernel.

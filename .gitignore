@@ -26,3 +26,6 @@ __pycache__/
 
 # Rust
 /target/
+
+# Third-party sources and builds fetched by tools/
+/third_party/

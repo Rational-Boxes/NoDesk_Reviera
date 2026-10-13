@@ -8,9 +8,20 @@ license.workspace = true
 authors.workspace = true
 repository.workspace = true
 publish.workspace = true
+links = "ifcopenshell"
 
 [dependencies]
 reviera-core.workspace = true
+cxx.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+
+[build-dependencies]
+cxx-build.workspace = true
+
+[dev-dependencies]
+tempfile = "3"
 
 [lints]
 workspace = true

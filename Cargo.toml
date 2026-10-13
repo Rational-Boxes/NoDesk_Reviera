@@ -76,6 +76,7 @@ wxdragon = "0.9.22"
 wgpu = "30.0.1"
 gltf = "1.4.1"
 cxx = "1.0.205"
+cxx-build = "1.0.205"
 
 [workspace.lints.rust]
 unsafe_op_in_unsafe_fn = "deny"
