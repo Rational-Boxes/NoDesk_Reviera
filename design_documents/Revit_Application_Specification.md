@@ -6808,8 +6808,8 @@ Coordinates ▾: *Acquire Coordinates* (from a link), *Publish Coordinates* (to 
 | ID | Format | Import | Link | Priority | Library (licence) | Notes |
 |---|---|---|---|---|---|---|
 | DM-IMP-001 | IFC (2X3, 4, 4X3) | ✔ (open, or merge into the current model) | ✔ | P0 (open) / P1 (merge, link) | IfcOpenShell (LGPL-3.0) | Merge keeps GUIDs. Clashing GUIDs get new ones, with a report. Merge options: target storeys (by name match, by elevation within 1 mm, or a chosen storey), IFC classes to include, and whether to bring property sets for unknown definitions. Merged elements without RXD are IFC-native (§2.11.1) until recognised. Linking an IFC keeps it read-only and reloads it on change (COL). The merge is one transaction. |
-| DM-IMP-002 | DXF (R12–2018) | ✔ | ✔ | P1 | LibreDWG (GPL-3.0+) DXF reader, or a Rust DXF crate (MIT) | Layers, blocks (as nested import groups), text, hatches, dimensions (as exploded geometry). Units come from `$INSUNITS`, or the chosen unit when it is missing. Splines are kept as NURBS, arcs and ellipses as exact curves; proxy and unsupported entities are listed in the import report. Layer visibility and colour can be overridden per view (DOC). |
-| DM-IMP-003 | DWG (R13–2018 and later where the library supports it) | ✔ | ✔ | P1 | LibreDWG (GPL-3.0+) | Coverage depends on LibreDWG. Unsupported entities are listed in a report. Same options and results as DXF. Xrefs are resolved from the DWG's folder and imported as nested groups, or skipped with a warning. Files saved by versions newer than the library supports are refused with the version found and a suggestion to save as DXF from the source tool. |
+| DM-IMP-002 | DXF (R12–2018, ASCII and binary) | ✔ | ✔ | P1 | `acadrust` (MPL-2.0), the reader CADCraft uses (§2.11.10); LibreDWG (GPL-3.0+) as a fallback | Layers, blocks (as nested import groups), text, hatches, dimensions (as exploded geometry). Units come from `$INSUNITS`, or the chosen unit when it is missing. Splines are kept as NURBS, arcs and ellipses as exact curves; proxy and unsupported entities are listed in the import report. Layer visibility and colour can be overridden per view (DOC). |
+| DM-IMP-003 | DWG (R13–2018 and later where the library supports it) | ✔ | ✔ | P1 | `acadrust` (MPL-2.0); LibreDWG (GPL-3.0+) as a fallback | Coverage depends on the library. Unsupported entities are listed in a report. Same options and results as DXF. Xrefs are resolved from the DWG's folder and imported as nested groups, or skipped with a warning. Files saved by versions newer than the library supports are refused with the version found and a suggestion to save as DXF from the source tool. |
 | DM-IMP-004 | PDF (as underlay) | ✔ | ✔ | P1 | PDFium (BSD-3/Apache-2.0) | Choose a page, resolution, and vector snapping to the PDF's path geometry. Pages are rendered at 72–600 dpi (default 150) for display; vector paths are extracted once into a snapping cache. Scale is set by the page's declared size or calibrated by two picked points of known distance. Password-protected PDFs are refused. Placed in plan, drafting and sheet views. |
 | DM-IMP-005 | Images (PNG, JPEG, TIFF, BMP, WebP) | ✔ | ✔ | P1 | `image` crate (MIT/Apache-2.0) | Placed in views, or on sheets. Images are RXD assets de-duplicated by hash, or linked by path (§2.10.14, COL-LNK-005). Native size comes from the image's dpi (96 dpi if none); maximum 16,384 × 16,384 pixels. Draw layer background or foreground; scale calibration by two points; alpha transparency kept. |
 | DM-IMP-006 | OBJ, STL, PLY | ✔ (project or family) | — | P1 | Rust crates (MIT/Apache-2.0) | Mesh. Optional decimation, and conversion to `IfcTriangulatedFaceSet`. Options: units (auto from file, or chosen), up-axis (Y or Z), merge coplanar triangles, decimate to a target triangle count, and category. Into a family, the mesh becomes a non-parametric form; into a project, a direct shape (§2.13.10). Non-manifold meshes are accepted for display and flagged. |
@@ -6847,7 +6847,7 @@ Coordinates ▾: *Acquire Coordinates* (from a link), *Publish Coordinates* (to 
 |---|---|---|---|---|---|
 | DM-EXP-001 | PDF (vector) | Sheets and views | P0 | Defined in DOC (own vector pipeline; for example `pdf-writer`, MIT/Apache-2.0) | Combined or separate files, naming rules, print order, raster fallback for shaded views. Fonts are embedded as subsets; text stays selectable and searchable. Sheet size, orientation and margins come from the title block; line weights from the line weight table at the view scale (§2.10.4). PDF/A-2b output is an option. Details in DOC. |
 | DM-EXP-002 | IFC (exchange) | Model | P0/P1 | IfcOpenShell | §2.11.4. Exchange exports never change the native file. Clean IFC (`strip_rxd`) and IFC with documentation are options of the same command (`02a` §4). Setups, property mapping and IDS validation as in §2.11.4. |
-| DM-EXP-003 | DXF | Views and sheets (2D), 3D views (3D) | P1 | Own writer, or LibreDWG | Layer mapping by category and subcategory, using layer standard tables (for example ISO 13567, AIA, BS 1192). Text, hatches, dimensions as entities or exploded. Versions R2000–R2018 selectable. Sheets export with views as model-space xrefs or flattened into paper space (option). Colours by layer or by entity; line patterns as linetypes. Fill patterns become hatches using the `.pat` definitions (§2.10.4). |
+| DM-EXP-003 | DXF | Views and sheets (2D), 3D views (3D) | P1 | `acadrust` (MPL-2.0), own writer, or LibreDWG | Layer mapping by category and subcategory, using layer standard tables (for example ISO 13567, AIA, BS 1192). Text, hatches, dimensions as entities or exploded. Versions R2000–R2018 selectable. Sheets export with views as model-space xrefs or flattened into paper space (option). Colours by layer or by entity; line patterns as linetypes. Fill patterns become hatches using the `.pat` definitions (§2.10.4). |
 | DM-EXP-004 | DWG | Views and sheets | P2 | LibreDWG (GPL-3.0+) | DWG output depends on LibreDWG write support (check version coverage). DXF is the recommended fallback. Same setups, layer mapping and naming as DXF. If the chosen version cannot be written, the job fails for that file with a message suggesting DXF, and the rest of the batch continues. |
 | DM-EXP-005 | Images (PNG, JPEG, TIFF) | Views and sheets | P1 | `image` crate | Resolution, size, visual style, crop. Size by pixel width or height, or by dpi at the sheet's paper size; maximum 16,384 pixels per side. Background white, transparent (PNG) or as shown. Each view or sheet becomes one file named by the naming rule. |
 | DM-EXP-006 | glTF 2.0 / GLB | 3D views | P1 | `gltf` crate | PBR materials (§2.10.5), element GUIDs and selected parameters in `extras`, one node per element, instancing for repeated types. Options: binary GLB or glTF with separate files, Draco mesh compression (on or off), texture size limit, which parameters to include, and coordinate base (internal origin, survey point). Only elements visible in the view are exported. |
@@ -6960,6 +6960,70 @@ Coordinates ▾: *Acquire Coordinates* (from a link), *Publish Coordinates* (to 
 - [ ] No password or token appears in settings files, logs or the saved IFC.
 
 ---
+
+### 2.11.10 CADCraft interoperability
+**ID:** DM-IMP-013 · **Priority:** P1 · **Ref:** the public CADCraft repository (github.com/storytold/cadcraft, MIT or Apache-2.0) and the public `acadrust` crate (MPL-2.0); see RESEARCH_LOG 2026-10-13
+
+**Purpose.** CADCraft is an open-source 2D drafting application written in Rust. Reviera and CADCraft complement each other: drawings made in CADCraft (site plans, surveys, details, consultant drawings) come into Reviera as imported or linked CAD, and Reviera's drawings go back to CADCraft as DXF or DWG. The exchange goes through files only; neither application depends on the other's code.
+
+**Behaviour & rules.**
+- **Formats.** CADCraft writes DXF R2000 (ASCII) and DWG R2000, and reads DXF R12–2018 (ASCII and binary) and DWG R13–2018. Reviera imports and links every DXF and DWG version CADCraft writes (DM-IMP-002, DM-IMP-003, COL-LNK-002), and exports DXF and DWG in versions CADCraft reads (DM-EXP-003, DM-EXP-004).
+- **One reader for both.** Reviera reads DXF and DWG with `acadrust` (MPL-2.0), the library CADCraft uses for DWG, so both applications read a file the same way. The `acadrust` version is pinned, and every upgrade runs the compatibility verification of DM-IMP-014 before it is accepted.
+- **Entity mapping.** Each CADCraft entity has a defined result in Reviera. Anything else is listed in the import report with its type, layer and handle, never dropped silently.
+
+| CADCraft entity (DXF type) | Reviera import result |
+|---|---|
+| Line (`LINE`), extended line and ray (`XLINE`, `RAY`) | Line; extended lines and rays are clipped to the drawing extents and listed in the report |
+| Polyline with arcs and widths (`LWPOLYLINE`, `POLYLINE`), rectangle, polygon, donut | Chain of lines and arcs (bulges kept as exact arcs); a non-zero width becomes a filled region of that outline |
+| Circle, arc, ellipse (`CIRCLE`, `ARC`, `ELLIPSE`) | Exact circle, arc or elliptical arc |
+| Spline (`SPLINE`) | NURBS curve with the file's control points, knots and weights |
+| Point (`POINT`) | Point marker (snappable) |
+| Text and multi-line text (`TEXT`, `MTEXT`) | Text with its height, rotation, justification and wrapping width; formatting codes are reduced to plain text and listed when lost |
+| Block with attributes (`INSERT`, `ATTRIB`) | Nested import group with the block's name; attribute values are kept as text and as group properties |
+| Hatch: pattern, solid, gradient (`HATCH`) | Filled region; patterns map to a drafting fill pattern of the same name when one exists, otherwise to solid fill and a report entry; gradients become solid fill in their first colour |
+| Dimension (`DIMENSION`) | Exploded into lines, arrows and text from the dimension's own block, so it looks as it did in CADCraft; its measured value is kept as a property |
+| Multileader (`MULTILEADER`) | Leader lines, arrowhead and text |
+| Table (`ACAD_TABLE`) | Exploded into lines and text |
+
+- **Layers and styles.** Each layer becomes an Imported Objects subcategory with its colour, linetype and lineweight (COL-LNK-002). Layers that are off or frozen in the file import hidden. ByLayer and ByBlock properties resolve as the file defines them.
+- **Units and position.** Units come from `$INSUNITS`; when it is missing or unitless, the user's chosen unit is used and the report says so. Positioning follows COL-LNK-001 (origin to origin by default; *Auto – by shared coordinates* when the drawing is in survey coordinates).
+- **Export preset "CADCraft".** DXF and DWG export (DOC-OUT-005) offer a preset for CADCraft. It writes R2000, uses only entities in the table above (anything else is exploded into lines, arcs, text and hatches), writes `$INSUNITS` from the project's length unit, and maps Reviera line patterns to linetypes CADCraft reads.
+- **Linked files reload.** A CADCraft drawing linked with `link.add_cad` reloads when the file changes, so the two applications can be used side by side on one project.
+
+**Commands.** No new commands: `import.cad`, `link.add_cad` and `export.dxf` / `export.dwg` with `preset: "cadcraft"`. `import.cad_report(path, options?) -> report` *(query)* reads a file without importing it and returns the entity counts by type and layer, the units found and every entity that would not be imported as itself.
+
+**Acceptance criteria.**
+- [ ] A CADCraft DXF R2000 drawing with one entity of each type in the mapping table imports into a plan view with every entity present as its mapped result, and an empty report of unsupported entities.
+- [ ] The same drawing saved by CADCraft as DWG R2000 imports to the same result as the DXF, entity for entity.
+- [ ] A drawing with `$INSUNITS` = millimetres places a 1000-unit line as 1 m in the model.
+- [ ] A floor plan exported with the CADCraft preset opens in CADCraft with every line, arc, text and hatch present and at the same coordinates.
+
+### 2.11.11 CADCraft compatibility verification
+**ID:** DM-IMP-014 · **Priority:** P1 · **Ref:** DM-IMP-013
+
+**Purpose.** Prove, continuously, that Reviera reads what CADCraft writes and that CADCraft reads what Reviera writes, and notice at once when a new version of either application breaks this.
+
+**Behaviour & rules.**
+- **Reference corpus.** The repository holds a corpus of drawings saved by CADCraft under `test-data/cadcraft/`. Each file has a provenance note recording the CADCraft version (release or commit), how the drawing was made, and its licence (made for Reviera's tests, or published under a licence that allows redistribution). The corpus covers at least:
+  - every entity type in the DM-IMP-013 mapping table, each on its own named layer;
+  - DXF R2000 ASCII, DXF binary and DWG R2000 copies of the same drawing;
+  - millimetre, metre, inch and unitless drawings;
+  - nested blocks with attributes, ByLayer and ByBlock properties, and layers that are off or frozen;
+  - a drawing in survey coordinates far from the origin (above 10⁶ units), to check precision.
+- **Expected results.** Each corpus file has an expected-results file (JSON) beside it: entity counts by type and layer, the drawing extents, chosen coordinates and texts, and the units. The expected results are written from the drawing's own definition (how it was drawn), not from Reviera's output.
+- **Automated checks.** The test suite (`cargo test`) imports every corpus file and compares the result with its expected results:
+  - coordinates within 10⁻⁶ drawing units, angles within 10⁻⁹ rad, texts exactly;
+  - the DXF, binary DXF and DWG copies of one drawing give identical results;
+  - export round trip: the imported drawing exported with the CADCraft preset and read again gives the same entities and coordinates.
+- **Checking in CADCraft itself.** When a CADCraft build is available on the test machine (found on the path, or named by `REVIERA_CADCRAFT`), the export round trip also opens Reviera's exported files in CADCraft, using its command-line or scripting interface where one is offered, and checks that every expected entity was read. Without CADCraft these checks are skipped and reported as skipped, never as passed.
+- **Compatibility matrix.** `docs/interop/cadcraft.md` records the Reviera, CADCraft and `acadrust` versions last verified together, the entity coverage in both directions, and known differences. It is updated with every corpus change, every `acadrust` upgrade, and every CADCraft release used for verification.
+- **Failures.** A corpus file that fails blocks the change that caused it. A difference caused by a new CADCraft version is recorded in the matrix with an issue, and that version's files are added to the corpus.
+
+**Acceptance criteria.**
+- [ ] `cargo test` runs the CADCraft corpus checks and fails when one expected coordinate in a corpus file is changed by 10⁻⁵ units.
+- [ ] With no CADCraft build available, the in-CADCraft checks are reported as skipped.
+- [ ] Upgrading `acadrust` without running the corpus checks is refused by the dependency review (`cargo deny` policy plus the review checklist).
+- [ ] The compatibility matrix names the CADCraft version that produced every corpus file.
 
 ## 2.12 The command registry
 
@@ -23277,14 +23341,14 @@ Common link fields: `id`, `name`, `source` (see each type), `pathType` (relative
 - [ ] A linked model placed *by shared coordinates* lands at the correct position relative to the host within 1 mm.
 
 ### CAD links and imports
-**ID:** COL-LNK-002 · **Priority:** P1 (DXF), P1 (DWG through LibreDWG), P3 (DGN, SAT, SKP, 3DM) · **Ref:** research/04 §8.1 (*CAD Link vs Import*)
+**ID:** COL-LNK-002 · **Priority:** P1 (DXF), P1 (DWG), P3 (DGN, SAT, SKP, 3DM) · **Ref:** research/04 §8.1 (*CAD Link vs Import*)
 
 **Purpose.** Use 2D and 3D CAD drawings as underlays and backgrounds.
 
 **Workflow.** Insert › Link › Link CAD (keeps a reference and reloads) or Insert › Import › Import CAD (copies the content into the project). Options: *Current view only* (the CAD becomes view-owned in that view) or all views; colours (black and white, preserve, invert); layers (all, visible only, specify); import units (auto-detect from the file header, or a chosen unit); *Correct lines slightly off axis* (snaps lines within 0.1° of the axes); positioning (as COL-LNK-001, plus *Auto – by shared coordinates* using the file's coordinates as shared coordinates); level to place at; orient to view.
 
 **Behaviour & rules.**
-- **Readers:** DXF through Reviera's own reader; DWG through LibreDWG (GPL-3.0-or-later), which reads the common DWG versions. Unsupported entities (for example proxy objects) are skipped and listed.
+- **Readers:** DXF and DWG through `acadrust` (MPL-2.0), the library CADCraft uses, so drawings from CADCraft (DM-IMP-013) read as CADCraft reads them; LibreDWG (GPL-3.0-or-later) is a fallback for DWG versions `acadrust` does not read. Unsupported entities (for example proxy objects) are skipped and listed.
 - CAD layers become sub-categories of an *Imported Objects* category for that file (Chapter 5, DOC-GFX-002), with per-view visibility in the graphics dialog's Imported Categories tab.
 - *Query* reports the layer and entity type of a picked CAD element; *Delete layers* removes layers from an import.
 - **Explode** (imports only): *Partial* (one level of blocks) or *Full*, turning CAD geometry into detail lines, text and filled regions (view-specific imports) or model lines (all-view imports).
@@ -24696,7 +24760,7 @@ Generated by `tools/build_spec.py` from the chapter command catalogs and require
 | Area | P0 | P1 | P2 | P3 | Total |
 |------|---:|---:|---:|---:|------:|
 | UI | 76 | 36 | 7 | 0 | 119 |
-| DM | 91 | 55 | 24 | 3 | 173 |
+| DM | 91 | 57 | 24 | 3 | 175 |
 | ARC | 75 | 48 | 10 | 1 | 134 |
 | STR | 0 | 14 | 47 | 0 | 61 |
 | MEP | 0 | 28 | 42 | 0 | 70 |
@@ -24704,7 +24768,7 @@ Generated by `tools/build_spec.py` from the chapter command catalogs and require
 | DOC | 68 | 38 | 12 | 1 | 119 |
 | COL | 8 | 45 | 6 | 1 | 60 |
 | ADV | 0 | 0 | 4 | 1 | 5 |
-| **Total** | **318** | **265** | **173** | **7** | **763** |
+| **Total** | **318** | **267** | **173** | **7** | **765** |
 
 Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver)"), it is counted under the first. The non-functional requirements (NFR-…) are in Chapter 0 §0.7 and are not counted here.
 
@@ -24759,7 +24823,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.2a Reviera-originated features
 
-77 requirements are Reviera's own design: owner directives, the technology stack (IFC/RXD storage, live store, BIMserver, MCP, scripting) and extensions beyond the reference product's feature set. Their Ref lines cite no research on the reference product. Listing them separately keeps the clean-room provenance clear: every other requirement traces to public research on the reference product.
+79 requirements are Reviera's own design: owner directives, the technology stack (IFC/RXD storage, live store, BIMserver, MCP, scripting) and extensions beyond the reference product's feature set. Their Ref lines cite no research on the reference product. Listing them separately keeps the clean-room provenance clear: every other requirement traces to public research on the reference product.
 
 | Requirement | Ch | Feature |
 |-------------|----|---------|
@@ -24790,6 +24854,8 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | DM-RXD-003 | 2 | 2.4.3 Reconciliation |
 | DM-REGEN-004 | 2 | 2.6.5 OCCT threading rules |
 | DM-FILE-007 | 2 | 2.11.9 Remote file locations (WebDAV) |
+| DM-IMP-013 | 2 | 2.11.10 CADCraft interoperability |
+| DM-IMP-014 | 2 | 2.11.11 CADCraft compatibility verification |
 | DM-CMD-002 | 2 | 2.12.2 Command naming and stability |
 | DM-MCP-002 | 2 | 2.16.2 Transports and authentication |
 | DM-MCP-003 | 2 | 2.16.3 Tool catalogue: generation from the registry |

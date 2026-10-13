@@ -729,14 +729,14 @@ Common link fields: `id`, `name`, `source` (see each type), `pathType` (relative
 - [ ] A linked model placed *by shared coordinates* lands at the correct position relative to the host within 1 mm.
 
 ### CAD links and imports
-**ID:** COL-LNK-002 · **Priority:** P1 (DXF), P1 (DWG through LibreDWG), P3 (DGN, SAT, SKP, 3DM) · **Ref:** research/04 §8.1 (*CAD Link vs Import*)
+**ID:** COL-LNK-002 · **Priority:** P1 (DXF), P1 (DWG), P3 (DGN, SAT, SKP, 3DM) · **Ref:** research/04 §8.1 (*CAD Link vs Import*)
 
 **Purpose.** Use 2D and 3D CAD drawings as underlays and backgrounds.
 
 **Workflow.** Insert › Link › Link CAD (keeps a reference and reloads) or Insert › Import › Import CAD (copies the content into the project). Options: *Current view only* (the CAD becomes view-owned in that view) or all views; colours (black and white, preserve, invert); layers (all, visible only, specify); import units (auto-detect from the file header, or a chosen unit); *Correct lines slightly off axis* (snaps lines within 0.1° of the axes); positioning (as COL-LNK-001, plus *Auto – by shared coordinates* using the file's coordinates as shared coordinates); level to place at; orient to view.
 
 **Behaviour & rules.**
-- **Readers:** DXF through Reviera's own reader; DWG through LibreDWG (GPL-3.0-or-later), which reads the common DWG versions. Unsupported entities (for example proxy objects) are skipped and listed.
+- **Readers:** DXF and DWG through `acadrust` (MPL-2.0), the library CADCraft uses, so drawings from CADCraft (DM-IMP-013) read as CADCraft reads them; LibreDWG (GPL-3.0-or-later) is a fallback for DWG versions `acadrust` does not read. Unsupported entities (for example proxy objects) are skipped and listed.
 - CAD layers become sub-categories of an *Imported Objects* category for that file (Chapter 5, DOC-GFX-002), with per-view visibility in the graphics dialog's Imported Categories tab.
 - *Query* reports the layer and entity type of a picked CAD element; *Delete layers* removes layers from an import.
 - **Explode** (imports only): *Partial* (one level of blocks) or *Full*, turning CAD geometry into detail lines, text and filled regions (view-specific imports) or model lines (all-view imports).
