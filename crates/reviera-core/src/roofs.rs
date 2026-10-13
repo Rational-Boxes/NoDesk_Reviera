@@ -1194,6 +1194,151 @@ pub(crate) fn set_edge(txn: &mut crate::txn::Transaction<'_>, p: SetEdgeParams) 
     classify_into(txn, id)
 }
 
+/// A roof shape: which footprint curves slope.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum RoofShape {
+    /// Every curve slopes.
+    Hip,
+    /// The curves along the longest one slope; the ends are gables.
+    Gable,
+    /// Turned a quarter: the curves across the longest one slope.
+    GableRotated,
+    /// One slope rising from the longest curve; the rest are gables.
+    Shed,
+    /// One slope rising from the curve opposite the longest one.
+    ShedReversed,
+    /// No curve slopes.
+    Flat,
+}
+
+pub const ROOF_SHAPES: &[(RoofShape, &str)] = &[
+    (RoofShape::Hip, "Hip"),
+    (RoofShape::Gable, "Gable"),
+    (RoofShape::GableRotated, "Gable (rotated)"),
+    (RoofShape::Shed, "Shed"),
+    (RoofShape::ShedReversed, "Shed (reversed)"),
+    (RoofShape::Flat, "Flat"),
+];
+
+/// Which outer footprint curves (by key) slope for `shape`; `None` when the footprint has no
+/// curve opposite its longest one (Shed reversed).
+pub fn shape_slopes(sketch: &sketch::Sketch, shape: RoofShape) -> Option<Vec<(u32, bool)>> {
+    let outer: Vec<&sketch::SketchCurve> = sketch
+        .loops
+        .first()?
+        .iter()
+        .filter_map(|k| sketch.curves.iter().find(|c| c.key == *k))
+        .collect();
+    let dir = |c: &sketch::SketchCurve| {
+        let (s, e) = (c.line.start, c.line.end);
+        let len = (e[0] - s[0]).hypot(e[1] - s[1]);
+        (
+            [
+                (e[0] - s[0]) / len.max(1e-12),
+                (e[1] - s[1]) / len.max(1e-12),
+            ],
+            len,
+        )
+    };
+    // The first of the longest curves (ties within a millimetre).
+    let max = outer.iter().map(|c| dir(c).1).fold(0.0, f64::max);
+    let longest = outer.iter().copied().find(|c| dir(c).1 > max - 1e-3)?;
+    let d = dir(longest).0;
+    // Within 10° of the longest curve's direction.
+    let parallel = |c: &sketch::SketchCurve| {
+        let u = dir(c).0;
+        (u[0] * d[1] - u[1] * d[0]).abs() < 10f64.to_radians().sin()
+    };
+    // The parallel curve farthest from the longest one.
+    let opposite = || {
+        let n = [-d[1], d[0]];
+        let at = |c: &sketch::SketchCurve| {
+            let m = c.line.start;
+            ((m[0] - longest.line.start[0]) * n[0] + (m[1] - longest.line.start[1]) * n[1]).abs()
+        };
+        outer
+            .iter()
+            .copied()
+            .filter(|c| c.key != longest.key && parallel(c))
+            .max_by(|a, b| at(a).total_cmp(&at(b)))
+            .filter(|c| at(c) > 1e-6)
+            .map(|c| c.key)
+    };
+    let slopes = |f: &dyn Fn(&sketch::SketchCurve) -> bool| {
+        outer.iter().map(|c| (c.key, f(c))).collect::<Vec<_>>()
+    };
+    Some(match shape {
+        RoofShape::Hip => slopes(&|_| true),
+        RoofShape::Flat => slopes(&|_| false),
+        RoofShape::Gable => slopes(&|c| parallel(c)),
+        RoofShape::GableRotated => slopes(&|c| !parallel(c)),
+        RoofShape::Shed => slopes(&|c| c.key == longest.key),
+        RoofShape::ShedReversed => {
+            let o = opposite()?;
+            slopes(&|c| c.key == o)
+        }
+    })
+}
+
+/// The shape a roof has now, if its curves match one (`None` is a custom roof).
+pub fn shape_of(e: &Element) -> Option<RoofShape> {
+    let recipe = roof_recipe(e)?;
+    let sketch = sketch::sketch_of(e)?;
+    ROOF_SHAPES.iter().map(|s| s.0).find(|shape| {
+        shape_slopes(&sketch, *shape).is_some_and(|v| {
+            v.iter()
+                .all(|(k, slopes)| recipe.edge(*k).defines_slope == *slopes)
+        })
+    })
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SetShapeParams {
+    pub roof_id: ElementRef,
+    /// `hip`, `gable`, `gable_rotated`, `shed`, `shed_reversed` or `flat`.
+    pub shape: RoofShape,
+    /// The overhang of every footprint curve (metres or text with units); default unchanged.
+    #[schemars(extend("x-reviera-data-type" = "length"))]
+    pub overhang: Option<Value>,
+}
+
+/// Sets which footprint curves slope from a roof shape, keeping their slopes and overhangs.
+pub(crate) fn set_shape(txn: &mut crate::txn::Transaction<'_>, p: SetShapeParams) -> Result<()> {
+    let store = txn.store().clone();
+    let (id, _) = resolve_roof(&store, &p.roof_id)?;
+    let sketch = sketch::sketch_of(store.get(id).expect("resolved")).unwrap_or_default();
+    let slopes = shape_slopes(&sketch, p.shape).ok_or_else(|| {
+        Error::new(
+            "roof.shape_unsuitable",
+            "the footprint has no curve opposite its longest one for a reversed shed",
+        )
+    })?;
+    let (_, mut recipe) = resolve_roof(&store, &p.roof_id)?;
+    crate::modify::check_unpinned(&store, id)?;
+    let overhang = p
+        .overhang
+        .as_ref()
+        .map(|v| number(&store, v, "length", "the overhang"))
+        .transpose()?;
+    for (k, defines) in slopes {
+        let mut e = recipe.edge(k);
+        e.defines_slope = defines;
+        if let Some(o) = overhang {
+            e.overhang = o;
+        }
+        if e == RoofEdge::default() {
+            recipe.edges.remove(&k.to_string());
+        } else {
+            recipe.edges.insert(k.to_string(), e);
+        }
+    }
+    write_recipe(txn, id, &recipe)?;
+    check(txn, id)?;
+    classify_into(txn, id)
+}
+
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct SetSlopeParams {

@@ -444,6 +444,12 @@ pub(crate) fn delete(txn: &mut crate::txn::Transaction<'_>, p: ViewIdsParams) ->
             Some(id) => id,
             None => resolve_view(&store, r)?.0,
         };
+        // The view's dimensions, tags and text go with it.
+        for a in crate::annotations::owned_by(&store, store.get(id).expect("resolved")) {
+            if txn.store().contains(a) {
+                txn.delete(a)?;
+            }
+        }
         txn.delete(id)?;
     }
     crate::sheets::drop_missing_viewports(txn)?;

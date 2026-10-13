@@ -148,11 +148,29 @@ impl App {
         }
         // Door swings of the doors in walls on the plan's level, in the doors' projection pen.
         let level = views::view_data(e).and_then(|d| d.level);
-        // Room labels on the plan's level: Name, Number and Area (ARC-ROOM-001).
+        // Tags and text notes, in annotation pen 1.
+        let mut note_lines = Lines {
+            color: [0.0, 0.0, 0.0, 1.0],
+            width: pens.annotation_width(1) as f32,
+            segments: Vec::new(),
+        };
+        for n in crate::notes::view_notes(store, e, scale as f32, range.cut as f32) {
+            note_lines.segments.extend(n.parts.segments);
+            labels.extend(n.parts.labels);
+        }
+        annotation.push(note_lines);
+        // Room labels on the plan's level: Name, Number and Area (ARC-ROOM-001), for rooms
+        // without a room tag in the view.
+        let tagged = crate::notes::tagged_rooms(store, e);
         if !ceiling {
             for r in reviera_core::rooms::all(store)
                 .into_iter()
                 .filter(|r| Some(&r.level) == level.as_ref())
+                .filter(|r| {
+                    store
+                        .get(r.id)
+                        .is_none_or(|e| !tagged.contains(e.guid().as_str()))
+                })
             {
                 let area = if r.geometry.enclosed() {
                     units::format(r.geometry.area(), "area", &settings, None)

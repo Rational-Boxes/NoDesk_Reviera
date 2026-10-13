@@ -310,11 +310,12 @@ pub(crate) fn list(store: &Store, p: ListParams) -> Result<Vec<DimensionInfo>> {
         .collect())
 }
 
-/// The annotation of a view element, for `element.delete` dependents.
+/// The annotation of a view element (dimensions, tags, text), for `element.delete` dependents.
 pub fn owned_by(store: &Store, view: &Element) -> Vec<ElementId> {
-    let guid = view.guid().to_string();
-    of_view(store, &guid)
-        .into_iter()
-        .map(|(id, _)| id)
+    let prefix = format!("{CLASS_PREFIX}{}/", view.guid());
+    store
+        .iter()
+        .filter(|e| e.class.starts_with(&prefix))
+        .map(Element::id)
         .collect()
 }

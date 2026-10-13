@@ -172,16 +172,84 @@ impl Gui {
             "rf_offset",
             offset,
         ));
-        let cutoff = recipe
-            .cutoff
-            .as_ref()
-            .map_or("None".to_owned(), |c| level_name(&c.level));
-        grid.append(Property::string("Cutoff Level", "rf_cutoff", cutoff));
-        grid.set_property_read_only("rf_cutoff", true);
+        // The cutoff: None or a level (the roof is cut off flat there).
+        let levels = self.levels();
+        let mut cutoffs = vec![("None".to_owned(), 0)];
+        cutoffs.extend(
+            levels
+                .iter()
+                .enumerate()
+                .map(|(i, l)| (l.name.clone(), i as i32 + 1)),
+        );
+        let cutoff = recipe.cutoff.as_ref().map_or(0, |c| {
+            levels
+                .iter()
+                .position(|l| {
+                    store
+                        .get(l.id)
+                        .is_some_and(|e| e.guid().as_str() == c.level)
+                })
+                .map_or(0, |i| i as i32 + 1)
+        });
+        grid.append(Property::enumeration(
+            "Cutoff Level",
+            "rf_cutoff",
+            cutoffs,
+            cutoff,
+        ));
+        grid.set_help_string(
+            "rf_cutoff",
+            "A level where the roof is cut off flat (a mansard or flat-topped roof)",
+        );
         if let Some(c) = &recipe.cutoff {
             let o = self.format_length(c.offset);
             grid.append(Property::string("Cutoff Offset", "rf_cutoff_offset", o));
         }
+        grid.append(Property::category("Shape", "c_roof_shape"));
+        let mut shapes: Vec<(String, i32)> = roofs::ROOF_SHAPES
+            .iter()
+            .enumerate()
+            .map(|(i, s)| (s.1.to_owned(), i as i32))
+            .collect();
+        let current = roofs::shape_of(e)
+            .and_then(|s| roofs::ROOF_SHAPES.iter().position(|r| r.0 == s))
+            .map_or_else(
+                || {
+                    shapes.push(("Custom".to_owned(), shapes.len() as i32));
+                    shapes.len() as i32 - 1
+                },
+                |i| i as i32,
+            );
+        grid.append(Property::enumeration(
+            "Roof Shape",
+            "rf_shape",
+            shapes,
+            current,
+        ));
+        grid.set_help_string(
+            "rf_shape",
+            "Which footprint edges slope: Gable puts gable ends on the short sides, Shed slopes \
+             up from the longest side. Edit Footprint sets edges one by one (Custom).",
+        );
+        // The overhang of every edge, or Varies.
+        let overhangs: Vec<f64> = reviera_core::sketch::sketch_of(e)
+            .map(|s| {
+                s.curves
+                    .iter()
+                    .map(|c| recipe.edge(c.key).overhang)
+                    .collect()
+            })
+            .unwrap_or_default();
+        let overhang = match overhangs.first() {
+            Some(o) if overhangs.iter().all(|v| (v - o).abs() < 1e-9) => self.format_length(*o),
+            Some(_) => "Varies".to_owned(),
+            None => String::new(),
+        };
+        grid.append(Property::string("Overhang", "rf_overhang", overhang));
+        grid.set_help_string(
+            "rf_overhang",
+            "How far the roof reaches past every footprint edge",
+        );
         grid.append(Property::category("Dimensions", "c_roof_dims"));
         let slope = angle(self, recipe.slope);
         grid.append(Property::string("Slope", "rf_slope", slope));
@@ -202,7 +270,10 @@ impl Gui {
                     ("Maximum Ridge Height", self.format_length(g.max_height())),
                     ("Area", fmt(self, g.area(), "area")),
                     ("Volume", fmt(self, g.volume(), "volume")),
-                    ("Roof Shape", g.predefined.replace('_', " ").to_lowercase()),
+                    (
+                        "IFC Roof Type",
+                        g.predefined.replace('_', " ").to_lowercase(),
+                    ),
                 ];
                 for (k, (label, value)) in rows.into_iter().enumerate() {
                     let name = format!("rf_q{k}");
@@ -280,6 +351,49 @@ impl Gui {
                 "roof.set_params",
                 json!({ "roof_ids": selected, "slope": text }),
             ),
+            "rf_shape" => {
+                let Some(shape) = roofs::ROOF_SHAPES.iter().find(|r| r.1 == text) else {
+                    return true;
+                };
+                let shape = serde_json::to_value(shape.0).unwrap_or_default();
+                selected
+                    .iter()
+                    .map(|r| self.run("roof.set_shape", json!({ "roof_id": r, "shape": shape })))
+                    .find(Result::is_err)
+                    .unwrap_or(Ok(json!(null)))
+            }
+            "rf_overhang" => {
+                let store = self
+                    .doc
+                    .and_then(|d| self.app.document(d))
+                    .map(|d| d.doc.store().clone());
+                selected
+                    .iter()
+                    .map(|r| {
+                        let keys: Vec<u32> = store
+                            .as_ref()
+                            .and_then(|s| reviera_core::sketch::sketch_of(s.get(*r)?))
+                            .map(|s| s.curves.iter().map(|c| c.key).collect())
+                            .unwrap_or_default();
+                        self.run(
+                            "roof.set_edge",
+                            json!({ "roof_id": r, "keys": keys, "overhang": text }),
+                        )
+                    })
+                    .find(Result::is_err)
+                    .unwrap_or(Ok(json!(null)))
+            }
+            "rf_cutoff" => {
+                let level = self
+                    .levels()
+                    .into_iter()
+                    .find(|l| l.name == text)
+                    .map(|l| l.id);
+                self.run(
+                    "roof.set_params",
+                    json!({ "roof_ids": selected, "cutoff_level_id": level }),
+                )
+            }
             "rf_cutoff_offset" => self.run(
                 "roof.set_params",
                 json!({ "roof_ids": selected, "cutoff_offset": text }),

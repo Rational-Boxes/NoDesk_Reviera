@@ -64,6 +64,7 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(RoofSetParams),
         registry.add(RoofSetEdge),
         registry.add(RoofSetSlope),
+        registry.add(RoofSetShape),
         registry.add(WallAttach),
         registry.add(ScheduleCreate),
         registry.add(CobieSetSettings),
@@ -90,6 +91,19 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(ViewGetViewRange),
         registry.add(DimCreateAligned),
         registry.add(AnnoList),
+        registry.add(TagCreate),
+        registry.add(TagCreateRoom),
+        registry.add(TagTagAll),
+        registry.add(TagSetLeader),
+        registry.add(TagSetType),
+        registry.add(TagSetDefaultType),
+        registry.add(TagList),
+        registry.add(TextCreate),
+        registry.add(TextSetContent),
+        registry.add(TextSet),
+        registry.add(TextAddLeader),
+        registry.add(TextRemoveLeaders),
+        registry.add(TextList),
         registry.add(LineWeightSet),
         registry.add(LineWeightAddScale),
         registry.add(LineWeightRemoveScale),
@@ -394,7 +408,9 @@ pub fn dependents_of(store: &crate::store::Store, id: ElementId) -> Vec<ElementI
     store
         .iter()
         .filter(|e| {
-            crate::annotations::dimension_data(e).is_some_and(|d| d.view == guid)
+            e.class
+                .strip_prefix(crate::annotations::CLASS_PREFIX)
+                .is_some_and(|rest| rest.starts_with(&format!("{guid}/")))
                 || e.param("@type").and_then(serde_json::Value::as_str) == Some(guid.as_str())
                 || crate::inserts::insert_recipe(e).is_some_and(|r| r.host == guid)
                 || crate::floors::slab_recipe(e).is_some_and(|(_, r)| r.level == guid)
@@ -2483,6 +2499,190 @@ impl Command for AnnoList {
 
     fn run(&self, cx: &mut CommandContext<'_>, p: ListParams) -> Result<Vec<DimensionInfo>> {
         annotations::list(cx.store(), p)
+    }
+}
+
+modify_command!(
+    RoofSetShape,
+    "roof.set_shape",
+    "Set a roof's shape",
+    "Sets which footprint curves slope from a shape: `hip` (all), `gable` (the curves along the longest one; \
+     gables at the ends), `gable_rotated` (the curves across it), `shed` (the longest curve only), \
+     `shed_reversed` (the curve opposite it) or `flat` (none). Slopes are kept; `overhang` sets every \
+     curve's overhang.",
+    "Roof Shape",
+    crate::roofs::SetShapeParams,
+    (),
+    crate::roofs::set_shape
+);
+modify_command!(
+    TagCreate,
+    "tag.create",
+    "Tag an element",
+    "Tags an element in a plan with values read live from it (DOC-ANN-010): `Door Tag` and `Window Tag` show \
+     the Mark, `Room Tag` the room's name and number (`Room Tag With Area` adds the area), `Wall Tag` the \
+     type, and `Multi-Category Tag` the Mark of any element. The tag type defaults to the category's \
+     (tag.set_default_type). The tag follows its host; `leader` draws a line to it.",
+    "Tag",
+    crate::notes::CreateTagParams,
+    ElementId,
+    crate::notes::create_tag
+);
+modify_command!(
+    TagCreateRoom,
+    "tag.create_room",
+    "Tag a room",
+    "Places a room tag (`Room Tag` or `Room Tag With Area`) in a plan, at the room's tag point unless a \
+     position is given.",
+    "Tag Room",
+    crate::notes::CreateRoomTagParams,
+    ElementId,
+    crate::notes::create_room_tag
+);
+modify_command!(
+    TagTagAll,
+    "tag.tag_all",
+    "Tag all not tagged",
+    "Tags every element of the categories on the plan's level (scope `view`) or among `element_ids` \
+     (scope `selection`) that has no tag of its category's default tag type in the view. Running it again \
+     creates no duplicates. Returns the new tags.",
+    "Tag All",
+    crate::notes::TagAllParams,
+    Vec<ElementId>,
+    crate::notes::tag_all
+);
+modify_command!(
+    TagSetLeader,
+    "tag.set_leader",
+    "Set a tag's leader",
+    "Sets how a tag's leader ends: `none`, `attached` (at the host, following it) or `free` (at the last of \
+     `points`).",
+    "Tag Leader",
+    crate::notes::SetLeaderParams,
+    (),
+    crate::notes::set_leader
+);
+modify_command!(
+    TagSetType,
+    "tag.set_type",
+    "Change tags' type",
+    "Changes the tag type (it must tag the hosts' category) and optionally the orientation of tags.",
+    "Tag Type",
+    crate::notes::SetTagTypeParams,
+    (),
+    crate::notes::set_tag_type
+);
+modify_command!(
+    TagSetDefaultType,
+    "tag.set_default_type",
+    "Set a category's default tag",
+    "Loaded Tags: the tag type that Tag by Category and Tag All use for a category.",
+    "Loaded Tags",
+    crate::notes::SetDefaultTypeParams,
+    (),
+    crate::notes::set_default_type
+);
+
+#[derive(Debug)]
+struct TagList;
+
+impl Command for TagList {
+    type Params = crate::notes::ListParams;
+    type Output = Vec<crate::notes::ResolvedTag>;
+    const META: CommandMeta = CommandMeta {
+        name: "tag.list",
+        version: 1,
+        summary: "List a view's tags",
+        description: "The tags of a view with their host, type, current text and position, and whether they are \
+                      orphaned (host deleted).",
+        effects: &[Effect::Read],
+        transaction_name: "",
+    };
+
+    fn run(
+        &self,
+        cx: &mut CommandContext<'_>,
+        p: crate::notes::ListParams,
+    ) -> Result<Vec<crate::notes::ResolvedTag>> {
+        crate::notes::list_tags(cx.store(), p)
+    }
+}
+
+modify_command!(
+    TextCreate,
+    "text.create",
+    "Place a text note",
+    "Places a text note in a plan with its top-left corner at `position` (DOC-ANN-009). Types: `Text 2.5 mm`, \
+     `Text 3.5 mm`, `Text 5 mm` (text height on paper). `width` wraps the text (paper mm); `\\n` starts a \
+     new line.",
+    "Text",
+    crate::notes::CreateTextParams,
+    ElementId,
+    crate::notes::create_text
+);
+modify_command!(
+    TextSetContent,
+    "text.set_content",
+    "Edit a text note",
+    "Replaces a text note's text; a note left empty is deleted.",
+    "Edit Text",
+    crate::notes::SetContentParams,
+    (),
+    crate::notes::set_content
+);
+modify_command!(
+    TextSet,
+    "text.set",
+    "Change text notes' type, width or rotation",
+    "Sets the text type, the wrapping width (paper mm; 0 unwraps) and the rotation of text notes.",
+    "Text Properties",
+    crate::notes::SetTextParams,
+    (),
+    crate::notes::set_text
+);
+modify_command!(
+    TextAddLeader,
+    "text.add_leader",
+    "Add a leader to a text note",
+    "Adds a straight leader from the note's side (default: the side facing the end) through an optional \
+     elbow to an arrow at the last point.",
+    "Add Leader",
+    crate::notes::AddLeaderParams,
+    (),
+    crate::notes::add_leader
+);
+modify_command!(
+    TextRemoveLeaders,
+    "text.remove_leaders",
+    "Remove a text note's leaders",
+    "Removes all leaders of a text note.",
+    "Remove Leaders",
+    crate::notes::RemoveLeadersParams,
+    (),
+    crate::notes::remove_leaders
+);
+
+#[derive(Debug)]
+struct TextList;
+
+impl Command for TextList {
+    type Params = crate::notes::ListParams;
+    type Output = Vec<crate::notes::TextInfo>;
+    const META: CommandMeta = CommandMeta {
+        name: "text.list",
+        version: 1,
+        summary: "List a view's text notes",
+        description: "The text notes of a view with their text, type, position, width, rotation and leaders.",
+        effects: &[Effect::Read],
+        transaction_name: "",
+    };
+
+    fn run(
+        &self,
+        cx: &mut CommandContext<'_>,
+        p: crate::notes::ListParams,
+    ) -> Result<Vec<crate::notes::TextInfo>> {
+        crate::notes::list_texts(cx.store(), p)
     }
 }
 

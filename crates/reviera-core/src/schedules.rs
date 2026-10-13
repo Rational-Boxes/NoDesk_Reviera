@@ -242,6 +242,42 @@ struct Context<'a> {
     settings: crate::units::UnitSettings,
 }
 
+/// Reads field values of elements as schedules show them (tags label with them, DOC-ANN-010).
+pub struct FieldReader<'a>(Context<'a>);
+
+impl std::fmt::Debug for FieldReader<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("FieldReader")
+    }
+}
+
+impl<'a> FieldReader<'a> {
+    /// `parents` is the model tree (for the Level field); an empty map leaves Level blank.
+    pub fn new(store: &'a Store, parents: &'a HashMap<ElementId, ElementId>) -> Self {
+        FieldReader(Context::new(store, parents))
+    }
+
+    /// The value of field `key` (`type`, `room.area`, `param:elem.mark`, …) of `e`.
+    pub fn cell(&self, e: &Element, key: &str) -> Cell {
+        self.0.cell(e, key)
+    }
+}
+
+impl<'a> Context<'a> {
+    fn new(store: &'a Store, parents: &'a HashMap<ElementId, ElementId>) -> Self {
+        Context {
+            store,
+            parents,
+            rooms: crate::rooms::all(store)
+                .into_iter()
+                .map(|r| (r.id, r.geometry))
+                .collect(),
+            walls: crate::walls::solve(store),
+            settings: crate::units::settings_of(store),
+        }
+    }
+}
+
 impl Context<'_> {
     fn fmt(&self, v: f64, data_type: &str) -> Cell {
         Cell {
@@ -436,16 +472,7 @@ pub fn table(
         .filter(|e| !crate::categories::is_type(e) && crate::inspect::in_tree(e))
         .filter(|e| crate::categories::category_of(e).is_some_and(|c| c.key == def.category))
         .collect();
-    let cx = Context {
-        store,
-        parents,
-        rooms: crate::rooms::all(store)
-            .into_iter()
-            .map(|r| (r.id, r.geometry))
-            .collect(),
-        walls: crate::walls::solve(store),
-        settings: crate::units::settings_of(store),
-    };
+    let cx = Context::new(store, parents);
     let names: HashMap<String, FieldInfo> = available_fields(store, &def.category)
         .into_iter()
         .map(|f| (f.key.clone(), f))

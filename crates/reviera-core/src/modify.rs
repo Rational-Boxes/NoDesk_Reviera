@@ -146,9 +146,19 @@ pub(crate) fn transform(
     }
     let selected: BTreeSet<ElementId> = ids.iter().copied().collect();
     let mut out = Vec::new();
+    let host_moves = |guid: &str| {
+        crate::id::GlobalId::parse(guid)
+            .and_then(|g| store.find_by_guid(&g))
+            .is_some_and(|h| selected.contains(&h))
+    };
     for id in ids {
         let store = txn.store().clone();
         let e = store.get(id).expect("resolved");
+        // Tags and text notes; a tag whose host moves too follows it.
+        if let Some(moved) = crate::notes::transform(txn, e, &x, copy, &host_moves)? {
+            out.extend(moved);
+            continue;
+        }
         if let Some(mut r) = walls::wall_recipe(e) {
             r.curve = x.line(r.curve);
             r.flip ^= x.reflects();

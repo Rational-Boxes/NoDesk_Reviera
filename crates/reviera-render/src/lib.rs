@@ -14,6 +14,7 @@ use reviera_core::ElementId;
 
 pub mod annotation;
 pub mod font;
+pub mod notes;
 pub mod plan;
 pub mod solid;
 pub mod viewcube;

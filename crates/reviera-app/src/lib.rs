@@ -10,6 +10,7 @@
 pub mod cobie;
 mod commands;
 pub mod inspect;
+pub mod notes;
 pub mod output;
 pub mod schedules;
 pub mod sheets;

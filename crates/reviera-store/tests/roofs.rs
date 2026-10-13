@@ -518,3 +518,67 @@ fn walls_attach_to_a_gable_roof_and_detach() {
     .unwrap_err();
     assert_eq!(e.code, "wall.attach_not_covered");
 }
+
+#[test]
+fn roof_shapes_set_which_curves_slope() {
+    let dir = tempfile::tempdir().unwrap();
+    let (_, mut doc, _, level) = project(dir.path());
+    let r = registry();
+    // A 10 × 6 footprint whose first curve is a long side.
+    let pts = [[0.0, 0.0], [10.0, 0.0], [10.0, 6.0], [0.0, 6.0]];
+    let roof = id(run(
+        &r,
+        &mut doc,
+        "roof.create_footprint",
+        json!({ "curves": curves(&pts, |_| json!({})), "level_id": level.0, "slope": "45°" }),
+    )
+    .unwrap());
+    let shape = |doc: &Document| roofs::shape_of(doc.store().get(roof).unwrap());
+    assert_eq!(shape(&doc), Some(roofs::RoofShape::Hip));
+    let set = |doc: &mut Document, s: &str| {
+        run(
+            &r,
+            doc,
+            "roof.set_shape",
+            json!({ "roof_id": roof.0, "shape": s, "overhang": "500 mm" }),
+        )
+        .unwrap();
+    };
+    // Gable: the ridge runs the full length at 3 m (45°, half of the 6 m width).
+    set(&mut doc, "gable");
+    assert_eq!(shape(&doc), Some(roofs::RoofShape::Gable));
+    let g = geometry(&doc, roof);
+    assert_eq!(g.predefined, "GABLE_ROOF");
+    assert!((g.underside([0.01, 3.0]).unwrap() - 3.0).abs() < 1e-6);
+    // Turned: the ridge runs across, 5 m up.
+    set(&mut doc, "gable_rotated");
+    assert!((geometry(&doc, roof).underside([5.0, 0.01]).unwrap() - 5.0).abs() < 1e-6);
+    // Shed: one slope rising from the first long side to 6 m at the other.
+    set(&mut doc, "shed");
+    assert_eq!(shape(&doc), Some(roofs::RoofShape::Shed));
+    assert!((geometry(&doc, roof).underside([5.0, 5.99]).unwrap() - 5.99).abs() < 1e-6);
+    set(&mut doc, "shed_reversed");
+    assert!((geometry(&doc, roof).underside([5.0, 0.01]).unwrap() - 5.99).abs() < 1e-6);
+    // Flat, with the overhang all round: 11 × 7.
+    set(&mut doc, "flat");
+    let g = geometry(&doc, roof);
+    assert_eq!(g.predefined, "FLAT_ROOF");
+    assert!((g.projected_area() - 77.0).abs() < 1e-6);
+    // One curve's own change makes it custom.
+    run(
+        &r,
+        &mut doc,
+        "roof.set_edge",
+        json!({ "roof_id": roof.0, "keys": [1], "defines_slope": true }),
+    )
+    .unwrap();
+    assert_eq!(shape(&doc), Some(roofs::RoofShape::Shed));
+    run(
+        &r,
+        &mut doc,
+        "roof.set_edge",
+        json!({ "roof_id": roof.0, "keys": [2], "defines_slope": true }),
+    )
+    .unwrap();
+    assert_eq!(shape(&doc), None);
+}

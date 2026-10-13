@@ -24,6 +24,7 @@ pub mod inserts;
 pub mod inspect;
 pub mod levels;
 pub mod modify;
+pub mod notes;
 pub mod origin;
 pub mod parameters;
 pub mod plans;
