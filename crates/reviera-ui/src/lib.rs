@@ -22,6 +22,7 @@ mod native;
 mod nav;
 mod plans;
 mod ribbon;
+mod sketch;
 mod snap;
 mod wx;
 
@@ -157,6 +158,12 @@ struct Gui {
     grid_tool: Option<grids::GridTool>,
     insert_tool: Option<inserts::InsertTool>,
     modify_tool: Option<modify::ModifyTool>,
+    /// A sketch session (floor boundaries).
+    sketch: Option<sketch::SketchSession>,
+    /// The floor type new floors take.
+    floor_type: Option<ElementId>,
+    /// The last pointer position in the active view (Tab in sketch mode picks there).
+    mouse: (i32, i32),
     /// The Offset tool's distance (metres), kept for the session.
     offset_distance: f64,
     /// The door and window types chosen for the tools, by IFC class.
@@ -350,6 +357,10 @@ impl Gui {
                 self.start_grid_tool();
                 true
             }
+            "FL" => {
+                self.start_floor_sketch();
+                true
+            }
             "DR" => {
                 self.start_insert_tool(reviera_core::inserts::Kind::Door);
                 true
@@ -380,9 +391,8 @@ impl Gui {
                 self.start_insert_tool(reviera_core::inserts::Kind::Window);
                 true
             }
-            "Z" | "W" | "P" | "D" | "L" | "G" | "M" | "C" | "R" | "A" | "O" | "T" | "S" | "U" => {
-                false
-            }
+            "Z" | "W" | "P" | "D" | "L" | "G" | "M" | "C" | "R" | "A" | "O" | "T" | "S" | "U"
+            | "F" => false,
             _ => {
                 self.keys.0.clear();
                 false
@@ -574,6 +584,7 @@ impl Gui {
             self.end_grid_tool();
             self.end_insert_tool();
             self.end_modify();
+            self.cancel_sketch();
             self.active = Some(id);
             self.doc = Some(doc);
             let _ = self.app.activate(doc);
@@ -1231,6 +1242,16 @@ impl Gui {
 
     /// Shows the contextual "Modify | <category>" tab while elements are selected (§1.9.1).
     fn update_ribbon_context(&mut self) {
+        if let Some(s) = &self.sketch {
+            let label = if s.host.is_some() {
+                "Edit Boundary"
+            } else {
+                "Create Floor Boundary"
+            };
+            self.ribbon
+                .set_context(Some((label, Some("session.floor_sketch"))));
+            return;
+        }
         let ids = self.selection();
         let store = self
             .doc
@@ -1420,6 +1441,10 @@ impl Gui {
         if is_insert {
             self.insert_rows(grid, id);
         }
+        if reviera_core::floors::floor_recipe(&e).is_some() {
+            self.floor_rows(grid, id);
+            return;
+        }
         if let Some(d) = dimension {
             let store = self.app.document(doc).expect("open").doc.store().clone();
             grid.append(Property::category("Dimension", "c_dim"));
@@ -1577,7 +1602,10 @@ impl Gui {
             }
             return;
         }
-        if self.grid_type_edit(property, text.clone()) || self.insert_edit(property, text.clone()) {
+        if self.grid_type_edit(property, text.clone())
+            || self.insert_edit(property, text.clone())
+            || self.floor_edit(property, text.clone())
+        {
             return;
         }
         if property == "grid_name" {
@@ -1836,6 +1864,7 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                 }
                 match cube {
                     Some(hit) => g.cube_click(hit),
+                    None if g.sketch.is_some() => g.sketch_click(x, y),
                     None if g.dim_tool.is_some() => g.dim_click(x, y),
                     None if g.grid_tool.is_some() => g.grid_click(x, y),
                     None if g.insert_tool.is_some() => g.insert_click(x, y),
@@ -1867,6 +1896,11 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                         return;
                     }
                     redraw |= g.cube_hover(Some((x, y)));
+                    g.mouse = (x, y);
+                    if g.sketch.is_some() {
+                        g.sketch_motion(x, y);
+                        redraw = true;
+                    }
                     if g.dim_tool.is_some() {
                         g.dim_motion(x, y);
                         redraw = true;
@@ -1988,7 +2022,11 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                 Some(WXK_DELETE) => {
                     with_view(&gui, id, |g| {
                         let typing = g.tool.as_ref().is_some_and(|t| !t.typed.is_empty());
-                        if !typing {
+                        if g.sketch.is_some() {
+                            // In sketch mode Delete removes the last curve.
+                            let (mx, my) = g.mouse;
+                            g.sketch_key(WXK_DELETE, mx, my);
+                        } else if !typing {
                             g.delete_selection();
                         }
                     });
@@ -1998,6 +2036,9 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                     with_view(&gui, id, |g| {
                         if g.active_view().is_some_and(|v| v.nav.walk.is_some()) {
                             g.toggle_walk();
+                        } else if g.sketch.is_some() {
+                            let (mx, my) = g.mouse;
+                            g.sketch_key(WXK_ESCAPE, mx, my);
                         } else if g.dim_tool.is_some() {
                             g.dim_escape();
                         } else if g.grid_tool.is_some() {
@@ -2015,6 +2056,10 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                 Some(key) => {
                     with_view(&gui, id, |g| {
                         used = g.walk_key(key, true, shift);
+                        if !used && g.sketch.is_some() {
+                            let (mx, my) = g.mouse;
+                            used = g.sketch_key(key, mx, my);
+                        }
                         if !used && matches!(key, WXK_BACK | WXK_RETURN | WXK_NUMPAD_ENTER) {
                             used = g.modify_key(key);
                         }
@@ -2235,6 +2280,9 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 grid_tool: None,
                 insert_tool: None,
                 modify_tool: None,
+                sketch: None,
+                floor_type: None,
+                mouse: (0, 0),
                 offset_distance: 1.0,
                 insert_types: std::collections::HashMap::new(),
                 grid_type: None,
@@ -2449,6 +2497,15 @@ type Dispatch = Box<dyn Fn(i32)>;
 
 /// Runs a catalog action (from the ribbon, the Quick Access Toolbar or a menu).
 fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
+    // While a sketch is open, only sketch, view and file actions run.
+    let mut sketching = false;
+    with(gui, |g| sketching = g.sketch.is_some());
+    let allowed = [
+        "sketch.", "view.", "window.", "ui.", "file.", "edit.", "app.",
+    ];
+    if sketching && !allowed.iter().any(|p| action.starts_with(p)) {
+        return f.set_status_text("Finish ✓ or Cancel ✗ the sketch first", 0);
+    }
     let focus = |g: &mut Gui| {
         if let Some(v) = g.active_view() {
             v.panel.set_focus();
@@ -2519,6 +2576,25 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
             g.update_ribbon_context();
         }),
         "element.delete" => with(gui, Gui::delete_selection),
+        "floor.create" => with(gui, |g| {
+            g.start_floor_sketch();
+            focus(g);
+        }),
+        "floor.edit_boundary" => with(gui, |g| {
+            g.edit_floor_boundary();
+            focus(g);
+        }),
+        "sketch.finish" => with(gui, Gui::finish_sketch),
+        "sketch.cancel" => with(gui, Gui::cancel_sketch),
+        "sketch.pick_walls" | "sketch.line" | "sketch.rectangle" => with(gui, |g| {
+            let mode = match action {
+                "sketch.pick_walls" => sketch::DrawMode::PickWalls,
+                "sketch.line" => sketch::DrawMode::Line,
+                _ => sketch::DrawMode::Rectangle,
+            };
+            g.set_draw_mode(mode);
+            focus(g);
+        }),
         "element.pin" | "element.unpin" => with(gui, |g| g.pin_selection(action == "element.pin")),
         a if modify::Kind::of_action(a).is_some() => with(gui, |g| {
             g.start_modify(modify::Kind::of_action(a).expect("checked"));

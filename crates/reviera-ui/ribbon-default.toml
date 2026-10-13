@@ -336,6 +336,49 @@ icon = "unpin"
 keys = "UP"
 help = "Unpin the selection"
 
+[[action]]
+id = "floor.create"
+label = "Floor"
+icon = "floor"
+keys = "FL"
+help = "Sketch a floor's boundary: pick walls, or draw lines or a rectangle"
+
+[[action]]
+id = "floor.edit_boundary"
+label = "Edit Boundary"
+icon = "edit_boundary"
+help = "Edit the selected floor's boundary sketch"
+
+[[action]]
+id = "sketch.pick_walls"
+label = "Pick Walls"
+icon = "pick_walls"
+help = "Pick wall faces as boundary lines, locked to follow the walls (Tab takes a chain)"
+
+[[action]]
+id = "sketch.line"
+label = "Line"
+icon = "line"
+help = "Draw boundary lines, chained"
+
+[[action]]
+id = "sketch.rectangle"
+label = "Rectangle"
+icon = "rectangle"
+help = "Draw a rectangle of boundary lines"
+
+[[action]]
+id = "sketch.finish"
+label = "Finish Edit Mode"
+icon = "finish"
+help = "Check the sketch and finish the element"
+
+[[action]]
+id = "sketch.cancel"
+label = "Cancel Edit Mode"
+icon = "cancel"
+help = "Leave the sketch without changing the model"
+
 # ---- Quick Access Toolbar ----
 
 [quick_access]
@@ -357,6 +400,7 @@ tools = [
   { action = "wall.create", size = "large" },
   { action = "door.place", size = "large" },
   { action = "window.place", size = "large" },
+  { action = "floor.create", size = "large" },
 ]
 
 [[tab.panel]]
@@ -474,6 +518,26 @@ panels = [{ label = "Door", tools = [
 ] }]
 
 [[context]]
+category = "cat.floors"
+label = "Floors"
+panels = [{ label = "Mode", tools = [{ action = "floor.edit_boundary", size = "large" }] }]
+
+[[context]]
+category = "session.floor_sketch"
+label = "Create Floor Boundary"
+panels = [
+  { label = "Mode", tools = [
+    { action = "sketch.finish", size = "large" },
+    { action = "sketch.cancel", size = "large" },
+  ] },
+  { label = "Draw", tools = [
+    { action = "sketch.pick_walls", size = "large" },
+    { action = "sketch.line", size = "small" },
+    { action = "sketch.rectangle", size = "small" },
+  ] },
+]
+
+[[context]]
 category = "cat.windows"
 label = "Windows"
 panels = [{ label = "Window", tools = [{ action = "insert.flip_facing", size = "large" }] }]
@@ -498,7 +562,10 @@ items = [
 
 [[menu]]
 label = "&Architecture"
-items = ["wall.create", "door.place", "window.place", "-", "grid.create", "level.create"]
+items = [
+  "wall.create", "door.place", "window.place", "floor.create", "floor.edit_boundary", "-",
+  "grid.create", "level.create",
+]
 
 [[menu]]
 label = "A&nnotate"

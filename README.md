@@ -59,6 +59,13 @@ in the specification (Chapter 2, §2.11.10–2.11.11). CAD import is not built y
   Choose, duplicate and edit types in Properties (also for the Grid tool); `type.duplicate`,
   `type.rename`, `type.set_param`, `type.list` and `element.set_type` work for grid and wall
   types alike.
+- **Floors**: Architecture › Floor (FL) opens sketch mode on a contextual *Modify | Create Floor
+  Boundary* tab: Pick Walls (the face on the cursor's side, locked so the floor follows the
+  wall; Tab picks a chain of joined walls), Line and Rectangle, then Finish or Cancel. The
+  sketch is checked (open ends, branches, crossings and overlaps are marked), inner loops make
+  holes, and Edit Boundary changes it later. Floors have types with a thickness, a height
+  offset, and area, perimeter and volume in Properties; they are saved as `IfcSlab` with an
+  extruded profile (`floor.create`, `floor.edit_boundary`, `floor.set_level`).
 - **Doors and windows**: Architecture › Door (DR) and Window (WN) place them in Reviera walls in
   plans or 3D: the preview follows the cursor along the wall, the cursor's side sets the facing
   and Spacebar flips a door's hand. Walls are cut, plans show door swings, and each new door or

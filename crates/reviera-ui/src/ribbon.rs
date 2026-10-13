@@ -42,6 +42,11 @@ pub const UI_ACTIONS: &[&str] = &[
     "view.default_3d",
     "element.mirror_pick",
     "element.mirror_draw",
+    "sketch.pick_walls",
+    "sketch.line",
+    "sketch.rectangle",
+    "sketch.finish",
+    "sketch.cancel",
 ];
 
 /// First wx id of the catalog's actions (one id per action, in catalog order).
@@ -421,13 +426,18 @@ impl Ribbon {
         if !was_shown {
             self.previous = unsafe { reviera_rb_active(self.bar) };
         }
-        let mut panels: Vec<PanelDef> = self
-            .catalog
-            .tabs
-            .iter()
-            .find(|t| t.id == "modify")
-            .map(|t| t.panels.clone())
-            .unwrap_or_default();
+        // Sketch sessions show only their own panels; selections start with the Modify tab's.
+        let session = category.is_some_and(|k| k.starts_with("session."));
+        let mut panels: Vec<PanelDef> = if session {
+            Vec::new()
+        } else {
+            self.catalog
+                .tabs
+                .iter()
+                .find(|t| t.id == "modify")
+                .map(|t| t.panels.clone())
+                .unwrap_or_default()
+        };
         if let Some(cx) =
             category.and_then(|k| self.catalog.contexts.iter().find(|c| c.category == k))
         {

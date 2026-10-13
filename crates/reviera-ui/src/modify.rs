@@ -188,7 +188,7 @@ impl Gui {
     }
 
     /// Lines to snap to: walls' location lines, grids and the plan's cut edges.
-    fn snap_lines(&self) -> Vec<([f64; 2], [f64; 2])> {
+    pub(crate) fn snap_lines(&self) -> Vec<([f64; 2], [f64; 2])> {
         let Some(store) = self
             .doc
             .and_then(|d| self.app.document(d))
@@ -214,7 +214,7 @@ impl Gui {
     }
 
     /// The snapped plan point under pixel (`x`, `y`), angles measured from `from`.
-    fn snapped_at(
+    pub(crate) fn snapped_at(
         &self,
         x: i32,
         y: i32,
@@ -779,6 +779,7 @@ impl Gui {
     /// Whether any tool is running.
     pub(crate) fn any_tool(&self) -> bool {
         self.tool.is_some()
+            || self.sketch.is_some()
             || self.dim_tool.is_some()
             || self.grid_tool.is_some()
             || self.insert_tool.is_some()

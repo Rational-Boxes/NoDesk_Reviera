@@ -159,6 +159,19 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "flip_hand" => format!(
             r#"<path d="M16 6v20" {s}/><path d="M4 16h8M8 12l-4 4 4 4M28 16h-8M24 12l4 4-4 4" {sa}/>"#
         ),
+        "floor" => format!(
+            r#"<path d="M3 20l9-7h17l-9 7z" fill="{f}" {s}/><path d="M3 20v4h17v-4M20 24l9-7v-4" {s}/><path d="M8 18h12" {sa}/>"#
+        ),
+        "edit_boundary" => format!(
+            r#"<path d="M4 8h16v16H4z" {s} stroke-dasharray="3 2"/><path d="M17 27l2-6 9-9 4 4-9 9z" fill="{f}" {sa}/>"#
+        ),
+        "pick_walls" => format!(
+            r#"<path d="M3 26V6h22" {s}/><path d="M6 23V9h19" {sa}/><path d="M18 14l6 13 2-5 5-2z" fill="{f}" {s}/>"#
+        ),
+        "line" => format!(r#"<path d="M5 27L27 5" {sa}/><circle cx="5" cy="27" r="2.5" fill="{paper}" {s}/><circle cx="27" cy="5" r="2.5" fill="{paper}" {s}/>"#),
+        "rectangle" => format!(r#"<rect x="5" y="8" width="22" height="16" fill="{f}" {sa}/>"#),
+        "finish" => r##"<path d="M5 17l7 7L27 8" fill="none" stroke="#2fa84f" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>"##.to_owned(),
+        "cancel" => r##"<path d="M7 7l18 18M25 7L7 25" fill="none" stroke="#d63b2f" stroke-width="3.5" stroke-linecap="round"/>"##.to_owned(),
         _ => return None,
     })
 }

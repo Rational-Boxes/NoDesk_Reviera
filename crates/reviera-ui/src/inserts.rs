@@ -131,7 +131,7 @@ impl Gui {
 
     /// The Reviera wall under pixel (`x`, `y`) and the plan point on it, with the side of the
     /// wall the cursor is on (`true` for the exterior).
-    fn wall_under(&self, x: i32, y: i32) -> Option<(ElementId, [f64; 2], bool)> {
+    pub(crate) fn wall_under(&self, x: i32, y: i32) -> Option<(ElementId, [f64; 2], bool)> {
         let v = self.active_view()?;
         let store = self.app.document(v.doc)?.doc.store();
         let size = v.panel.get_client_size();
