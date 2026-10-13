@@ -97,3 +97,37 @@ fn fzk_haus_renders_offscreen() {
             .unwrap();
     }
 }
+
+#[test]
+fn the_orientation_cube_draws_in_its_corner() {
+    let mut viewport = match WgpuViewport::offscreen(640, 400) {
+        Ok(v) => v,
+        Err(e) => {
+            eprintln!("skipped: no graphics adapter ({e})");
+            return;
+        }
+    };
+    let camera = reviera_render::Camera::default();
+    viewport.render(&camera).unwrap();
+    let empty = viewport.read_pixels().unwrap();
+    let cube = reviera_render::viewcube::ViewCube::default();
+    viewport.set_gizmo(Some(cube.gizmo(&camera, 640.0, 400.0, None)));
+    viewport.render(&camera).unwrap();
+    let with_cube = viewport.read_pixels().unwrap();
+    if let Ok(path) = std::env::var("REVIERA_DUMP_PPM") {
+        let mut out = b"P6 640 400 255\n".to_vec();
+        for px in with_cube.chunks(4) {
+            out.extend_from_slice(&px[..3]);
+        }
+        std::fs::write(path, out).unwrap();
+    }
+    let [x, y, w, h] = cube.rect(640.0, 400.0);
+    let pixel = |p: &[u8], px: f32, py: f32| {
+        let i = ((py as usize) * 640 + px as usize) * 4;
+        p[i..i + 3].to_vec()
+    };
+    // The cube's centre is drawn; the opposite corner of the view is untouched.
+    let (cx, cy) = (x + w / 2.0, y + h / 2.0);
+    assert_ne!(pixel(&with_cube, cx, cy), pixel(&empty, cx, cy));
+    assert_eq!(pixel(&with_cube, 20.0, 380.0), pixel(&empty, 20.0, 380.0));
+}

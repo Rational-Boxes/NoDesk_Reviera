@@ -10,6 +10,8 @@
 use glam::{Mat4, Vec3};
 use reviera_core::ElementId;
 
+pub mod viewcube;
+
 /// One element's triangulated geometry, in world coordinates (metres, Z up).
 #[derive(Debug, Clone, PartialEq)]
 pub struct SceneMesh {
@@ -105,7 +107,11 @@ pub fn class_color(class: &str) -> [f32; 4] {
     }
 }
 
-/// An orbit camera around a target point, Z up.
+/// An orbit camera around a target point, Z up (UI-NAV-001).
+///
+/// The eye is at `distance` from `target` in the direction given by `yaw` (about Z, from +X) and
+/// `pitch` (above the XY plane). Top and bottom views (pitch ±90°) are exact: the up vector
+/// follows the yaw, so a top view with the eye on the south side has north up.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Camera {
     pub target: Vec3,
@@ -116,6 +122,8 @@ pub struct Camera {
     pub pitch: f32,
     /// Vertical field of view, radians.
     pub fov: f32,
+    /// Perspective or parallel (orthographic) projection.
+    pub perspective: bool,
 }
 
 impl Default for Camera {
@@ -126,27 +134,72 @@ impl Default for Camera {
             yaw: -0.8,
             pitch: 0.5,
             fov: 45f32.to_radians(),
+            perspective: true,
         }
     }
 }
 
+/// The largest pitch: straight down onto the model (or straight up).
+pub const MAX_PITCH: f32 = std::f32::consts::FRAC_PI_2;
+
 impl Camera {
-    pub fn eye(&self) -> Vec3 {
-        let dir = Vec3::new(
+    /// Unit vector from the target to the eye.
+    pub fn direction(&self) -> Vec3 {
+        Vec3::new(
             self.pitch.cos() * self.yaw.cos(),
             self.pitch.cos() * self.yaw.sin(),
             self.pitch.sin(),
-        );
-        self.target + dir * self.distance
+        )
+    }
+
+    pub fn eye(&self) -> Vec3 {
+        self.target + self.direction() * self.distance
+    }
+
+    /// The screen's up direction in the world.
+    pub fn up(&self) -> Vec3 {
+        Vec3::new(
+            -self.yaw.cos() * self.pitch.sin(),
+            -self.yaw.sin() * self.pitch.sin(),
+            self.pitch.cos(),
+        )
+    }
+
+    /// The screen's right direction in the world.
+    pub fn right(&self) -> Vec3 {
+        (-self.direction()).cross(self.up()).normalize_or_zero()
+    }
+
+    pub fn view(&self) -> Mat4 {
+        glam::camera::rh::view::look_at_mat4(self.eye(), self.target, self.up())
+    }
+
+    /// Half the height of the view at the target, in metres (the parallel projection's scale).
+    pub fn half_height(&self) -> f32 {
+        self.distance * (self.fov * 0.5).tan()
     }
 
     pub fn view_proj(&self, aspect: f32) -> Mat4 {
-        let near = (self.distance * 0.01).max(0.01);
-        let far = self.distance * 100.0;
+        let aspect = aspect.max(1e-3);
         // wgpu clip space: depth 0..1, Y up (glam's DirectX convention).
-        let proj =
-            glam::camera::rh::proj::directx::perspective(self.fov, aspect.max(1e-3), near, far);
-        proj * glam::camera::rh::view::look_at_mat4(self.eye(), self.target, Vec3::Z)
+        let proj = if self.perspective {
+            let near = (self.distance * 0.01).max(0.01);
+            let far = self.distance * 100.0;
+            glam::camera::rh::proj::directx::perspective(self.fov, aspect, near, far)
+        } else {
+            // Parallel: the eye moves back so nothing between it and the target is clipped.
+            let h = self.half_height();
+            let depth = self.distance * 100.0;
+            glam::camera::rh::proj::directx::orthographic(
+                -h * aspect,
+                h * aspect,
+                -h,
+                h,
+                -depth,
+                depth,
+            )
+        };
+        proj * self.view()
     }
 
     /// Frames the scene bounds in view.
@@ -178,25 +231,126 @@ impl Camera {
         Some(((ndc.x + 1.0) * 0.5 * width, (1.0 - ndc.y) * 0.5 * height))
     }
 
-    /// Orbits by a mouse drag in pixels.
+    /// Orbits about the target by a mouse drag in pixels.
     pub fn orbit(&mut self, dx: f32, dy: f32) {
-        self.yaw -= dx * 0.008;
-        self.pitch = (self.pitch + dy * 0.008).clamp(-1.55, 1.55);
+        let pivot = self.target;
+        self.orbit_about(dx, dy, pivot);
+    }
+
+    /// Orbits about `pivot` by a mouse drag in pixels (UI-NAV-001: the selection's centre, or the
+    /// model's centre).
+    pub fn orbit_about(&mut self, dx: f32, dy: f32, pivot: Vec3) {
+        let (yaw, pitch) = (
+            self.yaw - dx * 0.008,
+            (self.pitch + dy * 0.008).clamp(-MAX_PITCH, MAX_PITCH),
+        );
+        let before = self.right();
+        let r_pitch = glam::Quat::from_axis_angle(before, -(pitch - self.pitch));
+        let r_yaw = glam::Quat::from_rotation_z(yaw - self.yaw);
+        let rotation = r_yaw * r_pitch;
+        self.target = pivot + rotation * (self.target - pivot);
+        self.yaw = yaw;
+        self.pitch = pitch;
+    }
+
+    /// Turns the view about the eye (look around), by a mouse drag in pixels.
+    pub fn look(&mut self, dx: f32, dy: f32) {
+        let eye = self.eye();
+        self.yaw -= dx * 0.004;
+        self.pitch = (self.pitch + dy * 0.004).clamp(-1.5, 1.5);
+        self.target = eye - self.direction() * self.distance;
+    }
+
+    /// Moves the eye and target together: `forward` along the level ground, `right` sideways,
+    /// `up` vertically, in metres.
+    pub fn walk(&mut self, forward: f32, right: f32, up: f32) {
+        let ahead = Vec3::new(-self.yaw.cos(), -self.yaw.sin(), 0.0);
+        let side = Vec3::new(-self.yaw.sin(), self.yaw.cos(), 0.0);
+        self.target += ahead * forward + side * right + Vec3::Z * up;
     }
 
     /// Pans by a mouse drag in pixels, for a viewport `height` pixels tall.
     pub fn pan(&mut self, dx: f32, dy: f32, height: f32) {
-        let forward = (self.target - self.eye()).normalize();
-        let right = forward.cross(Vec3::Z).normalize_or_zero();
-        let up = right.cross(forward);
-        let scale = 2.0 * self.distance * (self.fov * 0.5).tan() / height.max(1.0);
-        self.target += (-right * dx + up * dy) * scale;
+        let scale = 2.0 * self.half_height() / height.max(1.0);
+        self.target += (-self.right() * dx + self.up() * dy) * scale;
     }
 
     /// Zooms by wheel steps (positive is closer).
     pub fn zoom(&mut self, steps: f32) {
         self.distance = (self.distance * 0.85f32.powf(steps)).max(0.1);
     }
+
+    /// Zooms by wheel steps keeping the point under pixel (`x`, `y`) fixed on screen.
+    pub fn zoom_at(&mut self, steps: f32, x: f32, y: f32, width: f32, height: f32) {
+        let k = 0.85f32.powf(steps);
+        if self.distance * k < 0.1 {
+            return;
+        }
+        // The point under the cursor on the plane through the target, facing the camera.
+        let (o, d) = self.ray(x, y, width, height);
+        let n = self.direction();
+        let denom = d.dot(n);
+        if denom.abs() < 1e-6 {
+            return self.zoom(steps);
+        }
+        let p = o + d * ((self.target - o).dot(n) / denom);
+        // Scaling the eye and target about `p` keeps `p` on the same pixel.
+        self.target = p + (self.target - p) * k;
+        self.distance *= k;
+    }
+
+    /// Looks at the target from direction `dir` (from the target toward the eye). Straight up or
+    /// down keeps north up on screen.
+    pub fn orient(&mut self, dir: Vec3) {
+        let dir = dir.normalize_or_zero();
+        if dir == Vec3::ZERO {
+            return;
+        }
+        let horizontal = dir.x.hypot(dir.y);
+        self.pitch = dir.z.atan2(horizontal);
+        self.yaw = if horizontal < 1e-6 {
+            -std::f32::consts::FRAC_PI_2
+        } else {
+            dir.y.atan2(dir.x)
+        };
+    }
+
+    /// The camera a fraction `t` (0..1) of the way from `self` to `to`, for animated
+    /// transitions: the yaw turns the short way and the distance changes geometrically.
+    pub fn lerp(&self, to: &Camera, t: f32) -> Camera {
+        let t = t.clamp(0.0, 1.0);
+        let s = t * t * (3.0 - 2.0 * t);
+        let tau = std::f32::consts::TAU;
+        let dyaw =
+            ((to.yaw - self.yaw + std::f32::consts::PI).rem_euclid(tau)) - std::f32::consts::PI;
+        Camera {
+            target: self.target.lerp(to.target, s),
+            distance: self.distance * (to.distance / self.distance).powf(s),
+            yaw: self.yaw + dyaw * s,
+            pitch: self.pitch + (to.pitch - self.pitch) * s,
+            fov: self.fov + (to.fov - self.fov) * s,
+            perspective: if s < 0.5 {
+                self.perspective
+            } else {
+                to.perspective
+            },
+        }
+    }
+}
+
+/// Geometry drawn in a screen rectangle over the scene (the Orientation Cube).
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct Gizmo {
+    /// Pixel rectangle: x, y (top-left), width, height.
+    pub rect: [f32; 4],
+    /// Transform of `meshes` into the rectangle's clip space (lit).
+    pub view_proj: Mat4,
+    /// The direction the light comes from, for shading `meshes`.
+    pub eye: Vec3,
+    pub meshes: Vec<SceneMesh>,
+    /// Unlit geometry already in the rectangle's clip space (-1..1), drawn on top: buttons,
+    /// labels.
+    pub flat: Vec<SceneMesh>,
 }
 
 /// A render backend (DOC-RBE-001): draws a Render Scene with a camera.
@@ -205,6 +359,9 @@ pub trait RenderBackend {
     fn set_scene(&mut self, scene: &RenderScene);
     fn resize(&mut self, width: u32, height: u32);
     fn render(&mut self, camera: &Camera) -> Result<(), String>;
+    /// A gizmo drawn in a corner over the scene with its own camera, such as the Orientation
+    /// Cube; `None` hides it.
+    fn set_gizmo(&mut self, gizmo: Option<Gizmo>);
     /// Draws these elements in the highlight colour.
     fn set_highlight(&mut self, elements: &[ElementId]);
     /// Transient geometry drawn over the scene, such as the preview of a wall being drawn.
@@ -261,5 +418,61 @@ mod tests {
         let before = cam.target;
         cam.pan(100.0, 0.0, 600.0);
         assert!(cam.target.distance(before) > 0.0);
+    }
+
+    #[test]
+    fn wheel_zoom_keeps_the_point_under_the_cursor() {
+        for perspective in [true, false] {
+            let mut cam = Camera {
+                perspective,
+                ..Camera::default()
+            };
+            let (x, y) = (520.0, 130.0);
+            let (o, d) = cam.ray(x, y, 800.0, 600.0);
+            let n = cam.direction();
+            let p = o + d * ((cam.target - o).dot(n) / d.dot(n));
+            cam.zoom_at(3.0, x, y, 800.0, 600.0);
+            let (px, py) = cam.project(p, 800.0, 600.0).unwrap();
+            assert!(
+                (px - x).abs() < 0.5 && (py - y).abs() < 0.5,
+                "{perspective}: {px} {py}"
+            );
+        }
+    }
+
+    #[test]
+    fn orbiting_about_a_pivot_keeps_it_in_place() {
+        let mut cam = Camera::default();
+        let pivot = Vec3::new(3.0, -2.0, 1.0);
+        let before = cam.project(pivot, 800.0, 600.0).unwrap();
+        let eye_to_pivot = (pivot - cam.eye()).length();
+        cam.orbit_about(40.0, -25.0, pivot);
+        assert!(((pivot - cam.eye()).length() - eye_to_pivot).abs() < 1e-3);
+        let after = cam.project(pivot, 800.0, 600.0).unwrap();
+        assert!(
+            (before.0 - after.0).abs() < 0.5 && (before.1 - after.1).abs() < 0.5,
+            "{before:?} {after:?}"
+        );
+    }
+
+    #[test]
+    fn a_top_view_has_north_up() {
+        let mut cam = Camera::default();
+        cam.orient(Vec3::Z);
+        assert!((cam.pitch - MAX_PITCH).abs() < 1e-6);
+        let centre = cam.project(cam.target, 800.0, 600.0).unwrap();
+        let north = cam.project(cam.target + Vec3::Y, 800.0, 600.0).unwrap();
+        let east = cam.project(cam.target + Vec3::X, 800.0, 600.0).unwrap();
+        assert!(
+            north.1 < centre.1 - 1.0 && (north.0 - centre.0).abs() < 1e-3,
+            "{north:?}"
+        );
+        assert!(east.0 > centre.0 + 1.0, "{east:?}");
+        // Halfway between two views is between them; the ends are exact.
+        let mut side = cam;
+        side.orient(-Vec3::Y);
+        assert_eq!(cam.lerp(&side, 1.0).direction(), side.direction());
+        let mid = cam.lerp(&side, 0.5).direction();
+        assert!(mid.z > 0.1 && mid.y < -0.1, "{mid}");
     }
 }

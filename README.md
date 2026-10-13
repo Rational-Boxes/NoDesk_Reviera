@@ -23,9 +23,12 @@ operation can be driven by Lua scripts and by AI agents through the Model Contex
   the key kept in the OS keyring). After a crash, unsaved work and its undo history come back.
 - **Tabbed views**: several models open side by side, each view in its own tab with a `wgpu`
   3D viewport (Window › New 3D View, Tile Views, Tab Views, Ctrl+Tab); a dockable Properties
-  palette. In the views:
-  click to select, drag with the left mouse button to orbit, with the middle or right button
-  to pan, and use the wheel to zoom.
+  palette.
+- **Navigation**: an Orientation Cube in each 3D view (26 click regions, compass, Home, and a
+  PERSP/ISO projection toggle), standard and isometric views with animated transitions, wheel
+  zoom about the cursor, orbit about the selection, Previous/Next pan/zoom, and walk mode
+  (View › Walk: WASD or arrow keys, drag to look). Click to select; drag to orbit; middle or right
+  button to pan.
 - **Walls**: *Architecture > Wall* draws chains of straight walls on a level, snapping to wall ends,
   midpoints, wall lines and 15° angles; type a length (`4.5 m`, `12' 6"`) and press Enter, and
   Spacebar flips the exterior side. Walls appear at once,

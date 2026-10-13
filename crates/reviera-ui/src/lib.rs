@@ -11,6 +11,7 @@
 //! through `App::execute`, like Lua and MCP. The ribbon and browsers come next.
 
 mod native;
+mod nav;
 mod snap;
 mod wx;
 
@@ -41,6 +42,14 @@ const ID_PREV_VIEW: i32 = ID_HIGHEST + 12;
 const ID_TILE: i32 = ID_HIGHEST + 13;
 const ID_TAB_ALL: i32 = ID_HIGHEST + 14;
 const ID_SHOW_PROPERTIES: i32 = ID_HIGHEST + 15;
+const ID_HOME: i32 = ID_HIGHEST + 16;
+const ID_SET_HOME: i32 = ID_HIGHEST + 17;
+const ID_PERSPECTIVE: i32 = ID_HIGHEST + 18;
+const ID_ZOOM_PREV: i32 = ID_HIGHEST + 19;
+const ID_ZOOM_NEXT: i32 = ID_HIGHEST + 20;
+const ID_WALK: i32 = ID_HIGHEST + 21;
+/// The orientation presets of `nav::PRESETS`, one id each.
+const ID_ORIENT_FIRST: i32 = ID_HIGHEST + 40;
 
 /// Height of walls drawn on the top level (they reach the level above otherwise).
 const WALL_HEIGHT: f64 = 3.0;
@@ -53,10 +62,17 @@ const SNAP: [f32; 4] = [0.95, 0.55, 0.05, 1.0];
 /// A press that moves less than this many pixels is a click (select), not a drag.
 const CLICK_SLOP: i32 = 3;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 enum Drag {
-    Orbit,
+    /// Orbit about a pivot (the selection's centre, or the view's target).
+    Orbit(glam::Vec3),
     Pan,
+    /// Turning the Orientation Cube (or, on its ring, turning about the vertical only).
+    Cube {
+        ring: bool,
+    },
+    /// Looking around in walk mode.
+    Look,
 }
 
 /// The Wall tool: clicks on the level's plane add walls end to end.
@@ -98,6 +114,7 @@ struct View {
     camera: Camera,
     drag: Option<(Drag, i32, i32)>,
     press: Option<(i32, i32)>,
+    nav: nav::Nav,
 }
 
 struct Gui {
@@ -118,6 +135,10 @@ struct Gui {
     rows: Vec<Row>,
     properties_stale: bool,
     tool: Option<WallTool>,
+    /// Drives animated view changes and walking.
+    timer: Option<Timer<Frame>>,
+    /// Letters typed toward a keyboard sequence such as `ZF` (§1.26.4), and when.
+    keys: (String, std::time::Instant),
 }
 
 /// An empty scene and a default camera, for when no view is open.
@@ -214,14 +235,66 @@ impl Gui {
                 }
             }
         }
+        let Some(scale) = view.native.as_ref().map(native::NativeView::scale_factor) else {
+            return;
+        };
         if let (Some(v), Some(native)) = (&mut view.viewport, &view.native) {
             native.update();
-            let (w, h) = physical(size, native.scale_factor());
+            let (w, h) = physical(size, scale);
             v.resize(w, h);
-            if let Err(e) = v.render(&view.camera) {
-                frame.set_status_text(&e, 0);
-            }
         }
+        self.update_gizmo(index, scale);
+        let view = &mut self.views[index];
+        if let Some(v) = &mut view.viewport
+            && let Err(e) = v.render(&view.camera)
+        {
+            frame.set_status_text(&e, 0);
+        }
+    }
+
+    /// A keyboard sequence letter (§1.26.4); returns whether it completed a known sequence.
+    fn sequence_key(&mut self, c: char) -> bool {
+        if self.keys.1.elapsed() > std::time::Duration::from_millis(1500) {
+            self.keys.0.clear();
+        }
+        self.keys.0.push(c.to_ascii_uppercase());
+        self.keys.1 = std::time::Instant::now();
+        let frame = self.frame;
+        let done = match self.keys.0.as_str() {
+            "ZF" | "ZA" | "ZE" => {
+                self.zoom_to_fit();
+                true
+            }
+            "ZP" => {
+                self.history(true);
+                true
+            }
+            "ZN" => {
+                self.history(false);
+                true
+            }
+            "WA" => {
+                self.start_wall_tool(&frame);
+                true
+            }
+            "WK" => {
+                self.toggle_walk();
+                true
+            }
+            "PI" => {
+                self.toggle_perspective();
+                true
+            }
+            "Z" | "W" | "P" => false,
+            _ => {
+                self.keys.0.clear();
+                false
+            }
+        };
+        if done {
+            self.keys.0.clear();
+        }
+        done
     }
 
     fn open(&mut self, path: &Path, frame: &Frame) {
@@ -356,6 +429,7 @@ impl Gui {
             camera,
             drag: None,
             press: None,
+            nav: nav::Nav::default(),
         };
         let caption = self.caption(&view);
         self.views.push(view);
@@ -956,14 +1030,6 @@ impl Gui {
         }
     }
 
-    fn fit(&mut self) {
-        if let Some(b) = self.scene().bounds()
-            && let Some(v) = self.active_view_mut()
-        {
-            v.camera.fit(b);
-        }
-    }
-
     fn selection(&mut self) -> Vec<ElementId> {
         self.run("selection.get", json!({}))
             .ok()
@@ -1266,11 +1332,41 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
             e.skip(true);
         });
     }
-    for (button, kind) in [(0, Drag::Orbit), (1, Drag::Pan), (2, Drag::Pan)] {
+    // Left: the Orientation Cube, else orbit (look in walk mode). Shift+middle: orbit.
+    // Middle and right: pan. Right on the cube: its menu.
+    for button in 0..3 {
         let (gui, p) = (gui.clone(), panel);
         let handler = move |e: WindowEventData| {
+            let shift = match &e {
+                WindowEventData::MouseButton(m) => m.event.event.shift_down(),
+                _ => false,
+            };
+            let mut menu = None;
             if let Some((x, y)) = position(&e) {
                 with_view(&gui, id, |g| {
+                    let cube = g.cube_pick(x, y);
+                    if button == 2 && cube.is_some() {
+                        menu = Some(g.cube_menu());
+                        return;
+                    }
+                    let walking = g.active_view().is_some_and(|v| v.nav.walk.is_some());
+                    let kind = match (button, cube) {
+                        (0, Some(hit)) => {
+                            if let Some(v) = g.active_view_mut() {
+                                v.nav.cube_press = Some(hit);
+                            }
+                            Drag::Cube {
+                                ring: hit == reviera_render::viewcube::CubeHit::Ring,
+                            }
+                        }
+                        (0, None) if walking => Drag::Look,
+                        (0, None) => Drag::Orbit(g.pivot()),
+                        (1, _) if shift && !walking => Drag::Orbit(g.pivot()),
+                        _ => Drag::Pan,
+                    };
+                    if !matches!(kind, Drag::Cube { .. }) {
+                        g.remember();
+                    }
                     if let Some(v) = g.active_view_mut() {
                         v.drag = Some((kind, x, y));
                         if button == 0 {
@@ -1280,6 +1376,9 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                 });
             }
             p.set_focus();
+            if let Some(mut menu) = menu {
+                p.popup_menu(&mut menu, None);
+            }
         };
         match button {
             0 => panel.on_mouse_left_down(handler),
@@ -1294,16 +1393,19 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                 let Some(v) = g.active_view_mut() else { return };
                 v.drag = None;
                 let press = v.press.take();
-                if button == 0
-                    && let (Some((x0, y0)), Some((x, y))) = (press, position(&e))
-                    && (x - x0).abs() <= CLICK_SLOP
-                    && (y - y0).abs() <= CLICK_SLOP
-                {
-                    if g.tool.is_some() {
-                        g.wall_click(x, y, &p, &f);
-                    } else {
-                        g.pick(x, y, &p);
-                    }
+                let cube = v.nav.cube_press.take();
+                let Some((x, y)) = position(&e) else { return };
+                let click = press.is_some_and(|(x0, y0)| {
+                    (x - x0).abs() <= CLICK_SLOP && (y - y0).abs() <= CLICK_SLOP
+                });
+                if button != 0 || !click {
+                    return;
+                }
+                match cube {
+                    Some(hit) => g.cube_click(hit),
+                    None if g.active_view().is_some_and(|v| v.nav.walk.is_some()) => {}
+                    None if g.tool.is_some() => g.wall_click(x, y, &p, &f),
+                    None => g.pick(x, y, &p),
                 }
             });
             p.refresh(false, None);
@@ -1320,19 +1422,27 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
             let Some((x, y)) = position(&e) else { return };
             let mut redraw = false;
             with(&gui, |g| {
-                let Some(v) = g.views.iter_mut().find(|v| v.id == id) else {
+                let Some(v) = g.views.iter().find(|v| v.id == id) else {
                     return;
                 };
                 let Some((kind, x0, y0)) = v.drag else {
-                    if g.tool.is_some() && g.active == Some(id) {
+                    if g.active != Some(id) {
+                        return;
+                    }
+                    redraw |= g.cube_hover(Some((x, y)));
+                    if g.tool.is_some() {
                         g.wall_motion(x, y, &p, &f);
                         redraw = true;
                     }
                     return;
                 };
+                let v = g.views.iter_mut().find(|v| v.id == id).expect("found");
                 let (dx, dy) = ((x - x0) as f32, (y - y0) as f32);
                 match kind {
-                    Drag::Orbit => v.camera.orbit(dx, dy),
+                    Drag::Orbit(pivot) => v.camera.orbit_about(dx, dy, pivot),
+                    Drag::Cube { ring: false } => v.camera.orbit(dx, dy),
+                    Drag::Cube { ring: true } => v.camera.orbit(dx, 0.0),
+                    Drag::Look => v.camera.look(dx, dy),
                     Drag::Pan => {
                         let h = p.get_client_size().height as f32;
                         v.camera.pan(dx, dy, h);
@@ -1348,11 +1458,40 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
     }
     {
         let (gui, p) = (gui.clone(), panel);
+        panel.on_mouse_leave(move |e| {
+            let mut redraw = false;
+            with(&gui, |g| {
+                if g.active == Some(id) {
+                    redraw = g.cube_hover(None);
+                }
+            });
+            if redraw {
+                p.refresh(false, None);
+            }
+            e.skip(true);
+        });
+    }
+    {
+        let (gui, p) = (gui.clone(), panel);
         panel.on_mouse_wheel(move |e| {
             let steps = wheel(&e) as f32 / 120.0;
-            with(&gui, |g| {
-                if let Some(v) = g.views.iter_mut().find(|v| v.id == id) {
-                    v.camera.zoom(steps);
+            let at = position(&e);
+            with_view(&gui, id, |g| {
+                if g.walk_speed(steps) {
+                    return;
+                }
+                g.remember_wheel();
+                let size = p.get_client_size();
+                let Some(v) = g.active_view_mut() else { return };
+                match at {
+                    Some((x, y)) => v.camera.zoom_at(
+                        steps,
+                        x as f32,
+                        y as f32,
+                        size.width as f32,
+                        size.height as f32,
+                    ),
+                    None => v.camera.zoom(steps),
                 }
             });
             p.refresh(false, None);
@@ -1375,20 +1514,47 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                     used = true;
                 }
                 Some(WXK_ESCAPE) => {
-                    with_view(&gui, id, |g| g.escape(&f));
+                    with_view(&gui, id, |g| {
+                        if g.active_view().is_some_and(|v| v.nav.walk.is_some()) {
+                            g.toggle_walk();
+                        } else {
+                            g.escape(&f);
+                        }
+                    });
                     used = true;
                 }
-                Some(key @ (WXK_SPACE | WXK_BACK | WXK_RETURN | WXK_NUMPAD_ENTER)) => {
-                    with_view(&gui, id, |g| used = g.wall_key(key, &f));
+                Some(key) => {
+                    with_view(&gui, id, |g| {
+                        used = g.walk_key(key, true, shift);
+                        if !used
+                            && matches!(key, WXK_SPACE | WXK_BACK | WXK_RETURN | WXK_NUMPAD_ENTER)
+                        {
+                            used = g.wall_key(key, &f);
+                        }
+                    });
                 }
-                _ => {}
+                None => {}
             }
             if used {
                 p.refresh(false, None);
             } else {
-                // Lets the character event follow (typed lengths).
+                // Lets the character event follow (typed lengths, key sequences).
                 e.skip(true);
             }
+        });
+    }
+    {
+        let gui = gui.clone();
+        panel.on_key_up(move |e| {
+            if let WindowEventData::Keyboard(k) = &e
+                && let Some(key) = k.get_key_code()
+            {
+                let shift = k.shift_down();
+                with(&gui, |g| {
+                    g.walk_key(key, false, shift);
+                });
+            }
+            e.skip(true);
         });
     }
     {
@@ -1400,7 +1566,21 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
             };
             let mut used = false;
             if let Some(key) = key.filter(|k| *k > 32 && *k != 127) {
-                with_view(&gui, id, |g| used = g.wall_key(key, &f));
+                with_view(&gui, id, |g| {
+                    if g.active_view().is_some_and(|v| v.nav.walk.is_some()) {
+                        used = true;
+                        return;
+                    }
+                    used = g.wall_key(key, &f);
+                    let typing = g.tool.as_ref().is_some_and(|t| !t.typed.is_empty());
+                    if !used
+                        && !typing
+                        && let Some(c) = u32::try_from(key).ok().and_then(char::from_u32)
+                        && c.is_ascii_alphabetic()
+                    {
+                        used = g.sequence_key(c);
+                    }
+                });
             }
             if used {
                 p.refresh(false, None);
@@ -1440,15 +1620,56 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
             .append_separator()
             .append_item(ID_EXIT, "E&xit", "Close Reviera")
             .build();
+        let mut orient_menu = Menu::builder();
+        for (k, (label, _)) in nav::PRESETS.iter().enumerate() {
+            orient_menu = orient_menu.append_item(ID_ORIENT_FIRST + k as i32, label, "");
+        }
         let edit_menu = Menu::builder()
             .append_item(ID_UNDO, "&Undo\tCtrl+Z", "Undo the last change")
             .append_item(ID_REDO, "&Redo\tCtrl+Y", "Redo the last undone change")
             .build();
+        // Keyboard sequences (ZF, ZP, ...) are typed in the view (§1.26.4); single-letter menu
+        // accelerators would take letters away from typed lengths.
         let view_menu = Menu::builder()
-            .append_item(ID_FIT, "Zoom to &Fit\tF", "Show the whole model")
+            .append_item(
+                ID_FIT,
+                "Zoom to &Fit (ZF)",
+                "Show the whole model, or the selection",
+            )
+            .append_item(
+                ID_ZOOM_PREV,
+                "&Previous Pan/Zoom (ZP)",
+                "Go back to the previous view",
+            )
+            .append_item(ID_ZOOM_NEXT, "&Next Pan/Zoom (ZN)", "Go forward again")
+            .append_separator()
+            .append_item(
+                ID_HOME,
+                "&Home\tAlt+Home",
+                "Go to the view's home orientation",
+            )
+            .append_item(ID_SET_HOME, "Set Current View as Home", "")
             .build();
+        view_menu.append_submenu(
+            orient_menu.build(),
+            "&Orient",
+            "Standard and isometric views",
+        );
+        view_menu.append(
+            ID_PERSPECTIVE,
+            "Perspective / &Isometric (PI)",
+            "Switch between perspective and isometric (parallel) projection",
+            ItemKind::Normal,
+        );
+        view_menu.append_separator();
+        view_menu.append(
+            ID_WALK,
+            "&Walk (WK)",
+            "Walk through the model at eye height",
+            ItemKind::Normal,
+        );
         let architecture_menu = Menu::builder()
-            .append_item(ID_WALL, "&Wall", "Draw walls on the lowest level")
+            .append_item(ID_WALL, "&Wall (WA)", "Draw walls on the lowest level")
             .build();
         let window_menu = Menu::builder()
             .append_item(
@@ -1537,8 +1758,23 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 rows: Vec::new(),
                 properties_stale: true,
                 tool: None,
+                timer: Some(Timer::new(&frame)),
+                keys: (String::new(), std::time::Instant::now()),
             })
         });
+        {
+            let g = gui.clone();
+            let timer = gui.borrow();
+            timer.timer.as_ref().expect("created").on_tick(move |_| {
+                with(&g, |g| {
+                    if !g.tick()
+                        && let Some(t) = &g.timer
+                    {
+                        t.stop();
+                    }
+                });
+            });
+        }
 
         {
             let gui = gui.clone();
@@ -1658,10 +1894,19 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                         v.panel.set_focus();
                     }
                 }),
-                ID_FIT => with(&gui, |g| {
-                    g.fit();
-                    g.refresh_active();
-                }),
+                ID_FIT => with(&gui, Gui::zoom_to_fit),
+                ID_ZOOM_PREV => with(&gui, |g| g.history(true)),
+                ID_ZOOM_NEXT => with(&gui, |g| g.history(false)),
+                ID_HOME => with(&gui, Gui::go_home),
+                ID_SET_HOME => with(&gui, Gui::set_home),
+                ID_PERSPECTIVE => with(&gui, Gui::toggle_perspective),
+                ID_WALK => with(&gui, Gui::toggle_walk),
+                id if (ID_ORIENT_FIRST..ID_ORIENT_FIRST + nav::PRESETS.len() as i32)
+                    .contains(&id) =>
+                {
+                    let dir = nav::PRESETS[(id - ID_ORIENT_FIRST) as usize].1;
+                    with(&gui, |g| g.orient(glam::Vec3::from(dir)));
+                }
                 ID_NEW_VIEW => with(&gui, |g| {
                     if let Some(doc) = g.doc {
                         g.open_view(doc);

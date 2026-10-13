@@ -1975,6 +1975,7 @@ The following context panels are part of the default layout. Owners are authorit
 **Behaviour & rules.**
 - Shown in a corner of 3D views (default top-right). Semi-transparent when idle (configurable inactive opacity), opaque on hover.
 - Clicking any of its 26 regions (6 faces, 12 edges, 8 corners) animates to that orientation; dragging orbits freely; in face views, roll arrows rotate 90° and adjacent-face arrows step to neighbouring faces.
+- A **projection button** (Reviera addition, owner request) shows the current projection, PERSP or ISO, and switches between perspective and isometric (parallel) projection with one click. The same toggle is in the View menu and in the right-click menu, and has the keyboard sequence PI.
 - A **Home** button returns to the view's home orientation; a **compass ring** below shows N/E/S/W (project north or true north per view setting); clicking a letter faces that direction; dragging the ring rotates about the vertical axis.
 - Right-click menu: Go Home; Save View (creates a named 3D view, DOC); Lock to Selection; Perspective / Orthographic; Set Current View as Home; Set Front to View ▸; Reset Front; Show Compass; Orient to View ▸ (any plan, elevation, section or 3D view; adds a section box when orienting to a plan or section); Orient to Direction ▸ (N, S, E, W, NE, NW, SE, SW, Top, Bottom); Orient to a Plane…; Help; Options….
 - Face labels use the project's localisation; their content is generated text, not artwork.

@@ -53,13 +53,16 @@ fn fs(i: VOut) -> @location(0) vec4<f32> {
     let n = normalize(i.normal);
     let v = normalize(u.eye.xyz - i.world);
     let key = normalize(vec3<f32>(0.4, 0.3, 0.85));
-    // Two-sided: faces lit whichever way they point.
-    let light = 0.25 + 0.40 * abs(dot(n, v)) + 0.35 * abs(dot(n, key));
+    // Two-sided: faces lit whichever way they point. `eye.w` 0 draws unlit (overlay labels).
+    let lit = 0.25 + 0.40 * abs(dot(n, v)) + 0.35 * abs(dot(n, key));
+    let light = select(1.0, lit, u.eye.w > 0.5);
     return vec4<f32>(i.color.rgb * light, i.color.a);
 }
 "#;
 
 const DEPTH: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
+/// Multisampling (anti-aliasing); 4 is supported for every renderable format in WebGPU.
+const SAMPLES: u32 = 4;
 /// Background: a light blue-grey.
 const CLEAR: wgpu::Color = wgpu::Color {
     r: 0.80,
@@ -88,9 +91,16 @@ pub struct WgpuViewport {
     uniforms: wgpu::Buffer,
     bind_group: wgpu::BindGroup,
     depth: wgpu::TextureView,
+    /// The multisampled colour target, resolved into the window or texture at the end.
+    msaa: wgpu::TextureView,
     opaque: Option<(wgpu::Buffer, u32)>,
     transparent: Option<(wgpu::Buffer, u32)>,
     overlay: Option<(wgpu::Buffer, u32)>,
+    gizmo_pipeline: wgpu::RenderPipeline,
+    /// Uniforms of the gizmo's lit geometry and of its flat (clip-space) geometry.
+    gizmo_uniforms: [(wgpu::Buffer, wgpu::BindGroup); 2],
+    /// The gizmo: pixel rectangle, matrices, and vertex buffers (lit, flat).
+    gizmo: Option<GizmoGpu>,
     size: (u32, u32),
     adapter: String,
     scene: RenderScene,
@@ -104,6 +114,14 @@ impl std::fmt::Debug for WgpuViewport {
             .field("size", &self.size)
             .finish()
     }
+}
+
+struct GizmoGpu {
+    rect: [f32; 4],
+    view_proj: glam::Mat4,
+    eye: glam::Vec3,
+    lit: Option<(wgpu::Buffer, u32)>,
+    flat: Option<(wgpu::Buffer, u32)>,
 }
 
 fn instance() -> wgpu::Instance {
@@ -263,9 +281,11 @@ impl WgpuViewport {
             bind_group_layouts: &[Some(&layout)],
             immediate_size: 0,
         });
-        let pipeline = |transparent: bool| {
+        // `gizmo`: blended like transparent geometry, but writing depth (the Orientation Cube
+        // hides what is behind it, and fades as a whole).
+        let pipeline = |transparent: bool, gizmo: bool| {
             device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-                label: Some(if transparent { "transparent" } else { "opaque" }),
+                label: Some(if gizmo { "gizmo" } else if transparent { "transparent" } else { "opaque" }),
                 layout: Some(&pipeline_layout),
                 vertex: wgpu::VertexState {
                     module: &shader,
@@ -283,26 +303,49 @@ impl WgpuViewport {
                     compilation_options: Default::default(),
                     targets: &[Some(wgpu::ColorTargetState {
                         format,
-                        blend: transparent.then_some(wgpu::BlendState::ALPHA_BLENDING),
+                        blend: (transparent || gizmo).then_some(wgpu::BlendState::ALPHA_BLENDING),
                         write_mask: wgpu::ColorWrites::ALL,
                     })],
                 }),
                 primitive: wgpu::PrimitiveState { cull_mode: None, ..Default::default() },
                 depth_stencil: Some(wgpu::DepthStencilState {
                     format: DEPTH,
-                    depth_write_enabled: Some(!transparent),
+                    depth_write_enabled: Some(!transparent || gizmo),
                     depth_compare: Some(wgpu::CompareFunction::LessEqual),
                     stencil: Default::default(),
                     bias: Default::default(),
                 }),
-                multisample: Default::default(),
+                multisample: wgpu::MultisampleState {
+                    count: SAMPLES,
+                    ..Default::default()
+                },
                 multiview_mask: None,
                 cache: None,
             })
         };
-        let opaque_pipeline = pipeline(false);
-        let transparent_pipeline = pipeline(true);
+        let opaque_pipeline = pipeline(false, false);
+        let transparent_pipeline = pipeline(true, false);
+        let gizmo_pipeline = pipeline(true, true);
+        let uniform_set = || {
+            let buffer = device.create_buffer(&wgpu::BufferDescriptor {
+                label: Some("gizmo uniforms"),
+                size: std::mem::size_of::<Uniforms>() as u64,
+                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+            });
+            let group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+                label: None,
+                layout: &layout,
+                entries: &[wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: buffer.as_entire_binding(),
+                }],
+            });
+            (buffer, group)
+        };
+        let gizmo_uniforms = [uniform_set(), uniform_set()];
         let depth = depth_view(&device, size);
+        let msaa = msaa_view(&device, format, size);
         Self {
             device,
             queue,
@@ -313,6 +356,7 @@ impl WgpuViewport {
             uniforms,
             bind_group,
             depth,
+            msaa,
             opaque: None,
             transparent: None,
             size,
@@ -320,6 +364,9 @@ impl WgpuViewport {
             scene: RenderScene::default(),
             highlight: Default::default(),
             overlay: None,
+            gizmo_pipeline,
+            gizmo_uniforms,
+            gizmo: None,
         }
     }
 
@@ -400,6 +447,29 @@ fn offscreen_texture(
     })
 }
 
+fn msaa_view(
+    device: &wgpu::Device,
+    format: wgpu::TextureFormat,
+    (w, h): (u32, u32),
+) -> wgpu::TextureView {
+    device
+        .create_texture(&wgpu::TextureDescriptor {
+            label: Some("msaa"),
+            size: wgpu::Extent3d {
+                width: w,
+                height: h,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: SAMPLES,
+            dimension: wgpu::TextureDimension::D2,
+            format,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+            view_formats: &[],
+        })
+        .create_view(&Default::default())
+}
+
 fn depth_view(device: &wgpu::Device, (w, h): (u32, u32)) -> wgpu::TextureView {
     device
         .create_texture(&wgpu::TextureDescriptor {
@@ -410,7 +480,7 @@ fn depth_view(device: &wgpu::Device, (w, h): (u32, u32)) -> wgpu::TextureView {
                 depth_or_array_layers: 1,
             },
             mip_level_count: 1,
-            sample_count: 1,
+            sample_count: SAMPLES,
             dimension: wgpu::TextureDimension::D2,
             format: DEPTH,
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
@@ -480,6 +550,23 @@ impl RenderBackend for WgpuViewport {
         self.overlay = self.buffer(&opaque);
     }
 
+    fn set_gizmo(&mut self, gizmo: Option<reviera_render::Gizmo>) {
+        self.gizmo = gizmo.map(|g| {
+            let expand = |meshes: &[reviera_render::SceneMesh]| {
+                let (mut v, t) = vertices(meshes, &Default::default());
+                v.extend(t);
+                self.buffer(&v)
+            };
+            GizmoGpu {
+                rect: g.rect,
+                view_proj: g.view_proj,
+                eye: g.eye,
+                lit: expand(&g.meshes),
+                flat: expand(&g.flat),
+            }
+        });
+    }
+
     fn resize(&mut self, width: u32, height: u32) {
         self.resize_target(width, height);
     }
@@ -509,6 +596,65 @@ impl WgpuViewport {
         self.transparent = self.buffer(&transparent);
     }
 
+    /// Draws the gizmo into its rectangle, over the scene, with a fresh depth buffer.
+    fn draw_gizmo(
+        &self,
+        encoder: &mut wgpu::CommandEncoder,
+        view: &wgpu::TextureView,
+        g: &GizmoGpu,
+    ) {
+        let (w, h) = (self.size.0 as f32, self.size.1 as f32);
+        let [x, y, rw, rh] = g.rect;
+        let (x0, y0) = (x.clamp(0.0, w), y.clamp(0.0, h));
+        let (x1, y1) = ((x + rw).clamp(0.0, w), (y + rh).clamp(0.0, h));
+        if x1 - x0 < 1.0 || y1 - y0 < 1.0 {
+            return;
+        }
+        let write = |k: usize, view_proj: glam::Mat4, eye: [f32; 4]| {
+            let u = Uniforms {
+                view_proj: view_proj.to_cols_array_2d(),
+                eye,
+            };
+            self.queue
+                .write_buffer(&self.gizmo_uniforms[k].0, 0, bytemuck::bytes_of(&u));
+        };
+        write(0, g.view_proj, g.eye.extend(1.0).to_array());
+        write(1, glam::Mat4::IDENTITY, [0.0, 0.0, 1.0, 0.0]);
+        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: Some("gizmo"),
+            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                view: &self.msaa,
+                depth_slice: None,
+                resolve_target: Some(view),
+                ops: wgpu::Operations {
+                    load: wgpu::LoadOp::Load,
+                    store: wgpu::StoreOp::Discard,
+                },
+            })],
+            depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                view: &self.depth,
+                depth_ops: Some(wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(1.0),
+                    store: wgpu::StoreOp::Discard,
+                }),
+                stencil_ops: None,
+            }),
+            ..Default::default()
+        });
+        // The viewport is the gizmo's full rectangle (it may extend past the view's edges); the
+        // scissor keeps drawing inside the view.
+        pass.set_viewport(x, y, rw, rh, 0.0, 1.0);
+        pass.set_scissor_rect(x0 as u32, y0 as u32, (x1 - x0) as u32, (y1 - y0) as u32);
+        pass.set_pipeline(&self.gizmo_pipeline);
+        for (k, mesh) in [(0, &g.lit), (1, &g.flat)] {
+            if let Some((buffer, count)) = mesh {
+                pass.set_bind_group(0, &self.gizmo_uniforms[k].1, &[]);
+                pass.set_vertex_buffer(0, buffer.slice(..));
+                pass.draw(0..*count, 0..1);
+            }
+        }
+    }
+
     fn resize_target(&mut self, width: u32, height: u32) {
         let size = (width.max(1), height.max(1));
         if size == self.size {
@@ -526,6 +672,7 @@ impl WgpuViewport {
             }
         }
         self.depth = depth_view(&self.device, size);
+        self.msaa = msaa_view(&self.device, self.format, size);
     }
 
     fn draw(&mut self, camera: &Camera) -> Result<(), String> {
@@ -552,15 +699,21 @@ impl WgpuViewport {
         };
         let mut encoder = self.device.create_command_encoder(&Default::default());
         {
+            // Resolved into the frame here, or after the gizmo pass when there is one.
+            let resolve = self.gizmo.is_none().then_some(&view);
             let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("viewport"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &view,
+                    view: &self.msaa,
                     depth_slice: None,
-                    resolve_target: None,
+                    resolve_target: resolve,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(CLEAR),
-                        store: wgpu::StoreOp::Store,
+                        store: if resolve.is_some() {
+                            wgpu::StoreOp::Discard
+                        } else {
+                            wgpu::StoreOp::Store
+                        },
                     },
                 })],
                 depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
@@ -585,6 +738,9 @@ impl WgpuViewport {
                     pass.draw(0..*count, 0..1);
                 }
             }
+        }
+        if let Some(g) = &self.gizmo {
+            self.draw_gizmo(&mut encoder, &view, g);
         }
         self.queue.submit([encoder.finish()]);
         if let Some(f) = frame {
