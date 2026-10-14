@@ -11,7 +11,10 @@
 //! regeneration takes the face's current line and finds the corners again where neighbouring
 //! curves meet, so the host follows the wall.
 //!
-//! Built so far: straight boundary curves. Arcs, slope arrows and span directions come later.
+//! A curve may pass through points between its ends, as a curved wall does
+//! ([`crate::walls::curved`]): one point makes a circular arc, more a smooth spline. It is
+//! validated and gives profiles as its sampled polyline; locked to a curved wall's face, it
+//! follows that face's curve. Slope arrows and span directions come later.
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -43,6 +46,9 @@ pub struct Lock {
 pub struct SketchCurve {
     pub key: u32,
     pub line: Line,
+    /// Points the curve passes through between its ends (an arc or a spline).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub through: Vec<[f64; 2]>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub lock: Option<Lock>,
 }
@@ -121,6 +127,36 @@ fn dir(l: Line) -> [f64; 2] {
     [l.end[0] - l.start[0], l.end[1] - l.start[1]]
 }
 
+/// The points a curve passes through between its ends, sampled (empty for a straight one).
+pub fn interior(line: Line, through: &[[f64; 2]]) -> Vec<[f64; 2]> {
+    match crate::walls::curved::path(line, through) {
+        Some(p) if p.points.len() > 2 => p.points[1..p.points.len() - 1].to_vec(),
+        _ => Vec::new(),
+    }
+}
+
+/// A curve's sampled polyline from its start to its end.
+fn polyline(line: Line, through: &[[f64; 2]]) -> Vec<[f64; 2]> {
+    let mut pts = vec![line.start];
+    pts.extend(interior(line, through));
+    pts.push(line.end);
+    pts
+}
+
+/// Whether segments `a` and `b` cross or touch, and where.
+fn segments_meet(a: [[f64; 2]; 2], b: [[f64; 2]; 2]) -> Option<[f64; 2]> {
+    let (d, e) = (
+        [a[1][0] - a[0][0], a[1][1] - a[0][1]],
+        [b[1][0] - b[0][0], b[1][1] - b[0][1]],
+    );
+    let x = meet(a[0], d, b[0], e)?;
+    let on = |s: [[f64; 2]; 2], d: [f64; 2]| {
+        let t = ((x[0] - s[0][0]) * d[0] + (x[1] - s[0][1]) * d[1]) / (d[0] * d[0] + d[1] * d[1]);
+        (-1e-9..=1.0 + 1e-9).contains(&t)
+    };
+    (on(a, d) && on(b, e)).then_some(x)
+}
+
 /// The intersection of two infinite lines given by a point and a direction.
 fn meet(p: [f64; 2], d: [f64; 2], q: [f64; 2], e: [f64; 2]) -> Option<[f64; 2]> {
     let den = cross(d, e);
@@ -140,8 +176,17 @@ fn sketch_error(code: &'static str, message: &str, points: &[[f64; 2]]) -> Error
 /// Trims or extends curves whose ends miss a neighbour by up to [`PICK_GAP`] (picked wall
 /// faces stop short of, or run past, the corners) so that they meet.
 pub fn close_corners(lines: &mut [Line]) {
+    close_corners_except(lines, &vec![false; lines.len()]);
+}
+
+/// Like [`close_corners`], leaving the `fixed` curves (curved ones) as they are and not
+/// extending others to them.
+fn close_corners_except(lines: &mut [Line], fixed: &[bool]) {
     let n = lines.len();
     for i in 0..n {
+        if fixed[i] {
+            continue;
+        }
         for end in 0..2 {
             let e = if end == 0 {
                 lines[i].start
@@ -156,7 +201,7 @@ pub fn close_corners(lines: &mut [Line]) {
             }
             let mut best: Option<(f64, [f64; 2])> = None;
             for j in 0..n {
-                if j == i {
+                if j == i || fixed[j] {
                     continue;
                 }
                 let Some(x) = meet(lines[i].start, dir(lines[i]), lines[j].start, dir(lines[j]))
@@ -187,7 +232,7 @@ pub fn close_corners(lines: &mut [Line]) {
             for (a, b) in [(0, 0), (0, 1), (1, 0), (1, 1)] {
                 let pa = if a == 0 { lines[i].start } else { lines[i].end };
                 let pb = if b == 0 { lines[j].start } else { lines[j].end };
-                if close(pa, pb, 1e-9) && pa != pb {
+                if close(pa, pb, 1e-9) && pa != pb && !fixed[j] {
                     if b == 0 {
                         lines[j].start = pa;
                     } else {
@@ -203,12 +248,28 @@ pub fn close_corners(lines: &mut [Line]) {
 /// indices with a flag for curves that run backwards, outer loops counter-clockwise and holes
 /// clockwise.
 pub fn build_loops(lines: &[Line]) -> Result<Vec<Vec<(usize, bool)>>> {
+    build_curved_loops(lines, &vec![Vec::new(); lines.len()])
+}
+
+/// Like [`build_loops`], for curves that may pass through points between their ends
+/// (`through[i]` for curve `i`).
+pub fn build_curved_loops(
+    lines: &[Line],
+    through: &[Vec<[f64; 2]>],
+) -> Result<Vec<Vec<(usize, bool)>>> {
+    let inner: Vec<Vec<[f64; 2]>> = lines
+        .iter()
+        .zip(through)
+        .map(|(l, t)| interior(*l, t))
+        .collect();
+    let curved = |i: usize| !inner[i].is_empty();
     if lines.is_empty() {
         return Err(Error::new("sketch.empty", "The sketch has no boundary"));
     }
     // 1. Short curves.
     for l in lines {
         if l.length() < TOL_SHORT {
+            // A curve closing on itself (a full circle) is drawn as two arcs.
             return Err(sketch_error(
                 "sketch.short",
                 "A curve is too short",
@@ -218,7 +279,10 @@ pub fn build_loops(lines: &[Line]) -> Result<Vec<Vec<(usize, bool)>>> {
     }
     // 3. Overlaps: collinear curves sharing a positive length.
     for (i, a) in lines.iter().enumerate() {
-        for b in &lines[i + 1..] {
+        for (j, b) in lines.iter().enumerate().skip(i + 1) {
+            if curved(i) || curved(j) {
+                continue;
+            }
             let (da, db) = (dir(*a), dir(*b));
             let la = a.length();
             let off = cross(da, [b.start[0] - a.start[0], b.start[1] - a.start[1]]) / la;
@@ -281,6 +345,29 @@ pub fn build_loops(lines: &[Line]) -> Result<Vec<Vec<(usize, bool)>>> {
     // 5. Self-intersection: no two curves may cross except at a shared endpoint.
     for i in 0..lines.len() {
         for j in i + 1..lines.len() {
+            if curved(i) || curved(j) {
+                // Curved: no segment of one may meet a segment of the other, except at an end
+                // they share.
+                let (pa, pb) = (
+                    polyline(lines[i], &through[i]),
+                    polyline(lines[j], &through[j]),
+                );
+                let shared: Vec<[f64; 2]> = ends[i]
+                    .iter()
+                    .filter(|v| ends[j].contains(v))
+                    .map(|v| points[*v])
+                    .collect();
+                for sa in pa.windows(2) {
+                    for sb in pb.windows(2) {
+                        if let Some(x) = segments_meet([sa[0], sa[1]], [sb[0], sb[1]])
+                            && !shared.iter().any(|p| close(*p, x, 1e-6))
+                        {
+                            return Err(sketch_error("sketch.intersect", "Curves intersect", &[x]));
+                        }
+                    }
+                }
+                continue;
+            }
             let (a, b) = (lines[i], lines[j]);
             let Some(x) = meet(a.start, dir(a), b.start, dir(b)) else {
                 continue;
@@ -326,7 +413,10 @@ pub fn build_loops(lines: &[Line]) -> Result<Vec<Vec<(usize, bool)>>> {
         loops.push(lp);
     }
     // 6. Nesting and orientation: even depth outer (counter-clockwise), odd depth holes.
-    let rings: Vec<Vec<[f64; 2]>> = loops.iter().map(|lp| ring_of(lines, lp)).collect();
+    let rings: Vec<Vec<[f64; 2]>> = loops
+        .iter()
+        .map(|lp| curved_ring_of(lines, &inner, lp))
+        .collect();
     for (i, lp) in loops.iter_mut().enumerate() {
         let depth = rings
             .iter()
@@ -345,10 +435,24 @@ pub fn build_loops(lines: &[Line]) -> Result<Vec<Vec<(usize, bool)>>> {
 }
 
 /// The corner points of a loop, in order.
+#[cfg(test)]
 fn ring_of(lines: &[Line], lp: &[(usize, bool)]) -> Vec<[f64; 2]> {
-    lp.iter()
-        .map(|(i, rev)| if *rev { lines[*i].end } else { lines[*i].start })
-        .collect()
+    curved_ring_of(lines, &vec![Vec::new(); lines.len()], lp)
+}
+
+/// The points of a loop in order: each curve's start, then the points between its ends.
+fn curved_ring_of(lines: &[Line], inner: &[Vec<[f64; 2]>], lp: &[(usize, bool)]) -> Vec<[f64; 2]> {
+    let mut out = Vec::new();
+    for (i, rev) in lp {
+        if *rev {
+            out.push(lines[*i].end);
+            out.extend(inner[*i].iter().rev());
+        } else {
+            out.push(lines[*i].start);
+            out.extend(inner[*i].iter());
+        }
+    }
+    out
 }
 
 /// A curve argument of a create or edit command: a line, and optionally the wall face it was
@@ -357,6 +461,9 @@ fn ring_of(lines: &[Line], lp: &[(usize, bool)]) -> Vec<[f64; 2]> {
 #[serde(deny_unknown_fields)]
 pub struct CurveArg {
     pub line: Line,
+    /// Points the curve passes through between its ends: one makes an arc, more a spline.
+    #[serde(default)]
+    pub through: Vec<[f64; 2]>,
     /// Lock to a wall face or location line: `{element, sub}` (`face:ext`, `face:int`, `axis`).
     pub lock: Option<LockArg>,
 }
@@ -372,8 +479,20 @@ pub struct LockArg {
 /// ordered and oriented, locks resolved to GlobalIds.
 pub fn from_args(store: &Store, curves: &[CurveArg]) -> Result<Sketch> {
     let mut lines: Vec<Line> = curves.iter().map(|c| c.line).collect();
-    close_corners(&mut lines);
-    let loops = build_loops(&lines)?;
+    // Through points in line with the ends make a straight curve.
+    let through: Vec<Vec<[f64; 2]>> = curves
+        .iter()
+        .map(|c| {
+            if interior(c.line, &c.through).is_empty() {
+                Vec::new()
+            } else {
+                c.through.clone()
+            }
+        })
+        .collect();
+    let fixed: Vec<bool> = through.iter().map(|t| !t.is_empty()).collect();
+    close_corners_except(&mut lines, &fixed);
+    let loops = build_curved_loops(&lines, &through)?;
     let mut sketch = Sketch::default();
     for (i, c) in curves.iter().enumerate() {
         let lock = match &c.lock {
@@ -391,6 +510,7 @@ pub fn from_args(store: &Store, curves: &[CurveArg]) -> Result<Sketch> {
         sketch.curves.push(SketchCurve {
             key: i as u32 + 1,
             line: lines[i],
+            through: through[i].clone(),
             lock,
         });
     }
@@ -398,11 +518,12 @@ pub fn from_args(store: &Store, curves: &[CurveArg]) -> Result<Sketch> {
     for lp in &loops {
         for (i, rev) in lp {
             if *rev {
-                let l = &mut sketch.curves[*i].line;
-                *l = Line {
-                    start: l.end,
-                    end: l.start,
+                let c = &mut sketch.curves[*i];
+                c.line = Line {
+                    start: c.line.end,
+                    end: c.line.start,
                 };
+                c.through.reverse();
             }
         }
         sketch
@@ -417,10 +538,15 @@ pub fn from_args(store: &Store, curves: &[CurveArg]) -> Result<Sketch> {
 fn current(store: &Store, c: &SketchCurve) -> ([f64; 2], [f64; 2]) {
     let stored = (c.line.start, dir(c.line));
     let Some(lock) = &c.lock else { return stored };
-    if GlobalId::parse(&lock.element)
+    let Some(locked) = GlobalId::parse(&lock.element)
         .and_then(|g| store.find_by_guid(&g))
-        .is_none()
-    {
+        .and_then(|id| store.get(id))
+    else {
+        return stored;
+    };
+    // A straight piece of a curved wall's face (a ceiling's facet) keeps its line: the wall's
+    // own line is only its chord.
+    if crate::walls::wall_recipe(locked).is_some_and(|r| !r.through.is_empty()) {
         return stored;
     }
     let r = DimRef {
@@ -472,26 +598,125 @@ pub fn profiles(store: &Store, sketch: &Sketch) -> Vec<Profile> {
     out
 }
 
-/// Each loop of a sketch now: its corners (where neighbouring curves' current lines meet), and
-/// the key of the curve from each corner to the next.
-pub fn rings(store: &Store, sketch: &Sketch) -> Vec<(Vec<[f64; 2]>, Vec<u32>)> {
+/// A curve of a loop now: its key, its ends (where it meets its neighbours) and, for a curved
+/// one, the sampled points between them.
+#[derive(Debug, Clone, PartialEq)]
+pub struct LoopCurve {
+    pub key: u32,
+    pub line: Line,
+    pub interior: Vec<[f64; 2]>,
+}
+
+/// What a curve is now: a straight line (a point and direction), or a polyline.
+enum Shape {
+    Straight([f64; 2], [f64; 2]),
+    Curved(Vec<[f64; 2]>),
+}
+
+/// The face (or location line) of a curved wall a curve is locked to, now, as a polyline
+/// running the curve's stored way; `None` if the lock is not on a curved wall.
+fn curved_face(
+    store: &Store,
+    solved: &std::cell::OnceCell<crate::walls::Solved>,
+    c: &SketchCurve,
+) -> Option<Vec<[f64; 2]>> {
+    use crate::walls;
+    let lock = c.lock.as_ref()?;
+    let id = GlobalId::parse(&lock.element).and_then(|g| store.find_by_guid(&g))?;
+    let e = store.get(id)?;
+    let r = walls::wall_recipe(e)?;
+    let path = walls::curved::path_of(&r)?;
+    let g = walls::regenerate(store, e).ok()?;
+    let solved = solved.get_or_init(|| walls::solve(store));
+    let ([minus, plus], _) =
+        walls::curved::outline(&path, g.width, walls::curved::ends_of(solved, id));
+    // The exterior face is on the +normal (left) side unless the wall is flipped.
+    let mut pts = match (lock.sub.as_str(), r.flip) {
+        ("face:ext", false) | ("face:int", true) => plus,
+        ("face:int", false) | ("face:ext", true) => minus,
+        ("axis", _) => path.points.clone(),
+        _ => return None,
+    };
+    let d = |a: [f64; 2], b: [f64; 2]| (a[0] - b[0]).hypot(a[1] - b[1]);
+    let (first, last) = (pts[0], *pts.last()?);
+    if d(first, c.line.end) + d(last, c.line.start) < d(first, c.line.start) + d(last, c.line.end) {
+        pts.reverse();
+    }
+    Some(pts)
+}
+
+/// Each loop of a sketch now, curve by curve: straight curves meet their straight neighbours
+/// where their current lines cross; a curved curve keeps its own ends (a curve locked to a
+/// curved wall's face takes the face's current curve).
+pub fn loop_curves(store: &Store, sketch: &Sketch) -> Vec<Vec<LoopCurve>> {
+    let solved = std::cell::OnceCell::new();
     let by_key = |k: u32| sketch.curves.iter().find(|c| c.key == k);
     sketch
         .loops
         .iter()
         .map(|lp| {
             let curves: Vec<&SketchCurve> = lp.iter().filter_map(|k| by_key(*k)).collect();
-            let lines: Vec<([f64; 2], [f64; 2])> =
-                curves.iter().map(|c| current(store, c)).collect();
-            let corners = (0..curves.len())
-                .map(|i| {
-                    let prev = (i + curves.len() - 1) % curves.len();
-                    let (p, d) = lines[prev];
-                    let (q, e) = lines[i];
-                    meet(p, d, q, e).unwrap_or(curves[i].line.start)
+            let shapes: Vec<Shape> = curves
+                .iter()
+                .map(|c| {
+                    if !c.through.is_empty()
+                        && let Some(pts) = curved_face(store, &solved, c)
+                    {
+                        return Shape::Curved(pts);
+                    }
+                    if !interior(c.line, &c.through).is_empty() {
+                        return Shape::Curved(polyline(c.line, &c.through));
+                    }
+                    let (p, d) = current(store, c);
+                    Shape::Straight(p, d)
                 })
                 .collect();
-            (corners, curves.iter().map(|c| c.key).collect())
+            let n = curves.len();
+            let corners: Vec<[f64; 2]> = (0..n)
+                .map(|i| {
+                    let prev = (i + n - 1) % n;
+                    match (&shapes[prev], &shapes[i]) {
+                        (_, Shape::Curved(pts)) => pts[0],
+                        (Shape::Curved(pts), _) => *pts.last().expect("points"),
+                        (Shape::Straight(p, d), Shape::Straight(q, e)) => {
+                            meet(*p, *d, *q, *e).unwrap_or(curves[i].line.start)
+                        }
+                    }
+                })
+                .collect();
+            (0..n)
+                .map(|i| LoopCurve {
+                    key: curves[i].key,
+                    line: Line {
+                        start: corners[i],
+                        end: corners[(i + 1) % n],
+                    },
+                    interior: match &shapes[i] {
+                        Shape::Curved(pts) => pts[1..pts.len() - 1].to_vec(),
+                        Shape::Straight(..) => Vec::new(),
+                    },
+                })
+                .collect()
+        })
+        .collect()
+}
+
+/// Each loop of a sketch now: its points in order (corners, and the points along curved
+/// curves), and the key of the curve from each point to the next.
+pub fn rings(store: &Store, sketch: &Sketch) -> Vec<(Vec<[f64; 2]>, Vec<u32>)> {
+    loop_curves(store, sketch)
+        .into_iter()
+        .map(|lp| {
+            let (mut pts, mut keys) = (Vec::new(), Vec::new());
+            for c in lp {
+                pts.push(c.line.start);
+                keys.push(c.key);
+                for p in c.interior {
+                    pts.push(p);
+                    keys.push(c.key);
+                }
+            }
+            (pts, keys)
         })
         .collect()
 }
@@ -577,5 +802,65 @@ mod tests {
         let loops = build_loops(&lines).unwrap();
         let ring = ring_of(&lines, &loops[0]);
         assert!((signed_area(&ring) - 3.8 * 2.8).abs() < 1e-9);
+    }
+
+    #[test]
+    fn two_arcs_make_a_circle_and_an_arc_may_not_cross_a_line() {
+        // A circle of radius 2 as two half arcs, one drawn backwards.
+        let lines = vec![l([2.0, 0.0], [-2.0, 0.0]), l([2.0, 0.0], [-2.0, 0.0])];
+        let through = vec![vec![[0.0, 2.0]], vec![[0.0, -2.0]]];
+        let loops = build_curved_loops(&lines, &through).unwrap();
+        assert_eq!(loops.len(), 1);
+        let inner: Vec<_> = lines
+            .iter()
+            .zip(&through)
+            .map(|(l, t)| interior(*l, t))
+            .collect();
+        let area = signed_area(&curved_ring_of(&lines, &inner, &loops[0]));
+        let exact = std::f64::consts::PI * 4.0;
+        assert!((area - exact).abs() / exact < 1e-3, "{area}");
+        // A D shape whose arc bulges across a line through it.
+        let lines = vec![
+            l([0.0, 0.0], [0.0, 4.0]),
+            l([0.0, 4.0], [0.0, 0.0]),
+            l([1.0, -1.0], [1.0, 5.0]),
+            l([1.0, 5.0], [3.0, 5.0]),
+            l([3.0, 5.0], [3.0, -1.0]),
+            l([3.0, -1.0], [1.0, -1.0]),
+        ];
+        let mut through = vec![Vec::new(); 6];
+        through[1] = vec![[2.0, 2.0]];
+        assert_eq!(
+            build_curved_loops(&lines, &through).unwrap_err().code,
+            "sketch.intersect"
+        );
+    }
+
+    #[test]
+    fn a_half_round_floor_from_arguments() {
+        let store = Store::default();
+        let args: Vec<CurveArg> = serde_json::from_value(json!([
+            { "line": { "start": [-3, 0], "end": [3, 0] } },
+            { "line": { "start": [3, 0], "end": [-3, 0] }, "through": [[0, 3]] },
+        ]))
+        .unwrap();
+        let sketch = from_args(&store, &args).unwrap();
+        let p = profiles(&store, &sketch);
+        assert_eq!(p.len(), 1);
+        let exact = std::f64::consts::PI * 9.0 / 2.0;
+        assert!(
+            (p[0].area() - exact).abs() / exact < 1e-3,
+            "{}",
+            p[0].area()
+        );
+        // Through points in line with the ends make a straight curve.
+        let args: Vec<CurveArg> = serde_json::from_value(json!([
+            { "line": { "start": [0, 0], "end": [4, 0] }, "through": [[2, 0]] },
+            { "line": { "start": [4, 0], "end": [4, 3] } },
+            { "line": { "start": [4, 3], "end": [0, 0] } },
+        ]))
+        .unwrap();
+        let sketch = from_args(&store, &args).unwrap();
+        assert!(sketch.curves.iter().all(|c| c.through.is_empty()));
     }
 }

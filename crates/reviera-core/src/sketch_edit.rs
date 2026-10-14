@@ -120,24 +120,22 @@ pub fn set_length(lines: &mut [Line], i: usize, length: f64) -> Vec<usize> {
 }
 
 /// A roof's, floor's or ceiling's footprint now: each curve's key, current line (the corners
-/// where its loop's current lines meet) and lock.
-pub fn current_curves(
-    store: &Store,
-    e: &Element,
-) -> Option<Vec<(u32, Line, Option<crate::sketch::Lock>)>> {
+/// where its loop's current lines meet), lock, and the points a curved one passes through.
+pub type CurrentCurve = (u32, Line, Option<crate::sketch::Lock>, Vec<[f64; 2]>);
+
+pub fn current_curves(store: &Store, e: &Element) -> Option<Vec<CurrentCurve>> {
     let sketch = crate::sketch::sketch_of(e)?;
     let mut out = Vec::new();
-    for (corners, keys) in crate::sketch::rings(store, &sketch) {
-        for (i, k) in keys.iter().enumerate() {
-            let c = sketch.curves.iter().find(|c| c.key == *k)?;
-            out.push((
-                *k,
-                Line {
-                    start: corners[i],
-                    end: corners[(i + 1) % corners.len()],
-                },
-                c.lock.clone(),
-            ));
+    for lp in crate::sketch::loop_curves(store, &sketch) {
+        for c in lp {
+            let stored = sketch.curves.iter().find(|s| s.key == c.key)?;
+            // A curve locked to a curved face passes through its current points.
+            let through = if stored.lock.is_some() && !c.interior.is_empty() {
+                c.interior.clone()
+            } else {
+                stored.through.clone()
+            };
+            out.push((c.key, c.line, stored.lock.clone(), through));
         }
     }
     Some(out)
@@ -168,6 +166,18 @@ fn apply(txn: &mut crate::txn::Transaction<'_>, r: &ElementRef, edit: Edit) -> R
     let curves = current_curves(&store, e)
         .ok_or_else(|| Error::new("sketch.not_sketched", "the element has no footprint"))?;
     let mut lines: Vec<Line> = curves.iter().map(|c| c.1).collect();
+    let mut through: Vec<Vec<[f64; 2]>> = curves.iter().map(|c| c.3.clone()).collect();
+    if let Edit::Curve { key, vector } = &edit
+        && let Some(i) = curves.iter().position(|c| c.0 == *key)
+    {
+        // A curved curve moves across its chord with its points.
+        let u = unit(lines[i]);
+        let n = [-u[1], u[0]];
+        let d = vector[0] * n[0] + vector[1] * n[1];
+        for p in &mut through[i] {
+            *p = [p[0] + n[0] * d, p[1] + n[1] * d];
+        }
+    }
     let moved = match edit {
         Edit::Curve { key, vector } => {
             let i = curves.iter().position(|c| c.0 == key).ok_or_else(|| {
@@ -226,6 +236,7 @@ fn apply(txn: &mut crate::txn::Transaction<'_>, r: &ElementRef, edit: Edit) -> R
             let args = (0..lines.len())
                 .map(|k| crate::sketch::CurveArg {
                     line: lines[k],
+                    through: through[k].clone(),
                     lock: lock(k),
                 })
                 .collect();
@@ -294,7 +305,7 @@ pub fn curve_keys(store: &Store, id: ElementId) -> Vec<(u32, Line)> {
     store
         .get(id)
         .and_then(|e| current_curves(store, e))
-        .map(|c| c.into_iter().map(|(k, l, _)| (k, l)).collect())
+        .map(|c| c.into_iter().map(|(k, l, _, _)| (k, l)).collect())
         .unwrap_or_default()
 }
 

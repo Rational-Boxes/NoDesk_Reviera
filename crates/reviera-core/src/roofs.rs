@@ -1241,6 +1241,7 @@ fn footprint(
         .iter()
         .map(|c| sketch::CurveArg {
             line: c.line,
+            through: Vec::new(),
             lock: c.lock.clone(),
         })
         .collect();

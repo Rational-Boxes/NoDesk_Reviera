@@ -491,6 +491,7 @@ pub(crate) fn create_auto(
         lp.into_iter()
             .map(|e| sketch::CurveArg {
                 line: e.line,
+                through: Vec::new(),
                 lock: e.lock.map(|(element, sub)| sketch::LockArg {
                     element: ElementRef::Id(element),
                     sub,

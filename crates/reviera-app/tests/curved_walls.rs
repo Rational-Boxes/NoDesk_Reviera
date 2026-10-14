@@ -267,3 +267,92 @@ fn curved_walls_join_straight_ones() {
     let found = run(&mut app, "overlap.find", json!({})).unwrap();
     assert_eq!(found["overlaps"], json!([]), "{found:#}");
 }
+
+#[test]
+fn floors_follow_curved_wall_faces() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = App::new(AppConfig {
+        live: None,
+        untitled_dir: dir.path().to_owned(),
+    });
+    run(&mut app, "file.new", json!({})).unwrap();
+    let level = run(&mut app, "level.list", json!({})).unwrap()[0]["id"]
+        .as_u64()
+        .unwrap();
+    let arc = |app: &mut App, a: [f64; 2], m: [f64; 2], b: [f64; 2]| {
+        run(
+            app,
+            "wall.create",
+            json!({
+                "curve": { "line": { "start": a, "end": b }, "through": [m] },
+                "base_level": level, "top_constraint": { "unconnected": 3 },
+            }),
+        )
+        .unwrap()
+        .as_u64()
+        .unwrap()
+    };
+    let north = arc(&mut app, [-5.0, 0.0], [0.0, 5.0], [5.0, 0.0]);
+    let south = arc(&mut app, [5.0, 0.0], [0.0, -5.0], [-5.0, 0.0]);
+    // Picked inner faces (the −normal side of walls drawn clockwise), curved, locked.
+    let face = |w: u64, a: [f64; 2], m: [f64; 2], b: [f64; 2]| {
+        json!({
+            "line": { "start": a, "end": b }, "through": [m],
+            "lock": { "element": w, "sub": "face:int" },
+        })
+    };
+    let floor = run(
+        &mut app,
+        "floor.create",
+        json!({
+            "level_id": level,
+            "loops": [[
+                face(north, [-4.9, 0.0], [0.0, 4.9], [4.9, 0.0]),
+                face(south, [4.9, 0.0], [0.0, -4.9], [-4.9, 0.0]),
+            ]],
+        }),
+    )
+    .unwrap()
+    .as_u64()
+    .unwrap();
+    let ceiling = run(
+        &mut app,
+        "ceiling.create_auto",
+        json!({ "level_id": level, "point": [0.0, 0.0] }),
+    )
+    .unwrap()
+    .as_u64()
+    .unwrap();
+    let area = |app: &App, id: u64| {
+        let d = app.document(app.active().unwrap()).unwrap();
+        reviera_core::floors::all(d.doc.store())
+            .into_iter()
+            .find(|(e, _)| e.0 == id)
+            .map(|(_, g)| g.profiles.iter().map(|p| p.area()).sum::<f64>())
+            .unwrap()
+    };
+    let disc = std::f64::consts::PI * 4.9 * 4.9;
+    assert!(
+        (area(&app, floor) - disc).abs() / disc < 2e-3,
+        "{}",
+        area(&app, floor)
+    );
+    // The automatic ceiling's faceted boundary keeps its pieces of the curved faces.
+    assert!(
+        (area(&app, ceiling) - disc).abs() / disc < 1e-2,
+        "{}",
+        area(&app, ceiling)
+    );
+    // The north wall bulges out to 6 m: the floor follows its face.
+    run(
+        &mut app,
+        "wall.set_location",
+        json!({
+            "wall_id": north,
+            "curve": { "line": { "start": [-5.0, 0.0], "end": [5.0, 0.0] }, "through": [[0.0, 6.0]] },
+        }),
+    )
+    .unwrap();
+    let after = area(&app, floor);
+    assert!(after > disc + 3.0, "{after} vs {disc}");
+}
