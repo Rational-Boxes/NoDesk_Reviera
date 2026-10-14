@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Reviera contributors
 
-//! Wall bodies cut by rectangular openings (ARC-HOST-001), for Reviera's own display. IFC keeps
+//! Wall bodies cut by openings (ARC-HOST-001), rectangular or shaped (ARC-WIN-002), for
+//! Reviera's own display. IFC keeps
 //! the uncut body and an `IfcOpeningElement` per opening, so other tools cut the wall themselves.
 //!
 //! An opening passes through the whole wall: an interval along the wall and an interval of
@@ -9,15 +10,49 @@
 //! from its start, Y toward the exterior, Z up): the two long faces with the openings left out
 //! (split on a grid of the openings' edges, so neighbouring pieces share their vertices), the
 //! end faces, the top and bottom (split where an opening reaches them) and the reveals.
+//!
+//! A shaped opening (a round or arched window) has a convex outline. Its bounding rectangle is
+//! left out of the grid like any opening, then the corners between the rectangle and the
+//! outline are filled back strip by strip (between the outline's points), and the reveals follow
+//! the outline.
 
 use super::WallBody;
 
 /// An opening through a wall, in its local frame: `x` along the wall (metres from its start),
-/// `z` absolute elevations.
-#[derive(Debug, Clone, Copy, PartialEq)]
+/// `z` absolute elevations; for a shaped opening, its convex `outline` (counter-clockwise, in
+/// the same x and z) within that box. Empty for a rectangle.
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct Cut {
     pub x: [f64; 2],
     pub z: [f64; 2],
+    pub outline: Vec<[f64; 2]>,
+}
+
+impl Cut {
+    pub fn rect(x: [f64; 2], z: [f64; 2]) -> Self {
+        Self {
+            x,
+            z,
+            outline: Vec::new(),
+        }
+    }
+
+    /// The heights open at `x` along the wall; `None` outside the opening.
+    pub fn z_at(&self, x: f64) -> Option<[f64; 2]> {
+        if x < self.x[0] - 1e-9 || x > self.x[1] + 1e-9 {
+            return None;
+        }
+        if self.outline.is_empty() {
+            return Some(self.z);
+        }
+        crate::inserts::shape::span_at(&self.outline, x)
+    }
+
+    /// Where the open heights change slope along the wall: the outline's points (none for a
+    /// rectangle).
+    pub fn stations(&self) -> Vec<f64> {
+        crate::inserts::shape::stations(&self.outline)
+    }
 }
 
 /// The interval along the wall where its section is whole (between the joined ends), in which
@@ -121,7 +156,6 @@ pub fn cut_mesh(body: &WallBody, cuts: &[Cut]) -> (Vec<[f64; 3]>, Vec<u32>) {
     let span = clear_span(body);
     let cuts: Vec<Cut> = cuts
         .iter()
-        .copied()
         .filter(|c| {
             c.x[0] >= span[0] - 1e-9
                 && c.x[1] <= span[1] + 1e-9
@@ -133,6 +167,7 @@ pub fn cut_mesh(body: &WallBody, cuts: &[Cut]) -> (Vec<[f64; 3]>, Vec<u32>) {
         .map(|c| Cut {
             x: c.x,
             z: [c.z[0].max(z0), c.z[1].min(z1)],
+            outline: c.outline.clone(),
         })
         .collect();
     if cuts.is_empty() {
@@ -183,6 +218,31 @@ pub fn cut_mesh(body: &WallBody, cuts: &[Cut]) -> (Vec<[f64; 3]>, Vec<u32>) {
             }
         }
     }
+    // Shaped openings: the corners of their boxes outside the outline, on both long faces.
+    for c in cuts.iter().filter(|c| !c.outline.is_empty()) {
+        for w in c.stations().windows(2) {
+            let (Some(a), Some(b)) = (c.z_at(w[0]), c.z_at(w[1])) else {
+                continue;
+            };
+            for (y, outward) in [(yi, [0.0, -1.0, 0.0]), (ye, [0.0, 1.0, 0.0])] {
+                let below = [
+                    [w[0], y, c.z[0]],
+                    [w[1], y, c.z[0]],
+                    [w[1], y, b[0]],
+                    [w[0], y, a[0]],
+                ];
+                let above = [
+                    [w[0], y, a[1]],
+                    [w[1], y, b[1]],
+                    [w[1], y, c.z[1]],
+                    [w[0], y, c.z[1]],
+                ];
+                for quad in [below, above] {
+                    m.polygon(&distinct(&quad), outward);
+                }
+            }
+        }
+    }
     // End faces.
     for (a, b, outward) in [
         (f[3], f[0], [-1.0, 0.0, 0.0]),
@@ -208,7 +268,22 @@ pub fn cut_mesh(body: &WallBody, cuts: &[Cut]) -> (Vec<[f64; 3]>, Vec<u32>) {
         let holes: Vec<[f64; 2]> = cuts
             .iter()
             .filter(|c| (c.z[0] - z).abs() < 1e-9 || (c.z[1] - z).abs() < 1e-9)
-            .map(|c| c.x)
+            .flat_map(|c| {
+                if c.outline.is_empty() {
+                    return vec![c.x];
+                }
+                // Where the outline runs along the bottom or top.
+                c.stations()
+                    .windows(2)
+                    .filter(|w| {
+                        [w[0], w[1]].iter().all(|x| {
+                            c.z_at(*x)
+                                .is_some_and(|s| (s[0] - z).abs() < 1e-9 || (s[1] - z).abs() < 1e-9)
+                        })
+                    })
+                    .map(|w| [w[0], w[1]])
+                    .collect()
+            })
             .collect();
         for [a, b] in remaining(lo, hi, &holes) {
             let piece = clip_x(&outline, a, b);
@@ -216,8 +291,12 @@ pub fn cut_mesh(body: &WallBody, cuts: &[Cut]) -> (Vec<[f64; 3]>, Vec<u32>) {
             m.polygon(&points, outward);
         }
     }
-    // Reveals: jambs, sill and head.
+    // Reveals: jambs, sill and head; a shaped opening's follow its outline.
     for c in &cuts {
+        if !c.outline.is_empty() {
+            shaped_reveals(&mut m, c, yi, ye, z0, z1);
+            continue;
+        }
         let [a, b] = c.x;
         let [c0, c1] = c.z;
         for (x, dir) in [(a, 1.0), (b, -1.0)] {
@@ -237,6 +316,70 @@ pub fn cut_mesh(body: &WallBody, cuts: &[Cut]) -> (Vec<[f64; 3]>, Vec<u32>) {
         }
     }
     (m.positions, m.indices)
+}
+
+/// A polygon without repeated points (a quad with a corner on the box edge is a triangle).
+fn distinct(points: &[[f64; 3]]) -> Vec<[f64; 3]> {
+    let same = |a: &[f64; 3], b: &[f64; 3]| (0..3).all(|k| (a[k] - b[k]).abs() < 1e-9);
+    let mut out: Vec<[f64; 3]> = Vec::new();
+    for p in points {
+        if !out.last().is_some_and(|q| same(q, p)) {
+            out.push(*p);
+        }
+    }
+    while out.len() > 1 && same(&out[0], &out[out.len() - 1]) {
+        out.pop();
+    }
+    out
+}
+
+/// The reveals of a shaped opening: per strip between the outline's points, its lower and upper
+/// edge across the wall (facing into the opening), and the jambs where its ends are upright.
+/// Edges on the wall's bottom or top are left open.
+fn shaped_reveals(m: &mut Mesh, c: &Cut, yi: f64, ye: f64, z0: f64, z1: f64) {
+    let stations = c.stations();
+    for w in stations.windows(2) {
+        let (Some(a), Some(b)) = (c.z_at(w[0]), c.z_at(w[1])) else {
+            continue;
+        };
+        let (dx, (lo_dz, hi_dz)) = (w[1] - w[0], (b[0] - a[0], b[1] - a[1]));
+        let on = |za: f64, zb: f64, z: f64| (za - z).abs() < 1e-9 && (zb - z).abs() < 1e-9;
+        if !on(a[0], b[0], z0) {
+            m.polygon(
+                &[
+                    [w[0], yi, a[0]],
+                    [w[1], yi, b[0]],
+                    [w[1], ye, b[0]],
+                    [w[0], ye, a[0]],
+                ],
+                [-lo_dz, 0.0, dx],
+            );
+        }
+        if !on(a[1], b[1], z1) {
+            m.polygon(
+                &[
+                    [w[0], yi, a[1]],
+                    [w[1], yi, b[1]],
+                    [w[1], ye, b[1]],
+                    [w[0], ye, a[1]],
+                ],
+                [hi_dz, 0.0, -dx],
+            );
+        }
+    }
+    for (x, dir) in [
+        (stations.first().copied(), 1.0),
+        (stations.last().copied(), -1.0),
+    ] {
+        let Some(x) = x else { continue };
+        let Some([lo, hi]) = c.z_at(x) else { continue };
+        if hi - lo > 1e-9 {
+            m.polygon(
+                &[[x, yi, lo], [x, ye, lo], [x, ye, hi], [x, yi, hi]],
+                [dir, 0.0, 0.0],
+            );
+        }
+    }
 }
 
 #[cfg(test)]
@@ -278,14 +421,8 @@ mod tests {
         let cut = cut_mesh(
             &b,
             &[
-                Cut {
-                    x: [0.5, 1.4],
-                    z: [0.0, 2.1],
-                },
-                Cut {
-                    x: [2.5, 3.7],
-                    z: [0.9, 2.1],
-                },
+                Cut::rect([0.5, 1.4], [0.0, 2.1]),
+                Cut::rect([2.5, 3.7], [0.9, 2.1]),
             ],
         );
         let expected = 3.0 - 0.2 * (0.9 * 2.1 + 1.2 * 1.2);
@@ -295,13 +432,7 @@ mod tests {
     #[test]
     fn openings_outside_the_clear_span_are_skipped() {
         let b = body();
-        let cut = cut_mesh(
-            &b,
-            &[Cut {
-                x: [4.5, 5.5],
-                z: [0.0, 2.0],
-            }],
-        );
+        let cut = cut_mesh(&b, &[Cut::rect([4.5, 5.5], [0.0, 2.0])]);
         assert_eq!(cut, b.mesh());
         assert_eq!(clear_span(&b), [0.0, 5.0]);
     }

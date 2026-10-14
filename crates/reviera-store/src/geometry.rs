@@ -1206,6 +1206,12 @@ pub(crate) fn write_boxes(
     scale: f64,
     contexts: Contexts,
 ) -> Result<()> {
+    // A profile shape from before (the insert was shaped) goes.
+    if let Some(old) = ProfileShape::read(ifc, element)? {
+        for id in old.placement.into_iter().chain(old.rep) {
+            ifc.remove(id)?;
+        }
+    }
     let shape = match BoxShape::read(ifc, element)? {
         Some(s) if s.items.len() == boxes.len() => s,
         old => {
@@ -1275,6 +1281,357 @@ pub(crate) fn remove_boxes(ifc: &mut IfcModel, element: StepId) -> Result<()> {
             ifc.remove(id)?;
         }
     }
+    if let Some(shape) = ProfileShape::read(ifc, element)? {
+        for id in shape.placement.into_iter().chain(shape.rep) {
+            ifc.remove(id)?;
+        }
+    }
+    Ok(())
+}
+
+/// A profile of a shaped door, window or opening (ARC-WIN-002), in the element's plane: x along
+/// it and z up (metres).
+pub(crate) enum Profile<'a> {
+    Circle {
+        centre: [f64; 2],
+        radius: f64,
+    },
+    Rings {
+        outer: &'a [[f64; 2]],
+        holes: Vec<&'a [[f64; 2]]>,
+    },
+}
+
+/// A profile extruded across the element's plane, through `y` (metres).
+pub(crate) struct ProfileSolid<'a> {
+    pub profile: Profile<'a>,
+    pub y: [f64; 2],
+}
+
+/// What a profile shape holds, in file units, to compare a written shape with: per solid its
+/// depth and start, then a circle's centre and radius or each ring's points (closed).
+fn profile_signature(solids: &[ProfileSolid<'_>], scale: f64) -> Vec<f64> {
+    let mut s = vec![solids.len() as f64];
+    for sol in solids {
+        s.extend([(sol.y[1] - sol.y[0]) / scale, sol.y[1] / scale]);
+        match &sol.profile {
+            Profile::Circle { centre, radius } => {
+                s.extend([1.0, centre[0] / scale, centre[1] / scale, radius / scale]);
+            }
+            Profile::Rings { outer, holes } => {
+                s.extend([2.0, 1.0 + holes.len() as f64]);
+                for ring in std::iter::once(outer).chain(holes.iter()) {
+                    s.push(ring.len() as f64 + 1.0);
+                    for p in ring.iter().chain(ring.first()) {
+                        s.extend([p[0] / scale, p[1] / scale]);
+                    }
+                }
+            }
+        }
+    }
+    s
+}
+
+fn coords(ifc: &IfcModel, id: StepId) -> Result<Vec<f64>> {
+    Ok(match ifc.attribute(id, "Coordinates")? {
+        AttrValue::List(c) => c
+            .iter()
+            .filter_map(|v| match v {
+                AttrValue::Real(r) => Some(*r),
+                _ => None,
+            })
+            .collect(),
+        _ => Vec::new(),
+    })
+}
+
+/// The entities of a shape written by [`write_profiles`]: its placement (placement, axes,
+/// location, axis, ref direction), the rest of its representation, and its signature.
+struct ProfileShape {
+    placement: [StepId; 5],
+    rep: Vec<StepId>,
+    signature: Vec<f64>,
+}
+
+impl ProfileShape {
+    fn read(ifc: &IfcModel, element: StepId) -> Result<Option<Self>> {
+        let e = entity(ifc, element)?;
+        let one = |e: &Entity, attr: &str| e.refs(attr).first().copied();
+        macro_rules! get {
+            ($v:expr) => {
+                match $v {
+                    Some(v) => v,
+                    None => return Ok(None),
+                }
+            };
+        }
+        let placement = get!(one(&e, "ObjectPlacement"));
+        let axes = get!(one(&entity(ifc, placement)?, "RelativePlacement"));
+        let a = entity(ifc, axes)?;
+        let placement = [
+            placement,
+            axes,
+            get!(one(&a, "Location")),
+            get!(one(&a, "Axis")),
+            get!(one(&a, "RefDirection")),
+        ];
+        let shape = get!(one(&e, "Representation"));
+        let reps = entity(ifc, shape)?.refs("Representations");
+        if reps.len() != 1 {
+            return Ok(None);
+        }
+        let mut rep = vec![shape, reps[0]];
+        let solids = entity(ifc, reps[0])?.refs("Items");
+        let mut signature = vec![solids.len() as f64];
+        for solid in solids {
+            let s = entity(ifc, solid)?;
+            if !s.class.eq_ignore_ascii_case("IfcExtrudedAreaSolid") {
+                return Ok(None);
+            }
+            let profile = get!(one(&s, "SweptArea"));
+            let pr = entity(ifc, profile)?;
+            let position = get!(one(&s, "Position"));
+            let pos = entity(ifc, position)?;
+            let pos_location = get!(one(&pos, "Location"));
+            let depth = match s.get("Depth") {
+                AttrValue::Real(d) => *d,
+                _ => 0.0,
+            };
+            let y1 = coords(ifc, pos_location)?.get(1).copied().unwrap_or(0.0);
+            signature.extend([depth, y1]);
+            rep.extend([solid, profile, position, pos_location]);
+            rep.extend(one(&pos, "Axis"));
+            rep.extend(one(&pos, "RefDirection"));
+            rep.extend(one(&s, "ExtrudedDirection"));
+            if pr.class.eq_ignore_ascii_case("IfcCircleProfileDef") {
+                let p2 = get!(one(&pr, "Position"));
+                let centre = get!(one(&entity(ifc, p2)?, "Location"));
+                let c = coords(ifc, centre)?;
+                let radius = match pr.get("Radius") {
+                    AttrValue::Real(r) => *r,
+                    _ => 0.0,
+                };
+                signature.extend([1.0, c.first().copied().unwrap_or(0.0)]);
+                signature.extend([c.get(1).copied().unwrap_or(0.0), radius]);
+                rep.extend([p2, centre]);
+            } else if pr
+                .class
+                .eq_ignore_ascii_case("IfcArbitraryClosedProfileDef")
+                || pr
+                    .class
+                    .eq_ignore_ascii_case("IfcArbitraryProfileDefWithVoids")
+            {
+                let curves: Vec<StepId> = pr
+                    .refs("OuterCurve")
+                    .into_iter()
+                    .chain(pr.refs("InnerCurves"))
+                    .collect();
+                signature.extend([2.0, curves.len() as f64]);
+                for c in curves {
+                    let points = entity(ifc, c)?.refs("Points");
+                    rep.push(c);
+                    signature.push(points.len() as f64);
+                    for p in &points {
+                        signature.extend(coords(ifc, *p)?);
+                    }
+                    rep.extend(points);
+                }
+            } else {
+                return Ok(None);
+            }
+        }
+        rep.sort_by_key(|s| s.0);
+        rep.dedup();
+        Ok(Some(Self {
+            placement,
+            rep,
+            signature,
+        }))
+    }
+}
+
+/// Writes an element's placement and a body of profiles extruded across its plane (a shaped
+/// door, window or opening, ARC-WIN-002), unless it already has exactly this geometry. A box
+/// shape written before is replaced.
+pub(crate) fn write_profiles(
+    ifc: &mut IfcModel,
+    element: StepId,
+    frame: &Frame,
+    solids: &[ProfileSolid<'_>],
+    scale: f64,
+    contexts: Contexts,
+) -> Result<()> {
+    if let Some(old) = BoxShape::read(ifc, element)? {
+        for id in old.entities() {
+            ifc.remove(id)?;
+        }
+    }
+    let r = |id: StepId| AttrValue::Ref(id.0);
+    let existing = ProfileShape::read(ifc, element)?;
+    let [placement, _, location, axis, ref_direction] = match &existing {
+        Some(e) => e.placement,
+        None => {
+            let location = create_with(
+                ifc,
+                "IfcCartesianPoint",
+                &[("Coordinates", reals(&[0.0; 3]))],
+            )?;
+            let axis = create_with(
+                ifc,
+                "IfcDirection",
+                &[("DirectionRatios", reals(&[0.0, 0.0, 1.0]))],
+            )?;
+            let ref_direction = create_with(
+                ifc,
+                "IfcDirection",
+                &[("DirectionRatios", reals(&[1.0, 0.0, 0.0]))],
+            )?;
+            let axes = create_with(
+                ifc,
+                "IfcAxis2Placement3D",
+                &[
+                    ("Location", r(location)),
+                    ("Axis", r(axis)),
+                    ("RefDirection", r(ref_direction)),
+                ],
+            )?;
+            let placement =
+                create_with(ifc, "IfcLocalPlacement", &[("RelativePlacement", r(axes))])?;
+            ifc.set_attribute(element, "ObjectPlacement", &r(placement))?;
+            [placement, axes, location, axis, ref_direction]
+        }
+    };
+    let set = |ifc: &mut IfcModel, id: StepId, attr: &str, v: AttrValue| -> Result<()> {
+        if ifc.attribute(id, attr)? != v {
+            ifc.set_attribute(id, attr, &v)?;
+        }
+        Ok(())
+    };
+    let rel = frame
+        .relative_to
+        .map_or(AttrValue::Null, |p| AttrValue::Ref(p.0));
+    set(ifc, placement, "PlacementRelTo", rel)?;
+    set(ifc, location, "Coordinates", reals(&frame.origin))?;
+    set(ifc, axis, "DirectionRatios", reals(&[0.0, 0.0, 1.0]))?;
+    set(
+        ifc,
+        ref_direction,
+        "DirectionRatios",
+        reals(&[frame.x_dir[0], frame.x_dir[1], 0.0]),
+    )?;
+    let target = profile_signature(solids, scale);
+    if let Some(e) = &existing {
+        if e.signature.len() == target.len()
+            && e.signature
+                .iter()
+                .zip(&target)
+                .all(|(a, b)| (a - b).abs() < 1e-9)
+        {
+            return Ok(());
+        }
+        for id in &e.rep {
+            ifc.remove(*id)?;
+        }
+    }
+    let point = |ifc: &mut IfcModel, c: &[f64]| {
+        create_with(ifc, "IfcCartesianPoint", &[("Coordinates", reals(c))])
+    };
+    let direction = |ifc: &mut IfcModel, d: [f64; 3]| {
+        create_with(ifc, "IfcDirection", &[("DirectionRatios", reals(&d))])
+    };
+    let mut items = Vec::new();
+    for sol in solids {
+        let profile = match &sol.profile {
+            Profile::Circle { centre, radius } => {
+                let c = point(ifc, &[centre[0] / scale, centre[1] / scale])?;
+                let p2 = create_with(ifc, "IfcAxis2Placement2D", &[("Location", r(c))])?;
+                create_with(
+                    ifc,
+                    "IfcCircleProfileDef",
+                    &[
+                        ("ProfileType", AttrValue::Enum("AREA".into())),
+                        ("Position", r(p2)),
+                        ("Radius", AttrValue::Real(radius / scale)),
+                    ],
+                )?
+            }
+            Profile::Rings { outer, holes } => {
+                let polyline = |ifc: &mut IfcModel, ring: &[[f64; 2]]| -> Result<StepId> {
+                    let points = ring
+                        .iter()
+                        .chain(ring.first())
+                        .map(|p| point(ifc, &[p[0] / scale, p[1] / scale]).map(r))
+                        .collect::<Result<Vec<_>>>()?;
+                    create_with(ifc, "IfcPolyline", &[("Points", AttrValue::List(points))])
+                };
+                let outer_curve = polyline(ifc, outer)?;
+                if holes.is_empty() {
+                    create_with(
+                        ifc,
+                        "IfcArbitraryClosedProfileDef",
+                        &[
+                            ("ProfileType", AttrValue::Enum("AREA".into())),
+                            ("OuterCurve", r(outer_curve)),
+                        ],
+                    )?
+                } else {
+                    let inner = holes
+                        .iter()
+                        .map(|h| polyline(ifc, h).map(r))
+                        .collect::<Result<Vec<_>>>()?;
+                    create_with(
+                        ifc,
+                        "IfcArbitraryProfileDefWithVoids",
+                        &[
+                            ("ProfileType", AttrValue::Enum("AREA".into())),
+                            ("OuterCurve", r(outer_curve)),
+                            ("InnerCurves", AttrValue::List(inner)),
+                        ],
+                    )?
+                }
+            }
+        };
+        // The profile's x along the element, its y up; extruded from `y[1]` toward -y.
+        let start = point(ifc, &[0.0, sol.y[1] / scale, 0.0])?;
+        let z = direction(ifc, [0.0, -1.0, 0.0])?;
+        let x = direction(ifc, [1.0, 0.0, 0.0])?;
+        let position = create_with(
+            ifc,
+            "IfcAxis2Placement3D",
+            &[
+                ("Location", r(start)),
+                ("Axis", r(z)),
+                ("RefDirection", r(x)),
+            ],
+        )?;
+        let up = direction(ifc, [0.0, 0.0, 1.0])?;
+        items.push(r(create_with(
+            ifc,
+            "IfcExtrudedAreaSolid",
+            &[
+                ("SweptArea", r(profile)),
+                ("Position", r(position)),
+                ("ExtrudedDirection", r(up)),
+                ("Depth", AttrValue::Real((sol.y[1] - sol.y[0]) / scale)),
+            ],
+        )?));
+    }
+    let body = create_with(
+        ifc,
+        "IfcShapeRepresentation",
+        &[
+            ("ContextOfItems", r(contexts.body)),
+            ("RepresentationIdentifier", AttrValue::String("Body".into())),
+            ("RepresentationType", AttrValue::String("SweptSolid".into())),
+            ("Items", AttrValue::List(items)),
+        ],
+    )?;
+    let shape = create_with(
+        ifc,
+        "IfcProductDefinitionShape",
+        &[("Representations", AttrValue::List(vec![r(body)]))],
+    )?;
+    ifc.set_attribute(element, "Representation", &r(shape))?;
     Ok(())
 }
 

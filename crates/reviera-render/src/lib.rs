@@ -95,9 +95,8 @@ impl RenderScene {
                             continue;
                         }
                         entry.0 = true;
-                        let inside = q.is_some_and(|(x, y)| {
-                            x >= lo.0 && x <= hi.0 && y >= lo.1 && y <= hi.1
-                        });
+                        let inside = q
+                            .is_some_and(|(x, y)| x >= lo.0 && x <= hi.0 && y >= lo.1 && y <= hi.1);
                         entry.1 &= inside;
                     }
                 }
@@ -731,12 +730,23 @@ mod tests {
         let crossing = scene.boxed(&project, lo, hi, BoxMode::Crossing, &all, &vis);
         assert_eq!(crossing, vec![ElementId(1), ElementId(2)]);
         // A box inside a triangle, touching no corner, still crosses it.
-        let inner = scene.boxed(&project, (24.0, 4.0), (26.0, 5.0), BoxMode::Crossing, &all, &vis);
+        let inner = scene.boxed(
+            &project,
+            (24.0, 4.0),
+            (26.0, 5.0),
+            BoxMode::Crossing,
+            &all,
+            &vis,
+        );
         assert_eq!(inner, vec![ElementId(2)]);
         // Hidden elements are not picked.
         let mut hidden = Visibility::default();
         hidden.hidden.insert(ElementId(1));
-        assert!(scene.boxed(&project, lo, hi, BoxMode::Window, &all, &hidden).is_empty());
+        assert!(
+            scene
+                .boxed(&project, lo, hi, BoxMode::Window, &all, &hidden)
+                .is_empty()
+        );
     }
 
     #[test]

@@ -137,10 +137,19 @@ ribbon's tools, the command shell, Lua and MCP alike.
 - **Editing**: drag a selected one along its wall, or type its distance from either end of the
   wall. Properties edit the sill height (the head height follows), its own width and height (or
   the type's), the hand and facing, and the type (door and window types to duplicate and resize).
+- **Shapes** (ARC-WIN-002): a type's Shape in Properties makes it round, elliptical, round-top
+  (semicircular, segmental, elliptical, Gothic or Tudor heads), a fan light, gable-headed, a
+  trapezoid or a polygon, with its own values (rise, radius ratio, sides, rotation, side
+  heights) and radiating or upright glazing bars. Doors take round-top heads. The wall's opening,
+  the frame (at a constant width along arcs) and the glass follow the outline; plans cut it at
+  its true width at the cut height; fitting keeps a round window round and a semicircular or
+  Gothic head's shape.
 - Walls are cut, plans show door swings, and each new door or window gets the next Mark.
 - **IFC**: `IfcDoor`/`IfcWindow` filling an `IfcOpeningElement` that voids the wall (`door.place`,
   `window.place`, `insert.set_position`, `insert.set_sill_height`, `insert.set_size`,
-  `insert.flip_hand`, `insert.flip_facing`).
+  `insert.flip_hand`, `insert.flip_facing`). A shaped one's opening is its outline extruded
+  through the wall (an `IfcCircleProfileDef` for a round window), and a shaped window says
+  `PartitioningType = USERDEFINED` with its shape.
 
 #### Sketch mode
 
@@ -419,8 +428,10 @@ nearest gaps in what is built:
 - **Walls**: layered wall types (core and finishes), T joins into the side of a curved wall,
   attaching bases or to floors and ceilings, and true curved IFC geometry (curved walls, arches
   and domes are faceted B-reps).
-- **Windows and doors**: shaped windows (round, round-top, Gothic, fan and gable heads,
-  ARC-WIN-002); gate swing arcs in plan.
+- **Windows and doors**: quarter-round fan lights, arcs as true arc segments in IFC (shaped
+  outlines are written as polylines), the arch above the cut dashed in plans, and built-in
+  shaped types ready in the type list (today a type is duplicated and its Shape set); gate
+  swing arcs in plan.
 - **Roofs**: openings and skylights, slope arrows, picking single eave edges in the window,
   dormer openings as separate IFC opening elements. Gutters and downspouts are planned as part
   of plumbing (MEP-PIPE-010).

@@ -91,8 +91,8 @@ impl App {
             Weights {
                 cut: cut.map(|w| w as f32),
                 projection: projection as f32,
-            // Printed and exported drawings never show temporary state.
-            opacity: 1.0,
+                // Printed and exported drawings never show temporary state.
+                opacity: 1.0,
             }
         };
         let edges = feature_edges(scene);
@@ -273,7 +273,7 @@ pub fn section_parts(
         Weights {
             cut: cut.map(|w| w as f32),
             projection: projection as f32,
-        opacity: 1.0,
+            opacity: 1.0,
         }
     };
     let edges = feature_edges(&local);

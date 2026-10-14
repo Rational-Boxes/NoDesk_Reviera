@@ -10709,11 +10709,13 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 **Commands.** `type.set_param(type_id, "shape", rectangle|round|elliptical|round_top|fan|gable|trapezoid|polygon)` and the shape parameters (`rise`, `head_profile`, `radius_ratio`, `sides`, `rotation`, `left_height`, `right_height`, `muntins`), as for other type parameters. Placement is `window.place` / `door.place` unchanged.
 
 **Acceptance criteria.**
-- [ ] A round window of 900 mm diameter cuts a circular opening in its wall (the void's volume is π · 0.45² · the wall's thickness within 0.5%) and exports with an `IfcCircleProfileDef` opening.
-- [ ] A 1.2 m-wide semicircular round-top window 2.0 m high has its spring at 1.4 m, and its frame follows the arch at a constant frame width.
-- [ ] A Gothic window with a radius ratio of 1.0 has two arcs of radius equal to its width meeting at the apex.
-- [ ] A plan cut at 1.2 m through a round window centred at 1.5 m with a 900 mm diameter shows an opening of 2 · √(0.45² − 0.3²) ≈ 0.67 m.
-- [ ] Fitted into a wall too narrow for it, a round window keeps its circle and shrinks its diameter.
+- [x] A round window of 900 mm diameter cuts a circular opening in its wall (the void's volume is π · 0.45² · the wall's thickness within 0.5%) and exports with an `IfcCircleProfileDef` opening.
+- [x] A 1.2 m-wide semicircular round-top window 2.0 m high has its spring at 1.4 m, and its frame follows the arch at a constant frame width.
+- [x] A Gothic window with a radius ratio of 1.0 has two arcs of radius equal to its width meeting at the apex.
+- [x] A plan cut at 1.2 m through a round window centred at 1.5 m with a 900 mm diameter shows an opening of 2 · √(0.45² − 0.3²) ≈ 0.67 m.
+- [x] Fitted into a wall too narrow for it, a round window keeps its circle and shrinks its diameter.
+
+*Built (2026-10-14):* every shape and head profile above, glazing bars (radiating or upright), round-top doors, the cut in straight and curved walls, fitting by proportion, Properties rows for the shape's values, and the IFC opening and body as extruded profiles (`IfcCircleProfileDef` for round windows; other outlines as `IfcPolyline`s, not yet `IfcIndexedPolyCurve` arcs). Not yet: the quarter-round fan, the head arch dashed above the cut in plans, and shaped types ready-made in the type list.
 
 ### 3.4.4 Components
 **ID:** ARC-COMP-001 · **Priority:** P0 · **Ref:** research/02 §5.4

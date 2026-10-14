@@ -903,15 +903,53 @@ impl LocalProject {
                 ],
                 x_dir,
             };
-            let void = [[-half_w, half_w], [-half_t, half_t], [0.0, p.ty.height]];
-            geometry::write_boxes(&mut self.ifc, opening, &frame, &[void], scale, contexts)?;
+            // A shaped one (ARC-WIN-002): its outline extruded through the wall (a round one's
+            // a circle), and its frame, glass and panel as profiles; else boxes.
+            let outline = p.outline();
+            if p.ty.shaped() {
+                let profile = if p.ty.shape == inserts::Shape::Round {
+                    geometry::Profile::Circle {
+                        centre: [0.0, p.ty.height / 2.0],
+                        radius: p.ty.width.min(p.ty.height) / 2.0,
+                    }
+                } else {
+                    geometry::Profile::Rings {
+                        outer: &outline,
+                        holes: Vec::new(),
+                    }
+                };
+                let void = geometry::ProfileSolid {
+                    profile,
+                    y: [-half_t, half_t],
+                };
+                geometry::write_profiles(&mut self.ifc, opening, &frame, &[void], scale, contexts)?;
+            } else {
+                let void = [[-half_w, half_w], [-half_t, half_t], [0.0, p.ty.height]];
+                geometry::write_boxes(&mut self.ifc, opening, &frame, &[void], scale, contexts)?;
+            }
             let frame = geometry::Frame {
                 relative_to: placement_of(&self.ifc, opening)?,
                 origin: [0.0; 3],
                 x_dir: [1.0, 0.0],
             };
-            let boxes: Vec<geometry::LocalBox> = p.boxes().into_iter().map(|(b, _)| b).collect();
-            geometry::write_boxes(&mut self.ifc, step, &frame, &boxes, scale, contexts)?;
+            let solids = p.solids();
+            if solids.is_empty() {
+                let boxes: Vec<geometry::LocalBox> =
+                    p.boxes().into_iter().map(|(b, _)| b).collect();
+                geometry::write_boxes(&mut self.ifc, step, &frame, &boxes, scale, contexts)?;
+            } else {
+                let profiles: Vec<geometry::ProfileSolid<'_>> = solids
+                    .iter()
+                    .map(|s| geometry::ProfileSolid {
+                        profile: geometry::Profile::Rings {
+                            outer: &s.outer,
+                            holes: s.holes.iter().map(Vec::as_slice).collect(),
+                        },
+                        y: s.y,
+                    })
+                    .collect();
+                geometry::write_profiles(&mut self.ifc, step, &frame, &profiles, scale, contexts)?;
+            }
             geometry::relate_one(
                 &mut self.ifc,
                 "IfcRelVoidsElement",
@@ -941,6 +979,20 @@ impl LocalProject {
                 ("OverallWidth", AttrValue::Real(p.ty.width / scale)),
                 ("OverallHeight", AttrValue::Real(p.ty.height / scale)),
             ];
+            // A shaped window says so (its shape's values are in the type's RXD recipe).
+            if ifc4 && p.kind == inserts::Kind::Window {
+                let (kind, user) = if p.ty.shaped() {
+                    let mut name = p.ty.shape.label().to_owned();
+                    if p.ty.shape == inserts::Shape::RoundTop {
+                        name = format!("{name} ({})", p.ty.head_profile.label());
+                    }
+                    ("USERDEFINED", AttrValue::String(name))
+                } else {
+                    ("SINGLE_PANEL", AttrValue::Null)
+                };
+                attrs.push(("PartitioningType", AttrValue::Enum(kind.into())));
+                attrs.push(("UserDefinedPartitioningType", user));
+            }
             if ifc4 && p.kind == inserts::Kind::Door {
                 // Hinge on the left seen from the swing side.
                 let left = p.recipe.flip_hand == p.recipe.flip_facing;

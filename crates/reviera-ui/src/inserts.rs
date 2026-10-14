@@ -140,21 +140,22 @@ impl Gui {
             .ray(x as f32, y as f32, size.width as f32, size.height as f32);
         // The point of the wall's location curve nearest `p`, its direction there, and
         // whether `p` is on its +normal (left) side.
-        let nearest = |e: &reviera_core::Element, g: &reviera_core::walls::WallGeometry, p: [f64; 2]| {
-            let path = reviera_core::walls::wall_recipe(e)
-                .and_then(|r| reviera_core::walls::curved::path_of(&r));
-            let (foot, u) = match path {
-                Some(path) => path.at(path.project(p)),
-                None => {
-                    let u = g.direction();
-                    let t = ((p[0] - g.start[0]) * u[0] + (p[1] - g.start[1]) * u[1])
-                        .clamp(0.0, g.length());
-                    ([g.start[0] + u[0] * t, g.start[1] + u[1] * t], u)
-                }
+        let nearest =
+            |e: &reviera_core::Element, g: &reviera_core::walls::WallGeometry, p: [f64; 2]| {
+                let path = reviera_core::walls::wall_recipe(e)
+                    .and_then(|r| reviera_core::walls::curved::path_of(&r));
+                let (foot, u) = match path {
+                    Some(path) => path.at(path.project(p)),
+                    None => {
+                        let u = g.direction();
+                        let t = ((p[0] - g.start[0]) * u[0] + (p[1] - g.start[1]) * u[1])
+                            .clamp(0.0, g.length());
+                        ([g.start[0] + u[0] * t, g.start[1] + u[1] * t], u)
+                    }
+                };
+                let left = u[0] * (p[1] - foot[1]) - u[1] * (p[0] - foot[0]) >= 0.0;
+                (foot, u, left)
             };
-            let left = u[0] * (p[1] - foot[1]) - u[1] * (p[0] - foot[0]) >= 0.0;
-            (foot, u, left)
-        };
         if let Some(plan) = &v.plan {
             // In a plan: the nearest wall cut by the plan, within its faces plus a few pixels.
             let cut = plan.range.cut;
@@ -571,7 +572,136 @@ impl Gui {
             let text = self.format_length(value(key));
             grid.append(Property::string(*label, format!("it:{key}"), text));
         }
+        self.shape_rows(grid, kind, &t);
         self.type_rows = Some(id);
+    }
+
+    /// The shape rows of a door or window type (ARC-WIN-002): the shape, then its own values.
+    fn shape_rows(&mut self, grid: &PropertyGrid, kind: Kind, t: &inserts::InsertType) {
+        use inserts::{HeadProfile, Shape, shape};
+        let shapes: Vec<Shape> = Shape::ALL
+            .iter()
+            .copied()
+            .filter(|s| kind == Kind::Window || s.for_doors())
+            .collect();
+        let choices: Vec<(String, i32)> = shapes
+            .iter()
+            .enumerate()
+            .map(|(i, s)| (s.label().to_owned(), i as i32))
+            .collect();
+        let index = shapes
+            .iter()
+            .position(|s| *s == t.shape)
+            .map_or(-1, |i| i as i32);
+        grid.append(Property::enumeration("Shape", "it:shape", choices, index));
+        grid.set_help_string(
+            "it:shape",
+            "The outline: the opening in the wall follows it",
+        );
+        let (w, h) = (t.width, t.height);
+        let length_row = |g: &mut Self, label: &str, key: &str, v: f64, help: &str| {
+            let text = g.format_length(v);
+            grid.append(Property::string(label, format!("it:{key}"), text));
+            grid.set_help_string(format!("it:{key}"), help);
+        };
+        match t.shape {
+            Shape::RoundTop => {
+                let heads: Vec<(String, i32)> = HeadProfile::ALL
+                    .iter()
+                    .enumerate()
+                    .map(|(i, h)| (h.label().to_owned(), i as i32))
+                    .collect();
+                let index = HeadProfile::ALL
+                    .iter()
+                    .position(|h| *h == t.head_profile)
+                    .map_or(-1, |i| i as i32);
+                grid.append(Property::enumeration(
+                    "Head Profile",
+                    "it:head_profile",
+                    heads,
+                    index,
+                ));
+                match t.head_profile {
+                    HeadProfile::Segmental | HeadProfile::Elliptical | HeadProfile::Tudor => {
+                        let rise = shape::rise(t, w);
+                        length_row(
+                            self,
+                            "Rise",
+                            "rise",
+                            rise,
+                            "The arch's height above its springing",
+                        );
+                    }
+                    HeadProfile::Gothic => {
+                        let ratio = format!("{:.3}", shape::radius_ratio(t));
+                        grid.append(Property::string("Radius Ratio", "it:radius_ratio", ratio));
+                        grid.set_help_string(
+                            "it:radius_ratio",
+                            "Each arc's radius as a multiple of the width (1: equilateral)",
+                        );
+                    }
+                    HeadProfile::Semicircular => {}
+                }
+                let spring = self.format_length(shape::spring_height(t, w, h));
+                grid.append(Property::string("Spring Height", "it_spring", spring));
+                grid.set_property_read_only("it_spring", true);
+                grid.set_help_string(
+                    "it_spring",
+                    "The straight sides' height: Height less the arch",
+                );
+            }
+            Shape::Gable => {
+                length_row(
+                    self,
+                    "Rise",
+                    "rise",
+                    shape::rise(t, w).min(h),
+                    "The pitched head's height",
+                );
+            }
+            Shape::Trapezoid => {
+                let side = |v: Option<f64>| v.unwrap_or(h).min(h);
+                length_row(
+                    self,
+                    "Left Height",
+                    "left_height",
+                    side(t.left_height),
+                    "The left side's height",
+                );
+                length_row(
+                    self,
+                    "Right Height",
+                    "right_height",
+                    side(t.right_height),
+                    "The right side's height",
+                );
+            }
+            Shape::Polygon => {
+                let sides = t.sides.unwrap_or(8);
+                grid.append(Property::string("Sides", "it:sides", sides.to_string()));
+                let rotation = t
+                    .rotation
+                    .unwrap_or(std::f64::consts::PI / f64::from(sides.max(3)));
+                grid.append(Property::string(
+                    "Rotation",
+                    "it:rotation",
+                    format!("{:.1}°", rotation.to_degrees()),
+                ));
+            }
+            Shape::Rectangle | Shape::Round | Shape::Elliptical | Shape::Fan => {}
+        }
+        if kind == Kind::Window {
+            let n = t.muntins.unwrap_or(0);
+            grid.append(Property::string(
+                "Glazing Bars",
+                "it:muntins",
+                n.to_string(),
+            ));
+            grid.set_help_string(
+                "it:muntins",
+                "Radiating in round tops, fans and round windows; upright in the rest",
+            );
+        }
     }
 
     /// Instance rows of a selected door or window: sill height and flips.

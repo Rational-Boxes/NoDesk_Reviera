@@ -30,6 +30,9 @@ use crate::levels::next_name;
 use crate::store::Store;
 use crate::walls::{self, RECIPE_KEY, WallGeometry, openings};
 
+pub mod shape;
+pub use shape::{HeadProfile, Shape};
+
 pub const INSERT_RECIPE: &str = "recipe.insert";
 pub const OPENING_RECIPE: &str = "recipe.opening";
 pub const DOOR_TYPE_RECIPE: &str = "recipe.door_type";
@@ -93,6 +96,35 @@ pub struct InsertType {
     /// Sill height of new windows above the level.
     #[serde(default)]
     pub default_sill: f64,
+    /// The outline (ARC-WIN-002); a rectangle unless set.
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub shape: Shape,
+    /// The arch of a round top.
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub head_profile: HeadProfile,
+    /// The head's rise above the spring line (segmental, elliptical and Tudor heads; gables).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rise: Option<f64>,
+    /// A Gothic arch's radius as a multiple of its span (default 1: equilateral).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub radius_ratio: Option<f64>,
+    /// A polygon's number of sides (default 8) and rotation (radians; default flat-topped).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sides: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rotation: Option<f64>,
+    /// A trapezoid's left and right heights (default the height).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub left_height: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub right_height: Option<f64>,
+    /// Glazing bars: radiating in round tops, fans and round windows, upright in the rest.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub muntins: Option<u32>,
+}
+
+fn is_default<T: Default + PartialEq>(v: &T) -> bool {
+    *v == T::default()
 }
 
 impl InsertType {
@@ -106,6 +138,7 @@ impl InsertType {
                 panel_thickness: 0.04,
                 frame_depth: 0.0,
                 default_sill: 0.0,
+                ..Self::rectangle()
             },
             Kind::Window => Self {
                 kind: WINDOW_TYPE_RECIPE.into(),
@@ -115,8 +148,36 @@ impl InsertType {
                 panel_thickness: 0.0,
                 frame_depth: 0.07,
                 default_sill: 0.9,
+                ..Self::rectangle()
             },
         }
+    }
+
+    /// The shape values of a plain rectangle (the rest zero).
+    fn rectangle() -> Self {
+        Self {
+            kind: String::new(),
+            width: 0.0,
+            height: 0.0,
+            frame_width: 0.0,
+            panel_thickness: 0.0,
+            frame_depth: 0.0,
+            default_sill: 0.0,
+            shape: Shape::Rectangle,
+            head_profile: HeadProfile::Semicircular,
+            rise: None,
+            radius_ratio: None,
+            sides: None,
+            rotation: None,
+            left_height: None,
+            right_height: None,
+            muntins: None,
+        }
+    }
+
+    /// Whether the outline is not a rectangle.
+    pub fn shaped(&self) -> bool {
+        self.shape != Shape::Rectangle
     }
 
     pub fn kind(&self) -> Option<Kind> {
@@ -130,13 +191,31 @@ impl InsertType {
     /// The parameters `type.set_param` accepts for this kind.
     pub fn params(&self) -> &'static [&'static str] {
         match self.kind() {
-            Some(Kind::Door) => &["width", "height", "frame_width", "panel_thickness"],
+            Some(Kind::Door) => &[
+                "width",
+                "height",
+                "frame_width",
+                "panel_thickness",
+                "shape",
+                "head_profile",
+                "rise",
+                "radius_ratio",
+            ],
             _ => &[
                 "width",
                 "height",
                 "frame_width",
                 "frame_depth",
                 "default_sill",
+                "shape",
+                "head_profile",
+                "rise",
+                "radius_ratio",
+                "sides",
+                "rotation",
+                "left_height",
+                "right_height",
+                "muntins",
             ],
         }
     }
@@ -230,13 +309,80 @@ impl Placed {
         }
     }
 
-    /// The opening through the host, in the wall's local frame.
+    /// The opening through the host, in the wall's local frame (its outline when shaped).
     pub fn cut(&self) -> openings::Cut {
         let half = self.ty.width / 2.0;
+        let outline = if self.ty.shaped() {
+            self.outline()
+                .into_iter()
+                .map(|[x, z]| [self.recipe.along + x, self.z0 + z])
+                .collect()
+        } else {
+            Vec::new()
+        };
         openings::Cut {
             x: [self.recipe.along - half, self.recipe.along + half],
             z: [self.z0, self.z0 + self.ty.height],
+            outline,
         }
+    }
+
+    /// The outline in the insert's own plane: x from its centre, z from its bottom
+    /// (ARC-WIN-002).
+    pub fn outline(&self) -> Vec<[f64; 2]> {
+        shape::outline(&self.ty, self.ty.width, self.ty.height)
+    }
+
+    /// A shaped insert's body as prisms through the wall (ARC-WIN-002): the frame follows the
+    /// outline at the frame width (a door's is open at the floor), then the glass with its
+    /// glazing bars, or the door panel. Empty for rectangles, which are [`Placed::boxes`].
+    pub fn solids(&self) -> Vec<Solid> {
+        if !self.ty.shaped() {
+            return Vec::new();
+        }
+        let t = &self.ty;
+        let outline = self.outline();
+        let f = t.frame_width;
+        let mut out = Vec::new();
+        match self.kind {
+            Kind::Window => {
+                let d = t.frame_depth.min(self.wall.width) / 2.0;
+                let glass = shape::inset(&outline, f, false);
+                if glass.is_empty() {
+                    return vec![Solid::new(outline, Vec::new(), [-d, d], false)];
+                }
+                let bars =
+                    shape::muntins(t, t.width, t.height, &glass, t.muntins.unwrap_or(0), 0.03);
+                out.push(Solid::new(outline, vec![glass.clone()], [-d, d], false));
+                out.push(Solid::new(glass, Vec::new(), [-0.005, 0.005], false));
+                for bar in bars {
+                    out.push(Solid::new(bar, Vec::new(), [-0.012, 0.012], false));
+                }
+            }
+            Kind::Door => {
+                let half = self.wall.width / 2.0;
+                let outer = shape::from_bottom_left(&outline);
+                let inner = shape::from_bottom_left(&shape::inset(&outline, f, true));
+                if inner.len() < 3 {
+                    return vec![Solid::new(outline, Vec::new(), [-half, half], false)];
+                }
+                // Up one side of the outline, over the head and down; back up inside it.
+                let mut frame: Vec<[f64; 2]> = outer[1..].to_vec();
+                frame.push(outer[0]);
+                frame.push(inner[0]);
+                frame.extend(inner[1..].iter().rev());
+                out.push(Solid::new(frame, Vec::new(), [-half, half], false));
+                let s = self.facing();
+                let face = s * half;
+                let panel_y = if s > 0.0 {
+                    [face - t.panel_thickness, face]
+                } else {
+                    [face, face + t.panel_thickness]
+                };
+                out.push(Solid::new(inner, Vec::new(), panel_y, true));
+            }
+        }
+        out
     }
 
     /// Local frame point (x along the wall from the insert's centre, y toward the exterior, z
@@ -307,7 +453,20 @@ impl Placed {
     pub fn meshes(&self) -> Vec<(Mesh, bool)> {
         let mut frame = (Vec::new(), Vec::new());
         let mut panel = (Vec::new(), Vec::new());
-        for ([x, y, z], is_panel) in self.boxes() {
+        for sol in self.solids() {
+            // Extruded in (x, z, y) and turned into the insert's frame: swapping two axes
+            // mirrors, so the triangles turn round.
+            let (v, i) = crate::bodies::extrude(&sol.outer, &sol.holes, sol.y[0], sol.y[1]);
+            let target: &mut Mesh = if sol.panel { &mut panel } else { &mut frame };
+            let base = target.0.len() as u32;
+            target
+                .0
+                .extend(v.into_iter().map(|[x, z, y]| self.world([x, y, z])));
+            for t in i.chunks(3) {
+                target.1.extend([t[0] + base, t[2] + base, t[1] + base]);
+            }
+        }
+        for ([x, y, z], is_panel) in self.boxes().into_iter().filter(|_| !self.ty.shaped()) {
             let quad = [[x[0], y[0]], [x[1], y[0]], [x[1], y[1]], [x[0], y[1]]];
             let world = quad.map(|[a, b]| {
                 let p = self.world([a, b, 0.0]);
@@ -353,6 +512,28 @@ impl Placed {
             out.push([p(point(k)), p(point(k + 1))]);
         }
         out
+    }
+}
+
+/// A prism of a shaped insert's body: a profile in its plane (x from its centre, z from its
+/// bottom) with holes, through `y` (across the wall, toward its exterior).
+#[derive(Debug, Clone, PartialEq)]
+pub struct Solid {
+    pub outer: Vec<[f64; 2]>,
+    pub holes: Vec<Vec<[f64; 2]>>,
+    pub y: [f64; 2],
+    /// The door panel (drawn in 3D only).
+    pub panel: bool,
+}
+
+impl Solid {
+    fn new(outer: Vec<[f64; 2]>, holes: Vec<Vec<[f64; 2]>>, y: [f64; 2], panel: bool) -> Self {
+        Self {
+            outer,
+            holes,
+            y,
+            panel,
+        }
     }
 }
 
@@ -543,6 +724,14 @@ pub fn fit(store: &Store, p: &mut Placed) -> bool {
         }
         p.ty.height = h;
         p.recipe.height = Some(h);
+        // A round window's diameter, a semicircular or Gothic head's span shrink with it
+        // (ARC-WIN-002): the head keeps its shape.
+        if let Some(w) = shape::width_for_height(&p.ty, h)
+            && w < p.ty.width
+        {
+            p.ty.width = w;
+            p.recipe.width = Some(w);
+        }
     }
     let (z0, z1) = (p.z0, p.z0 + p.ty.height);
     // The free gap around the centre.
@@ -574,6 +763,11 @@ pub fn fit(store: &Store, p: &mut Placed) -> bool {
         w = gap;
         p.ty.width = w;
         p.recipe.width = Some(w);
+        // A round window stays round.
+        if p.ty.shape == Shape::Round && p.ty.height > w {
+            p.ty.height = w;
+            p.recipe.height = Some(w);
+        }
     }
     let half = w / 2.0;
     p.recipe.along = along.clamp(lo + half, hi - half);
@@ -711,13 +905,83 @@ pub(crate) fn set_type_param(
             ),
         ));
     }
-    let v = match value {
-        Value::Number(n) => n.as_f64().unwrap_or(f64::NAN),
-        Value::String(s) => {
-            crate::units::parse(s, "length", &crate::units::settings_of(txn.store()))?
+    let bad = |what: &str| Error::new("type.invalid_value", format!("`{param}` must be {what}"));
+    let settings = crate::units::settings_of(txn.store());
+    let number = |data_type: &str| -> Result<f64> {
+        match value {
+            Value::Number(n) => Ok(n.as_f64().unwrap_or(f64::NAN)),
+            Value::String(s) if data_type == "number" => Ok(s.trim().parse().unwrap_or(f64::NAN)),
+            Value::String(s) => crate::units::parse(s, data_type, &settings),
+            _ => Ok(f64::NAN),
         }
-        _ => f64::NAN,
     };
+    // The shape's own values (ARC-WIN-002).
+    match param {
+        "shape" => {
+            let shape = value.as_str().and_then(Shape::parse).ok_or_else(|| {
+                let names: Vec<&str> = Shape::ALL.iter().map(|s| s.name()).collect();
+                bad(&format!("one of {}", names.join(", ")))
+            })?;
+            if t.kind() == Some(Kind::Door) && !shape.for_doors() {
+                return Err(bad("rectangle or round_top for doors"));
+            }
+            t.shape = shape;
+            // A round window's diameter is both its width and its height.
+            if shape == Shape::Round {
+                t.height = t.width;
+            }
+            return write_type(txn, id, &t);
+        }
+        "head_profile" => {
+            t.head_profile = value.as_str().and_then(HeadProfile::parse).ok_or_else(|| {
+                let names: Vec<&str> = HeadProfile::ALL.iter().map(|s| s.name()).collect();
+                bad(&format!("one of {}", names.join(", ")))
+            })?;
+            return write_type(txn, id, &t);
+        }
+        "rise" | "left_height" | "right_height" | "radius_ratio" | "sides" | "rotation"
+        | "muntins" => {
+            let cleared = value.is_null() || value.as_str().is_some_and(|s| s.trim().is_empty());
+            let v = if cleared {
+                None
+            } else {
+                let data_type = match param {
+                    "rotation" => "angle",
+                    "radius_ratio" | "sides" | "muntins" => "number",
+                    _ => "length",
+                };
+                Some(number(data_type)?)
+            };
+            match (param, v) {
+                (_, Some(v)) if !v.is_finite() => return Err(bad("a number")),
+                ("rise" | "left_height" | "right_height", Some(v)) if v <= 0.0 => {
+                    return Err(bad("a length greater than 0"));
+                }
+                ("radius_ratio", Some(v)) if v < 0.5 => {
+                    return Err(bad("at least 0.5 (a semicircle)"));
+                }
+                ("sides", Some(v)) if !(3.0..=64.0).contains(&v.round()) => {
+                    return Err(bad("from 3 to 64"));
+                }
+                ("muntins", Some(v)) if !(0.0..=24.0).contains(&v.round()) => {
+                    return Err(bad("from 0 to 24"));
+                }
+                _ => {}
+            }
+            match param {
+                "rise" => t.rise = v,
+                "left_height" => t.left_height = v,
+                "right_height" => t.right_height = v,
+                "radius_ratio" => t.radius_ratio = v,
+                "sides" => t.sides = v.map(|v| v.round() as u32),
+                "rotation" => t.rotation = v,
+                _ => t.muntins = v.map(|v| v.round() as u32),
+            }
+            return write_type(txn, id, &t);
+        }
+        _ => {}
+    }
+    let v = number("length")?;
     let positive = param != "default_sill";
     if !v.is_finite() || (positive && v <= 0.0) || v < 0.0 {
         return Err(Error::new(
@@ -729,6 +993,11 @@ pub(crate) fn set_type_param(
         ));
     }
     match param {
+        // A round window keeps its width and height equal.
+        "width" | "height" if t.shape == Shape::Round => {
+            t.width = v;
+            t.height = v;
+        }
         "width" => t.width = v,
         "height" => t.height = v,
         "frame_width" => t.frame_width = v,
@@ -742,11 +1011,16 @@ pub(crate) fn set_type_param(
             "the frame must be narrower than the opening",
         ));
     }
-    let value = serde_json::to_value(&t).expect("serialises");
+    write_type(txn, id, &t)
+}
+
+/// Stores a door or window type's values; its inserts must still fit (a wider door can run into
+/// its neighbour).
+fn write_type(txn: &mut crate::txn::Transaction<'_>, id: ElementId, t: &InsertType) -> Result<()> {
+    let value = serde_json::to_value(t).expect("serialises");
     txn.modify(id, |e| {
         e.params.insert(RECIPE_KEY.into(), value);
     })?;
-    // Existing inserts must still fit (a wider door can run into its neighbour).
     check_all(txn.store(), |p| types_guid(txn.store(), p.id) == Some(id))
 }
 

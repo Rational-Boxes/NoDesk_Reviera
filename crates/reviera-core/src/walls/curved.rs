@@ -345,7 +345,8 @@ pub fn body(
         // Split at the openings' edges within the segment.
         let mut stops = vec![s0, s1];
         for c in cuts {
-            for x in c.x {
+            // A shaped opening also at its outline's points (the wall steps around it).
+            for x in c.x.into_iter().chain(c.stations()) {
                 if x > s0 + 1e-9 && x < s1 - 1e-9 {
                     stops.push(x);
                 }
@@ -366,16 +367,16 @@ pub fn body(
             let q = [at(a, &left), at(b, &left), at(b, &right), at(a, &right)];
             // The heights left solid: the full height less the openings over this piece.
             let mut solid = vec![(base_z, top_z)];
-            for c in cuts.iter().filter(|c| c.x[0] <= mid && mid <= c.x[1]) {
+            for z in cuts.iter().filter_map(|c| c.z_at(mid)) {
                 solid = solid
                     .into_iter()
                     .flat_map(|(z0, z1)| {
                         let mut keep = Vec::new();
-                        if c.z[0] > z0 {
-                            keep.push((z0, c.z[0].min(z1)));
+                        if z[0] > z0 {
+                            keep.push((z0, z[0].min(z1)));
                         }
-                        if c.z[1] < z1 {
-                            keep.push((c.z[1].max(z0), z1));
+                        if z[1] < z1 {
+                            keep.push((z[1].max(z0), z1));
                         }
                         keep
                     })
@@ -494,10 +495,7 @@ mod tests {
         let v = volume(&body(&p, 0.2, 0.0, 3.0, &[], None, [None, None]));
         assert!((v - exact).abs() / exact < 1e-3, "{v} vs {exact}");
         // A 1 × 2 m opening along the curve takes about its area times the thickness.
-        let cut = super::super::openings::Cut {
-            x: [7.0, 8.0],
-            z: [0.0, 2.0],
-        };
+        let cut = super::super::openings::Cut::rect([7.0, 8.0], [0.0, 2.0]);
         let w = volume(&body(&p, 0.2, 0.0, 3.0, &[cut], None, [None, None]));
         assert!(((v - w) - 1.0 * 2.0 * 0.2).abs() < 0.01, "{}", v - w);
     }

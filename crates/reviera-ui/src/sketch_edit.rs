@@ -25,8 +25,13 @@ fn edit(curves: &mut [Curve], f: impl FnOnce(&mut [Line]) -> Vec<usize>) {
 pub fn move_curve(curves: &mut [Curve], i: usize, v: [f64; 2]) {
     // A curved curve's points move across its chord with it.
     let l = curves[i].line;
-    let len = (l.end[0] - l.start[0]).hypot(l.end[1] - l.start[1]).max(1e-12);
-    let n = [-(l.end[1] - l.start[1]) / len, (l.end[0] - l.start[0]) / len];
+    let len = (l.end[0] - l.start[0])
+        .hypot(l.end[1] - l.start[1])
+        .max(1e-12);
+    let n = [
+        -(l.end[1] - l.start[1]) / len,
+        (l.end[0] - l.start[0]) / len,
+    ];
     let d = v[0] * n[0] + v[1] * n[1];
     for p in &mut curves[i].through {
         *p = [p[0] + n[0] * d, p[1] + n[1] * d];
@@ -68,7 +73,15 @@ pub fn nearest(curves: &[Curve], p: [f64; 2], reach: f64) -> Option<(usize, Opti
             let d = c
                 .points()
                 .windows(2)
-                .map(|w| segment_distance(p, Line { start: w[0], end: w[1] }))
+                .map(|w| {
+                    segment_distance(
+                        p,
+                        Line {
+                            start: w[0],
+                            end: w[1],
+                        },
+                    )
+                })
                 .fold(f64::INFINITY, f64::min);
             (i, d)
         })

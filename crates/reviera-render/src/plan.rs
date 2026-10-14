@@ -345,7 +345,11 @@ pub fn plan_graphics(
             continue;
         };
         for [a, b] in &segments {
-            add(fade(CUT_LINE, w.opacity), cut_width, [[a[0], a[1], cut], [b[0], b[1], cut]]);
+            add(
+                fade(CUT_LINE, w.opacity),
+                cut_width,
+                [[a[0], a[1], cut], [b[0], b[1], cut]],
+            );
         }
         cut_edges.extend(segments.iter().map(|s| (m.element, *s)));
         let (loops, _) = chains(&segments);
@@ -444,7 +448,11 @@ mod tests {
         let g = plan_graphics(&scene, &feature_edges(&scene), 1.2, 0.0, 100.0, &half);
         assert_eq!(g.poche[0].color, fade(POCHE, 0.25));
         assert!(g.poche[0].color[0] > 0.7, "{:?}", g.poche[0].color);
-        assert!(g.lines.iter().all(|l| l.color[0] >= 0.75 - 1e-6), "{:?}", g.lines);
+        assert!(
+            g.lines.iter().all(|l| l.color[0] >= 0.75 - 1e-6),
+            "{:?}",
+            g.lines
+        );
         assert_eq!(fade(CUT_LINE, 1.0), CUT_LINE);
     }
 

@@ -605,16 +605,10 @@ impl Gui {
                             // Two half arcs, counter-clockwise from the east.
                             let (e, w) = ([c[0] + r, c[1]], [c[0] - r, c[1]]);
                             let (n, so) = ([c[0], c[1] + r], [c[0], c[1] - r]);
-                            s.curves.push(Curve::curved(
-                                Line { start: e, end: w },
-                                vec![n],
-                                None,
-                            ));
-                            s.curves.push(Curve::curved(
-                                Line { start: w, end: e },
-                                vec![so],
-                                None,
-                            ));
+                            s.curves
+                                .push(Curve::curved(Line { start: e, end: w }, vec![n], None));
+                            s.curves
+                                .push(Curve::curved(Line { start: w, end: e }, vec![so], None));
                         }
                     }
                 }

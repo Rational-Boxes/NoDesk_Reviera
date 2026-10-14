@@ -18,8 +18,8 @@
 //!   whether they overlap (`overlap.find`) and offers the booleans (`overlap.resolve`).
 
 use reviera_core::ElementId;
-use reviera_render::{BoxMode, RenderBackend};
 use reviera_render::plan::Lines;
+use reviera_render::{BoxMode, RenderBackend};
 use serde_json::{Value, json};
 use wxdragon::prelude::*;
 
@@ -116,7 +116,10 @@ impl Gui {
                     let k = if len > 0.0 { d / len } else { 0.0 };
                     (a.0 + (b.0 - a.0) * k, a.1 + (b.1 - a.1) * k)
                 };
-                segments.push([self.screen_point(at(t), size), self.screen_point(at(u), size)]);
+                segments.push([
+                    self.screen_point(at(t), size),
+                    self.screen_point(at(u), size),
+                ]);
                 t += 10.0;
             }
         }
@@ -151,10 +154,10 @@ impl Gui {
         };
         let lo = (x0.min(x) as f32, y0.min(y) as f32);
         let hi = (x0.max(x) as f32, y0.max(y) as f32);
-        let (bottom, top) = v
-            .plan
-            .as_ref()
-            .map_or((f32::NEG_INFINITY, f32::INFINITY), super::plans::PlanState::drawn);
+        let (bottom, top) = v.plan.as_ref().map_or(
+            (f32::NEG_INFINITY, f32::INFINITY),
+            super::plans::PlanState::drawn,
+        );
         let (section_box, slices) = self.view_clip(v);
         let clipping = reviera_render::Clipping::of(section_box.as_ref(), &slices);
         let keep = |p: glam::Vec3| (bottom..=top).contains(&p.z) && clipping.keeps(p);
@@ -246,7 +249,10 @@ impl Gui {
         }
         item(&menu, "inspect.selection_box", "Section &Box");
         let pinned = |e: &reviera_core::Element| reviera_core::modify::is_pinned(e);
-        if ids.iter().any(|i| store.get(*i).is_some_and(|e| !pinned(e))) {
+        if ids
+            .iter()
+            .any(|i| store.get(*i).is_some_and(|e| !pinned(e)))
+        {
             item(&menu, "element.pin", "Pi&n");
         }
         if ids.iter().any(|i| store.get(*i).is_some_and(pinned)) {
@@ -291,7 +297,12 @@ impl Gui {
             "Accept the Overlap".to_owned(),
         ];
         let heading = ID_QUICK_FIRST + BOOLEANS.len() as i32;
-        menu.append(heading, &format!("Overlap of {amount}:"), "", ItemKind::Normal);
+        menu.append(
+            heading,
+            &format!("Overlap of {amount}:"),
+            "",
+            ItemKind::Normal,
+        );
         menu.enable_item(heading, false);
         for (k, label) in labels.iter().enumerate() {
             menu.append(ID_QUICK_FIRST + k as i32, label, "", ItemKind::Normal);
