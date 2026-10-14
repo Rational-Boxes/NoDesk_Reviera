@@ -19,4 +19,9 @@ REVIERA_REGEN_SAMPLES=1 cargo test -p reviera-app --test samples
 | `observatory.ifc` (`observatory.lua`, Castle Turret plugin) | A drum of curved walls (two arcs) rising to a hemispherical dome, with an observing slot cut from the dome by a boolean (CSG). Doors and windows on the curve, a round floor and room. A barrel-vaulted annex. A spline garden wall. A turret with an onion dome, built by the Castle Turret plugin. ADA 2010 door clearances. |
 | `csg.ifc` (`csg.lua`) | The same overlap (a wall pierced by a taller, thicker pier) resolved every way `overlap.resolve` offers: unresolved, cut A by B, cut B by A, join, intersect, union, move apart, accept. Each is labelled in the plan. The one unresolved pair is the model's only overlap (`allow_overlaps`). |
 
+Each sample also has a walkthrough (`house.md`, `observatory.md`, `csg.md`): the manual steps to
+build it in the window. It names the UI path for every operation the script uses, and marks
+the steps the window cannot do yet. Those gaps are missing UI for core features, or scripts
+that need an input form.
+
 Open one with `reviera gui test-data/samples/observatory.ifc`.
