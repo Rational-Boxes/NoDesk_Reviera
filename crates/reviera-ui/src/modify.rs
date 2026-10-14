@@ -38,6 +38,9 @@ pub enum Kind {
     TrimCorner,
     TrimSingle,
     Split,
+    /// Arrays (ARC-MOD-026): a row of copies, or copies round a centre.
+    ArrayLinear,
+    ArrayRadial,
 }
 
 impl Kind {
@@ -53,6 +56,8 @@ impl Kind {
             Kind::TrimCorner => "Trim/Extend to Corner",
             Kind::TrimSingle => "Trim/Extend Single Element",
             Kind::Split => "Split Element",
+            Kind::ArrayLinear => "Array",
+            Kind::ArrayRadial => "Radial Array",
         }
     }
 
@@ -60,7 +65,13 @@ impl Kind {
     fn needs_selection(self) -> bool {
         matches!(
             self,
-            Kind::Move | Kind::Copy | Kind::Rotate | Kind::MirrorPick | Kind::MirrorDraw
+            Kind::Move
+                | Kind::Copy
+                | Kind::Rotate
+                | Kind::MirrorPick
+                | Kind::MirrorDraw
+                | Kind::ArrayLinear
+                | Kind::ArrayRadial
         )
     }
 
@@ -77,6 +88,8 @@ impl Kind {
             "element.trim_corner" => Kind::TrimCorner,
             "element.trim_extend" => Kind::TrimSingle,
             "element.split" => Kind::Split,
+            "element.array_linear" => Kind::ArrayLinear,
+            "element.array_radial" => Kind::ArrayRadial,
             _ => return None,
         })
     }
@@ -105,6 +118,10 @@ pub struct ModifyTool {
     /// A length or angle being typed.
     typed: String,
     lines: Vec<([f64; 2], [f64; 2])>,
+    /// An array's members (the original included) and whether the second pick is the last
+    /// member.
+    count: u32,
+    last: bool,
 }
 
 fn sub(a: [f64; 2], b: [f64; 2]) -> [f64; 2] {
@@ -128,6 +145,16 @@ impl Gui {
                 0,
             );
         }
+        // An array asks how many members, and where the second pick goes.
+        let (count, last) = match kind {
+            Kind::ArrayLinear | Kind::ArrayRadial => {
+                let Some(o) = self.array_options(kind) else {
+                    return;
+                };
+                o
+            }
+            _ => (0, false),
+        };
         self.end_tool(&frame);
         self.end_dim_tool();
         self.end_grid_tool();
@@ -148,6 +175,8 @@ impl Gui {
             hover: None,
             typed: String::new(),
             lines,
+            count,
+            last,
         });
         if !kind.needs_selection() {
             self.clear_selection();
@@ -276,6 +305,10 @@ impl Gui {
                 }
             } else if let Some(g) = reviera_core::grids::grid_data(e) {
                 out.push([t(g.curve.start), t(g.curve.end)]);
+            } else if reviera_core::columns::column_recipe(e).is_some() {
+                if let Ok(g) = reviera_core::columns::regenerate(&store, e) {
+                    ring(&mut out, &g.ring);
+                }
             } else if let Ok(p) = reviera_core::inserts::resolve(&store, e) {
                 let c = p.cut();
                 let half = p.wall.width / 2.0;
@@ -302,13 +335,13 @@ impl Gui {
         let t = self.modify_tool.as_ref()?;
         let cursor = t.cursor.map(|c| c.point);
         match t.kind {
-            Kind::Move | Kind::Copy => {
+            Kind::Move | Kind::Copy | Kind::ArrayLinear => {
                 let base = *t.points.first()?;
                 let to = self.typed_point(base, cursor?).unwrap_or(cursor?);
                 let v = sub(to, base);
                 Some(Xform::Translate([v[0], v[1], 0.0]))
             }
-            Kind::Rotate => {
+            Kind::Rotate | Kind::ArrayRadial => {
                 let ray = *t.points.first()?;
                 let angle = match self.typed_number() {
                     Some(deg) => deg.to_radians(),
@@ -374,6 +407,21 @@ impl Gui {
             Kind::Rotate => {
                 "click the second ray, or type an angle in degrees and press Enter".to_owned()
             }
+            Kind::ArrayLinear if t.points.is_empty() => {
+                format!("{} members: click the start point", t.count)
+            }
+            Kind::ArrayLinear => format!(
+                "click where the {} member goes, or type a distance and press Enter",
+                if t.last { "last" } else { "second" }
+            ),
+            Kind::ArrayRadial if t.points.is_empty() => format!(
+                "{} members round the centre ✕: click a point on the first ray",
+                t.count
+            ),
+            Kind::ArrayRadial => format!(
+                "click the ray of the {} member, or type an angle in degrees (360 for a full turn) and press Enter",
+                if t.last { "last" } else { "second" }
+            ),
             Kind::MirrorPick => "pick a wall, wall face or grid as the axis".to_owned(),
             Kind::MirrorDraw if t.points.is_empty() => {
                 "click the first point of the axis".to_owned()
@@ -422,7 +470,7 @@ impl Gui {
     pub(crate) fn modify_motion(&mut self, x: i32, y: i32) {
         let Some(t) = &self.modify_tool else { return };
         let from = match t.kind {
-            Kind::Rotate => Some(t.center),
+            Kind::Rotate | Kind::ArrayRadial => Some(t.center),
             _ => t.points.first().copied(),
         };
         let lines = t.lines.clone();
@@ -454,15 +502,26 @@ impl Gui {
         let kind = t.kind;
         let cursor = t.cursor.map(|c| c.point);
         let result: Option<Result<Value, String>> = match kind {
-            Kind::Move | Kind::Copy | Kind::Rotate | Kind::MirrorDraw if t.points.is_empty() => {
+            Kind::Move
+            | Kind::Copy
+            | Kind::Rotate
+            | Kind::MirrorDraw
+            | Kind::ArrayLinear
+            | Kind::ArrayRadial
+                if t.points.is_empty() =>
+            {
                 if let (Some(p), Some(t)) = (cursor, &mut self.modify_tool) {
                     t.points.push(p);
                 }
                 None
             }
-            Kind::Move | Kind::Copy | Kind::Rotate | Kind::MirrorDraw | Kind::MirrorPick => {
-                self.commit_xform()
-            }
+            Kind::Move
+            | Kind::Copy
+            | Kind::Rotate
+            | Kind::MirrorDraw
+            | Kind::MirrorPick
+            | Kind::ArrayLinear
+            | Kind::ArrayRadial => self.commit_xform(),
             Kind::Align => match (t.reference.clone(), t.hover.clone()) {
                 (None, Some(h)) => {
                     if let Some(t) = &mut self.modify_tool {
@@ -564,6 +623,20 @@ impl Gui {
                 "element.mirror",
                 json!({ "element_ids": ids, "axis": { "start": a, "end": b }, "copy": true }),
             ),
+            (Kind::ArrayLinear, Xform::Translate(v)) => (
+                "element.array_linear",
+                json!({
+                    "element_ids": ids, "vector": v, "count": t.count,
+                    "move_to": if t.last { "last" } else { "second" },
+                }),
+            ),
+            (Kind::ArrayRadial, Xform::Rotate { center, angle }) => (
+                "element.array_radial",
+                json!({
+                    "element_ids": ids, "center": center, "angle": angle, "count": t.count,
+                    "move_to": if t.last { "last" } else { "second" },
+                }),
+            ),
             _ => return None,
         };
         let result = self.run(command, args);
@@ -575,6 +648,15 @@ impl Gui {
                 "element.copy" => v[0]
                     .as_array()
                     .into_iter()
+                    .flatten()
+                    .filter_map(Value::as_u64)
+                    .collect(),
+                // Every member of an array.
+                "element.array_linear" | "element.array_radial" => v
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .filter_map(Value::as_array)
                     .flatten()
                     .filter_map(Value::as_u64)
                     .collect(),
@@ -592,6 +674,75 @@ impl Gui {
         Some(result)
     }
 
+    /// The transformations the tool's preview shows for `x`: `x` itself, or for an array every
+    /// member after the original.
+    fn array_members(&self, x: Xform) -> Vec<Xform> {
+        let Some(t) = &self.modify_tool else {
+            return vec![x];
+        };
+        if !matches!(t.kind, Kind::ArrayLinear | Kind::ArrayRadial) || t.count < 2 {
+            return vec![x];
+        }
+        let n = f64::from(t.count - 1);
+        match x {
+            Xform::Translate(v) => {
+                let step = if t.last { v.map(|c| c / n) } else { v };
+                (1..t.count)
+                    .map(|k| Xform::Translate(step.map(|c| c * f64::from(k))))
+                    .collect()
+            }
+            Xform::Rotate { center, angle } => {
+                let full = (angle.abs() - std::f64::consts::TAU).abs() < 1e-6;
+                let step = match (t.last, full) {
+                    (false, _) => angle,
+                    (true, true) => angle / f64::from(t.count),
+                    (true, false) => angle / n,
+                };
+                (1..t.count)
+                    .map(|k| Xform::Rotate {
+                        center,
+                        angle: step * f64::from(k),
+                    })
+                    .collect()
+            }
+            Xform::Mirror { .. } => vec![x],
+        }
+    }
+
+    /// Asks an array's number of members and where its second pick goes; `None` if cancelled.
+    fn array_options(&mut self, kind: Kind) -> Option<(u32, bool)> {
+        use wxdragon::prelude::*;
+        let frame = self.frame;
+        let title = kind.label();
+        let d =
+            TextEntryDialog::builder(&frame, "Number of members (the original included):", title)
+                .with_default_value(&self.array_count.to_string())
+                .build();
+        if d.show_modal() != ID_OK {
+            return None;
+        }
+        let count: u32 = match d.get_value()?.trim().parse() {
+            Ok(n) if (2..=1000).contains(&n) => n,
+            _ => {
+                frame.set_status_text("An array has between 2 and 1000 members", 0);
+                return None;
+            }
+        };
+        let choices = [
+            "2nd: the pick places the second member",
+            "Last: the pick places the last member",
+        ];
+        let c = SingleChoiceDialog::builder(&frame, "Move To:", title, &choices).build();
+        c.set_selection(i32::from(self.array_last));
+        if c.show_modal() != ID_OK {
+            return None;
+        }
+        let last = c.get_selection() == 1;
+        self.array_count = count;
+        self.array_last = last;
+        Some((count, last))
+    }
+
     /// Keys in a modify tool: digits and units type a length or angle, Enter commits it,
     /// Backspace edits it. Returns whether the key was used.
     pub(crate) fn modify_key(&mut self, key: i32) -> bool {
@@ -601,7 +752,12 @@ impl Gui {
         use wxdragon::prelude::{WXK_BACK, WXK_NUMPAD_ENTER, WXK_RETURN};
         let typing = matches!(
             t.kind,
-            Kind::Move | Kind::Copy | Kind::Rotate | Kind::Offset
+            Kind::Move
+                | Kind::Copy
+                | Kind::Rotate
+                | Kind::Offset
+                | Kind::ArrayLinear
+                | Kind::ArrayRadial
         );
         match key {
             WXK_BACK if !t.typed.is_empty() => {
@@ -667,12 +823,12 @@ impl Gui {
             ]);
         }
         match t.kind {
-            Kind::Move | Kind::Copy => {
+            Kind::Move | Kind::Copy | Kind::ArrayLinear => {
                 if let (Some(b), Some(c)) = (t.points.first(), cursor) {
                     segs.push([*b, self.typed_point(*b, c).unwrap_or(c)]);
                 }
             }
-            Kind::Rotate => {
+            Kind::Rotate | Kind::ArrayRadial => {
                 let c = t.center;
                 let r = f64::from(2.5 * mm);
                 segs.push([[c[0] - r, c[1] - r], [c[0] + r, c[1] + r]]);
@@ -697,7 +853,9 @@ impl Gui {
                 .as_ref()
                 .map(|t| t.targets.clone())
                 .unwrap_or_default();
-            segs.extend(self.outline(&targets, Some(x)));
+            for m in self.array_members(x) {
+                segs.extend(self.outline(&targets, Some(m)));
+            }
         }
         // Offset: the hovered wall or grid where it would go.
         if let Some(t) = &self.modify_tool

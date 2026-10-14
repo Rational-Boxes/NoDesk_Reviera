@@ -746,3 +746,111 @@ pub(crate) fn pin(txn: &mut Transaction<'_>, p: PinParams, pinned: bool) -> Resu
     }
     Ok(())
 }
+
+// ---- Arrays (ARC-MOD-026) ----
+
+/// Where an array's second pick goes: the second member, or the last.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum MoveTo {
+    #[default]
+    Second,
+    Last,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ArrayLinearParams {
+    pub element_ids: Vec<ElementRef>,
+    /// From the original to the second member (`second`) or the last (`last`), metres.
+    pub vector: [f64; 3],
+    /// Members, the original included (2 or more).
+    #[schemars(range(min = 2, max = 1000))]
+    pub count: u32,
+    #[serde(default)]
+    pub move_to: MoveTo,
+    /// Members as group instances of an array set (not available yet).
+    #[serde(default)]
+    pub group_and_associate: bool,
+}
+
+fn check_array(count: u32, group: bool) -> Result<()> {
+    if !(2..=1000).contains(&count) {
+        return Err(Error::new(
+            "array.bad_count",
+            "an array has between 2 and 1000 members",
+        ));
+    }
+    if group {
+        return Err(Error::new(
+            "array.group_not_supported",
+            "Group and Associate needs groups, which are not available yet; the members are made \
+             as independent copies without it",
+        ));
+    }
+    Ok(())
+}
+
+/// Copies elements in a row (`element.array_linear`): one copy per member after the original,
+/// each the step on from the one before. Returns the copies, member by member.
+pub(crate) fn array_linear(
+    txn: &mut Transaction<'_>,
+    p: ArrayLinearParams,
+) -> Result<Vec<Vec<ElementId>>> {
+    check_array(p.count, p.group_and_associate)?;
+    let n = f64::from(p.count - 1);
+    let step = match p.move_to {
+        MoveTo::Second => p.vector,
+        MoveTo::Last => p.vector.map(|c| c / n),
+    };
+    (1..p.count)
+        .map(|k| {
+            let k = f64::from(k);
+            let v = step.map(|c| c * k);
+            transform(txn, &p.element_ids, Xform::Translate(v), true)
+        })
+        .collect()
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ArrayRadialParams {
+    pub element_ids: Vec<ElementRef>,
+    /// The centre in plan (metres).
+    pub center: [f64; 2],
+    /// To the second member (`second`) or the last (`last`), counter-clockwise; accepts units
+    /// ("45°"). A full turn with `last` spaces the members evenly round it.
+    #[schemars(extend("x-reviera-data-type" = "angle"))]
+    pub angle: f64,
+    #[schemars(range(min = 2, max = 1000))]
+    pub count: u32,
+    #[serde(default)]
+    pub move_to: MoveTo,
+    #[serde(default)]
+    pub group_and_associate: bool,
+}
+
+/// Copies elements round a centre (`element.array_radial`). Returns the copies, member by
+/// member.
+pub(crate) fn array_radial(
+    txn: &mut Transaction<'_>,
+    p: ArrayRadialParams,
+) -> Result<Vec<Vec<ElementId>>> {
+    check_array(p.count, p.group_and_associate)?;
+    let full = (p.angle.abs() - std::f64::consts::TAU).abs() < 1e-6;
+    let step = match p.move_to {
+        MoveTo::Second => p.angle,
+        // A full turn: the last member would land on the original.
+        MoveTo::Last if full => p.angle / f64::from(p.count),
+        MoveTo::Last => p.angle / f64::from(p.count - 1),
+    };
+    (1..p.count)
+        .map(|k| {
+            let x = Xform::Rotate {
+                center: p.center,
+                angle: step * f64::from(k),
+            };
+            transform(txn, &p.element_ids, x, true)
+        })
+        .collect()
+}

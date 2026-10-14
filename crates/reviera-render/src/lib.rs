@@ -167,6 +167,13 @@ impl Visibility {
         self.hidden.is_empty() && self.translucent.is_empty() && self.isolated.is_none()
     }
 
+    /// Whether an element is ghosted by an isolation (drawn faint behind the isolated ones).
+    pub fn ghosted(&self, element: Option<ElementId>) -> bool {
+        self.isolated.as_ref().is_some_and(|i| {
+            i.ghost.is_some() && !element.is_some_and(|e| i.elements.contains(&e) || e >= i.after)
+        })
+    }
+
     /// How an element draws: `None` when it is hidden, else its opacity factor (1 is unchanged).
     /// Geometry of no element counts as not isolated.
     pub fn opacity(&self, element: Option<ElementId>) -> Option<f32> {
@@ -268,8 +275,10 @@ fn triangle_touches(t: [(f32, f32); 3], lo: (f32, f32), hi: (f32, f32)) -> bool 
 
 impl RenderScene {
     /// The nearest hit along a ray among what a view shows: points the clipping removes and
-    /// hidden elements are passed through, and translucent elements are hit only when nothing
-    /// opaque is behind them (DOC-GFX-008, DOC-VIEW-014). Returns the mesh and distance.
+    /// hidden elements are passed through. A translucent element is hit like an opaque one (it
+    /// is still there); elements ghosted by an isolation are hit only when nothing else is behind
+    /// them; virtual volumes are never hit (DOC-GFX-008, DOC-VIEW-014). Returns the mesh and
+    /// distance.
     pub fn pick_visible(
         &self,
         origin: Vec3,
@@ -280,17 +289,11 @@ impl RenderScene {
         let mut opaque: Option<(usize, f32)> = None;
         let mut faint: Option<(usize, f32)> = None;
         for (i, m) in self.meshes.iter().enumerate() {
-            let Some(mut alpha) = visibility.opacity(m.element) else {
+            // Virtual volumes are not selectable, however they are shown.
+            if visibility.opacity(m.element).is_none() || is_virtual(&m.class) {
                 continue;
-            };
-            if is_virtual(&m.class) {
-                match visibility.virtual_volumes {
-                    VirtualMode::Hidden => continue,
-                    VirtualMode::Translucent => alpha *= m.color[3],
-                    VirtualMode::Solid => {}
-                }
             }
-            let best = if alpha < 0.99 {
+            let best = if visibility.ghosted(m.element) {
                 &mut faint
             } else {
                 &mut opaque
@@ -804,7 +807,7 @@ mod tests {
     }
 
     #[test]
-    fn picking_skips_what_is_hidden_clipped_or_translucent_in_front() {
+    fn picking_skips_what_is_hidden_or_clipped_but_not_translucent() {
         let quad = |id: u64, x: f32| SceneMesh {
             element: Some(ElementId(id)),
             class: "IfcWall".into(),
@@ -831,14 +834,11 @@ mod tests {
         let mut v = Visibility::default();
         v.hidden.insert(ElementId(1));
         assert_eq!(hit(&all, &v), Some(1));
+        // A translucent wall in front is still hit; only hiding passes through it.
         v.translucent.insert(ElementId(2), 0.25);
-        assert_eq!(hit(&all, &v), Some(2), "the opaque wall behind wins");
-        v.hidden.insert(ElementId(3));
-        assert_eq!(
-            hit(&all, &v),
-            Some(1),
-            "translucent when nothing opaque is behind"
-        );
+        assert_eq!(hit(&all, &v), Some(1), "the translucent wall in front");
+        v.hidden.insert(ElementId(2));
+        assert_eq!(hit(&all, &v), Some(2));
         // A slice keeping x >= 1.5 removes the first wall.
         let clip = Clipping {
             planes: vec![[1.0, 0.0, 0.0, 1.5]],
@@ -855,6 +855,15 @@ mod tests {
             ..Visibility::default()
         };
         assert_eq!(hit(&all, &iso), Some(2));
+        // Ghosted elements in front are a backdrop: the isolated wall behind is hit.
+        let ghosted = Visibility {
+            isolated: Some(Isolation {
+                ghost: Some(0.2),
+                ..iso.isolated.clone().unwrap()
+            }),
+            ..Visibility::default()
+        };
+        assert_eq!(hit(&all, &ghosted), Some(2));
         assert_eq!(iso.opacity(Some(ElementId(11))), Some(1.0));
         assert_eq!(iso.opacity(None), None);
     }

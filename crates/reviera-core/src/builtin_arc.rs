@@ -45,6 +45,8 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(ColumnSet),
         registry.add(ColumnAttach),
         registry.add(ColumnDetach),
+        registry.add(ElementArrayLinear),
+        registry.add(ElementArrayRadial),
     ];
     for r in results {
         r.expect("architecture commands are valid");
@@ -155,4 +157,32 @@ edit_command!(
     crate::columns::DetachParams,
     (),
     crate::columns::detach
+);
+
+edit_command!(
+    ElementArrayLinear,
+    "element.array_linear",
+    "Array elements in a row",
+    "Copies elements into a linear array (ARC-MOD-026): `count` members including the original, the \
+     `vector` reaching the second member (`move_to: second`) or the last (`move_to: last`). The members \
+     are independent copies (Group and Associate is not available yet). Returns the copies, member by \
+     member.",
+    "Array",
+    crate::modify::ArrayLinearParams,
+    Vec<Vec<ElementId>>,
+    crate::modify::array_linear
+);
+
+edit_command!(
+    ElementArrayRadial,
+    "element.array_radial",
+    "Array elements round a centre",
+    "Copies elements into a radial array (ARC-MOD-026) round `center`: `count` members including the \
+     original, `angle` reaching the second member (`second`) or the last (`last`; a full turn spaces \
+     them evenly without doubling the original). Doors and windows cannot be rotated off their wall. \
+     Returns the copies, member by member.",
+    "Radial Array",
+    crate::modify::ArrayRadialParams,
+    Vec<Vec<ElementId>>,
+    crate::modify::array_radial
 );

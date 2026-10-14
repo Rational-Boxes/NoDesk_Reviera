@@ -342,6 +342,19 @@ keys = "MV"
 help = "Move the selection: click a start point and an end point, or type a distance"
 
 [[action]]
+id = "element.array_linear"
+label = "Array"
+icon = "array"
+keys = "AR"
+help = "Copy the selection into a row: give the number of members, then click a start point and the second (or last) member's point"
+
+[[action]]
+id = "element.array_radial"
+label = "Radial Array"
+icon = "array_radial"
+help = "Copy the selection round its centre: give the number of members, then click the first ray and the second (or last) member's ray, or type an angle"
+
+[[action]]
 id = "element.copy"
 label = "Copy"
 icon = "copy"
@@ -1111,6 +1124,8 @@ tools = [
   { action = "element.move", size = "small" },
   { action = "element.copy", size = "small" },
   { action = "element.rotate", size = "small" },
+  { action = "element.array_linear", size = "small" },
+  { action = "element.array_radial", size = "small" },
   { action = "element.trim_corner", size = "small" },
   { action = "element.trim_extend", size = "small" },
   { action = "element.split", size = "small" },
@@ -1314,7 +1329,7 @@ label = "&Modify"
 items = [
   "tool.modify", "-",
   "element.align", "element.offset", "element.mirror_pick", "element.mirror_draw", "-",
-  "element.move", "element.copy", "element.rotate", "-",
+  "element.move", "element.copy", "element.rotate", "element.array_linear", "element.array_radial", "-",
   "element.trim_corner", "element.trim_extend", "element.split", "-",
   "element.pin", "element.unpin", "element.delete", "-",
   "wall.flip", "wall.attach", "wall.detach", "insert.flip_hand", "insert.flip_facing",

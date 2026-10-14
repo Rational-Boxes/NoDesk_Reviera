@@ -4177,7 +4177,9 @@ These tools are on the **Modify** tab and are repeated on every `Modify | <Eleme
 
 **Acceptance criteria.**
 - [ ] A linear array of 5 chairs at 0.8 m, with Group and Associate on, can be changed to 7 by editing the count label, and the spacing stays 0.8 m.
-- [ ] A radial array of 8 columns over 360° (Move To: Last, 360°) places the columns 45° apart without duplicating the first one.
+- [x] A radial array of 8 columns over 360° (Move To: Last, 360°) places the columns 45° apart without duplicating the first one.
+
+*Built (2026-10-15):* `element.array_linear` and `element.array_radial` without Group and Associate (refused with `array.group_not_supported` until groups exist): the members are independent copies made through the modify tools' transform, in one undo step. Modify › **Array** (AR) and **Radial Array** ask the number of members and Move To, then take the two picks (or a typed distance or angle) with every member previewed; the radial centre is the selection's centre. Not yet: Group and Associate, array sets and the count label, Constrain, placing the radial centre.
 
 ---
 

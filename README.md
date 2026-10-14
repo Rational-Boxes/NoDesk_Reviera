@@ -404,12 +404,15 @@ Create … Boundary* tab:
   checks whether they overlap and, when they do, offers the booleans: cut either way, intersect,
   union, join or accept (UI-SEL-006).
 - **Modify tools**: Align (AL), Offset (OF), Mirror by picked or drawn axis (MM, DM), Move (MV),
-  Copy (CO), Rotate (RO), Trim/Extend to Corner (TR), Trim/Extend to a boundary, Split (SL),
+  Copy (CO), Rotate (RO), Array (AR) and Radial Array (members as independent copies; Move To
+  2nd or Last; ARC-MOD-026), Trim/Extend to Corner (TR), Trim/Extend to a boundary, Split (SL),
   Pin (PN), Unpin (UP) and Delete (DE), with previews, snapping and typed distances and angles.
   Selected walls and grids show end grips to drag and can be dragged to move; walls carry their
   doors and windows when they move, are copied or mirrored (`element.move`, `element.copy`,
   `element.rotate`, `element.mirror`, `element.offset`, `element.split`, `element.trim_corner`,
-  `element.trim_extend`, `element.align`, `element.pin`, `element.unpin`, `element.delete`).
+  `element.trim_extend`, `element.align`, `element.pin`, `element.unpin`, `element.delete`,
+  `element.array_linear`, `element.array_radial`). A translucent element is picked like any
+  other; only hidden elements (and ghosted ones while isolating) let clicks through.
 
 ### The window
 

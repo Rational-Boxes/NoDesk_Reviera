@@ -236,6 +236,9 @@ struct Gui {
     feature_tool: Option<railings::FeatureTool>,
     dome_tool: Option<curved::DomeTool>,
     column_tool: Option<columns::ColumnTool>,
+    /// The last array's members and Move To (Last when true).
+    array_count: u32,
+    array_last: bool,
     /// The floor type new floors take.
     floor_type: Option<ElementId>,
     /// The last pointer position in the active view (Tab in sketch mode picks there).
@@ -3007,6 +3010,8 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 feature_tool: None,
                 dome_tool: None,
                 column_tool: None,
+                array_count: 4,
+                array_last: false,
                 floor_type: None,
                 mouse: (0, 0),
                 offset_distance: 1.0,

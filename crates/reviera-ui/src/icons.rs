@@ -300,6 +300,12 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "model_properties" => format!(
             r#"<path d="M6 4h14l6 6v18H6z" fill="{f}" {s}/><path d="M10 12h12M10 17h12M10 22h7" {s}/><path d="M21 22l2 2 4-5" {sa}/>"#
         ),
+        "array" => format!(
+            r#"<rect x="3" y="12" width="7" height="8" fill="{f}" {s}/><rect x="13" y="12" width="7" height="8" fill="{f}" {sa}/><rect x="23" y="12" width="7" height="8" fill="{f}" {sa}/><path d="M6 25h20" {s}/>"#
+        ),
+        "array_radial" => format!(
+            r#"<circle cx="16" cy="16" r="2" fill="{a}"/><rect x="13" y="3" width="6" height="6" fill="{f}" {s}/><rect x="23" y="13" width="6" height="6" fill="{f}" {sa}/><rect x="13" y="23" width="6" height="6" fill="{f}" {sa}/><rect x="3" y="13" width="6" height="6" fill="{f}" {sa}/>"#
+        ),
         "column" => format!(
             r#"<path d="M9 4h14v4H9zM9 25h14v4H9z" fill="{f}" {s}/><path d="M11 8v17M21 8v17" {s}/><path d="M16 10v13" {sa}/>"#
         ),
