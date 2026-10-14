@@ -10637,6 +10637,45 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 - [ ] A skylight in a 30° roof cuts an opening at right angles to the roof face.
 - [x] The default 1.2 m window placed in a 1 m wall is 1 m wide; placed in a flat dormer's front wall it sits above the main roof and shrinks under the dormer roof.
 
+### 3.4.3a Window shapes: round, round-top and other profiles
+**ID:** ARC-WIN-002 · **Priority:** P1 · **Ref:** owner requirement (2026-10-13); Reviera's own design (Appendix A.2a)
+
+**Purpose.** Windows (and doors) that are not rectangles: round (oculus) windows, round-top (arched-head) windows, and the common head and outline shapes, as parametric built-in types. *(Owner request, 2026-10-13: "spec out more complex windows including round and with a round top".)*
+
+**Workflow.** The user picks a window type whose **Shape** is not rectangular in the type selector (or duplicates a type and changes its Shape in Type Properties), then places it like any window (ARC-WIN-001), including the fit to the host.
+
+**Behaviour & rules.**
+- **Shapes** (type parameter *Shape*, with the shape's own parameters):
+  - *Rectangle* (today's windows).
+  - *Round* (circular, an oculus): Diameter is both Width and Height; an *Elliptical* variant has its own Width and Height.
+  - *Round top* (arched head): a rectangle below a head arch. Head profiles:
+    - *semicircular* (rise = Width / 2);
+    - *segmental* (a Rise below Width / 2; radius from width and rise);
+    - *elliptical* (a Rise; half-ellipse);
+    - *Gothic / pointed* (two arcs meeting at the apex; a radius ratio of the span, default 1.0 for an equilateral arch);
+    - *Tudor / four-centred* (two radii; a Rise).
+    Height is the overall height to the top of the arch; Spring Height (the rectangle's height) is derived and shown.
+  - *Quarter round / half round* (a fan light): the arch alone, with no rectangle below.
+  - *Triangle / gable* (a pitched head, its Rise or angle) and *Trapezoid* (the left and right heights differ, for raking walls).
+  - *Polygon* (an octagon or hexagon, with the number of sides and a rotation).
+- **Frame and glazing follow the outline:** the frame is the outline offset inward by the frame width (circular arcs stay arcs). The sash and glass are inside it. Mullions and muntins (a radial "sunburst" option for round tops and fans) come from a pattern parameter.
+- **Opening in the host:** the wall's void is the outline, not its bounding rectangle. It is extruded through the wall's thickness (`BRepPrimAPI_MakePrism` of the outline face, then `BRepAlgoAPI_Cut`). Plans cut at the cut plane show the opening's width at that height (a round window cut below its centre shows a narrower opening).
+- **Fit to the host** (ARC-WIN-001) keeps the shape's proportions: a round window shrinks its diameter; a round-top keeps its head profile and gives up spring height first, then width.
+- **Curved walls:** in a curved wall (ARC-WALL-002) the outline is projected onto the wall's surface, and the frame stays straight across (the wall bends around it) for openings up to the wall's chord tolerance.
+- **Doors** take the round-top and Gothic heads too (arched doorways).
+- **Display:** elevations and 3D show the true outline. Plans show the frame at the cut height, and the arch in the head dashed above the cut where the view shows it.
+
+**Data (IFC mapping).** `IfcWindow` with `PartitioningType` and `UserDefinedPartitioningType` for shaped windows, and `IfcWindowType` carrying the shape's parameters in the Reviera property set. The opening's `IfcOpeningElement` body is an `IfcExtrudedAreaSolid` of an `IfcArbitraryClosedProfileDef` (an `IfcIndexedPolyCurve` with arc segments, or an `IfcCircleProfileDef` for round windows), so consumers see the true shape. The recipe is RXD type data (`recipe.window_type`, `shape`).
+
+**Commands.** `type.set_param(type_id, "shape", rectangle|round|elliptical|round_top|fan|gable|trapezoid|polygon)` and the shape parameters (`rise`, `head_profile`, `radius_ratio`, `sides`, `rotation`, `left_height`, `right_height`, `muntins`), as for other type parameters. Placement is `window.place` / `door.place` unchanged.
+
+**Acceptance criteria.**
+- [ ] A round window of 900 mm diameter cuts a circular opening in its wall (the void's volume is π · 0.45² · the wall's thickness within 0.5%) and exports with an `IfcCircleProfileDef` opening.
+- [ ] A 1.2 m-wide semicircular round-top window 2.0 m high has its spring at 1.4 m, and its frame follows the arch at a constant frame width.
+- [ ] A Gothic window with a radius ratio of 1.0 has two arcs of radius equal to its width meeting at the apex.
+- [ ] A plan cut at 1.2 m through a round window centred at 1.5 m with a 900 mm diameter shows an opening of 2 · √(0.45² − 0.3²) ≈ 0.67 m.
+- [ ] Fitted into a wall too narrow for it, a round window keeps its circle and shrinks its diameter.
+
 ### 3.4.4 Components
 **ID:** ARC-COMP-001 · **Priority:** P0 · **Ref:** research/02 §5.4
 
@@ -25514,14 +25553,14 @@ Generated by `tools/build_spec.py` from the chapter command catalogs and require
 |------|---:|---:|---:|---:|------:|
 | UI | 76 | 37 | 7 | 0 | 120 |
 | DM | 91 | 57 | 24 | 3 | 175 |
-| ARC | 76 | 54 | 10 | 1 | 141 |
+| ARC | 76 | 55 | 10 | 1 | 142 |
 | STR | 0 | 14 | 47 | 0 | 61 |
 | MEP | 0 | 29 | 42 | 0 | 71 |
 | ANA | 0 | 1 | 21 | 0 | 22 |
 | DOC | 68 | 40 | 12 | 1 | 121 |
 | COL | 8 | 45 | 6 | 1 | 60 |
 | ADV | 0 | 0 | 4 | 1 | 5 |
-| **Total** | **319** | **277** | **173** | **7** | **776** |
+| **Total** | **319** | **278** | **173** | **7** | **777** |
 
 Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver)"), it is counted under the first. The non-functional requirements (NFR-…) are in Chapter 0 §0.7 and are not counted here.
 
@@ -25576,7 +25615,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.2a Reviera-originated features
 
-89 requirements are Reviera's own design: owner directives, the technology stack (IFC/RXD storage, live store, BIMserver, MCP, scripting) and extensions beyond the reference product's feature set. Their Ref lines cite no research on the reference product. Listing them separately keeps the clean-room provenance clear: every other requirement traces to public research on the reference product.
+90 requirements are Reviera's own design: owner directives, the technology stack (IFC/RXD storage, live store, BIMserver, MCP, scripting) and extensions beyond the reference product's feature set. Their Ref lines cite no research on the reference product. Listing them separately keeps the clean-room provenance clear: every other requirement traces to public research on the reference product.
 
 | Requirement | Ch | Feature |
 |-------------|----|---------|
@@ -25646,6 +25685,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | DM-LIVE-018 | 2b | Keyframe snapshots and the retention policy (§7, §8.5) shall keep every retained point … |
 | DM-LIVE-019 | 2b | In BIMserver mode, the History panel shall show one combined timeline of local … |
 | DM-LIVE-020 | 2b | Users shall be able to publish named snapshots to BIMserver without changing the … |
+| ARC-WIN-002 | 3 | 3.4.3a Window shapes: round, round-top and other profiles |
 | ARC-ROOF-010 | 3 | 3.6.7a Eaves and wall bearing |
 | ARC-ROOF-007 | 3 | 3.6.8a Dormers (automated) |
 | ARC-ROOF-008 | 3 | 3.6.8b Arched and vaulted roofs |

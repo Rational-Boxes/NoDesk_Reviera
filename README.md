@@ -283,7 +283,7 @@ The KIT FZK *AC20-Institute-Var-2* sample model (`test-data/ifc/`) open in Revie
 
 ## Planned next
 
-The first milestone continues with roof openings (skylights and shafts), and layered wall types. Then come curved forms: smooth arched roofs (including vaults that taper over trapezoidal
+The first milestone continues with shaped windows (round, round-top, Gothic, fan and gable heads, ARC-WIN-002), roof openings (skylights and shafts), and layered wall types. Then come curved forms: smooth arched roofs (including vaults that taper over trapezoidal
 footprints, ARC-ROOF-008), dome roofs (ARC-ROOF-009), spline-curved walls (ARC-WALL-002), and
 boolean intersect, subtract and union between elements (ARC-MOD-028). After that come general
 shape and CSG modelling tools,
