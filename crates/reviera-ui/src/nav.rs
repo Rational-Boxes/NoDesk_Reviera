@@ -252,12 +252,33 @@ impl Gui {
         })
     }
 
-    /// The orbit centre: the selection's centre, else the view's target (UI-NAV-001).
-    pub(crate) fn pivot(&mut self) -> Vec3 {
-        match self.selection_bounds() {
-            Some((lo, hi)) => (lo + hi) * 0.5,
-            None => self.camera().target,
+    /// The orbit centre for a drag from pixel (`x`, `y`) (UI-NAV-001): the selection's centre,
+    /// else the point of the model under the cursor (what the view shows: clipping, hidden
+    /// elements and translucency as for picking), else the view's target.
+    pub(crate) fn pivot(&mut self, x: i32, y: i32) -> Vec3 {
+        if let Some((lo, hi)) = self.selection_bounds() {
+            return (lo + hi) * 0.5;
         }
+        self.point_under(x, y)
+            .unwrap_or_else(|| self.camera().target)
+    }
+
+    /// Where the ray through pixel (`x`, `y`) of the active 3D view first meets the model.
+    pub(crate) fn point_under(&self, x: i32, y: i32) -> Option<Vec3> {
+        let v = self.active_view()?;
+        let size = v.panel.get_client_size();
+        let (origin, dir) = v
+            .camera
+            .ray(x as f32, y as f32, size.width as f32, size.height as f32);
+        let (b, slices) = self.view_clip(v);
+        let clipping = reviera_render::Clipping::of(b.as_ref(), &slices);
+        let (_, t) = self.scene().pick_visible(
+            origin,
+            dir,
+            &|p| clipping.keeps(p),
+            &self.view_visibility(v),
+        )?;
+        Some(origin + dir * t)
     }
 
     // ---- Orientation Cube ----

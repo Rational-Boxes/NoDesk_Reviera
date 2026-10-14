@@ -77,7 +77,8 @@ const CLICK_SLOP: i32 = 3;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum Drag {
-    /// Orbit about a pivot (the selection's centre, or the view's target).
+    /// Orbit about a pivot (the selection's centre, the point under the cursor, or the view's
+    /// target).
     Orbit(glam::Vec3),
     Pan,
     /// Turning the Orientation Cube (or, on its ring, turning about the vertical only).
@@ -2272,8 +2273,8 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                             }
                         }
                         (0, None) if walking => Drag::Look,
-                        (0, None) => Drag::Orbit(g.pivot()),
-                        (1, _) if shift && !walking => Drag::Orbit(g.pivot()),
+                        (0, None) => Drag::Orbit(g.pivot(x, y)),
+                        (1, _) if shift && !walking => Drag::Orbit(g.pivot(x, y)),
                         _ => Drag::Pan,
                     };
                     if !matches!(kind, Drag::Cube { .. }) {

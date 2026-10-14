@@ -1791,7 +1791,7 @@ The following context panels are part of the default layout. Owners are authorit
 
 **Behaviour & rules.**
 - **Middle-drag** pans; **wheel** zooms about the cursor; **double-click middle** zooms to fit.
-- **Shift + middle-drag** (3D) orbits about the pivot: the selection's centre if something is selected, else the model's visible extents centre, else a user-defined centre set with **Define Centre of Rotation** (R3, right-click in 3D).
+- **Shift + middle-drag** (3D) orbits about the pivot: the selection's centre if something is selected, else the point of the model under the cursor where the drag starts (the first visible surface the ray meets), else the model's visible extents centre, else a user-defined centre set with **Define Centre of Rotation** (R3, right-click in 3D).
 - **Ctrl + Shift + middle-drag** (3D, Reviera addition) looks around from the eye point in perspective views.
 - **F8** starts orbit with the left button until Esc (for users without a middle button). A preference offers **left-button navigation profile** for trackpads: Alt+drag orbit, Alt+Ctrl+drag pan (P1).
 - Trackpads: two-finger scroll pans, pinch zooms, Shift+two-finger scroll orbits in 3D (P1).
