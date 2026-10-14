@@ -75,6 +75,7 @@ fn raw_parent(store: &Store, e: &Element, imported: &Imported) -> Option<Element
         return match r.path {
             crate::railings::RailPath::Free { level, .. } => by_guid(&level),
             crate::railings::RailPath::Host { host, .. } => by_guid(&host),
+            crate::railings::RailPath::Stair { stair, .. } => by_guid(&stair),
         };
     }
     if let Some((railing, _)) = crate::railings::gate_of(e) {

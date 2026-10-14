@@ -1131,6 +1131,10 @@ impl LocalProject {
                             .or_else(|| roofs::roof_recipe(h).map(|r| r.level))?;
                         GlobalId::parse(&level)
                     }
+                    railings::RailPath::Stair { stair, .. } => {
+                        let h = store.get(store.find_by_guid(&GlobalId::parse(&stair)?)?)?;
+                        GlobalId::parse(&stairs::stair_recipe(h)?.base_level)
+                    }
                 },
             );
             let storey = level

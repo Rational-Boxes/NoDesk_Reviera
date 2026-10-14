@@ -108,8 +108,10 @@ The KIT FZK *AC20-Institute-Var-2* sample model (`test-data/ifc/`) open in Revie
   Double Gate add features to a laid-out railing: click on it where each goes. An opening gets a
   post each side; a gate fills it with one or two leaves and is its own `IfcDoor` (GATE) element
   (`railing.add_opening`, `railing.add_gate`, `railing.move_feature`, `railing.remove_feature`).
-  Not yet: railings on stairs, continuous handrails, baluster families, and gate swing arcs in
-  plan.
+  Stairs get railings on both sides, following the nosing line and flat across landings
+  (round the outside of a turn); Modify | Stairs › Railings puts them back
+  (`railing.create_on_stair`). Not yet: continuous handrails, baluster families, and gate swing
+  arcs in plan.
 - **Decks**: Architecture › Deck sketches a deck's outline. Its boards are laid out one by one:
   courses across from the start edge (the last ripped, or balanced), every end joint on a joist
   and staggered, picture-frame borders mitred at the corners, and pieces cut from the shortest
@@ -275,7 +277,7 @@ The KIT FZK *AC20-Institute-Var-2* sample model (`test-data/ifc/`) open in Revie
 
 ## Planned next
 
-The first milestone continues with railings on stairs, roof openings (below dormers,
+The first milestone continues with roof openings (below dormers,
 skylights and shafts), and layered wall types. Then come curved forms: smooth arched roofs (including vaults that taper over trapezoidal
 footprints, ARC-ROOF-008), dome roofs (ARC-ROOF-009), spline-curved walls (ARC-WALL-002), and
 boolean intersect, subtract and union between elements (ARC-MOD-028). After that come general

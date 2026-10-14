@@ -11781,7 +11781,7 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
   - **Stair (ST)**: click each run's start and end, with the riser countdown; landings join the runs.
   - **Spiral Stair**: click the centre, then a point on the walking line.
   - Properties edit the desired risers, tread depth and width, and show the actual values and warnings.
-- **Later:** winders, centre-ends spiral by clicks, assembled runs and nosings, supports, direct-manipulation handles, multistory stairs, plan symbols above the cut, and the generated railings (ARC-RAIL-001).
+- **Later:** winders, centre-ends spiral by clicks, assembled runs and nosings, supports, direct-manipulation handles, multistory stairs, and plan symbols above the cut. Generated railings: built (ARC-RAIL-001, on stairs).
 
 **Workflow.**
 1. The user starts Architecture › Circulation › **Stair** in a plan or 3D view. Tiling a plan view and a 3D view side by side is recommended.
@@ -12019,7 +12019,13 @@ These are view annotation and are specified in the DOC chapter. This chapter req
   - The specified 3.05 m case gives 24 balusters.
 - **IFC:** an `IfcRailing` (GUARDRAIL) with one faceted B-rep per rail, post and baluster, contained in its level or its host's. Deleting the host or the level deletes the railing.
 - **Window:** Architecture › Railing (click the points; the first point closes the path; Esc finishes) and Modify | Floors / Roofs › Guard Edges.
-- **Later:** railings on stairs (By Host heights), continuous handrails and their extensions, baluster families and multi-row patterns, sloped segments, stair gaps in guarded edges, and editing paths.
+- **On stairs** (Place on Stair, Treads):
+  - `railing.create_on_stair(stair_id, sides?, inset?, type_id?)`; `stair.create` places railings on both sides unless `railings: false`, and Modify | Stairs › Railings adds them to a selected stair.
+  - The path is the stair's side, `inset` (50 mm) in from its edge, along the nosing line: from the first nosing to the top.
+  - On a landing it is flat at the landing's height. At a turn it goes round the landing's corner on both sides; a half turn goes round the outside and straight across the well on the inside.
+  - Rails follow the sloped path at the type's heights, measured plumb above the nosing line. Posts and balusters stand plumb.
+  - The railing follows the stair (its runs, levels and moves) and is deleted with it. It is contained in the stair's base level; aggregation into the `IfcStair` comes later.
+- **Later:** continuous handrails and their extensions, By Host heights per segment, angled joins (vertical/horizontal segments), baluster families and multi-row patterns, stair gaps in guarded edges, and editing paths.
 
 ### 3.7.8 Baluster placement
 **ID:** ARC-RAIL-002 · **Priority:** P0 · **Ref:** research/02 §8.5 (Edit Baluster Placement), §17.9
@@ -13570,6 +13576,7 @@ All commands below are registered once in the command registry and exposed autom
 | `geometry.boolean` | target_id, tool_ids, op: intersect\|subtract\|union, tools?: keep\|hide\|consume | — | Yes | ARC-MOD-028 |
 | `geometry.remove_boolean` | target_id, tool_ids? | — | Yes | ARC-MOD-028 |
 | `railing.create_on_edges` | type_id, host_id, edges?: [curve_key]\|all_open, setback? | [element_id] | Yes | ARC-RAIL-001 |
+| `railing.create_on_stair` | stair_id, sides?: [left\|right], inset?, type_id? | [element_id] | Yes | ARC-RAIL-001 |
 | `deck.create` | outline: loops, level_id, height?, type_id?, start_edge?, direction? | element_id | Yes | ARC-DECK-001 |
 | `deck.set_boards` | deck_id, width?, thickness?, gap?, direction?, stock_lengths?, picture_frame?, breakers?, stagger?, balance_courses?, seed? | — | Yes | ARC-DECK-001 |
 | `deck.set_framing` | deck_id, joist_spacing?, joist_size?, beam_spacing?, post_spacing?, ledger_wall_id? | — | Yes | ARC-DECK-001 |
@@ -25646,7 +25653,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**1976 unique commands** in 402 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**1977 unique commands** in 402 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -25915,7 +25922,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `publish` | 1 |
 | `purge` | 2 |
 | `qto` | 1 |
-| `railing` | 11 |
+| `railing` | 12 |
 | `railingtype` | 5 |
 | `ramp` | 2 |
 | `rebar` | 24 |
@@ -27178,6 +27185,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `railing.add_opening` | 3 | railing_id, at?\ | point?, width? | key | Yes |
 | `railing.create` | 3 | type_id, path: [curve], host_ref?, base_level?, base_offset?, offset_from_path?, segment_slopes?: [ByHost\ | Flat\ | Sloped], height_corrections?: [f64\ | ByType] |
 | `railing.create_on_edges` | 3 | type_id, host_id, edges?: [curve_key]\ | all_open, setback? | [element_id] | Yes |
+| `railing.create_on_stair` | 3 | stair_id, sides?: [left\ | right], inset?, type_id? | [element_id] | Yes |
 | `railing.edit_path` | 3 | railing_id, path, ... | — | Yes | ARC-RAIL-001 |
 | `railing.features` | 3 | railing_id | [feature] | No | ARC-RAIL-003 |
 | `railing.flip_path` | 3 | railing_id | — | Yes | ARC-RAIL-001 |

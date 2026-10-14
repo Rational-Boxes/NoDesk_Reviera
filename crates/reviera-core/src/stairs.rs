@@ -520,6 +520,92 @@ pub fn generate(r: &StairRecipe, z_base: f64, z_top: f64, t: &StairType) -> Resu
     })
 }
 
+/// The line a railing follows along one side of a stair (ARC-RAIL-001, on a stair): the nosing
+/// line `inset` in from the run's left or right edge, rising with the treads; across each
+/// landing at the landing's height, round the outside of a turn and straight across its inside.
+/// Points are `[x, y, z]`, from the bottom.
+pub fn side_path(
+    r: &StairRecipe,
+    z_base: f64,
+    riser: f64,
+    left_side: bool,
+    inset: f64,
+) -> Vec<[f64; 3]> {
+    let td = r.tread_depth;
+    let sign = if left_side { 1.0 } else { -1.0 };
+    let offset = |run: &Run| sign * (run.width / 2.0 - inset);
+    let side = |run: &Run, p: [f64; 2], d: [f64; 2]| {
+        let n = left(d);
+        let o = offset(run);
+        [p[0] + n[0] * o, p[1] + n[1] * o]
+    };
+    let mut out: Vec<[f64; 3]> = Vec::new();
+    let push = |p: [f64; 2], z: f64, out: &mut Vec<[f64; 3]>| {
+        // A point on the one before in plan replaces it (a rise in place).
+        if let Some(last) = out.last()
+            && (last[0] - p[0]).hypot(last[1] - p[1]) < 1e-6
+        {
+            out.pop();
+        }
+        out.push([p[0], p[1], z]);
+    };
+    let mut done = 0u32;
+    for (i, run) in r.runs.iter().enumerate() {
+        let z0 = z_base + f64::from(done) * riser;
+        let k = run.risers.max(1);
+        if i > 0 {
+            // The landing: from the previous run's end to this run's start.
+            let prev = &r.runs[i - 1];
+            let pd = prev.end_direction(td);
+            let v = run.direction;
+            let e = side(prev, prev.end(td), pd);
+            let s0 = side(run, run.start, v);
+            let cross = pd[0] * v[1] - pd[1] * v[0];
+            let dot = pd[0] * v[0] + pd[1] * v[1];
+            if cross.abs() > 1e-6 {
+                // A turn: the side lines meet at the landing's corner.
+                let t = ((s0[0] - e[0]) * v[1] - (s0[1] - e[1]) * v[0]) / cross;
+                let x = [e[0] + pd[0] * t, e[1] + pd[1] * t];
+                if t > -1e-9 && (s0[0] - x[0]) * v[0] + (s0[1] - x[1]) * v[1] > -1e-9 {
+                    push(x, z0, &mut out);
+                }
+            } else if dot < 0.0 {
+                // A half turn: the outside goes round the landing, the inside straight across.
+                let n = left(pd);
+                let toward = (s0[0] - e[0]) * n[0] + (s0[1] - e[1]) * n[1];
+                let outside = toward * offset(prev) < 0.0;
+                if outside {
+                    let w = prev.width.max(run.width) - inset;
+                    push([e[0] + pd[0] * w, e[1] + pd[1] * w], z0, &mut out);
+                    push([s0[0] - v[0] * w, s0[1] - v[1] * w], z0, &mut out);
+                }
+            }
+        }
+        match &run.spiral {
+            Some(sp) => {
+                let (rad, a0, step) = run.turn(sp, td);
+                let dir_k = if sp.ccw { 1.0 } else { -1.0 };
+                for j in 0..k {
+                    let a = a0 + step * f64::from(j);
+                    let p = Run::on_circle(sp, rad, a);
+                    let d = [-a.sin() * dir_k, a.cos() * dir_k];
+                    push(side(run, p, d), z0 + riser * f64::from(j + 1), &mut out);
+                }
+            }
+            None => {
+                push(side(run, run.start, run.direction), z0 + riser, &mut out);
+                push(
+                    side(run, run.end(td), run.direction),
+                    z0 + riser * f64::from(k),
+                    &mut out,
+                );
+            }
+        }
+        done += run.risers;
+    }
+    out
+}
+
 /// A spiral run's steps: each tread an annular sector (a wedge where the inner radius reaches
 /// the centre), as a solid from its top down by the riser height and the structural depth (the
 /// first stands on the floor); and the radial tread lines.
@@ -621,6 +707,13 @@ fn type_of(store: &Store, e: &Element) -> StairType {
         .and_then(|g| store.get(find(store, g)?))
         .and_then(stair_type)
         .unwrap_or_default()
+}
+
+/// A stair's base and top elevations.
+pub fn elevations(store: &Store, e: &Element) -> Result<(f64, f64)> {
+    let r =
+        stair_recipe(e).ok_or_else(|| Error::new("stair.not_reviera", "not a Reviera stair"))?;
+    heights(store, &r)
 }
 
 /// Regenerates a stair from its recipe, levels and type.
@@ -766,6 +859,8 @@ pub struct CreateParams {
     pub width: Option<Value>,
     /// Straight runs in order up the stair; an automatic landing joins each to the next.
     pub runs: Vec<RunArg>,
+    /// Railings on both sides (default true; ARC-RAIL-001).
+    pub railings: Option<bool>,
 }
 
 /// The level above `level` (by elevation).
@@ -905,7 +1000,7 @@ pub(crate) fn create(txn: &mut crate::txn::Transaction<'_>, p: CreateParams) -> 
     generate(&recipe, z0, z1, &t)?;
     let type_guid = txn.store().get(type_id).expect("exists").guid().to_string();
     let predefined = classify(&recipe.runs);
-    txn.create(
+    let id = txn.create(
         NewElement::new(CLASS)
             .param("@PredefinedType", predefined)
             .param("@type", type_guid)
@@ -913,7 +1008,19 @@ pub(crate) fn create(txn: &mut crate::txn::Transaction<'_>, p: CreateParams) -> 
                 RECIPE_KEY,
                 serde_json::to_value(&recipe).expect("serialises"),
             ),
-    )
+    )?;
+    if p.railings != Some(false) {
+        crate::railings::create_on_stair(
+            txn,
+            crate::railings::CreateOnStairParams {
+                type_id: None,
+                stair_id: ElementRef::Id(id),
+                sides: None,
+                inset: None,
+            },
+        )?;
+    }
+    Ok(id)
 }
 
 fn resolve_stair(store: &Store, r: &ElementRef) -> Result<(ElementId, StairRecipe)> {

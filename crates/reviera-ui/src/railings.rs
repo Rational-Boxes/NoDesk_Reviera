@@ -6,6 +6,8 @@
 //!   closes it, and Esc finishes an open path (`railing.create`).
 //! - **Guard Edges** (Modify | Floors and Modify | Roofs): railings along every open edge of the
 //!   selected floors, decks and flat roofs (`railing.create_on_edges`).
+//! - **Railings** (Modify | Stairs): railings on both sides of the selected stairs, following
+//!   their nosing lines and landings (`railing.create_on_stair`; new stairs get them anyway).
 //! - **Opening**, **Gate** and **Double Gate** (Modify | Railings, ARC-RAIL-003): with a railing
 //!   selected, each click on it (in a plan, or on the railing in 3D) adds an opening or a gate
 //!   there (`railing.add_opening`, `railing.add_gate`). Esc ends the tool. Deleting a gate leaves
@@ -274,5 +276,40 @@ impl Gui {
         }
         self.refresh_scene(&frame);
         frame.set_status_text(&format!("Placed {n} railing(s) along the open edges"), 0);
+    }
+
+    /// Modify | Stairs › Railings: railings on both sides of the selected stairs.
+    pub(crate) fn rail_stairs(&mut self) {
+        let frame = self.frame;
+        let selected = self.selection();
+        let stairs: Vec<ElementId> = {
+            let Some(store) = self
+                .doc
+                .and_then(|d| self.app.document(d))
+                .map(|d| d.doc.store())
+            else {
+                return;
+            };
+            selected
+                .into_iter()
+                .filter(|id| {
+                    store
+                        .get(*id)
+                        .is_some_and(|e| reviera_core::stairs::stair_recipe(e).is_some())
+                })
+                .collect()
+        };
+        if stairs.is_empty() {
+            return frame.set_status_text("Select the stairs to put railings on", 0);
+        }
+        let mut n = 0;
+        for s in stairs {
+            match self.run("railing.create_on_stair", json!({ "stair_id": s })) {
+                Ok(v) => n += v.as_array().map_or(0, Vec::len),
+                Err(e) => return error(&frame, &format!("No railings were placed:\n{e}")),
+            }
+        }
+        self.refresh_scene(&frame);
+        frame.set_status_text(&format!("Placed {n} railing(s) on the stairs"), 0);
     }
 }

@@ -81,6 +81,7 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(DeckBoards),
         registry.add(DeckCutList),
         registry.add(RailingCreateOnEdges),
+        registry.add(RailingCreateOnStair),
         registry.add(RailingAddOpening),
         registry.add(RailingAddGate),
         registry.add(RailingMoveFeature),
@@ -442,6 +443,7 @@ pub fn dependents_of(store: &crate::store::Store, id: ElementId) -> Vec<ElementI
                 || crate::railings::railing_recipe(e).is_some_and(|r| match r.path {
                     crate::railings::RailPath::Free { level, .. } => level == guid,
                     crate::railings::RailPath::Host { host, .. } => host == guid,
+                    crate::railings::RailPath::Stair { stair, .. } => stair == guid,
                 })
                 || crate::railings::gate_of(e).is_some_and(|(r, _)| r == guid)
                 || crate::dormers::dormer_of(e) == Some(guid.as_str())
@@ -2685,6 +2687,19 @@ modify_command!(
     crate::railings::CreateOnEdgesParams,
     Vec<ElementId>,
     crate::railings::create_on_edges
+);
+modify_command!(
+    RailingCreateOnStair,
+    "railing.create_on_stair",
+    "Railings on a stair",
+    "Creates railings on a stair's sides (`sides`: `left`, `right`, going up; default both), `inset` in from \
+     its edges (default 50 mm). Each follows the nosing line at the type's height, crosses the landings at \
+     their height (round the outside of a turn, straight across the inside) and follows the stair when it \
+     changes. `stair.create` places them unless `railings` is false.",
+    "Railing",
+    crate::railings::CreateOnStairParams,
+    Vec<ElementId>,
+    crate::railings::create_on_stair
 );
 modify_command!(
     RailingAddOpening,

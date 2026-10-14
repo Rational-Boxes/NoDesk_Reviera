@@ -89,6 +89,13 @@ pub enum RailPath {
         closed: bool,
         setback: f64,
     },
+    /// Along one side of a stair (`left` or `right` going up), `inset` in from its edge,
+    /// following the nosing line and the landings.
+    Stair {
+        stair: String,
+        left: bool,
+        inset: f64,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
@@ -142,10 +149,11 @@ pub fn railing_type(e: &Element) -> Option<RailingType> {
 /// A railing as it is now.
 #[derive(Debug, Clone, PartialEq)]
 pub struct RailingGeometry {
-    /// The path in plan and its height.
+    /// The path in plan and its height (at its start); `heights` per point.
     pub path: Vec<[f64; 2]>,
     pub closed: bool,
     pub z: f64,
+    pub heights: Vec<f64>,
     /// Rails, posts and balusters, each a closed box.
     pub parts: Vec<Mesh>,
     pub posts: usize,
@@ -238,7 +246,20 @@ pub fn generate(
     t: &RailingType,
     features: &[RailFeature],
 ) -> Result<RailingGeometry> {
-    if path.len() < 2 {
+    generate_sloped(path, closed, &vec![z; path.len()], t, features)
+}
+
+/// Builds a railing along `path` whose base rises and falls with `heights` (one per point,
+/// linear along each segment): rails follow it at their heights above it; posts and balusters
+/// stand plumb, from the base under their centres.
+pub fn generate_sloped(
+    path: &[[f64; 2]],
+    closed: bool,
+    heights: &[f64],
+    t: &RailingType,
+    features: &[RailFeature],
+) -> Result<RailingGeometry> {
+    if path.len() < 2 || heights.len() != path.len() {
         return Err(Error::new(
             "railing.short_path",
             "a railing needs a path of at least two points",
@@ -264,13 +285,25 @@ pub fn generate(
     let gaps = feature_gaps(&lengths, t, features)?;
     let mut parts = Vec::new();
     let (mut posts, mut balusters) = (0, 0);
-    let top = z + t.height;
+    // Heights above the base line.
+    let top = t.height;
     let rail_under = top - t.top_rail[1];
-    let bottom_top = z + t.bottom_rail_height + t.bottom_rail[1];
+    let bottom_top = t.bottom_rail_height + t.bottom_rail[1];
     for (i, ((a, b), (post_at, baluster_at))) in segs.iter().zip(&plan).enumerate() {
         let len = (b[0] - a[0]).hypot(b[1] - a[1]);
         let u = [(b[0] - a[0]) / len, (b[1] - a[1]) / len];
         let at = |s: f64| [a[0] + u[0] * s, a[1] + u[1] * s];
+        let (za, zb) = (heights[i], heights[(i + 1) % heights.len()]);
+        let base = |s: f64| za + (zb - za) * s / len;
+        // A rail along the segment: built level, then sheared to follow the base.
+        let sloped = |m: Mesh| -> Mesh {
+            let (mut pts, idx) = m;
+            for p in &mut pts {
+                let s = (p[0] - a[0]) * u[0] + (p[1] - a[1]) * u[1];
+                p[2] += base(s);
+            }
+            (pts, idx)
+        };
         let here: Vec<(f64, f64)> = gaps
             .iter()
             .filter(|g| g.0 == i)
@@ -285,21 +318,28 @@ pub fn generate(
         }
         pieces.push((from, len));
         for (p, q) in pieces.into_iter().filter(|(p, q)| q - p > 1e-6) {
-            parts.push(bar(at(p), at(q), t.top_rail[0] / 2.0, rail_under, top));
-            parts.push(bar(
+            parts.push(sloped(bar(
+                at(p),
+                at(q),
+                t.top_rail[0] / 2.0,
+                rail_under,
+                top,
+            )));
+            parts.push(sloped(bar(
                 at(p),
                 at(q),
                 t.bottom_rail[0] / 2.0,
-                z + t.bottom_rail_height,
+                t.bottom_rail_height,
                 bottom_top,
-            ));
+            )));
         }
         let mut post_at = post_at.clone();
         for (g0, g1) in &here {
             post_at.extend([*g0, *g1]);
         }
         for s in &post_at {
-            parts.push(column(at(*s), u, t.post / 2.0, z, top));
+            let z = base(*s);
+            parts.push(column(at(*s), u, t.post / 2.0, z, z + top));
             posts += 1;
         }
         // Balusters keep out of the gaps and the gap posts' reserved space.
@@ -308,14 +348,22 @@ pub fn generate(
                 .iter()
                 .any(|(g0, g1)| **s > g0 - t.post_space - 1e-9 && **s < g1 + t.post_space + 1e-9)
         }) {
-            parts.push(column(at(*s), u, t.baluster / 2.0, bottom_top, rail_under));
+            let z = base(*s);
+            parts.push(column(
+                at(*s),
+                u,
+                t.baluster / 2.0,
+                z + bottom_top,
+                z + rail_under,
+            ));
             balusters += 1;
         }
     }
     Ok(RailingGeometry {
         path: path.to_vec(),
         closed,
-        z,
+        z: heights[0],
+        heights: heights.to_vec(),
         parts,
         posts,
         balusters,
@@ -661,7 +709,42 @@ pub fn resolve_path(store: &Store, r: &RailingRecipe) -> Result<(Vec<[f64; 2]>, 
                 host_top(store, h)?,
             ))
         }
+        RailPath::Stair { .. } => {
+            let (pts, _) = stair_path(store, r)?;
+            Ok((pts.iter().map(|p| [p[0], p[1]]).collect(), false, pts[0][2]))
+        }
     }
+}
+
+/// A stair railing's path, with its heights.
+fn stair_path(store: &Store, r: &RailingRecipe) -> Result<(Vec<[f64; 3]>, ElementId)> {
+    let RailPath::Stair { stair, left, inset } = &r.path else {
+        return Err(Error::new("railing.bad_host", "not a stair railing"));
+    };
+    let id = find(store, stair)
+        .ok_or_else(|| Error::new("railing.no_host", "the railing's stair is gone"))?;
+    let e = store.get(id).expect("found");
+    let recipe = crate::stairs::stair_recipe(e)
+        .ok_or_else(|| Error::new("railing.bad_host", "the host is not a Reviera stair"))?;
+    let g = crate::stairs::regenerate(store, e)?;
+    let (base, _) = crate::stairs::elevations(store, e)?;
+    let pts = crate::stairs::side_path(&recipe, base, g.riser_height, *left, *inset);
+    if pts.len() < 2 {
+        return Err(Error::new(
+            "railing.short_path",
+            "the stair is too short for a railing",
+        ));
+    }
+    Ok((pts, id))
+}
+
+/// The base height at each point of a railing's path.
+pub fn path_heights(store: &Store, r: &RailingRecipe) -> Result<Vec<f64>> {
+    if matches!(r.path, RailPath::Stair { .. }) {
+        return Ok(stair_path(store, r)?.0.iter().map(|p| p[2]).collect());
+    }
+    let (pts, _, z) = resolve_path(store, r)?;
+    Ok(vec![z; pts.len()])
 }
 
 fn type_of(store: &Store, e: &Element) -> RailingType {
@@ -676,12 +759,13 @@ fn type_of(store: &Store, e: &Element) -> RailingType {
 pub fn regenerate(store: &Store, e: &Element) -> Result<RailingGeometry> {
     let r = railing_recipe(e)
         .ok_or_else(|| Error::new("railing.not_reviera", "not a Reviera railing"))?;
-    let (path, closed, z) = resolve_path(store, &r)?;
+    let (path, closed, _) = resolve_path(store, &r)?;
+    let heights = path_heights(store, &r)?;
     let t = type_of(store, e);
-    generate(
+    generate_sloped(
         &path,
         closed,
-        z,
+        &heights,
         &t,
         &fitting(&path, closed, &t, &r.features),
     )
@@ -847,13 +931,14 @@ fn make(
         path,
         features: Vec::new(),
     };
-    let (pts, closed, z) = resolve_path(txn.store(), &recipe)?;
+    let (pts, closed, _) = resolve_path(txn.store(), &recipe)?;
+    let heights = path_heights(txn.store(), &recipe)?;
     let t = txn
         .store()
         .get(type_id)
         .and_then(railing_type)
         .unwrap_or_default();
-    generate(&pts, closed, z, &t, &[])?;
+    generate_sloped(&pts, closed, &heights, &t, &[])?;
     let type_guid = txn.store().get(type_id).expect("exists").guid().to_string();
     txn.create(
         NewElement::new(CLASS)
@@ -972,6 +1057,62 @@ pub(crate) fn create_on_edges(
         .collect()
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum StairSide {
+    Left,
+    Right,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct CreateOnStairParams {
+    pub type_id: Option<ElementRef>,
+    pub stair_id: ElementRef,
+    /// The sides going up (default both).
+    pub sides: Option<Vec<StairSide>>,
+    /// How far in from the stair's edge (default 50 mm).
+    #[schemars(extend("x-reviera-data-type" = "length"))]
+    pub inset: Option<Value>,
+}
+
+/// Railings on a stair's sides, following its nosing line and landings (Place on Stair).
+pub(crate) fn create_on_stair(
+    txn: &mut crate::txn::Transaction<'_>,
+    p: CreateOnStairParams,
+) -> Result<Vec<ElementId>> {
+    let store = txn.store().clone();
+    let stair = store
+        .resolve(&p.stair_id)
+        .and_then(|s| store.get(s))
+        .filter(|s| crate::stairs::stair_recipe(s).is_some())
+        .ok_or_else(|| Error::new("element.not_found", "no such stair"))?;
+    let inset = p
+        .inset
+        .as_ref()
+        .map(|v| number(&store, v, "the inset"))
+        .transpose()?
+        .unwrap_or(0.05);
+    let guid = stair.guid().to_string();
+    let sides = p
+        .sides
+        .unwrap_or_else(|| vec![StairSide::Left, StairSide::Right]);
+    sides
+        .into_iter()
+        .map(|side| {
+            make(
+                txn,
+                p.type_id.as_ref(),
+                RailPath::Stair {
+                    stair: guid.clone(),
+                    left: side == StairSide::Left,
+                    inset,
+                },
+            )
+        })
+        .collect()
+}
+
 // ---- Openings and gates (ARC-RAIL-003) ----
 
 /// The gate element's class.
@@ -1019,8 +1160,9 @@ fn save_features(
 ) -> Result<()> {
     let store = txn.store().clone();
     let e = store.get(id).expect("exists");
-    let (path, closed, z) = resolve_path(&store, &r)?;
-    generate(&path, closed, z, &type_of(&store, e), &features)?;
+    let (path, closed, _) = resolve_path(&store, &r)?;
+    let heights = path_heights(&store, &r)?;
+    generate_sloped(&path, closed, &heights, &type_of(&store, e), &features)?;
     r.features = features;
     let value = serde_json::to_value(&r).expect("serialises");
     txn.modify(id, |e| {
@@ -1254,10 +1396,10 @@ pub(crate) fn transform(
                 *p = point(*p);
             }
         }
-        RailPath::Host { .. } => {
+        RailPath::Host { .. } | RailPath::Stair { .. } => {
             return Err(Error::new(
                 "railing.hosted",
-                "a railing on a host's edges follows the host; move the host",
+                "a railing on a host's edges or a stair follows its host; move the host",
             ));
         }
     }

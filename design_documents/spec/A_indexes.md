@@ -166,7 +166,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**1976 unique commands** in 402 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**1977 unique commands** in 402 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -435,7 +435,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `publish` | 1 |
 | `purge` | 2 |
 | `qto` | 1 |
-| `railing` | 11 |
+| `railing` | 12 |
 | `railingtype` | 5 |
 | `ramp` | 2 |
 | `rebar` | 24 |
@@ -1698,6 +1698,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `railing.add_opening` | 3 | railing_id, at?\ | point?, width? | key | Yes |
 | `railing.create` | 3 | type_id, path: [curve], host_ref?, base_level?, base_offset?, offset_from_path?, segment_slopes?: [ByHost\ | Flat\ | Sloped], height_corrections?: [f64\ | ByType] |
 | `railing.create_on_edges` | 3 | type_id, host_id, edges?: [curve_key]\ | all_open, setback? | [element_id] | Yes |
+| `railing.create_on_stair` | 3 | stair_id, sides?: [left\ | right], inset?, type_id? | [element_id] | Yes |
 | `railing.edit_path` | 3 | railing_id, path, ... | — | Yes | ARC-RAIL-001 |
 | `railing.features` | 3 | railing_id | [feature] | No | ARC-RAIL-003 |
 | `railing.flip_path` | 3 | railing_id | — | Yes | ARC-RAIL-001 |

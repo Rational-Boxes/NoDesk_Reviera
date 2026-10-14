@@ -677,6 +677,12 @@ icon = "guard_edges"
 help = "Place railings along every open edge of the selected floors, decks or flat roofs"
 
 [[action]]
+id = "railing.create_on_stair"
+label = "Railings"
+icon = "railing"
+help = "Put railings on both sides of the selected stairs, following the nosings and landings"
+
+[[action]]
 id = "railing.add_opening"
 label = "Opening"
 icon = "rail_opening"
@@ -960,6 +966,11 @@ panels = [
   { label = "Mode", tools = [{ action = "floor.edit_boundary", size = "large" }] },
   { label = "Railing", tools = [{ action = "railing.create_on_edges", size = "large" }] },
 ]
+
+[[context]]
+category = "cat.stairs"
+label = "Stairs"
+panels = [{ label = "Railing", tools = [{ action = "railing.create_on_stair", size = "large" }] }]
 
 [[context]]
 category = "cat.railings"
