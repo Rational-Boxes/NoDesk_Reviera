@@ -67,6 +67,8 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(ClearanceSetRuleSet),
         registry.add(ViewSetVirtualVolumes),
         registry.add(ClearanceList),
+        registry.add(OverlapAccept),
+        registry.add(OverlapAccepted),
         registry.add(RoofCreateArched),
         registry.add(RoofSetArch),
         registry.add(RoofCreateDome),
@@ -2543,6 +2545,44 @@ modify_command!(
     (),
     crate::clearances::set_view_mode
 );
+
+modify_command!(
+    OverlapAccept,
+    "overlap.accept",
+    "Accept an overlap as intended",
+    "Marks the overlap between `a` and `b` as intended (ARC-MOD-032): overlap checks leave the pair out. \
+     It is kept on the project by GlobalId with who accepted it, when and an optional `note`. \
+     `accepted: false` takes it back.",
+    "Accept Overlap",
+    crate::overlap_accept::AcceptParams,
+    (),
+    crate::overlap_accept::accept
+);
+
+#[derive(Debug)]
+struct OverlapAccepted;
+
+impl Command for OverlapAccepted {
+    type Params = Option<NoParams>;
+    type Output = Vec<crate::overlap_accept::Accepted>;
+    const META: CommandMeta = CommandMeta {
+        name: "overlap.accepted",
+        version: 1,
+        summary: "List accepted overlaps",
+        description: "The overlaps accepted as intended (ARC-MOD-032): each pair's GlobalIds, who accepted it, when \
+                      and why.",
+        effects: &[Effect::Read],
+        transaction_name: "",
+    };
+
+    fn run(
+        &self,
+        cx: &mut CommandContext<'_>,
+        _: Option<NoParams>,
+    ) -> Result<Vec<crate::overlap_accept::Accepted>> {
+        Ok(crate::overlap_accept::accepted(cx.store()))
+    }
+}
 
 #[derive(Debug)]
 struct ClearanceList;

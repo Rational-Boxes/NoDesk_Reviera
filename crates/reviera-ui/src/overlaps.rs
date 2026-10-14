@@ -85,13 +85,66 @@ impl Gui {
         if dialog.show_modal() != ID_OK {
             return;
         }
-        let Some(o) = usize::try_from(dialog.get_selection())
-            .ok()
-            .and_then(|i| list.get(i))
-        else {
+        let picked = usize::try_from(dialog.get_selection()).ok();
+        dialog.destroy();
+        let Some(o) = picked.and_then(|i| list.get(i)) else {
             return;
         };
-        if o["virtual"] == true {
+        let (a_label, b_label) = (
+            o["a_label"].as_str().unwrap_or_default().to_owned(),
+            o["b_label"].as_str().unwrap_or_default().to_owned(),
+        );
+        // How to resolve it (ARC-MOD-032).
+        let is_virtual = o["virtual"] == true;
+        let mut actions: Vec<(String, &str)> = vec![
+            ("Select and frame them".to_owned(), "select"),
+            ("Accept as intended".to_owned(), "accept"),
+        ];
+        if !is_virtual {
+            actions.push((format!("Move {b_label} apart"), "move_b"));
+            actions.push((format!("Move {a_label} apart"), "move_a"));
+        }
+        let labels: Vec<&str> = actions.iter().map(|x| x.0.as_str()).collect();
+        let choose = SingleChoiceDialog::builder(
+            &frame,
+            &format!("{a_label} × {b_label}:"),
+            "Resolve Overlap",
+            &labels,
+        )
+        .build();
+        if choose.show_modal() != ID_OK {
+            return;
+        }
+        let action = usize::try_from(choose.get_selection())
+            .ok()
+            .and_then(|i| actions.get(i))
+            .map_or("select", |x| x.1);
+        let resolve = match action {
+            "accept" => Some(json!({ "a": o["a"], "b": o["b"], "mode": "accept" })),
+            "move_b" => {
+                Some(json!({ "a": o["a"], "b": o["b"], "mode": "move_apart", "moves": "b" }))
+            }
+            "move_a" => {
+                Some(json!({ "a": o["a"], "b": o["b"], "mode": "move_apart", "moves": "a" }))
+            }
+            _ => None,
+        };
+        if let Some(args) = resolve {
+            match self.run("overlap.resolve", args) {
+                Ok(_) => {
+                    self.refresh_scene(&frame);
+                    let what = if action == "accept" {
+                        "accepted"
+                    } else {
+                        "moved apart"
+                    };
+                    return frame
+                        .set_status_text(&format!("Overlap {what}: {a_label} × {b_label}"), 0);
+                }
+                Err(e) => return error(&frame, &format!("The overlap was not resolved:\n{e}")),
+            }
+        }
+        if is_virtual {
             self.reveal_virtual_volumes();
         }
         let _ = self.run("selection.set", json!({ "ids": [o["a"], o["b"]] }));

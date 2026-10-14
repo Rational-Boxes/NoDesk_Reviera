@@ -99,9 +99,11 @@ The KIT FZK *AC20-Institute-Var-2* sample model (`test-data/ifc/`) open in Revie
   roofs, stairs, railings, doors, windows and imported elements), largest first with the
   volume and depth, and frames a picked pair (`overlap.find`). Touching is not overlapping,
   and pairs that belong together by design (a door and its wall) are left out. It is the
-  shared engine for virtual volumes, below, and for what comes next, not built yet:
-  resolving overlaps by a boolean mode (ARC-MOD-032), clash tests (COL-CLASH) and automatic
-  pipe and duct penetrations (MEP-PEN-001).
+  shared engine for virtual volumes, below. A picked overlap can be accepted as intended (it
+  then drops out of the checks) or moved apart, as one undo step (`overlap.resolve`,
+  `overlap.accept`, `overlap.accepted`). Not yet: resolving by a boolean mode (cut, join,
+  subtract, intersect, union; they need the solid boolean kernel), clash tests (COL-CLASH) and
+  automatic pipe and duct penetrations (MEP-PEN-001).
 - **Virtual volumes**: every door has its swing volume, and with the ADA 2010 rule set
   (`clearance.set_rule_set`) its pull-side and push-side maneuvering clearances. Check Overlaps
   lists what intrudes into them (and doors that would hit each other), and View › Virtual

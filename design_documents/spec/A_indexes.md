@@ -171,7 +171,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**1985 unique commands** in 404 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**1986 unique commands** in 404 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -403,7 +403,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `objectstyle` | 3 |
 | `one_way_indicator` | 1 |
 | `opening` | 5 |
-| `overlap` | 3 |
+| `overlap` | 4 |
 | `ownership` | 5 |
 | `panel` | 4 |
 | `panel_schedule` | 12 |
@@ -1561,6 +1561,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `opening.create_shaft` | 3 | loops, base_level, base_offset?, top: Level{id,offset} \ | Unconnected(h), symbolic_lines?: [curve] | element_id | Yes |
 | `opening.create_vertical` | 3 | host_id, loops | element_id | Yes | ARC-OPEN-002 |
 | `opening.create_wall` | 3 | wall_id, u0, u1, base: {level_id, offset}, top: Level{id,offset} \ | Unconnected(h) | element_id | Yes |
+| `overlap.accept` | 3 | a, b, note?, accepted? | — | Yes | ARC-MOD-032 |
 | `overlap.accepted` | 3 | — | [pair] | No | ARC-MOD-032 |
 | `overlap.find` | 3 | element_ids?, against?, tolerance?, min_volume?, resolution?, include_related?, limit? | {overlaps, bodies} | No | ARC-MOD-030 |
 | `overlap.resolve` | 3 | a, b, mode: cut_a\ | cut_b\ | join\ | subtract\ |

@@ -13247,7 +13247,19 @@ These tools are on the **Modify** tab and are repeated on every `Modify | <Eleme
 
 **Acceptance criteria.**
 - [ ] A beam through a wall flagged by Check Overlaps and resolved with *Cut B by A* leaves the wall cut by the beam, and the overlap is no longer flagged.
-- [ ] An overlap resolved with *Accept* stays unflagged after both elements move.
+- [x] An overlap resolved with *Accept* stays unflagged after both elements move.
+
+**Implementation notes (2026-10-13).** As built:
+- **Accept** (`overlap.accept`, or `overlap.resolve` mode `accept`): pairs are held on the project by GlobalId, with who accepted them, when (UTC) and a note. `overlap.find` and `clearance.check` leave them out (`include_accepted` brings them back). `overlap.accepted` lists them, and `accepted: false` takes one back.
+- **Move apart** moves one element (`moves`: `a` or `b`) by the shortest of the four plan moves (±x, ±y) that clears the other's box, re-checking, as one undo step. It is refused if they still overlap.
+- **The other modes:** the boolean modes (cut, join, subtract, intersect, union) are refused with `overlap.needs_booleans` until the solid boolean kernel exists.
+- **Window:** picking an overlap in Check Overlaps offers Select and frame, Accept as intended, or Move one of them apart.
+- **Later:**
+  - the boolean modes;
+  - checking after each edit;
+  - drawing the overlap boxes in the view;
+  - moving in z;
+  - storing accepted pairs in `coordination/overlaps`.
 
 ### 3.12.3 Array
 **ID:** ARC-MOD-026 · **Priority:** P0 · **Ref:** research/02 §1 (2026), §13
@@ -13762,6 +13774,7 @@ All commands below are registered once in the command registry and exposed autom
 | `geometry.remove_boolean` | target_id, tool_ids? | — | Yes | ARC-MOD-028 |
 | `overlap.find` | element_ids?, against?, tolerance?, min_volume?, resolution?, include_related?, limit? | {overlaps, bodies} | No | ARC-MOD-030 |
 | `overlap.resolve` | a, b, mode: cut_a\|cut_b\|join\|subtract\|intersect\|union\|move_apart\|accept | — | Yes | ARC-MOD-032 |
+| `overlap.accept` | a, b, note?, accepted? | — | Yes | ARC-MOD-032 |
 | `overlap.accepted` | — | [pair] | No | ARC-MOD-032 |
 | `clearance.list` | element_ids? | [clearance] | No | ARC-MOD-031 |
 | `clearance.check` | element_ids?, rules? | [overlap] | No | ARC-MOD-031 |
@@ -25875,7 +25888,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**1985 unique commands** in 404 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**1986 unique commands** in 404 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -26107,7 +26120,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `objectstyle` | 3 |
 | `one_way_indicator` | 1 |
 | `opening` | 5 |
-| `overlap` | 3 |
+| `overlap` | 4 |
 | `ownership` | 5 |
 | `panel` | 4 |
 | `panel_schedule` | 12 |
@@ -27265,6 +27278,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `opening.create_shaft` | 3 | loops, base_level, base_offset?, top: Level{id,offset} \ | Unconnected(h), symbolic_lines?: [curve] | element_id | Yes |
 | `opening.create_vertical` | 3 | host_id, loops | element_id | Yes | ARC-OPEN-002 |
 | `opening.create_wall` | 3 | wall_id, u0, u1, base: {level_id, offset}, top: Level{id,offset} \ | Unconnected(h) | element_id | Yes |
+| `overlap.accept` | 3 | a, b, note?, accepted? | — | Yes | ARC-MOD-032 |
 | `overlap.accepted` | 3 | — | [pair] | No | ARC-MOD-032 |
 | `overlap.find` | 3 | element_ids?, against?, tolerance?, min_volume?, resolution?, include_related?, limit? | {overlaps, bodies} | No | ARC-MOD-030 |
 | `overlap.resolve` | 3 | a, b, mode: cut_a\ | cut_b\ | join\ | subtract\ |

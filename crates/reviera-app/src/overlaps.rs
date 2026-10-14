@@ -33,6 +33,9 @@ pub struct FindParams {
     /// their roof, a gate and its railing); default false.
     #[serde(default)]
     pub include_related: bool,
+    /// Include overlaps accepted as intended (`overlap.accept`); default false.
+    #[serde(default)]
+    pub include_accepted: bool,
     /// At most this many results, largest first (default 500).
     pub limit: Option<usize>,
 }
@@ -143,7 +146,8 @@ impl HostCommand for OverlapFind {
             resolution: p.resolution.unwrap_or(48).clamp(4, 1024),
         };
         let skip = |a: ElementId, b: ElementId| {
-            !p.include_related && reviera_core::bodies::related(store, a, b)
+            (!p.include_related && reviera_core::bodies::related(store, a, b))
+                || (!p.include_accepted && reviera_core::overlap_accept::is_accepted(store, a, b))
         };
         let mut found = overlap::find(&first, second.as_deref(), &skip, &o);
         found.truncate(p.limit.unwrap_or(500));
@@ -247,7 +251,10 @@ impl HostCommand for ClearanceCheck {
                 .get(id)
                 .map_or_else(|| format!("#{}", id.0), |e| format!("{} {}", e.class, id.0))
         };
-        let skip = |a: ElementId, b: ElementId| reviera_core::bodies::related(store, a, b);
+        let skip = |a: ElementId, b: ElementId| {
+            reviera_core::bodies::related(store, a, b)
+                || reviera_core::overlap_accept::is_accepted(store, a, b)
+        };
         let mut out = Vec::new();
         for c in &clearances {
             for ov in overlap::find(&[c.body()], Some(&bodies), &skip, &o) {
@@ -299,5 +306,171 @@ impl HostCommand for ClearanceCheck {
         }
         out.sort_by(|x, y| y.volume.total_cmp(&x.volume));
         Ok(out)
+    }
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ResolveMode {
+    /// Mark the overlap intended.
+    Accept,
+    /// Move one element out of the other along the shorter plan axis.
+    MoveApart,
+    CutA,
+    CutB,
+    Join,
+    Subtract,
+    Intersect,
+    Union,
+}
+
+#[derive(Debug, Clone, Copy, Default, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum Which {
+    A,
+    #[default]
+    B,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ResolveParams {
+    pub a: ElementRef,
+    pub b: ElementRef,
+    pub mode: ResolveMode,
+    /// For `move_apart`: the element that moves (default `b`).
+    #[serde(default)]
+    pub moves: Which,
+    /// For `accept`: why it is intended.
+    pub note: Option<String>,
+}
+
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct ResolveResult {
+    /// For `move_apart`: how far the element moved (metres, plan).
+    pub moved: Option<[f64; 2]>,
+}
+
+pub(crate) struct OverlapResolve;
+
+impl HostCommand for OverlapResolve {
+    type Host = App;
+    type Params = ResolveParams;
+    type Output = ResolveResult;
+    const META: CommandMeta = CommandMeta {
+        name: "overlap.resolve",
+        version: 1,
+        summary: "Resolve an overlap",
+        description: "Resolves the overlap between `a` and `b` by a mode (ARC-MOD-032). `accept` marks it intended \
+                      (as `overlap.accept`). `move_apart` moves `moves` (default `b`) by the shortest of the four \
+                      plan moves (±x, ±y) that clears the other's box, re-checking until they no longer overlap, \
+                      as one undo step. The boolean modes (`cut_a`, `cut_b`, `join`, `subtract`, `intersect`, `union`) need the \
+                      solid boolean kernel and are refused until it is built.",
+        effects: &[Effect::Edit],
+        transaction_name: "",
+    };
+
+    fn run(&self, app: &mut App, caller: &Caller, p: ResolveParams) -> Result<ResolveResult> {
+        let doc = app
+            .active()
+            .ok_or_else(|| Error::new("document.none", "no document is open"))?;
+        let (a, b) = {
+            let store = app.get(doc)?.doc.store();
+            let id = |r: &ElementRef| {
+                store
+                    .resolve(r)
+                    .ok_or_else(|| Error::new("element.not_found", format!("no element {r:?}")))
+            };
+            (id(&p.a)?, id(&p.b)?)
+        };
+        match p.mode {
+            ResolveMode::Accept => {
+                app.execute(
+                    "overlap.accept",
+                    serde_json::json!({ "a": a, "b": b, "note": p.note }),
+                    caller,
+                )?;
+                Ok(ResolveResult { moved: None })
+            }
+            ResolveMode::MoveApart => {
+                let (mover, other) = match p.moves {
+                    Which::A => (a, b),
+                    Which::B => (b, a),
+                };
+                app.group_begin("Move Apart", caller.origin.clone())?;
+                match move_apart(app, caller, mover, other) {
+                    Ok(total) => {
+                        app.group_end(reviera_core::GroupEnd::Assimilate)?;
+                        Ok(ResolveResult { moved: Some(total) })
+                    }
+                    Err(e) => {
+                        let _ = app.group_end(reviera_core::GroupEnd::Rollback);
+                        Err(e)
+                    }
+                }
+            }
+            _ => Err(Error::new(
+                "overlap.needs_booleans",
+                "cut, join and the boolean modes need the solid boolean kernel, which is not built yet; \
+                 accept the overlap or move the elements apart",
+            )),
+        }
+    }
+}
+
+/// Moves `mover` out of `other` along the plan axis needing the shorter move, re-checking (up to
+/// four moves) until they no longer overlap. Returns the total move.
+fn move_apart(
+    app: &mut App,
+    caller: &Caller,
+    mover: ElementId,
+    other: ElementId,
+) -> Result<[f64; 2]> {
+    let o = Options::default();
+    let mut total = [0.0, 0.0];
+    for _ in 0..4 {
+        let bodies = app.bodies()?;
+        let body = |id: ElementId| {
+            bodies
+                .iter()
+                .find(|b| b.element == id)
+                .cloned()
+                .ok_or_else(|| {
+                    Error::new("overlap.no_body", format!("element {} has no body", id.0))
+                })
+        };
+        let (m, t) = (body(mover)?, body(other)?);
+        if overlap::between(&m, &t, &o).is_none() {
+            return Ok(total);
+        }
+        let (Some((ml, mh)), Some((tl, th))) = (m.bounds(), t.bounds()) else {
+            return Ok(total);
+        };
+        // The shortest of the four plan moves (±x, ±y) that clears the other's box.
+        let candidates = [
+            [th[0] - ml[0] + 0.002, 0.0],
+            [-(mh[0] - tl[0] + 0.002), 0.0],
+            [0.0, th[1] - ml[1] + 0.002],
+            [0.0, -(mh[1] - tl[1] + 0.002)],
+        ];
+        let v = candidates
+            .into_iter()
+            .min_by(|p, q| p[0].hypot(p[1]).total_cmp(&q[0].hypot(q[1])))
+            .expect("four");
+        app.execute(
+            "element.move",
+            serde_json::json!({ "element_ids": [mover], "vector": [v[0], v[1], 0.0] }),
+            caller,
+        )?;
+        total = [total[0] + v[0], total[1] + v[1]];
+    }
+    let bodies = app.bodies()?;
+    let find = |id: ElementId| bodies.iter().find(|b| b.element == id);
+    match (find(mover), find(other)) {
+        (Some(m), Some(t)) if overlap::between(m, t, &o).is_some() => Err(Error::new(
+            "overlap.still_overlapping",
+            "the elements still overlap after moving; move them by hand",
+        )),
+        _ => Ok(total),
     }
 }

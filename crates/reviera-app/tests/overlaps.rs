@@ -132,3 +132,111 @@ fn a_room_has_no_overlaps_until_something_crosses_it() {
     let all = run(&mut app, "overlap.find", json!({ "include_related": true })).unwrap();
     assert!(pairs(&all).len() >= pairs(&found).len());
 }
+
+/// Resolving overlaps (ARC-MOD-032): accepting one takes it out of the checks; moving apart
+/// separates the pair in one undo step; the boolean modes wait for the kernel.
+#[test]
+fn overlaps_are_accepted_or_moved_apart() {
+    let mut app = App::new(AppConfig {
+        live: None,
+        untitled_dir: std::env::temp_dir(),
+    });
+    run(&mut app, "file.new", json!({})).unwrap();
+    let level = run(&mut app, "level.list", json!({})).unwrap()[0]["id"]
+        .as_u64()
+        .unwrap();
+    let wall = |app: &mut App, a: [f64; 2], b: [f64; 2]| {
+        run(
+            app,
+            "wall.create",
+            json!({ "curve": { "line": { "start": a, "end": b } },
+                    "base_level": level, "top_constraint": { "unconnected": 3 } }),
+        )
+        .unwrap()
+        .as_u64()
+        .unwrap()
+    };
+    let long = wall(&mut app, [0.0, 0.0], [8.0, 0.0]);
+    let cross = wall(&mut app, [3.0, 0.6], [3.0, -2.0]);
+    let rail = run(
+        &mut app,
+        "railing.create",
+        json!({ "path": [[6.0, -1.0], [6.0, 1.0]], "base_level": level }),
+    )
+    .unwrap()
+    .as_u64()
+    .unwrap();
+    assert_eq!(
+        pairs(&run(&mut app, "overlap.find", json!({})).unwrap()).len(),
+        2
+    );
+
+    // Accept the crossing wall: no longer reported, unless asked; and listed.
+    run(
+        &mut app,
+        "overlap.resolve",
+        json!({ "a": long, "b": cross, "mode": "accept", "note": "a buttress" }),
+    )
+    .unwrap();
+    let left = pairs(&run(&mut app, "overlap.find", json!({})).unwrap());
+    assert_eq!(left.len(), 1, "{left:?}");
+    assert_eq!(
+        pairs(
+            &run(
+                &mut app,
+                "overlap.find",
+                json!({ "include_accepted": true })
+            )
+            .unwrap()
+        )
+        .len(),
+        2
+    );
+    let accepted = run(&mut app, "overlap.accepted", json!({})).unwrap();
+    assert_eq!(accepted[0]["note"], "a buttress");
+    assert!(accepted[0]["at"].as_str().unwrap().ends_with('Z'));
+    run(
+        &mut app,
+        "overlap.accept",
+        json!({ "a": cross, "b": long, "accepted": false }),
+    )
+    .unwrap();
+    assert_eq!(
+        pairs(&run(&mut app, "overlap.find", json!({})).unwrap()).len(),
+        2
+    );
+
+    // Move the railing out of the wall: the shorter way is across it.
+    let out = run(
+        &mut app,
+        "overlap.resolve",
+        json!({ "a": long, "b": rail, "mode": "move_apart" }),
+    )
+    .unwrap();
+    let moved = out["moved"].as_array().unwrap();
+    assert_eq!(moved[0], 0.0);
+    assert!(
+        (moved[1].as_f64().unwrap().abs() - 1.0).abs() < 0.2,
+        "{out}"
+    );
+    let now = pairs(&run(&mut app, "overlap.find", json!({})).unwrap());
+    assert!(
+        !now.iter().any(|(a, b, _)| *a == rail || *b == rail),
+        "{now:?}"
+    );
+    // One undo puts it back.
+    run(&mut app, "edit.undo", json!({})).unwrap();
+    assert_eq!(
+        pairs(&run(&mut app, "overlap.find", json!({})).unwrap()).len(),
+        2
+    );
+
+    // The boolean modes need the kernel.
+    let err = run(
+        &mut app,
+        "overlap.resolve",
+        json!({ "a": long, "b": cross, "mode": "cut_a" }),
+    )
+    .unwrap_err();
+    assert_eq!(err.code, "overlap.needs_booleans");
+}
