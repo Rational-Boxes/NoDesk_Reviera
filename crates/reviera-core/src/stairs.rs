@@ -111,6 +111,24 @@ pub struct StairRecipe {
     pub desired_risers: Option<u32>,
     pub tread_depth: f64,
     pub runs: Vec<Run>,
+    /// The last run extends (or shortens) to place every riser, so the stair always reaches its
+    /// top as the levels move (ARC-STAIR-007).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub auto_extend: bool,
+}
+
+impl StairRecipe {
+    /// With `auto_extend`, the last run takes the risers the others leave of `n`.
+    pub fn extended(&self, n: u32) -> StairRecipe {
+        let mut r = self.clone();
+        if r.auto_extend {
+            let others: u32 = r.runs.iter().rev().skip(1).map(|run| run.risers).sum();
+            if let Some(last) = r.runs.last_mut() {
+                last.risers = n.saturating_sub(others).max(1);
+            }
+        }
+        r
+    }
 }
 
 pub fn stair_recipe(e: &Element) -> Option<StairRecipe> {
@@ -382,6 +400,11 @@ pub fn generate(r: &StairRecipe, z_base: f64, z_top: f64, t: &StairType) -> Resu
             "the stair's top must be above its base",
         ));
     }
+    let n = r
+        .desired_risers
+        .unwrap_or_else(|| min_risers(height, t.max_riser));
+    let extended = r.extended(n);
+    let r = &extended;
     if r.runs.is_empty() {
         return Err(Error::new(
             "stair.no_runs",
@@ -861,6 +884,9 @@ pub struct CreateParams {
     pub runs: Vec<RunArg>,
     /// Railings on both sides (default true; ARC-RAIL-001).
     pub railings: Option<bool>,
+    /// The last run extends to place every riser, now and as the levels move (default true;
+    /// ARC-STAIR-007).
+    pub auto_extend: Option<bool>,
 }
 
 /// The level above `level` (by elevation).
@@ -924,6 +950,7 @@ pub(crate) fn create(txn: &mut crate::txn::Transaction<'_>, p: CreateParams) -> 
         desired_risers: p.desired_risers,
         tread_depth: tread,
         runs: Vec::new(),
+        auto_extend: p.auto_extend.unwrap_or(true),
     };
     let (z0, z1) = heights(&store, &recipe)?;
     let n = p
@@ -1056,6 +1083,8 @@ pub struct SetParams {
     /// With a new riser count or height: share the risers out among the runs again, the last
     /// run taking the difference (default on).
     pub rebalance: Option<bool>,
+    /// The last run extends to place every riser as the levels move (ARC-STAIR-007).
+    pub auto_extend: Option<bool>,
 }
 
 /// Sets stairs' levels, offsets, riser count, tread depth and run width (`stair.set_params`).
@@ -1105,6 +1134,9 @@ pub(crate) fn set_params(txn: &mut crate::txn::Transaction<'_>, p: SetParams) ->
         }
         if let Some(d) = tread {
             recipe.tread_depth = d;
+        }
+        if let Some(a) = p.auto_extend {
+            recipe.auto_extend = a;
         }
         if let Some(w) = width {
             for run in &mut recipe.runs {
@@ -1191,6 +1223,7 @@ mod tests {
             desired_risers: None,
             tread_depth: 0.28,
             runs,
+            auto_extend: false,
         }
     }
 

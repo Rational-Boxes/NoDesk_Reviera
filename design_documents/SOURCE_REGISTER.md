@@ -38,7 +38,7 @@ Excluded from the register: two help-site directory roots and one URL template p
 | Gap-fill sources S0578 onward marked "search summary" in the agents' notes (two COL help pages) | Facts taken from public search-result summaries of public help pages | The pages themselves are public (HTTP 200 on re-check). |
 | `research/03` | Quotes Autodesk Help text heavily | Kept internal. The specification paraphrases it (conventions rule 1.1). |
 
-## A. Sources (702)
+## A. Sources (709)
 
 | ID | Area | Type | URL | Status | Public-availability test |
 |----|------|------|-----|--------|--------------------------|
@@ -744,6 +744,13 @@ Excluded from the register: two help-site directory roots and one URL template p
 | S0700 | COL | open-standard / open-source | https://github.com/buildingSMART/foundation-API | 200 | PASS: public (HTTP 200, unauthenticated) |
 | S0701 | COL | open-standard / open-source | https://github.com/buildingSMART/documents-API | 200 | PASS: public (HTTP 200, unauthenticated) |
 | S0702 | DOC | standards-body | https://nibs.org/nbims/v3/cobie/4-2/ | 200 | PASS: public (HTTP 200, unauthenticated) |
+| S0703 | ARC | public guidance (municipal) | https://www.tfid.org/DocumentCenter/View/6771/2018-RESIDENTIAL-STAIR-GUIDE | 200 | PASS: public (HTTP 200, unauthenticated) |
+| S0704 | ARC | public guidance (code training) | https://buildingcodetrainer.com/commercial-stair-codes-explained/ | 200 | PASS: public (HTTP 200, unauthenticated) |
+| S0705 | ARC | government (UK) | https://assets.publishing.service.gov.uk/government/uploads/system/uploads/attachment_data/file/3011/Building_regulations_appeal_45-3-161.pdf | 200 | PASS: public (HTTP 200, unauthenticated) |
+| S0706 | ARC | government (Canada, NRC) | https://codes-guides.nrc.ca/IA/05NBC/nbc05ei005129.html | 200 | PASS: public (HTTP 200, unauthenticated) |
+| S0707 | ARC | government (Australia, ABCB) | https://ncc.abcb.gov.au/editions/ncc-2022/adopted/housing-provisions/11-safe-movement-and-access/part-112-stairway-and-ramp-construction | 200 | PASS: public (HTTP 200, unauthenticated) |
+| S0708 | ARC | public guidance (building inspection) | https://surebuildinginspections.au/defects/stair-headroom-insufficient/ | 200 | PASS: public (HTTP 200, unauthenticated) |
+| S0709 | ARC | public guidance (trade reference) | https://www.baunetzwissen.de/glossar/d/durchgangshoehe-10204364 | 200 | PASS: public (HTTP 200, unauthenticated) |
 
 ## B. Screenshots (142) — internal reference only
 

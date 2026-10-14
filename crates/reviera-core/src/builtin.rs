@@ -66,6 +66,12 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(RoofSetEdge),
         registry.add(RoofSetEaves),
         registry.add(ClearanceSetRuleSet),
+        registry.add(CodeGet),
+        registry.add(CodeSet),
+        registry.add(OpeningCreateVertical),
+        registry.add(OpeningSetLoops),
+        registry.add(StairHeadroomCheck),
+        registry.add(StairCreateOpenings),
         registry.add(ViewSetVirtualVolumes),
         registry.add(ClearanceList),
         registry.add(OverlapAccept),
@@ -469,6 +475,7 @@ pub fn dependents_of(store: &crate::store::Store, id: ElementId) -> Vec<ElementI
                     r.level == guid || r.cutoff.as_ref().is_some_and(|c| c.level == guid)
                 })
                 || crate::inserts::opening_of(e).is_some_and(|i| i == guid)
+                || crate::slab_openings::opening_recipe(e).is_some_and(|r| r.host == guid)
                 || crate::grids::grid_data(e).is_some_and(|g| {
                     g.system == guid || g.type_guid.as_deref() == Some(guid.as_str())
                 })
@@ -2580,6 +2587,112 @@ modify_command!(
     (),
     crate::clearances::set_rule_set
 );
+modify_command!(
+    CodeSet,
+    "code.set",
+    "Set the model's building code",
+    "Sets the building code the model follows by default (DM-CODE-001): `ibc`, `irc`, `uk_adk`, \
+     `nbc_canada`, `ncc_australia`, `din_18065` or `custom`; the occupancy (`dwelling` or `other`, where the \
+     code tells them apart); and the model's own stair headroom in place of the code's (`null` returns to \
+     it). Tools use these values unless told to use another code.",
+    "Building Code",
+    crate::codes::SetParams,
+    (),
+    crate::codes::set
+);
+
+modify_command!(
+    OpeningCreateVertical,
+    "opening.create_vertical",
+    "Cut a floor or ceiling plumb",
+    "Cuts a Reviera floor or ceiling by closed loops in plan (ARC-OPEN-002), plumb through its whole \
+     thickness; a loop partly outside notches its edge. The opening is an IfcOpeningElement voiding the \
+     host; it moves with the host and goes with it. Returns the opening.",
+    "Vertical Opening",
+    crate::slab_openings::CreateParams,
+    ElementId,
+    crate::slab_openings::create
+);
+
+modify_command!(
+    OpeningSetLoops,
+    "opening.set_loops",
+    "Change a vertical opening's loops",
+    "Gives a vertical opening new loops in plan (its grips drag corners and edges); they must still cut \
+     its host.",
+    "Edit Opening",
+    crate::slab_openings::SetLoopsParams,
+    (),
+    crate::slab_openings::set_loops
+);
+
+modify_command!(
+    StairCreateOpenings,
+    "stair.create_openings",
+    "Open the floors over a stair",
+    "Opens every Reviera floor and ceiling over a stair that leaves less than the headroom (ARC-STAIR-007): \
+     the model's building code by default (`code.get`), another `code`, or a `headroom` of its own. Each \
+     opening covers the treads and landings short of headroom over the stair's full width and records the \
+     stair, headroom and clause; an opening made for the stair before takes the new outline. Returns the \
+     openings.",
+    "Stair Openings",
+    crate::slab_openings::HeadroomParams,
+    Vec<ElementId>,
+    crate::slab_openings::create_for_stair
+);
+
+#[derive(Debug)]
+struct StairHeadroomCheck;
+
+impl Command for StairHeadroomCheck {
+    type Params = crate::slab_openings::HeadroomParams;
+    type Output = crate::slab_openings::HeadroomReport;
+    const META: CommandMeta = CommandMeta {
+        name: "stair.headroom_check",
+        version: 1,
+        summary: "Check a stair's headroom",
+        description: "The floors and ceilings over a stair that leave less than the headroom (ARC-STAIR-007), \
+                      measured from the nosing line or a landing's floor: each one's least clearance, the \
+                      region to open, the area it still covers, and any opening made for the stair. Uses the \
+                      model's building code unless given another `code` or a `headroom`.",
+        effects: &[Effect::Read],
+        transaction_name: "",
+    };
+
+    fn run(
+        &self,
+        cx: &mut CommandContext<'_>,
+        p: crate::slab_openings::HeadroomParams,
+    ) -> Result<crate::slab_openings::HeadroomReport> {
+        crate::slab_openings::check(cx.store(), p)
+    }
+}
+
+#[derive(Debug)]
+struct CodeGet;
+
+impl Command for CodeGet {
+    type Params = Option<Value>;
+    type Output = crate::codes::CodeReport;
+    const META: CommandMeta = CommandMeta {
+        name: "code.get",
+        version: 1,
+        summary: "The model's building code",
+        description: "The model's building code settings, the stair headroom in force with the clause it comes \
+                      from, and every code Reviera knows with its headroom (DM-CODE-001).",
+        effects: &[Effect::Read],
+        transaction_name: "",
+    };
+
+    fn run(
+        &self,
+        cx: &mut CommandContext<'_>,
+        _: Option<Value>,
+    ) -> Result<crate::codes::CodeReport> {
+        Ok(crate::codes::report(cx.store()))
+    }
+}
+
 modify_command!(
     ViewSetVirtualVolumes,
     "view.set_virtual_volumes",

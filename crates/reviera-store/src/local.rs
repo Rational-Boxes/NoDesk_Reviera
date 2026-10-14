@@ -491,6 +491,12 @@ impl LocalProject {
             ) {
                 geometry::remove_boxes(&mut self.ifc, step)?;
             }
+            if recipe_kind == Some(reviera_core::slab_openings::OPENING_RECIPE) {
+                for rel in self.ifc.referenced_by(step, "IfcRelVoidsElement")? {
+                    self.ifc.remove(rel)?;
+                }
+                geometry::remove_slab(&mut self.ifc, step)?;
+            }
             if matches!(
                 recipe_kind,
                 Some(floors::FLOOR_RECIPE | floors::CEILING_RECIPE)
@@ -644,6 +650,7 @@ impl LocalProject {
         if !touched.is_empty() {
             self.write_inserts(doc)?;
             self.write_floors(doc)?;
+            self.write_slab_openings(doc)?;
             self.write_roofs(doc)?;
             self.write_stairs(doc)?;
             self.write_railings(doc)?;
@@ -1008,6 +1015,45 @@ impl LocalProject {
                     self.ifc.set_attribute(step, attr, &v)?;
                 }
             }
+        }
+        Ok(())
+    }
+
+    /// Writes every vertical opening (ARC-OPEN-002): its loops extruded plumb through its host
+    /// (plus 1 mm each way), voiding the host. The host's own body stays whole.
+    fn write_slab_openings(&mut self, doc: &Document) -> Result<()> {
+        let store = doc.store();
+        let contexts = geometry::Contexts::find(&self.ifc)?;
+        let owner_history = self.new_owner_history()?;
+        for e in store.iter() {
+            let Some(r) = reviera_core::slab_openings::opening_recipe(e) else {
+                continue;
+            };
+            let Some(host) = GlobalId::parse(&r.host).and_then(|g| store.find_by_guid(&g)) else {
+                continue;
+            };
+            let (Some(&step), Some(&host_step)) = (self.steps.get(&e.id()), self.steps.get(&host))
+            else {
+                continue;
+            };
+            let Ok(f) = floors::regenerate(store, store.get(host).expect("found")) else {
+                continue;
+            };
+            let body = geometry::SlabBody {
+                rings: r.loops.iter().map(|l| (l.as_slice(), Vec::new())).collect(),
+                top: f.top + 0.001,
+                depth: f.thickness + 0.002,
+            };
+            geometry::write_slab(&mut self.ifc, step, &body, self.length_scale, contexts)?;
+            geometry::relate_one(
+                &mut self.ifc,
+                "IfcRelVoidsElement",
+                "RelatingBuildingElement",
+                host_step,
+                "RelatedOpeningElement",
+                step,
+                owner_history,
+            )?;
         }
         Ok(())
     }

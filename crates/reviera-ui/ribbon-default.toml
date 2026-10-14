@@ -491,6 +491,19 @@ icon = "overlaps"
 help = "Find where elements overlap: listed largest first; pick one to select and frame it"
 
 [[action]]
+id = "ui.model_properties"
+label = "Model Properties"
+icon = "model_properties"
+help = "Units and number format, the building code and its stair headroom, and the accessibility rule set"
+keys = "UN"
+
+[[action]]
+id = "stair.create_openings"
+label = "Stair Openings"
+icon = "stair_opening"
+help = "Open the floors over the selected stair where they leave it short of the building code's headroom"
+
+[[action]]
 id = "clearance.set_rule_set"
 label = "Accessibility Rules"
 icon = "accessibility"
@@ -997,6 +1010,21 @@ tools = [
 ]
 
 [[tab]]
+id = "manage"
+label = "Manage"
+
+[[tab.panel]]
+label = "Select"
+tools = [{ action = "tool.modify", size = "large" }]
+
+[[tab.panel]]
+label = "Settings"
+tools = [
+  { action = "ui.model_properties", size = "large" },
+  { action = "clearance.set_rule_set", size = "large" },
+]
+
+[[tab]]
 id = "modify"
 label = "Modify"
 
@@ -1061,7 +1089,10 @@ panels = [
 [[context]]
 category = "cat.stairs"
 label = "Stairs"
-panels = [{ label = "Railing", tools = [{ action = "railing.create_on_stair", size = "large" }] }]
+panels = [
+  { label = "Railing", tools = [{ action = "railing.create_on_stair", size = "large" }] },
+  { label = "Headroom", tools = [{ action = "stair.create_openings", size = "large" }] },
+]
 
 [[context]]
 category = "cat.railings"
@@ -1170,7 +1201,7 @@ panels = [{ label = "Window", tools = [{ action = "insert.flip_facing", size = "
 
 [[menu]]
 label = "&File"
-items = ["file.new", "file.open", "file.save", "file.save_as", "-", "export.pdf", "export.cobie", "-", "app.exit"]
+items = ["file.new", "file.open", "file.save", "file.save_as", "-", "ui.model_properties", "-", "export.pdf", "export.cobie", "-", "app.exit"]
 
 [[menu]]
 label = "&Edit"

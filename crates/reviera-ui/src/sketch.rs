@@ -62,6 +62,8 @@ pub enum SketchKind {
     Roof,
     /// A deck's outline (a deck is a floor with boards and framing, ARC-DECK-001).
     Deck,
+    /// A vertical opening's loop (ARC-OPEN-002): edited by its grips only.
+    Opening,
 }
 
 /// A sketch curve: a line, the wall face it was picked from, and for roofs whether it is a
@@ -325,6 +327,7 @@ impl Gui {
             (None, SketchKind::Slab(SlabKind::Ceiling)) => "Ceiling",
             (None, SketchKind::Roof) => "Roof by Footprint",
             (None, SketchKind::Deck) => "Deck",
+            (None, SketchKind::Opening) => "Opening",
         };
         let text = format!(
             "{verb} · {what} · {} curves · Finish ✓ or Cancel ✗ on the ribbon",
@@ -747,6 +750,8 @@ impl Gui {
                 "deck.create",
                 json!({ "outline": [curves], "level_id": s.level }),
             ),
+            // Openings are made by their tools and edited by their grips, not sketched.
+            (None, SketchKind::Opening) => return,
         };
         match self.app.execute(command, args, &super::user()) {
             Ok(out) => {
@@ -1192,6 +1197,13 @@ pub(crate) fn edit_command(
             "floor.edit_boundary",
             json!({ "floor_id": host, "loops": [curves] }),
         ),
+        SketchKind::Opening => {
+            let corners: Vec<Value> = curves.iter().map(|c| c["line"]["start"].clone()).collect();
+            (
+                "opening.set_loops",
+                json!({ "opening_id": host, "loops": [corners] }),
+            )
+        }
     }
 }
 
@@ -1205,6 +1217,29 @@ impl Gui {
     ) -> Option<(SketchKind, ElementId, Vec<Curve>)> {
         let store = self.doc.and_then(|d| self.app.document(d))?.doc.store();
         let e = store.get(id)?;
+        // A vertical opening: its (first) loop as straight curves, on its host's level.
+        if let Some(r) = reviera_core::slab_openings::opening_recipe(e) {
+            let level = reviera_core::GlobalId::parse(&r.host)
+                .and_then(|g| store.find_by_guid(&g))
+                .and_then(|h| reviera_core::floors::slab_recipe(store.get(h)?))
+                .and_then(|(_, f)| reviera_core::GlobalId::parse(&f.level))
+                .and_then(|g| store.find_by_guid(&g))
+                .unwrap_or(ElementId(0));
+            let ring = r.loops.first()?;
+            let curves = (0..ring.len())
+                .map(|i| {
+                    Curve::curved(
+                        Line {
+                            start: ring[i],
+                            end: ring[(i + 1) % ring.len()],
+                        },
+                        Vec::new(),
+                        None,
+                    )
+                })
+                .collect();
+            return Some((SketchKind::Opening, level, curves));
+        }
         let sketch = reviera_core::sketch::sketch_of(e)?;
         let roof = reviera_core::roofs::roof_recipe(e);
         let (kind, level) = match (&roof, reviera_core::floors::slab_recipe(e)) {

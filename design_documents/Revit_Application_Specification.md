@@ -5973,6 +5973,38 @@ DN25,25,37.5,22,Copper
 - [ ] Changing the display unit from mm to m changes no stored value. An IFC diff before and after shows only RXD changes.
 - [ ] `units.parse("5' 6\"", "length")` returns 1.6764 m (exact to 1e-12).
 
+*Built (2026-10-14):* the unit presets and number format are set in **Model Properties** (Manage › Settings, UN; also File menu) beside the building code (DM-CODE-001) and the accessibility rule set, through `units.set_preset` and `units.set_number_format`. The per-data-type Format dialog is not built yet.
+
+### 2.9.5a Building code
+**ID:** DM-CODE-001 · **Priority:** P1 · **Ref:** owner requirement (2026-10-14); Reviera's own design (Appendix A.2a); code clauses as cited below (RESEARCH_LOG 2026-10-14)
+
+**Purpose.** The building code the model follows, kept with the other model-wide settings, so that tools that apply code values (stair headroom today; risers, treads, guards and clearances later) use it by default. *(Owner requests, 2026-10-14: "Code related options needs to be a model property interface along with other paramiters like metric/imperial measurements, etc." and "Both, set model default but a tool can select an alternate code.")*
+
+**Behaviour & rules.**
+- **Model Properties** (Manage › Settings › Model Properties, UN) holds, in one dialog: units (preset, decimal symbol, digit grouping), the **building code**, the **occupancy** (within a dwelling unit, or other) where a code tells them apart, the model's own **stair headroom** (empty uses the code's), and the accessibility rule set (ARC-MOD-031). The code's own value and clause are shown under the headroom.
+- **Codes and their stair headroom** (measured vertically from the line of the tread nosings, or a landing's floor):
+
+  | Code | Headroom | Spiral stairs | Clause |
+  |---|---|---|---|
+  | International Building Code (US) | 2032 mm (80 in) | 1981 mm (78 in) | IBC 1011.3, 1011.10 |
+  | International Residential Code (US) | 2032 mm (6 ft 8 in) | 1982 mm (6 ft 6 in) | IRC R311.7.2, R311.7.10.1 |
+  | Approved Document K (England) | 2.0 m (loft conversions 1.9 m at the centre) | 2.0 m | ADK 1.10 |
+  | National Building Code of Canada | 1950 mm in dwelling units, 2050 mm elsewhere | same | NBC 9.8.2.2 |
+  | National Construction Code (Australia) | 2.0 m above the nosing line | 2.0 m | NCC 2022 Housing Provisions |
+  | DIN 18065 (Germany) | 2.0 m clear | 2.0 m | DIN 18065 |
+  | Custom | the model's own value (2.0 m when unset) | same | — |
+
+- **Default and alternates.** The model's code is the default for every tool. A tool may use another code for one operation (the stair opening offer lists the model's code first, then the others with their values and clauses); doing so does not change the model's setting. The model's own headroom applies only under the model's code.
+- The default code is the IBC with dwelling occupancy until the model sets one.
+
+**Data (storage).** The project element's `rxd:building_code` (`code`, `occupancy`, `headroom`), saved in the RXD data with the IFC.
+
+**Commands.** `code.get() -> {settings, label, headroom: {stair, spiral, clause}, codes[]}` · `code.set(code?, occupancy?, headroom?: length | null)`.
+
+**Acceptance criteria.**
+- [x] With the model's code set to Approved Document K, `stair.headroom_check` uses 2.0 m; with `code: "nbc_canada"` for one check it uses 1950 mm (dwelling) and names NBC 9.8.2.2, and the model's code stays ADK. *(Built 2026-10-14.)*
+- [x] Model Properties shows the code, occupancy, headroom and the code's clause, and OK applies a changed code.
+
 ### 2.9.6 Global parameters
 **ID:** DM-GPAR-001 · **Priority:** P1 · **Ref:** research/05 §7.4, §2.3
 
@@ -8043,6 +8075,8 @@ All commands defined in this chapter. Every command in this table is also a Lua 
 | `units.format` | value, data_type, format? | text | No | DM-UNIT-001 |
 | `units.parse` | text, data_type | value | No | DM-UNIT-001 |
 | `units.edit` | — | — | No | DM-UNIT-001 |
+| `code.get` | — | {settings, label, headroom, codes} | No | DM-CODE-001 |
+| `code.set` | code?, occupancy?, headroom? | — | Yes | DM-CODE-001 |
 | `global.create` | name, data_type, value \| formula, group?, reporting=false | global_id | Yes | DM-GPAR-001 |
 | `global.set` | global_id, value \| {formula} | — | Yes | DM-GPAR-001 |
 | `global.delete` | global_id | — | Yes | DM-GPAR-001 |
@@ -12039,6 +12073,27 @@ These are view annotation and are specified in the DOC chapter. This chapter req
 **Acceptance criteria.**
 - [ ] Tread numbers keep their values after a run is moved. They change only when the number of treads changes.
 
+### 3.7.6a Stairs through floors: completing to the level above, openings and railings
+**ID:** ARC-STAIR-007 · **Priority:** P1 · **Ref:** owner requirement (2026-10-14); Reviera's own design (Appendix A.2a); headroom by DM-CODE-001
+
+**Purpose.** A stair reaches the level above without counting risers, and the floor or ceiling it passes under is opened to the code's headroom, with the opening editable. *(Owner requests, 2026-10-14: "modify to have it automatically extend, and when encountering a slab/ceiling/etc. intelligently offer to create the opening, and the opening needs to have adjustment handles. If a banister attached to the stairs it should also auto-extend"; "When offering to create the opening reference well known standards for clearances required for typical construction codes"; "Stairs extend should be able to 'snap' to the level above and intelligently complete the stairs.")*
+
+**Behaviour & rules.**
+- **Snapping to the level above.** While a run is drawn, a length within one tread of the one that places every riser left snaps to it. The status bar says the stair reaches the level above, and that click makes the stair.
+- **Completing.** Ending the tool early (Esc) completes the stair: the last run carries straight on with the risers left, and the preview shows that before Esc.
+- **Extending as the levels move.** A stair made this way (`auto_extend`, the default for new stairs) keeps reaching its top: when a level moves or the riser count changes, the last run takes the difference. Railings on the stair follow its runs as they are, so they extend with it.
+- **Headroom check.** Every Reviera floor and ceiling above the stair's base and lower than its top plus the headroom is checked. Where it leaves less than the headroom over a tread (measured from the nosing line, taken at the next nosing's height) or a landing, the region over those treads and landings, the stair's full width, is the opening it needs. Floors already opened there are not short.
+- **The offer.** After the stair is made (and from **Stair Openings** on the stair's contextual tab), the floors that are short are named, with their least headroom or "in the stair's way", and the choice is the model's code (first, as the default) or another code, each with its headroom and clause, or not to open. The opening is made in each short floor (`stair.create_openings`); running it again reshapes the stair's own openings.
+- **The opening** is a vertical opening (ARC-OPEN-002) named *Stair Opening* that records the stair, the headroom and the clause. In plans of its floor's level it is drawn crossed corner to corner; selecting it shows grips at its corners and edge middles, and dragging them reshapes it (`opening.set_loops`).
+- Guards around the opening at the upper floor are not added yet; a railing by Pick Edges (ARC-RAIL-001) can follow its edges.
+
+**Commands.** `stair.create(…, auto_extend?)` · `stair.set_params(…, auto_extend?)` · `stair.headroom_check(stair_id, code?, headroom?) -> {headroom, clause, obstructions[]}` · `stair.create_openings(stair_id, code?, headroom?) -> opening_ids` · `opening.set_loops(opening_id, loops)`.
+
+**Acceptance criteria.**
+- [x] A single run drawn 2 m long from Level 1 (0) to Level 2 (3 m) has 17 risers placed and no warning; raising Level 2 to 3.6 m gives 20 risers and its railings reach 0.84 m further. *(Built 2026-10-14.)*
+- [x] Under a 300 mm floor at Level 2, the IBC opening covers the 14 treads whose next nosing is above 0.668 m (14 × 280 mm × 1.2 m); Canada's 1950 mm opens less; after opening, the check finds nothing left to open.
+- [x] Drawing a run to within a tread of the top shows "reaches Level 2" and makes the stair on the click; the offer then makes the opening, which shows crossed in the Level 2 plan and widens when its edge grip is dragged.
+
 ### 3.7.7 Railings
 **ID:** ARC-RAIL-001 · **Priority:** P0 · **Ref:** research/02 §8.5, §17.9
 
@@ -12377,6 +12432,8 @@ These are view annotation and are specified in the DOC chapter. This chapter req
 - [ ] A 1 × 1 m loop that half overlaps the edge of a floor notches the floor by 0.5 m² and nothing else.
 - [ ] A vertical opening in the upper of two stacked floors leaves the lower floor intact.
 - [ ] Moving the host floor 2 m moves the opening with it.
+
+*Built (2026-10-14):* `opening.create_vertical` and `opening.set_loops` on Reviera floors and ceilings (roofs not yet); loops partly outside notch the edge (polygon booleans by iOverlay); the opening moves and mirrors with its host and is deleted with it; Reviera's display cuts the host while the IFC keeps the host whole and voids it with the opening (an `IfcExtrudedAreaSolid` of the loops through the host plus 1 mm). Plans draw it crossed with grips. Stair openings (ARC-STAIR-007) make them. Not yet: the Opening › Vertical sketch tool and Edit Sketch.
 
 ### 3.8.3 Wall opening
 **ID:** ARC-OPEN-003 · **Priority:** P0 · **Ref:** research/02 §4.11, §9
@@ -13886,6 +13943,8 @@ All commands below are registered once in the command registry and exposed autom
 | `stair.set_rules` | type_id, max_riser, min_tread, min_width, calculator?: {m,n,min,max} | — | Yes | ARC-STAIR-003 |
 | `stair.connect_levels` | stair_id, level_ids, align_with: MidLanding\|RunStart | — | Yes | ARC-STAIR-003 |
 | `stair.number_treads` | view_id, stair_id, start_number?, type_id? | element_id | Yes | ARC-STAIR-006 |
+| `stair.headroom_check` | stair_id, code?, headroom? | {headroom, clause, obstructions} | No | ARC-STAIR-007 |
+| `stair.create_openings` | stair_id, code?, headroom? | element_ids | Yes | ARC-STAIR-007 |
 | `railing.create` | type_id, path: [curve], host_ref?, base_level?, base_offset?, offset_from_path?, segment_slopes?: [ByHost\|Flat\|Sloped], height_corrections?: [f64\|ByType] | element_id | Yes | ARC-RAIL-001 |
 | `railing.place_on_host` | type_id, host_id, position: Treads\|Stringer | [element_id] | Yes | ARC-RAIL-001 |
 | `railing.edit_path` | railing_id, path, ... | — | Yes | ARC-RAIL-001 |
@@ -13900,6 +13959,7 @@ All commands below are registered once in the command registry and exposed autom
 | `ramp.edit_sketch` | ramp_id, ... | — | Yes | ARC-RAMP-001 |
 | `opening.create_by_face` | host_ref, loops | element_id | Yes | ARC-OPEN-001 |
 | `opening.create_vertical` | host_id, loops | element_id | Yes | ARC-OPEN-002 |
+| `opening.set_loops` | opening_id, loops | — | Yes | ARC-OPEN-002, ARC-STAIR-007 |
 | `opening.create_wall` | wall_id, u0, u1, base: {level_id, offset}, top: Level{id,offset} \| Unconnected(h) | element_id | Yes | ARC-OPEN-003 |
 | `opening.create_shaft` | loops, base_level, base_offset?, top: Level{id,offset} \| Unconnected(h), symbolic_lines?: [curve] | element_id | Yes | ARC-OPEN-004 |
 | `opening.create_dormer` | roof_id, refs: [ref] | element_id | Yes | ARC-OPEN-005 |
@@ -25783,15 +25843,15 @@ Generated by `tools/build_spec.py` from the chapter command catalogs and require
 | Area | P0 | P1 | P2 | P3 | Total |
 |------|---:|---:|---:|---:|------:|
 | UI | 76 | 38 | 7 | 0 | 121 |
-| DM | 91 | 57 | 24 | 3 | 175 |
-| ARC | 77 | 57 | 10 | 1 | 145 |
+| DM | 91 | 58 | 24 | 3 | 176 |
+| ARC | 77 | 58 | 10 | 1 | 146 |
 | STR | 0 | 14 | 47 | 0 | 61 |
 | MEP | 0 | 30 | 42 | 0 | 72 |
 | ANA | 0 | 1 | 21 | 0 | 22 |
 | DOC | 68 | 40 | 12 | 1 | 121 |
 | COL | 8 | 45 | 6 | 1 | 60 |
 | ADV | 0 | 0 | 4 | 1 | 5 |
-| **Total** | **320** | **282** | **173** | **7** | **782** |
+| **Total** | **320** | **284** | **173** | **7** | **784** |
 
 Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver)"), it is counted under the first. The non-functional requirements (NFR-…) are in Chapter 0 §0.7 and are not counted here.
 
@@ -25846,7 +25906,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.2a Reviera-originated features
 
-95 requirements are Reviera's own design: owner directives, the technology stack (IFC/RXD storage, live store, BIMserver, MCP, scripting) and extensions beyond the reference product's feature set. Their Ref lines cite no research on the reference product. Listing them separately keeps the clean-room provenance clear: every other requirement traces to public research on the reference product.
+97 requirements are Reviera's own design: owner directives, the technology stack (IFC/RXD storage, live store, BIMserver, MCP, scripting) and extensions beyond the reference product's feature set. Their Ref lines cite no research on the reference product. Listing them separately keeps the clean-room provenance clear: every other requirement traces to public research on the reference product.
 
 | Requirement | Ch | Feature |
 |-------------|----|---------|
@@ -25878,6 +25938,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | UI-RECOV-001 | 1 | 1.33.9 Crash recovery and live-store status |
 | DM-RXD-003 | 2 | 2.4.3 Reconciliation |
 | DM-REGEN-004 | 2 | 2.6.5 OCCT threading rules |
+| DM-CODE-001 | 2 | 2.9.5a Building code |
 | DM-FILE-007 | 2 | 2.11.9 Remote file locations (WebDAV) |
 | DM-IMP-013 | 2 | 2.11.10 CADCraft interoperability |
 | DM-IMP-014 | 2 | 2.11.11 CADCraft compatibility verification |
@@ -25922,6 +25983,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | ARC-ROOF-007 | 3 | 3.6.8a Dormers (automated) |
 | ARC-ROOF-008 | 3 | 3.6.8b Arched and vaulted roofs |
 | ARC-ROOF-009 | 3 | 3.6.8c Dome roofs |
+| ARC-STAIR-007 | 3 | 3.7.6a Stairs through floors: completing to the level above, openings and railings |
 | ARC-RAIL-003 | 3 | 3.7.8b Railing openings and gates |
 | ARC-DECK-001 | 3 | 3.7.8a Decks |
 | ARC-MOD-030 | 3 | 3.12.2a Volume overlaps, virtual volumes and their resolution |
@@ -25948,7 +26010,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**1988 unique commands** in 404 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**1993 unique commands** in 405 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -26010,6 +26072,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `clipboard` | 3 |
 | `cme` | 12 |
 | `cobie` | 2 |
+| `code` | 2 |
 | `colorlegend` | 1 |
 | `colorscheme` | 5 |
 | `column` | 7 |
@@ -26179,7 +26242,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `object_style` | 2 |
 | `objectstyle` | 3 |
 | `one_way_indicator` | 1 |
-| `opening` | 5 |
+| `opening` | 6 |
 | `overlap` | 4 |
 | `ownership` | 5 |
 | `panel` | 4 |
@@ -26287,7 +26350,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `spot` | 4 |
 | `sprinkler` | 1 |
 | `stackedwall` | 1 |
-| `stair` | 13 |
+| `stair` | 15 |
 | `standards` | 2 |
 | `stash` | 3 |
 | `steel_cut` | 6 |
@@ -26587,6 +26650,8 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `cme.surface.set_pattern` | 2 | divided_surface_id, pattern, border_tiles? | — | Yes | DM-CME-003 |
 | `cobie.set_settings` | 5 | settings | () | Yes | DOC-OUT-015 |
 | `cobie.validate` | 5 | version? | issues[] | No | DOC-OUT-015 |
+| `code.get` | 2 | — | {settings, label, headroom, codes} | No | DM-CODE-001 |
+| `code.set` | 2 | code?, occupancy?, headroom? | — | Yes | DM-CODE-001 |
 | `colorlegend.place` | 5 | view_id, scheme_id, position | annotation_id | Yes | DOC-ANN-022 |
 | `colorscheme.create` | 3 | name, category, parameter, mode: value\ | range, ranges? | scheme_id | Yes |
 | `colorscheme.duplicate` | 3 | scheme_id, name | id | Yes | ARC-CLR-001 |
@@ -27339,6 +27404,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `opening.create_shaft` | 3 | loops, base_level, base_offset?, top: Level{id,offset} \ | Unconnected(h), symbolic_lines?: [curve] | element_id | Yes |
 | `opening.create_vertical` | 3 | host_id, loops | element_id | Yes | ARC-OPEN-002 |
 | `opening.create_wall` | 3 | wall_id, u0, u1, base: {level_id, offset}, top: Level{id,offset} \ | Unconnected(h) | element_id | Yes |
+| `opening.set_loops` | 3 | opening_id, loops | — | Yes | ARC-OPEN-002, ARC-STAIR-007 |
 | `overlap.accept` | 3 | a, b, note?, accepted? | — | Yes | ARC-MOD-032 |
 | `overlap.accepted` | 3 | — | [pair] | No | ARC-MOD-032 |
 | `overlap.find` | 3 | element_ids?, against?, tolerance?, min_volume?, resolution?, include_related?, limit? | {overlaps, bodies} | No | ARC-MOD-030 |
@@ -27808,9 +27874,11 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `stair.connect_levels` | 3 | stair_id, level_ids, align_with: MidLanding\ | RunStart | — | Yes |
 | `stair.convert_to_sketch` | 3 | session_id, component_key | — | Within session; one step on finish | ARC-STAIR-002 |
 | `stair.create` | 3 | type_id, base_level, top_level \ | Unconnected(height), base_offset?, top_offset?, desired_risers?, tread_depth?, runs: [RunSpec], landings?: [LandingSpec], supports?: [SupportSpec], railing?: {type_id \ | None, position: Treads\ | Stringer} |
+| `stair.create_openings` | 3 | stair_id, code?, headroom? | element_ids | Yes | ARC-STAIR-007 |
 | `stair.edit` | 3 | stair_id | session_id | Within session; one step on finish | ARC-STAIR-002 |
 | `stair.finish` | 3 | session_id | — | Yes (one step) | ARC-STAIR-002 |
 | `stair.flip` | 3 | session_id | — | Within session; one step on finish | ARC-STAIR-002 |
+| `stair.headroom_check` | 3 | stair_id, code?, headroom? | {headroom, clause, obstructions} | No | ARC-STAIR-007 |
 | `stair.number_treads` | 3 | view_id, stair_id, start_number?, type_id? | element_id | Yes | ARC-STAIR-006 |
 | `stair.set_rules` | 3 | type_id, max_riser, min_tread, min_width, calculator?: {m,n,min,max} | — | Yes | ARC-STAIR-003 |
 | `stair.set_run_risers` | 3 | session_id, run_key, n | — | Within session; one step on finish | ARC-STAIR-002 |

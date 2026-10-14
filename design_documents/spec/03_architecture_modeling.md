@@ -2817,6 +2817,27 @@ These are view annotation and are specified in the DOC chapter. This chapter req
 **Acceptance criteria.**
 - [ ] Tread numbers keep their values after a run is moved. They change only when the number of treads changes.
 
+### 3.7.6a Stairs through floors: completing to the level above, openings and railings
+**ID:** ARC-STAIR-007 · **Priority:** P1 · **Ref:** owner requirement (2026-10-14); Reviera's own design (Appendix A.2a); headroom by DM-CODE-001
+
+**Purpose.** A stair reaches the level above without counting risers, and the floor or ceiling it passes under is opened to the code's headroom, with the opening editable. *(Owner requests, 2026-10-14: "modify to have it automatically extend, and when encountering a slab/ceiling/etc. intelligently offer to create the opening, and the opening needs to have adjustment handles. If a banister attached to the stairs it should also auto-extend"; "When offering to create the opening reference well known standards for clearances required for typical construction codes"; "Stairs extend should be able to 'snap' to the level above and intelligently complete the stairs.")*
+
+**Behaviour & rules.**
+- **Snapping to the level above.** While a run is drawn, a length within one tread of the one that places every riser left snaps to it. The status bar says the stair reaches the level above, and that click makes the stair.
+- **Completing.** Ending the tool early (Esc) completes the stair: the last run carries straight on with the risers left, and the preview shows that before Esc.
+- **Extending as the levels move.** A stair made this way (`auto_extend`, the default for new stairs) keeps reaching its top: when a level moves or the riser count changes, the last run takes the difference. Railings on the stair follow its runs as they are, so they extend with it.
+- **Headroom check.** Every Reviera floor and ceiling above the stair's base and lower than its top plus the headroom is checked. Where it leaves less than the headroom over a tread (measured from the nosing line, taken at the next nosing's height) or a landing, the region over those treads and landings, the stair's full width, is the opening it needs. Floors already opened there are not short.
+- **The offer.** After the stair is made (and from **Stair Openings** on the stair's contextual tab), the floors that are short are named, with their least headroom or "in the stair's way", and the choice is the model's code (first, as the default) or another code, each with its headroom and clause, or not to open. The opening is made in each short floor (`stair.create_openings`); running it again reshapes the stair's own openings.
+- **The opening** is a vertical opening (ARC-OPEN-002) named *Stair Opening* that records the stair, the headroom and the clause. In plans of its floor's level it is drawn crossed corner to corner; selecting it shows grips at its corners and edge middles, and dragging them reshapes it (`opening.set_loops`).
+- Guards around the opening at the upper floor are not added yet; a railing by Pick Edges (ARC-RAIL-001) can follow its edges.
+
+**Commands.** `stair.create(…, auto_extend?)` · `stair.set_params(…, auto_extend?)` · `stair.headroom_check(stair_id, code?, headroom?) -> {headroom, clause, obstructions[]}` · `stair.create_openings(stair_id, code?, headroom?) -> opening_ids` · `opening.set_loops(opening_id, loops)`.
+
+**Acceptance criteria.**
+- [x] A single run drawn 2 m long from Level 1 (0) to Level 2 (3 m) has 17 risers placed and no warning; raising Level 2 to 3.6 m gives 20 risers and its railings reach 0.84 m further. *(Built 2026-10-14.)*
+- [x] Under a 300 mm floor at Level 2, the IBC opening covers the 14 treads whose next nosing is above 0.668 m (14 × 280 mm × 1.2 m); Canada's 1950 mm opens less; after opening, the check finds nothing left to open.
+- [x] Drawing a run to within a tread of the top shows "reaches Level 2" and makes the stair on the click; the offer then makes the opening, which shows crossed in the Level 2 plan and widens when its edge grip is dragged.
+
 ### 3.7.7 Railings
 **ID:** ARC-RAIL-001 · **Priority:** P0 · **Ref:** research/02 §8.5, §17.9
 
@@ -3155,6 +3176,8 @@ These are view annotation and are specified in the DOC chapter. This chapter req
 - [ ] A 1 × 1 m loop that half overlaps the edge of a floor notches the floor by 0.5 m² and nothing else.
 - [ ] A vertical opening in the upper of two stacked floors leaves the lower floor intact.
 - [ ] Moving the host floor 2 m moves the opening with it.
+
+*Built (2026-10-14):* `opening.create_vertical` and `opening.set_loops` on Reviera floors and ceilings (roofs not yet); loops partly outside notch the edge (polygon booleans by iOverlay); the opening moves and mirrors with its host and is deleted with it; Reviera's display cuts the host while the IFC keeps the host whole and voids it with the opening (an `IfcExtrudedAreaSolid` of the loops through the host plus 1 mm). Plans draw it crossed with grips. Stair openings (ARC-STAIR-007) make them. Not yet: the Opening › Vertical sketch tool and Edit Sketch.
 
 ### 3.8.3 Wall opening
 **ID:** ARC-OPEN-003 · **Priority:** P0 · **Ref:** research/02 §4.11, §9
@@ -4664,6 +4687,8 @@ All commands below are registered once in the command registry and exposed autom
 | `stair.set_rules` | type_id, max_riser, min_tread, min_width, calculator?: {m,n,min,max} | — | Yes | ARC-STAIR-003 |
 | `stair.connect_levels` | stair_id, level_ids, align_with: MidLanding\|RunStart | — | Yes | ARC-STAIR-003 |
 | `stair.number_treads` | view_id, stair_id, start_number?, type_id? | element_id | Yes | ARC-STAIR-006 |
+| `stair.headroom_check` | stair_id, code?, headroom? | {headroom, clause, obstructions} | No | ARC-STAIR-007 |
+| `stair.create_openings` | stair_id, code?, headroom? | element_ids | Yes | ARC-STAIR-007 |
 | `railing.create` | type_id, path: [curve], host_ref?, base_level?, base_offset?, offset_from_path?, segment_slopes?: [ByHost\|Flat\|Sloped], height_corrections?: [f64\|ByType] | element_id | Yes | ARC-RAIL-001 |
 | `railing.place_on_host` | type_id, host_id, position: Treads\|Stringer | [element_id] | Yes | ARC-RAIL-001 |
 | `railing.edit_path` | railing_id, path, ... | — | Yes | ARC-RAIL-001 |
@@ -4678,6 +4703,7 @@ All commands below are registered once in the command registry and exposed autom
 | `ramp.edit_sketch` | ramp_id, ... | — | Yes | ARC-RAMP-001 |
 | `opening.create_by_face` | host_ref, loops | element_id | Yes | ARC-OPEN-001 |
 | `opening.create_vertical` | host_id, loops | element_id | Yes | ARC-OPEN-002 |
+| `opening.set_loops` | opening_id, loops | — | Yes | ARC-OPEN-002, ARC-STAIR-007 |
 | `opening.create_wall` | wall_id, u0, u1, base: {level_id, offset}, top: Level{id,offset} \| Unconnected(h) | element_id | Yes | ARC-OPEN-003 |
 | `opening.create_shaft` | loops, base_level, base_offset?, top: Level{id,offset} \| Unconnected(h), symbolic_lines?: [curve] | element_id | Yes | ARC-OPEN-004 |
 | `opening.create_dormer` | roof_id, refs: [ref] | element_id | Yes | ARC-OPEN-005 |

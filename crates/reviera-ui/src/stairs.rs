@@ -7,7 +7,12 @@
 //! risers as its length allows at the tread depth, at most those left; the status bar counts
 //! them down. The next click starts the next run, joined by an automatic landing. When every
 //! riser is placed the stair is made; Esc makes it from the runs so far (or cancels when there
-//! are none).
+//! are none), the last run extending to the top (ARC-STAIR-007).
+//!
+//! A run drawn to within a tread of the length that places every riser left snaps to it: the
+//! stair reaches the level above and is made on that click. Once made, a stair passing under a
+//! floor or ceiling that leaves it short of headroom offers to open it, under the model's
+//! building code or another one chosen there.
 
 use reviera_core::ElementId;
 use reviera_core::stairs::{self, risers_for_length};
@@ -36,6 +41,8 @@ pub struct StairTool {
     tread: f64,
     /// Runs placed: start and end.
     runs: Vec<([f64; 2], [f64; 2], u32)>,
+    /// The name of the level the stair reaches, for prompts.
+    top_name: String,
     start: Option<[f64; 2]>,
     cursor: Option<[f64; 2]>,
     /// A spiral: the first click is the centre, the second a point on the walking line.
@@ -55,7 +62,11 @@ impl StairTool {
         if len < 1e-6 {
             return None;
         }
-        let k = risers_for_length(len, self.tread).min(self.left()).max(1);
+        let mut k = risers_for_length(len, self.tread).min(self.left()).max(1);
+        // Within a tread of the top: it snaps to reach it.
+        if k + 1 >= self.left() {
+            k = self.left().max(1);
+        }
         let l = f64::from(k - 1) * self.tread;
         Some(([a[0] + d[0] / len * l, a[1] + d[1] / len * l], k))
     }
@@ -95,9 +106,13 @@ impl Gui {
         else {
             return;
         };
+        let top_name = top
+            .and_then(|t| levels.iter().find(|l| l.id == t))
+            .map_or_else(|| "its top".to_owned(), |l| l.name.clone());
         self.stair_tool = Some(StairTool {
             level: plan.level,
             top,
+            top_name,
             risers,
             tread: stairs::StairType::default().min_tread,
             runs: Vec::new(),
@@ -140,11 +155,17 @@ impl Gui {
                 t.risers
             ),
             None => format!(
-                "Stair: click the start of the next run (a landing joins them) · {left} risers left · Esc makes the stair now"
+                "Stair: click the start of the next run (a landing joins them) · {left} risers left · Esc completes it: the last run extends to {}",
+                t.top_name
+            ),
+            Some(_) if now >= left && left > 0 => format!(
+                "Stair: reaches {} · {now} risers · click to complete the stair",
+                t.top_name
             ),
             Some(_) => format!(
-                "Stair: click the end of the run · {now} risers in this run, {} left after it",
-                left.saturating_sub(now)
+                "Stair: click the end of the run · {now} risers in this run, {} left after it (it snaps to {} within a tread)",
+                left.saturating_sub(now),
+                t.top_name
             ),
         };
         self.frame.set_status_text(&text, 0);
@@ -224,11 +245,12 @@ impl Gui {
         match self.run("stair.create", args) {
             Ok(v) => {
                 self.refresh_scene(&frame);
+                frame.set_status_text("Spiral stair created", 0);
                 if let Some(id) = v.as_u64() {
                     let _ = self.run("selection.set", json!({ "ids": [id] }));
                     self.selection_changed();
+                    self.offer_stair_openings(ElementId(id), false);
                 }
-                frame.set_status_text("Spiral stair created", 0);
             }
             Err(e) => error(&frame, &format!("The stair was not created:\n{e}")),
         }
@@ -255,19 +277,17 @@ impl Gui {
         match self.run("stair.create", args) {
             Ok(v) => {
                 self.refresh_scene(&frame);
-                if let Some(id) = v.as_u64() {
-                    let _ = self.run("selection.set", json!({ "ids": [id] }));
-                    self.selection_changed();
-                }
                 let note = if t.left() > 0 {
-                    format!(
-                        " — {} risers were not placed, so the top is not reached",
-                        t.left()
-                    )
+                    format!(" — the last run extends to {}", t.top_name)
                 } else {
                     String::new()
                 };
                 frame.set_status_text(&format!("Stair created{note}"), 0);
+                if let Some(id) = v.as_u64() {
+                    let _ = self.run("selection.set", json!({ "ids": [id] }));
+                    self.selection_changed();
+                    self.offer_stair_openings(ElementId(id), false);
+                }
             }
             Err(e) => error(&frame, &format!("The stair was not created:\n{e}")),
         }
@@ -317,6 +337,18 @@ impl Gui {
             && let Some((end, k)) = t.run(a, c)
         {
             runs.push((a, end, k));
+        } else if let Some(&(a, b, k)) = t.runs.last()
+            && t.left() > 0
+        {
+            // What Esc makes: the last run carried on to the top.
+            let d = [b[0] - a[0], b[1] - a[1]];
+            let len = d[0].hypot(d[1]);
+            if len > 1e-9 {
+                let k = k + t.left();
+                let l = f64::from(k - 1) * t.tread;
+                runs.pop();
+                runs.push((a, [a[0] + d[0] / len * l, a[1] + d[1] / len * l], k));
+            }
         }
         for (a, b, k) in runs {
             let d = [b[0] - a[0], b[1] - a[1]];
@@ -350,6 +382,125 @@ impl Gui {
         }
         if let Some(v) = self.viewport() {
             v.set_overlay_lines(&[lines]);
+        }
+    }
+
+    /// Offers to open the floors and ceilings that leave a stair short of headroom
+    /// (ARC-STAIR-007), under the model's building code (Model Properties) or another one chosen
+    /// here. With `always`, says so when none is short.
+    pub(crate) fn offer_stair_openings(&mut self, stair: ElementId, always: bool) {
+        let frame = self.frame;
+        let Ok(check) = self.run("stair.headroom_check", json!({ "stair_id": stair })) else {
+            return;
+        };
+        let short: Vec<&serde_json::Value> = check["obstructions"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter(|o| o["uncovered"].as_f64().unwrap_or(0.0) > 1e-4)
+            .collect();
+        if short.is_empty() {
+            if always {
+                let h = self.format_length(check["headroom"].as_f64().unwrap_or(0.0));
+                frame.set_status_text(&format!("The stair has {h} of headroom everywhere"), 0);
+            }
+            return;
+        }
+        let names: Vec<String> = short
+            .iter()
+            .map(|o| {
+                let clearance = o["clearance"].as_f64().unwrap_or(0.0);
+                let name = o["host_name"].as_str().unwrap_or("a floor");
+                if clearance > 0.0 {
+                    format!(
+                        "{name} (headroom down to {})",
+                        self.format_length(clearance)
+                    )
+                } else {
+                    format!("{name} (in the stair's way)")
+                }
+            })
+            .collect();
+        // The model's code first, then the others, each with its headroom and clause.
+        let Ok(codes) = self.run("code.get", json!({})) else {
+            return;
+        };
+        let current = codes["settings"]["code"]
+            .as_str()
+            .unwrap_or("ibc")
+            .to_owned();
+        let model_headroom = codes["headroom"]["stair"].as_f64().unwrap_or(2.0);
+        let model_clause = codes["headroom"]["clause"]
+            .as_str()
+            .unwrap_or("")
+            .to_owned();
+        let mut choices: Vec<(String, Option<String>)> = vec![(
+            format!(
+                "{} — model default: {} ({model_clause})",
+                codes["label"].as_str().unwrap_or(""),
+                self.format_length(model_headroom)
+            ),
+            None,
+        )];
+        for c in codes["codes"].as_array().into_iter().flatten() {
+            let key = c["key"].as_str().unwrap_or("").to_owned();
+            if key == current || c["headroom"].is_null() {
+                continue;
+            }
+            let h = self.format_length(c["headroom"]["stair"].as_f64().unwrap_or(0.0));
+            choices.push((
+                format!(
+                    "{}: {h} ({})",
+                    c["label"].as_str().unwrap_or(""),
+                    c["headroom"]["clause"].as_str().unwrap_or("")
+                ),
+                Some(key),
+            ));
+        }
+        choices.push(("Don't open the floor".to_owned(), Some(String::new())));
+        let labels: Vec<&str> = choices.iter().map(|c| c.0.as_str()).collect();
+        let dialog = SingleChoiceDialog::builder(
+            &frame,
+            &format!(
+                "The stair passes under {} with less headroom than the building code asks, measured \
+                 from the line of the nosings.\n\nOpen the floor over the stair's full width, for the \
+                 headroom of:",
+                names.join(", ")
+            ),
+            "Stair Opening",
+            &labels,
+        )
+        .build();
+        dialog.set_selection(0);
+        if dialog.show_modal() != ID_OK {
+            return;
+        }
+        let Some((label, code)) = usize::try_from(dialog.get_selection())
+            .ok()
+            .and_then(|i| choices.get(i).cloned())
+        else {
+            return;
+        };
+        if code.as_deref() == Some("") {
+            return;
+        }
+        let mut args = json!({ "stair_id": stair });
+        if let Some(c) = code {
+            args["code"] = json!(c);
+        }
+        match self.run("stair.create_openings", args) {
+            Ok(v) => {
+                self.refresh_scene(&frame);
+                let n = v.as_array().map_or(0, Vec::len);
+                let what = label.split(" (").next().unwrap_or(&label).to_owned();
+                frame.set_status_text(
+                    &format!(
+                        "{n} opening(s) made for the stair · {what} · select one to drag its edges"
+                    ),
+                    0,
+                );
+            }
+            Err(e) => error(&frame, &format!("The floor was not opened:\n{e}")),
         }
     }
 

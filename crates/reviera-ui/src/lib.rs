@@ -22,6 +22,7 @@ mod inserts;
 mod inspect;
 mod levels;
 mod loading;
+mod model_props;
 mod modify;
 mod native;
 mod nav;
@@ -39,6 +40,7 @@ mod select;
 mod sheets;
 mod sketch;
 mod sketch_edit;
+mod slab_openings;
 mod snap;
 mod stairs;
 mod walls;
@@ -1578,6 +1580,7 @@ impl Gui {
             .or_else(|| self.dim_at(x, y))
             .or_else(|| self.grid_at(x, y))
             .or_else(|| self.insert_at(x, y))
+            .or_else(|| self.opening_at(x, y))
             .or_else(|| {
                 // What the view cuts away or hides cannot be picked.
                 let v = self.active_view()?;
@@ -1635,6 +1638,7 @@ impl Gui {
                     ("Create Ceiling Boundary", "session.floor_sketch")
                 }
                 (None, SketchKind::Deck) => ("Create Deck Outline", "session.floor_sketch"),
+                (None, SketchKind::Opening) => ("Opening", "session.floor_sketch"),
             };
             self.ribbon.set_context(Some((label, Some(session))));
             return;
@@ -3421,6 +3425,27 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "geometry.remove_boolean" => with(gui, Gui::remove_booleans),
         "view.set_virtual_volumes" => with(gui, Gui::cycle_virtual_volumes),
         "clearance.set_rule_set" => with(gui, Gui::choose_rule_set),
+        "ui.model_properties" => with(gui, Gui::model_properties),
+        "stair.create_openings" => with(gui, |g| {
+            let store = g.store_now();
+            let stairs: Vec<ElementId> = g
+                .selection()
+                .into_iter()
+                .filter(|i| {
+                    store
+                        .as_ref()
+                        .and_then(|s| s.get(*i))
+                        .and_then(reviera_core::stairs::stair_recipe)
+                        .is_some()
+                })
+                .collect();
+            if stairs.is_empty() {
+                return g.frame.set_status_text("Select a stair first", 0);
+            }
+            for s in stairs {
+                g.offer_stair_openings(s, true);
+            }
+        }),
         "stair.spiral" => with(gui, |g| {
             g.start_stair_tool(true);
             focus(g);

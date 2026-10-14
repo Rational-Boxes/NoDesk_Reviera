@@ -50,7 +50,7 @@ pub fn toolset_of(command: &str) -> String {
         "wall" | "floor" | "roof" | "door" | "window" | "stair" | "modify" | "str" | "mep"
         | "level" | "grid" | "room" | "ceiling" | "insert" | "sketch" | "dormer" | "railing"
         | "deck" | "site" | "cme" | "host" | "numbering" | "decal" | "spatial" | "building"
-        | "assembly" | "part" | "geometry" => "modeling",
+        | "assembly" | "part" | "geometry" | "opening" => "modeling",
         "view" | "sheet" | "schedule" | "annotate" | "render" | "walkthrough" | "xr" | "ui"
         | "tag" | "text" | "anno" | "dim" | "viewport" | "section" | "inspect" => "documentation",
         "family" | "family_doc" | "type" | "instance" | "library" | "formula" | "subcategory" => {
@@ -59,7 +59,7 @@ pub fn toolset_of(command: &str) -> String {
         "material" | "object_style" | "line_pattern" | "line_style" | "line_weight"
         | "fill_pattern" | "image" | "objectstyle" | "lineweight" => "materials",
         "project" | "location" | "coordinates" | "position" | "phase" | "standards" | "units"
-        | "purge" | "classification" | "keynotes" | "paramlib" | "external_props" => {
+        | "code" | "purge" | "classification" | "keynotes" | "paramlib" | "external_props" => {
             "project_setup"
         }
         "file" | "import" | "export" | "live" | "recovery" | "validate" | "rxd" | "journal"

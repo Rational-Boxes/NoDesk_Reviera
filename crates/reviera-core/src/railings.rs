@@ -728,6 +728,8 @@ fn stair_path(store: &Store, r: &RailingRecipe) -> Result<(Vec<[f64; 3]>, Elemen
         .ok_or_else(|| Error::new("railing.bad_host", "the host is not a Reviera stair"))?;
     let g = crate::stairs::regenerate(store, e)?;
     let (base, _) = crate::stairs::elevations(store, e)?;
+    // Along the stair as it is: a last run that extends takes the railing with it.
+    let recipe = recipe.extended(g.risers);
     let pts = crate::stairs::side_path(&recipe, base, g.riser_height, *left, *inset);
     if pts.len() < 2 {
         return Err(Error::new(

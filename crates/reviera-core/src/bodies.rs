@@ -201,7 +201,12 @@ pub fn all(store: &Store) -> Vec<Body> {
             continue;
         }
         let class = class_of(id, "IfcSlab");
-        for p in &f.profiles {
+        // Less its vertical openings (ARC-OPEN-002).
+        let profiles = match store.get(id) {
+            Some(e) => crate::slab_openings::cut_profiles(store, e, &f.profiles),
+            None => f.profiles.clone(),
+        };
+        for p in &profiles {
             push(
                 id,
                 &class,

@@ -255,6 +255,10 @@ pub(crate) fn transform(
         {
             let target = if copy { txn.create(copied(e))? } else { id };
             crate::floors::translate(txn, target, &|p| x.point(p), x.reflects())?;
+            // Its vertical openings go with it (a copy is made whole).
+            if !copy {
+                crate::slab_openings::follow_host(txn, e.guid().as_str(), &|p| x.point(p))?;
+            }
             out.push(target);
         } else {
             return Err(Error::new(

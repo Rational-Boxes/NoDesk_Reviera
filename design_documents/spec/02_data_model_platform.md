@@ -1979,6 +1979,38 @@ DN25,25,37.5,22,Copper
 - [ ] Changing the display unit from mm to m changes no stored value. An IFC diff before and after shows only RXD changes.
 - [ ] `units.parse("5' 6\"", "length")` returns 1.6764 m (exact to 1e-12).
 
+*Built (2026-10-14):* the unit presets and number format are set in **Model Properties** (Manage › Settings, UN; also File menu) beside the building code (DM-CODE-001) and the accessibility rule set, through `units.set_preset` and `units.set_number_format`. The per-data-type Format dialog is not built yet.
+
+### 2.9.5a Building code
+**ID:** DM-CODE-001 · **Priority:** P1 · **Ref:** owner requirement (2026-10-14); Reviera's own design (Appendix A.2a); code clauses as cited below (RESEARCH_LOG 2026-10-14)
+
+**Purpose.** The building code the model follows, kept with the other model-wide settings, so that tools that apply code values (stair headroom today; risers, treads, guards and clearances later) use it by default. *(Owner requests, 2026-10-14: "Code related options needs to be a model property interface along with other paramiters like metric/imperial measurements, etc." and "Both, set model default but a tool can select an alternate code.")*
+
+**Behaviour & rules.**
+- **Model Properties** (Manage › Settings › Model Properties, UN) holds, in one dialog: units (preset, decimal symbol, digit grouping), the **building code**, the **occupancy** (within a dwelling unit, or other) where a code tells them apart, the model's own **stair headroom** (empty uses the code's), and the accessibility rule set (ARC-MOD-031). The code's own value and clause are shown under the headroom.
+- **Codes and their stair headroom** (measured vertically from the line of the tread nosings, or a landing's floor):
+
+  | Code | Headroom | Spiral stairs | Clause |
+  |---|---|---|---|
+  | International Building Code (US) | 2032 mm (80 in) | 1981 mm (78 in) | IBC 1011.3, 1011.10 |
+  | International Residential Code (US) | 2032 mm (6 ft 8 in) | 1982 mm (6 ft 6 in) | IRC R311.7.2, R311.7.10.1 |
+  | Approved Document K (England) | 2.0 m (loft conversions 1.9 m at the centre) | 2.0 m | ADK 1.10 |
+  | National Building Code of Canada | 1950 mm in dwelling units, 2050 mm elsewhere | same | NBC 9.8.2.2 |
+  | National Construction Code (Australia) | 2.0 m above the nosing line | 2.0 m | NCC 2022 Housing Provisions |
+  | DIN 18065 (Germany) | 2.0 m clear | 2.0 m | DIN 18065 |
+  | Custom | the model's own value (2.0 m when unset) | same | — |
+
+- **Default and alternates.** The model's code is the default for every tool. A tool may use another code for one operation (the stair opening offer lists the model's code first, then the others with their values and clauses); doing so does not change the model's setting. The model's own headroom applies only under the model's code.
+- The default code is the IBC with dwelling occupancy until the model sets one.
+
+**Data (storage).** The project element's `rxd:building_code` (`code`, `occupancy`, `headroom`), saved in the RXD data with the IFC.
+
+**Commands.** `code.get() -> {settings, label, headroom: {stair, spiral, clause}, codes[]}` · `code.set(code?, occupancy?, headroom?: length | null)`.
+
+**Acceptance criteria.**
+- [x] With the model's code set to Approved Document K, `stair.headroom_check` uses 2.0 m; with `code: "nbc_canada"` for one check it uses 1950 mm (dwelling) and names NBC 9.8.2.2, and the model's code stays ADK. *(Built 2026-10-14.)*
+- [x] Model Properties shows the code, occupancy, headroom and the code's clause, and OK applies a changed code.
+
 ### 2.9.6 Global parameters
 **ID:** DM-GPAR-001 · **Priority:** P1 · **Ref:** research/05 §7.4, §2.3
 
@@ -4049,6 +4081,8 @@ All commands defined in this chapter. Every command in this table is also a Lua 
 | `units.format` | value, data_type, format? | text | No | DM-UNIT-001 |
 | `units.parse` | text, data_type | value | No | DM-UNIT-001 |
 | `units.edit` | — | — | No | DM-UNIT-001 |
+| `code.get` | — | {settings, label, headroom, codes} | No | DM-CODE-001 |
+| `code.set` | code?, occupancy?, headroom? | — | Yes | DM-CODE-001 |
 | `global.create` | name, data_type, value \| formula, group?, reporting=false | global_id | Yes | DM-GPAR-001 |
 | `global.set` | global_id, value \| {formula} | — | Yes | DM-GPAR-001 |
 | `global.delete` | global_id | — | Yes | DM-GPAR-001 |

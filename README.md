@@ -65,6 +65,11 @@ ribbon's tools, the command shell, Lua and MCP alike.
 - **Units**: SI storage with project display units (metric and imperial, feet-and-inches);
   every length field accepts typed units (`4.5 m`, `12' 6"`) (`units.get`, `units.set_preset`,
   `units.set_format`, `units.set_number_format`, `units.format`, `units.parse`).
+- **Model Properties** (Manage › Settings, UN; File menu): the model-wide settings in one dialog:
+  units preset and number format, the **building code** (IBC, IRC, Approved Document K, NBC
+  Canada, NCC Australia, DIN 18065 or custom) with its occupancy and the model's own stair
+  headroom, and the accessibility rule set. Tools follow the model's code by default and may use
+  another for one operation (`code.get`, `code.set`; DM-CODE-001).
 - **Parameters**: built-in, project and shared parameters, bound to types or instances and
   written to IFC property sets; Properties edit them, with type parameters marked
   (`param.list`, `param.get`, `param.set`, `param.set_many`, `param.clear`, `param.definition`,
@@ -179,6 +184,10 @@ Create … Boundary* tab:
   (its edges follow the walls' finish faces, round rooms included, and move with them), or
   Sketch Ceiling. Ceilings have types and sit 2600 mm above their level by default. Saved as
   `IfcCovering` (CEILING) (`ceiling.create_auto`, `ceiling.create`, `ceiling.edit_boundary`).
+- **Vertical openings**: a floor or ceiling is cut plumb by an opening's loops; one partly outside
+  notches the edge. Plans draw it crossed corner to corner; selected, its corner and edge grips
+  reshape it. It moves with its host and goes with it; the IFC keeps the slab whole and voids it
+  with an `IfcOpeningElement` (`opening.create_vertical`, `opening.set_loops`; ARC-OPEN-002).
 
 #### Roofs
 
@@ -226,6 +235,13 @@ Create … Boundary* tab:
   riser height and warnings. **Spiral Stair** makes a full-step spiral from its centre and a
   point on its walking line. New stairs get railings on both sides. Saved as `IfcStair`
   (`stair.create`, `stair.set_params`).
+- **Stairs through floors** (ARC-STAIR-007): a run drawn to within a tread of the top snaps to
+  reach the level above and completes the stair; Esc completes it too, the last run carrying on.
+  The stair keeps reaching its top as levels move, and its railings extend with it. Where a floor
+  or ceiling over it leaves less headroom than the building code asks (from the nosing line), the
+  stair offers to open it over its full width, under the model's code or another one (each listed
+  with its headroom and clause); Modify | Stairs › Stair Openings offers it again
+  (`stair.headroom_check`, `stair.create_openings`).
 - **Railings**: Architecture › Railing sketches a guard railing's path (sketched over a deck,
   floor or flat roof, it stands on its top). Modify | Floors / Roofs › Guard Edges puts railings
   along every open edge of a deck, patio, floor or flat roof, leaving out edges with a wall
@@ -435,6 +451,8 @@ nearest gaps in what is built:
 - **Roofs**: openings and skylights, slope arrows, picking single eave edges in the window,
   dormer openings as separate IFC opening elements. Gutters and downspouts are planned as part
   of plumbing (MEP-PIPE-010).
+- **Openings**: the Opening › Vertical sketch tool, openings in roofs, shafts and by face, and
+  guards around a stair opening (a Pick Edges railing can follow it).
 - **Stairs and railings**: winders, supports, editing runs with handles, continuous handrails
   and baluster families.
 - **Decks**: ledgers, span tables, breakers and board overrides.
