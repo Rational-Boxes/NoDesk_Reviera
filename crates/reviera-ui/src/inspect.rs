@@ -140,7 +140,22 @@ impl Gui {
 
     /// The temporary visibility of a view.
     pub(crate) fn view_visibility(&self, v: &View) -> Visibility {
-        self.app.temp_state(v.doc, v.element).visibility()
+        let mut vis = self.app.temp_state(v.doc, v.element).visibility();
+        vis.virtual_volumes = self.virtual_mode(v);
+        vis
+    }
+
+    /// How a view shows virtual volumes (ARC-MOD-031), from the view's setting.
+    pub(crate) fn virtual_mode(&self, v: &View) -> reviera_render::VirtualMode {
+        let mode = v.element.and_then(|e| {
+            let store = self.app.document(v.doc)?.doc.store();
+            reviera_core::clearances::view_mode(store, e)
+        });
+        match mode.as_deref() {
+            Some("translucent") => reviera_render::VirtualMode::Translucent,
+            Some("solid") => reviera_render::VirtualMode::Solid,
+            _ => reviera_render::VirtualMode::Hidden,
+        }
     }
 
     /// Hands a view's clipping, visibility and box and slice decorations to its viewport.

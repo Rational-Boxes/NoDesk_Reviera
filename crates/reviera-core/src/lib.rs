@@ -13,6 +13,7 @@ pub mod bodies;
 pub mod builtin;
 pub mod categories;
 pub mod change;
+pub mod clearances;
 pub mod cobie;
 pub mod command;
 pub mod decks;

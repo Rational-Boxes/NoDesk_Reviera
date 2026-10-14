@@ -455,6 +455,12 @@ icon = "overlaps"
 help = "Find where elements overlap: listed largest first; pick one to select and frame it"
 
 [[action]]
+id = "view.set_virtual_volumes"
+label = "Virtual Volumes"
+icon = "virtual_volumes"
+help = "Show door swings and accessibility clearances: hidden, translucent or solid in this view"
+
+[[action]]
 id = "inspect.section_box"
 label = "Section Box"
 icon = "section_box"
@@ -885,7 +891,10 @@ tools = [
 
 [[tab.panel]]
 label = "Coordination"
-tools = [{ action = "overlap.find", size = "large" }]
+tools = [
+  { action = "overlap.find", size = "large" },
+  { action = "view.set_virtual_volumes", size = "large" },
+]
 
 [[tab.panel]]
 label = "Section"

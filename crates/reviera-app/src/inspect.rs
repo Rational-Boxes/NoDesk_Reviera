@@ -61,6 +61,7 @@ impl TempState {
                 after: i.after,
                 ghost: i.ghost_others,
             }),
+            virtual_volumes: reviera_render::VirtualMode::Hidden,
         }
     }
 }

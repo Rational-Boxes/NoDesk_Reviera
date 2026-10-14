@@ -52,6 +52,7 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add_host(crate::cobie::CobieValidate),
         registry.add_host(crate::output::ExportPdf),
         registry.add_host(crate::overlaps::OverlapFind),
+        registry.add_host(crate::overlaps::ClearanceCheck),
         registry.add_host(crate::scripts::ScriptRun),
         registry.add_host(crate::scripts::PluginList),
         registry.add_host(crate::scripts::PluginRun),

@@ -242,7 +242,7 @@ pub fn section_parts(
     let meshes: Vec<reviera_render::SceneMesh> = scene
         .meshes
         .iter()
-        .filter(|m| shown(m.element))
+        .filter(|m| shown(m.element) && !reviera_render::is_virtual(&m.class))
         .map(|m| reviera_render::SceneMesh {
             element: m.element,
             class: m

@@ -3222,6 +3222,7 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "railing.create_on_edges" => with(gui, Gui::guard_edges),
         "railing.create_on_stair" => with(gui, Gui::rail_stairs),
         "overlap.find" => with(gui, Gui::check_overlaps),
+        "view.set_virtual_volumes" => with(gui, Gui::cycle_virtual_volumes),
         "stair.spiral" => with(gui, |g| {
             g.start_stair_tool(true);
             focus(g);

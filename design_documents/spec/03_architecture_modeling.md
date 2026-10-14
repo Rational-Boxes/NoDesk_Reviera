@@ -4006,9 +4006,23 @@ These tools are on the **Modify** tab and are repeated on every `Modify | <Eleme
 - `view.set_virtual_volumes(view_id, mode: hidden|translucent|solid)`
 
 **Acceptance criteria.**
-- [ ] A 900 mm door's swing volume flags a cabinet placed within its arc, and not the wall it opens from.
+- [x] A 900 mm door's swing volume flags a cabinet placed within its arc, and not the wall it opens from.
 - [ ] Under ADA 2010, a toilet's 1525 × 1420 mm clear floor space flags a lavatory placed inside it.
 - [ ] A room flagged accessible without a 1500 mm turning circle clear of fixtures is reported.
+
+**Implementation notes (2026-10-13).** As built:
+- **Door swings:** each leaf's quarter-circle sweep, from the sill to the leaf's top, on the swing side. Always present.
+- **ADA 2010 404.2.4.1 front-approach clearances:** with the rule set `ada_2010` (`clearance.set_rule_set`, held on the project), each door gets a pull-side clearance (1525 mm deep, the clear width plus 455 mm past the latch) and a push-side clearance (1220 mm deep, the clear width), both taken to 2030 mm high.
+- **Checks:** `clearance.check` tests every volume against every body (imported elements too), allowing the door itself and its wall, and door swings against each other, so doors that would hit each other are found. View › Check Overlaps lists intrusions with the overlaps, and picking one shows the volumes translucent.
+- **Display:** View › Virtual Volumes cycles the view between hidden (the default), translucent and solid; the choice is stored on the view (`view.set_virtual_volumes`). Plans and sections never cut the volumes, and Zoom to Fit ignores them.
+- **Later:**
+  - fixture clear floor spaces and grab-bar zones (with components);
+  - turning spaces in accessible rooms;
+  - latch-side and hinge-side approaches, and the closer and latch variants of 404.2.4;
+  - ISO 21542;
+  - element-defined service clearances;
+  - flagged volumes drawn in the warning colour;
+  - IFC export of clearances.
 
 **ID:** ARC-MOD-032 · **Priority:** P1 · **Ref:** owner requirement (2026-10-13); Reviera's own design (Appendix A.2a)
 
@@ -4548,7 +4562,7 @@ All commands below are registered once in the command registry and exposed autom
 | `overlap.accepted` | — | [pair] | No | ARC-MOD-032 |
 | `clearance.list` | element_ids? | [clearance] | No | ARC-MOD-031 |
 | `clearance.check` | element_ids?, rules? | [overlap] | No | ARC-MOD-031 |
-| `clearance.set_rule_set` | standard | — | Yes | ARC-MOD-031 |
+| `clearance.set_rule_set` | standard: none\|ada_2010 | — | Yes | ARC-MOD-031 |
 | `view.set_virtual_volumes` | view_id, mode: hidden\|translucent\|solid | — | Yes | ARC-MOD-031 |
 | `railing.create_on_edges` | type_id, host_id, edges?: [curve_key]\|all_open, setback? | [element_id] | Yes | ARC-RAIL-001 |
 | `railing.create_on_stair` | stair_id, sides?: [left\|right], inset?, type_id? | [element_id] | Yes | ARC-RAIL-001 |

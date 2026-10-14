@@ -99,10 +99,15 @@ The KIT FZK *AC20-Institute-Var-2* sample model (`test-data/ifc/`) open in Revie
   roofs, stairs, railings, doors, windows and imported elements), largest first with the
   volume and depth, and frames a picked pair (`overlap.find`). Touching is not overlapping,
   and pairs that belong together by design (a door and its wall) are left out. It is the
-  shared engine for what comes next, none of it built yet: virtual volumes (door swings and
-  accessibility clearances, shown translucent, ARC-MOD-031), resolving overlaps by a boolean
-  mode (ARC-MOD-032), clash tests (COL-CLASH) and automatic pipe and duct penetrations
-  (MEP-PEN-001).
+  shared engine for virtual volumes, below, and for what comes next, not built yet:
+  resolving overlaps by a boolean mode (ARC-MOD-032), clash tests (COL-CLASH) and automatic
+  pipe and duct penetrations (MEP-PEN-001).
+- **Virtual volumes**: every door has its swing volume, and with the ADA 2010 rule set
+  (`clearance.set_rule_set`) its pull-side and push-side maneuvering clearances. Check Overlaps
+  lists what intrudes into them (and doors that would hit each other), and View › Virtual
+  Volumes shows them hidden, translucent or solid in each view (`clearance.list`,
+  `clearance.check`, `view.set_virtual_volumes`). Not yet: bathroom fixture clear floor spaces
+  and turning spaces (they come with fixtures and accessible rooms), and ISO 21542.
 - **Lua scripting**: `script.run` runs Lua against the open model: `reviera.<domain>.<verb>{...}`
   calls any command, `reviera.ui.form{...}` asks for input (length, number, integer, checkbox,
   choice and text fields, validated), and `print` reports. Each run is one undo step and rolls

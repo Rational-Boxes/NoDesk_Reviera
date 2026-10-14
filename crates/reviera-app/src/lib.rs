@@ -387,6 +387,26 @@ impl App {
                 });
             }
         }
+        // Virtual volumes: door swings and clearances, drawn by each view's mode (hidden by
+        // default; translucent or solid), never cut in plans (ARC-MOD-031).
+        for c in reviera_core::clearances::all(store) {
+            let color = match c.kind {
+                reviera_core::clearances::ClearanceKind::DoorSwing => [1.0, 0.62, 0.08, 0.3],
+                _ => [0.1, 0.62, 1.0, 0.22],
+            };
+            meshes.push(reviera_render::SceneMesh {
+                element: Some(c.element),
+                color,
+                class: c.kind.class().to_owned(),
+                positions: c
+                    .mesh
+                    .0
+                    .iter()
+                    .map(|[x, y, z]| [*x as f32, *y as f32, *z as f32])
+                    .collect(),
+                indices: c.mesh.1,
+            });
+        }
         Ok(reviera_render::RenderScene { meshes })
     }
 

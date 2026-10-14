@@ -23,6 +23,24 @@ pub mod viewcube;
 /// is its swing).
 pub const PLAN_HIDDEN: &str = "/3d";
 
+/// The class prefix of virtual volumes (clearances such as door swings, ARC-MOD-031): drawn by
+/// each view's [`VirtualMode`], never cut in plans, picked only when shown.
+pub const VIRTUAL: &str = "Clearance";
+
+/// Whether a mesh class is a virtual volume's.
+pub fn is_virtual(class: &str) -> bool {
+    class.starts_with(VIRTUAL)
+}
+
+/// How a view shows virtual volumes.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum VirtualMode {
+    #[default]
+    Hidden,
+    Translucent,
+    Solid,
+}
+
 /// One element's triangulated geometry, in world coordinates (metres, Z up).
 #[derive(Debug, Clone, PartialEq)]
 pub struct SceneMesh {
@@ -47,9 +65,11 @@ impl RenderScene {
 
     /// Axis-aligned bounds of everything in the scene.
     pub fn bounds(&self) -> Option<(Vec3, Vec3)> {
+        // Virtual volumes (clearances) do not count: they are hidden by default.
         let mut points = self
             .meshes
             .iter()
+            .filter(|m| !is_virtual(&m.class))
             .flat_map(|m| m.positions.iter())
             .map(|p| Vec3::from(*p));
         let first = points.next()?;
@@ -65,6 +85,8 @@ pub struct Visibility {
     /// Translucent elements and their opacity (0..1).
     pub translucent: HashMap<ElementId, f32>,
     pub isolated: Option<Isolation>,
+    /// How virtual volumes show.
+    pub virtual_volumes: VirtualMode,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -156,9 +178,16 @@ impl RenderScene {
         let mut opaque: Option<(usize, f32)> = None;
         let mut faint: Option<(usize, f32)> = None;
         for (i, m) in self.meshes.iter().enumerate() {
-            let Some(alpha) = visibility.opacity(m.element) else {
+            let Some(mut alpha) = visibility.opacity(m.element) else {
                 continue;
             };
+            if is_virtual(&m.class) {
+                match visibility.virtual_volumes {
+                    VirtualMode::Hidden => continue,
+                    VirtualMode::Translucent => alpha *= m.color[3],
+                    VirtualMode::Solid => {}
+                }
+            }
             let best = if alpha < 0.99 {
                 &mut faint
             } else {
@@ -192,7 +221,12 @@ impl RenderScene {
         top: f32,
     ) -> Option<(usize, f32)> {
         let mut best: Option<(usize, f32)> = None;
-        for (i, m) in self.meshes.iter().enumerate() {
+        for (i, m) in self
+            .meshes
+            .iter()
+            .enumerate()
+            .filter(|(_, m)| !is_virtual(&m.class))
+        {
             for tri in m.indices.as_chunks::<3>().0 {
                 let [a, b, c] = tri.map(|k| Vec3::from(m.positions[k as usize]));
                 if let Some(t) = ray_triangle(origin, dir, a, b, c)

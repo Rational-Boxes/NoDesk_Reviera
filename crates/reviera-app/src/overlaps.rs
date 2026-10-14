@@ -169,3 +169,135 @@ impl HostCommand for OverlapFind {
         })
     }
 }
+
+#[derive(Debug, Default, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct CheckParams {
+    /// Check these elements' virtual volumes (default all).
+    pub element_ids: Option<Vec<ElementRef>>,
+    /// Intrusions thinner than this are contact (default 1 mm).
+    #[schemars(extend("x-reviera-data-type" = "length"))]
+    pub tolerance: Option<f64>,
+}
+
+/// Something intruding into a virtual volume.
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct Intrusion {
+    /// The element whose clearance it is, and which.
+    pub element: ElementId,
+    pub kind: reviera_core::clearances::ClearanceKind,
+    pub rule: String,
+    /// What intrudes: an element's body, or another door's swing.
+    pub other: ElementId,
+    pub other_is_swing: bool,
+    pub label: String,
+    pub volume: f64,
+    pub depth: f64,
+    pub min: [f64; 3],
+    pub max: [f64; 3],
+    pub centroid: [f64; 3],
+}
+
+pub(crate) struct ClearanceCheck;
+
+impl HostCommand for ClearanceCheck {
+    type Host = App;
+    type Params = Option<CheckParams>;
+    type Output = Vec<Intrusion>;
+    const META: CommandMeta = CommandMeta {
+        name: "clearance.check",
+        version: 1,
+        summary: "Check virtual volumes for intrusions",
+        description: "Checks each virtual volume (ARC-MOD-031: door swings, and the accessibility rule set's \
+                      maneuvering clearances) against every element's body, and door swings against each \
+                      other. A door's own body and its wall are allowed. Returns each intrusion with its volume, \
+                      depth, box and centroid, largest first.",
+        effects: &[Effect::Read],
+        transaction_name: "",
+    };
+
+    fn run(&self, app: &mut App, _: &Caller, p: Option<CheckParams>) -> Result<Vec<Intrusion>> {
+        let p = p.unwrap_or_default();
+        let bodies = app.bodies()?;
+        let doc = app.active().expect("bodies checked");
+        let store = app.get(doc)?.doc.store();
+        let only: Option<Vec<ElementId>> = p
+            .element_ids
+            .as_deref()
+            .map(|refs| {
+                refs.iter()
+                    .map(|r| {
+                        store.resolve(r).ok_or_else(|| {
+                            Error::new("element.not_found", format!("no element {r:?}"))
+                        })
+                    })
+                    .collect::<Result<Vec<_>>>()
+            })
+            .transpose()?;
+        let o = Options {
+            tolerance: p.tolerance.unwrap_or(0.001),
+            ..Options::default()
+        };
+        let clearances: Vec<_> = reviera_core::clearances::all(store)
+            .into_iter()
+            .filter(|c| only.as_ref().is_none_or(|ids| ids.contains(&c.element)))
+            .collect();
+        let label = |id: ElementId| {
+            store
+                .get(id)
+                .map_or_else(|| format!("#{}", id.0), |e| format!("{} {}", e.class, id.0))
+        };
+        let skip = |a: ElementId, b: ElementId| reviera_core::bodies::related(store, a, b);
+        let mut out = Vec::new();
+        for c in &clearances {
+            for ov in overlap::find(&[c.body()], Some(&bodies), &skip, &o) {
+                let other = if ov.a == c.element { ov.b } else { ov.a };
+                out.push(Intrusion {
+                    element: c.element,
+                    kind: c.kind,
+                    rule: c.rule.to_owned(),
+                    other,
+                    other_is_swing: false,
+                    label: label(other),
+                    volume: ov.volume,
+                    depth: ov.depth,
+                    min: ov.min,
+                    max: ov.max,
+                    centroid: ov.centroid,
+                });
+            }
+        }
+        // Doors that would hit each other.
+        let swings: Vec<_> = reviera_core::clearances::all(store)
+            .into_iter()
+            .filter(|c| c.kind == reviera_core::clearances::ClearanceKind::DoorSwing)
+            .collect();
+        for (i, a) in swings.iter().enumerate() {
+            for b in &swings[i + 1..] {
+                if only
+                    .as_ref()
+                    .is_some_and(|ids| !ids.contains(&a.element) && !ids.contains(&b.element))
+                {
+                    continue;
+                }
+                if let Some(ov) = overlap::between(&a.body(), &b.body(), &o) {
+                    out.push(Intrusion {
+                        element: a.element,
+                        kind: a.kind,
+                        rule: String::new(),
+                        other: b.element,
+                        other_is_swing: true,
+                        label: format!("{}'s swing", label(b.element)),
+                        volume: ov.volume,
+                        depth: ov.depth,
+                        min: ov.min,
+                        max: ov.max,
+                        centroid: ov.centroid,
+                    });
+                }
+            }
+        }
+        out.sort_by(|x, y| y.volume.total_cmp(&x.volume));
+        Ok(out)
+    }
+}

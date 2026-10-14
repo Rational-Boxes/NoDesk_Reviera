@@ -64,6 +64,9 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(RoofSetParams),
         registry.add(RoofSetEdge),
         registry.add(RoofSetEaves),
+        registry.add(ClearanceSetRuleSet),
+        registry.add(ViewSetVirtualVolumes),
+        registry.add(ClearanceList),
         registry.add(RoofCreateArched),
         registry.add(RoofSetArch),
         registry.add(RoofCreateDome),
@@ -2516,6 +2519,55 @@ modify_command!(
     (),
     roofs::curved::set_dome
 );
+
+modify_command!(
+    ClearanceSetRuleSet,
+    "clearance.set_rule_set",
+    "Set the accessibility rule set",
+    "Sets the project's accessibility rule set (ARC-MOD-031): `none` (door swings only) or `ada_2010` \
+     (adds door maneuvering clearances: 1525 mm deep on the pull side and 455 mm past the latch, 1220 mm on \
+     the push side). The clearances are virtual volumes that `clearance.check` tests for intrusion.",
+    "Accessibility Rules",
+    crate::clearances::RuleSetParams,
+    (),
+    crate::clearances::set_rule_set
+);
+modify_command!(
+    ViewSetVirtualVolumes,
+    "view.set_virtual_volumes",
+    "Show or hide virtual volumes in a view",
+    "Sets how a view shows virtual volumes (door swings, accessibility clearances; ARC-MOD-031): `hidden`, \
+     `translucent` or `solid`.",
+    "Virtual Volumes",
+    crate::clearances::ViewModeParams,
+    (),
+    crate::clearances::set_view_mode
+);
+
+#[derive(Debug)]
+struct ClearanceList;
+
+impl Command for ClearanceList {
+    type Params = Option<crate::clearances::ListParams>;
+    type Output = Vec<crate::clearances::ClearanceInfo>;
+    const META: CommandMeta = CommandMeta {
+        name: "clearance.list",
+        version: 1,
+        summary: "List virtual volumes",
+        description: "Lists the virtual volumes (ARC-MOD-031), or those of `element_ids`: each one's element, kind \
+                      (door swing, pull-side or push-side clearance), rule and box.",
+        effects: &[Effect::Read],
+        transaction_name: "",
+    };
+
+    fn run(
+        &self,
+        cx: &mut CommandContext<'_>,
+        p: Option<crate::clearances::ListParams>,
+    ) -> Result<Vec<crate::clearances::ClearanceInfo>> {
+        crate::clearances::list(cx.store(), p.unwrap_or_default())
+    }
+}
 
 #[derive(Debug)]
 struct RoofEaves;

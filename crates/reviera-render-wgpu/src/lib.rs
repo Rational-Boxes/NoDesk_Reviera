@@ -705,6 +705,16 @@ fn vertices(
         } else {
             m.color
         };
+        if reviera_render::is_virtual(&m.class) {
+            match visibility.virtual_volumes {
+                reviera_render::VirtualMode::Hidden => continue,
+                reviera_render::VirtualMode::Translucent => {
+                    // A selected door's clearances light up but stay see-through.
+                    color[3] = m.color[3];
+                }
+                reviera_render::VirtualMode::Solid => color[3] = 1.0,
+            }
+        }
         color[3] *= alpha;
         let out = if color[3] < 0.99 {
             &mut transparent

@@ -792,7 +792,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `classification.unassign` | 2 | element_ids[], system_id | — | Yes | DM-CLS-001 |
 | `clearance.check` | 3 | element_ids?, rules? | [overlap] | No | ARC-MOD-031 |
 | `clearance.list` | 3 | element_ids? | [clearance] | No | ARC-MOD-031 |
-| `clearance.set_rule_set` | 3 | standard | — | Yes | ARC-MOD-031 |
+| `clearance.set_rule_set` | 3 | standard: none\ | ada_2010 | — | Yes |
 | `clipboard.copy` | 3 | element_ids | — | No (session state) | ARC-MOD-021 |
 | `clipboard.cut` | 3 | element_ids | — | Yes | ARC-MOD-021 |
 | `clipboard.paste` | 3 | mode: Free(vector)\ | Levels([id])\ | Views([id])\ | CurrentView\ |
