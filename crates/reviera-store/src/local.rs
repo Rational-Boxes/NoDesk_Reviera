@@ -974,6 +974,8 @@ impl LocalProject {
             let solids: Vec<geometry::Polyhedron> = g
                 .faces
                 .iter()
+                // A curved roof's body is one shell, on its first face.
+                .filter(|f| !f.slab.1.is_empty())
                 .map(|f| {
                     // A slab with courtyards through it, or clipped, is written as its
                     // triangles.

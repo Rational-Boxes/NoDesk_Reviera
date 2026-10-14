@@ -64,6 +64,10 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(RoofSetParams),
         registry.add(RoofSetEdge),
         registry.add(RoofSetEaves),
+        registry.add(RoofCreateArched),
+        registry.add(RoofSetArch),
+        registry.add(RoofCreateDome),
+        registry.add(RoofSetDome),
         registry.add(RoofEaves),
         registry.add(RoofSetSlope),
         registry.add(RoofSetShape),
@@ -2460,6 +2464,57 @@ modify_command!(
     roofs::eaves::SetEavesParams,
     (),
     roofs::eaves::set_eaves
+);
+
+modify_command!(
+    RoofCreateArched,
+    "roof.create_arched",
+    "Create an arched roof",
+    "Creates a smooth arched (barrel or segmental) roof over a four-sided footprint (ARC-ROOF-008), springing \
+     from two opposite curves (`spring_edges`, default the longer pair) at the base offset. `rise` (default a \
+     quarter of the span) or `radius` sets the arch at the first end; `profile` is `segment`, `semicircle`, \
+     `elliptical` or `catenary`. Over a trapezoid the vault tapers: `taper` keeps the rise (`constant_rise`) \
+     or scales it with the span (`constant_slope`). `overhang` continues the arch past the spring edges, \
+     `end_overhang` past the ends.",
+    "Arched Roof",
+    roofs::curved::CreateArchedParams,
+    ElementId,
+    roofs::curved::create_arched
+);
+modify_command!(
+    RoofSetArch,
+    "roof.set_arch",
+    "Set an arched roof's arch",
+    "Makes a footprint roof arched, or changes its arch: spring edges, rise or radius, profile, taper and \
+     overhangs (ARC-ROOF-008).",
+    "Arch",
+    roofs::curved::SetArchParams,
+    (),
+    roofs::curved::set_arch
+);
+modify_command!(
+    RoofCreateDome,
+    "roof.create_dome",
+    "Create a dome",
+    "Creates a dome (ARC-ROOF-009) at `center` over a `plan`: `{\"circle\": {\"radius\"}}`, \
+     `{\"ellipse\": {\"radii\", \"rotation\"}}` or `{\"polygon\": {\"radius\", \"sides\", \"rotation\"}}` (a \
+     cloister vault). `profile` is `hemisphere` (rise = radius), `segmental` (a lower `rise`), `pointed` (arcs \
+     of `ratio` × the span, default 1) or `onion` (`rise`, bulge `ratio`, default 1.25). `oculus` leaves an \
+     opening of that diameter at the crown; `faceted` makes flat facets.",
+    "Dome",
+    roofs::curved::CreateDomeParams,
+    ElementId,
+    roofs::curved::create_dome
+);
+modify_command!(
+    RoofSetDome,
+    "roof.set_dome",
+    "Change a dome",
+    "Changes a dome's centre, plan, rise, profile, ratio, oculus or faceting (ARC-ROOF-009).",
+    "Dome",
+    roofs::curved::SetDomeParams,
+    (),
+    roofs::curved::set_dome
 );
 
 #[derive(Debug)]

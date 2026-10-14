@@ -40,6 +40,7 @@ use crate::sketch::{self, SKETCH_KEY};
 use crate::store::Store;
 use crate::walls::{Line, RECIPE_KEY};
 
+pub mod curved;
 pub mod eaves;
 pub mod skeleton;
 
@@ -115,6 +116,12 @@ pub struct RoofRecipe {
     pub edges: BTreeMap<String, RoofEdge>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cutoff: Option<Cutoff>,
+    /// An arched roof over the footprint (ARC-ROOF-008).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub arch: Option<curved::Arch>,
+    /// A dome (ARC-ROOF-009); a dome has no footprint sketch.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dome: Option<curved::Dome>,
 }
 
 impl RoofRecipe {
@@ -428,9 +435,12 @@ pub fn regenerate(store: &Store, e: &Element) -> Result<RoofGeometry> {
                 "the roof type defines no thickness",
             )
         })?;
+    let plate = crate::levels::elevation(level) + r.base_offset;
+    if let Some(d) = &r.dome {
+        return curved::dome(d, plate, thickness);
+    }
     let sketch = sketch::sketch_of(e)
         .ok_or_else(|| Error::new("roof.no_sketch", "the roof has no footprint"))?;
-    let plate = crate::levels::elevation(level) + r.base_offset;
     let cutoff = match &r.cutoff {
         Some(c) => Some(
             find(store, &c.level)
@@ -469,6 +479,9 @@ pub fn regenerate(store: &Store, e: &Element) -> Result<RoofGeometry> {
         loops.push(r.len());
         ring.extend(r);
         keys.extend(ks);
+    }
+    if let Some(a) = &r.arch {
+        return curved::arch(&ring, &keys, a, plate, thickness);
     }
     let edges: Vec<RoofEdge> = keys.iter().map(|k| r.edge(*k)).collect();
     // Eaves bear on their walls: their plate lines move, their overhangs are from the walls.
@@ -1336,6 +1349,8 @@ pub(crate) fn create(txn: &mut crate::txn::Transaction<'_>, p: CreateParams) -> 
         slope,
         edges,
         cutoff,
+        arch: None,
+        dome: None,
     };
     let type_guid = txn.store().get(type_id).expect("exists").guid().to_string();
     let id = txn.create(

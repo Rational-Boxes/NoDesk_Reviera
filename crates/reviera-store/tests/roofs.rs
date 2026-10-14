@@ -1272,3 +1272,124 @@ fn eaves_bear_on_the_walls_and_return_soffits_to_them() {
     let ifc = IfcModel::open(&path).unwrap();
     assert_eq!(ifc.entities_of_type("IfcRoof").unwrap().len(), 1);
 }
+
+/// Arched roofs (ARC-ROOF-008) and domes (ARC-ROOF-009) by command: the end walls fill up to
+/// the arch, and both save as IFC roofs.
+#[test]
+fn arched_roofs_and_domes() {
+    let dir = tempfile::tempdir().unwrap();
+    let (mut project, mut doc, path, level) = project(dir.path());
+    let r = registry();
+    let mut walls = Vec::new();
+    for i in 0..4 {
+        walls.push(id(run(
+            &r,
+            &mut doc,
+            "wall.create",
+            json!({
+                "curve": { "line": { "start": RECT[(i + 1) % 4], "end": RECT[i] } },
+                "base_level": level.0,
+                "top_constraint": { "unconnected": 3 },
+            }),
+        )
+        .unwrap()));
+    }
+    // Springing along the long sides (the walls' exterior faces), 1.5 m rise over 6.2 m.
+    let outer = [[-0.1, -0.1], [10.1, -0.1], [10.1, 6.1], [-0.1, 6.1]];
+    let vault = id(run(
+        &r,
+        &mut doc,
+        "roof.create_arched",
+        json!({
+            "curves": curves(&outer, |_| json!({})),
+            "level_id": level.0, "base_offset": 3.0, "rise": 1.5, "end_overhang": 0.3,
+        }),
+    )
+    .unwrap());
+    let g = geometry(&doc, vault);
+    assert_eq!(g.predefined, "BARREL_ROOF");
+    assert_eq!(
+        doc.store()
+            .get(vault)
+            .unwrap()
+            .param("@PredefinedType")
+            .unwrap(),
+        "BARREL_ROOF"
+    );
+    assert!((g.underside([5.0, 3.0]).unwrap() - 4.5).abs() < 1e-3);
+    // The end walls fill up to the arch; the side walls stay at the springing.
+    let attached = ids_of(
+        run(
+            &r,
+            &mut doc,
+            "roof.attach_walls",
+            json!({ "roof_id": vault.0 }),
+        )
+        .unwrap(),
+    );
+    assert_eq!(attached.len(), 4);
+    let solved = reviera_core::walls::solve(doc.store());
+    let tops: Vec<f64> = walls
+        .iter()
+        .map(|w| {
+            reviera_core::walls::attach::attached_body(doc.store(), *w, &solved.bodies[w])
+                .unwrap()
+                .unwrap()
+                .z_max
+        })
+        .collect();
+    // Walls 1 and 3 run along y (the ends): up to the crown, within the grid's chord.
+    assert!(
+        (tops[1] - 4.5).abs() < 0.02 && (tops[3] - 4.5).abs() < 0.02,
+        "{tops:?}"
+    );
+    assert!(tops[0] < 3.3 && tops[2] < 3.3, "{tops:?}");
+    // A tapering vault with constant slope, then back.
+    run(
+        &r,
+        &mut doc,
+        "roof.set_arch",
+        json!({ "roof_id": vault.0, "profile": "semicircle" }),
+    )
+    .unwrap();
+    assert!((geometry(&doc, vault).underside([5.0, 3.0]).unwrap() - 6.1).abs() < 1e-3);
+
+    // A hemisphere of 4 m radius beside it, with an oculus.
+    let dome = id(run(
+        &r,
+        &mut doc,
+        "roof.create_dome",
+        json!({
+            "level_id": level.0, "base_offset": 3.0, "center": [20.0, 3.0],
+            "plan": { "circle": { "radius": 4.0 } }, "oculus": 1.0,
+        }),
+    )
+    .unwrap());
+    let d = geometry(&doc, dome);
+    assert_eq!(d.predefined, "DOME_ROOF");
+    assert!(d.underside([20.0, 3.0]).is_none());
+    assert!((d.underside([20.6, 3.0]).unwrap() - (3.0 + (16.0f64 - 0.36).sqrt())).abs() < 0.05);
+    run(
+        &r,
+        &mut doc,
+        "roof.set_dome",
+        json!({ "roof_id": dome.0, "plan": { "polygon": { "radius": 4.0, "sides": 8 } }, "oculus": 0 }),
+    )
+    .unwrap();
+    assert!(geometry(&doc, dome).underside([20.0, 3.0]).is_some());
+
+    project.save(&doc).unwrap();
+    let ifc = IfcModel::open(&path).unwrap();
+    assert_eq!(ifc.entities_of_type("IfcRoof").unwrap().len(), 2);
+    let (_, reopened, _) = LocalProject::open(&path).unwrap();
+    assert!((geometry(&reopened, vault).underside([5.0, 3.0]).unwrap() - 6.1).abs() < 1e-3);
+    assert!(geometry(&reopened, dome).underside([20.0, 3.0]).is_some());
+}
+
+fn ids_of(v: Value) -> Vec<ElementId> {
+    v.as_array()
+        .unwrap()
+        .iter()
+        .map(|x| id(x.clone()))
+        .collect()
+}

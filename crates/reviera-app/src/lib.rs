@@ -447,6 +447,7 @@ impl App {
                 .iter()
                 .map(|f| &f.slab)
                 .chain(g.trims.iter().map(|t| &t.mesh))
+                .filter(|m| !m.1.is_empty())
             {
                 meshes.push(reviera_render::SceneMesh {
                     element: Some(id),
