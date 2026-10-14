@@ -136,6 +136,35 @@ fn a_round_room_of_curved_walls() {
     // The ends butt: no overlap; the door is cut into the wall, not overlapping it.
     let found = run(&mut app, "overlap.find", json!({})).unwrap();
     assert_eq!(found["overlaps"], json!([]), "{found:#}");
+    // A dome on the drum (overhanging its face), the walls attached: their tops follow its
+    // underside, rising from √(5.4² − 5.1²) at the outer face to √(5.4² − 4.9²) at the inner.
+    let dome = run(
+        &mut app,
+        "roof.create_dome",
+        json!({ "level_id": level, "base_offset": 3.0, "center": [0.0, 0.0],
+                "plan": { "circle": { "radius": 5.4 } } }),
+    )
+    .unwrap();
+    let attached = run(&mut app, "roof.attach_walls", json!({ "roof_id": dome })).unwrap();
+    let mut got: Vec<u64> = attached
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|v| v.as_u64().unwrap())
+        .collect();
+    got.sort();
+    assert_eq!(got, vec![north, south]);
+    let top = app
+        .bodies()
+        .unwrap()
+        .iter()
+        .filter(|b| b.element.0 == north)
+        .flat_map(|b| b.parts.iter().flat_map(|p| p.mesh.0.iter().map(|q| q[2])))
+        .fold(f64::MIN, f64::max);
+    let inner = 3.0 + (5.4f64 * 5.4 - 4.9 * 4.9).sqrt();
+    assert!((top - inner).abs() < 0.08, "{top} vs {inner}");
+    let found = run(&mut app, "overlap.find", json!({})).unwrap();
+    assert_eq!(found["overlaps"], json!([]), "{found:#}");
     // Mirrored, the curve goes with the wall.
     run(
         &mut app,

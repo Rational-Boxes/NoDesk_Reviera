@@ -9893,11 +9893,11 @@ Dragging a control issues the matching command once, on mouse-up. The preview du
 - **Body:** one closed prism per segment between the curve offset half the width to each side, mitred at shared edges, and split at opening edges. Doors and windows cut it along the curve's length.
 - **Inserts:** an insert's `along` is measured on the curve. A plan point is projected onto it. The insert stays straight, square to the curve where it stands, and fits within the curve's length.
 - **Rooms:** curved walls bound rooms by their offset polylines.
+- **Attached tops** (ARC-WALL-008): a curved wall attaches to a roof or dome piece by piece. Each piece is attached like a short straight wall, and the roof must cover the whole curve. `roof.attach_walls` finds curved perimeter walls, judged at the curve's middle. A dome needs a small overhang past the drum's outer face so its facets cover the wall.
 - **IFC:** a faceted B-rep in a frame at the wall's start along its chord. Openings are placed at their point and tangent on the curve in that frame.
 - **Window:** Architecture › Arc Wall (start, end, then a point on the arc) and Spline Wall (points; Enter ends at the last), each with a live preview.
 - **Later:**
   - joins with other walls (curved walls butt at their ends);
-  - attaching tops to roofs;
   - a true curved IFC body and axis (`IfcTrimmedCurve` / `IfcBSplineCurveWithKnots`);
   - the "curve too tight" check;
   - closed splines;

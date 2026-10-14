@@ -799,17 +799,25 @@ impl LocalProject {
                     p[2] - g.base_z,
                 ]
             };
-            let solids: Vec<geometry::Polyhedron> =
-                walls::curved::body(&path, g.width, g.base_z, g.base_z + g.height, &[])
-                    .iter()
-                    .map(|(pts, idx)| geometry::Polyhedron {
-                        points: pts.iter().map(local).collect(),
-                        faces: idx
-                            .chunks(3)
-                            .map(|t| t.iter().map(|i| *i as usize).collect())
-                            .collect(),
-                    })
-                    .collect();
+            let solids: Vec<geometry::Polyhedron> = walls::curved::body(
+                &path,
+                g.width,
+                g.base_z,
+                g.base_z + g.height,
+                &[],
+                walls::attach::top_target(store, e.id())
+                    .map(|(_, r)| r)
+                    .as_ref(),
+            )
+            .iter()
+            .map(|(pts, idx)| geometry::Polyhedron {
+                points: pts.iter().map(local).collect(),
+                faces: idx
+                    .chunks(3)
+                    .map(|t| t.iter().map(|i| *i as usize).collect())
+                    .collect(),
+            })
+            .collect();
             geometry::remove_wall_shape(&mut self.ifc, step)?;
             geometry::remove_breps(&mut self.ifc, step)?;
             geometry::write_breps(

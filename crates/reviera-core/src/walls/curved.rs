@@ -251,15 +251,51 @@ fn prism(q: [[f64; 2]; 4], z0: f64, z1: f64) -> Mesh {
     crate::bodies::extrude(&q, &[], z0, z1)
 }
 
+/// The wall body of one plan quad (`[start-left, end-left, end-right, start-right]`) from `z0`:
+/// as a short straight wall, for attaching its top.
+fn piece_body(q: [[f64; 2]; 4], width: f64, z0: f64, height: f64) -> super::WallBody {
+    let start = [(q[0][0] + q[3][0]) / 2.0, (q[0][1] + q[3][1]) / 2.0];
+    let end = [(q[1][0] + q[2][0]) / 2.0, (q[1][1] + q[2][1]) / 2.0];
+    super::WallBody {
+        geometry: super::WallGeometry {
+            start,
+            end,
+            base_z: z0,
+            height,
+            width,
+        },
+        footprint: [q[3], q[2], q[1], q[0]],
+    }
+}
+
+/// Whether a curved wall's top can attach to `roof` all along; the lowest point of the top.
+pub fn attach_check(
+    p: &Path,
+    width: f64,
+    base_z: f64,
+    roof: &crate::roofs::RoofGeometry,
+) -> crate::error::Result<f64> {
+    let (left, right) = (p.offset(width / 2.0), p.offset(-width / 2.0));
+    let mut z_min = f64::INFINITY;
+    for i in 0..p.points.len() - 1 {
+        let q = [left[i], left[i + 1], right[i + 1], right[i]];
+        let a = super::attach::attach_to(roof, &piece_body(q, width, base_z, 1.0))?;
+        z_min = z_min.min(a.z_min);
+    }
+    Ok(z_min)
+}
+
 /// A curved wall's body: per segment of its curve (split further at opening edges), the prism
 /// between the curve offset half the width to each side, from the base to the top, less each
-/// opening's `along` and height range (`cuts`, as for straight walls).
+/// opening's `along` and height range (`cuts`, as for straight walls). With `roof`, the top
+/// follows the roof's underside (ARC-WALL-008), piece by piece.
 pub fn body(
     p: &Path,
     width: f64,
     base_z: f64,
     top_z: f64,
     cuts: &[super::openings::Cut],
+    roof: Option<&crate::roofs::RoofGeometry>,
 ) -> Vec<Mesh> {
     let (left, right) = (p.offset(width / 2.0), p.offset(-width / 2.0));
     let mut out = Vec::new();
@@ -305,8 +341,19 @@ pub fn body(
                     .filter(|(z0, z1)| z1 - z0 > 1e-9)
                     .collect();
             }
-            for (z0, z1) in solid {
-                out.push(prism(q, z0, z1));
+            let last = solid.len();
+            for (k, (z0, z1)) in solid.into_iter().enumerate() {
+                // The run reaching the top follows the roof, when the wall is attached.
+                let attached = (k + 1 == last && (z1 - top_z).abs() < 1e-9)
+                    .then_some(roof)
+                    .flatten()
+                    .and_then(|r| {
+                        super::attach::attach_to(r, &piece_body(q, width, z0, z1 - z0)).ok()
+                    });
+                match attached {
+                    Some(a) => out.push(a.solid),
+                    None => out.push(prism(q, z0, z1)),
+                }
             }
         }
     }
@@ -403,14 +450,14 @@ mod tests {
         };
         // A half annulus 0.2 m thick, 3 m high: π (5.1² − 4.9²) / 2 × 3.
         let exact = std::f64::consts::PI * (5.1f64.powi(2) - 4.9f64.powi(2)) / 2.0 * 3.0;
-        let v = volume(&body(&p, 0.2, 0.0, 3.0, &[]));
+        let v = volume(&body(&p, 0.2, 0.0, 3.0, &[], None));
         assert!((v - exact).abs() / exact < 1e-3, "{v} vs {exact}");
         // A 1 × 2 m opening along the curve takes about its area times the thickness.
         let cut = super::super::openings::Cut {
             x: [7.0, 8.0],
             z: [0.0, 2.0],
         };
-        let w = volume(&body(&p, 0.2, 0.0, 3.0, &[cut]));
+        let w = volume(&body(&p, 0.2, 0.0, 3.0, &[cut], None));
         assert!(((v - w) - 1.0 * 2.0 * 0.2).abs() < 0.01, "{}", v - w);
     }
 

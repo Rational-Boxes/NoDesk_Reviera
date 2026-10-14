@@ -39,11 +39,13 @@ for k = 0, n - 1 do
 end
 reviera.floor.create{ loops = { floor }, level_id = level }
 reviera.room.place{ level_id = level, point = {0, 0}, name = "Observation" }
--- The dome on the drum, open at the crown (the oculus as the viewing slot).
-reviera.roof.create_dome{
+-- The dome on the drum, overhanging it a little and open at the crown (the oculus as the
+-- viewing slot); the drum's walls rise to its underside.
+local dome = reviera.roof.create_dome{
   level_id = level, base_offset = H, center = {0, 0},
-  plan = { circle = { radius = R + 0.1 } }, profile = "hemisphere", oculus = 1.2,
+  plan = { circle = { radius = R + 0.35 } }, profile = "hemisphere", oculus = 1.2,
 }
+reviera.roof.attach_walls{ roof_id = dome }
 
 -- The control annex east of the drum, under a barrel vault.
 local x0, x1, y0, y1 = 8.0, 16.0, -3.0, 3.0
@@ -55,7 +57,7 @@ reviera.door.place{ host_wall_id = front, point = {12.0, y0 - 0.3} }
 reviera.window.place{ host_wall_id = front, point = {9.8, y0 - 0.3} }
 reviera.window.place{ host_wall_id = front, point = {14.2, y0 - 0.3} }
 local o = 0.1
-reviera.roof.create_arched{
+local vault = reviera.roof.create_arched{
   curves = {
     { line = { start = {x0 - o, y0 - o}, ["end"] = {x1 + o, y0 - o} } },
     { line = { start = {x1 + o, y0 - o}, ["end"] = {x1 + o, y1 + o} } },
@@ -65,6 +67,8 @@ reviera.roof.create_arched{
   level_id = level, base_offset = 3.2, rise = 1.6, profile = "segment",
   overhang = 0.3, end_overhang = 0.4,
 }
+-- The end walls fill up to the arch (gable infill).
+reviera.roof.attach_walls{ roof_id = vault }
 -- A link between drum and annex: two short walls.
 wall({R + 0.05, -1.2}, {x0, -1.2}, nil, 3.0)
 wall({x0, 1.2}, {R + 0.05, 1.2}, nil, 3.0)

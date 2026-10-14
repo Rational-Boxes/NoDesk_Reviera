@@ -124,8 +124,9 @@ The KIT FZK *AC20-Institute-Var-2* sample model (`test-data/ifc/`) open in Revie
 - **Curved walls**: Architecture › Arc Wall draws a wall through its start, end and a point on
   the arc; Spline Wall draws one smoothly through clicked points. Doors and windows go on the
   curve (straight, square to it), rooms are bounded by curved walls, and the walls save as
-  faceted B-reps (`wall.create` with `curve.through`). Not yet: joins between curved and other
-  walls (their ends butt), attaching them to roofs, and true curved IFC geometry.
+  faceted B-reps (`wall.create` with `curve.through`). They attach to roofs and domes like
+  straight walls (a drum rises to its dome). Not yet: joins between curved and other walls
+  (their ends butt), and true curved IFC geometry.
 - **Arched roofs and domes**: Architecture › Arched Roof sketches a four-sided footprint and
   makes a smooth barrel or segmental vault springing from the longer sides (semicircle,
   elliptical and catenary profiles too). Over a trapezoid it tapers, keeping its rise or its

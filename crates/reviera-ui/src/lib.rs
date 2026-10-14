@@ -1455,7 +1455,7 @@ impl Gui {
         };
         if let Some(path) = &curve {
             let z = t.elevation;
-            for m in reviera_core::walls::curved::body(path, 0.2, z, z + WALL_HEIGHT, &[]) {
+            for m in reviera_core::walls::curved::body(path, 0.2, z, z + WALL_HEIGHT, &[], None) {
                 overlay.push(mesh(m, PREVIEW));
             }
         }

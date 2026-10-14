@@ -330,6 +330,18 @@ pub(crate) fn attach(txn: &mut crate::txn::Transaction<'_>, p: AttachParams) -> 
     // Every wall must fit under the roof.
     let solved = super::solve(txn.store());
     for id in ids {
+        // A curved wall: every piece along its curve.
+        let store = txn.store();
+        let e = store.get(id).expect("resolved");
+        if let Some(path) = super::wall_recipe(e).and_then(|r| super::curved::path_of(&r)) {
+            let g = super::regenerate(store, e)?;
+            let (_, roof) = top_target(store, id).ok_or_else(|| {
+                Error::new("wall.attach_bad_target", "the roof does not regenerate")
+            })?;
+            super::curved::attach_check(&path, g.width, g.base_z, &roof)
+                .map_err(|e| Error::new(e.code, format!("wall {id}: {}", e.message)))?;
+            continue;
+        }
         let body = solved.bodies.get(&id).ok_or_else(|| {
             Error::new(
                 "wall.cannot_regenerate",
@@ -381,6 +393,41 @@ pub fn walls_below(store: &Store, roof: ElementId) -> Vec<ElementId> {
         let rs = &regions.iter().find(|(k, _)| *k == key).expect("added").1;
         is_perimeter(geometry, rs, &g)
     });
+    // Curved walls (ARC-WALL-002): covered all along and starting below the roof, on the
+    // perimeter judged at the curve's middle.
+    for e in store.iter() {
+        let Some(r) = super::wall_recipe(e) else {
+            continue;
+        };
+        if r.attach_top.as_deref() == Some(guid.as_str()) {
+            continue;
+        }
+        let (Some(path), Ok(wg)) = (super::curved::path_of(&r), super::regenerate(store, e)) else {
+            continue;
+        };
+        let Ok(z_min) = super::curved::attach_check(&path, wg.width, wg.base_z, &g) else {
+            continue;
+        };
+        if z_min <= wg.base_z + 0.1 {
+            continue;
+        }
+        let (mid, d) = path.at(path.length() / 2.0);
+        let at_mid = super::WallGeometry {
+            start: [mid[0] - d[0] * 0.05, mid[1] - d[1] * 0.05],
+            end: [mid[0] + d[0] * 0.05, mid[1] + d[1] * 0.05],
+            ..wg
+        };
+        let z = wg.base_z + 0.05;
+        let key = (z * 1000.0).round() as i64;
+        if !regions.iter().any(|(k, _)| *k == key) {
+            let edges = crate::arrangement::wall_edges(store, z);
+            regions.push((key, crate::arrangement::regions(&edges)));
+        }
+        let rs = &regions.iter().find(|(k, _)| *k == key).expect("added").1;
+        if is_perimeter(&at_mid, rs, &g) {
+            out.push(e.id());
+        }
+    }
     out.sort();
     out
 }

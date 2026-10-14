@@ -164,7 +164,15 @@ pub fn all(store: &Store) -> Vec<Body> {
         };
         let class = e.class.clone();
         let c = cuts.get(&e.id()).map_or(&[][..], Vec::as_slice);
-        for mesh in crate::walls::curved::body(&path, g.width, g.base_z, g.base_z + g.height, c) {
+        let roof = crate::walls::attach::top_target(store, e.id()).map(|(_, r)| r);
+        for mesh in crate::walls::curved::body(
+            &path,
+            g.width,
+            g.base_z,
+            g.base_z + g.height,
+            c,
+            roof.as_ref(),
+        ) {
             push(e.id(), &class, mesh, false);
         }
     }
