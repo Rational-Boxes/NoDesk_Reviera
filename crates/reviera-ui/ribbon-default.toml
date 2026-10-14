@@ -449,6 +449,24 @@ icon = "ceiling_plan"
 help = "Create reflected ceiling plans of levels"
 
 [[action]]
+id = "script.run"
+label = "Run Script..."
+icon = "script"
+help = "Run a Lua script file on the model, as one undo step"
+
+[[action]]
+id = "script.import"
+label = "Import into Library..."
+icon = "script_import"
+help = "Copy a script or plugin folder into your script library, listed in this menu"
+
+[[action]]
+id = "ui.scripts.manage"
+label = "Manage Library..."
+icon = "script_library"
+help = "The known scripts: run, remove or import them"
+
+[[action]]
 id = "geometry.remove_boolean"
 label = "Remove Boolean"
 icon = "remove_boolean"
@@ -1174,6 +1192,10 @@ items = [
   "element.pin", "element.unpin", "element.delete", "-",
   "wall.flip", "wall.attach", "wall.detach", "insert.flip_hand", "insert.flip_facing",
 ]
+
+[[menu]]
+label = "&Scripts"
+items = ["script.run", "script.import", "ui.scripts.manage", "-"]
 
 [[menu]]
 label = "&Window"

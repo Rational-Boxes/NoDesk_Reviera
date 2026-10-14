@@ -279,6 +279,15 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "remove_boolean" => format!(
             r#"<rect x="4" y="9" width="15" height="15" fill="{f}" {s}/><rect x="13" y="4" width="15" height="15" fill="none" {s}/><path d="M20 22l8 8M28 22l-8 8" {sa}/>"#
         ),
+        "script" => format!(
+            r#"<path d="M7 4h14l5 5v19H7z" fill="{f}" {s}/><path d="M12 14l-3 3 3 3M19 14l3 3-3 3" {sa}/>"#
+        ),
+        "script_import" => format!(
+            r#"<path d="M7 4h14l5 5v19H7z" fill="{f}" {s}/><path d="M16 10v11M12 17l4 4 4-4" {sa}/>"#
+        ),
+        "script_library" => format!(
+            r#"<path d="M4 6h7v21H4zM12 6h7v21h-7z" fill="{f}" {s}/><path d="M21 7l6-1 3 20-6 1z" {s}/><path d="M6 10h3M14 10h3" {sa}/>"#
+        ),
         "overlaps" => format!(
             r#"<rect x="4" y="9" width="15" height="15" fill="{f}" {s}/><rect x="13" y="4" width="15" height="15" fill="none" {sa}/><path d="M13 9h6v10h-6z" fill="{a}" {s}/>"#
         ),

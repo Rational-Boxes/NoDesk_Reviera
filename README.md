@@ -120,8 +120,11 @@ The KIT FZK *AC20-Institute-Var-2* sample model (`test-data/ifc/`) open in Revie
   `{title, description, run}`) or single `.lua` scripts; `plugin.list`, `plugin.run`,
   `script.import` and `script.remove` manage the library (`~/.config/reviera/plugins`). The
   built-in Castle Turret plugin builds a tower with a cone, dome or battlement top and arrow
-  slits from a form. Not yet: the window's Scripts menu and form dialog (headless runs answer
-  forms from `answers` and defaults); macOS and Windows builds need LuaJIT built from source.
+  slits from a form. In the window, the **Scripts** menu has Run Script…, Import into
+  Library…, Manage Library… (run, remove, import) and the known scripts; a script's form shows
+  as a dialog in the model's units, shown again with the problem until the values are valid.
+  Headless runs answer forms from `answers` and defaults. Not yet: macOS and Windows builds
+  need LuaJIT built from source.
 - **Curved walls**: Architecture › Arc Wall draws a wall through its start, end and a point on
   the arc; Spline Wall draws one smoothly through clicked points. Doors and windows go on the
   curve (straight, square to it), rooms are bounded by curved walls, and the walls save as
@@ -342,8 +345,8 @@ Open one with `reviera gui test-data/samples/observatory.ifc`.
 The first milestone continues with shaped windows (round, round-top, Gothic, fan and gable
 heads, ARC-WIN-002), roof openings (skylights and shafts), and layered wall types. Then come
 T joins into curved walls, clearances for
-bathroom fixtures and accessible rooms, clash tests, automatic MEP penetrations, the window
-side of scripting (a Scripts menu and form dialogs), general shape tools, CADCraft drawing
+bathroom fixtures and accessible rooms, clash tests, automatic MEP penetrations, general
+shape tools, CADCraft drawing
 exchange, and the current NBIMS-US COBie layout.
 
 ### Working with CADCraft

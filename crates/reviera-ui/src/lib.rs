@@ -33,6 +33,7 @@ mod ribbon;
 mod roofs;
 mod rooms;
 mod schedules;
+mod scripts;
 mod sections;
 mod sheets;
 mod sketch;
@@ -239,6 +240,8 @@ struct Gui {
     wall_type: Option<ElementId>,
     /// The wall type whose values the palette shows.
     wall_type_row: Option<ElementId>,
+    /// The units of the model a script runs on, for its forms.
+    script_units: Rc<RefCell<reviera_core::units::UnitSettings>>,
     /// Drives animated view changes and walking.
     timer: Option<Timer<Frame>>,
     /// Models being opened in the background, and the timer that animates their tabs.
@@ -2907,6 +2910,7 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 type_rows: None,
                 wall_type: None,
                 wall_type_row: None,
+                script_units: Rc::new(RefCell::new(Default::default())),
                 timer: Some(Timer::new(&frame)),
                 loading: Vec::new(),
                 load_timer: Some(Timer::new(&frame)),
@@ -2926,6 +2930,13 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 },
             })
         });
+        // Scripts' forms show as dialogs; the Scripts menu lists the known scripts.
+        {
+            let mut g = gui.borrow_mut();
+            let units = g.script_units.clone();
+            scripts::install_form_handler(&mut g, units);
+            g.refresh_scripts_menu();
+        }
         {
             let g = gui.clone();
             let state = gui.borrow();
@@ -3140,6 +3151,12 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                     let dir = nav::PRESETS[(id - ID_ORIENT_FIRST) as usize].1;
                     with(&gui, |g| g.orient(glam::Vec3::from(dir)));
                 }
+                id if (scripts::ID_PLUGIN_FIRST
+                    ..scripts::ID_PLUGIN_FIRST + scripts::MAX_PLUGINS as i32)
+                    .contains(&id) =>
+                {
+                    with(&gui, |g| g.run_plugin_item(id));
+                }
                 id if (inspect::ID_TREE_FIRST
                     ..inspect::ID_TREE_FIRST + inspect::TREE_MENU.len() as i32)
                     .contains(&id) =>
@@ -3346,6 +3363,9 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "railing.create_on_edges" => with(gui, Gui::guard_edges),
         "railing.create_on_stair" => with(gui, Gui::rail_stairs),
         "overlap.find" => with(gui, Gui::check_overlaps),
+        "script.run" => with(gui, Gui::open_script),
+        "script.import" => with(gui, Gui::import_script),
+        "ui.scripts.manage" => with(gui, Gui::manage_scripts),
         "geometry.remove_boolean" => with(gui, Gui::remove_booleans),
         "view.set_virtual_volumes" => with(gui, Gui::cycle_virtual_volumes),
         "stair.spiral" => with(gui, |g| {

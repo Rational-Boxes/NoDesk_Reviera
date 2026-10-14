@@ -16,6 +16,7 @@ wxdragon = { workspace = true, features = ["aui"] }
 # Direct dependency so its build script (which builds wxWidgets) runs before ours: see build.rs.
 wxdragon-sys = "0.9.22"
 reviera-app.workspace = true
+reviera-lua.workspace = true
 reviera-render.workspace = true
 reviera-render-wgpu.workspace = true
 raw-window-handle.workspace = true

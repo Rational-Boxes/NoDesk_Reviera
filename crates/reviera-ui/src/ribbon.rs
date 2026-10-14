@@ -55,6 +55,7 @@ pub const UI_ACTIONS: &[&str] = &[
     "ceiling.sketch",
     "sketch.defines_slope",
     "view.building_elevations",
+    "ui.scripts.manage",
     "view.new_schedule",
     "view.new_sheet",
     "sheet.open_view",
@@ -505,6 +506,11 @@ impl Ribbon {
                 bar.enable_item(id, enable);
             }
         }
+    }
+
+    /// The wx id of an action.
+    pub fn id_of(&self, action: &str) -> Option<i32> {
+        self.catalog.id_of(action)
     }
 
     /// The menu bar whose items follow the ribbon's enabled state.

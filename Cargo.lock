@@ -2727,6 +2727,7 @@ dependencies = [
  "raw-window-handle",
  "reviera-app",
  "reviera-core",
+ "reviera-lua",
  "reviera-render",
  "reviera-render-wgpu",
  "serde_json",

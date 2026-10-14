@@ -40,9 +40,8 @@ Start with **File › New**, and open a Level 1 plan (View › Floor Plan).
 10. **Link walls.** Wall: (5050, -1200)–(8000, -1200) and (8000, 1200)–(5050, 1200), 3000 high.
 11. **Garden wall.** Architecture › **Spline Wall**: click (-7000, -4000), (-4000, -8500),
     (2000, -9500), (9000, -7500), (13000, -8500), (17000, -7000), Enter. Height 1200.
-12. **The turret.** Run the *Castle Turret* plugin: centre (19000, 5500), radius 1600, 16 sides,
-    6500 high, *Onion dome* 3000, 3 arrow slits.
-    **[gap: the window has no Scripts menu to run a plugin, nor a dialog for its form]**
+12. **The turret.** Scripts › **Castle Turret**; in its dialog: Centre X 19000, Centre Y 5500,
+    Radius 1600, Sides 16, Wall Height 6500, Top *Onion dome*, Roof Height 3000, Arrow Slits 3.
 13. **Accessibility rules.** Set the project's rule set to ADA 2010 (door maneuvering
     clearances); View › Coordination › **Virtual Volumes** shows them.
     **[gap: the rule set has no UI]**
@@ -55,5 +54,4 @@ Check: View › Coordination › **Check Overlaps** reports none.
   Circle tools.
 - **Dome Properties:** centre and plan (radius, sides) are only set by clicking.
 - **Resolve dialog:** cutting or intersecting cannot hide the tool's body.
-- **Scripts:** no Scripts menu to run plugins and scripts, and no form dialog for their input.
 - **Accessibility rule set:** no UI to choose it.
