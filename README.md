@@ -95,6 +95,15 @@ The KIT FZK *AC20-Institute-Var-2* sample model (`test-data/ifc/`) open in Revie
   arrows, and openings in roofs. Footprints may have courtyards: a building around a central
   courtyard gets a roof that falls to the street and to the courtyard (or a flat slab with the
   courtyard as a hole).
+- **Lua scripting**: `script.run` runs Lua against the open model: `reviera.<domain>.<verb>{...}`
+  calls any command, `reviera.ui.form{...}` asks for input (length, number, integer, checkbox,
+  choice and text fields, validated), and `print` reports. Each run is one undo step and rolls
+  back on failure. Plugins are script modules (a folder whose `plugin.lua` returns
+  `{title, description, run}`) or single `.lua` scripts; `plugin.list`, `plugin.run`,
+  `script.import` and `script.remove` manage the library (`~/.config/reviera/plugins`). The
+  built-in Castle Turret plugin builds a tower with a cone, dome or battlement top and arrow
+  slits from a form. Not yet: the window's Scripts menu and form dialog (headless runs answer
+  forms from `answers` and defaults); macOS and Windows builds need LuaJIT built from source.
 - **Arched roofs and domes**: Architecture › Arched Roof sketches a four-sided footprint and
   makes a smooth barrel or segmental vault springing from the longer sides (semicircle,
   elliptical and catenary profiles too). Over a trapezoid it tapers, keeping its rise or its
@@ -357,7 +366,7 @@ Permission levels are `read_only` (the default), `model_edit` and `full_scriptin
 | `crates/reviera-render` | Render Scene, plan and section graphics, annotation, stroke font |
 | `crates/reviera-render-wgpu` | The built-in `wgpu` viewport |
 | `crates/reviera-ui` | The main window (wxWidgets through wxDragon): ribbon, views, tools, panes |
-| `crates/…` | Geometry, Godot, Lua, network, BIMserver and OpenCDE crates (placeholders) |
+| `crates/…` | Geometry, Godot, network, BIMserver and OpenCDE crates (placeholders); `reviera-lua` is the LuaJIT scripting host |
 | `design_documents/` | The specification (`spec/`), technology stack, research log and source register |
 | `schemas/`, `clients/rsp/` | Open data formats and protocol clients (MIT) |
 | `test-data/ifc/` | Sample IFC models for tests (see their README for provenance) |

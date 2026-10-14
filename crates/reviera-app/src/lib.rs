@@ -13,6 +13,7 @@ pub mod inspect;
 pub mod notes;
 pub mod output;
 pub mod schedules;
+pub mod scripts;
 pub mod sheets;
 pub mod views;
 
@@ -210,6 +211,8 @@ pub struct App {
     config: AppConfig,
     /// Views that commands asked the UI to open.
     view_requests: Vec<(DocumentId, reviera_core::ElementId)>,
+    /// Shows scripts' forms as dialogs (set by the window).
+    form_handler: Option<scripts::Handler>,
 }
 
 impl App {
@@ -224,6 +227,7 @@ impl App {
             active: None,
             config,
             view_requests: Vec::new(),
+            form_handler: None,
         }
     }
 

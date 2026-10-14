@@ -66,7 +66,7 @@ pub fn toolset_of(command: &str) -> String {
         | "history" | "snapshot" | "cobie" => "io",
         "bimserver" | "link" | "workset" | "bcf" | "cde" | "api" | "http" => "collaboration",
         "analysis" => "analysis",
-        "script" | "addin" | "lua" => "scripting",
+        "script" | "plugin" | "addin" | "lua" => "scripting",
         "app" | "mcp" | "settings" | "txn" => "admin",
         _ => "other",
     };

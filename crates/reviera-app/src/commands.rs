@@ -51,6 +51,11 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add_host(crate::cobie::ExportCobie),
         registry.add_host(crate::cobie::CobieValidate),
         registry.add_host(crate::output::ExportPdf),
+        registry.add_host(crate::scripts::ScriptRun),
+        registry.add_host(crate::scripts::PluginList),
+        registry.add_host(crate::scripts::PluginRun),
+        registry.add_host(crate::scripts::ScriptImport),
+        registry.add_host(crate::scripts::ScriptRemove),
         registry.add_host(SelectionAdd),
         registry.add_host(SelectionRemove),
     ];

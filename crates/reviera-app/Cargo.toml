@@ -10,6 +10,7 @@ repository.workspace = true
 publish.workspace = true
 
 [dependencies]
+reviera-lua.workspace = true
 pdf-writer.workspace = true
 reviera-core.workspace = true
 reviera-ifc.workspace = true
