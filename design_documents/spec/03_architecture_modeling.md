@@ -797,6 +797,8 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 - `compound.duplicate_layer(type_id, index)`
 - `compound.set_default_wrapping(type_id, at_inserts, at_ends)`
 
+*Built (2026-10-15), walls:* `compound.get` and `compound.set_layers` (layers with function, priority, material by name, thickness accepting units, wraps, structural and variable flags; the core defaults to the Structure layers), validated as above; stored in the wall type's `recipe.wall_type` as `compound`, the type's width becoming the layers' total (`type.set_param width` is refused on a layered type). Plans draw the inner layer boundaries in cut straight walls (between their joined ends, broken by openings). IFC: an `IfcMaterialLayerSet` per layered type (Name, Category, Priority as above; the core's layers described "Core"; IsVentilated false, unset for membranes) and one shared `IfcMaterialLayerSetUsage` (AXIS2, POSITIVE, centred) for its walls, replaced only when the structure changes. Not yet: the separate `compound.insert_layer`/`delete_layer`/`move_layer`/`duplicate_layer` commands (the dialog edits rows and applies them with `set_layers`), default wrapping, floors, roofs and ceilings, import of layer sets without RXD, and Resistance and Thermal Mass.
+
 **Acceptance criteria.**
 - [ ] A type whose layers are all outside the core (empty core) saves, regenerates and round-trips through IFC and RXD.
 - [ ] Setting a Finish layer to priority 1 while it lies between a priority-3 layer and the core fails validation with a message naming both layers.
@@ -820,7 +822,9 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 **Commands.** The `compound.*` commands, applied as a batch.
 
 **Acceptance criteria.**
-- [ ] Changing a layer's material and pressing OK updates all instances. Cancel leaves them untouched.
+- [x] Changing a layer's material and pressing OK updates all instances. Cancel leaves them untouched.
+
+*Built (2026-10-15):* Modify | Walls › **Edit Assembly** for the selected wall's type: a grid of Function, Priority, Material, Thickness, Wraps and Core (ticked rows, together), with Insert, Delete, Up and Down; OK validates and applies one `compound.set_layers` (an error keeps the dialog open), Cancel changes nothing. The type's Properties show its layers as *Structure*. Not yet: the header's R and thermal mass, the material browser, the preview pane, Structural Material and Variable columns, default wrapping, and vertical structure.
 
 ### 3.3.7 Vertically compound walls (regions)
 **ID:** ARC-CMPD-003 · **Priority:** P1 · **Ref:** research/02 §4.5

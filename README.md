@@ -14,8 +14,8 @@ operation can be driven by Lua scripts and by AI agents through the Model Contex
 > railings with gates, rooms, levels and grids. It finds and resolves overlaps with kept
 > booleans (OpenCASCADE), checks door clearances, and draws plans, ceiling plans, sections,
 > elevations, schedules and sheets to PDF and COBie. Every operation is a command that the
-> ribbon, Lua scripts and AI agents (MCP) share. Shaped windows, roof openings and layered walls
-> are next.
+> ribbon, Lua scripts and AI agents (MCP) share. Layered walls, columns, openings, shafts and
+> arrays are the newest; the first pre-release packages are being prepared.
 
 ## Contents
 
@@ -132,6 +132,11 @@ ribbon's tools, the command shell, Lua and MCP alike.
   (`wall.attach`, `wall.detach`; Modify | Walls › Attach Top/Base).
 - **Curved walls** carry doors and windows along the curve (square to it), bound rooms, attach to
   roofs and save as faceted B-reps.
+- **Layers** (Modify | Walls › Edit Assembly): a wall type's layers, exterior first, each with a
+  function, priority, material, thickness and wrapping, and the core; validated as the
+  specification asks. The type's width is their total, plans draw the layer boundaries in cut
+  walls, and IFC gets an `IfcMaterialLayerSet` with an `IfcMaterialLayerSetUsage` per wall
+  (`compound.get`, `compound.set_layers`; ARC-CMPD-001/002).
 - **IFC**: `IfcWall` with an `Axis` and a `SweptSolid` body (curved and attached walls as faceted
   B-reps in the wall's own frame), typed, contained in its storey and connected to its
   neighbours with `IfcRelConnectsPathElements`.
@@ -418,8 +423,8 @@ Create … Boundary* tab:
 
 - **Tabbed views**: several models open side by side, each view in its own tab with a `wgpu`
   viewport (Window › New 3D View, Tile Views, Tab Views, Ctrl+Tab; Tile Views remembers its
-  arrangement). Drag a tab to reorder it, onto another group's tabs to move it there, or to an
-  edge of the view area to tile it. Dockable Properties, Project Browser and Model Tree panes.
+  arrangement). Each tab has a close button; drag a tab to reorder it, onto another group's tabs
+  to move it there, or to an edge of the view area to tile it. The help tab opens at start. Dockable Properties, Project Browser and Model Tree panes.
 - **Ribbon**: Architecture (Wall, Arc Wall, Spline Wall, Door, Window, Floor, Ceiling, Roof,
   Arched Roof, Dome, Column, Room, Stair, Spiral Stair, Railing, Deck, Wall Opening, Vertical,
   Shaft,
@@ -479,7 +484,8 @@ Open one with `reviera gui test-data/samples/manor.ifc`, or rebuild them with
 The specification (`design_documents/spec/`) describes the whole application; these are the
 nearest gaps in what is built:
 
-- **Walls**: layered wall types (core and finishes), T joins into the side of a curved wall,
+- **Walls**: location lines other than the centreline, layer cleanup at joins and wrapping,
+  layered floors and roofs, a material library, T joins into the side of a curved wall,
   attaching bases or to floors and ceilings, and true curved IFC geometry (curved walls, arches
   and domes are faceted B-reps).
 - **Windows and doors**: quarter-round fan lights, arcs as true arc segments in IFC (shaped

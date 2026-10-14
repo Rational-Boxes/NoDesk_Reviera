@@ -10,6 +10,7 @@
 //! draws chains of walls on a level with `wall.create`, and they show at once. Every action goes
 //! through `App::execute`, like Lua and MCP. The ribbon and browsers come next.
 
+mod assembly;
 mod browser;
 mod columns;
 mod curved;
@@ -3312,6 +3313,9 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
 
         frame.show(true);
         frame.centre();
+        // The help opens at start (its home page lists the samples); a model opened from the
+        // command line comes in front of it.
+        gui.borrow_mut().show_help();
         if let Some(path) = &file {
             gui.borrow_mut().open(path, &frame);
         }
@@ -3489,6 +3493,7 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
             focus(g);
         }),
         "column.attach" => with(gui, Gui::attach_column_tops),
+        "wall.edit_assembly" => with(gui, Gui::edit_assembly),
         "column.detach" => with(gui, Gui::detach_column_tops),
         "opening.create_wall" => with(gui, |g| {
             g.start_wall_opening_tool();

@@ -98,8 +98,8 @@ pub fn on_tab_event(notebook: &AuiNotebook, f: impl Fn(TabEvent) + 'static) {
     unsafe { reviera_nb_bind(ptr(notebook), trampoline, user as *mut c_void) }
 }
 
-/// Lets the view tabs be dragged: reordered within a tab group, moved between groups, and
-/// dropped at an edge to tile.
+/// Gives every view tab a close button, and lets the tabs be dragged: reordered within a tab
+/// group, moved between groups, and dropped at an edge to tile.
 pub fn enable_tab_dragging(notebook: &AuiNotebook) {
     unsafe { reviera_nb_set_style(ptr(notebook)) }
 }

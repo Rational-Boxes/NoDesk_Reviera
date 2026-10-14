@@ -671,6 +671,14 @@ impl LocalProject {
         if !touched.is_empty() {
             self.write_inserts(doc)?;
             self.write_wall_openings(doc)?;
+            let owner_history = self.new_owner_history()?;
+            crate::materials::write_layer_sets(
+                &mut self.ifc,
+                doc,
+                &self.steps,
+                owner_history,
+                self.length_scale,
+            )?;
             self.write_floors(doc)?;
             self.write_slab_openings(doc)?;
             self.write_roofs(doc)?;

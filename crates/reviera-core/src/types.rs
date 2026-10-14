@@ -217,6 +217,12 @@ pub(crate) fn set_param(txn: &mut crate::txn::Transaction<'_>, p: SetParamParams
         return crate::floors::set_type_thickness(txn, id, &p.value);
     }
     // A Reviera wall type's width is part of its recipe.
+    if walls::type_width(e).is_some() && p.param == "width" && crate::compound::is_layered(e) {
+        return Err(Error::new(
+            "type.layered",
+            "a layered wall type's width is the total of its layers: change them in Edit Assembly (compound.set_layers)",
+        ));
+    }
     if walls::type_width(e).is_some() && p.param == "width" {
         let width = match &p.value {
             Value::Number(n) => n.as_f64().unwrap_or(-1.0),

@@ -8,6 +8,7 @@ pub mod commands;
 mod geometry;
 mod grids;
 mod local;
+mod materials;
 pub mod params;
 mod psets;
 mod spatial;

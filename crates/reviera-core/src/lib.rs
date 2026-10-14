@@ -19,6 +19,7 @@ pub mod cobie;
 pub mod codes;
 pub mod columns;
 pub mod command;
+pub mod compound;
 pub mod csg;
 pub mod decks;
 pub mod document;

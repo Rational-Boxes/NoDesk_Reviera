@@ -783,6 +783,12 @@ keys = "ST"
 help = "Draw a stair in a plan: click the start and end of each run; landings join the runs"
 
 [[action]]
+id = "wall.edit_assembly"
+label = "Edit Assembly"
+icon = "assembly"
+help = "Edit the layers of the selected wall's type: functions, priorities, materials, thicknesses and the core"
+
+[[action]]
 id = "column.place_architectural"
 label = "Column"
 icon = "column"
@@ -1145,6 +1151,7 @@ tools = [{ action = "dim.create_aligned", size = "small" }]
 category = "cat.walls"
 label = "Walls"
 panels = [{ label = "Wall", tools = [
+  { action = "wall.edit_assembly", size = "large" },
   { action = "wall.flip", size = "large" },
   { action = "wall.attach", size = "large" },
   { action = "wall.detach", size = "large" },

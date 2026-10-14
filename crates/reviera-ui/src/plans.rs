@@ -211,6 +211,7 @@ impl Gui {
         graphics.lines.extend(self.section_markers(index));
         graphics.lines.extend(self.insert_symbol_lines(index));
         graphics.lines.extend(self.opening_lines(index));
+        graphics.lines.extend(self.layer_lines(index));
         let v = &mut self.views[index];
         if let Some(viewport) = &mut v.viewport {
             viewport.set_plan(Some(graphics));

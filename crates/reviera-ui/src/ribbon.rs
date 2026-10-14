@@ -28,6 +28,7 @@ pub const UI_ACTIONS: &[&str] = &[
     "app.exit",
     "ui.model_properties",
     "help.home",
+    "wall.edit_assembly",
     "help.about",
     "tool.modify",
     "ui.pane.properties",

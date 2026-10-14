@@ -47,6 +47,8 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(ColumnDetach),
         registry.add(ElementArrayLinear),
         registry.add(ElementArrayRadial),
+        registry.add(CompoundGet),
+        registry.add(CompoundSetLayers),
     ];
     for r in results {
         r.expect("architecture commands are valid");
@@ -185,4 +187,47 @@ edit_command!(
     crate::modify::ArrayRadialParams,
     Vec<Vec<ElementId>>,
     crate::modify::array_radial
+);
+
+#[derive(Debug)]
+struct CompoundGet;
+
+impl Command for CompoundGet {
+    type Params = crate::compound::GetParams;
+    type Output = crate::compound::CompoundReport;
+    const META: CommandMeta = CommandMeta {
+        name: "compound.get",
+        version: 1,
+        summary: "A wall type's layers",
+        description: "A wall type's compound structure (ARC-CMPD-001): its layers, exterior first (function, \
+                      priority, material, thickness, wraps), its core and its total thickness. A type without \
+                      layers of its own reads as one Structure layer of its width.",
+        effects: &[Effect::Read],
+        transaction_name: "",
+    };
+
+    fn run(
+        &self,
+        cx: &mut CommandContext<'_>,
+        p: crate::compound::GetParams,
+    ) -> Result<crate::compound::CompoundReport> {
+        crate::compound::get(cx.store(), p)
+    }
+}
+
+edit_command!(
+    CompoundSetLayers,
+    "compound.set_layers",
+    "Set a wall type's layers",
+    "Gives a wall type its layers (ARC-CMPD-001), exterior first: each a `function` (structure, substrate, \
+     thermal_air, finish1, finish2, membrane), an optional `priority` (1 highest … 9; the function's \
+     default), a `material` name, a `thickness` (accepts units), and `wraps`, `structural_material` and \
+     `variable` flags; and the core `core_start..core_end` (by default the Structure layers). They are \
+     validated (thicknesses, priorities not rising away from the core, one variable and one structural \
+     layer at most). The type's width becomes their total and its walls regenerate; IFC gets an \
+     IfcMaterialLayerSet.",
+    "Edit Assembly",
+    crate::compound::SetLayersParams,
+    (),
+    crate::compound::set_layers
 );

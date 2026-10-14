@@ -94,6 +94,27 @@ under a roof at once, select the roof and use <b>Modify | Roofs › Attach Walls
 <a href="reviera:help/roofs#attach">Roofs</a>. <code>wall.attach</code>,
 <code>wall.detach</code></p>
 
+<h2 id="layers">Layers (Edit Assembly)</h2>
+<p>A wall type can have layers: finishes, insulation, structure and so on, exterior first. Select
+a wall and click <b>Modify | Walls › Edit Assembly</b>; the dialog lists the layers of its type:</p>
+<table>
+  <tr><td>Function</td><td>Structure, Substrate, Thermal/Air, Finish 1, Finish 2 or Membrane (a
+    membrane has no thickness).</td></tr>
+  <tr><td>Priority</td><td>1 (the strongest) to 9; each function has a default. Walking out from
+    the core, priorities must not get stronger.</td></tr>
+  <tr><td>Material</td><td>The material's name (written to IFC).</td></tr>
+  <tr><td>Thickness</td><td>In the model's units; at least 3.2 mm except membranes.</td></tr>
+  <tr><td>Wraps, Core</td><td>Tick Core on the core's layers, which must be next to each
+    other.</td></tr>
+</table>
+<p><b>Insert</b>, <b>Delete</b>, <b>Up</b> and <b>Down</b> edit the rows. <b>OK</b> checks the
+layers and applies them to the type, so every wall of the type changes; a problem is shown and
+the dialog stays open. The type's width is then the total of its layers (its Properties show the
+layers as <b>Structure</b>), and plans draw the boundaries between the layers inside cut walls.
+<code>compound.get</code>, <code>compound.set_layers</code></p>
+<p>In IFC the type has an <code>IfcMaterialLayerSet</code> and its walls an
+<code>IfcMaterialLayerSetUsage</code>.</p>
+
 <h2 id="edit">Editing walls</h2>
 <ul>
   <li>A selected wall shows a grip at each end: drag it to move that end.</li>
@@ -104,5 +125,7 @@ under a roof at once, select the roof and use <b>Modify | Roofs › Attach Walls
 </ul>
 <p>Walls are saved as <code>IfcWall</code> with an axis and a body (curved and attached walls as
 faceted B-reps), typed, contained in their storey and connected to their neighbours.</p>
-<p class="note">Not yet available: layered wall types (core and finishes), T joins into the side
-of a curved wall, and attaching wall bases or attaching to floors and ceilings.</p>
+<p class="note">Not yet available: location lines other than the centreline, layer cleanup at
+joins and wrapping at ends and openings, layered floors and roofs, a material library, T joins
+into the side of a curved wall, and attaching wall bases or attaching to floors and
+ceilings.</p>

@@ -85,7 +85,37 @@ impl Gui {
         grid.append(Property::string("Type Name", "wt_name", name));
         let w = self.format_length(width);
         grid.append(Property::string("Width", "wt_width", w));
-        grid.set_help_string("wt_width", "Changes every wall of this type");
+        let t = store.get(id).expect("listed");
+        // A layered type's width is its layers' total (ARC-CMPD-001).
+        if reviera_core::compound::is_layered(t) {
+            grid.set_property_read_only("wt_width", true);
+            grid.set_help_string(
+                "wt_width",
+                "The total of the layers: Edit Assembly changes them",
+            );
+        } else {
+            grid.set_help_string("wt_width", "Changes every wall of this type");
+        }
+        let structure = reviera_core::compound::of_wall_type(t).map_or_else(String::new, |c| {
+            c.layers
+                .iter()
+                .map(|l| {
+                    let m = if l.material.is_empty() {
+                        l.function.name().to_owned()
+                    } else {
+                        l.material.clone()
+                    };
+                    format!("{m} {}", self.format_length(l.thickness))
+                })
+                .collect::<Vec<_>>()
+                .join(" | ")
+        });
+        grid.append(Property::string("Structure", "wt_structure", structure));
+        grid.set_property_read_only("wt_structure", true);
+        grid.set_help_string(
+            "wt_structure",
+            "The layers, exterior first: Modify | Walls › Edit Assembly edits them",
+        );
         self.wall_type_row = Some(id);
     }
 
@@ -279,5 +309,102 @@ impl Gui {
             )
             .map(|_| ()),
         )
+    }
+}
+
+/// Layer boundaries over the cut fill of layered walls: light enough to show on it.
+const LAYER_LINE: [f32; 4] = [0.78, 0.78, 0.78, 1.0];
+
+impl Gui {
+    /// The boundaries between the layers of layered walls cut by plan `index` (ARC-CMPD-001):
+    /// lines along each straight wall at each inner layer boundary, between its joined ends and
+    /// broken by its openings.
+    pub(crate) fn layer_lines(&mut self, index: usize) -> Vec<reviera_render::plan::Lines> {
+        let v = &self.views[index];
+        let (Some(plan), Some(store)) = (
+            v.plan.as_ref(),
+            self.app.document(v.doc).map(|d| d.doc.store().clone()),
+        ) else {
+            return Vec::new();
+        };
+        if plan.ceiling {
+            return Vec::new();
+        }
+        let cut = plan.range.cut;
+        let z = cut as f32 + 0.001;
+        let solved = walls::solve(&store);
+        let cuts = reviera_core::inserts::cuts_by_host(&store);
+        let mut segments = Vec::new();
+        for (id, body) in &solved.bodies {
+            let g = &body.geometry;
+            if cut < g.base_z || cut > g.base_z + g.height {
+                continue;
+            }
+            let Some(e) = store.get(*id) else { continue };
+            let Some(t) = e
+                .param("@type")
+                .and_then(Value::as_str)
+                .and_then(reviera_core::GlobalId::parse)
+                .and_then(|g| store.find_by_guid(&g))
+                .and_then(|t| store.get(t))
+            else {
+                continue;
+            };
+            if !reviera_core::compound::is_layered(t) {
+                continue;
+            }
+            let Some(c) = reviera_core::compound::of_wall_type(t) else {
+                continue;
+            };
+            let flip = walls::wall_recipe(e).is_some_and(|r| r.flip);
+            let local = body.local_footprint();
+            let w = c.thickness();
+            let (u, n, s) = (g.direction(), g.normal(), g.start);
+            let bounds = c.boundaries();
+            // The openings at the cut plane, along the wall.
+            let gaps: Vec<[f64; 2]> = cuts
+                .get(id)
+                .into_iter()
+                .flatten()
+                .filter(|o| o.z[0] <= cut && cut <= o.z[1])
+                .map(|o| o.x)
+                .collect();
+            for d in &bounds[1..bounds.len() - 1] {
+                // From the exterior face (+Y) inward; reversed when the wall is flipped.
+                let y = if flip { d - w / 2.0 } else { w / 2.0 - d };
+                let t = (y + w / 2.0) / w;
+                let x0 = local[0][0] + t * (local[3][0] - local[0][0]);
+                let x1 = local[1][0] + t * (local[2][0] - local[1][0]);
+                let mut pieces = vec![[x0.min(x1), x0.max(x1)]];
+                for gap in &gaps {
+                    pieces = pieces
+                        .into_iter()
+                        .flat_map(|[a, b]| {
+                            let mut out = Vec::new();
+                            if gap[0] > a {
+                                out.push([a, gap[0].min(b)]);
+                            }
+                            if gap[1] < b {
+                                out.push([gap[1].max(a), b]);
+                            }
+                            out.into_iter().filter(|p| p[1] - p[0] > 1e-6)
+                        })
+                        .collect();
+                }
+                let at = |x: f64| {
+                    [
+                        (s[0] + u[0] * x + n[0] * y) as f32,
+                        (s[1] + u[1] * x + n[1] * y) as f32,
+                        z,
+                    ]
+                };
+                segments.extend(pieces.into_iter().map(|[a, b]| [at(a), at(b)]));
+            }
+        }
+        vec![reviera_render::plan::Lines {
+            color: LAYER_LINE,
+            width: 0.13,
+            segments,
+        }]
     }
 }
