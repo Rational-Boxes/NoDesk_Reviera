@@ -32,6 +32,8 @@ pub struct InsertTool {
     /// The insert under the cursor, as it would be placed.
     hover: Option<Placed>,
     flip_hand: bool,
+    /// Architecture › Opening › Wall: the tool cuts plain openings instead (ARC-OPEN-003).
+    pub wall_opening: Option<crate::openings::WallOpeningMode>,
 }
 
 impl Gui {
@@ -80,6 +82,7 @@ impl Gui {
             kind,
             hover: None,
             flip_hand: false,
+            wall_opening: None,
         });
         self.clear_selection();
         self.properties_stale = true;
@@ -101,6 +104,9 @@ impl Gui {
 
     fn insert_prompt(&mut self) {
         let Some(t) = &self.insert_tool else { return };
+        if t.wall_opening.is_some() {
+            return self.wall_opening_prompt();
+        }
         let text = match (t.kind, &t.hover) {
             (Kind::Door, None) => {
                 "Door: hover a wall; the side of the cursor is the swing side".into()
@@ -235,6 +241,13 @@ impl Gui {
     }
 
     pub(crate) fn insert_motion(&mut self, x: i32, y: i32) {
+        if self
+            .insert_tool
+            .as_ref()
+            .is_some_and(|t| t.wall_opening.is_some())
+        {
+            return self.wall_opening_motion(x, y);
+        }
         let hover = self.insert_candidate(x, y);
         if let Some(t) = &mut self.insert_tool {
             t.hover = hover;
@@ -244,6 +257,13 @@ impl Gui {
     }
 
     pub(crate) fn insert_click(&mut self, x: i32, y: i32) {
+        if self
+            .insert_tool
+            .as_ref()
+            .is_some_and(|t| t.wall_opening.is_some())
+        {
+            return self.wall_opening_click(x, y);
+        }
         let Some(p) = self.insert_candidate(x, y) else {
             return self
                 .frame
@@ -279,7 +299,7 @@ impl Gui {
             return false;
         }
         if let Some(t) = &mut self.insert_tool {
-            if t.kind != Kind::Door {
+            if t.kind != Kind::Door || t.wall_opening.is_some() {
                 return true;
             }
             t.flip_hand = !t.flip_hand;
@@ -303,6 +323,9 @@ impl Gui {
 
     fn insert_preview(&mut self) {
         let Some(t) = &self.insert_tool else { return };
+        if t.wall_opening.is_some() {
+            return;
+        }
         let hover = t.hover.clone();
         self.show_insert_overlay(hover.as_ref());
     }
@@ -814,6 +837,9 @@ impl Gui {
 
     /// The palette while the Door or Window tool runs with nothing selected.
     pub(crate) fn insert_tool_properties(&mut self, grid: &PropertyGrid) -> bool {
+        if self.wall_opening_tool_properties(grid) {
+            return true;
+        }
         let Some(kind) = self.insert_tool.as_ref().map(|t| t.kind) else {
             return false;
         };

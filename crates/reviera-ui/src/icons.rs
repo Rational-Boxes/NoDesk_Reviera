@@ -300,6 +300,15 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "model_properties" => format!(
             r#"<path d="M6 4h14l6 6v18H6z" fill="{f}" {s}/><path d="M10 12h12M10 17h12M10 22h7" {s}/><path d="M21 22l2 2 4-5" {sa}/>"#
         ),
+        "wall_opening" => format!(
+            r#"<path d="M3 24l8-6h18l-8 6z" fill="{f}" {s}/><path d="M3 24V10l8-6h18v14" {s}/><path d="M3 10h18v14M21 10l8-6" {s}/><path d="M8 24v-10h8v10" fill="{paper}" {sa}/>"#
+        ),
+        "vertical_opening" => format!(
+            r#"<path d="M2 20l10-7h18l-10 7z" fill="{f}" {s}/><path d="M2 20v4h18l10-7v-4M20 20v4" {s}/><path d="M12 17l3-2h6l-3 2z" fill="{paper}" {sa}/><path d="M16 4v9M13 7l3-3 3 3" {sa}/>"#
+        ),
+        "shaft" => format!(
+            r#"<path d="M3 10l8-5h18l-8 5zM3 19l8-5h18l-8 5zM3 28l8-5h18l-8 5z" fill="{f}" {s}/><path d="M13 9l3-2h6l-3 2zM13 18l3-2h6l-3 2zM13 27l3-2h6l-3 2z" fill="{paper}" {sa}/>"#
+        ),
         "stair_opening" => format!(
             r#"<path d="M3 28h6v-5h6v-5h6v-5h6" fill="none" {s}/><path d="M12 5h17v8H12z" fill="none" stroke-dasharray="2 2" {sa}/><path d="M12 5l17 8M29 5L12 13" {sa}/>"#
         ),

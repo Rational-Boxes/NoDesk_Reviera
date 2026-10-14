@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Reviera contributors
 
-//! Vertical openings in plans (ARC-OPEN-002, ARC-STAIR-007): each opening in a floor or ceiling
-//! of the plan's level is drawn as its outline crossed corner to corner, the usual symbol for
-//! an opening. Clicking the outline or the cross selects it; a selected opening shows the
+//! Openings in plans (ARC-OPEN-002/003/004, ARC-STAIR-007): each opening in a floor, ceiling or
+//! roof of the plan's level, and each shaft through the level, is drawn as its outline crossed
+//! corner to corner, the usual symbol for an opening; a wall opening in a wall the plan cuts as
+//! its outline. Clicking the outline or the cross selects it; a selected opening shows the
 //! footprint grips (corners and edge middles), which drag it (`opening.set_loops`).
 
 use reviera_core::ElementId;
@@ -14,7 +15,9 @@ use super::Gui;
 const NEAR_PX: f32 = 8.0;
 
 impl Gui {
-    /// The openings of floors and ceilings on plan `index`'s level, with their segments.
+    /// The openings drawn in plan `index`, with their segments: the vertical openings of the
+    /// floors, ceilings and roofs on its level, the shafts through its level (outline crossed
+    /// corner to corner), and the wall openings in walls the plan cuts (their outline).
     fn plan_openings(&self, index: usize) -> Vec<(ElementId, Vec<[[f64; 2]; 2]>)> {
         let v = &self.views[index];
         let Some(plan) = v.plan.as_ref() else {
@@ -26,43 +29,61 @@ impl Gui {
         let Some(level) = store.get(plan.level).map(|l| l.guid().to_string()) else {
             return Vec::new();
         };
-        store
+        let crossed = |loops: &[Vec<[f64; 2]>]| {
+            let mut segments = Vec::new();
+            for ring in loops {
+                let n = ring.len();
+                for i in 0..n {
+                    segments.push([ring[i], ring[(i + 1) % n]]);
+                }
+                // The cross: between the extreme corners of the loop.
+                let (lo, hi) = ring
+                    .iter()
+                    .fold(([f64::MAX; 2], [f64::MIN; 2]), |(lo, hi), p| {
+                        (
+                            [lo[0].min(p[0]), lo[1].min(p[1])],
+                            [hi[0].max(p[0]), hi[1].max(p[1])],
+                        )
+                    });
+                if n == 4 {
+                    segments.push([ring[0], ring[2]]);
+                    segments.push([ring[1], ring[3]]);
+                } else if hi[0] > lo[0] {
+                    segments.push([lo, hi]);
+                    segments.push([[lo[0], hi[1]], [hi[0], lo[1]]]);
+                }
+            }
+            segments
+        };
+        let mut out: Vec<(ElementId, Vec<[[f64; 2]; 2]>)> = store
             .iter()
             .filter_map(|e| {
                 let r = reviera_core::slab_openings::opening_recipe(e)?;
                 let host = reviera_core::GlobalId::parse(&r.host)
                     .and_then(|g| store.find_by_guid(&g))
                     .and_then(|h| store.get(h))?;
-                let (_, f) = reviera_core::floors::slab_recipe(host)?;
-                if f.level != level {
-                    return None;
-                }
-                let mut segments = Vec::new();
-                for ring in &r.loops {
-                    let n = ring.len();
-                    for i in 0..n {
-                        segments.push([ring[i], ring[(i + 1) % n]]);
-                    }
-                    // The cross: between the extreme corners of the loop.
-                    let (lo, hi) =
-                        ring.iter()
-                            .fold(([f64::MAX; 2], [f64::MIN; 2]), |(lo, hi), p| {
-                                (
-                                    [lo[0].min(p[0]), lo[1].min(p[1])],
-                                    [hi[0].max(p[0]), hi[1].max(p[1])],
-                                )
-                            });
-                    if n == 4 {
-                        segments.push([ring[0], ring[2]]);
-                        segments.push([ring[1], ring[3]]);
-                    } else if hi[0] > lo[0] {
-                        segments.push([lo, hi]);
-                        segments.push([[lo[0], hi[1]], [hi[0], lo[1]]]);
-                    }
-                }
-                Some((e.id(), segments))
+                let host_level = match reviera_core::floors::slab_recipe(host) {
+                    Some((_, f)) => f.level,
+                    None => reviera_core::roofs::roof_recipe(host)?.level,
+                };
+                (host_level == level).then(|| (e.id(), crossed(&r.loops)))
             })
-            .collect()
+            .collect();
+        out.extend(
+            reviera_core::slab_openings::shafts_at(store, plan.elevation)
+                .into_iter()
+                .map(|(id, r)| (id, crossed(&r.loops))),
+        );
+        let cut = plan.range.cut;
+        for o in reviera_core::wall_openings::all(store) {
+            if cut < o.wall.base_z || cut > o.wall.base_z + o.wall.height {
+                continue;
+            }
+            let ring = o.outline();
+            let n = ring.len();
+            out.push((o.id, (0..n).map(|i| [ring[i], ring[(i + 1) % n]]).collect()));
+        }
+        out
     }
 
     /// The opening symbols of plan `index` (the selected ones highlighted).

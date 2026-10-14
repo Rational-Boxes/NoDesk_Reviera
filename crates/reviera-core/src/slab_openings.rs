@@ -372,6 +372,50 @@ pub(crate) fn follow_host(
     Ok(())
 }
 
+/// The host a vertical opening sketched on level `level` (GlobalId) cuts: of the floors (or,
+/// with `ceiling`, the ceilings) on that level, the one the loops overlap most; else the roof
+/// they overlap most.
+pub fn host_for(store: &Store, level: &str, loops: &[Ring], ceiling: bool) -> Option<ElementId> {
+    let best = |c: Vec<(ElementId, f64)>| {
+        c.into_iter()
+            .filter(|(_, a)| *a > 1e-6)
+            .max_by(|a, b| a.1.total_cmp(&b.1))
+            .map(|(id, _)| id)
+    };
+    let slabs: Vec<(ElementId, f64)> = crate::floors::all(store)
+        .into_iter()
+        .filter(|(id, _)| {
+            let e = store.get(*id).expect("listed");
+            crate::decks::deck_settings(e).is_none()
+                && crate::floors::slab_recipe(e).is_some_and(|(k, r)| {
+                    r.level == level && (k == crate::floors::SlabKind::Ceiling) == ceiling
+                })
+        })
+        .map(|(id, f)| (id, overlap_area(&f.profiles, loops)))
+        .collect();
+    best(slabs).or_else(|| {
+        best(
+            crate::roofs::all(store)
+                .into_iter()
+                .filter(|(id, _)| {
+                    crate::roofs::roof_recipe(store.get(*id).expect("listed"))
+                        .is_some_and(|r| r.arch.is_none() && r.dome.is_none())
+                })
+                .map(|(id, g)| (id, overlap_area(&roof_profiles(&g), loops)))
+                .collect(),
+        )
+    })
+}
+
+/// The shafts drawn in a plan of the level at elevation `z`: those whose extent covers it.
+pub fn shafts_at(store: &Store, z: f64) -> Vec<(ElementId, ShaftRecipe)> {
+    shafts(store)
+        .into_iter()
+        .filter(|(_, _, (z0, z1))| *z0 <= z + 1e-6 && *z1 > z + 1e-6)
+        .map(|(id, r, _)| (id, r))
+        .collect()
+}
+
 // ---- Shafts (ARC-OPEN-004) ----
 
 #[derive(Debug, Deserialize, JsonSchema)]

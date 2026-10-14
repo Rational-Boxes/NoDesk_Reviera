@@ -3202,7 +3202,7 @@ These are view annotation and are specified in the DOC chapter. This chapter req
 - [ ] A vertical opening in the upper of two stacked floors leaves the lower floor intact.
 - [ ] Moving the host floor 2 m moves the opening with it.
 
-*Built (2026-10-14):* `opening.create_vertical` and `opening.set_loops` on Reviera floors and ceilings (roofs not yet); loops partly outside notch the edge (polygon booleans by iOverlay); the opening moves and mirrors with its host and is deleted with it; Reviera's display cuts the host while the IFC keeps the host whole and voids it with the opening (an `IfcExtrudedAreaSolid` of the loops through the host plus 1 mm). Plans draw it crossed with grips. Stair openings (ARC-STAIR-007) make them. Not yet: the Opening › Vertical sketch tool and Edit Sketch.
+*Built (2026-10-14):* `opening.create_vertical` and `opening.set_loops` on Reviera floors, ceilings and footprint roofs; loops partly outside notch the edge (polygon booleans by iOverlay); the opening moves and mirrors with its host and is deleted with it; Reviera's display cuts the host while the IFC keeps a slab whole and voids it with the opening (an `IfcExtrudedAreaSolid` of the loops through the host plus 1 mm; a roof's faceted body is written with the hole). Plans draw it crossed with grips. Stair openings (ARC-STAIR-007) make them. *Built (2026-10-15):* Architecture › Opening › **Vertical** sketches the loops on the plan's level; Finish cuts the floor (in a ceiling plan the ceiling) on that level the loops overlap most, else a roof; `opening.create_vertical` also takes sketch `curves`. In a roof an opening must lie within one face. Not yet: picking the host explicitly, Edit Sketch (grips reshape it), openings across roof faces and in arched roofs and domes.
 
 ### 3.8.3 Wall opening
 **ID:** ARC-OPEN-003 · **Priority:** P0 · **Ref:** research/02 §4.11, §9
@@ -3221,7 +3221,9 @@ These are view annotation and are specified in the DOC chapter. This chapter req
 **Commands.** `opening.create_wall(wall_id, u0, u1, base: {level_id, offset}, top: Level{id,offset} | Unconnected(h)) -> element_id`.
 
 **Acceptance criteria.**
-- [ ] A wall opening that follows its base and top levels grows when the top level is raised.
+- [x] A wall opening that follows its base and top levels grows when the top level is raised.
+
+*Built (2026-10-15):* `opening.create_wall` (`wall_id`, `u0`, `u1`, `base_level` defaulting to the wall's, `base_offset`, `top_constraint` defaulting to 2.1 m, `top_offset`) and `opening.edit_wall`, in straight and curved walls; refused where it leaves the wall's clear span or overlaps a door, window or another opening (and doors and windows are refused over it). It slides along the wall with `element.move`, moves and is copied with its wall and is deleted with it or its levels. Architecture › Opening › **Wall Opening** places it by hovering a wall (width and height in Properties); Properties edits its constraints, width and position. IFC: an `IfcOpeningElement` (box through the wall plus 1 mm, in the wall's frame) voiding the wall. Not yet: drag controls in elevations, mid-end faces for joins and wrapping, cased openings.
 
 ### 3.8.4 Shaft opening
 **ID:** ARC-OPEN-004 · **Priority:** P0 · **Ref:** research/02 §9
@@ -3239,8 +3241,10 @@ These are view annotation and are specified in the DOC chapter. This chapter req
 **Commands.** `opening.create_shaft(loops, base_level, base_offset?, top: Level{id,offset} | Unconnected(h), symbolic_lines?: [curve]) -> element_id`.
 
 **Acceptance criteria.**
-- [ ] A shaft from Level 1 to Roof cuts every floor between them. A floor added later in that range is cut automatically.
-- [ ] The IFC export contains one `IfcOpeningElement` per cut host, and each one is voided correctly.
+- [x] A shaft from Level 1 to Roof cuts every floor between them. A floor added later in that range is cut automatically.
+- [x] The IFC export contains one `IfcOpeningElement` per cut host, and each one is voided correctly.
+
+*Built (2026-10-15):* `opening.create_shaft` (loops or sketch curves, base level and offset, top level and offset or a height) and `opening.edit_shaft`; it cuts every Reviera floor, ceiling and footprint roof whose body its extent reaches into (computed on regeneration, so later hosts are cut too) and moves, copies and mirrors with the modify tools. Architecture › Opening › **Shaft** sketches it on the plan's level, up to the next level; plans of every level it passes draw it crossed with grips; Properties edits its extent and lists what it cuts. IFC: the proxy's body is the whole prism; each host gets a derived `IfcOpeningElement` (marked `rxd:shaft <shaft> <host>` in its Description, not loaded as an element) that is updated or removed on save. Not yet: symbolic lines, Pick Walls boundaries, toposolids (none exist yet).
 
 ### 3.8.5 Dormer opening
 **ID:** ARC-OPEN-005 · **Priority:** P1 · **Ref:** research/02 §9

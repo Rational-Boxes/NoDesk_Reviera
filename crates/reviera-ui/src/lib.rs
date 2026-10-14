@@ -28,6 +28,7 @@ mod modify;
 mod native;
 mod nav;
 mod notes;
+mod openings;
 mod overlaps;
 mod plans;
 mod railings;
@@ -1680,7 +1681,8 @@ impl Gui {
                     ("Create Ceiling Boundary", "session.floor_sketch")
                 }
                 (None, SketchKind::Deck) => ("Create Deck Outline", "session.floor_sketch"),
-                (None, SketchKind::Opening) => ("Opening", "session.floor_sketch"),
+                (None, SketchKind::Opening) => ("Vertical Opening", "session.floor_sketch"),
+                (None, SketchKind::Shaft) => ("Shaft Opening", "session.floor_sketch"),
             };
             self.ribbon.set_context(Some((label, Some(session))));
             return;
@@ -1922,7 +1924,7 @@ impl Gui {
             self.room_rows(grid, id);
             return;
         }
-        if self.note_rows(grid, id) || self.stair_rows(grid, id) {
+        if self.note_rows(grid, id) || self.stair_rows(grid, id) || self.opening_rows(grid, id) {
             return;
         }
         if let Some(d) = dimension {
@@ -2127,6 +2129,7 @@ impl Gui {
             return;
         }
         if self.grid_type_edit(property, text.clone())
+            || self.opening_edit(property, text.clone())
             || self.insert_edit(property, text.clone())
             || self.wall_edit(property, text.clone())
             || self.floor_edit(property, text.clone())
@@ -2894,6 +2897,7 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
             .with_style(PropertyGridStyle::Tooltips)
             .build();
         let notebook = AuiNotebook::builder(&frame).build();
+        wx::enable_tab_dragging(&notebook);
         let browser = TreeCtrl::builder(&frame)
             .with_style(
                 TreeCtrlStyle::Default
@@ -3453,6 +3457,18 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         }),
         "deck.create" => with(gui, |g| {
             g.start_deck_sketch();
+            focus(g);
+        }),
+        "opening.create_wall" => with(gui, |g| {
+            g.start_wall_opening_tool();
+            focus(g);
+        }),
+        "opening.create_vertical" => with(gui, |g| {
+            g.start_vertical_opening();
+            focus(g);
+        }),
+        "opening.create_shaft" => with(gui, |g| {
+            g.start_shaft();
             focus(g);
         }),
         "railing.create" => with(gui, |g| {

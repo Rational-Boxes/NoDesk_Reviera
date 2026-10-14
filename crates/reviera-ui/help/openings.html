@@ -1,30 +1,74 @@
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
 <!-- Copyright (C) 2026 Reviera contributors -->
-<h1>Vertical openings</h1>
-<p class="lead">A vertical opening cuts a floor or ceiling plumb, for example over a stair. In the
-window, openings come from the Stair tool's headroom offer; they are then reshaped with their
-grips.</p>
+<h1>Openings</h1>
+<p class="lead">Openings are holes without a door or window: a rectangular opening through a
+wall, a vertical opening through a floor, ceiling or roof, and a shaft through several floors.
+The tools are on <b>Architecture › Opening</b> (and the Architecture menu).</p>
 
-<h2 id="make">Making an opening</h2>
-<p>When a stair passes under a floor or ceiling that leaves it short of the building code's
-headroom, Reviera offers to open it over the stair's full width. Accept the offer when the stair
-is made, or later select the stair and use <b>Modify | Stairs › Stair Openings</b>. See
-<a href="reviera:help/stairs#headroom">Stairs</a>.</p>
-<p>Scripts and agents can make openings of any outline with
-<code>opening.create_vertical</code>.</p>
+<h2 id="wall">Wall openings</h2>
+<ol>
+  <li>Click <b>Architecture › Opening › Wall Opening</b>
+    <a href="reviera:action/opening.create_wall">Wall Opening</a>.</li>
+  <li>Set the <b>Width</b> and <b>Height</b> in Properties if 1000 × 2100 is not what you want.</li>
+  <li>Hover a wall in a plan or a 3D view: the opening's outline follows the cursor along the
+    wall, kept inside it. Click to cut it. The tool repeats until <kbd>Esc</kbd>.</li>
+</ol>
+<p>A wall opening goes through the wall's whole thickness, square to its line, in straight and
+curved walls. It may not overlap the wall's doors, windows or other openings.</p>
+<p>Select it in a plan by its outline. Properties sets its <b>Base Constraint</b> and <b>Base
+Offset</b>, its <b>Top Constraint</b> (a level, or Unconnected with a height) and <b>Top
+Offset</b>, its <b>Width</b>, and its place <b>From Wall Start</b> or <b>From Wall End</b>. An
+opening whose top follows a level grows when the level is raised. Moving it slides it along its
+wall; it moves and is copied with its wall, and is deleted with it.
+<code>opening.create_wall</code>, <code>opening.edit_wall</code></p>
+
+<h2 id="make">Vertical openings</h2>
+<ol>
+  <li>Open the plan of the level (a ceiling plan to cut a ceiling).</li>
+  <li>Click <b>Architecture › Opening › Vertical</b>
+    <a href="reviera:action/opening.create_vertical">Vertical</a>. Sketch mode starts with
+    the Rectangle tool; lines, arcs and circles work too (see
+    <a href="reviera:help/sketch">Sketch mode</a>).</li>
+  <li>Click <b>Finish Edit Mode</b>. The opening cuts the floor on the level that the sketch
+    overlaps most (in a ceiling plan, the ceiling); if no floor is there, the roof it overlaps.</li>
+</ol>
+<p>The opening's sides are plumb, whatever the slope: in a roof it makes a skylight-shaped hole
+with vertical sides. A loop partly outside a floor notches the floor's edge. In a roof, an
+opening must lie within one roof face (not across a ridge or hip).</p>
+<p>Stairs also make vertical openings: when a stair passes under a floor or ceiling that leaves it
+short of the building code's headroom, Reviera offers to open it. See
+<a href="reviera:help/stairs#headroom">Stairs</a>. <code>opening.create_vertical</code></p>
+
+<h2 id="shaft">Shafts</h2>
+<ol>
+  <li>Open the plan of the shaft's lowest level.</li>
+  <li>Click <b>Architecture › Opening › Shaft</b>
+    <a href="reviera:action/opening.create_shaft">Shaft</a> and sketch its outline.</li>
+  <li>Click <b>Finish Edit Mode</b>. The shaft runs from this level up to the next one.</li>
+</ol>
+<p>A shaft cuts every floor, ceiling and roof whose body its height reaches into, including ones
+added later; walls are not cut. Select it in a plan of any level it passes and set its base and
+top in Properties (for example, a top level higher up). Properties also lists what it cuts.
+<code>opening.create_shaft</code>, <code>opening.edit_shaft</code></p>
 
 <h2 id="plans">In plans</h2>
-<p>Plans of the host's level draw each opening as its outline crossed corner to corner. Click the
-outline or the cross to select it.</p>
+<p>Vertical openings and shafts are drawn as their outline crossed corner to corner, on the
+plans of their host's level (a shaft on every level it passes). Wall openings show as the gap in
+the cut wall, with their outline. Click the outline or the cross to select one.</p>
 
-<h2 id="grips">Reshaping an opening</h2>
+<h2 id="grips">Reshaping</h2>
 <ol>
-  <li>Select the opening in a plan.</li>
+  <li>Select a vertical opening or shaft in a plan.</li>
   <li>Drag a corner grip to move the corner, or an edge grip to move that edge across.</li>
 </ol>
-<p>Each drag is one undo step. An opening partly outside its floor notches the floor's edge. The
-opening moves with its floor or ceiling, and is deleted with it. <code>opening.set_loops</code></p>
-<p>In IFC the slab stays whole and an <code>IfcOpeningElement</code> voids it.</p>
-<p class="note">Not yet available: a sketch tool for openings in the window, openings in roofs,
-shafts through several floors, and guards placed round an opening by themselves (a railing can be
+<p>Each drag is one undo step. A vertical opening moves with its floor, ceiling or roof and is
+deleted with it. <code>opening.set_loops</code></p>
+
+<h2 id="ifc">In IFC</h2>
+<p>Each opening is an <code>IfcOpeningElement</code> voiding its host, whose own body stays whole
+(a roof's body is written with its holes). A shaft is an <code>IfcBuildingElementProxy</code>
+(<code>PROVISIONFORVOID</code>) with the whole prism as its body, and each floor, ceiling or roof
+it cuts gets its own opening.</p>
+<p class="note">Not yet available: openings by face (at right angles to a sloped roof), openings
+in arched roofs and domes, and guards placed round an opening by themselves (a railing can be
 sketched along its edge).</p>

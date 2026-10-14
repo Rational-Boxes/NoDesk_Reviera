@@ -13,6 +13,7 @@ unsafe extern "C" {
         callback: extern "C" fn(*mut c_void, c_int, c_int),
         user: *mut c_void,
     );
+    fn reviera_nb_set_style(notebook: *mut c_void);
     fn reviera_nb_split(notebook: *mut c_void, page: usize, direction: c_int);
     fn reviera_nb_unsplit_all(notebook: *mut c_void);
     fn reviera_nb_page_index(notebook: *mut c_void, page: *mut c_void) -> c_int;
@@ -95,6 +96,12 @@ pub fn on_tab_event(notebook: &AuiNotebook, f: impl Fn(TabEvent) + 'static) {
     // Lives as long as the notebook, which lives as long as the main window.
     let user = Box::into_raw(Box::new(Box::new(f) as Handler));
     unsafe { reviera_nb_bind(ptr(notebook), trampoline, user as *mut c_void) }
+}
+
+/// Lets the view tabs be dragged: reordered within a tab group, moved between groups, and
+/// dropped at an edge to tile.
+pub fn enable_tab_dragging(notebook: &AuiNotebook) {
+    unsafe { reviera_nb_set_style(ptr(notebook)) }
 }
 
 #[derive(Debug, Clone, Copy)]

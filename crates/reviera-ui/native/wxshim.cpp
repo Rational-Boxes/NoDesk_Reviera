@@ -51,6 +51,16 @@ void reviera_nb_bind(void* notebook, reviera_nb_callback callback, void* user) {
     });
 }
 
+// The view notebook's style: tabs on top that can be dragged to reorder them, between tab
+// groups, and to an edge to tile them (wxDragon's default style predates wxWidgets 3.3's flag
+// values and leaves tab moving off).
+void reviera_nb_set_style(void* notebook) {
+    auto* nb = static_cast<wxAuiNotebook*>(notebook);
+    nb->SetWindowStyleFlag(wxAUI_NB_TOP | wxAUI_NB_TAB_SPLIT | wxAUI_NB_TAB_MOVE |
+                           wxAUI_NB_SCROLL_BUTTONS | wxAUI_NB_WINDOWLIST_BUTTON);
+    nb->Refresh();
+}
+
 // Moves `page` into a new tab group at `direction` (1 left, 2 right, 3 top, 4 bottom).
 void reviera_nb_split(void* notebook, size_t page, int direction) {
     auto* nb = static_cast<wxAuiNotebook*>(notebook);

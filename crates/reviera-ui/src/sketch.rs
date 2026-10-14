@@ -62,8 +62,11 @@ pub enum SketchKind {
     Roof,
     /// A deck's outline (a deck is a floor with boards and framing, ARC-DECK-001).
     Deck,
-    /// A vertical opening's loop (ARC-OPEN-002): edited by its grips only.
+    /// A vertical opening's loops (ARC-OPEN-002): sketched new (Architecture › Opening ›
+    /// Vertical), then edited by its grips.
     Opening,
+    /// A shaft's loops (ARC-OPEN-004): sketched new, then edited by its grips.
+    Shaft,
 }
 
 /// A sketch curve: a line, the wall face it was picked from, and for roofs whether it is a
@@ -327,7 +330,8 @@ impl Gui {
             (None, SketchKind::Slab(SlabKind::Ceiling)) => "Ceiling",
             (None, SketchKind::Roof) => "Roof by Footprint",
             (None, SketchKind::Deck) => "Deck",
-            (None, SketchKind::Opening) => "Opening",
+            (None, SketchKind::Opening) => "Vertical Opening",
+            (None, SketchKind::Shaft) => "Shaft",
         };
         let text = format!(
             "{verb} · {what} · {} curves · Finish ✓ or Cancel ✗ on the ribbon",
@@ -750,8 +754,52 @@ impl Gui {
                 "deck.create",
                 json!({ "outline": [curves], "level_id": s.level }),
             ),
-            // Openings are made by their tools and edited by their grips, not sketched.
-            (None, SketchKind::Opening) => return,
+            // The host: the floor (or in a ceiling plan the ceiling) on the plan's level it
+            // overlaps most, else a roof.
+            (None, SketchKind::Opening) => {
+                let store = self.store_now();
+                let level = store
+                    .as_ref()
+                    .and_then(|st| st.get(s.level))
+                    .map(|l| l.guid().to_string())
+                    .unwrap_or_default();
+                let loops = sketch_loops(&s.curves);
+                let ceiling = self
+                    .active_view()
+                    .and_then(|v| v.plan.as_ref())
+                    .is_some_and(|p| p.ceiling);
+                let host = store.as_ref().and_then(|st| {
+                    reviera_core::slab_openings::host_for(st, &level, &loops, ceiling)
+                });
+                let Some(host) = host else {
+                    return frame.set_status_text(
+                        "The opening must overlap a floor or ceiling on this level, or a roof — the sketch stays open",
+                        0,
+                    );
+                };
+                (
+                    "opening.create_vertical",
+                    json!({ "host_id": host, "curves": curves }),
+                )
+            }
+            // From this level up to the next one (or 3 m when there is none).
+            (None, SketchKind::Shaft) => {
+                let top = self.store_now().and_then(|st| {
+                    let z = reviera_core::levels::elevation(st.get(s.level)?);
+                    reviera_core::levels::list(&st)
+                        .into_iter()
+                        .find(|l| l.elevation > z + 1e-6)
+                        .map(|l| l.id)
+                });
+                let top = match top {
+                    Some(l) => json!({ "level": l }),
+                    None => json!({ "unconnected": 3.0 }),
+                };
+                (
+                    "opening.create_shaft",
+                    json!({ "curves": curves, "base_level": s.level, "top_constraint": top }),
+                )
+            }
         };
         match self.app.execute(command, args, &super::user()) {
             Ok(out) => {
@@ -1204,7 +1252,46 @@ pub(crate) fn edit_command(
                 json!({ "opening_id": host, "loops": [corners] }),
             )
         }
+        SketchKind::Shaft => {
+            let corners: Vec<Value> = curves.iter().map(|c| c["line"]["start"].clone()).collect();
+            (
+                "opening.edit_shaft",
+                json!({ "shaft_id": host, "loops": [corners] }),
+            )
+        }
     }
+}
+
+/// The sketch's curves as closed loops of points (curved ones sampled), chained end to end.
+pub(crate) fn sketch_loops(curves: &[Curve]) -> Vec<Vec<[f64; 2]>> {
+    let mut left: Vec<Vec<[f64; 2]>> = curves.iter().map(Curve::points).collect();
+    let near = |a: [f64; 2], b: [f64; 2]| (a[0] - b[0]).hypot(a[1] - b[1]) < 1e-6;
+    let mut out = Vec::new();
+    while let Some(first) = left.pop() {
+        let start = first[0];
+        let mut ring = first;
+        while !near(*ring.last().expect("points"), start) {
+            let end = *ring.last().expect("points");
+            let Some(i) = left
+                .iter()
+                .position(|c| near(c[0], end) || near(*c.last().expect("points"), end))
+            else {
+                break;
+            };
+            let mut c = left.remove(i);
+            if !near(c[0], end) {
+                c.reverse();
+            }
+            ring.extend(c.into_iter().skip(1));
+        }
+        if near(*ring.last().expect("points"), start) {
+            ring.pop();
+        }
+        if ring.len() >= 3 {
+            out.push(ring);
+        }
+    }
+    out
 }
 
 impl Gui {
@@ -1239,6 +1326,26 @@ impl Gui {
                 })
                 .collect();
             return Some((SketchKind::Opening, level, curves));
+        }
+        // A shaft: its (first) loop, on its base level.
+        if let Some(r) = reviera_core::slab_openings::shaft_recipe(e) {
+            let level = reviera_core::GlobalId::parse(&r.extent.base_level)
+                .and_then(|g| store.find_by_guid(&g))
+                .unwrap_or(ElementId(0));
+            let ring = r.loops.first()?;
+            let curves = (0..ring.len())
+                .map(|i| {
+                    Curve::curved(
+                        Line {
+                            start: ring[i],
+                            end: ring[(i + 1) % ring.len()],
+                        },
+                        Vec::new(),
+                        None,
+                    )
+                })
+                .collect();
+            return Some((SketchKind::Shaft, level, curves));
         }
         let sketch = reviera_core::sketch::sketch_of(e)?;
         let roof = reviera_core::roofs::roof_recipe(e);

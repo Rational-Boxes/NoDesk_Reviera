@@ -770,6 +770,24 @@ keys = "ST"
 help = "Draw a stair in a plan: click the start and end of each run; landings join the runs"
 
 [[action]]
+id = "opening.create_wall"
+label = "Wall Opening"
+icon = "wall_opening"
+help = "Cut a plain rectangular opening through a wall: hover the wall and click (set its width and height in Properties)"
+
+[[action]]
+id = "opening.create_vertical"
+label = "Vertical"
+icon = "vertical_opening"
+help = "Sketch an opening cut plumb through a floor, ceiling or roof on this plan's level"
+
+[[action]]
+id = "opening.create_shaft"
+label = "Shaft"
+icon = "shaft"
+help = "Sketch a shaft that cuts every floor, ceiling and roof from this level up to the next"
+
+[[action]]
 id = "deck.create"
 label = "Deck"
 icon = "deck"
@@ -909,6 +927,14 @@ tools = [
   { action = "stair.spiral", size = "large" },
   { action = "railing.create", size = "large" },
   { action = "deck.create", size = "large" },
+]
+
+[[tab.panel]]
+label = "Opening"
+tools = [
+  { action = "opening.create_wall", size = "large" },
+  { action = "opening.create_vertical", size = "small" },
+  { action = "opening.create_shaft", size = "small" },
 ]
 
 [[tab.panel]]
@@ -1248,6 +1274,7 @@ items = [
   "wall.create", "door.place", "window.place", "floor.create", "floor.edit_boundary",
   "ceiling.create", "ceiling.edit_boundary", "roof.create_footprint", "roof.edit_footprint", "-",
   "room.place", "room.place_automatically", "-",
+  "opening.create_wall", "opening.create_vertical", "opening.create_shaft", "-",
   "grid.create", "level.create",
 ]
 

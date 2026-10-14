@@ -194,10 +194,20 @@ Create … Boundary* tab:
   (its edges follow the walls' finish faces, round rooms included, and move with them), or
   Sketch Ceiling. Ceilings have types and sit 2600 mm above their level by default. Saved as
   `IfcCovering` (CEILING) (`ceiling.create_auto`, `ceiling.create`, `ceiling.edit_boundary`).
-- **Vertical openings**: a floor or ceiling is cut plumb by an opening's loops; one partly outside
-  notches the edge. Plans draw it crossed corner to corner; selected, its corner and edge grips
-  reshape it. It moves with its host and goes with it; the IFC keeps the slab whole and voids it
-  with an `IfcOpeningElement` (`opening.create_vertical`, `opening.set_loops`; ARC-OPEN-002).
+- **Openings** (Architecture › Opening):
+  - **Wall Opening**: hover a wall and click to cut a rectangular hole of the tool's width and
+    height through a straight or curved wall. Its base and top follow levels; it slides along the
+    wall and moves, copies and goes with it (`opening.create_wall`, `opening.edit_wall`;
+    ARC-WALL-012, ARC-OPEN-003).
+  - **Vertical**: sketch loops in a plan; Finish cuts the floor (or ceiling) on the level they
+    overlap most, else a roof, plumb; one partly outside notches the edge. Plans draw it crossed
+    corner to corner; its grips reshape it; it moves with its host and goes with it
+    (`opening.create_vertical`, `opening.set_loops`; ARC-OPEN-002).
+  - **Shaft**: sketch loops; the shaft cuts every floor, ceiling and roof between its base and top
+    levels, including ones added later (`opening.create_shaft`, `opening.edit_shaft`;
+    ARC-OPEN-004).
+  - IFC: an `IfcOpeningElement` voids each host, whose own body stays whole; a shaft is an
+    `IfcBuildingElementProxy` (PROVISIONFORVOID) with one derived opening per host.
 
 #### Roofs
 
@@ -400,9 +410,11 @@ Create … Boundary* tab:
 
 - **Tabbed views**: several models open side by side, each view in its own tab with a `wgpu`
   viewport (Window › New 3D View, Tile Views, Tab Views, Ctrl+Tab; Tile Views remembers its
-  arrangement). Dockable Properties, Project Browser and Model Tree panes.
+  arrangement). Drag a tab to reorder it, onto another group's tabs to move it there, or to an
+  edge of the view area to tile it. Dockable Properties, Project Browser and Model Tree panes.
 - **Ribbon**: Architecture (Wall, Arc Wall, Spline Wall, Door, Window, Floor, Ceiling, Roof,
-  Arched Roof, Dome, Room, Stair, Spiral Stair, Railing, Deck, Level, Grid), Annotate
+  Arched Roof, Dome, Room, Stair, Spiral Stair, Railing, Deck, Wall Opening, Vertical, Shaft,
+  Level, Grid), Annotate
   (dimensions, text, tags), View (views, sheets, navigation, coordination, section box and
   slices, hide/isolate, windows, panes) and Modify tabs, with a Quick Access Toolbar above.
   While elements are selected a contextual *Modify | <category>* tab adds their tools (for
@@ -465,11 +477,11 @@ nearest gaps in what is built:
   outlines are written as polylines), the arch above the cut dashed in plans, and built-in
   shaped types ready in the type list (today a type is duplicated and its Shape set); gate
   swing arcs in plan.
-- **Roofs**: openings and skylights, slope arrows, picking single eave edges in the window,
+- **Roofs**: skylights (vertical openings and shafts do cut roofs), slope arrows, picking single eave edges in the window,
   dormer openings as separate IFC opening elements. Gutters and downspouts are planned as part
   of plumbing (MEP-PIPE-010).
-- **Openings**: the Opening › Vertical sketch tool, openings in roofs, shafts and by face, and
-  guards around a stair opening (a Pick Edges railing can follow it).
+- **Openings**: openings by face (square to a sloped roof), across roof ridges and in arched
+  roofs and domes, and guards around a stair opening (a Pick Edges railing can follow it).
 - **Stairs and railings**: winders, supports, editing runs with handles, continuous handrails
   and baluster families.
 - **Decks**: ledgers, span tables, breakers and board overrides.
