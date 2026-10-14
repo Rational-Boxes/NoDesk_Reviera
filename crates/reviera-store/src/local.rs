@@ -603,12 +603,20 @@ impl LocalProject {
             // Attributes IFC4 requires of door and window types.
             if let Some(t) = inserts::insert_type(e) {
                 let (attr, value) = match t.kind() {
-                    Some(inserts::Kind::Door) => ("OperationType", "NOTDEFINED"),
+                    // A door type's operation (a single swing's hand is the occurrence's).
+                    Some(inserts::Kind::Door) => (
+                        "OperationType",
+                        match t.operation {
+                            inserts::Operation::SingleSwing => "NOTDEFINED",
+                            op => op.ifc(true),
+                        },
+                    ),
                     _ => ("PartitioningType", "SINGLE_PANEL"),
                 };
-                if self.ifc.attribute(step, attr)? == AttrValue::Null {
-                    self.ifc
-                        .set_attribute(step, attr, &AttrValue::Enum(value.into()))?;
+                let current = self.ifc.attribute(step, attr)?;
+                let wanted = AttrValue::Enum(value.into());
+                if current == AttrValue::Null || (attr == "OperationType" && current != wanted) {
+                    self.ifc.set_attribute(step, attr, &wanted)?;
                 }
             }
             if core_grids::is_grid_type(e) {
@@ -928,6 +936,7 @@ impl LocalProject {
                 let void = geometry::ProfileSolid {
                     profile,
                     y: [-half_t, half_t],
+                    plan: false,
                 };
                 geometry::write_profiles(&mut self.ifc, opening, &frame, &[void], scale, contexts)?;
             } else {
@@ -953,6 +962,7 @@ impl LocalProject {
                             holes: s.holes.iter().map(Vec::as_slice).collect(),
                         },
                         y: s.y,
+                        plan: s.plan,
                     })
                     .collect();
                 geometry::write_profiles(&mut self.ifc, step, &frame, &profiles, scale, contexts)?;
@@ -1001,13 +1011,10 @@ impl LocalProject {
                 attrs.push(("UserDefinedPartitioningType", user));
             }
             if ifc4 && p.kind == inserts::Kind::Door {
-                // Hinge on the left seen from the swing side.
+                // Hinge on the left seen from the swing side; double, revolving and sliding by
+                // their operation (ARC-DOOR-002).
                 let left = p.recipe.flip_hand == p.recipe.flip_facing;
-                let op = if left {
-                    "SINGLE_SWING_LEFT"
-                } else {
-                    "SINGLE_SWING_RIGHT"
-                };
+                let op = p.ty.operation.ifc(left);
                 attrs.push(("OperationType", AttrValue::Enum(op.into())));
             }
             for (attr, v) in attrs {

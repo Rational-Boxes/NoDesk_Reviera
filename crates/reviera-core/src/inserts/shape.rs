@@ -81,6 +81,8 @@ macro_rules! names {
     };
 }
 
+pub(crate) use names;
+
 names!(Shape,
     Rectangle => "rectangle", "Rectangle";
     Round => "round", "Round";

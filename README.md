@@ -149,6 +149,11 @@ ribbon's tools, the command shell, Lua and MCP alike.
   the frame (at a constant width along arcs) and the glass follow the outline; plans cut it at
   its true width at the cut height; fitting keeps a round window round and a semicircular or
   Gothic head's shape.
+- **Door operations** (ARC-DOOR-002): a door type opens as a single or double swing, a
+  revolving door (its width the drum) or an automatic bi-parting sliding door, with solid or
+  glass storefront leaves and an automatic operator. A sliding door takes the wall its leaves
+  slide over (fitting, refusals and a *slide space* virtual volume); plans draw each kind's
+  symbol; IFC writes the operation type and `HasDrive`.
 - Walls are cut, plans show door swings, and each new door or window gets the next Mark.
 - **IFC**: `IfcDoor`/`IfcWindow` filling an `IfcOpeningElement` that voids the wall (`door.place`,
   `window.place`, `insert.set_position`, `insert.set_sill_height`, `insert.set_size`,
@@ -422,9 +427,11 @@ Create … Boundary* tab:
 
 `test-data/samples` holds Reviera's own sample models. Each is rebuilt by a Lua script and
 checked by a test (no overlaps, no clearance intrusions, saves and reopens), and each has a
-walkthrough (`house.md`, `observatory.md`, `csg.md`, `manor.md`) giving the manual steps to build it in the
+walkthrough (`house.md`, `observatory.md`, `csg.md`, `manor.md`, `storefront.md`) giving the manual steps to build it in the
 window, which confirms that every operation it uses has its UI:
 
+- **Storefront doors** (`storefront.ifc`): a shop front with a revolving door, an automatic
+  sliding door, a pair of glass swing doors and an automatic storefront door, under ADA 2010.
 - **Manor with tower** (`manor.ifc`), the demonstration model: a two-storey house with an arched
   door, round-top, Gothic and oculus windows, rooms, ceilings, a hipped roof with eaves and a
   dormer, and a straight stair that completes itself and opens the ceiling and floor over it

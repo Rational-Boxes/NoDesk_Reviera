@@ -30,7 +30,9 @@ use crate::levels::next_name;
 use crate::store::Store;
 use crate::walls::{self, RECIPE_KEY, WallGeometry, openings};
 
+pub mod doors;
 pub mod shape;
+pub use doors::{Operation, Panel};
 pub use shape::{HeadProfile, Shape};
 
 pub const INSERT_RECIPE: &str = "recipe.insert";
@@ -121,6 +123,15 @@ pub struct InsertType {
     /// Glazing bars: radiating in round tops, fans and round windows, upright in the rest.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub muntins: Option<u32>,
+    /// How a door opens (ARC-DOOR-002).
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub operation: Operation,
+    /// A door's leaves: solid or glass storefront.
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub panel: Panel,
+    /// A powered operator (an automatic door).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub automatic: bool,
 }
 
 fn is_default<T: Default + PartialEq>(v: &T) -> bool {
@@ -172,6 +183,9 @@ impl InsertType {
             left_height: None,
             right_height: None,
             muntins: None,
+            operation: Operation::SingleSwing,
+            panel: Panel::Solid,
+            automatic: false,
         }
     }
 
@@ -200,6 +214,9 @@ impl InsertType {
                 "head_profile",
                 "rise",
                 "radius_ratio",
+                "operation",
+                "panel",
+                "automatic",
             ],
             _ => &[
                 "width",
@@ -337,6 +354,9 @@ impl Placed {
     /// outline at the frame width (a door's is open at the floor), then the glass with its
     /// glazing bars, or the door panel. Empty for rectangles, which are [`Placed::boxes`].
     pub fn solids(&self) -> Vec<Solid> {
+        if self.kind == Kind::Door && self.ty.operation == Operation::Revolving {
+            return self.revolving();
+        }
         if !self.ty.shaped() {
             return Vec::new();
         }
@@ -354,7 +374,7 @@ impl Placed {
                 let bars =
                     shape::muntins(t, t.width, t.height, &glass, t.muntins.unwrap_or(0), 0.03);
                 out.push(Solid::new(outline, vec![glass.clone()], [-d, d], false));
-                out.push(Solid::new(glass, Vec::new(), [-0.005, 0.005], false));
+                out.push(Solid::new(glass, Vec::new(), [-0.005, 0.005], false).of(Material::Glass));
                 for bar in bars {
                     out.push(Solid::new(bar, Vec::new(), [-0.012, 0.012], false));
                 }
@@ -379,7 +399,19 @@ impl Placed {
                 } else {
                     [face, face + t.panel_thickness]
                 };
-                out.push(Solid::new(inner, Vec::new(), panel_y, true));
+                if t.operation == Operation::DoubleSwing {
+                    // A pair: the panel split down the middle.
+                    let far = t.width + t.height;
+                    for (x0, x1) in [(-far, -0.002), (0.002, far)] {
+                        let half =
+                            shape::clip_to(&inner, &[[x0, -far], [x1, -far], [x1, far], [x0, far]]);
+                        if half.len() >= 3 {
+                            out.push(Solid::new(half, Vec::new(), panel_y, true));
+                        }
+                    }
+                } else {
+                    out.push(Solid::new(inner, Vec::new(), panel_y, true));
+                }
             }
         }
         out
@@ -414,69 +446,256 @@ impl Placed {
 
     /// The boxes of the insert in its local frame: (x, y, z) intervals, and whether the box is
     /// the door panel (drawn in 3D only; plans show the swing instead).
-    pub fn boxes(&self) -> Vec<([[f64; 2]; 3], bool)> {
+    pub fn tagged_boxes(&self) -> Vec<([[f64; 2]; 3], bool, Material)> {
         let t = &self.ty;
         let (w, h, f) = (t.width / 2.0, t.height, t.frame_width);
         match self.kind {
             Kind::Door => {
+                if t.operation == Operation::Revolving {
+                    // A drum of plan prisms (`solids`), with no frame of boxes.
+                    return Vec::new();
+                }
                 let half = self.wall.width / 2.0;
                 let depth = [-half, half];
-                let s = self.facing();
-                let face = s * half;
-                let panel_y = if s > 0.0 {
-                    [face - t.panel_thickness, face]
-                } else {
-                    [face, face + t.panel_thickness]
-                };
-                vec![
-                    ([[-w, -w + f], depth, [0.0, h]], false),
-                    ([[w - f, w], depth, [0.0, h]], false),
-                    ([[-w + f, w - f], depth, [h - f, h]], false),
-                    ([[-w + f, w - f], panel_y, [0.0, h - f]], true),
-                ]
+                let mut out = vec![
+                    ([[-w, -w + f], depth, [0.0, h]], false, Material::Body),
+                    ([[w - f, w], depth, [0.0, h]], false, Material::Body),
+                    ([[-w + f, w - f], depth, [h - f, h]], false, Material::Body),
+                ];
+                // The leaves (closed), then the operator of an automatic door.
+                for (x, y, z, plan_hidden) in self.leaves() {
+                    out.extend(leaf_boxes(t.panel, x, y, z, plan_hidden));
+                }
+                if t.automatic {
+                    let (x, y) = self.operator();
+                    out.push((
+                        [x, y, [h, h + doors::OPERATOR_HEIGHT]],
+                        false,
+                        Material::Metal,
+                    ));
+                }
+                out
             }
             Kind::Window => {
                 let d = t.frame_depth.min(self.wall.width) / 2.0;
                 let depth = [-d, d];
                 vec![
-                    ([[-w, -w + f], depth, [0.0, h]], false),
-                    ([[w - f, w], depth, [0.0, h]], false),
-                    ([[-w + f, w - f], depth, [0.0, f]], false),
-                    ([[-w + f, w - f], depth, [h - f, h]], false),
-                    ([[-w + f, w - f], [-0.005, 0.005], [f, h - f]], false),
+                    ([[-w, -w + f], depth, [0.0, h]], false, Material::Body),
+                    ([[w - f, w], depth, [0.0, h]], false, Material::Body),
+                    ([[-w + f, w - f], depth, [0.0, f]], false, Material::Body),
+                    ([[-w + f, w - f], depth, [h - f, h]], false, Material::Body),
+                    (
+                        [[-w + f, w - f], [-0.005, 0.005], [f, h - f]],
+                        false,
+                        Material::Glass,
+                    ),
                 ]
             }
         }
     }
 
-    /// The insert's meshes in project coordinates: the frame (and glass), and the door panel.
-    pub fn meshes(&self) -> Vec<(Mesh, bool)> {
-        let mut frame = (Vec::new(), Vec::new());
-        let mut panel = (Vec::new(), Vec::new());
-        for sol in self.solids() {
-            // Extruded in (x, z, y) and turned into the insert's frame: swapping two axes
-            // mirrors, so the triangles turn round.
-            let (v, i) = crate::bodies::extrude(&sol.outer, &sol.holes, sol.y[0], sol.y[1]);
-            let target: &mut Mesh = if sol.panel { &mut panel } else { &mut frame };
-            let base = target.0.len() as u32;
-            target
-                .0
-                .extend(v.into_iter().map(|[x, z, y]| self.world([x, y, z])));
-            for t in i.chunks(3) {
-                target.1.extend([t[0] + base, t[2] + base, t[1] + base]);
+    /// The boxes of the insert in its local frame: (x, y, z) intervals, and whether the box is
+    /// drawn in 3D only (a swinging leaf; plans show its swing).
+    pub fn boxes(&self) -> Vec<([[f64; 2]; 3], bool)> {
+        self.tagged_boxes()
+            .into_iter()
+            .map(|(b, hidden, _)| (b, hidden))
+            .collect()
+    }
+
+    /// A rectangular door's leaves, closed, in its local frame: (x, y, z) intervals and whether
+    /// they are drawn in 3D only (swinging leaves; plans show their swing). Sliding leaves ride
+    /// on the face away from the facing side, past each jamb onto the wall.
+    pub fn leaves(&self) -> Vec<Leaf> {
+        let t = &self.ty;
+        let (w, h, f) = (t.width / 2.0, t.height, t.frame_width);
+        let half = self.wall.width / 2.0;
+        let s = self.facing();
+        let face = s * half;
+        let panel_y = if s > 0.0 {
+            [face - t.panel_thickness, face]
+        } else {
+            [face, face + t.panel_thickness]
+        };
+        match t.operation {
+            Operation::SingleSwing => vec![([-w + f, w - f], panel_y, [0.0, h - f], true)],
+            Operation::DoubleSwing => vec![
+                ([-w + f, -0.002], panel_y, [0.0, h - f], true),
+                ([0.002, w - f], panel_y, [0.0, h - f], true),
+            ],
+            Operation::Sliding => {
+                let y = self.slide_track();
+                vec![
+                    ([-w + f - SLIDE_LAP, 0.0], y, [0.0, h - f], false),
+                    ([0.0, w - f + SLIDE_LAP], y, [0.0, h - f], false),
+                ]
             }
+            Operation::Revolving => Vec::new(),
         }
-        for ([x, y, z], is_panel) in self.boxes().into_iter().filter(|_| !self.ty.shaped()) {
-            let quad = [[x[0], y[0]], [x[1], y[0]], [x[1], y[1]], [x[0], y[1]]];
-            let world = quad.map(|[a, b]| {
-                let p = self.world([a, b, 0.0]);
-                [p[0], p[1]]
-            });
-            let (v, i) = walls::prism(&world, self.z0 + z[0], self.z0 + z[1]);
-            let target: &mut Mesh = if is_panel { &mut panel } else { &mut frame };
+    }
+
+    /// The plane sliding leaves ride in: just off the wall face away from the facing side.
+    fn slide_track(&self) -> [f64; 2] {
+        let back = -self.facing() * self.wall.width / 2.0;
+        let dir = -self.facing();
+        let (a, b) = (
+            back + dir * 0.015,
+            back + dir * (0.015 + self.ty.panel_thickness.max(0.04)),
+        );
+        [a.min(b), a.max(b)]
+    }
+
+    /// How far a sliding door's leaves travel past each jamb when open: a leaf's width.
+    pub fn slide_travel(&self) -> f64 {
+        if self.kind == Kind::Door && self.ty.operation == Operation::Sliding {
+            self.ty.width / 2.0 - self.ty.frame_width + SLIDE_LAP
+        } else {
+            0.0
+        }
+    }
+
+    /// The stretch of wall the insert takes, along it: its opening, and for a sliding door the
+    /// wall its leaves slide over (ARC-DOOR-002).
+    pub fn extent(&self) -> [f64; 2] {
+        let c = self.cut();
+        let more = self.slide_travel();
+        [c.x[0] - more, c.x[1] + more]
+    }
+
+    /// An automatic door's operator housing over the head, off the wall face on the leaves'
+    /// side, across their travel: its x and y intervals.
+    pub fn operator(&self) -> ([f64; 2], [f64; 2]) {
+        let w = self.ty.width / 2.0 + self.slide_travel();
+        let (face, dir) = match self.ty.operation {
+            Operation::Sliding => (-self.facing() * self.wall.width / 2.0, -self.facing()),
+            _ => (self.facing() * self.wall.width / 2.0, self.facing()),
+        };
+        let (a, b) = (face, face + dir * doors::OPERATOR_DEPTH);
+        ([-w, w], [a.min(b), a.max(b)])
+    }
+
+    /// A revolving door's drum (its width the diameter): curved glass enclosures across the
+    /// wall's line on both sides of the passage, four wings in a cross on a centre post, and a
+    /// canopy over them, as plan prisms.
+    fn revolving(&self) -> Vec<Solid> {
+        use std::f64::consts::{FRAC_PI_4, PI};
+        let t = &self.ty;
+        let r = t.width / 2.0;
+        let (h, canopy) = (t.height, 0.2);
+        let glass = 0.012;
+        let mut out = Vec::new();
+        // Enclosures: about the wall's line (the x axis), each a quarter of the circle.
+        for c in [0.0, PI] {
+            out.push(Solid::plan(
+                sector(r - glass, r, c - FRAC_PI_4, c + FRAC_PI_4),
+                [0.0, h - canopy],
+                Material::Glass,
+            ));
+        }
+        // Wings at 45° to the wall, from the post to just inside the drum.
+        let wing = 0.04;
+        for k in 0..4 {
+            let a = FRAC_PI_4 + PI / 2.0 * f64::from(k);
+            let (d, n) = (
+                [a.cos(), a.sin()],
+                [-a.sin() * wing / 2.0, a.cos() * wing / 2.0],
+            );
+            let (r0, r1) = (0.06, r - glass - 0.02);
+            out.push(Solid::plan(
+                vec![
+                    [d[0] * r0 - n[0], d[1] * r0 - n[1]],
+                    [d[0] * r1 - n[0], d[1] * r1 - n[1]],
+                    [d[0] * r1 + n[0], d[1] * r1 + n[1]],
+                    [d[0] * r0 + n[0], d[1] * r0 + n[1]],
+                ],
+                [0.01, h - canopy],
+                Material::Glass,
+            ));
+        }
+        out.push(Solid::plan(
+            sector(0.0, 0.06, 0.0, 2.0 * PI),
+            [0.0, h - canopy],
+            Material::Metal,
+        ));
+        out.push(Solid::plan(
+            sector(0.0, r, 0.0, 2.0 * PI),
+            [h - canopy, h],
+            Material::Metal,
+        ));
+        out
+    }
+
+    /// The insert's parts in project coordinates, one mesh per kind: whether it is drawn in 3D
+    /// only (a swinging leaf) and what it is drawn as (its own colour, glass or metal).
+    pub fn parts(&self) -> Vec<(Mesh, bool, Material)> {
+        let mut out: Vec<(Mesh, bool, Material)> = Vec::new();
+        let mut add = |hidden: bool, material: Material, v: Vec<[f64; 3]>, i: Vec<u32>| {
+            let at = match out.iter().position(|o| o.1 == hidden && o.2 == material) {
+                Some(k) => k,
+                None => {
+                    out.push(((Vec::new(), Vec::new()), hidden, material));
+                    out.len() - 1
+                }
+            };
+            let target = &mut out[at].0;
             let base = target.0.len() as u32;
             target.0.extend(v);
             target.1.extend(i.into_iter().map(|k| k + base));
+        };
+        for sol in self.solids() {
+            if sol.plan {
+                // A plan profile extruded up, placed point by point.
+                let to_plan = |r: &[[f64; 2]]| -> Vec<[f64; 2]> {
+                    r.iter()
+                        .map(|[x, y]| {
+                            let w = self.world([*x, *y, 0.0]);
+                            [w[0], w[1]]
+                        })
+                        .collect()
+                };
+                let holes: Vec<Vec<[f64; 2]>> = sol.holes.iter().map(|h| to_plan(h)).collect();
+                let (v, i) = crate::bodies::extrude(
+                    &to_plan(&sol.outer),
+                    &holes,
+                    self.z0 + sol.y[0],
+                    self.z0 + sol.y[1],
+                );
+                add(sol.panel, sol.material, v, i);
+                continue;
+            }
+            // Extruded in (x, z, y) and turned into the insert's frame: swapping two axes
+            // mirrors, so the triangles turn round.
+            let (v, i) = crate::bodies::extrude(&sol.outer, &sol.holes, sol.y[0], sol.y[1]);
+            let v = v
+                .into_iter()
+                .map(|[x, z, y]| self.world([x, y, z]))
+                .collect();
+            let i = i.chunks(3).flat_map(|t| [t[0], t[2], t[1]]).collect();
+            add(sol.panel, sol.material, v, i);
+        }
+        if !self.ty.shaped() {
+            for ([x, y, z], hidden, material) in self.tagged_boxes() {
+                let quad = [[x[0], y[0]], [x[1], y[0]], [x[1], y[1]], [x[0], y[1]]];
+                let world = quad.map(|[a, b]| {
+                    let p = self.world([a, b, 0.0]);
+                    [p[0], p[1]]
+                });
+                let (v, i) = walls::prism(&world, self.z0 + z[0], self.z0 + z[1]);
+                add(hidden, material, v, i);
+            }
+        }
+        out
+    }
+
+    /// The insert's meshes in project coordinates: the frame (and glass), and the door panel.
+    pub fn meshes(&self) -> Vec<(Mesh, bool)> {
+        let mut frame: Mesh = (Vec::new(), Vec::new());
+        let mut panel: Mesh = (Vec::new(), Vec::new());
+        for (m, hidden, _) in self.parts() {
+            let target = if hidden { &mut panel } else { &mut frame };
+            let base = target.0.len() as u32;
+            target.0.extend(m.0);
+            target.1.extend(m.1.into_iter().map(|k| k + base));
         }
         let mut out = vec![(frame, false)];
         if !panel.0.is_empty() {
@@ -485,33 +704,79 @@ impl Placed {
         out
     }
 
-    /// The door swing drawn in plan: the open panel and its arc (segments in plan).
+    /// A door's plan symbol (segments in plan): each swinging leaf open, with its arc; a
+    /// sliding door's arrows along the wall to where its leaves go; a revolving door's drum.
     pub fn swing(&self) -> Vec<[[f64; 2]; 2]> {
         if self.kind != Kind::Door {
             return Vec::new();
         }
         let t = &self.ty;
-        let r = t.width - 2.0 * t.frame_width;
         let s = self.facing();
         let face = s * self.wall.width / 2.0;
-        let side = if self.recipe.flip_hand { 1.0 } else { -1.0 };
-        let hinge = [side * (t.width / 2.0 - t.frame_width), face];
-        let open = [hinge[0], face + s * r];
         let p = |[x, y]: [f64; 2]| {
             let w = self.world([x, y, 0.0]);
             [w[0], w[1]]
         };
-        let mut out = vec![[p(hinge), p(open)]];
-        // From the open panel to the closed position, a quarter circle about the hinge.
-        let steps = 16;
-        let point = |k: usize| {
-            let a = std::f64::consts::FRAC_PI_2 * k as f64 / steps as f64;
-            [hinge[0] - side * r * a.sin(), face + s * r * a.cos()]
-        };
-        for k in 0..steps {
-            out.push([p(point(k)), p(point(k + 1))]);
+        let mut out = Vec::new();
+        match t.operation {
+            Operation::SingleSwing | Operation::DoubleSwing => {
+                for (hinge_x, side, r) in self.hinges() {
+                    let hinge = [hinge_x, face];
+                    out.push([p(hinge), p([hinge[0], face + s * r])]);
+                    // From the open leaf to the closed position, a quarter circle about the hinge.
+                    let steps = 16;
+                    let point = |k: usize| {
+                        let a = std::f64::consts::FRAC_PI_2 * k as f64 / steps as f64;
+                        [hinge[0] - side * r * a.sin(), face + s * r * a.cos()]
+                    };
+                    for k in 0..steps {
+                        out.push([p(point(k)), p(point(k + 1))]);
+                    }
+                }
+            }
+            Operation::Sliding => {
+                // From the middle out past each jamb, with arrowheads.
+                let y = {
+                    let tr = self.slide_track();
+                    let back = -s;
+                    (tr[0] + tr[1]) / 2.0 + back * 0.12
+                };
+                let reach = t.width / 2.0 + self.slide_travel();
+                for dir in [-1.0, 1.0] {
+                    let (a, b) = ([dir * 0.1, y], [dir * reach, y]);
+                    out.push([p(a), p(b)]);
+                    let head = 0.12;
+                    out.push([p(b), p([b[0] - dir * head, y + head / 2.0])]);
+                    out.push([p(b), p([b[0] - dir * head, y - head / 2.0])]);
+                }
+            }
+            Operation::Revolving => {
+                let r = t.width / 2.0;
+                let n = 48;
+                let at = |k: usize| {
+                    let a = std::f64::consts::TAU * k as f64 / n as f64;
+                    [r * a.cos(), r * a.sin()]
+                };
+                for k in 0..n {
+                    out.push([p(at(k)), p(at(k + 1))]);
+                }
+            }
         }
         out
+    }
+
+    /// A swinging door's leaves as (hinge x, side the leaf closes toward as -1/+1, radius).
+    pub fn hinges(&self) -> Vec<(f64, f64, f64)> {
+        let t = &self.ty;
+        let jamb = t.width / 2.0 - t.frame_width;
+        match t.operation {
+            Operation::SingleSwing => {
+                let side = if self.recipe.flip_hand { 1.0 } else { -1.0 };
+                vec![(side * jamb, side, 2.0 * jamb)]
+            }
+            Operation::DoubleSwing => vec![(-jamb, -1.0, jamb), (jamb, 1.0, jamb)],
+            _ => Vec::new(),
+        }
     }
 }
 
@@ -524,6 +789,10 @@ pub struct Solid {
     pub y: [f64; 2],
     /// The door panel (drawn in 3D only).
     pub panel: bool,
+    /// A plan profile instead: `outer` and `holes` in (x, y) and `y` the heights it spans
+    /// above the insert's bottom (a revolving door's drum).
+    pub plan: bool,
+    pub material: Material,
 }
 
 impl Solid {
@@ -533,8 +802,104 @@ impl Solid {
             holes,
             y,
             panel,
+            plan: false,
+            material: Material::Body,
         }
     }
+
+    fn plan(outer: Vec<[f64; 2]>, z: [f64; 2], material: Material) -> Self {
+        Self {
+            outer,
+            holes: Vec::new(),
+            y: z,
+            panel: false,
+            plan: true,
+            material,
+        }
+    }
+
+    fn of(mut self, material: Material) -> Self {
+        self.material = material;
+        self
+    }
+}
+
+/// A door leaf in its local frame: x, y and z intervals, and whether it is drawn in 3D only.
+pub type Leaf = ([f64; 2], [f64; 2], [f64; 2], bool);
+
+/// How far sliding leaves lap past the jambs (and so travel past them).
+const SLIDE_LAP: f64 = 0.05;
+
+/// A leaf's boxes: one solid leaf, or a storefront leaf's stiles, rails and glass.
+fn leaf_boxes(
+    panel: Panel,
+    x: [f64; 2],
+    y: [f64; 2],
+    z: [f64; 2],
+    plan_hidden: bool,
+) -> Vec<([[f64; 2]; 3], bool, Material)> {
+    if panel == Panel::Solid || x[1] - x[0] < 3.0 * doors::STILE {
+        return vec![([x, y, z], plan_hidden, Material::Body)];
+    }
+    let (st, br) = (doors::STILE, doors::BOTTOM_RAIL);
+    let mid = (y[0] + y[1]) / 2.0;
+    let glass = [mid - 0.005, mid + 0.005];
+    let metal = Material::Metal;
+    vec![
+        ([[x[0], x[0] + st], y, z], plan_hidden, metal),
+        ([[x[1] - st, x[1]], y, z], plan_hidden, metal),
+        (
+            [[x[0] + st, x[1] - st], y, [z[0], z[0] + br]],
+            plan_hidden,
+            metal,
+        ),
+        (
+            [[x[0] + st, x[1] - st], y, [z[1] - st, z[1]]],
+            plan_hidden,
+            metal,
+        ),
+        (
+            [[x[0] + st, x[1] - st], glass, [z[0] + br, z[1] - st]],
+            plan_hidden,
+            Material::Glass,
+        ),
+    ]
+}
+
+/// What a part of a door or window is drawn as: its own colour, glass or metal (storefront
+/// stiles, operators, a revolving door's post and canopy).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Material {
+    Body,
+    Glass,
+    Metal,
+}
+
+impl Material {
+    /// The suffix of its render class (`IfcDoor:glass`).
+    pub fn suffix(self) -> &'static str {
+        match self {
+            Material::Body => "",
+            Material::Glass => ":glass",
+            Material::Metal => ":metal",
+        }
+    }
+}
+
+/// A ring sector in plan: radii `r0`..`r1`, angles `a0`..`a1` (radians), counter-clockwise.
+fn sector(r0: f64, r1: f64, a0: f64, a1: f64) -> Vec<[f64; 2]> {
+    let n = ((a1 - a0).abs() / (std::f64::consts::PI / 24.0))
+        .ceil()
+        .max(2.0) as usize;
+    let at = |r: f64, k: usize| {
+        let a = a0 + (a1 - a0) * k as f64 / n as f64;
+        [r * a.cos(), r * a.sin()]
+    };
+    let mut out: Vec<[f64; 2]> = (0..=n).map(|k| at(r1, k)).collect();
+    if r0 > 1e-9 {
+        out.extend((0..=n).rev().map(|k| at(r0, k)));
+    }
+    out
 }
 
 fn find(store: &Store, guid: &str) -> Option<ElementId> {
@@ -745,16 +1110,25 @@ pub fn fit(store: &Store, p: &mut Placed) -> bool {
         if o.z[0] >= z1 - 1e-9 || o.z[1] <= z0 + 1e-9 {
             continue;
         }
-        if o.x[1] <= along + 1e-9 {
-            lo = lo.max(o.x[1]);
-        } else if o.x[0] >= along - 1e-9 {
-            hi = hi.min(o.x[0]);
+        // The wall it takes, a sliding door's travel included.
+        let ox = other.extent();
+        if ox[1] <= along + 1e-9 {
+            lo = lo.max(ox[1]);
+        } else if ox[0] >= along - 1e-9 {
+            hi = hi.min(ox[0]);
         } else {
             // The centre is inside another: no gap here.
             return false;
         }
     }
-    let gap = hi - lo;
+    // A sliding door needs its leaves' travel each side too: its extent is
+    // 2·width − 2·frame + 2·lap, so the widest that fits a gap is half of gap + 2·frame − 2·lap.
+    let sliding = p.kind == Kind::Door && p.ty.operation == Operation::Sliding;
+    let gap = if sliding {
+        (hi - lo + 2.0 * p.ty.frame_width - 2.0 * SLIDE_LAP) / 2.0
+    } else {
+        hi - lo
+    };
     if gap < min - 1e-9 {
         return false;
     }
@@ -769,7 +1143,7 @@ pub fn fit(store: &Store, p: &mut Placed) -> bool {
             p.recipe.height = Some(w);
         }
     }
-    let half = w / 2.0;
+    let half = w / 2.0 + p.slide_travel();
     p.recipe.along = along.clamp(lo + half, hi - half);
     true
 }
@@ -802,11 +1176,16 @@ pub(crate) fn check_fit(store: &Store, p: &Placed) -> Result<()> {
         .map(openings::clear_span)
         .unwrap_or([0.0, p.span()]);
     let c = p.cut();
+    let x = p.extent();
     let (bottom, top) = (p.wall.base_z, p.wall.base_z + p.wall.height);
-    if c.x[0] < span[0] - 1e-9 || c.x[1] > span[1] + 1e-9 {
+    if x[0] < span[0] - 1e-9 || x[1] > span[1] + 1e-9 {
         return Err(Error::new(
             "insert.outside_host",
-            format!("the {} does not fit along its wall", p.kind.noun()),
+            if p.slide_travel() > 0.0 {
+                "the door and the wall its leaves slide over do not fit along its wall".to_owned()
+            } else {
+                format!("the {} does not fit along its wall", p.kind.noun())
+            },
         ));
     }
     if c.z[0] < bottom - 1e-9 || c.z[1] > top + 1e-9 {
@@ -820,8 +1199,9 @@ pub(crate) fn check_fit(store: &Store, p: &Placed) -> Result<()> {
             continue;
         }
         let o = other.cut();
-        if o.x[0] < c.x[1] - 1e-9
-            && c.x[0] < o.x[1] - 1e-9
+        let ox = other.extent();
+        if ox[0] < x[1] - 1e-9
+            && x[0] < ox[1] - 1e-9
             && o.z[0] < c.z[1] - 1e-9
             && c.z[0] < o.z[1] - 1e-9
         {
@@ -915,6 +1295,52 @@ pub(crate) fn set_type_param(
             _ => Ok(f64::NAN),
         }
     };
+    // How a door opens (ARC-DOOR-002).
+    match param {
+        "operation" => {
+            let op = value.as_str().and_then(Operation::parse).ok_or_else(|| {
+                let names: Vec<&str> = Operation::ALL.iter().map(|o| o.name()).collect();
+                bad(&format!("one of {}", names.join(", ")))
+            })?;
+            if !op.swings() && t.shaped() {
+                return Err(bad("a swing for a shaped door (make it a rectangle first)"));
+            }
+            t.operation = op;
+            return write_type(txn, id, &t);
+        }
+        "panel" => {
+            t.panel = value
+                .as_str()
+                .and_then(Panel::parse)
+                .ok_or_else(|| bad("solid or glass"))?;
+            return write_type(txn, id, &t);
+        }
+        "automatic" => {
+            let on = match value {
+                Value::Bool(b) => *b,
+                Value::String(v) => matches!(
+                    v.trim().to_lowercase().as_str(),
+                    "true" | "yes" | "1" | "on"
+                ),
+                Value::Number(n) => n.as_f64().unwrap_or(0.0) != 0.0,
+                _ => return Err(bad("true or false")),
+            };
+            t.automatic = on;
+            write_type(txn, id, &t)?;
+            // Pset_DoorCommon.HasDrive says it is powered.
+            return txn.modify(id, |e| {
+                if on {
+                    e.params.insert(
+                        "Pset_DoorCommon.HasDrive".into(),
+                        json!({ "type": "IfcBoolean", "value": true }),
+                    );
+                } else {
+                    e.params.remove("Pset_DoorCommon.HasDrive");
+                }
+            });
+        }
+        _ => {}
+    }
     // The shape's own values (ARC-WIN-002).
     match param {
         "shape" => {
@@ -924,6 +1350,9 @@ pub(crate) fn set_type_param(
             })?;
             if t.kind() == Some(Kind::Door) && !shape.for_doors() {
                 return Err(bad("rectangle or round_top for doors"));
+            }
+            if shape != Shape::Rectangle && !t.operation.swings() {
+                return Err(bad("a rectangle for a revolving or sliding door"));
             }
             t.shape = shape;
             // A round window's diameter is both its width and its height.
@@ -1043,9 +1472,9 @@ fn check_all(store: &Store, which: impl Fn(&Placed) -> bool) -> Result<()> {
 pub struct PlaceParams {
     /// A door type (window type for `window.place`); omitted, the project's default.
     pub type_id: Option<ElementRef>,
-    /// The host wall (a Reviera wall).
+    /// The host wall (a Reviera wall); omitted, the one wall at `point`.
     #[serde(alias = "host_id")]
-    pub host_wall_id: ElementRef,
+    pub host_wall_id: Option<ElementRef>,
     /// Distance of the centre from the wall's start, along the wall (accepts units).
     #[schemars(extend("x-reviera-data-type" = "length"))]
     pub point_along: Option<f64>,
@@ -1075,9 +1504,20 @@ pub(crate) fn place(
     p: PlaceParams,
 ) -> Result<ElementId> {
     let store = txn.store().clone();
-    let host = store
-        .resolve(&p.host_wall_id)
-        .ok_or_else(|| Error::new("element.not_found", "no such wall"))?;
+    let host = match &p.host_wall_id {
+        Some(r) => store
+            .resolve(r)
+            .ok_or_else(|| Error::new("element.not_found", "no such wall"))?,
+        None => wall_at(
+            &store,
+            p.point.ok_or_else(|| {
+                Error::new(
+                    "insert.no_host",
+                    "give host_wall_id, or a point on the wall",
+                )
+            })?,
+        )?,
+    };
     let host_e = store.get(host).expect("resolved");
     if walls::wall_recipe(host_e).is_none() {
         return Err(Error::new(
@@ -1208,6 +1648,49 @@ fn some_f64<'de, D: serde::Deserializer<'de>>(
     d: D,
 ) -> std::result::Result<Option<Option<f64>>, D::Error> {
     Option::<f64>::deserialize(d).map(Some)
+}
+
+/// The one Reviera wall at plan point `p`: on it (within 50 mm of its faces).
+/// Stacked walls (one storey on another) are ambiguous there.
+fn wall_at(store: &Store, p: [f64; 2]) -> Result<ElementId> {
+    let mut near: Vec<ElementId> = Vec::new();
+    for e in store.iter() {
+        let Some(r) = walls::wall_recipe(e) else {
+            continue;
+        };
+        let Ok(g) = walls::regenerate(store, e) else {
+            continue;
+        };
+        let d = match walls::curved::path_of(&r) {
+            Some(path) => {
+                let (c, _) = path.at(path.project(p));
+                (c[0] - p[0]).hypot(c[1] - p[1])
+            }
+            None => {
+                let (s, u) = (g.start, g.direction());
+                let len = g.length();
+                let t = ((p[0] - s[0]) * u[0] + (p[1] - s[1]) * u[1]).clamp(0.0, len);
+                (s[0] + u[0] * t - p[0]).hypot(s[1] + u[1] * t - p[1])
+            }
+        };
+        if d <= g.width / 2.0 + 0.05 {
+            near.push(e.id());
+        }
+    }
+    match near[..] {
+        [one] => Ok(one),
+        [] => Err(Error::new(
+            "insert.no_host",
+            "there is no wall at that point; give host_wall_id",
+        )),
+        _ => Err(Error::new(
+            "insert.ambiguous_host",
+            format!(
+                "{} walls are at that point (one storey on another?); give host_wall_id",
+                near.len()
+            ),
+        )),
+    }
 }
 
 /// Sets doors' and windows' own width and height (`insert.set_size`); centred where they are.

@@ -8,7 +8,7 @@
 -- - three levels with plans and a 3D view; the model follows the US residential code (IRC);
 -- - a two-storey house: walls on each level, partitions, doors (an arched front door) and
 --   windows (round-top, Gothic, an oculus), floors, rooms and automatic ceilings, a hipped roof
---   with eaves and a gable dormer, the walls attached;
+--   with eaves and a gable dormer with a round-top window, the walls attached;
 -- - a straight stair drawn short that completes itself to Level 2, with railings, and openings
 --   cut in the ceiling and floor over it for the code's headroom, guarded at the top;
 -- - a round tower of curved walls with Gothic windows and an oculus, two spiral stairs (Level 1
@@ -138,6 +138,12 @@ end
 local roof = reviera.roof.create_footprint{ curves = curves, level_id = l1, base_offset = 6.0 }
 reviera.roof.set_eaves{ roof_id = roof, overhang = 0.6, fascia = true }
 reviera.dormer.create{ roof_id = roof, point = {7.0, 0.6}, style = "gable", front_height = 0.8 }
+-- A round-top window in the dormer's front wall (found by its point), as the owner added it in
+-- the window: placed at the type's sill, it fits itself onto the wall's open face above the
+-- main roof and under the dormer roof.
+-- (The point is off the hall partition below; the window then goes to the front's middle.)
+local dormer_window = reviera.window.place{ type_id = round_top, point = {7.4, 0.7} }
+reviera.insert.set_position{ element_id = dormer_window, along = 0.8 }
 
 -- ---- The tower: a drum of radius 2.6 east of the house, three storeys ----
 local cx, cy, R = 19.5, 4.5, 2.6

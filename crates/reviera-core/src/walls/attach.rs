@@ -372,11 +372,13 @@ fn has_wall_above(solved: &super::Solved, id: ElementId, body: &super::WallBody)
             (b[0] - a[0]) * (p[1] - a[1]) - (b[1] - a[1]) * (p[0] - a[0]) <= 1e-9
         })
     };
-    let mid = |g: &super::WallGeometry| [(g.start[0] + g.end[0]) / 2.0, (g.start[1] + g.end[1]) / 2.0];
+    let mid =
+        |g: &super::WallGeometry| [(g.start[0] + g.end[0]) / 2.0, (g.start[1] + g.end[1]) / 2.0];
     solved.bodies.iter().any(|(other, o)| {
         *other != id
             && (o.geometry.base_z - top).abs() < 0.05
-            && (inside(mid(&o.geometry), &body.footprint) || inside(mid(&body.geometry), &o.footprint))
+            && (inside(mid(&o.geometry), &body.footprint)
+                || inside(mid(&body.geometry), &o.footprint))
     })
 }
 

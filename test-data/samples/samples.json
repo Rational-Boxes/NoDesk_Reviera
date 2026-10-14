@@ -69,5 +69,17 @@
         }
       }
     ]
+  },
+  {
+    "name": "storefront",
+    "title": "Storefront doors",
+    "steps": [
+      {
+        "command": "script.run",
+        "args": {
+          "file": "storefront.lua"
+        }
+      }
+    ]
   }
 ]

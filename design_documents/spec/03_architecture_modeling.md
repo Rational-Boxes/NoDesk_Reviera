@@ -1427,6 +1427,31 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + 危 t岬
 - [ ] Flipping facing swaps From Room and To Room.
 - [ ] Ten doors placed in sequence are numbered 1 to 10.
 
+### 3.4.2a Door operations: double, revolving, sliding, storefront and automatic doors
+**ID:** ARC-DOOR-002 路 **Priority:** P1 路 **Ref:** owner requirement (2026-10-14); Reviera's own design (Appendix A.2a); IFC4 `IfcDoorTypeOperationEnum`, `Pset_DoorCommon.HasDrive`; ADA 2010 404.1, 404.3
+
+**Purpose.** The commonest door kinds beyond a single swinging leaf, as values of the built-in door type. *(Owner requests, 2026-10-14: "Door options need to include double-doors, turnstyle doors, and glass store style swing and automatic door options"; "Yes, revolving door. And automatic sliding door that includes the space needed for the sliding elements.")*
+
+**Behaviour & rules.**
+- **Operation** (type parameter): *Single Swing* (today's doors); *Double Swing*, two leaves hinged at both jambs meeting in the middle (a pair; round-top pairs split the arched leaf); *Revolving*, four wings in a cross on a centre post inside a drum whose diameter is the door's width, with curved glass enclosures across the wall's line on both sides of the passage and a canopy; *Sliding (Bi-parting)*, two leaves riding just off the wall face on the side away from the facing side, lapping 50 mm past each jamb. Revolving and sliding doors are rectangles; arched heads take swing operations only.
+- **Leaves** (type parameter): *Solid*, or *Glass (Storefront)*: 100 mm stiles and top rail, a 250 mm bottom rail, full glass between.
+- **Automatic** (type parameter): a powered operator housing over the head on the leaves' side, 150 mm high and deep, across the leaves' travel; IFC `Pset_DoorCommon.HasDrive = TRUE` on the type.
+- **The space a sliding door needs.** Open, each leaf slides past its jamb by its own width. The door takes that wall as well as its opening: fitting slides it along (or narrows it) until the leaves fit the wall's clear span and miss the other doors and windows at their height, and a placement that does not fit is refused ("the door and the wall its leaves slide over do not fit along its wall"). The wall beside the opening is a virtual volume (*slide space*, ARC-MOD-031): the leaves' travel each side, from the wall face out 100 mm, to the leaves' top, so anything placed against the wall there is reported.
+- **Swing volumes.** Each swinging leaf has its own (a pair has two). A revolving door's drum is its volume. A sliding door has its slide space.
+- **Maneuvering clearances** (ADA 2010) apply to manual swinging doors. Automatic doors, sliding and revolving doors have none of their own: ADA 404.3 covers automatic doors, and a revolving door needs an accessible door beside it (404.1).
+- **Plans** draw each swinging leaf open with its arc, a sliding door's arrows along the wall to where its leaves go, and a revolving door's drum (its wings are cut). **3D** draws glass as glass and storefront stiles, operators, the post and canopy as metal.
+
+**Data (IFC mapping).** `IfcDoor.OperationType` and `IfcDoorType.OperationType`: `SINGLE_SWING_LEFT`/`RIGHT`, `DOUBLE_DOOR_SINGLE_SWING`, `REVOLVING`, `DOUBLE_DOOR_SLIDING`. A revolving door's body is extruded plan profiles; the others are boxes. `Pset_DoorCommon.HasDrive` for automatic doors.
+
+**Commands.** `type.set_param(type_id, "operation", single_swing|double_swing|revolving|sliding)`, `type.set_param(type_id, "panel", solid|glass)`, `type.set_param(type_id, "automatic", true|false)`; `door.place` and `window.place` find the host from `point` when `host_wall_id` is omitted (the one wall at that point; stacked walls must be named).
+
+**Acceptance criteria.**
+- [x] A 1.8 m automatic glass pair has two leaves of stiles, rails and glass, an operator, two swing volumes and no maneuvering clearances; its type says `HasDrive`. *(Built 2026-10-14.)*
+- [x] A 2.2 m revolving door has a drum and wings and no frame boxes; it refuses an arched head; its volume is the drum.
+- [x] A 1.8 m automatic sliding door at 4 m in a wall takes 2.2 m to 5.8 m of it; a window placed at 6.0 m is refused; placed 0.5 m from a wall's end it slides along until its leaves fit; it has two slide spaces.
+- [x] The IFC carries `DOUBLE_DOOR_SINGLE_SWING`, `REVOLVING`, `DOUBLE_DOOR_SLIDING` and `HasDrive`.
+- [x] The storefront sample (`test-data/samples/storefront.lua`) has all four in one front with no overlaps or intrusions.
+
 ### 3.4.3 Windows
 **ID:** ARC-WIN-001 路 **Priority:** P0 路 **Ref:** research/02 搂5.3
 

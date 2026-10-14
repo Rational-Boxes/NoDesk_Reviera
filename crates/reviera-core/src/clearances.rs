@@ -7,13 +7,18 @@
 //!
 //! Built so far:
 //! - **Door swings**: each door leaf's swept volume (a quarter circle of the leaf's width about
-//!   its hinge, on the swing side), from the sill to the leaf's top. Always present.
+//!   its hinge, on the swing side), from the sill to the leaf's top; a revolving door's drum,
+//!   which its wings sweep. Always present.
+//! - **Slide space**: the wall face beside a sliding door that its leaves slide over when open,
+//!   a leaf's width each side and as deep as the leaves and their clearance (ARC-DOOR-002).
 //! - **Door maneuvering clearances** under the project's accessibility rule set. ADA 2010
 //!   404.2.4.1 (front approach) gives:
 //!   - on the pull (swing) side, 1525 mm (60 in) deep and 455 mm (18 in) beyond the latch;
 //!   - on the push side, 1220 mm (48 in) deep, the door's clear width.
 //!
-//!   Both are floor spaces taken to 2030 mm (80 in) high.
+//!   Both are floor spaces taken to 2030 mm (80 in) high. They apply to manual swinging doors:
+//!   automatic (powered) doors, sliding and revolving doors have none of their own (ADA 404.3
+//!   covers automatic doors; a revolving door needs an accessible door beside it, 404.1).
 //!
 //! The rule set is held on the project (`rxd:accessibility`). Fixture clear floor spaces,
 //! turning spaces and element-defined service clearances come with components and accessible
@@ -55,6 +60,8 @@ pub enum ClearanceKind {
     PullSide,
     /// The maneuvering clearance on a door's push side.
     PushSide,
+    /// The wall face a sliding door's leaves slide over.
+    SlideSpace,
 }
 
 impl ClearanceKind {
@@ -64,6 +71,7 @@ impl ClearanceKind {
             Self::DoorSwing => "Clearance:door_swing/3d",
             Self::PullSide => "Clearance:pull_side/3d",
             Self::PushSide => "Clearance:push_side/3d",
+            Self::SlideSpace => "Clearance:slide_space/3d",
         }
     }
 
@@ -72,6 +80,7 @@ impl ClearanceKind {
             Self::DoorSwing => "door swing",
             Self::PullSide => "pull-side clearance",
             Self::PushSide => "push-side clearance",
+            Self::SlideSpace => "slide space",
         }
     }
 }
@@ -126,38 +135,78 @@ fn local_prism(p: &Placed, poly: &[[f64; 2]], z0: f64, z1: f64) -> Mesh {
 
 /// The virtual volumes of one door.
 pub fn of_door(p: &Placed, rules: RuleSet) -> Vec<Clearance> {
+    use crate::inserts::Operation;
     if p.kind != Kind::Door {
         return Vec::new();
     }
     let t = &p.ty;
-    let r = t.width - 2.0 * t.frame_width;
     let s = p.facing();
     let face = s * p.wall.width / 2.0;
     let back = -face;
-    let side = if p.recipe.flip_hand { 1.0 } else { -1.0 };
-    let hinge = [side * (t.width / 2.0 - t.frame_width), face];
     let leaf_top = t.height - t.frame_width;
-    // The swing: the hinge, then the arc from the open leaf round to the closed one.
-    let steps = 24;
-    let mut swing = vec![hinge];
-    for k in 0..=steps {
-        let a = std::f64::consts::FRAC_PI_2 * k as f64 / steps as f64;
-        swing.push([hinge[0] - side * r * a.sin(), face + s * r * a.cos()]);
+    let mut out = Vec::new();
+    // Each swinging leaf: the hinge, then the arc from the open leaf round to the closed one.
+    for (hinge_x, side, r) in p.hinges() {
+        let steps = 24;
+        let mut swing = vec![[hinge_x, face]];
+        for k in 0..=steps {
+            let a = std::f64::consts::FRAC_PI_2 * k as f64 / steps as f64;
+            swing.push([hinge_x - side * r * a.sin(), face + s * r * a.cos()]);
+        }
+        out.push(Clearance {
+            element: p.id,
+            kind: ClearanceKind::DoorSwing,
+            rule: "",
+            mesh: local_prism(p, &swing, 0.0, leaf_top),
+        });
     }
-    let mut out = vec![Clearance {
-        element: p.id,
-        kind: ClearanceKind::DoorSwing,
-        rule: "",
-        mesh: local_prism(p, &swing, 0.0, leaf_top),
-    }];
-    if rules == RuleSet::Ada2010 {
+    match t.operation {
+        Operation::Revolving => {
+            // The drum the wings sweep, inside its enclosure.
+            let r = t.width / 2.0 - 0.03;
+            let drum: Vec<[f64; 2]> = (0..48)
+                .map(|k| {
+                    let a = std::f64::consts::TAU * f64::from(k) / 48.0;
+                    [r * a.cos(), r * a.sin()]
+                })
+                .collect();
+            out.push(Clearance {
+                element: p.id,
+                kind: ClearanceKind::DoorSwing,
+                rule: "",
+                mesh: local_prism(p, &drum, 0.0, t.height - 0.2),
+            });
+        }
+        Operation::Sliding => {
+            // Beside each jamb, the leaf's travel, from the wall face out past the leaves.
+            let jamb = t.width / 2.0;
+            let travel = p.slide_travel();
+            let dir = -s;
+            let (y0, y1) = (back, back + dir * 0.1);
+            for (x0, x1) in [(-jamb - travel, -jamb), (jamb, jamb + travel)] {
+                let space = [[x0, y0], [x1, y0], [x1, y1], [x0, y1]];
+                out.push(Clearance {
+                    element: p.id,
+                    kind: ClearanceKind::SlideSpace,
+                    rule: "",
+                    mesh: local_prism(p, &space, 0.0, leaf_top),
+                });
+            }
+        }
+        _ => {}
+    }
+    // Maneuvering clearances: manual swinging doors only.
+    if rules == RuleSet::Ada2010 && t.operation.swings() && !t.automatic {
+        let r = t.width - 2.0 * t.frame_width;
+        let side = if p.recipe.flip_hand { 1.0 } else { -1.0 };
         let half = r / 2.0;
         let height = 2.03;
-        // Pull side: the swing side, past the latch (opposite the hinge).
-        let (x0, x1) = if side < 0.0 {
-            (-half, half + 0.455)
-        } else {
-            (-half - 0.455, half)
+        // Pull side: the swing side, 455 mm past the latch (opposite the hinge); a pair has its
+        // latches in the middle, so its space is the opening's width.
+        let (x0, x1) = match (t.operation, side < 0.0) {
+            (Operation::DoubleSwing, _) => (-half, half),
+            (_, true) => (-half, half + 0.455),
+            (_, false) => (-half - 0.455, half),
         };
         let pull = [
             [x0, face],

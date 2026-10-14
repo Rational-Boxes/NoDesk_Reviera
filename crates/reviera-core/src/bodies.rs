@@ -241,8 +241,9 @@ pub fn all(store: &Store) -> Vec<Body> {
     }
     for p in crate::inserts::placed(store) {
         let class = p.kind.class();
-        for (mesh, panel) in p.meshes() {
-            push(p.id, class, mesh, panel);
+        // Glass and metal parts draw as such (`IfcDoor:glass`).
+        for (mesh, panel, material) in p.parts() {
+            push(p.id, &format!("{class}{}", material.suffix()), mesh, panel);
         }
     }
     out

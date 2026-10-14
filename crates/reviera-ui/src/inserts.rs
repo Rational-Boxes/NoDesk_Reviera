@@ -690,6 +690,43 @@ impl Gui {
             }
             Shape::Rectangle | Shape::Round | Shape::Elliptical | Shape::Fan => {}
         }
+        if kind == Kind::Door {
+            // How it opens (ARC-DOOR-002).
+            use inserts::{Operation, Panel};
+            let ops: Vec<(String, i32)> = Operation::ALL
+                .iter()
+                .enumerate()
+                .map(|(i, o)| (o.label().to_owned(), i as i32))
+                .collect();
+            let at = Operation::ALL
+                .iter()
+                .position(|o| *o == t.operation)
+                .map_or(-1, |i| i as i32);
+            grid.append(Property::enumeration("Operation", "it:operation", ops, at));
+            grid.set_help_string(
+                "it:operation",
+                "Single or double swing, revolving (Width is the drum), or bi-parting sliding (it takes the wall its leaves slide over)",
+            );
+            let panels: Vec<(String, i32)> = Panel::ALL
+                .iter()
+                .enumerate()
+                .map(|(i, p)| (p.label().to_owned(), i as i32))
+                .collect();
+            let at = Panel::ALL
+                .iter()
+                .position(|p| *p == t.panel)
+                .map_or(-1, |i| i as i32);
+            grid.append(Property::enumeration("Leaves", "it:panel", panels, at));
+            grid.set_help_string(
+                "it:panel",
+                "Solid leaves, or storefront glass in narrow stiles",
+            );
+            grid.append(Property::boolean("Automatic", "it:automatic", t.automatic));
+            grid.set_help_string(
+                "it:automatic",
+                "A powered operator over the head (IFC HasDrive)",
+            );
+        }
         if kind == Kind::Window {
             let n = t.muntins.unwrap_or(0);
             grid.append(Property::string(

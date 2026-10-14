@@ -42,7 +42,8 @@ Start with **File › New**. The model has Level 1 at 0.
     50 mm onto the floor.
 11. **Roof.** Architecture › **Roof** on the upper walls' exterior faces, 100 mm out, Base Offset
     6000, Shape *Hip*. Modify | Roofs › **Eaves**: Overhang 600, Fascia *Yes*. **Dormer** ›
-    *Gable*: click the south slope at (7000, 600); Front Height 800.
+    *Gable*: click the south slope at (7000, 600); Front Height 800. Then the Window tool with *Round Top 1000 x 1800*: click the dormer's front wall
+    at its middle (it fits itself under the dormer roof).
 12. **Tower walls.** Level 1 plan, Architecture › **Arc Wall**: two half circles of radius 2600
     about (19500, 4500), 9400 high, clockwise (north half from west to east, south half back).
 13. **Tower doors and windows.** The arched door on the south half at its middle; Gothic windows

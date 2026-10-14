@@ -1302,10 +1302,12 @@ pub(crate) enum Profile<'a> {
     },
 }
 
-/// A profile extruded across the element's plane, through `y` (metres).
+/// A profile extruded across the element's plane, through `y` (metres); or, with `plan`, a
+/// plan profile (x, y) extruded up through the heights `y`.
 pub(crate) struct ProfileSolid<'a> {
     pub profile: Profile<'a>,
     pub y: [f64; 2],
+    pub plan: bool,
 }
 
 /// What a profile shape holds, in file units, to compare a written shape with: per solid its
@@ -1313,7 +1315,17 @@ pub(crate) struct ProfileSolid<'a> {
 fn profile_signature(solids: &[ProfileSolid<'_>], scale: f64) -> Vec<f64> {
     let mut s = vec![solids.len() as f64];
     for sol in solids {
-        s.extend([(sol.y[1] - sol.y[0]) / scale, sol.y[1] / scale]);
+        let (y, z) = if sol.plan {
+            (0.0, sol.y[0] / scale)
+        } else {
+            (sol.y[1] / scale, 0.0)
+        };
+        s.extend([
+            (sol.y[1] - sol.y[0]) / scale,
+            y,
+            z,
+            f64::from(u8::from(sol.plan)),
+        ]);
         match &sol.profile {
             Profile::Circle { centre, radius } => {
                 s.extend([1.0, centre[0] / scale, centre[1] / scale, radius / scale]);
@@ -1397,8 +1409,20 @@ impl ProfileShape {
                 AttrValue::Real(d) => *d,
                 _ => 0.0,
             };
-            let y1 = coords(ifc, pos_location)?.get(1).copied().unwrap_or(0.0);
-            signature.extend([depth, y1]);
+            let at = coords(ifc, pos_location)?;
+            let plan = match one(&pos, "Axis") {
+                Some(a) => match ifc.attribute(a, "DirectionRatios")? {
+                    AttrValue::List(d) => matches!(d.get(2), Some(AttrValue::Real(z)) if *z > 0.5),
+                    _ => false,
+                },
+                None => false,
+            };
+            signature.extend([
+                depth,
+                at.get(1).copied().unwrap_or(0.0),
+                at.get(2).copied().unwrap_or(0.0),
+                f64::from(u8::from(plan)),
+            ]);
             rep.extend([solid, profile, position, pos_location]);
             rep.extend(one(&pos, "Axis"));
             rep.extend(one(&pos, "RefDirection"));
@@ -1591,9 +1615,19 @@ pub(crate) fn write_profiles(
                 }
             }
         };
-        // The profile's x along the element, its y up; extruded from `y[1]` toward -y.
-        let start = point(ifc, &[0.0, sol.y[1] / scale, 0.0])?;
-        let z = direction(ifc, [0.0, -1.0, 0.0])?;
+        // The profile's x along the element, its y up; extruded from `y[1]` toward -y. A plan
+        // profile lies flat and rises from `y[0]`.
+        let (start, z) = if sol.plan {
+            (
+                point(ifc, &[0.0, 0.0, sol.y[0] / scale])?,
+                direction(ifc, [0.0, 0.0, 1.0])?,
+            )
+        } else {
+            (
+                point(ifc, &[0.0, sol.y[1] / scale, 0.0])?,
+                direction(ifc, [0.0, -1.0, 0.0])?,
+            )
+        };
         let x = direction(ifc, [1.0, 0.0, 0.0])?;
         let position = create_with(
             ifc,

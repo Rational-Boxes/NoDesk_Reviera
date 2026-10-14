@@ -370,6 +370,13 @@ pub const HIGHLIGHT: [f32; 4] = [0.15, 0.45, 0.95, 1.0];
 
 /// Default display colours by IFC class, until object styles and materials drive them.
 pub fn class_color(class: &str) -> [f32; 4] {
+    // A part's material after the class (`IfcDoor:glass`).
+    let (class, material) = class.split_once(':').unwrap_or((class, ""));
+    match material.split('/').next().unwrap_or("") {
+        "glass" => return [0.62, 0.80, 0.92, 0.35],
+        "metal" => return [0.66, 0.68, 0.71, 1.0],
+        _ => {}
+    }
     let c = class.strip_suffix("StandardCase").unwrap_or(class);
     match c {
         "IfcWall" => [0.85, 0.83, 0.78, 1.0],
