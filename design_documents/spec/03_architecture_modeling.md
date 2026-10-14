@@ -677,6 +677,7 @@ Dragging a control issues the matching command once, on mouse-up. The preview du
 - `wall.create_chain(type_id, curves: [curve], closed?: bool, fillet_radius?, ...same as wall.create) -> [element_id]`
 - `wall.create_from_faces(type_id, face_refs, base_level, location_line, ...) -> [element_id]`
 - `wall.set_location(wall_id, curve)`
+- `wall.set_constraints(wall_id, base_level?, base_offset?, top_constraint?: Level(id) | Unconnected(height), top_offset?)` — omitted values are kept; a top at or below the base is refused. *Built; the wall's Properties (Constraints: Base Constraint, Base Offset, Top Constraint, Unconnected Height, Top Offset; Type: choose, Duplicate Type…, Type Name, Width) use it and the type commands.*
 - `wall.set_location_line(wall_ids, location_line)`
 - `wall.flip(wall_ids)`
 
@@ -1446,7 +1447,7 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 
 **Data (IFC mapping).** **`IfcWindow`** (`PredefinedType = WINDOW`, `SKYLIGHT` for roof-hosted, `LIGHTDOME` where flagged) with `OverallHeight` and `OverallWidth`. **`IfcWindowType`** with `PartitioningType` from the family. `Pset_WindowCommon` holds IsExternal, FireRating, ThermalTransmittance and similar values. Openings and fills are as in ARC-HOST-001.
 
-**Commands.** `window.place(type_id, host_id, point_along | point, sill_height?, flip_facing?, width?, height?, fit?) -> element_id`; `insert.set_size(element_ids, width?, height?, fit?)`.
+**Commands.** `window.place(type_id, host_id, point_along | point, sill_height?, flip_facing?, width?, height?, fit?) -> element_id`; `insert.set_size(element_ids, width?, height?, fit?)`; `insert.set_position(element_id, along | from_end)` places the centre a distance along the host from its start (or end), along the curve on a curved wall, refusing a place where it no longer fits (*built; Properties › Placement › From Wall Start / From Wall End*).
 
 **Acceptance criteria.**
 - [ ] Changing a window type's Default Sill Height does not move windows that are already placed. It changes only the default for new ones.
@@ -4462,6 +4463,7 @@ All commands below are registered once in the command registry and exposed autom
 | `dim.temporary_query` | element_id, view_id | [TempDim] | No (query) | ARC-DIM-001 |
 | `element.move` | element_ids, vector, disjoin?: bool | [element_id] | Yes | ARC-DIM-001, ARC-MOD-004, ARC-MOD-000 |
 | `wall.set_location` | wall_id, curve | — | Yes | ARC-DIM-001, ARC-WALL-002 |
+| `wall.set_constraints` | wall_id, base_level?, base_offset?, top_constraint?, top_offset? | — | Yes | ARC-WALL-001 |
 | `dim.make_permanent` | view_id, temporary_dimension_ref \| {ref_a, ref_b} | dimension_id | Yes | ARC-DIM-001 |
 | `snap.set_options` | kinds, increments? | — | No (session state) | ARC-SNAP-001 |
 | `level.create` | elevation, name?, type_id?, make_plan_views?: bool, plan_view_types?: [view_type_id], extent?: Line | element_id | Yes | ARC-LVL-001 |
@@ -4561,6 +4563,7 @@ All commands below are registered once in the command registry and exposed autom
 | `element.flip_state` | element_id | {facing_flipped, hand_flipped, mirrored, controls: [control_key]} | No (query) | ARC-FLIP-001 |
 | `window.place` | type_id, host_id, point_along \| point, sill_height?, flip_facing?, width?, height?, fit? | element_id | Yes | ARC-WIN-001 |
 | `insert.set_size` | element_ids, width?, height?, fit? | — | Yes | ARC-WIN-001, ARC-DOOR-001 |
+| `insert.set_position` | element_id, along \| from_end | — | Yes | ARC-WIN-001, ARC-DOOR-001 |
 | `component.place` | type_id, point \| host_ref, rotation?: f64, level_id?, offset?, placement?: VerticalFace\|Face\|WorkPlane | element_id | Yes | ARC-COMP-001 |
 | `column.place_architectural` | type_id, point, base_level, top_constraint, base_offset?, top_offset?, rotation?, room_bounding? | element_id | Yes | ARC-COL-001 |
 | `column.attach` | column_ids[], end: top\|base, target_id, style?, justification?, offset? | () | Yes | ARC-COL-001 |

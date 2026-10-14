@@ -1996,7 +1996,7 @@ The following context panels are part of the default layout. Owners are authorit
 
 **Behaviour & rules.**
 - **Middle-drag** pans; **wheel** zooms about the cursor; **double-click middle** zooms to fit.
-- **Shift + middle-drag** (3D) orbits about the pivot: the selection's centre if something is selected, else the model's visible extents centre, else a user-defined centre set with **Define Centre of Rotation** (R3, right-click in 3D).
+- **Shift + middle-drag** (3D) orbits about the pivot: the selection's centre if something is selected, else the point of the model under the cursor where the drag starts (the first visible surface the ray meets), else the model's visible extents centre, else a user-defined centre set with **Define Centre of Rotation** (R3, right-click in 3D).
 - **Ctrl + Shift + middle-drag** (3D, Reviera addition) looks around from the eye point in perspective views.
 - **F8** starts orbit with the left button until Esc (for users without a middle button). A preference offers **left-button navigation profile** for trackpads: Alt+drag orbit, Alt+Ctrl+drag pan (P1).
 - Trackpads: two-finger scroll pans, pinch zooms, Shift+two-finger scroll orbits in 3D (P1).
@@ -9367,6 +9367,7 @@ The behaviours in this section are implemented once, in the tool framework, and 
 - **Pick-and-lock.** A curve created with Pick Walls, Pick Lines or Pick Roof Edges while *Lock* is on gets a `sketch-lock` dependency on the picked edge or face. When the source moves, the sketch curve is recomputed and the host regenerates. If the source is deleted, the lock is dropped silently and the curve keeps its last position.
 - Pick Walls uses the wall's finish face on the side the cursor is on, unless *Extend into wall (to core)* is on, in which case it uses the core face. The *Offset* value is measured from that face.
 - **Tab** while hovering a pick candidate selects the connected chain of the same kind, for example all walls joined end to end.
+- **Curved curves.** The Draw gallery has Arc (start, end, a point on it) and Circle (centre, a point on it; two half arcs). A sketch curve may pass through points between its ends, as a curved wall does (one point: a circular arc; more: a spline); it is validated and gives profiles as its sampled polyline. Pick Walls on a curved wall takes the face's curve, locked: it follows the face's current curve. In curve arguments: `{line, through?, lock?}`. *Built: floors, ceilings and decks; roof footprints stay straight (arched roofs and domes make curved roofs).*
 - The sketch session uses a transaction group (ARC-TOOL-001), so Cancel discards every change.
 
 **Data (IFC mapping).** The sketch is stored as RXD element data (`sketch`) on the host. Each curve has a stable key, its geometry, its role (boundary, slope arrow, riser and so on), its per-curve properties and an optional lock target (GlobalId plus face key). The resulting geometry is exported normally: for example, a floor boundary becomes the `IfcArbitraryProfileDefWithVoids` of its extrusion.
@@ -9879,6 +9880,7 @@ Dragging a control issues the matching command once, on mouse-up. The preview du
 - `wall.create_chain(type_id, curves: [curve], closed?: bool, fillet_radius?, ...same as wall.create) -> [element_id]`
 - `wall.create_from_faces(type_id, face_refs, base_level, location_line, ...) -> [element_id]`
 - `wall.set_location(wall_id, curve)`
+- `wall.set_constraints(wall_id, base_level?, base_offset?, top_constraint?: Level(id) | Unconnected(height), top_offset?)` — omitted values are kept; a top at or below the base is refused. *Built; the wall's Properties (Constraints: Base Constraint, Base Offset, Top Constraint, Unconnected Height, Top Offset; Type: choose, Duplicate Type…, Type Name, Width) use it and the type commands.*
 - `wall.set_location_line(wall_ids, location_line)`
 - `wall.flip(wall_ids)`
 
@@ -10648,7 +10650,7 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 
 **Data (IFC mapping).** **`IfcWindow`** (`PredefinedType = WINDOW`, `SKYLIGHT` for roof-hosted, `LIGHTDOME` where flagged) with `OverallHeight` and `OverallWidth`. **`IfcWindowType`** with `PartitioningType` from the family. `Pset_WindowCommon` holds IsExternal, FireRating, ThermalTransmittance and similar values. Openings and fills are as in ARC-HOST-001.
 
-**Commands.** `window.place(type_id, host_id, point_along | point, sill_height?, flip_facing?, width?, height?, fit?) -> element_id`; `insert.set_size(element_ids, width?, height?, fit?)`.
+**Commands.** `window.place(type_id, host_id, point_along | point, sill_height?, flip_facing?, width?, height?, fit?) -> element_id`; `insert.set_size(element_ids, width?, height?, fit?)`; `insert.set_position(element_id, along | from_end)` places the centre a distance along the host from its start (or end), along the curve on a curved wall, refusing a place where it no longer fits (*built; Properties › Placement › From Wall Start / From Wall End*).
 
 **Acceptance criteria.**
 - [ ] Changing a window type's Default Sill Height does not move windows that are already placed. It changes only the default for new ones.
@@ -13664,6 +13666,7 @@ All commands below are registered once in the command registry and exposed autom
 | `dim.temporary_query` | element_id, view_id | [TempDim] | No (query) | ARC-DIM-001 |
 | `element.move` | element_ids, vector, disjoin?: bool | [element_id] | Yes | ARC-DIM-001, ARC-MOD-004, ARC-MOD-000 |
 | `wall.set_location` | wall_id, curve | — | Yes | ARC-DIM-001, ARC-WALL-002 |
+| `wall.set_constraints` | wall_id, base_level?, base_offset?, top_constraint?, top_offset? | — | Yes | ARC-WALL-001 |
 | `dim.make_permanent` | view_id, temporary_dimension_ref \| {ref_a, ref_b} | dimension_id | Yes | ARC-DIM-001 |
 | `snap.set_options` | kinds, increments? | — | No (session state) | ARC-SNAP-001 |
 | `level.create` | elevation, name?, type_id?, make_plan_views?: bool, plan_view_types?: [view_type_id], extent?: Line | element_id | Yes | ARC-LVL-001 |
@@ -13763,6 +13766,7 @@ All commands below are registered once in the command registry and exposed autom
 | `element.flip_state` | element_id | {facing_flipped, hand_flipped, mirrored, controls: [control_key]} | No (query) | ARC-FLIP-001 |
 | `window.place` | type_id, host_id, point_along \| point, sill_height?, flip_facing?, width?, height?, fit? | element_id | Yes | ARC-WIN-001 |
 | `insert.set_size` | element_ids, width?, height?, fit? | — | Yes | ARC-WIN-001, ARC-DOOR-001 |
+| `insert.set_position` | element_id, along \| from_end | — | Yes | ARC-WIN-001, ARC-DOOR-001 |
 | `component.place` | type_id, point \| host_ref, rotation?: f64, level_id?, offset?, placement?: VerticalFace\|Face\|WorkPlane | element_id | Yes | ARC-COMP-001 |
 | `column.place_architectural` | type_id, point, base_level, top_constraint, base_offset?, top_offset?, rotation?, room_bounding? | element_id | Yes | ARC-COL-001 |
 | `column.attach` | column_ids[], end: top\|base, target_id, style?, justification?, offset? | () | Yes | ARC-COL-001 |
@@ -25922,7 +25926,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**1986 unique commands** in 404 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**1988 unique commands** in 404 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -26099,7 +26103,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `image` | 8 |
 | `import` | 10 |
 | `inplace` | 5 |
-| `insert` | 3 |
+| `insert` | 4 |
 | `instance` | 5 |
 | `job` | 4 |
 | `journal` | 1 |
@@ -26313,7 +26317,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `viewtype` | 1 |
 | `voltage` | 1 |
 | `walkthrough` | 9 |
-| `wall` | 27 |
+| `wall` | 28 |
 | `wall_foundation` | 1 |
 | `wallreveal` | 1 |
 | `wallsweep` | 4 |
@@ -27108,6 +27112,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `inplace.finish` | 3 | session_id | element_id | Yes (one step) | ARC-INPL-001 |
 | `insert.flip_facing` | 3 | element_ids | — | Yes | ARC-DOOR-001, ARC-FLIP-001 |
 | `insert.flip_hand` | 3 | element_ids | — | Yes | ARC-DOOR-001, ARC-FLIP-001 |
+| `insert.set_position` | 3 | element_id, along \ | from_end | — | Yes |
 | `insert.set_size` | 3 | element_ids, width?, height?, fit? | — | Yes | ARC-WIN-001, ARC-DOOR-001 |
 | `instance.change_type` | 2 | element_ids[], type_id | — | Yes | DM-TYPE-001 |
 | `instance.flip` | 2 | element_id, axis: "facing"\ | "hand"\ | "work_plane" | — |
@@ -28259,6 +28264,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `wall.remove_host` | 3 | wall_ids | — | Yes | ARC-WALL-016 |
 | `wall.reset_profile` | 3 | wall_ids | — | Yes | ARC-WALL-009 |
 | `wall.select_main_host` | 3 | wall_id | element_id | No (query) | ARC-WALL-016 |
+| `wall.set_constraints` | 3 | wall_id, base_level?, base_offset?, top_constraint?, top_offset? | — | Yes | ARC-WALL-001 |
 | `wall.set_cross_section` | 3 | wall_ids, mode: Vertical\ | Slanted\ | Tapered, angle?: f64, exterior_angle?: f64, interior_angle?: f64, override_angles?: bool | — |
 | `wall.set_end_wrap` | 3 | wall_id, end: Start\ | End, mode: ByType\ | Exterior\ | Interior\ |
 | `wall.set_extension` | 3 | wall_ids, top?: f64, base?: f64 | — | Yes | ARC-CMPD-004 |

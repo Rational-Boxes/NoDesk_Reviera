@@ -171,7 +171,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**1986 unique commands** in 404 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**1988 unique commands** in 404 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -348,7 +348,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `image` | 8 |
 | `import` | 10 |
 | `inplace` | 5 |
-| `insert` | 3 |
+| `insert` | 4 |
 | `instance` | 5 |
 | `job` | 4 |
 | `journal` | 1 |
@@ -562,7 +562,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `viewtype` | 1 |
 | `voltage` | 1 |
 | `walkthrough` | 9 |
-| `wall` | 27 |
+| `wall` | 28 |
 | `wall_foundation` | 1 |
 | `wallreveal` | 1 |
 | `wallsweep` | 4 |
@@ -1357,6 +1357,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `inplace.finish` | 3 | session_id | element_id | Yes (one step) | ARC-INPL-001 |
 | `insert.flip_facing` | 3 | element_ids | — | Yes | ARC-DOOR-001, ARC-FLIP-001 |
 | `insert.flip_hand` | 3 | element_ids | — | Yes | ARC-DOOR-001, ARC-FLIP-001 |
+| `insert.set_position` | 3 | element_id, along \ | from_end | — | Yes |
 | `insert.set_size` | 3 | element_ids, width?, height?, fit? | — | Yes | ARC-WIN-001, ARC-DOOR-001 |
 | `instance.change_type` | 2 | element_ids[], type_id | — | Yes | DM-TYPE-001 |
 | `instance.flip` | 2 | element_id, axis: "facing"\ | "hand"\ | "work_plane" | — |
@@ -2508,6 +2509,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `wall.remove_host` | 3 | wall_ids | — | Yes | ARC-WALL-016 |
 | `wall.reset_profile` | 3 | wall_ids | — | Yes | ARC-WALL-009 |
 | `wall.select_main_host` | 3 | wall_id | element_id | No (query) | ARC-WALL-016 |
+| `wall.set_constraints` | 3 | wall_id, base_level?, base_offset?, top_constraint?, top_offset? | — | Yes | ARC-WALL-001 |
 | `wall.set_cross_section` | 3 | wall_ids, mode: Vertical\ | Slanted\ | Tapered, angle?: f64, exterior_angle?: f64, interior_angle?: f64, override_angles?: bool | — |
 | `wall.set_end_wrap` | 3 | wall_id, end: Start\ | End, mode: ByType\ | Exterior\ | Interior\ |
 | `wall.set_extension` | 3 | wall_ids, top?: f64, base?: f64 | — | Yes | ARC-CMPD-004 |
