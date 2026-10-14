@@ -349,7 +349,8 @@ Create … Boundary* tab:
   at once. The selection drives Properties and the contextual tab (`selection.get`, `selection.set`, `selection.add`, `selection.remove`,
   `selection.clear`, `element.get_ids`, `element.find_by_guid`).
 - **Quick modify menu**: a middle click on an element opens Move, Copy, Rotate, Mirror, Flip,
-  Hide, Isolate, Section Box, Pin/Unpin and Delete at the cursor. With two elements selected it
+  Hide, Make Translucent/Opaque, Isolate, Reset Hide/Isolate, Section Box, Pin/Unpin and Delete
+  at the cursor; a middle click on empty space offers the reset when anything is hidden. With two elements selected it
   checks whether they overlap and, when they do, offers the booleans: cut either way, intersect,
   union, join or accept (UI-SEL-006).
 - **Modify tools**: Align (AL), Offset (OF), Mirror by picked or drawn axis (MM, DM), Move (MV),

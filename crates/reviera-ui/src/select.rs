@@ -12,7 +12,9 @@
 //!   view shows is picked (its view range, section box, slices and hidden elements).
 //! - A **middle click** (pressed and released without moving; a middle drag still pans) on an
 //!   element opens the quick modify menu for the selection, selecting the element first when it
-//!   is not selected (Ctrl keeps the rest). With exactly two elements selected, the menu checks
+//!   is not selected (Ctrl keeps the rest). Besides hiding, it toggles the selection's temporary
+//!   translucency in the view, and resets the view's temporary hiding and isolation (also from a
+//!   middle click on empty space, since hidden elements cannot be clicked). With exactly two elements selected, the menu checks
 //!   whether they overlap (`overlap.find`) and offers the booleans (`overlap.resolve`).
 
 use reviera_core::ElementId;
@@ -26,6 +28,8 @@ use super::Gui;
 /// The quick menu's own items: a title, then the booleans by index into [`BOOLEANS`].
 pub(crate) const ID_QUICK_TITLE: i32 = wxdragon::id::ID_HIGHEST + 100;
 pub(crate) const ID_QUICK_FIRST: i32 = wxdragon::id::ID_HIGHEST + 101;
+/// Toggles the selection's temporary translucency in the view.
+pub(crate) const ID_QUICK_TRANSLUCENT: i32 = wxdragon::id::ID_HIGHEST + 110;
 
 /// The boolean modes of `overlap.resolve` the quick menu offers.
 pub(crate) const BOOLEANS: &[&str] = &["cut_a", "cut_b", "intersect", "union", "join", "accept"];
@@ -178,9 +182,20 @@ impl Gui {
         if self.doc.is_none() || self.any_tool() || self.in_sheet() {
             return None;
         }
-        let hit = self
+        // Over nothing, only the reset of temporary hiding and isolation (when there is any):
+        // hidden elements cannot be clicked.
+        let temporary = self
+            .active_view()
+            .is_some_and(|v| !self.view_visibility(v).is_empty());
+        let Some(hit) = self
             .room_label_at(x, y)
-            .or_else(|| self.element_at(x, y, panel))?;
+            .or_else(|| self.element_at(x, y, panel))
+        else {
+            let id = self.ribbon.id_of("inspect.reset").filter(|_| temporary)?;
+            let menu = Menu::builder().build();
+            menu.append(id, "&Reset Hide/Isolate (show all)", "", ItemKind::Normal);
+            return Some(menu);
+        };
         let mut ids = self.selection();
         if !ids.contains(&hit) {
             let combine = if add { Combine::Add } else { Combine::Replace };
@@ -219,7 +234,16 @@ impl Gui {
         }
         menu.append_separator();
         item(&menu, "inspect.hide", "&Hide in View");
+        let label = if self.all_translucent(&ids) {
+            "Make &Opaque"
+        } else {
+            "Make &Translucent"
+        };
+        menu.append(ID_QUICK_TRANSLUCENT, label, "", ItemKind::Normal);
         item(&menu, "inspect.isolate", "&Isolate");
+        if temporary {
+            item(&menu, "inspect.reset", "&Reset Hide/Isolate (show all)");
+        }
         item(&menu, "inspect.selection_box", "Section &Box");
         let pinned = |e: &reviera_core::Element| reviera_core::modify::is_pinned(e);
         if ids.iter().any(|i| store.get(*i).is_some_and(|e| !pinned(e))) {
@@ -278,6 +302,26 @@ impl Gui {
             a_label,
             b_label,
         });
+    }
+
+    /// Whether every one of `ids` is drawn translucent in the active view for now.
+    fn all_translucent(&self, ids: &[ElementId]) -> bool {
+        let Some(v) = self.active_view() else {
+            return false;
+        };
+        let state = self.view_visibility(v);
+        !ids.is_empty() && ids.iter().all(|i| state.translucent.contains_key(i))
+    }
+
+    /// Makes the selection translucent in the view for now, or opaque again when it all is.
+    pub(crate) fn quick_translucent(&mut self) {
+        let ids = self.selection();
+        let command = if self.all_translucent(&ids) {
+            "view.temp_show"
+        } else {
+            "view.temp_translucent"
+        };
+        self.temp(command, &ids, json!({ "by": "element" }));
     }
 
     /// Runs a boolean of the quick menu.

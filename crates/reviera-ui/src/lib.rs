@@ -3187,6 +3187,7 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                     let dir = nav::PRESETS[(id - ID_ORIENT_FIRST) as usize].1;
                     with(&gui, |g| g.orient(glam::Vec3::from(dir)));
                 }
+                select::ID_QUICK_TRANSLUCENT => with(&gui, Gui::quick_translucent),
                 id if (select::ID_QUICK_FIRST
                     ..select::ID_QUICK_FIRST + select::BOOLEANS.len() as i32)
                     .contains(&id) =>
