@@ -1156,8 +1156,6 @@ panels = [
     { action = "sketch.pick_walls", size = "large" },
     { action = "sketch.line", size = "small" },
     { action = "sketch.rectangle", size = "small" },
-    { action = "sketch.arc", size = "small" },
-    { action = "sketch.circle", size = "small" },
     { action = "sketch.defines_slope", size = "large" },
     { action = "sketch.overhang", size = "small" },
   ] },
