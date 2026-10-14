@@ -151,6 +151,23 @@ pub fn all(store: &Store) -> Vec<Body> {
         };
         push(id, &class, mesh, false);
     }
+    // Curved walls (ARC-WALL-002): pieces along the curve, cut by their openings.
+    for e in store.iter() {
+        let Some(r) = crate::walls::wall_recipe(e) else {
+            continue;
+        };
+        let (Some(path), Ok(g)) = (
+            crate::walls::curved::path_of(&r),
+            crate::walls::regenerate(store, e),
+        ) else {
+            continue;
+        };
+        let class = e.class.clone();
+        let c = cuts.get(&e.id()).map_or(&[][..], Vec::as_slice);
+        for mesh in crate::walls::curved::body(&path, g.width, g.base_z, g.base_z + g.height, c) {
+            push(e.id(), &class, mesh, false);
+        }
+    }
     // Decks: boards (coverings) and framing (members).
     for (id, g) in crate::decks::all(store) {
         let n_boards = g.boards.len();

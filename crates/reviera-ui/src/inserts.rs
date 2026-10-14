@@ -207,9 +207,7 @@ impl Gui {
             t.flip_hand,
             !exterior,
         )?;
-        let u = p.wall.direction();
-        let along = (point[0] - p.wall.start[0]) * u[0] + (point[1] - p.wall.start[1]) * u[1];
-        p.recipe.along = along;
+        p.recipe.along = p.along_of(point);
         if !inserts::fit(&store, &mut p) {
             return None;
         }

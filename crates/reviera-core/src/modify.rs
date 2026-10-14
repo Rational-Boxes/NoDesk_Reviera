@@ -161,6 +161,7 @@ pub(crate) fn transform(
         }
         if let Some(mut r) = walls::wall_recipe(e) {
             r.curve = x.line(r.curve);
+            r.through = r.through.iter().map(|p| x.point(*p)).collect();
             r.flip ^= x.reflects();
             let hosted = inserts::hosted_by(&store, e.guid().as_str());
             if copy {

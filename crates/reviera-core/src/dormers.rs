@@ -301,6 +301,7 @@ fn build(
                 type_id: Some(ElementRef::Id(type_id)),
                 curve: walls::CurveArg {
                     line: Line { start: s, end: e },
+                    through: Vec::new(),
                 },
                 base_level: ElementRef::Id(level_id),
                 top_constraint: walls::TopConstraint::Unconnected(top),

@@ -53,6 +53,41 @@ pub fn wall_edges(store: &Store, z: f64) -> Vec<Edge> {
         out.push(edge(f[2], f[3], Some(plus)));
         out.push(edge(f[3], f[0], None));
     }
+    // Curved walls: their sides as polylines, and their ends.
+    for e in store.iter() {
+        let Some(r) = walls::wall_recipe(e) else {
+            continue;
+        };
+        let (Some(path), Ok(g)) = (walls::curved::path_of(&r), walls::regenerate(store, e)) else {
+            continue;
+        };
+        if z < g.base_z - 1e-9 || z > g.base_z + g.height + 1e-9 {
+            continue;
+        }
+        let ([minus, plus], ends) = walls::curved::outline(&path, g.width);
+        let (m, p) = if r.flip {
+            ("face:ext", "face:int")
+        } else {
+            ("face:int", "face:ext")
+        };
+        for (side, sub) in [(minus, m), (plus, p)] {
+            for w in side.windows(2) {
+                out.push(Edge {
+                    line: Line {
+                        start: w[0],
+                        end: w[1],
+                    },
+                    lock: Some((e.id(), sub.to_owned())),
+                });
+            }
+        }
+        for [a, b] in ends {
+            out.push(Edge {
+                line: Line { start: a, end: b },
+                lock: None,
+            });
+        }
+    }
     out
 }
 

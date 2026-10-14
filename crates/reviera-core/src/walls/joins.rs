@@ -221,6 +221,10 @@ pub fn solve(store: &Store) -> Solved {
         .iter()
         .filter_map(|e| {
             let recipe = wall_recipe(e)?;
+            // Curved walls do not join yet (ARC-WALL-002); their ends butt.
+            if !recipe.through.is_empty() {
+                return None;
+            }
             let g = regenerate(store, e).ok()?;
             Some(Wall {
                 id: e.id(),

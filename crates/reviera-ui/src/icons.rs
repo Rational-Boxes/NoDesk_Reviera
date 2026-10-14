@@ -261,6 +261,12 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "double_gate" => format!(
             r#"<path d="M3 8v20M29 8v20" {s}/><rect x="5" y="11" width="10" height="15" fill="{f}" {s}/><rect x="17" y="11" width="10" height="15" fill="{f}" {s}/><path d="M10 11v15M22 11v15" {sa} stroke-width="1.2"/>"#
         ),
+        "arc_wall" => format!(
+            r#"<path d="M4 26A20 20 0 0 1 26 6" fill="none" {sa} stroke-width="5"/><path d="M4 26A20 20 0 0 1 26 6" fill="none" stroke="{f}" stroke-width="2"/>"#
+        ),
+        "spline_wall" => format!(
+            r#"<path d="M3 24C9 4 15 30 21 12S29 6 29 6" fill="none" {sa} stroke-width="5"/><path d="M3 24C9 4 15 30 21 12S29 6 29 6" fill="none" stroke="{f}" stroke-width="2"/>"#
+        ),
         "arched_roof" => format!(
             r#"<path d="M3 24C3 10 29 10 29 24" fill="none" {sa}/><path d="M7 24v4h18v-4" {s}/><path d="M3 24h26" {s}/>"#
         ),

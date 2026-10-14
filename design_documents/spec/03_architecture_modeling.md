@@ -684,6 +684,23 @@ Dragging a control issues the matching command once, on mouse-up. The preview du
 - [ ] Changing a placed wall's Location Line from Centerline to Finish Face: Exterior does not move any face. A flip after that change mirrors the wall about the exterior face.
 - [ ] A 250 mm wall, unflipped, with its centreline as the location line, exports `OffsetFromReferenceLine = 0.125` and `DirectionSense = NEGATIVE`, and an independent IFC viewer shows the layers on the correct sides.
 
+**Implementation notes (2026-10-13), curved walls.** As built:
+- **Curve:** `wall.create` and `wall.set_location` take `curve: {line, through: [points]}`. One point makes a circular arc through the start, the point and the end; two or more make a centripetal Catmull–Rom spline through them all. Points in line with the ends give a straight wall. The recipe keeps `through`; moves, rotations and mirrors carry it.
+- **Sampling:** the curve is sampled as a polyline (arcs at most 3° per segment, splines 16 segments per span). Tangents are averaged at the samples (exact on an arc), and ends are square to the end tangent.
+- **Body:** one closed prism per segment between the curve offset half the width to each side, mitred at shared edges, and split at opening edges. Doors and windows cut it along the curve's length.
+- **Inserts:** an insert's `along` is measured on the curve. A plan point is projected onto it. The insert stays straight, square to the curve where it stands, and fits within the curve's length.
+- **Rooms:** curved walls bound rooms by their offset polylines.
+- **IFC:** a faceted B-rep in a frame at the wall's start along its chord. Openings are placed at their point and tangent on the curve in that frame.
+- **Window:** Architecture › Arc Wall (start, end, then a point on the arc) and Spline Wall (points; Enter ends at the last), each with a live preview.
+- **Later:**
+  - joins with other walls (curved walls butt at their ends);
+  - attaching tops to roofs;
+  - a true curved IFC body and axis (`IfcTrimmedCurve` / `IfcBSplineCurveWithKnots`);
+  - the "curve too tight" check;
+  - closed splines;
+  - drawing a chain of arcs;
+  - smooth plan poché (the segments show).
+
 ### 3.3.3 Wall instance parameters
 **ID:** ARC-WALL-003 · **Priority:** P0 · **Ref:** research/02 §4.3
 

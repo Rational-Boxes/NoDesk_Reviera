@@ -131,6 +131,20 @@ struct WallTool {
     typed: String,
     /// Location lines of the walls on the level, for snapping.
     lines: Vec<([f64; 2], [f64; 2])>,
+    /// Straight, arc or spline walls (ARC-WALL-002).
+    shape: WallShape,
+    /// Points clicked for the curved wall being drawn: an arc's end; a spline's points.
+    pending: Vec<[f64; 2]>,
+}
+
+/// The shape the Wall tool draws.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum WallShape {
+    Line,
+    /// Click the end, then a point the arc passes through.
+    Arc,
+    /// Click points; Enter ends at the last.
+    Spline,
 }
 
 /// The parameter behind one palette row.
@@ -1007,6 +1021,10 @@ impl Gui {
 
     /// Starts the Wall tool on the lowest level.
     fn start_wall_tool(&mut self, frame: &Frame) {
+        self.start_shaped_wall_tool(frame, WallShape::Line);
+    }
+
+    fn start_shaped_wall_tool(&mut self, frame: &Frame, shape: WallShape) {
         self.leave_walk();
         self.end_dim_tool();
         self.end_grid_tool();
@@ -1049,6 +1067,8 @@ impl Gui {
             flip: false,
             typed: String::new(),
             lines: Vec::new(),
+            shape,
+            pending: Vec::new(),
         });
         self.update_wall_lines();
         self.clear_selection();
@@ -1080,7 +1100,16 @@ impl Gui {
     fn tool_prompt(&mut self, frame: &Frame) {
         let Some(t) = &self.tool else { return };
         let exterior = if t.flip { "right" } else { "left" };
-        let text = if !t.typed.is_empty() {
+        let text = if t.last.is_some() && t.shape == WallShape::Arc && !t.pending.is_empty() {
+            "Arc wall: click a point the arc passes through (Esc cancels)".to_owned()
+        } else if t.last.is_some() && t.shape == WallShape::Arc {
+            "Arc wall: click the arc's end".to_owned()
+        } else if t.last.is_some() && t.shape == WallShape::Spline {
+            format!(
+                "Spline wall: click the points it passes through; Enter ends at the last ({} so far)",
+                t.pending.len()
+            )
+        } else if !t.typed.is_empty() {
             format!("Wall length: {}_  (Enter to place, Esc to cancel)", t.typed)
         } else if t.last.is_none() {
             format!(
@@ -1223,11 +1252,47 @@ impl Gui {
             self.update_overlay();
             return self.tool_prompt(frame);
         }
-        self.place_wall(p.point, frame);
+        match t.shape {
+            WallShape::Line => self.place_wall(p.point, frame),
+            // An arc: its end, then a point on it.
+            WallShape::Arc if t.pending.is_empty() => {
+                t.pending.push(p.point);
+                self.update_overlay();
+                self.tool_prompt(frame);
+            }
+            WallShape::Arc => {
+                let end = t.pending[0];
+                self.place_curve(end, vec![p.point], frame);
+            }
+            // A spline: more points until Enter.
+            WallShape::Spline => {
+                t.pending.push(p.point);
+                self.update_overlay();
+                self.tool_prompt(frame);
+            }
+        }
+    }
+
+    /// Enter in the Spline tool: the wall through the clicked points, ending at the last.
+    fn finish_spline(&mut self, frame: &Frame) -> bool {
+        let Some(t) = &self.tool else { return false };
+        if t.shape != WallShape::Spline || t.pending.is_empty() {
+            return false;
+        }
+        let mut pts = t.pending.clone();
+        let end = pts.pop().expect("one");
+        self.place_curve(end, pts, frame);
+        true
     }
 
     /// Creates a wall from the chain's last point to `end`, and continues the chain from `end`.
     fn place_wall(&mut self, end: [f64; 2], frame: &Frame) {
+        self.place_curve(end, Vec::new(), frame);
+    }
+
+    /// Creates a wall from the chain's last point to `end` through `through` (straight when
+    /// empty), and continues the chain from `end`.
+    fn place_curve(&mut self, end: [f64; 2], through: Vec<[f64; 2]>, frame: &Frame) {
         let Some(t) = &self.tool else { return };
         let Some(start) = t.last else { return };
         let top = match t.top {
@@ -1235,7 +1300,7 @@ impl Gui {
             None => json!({ "unconnected": WALL_HEIGHT }),
         };
         let args = json!({
-            "curve": {"line": {"start": start, "end": end}},
+            "curve": {"line": {"start": start, "end": end}, "through": through},
             "base_level": t.level,
             "top_constraint": top,
             "flip": t.flip,
@@ -1245,6 +1310,7 @@ impl Gui {
                 let t = self.tool.as_mut().expect("tool");
                 t.last = Some(end);
                 t.typed.clear();
+                t.pending.clear();
                 self.update_wall_lines();
                 self.refresh_scene(frame);
                 self.update_overlay();
@@ -1283,6 +1349,9 @@ impl Gui {
             WXK_RETURN | WXK_NUMPAD_ENTER if !t.typed.is_empty() => {
                 self.commit_typed_length(frame);
                 return true;
+            }
+            WXK_RETURN | WXK_NUMPAD_ENTER if t.shape == WallShape::Spline => {
+                return self.finish_spline(frame);
             }
             _ => {
                 let Some(c) = u32::try_from(key).ok().and_then(char::from_u32) else {
@@ -1362,8 +1431,37 @@ impl Gui {
                 color,
             ));
         }
+        // A curved wall being drawn: the curve through the clicked points and the cursor.
+        let curve = match (t.shape, t.last, t.cursor) {
+            (WallShape::Arc, Some(start), Some(c)) if !t.pending.is_empty() => {
+                reviera_core::walls::curved::path(
+                    reviera_core::walls::Line {
+                        start,
+                        end: t.pending[0],
+                    },
+                    &[c.point],
+                )
+            }
+            (WallShape::Spline, Some(start), Some(c)) if !t.pending.is_empty() => {
+                reviera_core::walls::curved::path(
+                    reviera_core::walls::Line {
+                        start,
+                        end: c.point,
+                    },
+                    &t.pending,
+                )
+            }
+            _ => None,
+        };
+        if let Some(path) = &curve {
+            let z = t.elevation;
+            for m in reviera_core::walls::curved::body(path, 0.2, z, z + WALL_HEIGHT, &[]) {
+                overlay.push(mesh(m, PREVIEW));
+            }
+        }
         if let (Some(start), Some(c)) = (t.last, t.cursor)
             && t.typed.is_empty()
+            && curve.is_none()
         {
             let height = t
                 .top
@@ -3316,6 +3414,14 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         }),
         "wall.create" => with(gui, |g| {
             g.start_wall_tool(f);
+            focus(g);
+        }),
+        "wall.create_arc" => with(gui, |g| {
+            g.start_shaped_wall_tool(f, WallShape::Arc);
+            focus(g);
+        }),
+        "wall.create_spline" => with(gui, |g| {
+            g.start_shaped_wall_tool(f, WallShape::Spline);
             focus(g);
         }),
         "door.place" | "window.place" => {

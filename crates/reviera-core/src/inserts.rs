@@ -203,6 +203,8 @@ pub struct Placed {
     pub kind: Kind,
     pub host: ElementId,
     pub wall: WallGeometry,
+    /// The host's curve, when it is curved (ARC-WALL-002): `along` is measured on it.
+    pub path: Option<walls::curved::Path>,
     pub ty: InsertType,
     pub recipe: InsertRecipe,
     /// Bottom elevation (absolute).
@@ -210,6 +212,24 @@ pub struct Placed {
 }
 
 impl Placed {
+    /// The length of the host's location curve (along a curved wall's curve).
+    pub fn span(&self) -> f64 {
+        self.path
+            .as_ref()
+            .map_or(self.wall.length(), walls::curved::Path::length)
+    }
+
+    /// The distance along the host of the point nearest to `p` (plan).
+    pub fn along_of(&self, p: [f64; 2]) -> f64 {
+        match &self.path {
+            Some(path) => path.project(p),
+            None => {
+                let (u, s) = (self.wall.direction(), self.wall.start);
+                (p[0] - s[0]) * u[0] + (p[1] - s[1]) * u[1]
+            }
+        }
+    }
+
     /// The opening through the host, in the wall's local frame.
     pub fn cut(&self) -> openings::Cut {
         let half = self.ty.width / 2.0;
@@ -222,6 +242,16 @@ impl Placed {
     /// Local frame point (x along the wall from the insert's centre, y toward the exterior, z
     /// from the bottom) to project coordinates.
     pub fn world(&self, [x, y, z]: [f64; 3]) -> [f64; 3] {
+        // On a curved wall the insert stays straight, square to the curve where it stands.
+        if let Some(p) = &self.path {
+            let (c, u) = p.at(self.recipe.along);
+            let n = [-u[1], u[0]];
+            return [
+                c[0] + u[0] * x + n[0] * y,
+                c[1] + u[1] * x + n[1] * y,
+                self.z0 + z,
+            ];
+        }
         let (u, n, s) = (self.wall.direction(), self.wall.normal(), self.wall.start);
         let along = self.recipe.along + x;
         [
@@ -355,11 +385,13 @@ pub fn resolve(store: &Store, e: &Element) -> Result<Placed> {
         .filter(|t| t.kind() == Some(kind))
         .unwrap_or_else(|| InsertType::default_for(kind));
     let ty = sized(ty, &recipe);
+    let path = walls::wall_recipe(wall_e).and_then(|r| walls::curved::path_of(&r));
     Ok(Placed {
         id: e.id(),
         kind,
         host,
         wall,
+        path,
         ty,
         z0: level_z + recipe.sill,
         recipe,
@@ -397,6 +429,7 @@ pub fn preview(
         kind,
         host,
         wall,
+        path: walls::wall_recipe(host_e).and_then(|r| walls::curved::path_of(&r)),
         z0: level_z + sill,
         ty,
         recipe: InsertRecipe {
@@ -493,7 +526,7 @@ pub fn fit(store: &Store, p: &mut Placed) -> bool {
         .bodies
         .get(&p.host)
         .map(openings::clear_span)
-        .unwrap_or([0.0, p.wall.length()]);
+        .unwrap_or([0.0, p.span()]);
     let min = min_size(&p.ty);
     // Height: on the wall's open face, above any roof it rises out of and under the roof it
     // is attached to (a dormer's front wall), else within its own height.
@@ -573,7 +606,7 @@ pub(crate) fn check_fit(store: &Store, p: &Placed) -> Result<()> {
         .bodies
         .get(&p.host)
         .map(openings::clear_span)
-        .unwrap_or([0.0, p.wall.length()]);
+        .unwrap_or([0.0, p.span()]);
     let c = p.cut();
     let (bottom, top) = (p.wall.base_z, p.wall.base_z + p.wall.height);
     if c.x[0] < span[0] - 1e-9 || c.x[1] > span[1] + 1e-9 {
@@ -782,8 +815,13 @@ pub(crate) fn place(
     let along = match (p.point_along, p.point) {
         (Some(a), _) => a,
         (None, Some(pt)) => {
-            let u = g.direction();
-            (pt[0] - g.start[0]) * u[0] + (pt[1] - g.start[1]) * u[1]
+            match walls::wall_recipe(host_e).and_then(|r| walls::curved::path_of(&r)) {
+                Some(path) => path.project(pt),
+                None => {
+                    let u = g.direction();
+                    (pt[0] - g.start[0]) * u[0] + (pt[1] - g.start[1]) * u[1]
+                }
+            }
         }
         (None, None) => {
             return Err(Error::new(

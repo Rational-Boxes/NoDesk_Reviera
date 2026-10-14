@@ -670,6 +670,18 @@ icon = "roof"
 help = "Roof by footprint: pick walls or sketch the outline; sloped edges rise, the others are gables"
 
 [[action]]
+id = "wall.create_arc"
+label = "Arc Wall"
+icon = "arc_wall"
+help = "Draw a curved wall: click its start and end, then a point the arc passes through"
+
+[[action]]
+id = "wall.create_spline"
+label = "Spline Wall"
+icon = "spline_wall"
+help = "Draw a smoothly curved wall through points: click them, Enter ends at the last"
+
+[[action]]
 id = "roof.create_arched"
 label = "Arched Roof"
 icon = "arched_roof"
@@ -803,6 +815,8 @@ tools = [{ action = "tool.modify", size = "large" }]
 label = "Build"
 tools = [
   { action = "wall.create", size = "large" },
+  { action = "wall.create_arc", size = "small" },
+  { action = "wall.create_spline", size = "small" },
   { action = "door.place", size = "large" },
   { action = "window.place", size = "large" },
   { action = "floor.create", size = "large" },

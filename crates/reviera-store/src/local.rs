@@ -774,6 +774,57 @@ impl LocalProject {
             geometry::contain(&mut self.ifc, step, storey, owner_history)?;
             wall_steps.insert(step);
         }
+        // Curved walls (ARC-WALL-002): a faceted B-rep of the curve's pieces, in a frame at the
+        // start along the chord (where its openings are placed).
+        for e in store.iter() {
+            let Some(r) = walls::wall_recipe(e) else {
+                continue;
+            };
+            let (Some(path), Ok(g)) = (walls::curved::path_of(&r), walls::regenerate(store, e))
+            else {
+                continue;
+            };
+            let storey = GlobalId::parse(&r.base_level)
+                .and_then(|l| store.find_by_guid(&l))
+                .and_then(|b| self.steps.get(&b).copied());
+            let (Some(&step), Some(storey)) = (self.steps.get(&e.id()), storey) else {
+                continue;
+            };
+            let (u, n) = (g.direction(), g.normal());
+            let local = |p: &[f64; 3]| {
+                let d = [p[0] - g.start[0], p[1] - g.start[1]];
+                [
+                    d[0] * u[0] + d[1] * u[1],
+                    d[0] * n[0] + d[1] * n[1],
+                    p[2] - g.base_z,
+                ]
+            };
+            let solids: Vec<geometry::Polyhedron> =
+                walls::curved::body(&path, g.width, g.base_z, g.base_z + g.height, &[])
+                    .iter()
+                    .map(|(pts, idx)| geometry::Polyhedron {
+                        points: pts.iter().map(local).collect(),
+                        faces: idx
+                            .chunks(3)
+                            .map(|t| t.iter().map(|i| *i as usize).collect())
+                            .collect(),
+                    })
+                    .collect();
+            geometry::remove_wall_shape(&mut self.ifc, step)?;
+            geometry::remove_breps(&mut self.ifc, step)?;
+            geometry::write_breps(
+                &mut self.ifc,
+                step,
+                geometry::BrepFrame {
+                    origin: [g.start[0], g.start[1], g.base_z],
+                    x_dir: u,
+                },
+                &solids,
+                self.length_scale,
+                contexts,
+            )?;
+            geometry::contain(&mut self.ifc, step, storey, owner_history)?;
+        }
         let joins: Vec<_> = solved
             .joins
             .iter()
@@ -816,10 +867,28 @@ impl LocalProject {
                 })
             };
             let (half_w, half_t) = (p.ty.width / 2.0, p.wall.width / 2.0 + 0.001);
+            // In the wall's frame (its start, along its chord): on a curved wall, the insert's
+            // point and tangent on the curve.
+            let (origin, x_dir) = match &p.path {
+                Some(path) => {
+                    let (c, t) = path.at(p.recipe.along);
+                    let (u, n, s) = (p.wall.direction(), p.wall.normal(), p.wall.start);
+                    let d = [c[0] - s[0], c[1] - s[1]];
+                    (
+                        [d[0] * u[0] + d[1] * u[1], d[0] * n[0] + d[1] * n[1]],
+                        [t[0] * u[0] + t[1] * u[1], t[0] * n[0] + t[1] * n[1]],
+                    )
+                }
+                None => ([p.recipe.along, 0.0], [1.0, 0.0]),
+            };
             let frame = geometry::Frame {
                 relative_to: placement_of(&self.ifc, wall)?,
-                origin: [p.recipe.along / scale, 0.0, (p.z0 - p.wall.base_z) / scale],
-                x_dir: [1.0, 0.0],
+                origin: [
+                    origin[0] / scale,
+                    origin[1] / scale,
+                    (p.z0 - p.wall.base_z) / scale,
+                ],
+                x_dir,
             };
             let void = [[-half_w, half_w], [-half_t, half_t], [0.0, p.ty.height]];
             geometry::write_boxes(&mut self.ifc, opening, &frame, &[void], scale, contexts)?;

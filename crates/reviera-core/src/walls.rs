@@ -14,6 +14,7 @@
 //! Chapter 3.
 
 pub mod attach;
+pub mod curved;
 pub mod joins;
 pub mod openings;
 
@@ -95,6 +96,10 @@ pub struct WallRecipe {
     /// The roof the top is attached to (GlobalId, ARC-WALL-008).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub attach_top: Option<String>,
+    /// Points the location curve passes through between its start and end: one makes an arc,
+    /// more a spline (ARC-WALL-002). Empty for a straight wall.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub through: Vec<[f64; 2]>,
 }
 
 fn both_allowed() -> [bool; 2] {
@@ -247,6 +252,10 @@ pub fn regenerate(store: &Store, e: &Element) -> Result<WallGeometry> {
 #[serde(deny_unknown_fields)]
 pub struct CurveArg {
     pub line: Line,
+    /// Points the wall passes through between the line's start and end: one makes an arc, two
+    /// or more a smooth spline (ARC-WALL-002).
+    #[serde(default)]
+    pub through: Vec<[f64; 2]>,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -336,7 +345,13 @@ pub(crate) fn create(txn: &mut crate::txn::Transaction<'_>, p: CreateParams) -> 
             ),
         )
     })?;
-    let length = p.curve.line.length();
+    // A curve through points in line with its ends is straight.
+    let through = if curved::path(p.curve.line, &p.curve.through).is_some() {
+        p.curve.through.clone()
+    } else {
+        Vec::new()
+    };
+    let length = curved::path(p.curve.line, &through).map_or(p.curve.line.length(), |c| c.length());
     if length < TOL_SHORT || length < width {
         return Err(Error::new("wall.too_short", "Wall is too short"));
     }
@@ -364,6 +379,7 @@ pub(crate) fn create(txn: &mut crate::txn::Transaction<'_>, p: CreateParams) -> 
         flip: p.flip,
         join_allowed: both_allowed(),
         attach_top: None,
+        through,
     };
     let id = txn.create(
         NewElement::new("IfcWall")
@@ -401,12 +417,19 @@ pub(crate) fn set_location(
         )
     })?;
     let width = regenerate(&store, wall)?.width;
-    let length = p.curve.line.length();
+    // A curve through points in line with its ends is straight.
+    let through = if curved::path(p.curve.line, &p.curve.through).is_some() {
+        p.curve.through.clone()
+    } else {
+        Vec::new()
+    };
+    let length = curved::path(p.curve.line, &through).map_or(p.curve.line.length(), |c| c.length());
     if length < TOL_SHORT || length < width {
         return Err(Error::new("wall.too_short", "Wall is too short"));
     }
     let old = recipe.curve;
     recipe.curve = p.curve.line;
+    recipe.through = through;
     let value = serde_json::to_value(&recipe).expect("recipes serialise");
     txn.modify(id, |e| {
         e.params.insert(RECIPE_KEY.into(), value);

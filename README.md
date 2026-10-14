@@ -121,6 +121,11 @@ The KIT FZK *AC20-Institute-Var-2* sample model (`test-data/ifc/`) open in Revie
   built-in Castle Turret plugin builds a tower with a cone, dome or battlement top and arrow
   slits from a form. Not yet: the window's Scripts menu and form dialog (headless runs answer
   forms from `answers` and defaults); macOS and Windows builds need LuaJIT built from source.
+- **Curved walls**: Architecture › Arc Wall draws a wall through its start, end and a point on
+  the arc; Spline Wall draws one smoothly through clicked points. Doors and windows go on the
+  curve (straight, square to it), rooms are bounded by curved walls, and the walls save as
+  faceted B-reps (`wall.create` with `curve.through`). Not yet: joins between curved and other
+  walls (their ends butt), attaching them to roofs, and true curved IFC geometry.
 - **Arched roofs and domes**: Architecture › Arched Roof sketches a four-sided footprint and
   makes a smooth barrel or segmental vault springing from the longer sides (semicircle,
   elliptical and catenary profiles too). Over a trapezoid it tapers, keeping its rise or its
@@ -317,7 +322,7 @@ The KIT FZK *AC20-Institute-Var-2* sample model (`test-data/ifc/`) open in Revie
 
 ## Planned next
 
-The first milestone continues with shaped windows (round, round-top, Gothic, fan and gable heads, ARC-WIN-002), roof openings (skylights and shafts), and layered wall types. Then come the rest of the curved forms: spline-curved walls (ARC-WALL-002), and
+The first milestone continues with shaped windows (round, round-top, Gothic, fan and gable heads, ARC-WIN-002), roof openings (skylights and shafts), and layered wall types. Then come the rest of the curved forms:
 boolean intersect, subtract and union between elements (ARC-MOD-028). After that come general
 shape and CSG modelling tools,
 CADCraft drawing exchange, and the current NBIMS-US COBie layout.
