@@ -139,7 +139,9 @@ pub fn all(store: &Store) -> Vec<Body> {
     // Walls: joined, cut by their openings; an attached wall's part above the roof's lowest point
     // over it follows the roof (ARC-WALL-008).
     let cuts = crate::inserts::cuts_by_host(store);
-    for (id, mut body) in crate::walls::solve(store).bodies {
+    let solved = crate::walls::solve(store);
+    let curved_ends = |id| crate::walls::curved::ends_of(&solved, id);
+    for (id, mut body) in solved.bodies.clone() {
         let class = class_of(id, "IfcWall");
         if let Some(Ok(a)) = crate::walls::attach::attached_body(store, id, &body) {
             body.geometry.height = a.z_min - body.geometry.base_z;
@@ -172,6 +174,7 @@ pub fn all(store: &Store) -> Vec<Body> {
             g.base_z + g.height,
             c,
             roof.as_ref(),
+            curved_ends(e.id()),
         ) {
             push(e.id(), &class, mesh, false);
         }

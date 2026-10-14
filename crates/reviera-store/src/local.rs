@@ -808,6 +808,7 @@ impl LocalProject {
                 walls::attach::top_target(store, e.id())
                     .map(|(_, r)| r)
                     .as_ref(),
+                walls::curved::ends_of(&solved, e.id()),
             )
             .iter()
             .map(|(pts, idx)| geometry::Polyhedron {

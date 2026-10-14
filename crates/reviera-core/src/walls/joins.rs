@@ -105,6 +105,9 @@ impl WallBody {
 pub struct Solved {
     pub bodies: BTreeMap<ElementId, WallBody>,
     pub joins: Vec<Join>,
+    /// Curved walls' joined ends (ARC-WALL-002): by wall and end (0 start, 1 end), the end's
+    /// corners on the curve's left and right side, where a join moved them.
+    pub curved_ends: BTreeMap<(ElementId, usize), [[f64; 2]; 2]>,
 }
 
 impl Solved {
@@ -221,7 +224,7 @@ pub fn solve(store: &Store) -> Solved {
         .iter()
         .filter_map(|e| {
             let recipe = wall_recipe(e)?;
-            // Curved walls do not join yet (ARC-WALL-002); their ends butt.
+            // Curved walls join through stand-ins at their ends (below).
             if !recipe.through.is_empty() {
                 return None;
             }
@@ -234,6 +237,48 @@ pub fn solve(store: &Store) -> Solved {
             })
         })
         .collect();
+
+    // Curved walls (ARC-WALL-002): each end joins through a short straight stand-in along the
+    // curve's end tangent; its solved corners become the curved wall's end corners.
+    let real = walls.len();
+    let mut stands: Vec<(ElementId, usize)> = Vec::new();
+    for e in store.iter() {
+        let Some(recipe) = wall_recipe(e) else {
+            continue;
+        };
+        let (Some(path), Ok(g)) = (super::curved::path_of(&recipe), regenerate(store, e)) else {
+            continue;
+        };
+        let len = (path.length() / 2.0).min(1.0);
+        for end in 0..2 {
+            if !recipe.join_allowed[end] {
+                continue;
+            }
+            // From the end, back into the curve.
+            let (p, t) = if end == 0 {
+                path.at(0.0)
+            } else {
+                path.at(path.length())
+            };
+            let dir = if end == 0 { t } else { [-t[0], -t[1]] };
+            let sg = WallGeometry {
+                start: p,
+                end: [p[0] + dir[0] * len, p[1] + dir[1] * len],
+                ..g
+            };
+            walls.push(Wall {
+                id: ElementId(u64::MAX - stands.len() as u64),
+                g: sg,
+                allowed: [true, false],
+                footprint: sg.footprint(),
+            });
+            stands.push((e.id(), end));
+        }
+    }
+    let real_of = |id: ElementId| -> ElementId {
+        let k = u64::MAX - id.0;
+        stands.get(k as usize).map_or(id, |s| s.0)
+    };
 
     // L candidates: pairs of allowed ends of different walls.
     let ends: Vec<WallEnd> = walls
@@ -299,8 +344,32 @@ pub fn solve(store: &Store) -> Solved {
         }
     }
 
+    // The stand-ins' joined end corners, on their curves' left and right; joins name the curved
+    // wall itself.
+    let mut curved_ends = BTreeMap::new();
+    for (k, w) in walls[real..].iter().enumerate() {
+        if !joins.iter().any(|j| j.wall == w.id || j.other == w.id) {
+            continue;
+        }
+        let (id, end) = stands[k];
+        // A stand-in runs into its curve: at the start its left is the curve's left; at the end
+        // it runs backwards, so its left is the curve's right.
+        let (plus, minus) = (w.footprint[3], w.footprint[0]);
+        let corners = if end == 0 {
+            [plus, minus]
+        } else {
+            [minus, plus]
+        };
+        curved_ends.insert((id, end), corners);
+    }
+    for j in &mut joins {
+        j.wall = real_of(j.wall);
+        j.other = real_of(j.other);
+    }
+    walls.truncate(real);
     joins.sort();
     Solved {
+        curved_ends,
         bodies: walls
             .into_iter()
             .map(|w| {

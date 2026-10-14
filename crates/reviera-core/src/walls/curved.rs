@@ -251,6 +251,32 @@ fn prism(q: [[f64; 2]; 4], z0: f64, z1: f64) -> Mesh {
     crate::bodies::extrude(&q, &[], z0, z1)
 }
 
+/// The curve offset half the width to its left and right, with joined ends' corners
+/// (`[left, right]` at the start and the end) in place of the square ones.
+pub fn sides(
+    p: &Path,
+    width: f64,
+    ends: [Option<[[f64; 2]; 2]>; 2],
+) -> (Vec<[f64; 2]>, Vec<[f64; 2]>) {
+    let (mut left, mut right) = (p.offset(width / 2.0), p.offset(-width / 2.0));
+    let n = left.len();
+    for (end, k) in [(0, 0), (1, n - 1)] {
+        if let Some([l, r]) = ends[end] {
+            left[k] = l;
+            right[k] = r;
+        }
+    }
+    (left, right)
+}
+
+/// A curved wall's joined ends, from the solved walls.
+pub fn ends_of(solved: &super::Solved, id: crate::id::ElementId) -> [Option<[[f64; 2]; 2]>; 2] {
+    [
+        solved.curved_ends.get(&(id, 0)).copied(),
+        solved.curved_ends.get(&(id, 1)).copied(),
+    ]
+}
+
 /// The wall body of one plan quad (`[start-left, end-left, end-right, start-right]`) from `z0`:
 /// as a short straight wall, for attaching its top.
 fn piece_body(q: [[f64; 2]; 4], width: f64, z0: f64, height: f64) -> super::WallBody {
@@ -296,8 +322,9 @@ pub fn body(
     top_z: f64,
     cuts: &[super::openings::Cut],
     roof: Option<&crate::roofs::RoofGeometry>,
+    ends: [Option<[[f64; 2]; 2]>; 2],
 ) -> Vec<Mesh> {
-    let (left, right) = (p.offset(width / 2.0), p.offset(-width / 2.0));
+    let (left, right) = sides(p, width, ends);
     let mut out = Vec::new();
     for i in 0..p.points.len() - 1 {
         let (s0, s1) = (p.along[i], p.along[i + 1]);
@@ -365,8 +392,8 @@ pub fn body(
 pub type Outline = ([Vec<[f64; 2]>; 2], [[[f64; 2]; 2]; 2]);
 
 /// A curved wall's faces in plan, for room boundaries.
-pub fn outline(p: &Path, width: f64) -> Outline {
-    let (plus, minus) = (p.offset(width / 2.0), p.offset(-width / 2.0));
+pub fn outline(p: &Path, width: f64, ends: [Option<[[f64; 2]; 2]>; 2]) -> Outline {
+    let (plus, minus) = sides(p, width, ends);
     let n = plus.len();
     (
         [minus.clone(), plus.clone()],
@@ -450,14 +477,14 @@ mod tests {
         };
         // A half annulus 0.2 m thick, 3 m high: π (5.1² − 4.9²) / 2 × 3.
         let exact = std::f64::consts::PI * (5.1f64.powi(2) - 4.9f64.powi(2)) / 2.0 * 3.0;
-        let v = volume(&body(&p, 0.2, 0.0, 3.0, &[], None));
+        let v = volume(&body(&p, 0.2, 0.0, 3.0, &[], None, [None, None]));
         assert!((v - exact).abs() / exact < 1e-3, "{v} vs {exact}");
         // A 1 × 2 m opening along the curve takes about its area times the thickness.
         let cut = super::super::openings::Cut {
             x: [7.0, 8.0],
             z: [0.0, 2.0],
         };
-        let w = volume(&body(&p, 0.2, 0.0, 3.0, &[cut], None));
+        let w = volume(&body(&p, 0.2, 0.0, 3.0, &[cut], None, [None, None]));
         assert!(((v - w) - 1.0 * 2.0 * 0.2).abs() < 0.01, "{}", v - w);
     }
 

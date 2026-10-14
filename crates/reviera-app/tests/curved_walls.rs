@@ -201,3 +201,58 @@ fn a_round_room_of_curved_walls() {
         .count();
     assert_eq!(curved, 2);
 }
+
+/// A curved wall meeting a straight wall at an angle joins it with a mitre (ARC-JOIN-001 through
+/// a stand-in along the curve's end tangent): the corners meet and nothing overlaps.
+#[test]
+fn curved_walls_join_straight_ones() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = App::new(AppConfig {
+        live: None,
+        untitled_dir: dir.path().to_owned(),
+    });
+    run(&mut app, "file.new", json!({})).unwrap();
+    let level = run(&mut app, "level.list", json!({})).unwrap()[0]["id"].as_u64().unwrap();
+    let straight = run(
+        &mut app,
+        "wall.create",
+        json!({ "curve": { "line": { "start": [0.0, 0.0], "end": [6.0, 0.0] } },
+                "base_level": level, "top_constraint": { "unconnected": 3 } }),
+    )
+    .unwrap()
+    .as_u64()
+    .unwrap();
+    // An arc leaving the straight wall's end at an angle, bulging out.
+    let arc = run(
+        &mut app,
+        "wall.create",
+        json!({ "curve": { "line": { "start": [6.0, 0.0], "end": [9.0, 5.0] },
+                           "through": [[8.6, 1.6]] },
+                "base_level": level, "top_constraint": { "unconnected": 3 } }),
+    )
+    .unwrap()
+    .as_u64()
+    .unwrap();
+    let d = app.document(app.active().unwrap()).unwrap();
+    let store = d.doc.store();
+    let solved = reviera_core::walls::solve(store);
+    let id = |n: u64| reviera_core::ElementId(n);
+    // Joined: the join names the curved wall, and its start corners are the straight wall's end
+    // corners.
+    assert!(
+        solved.joins.iter().any(|j| (j.wall == id(straight) && j.other == id(arc))
+            || (j.wall == id(arc) && j.other == id(straight))),
+        "{:?}",
+        solved.joins
+    );
+    let ends = solved.curved_ends.get(&(id(arc), 0)).copied().expect("the arc's start joined");
+    let f = solved.bodies[&id(straight)].footprint;
+    for c in ends {
+        assert!(
+            [f[1], f[2]].iter().any(|q| (q[0] - c[0]).hypot(q[1] - c[1]) < 1e-9),
+            "{c:?} not on {f:?}"
+        );
+    }
+    let found = run(&mut app, "overlap.find", json!({})).unwrap();
+    assert_eq!(found["overlaps"], json!([]), "{found:#}");
+}

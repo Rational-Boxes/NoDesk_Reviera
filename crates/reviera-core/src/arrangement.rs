@@ -64,7 +64,8 @@ pub fn wall_edges(store: &Store, z: f64) -> Vec<Edge> {
         if z < g.base_z - 1e-9 || z > g.base_z + g.height + 1e-9 {
             continue;
         }
-        let ([minus, plus], ends) = walls::curved::outline(&path, g.width);
+        let ([minus, plus], ends) =
+            walls::curved::outline(&path, g.width, walls::curved::ends_of(&solved, e.id()));
         let (m, p) = if r.flip {
             ("face:ext", "face:int")
         } else {
