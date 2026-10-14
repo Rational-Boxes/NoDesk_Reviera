@@ -4006,7 +4006,7 @@ These tools are on the **Modify** tab and are repeated on every `Modify | <Eleme
 - `view.set_virtual_volumes(view_id, mode: hidden|translucent|solid)`
 
 **Acceptance criteria.**
-- [x] A 900 mm door's swing volume flags a cabinet placed within its arc, and not the wall it opens from.
+- [ ] A 900 mm door's swing volume flags a cabinet placed within its arc, and not the wall it opens from.
 - [ ] Under ADA 2010, a toilet's 1525 × 1420 mm clear floor space flags a lavatory placed inside it.
 - [ ] A room flagged accessible without a 1500 mm turning circle clear of fixtures is reported.
 
