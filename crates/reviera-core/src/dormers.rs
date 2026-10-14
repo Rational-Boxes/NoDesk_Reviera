@@ -21,9 +21,13 @@
 //!   roof.
 //!
 //! The dormer is an `IfcElementAssembly` (ObjectType "DORMER") whose recipe lists its parts; each
-//! part names its dormer, and goes with it. Editing regenerates the parts. Built so far: the
-//! parts above. The opening in the main roof (ARC-OPEN-005), wall bases that follow the main
-//! roof, and regeneration when the main roof changes come later.
+//! part names its dormer, and goes with it. Editing regenerates the parts.
+//!
+//! **Opening** (ARC-OPEN-005): the main roof is cut through, plumb, inside the dormer walls'
+//! interior faces, from the front wall back to where the cheek walls end (where the main roof's
+//! top meets the dormer eave). The opening is taken from the walls as they are, so it follows
+//! them. Wall bases that follow the main roof, and regeneration when the main roof changes,
+//! come later.
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -320,6 +324,48 @@ fn build(
         })?;
     }
     Ok(parts)
+}
+
+/// The openings the dormers on a roof (GlobalId) cut through it, in plan: each the region inside
+/// its front and cheek walls' interior faces, from the front wall to the cheeks' ends.
+pub fn openings(store: &Store, roof: &str) -> Vec<Vec<[f64; 2]>> {
+    let lines = |id: &str| -> Option<(walls::WallGeometry, [f64; 2], [f64; 2])> {
+        let w = store.get(store.find_by_guid(&GlobalId::parse(id)?)?)?;
+        let g = walls::regenerate(store, w).ok()?;
+        // The interior face: right of the wall's direction.
+        let n = g.normal();
+        let o = -g.width / 2.0;
+        Some((
+            g,
+            [g.start[0] + n[0] * o, g.start[1] + n[1] * o],
+            [g.end[0] + n[0] * o, g.end[1] + n[1] * o],
+        ))
+    };
+    let meet = |a: ([f64; 2], [f64; 2]), b: ([f64; 2], [f64; 2])| -> Option<[f64; 2]> {
+        let (p, d) = (a.0, [a.1[0] - a.0[0], a.1[1] - a.0[1]]);
+        let (q, e) = (b.0, [b.1[0] - b.0[0], b.1[1] - b.0[1]]);
+        let den = d[0] * e[1] - d[1] * e[0];
+        if den.abs() < 1e-12 {
+            return None;
+        }
+        let t = ((q[0] - p[0]) * e[1] - (q[1] - p[1]) * e[0]) / den;
+        Some([p[0] + d[0] * t, p[1] + d[1] * t])
+    };
+    store
+        .iter()
+        .filter_map(dormer_recipe)
+        .filter(|r| r.roof == roof)
+        .filter_map(|r| {
+            // Parts: the roof, then the front, left and right walls.
+            let front = lines(r.parts.get(1)?)?;
+            let left = lines(r.parts.get(2)?)?;
+            let right = lines(r.parts.get(3)?)?;
+            let f = (front.1, front.2);
+            let (l, rt) = ((left.1, left.2), (right.1, right.2));
+            // The left wall runs up the slope (its end at the back); the right one down it.
+            Some(vec![meet(f, rt)?, meet(f, l)?, left.2, right.1])
+        })
+        .collect()
 }
 
 fn write_recipe(

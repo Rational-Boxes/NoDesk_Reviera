@@ -479,7 +479,97 @@ pub fn regenerate(store: &Store, e: &Element) -> Result<RoofGeometry> {
         &loops, &ring, &keys, &edges, r.slope, plate, cutoff, thickness,
     )?;
     g.trims = eaves::trims(&g, &loops, &ring, &keys, &edges, &lines, r.slope);
+    // Openings through the roof: under its dormers (ARC-OPEN-005).
+    for hole in crate::dormers::openings(store, e.guid().as_str()) {
+        cut_hole(&mut g, &hole);
+    }
     Ok(g)
+}
+
+/// Cuts a plumb opening (a plan polygon) through the face it lies in: the face's slab is
+/// rebuilt with the hole, its sides plumb. A hole across faces, or in a clipped face, is left.
+pub fn cut_hole(g: &mut RoofGeometry, hole: &[[f64; 2]]) {
+    if hole.len() < 3 {
+        return;
+    }
+    let ring2 = |r: &[[f64; 3]]| r.iter().map(|q| [q[0], q[1]]).collect::<Vec<_>>();
+    let Some(face) = g.faces.iter_mut().find(|f| {
+        let ring = ring2(&f.bottom);
+        hole.iter().all(|p| inside(*p, &ring))
+    }) else {
+        return;
+    };
+    let n = face.bottom.len();
+    if face.faceted || !face.holes.is_empty() || face.slab.0.len() != 2 * n {
+        return;
+    }
+    let normal = face.normal;
+    let on = |p: [f64; 2], q: [f64; 3]| {
+        q[2] - (normal[0] * (p[0] - q[0]) + normal[1] * (p[1] - q[1])) / normal[2]
+    };
+    let (b0, t0) = (face.bottom[0], face.slab.0[n]);
+    let hb: Vec<[f64; 3]> = hole.iter().map(|p| [p[0], p[1], on(*p, b0)]).collect();
+    let ht: Vec<[f64; 3]> = hole.iter().map(|p| [p[0], p[1], on(*p, t0)]).collect();
+    let m = hole.len();
+    let bottom = face.slab.0[..n].to_vec();
+    let top = face.slab.0[n..].to_vec();
+    // Points: bottom ring, hole bottom, top ring, hole top.
+    let mut positions = bottom.clone();
+    positions.extend(&hb);
+    positions.extend(&top);
+    positions.extend(&ht);
+    let (nb, nh) = (n as u32, m as u32);
+    let top_at = nb + nh;
+    let mut indices: Vec<u32> = Vec::new();
+    let cap = |ring: &[[f64; 3]], first: u32, up: bool, indices: &mut Vec<u32>| {
+        let mut flat = ring2(ring);
+        flat.extend(hole.iter().copied());
+        let mut tris: Vec<u32> = Vec::new();
+        earcut::Earcut::new().earcut(flat.iter().copied(), &[n as u32], &mut tris);
+        for t in tris.chunks(3) {
+            let (a, b, c) = (t[0] as usize, t[1] as usize, t[2] as usize);
+            let ccw = cross2(
+                [flat[b][0] - flat[a][0], flat[b][1] - flat[a][1]],
+                [flat[c][0] - flat[a][0], flat[c][1] - flat[a][1]],
+            ) > 0.0;
+            let (a, b, c) = (first + t[0], first + t[1], first + t[2]);
+            if ccw == up {
+                indices.extend([a, b, c]);
+            } else {
+                indices.extend([a, c, b]);
+            }
+        }
+    };
+    cap(&bottom, 0, false, &mut indices);
+    cap(&top, top_at, true, &mut indices);
+    // The outer sides as before (the bottom ring counter-clockwise from above).
+    for i in 0..nb {
+        let j = (i + 1) % nb;
+        indices.extend([i, j, top_at + j, i, top_at + j, top_at + i]);
+    }
+    // The hole's sides, facing into the hole.
+    let centre = [
+        hole.iter().map(|p| p[0]).sum::<f64>() / m as f64,
+        hole.iter().map(|p| p[1]).sum::<f64>() / m as f64,
+    ];
+    for i in 0..nh {
+        let j = (i + 1) % nh;
+        let (a, b) = (hole[i as usize], hole[j as usize]);
+        let d = [b[0] - a[0], b[1] - a[1]];
+        // The outward normal of a counter-clockwise quad (a, b, b top, a top) is d × up = right.
+        let right = [d[1], -d[0]];
+        let mid = [(a[0] + b[0]) / 2.0, (a[1] + b[1]) / 2.0];
+        let toward = right[0] * (centre[0] - mid[0]) + right[1] * (centre[1] - mid[1]) > 0.0;
+        let (ba, bb, ta, tb) = (nb + i, nb + j, top_at + nb + i, top_at + nb + j);
+        if toward {
+            indices.extend([ba, bb, tb, ba, tb, ta]);
+        } else {
+            indices.extend([ba, tb, bb, ba, ta, tb]);
+        }
+    }
+    face.slab = (positions, indices);
+    face.holes.push(hb);
+    face.faceted = true;
 }
 
 /// A loop turned counter-clockwise (or clockwise when `ccw` is false), each corner still

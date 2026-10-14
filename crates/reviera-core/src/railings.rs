@@ -964,6 +964,55 @@ pub struct CreateParams {
     pub base_offset: Option<Value>,
 }
 
+/// The top of the highest floor, deck or flat roof on `level` that the whole path lies on
+/// (inside its outline or on its edges, within 10 mm).
+fn surface_under(store: &Store, level: &Element, path: &[[f64; 2]]) -> Option<f64> {
+    let guid = level.guid().to_string();
+    let inside = |p: [f64; 2], ring: &[[f64; 2]]| {
+        let n = ring.len();
+        let mut c = false;
+        let mut near = false;
+        for i in 0..n {
+            let (a, b) = (ring[i], ring[(i + 1) % n]);
+            let d = [b[0] - a[0], b[1] - a[1]];
+            let l2 = (d[0] * d[0] + d[1] * d[1]).max(1e-18);
+            let t = (((p[0] - a[0]) * d[0] + (p[1] - a[1]) * d[1]) / l2).clamp(0.0, 1.0);
+            if (p[0] - a[0] - d[0] * t).hypot(p[1] - a[1] - d[1] * t) < 0.01 {
+                near = true;
+            }
+            if (a[1] > p[1]) != (b[1] > p[1])
+                && p[0] < a[0] + (p[1] - a[1]) / (b[1] - a[1]) * (b[0] - a[0])
+            {
+                c = !c;
+            }
+        }
+        c || near
+    };
+    store
+        .iter()
+        .filter_map(|e| {
+            let top = match crate::floors::slab_recipe(e) {
+                Some((crate::floors::SlabKind::Floor, r)) if r.level == guid => {
+                    crate::floors::regenerate(store, e).ok()?.top
+                }
+                Some(_) => return None,
+                None => {
+                    let r = crate::roofs::roof_recipe(e)?;
+                    if r.level != guid {
+                        return None;
+                    }
+                    host_top(store, e).ok()?
+                }
+            };
+            let curves = crate::sketch_edit::current_curves(store, e)?;
+            let ring: Vec<[f64; 2]> = curves.iter().map(|c| c.1.start).collect();
+            path.iter().all(|p| inside(*p, &ring)).then_some(top)
+        })
+        .fold(None, |best: Option<f64>, t| {
+            Some(best.map_or(t, |b| b.max(t)))
+        })
+}
+
 /// A railing along a sketched path (Sketch Path).
 pub(crate) fn create(txn: &mut crate::txn::Transaction<'_>, p: CreateParams) -> Result<ElementId> {
     let store = txn.store().clone();
@@ -972,12 +1021,12 @@ pub(crate) fn create(txn: &mut crate::txn::Transaction<'_>, p: CreateParams) -> 
         .and_then(|l| store.get(l))
         .filter(|l| l.class == crate::levels::CLASS)
         .ok_or_else(|| Error::new("railing.no_level", "no such level"))?;
-    let base_offset = p
-        .base_offset
-        .as_ref()
-        .map(|v| number(&store, v, "the base offset"))
-        .transpose()?
-        .unwrap_or(0.0);
+    let base_offset = match p.base_offset.as_ref() {
+        Some(v) => number(&store, v, "the base offset")?,
+        // Sketched over a deck, floor or flat roof: on its top.
+        None => surface_under(&store, level, &p.path)
+            .map_or(0.0, |top| top - crate::levels::elevation(level)),
+    };
     make(
         txn,
         p.type_id.as_ref(),

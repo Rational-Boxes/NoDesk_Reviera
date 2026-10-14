@@ -147,6 +147,83 @@ fn dormers_of_every_style_fill_their_gaps() {
     // The cheek walls end where the dormer eave meets the main roof.
     assert!((main_top([5.0, 0.5 + cheek]) - z_eave).abs() < 1e-6);
 
+    // The opening (ARC-OPEN-005): through the main roof inside the walls' interior faces (200 mm
+    // walls), from the front wall back to the cheeks' ends.
+    let opening = |doc: &Document| {
+        let g = roofs::regenerate(doc.store(), doc.store().get(main).unwrap()).unwrap();
+        let holes: Vec<Vec<[f64; 3]>> = g.faces.iter().flat_map(|f| f.holes.clone()).collect();
+        assert_eq!(holes.len(), 1);
+        let xs = holes[0].iter().map(|p| p[0]);
+        let ys = holes[0].iter().map(|p| p[1]);
+        (
+            xs.clone().fold(f64::MAX, f64::min),
+            xs.fold(f64::MIN, f64::max),
+            ys.clone().fold(f64::MAX, f64::min),
+            ys.fold(f64::MIN, f64::max),
+            g,
+        )
+    };
+    let (x0, x1, y0, y1, g) = opening(&doc);
+    assert!(
+        (x0 - 4.2).abs() < 1e-9 && (x1 - 5.8).abs() < 1e-9,
+        "{x0} {x1}"
+    );
+    assert!(
+        (y0 - 0.7).abs() < 1e-9 && (y1 - (0.5 + cheek)).abs() < 1e-9,
+        "{y0} {y1}"
+    );
+    assert!(g.underside([5.0, 1.0]).is_none());
+    assert!(g.underside([3.0, 1.0]).is_some());
+    // Less roof by the opening: its plan area.
+    assert!(
+        (main_g.projected_area() - g.projected_area() - 1.6 * (y1 - y0)).abs() < 1e-6,
+        "{}",
+        main_g.projected_area() - g.projected_area()
+    );
+    // The slab stays a closed solid: less by the opening's plan area times its plumb depth.
+    let vol = |g: &roofs::RoofGeometry| -> f64 {
+        g.faces
+            .iter()
+            .map(|f| {
+                let p = &f.slab.0;
+                f.slab
+                    .1
+                    .chunks(3)
+                    .map(|t| {
+                        let (a, b, c) = (p[t[0] as usize], p[t[1] as usize], p[t[2] as usize]);
+                        (a[0] * (b[1] * c[2] - b[2] * c[1]) - a[1] * (b[0] * c[2] - b[2] * c[0])
+                            + a[2] * (b[0] * c[1] - b[1] * c[0]))
+                            / 6.0
+                    })
+                    .sum::<f64>()
+            })
+            .sum()
+    };
+    let cut = vol(&main_g) - vol(&g);
+    let expected = 1.6 * (y1 - y0) * 0.3 * 2f64.sqrt();
+    assert!((cut - expected).abs() < 1e-6, "{cut} vs {expected}");
+    // Moving the dormer walls 300 mm along the roof moves the opening.
+    let ids: Vec<u64> = ws.iter().map(|w| w.0).collect();
+    run(
+        &r,
+        &mut doc,
+        "element.move",
+        json!({ "element_ids": ids, "vector": [0.3, 0.0, 0.0] }),
+    )
+    .unwrap();
+    let (x0, x1, ..) = opening(&doc);
+    assert!(
+        (x0 - 4.5).abs() < 1e-9 && (x1 - 6.1).abs() < 1e-9,
+        "{x0} {x1}"
+    );
+    run(
+        &r,
+        &mut doc,
+        "element.move",
+        json!({ "element_ids": ids, "vector": [-0.3, 0.0, 0.0] }),
+    )
+    .unwrap();
+
     // The other styles.
     for (style, kind) in [
         ("hip", "HIPPED_GABLE_ROOF"),

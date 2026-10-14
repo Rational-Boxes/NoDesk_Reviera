@@ -12329,7 +12329,15 @@ These are view annotation and are specified in the DOC chapter. This chapter req
 **Commands.** `opening.create_dormer(roof_id, refs: [ref]) -> element_id`.
 
 **Acceptance criteria.**
-- [ ] A dormer opening moves with the dormer walls when they are moved 300 mm along the roof.
+- [x] A dormer opening moves with the dormer walls when they are moved 300 mm along the roof.
+
+**Implementation notes (2026-10-13).** As built for automated dormers (ARC-ROOF-007):
+- **The opening:** the main roof is cut plumb inside the dormer's front and cheek walls' interior faces, from the front wall back to the cheeks' ends (where the main roof's top meets the dormer eave). It is taken from the walls as they are, so it follows them.
+- **The slab:** the face's slab is rebuilt with the hole (plumb sides) and written as triangles. The roof's areas, volume and underside leave the hole out.
+- **Later:**
+  - an `IfcOpeningElement` (today the hole is in the roof's body);
+  - Opening › Dormer by picked references for hand-made dormers;
+  - the region under a gable dormer's ridge beyond the cheeks.
 
 ---
 

@@ -394,3 +394,43 @@ fn openings_and_gates_in_a_railing() {
     .unwrap();
     assert!(doc.store().get(gate).is_none());
 }
+
+/// Railings on a deck stand on its boards, whether placed on its edges or sketched over it.
+#[test]
+fn deck_railings_stand_on_the_boards() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("deck-rails.ifc");
+    let (_, mut doc) = LocalProject::new(Schema::Ifc4, &path).unwrap();
+    let r = registry();
+    let level = doc
+        .store()
+        .iter()
+        .find(|e| e.class == "IfcBuildingStorey")
+        .unwrap()
+        .id();
+    let deck = id(run(
+        &r,
+        &mut doc,
+        "deck.create",
+        json!({ "outline": [rect([0.0, 0.0], [4.0, 3.0])], "level_id": level.0 }),
+    )
+    .unwrap());
+    let made = ids(run(
+        &r,
+        &mut doc,
+        "railing.create_on_edges",
+        json!({ "host_id": deck.0 }),
+    )
+    .unwrap());
+    let g = geometry(&doc, made[0]);
+    assert!((g.z - 0.6).abs() < 1e-9, "on the edges: {}", g.z);
+    let sketched = id(run(
+        &r,
+        &mut doc,
+        "railing.create",
+        json!({ "path": [[0.5, 2.5], [3.5, 2.5]], "base_level": level.0 }),
+    )
+    .unwrap());
+    let g = geometry(&doc, sketched);
+    assert!((g.z - 0.6).abs() < 1e-9, "sketched over the deck: {}", g.z);
+}

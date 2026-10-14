@@ -100,7 +100,8 @@ The KIT FZK *AC20-Institute-Var-2* sample model (`test-data/ifc/`) open in Revie
   attached. A roof made from picked walls gets eaves by default. Not yet: picking single edges
   in the window, and cladding stopping at the soffit. Gutters and downspouts are planned as part
   of plumbing (MEP-PIPE-010), not built yet.
-- **Railings**: Architecture › Railing sketches a guard railing's path in a plan, and Modify |
+- **Railings**: Architecture › Railing sketches a guard railing's path in a plan (sketched over
+  a deck, floor or flat roof, it stands on its top), and Modify |
   Floors / Roofs › Guard Edges puts railings along every open edge of a deck, patio, floor or
   flat roof (edges with a wall along them are left out). Each has a top and a bottom rail, posts
   at the ends and corners, and balusters spaced by the type. Railings on edges follow the host's
@@ -127,7 +128,8 @@ The KIT FZK *AC20-Institute-Var-2* sample model (`test-data/ifc/`) open in Revie
   slope until it meets the main roof. A dormer that would run off its roof face is refused.
   Properties change the style, width, front height, slope and overhang, and the dormer rebuilds;
   deleting it (or its roof) removes its parts (`dormer.create`, `dormer.set`, `dormer.move`).
-  Not yet: the opening in the main roof below the dormer.
+  The main roof is cut open below each dormer, inside its walls, and the opening follows the
+  walls. Not yet: the opening as a separate IFC opening element.
 - **Stairs**: Architecture › Stair (ST) draws a cast-in-place stair in a plan: click the start
   and end of each run while the status bar counts the risers down; the next run starts after an
   automatic landing (straight, L and U arrangements). The riser count is the fewest that keep
@@ -277,8 +279,7 @@ The KIT FZK *AC20-Institute-Var-2* sample model (`test-data/ifc/`) open in Revie
 
 ## Planned next
 
-The first milestone continues with roof openings (below dormers,
-skylights and shafts), and layered wall types. Then come curved forms: smooth arched roofs (including vaults that taper over trapezoidal
+The first milestone continues with roof openings (skylights and shafts), and layered wall types. Then come curved forms: smooth arched roofs (including vaults that taper over trapezoidal
 footprints, ARC-ROOF-008), dome roofs (ARC-ROOF-009), spline-curved walls (ARC-WALL-002), and
 boolean intersect, subtract and union between elements (ARC-MOD-028). After that come general
 shape and CSG modelling tools,
