@@ -322,10 +322,12 @@ The KIT FZK *AC20-Institute-Var-2* sample model (`test-data/ifc/`) open in Revie
 
 ## Planned next
 
-The first milestone continues with shaped windows (round, round-top, Gothic, fan and gable heads, ARC-WIN-002), roof openings (skylights and shafts), and layered wall types. Then come the rest of the curved forms:
-boolean intersect, subtract and union between elements (ARC-MOD-028). After that come general
-shape and CSG modelling tools,
-CADCraft drawing exchange, and the current NBIMS-US COBie layout.
+The first milestone continues with shaped windows (round, round-top, Gothic, fan and gable
+heads, ARC-WIN-002), roof openings (skylights and shafts), and layered wall types. Then come
+joins and roof attachment for curved walls, shaped bodies in the saved IFC, clearances for
+bathroom fixtures and accessible rooms, clash tests, automatic MEP penetrations, the window
+side of scripting (a Scripts menu and form dialogs), general shape tools, CADCraft drawing
+exchange, and the current NBIMS-US COBie layout.
 
 ### Working with CADCraft
 
