@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Copyright (C) 2026 Reviera contributors -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Reviera Help</title>
+<style>
+  :root { --ink: #23272e; --muted: #5b6370; --line: #d8dde4; --accent: #2a6edc; --paper: #f7f8fa; --card: #ffffff; }
+  @media (prefers-color-scheme: dark) {
+    :root { --ink: #e6e8eb; --muted: #a3abb8; --line: #3a404a; --accent: #6ea2ff; --paper: #1f2329; --card: #282d34; }
+  }
+  body { margin: 0; background: var(--paper); color: var(--ink); font: 15px/1.5 system-ui, sans-serif; }
+  main { max-width: 860px; margin: 0 auto; padding: 28px 24px 48px; }
+  h1 { font-size: 26px; margin: 0 0 4px; }
+  h2 { font-size: 18px; margin: 32px 0 8px; border-bottom: 1px solid var(--line); padding-bottom: 4px; }
+  p.lead { color: var(--muted); margin-top: 0; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  nav.toc { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 14px 0 0; }
+  .samples { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; }
+  .sample { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; }
+  .sample h3 { margin: 0 0 4px; font-size: 15px; }
+  .sample p { margin: 0 0 10px; color: var(--muted); font-size: 13px; }
+  .sample a.open { display: inline-block; padding: 4px 10px; border: 1px solid var(--accent); border-radius: 5px; font-size: 13px; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  td { padding: 4px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  td:first-child { white-space: nowrap; color: var(--muted); width: 32%; }
+  kbd { font: 12px ui-monospace, monospace; border: 1px solid var(--line); border-radius: 3px; padding: 0 4px; background: var(--card); }
+  .note { color: var(--muted); font-size: 13px; }
+</style>
+</head>
+<body>
+<main>
+<h1>NoDesk Reviera</h1>
+<p class="lead">Open-source building information modelling on IFC. Version {{VERSION}}.</p>
+<nav class="toc">
+  <a href="#samples">Sample models</a>
+  <a href="#start">Getting started</a>
+  <a href="#navigate">Navigating</a>
+  <a href="#select">Selecting and modifying</a>
+  <a href="#settings">Model settings</a>
+  <a href="#scripting">Scripting and agents</a>
+</nav>
+
+<h2 id="samples">Sample models</h2>
+<p>Each opens as a fresh copy, so the sample stays as shipped; use <b>File › Save As</b> to keep
+your changes.</p>
+{{SAMPLES}}
+
+<h2 id="start">Getting started</h2>
+<table>
+  <tr><td>A new model</td><td><b>File › New</b> starts from the built-in template with one level.
+    <a href="reviera:action/file.new">New model</a></td></tr>
+  <tr><td>Open an IFC file</td><td><b>File › Open</b>. Several models can be open at once, each in
+    its own tabs. <a href="reviera:action/file.open">Open…</a></td></tr>
+  <tr><td>Draw</td><td>The <b>Architecture</b> tab: walls, doors and windows, floors, ceilings,
+    roofs, stairs (they complete themselves to the level above), railings and decks.</td></tr>
+  <tr><td>Views</td><td>The Project Browser lists plans, 3D views, sections and sheets;
+    double-click one to open it.</td></tr>
+</table>
+
+<h2 id="navigate">Navigating</h2>
+<table>
+  <tr><td>Orbit (3D)</td><td>Left drag, about the point under the cursor or the selection; or
+    <kbd>Shift</kbd> + middle drag.</td></tr>
+  <tr><td>Pan</td><td>Middle or right drag.</td></tr>
+  <tr><td>Zoom</td><td>The wheel, about the cursor.</td></tr>
+  <tr><td>Standard views</td><td>Click the Orientation Cube's faces, edges and corners; its
+    home button returns to the home view.</td></tr>
+</table>
+
+<h2 id="select">Selecting and modifying</h2>
+<table>
+  <tr><td>Select</td><td>Click. <kbd>Ctrl</kbd>+click adds, <kbd>Shift</kbd>+click removes.</td></tr>
+  <tr><td>Box select</td><td>Drag left to right for a window (entirely inside), right to left for
+    a crossing (touching). In 3D hold <kbd>Ctrl</kbd> or <kbd>Shift</kbd>.</td></tr>
+  <tr><td>Quick menu</td><td>Middle-click an element: move, copy, rotate, mirror, hide,
+    translucency, isolate, pin, delete. With two overlapping elements selected it offers the
+    booleans (cut, intersect, union, join).</td></tr>
+  <tr><td>Properties</td><td>The Properties palette edits the selection, its type, and with
+    nothing selected the active view.</td></tr>
+</table>
+
+<h2 id="settings">Model settings</h2>
+<p><b>Manage › Model Properties</b> holds the units, the building code (its stair headroom) and the
+accessibility rules. <a href="reviera:action/ui.model_properties">Open Model Properties</a></p>
+
+<h2 id="scripting">Scripting and agents</h2>
+<p>Every tool is a registered command, available to Lua scripts (<b>Scripts</b> menu) and to AI
+agents over the Model Context Protocol.</p>
+
+<p class="note">This is the start of Reviera's help: more pages follow the specification's
+chapters.</p>
+</main>
+<script>
+  // Reviera links (and web links) go to the application through the page title: the click is
+  // cancelled, and the title carries the link (with a counter, so each click changes it).
+  let clicks = 0;
+  document.addEventListener('click', (e) => {
+    const a = e.target.closest('a[href]');
+    if (!a) return;
+    const href = a.getAttribute('href');
+    if (href.startsWith('reviera:') || /^(https?|mailto):/.test(href)) {
+      e.preventDefault();
+      clicks += 1;
+      document.title = 'link ' + clicks + ' ' + href;
+    }
+  });
+</script>
+</body>
+</html>

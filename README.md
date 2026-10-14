@@ -65,6 +65,11 @@ ribbon's tools, the command shell, Lua and MCP alike.
 - **Units**: SI storage with project display units (metric and imperial, feet-and-inches);
   every length field accepts typed units (`4.5 m`, `12' 6"`) (`units.get`, `units.set_preset`,
   `units.set_format`, `units.set_number_format`, `units.format`, `units.parse`).
+- **Help** (Help › Reviera Help, F1): a help tab beside the views with getting started,
+  navigation and selection basics, and the sample models, each opened (as a fresh copy) from its
+  link. Help › About gives the version and licence.
+- **Several models at once**: each opens in its own tabs; File › Close Model (Ctrl+Shift+W)
+  closes the active one and its views, asking to save changes.
 - **Model Properties** (Manage › Settings, UN; File menu): the model-wide settings in one dialog:
   units preset and number format, the **building code** (IBC, IRC, Approved Document K, NBC
   Canada, NCC Australia, DIN 18065 or custom) with its occupancy and the model's own stair
@@ -501,7 +506,7 @@ Linux (Fedora) is the development platform today; Windows 10+ and macOS are targ
 ```sh
 # Toolchain and libraries (Fedora)
 sudo dnf install rustup cmake ninja-build gcc-c++ opencascade-devel boost-devel eigen3-devel \
-    libxml2-devel json-devel perl-FindBin perl-IPC-Cmd perl-Time-Piece
+    libxml2-devel json-devel perl-FindBin perl-IPC-Cmd perl-Time-Piece webkit2gtk4.1-devel
 rustup-init
 
 # The first build also downloads and compiles wxWidgets 3.3.3 (through wxDragon).

@@ -12,7 +12,7 @@ publish.workspace = true
 [dependencies]
 glam.workspace = true
 reviera-core.workspace = true
-wxdragon = { workspace = true, features = ["aui"] }
+wxdragon = { workspace = true, features = ["aui", "webview"] }
 # Direct dependency so its build script (which builds wxWidgets) runs before ours: see build.rs.
 wxdragon-sys = "0.9.22"
 reviera-app.workspace = true

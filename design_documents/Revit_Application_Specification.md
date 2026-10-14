@@ -518,7 +518,7 @@ The chapter **does not** specify the modelling behaviour behind the tools that a
 | Export | — | CAD ▸ DWG, DXF, DGN, SAT, STL; Images & Animations ▸ Image, Walkthrough, Sun Study; Reports ▸ Schedule, Room/Area Report; PDF; OBJ; FBX; glTF; gbXML; Family Types; Database (ODBC/SQLite); IFC ▸ (with Reviera data, Clean IFC (strip Reviera data), another schema or MVD); BCF; Export options ▸ (CAD export setups, IFC export setups) | `export.*` (DOC/DM) | PDF P0; CAD, image, schedule P1; others P2 |
 | Print | Print dialog | Print; Print Preview; Print Setup; Batch Print | `print.*` (DOC) | P0 (batch P2) |
 | Server | — (only shown when BIMserver features are enabled) | Connect…; Publish to Server…; Check In…; Get Latest; Sync; Export Local Copy…; Disconnect | `server.*` (COL) | P1 |
-| Close | Close active model | — | `file.close()` (DM) | P0 |
+| Close | Close active model (*built: File › Close Model, Ctrl+Shift+W (Ctrl+W closes the view), asking to save changes*) | — | `file.close()` (DM) | P0 |
 
 - **Right pane, default content**: **Recent Documents** with a sort control (Most recent first, By name, By size, By kind) and pins; a toggle switches to **Open Documents**, which lists every open view of every open model; clicking a view activates it (`view.activate`).
 - **Footer**: **Options** (`ui.options.open`) and **Exit Reviera** (`app.exit`).
@@ -634,6 +634,8 @@ The chapter **does not** specify the modelling behaviour behind the tools that a
 **Acceptance criteria.**
 - [ ] F1 while hovering the Wall button with its tooltip shown opens the wall help topic.
 - [ ] About shows the GPL text and a list of third-party licences that matches the build's dependency manifest.
+
+*Built (2026-10-14):* the **Help** menu with *Reviera Help* (F1) and *About NoDesk Reviera*. Help opens as a tab beside the views (a webview: WebKitGTK, WebView2 or WKWebView): a landing page with Getting started, Navigating, Selecting and modifying, Model settings and Scripting sections, and the **sample models** from the samples folder's `samples.json`, each with an *Open* link that opens a fresh copy of it (so the sample stays as shipped). Links `reviera:sample/<name>` and `reviera:action/<id>` reach the application; web links open in the system browser. *(Owner request, 2026-10-14: "Add the start of the help menu. Seed a landing hypertext help view. Help will be an inline tab/document-window. The help landing will link to the examples with a link that opens each sample file.")* Not yet: the manual's other pages, context help for the tool under the cursor, the generated references, and About's licence texts.
 
 ### 1.6.3 User identity
 **ID:** UI-IDENT-001 · **Priority:** P0 (Local) / P1 (server) · **Ref:** research/01 §5, §24.1

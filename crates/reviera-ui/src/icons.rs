@@ -288,6 +288,15 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "accessibility" => format!(
             r#"<circle cx="14" cy="5" r="2.5" fill="{a}"/><path d="M14 9v9h7l3 7" fill="none" {sa}/><path d="M9 13h10" {s}/><path d="M11 15a7 7 0 1 0 8 9" fill="none" {s}/>"#
         ),
+        "close_model" => format!(
+            r#"<path d="M6 4h14l6 6v18H6z" fill="{f}" {s}/><path d="M12 15l8 8M20 15l-8 8" {sa}/>"#
+        ),
+        "help" => format!(
+            r#"<circle cx="16" cy="16" r="12" fill="{f}" {s}/><path d="M12 12.5a4 4 0 1 1 5.5 3.7c-1 .4-1.5 1.2-1.5 2.3v1" fill="none" {sa}/><circle cx="16" cy="23.5" r="1.4" fill="{a}"/>"#
+        ),
+        "about" => format!(
+            r#"<circle cx="16" cy="16" r="12" fill="{f}" {s}/><path d="M16 14v9" {sa}/><circle cx="16" cy="10" r="1.4" fill="{a}"/>"#
+        ),
         "model_properties" => format!(
             r#"<path d="M6 4h14l6 6v18H6z" fill="{f}" {s}/><path d="M10 12h12M10 17h12M10 22h7" {s}/><path d="M21 22l2 2 4-5" {sa}/>"#
         ),

@@ -17,6 +17,7 @@ mod dims;
 mod dormers;
 mod footprint;
 mod grids;
+mod help;
 mod icons;
 mod inserts;
 mod inspect;
@@ -250,6 +251,8 @@ struct Gui {
     wall_type_row: Option<ElementId>,
     /// The two elements the quick modify menu offers booleans for (UI-SEL-006).
     quick_pair: Option<select::QuickPair>,
+    /// The help tab, while open (UI-HELP-001).
+    help: Option<help::HelpTab>,
     /// The units of the model a script runs on, for its forms.
     script_units: Rc<RefCell<reviera_core::units::UnitSettings>>,
     /// Drives animated view changes and walking.
@@ -644,7 +647,8 @@ impl Gui {
             && let Some(id) = self
                 .views
                 .iter()
-                .find(|v| v.element == Some(e))
+                // Element ids are per model: the view must be this model's.
+                .find(|v| v.doc == doc && v.element == Some(e))
                 .map(|v| v.id)
         {
             return self.activate_view(id);
@@ -817,40 +821,73 @@ impl Gui {
     /// Closes a view. Closing the last view of a model closes the model, asking to save unsaved
     /// changes first. Returns `false` when the user cancelled.
     fn close_view(&mut self, id: u32) -> bool {
-        let frame = self.frame;
         let Some(doc) = self.view(id).map(|v| v.doc) else {
             return true;
         };
-        if self.views.iter().filter(|v| v.doc == doc).count() == 1 {
-            let info = self.doc_info(doc);
-            let mut save = "no";
-            if info.as_ref().is_some_and(|d| d.dirty) {
-                let message = format!("Save changes to {} before closing?", self.doc_title(doc));
-                let dialog = MessageDialog::builder(&frame, &message, "NoDesk Reviera")
-                    .with_style(
-                        MessageDialogStyle::YesNo
-                            | MessageDialogStyle::Cancel
-                            | MessageDialogStyle::IconQuestion,
-                    )
-                    .build();
-                match dialog.show_modal() {
-                    ID_YES => save = "yes",
-                    ID_NO => {}
-                    _ => return false,
-                }
-                if save == "yes" && info.as_ref().is_some_and(|d| d.path.is_none()) {
-                    error(&frame, "Save the new project with File > Save As first.");
-                    return false;
-                }
-            }
-            if let Err(e) = self.run("file.close", json!({ "document_id": doc, "save": save })) {
-                error(&frame, &format!("Could not close the model:\n{e}"));
-                return false;
-            }
-            self.scenes.remove(&doc);
+        // The model's last view closes the model.
+        if self.views.iter().filter(|v| v.doc == doc).count() == 1 && !self.close_document(doc) {
+            return false;
         }
         self.close_tab(id);
         true
+    }
+
+    /// Closes model `doc`, asking to save its changes first; false when cancelled or refused.
+    /// Its tabs are left to the caller.
+    fn close_document(&mut self, doc: DocumentId) -> bool {
+        let frame = self.frame;
+        let info = self.doc_info(doc);
+        let mut save = "no";
+        if info.as_ref().is_some_and(|d| d.dirty) {
+            let message = format!("Save changes to {} before closing?", self.doc_title(doc));
+            let dialog = MessageDialog::builder(&frame, &message, "NoDesk Reviera")
+                .with_style(
+                    MessageDialogStyle::YesNo
+                        | MessageDialogStyle::Cancel
+                        | MessageDialogStyle::IconQuestion,
+                )
+                .build();
+            match dialog.show_modal() {
+                ID_YES => save = "yes",
+                ID_NO => {}
+                _ => return false,
+            }
+            if save == "yes" && info.as_ref().is_some_and(|d| d.path.is_none()) {
+                error(&frame, "Save the new project with File > Save As first.");
+                return false;
+            }
+        }
+        if let Err(e) = self.run("file.close", json!({ "document_id": doc, "save": save })) {
+            error(&frame, &format!("Could not close the model:\n{e}"));
+            return false;
+        }
+        self.scenes.remove(&doc);
+        true
+    }
+
+    /// File › Close: closes the active model and all its tabs, asking to save its changes.
+    fn close_model(&mut self) {
+        let Some(doc) = self.doc else {
+            return self.frame.set_status_text("No model is open", 0);
+        };
+        let title = self.doc_title(doc);
+        if !self.close_document(doc) {
+            return;
+        }
+        let tabs: Vec<u32> = self.views.iter().filter(|v| v.doc == doc).map(|v| v.id).collect();
+        for id in tabs {
+            self.close_tab(id);
+        }
+        // Another model's view takes over (the panes follow it), or nothing is open.
+        match self.active.or_else(|| self.views.first().map(|v| v.id)) {
+            Some(v) => self.activate_view(v),
+            None => {
+                self.doc = None;
+                self.properties_stale = true;
+                self.browser_stale = true;
+            }
+        }
+        self.frame.set_status_text(&format!("Closed {title}"), 0);
     }
 
     /// Closes a view's tab (the model stays open).
@@ -2950,6 +2987,7 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 wall_type: None,
                 wall_type_row: None,
                 quick_pair: None,
+                help: None,
                 script_units: Rc::new(RefCell::new(Default::default())),
                 timer: Some(Timer::new(&frame)),
                 loading: Vec::new(),
@@ -3020,7 +3058,7 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                     wx::TabEvent::Close(i) | wx::TabEvent::MiddleClick(i) => {
                         if let Some(v) = g.view_at(i) {
                             g.close_view(v);
-                        } else {
+                        } else if !g.close_help(i) {
                             g.cancel_loading(i);
                         }
                     }
@@ -3426,6 +3464,9 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "view.set_virtual_volumes" => with(gui, Gui::cycle_virtual_volumes),
         "clearance.set_rule_set" => with(gui, Gui::choose_rule_set),
         "ui.model_properties" => with(gui, Gui::model_properties),
+        "file.close" => with(gui, Gui::close_model),
+        "help.home" => with(gui, Gui::show_help),
+        "help.about" => with(gui, |g| g.about()),
         "stair.create_openings" => with(gui, |g| {
             let store = g.store_now();
             let stairs: Vec<ElementId> = g

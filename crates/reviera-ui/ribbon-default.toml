@@ -41,6 +41,26 @@ accel = "Ctrl+Shift+S"
 help = "Save the project to a new file"
 
 [[action]]
+id = "file.close"
+label = "Close Model"
+icon = "close_model"
+accel = "Ctrl+Shift+W"
+help = "Close the active model and its views (asks to save changes)"
+
+[[action]]
+id = "help.home"
+label = "Reviera Help"
+icon = "help"
+accel = "F1"
+help = "Open the help: getting started, navigating, and the sample models"
+
+[[action]]
+id = "help.about"
+label = "About NoDesk Reviera"
+icon = "about"
+help = "The version, licence and components"
+
+[[action]]
 id = "export.pdf"
 label = "Export PDF..."
 icon = "pdf"
@@ -1201,7 +1221,7 @@ panels = [{ label = "Window", tools = [{ action = "insert.flip_facing", size = "
 
 [[menu]]
 label = "&File"
-items = ["file.new", "file.open", "file.save", "file.save_as", "-", "ui.model_properties", "-", "export.pdf", "export.cobie", "-", "app.exit"]
+items = ["file.new", "file.open", "file.save", "file.save_as", "file.close", "-", "ui.model_properties", "-", "export.pdf", "export.cobie", "-", "app.exit"]
 
 [[menu]]
 label = "&Edit"
@@ -1256,3 +1276,7 @@ items = [
   "view.create_3d", "window.close", "-", "window.next", "window.previous", "-",
   "window.tile", "window.tab_all", "-", "ui.pane.properties", "ui.pane.browser", "ui.pane.model_tree",
 ]
+
+[[menu]]
+label = "&Help"
+items = ["help.home", "-", "help.about"]
