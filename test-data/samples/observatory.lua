@@ -5,7 +5,7 @@
 -- description: A domed observatory drum of curved walls, a vaulted annex, a spline garden wall.
 --
 -- Reviera sample model (test-data/samples): curved walls (arcs and a spline), a hemispherical
--- dome with an oculus, a barrel-vaulted annex, doors and windows on curved walls, a round
+-- dome with an observing slot cut by a boolean (CSG), a barrel-vaulted annex, doors and windows on curved walls, a round
 -- floor and room. The turret beside it comes from the Castle Turret plugin (samples.json).
 local level = reviera.level.list()[1].id
 local function wall(a, b, through, height, base)
@@ -39,13 +39,28 @@ for k = 0, n - 1 do
 end
 reviera.floor.create{ loops = { floor }, level_id = level }
 reviera.room.place{ level_id = level, point = {0, 0}, name = "Observation" }
--- The dome on the drum, overhanging it a little and open at the crown (the oculus as the
--- viewing slot); the drum's walls rise to its underside.
+-- The dome on the drum, overhanging it a little; the drum's walls rise to its underside.
 local dome = reviera.roof.create_dome{
   level_id = level, base_offset = H, center = {0, 0},
-  plan = { circle = { radius = R + 0.35 } }, profile = "hemisphere", oculus = 1.2,
+  plan = { circle = { radius = R + 0.35 } }, profile = "hemisphere",
 }
 reviera.roof.attach_walls{ roof_id = dome }
+-- The observing slot, by constructive solid geometry: a tall, thin cutter along the dome's
+-- north meridian, from just past the crown to beyond the eave, subtracted from the dome and
+-- hidden (geometry.boolean). Until there are free-form solids, the cutter is a wall, of its
+-- own 800 mm type.
+local generic
+for _, t in ipairs(reviera.type.list()) do
+  if t.name == "Generic - 200mm" then generic = t.id end
+end
+local slot_type = reviera.type.duplicate{ type_id = generic, new_name = "Slot cutter 800" }
+reviera.type.set_param{ type_id = slot_type, param = "width", value = 0.8 }
+local cutter = reviera.wall.create{
+  type_id = slot_type,
+  curve = { line = { start = {0, -0.6}, ["end"] = {0, R + 1.0} } },
+  base_level = level, base_offset = H + 1.4, top_constraint = { unconnected = R + 1.0 },
+}
+reviera.geometry.boolean{ target_id = dome, tool_ids = { cutter }, op = "subtract", tools = "hide" }
 
 -- The control annex east of the drum, under a barrel vault.
 local x0, x1, y0, y1 = 8.0, 16.0, -3.0, 3.0

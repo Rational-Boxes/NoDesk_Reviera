@@ -328,8 +328,9 @@ by a test (no overlaps, no clearance intrusions, saves and reopens):
 
 - **House with dormers** (`house.ifc`): eaves, flush-joined dormers, stairs, a gated railing
   and a deck.
-- **Observatory** (`observatory.ifc`): curved walls under a dome with an oculus, a vaulted annex,
-  a spline garden wall and a turret built by the Castle Turret plugin.
+- **Observatory** (`observatory.ifc`): curved walls under a dome, a vaulted annex,
+  a spline garden wall and a turret built by the Castle Turret plugin; the dome's observing
+  slot is cut by a boolean (CSG).
 
 Open one with `reviera gui test-data/samples/observatory.ifc`.
 
