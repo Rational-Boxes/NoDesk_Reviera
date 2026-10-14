@@ -1,0 +1,52 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Copyright (C) 2026 Reviera contributors -->
+<h1>Columns</h1>
+<p class="lead">Architectural columns are non-structural: casings, pilasters and decorative
+columns. Each has a type that gives its section, rectangular or round.</p>
+
+<h2 id="place">Placing columns</h2>
+<ol>
+  <li>Open a floor plan and click <b>Architecture › Column</b>
+    <a href="reviera:action/column.place_architectural">Column</a>.</li>
+  <li>Choose the type in Properties (or <i>Duplicate Type…</i> to make a new size).</li>
+  <li>Move the cursor: the column's section follows it, snapping to grid intersections, wall
+    lines and other snaps. <kbd>Space</kbd> turns it by 90°.</li>
+  <li>Click to place it. It runs from the plan's level up to the next level (3 m when there is
+    none). The tool repeats until <kbd>Esc</kbd>.</li>
+</ol>
+<p><code>column.place_architectural</code></p>
+
+<h2 id="properties">Properties</h2>
+<table>
+  <tr><td>Base Constraint, Base Offset</td><td>The level it stands on, and how far above it.</td></tr>
+  <tr><td>Top Constraint, Top Offset</td><td>The level its top follows, or <i>Unconnected</i>
+    with an <b>Unconnected Height</b>. A column whose top follows a level grows when the level is
+    raised.</td></tr>
+  <tr><td>Rotation</td><td>Degrees, counter-clockwise.</td></tr>
+  <tr><td>Type</td><td>The type selector; <b>Section</b> (Rectangular or Round), <b>Width</b>
+    and <b>Depth</b> (a round column's <b>Diameter</b>) are the type's, so they change every
+    column of the type.</td></tr>
+</table>
+<p><code>column.set</code>, <code>type.set_param</code> (<code>section</code>,
+<code>width</code>, <code>depth</code>, <code>diameter</code>)</p>
+
+<h2 id="attach">Attaching the top</h2>
+<p>Select columns and click <b>Modify | Columns › Attach Top</b>. Each column's top attaches to
+the roof, floor or ceiling directly above it, and follows it when it changes. Under a sloped roof
+the top is cut by the roof's underside, so it meets the roof flush. <b>Detach Top</b> returns
+the column to its own top constraint, as does deleting the roof.</p>
+<p>Scripts can choose where the top goes over the column's section: <code>maximum</code> (the
+highest point of the underside, cut by it; the default), <code>midline</code>, or
+<code>minimum</code> (the lowest point, flat), with an offset. <code>column.attach</code>,
+<code>column.detach</code></p>
+
+<h2 id="modify">Moving and copying</h2>
+<p>Move, Copy, Rotate and Mirror work on columns (rotating turns the column too). Columns are
+deleted with their base or top level.</p>
+
+<h2 id="ifc">In IFC</h2>
+<p>A column is an <code>IfcColumn</code> (<code>COLUMN</code>, with
+<code>Pset_ColumnCommon.LoadBearing</code> false) of an <code>IfcColumnType</code>, contained in
+its base level; its body is written as a faceted B-rep.</p>
+<p class="note">Not yet available: attaching bases, taking the material of a joined wall,
+wrapping wall finishes round columns, Moves With Grids, and structural columns.</p>

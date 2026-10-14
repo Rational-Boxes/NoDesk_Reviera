@@ -41,6 +41,10 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(OpeningEditWall),
         registry.add(OpeningCreateShaft),
         registry.add(OpeningEditShaft),
+        registry.add(ColumnPlace),
+        registry.add(ColumnSet),
+        registry.add(ColumnAttach),
+        registry.add(ColumnDetach),
     ];
     for r in results {
         r.expect("architecture commands are valid");
@@ -100,4 +104,55 @@ edit_command!(
     crate::slab_openings::EditShaftParams,
     (),
     crate::slab_openings::edit_shaft
+);
+
+edit_command!(
+    ColumnPlace,
+    "column.place_architectural",
+    "Place an architectural column",
+    "Places a non-structural column (ARC-COL-001) of a column type (the default 400 × 400 mm type when \
+     omitted) centred at `point`, rotated by `rotation`, from a base level and offset to a top level \
+     and offset or a height. Written as an IfcColumn (Pset_ColumnCommon.LoadBearing false). Returns \
+     the column.",
+    "Column",
+    crate::columns::PlaceParams,
+    ElementId,
+    crate::columns::place
+);
+
+edit_command!(
+    ColumnSet,
+    "column.set",
+    "Change columns",
+    "Changes columns' centre, rotation, base level and offset, or top constraint and offset; omitted \
+     values are kept.",
+    "Edit Column",
+    crate::columns::SetParams,
+    (),
+    crate::columns::set
+);
+
+edit_command!(
+    ColumnAttach,
+    "column.attach",
+    "Attach columns' tops",
+    "Attaches columns' tops to a Reviera roof, floor or ceiling above them (ARC-COL-001): the top \
+     follows the target's underside over the column's section at its lowest point (`minimum`), middle \
+     (`midline`) or highest point (`maximum`, the default), plus `offset`; with `maximum` and \
+     `midline` the top is cut by the underside.",
+    "Attach Column",
+    crate::columns::AttachParams,
+    (),
+    crate::columns::attach
+);
+
+edit_command!(
+    ColumnDetach,
+    "column.detach",
+    "Detach columns' tops",
+    "Detaches columns' tops: they go back to their top constraint.",
+    "Detach Column",
+    crate::columns::DetachParams,
+    (),
+    crate::columns::detach
 );

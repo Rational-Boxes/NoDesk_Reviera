@@ -281,7 +281,7 @@ impl Gui {
 
     /// Base and top rows of an extent (`prefix` names them): base level and offset, top
     /// constraint, height and top offset.
-    fn extent_rows(
+    pub(crate) fn extent_rows(
         &mut self,
         grid: &PropertyGrid,
         prefix: &str,

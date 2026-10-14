@@ -803,6 +803,7 @@ impl Gui {
             || self.stair_tool.is_some()
             || self.dormer_tool.is_some()
             || self.railing_tool.is_some()
+            || self.column_tool.is_some()
     }
 
     /// Shows the grips of the selection (or nothing).

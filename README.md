@@ -194,6 +194,11 @@ Create … Boundary* tab:
   (its edges follow the walls' finish faces, round rooms included, and move with them), or
   Sketch Ceiling. Ceilings have types and sit 2600 mm above their level by default. Saved as
   `IfcCovering` (CEILING) (`ceiling.create_auto`, `ceiling.create`, `ceiling.edit_boundary`).
+- **Columns** (Architecture › Column): architectural columns of rectangular or round types,
+  placed by clicking in a plan (Spacebar turns them 90°), from a base level to a top level or a
+  height. Attach Top (Modify | Columns) attaches their tops to the roof, floor or ceiling above,
+  cut by a sloped underside. They move, rotate, mirror and copy, and are written as `IfcColumn`
+  (`column.place_architectural`, `column.set`, `column.attach`, `column.detach`; ARC-COL-001).
 - **Openings** (Architecture › Opening):
   - **Wall Opening**: hover a wall and click to cut a rectangular hole of the tool's width and
     height through a straight or curved wall. Its base and top follow levels; it slides along the
@@ -413,7 +418,8 @@ Create … Boundary* tab:
   arrangement). Drag a tab to reorder it, onto another group's tabs to move it there, or to an
   edge of the view area to tile it. Dockable Properties, Project Browser and Model Tree panes.
 - **Ribbon**: Architecture (Wall, Arc Wall, Spline Wall, Door, Window, Floor, Ceiling, Roof,
-  Arched Roof, Dome, Room, Stair, Spiral Stair, Railing, Deck, Wall Opening, Vertical, Shaft,
+  Arched Roof, Dome, Column, Room, Stair, Spiral Stair, Railing, Deck, Wall Opening, Vertical,
+  Shaft,
   Level, Grid), Annotate
   (dimensions, text, tags), View (views, sheets, navigation, coordination, section box and
   slices, hide/isolate, windows, panes) and Modify tabs, with a Quick Access Toolbar above.

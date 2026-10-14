@@ -11,6 +11,7 @@
 //! through `App::execute`, like Lua and MCP. The ribbon and browsers come next.
 
 mod browser;
+mod columns;
 mod curved;
 mod decks;
 mod dims;
@@ -234,6 +235,7 @@ struct Gui {
     railing_tool: Option<railings::RailingTool>,
     feature_tool: Option<railings::FeatureTool>,
     dome_tool: Option<curved::DomeTool>,
+    column_tool: Option<columns::ColumnTool>,
     /// The floor type new floors take.
     floor_type: Option<ElementId>,
     /// The last pointer position in the active view (Tab in sketch mode picks there).
@@ -1209,6 +1211,7 @@ impl Gui {
         self.end_railing_tool();
         self.end_feature_tool();
         self.end_dome_tool();
+        self.end_column_tool();
         if self.tool.take().is_some() {
             if let Some(v) = self.viewport() {
                 v.set_overlay(&[]);
@@ -1238,7 +1241,7 @@ impl Gui {
         if self.railing_tool.is_some() {
             return self.railing_escape();
         }
-        if self.end_feature_tool() || self.end_dome_tool() {
+        if self.end_feature_tool() || self.end_dome_tool() || self.end_column_tool() {
             return frame.set_status_text("Ready", 0);
         }
         if self.attach_pick.take().is_some() {
@@ -1793,6 +1796,7 @@ impl Gui {
         }
         if ids.is_empty()
             && (self.grid_tool_properties(grid)
+                || self.column_tool_properties(grid)
                 || self.insert_tool_properties(grid)
                 || self.wall_tool_properties(grid)
                 || self.view_properties(grid))
@@ -1851,7 +1855,8 @@ impl Gui {
         let is_level = e.class == reviera_core::levels::CLASS;
         let is_grid = reviera_core::grids::is_grid(&e);
         let is_insert = reviera_core::inserts::kind_of(&e).is_some();
-        let is_wall = reviera_core::walls::wall_recipe(&e).is_some();
+        let is_wall = reviera_core::walls::wall_recipe(&e).is_some()
+            || reviera_core::columns::column_recipe(&e).is_some();
         for (i, (label, value)) in [
             ("Category", category),
             // A grid line is written as an axis of the grid system.
@@ -1924,7 +1929,11 @@ impl Gui {
             self.room_rows(grid, id);
             return;
         }
-        if self.note_rows(grid, id) || self.stair_rows(grid, id) || self.opening_rows(grid, id) {
+        if self.note_rows(grid, id)
+            || self.stair_rows(grid, id)
+            || self.opening_rows(grid, id)
+            || self.column_rows(grid, id)
+        {
             return;
         }
         if let Some(d) = dimension {
@@ -2130,6 +2139,7 @@ impl Gui {
         }
         if self.grid_type_edit(property, text.clone())
             || self.opening_edit(property, text.clone())
+            || self.column_edit(property, text.clone())
             || self.insert_edit(property, text.clone())
             || self.wall_edit(property, text.clone())
             || self.floor_edit(property, text.clone())
@@ -2462,6 +2472,7 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                     None if g.railing_tool.is_some() => g.railing_click(x, y),
                     None if g.feature_tool.is_some() => g.feature_click(x, y, &p),
                     None if g.dome_tool.is_some() => g.dome_click(x, y),
+                    None if g.column_tool.is_some() => g.column_click(x, y),
                     None if g.dim_tool.is_some() => g.dim_click(x, y),
                     None if g.grid_tool.is_some() => g.grid_click(x, y),
                     None if g.insert_tool.is_some() => g.insert_click(x, y),
@@ -2524,6 +2535,10 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                     }
                     if g.dome_tool.is_some() {
                         g.dome_motion(x, y);
+                        redraw = true;
+                    }
+                    if g.column_tool.is_some() {
+                        g.column_motion(x, y);
                         redraw = true;
                     }
                     if g.dim_tool.is_some() {
@@ -2725,6 +2740,10 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                         }
                         if !used && matches!(key, WXK_BACK | WXK_RETURN | WXK_NUMPAD_ENTER) {
                             used = g.modify_key(key);
+                        }
+                        if !used {
+                            let (mx, my) = g.mouse;
+                            used = g.column_key(key, mx, my);
                         }
                         if !used {
                             used = g.insert_key(key);
@@ -2987,6 +3006,7 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 railing_tool: None,
                 feature_tool: None,
                 dome_tool: None,
+                column_tool: None,
                 floor_type: None,
                 mouse: (0, 0),
                 offset_distance: 1.0,
@@ -3459,6 +3479,12 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
             g.start_deck_sketch();
             focus(g);
         }),
+        "column.place_architectural" => with(gui, |g| {
+            g.start_column_tool();
+            focus(g);
+        }),
+        "column.attach" => with(gui, Gui::attach_column_tops),
+        "column.detach" => with(gui, Gui::detach_column_tops),
         "opening.create_wall" => with(gui, |g| {
             g.start_wall_opening_tool();
             focus(g);

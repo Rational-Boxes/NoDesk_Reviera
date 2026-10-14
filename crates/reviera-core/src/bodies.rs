@@ -234,6 +234,9 @@ pub fn all(store: &Store) -> Vec<Body> {
             push(id, "IfcDoor", mesh, false);
         }
     }
+    for (id, g) in crate::columns::all(store) {
+        push(id, "IfcColumn", g.mesh(), false);
+    }
     for (id, g) in crate::stairs::all(store) {
         for mesh in g.runs.into_iter().chain(g.landings) {
             push(id, "IfcStair", mesh, false);

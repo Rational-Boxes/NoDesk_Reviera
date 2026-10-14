@@ -477,6 +477,7 @@ pub fn dependents_of(store: &crate::store::Store, id: ElementId) -> Vec<ElementI
                 })
                 || crate::inserts::opening_of(e).is_some_and(|i| i == guid)
                 || crate::slab_openings::opening_recipe(e).is_some_and(|r| r.host == guid)
+                || crate::columns::column_recipe(e).is_some_and(|r| r.extent.uses_level(&guid))
                 || crate::slab_openings::shaft_recipe(e).is_some_and(|r| r.extent.uses_level(&guid))
                 || crate::wall_openings::wall_opening_recipe(e)
                     .is_some_and(|r| r.host == guid || r.extent.uses_level(&guid))

@@ -770,6 +770,24 @@ keys = "ST"
 help = "Draw a stair in a plan: click the start and end of each run; landings join the runs"
 
 [[action]]
+id = "column.place_architectural"
+label = "Column"
+icon = "column"
+help = "Place an architectural column in a plan: click its centre (Spacebar turns it 90°); it runs up to the next level"
+
+[[action]]
+id = "column.attach"
+label = "Attach Top"
+icon = "column_attach"
+help = "Attach the selected columns' tops to the roof, floor or ceiling directly above them"
+
+[[action]]
+id = "column.detach"
+label = "Detach Top"
+icon = "column_detach"
+help = "Detach the selected columns' tops: they go back to their top constraint"
+
+[[action]]
 id = "opening.create_wall"
 label = "Wall Opening"
 icon = "wall_opening"
@@ -906,6 +924,7 @@ tools = [
   { action = "wall.create_spline", size = "small" },
   { action = "door.place", size = "large" },
   { action = "window.place", size = "large" },
+  { action = "column.place_architectural", size = "large" },
   { action = "floor.create", size = "large" },
   { action = "ceiling.create", size = "large" },
   { action = "roof.create_footprint", size = "large" },
@@ -1141,6 +1160,14 @@ panels = [
 ]
 
 [[context]]
+category = "cat.columns"
+label = "Columns"
+panels = [{ label = "Attach", tools = [
+  { action = "column.attach", size = "large" },
+  { action = "column.detach", size = "large" },
+] }]
+
+[[context]]
 category = "cat.railings"
 label = "Railings"
 panels = [{ label = "Openings", tools = [
@@ -1271,7 +1298,7 @@ items = [
 [[menu]]
 label = "&Architecture"
 items = [
-  "wall.create", "door.place", "window.place", "floor.create", "floor.edit_boundary",
+  "wall.create", "door.place", "window.place", "column.place_architectural", "floor.create", "floor.edit_boundary",
   "ceiling.create", "ceiling.edit_boundary", "roof.create_footprint", "roof.edit_footprint", "-",
   "room.place", "room.place_automatically", "-",
   "opening.create_wall", "opening.create_vertical", "opening.create_shaft", "-",

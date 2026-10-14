@@ -17,6 +17,7 @@ pub mod change;
 pub mod clearances;
 pub mod cobie;
 pub mod codes;
+pub mod columns;
 pub mod command;
 pub mod csg;
 pub mod decks;

@@ -50,7 +50,7 @@ pub fn toolset_of(command: &str) -> String {
         "wall" | "floor" | "roof" | "door" | "window" | "stair" | "modify" | "str" | "mep"
         | "level" | "grid" | "room" | "ceiling" | "insert" | "sketch" | "dormer" | "railing"
         | "deck" | "site" | "cme" | "host" | "numbering" | "decal" | "spatial" | "building"
-        | "assembly" | "part" | "geometry" | "opening" => "modeling",
+        | "assembly" | "part" | "geometry" | "opening" | "column" => "modeling",
         "view" | "sheet" | "schedule" | "annotate" | "render" | "walkthrough" | "xr" | "ui"
         | "tag" | "text" | "anno" | "dim" | "viewport" | "section" | "inspect" => "documentation",
         "family" | "family_doc" | "type" | "instance" | "library" | "formula" | "subcategory" => {

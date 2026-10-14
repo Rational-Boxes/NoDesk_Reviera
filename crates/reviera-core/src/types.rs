@@ -208,6 +208,9 @@ pub(crate) fn set_param(txn: &mut crate::txn::Transaction<'_>, p: SetParamParams
     if inserts::insert_type(e).is_some() {
         return inserts::set_type_param(txn, id, &p.param, &p.value);
     }
+    if crate::columns::column_type(e).is_some() {
+        return crate::columns::set_type_param(txn, id, &p.param, &p.value);
+    }
     if (crate::floors::type_thickness(e).is_some() || crate::roofs::is_roof_type(e))
         && p.param == "thickness"
     {
@@ -304,6 +307,18 @@ pub(crate) fn set_type(txn: &mut crate::txn::Transaction<'_>, p: SetTypeParams) 
             txn.modify(id, |w| {
                 w.params.insert("@type".into(), Value::String(guid));
             })?;
+        } else if crate::columns::column_recipe(e).is_some() {
+            if crate::columns::column_type(ty).is_none() {
+                return Err(Error::new(
+                    "type.wrong_family",
+                    format!("column {id} needs a column type"),
+                ));
+            }
+            let guid = ty.guid().to_string();
+            txn.modify(id, |w| {
+                w.params.insert("@type".into(), Value::String(guid));
+            })?;
+            crate::columns::regenerate(txn.store(), txn.store().get(id).expect("exists"))?;
         } else if walls::wall_recipe(e).is_some() {
             if walls::type_width(ty).is_none() {
                 return Err(Error::new(

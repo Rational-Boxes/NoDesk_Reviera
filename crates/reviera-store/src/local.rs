@@ -518,6 +518,7 @@ impl LocalProject {
                 geometry::remove_breps(&mut self.ifc, step)?;
             }
             if recipe_kind == Some(roofs::ROOF_RECIPE)
+                || recipe_kind == Some(reviera_core::columns::COLUMN_RECIPE)
                 || recipe_kind == Some(stairs::STAIR_RECIPE)
                 || recipe_kind == Some(railings::RAILING_RECIPE)
                 || recipe_kind == Some(railings::GATE_RECIPE)
@@ -674,6 +675,7 @@ impl LocalProject {
             self.write_slab_openings(doc)?;
             self.write_roofs(doc)?;
             self.write_stairs(doc)?;
+            self.write_columns(doc)?;
             self.write_railings(doc)?;
             self.write_rooms(doc)?;
         }
@@ -1386,6 +1388,44 @@ impl LocalProject {
             )?;
             let storey = roofs::roof_recipe(store.get(*id).expect("listed"))
                 .and_then(|r| GlobalId::parse(&r.level))
+                .and_then(|g| store.find_by_guid(&g))
+                .and_then(|l| self.steps.get(&l).copied());
+            if let Some(storey) = storey {
+                geometry::contain(&mut self.ifc, step, storey, owner_history)?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Writes every Reviera column (ARC-COL-001): its body as a faceted B-rep (its top may follow
+    /// an attached roof), contained in its base level.
+    fn write_columns(&mut self, doc: &Document) -> Result<()> {
+        let store = doc.store();
+        let all = reviera_core::columns::all(store);
+        if all.is_empty() {
+            return Ok(());
+        }
+        let contexts = geometry::Contexts::find(&self.ifc)?;
+        let owner_history = self.new_owner_history()?;
+        for (id, g) in &all {
+            let Some(&step) = self.steps.get(id) else {
+                continue;
+            };
+            let n = g.ring.len();
+            let mut points: Vec<[f64; 3]> = g.ring.iter().map(|p| [p[0], p[1], g.z0]).collect();
+            points.extend(g.ring.iter().zip(&g.tops).map(|(p, z)| [p[0], p[1], *z]));
+            let mut faces = vec![(0..n).rev().collect::<Vec<_>>(), (n..2 * n).collect()];
+            faces.extend((0..n).map(|i| vec![i, (i + 1) % n, n + (i + 1) % n, n + i]));
+            geometry::write_breps(
+                &mut self.ifc,
+                step,
+                geometry::BrepFrame::WORLD,
+                &[geometry::Polyhedron { points, faces }],
+                self.length_scale,
+                contexts,
+            )?;
+            let storey = reviera_core::columns::column_recipe(store.get(*id).expect("listed"))
+                .and_then(|r| GlobalId::parse(&r.extent.base_level))
                 .and_then(|g| store.find_by_guid(&g))
                 .and_then(|l| self.steps.get(&l).copied());
             if let Some(storey) = storey {

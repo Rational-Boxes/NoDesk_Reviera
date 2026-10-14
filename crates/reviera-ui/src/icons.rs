@@ -300,6 +300,15 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "model_properties" => format!(
             r#"<path d="M6 4h14l6 6v18H6z" fill="{f}" {s}/><path d="M10 12h12M10 17h12M10 22h7" {s}/><path d="M21 22l2 2 4-5" {sa}/>"#
         ),
+        "column" => format!(
+            r#"<path d="M9 4h14v4H9zM9 25h14v4H9z" fill="{f}" {s}/><path d="M11 8v17M21 8v17" {s}/><path d="M16 10v13" {sa}/>"#
+        ),
+        "column_attach" => format!(
+            r#"<path d="M3 10L16 3l13 7" fill="none" {sa}/><path d="M11 9v19h10V6" fill="{f}" {s}/><path d="M16 22v-9M13 16l3-3 3 3" {sa}/>"#
+        ),
+        "column_detach" => format!(
+            r#"<path d="M3 8L16 1l13 7" fill="none" {s}/><path d="M11 13v15h10V13z" fill="{f}" {s}/><path d="M16 4v6M13 7l3 3 3-3" {sa}/>"#
+        ),
         "wall_opening" => format!(
             r#"<path d="M3 24l8-6h18l-8 6z" fill="{f}" {s}/><path d="M3 24V10l8-6h18v14" {s}/><path d="M3 10h18v14M21 10l8-6" {s}/><path d="M8 24v-10h8v10" fill="{paper}" {sa}/>"#
         ),

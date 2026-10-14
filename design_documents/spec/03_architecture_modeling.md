@@ -1577,8 +1577,10 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 - `column.detach(column_ids[], end: top|base, target_ids?) -> ()`
 
 **Acceptance criteria.**
-- [ ] A column attached at its top to a sloping roof with Maximum Intersection reaches the highest point where the roof crosses the column's footprint. With Minimum Intersection it reaches the lowest.
+- [x] A column attached at its top to a sloping roof with Maximum Intersection reaches the highest point where the roof crosses the column's footprint. With Minimum Intersection it reaches the lowest.
 - [ ] A column joined to a plastered wall takes the plaster finish on its faces.
+
+*Built (2026-10-15):* `column.place_architectural`, `column.set`, `column.attach` (top only; targets: Reviera roofs, floors and ceilings; Cut Column style: with Maximum and Midline the top is cut by the underside), `column.detach`; column types (`IfcColumnType` with a `recipe.column_type`: rectangular width × depth or round diameter) through `type.duplicate`, `type.set_param` and `element.set_type`. Columns move, rotate, mirror and copy, follow their levels and are deleted with them; an attach target that goes leaves the column at its own top. Architecture › **Column** places them in plans (Spacebar turns 90°), Properties edits constraints, rotation and type, and Modify | Columns › Attach Top / Detach Top attach to what is directly above. IFC: `IfcColumn` (`COLUMN`, `Pset_ColumnCommon.LoadBearing` false) with a faceted B-rep body, contained in its base level. Not yet: attaching bases, Cut Target and Do Not Cut styles, reference planes and levels as targets, wall materials and wrapping, Moves With Grids, Room Bounding.
 
 ### 3.4.6 Flip controls and mirrored state
 **ID:** ARC-FLIP-001 · **Priority:** P0 · **Ref:** research/02 §2.4, §2.5, §4.13, §5.2, §5.3, §13 (Edge cases) · web: About Flip Controls; Flip Elements
