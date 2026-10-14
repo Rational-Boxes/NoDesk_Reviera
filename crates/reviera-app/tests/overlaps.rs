@@ -192,6 +192,12 @@ fn overlaps_are_accepted_or_moved_apart() {
         .len(),
         2
     );
+    // Still accepted after both move.
+    for (id, v) in [(cross, [0.5, 0.0, 0.0]), (long, [0.0, 0.05, 0.0])] {
+        run(&mut app, "element.move", json!({ "element_ids": [id], "vector": v })).unwrap();
+    }
+    let left = pairs(&run(&mut app, "overlap.find", json!({})).unwrap());
+    assert!(!left.iter().any(|(a, b, _)| (*a, *b) == (long.min(cross), long.max(cross))), "{left:?}");
     let accepted = run(&mut app, "overlap.accepted", json!({})).unwrap();
     assert_eq!(accepted[0]["note"], "a buttress");
     assert!(accepted[0]["at"].as_str().unwrap().ends_with('Z'));
