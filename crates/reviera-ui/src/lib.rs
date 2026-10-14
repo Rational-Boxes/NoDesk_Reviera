@@ -39,6 +39,7 @@ mod sketch;
 mod sketch_edit;
 mod snap;
 mod stairs;
+mod walls;
 mod wx;
 
 use std::cell::RefCell;
@@ -234,6 +235,10 @@ struct Gui {
     grid_type: Option<ElementId>,
     /// The grid type whose values the palette shows.
     type_rows: Option<ElementId>,
+    /// The type new walls get (Wall tool); `None` for the default.
+    wall_type: Option<ElementId>,
+    /// The wall type whose values the palette shows.
+    wall_type_row: Option<ElementId>,
     /// Drives animated view changes and walking.
     timer: Option<Timer<Frame>>,
     /// Models being opened in the background, and the timer that animates their tabs.
@@ -1073,6 +1078,7 @@ impl Gui {
         });
         self.update_wall_lines();
         self.clear_selection();
+        self.properties_stale = true;
         self.tool_prompt(frame);
     }
 
@@ -1300,12 +1306,15 @@ impl Gui {
             Some(level) => json!({ "level": level }),
             None => json!({ "unconnected": WALL_HEIGHT }),
         };
-        let args = json!({
+        let mut args = json!({
             "curve": {"line": {"start": start, "end": end}, "through": through},
             "base_level": t.level,
             "top_constraint": top,
             "flip": t.flip,
         });
+        if let Some(ty) = self.tool_wall_type() {
+            args["type_id"] = json!(ty);
+        }
         match self.run("wall.create", args) {
             Ok(_) => {
                 let t = self.tool.as_mut().expect("tool");
@@ -1720,12 +1729,14 @@ impl Gui {
         let Some(doc) = self.doc else { return };
         let ids = self.selection();
         self.type_rows = None;
+        self.wall_type_row = None;
         if self.sketch_rows(grid) {
             return;
         }
         if ids.is_empty()
             && (self.grid_tool_properties(grid)
                 || self.insert_tool_properties(grid)
+                || self.wall_tool_properties(grid)
                 || self.view_properties(grid))
         {
             return;
@@ -1782,6 +1793,7 @@ impl Gui {
         let is_level = e.class == reviera_core::levels::CLASS;
         let is_grid = reviera_core::grids::is_grid(&e);
         let is_insert = reviera_core::inserts::kind_of(&e).is_some();
+        let is_wall = reviera_core::walls::wall_recipe(&e).is_some();
         for (i, (label, value)) in [
             ("Category", category),
             // A grid line is written as an axis of the grid system.
@@ -1811,8 +1823,8 @@ impl Gui {
                 grid.append(Property::string(label, "grid_name", value));
                 continue;
             }
-            // A grid's, door's or window's type is chosen below, with its values.
-            if (is_grid || is_insert) && label == "Type" {
+            // A grid's, wall's, door's or window's type is chosen below, with its values.
+            if (is_grid || is_insert || is_wall) && label == "Type" {
                 continue;
             }
             let name = format!("e{i}");
@@ -1837,6 +1849,8 @@ impl Gui {
         if is_insert {
             self.insert_rows(grid, id);
         }
+        // Walls go on to their parameters (identity data, type values).
+        self.wall_rows(grid, id);
         if self.deck_rows(grid, id) {
             return;
         }
@@ -2058,6 +2072,7 @@ impl Gui {
         }
         if self.grid_type_edit(property, text.clone())
             || self.insert_edit(property, text.clone())
+            || self.wall_edit(property, text.clone())
             || self.floor_edit(property, text.clone())
             || self.roof_edit(property, text.clone())
             || self.room_edit(property, text.clone())
@@ -2890,6 +2905,8 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 insert_types: std::collections::HashMap::new(),
                 grid_type: None,
                 type_rows: None,
+                wall_type: None,
+                wall_type_row: None,
                 timer: Some(Timer::new(&frame)),
                 loading: Vec::new(),
                 load_timer: Some(Timer::new(&frame)),

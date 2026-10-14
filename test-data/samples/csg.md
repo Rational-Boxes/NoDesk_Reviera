@@ -5,12 +5,14 @@ window cannot do yet ([gaps](#gaps)). The script `csg.lua` is the reference.
 
 Start with **File › New**, and open a Level 1 plan (View › Floor Plan).
 
-1. **The pier type.** Draw any wall, select it, and in Properties › Type choose Duplicate Type…
-   as *Pier 600*, Width 600. **[gap: wall types are not chosen or duplicated in Properties]**
+1. **The pier type.** Start the Wall tool; with nothing selected, Properties › Type chooses the
+   type new walls get. Draw any wall, select it, and in Properties › Type choose Duplicate
+   Type… as *Pier 600*, then set Width 600.
 2. **Eight pairs.** For n = 0 … 7, at x = 7000 · n:
-   - wall A: Architecture › **Wall** from (x − 2000, 0) to (x + 2000, 0), 3000 high;
-   - pier B: a *Pier 600* wall from (x, −1000) to (x, 1000), 4500 high.
-   **[gap: a wall's type and height are not set in Properties]**
+   - wall A: Architecture › **Wall** (type *Generic - 200mm*) from (x − 2000, 0) to (x + 2000,
+     0), 3000 high (the tool's default);
+   - pier B: the Wall tool with type *Pier 600*, from (x, −1000) to (x, 1000); then select the
+     piers and set Unconnected Height 4500.
 3. **Resolve each pair.** View › Coordination › **Check Overlaps**, pick the pair, then in the
    *Resolve Overlap* dialog:
    1. leave the first unresolved;
@@ -28,4 +30,4 @@ Check: View › Coordination › **Check Overlaps** lists exactly one overlap (t
 
 ## Gaps
 
-- **Wall Properties:** type (choose, Duplicate Type…) and height.
+None: every step has its UI.

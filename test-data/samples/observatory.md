@@ -8,9 +8,8 @@ Start with **File › New**, and open a Level 1 plan (View › Floor Plan).
 
 1. **The drum.** Architecture › **Arc Wall**: click (-5000, 0), then the end (5000, 0), then a
    point on the arc at (0, 5000): the north half. Again from (5000, 0) to (-5000, 0) through (0,
-   -5000): the south half. Set each wall's height to 5000.
-   **[gap: a wall's height, base and top constraints cannot be edited in Properties (nor by a
-   command)]**
+   -5000): the south half. Select both and set Properties › Constraints › Unconnected Height
+   to 5000.
 2. **Door and windows on the curve.** Architecture › **Door**: hover the south arc at its
    lowest point and click. **Window**: three on the north arc (north-west, north-east, north),
    one on the south arc (south-west); set each Sill Height to 1600 in Properties.
@@ -25,15 +24,15 @@ Start with **File › New**, and open a Level 1 plan (View › Floor Plan).
 6. **Drum attached.** With the dome selected, Modify | Roofs › **Attach Walls**: the drum
    rises to the dome's underside.
 7. **The observing slot (CSG).**
-   - Draw a cutter: a wall from (0, -600) to (0, 6000), 800 wide, its base 6400 up and 6000
-     high. Make its type with Duplicate Type… (*Slot cutter 800*, Width 800).
-     **[gap: a wall's type, base offset and height are not in its Properties]**
+   - Draw a cutter: a wall from (0, -600) to (0, 6000). In Properties › Type choose Duplicate
+     Type… (*Slot cutter 800*) and set Width 800; under Constraints set Base Offset 6400 and
+     Unconnected Height 6000.
    - View › Coordination › **Check Overlaps**: pick *dome × cutter*, then *Cut … by …* (the dome
      by the cutter).
    - **[gap: the cutter's body should then be hidden (`tools: hide`); the resolve dialog cannot
      ask for it]**
 8. **The annex.** Wall: (8000, -3000) up to (8000, 3000), along to (16000, 3000), down to (16000,
-   -3000), back to the start; 3200 high. A door in the south wall at its middle, windows either
+   -3000), back to the start; Unconnected Height 3200. A door in the south wall at its middle, windows either
    side.
 9. **The vault.** Architecture › **Arched Roof**: Pick Walls on the annex (Tab for the chain),
    Finish, accept *Attach the walls*: the end walls fill up to the arch. In Properties › Arch:
@@ -52,9 +51,6 @@ Check: View › Coordination › **Check Overlaps** reports none.
 
 ## Gaps
 
-- **Wall Properties:** type (choose, Duplicate Type… with Width), base offset, top constraint,
-  unconnected height and top offset. Core has no command to change them after creation either
-  (`wall.set_params`).
 - **Sketching curves:** Pick Walls on a curved wall should take its curve; sketches need Arc and
   Circle tools.
 - **Dome Properties:** centre and plan (radius, sides) are only set by clicking.
