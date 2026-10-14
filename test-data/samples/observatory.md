@@ -18,9 +18,9 @@ Start with **File › New**, and open a Level 1 plan (View › Floor Plan).
    or arc tool]**
 4. **Room.** Architecture › **Room**: click inside the drum. Set its Name to *Observation* in
    Properties.
-5. **The dome.** Architecture › **Dome** › *Circle*, *Hemisphere*: click the centre (0, 0) and a
-   point 5350 from it. It springs from the drum's top.
-   **[gap: the dome's centre and radius cannot be typed or edited in Properties]**
+5. **The dome.** Architecture › **Dome** › *Circle*, *Hemisphere*: click the centre and a point
+   on the rim. It springs from the drum's top. In Properties › Dome set Centre X 0, Centre Y 0
+   and Radius 5350 (the rise follows).
 6. **Drum attached.** With the dome selected, Modify | Roofs › **Attach Walls**: the drum
    rises to the dome's underside.
 7. **The observing slot (CSG).**
@@ -52,6 +52,5 @@ Check: View › Coordination › **Check Overlaps** reports none.
 
 - **Sketching curves:** Pick Walls on a curved wall should take its curve; sketches need Arc and
   Circle tools.
-- **Dome Properties:** centre and plan (radius, sides) are only set by clicking.
 - **Resolve dialog:** cutting or intersecting cannot hide the tool's body.
 - **Accessibility rule set:** no UI to choose it.

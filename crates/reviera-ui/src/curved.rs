@@ -262,6 +262,63 @@ impl Gui {
                 DOME_PROFILES,
                 &name(json!(d.profile)),
             ));
+            let (cx, cy) = (
+                self.format_length(d.center[0]),
+                self.format_length(d.center[1]),
+            );
+            grid.append(Property::string("Centre X", "do_cx", cx));
+            grid.append(Property::string("Centre Y", "do_cy", cy));
+            let (plan, rows): (&str, Vec<(&str, &str, String)>) = match &d.plan {
+                roofs::curved::DomePlan::Circle { radius } => (
+                    "Circle",
+                    vec![("Radius", "do_radius", self.format_length(*radius))],
+                ),
+                roofs::curved::DomePlan::Ellipse { radii, rotation } => (
+                    "Ellipse",
+                    vec![
+                        ("Radius 1", "do_r0", self.format_length(radii[0])),
+                        ("Radius 2", "do_r1", self.format_length(radii[1])),
+                        (
+                            "Rotation",
+                            "do_rot",
+                            format!("{:.1}°", rotation.to_degrees()),
+                        ),
+                    ],
+                ),
+                roofs::curved::DomePlan::Polygon {
+                    radius,
+                    sides,
+                    rotation,
+                } => (
+                    "Polygon",
+                    vec![
+                        ("Radius", "do_radius", self.format_length(*radius)),
+                        ("Sides", "do_sides", sides.to_string()),
+                        (
+                            "Rotation",
+                            "do_rot",
+                            format!("{:.1}°", rotation.to_degrees()),
+                        ),
+                    ],
+                ),
+            };
+            grid.append(Property::string("Plan", "do_plan", plan));
+            grid.set_property_read_only("do_plan", true);
+            for (label, key, v) in rows {
+                grid.append(Property::string(label, key, v));
+            }
+            grid.set_help_string(
+                "do_radius",
+                "A circle's radius, or a polygon's to its corners; a hemisphere's rise follows",
+            );
+            if d.profile != roofs::curved::DomeProfile::Hemisphere {
+                let ratio = d.ratio.map_or(String::new(), |r| format!("{r}"));
+                grid.append(Property::string("Ratio", "do_ratio", ratio));
+                grid.set_help_string(
+                    "do_ratio",
+                    "Pointed: the arcs' radius over the span (1 when empty); onion: the bulge (1.25)",
+                );
+            }
             let (rise, oculus) = (self.format_length(d.rise), self.format_length(d.oculus));
             grid.append(Property::string("Rise", "do_rise", rise));
             grid.append(Property::string("Oculus", "do_oculus", oculus));
@@ -288,6 +345,14 @@ impl Gui {
         let choice = |list: &'static [(&'static str, &'static str)]| {
             list.iter().find(|c| c.0 == text).map(|c| c.1)
         };
+        if let Some(r) = self.dome_plan_edit(property, &text, roof) {
+            if let Err(e) = r {
+                error(&frame, &format!("The roof was not changed:\n{e}"));
+            }
+            self.properties_stale = true;
+            self.refresh_scene(&frame);
+            return true;
+        }
         let (command, field, value) = match property {
             "ar_profile" => (
                 "roof.set_arch",
@@ -321,5 +386,81 @@ impl Gui {
         self.properties_stale = true;
         self.refresh_scene(&frame);
         true
+    }
+
+    /// An edit of a dome's centre or plan; `None` if `property` is not one.
+    fn dome_plan_edit(
+        &mut self,
+        property: &str,
+        text: &str,
+        roof: reviera_core::ElementId,
+    ) -> Option<Result<(), String>> {
+        use roofs::curved::DomePlan;
+        if !matches!(
+            property,
+            "do_cx"
+                | "do_cy"
+                | "do_radius"
+                | "do_r0"
+                | "do_r1"
+                | "do_sides"
+                | "do_rot"
+                | "do_ratio"
+        ) {
+            return None;
+        }
+        let d = self
+            .doc
+            .and_then(|d| self.app.document(d))
+            .and_then(|d| d.doc.store().get(roof).and_then(roofs::roof_recipe))
+            .and_then(|r| r.dome)?;
+        let length = |g: &mut Gui| -> Result<f64, String> {
+            g.run(
+                "units.parse",
+                json!({ "text": text, "data_type": "length" }),
+            )
+            .map(|v| v.as_f64().unwrap_or_default())
+        };
+        let number = || -> Result<f64, String> {
+            text.trim()
+                .trim_end_matches('°')
+                .trim()
+                .parse::<f64>()
+                .map_err(|_| format!("`{text}` is not a number"))
+        };
+        let mut args = json!({ "roof_id": roof });
+        let result = (|| -> Result<(), String> {
+            match property {
+                "do_cx" => args["center"] = json!([length(self)?, d.center[1]]),
+                "do_cy" => args["center"] = json!([d.center[0], length(self)?]),
+                "do_ratio" => args["ratio"] = json!(number()?),
+                _ => {
+                    let mut plan = d.plan.clone();
+                    match (&mut plan, property) {
+                        (
+                            DomePlan::Circle { radius } | DomePlan::Polygon { radius, .. },
+                            "do_radius",
+                        ) => *radius = length(self)?,
+                        (DomePlan::Ellipse { radii, .. }, "do_r0") => radii[0] = length(self)?,
+                        (DomePlan::Ellipse { radii, .. }, "do_r1") => radii[1] = length(self)?,
+                        (DomePlan::Polygon { sides, .. }, "do_sides") => {
+                            let n = number()?;
+                            if n < 3.0 || n.fract() != 0.0 {
+                                return Err("a polygon has 3 or more whole sides".to_owned());
+                            }
+                            *sides = n as u32;
+                        }
+                        (
+                            DomePlan::Ellipse { rotation, .. } | DomePlan::Polygon { rotation, .. },
+                            "do_rot",
+                        ) => *rotation = number()?.to_radians(),
+                        _ => return Ok(()),
+                    }
+                    args["plan"] = serde_json::to_value(&plan).expect("serialises");
+                }
+            }
+            self.run("roof.set_dome", args.clone()).map(|_| ())
+        })();
+        Some(result)
     }
 }
