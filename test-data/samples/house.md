@@ -18,8 +18,8 @@ Start with **File › New**. The model has Level 1 at 0.
      partition and click at its middle.
    - Architecture › **Window**: south wall at 2.5 m, north wall at 2.5 m and 7.5 m, east wall at
      3.5 m.
-   - The positions are set by clicking; to set an exact distance along the wall, select the
-     insert and drag it. **[gap: no Properties row for the distance along the wall]**
+   - Clicks place them roughly; select each and set Properties › Placement › From Wall Start
+     (its centre's distance along the wall) to the exact value.
 5. **Roof.** Architecture › **Roof**. Pick Walls (Tab picks the joined chain) takes the
    exterior faces. Finish, and accept *Attach the walls*. In Properties: Roof Shape *Hip*,
    Base Offset 3000.
@@ -43,5 +43,4 @@ Check: View › **Check Overlaps** reports none.
 
 ## Gaps
 
-- **Exact distance of a door or window along its wall.** Clicks and drags only; Properties
-  should show and edit it.
+None: every step has its UI.

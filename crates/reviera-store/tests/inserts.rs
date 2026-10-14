@@ -554,3 +554,39 @@ fn windows_fit_their_wall() {
     let pb3 = placed(&doc, b);
     assert!((pb3.ty.width - 1.8).abs() < 1e-9, "{}", pb3.ty.width);
 }
+
+#[test]
+fn an_insert_is_placed_at_a_distance_along_its_wall() {
+    let dir = tempfile::tempdir().unwrap();
+    let (_, mut doc, _) = new_project(dir.path());
+    let r = registry();
+    let w = wall(&r, &mut doc, 10.0);
+    let win = place(&r, &mut doc, "window.place", w, 2.0);
+    run(
+        &r,
+        &mut doc,
+        "insert.set_position",
+        json!({ "element_id": win.0, "along": "7.5 m" }),
+    )
+    .unwrap();
+    assert!((placed(&doc, win).recipe.along - 7.5).abs() < 1e-9);
+    run(
+        &r,
+        &mut doc,
+        "insert.set_position",
+        json!({ "element_id": win.0, "from_end": "3500 mm" }),
+    )
+    .unwrap();
+    assert!((placed(&doc, win).recipe.along - 6.5).abs() < 1e-9);
+    // Past the wall's end it no longer fits, and stays.
+    assert!(
+        run(
+            &r,
+            &mut doc,
+            "insert.set_position",
+            json!({ "element_id": win.0, "along": 9.9 }),
+        )
+        .is_err()
+    );
+    assert!((placed(&doc, win).recipe.along - 6.5).abs() < 1e-9);
+}

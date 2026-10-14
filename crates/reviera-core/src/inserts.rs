@@ -1146,6 +1146,53 @@ pub(crate) fn move_by(
 
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
+pub struct SetPositionParams {
+    pub element_id: ElementRef,
+    /// The centre's distance from the host wall's start, along the wall (accepts units).
+    #[schemars(extend("x-reviera-data-type" = "length"))]
+    pub along: Option<f64>,
+    /// Or the centre's distance from the wall's end.
+    #[schemars(extend("x-reviera-data-type" = "length"))]
+    pub from_end: Option<f64>,
+}
+
+/// Places a door or window at a distance along its wall (`insert.set_position`).
+pub(crate) fn set_position(
+    txn: &mut crate::txn::Transaction<'_>,
+    p: SetPositionParams,
+) -> Result<()> {
+    let store = txn.store().clone();
+    let id = store.resolve(&p.element_id).ok_or_else(|| {
+        Error::new(
+            "element.not_found",
+            format!("no element {:?}", p.element_id),
+        )
+    })?;
+    crate::modify::check_unpinned(&store, id)?;
+    let e = store.get(id).expect("resolved");
+    let placed = resolve(&store, e)?;
+    let along = match (p.along, p.from_end) {
+        (Some(a), None) => a,
+        (None, Some(b)) => placed.span() - b,
+        _ => {
+            return Err(Error::new(
+                "insert.bad_position",
+                "give either `along` or `from_end`",
+            ));
+        }
+    };
+    let mut recipe = placed.recipe;
+    recipe.along = along;
+    let value = serde_json::to_value(&recipe).expect("serialises");
+    txn.modify(id, |e| {
+        e.params.insert(RECIPE_KEY.into(), value);
+    })?;
+    let moved = resolve(txn.store(), txn.store().get(id).expect("exists"))?;
+    check_fit(txn.store(), &moved)
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct SetSillParams {
     pub element_ids: Vec<ElementRef>,
     /// Bottom above the host's base level (accepts units).

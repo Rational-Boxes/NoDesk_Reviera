@@ -161,6 +161,7 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(WindowPlace),
         registry.add(InsertFlipHand),
         registry.add(InsertFlipFacing),
+        registry.add(InsertSetPosition),
         registry.add(InsertSetSill),
         registry.add(InsertSetSize),
         registry.add(ElementMove),
@@ -1900,6 +1901,28 @@ impl Command for InsertFlipFacing {
 
     fn run(&self, cx: &mut CommandContext<'_>, p: inserts::FlipParams) -> Result<()> {
         inserts::flip(cx.edit()?, p, false)
+    }
+}
+
+#[derive(Debug)]
+struct InsertSetPosition;
+
+impl Command for InsertSetPosition {
+    type Params = inserts::SetPositionParams;
+    type Output = ();
+    const META: CommandMeta = CommandMeta {
+        name: "insert.set_position",
+        version: 1,
+        summary: "Place a door or window along its wall",
+        description: "Moves a door or window along its host wall so that its centre is `along` from the wall's \
+                      start (or `from_end` from its end), measured along the wall (curved walls: along the \
+                      curve). It must still fit in the wall.",
+        effects: &[Effect::Edit],
+        transaction_name: "Insert Position",
+    };
+
+    fn run(&self, cx: &mut CommandContext<'_>, p: inserts::SetPositionParams) -> Result<()> {
+        inserts::set_position(cx.edit()?, p)
     }
 }
 

@@ -584,6 +584,20 @@ impl Gui {
         );
         grid.append(Property::string("Head Height", "in_head", head));
         grid.set_property_read_only("in_head", true);
+        let (start, end) = (
+            self.format_length(p.recipe.along),
+            self.format_length(p.span() - p.recipe.along),
+        );
+        grid.append(Property::string("From Wall Start", "in_along", start));
+        grid.append(Property::string("From Wall End", "in_from_end", end));
+        grid.set_help_string(
+            "in_along",
+            "Its centre's distance from the wall's start, along the wall",
+        );
+        grid.set_help_string(
+            "in_from_end",
+            "Its centre's distance from the wall's end, along the wall",
+        );
         grid.append(Property::category("Dimensions", "c_insert_size"));
         let (w, h) = (
             self.format_length(p.ty.width),
@@ -650,6 +664,20 @@ impl Gui {
                 )
                 .map(|_| ()),
             ),
+            "in_along" | "in_from_end" => {
+                let key = if property == "in_along" {
+                    "along"
+                } else {
+                    "from_end"
+                };
+                Some(selected.iter().try_for_each(|id| {
+                    self.run(
+                        "insert.set_position",
+                        json!({ "element_id": id, key: text }),
+                    )
+                    .map(|_| ())
+                }))
+            }
             "in_width" | "in_height" => {
                 let key = if property == "in_width" {
                     "width"
