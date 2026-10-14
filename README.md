@@ -101,9 +101,11 @@ The KIT FZK *AC20-Institute-Var-2* sample model (`test-data/ifc/`) open in Revie
   and pairs that belong together by design (a door and its wall) are left out. It is the
   shared engine for virtual volumes, below. A picked overlap can be accepted as intended (it
   then drops out of the checks) or moved apart, as one undo step (`overlap.resolve`,
-  `overlap.accept`, `overlap.accepted`). Not yet: resolving by a boolean mode (cut, join,
-  subtract, intersect, union; they need the solid boolean kernel), clash tests (COL-CLASH) and
-  automatic pipe and duct penetrations (MEP-PEN-001).
+  `overlap.accept`, `overlap.accepted`), or resolved by a boolean: cut either by the other,
+  join by precedence, intersect or union. Booleans are kept and re-made when either element
+  changes (`geometry.boolean`, `geometry.remove_boolean`; View › Remove Boolean), computed by
+  OpenCASCADE (`reviera-geom`). Not yet: shaped bodies in the saved IFC, clash tests
+  (COL-CLASH) and automatic pipe and duct penetrations (MEP-PEN-001).
 - **Virtual volumes**: every door has its swing volume, and with the ADA 2010 rule set
   (`clearance.set_rule_set`) its pull-side and push-side maneuvering clearances. Check Overlaps
   lists what intrudes into them (and doors that would hit each other), and View › Virtual
@@ -381,7 +383,7 @@ Permission levels are `read_only` (the default), `model_edit` and `full_scriptin
 | `crates/reviera-render` | Render Scene, plan and section graphics, annotation, stroke font |
 | `crates/reviera-render-wgpu` | The built-in `wgpu` viewport |
 | `crates/reviera-ui` | The main window (wxWidgets through wxDragon): ribbon, views, tools, panes |
-| `crates/…` | Geometry, Godot, network, BIMserver and OpenCDE crates (placeholders); `reviera-lua` is the LuaJIT scripting host |
+| `crates/…` | Godot, network, BIMserver and OpenCDE crates (placeholders); `reviera-lua` is the LuaJIT scripting host and `reviera-geom` the OpenCASCADE solid kernel (booleans so far) |
 | `design_documents/` | The specification (`spec/`), technology stack, research log and source register |
 | `schemas/`, `clients/rsp/` | Open data formats and protocol clients (MIT) |
 | `test-data/ifc/` | Sample IFC models for tests (see their README for provenance) |

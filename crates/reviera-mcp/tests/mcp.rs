@@ -177,7 +177,7 @@ async fn tools_are_generated_from_the_registry_in_toolsets() {
 
     // Disabled toolsets are still discoverable and runnable.
     let found = h
-        .call("find_commands", json!({"query": "test wall"}))
+        .call("find_commands", json!({"query": "add test wall"}))
         .await
         .unwrap();
     assert_eq!(found["commands"][0]["name"], "wall.add_test");

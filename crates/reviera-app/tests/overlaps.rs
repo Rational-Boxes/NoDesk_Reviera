@@ -194,10 +194,20 @@ fn overlaps_are_accepted_or_moved_apart() {
     );
     // Still accepted after both move.
     for (id, v) in [(cross, [0.5, 0.0, 0.0]), (long, [0.0, 0.05, 0.0])] {
-        run(&mut app, "element.move", json!({ "element_ids": [id], "vector": v })).unwrap();
+        run(
+            &mut app,
+            "element.move",
+            json!({ "element_ids": [id], "vector": v }),
+        )
+        .unwrap();
     }
     let left = pairs(&run(&mut app, "overlap.find", json!({})).unwrap());
-    assert!(!left.iter().any(|(a, b, _)| (*a, *b) == (long.min(cross), long.max(cross))), "{left:?}");
+    assert!(
+        !left
+            .iter()
+            .any(|(a, b, _)| (*a, *b) == (long.min(cross), long.max(cross))),
+        "{left:?}"
+    );
     let accepted = run(&mut app, "overlap.accepted", json!({})).unwrap();
     assert_eq!(accepted[0]["note"], "a buttress");
     assert!(accepted[0]["at"].as_str().unwrap().ends_with('Z'));
@@ -237,12 +247,79 @@ fn overlaps_are_accepted_or_moved_apart() {
         2
     );
 
-    // The boolean modes need the kernel.
-    let err = run(
+    // Cut the long wall by the crossing one (ARC-MOD-028): it loses the shared volume, and the
+    // pair is no longer an overlap.
+    let volume = |app: &App, id: u64| -> f64 {
+        app.bodies()
+            .unwrap()
+            .iter()
+            .find(|b| b.element.0 == id)
+            .map_or(0.0, |b| {
+                b.parts
+                    .iter()
+                    .map(|p| {
+                        let (pts, idx) = &p.mesh;
+                        idx.chunks(3)
+                            .map(|t| {
+                                let (a, b, c) =
+                                    (pts[t[0] as usize], pts[t[1] as usize], pts[t[2] as usize]);
+                                (a[0] * (b[1] * c[2] - b[2] * c[1])
+                                    - a[1] * (b[0] * c[2] - b[2] * c[0])
+                                    + a[2] * (b[0] * c[1] - b[1] * c[0]))
+                                    / 6.0
+                            })
+                            .sum::<f64>()
+                    })
+                    .sum()
+            })
+    };
+    let before = volume(&app, long);
+    run(
         &mut app,
         "overlap.resolve",
         json!({ "a": long, "b": cross, "mode": "cut_a" }),
     )
-    .unwrap_err();
-    assert_eq!(err.code, "overlap.needs_booleans");
+    .unwrap();
+    let after = volume(&app, long);
+    assert!(
+        (before - after - 0.2 * 0.2 * 3.0).abs() < 1e-6,
+        "{before} → {after}"
+    );
+    let left = pairs(&run(&mut app, "overlap.find", json!({})).unwrap());
+    assert!(
+        !left
+            .iter()
+            .any(|(a, b, _)| (*a, *b) == (long.min(cross), long.max(cross))),
+        "{left:?}"
+    );
+    // The cut follows the crossing wall when it moves.
+    run(
+        &mut app,
+        "element.move",
+        json!({ "element_ids": [cross], "vector": [1.0, 0.0, 0.0] }),
+    )
+    .unwrap();
+    assert!((volume(&app, long) - after).abs() < 1e-6);
+    // Removing the boolean restores the wall.
+    run(
+        &mut app,
+        "geometry.remove_boolean",
+        json!({ "target_id": long }),
+    )
+    .unwrap();
+    assert!((volume(&app, long) - before).abs() < 1e-6);
+    // A union fuses the tool in and hides its own body.
+    run(
+        &mut app,
+        "geometry.boolean",
+        json!({ "target_id": long, "tool_ids": [cross], "op": "union" }),
+    )
+    .unwrap();
+    assert!(app.bodies().unwrap().iter().all(|b| b.element.0 != cross));
+    let fused = volume(&app, long);
+    let cross_volume = 0.2 * 2.6 * 3.0;
+    assert!(
+        (fused - (before + cross_volume - 0.12)).abs() < 1e-6,
+        "{fused}"
+    );
 }

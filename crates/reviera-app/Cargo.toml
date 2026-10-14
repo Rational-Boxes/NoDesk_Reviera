@@ -11,6 +11,7 @@ publish.workspace = true
 
 [dependencies]
 reviera-lua.workspace = true
+reviera-geom.workspace = true
 pdf-writer.workspace = true
 reviera-core.workspace = true
 reviera-ifc.workspace = true

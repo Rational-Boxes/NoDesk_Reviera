@@ -2527,6 +2527,7 @@ version = "0.1.0"
 dependencies = [
  "pdf-writer",
  "reviera-core",
+ "reviera-geom",
  "reviera-ifc",
  "reviera-livestore",
  "reviera-lua",
@@ -2566,6 +2567,8 @@ dependencies = [
 name = "reviera-geom"
 version = "0.1.0"
 dependencies = [
+ "cxx",
+ "cxx-build",
  "reviera-core",
 ]
 

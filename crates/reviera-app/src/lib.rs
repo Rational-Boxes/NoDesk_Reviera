@@ -9,6 +9,7 @@
 
 pub mod cobie;
 mod commands;
+pub mod csg;
 pub mod inspect;
 pub mod notes;
 pub mod output;
@@ -80,6 +81,8 @@ pub struct OpenDocument {
     spatial: std::sync::Mutex<Option<(i64, Arc<reviera_core::inspect::Imported>)>>,
     /// Tessellated IFC geometry and the data revision it was made at.
     tessellation: std::sync::Mutex<Option<(i64, std::sync::Arc<Vec<reviera_render::SceneMesh>>)>>,
+    /// Boolean results (ARC-MOD-028).
+    pub(crate) csg: csg::Cache,
 }
 
 impl OpenDocument {
@@ -355,11 +358,13 @@ impl App {
     pub fn render_scene(&self, id: DocumentId) -> Result<reviera_render::RenderScene> {
         let open = self.get(id)?;
         let store = open.doc.store();
+        // Elements in booleans are drawn from their (shaped) bodies.
+        let involved = csg::involved(store);
         let mut meshes: Vec<reviera_render::SceneMesh> = open
             .tessellation()?
             .iter()
             .filter(|m| match m.element {
-                Some(e) => store.get(e).is_some_and(|e| !regenerated(e)),
+                Some(e) => store.get(e).is_some_and(|e| !regenerated(e)) && !involved.contains(&e),
                 None => true,
             })
             .cloned()
@@ -367,7 +372,7 @@ impl App {
         // Reviera's own elements, regenerated (`bodies`): walls joined and cut by their openings,
         // floors, ceilings and decks, roofs, railings, gates, stairs, doors and windows. One that
         // cannot regenerate is not drawn.
-        for body in reviera_core::bodies::all(store) {
+        for body in self.bodies_of(id, |e| involved.contains(&e))? {
             for part in body.parts {
                 meshes.push(reviera_render::SceneMesh {
                     element: Some(body.element),
@@ -543,6 +548,7 @@ impl App {
                 temp: Default::default(),
                 spatial: Default::default(),
                 tessellation: Default::default(),
+                csg: Default::default(),
             },
         );
         self.active = Some(id);

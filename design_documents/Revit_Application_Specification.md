@@ -13246,16 +13246,31 @@ These tools are on the **Modify** tab and are repeated on every `Modify | <Eleme
 **Commands.** `overlap.resolve(a, b, mode: cut_a|cut_b|join|subtract|intersect|union|move_apart|accept) -> ()`, `overlap.accepted() -> [pair]`.
 
 **Acceptance criteria.**
-- [ ] A beam through a wall flagged by Check Overlaps and resolved with *Cut B by A* leaves the wall cut by the beam, and the overlap is no longer flagged.
+- [x] A beam through a wall flagged by Check Overlaps and resolved with *Cut B by A* leaves the wall cut by the beam, and the overlap is no longer flagged.
 - [x] An overlap resolved with *Accept* stays unflagged after both elements move.
 
 **Implementation notes (2026-10-13).** As built:
 - **Accept** (`overlap.accept`, or `overlap.resolve` mode `accept`): pairs are held on the project by GlobalId, with who accepted them, when (UTC) and a note. `overlap.find` and `clearance.check` leave them out (`include_accepted` brings them back). `overlap.accepted` lists them, and `accepted: false` takes one back.
 - **Move apart** moves one element (`moves`: `a` or `b`) by the shortest of the four plan moves (±x, ±y) that clears the other's box, re-checking, as one undo step. It is refused if they still overlap.
-- **The other modes:** the boolean modes (cut, join, subtract, intersect, union) are refused with `overlap.needs_booleans` until the solid boolean kernel exists.
-- **Window:** picking an overlap in Check Overlaps offers Select and frame, Accept as intended, or Move one of them apart.
+- **Boolean modes** (cut A by B, cut B by A, join by precedence, intersect, union): each becomes a kept boolean (ARC-MOD-028, below).
+- **Window:** picking an overlap in Check Overlaps offers:
+  - Select and frame;
+  - Accept as intended;
+  - the cuts, join, intersect and union;
+  - Move one of them apart.
+
+  View › Coordination › Remove Boolean removes the selected elements' booleans.
+- **The solid boolean kernel** (`reviera-geom`, OCCT 7.9):
+  - each closed part becomes a solid (its triangles sewn into a shell, turned to face out);
+  - `BRepAlgoAPI_Cut`, `_Common` or `_Fuse` runs on the compounds;
+  - coplanar faces are merged (`ShapeUpgrade_UnifySameDomain`), and the result is triangulated back.
+- **Kept booleans** (`geometry.boolean`, `geometry.remove_boolean`):
+  - The relations are held on the project (`rxd:csg`) by GlobalId.
+  - The application applies them wherever bodies are built, so the 3D view and the overlap engine see the result. Results are cached by their inputs, so a target is re-made only when it or its tool changes.
+  - A union hides the tool's own body. Pairs in a boolean count as related, so they are no longer flagged.
+  - A cycle (a tool already shaped by its target) is refused.
 - **Later:**
-  - the boolean modes;
+  - IFC export of shaped bodies (`IfcBooleanResult` or faceted B-reps; the file has each element's own body today);
   - checking after each edit;
   - drawing the overlap boxes in the view;
   - moving in z;

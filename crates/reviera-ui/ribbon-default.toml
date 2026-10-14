@@ -449,6 +449,12 @@ icon = "ceiling_plan"
 help = "Create reflected ceiling plans of levels"
 
 [[action]]
+id = "geometry.remove_boolean"
+label = "Remove Boolean"
+icon = "remove_boolean"
+help = "Remove the selected elements' cuts, joins and other booleans; their own shapes return"
+
+[[action]]
 id = "overlap.find"
 label = "Check Overlaps"
 icon = "overlaps"
@@ -893,6 +899,7 @@ tools = [
 label = "Coordination"
 tools = [
   { action = "overlap.find", size = "large" },
+  { action = "geometry.remove_boolean", size = "small" },
   { action = "view.set_virtual_volumes", size = "large" },
 ]
 

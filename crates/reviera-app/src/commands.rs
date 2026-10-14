@@ -515,6 +515,7 @@ impl HostCommand for RecoveryRestore {
                 temp: Default::default(),
                 spatial: Default::default(),
                 tessellation: Default::default(),
+                csg: Default::default(),
             },
         );
         app.active = Some(id);

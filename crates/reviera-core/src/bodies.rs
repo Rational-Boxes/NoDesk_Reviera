@@ -266,5 +266,5 @@ pub fn related(store: &Store, a: ElementId, b: ElementId) -> bool {
         }
         _ => false,
     };
-    ha.contains(&gb) || hb.contains(&ga) || same_dormer
+    ha.contains(&gb) || hb.contains(&ga) || same_dormer || crate::csg::related(store, a, b)
 }

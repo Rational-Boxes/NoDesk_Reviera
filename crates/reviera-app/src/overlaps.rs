@@ -57,17 +57,28 @@ pub struct FindResult {
 }
 
 impl App {
-    /// Every element's body in the active document: regenerated, then tessellated from the file.
+    /// Every element's body in the active document: regenerated, then tessellated from the file,
+    /// with the model's booleans applied.
     pub fn bodies(&self) -> Result<Vec<Body>> {
         let id = self
             .active()
             .ok_or_else(|| Error::new("document.none", "no document is open"))?;
+        self.bodies_of(id, |_| true)
+    }
+
+    /// A document's bodies: Reviera's own, and those tessellated from the file that `imported`
+    /// asks for; the model's booleans applied.
+    pub(crate) fn bodies_of(
+        &self,
+        id: crate::DocumentId,
+        imported: impl Fn(ElementId) -> bool,
+    ) -> Result<Vec<Body>> {
         let open = self.get(id)?;
         let store = open.doc.store();
         let mut out = reviera_core::bodies::all(store);
         for m in open.tessellation()?.iter() {
             let Some(e) = m.element else { continue };
-            if store.get(e).is_none_or(crate::regenerated) || m.indices.is_empty() {
+            if store.get(e).is_none_or(crate::regenerated) || m.indices.is_empty() || !imported(e) {
                 continue;
             }
             let part = Part {
@@ -86,6 +97,7 @@ impl App {
                 }),
             }
         }
+        crate::csg::apply(&open.csg, store, &mut out);
         Ok(out)
     }
 }
@@ -364,8 +376,10 @@ impl HostCommand for OverlapResolve {
         description: "Resolves the overlap between `a` and `b` by a mode (ARC-MOD-032). `accept` marks it intended \
                       (as `overlap.accept`). `move_apart` moves `moves` (default `b`) by the shortest of the four \
                       plan moves (±x, ±y) that clears the other's box, re-checking until they no longer overlap, \
-                      as one undo step. The boolean modes (`cut_a`, `cut_b`, `join`, `subtract`, `intersect`, `union`) need the \
-                      solid boolean kernel and are refused until it is built.",
+                      as one undo step. `cut_a` / `subtract` cuts `a` by `b`, `cut_b` cuts `b` by `a`, `join` cuts by precedence \
+                      (floors, ceilings and roofs cut walls; walls cut columns; else `a` cuts `b`), `intersect` \
+                      keeps what `a` shares with `b`, `union` fuses `b` into `a`: each as a kept boolean \
+                      (`geometry.boolean`).",
         effects: &[Effect::Edit],
         transaction_name: "",
     };
@@ -409,11 +423,41 @@ impl HostCommand for OverlapResolve {
                     }
                 }
             }
-            _ => Err(Error::new(
-                "overlap.needs_booleans",
-                "cut, join and the boolean modes need the solid boolean kernel, which is not built yet; \
-                 accept the overlap or move the elements apart",
-            )),
+            mode => {
+                // The target, its tool and the operation (ARC-MOD-016/017/028).
+                let (target, tool, op) = match mode {
+                    ResolveMode::CutA | ResolveMode::Subtract => (a, b, "subtract"),
+                    ResolveMode::CutB => (b, a, "subtract"),
+                    ResolveMode::Intersect => (a, b, "intersect"),
+                    ResolveMode::Union => (a, b, "union"),
+                    _ => {
+                        // Join: floors, ceilings and roofs cut walls; walls cut columns;
+                        // otherwise the first cuts the second.
+                        let store = app.get(doc)?.doc.store();
+                        let class = |id: ElementId| {
+                            store.get(id).map(|e| e.class.clone()).unwrap_or_default()
+                        };
+                        let rank = |c: &str| match c {
+                            "IfcSlab" | "IfcRoof" | "IfcCovering" => 2,
+                            "IfcWall" | "IfcWallStandardCase" => 1,
+                            "IfcColumn" => 0,
+                            _ => -1,
+                        };
+                        let (ra, rb) = (rank(&class(a)), rank(&class(b)));
+                        if ra >= 0 && rb >= 0 && rb > ra {
+                            (a, b, "subtract")
+                        } else {
+                            (b, a, "subtract")
+                        }
+                    }
+                };
+                app.execute(
+                    "geometry.boolean",
+                    serde_json::json!({ "target_id": target, "tool_ids": [tool], "op": op }),
+                    caller,
+                )?;
+                Ok(ResolveResult { moved: None })
+            }
         }
     }
 }

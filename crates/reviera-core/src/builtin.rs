@@ -68,6 +68,8 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(ViewSetVirtualVolumes),
         registry.add(ClearanceList),
         registry.add(OverlapAccept),
+        registry.add(GeometryBoolean),
+        registry.add(GeometryRemoveBoolean),
         registry.add(OverlapAccepted),
         registry.add(RoofCreateArched),
         registry.add(RoofSetArch),
@@ -2557,6 +2559,30 @@ modify_command!(
     crate::overlap_accept::AcceptParams,
     (),
     crate::overlap_accept::accept
+);
+
+modify_command!(
+    GeometryBoolean,
+    "geometry.boolean",
+    "Boolean between elements",
+    "Shapes `target_id` by `tool_ids` (ARC-MOD-028): `subtract` removes the tools' volume from the target, \
+     `intersect` keeps only what they share, `union` fuses them into the target. The relation is kept and \
+     re-applied whenever either element changes; the target keeps its category, type and parameters. A \
+     union hides the tools' own bodies; otherwise `tools: hide` does.",
+    "Boolean",
+    crate::csg::BooleanParams,
+    (),
+    crate::csg::boolean
+);
+modify_command!(
+    GeometryRemoveBoolean,
+    "geometry.remove_boolean",
+    "Remove a boolean",
+    "Removes the target's booleans (with `tool_ids`, only those tools'); its own body returns.",
+    "Remove Boolean",
+    crate::csg::RemoveParams,
+    (),
+    crate::csg::remove
 );
 
 #[derive(Debug)]

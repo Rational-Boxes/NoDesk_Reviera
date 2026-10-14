@@ -11,6 +11,10 @@ publish.workspace = true
 
 [dependencies]
 reviera-core.workspace = true
+cxx.workspace = true
+
+[build-dependencies]
+cxx-build.workspace = true
 
 [lints]
 workspace = true

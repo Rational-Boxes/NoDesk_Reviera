@@ -101,6 +101,14 @@ impl Gui {
             ("Accept as intended".to_owned(), "accept"),
         ];
         if !is_virtual {
+            actions.push((format!("Cut {a_label} by {b_label}"), "cut_a"));
+            actions.push((format!("Cut {b_label} by {a_label}"), "cut_b"));
+            actions.push(("Join (by precedence)".to_owned(), "join"));
+            actions.push((
+                format!("Keep only what {a_label} shares (intersect)"),
+                "intersect",
+            ));
+            actions.push((format!("Fuse {b_label} into {a_label} (union)"), "union"));
             actions.push((format!("Move {b_label} apart"), "move_b"));
             actions.push((format!("Move {a_label} apart"), "move_a"));
         }
@@ -127,16 +135,19 @@ impl Gui {
             "move_a" => {
                 Some(json!({ "a": o["a"], "b": o["b"], "mode": "move_apart", "moves": "a" }))
             }
+            mode @ ("cut_a" | "cut_b" | "join" | "intersect" | "union") => {
+                Some(json!({ "a": o["a"], "b": o["b"], "mode": mode }))
+            }
             _ => None,
         };
         if let Some(args) = resolve {
             match self.run("overlap.resolve", args) {
                 Ok(_) => {
                     self.refresh_scene(&frame);
-                    let what = if action == "accept" {
-                        "accepted"
-                    } else {
-                        "moved apart"
+                    let what = match action {
+                        "accept" => "accepted",
+                        "move_a" | "move_b" => "moved apart",
+                        _ => "resolved by a boolean",
                     };
                     return frame
                         .set_status_text(&format!("Overlap {what}: {a_label} × {b_label}"), 0);
@@ -225,5 +236,35 @@ impl Gui {
             let frame = self.frame;
             self.refresh_scene(&frame);
         }
+    }
+}
+
+impl Gui {
+    /// Modify › Remove Boolean: the selected elements' booleans are removed; their own bodies
+    /// return.
+    pub(crate) fn remove_booleans(&mut self) {
+        let frame = self.frame;
+        let selected = self.selection();
+        if selected.is_empty() {
+            return frame.set_status_text("Select the elements to remove booleans from", 0);
+        }
+        let mut n = 0;
+        for id in selected {
+            if self
+                .run("geometry.remove_boolean", json!({ "target_id": id }))
+                .is_ok()
+            {
+                n += 1;
+            }
+        }
+        self.refresh_scene(&frame);
+        frame.set_status_text(
+            &if n == 0 {
+                "The selection has no booleans".to_owned()
+            } else {
+                format!("Removed the booleans of {n} element(s)")
+            },
+            0,
+        );
     }
 }
