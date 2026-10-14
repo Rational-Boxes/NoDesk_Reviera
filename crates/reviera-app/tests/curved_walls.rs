@@ -212,7 +212,9 @@ fn curved_walls_join_straight_ones() {
         untitled_dir: dir.path().to_owned(),
     });
     run(&mut app, "file.new", json!({})).unwrap();
-    let level = run(&mut app, "level.list", json!({})).unwrap()[0]["id"].as_u64().unwrap();
+    let level = run(&mut app, "level.list", json!({})).unwrap()[0]["id"]
+        .as_u64()
+        .unwrap();
     let straight = run(
         &mut app,
         "wall.create",
@@ -240,16 +242,25 @@ fn curved_walls_join_straight_ones() {
     // Joined: the join names the curved wall, and its start corners are the straight wall's end
     // corners.
     assert!(
-        solved.joins.iter().any(|j| (j.wall == id(straight) && j.other == id(arc))
-            || (j.wall == id(arc) && j.other == id(straight))),
+        solved
+            .joins
+            .iter()
+            .any(|j| (j.wall == id(straight) && j.other == id(arc))
+                || (j.wall == id(arc) && j.other == id(straight))),
         "{:?}",
         solved.joins
     );
-    let ends = solved.curved_ends.get(&(id(arc), 0)).copied().expect("the arc's start joined");
+    let ends = solved
+        .curved_ends
+        .get(&(id(arc), 0))
+        .copied()
+        .expect("the arc's start joined");
     let f = solved.bodies[&id(straight)].footprint;
     for c in ends {
         assert!(
-            [f[1], f[2]].iter().any(|q| (q[0] - c[0]).hypot(q[1] - c[1]) < 1e-9),
+            [f[1], f[2]]
+                .iter()
+                .any(|q| (q[0] - c[0]).hypot(q[1] - c[1]) < 1e-9),
             "{c:?} not on {f:?}"
         );
     }

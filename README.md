@@ -104,8 +104,9 @@ The KIT FZK *AC20-Institute-Var-2* sample model (`test-data/ifc/`) open in Revie
   `overlap.accept`, `overlap.accepted`), or resolved by a boolean: cut either by the other,
   join by precedence, intersect or union. Booleans are kept and re-made when either element
   changes (`geometry.boolean`, `geometry.remove_boolean`; View › Remove Boolean), computed by
-  OpenCASCADE (`reviera-geom`). Not yet: shaped bodies in the saved IFC, clash tests
-  (COL-CLASH) and automatic pipe and duct penetrations (MEP-PEN-001).
+  OpenCASCADE (`reviera-geom`), and saved as the shaped bodies with an
+  `IfcRelInterferesElements` for each. Not yet: clash tests (COL-CLASH) and automatic pipe and
+  duct penetrations (MEP-PEN-001).
 - **Virtual volumes**: every door has its swing volume, and with the ADA 2010 rule set
   (`clearance.set_rule_set`) its pull-side and push-side maneuvering clearances. Check Overlaps
   lists what intrudes into them (and doors that would hit each other), and View › Virtual
@@ -340,7 +341,7 @@ Open one with `reviera gui test-data/samples/observatory.ifc`.
 
 The first milestone continues with shaped windows (round, round-top, Gothic, fan and gable
 heads, ARC-WIN-002), roof openings (skylights and shafts), and layered wall types. Then come
-joins and roof attachment for curved walls, shaped bodies in the saved IFC, clearances for
+T joins into curved walls, clearances for
 bathroom fixtures and accessible rooms, clash tests, automatic MEP penetrations, the window
 side of scripting (a Scripts menu and form dialogs), general shape tools, CADCraft drawing
 exchange, and the current NBIMS-US COBie layout.

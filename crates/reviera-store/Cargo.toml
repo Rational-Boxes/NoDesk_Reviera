@@ -12,6 +12,7 @@ publish.workspace = true
 [dependencies]
 reviera-core.workspace = true
 reviera-ifc.workspace = true
+reviera-geom.workspace = true
 reviera-rxd.workspace = true
 serde_json.workspace = true
 serde.workspace = true

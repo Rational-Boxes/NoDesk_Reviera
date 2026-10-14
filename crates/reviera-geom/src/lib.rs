@@ -9,6 +9,7 @@
 //! subtraction, intersection or union runs on the two compounds, coplanar faces are merged
 //! (`ShapeUpgrade_UnifySameDomain`), and the result is triangulated back into closed parts.
 
+pub mod csg;
 mod ffi;
 
 pub use reviera_core::bodies::Mesh;

@@ -61,6 +61,19 @@ fn the_sample_corpus_builds_cleanly() {
         };
         let _ = std::fs::remove_file(&path);
         run(&mut app, "file.save_as", json!({ "path": path })).unwrap();
+        // Boolean-shaped bodies are written as their result, each relation recorded.
+        let relations = {
+            let d = app.document(app.active().unwrap()).unwrap();
+            reviera_core::csg::resolved(d.doc.store()).len()
+        };
+        let ifc = reviera_ifc::IfcModel::open(&path).unwrap();
+        assert_eq!(
+            ifc.entities_of_type("IfcRelInterferesElements")
+                .unwrap()
+                .len(),
+            relations,
+            "{name}"
+        );
         // It reopens with its Reviera elements intact.
         let mut again = App::new(AppConfig {
             live: None,

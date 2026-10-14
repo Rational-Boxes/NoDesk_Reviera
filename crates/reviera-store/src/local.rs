@@ -652,6 +652,10 @@ impl LocalProject {
         if grids_touched {
             self.write_grids(doc)?;
         }
+        // Booleans last: they reshape bodies the writers above made.
+        if !touched.is_empty() {
+            self.write_csg(doc)?;
+        }
 
         for id in dirty {
             let Some(&step) = self.steps.get(&id) else {
@@ -1149,6 +1153,118 @@ impl LocalProject {
                 .and_then(|l| self.steps.get(&l).copied());
             if let Some(storey) = storey {
                 geometry::contain(&mut self.ifc, step, storey, owner_history)?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Writes the bodies of boolean targets (ARC-MOD-028) as their shaped result: faceted
+    /// B-reps (a wall's in its own frame, so its openings keep their placement), and each
+    /// relation as an `IfcRelInterferesElements` (IFC4: InterferenceType `Subtract`,
+    /// `Intersect` or `Union`).
+    fn write_csg(&mut self, doc: &Document) -> Result<()> {
+        let store = doc.store();
+        let relations = reviera_core::csg::resolved(store);
+        if relations.is_empty() {
+            return Ok(());
+        }
+        let mut bodies = reviera_core::bodies::all(store);
+        reviera_geom::csg::apply(&Default::default(), store, &mut bodies);
+        let contexts = geometry::Contexts::find(&self.ifc)?;
+        let owner_history = self.new_owner_history()?;
+        let mut targets: Vec<ElementId> = relations.iter().map(|r| r.0).collect();
+        targets.sort();
+        targets.dedup();
+        for target in targets {
+            let (Some(&step), Some(body), Some(e)) = (
+                self.steps.get(&target),
+                bodies.iter().find(|b| b.element == target),
+                store.get(target),
+            ) else {
+                continue;
+            };
+            // The frame: a wall's own, else the world's.
+            let (frame, local): (geometry::BrepFrame, Box<dyn Fn(&[f64; 3]) -> [f64; 3]>) =
+                match walls::wall_recipe(e).and_then(|_| walls::regenerate(store, e).ok()) {
+                    Some(g) => {
+                        let (u, n, s0, z0) = (g.direction(), g.normal(), g.start, g.base_z);
+                        (
+                            geometry::BrepFrame {
+                                origin: [s0[0], s0[1], z0],
+                                x_dir: u,
+                            },
+                            Box::new(move |p: &[f64; 3]| {
+                                let d = [p[0] - s0[0], p[1] - s0[1]];
+                                [
+                                    d[0] * u[0] + d[1] * u[1],
+                                    d[0] * n[0] + d[1] * n[1],
+                                    p[2] - z0,
+                                ]
+                            }),
+                        )
+                    }
+                    None => (geometry::BrepFrame::WORLD, Box::new(|p: &[f64; 3]| *p)),
+                };
+            let solids: Vec<geometry::Polyhedron> = body
+                .parts
+                .iter()
+                .map(|p| geometry::Polyhedron {
+                    points: p.mesh.0.iter().map(|q| local(q)).collect(),
+                    faces: p
+                        .mesh
+                        .1
+                        .chunks(3)
+                        .map(|t| t.iter().map(|i| *i as usize).collect())
+                        .collect(),
+                })
+                .collect();
+            if walls::wall_recipe(e).is_some() {
+                geometry::remove_wall_shape(&mut self.ifc, step)?;
+            }
+            if floors::slab_recipe(e).is_some() {
+                geometry::remove_slab(&mut self.ifc, step)?;
+            }
+            geometry::remove_breps(&mut self.ifc, step)?;
+            geometry::write_breps(
+                &mut self.ifc,
+                step,
+                frame,
+                &solids,
+                self.length_scale,
+                contexts,
+            )?;
+        }
+        if self.ifc.schema() == "IFC2X3" {
+            return Ok(());
+        }
+        for (target, tool, op, _) in relations {
+            let (Some(&a), Some(&b)) = (self.steps.get(&target), self.steps.get(&tool)) else {
+                continue;
+            };
+            geometry::relate_one(
+                &mut self.ifc,
+                "IfcRelInterferesElements",
+                "RelatingElement",
+                a,
+                "RelatedElement",
+                b,
+                owner_history,
+            )?;
+            let kind = match op {
+                reviera_core::csg::CsgOp::Subtract => "Subtract",
+                reviera_core::csg::CsgOp::Intersect => "Intersect",
+                reviera_core::csg::CsgOp::Union => "Union",
+            };
+            for rel in self.ifc.referenced_by(b, "IfcRelInterferesElements")? {
+                if self.ifc.attribute(rel, "RelatingElement")? == AttrValue::Ref(a.0) {
+                    self.ifc.set_attribute(
+                        rel,
+                        "InterferenceType",
+                        &AttrValue::String(kind.into()),
+                    )?;
+                    self.ifc
+                        .set_attribute(rel, "ImpliedOrder", &AttrValue::Bool(true))?;
+                }
             }
         }
         Ok(())

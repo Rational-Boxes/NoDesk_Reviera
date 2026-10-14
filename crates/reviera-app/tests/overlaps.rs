@@ -292,6 +292,43 @@ fn overlaps_are_accepted_or_moved_apart() {
             .any(|(a, b, _)| (*a, *b) == (long.min(cross), long.max(cross))),
         "{left:?}"
     );
+    // Saved, the file's body is the cut result (tessellated by IfcOpenShell).
+    {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("cut.ifc");
+        run(&mut app, "file.save_as", json!({ "path": path })).unwrap();
+        let guid = {
+            let d = app.document(app.active().unwrap()).unwrap();
+            d.doc
+                .store()
+                .get(reviera_core::ElementId(long))
+                .unwrap()
+                .guid()
+                .to_string()
+        };
+        let ifc = reviera_ifc::IfcModel::open(&path).unwrap();
+        let mesh = ifc
+            .tessellate(1)
+            .unwrap()
+            .into_iter()
+            .find(|m| m.global_id.as_ref().is_some_and(|g| g.as_str() == guid))
+            .expect("the wall's body");
+        let p = |k: u32| {
+            let k = 3 * k as usize;
+            [mesh.verts[k], mesh.verts[k + 1], mesh.verts[k + 2]]
+        };
+        let v: f64 = mesh
+            .faces
+            .chunks(3)
+            .map(|t| {
+                let (a, b, c) = (p(t[0]), p(t[1]), p(t[2]));
+                (a[0] * (b[1] * c[2] - b[2] * c[1]) - a[1] * (b[0] * c[2] - b[2] * c[0])
+                    + a[2] * (b[0] * c[1] - b[1] * c[0]))
+                    / 6.0
+            })
+            .sum();
+        assert!((v.abs() - after).abs() < 1e-3, "{v} in the file vs {after}");
+    }
     // The cut follows the crossing wall when it moves.
     run(
         &mut app,

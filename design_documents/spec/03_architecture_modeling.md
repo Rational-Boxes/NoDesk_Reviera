@@ -4079,13 +4079,14 @@ These tools are on the **Modify** tab and are repeated on every `Modify | <Eleme
   - each closed part becomes a solid (its triangles sewn into a shell, turned to face out);
   - `BRepAlgoAPI_Cut`, `_Common` or `_Fuse` runs on the compounds;
   - coplanar faces are merged (`ShapeUpgrade_UnifySameDomain`), and the result is triangulated back.
+- **IFC:** a boolean target's body is written as its shaped result (faceted B-reps; a wall's in its own frame, so its openings keep their placement). Each relation is an `IfcRelInterferesElements` (IFC4) with its InterferenceType (`Subtract`, `Intersect`, `Union`) and ImpliedOrder true. IfcOpenShell reads the result back: a cut wall's tessellated volume is the cut volume.
 - **Kept booleans** (`geometry.boolean`, `geometry.remove_boolean`):
   - The relations are held on the project (`rxd:csg`) by GlobalId.
   - The application applies them wherever bodies are built, so the 3D view and the overlap engine see the result. Results are cached by their inputs, so a target is re-made only when it or its tool changes.
   - A union hides the tool's own body. Pairs in a boolean count as related, so they are no longer flagged.
   - A cycle (a tool already shaped by its target) is refused.
 - **Later:**
-  - IFC export of shaped bodies (`IfcBooleanResult` or faceted B-reps; the file has each element's own body today);
+  - IFC bodies as `IfcBooleanResult` where both bodies are swept or CSG solids;
   - checking after each edit;
   - drawing the overlap boxes in the view;
   - moving in z;
