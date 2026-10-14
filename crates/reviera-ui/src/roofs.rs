@@ -12,6 +12,35 @@ use wxdragon::prelude::*;
 use super::sketch::{DUPLICATE, SketchKind};
 use super::{Gui, ask, error};
 
+/// Eave choices: label and command value (ARC-ROOF-010).
+const BEARINGS: &[(&str, &str)] = &[
+    ("Exterior Face", "exterior"),
+    ("Core Centre", "core"),
+    ("Interior Face", "interior"),
+];
+const CUTS: &[(&str, &str)] = &[
+    ("Plumb", "plumb"),
+    ("Square", "square"),
+    ("Two-Cut", "two_cut"),
+];
+const SOFFITS: &[(&str, &str)] = &[("Boxed", "boxed"), ("Sloped", "sloped"), ("Open", "open")];
+const YES_NO: &[(&str, &str)] = &[("No", "false"), ("Yes", "true")];
+
+fn choices(list: &[(&str, &str)]) -> Vec<(String, i32)> {
+    list.iter()
+        .enumerate()
+        .map(|(i, c)| (c.0.to_owned(), i as i32))
+        .collect()
+}
+
+fn index_of(list: &[(&str, &str)], value: &Value) -> i32 {
+    let v = match value {
+        Value::String(s) => s.clone(),
+        other => other.to_string(),
+    };
+    list.iter().position(|c| c.1 == v).map_or(-1, |i| i as i32)
+}
+
 impl Gui {
     /// Architecture › Roof: a footprint sketch in a plan. In the lowest level's plan the roof
     /// can go to the level above, where walls end.
@@ -222,6 +251,48 @@ impl Gui {
             "rf_overhang",
             "How far the roof reaches past every footprint edge",
         );
+        // The eaves (the first eave's settings; edits apply to every eave).
+        let eaves: Vec<(u32, roofs::eaves::Eave)> = recipe
+            .edges
+            .iter()
+            .filter_map(|(k, e)| Some((k.parse().ok()?, e.eave.clone()?)))
+            .collect();
+        if let Some((_, eave)) = eaves.iter().min_by_key(|e| e.0) {
+            let v = serde_json::to_value(eave).unwrap_or_default();
+            grid.append(Property::category("Eaves", "c_roof_eaves"));
+            let enums = [
+                ("Bearing", "ev_bearing", BEARINGS, &v["bearing"]),
+                ("Rafter Cut", "ev_cut", CUTS, &v["cut"]),
+                ("Fascia", "ev_fascia", YES_NO, &v["fascia"]),
+                ("Soffit", "ev_soffit", SOFFITS, &v["soffit"]),
+            ];
+            for (label, key, list, value) in enums {
+                grid.append(Property::enumeration(
+                    label,
+                    key,
+                    choices(list),
+                    index_of(list, value),
+                ));
+            }
+            let heel = eave.heel.map(|h| self.format_length(h)).unwrap_or_default();
+            grid.append(Property::string("Heel Height", "ev_heel", heel));
+            let depth = self.format_length(eave.fascia_depth);
+            grid.append(Property::string("Fascia Depth", "ev_fascia_depth", depth));
+            grid.set_help_string(
+                "ev_bearing",
+                "Where the roof's underside meets the plate on the wall below; the overhang is \
+                 measured from the wall's exterior face whatever the bearing",
+            );
+            grid.set_help_string(
+                "ev_heel",
+                "The roof construction's depth at the bearing line; deeper than the roof raises \
+                 it. Empty: the roof's own depth",
+            );
+            grid.set_help_string(
+                "ev_fascia_depth",
+                "The fascia's depth, and a two-cut's plumb face",
+            );
+        }
         grid.append(Property::category("Dimensions", "c_roof_dims"));
         let slope = angle(self, recipe.slope);
         grid.append(Property::string("Slope", "rf_slope", slope));
@@ -334,6 +405,50 @@ impl Gui {
                     .find(Result::is_err)
                     .unwrap_or(Ok(json!(null)))
             }
+            key if key.starts_with("ev_") => {
+                let pick = |list: &[(&str, &str)]| {
+                    list.iter()
+                        .find(|c| c.0 == text)
+                        .map(|c| serde_json::from_str(c.1).unwrap_or(json!(c.1)))
+                };
+                let (field, value) = match key {
+                    "ev_bearing" => ("bearing", pick(BEARINGS)),
+                    "ev_cut" => ("cut", pick(CUTS)),
+                    "ev_soffit" => ("soffit", pick(SOFFITS)),
+                    "ev_fascia" => ("fascia", pick(YES_NO)),
+                    "ev_heel" if text.trim().is_empty() => ("heel", Some(Value::Null)),
+                    "ev_heel" => ("heel", Some(json!(text))),
+                    "ev_fascia_depth" => ("fascia_depth", Some(json!(text))),
+                    _ => return false,
+                };
+                let Some(value) = value else { return true };
+                let store = self
+                    .doc
+                    .and_then(|d| self.app.document(d))
+                    .map(|d| d.doc.store().clone());
+                selected
+                    .iter()
+                    .map(|r| {
+                        // Only the edges that are eaves already.
+                        let keys: Vec<u32> = store
+                            .as_ref()
+                            .and_then(|s| roofs::roof_recipe(s.get(*r)?))
+                            .map(|rc| {
+                                rc.edges
+                                    .iter()
+                                    .filter(|(_, e)| e.eave.is_some())
+                                    .filter_map(|(k, _)| k.parse().ok())
+                                    .collect()
+                            })
+                            .unwrap_or_default();
+                        let mut args =
+                            json!({ "roof_id": r, "edges": keys, "attach_walls": false });
+                        args[field] = value.clone();
+                        self.run("roof.set_eaves", args)
+                    })
+                    .find(Result::is_err)
+                    .unwrap_or(Ok(json!(null)))
+            }
             "rf_overhang" => {
                 let store = self
                     .doc
@@ -434,6 +549,40 @@ impl Gui {
         self.properties_stale = true;
         self.refresh_scene(&frame);
         true
+    }
+
+    /// Modify | Roofs › Eaves: every slope-defining edge of the selected roofs becomes an eave
+    /// bearing on the wall below, with its overhang from the wall's exterior face, a boxed
+    /// soffit, and the perimeter walls attached (ARC-ROOF-010). Its settings are then in the
+    /// Properties palette.
+    pub(crate) fn set_roof_eaves(&mut self) {
+        let frame = self.frame;
+        let Some(store) = self
+            .doc
+            .and_then(|d| self.app.document(d))
+            .map(|d| d.doc.store().clone())
+        else {
+            return;
+        };
+        let selected: Vec<ElementId> = self
+            .selection()
+            .into_iter()
+            .filter(|id| store.get(*id).and_then(roofs::roof_recipe).is_some())
+            .collect();
+        if selected.is_empty() {
+            return frame.set_status_text("Select a roof to give it eaves", 0);
+        }
+        for roof in selected {
+            if let Err(e) = self.run("roof.set_eaves", json!({ "roof_id": roof })) {
+                return error(&frame, &format!("The eaves were not set:\n{e}"));
+            }
+        }
+        frame.set_status_text(
+            "Eaves set: bearing, rafter cut, fascia and soffit are in the Properties palette",
+            0,
+        );
+        self.properties_stale = true;
+        self.refresh_scene(&frame);
     }
 
     /// After a roof is made from picked walls, offers to attach those walls to it.

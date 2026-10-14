@@ -3401,6 +3401,32 @@ Allowed values come from Mechanical Settings › Slopes. Fabrication pipework ca
 
 ---
 
+### 4.8.10 Roof drainage: gutters and downspouts
+**ID:** MEP-PIPE-010 · **Priority:** P1 · **Ref:** owner requirement (2026-10-13); Reviera's own design (Appendix A.2a)
+
+**Purpose.** Design a roof's rainwater drainage as part of the plumbing subsystem: gutters along the eaves, outlets, and downspouts to the ground or to a storm drain. *(Owner direction, 2026-10-13: "A gutters tool is a good idea, though it may be more appropriate to make it part of the plumbing subsystem.")* The eave (ARC-ROOF-010) gives the gutter its line and the fascia it hangs on, but it does not own the gutter.
+
+**Workflow.**
+1. Systems › Plumbing › **Gutter**: the user picks eaves of a roof (Tab picks a chain of eaves around hips). The gutter follows the eave line, hung on the fascia's face (or on the rafter tails when there is no fascia).
+2. **Outlet** and **Downspout** tools place outlets on a gutter, each with a downspout dropping to a level, a point on the ground, or a connection to a storm pipe (MEP-PIPE-001).
+
+**Behaviour & rules.**
+- A gutter is a run of the *Storm Drainage* system (MEP-PIPE-006), with a profile type (half-round, K-style or box), a size and a fall (default 1:500) toward its outlets. Its ends and corners take end caps and mitres.
+- The gutter regenerates with the roof: changing the eave's overhang, fascia or bearing moves it.
+- Sizing: from the roof area draining to each outlet (the plan area of the faces above the gutter's eaves) and a design rainfall intensity, the gutter and downspout sizes are checked (MEP-PIPE-005 style) and flagged when too small.
+
+**Data (IFC mapping).** Gutter: `IfcPipeSegment` (`PredefinedType = GUTTER`), assigned to the storm `IfcDistributionSystem`, with an `IfcRelConnectsElements` to the roof. Downspouts: `IfcPipeSegment` (`RIGIDSEGMENT`) with `IfcPipeFitting` bends; outlets as `IfcPipeFitting` (`CONNECTOR`).
+
+**Commands.**
+- `gutter.create(roof_id, edges: [curve_key], type_id?, fall?) -> element_id`
+- `gutter.add_outlet(gutter_id, at, downspout_to?: level_id | point | pipe_id) -> element_id`
+- `gutter.size(gutter_id, rainfall?) -> report`
+
+**Acceptance criteria.**
+- [ ] A gutter along the four eaves of a hip roof is one mitred run hung on the fascias, falling toward its outlet, and exports as `IfcPipeSegment(GUTTER)` in the storm system.
+- [ ] Changing the roof's overhang moves the gutter with the eave.
+- [ ] A downspout from an outlet to the ground level is a vertical run with bends at the eave offset.
+
 ## 4.9 Electrical
 
 Placing electrical components, cable tray and conduit is **P1**. Circuiting, panel schedules, demand factors and the electrical analytical model are **P2**.

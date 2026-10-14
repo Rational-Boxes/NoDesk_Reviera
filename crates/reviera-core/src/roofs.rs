@@ -40,6 +40,7 @@ use crate::sketch::{self, SKETCH_KEY};
 use crate::store::Store;
 use crate::walls::{Line, RECIPE_KEY};
 
+pub mod eaves;
 pub mod skeleton;
 
 use skeleton::{Across, SkelEdge};
@@ -69,9 +70,13 @@ pub struct RoofEdge {
     /// The edge's own slope (radians); the roof's slope when absent.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub slope: Option<f64>,
-    /// How far the roof reaches past the edge, metres.
+    /// How far the roof reaches past the edge, metres (with an eave, past the wall's exterior
+    /// face).
     #[serde(default)]
     pub overhang: f64,
+    /// The eave's construction and wall bearing (ARC-ROOF-010).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub eave: Option<eaves::Eave>,
 }
 
 impl Default for RoofEdge {
@@ -80,6 +85,7 @@ impl Default for RoofEdge {
             defines_slope: true,
             slope: None,
             overhang: 0.0,
+            eave: None,
         }
     }
 }
@@ -159,6 +165,8 @@ pub struct RoofFace {
     pub slab: Mesh,
     /// Courtyards through a flat roof (clockwise), on the underside's plane.
     pub holes: Vec<Vec<[f64; 3]>>,
+    /// The slab is not a prism of its bottom and top rings (a two-cut eave clipped it).
+    pub faceted: bool,
 }
 
 /// A roof as it is now.
@@ -173,6 +181,8 @@ pub struct RoofGeometry {
     pub keys: Vec<u32>,
     /// `IfcRoof.PredefinedType` classified from the faces.
     pub predefined: &'static str,
+    /// Fascias and soffits along the eaves.
+    pub trims: Vec<eaves::RoofTrim>,
 }
 
 impl RoofGeometry {
@@ -461,9 +471,15 @@ pub fn regenerate(store: &Store, e: &Element) -> Result<RoofGeometry> {
         keys.extend(ks);
     }
     let edges: Vec<RoofEdge> = keys.iter().map(|k| r.edge(*k)).collect();
-    generate_loops(
+    // Eaves bear on their walls: their plate lines move, their overhangs are from the walls.
+    let (ring, edges, lines) = eaves::prepare(
+        store, &sketch, &loops, &ring, &keys, &edges, r.slope, thickness,
+    );
+    let mut g = generate_loops(
         &loops, &ring, &keys, &edges, r.slope, plate, cutoff, thickness,
-    )
+    )?;
+    g.trims = eaves::trims(&g, &loops, &ring, &keys, &edges, &lines, r.slope);
+    Ok(g)
 }
 
 /// A loop turned counter-clockwise (or clockwise when `ccw` is false), each corner still
@@ -624,12 +640,14 @@ pub fn generate_loops(
                 normal,
                 slab,
                 holes,
+                faceted: false,
             }],
             plate,
             thickness,
             footprint: ring[..outer_len].to_vec(),
             keys: keys[..outer_len].to_vec(),
             predefined: "FLAT_ROOF",
+            trims: Vec::new(),
         });
     }
     // Speeds: horizontal metres per metre of rise. A very shallow edge moves very fast.
@@ -791,13 +809,45 @@ pub fn generate_loops(
                 if is_gable(j) { None } else { Some(normal(j)) }
             },
         );
-        let slab = slab(&bottom, up, &cuts, thickness);
+        // The eave's rafter cut (ARC-ROOF-010): square to the roof, or a two-cut.
+        let mut cuts = cuts;
+        let z_eave = plate + eave_t(i).max(-1e9);
+        let at_eave = |p: [f64; 3]| (p[2] - z_eave).abs() < 1e-9;
+        let eave = edges[i].eave.as_ref();
+        if eave.is_some_and(|e| e.cut == eaves::RafterCut::Square) {
+            let m = bottom.len();
+            for j in 0..m {
+                let (a, b) = (bottom[j], bottom[(j + 1) % m]);
+                if ring3[j].1 == Across::Base && at_eave(a) && at_eave(b) {
+                    let d = unit3(sub3(b, a));
+                    let plumb = [d[1], -d[0], 0.0];
+                    let c = unit3(cross3(d, up));
+                    cuts[j] = if dot3(c, plumb) < 0.0 {
+                        scale3(c, -1.0)
+                    } else {
+                        c
+                    };
+                }
+            }
+        }
+        let mut slab = slab(&bottom, up, &cuts, thickness);
+        let mut faceted = false;
+        if let (Some(e), Some(s)) = (eave, slopes[i])
+            && e.cut == eaves::RafterCut::TwoCut
+        {
+            let level = z_eave + thickness / s.max(1e-4).cos() - e.fascia_depth;
+            if level > z_eave + 1e-9 {
+                slab = eaves::clip_above(&slab, level);
+                faceted = true;
+            }
+        }
         faces.push(RoofFace {
             key: Some(keys[i]),
             bottom,
             normal: up,
             slab,
             holes: Vec::new(),
+            faceted,
         });
     }
     for top in &skel.tops {
@@ -817,6 +867,7 @@ pub fn generate_loops(
             normal: up,
             slab,
             holes: Vec::new(),
+            faceted: false,
         });
     }
     let predefined = classify(&slopes, &faces, cutoff.is_some() && !skel.tops.is_empty());
@@ -827,6 +878,7 @@ pub fn generate_loops(
         footprint: ring[..outer_len].to_vec(),
         keys: keys[..outer_len].to_vec(),
         predefined,
+        trims: Vec::new(),
     })
 }
 
@@ -1048,6 +1100,10 @@ pub struct RoofCurveArg {
     /// How far the roof reaches past the curve (metres or text with units); default 0.
     #[schemars(extend("x-reviera-data-type" = "length"))]
     pub overhang: Option<Value>,
+    /// The curve's eave (ARC-ROOF-010). On a new roof, a slope-defining curve picked from a
+    /// wall gets a default eave.
+    #[serde(default)]
+    pub eave: Option<eaves::Eave>,
 }
 
 fn number(store: &Store, v: &Value, data_type: &str, what: &str) -> Result<f64> {
@@ -1065,6 +1121,7 @@ fn number(store: &Store, v: &Value, data_type: &str, what: &str) -> Result<f64> 
 fn footprint(
     store: &Store,
     curves: &[RoofCurveArg],
+    new: bool,
 ) -> Result<(sketch::Sketch, BTreeMap<String, RoofEdge>)> {
     let args: Vec<sketch::CurveArg> = curves
         .iter()
@@ -1083,8 +1140,13 @@ fn footprint(
     }
     let mut edges = BTreeMap::new();
     for (i, c) in curves.iter().enumerate() {
+        let defines_slope = c.defines_slope.unwrap_or(true);
         let e = RoofEdge {
-            defines_slope: c.defines_slope.unwrap_or(true),
+            eave: c
+                .eave
+                .clone()
+                .or_else(|| (new && defines_slope && c.lock.is_some()).then(eaves::Eave::default)),
+            defines_slope,
             slope: c
                 .slope
                 .as_ref()
@@ -1126,7 +1188,7 @@ pub struct CreateParams {
 
 pub(crate) fn create(txn: &mut crate::txn::Transaction<'_>, p: CreateParams) -> Result<ElementId> {
     let store = txn.store().clone();
-    let (sketch, edges) = footprint(&store, &p.curves)?;
+    let (sketch, edges) = footprint(&store, &p.curves, true)?;
     let level = resolve_level(&store, &p.level_id)?;
     let type_id = match &p.type_id {
         Some(r) => {
@@ -1227,7 +1289,18 @@ pub(crate) fn edit_footprint(
     let store = txn.store().clone();
     let (id, mut recipe) = resolve_roof(&store, &p.roof_id)?;
     crate::modify::check_unpinned(&store, id)?;
-    let (sketch, edges) = footprint(&store, &p.curves)?;
+    let (sketch, mut edges) = footprint(&store, &p.curves, false)?;
+    // Curves keep the eaves they had (by key) unless given new ones.
+    for (k, old) in &recipe.edges {
+        if let Some(eave) = &old.eave
+            && sketch.curves.iter().any(|c| c.key.to_string() == *k)
+        {
+            let e = edges.entry(k.clone()).or_default();
+            if e.eave.is_none() {
+                e.eave = Some(eave.clone());
+            }
+        }
+    }
     recipe.edges = edges;
     write_recipe(txn, id, &recipe)?;
     let value = serde_json::to_value(&sketch).expect("serialises");
@@ -1675,6 +1748,7 @@ mod tests {
                 defines_slope: i % 2 == 0,
                 slope: None,
                 overhang: if i % 2 == 0 { 0.5 } else { 0.3 },
+                eave: None,
             }),
             std::f64::consts::FRAC_PI_4,
             3.0,

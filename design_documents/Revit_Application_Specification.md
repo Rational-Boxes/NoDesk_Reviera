@@ -11303,7 +11303,7 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
   - *sloped* (following the roof's underside back to the wall),
   - or *open* (none).
   - The soffit **returns to the wall face** and is trimmed against it, so there is no gap between the soffit and the wall.
-- **Gutter:** optional, along the eave (ARC-ROOF-004).
+- **Gutter:** not part of the eave. Gutters and downspouts belong to the plumbing subsystem (MEP-PIPE-010), which hangs them on the eave's fascia. *(Owner direction, 2026-10-13.)*
 - **Wall join at the eave:**
   - The walls under an eave are **attached** to the roof (ARC-WALL-008). Their tops follow the roof's underside across the wall's thickness (a birdsmouth-like top: high at the interior face, low at the exterior face), and stop at the soffit where there is one.
   - A gable wall under a gable edge rises to the roof's underside (gable infill). The roof's rake overhang is measured from that wall's exterior face too.
@@ -11311,18 +11311,30 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 - **Consistency:** each eave's settings regenerate with the roof. Moving a wall the footprint is locked to moves the bearing line, so the eave, fascia, soffit and attachment all follow.
 - **Defaults:** a roof made with Pick Walls gets eaves on its slope-defining edges: exterior-face bearing, the overhang given in the tool, a plumb cut, a boxed soffit, and walls attached.
 
-**Data (IFC mapping).** The eave settings are RXD element data on the roof (`recipe.roof`, per edge). Fascia, soffit and gutter are written as in ARC-ROOF-004, and the attachment as in ARC-WALL-008.
+**Data (IFC mapping).** The eave settings are RXD element data on the roof (`recipe.roof`, per edge). Fascia and soffit are written as in ARC-ROOF-004, and the attachment as in ARC-WALL-008.
 
-**Commands.** `roof.set_eaves(roof_id, edges: [curve_key] | all, bearing?: exterior|core|interior, heel?, overhang?, cut?: plumb|square|two_cut, fascia_depth?, fascia?: bool|type_id, soffit?: boxed|sloped|open, gutter?: bool|type_id, attach_walls?: bool) -> ()`
+**Commands.** `roof.set_eaves(roof_id, edges: [curve_key] | all, bearing?: exterior|core|interior, heel?, overhang?, cut?: plumb|square|two_cut, fascia_depth?, fascia?: bool|type_id, soffit?: boxed|sloped|open, attach_walls?: bool, remove?: bool) -> ()`; `roof.eaves(roof_id) -> [eave]`
 
 **Acceptance criteria.**
-- [ ] A 45° hip roof on 300 mm walls with exterior-face bearing, a 500 mm overhang and a boxed soffit:
+- [x] A 45° hip roof on 300 mm walls with exterior-face bearing, a 500 mm overhang and a boxed soffit:
   - every wall top meets the roof's underside across its full thickness;
   - the soffit runs from the fascia's bottom to the wall's exterior face with no gap;
   - the eave line is 500 mm out from the exterior face.
-- [ ] Changing the bearing to the core centre keeps the overhang measured from the exterior face, and raises the roof by the slope across half the wall.
-- [ ] A two-cut eave with a 200 mm fascia depth has a 200 mm plumb face and a level underside at the eave.
-- [ ] Moving a locked eave wall 300 mm outward moves the eave, the fascia and the soffit with it, and the wall stays attached.
+- [x] Changing the bearing to the core centre keeps the overhang measured from the exterior face. The underside then meets the plate at the wall's centre line: across half the wall, the roof's plane moves by tan(slope) × half the wall's thickness.
+- [x] A two-cut eave with a 200 mm fascia depth has a 200 mm plumb face and a level underside at the eave.
+- [x] Moving a locked eave wall 300 mm outward moves the eave, the fascia and the soffit with it, and the wall stays attached.
+
+**Implementation notes (2026-10-13).** As built:
+- **Storage:** eaves are per-edge `eave` settings in the roof recipe. Each eave finds the wall beneath it: the wall its curve is locked to, or else the nearest parallel wall the curve lies within.
+- **Bearing and heel:** each eave's plate line moves to the bearing (and further out by `raise / tan(slope)` for a heel deeper than the roof's plumb depth), and its overhang is measured from the wall's exterior face.
+- **Rafter cuts:** a square cut is a side plane square to the roof. A two-cut clips the face's slab with a level plane at the fascia depth below the eave's top and caps it; such a slab is written to IFC as triangles.
+- **Fascia and soffit:** 25 mm fascia and 12 mm boxed or sloped soffit bands along each eave, mitred where neighbouring eaves meet. They are generated with the roof and written as extra B-reps of the `IfcRoof`. Separate covering elements and type choices are deferred.
+- **Defaults:** a roof made from picked walls gets a default eave on each slope-defining picked curve. Footprint edits keep each curve's eave by key.
+- **Wall join:** `roof.set_eaves` attaches the perimeter walls (ARC-WALL-008).
+- **In the window:** Modify | Roofs › Eaves turns the selected roof's sloped edges into eaves. Bearing, Rafter Cut, Fascia, Soffit, Heel Height and Fascia Depth are in the Properties palette (they apply to every eave). Per-edge settings are by command.
+- **Not built yet:**
+  - picking edges in the window;
+  - cladding layers stopping at the soffit (needs layered walls).
 
 ### 3.6.8 Slope arrows in roofs
 **ID:** ARC-ROOF-005 · **Priority:** P1 · **Ref:** research/02 §7.4 · web: Slope Arrow Properties
@@ -13563,7 +13575,8 @@ All commands below are registered once in the command registry and exposed autom
 | `deck.set_framing` | deck_id, joist_spacing?, joist_size?, beam_spacing?, post_spacing?, ledger_wall_id? | — | Yes | ARC-DECK-001 |
 | `deck.boards` | deck_id | [board] | No | ARC-DECK-001 |
 | `deck.cut_list` | deck_id | cut_list | No | ARC-DECK-001 |
-| `roof.set_eaves` | roof_id, edges, bearing?, heel?, overhang?, cut?, fascia_depth?, fascia?, soffit?, gutter?, attach_walls? | — | Yes | ARC-ROOF-010 |
+| `roof.set_eaves` | roof_id, edges?, bearing?, heel?, overhang?, cut?, fascia_depth?, fascia?, soffit?, attach_walls?, remove? | — | Yes | ARC-ROOF-010 |
+| `roof.eaves` | roof_id | [eave] | No | ARC-ROOF-010 |
 | `railing.add_opening` | railing_id, at?\|point?, width? | key | Yes | ARC-RAIL-003 |
 | `railing.add_gate` | railing_id, at?\|point?, leaves?: 1\|2, width?, swing_out?, hinge_end? | element_id | Yes | ARC-RAIL-003 |
 | `railing.move_feature` | railing_id, key, at?\|point?, width? | — | Yes | ARC-RAIL-003 |
@@ -17258,6 +17271,32 @@ Allowed values come from Mechanical Settings › Slopes. Fabrication pipework ca
 - [ ] A hydronic return connector is not connected to a supply pipe, and the skip is listed.
 
 ---
+
+### 4.8.10 Roof drainage: gutters and downspouts
+**ID:** MEP-PIPE-010 · **Priority:** P1 · **Ref:** owner requirement (2026-10-13); Reviera's own design (Appendix A.2a)
+
+**Purpose.** Design a roof's rainwater drainage as part of the plumbing subsystem: gutters along the eaves, outlets, and downspouts to the ground or to a storm drain. *(Owner direction, 2026-10-13: "A gutters tool is a good idea, though it may be more appropriate to make it part of the plumbing subsystem.")* The eave (ARC-ROOF-010) gives the gutter its line and the fascia it hangs on, but it does not own the gutter.
+
+**Workflow.**
+1. Systems › Plumbing › **Gutter**: the user picks eaves of a roof (Tab picks a chain of eaves around hips). The gutter follows the eave line, hung on the fascia's face (or on the rafter tails when there is no fascia).
+2. **Outlet** and **Downspout** tools place outlets on a gutter, each with a downspout dropping to a level, a point on the ground, or a connection to a storm pipe (MEP-PIPE-001).
+
+**Behaviour & rules.**
+- A gutter is a run of the *Storm Drainage* system (MEP-PIPE-006), with a profile type (half-round, K-style or box), a size and a fall (default 1:500) toward its outlets. Its ends and corners take end caps and mitres.
+- The gutter regenerates with the roof: changing the eave's overhang, fascia or bearing moves it.
+- Sizing: from the roof area draining to each outlet (the plan area of the faces above the gutter's eaves) and a design rainfall intensity, the gutter and downspout sizes are checked (MEP-PIPE-005 style) and flagged when too small.
+
+**Data (IFC mapping).** Gutter: `IfcPipeSegment` (`PredefinedType = GUTTER`), assigned to the storm `IfcDistributionSystem`, with an `IfcRelConnectsElements` to the roof. Downspouts: `IfcPipeSegment` (`RIGIDSEGMENT`) with `IfcPipeFitting` bends; outlets as `IfcPipeFitting` (`CONNECTOR`).
+
+**Commands.**
+- `gutter.create(roof_id, edges: [curve_key], type_id?, fall?) -> element_id`
+- `gutter.add_outlet(gutter_id, at, downspout_to?: level_id | point | pipe_id) -> element_id`
+- `gutter.size(gutter_id, rainfall?) -> report`
+
+**Acceptance criteria.**
+- [ ] A gutter along the four eaves of a hip roof is one mitred run hung on the fascias, falling toward its outlet, and exports as `IfcPipeSegment(GUTTER)` in the storm system.
+- [ ] Changing the roof's overhang moves the gutter with the eave.
+- [ ] A downspout from an outlet to the ground level is a vertical run with bends at the eave offset.
 
 ## 4.9 Electrical
 
@@ -25451,12 +25490,12 @@ Generated by `tools/build_spec.py` from the chapter command catalogs and require
 | DM | 91 | 57 | 24 | 3 | 175 |
 | ARC | 76 | 54 | 10 | 1 | 141 |
 | STR | 0 | 14 | 47 | 0 | 61 |
-| MEP | 0 | 28 | 42 | 0 | 70 |
+| MEP | 0 | 29 | 42 | 0 | 71 |
 | ANA | 0 | 1 | 21 | 0 | 22 |
 | DOC | 68 | 40 | 12 | 1 | 121 |
 | COL | 8 | 45 | 6 | 1 | 60 |
 | ADV | 0 | 0 | 4 | 1 | 5 |
-| **Total** | **319** | **276** | **173** | **7** | **775** |
+| **Total** | **319** | **277** | **173** | **7** | **776** |
 
 Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver)"), it is counted under the first. The non-functional requirements (NFR-…) are in Chapter 0 §0.7 and are not counted here.
 
@@ -25511,7 +25550,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.2a Reviera-originated features
 
-88 requirements are Reviera's own design: owner directives, the technology stack (IFC/RXD storage, live store, BIMserver, MCP, scripting) and extensions beyond the reference product's feature set. Their Ref lines cite no research on the reference product. Listing them separately keeps the clean-room provenance clear: every other requirement traces to public research on the reference product.
+89 requirements are Reviera's own design: owner directives, the technology stack (IFC/RXD storage, live store, BIMserver, MCP, scripting) and extensions beyond the reference product's feature set. Their Ref lines cite no research on the reference product. Listing them separately keeps the clean-room provenance clear: every other requirement traces to public research on the reference product.
 
 | Requirement | Ch | Feature |
 |-------------|----|---------|
@@ -25587,6 +25626,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | ARC-ROOF-009 | 3 | 3.6.8c Dome roofs |
 | ARC-RAIL-003 | 3 | 3.7.8b Railing openings and gates |
 | ARC-DECK-001 | 3 | 3.7.8a Decks |
+| MEP-PIPE-010 | 4 | 4.8.10 Roof drainage: gutters and downspouts |
 | DOC-VIEW-014 | 5 | Slice planes |
 | DOC-VIEW-013 | 5 | Blueprint mode (3D slice to 2D drawing) |
 | DOC-RBE-001 | 5 | Pluggable render backends |
@@ -25606,7 +25646,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**1975 unique commands** in 402 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**1976 unique commands** in 402 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -25902,7 +25942,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `revcloud` | 2 |
 | `revision` | 8 |
 | `revisionsequence` | 1 |
-| `roof` | 15 |
+| `roof` | 16 |
 | `room` | 8 |
 | `roomseparator` | 1 |
 | `roomtag` | 1 |
@@ -27246,11 +27286,12 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `roof.create_dome` | 3 | plan, level_id, base_offset?, rise?, profile?, oculus?, polygon_mode?, type_id? | element_id | Yes | ARC-ROOF-009 |
 | `roof.create_extrusion` | 3 | type_id, work_plane, profile: [curve], ref_level, level_offset?, start, end | element_id | Yes | ARC-ROOF-002 |
 | `roof.create_footprint` | 3 | type_id, loop: [{curve, defines_slope, slope?, overhang?, plate_offset?, offset_from_base?, extend_to_core?, lock_ref?}], holes?, base_level, base_offset?, cutoff?: {level_id, offset}, rafter_cut?, fascia_depth?, rafter_or_truss?, slope_arrows?: [SlopeArrow], attach_walls?: bool | element_id | Yes | ARC-ROOF-001 |
+| `roof.eaves` | 3 | roof_id | [eave] | No | ARC-ROOF-010 |
 | `roof.edit_footprint` | 3 | roof_id, ... | — | Yes | ARC-ROOF-001 |
 | `roof.join` | 3 | roof_id, edge_ref, target_ref | — | Yes | ARC-ROOF-006 |
 | `roof.set_arch` | 3 | roof_id, rise?, radius?, profile?, taper? | — | Yes | ARC-ROOF-008 |
 | `roof.set_dome` | 3 | roof_id, rise?, profile?, oculus?, polygon_mode? | — | Yes | ARC-ROOF-009 |
-| `roof.set_eaves` | 3 | roof_id, edges, bearing?, heel?, overhang?, cut?, fascia_depth?, fascia?, soffit?, gutter?, attach_walls? | — | Yes | ARC-ROOF-010 |
+| `roof.set_eaves` | 3 | roof_id, edges?, bearing?, heel?, overhang?, cut?, fascia_depth?, fascia?, soffit?, attach_walls?, remove? | — | Yes | ARC-ROOF-010 |
 | `roof.set_shape` | 3 | roof_id, shape: hip\ | gable\ | gable_rotated\ | shed\ |
 | `roof.set_slope` | 3 | roof_id, slope, edge_keys? | — | Yes | ARC-ROOF-001 |
 | `roof.unjoin` | 3 | roof_id, edge_ref? | — | Yes | ARC-ROOF-006 |

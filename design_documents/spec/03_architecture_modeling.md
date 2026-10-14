@@ -2100,7 +2100,7 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
   - *sloped* (following the roof's underside back to the wall),
   - or *open* (none).
   - The soffit **returns to the wall face** and is trimmed against it, so there is no gap between the soffit and the wall.
-- **Gutter:** optional, along the eave (ARC-ROOF-004).
+- **Gutter:** not part of the eave. Gutters and downspouts belong to the plumbing subsystem (MEP-PIPE-010), which hangs them on the eave's fascia. *(Owner direction, 2026-10-13.)*
 - **Wall join at the eave:**
   - The walls under an eave are **attached** to the roof (ARC-WALL-008). Their tops follow the roof's underside across the wall's thickness (a birdsmouth-like top: high at the interior face, low at the exterior face), and stop at the soffit where there is one.
   - A gable wall under a gable edge rises to the roof's underside (gable infill). The roof's rake overhang is measured from that wall's exterior face too.
@@ -2108,18 +2108,30 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 - **Consistency:** each eave's settings regenerate with the roof. Moving a wall the footprint is locked to moves the bearing line, so the eave, fascia, soffit and attachment all follow.
 - **Defaults:** a roof made with Pick Walls gets eaves on its slope-defining edges: exterior-face bearing, the overhang given in the tool, a plumb cut, a boxed soffit, and walls attached.
 
-**Data (IFC mapping).** The eave settings are RXD element data on the roof (`recipe.roof`, per edge). Fascia, soffit and gutter are written as in ARC-ROOF-004, and the attachment as in ARC-WALL-008.
+**Data (IFC mapping).** The eave settings are RXD element data on the roof (`recipe.roof`, per edge). Fascia and soffit are written as in ARC-ROOF-004, and the attachment as in ARC-WALL-008.
 
-**Commands.** `roof.set_eaves(roof_id, edges: [curve_key] | all, bearing?: exterior|core|interior, heel?, overhang?, cut?: plumb|square|two_cut, fascia_depth?, fascia?: bool|type_id, soffit?: boxed|sloped|open, gutter?: bool|type_id, attach_walls?: bool) -> ()`
+**Commands.** `roof.set_eaves(roof_id, edges: [curve_key] | all, bearing?: exterior|core|interior, heel?, overhang?, cut?: plumb|square|two_cut, fascia_depth?, fascia?: bool|type_id, soffit?: boxed|sloped|open, attach_walls?: bool, remove?: bool) -> ()`; `roof.eaves(roof_id) -> [eave]`
 
 **Acceptance criteria.**
-- [ ] A 45° hip roof on 300 mm walls with exterior-face bearing, a 500 mm overhang and a boxed soffit:
+- [x] A 45° hip roof on 300 mm walls with exterior-face bearing, a 500 mm overhang and a boxed soffit:
   - every wall top meets the roof's underside across its full thickness;
   - the soffit runs from the fascia's bottom to the wall's exterior face with no gap;
   - the eave line is 500 mm out from the exterior face.
-- [ ] Changing the bearing to the core centre keeps the overhang measured from the exterior face, and raises the roof by the slope across half the wall.
-- [ ] A two-cut eave with a 200 mm fascia depth has a 200 mm plumb face and a level underside at the eave.
-- [ ] Moving a locked eave wall 300 mm outward moves the eave, the fascia and the soffit with it, and the wall stays attached.
+- [x] Changing the bearing to the core centre keeps the overhang measured from the exterior face. The underside then meets the plate at the wall's centre line: across half the wall, the roof's plane moves by tan(slope) × half the wall's thickness.
+- [x] A two-cut eave with a 200 mm fascia depth has a 200 mm plumb face and a level underside at the eave.
+- [x] Moving a locked eave wall 300 mm outward moves the eave, the fascia and the soffit with it, and the wall stays attached.
+
+**Implementation notes (2026-10-13).** As built:
+- **Storage:** eaves are per-edge `eave` settings in the roof recipe. Each eave finds the wall beneath it: the wall its curve is locked to, or else the nearest parallel wall the curve lies within.
+- **Bearing and heel:** each eave's plate line moves to the bearing (and further out by `raise / tan(slope)` for a heel deeper than the roof's plumb depth), and its overhang is measured from the wall's exterior face.
+- **Rafter cuts:** a square cut is a side plane square to the roof. A two-cut clips the face's slab with a level plane at the fascia depth below the eave's top and caps it; such a slab is written to IFC as triangles.
+- **Fascia and soffit:** 25 mm fascia and 12 mm boxed or sloped soffit bands along each eave, mitred where neighbouring eaves meet. They are generated with the roof and written as extra B-reps of the `IfcRoof`. Separate covering elements and type choices are deferred.
+- **Defaults:** a roof made from picked walls gets a default eave on each slope-defining picked curve. Footprint edits keep each curve's eave by key.
+- **Wall join:** `roof.set_eaves` attaches the perimeter walls (ARC-WALL-008).
+- **In the window:** Modify | Roofs › Eaves turns the selected roof's sloped edges into eaves. Bearing, Rafter Cut, Fascia, Soffit, Heel Height and Fascia Depth are in the Properties palette (they apply to every eave). Per-edge settings are by command.
+- **Not built yet:**
+  - picking edges in the window;
+  - cladding layers stopping at the soffit (needs layered walls).
 
 ### 3.6.8 Slope arrows in roofs
 **ID:** ARC-ROOF-005 · **Priority:** P1 · **Ref:** research/02 §7.4 · web: Slope Arrow Properties
@@ -4360,7 +4372,8 @@ All commands below are registered once in the command registry and exposed autom
 | `deck.set_framing` | deck_id, joist_spacing?, joist_size?, beam_spacing?, post_spacing?, ledger_wall_id? | — | Yes | ARC-DECK-001 |
 | `deck.boards` | deck_id | [board] | No | ARC-DECK-001 |
 | `deck.cut_list` | deck_id | cut_list | No | ARC-DECK-001 |
-| `roof.set_eaves` | roof_id, edges, bearing?, heel?, overhang?, cut?, fascia_depth?, fascia?, soffit?, gutter?, attach_walls? | — | Yes | ARC-ROOF-010 |
+| `roof.set_eaves` | roof_id, edges?, bearing?, heel?, overhang?, cut?, fascia_depth?, fascia?, soffit?, attach_walls?, remove? | — | Yes | ARC-ROOF-010 |
+| `roof.eaves` | roof_id | [eave] | No | ARC-ROOF-010 |
 | `railing.add_opening` | railing_id, at?\|point?, width? | key | Yes | ARC-RAIL-003 |
 | `railing.add_gate` | railing_id, at?\|point?, leaves?: 1\|2, width?, swing_out?, hinge_end? | element_id | Yes | ARC-RAIL-003 |
 | `railing.move_feature` | railing_id, key, at?\|point?, width? | — | Yes | ARC-RAIL-003 |

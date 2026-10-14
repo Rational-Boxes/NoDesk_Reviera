@@ -441,18 +441,23 @@ impl App {
         }
         // Roofs: one closed slab per face.
         for (id, g) in reviera_core::roofs::all(store) {
-            for f in &g.faces {
+            // The faces, then the eaves' fascias and soffits.
+            for mesh in g
+                .faces
+                .iter()
+                .map(|f| &f.slab)
+                .chain(g.trims.iter().map(|t| &t.mesh))
+            {
                 meshes.push(reviera_render::SceneMesh {
                     element: Some(id),
                     color: reviera_render::class_color("IfcRoof"),
                     class: "IfcRoof".into(),
-                    positions: f
-                        .slab
+                    positions: mesh
                         .0
                         .iter()
                         .map(|[x, y, z]| [*x as f32, *y as f32, *z as f32])
                         .collect(),
-                    indices: f.slab.1.clone(),
+                    indices: mesh.1.clone(),
                 });
             }
         }

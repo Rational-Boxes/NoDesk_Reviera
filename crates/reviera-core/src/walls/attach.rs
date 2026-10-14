@@ -522,6 +522,7 @@ mod tests {
                 defines_slope: i % 2 == 0,
                 slope: None,
                 overhang: 0.5,
+                eave: None,
             })
             .collect();
         let roof = generate(

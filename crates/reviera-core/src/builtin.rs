@@ -63,6 +63,8 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(RoofEditFootprint),
         registry.add(RoofSetParams),
         registry.add(RoofSetEdge),
+        registry.add(RoofSetEaves),
+        registry.add(RoofEaves),
         registry.add(RoofSetSlope),
         registry.add(RoofSetShape),
         registry.add(RoofAttachWalls),
@@ -2416,6 +2418,46 @@ modify_command!(
     (),
     roofs::set_edge
 );
+modify_command!(
+    RoofSetEaves,
+    "roof.set_eaves",
+    "Set a roof's eaves and wall bearing",
+    "Sets eaves on footprint curves (`edges`; omitted, every slope-defining edge) (ARC-ROOF-010): the \
+     `bearing` on the wall below (`exterior` face, `core` centre or `interior` face), a `heel` height, the \
+     `overhang` from the wall's exterior face, the rafter `cut` (`plumb`, `square`, `two_cut`) with its \
+     `fascia_depth`, a `fascia`, and the `soffit` (`boxed`, `sloped`, `open`) returning to the wall's face. \
+     The perimeter walls under the roof are attached to it unless `attach_walls` is false. `remove` turns \
+     the edges back into plain overhangs.",
+    "Roof Eaves",
+    roofs::eaves::SetEavesParams,
+    (),
+    roofs::eaves::set_eaves
+);
+
+#[derive(Debug)]
+struct RoofEaves;
+
+impl Command for RoofEaves {
+    type Params = roofs::eaves::EavesParams;
+    type Output = Vec<roofs::eaves::EaveRow>;
+    const META: CommandMeta = CommandMeta {
+        name: "roof.eaves",
+        version: 1,
+        summary: "A roof's eaves",
+        description: "Every eave of a roof: its footprint curve's key, its overhang from the wall's exterior \
+                      face, and its bearing, heel, rafter cut, fascia and soffit.",
+        effects: &[Effect::Read],
+        transaction_name: "",
+    };
+
+    fn run(
+        &self,
+        cx: &mut CommandContext<'_>,
+        p: roofs::eaves::EavesParams,
+    ) -> Result<Vec<roofs::eaves::EaveRow>> {
+        roofs::eaves::eaves_of(cx.store(), p)
+    }
+}
 
 use crate::plans::{self, CreatePlanParams, SetViewRangeParams, ViewRangeReport};
 

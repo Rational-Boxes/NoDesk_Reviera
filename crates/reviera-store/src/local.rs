@@ -975,8 +975,9 @@ impl LocalProject {
                 .faces
                 .iter()
                 .map(|f| {
-                    // A slab with courtyards through it is written as its triangles.
-                    if !f.holes.is_empty() {
+                    // A slab with courtyards through it, or clipped, is written as its
+                    // triangles.
+                    if !f.holes.is_empty() || f.faceted {
                         return geometry::Polyhedron {
                             points: f.slab.0.clone(),
                             faces: f
@@ -995,6 +996,17 @@ impl LocalProject {
                         faces,
                     }
                 })
+                .chain(g.trims.iter().map(|t| {
+                    geometry::Polyhedron {
+                        points: t.mesh.0.clone(),
+                        faces: t
+                            .mesh
+                            .1
+                            .chunks(3)
+                            .map(|t| t.iter().map(|i| *i as usize).collect())
+                            .collect(),
+                    }
+                }))
                 .collect();
             geometry::write_breps(
                 &mut self.ifc,

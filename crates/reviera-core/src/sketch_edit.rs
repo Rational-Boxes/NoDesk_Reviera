@@ -210,6 +210,7 @@ fn apply(txn: &mut crate::txn::Transaction<'_>, r: &ElementRef, edit: Edit) -> R
                         defines_slope: Some(edge.defines_slope),
                         slope: edge.slope.map(serde_json::Value::from),
                         overhang: Some(edge.overhang.into()),
+                        eave: edge.eave,
                     }
                 })
                 .collect();

@@ -261,6 +261,9 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "double_gate" => format!(
             r#"<path d="M3 8v20M29 8v20" {s}/><rect x="5" y="11" width="10" height="15" fill="{f}" {s}/><rect x="17" y="11" width="10" height="15" fill="{f}" {s}/><path d="M10 11v15M22 11v15" {sa} stroke-width="1.2"/>"#
         ),
+        "eaves" => format!(
+            r#"<path d="M2 16L16 5l14 11" fill="none" {sa}/><path d="M7 12v16h18V12" fill="{f}" {s}/><path d="M2 16v3h5M30 16v3h-5" {sa}/>"#
+        ),
         "dormer" => format!(
             r#"<path d="M2 26L16 8l14 18z" fill="{f}" {s}/><path d="M11 22v-6h6v6" {sa}/><path d="M10 16l4-4 4 4" {sa}/>"#
         ),

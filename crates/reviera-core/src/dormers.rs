@@ -240,6 +240,7 @@ fn build(
         defines_slope: Some(slopes),
         slope: None,
         overhang: Some(overhang.into()),
+        eave: None,
     };
     let curves = vec![
         edge(fl, fr, front, r.overhang),

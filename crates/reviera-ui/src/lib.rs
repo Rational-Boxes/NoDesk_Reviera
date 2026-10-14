@@ -3243,6 +3243,7 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         }),
         "wall.detach" => with(gui, Gui::detach_selection),
         "roof.attach_walls" => with(gui, Gui::attach_walls_below),
+        "roof.set_eaves" => with(gui, Gui::set_roof_eaves),
         "railing.add_opening" => with(gui, |g| {
             g.start_feature_tool(railings::FeatureKind::Opening);
             focus(g);

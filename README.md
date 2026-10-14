@@ -92,6 +92,14 @@ The KIT FZK *AC20-Institute-Var-2* sample model (`test-data/ifc/`) open in Revie
   arrows, and openings in roofs. Footprints may have courtyards: a building around a central
   courtyard gets a roof that falls to the street and to the courtyard (or a flat slab with the
   courtyard as a hole).
+- **Eaves**: Modify | Roofs › Eaves makes a roof's sloped edges eaves that bear on the walls
+  below (`roof.set_eaves`, `roof.eaves`). The overhang is measured from the wall's exterior
+  face. The bearing is the exterior face, the core centre or the interior face, and a heel height
+  raises the roof. The rafter cut is plumb, square or two-cut. A fascia and a soffit (boxed,
+  sloped or open) return to the wall's face, mitred at hips, and the perimeter walls are
+  attached. A roof made from picked walls gets eaves by default. Not yet: picking single edges
+  in the window, and cladding stopping at the soffit. Gutters and downspouts are planned as part
+  of plumbing (MEP-PIPE-010), not built yet.
 - **Railings**: Architecture › Railing sketches a guard railing's path in a plan, and Modify |
   Floors / Roofs › Guard Edges puts railings along every open edge of a deck, patio, floor or
   flat roof (edges with a wall along them are left out). Each has a top and a bottom rail, posts
@@ -267,8 +275,7 @@ The KIT FZK *AC20-Institute-Var-2* sample model (`test-data/ifc/`) open in Revie
 
 ## Planned next
 
-The first milestone continues with roof eaves that join the walls properly (ARC-ROOF-010:
-bearing, overhang from the wall face, rafter cuts, fascia, soffit and gutter), railings on stairs, roof openings (below dormers,
+The first milestone continues with railings on stairs, roof openings (below dormers,
 skylights and shafts), and layered wall types. Then come curved forms: smooth arched roofs (including vaults that taper over trapezoidal
 footprints, ARC-ROOF-008), dome roofs (ARC-ROOF-009), spline-curved walls (ARC-WALL-002), and
 boolean intersect, subtract and union between elements (ARC-MOD-028). After that come general

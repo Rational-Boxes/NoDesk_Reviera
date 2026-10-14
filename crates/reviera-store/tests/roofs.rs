@@ -1111,3 +1111,164 @@ fn footprint_edges_and_corners_move_by_command() {
     run(&r, &mut doc, "edit.undo", json!({})).unwrap();
     assert!((geometry(&doc, roof).projected_area() - 72.0).abs() < 1e-6);
 }
+
+/// ARC-ROOF-010: eaves bear on the walls below, with the overhang from their exterior faces.
+#[test]
+fn eaves_bear_on_the_walls_and_return_soffits_to_them() {
+    let dir = tempfile::tempdir().unwrap();
+    let (mut project, mut doc, path, level) = project(dir.path());
+    let r = registry();
+    // 200 mm walls on the rectangle's centrelines, clockwise (exterior faces outside).
+    let mut walls = Vec::new();
+    for i in 0..4 {
+        walls.push(id(run(
+            &r,
+            &mut doc,
+            "wall.create",
+            json!({
+                "curve": { "line": { "start": RECT[(i + 1) % 4], "end": RECT[i] } },
+                "base_level": level.0,
+                "top_constraint": { "unconnected": 3 },
+            }),
+        )
+        .unwrap()));
+    }
+    // A 45° hip roof picked from the walls' exterior faces: each edge gets a default eave.
+    let faces: Vec<Value> = (0..4)
+        .map(|i| {
+            let (a, b) = (RECT[i], RECT[(i + 1) % 4]);
+            let d = [b[0] - a[0], b[1] - a[1]];
+            let l = d[0].hypot(d[1]);
+            let out = [d[1] / l * 0.1, -d[0] / l * 0.1];
+            json!({
+                "line": { "start": [a[0] + out[0], a[1] + out[1]], "end": [b[0] + out[0], b[1] + out[1]] },
+                "lock": { "element": walls[i].0, "sub": "face:ext" },
+            })
+        })
+        .collect();
+    let roof = id(run(
+        &r,
+        &mut doc,
+        "roof.create_footprint",
+        json!({
+            "curves": faces, "level_id": level.0, "base_offset": 3.0,
+            "slope": std::f64::consts::FRAC_PI_4,
+        }),
+    )
+    .unwrap());
+    let rows = run(&r, &mut doc, "roof.eaves", json!({ "roof_id": roof.0 })).unwrap();
+    assert_eq!(rows.as_array().unwrap().len(), 4);
+    assert_eq!(rows[0]["eave"]["bearing"], "exterior");
+
+    // A 500 mm overhang with a fascia: the walls are attached.
+    run(
+        &r,
+        &mut doc,
+        "roof.set_eaves",
+        json!({ "roof_id": roof.0, "overhang": 0.5, "fascia": true }),
+    )
+    .unwrap();
+    let guid = doc.store().get(roof).unwrap().guid().to_string();
+    for w in &walls {
+        let rec = reviera_core::walls::wall_recipe(doc.store().get(*w).unwrap()).unwrap();
+        assert_eq!(rec.attach_top.as_deref(), Some(guid.as_str()));
+    }
+    let g = geometry(&doc, roof);
+    let bottoms = || g.faces.iter().flat_map(|f| f.bottom.iter());
+    let min_x = bottoms().map(|p| p[0]).fold(f64::MAX, f64::min);
+    let min_z = bottoms().map(|p| p[2]).fold(f64::MAX, f64::min);
+    // The eave line 500 mm out from the exterior face (x = −0.1), 0.5 m below the plate.
+    assert!((min_x + 0.6).abs() < 1e-9, "{min_x}");
+    assert!((min_z - 2.5).abs() < 1e-9, "{min_z}");
+    // The underside meets the plate at the exterior face and rises across the wall.
+    assert!((g.underside([5.0, -0.1]).unwrap() - 3.0).abs() < 1e-9);
+    assert!((g.underside([5.0, 0.1]).unwrap() - 3.2).abs() < 1e-9);
+    // The south soffit runs from the eave line back to the wall's exterior face; the fascia's
+    // bottom meets it.
+    let trims = |kind| {
+        g.trims
+            .iter()
+            .filter(move |t| t.kind == kind && t.key == 1)
+            .flat_map(|t| t.mesh.0.iter().copied())
+            .collect::<Vec<_>>()
+    };
+    let soffit = trims(roofs::eaves::TrimKind::Soffit);
+    let fascia = trims(roofs::eaves::TrimKind::Fascia);
+    let range = |pts: &[[f64; 3]], k: usize| {
+        (
+            pts.iter().map(|p| p[k]).fold(f64::MAX, f64::min),
+            pts.iter().map(|p| p[k]).fold(f64::MIN, f64::max),
+        )
+    };
+    let (y0, y1) = range(&soffit, 1);
+    assert!(
+        (y0 + 0.6).abs() < 1e-9 && (y1 + 0.1).abs() < 1e-9,
+        "{y0} {y1}"
+    );
+    assert!((range(&fascia, 2).0 - range(&soffit, 2).0).abs() < 1e-9);
+    assert_eq!(
+        g.trims
+            .iter()
+            .filter(|t| t.kind == roofs::eaves::TrimKind::Soffit)
+            .count(),
+        4
+    );
+
+    // Bearing on the core: the underside meets the plate at the wall's centre; the eave line
+    // stays 500 mm out from the exterior face.
+    run(
+        &r,
+        &mut doc,
+        "roof.set_eaves",
+        json!({ "roof_id": roof.0, "bearing": "core" }),
+    )
+    .unwrap();
+    let g = geometry(&doc, roof);
+    assert!((g.underside([5.0, 0.0]).unwrap() - 3.0).abs() < 1e-9);
+    let min_y = g
+        .faces
+        .iter()
+        .flat_map(|f| f.bottom.iter())
+        .map(|p| p[1])
+        .fold(f64::MAX, f64::min);
+    assert!((min_y + 0.6).abs() < 1e-9, "{min_y}");
+
+    // A two-cut eave with a 200 mm fascia depth: a 200 mm plumb face, then level underneath.
+    run(
+        &r,
+        &mut doc,
+        "roof.set_eaves",
+        json!({ "roof_id": roof.0, "cut": "two_cut", "fascia_depth": 0.2 }),
+    )
+    .unwrap();
+    let g = geometry(&doc, roof);
+    let south = g.faces.iter().find(|f| f.key == Some(1)).unwrap();
+    assert!(south.faceted);
+    // The eave's underside 0.6 m out from the core line, 0.6 m below the plate.
+    let top = 3.0 - 0.6 + 0.3 / std::f64::consts::FRAC_PI_4.cos();
+    let low = south.slab.0.iter().map(|p| p[2]).fold(f64::MAX, f64::min);
+    assert!((low - (top - 0.2)).abs() < 1e-9, "{low}");
+
+    // Moving the south wall 300 mm out moves its eave, and the wall stays attached.
+    run(
+        &r,
+        &mut doc,
+        "element.move",
+        json!({ "element_ids": [walls[0].0], "vector": [0.0, -0.3, 0.0] }),
+    )
+    .unwrap();
+    let g = geometry(&doc, roof);
+    let min_y = g
+        .faces
+        .iter()
+        .flat_map(|f| f.bottom.iter())
+        .map(|p| p[1])
+        .fold(f64::MAX, f64::min);
+    assert!((min_y + 0.9).abs() < 1e-9, "{min_y}");
+    let rec = reviera_core::walls::wall_recipe(doc.store().get(walls[0]).unwrap()).unwrap();
+    assert_eq!(rec.attach_top.as_deref(), Some(guid.as_str()));
+
+    project.save(&doc).unwrap();
+    let ifc = IfcModel::open(&path).unwrap();
+    assert_eq!(ifc.entities_of_type("IfcRoof").unwrap().len(), 1);
+}
