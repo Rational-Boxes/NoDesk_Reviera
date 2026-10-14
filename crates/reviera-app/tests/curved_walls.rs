@@ -90,6 +90,49 @@ fn a_round_room_of_curved_walls() {
     };
     let exact = std::f64::consts::PI * 4.9 * 4.9;
     assert!((area - exact).abs() / exact < 0.005, "{area} vs {exact}");
+    // In plan (cut at 1.2 m), the curved walls' cut edges lie on their faces' true radii
+    // (4.9 and 5.1 m, within the chord of a 3° segment), all the way round but the door.
+    {
+        let scene = app.render_scene(app.active().unwrap()).unwrap();
+        let edges = reviera_render::plan::feature_edges(&scene);
+        let g = reviera_render::plan::plan_graphics(&scene, &edges, 1.2, 0.0, 100.0, &|_| {
+            reviera_render::plan::Weights {
+                cut: Some(0.5),
+                projection: 0.25,
+            }
+        });
+        let walls = [north, south];
+        let cut: Vec<[[f32; 2]; 2]> = g
+            .cut_edges
+            .iter()
+            .filter(|(e, _)| e.is_some_and(|e| walls.contains(&e.0)))
+            .map(|(_, s)| *s)
+            .collect();
+        assert!(cut.len() > 100, "{}", cut.len());
+        let sagitta = 5.1 * (1.0 - (1.5f64.to_radians()).cos());
+        let (mut inner, mut outer) = (0, 0);
+        for s in &cut {
+            for p in s {
+                let r = f64::from(p[0]).hypot(f64::from(p[1]));
+                assert!(
+                    r > 4.9 - sagitta - 1e-3 && r < 5.1 + 1e-3,
+                    "{r} off the wall's faces"
+                );
+                if (r - 4.9).abs() < 2e-3 {
+                    inner += 1;
+                }
+                if (r - 5.1).abs() < 2e-3 {
+                    outer += 1;
+                }
+            }
+        }
+        assert!(inner > 50 && outer > 50, "{inner} {outer}");
+        // The door's opening (at the top, about 0.8 m wide) is open in plan: no face edge there.
+        assert!(
+            !cut.iter()
+                .any(|s| s.iter().all(|p| p[0].abs() < 0.3 && p[1] > 4.8))
+        );
+    }
     // The ends butt: no overlap; the door is cut into the wall, not overlapping it.
     let found = run(&mut app, "overlap.find", json!({})).unwrap();
     assert_eq!(found["overlaps"], json!([]), "{found:#}");

@@ -320,6 +320,18 @@ The KIT FZK *AC20-Institute-Var-2* sample model (`test-data/ifc/`) open in Revie
   (View › Walk: WASD or arrow keys, drag to look). Click to select; drag to orbit; middle or right
   button to pan.
 
+## Sample models
+
+`test-data/samples` holds Reviera's own sample models, each rebuilt by a Lua script and checked
+by a test (no overlaps, no clearance intrusions, saves and reopens):
+
+- **House with dormers** (`house.ifc`): eaves, flush-joined dormers, stairs, a gated railing
+  and a deck.
+- **Observatory** (`observatory.ifc`): curved walls under a dome with an oculus, a vaulted annex,
+  a spline garden wall and a turret built by the Castle Turret plugin.
+
+Open one with `reviera gui test-data/samples/observatory.ifc`.
+
 ## Planned next
 
 The first milestone continues with shaped windows (round, round-top, Gothic, fan and gable

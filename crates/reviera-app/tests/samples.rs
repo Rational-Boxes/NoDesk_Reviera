@@ -1,0 +1,75 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Reviera contributors
+
+//! The sample corpus (`test-data/samples`): each sample is rebuilt from its manifest steps (Lua
+//! scripts, plugin runs, settings) and must have no overlaps and no intrusions into its
+//! clearances, then save and reopen. With `REVIERA_REGEN_SAMPLES=1` the corpus's `.ifc` files
+//! are rewritten from the rebuild.
+
+use std::path::{Path, PathBuf};
+
+use reviera_app::{App, AppConfig};
+use reviera_core::Caller;
+use serde_json::{Value, json};
+
+fn run(app: &mut App, name: &str, args: Value) -> reviera_core::Result<Value> {
+    app.execute(name, args, &Caller::user()).map(|o| o.result)
+}
+
+fn samples() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data/samples")
+}
+
+#[test]
+fn the_sample_corpus_builds_cleanly() {
+    let dir = samples();
+    let manifest: Vec<Value> =
+        serde_json::from_str(&std::fs::read_to_string(dir.join("samples.json")).unwrap()).unwrap();
+    assert!(!manifest.is_empty());
+    let regen = std::env::var_os("REVIERA_REGEN_SAMPLES").is_some();
+    let out = tempfile::tempdir().unwrap();
+    for sample in &manifest {
+        let name = sample["name"].as_str().unwrap();
+        let mut app = App::new(AppConfig {
+            live: None,
+            untitled_dir: out.path().to_owned(),
+        });
+        run(&mut app, "file.new", json!({})).unwrap();
+        for step in sample["steps"].as_array().unwrap() {
+            let mut args = step["args"].clone();
+            // Scripts are named relative to the corpus.
+            if let Some(f) = args["file"].as_str() {
+                args["file"] = json!(dir.join(f));
+            }
+            let command = step["command"].as_str().unwrap();
+            run(&mut app, command, args).unwrap_or_else(|e| panic!("{name}: {command}: {e:?}"));
+        }
+        let overlaps = run(&mut app, "overlap.find", json!({})).unwrap();
+        assert_eq!(overlaps["overlaps"], json!([]), "{name}: {overlaps:#}");
+        let intrusions = run(&mut app, "clearance.check", json!({})).unwrap();
+        assert_eq!(intrusions, json!([]), "{name}: {intrusions:#}");
+        let path = if regen {
+            dir.join(format!("{name}.ifc"))
+        } else {
+            out.path().join(format!("{name}.ifc"))
+        };
+        let _ = std::fs::remove_file(&path);
+        run(&mut app, "file.save_as", json!({ "path": path })).unwrap();
+        // It reopens with its Reviera elements intact.
+        let mut again = App::new(AppConfig {
+            live: None,
+            untitled_dir: out.path().to_owned(),
+        });
+        run(&mut again, "file.open", json!({ "path": path })).unwrap();
+        let reopened = run(&mut again, "overlap.find", json!({})).unwrap();
+        assert_eq!(
+            reopened["overlaps"],
+            json!([]),
+            "{name} reopened: {reopened:#}"
+        );
+        assert_eq!(
+            reopened["bodies"], overlaps["bodies"],
+            "{name}: every body comes back"
+        );
+    }
+}
