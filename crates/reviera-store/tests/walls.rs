@@ -542,3 +542,57 @@ fn flipping_and_typed_lengths_with_units() {
     .unwrap();
     assert!((v.as_f64().unwrap() - 3.81).abs() < 1e-9, "{v}");
 }
+
+#[test]
+fn a_walls_base_and_top_can_be_changed() {
+    let dir = tempfile::tempdir().unwrap();
+    let (_, mut doc, _) = new_project(dir.path());
+    let r = registry();
+    let l1 = level(&doc, "Level 1");
+    let id = create_wall(&r, &mut doc, l1, [0.0, 0.0], [5.0, 0.0]);
+    let geometry =
+        |doc: &Document| walls::regenerate(doc.store(), doc.store().get(id).unwrap()).unwrap();
+
+    run(
+        &r,
+        &mut doc,
+        "wall.set_constraints",
+        json!({"wall_id": id.0, "base_offset": "6.4 m", "top_constraint": {"unconnected": "6 m"}}),
+    )
+    .unwrap();
+    let g = geometry(&doc);
+    assert_eq!((g.base_z, g.height), (6.4, 6.0));
+
+    // Up to a level: the height follows it, less the base offset.
+    let l2 = ElementId(
+        run(
+            &r,
+            &mut doc,
+            "level.create",
+            json!({"name": "Roof", "elevation": "10 m"}),
+        )
+        .unwrap()
+        .as_u64()
+        .unwrap(),
+    );
+    run(
+        &r,
+        &mut doc,
+        "wall.set_constraints",
+        json!({"wall_id": id.0, "top_constraint": {"level": l2.0}, "top_offset": "0.5 m"}),
+    )
+    .unwrap();
+    let g = geometry(&doc);
+    assert!((g.height - 4.1).abs() < 1e-9, "{}", g.height);
+
+    // A top below the base is refused, and nothing changes.
+    let err = run(
+        &r,
+        &mut doc,
+        "wall.set_constraints",
+        json!({"wall_id": id.0, "base_offset": "11 m"}),
+    )
+    .unwrap_err();
+    assert_eq!(err.code, "wall.non_positive_height");
+    assert_eq!(geometry(&doc).base_z, 6.4);
+}

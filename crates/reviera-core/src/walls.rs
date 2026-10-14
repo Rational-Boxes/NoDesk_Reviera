@@ -441,6 +441,64 @@ pub(crate) fn set_location(
 
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
+pub struct SetConstraintsParams {
+    pub wall_id: ElementRef,
+    /// The level the base is measured from.
+    pub base_level: Option<ElementRef>,
+    #[schemars(extend("x-reviera-data-type" = "length"))]
+    pub base_offset: Option<f64>,
+    /// Up to a level, or a fixed height above the base.
+    pub top_constraint: Option<TopConstraint>,
+    #[schemars(extend("x-reviera-data-type" = "length"))]
+    pub top_offset: Option<f64>,
+}
+
+/// Changes a wall's base and top (`wall.set_constraints`); omitted fields keep their values.
+pub(crate) fn set_constraints(
+    txn: &mut crate::txn::Transaction<'_>,
+    p: SetConstraintsParams,
+) -> Result<()> {
+    let store = txn.store().clone();
+    let id = resolve(&store, &p.wall_id, "wall")?;
+    crate::modify::check_unpinned(&store, id)?;
+    let mut recipe = wall_recipe(store.get(id).expect("resolved")).ok_or_else(|| {
+        Error::new(
+            "wall.not_reviera",
+            "only Reviera walls have base and top constraints",
+        )
+    })?;
+    if let Some(r) = &p.base_level {
+        recipe.base_level = level_guid(&store, resolve(&store, r, "level")?)?;
+    }
+    if let Some(o) = p.base_offset {
+        recipe.base_offset = o;
+    }
+    match p.top_constraint {
+        Some(TopConstraint::Unconnected(h)) if h <= 0.0 => {
+            return Err(Error::new(
+                "wall.non_positive_height",
+                "the height must be greater than 0",
+            ));
+        }
+        Some(TopConstraint::Unconnected(h)) => recipe.top = json!({ "unconnected": h }),
+        Some(TopConstraint::Level(ElementRefValue::Id(l))) => {
+            recipe.top = json!({ "level": level_guid(&store, l)? });
+        }
+        None => {}
+    }
+    if let Some(o) = p.top_offset {
+        recipe.top_offset = o;
+    }
+    let value = serde_json::to_value(&recipe).expect("recipes serialise");
+    txn.modify(id, |e| {
+        e.params.insert(RECIPE_KEY.into(), value);
+    })?;
+    // The top must stay above the base.
+    regenerate(txn.store(), txn.store().get(id).expect("modified")).map(|_| ())
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct SetJoinAllowedParams {
     pub wall_id: ElementRef,
     pub end: End,

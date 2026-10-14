@@ -1191,9 +1191,16 @@ impl LocalProject {
                         origin: [g.start[0], g.start[1], g.base_z],
                         x_dir: g.direction(),
                     },
-                    ([g.start[0], g.start[1], g.base_z], g.direction(), g.normal()),
+                    (
+                        [g.start[0], g.start[1], g.base_z],
+                        g.direction(),
+                        g.normal(),
+                    ),
                 ),
-                None => (geometry::BrepFrame::WORLD, ([0.0; 3], [1.0, 0.0], [0.0, 1.0])),
+                None => (
+                    geometry::BrepFrame::WORLD,
+                    ([0.0; 3], [1.0, 0.0], [0.0, 1.0]),
+                ),
             };
             let local = |p: &[f64; 3]| {
                 let (o, u, n) = axes;

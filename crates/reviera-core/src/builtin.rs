@@ -49,6 +49,7 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(ParamSetIfcHome),
         registry.add(WallCreate),
         registry.add(WallSetLocation),
+        registry.add(WallSetConstraints),
         registry.add(WallSetJoinAllowed),
         registry.add(WallFlip),
         registry.add(ViewCreate3d),
@@ -1263,6 +1264,26 @@ impl Command for WallSetLocation {
 
     fn run(&self, cx: &mut CommandContext<'_>, p: SetLocationParams) -> Result<()> {
         walls::set_location(cx.edit()?, p)
+    }
+}
+
+#[derive(Debug)]
+struct WallSetConstraints;
+
+impl Command for WallSetConstraints {
+    type Params = walls::SetConstraintsParams;
+    type Output = ();
+    const META: CommandMeta = CommandMeta {
+        name: "wall.set_constraints",
+        version: 1,
+        summary: "Change a wall's base and top",
+        description: "Sets a wall's base level and offset, and its top: up to a level plus a top offset, or an unconnected height. Omitted fields keep their values; the top must stay above the base.",
+        effects: &[Effect::Edit],
+        transaction_name: "Wall Constraints",
+    };
+
+    fn run(&self, cx: &mut CommandContext<'_>, p: walls::SetConstraintsParams) -> Result<()> {
+        walls::set_constraints(cx.edit()?, p)
     }
 }
 
