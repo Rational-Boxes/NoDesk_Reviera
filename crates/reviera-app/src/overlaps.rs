@@ -355,6 +355,10 @@ pub struct ResolveParams {
     pub moves: Which,
     /// For `accept`: why it is intended.
     pub note: Option<String>,
+    /// For a boolean: whether the tool's own body still shows (default `keep`; a union always
+    /// hides it).
+    #[serde(default)]
+    pub tools: reviera_core::csg::Tools,
 }
 
 #[derive(Debug, Serialize, JsonSchema)]
@@ -379,7 +383,7 @@ impl HostCommand for OverlapResolve {
                       as one undo step. `cut_a` / `subtract` cuts `a` by `b`, `cut_b` cuts `b` by `a`, `join` cuts by precedence \
                       (floors, ceilings and roofs cut walls; walls cut columns; else `a` cuts `b`), `intersect` \
                       keeps what `a` shares with `b`, `union` fuses `b` into `a`: each as a kept boolean \
-                      (`geometry.boolean`).",
+                      (`geometry.boolean`); `tools: hide` hides the tool's own body.",
         effects: &[Effect::Edit],
         transaction_name: "",
     };
@@ -458,7 +462,9 @@ impl HostCommand for OverlapResolve {
                 };
                 app.execute(
                     "geometry.boolean",
-                    serde_json::json!({ "target_id": target, "tool_ids": [tool], "op": op }),
+                    serde_json::json!({
+                        "target_id": target, "tool_ids": [tool], "op": op, "tools": p.tools,
+                    }),
                     caller,
                 )?;
                 Ok(ResolveResult { moved: None })

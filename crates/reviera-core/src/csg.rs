@@ -67,7 +67,7 @@ pub fn related(store: &Store, a: ElementId, b: ElementId) -> bool {
         .any(|(t, u, _, _)| (*t == a && *u == b) || (*t == b && *u == a))
 }
 
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Tools {
     #[default]

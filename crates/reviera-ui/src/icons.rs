@@ -279,6 +279,9 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "remove_boolean" => format!(
             r#"<rect x="4" y="9" width="15" height="15" fill="{f}" {s}/><rect x="13" y="4" width="15" height="15" fill="none" {s}/><path d="M20 22l8 8M28 22l-8 8" {sa}/>"#
         ),
+        "accessibility" => format!(
+            r#"<circle cx="14" cy="5" r="2.5" fill="{a}"/><path d="M14 9v9h7l3 7" fill="none" {sa}/><path d="M9 13h10" {s}/><path d="M11 15a7 7 0 1 0 8 9" fill="none" {s}/>"#
+        ),
         "script" => format!(
             r#"<path d="M7 4h14l5 5v19H7z" fill="{f}" {s}/><path d="M12 14l-3 3 3 3M19 14l3 3-3 3" {sa}/>"#
         ),

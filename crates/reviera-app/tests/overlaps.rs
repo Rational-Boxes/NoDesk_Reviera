@@ -359,4 +359,19 @@ fn overlaps_are_accepted_or_moved_apart() {
         (fused - (before + cross_volume - 0.12)).abs() < 1e-6,
         "{fused}"
     );
+    // Resolved as a cut that hides its tool, the tool's body is gone and the target is cut.
+    run(
+        &mut app,
+        "geometry.remove_boolean",
+        json!({ "target_id": long }),
+    )
+    .unwrap();
+    run(
+        &mut app,
+        "overlap.resolve",
+        json!({ "a": long, "b": cross, "mode": "cut_a", "tools": "hide" }),
+    )
+    .unwrap();
+    assert!(app.bodies().unwrap().iter().all(|b| b.element.0 != cross));
+    assert!((volume(&app, long) - after).abs() < 1e-6);
 }

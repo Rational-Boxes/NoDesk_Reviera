@@ -479,6 +479,12 @@ icon = "overlaps"
 help = "Find where elements overlap: listed largest first; pick one to select and frame it"
 
 [[action]]
+id = "clearance.set_rule_set"
+label = "Accessibility Rules"
+icon = "accessibility"
+help = "The project's accessibility rule set: door swings only, or ADA 2010 maneuvering clearances"
+
+[[action]]
 id = "view.set_virtual_volumes"
 label = "Virtual Volumes"
 icon = "virtual_volumes"
@@ -933,6 +939,7 @@ tools = [
   { action = "overlap.find", size = "large" },
   { action = "geometry.remove_boolean", size = "small" },
   { action = "view.set_virtual_volumes", size = "large" },
+  { action = "clearance.set_rule_set" },
 ]
 
 [[tab.panel]]
@@ -1166,7 +1173,8 @@ items = [
   "inspect.slice_vertical", "inspect.clear_slices", "-",
   "inspect.hide", "inspect.hide_subtree", "inspect.hide_category", "inspect.hide_type",
   "inspect.isolate", "inspect.isolate_subtree", "inspect.isolate_category", "inspect.isolate_type",
-  "inspect.ghost_others", "inspect.translucent", "inspect.translucent_subtree", "inspect.reset",
+  "inspect.ghost_others", "inspect.translucent", "inspect.translucent_subtree", "inspect.reset", "-",
+  "overlap.find", "view.set_virtual_volumes", "clearance.set_rule_set",
 ]
 
 [[menu]]

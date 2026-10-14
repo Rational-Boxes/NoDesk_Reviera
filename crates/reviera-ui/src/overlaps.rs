@@ -135,9 +135,17 @@ impl Gui {
             "move_a" => {
                 Some(json!({ "a": o["a"], "b": o["b"], "mode": "move_apart", "moves": "a" }))
             }
-            mode @ ("cut_a" | "cut_b" | "join" | "intersect" | "union") => {
-                Some(json!({ "a": o["a"], "b": o["b"], "mode": mode }))
+            mode @ ("cut_a" | "cut_b" | "intersect") => {
+                // A tool made only to shape the cut (a slot's cutter) can be hidden.
+                let tool = if mode == "cut_b" { &a_label } else { &b_label };
+                let hide = super::ask(
+                    &frame,
+                    &format!("Hide {tool}'s own body? (Yes when it only shapes the cut.)"),
+                );
+                let tools = if hide { "hide" } else { "keep" };
+                Some(json!({ "a": o["a"], "b": o["b"], "mode": mode, "tools": tools }))
             }
+            mode @ ("join" | "union") => Some(json!({ "a": o["a"], "b": o["b"], "mode": mode })),
             _ => None,
         };
         if let Some(args) = resolve {
@@ -221,6 +229,54 @@ impl Gui {
         }
         self.refresh_scene(&frame);
         frame.set_status_text(&format!("Virtual volumes: {next}"), 0);
+    }
+
+    /// View › Accessibility Rules: the project's rule set (`clearance.set_rule_set`).
+    pub(crate) fn choose_rule_set(&mut self) {
+        const SETS: [(&str, &str); 2] = [
+            ("None (door swings only)", "none"),
+            (
+                "ADA 2010 (door maneuvering clearances, 404.2.4.1)",
+                "ada_2010",
+            ),
+        ];
+        let frame = self.frame;
+        let Some(store) = self
+            .doc
+            .and_then(|d| self.app.document(d))
+            .map(|d| d.doc.store().clone())
+        else {
+            return;
+        };
+        let current = match reviera_core::clearances::rule_set(&store) {
+            reviera_core::clearances::RuleSet::None => 0,
+            reviera_core::clearances::RuleSet::Ada2010 => 1,
+        };
+        let labels: Vec<&str> = SETS.iter().map(|s| s.0).collect();
+        let dialog = SingleChoiceDialog::builder(
+            &frame,
+            "The project's accessibility rule set. Its clearances are virtual volumes: \
+             Check Overlaps reports what intrudes on them.",
+            "Accessibility Rules",
+            &labels,
+        )
+        .build();
+        dialog.set_selection(current);
+        if dialog.show_modal() != ID_OK {
+            return;
+        }
+        let Some((label, key)) = usize::try_from(dialog.get_selection())
+            .ok()
+            .and_then(|i| SETS.get(i))
+        else {
+            return;
+        };
+        if let Err(e) = self.run("clearance.set_rule_set", json!({ "standard": key })) {
+            return error(&frame, &format!("The rule set was not changed:\n{e}"));
+        }
+        self.reveal_virtual_volumes();
+        self.refresh_scene(&frame);
+        frame.set_status_text(&format!("Accessibility rules: {label}"), 0);
     }
 
     /// Shows virtual volumes translucent in the active view if they are hidden.

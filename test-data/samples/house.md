@@ -39,7 +39,7 @@ Start with **File › New**. The model has Level 1 at 0.
     over the deck, it stands on the boards.
 12. **Plans.** View › **Floor Plan**: Level 1 and Level 2.
 
-Check: View › Coordination › **Check Overlaps** reports none.
+Check: View › **Check Overlaps** reports none.
 
 ## Gaps
 

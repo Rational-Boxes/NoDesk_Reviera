@@ -27,10 +27,8 @@ Start with **File › New**, and open a Level 1 plan (View › Floor Plan).
    - Draw a cutter: a wall from (0, -600) to (0, 6000). In Properties › Type choose Duplicate
      Type… (*Slot cutter 800*) and set Width 800; under Constraints set Base Offset 6400 and
      Unconnected Height 6000.
-   - View › Coordination › **Check Overlaps**: pick *dome × cutter*, then *Cut … by …* (the dome
-     by the cutter).
-   - **[gap: the cutter's body should then be hidden (`tools: hide`); the resolve dialog cannot
-     ask for it]**
+   - View › **Check Overlaps**: pick *dome × cutter*, then *Cut … by …* (the dome by the
+     cutter), and answer **Yes** to hiding the cutter's own body.
 8. **The annex.** Wall: (8000, -3000) up to (8000, 3000), along to (16000, 3000), down to (16000,
    -3000), back to the start; Unconnected Height 3200. A door in the south wall at its middle, windows either
    side.
@@ -42,15 +40,12 @@ Start with **File › New**, and open a Level 1 plan (View › Floor Plan).
     (2000, -9500), (9000, -7500), (13000, -8500), (17000, -7000), Enter. Height 1200.
 12. **The turret.** Scripts › **Castle Turret**; in its dialog: Centre X 19000, Centre Y 5500,
     Radius 1600, Sides 16, Wall Height 6500, Top *Onion dome*, Roof Height 3000, Arrow Slits 3.
-13. **Accessibility rules.** Set the project's rule set to ADA 2010 (door maneuvering
-    clearances); View › Coordination › **Virtual Volumes** shows them.
-    **[gap: the rule set has no UI]**
+13. **Accessibility rules.** View › **Accessibility Rules** › *ADA 2010* (door maneuvering
+    clearances); View › **Virtual Volumes** shows them hidden, translucent or solid.
 
-Check: View › Coordination › **Check Overlaps** reports none.
+Check: View › **Check Overlaps** reports none.
 
 ## Gaps
 
 - **Sketching curves:** Pick Walls on a curved wall should take its curve; sketches need Arc and
   Circle tools.
-- **Resolve dialog:** cutting or intersecting cannot hide the tool's body.
-- **Accessibility rule set:** no UI to choose it.

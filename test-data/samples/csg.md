@@ -13,7 +13,7 @@ Start with **File › New**, and open a Level 1 plan (View › Floor Plan).
      0), 3000 high (the tool's default);
    - pier B: the Wall tool with type *Pier 600*, from (x, −1000) to (x, 1000); then select the
      piers and set Unconnected Height 4500.
-3. **Resolve each pair.** View › Coordination › **Check Overlaps**, pick the pair, then in the
+3. **Resolve each pair.** View › **Check Overlaps**, pick the pair, then in the
    *Resolve Overlap* dialog:
    1. leave the first unresolved;
    2. *Cut A by B*;
@@ -26,7 +26,7 @@ Start with **File › New**, and open a Level 1 plan (View › Floor Plan).
 4. **Labels.** Annotate › **Text**: click below each pair and type its name (*1. Unresolved*,
    *2. Cut A by B*, …).
 
-Check: View › Coordination › **Check Overlaps** lists exactly one overlap (the unresolved pair).
+Check: View › **Check Overlaps** lists exactly one overlap (the unresolved pair).
 
 ## Gaps
 

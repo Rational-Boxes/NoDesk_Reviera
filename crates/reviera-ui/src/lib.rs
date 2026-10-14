@@ -3368,6 +3368,7 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "ui.scripts.manage" => with(gui, Gui::manage_scripts),
         "geometry.remove_boolean" => with(gui, Gui::remove_booleans),
         "view.set_virtual_volumes" => with(gui, Gui::cycle_virtual_volumes),
+        "clearance.set_rule_set" => with(gui, Gui::choose_rule_set),
         "stair.spiral" => with(gui, |g| {
             g.start_stair_tool(true);
             focus(g);
