@@ -45,7 +45,9 @@ The KIT FZK *AC20-Institute-Var-2* sample model (`test-data/ifc/`) open in Revie
 
 - **Walls**: *Architecture > Wall* draws chains of straight walls on a level, snapping to wall ends,
   midpoints, wall lines and 15° angles; type a length (`4.5 m`, `12' 6"`) and press Enter, and
-  Spacebar flips the exterior side. Walls appear at once,
+  Spacebar flips the exterior side. A selected wall's Properties edit its base and top (level,
+  offsets, unconnected height: `wall.set_constraints`) and its type (choose, Duplicate Type…,
+  width); with the Wall tool running, the type row picks the type new walls get. Walls appear at once,
   regenerated from their recipe (`wall.create`, `wall.set_location`). Walls that meet join at
   mitred L corners and T junctions (`wall.set_join_allowed` turns a join off). Saving writes standard IFC
   (`IfcWall` with an `Axis` and a `SweptSolid` body, typed, contained in its storey and
@@ -56,7 +58,8 @@ The KIT FZK *AC20-Institute-Var-2* sample model (`test-data/ifc/`) open in Revie
   and Spacebar flips a door's hand. Walls are cut, plans show door swings, and each new door or
   window gets the next Mark. A new one fits the wall where it lands: it slides or shrinks into
   the free gap, and on a dormer it rises above the main roof and shrinks under the dormer roof
-  (the preview shows the fitted size). Drag a selected one along its wall; edit its sill height,
+  (the preview shows the fitted size). Drag a selected one along its wall, or type its distance
+  from either end of the wall (`insert.set_position`); edit its sill height,
   own width and height, flips and type (with door and window types to duplicate and resize) in
   Properties (`insert.set_size`). Saved as
   `IfcDoor`/`IfcWindow` filling an `IfcOpeningElement` that voids the wall (`door.place`,
