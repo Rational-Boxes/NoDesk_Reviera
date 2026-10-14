@@ -198,6 +198,8 @@ impl Gui {
             reviera_render::plan::Weights {
                 cut: cut.map(|w| w as f32),
                 projection: projection as f32,
+                // Temporarily translucent (or ghosted) elements fade toward the paper.
+                opacity: visibility.opacity(element).unwrap_or(1.0),
             }
         };
         let mut graphics =

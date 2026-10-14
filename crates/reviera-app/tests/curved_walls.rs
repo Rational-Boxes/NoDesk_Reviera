@@ -99,6 +99,7 @@ fn a_round_room_of_curved_walls() {
             reviera_render::plan::Weights {
                 cut: Some(0.5),
                 projection: 0.25,
+                opacity: 1.0,
             }
         });
         let walls = [north, south];

@@ -29,11 +29,24 @@ pub struct Lines {
 pub type Edge = (Option<reviera_core::ElementId>, [[f32; 3]; 2]);
 
 /// Line widths of an element in paper millimetres: cut lines (`None` if its category is not cut)
-/// and projection lines.
+/// and projection lines; and its opacity in the view (1 drawn as is; less for a temporarily
+/// translucent or ghosted element, faded toward the paper).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Weights {
     pub cut: Option<f32>,
     pub projection: f32,
+    pub opacity: f32,
+}
+
+/// A colour faded toward white paper by `opacity` (1 leaves it as it is).
+pub fn fade(c: [f32; 4], opacity: f32) -> [f32; 4] {
+    let a = opacity.clamp(0.0, 1.0);
+    [
+        c[0] * a + (1.0 - a),
+        c[1] * a + (1.0 - a),
+        c[2] * a + (1.0 - a),
+        c[3],
+    ]
 }
 
 /// A cut edge in plan and the element it belongs to.
@@ -327,15 +340,17 @@ pub fn plan_graphics(
             continue;
         }
         // Elements whose category is not cut are drawn in projection only.
-        let Some(cut_width) = weights(m.element).cut else {
+        let w = weights(m.element);
+        let Some(cut_width) = w.cut else {
             continue;
         };
         for [a, b] in &segments {
-            add(CUT_LINE, cut_width, [[a[0], a[1], cut], [b[0], b[1], cut]]);
+            add(fade(CUT_LINE, w.opacity), cut_width, [[a[0], a[1], cut], [b[0], b[1], cut]]);
         }
         cut_edges.extend(segments.iter().map(|s| (m.element, *s)));
         let (loops, _) = chains(&segments);
-        let filled = fill(&loops, cut, m.element);
+        let mut filled = fill(&loops, cut, m.element);
+        filled.color = fade(filled.color, w.opacity);
         if !filled.indices.is_empty() {
             poche.push(filled);
         }
@@ -348,9 +363,9 @@ pub fn plan_graphics(
         (cut, bottom)
     };
     for (element, segment) in edges {
-        let width = weights(*element).projection;
+        let w = weights(*element);
         for s in clip_segments(&[*segment], lo, hi) {
-            add(PROJECTION_LINE, width, s);
+            add(fade(PROJECTION_LINE, w.opacity), w.projection, s);
         }
     }
     PlanGraphics {
@@ -371,6 +386,7 @@ mod tests {
     const WEIGHTS: fn(Option<reviera_core::ElementId>) -> Weights = |_| Weights {
         cut: Some(0.5),
         projection: 0.18,
+        opacity: 1.0,
     };
 
     /// A closed box as a mesh (8 corners, 12 triangles).
@@ -414,6 +430,22 @@ mod tests {
                     / 2.0
             })
             .sum()
+    }
+
+    #[test]
+    fn translucent_elements_fade_toward_the_paper() {
+        let mut wall = cube([0.0, 0.0, 0.0], [4.0, 0.2, 3.0]);
+        wall.element = Some(reviera_core::ElementId(7));
+        let scene = RenderScene { meshes: vec![wall] };
+        let half = |_: Option<reviera_core::ElementId>| Weights {
+            opacity: 0.25,
+            ..WEIGHTS(None)
+        };
+        let g = plan_graphics(&scene, &feature_edges(&scene), 1.2, 0.0, 100.0, &half);
+        assert_eq!(g.poche[0].color, fade(POCHE, 0.25));
+        assert!(g.poche[0].color[0] > 0.7, "{:?}", g.poche[0].color);
+        assert!(g.lines.iter().all(|l| l.color[0] >= 0.75 - 1e-6), "{:?}", g.lines);
+        assert_eq!(fade(CUT_LINE, 1.0), CUT_LINE);
     }
 
     #[test]
