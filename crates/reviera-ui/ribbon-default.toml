@@ -407,6 +407,18 @@ icon = "rectangle"
 help = "Draw a rectangle of boundary lines"
 
 [[action]]
+id = "sketch.arc"
+label = "Arc"
+icon = "sketch_arc"
+help = "Draw an arc: its start, its end, then a point on it"
+
+[[action]]
+id = "sketch.circle"
+label = "Circle"
+icon = "sketch_circle"
+help = "Draw a circle: its centre, then a point on it"
+
+[[action]]
 id = "sketch.finish"
 label = "Finish Edit Mode"
 icon = "finish"
@@ -1086,6 +1098,8 @@ panels = [
     { action = "sketch.pick_walls", size = "large" },
     { action = "sketch.line", size = "small" },
     { action = "sketch.rectangle", size = "small" },
+    { action = "sketch.arc", size = "small" },
+    { action = "sketch.circle", size = "small" },
   ] },
 ]
 
@@ -1142,6 +1156,8 @@ panels = [
     { action = "sketch.pick_walls", size = "large" },
     { action = "sketch.line", size = "small" },
     { action = "sketch.rectangle", size = "small" },
+    { action = "sketch.arc", size = "small" },
+    { action = "sketch.circle", size = "small" },
     { action = "sketch.defines_slope", size = "large" },
     { action = "sketch.overhang", size = "small" },
   ] },

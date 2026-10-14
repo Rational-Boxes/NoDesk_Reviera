@@ -50,6 +50,8 @@ pub const UI_ACTIONS: &[&str] = &[
     "wall.create_spline",
     "railing.add_double_gate",
     "sketch.rectangle",
+    "sketch.arc",
+    "sketch.circle",
     "sketch.finish",
     "sketch.cancel",
     "ceiling.sketch",

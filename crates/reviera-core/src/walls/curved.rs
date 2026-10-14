@@ -66,16 +66,16 @@ impl Path {
             [d[0] / l, d[1] / l]
         };
         let d = match k {
-            // At the ends, the first (last) segment's direction turned as far again as the next
-            // point's tangent turns from it: exact on an arc.
-            0 if n >= 2 => {
-                let (d0, t1) = (self.direction(0), inner(1));
-                [2.0 * d0[0] - t1[0], 2.0 * d0[1] - t1[1]]
-            }
-            k if k >= n && n >= 2 => {
-                let (d1, t1) = (self.direction(n - 1), inner(n - 1));
-                [2.0 * d1[0] - t1[0], 2.0 * d1[1] - t1[1]]
-            }
+            // At the ends, square to the radius of the circle through the end's three points:
+            // exact on an arc.
+            0 if n >= 2 => end_tangent(
+                [self.points[0], self.points[1], self.points[2]],
+                self.direction(0),
+            ),
+            k if k >= n && n >= 2 => end_tangent(
+                [self.points[n], self.points[n - 1], self.points[n - 2]],
+                self.direction(n - 1),
+            ),
             0 => self.direction(0),
             k if k >= n => self.direction(n - 1),
             k => inner(k),
@@ -136,6 +136,20 @@ impl Path {
                 [p[0] + m[0] * d * scale, p[1] + m[1] * d * scale]
             })
             .collect()
+    }
+}
+
+/// The tangent at `p[0]` of the circle through `p`, the way `along` runs (along it when the
+/// points are in line).
+fn end_tangent(p: [[f64; 2]; 3], along: [f64; 2]) -> [f64; 2] {
+    let Some((c, _)) = circle(p[0], p[1], p[2]) else {
+        return along;
+    };
+    let t = [-(p[0][1] - c[1]), p[0][0] - c[0]];
+    if t[0] * along[0] + t[1] * along[1] < 0.0 {
+        [-t[0], -t[1]]
+    } else {
+        t
     }
 }
 

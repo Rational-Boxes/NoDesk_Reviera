@@ -23,6 +23,14 @@ fn edit(curves: &mut [Curve], f: impl FnOnce(&mut [Line]) -> Vec<usize>) {
 
 /// Moves curve `i` across itself by `v`; its neighbours stretch or shorten to meet it.
 pub fn move_curve(curves: &mut [Curve], i: usize, v: [f64; 2]) {
+    // A curved curve's points move across its chord with it.
+    let l = curves[i].line;
+    let len = (l.end[0] - l.start[0]).hypot(l.end[1] - l.start[1]).max(1e-12);
+    let n = [-(l.end[1] - l.start[1]) / len, (l.end[0] - l.start[0]) / len];
+    let d = v[0] * n[0] + v[1] * n[1];
+    for p in &mut curves[i].through {
+        *p = [p[0] + n[0] * d, p[1] + n[1] * d];
+    }
     edit(curves, |l| reviera_core::sketch_edit::move_curve(l, i, v));
 }
 
@@ -56,7 +64,14 @@ pub fn nearest(curves: &[Curve], p: [f64; 2], reach: f64) -> Option<(usize, Opti
     curves
         .iter()
         .enumerate()
-        .map(|(i, c)| (i, segment_distance(p, c.line)))
+        .map(|(i, c)| {
+            let d = c
+                .points()
+                .windows(2)
+                .map(|w| segment_distance(p, Line { start: w[0], end: w[1] }))
+                .fold(f64::INFINITY, f64::min);
+            (i, d)
+        })
         .filter(|(_, dist)| *dist <= reach)
         .min_by(|a, b| a.1.total_cmp(&b.1))
         .map(|(i, _)| (i, None))

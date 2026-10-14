@@ -279,6 +279,12 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "remove_boolean" => format!(
             r#"<rect x="4" y="9" width="15" height="15" fill="{f}" {s}/><rect x="13" y="4" width="15" height="15" fill="none" {s}/><path d="M20 22l8 8M28 22l-8 8" {sa}/>"#
         ),
+        "sketch_arc" => format!(
+            r#"<path d="M5 25A13 13 0 0 1 27 25" fill="none" {sa}/><circle cx="5" cy="25" r="2" fill="{a}"/><circle cx="27" cy="25" r="2" fill="{a}"/>"#
+        ),
+        "sketch_circle" => format!(
+            r#"<circle cx="16" cy="16" r="11" fill="none" {sa}/><path d="M16 16h11" {s}/><circle cx="16" cy="16" r="1.5" fill="{a}"/>"#
+        ),
         "accessibility" => format!(
             r#"<circle cx="14" cy="5" r="2.5" fill="{a}"/><path d="M14 9v9h7l3 7" fill="none" {sa}/><path d="M9 13h10" {s}/><path d="M11 15a7 7 0 1 0 8 9" fill="none" {s}/>"#
         ),

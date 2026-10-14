@@ -3442,12 +3442,15 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         }),
         "sketch.finish" => with(gui, Gui::finish_sketch),
         "sketch.cancel" => with(gui, Gui::cancel_sketch),
-        "sketch.select" | "sketch.pick_walls" | "sketch.line" | "sketch.rectangle" => {
+        "sketch.select" | "sketch.pick_walls" | "sketch.line" | "sketch.rectangle" | "sketch.arc"
+        | "sketch.circle" => {
             with(gui, |g| {
                 let mode = match action {
                     "sketch.select" => sketch::DrawMode::Select,
                     "sketch.pick_walls" => sketch::DrawMode::PickWalls,
                     "sketch.line" => sketch::DrawMode::Line,
+                    "sketch.arc" => sketch::DrawMode::Arc,
+                    "sketch.circle" => sketch::DrawMode::Circle,
                     _ => sketch::DrawMode::Rectangle,
                 };
                 g.set_draw_mode(mode);

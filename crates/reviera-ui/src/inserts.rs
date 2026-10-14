@@ -138,15 +138,28 @@ impl Gui {
         let (o, d) = v
             .camera
             .ray(x as f32, y as f32, size.width as f32, size.height as f32);
-        let side = |g: &reviera_core::walls::WallGeometry, p: [f64; 2]| {
-            let n = g.normal();
-            (p[0] - g.start[0]) * n[0] + (p[1] - g.start[1]) * n[1] >= 0.0
+        // The point of the wall's location curve nearest `p`, its direction there, and
+        // whether `p` is on its +normal (left) side.
+        let nearest = |e: &reviera_core::Element, g: &reviera_core::walls::WallGeometry, p: [f64; 2]| {
+            let path = reviera_core::walls::wall_recipe(e)
+                .and_then(|r| reviera_core::walls::curved::path_of(&r));
+            let (foot, u) = match path {
+                Some(path) => path.at(path.project(p)),
+                None => {
+                    let u = g.direction();
+                    let t = ((p[0] - g.start[0]) * u[0] + (p[1] - g.start[1]) * u[1])
+                        .clamp(0.0, g.length());
+                    ([g.start[0] + u[0] * t, g.start[1] + u[1] * t], u)
+                }
+            };
+            let left = u[0] * (p[1] - foot[1]) - u[1] * (p[0] - foot[0]) >= 0.0;
+            (foot, u, left)
         };
         if let Some(plan) = &v.plan {
             // In a plan: the nearest wall cut by the plan, within its faces plus a few pixels.
             let cut = plan.range.cut;
             let point = [f64::from(o.x), f64::from(o.y)];
-            let mut best: Option<(f64, ElementId)> = None;
+            let mut best: Option<(f64, ElementId, bool)> = None;
             for e in store.iter() {
                 if reviera_core::walls::wall_recipe(e).is_none() {
                     continue;
@@ -157,12 +170,9 @@ impl Gui {
                 if cut < g.base_z || cut > g.base_z + g.height {
                     continue;
                 }
-                let seg = [g.start, g.end];
+                let (foot, u, left) = nearest(e, &g, point);
+                let seg = [foot, [foot[0] + u[0] * 1e-3, foot[1] + u[1] * 1e-3]];
                 let px = self.pixel_distance(x, y, seg, cut as f32);
-                let u = g.direction();
-                let t = ((point[0] - g.start[0]) * u[0] + (point[1] - g.start[1]) * u[1])
-                    .clamp(0.0, g.length());
-                let foot = [g.start[0] + u[0] * t, g.start[1] + u[1] * t];
                 let model = (point[0] - foot[0]).hypot(point[1] - foot[1]);
                 // Pixels per metre here, to widen the wall by a few pixels.
                 let per_px = if px > 1e-3 {
@@ -172,12 +182,11 @@ impl Gui {
                 };
                 let reach = g.width / 2.0 + f64::from(NEAR_PX) * per_px;
                 if model <= reach && best.is_none_or(|b| model < b.0) {
-                    best = Some((model, e.id()));
+                    best = Some((model, e.id(), left));
                 }
             }
-            let (_, id) = best?;
-            let g = reviera_core::walls::regenerate(store, store.get(id)?).ok()?;
-            return Some((id, point, side(&g, point)));
+            let (_, id, left) = best?;
+            return Some((id, point, left));
         }
         // In 3D: the wall face under the cursor.
         let (i, t) = self
@@ -189,7 +198,7 @@ impl Gui {
         let g = reviera_core::walls::regenerate(store, e).ok()?;
         let hit = o + d * t;
         let point = [f64::from(hit.x), f64::from(hit.y)];
-        Some((id, point, side(&g, point)))
+        Some((id, point, nearest(e, &g, point).2))
     }
 
     /// The insert the tool would place at pixel (`x`, `y`): centred on the cursor along the

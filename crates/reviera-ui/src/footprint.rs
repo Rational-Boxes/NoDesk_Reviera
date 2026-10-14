@@ -47,10 +47,16 @@ impl Gui {
             }
         }
         for (i, c) in curves.iter().enumerate() {
-            let m = [
-                (c.line.start[0] + c.line.end[0]) / 2.0,
-                (c.line.start[1] + c.line.end[1]) / 2.0,
-            ];
+            // On a curved edge, the grip sits on the curve.
+            let pts = c.points();
+            let m = if c.is_curved() {
+                pts[pts.len() / 2]
+            } else {
+                [
+                    (c.line.start[0] + c.line.end[0]) / 2.0,
+                    (c.line.start[1] + c.line.end[1]) / 2.0,
+                ]
+            };
             out.push((SketchDrag::Curve(i), m));
         }
         out
@@ -111,11 +117,16 @@ impl Gui {
             width: 0.5,
             segments: curves
                 .iter()
-                .map(|c| {
-                    [
-                        [c.line.start[0] as f32, c.line.start[1] as f32, z],
-                        [c.line.end[0] as f32, c.line.end[1] as f32, z],
-                    ]
+                .flat_map(|c| {
+                    c.points()
+                        .windows(2)
+                        .map(|w| {
+                            [
+                                [w[0][0] as f32, w[0][1] as f32, z],
+                                [w[1][0] as f32, w[1][1] as f32, z],
+                            ]
+                        })
+                        .collect::<Vec<_>>()
                 })
                 .collect(),
         };

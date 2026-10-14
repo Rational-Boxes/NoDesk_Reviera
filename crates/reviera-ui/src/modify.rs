@@ -810,10 +810,12 @@ impl Gui {
         // A roof's, floor's or ceiling's outline, and grips at its corners and edge middles.
         let curves = self.footprint().map(|f| f.2).unwrap_or_default();
         for c in &curves {
-            let (a, b) = (c.line.start, c.line.end);
-            lines
-                .segments
-                .push([[a[0] as f32, a[1] as f32, z], [b[0] as f32, b[1] as f32, z]]);
+            for w in c.points().windows(2) {
+                let (a, b) = (w[0], w[1]);
+                lines
+                    .segments
+                    .push([[a[0] as f32, a[1] as f32, z], [b[0] as f32, b[1] as f32, z]]);
+            }
         }
         let footprint: Vec<[f64; 2]> = Self::footprint_grips(&curves)
             .into_iter()

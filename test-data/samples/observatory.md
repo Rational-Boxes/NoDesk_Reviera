@@ -13,9 +13,8 @@ Start with **File › New**, and open a Level 1 plan (View › Floor Plan).
 2. **Door and windows on the curve.** Architecture › **Door**: hover the south arc at its
    lowest point and click. **Window**: three on the north arc (north-west, north-east, north),
    one on the south arc (south-west); set each Sill Height to 1600 in Properties.
-3. **Floor.** Architecture › **Floor**: Pick Walls on the drum's inner faces.
-   **[gap: Pick Walls takes a curved wall's chord, not its curve; and sketches have no circle
-   or arc tool]**
+3. **Floor.** Architecture › **Floor**: hover just inside the drum and press Tab (Pick Walls
+   takes both arcs' inner faces, as curves), then Finish. Or draw it with Draw › **Circle**.
 4. **Room.** Architecture › **Room**: click inside the drum. Set its Name to *Observation* in
    Properties.
 5. **The dome.** Architecture › **Dome** › *Circle*, *Hemisphere*: click the centre and a point
@@ -47,5 +46,4 @@ Check: View › **Check Overlaps** reports none.
 
 ## Gaps
 
-- **Sketching curves:** Pick Walls on a curved wall should take its curve; sketches need Arc and
-  Circle tools.
+None: every step has its UI.

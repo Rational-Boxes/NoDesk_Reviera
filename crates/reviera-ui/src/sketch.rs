@@ -6,13 +6,16 @@
 //! the cursor, or a sketch).
 //!
 //! Sketch mode: a modal session in a plan with
-//! its own contextual tab (Draw: Pick Walls, Line, Rectangle; Mode: Finish, Cancel).
+//! its own contextual tab (Draw: Pick Walls, Line, Rectangle, Arc, Circle; Mode: Finish,
+//! Cancel).
 //!
 //! - **Pick Walls** (the default) takes the face of the wall on the cursor's side, locked so the
 //!   floor follows the wall; Tab takes the whole chain of joined walls on that side.
 //! - **Line** draws chained lines, snapping like the drawing tools; clicking the chain's first
 //!   point closes it.
 //! - **Rectangle** takes two corners.
+//! - **Arc** takes its start, its end and a point on it; **Circle** its centre and a point on
+//!   it (two half arcs). A curved wall picked with Pick Walls gives its face's curve.
 //! - **Defines Slope** (roofs) switches the clicked curve between sloping and gable. Slope-defining
 //!   curves show a triangle. Walls picked for a roof take the session's overhang.
 //!
@@ -44,6 +47,10 @@ pub enum DrawMode {
     PickWalls,
     Line,
     Rectangle,
+    /// Start, end, then a point on the arc.
+    Arc,
+    /// Centre, then a point on the circle.
+    Circle,
     /// Click a roof footprint curve to switch it between sloping and gable.
     DefinesSlope,
 }
@@ -62,6 +69,8 @@ pub enum SketchKind {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Curve {
     pub line: Line,
+    /// Points it passes through between its ends: an arc (one) or a spline (more).
+    pub through: Vec<[f64; 2]>,
     pub lock: Option<(ElementId, String)>,
     pub gable: bool,
     pub overhang: f64,
@@ -72,11 +81,34 @@ impl Curve {
     pub fn new(line: Line, lock: Option<(ElementId, String)>) -> Self {
         Self {
             line,
+            through: Vec::new(),
             lock,
             gable: false,
             overhang: 0.0,
             slope: None,
         }
+    }
+}
+
+impl Curve {
+    /// A curve from `line`'s start to its end through `through`.
+    pub fn curved(line: Line, through: Vec<[f64; 2]>, lock: Option<(ElementId, String)>) -> Self {
+        Self {
+            through,
+            ..Self::new(line, lock)
+        }
+    }
+
+    /// Its polyline from start to end (sampled when curved).
+    pub fn points(&self) -> Vec<[f64; 2]> {
+        let mut pts = vec![self.line.start];
+        pts.extend(reviera_core::sketch::interior(self.line, &self.through));
+        pts.push(self.line.end);
+        pts
+    }
+
+    pub fn is_curved(&self) -> bool {
+        !self.through.is_empty()
     }
 }
 
@@ -279,6 +311,11 @@ impl Gui {
             }
             DrawMode::Rectangle if s.corner.is_none() => "Rectangle: click the first corner",
             DrawMode::Rectangle => "Rectangle: click the opposite corner",
+            DrawMode::Arc if s.chain_start.is_none() => "Arc: click its start",
+            DrawMode::Arc if s.last.is_none() => "Arc: click its end",
+            DrawMode::Arc => "Arc: click a point on the arc",
+            DrawMode::Circle if s.corner.is_none() => "Circle: click its centre",
+            DrawMode::Circle => "Circle: click a point on it",
             DrawMode::DefinesSlope => "Defines Slope: click a curve to make it slope or a gable",
         };
         let verb = match (s.host, s.kind) {
@@ -308,6 +345,32 @@ impl Gui {
         } else {
             "face:int"
         };
+        // A curved wall's face: its curve, through points along it.
+        if let Some(path) = reviera_core::walls::curved::path_of(&recipe) {
+            let solved = reviera_core::walls::solve(store);
+            let ([minus, plus], _) = reviera_core::walls::curved::outline(
+                &path,
+                g.width,
+                reviera_core::walls::curved::ends_of(&solved, wall),
+            );
+            let pts = if plus_side { plus } else { minus };
+            let n = pts.len();
+            // An arc's face is an arc through its middle; a spline's, through points along it.
+            let through: Vec<[f64; 2]> = if recipe.through.len() == 1 {
+                vec![pts[n / 2]]
+            } else {
+                let step = (n / 24).max(1);
+                (step..n - 1).step_by(step).map(|k| pts[k]).collect()
+            };
+            return Some(Curve::curved(
+                Line {
+                    start: pts[0],
+                    end: pts[n - 1],
+                },
+                through,
+                Some((wall, sub.to_owned())),
+            ));
+        }
         let n = g.normal();
         let s = if plus_side { 1.0 } else { -1.0 } * g.width / 2.0;
         let shift = |p: [f64; 2]| [p[0] + n[0] * s, p[1] + n[1] * s];
@@ -325,19 +388,40 @@ impl Gui {
         let Some(store) = self.doc.and_then(|d| self.app.document(d)) else {
             return vec![wall];
         };
-        let solved = reviera_core::walls::solve(store.doc.store());
+        let store = store.doc.store();
+        let solved = reviera_core::walls::solve(store);
+        // Location ends, for walls that meet in line (a round room's arcs) without a join.
+        let ends: Vec<(ElementId, [[f64; 2]; 2])> = store
+            .iter()
+            .filter_map(|e| {
+                let r = reviera_core::walls::wall_recipe(e)?;
+                Some((e.id(), [r.curve.start, r.curve.end]))
+            })
+            .collect();
+        let meets = |a: [[f64; 2]; 2], b: [[f64; 2]; 2]| {
+            a.iter()
+                .any(|p| b.iter().any(|q| (p[0] - q[0]).hypot(p[1] - q[1]) < 1e-3))
+        };
         let mut chain = vec![wall];
         let mut i = 0;
         while i < chain.len() {
-            for j in solved.joins_of(chain[i]) {
+            let mut next: Vec<ElementId> = solved
+                .joins_of(chain[i])
+                .into_iter()
                 // End-to-end joins only (L corners), not T junctions.
-                if j.other_end.is_none() {
-                    continue;
-                }
-                for w in [j.wall, j.other] {
-                    if !chain.contains(&w) {
-                        chain.push(w);
-                    }
+                .filter(|j| j.other_end.is_some())
+                .flat_map(|j| [j.wall, j.other])
+                .collect();
+            if let Some((_, mine)) = ends.iter().find(|(id, _)| *id == chain[i]) {
+                next.extend(
+                    ends.iter()
+                        .filter(|(_, theirs)| meets(*mine, *theirs))
+                        .map(|(id, _)| *id),
+                );
+            }
+            for w in next {
+                if !chain.contains(&w) {
+                    chain.push(w);
                 }
             }
             i += 1;
@@ -378,7 +462,18 @@ impl Gui {
                 c[1] + (g.start[1] + g.end[1]) / 2.0 / n,
             ]
         });
-        let toward = |g: &reviera_core::walls::WallGeometry, p: [f64; 2]| {
+        let paths: std::collections::HashMap<ElementId, reviera_core::walls::curved::Path> = walls
+            .iter()
+            .filter_map(|w| {
+                let r = reviera_core::walls::wall_recipe(store.get(*w)?)?;
+                Some((*w, reviera_core::walls::curved::path_of(&r)?))
+            })
+            .collect();
+        let toward_wall = |w: ElementId, g: &reviera_core::walls::WallGeometry, p: [f64; 2]| {
+            if let Some(path) = paths.get(&w) {
+                let (q, u) = path.at(path.project(p));
+                return u[0] * (p[1] - q[1]) - u[1] * (p[0] - q[0]) >= 0.0;
+            }
             let nn = g.normal();
             (p[0] - g.start[0]) * nn[0] + (p[1] - g.start[1]) * nn[1] >= 0.0
         };
@@ -386,11 +481,11 @@ impl Gui {
         let inside = geoms
             .iter()
             .find(|(w, _)| *w == wall)
-            .is_some_and(|(_, g)| toward(g, centre) == toward(g, point));
+            .is_some_and(|(w, g)| toward_wall(*w, g, centre) == toward_wall(*w, g, point));
         geoms
             .iter()
             .filter_map(|(w, g)| {
-                let plus = toward(g, centre) == inside;
+                let plus = toward_wall(*w, g, centre) == inside;
                 self.face_curve(*w, plus)
             })
             .collect()
@@ -476,6 +571,54 @@ impl Gui {
                     s.curves[i].gable = !s.curves[i].gable;
                 }
             }
+            DrawMode::Arc => {
+                let Some(p) = p else { return };
+                let s = self.sketch.as_mut().expect("checked");
+                match (s.chain_start, s.last) {
+                    (None, _) => s.chain_start = Some(p),
+                    (Some(a), None) if a != p => s.last = Some(p),
+                    (Some(a), Some(b)) => {
+                        let line = Line { start: a, end: b };
+                        if reviera_core::sketch::interior(line, &[p]).is_empty() {
+                            return self.frame.set_status_text(
+                                "Arc: the point must be off the line between the ends",
+                                0,
+                            );
+                        }
+                        s.curves.push(Curve::curved(line, vec![p], None));
+                        s.chain_start = None;
+                        s.last = None;
+                    }
+                    _ => {}
+                }
+            }
+            DrawMode::Circle => {
+                let Some(p) = p else { return };
+                let s = self.sketch.as_mut().expect("checked");
+                match s.corner.take() {
+                    None => s.corner = Some(p),
+                    Some(c) => {
+                        let r = (p[0] - c[0]).hypot(p[1] - c[1]);
+                        if r < 0.01 {
+                            s.corner = Some(c);
+                        } else {
+                            // Two half arcs, counter-clockwise from the east.
+                            let (e, w) = ([c[0] + r, c[1]], [c[0] - r, c[1]]);
+                            let (n, so) = ([c[0], c[1] + r], [c[0], c[1] - r]);
+                            s.curves.push(Curve::curved(
+                                Line { start: e, end: w },
+                                vec![n],
+                                None,
+                            ));
+                            s.curves.push(Curve::curved(
+                                Line { start: w, end: e },
+                                vec![so],
+                                None,
+                            ));
+                        }
+                    }
+                }
+            }
             DrawMode::Rectangle => {
                 let Some(p) = p else { return };
                 let s = self.sketch.as_mut().expect("checked");
@@ -505,8 +648,17 @@ impl Gui {
     }
 
     fn add_curves(&mut self, picks: Vec<Curve>) {
+        let frame = self.frame;
         let Some(s) = &mut self.sketch else { return };
         for mut c in picks {
+            // Roof footprints are straight (an arched roof or a dome makes the curve).
+            if s.kind == SketchKind::Roof && c.is_curved() {
+                frame.set_status_text(
+                    "Roof footprints are straight: use Arched Roof or Dome over curved walls",
+                    0,
+                );
+                continue;
+            }
             // Walls picked for a roof take the overhang.
             if s.kind == SketchKind::Roof {
                 c.overhang = s.overhang;
@@ -661,7 +813,9 @@ impl Gui {
             segments: Vec::new(),
         };
         for c in &s.curves {
-            sketch.segments.push(seg(c.line.start, c.line.end));
+            for w in c.points().windows(2) {
+                sketch.segments.push(seg(w[0], w[1]));
+            }
             // A roof's slope-defining curves show a triangle on their left (inside a
             // counter-clockwise footprint).
             if s.kind == SketchKind::Roof && !c.gable {
@@ -686,10 +840,15 @@ impl Gui {
             }
             // Locked curves show a small padlock square at their middle.
             if c.lock.is_some() {
-                let m = [
-                    (c.line.start[0] + c.line.end[0]) / 2.0,
-                    (c.line.start[1] + c.line.end[1]) / 2.0,
-                ];
+                let pts = c.points();
+                let m = if c.is_curved() {
+                    pts[pts.len() / 2]
+                } else {
+                    [
+                        (c.line.start[0] + c.line.end[0]) / 2.0,
+                        (c.line.start[1] + c.line.end[1]) / 2.0,
+                    ]
+                };
                 let r = 1.0 * mm;
                 let q = [
                     [m[0] - r, m[1] - r],
@@ -709,7 +868,9 @@ impl Gui {
             segments: Vec::new(),
         };
         if let Some(c) = s.selected.and_then(|i| s.curves.get(i)) {
-            selected.segments.push(seg(c.line.start, c.line.end));
+            for w in c.points().windows(2) {
+                selected.segments.push(seg(w[0], w[1]));
+            }
             let r = 1.2 * mm;
             for p in [c.line.start, c.line.end] {
                 let q = [
@@ -729,16 +890,49 @@ impl Gui {
             segments: Vec::new(),
         };
         for c in &s.hover {
-            hover.segments.push(seg(c.line.start, c.line.end));
+            for w in c.points().windows(2) {
+                hover.segments.push(seg(w[0], w[1]));
+            }
         }
         if let Some(c) = s.cursor.map(|c| c.point) {
-            if let Some(a) = s.last {
-                hover.segments.push(seg(a, c));
-            }
-            if let Some(a) = s.corner {
-                let q = [a, [c[0], a[1]], c, [a[0], c[1]]];
-                for k in 0..4 {
-                    hover.segments.push(seg(q[k], q[(k + 1) % 4]));
+            match s.mode {
+                DrawMode::Arc => {
+                    let pts = match (s.chain_start, s.last) {
+                        (Some(a), None) => vec![a, c],
+                        (Some(a), Some(b)) => {
+                            Curve::curved(Line { start: a, end: b }, vec![c], None).points()
+                        }
+                        _ => Vec::new(),
+                    };
+                    for w in pts.windows(2) {
+                        hover.segments.push(seg(w[0], w[1]));
+                    }
+                }
+                DrawMode::Circle => {
+                    if let Some(o) = s.corner {
+                        let r = (c[0] - o[0]).hypot(c[1] - o[1]);
+                        let ring: Vec<[f64; 2]> = (0..=72)
+                            .map(|k| {
+                                let a = k as f64 / 72.0 * std::f64::consts::TAU;
+                                [o[0] + r * a.cos(), o[1] + r * a.sin()]
+                            })
+                            .collect();
+                        for w in ring.windows(2) {
+                            hover.segments.push(seg(w[0], w[1]));
+                        }
+                        hover.segments.push(seg(o, c));
+                    }
+                }
+                _ => {
+                    if let Some(a) = s.last {
+                        hover.segments.push(seg(a, c));
+                    }
+                    if let Some(a) = s.corner {
+                        let q = [a, [c[0], a[1]], c, [a[0], c[1]]];
+                        for k in 0..4 {
+                            hover.segments.push(seg(q[k], q[(k + 1) % 4]));
+                        }
+                    }
                 }
             }
             let r = 1.5 * mm;
@@ -846,11 +1040,18 @@ impl Gui {
         let Some(c) = s.selected.and_then(|i| s.curves.get(i)).cloned() else {
             return false;
         };
-        let line = c.line;
-        let length = (line.end[0] - line.start[0]).hypot(line.end[1] - line.start[1]);
+        let length: f64 = c
+            .points()
+            .windows(2)
+            .map(|w| (w[1][0] - w[0][0]).hypot(w[1][1] - w[0][1]))
+            .sum();
         grid.append(Property::category("Sketch Curve", "c_skc"));
         let text = self.format_length(length);
         grid.append(Property::string("Length", "skc_length", text));
+        if c.is_curved() {
+            grid.set_property_read_only("skc_length", true);
+            grid.set_help_string("skc_length", "Along the curve; drag its ends to change it");
+        }
         let lock = if c.lock.is_some() {
             "Locked to its wall"
         } else {
@@ -964,6 +1165,9 @@ pub(crate) fn curves_json(kind: SketchKind, curves: &[Curve]) -> Vec<Value> {
         .iter()
         .map(|c| {
             let mut v = json!({ "line": { "start": c.line.start, "end": c.line.end } });
+            if c.is_curved() {
+                v["through"] = json!(c.through);
+            }
             if let Some((e, sub)) = &c.lock {
                 v["lock"] = json!({ "element": e, "sub": sub });
             }
@@ -1018,9 +1222,9 @@ impl Gui {
             .and_then(|g| store.find_by_guid(&g))
             .unwrap_or(ElementId(0));
         let mut curves = Vec::new();
-        for (corners, keys) in reviera_core::sketch::rings(store, &sketch) {
-            for (i, k) in keys.iter().enumerate() {
-                let Some(c) = sketch.curves.iter().find(|c| c.key == *k) else {
+        for lp in reviera_core::sketch::loop_curves(store, &sketch) {
+            for lc in lp {
+                let Some(c) = sketch.curves.iter().find(|c| c.key == lc.key) else {
                     continue;
                 };
                 let lock = c.lock.as_ref().and_then(|l| {
@@ -1028,13 +1232,17 @@ impl Gui {
                         .and_then(|g| store.find_by_guid(&g))?;
                     Some((id, l.sub.clone()))
                 });
-                let line = Line {
-                    start: corners[i],
-                    end: corners[(i + 1) % corners.len()],
+                // A curve following a curved face passes through its points now.
+                let through = if c.through.is_empty() {
+                    Vec::new()
+                } else if lock.is_some() {
+                    lc.interior.clone()
+                } else {
+                    c.through.clone()
                 };
-                let mut curve = Curve::new(line, lock);
+                let mut curve = Curve::curved(lc.line, through, lock);
                 if let Some(r) = &roof {
-                    let edge = r.edge(*k);
+                    let edge = r.edge(lc.key);
                     curve.gable = !edge.defines_slope;
                     curve.overhang = edge.overhang;
                     curve.slope = edge.slope;

@@ -64,9 +64,11 @@ The KIT FZK *AC20-Institute-Var-2* sample model (`test-data/ifc/`) open in Revie
   `element.move`).
 - **Floors**: Architecture › Floor (FL) opens sketch mode on a contextual *Modify | Create Floor
   Boundary* tab: Pick Walls (the face on the cursor's side, locked so the floor follows the
-  wall; Tab picks a chain of joined walls), Line and Rectangle, then Finish or Cancel. The
+  wall; Tab picks a chain of joined walls; a curved wall gives its face's curve), Line,
+  Rectangle, Arc (start, end, a point on it) and Circle, then Finish or Cancel. The
   sketch is checked (open ends, branches, crossings and overlaps are marked), inner loops make
-  holes, and Edit Boundary changes it later. Floors have types with a thickness, a height
+  holes, and Edit Boundary changes it later. Curves pass through points (`through`: an arc or
+  a spline) and follow curved walls' faces. Floors have types with a thickness, a height
   offset, and area, perimeter and volume in Properties; they are saved as `IfcSlab` with an
   extruded profile (`floor.create`, `floor.edit_boundary`, `floor.set_level`).
 - **Ceilings and ceiling plans**: Architecture › Ceiling places an automatic ceiling in the room
