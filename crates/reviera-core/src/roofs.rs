@@ -483,6 +483,17 @@ pub fn regenerate(store: &Store, e: &Element) -> Result<RoofGeometry> {
     for hole in crate::dormers::openings(store, e.guid().as_str()) {
         cut_hole(&mut g, &hole);
     }
+    // A dormer's roof joins the main roof flush: cut along the main roof's top surface
+    // (ARC-ROOF-007), its top meeting the main roof's in valleys.
+    if let Some((n, d)) = crate::dormers::main_top_plane(store, e) {
+        for f in &mut g.faces {
+            f.slab = eaves::clip_plane(&f.slab, n, d);
+            f.faceted = true;
+        }
+        for t in &mut g.trims {
+            t.mesh = eaves::clip_plane(&t.mesh, n, d);
+        }
+    }
     Ok(g)
 }
 

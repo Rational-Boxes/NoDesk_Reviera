@@ -131,8 +131,9 @@ The KIT FZK *AC20-Institute-Var-2* sample model (`test-data/ifc/`) open in Revie
   slope until it meets the main roof. A dormer that would run off its roof face is refused.
   Properties change the style, width, front height, slope and overhang, and the dormer rebuilds;
   deleting it (or its roof) removes its parts (`dormer.create`, `dormer.set`, `dormer.move`).
-  The main roof is cut open below each dormer, inside its walls, and the opening follows the
-  walls. Not yet: the opening as a separate IFC opening element.
+  The dormer roof joins the main roof flush: it reaches back until its top meets the main
+  roof's top and is cut along it, so the two meet in valleys and rain runs off. The main roof
+  is cut open below each dormer, inside its walls, and the opening follows the walls. Not yet: the opening as a separate IFC opening element.
 - **Stairs**: Architecture › Stair (ST) draws a cast-in-place stair in a plan: click the start
   and end of each run while the status bar counts the risers down; the next run starts after an
   automatic landing (straight, L and U arrangements). The riser count is the fewest that keep

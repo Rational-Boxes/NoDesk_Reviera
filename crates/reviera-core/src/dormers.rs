@@ -145,13 +145,18 @@ pub fn placement(store: &Store, roof: &Element, point: [f64; 2]) -> Result<Place
     })
 }
 
-/// The dormer's outline depth up the slope, and the cheek walls' length.
+/// The dormer's outline depth up the slope, and the cheek walls' length. The outline reaches
+/// back until the dormer roof's *top* meets the main roof's top (its ridge, rising plane or flat
+/// top), so the two surfaces join flush along valleys once the dormer roof is cut by the main
+/// roof's top plane; the cheek walls end where the dormer roof's underside meets it.
 pub fn depths(r: &DormerRecipe, p: &Placement, roof_thickness: f64) -> Result<(f64, f64)> {
     let t = p.tan_main;
     let eave = r.front_height / t;
+    // The dormer roof's plumb depth (it uses the main roof's type).
+    let plumb = roof_thickness / r.slope.cos().max(1e-6);
     let depth = match r.style {
         DormerStyle::Gable | DormerStyle::Hip => {
-            (r.front_height + r.width / 2.0 * r.slope.tan()) / t
+            (r.front_height + r.width / 2.0 * r.slope.tan() + plumb) / t
         }
         DormerStyle::Shed => {
             let s = r.slope.tan();
@@ -161,12 +166,12 @@ pub fn depths(r: &DormerRecipe, p: &Placement, roof_thickness: f64) -> Result<(f
                     "a shed dormer's slope must be shallower than the main roof's",
                 ));
             }
-            r.front_height / (t - s)
+            (r.front_height + plumb) / (t - s)
         }
         DormerStyle::Flat => (r.front_height + roof_thickness) / t,
     };
     let cheek = match r.style {
-        DormerStyle::Shed => depth,
+        DormerStyle::Shed => r.front_height / (t - r.slope.tan()),
         _ => eave,
     };
     Ok((depth, cheek))
@@ -324,6 +329,24 @@ fn build(
         })?;
     }
     Ok(parts)
+}
+
+/// The plane of the main roof's top surface under a dormer roof (a dormer part): its upward unit
+/// normal and offset (`n · p = d`).
+pub fn main_top_plane(store: &Store, dormer_roof: &Element) -> Option<([f64; 3], f64)> {
+    let dormer = store.get(store.find_by_guid(&GlobalId::parse(dormer_of(dormer_roof)?)?)?)?;
+    let r = dormer_recipe(dormer)?;
+    let main = store.get(store.find_by_guid(&GlobalId::parse(&r.roof)?)?)?;
+    let g = roofs::regenerate(store, main).ok()?;
+    let f = g.face_at(r.point)?;
+    let n = f.normal;
+    let q = f.bottom[0];
+    let top = [
+        q[0] + n[0] * g.thickness,
+        q[1] + n[1] * g.thickness,
+        q[2] + n[2] * g.thickness,
+    ];
+    Some((n, n[0] * top[0] + n[1] * top[1] + n[2] * top[2]))
 }
 
 /// The openings the dormers on a roof (GlobalId) cut through it, in plan: each the region inside

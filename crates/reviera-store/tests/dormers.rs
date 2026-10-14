@@ -95,14 +95,14 @@ fn dormers_of_every_style_fill_their_gaps() {
     )
     .unwrap_err();
     assert_eq!(err.code, "dormer.does_not_fit");
-    // A gable dormer 2 m wide, its eave 1.2 m above the roof, at 45°.
+    // A gable dormer 2 m wide, its eave 1 m above the roof, at 45°.
     let dormer = id(run(
         &r,
         &mut doc,
         "dormer.create",
         json!({
             "roof_id": main.0, "point": [5.0, 0.5], "style": "gable",
-            "width": 2.0, "front_height": 1.2,
+            "width": 2.0, "front_height": 1.0,
         }),
     )
     .unwrap());
@@ -110,7 +110,7 @@ fn dormers_of_every_style_fill_their_gaps() {
     assert_eq!(ws.len(), 3);
     let g = roofs::regenerate(doc.store(), doc.store().get(droof).unwrap()).unwrap();
     assert_eq!(g.predefined, "GABLE_ROOF");
-    let z_eave = main_top([5.0, 0.5]) + 1.2;
+    let z_eave = main_top([5.0, 0.5]) + 1.0;
     assert!((g.plate - z_eave).abs() < 1e-6);
     // The ridge, 1 m above the eave (half the width at 45°), runs back until it meets the main
     // roof's top surface.
@@ -121,8 +121,23 @@ fn dormers_of_every_style_fill_their_gaps() {
         0.3,
     )
     .unwrap();
+    // Its top meets the main roof's top at the back: the ridge's underside is the dormer roof's
+    // plumb depth below it.
     let back = [5.0, 0.5 + depth];
-    assert!((g.underside([5.0, 0.5 + depth - 1e-6]).unwrap() - main_top(back)).abs() < 1e-4);
+    let plumb = 0.3 * 2f64.sqrt();
+    assert!(
+        (g.underside([5.0, 0.5 + depth - 1e-6]).unwrap() + plumb - main_top(back)).abs() < 1e-4
+    );
+    // Cut along the main roof's top: nothing of the dormer roof lies below it, so the two
+    // surfaces meet flush and rain runs off the dormer into the valleys.
+    let main_top_at = |p: [f64; 3]| main_top([p[0], p[1]]);
+    for f in &g.faces {
+        for p in &f.slab.0 {
+            if main_g.underside([p[0], p[1]]).is_some() {
+                assert!(p[2] >= main_top_at(*p) - 1e-6, "{p:?} below the main roof");
+            }
+        }
+    }
     // The gap walls: tops on the dormer roof (the front gable reaching the ridge), bases under
     // the main roof.
     let solved = walls::solve(doc.store());
@@ -284,7 +299,7 @@ fn dormers_of_every_style_fill_their_gaps() {
                 .unwrap();
         }
     }
-    // The flat dormer (1.2 m front) is lower: a window shrinks under its roof.
+    // The flat dormer (1 m front) is lower: a window shrinks under its roof.
     let (_, ws) = parts(&doc, dormer);
     let win = id(run(
         &r,

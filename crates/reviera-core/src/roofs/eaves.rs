@@ -428,7 +428,14 @@ pub fn trims(
 
 /// The part of a closed mesh at or above height `z`, closed again by a level cap.
 pub fn clip_above(mesh: &Mesh, z: f64) -> Mesh {
+    clip_plane(mesh, [0.0, 0.0, 1.0], z)
+}
+
+/// The part of a closed mesh on the side of the plane `n · p = d` that `n` points to (`n` a
+/// unit vector), closed again by a cap on the plane.
+pub fn clip_plane(mesh: &Mesh, n: [f64; 3], d: f64) -> Mesh {
     let (points, indices) = mesh;
+    let dist = |p: [f64; 3]| n[0] * p[0] + n[1] * p[1] + n[2] * p[2] - d;
     let mut out_pts: Vec<[f64; 3]> = Vec::new();
     let mut out_idx: Vec<u32> = Vec::new();
     let mut index: std::collections::HashMap<[i64; 3], u32> = std::collections::HashMap::new();
@@ -450,13 +457,18 @@ pub fn clip_above(mesh: &Mesh, z: f64) -> Mesh {
         } else {
             (b, a)
         };
-        let t = (z - a[2]) / (b[2] - a[2]);
-        [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, z]
+        let (da, db) = (dist(a), dist(b));
+        let t = da / (da - db);
+        [
+            a[0] + (b[0] - a[0]) * t,
+            a[1] + (b[1] - a[1]) * t,
+            a[2] + (b[2] - a[2]) * t,
+        ]
     };
     let mut segments: Vec<(u32, u32)> = Vec::new();
     for tri in indices.chunks(3) {
         let v: Vec<[f64; 3]> = tri.iter().map(|i| points[*i as usize]).collect();
-        let above: Vec<bool> = v.iter().map(|p| p[2] >= z - 1e-12).collect();
+        let above: Vec<bool> = v.iter().map(|p| dist(*p) >= -1e-12).collect();
         let mut poly: Vec<[f64; 3]> = Vec::new();
         let mut cut: Vec<[f64; 3]> = Vec::new();
         for k in 0..3 {
@@ -485,7 +497,7 @@ pub fn clip_above(mesh: &Mesh, z: f64) -> Mesh {
             }
         }
     }
-    // The cap: chain the cut segments into loops and fill each, facing down.
+    // The cap: chain the cut segments into loops and fill each, facing away from `n`.
     let mut loops: Vec<Vec<u32>> = Vec::new();
     while let Some((a, b)) = segments.pop() {
         let mut lp = vec![a, b];
@@ -505,10 +517,33 @@ pub fn clip_above(mesh: &Mesh, z: f64) -> Mesh {
             loops.push(lp);
         }
     }
+    // A basis in the plane: (e1, e2, n) right-handed.
+    let helper = if n[2].abs() < 0.9 {
+        [0.0, 0.0, 1.0]
+    } else {
+        [1.0, 0.0, 0.0]
+    };
+    let cr = |a: [f64; 3], b: [f64; 3]| {
+        [
+            a[1] * b[2] - a[2] * b[1],
+            a[2] * b[0] - a[0] * b[2],
+            a[0] * b[1] - a[1] * b[0],
+        ]
+    };
+    let e1 = {
+        let c = cr(helper, n);
+        let l = (c[0] * c[0] + c[1] * c[1] + c[2] * c[2]).sqrt();
+        [c[0] / l, c[1] / l, c[2] / l]
+    };
+    let e2 = cr(n, e1);
+    let dot = |a: [f64; 3], b: [f64; 3]| a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
     for lp in loops {
         let flat: Vec<[f64; 2]> = lp
             .iter()
-            .map(|i| [out_pts[*i as usize][0], out_pts[*i as usize][1]])
+            .map(|i| {
+                let p = out_pts[*i as usize];
+                [dot(p, e1), dot(p, e2)]
+            })
             .collect();
         let mut tris: Vec<u32> = Vec::new();
         earcut::Earcut::new().earcut(flat.iter().copied(), &[] as &[u32], &mut tris);
@@ -516,7 +551,7 @@ pub fn clip_above(mesh: &Mesh, z: f64) -> Mesh {
             let (a, b, c) = (t[0] as usize, t[1] as usize, t[2] as usize);
             let up = (flat[b][0] - flat[a][0]) * (flat[c][1] - flat[a][1])
                 - (flat[b][1] - flat[a][1]) * (flat[c][0] - flat[a][0]);
-            // Facing down: clockwise seen from above.
+            // Facing away from n: clockwise seen from n's side.
             if up > 0.0 {
                 out_idx.extend([lp[a], lp[c], lp[b]]);
             } else {
