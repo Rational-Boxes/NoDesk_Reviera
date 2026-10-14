@@ -331,6 +331,8 @@ by a test (no overlaps, no clearance intrusions, saves and reopens):
 - **Observatory** (`observatory.ifc`): curved walls under a dome, a vaulted annex,
   a spline garden wall and a turret built by the Castle Turret plugin; the dome's observing
   slot is cut by a boolean (CSG).
+- **Overlap resolutions** (`csg.ifc`): one overlap resolved every way, side by side: cut either
+  way, join, intersect, union, move apart and accept, with an unresolved pair to compare.
 
 Open one with `reviera gui test-data/samples/observatory.ifc`.
 

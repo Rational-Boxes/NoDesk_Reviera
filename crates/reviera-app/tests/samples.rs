@@ -2,8 +2,8 @@
 // Copyright (C) 2026 Reviera contributors
 
 //! The sample corpus (`test-data/samples`): each sample is rebuilt from its manifest steps (Lua
-//! scripts, plugin runs, settings) and must have no overlaps and no intrusions into its
-//! clearances, then save and reopen. With `REVIERA_REGEN_SAMPLES=1` the corpus's `.ifc` files
+//! scripts, plugin runs, settings) and must have no overlaps (beyond those it leaves on
+//! purpose, `allow_overlaps`) and no intrusions into its clearances, then save and reopen. With `REVIERA_REGEN_SAMPLES=1` the corpus's `.ifc` files
 //! are rewritten from the rebuild.
 
 use std::path::{Path, PathBuf};
@@ -44,8 +44,14 @@ fn the_sample_corpus_builds_cleanly() {
             let command = step["command"].as_str().unwrap();
             run(&mut app, command, args).unwrap_or_else(|e| panic!("{name}: {command}: {e:?}"));
         }
+        // Overlaps the sample leaves on purpose (`allow_overlaps`), else none.
+        let allowed = sample["allow_overlaps"].as_u64().unwrap_or(0) as usize;
         let overlaps = run(&mut app, "overlap.find", json!({})).unwrap();
-        assert_eq!(overlaps["overlaps"], json!([]), "{name}: {overlaps:#}");
+        assert_eq!(
+            overlaps["overlaps"].as_array().unwrap().len(),
+            allowed,
+            "{name}: {overlaps:#}"
+        );
         let intrusions = run(&mut app, "clearance.check", json!({})).unwrap();
         assert_eq!(intrusions, json!([]), "{name}: {intrusions:#}");
         let path = if regen {
@@ -63,8 +69,8 @@ fn the_sample_corpus_builds_cleanly() {
         run(&mut again, "file.open", json!({ "path": path })).unwrap();
         let reopened = run(&mut again, "overlap.find", json!({})).unwrap();
         assert_eq!(
-            reopened["overlaps"],
-            json!([]),
+            reopened["overlaps"].as_array().unwrap().len(),
+            allowed,
             "{name} reopened: {reopened:#}"
         );
         assert_eq!(

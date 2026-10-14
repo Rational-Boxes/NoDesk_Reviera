@@ -3,25 +3,59 @@
     "name": "house",
     "title": "House with dormers",
     "steps": [
-      { "command": "script.run", "args": { "file": "house.lua" } }
+      {
+        "command": "script.run",
+        "args": {
+          "file": "house.lua"
+        }
+      }
     ]
   },
   {
     "name": "observatory",
     "title": "Observatory",
     "steps": [
-      { "command": "script.run", "args": { "file": "observatory.lua" } },
+      {
+        "command": "script.run",
+        "args": {
+          "file": "observatory.lua"
+        }
+      },
       {
         "command": "plugin.run",
         "args": {
           "name": "turret",
           "answers": {
-            "x": 19.0, "y": 5.5, "radius": 1.6, "sides": 16, "height": 6.5,
-            "roof": "Onion dome", "roof_height": 3.0, "slits": 3
+            "x": 19.0,
+            "y": 5.5,
+            "radius": 1.6,
+            "sides": 16,
+            "height": 6.5,
+            "roof": "Onion dome",
+            "roof_height": 3.0,
+            "slits": 3
           }
         }
       },
-      { "command": "clearance.set_rule_set", "args": { "standard": "ada_2010" } }
+      {
+        "command": "clearance.set_rule_set",
+        "args": {
+          "standard": "ada_2010"
+        }
+      }
+    ]
+  },
+  {
+    "name": "csg",
+    "title": "Overlap resolutions",
+    "allow_overlaps": 1,
+    "steps": [
+      {
+        "command": "script.run",
+        "args": {
+          "file": "csg.lua"
+        }
+      }
     ]
   }
 ]

@@ -411,14 +411,19 @@ impl HostCommand for OverlapResolve {
                     Which::A => (a, b),
                     Which::B => (b, a),
                 };
-                app.group_begin("Move Apart", caller.origin.clone())?;
+                // One undo step; inside a group already open (a script's), part of it.
+                let grouped = app.group_begin("Move Apart", caller.origin.clone()).is_ok();
                 match move_apart(app, caller, mover, other) {
                     Ok(total) => {
-                        app.group_end(reviera_core::GroupEnd::Assimilate)?;
+                        if grouped {
+                            app.group_end(reviera_core::GroupEnd::Assimilate)?;
+                        }
                         Ok(ResolveResult { moved: Some(total) })
                     }
                     Err(e) => {
-                        let _ = app.group_end(reviera_core::GroupEnd::Rollback);
+                        if grouped {
+                            let _ = app.group_end(reviera_core::GroupEnd::Rollback);
+                        }
                         Err(e)
                     }
                 }
