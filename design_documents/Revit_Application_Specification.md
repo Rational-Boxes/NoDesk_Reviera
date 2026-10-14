@@ -12070,16 +12070,31 @@ These are view annotation and are specified in the DOC chapter. This chapter req
 - **Gate:** an `IfcDoor` (`PredefinedType = GATE`), with an `IfcDoorType` (`OperationType = SINGLE_SWING_LEFT`/`RIGHT`, or `DOUBLE_DOOR_SINGLE_SWING`), contained in the railing's storey. It is related to the railing through `IfcRelConnectsElements` (Name "Gate").
 
 **Commands.**
-- `railing.add_opening(railing_id, at, width) -> key`
-- `railing.add_gate(railing_id, at, leaves: 1|2, width?, swing?: in|out, hinge?: left|right) -> element_id`
-- `railing.move_feature(railing_id, key, at?, width?)`
+- `railing.add_opening(railing_id, at? | point?, width?) -> key`
+- `railing.add_gate(railing_id, at? | point?, leaves?: 1|2, width?, swing_out?, hinge_end?) -> element_id`
+- `railing.move_feature(railing_id, key, at? | point?, width?)`
 - `railing.remove_feature(railing_id, key)`
+- `railing.features(railing_id) -> [feature]`
 
 **Acceptance criteria.**
-- [ ] A 900 mm opening in a 6 m deck railing has a post on each side, no balusters or rails across the gap, and stays 900 mm clear.
-- [ ] A double gate of 1.2 m places two leaves of 600 mm, swinging outward, and exports as `IfcDoor(GATE)` with `DOUBLE_DOOR_SINGLE_SWING`.
-- [ ] Moving the railing's path keeps the gate the same distance from the path's start.
-- [ ] `railing.add_gate` from Lua or MCP gives the same model as the window tool.
+- [x] A 900 mm opening in a 6 m deck railing has a post on each side, no balusters or rails across the gap, and stays 900 mm clear.
+- [x] A double gate of 1.2 m places two leaves of 600 mm, swinging outward, and exports as `IfcDoor(GATE)` with `DOUBLE_DOOR_SINGLE_SWING`.
+- [x] Moving the railing's path keeps the gate the same distance from the path's start.
+- [x] `railing.add_gate` from Lua or MCP gives the same model as the window tool.
+
+**Implementation notes (2026-10-13).** As built:
+- **Storage:** openings and gates are `features` in the railing's recipe, each with a key, its centre's distance along the path (`at`) and its clear width. Commands take `at` or a plan `point`, which is projected onto the path.
+- **Layout:** a post is added each side of the gap. Rails stop at those posts, and balusters are dropped from the gap and the posts' reserved spaces. A feature must lie within one straight run, clear of its corner posts (`railing.feature_off_segment`), and must not overlap another (`railing.feature_overlap`).
+- **Path changes:** when the path changes, a feature that no longer fits is left out of the layout (and its gate is not drawn) until the path makes room again.
+- **Gate:** an `IfcDoor` (`GATE`) holding the railing's GUID and the feature key. Its leaves are drawn from the railing: stiles, a top and bottom rail, and balusters, with 10 mm clearances. The IFC writer sets `OverallWidth`, `OverallHeight` and `OperationType` (IFC4). Default widths are 1 m for a single gate and 1.2 m for a double.
+- **Lifecycle:** deleting the railing deletes its gates. `railing.remove_feature` removes a gate and its element. Deleting a gate on its own leaves its opening.
+- **Read-back:** `railing.features` lists a railing's openings and gates.
+- **In the window:** Modify | Railings › Opening, Gate and Double Gate. With the railing selected, click it in a plan or in 3D; Esc ends the tool.
+- **Deferred:**
+  - the gate's swing arc in plan, and the swing and hinge settings in the Properties palette;
+  - drag handles;
+  - reusing an existing post;
+  - the `IfcDoorType` and the `IfcRelConnectsElements` to the railing.
 
 ### 3.7.8a Decks
 **ID:** ARC-DECK-001 · **Priority:** P1 · **Ref:** owner requirement (2026-10-13); Reviera's own design (Appendix A.2a)
@@ -13549,10 +13564,11 @@ All commands below are registered once in the command registry and exposed autom
 | `deck.boards` | deck_id | [board] | No | ARC-DECK-001 |
 | `deck.cut_list` | deck_id | cut_list | No | ARC-DECK-001 |
 | `roof.set_eaves` | roof_id, edges, bearing?, heel?, overhang?, cut?, fascia_depth?, fascia?, soffit?, gutter?, attach_walls? | — | Yes | ARC-ROOF-010 |
-| `railing.add_opening` | railing_id, at, width | key | Yes | ARC-RAIL-003 |
-| `railing.add_gate` | railing_id, at, leaves: 1\|2, width?, swing?, hinge? | element_id | Yes | ARC-RAIL-003 |
-| `railing.move_feature` | railing_id, key, at?, width? | — | Yes | ARC-RAIL-003 |
+| `railing.add_opening` | railing_id, at?\|point?, width? | key | Yes | ARC-RAIL-003 |
+| `railing.add_gate` | railing_id, at?\|point?, leaves?: 1\|2, width?, swing_out?, hinge_end? | element_id | Yes | ARC-RAIL-003 |
+| `railing.move_feature` | railing_id, key, at?\|point?, width? | — | Yes | ARC-RAIL-003 |
 | `railing.remove_feature` | railing_id, key | — | Yes | ARC-RAIL-003 |
+| `railing.features` | railing_id | [feature] | No | ARC-RAIL-003 |
 | `deck.override_board` | deck_id, board_key, length?, joint?, removed? | — | Yes | ARC-DECK-001 |
 | `roof.set_slope` | roof_id, slope, edge_keys? | — | Yes | ARC-ROOF-001 |
 | `roof.create_extrusion` | type_id, work_plane, profile: [curve], ref_level, level_offset?, start, end | element_id | Yes | ARC-ROOF-002 |
@@ -25590,7 +25606,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**1974 unique commands** in 402 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**1975 unique commands** in 402 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -25859,7 +25875,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `publish` | 1 |
 | `purge` | 2 |
 | `qto` | 1 |
-| `railing` | 10 |
+| `railing` | 11 |
 | `railingtype` | 5 |
 | `ramp` | 2 |
 | `rebar` | 24 |
@@ -27118,13 +27134,14 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `purge.list` | 2 | include_unplaced_views=false | {kind, items[]}[] | No | DM-PURGE-001 |
 | `purge.run` | 2 | item_ids[], compact_undo=false | report | Yes | DM-PURGE-001 |
 | `qto.recompute` | 2 | element_ids?[] | — | Yes | DM-IFC-003 |
-| `railing.add_gate` | 3 | railing_id, at, leaves: 1\ | 2, width?, swing?, hinge? | element_id | Yes |
-| `railing.add_opening` | 3 | railing_id, at, width | key | Yes | ARC-RAIL-003 |
+| `railing.add_gate` | 3 | railing_id, at?\ | point?, leaves?: 1\ | 2, width?, swing_out?, hinge_end? | element_id |
+| `railing.add_opening` | 3 | railing_id, at?\ | point?, width? | key | Yes |
 | `railing.create` | 3 | type_id, path: [curve], host_ref?, base_level?, base_offset?, offset_from_path?, segment_slopes?: [ByHost\ | Flat\ | Sloped], height_corrections?: [f64\ | ByType] |
 | `railing.create_on_edges` | 3 | type_id, host_id, edges?: [curve_key]\ | all_open, setback? | [element_id] | Yes |
 | `railing.edit_path` | 3 | railing_id, path, ... | — | Yes | ARC-RAIL-001 |
+| `railing.features` | 3 | railing_id | [feature] | No | ARC-RAIL-003 |
 | `railing.flip_path` | 3 | railing_id | — | Yes | ARC-RAIL-001 |
-| `railing.move_feature` | 3 | railing_id, key, at?, width? | — | Yes | ARC-RAIL-003 |
+| `railing.move_feature` | 3 | railing_id, key, at?\ | point?, width? | — | Yes |
 | `railing.place_on_host` | 3 | type_id, host_id, position: Treads\ | Stringer | [element_id] | Yes |
 | `railing.remove_feature` | 3 | railing_id, key | — | Yes | ARC-RAIL-003 |
 | `railing.set_rail_join` | 3 | railing_id, join_ref, mode: ByType\ | Fillet\ | Miter\ | Flush |

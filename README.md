@@ -96,8 +96,12 @@ The KIT FZK *AC20-Institute-Var-2* sample model (`test-data/ifc/`) open in Revie
   Floors / Roofs › Guard Edges puts railings along every open edge of a deck, patio, floor or
   flat roof (edges with a wall along them are left out). Each has a top and a bottom rail, posts
   at the ends and corners, and balusters spaced by the type. Railings on edges follow the host's
-  outline (`railing.create`, `railing.create_on_edges`). Not yet: railings on stairs, continuous
-  handrails and baluster families.
+  outline (`railing.create`, `railing.create_on_edges`). Modify | Railings › Opening, Gate and
+  Double Gate add features to a laid-out railing: click on it where each goes. An opening gets a
+  post each side; a gate fills it with one or two leaves and is its own `IfcDoor` (GATE) element
+  (`railing.add_opening`, `railing.add_gate`, `railing.move_feature`, `railing.remove_feature`).
+  Not yet: railings on stairs, continuous handrails, baluster families, and gate swing arcs in
+  plan.
 - **Decks**: Architecture › Deck sketches a deck's outline. Its boards are laid out one by one:
   courses across from the start edge (the last ripped, or balanced), every end joint on a joist
   and staggered, picture-frame borders mitred at the corners, and pieces cut from the shortest
@@ -264,8 +268,7 @@ The KIT FZK *AC20-Institute-Var-2* sample model (`test-data/ifc/`) open in Revie
 ## Planned next
 
 The first milestone continues with roof eaves that join the walls properly (ARC-ROOF-010:
-bearing, overhang from the wall face, rafter cuts, fascia, soffit and gutter), railing openings
-and gates (ARC-RAIL-003), railings on stairs, roof openings (below dormers,
+bearing, overhang from the wall face, rafter cuts, fascia, soffit and gutter), railings on stairs, roof openings (below dormers,
 skylights and shafts), and layered wall types. Then come curved forms: smooth arched roofs (including vaults that taper over trapezoidal
 footprints, ARC-ROOF-008), dome roofs (ARC-ROOF-009), spline-curved walls (ARC-WALL-002), and
 boolean intersect, subtract and union between elements (ARC-MOD-028). After that come general

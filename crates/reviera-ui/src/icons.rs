@@ -252,6 +252,15 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "guard_edges" => format!(
             r#"<path d="M3 26h26l-6-8H9z" fill="{f}" {s}/><path d="M9 18V9h14v9M9 12h14" {sa}/><path d="M13 12v6M17 12v6" {sa} stroke-width="1.2"/>"#
         ),
+        "rail_opening" => format!(
+            r#"<path d="M3 12h9M20 12h9M3 26h9M20 26h9" {sa}/><path d="M4 9v18M11 9v18M21 9v18M28 9v18" {s}/><path d="M14 19h4" {sa} stroke-dasharray="1 1.5"/>"#
+        ),
+        "gate" => format!(
+            r#"<path d="M4 8v20M28 8v20" {s}/><rect x="7" y="11" width="18" height="15" fill="{f}" {s}/><path d="M11 11v15M15 11v15M19 11v15M23 11v15" {sa} stroke-width="1.2"/>"#
+        ),
+        "double_gate" => format!(
+            r#"<path d="M3 8v20M29 8v20" {s}/><rect x="5" y="11" width="10" height="15" fill="{f}" {s}/><rect x="17" y="11" width="10" height="15" fill="{f}" {s}/><path d="M10 11v15M22 11v15" {sa} stroke-width="1.2"/>"#
+        ),
         "dormer" => format!(
             r#"<path d="M2 26L16 8l14 18z" fill="{f}" {s}/><path d="M11 22v-6h6v6" {sa}/><path d="M10 16l4-4 4 4" {sa}/>"#
         ),

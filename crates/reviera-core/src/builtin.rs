@@ -79,6 +79,11 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(DeckBoards),
         registry.add(DeckCutList),
         registry.add(RailingCreateOnEdges),
+        registry.add(RailingAddOpening),
+        registry.add(RailingAddGate),
+        registry.add(RailingMoveFeature),
+        registry.add(RailingRemoveFeature),
+        registry.add(RailingFeatures),
         registry.add(StairSetParams),
         registry.add(WallAttach),
         registry.add(ScheduleCreate),
@@ -436,6 +441,7 @@ pub fn dependents_of(store: &crate::store::Store, id: ElementId) -> Vec<ElementI
                     crate::railings::RailPath::Free { level, .. } => level == guid,
                     crate::railings::RailPath::Host { host, .. } => host == guid,
                 })
+                || crate::railings::gate_of(e).is_some_and(|(r, _)| r == guid)
                 || crate::dormers::dormer_of(e) == Some(guid.as_str())
                 || crate::dormers::dormer_recipe(e).is_some_and(|r| r.roof == guid)
                 || crate::stairs::stair_recipe(e).is_some_and(|r| {
@@ -2638,6 +2644,78 @@ modify_command!(
     Vec<ElementId>,
     crate::railings::create_on_edges
 );
+modify_command!(
+    RailingAddOpening,
+    "railing.add_opening",
+    "Add an opening to a railing",
+    "Adds an opening to a laid-out railing (ARC-RAIL-003): its centre at `at` (a distance along the path) or \
+     the nearest point of the path to `point`, `width` clear between the posts (default 900 mm). A post goes \
+     each side and the rails and balusters stop there. The opening must lie within one straight run, clear of \
+     the corner posts and other openings. Returns the opening's key.",
+    "Railing Opening",
+    crate::railings::AddOpeningParams,
+    u32,
+    crate::railings::add_opening
+);
+modify_command!(
+    RailingAddGate,
+    "railing.add_gate",
+    "Add a gate to a railing",
+    "Adds a gate to a laid-out railing (ARC-RAIL-003): an opening as `railing.add_opening` (default width 1 m, \
+     or 1.2 m double) filled with one leaf or two (`leaves`), swinging in or out (`swing_out`), a single leaf \
+     hinged at the start side or the end (`hinge_end`). The gate is its own `IfcDoor` (GATE) element, hosted \
+     by the railing, that follows it. Returns the gate.",
+    "Railing Gate",
+    crate::railings::AddGateParams,
+    ElementId,
+    crate::railings::add_gate
+);
+modify_command!(
+    RailingMoveFeature,
+    "railing.move_feature",
+    "Move or resize a railing opening or gate",
+    "Moves an opening or gate (`key`) along its railing to `at` or `point`, and/or changes its `width`.",
+    "Move Railing Opening",
+    crate::railings::MoveFeatureParams,
+    (),
+    crate::railings::move_feature
+);
+modify_command!(
+    RailingRemoveFeature,
+    "railing.remove_feature",
+    "Remove a railing opening or gate",
+    "Removes an opening or gate (`key`) and the gate's element; the railing closes over it.",
+    "Remove Railing Opening",
+    crate::railings::FeatureParams,
+    (),
+    crate::railings::remove_feature
+);
+
+#[derive(Debug)]
+struct RailingFeatures;
+
+impl Command for RailingFeatures {
+    type Params = crate::railings::FeaturesParams;
+    type Output = Vec<crate::railings::RailFeature>;
+    const META: CommandMeta = CommandMeta {
+        name: "railing.features",
+        version: 1,
+        summary: "A railing's openings and gates",
+        description: "Every opening and gate of a railing: its key, centre (distance along the path), clear \
+                      width, and for a gate its leaves, swing, hinge side and gate element.",
+        effects: &[Effect::Read],
+        transaction_name: "",
+    };
+
+    fn run(
+        &self,
+        cx: &mut CommandContext<'_>,
+        p: crate::railings::FeaturesParams,
+    ) -> Result<Vec<crate::railings::RailFeature>> {
+        crate::railings::features(cx.store(), p)
+    }
+}
+
 modify_command!(
     StairCreate,
     "stair.create",

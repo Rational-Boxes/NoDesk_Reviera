@@ -6,6 +6,10 @@
 //!   closes it, and Esc finishes an open path (`railing.create`).
 //! - **Guard Edges** (Modify | Floors and Modify | Roofs): railings along every open edge of the
 //!   selected floors, decks and flat roofs (`railing.create_on_edges`).
+//! - **Opening**, **Gate** and **Double Gate** (Modify | Railings, ARC-RAIL-003): with a railing
+//!   selected, each click on it (in a plan, or on the railing in 3D) adds an opening or a gate
+//!   there (`railing.add_opening`, `railing.add_gate`). Esc ends the tool. Deleting a gate leaves
+//!   its opening.
 
 use reviera_core::ElementId;
 use reviera_render::RenderBackend;
@@ -24,7 +28,83 @@ pub struct RailingTool {
     cursor: Option<[f64; 2]>,
 }
 
+/// What the railing feature tool adds.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FeatureKind {
+    Opening,
+    Gate { leaves: u8 },
+}
+
+/// The railing Opening / Gate tool: the railing, and what each click adds to it.
+#[derive(Debug, Clone, Copy)]
+pub struct FeatureTool {
+    railing: ElementId,
+    kind: FeatureKind,
+}
+
 impl Gui {
+    /// Modify | Railings › Opening, Gate or Double Gate.
+    pub(crate) fn start_feature_tool(&mut self, kind: FeatureKind) {
+        let frame = self.frame;
+        let Some(store) = self
+            .doc
+            .and_then(|d| self.app.document(d))
+            .map(|d| d.doc.store().clone())
+        else {
+            return;
+        };
+        let Some(railing) = self.selection().into_iter().find(|id| {
+            store
+                .get(*id)
+                .and_then(reviera_core::railings::railing_recipe)
+                .is_some()
+        }) else {
+            return frame.set_status_text("Select the railing to add openings or gates to", 0);
+        };
+        self.end_tool(&frame);
+        self.feature_tool = Some(FeatureTool { railing, kind });
+        let what = match kind {
+            FeatureKind::Opening => "an opening",
+            FeatureKind::Gate { leaves: 1 } => "a gate",
+            FeatureKind::Gate { .. } => "a double gate",
+        };
+        frame.set_status_text(
+            &format!(
+                "Click the railing where {what} goes (in a plan, or on the railing in 3D); Esc ends"
+            ),
+            0,
+        );
+    }
+
+    pub(crate) fn end_feature_tool(&mut self) -> bool {
+        self.feature_tool.take().is_some()
+    }
+
+    pub(crate) fn feature_click(&mut self, x: i32, y: i32, panel: &wxdragon::prelude::Panel) {
+        let frame = self.frame;
+        let Some(t) = self.feature_tool else { return };
+        let Some(p) = self.model_point(x, y, panel) else {
+            return frame.set_status_text("Click on the railing", 0);
+        };
+        let result = match t.kind {
+            FeatureKind::Opening => self.run(
+                "railing.add_opening",
+                json!({ "railing_id": t.railing, "point": p }),
+            ),
+            FeatureKind::Gate { leaves } => self.run(
+                "railing.add_gate",
+                json!({ "railing_id": t.railing, "point": p, "leaves": leaves }),
+            ),
+        };
+        match result {
+            Ok(_) => {
+                self.refresh_scene(&frame);
+                frame.set_status_text("Added; click for another, or Esc", 0);
+            }
+            Err(e) => error(&frame, &format!("Nothing was added:\n{e}")),
+        }
+    }
+
     /// Architecture › Railing.
     pub(crate) fn start_railing_tool(&mut self) {
         let frame = self.frame;

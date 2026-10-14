@@ -77,6 +77,9 @@ fn raw_parent(store: &Store, e: &Element, imported: &Imported) -> Option<Element
             crate::railings::RailPath::Host { host, .. } => by_guid(&host),
         };
     }
+    if let Some((railing, _)) = crate::railings::gate_of(e) {
+        return by_guid(&railing);
+    }
     if let Some(r) = crate::stairs::stair_recipe(e) {
         return by_guid(&r.base_level);
     }

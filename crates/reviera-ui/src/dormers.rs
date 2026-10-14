@@ -73,7 +73,7 @@ impl Gui {
 
     /// The plan point under the cursor: in a plan, where it points; in 3D, where it hits the
     /// model.
-    fn dormer_point(&self, x: i32, y: i32, panel: &Panel) -> Option<[f64; 2]> {
+    pub(crate) fn model_point(&self, x: i32, y: i32, panel: &Panel) -> Option<[f64; 2]> {
         if self.in_plan() {
             return self.plan_xy(x, y);
         }
@@ -92,7 +92,7 @@ impl Gui {
     pub(crate) fn dormer_click(&mut self, x: i32, y: i32, panel: &Panel) {
         let frame = self.frame;
         let Some(t) = self.dormer_tool else { return };
-        let Some(p) = self.dormer_point(x, y, panel) else {
+        let Some(p) = self.model_point(x, y, panel) else {
             return frame.set_status_text("Click on the roof", 0);
         };
         let style = STYLES

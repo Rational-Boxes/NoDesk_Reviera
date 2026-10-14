@@ -165,7 +165,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**1974 unique commands** in 402 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**1975 unique commands** in 402 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -434,7 +434,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `publish` | 1 |
 | `purge` | 2 |
 | `qto` | 1 |
-| `railing` | 10 |
+| `railing` | 11 |
 | `railingtype` | 5 |
 | `ramp` | 2 |
 | `rebar` | 24 |
@@ -1693,13 +1693,14 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `purge.list` | 2 | include_unplaced_views=false | {kind, items[]}[] | No | DM-PURGE-001 |
 | `purge.run` | 2 | item_ids[], compact_undo=false | report | Yes | DM-PURGE-001 |
 | `qto.recompute` | 2 | element_ids?[] | — | Yes | DM-IFC-003 |
-| `railing.add_gate` | 3 | railing_id, at, leaves: 1\ | 2, width?, swing?, hinge? | element_id | Yes |
-| `railing.add_opening` | 3 | railing_id, at, width | key | Yes | ARC-RAIL-003 |
+| `railing.add_gate` | 3 | railing_id, at?\ | point?, leaves?: 1\ | 2, width?, swing_out?, hinge_end? | element_id |
+| `railing.add_opening` | 3 | railing_id, at?\ | point?, width? | key | Yes |
 | `railing.create` | 3 | type_id, path: [curve], host_ref?, base_level?, base_offset?, offset_from_path?, segment_slopes?: [ByHost\ | Flat\ | Sloped], height_corrections?: [f64\ | ByType] |
 | `railing.create_on_edges` | 3 | type_id, host_id, edges?: [curve_key]\ | all_open, setback? | [element_id] | Yes |
 | `railing.edit_path` | 3 | railing_id, path, ... | — | Yes | ARC-RAIL-001 |
+| `railing.features` | 3 | railing_id | [feature] | No | ARC-RAIL-003 |
 | `railing.flip_path` | 3 | railing_id | — | Yes | ARC-RAIL-001 |
-| `railing.move_feature` | 3 | railing_id, key, at?, width? | — | Yes | ARC-RAIL-003 |
+| `railing.move_feature` | 3 | railing_id, key, at?\ | point?, width? | — | Yes |
 | `railing.place_on_host` | 3 | type_id, host_id, position: Treads\ | Stringer | [element_id] | Yes |
 | `railing.remove_feature` | 3 | railing_id, key | — | Yes | ARC-RAIL-003 |
 | `railing.set_rail_join` | 3 | railing_id, join_ref, mode: ByType\ | Fillet\ | Miter\ | Flush |

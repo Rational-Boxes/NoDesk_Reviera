@@ -677,6 +677,24 @@ icon = "guard_edges"
 help = "Place railings along every open edge of the selected floors, decks or flat roofs"
 
 [[action]]
+id = "railing.add_opening"
+label = "Opening"
+icon = "rail_opening"
+help = "Add openings to the selected railing: click it where each goes; a post goes each side"
+
+[[action]]
+id = "railing.add_gate"
+label = "Gate"
+icon = "gate"
+help = "Add single gates to the selected railing: click it where each goes"
+
+[[action]]
+id = "railing.add_double_gate"
+label = "Double Gate"
+icon = "double_gate"
+help = "Add double gates to the selected railing: click it where each goes"
+
+[[action]]
 id = "stair.spiral"
 label = "Spiral Stair"
 icon = "spiral_stair"
@@ -936,6 +954,15 @@ panels = [
   { label = "Mode", tools = [{ action = "floor.edit_boundary", size = "large" }] },
   { label = "Railing", tools = [{ action = "railing.create_on_edges", size = "large" }] },
 ]
+
+[[context]]
+category = "cat.railings"
+label = "Railings"
+panels = [{ label = "Openings", tools = [
+  { action = "railing.add_opening", size = "large" },
+  { action = "railing.add_gate", size = "large" },
+  { action = "railing.add_double_gate", size = "large" },
+] }]
 
 [[context]]
 category = "cat.ceilings"

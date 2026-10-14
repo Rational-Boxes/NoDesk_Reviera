@@ -502,6 +502,7 @@ impl LocalProject {
             if recipe_kind == Some(roofs::ROOF_RECIPE)
                 || recipe_kind == Some(stairs::STAIR_RECIPE)
                 || recipe_kind == Some(railings::RAILING_RECIPE)
+                || recipe_kind == Some(railings::GATE_RECIPE)
             {
                 geometry::remove_breps(&mut self.ifc, step)?;
             }
@@ -1062,21 +1063,33 @@ impl LocalProject {
     }
 
     /// Writes every Reviera railing (ARC-RAIL-001): one faceted B-rep per rail, post and
-    /// baluster, contained in its level (a free railing's, or its host's).
+    /// baluster, contained in its level (a free railing's, or its host's); and each gate
+    /// (ARC-RAIL-003) as its leaves, in its railing's level.
     fn write_railings(&mut self, doc: &Document) -> Result<()> {
         let store = doc.store();
-        let all = railings::all(store);
+        let mut all: Vec<(ElementId, Vec<railings::Mesh>, ElementId)> = railings::all(store)
+            .into_iter()
+            .map(|(id, g)| (id, g.parts, id))
+            .collect();
+        for (id, parts) in railings::all_gates(store) {
+            let railing = store
+                .get(id)
+                .and_then(railings::gate_of)
+                .and_then(|(r, _)| store.find_by_guid(&GlobalId::parse(&r)?));
+            if let Some(railing) = railing {
+                all.push((id, parts, railing));
+            }
+        }
         if all.is_empty() {
             return Ok(());
         }
         let contexts = geometry::Contexts::find(&self.ifc)?;
         let owner_history = self.new_owner_history()?;
-        for (id, g) in &all {
+        for (id, parts, railing) in &all {
             let Some(&step) = self.steps.get(id) else {
                 continue;
             };
-            let solids: Vec<geometry::Polyhedron> = g
-                .parts
+            let solids: Vec<geometry::Polyhedron> = parts
                 .iter()
                 .map(|(points, _)| {
                     let n = points.len() / 2;
@@ -1096,8 +1109,8 @@ impl LocalProject {
                 self.length_scale,
                 contexts,
             )?;
-            let level = railings::railing_recipe(store.get(*id).expect("listed")).and_then(|r| {
-                match r.path {
+            let level = railings::railing_recipe(store.get(*railing).expect("listed")).and_then(
+                |r| match r.path {
                     railings::RailPath::Free { level, .. } => GlobalId::parse(&level),
                     railings::RailPath::Host { host, .. } => {
                         let h = store.get(store.find_by_guid(&GlobalId::parse(&host)?)?)?;
@@ -1106,13 +1119,30 @@ impl LocalProject {
                             .or_else(|| roofs::roof_recipe(h).map(|r| r.level))?;
                         GlobalId::parse(&level)
                     }
-                }
-            });
+                },
+            );
             let storey = level
                 .and_then(|g| store.find_by_guid(&g))
                 .and_then(|l| self.steps.get(&l).copied());
             if let Some(storey) = storey {
                 geometry::contain(&mut self.ifc, step, storey, owner_history)?;
+            }
+            // A gate's size and operation, as a door's.
+            if let Some((op, width, height)) =
+                railings::gate_operation(store, store.get(*id).expect("listed"))
+            {
+                let mut attrs = vec![
+                    ("OverallWidth", AttrValue::Real(width / self.length_scale)),
+                    ("OverallHeight", AttrValue::Real(height / self.length_scale)),
+                ];
+                if self.ifc.schema() != "IFC2X3" {
+                    attrs.push(("OperationType", AttrValue::Enum(op.into())));
+                }
+                for (attr, v) in attrs {
+                    if self.ifc.attribute(step, attr)? != v {
+                        self.ifc.set_attribute(step, attr, &v)?;
+                    }
+                }
             }
         }
         Ok(())

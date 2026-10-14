@@ -203,6 +203,7 @@ struct Gui {
     dormer_tool: Option<dormers::DormerTool>,
     /// The Railing tool.
     railing_tool: Option<railings::RailingTool>,
+    feature_tool: Option<railings::FeatureTool>,
     /// The floor type new floors take.
     floor_type: Option<ElementId>,
     /// The last pointer position in the active view (Tab in sketch mode picks there).
@@ -1111,6 +1112,7 @@ impl Gui {
         self.end_stair_tool();
         self.end_dormer_tool();
         self.end_railing_tool();
+        self.end_feature_tool();
         if self.tool.take().is_some() {
             if let Some(v) = self.viewport() {
                 v.set_overlay(&[]);
@@ -1139,6 +1141,9 @@ impl Gui {
         }
         if self.railing_tool.is_some() {
             return self.railing_escape();
+        }
+        if self.end_feature_tool() {
+            return frame.set_status_text("Ready", 0);
         }
         if self.attach_pick.take().is_some() {
             return frame.set_status_text("Attach cancelled", 0);
@@ -2250,6 +2255,7 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                     None if g.stair_tool.is_some() => g.stair_click(x, y),
                     None if g.dormer_tool.is_some() => g.dormer_click(x, y, &p),
                     None if g.railing_tool.is_some() => g.railing_click(x, y),
+                    None if g.feature_tool.is_some() => g.feature_click(x, y, &p),
                     None if g.dim_tool.is_some() => g.dim_click(x, y),
                     None if g.grid_tool.is_some() => g.grid_click(x, y),
                     None if g.insert_tool.is_some() => g.insert_click(x, y),
@@ -2759,6 +2765,7 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 stair_tool: None,
                 dormer_tool: None,
                 railing_tool: None,
+                feature_tool: None,
                 floor_type: None,
                 mouse: (0, 0),
                 offset_distance: 1.0,
@@ -3236,6 +3243,18 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         }),
         "wall.detach" => with(gui, Gui::detach_selection),
         "roof.attach_walls" => with(gui, Gui::attach_walls_below),
+        "railing.add_opening" => with(gui, |g| {
+            g.start_feature_tool(railings::FeatureKind::Opening);
+            focus(g);
+        }),
+        "railing.add_gate" => with(gui, |g| {
+            g.start_feature_tool(railings::FeatureKind::Gate { leaves: 1 });
+            focus(g);
+        }),
+        "railing.add_double_gate" => with(gui, |g| {
+            g.start_feature_tool(railings::FeatureKind::Gate { leaves: 2 });
+            focus(g);
+        }),
         "dormer.create" => with(gui, |g| {
             g.start_dormer_tool();
             focus(g);

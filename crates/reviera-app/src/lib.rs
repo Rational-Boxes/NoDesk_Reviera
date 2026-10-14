@@ -347,6 +347,7 @@ impl App {
                         && reviera_core::roofs::roof_recipe(e).is_none()
                         && reviera_core::stairs::stair_recipe(e).is_none()
                         && reviera_core::railings::railing_recipe(e).is_none()
+                        && reviera_core::railings::gate_of(e).is_none()
                         && reviera_core::inserts::kind_of(e).is_none()
                         && reviera_core::inserts::opening_of(e).is_none()
                 }),
@@ -462,6 +463,21 @@ impl App {
                     element: Some(id),
                     color: reviera_render::class_color("IfcRailing"),
                     class: "IfcRailing".into(),
+                    positions: positions
+                        .iter()
+                        .map(|[x, y, z]| [*x as f32, *y as f32, *z as f32])
+                        .collect(),
+                    indices: indices.clone(),
+                });
+            }
+        }
+        // Gates: their leaves.
+        for (id, parts) in reviera_core::railings::all_gates(store) {
+            for (positions, indices) in &parts {
+                meshes.push(reviera_render::SceneMesh {
+                    element: Some(id),
+                    color: reviera_render::class_color("IfcDoor"),
+                    class: "IfcDoor".into(),
                     positions: positions
                         .iter()
                         .map(|[x, y, z]| [*x as f32, *y as f32, *z as f32])
