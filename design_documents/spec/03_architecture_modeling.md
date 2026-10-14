@@ -4043,7 +4043,7 @@ These tools are on the **Modify** tab and are repeated on every `Modify | <Eleme
 **Commands.** `overlap.resolve(a, b, mode: cut_a|cut_b|join|subtract|intersect|union|move_apart|accept) -> ()`, `overlap.accepted() -> [pair]`.
 
 **Acceptance criteria.**
-- [x] A beam through a wall flagged by Check Overlaps and resolved with *Cut B by A* leaves the wall cut by the beam, and the overlap is no longer flagged.
+- [ ] A beam through a wall flagged by Check Overlaps and resolved with *Cut B by A* leaves the wall cut by the beam, and the overlap is no longer flagged.
 - [x] An overlap resolved with *Accept* stays unflagged after both elements move.
 
 **Implementation notes (2026-10-13).** As built:
