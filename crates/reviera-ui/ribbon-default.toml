@@ -449,6 +449,12 @@ icon = "ceiling_plan"
 help = "Create reflected ceiling plans of levels"
 
 [[action]]
+id = "overlap.find"
+label = "Check Overlaps"
+icon = "overlaps"
+help = "Find where elements overlap: listed largest first; pick one to select and frame it"
+
+[[action]]
 id = "inspect.section_box"
 label = "Section Box"
 icon = "section_box"
@@ -876,6 +882,10 @@ tools = [
   { action = "view.set_projection", size = "small" },
   { action = "view.walk", size = "small" },
 ]
+
+[[tab.panel]]
+label = "Coordination"
+tools = [{ action = "overlap.find", size = "large" }]
 
 [[tab.panel]]
 label = "Section"

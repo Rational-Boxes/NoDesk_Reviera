@@ -26,6 +26,7 @@ mod modify;
 mod native;
 mod nav;
 mod notes;
+mod overlaps;
 mod plans;
 mod railings;
 mod ribbon;
@@ -3220,6 +3221,7 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         }),
         "railing.create_on_edges" => with(gui, Gui::guard_edges),
         "railing.create_on_stair" => with(gui, Gui::rail_stairs),
+        "overlap.find" => with(gui, Gui::check_overlaps),
         "stair.spiral" => with(gui, |g| {
             g.start_stair_tool(true);
             focus(g);

@@ -3934,6 +3934,104 @@ These tools are on the **Modify** tab and are repeated on every `Modify | <Eleme
 - [ ] Join Geometry between a floor and a wall makes the floor cut the wall, and *Switch Join Order* reverses that.
 - [ ] Mirror with Copy of a right-handed door produces a left-handed door with *Mirrored* = true.
 
+### 3.12.2a Volume overlaps, virtual volumes and their resolution
+**ID:** ARC-MOD-030 · **Priority:** P0 · **Ref:** owner requirement (2026-10-13); Reviera's own design (Appendix A.2a)
+
+**Purpose.** One low-level operation, *volume overlap*, that finds where element bodies (and virtual volumes, ARC-MOD-031) occupy the same space and measures it. It serves:
+- boolean resolution (ARC-MOD-032);
+- clash detection (COL-CLASH-001/002);
+- door-swing and accessibility clearance checks;
+- automatic openings for pipes, ducts and conduits (MEP-PEN-001).
+
+*(Owner direction, 2026-10-13: "We will need a generalized overlap detector… Volume overlay is a low-level operation used for multiple cases.")*
+
+**Behaviour & rules.**
+- **Bodies.** Every element's body as closed meshes in project coordinates:
+  - Reviera's own elements regenerated from their recipes (walls joined and cut by their openings, floors, ceilings, decks, roofs with their trims, stairs, railings, gates, doors and windows);
+  - elements known only from the IFC file, as tessellated for the 3D view.
+
+  The 3D view draws the same bodies, so what is checked is what is seen.
+- **Broad phase.** Axis-aligned boxes, sorted along x and swept; pairs whose boxes overlap by more than the tolerance in every axis go on.
+- **Narrow phase.** A grid of vertical lines across the two boxes' common box (up to the resolution each way, default 48). On each line every closed mesh is crossed an even number of times, which gives the intervals inside it; a body's intervals are their union. Summed over the cells, the length of the two bodies' common intervals gives:
+  - the overlap's volume;
+  - its depth (the longest vertical run);
+  - its box and its centroid.
+- **Tolerance.** Runs shorter than the tolerance (default 1 mm) and overlaps smaller than the minimum volume (default 1 cm³) are contact, not overlap. Touching faces never overlap.
+- **Related pairs.** Pairs that overlap by design are left out unless asked: an element and its host (a door and its wall, a railing and its deck or stair), a gate and its railing, a dormer's parts and their main roof.
+- **Accuracy.** The volume converges with the resolution. Slivers thinner than a cell in both plan directions can be missed, so a check needing certainty raises the resolution. Exact solid booleans (OCCT `BRepAlgoAPI_Common`) refine flagged pairs where present.
+
+**UI.** View › Coordination › **Check Overlaps** lists the overlaps largest first (the pair, the volume and the depth). Picking one selects both elements and frames them.
+
+**Commands.** `overlap.find(element_ids?, against?, tolerance?, min_volume?, resolution?, include_related?, limit?) -> {overlaps: [{a, b, a_label, b_label, volume, depth, min, max, centroid}], bodies}`. It is available to Lua scripts and MCP like every command.
+
+**Acceptance criteria.**
+- [x] Two 2 m cubes offset by 1 m each way overlap by 1 m³, with their centroid at the common box's centre; cubes that touch, or stand one on the other, do not overlap.
+- [x] A room of four joined walls with a door, a floor under it and an attached roof has no overlaps. A wall run through one of its walls and a railing through another are both found, the wall with 0.08 m³.
+- [x] A pipe through a hole in a slab does not overlap the slab; one through the slab's edge does, by its volume in the slab.
+
+**Implementation notes (2026-10-13).**
+- `reviera_core::bodies` gives every Reviera element's closed parts (the 3D view now draws them), and `reviera_core::overlap` measures them.
+- `overlap.find` is an application command, so imported elements are included.
+- The window lists the overlaps and frames a picked pair.
+- Later: overlap boxes drawn in the view, a background check with progress for large models, and the OCCT refinement.
+
+**ID:** ARC-MOD-031 · **Priority:** P1 · **Ref:** owner requirement (2026-10-13); Reviera's own design (Appendix A.2a)
+
+**Purpose.** *Virtual volumes*: non-physical spaces that elements need kept clear. They take part in overlap checks (ARC-MOD-030) but are never built, scheduled as material or exported as physical bodies. *(Owner requests, 2026-10-13:)*
+- *"virtual volume objects for door swings, and accessibility constraints that detect collision with other geometry";*
+- *"accessibility related space requirements around bathroom objects";*
+- *"the virtual volumes should have an option to appear as translucent objects".*
+
+**Behaviour & rules.**
+- **Sources.**
+  - *Door swings:* the volume a door leaf sweeps (its arc in plan, to the leaf's height), for each leaf, on the swing side.
+  - *Accessibility clearances*, by the project's accessibility standard (a selectable rule set, ADA 2010 and ISO 21542 to start):
+    - the clear floor space at fixtures (toilet, lavatory, urinal, shower, bath, kitchen sink and appliances);
+    - grab-bar and transfer zones;
+    - a wheelchair turning space in rooms flagged accessible (a 1500 mm circle or T-shape);
+    - maneuvering clearances at doors (the push and pull sides);
+    - headroom over stairs and routes.
+  - *Element-defined:* a type may carry its own clearance boxes (equipment service access, panel working space), with a name and the categories that may intrude.
+- **Regeneration.** Each volume is regenerated with its element. It moves, flips and resizes with it.
+- **Checks.** A virtual volume overlapping a physical body is flagged, except by the bodies the rule allows: a door's swing may cross its own wall's opening, and a fixture's clear space may contain its own fixture and the floor. Two virtual volumes may overlap where the rule allows (two clear floor spaces may share).
+- **Display.** Per view, Visibility/Graphics › *Virtual Volumes*: *Hidden*, *Translucent* (the default in coordination views) or *Solid*, with a colour per kind. Flagged volumes show in the warning colour.
+- **Rule sets** are RXD data (`standards/accessibility`), editable and versioned with the project.
+
+**Data (IFC mapping).** Virtual volumes are not exported as physical elements. On request (*Export clearances*), they are written as `IfcSpatialZone` (`PredefinedType = USERDEFINED`, ObjectType "Clearance") with their element related by `IfcRelAssignsToProduct`.
+
+**Commands.**
+- `clearance.list(element_ids?) -> [{element, kind, rule, mesh}]`
+- `clearance.check(element_ids?, rules?) -> [overlap]`
+- `clearance.set_rule_set(standard)`
+- `view.set_virtual_volumes(view_id, mode: hidden|translucent|solid)`
+
+**Acceptance criteria.**
+- [ ] A 900 mm door's swing volume flags a cabinet placed within its arc, and not the wall it opens from.
+- [ ] Under ADA 2010, a toilet's 1525 × 1420 mm clear floor space flags a lavatory placed inside it.
+- [ ] A room flagged accessible without a 1500 mm turning circle clear of fixtures is reported.
+
+**ID:** ARC-MOD-032 · **Priority:** P1 · **Ref:** owner requirement (2026-10-13); Reviera's own design (Appendix A.2a)
+
+**Purpose.** Overlaps between elements are flagged, and the user resolves each by choosing a boolean (CSG) mode. *(Owner request, 2026-10-13: "collisions should be detected, flagged and allow the user to resolve by selecting a CSG mode to resolve the overlaps.")*
+
+**Behaviour & rules.**
+- **Flagging.** Overlaps found by ARC-MOD-030 are listed, and optionally shown in the view as their boxes. A setting checks after each edit, and only the edited elements.
+- **Resolution modes**, chosen per overlap:
+  - *Cut A by B* / *Cut B by A* (ARC-MOD-016);
+  - *Join* (ARC-MOD-017);
+  - *Subtract*, *Intersect* or *Union* (ARC-MOD-028);
+  - *Move apart* (along the shortest separating axis);
+  - *Accept* (marked intended, no longer flagged).
+
+  The chosen relation is kept and re-applied when either element changes.
+- **Accepted overlaps** are stored by GlobalId pair with who accepted them and when (RXD `coordination/overlaps`).
+
+**Commands.** `overlap.resolve(a, b, mode: cut_a|cut_b|join|subtract|intersect|union|move_apart|accept) -> ()`, `overlap.accepted() -> [pair]`.
+
+**Acceptance criteria.**
+- [ ] A beam through a wall flagged by Check Overlaps and resolved with *Cut B by A* leaves the wall cut by the beam, and the overlap is no longer flagged.
+- [ ] An overlap resolved with *Accept* stays unflagged after both elements move.
+
 ### 3.12.3 Array
 **ID:** ARC-MOD-026 · **Priority:** P0 · **Ref:** research/02 §1 (2026), §13
 
@@ -4445,6 +4543,13 @@ All commands below are registered once in the command registry and exposed autom
 | `roof.set_dome` | roof_id, rise?, profile?, oculus?, polygon_mode? | — | Yes | ARC-ROOF-009 |
 | `geometry.boolean` | target_id, tool_ids, op: intersect\|subtract\|union, tools?: keep\|hide\|consume | — | Yes | ARC-MOD-028 |
 | `geometry.remove_boolean` | target_id, tool_ids? | — | Yes | ARC-MOD-028 |
+| `overlap.find` | element_ids?, against?, tolerance?, min_volume?, resolution?, include_related?, limit? | {overlaps, bodies} | No | ARC-MOD-030 |
+| `overlap.resolve` | a, b, mode: cut_a\|cut_b\|join\|subtract\|intersect\|union\|move_apart\|accept | — | Yes | ARC-MOD-032 |
+| `overlap.accepted` | — | [pair] | No | ARC-MOD-032 |
+| `clearance.list` | element_ids? | [clearance] | No | ARC-MOD-031 |
+| `clearance.check` | element_ids?, rules? | [overlap] | No | ARC-MOD-031 |
+| `clearance.set_rule_set` | standard | — | Yes | ARC-MOD-031 |
+| `view.set_virtual_volumes` | view_id, mode: hidden\|translucent\|solid | — | Yes | ARC-MOD-031 |
 | `railing.create_on_edges` | type_id, host_id, edges?: [curve_key]\|all_open, setback? | [element_id] | Yes | ARC-RAIL-001 |
 | `railing.create_on_stair` | stair_id, sides?: [left\|right], inset?, type_id? | [element_id] | Yes | ARC-RAIL-001 |
 | `deck.create` | outline: loops, level_id, height?, type_id?, start_edge?, direction? | element_id | Yes | ARC-DECK-001 |

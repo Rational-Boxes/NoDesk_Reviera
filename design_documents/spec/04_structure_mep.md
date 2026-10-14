@@ -3427,6 +3427,31 @@ Allowed values come from Mechanical Settings › Slopes. Fabrication pipework ca
 - [ ] Changing the roof's overhang moves the gutter with the eave.
 - [ ] A downspout from an outlet to the ground level is a vertical run with bends at the eave offset.
 
+### 4.8.11 Automatic penetrations for pipes, ducts, conduits and cable trays
+**ID:** MEP-PEN-001 · **Priority:** P1 · **Ref:** owner requirement (2026-10-13); Reviera's own design (Appendix A.2a)
+
+**Purpose.** Openings in walls, floors, roofs and beams where MEP runs pass through them, made and kept automatically from the overlaps the volume overlap engine finds (ARC-MOD-030). *(Owner direction, 2026-10-13: "automatic opening creation for pipes, conduits, and other HVAC entities when developing the Mechanical features".)*
+
+**Behaviour & rules.**
+- **Detection.** When a pipe, duct, conduit or cable tray is placed or edited, its overlaps with hosts (walls, floors, ceilings, roofs and, by option, structural framing) are found.
+- **Openings.** Each crossing gets an opening in the host:
+  - round or rectangular after the run's profile, plus a clearance (per system type, default 25 mm), or a sleeve of a chosen type;
+  - fire-rated hosts get a penetration-seal annotation (the host's rating).
+- **Following the run.** The opening follows the run: it moves, resizes and is removed with it. A run that no longer passes through removes its opening.
+- **Rules.** Per host category and per system classification:
+  - *create*: automatic, the default for walls and floors;
+  - *flag only*: report the crossing without opening it, the default for structural framing, which needs an engineer's approval;
+  - *never*.
+- **Coordination.** Openings in another discipline's (linked) model are proposed as provisions-for-voids (BCF topics with the opening's geometry) rather than made.
+
+**Data (IFC mapping).** `IfcOpeningElement` (`PredefinedType = OPENING`) voiding the host (`IfcRelVoidsElement`), and, with a sleeve, an `IfcPipeSegment` (`SLEEVE`) or `IfcDuctSegment` filling it. Provisions for voids are `IfcVirtualElement` / `IfcBuildingElementProxy` (`PROVISIONFORVOID`) per the IFC4 reference views.
+
+**Commands.** `mep.penetrations(run_ids?) -> [crossing]`, `mep.set_penetration_rule(host_category, system?, mode: create|flag|never, clearance?, sleeve_type?) -> ()`.
+
+**Acceptance criteria.**
+- [ ] A 100 mm pipe through a 200 mm wall gets a 150 mm round opening (25 mm clearance) through the wall, which follows the pipe when it moves 500 mm along the wall.
+- [ ] A duct through a beam is flagged and not opened under the default rules.
+
 ## 4.9 Electrical
 
 Placing electrical components, cable tray and conduit is **P1**. Circuiting, panel schedules, demand factors and the electrical analytical model are **P2**.

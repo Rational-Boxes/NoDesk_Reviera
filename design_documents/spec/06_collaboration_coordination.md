@@ -1187,7 +1187,7 @@ Common link fields: `id`, `name`, `source` (see each type), `pathType` (relative
 
 **Behaviour & rules.**
 - **Broad phase:** axis-aligned boxes of all candidate elements in a BVH; candidate pairs are found in parallel (rayon).
-- **Narrow phase:** triangle–triangle intersection on the tessellation cache to reject non-intersecting pairs quickly, then an exact OCCT check (`BRepAlgoAPI_Common`, keeping pairs whose common volume exceeds a tiny tolerance, default 1 cm³, so that touching faces do not count).
+- **Narrow phase:** the volume overlap engine (ARC-MOD-030) on the bodies the 3D view draws, then an exact OCCT check (`BRepAlgoAPI_Common`, keeping pairs whose common volume exceeds a tiny tolerance, default 1 cm³, so that touching faces do not count).
 - Pairs that the model treats as intended are excluded automatically: a host and its hosted elements (wall and door), joined elements (wall–wall joins, wall–floor joins), an element and its own parts, elements in different design options that are never shown together, and elements of the same element group instance that overlap by definition (for example curtain panels and mullions).
 - Linked elements are tested in their placed position.
 

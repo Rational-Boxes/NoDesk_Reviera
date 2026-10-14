@@ -64,7 +64,9 @@ pub fn toolset_of(command: &str) -> String {
         }
         "file" | "import" | "export" | "live" | "recovery" | "validate" | "rxd" | "journal"
         | "history" | "snapshot" | "cobie" => "io",
-        "bimserver" | "link" | "workset" | "bcf" | "cde" | "api" | "http" => "collaboration",
+        "bimserver" | "link" | "workset" | "bcf" | "cde" | "api" | "http" | "overlap" | "clash" => {
+            "collaboration"
+        }
         "analysis" => "analysis",
         "script" | "plugin" | "addin" | "lua" => "scripting",
         "app" | "mcp" | "settings" | "txn" => "admin",

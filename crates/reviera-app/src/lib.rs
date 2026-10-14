@@ -12,6 +12,7 @@ mod commands;
 pub mod inspect;
 pub mod notes;
 pub mod output;
+pub mod overlaps;
 pub mod schedules;
 pub mod scripts;
 pub mod sheets;
@@ -215,6 +216,19 @@ pub struct App {
     form_handler: Option<scripts::Handler>,
 }
 
+/// Whether an element's body is regenerated from its Reviera recipe (`bodies`), rather than
+/// tessellated from the IFC file.
+pub(crate) fn regenerated(e: &reviera_core::Element) -> bool {
+    walls::wall_recipe(e).is_some()
+        || reviera_core::floors::slab_recipe(e).is_some()
+        || reviera_core::roofs::roof_recipe(e).is_some()
+        || reviera_core::stairs::stair_recipe(e).is_some()
+        || reviera_core::railings::railing_recipe(e).is_some()
+        || reviera_core::railings::gate_of(e).is_some()
+        || reviera_core::inserts::kind_of(e).is_some()
+        || reviera_core::inserts::opening_of(e).is_some()
+}
+
 impl App {
     pub fn new(config: AppConfig) -> Self {
         let mut registry = CommandRegistry::with_core();
@@ -345,190 +359,31 @@ impl App {
             .tessellation()?
             .iter()
             .filter(|m| match m.element {
-                Some(e) => store.get(e).is_some_and(|e| {
-                    walls::wall_recipe(e).is_none()
-                        && reviera_core::floors::slab_recipe(e).is_none()
-                        && reviera_core::roofs::roof_recipe(e).is_none()
-                        && reviera_core::stairs::stair_recipe(e).is_none()
-                        && reviera_core::railings::railing_recipe(e).is_none()
-                        && reviera_core::railings::gate_of(e).is_none()
-                        && reviera_core::inserts::kind_of(e).is_none()
-                        && reviera_core::inserts::opening_of(e).is_none()
-                }),
+                Some(e) => store.get(e).is_some_and(|e| !regenerated(e)),
                 None => true,
             })
             .cloned()
             .collect();
-        // Walls are regenerated and joined together, and cut by their doors and windows; one
-        // that cannot regenerate (for example, its level was deleted outside a command) is not
-        // drawn.
-        let cuts = reviera_core::inserts::cuts_by_host(store);
-        for (id, mut body) in walls::solve(store).bodies {
-            let class = store.get(id).map_or("IfcWall".into(), |e| e.class.clone());
-            // A wall attached to a roof: cut by its openings up to the roof's lowest point over
-            // it, with the part above following the roof (ARC-WALL-008).
-            if let Some(Ok(a)) = walls::attach::attached_body(store, id, &body) {
-                body.geometry.height = a.z_min - body.geometry.base_z;
+        // Reviera's own elements, regenerated (`bodies`): walls joined and cut by their openings,
+        // floors, ceilings and decks, roofs, railings, gates, stairs, doors and windows. One that
+        // cannot regenerate is not drawn.
+        for body in reviera_core::bodies::all(store) {
+            for part in body.parts {
                 meshes.push(reviera_render::SceneMesh {
-                    element: Some(id),
-                    color: reviera_render::class_color(&class),
-                    class: class.clone(),
-                    positions: a
-                        .cap
-                        .0
-                        .iter()
-                        .map(|[x, y, z]| [*x as f32, *y as f32, *z as f32])
-                        .collect(),
-                    indices: a.cap.1,
-                });
-            }
-            let (verts, indices) = match cuts.get(&id) {
-                Some(c) => walls::openings::cut_mesh(&body, c),
-                None => body.mesh(),
-            };
-            meshes.push(reviera_render::SceneMesh {
-                element: Some(id),
-                color: reviera_render::class_color(&class),
-                class,
-                positions: verts
-                    .iter()
-                    .map(|[x, y, z]| [*x as f32, *y as f32, *z as f32])
-                    .collect(),
-                indices,
-            });
-        }
-        // Floors and ceilings: each outer boundary with its holes, between bottom and top.
-        // Decks: boards and framing instead of a slab.
-        for (id, g) in reviera_core::decks::all(store) {
-            let n_boards = g.boards.len();
-            for (k, (positions, indices)) in g.parts.iter().enumerate() {
-                let class = if k < n_boards {
-                    "IfcCovering"
-                } else {
-                    "IfcMember"
-                };
-                meshes.push(reviera_render::SceneMesh {
-                    element: Some(id),
-                    color: reviera_render::class_color(class),
-                    class: class.into(),
-                    positions: positions
-                        .iter()
-                        .map(|[x, y, z]| [*x as f32, *y as f32, *z as f32])
-                        .collect(),
-                    indices: indices.clone(),
-                });
-            }
-        }
-        for (id, f) in reviera_core::floors::all(store)
-            .into_iter()
-            .filter(|(id, _)| {
-                store
-                    .get(*id)
-                    .and_then(reviera_core::decks::deck_settings)
-                    .is_none()
-            })
-        {
-            let class = store
-                .get(id)
-                .map_or("IfcSlab".to_owned(), |e| e.class.clone());
-            for p in &f.profiles {
-                let (positions, indices) =
-                    reviera_render::solid::extrude(&p.outer, &p.holes, f.top - f.thickness, f.top);
-                meshes.push(reviera_render::SceneMesh {
-                    element: Some(id),
-                    color: reviera_render::class_color(&class),
-                    class: class.clone(),
-                    positions,
-                    indices,
-                });
-            }
-        }
-        // Roofs: one closed slab per face.
-        for (id, g) in reviera_core::roofs::all(store) {
-            // The faces, then the eaves' fascias and soffits.
-            for mesh in g
-                .faces
-                .iter()
-                .map(|f| &f.slab)
-                .chain(g.trims.iter().map(|t| &t.mesh))
-                .filter(|m| !m.1.is_empty())
-            {
-                meshes.push(reviera_render::SceneMesh {
-                    element: Some(id),
-                    color: reviera_render::class_color("IfcRoof"),
-                    class: "IfcRoof".into(),
-                    positions: mesh
-                        .0
-                        .iter()
-                        .map(|[x, y, z]| [*x as f32, *y as f32, *z as f32])
-                        .collect(),
-                    indices: mesh.1.clone(),
-                });
-            }
-        }
-        // Railings: rails, posts and balusters.
-        for (id, g) in reviera_core::railings::all(store) {
-            for (positions, indices) in &g.parts {
-                meshes.push(reviera_render::SceneMesh {
-                    element: Some(id),
-                    color: reviera_render::class_color("IfcRailing"),
-                    class: "IfcRailing".into(),
-                    positions: positions
-                        .iter()
-                        .map(|[x, y, z]| [*x as f32, *y as f32, *z as f32])
-                        .collect(),
-                    indices: indices.clone(),
-                });
-            }
-        }
-        // Gates: their leaves.
-        for (id, parts) in reviera_core::railings::all_gates(store) {
-            for (positions, indices) in &parts {
-                meshes.push(reviera_render::SceneMesh {
-                    element: Some(id),
-                    color: reviera_render::class_color("IfcDoor"),
-                    class: "IfcDoor".into(),
-                    positions: positions
-                        .iter()
-                        .map(|[x, y, z]| [*x as f32, *y as f32, *z as f32])
-                        .collect(),
-                    indices: indices.clone(),
-                });
-            }
-        }
-        // Stairs: each run and landing a closed solid.
-        for (id, g) in reviera_core::stairs::all(store) {
-            for (positions, indices) in g.runs.iter().chain(&g.landings) {
-                meshes.push(reviera_render::SceneMesh {
-                    element: Some(id),
-                    color: reviera_render::class_color("IfcStair"),
-                    class: "IfcStair".into(),
-                    positions: positions
-                        .iter()
-                        .map(|[x, y, z]| [*x as f32, *y as f32, *z as f32])
-                        .collect(),
-                    indices: indices.clone(),
-                });
-            }
-        }
-        // Doors and windows: frames and glass; a door's closed panel is drawn in 3D only (plans
-        // show its swing).
-        for p in reviera_core::inserts::placed(store) {
-            let class = p.kind.class();
-            for ((verts, indices), panel) in p.meshes() {
-                meshes.push(reviera_render::SceneMesh {
-                    element: Some(p.id),
-                    color: reviera_render::class_color(class),
-                    class: if panel {
-                        format!("{class}{}", reviera_render::PLAN_HIDDEN)
+                    element: Some(body.element),
+                    color: reviera_render::class_color(&part.class),
+                    class: if part.plan_hidden {
+                        format!("{}{}", part.class, reviera_render::PLAN_HIDDEN)
                     } else {
-                        class.to_owned()
+                        part.class
                     },
-                    positions: verts
+                    positions: part
+                        .mesh
+                        .0
                         .iter()
                         .map(|[x, y, z]| [*x as f32, *y as f32, *z as f32])
                         .collect(),
-                    indices,
+                    indices: part.mesh.1,
                 });
             }
         }

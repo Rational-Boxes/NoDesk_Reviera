@@ -267,6 +267,9 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "dome" => format!(
             r#"<path d="M5 22a11 11 0 0 1 22 0z" fill="{f}" {s}/><path d="M5 22h22v5H5z" {s}/><path d="M16 11V6" {sa}/>"#
         ),
+        "overlaps" => format!(
+            r#"<rect x="4" y="9" width="15" height="15" fill="{f}" {s}/><rect x="13" y="4" width="15" height="15" fill="none" {sa}/><path d="M13 9h6v10h-6z" fill="{a}" {s}/>"#
+        ),
         "eaves" => format!(
             r#"<path d="M2 16L16 5l14 11" fill="none" {sa}/><path d="M7 12v16h18V12" fill="{f}" {s}/><path d="M2 16v3h5M30 16v3h-5" {sa}/>"#
         ),

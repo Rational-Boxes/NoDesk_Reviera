@@ -95,6 +95,14 @@ The KIT FZK *AC20-Institute-Var-2* sample model (`test-data/ifc/`) open in Revie
   arrows, and openings in roofs. Footprints may have courtyards: a building around a central
   courtyard gets a roof that falls to the street and to the courtyard (or a flat slab with the
   courtyard as a hole).
+- **Overlaps**: View › Check Overlaps finds where elements' bodies overlap (walls, floors,
+  roofs, stairs, railings, doors, windows and imported elements), largest first with the
+  volume and depth, and frames a picked pair (`overlap.find`). Touching is not overlapping,
+  and pairs that belong together by design (a door and its wall) are left out. It is the
+  shared engine for what comes next, none of it built yet: virtual volumes (door swings and
+  accessibility clearances, shown translucent, ARC-MOD-031), resolving overlaps by a boolean
+  mode (ARC-MOD-032), clash tests (COL-CLASH) and automatic pipe and duct penetrations
+  (MEP-PEN-001).
 - **Lua scripting**: `script.run` runs Lua against the open model: `reviera.<domain>.<verb>{...}`
   calls any command, `reviera.ui.form{...}` asks for input (length, number, integer, checkbox,
   choice and text fields, validated), and `print` reports. Each run is one undo step and rolls
