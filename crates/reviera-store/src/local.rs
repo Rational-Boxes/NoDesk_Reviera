@@ -125,7 +125,13 @@ impl LocalProject {
         objects.sort_by_key(|e| e.id);
         // The openings a shaft derives for each host it cuts are written from the shaft; they
         // are not elements of their own.
-        objects.retain(|e| e.class != "IfcOpeningElement" || !is_derived_opening(&ifc, e.id));
+        // So are a curtain wall's panels and mullions.
+        objects.retain(|e| {
+            !matches!(
+                e.class.as_str(),
+                "IfcOpeningElement" | "IfcPlate" | "IfcMember"
+            ) || !is_derived(&ifc, e.id)
+        });
         let length_scale = geometry::length_scale(&ifc)?;
         let (mut values, sets) = params::load(&ifc, &objects, length_scale)?;
         let types: HashSet<StepId> = ifc
@@ -500,6 +506,9 @@ impl LocalProject {
                 }
                 geometry::remove_boxes(&mut self.ifc, step)?;
             }
+            if recipe_kind == Some(reviera_core::curtain::CURTAIN_RECIPE) {
+                crate::curtains::remove_parts(&mut self.ifc, step)?;
+            }
             if recipe_kind == Some(reviera_core::slab_openings::SHAFT_RECIPE) {
                 geometry::remove_slab(&mut self.ifc, step)?;
             }
@@ -684,6 +693,14 @@ impl LocalProject {
             self.write_roofs(doc)?;
             self.write_stairs(doc)?;
             self.write_columns(doc)?;
+            let owner_history = self.new_owner_history()?;
+            crate::curtains::write_curtains(
+                &mut self.ifc,
+                doc,
+                &self.steps,
+                owner_history,
+                self.length_scale,
+            )?;
             self.write_railings(doc)?;
             self.write_rooms(doc)?;
         }
@@ -1974,8 +1991,11 @@ impl RxdRecord {
 /// The Description that marks an opening a shaft derived for one of its hosts.
 const DERIVED_OPENING: &str = "rxd:shaft";
 
-fn is_derived_opening(ifc: &IfcModel, id: StepId) -> bool {
-    matches!(ifc.attribute(id, "Description"), Ok(AttrValue::String(d)) if d.starts_with(DERIVED_OPENING))
+/// Whether an entity is one Reviera derives from another element: a shaft's opening or a
+/// curtain wall's part.
+fn is_derived(ifc: &IfcModel, id: StepId) -> bool {
+    matches!(ifc.attribute(id, "Description"), Ok(AttrValue::String(d))
+        if d.starts_with(DERIVED_OPENING) || d == crate::curtains::PART_TAG)
 }
 
 /// The lowest and highest points of a floor's, ceiling's or roof's body.

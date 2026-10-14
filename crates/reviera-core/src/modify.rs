@@ -254,6 +254,14 @@ pub(crate) fn transform(
                 crate::wall_openings::move_by(txn, id, v)?;
                 out.push(id);
             }
+        } else if crate::curtain::curtain_recipe(e).is_some() {
+            let target = if copy { txn.create(copied(e))? } else { id };
+            let dz = match x {
+                Xform::Translate(v) => v[2],
+                _ => 0.0,
+            };
+            crate::curtain::transform(txn, target, &|p| x.point(p), x.reflects(), dz)?;
+            out.push(target);
         } else if crate::columns::column_recipe(e).is_some() {
             let target = if copy { txn.create(copied(e))? } else { id };
             let (turn, mirror, dz) = match x {

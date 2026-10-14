@@ -1163,6 +1163,10 @@ pub fn cuts_by_host(store: &Store) -> std::collections::BTreeMap<ElementId, Vec<
     for p in placed(store) {
         out.entry(p.host).or_default().push(p.cut());
     }
+    // Curtain walls drawn in walls (ARC-WALL-013).
+    for (host, _, cut) in crate::curtain::embedded_cuts(store) {
+        out.entry(host).or_default().push(cut);
+    }
     // Plain openings (ARC-WALL-012).
     for (host, cuts) in crate::wall_openings::cuts_by_host(store) {
         out.entry(host)

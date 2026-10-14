@@ -234,6 +234,18 @@ pub fn all(store: &Store) -> Vec<Body> {
             push(id, "IfcDoor", mesh, false);
         }
     }
+    for (id, g) in crate::curtain::all(store) {
+        for p in &g.parts {
+            let class = if p.mullion {
+                "IfcMember:metal"
+            } else if g.ty.panel == crate::curtain::Panel::Glazed {
+                "IfcPlate:glass"
+            } else {
+                "IfcPlate"
+            };
+            push(id, class, g.mesh(p), false);
+        }
+    }
     for (id, g) in crate::columns::all(store) {
         push(id, "IfcColumn", g.mesh(), false);
     }
@@ -303,5 +315,26 @@ pub fn related(store: &Store, a: ElementId, b: ElementId) -> bool {
         }
         _ => false,
     };
-    ha.contains(&gb) || hb.contains(&ga) || same_dormer || crate::csg::related(store, a, b)
+    // A curtain wall and the wall it is drawn in (ARC-WALL-013).
+    let embedded = || {
+        let curtain = |x: ElementId| {
+            store
+                .get(x)
+                .and_then(crate::curtain::curtain_recipe)
+                .is_some()
+        };
+        let (c, w) = match (curtain(a), curtain(b)) {
+            (true, false) => (a, b),
+            (false, true) => (b, a),
+            _ => return false,
+        };
+        crate::curtain::embedded_cuts(store)
+            .iter()
+            .any(|(host, cw, _)| *host == w && *cw == c)
+    };
+    ha.contains(&gb)
+        || hb.contains(&ga)
+        || same_dormer
+        || crate::csg::related(store, a, b)
+        || embedded()
 }

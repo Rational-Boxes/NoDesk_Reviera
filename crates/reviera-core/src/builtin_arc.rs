@@ -49,6 +49,8 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(ElementArrayRadial),
         registry.add(CompoundGet),
         registry.add(CompoundSetLayers),
+        registry.add(CurtainCreate),
+        registry.add(CurtainSet),
     ];
     for r in results {
         r.expect("architecture commands are valid");
@@ -230,4 +232,32 @@ edit_command!(
     crate::compound::SetLayersParams,
     (),
     crate::compound::set_layers
+);
+
+edit_command!(
+    CurtainCreate,
+    "curtain.create",
+    "Make a curtain wall",
+    "Makes a curtain wall (ARC-CW-001/002) along a straight base line, from a base level and offset to a \
+     top level and offset or a height, of a curtain wall type (the default Storefront when omitted: \
+     vertical grid lines at most 1.5 m apart, a transom at 2.4 m, 50 × 150 mm mullions, glazed panels). \
+     Drawn along a basic wall, it cuts its opening through it (ARC-WALL-013). IFC: an IfcCurtainWall \
+     aggregating IfcPlate panels and IfcMember mullions. Returns the curtain wall.",
+    "Curtain Wall",
+    crate::curtain::CreateParams,
+    ElementId,
+    crate::curtain::create
+);
+
+edit_command!(
+    CurtainSet,
+    "curtain.set",
+    "Change curtain walls",
+    "Changes curtain walls' base line, base and top, and the justification (`beginning`, `center`, \
+     `end`) and offset of their vertical (`u_*`) and horizontal (`v_*`) grid layouts; omitted values are \
+     kept. The type's layout rules, mullions and panels are type parameters (`type.set_param`).",
+    "Edit Curtain Wall",
+    crate::curtain::SetParams,
+    (),
+    crate::curtain::set
 );

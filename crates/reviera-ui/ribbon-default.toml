@@ -789,6 +789,12 @@ icon = "assembly"
 help = "Edit the layers of the selected wall's type: functions, priorities, materials, thicknesses and the core"
 
 [[action]]
+id = "curtain.create"
+label = "Curtain Wall"
+icon = "curtain_wall"
+help = "Draw a curtain wall in a plan: click the start and end of its base line; drawn along a wall it cuts its own opening"
+
+[[action]]
 id = "column.place_architectural"
 label = "Column"
 icon = "column"
@@ -941,6 +947,7 @@ tools = [
   { action = "wall.create", size = "large" },
   { action = "wall.create_arc", size = "small" },
   { action = "wall.create_spline", size = "small" },
+  { action = "curtain.create", size = "large" },
   { action = "door.place", size = "large" },
   { action = "window.place", size = "large" },
   { action = "column.place_architectural", size = "large" },
@@ -1320,7 +1327,7 @@ items = [
 [[menu]]
 label = "&Architecture"
 items = [
-  "wall.create", "door.place", "window.place", "column.place_architectural", "floor.create", "floor.edit_boundary",
+  "wall.create", "curtain.create", "door.place", "window.place", "column.place_architectural", "floor.create", "floor.edit_boundary",
   "ceiling.create", "ceiling.edit_boundary", "roof.create_footprint", "roof.edit_footprint", "-",
   "room.place", "room.place_automatically", "-",
   "opening.create_wall", "opening.create_vertical", "opening.create_shaft", "-",

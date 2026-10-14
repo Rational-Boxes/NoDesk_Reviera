@@ -1,0 +1,48 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Copyright (C) 2026 Reviera contributors -->
+<h1>Curtain walls</h1>
+<p class="lead">A curtain wall is a surface divided by grid lines into panels, with mullions along
+the grid lines and round the border: storefronts and glazed façades.</p>
+
+<h2 id="draw">Drawing a curtain wall</h2>
+<ol>
+  <li>Open a floor plan and click <b>Architecture › Curtain Wall</b>
+    <a href="reviera:action/curtain.create">Curtain Wall</a>.</li>
+  <li>Choose its type in Properties (the default is <i>Storefront</i>: vertical grid lines at most
+    1.5 m apart, a transom 2.4 m up, 50 × 150 mm mullions, glazed panels).</li>
+  <li>Click the start and the end of its base line; it snaps like the Wall tool. It runs from
+    the plan's level up to the next level (3 m when there is none).</li>
+</ol>
+<p>Drawn along an existing wall, the curtain wall is <b>embedded</b>: it cuts its own opening
+through the wall. <code>curtain.create</code></p>
+
+<h2 id="grids">Grids, mullions and panels</h2>
+<p>The type sets how each direction's grid lines are laid out:</p>
+<table>
+  <tr><td>Fixed Distance</td><td>Lines at the spacing, from the start (or the middle, or the
+    end: the instance's Justification), with what is left over at the other end.</td></tr>
+  <tr><td>Fixed Number</td><td>That many lines, evenly spaced.</td></tr>
+  <tr><td>Maximum Spacing</td><td>Equal panels no wider than the spacing.</td></tr>
+  <tr><td>Minimum Spacing</td><td>Equal panels no narrower than the spacing.</td></tr>
+  <tr><td>None</td><td>No lines.</td></tr>
+</table>
+<p>The type also sets the mullions' width and depth (0 for none), whether there are border
+mullions, and the panels: Glazed, Solid or Empty, and their thickness. These are type values, so
+they change every curtain wall of the type; <i>Duplicate Type…</i> makes a new one.
+<code>type.set_param</code> (<code>u_layout</code>, <code>u_spacing</code>, <code>u_number</code>,
+<code>v_…</code>, <code>mullion_width</code>, <code>mullion_depth</code>,
+<code>border_mullions</code>, <code>panel</code>, <code>panel_thickness</code>)</p>
+<p>Each curtain wall has its own base and top, and for each direction a <b>Justification</b>
+(Beginning, Center, End) and <b>Offset</b> for Fixed Distance lines. <code>curtain.set</code></p>
+
+<h2 id="modify">Moving and copying</h2>
+<p>Move, Copy, Rotate and Mirror work on curtain walls. They are deleted with their levels.</p>
+
+<h2 id="ifc">In IFC</h2>
+<p>An <code>IfcCurtainWall</code> of an <code>IfcCurtainWallType</code>, aggregating its panels
+(<code>IfcPlate</code>, <code>CURTAIN_PANEL</code>) and mullions (<code>IfcMember</code>,
+<code>MULLION</code>).</p>
+<p class="note">Not yet available: arc curtain walls, adding or removing single grid lines and
+segments, curtain-wall doors and other panel types, mullion profiles and corner mullions,
+Adjust for Mullion Size, curtain systems by face and sloped glazing; a curtain wall does not yet
+refuse doors or windows in the stretch of wall it replaces.</p>

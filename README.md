@@ -199,6 +199,12 @@ Create … Boundary* tab:
   (its edges follow the walls' finish faces, round rooms included, and move with them), or
   Sketch Ceiling. Ceilings have types and sit 2600 mm above their level by default. Saved as
   `IfcCovering` (CEILING) (`ceiling.create_auto`, `ceiling.create`, `ceiling.edit_boundary`).
+- **Curtain walls** (Architecture › Curtain Wall): two clicks draw one; its type lays out the
+  vertical and horizontal grid lines (Fixed Distance, Fixed Number, Maximum or Minimum Spacing,
+  with the instance's justification and offset), mullions and glazed, solid or empty panels.
+  Drawn along a wall, it cuts its own opening. IFC: `IfcCurtainWall` aggregating `IfcPlate`
+  panels and `IfcMember` mullions (`curtain.create`, `curtain.set`; ARC-CW-001 … 006,
+  ARC-WALL-013).
 - **Columns** (Architecture › Column): architectural columns of rectangular or round types,
   placed by clicking in a plan (Spacebar turns them 90°), from a base level to a top level or a
   height. Attach Top (Modify | Columns) attaches their tops to the roof, floor or ceiling above,
@@ -425,7 +431,8 @@ Create … Boundary* tab:
   viewport (Window › New 3D View, Tile Views, Tab Views, Ctrl+Tab; Tile Views remembers its
   arrangement). Each tab has a close button; drag a tab to reorder it, onto another group's tabs
   to move it there, or to an edge of the view area to tile it. The help tab opens at start. Dockable Properties, Project Browser and Model Tree panes.
-- **Ribbon**: Architecture (Wall, Arc Wall, Spline Wall, Door, Window, Floor, Ceiling, Roof,
+- **Ribbon**: Architecture (Wall, Arc Wall, Spline Wall, Curtain Wall, Door, Window, Floor,
+  Ceiling, Roof,
   Arched Roof, Dome, Column, Room, Stair, Spiral Stair, Railing, Deck, Wall Opening, Vertical,
   Shaft,
   Level, Grid), Annotate

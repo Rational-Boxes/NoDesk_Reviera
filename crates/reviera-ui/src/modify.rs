@@ -309,6 +309,10 @@ impl Gui {
                 if let Ok(g) = reviera_core::columns::regenerate(&store, e) {
                     ring(&mut out, &g.ring);
                 }
+            } else if reviera_core::curtain::curtain_recipe(e).is_some() {
+                if let Ok(g) = reviera_core::curtain::regenerate(&store, e) {
+                    ring(&mut out, &g.footprint());
+                }
             } else if let Ok(p) = reviera_core::inserts::resolve(&store, e) {
                 let c = p.cut();
                 let half = p.wall.width / 2.0;
@@ -962,6 +966,7 @@ impl Gui {
             || self.dormer_tool.is_some()
             || self.railing_tool.is_some()
             || self.column_tool.is_some()
+            || self.curtain_tool.is_some()
     }
 
     /// Shows the grips of the selection (or nothing).

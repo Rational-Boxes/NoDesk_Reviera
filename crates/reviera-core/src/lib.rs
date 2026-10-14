@@ -21,6 +21,7 @@ pub mod columns;
 pub mod command;
 pub mod compound;
 pub mod csg;
+pub mod curtain;
 pub mod decks;
 pub mod document;
 pub mod dormers;

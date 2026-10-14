@@ -300,6 +300,9 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "model_properties" => format!(
             r#"<path d="M6 4h14l6 6v18H6z" fill="{f}" {s}/><path d="M10 12h12M10 17h12M10 22h7" {s}/><path d="M21 22l2 2 4-5" {sa}/>"#
         ),
+        "curtain_wall" => format!(
+            r#"<rect x="4" y="4" width="24" height="24" fill="{f}" {s}/><path d="M12 4v24M20 4v24M4 16h24" {sa}/>"#
+        ),
         "assembly" => format!(
             r#"<path d="M6 4v24M11 4v24M21 4v24M26 4v24" {s}/><rect x="11" y="4" width="10" height="24" fill="{f}" {sa}/>"#
         ),

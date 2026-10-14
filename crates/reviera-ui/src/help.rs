@@ -68,6 +68,7 @@ pub(crate) const PAGES: &[Page] = &[
     page!("scripting", "Scripting and automation", CORE),
     page!("levels-grids", "Levels and grids", ARCHITECTURE),
     page!("walls", "Walls", ARCHITECTURE),
+    page!("curtain-walls", "Curtain walls", ARCHITECTURE),
     page!("doors-windows", "Doors and windows", ARCHITECTURE),
     page!("columns", "Columns", ARCHITECTURE),
     page!("sketch", "Sketch mode", ARCHITECTURE),

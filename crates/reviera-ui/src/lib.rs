@@ -13,6 +13,7 @@
 mod assembly;
 mod browser;
 mod columns;
+mod curtain;
 mod curved;
 mod decks;
 mod dims;
@@ -237,6 +238,7 @@ struct Gui {
     feature_tool: Option<railings::FeatureTool>,
     dome_tool: Option<curved::DomeTool>,
     column_tool: Option<columns::ColumnTool>,
+    curtain_tool: Option<curtain::CurtainTool>,
     /// The last array's members and Move To (Last when true).
     array_count: u32,
     array_last: bool,
@@ -1216,6 +1218,7 @@ impl Gui {
         self.end_feature_tool();
         self.end_dome_tool();
         self.end_column_tool();
+        self.end_curtain_tool();
         if self.tool.take().is_some() {
             if let Some(v) = self.viewport() {
                 v.set_overlay(&[]);
@@ -1244,6 +1247,9 @@ impl Gui {
         }
         if self.railing_tool.is_some() {
             return self.railing_escape();
+        }
+        if self.curtain_escape() {
+            return;
         }
         if self.end_feature_tool() || self.end_dome_tool() || self.end_column_tool() {
             return frame.set_status_text("Ready", 0);
@@ -1801,6 +1807,7 @@ impl Gui {
         if ids.is_empty()
             && (self.grid_tool_properties(grid)
                 || self.column_tool_properties(grid)
+                || self.curtain_tool_properties(grid)
                 || self.insert_tool_properties(grid)
                 || self.wall_tool_properties(grid)
                 || self.view_properties(grid))
@@ -1860,7 +1867,8 @@ impl Gui {
         let is_grid = reviera_core::grids::is_grid(&e);
         let is_insert = reviera_core::inserts::kind_of(&e).is_some();
         let is_wall = reviera_core::walls::wall_recipe(&e).is_some()
-            || reviera_core::columns::column_recipe(&e).is_some();
+            || reviera_core::columns::column_recipe(&e).is_some()
+            || reviera_core::curtain::curtain_recipe(&e).is_some();
         for (i, (label, value)) in [
             ("Category", category),
             // A grid line is written as an axis of the grid system.
@@ -1937,6 +1945,7 @@ impl Gui {
             || self.stair_rows(grid, id)
             || self.opening_rows(grid, id)
             || self.column_rows(grid, id)
+            || self.curtain_rows(grid, id)
         {
             return;
         }
@@ -2144,6 +2153,7 @@ impl Gui {
         if self.grid_type_edit(property, text.clone())
             || self.opening_edit(property, text.clone())
             || self.column_edit(property, text.clone())
+            || self.curtain_edit(property, text.clone())
             || self.insert_edit(property, text.clone())
             || self.wall_edit(property, text.clone())
             || self.floor_edit(property, text.clone())
@@ -2477,6 +2487,7 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                     None if g.feature_tool.is_some() => g.feature_click(x, y, &p),
                     None if g.dome_tool.is_some() => g.dome_click(x, y),
                     None if g.column_tool.is_some() => g.column_click(x, y),
+                    None if g.curtain_tool.is_some() => g.curtain_click(x, y),
                     None if g.dim_tool.is_some() => g.dim_click(x, y),
                     None if g.grid_tool.is_some() => g.grid_click(x, y),
                     None if g.insert_tool.is_some() => g.insert_click(x, y),
@@ -2543,6 +2554,10 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                     }
                     if g.column_tool.is_some() {
                         g.column_motion(x, y);
+                        redraw = true;
+                    }
+                    if g.curtain_tool.is_some() {
+                        g.curtain_motion(x, y);
                         redraw = true;
                     }
                     if g.dim_tool.is_some() {
@@ -3011,6 +3026,7 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 feature_tool: None,
                 dome_tool: None,
                 column_tool: None,
+                curtain_tool: None,
                 array_count: 4,
                 array_last: false,
                 floor_type: None,
@@ -3493,6 +3509,10 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
             focus(g);
         }),
         "column.attach" => with(gui, Gui::attach_column_tops),
+        "curtain.create" => with(gui, |g| {
+            g.start_curtain_tool();
+            focus(g);
+        }),
         "wall.edit_assembly" => with(gui, Gui::edit_assembly),
         "column.detach" => with(gui, Gui::detach_column_tops),
         "opening.create_wall" => with(gui, |g| {

@@ -1246,6 +1246,8 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 
 **Commands.** No command of its own. Embedding is automatic on create or move. `geometry.cut` (ARC-MOD-016) forces a cut manually.
 
+*Built (2026-10-15):* a straight curtain wall whose base line lies within half a straight basic wall's width of its location line cuts an opening through it over the span and heights they share; the two are related (not reported as an overlap). Not yet: refusing doors and windows in the cut span, curved hosts, `geometry.cut`.
+
 **Acceptance criteria.**
 - [ ] Drawing a storefront along a brick wall cuts a matching opening, and moving the storefront moves the opening.
 
@@ -1662,7 +1664,9 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 - Grid lines (U/V positions, segment on/off, pin state, independent flag) are stored in RXD element data (`recipe.curtain_grid`). The type's layout rules are stored in RXD type data (`recipe.curtain_type`).
 
 **Acceptance criteria.**
-- [ ] A 6 m × 3 m curtain wall with three vertical grid lines and one horizontal grid line exports one `IfcCurtainWall` aggregating 8 `IfcPlate` and the matching `IfcMember` parts, and it opens in an independent viewer with every part present.
+- [x] A 6 m × 3 m curtain wall with three vertical grid lines and one horizontal grid line exports one `IfcCurtainWall` aggregating 8 `IfcPlate` and the matching `IfcMember` parts, and it opens in an independent viewer with every part present. *(Checked by test with IfcOpenShell; not yet in another viewer.)*
+
+*Built (2026-10-15):* straight curtain walls (`curtain.create`, `curtain.set`) of curtain wall types (`IfcCurtainWallType` with a `recipe.curtain_type`: U and V layout rules, interior and border mullions as rectangles, Glazed, Solid or Empty system panels and their thickness; values through `type.set_param`, swapped with `element.set_type`; the default type is a *Storefront*). Panels fill the cells inside the mullions; vertical mullions run full height, horizontal ones between them. They move, rotate, mirror and copy and are deleted with their levels. Architecture › **Curtain Wall** draws them with two clicks; Properties edits constraints, justification and offset per direction, and the type. IFC: the parts are derived on save (marked `rxd:curtain`, not loaded as elements), rewritten only when the curtain wall changes. Not yet: an `Axis` representation, arc curtain walls, independent grid lines and segments, curtain-panel and door families, mullion profiles, `Adjust for Mullion Size`, pinned grids, curtain systems and sloped glazing.
 
 ### 3.5.2 Creating curtain walls
 **ID:** ARC-CW-002 · **Priority:** P1 · **Ref:** research/02 §6.2

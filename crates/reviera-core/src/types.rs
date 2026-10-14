@@ -211,6 +211,9 @@ pub(crate) fn set_param(txn: &mut crate::txn::Transaction<'_>, p: SetParamParams
     if crate::columns::column_type(e).is_some() {
         return crate::columns::set_type_param(txn, id, &p.param, &p.value);
     }
+    if crate::curtain::curtain_type(e).is_some() {
+        return crate::curtain::set_type_param(txn, id, &p.param, &p.value);
+    }
     if (crate::floors::type_thickness(e).is_some() || crate::roofs::is_roof_type(e))
         && p.param == "thickness"
     {
@@ -307,6 +310,17 @@ pub(crate) fn set_type(txn: &mut crate::txn::Transaction<'_>, p: SetTypeParams) 
                 return Err(Error::new(
                     "type.wrong_family",
                     format!("{} {id} needs a {} type", kind.noun(), kind.noun()),
+                ));
+            }
+            let guid = ty.guid().to_string();
+            txn.modify(id, |w| {
+                w.params.insert("@type".into(), Value::String(guid));
+            })?;
+        } else if crate::curtain::curtain_recipe(e).is_some() {
+            if crate::curtain::curtain_type(ty).is_none() {
+                return Err(Error::new(
+                    "type.wrong_family",
+                    format!("curtain wall {id} needs a curtain wall type"),
                 ));
             }
             let guid = ty.guid().to_string();
