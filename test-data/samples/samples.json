@@ -57,5 +57,17 @@
         }
       }
     ]
+  },
+  {
+    "name": "manor",
+    "title": "Manor with tower",
+    "steps": [
+      {
+        "command": "script.run",
+        "args": {
+          "file": "manor.lua"
+        }
+      }
+    ]
   }
 ]

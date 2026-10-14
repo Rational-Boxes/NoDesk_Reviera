@@ -422,9 +422,14 @@ Create … Boundary* tab:
 
 `test-data/samples` holds Reviera's own sample models. Each is rebuilt by a Lua script and
 checked by a test (no overlaps, no clearance intrusions, saves and reopens), and each has a
-walkthrough (`house.md`, `observatory.md`, `csg.md`) giving the manual steps to build it in the
+walkthrough (`house.md`, `observatory.md`, `csg.md`, `manor.md`) giving the manual steps to build it in the
 window, which confirms that every operation it uses has its UI:
 
+- **Manor with tower** (`manor.ifc`), the demonstration model: a two-storey house with an arched
+  door, round-top, Gothic and oculus windows, rooms, ceilings, a hipped roof with eaves and a
+  dormer, and a straight stair that completes itself and opens the ceiling and floor over it
+  for the IRC's headroom; a round three-storey tower with two spiral stairs opening the floors
+  above them, under an onion dome; and a deck with a gated railing.
 - **House with dormers** (`house.ifc`): eaves, flush-joined dormers, L and U stairs with
   railings, a gated front railing and a deck with its railing.
 - **Observatory** (`observatory.ifc`): a round drum of arc walls under a dome, a vaulted annex, a
@@ -433,7 +438,7 @@ window, which confirms that every operation it uses has its UI:
 - **Overlap resolutions** (`csg.ifc`): one overlap resolved every way, side by side (cut either
   way, join, intersect, union, move apart and accept) next to an unresolved pair.
 
-Open one with `reviera gui test-data/samples/observatory.ifc`, or rebuild them with
+Open one with `reviera gui test-data/samples/manor.ifc`, or rebuild them with
 `REVIERA_REGEN_SAMPLES=1 cargo test -p reviera-app --test samples`.
 
 ## Not built yet

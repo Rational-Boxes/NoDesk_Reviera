@@ -253,8 +253,8 @@ pub struct Obstruction {
 
 /// The headroom check of a stair under `headroom` (metres; `spiral` over spiral runs): every
 /// floor or ceiling that leaves less over a tread (from the nosing line, approximated by the
-/// next nosing's height) or a landing, and the plan region it must open: the union of those
-/// treads and landings, over the stair's full width.
+/// next nosing's height) or a landing, or that the stair passes through, and the plan region
+/// it must open: the union of those treads and landings, over the stair's full width.
 pub fn obstructions(
     store: &Store,
     stair: ElementId,
@@ -299,6 +299,15 @@ pub fn obstructions(
     collect(&g.runs, g.riser_height);
     collect(&g.landings, 0.0);
     let top = g.z_base + g.height;
+    // How far the stair's body reaches below a walking surface: a riser, and its structure.
+    let t = e
+        .param("@type")
+        .and_then(Value::as_str)
+        .and_then(|guid| find(store, guid))
+        .and_then(|t| store.get(t))
+        .and_then(crate::stairs::stair_type)
+        .unwrap_or_default();
+    let body = g.riser_height + t.structural_depth.max(t.landing_thickness);
     let mut out = Vec::new();
     for (id, f) in crate::floors::all(store) {
         let host = store.get(id).expect("listed");
@@ -312,7 +321,8 @@ pub fn obstructions(
         }
         let low: Vec<&([[f64; 2]; 3], f64, f64)> = surfaces
             .iter()
-            .filter(|(_, z, from)| *z < f.top - 1e-6 && underside - from < need - 1e-6)
+            // Under the slab and short of headroom, or passing through it.
+            .filter(|(_, z, from)| *z < f.top + body - 1e-6 && underside - from < need - 1e-6)
             .collect();
         if low.is_empty() {
             continue;

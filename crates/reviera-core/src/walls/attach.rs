@@ -359,6 +359,27 @@ pub(crate) fn attach(txn: &mut crate::txn::Transaction<'_>, p: AttachParams) -> 
 /// outside every enclosed region of their level) that the roof covers whole and that start
 /// below its lowest point over them (ARC-ROOF-001: the walls whose gables fill when a roof is
 /// finished). Interior walls are left to be attached by hand.
+/// Whether another wall stands on `body`: its base at or above `body`'s top, with the middle
+/// of one wall's location line inside the other's footprint.
+fn has_wall_above(solved: &super::Solved, id: ElementId, body: &super::WallBody) -> bool {
+    let top = body.geometry.base_z + body.geometry.height;
+    let inside = |p: [f64; 2], q: &[[f64; 2]; 4]| {
+        (0..4).all(|i| {
+            let (a, b) = (q[i], q[(i + 1) % 4]);
+            (b[0] - a[0]) * (p[1] - a[1]) - (b[1] - a[1]) * (p[0] - a[0]) >= -1e-9
+        }) || (0..4).all(|i| {
+            let (a, b) = (q[i], q[(i + 1) % 4]);
+            (b[0] - a[0]) * (p[1] - a[1]) - (b[1] - a[1]) * (p[0] - a[0]) <= 1e-9
+        })
+    };
+    let mid = |g: &super::WallGeometry| [(g.start[0] + g.end[0]) / 2.0, (g.start[1] + g.end[1]) / 2.0];
+    solved.bodies.iter().any(|(other, o)| {
+        *other != id
+            && (o.geometry.base_z - top).abs() < 0.05
+            && (inside(mid(&o.geometry), &body.footprint) || inside(mid(&body.geometry), &o.footprint))
+    })
+}
+
 pub fn walls_below(store: &Store, roof: ElementId) -> Vec<ElementId> {
     let Some(e) = store.get(roof) else {
         return Vec::new();
@@ -378,6 +399,8 @@ pub fn walls_below(store: &Store, roof: ElementId) -> Vec<ElementId> {
                 .is_some_and(|r| r.attach_top.as_deref() != Some(guid.as_str()))
         })
         .filter(|(_, body)| attach_to(&g, body).is_ok_and(|a| a.z_min > body.geometry.base_z + 0.1))
+        // A wall with another standing on it (a lower storey's) does not reach the roof.
+        .filter(|(id, body)| !has_wall_above(&solved, **id, body))
         .map(|(id, _)| *id)
         .collect();
     // Enclosed regions by the height they are taken at (each wall's base, a little up).
