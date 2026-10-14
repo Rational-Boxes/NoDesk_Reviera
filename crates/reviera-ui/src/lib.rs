@@ -11,6 +11,7 @@
 //! through `App::execute`, like Lua and MCP. The ribbon and browsers come next.
 
 mod browser;
+mod curved;
 mod decks;
 mod dims;
 mod dormers;
@@ -204,6 +205,7 @@ struct Gui {
     /// The Railing tool.
     railing_tool: Option<railings::RailingTool>,
     feature_tool: Option<railings::FeatureTool>,
+    dome_tool: Option<curved::DomeTool>,
     /// The floor type new floors take.
     floor_type: Option<ElementId>,
     /// The last pointer position in the active view (Tab in sketch mode picks there).
@@ -1113,6 +1115,7 @@ impl Gui {
         self.end_dormer_tool();
         self.end_railing_tool();
         self.end_feature_tool();
+        self.end_dome_tool();
         if self.tool.take().is_some() {
             if let Some(v) = self.viewport() {
                 v.set_overlay(&[]);
@@ -1142,7 +1145,7 @@ impl Gui {
         if self.railing_tool.is_some() {
             return self.railing_escape();
         }
-        if self.end_feature_tool() {
+        if self.end_feature_tool() || self.end_dome_tool() {
             return frame.set_status_text("Ready", 0);
         }
         if self.attach_pick.take().is_some() {
@@ -1956,6 +1959,7 @@ impl Gui {
             || self.sketch_edit(property, text.clone())
             || self.stair_edit(property, text.clone())
             || self.dormer_edit(property, text.clone())
+            || self.curved_roof_edit(property, text.clone())
             || self.deck_edit(property, text.clone())
         {
             return;
@@ -2256,6 +2260,7 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                     None if g.dormer_tool.is_some() => g.dormer_click(x, y, &p),
                     None if g.railing_tool.is_some() => g.railing_click(x, y),
                     None if g.feature_tool.is_some() => g.feature_click(x, y, &p),
+                    None if g.dome_tool.is_some() => g.dome_click(x, y),
                     None if g.dim_tool.is_some() => g.dim_click(x, y),
                     None if g.grid_tool.is_some() => g.grid_click(x, y),
                     None if g.insert_tool.is_some() => g.insert_click(x, y),
@@ -2311,6 +2316,10 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                     }
                     if g.railing_tool.is_some() {
                         g.railing_motion(x, y);
+                        redraw = true;
+                    }
+                    if g.dome_tool.is_some() {
+                        g.dome_motion(x, y);
                         redraw = true;
                     }
                     if g.dim_tool.is_some() {
@@ -2766,6 +2775,7 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 dormer_tool: None,
                 railing_tool: None,
                 feature_tool: None,
+                dome_tool: None,
                 floor_type: None,
                 mouse: (0, 0),
                 offset_distance: 1.0,
@@ -3232,6 +3242,14 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         }),
         "roof.create_footprint" => with(gui, |g| {
             g.start_roof_sketch();
+            focus(g);
+        }),
+        "roof.create_arched" => with(gui, |g| {
+            g.start_arched_roof_sketch();
+            focus(g);
+        }),
+        "roof.create_dome" => with(gui, |g| {
+            g.start_dome_tool();
             focus(g);
         }),
         "roof.edit_footprint" => with(gui, |g| {

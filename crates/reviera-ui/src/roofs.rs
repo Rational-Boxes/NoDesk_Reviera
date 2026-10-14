@@ -206,92 +206,95 @@ impl Gui {
             let o = self.format_length(c.offset);
             grid.append(Property::string("Cutoff Offset", "rf_cutoff_offset", o));
         }
-        grid.append(Property::category("Shape", "c_roof_shape"));
-        let mut shapes: Vec<(String, i32)> = roofs::ROOF_SHAPES
-            .iter()
-            .enumerate()
-            .map(|(i, s)| (s.1.to_owned(), i as i32))
-            .collect();
-        let current = roofs::shape_of(e)
-            .and_then(|s| roofs::ROOF_SHAPES.iter().position(|r| r.0 == s))
-            .map_or_else(
-                || {
-                    shapes.push(("Custom".to_owned(), shapes.len() as i32));
-                    shapes.len() as i32 - 1
-                },
-                |i| i as i32,
-            );
-        grid.append(Property::enumeration(
-            "Roof Shape",
-            "rf_shape",
-            shapes,
-            current,
-        ));
-        grid.set_help_string(
+        // Arched roofs and domes have their own rows; footprint roofs their shape and eaves.
+        if !self.curved_roof_rows(grid, &recipe) {
+            grid.append(Property::category("Shape", "c_roof_shape"));
+            let mut shapes: Vec<(String, i32)> = roofs::ROOF_SHAPES
+                .iter()
+                .enumerate()
+                .map(|(i, s)| (s.1.to_owned(), i as i32))
+                .collect();
+            let current = roofs::shape_of(e)
+                .and_then(|s| roofs::ROOF_SHAPES.iter().position(|r| r.0 == s))
+                .map_or_else(
+                    || {
+                        shapes.push(("Custom".to_owned(), shapes.len() as i32));
+                        shapes.len() as i32 - 1
+                    },
+                    |i| i as i32,
+                );
+            grid.append(Property::enumeration(
+                "Roof Shape",
+                "rf_shape",
+                shapes,
+                current,
+            ));
+            grid.set_help_string(
             "rf_shape",
             "Which footprint edges slope: Gable puts gable ends on the short sides, Shed slopes \
              up from the longest side. Edit Footprint sets edges one by one (Custom).",
         );
-        // The overhang of every edge, or Varies.
-        let overhangs: Vec<f64> = reviera_core::sketch::sketch_of(e)
-            .map(|s| {
-                s.curves
-                    .iter()
-                    .map(|c| recipe.edge(c.key).overhang)
-                    .collect()
-            })
-            .unwrap_or_default();
-        let overhang = match overhangs.first() {
-            Some(o) if overhangs.iter().all(|v| (v - o).abs() < 1e-9) => self.format_length(*o),
-            Some(_) => "Varies".to_owned(),
-            None => String::new(),
-        };
-        grid.append(Property::string("Overhang", "rf_overhang", overhang));
-        grid.set_help_string(
-            "rf_overhang",
-            "How far the roof reaches past every footprint edge",
-        );
-        // The eaves (the first eave's settings; edits apply to every eave).
-        let eaves: Vec<(u32, roofs::eaves::Eave)> = recipe
-            .edges
-            .iter()
-            .filter_map(|(k, e)| Some((k.parse().ok()?, e.eave.clone()?)))
-            .collect();
-        if let Some((_, eave)) = eaves.iter().min_by_key(|e| e.0) {
-            let v = serde_json::to_value(eave).unwrap_or_default();
-            grid.append(Property::category("Eaves", "c_roof_eaves"));
-            let enums = [
-                ("Bearing", "ev_bearing", BEARINGS, &v["bearing"]),
-                ("Rafter Cut", "ev_cut", CUTS, &v["cut"]),
-                ("Fascia", "ev_fascia", YES_NO, &v["fascia"]),
-                ("Soffit", "ev_soffit", SOFFITS, &v["soffit"]),
-            ];
-            for (label, key, list, value) in enums {
-                grid.append(Property::enumeration(
-                    label,
-                    key,
-                    choices(list),
-                    index_of(list, value),
-                ));
-            }
-            let heel = eave.heel.map(|h| self.format_length(h)).unwrap_or_default();
-            grid.append(Property::string("Heel Height", "ev_heel", heel));
-            let depth = self.format_length(eave.fascia_depth);
-            grid.append(Property::string("Fascia Depth", "ev_fascia_depth", depth));
+            // The overhang of every edge, or Varies.
+            let overhangs: Vec<f64> = reviera_core::sketch::sketch_of(e)
+                .map(|s| {
+                    s.curves
+                        .iter()
+                        .map(|c| recipe.edge(c.key).overhang)
+                        .collect()
+                })
+                .unwrap_or_default();
+            let overhang = match overhangs.first() {
+                Some(o) if overhangs.iter().all(|v| (v - o).abs() < 1e-9) => self.format_length(*o),
+                Some(_) => "Varies".to_owned(),
+                None => String::new(),
+            };
+            grid.append(Property::string("Overhang", "rf_overhang", overhang));
             grid.set_help_string(
-                "ev_bearing",
-                "Where the roof's underside meets the plate on the wall below; the overhang is \
-                 measured from the wall's exterior face whatever the bearing",
+                "rf_overhang",
+                "How far the roof reaches past every footprint edge",
             );
-            grid.set_help_string(
+            // The eaves (the first eave's settings; edits apply to every eave).
+            let eaves: Vec<(u32, roofs::eaves::Eave)> = recipe
+                .edges
+                .iter()
+                .filter_map(|(k, e)| Some((k.parse().ok()?, e.eave.clone()?)))
+                .collect();
+            if let Some((_, eave)) = eaves.iter().min_by_key(|e| e.0) {
+                let v = serde_json::to_value(eave).unwrap_or_default();
+                grid.append(Property::category("Eaves", "c_roof_eaves"));
+                let enums = [
+                    ("Bearing", "ev_bearing", BEARINGS, &v["bearing"]),
+                    ("Rafter Cut", "ev_cut", CUTS, &v["cut"]),
+                    ("Fascia", "ev_fascia", YES_NO, &v["fascia"]),
+                    ("Soffit", "ev_soffit", SOFFITS, &v["soffit"]),
+                ];
+                for (label, key, list, value) in enums {
+                    grid.append(Property::enumeration(
+                        label,
+                        key,
+                        choices(list),
+                        index_of(list, value),
+                    ));
+                }
+                let heel = eave.heel.map(|h| self.format_length(h)).unwrap_or_default();
+                grid.append(Property::string("Heel Height", "ev_heel", heel));
+                let depth = self.format_length(eave.fascia_depth);
+                grid.append(Property::string("Fascia Depth", "ev_fascia_depth", depth));
+                grid.set_help_string(
+                    "ev_bearing",
+                    "Where the roof's underside meets the plate on the wall below; the overhang is \
+                 measured from the wall's exterior face whatever the bearing",
+                );
+                grid.set_help_string(
                 "ev_heel",
                 "The roof construction's depth at the bearing line; deeper than the roof raises \
                  it. Empty: the roof's own depth",
             );
-            grid.set_help_string(
-                "ev_fascia_depth",
-                "The fascia's depth, and a two-cut's plumb face",
-            );
+                grid.set_help_string(
+                    "ev_fascia_depth",
+                    "The fascia's depth, and a two-cut's plumb face",
+                );
+            }
         }
         grid.append(Property::category("Dimensions", "c_roof_dims"));
         let slope = angle(self, recipe.slope);

@@ -652,6 +652,18 @@ icon = "roof"
 help = "Roof by footprint: pick walls or sketch the outline; sloped edges rise, the others are gables"
 
 [[action]]
+id = "roof.create_arched"
+label = "Arched Roof"
+icon = "arched_roof"
+help = "A smooth arched (barrel) roof: sketch a four-sided footprint; it springs from the longer sides and tapers over a trapezoid"
+
+[[action]]
+id = "roof.create_dome"
+label = "Dome"
+icon = "dome"
+help = "A dome over a circle or a regular polygon: choose the plan and profile, then click the centre and the radius in a plan"
+
+[[action]]
 id = "stair.create"
 label = "Stair"
 icon = "stair"
@@ -778,6 +790,8 @@ tools = [
   { action = "floor.create", size = "large" },
   { action = "ceiling.create", size = "large" },
   { action = "roof.create_footprint", size = "large" },
+  { action = "roof.create_arched", size = "small" },
+  { action = "roof.create_dome", size = "small" },
 ]
 
 [[tab.panel]]

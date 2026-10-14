@@ -2311,10 +2311,18 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 **Commands.** `roof.create_arched(footprint: [4 points] | curves, spring_edges: [k1, k2], level_id, base_offset?, rise?, radius?, profile?: segment|semicircle|elliptical|catenary, taper?: constant_rise|constant_slope, overhang?, end_overhang?, type_id?) -> element_id` and `roof.set_arch(roof_id, rise?, radius?, profile?, taper?) -> ()`.
 
 **Acceptance criteria.**
-- [ ] A 6 m-wide, 10 m-long footprint with a 1.5 m rise gives a circular-segment barrel roof of radius 3.75 m. Its crown is 1.5 m above the springing all along.
-- [ ] A trapezoid whose span narrows from 6 m to 4 m along 8 m, with constant rise, gives a smooth vault. Every section is a circular segment of rise 1.5 m, with a radius of 3.75 m at the wide end and 2.08 m at the narrow end, and the surface has no creases.
-- [ ] With constant slope at the springing instead, the narrow end's rise is 1.0 m.
-- [ ] End walls attached to an arched roof reach the arch exactly.
+- [x] A 6 m-wide, 10 m-long footprint with a 1.5 m rise gives a circular-segment barrel roof of radius 3.75 m. Its crown is 1.5 m above the springing all along.
+- [x] A trapezoid whose span narrows from 6 m to 4 m along 8 m, with constant rise, gives a smooth vault. Every section is a circular segment of rise 1.5 m, with a radius of 3.75 m at the wide end and 2.08 m at the narrow end, and the surface has no creases.
+- [x] With constant slope at the springing instead, the narrow end's rise is 1.0 m.
+- [x] End walls attached to an arched roof reach the arch exactly.
+
+**Implementation notes (2026-10-13).** As built:
+- An arched roof is a footprint roof (four curves) with an `arch` in its recipe:
+  - spring edges (default the longer pair), rise or radius, profile (segment, semicircle, elliptical, catenary), taper (constant rise or constant slope), side and end overhangs.
+  - `roof.create_arched` and `roof.set_arch`.
+- **Generation:** sections every 500 mm along the vault at equal parameters (cosine-spaced across, 24 steps), so a trapezoid gives a smooth taper. Each grid cell is two flat triangles, which are the roof's faces, so wall attachment, underside queries and plans work as for any roof. Overhangs continue the arch's tangent (capped at 80°) and the vault past its ends.
+- **Body:** one closed shell, the grid offset by the type's thickness along the smoothed vertex normals. It is written as a faceted B-rep (`BARREL_ROOF`). The B-spline `IfcAdvancedBrep` and `IfcExtrudedAreaSolid` forms come later, with OCCT.
+- **Window:** Architecture › Arched Roof sketches the footprint like Roof, and Finish makes it arched (and offers to attach the walls; the end walls fill up to the arch). A selected arched roof shows Profile, Taper, Rise and the overhangs in Properties.
 
 ### 3.6.8c Dome roofs
 **ID:** ARC-ROOF-009 · **Priority:** P1 · **Ref:** owner requirement (2026-10-13); Reviera's own design (Appendix A.2a)
@@ -2335,9 +2343,16 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 **Commands.** `roof.create_dome(plan: Circle{center, radius} | Ellipse{...} | Polygon{center, radius, sides, rotation}, level_id, base_offset?, rise?, profile?: hemisphere|segmental|pointed|onion, oculus?, polygon_mode?: cloister|faceted, type_id?) -> element_id` and `roof.set_dome(roof_id, ...) -> ()`.
 
 **Acceptance criteria.**
-- [ ] A hemisphere over a 4 m-radius circle has its crown 4 m above the springing, and the volume of its shell matches 2/3·π·(R₂³ − R₁³) within 0.5%.
-- [ ] An octagonal cloister vault has eight cylindrical faces meeting at straight hips in plan.
-- [ ] An oculus of 1 m leaves a 1 m circular opening at the crown.
+- [x] A hemisphere over a 4 m-radius circle has its crown 4 m above the springing, and the volume of its shell matches 2/3·π·(R₂³ − R₁³) within 0.5%.
+- [x] An octagonal cloister vault has eight cylindrical faces meeting at straight hips in plan.
+- [x] An oculus of 1 m leaves a 1 m circular opening at the crown.
+
+**Implementation notes (2026-10-13).** As built:
+- A dome is an `IfcRoof` whose recipe holds its plan (circle, ellipse, regular polygon), rise, profile (hemisphere, segmental, pointed with an arc ratio, onion with a bulge ratio), oculus and a faceted option. It has no footprint sketch.
+- `roof.create_dome` and `roof.set_dome`.
+- **Generation:** rings up the profile (16, or 5 faceted) by directions round the plan (48 for curves; six per polygon side including the corners, so the cloister vault's hips are straight). The faces and the shell are built as for arched roofs, and saved as `DOME_ROOF`.
+- **Window:** Architecture › Dome asks for the plan and profile, then two clicks in a plan (the centre and a point on the springing; a polygon's first corner is there). The dome springs from the top of the walls inside its circle (a drum), else from the level's walls. Properties show Profile, Rise, Oculus and Faceted.
+- **Later:** a lantern curb at the oculus, a revolved-solid IFC body, ellipse picking in the window.
 
 ### 3.6.9 Join/Unjoin Roof
 **ID:** ARC-ROOF-006 · **Priority:** P1 · **Ref:** research/02 §7.4, §9

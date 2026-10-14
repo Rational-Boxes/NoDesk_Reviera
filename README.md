@@ -95,6 +95,14 @@ The KIT FZK *AC20-Institute-Var-2* sample model (`test-data/ifc/`) open in Revie
   arrows, and openings in roofs. Footprints may have courtyards: a building around a central
   courtyard gets a roof that falls to the street and to the courtyard (or a flat slab with the
   courtyard as a hole).
+- **Arched roofs and domes**: Architecture › Arched Roof sketches a four-sided footprint and
+  makes a smooth barrel or segmental vault springing from the longer sides (semicircle,
+  elliptical and catenary profiles too). Over a trapezoid it tapers, keeping its rise or its
+  slope at the springing. The end walls attach up to the arch. Architecture › Dome places a
+  hemisphere, segmental, pointed or onion dome over a circle or a square, hexagonal or
+  octagonal cloister vault, with an optional oculus (`roof.create_arched`, `roof.set_arch`,
+  `roof.create_dome`, `roof.set_dome`). Saved as faceted B-reps (`BARREL_ROOF`, `DOME_ROOF`);
+  true curved IFC bodies come later.
 - **Eaves**: Modify | Roofs › Eaves makes a roof's sloped edges eaves that bear on the walls
   below (`roof.set_eaves`, `roof.eaves`). The overhang is measured from the wall's exterior
   face. The bearing is the exterior face, the core centre or the interior face, and a heel height
@@ -283,8 +291,7 @@ The KIT FZK *AC20-Institute-Var-2* sample model (`test-data/ifc/`) open in Revie
 
 ## Planned next
 
-The first milestone continues with shaped windows (round, round-top, Gothic, fan and gable heads, ARC-WIN-002), roof openings (skylights and shafts), and layered wall types. Then come curved forms: smooth arched roofs (including vaults that taper over trapezoidal
-footprints, ARC-ROOF-008), dome roofs (ARC-ROOF-009), spline-curved walls (ARC-WALL-002), and
+The first milestone continues with shaped windows (round, round-top, Gothic, fan and gable heads, ARC-WIN-002), roof openings (skylights and shafts), and layered wall types. Then come the rest of the curved forms: spline-curved walls (ARC-WALL-002), and
 boolean intersect, subtract and union between elements (ARC-MOD-028). After that come general
 shape and CSG modelling tools,
 CADCraft drawing exchange, and the current NBIMS-US COBie layout.

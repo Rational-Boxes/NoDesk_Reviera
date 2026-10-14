@@ -90,6 +90,8 @@ pub struct SketchSession {
     pub kind: SketchKind,
     /// The overhang of walls picked for a roof.
     pub overhang: f64,
+    /// A roof finished as an arched roof (ARC-ROOF-008).
+    pub arched: bool,
     /// The floor or ceiling being edited (Edit Boundary); `None` for a new one.
     pub host: Option<ElementId>,
     pub level: ElementId,
@@ -213,6 +215,7 @@ impl Gui {
         self.sketch = Some(SketchSession {
             kind,
             overhang: ROOF_OVERHANG,
+            arched: false,
             host,
             level,
             curves,
@@ -577,7 +580,11 @@ impl Gui {
                 {
                     a["base_offset"] = json!(top);
                 }
-                ("roof.create_footprint", a)
+                if s.arched {
+                    ("roof.create_arched", a)
+                } else {
+                    ("roof.create_footprint", a)
+                }
             }
             (None, SketchKind::Slab(SlabKind::Floor)) => {
                 let mut a = json!({ "loops": [curves], "level_id": s.level });
@@ -935,7 +942,7 @@ impl Gui {
 impl Gui {
     /// The highest wall top above `level` among the walls based on it, when `level` is the
     /// highest level (relative to the level, metres).
-    fn top_level_wall_top(&self, level: ElementId) -> Option<f64> {
+    pub(crate) fn top_level_wall_top(&self, level: ElementId) -> Option<f64> {
         if self.levels().last().map(|l| l.id) != Some(level) {
             return None;
         }
