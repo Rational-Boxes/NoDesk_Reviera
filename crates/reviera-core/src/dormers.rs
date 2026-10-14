@@ -224,10 +224,17 @@ fn build(
         if main.face_at(q).and_then(|f| f.key) != face {
             return Err(Error::new(
                 "dormer.does_not_fit",
-                format!(
-                    "the dormer's {what} runs off the roof face (it is {depth:.2} m deep and {w:.2} m wide); \
-                     place it lower or make it smaller"
-                ),
+                if what == "back" {
+                    format!(
+                        "the dormer's back runs off the roof face: to meet the main roof flush it must reach \
+                         {depth:.2} m up the slope, past the ridge or a hip. Lower its front height, narrow it \
+                         ({w:.2} m) or place it lower"
+                    )
+                } else {
+                    format!(
+                        "the dormer's front runs off the roof face ({w:.2} m wide); place it away from the hips"
+                    )
+                },
             ));
         }
     }
