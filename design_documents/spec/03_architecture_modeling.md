@@ -1418,15 +1418,21 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 - **Instance parameters:** Level, **Sill Height** (defaults to the type's Default Sill Height), **Head Height**, Orientation, Mark, Comments and phasing.
 - **Type parameters:** Width, Height, Default Sill Height, Wall Closure, Window Inset, Construction Type and materials.
 - Roof-hosted window families cut roofs at right angles to the roof face (a skylight).
+- **Fit to the host** (owner requirement, 2026-10-13: "windows should be able to dynamically resize so they can fit on the selected wall"). Placing a window or door fits it to the wall where it lands, and the placement preview shows the fitted size as the cursor moves:
+  - it slides inside the free gap (the wall's clear span, less the other inserts at its height) when the gap is wide enough, and otherwise shrinks to the gap;
+  - it rises onto the wall's open face, 100 mm above the top of any roof the wall stands on (a dormer's front and cheek walls);
+  - it shrinks to 50 mm under the roof the wall is attached to.
+  - The fitted size is the insert's own Width and Height (instance values that override the type's), which Properties show and edit; clearing *Own Size* returns to the type's. Where not even the smallest size (the frame each side and 100 mm) fits, placement is refused.
 - **Window Inset** moves the family's glazing plane in from the exterior face. It is applied as a translation along the wall normal before the void is computed.
 
 **Data (IFC mapping).** **`IfcWindow`** (`PredefinedType = WINDOW`, `SKYLIGHT` for roof-hosted, `LIGHTDOME` where flagged) with `OverallHeight` and `OverallWidth`. **`IfcWindowType`** with `PartitioningType` from the family. `Pset_WindowCommon` holds IsExternal, FireRating, ThermalTransmittance and similar values. Openings and fills are as in ARC-HOST-001.
 
-**Commands.** `window.place(type_id, host_id, point_along | point, sill_height?, flip_facing?) -> element_id`.
+**Commands.** `window.place(type_id, host_id, point_along | point, sill_height?, flip_facing?, width?, height?, fit?) -> element_id`; `insert.set_size(element_ids, width?, height?, fit?)`.
 
 **Acceptance criteria.**
 - [ ] Changing a window type's Default Sill Height does not move windows that are already placed. It changes only the default for new ones.
 - [ ] A skylight in a 30° roof cuts an opening at right angles to the roof face.
+- [x] The default 1.2 m window placed in a 1 m wall is 1 m wide; placed in a flat dormer's front wall it sits above the main roof and shrinks under the dormer roof.
 
 ### 3.4.4 Components
 **ID:** ARC-COMP-001 · **Priority:** P0 · **Ref:** research/02 §5.4
@@ -4336,7 +4342,8 @@ All commands below are registered once in the command registry and exposed autom
 | `insert.flip_facing` | element_ids | — | Yes | ARC-DOOR-001, ARC-FLIP-001 |
 | `element.flip` | element_ids, control?: Facing\|Hand\|WorkPlane\|Family(control_key) | () | Yes | ARC-FLIP-001 |
 | `element.flip_state` | element_id | {facing_flipped, hand_flipped, mirrored, controls: [control_key]} | No (query) | ARC-FLIP-001 |
-| `window.place` | type_id, host_id, point_along \| point, sill_height?, flip_facing? | element_id | Yes | ARC-WIN-001 |
+| `window.place` | type_id, host_id, point_along \| point, sill_height?, flip_facing?, width?, height?, fit? | element_id | Yes | ARC-WIN-001 |
+| `insert.set_size` | element_ids, width?, height?, fit? | — | Yes | ARC-WIN-001, ARC-DOOR-001 |
 | `component.place` | type_id, point \| host_ref, rotation?: f64, level_id?, offset?, placement?: VerticalFace\|Face\|WorkPlane | element_id | Yes | ARC-COMP-001 |
 | `column.place_architectural` | type_id, point, base_level, top_constraint, base_offset?, top_offset?, rotation?, room_bounding? | element_id | Yes | ARC-COL-001 |
 | `column.attach` | column_ids[], end: top\|base, target_id, style?, justification?, offset? | () | Yes | ARC-COL-001 |

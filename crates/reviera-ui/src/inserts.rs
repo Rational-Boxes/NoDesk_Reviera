@@ -193,7 +193,7 @@ impl Gui {
     }
 
     /// The insert the tool would place at pixel (`x`, `y`): centred on the cursor along the
-    /// wall, kept inside the wall's clear span.
+    /// wall, fitted to it (slid or shrunk into the free gap, raised onto the wall's open face).
     fn insert_candidate(&self, x: i32, y: i32) -> Option<Placed> {
         let t = self.insert_tool.as_ref()?;
         let (host, point, exterior) = self.wall_under(x, y)?;
@@ -209,18 +209,20 @@ impl Gui {
         )?;
         let u = p.wall.direction();
         let along = (point[0] - p.wall.start[0]) * u[0] + (point[1] - p.wall.start[1]) * u[1];
-        let span = reviera_core::walls::solve(&store)
-            .bodies
-            .get(&host)
-            .map(reviera_core::walls::openings::clear_span)
-            .unwrap_or([0.0, p.wall.length()]);
-        let half = p.ty.width / 2.0;
-        let (lo, hi) = (span[0] + half, span[1] - half);
-        if lo > hi {
+        p.recipe.along = along;
+        if !inserts::fit(&store, &mut p) {
             return None;
         }
-        // To the millimetre, inside the wall.
-        p.recipe.along = ((along.clamp(lo, hi)) * 1000.0).round() / 1000.0;
+        // To the millimetre.
+        p.recipe.along = (p.recipe.along * 1000.0).round() / 1000.0;
+        p.recipe.width = p.recipe.width.map(|w| (w * 1000.0).floor() / 1000.0);
+        p.recipe.height = p.recipe.height.map(|h| (h * 1000.0).floor() / 1000.0);
+        if let Some(w) = p.recipe.width {
+            p.ty.width = w;
+        }
+        if let Some(h) = p.recipe.height {
+            p.ty.height = h;
+        }
         Some(p)
     }
 
@@ -247,6 +249,9 @@ impl Gui {
             "type_id": self.tool_insert_type(p.kind),
             "host_wall_id": p.host,
             "point_along": p.recipe.along,
+            "sill_height": p.recipe.sill,
+            "width": p.recipe.width,
+            "height": p.recipe.height,
             "flip_hand": p.recipe.flip_hand,
             "flip_facing": p.recipe.flip_facing,
         });
@@ -581,6 +586,23 @@ impl Gui {
         );
         grid.append(Property::string("Head Height", "in_head", head));
         grid.set_property_read_only("in_head", true);
+        grid.append(Property::category("Dimensions", "c_insert_size"));
+        let (w, h) = (
+            self.format_length(p.ty.width),
+            self.format_length(p.ty.height),
+        );
+        grid.append(Property::string("Width", "in_width", w));
+        grid.append(Property::string("Height", "in_height", h));
+        grid.append(Property::boolean(
+            "Own Size",
+            "in_own",
+            p.recipe.width.is_some() || p.recipe.height.is_some(),
+        ));
+        grid.set_help_string(
+            "in_width",
+            "This one's own width (the type's until changed); it stays centred",
+        );
+        grid.set_help_string("in_own", "Clear to return to the type's width and height");
         if kind == Kind::Door {
             grid.append(Property::boolean(
                 "Flip Hand",
@@ -630,6 +652,28 @@ impl Gui {
                 )
                 .map(|_| ()),
             ),
+            "in_width" | "in_height" => {
+                let key = if property == "in_width" {
+                    "width"
+                } else {
+                    "height"
+                };
+                Some(
+                    self.run(
+                        "insert.set_size",
+                        json!({ "element_ids": selected, key: text }),
+                    )
+                    .map(|_| ()),
+                )
+            }
+            "in_own" if text != "true" && text != "1" => Some(
+                self.run(
+                    "insert.set_size",
+                    json!({ "element_ids": selected, "width": null, "height": null }),
+                )
+                .map(|_| ()),
+            ),
+            "in_own" => None,
             "in_hand" => Some(
                 self.run("insert.flip_hand", json!({ "element_ids": selected }))
                     .map(|_| ()),

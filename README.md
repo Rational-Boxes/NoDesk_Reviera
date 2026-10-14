@@ -54,8 +54,11 @@ The KIT FZK *AC20-Institute-Var-2* sample model (`test-data/ifc/`) open in Revie
 - **Doors and windows**: Architecture › Door (DR) and Window (WN) place them in Reviera walls in
   plans or 3D: the preview follows the cursor along the wall, the cursor's side sets the facing
   and Spacebar flips a door's hand. Walls are cut, plans show door swings, and each new door or
-  window gets the next Mark. Drag a selected one along its wall; edit its sill height, flips
-  and type (with door and window types to duplicate and resize) in Properties. Saved as
+  window gets the next Mark. A new one fits the wall where it lands: it slides or shrinks into
+  the free gap, and on a dormer it rises above the main roof and shrinks under the dormer roof
+  (the preview shows the fitted size). Drag a selected one along its wall; edit its sill height,
+  own width and height, flips and type (with door and window types to duplicate and resize) in
+  Properties (`insert.set_size`). Saved as
   `IfcDoor`/`IfcWindow` filling an `IfcOpeningElement` that voids the wall (`door.place`,
   `window.place`, `insert.flip_hand`, `insert.flip_facing`, `insert.set_sill_height`,
   `element.move`).

@@ -224,6 +224,42 @@ fn dormers_of_every_style_fill_their_gaps() {
     )
     .unwrap();
 
+    // A window in the dormer's front wall: the default 1.2 × 1.2 m window would start 900 mm
+    // above the floor level and stand taller than the wall's open face; it rises above the
+    // main roof and shrinks under the dormer roof.
+    let front = ws[0];
+    let win = id(run(
+        &r,
+        &mut doc,
+        "window.place",
+        json!({ "host_wall_id": front.0, "point_along": 0.9 }),
+    )
+    .unwrap());
+    let p = reviera_core::inserts::resolve(doc.store(), doc.store().get(win).unwrap()).unwrap();
+    let c = p.cut();
+    // Above the main roof's top where it meets the wall's exterior face (inside, the main roof
+    // is cut away under the dormer).
+    assert!(
+        (c.z[0] - (main_top([5.0, 0.5]) + 0.1)).abs() < 1e-9,
+        "{:?}",
+        c
+    );
+    // Under the dormer roof's underside: the front wall runs from x = 4.1.
+    let droof_g = roofs::regenerate(doc.store(), doc.store().get(droof).unwrap()).unwrap();
+    let under = [c.x[0], c.x[1]]
+        .iter()
+        .map(|x| droof_g.underside([4.1 + x, 0.6]).unwrap())
+        .fold(f64::MAX, f64::min);
+    assert!(c.z[1] <= under + 1e-6, "{:?} under {under}", c);
+    assert!(p.ty.height > 0.3, "{}", p.ty.height);
+    run(
+        &r,
+        &mut doc,
+        "element.delete",
+        json!({ "element_ids": [win.0] }),
+    )
+    .unwrap();
+
     // The other styles.
     for (style, kind) in [
         ("hip", "HIPPED_GABLE_ROOF"),
@@ -248,6 +284,25 @@ fn dormers_of_every_style_fill_their_gaps() {
                 .unwrap();
         }
     }
+    // The flat dormer (1.2 m front) is lower: a window shrinks under its roof.
+    let (_, ws) = parts(&doc, dormer);
+    let win = id(run(
+        &r,
+        &mut doc,
+        "window.place",
+        json!({ "host_wall_id": ws[0].0, "point_along": 0.9 }),
+    )
+    .unwrap());
+    let p = reviera_core::inserts::resolve(doc.store(), doc.store().get(win).unwrap()).unwrap();
+    assert!(p.ty.height < 1.2 - 1e-6, "{}", p.ty.height);
+    assert_eq!(p.recipe.height, Some(p.ty.height));
+    run(
+        &r,
+        &mut doc,
+        "element.delete",
+        json!({ "element_ids": [win.0] }),
+    )
+    .unwrap();
     // Only one set of parts exists at a time.
     let count = doc
         .store()

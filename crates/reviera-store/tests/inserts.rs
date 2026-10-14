@@ -159,17 +159,17 @@ fn inserts_must_fit_and_follow_their_wall() {
     for (cmd, args, code) in [
         (
             "door.place",
-            json!({ "host_wall_id": w.0, "point_along": 1.5 }),
+            json!({ "host_wall_id": w.0, "point_along": 1.5, "fit": false }),
             "insert.overlaps",
         ),
         (
             "door.place",
-            json!({ "host_wall_id": w.0, "point_along": 5.8 }),
+            json!({ "host_wall_id": w.0, "point_along": 5.8, "fit": false }),
             "insert.outside_host",
         ),
         (
             "window.place",
-            json!({ "host_wall_id": w.0, "point_along": 4.0, "sill_height": 2.5 }),
+            json!({ "host_wall_id": w.0, "point_along": 4.0, "sill_height": 2.5, "fit": false }),
             "insert.outside_host",
         ),
     ] {
@@ -455,4 +455,102 @@ fn saved_inserts_void_and_fill_their_wall() {
     assert_eq!(ifc.entities_of_type("IfcOpeningElement").unwrap().len(), 1);
     assert_eq!(ifc.entities_of_type("IfcRelVoidsElement").unwrap().len(), 1);
     assert_eq!(ifc.entities_of_type("IfcRelFillsElement").unwrap().len(), 1);
+}
+
+/// Windows fit their wall where they are placed: they slide off the wall's ends, shrink to a
+/// short wall or the gap between neighbours, and on a dormer rise onto its front wall's open
+/// face and shrink under the dormer roof.
+#[test]
+fn windows_fit_their_wall() {
+    let dir = tempfile::tempdir().unwrap();
+    let (_, mut doc, _) = new_project(dir.path());
+    let r = registry();
+    let level = doc
+        .store()
+        .iter()
+        .find(|e| e.class == "IfcBuildingStorey")
+        .unwrap()
+        .id()
+        .0;
+    // A 1 m wall: the 1.2 m default window shrinks to it.
+    let short = wall(&r, &mut doc, 1.0);
+    let win = place(&r, &mut doc, "window.place", short, 0.5);
+    let p = placed(&doc, win);
+    assert!((p.ty.width - 1.0).abs() < 1e-9, "{}", p.ty.width);
+    assert_eq!(p.recipe.width, Some(p.ty.width));
+    // A window clicked near a wall's end slides inside it, at the type's size.
+    let long = id(run(
+        &r,
+        &mut doc,
+        "wall.create",
+        json!({
+            "curve": { "line": { "start": [0, 5], "end": [3, 5] } },
+            "base_level": level,
+            "top_constraint": { "unconnected": 3 },
+        }),
+    )
+    .unwrap());
+    let a = place(&r, &mut doc, "window.place", long, 0.1);
+    let pa = placed(&doc, a);
+    assert!((pa.recipe.along - 0.6).abs() < 1e-9 && pa.recipe.width.is_none());
+    // The next one fits where it is clicked, in the 1.8 m left beside it.
+    let b = place(&r, &mut doc, "window.place", long, 2.0);
+    let pb = placed(&doc, b);
+    assert!((pb.cut().x[0] - 1.4).abs() < 1e-9, "{:?}", pb.cut());
+    assert!(pb.recipe.width.is_none());
+    let err = run(
+        &r,
+        &mut doc,
+        "window.place",
+        json!({ "host_wall_id": long.0, "point_along": 2.0, "fit": false }),
+    )
+    .unwrap_err();
+    assert_eq!(err.code, "insert.overlaps");
+    // Clicked on another window: no room there.
+    let err = run(
+        &r,
+        &mut doc,
+        "window.place",
+        json!({ "host_wall_id": long.0, "point_along": 0.6 }),
+    )
+    .unwrap_err();
+    assert_eq!(err.code, "insert.no_room");
+
+    // Resized by command: its own size, centred; null returns to the type's.
+    run(
+        &r,
+        &mut doc,
+        "insert.set_size",
+        json!({ "element_ids": [b.0], "width": 0.8, "height": 0.6 }),
+    )
+    .unwrap();
+    let pb2 = placed(&doc, b);
+    assert!((pb2.ty.width - 0.8).abs() < 1e-9 && (pb2.ty.height - 0.6).abs() < 1e-9);
+    assert!((pb2.recipe.along - pb.recipe.along).abs() < 1e-9);
+    run(
+        &r,
+        &mut doc,
+        "insert.set_size",
+        json!({ "element_ids": [b.0], "width": null, "height": null }),
+    )
+    .unwrap();
+    assert_eq!(placed(&doc, b).recipe.width, None);
+    // Too wide to fit beside its neighbour without `fit`: refused; with it, shrunk.
+    let err = run(
+        &r,
+        &mut doc,
+        "insert.set_size",
+        json!({ "element_ids": [b.0], "width": 2.5 }),
+    )
+    .unwrap_err();
+    assert!(err.code == "insert.overlaps" || err.code == "insert.outside_host");
+    run(
+        &r,
+        &mut doc,
+        "insert.set_size",
+        json!({ "element_ids": [b.0], "width": 2.5, "fit": true }),
+    )
+    .unwrap();
+    let pb3 = placed(&doc, b);
+    assert!((pb3.ty.width - 1.8).abs() < 1e-9, "{}", pb3.ty.width);
 }

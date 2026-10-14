@@ -166,7 +166,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**1977 unique commands** in 402 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**1978 unique commands** in 402 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -342,7 +342,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `image` | 8 |
 | `import` | 10 |
 | `inplace` | 5 |
-| `insert` | 2 |
+| `insert` | 3 |
 | `instance` | 5 |
 | `job` | 4 |
 | `journal` | 1 |
@@ -1347,6 +1347,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `inplace.finish` | 3 | session_id | element_id | Yes (one step) | ARC-INPL-001 |
 | `insert.flip_facing` | 3 | element_ids | — | Yes | ARC-DOOR-001, ARC-FLIP-001 |
 | `insert.flip_hand` | 3 | element_ids | — | Yes | ARC-DOOR-001, ARC-FLIP-001 |
+| `insert.set_size` | 3 | element_ids, width?, height?, fit? | — | Yes | ARC-WIN-001, ARC-DOOR-001 |
 | `instance.change_type` | 2 | element_ids[], type_id | — | Yes | DM-TYPE-001 |
 | `instance.flip` | 2 | element_id, axis: "facing"\ | "hand"\ | "work_plane" | — |
 | `instance.pick_new_host` | 2 | element_id, host_id, face_ref? | — | Yes | DM-INST-001 |
@@ -2521,7 +2522,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `window.float` | 1 | `view_id`, `rect?`, `monitor?` | `frame_id` | No | UI-VIEWWIN-003 |
 | `window.list` | 1 | — | `[WindowInfo]` | No | UI-VIEWWIN-001 |
 | `window.next` | 1 | `direction: forward | back` | `window_id` | No |
-| `window.place` | 3 | type_id, host_id, point_along \ | point, sill_height?, flip_facing? | element_id | Yes |
+| `window.place` | 3 | type_id, host_id, point_along \ | point, sill_height?, flip_facing?, width?, height?, fit? | element_id | Yes |
 | `window.switch` | 1 | `view_id` | `window_id` | No | UI-VIEWWIN-001 |
 | `window.tab_all` | 1 | — | `()` | No | UI-VIEWWIN-002 |
 | `window.tile` | 1 | — | `()` | No | UI-VIEWWIN-002 |

@@ -165,6 +165,12 @@ pub struct InsertRecipe {
     /// Facing (the swing side for doors) toward the wall's interior instead of its exterior.
     #[serde(default)]
     pub flip_facing: bool,
+    /// This insert's own width and height, overriding its type's (set when it was fitted to
+    /// its wall, or resized).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub width: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub height: Option<f64>,
 }
 
 pub fn insert_recipe(e: &Element) -> Option<InsertRecipe> {
@@ -348,6 +354,7 @@ pub fn resolve(store: &Store, e: &Element) -> Result<Placed> {
         .and_then(insert_type)
         .filter(|t| t.kind() == Some(kind))
         .unwrap_or_else(|| InsertType::default_for(kind));
+    let ty = sized(ty, &recipe);
     Ok(Placed {
         id: e.id(),
         kind,
@@ -399,8 +406,145 @@ pub fn preview(
             sill,
             flip_hand,
             flip_facing,
+            width: None,
+            height: None,
         },
     })
+}
+
+/// A type with an insert's own width and height applied.
+fn sized(mut ty: InsertType, r: &InsertRecipe) -> InsertType {
+    if let Some(w) = r.width {
+        ty.width = w;
+    }
+    if let Some(h) = r.height {
+        ty.height = h;
+    }
+    ty
+}
+
+/// The open face of an insert's wall over the insert's span, both faces: its bottom (the wall's
+/// base, or the top of a roof the wall rises out of, plus 100 mm) and its top (the underside of
+/// the roof it is attached to, less 50 mm, else the wall's top).
+fn vertical_room(store: &Store, p: &Placed) -> (f64, f64) {
+    let (u, n, s) = (p.wall.direction(), p.wall.normal(), p.wall.start);
+    let half = p.ty.width / 2.0;
+    let points: Vec<[f64; 2]> = [-half, 0.0, half]
+        .iter()
+        .flat_map(|dx| {
+            let a = p.recipe.along + dx;
+            [-1.0, 1.0].map(|side| {
+                let o = side * p.wall.width / 2.0;
+                [s[0] + u[0] * a + n[0] * o, s[1] + u[1] * a + n[1] * o]
+            })
+        })
+        .collect();
+    let mut bottom = p.wall.base_z;
+    let mut top = p.wall.base_z + p.wall.height;
+    let attached = store
+        .get(p.host)
+        .and_then(walls::wall_recipe)
+        .and_then(|r| r.attach_top);
+    for e in store.iter() {
+        let Some(_) = crate::roofs::roof_recipe(e) else {
+            continue;
+        };
+        let Ok(g) = crate::roofs::regenerate(store, e) else {
+            continue;
+        };
+        if attached.as_deref() == Some(e.guid().as_str()) {
+            if let Some(z) = points
+                .iter()
+                .filter_map(|q| g.underside(*q))
+                .reduce(f64::min)
+            {
+                top = top.min(z - 0.05);
+            }
+            continue;
+        }
+        // The roof's top surface where it meets the wall.
+        let tops = points.iter().filter_map(|q| {
+            let f = g.face_at(*q)?;
+            Some(g.underside(*q)? + g.thickness / f.normal[2].max(1e-6))
+        });
+        if let Some(z) = tops.reduce(f64::max)
+            && z > bottom
+            && z < top
+        {
+            bottom = z + 0.1;
+        }
+    }
+    (bottom, top)
+}
+
+/// The smallest a fitted insert may get: its frame each side and 100 mm between.
+fn min_size(ty: &InsertType) -> f64 {
+    2.0 * ty.frame_width + 0.1
+}
+
+/// Fits an insert to its wall where it stands (ARC-WIN-001, fit to host): the free gap around
+/// its centre (the wall's clear span, less the other doors and windows at its height) and the
+/// wall's height. It slides to fit when the gap is wide enough, else shrinks to the gap; it
+/// shrinks to the wall's top. Sets its own width and height only when they differ from the
+/// type's. Returns false when even the smallest size does not fit.
+pub fn fit(store: &Store, p: &mut Placed) -> bool {
+    let solved = walls::solve(store);
+    let span = solved
+        .bodies
+        .get(&p.host)
+        .map(openings::clear_span)
+        .unwrap_or([0.0, p.wall.length()]);
+    let min = min_size(&p.ty);
+    // Height: on the wall's open face, above any roof it rises out of and under the roof it
+    // is attached to (a dormer's front wall), else within its own height.
+    let (bottom, top) = vertical_room(store, p);
+    if p.z0 < bottom - 1e-9 {
+        let dz = bottom - p.z0;
+        p.z0 += dz;
+        p.recipe.sill += dz;
+    }
+    if p.z0 + p.ty.height > top + 1e-9 {
+        let h = top - p.z0;
+        if h < min {
+            return false;
+        }
+        p.ty.height = h;
+        p.recipe.height = Some(h);
+    }
+    let (z0, z1) = (p.z0, p.z0 + p.ty.height);
+    // The free gap around the centre.
+    let along = p.recipe.along.clamp(span[0], span[1]);
+    let (mut lo, mut hi) = (span[0], span[1]);
+    for other in placed(store) {
+        if other.id == p.id || other.host != p.host {
+            continue;
+        }
+        let o = other.cut();
+        if o.z[0] >= z1 - 1e-9 || o.z[1] <= z0 + 1e-9 {
+            continue;
+        }
+        if o.x[1] <= along + 1e-9 {
+            lo = lo.max(o.x[1]);
+        } else if o.x[0] >= along - 1e-9 {
+            hi = hi.min(o.x[0]);
+        } else {
+            // The centre is inside another: no gap here.
+            return false;
+        }
+    }
+    let gap = hi - lo;
+    if gap < min - 1e-9 {
+        return false;
+    }
+    let mut w = p.ty.width;
+    if w > gap {
+        w = gap;
+        p.ty.width = w;
+        p.recipe.width = Some(w);
+    }
+    let half = w / 2.0;
+    p.recipe.along = along.clamp(lo + half, hi - half);
+    true
 }
 
 /// The doors and windows of a model that resolve.
@@ -608,6 +752,14 @@ pub struct PlaceParams {
     pub flip_hand: bool,
     #[serde(default)]
     pub flip_facing: bool,
+    /// This insert's own width and height (default the type's).
+    #[schemars(extend("x-reviera-data-type" = "length"))]
+    pub width: Option<f64>,
+    #[schemars(extend("x-reviera-data-type" = "length"))]
+    pub height: Option<f64>,
+    /// Fit the wall where it is placed (default true): slide, raise onto the wall's open face,
+    /// or shrink to the free gap and the wall's height.
+    pub fit: Option<bool>,
 }
 
 pub(crate) fn place(
@@ -668,7 +820,19 @@ pub(crate) fn place(
         sill,
         flip_hand: p.flip_hand,
         flip_facing: p.flip_facing,
+        width: p.width,
+        height: p.height,
     };
+    for (v, what) in [(p.width, "width"), (p.height, "height")] {
+        if let Some(v) = v
+            && !(v.is_finite() && v > min_size(&ty))
+        {
+            return Err(Error::new(
+                "insert.too_small",
+                format!("the {what} must be over {:.0} mm", min_size(&ty) * 1000.0),
+            ));
+        }
+    }
     let mark = next_mark(txn.store(), kind);
     let predefined = match kind {
         Kind::Door => "DOOR",
@@ -693,9 +857,93 @@ pub(crate) fn place(
                 json!({ "kind": OPENING_RECIPE, "insert": guid }),
             ),
     )?;
-    let placed = resolve(txn.store(), txn.store().get(id).expect("created"))?;
+    let mut placed = resolve(txn.store(), txn.store().get(id).expect("created"))?;
+    if p.fit != Some(false) {
+        if !fit(txn.store(), &mut placed) {
+            return Err(Error::new(
+                "insert.no_room",
+                format!("there is no room for a {} here on the wall", kind.noun()),
+            ));
+        }
+        if placed.recipe != recipe {
+            let value = serde_json::to_value(&placed.recipe).expect("serialises");
+            txn.modify(id, |e| {
+                e.params.insert(RECIPE_KEY.into(), value);
+            })?;
+        }
+    }
     check_fit(txn.store(), &placed)?;
     Ok(id)
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SetSizeParams {
+    pub element_ids: Vec<ElementRef>,
+    /// The insert's own width; `null` returns it to the type's.
+    #[serde(default, deserialize_with = "some_f64")]
+    #[schemars(extend("x-reviera-data-type" = "length"))]
+    pub width: Option<Option<f64>>,
+    #[serde(default, deserialize_with = "some_f64")]
+    #[schemars(extend("x-reviera-data-type" = "length"))]
+    pub height: Option<Option<f64>>,
+    /// Fit the wall afterwards (shrink to the free gap and open face); default false.
+    #[serde(default)]
+    pub fit: bool,
+}
+
+fn some_f64<'de, D: serde::Deserializer<'de>>(
+    d: D,
+) -> std::result::Result<Option<Option<f64>>, D::Error> {
+    Option::<f64>::deserialize(d).map(Some)
+}
+
+/// Sets doors' and windows' own width and height (`insert.set_size`); centred where they are.
+pub(crate) fn set_size(txn: &mut crate::txn::Transaction<'_>, p: SetSizeParams) -> Result<()> {
+    for r in &p.element_ids {
+        let store = txn.store().clone();
+        let id = store
+            .resolve(r)
+            .ok_or_else(|| Error::new("element.not_found", format!("no element {r:?}")))?;
+        let e = store.get(id).expect("resolved");
+        let before = resolve(&store, e)?;
+        let mut recipe = before.recipe.clone();
+        if let Some(w) = p.width {
+            recipe.width = w;
+        }
+        if let Some(h) = p.height {
+            recipe.height = h;
+        }
+        let ty = sized(before.ty.clone(), &recipe);
+        if ty.width <= min_size(&ty) || ty.height <= min_size(&ty) {
+            return Err(Error::new(
+                "insert.too_small",
+                format!(
+                    "the {} must be over {:.0} mm each way",
+                    before.kind.noun(),
+                    min_size(&ty) * 1000.0
+                ),
+            ));
+        }
+        let mut placed = Placed {
+            ty,
+            recipe: recipe.clone(),
+            ..before
+        };
+        if p.fit && !fit(&store, &mut placed) {
+            return Err(Error::new(
+                "insert.no_room",
+                "there is no room for it here on the wall",
+            ));
+        }
+        let value = serde_json::to_value(&placed.recipe).expect("serialises");
+        txn.modify(id, |e| {
+            e.params.insert(RECIPE_KEY.into(), value);
+        })?;
+        let now = resolve(txn.store(), txn.store().get(id).expect("exists"))?;
+        check_fit(txn.store(), &now)?;
+    }
+    Ok(())
 }
 
 /// Copies a door or window into `host` (GlobalId) at `along`, with its type, sill and flips (the

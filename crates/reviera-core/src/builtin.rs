@@ -150,6 +150,7 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(InsertFlipHand),
         registry.add(InsertFlipFacing),
         registry.add(InsertSetSill),
+        registry.add(InsertSetSize),
         registry.add(ElementMove),
         registry.add(ElementCopy),
         registry.add(ElementRotate),
@@ -1797,7 +1798,9 @@ impl Command for DoorPlace {
         description: "Places a door in a Reviera wall: its centre `point_along` the wall from its start (or \
                       at `point` projected onto it), its bottom `sill_height` above the wall's base level \
                       (default 0). Facing is the wall's exterior unless `flip_facing`. The door cuts the wall \
-                      and gets the next Mark.",
+                      and gets the next Mark. `width` and `height` give it its own size. Unless `fit` is \
+                      false it fits the wall where it lands: it slides or shrinks to the free gap, and rises \
+                      onto the wall's open face and shrinks under its top (a dormer's front wall).",
         effects: &[Effect::Edit],
         transaction_name: "Door",
     };
@@ -1886,6 +1889,29 @@ impl Command for InsertSetSill {
 
     fn run(&self, cx: &mut CommandContext<'_>, p: inserts::SetSillParams) -> Result<()> {
         inserts::set_sill(cx.edit()?, p)
+    }
+}
+
+#[derive(Debug)]
+struct InsertSetSize;
+
+impl Command for InsertSetSize {
+    type Params = inserts::SetSizeParams;
+    type Output = ();
+    const META: CommandMeta = CommandMeta {
+        name: "insert.set_size",
+        version: 1,
+        summary: "Resize doors and windows",
+        description: "Sets doors' and windows' own `width` and `height` (`null` returns one to the type's), \
+                      centred where they are. With `fit`, each then fits its wall: it slides or shrinks to \
+                      the free gap between its neighbours and the wall's ends, and onto the wall's open face \
+                      (above a roof the wall rises from, under the roof it is attached to).",
+        effects: &[Effect::Edit],
+        transaction_name: "Resize",
+    };
+
+    fn run(&self, cx: &mut CommandContext<'_>, p: inserts::SetSizeParams) -> Result<()> {
+        inserts::set_size(cx.edit()?, p)
     }
 }
 
