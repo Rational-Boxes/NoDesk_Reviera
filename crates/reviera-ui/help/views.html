@@ -1,0 +1,145 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Copyright (C) 2026 Reviera contributors -->
+<h1>Views and navigation</h1>
+<p class="lead">Plans, ceiling plans, sections, elevations and 3D views are saved in the model.
+The Project Browser opens them; each opens in its own tab. This page also covers moving around
+a view and the temporary ways of seeing inside a model: the section box, slices, and hiding and
+isolating elements.</p>
+<nav class="toc">
+  <a href="#plans">Plans</a>
+  <a href="#ceiling">Ceiling plans</a>
+  <a href="#sections">Sections and elevations</a>
+  <a href="#3d">3D views</a>
+  <a href="#navigate">Navigating</a>
+  <a href="#cube">Orientation Cube</a>
+  <a href="#walk">Walking</a>
+  <a href="#box">Section box and slices</a>
+  <a href="#hide">Hide and isolate</a>
+  <a href="#manage">Managing views</a>
+</nav>
+
+<h2 id="plans">Floor plans</h2>
+<p>A floor plan looks straight down at a level, cut at the plan's cut plane: cut walls and floors
+are drawn with poché, the rest below in projection, with door swings, room labels, grids and the
+markers of sections and elevations. Plans are drawn with each category's pens at their paper
+widths for the view's scale.</p>
+<p>To create floor plans: <b>View › Floor Plan</b>, then tick the levels in the list. A new level
+gets its floor plan anyway. <a class="run" href="reviera:action/view.create_plan">Floor Plan</a></p>
+<p>Plans pan and zoom but do not orbit. With nothing selected, Properties show the plan's
+<b>View Name</b>, its <b>Cut Plane</b> (the height of the cut above the level, which you can
+edit) and its view range (Top, Bottom, View Depth). Curved walls, arched roofs and domes are cut
+at their true shape. <code>view.create_plan</code>, <code>view.set_view_range</code></p>
+
+<h2 id="ceiling">Ceiling plans</h2>
+<p><b>View › Ceiling Plan</b> creates reflected ceiling plans of levels: cut at 2300 mm above the
+level, looking up, so they show the ceilings and what is above the cut.
+<a class="run" href="reviera:action/view.create_ceiling_plan">Ceiling Plan</a></p>
+
+<h2 id="sections">Sections and elevations</h2>
+<p>To draw a section:</p>
+<ol>
+  <li>Open a plan. <b>View › Section</b>.</li>
+  <li>Click the start and the end of the section line. The view looks to the right of the line,
+    from start to end.</li>
+</ol>
+<p><a class="run" href="reviera:action/view.create_section">Section</a></p>
+<p><b>View › Building Elevations</b> creates North, South, East and West elevations around the
+model. <a class="run" href="reviera:action/view.building_elevations">Building Elevations</a></p>
+<p>Sections and elevations draw cut walls and floors with poché, everything up to the far clip in
+projection, level lines and grid bubbles. Plans show their section lines and elevation markers.
+In Properties, <b>Far Clip Offset</b> sets how far the view sees and <b>Flipped</b> turns it to
+look the other way. <code>view.create_section</code>, <code>view.create_elevation</code>,
+<code>section.edit</code></p>
+
+<h2 id="3d">3D views</h2>
+<p><b>View › Default 3D View</b> opens the model's default 3D view; <b>New 3D View</b> opens
+another, with its own camera. Each 3D view keeps its camera, Home, section box and slices in the
+saved file. <a class="run" href="reviera:action/view.default_3d">Default 3D View</a></p>
+<p><b>Perspective / Isometric</b> (<kbd>PI</kbd>) switches between perspective and parallel
+projection.</p>
+
+<h2 id="navigate">Navigating</h2>
+<table>
+  <tr><td>Orbit (3D)</td><td>Left drag on empty space or the model. The view turns about the
+    selection's centre, or about the point of the model under the cursor. <kbd>Shift</kbd> +
+    middle drag also orbits.</td></tr>
+  <tr><td>Pan</td><td>Middle or right drag. In plans, a left drag on nothing draws a selection
+    box instead.</td></tr>
+  <tr><td>Zoom</td><td>The mouse wheel, about the cursor.</td></tr>
+  <tr><td>Zoom to Fit <kbd>ZF</kbd></td><td>Shows the whole model, or the selection.</td></tr>
+  <tr><td>Previous / Next Pan/Zoom <kbd>ZP</kbd> <kbd>ZN</kbd></td><td>Steps back and forward
+    through the views you had.</td></tr>
+  <tr><td>Home <kbd>Alt</kbd>+<kbd>Home</kbd></td><td>Returns to the view's home orientation;
+    <b>View › Set as Home</b> makes the current one its home.</td></tr>
+  <tr><td>Standard directions</td><td><b>View › Orient</b> (Top, Bottom, Front, Back, Left,
+    Right, the four isometric corners and the four diagonals), or the Orientation Cube.</td></tr>
+</table>
+<p>Navigating changes only the camera: it adds nothing to the undo history and does not mark the
+model as changed.</p>
+
+<h2 id="cube">The Orientation Cube</h2>
+<p>Every 3D view shows an Orientation Cube in its corner. Click a face, edge or corner (26
+regions) to look from that side; the view turns there smoothly. The compass letters around it
+turn the view to that direction at its current height. The home button returns to the Home
+view, and a button switches perspective and isometric. Right-click the cube for <b>Go Home</b>,
+<b>Set Current View as Home</b>, the projection switch, and the standard directions.</p>
+
+<h2 id="walk">Walking through a model</h2>
+<p><b>View › Walk</b> (<kbd>WK</kbd>) walks through a 3D view at eye height.</p>
+<table class="keys">
+  <tr><td><kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> or the arrow keys</td><td>Walk
+    forward, left, back and right</td></tr>
+  <tr><td><kbd>E</kbd> or <kbd>PgUp</kbd>, <kbd>Q</kbd> or <kbd>PgDn</kbd></td><td>Rise, sink</td></tr>
+  <tr><td><kbd>Shift</kbd></td><td>Move three times as fast</td></tr>
+  <tr><td>Left drag</td><td>Look around</td></tr>
+  <tr><td>Mouse wheel</td><td>Change the walking speed</td></tr>
+  <tr><td><kbd>Esc</kbd></td><td>Stop walking</td></tr>
+</table>
+
+<h2 id="box">Section box and slices</h2>
+<p>These cut a 3D view open, to see inside. Cut solids are drawn capped. They are saved with the
+view and match BCF clipping planes.</p>
+<table>
+  <tr><td><b>View › Section Box</b> <kbd>SX</kbd></td><td>Turns the view's section box on or off.
+    Drag its orange face grips to resize it. Properties › Extents › Section Box also turns it on
+    and off. <a class="run" href="reviera:action/inspect.section_box">Section Box</a></td></tr>
+  <tr><td><b>Selection Box</b> <kbd>BX</kbd></td><td>Fits the section box around the selected
+    elements.</td></tr>
+  <tr><td><b>Horizontal Slice</b></td><td>Click a point: the model above its height is cut
+    away.</td></tr>
+  <tr><td><b>Vertical Slice</b></td><td>Click a point: the model between you and it is cut away.
+  </td></tr>
+  <tr><td><b>Clear Slices</b></td><td>Removes the view's slice planes.</td></tr>
+</table>
+<p>A view holds up to eight slice planes, each with a grip to drag it. <code>view.set_section_box</code>,
+<code>view.fit_section_box</code>, <code>view.set_slice_planes</code></p>
+
+<h2 id="hide">Temporary hide and isolate</h2>
+<p>These change only what the active view shows for now. They are never saved or printed.
+Select elements first, then:</p>
+<table>
+  <tr><td><b>Hide Element</b> <kbd>HH</kbd></td><td>Hides the selection.</td></tr>
+  <tr><td><b>Hide with Children</b></td><td>Also hides what the selection contains or hosts (a
+    wall's doors and windows).</td></tr>
+  <tr><td><b>Hide Category</b> <kbd>HC</kbd>, <b>Hide Type</b></td><td>Hides every element of
+    the selection's categories, or of its types.</td></tr>
+  <tr><td><b>Isolate Element</b> <kbd>HI</kbd></td><td>Shows only the selection (also <b>with
+    Children</b>, <b>Isolate Category</b> <kbd>IC</kbd>, <b>Isolate Type</b>).</td></tr>
+  <tr><td><b>Isolate, Ghost Others</b> <kbd>HG</kbd></td><td>Shows the selection, and everything
+    else translucent.</td></tr>
+  <tr><td><b>Translucent</b> <kbd>HT</kbd></td><td>Draws the selection translucent (also
+    <b>with Children</b>).</td></tr>
+  <tr><td><b>Reset Hide/Isolate</b> <kbd>HR</kbd></td><td>Shows everything again. A middle click
+    on empty space offers it too, since hidden elements cannot be clicked.</td></tr>
+</table>
+<p>The tools are on <b>View › Hide/Isolate</b> and in the <b>View</b> menu; the
+<a href="reviera:help/selecting#quick">quick modify menu</a> and the
+<a href="reviera:help/window#tree">Model Tree</a> offer them too. <code>view.temp_hide</code>,
+<code>view.temp_isolate</code>, <code>view.temp_translucent</code>, <code>view.temp_reset</code></p>
+
+<h2 id="manage">Managing views</h2>
+<p>In the Project Browser, double-click a view to open it, or right-click it to <b>Open</b>,
+<b>Rename</b>, <b>Duplicate</b> or <b>Delete</b> it. <code>view.list</code>,
+<code>view.open</code>, <code>view.rename</code>, <code>view.duplicate</code>,
+<code>view.delete</code></p>
+<p>Schedules and sheets are views too: see <a href="reviera:help/documentation">Documentation</a>.</p>

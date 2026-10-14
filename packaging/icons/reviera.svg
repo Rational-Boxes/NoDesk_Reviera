@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Copyright (C) 2026 Reviera contributors -->
+<!-- NoDesk Reviera logo: an abstract beach at sunset, a palm behind, and an "R" standing on the
+     sand in perspective, its depth extruded toward the viewer's right. -->
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
+     width="512" height="512" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title id="title">NoDesk Reviera</title>
+  <defs>
+    <clipPath id="tile">
+      <rect x="0" y="0" width="512" height="512" rx="112" ry="112"/>
+    </clipPath>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2b4c9b"/>
+      <stop offset="0.45" stop-color="#8a5bb8"/>
+      <stop offset="0.75" stop-color="#f2786a"/>
+      <stop offset="1" stop-color="#ffc56b"/>
+    </linearGradient>
+    <radialGradient id="sun" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#fff6c9"/>
+      <stop offset="0.7" stop-color="#ffd76a"/>
+      <stop offset="1" stop-color="#ffb347"/>
+    </radialGradient>
+    <linearGradient id="sea" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1f8fa6"/>
+      <stop offset="1" stop-color="#0d5e78"/>
+    </linearGradient>
+    <linearGradient id="sand" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f6dca4"/>
+      <stop offset="1" stop-color="#e2b46e"/>
+    </linearGradient>
+    <linearGradient id="face" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#dfe9f5"/>
+    </linearGradient>
+    <!-- The letter R on a 100 × 120 grid, its counter cut out (even-odd). -->
+    <path id="r" fill-rule="evenodd"
+          d="M0,0 H55 C81,0 96,15 96,36 C96,53 85,65 68,69 L99,120 H70 L42,71 H27 V120 H0 Z
+             M27,23 V49 H53 C63,49 69,44 69,36 C69,28 63,23 53,23 Z"/>
+  </defs>
+
+  <g clip-path="url(#tile)">
+    <!-- Sky and sun, the sun half set behind the sea. -->
+    <rect width="512" height="512" fill="url(#sky)"/>
+    <circle cx="300" cy="268" r="74" fill="url(#sun)"/>
+
+    <!-- Sea, with a few abstract swells and the sun's path on the water. -->
+    <rect x="0" y="262" width="512" height="130" fill="url(#sea)"/>
+    <g fill="#ffe3a0" opacity="0.75">
+      <rect x="262" y="278" width="76" height="5" rx="2.5"/>
+      <rect x="274" y="294" width="52" height="4" rx="2"/>
+      <rect x="284" y="309" width="32" height="4" rx="2"/>
+    </g>
+    <g fill="none" stroke="#7fd3e0" stroke-width="5" stroke-linecap="round" opacity="0.55">
+      <path d="M40,300 q18,-9 36,0 t36,0"/>
+      <path d="M380,322 q18,-9 36,0 t36,0"/>
+      <path d="M120,344 q18,-9 36,0 t36,0"/>
+    </g>
+
+    <!-- The palm in the background, leaning over the water. -->
+    <g>
+      <path d="M418,382 C412,320 404,250 372,176" fill="none" stroke="#5a3a2a"
+            stroke-width="15" stroke-linecap="round"/>
+      <g fill="none" stroke="#7a5038" stroke-width="3" opacity="0.7">
+        <path d="M403,330 l18,-4"/>
+        <path d="M398,292 l18,-5"/>
+        <path d="M390,256 l17,-6"/>
+        <path d="M380,222 l16,-7"/>
+      </g>
+      <g fill="#1f6b4a">
+        <path d="M372,176 C340,150 296,152 266,176 C300,164 334,168 372,176 Z"/>
+        <path d="M372,176 C352,134 318,118 284,122 C318,134 346,150 372,176 Z"/>
+        <path d="M372,176 C376,130 400,104 432,98 C406,120 390,144 372,176 Z"/>
+        <path d="M372,176 C410,152 452,156 482,184 C446,170 410,170 372,176 Z"/>
+        <path d="M372,176 C404,186 432,212 444,246 C420,218 398,200 372,176 Z"/>
+        <path d="M372,176 C346,190 324,218 318,250 C336,222 352,204 372,176 Z"/>
+      </g>
+      <g fill="#2e8a5e">
+        <path d="M372,176 C352,134 318,118 284,122 C326,128 352,146 372,176 Z"/>
+        <path d="M372,176 C410,152 452,156 482,184 C444,164 412,166 372,176 Z"/>
+      </g>
+      <circle cx="368" cy="182" r="7" fill="#4a2e1f"/>
+      <circle cx="380" cy="184" r="6" fill="#4a2e1f"/>
+    </g>
+
+    <!-- The beach: a dune sweeping up from the left. -->
+    <path d="M0,360 C120,330 260,350 360,376 C430,394 480,392 512,384 V512 H0 Z" fill="url(#sand)"/>
+    <path d="M0,404 C140,382 300,398 512,430 V512 H0 Z" fill="#e9c27f" opacity="0.6"/>
+
+    <!-- The R's shadow, cast back and right across the sand. -->
+    <ellipse cx="196" cy="424" rx="112" ry="15" fill="#9c6f3a" opacity="0.35"/>
+
+    <!-- The R in perspective: the face turned to the left and receding (skewed and narrowed
+         toward its right), with its depth stacked behind it. -->
+    <g transform="translate(108,232) matrix(1.35,-0.16,0,1.62,0,0)">
+      <g fill="#1d3f73">
+        <use xlink:href="#r" transform="translate(9,7)"/>
+        <use xlink:href="#r" transform="translate(8,6.2)"/>
+        <use xlink:href="#r" transform="translate(7,5.4)"/>
+        <use xlink:href="#r" transform="translate(6,4.6)"/>
+        <use xlink:href="#r" transform="translate(5,3.8)"/>
+        <use xlink:href="#r" transform="translate(4,3)"/>
+        <use xlink:href="#r" transform="translate(3,2.2)"/>
+        <use xlink:href="#r" transform="translate(2,1.4)"/>
+        <use xlink:href="#r" transform="translate(1,0.6)"/>
+      </g>
+      <use xlink:href="#r" fill="url(#face)" stroke="#1d3f73" stroke-width="1.2"
+           stroke-linejoin="round"/>
+    </g>
+  </g>
+</svg>

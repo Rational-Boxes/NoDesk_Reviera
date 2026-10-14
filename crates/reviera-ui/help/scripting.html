@@ -1,0 +1,140 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Copyright (C) 2026 Reviera contributors -->
+<h1>Scripting and automation</h1>
+<p class="lead">Every tool in Reviera runs a registered command. The same commands are available
+in the command shell, in Lua scripts and plugins, and to AI agents over the Model Context
+Protocol (MCP), with the same undo, warnings and checks as the ribbon.</p>
+<nav class="toc">
+  <a href="#commands">Commands</a>
+  <a href="#shell">Command shell</a>
+  <a href="#lua">Lua scripts</a>
+  <a href="#forms">Forms</a>
+  <a href="#plugins">Plugins</a>
+  <a href="#menu">Scripts menu</a>
+  <a href="#mcp">MCP for AI agents</a>
+</nav>
+
+<h2 id="commands">Commands</h2>
+<p>A command has a name of the form <code>domain.verb</code> (<code>wall.create</code>,
+<code>door.place</code>, <code>roof.set_eaves</code>), JSON arguments described by a JSON Schema,
+and a permission level. The help pages name the commands behind each tool in
+<code>code</code>. To list and explain them:</p>
+<ul>
+  <li><code>registry.list</code> lists every command with its summary;</li>
+  <li><code>registry.describe</code> gives one command's description and argument schema.</li>
+</ul>
+<p>Lengths in commands and scripts are in metres, whatever the model's display units.</p>
+
+<h2 id="shell">The command shell</h2>
+<p>From a terminal, <code>reviera shell model.ifc</code> opens a model and reads one command per
+line: the command's name, then its arguments as JSON.</p>
+<pre><code>reviera shell model.ifc
+&gt; :commands wall
+&gt; level.list
+&gt; level.create {"elevation": 3.0}
+&gt; edit.undo {"steps": 2}
+&gt; file.save
+&gt; :quit</code></pre>
+<p><code>:commands [prefix]</code> lists the commands (those starting with the prefix),
+<code>:docs</code> lists the open documents and <code>:quit</code> leaves. The shell is a session
+of its own: it does not drive an open window.</p>
+
+<h2 id="lua">Lua scripts</h2>
+<p>Scripts are LuaJIT. In a script, <code>reviera.&lt;domain&gt;.&lt;verb&gt;{...}</code> runs a
+command: <code>reviera.wall.create{...}</code> is <code>wall.create</code>. The arguments are a
+table, as the command's JSON arguments, and the result comes back as a table or value.
+<code>reviera.call(name, args)</code> runs any command by name. A failed command raises a Lua
+error whose message starts with the error code, so <code>pcall</code> can catch it.</p>
+<pre><code>-- title: Two walls
+-- description: An L of two 5 m walls on the first level.
+local level = reviera.level.list()[1].id
+local function wall(a, b)
+  return reviera.wall.create{
+    curve = { line = { start = a, ["end"] = b } },
+    base_level = level, top_constraint = { unconnected = 3.0 },
+  }
+end
+wall({0, 0}, {5, 0})
+wall({5, 0}, {5, 5})
+print("Two walls")</code></pre>
+<ul>
+  <li>A whole run is <b>one undo step</b>, and it is rolled back entirely if the script
+    fails.</li>
+  <li><code>print</code> (or <code>reviera.print</code>) and <code>reviera.ui.message</code>
+    report to the user.</li>
+  <li>Scripts run with the safe standard libraries: no <code>ffi</code>, <code>debug</code>,
+    <code>io</code> or process control.</li>
+  <li>The sample models are built by scripts: <code>house.lua</code>, <code>manor.lua</code> and
+    the others beside the samples are complete examples.</li>
+</ul>
+<p>Commands: <code>script.run</code> (Lua <code>code</code> or a <code>file</code>).</p>
+
+<h2 id="forms">Asking for input: forms</h2>
+<p><code>reviera.ui.form{title, message, fields}</code> asks the user for values and returns a
+table of them by field key, or <code>nil</code> when the user cancels. In the window it shows as
+a dialog in the model's units, checking each value and asking again until it is valid.</p>
+<pre><code>local t = reviera.ui.form{
+  title = "Tower",
+  message = "A round tower.",
+  fields = {
+    { key = "radius", label = "Radius", type = "length", default = 2.5, min = 1, max = 15,
+      help = "To the walls' centrelines" },
+    { key = "sides", label = "Sides", type = "integer", default = 16, min = 6 },
+    { key = "roof", label = "Top", type = "choice", choices = { "Cone", "Dome" } },
+  },
+}
+if t == nil then return end</code></pre>
+<p>Field types are <code>length</code> (metres; the user may type units), <code>number</code>,
+<code>integer</code>, <code>bool</code> (a checkbox), <code>choice</code> and <code>text</code>.
+Runs without a window (the shell, MCP, tests) take the values from the call's
+<code>answers</code> and the defaults.</p>
+
+<h2 id="plugins">Plugins</h2>
+<p>A plugin is either a folder with a <code>plugin.lua</code> that returns a table with
+<code>title</code>, <code>description</code> and a <code>run</code> function, or a single
+<code>.lua</code> file with <code>-- title:</code> and <code>-- description:</code> lines at the
+top. Reviera finds them:</p>
+<ul>
+  <li>built in: the <b>Castle Turret</b> plugin, which builds a round tower with a cone, dome or
+    battlements and arrow slits from a form;</li>
+  <li>in your script library: <code>~/.config/reviera/plugins</code> on Linux,
+    <code>%APPDATA%\Reviera\plugins</code> on Windows (or <code>REVIERA_LIBRARY</code>);</li>
+  <li>in the folders listed in <code>REVIERA_PLUGINS</code>.</li>
+</ul>
+<p>Commands: <code>plugin.list</code>, <code>plugin.run</code>, <code>script.import</code>,
+<code>script.remove</code>.</p>
+
+<h2 id="menu">The Scripts menu</h2>
+<table>
+  <tr><td><b>Run Script…</b></td><td>Runs a <code>.lua</code> file on the active model, as one
+    undo step. <a class="run" href="reviera:action/script.run">Run Script…</a></td></tr>
+  <tr><td><b>Import into Library…</b></td><td>Copies a script file or a plugin folder into your
+    script library, so it is listed in this menu.</td></tr>
+  <tr><td><b>Manage Library…</b></td><td>Lists the known scripts with their descriptions, to run,
+    remove or import them. Built-in scripts cannot be removed.</td></tr>
+  <tr><td>The scripts</td><td>Every known script and plugin, by title: choose one to run it. The
+    <a href="reviera:sample/observatory">Observatory</a> sample's turret was made with
+    <b>Scripts › Castle Turret</b>.</td></tr>
+</table>
+
+<h2 id="mcp">MCP for AI agents</h2>
+<p><code>reviera --mcp-stdio</code> runs Reviera as an MCP server on standard input and output.
+Every command is a tool, grouped into toolsets (core, modeling, documentation, families,
+materials, project_setup, io, collaboration, analysis, scripting, admin) that the agent enables
+as it needs them. Agents also get discovery tools, <code>query_elements</code> and
+<code>get_element</code>, undo and redo, undo groups, a preview and confirmation for
+destructive changes, and the model's documents and elements as resources.</p>
+<p>To connect Claude Code to a model:</p>
+<pre><code>claude mcp add reviera -- /path/to/reviera --mcp-stdio --permission model_edit /path/to/model.ifc</code></pre>
+<table>
+  <tr><th>Permission</th><th>What the agent may do</th></tr>
+  <tr><td><code>read_only</code> (the default)</td><td>Read the model; nothing changes.</td></tr>
+  <tr><td><code>model_edit</code></td><td>Edit the model. Files are written only to the output
+    folder, and destructive changes need confirming.</td></tr>
+  <tr><td><code>full_scripting</code></td><td>Every command.</td></tr>
+</table>
+<p><code>--toolsets a,b</code> enables toolsets from the start. The MCP server is a session of
+its own, without a window: it opens the file it is given, and the agent saves it with
+<code>file.save</code>. The agent's changes are recorded in the history as made by an agent.</p>
+<p class="note">Not yet available: MCP over HTTP with tokens, subscriptions, prompts, an
+<code>execute_lua</code> tool and view images.</p>

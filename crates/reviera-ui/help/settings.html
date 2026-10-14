@@ -1,0 +1,66 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Copyright (C) 2026 Reviera contributors -->
+<h1>Model properties and units</h1>
+<p class="lead">The model-wide settings are in one dialog: the units and number format, the
+building code, and the accessibility rule set. Tools use them as their defaults.</p>
+
+<h2 id="dialog">Model Properties</h2>
+<p><b>Manage › Settings › Model Properties</b> (<kbd>UN</kbd>; also in the <b>File</b> menu).
+<a class="run" href="reviera:action/ui.model_properties">Model Properties</a></p>
+<table>
+  <tr><th>Setting</th><th>What it does</th></tr>
+  <tr><td><b>Units</b></td><td>The display units: <i>Metric (mm)</i>, <i>Metric (m)</i>,
+    <i>Imperial (ft-in)</i> or <i>Imperial (decimal ft)</i>. Lengths, areas, volumes and angles
+    are shown as the preset formats them.</td></tr>
+  <tr><td><b>Decimal symbol</b>, <b>Digit grouping</b></td><td>The symbols before the decimals
+    and between groups of digits.</td></tr>
+  <tr><td><b>Building code</b></td><td>The code tools follow by default. See
+    <a href="#code">below</a>.</td></tr>
+  <tr><td><b>Occupancy</b></td><td><i>Within a dwelling unit</i>, or <i>Other (public,
+    commercial, common areas)</i>, where the code asks differently of each.</td></tr>
+  <tr><td><b>Stair headroom</b></td><td>The model's own stair headroom, in place of the code's.
+    Leave it empty to use the code's value, shown beside it with its clause.</td></tr>
+  <tr><td><b>Rule set</b> (Accessibility)</td><td><i>None (door swings only)</i> or <i>ADA
+    2010</i>. See <a href="reviera:help/coordination#clearances">Clearances</a>.</td></tr>
+</table>
+<p><b>OK</b> applies what changed. Values are always stored in SI units; the
+display units change only how they are shown and the unit a bare number is read in.
+<code>units.get</code>, <code>units.set_preset</code>, <code>units.set_number_format</code>,
+<code>units.set_format</code></p>
+
+<h2 id="typing">Typing lengths</h2>
+<p>Every length field, and the lengths typed while drawing, accept a value with a unit:</p>
+<table>
+  <tr><th>Typed</th><th>Read as</th></tr>
+  <tr><td><code>1067</code></td><td>A bare number is in the display unit (millimetres with
+    <i>Metric (mm)</i>). With <i>Imperial (ft-in)</i>, a bare number is inches.</td></tr>
+  <tr><td><code>4.5 m</code>, <code>450 cm</code>, <code>4500 mm</code></td><td>Metric
+    lengths.</td></tr>
+  <tr><td><code>12' 6"</code>, <code>5'-6 1/2"</code></td><td>Feet and inches, with
+    fractions.</td></tr>
+  <tr><td><code>42 in</code>, <code>3.5 ft</code>, <code>2 yd</code></td><td>Other units by
+    name.</td></tr>
+</table>
+<p><code>units.parse</code> reads a value as a script would; <code>units.format</code> shows one
+in the model's units.</p>
+
+<h2 id="code">Building code</h2>
+<p>The model follows one building code, set in Model Properties. Today the code supplies the
+stair headroom the <a href="reviera:help/stairs#headroom">Stair tool</a> checks:</p>
+<table>
+  <tr><th>Code</th><th>Stair headroom</th></tr>
+  <tr><td>International Residential Code (US)</td><td>6 ft 8 in (2032 mm); spiral stairs
+    6 ft 6 in (R311.7.2, R311.7.10.1)</td></tr>
+  <tr><td>International Building Code (US)</td><td>80 in (2032 mm); spiral stairs 78 in
+    (1011.3)</td></tr>
+  <tr><td>Approved Document K (England)</td><td>2.0 m (1.10)</td></tr>
+  <tr><td>National Building Code of Canada</td><td>1950 mm within dwelling units, 2050 mm
+    elsewhere (9.8.2.2)</td></tr>
+  <tr><td>National Construction Code (Australia)</td><td>2.0 m above the nosing line</td></tr>
+  <tr><td>DIN 18065 (Germany)</td><td>2.0 m clear headroom</td></tr>
+  <tr><td>Custom</td><td>None of its own: set the model's stair headroom.</td></tr>
+</table>
+<p>A tool may use another code for one operation: the stair's offer to open the floors above it
+lists each code with its headroom. <code>code.get</code>, <code>code.set</code></p>
+<p class="note">Check the code that applies to your project yourself: Reviera's values are a
+convenience, not a compliance check.</p>

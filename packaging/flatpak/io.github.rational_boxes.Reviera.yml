@@ -1,0 +1,241 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Reviera contributors
+#
+# Flatpak manifest for NoDesk Reviera. Built by packaging/flatpak/build.sh; see packaging/README.md.
+#
+# The build is fully offline (no --share=network at build time): every source is pinned by
+# checksum, and the Rust crates come from cargo-sources.json (flatpak-cargo-generator, rerun by
+# build.sh whenever Cargo.lock changes). For Flathub, swap the `dir` source of the last module
+# for a `git` source (url + tag + commit); everything else is already in Flathub's shape.
+id: io.github.rational_boxes.Reviera
+runtime: org.gnome.Platform
+# GNOME 51 is on freedesktop-sdk 26.08 and still ships GTK 3 and WebKitGTK 4.1 (wxWidgets' GTK port).
+runtime-version: '51'
+sdk: org.gnome.Sdk
+sdk-extensions:
+  # libclang for bindgen (wxdragon-sys generates its bindings at build time).
+  - org.freedesktop.Sdk.Extension.llvm22
+command: reviera
+finish-args:
+  - --share=ipc
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --device=dri
+  # Models, sheets and exports live anywhere under home; wxWidgets' GTK file dialogs are not
+  # portal-backed, so the sandbox needs the folders themselves.
+  - --filesystem=home
+  # Live-store encryption keys in the user's keyring (keyring crate, Secret Service over D-Bus).
+  - --talk-name=org.freedesktop.secrets
+
+build-options:
+  append-path: /usr/lib/sdk/llvm22/bin
+  prepend-ld-library-path: /usr/lib/sdk/llvm22/lib
+
+cleanup:
+  - /include
+  - /lib/cmake
+  - /lib/pkgconfig
+  - /share/cmake
+  - /share/pkgconfig
+  - /share/doc
+  - /share/man
+  - /man
+  - '*.a'
+  - '*.la'
+
+modules:
+  # ---------------------------------------------------------------- Boost 1.83 (as Fedora 43)
+  # IfcOpenShell links date_time, iostreams, regex, system, thread (and program_options for
+  # IfcConvert, which is built but not shipped); reviera-ifc links the same set as shared libs.
+  - name: boost
+    buildsystem: simple
+    build-commands:
+      - ./bootstrap.sh --prefix=/app --with-libraries=date_time,iostreams,program_options,regex,system,thread
+      - ./b2 -j${FLATPAK_BUILDER_N_JOBS} install variant=release link=shared threading=multi
+        runtime-link=shared cxxflags="$CXXFLAGS -fPIC" linkflags="$LDFLAGS" --prefix=/app
+        -sNO_LZMA=1 -sNO_ZSTD=1
+    sources:
+      - type: archive
+        url: https://archives.boost.io/release/1.83.0/source/boost_1_83_0.tar.bz2
+        sha256: 6478edfe2f3305127cffe8caf73ea0176c53769f4bf1585be237eb30798c3b8e
+
+  # ---------------------------------------------------------------- Eigen 3.4 (headers only)
+  - name: eigen
+    buildsystem: cmake-ninja
+    builddir: true
+    config-opts:
+      - -DBUILD_TESTING=OFF
+      - -DEIGEN_BUILD_DOC=OFF
+      - -DEIGEN_BUILD_PKGCONFIG=ON
+    cleanup:
+      - '*'
+    sources:
+      - type: archive
+        url: https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.tar.bz2
+        sha256: b4c198460eba6f28d34894e3a5710998818515104d6e74e5cc331ce31e46e626
+
+  # ---------------------------------------------------------------- OpenCASCADE 7.9.3
+  # Every module but Draw: IfcOpenShell links TKDESTEP (DataExchange) and TKBin
+  # (ApplicationFramework), which pull in Visualization.
+  - name: opencascade
+    buildsystem: cmake-ninja
+    builddir: true
+    config-opts:
+      - -DCMAKE_BUILD_TYPE=Release
+      - -DINSTALL_DIR=/app
+      - -DINSTALL_DIR_LAYOUT=Unix
+      - -DINSTALL_DIR_LIB=lib
+      - -DBUILD_LIBRARY_TYPE=Shared
+      - -DBUILD_MODULE_Draw=OFF
+      - -DBUILD_DOC_Overview=OFF
+      - -DBUILD_SAMPLES_QT=OFF
+      - -DUSE_TK=OFF
+      - -DUSE_TCL=OFF
+      - -DUSE_TBB=OFF
+      - -DUSE_VTK=OFF
+      - -DUSE_FREEIMAGE=OFF
+      - -DUSE_RAPIDJSON=OFF
+      - -DUSE_DRACO=OFF
+      - -DUSE_FFMPEG=OFF
+      - -DUSE_OPENVR=OFF
+      - -DINSTALL_SAMPLES=OFF
+      - -DINSTALL_TEST_CASES=OFF
+    cleanup:
+      - /bin
+      - /share/opencascade/samples
+    sources:
+      - type: archive
+        url: https://github.com/Open-Cascade-SAS/OCCT/archive/refs/tags/V7_9_3.tar.gz
+        sha256: 5ecf094ec6b12d5413dfb851d8c3590c354058aee556e32e408bdfbf8c357d57
+
+  # ---------------------------------------------------------------- LuaJIT 2.1 (rolling)
+  # The commit Fedora 43's luajit-2.1.1767980792 was cut from.
+  - name: luajit
+    buildsystem: simple
+    build-commands:
+      - make -j${FLATPAK_BUILDER_N_JOBS} PREFIX=/app amalg
+      - make install PREFIX=/app
+    cleanup:
+      - /bin
+      - /share/luajit-*
+      - /share/lua
+      - /lib/lua
+    sources:
+      - type: archive
+        url: https://github.com/LuaJIT/LuaJIT/archive/707c12bf00dafdfd3899b1a6c36435dbbf6c7022.tar.gz
+        sha256: ac2defd1e9b4ab07ac0a52f2403318ffb0d54505b975dff0cfc49a927ab84d90
+
+  # ---------------------------------------------------------------- IfcOpenShell 0.8.5
+  # Static libraries, configured as tools/build-ifcopenshell.sh does (keep the two in step).
+  - name: ifcopenshell
+    buildsystem: cmake-ninja
+    subdir: cmake
+    builddir: true
+    config-opts:
+      - -DCMAKE_BUILD_TYPE=Release
+      - -DCMAKE_POSITION_INDEPENDENT_CODE=ON
+      - -DBUILD_SHARED_LIBS=OFF
+      - -DSCHEMA_VERSIONS=2x3;4;4x3_add2
+      - -DBUILD_IFCPYTHON=OFF
+      - -DBUILD_CONVERT=ON
+      - -DBUILD_GEOMSERVER=OFF
+      - -DWITH_OPENCASCADE=ON
+      - -DWITH_CGAL=OFF
+      - -DCOLLADA_SUPPORT=OFF
+      - -DGLTF_SUPPORT=OFF
+      - -DHDF5_SUPPORT=OFF
+      - -DIFCXML_SUPPORT=OFF
+      - -DUSE_CCACHE=OFF
+      - -DOCC_INCLUDE_DIR=/app/include/opencascade
+      - -DOCC_LIBRARY_DIR=/app/lib
+      - -DBOOST_ROOT=/app
+      - -DEigen3_DIR=/app/share/eigen3/cmake
+      - -DEIGEN_DIR=/app/include/eigen3
+    cleanup:
+      - /bin
+    sources:
+      - type: archive
+        url: https://github.com/IfcOpenShell/IfcOpenShell/archive/refs/tags/ifcopenshell-python-0.8.5.tar.gz
+        sha256: 185b97d79c800603685c60abd1497df242050dbb117dcaccbaebdec0cdf25dd5
+
+  # ---------------------------------------------------------------- Rust 1.99 (build only)
+  # rust-toolchain.toml pins 1.99, and the workspace's rust-version is 1.99. The
+  # org.freedesktop.Sdk.Extension.rust-stable//26.08 build on Flathub was still 1.98 when this
+  # was written, so the official toolchain is installed under /app/rust for the build and removed
+  # afterwards. Once rust-stable reaches 1.99, replace this module with
+  # `sdk-extensions: [org.freedesktop.Sdk.Extension.rust-stable]` and
+  # `append-path: /usr/lib/sdk/rust-stable/bin`.
+  - name: rust-toolchain
+    buildsystem: simple
+    # Stripping breaks the toolchain's libLLVM; nothing of it is shipped anyway.
+    build-options:
+      no-debuginfo: true
+      strip: false
+    build-commands:
+      - ./install.sh --prefix=/app/rust --disable-ldconfig
+        --components=rustc,cargo,rust-std-$(uname -m)-unknown-linux-gnu
+    cleanup:
+      - /rust
+    sources:
+      - type: archive
+        only-arches: [x86_64]
+        url: https://static.rust-lang.org/dist/rust-1.99.0-x86_64-unknown-linux-gnu.tar.xz
+        sha256: 891c6366d7100feda0bca4c03ce63f3c9ac827cbebbc283e7433061d42c6a376
+      - type: archive
+        only-arches: [aarch64]
+        url: https://static.rust-lang.org/dist/rust-1.99.0-aarch64-unknown-linux-gnu.tar.xz
+        sha256: 5a30ce742be0835d9b23fc862db5cbbbc71464e1c9b1fca22917e10e4ba32a92
+
+  # ---------------------------------------------------------------- NoDesk Reviera
+  - name: reviera
+    buildsystem: simple
+    build-options:
+      append-path: /app/rust/bin
+      env:
+        CARGO_HOME: /run/build/reviera/cargo
+        CARGO_NET_OFFLINE: 'true'
+        LIBCLANG_PATH: /usr/lib/sdk/llvm22/lib
+        # wxdragon-sys builds wxWidgets 3.3.3 from this tree instead of downloading it.
+        WXWIDGETS_DIR: /run/build/reviera/wxWidgets
+        REVIERA_IFCOS_PREFIX: /app
+        OCC_INCLUDE_DIR: /app/include/opencascade
+        OCC_LIBRARY_DIR: /app/lib
+        # reviera-ifc's shim includes IfcGeom headers, which include Eigen.
+        CPLUS_INCLUDE_PATH: /app/include/eigen3
+    build-commands:
+      - cargo --offline build --release --locked -p reviera
+      - install -Dm755 target/release/reviera -t /app/bin
+      # Sample models for Help (crates/reviera-ui/src/help.rs: <exe>/../share/reviera/samples).
+      - install -Dm644 -t /app/share/reviera/samples test-data/samples/samples.json
+        test-data/samples/*.ifc test-data/samples/*.lua test-data/samples/*.md
+      - install -Dm644 packaging/THIRD-PARTY-NOTICES.txt -t /app/share/licenses/${FLATPAK_ID}
+      - install -Dm644 LICENSE /app/share/licenses/${FLATPAK_ID}/COPYING
+      - install -Dm644 packaging/flatpak/${FLATPAK_ID}.desktop -t /app/share/applications
+      - install -Dm644 packaging/flatpak/${FLATPAK_ID}.metainfo.xml -t /app/share/metainfo
+      - install -Dm644 packaging/flatpak/${FLATPAK_ID}.mime.xml /app/share/mime/packages/${FLATPAK_ID}.xml
+      # PNG sizes only: appstreamcli compose runs on the build host, and hosts whose gdk-pixbuf
+      # has no SVG loader (Fedora 43) fail on a scalable icon.
+      - for s in 16 24 32 48 64 128 256 512; do
+          mkdir -p /app/share/icons/hicolor/${s}x${s}/apps;
+          rsvg-convert -w $s -h $s packaging/icons/reviera.svg
+            -o /app/share/icons/hicolor/${s}x${s}/apps/${FLATPAK_ID}.png;
+        done
+    sources:
+      # The working tree. For Flathub: a `git` source with the release tag and commit.
+      - type: dir
+        path: ../..
+        skip:
+          - .git
+          - target
+          - third_party
+          - design_documents
+          - dist
+          - packaging/flatpak/.flatpak-builder
+          - packaging/flatpak/build-dir
+          - packaging/flatpak/repo
+      - type: archive
+        url: https://github.com/wxWidgets/wxWidgets/releases/download/v3.3.3/wxWidgets-3.3.3.zip
+        sha256: 458a1ef598c90174ee43622e8e63bfa1eccb451ffc2258bb4f8edcb050c5feb1
+        strip-components: 0
+        dest: wxWidgets
+      - cargo-sources.json

@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Copyright (C) 2026 Reviera contributors -->
+<component type="desktop-application">
+  <id>io.github.rational_boxes.Reviera</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+  <name>NoDesk Reviera</name>
+  <summary>Model buildings on native IFC</summary>
+  <developer id="io.github.rational_boxes">
+    <name>Reviera contributors</name>
+  </developer>
+  <description>
+    <p>
+      Reviera is a parametric Building Information Modeling (BIM) application for architecture,
+      structure and MEP. IFC is its native file format, so there is no proprietary container.
+      Every operation can be driven by Lua scripts and by AI agents through the Model Context
+      Protocol (MCP).
+    </p>
+    <p>This is an early pre-release. It already models a small building end to end:</p>
+    <ul>
+      <li>Straight and curved walls, doors and windows, floors, ceilings and decks</li>
+      <li>Hip, gable, arched and domed roofs with eaves and dormers</li>
+      <li>Stairs, railings with gates, rooms, levels and grids</li>
+      <li>Overlap detection with kept booleans, and door clearance checks</li>
+      <li>Plans, ceiling plans, sections, elevations, schedules and sheets to PDF and COBie</li>
+    </ul>
+    <p>
+      Help lists sample models to open, and the Castle Turret plugin shows what a Lua plugin can
+      do.
+    </p>
+  </description>
+  <launchable type="desktop-id">io.github.rational_boxes.Reviera.desktop</launchable>
+  <provides>
+    <binary>reviera</binary>
+    <mediatype>application/x-ifc</mediatype>
+  </provides>
+  <url type="homepage">https://github.com/Rational-Boxes/NoDesk_Reviera</url>
+  <url type="bugtracker">https://github.com/Rational-Boxes/NoDesk_Reviera/issues</url>
+  <url type="vcs-browser">https://github.com/Rational-Boxes/NoDesk_Reviera</url>
+  <screenshots>
+    <screenshot type="default">
+      <caption>A door selected in the 3D view</caption>
+      <image>https://raw.githubusercontent.com/Rational-Boxes/NoDesk_Reviera/main/design_documents/application_screenshots/3D-view.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>A floor plan with cut walls, stairs and furniture</caption>
+      <image>https://raw.githubusercontent.com/Rational-Boxes/NoDesk_Reviera/main/design_documents/application_screenshots/plan-view.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>A section box cutting a model open</caption>
+      <image>https://raw.githubusercontent.com/Rational-Boxes/NoDesk_Reviera/main/design_documents/application_screenshots/section-box.png</image>
+    </screenshot>
+  </screenshots>
+  <categories>
+    <category>Graphics</category>
+    <category>Engineering</category>
+  </categories>
+  <keywords>
+    <keyword>BIM</keyword>
+    <keyword>IFC</keyword>
+    <keyword>CAD</keyword>
+    <keyword>architecture</keyword>
+  </keywords>
+  <branding>
+    <color type="primary" scheme_preference="light">#9cc6f0</color>
+    <color type="primary" scheme_preference="dark">#1f5fa8</color>
+  </branding>
+  <requires>
+    <display_length compare="ge">768</display_length>
+  </requires>
+  <supports>
+    <control>pointing</control>
+    <control>keyboard</control>
+  </supports>
+  <content_rating type="oars-1.1"/>
+  <releases>
+    <release version="0.1.0~pre.1" date="2026-10-14" type="development">
+      <description>
+        <p>First pre-release (tag 0.1.0-pre.1), for testing.</p>
+      </description>
+    </release>
+  </releases>
+</component>

@@ -1,0 +1,108 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Copyright (C) 2026 Reviera contributors -->
+<h1>Walls</h1>
+<p class="lead">Walls are drawn on a level as chains of straight segments, arcs or splines. They
+join at corners by themselves, carry doors and windows, bound rooms, and can attach their tops
+to a roof.</p>
+<nav class="toc">
+  <a href="#draw">Drawing walls</a>
+  <a href="#arc">Arc walls</a>
+  <a href="#spline">Spline walls</a>
+  <a href="#properties">Properties</a>
+  <a href="#joins">Joins</a>
+  <a href="#attach">Attaching to roofs</a>
+  <a href="#edit">Editing walls</a>
+</nav>
+
+<h2 id="draw">Drawing walls</h2>
+<ol>
+  <li>Open the plan of the level the walls stand on (the tool uses the plan's level; in a 3D
+    view, the lowest level).</li>
+  <li><b>Architecture › Build › Wall</b> (<kbd>WA</kbd>).
+    <a class="run" href="reviera:action/wall.create">Wall</a></li>
+  <li>Optionally choose the wall type in Properties (nothing is selected while the tool
+    runs).</li>
+  <li>Click the start point, then each next point. Each click ends one wall and starts the next,
+    so a chain of walls follows the clicks.</li>
+  <li>Instead of clicking the next point, type a length and press <kbd>Enter</kbd>: the wall runs
+    that far toward the cursor. Any unit can be typed (<code>4500</code>, <code>4.5 m</code>,
+    <code>12' 6"</code>); <kbd>Backspace</kbd> edits it.</li>
+  <li><kbd>Esc</kbd> ends the chain; <kbd>Esc</kbd> again ends the tool.</li>
+</ol>
+<p><b>Snapping.</b> Points snap to wall ends, wall midpoints, points on walls' location lines,
+cut edges of other elements in the plan, and the nearest 15° direction from the previous
+point.</p>
+<p><b>Exterior side.</b> The status bar says which side of the line the exterior face is on (the
+left, as you draw). Draw a building's outline clockwise and the exteriors face out.
+<kbd>Spacebar</kbd> flips the side while drawing.</p>
+<p><b>Height.</b> A new wall rises to the level above, when there is one; otherwise it gets an
+unconnected height of 3000 mm. Change either afterwards in Properties.</p>
+<p>The <a href="reviera:sample/house">House</a> sample's guide starts with a rectangle of walls:
+click (0, 0), type <code>10000</code> along x and <kbd>Enter</kbd>, then 7000 up, 10000 back and
+down to the start. <code>wall.create</code></p>
+
+<h2 id="arc">Arc walls</h2>
+<ol>
+  <li><b>Architecture › Build › Arc Wall</b>.
+    <a class="run" href="reviera:action/wall.create_arc">Arc Wall</a></li>
+  <li>Click the wall's start, then its end, then a point the arc passes through.</li>
+</ol>
+<p>A full circle takes two half arcs, as the round tower of the
+<a href="reviera:sample/manor">Manor</a> and the drum of the
+<a href="reviera:sample/observatory">Observatory</a>.</p>
+
+<h2 id="spline">Spline walls</h2>
+<ol>
+  <li><b>Architecture › Build › Spline Wall</b>.
+    <a class="run" href="reviera:action/wall.create_spline">Spline Wall</a></li>
+  <li>Click the points the wall passes through; <kbd>Enter</kbd> ends it at the last point.</li>
+</ol>
+<p>Curved walls (arc and spline) carry doors and windows along the curve, square to it, bound
+rooms, attach to roofs and join straight walls with mitred corners.</p>
+
+<h2 id="properties">Properties</h2>
+<p>Select a wall to see its rows in Properties:</p>
+<table>
+  <tr><td><b>Base Constraint</b>, <b>Base Offset</b></td><td>The level the wall stands on, and
+    how far above it its base is.</td></tr>
+  <tr><td><b>Top Constraint</b></td><td>A level the top reaches, or <i>Unconnected</i>.</td></tr>
+  <tr><td><b>Unconnected Height</b></td><td>The height when the top is unconnected (it follows the
+    level otherwise).</td></tr>
+  <tr><td><b>Top Offset</b></td><td>How far above (or below) the top level the top is.</td></tr>
+  <tr><td><b>Type</b></td><td>Choose a type, or <b>Duplicate Type…</b>. The type's <b>Width</b>
+    changes every wall of that type. See <a href="reviera:help/types">Types</a>.</td></tr>
+</table>
+<p>To flip a wall's exterior and interior sides afterwards, select it and press
+<kbd>Spacebar</kbd>, or <b>Modify | Walls › Flip Wall</b>. <code>wall.set_constraints</code>,
+<code>wall.flip</code>, <code>wall.set_location</code></p>
+
+<h2 id="joins">Joins</h2>
+<p>Walls that meet join by themselves: mitred at L corners, and joined at T junctions. Joins are
+recomputed as walls move. A join can be disallowed at either end of a wall with the
+<code>wall.set_join_allowed</code> command; <code>wall.joins_query</code> lists a wall's
+joins.</p>
+
+<h2 id="attach">Attaching to roofs</h2>
+<p>A wall's top can attach to a roof or dome above it: gable walls rise to the ridge, and a drum
+rises to its dome. The part of the wall above the roof's lowest point follows the roof.</p>
+<ol>
+  <li>Select the walls. <b>Modify | Walls › Attach Top/Base</b>.</li>
+  <li>Click the roof.</li>
+</ol>
+<p><b>Detach Top/Base</b> returns the selected walls to their own tops. To attach every wall
+under a roof at once, select the roof and use <b>Modify | Roofs › Attach Walls</b>; see
+<a href="reviera:help/roofs#attach">Roofs</a>. <code>wall.attach</code>,
+<code>wall.detach</code></p>
+
+<h2 id="edit">Editing walls</h2>
+<ul>
+  <li>A selected wall shows a grip at each end: drag it to move that end.</li>
+  <li>Drag selected walls to move them. Walls carry their doors and windows when they are moved,
+    copied or mirrored.</li>
+  <li>Offset, Trim/Extend, Split and Align are on the Modify tab: see
+    <a href="reviera:help/selecting#tools">Modify tools</a>.</li>
+</ul>
+<p>Walls are saved as <code>IfcWall</code> with an axis and a body (curved and attached walls as
+faceted B-reps), typed, contained in their storey and connected to their neighbours.</p>
+<p class="note">Not yet available: layered wall types (core and finishes), T joins into the side
+of a curved wall, and attaching wall bases or attaching to floors and ceilings.</p>

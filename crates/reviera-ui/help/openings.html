@@ -1,0 +1,30 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Copyright (C) 2026 Reviera contributors -->
+<h1>Vertical openings</h1>
+<p class="lead">A vertical opening cuts a floor or ceiling plumb, for example over a stair. In the
+window, openings come from the Stair tool's headroom offer; they are then reshaped with their
+grips.</p>
+
+<h2 id="make">Making an opening</h2>
+<p>When a stair passes under a floor or ceiling that leaves it short of the building code's
+headroom, Reviera offers to open it over the stair's full width. Accept the offer when the stair
+is made, or later select the stair and use <b>Modify | Stairs › Stair Openings</b>. See
+<a href="reviera:help/stairs#headroom">Stairs</a>.</p>
+<p>Scripts and agents can make openings of any outline with
+<code>opening.create_vertical</code>.</p>
+
+<h2 id="plans">In plans</h2>
+<p>Plans of the host's level draw each opening as its outline crossed corner to corner. Click the
+outline or the cross to select it.</p>
+
+<h2 id="grips">Reshaping an opening</h2>
+<ol>
+  <li>Select the opening in a plan.</li>
+  <li>Drag a corner grip to move the corner, or an edge grip to move that edge across.</li>
+</ol>
+<p>Each drag is one undo step. An opening partly outside its floor notches the floor's edge. The
+opening moves with its floor or ceiling, and is deleted with it. <code>opening.set_loops</code></p>
+<p>In IFC the slab stays whole and an <code>IfcOpeningElement</code> voids it.</p>
+<p class="note">Not yet available: a sketch tool for openings in the window, openings in roofs,
+shafts through several floors, and guards placed round an opening by themselves (a railing can be
+sketched along its edge).</p>

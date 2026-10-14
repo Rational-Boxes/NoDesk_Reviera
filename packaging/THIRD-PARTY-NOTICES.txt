@@ -1,0 +1,328 @@
+NoDesk Reviera - third-party notices
+====================================
+
+NoDesk Reviera is free software under the GNU General Public License, version 3 or (at your
+option) any later version (see COPYING / LICENSE). Its complete source code, including the
+build scripts that produced this package, is at https://github.com/Rational-Boxes/NoDesk_Reviera
+
+The packages (Flatpak, macOS .app/.dmg, Windows installer and ZIP) contain the following
+third-party software. Every component is distributed under its own licence, all of which allow
+redistribution together with a GPL-3.0-or-later program. The licence texts are in each project's
+source distribution at the address given; the Flatpak also carries copies under
+/app/share/licenses.
+
+Native libraries
+----------------
+
+OpenCASCADE Technology (OCCT) 7.9
+  GNU LGPL 2.1 with the Open CASCADE exception. Linked dynamically (libTK*).
+  https://github.com/Open-Cascade-SAS/OCCT
+
+IfcOpenShell 0.8.5 (IfcParse, IfcGeom)
+  GNU LGPL 3.0 or later. Linked statically; the corresponding source of the whole program,
+  and therefore the means to relink it, is published as above.
+  https://github.com/IfcOpenShell/IfcOpenShell
+
+wxWidgets 3.3.3 (through wxDragon)
+  wxWindows Library Licence 3.1 (LGPL 2.0 or later with an exception that permits binary
+  distribution of linked works on the user's own terms). Linked statically.
+  https://www.wxwidgets.org/   https://github.com/AllenDang/wxDragon (wxDragon: MIT/Apache-2.0)
+
+LuaJIT 2.1
+  MIT licence. Copyright Mike Pall.
+  https://luajit.org/
+
+SQLCipher (bundled in the rusqlite / libsqlite3-sys crates)
+  BSD-3-Clause style licence, Copyright Zetetic LLC. SQLite itself is public domain.
+  https://www.zetetic.net/sqlcipher/
+
+OpenSSL 3 (vendored by the openssl-src crate, used by SQLCipher)
+  Apache License 2.0.
+  https://www.openssl.org/
+
+Boost 1.83 (date_time, iostreams, regex, system, thread)
+  Boost Software License 1.0.
+  https://www.boost.org/
+
+Eigen 3.4 (headers compiled into IfcOpenShell)
+  Mozilla Public License 2.0.
+  https://eigen.tuxfamily.org/
+
+FreeType (used by OCCT; macOS and Windows packages bundle it, the Flatpak takes it from the
+GNOME runtime)
+  FreeType Licence (BSD-style with credit clause) or GNU GPL 2.
+  https://freetype.org/
+
+On macOS and Windows the package may also contain further libraries that the OCCT, Boost and
+LuaJIT builds of Homebrew or vcpkg depend on (for example zlib, bzip2, TBB, FreeImage, Tcl/Tk).
+They keep the licences of their projects: zlib (zlib), bzip2 (bzip2 licence), oneTBB
+(Apache-2.0), FreeImage (FreeImage Public Licence), Tcl/Tk (BSD-style).
+
+The Flatpak runs on the GNOME 51 runtime (GTK 3, WebKitGTK 4.1, Mesa and others), which is
+installed separately and is not part of the Reviera bundle. On Windows, the help pages use the
+Microsoft Edge WebView2 runtime that is part of Windows; on macOS, the system WKWebView.
+
+Rust crates
+-----------
+
+The program statically links these Rust crates (Linux build; the macOS and Windows builds swap a
+few platform crates such as windows-sys or objc2 for their own). Licence expressions are as the
+crates declare them; their texts are in each crate's source at https://crates.io.
+
+  adler2 2.0.1                                 0BSD OR MIT OR Apache-2.0
+  aes 0.9.3                                    MIT OR Apache-2.0
+  ahash 0.8.12                                 MIT OR Apache-2.0
+  aho-corasick 1.1.5                           Unlicense OR MIT
+  allocator-api2 0.2.21                        MIT OR Apache-2.0
+  archery 1.2.3                                MIT
+  arrayvec 0.7.8                               MIT OR Apache-2.0
+  ash 0.38.0+1.3.281                           MIT OR Apache-2.0
+  async-broadcast 0.7.2                        MIT OR Apache-2.0
+  async-channel 2.5.0                          Apache-2.0 OR MIT
+  async-executor 1.14.0                        Apache-2.0 OR MIT
+  async-io 2.6.0                               Apache-2.0 OR MIT
+  async-lock 3.4.2                             Apache-2.0 OR MIT
+  async-process 2.5.0                          Apache-2.0 OR MIT
+  async-recursion 1.2.0                        MIT OR Apache-2.0
+  async-signal 0.2.14                          Apache-2.0 OR MIT
+  async-task 4.7.1                             Apache-2.0 OR MIT
+  async-trait 0.1.92                           MIT OR Apache-2.0
+  atomic-waker 1.1.2                           Apache-2.0 OR MIT
+  base64 0.23.1                                MIT OR Apache-2.0
+  bit-set 0.10.0                               Apache-2.0 OR MIT
+  bit-set 0.8.0                                Apache-2.0 OR MIT
+  bit-vec 0.8.0                                Apache-2.0 OR MIT
+  bit-vec 0.9.1                                Apache-2.0 OR MIT
+  bitflags 2.13.2                              MIT OR Apache-2.0
+  block-buffer 0.12.1                          MIT OR Apache-2.0
+  block-padding 0.4.2                          MIT OR Apache-2.0
+  blocking 1.7.0                               Apache-2.0 OR MIT
+  borrow-or-share 0.2.4                        MIT-0
+  bstr 1.13.1                                  MIT OR Apache-2.0
+  bumpalo 3.20.3                               MIT OR Apache-2.0
+  bytecount 0.6.9                              Apache-2.0/MIT
+  bytemuck 1.25.2                              Zlib OR Apache-2.0 OR MIT
+  bytemuck_derive 1.12.1                       Zlib OR Apache-2.0 OR MIT
+  bytes 1.12.1                                 MIT
+  cbc 0.2.1                                    MIT OR Apache-2.0
+  cfg-if 1.0.5                                 MIT OR Apache-2.0
+  chrono 0.4.45                                MIT OR Apache-2.0
+  cipher 0.5.2                                 MIT OR Apache-2.0
+  cmov 0.5.4                                   Apache-2.0 OR MIT
+  codespan-reporting 0.13.1                    Apache-2.0
+  concurrent-queue 2.5.0                       Apache-2.0 OR MIT
+  const-oid 0.10.2                             Apache-2.0 OR MIT
+  cpubits 0.1.1                                MIT OR Apache-2.0
+  cpufeatures 0.3.1                            MIT OR Apache-2.0
+  crc32fast 1.5.2                              MIT OR Apache-2.0
+  crossbeam-utils 0.8.23                       MIT OR Apache-2.0
+  crypto-common 0.2.2                          MIT OR Apache-2.0
+  ctutils 0.4.3                                Apache-2.0 OR MIT
+  cxx 1.0.205                                  MIT OR Apache-2.0
+  cxxbridge-macro 1.0.205                      MIT OR Apache-2.0
+  data-encoding 2.11.1                         MIT
+  digest 0.11.3                                MIT OR Apache-2.0
+  dlib 0.5.3                                   MIT
+  document-features 0.2.12                     MIT OR Apache-2.0
+  dyn-clone 1.0.20                             MIT OR Apache-2.0
+  earcut 0.4.11                                MIT OR Apache-2.0
+  either 1.19.0                                MIT OR Apache-2.0
+  email_address 0.2.9                          MIT
+  endi 1.1.1                                   MIT
+  enumflags2 0.7.12                            MIT OR Apache-2.0
+  enumflags2_derive 0.7.12                     MIT OR Apache-2.0
+  equivalent 1.0.2                             Apache-2.0 OR MIT
+  erased-serde 0.4.10                          MIT OR Apache-2.0
+  errno 0.3.14                                 MIT OR Apache-2.0
+  event-listener 5.4.2                         Apache-2.0 OR MIT
+  event-listener-strategy 0.5.4                Apache-2.0 OR MIT
+  fallible-iterator 0.3.0                      MIT/Apache-2.0
+  fallible-streaming-iterator 0.1.9            MIT/Apache-2.0
+  fancy-regex 0.19.2                           MIT
+  fastrand 2.5.0                               Apache-2.0 OR MIT
+  flate2 1.1.10                                MIT OR Apache-2.0
+  fluent-uri 0.4.1                             MIT
+  foldhash 0.2.0                               Zlib
+  fraction 0.17.0                              MIT OR Apache-2.0
+  futures 0.3.34                               MIT OR Apache-2.0
+  futures-channel 0.3.34                       MIT OR Apache-2.0
+  futures-core 0.3.34                          MIT OR Apache-2.0
+  futures-executor 0.3.34                      MIT OR Apache-2.0
+  futures-io 0.3.34                            MIT OR Apache-2.0
+  futures-lite 2.6.1                           Apache-2.0 OR MIT
+  futures-macro 0.3.34                         MIT OR Apache-2.0
+  futures-sink 0.3.34                          MIT OR Apache-2.0
+  futures-task 0.3.34                          MIT OR Apache-2.0
+  futures-util 0.3.34                          MIT OR Apache-2.0
+  getrandom 0.3.4                              MIT OR Apache-2.0
+  getrandom 0.4.3                              MIT OR Apache-2.0
+  glam 0.34.1                                  MIT OR Apache-2.0
+  glow 0.17.0                                  MIT OR Apache-2.0 OR Zlib
+  gpu-allocator 0.28.0                         MIT OR Apache-2.0
+  half 2.7.1                                   MIT OR Apache-2.0
+  hashbrown 0.16.1                             MIT OR Apache-2.0
+  hashbrown 0.17.1                             MIT OR Apache-2.0
+  hashlink 0.12.2                              MIT OR Apache-2.0
+  heck 0.5.0                                   MIT OR Apache-2.0
+  hex 0.4.3                                    MIT OR Apache-2.0
+  hkdf 0.13.0                                  MIT OR Apache-2.0
+  hmac 0.13.0                                  MIT OR Apache-2.0
+  hybrid-array 0.4.15                          MIT OR Apache-2.0
+  i_float 5.0.0                                MIT
+  i_key_sort 0.12.0                            MIT
+  i_overlay 9.1.0                              MIT OR Apache-2.0
+  i_shape 5.0.0                                MIT
+  i_tree 0.20.0                                MIT
+  iana-time-zone 0.1.65                        MIT OR Apache-2.0
+  imbl 7.0.2                                   MPL-2.0+
+  imbl-sized-chunks 0.2.0                      MPL-2.0+
+  indexmap 2.14.2                              Apache-2.0 OR MIT
+  inout 0.2.2                                  MIT OR Apache-2.0
+  itoa 1.0.18                                  MIT OR Apache-2.0
+  jsonschema 0.58.6                            MIT
+  jsonschema-regex 0.58.6                      MIT
+  jsonschema-value 0.58.6                      MIT
+  keyring 4.2.0                                MIT OR Apache-2.0
+  keyring-core 1.0.1                           MIT OR Apache-2.0
+  khronos-egl 6.0.0                            MIT/Apache-2.0
+  libc 0.2.190                                 MIT OR Apache-2.0
+  libloading 0.8.9                             ISC
+  libm 0.2.16                                  MIT
+  libsqlite3-sys 0.38.2                        MIT
+  link-cplusplus 1.0.12                        MIT OR Apache-2.0
+  linux-raw-sys 0.12.1                         Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT
+  litrs 1.0.1                                  MIT OR Apache-2.0
+  lock_api 0.4.14                              MIT OR Apache-2.0
+  log 0.4.34                                   MIT OR Apache-2.0
+  memchr 2.8.3                                 Unlicense OR MIT
+  micromap 0.3.0                               MIT
+  miniz_oxide 0.9.1                            MIT OR Zlib OR Apache-2.0
+  mio 1.2.4                                    MIT
+  mlua 0.12.2                                  MIT
+  mlua-sys 0.13.0                              MIT
+  naga 30.0.1                                  MIT OR Apache-2.0
+  naga-types 30.0.1                            MIT OR Apache-2.0
+  num 0.4.3                                    MIT OR Apache-2.0
+  num-bigint 0.4.8                             MIT OR Apache-2.0
+  num-cmp 0.1.0                                MIT/Apache-2.0
+  num-complex 0.4.6                            MIT OR Apache-2.0
+  num-integer 0.1.47                           MIT OR Apache-2.0
+  num-iter 0.1.46                              MIT OR Apache-2.0
+  num-rational 0.4.2                           MIT OR Apache-2.0
+  num-traits 0.2.19                            MIT OR Apache-2.0
+  once_cell 1.21.4                             MIT OR Apache-2.0
+  openssl-sys 0.9.117                          MIT
+  ordered-float 2.10.1                         MIT
+  ordered-float 5.5.0                          MIT
+  ordered-stream 0.2.0                         MIT OR Apache-2.0
+  outref 0.5.2                                 MIT
+  parking 2.2.1                                Apache-2.0 OR MIT
+  parking_lot 0.12.5                           MIT OR Apache-2.0
+  parking_lot_core 0.9.12                      MIT OR Apache-2.0
+  paste 1.0.15                                 MIT OR Apache-2.0
+  pastey 0.2.3                                 MIT OR Apache-2.0
+  pdf-writer 0.15.0                            MIT OR Apache-2.0
+  percent-encoding 2.3.2                       MIT OR Apache-2.0
+  pin-project-lite 0.2.17                      Apache-2.0 OR MIT
+  piper 0.2.5                                  MIT OR Apache-2.0
+  polling 3.11.0                               Apache-2.0 OR MIT
+  pollster 1.0.1                               Apache-2.0/MIT
+  presser 0.3.1                                MIT OR Apache-2.0
+  proc-macro-crate 3.5.0                       MIT OR Apache-2.0
+  proc-macro2 1.0.107                          MIT OR Apache-2.0
+  profiling 1.0.18                             MIT OR Apache-2.0
+  quick-xml 0.42.0                             MIT
+  quote 1.0.47                                 MIT OR Apache-2.0
+  rand_core 0.9.5                              MIT OR Apache-2.0
+  rand_xoshiro 0.7.0                           MIT OR Apache-2.0
+  raw-window-handle 0.6.2                      MIT OR Apache-2.0 OR Zlib
+  ref-cast 1.0.27                              MIT OR Apache-2.0
+  ref-cast-impl 1.0.27                         MIT OR Apache-2.0
+  referencing 0.58.6                           MIT
+  regex 1.13.1                                 MIT OR Apache-2.0
+  regex-automata 0.4.18                        MIT OR Apache-2.0
+  regex-syntax 0.8.11                          MIT OR Apache-2.0
+  renderdoc-sys 1.1.0                          MIT OR Apache-2.0
+  rmcp 3.5.1                                   Apache-2.0
+  rusqlite 0.40.2                              MIT
+  rust_xlsxwriter 0.99.1                       MIT OR Apache-2.0
+  rustc-hash 1.1.0                             Apache-2.0/MIT
+  rustc-hash 2.1.3                             Apache-2.0 OR MIT
+  rustix 1.1.5                                 Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT
+  ryu 1.0.23                                   Apache-2.0 OR BSL-1.0
+  safe_arch 0.7.4                              Zlib OR Apache-2.0 OR MIT
+  schemars 1.2.3                               MIT
+  schemars_derive 1.2.3                        MIT
+  scopeguard 1.2.0                             MIT OR Apache-2.0
+  secret-service 5.2.0                         MIT OR Apache-2.0
+  serde 1.0.229                                MIT OR Apache-2.0
+  serde-value 0.7.0                            MIT
+  serde_core 1.0.229                           MIT OR Apache-2.0
+  serde_derive 1.0.229                         MIT OR Apache-2.0
+  serde_derive_internals 0.30.0                MIT OR Apache-2.0
+  serde_json 1.0.154                           MIT OR Apache-2.0
+  serde_repr 0.1.21                            MIT OR Apache-2.0
+  sha2 0.11.1                                  MIT OR Apache-2.0
+  signal-hook-registry 1.4.8                   MIT OR Apache-2.0
+  simd-adler32 0.3.10                          MIT
+  slab 0.4.12                                  MIT
+  smallvec 1.16.3                              MIT OR Apache-2.0
+  socket2 0.6.5                                MIT OR Apache-2.0
+  spirv 0.4.0+sdk-1.4.341.0                    Apache-2.0
+  static_assertions 1.1.0                      MIT OR Apache-2.0
+  strum 0.28.0                                 MIT
+  strum_macros 0.28.0                          MIT
+  syn 2.0.119                                  MIT OR Apache-2.0
+  syn 3.0.9                                    MIT OR Apache-2.0
+  termcolor 1.4.1                              Unlicense OR MIT
+  thiserror 2.0.21                             MIT OR Apache-2.0
+  thiserror-impl 2.0.21                        MIT OR Apache-2.0
+  tokio 1.53.2                                 MIT
+  tokio-macros 2.7.2                           MIT
+  tokio-stream 0.1.19                          MIT
+  tokio-util 0.7.20                            MIT
+  toml_datetime 1.1.2+spec-1.1.0               MIT OR Apache-2.0
+  toml_edit 0.25.17+spec-1.1.0                 MIT OR Apache-2.0
+  toml_parser 1.1.5+spec-1.1.0                 MIT OR Apache-2.0
+  toml_writer 1.1.3+spec-1.1.0                 MIT OR Apache-2.0
+  tracing 0.1.44                               MIT
+  tracing-attributes 0.1.31                    MIT
+  tracing-core 0.1.36                          MIT
+  typed-path 0.12.3                            MIT OR Apache-2.0
+  typeid 1.0.3                                 MIT OR Apache-2.0
+  typenum 1.20.1                               MIT OR Apache-2.0
+  unicode-general-category 1.1.0               Apache-2.0
+  unicode-ident 1.0.27                         (MIT OR Apache-2.0) AND Unicode-3.0
+  unicode-width 0.2.2                          MIT OR Apache-2.0
+  uuid 1.28.0                                  Apache-2.0 OR MIT
+  uuid-simd 0.8.0                              MIT
+  vsimd 0.8.0                                  MIT
+  wayland-sys 0.31.11                          MIT
+  wgpu 30.0.1                                  MIT OR Apache-2.0
+  wgpu-core 30.0.1                             MIT OR Apache-2.0
+  wgpu-core-deps-windows-linux-android 30.0.1  MIT OR Apache-2.0
+  wgpu-hal 30.0.1                              MIT OR Apache-2.0
+  wgpu-naga-bridge 30.0.1                      MIT OR Apache-2.0
+  wgpu-types 30.0.1                            MIT OR Apache-2.0
+  wide 0.7.33                                  Zlib OR Apache-2.0 OR MIT
+  winnow 1.0.4                                 MIT
+  wxdragon 0.9.22                              MIT OR Apache-2.0
+  wxdragon-macros 0.9.22                       MIT OR Apache-2.0
+  wxdragon-sys 0.9.22                          MIT OR Apache-2.0
+  zbus 5.19.0                                  MIT
+  zbus-secret-service-keyring-store 1.0.1      MIT OR Apache-2.0
+  zbus_macros 5.19.0                           MIT
+  zbus_names 4.3.4                             MIT
+  zcheapstr 1.1.0                              MIT
+  zerocopy 0.8.62                              BSD-2-Clause OR Apache-2.0 OR MIT
+  zerocopy-derive 0.8.62                       BSD-2-Clause OR Apache-2.0 OR MIT
+  zip 8.6.0                                    MIT
+  zlib-rs 0.6.8                                Zlib
+  zmij 1.0.23                                  MIT
+  zopfli 0.8.4                                 Apache-2.0
+  zstd 0.14.2                                  BSD-3-Clause
+  zstd-safe 8.1.0                              BSD-3-Clause
+  zstd-sys 2.1.1+zstd.1.5.7                    BSD-3-Clause
+  zvariant 5.15.0                              MIT
+  zvariant_derive 5.15.0                       MIT
+  zvariant_utils 4.2.0                         MIT

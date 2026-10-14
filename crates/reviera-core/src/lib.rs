@@ -11,6 +11,7 @@ pub mod annotations;
 pub mod arrangement;
 pub mod bodies;
 pub mod builtin;
+mod builtin_arc;
 pub mod categories;
 pub mod change;
 pub mod clearances;
@@ -53,6 +54,7 @@ pub mod txn;
 pub mod types;
 pub mod units;
 pub mod views;
+pub mod wall_openings;
 pub mod walls;
 
 pub use change::{ChangeRecord, ChangeSet, ChangedSummary};

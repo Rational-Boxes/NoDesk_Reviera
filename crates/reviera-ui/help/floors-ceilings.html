@@ -1,0 +1,56 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Copyright (C) 2026 Reviera contributors -->
+<h1>Floors and ceilings</h1>
+<p class="lead">Floors and ceilings are slabs drawn from a sketch of their outline. A ceiling can
+also be placed in one click inside a room, and then follows the room's walls.</p>
+
+<h2 id="floor">To create a floor</h2>
+<ol>
+  <li>Open the plan of the floor's level. <b>Architecture › Build › Floor</b> (<kbd>FL</kbd>).
+    <a class="run" href="reviera:action/floor.create">Floor</a></li>
+  <li>The sketch starts with <b>Pick Walls</b>: click the walls round the floor (on the side the
+    floor goes), or hover one and press <kbd>Tab</kbd> for the whole chain. Or draw the outline
+    with <b>Line</b>, <b>Rectangle</b>, <b>Arc</b> or <b>Circle</b>. See
+    <a href="reviera:help/sketch">Sketch mode</a>.</li>
+  <li><b>Finish Edit Mode</b>.</li>
+</ol>
+<p>A round floor can be picked from curved walls (their inner faces become arcs) or drawn with
+<b>Circle</b>, as in the <a href="reviera:sample/observatory">Observatory</a>.</p>
+<h3 id="floor-properties">Floor properties</h3>
+<table>
+  <tr><td><b>Level</b>, <b>Height Offset From Level</b></td><td>Where the floor's top is.</td></tr>
+  <tr><td><b>Area</b>, <b>Perimeter</b>, <b>Volume</b>, <b>Thickness</b></td><td>Computed, read
+    only.</td></tr>
+  <tr><td><b>Type</b></td><td>Floor types set the thickness. Choose one, or <b>Duplicate
+    Type…</b>.</td></tr>
+</table>
+<p>To change the outline, drag its grips in a plan, or use <b>Modify | Floors › Edit
+Boundary</b>. <b>Modify | Floors › Guard Edges</b> puts railings along its open edges (see
+<a href="reviera:help/railings-decks#edges">Railings</a>). Floors are saved as
+<code>IfcSlab</code>. <code>floor.create</code>, <code>floor.edit_boundary</code>,
+<code>floor.set_level</code></p>
+
+<h2 id="ceiling">To place a ceiling</h2>
+<ol>
+  <li>Open a plan of the level, a ceiling plan being best. <b>Architecture › Build › Ceiling</b>.
+    <a class="run" href="reviera:action/ceiling.create">Ceiling</a></li>
+  <li>The <b>Place Ceiling</b> tab offers <b>Automatic Ceiling</b> (the default) and <b>Sketch
+    Ceiling</b>.</li>
+  <li>With Automatic Ceiling, click inside a room enclosed by walls: the ceiling fills it. Click
+    more rooms; <kbd>Esc</kbd> ends.</li>
+  <li>With Sketch Ceiling, sketch its boundary as for a floor and finish.</li>
+</ol>
+<p>An automatic ceiling's edges follow the walls' finish faces, round rooms included, and move
+with the walls. Ceilings sit 2600 mm above their level by default and have types. Select one and
+use <b>Modify | Ceilings › Edit Boundary</b> to change its outline. Ceilings are saved as
+<code>IfcCovering</code> (CEILING). <code>ceiling.create_auto</code>,
+<code>ceiling.create</code>, <code>ceiling.edit_boundary</code></p>
+
+<h2 id="ceiling-plans">Ceiling plans</h2>
+<p><b>View › Ceiling Plan</b> makes a reflected ceiling plan of a level, cut at 2300 mm and
+looking up. See <a href="reviera:help/views#ceiling">Views</a>.</p>
+
+<h2 id="openings">Openings in floors and ceilings</h2>
+<p>A stair offers to open the floors and ceilings above it where headroom is short. Those
+openings can then be reshaped with their grips. See
+<a href="reviera:help/openings">Vertical openings</a>.</p>

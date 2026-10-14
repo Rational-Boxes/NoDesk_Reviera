@@ -1,0 +1,59 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Copyright (C) 2026 Reviera contributors -->
+<h1>Sketch mode</h1>
+<p class="lead">Floors, ceilings, decks and roofs are made from a sketch: closed loops of lines
+and curves drawn in a plan. Sketch mode has its own contextual tab, and Finish turns the sketch
+into the element.</p>
+
+<h2 id="tab">The sketch tab</h2>
+<p>While sketching, the ribbon shows <b>Modify | Create Floor Boundary</b> (or <i>Create Ceiling
+Boundary</i>, <i>Create Deck Outline</i>, <i>Create Roof Footprint</i>, or <i>Edit Boundary</i>
+and <i>Edit Footprint</i> when editing):</p>
+<table>
+  <tr><th>Tool</th><th>What it does</th></tr>
+  <tr><td><b>Pick Walls</b> (the default)</td><td>Click a wall: its face on the cursor's side
+    becomes a boundary line, locked so the element follows the wall when it moves.
+    <kbd>Tab</kbd> takes the whole chain of walls joined or meeting end to end on that side. A
+    curved wall gives its face's curve.</td></tr>
+  <tr><td><b>Line</b></td><td>Draws chained lines, snapping like the drawing tools. Clicking the
+    chain's first point closes it.</td></tr>
+  <tr><td><b>Rectangle</b></td><td>Two opposite corners.</td></tr>
+  <tr><td><b>Arc</b></td><td>Its start, its end, then a point on it (floors, ceilings and
+    decks).</td></tr>
+  <tr><td><b>Circle</b></td><td>Its centre, then a point on it (floors, ceilings and
+    decks).</td></tr>
+  <tr><td><b>Modify</b></td><td>Selects sketch curves to edit (see below).</td></tr>
+  <tr><td><b>Finish Edit Mode</b></td><td>Checks the sketch and makes the element.</td></tr>
+  <tr><td><b>Cancel Edit Mode</b></td><td>Leaves the sketch without changing the model.</td></tr>
+</table>
+<p>Roof footprints also have <b>Defines Slope</b> and <b>Overhang…</b>: see
+<a href="reviera:help/roofs#footprint">Roofs</a>.</p>
+
+<h2 id="edit">Editing curves in the sketch</h2>
+<ul>
+  <li>With <b>Modify</b>, click a curve to select it. Drag it to move it across (its neighbours
+    stretch to meet it), or drag a corner to move the corner.</li>
+  <li>Properties show the selected curve's length, which you can edit (and for roofs, Defines
+    Slope, Slope and Overhang).</li>
+  <li><kbd>Delete</kbd> (or <kbd>Backspace</kbd>) removes the selected curve, or the last curve
+    drawn when none is selected.</li>
+  <li>A curve moved off its wall drops its lock to the wall.</li>
+</ul>
+
+<h2 id="finish">Finishing</h2>
+<p><b>Finish Edit Mode</b> checks the sketch. Open ends, branches, crossings and overlapping
+curves are marked in red, and the sketch stays open to fix them. A loop inside another makes a
+hole. <b>Cancel Edit Mode</b> discards the sketch. <kbd>Esc</kbd> only drops a line or
+rectangle in progress: the sketch stays open until you finish or cancel it.</p>
+
+<h2 id="grips">Changing a finished outline</h2>
+<p>In a plan, a selected floor, ceiling, deck or roof shows its outline with a grip at each
+corner and at the middle of each edge:</p>
+<ul>
+  <li>drag an edge grip to move that edge across (its neighbours stretch to meet it);</li>
+  <li>drag a corner grip to move the corner.</li>
+</ul>
+<p>Each drag is one undoable edit, made without opening the sketch. To change the outline in
+sketch mode instead, use <b>Edit Boundary</b> (Modify | Floors, Modify | Ceilings) or <b>Edit
+Footprint</b> (Modify | Roofs). <code>sketch.move_curve</code>,
+<code>sketch.move_corner</code></p>

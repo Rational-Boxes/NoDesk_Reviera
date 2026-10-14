@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Name=NoDesk Reviera
+GenericName=BIM Modeller
+Comment=Model buildings on native IFC
+Exec=reviera gui %f
+Icon=io.github.rational_boxes.Reviera
+Terminal=false
+Categories=Graphics;3DGraphics;Engineering;
+Keywords=BIM;IFC;CAD;architecture;building;model;
+MimeType=application/x-ifc;
+StartupNotify=true
+StartupWMClass=reviera

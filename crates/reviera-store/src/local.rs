@@ -123,6 +123,9 @@ impl LocalProject {
 
         let mut objects = ifc.entities_of_type("IfcObjectDefinition")?;
         objects.sort_by_key(|e| e.id);
+        // The openings a shaft derives for each host it cuts are written from the shaft; they
+        // are not elements of their own.
+        objects.retain(|e| e.class != "IfcOpeningElement" || !is_derived_opening(&ifc, e.id));
         let length_scale = geometry::length_scale(&ifc)?;
         let (mut values, sets) = params::load(&ifc, &objects, length_scale)?;
         let types: HashSet<StepId> = ifc
@@ -491,6 +494,15 @@ impl LocalProject {
             ) {
                 geometry::remove_boxes(&mut self.ifc, step)?;
             }
+            if recipe_kind == Some(reviera_core::wall_openings::WALL_OPENING_RECIPE) {
+                for rel in self.ifc.referenced_by(step, "IfcRelVoidsElement")? {
+                    self.ifc.remove(rel)?;
+                }
+                geometry::remove_boxes(&mut self.ifc, step)?;
+            }
+            if recipe_kind == Some(reviera_core::slab_openings::SHAFT_RECIPE) {
+                geometry::remove_slab(&mut self.ifc, step)?;
+            }
             if recipe_kind == Some(reviera_core::slab_openings::OPENING_RECIPE) {
                 for rel in self.ifc.referenced_by(step, "IfcRelVoidsElement")? {
                     self.ifc.remove(rel)?;
@@ -657,6 +669,7 @@ impl LocalProject {
         self.write_regenerated(doc, &touched)?;
         if !touched.is_empty() {
             self.write_inserts(doc)?;
+            self.write_wall_openings(doc)?;
             self.write_floors(doc)?;
             self.write_slab_openings(doc)?;
             self.write_roofs(doc)?;
@@ -1026,8 +1039,73 @@ impl LocalProject {
         Ok(())
     }
 
+    /// Writes every wall opening (ARC-OPEN-003): a box through the wall (plus 1 mm each side) in
+    /// the wall's frame, voiding the wall, and contained in the wall's base level.
+    fn write_wall_openings(&mut self, doc: &Document) -> Result<()> {
+        let store = doc.store();
+        let all = reviera_core::wall_openings::all(store);
+        if all.is_empty() {
+            return Ok(());
+        }
+        let contexts = geometry::Contexts::find(&self.ifc)?;
+        let owner_history = self.new_owner_history()?;
+        let scale = self.length_scale;
+        for o in all {
+            let (Some(&step), Some(&wall)) = (self.steps.get(&o.id), self.steps.get(&o.host))
+            else {
+                continue;
+            };
+            let relative_to = match self.ifc.attribute(wall, "ObjectPlacement")? {
+                AttrValue::Ref(r) => Some(StepId(r)),
+                _ => None,
+            };
+            let c = o.cut();
+            if c.z[1] <= c.z[0] {
+                continue;
+            }
+            let mid = (o.recipe.u[0] + o.recipe.u[1]) / 2.0;
+            // In the wall's frame (its start, along its chord): on a curved wall, the opening's
+            // middle and tangent on the curve.
+            let (origin, x_dir) = match &o.path {
+                Some(_) => {
+                    let (p, t) = o.at(mid);
+                    let (u, n, s) = (o.wall.direction(), o.wall.normal(), o.wall.start);
+                    let d = [p[0] - s[0], p[1] - s[1]];
+                    (
+                        [d[0] * u[0] + d[1] * u[1], d[0] * n[0] + d[1] * n[1]],
+                        [t[0] * u[0] + t[1] * u[1], t[0] * n[0] + t[1] * n[1]],
+                    )
+                }
+                None => ([mid, 0.0], [1.0, 0.0]),
+            };
+            let frame = geometry::Frame {
+                relative_to,
+                origin: [
+                    origin[0] / scale,
+                    origin[1] / scale,
+                    (c.z[0] - o.wall.base_z) / scale,
+                ],
+                x_dir,
+            };
+            let (half_w, half_t) = (o.width() / 2.0, o.wall.width / 2.0 + 0.001);
+            let void = [[-half_w, half_w], [-half_t, half_t], [0.0, c.z[1] - c.z[0]]];
+            geometry::write_boxes(&mut self.ifc, step, &frame, &[void], scale, contexts)?;
+            geometry::relate_one(
+                &mut self.ifc,
+                "IfcRelVoidsElement",
+                "RelatingBuildingElement",
+                wall,
+                "RelatedOpeningElement",
+                step,
+                owner_history,
+            )?;
+        }
+        Ok(())
+    }
+
     /// Writes every vertical opening (ARC-OPEN-002): its loops extruded plumb through its host
-    /// (plus 1 mm each way), voiding the host. The host's own body stays whole.
+    /// (plus 1 mm each way), voiding the host. A floor's own body stays whole (a roof's has the
+    /// hole). Then the shafts (ARC-OPEN-004).
     fn write_slab_openings(&mut self, doc: &Document) -> Result<()> {
         let store = doc.store();
         let contexts = geometry::Contexts::find(&self.ifc)?;
@@ -1043,13 +1121,13 @@ impl LocalProject {
             else {
                 continue;
             };
-            let Ok(f) = floors::regenerate(store, store.get(host).expect("found")) else {
+            let Some((lo, hi)) = host_span(store, host) else {
                 continue;
             };
             let body = geometry::SlabBody {
                 rings: r.loops.iter().map(|l| (l.as_slice(), Vec::new())).collect(),
-                top: f.top + 0.001,
-                depth: f.thickness + 0.002,
+                top: hi + 0.001,
+                depth: hi - lo + 0.002,
             };
             geometry::write_slab(&mut self.ifc, step, &body, self.length_scale, contexts)?;
             geometry::relate_one(
@@ -1061,6 +1139,107 @@ impl LocalProject {
                 step,
                 owner_history,
             )?;
+        }
+        self.write_shafts(doc)
+    }
+
+    /// Writes every shaft (ARC-OPEN-004): its body the whole prism, and for each host it cuts an
+    /// `IfcOpeningElement` of the prism through that host (plus 1 mm), voiding it. The derived
+    /// openings carry `rxd:shaft <shaft> <host>` in their Description; ones no longer cut are
+    /// removed.
+    fn write_shafts(&mut self, doc: &Document) -> Result<()> {
+        let store = doc.store();
+        let mut derived: HashMap<String, StepId> = HashMap::new();
+        for o in self.ifc.entities_of_type("IfcOpeningElement")? {
+            if let AttrValue::String(d) = self.ifc.attribute(o.id, "Description")?
+                && d.starts_with(DERIVED_OPENING)
+            {
+                derived.insert(d, o.id);
+            }
+        }
+        let shafts = reviera_core::slab_openings::shafts(store);
+        if shafts.is_empty() && derived.is_empty() {
+            return Ok(());
+        }
+        let contexts = geometry::Contexts::find(&self.ifc)?;
+        let owner_history = self.new_owner_history()?;
+        let ifc4 = self.ifc.schema() != "IFC2X3";
+        for (id, r, (z0, z1)) in shafts {
+            let Some(&step) = self.steps.get(&id) else {
+                continue;
+            };
+            let rings = || r.loops.iter().map(|l| (l.as_slice(), Vec::new())).collect();
+            let body = geometry::SlabBody {
+                rings: rings(),
+                top: z1,
+                depth: z1 - z0,
+            };
+            geometry::write_slab(&mut self.ifc, step, &body, self.length_scale, contexts)?;
+            if let Some(storey) = GlobalId::parse(&r.extent.base_level)
+                .and_then(|g| store.find_by_guid(&g))
+                .and_then(|l| self.steps.get(&l).copied())
+            {
+                geometry::contain(&mut self.ifc, step, storey, owner_history)?;
+            }
+            let shaft_guid = store.get(id).expect("listed").guid().to_string();
+            for (host, lo, hi) in reviera_core::slab_openings::shaft_hosts(store, &r) {
+                let Some(&host_step) = self.steps.get(&host) else {
+                    continue;
+                };
+                let host_guid = store.get(host).expect("listed").guid().to_string();
+                let tag = format!("{DERIVED_OPENING} {shaft_guid} {host_guid}");
+                let opening = match derived.remove(&tag) {
+                    Some(o) => o,
+                    None => {
+                        let o = self
+                            .ifc
+                            .create_rooted("IfcOpeningElement", &GlobalId::new())?;
+                        self.ifc.set_attribute(
+                            o,
+                            "Name",
+                            &AttrValue::String("Shaft Opening".into()),
+                        )?;
+                        self.ifc
+                            .set_attribute(o, "Description", &AttrValue::String(tag))?;
+                        if let Some(h) = owner_history {
+                            self.ifc
+                                .set_attribute(o, "OwnerHistory", &AttrValue::Ref(h.0))?;
+                        }
+                        if ifc4 {
+                            self.ifc.set_attribute(
+                                o,
+                                "PredefinedType",
+                                &AttrValue::Enum("OPENING".into()),
+                            )?;
+                        }
+                        o
+                    }
+                };
+                let top = z1.min(hi) + 0.001;
+                let body = geometry::SlabBody {
+                    rings: rings(),
+                    top,
+                    depth: top - z0.max(lo) + 0.001,
+                };
+                geometry::write_slab(&mut self.ifc, opening, &body, self.length_scale, contexts)?;
+                geometry::relate_one(
+                    &mut self.ifc,
+                    "IfcRelVoidsElement",
+                    "RelatingBuildingElement",
+                    host_step,
+                    "RelatedOpeningElement",
+                    opening,
+                    owner_history,
+                )?;
+            }
+        }
+        // Openings of shafts that are gone, or of hosts they no longer cut.
+        for (_, o) in derived {
+            for rel in self.ifc.referenced_by(o, "IfcRelVoidsElement")? {
+                self.ifc.remove(rel)?;
+            }
+            geometry::remove_slab(&mut self.ifc, o)?;
+            self.ifc.remove(o)?;
         }
         Ok(())
     }
@@ -1744,6 +1923,25 @@ impl RxdRecord {
 }
 
 /// The built-in project template.
+/// The Description that marks an opening a shaft derived for one of its hosts.
+const DERIVED_OPENING: &str = "rxd:shaft";
+
+fn is_derived_opening(ifc: &IfcModel, id: StepId) -> bool {
+    matches!(ifc.attribute(id, "Description"), Ok(AttrValue::String(d)) if d.starts_with(DERIVED_OPENING))
+}
+
+/// The lowest and highest points of a floor's, ceiling's or roof's body.
+fn host_span(store: &reviera_core::Store, host: ElementId) -> Option<(f64, f64)> {
+    let e = store.get(host)?;
+    if roofs::roof_recipe(e).is_some() {
+        let g = roofs::regenerate(store, e).ok()?;
+        let (lo, hi) = reviera_core::slab_openings::roof_span(&g);
+        return (lo <= hi).then_some((lo, hi));
+    }
+    let f = floors::regenerate(store, e).ok()?;
+    Some((f.top - f.thickness, f.top))
+}
+
 fn template(schema: Schema) -> Result<IfcModel> {
     let mut m = IfcModel::new(schema)?;
     let s = |v: &str| AttrValue::String(v.into());

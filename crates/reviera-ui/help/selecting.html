@@ -1,0 +1,124 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Copyright (C) 2026 Reviera contributors -->
+<h1>Selecting and modifying</h1>
+<p class="lead">Select elements in a view, then change them in Properties, with grips, or with
+the tools of the Modify tab. Every change can be undone.</p>
+<nav class="toc">
+  <a href="#select">Selecting</a>
+  <a href="#box">Box selection</a>
+  <a href="#quick">Quick modify menu</a>
+  <a href="#tools">Modify tools</a>
+  <a href="#grips">Grips and dragging</a>
+  <a href="#delete">Deleting and pinning</a>
+  <a href="#undo">Undo and history</a>
+</nav>
+
+<h2 id="select">Selecting</h2>
+<table>
+  <tr><td>Click</td><td>Selects the element under the cursor. Clicking empty space, or
+    <kbd>Esc</kbd>, clears the selection.</td></tr>
+  <tr><td><kbd>Ctrl</kbd>+click</td><td>Adds the element to the selection.</td></tr>
+  <tr><td><kbd>Shift</kbd>+click</td><td>Removes it from the selection.</td></tr>
+  <tr><td><b>Modify</b> <kbd>MD</kbd></td><td>Ends the running tool, so clicks select
+    again.</td></tr>
+</table>
+<p>The selection decides what Properties show and which
+<a href="reviera:help/window#contextual">contextual tab</a> appears. The Model Tree, schedules
+(selecting a row) and Check Overlaps also select elements. In plans, a room is selected by
+clicking its label or inside it. <code>selection.get</code>, <code>selection.set</code>,
+<code>selection.add</code>, <code>selection.remove</code>, <code>selection.clear</code></p>
+
+<h2 id="box">Box selection</h2>
+<p>Drag a box over the elements:</p>
+<ul>
+  <li><b>Left to right</b> draws a solid <i>window</i>: it selects what is entirely inside.</li>
+  <li><b>Right to left</b> draws a dashed <i>crossing</i>: it selects what is inside or touches
+    it.</li>
+</ul>
+<p>In plans, a left drag that starts on nothing draws the box. In 3D views a left drag orbits, so
+hold <kbd>Ctrl</kbd> or <kbd>Shift</kbd> while dragging. <kbd>Ctrl</kbd> adds the boxed elements
+to the selection and <kbd>Shift</kbd> removes them. Only what the view shows can be boxed: its
+view range, section box, slices and hidden elements are respected.</p>
+
+<h2 id="quick">The quick modify menu</h2>
+<p>A middle click (press and release without moving; a middle drag pans) on an element opens a
+menu at the cursor for the selection. The element is selected first if it is not already
+(<kbd>Ctrl</kbd> keeps the rest of the selection). It offers:</p>
+<ul>
+  <li><b>Move</b>, <b>Copy</b>, <b>Rotate</b>, <b>Mirror – Pick Axis</b>, <b>Mirror – Draw
+    Axis</b>;</li>
+  <li><b>Flip Wall</b> for walls, <b>Flip Hand</b> and <b>Flip Facing</b> for doors and
+    windows;</li>
+  <li><b>Hide in View</b>, <b>Make Translucent</b> / <b>Make Opaque</b>, <b>Isolate</b>,
+    <b>Reset Hide/Isolate</b> (when anything is hidden) and <b>Section Box</b>;</li>
+  <li><b>Pin</b> or <b>Unpin</b>, and <b>Delete</b>.</li>
+</ul>
+<p>With exactly two elements selected, the menu checks whether they overlap. When they do, it
+offers the booleans: cut either by the other, intersect, union, join (by precedence), or accept
+the overlap. See <a href="reviera:help/coordination#booleans">Booleans</a>.</p>
+
+<h2 id="tools">Modify tools</h2>
+<p>The tools are on the <b>Modify</b> tab, on every contextual tab and in the <b>Modify</b>
+menu. They work in plan views. Move, Copy, Rotate and Mirror act on the selection made first
+(select, then start the tool). Points snap like the
+drawing tools, and lengths and angles can be typed and placed with <kbd>Enter</kbd>.
+<kbd>Esc</kbd> drops the last pick, then ends the tool. Align, Offset, Trim/Extend and Split
+pick elements in the view and stay active for more picks.</p>
+<table>
+  <tr><th>Tool</th><th>How it works</th></tr>
+  <tr><td><b>Move</b> <kbd>MV</kbd></td><td>Click a start point and an end point, or type a
+    distance. <a class="run" href="reviera:action/element.move">Move</a></td></tr>
+  <tr><td><b>Copy</b> <kbd>CO</kbd></td><td>As Move, leaving the original in place.</td></tr>
+  <tr><td><b>Rotate</b> <kbd>RO</kbd></td><td>Rotates about the selection's centre: click a point on
+    the first ray, then the second ray, or type an angle in degrees.</td></tr>
+  <tr><td><b>Mirror – Pick Axis</b> <kbd>MM</kbd></td><td>Mirrored copies about a wall, wall face
+    or grid you click.</td></tr>
+  <tr><td><b>Mirror – Draw Axis</b> <kbd>DM</kbd></td><td>Mirrored copies about an axis drawn
+    with two clicks.</td></tr>
+  <tr><td><b>Align</b> <kbd>AL</kbd></td><td>Pick the reference line (a wall face, centreline or
+    grid), then each line to align with it. <kbd>Esc</kbd> picks a new reference.</td></tr>
+  <tr><td><b>Offset</b> <kbd>OF</kbd></td><td>Click a wall or grid: it is copied parallel to itself,
+    toward the cursor, at the offset distance (type a distance to change it).</td></tr>
+  <tr><td><b>Trim/Extend to Corner</b> <kbd>TR</kbd></td><td>Click two walls on the parts to
+    keep: they are trimmed or extended to meet at a corner.</td></tr>
+  <tr><td><b>Trim/Extend Single Element</b></td><td>Pick the boundary (a wall or grid), then click
+    the walls to trim or extend to it, on the part to keep. <kbd>Esc</kbd> picks a new
+    boundary.</td></tr>
+  <tr><td><b>Split Element</b> <kbd>SL</kbd></td><td>Splits a wall in two where you
+    click.</td></tr>
+</table>
+<p>Walls carry their doors and windows when they are moved, copied or mirrored.
+<code>element.move</code>, <code>element.copy</code>, <code>element.rotate</code>,
+<code>element.mirror</code>, <code>element.align</code>, <code>element.offset</code>,
+<code>element.trim_corner</code>, <code>element.trim_extend</code>,
+<code>element.split</code></p>
+
+<h2 id="grips">Grips and dragging</h2>
+<p>Many elements can be changed by dragging, each drag one undo step:</p>
+<table>
+  <tr><td>Walls and grids</td><td>A selected wall or grid shows a grip at each end: drag it to
+    move that end. Drag the selected walls or grids themselves to move them.</td></tr>
+  <tr><td>Doors and windows</td><td>Drag a selected one along its wall.</td></tr>
+  <tr><td>Floors, ceilings, roofs, decks</td><td>In a plan, a selected one shows grips at its
+    corners and edge middles: drag an edge across, or a corner.
+    See <a href="reviera:help/sketch#grips">Sketch mode</a>.</td></tr>
+  <tr><td>Vertical openings</td><td>The same corner and edge grips. See
+    <a href="reviera:help/openings">Vertical openings</a>.</td></tr>
+  <tr><td>Section box and slices</td><td>Face grips and slice grips in 3D views.</td></tr>
+  <tr><td>Tags, text, viewports</td><td>Drag them in plans and on sheets.</td></tr>
+</table>
+
+<h2 id="delete">Deleting and pinning</h2>
+<p><b>Delete</b> (<kbd>DE</kbd>, or the <kbd>Delete</kbd> key) deletes the selection along with
+what depends on it: a wall's doors and windows, a dormer's parts. Deleting a level first lists
+what would go with it. <code>element.delete</code></p>
+<p><b>Pin</b> (<kbd>PN</kbd>) keeps the selected elements from being moved or deleted;
+<b>Unpin</b> (<kbd>UP</kbd>) releases them. <code>element.pin</code>,
+<code>element.unpin</code></p>
+
+<h2 id="undo">Undo, redo and history</h2>
+<p><b>Edit › Undo</b> (<kbd>Ctrl</kbd>+<kbd>Z</kbd>) and <b>Redo</b>
+(<kbd>Ctrl</kbd>+<kbd>Y</kbd>). Every change is one transaction; a tool that makes several
+changes, and a whole script run, undo as one step. The history records who made each change
+(you, a script or an agent); the <code>edit.history</code> command lists it, and
+<code>edit.undo</code> takes a number of steps.</p>

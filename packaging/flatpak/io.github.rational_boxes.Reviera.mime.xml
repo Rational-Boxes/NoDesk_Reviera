@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- shared-mime-info has no type for IFC (ISO 16739) files; this one is registered by Reviera. -->
+<mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
+  <mime-type type="application/x-ifc">
+    <comment>IFC building model</comment>
+    <sub-class-of type="text/plain"/>
+    <generic-icon name="x-office-drawing"/>
+    <glob pattern="*.ifc" weight="80"/>
+    <glob pattern="*.IFC" weight="80" case-sensitive="true"/>
+  </mime-type>
+</mime-info>

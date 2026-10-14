@@ -1,0 +1,47 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Copyright (C) 2026 Reviera contributors -->
+<h1>Rooms</h1>
+<p class="lead">A room fills a region enclosed by walls. It measures its area and volume to the
+walls' finish faces, follows the walls when they move, and is labelled in plans.</p>
+
+<h2 id="place">To place rooms</h2>
+<ol>
+  <li>Open the plan of the level. <b>Architecture › Room &amp; Area › Room</b> (<kbd>RM</kbd>).
+    <a class="run" href="reviera:action/room.place">Room</a></li>
+  <li>Hover inside a region: the region the room would take is shown.</li>
+  <li>Click to place the room. Click more regions; <kbd>Esc</kbd> ends.</li>
+</ol>
+<p><b>Place Rooms Automatically</b> puts a room in every enclosed region of the plan's level that
+has none, numbered in reading order.
+<a class="run" href="reviera:action/room.place_automatically">Place Rooms Automatically</a>
+<code>room.place</code>, <code>room.place_automatically</code></p>
+
+<h2 id="boundaries">Boundaries</h2>
+<ul>
+  <li>Rooms measure to the walls' finish faces, curved walls included.</li>
+  <li>Islands, such as a free-standing wall inside the room, are left out of the area.</li>
+  <li>When the walls move, the room follows them. If the walls open up so the region is no
+    longer enclosed, the room's status becomes <i>Not Enclosed</i>.</li>
+</ul>
+
+<h2 id="properties">Names, numbers and properties</h2>
+<p>Select a room by clicking its label or its inside in a plan. In Properties:</p>
+<table>
+  <tr><td><b>Name</b></td><td>The room's name (<i>Living</i>, <i>Kitchen</i>).</td></tr>
+  <tr><td>Number</td><td>Shown as the element's Name in the identity rows at the top.</td></tr>
+  <tr><td><b>Level</b>, <b>Upper Limit</b>, <b>Limit Offset</b>, <b>Base Offset</b></td><td>The
+    room's height range.</td></tr>
+  <tr><td><b>Area</b>, <b>Perimeter</b>, <b>Volume</b>, <b>Status</b></td><td>Computed, read
+    only. Status is <i>Placed</i>, <i>Not Enclosed</i> or <i>Redundant</i>.</td></tr>
+</table>
+<p><code>room.set</code> sets a room's name and number from a script.</p>
+
+<h2 id="tags">Labels and tags</h2>
+<p>Plans label each room with its name, number and area. <b>Annotate › Room Tag</b>
+(<kbd>RT</kbd>) adds a room tag, and Rooms can be scheduled with <b>View › Schedules</b>. See
+<a href="reviera:help/documentation#tags">Tags</a> and
+<a href="reviera:help/documentation#schedules">Schedules</a>.</p>
+<p>Rooms are saved as <code>IfcSpace</code> under their storey, with the number as the IFC Name
+and the name as its LongName.</p>
+<p class="note">Not yet available: room separation lines, other area rules, and volumes clipped by
+floors and roofs.</p>

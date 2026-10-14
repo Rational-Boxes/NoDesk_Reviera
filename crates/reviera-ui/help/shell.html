@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Copyright (C) 2026 Reviera contributors -->
+<!-- The frame every help page is shown in: help.rs fills in the page's title, the Back link,
+     the anchor to scroll to and the page's body. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{TITLE}}</title>
+<style>
+  :root { --ink: #23272e; --muted: #5b6370; --line: #d8dde4; --accent: #2a6edc; --paper: #f7f8fa; --card: #ffffff; --code: #eef1f5; }
+  @media (prefers-color-scheme: dark) {
+    :root { --ink: #e6e8eb; --muted: #a3abb8; --line: #3a404a; --accent: #6ea2ff; --paper: #1f2329; --card: #282d34; --code: #2f353d; }
+  }
+  body { margin: 0; background: var(--paper); color: var(--ink); font: 15px/1.5 system-ui, sans-serif; }
+  header.bar { position: sticky; top: 0; z-index: 1; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px;
+    padding: 6px 24px; background: var(--card); border-bottom: 1px solid var(--line); font-size: 14px; }
+  header.bar .here { color: var(--muted); }
+  main { max-width: 860px; margin: 0 auto; padding: 24px 24px 48px; }
+  [id] { scroll-margin-top: 48px; }
+  h1 { font-size: 26px; margin: 0 0 4px; }
+  h2 { font-size: 18px; margin: 32px 0 8px; border-bottom: 1px solid var(--line); padding-bottom: 4px; }
+  h3 { font-size: 15px; margin: 20px 0 6px; }
+  p.lead { color: var(--muted); margin-top: 0; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  a.run { display: inline-block; padding: 0 8px; border: 1px solid var(--accent); border-radius: 5px; font-size: 13px; }
+  nav.toc { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 14px 0 0; }
+  ol, ul { padding-left: 24px; }
+  li { margin: 2px 0; }
+  .samples { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; }
+  .sample { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; }
+  .sample h3 { margin: 0 0 4px; font-size: 15px; }
+  .sample p { margin: 0 0 10px; color: var(--muted); font-size: 13px; }
+  .sample a.open { display: inline-block; padding: 4px 10px; border: 1px solid var(--accent); border-radius: 5px; font-size: 13px; }
+  .contents { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 0 24px; }
+  .contents h3 { margin: 12px 0 4px; }
+  .contents ul { margin: 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; margin: 8px 0; }
+  th { text-align: left; padding: 4px 8px; border-bottom: 2px solid var(--line); }
+  td { padding: 4px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  td:first-child { color: var(--muted); width: 32%; }
+  table.keys td:first-child { white-space: nowrap; }
+  kbd { font: 12px ui-monospace, monospace; border: 1px solid var(--line); border-radius: 3px; padding: 0 4px; background: var(--card); white-space: nowrap; }
+  code { font: 13px ui-monospace, monospace; background: var(--code); border-radius: 3px; padding: 0 3px; }
+  pre { background: var(--code); border-radius: 6px; padding: 10px 12px; overflow-x: auto; font: 13px/1.45 ui-monospace, monospace; }
+  pre code { background: none; padding: 0; }
+  .note { color: var(--muted); font-size: 13px; }
+  .see { color: var(--muted); font-size: 14px; }
+  @media (max-width: 560px) {
+    main { padding: 16px 14px 32px; }
+    header.bar { padding: 6px 14px; }
+    td:first-child { width: auto; }
+  }
+</style>
+</head>
+<body>
+<header class="bar">
+  <a href="reviera:help/index">Home</a>
+  {{BACK}}
+  <span class="here">{{TITLE}}</span>
+</header>
+<main>
+{{BODY}}
+</main>
+<script>
+  // Reviera links (and web links) go to the application through the page title: the click is
+  // cancelled, and the title carries the link (with a counter, so each click changes it).
+  let clicks = 0;
+  document.addEventListener('click', (e) => {
+    const a = e.target.closest('a[href]');
+    if (!a) return;
+    const href = a.getAttribute('href');
+    if (href.startsWith('reviera:') || /^(https?|mailto):/.test(href)) {
+      e.preventDefault();
+      clicks += 1;
+      document.title = 'link ' + clicks + ' ' + href;
+    } else if (href.startsWith('#')) {
+      // Within the page: scroll there (the page has no address of its own to navigate in).
+      const target = document.getElementById(href.slice(1));
+      if (target) {
+        e.preventDefault();
+        target.scrollIntoView();
+      }
+    }
+  });
+  // A page opened at an anchor (reviera:help/<page>#<anchor>).
+  const anchor = '{{ANCHOR}}';
+  if (anchor) {
+    const target = document.getElementById(anchor);
+    if (target) target.scrollIntoView();
+  }
+</script>
+</body>
+</html>

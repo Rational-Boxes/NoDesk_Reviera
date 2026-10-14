@@ -1,0 +1,119 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Copyright (C) 2026 Reviera contributors -->
+<h1>Roofs</h1>
+<p class="lead">Pitched and flat roofs are made from a sketched footprint, with eaves that bear on
+the walls and dormers. Arched (barrel) roofs and domes have tools of their own.</p>
+<nav class="toc">
+  <a href="#footprint">Footprint roofs</a>
+  <a href="#shape">Shape and slopes</a>
+  <a href="#attach">Attaching walls</a>
+  <a href="#eaves">Eaves</a>
+  <a href="#dormers">Dormers</a>
+  <a href="#arched">Arched roofs</a>
+  <a href="#domes">Domes</a>
+</nav>
+
+<h2 id="footprint">To make a roof from a footprint</h2>
+<ol>
+  <li>Open the plan of the level the walls stand on. <b>Architecture › Build › Roof</b>.
+    <a class="run" href="reviera:action/roof.create_footprint">Roof</a></li>
+  <li>The <b>Create Roof Footprint</b> sketch starts with <b>Pick Walls</b>: click the walls (or
+    hover one and press <kbd>Tab</kbd> for the chain). Picked walls give their exterior faces,
+    pushed out by the overhang (600 mm unless you change it first with <b>Overhang…</b>). You can
+    also draw the footprint with <b>Line</b> or <b>Rectangle</b>.</li>
+  <li>Optionally use <b>Defines Slope</b> and click footprint curves to switch each between
+    sloping and gable. Sloping curves show a triangle.</li>
+  <li><b>Finish Edit Mode</b>. A roof on picked walls sits on the walls' tops, and Reviera offers
+    to attach the walls under it so the gables fill: answer yes.</li>
+</ol>
+<p>Any simple footprint works, including courtyards (an inner loop). Each roof face is a slab of
+the roof type's thickness, mitred to its neighbours. <code>roof.create_footprint</code>,
+<code>roof.edit_footprint</code></p>
+
+<h2 id="shape">Shape and slopes</h2>
+<p>Select the roof; Properties show:</p>
+<table>
+  <tr><td><b>Roof Shape</b></td><td><i>Hip</i>, <i>Gable</i>, <i>Gable (rotated)</i>,
+    <i>Shed</i>, <i>Shed (reversed)</i> or <i>Flat</i>. It sets which footprint edges slope.</td></tr>
+  <tr><td><b>Slope</b></td><td>The slope of every slope-defining edge. Edges can have different
+    slopes (<code>roof.set_edge</code>, or the curve's Slope in the sketch).</td></tr>
+  <tr><td><b>Overhang</b></td><td>How far the roof reaches past every footprint edge.</td></tr>
+  <tr><td><b>Base Level</b>, <b>Base Offset From Level</b></td><td>The height the roof starts
+    from.</td></tr>
+  <tr><td><b>Cutoff Level</b>, <b>Cutoff Offset</b></td><td>Cuts the roof off flat at a height,
+    for mansard and cut-off roofs.</td></tr>
+  <tr><td><b>Type</b></td><td>The roof type and its thickness; <b>Duplicate Type…</b>.</td></tr>
+</table>
+<p>Area, volume and the maximum ridge height are shown too. Drag the footprint's grips in a plan,
+or use <b>Modify | Roofs › Edit Footprint</b>, to change the outline.
+<code>roof.set_params</code>, <code>roof.set_shape</code>, <code>roof.set_slope</code></p>
+
+<h2 id="attach">Attaching walls</h2>
+<p>Select the roof and use <b>Modify | Roofs › Attach Walls</b>: every wall under the roof
+attaches to it. Gable walls rise to the ridge and the rest meet the roof's underside. To attach
+single walls, see <a href="reviera:help/walls#attach">Walls</a>.
+<code>roof.attach_walls</code></p>
+
+<h2 id="eaves">Eaves</h2>
+<p>Select a roof and use <b>Modify | Roofs › Eaves</b>: its sloped edges become eaves that bear on
+the walls below. (A roof made from picked walls gets eaves by default.) Properties › <b>Eaves</b>
+then sets:</p>
+<table>
+  <tr><td><b>Overhang</b></td><td>Measured from the wall's exterior face.</td></tr>
+  <tr><td><b>Bearing</b></td><td>Where the roof's underside meets the wall: <i>Exterior
+    Face</i>, <i>Core Centre</i> or <i>Interior Face</i>.</td></tr>
+  <tr><td><b>Heel Height</b></td><td>The roof construction's depth at the bearing line; more than
+    the roof's own depth raises the roof.</td></tr>
+  <tr><td><b>Rafter Cut</b></td><td><i>Plumb</i>, <i>Square</i> or <i>Two-Cut</i>.</td></tr>
+  <tr><td><b>Fascia</b>, <b>Fascia Depth</b></td><td>A fascia board, mitred at hips.</td></tr>
+  <tr><td><b>Soffit</b></td><td><i>Boxed</i>, <i>Sloped</i> or <i>Open</i>, returning to the
+    wall's face.</td></tr>
+</table>
+<p><code>roof.set_eaves</code>, <code>roof.eaves</code></p>
+
+<h2 id="dormers">Dormers</h2>
+<ol>
+  <li>Select the roof. <b>Modify | Roofs › Dormer</b>.</li>
+  <li>Choose the style: <i>Gable (pitched)</i>, <i>Hipped (pitched)</i>, <i>Shed (flat lift)</i>
+    or <i>Flat</i>.</li>
+  <li>Click on the roof where each dormer goes, in a plan or in 3D. <kbd>Esc</kbd> ends.</li>
+</ol>
+<p>Each dormer comes with its roof, a front wall and cheek walls down to the main roof. Its roof
+joins the main roof flush, meeting it in valleys, and the main roof is cut open below the dormer.
+Select a dormer's roof or walls to edit the dormer in Properties: <b>Style</b>, <b>Width</b>,
+<b>Front Height</b>, <b>Slope</b> and <b>Overhang</b>. A window placed in the front wall fits
+under the dormer roof. Deleting the dormer (or its roof) removes its parts. See the
+<a href="reviera:sample/house">House</a>. <code>dormer.create</code>, <code>dormer.set</code>,
+<code>dormer.move</code></p>
+
+<h2 id="arched">Arched roofs</h2>
+<ol>
+  <li><b>Architecture › Build › Arched Roof</b>.
+    <a class="run" href="reviera:action/roof.create_arched">Arched Roof</a></li>
+  <li>Sketch a four-sided footprint (Pick Walls, Line or Rectangle) and finish. The arch springs
+    from the longer pair of sides.</li>
+  <li>Accept attaching the walls: the end walls fill up to the arch.</li>
+</ol>
+<p>Properties › <b>Arch</b>: <b>Rise</b>, <b>Overhang</b>, <b>End Overhang</b>, <b>Profile</b>
+(<i>Semicircle</i>, <i>Circular Segment</i>, <i>Elliptical</i> or <i>Catenary</i>) and, over a
+trapezoid footprint, <b>Taper</b> (<i>Constant Rise</i> or <i>Constant Slope</i>). The
+<a href="reviera:sample/observatory">Observatory</a>'s annex has one.
+<code>roof.create_arched</code>, <code>roof.set_arch</code></p>
+
+<h2 id="domes">Domes</h2>
+<ol>
+  <li><b>Architecture › Build › Dome</b>.
+    <a class="run" href="reviera:action/roof.create_dome">Dome</a></li>
+  <li>Choose the plan (<i>Circle</i>, <i>Ellipse</i>, or a <i>Square</i>, <i>Hexagon</i> or
+    <i>Octagon</i> cloister vault) and the profile (<i>Hemisphere</i>, <i>Segmental</i>,
+    <i>Pointed</i> or <i>Onion</i>).</li>
+  <li>In a plan, click the centre, then a point on the springing (the rim).</li>
+  <li>Accept attaching the walls: a drum of walls under it rises to the dome.</li>
+</ol>
+<p>Properties › <b>Dome</b>: <b>Centre X</b>, <b>Centre Y</b>, <b>Radius</b> (a hemisphere's
+rise follows), <b>Sides</b>, <b>Rotation</b>, <b>Rise</b>, the profile's <b>Ratio</b>, an
+<b>Oculus</b> and <b>Faceted</b>. See the <a href="reviera:sample/manor">Manor</a>'s onion dome.
+<code>roof.create_dome</code>, <code>roof.set_dome</code></p>
+<p>Roofs are saved as <code>IfcRoof</code> with faceted bodies.</p>
+<p class="note">Not yet available: roof openings and skylights, slope arrows, and picking single
+eave edges in the window. Gutters and downspouts are planned with plumbing.</p>

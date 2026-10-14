@@ -29,3 +29,11 @@ __pycache__/
 
 # Third-party sources and builds fetched by tools/
 /third_party/
+
+# Packaging outputs and flatpak-builder state (packaging/README.md)
+/dist/
+/packaging/flatpak/.flatpak-builder/
+/packaging/flatpak/build-dir/
+/packaging/flatpak/repo/
+/packaging/macos/build/
+/packaging/windows/build/

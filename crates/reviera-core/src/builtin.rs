@@ -191,6 +191,7 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
     for r in results {
         r.expect("core commands are valid");
     }
+    crate::builtin_arc::register(registry);
 }
 
 /// Arguments of a command that takes none.
@@ -476,6 +477,9 @@ pub fn dependents_of(store: &crate::store::Store, id: ElementId) -> Vec<ElementI
                 })
                 || crate::inserts::opening_of(e).is_some_and(|i| i == guid)
                 || crate::slab_openings::opening_recipe(e).is_some_and(|r| r.host == guid)
+                || crate::slab_openings::shaft_recipe(e).is_some_and(|r| r.extent.uses_level(&guid))
+                || crate::wall_openings::wall_opening_recipe(e)
+                    .is_some_and(|r| r.host == guid || r.extent.uses_level(&guid))
                 || crate::grids::grid_data(e).is_some_and(|g| {
                     g.system == guid || g.type_guid.as_deref() == Some(guid.as_str())
                 })

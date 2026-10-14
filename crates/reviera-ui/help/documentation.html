@@ -1,0 +1,103 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Copyright (C) 2026 Reviera contributors -->
+<h1>Documentation</h1>
+<p class="lead">Schedules, sheets, tags, text and dimensions, and export to PDF and COBie.
+Plans, sections and elevations are described in <a href="reviera:help/views">Views</a>.</p>
+<nav class="toc">
+  <a href="#schedules">Schedules</a>
+  <a href="#sheets">Sheets</a>
+  <a href="#tags">Tags</a>
+  <a href="#text">Text</a>
+  <a href="#dimensions">Dimensions</a>
+  <a href="#pdf">PDF</a>
+  <a href="#cobie">COBie</a>
+</nav>
+
+<h2 id="schedules">Schedules</h2>
+<p>A schedule is a live table of one category's elements: doors, windows, rooms, walls, floors,
+ceilings or roofs. It updates as the model changes.</p>
+<ol>
+  <li><b>View › Schedules</b>, then choose the category.
+    <a class="run" href="reviera:action/view.new_schedule">Schedules</a></li>
+  <li>The schedule opens in its own tab, with one row per element and the totals of areas,
+    volumes, lengths and counts at the bottom.</li>
+  <li>Its <b>Schedule</b> tab on the ribbon has <b>Fields…</b> (choose the columns),
+    <b>Sort…</b> (sort by a column), <b>Itemize</b> (switch between one row per element and one
+    row per group of identical sorted values, with a count) and <b>Export…</b> (CSV or
+    tab-separated text).</li>
+</ol>
+<p>Editing a cell sets that parameter on the element (and can be undone); computed cells are grey
+and read-only. Selecting a row selects its elements. Schedules are listed under
+<b>Schedules/Quantities</b> in the Project Browser. <code>schedule.create</code>,
+<code>schedule.set_fields</code>, <code>schedule.set_sort</code>, <code>schedule.set_cell</code>,
+<code>schedule.get_table</code>, <code>schedule.export</code></p>
+
+<h2 id="sheets">Sheets</h2>
+<ol>
+  <li><b>View › Sheet</b>, then choose a title block size (ISO A0 to A4). Sheets are numbered
+    A101, A102 and so on. <a class="run" href="reviera:action/view.new_sheet">Sheet</a></li>
+  <li>With the sheet open, its <b>Sheet</b> tab has <b>Place View</b>: choose a plan, section or
+    elevation, and it is placed at its scale with a numbered title. A view can be on one sheet
+    only.</li>
+  <li><b>Place Schedule</b> adds a schedule's live table.</li>
+  <li>Drag viewports and schedules to arrange them; <kbd>Delete</kbd> removes the selected one
+    from the sheet. <b>Open View</b> opens the selected viewport's view.</li>
+</ol>
+<p>The title block shows the project, the sheet's name and number, the date, the people and the
+scale (<i>As indicated</i> when the scales differ). With the sheet selected, Properties edit its
+values. <code>sheet.create</code>, <code>sheet.set_parameter</code>,
+<code>sheet.place_view</code>, <code>sheet.place_schedule</code>, <code>viewport.move</code>,
+<code>viewport.remove</code></p>
+
+<h2 id="tags">Tags</h2>
+<p>Tags show values read live from the element they tag. They are placed in plans.</p>
+<table>
+  <tr><td><b>Annotate › Tag by Category</b> <kbd>TG</kbd></td><td>Click a door, window, room,
+    wall or other element to tag it. <kbd>Esc</kbd> ends.
+    <a class="run" href="reviera:action/tag.create">Tag by Category</a></td></tr>
+  <tr><td><b>Room Tag</b> <kbd>RT</kbd></td><td>Click inside a room: its name, number and
+    area.</td></tr>
+  <tr><td><b>Tag All Not Tagged</b></td><td>Tick the categories: every element of them on the
+    plan's level that has no tag yet gets one.</td></tr>
+</table>
+<p>Drag a tag to move it. In Properties, change its type, leader and orientation, or edit its
+value: that changes the element itself. Tags follow their elements; a tag whose element was
+deleted stays, drawn in orange. <code>tag.create</code>, <code>tag.create_room</code>,
+<code>tag.tag_all</code>, <code>tag.set_type</code>, <code>tag.set_leader</code></p>
+
+<h2 id="text">Text</h2>
+<p><b>Annotate › Text</b> (<kbd>TX</kbd>): click in a plan where the text's top-left corner
+goes, then type the text. Text types are 2.5, 3.5 and 5 mm high on paper. Properties edit a
+note's text, type, width (it wraps) and rotation; notes can have leaders.
+<code>text.create</code>, <code>text.set</code>, <code>text.add_leader</code></p>
+
+<h2 id="dimensions">Dimensions</h2>
+<p><b>Annotate › Aligned Dimension</b> (<kbd>DI</kbd>) dimensions in plans:</p>
+<ol>
+  <li>Click a wall face, wall centreline, grid or cut edge.</li>
+  <li>Click the next parallel reference; repeat for a string of dimensions.</li>
+  <li>Click in empty space to place the dimension line through the cursor.</li>
+</ol>
+<p>Dimensions to Reviera walls and grids follow them when they move.
+<code>dim.create_aligned</code>, <code>anno.list</code></p>
+
+<h2 id="pdf">Export to PDF</h2>
+<p>Open a plan, ceiling plan, section, elevation or sheet, then <b>File › Export PDF</b>
+(<kbd>Ctrl</kbd>+<kbd>P</kbd>). The PDF is vector, at the view's scale, with pen widths in paper
+millimetres and real text. <a class="run" href="reviera:action/export.pdf">Export PDF…</a>
+<code>export.pdf</code></p>
+
+<h2 id="cobie">COBie handover</h2>
+<p><b>File › Export COBie</b> writes a COBie 2.4 workbook (XLSX) with Contact, Facility, Floor,
+Space, Type, Component and Attribute sheets: every record with its IFC class and GlobalId, every
+component in its room, every parameter as an attribute. Missing required values are written as
+<i>n/a</i>, never invented. Reviera asks for the contact (company and e-mail address) when the
+model has none, and reports what is missing.
+<a class="run" href="reviera:action/export.cobie">Export COBie…</a></p>
+<p>The <code>export.cobie</code> command can also write one CSV file per table;
+<code>cobie.validate</code> checks the data first and <code>cobie.set_settings</code> sets the
+contact.</p>
+
+<p class="note">Not yet available: crop regions, jogged sections, interior elevations, schedule
+filters and calculated fields, title block families and revisions, and tags or text in sections
+and on sheets.</p>

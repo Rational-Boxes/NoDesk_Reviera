@@ -874,7 +874,12 @@ impl Gui {
         if !self.close_document(doc) {
             return;
         }
-        let tabs: Vec<u32> = self.views.iter().filter(|v| v.doc == doc).map(|v| v.id).collect();
+        let tabs: Vec<u32> = self
+            .views
+            .iter()
+            .filter(|v| v.doc == doc)
+            .map(|v| v.id)
+            .collect();
         for id in tabs {
             self.close_tab(id);
         }

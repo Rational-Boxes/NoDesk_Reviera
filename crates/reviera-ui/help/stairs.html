@@ -1,0 +1,81 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Copyright (C) 2026 Reviera contributors -->
+<h1>Stairs</h1>
+<p class="lead">Stairs are drawn run by run in a plan and complete themselves to the level above.
+They get railings on both sides, and offer to open the floors above them where the building
+code's headroom is short.</p>
+<nav class="toc">
+  <a href="#draw">Drawing a stair</a>
+  <a href="#top">Reaching the level above</a>
+  <a href="#headroom">Headroom and openings</a>
+  <a href="#spiral">Spiral stairs</a>
+  <a href="#properties">Properties</a>
+</nav>
+
+<h2 id="draw">To draw a stair</h2>
+<ol>
+  <li>Open the plan of the stair's bottom level. <b>Architecture › Circulation › Stair</b>
+    (<kbd>ST</kbd>). <a class="run" href="reviera:action/stair.create">Stair</a></li>
+  <li>Click the start of the first run, then toward its end. The run holds as many risers as its
+    length allows at the tread depth; the status bar counts the risers left.</li>
+  <li>To turn, click the start of the next run: an automatic landing joins the runs. Straight, L
+    and U arrangements work this way.</li>
+  <li>When every riser is placed the stair is made.</li>
+</ol>
+<p>The number of risers is the fewest that keep each riser within the type's maximum height
+(180 mm by default). <code>stair.create</code></p>
+<p>The <a href="reviera:sample/house">House</a> sample has an L and a U stair; its guide gives
+the clicks.</p>
+
+<h2 id="top">Reaching the level above</h2>
+<ul>
+  <li>A run drawn to within a tread of the length that places every riser left snaps to it: the
+    status bar says it reaches the level above, and the click makes the stair.</li>
+  <li><kbd>Esc</kbd> makes the stair from the runs drawn so far, the last run carrying on to the
+    top. With no run drawn, <kbd>Esc</kbd> cancels.</li>
+  <li>The stair keeps reaching its top level when levels move, and its railings extend with
+    it.</li>
+</ul>
+
+<h2 id="headroom">Headroom and stair openings</h2>
+<p>When a new stair passes under a floor or ceiling that leaves less headroom than the building
+code asks (measured from the line of the nosings), Reviera asks whether to open the floor over
+the stair's full width, and for which code's headroom:</p>
+<ul>
+  <li>the model's code (from <a href="reviera:help/settings#code">Model Properties</a>), listed
+    first;</li>
+  <li>each other code, with its headroom and clause;</li>
+  <li><i>Don't open the floor</i>.</li>
+</ul>
+<p>The openings are <a href="reviera:help/openings">vertical openings</a>, reshaped with their
+grips. To check a stair again later, select it and use <b>Modify | Stairs › Stair Openings</b>:
+it makes the offer again where headroom is still short, or says the stair has enough
+headroom everywhere.
+<code>stair.headroom_check</code>, <code>stair.create_openings</code></p>
+<p>In the <a href="reviera:sample/manor">Manor</a>, the main stair opens the ceiling and the
+Level 2 floor over it for the IRC's 6 ft 8 in.</p>
+
+<h2 id="spiral">Spiral stairs</h2>
+<ol>
+  <li>Open a plan. <b>Architecture › Circulation › Spiral Stair</b>.
+    <a class="run" href="reviera:action/stair.spiral">Spiral Stair</a></li>
+  <li>Click the centre, then a point on the walking line (its radius).</li>
+</ol>
+<p>The spiral climbs to the level above with full steps, and offers to open the floor over it
+like any stair (codes give spiral stairs their own headroom). The Manor's tower has two.</p>
+
+<h2 id="properties">Properties</h2>
+<table>
+  <tr><td><b>Base Level</b>, <b>Top</b></td><td>The levels the stair runs between.</td></tr>
+  <tr><td><b>Desired Number of Risers</b></td><td>Empty takes the fewest the type allows.</td></tr>
+  <tr><td><b>Actual Tread Depth</b></td><td>The going; edit it to change the treads.</td></tr>
+  <tr><td><b>Run Width</b></td><td>The width of the runs.</td></tr>
+  <tr><td><b>Actual Number of Risers</b>, <b>Treads</b>, <b>Actual Riser Height</b></td><td>The
+    result, read only.</td></tr>
+  <tr><td><b>Warning</b>, <b>Error</b></td><td>Shown when the stair breaks its type's
+    limits.</td></tr>
+</table>
+<p>New stairs get railings on both sides. To put them back after deleting them, select the stair
+and use <b>Modify | Stairs › Railings</b>; see <a href="reviera:help/railings-decks#stair">Railings</a>.
+Stairs are saved as <code>IfcStair</code>. <code>stair.set_params</code></p>
+<p class="note">Not yet available: winders, stair supports, and editing runs with handles.</p>

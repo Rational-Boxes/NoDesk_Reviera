@@ -37,6 +37,101 @@ pub fn elevation(e: &crate::Element) -> f64 {
         .unwrap_or(0.0)
 }
 
+/// A vertical extent between levels, as walls, wall openings, shafts and columns store it: a
+/// base level (GlobalId) and offset, and a top that is a level plus an offset or a height above
+/// the base (`{"level": guid}` or `{"unconnected": height}`).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct Extent {
+    pub base_level: String,
+    #[serde(default)]
+    pub base_offset: f64,
+    pub top: Value,
+    #[serde(default)]
+    pub top_offset: f64,
+}
+
+/// The elevation of the level with GlobalId `guid`.
+pub fn elevation_of(store: &Store, guid: &str) -> Result<f64> {
+    crate::id::GlobalId::parse(guid)
+        .and_then(|g| store.find_by_guid(&g))
+        .and_then(|id| store.get(id))
+        .filter(|e| e.class == CLASS)
+        .map(elevation)
+        .ok_or_else(|| Error::new("level.missing", format!("level {guid} no longer exists")))
+}
+
+impl Extent {
+    /// From command arguments: a base level and offset, and a top constraint and offset.
+    pub fn from_args(
+        store: &Store,
+        base_level: &ElementRef,
+        base_offset: f64,
+        top: walls::TopConstraint,
+        top_offset: f64,
+    ) -> Result<Extent> {
+        let base = store
+            .get(resolve_level(store, base_level)?)
+            .expect("resolved");
+        let top = match top {
+            walls::TopConstraint::Unconnected(h) if h > 0.0 => {
+                serde_json::json!({ "unconnected": h })
+            }
+            walls::TopConstraint::Unconnected(_) => {
+                return Err(Error::new(
+                    "extent.non_positive_height",
+                    "the height must be greater than 0",
+                ));
+            }
+            walls::TopConstraint::Level(walls::ElementRefValue::Id(id)) => {
+                let l = store
+                    .get(resolve_level(store, &ElementRef::Id(id))?)
+                    .expect("resolved");
+                serde_json::json!({ "level": l.guid().as_str() })
+            }
+        };
+        let e = Extent {
+            base_level: base.guid().to_string(),
+            base_offset,
+            top,
+            top_offset,
+        };
+        e.z(store)?;
+        Ok(e)
+    }
+
+    /// The bottom and top elevations, refused when the top is not above the bottom.
+    pub fn z(&self, store: &Store) -> Result<(f64, f64)> {
+        let z0 = elevation_of(store, &self.base_level)? + self.base_offset;
+        let z1 = if let Some(h) = self.top.get("unconnected").and_then(Value::as_f64) {
+            z0 + h
+        } else if let Some(g) = self.top.get("level").and_then(Value::as_str) {
+            elevation_of(store, g)? + self.top_offset
+        } else {
+            return Err(Error::new(
+                "extent.bad_top",
+                "the top is neither a level nor a height",
+            ));
+        };
+        if z1 <= z0 + 1e-6 {
+            return Err(Error::new(
+                "extent.non_positive_height",
+                "the top is at or below the base",
+            ));
+        }
+        Ok((z0, z1))
+    }
+
+    /// The top level (GlobalId), if the top follows one.
+    pub fn top_level(&self) -> Option<&str> {
+        self.top.get("level").and_then(Value::as_str)
+    }
+
+    /// Whether either end follows level `guid`.
+    pub fn uses_level(&self, guid: &str) -> bool {
+        self.base_level == guid || self.top_level() == Some(guid)
+    }
+}
+
 /// One level, for listings.
 #[derive(Debug, Clone, PartialEq, Serialize, JsonSchema)]
 pub struct LevelInfo {

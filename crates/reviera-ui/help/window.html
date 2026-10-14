@@ -1,0 +1,190 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Copyright (C) 2026 Reviera contributors -->
+<h1>The window</h1>
+<p class="lead">The ribbon and the Quick Access Toolbar at the top, the Properties palette, the
+Project Browser and the Model Tree in docked panes, the views as tabs in the centre, and the
+status bar at the bottom.</p>
+<nav class="toc">
+  <a href="#ribbon">Ribbon</a>
+  <a href="#contextual">Contextual tabs</a>
+  <a href="#menus">Menus</a>
+  <a href="#panes">Panes</a>
+  <a href="#views">View tabs</a>
+  <a href="#status">Status bar</a>
+  <a href="#keys">Keyboard shortcuts</a>
+</nav>
+
+<h2 id="ribbon">The ribbon</h2>
+<p>The ribbon's tabs hold the tools in titled panels. Every tab starts with the <b>Select</b>
+panel, whose <b>Modify</b> button (<kbd>MD</kbd>) ends the running tool so you can select
+elements. Hovering a button shows what it does and its keyboard sequence.</p>
+<table>
+  <tr><th>Tab</th><th>Panels</th></tr>
+  <tr><td><b>Architecture</b></td><td><b>Build</b>: Wall, Arc Wall, Spline Wall, Door, Window,
+    Floor, Ceiling, Roof, Arched Roof, Dome. <b>Room &amp; Area</b>: Room, Place Rooms
+    Automatically. <b>Circulation</b>: Stair, Spiral Stair, Railing, Deck. <b>Datum</b>: Level,
+    Grid.</td></tr>
+  <tr><td><b>Annotate</b></td><td><b>Dimension</b>: Aligned Dimension. <b>Text</b>. <b>Tag</b>:
+    Tag by Category, Room Tag, Tag All Not Tagged.</td></tr>
+  <tr><td><b>View</b></td><td><b>Create</b>: Floor Plan, Ceiling Plan, Section, Building
+    Elevations, Schedules, Default 3D View, New 3D View. <b>Sheet Composition</b>: Sheet.
+    <b>Navigate</b>: Zoom to Fit, Previous and Next Pan/Zoom, Home, Set as Home, Perspective /
+    Isometric, Walk. <b>Coordination</b>: Check Overlaps, Remove Boolean, Virtual Volumes,
+    Accessibility Rules. <b>Section</b>: Section Box, Selection Box, Horizontal and Vertical
+    Slice, Clear Slices. <b>Hide/Isolate</b>. <b>Windows</b>. <b>User Interface</b>: show or hide
+    the Properties, Project Browser and Model Tree panes.</td></tr>
+  <tr><td><b>Manage</b></td><td><b>Settings</b>: Model Properties, Accessibility Rules.</td></tr>
+  <tr><td><b>Modify</b></td><td><b>Properties</b>. <b>Modify</b>: Align, Offset, Mirror (pick or
+    draw an axis), Move, Copy, Rotate, Trim/Extend to Corner, Trim/Extend Single Element, Split
+    Element, Pin, Unpin, Delete. <b>Measure</b>: Aligned Dimension.</td></tr>
+</table>
+<p>The <b>Quick Access Toolbar</b> above the ribbon has Open, Save, Undo, Redo, Default 3D View
+and Close View. The ribbon collapses panels as the window narrows.</p>
+
+<h2 id="contextual">Contextual tabs</h2>
+<p>While elements are selected, a highlighted <b>Modify | <i>category</i></b> tab appears with
+the Modify tools and the tools for that kind of element:</p>
+<table>
+  <tr><th>Tab</th><th>Its own tools</th></tr>
+  <tr><td>Modify | Walls</td><td>Flip Wall, Attach Top/Base, Detach Top/Base</td></tr>
+  <tr><td>Modify | Doors</td><td>Flip Hand, Flip Facing</td></tr>
+  <tr><td>Modify | Windows</td><td>Flip Facing</td></tr>
+  <tr><td>Modify | Floors</td><td>Edit Boundary, Guard Edges</td></tr>
+  <tr><td>Modify | Ceilings</td><td>Edit Boundary</td></tr>
+  <tr><td>Modify | Roofs</td><td>Edit Footprint, Eaves, Attach Walls, Dormer, Guard Edges</td></tr>
+  <tr><td>Modify | Stairs</td><td>Railings, Stair Openings</td></tr>
+  <tr><td>Modify | Railings</td><td>Opening, Gate, Double Gate</td></tr>
+</table>
+<p>Some tools have a tab of their own while they run: the floor and roof sketches
+(<a href="reviera:help/sketch">sketch mode</a>), the Ceiling and Room tools, and open schedules
+and sheets.</p>
+
+<h2 id="menus">Menus</h2>
+<p>The menu bar has <b>File</b>, <b>Edit</b>, <b>View</b>, <b>Architecture</b>,
+<b>Annotate</b>, <b>Modify</b>, <b>Scripts</b>, <b>Window</b> and <b>Help</b>. They run the same
+actions as the ribbon and show each one's shortcut. <b>View › Orient</b> lists the standard
+directions (Top, Front, South-East Isometric…). The <b>Scripts</b> menu is described in
+<a href="reviera:help/scripting#menu">Scripting</a>.</p>
+
+<h2 id="panes">Panes</h2>
+<h3 id="properties">Properties</h3>
+<p>The Properties palette (<kbd>PP</kbd>) shows and edits:</p>
+<ul>
+  <li>the selected element: its identity (class, name, type, IDs), its own rows (for example a
+    wall's constraints, a door's placement and size, a roof's shape and eaves) and every
+    parameter, grouped; type rows choose, duplicate and edit its type (see
+    <a href="reviera:help/types">Types and parameters</a>);</li>
+  <li>with a tool running and nothing selected, the type the tool will place;</li>
+  <li>with nothing selected, the active view: its name, view range, projection and section
+    box.</li>
+</ul>
+<p>Lengths can be typed in any unit (<code>4.5 m</code>, <code>12' 6"</code>); see
+<a href="reviera:help/settings#typing">Typing lengths</a>. Each edit is one undo step.</p>
+<h3 id="browser">Project Browser</h3>
+<p>The Project Browser lists the model's views (Floor Plans, Ceiling Plans, Elevations,
+Sections, Schedules/Quantities, 3D Views), its sheets and its levels. Double-click a view to open
+it. Right-click a view to <b>Open</b>, <b>Rename</b>, <b>Duplicate</b> or <b>Delete</b> it, and
+a level to <b>Rename</b> it, <b>Change Elevation</b> or <b>Delete</b> it. Views that are open are
+shown in bold.</p>
+<h3 id="tree">Model Tree</h3>
+<p>The Model Tree (<kbd>MT</kbd>) shows the model's structure: project, site, building, storeys,
+then categories and elements, with hosted elements (doors, windows) under their hosts. Selecting
+an item selects its elements; double-clicking zooms to them. Its right-click menu selects, hides,
+isolates, ghosts, makes translucent or shows a whole branch, zooms to it or fits a section box
+around it.</p>
+
+<h2 id="views">View tabs</h2>
+<p>Each open view is a tab. Several models can have views open at once.</p>
+<table class="keys">
+  <tr><td><kbd>Ctrl</kbd>+<kbd>Tab</kbd>, <kbd>Ctrl</kbd>+<kbd>PgDn</kbd></td><td>Next view</td></tr>
+  <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Tab</kbd>, <kbd>Ctrl</kbd>+<kbd>PgUp</kbd></td><td>Previous view</td></tr>
+  <tr><td><kbd>Ctrl</kbd>+<kbd>W</kbd></td><td>Close the active view</td></tr>
+  <tr><td><b>Window › Tile Views</b></td><td>Show every view at once</td></tr>
+  <tr><td><b>Window › Tab Views</b></td><td>Put every view back in one tab group</td></tr>
+</table>
+<p>The help is a tab too: <b>Help › Reviera Help</b> (<kbd>F1</kbd>) opens it.</p>
+
+<h2 id="status">Status bar</h2>
+<p>The status bar at the bottom of the window says what the running tool expects next (for
+example <i>click the start point</i>, or the risers left to place while drawing a stair), and
+reports the result of each action and any error.</p>
+
+<h2 id="keys">Keyboard shortcuts</h2>
+<p>Tools start from two-letter <b>key sequences</b> typed in a view, without modifier keys
+(click in the view first if it does not have the keyboard focus): type <kbd>W</kbd> then
+<kbd>A</kbd> to start the Wall tool. Menus and tooltips show
+them too.</p>
+<table class="keys">
+  <tr><th>Keys</th><th>Action</th></tr>
+  <tr><td><kbd>MD</kbd></td><td>Modify (end the tool, select)</td></tr>
+  <tr><td><kbd>WA</kbd></td><td>Wall</td></tr>
+  <tr><td><kbd>DR</kbd></td><td>Door</td></tr>
+  <tr><td><kbd>WN</kbd></td><td>Window</td></tr>
+  <tr><td><kbd>FL</kbd></td><td>Floor</td></tr>
+  <tr><td><kbd>RM</kbd></td><td>Room</td></tr>
+  <tr><td><kbd>ST</kbd></td><td>Stair</td></tr>
+  <tr><td><kbd>LL</kbd></td><td>Level</td></tr>
+  <tr><td><kbd>GR</kbd></td><td>Grid</td></tr>
+  <tr><td><kbd>DI</kbd></td><td>Aligned Dimension</td></tr>
+  <tr><td><kbd>TX</kbd></td><td>Text</td></tr>
+  <tr><td><kbd>TG</kbd></td><td>Tag by Category</td></tr>
+  <tr><td><kbd>RT</kbd></td><td>Room Tag</td></tr>
+  <tr><td><kbd>AL</kbd></td><td>Align</td></tr>
+  <tr><td><kbd>OF</kbd></td><td>Offset</td></tr>
+  <tr><td><kbd>MM</kbd></td><td>Mirror – Pick Axis</td></tr>
+  <tr><td><kbd>DM</kbd></td><td>Mirror – Draw Axis</td></tr>
+  <tr><td><kbd>MV</kbd></td><td>Move</td></tr>
+  <tr><td><kbd>CO</kbd></td><td>Copy</td></tr>
+  <tr><td><kbd>RO</kbd></td><td>Rotate</td></tr>
+  <tr><td><kbd>TR</kbd></td><td>Trim/Extend to Corner</td></tr>
+  <tr><td><kbd>SL</kbd></td><td>Split Element</td></tr>
+  <tr><td><kbd>PN</kbd></td><td>Pin</td></tr>
+  <tr><td><kbd>UP</kbd></td><td>Unpin</td></tr>
+  <tr><td><kbd>DE</kbd></td><td>Delete</td></tr>
+  <tr><td><kbd>ZF</kbd></td><td>Zoom to Fit</td></tr>
+  <tr><td><kbd>ZP</kbd></td><td>Previous Pan/Zoom</td></tr>
+  <tr><td><kbd>ZN</kbd></td><td>Next Pan/Zoom</td></tr>
+  <tr><td><kbd>PI</kbd></td><td>Perspective / Isometric</td></tr>
+  <tr><td><kbd>WK</kbd></td><td>Walk</td></tr>
+  <tr><td><kbd>SX</kbd></td><td>Section Box</td></tr>
+  <tr><td><kbd>BX</kbd></td><td>Selection Box</td></tr>
+  <tr><td><kbd>HH</kbd></td><td>Hide Element</td></tr>
+  <tr><td><kbd>HC</kbd></td><td>Hide Category</td></tr>
+  <tr><td><kbd>HI</kbd></td><td>Isolate Element</td></tr>
+  <tr><td><kbd>IC</kbd></td><td>Isolate Category</td></tr>
+  <tr><td><kbd>HG</kbd></td><td>Isolate, Ghost Others</td></tr>
+  <tr><td><kbd>HT</kbd></td><td>Translucent</td></tr>
+  <tr><td><kbd>HR</kbd></td><td>Reset Hide/Isolate</td></tr>
+  <tr><td><kbd>PP</kbd></td><td>Show or hide Properties</td></tr>
+  <tr><td><kbd>MT</kbd></td><td>Show or hide the Model Tree</td></tr>
+  <tr><td><kbd>UN</kbd></td><td>Model Properties</td></tr>
+</table>
+<p>Keys with modifiers:</p>
+<table class="keys">
+  <tr><th>Keys</th><th>Action</th></tr>
+  <tr><td><kbd>Ctrl</kbd>+<kbd>N</kbd></td><td>New model</td></tr>
+  <tr><td><kbd>Ctrl</kbd>+<kbd>O</kbd></td><td>Open</td></tr>
+  <tr><td><kbd>Ctrl</kbd>+<kbd>S</kbd></td><td>Save</td></tr>
+  <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd></td><td>Save As</td></tr>
+  <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd></td><td>Close Model</td></tr>
+  <tr><td><kbd>Ctrl</kbd>+<kbd>P</kbd></td><td>Export PDF</td></tr>
+  <tr><td><kbd>Ctrl</kbd>+<kbd>Z</kbd></td><td>Undo</td></tr>
+  <tr><td><kbd>Ctrl</kbd>+<kbd>Y</kbd></td><td>Redo</td></tr>
+  <tr><td><kbd>Ctrl</kbd>+<kbd>W</kbd></td><td>Close View</td></tr>
+  <tr><td><kbd>Ctrl</kbd>+<kbd>PgDn</kbd> / <kbd>PgUp</kbd></td><td>Next / previous view</td></tr>
+  <tr><td><kbd>Alt</kbd>+<kbd>Home</kbd></td><td>Go to the view's Home</td></tr>
+  <tr><td><kbd>F1</kbd></td><td>Reviera Help</td></tr>
+</table>
+<p>Keys inside tools:</p>
+<table class="keys">
+  <tr><th>Key</th><th>Action</th></tr>
+  <tr><td><kbd>Esc</kbd></td><td>Drop the last pick or the typed value; again, end the tool. With
+    no tool running, clear the selection. Ends walk mode.</td></tr>
+  <tr><td><kbd>Enter</kbd></td><td>Place a typed length or angle; end a spline wall.</td></tr>
+  <tr><td><kbd>Backspace</kbd></td><td>Edit a typed value.</td></tr>
+  <tr><td><kbd>Spacebar</kbd></td><td>Flip a wall's exterior side while drawing it, or the
+    selected walls; flip a door's hand while placing it.</td></tr>
+  <tr><td><kbd>Tab</kbd></td><td>In a sketch with Pick Walls: take the whole chain of walls.</td></tr>
+  <tr><td><kbd>Delete</kbd></td><td>Delete the selection (in a sketch: the selected or last curve;
+    on a sheet: the selected viewport).</td></tr>
+</table>

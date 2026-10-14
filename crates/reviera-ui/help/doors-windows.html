@@ -1,0 +1,114 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Copyright (C) 2026 Reviera contributors -->
+<h1>Doors and windows</h1>
+<p class="lead">Doors and windows are placed in walls, straight or curved, and cut their opening
+in the wall. Their types set the size, the shape and, for doors, how they open.</p>
+<nav class="toc">
+  <a href="#place">Placing</a>
+  <a href="#position">Position and size</a>
+  <a href="#flip">Facing and hand</a>
+  <a href="#shapes">Shapes</a>
+  <a href="#operations">Door operations</a>
+  <a href="#clearances">Clearances</a>
+</nav>
+
+<h2 id="place">Placing doors and windows</h2>
+<ol>
+  <li><b>Architecture › Build › Door</b> (<kbd>DR</kbd>) or <b>Window</b> (<kbd>WN</kbd>), in a
+    plan or a 3D view. <a class="run" href="reviera:action/door.place">Door</a>
+    <a class="run" href="reviera:action/window.place">Window</a></li>
+  <li>Optionally choose the type in Properties › Type.</li>
+  <li>Hover a wall: a preview follows the cursor along it. The side of the wall the cursor is on
+    sets the facing (for a door, the side it swings to). <kbd>Spacebar</kbd> flips a door's
+    hand.</li>
+  <li>Click to place it. The tool stays on for more; <kbd>Esc</kbd> ends it.</li>
+</ol>
+<p>A new door or window fits the wall where it lands: it slides or shrinks into the free gap
+between its neighbours and the wall's ends, and the preview shows the fitted size. On a dormer's
+front wall a window rises above the main roof and shrinks to fit under the dormer roof. Each new
+one gets the next <b>Mark</b>. Plans show door swings. <code>door.place</code>,
+<code>window.place</code></p>
+
+<h2 id="position">Position and size</h2>
+<p>Clicks place doors and windows roughly. To place one exactly, select it and edit Properties ›
+<b>Placement</b>:</p>
+<table>
+  <tr><td><b>From Wall Start</b>, <b>From Wall End</b></td><td>The distance of its centre along
+    the wall from either end.</td></tr>
+  <tr><td><b>Sill Height</b></td><td>The bottom above the wall's base level. It moves the door or
+    window and keeps its size; <b>Head Height</b> follows.</td></tr>
+  <tr><td><b>Own Size</b>, <b>Width</b>, <b>Height</b></td><td>This one's own size, in place of
+    the type's. It stays centred.</td></tr>
+</table>
+<p>You can also drag a selected door or window along its wall. <code>insert.set_position</code>,
+<code>insert.set_sill_height</code>, <code>insert.set_size</code></p>
+<p>The type's values (Properties › <b>Type Parameters</b>) are <b>Width</b>, <b>Height</b>,
+<b>Frame Width</b>, <b>Frame Depth</b>, <b>Panel Thickness</b> and <b>Default Sill
+Height</b>, plus the shape and the operation below. Use <b>Duplicate Type…</b> to make a new
+size; see <a href="reviera:help/types#duplicate">making a door type</a>.</p>
+
+<h2 id="flip">Facing and hand</h2>
+<table>
+  <tr><td><b>Flip Facing</b></td><td>Turns the selected doors and windows to face the wall's other
+    side (a door then swings to the other side). <b>Modify | Doors</b> or <b>Modify |
+    Windows</b>.</td></tr>
+  <tr><td><b>Flip Hand</b></td><td>Moves the selected doors' hinges to the other side. <b>Modify |
+    Doors</b>, or <kbd>Spacebar</kbd> while placing.</td></tr>
+</table>
+<p>Both are also in the <a href="reviera:help/selecting#quick">quick modify menu</a>.
+<code>insert.flip_facing</code>, <code>insert.flip_hand</code></p>
+
+<h2 id="shapes">Shapes</h2>
+<p>A type's <b>Shape</b> in Properties sets the outline; the opening in the wall, the frame and
+the glass all follow it.</p>
+<table>
+  <tr><th>Shape</th><th>Values</th></tr>
+  <tr><td><i>Rectangle</i></td><td>The default.</td></tr>
+  <tr><td><i>Round</i>, <i>Elliptical</i></td><td>Width and height (a round window's width is
+    its diameter).</td></tr>
+  <tr><td><i>Round Top</i></td><td><b>Head Profile</b>: <i>Semicircular</i>, <i>Segmental</i>,
+    <i>Elliptical</i>, <i>Gothic</i> or <i>Tudor</i>. Segmental, elliptical and Tudor heads have
+    a <b>Rise</b>; a Gothic head a <b>Radius Ratio</b> (1 is equilateral). <b>Spring Height</b>
+    shows the height of the straight sides.</td></tr>
+  <tr><td><i>Fan</i></td><td>A fan light.</td></tr>
+  <tr><td><i>Gable</i></td><td>A pitched head with its <b>Rise</b>.</td></tr>
+  <tr><td><i>Trapezoid</i></td><td><b>Left Height</b> and <b>Right Height</b>.</td></tr>
+  <tr><td><i>Polygon</i></td><td><b>Sides</b> and <b>Rotation</b>.</td></tr>
+</table>
+<p>Doors take <i>Rectangle</i> and <i>Round Top</i>. Windows also have <b>Glazing Bars</b>: a
+number of bars, radiating in round tops, fans and round windows and upright in the rest.</p>
+<p>Plans cut a shaped window at its true width at the cut height. When a shaped window is fitted
+to a smaller gap, a round window stays round and a semicircular or Gothic head keeps its shape.
+The <a href="reviera:sample/manor">Manor</a> has an arched door, round-top and Gothic windows and
+an oculus.</p>
+
+<h2 id="operations">Door operations</h2>
+<p>A door type's <b>Operation</b>, <b>Leaves</b> and <b>Automatic</b> rows set how it opens:</p>
+<table>
+  <tr><td><b>Operation</b></td><td><i>Single Swing</i>, <i>Double Swing</i> (a pair),
+    <i>Revolving</i> (the width is the drum's) or <i>Sliding (Bi-parting)</i>.</td></tr>
+  <tr><td><b>Leaves</b></td><td><i>Solid</i> or <i>Glass (Storefront)</i>.</td></tr>
+  <tr><td><b>Automatic</b></td><td>A powered operator over the head.</td></tr>
+</table>
+<p>A sliding door also claims the wall its leaves slide over, one leaf width each side: windows
+and other doors are kept clear of it, and its <i>slide space</i> is checked as a virtual volume.
+Plans draw each kind's symbol. The <a href="reviera:sample/storefront">Storefront</a> sample has
+a revolving door, an automatic sliding door, a pair of glass doors and an automatic storefront
+door.</p>
+<h3 id="storefront">To make an automatic sliding door</h3>
+<ol>
+  <li>Place any door and select it.</li>
+  <li>Properties › Type › <b>Duplicate Type…</b>, named for example <i>Automatic Sliding
+    2000</i>.</li>
+  <li>Under Type Parameters: Width 2000, Height 2300, Operation <i>Sliding (Bi-parting)</i>,
+    Leaves <i>Glass (Storefront)</i>, Automatic <i>Yes</i>.</li>
+</ol>
+
+<h2 id="clearances">Clearances</h2>
+<p>Every door has a swing volume, and with the ADA 2010 rule set its maneuvering clearances:
+Check Overlaps reports what intrudes into them. See
+<a href="reviera:help/coordination#clearances">Clearances and virtual volumes</a>.</p>
+<p>In IFC, a door or window is an <code>IfcDoor</code> or <code>IfcWindow</code> filling an
+<code>IfcOpeningElement</code> that voids the wall; a door's operation type is written too.</p>
+<p class="note">Not yet available: quarter-round fan lights, ready-made shaped types in the type
+list (duplicate a type and set its Shape), and gate swings in plans.</p>

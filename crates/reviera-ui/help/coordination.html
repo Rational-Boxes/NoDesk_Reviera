@@ -1,0 +1,78 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Copyright (C) 2026 Reviera contributors -->
+<h1>Overlaps, booleans and clearances</h1>
+<p class="lead">Reviera finds where elements' bodies overlap, and resolves each overlap by
+accepting it, moving an element apart, or a boolean that is kept up to date. Door swings and
+accessibility clearances are checked the same way, as virtual volumes.</p>
+<nav class="toc">
+  <a href="#check">Checking overlaps</a>
+  <a href="#resolve">Resolving an overlap</a>
+  <a href="#booleans">Booleans</a>
+  <a href="#clearances">Clearances and virtual volumes</a>
+</nav>
+
+<h2 id="check">Checking overlaps</h2>
+<ol>
+  <li><b>View › Check Overlaps</b>.
+    <a class="run" href="reviera:action/overlap.find">Check Overlaps</a></li>
+  <li>The list shows each overlap, largest first, with the two elements, the overlapping volume
+    and its depth.</li>
+  <li>Pick one and press OK: the <b>Resolve Overlap</b> dialog follows.</li>
+</ol>
+<p>Walls, floors, roofs, stairs, railings, doors, windows and imported elements are checked.
+Touching is not overlapping, and pairs that belong together by design (a door and its wall, a
+dormer and its roof, a gate and its railing) are left out. <code>overlap.find</code></p>
+
+<h2 id="resolve">Resolving an overlap</h2>
+<p>The Resolve Overlap dialog offers, for elements <i>A</i> and <i>B</i>:</p>
+<table>
+  <tr><td><b>Select and frame them</b></td><td>Selects the pair and zooms to it, changing
+    nothing.</td></tr>
+  <tr><td><b>Accept as intended</b></td><td>Records the overlap as intended: it no longer
+    appears in the checks.</td></tr>
+  <tr><td><b>Cut A by B</b>, <b>Cut B by A</b></td><td>Subtracts one body from the other. Reviera
+    asks whether to hide the cutting element's own body: answer <b>Yes</b> when it exists only
+    to shape the cut (like the slot cutter in the <a href="reviera:sample/observatory">Observatory</a>).</td></tr>
+  <tr><td><b>Join (by precedence)</b></td><td>The element that takes precedence cuts the other:
+    floors and roofs cut walls, walls cut columns.</td></tr>
+  <tr><td><b>Keep only what A shares (intersect)</b></td><td>A keeps only the part inside
+    B.</td></tr>
+  <tr><td><b>Fuse B into A (union)</b></td><td>A takes B's volume.</td></tr>
+  <tr><td><b>Move B apart</b>, <b>Move A apart</b></td><td>Moves one element so they no longer
+    overlap.</td></tr>
+</table>
+<p>The <a href="reviera:sample/csg">Overlap resolutions</a> sample shows each of these side by
+side. <code>overlap.resolve</code>, <code>overlap.accept</code>,
+<code>overlap.accepted</code></p>
+
+<h2 id="booleans">Booleans</h2>
+<p>Booleans between elements (cut, intersect, union, join) are computed by OpenCASCADE and kept:
+they are made again whenever either element changes. Besides Check Overlaps, they can be made
+from the <a href="reviera:help/selecting#quick">quick modify menu</a>: select exactly two
+overlapping elements and middle-click one of them.</p>
+<p>To take booleans off, select the elements and use <b>View › Coordination › Remove
+Boolean</b>: their own shapes return.
+<a class="run" href="reviera:action/geometry.remove_boolean">Remove Boolean</a></p>
+<p>In IFC, the shaped bodies are saved with an <code>IfcRelInterferesElements</code> for each
+boolean. <code>geometry.boolean</code>, <code>geometry.remove_boolean</code></p>
+
+<h2 id="clearances">Clearances and virtual volumes</h2>
+<p>Every door has a <i>swing</i> volume: the space its leaves sweep. A sliding door has a
+<i>slide space</i>: the wall its leaves slide over. With the <b>ADA 2010</b> rule set, doors also
+get their pull-side and push-side maneuvering clearances. These are <b>virtual volumes</b>: they
+take part in Check Overlaps, which lists what intrudes into them (and doors that would hit each
+other), but they are never exported as physical elements.</p>
+<table>
+  <tr><td><b>View › Accessibility Rules</b></td><td>Chooses the rule set: <i>None (door swings
+    only)</i> or <i>ADA 2010</i> (door maneuvering clearances, 404.2.4.1). Also in Model
+    Properties. <a class="run" href="reviera:action/clearance.set_rule_set">Accessibility
+    Rules</a></td></tr>
+  <tr><td><b>View › Virtual Volumes</b></td><td>Each click shows the active view's virtual
+    volumes in turn hidden, translucent or solid.
+    <a class="run" href="reviera:action/view.set_virtual_volumes">Virtual Volumes</a></td></tr>
+</table>
+<p>See the <a href="reviera:sample/storefront">Storefront</a> sample, which has the ADA 2010
+rules on. <code>clearance.set_rule_set</code>, <code>clearance.list</code>,
+<code>clearance.check</code>, <code>view.set_virtual_volumes</code></p>
+<p class="note">Clash tests between disciplines, automatic openings for pipes and ducts, and
+fixture clearances are not yet available.</p>

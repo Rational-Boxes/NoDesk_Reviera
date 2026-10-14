@@ -1,0 +1,85 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Copyright (C) 2026 Reviera contributors -->
+<h1>Getting started</h1>
+<p class="lead">Reviera works directly on IFC files: there is no separate project format. This
+page covers creating, opening, saving and closing models, and getting work back after a
+crash.</p>
+
+<h2 id="new">Starting a model</h2>
+<p><b>File › New</b> (<kbd>Ctrl</kbd>+<kbd>N</kbd>) creates a model from the built-in template.
+It has one level, <i>Level 1</i>, at elevation 0.
+<a class="run" href="reviera:action/file.new">New model</a></p>
+<p>To start drawing:</p>
+<ol>
+  <li>Open the Level 1 floor plan: double-click it under <b>Floor Plans</b> in the Project
+    Browser, or create it with <b>View › Floor Plan</b>.</li>
+  <li>Choose a tool on the <b>Architecture</b> tab, for example <b>Wall</b>
+    (<kbd>WA</kbd>). See <a href="reviera:help/walls">Walls</a>.</li>
+  <li>Add more levels with <b>Architecture › Level</b> (<kbd>LL</kbd>). See
+    <a href="reviera:help/levels-grids">Levels and grids</a>.</li>
+</ol>
+
+<h2 id="open">Opening a model</h2>
+<p><b>File › Open</b> (<kbd>Ctrl</kbd>+<kbd>O</kbd>) opens an IFC file (IFC2X3, IFC4 or
+IFC4X3_ADD2). Large files load in the background: a tab shows the progress while the file is
+read and its geometry is built. <a class="run" href="reviera:action/file.open">Open…</a></p>
+<ul>
+  <li>Elements Reviera does not model itself (furniture, equipment, imported stairs) are kept,
+    drawn and can be selected. Saving keeps them as they were.</li>
+  <li>A file that is already open in another Reviera session opens read-only.</li>
+  <li>From a terminal, <code>reviera gui model.ifc</code> starts the window with a file open.</li>
+</ul>
+
+<h2 id="several">Several models</h2>
+<p>Several models can be open at once. Each model's views are tabs in the centre of the window;
+the active tab decides which model the ribbon, the Project Browser and Properties work on.
+<b>File › Close Model</b> (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd>) closes the active
+model and all its views, and asks to save changes first.
+<b>Window › Close View</b> (<kbd>Ctrl</kbd>+<kbd>W</kbd>) closes just the active view.</p>
+
+<h2 id="save">Saving</h2>
+<table>
+  <tr><td><b>File › Save</b> <kbd>Ctrl</kbd>+<kbd>S</kbd></td><td>Saves the model to its IFC
+    file.</td></tr>
+  <tr><td><b>File › Save As</b> <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd></td><td>Saves the
+    model to a new IFC file.</td></tr>
+</table>
+<p>Reviera's own elements are written as ordinary IFC entities (<code>IfcWall</code>,
+<code>IfcSlab</code>, <code>IfcDoor</code>…), so other IFC tools read them. What Reviera needs to
+edit them again (sketches, recipes, views, settings) goes into <code>Reviera_*</code> property
+sets in the same file. Views, schedules and sheets are saved in the file too.</p>
+
+<h2 id="recovery">After a crash</h2>
+<p>Every change is also written, encrypted, to a local live store as you work. If Reviera ends
+unexpectedly, the unsaved work and its undo history can be recovered:</p>
+<ol>
+  <li>Open the same file again with <b>File › Open</b>.</li>
+  <li>Reviera says the file <i>has unsaved work from a session that ended unexpectedly</i> and
+    asks whether to restore it.</li>
+  <li><b>Yes</b> restores the work; <b>No</b> discards it and opens the file as saved.</li>
+</ol>
+<p>Running <code>reviera</code> with no arguments in a terminal lists the unsaved work that is
+waiting; the commands <code>recovery.list</code>, <code>recovery.restore</code>,
+<code>recovery.show_changes</code> and <code>recovery.discard</code> manage it from the
+<a href="reviera:help/scripting#shell">command shell</a>.</p>
+
+<h2 id="samples">Sample models</h2>
+<p>The <a href="reviera:help/index#samples">help's home page</a> opens the sample models. Each
+opens as a fresh copy, so the original stays as shipped. They are also good examples of what
+the tools do:</p>
+<table>
+  <tr><td><a href="reviera:sample/manor">Manor with tower</a></td><td>The demonstration model:
+    shaped windows, rooms, ceilings, a hipped roof with eaves and a dormer, stairs that open the
+    floors above them, a round tower with spiral stairs under an onion dome, a deck.</td></tr>
+  <tr><td><a href="reviera:sample/house">House with dormers</a></td><td>Eaves, dormers, L and U
+    stairs, a gated railing, a deck.</td></tr>
+  <tr><td><a href="reviera:sample/observatory">Observatory</a></td><td>Curved walls, a dome with
+    a slot cut by a boolean, a vaulted annex, a spline wall, a scripted turret.</td></tr>
+  <tr><td><a href="reviera:sample/storefront">Storefront doors</a></td><td>Revolving, sliding,
+    double and automatic doors under the ADA 2010 rules.</td></tr>
+  <tr><td><a href="reviera:sample/csg">Overlap resolutions</a></td><td>One overlap resolved each
+    way Reviera offers.</td></tr>
+</table>
+
+<h2 id="exit">Closing Reviera</h2>
+<p><b>File › Exit</b> closes every model and the window.</p>

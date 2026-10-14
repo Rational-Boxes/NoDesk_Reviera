@@ -313,6 +313,7 @@ fn roof_of(
         keys,
         predefined,
         trims: Vec::new(),
+        uncut: 0,
     }
 }
 

@@ -1,13 +1,20 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Reviera contributors
 
-//! Vertical openings (ARC-OPEN-002) and stair openings (ARC-STAIR-007).
+//! Vertical openings (ARC-OPEN-002), shafts (ARC-OPEN-004) and stair openings (ARC-STAIR-007).
 //!
-//! A vertical opening is an `IfcOpeningElement` with a `recipe.vertical_opening`: its host floor
-//! or ceiling (GlobalId) and its loops in plan. It cuts that host only, plumb through its whole
-//! thickness; a loop partly outside the host notches its edge. Reviera's own display cuts the
-//! host's body ([`cut_profiles`]); the IFC keeps the host's body whole and voids it with the
-//! opening, as for walls. It moves and is mirrored with its host and goes when the host goes.
+//! A vertical opening is an `IfcOpeningElement` with a `recipe.vertical_opening`: its host floor,
+//! ceiling or roof (GlobalId) and its loops in plan. It cuts that host only, plumb through its
+//! whole thickness; a loop partly outside a floor or ceiling notches its edge. Reviera's own
+//! display cuts the host's body ([`cut_profiles`]; a roof's face slabs, [`roof_holes`]); the IFC
+//! keeps a floor's body whole and voids it with the opening, as for walls. It moves and is
+//! mirrored with its host and goes when the host goes.
+//!
+//! A shaft is an `IfcBuildingElementProxy` (`PROVISIONFORVOID`) with a `recipe.shaft`: loops in
+//! plan and a vertical extent between levels. It cuts every floor, ceiling and roof whose body
+//! its extent reaches into, plumb, including ones added later; walls are not cut. In IFC its
+//! body is the whole prism, and each host it cuts gets its own `IfcOpeningElement` (the part of
+//! the prism through that host) voiding it, which records the shaft.
 //!
 //! A stair opening is a vertical opening made for a stair: where a floor or ceiling over the
 //! stair leaves less than the headroom of the building code in force (`codes`), measured from
@@ -28,6 +35,7 @@ use crate::store::Store;
 use crate::walls::RECIPE_KEY;
 
 pub const OPENING_RECIPE: &str = "recipe.vertical_opening";
+pub const SHAFT_RECIPE: &str = "recipe.shaft";
 
 /// The stored recipe of a vertical opening.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
@@ -44,6 +52,70 @@ pub struct OpeningRecipe {
     pub headroom: Option<f64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub clause: Option<String>,
+}
+
+/// The stored recipe of a shaft.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct ShaftRecipe {
+    pub kind: String,
+    /// Closed loops in plan (metres).
+    pub loops: Vec<Ring>,
+    #[serde(flatten)]
+    pub extent: crate::levels::Extent,
+}
+
+pub fn shaft_recipe(e: &Element) -> Option<ShaftRecipe> {
+    let v = e.param(RECIPE_KEY)?;
+    (v.get("kind")?.as_str()? == SHAFT_RECIPE).then(|| serde_json::from_value(v.clone()).ok())?
+}
+
+/// Every shaft that resolves, with its bottom and top elevations.
+pub fn shafts(store: &Store) -> Vec<(ElementId, ShaftRecipe, (f64, f64))> {
+    store
+        .iter()
+        .filter_map(|e| {
+            let r = shaft_recipe(e)?;
+            let z = r.extent.z(store).ok()?;
+            Some((e.id(), r, z))
+        })
+        .collect()
+}
+
+/// The shafts whose extent reaches into a body between elevations `lo` and `hi`.
+pub fn shafts_through(store: &Store, lo: f64, hi: f64) -> Vec<(ElementId, ShaftRecipe)> {
+    shafts(store)
+        .into_iter()
+        .filter(|(_, _, (z0, z1))| *z0 < hi - 1e-6 && *z1 > lo + 1e-6)
+        .map(|(id, r, _)| (id, r))
+        .collect()
+}
+
+/// The lowest and highest points of a roof's body.
+pub fn roof_span(g: &crate::roofs::RoofGeometry) -> (f64, f64) {
+    g.faces
+        .iter()
+        .flat_map(|f| f.slab.0.iter())
+        .fold((f64::INFINITY, f64::NEG_INFINITY), |(lo, hi), p| {
+            (lo.min(p[2]), hi.max(p[2]))
+        })
+}
+
+/// The plan holes a roof's own vertical openings and the shafts through it cut, for
+/// [`crate::roofs::cut_holes`].
+pub fn roof_holes(store: &Store, roof: &Element, g: &crate::roofs::RoofGeometry) -> Vec<Ring> {
+    let mut out: Vec<Ring> = of_host(store, roof.guid().as_str())
+        .into_iter()
+        .flat_map(|(_, r)| r.loops)
+        .collect();
+    let (lo, hi) = roof_span(g);
+    if lo <= hi {
+        out.extend(
+            shafts_through(store, lo, hi)
+                .into_iter()
+                .flat_map(|(_, r)| r.loops),
+        );
+    }
+    out
 }
 
 pub fn opening_recipe(e: &Element) -> Option<OpeningRecipe> {
@@ -74,12 +146,22 @@ fn to_shapes(profiles: &[Profile]) -> Vec<Shape> {
         .collect()
 }
 
-/// A floor's or ceiling's profiles less its vertical openings (for display and measuring).
+/// A floor's or ceiling's profiles less its vertical openings and the shafts through it (for
+/// display and measuring).
 pub fn cut_profiles(store: &Store, host: &Element, profiles: &[Profile]) -> Vec<Profile> {
-    let loops: Vec<Ring> = of_host(store, host.guid().as_str())
+    let mut loops: Vec<Ring> = of_host(store, host.guid().as_str())
         .into_iter()
         .flat_map(|(_, r)| r.loops)
         .collect();
+    if store.iter().any(|e| shaft_recipe(e).is_some())
+        && let Ok(f) = crate::floors::regenerate(store, host)
+    {
+        loops.extend(
+            shafts_through(store, f.top - f.thickness, f.top)
+                .into_iter()
+                .flat_map(|(_, r)| r.loops),
+        );
+    }
     if loops.is_empty() {
         return profiles.to_vec();
     }
@@ -119,19 +201,49 @@ fn check_loops(loops: &[Ring]) -> Result<Vec<Ring>> {
 fn host_of(store: &Store, r: &ElementRef) -> Result<ElementId> {
     let id = store
         .resolve(r)
-        .ok_or_else(|| Error::new("element.not_found", "no such floor or ceiling"))?;
-    if crate::floors::slab_recipe(store.get(id).expect("resolved")).is_none() {
+        .ok_or_else(|| Error::new("element.not_found", "no such floor, ceiling or roof"))?;
+    let e = store.get(id).expect("resolved");
+    if let Some(roof) = crate::roofs::roof_recipe(e) {
+        if roof.arch.is_some() || roof.dome.is_some() {
+            return Err(Error::new(
+                "opening.bad_host",
+                "openings in arched roofs and domes are not supported yet",
+            ));
+        }
+        return Ok(id);
+    }
+    if crate::floors::slab_recipe(e).is_none() {
         return Err(Error::new(
             "opening.bad_host",
-            format!("element {id} is not a Reviera floor or ceiling"),
+            format!("element {id} is not a Reviera floor, ceiling or roof"),
         ));
     }
     Ok(id)
 }
 
+/// A roof's faces seen from above, as profiles.
+fn roof_profiles(g: &crate::roofs::RoofGeometry) -> Vec<Profile> {
+    g.faces
+        .iter()
+        .map(|f| Profile {
+            outer: f.bottom.iter().map(|p| [p[0], p[1]]).collect(),
+            holes: Vec::new(),
+        })
+        .collect()
+}
+
+/// A floor's, ceiling's or roof's plan profiles.
+fn host_profiles(store: &Store, host: ElementId) -> Result<Vec<Profile>> {
+    let e = store.get(host).expect("exists");
+    if crate::roofs::roof_recipe(e).is_some() {
+        return Ok(roof_profiles(&crate::roofs::regenerate(store, e)?));
+    }
+    Ok(crate::floors::regenerate(store, e)?.profiles)
+}
+
 fn intersects_host(store: &Store, host: ElementId, loops: &[Ring]) -> Result<()> {
-    let g = crate::floors::regenerate(store, store.get(host).expect("exists"))?;
-    if overlap_area(&g.profiles, loops) < 1e-6 {
+    let profiles = host_profiles(store, host)?;
+    if overlap_area(&profiles, loops) < 1e-6 {
         return Err(Error::new(
             "opening.misses_host",
             "Opening does not intersect host",
@@ -145,17 +257,45 @@ fn intersects_host(store: &Store, host: ElementId, loops: &[Ring]) -> Result<()>
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct CreateParams {
-    /// A Reviera floor or ceiling.
+    /// A Reviera floor, ceiling or footprint roof.
     pub host_id: ElementRef,
     /// Closed loops in plan (metres), each a list of corners.
+    #[serde(default)]
     pub loops: Vec<Ring>,
+    /// Or sketch curves (lines, arcs through a point) forming closed loops, as floors take them.
+    #[serde(default)]
+    pub curves: Vec<crate::sketch::CurveArg>,
 }
 
-/// Cuts a floor or ceiling plumb by loops (`opening.create_vertical`).
+/// The loops of a command: given as corners, or as sketch curves (validated like a floor's
+/// sketch; each profile's outer loop and holes).
+fn loops_of(
+    store: &Store,
+    loops: &[Ring],
+    curves: &[crate::sketch::CurveArg],
+) -> Result<Vec<Ring>> {
+    if curves.is_empty() {
+        return check_loops(loops);
+    }
+    if !loops.is_empty() {
+        return Err(Error::new(
+            "opening.loops_and_curves",
+            "give either loops or curves, not both",
+        ));
+    }
+    let sketch = crate::sketch::from_args(store, curves)?;
+    let rings: Vec<Ring> = crate::sketch::profiles(store, &sketch)
+        .into_iter()
+        .flat_map(|p| std::iter::once(p.outer).chain(p.holes))
+        .collect();
+    check_loops(&rings)
+}
+
+/// Cuts a floor, ceiling or roof plumb by loops (`opening.create_vertical`).
 pub(crate) fn create(txn: &mut crate::txn::Transaction<'_>, p: CreateParams) -> Result<ElementId> {
     let store = txn.store().clone();
     let host = host_of(&store, &p.host_id)?;
-    let loops = check_loops(&p.loops)?;
+    let loops = loops_of(&store, &p.loops, &p.curves)?;
     intersects_host(&store, host, &loops)?;
     let recipe = OpeningRecipe {
         kind: OPENING_RECIPE.into(),
@@ -230,6 +370,164 @@ pub(crate) fn follow_host(
         })?;
     }
     Ok(())
+}
+
+// ---- Shafts (ARC-OPEN-004) ----
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct CreateShaftParams {
+    /// Closed loops in plan (metres), each a list of corners.
+    #[serde(default)]
+    pub loops: Vec<Ring>,
+    /// Or sketch curves forming closed loops.
+    #[serde(default)]
+    pub curves: Vec<crate::sketch::CurveArg>,
+    pub base_level: ElementRef,
+    #[serde(default)]
+    #[schemars(extend("x-reviera-data-type" = "length"))]
+    pub base_offset: f64,
+    /// A level, or a height above the base.
+    pub top_constraint: crate::walls::TopConstraint,
+    #[serde(default)]
+    #[schemars(extend("x-reviera-data-type" = "length"))]
+    pub top_offset: f64,
+}
+
+/// Makes a shaft (`opening.create_shaft`).
+pub(crate) fn create_shaft(
+    txn: &mut crate::txn::Transaction<'_>,
+    p: CreateShaftParams,
+) -> Result<ElementId> {
+    let store = txn.store().clone();
+    let loops = loops_of(&store, &p.loops, &p.curves)?;
+    let extent = crate::levels::Extent::from_args(
+        &store,
+        &p.base_level,
+        p.base_offset,
+        p.top_constraint,
+        p.top_offset,
+    )?;
+    let recipe = ShaftRecipe {
+        kind: SHAFT_RECIPE.into(),
+        loops,
+        extent,
+    };
+    txn.create(
+        NewElement::new("IfcBuildingElementProxy")
+            .name("Shaft Opening")
+            .param("@PredefinedType", "PROVISIONFORVOID")
+            .param(
+                RECIPE_KEY,
+                serde_json::to_value(&recipe).expect("serialises"),
+            ),
+    )
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct EditShaftParams {
+    pub shaft_id: ElementRef,
+    /// New loops (corners), kept when omitted.
+    pub loops: Option<Vec<Ring>>,
+    pub base_level: Option<ElementRef>,
+    #[schemars(extend("x-reviera-data-type" = "length"))]
+    pub base_offset: Option<f64>,
+    pub top_constraint: Option<crate::walls::TopConstraint>,
+    #[schemars(extend("x-reviera-data-type" = "length"))]
+    pub top_offset: Option<f64>,
+}
+
+/// Changes a shaft's loops or extent (`opening.edit_shaft`); omitted values are kept.
+pub(crate) fn edit_shaft(txn: &mut crate::txn::Transaction<'_>, p: EditShaftParams) -> Result<()> {
+    let store = txn.store().clone();
+    let id = store
+        .resolve(&p.shaft_id)
+        .ok_or_else(|| Error::new("element.not_found", "no such shaft"))?;
+    let mut r = shaft_recipe(store.get(id).expect("resolved"))
+        .ok_or_else(|| Error::new("opening.not_shaft", format!("element {id} is not a shaft")))?;
+    crate::modify::check_unpinned(&store, id)?;
+    if let Some(l) = &p.loops {
+        r.loops = check_loops(l)?;
+    }
+    let base = match &p.base_level {
+        Some(b) => b.clone(),
+        None => ElementRef::Id(
+            find(&store, &r.extent.base_level)
+                .ok_or_else(|| Error::new("level.missing", "the shaft's base level is gone"))?,
+        ),
+    };
+    let top = match p.top_constraint {
+        Some(t) => t,
+        None => match r.extent.top_level().and_then(|g| find(&store, g)) {
+            Some(l) => crate::walls::TopConstraint::Level(crate::walls::ElementRefValue::Id(l)),
+            None => crate::walls::TopConstraint::Unconnected(
+                r.extent.top["unconnected"].as_f64().unwrap_or(3.0),
+            ),
+        },
+    };
+    r.extent = crate::levels::Extent::from_args(
+        &store,
+        &base,
+        p.base_offset.unwrap_or(r.extent.base_offset),
+        top,
+        p.top_offset.unwrap_or(r.extent.top_offset),
+    )?;
+    let value = serde_json::to_value(&r).expect("serialises");
+    txn.modify(id, |e| {
+        e.params.insert(RECIPE_KEY.into(), value);
+    })
+}
+
+/// Moves (or mirrors) a shaft's loops by `x` (`element.move` and the other modify tools).
+pub(crate) fn transform_shaft(
+    txn: &mut crate::txn::Transaction<'_>,
+    id: ElementId,
+    x: &dyn Fn([f64; 2]) -> [f64; 2],
+    dz: f64,
+) -> Result<()> {
+    let store = txn.store().clone();
+    let mut r = shaft_recipe(store.get(id).expect("exists")).expect("a shaft");
+    for l in &mut r.loops {
+        for p in l.iter_mut() {
+            *p = x(*p);
+        }
+    }
+    r.extent.base_offset += dz;
+    if r.extent.top_level().is_some() {
+        r.extent.top_offset += dz;
+    }
+    let value = serde_json::to_value(&r).expect("serialises");
+    txn.modify(id, |e| {
+        e.params.insert(RECIPE_KEY.into(), value);
+    })
+}
+
+/// The hosts a shaft cuts now: every floor, ceiling (not decks) and roof its extent reaches
+/// into whose plan it overlaps, with the elevations of the host's body there.
+pub fn shaft_hosts(store: &Store, shaft: &ShaftRecipe) -> Vec<(ElementId, f64, f64)> {
+    let Ok((z0, z1)) = shaft.extent.z(store) else {
+        return Vec::new();
+    };
+    let reaches = |lo: f64, hi: f64| z0 < hi - 1e-6 && z1 > lo + 1e-6;
+    let mut out = Vec::new();
+    for (id, f) in crate::floors::all(store) {
+        let e = store.get(id).expect("listed");
+        if crate::decks::deck_settings(e).is_some() {
+            continue;
+        }
+        let (lo, hi) = (f.top - f.thickness, f.top);
+        if reaches(lo, hi) && overlap_area(&f.profiles, &shaft.loops) > 1e-6 {
+            out.push((id, lo, hi));
+        }
+    }
+    for (id, g) in crate::roofs::all(store) {
+        let (lo, hi) = roof_span(&g);
+        if lo <= hi && reaches(lo, hi) && overlap_area(&roof_profiles(&g), &shaft.loops) > 1e-6 {
+            out.push((id, lo, hi));
+        }
+    }
+    out
 }
 
 // ---- Stair openings (ARC-STAIR-007) ----

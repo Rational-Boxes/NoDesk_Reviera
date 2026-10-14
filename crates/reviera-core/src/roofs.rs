@@ -190,6 +190,8 @@ pub struct RoofGeometry {
     pub predefined: &'static str,
     /// Fascias and soffits along the eaves.
     pub trims: Vec<eaves::RoofTrim>,
+    /// Openings that could not be cut (across faces, or in a clipped face).
+    pub uncut: usize,
 }
 
 impl RoofGeometry {
@@ -492,10 +494,11 @@ pub fn regenerate(store: &Store, e: &Element) -> Result<RoofGeometry> {
         &loops, &ring, &keys, &edges, r.slope, plate, cutoff, thickness,
     )?;
     g.trims = eaves::trims(&g, &loops, &ring, &keys, &edges, &lines, r.slope);
-    // Openings through the roof: under its dormers (ARC-OPEN-005).
-    for hole in crate::dormers::openings(store, e.guid().as_str()) {
-        cut_hole(&mut g, &hole);
-    }
+    // Openings through the roof: under its dormers (ARC-OPEN-005), its vertical openings
+    // (ARC-OPEN-002) and the shafts through it (ARC-OPEN-004).
+    let mut holes = crate::dormers::openings(store, e.guid().as_str());
+    holes.extend(crate::slab_openings::roof_holes(store, e, &g));
+    g.uncut = cut_holes(&mut g, &holes).len();
     // A dormer's roof joins the main roof flush: cut along the main roof's top surface
     // (ARC-ROOF-007), its top meeting the main roof's in valleys.
     if let Some((n, d)) = crate::dormers::main_top_plane(store, e) {
@@ -510,46 +513,103 @@ pub fn regenerate(store: &Store, e: &Element) -> Result<RoofGeometry> {
     Ok(g)
 }
 
-/// Cuts a plumb opening (a plan polygon) through the face it lies in: the face's slab is
-/// rebuilt with the hole, its sides plumb. A hole across faces, or in a clipped face, is left.
-pub fn cut_hole(g: &mut RoofGeometry, hole: &[[f64; 2]]) {
-    if hole.len() < 3 {
-        return;
-    }
+/// Cuts plumb openings (plan polygons) through the faces they lie in: each face's slab is
+/// rebuilt with its holes, their sides plumb. Returns the holes left uncut: those across faces,
+/// or in a face that is clipped or already has courtyards.
+pub fn cut_holes(g: &mut RoofGeometry, holes: &[Vec<[f64; 2]>]) -> Vec<usize> {
     let ring2 = |r: &[[f64; 3]]| r.iter().map(|q| [q[0], q[1]]).collect::<Vec<_>>();
-    let Some(face) = g.faces.iter_mut().find(|f| {
-        let ring = ring2(&f.bottom);
-        hole.iter().all(|p| inside(*p, &ring))
-    }) else {
-        return;
-    };
-    let n = face.bottom.len();
-    if face.faceted || !face.holes.is_empty() || face.slab.0.len() != 2 * n {
-        return;
+    let mut by_face: Vec<Vec<usize>> = vec![Vec::new(); g.faces.len()];
+    let mut left = Vec::new();
+    for (k, hole) in holes.iter().enumerate() {
+        if hole.len() < 3 {
+            continue;
+        }
+        let face = g.faces.iter().position(|f| {
+            let ring = ring2(&f.bottom);
+            hole.iter().all(|p| inside(*p, &ring))
+        });
+        match face {
+            Some(i) => by_face[i].push(k),
+            None => left.push(k),
+        }
     }
+    for (i, ks) in by_face.into_iter().enumerate() {
+        if ks.is_empty() {
+            continue;
+        }
+        let face = &mut g.faces[i];
+        let n = face.bottom.len();
+        if face.faceted || !face.holes.is_empty() || face.slab.0.len() != 2 * n {
+            left.extend(ks);
+            continue;
+        }
+        // Holes inside another hole of the face, or crossing one, are left.
+        let mut mine: Vec<&Vec<[f64; 2]>> = Vec::new();
+        for k in ks {
+            let h = &holes[k];
+            let clash = mine.iter().any(|o| {
+                crate::polygons::intersection(
+                    &[crate::polygons::Shape {
+                        outer: (*o).clone(),
+                        holes: Vec::new(),
+                    }],
+                    &[crate::polygons::Shape {
+                        outer: h.clone(),
+                        holes: Vec::new(),
+                    }],
+                )
+                .iter()
+                .map(crate::polygons::Shape::area)
+                .sum::<f64>()
+                    > 1e-9
+            });
+            if clash {
+                left.push(k);
+            } else {
+                mine.push(h);
+            }
+        }
+        cut_face(face, &mine);
+    }
+    left.sort_unstable();
+    left
+}
+
+/// Rebuilds a prism face's slab with plumb holes through it.
+fn cut_face(face: &mut RoofFace, holes: &[&Vec<[f64; 2]>]) {
+    let ring2 = |r: &[[f64; 3]]| r.iter().map(|q| [q[0], q[1]]).collect::<Vec<_>>();
+    let n = face.bottom.len();
     let normal = face.normal;
     let on = |p: [f64; 2], q: [f64; 3]| {
         q[2] - (normal[0] * (p[0] - q[0]) + normal[1] * (p[1] - q[1])) / normal[2]
     };
     let (b0, t0) = (face.bottom[0], face.slab.0[n]);
-    let hb: Vec<[f64; 3]> = hole.iter().map(|p| [p[0], p[1], on(*p, b0)]).collect();
-    let ht: Vec<[f64; 3]> = hole.iter().map(|p| [p[0], p[1], on(*p, t0)]).collect();
-    let m = hole.len();
     let bottom = face.slab.0[..n].to_vec();
     let top = face.slab.0[n..].to_vec();
-    // Points: bottom ring, hole bottom, top ring, hole top.
+    // Points: bottom ring, the holes' bottoms, top ring, the holes' tops.
     let mut positions = bottom.clone();
-    positions.extend(&hb);
+    let mut starts: Vec<u32> = Vec::new();
+    let mut flat_holes: Vec<[f64; 2]> = Vec::new();
+    let mut hole_bottoms = Vec::new();
+    for h in holes {
+        starts.push((n + flat_holes.len()) as u32);
+        flat_holes.extend(h.iter().copied());
+        let hb: Vec<[f64; 3]> = h.iter().map(|p| [p[0], p[1], on(*p, b0)]).collect();
+        positions.extend(&hb);
+        hole_bottoms.push(hb);
+    }
+    let top_at = positions.len() as u32;
     positions.extend(&top);
-    positions.extend(&ht);
-    let (nb, nh) = (n as u32, m as u32);
-    let top_at = nb + nh;
+    for h in holes {
+        positions.extend(h.iter().map(|p| [p[0], p[1], on(*p, t0)]));
+    }
+    let nb = n as u32;
     let mut indices: Vec<u32> = Vec::new();
     let cap = |ring: &[[f64; 3]], first: u32, up: bool, indices: &mut Vec<u32>| {
         let mut flat = ring2(ring);
-        flat.extend(hole.iter().copied());
+        flat.extend(flat_holes.iter().copied());
         let mut tris: Vec<u32> = Vec::new();
-        earcut::Earcut::new().earcut(flat.iter().copied(), &[n as u32], &mut tris);
+        earcut::Earcut::new().earcut(flat.iter().copied(), &starts, &mut tris);
         for t in tris.chunks(3) {
             let (a, b, c) = (t[0] as usize, t[1] as usize, t[2] as usize);
             let ccw = cross2(
@@ -571,28 +631,34 @@ pub fn cut_hole(g: &mut RoofGeometry, hole: &[[f64; 2]]) {
         let j = (i + 1) % nb;
         indices.extend([i, j, top_at + j, i, top_at + j, top_at + i]);
     }
-    // The hole's sides, facing into the hole.
-    let centre = [
-        hole.iter().map(|p| p[0]).sum::<f64>() / m as f64,
-        hole.iter().map(|p| p[1]).sum::<f64>() / m as f64,
-    ];
-    for i in 0..nh {
-        let j = (i + 1) % nh;
-        let (a, b) = (hole[i as usize], hole[j as usize]);
-        let d = [b[0] - a[0], b[1] - a[1]];
-        // The outward normal of a counter-clockwise quad (a, b, b top, a top) is d × up = right.
-        let right = [d[1], -d[0]];
-        let mid = [(a[0] + b[0]) / 2.0, (a[1] + b[1]) / 2.0];
-        let toward = right[0] * (centre[0] - mid[0]) + right[1] * (centre[1] - mid[1]) > 0.0;
-        let (ba, bb, ta, tb) = (nb + i, nb + j, top_at + nb + i, top_at + nb + j);
-        if toward {
-            indices.extend([ba, bb, tb, ba, tb, ta]);
-        } else {
-            indices.extend([ba, tb, bb, ba, ta, tb]);
+    // Each hole's sides, facing into the hole.
+    let mut first = nb;
+    for h in holes {
+        let m = h.len();
+        let centre = [
+            h.iter().map(|p| p[0]).sum::<f64>() / m as f64,
+            h.iter().map(|p| p[1]).sum::<f64>() / m as f64,
+        ];
+        let nh = m as u32;
+        for i in 0..nh {
+            let j = (i + 1) % nh;
+            let (a, b) = (h[i as usize], h[j as usize]);
+            let d = [b[0] - a[0], b[1] - a[1]];
+            // The outward normal of a counter-clockwise quad (a, b, b top, a top) is d × up.
+            let right = [d[1], -d[0]];
+            let mid = [(a[0] + b[0]) / 2.0, (a[1] + b[1]) / 2.0];
+            let toward = right[0] * (centre[0] - mid[0]) + right[1] * (centre[1] - mid[1]) > 0.0;
+            let (ba, bb, ta, tb) = (first + i, first + j, top_at + first + i, top_at + first + j);
+            if toward {
+                indices.extend([ba, bb, tb, ba, tb, ta]);
+            } else {
+                indices.extend([ba, tb, bb, ba, ta, tb]);
+            }
         }
+        first += nh;
     }
     face.slab = (positions, indices);
-    face.holes.push(hb);
+    face.holes.extend(hole_bottoms);
     face.faceted = true;
 }
 
@@ -762,6 +828,7 @@ pub fn generate_loops(
             keys: keys[..outer_len].to_vec(),
             predefined: "FLAT_ROOF",
             trims: Vec::new(),
+            uncut: 0,
         });
     }
     // Speeds: horizontal metres per metre of rise. A very shallow edge moves very fast.
@@ -993,6 +1060,7 @@ pub fn generate_loops(
         keys: keys[..outer_len].to_vec(),
         predefined,
         trims: Vec::new(),
+        uncut: 0,
     })
 }
 

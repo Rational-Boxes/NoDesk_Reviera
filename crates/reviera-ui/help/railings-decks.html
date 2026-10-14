@@ -1,0 +1,82 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Copyright (C) 2026 Reviera contributors -->
+<h1>Railings and decks</h1>
+<p class="lead">Railings are sketched along a path, put along the open edges of floors, decks and
+flat roofs, or follow stairs. Gates and openings are added where you click. Decks lay out their
+boards and framing one by one, with a cut list.</p>
+<nav class="toc">
+  <a href="#sketch">Sketching a railing</a>
+  <a href="#edges">Guarding edges</a>
+  <a href="#stair">Stair railings</a>
+  <a href="#gates">Openings and gates</a>
+  <a href="#deck">Decks</a>
+  <a href="#cutlist">Cut list</a>
+</nav>
+
+<h2 id="sketch">To sketch a railing</h2>
+<ol>
+  <li>Open a plan. <b>Architecture › Circulation › Railing</b>.
+    <a class="run" href="reviera:action/railing.create">Railing</a></li>
+  <li>Click the path's points.</li>
+  <li>Click the first point again to close the path, or press <kbd>Esc</kbd> to finish an open
+    path.</li>
+</ol>
+<p>A railing sketched over a deck, floor or flat roof stands on its top. Each railing has a top
+and a bottom rail, posts at its ends and corners, and balusters spaced by its type.
+<code>railing.create</code></p>
+
+<h2 id="edges">Guarding edges</h2>
+<p>Select floors, decks or flat roofs, then <b>Modify | Floors › Guard Edges</b> (or <b>Modify |
+Roofs › Guard Edges</b>): railings go along every open edge, leaving out edges with a wall along
+them. They follow the host's outline when it changes.
+<a class="run" href="reviera:action/railing.create_on_edges">Guard Edges</a>
+<code>railing.create_on_edges</code></p>
+
+<h2 id="stair">Stair railings</h2>
+<p>A new stair gets railings on both sides. They follow the nosing line, run flat across
+landings and round the outside of a turn, and extend when the stair does. To add them to a
+selected stair: <b>Modify | Stairs › Railings</b>. <code>railing.create_on_stair</code></p>
+
+<h2 id="gates">Openings and gates</h2>
+<ol>
+  <li>Select the railing.</li>
+  <li><b>Modify | Railings › Opening</b>, <b>Gate</b> or <b>Double Gate</b>.</li>
+  <li>Click on the railing where each goes, in a plan or on the railing in 3D. <kbd>Esc</kbd>
+    ends.</li>
+</ol>
+<p>An opening gets a post on each side. A gate fills its opening with one leaf, a double gate
+with two, swinging in or out. A gate is its own door element (<code>IfcDoor</code>, GATE);
+deleting it leaves its opening. The <a href="reviera:sample/house">House</a> sample's front
+railing has a gate, a double gate and an opening. <code>railing.add_opening</code>,
+<code>railing.add_gate</code>, <code>railing.move_feature</code>,
+<code>railing.remove_feature</code>, <code>railing.features</code></p>
+
+<h2 id="deck">Decks</h2>
+<ol>
+  <li>Open a plan. <b>Architecture › Circulation › Deck</b>.
+    <a class="run" href="reviera:action/deck.create">Deck</a></li>
+  <li>Sketch the outline (<b>Create Deck Outline</b>: Line, Rectangle, Arc, Circle or Pick
+    Walls) and finish. See <a href="reviera:help/sketch">Sketch mode</a>.</li>
+</ol>
+<p>The deck's boards are laid out one by one: courses across from the start edge (the last one
+ripped, or the courses balanced), every end joint on a joist and staggered, picture-frame borders
+mitred at the corners, and each piece cut from the shortest stock length that fits, with offcuts
+reused. The framing is laid out too: joists, beams, posts and footings.</p>
+<p>Select the deck to change, in Properties:</p>
+<table>
+  <tr><td><b>Boards</b></td><td><b>Board Width</b>, <b>Board Thickness</b>, <b>Gap</b>,
+    <b>Direction</b>, <b>Stock Lengths</b>, <b>Picture Frame Rows</b>, <b>Joint Stagger</b>,
+    <b>Balance Courses</b>.</td></tr>
+  <tr><td><b>Framing</b></td><td><b>Joist Spacing</b>, <b>Beam Spacing</b>, <b>Post
+    Spacing</b>.</td></tr>
+</table>
+<p>A deck is a floor, so its outline grips, <b>Edit Boundary</b> and <b>Guard Edges</b> work on
+it. <code>deck.create</code>, <code>deck.set_boards</code>, <code>deck.set_framing</code>,
+<code>deck.boards</code></p>
+
+<h2 id="cutlist">Cut list</h2>
+<p>The selected deck's Properties end with its <b>Cut List</b>: the boards, the stock lengths to
+buy, the framing (joists, beams, posts and footings) and the screws. <code>deck.cut_list</code>
+returns it to scripts.</p>
+<p class="note">Not yet available: continuous handrails, baluster families, deck ledgers, span
+tables, breaker boards and per-board overrides.</p>

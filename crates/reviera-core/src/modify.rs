@@ -178,6 +178,9 @@ pub(crate) fn transform(
                         .along;
                     inserts::copy_to(txn, i, &guid, along, x.reflects())?;
                 }
+                for o in crate::wall_openings::of_host(&store, e.guid().as_str()) {
+                    crate::wall_openings::copy_to(txn, o, &guid, [0.0; 3])?;
+                }
                 out.push(new);
             } else {
                 set_recipe(txn, id, &r)?;
@@ -233,6 +236,32 @@ pub(crate) fn transform(
                 inserts::move_by(txn, id, v)?;
                 out.push(id);
             }
+        } else if let Some(r) = crate::wall_openings::wall_opening_recipe(e) {
+            // With its wall in the selection, the wall carries (or copies) it.
+            let host = crate::id::GlobalId::parse(&r.host).and_then(|g| store.find_by_guid(&g));
+            if host.is_some_and(|h| selected.contains(&h)) {
+                continue;
+            }
+            let Xform::Translate(v) = x else {
+                return Err(Error::new(
+                    "opening.cannot_rotate",
+                    "wall openings only slide along their wall; select the wall too",
+                ));
+            };
+            if copy {
+                out.push(crate::wall_openings::copy_to(txn, id, &r.host, v)?);
+            } else {
+                crate::wall_openings::move_by(txn, id, v)?;
+                out.push(id);
+            }
+        } else if crate::slab_openings::shaft_recipe(e).is_some() {
+            let target = if copy { txn.create(copied(e))? } else { id };
+            let dz = match x {
+                Xform::Translate(v) => v[2],
+                _ => 0.0,
+            };
+            crate::slab_openings::transform_shaft(txn, target, &|p| x.point(p), dz)?;
+            out.push(target);
         } else if crate::rooms::room_recipe(e).is_some() {
             let target = if copy {
                 let mut n = copied(e);

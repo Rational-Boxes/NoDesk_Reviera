@@ -1,0 +1,53 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Copyright (C) 2026 Reviera contributors -->
+<h1>Types and parameters</h1>
+<p class="lead">Most elements have a type that holds the values they share, such as a wall's
+width or a door's size. Each element also has its own parameters. Both are edited in the
+Properties palette and saved as ordinary IFC types and property sets.</p>
+
+<h2 id="types">Types</h2>
+<p>Walls, doors, windows, floors, ceilings, roofs, stairs, railings and grids have types. In
+Properties, the <b>Type</b> row of a selected wall, door, window, floor, roof or grid shows its
+type:</p>
+<ul>
+  <li><b>Choose another type</b> from the list to change the selected elements' type.</li>
+  <li><b>Duplicate Type…</b> (the last entry in the list) copies the current type under a new
+    name and gives it to the selection. Change the new type's values afterwards.</li>
+  <li><b>Type Name</b> renames the type.</li>
+  <li>The rows under <b>Type Parameters (<i>n</i> walls)</b> are the type's values. Changing one
+    changes every element of that type: the heading says how many there are.</li>
+</ul>
+<p><b>With a tool running and nothing selected</b>, the Type row chooses the type the tool
+places: start the Wall, Door, Window or Grid tool, then pick the type in Properties before
+clicking in the view.</p>
+
+<h3 id="duplicate">To make a new door type</h3>
+<ol>
+  <li>Place a door (the first door makes the default type) and select it.</li>
+  <li>In Properties › Type, choose <b>Duplicate Type…</b> and type a name, for example
+    <i>Arched Door 1000 x 2400</i>.</li>
+  <li>Under Type Parameters, set Width 1000, Height 2400 and Shape <i>Round Top</i>.</li>
+</ol>
+<p>The <a href="reviera:sample/manor">Manor</a> and <a href="reviera:sample/storefront">Storefront</a>
+samples are built from types made this way. <code>type.list</code>,
+<code>type.duplicate</code>, <code>type.rename</code>, <code>type.set_param</code>,
+<code>element.set_type</code></p>
+
+<h2 id="parameters">Instance and type parameters</h2>
+<p>Properties list every parameter of the selection, grouped (Identity Data, Constraints,
+Dimensions and so on). Type parameters are marked as such; editing one changes the type. An
+instance parameter belongs to the selected element alone. When several elements are selected,
+an edit applies to all of them.</p>
+<p>Some values are computed and read-only, such as a floor's area and volume or a stair's actual
+riser height; they are shown greyed.</p>
+<p>Parameters are written to IFC property sets, so other IFC tools see them.
+<code>param.list</code>, <code>param.get</code>, <code>param.set</code>,
+<code>param.set_many</code>, <code>param.clear</code>, <code>param.definition</code></p>
+
+<h2 id="project">Project parameters and property sets</h2>
+<p>Project parameters (your own parameters, bound to categories as type or instance
+parameters) and direct property set edits are available as commands today; there is no dialog
+for them yet. Run them from the <a href="reviera:help/scripting#shell">command shell</a> or a
+script: <code>param.project.add</code>, <code>param.project.modify</code>,
+<code>param.project.remove</code>, <code>param.set_ifc_home</code>, <code>pset.set</code>,
+<code>pset.remove</code>. Once added, a project parameter shows in Properties like any other.</p>

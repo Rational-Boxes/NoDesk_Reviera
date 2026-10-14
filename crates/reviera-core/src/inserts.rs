@@ -72,7 +72,7 @@ impl Kind {
         }
     }
 
-    fn noun(self) -> &'static str {
+    pub fn noun(self) -> &'static str {
         match self {
             Kind::Door => "door",
             Kind::Window => "window",
@@ -1163,6 +1163,12 @@ pub fn cuts_by_host(store: &Store) -> std::collections::BTreeMap<ElementId, Vec<
     for p in placed(store) {
         out.entry(p.host).or_default().push(p.cut());
     }
+    // Plain openings (ARC-WALL-012).
+    for (host, cuts) in crate::wall_openings::cuts_by_host(store) {
+        out.entry(host)
+            .or_default()
+            .extend(cuts.into_iter().map(|(_, c)| c));
+    }
     out
 }
 
@@ -1213,6 +1219,15 @@ pub(crate) fn check_fit(store: &Store, p: &Placed) -> Result<()> {
                     other.kind.noun(),
                     other.id
                 ),
+            ));
+        }
+    }
+    let cuts = crate::wall_openings::cuts_by_host(store);
+    for (other, o) in cuts.get(&p.host).into_iter().flatten() {
+        if crate::wall_openings::overlap(&c, x, o, o.x) {
+            return Err(Error::new(
+                "insert.overlaps",
+                format!("the {} overlaps opening {other}", p.kind.noun()),
             ));
         }
     }

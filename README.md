@@ -517,6 +517,10 @@ cargo build
 cargo test --workspace
 ```
 
+**Packages.** `packaging/` builds the release packages: a Flatpak (built and tested on Fedora
+43), a macOS `.app` in a `.dmg`, and a Windows installer with a portable ZIP (both scripts are
+written but not yet run on a Mac or a Windows PC). See [packaging/README.md](packaging/README.md).
+
 ## Trying it
 
 ```sh

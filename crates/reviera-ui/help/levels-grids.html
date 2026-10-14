@@ -1,0 +1,60 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Copyright (C) 2026 Reviera contributors -->
+<h1>Levels and grids</h1>
+<p class="lead">Levels are the storeys of the building: walls, floors and rooms sit on them and
+stairs climb between them. Grids are the lines that set out the structure.</p>
+
+<h2 id="levels">Levels</h2>
+<h3 id="add-level">To add a level</h3>
+<ol>
+  <li><b>Architecture › Datum › Level</b> (<kbd>LL</kbd>).
+    <a class="run" href="reviera:action/level.create">Level</a></li>
+  <li>Type the new level's elevation. The suggestion is one storey above the top level; any
+    unit can be typed (<code>3000</code>, <code>3 m</code>, <code>10'</code>).</li>
+  <li>OK. The level is named after the one below (<i>Level 2</i> after <i>Level 1</i>) and gets
+    its floor plan.</li>
+</ol>
+<h3 id="edit-level">Changing a level</h3>
+<ul>
+  <li>Select a level in the <b>Levels</b> group of the Project Browser: Properties show its
+    <b>Name</b> and <b>Elevation</b> to edit.</li>
+  <li>Right-click it in the Project Browser for <b>Rename…</b>, <b>Change Elevation…</b> and
+    <b>Delete</b>.</li>
+  <li>Moving a level moves the walls on it, and stretches the walls that rise to it. Stairs keep
+    reaching the level above.</li>
+  <li>Deleting a level first lists what would be deleted with it (its views, the elements on
+    it).</li>
+</ul>
+<p>Levels are saved as <code>IfcBuildingStorey</code>. <code>level.create</code>,
+<code>level.set_elevation</code>, <code>level.rename</code>, <code>level.list</code></p>
+
+<h2 id="grids">Grids</h2>
+<h3 id="draw-grid">To draw grid lines</h3>
+<ol>
+  <li>Open a plan. <b>Architecture › Datum › Grid</b> (<kbd>GR</kbd>).
+    <a class="run" href="reviera:action/grid.create">Grid</a></li>
+  <li>Optionally choose the grid type in Properties before clicking.</li>
+  <li>Click the start and the end of the line. Points snap to the ends and midpoints of grids
+    and walls, to cut edges, and to 15° directions from the start. The preview shows the bubble
+    and the name the line will get.</li>
+  <li>Draw more lines. <kbd>Esc</kbd> drops a start point; again, it ends the tool.</li>
+</ol>
+<p>Names continue the series: <i>1, 2, 3…</i> or <i>A, B, C…</i>. Rename a grid with its
+<b>Name</b> in Properties.</p>
+<h3 id="grid-edit">Grids in the model</h3>
+<ul>
+  <li>Grids show in every plan, and in sections and elevations, with their bubbles, and in
+    PDF.</li>
+  <li>A selected grid shows a grip at each end to drag; the
+    <a href="reviera:help/selecting#tools">Modify tools</a> (Move, Copy, Offset)
+    work on grids.</li>
+  <li><a href="reviera:help/documentation#dimensions">Dimensions</a> to grids follow them when
+    they move.</li>
+  <li>Grid types set the <b>Symbol</b> (<i>Bubble</i> or <i>None</i>), <b>Bubble at Start</b>
+    and <b>Bubble at End</b>, the <b>Center Segment</b> (<i>Continuous</i>, <i>None</i> or
+    <i>Custom</i>, with the <b>End Segments Length</b> on paper), and the pens and patterns.</li>
+</ul>
+<p>All grid lines are saved as one <code>IfcGrid</code>, with an <code>IfcGridAxis</code> per
+line; axes changed in another IFC tool are taken over when the file is opened.
+<code>grid.create</code>, <code>grid.rename</code>, <code>grid.set_curve</code>,
+<code>grid.list</code></p>
