@@ -1183,33 +1183,32 @@ impl LocalProject {
             ) else {
                 continue;
             };
-            // The frame: a wall's own, else the world's.
-            let (frame, local): (geometry::BrepFrame, Box<dyn Fn(&[f64; 3]) -> [f64; 3]>) =
-                match walls::wall_recipe(e).and_then(|_| walls::regenerate(store, e).ok()) {
-                    Some(g) => {
-                        let (u, n, s0, z0) = (g.direction(), g.normal(), g.start, g.base_z);
-                        (
-                            geometry::BrepFrame {
-                                origin: [s0[0], s0[1], z0],
-                                x_dir: u,
-                            },
-                            Box::new(move |p: &[f64; 3]| {
-                                let d = [p[0] - s0[0], p[1] - s0[1]];
-                                [
-                                    d[0] * u[0] + d[1] * u[1],
-                                    d[0] * n[0] + d[1] * n[1],
-                                    p[2] - z0,
-                                ]
-                            }),
-                        )
-                    }
-                    None => (geometry::BrepFrame::WORLD, Box::new(|p: &[f64; 3]| *p)),
-                };
+            // The frame: a wall's own (origin, x along it, y across it), else the world's.
+            let wall = walls::wall_recipe(e).and_then(|_| walls::regenerate(store, e).ok());
+            let (frame, axes) = match wall {
+                Some(g) => (
+                    geometry::BrepFrame {
+                        origin: [g.start[0], g.start[1], g.base_z],
+                        x_dir: g.direction(),
+                    },
+                    ([g.start[0], g.start[1], g.base_z], g.direction(), g.normal()),
+                ),
+                None => (geometry::BrepFrame::WORLD, ([0.0; 3], [1.0, 0.0], [0.0, 1.0])),
+            };
+            let local = |p: &[f64; 3]| {
+                let (o, u, n) = axes;
+                let d = [p[0] - o[0], p[1] - o[1]];
+                [
+                    d[0] * u[0] + d[1] * u[1],
+                    d[0] * n[0] + d[1] * n[1],
+                    p[2] - o[2],
+                ]
+            };
             let solids: Vec<geometry::Polyhedron> = body
                 .parts
                 .iter()
                 .map(|p| geometry::Polyhedron {
-                    points: p.mesh.0.iter().map(|q| local(q)).collect(),
+                    points: p.mesh.0.iter().map(local).collect(),
                     faces: p
                         .mesh
                         .1
