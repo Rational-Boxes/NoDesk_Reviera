@@ -34,6 +34,7 @@ mod roofs;
 mod rooms;
 mod schedules;
 mod scripts;
+mod select;
 mod sections;
 mod sheets;
 mod sketch;
@@ -115,6 +116,11 @@ enum Drag {
     Sketch,
     /// Dragging a footprint grip of a roof, floor or ceiling.
     Footprint(footprint::FootprintDrag),
+    /// Dragging a selection box from a pixel (UI-SEL-002).
+    SelectBox {
+        from: (i32, i32),
+        combine: select::Combine,
+    },
 }
 
 /// The Wall tool: clicks on the level's plane add walls end to end.
@@ -240,6 +246,8 @@ struct Gui {
     wall_type: Option<ElementId>,
     /// The wall type whose values the palette shows.
     wall_type_row: Option<ElementId>,
+    /// The two elements the quick modify menu offers booleans for (UI-SEL-006).
+    quick_pair: Option<select::QuickPair>,
     /// The units of the model a script runs on, for its forms.
     script_units: Rc<RefCell<reviera_core::units::UnitSettings>>,
     /// Drives animated view changes and walking.
@@ -1534,8 +1542,9 @@ impl Gui {
             .unwrap_or_default()
     }
 
-    /// Selects what is under pixel (`x`, `y`), or clears the selection over empty space.
-    fn pick(&mut self, x: i32, y: i32, panel: &Panel) {
+    /// Selects what is under pixel (`x`, `y`), or clears the selection over empty space; with
+    /// `combine` Add or Remove, adds it to the selection or takes it out (UI-SEL-002).
+    fn pick(&mut self, x: i32, y: i32, panel: &Panel, combine: select::Combine) {
         if self.doc.is_none() {
             return;
         }
@@ -1544,12 +1553,10 @@ impl Gui {
             .room_label_at(x, y)
             .or_else(|| self.element_at(x, y, panel))
             .or_else(|| self.room_inside(x, y));
-        let result = match hit {
-            Some(id) => self.run("selection.set", json!({ "ids": [id] })),
-            None => self.run("selection.clear", json!({})),
-        };
-        if result.is_ok() {
-            self.selection_changed();
+        match hit {
+            Some(id) => self.select_ids(&[id], combine),
+            None if combine == select::Combine::Replace => self.select_ids(&[], combine),
+            None => {}
         }
     }
 
@@ -2245,10 +2252,7 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
     for button in 0..3 {
         let (gui, p) = (gui.clone(), panel);
         let handler = move |e: WindowEventData| {
-            let shift = match &e {
-                WindowEventData::MouseButton(m) => m.event.event.shift_down(),
-                _ => false,
-            };
+            let (shift, ctrl) = modifiers();
             let mut menu = None;
             if let Some((x, y)) = position(&e) {
                 with_view(&gui, id, |g| {
@@ -2275,9 +2279,16 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                         Some(Drag::Footprint(d))
                     } else if let Some((id, end, other)) = g.grip_at(x, y) {
                         Some(Drag::Grip { id, end, other })
+                    } else if let Some(from) = g.selection_drag_start(x, y, &p) {
+                        Some(Drag::MoveSelection { from })
+                    } else if g.picking_free() && cube.is_none() && (plan || ctrl || shift) {
+                        // A box: from empty space in plans, with Ctrl or Shift in 3D.
+                        Some(Drag::SelectBox {
+                            from: (x, y),
+                            combine: select::Combine::of(ctrl, shift),
+                        })
                     } else {
-                        g.selection_drag_start(x, y, &p)
-                            .map(|from| Drag::MoveSelection { from })
+                        None
                     };
                     let kind = match (button, cube) {
                         _ if editing.is_some() => editing.expect("checked"),
@@ -2300,7 +2311,7 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                     }
                     if let Some(v) = g.active_view_mut() {
                         v.drag = Some((kind, x, y));
-                        if button == 0 {
+                        if button <= 1 {
                             v.press = Some((x, y));
                         }
                     }
@@ -2320,6 +2331,8 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
     for button in 0..3 {
         let (gui, p, f) = (gui.clone(), panel, frame);
         let handler = move |e: WindowEventData| {
+            let (shift, ctrl) = modifiers();
+            let mut menu = None;
             with_view(&gui, id, |g| {
                 let Some(v) = g.active_view_mut() else { return };
                 let drag = v.drag.take();
@@ -2368,7 +2381,20 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                             return;
                         }
                     }
+                    Some((Drag::SelectBox { from, combine }, _, _)) => {
+                        if !click {
+                            return g.box_select(from, (x, y), combine, &p);
+                        }
+                        if let Some(v) = g.viewport() {
+                            v.set_overlay_lines(&[]);
+                        }
+                    }
                     _ => {}
+                }
+                // A middle click (a middle drag pans): the quick modify menu.
+                if button == 1 && click {
+                    menu = g.quick_menu(x, y, &p, ctrl);
+                    return;
                 }
                 if button != 0 || !click {
                     return;
@@ -2394,10 +2420,13 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                     None if g.active_view().is_some_and(|v| v.nav.walk.is_some()) => {}
                     None if g.tool.is_some() => g.wall_click(x, y, &p, &f),
                     None if g.in_sheet() => g.sheet_click(x, y),
-                    None => g.pick(x, y, &p),
+                    None => g.pick(x, y, &p, select::Combine::of(ctrl, shift)),
                 }
             });
             p.refresh(false, None);
+            if let Some(mut menu) = menu {
+                p.popup_menu(&mut menu, None);
+            }
         };
         match button {
             0 => panel.on_mouse_left_up(handler),
@@ -2506,6 +2535,11 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                         redraw = true;
                         return;
                     }
+                    Drag::SelectBox { from, .. } => {
+                        g.box_motion(from, (x, y), &p);
+                        redraw = true;
+                        return;
+                    }
                     _ => {}
                 }
                 let v = g.views.iter_mut().find(|v| v.id == id).expect("found");
@@ -2525,7 +2559,8 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                     | Drag::Clip(_)
                     | Drag::SheetItem { .. }
                     | Drag::Sketch
-                    | Drag::Footprint(_) => {}
+                    | Drag::Footprint(_)
+                    | Drag::SelectBox { .. } => {}
                 }
                 v.drag = Some((kind, x, y));
                 redraw = true;
@@ -2910,6 +2945,7 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 type_rows: None,
                 wall_type: None,
                 wall_type_row: None,
+                quick_pair: None,
                 script_units: Rc::new(RefCell::new(Default::default())),
                 timer: Some(Timer::new(&frame)),
                 loading: Vec::new(),
@@ -3151,6 +3187,12 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                     let dir = nav::PRESETS[(id - ID_ORIENT_FIRST) as usize].1;
                     with(&gui, |g| g.orient(glam::Vec3::from(dir)));
                 }
+                id if (select::ID_QUICK_FIRST
+                    ..select::ID_QUICK_FIRST + select::BOOLEANS.len() as i32)
+                    .contains(&id) =>
+                {
+                    with(&gui, |g| g.quick_command(id));
+                }
                 id if (scripts::ID_PLUGIN_FIRST
                     ..scripts::ID_PLUGIN_FIRST + scripts::MAX_PLUGINS as i32)
                     .contains(&id) =>
@@ -3198,6 +3240,15 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
         }
     })
     .map_err(|e| e.to_string())
+}
+
+/// Whether Shift and Ctrl are held now. Mouse events do not carry them through wxDragon (its
+/// modifier accessors read key events only), so the keyboard is asked.
+fn modifiers() -> (bool, bool) {
+    (
+        get_key_state(wxdragon::keycode::WXK_SHIFT),
+        get_key_state(wxdragon::keycode::WXK_CONTROL),
+    )
 }
 
 /// Runs the action of a wx id (ribbon, Quick Access Toolbar and menus share one dispatcher).

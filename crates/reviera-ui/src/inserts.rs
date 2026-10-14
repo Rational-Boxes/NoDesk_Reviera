@@ -35,7 +35,7 @@ pub struct InsertTool {
 }
 
 impl Gui {
-    fn store_now(&self) -> Option<reviera_core::Store> {
+    pub(crate) fn store_now(&self) -> Option<reviera_core::Store> {
         Some(self.app.document(self.doc?)?.doc.store().clone())
     }
 

@@ -127,40 +127,10 @@ impl Gui {
             .ok()
             .and_then(|i| actions.get(i))
             .map_or("select", |x| x.1);
-        let resolve = match action {
-            "accept" => Some(json!({ "a": o["a"], "b": o["b"], "mode": "accept" })),
-            "move_b" => {
-                Some(json!({ "a": o["a"], "b": o["b"], "mode": "move_apart", "moves": "b" }))
-            }
-            "move_a" => {
-                Some(json!({ "a": o["a"], "b": o["b"], "mode": "move_apart", "moves": "a" }))
-            }
-            mode @ ("cut_a" | "cut_b" | "intersect") => {
-                // A tool made only to shape the cut (a slot's cutter) can be hidden.
-                let tool = if mode == "cut_b" { &a_label } else { &b_label };
-                let hide = super::ask(
-                    &frame,
-                    &format!("Hide {tool}'s own body? (Yes when it only shapes the cut.)"),
-                );
-                let tools = if hide { "hide" } else { "keep" };
-                Some(json!({ "a": o["a"], "b": o["b"], "mode": mode, "tools": tools }))
-            }
-            mode @ ("join" | "union") => Some(json!({ "a": o["a"], "b": o["b"], "mode": mode })),
-            _ => None,
-        };
-        if let Some(args) = resolve {
-            match self.run("overlap.resolve", args) {
-                Ok(_) => {
-                    self.refresh_scene(&frame);
-                    let what = match action {
-                        "accept" => "accepted",
-                        "move_a" | "move_b" => "moved apart",
-                        _ => "resolved by a boolean",
-                    };
-                    return frame
-                        .set_status_text(&format!("Overlap {what}: {a_label} × {b_label}"), 0);
-                }
-                Err(e) => return error(&frame, &format!("The overlap was not resolved:\n{e}")),
+        if action != "select" {
+            let (a, b) = (o["a"].clone(), o["b"].clone());
+            if self.resolve_overlap(&a, &b, &a_label, &b_label, action) {
+                return;
             }
         }
         if is_virtual {
@@ -179,8 +149,55 @@ impl Gui {
         );
     }
 
+    /// Resolves the overlap of `a` and `b` by `action` (ARC-MOD-032): `accept`, `move_a` or
+    /// `move_b`, `cut_a`, `cut_b` or `intersect` (asking whether the tool's own body hides),
+    /// `join` or `union`. Reports the outcome; true when it was resolved.
+    pub(crate) fn resolve_overlap(
+        &mut self,
+        a: &serde_json::Value,
+        b: &serde_json::Value,
+        a_label: &str,
+        b_label: &str,
+        action: &str,
+    ) -> bool {
+        let frame = self.frame;
+        let args = match action {
+            "accept" => json!({ "a": a, "b": b, "mode": "accept" }),
+            "move_b" => json!({ "a": a, "b": b, "mode": "move_apart", "moves": "b" }),
+            "move_a" => json!({ "a": a, "b": b, "mode": "move_apart", "moves": "a" }),
+            mode @ ("cut_a" | "cut_b" | "intersect") => {
+                // A tool made only to shape the cut (a slot's cutter) can be hidden.
+                let tool = if mode == "cut_b" { a_label } else { b_label };
+                let hide = super::ask(
+                    &frame,
+                    &format!("Hide {tool}'s own body? (Yes when it only shapes the cut.)"),
+                );
+                let tools = if hide { "hide" } else { "keep" };
+                json!({ "a": a, "b": b, "mode": mode, "tools": tools })
+            }
+            mode @ ("join" | "union") => json!({ "a": a, "b": b, "mode": mode }),
+            _ => return false,
+        };
+        match self.run("overlap.resolve", args) {
+            Ok(_) => {
+                self.refresh_scene(&frame);
+                let what = match action {
+                    "accept" => "accepted",
+                    "move_a" | "move_b" => "moved apart",
+                    _ => "resolved by a boolean",
+                };
+                frame.set_status_text(&format!("Overlap {what}: {a_label} × {b_label}"), 0);
+                true
+            }
+            Err(e) => {
+                error(&frame, &format!("The overlap was not resolved:\n{e}"));
+                true
+            }
+        }
+    }
+
     /// An element's class and id, for lists.
-    fn element_label(&self, id: &serde_json::Value) -> String {
+    pub(crate) fn element_label(&self, id: &serde_json::Value) -> String {
         let Some(n) = id.as_u64() else {
             return String::new();
         };
@@ -196,7 +213,7 @@ impl Gui {
     }
 
     /// A value in the project's units.
-    fn format_value(&mut self, v: f64, data_type: &str) -> String {
+    pub(crate) fn format_value(&mut self, v: f64, data_type: &str) -> String {
         self.run(
             "units.format",
             json!({ "value": v, "data_type": data_type }),

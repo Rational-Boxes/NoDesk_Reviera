@@ -59,6 +59,71 @@ pub struct RenderScene {
 }
 
 impl RenderScene {
+    /// The elements a selection box picks (UI-SEL-002): `project` gives a point's pixel position
+    /// (`None` behind the eye); `lo`..`hi` is the box in pixels. Only what the view shows counts:
+    /// points `keep` drops and hidden elements are left out. A window takes elements whose every
+    /// shown point is inside; a crossing those with a shown triangle touching it.
+    pub fn boxed(
+        &self,
+        project: &dyn Fn(Vec3) -> Option<(f32, f32)>,
+        lo: (f32, f32),
+        hi: (f32, f32),
+        mode: BoxMode,
+        keep: &dyn Fn(Vec3) -> bool,
+        visibility: &Visibility,
+    ) -> Vec<ElementId> {
+        // Per element: (any point shown, every shown point inside / any triangle touching).
+        let mut seen: std::collections::BTreeMap<ElementId, (bool, bool)> = Default::default();
+        for m in &self.meshes {
+            let Some(e) = m.element else { continue };
+            if visibility.opacity(Some(e)).is_none_or(|a| a <= 0.0) || is_virtual(&m.class) {
+                continue;
+            }
+            let entry = seen.entry(e).or_insert((false, mode == BoxMode::Window));
+            let points: Vec<Option<(f32, f32)>> = m
+                .positions
+                .iter()
+                .map(|p| {
+                    let p = Vec3::from(*p);
+                    if keep(p) { project(p) } else { None }
+                })
+                .collect();
+            match mode {
+                BoxMode::Window => {
+                    for (p, q) in m.positions.iter().zip(&points) {
+                        if !keep(Vec3::from(*p)) {
+                            continue;
+                        }
+                        entry.0 = true;
+                        let inside = q.is_some_and(|(x, y)| {
+                            x >= lo.0 && x <= hi.0 && y >= lo.1 && y <= hi.1
+                        });
+                        entry.1 &= inside;
+                    }
+                }
+                BoxMode::Crossing => {
+                    if entry.1 {
+                        continue;
+                    }
+                    for tri in m.indices.as_chunks::<3>().0 {
+                        let [a, b, c] = tri.map(|k| points[k as usize]);
+                        if let (Some(a), Some(b), Some(c)) = (a, b, c) {
+                            entry.0 = true;
+                            if triangle_touches([a, b, c], lo, hi) {
+                                entry.1 = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        seen.into_iter()
+            .filter(|(_, (shown, hit))| *shown && *hit)
+            .map(|(e, _)| e)
+            .collect()
+    }
+
     pub fn triangle_count(&self) -> usize {
         self.meshes.iter().map(|m| m.indices.len() / 3).sum()
     }
@@ -162,6 +227,44 @@ impl Clipping {
         planes.truncate(MAX_CLIP_PLANES);
         Clipping { planes, caps }
     }
+}
+
+/// How a selection box picks (UI-SEL-002).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BoxMode {
+    /// Dragged left to right: elements entirely inside.
+    Window,
+    /// Dragged right to left: elements inside or touching.
+    Crossing,
+}
+
+/// Whether the triangle `t` (pixels) touches the rectangle `lo`..`hi`.
+fn triangle_touches(t: [(f32, f32); 3], lo: (f32, f32), hi: (f32, f32)) -> bool {
+    let inside = |p: (f32, f32)| p.0 >= lo.0 && p.0 <= hi.0 && p.1 >= lo.1 && p.1 <= hi.1;
+    if t.iter().any(|p| inside(*p)) {
+        return true;
+    }
+    // Separating axes: the rectangle's two, then the triangle's three edge normals.
+    let (xs, ys) = (t.map(|p| p.0), t.map(|p| p.1));
+    let min = |v: [f32; 3]| v[0].min(v[1]).min(v[2]);
+    let max = |v: [f32; 3]| v[0].max(v[1]).max(v[2]);
+    if max(xs) < lo.0 || min(xs) > hi.0 || max(ys) < lo.1 || min(ys) > hi.1 {
+        return false;
+    }
+    let corners = [lo, (hi.0, lo.1), hi, (lo.0, hi.1)];
+    for i in 0..3 {
+        let (a, b, c) = (t[i], t[(i + 1) % 3], t[(i + 2) % 3]);
+        let n = (b.1 - a.1, a.0 - b.0);
+        let side = |p: (f32, f32)| (p.0 - a.0) * n.0 + (p.1 - a.1) * n.1;
+        let own = side(c);
+        if own.abs() < 1e-9 {
+            continue;
+        }
+        if corners.iter().all(|q| side(*q) * own.signum() < 0.0) {
+            return false;
+        }
+    }
+    true
 }
 
 impl RenderScene {
@@ -599,6 +702,42 @@ pub trait RenderBackend {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_window_takes_what_is_inside_and_a_crossing_what_it_touches() {
+        // Two flat squares seen from above, projected 1:1 (x, y as pixels).
+        let square = |e: u64, x0: f32| SceneMesh {
+            element: Some(ElementId(e)),
+            class: "IfcWall".into(),
+            positions: vec![
+                [x0, 0.0, 0.0],
+                [x0 + 10.0, 0.0, 0.0],
+                [x0 + 10.0, 10.0, 0.0],
+                [x0, 10.0, 0.0],
+            ],
+            indices: vec![0, 1, 2, 0, 2, 3],
+            color: [1.0; 4],
+        };
+        let scene = RenderScene {
+            meshes: vec![square(1, 0.0), square(2, 20.0)],
+        };
+        let project = |p: Vec3| Some((p.x, p.y));
+        let all = |_: Vec3| true;
+        let vis = Visibility::default();
+        // Around the first and half the second.
+        let (lo, hi) = ((-1.0, -1.0), (25.0, 11.0));
+        let window = scene.boxed(&project, lo, hi, BoxMode::Window, &all, &vis);
+        assert_eq!(window, vec![ElementId(1)]);
+        let crossing = scene.boxed(&project, lo, hi, BoxMode::Crossing, &all, &vis);
+        assert_eq!(crossing, vec![ElementId(1), ElementId(2)]);
+        // A box inside a triangle, touching no corner, still crosses it.
+        let inner = scene.boxed(&project, (24.0, 4.0), (26.0, 5.0), BoxMode::Crossing, &all, &vis);
+        assert_eq!(inner, vec![ElementId(2)]);
+        // Hidden elements are not picked.
+        let mut hidden = Visibility::default();
+        hidden.hidden.insert(ElementId(1));
+        assert!(scene.boxed(&project, lo, hi, BoxMode::Window, &all, &hidden).is_empty());
+    }
 
     #[test]
     fn fitting_keeps_the_scene_in_front_of_the_camera() {

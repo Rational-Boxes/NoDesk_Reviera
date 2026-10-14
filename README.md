@@ -342,9 +342,16 @@ Create … Boundary* tab:
 - **Model Tree** (MT): Project › Site › Building › storeys › categories › elements, with hosted
   elements under their hosts; its context menu selects, hides, isolates or boxes whole branches
   (`model.tree`).
-- **Selection**: click to select in a view; the Model Tree, schedules and Check Overlaps select
-  several at once. The selection drives Properties and the contextual tab (`selection.get`, `selection.set`, `selection.add`, `selection.remove`,
+- **Selection**: click to select in a view; Ctrl+click adds and Shift+click removes. A box selects
+  several: left to right a window (entirely inside), right to left a crossing (inside or
+  touching); in plans a left drag boxes, in 3D views Ctrl or Shift + left drag (Ctrl adds the
+  boxed set, Shift removes it). The Model Tree, schedules and Check Overlaps also select several
+  at once. The selection drives Properties and the contextual tab (`selection.get`, `selection.set`, `selection.add`, `selection.remove`,
   `selection.clear`, `element.get_ids`, `element.find_by_guid`).
+- **Quick modify menu**: a middle click on an element opens Move, Copy, Rotate, Mirror, Flip,
+  Hide, Isolate, Section Box, Pin/Unpin and Delete at the cursor. With two elements selected it
+  checks whether they overlap and, when they do, offers the booleans: cut either way, intersect,
+  union, join or accept (UI-SEL-006).
 - **Modify tools**: Align (AL), Offset (OF), Mirror by picked or drawn axis (MM, DM), Move (MV),
   Copy (CO), Rotate (RO), Trim/Extend to Corner (TR), Trim/Extend to a boundary, Split (SL),
   Pin (PN), Unpin (UP) and Delete (DE), with previews, snapping and typed distances and angles.
@@ -381,7 +388,7 @@ Create … Boundary* tab:
   perspective/isometric toggle), standard views with animated transitions, wheel zoom about the
   cursor, Previous/Next pan/zoom, and walk mode (WASD or arrow keys, drag to look). Dragging
   orbits about the selection's centre, or about the point of the model under the cursor; the
-  middle or right button pans.
+  middle or right button pans, and Shift + middle drag orbits.
 - **Platform**: Linux (X11, and Wayland through a native subsurface) today; wxWidgets and `wgpu` keep Windows and macOS within
   reach.
 

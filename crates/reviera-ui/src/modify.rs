@@ -776,6 +776,20 @@ impl Gui {
         line.map_or_else(Vec::new, |l| vec![(id, 0, l.start), (id, 1, l.end)])
     }
 
+    /// Whether clicks and boxes select: no tool or pick mode is running, outside sheets and
+    /// walk mode.
+    pub(crate) fn picking_free(&self) -> bool {
+        !self.any_tool()
+            && self.room_tool.is_none()
+            && self.section_tool.is_none()
+            && self.dome_tool.is_none()
+            && self.feature_tool.is_none()
+            && self.slice_pick.is_none()
+            && self.attach_pick.is_none()
+            && !self.in_sheet()
+            && !self.active_view().is_some_and(|v| v.nav.walk.is_some())
+    }
+
     /// Whether any tool is running.
     pub(crate) fn any_tool(&self) -> bool {
         self.tool.is_some()
