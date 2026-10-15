@@ -14,14 +14,17 @@ operation can be driven by Lua scripts and by AI agents through the Model Contex
 > railings with gates, rooms, levels and grids. It finds and resolves overlaps with kept
 > booleans (OpenCASCADE), checks door clearances, and draws plans, ceiling plans, sections,
 > elevations, schedules and sheets to PDF and COBie. Every operation is a command that the
-> ribbon, Lua scripts and AI agents (MCP) share. Layered walls, columns, openings, shafts and
-> arrays are the newest; the first pre-release packages are being prepared.
+> ribbon, Lua scripts and AI agents (MCP) share. The newest work is components: Component
+> Libraries of ordinary 3D files and IFC components, placed like stamps, made from any selection,
+> and repeated along paths parametrically (see the Greek temple sample). Pre-release packages
+> are built for Linux (Flatpak) and Windows.
 
 ## Contents
 
 - [Screenshots](#screenshots)
 - [What works today](#what-works-today): [platform](#platform-and-file-format),
   [automation](#commands-scripting-and-ai-agents), [modelling](#modelling),
+  [components and libraries](#components-and-libraries),
   [coordination](#overlaps-booleans-and-clearances), [documentation](#views-and-documentation),
   [inspecting and editing](#inspecting-and-editing), [the window](#the-window)
 - [Sample models](#sample-models)
@@ -341,6 +344,53 @@ Create … Boundary* tab:
   with an `IfcGridAxis` per line; axes changed in another tool are taken over on open
   (`grid.create`, `grid.rename`, `grid.set_curve`, `grid.list`).
 
+### Components and libraries
+
+Components are reusable objects (furniture, fittings, planting, columns, scanned statues, whole
+pieces of a building) placed into a model as many times as needed. They come from **Component
+Libraries**: plain folders of ordinary 3D files, readable by any other tool.
+
+- **Component Libraries**: a library is a folder of OBJ (with its MTL and textures), STL, PLY,
+  glTF/GLB and IFC files with one manifest, `reviera-library.json`, in its root. The manifest
+  holds what the files cannot: names, categories, units, up axes, tags, product data and settings
+  per folder (inherited by sub-folders). The files are never rewritten, so a library can live in
+  git or a shared folder (`library.create`, `library.open`, `library.list`,
+  `library.import_files`, `library.get_meta`, `library.set_meta`, `library.delete_items`,
+  `library.restore_items`; DM-LIB-004).
+- **The Component Library panel** (docked right; Window › Component Library, CL): the libraries
+  you have open (remembered; the sample library at first), their folders with item counts, and
+  each folder's components as thumbnails rendered by Reviera. Open… turns any folder into a library
+  by adding only the manifest; New… makes one; Import… copies 3D files in, with their units and
+  up axis set once and the size previewed.
+- **Place Component** (Architecture › Component, CM): click a component in the panel to pick it
+  up, like a stamp; each click places a copy until Esc, Spacebar turns the next one. In plans it
+  snaps; in 3D a copy sits on the surface under the cursor. A library component becomes a type
+  in the model on its first copy and every copy shares its geometry. Properties edit its details
+  in the library's manifest (`component.place`; DM-LIB-002).
+- **Import Object** (Architecture › Component): one 3D file straight into the model as a
+  component type, with units, up axis, insertion point, category and name, its size previewed
+  (`mesh_object.inspect`, `mesh_object.import`, `mesh_object.reload`; DM-IMP-015). Reviera reads
+  OBJ, STL, PLY, glTF and GLB itself.
+- **Create Component** (middle-click quick menu, Modify tab): any selection becomes a component,
+  an IFC file of that piece of the model saved into the library folder shown. It brings what the
+  selection needs (doors in its walls, hosts, types, levels). Placing it copies the elements in
+  with new identities, maps its levels by height and reuses the model's types
+  (`component.create`, `component.place_fragment`; DM-LIB-003).
+- **Array along Path** (Modify, AP): repeats a component along a picked wall, grid line or floor
+  edge, or a drawn polyline, arc or spline, by number or spacing, with counts per side, a copy at
+  every corner, facing along, outward or inward, and seeded random turn and scale for planting.
+  It stays parametric: change the count, the path or the component and every copy follows,
+  even when the component is a plain scanned mesh. Unarray makes the copies independent
+  (`array.along_path`, `array.set`, `array.exclude_member`, `array.restore_member`,
+  `array.members`, `array.unarray`; ARC-MOD-033).
+- **In IFC** a component type is its category's type class with its mesh written once (an
+  `IfcRepresentationMap` of styled `IfcTriangulatedFaceSet`s) and each copy maps it
+  (`IfcMappedItem`); a path array is an `IfcElementAssembly` of its members. Other IFC tools see
+  them all. Types placed from a library record the library and item, never folder paths.
+- **Properties** of placed components: offset, rotation, mirror and scale; the type's name,
+  category, scale and material colours (`mesh_object.set`, `mesh_object.set_type`,
+  `mesh_object.types`). Selected components and arrays get their own contextual tabs.
+
 ### Overlaps, booleans and clearances
 
 - **Volume overlap engine**: View › Check Overlaps finds where elements' bodies overlap (walls,
@@ -433,8 +483,8 @@ Create … Boundary* tab:
   at once. The selection drives Properties and the contextual tab (`selection.get`, `selection.set`, `selection.add`, `selection.remove`,
   `selection.clear`, `element.get_ids`, `element.find_by_guid`).
 - **Quick modify menu**: a middle click on an element opens Move, Copy, Rotate, Mirror, Flip,
-  Hide, Make Translucent/Opaque, Isolate, Reset Hide/Isolate, Section Box, Pin/Unpin and Delete
-  at the cursor; a middle click on empty space offers the reset when anything is hidden. With two elements selected it
+  Hide, Make Translucent/Opaque, Isolate, Reset Hide/Isolate, Section Box, Create Component,
+  Pin/Unpin and Delete at the cursor; a middle click on empty space offers the reset when anything is hidden. With two elements selected it
   checks whether they overlap and, when they do, offers the booleans: cut either way, intersect,
   union, join or accept (UI-SEL-006).
 - **Measure** (Modify › Measure): click points in a plan; the status bar shows each segment, its
@@ -455,12 +505,12 @@ Create … Boundary* tab:
 - **Tabbed views**: several models open side by side, each view in its own tab with a `wgpu`
   viewport (Window › New 3D View, Tile Views, Tab Views, Ctrl+Tab; Tile Views remembers its
   arrangement). Each tab has a close button; drag a tab to reorder it, onto another group's tabs
-  to move it there, or to an edge of the view area to tile it. The help tab opens at start. Dockable Properties, Project Browser and Model Tree panes.
-- **Ribbon**: Architecture (Wall, Arc Wall, Spline Wall, Curtain Wall, Door, Window, Floor,
-  Ceiling, Roof,
-  Arched Roof, Dome, Column, Room, Stair, Spiral Stair, Railing, Deck, Wall Opening, Vertical,
-  Shaft,
-  Level, Grid), Annotate
+  to move it there, or to an edge of the view area to tile it. The help tab opens at start.
+  Dockable Properties, Project Browser, Model Tree and Component Library panes.
+- **Ribbon**: Architecture (Wall, Arc Wall, Spline Wall, Curtain Wall, Door, Window, Column,
+  Floor, Ceiling, Roof, Arched Roof, Dome, Component, Import Object, Component Library, Room,
+  Stair, Spiral Stair, Ramp, Railing, Deck, Wall Opening, Vertical, Shaft, Skylight, Level,
+  Grid), Annotate
   (dimensions, text, tags), View (views, sheets, navigation, coordination, section box and
   slices, hide/isolate, windows, panes) and Modify tabs, with a Quick Access Toolbar above.
   While elements are selected a contextual *Modify | <category>* tab adds their tools (for
@@ -471,8 +521,8 @@ Create … Boundary* tab:
 - **Keyboard shortcuts**: two-letter sequences typed in a view, shown in tooltips and menus:
   WA wall, DR door, WN window, FL floor, RM room, ST stair, LL level, GR grid, TX text, TG and RT
   tags, DI dimension, MD modify, DE delete, PP properties, MT model tree, ZF/ZP/ZN zoom, PI
-  projection, WK walk, SX/BX section and selection box, plus the Modify and hide/isolate keys
-  above.
+  projection, WK walk, SX/BX section and selection box, CM component, CL component library, AP
+  array along path, plus the Modify and hide/isolate keys above.
 - **Properties palette**: the selected element's identity, its own rows (wall constraints and
   type, insert placement and size, roof shape and eaves, arch and dome, stair, deck, dormer,
   room, tag and note values) and every parameter, grouped; type rows choose, duplicate and edit
@@ -546,41 +596,14 @@ nearest gaps in what is built:
   from its marker; schedule filters, grouping and calculated fields; title block families,
   revisions and sheet collections; tags and text in sections and on sheets; the current NBIMS-US
   COBie layout and a COBie settings dialog.
-- **Custom objects from meshes** (DM-IMP-015): importing OBJ, STL, PLY and glTF/GLB (3MF and OFF
-  later) as reusable object types with a category, material slots and plan outlines, placed many
-  times, reloaded from the file, and saved to an object library. **Built**: Import Object (with a
-  size preview), the commands (`mesh_object.*`) and IFC (`IfcRepresentationMap` + `IfcMappedItem`);
-  still to come: plan cut outlines, 3MF/OFF, decimation and textures.
-- **Components and a library tree** (DM-LIB-003/004): Create Component (in the middle-click quick
-  menu) turns any selection in a model (with its hosts, hosted elements and rooms) into a
-  component, which is just an IFC file of that model fragment; Edit Component opens it as a model.
-  Parts of external IFC files can be added too, with variants, multi-level fragments and type
-  merging when placed. A library is a physical tree of folders of ordinary 3D files (OBJ, STL,
-  PLY, glTF, 3MF, OFF and IFC fragments) read where they are. A library is a folder that is
-  opened, with one JSON manifest (`reviera-library.json`) in its root. Import into Library (or
-  dropping files on a folder) copies files in a supported 3D format into a folder and adds them to
-  the manifest. The Library panel previews each item and edits details its file format cannot
-  hold (units, category, manufacturer, classification, property sets, material colours), kept in
-  the manifest and applied when the item is placed. Libraries have smart folders and
-  drag-and-drop reorganising. **Built**: the Component Library panel (libraries, folders,
-  thumbnails, Open/New/Import), item details in Properties, Place Component (CM) in plans and on
-  surfaces in 3D, Create Component from any selection (quick menu) and placing IFC components
-  with new identities and levels mapped by height, and the commands (`library.*`,
-  `component.*`); still to come: Edit Component, components as linked groups, smart folders,
-  drag and drop.
-- **Array along a path** (ARC-MOD-033): a component (a plain mesh included) repeated along a picked
-  or drawn path or a host's edges, by number or spacing, with copies at every corner and facing
-  outward (a temple colonnade), or along a spline with seeded random rotation, scale and choice of
-  model (a hedge), staying parametric as the path, count or component changes. **Built**: the
-  Array along Path tool (AP; pick a wall, grid or floor, or draw), its Properties, Unarray, the
-  commands (`array.*`) and IFC; still to come: grips and an on-canvas count label, railing paths,
-  alternate mirroring.
-- **Stamps** (DM-LIB-002): any library object, family type or model fragment picked up as a stamp
-  from the Library panel's Stamps strip (or Alt+click on a placed copy), inserting a copy at each
-  click in a plan or on a face in 3D; all copies share one type (Make Unique detaches one); rows
-  and random scatter later. **Built**: the thumbnail palette (the Component Library panel) and
-  Place Component, repeating until Esc; still to come: pinned stamps, Alt+click to pick a stamp,
-  rows and scatter.
+- **Components**: Edit Component (opening a component and updating its copies), components placed
+  as linked groups, pinned and recent stamps and Alt+click to pick one from the model, rows and
+  scatter, smart folders, moving and drag-and-drop in the panel, organisation libraries, 3MF and
+  OFF files, textures, reducing large meshes, plan cut outlines of components, and IFC
+  components from other tools whose geometry Reviera does not regenerate (DM-IMP-015,
+  DM-LIB-002 … 005).
+- **Path arrays**: grips and an on-canvas count label, railing paths, heights following the path
+  or a host face, alternate mirroring, arrays of IFC components (ARC-MOD-033).
 - **Interface**: general shape tools; a macOS build (the script is written, not yet run on a
   Mac); a Windows GUI that opens without a console window beside it.
 - **MCP**: streamable HTTP with tokens, rate and size limits, subscriptions, prompts,
@@ -620,7 +643,8 @@ cargo test --workspace
 
 **Packages.** `packaging/` builds the release packages: a Flatpak (built and tested on Fedora
 43), a Windows installer with a portable ZIP (cross-built on Fedora; tested on Windows 11 and
-under Wine), and a macOS `.app` in a `.dmg` (written, not yet run on a Mac). See [packaging/README.md](packaging/README.md).
+under Wine), and a macOS `.app` in a `.dmg` (written, not yet run on a Mac). Each carries the
+sample models and the sample Component Library. See [packaging/README.md](packaging/README.md).
 
 ## Trying it
 
@@ -644,10 +668,10 @@ Permission levels are `read_only` (the default), `model_edit` and `full_scriptin
 | Path | Contents |
 |---|---|
 | `apps/reviera` | The `reviera` program |
-| `crates/reviera-core` | Element store, transactions, undo, command registry, and the modelling: walls, inserts, sketches, floors, roofs, stairs, railings, decks, rooms, overlaps, clearances |
+| `crates/reviera-core` | Element store, transactions, undo, command registry, and the modelling: walls, inserts, sketches, floors, roofs, stairs, railings, decks, rooms, components and libraries, path arrays, overlaps, clearances |
 | `crates/reviera-ifc` | IfcOpenShell bridge (C++ shim through `cxx`) |
 | `crates/reviera-rxd` | Reviera Extension Data encoding |
-| `crates/reviera-store` | Local `.ifc` projects with embedded RXD |
+| `crates/reviera-store` | Local `.ifc` projects with embedded RXD; IFC components (model fragments) |
 | `crates/reviera-livestore` | Encrypted live store and crash recovery |
 | `crates/reviera-app` | Application session: documents, file, view-state, inspection, output and recovery commands |
 | `crates/reviera-mcp` | MCP server |
@@ -661,6 +685,8 @@ Permission levels are `read_only` (the default), `model_edit` and `full_scriptin
 | `schemas/`, `clients/rsp/` | Open data formats and protocol clients (MIT) |
 | `test-data/ifc/` | Third-party IFC models for tests (see their README for provenance) |
 | `test-data/samples/` | Reviera's own sample models, their Lua scripts and walkthroughs |
+| `test-data/library/` | The sample Component Library (a public-domain Doric column; see its README) |
+| `tools/` | Building IfcOpenShell, and preparing sample components (`decimate_stl.py`, `make_parthenon_column.py`) |
 
 The specification is in `design_documents/spec/`, collected into
 `design_documents/Revit_Application_Specification.md`.
