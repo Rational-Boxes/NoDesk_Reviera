@@ -1,0 +1,45 @@
+{
+  "format": "reviera-library",
+  "version": 1,
+  "id": "6ab770d0-f8a1-4db9-b08e-52f40e0b7a62",
+  "name": "Reviera Sample Library",
+  "description": "Sample Component Library for Reviera's demonstration models. Every item is free to use and redistribute; each item's provenance is in its details.",
+  "defaults": {},
+  "folders": {
+    "Classical": {
+      "tags": [
+        "classical"
+      ]
+    },
+    "Classical/Columns": {
+      "category": "column",
+      "import": {
+        "units": "m",
+        "up_axis": "z",
+        "insertion": "bottom_centre",
+        "clean": true
+      }
+    }
+  },
+  "items": {
+    "Classical/Columns/parthenon_column.obj": {
+      "guid": "e51f4499-4379-4efb-a870-a3c66aa1a430",
+      "name": "Parthenon Doric Column",
+      "description": "A Doric column at the Parthenon's proportions: a fluted, tapering shaft about 1.9 m across at the base, a curved echinus and a square abacus; 10.17 m tall.",
+      "tags": [
+        "doric",
+        "greek",
+        "temple"
+      ],
+      "provenance": {
+        "author": "Shaft: PantheraLeo1359531 (Wikimedia Commons); capital: Reviera contributors",
+        "date_added": "2026-10-14",
+        "licence": "CC0-1.0",
+        "modified": "Shaft reduced from 494,392 to 20,000 triangles (tools/decimate_stl.py) and scaled by 0.7; echinus and abacus added (tools/make_parthenon_column.py).",
+        "original_sha256": "a4d9b0a5038e8884825fde2c5d52f4c33b3fb2011a2d41584d239c59edaf935b",
+        "source_url": "https://commons.wikimedia.org/wiki/File:Antike_griechische_S%C3%A4ule_20220605.stl"
+      },
+      "sha256": "9dfa2c1dd8a582c9bcb3a6a3e61e6fc79f8389b90ef33b723b84763a23897e57"
+    }
+  }
+}

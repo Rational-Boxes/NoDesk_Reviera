@@ -38,7 +38,7 @@ Excluded from the register: two help-site directory roots and one URL template p
 | Gap-fill sources S0578 onward marked "search summary" in the agents' notes (two COL help pages) | Facts taken from public search-result summaries of public help pages | The pages themselves are public (HTTP 200 on re-check). |
 | `research/03` | Quotes Autodesk Help text heavily | Kept internal. The specification paraphrases it (conventions rule 1.1). |
 
-## A. Sources (709)
+## A. Sources (710)
 
 | ID | Area | Type | URL | Status | Public-availability test |
 |----|------|------|-----|--------|--------------------------|
@@ -751,6 +751,7 @@ Excluded from the register: two help-site directory roots and one URL template p
 | S0707 | ARC | government (Australia, ABCB) | https://ncc.abcb.gov.au/editions/ncc-2022/adopted/housing-provisions/11-safe-movement-and-access/part-112-stairway-and-ramp-construction | 200 | PASS: public (HTTP 200, unauthenticated) |
 | S0708 | ARC | public guidance (building inspection) | https://surebuildinginspections.au/defects/stair-headroom-insufficient/ | 200 | PASS: public (HTTP 200, unauthenticated) |
 | S0709 | ARC | public guidance (trade reference) | https://www.baunetzwissen.de/glossar/d/durchgangshoehe-10204364 | 200 | PASS: public (HTTP 200, unauthenticated) |
+| S0710 | ASSET | public-domain 3D model (CC0), redistributed in test-data/library | https://commons.wikimedia.org/wiki/File:Antike_griechische_S%C3%A4ule_20220605.stl | 200 | PASS: public (HTTP 200, unauthenticated); CC0 1.0 dedication by its author, no attribution required |
 
 ## B. Screenshots (142) — internal reference only
 

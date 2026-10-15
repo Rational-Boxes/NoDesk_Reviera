@@ -81,5 +81,17 @@
         }
       }
     ]
+  },
+  {
+    "name": "temple",
+    "title": "Greek temple",
+    "steps": [
+      {
+        "command": "script.run",
+        "args": {
+          "file": "temple.lua"
+        }
+      }
+    ]
   }
 ]

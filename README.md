@@ -44,6 +44,11 @@ the porch columns and the shaped windows show through the walls.
 
 ![The Manor sample see-through in 3D, its roof selected](design_documents/application_screenshots/manor-transparency.png)
 
+The Greek temple sample: 46 Doric columns from the sample Component Library, placed round the
+stylobate by one parametric path array.
+
+![The Greek temple sample's colonnade in 3D](design_documents/application_screenshots/temple-colonnade.png)
+
 ## What works today
 
 Command names are given in `code` after each feature; every one of them can be run from the
@@ -501,6 +506,11 @@ window, which confirms that every operation it uses has its UI:
 - **Observatory** (`observatory.ifc`): a round drum of arc walls under a dome, a vaulted annex, a
   spline garden wall and a turret built by the Castle Turret plugin; the dome's observing slot is
   cut by a boolean, and the ADA 2010 rules are on.
+- **Greek temple** (`temple.ifc`): the Parthenon's plan at its size: three marble steps, 46
+  Doric columns round the stylobate (a path array with a column on every corner) and two porches,
+  the cella with its great doors, the entablature and a pedimented roof. The column comes from the
+  sample Component Library (`test-data/library`): a public-domain (CC0) scan from Wikimedia
+  Commons with a modelled capital.
 - **Overlap resolutions** (`csg.ifc`): one overlap resolved every way, side by side (cut either
   way, join, intersect, union, move apart and accept) next to an unresolved pair.
 
@@ -538,7 +548,9 @@ nearest gaps in what is built:
   COBie layout and a COBie settings dialog.
 - **Custom objects from meshes** (DM-IMP-015): importing OBJ, STL, PLY and glTF/GLB (3MF and OFF
   later) as reusable object types with a category, material slots and plan outlines, placed many
-  times, reloaded from the file, and saved to an object library. Specified; not built yet.
+  times, reloaded from the file, and saved to an object library. **Built as commands**
+  (`mesh_object.*`; scripts and MCP), with IFC (`IfcRepresentationMap` + `IfcMappedItem`); still to
+  come: the window's Import Object dialog, plan cut outlines, 3MF/OFF, decimation and textures.
 - **Components and a library tree** (DM-LIB-003/004): Create Component (in the middle-click quick
   menu) turns any selection in a model (with its hosts, hosted elements and rooms) into a
   component, which is just an IFC file of that model fragment; Edit Component opens it as a model.
@@ -550,16 +562,22 @@ nearest gaps in what is built:
   the manifest. The Library panel previews each item and edits details its file format cannot
   hold (units, category, manufacturer, classification, property sets, material colours), kept in
   the manifest and applied when the item is placed. Libraries have smart folders and
-  drag-and-drop reorganising. Specified; not built yet.
+  drag-and-drop reorganising. **Built as commands**: libraries with their manifest, folders,
+  Import into Library, item details, delete and restore, and Place Component of mesh items
+  (`library.*`, `component.place`); still to come: the Component Library panel, previews, IFC
+  fragments, Create and Edit Component, smart folders.
 - **Array along a path** (ARC-MOD-033): a component (a plain mesh included) repeated along a picked
   or drawn path or a host's edges, by number or spacing, with copies at every corner and facing
   outward (a temple colonnade), or along a spline with seeded random rotation, scale and choice of
-  model (a hedge), staying parametric as the path, count or component changes.
-  Specified; not built yet.
+  model (a hedge), staying parametric as the path, count or component changes. **Built as
+  commands** (`array.*`), members written to IFC as elements of the component's class; still to
+  come: the window's tool, grips and the count label, railing and slab-edge paths, P2 rows and
+  alternate mirroring.
 - **Stamps** (DM-LIB-002): any library object, family type or model fragment picked up as a stamp
   from the Library panel's Stamps strip (or Alt+click on a placed copy), inserting a copy at each
   click in a plan or on a face in 3D; all copies share one type (Make Unique detaches one); rows
-  and random scatter later. Specified; not built yet.
+  and random scatter later. Placing by command is built (`component.place`); the window's Place
+  Component tool and the thumbnail palette are next.
 - **Interface**: general shape tools; a macOS build (the script is written, not yet run on a
   Mac); a Windows GUI that opens without a console window beside it.
 - **MCP**: streamable HTTP with tokens, rate and size limits, subscriptions, prompts,
