@@ -47,6 +47,9 @@ pub struct StairTool {
     cursor: Option<[f64; 2]>,
     /// A spiral: the first click is the centre, the second a point on the walking line.
     spiral: bool,
+    /// An L winder: the start, the walking line's corner, then the side it turns to.
+    winder: bool,
+    corner: Option<[f64; 2]>,
 }
 
 impl StairTool {
@@ -120,9 +123,20 @@ impl Gui {
             start: None,
             cursor: None,
             spiral,
+            winder: false,
+            corner: None,
         });
         let _ = self.run("selection.clear", json!({}));
         self.selection_changed();
+        self.stair_prompt();
+    }
+
+    /// Architecture › Winder Stair (an L winder with every riser).
+    pub(crate) fn start_winder_tool(&mut self) {
+        self.start_stair_tool(false);
+        if let Some(t) = &mut self.stair_tool {
+            t.winder = true;
+        }
         self.stair_prompt();
     }
 
@@ -144,6 +158,16 @@ impl Gui {
             _ => 0,
         };
         let text = match t.start {
+            None if t.winder => format!(
+                "Winder Stair: click the start of the walking line (the middle of the first riser) · {} risers (Esc cancels)",
+                t.risers
+            ),
+            Some(_) if t.winder && t.corner.is_none() => {
+                "Winder Stair: click the corner of the walking line".to_owned()
+            }
+            Some(_) if t.winder => {
+                "Winder Stair: click the side it turns to; it places every riser".to_owned()
+            }
             None if t.spiral => format!(
                 "Spiral Stair: click the centre · {} risers (Esc cancels)",
                 t.risers
@@ -194,6 +218,11 @@ impl Gui {
         };
         match t.start {
             None => t.start = Some(p),
+            Some(_) if t.winder && t.corner.is_none() => t.corner = Some(p),
+            Some(a) if t.winder => {
+                let c = t.corner.expect("checked");
+                return self.finish_winder(a, c, p);
+            }
             Some(c) if t.spiral => return self.finish_spiral(c, p),
             Some(a) => {
                 let Some((end, k)) = t.run(a, p) else { return };
@@ -213,7 +242,7 @@ impl Gui {
         let Some(t) = &mut self.stair_tool else {
             return;
         };
-        if t.start.take().is_some() {
+        if t.corner.take().is_some() || t.start.take().is_some() {
             self.stair_preview();
             return self.stair_prompt();
         }
@@ -222,6 +251,70 @@ impl Gui {
             return self.frame.set_status_text("Stair cancelled", 0);
         }
         self.finish_stair();
+    }
+
+    /// The end of an L winder from `start` round `corner`, turning toward `side`, holding
+    /// every riser; `None` when the second leg would be too short.
+    fn winder_end(
+        t: &StairTool,
+        start: [f64; 2],
+        corner: [f64; 2],
+        side: [f64; 2],
+    ) -> Option<[f64; 2]> {
+        let d = [corner[0] - start[0], corner[1] - start[1]];
+        let leg1 = d[0].hypot(d[1]);
+        if leg1 < 1e-6 {
+            return None;
+        }
+        let u = [d[0] / leg1, d[1] / leg1];
+        let cross = u[0] * (side[1] - corner[1]) - u[1] * (side[0] - corner[0]);
+        let v = if cross >= 0.0 {
+            [-u[1], u[0]]
+        } else {
+            [u[1], -u[0]]
+        };
+        let leg2 = f64::from(t.risers.saturating_sub(1)) * t.tread - leg1;
+        (leg2 >= WIDTH / 2.0 && leg1 >= WIDTH / 2.0)
+            .then(|| [corner[0] + v[0] * leg2, corner[1] + v[1] * leg2])
+    }
+
+    fn finish_winder(&mut self, start: [f64; 2], corner: [f64; 2], side: [f64; 2]) {
+        let frame = self.frame;
+        let Some(t) = self.stair_tool.clone() else {
+            return;
+        };
+        let Some(end) = Self::winder_end(&t, start, corner, side) else {
+            return frame.set_status_text(
+                "Winder Stair: the corner leaves too little (or too much) for the second leg; click the corner again",
+                0,
+            );
+        };
+        self.stair_tool = None;
+        if let Some(v) = self.viewport() {
+            v.set_overlay_lines(&[]);
+        }
+        let mut args = json!({
+            "base_level": t.level,
+            "width": WIDTH,
+            "tread_depth": t.tread,
+            "runs": [{ "start": start, "corner": corner, "end": end }],
+        });
+        match t.top {
+            Some(l) => args["top"] = json!({ "level": l }),
+            None => args["top"] = json!({ "unconnected": UNCONNECTED }),
+        }
+        match self.run("stair.create", args) {
+            Ok(v) => {
+                self.refresh_scene(&frame);
+                frame.set_status_text("Winder stair created", 0);
+                if let Some(id) = v.as_u64() {
+                    let _ = self.run("selection.set", json!({ "ids": [id] }));
+                    self.selection_changed();
+                    self.offer_stair_openings(ElementId(id), false);
+                }
+            }
+            Err(e) => error(&frame, &format!("The stair was not created:\n{e}")),
+        }
     }
 
     /// A full-step spiral about `center` through `start`, with every riser.
@@ -311,6 +404,25 @@ impl Gui {
             width: 0.35,
             segments: Vec::new(),
         };
+        // A winder: its walking line, to the corner and on to where every riser ends.
+        if t.winder {
+            if let Some(a) = t.start {
+                match (t.corner, t.cursor) {
+                    (None, Some(p)) => lines.segments.push(seg(a, p)),
+                    (Some(c), p) => {
+                        lines.segments.push(seg(a, c));
+                        if let Some(e) = p.and_then(|p| Self::winder_end(&t, a, c, p)) {
+                            lines.segments.push(seg(c, e));
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            if let Some(v) = self.viewport() {
+                v.set_overlay_lines(&[lines]);
+            }
+            return;
+        }
         // A spiral: the walking line and the treads' inner and outer circles.
         if t.spiral {
             if let (Some(c), Some(p)) = (t.start, t.cursor) {

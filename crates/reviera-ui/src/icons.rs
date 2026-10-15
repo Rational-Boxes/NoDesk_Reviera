@@ -121,6 +121,9 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "parts_visibility" => format!(
             r#"<path d="M3 16q13-12 26 0q-13 12-26 0z" fill="none" {s}/><path d="M12 12h3v8h-3zM17 12h3v8h-3z" fill="{f}" {sa}/>"#
         ),
+        "winder_stair" => format!(
+            r#"<path d="M4 28V20h8l4 4 4-8V4h8v24z" fill="{f}" {s}/><path d="M12 20l4-4M16 24l4-4M20 16h8M20 10h8M4 24h8" {sa}/>"#
+        ),
         "mass" => format!(
             r#"<path d="M6 26V10l10-6 10 6v16z" fill="{f}" {s}/><path d="M6 10l10 6 10-6M16 16v10" {sa}/>"#
         ),

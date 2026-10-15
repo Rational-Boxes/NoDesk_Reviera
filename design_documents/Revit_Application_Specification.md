@@ -12562,8 +12562,10 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 
 **Acceptance criteria.**
 - [ ] A cast-in-place straight run with structural depth 150 mm has an underside parallel to the pitch line, at a perpendicular distance of 150 mm from the nosing line.
-- [ ] An L winder with three winder treads has walking-line tread depths equal to `T` within 0.1 mm, and every inner tread width is greater than 0.
+- [x] An L winder with three winder treads has walking-line tread depths equal to `T` within 0.1 mm, and every inner tread width is greater than 0.
 - [ ] The volume of a full-step spiral with 16 treads matches the analytic sector volume within 0.5%.
+
+**Implementation note (2026-10-15).** L winders: a run with `winder` (`leg1`, turn) from `stair.create` runs given a `corner`; riser lines a tread depth apart along the walking line (the run's centre line), turning linearly from square to radial through the inner corner within 1.5 run widths of the corner; treads are the polygons between riser lines and the side lines, stepped blocks of riser height plus structural depth; the "Winder inner width below minimum" warning at a third of the tread depth; railings follow the sides round the corner; `QUARTER_WINDING_STAIR`. The window: Architecture › Winder Stair (start, corner, side). Not built yet: U winders, parallel treads at start or end, the leg-balance controls, a smooth underside, supports.
 
 ### 3.7.5 Stair parameters
 **ID:** ARC-STAIR-005 · **Priority:** P0 · **Ref:** research/02 §8.3, §8.4

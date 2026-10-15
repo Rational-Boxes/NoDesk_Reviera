@@ -64,6 +64,16 @@ Level 2 floor over it for the IRC's 6 ft 8 in.</p>
 <p>The spiral climbs to the level above with full steps, and offers to open the floor over it
 like any stair (codes give spiral stairs their own headroom). The Manor's tower has two.</p>
 
+<h2 id="winder">Winder stairs</h2>
+<p>A winder turns a corner without a landing: the treads round the corner are wedge-shaped
+("winders"). Click <b>Architecture › Circulation › Winder Stair</b>
+<a href="reviera:action/stair.winder">Winder Stair</a> in a plan, then the start of the walking
+line (the middle of the first riser), its corner, and the side it turns to. It places every
+riser up to the level above. The risers are a tread depth apart along the walking line; near the
+corner they turn gradually from square to the run to pointing at the inside corner, so no tread
+is too narrow at its inside (a warning says if one is under a third of the tread depth).
+<code>stair.create</code> takes a run with a <code>corner</code>.</p>
+
 <h2 id="properties">Properties</h2>
 <table>
   <tr><td><b>Base Level</b>, <b>Top</b></td><td>The levels the stair runs between.</td></tr>
@@ -85,4 +95,5 @@ plane, the path stops and a zig-zag cut mark crosses the tread. To number the tr
 select stairs and click <b>Modify | Stairs › Number Treads</b>: the numbers follow the treads'
 order along the stair, so they stay when the stair moves. <code>stair.number_treads</code></p>
 
-<p class="note">Not yet available: winders, stair supports, and editing runs with handles.</p>
+<p class="note">Not yet available: U-shaped winders, a smooth underside under winders, stair
+supports, and editing runs with handles.</p>

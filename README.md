@@ -337,7 +337,8 @@ Create … Boundary* tab:
   within the type's maximum (180 mm by default), and runs hold what their length allows at the
   tread depth. Properties set the desired risers, tread depth and width and show the actual
   riser height and warnings. **Spiral Stair** makes a full-step spiral from its centre and a
-  point on its walking line. New stairs get railings on both sides. Saved as `IfcStair`
+  point on its walking line; **Winder Stair** an L winder from its start, corner and turn, its
+  treads balanced round the corner (ARC-STAIR-004). New stairs get railings on both sides. Saved as `IfcStair`
   (`stair.create`, `stair.set_params`).
 - **Ramps** (Architecture › Ramp): click a centreline in a plan from the bottom up. Corners get
   square landings, and a run longer than the type's maximum incline length (9 m) is split by
@@ -759,7 +760,7 @@ area by area (reviewed against the spec on 2026-10-15).
   downspouts are planned as part of plumbing (MEP-PIPE-010).
 - **Openings**: openings across roof ridges and in arched roofs, domes and roofs by extrusion,
   and guards around a stair opening (a Pick Edges railing can follow it).
-- **Stairs, ramps and railings**: winders, supports, editing runs with handles, continuous
+- **Stairs, ramps and railings**: U winders, supports, editing runs with handles, continuous
   handrails and baluster families; curved ramps, ramp railings and editing a ramp's path with
   grips.
 - **Decks**: ledgers, span tables, breakers and board overrides.

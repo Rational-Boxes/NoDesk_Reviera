@@ -402,3 +402,71 @@ fn stair_marks_and_tread_numbers() {
             .all(|e| reviera_core::stair_marks::numbers_recipe(e).is_none())
     );
 }
+
+#[test]
+fn an_l_winder_balances_its_treads() {
+    let dir = tempfile::tempdir().unwrap();
+    let (mut project, mut doc) =
+        LocalProject::new(Schema::Ifc4, &dir.path().join("w.ifc")).unwrap();
+    let r = registry();
+    let l1 = doc
+        .store()
+        .iter()
+        .find(|e| e.class == "IfcBuildingStorey")
+        .unwrap()
+        .id();
+    // 2.7 m at 180 mm: 15 risers, 14 treads of 280 mm along the walking line: 2 m then 1.92 m
+    // after a left turn.
+    let stair = id(run(
+        &r,
+        &mut doc,
+        "stair.create",
+        json!({
+            "base_level": l1.0,
+            "top": { "unconnected": 2.7 },
+            "width": 1.0,
+            "tread_depth": 0.28,
+            "runs": [{ "start": [0.0, 0.0], "corner": [2.0, 0.0], "end": [2.0, 1.92] }],
+        }),
+    )
+    .unwrap());
+    let g = geometry(&doc, stair);
+    assert_eq!((g.risers, g.placed), (15, 15));
+    assert_eq!(g.runs.len(), 14);
+    assert_eq!(g.predefined, "QUARTER_WINDING_STAIR");
+    assert!(g.warnings.is_empty(), "{:?}", g.warnings);
+    // The riser lines: the walking line crosses them 280 mm apart; every tread is wider than
+    // nothing on the inside, and the ones round the corner are not square to the run.
+    let rec = stairs::stair_recipe(doc.store().get(stair).unwrap()).unwrap();
+    let run0 = rec.runs[0];
+    assert!(run0.winder.is_some());
+    let walk = |s: f64| if s <= 2.0 { [s, 0.0] } else { [2.0, s - 2.0] };
+    for (j, line) in g.treads.iter().enumerate() {
+        // The walking-line point of riser j lies on its line.
+        let p = walk(j as f64 * 0.28);
+        let [a, b] = *line;
+        let cross = (b[0] - a[0]) * (p[1] - a[1]) - (b[1] - a[1]) * (p[0] - a[0]);
+        assert!(cross.abs() < 1e-4, "riser {j} misses the walking line");
+    }
+    let inner = |j: usize| g.treads[j][0];
+    for j in 0..14 {
+        let (a, b) = (inner(j), inner(j + 1));
+        assert!(
+            (a[0] - b[0]).hypot(a[1] - b[1]) > 0.0,
+            "tread {j} has no inner width"
+        );
+    }
+    let skew = |j: usize| {
+        let [a, b] = g.treads[j];
+        (b[0] - a[0]).abs() > 1e-6 && (b[1] - a[1]).abs() > 1e-6
+    };
+    assert!(skew(7) && !skew(0) && !skew(14));
+    // Railings follow both sides.
+    let rails = doc
+        .store()
+        .iter()
+        .filter(|e| e.class == "IfcRailing")
+        .count();
+    assert_eq!(rails, 2);
+    project.save(&doc).unwrap();
+}

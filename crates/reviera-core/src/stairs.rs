@@ -9,7 +9,8 @@
 //!   riser height is `H / N`. A run of `k` risers that begins and ends with a riser has `k − 1`
 //!   treads of the actual tread depth.
 //! - **Runs** are stored by their start, direction, width and riser count, so a run keeps its
-//!   steps when the levels move. Runs whose risers do not add up to `N` are reported.
+//!   steps when the levels move. A run can be a spiral, or an L winder whose treads wind round
+//!   its corner, balanced along the walking line. Runs whose risers do not add up to `N` are reported.
 //! - **Geometry (ARC-STAIR-004).** A run is cast in place (monolithic): its side profile of
 //!   risers and treads, with a smooth underside parallel to the pitch line at the type's
 //!   structural depth, extruded across its width. A landing between two runs is the convex hull
@@ -77,6 +78,18 @@ pub struct Run {
     /// `start`, and each tread is the tread depth along it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub spiral: Option<Spiral>,
+    /// An L-shaped winder: the walking line runs `leg1` along `direction` to its corner, then
+    /// turns a right angle; the treads round the corner wind (ARC-STAIR-004).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub winder: Option<Winder>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct Winder {
+    /// The walking line's length from the run's start to its corner.
+    pub leg1: f64,
+    /// Turning counter-clockwise (left) going up.
+    pub ccw: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, JsonSchema)]
@@ -348,6 +361,11 @@ impl Run {
 
     /// The end of the run's path.
     pub fn end(&self, tread: f64) -> [f64; 2] {
+        if let Some(w) = &self.winder {
+            let (_, v, c) = self.winder_frame(w);
+            let l2 = self.length(tread) - w.leg1;
+            return [c[0] + v[0] * l2, c[1] + v[1] * l2];
+        }
         if let Some(s) = &self.spiral {
             let (r, a0, step) = self.turn(s, tread);
             return Self::on_circle(s, r, a0 + step * f64::from(self.risers.saturating_sub(1)));
@@ -361,6 +379,9 @@ impl Run {
 
     /// The up direction at the end of the path.
     pub fn end_direction(&self, tread: f64) -> [f64; 2] {
+        if let Some(w) = &self.winder {
+            return self.winder_frame(w).1;
+        }
         match &self.spiral {
             Some(s) => {
                 let (_, a0, step) = self.turn(s, tread);
@@ -370,6 +391,109 @@ impl Run {
             }
             None => self.direction,
         }
+    }
+
+    /// A winder's directions along its two legs and its walking-line corner.
+    fn winder_frame(&self, w: &Winder) -> ([f64; 2], [f64; 2], [f64; 2]) {
+        let u = self.direction;
+        let l = left(u);
+        let v = if w.ccw { l } else { [-l[0], -l[1]] };
+        (
+            u,
+            v,
+            [self.start[0] + u[0] * w.leg1, self.start[1] + u[1] * w.leg1],
+        )
+    }
+
+    /// A winder's side lines `half` out from the walking line: the inner (round the inside of
+    /// the turn) and the outer, each from the start to the end.
+    fn winder_sides(&self, w: &Winder, tread: f64, half: f64) -> [Vec<[f64; 2]>; 2] {
+        let (u, v, c) = self.winder_frame(w);
+        let e = self.end(tread);
+        let at = |p: [f64; 2], a: [f64; 2], ka: f64, b: [f64; 2], kb: f64| {
+            [p[0] + a[0] * ka + b[0] * kb, p[1] + a[1] * ka + b[1] * kb]
+        };
+        [
+            vec![
+                at(self.start, v, half, u, 0.0),
+                at(c, v, half, u, -half),
+                at(e, u, -half, v, 0.0),
+            ],
+            vec![
+                at(self.start, v, -half, u, 0.0),
+                at(c, v, -half, u, half),
+                at(e, u, half, v, 0.0),
+            ],
+        ]
+    }
+
+    /// A winder's riser lines: for each riser, where its line meets the inner and outer sides
+    /// `half` out (point and distance along that side). Lines are a tread depth apart along the
+    /// walking line and turn linearly from square to the run to radial through the inner corner
+    /// within one and a half run widths of the corner ("balanced").
+    #[allow(clippy::type_complexity)]
+    fn winder_lines(&self, w: &Winder, tread: f64, half: f64) -> Vec<[([f64; 2], f64); 2]> {
+        let (u, v, c) = self.winder_frame(w);
+        let [inner, outer] = self.winder_sides(w, tread, half);
+        let nu = [-u[0], -u[1]];
+        let diag = {
+            let d = [v[0] - u[0], v[1] - u[1]];
+            let l = d[0].hypot(d[1]);
+            [d[0] / l, d[1] / l]
+        };
+        let angle =
+            |a: [f64; 2], b: [f64; 2]| (a[0] * b[1] - a[1] * b[0]).atan2(a[0] * b[0] + a[1] * b[1]);
+        let rot = |a: [f64; 2], t: f64| {
+            [
+                a[0] * t.cos() - a[1] * t.sin(),
+                a[0] * t.sin() + a[1] * t.cos(),
+            ]
+        };
+        let zone = self.width * 1.5;
+        // Where a ray meets a polyline: the point and the distance along the polyline.
+        let hit = |p: [f64; 2], d: [f64; 2], line: &[[f64; 2]]| -> ([f64; 2], f64) {
+            let mut along = 0.0;
+            let mut best: Option<([f64; 2], f64, f64)> = None;
+            for k in 0..line.len() - 1 {
+                let (a, b) = (line[k], line[k + 1]);
+                let e = [b[0] - a[0], b[1] - a[1]];
+                let len = e[0].hypot(e[1]);
+                let den = d[0] * e[1] - d[1] * e[0];
+                if den.abs() > 1e-12 {
+                    let ap = [a[0] - p[0], a[1] - p[1]];
+                    let t = (ap[0] * e[1] - ap[1] * e[0]) / den;
+                    let s = (ap[0] * d[1] - ap[1] * d[0]) / den;
+                    let first = k == 0;
+                    let last = k + 2 == line.len();
+                    let ok = (s >= -1e-9 || first) && (s <= 1.0 + 1e-9 || last);
+                    if ok && t > -1e-9 && best.is_none_or(|b| t < b.2) {
+                        best = Some(([a[0] + e[0] * s, a[1] + e[1] * s], along + s * len, t));
+                    }
+                }
+                along += len;
+            }
+            best.map_or((p, 0.0), |b| (b.0, b.1))
+        };
+        (0..self.risers.max(1))
+            .map(|j| {
+                let sj = f64::from(j) * tread;
+                let d = sj - w.leg1;
+                let (p, dir) = if d <= 0.0 {
+                    let f = (1.0 - -d / zone).clamp(0.0, 1.0);
+                    (
+                        [self.start[0] + u[0] * sj, self.start[1] + u[1] * sj],
+                        rot(v, f * angle(v, diag)),
+                    )
+                } else {
+                    let f = (1.0 - d / zone).clamp(0.0, 1.0);
+                    (
+                        [c[0] + v[0] * d, c[1] + v[1] * d],
+                        rot(nu, f * angle(nu, diag)),
+                    )
+                };
+                [hit(p, dir, &inner), hit(p, [-dir[0], -dir[1]], &outer)]
+            })
+            .collect()
     }
 
     /// The edge across the run at its start and at its end.
@@ -492,6 +616,15 @@ pub fn generate(r: &StairRecipe, z_base: f64, z_top: f64, t: &StairType) -> Resu
                 ));
             }
         }
+        if let Some(w) = &run.winder {
+            let (steps, lines, warning) =
+                winder_steps(run, w, z0, riser, r.tread_depth, t.structural_depth);
+            runs.extend(steps);
+            treads.extend(lines);
+            warnings.extend(warning);
+            done += run.risers;
+            continue;
+        }
         if let Some(sp) = &run.spiral {
             let (steps, lines) =
                 spiral_steps(run, sp, z0, riser, r.tread_depth, t.structural_depth);
@@ -604,6 +737,33 @@ pub fn side_path(
                 }
             }
         }
+        if let Some(w) = &run.winder {
+            // Along the side, rising a riser at each riser line, round the corner on the
+            // outside of the turn.
+            let half = run.width / 2.0 - inset;
+            let inner_side = left_side == w.ccw;
+            let k_side = usize::from(!inner_side);
+            let line = &run.winder_sides(w, td, half)[k_side];
+            let at_corner = (line[1][0] - line[0][0]).hypot(line[1][1] - line[0][1]);
+            let hits: Vec<([f64; 2], f64)> = run
+                .winder_lines(w, td, half)
+                .into_iter()
+                .map(|h| h[k_side])
+                .collect();
+            for (j, h) in hits.iter().enumerate() {
+                let z = z0 + riser * (j as f64 + 1.0);
+                if j > 0 {
+                    let prev = hits[j - 1];
+                    if prev.1 < at_corner && h.1 > at_corner {
+                        let f = (at_corner - prev.1) / (h.1 - prev.1);
+                        push(line[1], z - riser + riser * f, &mut out);
+                    }
+                }
+                push(h.0, z, &mut out);
+            }
+            done += run.risers;
+            continue;
+        }
         match &run.spiral {
             Some(sp) => {
                 let (rad, a0, step) = run.turn(sp, td);
@@ -680,8 +840,75 @@ fn spiral_steps(
     (solids, lines)
 }
 
+/// A winder's steps: each tread the polygon between its riser lines and the run's sides (with
+/// the corner where a side turns), as a solid from its top down by the riser height and the
+/// structural depth (the first stands on the floor); the riser lines; and a warning when a tread
+/// is narrower at the inside than a third of the tread depth.
+fn winder_steps(
+    run: &Run,
+    w: &Winder,
+    z0: f64,
+    riser: f64,
+    tread: f64,
+    depth: f64,
+) -> (Vec<Mesh>, Vec<[[f64; 2]; 2]>, Option<String>) {
+    let half = run.width / 2.0;
+    let lines = run.winder_lines(w, tread, half);
+    let [inner, outer] = run.winder_sides(w, tread, half);
+    let corner = |line: &[[f64; 2]]| {
+        let e = [line[1][0] - line[0][0], line[1][1] - line[0][1]];
+        (line[1], e[0].hypot(e[1]))
+    };
+    let (p_in, at_in) = corner(&inner);
+    let (p_out, at_out) = corner(&outer);
+    let mut solids = Vec::new();
+    let mut narrow = f64::MAX;
+    for j in 0..lines.len().saturating_sub(1) {
+        let ([i0, o0], [i1, o1]) = (lines[j], lines[j + 1]);
+        let mut poly = vec![o0.0];
+        if o0.1 < at_out && o1.1 > at_out {
+            poly.push(p_out);
+        }
+        poly.push(o1.0);
+        poly.push(i1.0);
+        if i0.1 < at_in && i1.1 > at_in {
+            poly.push(p_in);
+        }
+        poly.push(i0.0);
+        poly.dedup_by(|a, b| (a[0] - b[0]).hypot(a[1] - b[1]) < 1e-9);
+        narrow = narrow.min(i1.1 - i0.1);
+        let top = z0 + riser * f64::from(j as u32 + 1);
+        let bottom = (top - riser - depth).max(z0);
+        if poly.len() >= 3 {
+            solids.push(prism(
+                &poly,
+                [0.0, 0.0, bottom],
+                [1.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0],
+                [0.0, 0.0, top - bottom],
+            ));
+        }
+    }
+    let plan = lines.iter().map(|[i, o]| [i.0, o.0]).collect();
+    let warning = (narrow < tread / 3.0 - 1e-9).then(|| {
+        format!(
+            "Winder inner width below minimum: {:.0} mm (a third of the tread depth is {:.0} mm)",
+            narrow.max(0.0) * 1000.0,
+            tread / 3.0 * 1000.0
+        )
+    });
+    (solids, plan, warning)
+}
+
 /// `IfcStair.PredefinedType` from the runs' arrangement.
 fn classify(runs: &[Run]) -> &'static str {
+    if runs.iter().any(|r| r.winder.is_some()) {
+        return if runs.len() == 1 {
+            "QUARTER_WINDING_STAIR"
+        } else {
+            "USERDEFINED"
+        };
+    }
     if runs.iter().any(|r| r.spiral.is_some()) {
         return if runs.len() == 1 {
             "SPIRAL_STAIR"
@@ -855,6 +1082,9 @@ pub struct RunArg {
     pub center: Option<[f64; 2]>,
     /// A spiral turns counter-clockwise going up (default true).
     pub ccw: Option<bool>,
+    /// An L winder: the walking line's corner; the run goes from `start` to it and turns a
+    /// right angle toward `end`.
+    pub corner: Option<[f64; 2]>,
     /// Default the stair's width.
     #[schemars(extend("x-reviera-data-type" = "length"))]
     pub width: Option<Value>,
@@ -995,6 +1225,7 @@ pub(crate) fn create(txn: &mut crate::txn::Transaction<'_>, p: CreateParams) -> 
                 width,
                 risers,
                 spiral: Some(Spiral { center: c, ccw }),
+                winder: None,
             });
             continue;
         }
@@ -1004,6 +1235,49 @@ pub(crate) fn create(txn: &mut crate::txn::Transaction<'_>, p: CreateParams) -> 
                 format!("run {} needs an `end` (or a `center` for a spiral)", i + 1),
             )
         })?;
+        if let Some(c) = a.corner {
+            let d1 = [c[0] - a.start[0], c[1] - a.start[1]];
+            let d2 = [end[0] - c[0], end[1] - c[1]];
+            let (l1, l2) = (d1[0].hypot(d1[1]), d2[0].hypot(d2[1]));
+            if l1 < 1e-6 || l2 < 1e-6 {
+                return Err(Error::new(
+                    "stair.bad_run",
+                    format!("run {}: the winder's legs need length", i + 1),
+                ));
+            }
+            let (u, v) = ([d1[0] / l1, d1[1] / l1], [d2[0] / l2, d2[1] / l2]);
+            if (u[0] * v[0] + u[1] * v[1]).abs() > 1e-6 {
+                return Err(Error::new(
+                    "stair.winder_angle",
+                    format!("run {}: a winder turns a right angle at its corner", i + 1),
+                ));
+            }
+            if l1 < width / 2.0 - 1e-9 || l2 < width / 2.0 - 1e-9 {
+                return Err(Error::new(
+                    "stair.winder_short",
+                    format!(
+                        "run {}: each leg must be at least half the run width long",
+                        i + 1
+                    ),
+                ));
+            }
+            let risers = a
+                .risers
+                .unwrap_or_else(|| risers_for_length(l1 + l2, tread).min(left_over.max(1)));
+            left_over = left_over.saturating_sub(risers);
+            recipe.runs.push(Run {
+                start: a.start,
+                direction: u,
+                width,
+                risers,
+                spiral: None,
+                winder: Some(Winder {
+                    leg1: l1,
+                    ccw: u[0] * v[1] - u[1] * v[0] > 0.0,
+                }),
+            });
+            continue;
+        }
         let d = [end[0] - a.start[0], end[1] - a.start[1]];
         let len = d[0].hypot(d[1]);
         if len < 1e-6 {
@@ -1022,6 +1296,7 @@ pub(crate) fn create(txn: &mut crate::txn::Transaction<'_>, p: CreateParams) -> 
             width,
             risers,
             spiral: None,
+            winder: None,
         });
     }
     generate(&recipe, z0, z1, &t)?;
@@ -1245,6 +1520,7 @@ mod tests {
             width: 1.2,
             risers: 17,
             spiral: None,
+            winder: None,
         }]);
         let g = generate(&r, 0.0, 3.0, &StairType::default()).unwrap();
         assert_eq!(g.risers, 17);
@@ -1275,6 +1551,7 @@ mod tests {
                 center: [0.0, 0.0],
                 ccw: true,
             }),
+            winder: None,
         };
         let g = generate(&recipe(vec![run]), 0.0, 3.0, &StairType::default()).unwrap();
         assert_eq!(g.predefined, "SPIRAL_STAIR");
@@ -1314,6 +1591,7 @@ mod tests {
             width: 1.2,
             risers: 9,
             spiral: None,
+            winder: None,
         };
         let b = Run {
             start: [8.0 * 0.28 + 0.6, 0.6],
@@ -1321,6 +1599,7 @@ mod tests {
             width: 1.2,
             risers: 8,
             spiral: None,
+            winder: None,
         };
         let g = generate(&recipe(vec![a, b]), 0.0, 3.0, &StairType::default()).unwrap();
         assert_eq!(g.predefined, "QUARTER_TURN_STAIR");

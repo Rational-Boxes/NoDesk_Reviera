@@ -3919,6 +3919,10 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
             g.start_stair_tool(true);
             focus(g);
         }),
+        "stair.winder" => with(gui, |g| {
+            g.start_winder_tool();
+            focus(g);
+        }),
         "sheet.place_view" => with(gui, Gui::place_view_on_sheet),
         "sheet.place_schedule" => with(gui, Gui::place_schedule_on_sheet),
         "sheet.open_view" => with(gui, Gui::open_sheet_view),

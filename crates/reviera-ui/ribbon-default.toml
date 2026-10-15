@@ -1378,6 +1378,12 @@ icon = "spiral_stair"
 help = "Draw a spiral stair in a plan: click its centre, then a point on its walking line"
 
 [[action]]
+id = "stair.winder"
+label = "Winder Stair"
+icon = "winder_stair"
+help = "Draw an L-shaped winder stair in a plan: click the start of its walking line, its corner, then the side it turns to"
+
+[[action]]
 id = "dormer.create"
 label = "Dormer"
 icon = "dormer"
@@ -1488,7 +1494,8 @@ tools = [
 label = "Circulation"
 tools = [
   { action = "stair.create", size = "large" },
-  { action = "stair.spiral", size = "large" },
+  { action = "stair.spiral", size = "small" },
+  { action = "stair.winder", size = "small" },
   { action = "ramp.create", size = "large" },
   { action = "railing.create", size = "large" },
   { action = "deck.create", size = "large" },
