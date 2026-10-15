@@ -9,7 +9,7 @@ another one (`REVIERA_VERSION=…` or `-Version …`).
 |---|---|---|---|
 | Linux Flatpak | `packaging/flatpak/build.sh` | `NoDesk-Reviera-<ver>-x86_64.flatpak` | Built and tested on Fedora 43 |
 | macOS disk image | `packaging/macos/build-dmg.sh` | `NoDesk-Reviera-<ver>-macos-<arch>.dmg` | Written, **not yet run on a Mac** |
-| Windows installer and ZIP | `packaging/windows/build-installer.ps1` | `NoDesk-Reviera-<ver>-windows-x64-setup.exe`, `…-portable.zip` | Written, **not yet run on Windows** |
+| Windows installer and ZIP | `packaging/windows/cross/build-cross.sh` (on Linux), `packaging/windows/build-installer.ps1` (on Windows) | `NoDesk-Reviera-<ver>-windows-x64-setup.exe`, `…-portable.zip` | Cross-built on Fedora 43; tested on Windows 11 and under Wine. The MSVC script is **not yet run** |
 
 Every package carries the sample models of the Help page (`test-data/samples`), the GPL
 (`COPYING`) and [`THIRD-PARTY-NOTICES.txt`](THIRD-PARTY-NOTICES.txt). The application icon is
@@ -128,6 +128,35 @@ To check on the first run on a Mac:
   `wxApp::MacOpenFiles`.
 
 ## Windows: installer and portable ZIP
+
+### Cross-built on Linux (how 0.1.0-pre.1 was made)
+
+```sh
+packaging/windows/cross/build-cross.sh
+```
+
+The MinGW-w64 toolchain builds the GNU target (`x86_64-pc-windows-gnu`) on Fedora; the script's
+header lists the packages. OpenCASCADE 7.9.3 (DLLs), LuaJIT and IfcOpenShell 0.8.5 (static) are
+cross-built once from pinned sources under `packaging/windows/cross/build/` (git-ignored), then
+the program is built, staged with the DLLs it imports (found by walking `objdump` imports),
+`WebView2Loader.dll`, the samples and the notices, zipped, and the installer is compiled with
+Inno Setup under Wine in its own prefix. What it needed:
+
+- libstdc++ and winpthread are linked statically. With `libstdc++-6.dll`, `std::call_once`
+  (inside `std::async` in IfcOpenShell's geometry iterator) called a null pointer.
+- `patches/ifcopenshell-mingw-strtod.patch`: IfcOpenShell's MinGW real-number parser rejected a
+  number that ends its token (a storey's elevation), so files did not open.
+- `apps/reviera/build.rs` embeds the application manifest (Common Controls 6, per-monitor DPI,
+  long paths) and the icon. Without it Windows 11 loads comctl32 5.x, which lacks
+  `GetWindowSubclass`, and the program does not start; Wine hides this.
+- Under Wine there is no WebView2: Help falls back to wxWidgets' HTML window, and wgpu draws with
+  OpenGL.
+
+To test under Wine: `WINEPREFIX=$PWD/packaging/windows/cross/build/wine wine
+dist/NoDesk-Reviera-0.1.0-pre.1-windows-x64-setup.exe`. Wine maps the prefix's Documents folder
+to your real home folder, so keep test files elsewhere (`C:\reviera-test`).
+
+### Built on Windows (MSVC)
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File packaging\windows\build-installer.ps1

@@ -472,8 +472,9 @@ Create … Boundary* tab:
   cursor, Previous/Next pan/zoom, and walk mode (WASD or arrow keys, drag to look). Dragging
   orbits about the selection's centre, or about the point of the model under the cursor; the
   middle or right button pans, and Shift + middle drag orbits.
-- **Platform**: Linux (X11, and Wayland through a native subsurface) today; wxWidgets and `wgpu` keep Windows and macOS within
-  reach.
+- **Platform**: Linux (X11, and Wayland through a native subsurface) and Windows 10/11 (also
+  under Wine, where Help falls back to wxWidgets' HTML window and the view draws with OpenGL);
+  wxWidgets and `wgpu` keep macOS within reach.
 
 ## Sample models
 
@@ -529,8 +530,8 @@ nearest gaps in what is built:
   from its marker; schedule filters, grouping and calculated fields; title block families,
   revisions and sheet collections; tags and text in sections and on sheets; the current NBIMS-US
   COBie layout and a COBie settings dialog.
-- **Interface**: general shape tools; macOS and Windows builds (LuaJIT must be built from
-  source there).
+- **Interface**: general shape tools; a macOS build (the script is written, not yet run on a
+  Mac); a Windows GUI that opens without a console window beside it.
 - **MCP**: streamable HTTP with tokens, rate and size limits, subscriptions, prompts,
   `execute_lua` and view images.
 - **Structure, MEP, families and collaboration** (BIMserver, OpenCDE, Godot) are specified but
@@ -549,7 +550,8 @@ in the specification (Chapter 2, §2.11.10–2.11.11). CAD import is not built y
 
 ## Building
 
-Linux (Fedora) is the development platform today; Windows 10+ and macOS are targets.
+Linux (Fedora) is the development platform today; Windows builds are cross-compiled from it, and
+macOS is a target.
 
 ```sh
 # Toolchain and libraries (Fedora)
@@ -566,8 +568,8 @@ cargo test --workspace
 ```
 
 **Packages.** `packaging/` builds the release packages: a Flatpak (built and tested on Fedora
-43), a macOS `.app` in a `.dmg`, and a Windows installer with a portable ZIP (both scripts are
-written but not yet run on a Mac or a Windows PC). See [packaging/README.md](packaging/README.md).
+43), a Windows installer with a portable ZIP (cross-built on Fedora; tested on Windows 11 and
+under Wine), and a macOS `.app` in a `.dmg` (written, not yet run on a Mac). See [packaging/README.md](packaging/README.md).
 
 ## Trying it
 
