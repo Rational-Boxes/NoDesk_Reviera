@@ -539,6 +539,10 @@ nearest gaps in what is built:
 - **Custom objects from meshes** (DM-IMP-015): importing OBJ, STL, PLY and glTF/GLB (3MF and OFF
   later) as reusable object types with a category, material slots and plan outlines, placed many
   times, reloaded from the file, and saved to an object library. Specified; not built yet.
+- **Stamps** (DM-LIB-002): any library object, family type or saved group picked up as a stamp
+  from the Library panel's Stamps strip (or Alt+click on a placed copy), inserting a copy at each
+  click in a plan or on a face in 3D; all copies share one type (Make Unique detaches one); rows
+  and random scatter later. Specified; not built yet.
 - **Interface**: general shape tools; a macOS build (the script is written, not yet run on a
   Mac); a Windows GUI that opens without a console window beside it.
 - **MCP**: streamable HTTP with tokens, rate and size limits, subscriptions, prompts,

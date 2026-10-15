@@ -5713,6 +5713,72 @@ DN25,25,37.5,22,Copper
 - [ ] A remote library whose package checksum does not match its index entry is refused with an error naming the package, and nothing is loaded.
 - [ ] *Load and Place* on a door with 30 types opens Specify Types, then starts door placement with the chosen type.
 
+### 2.8.16 Stamps: placing library objects again and again
+**ID:** DM-LIB-002 · **Priority:** P1 · **Ref:** owner requirement (2026-10-14); DM-LIB-001, DM-IMP-015, ARC-COMP-001; Reviera's own design
+
+**Purpose.** Make custom geometry quick to reuse. Any custom object (DM-IMP-015), family type or saved group in a library can be picked up as a **stamp**, and every click in a view inserts another copy. *(Owner requirement, 2026-10-14: "a library system so that custom objects can be used as a stamp to easily insert a duplicate of the object".)*
+
+**Workflow.**
+1. Open the **Library** panel (DM-LIB-001). Its **Stamps** strip, at the top of the panel, shows thumbnails of pinned stamps and the most recently used ones.
+2. Click a stamp, or double-click a library result. The **Stamp** tool starts with that stamp: a see-through preview follows the cursor, snapping like other placement tools.
+3. Click to insert a copy. The tool stays armed, so each further click inserts another, until Esc or another tool.
+4. While stamping:
+   - Spacebar turns the next copy by 90°; Shift+Spacebar mirrors it.
+   - *Click and drag* sets the direction of that copy.
+   - `[` and `]` step through the Stamps strip, and the digit keys 1–9 pick pinned stamps.
+5. **Pick a stamp from the model**: in the Stamp tool, Alt+click an existing instance, or select it and choose *Stamp This*. That instance's type becomes the stamp, with its rotation and offset.
+
+**Behaviour & rules.**
+- **What can be a stamp:**
+  - a custom object type (DM-IMP-015);
+  - a family type (DM-LIB-001);
+  - a saved group of elements, for example a desk with its chair and lamp (`group.save`).
+- **Adding to the library:**
+  - **Add to Library** (on a selected instance or type) copies the type into a library folder, with a thumbnail rendered from it.
+  - **Save Selection as Stamp** saves several selected elements either as a group, which keeps them as separate elements, or as one custom object, whose meshed geometry merges them.
+  - Library items carry a name, a category, tags and a description, all searchable.
+- **Libraries:**
+  - **My Library** is per user, in the user data folder.
+  - **Project Library** holds the types already in the open project.
+  - Further library folders, including network or WebDAV folders shared by a team, can be added as sources (DM-LIB-001).
+  - Pinned stamps and recent stamps are kept per user.
+- **Copies are duplicates of one type.**
+  - The first stamp of a library item into a project loads its type once. The type keeps the library item's GUID, so it isn't duplicated if stamped again later. Later stamps reuse it.
+  - Every stamped copy is an instance of that type: changing the type (materials, scale, Reload from File) changes every copy.
+  - **Make Unique** gives one copy a type of its own.
+  - When a newer version of the item is in the library, the project offers to update the type (*Reload from library*, DM-LIB-001).
+- **Where copies go:**
+  - In a plan, on the plan's level, at the type's default offset.
+  - In a 3D view, on the face under the cursor: floors, roofs, decks, terrain and the tops of other objects. Optionally the copy turns to the face's slope.
+  - On a work plane when one is set.
+  - A copy's base level is the level it is placed on, or the nearest level below the face it lands on.
+- **Variation (P2).** For planting and scattered objects, a stamp can vary each copy: a random rotation, a random scale within a range (for example 90–110 %), or a choice among several stamps in a set.
+- **Rows of stamps (P2).** Shift+drag stamps a row of evenly spaced copies along the drag. The spacing is the stamp's width plus a gap, or a typed distance; the count shows while dragging.
+- **Undo.** Each click is one undo step; a row or a scatter is one step.
+
+**Data (storage).**
+- A library item is a small IFC file with RXD: the type, with its geometry and recipe; for a group, the group's elements. Beside it sits a thumbnail PNG. The format is the package format of §2.8.14, so the Library panel indexes stamps like families.
+- In a project, a stamped type records its library source and the item's content hash in `families/index`, so the Library panel can tell when it is out of date.
+- Pinned and recent stamps are per-user settings, not model data.
+
+**Commands.**
+`library.add_item(element_or_type_id, library?, name?, tags?) -> item_ref` ·
+`library.save_selection(element_ids[], as: "group"|"object", name, library?, tags?) -> item_ref` ·
+`stamp.place(item_ref | type_id, points[], rotation?, mirror?, level_id?, on_face?: bool) -> element_ids[]` (scriptable: one copy per point) ·
+`stamp.row(item_ref | type_id, start, end, spacing?, count?) -> element_ids[]` (P2) ·
+`stamp.scatter(item_refs[], points[], rotation_range?, scale_range?, seed?) -> element_ids[]` (P2) ·
+`element.make_unique(element_id) -> type_id`.
+The Stamp tool itself is the UI over `stamp.place`.
+
+**Acceptance criteria.**
+- [ ] A custom chair added to My Library appears in the Stamps strip with a thumbnail. Clicking it and then clicking ten times in a plan inserts ten chairs, and the saved IFC holds one chair type with ten instances.
+- [ ] Undo after the tenth click removes only the tenth chair.
+- [ ] Alt+click on a placed table in the Stamp tool makes the table the stamp; the next click inserts a table with the same rotation.
+- [ ] In a 3D view, stamping a lamp on a sloped roof places it on the roof face, and with *Align to face* on, its up direction is the roof's normal.
+- [ ] A desk group saved with *Save Selection as Stamp* (as a group) stamps a desk, chair and lamp as three elements together.
+- [ ] Changing the chair type's material in the project changes all ten stamped chairs. After Make Unique on one, changing the type no longer changes that one.
+- [ ] Stamping the same library item in a second session reuses the type already in the project, not a second copy.
+
 ---
 
 ## 2.9 Parameters and units
@@ -7142,7 +7208,7 @@ Coordinates ▾: *Acquire Coordinates* (from a link), *Publish Coordinates* (to 
 - **Plans and sections.** A custom object is drawn in plans by its outline: the mesh cut at the view's cut plane, and the projection of what is below it (computed from the mesh and cached with the type). Above the cut, it is drawn per the category's overhead style, as other elements are. Sections and elevations draw its projection and cut faces.
 - **Modifying.** Instances move, copy, rotate, mirror, array, align, pin and delete like other elements; they are selected by clicking any face. **Type properties** hold the name, category, material slots, a uniform scale, and the import options. **Reload from File** (`mesh_object.reload`) re-reads the source (or a new file) into the type, keeping every instance and the material mapping where slot names still match.
 - **Taking part in the model.** Custom objects appear in schedules by category, carry parameters and property sets like other elements, are hidden and isolated by category, and take part in overlap detection and clash tests (COL-CLASH). A closed, consistently wound mesh is treated as a solid (its volume is reported and booleans may use it, P2); an open mesh is display-only for booleans and its clash results are marked approximate.
-- **Library.** A type can be saved to the user's object library (Manage › Object Library) as a small IFC file with its RXD recipe, and loaded into other projects. The library is a folder; its location is a setting.
+- **Library and stamps.** A type can be added to a library (a folder of small IFC files with their RXD recipes) and reused in other projects, and any library item can be used as a **stamp** that inserts a copy at each click (DM-LIB-002).
 - **Limits.** A type above 1,000,000 triangles asks to decimate before import; above 5,000,000 it is refused with the count found. Import runs in the background with progress and can be cancelled.
 
 **Data (IFC mapping).**
@@ -8103,6 +8169,12 @@ All commands defined in this chapter. Every command in this table is also a Lua 
 | `library.source.remove` | source_id | — | No | DM-LIB-001 |
 | `library.refresh` | source_id? | — | No | DM-LIB-001 |
 | `library.load` | item_ref, type_names?, place=false | family_id | Yes | DM-LIB-001 |
+| `library.add_item` | element_or_type_id, library?, name?, tags? | item_ref | No | DM-LIB-002 |
+| `library.save_selection` | element_ids[], as: "group"\|"object", name, library?, tags? | item_ref | No | DM-LIB-002 |
+| `stamp.place` | item_ref \| type_id, points[], rotation?, mirror?, level_id?, on_face? | element_ids[] | Yes | DM-LIB-002 |
+| `stamp.row` | item_ref \| type_id, start, end, spacing?, count? | element_ids[] | Yes | DM-LIB-002 |
+| `stamp.scatter` | item_refs[], points[], rotation_range?, scale_range?, seed? | element_ids[] | Yes | DM-LIB-002 |
+| `element.make_unique` | element_id | type_id | Yes | DM-LIB-002 |
 | `param.definition` | param_ref | definition | No | DM-PARAM-002 |
 | `param.list` | category?, element_id? | definition[] | No | DM-PARAM-002 |
 | `param.set_ifc_home` | param_ref, category?, pset_name, property_name | — | Yes | DM-PARAM-002 |
@@ -26018,6 +26090,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | DM-IMP-013 | 2 | 2.11.10 CADCraft interoperability |
 | DM-IMP-014 | 2 | 2.11.11 CADCraft compatibility verification |
 | DM-IMP-015 | 2 | 2.11.12 Custom objects from meshes |
+| DM-LIB-002 | 2 | 2.8.16 Stamps: placing library objects again and again |
 | DM-CMD-002 | 2 | 2.12.2 Command naming and stability |
 | DM-MCP-002 | 2 | 2.16.2 Transports and authentication |
 | DM-MCP-003 | 2 | 2.16.3 Tool catalogue: generation from the registry |
@@ -26203,6 +26276,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `electrical_load_type` | 1 |
 | `electrical_settings` | 2 |
 | `element` | 38 |
+| `element.make_unique` | 2 | element_id | type_id | Yes | DM-LIB-002 |
 | `elevationmarker` | 1 |
 | `embodied_carbon` | 5 |
 | `energy_location` | 1 |
@@ -26274,6 +26348,8 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `legend` | 1 |
 | `level` | 5 |
 | `library` | 6 |
+| `library.add_item` | 2 | element_or_type_id, library?, name?, tags? | item_ref | No | DM-LIB-002 |
+| `library.save_selection` | 2 | element_ids[], as: "group"\|"object", name, library?, tags? | item_ref | No | DM-LIB-002 |
 | `lighting` | 1 |
 | `lighting_fixture` | 1 |
 | `line` | 1 |
@@ -26311,6 +26387,10 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `mep_settings` | 1 |
 | `merge` | 7 |
 | `model` | 12 |
+| `mesh_object.import` | 2 | path, options | type_id | Yes | DM-IMP-015 |
+| `mesh_object.inspect` | 2 | path, options? | report | No | DM-IMP-015 |
+| `mesh_object.place` | 2 | type_id, point, level_id?, rotation?, mirror? | element_id | Yes | DM-IMP-015 |
+| `mesh_object.reload` | 2 | type_id, path?, options? | — | Yes | DM-IMP-015 |
 | `modelline` | 1 |
 | `modeltext` | 2 |
 | `mullion` | 2 |
@@ -26428,6 +26508,9 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `sprinkler` | 1 |
 | `stackedwall` | 1 |
 | `stair` | 15 |
+| `stamp.place` | 2 | item_ref \| type_id, points[], rotation?, mirror?, level_id?, on_face? | element_ids[] | Yes | DM-LIB-002 |
+| `stamp.row` | 2 | item_ref \| type_id, start, end, spacing?, count? | element_ids[] | Yes | DM-LIB-002 |
+| `stamp.scatter` | 2 | item_refs[], points[], rotation_range?, scale_range?, seed? | element_ids[] | Yes | DM-LIB-002 |
 | `standards` | 2 |
 | `stash` | 3 |
 | `steel_cut` | 6 |
