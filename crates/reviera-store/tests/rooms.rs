@@ -272,3 +272,57 @@ fn rooms_are_saved_as_spaces_under_their_storey() {
     .unwrap();
     assert!(deleted.as_array().unwrap().iter().any(|v| v == room.0));
 }
+
+#[test]
+fn room_separators_split_a_room() {
+    let dir = tempfile::tempdir().unwrap();
+    let (mut project, mut doc) =
+        LocalProject::new(Schema::Ifc4, &dir.path().join("sep.ifc")).unwrap();
+    let mut r = CommandRegistry::with_core();
+    reviera_store::commands::register(&mut r);
+    let level = doc
+        .store()
+        .iter()
+        .find(|e| e.class == "IfcBuildingStorey")
+        .unwrap()
+        .id();
+    let c = [[0.0, 0.0], [10.0, 0.0], [10.0, 6.0], [0.0, 6.0]];
+    for k in 0..4 {
+        r.execute(
+            &mut doc,
+            "wall.create",
+            json!({ "curve": { "line": { "start": c[k], "end": c[(k + 1) % 4] } }, "base_level": level.0, "top_constraint": { "unconnected": 3.0 } }),
+            &Caller::user(),
+        )
+        .unwrap();
+    }
+    let room = r
+        .execute(
+            &mut doc,
+            "room.place",
+            json!({ "level_id": level.0, "point": [2.0, 3.0] }),
+            &Caller::user(),
+        )
+        .unwrap()
+        .result;
+    let room = ElementId(room.as_u64().unwrap());
+    let area = |doc: &Document| {
+        reviera_core::rooms::all(doc.store())
+            .into_iter()
+            .find(|x| x.id == room)
+            .unwrap()
+            .geometry
+            .area()
+    };
+    assert!((area(&doc) - 9.8 * 5.8).abs() < 1e-6);
+    // A separator at x = 4 from wall to wall: the room is the left part only.
+    r.execute(
+        &mut doc,
+        "roomseparator.create",
+        json!({ "level_id": level.0, "lines": [{ "start": [4.0, 0.0], "end": [4.0, 6.0] }] }),
+        &Caller::user(),
+    )
+    .unwrap();
+    assert!((area(&doc) - 3.9 * 5.8).abs() < 1e-6, "{}", area(&doc));
+    project.save(&doc).unwrap();
+}

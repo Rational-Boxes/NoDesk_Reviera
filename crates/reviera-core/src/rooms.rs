@@ -129,7 +129,10 @@ fn elevation(store: &Store, guid: &str, what: &str) -> Result<f64> {
 
 /// The arrangement of wall faces where rooms on a level are computed.
 fn plane_edges(store: &Store, level_z: f64) -> Vec<arrangement::Edge> {
-    arrangement::wall_edges(store, level_z + COMPUTATION_HEIGHT)
+    let mut edges = arrangement::wall_edges(store, level_z + COMPUTATION_HEIGHT);
+    // Room separation lines on the level split space too.
+    edges.extend(crate::room_separators::edges(store, level_z));
+    edges
 }
 
 /// Whether `p` lies inside a wall cut at `z`.

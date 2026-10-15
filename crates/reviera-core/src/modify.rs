@@ -295,6 +295,10 @@ pub fn transform(
             };
             crate::model_lines::transform(txn, target, &|p| x.point(p), dz)?;
             out.push(target);
+        } else if crate::room_separators::recipe(e).is_some() {
+            let target = if copy { txn.create(copied(e))? } else { id };
+            crate::room_separators::transform(txn, target, &|p| x.point(p))?;
+            out.push(target);
         } else if crate::in_place::recipe(e).is_some() {
             // A copy is another, independent in-place element, with a name of its own.
             let target = if copy {

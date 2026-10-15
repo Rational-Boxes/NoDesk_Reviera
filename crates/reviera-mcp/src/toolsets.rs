@@ -56,7 +56,7 @@ pub fn toolset_of(command: &str) -> String {
             | "refplane" | "workplane" | "modelline" | "datum" | "scopebox" | "constraint"
             | "slabedge" | "hostsweep" | "shape" | "stackedwall" | "wallsweep" | "wallreveal"
             | "area" | "areascheme" | "areaplan" | "areaboundary" | "group" | "selectionset"
-            | "modeltext" | "inplace" => "modeling",
+            | "modeltext" | "inplace" | "roomseparator" => "modeling",
             "view" | "sheet" | "schedule" | "annotate" | "render" | "walkthrough" | "xr" | "ui"
             | "tag" | "text" | "anno" | "dim" | "viewport" | "section" | "inspect"
             | "colorscheme" => "documentation",

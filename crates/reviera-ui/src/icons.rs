@@ -79,6 +79,9 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "equality" => format!(
             r#"<path d="M4 8v16M16 8v16M28 8v16" {s}/><path d="M4 16h24" {sa}/><path d="M8 12h4M8 14h4M20 12h4M20 14h4" {sa}/>"#
         ),
+        "room_separator" => format!(
+            r#"<path d="M4 6h24v20H4z" fill="{f}" {s}/><path d="M16 6v20" {sa} stroke-dasharray="3 2"/>"#
+        ),
         "tread_numbers" => format!(
             r#"<path d="M4 26h6v-6h6v-6h6V8h6" fill="none" {s}/><path d="M6 17h2M12 11h2" {sa}/>"#
         ),

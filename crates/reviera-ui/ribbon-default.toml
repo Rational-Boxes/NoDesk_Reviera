@@ -935,6 +935,12 @@ icon = "sloped_glazing"
 help = "Turn the selected roofs into sloped glazing (a Sloped Glazing type, made if there is none); change their type back to undo"
 
 [[action]]
+id = "roomseparator.create"
+label = "Room Separator"
+icon = "room_separator"
+help = "Draw lines that split space for rooms, like walls (Arc in Properties for curves)"
+
+[[action]]
 id = "stair.number_treads"
 label = "Number Treads"
 icon = "tread_numbers"
@@ -1340,6 +1346,7 @@ label = "Room & Area"
 tools = [
   { action = "room.place", size = "large" },
   { action = "room.place_automatically", size = "small" },
+  { action = "roomseparator.create", size = "small" },
   { action = "colorscheme.create", size = "small" },
 ]
 

@@ -50,6 +50,8 @@ pub enum LineMode {
     ShapePoint,
     /// Split with Gap (ARC-WALL-011): click a wall where the gap goes.
     SplitGap,
+    /// Room Separator (ARC-ROOM-001): lines (or arcs) on the plan's level.
+    RoomSeparator,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -266,6 +268,7 @@ impl Gui {
             LineMode::SlabEdge => "Slab Edge",
             LineMode::ShapePoint => "Add Point",
             LineMode::SplitGap => "Split with Gap",
+            LineMode::RoomSeparator => "Room Separator",
         };
         let mut text = match (t.points.len(), t.shape) {
             _ if t.mode == LineMode::SplitGap => {
@@ -541,6 +544,14 @@ impl Gui {
                     None => Err("The selected roof has no footprint".to_owned()),
                 }
             }
+            LineMode::RoomSeparator => {
+                let level = self.active_view().and_then(|v| v.plan.as_ref()).map(|p| p.level);
+                let through = through.first().copied();
+                self.run(
+                    "roomseparator.create",
+                    json!({ "level_id": level, "lines": [{ "start": start, "end": end }], "through": [through] }),
+                )
+            }
             LineMode::ScopeBox => {
                 let mut args = json!({ "rectangle": { "corner_a": start, "corner_b": end } });
                 if !t.name.trim().is_empty() {
@@ -683,6 +694,10 @@ impl Gui {
             LineMode::RefPlane => {
                 grid.append(Property::category("Reference Plane", "c_lt"));
                 grid.append(Property::string("Name", "lt_name", t.name.clone()));
+            }
+            LineMode::RoomSeparator => {
+                grid.append(Property::category("Room Separator", "c_lt"));
+                grid.append(Property::boolean("Chain", "lt_chain", t.chain));
             }
             LineMode::ScopeBox => {
                 grid.append(Property::category("Scope Box", "c_lt"));

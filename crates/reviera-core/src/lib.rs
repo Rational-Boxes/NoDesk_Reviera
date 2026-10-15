@@ -58,6 +58,7 @@ pub mod railings;
 pub mod ramps;
 pub mod ref_planes;
 pub mod roofs;
+pub mod room_separators;
 pub mod rooms;
 pub mod schedules;
 pub mod scope_boxes;

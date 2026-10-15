@@ -162,6 +162,7 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(RoofCreateGlazingType),
         registry.add(ModelTextCreate),
         registry.add(StairNumberTreads),
+        registry.add(RoomSeparatorCreate),
         registry.add(InPlaceCreate),
         registry.add(InPlaceAddForm),
         registry.add(InPlaceRemoveForm),
@@ -2131,6 +2132,18 @@ edit_command!(
     crate::in_place::RemoveFormParams,
     (),
     crate::in_place::remove_form
+);
+
+edit_command!(
+    RoomSeparatorCreate,
+    "roomseparator.create",
+    "Add room separation lines",
+    "Lines on a level that split space for rooms like walls (ARC-ROOM-001); `through` gives a point \
+     for an arc, per line. Rooms on the level update at once.",
+    "Room Separator",
+    crate::room_separators::CreateParams,
+    Vec<crate::id::ElementId>,
+    crate::room_separators::create
 );
 
 edit_command!(

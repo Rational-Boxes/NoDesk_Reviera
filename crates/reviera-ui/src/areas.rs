@@ -504,4 +504,39 @@ impl Gui {
         }
         dialog.destroy();
     }
+
+    /// Room separation lines on a plan's level (ARC-ROOM-001).
+    pub(crate) fn separator_lines(&mut self, index: usize) -> Vec<Lines> {
+        let v = &self.views[index];
+        let Some(plan) = v.plan.clone() else {
+            return Vec::new();
+        };
+        let Some(store) = self.app.document(v.doc).map(|d| d.doc.store().clone()) else {
+            return Vec::new();
+        };
+        let Some(level) = store.get(plan.level).map(|l| l.guid().to_string()) else {
+            return Vec::new();
+        };
+        let z = plan.range.cut as f32 + 0.003;
+        let mut lines = Lines {
+            color: [0.2, 0.2, 0.2, 1.0],
+            width: 0.13,
+            segments: Vec::new(),
+        };
+        for e in store.iter() {
+            let Some(r) = reviera_core::room_separators::recipe(e) else {
+                continue;
+            };
+            if r.level != level {
+                continue;
+            }
+            for w in reviera_core::room_separators::points(&r).windows(2) {
+                lines.segments.push([
+                    [w[0][0] as f32, w[0][1] as f32, z],
+                    [w[1][0] as f32, w[1][1] as f32, z],
+                ]);
+            }
+        }
+        vec![lines]
+    }
 }

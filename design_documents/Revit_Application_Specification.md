@@ -13073,6 +13073,8 @@ These are view annotation and are specified in the DOC chapter. This chapter req
 - `roomtag.move_to_reference(tag_ids)`
 - `room.highlight_boundaries(view_id) -> [element_id]` *(query)*
 
+**Implementation note (2026-10-15, room separators).** `roomseparator.create(level_id, lines, through?)` makes `IfcVirtualElement`s (`recipe.room_separation`: level, line, optional arc point) that rooms on the level take as boundaries; they move, copy and rotate with the ordinary tools and go with their level. The window: Room & Area › Room Separator (lines or arcs). Not built yet: Pick Lines, the Room Separation line style, `IfcRelSpaceBoundary` (VIRTUAL).
+
 **Implementation notes (2026-10-13).**
 - As built:
   - Rooms are bounded by walls at their finish faces, cut 1 mm above the level.

@@ -43,6 +43,12 @@ has none, numbered in reading order.
 <a href="reviera:help/documentation#schedules">Schedules</a>.</p>
 <p>Rooms are saved as <code>IfcSpace</code> under their storey, with the number as the IFC Name
 and the name as its LongName.</p>
+<h2 id="separators">Room separators</h2>
+<p><b>Architecture › Room &amp; Area › Room Separator</b> draws lines (or arcs, from the
+<b>Shape</b> row in Properties) that split space like walls without being built: an open-plan
+kitchen and living room become two rooms. Rooms on the level update at once.
+<code>roomseparator.create</code></p>
+
 <h2 id="color-schemes">Colour schemes</h2>
 <p><b>Architecture › Room &amp; Area › Color Schemes</b> colours a plan's rooms (or an area plan's
 areas) by a parameter: Name, Number, Area, Perimeter, or any parameter of rooms, including your
@@ -78,5 +84,5 @@ outside. Changing an area's type (<code>area.set_type</code>) moves its boundari
 <code>areascheme.create</code>, <code>areascheme.set_rules</code>, <code>areaplan.create</code>,
 <code>areaboundary.create</code>, <code>area.place</code>, <code>area.list</code></p>
 
-<p class="note">Not yet available: room separation lines, other area rules, and volumes clipped by
+<p class="note">Not yet available: other area rules, and volumes clipped by
 floors and roofs.</p>

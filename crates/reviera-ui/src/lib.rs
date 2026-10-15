@@ -4008,6 +4008,10 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
             g.start_line_tool(datum_tools::LineMode::ModelLine);
             focus(g);
         }),
+        "roomseparator.create" => with(gui, |g| {
+            g.start_line_tool(datum_tools::LineMode::RoomSeparator);
+            focus(g);
+        }),
         "workplane.set" => with(gui, Gui::set_work_plane),
         "scopebox.create" => with(gui, |g| {
             g.start_line_tool(datum_tools::LineMode::ScopeBox);

@@ -114,6 +114,9 @@ fn raw_parent(store: &Store, e: &Element, imported: &Imported) -> Option<Element
     if let Some(r) = crate::path_arrays::path_array_recipe(e) {
         return by_guid(&r.level);
     }
+    if let Some(r) = crate::room_separators::recipe(e) {
+        return by_guid(&r.level);
+    }
     // Areas and area boundaries sit on their level.
     if let Some(r) = crate::areas::area_recipe(e) {
         return by_guid(&r.level);

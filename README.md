@@ -395,6 +395,8 @@ Create … Boundary* tab:
   ARC-GRP-001 … 003).
 - **Saved selections** (Manage › Selection): Save and Load Selection (`selectionset.save`,
   `selectionset.load`, `selectionset.edit`, `selectionset.list`; ARC-SEL-002).
+- **Room separators** (Room & Area › Room Separator): lines or arcs that split space for rooms
+  like walls (`roomseparator.create`; ARC-ROOM-001).
 - **Areas and area schemes** (Architecture › Area): Gross Building and Rentable schemes with area
   types and boundary rules, area plans (boundaries on the outside walls), picked boundaries
   placed by the rules for the areas either side, and areas (`areascheme.create`,
@@ -736,7 +738,7 @@ area by area (a review against the spec on 2026-10-15). Whole areas not started 
   handrails and baluster families; curved ramps, ramp railings and editing a ramp's path with
   grips.
 - **Decks**: ledgers, span tables, breakers and board overrides.
-- **Rooms**: room separation lines, tags as elements, other area rules, volumes clipped by floors
+- **Rooms**: tags as elements, other area rules, volumes clipped by floors
   and roofs.
 - **Components**: Edit Component (opening a component and updating its copies), components placed
   as linked groups, pinned and recent stamps and Alt+click to pick one from the model, rows and
