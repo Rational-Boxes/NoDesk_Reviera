@@ -2220,15 +2220,17 @@ The following context panels are part of the default layout. Owners are authorit
 
 **Behaviour & rules.**
 - A **middle click** (press and release without moving; a middle drag still pans) on a model element opens the menu at the cursor. If the element is not selected it is selected first, replacing the selection, or added to it with Ctrl. A middle click on nothing offers only Reset Hide/Isolate, when the view has temporary hiding or isolation (hidden elements cannot be clicked); otherwise, and while a tool runs or on a sheet, it does nothing.
-- The menu's title names the element (or the count), then: Move, Copy, Rotate, Mirror – Pick Axis, Mirror – Draw Axis; Flip Wall (all walls) or Flip Hand and Flip Facing (all doors and windows); Hide in View, Make Translucent (Make Opaque when the whole selection already is; `view.temp_translucent` / `view.temp_show`), Isolate, Reset Hide/Isolate (when the view has any temporary hiding, translucency or isolation; `view.temp_reset`), Section Box; Pin and/or Unpin (as the selection is); Delete. Each runs the same command as its ribbon button.
+- The menu's title names the element (or the count), then: Move, Copy, Rotate, Mirror – Pick Axis, Mirror – Draw Axis; Flip Wall (all walls) or Flip Hand and Flip Facing (all doors and windows); Hide in View, Make Translucent (Make Opaque when the whole selection already is; `view.temp_translucent` / `view.temp_show`), Isolate, Reset Hide/Isolate (when the view has any temporary hiding, translucency or isolation; `view.temp_reset`), Section Box; **Create Component…** (DM-LIB-003); Pin and/or Unpin (as the selection is); Delete. Each runs the same command as its ribbon button.
+- **Create Component…** turns the current selection into a reusable component. *(Owner requirement, 2026-10-14: "from the center-click, the current selection can be turned into a reusable component".)* It opens the Create Component dialog of DM-LIB-003 for the selection, with any members Tab-selected inside groups and components. The dialog's destination is the library folder used last, and Replace selection with the component is on.
 - **Two elements selected:** the menu checks whether their bodies overlap (`overlap.find`, accepted overlaps included, pairs related by design such as a window and its wall left out). If they do, it shows the overlap's volume and the booleans of ARC-MOD-032: Cut A by B, Cut B by A, Intersect, Union, Join (by precedence) and Accept the Overlap (`overlap.resolve`). A cut or intersect asks whether the tool's own body hides. If they do not overlap, the menu says so.
 
-**Commands.** None of its own: the items are the registry's (`element.*`, `wall.flip`, `insert.flip_*`, `view.temp_*`, `overlap.find`, `overlap.resolve`).
+**Commands.** None of its own: the items are the registry's (`element.*`, `wall.flip`, `insert.flip_*`, `view.temp_*`, `overlap.find`, `overlap.resolve`, `component.create`).
 
 **Acceptance criteria.**
 - [x] Selecting a wall and Ctrl+clicking the pier through it, then middle-clicking the pier, shows "Overlap of 0.36 m³" and the booleans; Cut A by B cuts the wall and the overlap is gone from the next menu. *(Built 2026-10-14.)*
 - [x] A middle click on an unselected element selects it and opens its menu; a middle drag pans.
 - [x] Make Translucent, then the menu again, offers Make Opaque; after Hide in View, a middle click on empty space offers Reset Hide/Isolate, which shows the element again.
+- [ ] Selecting a desk, its chair and its lamp, then middle-clicking one of them and choosing Create Component…, saves an IFC component of the three into the library folder used last, and the three become one placed copy of it.
 ---
 
 ## 1.22 In-canvas controls
@@ -5796,7 +5798,7 @@ The Stamp tool itself is the UI over `stamp.place`.
   - **What can be selected:** any selection of objects in a model, of any categories and any number. This includes a sub-selection:
     - some of a group's or a placed component's members, picked with Tab;
     - elements of an imported or linked IFC model.
-  - **Create Component** (Modify tab, the right-click menu, and Library › Create Component) writes the selection as a new component: **an IFC file of that model fragment**, and nothing else.
+  - **Create Component** (first in the middle-click quick modify menu, UI-SEL-006; also on the Modify tab, the right-click menu, and Library › Create Component) writes the selection as a new component: **an IFC file of that model fragment**, and nothing else.
   - **Where it goes:** into a folder of an open library, where it becomes a library item at once, or to any path.
   - **In the dialog:** name, destination (a library folder, or a file path), tags and description, and the options below.
   - **Kind**: *Fragment* (default for several elements) or *Object* (merge into one custom object, DM-IMP-015).
