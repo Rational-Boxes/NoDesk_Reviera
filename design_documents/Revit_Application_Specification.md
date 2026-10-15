@@ -2220,7 +2220,7 @@ The following context panels are part of the default layout. Owners are authorit
 
 **Behaviour & rules.**
 - A **middle click** (press and release without moving; a middle drag still pans) on a model element opens the menu at the cursor. If the element is not selected it is selected first, replacing the selection, or added to it with Ctrl. A middle click on nothing offers only Reset Hide/Isolate, when the view has temporary hiding or isolation (hidden elements cannot be clicked); otherwise, and while a tool runs or on a sheet, it does nothing.
-- The menu's title names the element (or the count), then: Move, Copy, Rotate, Mirror – Pick Axis, Mirror – Draw Axis; Flip Wall (all walls) or Flip Hand and Flip Facing (all doors and windows); Hide in View, Make Translucent (Make Opaque when the whole selection already is; `view.temp_translucent` / `view.temp_show`), Isolate, Reset Hide/Isolate (when the view has any temporary hiding, translucency or isolation; `view.temp_reset`), Section Box; **Create Component…** (DM-LIB-003); Pin and/or Unpin (as the selection is); Delete. Each runs the same command as its ribbon button.
+- The menu's title names the element (or the count), then: Move, Copy, Rotate, Mirror – Pick Axis, Mirror – Draw Axis; Flip Wall (all walls) or Flip Hand and Flip Facing (all doors and windows); Hide in View, Make Translucent (Make Opaque when the whole selection already is; `view.temp_translucent` / `view.temp_show`), Isolate, Reset Hide/Isolate (when the view has any temporary hiding, translucency or isolation; `view.temp_reset`), Section Box; **Create Component…** (DM-LIB-003); **Path Array** (ARC-MOD-033); Pin and/or Unpin (as the selection is); Delete. Each runs the same command as its ribbon button.
 - **Create Component…** turns the current selection into a reusable component. *(Owner requirement, 2026-10-14: "from the center-click, the current selection can be turned into a reusable component".)* It opens the Create Component dialog of DM-LIB-003 for the selection, with any members Tab-selected inside groups and components. The dialog's destination is the library folder used last, and Replace selection with the component is on.
 - **Two elements selected:** the menu checks whether their bodies overlap (`overlap.find`, accepted overlaps included, pairs related by design such as a window and its wall left out). If they do, it shows the overlap's volume and the booleans of ARC-MOD-032: Cut A by B, Cut B by A, Intersect, Union, Join (by precedence) and Accept the Overlap (`overlap.resolve`). A cut or intersect asks whether the tool's own body hides. If they do not overlap, the menu says so.
 
@@ -13612,6 +13612,7 @@ These tools are on the **Modify** tab and are repeated on every `Modify | <Eleme
 | ARC-MOD-024 | **Demolish** | P1 | — | A hammer cursor: each clicked element gets Phase Demolished = the view's phase, and its graphics follow the phase filter. Undone by setting Phase Demolished to None. Elements that can be demolished highlight on hover. The change is model data, so the element shows as demolished in every view of that phase. Elements created after the view's phase, or already demolished in an earlier phase, are refused with a status-bar message. Hosted inserts are demolished with their host. Nothing is deleted or unhosted, and rooms in later phases recompute without the element. Linked elements and annotation cannot be demolished. Esc or Modify exits; each click is one undo step | `element.demolish(element_ids[], phase_id? (default: the active view's phase), view_id?) -> ()` |
 | ARC-MOD-025 | **Linework** | P1 | LW | A view-specific override of the line style of model edges. Specified in the DOC chapter. The user picks a line style on the contextual tab (including *Invisible lines*, and *By Category* to remove an override) and clicks edges, Tab cycling between coincident edges; dragging an edge's end controls limits the override to part of the edge. It works on projected and cut edges in plan, section, elevation and orthographic 3D views. The element itself is unchanged, and an override is dropped with a warning when its edge disappears (DOC-GFX-007) | `view.set_linework(view_id, edge_refs[], line_style_id?)` (DOC) |
 | → ARC-MOD-026 | **Array** | P0 | AR | ARC-MOD-026 below | `element.array_linear`, `element.array_radial`, `array.set_count` |
+| → ARC-MOD-033 | **Array along Path** | P1 | AP | ARC-MOD-033 below | `array.along_path`, `array.set`, `array.exclude_member`, `array.unarray` |
 | ARC-MOD-027 | **Repeat last command** | P0 | RC / Enter | Re-runs the last tool with its options. Enter repeats only when no tool is active and nothing is being edited; RC and the context-menu item *Repeat [tool name]* always repeat. The repeated tool starts with the options it had when it ended (Multiple, Copy, Disjoin, joint gap, and so on) and the same type, but with no selection, so select-first tools ask for a selection. Commands run from Lua or MCP are not recorded as "last"; view-navigation and selection commands are not either. After a session tool (sketch, group editor) the repeat starts a new session. If the last tool is unavailable in the current view, the status bar says so | `tool.repeat_last() -> session_id` |
 
 **Acceptance criteria (modify tools).**
@@ -13792,6 +13793,83 @@ These tools are on the **Modify** tab and are repeated on every `Modify | <Eleme
 **Acceptance criteria.**
 - [ ] A linear array of 5 chairs at 0.8 m, with Group and Associate on, can be changed to 7 by editing the count label, and the spacing stays 0.8 m.
 - [ ] A radial array of 8 columns over 360° (Move To: Last, 360°) places the columns 45° apart without duplicating the first one.
+
+### 3.12.3a Array along a path
+**ID:** ARC-MOD-033 · **Priority:** P1 · **Ref:** owner requirement (2026-10-14); ARC-MOD-026, DM-IMP-015, DM-LIB-002 … 004; Reviera's own design
+
+**Purpose.** Repeat a component along any path, keeping it parametric: change the path, the count or the spacing, and the copies follow. This holds even when the component is a plain mesh with no parameters of its own. A typical use is a custom column model filling a Greek temple's colonnade: columns round the stylobate, one at every corner, and equal spacing along each side. Other uses are balusters along a curved balcony, lamp posts along a road, trees along an avenue and bollards along a kerb. *(Owner requirement, 2026-10-14: "a duplicate-along-a-path tool… a custom column model to fill in a Greek temple style facade; set the number of duplicates to space along the path; remains parametric even though the individual objects are plain meshes".)*
+
+**Workflow.**
+1. Select what to repeat: a component instance or several elements, or pick a component in the Component Library. Then choose Modify › **Array along Path** (or **Path Array** in the middle-click quick menu, UI-SEL-006).
+2. Give the path, in one of three ways:
+   - **Pick** an existing line: a wall's location line, a curtain wall, a grid line, a railing's path, a model line, or an edge of a floor, roof, deck or slab. Several picked lines chain into one path (Tab picks a chain).
+   - **Draw** a line, arc, spline or polyline in a plan or on a work plane.
+   - **Use the edges** of a selected floor, deck or roof as one closed path: *Edges of Host*.
+3. Set the distribution in the options bar. A preview shows every copy as the values change. Enter or Finish makes the array.
+
+**Behaviour & rules.**
+- **Distribution** (as in curtain grid layouts, ARC-CW-002):
+  - **Number:** a count of copies spread evenly over the path.
+  - **Fixed Distance:** a spacing, with the remainder placed at the *Start*, the *End*, or split at both ends (*Centre*).
+  - **Maximum Spacing:** the fewest equal spaces no larger than the value.
+  - **Minimum Spacing:** the most equal spaces no smaller than the value.
+- **Ends:**
+  - *Include start* and *Include end*, each on by default, place a copy at each end. On a closed path the start and end coincide, so there is one copy there.
+  - *Start inset* and *End inset* shorten the used part of the path.
+- **Corners** (for paths with corners, such as a polyline or a closed outline):
+  - **Through corners** spaces the copies along the whole length, ignoring corners.
+  - **At every corner** puts a copy on each corner and spaces the rest evenly along each segment. In this mode *Number* is per segment, or a total shared in proportion to segment lengths; this suits a peristyle with columns at the four corners.
+  - *Skip corners* leaves the corners empty.
+- **Orientation** of each copy:
+  - **Follow path:** the copy's local x along the tangent. This is the default for walls, railings and edges.
+  - **Fixed:** every copy keeps the source's rotation.
+  - **Face outward or inward:** perpendicular to the path, outward from a closed path's centre or inward to it, as columns face out from a temple.
+  - Plus a *rotation offset*, and *alternate mirror* (every second copy mirrored, P2).
+- **Height:**
+  - In plan, copies stand on the array's level, plus an offset.
+  - **Follow path height** sets each copy's base from the path's height at that point, as for a sloped edge or a 3D spline.
+  - **On host face** drops each copy onto the face below it: a stylobate, stepped floors, or terrain.
+- **It remains parametric.** The array is one element: a **path array**. It records the path, the source component (type or fragment), the distribution and the options, and its members are generated from them.
+  - **When the path is a picked element**, the path follows it. Moving the wall, reshaping the floor's edge or editing the railing's path regenerates the copies.
+  - **Editing:** selecting a member or the array shows:
+    - grips at the path's ends, and grips along a drawn path to reshape it;
+    - an editable count label on the canvas;
+    - the distribution, options and component in Properties.
+
+    Each change is one undo step.
+  - **The component can be swapped** for another type or library item (the Type Selector on the array), and every member changes.
+  - **Plain mesh components** (DM-IMP-015) work the same as parametric ones: the array is what is parametric. The members share the one mesh (`IfcMappedItem`), so 200 columns store their geometry once.
+- **Members.**
+  - Each member is a real element of the component's category (an `IfcColumn` for a column component, and so on). Members appear in schedules, take tags, and clash like any other element. They are read-only on their own and change through the array.
+  - Tab selects one member. **Exclude Member** removes a copy and keeps the gap, for an entrance between two columns, say. Excluded positions are kept by index and survive count changes where they can (Restore Excluded brings them back).
+  - Instance properties set on a member (Mark, Comments) are kept by index across regeneration.
+- **Dissolving.**
+  - **Unarray** turns the members into independent elements and deletes the array.
+  - Deleting the array deletes its members.
+  - Deleting the picked path element asks whether to keep the members as independent elements, or delete them with it.
+- **Arrays of several elements.** The source may be several elements or a fragment component (DM-LIB-003), such as a column with its plinth and capital as separate elements. Each copy is then a group instance (ARC-GRP-001), regenerated together.
+- **Limits.** Up to 10,000 copies. Above 1,000 the preview thins to a sample of copies while dragging.
+
+**Data (IFC mapping).**
+- Each member is an element of the component's IFC class, whose body is an `IfcMappedItem` of the component type's representation map (DM-IMP-015). A fragment member is an `IfcGroup` (ARC-GRP-001).
+- The path array is an `IfcGroup` with `ObjectType = "PathArray"`, with its members assigned by `IfcRelAssignsToGroup`.
+- The path, distribution, options, member indices, exclusions and per-member properties are in its RXD recipe (`recipe.path_array`).
+- A drawn path is stored in the recipe. A picked path stores the element's GlobalId and which curve (its location line, or the edge index).
+
+**Commands.**
+`array.along_path(source: element_ids[] | type_id | item_ref, path: {curve} | {element_id, edge?} | {host_edges: element_id}, distribution: {mode: "number"|"fixed"|"max"|"min", value, justify?: "start"|"end"|"centre"}, options?: {include_start?, include_end?, start_inset?, end_inset?, corners?: "through"|"every_corner"|"skip", orientation?: "follow"|"fixed"|"outward"|"inward", rotation_offset?, alternate_mirror?, height?: "level"|"path"|"host_face", level_id?, offset?}) -> array_id` ·
+`array.set(array_id, {source?, path?, distribution?, options?})` ·
+`array.exclude_member(array_id, index)` · `array.restore_member(array_id, index | "all")` ·
+`array.unarray(array_id) -> element_ids[]`.
+`array.set_count` (ARC-MOD-026) also works on path arrays.
+
+**Acceptance criteria.**
+- [ ] A Doric column mesh component, arrayed along the edges of a 30 × 14 m stylobate floor with *At every corner*, 13 per long side and 6 per short side, gives a 6 × 13 peripteral colonnade of 34 columns facing outward. The saved IFC holds one column mesh and 34 `IfcColumn` members.
+- [ ] Moving one edge of that floor by 2 m regenerates the columns on that side, and the corners stay occupied.
+- [ ] Changing the long-side count from 13 to 15 on the canvas label respaces the long sides in one undo step.
+- [ ] Excluding the middle column of the front row leaves a gap that survives changing the column component to an Ionic one.
+- [ ] Balusters arrayed along a curved railing path with *Maximum Spacing* 110 mm follow the curve, each turned to its tangent, and stay within 110 mm when the railing is lengthened.
+- [ ] Unarray leaves 34 independent columns where they stood, and the array element is gone.
 
 ---
 
@@ -14441,6 +14519,11 @@ All commands below are registered once in the command registry and exposed autom
 | `element.array_linear` | element_ids, vector, count, move_to: Second\|Last, group_and_associate: bool, constrain?: bool | array_id \| [element_id] | Yes | ARC-MOD-026 |
 | `element.array_radial` | element_ids, center, angle, count, move_to: Second\|Last, axis?, group_and_associate: bool | array_id \| [element_id] | Yes | ARC-MOD-026 |
 | `array.set_count` | array_id, count, append_to_end: bool | — | Yes | ARC-MOD-026 |
+| `array.along_path` | source, path, distribution, options? | array_id | Yes | ARC-MOD-033 |
+| `array.set` | array_id, {source?, path?, distribution?, options?} | — | Yes | ARC-MOD-033 |
+| `array.exclude_member` | array_id, index | — | Yes | ARC-MOD-033 |
+| `array.restore_member` | array_id, index \| "all" | — | Yes | ARC-MOD-033 |
+| `array.unarray` | array_id | element_ids[] | Yes | ARC-MOD-033 |
 | `group.create` | element_ids, name, kind?: Model\|Detail | {group_type_id, instance_id, attached_detail_type_id?} | Yes | ARC-GRP-001 |
 | `group.place` | group_type_id, point, rotation?, level_id?, origin_offset? | element_id | Yes | ARC-GRP-001 |
 | `group.swap_type` | instance_ids, group_type_id | — | Yes | ARC-GRP-001 |
@@ -26335,6 +26418,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | DM-LIB-002 | 2 | 2.8.16 Stamps: placing library objects again and again |
 | DM-LIB-003 | 2 | 2.8.17 Model fragments in the library |
 | DM-LIB-004 | 2 | 2.8.18 Library folders and large libraries |
+| ARC-MOD-033 | 3 | 3.12.3a Array along a path |
 | DM-CMD-002 | 2 | 2.12.2 Command naming and stability |
 | DM-MCP-002 | 2 | 2.16.2 Transports and authentication |
 | DM-MCP-003 | 2 | 2.16.3 Tool catalogue: generation from the registry |
@@ -26438,6 +26522,11 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `areascheme` | 2 |
 | `array` | 1 |
 | `assembly` | 16 |
+| `array.along_path` | 3 | source, path, distribution, options? | array_id | Yes | ARC-MOD-033 |
+| `array.exclude_member` | 3 | array_id, index | — | Yes | ARC-MOD-033 |
+| `array.restore_member` | 3 | array_id, index \| "all" | — | Yes | ARC-MOD-033 |
+| `array.set` | 3 | array_id, {source?, path?, distribution?, options?} | — | Yes | ARC-MOD-033 |
+| `array.unarray` | 3 | array_id | element_ids[] | Yes | ARC-MOD-033 |
 | `assemblytemplate` | 1 |
 | `bcf` | 25 |
 | `beam` | 3 |

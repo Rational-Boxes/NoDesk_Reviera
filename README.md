@@ -551,6 +551,10 @@ nearest gaps in what is built:
   hold (units, category, manufacturer, classification, property sets, material colours), kept in
   the manifest and applied when the item is placed. Libraries have smart folders and
   drag-and-drop reorganising. Specified; not built yet.
+- **Array along a path** (ARC-MOD-033): a component (a plain mesh included) repeated along a picked
+  or drawn path or a host's edges, by number or spacing, with copies at every corner and facing
+  outward (a temple colonnade), staying parametric as the path, count or component changes.
+  Specified; not built yet.
 - **Stamps** (DM-LIB-002): any library object, family type or model fragment picked up as a stamp
   from the Library panel's Stamps strip (or Alt+click on a placed copy), inserting a copy at each
   click in a plan or on a face in 3D; all copies share one type (Make Unique detaches one); rows
