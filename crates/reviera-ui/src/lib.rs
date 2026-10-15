@@ -2881,7 +2881,8 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                             used = g.sketch_key(key, mx, my);
                         }
                         if !used && matches!(key, WXK_BACK | WXK_RETURN | WXK_NUMPAD_ENTER) {
-                            used = g.modify_key(key) || g.typed_length_key(key);
+                            used =
+                                g.modify_key(key) || g.typed_length_key(key) || g.line_enter(key);
                         }
                         if !used {
                             let (mx, my) = g.mouse;
@@ -3712,6 +3713,14 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         }),
         "opening.create_vertical" => with(gui, |g| {
             g.start_vertical_opening();
+            focus(g);
+        }),
+        "opening.create_by_face" => with(gui, |g| {
+            g.start_opening_by_face();
+            focus(g);
+        }),
+        "roof.create_extrusion" => with(gui, |g| {
+            g.start_line_tool(datum_tools::LineMode::RoofExtrusion);
             focus(g);
         }),
         "opening.create_shaft" => with(gui, |g| {

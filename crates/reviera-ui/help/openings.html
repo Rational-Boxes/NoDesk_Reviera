@@ -39,6 +39,14 @@ opening must lie within one roof face (not across a ridge or hip).</p>
 short of the building code's headroom, Reviera offers to open it. See
 <a href="reviera:help/stairs#headroom">Stairs</a>. <code>opening.create_vertical</code></p>
 
+<h2 id="by-face">Openings by face</h2>
+<p><b>Architecture › Opening › By Face</b>
+<a href="reviera:action/opening.create_by_face">By Face</a> works like a vertical opening (sketch
+it as seen from above, then Finish Edit Mode), but the opening is cut square to the face: in a
+30° roof its sides lean 30° from vertical, as a roof light's well does. In a floor or ceiling it is
+the same as a vertical opening. It is saved as an <code>IfcOpeningElement</code> whose body runs
+along the face's normal. <code>opening.create_by_face</code></p>
+
 <h2 id="shaft">Shafts</h2>
 <ol>
   <li>Open the plan of the shaft's lowest level.</li>

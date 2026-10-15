@@ -42,6 +42,7 @@ use crate::walls::{Line, RECIPE_KEY};
 
 pub mod curved;
 pub mod eaves;
+pub mod extrusion;
 pub mod skeleton;
 
 use skeleton::{Across, SkelEdge};
@@ -122,6 +123,9 @@ pub struct RoofRecipe {
     /// A dome (ARC-ROOF-009); a dome has no footprint sketch.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dome: Option<curved::Dome>,
+    /// A roof by extrusion (ARC-ROOF-002); it has no footprint sketch either.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub extrusion: Option<extrusion::Extrusion>,
 }
 
 impl RoofRecipe {
@@ -283,7 +287,7 @@ fn on_edge(p: [f64; 2], ring: &[[f64; 2]]) -> bool {
     })
 }
 
-fn inside(p: [f64; 2], ring: &[[f64; 2]]) -> bool {
+pub(crate) fn inside(p: [f64; 2], ring: &[[f64; 2]]) -> bool {
     let mut c = false;
     for i in 0..ring.len() {
         let (a, b) = (ring[i], ring[(i + 1) % ring.len()]);
@@ -441,6 +445,9 @@ pub fn regenerate(store: &Store, e: &Element) -> Result<RoofGeometry> {
     if let Some(d) = &r.dome {
         return curved::dome(d, plate, thickness);
     }
+    if let Some(x) = &r.extrusion {
+        return extrusion::geometry(store, x, plate, thickness);
+    }
     let sketch = sketch::sketch_of(e)
         .ok_or_else(|| Error::new("roof.no_sketch", "the roof has no footprint"))?;
     let cutoff = match &r.cutoff {
@@ -497,8 +504,12 @@ pub fn regenerate(store: &Store, e: &Element) -> Result<RoofGeometry> {
     // Openings through the roof: under its dormers (ARC-OPEN-005), its vertical openings
     // (ARC-OPEN-002) and the shafts through it (ARC-OPEN-004).
     let mut holes = crate::dormers::openings(store, e.guid().as_str());
-    holes.extend(crate::slab_openings::roof_holes(store, e, &g));
-    g.uncut = cut_holes(&mut g, &holes).len();
+    let mut square = vec![false; holes.len()];
+    for (h, s) in crate::slab_openings::roof_holes(store, e, &g) {
+        holes.push(h);
+        square.push(s);
+    }
+    g.uncut = cut_holes_with(&mut g, &holes, &square).len();
     // A dormer's roof joins the main roof flush: cut along the main roof's top surface
     // (ARC-ROOF-007), its top meeting the main roof's in valleys.
     if let Some((n, d)) = crate::dormers::main_top_plane(store, e) {
@@ -517,6 +528,16 @@ pub fn regenerate(store: &Store, e: &Element) -> Result<RoofGeometry> {
 /// rebuilt with its holes, their sides plumb. Returns the holes left uncut: those across faces,
 /// or in a face that is clipped or already has courtyards.
 pub fn cut_holes(g: &mut RoofGeometry, holes: &[Vec<[f64; 2]>]) -> Vec<usize> {
+    cut_holes_with(g, holes, &vec![false; holes.len()])
+}
+
+/// As [`cut_holes`]; holes marked `square` have their sides square to the face (openings by
+/// face, ARC-OPEN-001), the rest plumb.
+pub fn cut_holes_with(
+    g: &mut RoofGeometry,
+    holes: &[Vec<[f64; 2]>],
+    square: &[bool],
+) -> Vec<usize> {
     let ring2 = |r: &[[f64; 3]]| r.iter().map(|q| [q[0], q[1]]).collect::<Vec<_>>();
     let mut by_face: Vec<Vec<usize>> = vec![Vec::new(); g.faces.len()];
     let mut left = Vec::new();
@@ -545,6 +566,7 @@ pub fn cut_holes(g: &mut RoofGeometry, holes: &[Vec<[f64; 2]>]) -> Vec<usize> {
         }
         // Holes inside another hole of the face, or crossing one, are left.
         let mut mine: Vec<&Vec<[f64; 2]>> = Vec::new();
+        let mut mine_square: Vec<bool> = Vec::new();
         for k in ks {
             let h = &holes[k];
             let clash = mine.iter().any(|o| {
@@ -567,16 +589,18 @@ pub fn cut_holes(g: &mut RoofGeometry, holes: &[Vec<[f64; 2]>]) -> Vec<usize> {
                 left.push(k);
             } else {
                 mine.push(h);
+                mine_square.push(square.get(k).copied().unwrap_or(false));
             }
         }
-        cut_face(face, &mine);
+        cut_face(face, &mine, &mine_square);
     }
     left.sort_unstable();
     left
 }
 
-/// Rebuilds a prism face's slab with plumb holes through it.
-fn cut_face(face: &mut RoofFace, holes: &[&Vec<[f64; 2]>]) {
+/// Rebuilds a prism face's slab with holes through it: plumb, or square to the face where
+/// `square` says so.
+fn cut_face(face: &mut RoofFace, holes: &[&Vec<[f64; 2]>], square: &[bool]) {
     let ring2 = |r: &[[f64; 3]]| r.iter().map(|q| [q[0], q[1]]).collect::<Vec<_>>();
     let n = face.bottom.len();
     let normal = face.normal;
@@ -586,6 +610,22 @@ fn cut_face(face: &mut RoofFace, holes: &[&Vec<[f64; 2]>]) {
     let (b0, t0) = (face.bottom[0], face.slab.0[n]);
     let bottom = face.slab.0[..n].to_vec();
     let top = face.slab.0[n..].to_vec();
+    // The slab's thickness square to the face.
+    let depth =
+        normal[0] * (t0[0] - b0[0]) + normal[1] * (t0[1] - b0[1]) + normal[2] * (t0[2] - b0[2]);
+    // A hole's top: plumb above its bottom, or along the normal from it.
+    let hole_top = |k: usize, p: [f64; 2]| -> [f64; 3] {
+        if square.get(k).copied().unwrap_or(false) {
+            let b = [p[0], p[1], on(p, b0)];
+            [
+                b[0] + normal[0] * depth,
+                b[1] + normal[1] * depth,
+                b[2] + normal[2] * depth,
+            ]
+        } else {
+            [p[0], p[1], on(p, t0)]
+        }
+    };
     // Points: bottom ring, the holes' bottoms, top ring, the holes' tops.
     let mut positions = bottom.clone();
     let mut starts: Vec<u32> = Vec::new();
@@ -600,14 +640,21 @@ fn cut_face(face: &mut RoofFace, holes: &[&Vec<[f64; 2]>]) {
     }
     let top_at = positions.len() as u32;
     positions.extend(&top);
-    for h in holes {
-        positions.extend(h.iter().map(|p| [p[0], p[1], on(*p, t0)]));
+    let mut flat_top_holes: Vec<[f64; 2]> = Vec::new();
+    for (k, h) in holes.iter().enumerate() {
+        let tops: Vec<[f64; 3]> = h.iter().map(|p| hole_top(k, *p)).collect();
+        flat_top_holes.extend(tops.iter().map(|q| [q[0], q[1]]));
+        positions.extend(tops);
     }
     let nb = n as u32;
     let mut indices: Vec<u32> = Vec::new();
-    let cap = |ring: &[[f64; 3]], first: u32, up: bool, indices: &mut Vec<u32>| {
+    let cap = |ring: &[[f64; 3]],
+               hole_points: &[[f64; 2]],
+               first: u32,
+               up: bool,
+               indices: &mut Vec<u32>| {
         let mut flat = ring2(ring);
-        flat.extend(flat_holes.iter().copied());
+        flat.extend(hole_points.iter().copied());
         let mut tris: Vec<u32> = Vec::new();
         earcut::Earcut::new().earcut(flat.iter().copied(), &starts, &mut tris);
         for t in tris.chunks(3) {
@@ -624,8 +671,8 @@ fn cut_face(face: &mut RoofFace, holes: &[&Vec<[f64; 2]>]) {
             }
         }
     };
-    cap(&bottom, 0, false, &mut indices);
-    cap(&top, top_at, true, &mut indices);
+    cap(&bottom, &flat_holes, 0, false, &mut indices);
+    cap(&top, &flat_top_holes, top_at, true, &mut indices);
     // The outer sides as before (the bottom ring counter-clockwise from above).
     for i in 0..nb {
         let j = (i + 1) % nb;
@@ -1201,7 +1248,7 @@ pub fn all(store: &Store) -> Vec<(ElementId, RoofGeometry)> {
 }
 
 /// The project's default roof type, created when first needed.
-fn default_type(txn: &mut crate::txn::Transaction<'_>) -> Result<ElementId> {
+pub(crate) fn default_type(txn: &mut crate::txn::Transaction<'_>) -> Result<ElementId> {
     if let Some(e) = txn
         .store()
         .iter()
@@ -1221,7 +1268,7 @@ fn default_type(txn: &mut crate::txn::Transaction<'_>) -> Result<ElementId> {
     )
 }
 
-fn resolve_level(store: &Store, r: &ElementRef) -> Result<String> {
+pub(crate) fn resolve_level(store: &Store, r: &ElementRef) -> Result<String> {
     let id = store
         .resolve(r)
         .ok_or_else(|| Error::new("element.not_found", "no such level"))?;
@@ -1235,7 +1282,7 @@ fn resolve_level(store: &Store, r: &ElementRef) -> Result<String> {
     Ok(e.guid().to_string())
 }
 
-fn resolve_roof(store: &Store, r: &ElementRef) -> Result<(ElementId, RoofRecipe)> {
+pub(crate) fn resolve_roof(store: &Store, r: &ElementRef) -> Result<(ElementId, RoofRecipe)> {
     let id = store
         .resolve(r)
         .ok_or_else(|| Error::new("element.not_found", "no such roof"))?;
@@ -1260,7 +1307,7 @@ fn write_recipe(
 }
 
 /// Checks that a roof regenerates; on failure the edit is refused with the reason.
-fn check(txn: &crate::txn::Transaction<'_>, id: ElementId) -> Result<()> {
+pub(crate) fn check(txn: &crate::txn::Transaction<'_>, id: ElementId) -> Result<()> {
     let store = txn.store();
     regenerate(store, store.get(id).expect("exists")).map(|_| ())
 }
@@ -1420,6 +1467,7 @@ pub(crate) fn create(txn: &mut crate::txn::Transaction<'_>, p: CreateParams) -> 
         cutoff,
         arch: None,
         dome: None,
+        extrusion: None,
     };
     let type_guid = txn.store().get(type_id).expect("exists").guid().to_string();
     let id = txn.create(

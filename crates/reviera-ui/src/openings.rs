@@ -67,6 +67,19 @@ impl Gui {
         self.start_opening_sketch(SketchKind::Opening);
     }
 
+    /// Architecture › Opening › By Face: a sketch seen from above, cut square to the host's face
+    /// (ARC-OPEN-001).
+    pub(crate) fn start_opening_by_face(&mut self) {
+        self.start_opening_sketch(SketchKind::Opening);
+        if let Some(s) = &mut self.sketch {
+            s.by_face = true;
+            self.frame.set_status_text(
+                "Opening by Face: sketch the opening as seen from above; it is cut square to the roof or floor",
+                0,
+            );
+        }
+    }
+
     /// Architecture › Opening › Shaft: a sketch on the plan's level.
     pub(crate) fn start_shaft(&mut self) {
         self.start_opening_sketch(SketchKind::Shaft);

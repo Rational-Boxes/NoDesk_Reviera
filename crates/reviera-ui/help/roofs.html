@@ -115,6 +115,23 @@ trapezoid footprint, <b>Taper</b> (<i>Constant Rise</i> or <i>Constant Slope</i>
 rise follows), <b>Sides</b>, <b>Rotation</b>, <b>Rise</b>, the profile's <b>Ratio</b>, an
 <b>Oculus</b> and <b>Faceted</b>. See the <a href="reviera:sample/manor">Manor</a>'s onion dome.
 <code>roof.create_dome</code>, <code>roof.set_dome</code></p>
+<h2 id="extrusion">Roofs by extrusion</h2>
+<p>A roof by extrusion is a profile drawn in a section or elevation, carried across the view:</p>
+<ol>
+  <li>Open a section or elevation that looks at the roof's profile (the plane of the view is the
+    roof's plane).</li>
+  <li>Click <b>Architecture › Build › Roof by Extrusion</b>
+    <a class="run" href="reviera:action/roof.create_extrusion">Roof by Extrusion</a>, then click
+    the points of the roof's top: two lines for a gable, one for a shed, more for a mansard.</li>
+  <li>Press <kbd>Enter</kbd>. The roof's thickness hangs below the profile, and it runs across
+    over the walls under it (or 6 m).</li>
+</ol>
+<p>Its Reference Level is the highest level at or below the profile, and it moves with it.
+Scripts and agents can put the profile on a grid or a named reference plane (then it follows
+them), and give it arcs (a barrel roof) and its Extrusion Start and End.
+<code>roof.create_extrusion</code>, <code>roof.set_extrusion</code></p>
+
 <p>Roofs are saved as <code>IfcRoof</code> with faceted bodies.</p>
-<p class="note">Not yet available: roof openings and skylights, slope arrows, and picking single
-eave edges in the window. Gutters and downspouts are planned with plumbing.</p>
+<p class="note">Not yet available: slope arrows, picking single eave edges in the window, openings
+in arched roofs, domes and roofs by extrusion, and editing a roof by extrusion's profile in the
+window. Gutters and downspouts are planned with plumbing.</p>

@@ -373,6 +373,20 @@ pub fn transform(
             let target = if copy { txn.create(copied(e))? } else { id };
             crate::stairs::transform(txn, target, &|p| x.point(p))?;
             out.push(target);
+        } else if let Some(mut r) = crate::roofs::roof_recipe(e).filter(|r| r.extrusion.is_some()) {
+            // A roof by extrusion moves with a plane fixed where it is put.
+            let target = if copy { txn.create(copied(e))? } else { id };
+            let dz = match x {
+                Xform::Translate(v) => v[2],
+                _ => 0.0,
+            };
+            crate::roofs::extrusion::transform(&store, &mut r, &|p| x.point(p), dz)?;
+            set_recipe(txn, target, &r)?;
+            if !copy {
+                crate::slab_openings::follow_host(txn, e.guid().as_str(), &|p| x.point(p))?;
+                crate::skylights::follow_roof(txn, e.guid().as_str(), &|p| x.point(p))?;
+            }
+            out.push(target);
         } else if crate::floors::slab_recipe(e).is_some() || crate::roofs::roof_recipe(e).is_some()
         {
             let target = if copy { txn.create(copied(e))? } else { id };

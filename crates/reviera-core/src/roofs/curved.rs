@@ -165,9 +165,9 @@ fn unit(a: [f64; 3]) -> [f64; 3] {
 
 /// A surface sampled on a grid of rows; `wrap` joins each row's last point to its first (a
 /// dome's rings).
-struct Grid {
-    rows: Vec<Vec<[f64; 3]>>,
-    wrap: bool,
+pub(super) struct Grid {
+    pub(super) rows: Vec<Vec<[f64; 3]>>,
+    pub(super) wrap: bool,
 }
 
 impl Grid {
@@ -204,7 +204,7 @@ impl Grid {
 
 /// The roof from a grid: one face per (non-degenerate) triangle, and a closed shell of
 /// `thickness` along the smoothed normals as the body.
-fn roof_of(
+pub(super) fn roof_of(
     g: &Grid,
     plate: f64,
     thickness: f64,
@@ -900,6 +900,7 @@ pub(crate) fn create_dome(
         cutoff: None,
         arch: None,
         dome: Some(d),
+        extrusion: None,
     };
     let type_guid = txn.store().get(type_id).expect("exists").guid().to_string();
     let id = txn.create(

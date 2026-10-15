@@ -120,6 +120,8 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(DimTemporarySet),
         registry.add(DimMakePermanent),
         registry.add(ViewRevealConstraints),
+        registry.add(RoofCreateExtrusion),
+        registry.add(RoofSetExtrusion),
     ];
     for r in results {
         r.expect("architecture commands are valid");
@@ -1165,4 +1167,32 @@ edit_command!(
     crate::constraints::RevealParams,
     (),
     crate::constraints::reveal
+);
+
+edit_command!(
+    RoofCreateExtrusion,
+    "roof.create_extrusion",
+    "Create a roof by extrusion",
+    "Creates a roof by extrusion (ARC-ROOF-002): an open `profile` of lines and arcs (`through` points) \
+     on a vertical work plane (`grid`, `ref_plane` or `plane`), in plane coordinates (along the plane; up \
+     from the Reference Level `ref_level`, the highest by default, plus `level_offset`). The profile is \
+     the roof's top; the roof's thickness hangs below it, extruded across the plane from `start` to \
+     `end` (by default over the walls under the profile, else 0 to 6 m). One straight segment is a \
+     shed roof, two a gable, arcs a barrel roof. Returns the roof.",
+    "Roof by Extrusion",
+    crate::roofs::extrusion::CreateParams,
+    ElementId,
+    crate::roofs::extrusion::create
+);
+
+edit_command!(
+    RoofSetExtrusion,
+    "roof.set_extrusion",
+    "Change a roof by extrusion",
+    "Changes a roof by extrusion's profile, Extrusion Start and End, or level offset; omitted values \
+     are kept.",
+    "Edit Roof",
+    crate::roofs::extrusion::SetParams,
+    (),
+    crate::roofs::extrusion::set
 );

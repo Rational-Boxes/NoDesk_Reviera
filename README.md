@@ -353,6 +353,11 @@ Create … Boundary* tab:
   Constraints (`constraint.lock_dimension`, `constraint.unlock_dimension`,
   `constraint.set_equality`, `constraint.lock_alignment`, `constraint.delete`,
   `constraint.list`, `view.reveal_constraints`; ARC-CNST-001/002).
+- **Roofs by extrusion**: a profile clicked in a section or elevation (Enter), or on a grid or
+  reference plane by command, extruded across with the roof's thickness below it; a gable, shed,
+  mansard or barrel (`roof.create_extrusion`, `roof.set_extrusion`; ARC-ROOF-002).
+- **Openings by face**: sketched like vertical openings, cut square to a roof's face; saved as
+  an `IfcOpeningElement` along the face's normal (`opening.create_by_face`; ARC-OPEN-001).
 - **Datum extents**: levels, grids and reference planes have a 3D extent and, per view, a 2D
   extent, bubbles and grid elbows; Reset to 3D, Maximize 3D and Propagate Extents on their
   contextual tab (`datum.set_extent`, `datum.reset_to_3d`, `datum.maximize_3d`,
@@ -617,9 +622,9 @@ area by area (a review against the spec on 2026-10-15). Whole areas not started 
   ARC-WRAP-001, ARC-WALL-005, ARC-STKW-001, ARC-WALL-009/010/014/015/016).
 - **Curtain extras**: manual grid lines and segments, swapping single panels (curtain-wall
   doors), curtain systems by face, sloped glazing (ARC-CW-004/006/007/008).
-- **Floors and roofs**: slab edges, roof by extrusion, roof by face, slope arrows, Join/Unjoin
-  Roof, shape editing (points and split lines on floors and roofs), parts (ARC-SLED-001,
-  ARC-ROOF-002/003/005/006, ARC-SHAPE-001, ARC-PART-001 … 004).
+- **Floors and roofs**: slab edges, roof by face, slope arrows, Join/Unjoin Roof, shape editing
+  (points and split lines on floors and roofs), parts (ARC-SLED-001, ARC-ROOF-003/005/006,
+  ARC-SHAPE-001, ARC-PART-001 … 004).
 - **Rooms and areas**: area plans and area schemes, colour schemes (ARC-AREA-001, ARC-CLR-001).
 - **Modelling in the project**: Model In-Place, model text, converting model lines to detail
   lines (ARC-INPL-001, ARC-MTXT-001, ARC-MLIN-001).
@@ -628,8 +633,7 @@ area by area (a review against the spec on 2026-10-15). Whole areas not started 
   (ARC-MASS-001 … 003, ARC-TOPO-001 … 006, ARC-SITE-001).
 - **Groups and selection sets**: group types, the group editor, excluding members, saved
   selections (ARC-GRP-001 … 003, ARC-SEL-002).
-- **Openings by face** (square to a sloped roof or floor; ARC-OPEN-001) and stair annotation
-  (cut mark, path, up/down labels; ARC-STAIR-006).
+- **Stair annotation** (cut mark, path, up/down labels; ARC-STAIR-006).
 
 **Gaps in what is built:**
 
@@ -644,8 +648,8 @@ area by area (a review against the spec on 2026-10-15). Whole areas not started 
 - **Roofs**: skylight openings square to the roof face, flashing, and skylight types; picking
   single eave edges in the window; dormer openings as separate IFC opening elements. Gutters and
   downspouts are planned as part of plumbing (MEP-PIPE-010).
-- **Openings**: openings across roof ridges and in arched roofs and domes, vertical openings in
-  roofs, and guards around a stair opening (a Pick Edges railing can follow it).
+- **Openings**: openings across roof ridges and in arched roofs, domes and roofs by extrusion,
+  and guards around a stair opening (a Pick Edges railing can follow it).
 - **Stairs, ramps and railings**: winders, supports, editing runs with handles, continuous
   handrails and baluster families; curved ramps, ramp railings and editing a ramp's path with
   grips.

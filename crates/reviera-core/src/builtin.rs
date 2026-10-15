@@ -69,6 +69,7 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(CodeGet),
         registry.add(CodeSet),
         registry.add(OpeningCreateVertical),
+        registry.add(OpeningCreateByFace),
         registry.add(OpeningSetLoops),
         registry.add(StairHeadroomCheck),
         registry.add(StairCreateOpenings),
@@ -473,7 +474,11 @@ pub fn dependents_of(store: &crate::store::Store, id: ElementId) -> Vec<ElementI
                     r.base_level == guid || r.top == crate::stairs::StairTop::Level(guid.clone())
                 })
                 || crate::roofs::roof_recipe(e).is_some_and(|r| {
-                    r.level == guid || r.cutoff.as_ref().is_some_and(|c| c.level == guid)
+                    r.level == guid
+                        || r.cutoff.as_ref().is_some_and(|c| c.level == guid)
+                        || r.extrusion.as_ref().is_some_and(|x| {
+                            crate::work_planes::host_of(&x.plane) == Some(guid.as_str())
+                        })
                 })
                 || crate::inserts::opening_of(e).is_some_and(|i| i == guid)
                 || crate::slab_openings::opening_recipe(e).is_some_and(|r| r.host == guid)
@@ -2626,6 +2631,20 @@ modify_command!(
     crate::slab_openings::CreateParams,
     ElementId,
     crate::slab_openings::create
+);
+
+modify_command!(
+    OpeningCreateByFace,
+    "opening.create_by_face",
+    "Cut an opening square to a face",
+    "Cuts a Reviera floor, ceiling or footprint roof by closed loops sketched on its face (ARC-OPEN-001), \
+     given as seen from above: the opening's sides are square to the face, so on a sloped roof they lean \
+     with it. The opening is an IfcOpeningElement voiding the host, its body extruded along the face \
+     normal; it moves with the host and goes with it. Returns the opening.",
+    "Opening by Face",
+    crate::slab_openings::CreateParams,
+    ElementId,
+    crate::slab_openings::create_by_face
 );
 
 modify_command!(

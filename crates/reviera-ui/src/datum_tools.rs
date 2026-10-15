@@ -36,6 +36,9 @@ pub enum LineMode {
     ModelLine,
     /// Two opposite corners of a scope box (ARC-SCOPE-001).
     ScopeBox,
+    /// A roof by extrusion's open profile, clicked in a section or elevation (ARC-ROOF-002);
+    /// Enter finishes it.
+    RoofExtrusion,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -103,7 +106,14 @@ impl Gui {
     /// Starts the Ref Plane or Model Line tool (plans).
     pub(crate) fn start_line_tool(&mut self, mode: LineMode) {
         let frame = self.frame;
-        if !self.ensure_plan(false) {
+        if mode == LineMode::RoofExtrusion {
+            if self.active_view().is_none_or(|v| v.section.is_none()) {
+                return frame.set_status_text(
+                    "Roof by Extrusion: open a section or elevation looking at the roof's profile",
+                    0,
+                );
+            }
+        } else if !self.ensure_plan(false) {
             return;
         }
         self.end_tool(&frame);
@@ -199,8 +209,15 @@ impl Gui {
             LineMode::RefPlane => "Reference Plane",
             LineMode::ModelLine => "Model Line",
             LineMode::ScopeBox => "Scope Box",
+            LineMode::RoofExtrusion => "Roof by Extrusion",
         };
         let mut text = match (t.points.len(), t.shape) {
+            (0, _) if t.mode == LineMode::RoofExtrusion => {
+                format!("{what}: click the profile's first point (the roof's top)")
+            }
+            (_, _) if t.mode == LineMode::RoofExtrusion => {
+                "Click the next point; Enter finishes the profile, Esc restarts it".to_owned()
+            }
             (0, _) if t.mode == LineMode::ScopeBox => format!("{what}: click a corner"),
             (1, _) if t.mode == LineMode::ScopeBox => {
                 "Click the opposite corner. Esc restarts.".to_owned()
@@ -235,6 +252,22 @@ impl Gui {
     fn line_snapped(&self, x: i32, y: i32) -> Option<snap::Snap> {
         let t = self.line_tool.as_ref()?;
         let v = self.active_view()?;
+        // In a section or elevation: the point on the view's plane (across, up), to the mm.
+        if v.section.is_some() {
+            let size = v.panel.get_client_size();
+            let (o, d) = v
+                .camera
+                .ray(x as f32, y as f32, size.width as f32, size.height as f32);
+            if d.z.abs() < 1e-9 {
+                return None;
+            }
+            let k = -o.z / d.z;
+            let p = [f64::from(o.x + d.x * k), f64::from(o.y + d.y * k)];
+            return Some(snap::Snap {
+                point: p.map(|v| (v * 1000.0).round() / 1000.0),
+                kind: snap::SnapKind::None,
+            });
+        }
         let z = v.plan.as_ref()?.range.cut as f32;
         let raw = self.plan_xy(x, y)?;
         let size = v.panel.get_client_size();
@@ -280,6 +313,11 @@ impl Gui {
         t.typed.clear();
         t.typed_dir = None;
         t.points.push(point);
+        if t.mode == LineMode::RoofExtrusion {
+            self.properties_stale = true;
+            self.line_preview();
+            return self.line_prompt();
+        }
         let needed = match t.shape {
             Shape::Arc if t.mode != LineMode::ScopeBox => 3,
             _ => 2,
@@ -292,6 +330,8 @@ impl Gui {
         let (start, end) = (t.points[0], t.points[1]);
         let through: Vec<[f64; 2]> = t.points.get(2).copied().into_iter().collect();
         let result = match t.mode {
+            // Finished with Enter (`line_enter`).
+            LineMode::RoofExtrusion => return,
             LineMode::ScopeBox => {
                 let mut args = json!({ "rectangle": { "corner_a": start, "corner_b": end } });
                 if !t.name.trim().is_empty() {
@@ -353,10 +393,19 @@ impl Gui {
     /// The snap marker and the line or arc being drawn.
     pub(crate) fn line_preview(&mut self) {
         let Some(t) = &self.line_tool else { return };
-        let Some(plan) = self.active_view().and_then(|v| v.plan.clone()) else {
-            return;
+        // A plan draws over its cut; a section in its own frame, over the view plane.
+        let (z, scale) = match self.active_view() {
+            Some(v) if v.plan.is_some() => {
+                let p = v.plan.as_ref().expect("checked");
+                (p.range.cut as f32 + 0.003, p.scale)
+            }
+            Some(v) if v.section.is_some() => (0.003, v.section.as_ref().expect("checked").scale),
+            _ => return,
         };
-        let z = plan.range.cut as f32 + 0.003;
+        struct Scale {
+            scale: f32,
+        }
+        let plan = Scale { scale };
         let mut lines = Lines {
             color: PREVIEW_COLOR,
             width: 0.25,
@@ -378,6 +427,11 @@ impl Gui {
         }
         if let (Some(&start), Some(c)) = (t.points.first(), t.cursor) {
             let pts: Vec<[f64; 2]> = match (t.shape, t.points.len()) {
+                _ if t.mode == LineMode::RoofExtrusion => {
+                    let mut v = t.points.clone();
+                    v.push(c.point);
+                    v
+                }
                 _ if t.mode == LineMode::ScopeBox => vec![
                     start,
                     [c.point[0], start[1]],
@@ -424,6 +478,16 @@ impl Gui {
             LineMode::ScopeBox => {
                 grid.append(Property::category("Scope Box", "c_lt"));
                 grid.append(Property::string("Name", "lt_name", t.name.clone()));
+                return true;
+            }
+            LineMode::RoofExtrusion => {
+                grid.append(Property::category("Roof by Extrusion", "c_lt"));
+                grid.append(Property::string(
+                    "Profile Points",
+                    "lt_count",
+                    t.points.len().to_string(),
+                ));
+                grid.set_property_read_only("lt_count", true);
                 return true;
             }
             LineMode::ModelLine => {
@@ -1134,5 +1198,74 @@ impl Gui {
             }
             Err(e) => frame.set_status_text(&e, 0),
         }
+    }
+}
+
+impl Gui {
+    /// Enter in the Roof by Extrusion tool: the roof on the section's plane, from the profile
+    /// clicked; `true` when it was the tool's.
+    pub(crate) fn line_enter(&mut self, key: i32) -> bool {
+        if !matches!(key, WXK_RETURN | WXK_NUMPAD_ENTER) {
+            return false;
+        }
+        let Some(t) = &self.line_tool else {
+            return false;
+        };
+        if t.mode != LineMode::RoofExtrusion {
+            return false;
+        }
+        let frame = self.frame;
+        if t.points.len() < 2 {
+            frame.set_status_text("Click at least two points of the profile", 0);
+            return true;
+        }
+        let points = t.points.clone();
+        let Some(def) = self
+            .active_view()
+            .and_then(|v| v.section.as_ref())
+            .map(|s| s.def)
+        else {
+            return true;
+        };
+        let f = def.frame();
+        // The view's plane: along its right, up; its normal right × up.
+        let origin = f.to_world([0.0, 0.0, 0.0]);
+        let x_dir = [f.right[0], f.right[1], 0.0];
+        let normal = [f.right[1], -f.right[0], 0.0];
+        // The Reference Level: the highest at or below the profile's lowest point.
+        let low = points.iter().map(|p| p[1]).fold(f64::INFINITY, f64::min);
+        let level = self.store_now().and_then(|st| {
+            let levels = reviera_core::levels::list(&st);
+            levels
+                .iter()
+                .rev()
+                .find(|l| l.elevation <= low + 1e-6)
+                .or(levels.first())
+                .map(|l| (l.id, l.elevation))
+        });
+        let Some((level, elevation)) = level else {
+            frame.set_status_text("The model has no level", 0);
+            return true;
+        };
+        let profile: Vec<Value> = points
+            .windows(2)
+            .map(|w| json!({ "line": { "start": [w[0][0], w[0][1] - elevation], "end": [w[1][0], w[1][1] - elevation] } }))
+            .collect();
+        match self.run(
+            "roof.create_extrusion",
+            json!({
+                "plane": { "origin": origin, "x_dir": x_dir, "normal": normal },
+                "profile": profile,
+                "ref_level": level,
+            }),
+        ) {
+            Ok(_) => {
+                self.end_line_tool();
+                self.refresh_scene(&frame);
+                frame.set_status_text("Roof by extrusion created", 0);
+            }
+            Err(e) => frame.set_status_text(&e, 0),
+        }
+        true
     }
 }

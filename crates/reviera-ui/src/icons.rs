@@ -79,6 +79,12 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "equality" => format!(
             r#"<path d="M4 8v16M16 8v16M28 8v16" {s}/><path d="M4 16h24" {sa}/><path d="M8 12h4M8 14h4M20 12h4M20 14h4" {sa}/>"#
         ),
+        "roof_extrusion" => format!(
+            r#"<path d="M3 20l8-8 8 8M3 20v2M19 20v2" {s}/><path d="M11 12l10-6 8 8-8 8" fill="{f}" {sa}/><path d="M19 20l10-6" {s}/>"#
+        ),
+        "opening_face" => format!(
+            r#"<path d="M3 24L17 6l12 10L15 28z" fill="{f}" {s}/><path d="M12 18l5-5 4 3-5 5z" fill="{paper}" {sa}/>"#
+        ),
         "scope_box" => format!(
             r#"<path d="M5 11l8-6h14l-8 6zM5 11v14h14V11M19 25l8-6V5" fill="{f}" {s} stroke-dasharray="4 2"/>"#
         ),

@@ -513,6 +513,8 @@ impl LocalProject {
                     self.ifc.remove(rel)?;
                 }
                 geometry::remove_slab(&mut self.ifc, step)?;
+                // An opening by face's prisms.
+                geometry::remove_breps(&mut self.ifc, step)?;
             }
             if matches!(
                 recipe_kind,
@@ -1198,12 +1200,44 @@ impl LocalProject {
             let Some((lo, hi)) = host_span(store, host) else {
                 continue;
             };
-            let body = geometry::SlabBody {
-                rings: r.loops.iter().map(|l| (l.as_slice(), Vec::new())).collect(),
-                top: hi + 0.001,
-                depth: hi - lo + 0.002,
-            };
-            geometry::write_slab(&mut self.ifc, step, &body, self.length_scale, contexts)?;
+            // An opening by face in a roof (ARC-OPEN-001): prisms along the face's normal.
+            if let Some(prisms) = reviera_core::slab_openings::face_prisms(store, &r) {
+                let solids: Vec<geometry::Polyhedron> = prisms
+                    .into_iter()
+                    .map(|(mut bottom, mut top)| {
+                        let flat: Vec<[f64; 2]> = bottom.iter().map(|q| [q[0], q[1]]).collect();
+                        if reviera_core::sketch::signed_area(&flat) < 0.0 {
+                            bottom.reverse();
+                            top.reverse();
+                        }
+                        let n = bottom.len();
+                        let mut faces =
+                            vec![(0..n).rev().collect::<Vec<_>>(), (n..2 * n).collect()];
+                        for i in 0..n {
+                            let j = (i + 1) % n;
+                            faces.push(vec![i, j, n + j, n + i]);
+                        }
+                        let mut points = bottom;
+                        points.extend(top);
+                        geometry::Polyhedron { points, faces }
+                    })
+                    .collect();
+                geometry::write_breps(
+                    &mut self.ifc,
+                    step,
+                    geometry::BrepFrame::WORLD,
+                    &solids,
+                    self.length_scale,
+                    contexts,
+                )?;
+            } else {
+                let body = geometry::SlabBody {
+                    rings: r.loops.iter().map(|l| (l.as_slice(), Vec::new())).collect(),
+                    top: hi + 0.001,
+                    depth: hi - lo + 0.002,
+                };
+                geometry::write_slab(&mut self.ifc, step, &body, self.length_scale, contexts)?;
+            }
             geometry::relate_one(
                 &mut self.ifc,
                 "IfcRelVoidsElement",

@@ -11807,8 +11807,10 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 
 **Commands.** `roof.create_extrusion(type_id, work_plane, profile: [curve], ref_level, level_offset?, start, end) -> element_id`.
 
+**Implementation notes (2026-10-15).** As built: the roof recipe's `extrusion` (`plane`, `profile` of curves in plane coordinates from the Reference Level plus offset, `start`, `end`); the body is exact (the profile mitre-offset down by the thickness, top, underside, ends and eaves), one roof face per upward segment; one straight segment is SHED_ROOF, two GABLE_ROOF, arcs BARREL_ROOF, more FREEFORM; it follows its level and its grid or reference plane; `roof.create_extrusion(type_id?, grid | ref_plane | plane, profile, ref_level?, level_offset?, start?, end?)` and `roof.set_extrusion`; the window's Roof by Extrusion clicks the profile in a section or elevation (its plane). IFC: an `IfcRoof` with one faceted B-rep body (not yet one `IfcSlab` per segment). Not built yet: layers, Rafter Cut, Fascia Depth, openings in it, Edit Work Plane.
+
 **Acceptance criteria.**
-- [ ] An arc profile extruded 8 m gives a barrel roof (`PredefinedType = BARREL_ROOF`) of uniform thickness.
+- [x] An arc profile extruded 8 m gives a barrel roof (`PredefinedType = BARREL_ROOF`) of uniform thickness.
 
 ### 3.6.6 Roof by face
 **ID:** ARC-ROOF-003 · **Priority:** P2 · **Ref:** research/02 §7.4, §12.1 · web: Create a Roof from a Mass Face; Update Face Selections for Roofs and Curtain Systems
@@ -12881,8 +12883,10 @@ These are view annotation and are specified in the DOC chapter. This chapter req
 
 **Commands.** `opening.create_by_face(host_ref, loops) -> element_id`.
 
+**Implementation notes (2026-10-15).** As built: the vertical opening's recipe with `by_face: true`; `opening.create_by_face(host_id, loops | curves)` with the loops as seen from above; in a footprint roof's face the hole's sides run along the face's normal; in floors and ceilings it is plumb (their faces are level). IFC: the opening's body is a faceted B-rep prism along the face normal (1 mm beyond each side). The window's Opening › By Face sketches it like a vertical opening. Not built yet: picking beams, braces and columns, curved faces, arched roofs and domes.
+
 **Acceptance criteria.**
-- [ ] An opening by face on a 30° roof cuts at right angles to the roof surface, so its sides lean 30° from vertical.
+- [x] An opening by face on a 30° roof cuts at right angles to the roof surface, so its sides lean 30° from vertical.
 
 ### 3.8.2 Vertical opening
 **ID:** ARC-OPEN-002 · **Priority:** P0 · **Ref:** research/02 §9

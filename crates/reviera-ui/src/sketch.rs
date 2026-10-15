@@ -129,6 +129,9 @@ pub struct SketchSession {
     pub overhang: f64,
     /// A roof finished as an arched roof (ARC-ROOF-008).
     pub arched: bool,
+    /// An opening finished as an opening by face (ARC-OPEN-001): its sides square to the
+    /// host's face.
+    pub by_face: bool,
     /// The floor or ceiling being edited (Edit Boundary); `None` for a new one.
     pub host: Option<ElementId>,
     pub level: ElementId,
@@ -254,6 +257,7 @@ impl Gui {
             kind,
             overhang: ROOF_OVERHANG,
             arched: false,
+            by_face: false,
             host,
             level,
             curves,
@@ -779,7 +783,11 @@ impl Gui {
                     );
                 };
                 (
-                    "opening.create_vertical",
+                    if s.by_face {
+                        "opening.create_by_face"
+                    } else {
+                        "opening.create_vertical"
+                    },
                     json!({ "host_id": host, "curves": curves }),
                 )
             }

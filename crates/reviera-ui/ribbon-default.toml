@@ -143,6 +143,18 @@ keys = "GR"
 help = "Draw grid lines in a plan"
 
 [[action]]
+id = "roof.create_extrusion"
+label = "Roof by Extrusion"
+icon = "roof_extrusion"
+help = "Click a roof's profile in a section or elevation, Enter to finish: it is extruded across the view"
+
+[[action]]
+id = "opening.create_by_face"
+label = "By Face"
+icon = "opening_face"
+help = "Sketch an opening in a roof, floor or ceiling, cut square to its face (on a sloped roof it leans with it)"
+
+[[action]]
 id = "refplane.create"
 label = "Ref Plane"
 icon = "ref_plane"
@@ -1087,6 +1099,7 @@ tools = [
   { action = "roof.create_footprint", size = "large" },
   { action = "roof.create_arched", size = "small" },
   { action = "roof.create_dome", size = "small" },
+  { action = "roof.create_extrusion", size = "small" },
 ]
 
 [[tab.panel]]
@@ -1120,6 +1133,7 @@ label = "Opening"
 tools = [
   { action = "opening.create_wall", size = "large" },
   { action = "opening.create_vertical", size = "small" },
+  { action = "opening.create_by_face", size = "small" },
   { action = "opening.create_shaft", size = "small" },
   { action = "skylight.create", size = "large" },
 ]

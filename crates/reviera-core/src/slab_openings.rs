@@ -52,6 +52,9 @@ pub struct OpeningRecipe {
     pub headroom: Option<f64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub clause: Option<String>,
+    /// An opening by face (ARC-OPEN-001): its sides are square to the host's face, not plumb.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub by_face: bool,
 }
 
 /// The stored recipe of a shaft.
@@ -102,24 +105,33 @@ pub fn roof_span(g: &crate::roofs::RoofGeometry) -> (f64, f64) {
 
 /// The plan holes a roof's own vertical openings and the shafts through it cut, for
 /// [`crate::roofs::cut_holes`].
-pub fn roof_holes(store: &Store, roof: &Element, g: &crate::roofs::RoofGeometry) -> Vec<Ring> {
-    let mut out: Vec<Ring> = of_host(store, roof.guid().as_str())
+pub fn roof_holes(
+    store: &Store,
+    roof: &Element,
+    g: &crate::roofs::RoofGeometry,
+) -> Vec<(Ring, bool)> {
+    let mut out: Vec<(Ring, bool)> = of_host(store, roof.guid().as_str())
         .into_iter()
-        .flat_map(|(_, r)| r.loops)
+        .flat_map(|(_, r)| {
+            let square = r.by_face;
+            r.loops.into_iter().map(move |l| (l, square))
+        })
         .collect();
     let (lo, hi) = roof_span(g);
     if lo <= hi {
         out.extend(
             shafts_through(store, lo, hi)
                 .into_iter()
-                .flat_map(|(_, r)| r.loops),
+                .flat_map(|(_, r)| r.loops)
+                .map(|l| (l, false)),
         );
     }
     // Skylights (their outline seen from above).
     out.extend(
         crate::skylights::of_roof(store, roof.guid().as_str())
             .iter()
-            .filter_map(|(_, s)| crate::skylights::hole(s, g)),
+            .filter_map(|(_, s)| crate::skylights::hole(s, g))
+            .map(|l| (l, false)),
     );
     out
 }
@@ -310,8 +322,83 @@ pub(crate) fn create(txn: &mut crate::txn::Transaction<'_>, p: CreateParams) -> 
         stair: None,
         headroom: None,
         clause: None,
+        by_face: false,
     };
     make(txn, &recipe, "Opening")
+}
+
+/// `opening.create_by_face`: an opening sketched on a floor's, ceiling's or roof's face, its sides
+/// square to the face (ARC-OPEN-001). The loops are the sketch seen from above.
+pub(crate) fn create_by_face(
+    txn: &mut crate::txn::Transaction<'_>,
+    p: CreateParams,
+) -> Result<ElementId> {
+    let store = txn.store().clone();
+    let host = host_of(&store, &p.host_id)?;
+    let loops = loops_of(&store, &p.loops, &p.curves)?;
+    intersects_host(&store, host, &loops)?;
+    let recipe = OpeningRecipe {
+        kind: OPENING_RECIPE.into(),
+        host: store.get(host).expect("exists").guid().to_string(),
+        loops,
+        stair: None,
+        headroom: None,
+        clause: None,
+        by_face: true,
+    };
+    make(txn, &recipe, "Opening by Face")
+}
+
+/// A prism's bottom ring and top ring.
+pub type Prism = (Vec<[f64; 3]>, Vec<[f64; 3]>);
+
+/// The prisms of an opening by face in a roof, for its IFC body: per loop, its ring on the face's
+/// underside and the same ring moved along the face's normal through the roof (1 mm beyond each
+/// side). `None` when the host is not a roof, or the loop is not within one planar face.
+pub fn face_prisms(
+    store: &Store,
+    r: &OpeningRecipe,
+) -> Option<Vec<Prism>> {
+    if !r.by_face {
+        return None;
+    }
+    let host = store.get(find(store, &r.host)?)?;
+    crate::roofs::roof_recipe(host)?;
+    let g = crate::roofs::regenerate(store, host).ok()?;
+    let mut out = Vec::new();
+    for l in &r.loops {
+        let face = g.faces.iter().find(|f| {
+            let ring: Vec<[f64; 2]> = f.bottom.iter().map(|q| [q[0], q[1]]).collect();
+            l.iter().all(|p| crate::roofs::inside(*p, &ring))
+        })?;
+        let n = face.normal;
+        let b0 = face.bottom[0];
+        let z_on = |p: [f64; 2]| b0[2] - (n[0] * (p[0] - b0[0]) + n[1] * (p[1] - b0[1])) / n[2];
+        let bottom: Vec<[f64; 3]> = l
+            .iter()
+            .map(|p| {
+                let q = [p[0], p[1], z_on(*p)];
+                [
+                    q[0] - n[0] * 0.001,
+                    q[1] - n[1] * 0.001,
+                    q[2] - n[2] * 0.001,
+                ]
+            })
+            .collect();
+        let reach = g.thickness + 0.002;
+        let top = bottom
+            .iter()
+            .map(|q| {
+                [
+                    q[0] + n[0] * reach,
+                    q[1] + n[1] * reach,
+                    q[2] + n[2] * reach,
+                ]
+            })
+            .collect();
+        out.push((bottom, top));
+    }
+    Some(out)
 }
 
 fn make(txn: &mut crate::txn::Transaction<'_>, r: &OpeningRecipe, name: &str) -> Result<ElementId> {
@@ -829,6 +916,7 @@ pub(crate) fn create_for_stair(
             stair: Some(stair.clone()),
             headroom: Some(report.headroom),
             clause: Some(report.clause.clone()),
+            by_face: false,
         };
         match o.existing {
             Some(id) => {
