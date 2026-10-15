@@ -5732,10 +5732,10 @@ DN25,25,37.5,22,Copper
 - **What can be a stamp:**
   - a custom object type (DM-IMP-015);
   - a family type (DM-LIB-001);
-  - a saved group of elements, for example a desk with its chair and lamp (`group.save`).
+  - a model fragment: a set of related elements, for example a desk with its chair and lamp, or a whole bathroom (DM-LIB-003).
 - **Adding to the library:**
   - **Add to Library** (on a selected instance or type) copies the type into a library folder, with a thumbnail rendered from it.
-  - **Save Selection as Stamp** saves several selected elements either as a group, which keeps them as separate elements, or as one custom object, whose meshed geometry merges them.
+  - Several selected elements are added as a model fragment, which keeps them as separate related elements, or as one custom object, whose meshed geometry merges them (DM-LIB-003).
   - Library items carry a name, a category, tags and a description, all searchable.
 - **Libraries:**
   - **My Library** is per user, in the user data folder.
@@ -5757,13 +5757,16 @@ DN25,25,37.5,22,Copper
 - **Undo.** Each click is one undo step; a row or a scatter is one step.
 
 **Data (storage).**
-- A library item is a small IFC file with RXD: the type, with its geometry and recipe; for a group, the group's elements. Beside it sits a thumbnail PNG. The format is the package format of §2.8.14, so the Library panel indexes stamps like families.
+- A library item is a file in a library folder (DM-LIB-004):
+  - a 3D file as it is, such as OBJ, STL, PLY, glTF/GLB, 3MF or OFF;
+  - an IFC file: a family package (§2.8.14), a fragment (DM-LIB-003), or any IFC file.
+
+  Stamping a mesh file the first time imports it into the project as a custom object type (DM-IMP-015), with its sidecar's or folder's import options. Later stamps reuse that type.
 - In a project, a stamped type records its library source and the item's content hash in `families/index`, so the Library panel can tell when it is out of date.
 - Pinned and recent stamps are per-user settings, not model data.
 
 **Commands.**
 `library.add_item(element_or_type_id, library?, name?, tags?) -> item_ref` ·
-`library.save_selection(element_ids[], as: "group"|"object", name, library?, tags?) -> item_ref` ·
 `stamp.place(item_ref | type_id, points[], rotation?, mirror?, level_id?, on_face?: bool) -> element_ids[]` (scriptable: one copy per point) ·
 `stamp.row(item_ref | type_id, start, end, spacing?, count?) -> element_ids[]` (P2) ·
 `stamp.scatter(item_refs[], points[], rotation_range?, scale_range?, seed?) -> element_ids[]` (P2) ·
@@ -5775,9 +5778,143 @@ The Stamp tool itself is the UI over `stamp.place`.
 - [ ] Undo after the tenth click removes only the tenth chair.
 - [ ] Alt+click on a placed table in the Stamp tool makes the table the stamp; the next click inserts a table with the same rotation.
 - [ ] In a 3D view, stamping a lamp on a sloped roof places it on the roof face, and with *Align to face* on, its up direction is the roof's normal.
-- [ ] A desk group saved with *Save Selection as Stamp* (as a group) stamps a desk, chair and lamp as three elements together.
+- [ ] A desk, chair and lamp added to the library as a fragment stamp as three elements together.
 - [ ] Changing the chair type's material in the project changes all ten stamped chairs. After Make Unique on one, changing the type no longer changes that one.
 - [ ] Stamping the same library item in a second session reuses the type already in the project, not a second copy.
+
+### 2.8.17 Model fragments in the library
+**ID:** DM-LIB-003 · **Priority:** P1 · **Ref:** owner requirement (2026-10-14); DM-LIB-001, DM-LIB-002, ARC-GRP-001 (Save Group, Load as Group); Reviera's own design
+
+**Purpose.** Let a library hold whole pieces of buildings, not only single objects: a bathroom with its walls, door, fixtures and room; a stair core; a kitchen run; a balcony with its railing; a façade bay; or part of a consultant's or manufacturer's IFC model. Like a family in the reference product, a library item is a named, reusable definition that can have several variants. Unlike a family, it may be a full IFC **model fragment** of many related elements. *(Owner requirement, 2026-10-14: "may include full IFC model fragments. A selection of objects in a model could be added to the library.")*
+
+**Behaviour & rules.**
+- **Kinds of library item.** Every item has one of three kinds, shown with a badge in the Library panel:
+  - **Object**: one type, such as a custom mesh object (DM-IMP-015) or a family type.
+  - **Fragment**: a set of related elements, stored as a group template (ARC-GRP-001).
+  - **Collection**: a folder of items (DM-LIB-004).
+- **Adding a selection to the library.** Select elements in a model and choose **Add to Library** (right-click, or Manage › Library). The dialog has:
+  - Name, library folder, tags and description.
+  - **Kind**: *Fragment* (default for several elements) or *Object* (merge into one custom object, DM-IMP-015).
+  - **Base point**: the selection's bottom-centre, a picked point, or the project's base point. It becomes the fragment's origin, the point the cursor holds when stamping.
+  - **Include hosts and hosted**, on by default:
+    - selecting a wall brings its doors, windows, openings, curtain panels and wall-hosted fixtures;
+    - selecting a door or window brings its host wall;
+    - selecting a stair brings its railings, and a roof its dormers, skylights and openings.
+  - **Include rooms**: the rooms enclosed by the selected walls (on by default).
+  - **Levels.** A fragment on several levels keeps each member's level as a **relative level**: 0 for its lowest, then 1, 2… by elevation, with each level's height above the lowest.
+  - **Outside references.** Each reference to an element outside the selection is listed, then dropped (with the element left as it is) or brought in. Such references include a wall attached to a roof, a join to another wall, or a stair opening in a floor. The dialog shows the list before saving.
+- **Variants.** An item can hold several variants (like the types of a family), for example a bathroom in a left-hand and a right-hand version, or a chair in three sizes. Variants of a fragment are group types of one item; variants of an object are types of one family or custom object. **Add Variant** adds the current selection to an existing item as a new variant.
+- **IFC files as fragments.** An IFC file copied into a library folder is a fragment at once (see Data). **Import to Library** (Manage › Library) writes a part of an external IFC file into a library folder as a new IFC file:
+  - the part is chosen by storey, by IFC class, by system, or by picking in a preview;
+  - elements keep their IFC classes, property sets, materials and geometry;
+  - elements Reviera recognises become Reviera elements (DM-IMP-001 Recognise); the rest stay IFC-native (§2.11.1).
+- **Stamping a fragment** (DM-LIB-002) creates the elements again at the clicked point, in one of two modes, chosen per stamp:
+  - **As a group** (default): a group instance (ARC-GRP-001). Editing the group changes every stamped copy; Ungroup makes one independent.
+  - **As elements**: independent elements with no group.
+
+  In both modes:
+  - **GUIDs**: every element gets new GlobalIds.
+  - **Types**: the fragment's types are merged into the project. A type that already exists (same GUID, or same name and identical parameters) is reused. Otherwise there is a choice: *Use project's*, *Use library's*, or *Keep both* (renamed with a suffix).
+  - **Materials**: matched by name, or created.
+  - **Levels**: relative level 0 is the level clicked on. Higher relative levels map to the project's levels above it by order or by nearest elevation (a setting). When the project has too few levels, the member stays on the highest one with an offset, and a warning lists it.
+  - **Hosts**: members whose host was left out of the fragment are rehosted where the copy lands (ARC-GRP-001 hosted members). An example is a door saved without its wall, stamped onto a wall.
+- **Preview.** Selecting a fragment in the Library panel shows a 3D preview, its plan outline, its member counts by category, its variants, its levels and its size.
+
+**Data (storage).**
+- A fragment is an IFC file in a library folder.
+  - **Written by Reviera** (Add to Library, Import to Library): a standalone IFC4 file written as Save Group writes it (ARC-GRP-001). Its RXD carries the group template, the relative levels, the base point and the list of dropped outside references. For Import to Library, it also carries the source file's name and SHA-256.
+  - **Any other IFC file** placed in a library folder is a fragment as it is. Stamping it brings its elements in as an IFC merge does (DM-IMP-001):
+    - its storeys become relative levels by elevation;
+    - its base point is the bottom-centre, unless its sidecar names one;
+    - its types become variants when it has several.
+  - Either way, the file opens in other IFC tools as a small model.
+- An item's variants are the types or group types in its file, or several files grouped by their sidecars.
+- In a project, a group type stamped from the library records the item's GUID, variant and content hash in `families/index` (DM-LIB-001), so the Library panel can offer updates.
+
+**Commands.**
+`library.add_selection(element_ids[], kind: "fragment"|"object", name, folder?, base_point?, include_hosts?: bool, include_rooms?: bool, tags?) -> item_ref` ·
+`library.add_variant(item_ref, element_ids[], variant_name) -> variant_ref` ·
+`library.import_ifc(path, folder, filter?: {storeys?, classes?, systems?, element_guids?}, name?) -> item_ref` ·
+`library.inspect(item_ref) -> {kind, variants, members_by_category, levels, size, outside_refs}` *(query)* ·
+`stamp.place(..., mode?: "group"|"elements", type_conflict?: "project"|"library"|"both")` (DM-LIB-002, extended).
+
+
+**Acceptance criteria.**
+- [ ] Selecting a bathroom's four walls and choosing Add to Library (hosts and rooms on) saves a fragment with the walls, the door, the fixtures and the room. The saved file opens in another IFC viewer.
+- [ ] Stamping that fragment three times, as groups, places three bathrooms, each with new GlobalIds. Adding a fixture to one bathroom's group adds it to all three.
+- [ ] A fragment of a stair core spanning two levels, stamped on Level 2 of a five-level project, puts its upper part on Level 3.
+- [ ] A fragment whose wall type `Exterior 300` differs from the project's type of the same name asks *Use project's / Use library's / Keep both*. *Keep both* adds `Exterior 300 (2)`.
+- [ ] Import to Library of a manufacturer's IFC file, filtered to `IfcSanitaryTerminal`, adds a fragment of only those elements, with their property sets.
+- [ ] A door saved alone as a fragment, without its wall, is stamped into a wall and cuts it.
+
+### 2.8.18 Library folders and large libraries
+**ID:** DM-LIB-004 · **Priority:** P1 · **Ref:** owner requirement (2026-10-14); DM-LIB-001 … 003; Reviera's own design
+
+**Purpose.** Keep thousands of imported objects and model fragments in order. A library is a tree of nested folders of any depth. It can be browsed, searched, reorganised and shared like a well-kept file system. *(Owner requirement, 2026-10-14: "the library needs to support nested hierarchies to manage large sets of imported and model fragments".)*
+
+**Behaviour & rules.**
+- **Nested folders.** Under each source (DM-LIB-001), items live in folders nested to any depth, for example `Furniture › Office › Chairs › Task chairs`. The tree in the Library panel shows each folder with the count of items in it and below it.
+  - Folders are created, renamed, moved and deleted in the panel.
+  - Items and folders are moved by drag and drop, or with Cut and Paste.
+  - Deleting a folder that holds items asks for confirmation and moves them to the source's *Deleted items* folder, from which they can be restored for 30 days.
+- **The library is a set of physical folders of 3D files.** *(Owner clarification, 2026-10-14.)*
+  - A source is a directory tree on a local disk, a network share or WebDAV. Its sub-directories are the library's folders.
+  - Its items are ordinary 3D files, read where they are:
+    - OBJ, with its MTL and texture files beside it;
+    - STL, PLY, glTF/GLB, 3MF and OFF;
+    - IFC files, whether whole models or fragments, written by Reviera or any other tool.
+  - Reviera converts nothing and copies nothing into a private store. A file dropped into a library folder by any means is an item after the next refresh. The same folders can be kept in git, synced, or used by other programs.
+- **Sidecar files (optional).** A sidecar beside an item, named `<file>.meta.json`, holds:
+  - tags, description and category;
+  - import options: units, up axis, insertion point and clean-up (DM-IMP-015);
+  - variant grouping.
+
+  A folder's `.meta.json` holds its settings. Items without a sidecar use their folder's settings, then the format's defaults. Reviera writes sidecars only when the user edits an item's details in a writable folder.
+- **Thumbnails** are rendered by Reviera and kept in the per-user cache, keyed by the file's hash, not written into library folders.
+- **Folder settings** (inherited by sub-folders unless overridden):
+  - default category;
+  - default stamp mode (group or elements);
+  - default tags;
+  - a folder thumbnail, which is otherwise a mosaic of its first four items.
+- **Smart folders.** A smart folder is a saved search: text plus filters over category, kind, tags, source, author, licence, size and date added. It shows matching items from anywhere, without moving them. Examples: *All plumbing fixtures*, *Added this month*, *Fragments over 2 levels*.
+- **Search in a folder.** The search box searches the selected folder and everything below it, or every source; the result list shows each item's folder path.
+- **Existing folders.** **Add Folder as Source** adds any directory tree of 3D files as a source as it is. It is indexed in the background, with progress, and its folder structure is the library tree. **Copy Folder into Library** copies a directory tree into a folder of an existing source instead. Both end with a report:
+  - files read;
+  - files unreadable, with the reason;
+  - duplicates, by SHA-256.
+
+  Import options (units, up axis, category) can be set for a whole folder at once; they are saved in the folder's `.meta.json`.
+- **Bulk edits.** Several selected items can be moved, tagged, re-categorised or deleted together.
+- **Scale.** Loading is lazy, so the panel stays responsive with large libraries:
+  - the tree loads folders as they are expanded;
+  - thumbnails load as they scroll into view;
+  - the index (DM-LIB-001) covers every folder.
+
+  A source of 50,000 items in 2,000 folders opens its tree in under 1 s once indexed, and a search over it returns in under 200 ms.
+- **Organisation libraries (P2).** A remote library's index (DM-LIB-001) carries each item's folder path, so the same tree appears for everyone. Remote libraries are read-only. Items are added through the organisation's own process: a git pull request, or a write-enabled WebDAV folder (DM-FILE-007).
+- **Project Library.** The Project Library source lists the types, families and group types already in the open project, in the same tree form: by category, or by the folder they were stamped from.
+
+**Data (storage).** A library is its directories and files; the `.meta.json` sidecars are its only Reviera-specific files, and they are optional. The search index and thumbnails are per-user caches (DM-LIB-001), rebuilt when missing. Smart folders, favourites and pinned stamps are per-user settings. No model data.
+
+**Commands.**
+`library.folder.create(source_id, path) -> folder_ref` ·
+`library.folder.rename(folder_ref, name)` ·
+`library.folder.delete(folder_ref)` ·
+`library.move(item_or_folder_refs[], to_folder_ref)` ·
+`library.list(folder_ref, recursive?: bool, offset?, limit?) -> {folders[], items[]}` *(query)* ·
+`library.smart_folder.save(name, query) -> smart_folder_id` ·
+`library.source.add(path)` (DM-LIB-001) adds a folder as a source · `library.copy_folder(path, to_folder_ref, options?) -> job_id` ·
+`library.set_meta(item_or_folder_refs[], {tags?, category?, description?, settings?})` ·
+`library.restore_deleted(item_refs[])`.
+
+**Acceptance criteria.**
+- [ ] A directory of 3,000 OBJ, STL, glTF and IFC files in 120 nested folders, added with Add Folder as Source, appears as the same tree with item counts per folder, with no file in it changed or added. Duplicates are reported.
+- [ ] An OBJ file copied into a library folder with a file manager can be stamped after Refresh, using its folder's import options.
+- [ ] Dragging the folder `Chairs` from `Furniture › Office` to `Furniture › Lounge` moves its items on disk, and stamps already placed in projects still find their item (by GUID).
+- [ ] A search for "basin" in `Plumbing` returns only items under `Plumbing`, each shown with its folder path.
+- [ ] A smart folder *Fragments over 2 levels* lists every matching fragment across all sources.
+- [ ] A folder added to the library directory by a file manager appears in the panel after Refresh.
+- [ ] A deleted folder's items can be restored from *Deleted items* the next day.
 
 ---
 
@@ -7208,7 +7345,7 @@ Coordinates ▾: *Acquire Coordinates* (from a link), *Publish Coordinates* (to 
 - **Plans and sections.** A custom object is drawn in plans by its outline: the mesh cut at the view's cut plane, and the projection of what is below it (computed from the mesh and cached with the type). Above the cut, it is drawn per the category's overhead style, as other elements are. Sections and elevations draw its projection and cut faces.
 - **Modifying.** Instances move, copy, rotate, mirror, array, align, pin and delete like other elements; they are selected by clicking any face. **Type properties** hold the name, category, material slots, a uniform scale, and the import options. **Reload from File** (`mesh_object.reload`) re-reads the source (or a new file) into the type, keeping every instance and the material mapping where slot names still match.
 - **Taking part in the model.** Custom objects appear in schedules by category, carry parameters and property sets like other elements, are hidden and isolated by category, and take part in overlap detection and clash tests (COL-CLASH). A closed, consistently wound mesh is treated as a solid (its volume is reported and booleans may use it, P2); an open mesh is display-only for booleans and its clash results are marked approximate.
-- **Library and stamps.** A type can be added to a library (a folder of small IFC files with their RXD recipes) and reused in other projects, and any library item can be used as a **stamp** that inserts a copy at each click (DM-LIB-002).
+- **Library and stamps.** A library is a set of folders of 3D files (DM-LIB-004). Mesh files in them are used directly: stamping one imports it as a custom object type the first time (DM-LIB-002). A type imported elsewhere can be added to a library folder, as its source file or as an IFC file.
 - **Limits.** A type above 1,000,000 triangles asks to decimate before import; above 5,000,000 it is refused with the count found. Import runs in the background with progress and can be cancelled.
 
 **Data (IFC mapping).**
@@ -8170,11 +8307,23 @@ All commands defined in this chapter. Every command in this table is also a Lua 
 | `library.refresh` | source_id? | — | No | DM-LIB-001 |
 | `library.load` | item_ref, type_names?, place=false | family_id | Yes | DM-LIB-001 |
 | `library.add_item` | element_or_type_id, library?, name?, tags? | item_ref | No | DM-LIB-002 |
-| `library.save_selection` | element_ids[], as: "group"\|"object", name, library?, tags? | item_ref | No | DM-LIB-002 |
 | `stamp.place` | item_ref \| type_id, points[], rotation?, mirror?, level_id?, on_face? | element_ids[] | Yes | DM-LIB-002 |
 | `stamp.row` | item_ref \| type_id, start, end, spacing?, count? | element_ids[] | Yes | DM-LIB-002 |
 | `stamp.scatter` | item_refs[], points[], rotation_range?, scale_range?, seed? | element_ids[] | Yes | DM-LIB-002 |
 | `element.make_unique` | element_id | type_id | Yes | DM-LIB-002 |
+| `library.add_selection` | element_ids[], kind: "fragment"\|"object", name, folder?, base_point?, include_hosts?, include_rooms?, tags? | item_ref | No | DM-LIB-003 |
+| `library.add_variant` | item_ref, element_ids[], variant_name | variant_ref | No | DM-LIB-003 |
+| `library.import_ifc` | path, folder, filter?, name? | item_ref | No | DM-LIB-003 |
+| `library.inspect` | item_ref | item_report | No | DM-LIB-003 |
+| `library.folder.create` | source_id, path | folder_ref | No | DM-LIB-004 |
+| `library.folder.rename` | folder_ref, name | — | No | DM-LIB-004 |
+| `library.folder.delete` | folder_ref | — | No | DM-LIB-004 |
+| `library.move` | item_or_folder_refs[], to_folder_ref | — | No | DM-LIB-004 |
+| `library.list` | folder_ref, recursive?, offset?, limit? | {folders[], items[]} | No | DM-LIB-004 |
+| `library.smart_folder.save` | name, query | smart_folder_id | No | DM-LIB-004 |
+| `library.set_meta` | item_or_folder_refs[], meta | — | No | DM-LIB-004 |
+| `library.restore_deleted` | item_refs[] | — | No | DM-LIB-004 |
+| `library.copy_folder` | path, to_folder_ref, options? | job_id | No | DM-LIB-004 |
 | `param.definition` | param_ref | definition | No | DM-PARAM-002 |
 | `param.list` | category?, element_id? | definition[] | No | DM-PARAM-002 |
 | `param.set_ifc_home` | param_ref, category?, pset_name, property_name | — | Yes | DM-PARAM-002 |
@@ -26091,6 +26240,8 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | DM-IMP-014 | 2 | 2.11.11 CADCraft compatibility verification |
 | DM-IMP-015 | 2 | 2.11.12 Custom objects from meshes |
 | DM-LIB-002 | 2 | 2.8.16 Stamps: placing library objects again and again |
+| DM-LIB-003 | 2 | 2.8.17 Model fragments in the library |
+| DM-LIB-004 | 2 | 2.8.18 Library folders and large libraries |
 | DM-CMD-002 | 2 | 2.12.2 Command naming and stability |
 | DM-MCP-002 | 2 | 2.16.2 Transports and authentication |
 | DM-MCP-003 | 2 | 2.16.3 Tool catalogue: generation from the registry |
@@ -26349,7 +26500,19 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `level` | 5 |
 | `library` | 6 |
 | `library.add_item` | 2 | element_or_type_id, library?, name?, tags? | item_ref | No | DM-LIB-002 |
-| `library.save_selection` | 2 | element_ids[], as: "group"\|"object", name, library?, tags? | item_ref | No | DM-LIB-002 |
+| `library.add_selection` | 2 | element_ids[], kind: "fragment"\|"object", name, folder?, base_point?, include_hosts?, include_rooms?, tags? | item_ref | No | DM-LIB-003 |
+| `library.add_variant` | 2 | item_ref, element_ids[], variant_name | variant_ref | No | DM-LIB-003 |
+| `library.copy_folder` | 2 | path, to_folder_ref, options? | job_id | No | DM-LIB-004 |
+| `library.folder.create` | 2 | source_id, path | folder_ref | No | DM-LIB-004 |
+| `library.folder.delete` | 2 | folder_ref | — | No | DM-LIB-004 |
+| `library.folder.rename` | 2 | folder_ref, name | — | No | DM-LIB-004 |
+| `library.import_ifc` | 2 | path, folder, filter?, name? | item_ref | No | DM-LIB-003 |
+| `library.inspect` | 2 | item_ref | item_report | No | DM-LIB-003 |
+| `library.list` | 2 | folder_ref, recursive?, offset?, limit? | {folders[], items[]} | No | DM-LIB-004 |
+| `library.move` | 2 | item_or_folder_refs[], to_folder_ref | — | No | DM-LIB-004 |
+| `library.restore_deleted` | 2 | item_refs[] | — | No | DM-LIB-004 |
+| `library.set_meta` | 2 | item_or_folder_refs[], meta | — | No | DM-LIB-004 |
+| `library.smart_folder.save` | 2 | name, query | smart_folder_id | No | DM-LIB-004 |
 | `lighting` | 1 |
 | `lighting_fixture` | 1 |
 | `line` | 1 |

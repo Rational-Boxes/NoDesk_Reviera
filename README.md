@@ -539,7 +539,13 @@ nearest gaps in what is built:
 - **Custom objects from meshes** (DM-IMP-015): importing OBJ, STL, PLY and glTF/GLB (3MF and OFF
   later) as reusable object types with a category, material slots and plan outlines, placed many
   times, reloaded from the file, and saved to an object library. Specified; not built yet.
-- **Stamps** (DM-LIB-002): any library object, family type or saved group picked up as a stamp
+- **Model fragments and a library tree** (DM-LIB-003/004): a selection in a model (with its hosts,
+  hosted elements and rooms) or part of an external IFC file added to the library as a fragment,
+  with variants, multi-level fragments and type merging when placed. A library is a physical tree
+  of folders of ordinary 3D files (OBJ, STL, PLY, glTF, 3MF, OFF and IFC fragments) read where they
+  are, with optional `.meta.json` sidecars, smart folders and drag-and-drop reorganising.
+  Specified; not built yet.
+- **Stamps** (DM-LIB-002): any library object, family type or model fragment picked up as a stamp
   from the Library panel's Stamps strip (or Alt+click on a placed copy), inserting a copy at each
   click in a plan or on a face in 3D; all copies share one type (Make Unique detaches one); rows
   and random scatter later. Specified; not built yet.
