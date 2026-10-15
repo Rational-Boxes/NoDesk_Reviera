@@ -21,6 +21,8 @@
 
 #define AppName "NoDesk Reviera"
 #define AppExe "reviera.exe"
+; Opens the window with no console window (reviera.exe is a console program: the command-line tool).
+#define GuiExe "reviera-gui.exe"
 #define AppUrl "https://github.com/Rational-Boxes/NoDesk_Reviera"
 #define ProgId "Reviera.IfcModel"
 
@@ -68,22 +70,23 @@ Name: "associate"; Description: "Open .ifc files with {#AppName}"; GroupDescript
 Source: "{#StageDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-; `reviera.exe gui` opens the window; without arguments reviera.exe is the command-line tool.
-Name: "{group}\{#AppName}"; Filename: "{app}\{#AppExe}"; Parameters: "gui"; WorkingDir: "{userdocs}"; IconFilename: "{app}\reviera.ico"
+; reviera-gui.exe opens the window (it starts `reviera.exe gui` without a console window);
+; reviera.exe in a terminal is the command-line tool.
+Name: "{group}\{#AppName}"; Filename: "{app}\{#GuiExe}"; WorkingDir: "{userdocs}"; IconFilename: "{app}\reviera.ico"
 Name: "{group}\Third-party notices"; Filename: "{app}\THIRD-PARTY-NOTICES.txt"
 Name: "{group}\{cm:UninstallProgram,{#AppName}}"; Filename: "{uninstallexe}"
-Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExe}"; Parameters: "gui"; WorkingDir: "{userdocs}"; IconFilename: "{app}\reviera.ico"; Tasks: desktopicon
+Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#GuiExe}"; WorkingDir: "{userdocs}"; IconFilename: "{app}\reviera.ico"; Tasks: desktopicon
 
 [Registry]
 ; .ifc association (optional task). HKA is HKCU for a per-user install and HKLM for all users.
 Root: HKA; Subkey: "Software\Classes\.ifc\OpenWithProgids"; ValueType: string; ValueName: "{#ProgId}"; ValueData: ""; Flags: uninsdeletevalue; Tasks: associate
 Root: HKA; Subkey: "Software\Classes\{#ProgId}"; ValueType: string; ValueName: ""; ValueData: "IFC building model"; Flags: uninsdeletekey; Tasks: associate
 Root: HKA; Subkey: "Software\Classes\{#ProgId}\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\reviera.ico"; Tasks: associate
-Root: HKA; Subkey: "Software\Classes\{#ProgId}\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#AppExe}"" gui ""%1"""; Tasks: associate
-Root: HKA; Subkey: "Software\Classes\Applications\{#AppExe}\SupportedTypes"; ValueType: string; ValueName: ".ifc"; ValueData: ""; Flags: uninsdeletekey; Tasks: associate
+Root: HKA; Subkey: "Software\Classes\{#ProgId}\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#GuiExe}"" ""%1"""; Tasks: associate
+Root: HKA; Subkey: "Software\Classes\Applications\{#GuiExe}\SupportedTypes"; ValueType: string; ValueName: ".ifc"; ValueData: ""; Flags: uninsdeletekey; Tasks: associate
 
 [Run]
-Filename: "{app}\{#AppExe}"; Parameters: "gui"; WorkingDir: "{userdocs}"; Description: "{cm:LaunchProgram,{#AppName}}"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\{#GuiExe}"; WorkingDir: "{userdocs}"; Description: "{cm:LaunchProgram,{#AppName}}"; Flags: nowait postinstall skipifsilent
 
 [Code]
 { The help pages use the Microsoft Edge WebView2 runtime (wxWidgets' Edge backend, linked with the

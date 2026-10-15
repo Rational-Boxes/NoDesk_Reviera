@@ -13,6 +13,11 @@ publish.workspace = true
 name = "reviera"
 path = "src/main.rs"
 
+# Opens the window without a console window on Windows (shortcuts and the file association).
+[[bin]]
+name = "reviera-gui"
+path = "src/bin/reviera-gui.rs"
+
 [dependencies]
 reviera-core.workspace = true
 reviera-app.workspace = true

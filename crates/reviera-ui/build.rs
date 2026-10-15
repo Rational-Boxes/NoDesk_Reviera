@@ -4,6 +4,7 @@
 //! Compiles the native shims:
 //!
 //! - `native/gtk.c` (Linux): native handles for the viewport.
+//! - `native/crash.c`: reports of native crashes (see `src/crash.rs`).
 //! - `native/wxshim.cpp`: wxWidgets features wxDragon does not wrap yet. It is built against the
 //!   wxWidgets that `wxdragon-sys` built (same headers and flags), which is why `wxdragon-sys` is a
 //!   direct dependency: its build script (`links = "wxdragon"`) then runs before this one.
@@ -14,12 +15,17 @@ use std::process::Command;
 fn main() {
     println!("cargo:rerun-if-changed=native/gtk.c");
     println!("cargo:rerun-if-changed=native/wxshim.cpp");
+    println!("cargo:rerun-if-changed=native/crash.c");
     println!("cargo:rerun-if-env-changed=WXDRAGON_SYS_BUILD_DIR");
     let os = std::env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();
     if os == "linux" {
         gtk_shim();
     }
     wx_shim(&os);
+    cc::Build::new()
+        .file("native/crash.c")
+        .warnings(false)
+        .compile("reviera_ui_crash");
 }
 
 fn gtk_shim() {

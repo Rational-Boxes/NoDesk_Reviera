@@ -63,6 +63,15 @@ waiting; the commands <code>recovery.list</code>, <code>recovery.restore</code>,
 <code>recovery.show_changes</code> and <code>recovery.discard</code> manage it from the
 <a href="reviera:help/scripting#shell">command shell</a>.</p>
 
+<h3 id="error-reports">Error reports</h3>
+<p>When Reviera fails, it saves a report and shows it to you. An error inside an action stops
+that action and shows the report at once; Reviera keeps running, but saving your work under a new
+name is a good precaution. If Reviera closed, the report is shown when it next opens (on Windows
+a message also says so at once). Please include the report when you file an issue.
+<b>Open Reports Folder</b> shows where the reports are kept: <code>%LOCALAPPDATA%\Reviera\crash-reports</code>
+on Windows, <code>~/.local/share/Reviera/crash-reports</code> on Linux (in the Flatpak,
+<code>~/.var/app/io.github.rational_boxes.Reviera/data/Reviera/crash-reports</code>).</p>
+
 <h2 id="samples">Sample models</h2>
 <p>The <a href="reviera:help/index#samples">help's home page</a> opens the sample models. Each
 opens as a fresh copy, so the original stays as shipped. They are also good examples of what

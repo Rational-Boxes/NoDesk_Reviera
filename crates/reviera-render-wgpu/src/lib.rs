@@ -12,6 +12,25 @@ use raw_window_handle::{RawDisplayHandle, RawWindowHandle};
 use reviera_render::{Camera, RenderBackend, RenderScene};
 use wgpu::util::DeviceExt;
 
+/// The latest graphics error not caught where it happened. `wgpu` aborts on these by default; the
+/// viewport reports them instead (the next frame returns it) so a driver or validation error does
+/// not close the application.
+static UNCAPTURED: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(None);
+
+/// Requests a device whose uncaptured errors are recorded, not fatal.
+fn request_device(adapter: &wgpu::Adapter) -> Result<(wgpu::Device, wgpu::Queue), String> {
+    let (device, queue) =
+        pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor::default()))
+            .map_err(|e| e.to_string())?;
+    device.on_uncaptured_error(std::sync::Arc::new(|e: wgpu::Error| {
+        eprintln!("graphics error: {e}");
+        if let Ok(mut last) = UNCAPTURED.lock() {
+            *last = Some(e.to_string());
+        }
+    }));
+    Ok((device, queue))
+}
+
 const VERTEX_ATTRIBUTES: [wgpu::VertexAttribute; 3] =
     wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x4, 2 => Float32x4];
 const LINE_ATTRIBUTES: [wgpu::VertexAttribute; 4] =
@@ -207,6 +226,8 @@ pub struct WgpuViewport {
     /// Uniforms of unlit, unclipped plan graphics.
     plan_uniforms: (wgpu::Buffer, wgpu::BindGroup),
     size: (u32, u32),
+    /// The window has no area (minimized): nothing is configured or drawn until it has again.
+    hidden: bool,
     adapter: String,
     scene: RenderScene,
     /// Per scene mesh: whether it is a closed solid, and whether its winding is inward.
@@ -306,9 +327,7 @@ impl WgpuViewport {
                         ..Default::default()
                     }))
                     .map_err(|e| e.to_string())?;
-                let (device, queue) =
-                    pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor::default()))
-                        .map_err(|e| e.to_string())?;
+                let (device, queue) = request_device(&adapter)?;
                 gpu.insert(Gpu {
                     instance,
                     adapter,
@@ -321,17 +340,23 @@ impl WgpuViewport {
         let config = surface
             .get_default_config(&shared.adapter, width.max(1), height.max(1))
             .ok_or("the window surface is not supported by the graphics adapter")?;
-        surface.configure(&shared.device, &config);
+        // Configured when the window has an area (see `resize_target`).
+        let hidden = width == 0 || height == 0;
+        if !hidden {
+            surface.configure(&shared.device, &config);
+        }
         let format = config.format;
         let info = shared.adapter.get_info();
-        Ok(Self::build(
+        let mut viewport = Self::build(
             shared.device,
             shared.queue,
             Target::Surface { surface, config },
             format,
             (width.max(1), height.max(1)),
             info,
-        ))
+        );
+        viewport.hidden = hidden;
+        Ok(viewport)
     }
 
     /// A viewport drawing into an offscreen texture.
@@ -340,9 +365,7 @@ impl WgpuViewport {
         let adapter =
             pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions::default()))
                 .map_err(|e| e.to_string())?;
-        let (device, queue) =
-            pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor::default()))
-                .map_err(|e| e.to_string())?;
+        let (device, queue) = request_device(&adapter)?;
         let format = wgpu::TextureFormat::Rgba8UnormSrgb;
         let texture = offscreen_texture(&device, format, width.max(1), height.max(1));
         let info = adapter.get_info();
@@ -499,6 +522,7 @@ impl WgpuViewport {
             opaque: None,
             transparent: None,
             size,
+            hidden: false,
             adapter: format!("{} ({:?})", info.name, info.backend),
             scene: RenderScene::default(),
             solids: Vec::new(),
@@ -931,8 +955,11 @@ impl WgpuViewport {
     }
 
     fn resize_target(&mut self, width: u32, height: u32) {
+        // A minimized window has no area. Configuring its surface (at any size) is an error on
+        // Vulkan and Direct3D, so it is left as it was until the window is restored.
+        self.hidden = width == 0 || height == 0;
         let size = (width.max(1), height.max(1));
-        if size == self.size {
+        if self.hidden || size == self.size {
             return;
         }
         self.size = size;
@@ -951,6 +978,12 @@ impl WgpuViewport {
     }
 
     fn draw(&mut self, camera: &Camera) -> Result<(), String> {
+        if let Some(e) = UNCAPTURED.lock().ok().and_then(|mut e| e.take()) {
+            return Err(format!("Graphics error: {e}"));
+        }
+        if self.hidden {
+            return Ok(());
+        }
         let aspect = self.size.0 as f32 / self.size.1 as f32;
         let view_proj = camera.view_proj(aspect).to_cols_array_2d();
         let clip = match &self.plan {
@@ -1006,6 +1039,18 @@ impl WgpuViewport {
             Target::Surface { surface, .. } => Some(match surface.get_current_texture() {
                 wgpu::CurrentSurfaceTexture::Success(t)
                 | wgpu::CurrentSurfaceTexture::Suboptimal(t) => t,
+                // The window changed under the surface (restored, moved to another screen):
+                // configured again, drawn on the next paint.
+                wgpu::CurrentSurfaceTexture::Outdated => {
+                    if let Target::Surface { surface, config } = &self.target {
+                        surface.configure(&self.device, config);
+                    }
+                    return Ok(());
+                }
+                // Minimized or covered, or slow: this frame is skipped.
+                wgpu::CurrentSurfaceTexture::Occluded | wgpu::CurrentSurfaceTexture::Timeout => {
+                    return Ok(());
+                }
                 other => return Err(format!("no frame to draw into: {other:?}")),
             }),
             Target::Offscreen { .. } => None,

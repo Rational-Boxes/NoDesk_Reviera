@@ -14,6 +14,7 @@ mod assembly;
 mod browser;
 mod columns;
 mod components;
+mod crash;
 mod curtain;
 mod curved;
 mod decks;
@@ -2273,9 +2274,9 @@ impl Gui {
     }
 }
 
-/// The viewport's size in device pixels.
+/// The viewport's size in device pixels; 0 when the window is minimized.
 fn physical(size: Size, scale: f64) -> (u32, u32) {
-    let px = |v: i32| ((v.max(1) as f64) * scale).round() as u32;
+    let px = |v: i32| ((v.max(0) as f64) * scale).round() as u32;
     (px(size.width), px(size.height))
 }
 
@@ -2939,6 +2940,7 @@ impl Gui {
 
 /// Runs the main window until it is closed, opening `file` if given.
 pub fn run(file: Option<PathBuf>) -> Result<(), String> {
+    crash::install();
     wxdragon::main(move |_| {
         let frame = Frame::builder()
             .with_title("NoDesk Reviera")
@@ -3419,6 +3421,17 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
         // command line comes in front of it.
         Gui::build_library_pane(&gui);
         gui.borrow_mut().show_help();
+        // Reports of failures: one left by a session that closed unexpectedly, now; this
+        // session's, when the window is next idle after them.
+        crash::show_earlier(&frame);
+        let mut test = crash::test_failure();
+        frame.on_idle(move |e| {
+            if let Some(kind) = test.take() {
+                crash::fail(&kind);
+            }
+            crash::show_pending(&frame);
+            e.skip(true);
+        });
         if let Some(path) = &file {
             gui.borrow_mut().open(path, &frame);
         }

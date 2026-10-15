@@ -201,7 +201,7 @@ $env:INCLUDE = @(
 ) -join ';'
 Push-Location $Root
 try {
-    Invoke-Native cargo @('build', '--release', '--locked', '-p', 'reviera')
+    Invoke-Native cargo @('build', '--release', '--locked', '-p', 'reviera', '--bins')
 } finally { Pop-Location }
 $Exe = Join-Path $Root 'target\release\reviera.exe'
 
@@ -210,6 +210,8 @@ Step "Staging $Stage"
 if (Test-Path $Stage) { Remove-Item -Recurse -Force $Stage }
 New-Item -ItemType Directory -Force $Stage | Out-Null
 Copy-Item $Exe $Stage
+# The window without a console window: what the shortcuts and the file association start.
+Copy-Item (Join-Path $Root 'target\release\reviera-gui.exe') $Stage
 
 # The DLLs reviera.exe needs from vcpkg, followed recursively (dumpbin /dependents).
 $searchDirs = @((Join-Path $Dyn 'bin'), (Join-Path $BoostDir 'bin'))
@@ -253,11 +255,6 @@ Copy-Item -Recurse -Force (Join-Path $Root 'test-data\library') (Join-Path $Stag
 Copy-Item (Join-Path $Root 'LICENSE') (Join-Path $Stage 'COPYING.txt')
 Copy-Item (Join-Path $Root 'packaging\THIRD-PARTY-NOTICES.txt') $Stage
 Copy-Item (Join-Path $Root 'packaging\icons\reviera.ico') $Stage
-Set-Content -Path (Join-Path $Stage 'NoDesk Reviera.cmd') -Encoding ASCII -Value @(
-    '@echo off',
-    'rem Opens the Reviera window (reviera.exe without "gui" is the command-line tool).',
-    'start "" "%~dp0reviera.exe" gui %*'
-)
 
 # ------------------------------------------------------------------ 5. Portable ZIP
 New-Item -ItemType Directory -Force $Dist | Out-Null

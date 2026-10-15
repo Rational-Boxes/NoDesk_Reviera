@@ -595,10 +595,24 @@ fn to_result<O: Serialize>(output: O) -> Result<Value> {
     serde_json::to_value(output).map_err(|e| Error::new("internal", e.to_string()))
 }
 
+thread_local! {
+    /// How many commands are running on this thread inside [`guard`].
+    static GUARDED: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
+}
+
+/// Whether a panic on this thread now would be caught and reported as a command's error (for a
+/// panic hook deciding whether the application is failing).
+pub fn panic_is_recovered() -> bool {
+    GUARDED.with(|g| g.get() > 0)
+}
+
 /// Turns a panic inside a command into an error; for editing commands the transaction is dropped,
 /// which rolls it back.
 fn guard(name: &str, f: impl FnOnce() -> Result<Value>) -> Result<Value> {
-    catch_unwind(AssertUnwindSafe(f)).unwrap_or_else(|panic| {
+    GUARDED.with(|g| g.set(g.get() + 1));
+    let result = catch_unwind(AssertUnwindSafe(f));
+    GUARDED.with(|g| g.set(g.get() - 1));
+    result.unwrap_or_else(|panic| {
         let msg = panic
             .downcast_ref::<&str>()
             .map(|s| s.to_string())

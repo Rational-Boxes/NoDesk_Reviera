@@ -149,6 +149,12 @@ Inno Setup under Wine in its own prefix. What it needed:
 - `apps/reviera/build.rs` embeds the application manifest (Common Controls 6, per-monitor DPI,
   long paths) and the icon. Without it Windows 11 loads comctl32 5.x, which lacks
   `GetWindowSubclass`, and the program does not start; Wine hides this.
+- `reviera.exe` is a console program (it is also the command-line tool and the MCP server), so
+  started as the window it would bring a console window whose closing ends the program. The
+  shortcuts and the `.ifc` association start `reviera-gui.exe` instead, a small Windows-subsystem
+  launcher (`apps/reviera/src/bin/reviera-gui.rs`) that runs `reviera.exe gui` with no console
+  window. `reviera.exe gui` (or a double click on it) also lets go of a console that is its
+  alone; a terminal it was started from is left alone.
 - Under Wine there is no WebView2: Help falls back to wxWidgets' HTML window, and wgpu draws with
   OpenGL.
 
@@ -171,9 +177,9 @@ vcpkg (`-VcpkgRoot` or `VCPKG_ROOT`) and Inno Setup 7 (or 6.3+).
 Steps: `vcpkg install` OpenCASCADE, LuaJIT, Eigen and nlohmann-json (`x64-windows`, DLLs) and
 Boost (`x64-windows-static-md`, the static libraries IfcOpenShell's CMake asks for on Windows);
 IfcOpenShell 0.8.5 with the options of `tools/build-ifcopenshell.sh`; `cargo build --release`;
-then a stage folder with `reviera.exe`, the DLLs it needs (followed recursively with `dumpbin
+then a stage folder with `reviera.exe` and `reviera-gui.exe`, the DLLs it needs (followed recursively with `dumpbin
 /dependents`), the MSVC runtime DLLs, `samples\` (found as `<exe dir>\samples`), `COPYING.txt`,
-the notices, the icon and `NoDesk Reviera.cmd`. From it come the portable ZIP and the installer.
+the notices and the icon. From it come the portable ZIP and the installer.
 
 **Inno Setup** rather than WiX: one readable script, per-user or per-machine install from the
 same installer (`PrivilegesRequiredOverridesAllowed=dialog`), a licence page, Start-menu and
@@ -194,9 +200,6 @@ To check on the first run on Windows (the build scripts of the crates were writt
   reviera-ifc looks for `libIfcParse.a` and links Boost as `boost_<name>`; the script adds a
   marker file and copies of vcpkg's Boost libraries under those names. A cleaner fix is in the
   build scripts: `.include()` and the MSVC library names when the target is `msvc`.
-- `reviera.exe` is a console program, so the window opens with a console beside it. Building
-  the GUI as a Windows-subsystem program (and attaching a console for `shell` and
-  `--mcp-stdio`) is a change in `apps/reviera`.
 
 ## Licences of bundled components
 

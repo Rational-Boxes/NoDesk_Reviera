@@ -22,7 +22,10 @@ fn main() -> ExitCode {
     if args.first().map(String::as_str) == Some("--mcp-stdio") {
         return mcp_stdio(&args[1..]);
     }
-    if args.first().map(String::as_str) == Some("gui") {
+    // On Windows a double click on reviera.exe (a console of its own, no arguments) opens the
+    // window too.
+    if args.first().map(String::as_str) == Some("gui") || (args.is_empty() && own_console()) {
+        release_console();
         return match reviera_ui::run(args.get(1).map(std::path::PathBuf::from)) {
             Ok(()) => ExitCode::SUCCESS,
             Err(e) => fail(&e),
@@ -44,6 +47,36 @@ fn main() -> ExitCode {
             );
             ExitCode::FAILURE
         }
+    }
+}
+
+/// Windows: whether the console this program has was made for it alone (it was started from
+/// Explorer or a shortcut, not from a terminal).
+#[cfg(windows)]
+fn own_console() -> bool {
+    unsafe extern "system" {
+        fn GetConsoleProcessList(list: *mut u32, count: u32) -> u32;
+    }
+    let mut list = [0u32; 2];
+    // SAFETY: the list holds two ids; the count of attached processes is returned.
+    unsafe { GetConsoleProcessList(list.as_mut_ptr(), 2) == 1 }
+}
+
+#[cfg(not(windows))]
+fn own_console() -> bool {
+    false
+}
+
+/// Windows: closes the console window the window was started with, when nothing else uses it;
+/// otherwise its closing would end the program. A terminal it was started from is left alone.
+fn release_console() {
+    #[cfg(windows)]
+    if own_console() {
+        unsafe extern "system" {
+            fn FreeConsole() -> i32;
+        }
+        // SAFETY: detaches from the console; later writes to stdout and stderr go nowhere.
+        unsafe { FreeConsole() };
     }
 }
 
