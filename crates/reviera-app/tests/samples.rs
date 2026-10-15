@@ -26,7 +26,13 @@ fn the_sample_corpus_builds_cleanly() {
     let manifest: Vec<Value> =
         serde_json::from_str(&std::fs::read_to_string(dir.join("samples.json")).unwrap()).unwrap();
     assert!(!manifest.is_empty());
-    let regen = std::env::var_os("REVIERA_REGEN_SAMPLES").is_some();
+    // `1` rewrites every sample; a comma-separated list of names, only those.
+    let regen_list = std::env::var("REVIERA_REGEN_SAMPLES").ok();
+    let regen_this = |name: &str| {
+        regen_list
+            .as_deref()
+            .is_some_and(|l| l == "1" || l.split(',').any(|n| n.trim() == name))
+    };
     let out = tempfile::tempdir().unwrap();
     for sample in &manifest {
         let name = sample["name"].as_str().unwrap();
@@ -54,7 +60,7 @@ fn the_sample_corpus_builds_cleanly() {
         );
         let intrusions = run(&mut app, "clearance.check", json!({})).unwrap();
         assert_eq!(intrusions, json!([]), "{name}: {intrusions:#}");
-        let path = if regen {
+        let path = if regen_this(name) {
             dir.join(format!("{name}.ifc"))
         } else {
             out.path().join(format!("{name}.ifc"))

@@ -11,7 +11,7 @@
 --   one path array of the library's "Parthenon Doric Column" (a public-domain scanned shaft with
 --   a modelled capital, test-data/library);
 -- - the cella: the naos (east) and the opisthodomos (west) with great doors, each fronted by a
---   porch of six columns (path arrays along a line);
+--   porch of four columns (path arrays along a line);
 -- - the entablature over the columns, and a gable roof at 13.5° whose pediments are walls
 --   attached to it.
 --
@@ -61,7 +61,9 @@ reviera.array.along_path{
   level = stylobate_level,
   distribution = { mode = "number", value = 8, counts = { 8, 17 } },
   corners = "every_corner",
-  orientation = "outward",
+  -- Every column turned the same way: square capitals stay square to the building, the corner
+  -- ones too (facing outward would turn those 45°).
+  orientation = "same",
 }
 
 -- ---- The cella: naos to the east, opisthodomos to the west, 1 m marble walls ----
@@ -91,15 +93,15 @@ reviera.type.set_param{ type_id = great_door, param = "height", value = 9.0 }
 reviera.door.place{ type_id = great_door, host_wall_id = east, point_along = (x1 - x0) / 2 }
 reviera.door.place{ type_id = great_door, host_wall_id = west, point_along = (x1 - x0) / 2 }
 
--- ---- The porches: six columns before each end of the cella ----
+-- ---- The porches: four columns before each end of the cella ----
 for _, y in ipairs({ 62.0, 7.5 }) do
   reviera.array.along_path{
     name = y > 30 and "East Porch" or "West Porch",
     sources = { { library = library, item = column } },
     path = { points = { {x0, y}, {x1, y} } },
     level = stylobate_level,
-    distribution = { mode = "number", value = 6 },
-    orientation = "fixed",
+    distribution = { mode = "number", value = 4 },
+    orientation = "same",
   }
 end
 

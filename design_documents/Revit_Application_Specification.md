@@ -13898,8 +13898,8 @@ These tools are on the **Modify** tab and are repeated on every `Modify | <Eleme
   - *Skip corners* leaves the corners empty.
 - **Orientation** of each copy:
   - **Follow path:** the copy's local x along the tangent. This is the default for walls, railings and edges.
-  - **Fixed:** every copy keeps the source's rotation.
-  - **Face outward or inward:** perpendicular to the path, outward from a closed path's centre or inward to it, as columns face out from a temple.
+  - **Same for all** (`fixed`, or `same`): every copy, corners included, turned the same way: the source's rotation plus the rotation offset. This suits a temple's columns, whose square capitals all stay square to the building.
+  - **Face outward or inward:** perpendicular to the path, outward from a closed path's centre or inward to it, as statues face out from a terrace. A copy on a corner faces along the corner's bisector.
   - Plus a *rotation offset*, and *alternate mirror* (every second copy mirrored, P2).
 - **Variation**, for planting and other natural things, so a hedge does not look stamped out:
   - a random rotation about the vertical (a range, or any angle);
@@ -13940,14 +13940,14 @@ These tools are on the **Modify** tab and are repeated on every `Modify | <Eleme
 - A drawn path is stored in the recipe. A picked path stores the element's GlobalId and which curve (its location line, or the edge index).
 
 **Commands.**
-`array.along_path(source: element_ids[] | type_id | item_ref, path: {curve} | {element_id, edge?} | {host_edges: element_id}, distribution: {mode: "number"|"fixed"|"max"|"min", value, justify?: "start"|"end"|"centre"}, options?: {include_start?, include_end?, start_inset?, end_inset?, corners?: "through"|"every_corner"|"skip", orientation?: "follow"|"fixed"|"outward"|"inward", rotation_offset?, alternate_mirror?, variation?: {rotation_range?, scale_range?, sources?: [{type_id|item_ref, weight}], jitter?, seed?}, height?: "level"|"path"|"host_face", level_id?, offset?}) -> array_id` ·
+`array.along_path(source: element_ids[] | type_id | item_ref, path: {curve} | {element_id, edge?} | {host_edges: element_id}, distribution: {mode: "number"|"fixed"|"max"|"min", value, justify?: "start"|"end"|"centre"}, options?: {include_start?, include_end?, start_inset?, end_inset?, corners?: "through"|"every_corner"|"skip", orientation?: "follow"|"fixed"|"same"|"outward"|"inward", rotation_offset?, alternate_mirror?, variation?: {rotation_range?, scale_range?, sources?: [{type_id|item_ref, weight}], jitter?, seed?}, height?: "level"|"path"|"host_face", level_id?, offset?}) -> array_id` ·
 `array.set(array_id, {source?, path?, distribution?, options?})` ·
 `array.exclude_member(array_id, index)` · `array.restore_member(array_id, index | "all")` ·
 `array.unarray(array_id) -> element_ids[]`.
 `array.set_count` (ARC-MOD-026) also works on path arrays.
 
 **Acceptance criteria.**
-- [ ] A Doric column mesh component, arrayed along the edges of a 30 × 14 m stylobate floor with *At every corner*, 13 per long side and 6 per short side, gives a 6 × 13 peripteral colonnade of 34 columns facing outward. The saved IFC holds one column mesh and 34 `IfcColumn` members.
+- [ ] A Doric column mesh component, arrayed along the edges of a 30 × 14 m stylobate floor with *At every corner*, 13 per long side and 6 per short side, gives a 6 × 13 peripteral colonnade of 34 columns, all turned the same way (Orientation *Same for all*). The saved IFC holds one column mesh and 34 `IfcColumn` members.
 - [ ] Moving one edge of that floor by 2 m regenerates the columns on that side, and the corners stay occupied.
 - [ ] Changing the long-side count from 13 to 15 on the canvas label respaces the long sides in one undo step.
 - [ ] Excluding the middle column of the front row leaves a gap that survives changing the column component to an Ionic one.

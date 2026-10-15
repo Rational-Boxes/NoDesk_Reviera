@@ -36,7 +36,7 @@ const CORNERS: [(Corners, &str); 3] = [
 ];
 const ORIENTATIONS: [(Orientation, &str); 4] = [
     (Orientation::Follow, "Follow path"),
-    (Orientation::Fixed, "Fixed"),
+    (Orientation::Fixed, "Same for all"),
     (Orientation::Outward, "Face outward"),
     (Orientation::Inward, "Face inward"),
 ];

@@ -123,6 +123,40 @@ fn temple_colonnade_round_the_stylobate() {
         (front["rotation"].as_f64().unwrap() + std::f64::consts::FRAC_PI_2).abs() < 1e-6,
         "{front}"
     );
+    // Facing outward, a corner column faces along the corner's bisector (45° off its sides),
+    // the path's start corner too.
+    for (x, y) in [(0.0, 0.0), (30.0, 0.0)] {
+        let corner = at(x, y).unwrap()["rotation"].as_f64().unwrap();
+        assert!(
+            ((corner - front["rotation"].as_f64().unwrap()).abs() - std::f64::consts::FRAC_PI_4)
+                .abs()
+                < 1e-6,
+            "{x}, {y}: {corner}"
+        );
+    }
+    // Same for all: every column, the corners too, turned the same way (by the offset).
+    run(
+        &r,
+        &mut doc,
+        "array.set",
+        json!({ "array_id": a.0, "orientation": "same", "rotation_offset": 0.25 }),
+    )
+    .unwrap();
+    let same = members(&r, &mut doc, a);
+    assert_eq!(same.len(), 34);
+    assert!(
+        same.iter()
+            .all(|v| (v["rotation"].as_f64().unwrap() - 0.25).abs() < 1e-9),
+        "{same:?}"
+    );
+    run(
+        &r,
+        &mut doc,
+        "array.set",
+        json!({ "array_id": a.0, "orientation": "outward", "rotation_offset": 0.0 }),
+    )
+    .unwrap();
+
     // The array's body is its columns.
     let bodies = reviera_core::bodies::all(doc.store());
     let body = bodies.iter().find(|b| b.element == a).unwrap();

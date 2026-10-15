@@ -16,7 +16,8 @@ Start with **File › New**. The model has Level 1 at 0. Open the sample Compone
 3. **The peristyle.** In the Component Library, *Classical › Columns › Parthenon Doric Column*;
    **Array along Path** with a drawn closed rectangle through the column axes, 1150 inside the
    stylobate's edge, on the Stylobate level: Distribution *Number* with 8 per front and 17 per
-   flank (Counts per Side 8, 17), Corners *At every corner*, Orientation *Face outward*. 46
+   flank (Counts per Side 8, 17), Corners *At every corner*, Orientation *Same for all* (with *Face outward* the corner columns would
+   turn 45°). 46
    columns. (Place one column first and select it, or pick it up in the library, then Modify ›
    **Array along Path**; draw the rectangle's corners, Closed on, Enter.)
 4. **The cella.** Stylobate plan, Architecture › **Wall**, type *Marble Wall 1000* (duplicate
@@ -24,9 +25,9 @@ Start with **File › New**. The model has Level 1 at 0. Open the sample Compone
    (23380, 60000) and a cross wall at y = 40000.
 5. **Doors.** Architecture › **Door**, type *Bronze Doors 4900 x 9000*, in the middle of the east
    and west walls.
-6. **The porches.** Six columns before each end: **Array along Path** of the column along a drawn
-   line from (7500, 62000) to (23380, 62000), and from (7500, 7500) to (23380, 7500), Number 6,
-   Orientation *Fixed*.
+6. **The porches.** Four columns before each end: **Array along Path** of the column along a drawn
+   line from (7500, 62000) to (23380, 62000), and from (7500, 7500) to (23380, 7500), Number 4,
+   Orientation *Same for all*.
 7. **The entablature.** Cornice plan, Architecture › **Floor**, type *Entablature 3320*
    (Thickness 3320): the stylobate's rectangle with a hole 2400 inside it.
 8. **The roof.** Architecture › **Roof** on the stylobate's rectangle at the Cornice level;

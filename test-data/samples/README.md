@@ -13,6 +13,8 @@ the `.ifc` files after a change:
 REVIERA_REGEN_SAMPLES=1 cargo test -p reviera-app --test samples
 ```
 
+or only some of them, by name: `REVIERA_REGEN_SAMPLES=temple,csg`.
+
 | Sample | Shows |
 |---|---|
 | `house.ifc` (`house.lua`) | Walls, doors and windows. A hipped roof with eaves bearing on the walls (fascia, soffits), walls attached. A gable and a shed dormer joined flush. A U-shaped and an L-shaped stair with railings. A railing with a single gate, a double gate and an opening. A deck with a railing on its boards. Two levels with plans. |

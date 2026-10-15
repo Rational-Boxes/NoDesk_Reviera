@@ -126,17 +126,36 @@ pub enum Corners {
     Skip,
 }
 
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Orientation {
     /// The copy's x along the path.
     #[default]
     Follow,
-    /// The copy keeps the source's own rotation (only the offset).
+    /// Every copy turned the same way, corners included: the source's own rotation plus the
+    /// rotation offset ("same" in scripts too).
+    #[serde(alias = "same")]
     Fixed,
     /// The copy's x away from the path's inside (the right of travel on an open path).
     Outward,
     Inward,
+}
+
+// Written by hand so that `same`, the alias of `fixed`, is accepted too.
+impl JsonSchema for Orientation {
+    fn schema_name() -> std::borrow::Cow<'static, str> {
+        "Orientation".into()
+    }
+
+    fn json_schema(_: &mut schemars::SchemaGenerator) -> schemars::Schema {
+        schemars::json_schema!({
+            "type": "string",
+            "enum": ["follow", "fixed", "same", "outward", "inward"],
+            "description": "How each copy is turned: `follow` the path; `fixed` or `same`, every \
+                copy (corners included) the same way, by the rotation offset; or `outward` or \
+                `inward`, square to the path (a corner copy along the corner's bisector)."
+        })
+    }
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -440,7 +459,7 @@ fn cumulative(points: &[[f64; 2]]) -> Vec<f64> {
 }
 
 /// The point and unit tangent at distance `s` along a polyline (at a vertex, the bisector).
-fn at(points: &[[f64; 2]], along: &[f64], s: f64) -> ([f64; 2], [f64; 2]) {
+fn at(points: &[[f64; 2]], along: &[f64], s: f64, closed: bool) -> ([f64; 2], [f64; 2]) {
     let n = points.len() - 1;
     let i = along[1..]
         .iter()
@@ -459,12 +478,13 @@ fn at(points: &[[f64; 2]], along: &[f64], s: f64) -> ([f64; 2], [f64; 2]) {
         points[i][1] + (points[i + 1][1] - points[i][1]) * t,
     ];
     let mut d = dir(i);
-    // At a vertex between two segments, the bisector of their directions.
-    if t > 1.0 - 1e-9 && i + 1 < n {
-        let e = dir(i + 1);
+    // At a vertex between two segments, the bisector of their directions; on a closed path the
+    // start (and end) is such a vertex too, between the last segment and the first.
+    if t > 1.0 - 1e-9 && (i + 1 < n || closed) {
+        let e = dir(if i + 1 < n { i + 1 } else { 0 });
         d = [d[0] + e[0], d[1] + e[1]];
-    } else if t < 1e-9 && i > 0 {
-        let e = dir(i - 1);
+    } else if t < 1e-9 && (i > 0 || closed) {
+        let e = dir(if i > 0 { i - 1 } else { n - 1 });
         d = [d[0] + e[0], d[1] + e[1]];
     }
     let l = d[0].hypot(d[1]).max(1e-12);
@@ -609,7 +629,7 @@ pub fn members(store: &Store, r: &PathArrayRecipe) -> Result<Vec<Member>> {
         if r.excluded.contains(&index) {
             continue;
         }
-        let (mut p, t) = at(&pts, &along, d);
+        let (mut p, t) = at(&pts, &along, d, g.closed);
         let right = [t[1], -t[0]];
         let outward = if ccw { right } else { [-right[0], -right[1]] };
         let base = match r.orientation {
