@@ -545,8 +545,9 @@ nearest gaps in what is built:
   Parts of external IFC files can be added too, with variants, multi-level fragments and type
   merging when placed. A library is a physical tree of folders of ordinary 3D files (OBJ, STL,
   PLY, glTF, 3MF, OFF and IFC fragments) read where they are. A library is a folder that is
-  opened, with one JSON manifest (`reviera-library.json`) in its root, and has smart folders and
-  drag-and-drop reorganising. Specified; not built yet.
+  opened, with one JSON manifest (`reviera-library.json`) in its root. Import into Library (or
+  dropping files on a folder) copies files in a supported 3D format into a folder and adds them to
+  the manifest. Libraries have smart folders and drag-and-drop reorganising. Specified; not built yet.
 - **Stamps** (DM-LIB-002): any library object, family type or model fragment picked up as a stamp
   from the Library panel's Stamps strip (or Alt+click on a placed copy), inserting a copy at each
   click in a plan or on a face in 3D; all copies share one type (Make Unique detaches one); rows

@@ -5913,6 +5913,20 @@ The Stamp tool itself is the UI over `stamp.place`.
   - a folder thumbnail, which is otherwise a mosaic of its first four items.
 - **Smart folders.** A smart folder is a saved search: text plus filters over category, kind, tags, source, author, licence, size and date added. It shows matching items from anywhere, without moving them. Examples: *All plumbing fixtures*, *Added this month*, *Fragments over 2 levels*.
 - **Search in a folder.** The search box searches the selected folder and everything below it, or every source; the result list shows each item's folder path.
+- **Import into Library.** *(Owner requirement, 2026-10-14: "the UI would include an import into a library: copy in a supported 3D format and adjust the manifest".)*
+  - **Library › Import into Library**, or **Import…** on a folder's right-click menu, picks one or more files from anywhere: OBJ, STL, PLY, glTF/GLB, 3MF, OFF or IFC.
+  - **What it does to each file:** copies it into the chosen library folder and adds its entry to the manifest. Nothing else in the library changes.
+    - An OBJ brings its MTL and texture files along, keeping their relative paths.
+    - A glTF brings its `.bin` and image files along.
+  - **One dialog for the batch:**
+    - the destination folder;
+    - name, category and tags, set for all files or file by file;
+    - for mesh files, the import options of DM-IMP-015: units, up axis, insertion point and clean-up. A 3D preview shows each file at its resulting size, so a wrong unit is seen before anything is copied.
+  - The options are written into each file's manifest entry, so later stamps use them without asking.
+  - **Dropping files from the system's file manager** onto a folder in the Library panel opens the same dialog with those files.
+  - **Name clashes:** a file whose name is already used in the destination folder is renamed with a suffix. A file whose SHA-256 matches an item already in the library is reported, with the choice to skip it or to import it again.
+  - **Its own undo:** Import into Library is undone from the panel (*Undo Import*), which removes the copied files and their manifest entries. It is not part of the model's undo history.
+  - **Formats Reviera reads but a library does not hold**, such as STEP (DM-IMP-008), are converted on import into a supported format: IFC for solids, glTF for meshes. The original is copied beside it only when *Keep original* is ticked.
 - **Existing folders.** **Add Folder as Source** adds any directory tree of 3D files as a source as it is. It is indexed in the background, with progress, and its folder structure is the library tree. **Copy Folder into Library** copies a directory tree into a folder of an existing source instead. Both end with a report:
   - files read;
   - files unreadable, with the reason;
@@ -5939,6 +5953,8 @@ The Stamp tool itself is the UI over `stamp.place`.
 `library.move(item_or_folder_refs[], to_folder_ref)` ·
 `library.list(folder_ref, recursive?: bool, offset?, limit?) -> {folders[], items[]}` *(query)* ·
 `library.smart_folder.save(name, query) -> smart_folder_id` ·
+`library.import_files(paths[], to_folder_ref, options?: {name?, category?, tags?, units?, up_axis?, insertion?, cleanup?, per_file?, on_duplicate?: "skip"|"import", keep_original?}) -> {item_refs[], report}` ·
+`library.undo_import(import_id)` ·
 `library.source.add(path)` (DM-LIB-001) adds a folder as a source · `library.copy_folder(path, to_folder_ref, options?) -> job_id` ·
 `library.set_meta(item_or_folder_refs[], {tags?, category?, description?, settings?})` ·
 `library.restore_deleted(item_refs[])`.
@@ -5946,6 +5962,8 @@ The Stamp tool itself is the UI over `stamp.place`.
 **Acceptance criteria.**
 - [ ] A directory of 3,000 OBJ, STL, glTF and IFC files in 120 nested folders, added with Add Folder as Source, appears as the same tree with item counts per folder, with no file in it changed or added. Duplicates are reported.
 - [ ] An OBJ file copied into a library folder with a file manager can be stamped after Refresh, using its folder's import options.
+- [ ] Import into Library of a chair OBJ, with its MTL and two textures, into `Furniture › Chairs` (units cm) copies all four files there. The manifest gains one entry, with `units: "cm"`. The chair then stamps at its real size without a dialog.
+- [ ] Dropping three glTF files from the file manager onto a library folder opens the import dialog for the three. Undo Import afterwards removes the files and their manifest entries.
 - [ ] Dragging the folder `Chairs` from `Furniture › Office` to `Furniture › Lounge` moves its items on disk, and stamps already placed in projects still find their item (by GUID).
 - [ ] A search for "basin" in `Plumbing` returns only items under `Plumbing`, each shown with its folder path.
 - [ ] A smart folder *Fragments over 2 levels* lists every matching fragment across all sources.
@@ -8364,6 +8382,8 @@ All commands defined in this chapter. Every command in this table is also a Lua 
 | `library.set_meta` | item_or_folder_refs[], meta | — | No | DM-LIB-004 |
 | `library.restore_deleted` | item_refs[] | — | No | DM-LIB-004 |
 | `library.copy_folder` | path, to_folder_ref, options? | job_id | No | DM-LIB-004 |
+| `library.import_files` | paths[], to_folder_ref, options? | {item_refs[], report} | No | DM-LIB-004 |
+| `library.undo_import` | import_id | — | No | DM-LIB-004 |
 | `library.open` | path | library_id | No | DM-LIB-004 |
 | `library.create` | path, name | library_id | No | DM-LIB-004 |
 | `library.close` | library_id | — | No | DM-LIB-004 |
@@ -26553,6 +26573,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `library.folder.create` | 2 | library_id, path | folder_ref | No | DM-LIB-004 |
 | `library.folder.delete` | 2 | folder_ref | — | No | DM-LIB-004 |
 | `library.folder.rename` | 2 | folder_ref, name | — | No | DM-LIB-004 |
+| `library.import_files` | 2 | paths[], to_folder_ref, options? | {item_refs[], report} | No | DM-LIB-004 |
 | `library.import_ifc` | 2 | path, folder, filter?, name? | item_ref | No | DM-LIB-003 |
 | `library.inspect` | 2 | item_ref | item_report | No | DM-LIB-003 |
 | `library.list` | 2 | folder_ref, recursive?, offset?, limit? | {folders[], items[]} | No | DM-LIB-004 |
@@ -26561,6 +26582,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `library.restore_deleted` | 2 | item_refs[] | — | No | DM-LIB-004 |
 | `library.set_meta` | 2 | item_or_folder_refs[], meta | — | No | DM-LIB-004 |
 | `library.smart_folder.save` | 2 | name, query | smart_folder_id | No | DM-LIB-004 |
+| `library.undo_import` | 2 | import_id | — | No | DM-LIB-004 |
 | `lighting` | 1 |
 | `lighting_fixture` | 1 |
 | `line` | 1 |
