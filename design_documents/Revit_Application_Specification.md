@@ -5735,7 +5735,7 @@ DN25,25,37.5,22,Copper
   - a model fragment: a set of related elements, for example a desk with its chair and lamp, or a whole bathroom (DM-LIB-003).
 - **Adding to the library:**
   - **Add to Library** (on a selected instance or type) copies the type into a library folder, with a thumbnail rendered from it.
-  - Several selected elements are added as a model fragment, which keeps them as separate related elements, or as one custom object, whose meshed geometry merges them (DM-LIB-003).
+  - **Create Component** turns any selection into a new component (DM-LIB-003): an IFC file of the model fragment, saved into a library folder. Alternatively it merges the selection into one custom object.
   - Library items carry a name, a category, tags and a description, all searchable.
 - **Libraries:**
   - **My Library** is per user, in the user data folder.
@@ -5792,8 +5792,13 @@ The Stamp tool itself is the UI over `stamp.place`.
   - **Object**: one type, such as a custom mesh object (DM-IMP-015) or a family type.
   - **Fragment**: a set of related elements, stored as a group template (ARC-GRP-001).
   - **Collection**: a folder of items (DM-LIB-004).
-- **Adding a selection to the library.** Select elements in a model and choose **Add to Library** (right-click, or Manage › Library). The dialog has:
-  - Name, library folder, tags and description.
+- **Create Component from any selection.** *(Owner clarification, 2026-10-14: "any subselection of objects can be used to create a new component; it is just an IFC with the model fragment".)*
+  - **What can be selected:** any selection of objects in a model, of any categories and any number. This includes a sub-selection:
+    - some of a group's or a placed component's members, picked with Tab;
+    - elements of an imported or linked IFC model.
+  - **Create Component** (Modify tab, the right-click menu, and Library › Create Component) writes the selection as a new component: **an IFC file of that model fragment**, and nothing else.
+  - **Where it goes:** into a folder of an open library, where it becomes a library item at once, or to any path.
+  - **In the dialog:** name, destination (a library folder, or a file path), tags and description, and the options below.
   - **Kind**: *Fragment* (default for several elements) or *Object* (merge into one custom object, DM-IMP-015).
   - **Base point**: the selection's bottom-centre, a picked point, or the project's base point. It becomes the fragment's origin, the point the cursor holds when stamping.
   - **Include hosts and hosted**, on by default:
@@ -5803,6 +5808,8 @@ The Stamp tool itself is the UI over `stamp.place`.
   - **Include rooms**: the rooms enclosed by the selected walls (on by default).
   - **Levels.** A fragment on several levels keeps each member's level as a **relative level**: 0 for its lowest, then 1, 2… by elevation, with each level's height above the lowest.
   - **Outside references.** Each reference to an element outside the selection is listed, then dropped (with the element left as it is) or brought in. Such references include a wall attached to a roof, a join to another wall, or a stair opening in a floor. The dialog shows the list before saving.
+  - **Replace selection with the component** (on by default): the selected elements become a placed copy of the new component, a group instance (ARC-GRP-001). Copies stamped later are linked to them. Off, the selection is left as it was and only the file is written.
+- **Edit Component.** On a placed copy or a library item, **Edit Component** opens the component's IFC file in its own tab, as a model. Every tool works there, and Save writes the file. Projects open in the session that use the component update their copies; others offer *Reload from library* when next opened (DM-LIB-001). Read-only libraries open the file as a copy, to be saved elsewhere.
 - **Variants.** An item can hold several variants (like the types of a family), for example a bathroom in a left-hand and a right-hand version, or a chair in three sizes. Variants of a fragment are group types of one item; variants of an object are types of one family or custom object. **Add Variant** adds the current selection to an existing item as a new variant.
 - **IFC files as fragments.** An IFC file copied into a library folder is a fragment at once (see Data). **Import to Library** (Manage › Library) writes a part of an external IFC file into a library folder as a new IFC file:
   - the part is chosen by storey, by IFC class, by system, or by picking in a preview;
@@ -5822,7 +5829,12 @@ The Stamp tool itself is the UI over `stamp.place`.
 
 **Data (storage).**
 - A fragment is an IFC file in a library folder.
-  - **Written by Reviera** (Add to Library, Import to Library): a standalone IFC4 file written as Save Group writes it (ARC-GRP-001). Its RXD carries the group template, the relative levels, the base point and the list of dropped outside references. For Import to Library, it also carries the source file's name and SHA-256.
+  - **Written by Reviera** (Create Component, Import to Library): a standalone IFC4 model of the fragment, with:
+    - a project, site and building;
+    - one storey per relative level;
+    - the elements with their types, materials, property sets, openings, hosting and other relationships.
+
+    Its RXD carries the group template, the relative levels, the base point and the list of dropped outside references. For Import to Library, it also carries the source file's name and SHA-256. The RXD is optional to the file's meaning: with it stripped, Reviera still uses the file as an IFC fragment, as below.
   - **Any other IFC file** placed in a library folder is a fragment as it is. Stamping it brings its elements in as an IFC merge does (DM-IMP-001):
     - its storeys become relative levels by elevation;
     - its base point is the bottom-centre, unless its manifest entry names one;
@@ -5832,7 +5844,8 @@ The Stamp tool itself is the UI over `stamp.place`.
 - In a project, a group type stamped from the library records the item's GUID, variant and content hash in `families/index` (DM-LIB-001), so the Library panel can offer updates.
 
 **Commands.**
-`library.add_selection(element_ids[], kind: "fragment"|"object", name, folder?, base_point?, include_hosts?: bool, include_rooms?: bool, tags?) -> item_ref` ·
+`component.create(element_ids[], destination: folder_ref | path, name, kind?: "fragment"|"object", base_point?, include_hosts?: bool, include_rooms?: bool, replace_selection?: bool = true, tags?) -> item_ref` ·
+`component.edit(item_ref | element_id) -> document_id` · `component.reload(item_ref)` ·
 `library.add_variant(item_ref, element_ids[], variant_name) -> variant_ref` ·
 `library.import_ifc(path, folder, filter?: {storeys?, classes?, systems?, element_guids?}, name?) -> item_ref` ·
 `library.inspect(item_ref) -> {kind, variants, members_by_category, levels, size, outside_refs}` *(query)* ·
@@ -5840,12 +5853,15 @@ The Stamp tool itself is the UI over `stamp.place`.
 
 
 **Acceptance criteria.**
-- [ ] Selecting a bathroom's four walls and choosing Add to Library (hosts and rooms on) saves a fragment with the walls, the door, the fixtures and the room. The saved file opens in another IFC viewer.
+- [ ] Selecting a bathroom's four walls and choosing Create Component (hosts and rooms on) saves an IFC file with the walls, the door, the fixtures and the room, and replaces the selection with a placed copy of it. The saved file opens in another IFC viewer.
 - [ ] Stamping that fragment three times, as groups, places three bathrooms, each with new GlobalIds. Adding a fixture to one bathroom's group adds it to all three.
 - [ ] A fragment of a stair core spanning two levels, stamped on Level 2 of a five-level project, puts its upper part on Level 3.
 - [ ] A fragment whose wall type `Exterior 300` differs from the project's type of the same name asks *Use project's / Use library's / Keep both*. *Keep both* adds `Exterior 300 (2)`.
 - [ ] Import to Library of a manufacturer's IFC file, filtered to `IfcSanitaryTerminal`, adds a fragment of only those elements, with their property sets.
 - [ ] A door saved alone as a fragment, without its wall, is stamped into a wall and cuts it.
+- [ ] Tab-selecting two chairs inside a placed dining-set component and choosing Create Component writes a new IFC file holding only those two chairs.
+- [ ] Edit Component on a placed bathroom opens its IFC file in a tab. Adding a towel rail and saving updates every placed bathroom in the open project.
+- [ ] A component file written by Reviera, with its RXD removed by another tool, still opens as a model in other IFC viewers and still stamps in Reviera.
 
 ### 2.8.18 Library folders and large libraries
 **ID:** DM-LIB-004 · **Priority:** P1 · **Ref:** owner requirement (2026-10-14); DM-LIB-001 … 003; Reviera's own design
@@ -8331,7 +8347,9 @@ All commands defined in this chapter. Every command in this table is also a Lua 
 | `stamp.row` | item_ref \| type_id, start, end, spacing?, count? | element_ids[] | Yes | DM-LIB-002 |
 | `stamp.scatter` | item_refs[], points[], rotation_range?, scale_range?, seed? | element_ids[] | Yes | DM-LIB-002 |
 | `element.make_unique` | element_id | type_id | Yes | DM-LIB-002 |
-| `library.add_selection` | element_ids[], kind: "fragment"\|"object", name, folder?, base_point?, include_hosts?, include_rooms?, tags? | item_ref | No | DM-LIB-003 |
+| `component.create` | element_ids[], destination, name, kind?, base_point?, include_hosts?, include_rooms?, replace_selection?, tags? | item_ref | Yes | DM-LIB-003 |
+| `component.edit` | item_ref \| element_id | document_id | No | DM-LIB-003 |
+| `component.reload` | item_ref | — | Yes | DM-LIB-003 |
 | `library.add_variant` | item_ref, element_ids[], variant_name | variant_ref | No | DM-LIB-003 |
 | `library.import_ifc` | path, folder, filter?, name? | item_ref | No | DM-LIB-003 |
 | `library.inspect` | item_ref | item_report | No | DM-LIB-003 |
@@ -26402,6 +26420,9 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `column` | 7 |
 | `component` | 1 |
 | `compound` | 11 |
+| `component.create` | 2 | element_ids[], destination, name, kind?, base_point?, include_hosts?, include_rooms?, replace_selection?, tags? | item_ref | Yes | DM-LIB-003 |
+| `component.edit` | 2 | item_ref \| element_id | document_id | No | DM-LIB-003 |
+| `component.reload` | 2 | item_ref | — | Yes | DM-LIB-003 |
 | `conductor_size` | 1 |
 | `conductor_table` | 1 |
 | `conduit` | 2 |
@@ -26523,7 +26544,6 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `level` | 5 |
 | `library` | 6 |
 | `library.add_item` | 2 | element_or_type_id, library?, name?, tags? | item_ref | No | DM-LIB-002 |
-| `library.add_selection` | 2 | element_ids[], kind: "fragment"\|"object", name, folder?, base_point?, include_hosts?, include_rooms?, tags? | item_ref | No | DM-LIB-003 |
 | `library.add_variant` | 2 | item_ref, element_ids[], variant_name | variant_ref | No | DM-LIB-003 |
 | `library.close` | 2 | library_id | — | No | DM-LIB-004 |
 | `library.copy_folder` | 2 | path, to_folder_ref, options? | job_id | No | DM-LIB-004 |

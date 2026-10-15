@@ -539,8 +539,9 @@ nearest gaps in what is built:
 - **Custom objects from meshes** (DM-IMP-015): importing OBJ, STL, PLY and glTF/GLB (3MF and OFF
   later) as reusable object types with a category, material slots and plan outlines, placed many
   times, reloaded from the file, and saved to an object library. Specified; not built yet.
-- **Model fragments and a library tree** (DM-LIB-003/004): a selection in a model (with its hosts,
-  hosted elements and rooms) or part of an external IFC file added to the library as a fragment,
+- **Components and a library tree** (DM-LIB-003/004): Create Component turns any selection in a
+  model (with its hosts, hosted elements and rooms) into a component, which is just an IFC file of
+  that model fragment; Edit Component opens it as a model. Parts of external IFC files can be added too,
   with variants, multi-level fragments and type merging when placed. A library is a physical tree
   of folders of ordinary 3D files (OBJ, STL, PLY, glTF, 3MF, OFF and IFC fragments) read where they
   are. A library is a folder that is opened, with one JSON manifest (`reviera-library.json`) in
