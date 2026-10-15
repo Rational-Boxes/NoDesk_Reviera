@@ -3795,6 +3795,7 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "colorscheme.create" => with(gui, Gui::color_scheme_dialog),
         "group.create" => with(gui, Gui::create_group),
         "inplace.create" => with(gui, Gui::model_in_place),
+        "stair.number_treads" => with(gui, Gui::number_treads),
         "modeltext.create" => with(gui, |g| {
             g.start_model_text();
             focus(g);

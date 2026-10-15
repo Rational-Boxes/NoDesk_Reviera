@@ -161,6 +161,7 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(CurtainSetLayout),
         registry.add(RoofCreateGlazingType),
         registry.add(ModelTextCreate),
+        registry.add(StairNumberTreads),
         registry.add(InPlaceCreate),
         registry.add(InPlaceAddForm),
         registry.add(InPlaceRemoveForm),
@@ -2130,6 +2131,18 @@ edit_command!(
     crate::in_place::RemoveFormParams,
     (),
     crate::in_place::remove_form
+);
+
+edit_command!(
+    StairNumberTreads,
+    "stair.number_treads",
+    "Number a stair's treads",
+    "Tread numbers for a stair in a view (ARC-STAIR-006), from `start_number` (default 1) by each \
+     tread's place along the stair, so they stay when the stair moves.",
+    "Number Treads",
+    crate::stair_marks::NumberParams,
+    crate::id::ElementId,
+    crate::stair_marks::number_treads
 );
 
 edit_command!(

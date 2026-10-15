@@ -627,3 +627,117 @@ impl Gui {
         true
     }
 }
+
+impl Gui {
+    /// Stair paths, cut marks and tread numbers in a plan (ARC-STAIR-006).
+    pub(crate) fn stair_mark_lines(&mut self, index: usize) -> Vec<Lines> {
+        let v = &self.views[index];
+        let (Some(plan), Some(view)) = (v.plan.clone(), v.element) else {
+            return Vec::new();
+        };
+        if plan.ceiling {
+            return Vec::new();
+        }
+        let Some(store) = self.app.document(v.doc).map(|d| d.doc.store().clone()) else {
+            return Vec::new();
+        };
+        let z = plan.range.cut as f32 + 0.004;
+        let p3 = |p: [f64; 2]| [p[0] as f32, p[1] as f32, z];
+        let mm = plan.scale / 1000.0;
+        let mut lines = Lines {
+            color: [0.1, 0.1, 0.1, 1.0],
+            width: 0.18,
+            segments: Vec::new(),
+        };
+        let label = |text: &str, at: [f64; 2], height: f32| reviera_render::annotation::Label {
+            origin: [
+                at[0] as f32 - reviera_render::font::width(text, height) / 2.0,
+                at[1] as f32,
+                z,
+            ],
+            right: [1.0, 0.0, 0.0],
+            up: [0.0, 1.0, 0.0],
+            height,
+            text: text.to_owned(),
+        };
+        for e in store.iter() {
+            if stairs::stair_recipe(e).is_none() {
+                continue;
+            }
+            let Ok(g) = stairs::regenerate(&store, e) else {
+                continue;
+            };
+            // On this level, or reaching it from below.
+            let on = (g.z_base - plan.elevation).abs() < 0.05
+                || (g.z_base + g.height - plan.elevation).abs() < 0.05;
+            if !on {
+                continue;
+            }
+            let Some(m) =
+                reviera_core::stair_marks::marks(&store, e, plan.elevation, plan.range.cut)
+            else {
+                continue;
+            };
+            for w in m.path.windows(2) {
+                lines.segments.push([p3(w[0]), p3(w[1])]);
+            }
+            for [a, b] in m.arrow {
+                lines.segments.push([p3(a), p3(b)]);
+            }
+            if let Some(c) = &m.cut {
+                for w in c.windows(2) {
+                    lines.segments.push([p3(w[0]), p3(w[1])]);
+                }
+            }
+            lines
+                .segments
+                .extend(reviera_render::annotation::label_strokes(&[label(
+                    m.label.0,
+                    m.label.1,
+                    2.5 * mm,
+                )]));
+        }
+        if let Some(view) = store.get(view) {
+            for (n, at) in reviera_core::stair_marks::numbers_in(&store, view) {
+                let t = n.to_string();
+                lines
+                    .segments
+                    .extend(reviera_render::annotation::label_strokes(&[label(
+                        &t,
+                        at,
+                        2.0 * mm,
+                    )]));
+            }
+        }
+        vec![lines]
+    }
+
+    /// Modify | Stairs › Number Treads: the selected stairs, in this view.
+    pub(crate) fn number_treads(&mut self) {
+        let frame = self.frame;
+        let Some(view) = self.active_view().and_then(|v| v.element) else {
+            return frame.set_status_text("Tread numbers go in a plan or section", 0);
+        };
+        let Some(store) = self.store_now() else {
+            return;
+        };
+        let stairs: Vec<ElementId> = self
+            .selection()
+            .into_iter()
+            .filter(|id| store.get(*id).and_then(stairs::stair_recipe).is_some())
+            .collect();
+        if stairs.is_empty() {
+            return frame.set_status_text("Select the stairs to number", 0);
+        }
+        for s in stairs {
+            if let Err(e) = self.run(
+                "stair.number_treads",
+                json!({ "view_id": view, "stair_id": s }),
+            ) {
+                return frame.set_status_text(&e, 0);
+            }
+        }
+        self.refresh_scene(&frame);
+        frame.set_status_text("Treads numbered", 0);
+    }
+}

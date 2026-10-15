@@ -78,4 +78,11 @@ like any stair (codes give spiral stairs their own headroom). The Manor's tower 
 <p>New stairs get railings on both sides. To put them back after deleting them, select the stair
 and use <b>Modify | Stairs › Railings</b>; see <a href="reviera:help/railings-decks#stair">Railings</a>.
 Stairs are saved as <code>IfcStair</code>. <code>stair.set_params</code></p>
+<h2 id="annotation">Stair path, cut mark and tread numbers</h2>
+<p>Plans draw each stair's path through the middles of its treads with an arrow, labelled UP on
+the level it starts from (DN on the level it reaches); where a stair passes the plan's cut
+plane, the path stops and a zig-zag cut mark crosses the tread. To number the treads in a view,
+select stairs and click <b>Modify | Stairs › Number Treads</b>: the numbers follow the treads'
+order along the stair, so they stay when the stair moves. <code>stair.number_treads</code></p>
+
 <p class="note">Not yet available: winders, stair supports, and editing runs with handles.</p>

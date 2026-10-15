@@ -209,6 +209,7 @@ impl Gui {
         graphics.lines.extend(self.note_lines(index));
         graphics.lines.extend(self.room_lines(index));
         graphics.lines.extend(self.area_lines(index));
+        graphics.lines.extend(self.stair_mark_lines(index));
         // Colour scheme fills (ARC-CLR-001), under the cut.
         graphics.poche.extend(self.color_fills(index));
         graphics.lines.extend(self.section_markers(index));

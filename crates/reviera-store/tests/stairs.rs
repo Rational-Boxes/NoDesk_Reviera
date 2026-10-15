@@ -311,3 +311,94 @@ fn stairs_get_railings_that_follow_them() {
     .unwrap();
     assert!(doc.store().get(rails[0].0).is_none());
 }
+
+#[test]
+fn stair_marks_and_tread_numbers() {
+    let dir = tempfile::tempdir().unwrap();
+    let (mut project, mut doc) =
+        LocalProject::new(Schema::Ifc4, &dir.path().join("sm.ifc")).unwrap();
+    let r = registry();
+    let l1 = doc
+        .store()
+        .iter()
+        .find(|e| e.class == "IfcBuildingStorey")
+        .unwrap()
+        .id();
+    run(&r, &mut doc, "level.create", json!({ "elevation": 3.0 })).unwrap();
+    let stair = id(run(
+        &r,
+        &mut doc,
+        "stair.create",
+        json!({ "base_level": l1.0, "runs": [
+            { "start": [0.0, 0.0], "end": [2.24, 0.0] },
+            { "start": [2.24, 1.4], "end": [0.0, 1.4] },
+        ] }),
+    )
+    .unwrap());
+    let e = doc.store().get(stair).unwrap();
+    let g = geometry(&doc, stair);
+    // A plan of Level 1 cut at 1.2 m: the path through every tread, UP, and a cut mark.
+    let m = reviera_core::stair_marks::marks(doc.store(), e, 0.0, 1.2).unwrap();
+    assert_eq!(m.treads.len(), g.treads.len());
+    assert_eq!(m.label.0, "UP");
+    assert!(m.cut.is_some());
+    // Numbered in the plan: 1 … n by tread; moving the stair keeps the numbers.
+    let existing = doc
+        .store()
+        .iter()
+        .find(|e| {
+            reviera_core::views::view_data(e)
+                .is_some_and(|d| d.kind == reviera_core::plans::KIND_PLAN)
+        })
+        .map(|e| e.id());
+    let plan = match existing {
+        Some(p) => p,
+        None => id(run(
+            &r,
+            &mut doc,
+            "view.create_plan",
+            json!({ "level_ids": [l1.0] }),
+        )
+        .unwrap()[0]
+            .clone()),
+    };
+    run(
+        &r,
+        &mut doc,
+        "stair.number_treads",
+        json!({ "view_id": plan.0, "stair_id": stair.0 }),
+    )
+    .unwrap();
+    let numbers = |doc: &Document| {
+        reviera_core::stair_marks::numbers_in(doc.store(), doc.store().get(plan).unwrap())
+            .into_iter()
+            .map(|(n, _)| n)
+            .collect::<Vec<_>>()
+    };
+    let before = numbers(&doc);
+    assert_eq!(before.first(), Some(&1));
+    assert_eq!(before.len(), g.treads.len());
+    run(
+        &r,
+        &mut doc,
+        "element.move",
+        json!({ "element_ids": [stair.0], "vector": [3.0, 0.0, 0.0] }),
+    )
+    .unwrap();
+    assert_eq!(numbers(&doc), before);
+    project.save(&doc).unwrap();
+    // Deleting the stair takes its numbers.
+    run(
+        &r,
+        &mut doc,
+        "element.delete",
+        json!({ "element_ids": [stair.0] }),
+    )
+    .unwrap();
+    assert!(numbers(&doc).is_empty());
+    assert!(
+        doc.store()
+            .iter()
+            .all(|e| reviera_core::stair_marks::numbers_recipe(e).is_none())
+    );
+}

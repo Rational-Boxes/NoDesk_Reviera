@@ -379,6 +379,8 @@ Create … Boundary* tab:
   the walls open up. Plans label each room with its name, number and area. Saved as `IfcSpace`
   (Name = Number, LongName = Name) under its storey (`room.place`,
   `room.place_automatically`, `room.set`).
+- **Stair annotation**: plans draw stair paths with UP/DN and cut marks; Number Treads numbers a
+  stair's treads in a view, kept when it moves (`stair.number_treads`; ARC-STAIR-006).
 - **Model In-Place** (Architecture › Model): free-form elements of a chosen category from
   extrusions, blends, revolves and sweeps on work planes, solid or void (voids cut through the
   boolean relations); made in the window from selected model lines (`inplace.create`,
@@ -713,7 +715,7 @@ area by area (a review against the spec on 2026-10-15). Whole areas not started 
   (ARC-MASS-001 … 003, ARC-TOPO-001 … 006, ARC-SITE-001).
 - **Groups and selection sets**: detail and nested groups, Save/Load Group, saved selections as
   view filters (ARC-GRP-001 … 003, ARC-SEL-002).
-- **Stair annotation** (cut mark, path, up/down labels; ARC-STAIR-006).
+- **Stair annotation**: path and cut mark types, number styles, riser numbers (ARC-STAIR-006).
 
 **Gaps in what is built:**
 

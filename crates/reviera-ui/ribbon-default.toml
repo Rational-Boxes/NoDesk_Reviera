@@ -935,6 +935,12 @@ icon = "sloped_glazing"
 help = "Turn the selected roofs into sloped glazing (a Sloped Glazing type, made if there is none); change their type back to undo"
 
 [[action]]
+id = "stair.number_treads"
+label = "Number Treads"
+icon = "tread_numbers"
+help = "Number the selected stairs' treads in this view"
+
+[[action]]
 id = "inplace.create"
 label = "Model In-Place"
 icon = "in_place"
@@ -1611,6 +1617,7 @@ label = "Stairs"
 panels = [
   { label = "Railing", tools = [{ action = "railing.create_on_stair", size = "large" }] },
   { label = "Headroom", tools = [{ action = "stair.create_openings", size = "large" }] },
+  { label = "Annotation", tools = [{ action = "stair.number_treads", size = "large" }] },
 ]
 
 [[context]]

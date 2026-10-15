@@ -79,6 +79,9 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "equality" => format!(
             r#"<path d="M4 8v16M16 8v16M28 8v16" {s}/><path d="M4 16h24" {sa}/><path d="M8 12h4M8 14h4M20 12h4M20 14h4" {sa}/>"#
         ),
+        "tread_numbers" => format!(
+            r#"<path d="M4 26h6v-6h6v-6h6V8h6" fill="none" {s}/><path d="M6 17h2M12 11h2" {sa}/>"#
+        ),
         "in_place" => format!(
             r#"<path d="M6 26V12l10-8 10 8v14z" fill="{f}" {s}/><path d="M12 26v-8h8v8" fill="{paper}" {sa}/>"#
         ),

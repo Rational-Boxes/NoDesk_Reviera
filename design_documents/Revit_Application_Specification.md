@@ -12589,7 +12589,9 @@ These are view annotation and are specified in the DOC chapter. This chapter req
 **Commands.** `stair.number_treads(view_id, stair_id, start_number?, type_id?) -> element_id`.
 
 **Acceptance criteria.**
-- [ ] Tread numbers keep their values after a run is moved. They change only when the number of treads changes.
+- [x] Tread numbers keep their values after a run is moved. They change only when the number of treads changes.
+
+**Implementation note (2026-10-15, first build).** As built: plans draw each stair's path through its tread middles up to the cut plane, an arrow, UP (DN in a plan of its top level) and a zig-zag cut mark across the first tread above the cut; `stair.number_treads(view_id, stair_id, start_number?)` makes a view's tread numbers (`IfcAnnotation`, `recipe.stair_numbers`), numbered by tread index, deleted with the stair or the view. The window: Modify | Stairs › Number Treads. Not built yet: Stair Path and cut mark types, number type properties, riser numbers, the path above the cut, sections.
 
 ### 3.7.6a Stairs through floors: completing to the level above, openings and railings
 **ID:** ARC-STAIR-007 · **Priority:** P1 · **Ref:** owner requirement (2026-10-14); Reviera's own design (Appendix A.2a); headroom by DM-CODE-001
