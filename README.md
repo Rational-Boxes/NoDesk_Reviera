@@ -38,6 +38,12 @@ The KIT FZK *AC20-Institute-Var-2* sample model (`test-data/ifc/`) open in Revie
 
 ![A section box cutting the Institute model open, in isometric projection](design_documents/application_screenshots/section-box.png)
 
+The Manor sample (`test-data/samples/manor.ifc`), drawn see-through in a Hide/Isolate view, with
+its roof selected and the Modify | Roofs tab open: the dormer, the spiral stairs inside the tower,
+the porch columns and the shaped windows show through the walls.
+
+![The Manor sample see-through in 3D, its roof selected](design_documents/application_screenshots/manor-transparency.png)
+
 ## What works today
 
 Command names are given in `code` after each feature; every one of them can be run from the
