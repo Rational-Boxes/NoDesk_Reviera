@@ -13,6 +13,7 @@
 mod assembly;
 mod browser;
 mod columns;
+mod components;
 mod curtain;
 mod curved;
 mod decks;
@@ -33,6 +34,7 @@ mod nav;
 mod notes;
 mod openings;
 mod overlaps;
+mod path_arrays;
 mod plans;
 mod railings;
 mod ramps;
@@ -244,6 +246,14 @@ struct Gui {
     ramp_tool: Option<ramps::RampTool>,
     measure_tool: Option<ramps::MeasureTool>,
     skylight_tool: Option<skylights::SkylightTool>,
+    /// The Place Component tool (a component picked up from the library, or a project type).
+    place_tool: Option<components::PlaceTool>,
+    /// The Array along Path tool.
+    array_tool: Option<path_arrays::ArrayTool>,
+    /// The Component Library panel.
+    library_pane: Option<components::LibraryPane>,
+    /// Renders component thumbnails offscreen (made when first needed).
+    thumb_renderer: Option<WgpuViewport>,
     /// The last array's members and Move To (Last when true).
     array_count: u32,
     array_last: bool,
@@ -1229,6 +1239,8 @@ impl Gui {
         self.end_ramp_tool();
         self.end_measure_tool();
         self.end_skylight_tool();
+        self.end_place_tool();
+        self.end_array_tool();
         if self.tool.take().is_some() {
             if let Some(v) = self.viewport() {
                 v.set_overlay(&[]);
@@ -1262,6 +1274,8 @@ impl Gui {
             || self.measure_escape()
             || self.ramp_key(WXK_ESCAPE)
             || self.end_skylight_tool()
+            || self.end_place_tool()
+            || self.end_array_tool()
         {
             return;
         }
@@ -1743,6 +1757,14 @@ impl Gui {
                         if reviera_core::notes::text_data(e).is_some() {
                             return Some("cat.text_notes");
                         }
+                        // Placed components and path arrays have their own tools, whatever
+                        // category their component gives them.
+                        if reviera_core::mesh_objects::mesh_object_recipe(e).is_some() {
+                            return Some("ctx.components");
+                        }
+                        if reviera_core::path_arrays::path_array_recipe(e).is_some() {
+                            return Some("ctx.path_arrays");
+                        }
                         reviera_core::categories::category_of(e).map(|c| c.key)
                     })
                 })
@@ -1825,6 +1847,8 @@ impl Gui {
                 || self.ceiling_tool_properties(grid)
                 || self.ramp_tool_properties(grid)
                 || self.skylight_tool_properties(grid)
+                || self.place_tool_properties(grid)
+                || self.array_tool_properties(grid)
                 || self.insert_tool_properties(grid)
                 || self.wall_tool_properties(grid)
                 || self.view_properties(grid))
@@ -1965,6 +1989,8 @@ impl Gui {
             || self.curtain_rows(grid, id)
             || self.ramp_rows(grid, id)
             || self.skylight_rows(grid, id)
+            || self.mesh_object_rows(grid, id)
+            || self.path_array_rows(grid, id)
         {
             return;
         }
@@ -2179,6 +2205,9 @@ impl Gui {
             || self.curtain_edit(property, text.clone())
             || self.ramp_edit(property, text.clone())
             || self.skylight_edit(property, text.clone())
+            || self.place_edit(property, text.clone())
+            || self.mesh_object_edit(property, text.clone())
+            || self.path_array_edit(property, text.clone())
             || self.insert_edit(property, text.clone())
             || self.wall_edit(property, text.clone())
             || self.floor_edit(property, text.clone())
@@ -2516,6 +2545,8 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                     None if g.ramp_tool.is_some() => g.ramp_click(x, y),
                     None if g.measure_tool.is_some() => g.measure_click(x, y),
                     None if g.skylight_tool.is_some() => g.skylight_click(x, y),
+                    None if g.place_tool.is_some() => g.place_click(x, y),
+                    None if g.array_tool.is_some() => g.array_click(x, y, &p),
                     None if g.dim_tool.is_some() => g.dim_click(x, y),
                     None if g.grid_tool.is_some() => g.grid_click(x, y),
                     None if g.insert_tool.is_some() => g.insert_click(x, y),
@@ -2594,6 +2625,14 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                     }
                     if g.measure_tool.is_some() {
                         g.measure_motion(x, y);
+                        redraw = true;
+                    }
+                    if g.place_tool.is_some() {
+                        g.place_motion(x, y);
+                        redraw = true;
+                    }
+                    if g.array_tool.is_some() {
+                        g.array_motion(x, y);
                         redraw = true;
                     }
                     if g.dim_tool.is_some() {
@@ -2798,10 +2837,10 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                         }
                         if !used {
                             let (mx, my) = g.mouse;
-                            used = g.column_key(key, mx, my);
+                            used = g.column_key(key, mx, my) || g.place_key(key, mx, my);
                         }
                         if !used && matches!(key, WXK_RETURN | WXK_NUMPAD_ENTER) {
-                            used = g.ramp_key(key);
+                            used = g.ramp_key(key) || g.array_key(key);
                         }
                         if !used {
                             used = g.insert_key(key);
@@ -3069,6 +3108,10 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 ramp_tool: None,
                 measure_tool: None,
                 skylight_tool: None,
+                place_tool: None,
+                array_tool: None,
+                library_pane: None,
+                thumb_renderer: None,
                 array_count: 4,
                 array_last: false,
                 ceiling_follow_roof: false,
@@ -3374,6 +3417,7 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
         frame.centre();
         // The help opens at start (its home page lists the samples); a model opened from the
         // command line comes in front of it.
+        Gui::build_library_pane(&gui);
         gui.borrow_mut().show_help();
         if let Some(path) = &file {
             gui.borrow_mut().open(path, &frame);
@@ -3556,6 +3600,21 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
             g.start_ramp_tool();
             focus(g);
         }),
+        "component.place" => with(gui, |g| {
+            g.place_component();
+            focus(g);
+        }),
+        "mesh_object.import" => with(gui, |g| {
+            g.import_object();
+            focus(g);
+        }),
+        "ui.pane.components" => with(gui, |g| g.toggle_pane("components")),
+        "library.import_files" => with(gui, Gui::import_into_library),
+        "array.along_path" => with(gui, |g| {
+            g.start_array_tool();
+            focus(g);
+        }),
+        "array.unarray" => with(gui, Gui::unarray_selection),
         "skylight.create" => with(gui, |g| {
             g.start_skylight_tool();
             focus(g);

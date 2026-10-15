@@ -62,6 +62,16 @@ The Flatpak runs on the GNOME 51 runtime (GTK 3, WebKitGTK 4.1, Mesa and others)
 installed separately and is not part of the Reviera bundle. On Windows, the help pages use the
 Microsoft Edge WebView2 runtime that is part of Windows; on macOS, the system WKWebView.
 
+Sample content
+--------------
+
+The sample Component Library (library/, share/reviera/library) contains a Doric column whose
+shaft is "Antike griechische Säule 20220605.stl" by PantheraLeo1359531, dedicated to the public
+domain under CC0 1.0 (no attribution required; credited here as a courtesy).
+https://commons.wikimedia.org/wiki/File:Antike_griechische_S%C3%A4ule_20220605.stl
+It was reduced and given a capital by Reviera's tools (tools/decimate_stl.py,
+tools/make_parthenon_column.py); the library's README has the details.
+
 Rust crates
 -----------
 

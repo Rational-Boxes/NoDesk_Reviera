@@ -789,6 +789,45 @@ icon = "assembly"
 help = "Edit the layers of the selected wall's type: functions, priorities, materials, thicknesses and the core"
 
 [[action]]
+id = "component.place"
+label = "Component"
+icon = "component"
+keys = "CM"
+help = "Place Component: place copies of a component (pick one in the Component Library, or a type in the project); each click places another, Spacebar turns it"
+
+[[action]]
+id = "mesh_object.import"
+label = "Import Object"
+icon = "import_object"
+help = "Import a mesh file (OBJ, STL, PLY, glTF, GLB) as a component type, with its units, up axis and category, then place it"
+
+[[action]]
+id = "ui.pane.components"
+label = "Component Library"
+icon = "library"
+keys = "CL"
+help = "Show or hide the Component Library: libraries of 3D files and IFC components to place"
+
+[[action]]
+id = "library.import_files"
+label = "Import into Library"
+icon = "import_object"
+help = "Copy 3D files (OBJ, STL, PLY, glTF, GLB, IFC) into the folder shown in the Component Library"
+
+[[action]]
+id = "array.along_path"
+label = "Array along Path"
+icon = "path_array"
+keys = "AP"
+help = "Repeat the selected component along a path you pick (a wall, grid, or a floor's edges) or draw; the copies stay parametric"
+
+[[action]]
+id = "array.unarray"
+label = "Unarray"
+icon = "unarray"
+help = "Turn the selected path array's members into independent objects"
+
+[[action]]
 id = "ramp.create"
 label = "Ramp"
 icon = "ramp"
@@ -977,6 +1016,15 @@ tools = [
 ]
 
 [[tab.panel]]
+label = "Component"
+tools = [
+  { action = "component.place", size = "large" },
+  { action = "mesh_object.import", size = "small" },
+  { action = "ui.pane.components", size = "small" },
+  { action = "library.import_files", size = "small" },
+]
+
+[[tab.panel]]
 label = "Room & Area"
 tools = [
   { action = "room.place", size = "large" },
@@ -1118,6 +1166,7 @@ tools = [
   { action = "ui.pane.properties", size = "small" },
   { action = "ui.pane.browser", size = "small" },
   { action = "ui.pane.model_tree", size = "small" },
+  { action = "ui.pane.components", size = "small" },
 ]
 
 [[tab]]
@@ -1159,6 +1208,8 @@ tools = [
   { action = "element.rotate", size = "small" },
   { action = "element.array_linear", size = "small" },
   { action = "element.array_radial", size = "small" },
+  { action = "array.along_path", size = "small" },
+  { action = "array.unarray", size = "small" },
   { action = "element.trim_corner", size = "small" },
   { action = "element.trim_extend", size = "small" },
   { action = "element.split", size = "small" },
@@ -1207,6 +1258,21 @@ panels = [
   { label = "Railing", tools = [{ action = "railing.create_on_stair", size = "large" }] },
   { label = "Headroom", tools = [{ action = "stair.create_openings", size = "large" }] },
 ]
+
+[[context]]
+category = "ctx.components"
+label = "Components"
+panels = [{ label = "Component", tools = [
+  { action = "array.along_path", size = "large" },
+  { action = "component.place", size = "large" },
+] }]
+
+[[context]]
+category = "ctx.path_arrays"
+label = "Path Arrays"
+panels = [{ label = "Array", tools = [
+  { action = "array.unarray", size = "large" },
+] }]
 
 [[context]]
 category = "cat.columns"
@@ -1377,7 +1443,7 @@ items = ["script.run", "script.import", "ui.scripts.manage", "-"]
 label = "&Window"
 items = [
   "view.create_3d", "window.close", "-", "window.next", "window.previous", "-",
-  "window.tile", "window.tab_all", "-", "ui.pane.properties", "ui.pane.browser", "ui.pane.model_tree",
+  "window.tile", "window.tab_all", "-", "ui.pane.properties", "ui.pane.browser", "ui.pane.model_tree", "ui.pane.components",
 ]
 
 [[menu]]

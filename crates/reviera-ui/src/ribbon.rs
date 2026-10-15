@@ -89,6 +89,7 @@ pub const UI_ACTIONS: &[&str] = &[
     "inspect.translucent_subtree",
     "inspect.reset",
     "ui.pane.model_tree",
+    "ui.pane.components",
 ];
 
 /// First wx id of the catalog's actions (one id per action, in catalog order).

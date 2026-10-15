@@ -171,6 +171,8 @@ else
     echo "warning: WebView2Loader.dll not found; the help tab will not open" >&2
 fi
 install -m644 "$ROOT"/test-data/samples/samples.json "$STAGE/samples/"
+# The sample Component Library beside the samples (crates/reviera-ui/src/components.rs).
+rm -rf "$STAGE/library" && cp -r "$ROOT/test-data/library" "$STAGE/library"
 for n in $(python3 -c "import json;print(' '.join(s['name'] for s in json.load(open('$ROOT/test-data/samples/samples.json'))))"); do
     for ext in ifc lua md; do
         [ -f "$ROOT/test-data/samples/$n.$ext" ] && install -m644 "$ROOT/test-data/samples/$n.$ext" "$STAGE/samples/"

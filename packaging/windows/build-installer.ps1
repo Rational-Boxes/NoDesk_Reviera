@@ -248,6 +248,8 @@ New-Item -ItemType Directory -Force $samples | Out-Null
 $sampleSrc = Join-Path $Root 'test-data\samples'
 Copy-Item (Join-Path $sampleSrc 'samples.json') $samples
 foreach ($pattern in @('*.ifc', '*.lua', '*.md')) { Copy-Item (Join-Path $sampleSrc $pattern) $samples }
+# The sample Component Library beside the samples (crates/reviera-ui/src/components.rs).
+Copy-Item -Recurse -Force (Join-Path $Root 'test-data\library') (Join-Path $Stage 'library')
 Copy-Item (Join-Path $Root 'LICENSE') (Join-Path $Stage 'COPYING.txt')
 Copy-Item (Join-Path $Root 'packaging\THIRD-PARTY-NOTICES.txt') $Stage
 Copy-Item (Join-Path $Root 'packaging\icons\reviera.ico') $Stage

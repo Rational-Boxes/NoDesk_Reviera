@@ -287,7 +287,7 @@ fn info(root: &Path, m: &Manifest) -> LibraryInfo {
 }
 
 /// Makes a library (`library.create`): writes its manifest, keeping one that is already there.
-pub(crate) fn create(_: &Store, p: CreateParams) -> Result<LibraryInfo> {
+pub fn create(_: &Store, p: CreateParams) -> Result<LibraryInfo> {
     let root = PathBuf::from(&p.path);
     std::fs::create_dir_all(&root).map_err(|e| io(&root, e))?;
     let m = match Manifest::read(&root)? {
@@ -309,7 +309,7 @@ pub struct OpenParams {
 
 /// Opens a library (`library.open`): its summary. A folder without a manifest is refused; the
 /// window offers to create one.
-pub(crate) fn open_library(_: &Store, p: OpenParams) -> Result<LibraryInfo> {
+pub fn open_library(_: &Store, p: OpenParams) -> Result<LibraryInfo> {
     let root = PathBuf::from(&p.path);
     let m = open(&root)?;
     Ok(info(&root, &m))
@@ -415,7 +415,7 @@ fn item_info(root: &Path, m: &Manifest, rel: &Path, kind: ItemKind) -> ItemInfo 
 }
 
 /// A folder's sub-folders (with their item counts) and items (`library.list`).
-pub(crate) fn list(_: &Store, p: ListParams) -> Result<Listing> {
+pub fn list(_: &Store, p: ListParams) -> Result<Listing> {
     let root = PathBuf::from(&p.library);
     let m = open(&root)?;
     let dir = root.join(relative_or_root(&p.folder)?);
@@ -591,7 +591,7 @@ fn free_name(dir: &Path, name: &Path) -> PathBuf {
 
 /// Import into Library (`library.import_files`): copies files in a format Reviera reads into a
 /// library folder, with the files they need beside them, and adds their entries to the manifest.
-pub(crate) fn import_files(_: &Store, p: ImportFilesParams) -> Result<ImportReport> {
+pub fn import_files(_: &Store, p: ImportFilesParams) -> Result<ImportReport> {
     let root = PathBuf::from(&p.library);
     let mut m = open(&root)?;
     let folder = relative_or_root(&p.folder)?;
@@ -696,7 +696,7 @@ pub struct ItemMeta {
 }
 
 /// An item's details and what it inherits (`library.get_meta`).
-pub(crate) fn get_meta(_: &Store, p: GetMetaParams) -> Result<ItemMeta> {
+pub fn get_meta(_: &Store, p: GetMetaParams) -> Result<ItemMeta> {
     let root = PathBuf::from(&p.library);
     let m = open(&root)?;
     let rel = relative(&p.item)?;
@@ -732,7 +732,7 @@ pub struct SetMetaParams {
 
 /// Edits items' details or folders' settings in the manifest (`library.set_meta`); the files are
 /// not touched.
-pub(crate) fn set_meta(_: &Store, p: SetMetaParams) -> Result<()> {
+pub fn set_meta(_: &Store, p: SetMetaParams) -> Result<()> {
     let root = PathBuf::from(&p.library);
     let mut m = open(&root)?;
     for path in &p.paths {
@@ -791,12 +791,12 @@ pub struct DeleteItemsParams {
 /// Deletes items (`library.delete_items`): each file and its companions move to the library's
 /// `.deleted` folder, keeping their paths, and their entries go with them; `library.restore_items`
 /// brings them back.
-pub(crate) fn delete_items(_: &Store, p: DeleteItemsParams) -> Result<Vec<String>> {
+pub fn delete_items(_: &Store, p: DeleteItemsParams) -> Result<Vec<String>> {
     move_items(&p.library, &p.items, true)
 }
 
 /// Restores deleted items (`library.restore_items`).
-pub(crate) fn restore_items(_: &Store, p: DeleteItemsParams) -> Result<Vec<String>> {
+pub fn restore_items(_: &Store, p: DeleteItemsParams) -> Result<Vec<String>> {
     move_items(&p.library, &p.items, false)
 }
 

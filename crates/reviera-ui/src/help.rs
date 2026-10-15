@@ -75,6 +75,7 @@ pub(crate) const PAGES: &[Page] = &[
     page!("curtain-walls", "Curtain walls", ARCHITECTURE),
     page!("doors-windows", "Doors and windows", ARCHITECTURE),
     page!("columns", "Columns", ARCHITECTURE),
+    page!("components", "Components and libraries", ARCHITECTURE),
     page!("sketch", "Sketch mode", ARCHITECTURE),
     page!("floors-ceilings", "Floors and ceilings", ARCHITECTURE),
     page!("roofs", "Roofs", ARCHITECTURE),

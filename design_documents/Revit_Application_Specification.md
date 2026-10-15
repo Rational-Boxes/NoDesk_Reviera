@@ -5715,20 +5715,20 @@ DN25,25,37.5,22,Copper
 - [ ] A remote library whose package checksum does not match its index entry is refused with an error naming the package, and nothing is loaded.
 - [ ] *Load and Place* on a door with 30 types opens Specify Types, then starts door placement with the chosen type.
 
-### 2.8.16 Stamps: placing library objects again and again
+### 2.8.16 Stamps: placing components again and again (Place Component)
 **ID:** DM-LIB-002 · **Priority:** P1 · **Ref:** owner requirement (2026-10-14); DM-LIB-001, DM-IMP-015, ARC-COMP-001; Reviera's own design
 
 **Purpose.** Make custom geometry quick to reuse. Any custom object (DM-IMP-015), family type or saved group in a library can be picked up as a **stamp**, and every click in a view inserts another copy. *(Owner requirement, 2026-10-14: "a library system so that custom objects can be used as a stamp to easily insert a duplicate of the object".)*
 
 **Workflow.**
 1. Open the **Library** panel (DM-LIB-001). Its **Stamps** strip, at the top of the panel, shows thumbnails of pinned stamps and the most recently used ones.
-2. Click a stamp, or double-click a library result. The **Stamp** tool starts with that stamp: a see-through preview follows the cursor, snapping like other placement tools.
+2. Click a stamp, or double-click a library result. The **Place Component** tool (CM, as for components generally, ARC-COMP-001) starts with that component: a see-through preview follows the cursor, snapping like other placement tools.
 3. Click to insert a copy. The tool stays armed, so each further click inserts another, until Esc or another tool.
 4. While stamping:
    - Spacebar turns the next copy by 90°; Shift+Spacebar mirrors it.
    - *Click and drag* sets the direction of that copy.
    - `[` and `]` step through the Stamps strip, and the digit keys 1–9 pick pinned stamps.
-5. **Pick a stamp from the model**: in the Stamp tool, Alt+click an existing instance, or select it and choose *Stamp This*. That instance's type becomes the stamp, with its rotation and offset.
+5. **Pick a stamp from the model**: in Place Component, Alt+click an existing instance, or select it and choose *Stamp This*. That instance's type becomes the stamp, with its rotation and offset.
 
 **Behaviour & rules.**
 - **What can be a stamp:**
@@ -5769,20 +5769,28 @@ DN25,25,37.5,22,Copper
 
 **Commands.**
 `library.add_item(element_or_type_id, library?, name?, tags?) -> item_ref` ·
-`stamp.place(item_ref | type_id, points[], rotation?, mirror?, level_id?, on_face?: bool) -> element_ids[]` (scriptable: one copy per point) ·
-`stamp.row(item_ref | type_id, start, end, spacing?, count?) -> element_ids[]` (P2) ·
-`stamp.scatter(item_refs[], points[], rotation_range?, scale_range?, seed?) -> element_ids[]` (P2) ·
+`component.place(type_id | {library, item}, points[], level, offset?, rotation?, mirror?) -> element_ids[]` (ARC-COMP-001's command, extended: a library item, one copy per point) ·
+`component.place_row(type_id | {library, item}, start, end, spacing?, count?) -> element_ids[]` (P2) ·
+`component.scatter(sources[], points[], rotation_range?, scale_range?, seed?) -> element_ids[]` (P2) ·
 `element.make_unique(element_id) -> type_id`.
-The Stamp tool itself is the UI over `stamp.place`.
+The Place Component tool is the UI over `component.place`.
 
 **Acceptance criteria.**
 - [ ] A custom chair added to My Library appears in the Stamps strip with a thumbnail. Clicking it and then clicking ten times in a plan inserts ten chairs, and the saved IFC holds one chair type with ten instances.
 - [ ] Undo after the tenth click removes only the tenth chair.
-- [ ] Alt+click on a placed table in the Stamp tool makes the table the stamp; the next click inserts a table with the same rotation.
+- [ ] Alt+click on a placed table in Place Component makes the table the stamp; the next click inserts a table with the same rotation.
 - [ ] In a 3D view, stamping a lamp on a sloped roof places it on the roof face, and with *Align to face* on, its up direction is the roof's normal.
 - [ ] A desk, chair and lamp added to the library as a fragment stamp as three elements together.
 - [ ] Changing the chair type's material in the project changes all ten stamped chairs. After Make Unique on one, changing the type no longer changes that one.
 - [ ] Stamping the same library item in a second session reuses the type already in the project, not a second copy.
+
+**Implementation note (2026-10-14, first build).**
+- **Placing:** the Component Library panel's thumbnails are the palette. Clicking one starts Place Component, which repeats until Esc, and Spacebar turns the next copy 90°.
+- **Where copies land:** in plans on the plan's level, snapped; in 3D on the surface under the cursor, or on the lowest level's plane over nothing.
+- **First copy:** a library component is loaded as a type on its first copy, and the tool then places that type.
+- **Properties:** they show the placement (rotation, mirror, offset) and the component's details, which are edited into the manifest.
+- **Command:** `component.place` extends ARC-COMP-001's command with a library item and several points.
+- **Not built yet:** pinned and recent stamps, Alt+click to pick a stamp from the model, Shift+Spacebar mirroring (Properties has Mirrored), rows and scatter, drag from the palette, and stamping fragments.
 
 ### 2.8.17 Model fragments in the library
 **ID:** DM-LIB-003 · **Priority:** P1 · **Ref:** owner requirement (2026-10-14); DM-LIB-001, DM-LIB-002, ARC-GRP-001 (Save Group, Load as Group); Reviera's own design
@@ -5851,7 +5859,7 @@ The Stamp tool itself is the UI over `stamp.place`.
 `library.add_variant(item_ref, element_ids[], variant_name) -> variant_ref` ·
 `library.import_ifc(path, folder, filter?: {storeys?, classes?, systems?, element_guids?}, name?) -> item_ref` ·
 `library.inspect(item_ref) -> {kind, variants, members_by_category, levels, size, outside_refs}` *(query)* ·
-`stamp.place(..., mode?: "group"|"elements", type_conflict?: "project"|"library"|"both")` (DM-LIB-002, extended).
+`component.place(..., mode?: "group"|"elements", type_conflict?: "project"|"library"|"both")` (DM-LIB-002, extended).
 
 
 **Acceptance criteria.**
@@ -5998,6 +6006,47 @@ The Stamp tool itself is the UI over `stamp.place`.
 - [ ] A deleted folder's items can be restored from *Deleted items* the next day.
 - [ ] Library › Open Library on a folder of 3D files with no manifest offers to create one; the created `reviera-library.json` holds only `format`, `version`, `id` and `name`, and every file in the folder is usable.
 - [ ] Moving a library folder to another disk and opening it there keeps every item's details, and stamped types in projects still find the library by its `id`.
+
+**Implementation note (2026-10-14, first build).**
+- **Built:** the manifest, folders and settings, listing, Import into Library (with companions, duplicates by SHA-256 and free names), item details, delete and restore through `.deleted`, and the panel.
+- **The panel:** docked on the right (Window › Component Library, CL), it lists the open libraries (kept per user in `libraries.json`; the sample library is offered at first), shows folders with counts, and shows items as thumbnails.
+- **Thumbnails:** rendered offscreen and cached per user by file, date, size and import options.
+- **The sample library:** `test-data/library` ships beside the samples in every package.
+- **Not built yet:** smart folders, moving and renaming in the panel, drag and drop, search, bulk edits and organisation libraries.
+
+### 2.8.19 A familiar workflow, in Reviera's own words
+**ID:** DM-LIB-005 · **Priority:** P1 · **Ref:** owner requirement (2026-10-14); research/06 (the reference product's family UI and workflow); DM-LIB-001 … 004
+
+**Purpose.** Users who know the reference product's families should find components familiar: the same gestures, places and sequence. Reviera keeps its own names and its own model of libraries as folders of ordinary files. *(Owner requirements, 2026-10-14: "not called Families; our term will be Component Libraries"; "differentiate, but be familiar to users with a Revit background"; "stamps just means a quick and easy mechanism to add library items, like a stamp in GIMP".)*
+
+**Behaviour & rules.**
+- **Names.** The feature is **Component Libraries** and its items **components**; the reference product's term is not used in Reviera's interface or help. A component's variants are its **types**.
+- **The same gestures where they fit.** The reference product's patterns (research/06) map onto Reviera like this:
+
+| What users know (research/06) | In Reviera |
+|---|---|
+| Architecture › Component › Place a Component, shortcut CM; places until Esc; Spacebar turns 90° | Architecture › Component › **Component**, shortcut **CM**; places until Esc; Spacebar turns 90° (DM-LIB-002) |
+| Load Family (a file dialog with a preview), then place | The **Component Library** panel: folders and thumbnails; a click picks a component up and places it. Loading happens on the first copy, and the panel stays open. |
+| Load Autodesk Family (a cloud content browser with a tree, search and preview) | The same panel, over folders on disk, a share or WebDAV, with organisation libraries later (DM-LIB-001, DM-LIB-004) |
+| Library locations set in Options (Places) | Libraries opened in the panel (Open…, New…), remembered per user |
+| Type catalogs and Specify Types | Variants in the manifest (DM-LIB-003) |
+| Type Selector and Properties during placement | Properties during Place Component: the component, its details, rotation, mirror and offset |
+| Edit Family, then Load into Project (and Close); Family Already Exists: overwrite, or overwrite with parameter values | **Edit Component**, then Save, which updates placed copies; a type conflict asks *Use project's*, *Use library's* or *Keep both* (DM-LIB-003) |
+| Save As › Library › Family; Save Group and Load as Group for repeated layouts | **Create Component** from any selection, written as an IFC file (DM-LIB-003) |
+| Thumbnails taken from the view saved last | Thumbnails rendered by Reviera from the file, cached per user (DM-LIB-004) |
+| Project Browser › Families: category, family, type; drag a type into a view | The Model Tree and Project Browser list placed components and types; dragging a type from the browser is P2 |
+
+- **Where Reviera differs, on purpose:**
+  - libraries are plain folders of open 3D files and IFC, readable by other tools;
+  - any selection becomes a component, as an IFC file;
+  - placing is stamp-like, from a thumbnail palette, with no separate load step;
+  - components can be arrayed along paths parametrically (ARC-MOD-033).
+
+**Acceptance criteria.**
+- [x] CM starts Place Component, which places copies until Esc; Spacebar turns the next copy 90°. *(Built 2026-10-14.)*
+- [x] The Component Library panel shows a library's folders and thumbnails; clicking a component starts placing it. *(Built 2026-10-14.)*
+- [ ] Neither the interface nor the help uses the word "family" for components.
+- [ ] Edit Component on a placed copy opens its IFC file; saving updates the copies in the open model.
 
 ---
 
@@ -7453,6 +7502,14 @@ Coordinates ▾: *Acquire Coordinates* (from a link), *Publish Coordinates* (to 
 - [ ] A saved project with custom objects opens in another IFC viewer with the objects visible, typed and in the right places.
 - [ ] Importing a 6,000,000-triangle mesh is refused with the triangle count in the message.
 
+**Implementation note (2026-10-14, first build).**
+- **Readers:** Reviera's own readers, with no new dependencies, for OBJ (with MTL colours), STL (ASCII and binary), PLY (ASCII and binary, both byte orders) and glTF 2.0/GLB (node transforms, base colours; Draco and sparse accessors refused with a message).
+- **Storage:** the type stores its mesh in its RXD recipe (base64 `f32` positions, `u32` triangles, `u16` slots, keyed by a content hash so it is decoded once). In IFC it is written once as an `IfcRepresentationMap` of one `IfcTriangulatedFaceSet` per slot, each with an `IfcStyledItem`. Copies are `IfcMappedItem`s; a mirrored copy uses `IfcCartesianTransformationOperator3DnonUniform`.
+- **Copies:** each has its own scale as well as the type's.
+- **Library-loaded types:** these record the library's id and name and the item's path in it, but no absolute folders, so shared models do not carry the author's paths.
+- **The window:** Import Object (with a size preview that follows the units and up axis), Properties of copies and types (offset, rotation, mirror, scale; type name, category, scale and slot colours).
+- **Not built yet:** 3MF and OFF, textures, decimation, plan cut outlines (plans draw the 3D body), an object library browser for project types, and Reload from File in the window.
+
 ## 2.12 The command registry
 
 ### 2.12.1 Command definitions
@@ -8390,9 +8447,8 @@ All commands defined in this chapter. Every command in this table is also a Lua 
 | `library.refresh` | source_id? | — | No | DM-LIB-001 |
 | `library.load` | item_ref, type_names?, place=false | family_id | Yes | DM-LIB-001 |
 | `library.add_item` | element_or_type_id, library?, name?, tags? | item_ref | No | DM-LIB-002 |
-| `stamp.place` | item_ref \| type_id, points[], rotation?, mirror?, level_id?, on_face? | element_ids[] | Yes | DM-LIB-002 |
-| `stamp.row` | item_ref \| type_id, start, end, spacing?, count? | element_ids[] | Yes | DM-LIB-002 |
-| `stamp.scatter` | item_refs[], points[], rotation_range?, scale_range?, seed? | element_ids[] | Yes | DM-LIB-002 |
+| `component.place_row` | type_id \| {library, item}, start, end, spacing?, count? | element_ids[] | Yes | DM-LIB-002 |
+| `component.scatter` | sources[], points[], rotation_range?, scale_range?, seed? | element_ids[] | Yes | DM-LIB-002 |
 | `element.make_unique` | element_id | type_id | Yes | DM-LIB-002 |
 | `component.create` | element_ids[], destination, name, kind?, base_point?, include_hosts?, include_rooms?, replace_selection?, tags? | item_ref | Yes | DM-LIB-003 |
 | `component.edit` | item_ref \| element_id | document_id | No | DM-LIB-003 |
@@ -13879,6 +13935,14 @@ These tools are on the **Modify** tab and are repeated on every `Modify | <Eleme
 - [ ] Unarray leaves 34 independent columns where they stood, and the array element is gone.
 - [ ] A hedge is made from two shrub meshes arrayed along a drawn spline at a maximum spacing of 0.6 m, with any rotation and a scale of 85–115 %. Dragging a spline grip reshapes the hedge, and each shrub keeps its rotation and scale. Reseed changes the arrangement.
 
+**Implementation note (2026-10-14, first build).**
+- **IFC:** the array is an `IfcElementAssembly` (`ObjectType` "PathArray") rather than an `IfcGroup`, so its members can be aggregated and placed. Its members are not separate elements in the model: they are made from the array whenever it regenerates, so they follow the path element and the counts. When saving, they are written as elements of the component's class, typed, aggregated by the array and marked `rxd:path_array`, so they are skipped on opening.
+- **Paths built:** drawn polylines (closed or not), arcs through three points, splines through points, wall location lines, grid lines, and the edges of floors, ceilings and decks (copies on the host's top).
+- **Distribution built:** the four modes with justification, counts per side, the three corner modes, the four orientations with an offset, and seeded variation (rotation and scale ranges, weighted choice of components, jitter).
+- **Editing built:** exclusions, Unarray (members keep their varied scale), and Move, Copy, Rotate and Mirror for drawn paths.
+- **The window:** the Array along Path tool (AP, from a selected copy or a component picked up in the library): click a wall, grid or floor, or click points and press Enter. Properties carry the distribution, corners, orientation, ends, offsets and variation, plus Reseed and restoring exclusions. Modify | Path Arrays offers Unarray.
+- **Not built yet:** grips, an on-canvas count label, railing and slab-edge picks beyond floors, height following the path or a host face, alternate mirroring, arrays of fragments, and the member-index property memory.
+
 ---
 
 ## 3.13 Groups
@@ -14320,7 +14384,7 @@ All commands below are registered once in the command registry and exposed autom
 | `window.place` | type_id, host_id, point_along \| point, sill_height?, flip_facing?, width?, height?, fit? | element_id | Yes | ARC-WIN-001 |
 | `insert.set_size` | element_ids, width?, height?, fit? | — | Yes | ARC-WIN-001, ARC-DOOR-001 |
 | `insert.set_position` | element_id, along \| from_end | — | Yes | ARC-WIN-001, ARC-DOOR-001 |
-| `component.place` | type_id, point \| host_ref, rotation?: f64, level_id?, offset?, placement?: VerticalFace\|Face\|WorkPlane | element_id | Yes | ARC-COMP-001 |
+| `component.place` | type_id \| {library, item}, point \| points[] \| host_ref, rotation?: f64, level_id?, offset?, mirror?, placement?: VerticalFace\|Face\|WorkPlane | element_id \| element_ids[] | Yes | ARC-COMP-001, DM-LIB-002 |
 | `column.place_architectural` | type_id, point, base_level, top_constraint, base_offset?, top_offset?, rotation?, room_bounding? | element_id | Yes | ARC-COL-001 |
 | `column.attach` | column_ids[], end: top\|base, target_id, style?, justification?, offset? | () | Yes | ARC-COL-001 |
 | `column.detach` | column_ids[], end: top\|base, target_ids? | () | Yes | ARC-COL-001 |
@@ -26426,6 +26490,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | DM-LIB-002 | 2 | 2.8.16 Stamps: placing library objects again and again |
 | DM-LIB-003 | 2 | 2.8.17 Model fragments in the library |
 | DM-LIB-004 | 2 | 2.8.18 Library folders and large libraries |
+| DM-LIB-005 | 2 | 2.8.19 A familiar workflow, in Reviera's own words |
 | ARC-MOD-033 | 3 | 3.12.3a Array along a path |
 | DM-CMD-002 | 2 | 2.12.2 Command naming and stability |
 | DM-MCP-002 | 2 | 2.16.2 Transports and authentication |
@@ -26571,7 +26636,9 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `compound` | 11 |
 | `component.create` | 2 | element_ids[], destination, name, kind?, base_point?, include_hosts?, include_rooms?, replace_selection?, tags? | item_ref | Yes | DM-LIB-003 |
 | `component.edit` | 2 | item_ref \| element_id | document_id | No | DM-LIB-003 |
+| `component.place_row` | 2 | type_id \| {library, item}, start, end, spacing?, count? | element_ids[] | Yes | DM-LIB-002 |
 | `component.reload` | 2 | item_ref | — | Yes | DM-LIB-003 |
+| `component.scatter` | 2 | sources[], points[], rotation_range?, scale_range?, seed? | element_ids[] | Yes | DM-LIB-002 |
 | `conductor_size` | 1 |
 | `conductor_table` | 1 |
 | `conduit` | 2 |
@@ -26871,9 +26938,6 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `sprinkler` | 1 |
 | `stackedwall` | 1 |
 | `stair` | 15 |
-| `stamp.place` | 2 | item_ref \| type_id, points[], rotation?, mirror?, level_id?, on_face? | element_ids[] | Yes | DM-LIB-002 |
-| `stamp.row` | 2 | item_ref \| type_id, start, end, spacing?, count? | element_ids[] | Yes | DM-LIB-002 |
-| `stamp.scatter` | 2 | item_refs[], points[], rotation_range?, scale_range?, seed? | element_ids[] | Yes | DM-LIB-002 |
 | `standards` | 2 |
 | `stash` | 3 |
 | `steel_cut` | 6 |
@@ -27188,7 +27252,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `column.place_at_grids` | 4 | type_id, grid_ids[], base_level, top_constraint, rotation? | element_id[] | Yes | STR-COL-001 |
 | `column.place_in_columns` | 4 | type_id, arch_column_ids[] | element_id[] | Yes | STR-COL-001 |
 | `column.place_slanted` | 4 | type_id, p1, p1_level, p1_offset, p2, p2_level, p2_offset, style | element_id | Yes | STR-COL-002 |
-| `component.place` | 3 | type_id, point \ | host_ref, rotation?: f64, level_id?, offset?, placement?: VerticalFace\ | Face\ | WorkPlane |
+| `component.place` | 3 | type_id \| {library, item}, point \| points[] \| host_ref, rotation?: f64, level_id?, offset?, mirror?, placement?: VerticalFace\|Face\|WorkPlane | element_id \| element_ids[] | Yes | ARC-COMP-001, DM-LIB-002 |
 | `compound.assign_layer` | 3 | type_id, region_keys, layer_index | — | Yes | ARC-CMPD-003 |
 | `compound.delete_layer` | 3 | type_id, index | — | Yes | ARC-CMPD-001 |
 | `compound.duplicate_layer` | 3 | type_id, index | — | Yes | ARC-CMPD-001 |

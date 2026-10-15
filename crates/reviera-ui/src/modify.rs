@@ -970,6 +970,8 @@ impl Gui {
             || self.ramp_tool.is_some()
             || self.measure_tool.is_some()
             || self.skylight_tool.is_some()
+            || self.place_tool.is_some()
+            || self.array_tool.is_some()
     }
 
     /// Shows the grips of the selection (or nothing).

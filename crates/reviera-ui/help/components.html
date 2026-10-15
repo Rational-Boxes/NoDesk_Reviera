@@ -1,0 +1,114 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Copyright (C) 2026 Reviera contributors -->
+<h1>Components and Component Libraries</h1>
+<p class="lead">Components are reusable objects (furniture, fittings, planting, columns, statues)
+kept in Component Libraries and placed into a model as many times as you like. A component can be
+a 3D file from almost any modelling program, so anything you can model or download can be
+placed.</p>
+
+<h2 id="libraries">Component Libraries</h2>
+<p>A Component Library is simply a folder of 3D files: OBJ (with its material and texture
+files), STL, PLY, glTF and GLB, and IFC files. One file in the folder's root,
+<code>reviera-library.json</code>, holds what the files themselves cannot: each component's name,
+category, units, up axis, tags and product details, and settings for each folder. The 3D files
+are never changed, so the same folder can be kept in git, synced, or used by other programs.</p>
+<p>The <b>Component Library</b> panel (on the right; Window › Component Library, or
+<kbd>CL</kbd>) shows the libraries you have open. Pick one in the list at the top; its folders are
+in the tree, and the folder you pick shows its components as thumbnails.</p>
+<table>
+  <tr><td>Open…</td><td>Opens a folder as a library. A folder without a manifest can become a
+    library as it is: Reviera only adds the manifest.</td></tr>
+  <tr><td>New…</td><td>Makes a new library in a folder you choose.</td></tr>
+  <tr><td>Import…</td><td>Copies 3D files into the folder shown (an OBJ brings its MTL and
+    textures, a glTF its buffers and images). You set their units, up axis and category once for
+    all of them; a file already in the library is skipped.</td></tr>
+</table>
+<p>The libraries you open are remembered. Reviera comes with a small sample library; its Doric
+column is a public-domain scan (see the library's README).</p>
+<p><code>library.create</code>, <code>library.open</code>, <code>library.list</code>,
+<code>library.import_files</code>, <code>library.get_meta</code>, <code>library.set_meta</code>,
+<code>library.delete_items</code>, <code>library.restore_items</code></p>
+
+<h2 id="place">Placing components</h2>
+<p>Click a component in the panel: you pick it up, like a stamp. Its outline follows the cursor;
+click to place a copy, and again for each further copy, until <kbd>Esc</kbd>.</p>
+<ul>
+  <li>In a plan, copies go on the plan's level, snapping like other tools.</li>
+  <li>In a 3D view, a copy sits on the surface under the cursor (a floor, a roof, a table top),
+    or on the ground when there is nothing there.</li>
+  <li><kbd>Spacebar</kbd> turns the next copy by 90°. Properties set its exact rotation, mirroring
+    and height offset.</li>
+</ul>
+<p>The first copy of a library component brings it into the model as a type; later copies share
+it, so a hundred chairs keep their geometry once. <b>Architecture › Component</b>
+<a href="reviera:action/component.place">Component</a> (<kbd>CM</kbd>) places again the last
+component, or one already in the model.</p>
+<p>While a component is picked up, Properties shows its details from the library: change its name,
+category, units or up axis there and the library's manifest is updated (the file is not).</p>
+<p><code>component.place</code></p>
+
+<h2 id="import">Importing a single object</h2>
+<p><b>Architecture › Component › Import Object</b>
+<a href="reviera:action/mesh_object.import">Import Object</a> brings a 3D file straight into the
+model, without a library. The dialog shows the object's size with the units and up axis you
+choose, so a wrong unit is plain before it is imported; the insertion point is its bottom centre
+unless you choose the file's origin or a corner. The Place Component tool then starts with it.</p>
+<p><code>mesh_object.inspect</code>, <code>mesh_object.import</code>,
+<code>mesh_object.reload</code></p>
+
+<h2 id="properties">Properties of a placed component</h2>
+<table>
+  <tr><td>Offset, Rotation, Mirrored, Scale</td><td>This copy's height above its level, its turn,
+    its mirroring and its own scale.</td></tr>
+  <tr><td>Type Name, Category</td><td>The component type's name, and its category (the IFC class
+    it is written as; it can change while the type has no copies).</td></tr>
+  <tr><td>Scale (type)</td><td>Scales every copy of the type.</td></tr>
+  <tr><td>Colour: …</td><td>Each material's colour, as <code>#rrggbb</code>, for every copy.</td></tr>
+</table>
+<p>Move, Copy, Rotate and Mirror work on placed components. Deleting a type deletes its
+copies.</p>
+<p><code>mesh_object.set</code>, <code>mesh_object.set_type</code>,
+<code>mesh_object.types</code></p>
+
+<h2 id="path-array">Array along Path</h2>
+<p>Repeats a component along a line, and stays parametric: change the count, the spacing or the
+path, or swap the component, and every copy follows. It works the same with a plain mesh, such as
+a scanned column, as with anything else.</p>
+<ol>
+  <li>Select a placed component (or pick one up in the library) and choose
+    <b>Modify › Array along Path</b>
+    <a href="reviera:action/array.along_path">Array along Path</a> (<kbd>AP</kbd>).</li>
+  <li>Click a wall, a grid line or a floor to follow its line or its edges, or click points to
+    draw a path and press <kbd>Enter</kbd>. Properties choose a polyline, a smooth spline or an
+    arc, and whether it is closed.</li>
+</ol>
+<table>
+  <tr><td>Distribution</td><td><i>Number</i> of copies, a <i>Fixed Distance</i>, or the
+    <i>Maximum</i> or <i>Minimum Spacing</i>.</td></tr>
+  <tr><td>Counts per Side</td><td>With corners, a number for each side in turn: <i>8, 17</i>
+    puts 8 columns on each front and 17 on each flank.</td></tr>
+  <tr><td>Corners</td><td>Spaced through the corners, a copy <i>At every corner</i> (the rest
+    spaced along each side), or corners left empty.</td></tr>
+  <tr><td>Orientation</td><td>Along the path, fixed, or facing outward or inward.</td></tr>
+  <tr><td>Random Turn, Random Scale</td><td>For planting and other natural things, for example
+    0 to 360 and 0.85 to 1.15. The randomness is kept: tick <i>Reseed</i> for a new
+    arrangement.</td></tr>
+  <tr><td>Excluded</td><td>Members left out (<code>array.exclude_member</code>); type 0 to bring
+    them all back.</td></tr>
+</table>
+<p>An array on a wall or a floor's edges follows it when it moves or changes. <b>Unarray</b>
+<a href="reviera:action/array.unarray">Unarray</a> turns the copies into independent objects.
+The Greek temple sample's colonnade is one such array.</p>
+<p><code>array.along_path</code>, <code>array.set</code>, <code>array.exclude_member</code>,
+<code>array.restore_member</code>, <code>array.members</code>, <code>array.unarray</code></p>
+
+<h2 id="ifc">In IFC</h2>
+<p>A component type is written as its category's type class (for example
+<code>IfcFurnitureType</code>) with its mesh once, as an <code>IfcRepresentationMap</code> of
+triangulated face sets styled in its colours; each copy is an element of the category (for
+example <code>IfcFurniture</code>) whose body maps it. A path array is an
+<code>IfcElementAssembly</code> whose members are written as elements of the component's class.
+Other IFC tools show them all.</p>
+<p class="note">Not yet available: IFC components (model fragments) and Create Component, editing a
+component, smart folders, 3MF and OFF files, textures, plan cut outlines of components, and
+reducing a large mesh on import.</p>

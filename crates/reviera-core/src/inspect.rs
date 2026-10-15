@@ -84,6 +84,30 @@ fn raw_parent(store: &Store, e: &Element, imported: &Imported) -> Option<Element
     if let Some(r) = crate::stairs::stair_recipe(e) {
         return by_guid(&r.base_level);
     }
+    if let Some(r) = crate::columns::column_recipe(e) {
+        return by_guid(&r.extent.base_level);
+    }
+    if let Some(r) = crate::curtain::curtain_recipe(e) {
+        return by_guid(&r.extent.base_level);
+    }
+    if let Some(r) = crate::ramps::ramp_recipe(e) {
+        return by_guid(&r.extent.base_level);
+    }
+    if let Some(r) = crate::slab_openings::shaft_recipe(e) {
+        return by_guid(&r.extent.base_level);
+    }
+    if let Some(r) = crate::wall_openings::wall_opening_recipe(e) {
+        return by_guid(&r.host);
+    }
+    if let Some(r) = crate::skylights::skylight_recipe(e) {
+        return by_guid(&r.roof);
+    }
+    if let Some(r) = crate::mesh_objects::mesh_object_recipe(e) {
+        return by_guid(&r.level);
+    }
+    if let Some(r) = crate::path_arrays::path_array_recipe(e) {
+        return by_guid(&r.level);
+    }
     // A dormer's parts sit in the dormer; the dormer on its roof.
     if let Some(d) = crate::dormers::dormer_of(e) {
         return by_guid(d);

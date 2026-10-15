@@ -112,6 +112,8 @@ chmod 755 "$APP/Contents/MacOS/NoDesk Reviera"
 mkdir -p "$APP/Contents/Resources/samples"
 cp "$ROOT"/test-data/samples/samples.json "$ROOT"/test-data/samples/*.ifc \
    "$ROOT"/test-data/samples/*.lua "$ROOT"/test-data/samples/*.md "$APP/Contents/Resources/samples/"
+# The sample Component Library beside the samples (crates/reviera-ui/src/components.rs).
+rm -rf "$APP/Contents/Resources/library" && cp -R "$ROOT/test-data/library" "$APP/Contents/Resources/library"
 cp "$ROOT/LICENSE" "$APP/Contents/Resources/COPYING"
 cp "$ROOT/packaging/THIRD-PARTY-NOTICES.txt" "$APP/Contents/Resources/"
 

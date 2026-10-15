@@ -300,6 +300,22 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "model_properties" => format!(
             r#"<path d="M6 4h14l6 6v18H6z" fill="{f}" {s}/><path d="M10 12h12M10 17h12M10 22h7" {s}/><path d="M21 22l2 2 4-5" {sa}/>"#
         ),
+        // A classical column: capital, fluted shaft, base.
+        "component" => format!(
+            r#"<path d="M7 5h18v4H7zM9 27h14v-3H9z" fill="{f}" {s}/><path d="M11 9h10l-1 15h-8z" fill="{paper}" {s}/><path d="M14 11v11M18 11v11" {sa}/>"#
+        ),
+        "import_object" => format!(
+            r#"<path d="M14 15l9-5 6 3v10l-9 5-6-3z" fill="{f}" {s}/><path d="M14 15l6 3 9-5M20 18v10" {s}/><path d="M3 9h9M8 5l4 4-4 4" {sa}/>"#
+        ),
+        "library" => format!(
+            r#"<path d="M3 8h9l3 3h14v16H3z" fill="{f}" {s}/><rect x="8" y="15" width="6" height="8" fill="{paper}" {sa}/><rect x="18" y="15" width="6" height="8" fill="{paper}" {sa}/>"#
+        ),
+        "path_array" => format!(
+            r#"<path d="M3 26C10 26 10 8 29 8" {s}/><circle cx="5" cy="26" r="2.6" fill="{f}" {sa}/><circle cx="12" cy="20" r="2.6" fill="{f}" {sa}/><circle cx="16" cy="12" r="2.6" fill="{f}" {sa}/><circle cx="25" cy="8" r="2.6" fill="{f}" {sa}/>"#
+        ),
+        "unarray" => format!(
+            r#"<circle cx="7" cy="16" r="3" fill="{f}" {s}/><circle cx="16" cy="16" r="3" fill="{f}" {s}/><circle cx="25" cy="16" r="3" fill="{f}" {s}/><path d="M4 8l24 16M4 24L28 8" {sa}/>"#
+        ),
         "skylight" => format!(
             r#"<path d="M2 26L16 6l14 20z" fill="{f}" {s}/><path d="M12 22l4-8 5 8z" fill="{paper}" {sa}/><path d="M16 14v8M13 18h6" {sa}/>"#
         ),
