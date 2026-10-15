@@ -56,6 +56,7 @@ pub mod store;
 pub mod txn;
 pub mod types;
 pub mod units;
+pub mod vaults;
 pub mod views;
 pub mod wall_openings;
 pub mod walls;

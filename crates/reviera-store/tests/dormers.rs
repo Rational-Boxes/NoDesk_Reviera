@@ -108,6 +108,24 @@ fn dormers_of_every_style_fill_their_gaps() {
     .unwrap());
     let (droof, ws) = parts(&doc, dormer);
     assert_eq!(ws.len(), 3);
+    // The walls stop at the main roof's underside: no point of them is below it, so the cheek
+    // walls follow the slope instead of hanging into the room.
+    let bodies = reviera_core::bodies::all(doc.store());
+    for w in &ws {
+        let points: Vec<[f64; 3]> = bodies
+            .iter()
+            .filter(|b| b.element == *w)
+            .flat_map(|b| b.parts.iter().flat_map(|p| p.mesh.0.clone()))
+            .collect();
+        assert!(!points.is_empty());
+        for p in points {
+            let under = main_g.underside([p[0], p[1]]).unwrap_or(f64::NEG_INFINITY);
+            assert!(
+                p[2] >= under - 1e-6,
+                "{p:?} is below the roof's underside {under}"
+            );
+        }
+    }
     let g = roofs::regenerate(doc.store(), doc.store().get(droof).unwrap()).unwrap();
     assert_eq!(g.predefined, "GABLE_ROOF");
     let z_eave = main_top([5.0, 0.5]) + 1.0;

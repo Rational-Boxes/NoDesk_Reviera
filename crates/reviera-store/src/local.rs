@@ -792,7 +792,11 @@ impl LocalProject {
             // A wall attached to a roof gets a B-rep body in its own frame (where its openings are
             // placed); others keep their extruded body.
             match walls::attach::attached_body(store, *id, body) {
-                Some(Ok(a)) => {
+                Some(Ok(mut a)) => {
+                    // A dormer's walls stop at the main roof's underside.
+                    if let Some((n, d)) = reviera_core::dormers::wall_base_plane(store, e) {
+                        a.solid = reviera_core::roofs::eaves::clip_plane(&a.solid, n, d);
+                    }
                     let g = &body.geometry;
                     let (u, n) = (g.direction(), g.normal());
                     let local = |p: &[f64; 3]| {
@@ -1324,6 +1328,37 @@ impl LocalProject {
                 }
                 continue;
             }
+            // A ceiling that follows its roof: its pieces as faceted B-reps.
+            if let Some(meshes) = reviera_core::vaults::meshes(store, e) {
+                geometry::remove_slab(&mut self.ifc, step)?;
+                let solids: Vec<geometry::Polyhedron> = meshes
+                    .into_iter()
+                    .map(|(points, idx)| geometry::Polyhedron {
+                        points,
+                        faces: idx
+                            .chunks(3)
+                            .map(|t| t.iter().map(|i| *i as usize).collect())
+                            .collect(),
+                    })
+                    .collect();
+                geometry::write_breps(
+                    &mut self.ifc,
+                    step,
+                    geometry::BrepFrame::WORLD,
+                    &solids,
+                    self.length_scale,
+                    contexts,
+                )?;
+                let storey = floors::slab_recipe(e)
+                    .and_then(|(_, r)| GlobalId::parse(&r.level))
+                    .and_then(|g| store.find_by_guid(&g))
+                    .and_then(|l| self.steps.get(&l).copied());
+                if let Some(storey) = storey {
+                    geometry::contain(&mut self.ifc, step, storey, owner_history)?;
+                }
+                continue;
+            }
+            geometry::remove_breps(&mut self.ifc, step)?;
             let body = geometry::SlabBody {
                 rings: f
                     .profiles

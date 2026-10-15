@@ -2,7 +2,7 @@
 -- Copyright (C) 2026 Reviera contributors
 
 -- title: Manor with tower
--- description: A two-storey house and a round three-storey tower with spiral stairs, shaped windows, stairs through floors and a deck.
+-- description: A two-storey house and a round three-storey tower with spiral stairs, shaped windows, layered walls, a curtain wall, columns, a shaft, a skylight, vaulted ceilings and a deck.
 --
 -- Reviera sample model (test-data/samples), a demonstration of most of what Reviera models:
 -- - three levels with plans and a 3D view; the model follows the US residential code (IRC);
@@ -13,7 +13,11 @@
 --   cut in the ceiling and floor over it for the code's headroom, guarded at the top;
 -- - a round tower of curved walls with Gothic windows and an oculus, two spiral stairs (Level 1
 --   to 2 and 2 to 3), each opening the floor above it, and an onion dome;
--- - a deck behind the house with a guard railing and a gate.
+-- - a deck behind the house with a guard railing and a gate;
+-- - layered exterior walls (render, insulation, block and plaster), a cased opening in the hall
+--   partition, a glazed curtain wall onto the garden, a service shaft, a skylight in the roof,
+--   vaulted ceilings upstairs following the roof and a domed one in the tower top, and two round
+--   porch columns (the second made by an array) attached to the eave.
 
 reviera.code.set{ code = "irc", occupancy = "dwelling" }
 
@@ -51,9 +55,25 @@ for i = 1, 4 do
   upper[i] = wall(l2, c[i % 4 + 1], c[i])
 end
 -- ground[1] is the south wall (14,0)→(0,0), [2] east (14,9)→(14,0), [3] north, [4] west.
+-- The exterior walls are layered (ARC-CMPD-001), 200 mm in all, exterior first.
+local exterior = reviera.type.duplicate{ type_id = type_named("Generic - 200mm"), new_name = "Exterior - Render on Block 200" }
+reviera.compound.set_layers{ type_id = exterior, layers = {
+  { ["function"] = "finish1", material = "Lime Render", thickness = "15 mm" },
+  { ["function"] = "thermal_air", material = "Wood Fibre Insulation", thickness = "60 mm" },
+  { ["function"] = "structure", material = "Concrete Block", thickness = "110 mm" },
+  { ["function"] = "finish2", material = "Gypsum Plaster", thickness = "15 mm" },
+} }
+local outer_walls = {}
+for i = 1, 4 do
+  outer_walls[#outer_walls + 1] = ground[i]
+  outer_walls[#outer_walls + 1] = upper[i]
+end
+reviera.element.set_type{ element_ids = outer_walls, type_id = exterior }
 -- Partitions stop under the floor above (its slab is 300 mm deep).
 local hall = wall(l1, {7, 0}, {7, D}, 2.7)
 local split = wall(l2, {7, 3.2}, {7, D})
+-- A wide cased opening between the living room and the hall (ARC-OPEN-003).
+reviera.opening.create_wall{ wall_id = hall, u0 = 1.6, u1 = 3.4, top_constraint = { unconnected = 2.2 } }
 
 -- Doors and windows. The first of each makes the default types; the shaped ones are duplicates.
 reviera.door.place{ host_wall_id = hall, point_along = 6.0 }
@@ -95,6 +115,15 @@ reviera.window.place{ type_id = gothic, host_wall_id = upper[2], point_along = 4
 reviera.window.place{ type_id = gothic, host_wall_id = upper[4], point_along = 4.5 }
 -- A back door to the deck, swinging in (outward it would sweep the deck boards).
 reviera.door.place{ host_wall_id = ground[3], point_along = 7.6, flip_facing = true }
+-- A glazed screen onto the garden in the north wall (ARC-CW-001), cutting its own opening:
+-- the default Storefront type, its panels at most 0.8 m wide, a transom at 2.1 m.
+reviera.curtain.create{
+  curve = { start = {4.3, D}, ["end"] = {6.9, D} }, base_level = l1,
+  top_constraint = { unconnected = 2.5 },
+}
+local storefront = type_named("Storefront")
+reviera.type.set_param{ type_id = storefront, param = "u_spacing", value = 0.8 }
+reviera.type.set_param{ type_id = storefront, param = "v_spacing", value = 2.1 }
 
 -- Floors: the ground floor, and Level 2 inside the walls.
 reviera.floor.create{ loops = { square(0.1, 0.1, W - 0.1, D - 0.1) }, level_id = l1 }
@@ -126,6 +155,11 @@ for _, o in ipairs(check.obstructions) do
 end
 reviera.room.place{ level_id = l2, point = {3.5, 4.5}, name = "Bedroom" }
 reviera.room.place{ level_id = l2, point = {10.5, 6.0}, name = "Study" }
+-- A service shaft through the Level 2 floor, from Level 1 up to Level 2 (ARC-OPEN-004).
+reviera.opening.create_shaft{
+  loops = { { {12.6, 7.9}, {13.6, 7.9}, {13.6, 8.6}, {12.6, 8.6} } },
+  base_level = l1, top_constraint = { level = l2 },
+}
 
 -- The hipped roof on the walls' exterior faces, with eaves, a gable dormer to the south, and
 -- the upper walls attached.
@@ -144,6 +178,22 @@ reviera.dormer.create{ roof_id = roof, point = {7.0, 0.6}, style = "gable", fron
 -- (The point is off the hall partition below; the window then goes to the front's middle.)
 local dormer_window = reviera.window.place{ type_id = round_top, point = {7.4, 0.7} }
 reviera.insert.set_position{ element_id = dormer_window, along = 0.8 }
+-- A vaulted ceiling upstairs, shaped to the roof's underside (ARC-CEIL-001): the bedroom and
+-- study are open to each other south of the partition, so one ceiling covers both.
+reviera.ceiling.create_auto{ level_id = l2, point = {3.5, 4.5}, follow_roof = true }
+-- A skylight over the study, cut plumb through the north slope (ARC-OPEN-002).
+reviera.opening.create_vertical{ host_id = roof, loops = { { {9.6, 6.6}, {10.8, 6.6}, {10.8, 7.6}, {9.6, 7.6} } } }
+-- Two round porch columns by the front door, the second an array of the first (ARC-MOD-026),
+-- their tops attached to the eave over them (ARC-COL-001).
+local porch = reviera.column.place_architectural{
+  point = {2.6, -0.4}, base_level = l1, top_constraint = { unconnected = 3.5 },
+}
+local round_column = reviera.type.duplicate{ type_id = type_named("Rectangular Column 400 x 400"), new_name = "Round Column 250" }
+reviera.type.set_param{ type_id = round_column, param = "section", value = "round" }
+reviera.type.set_param{ type_id = round_column, param = "diameter", value = "250 mm" }
+reviera.element.set_type{ element_ids = { porch }, type_id = round_column }
+local copies = reviera.element.array_linear{ element_ids = { porch }, vector = { 1.8, 0, 0 }, count = 2 }
+reviera.column.attach{ column_ids = { porch, copies[1][1] }, target_id = roof }
 
 -- ---- The tower: a drum of radius 2.6 east of the house, three storeys ----
 local cx, cy, R = 19.5, 4.5, 2.6
@@ -180,12 +230,15 @@ for _, b in ipairs({ l1, l2 }) do
   reviera.stair.create_openings{ stair_id = s }
 end
 reviera.room.place{ level_id = l1, point = {cx - 1.6, cy}, name = "Tower" }
+-- The tower's top room has a domed ceiling under the onion dome, sketched inside the drum.
+local tower_ceiling = reviera.ceiling.create{ loops = { disc(R - 0.1) }, level_id = l3 }
 -- An onion dome over the drum, its walls attached.
 local dome = reviera.roof.create_dome{
   level_id = l1, base_offset = TH, center = {cx, cy},
   plan = { circle = { radius = R + 0.3 } }, profile = "onion",
 }
 reviera.roof.attach_walls{ roof_id = dome }
+reviera.ceiling.set_shape{ ceiling_ids = { tower_ceiling }, shape = "follow_roof", roof_id = dome }
 
 -- ---- A deck behind the house, with a guard railing and a gate ----
 local dk = { {4.0, 9.2}, {12.0, 9.2}, {12.0, 12.5}, {4.0, 12.5} }

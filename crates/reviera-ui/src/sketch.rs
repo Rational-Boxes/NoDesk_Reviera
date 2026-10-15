@@ -1433,6 +1433,23 @@ impl Gui {
             "fl_offset",
             offset,
         ));
+        // A ceiling can follow the roof over it (vaulted, domed).
+        if reviera_core::floors::slab_recipe(e).map(|(k, _)| k)
+            == Some(reviera_core::floors::SlabKind::Ceiling)
+            && reviera_core::decks::deck_settings(e).is_none()
+        {
+            let follows = recipe.follow_roof.is_some();
+            grid.append(Property::enumeration(
+                "Shape",
+                "fl_shape",
+                vec![("Flat".to_owned(), 0), ("Follow Roof".to_owned(), 1)],
+                i32::from(follows),
+            ));
+            grid.set_help_string(
+                "fl_shape",
+                "Follow Roof shapes the ceiling to the underside of the roof over it",
+            );
+        }
         grid.append(Property::category("Dimensions", "c_floor_dims"));
         let area = self
             .run(
@@ -1520,6 +1537,13 @@ impl Gui {
             "fl_offset" => self.run(
                 "floor.set_level",
                 json!({ "floor_ids": floors, "offset": text }),
+            ),
+            "fl_shape" => self.run(
+                "ceiling.set_shape",
+                json!({
+                    "ceiling_ids": floors,
+                    "shape": if text == "Follow Roof" { "follow_roof" } else { "flat" },
+                }),
             ),
             "fl_thickness" => match self.type_rows {
                 Some(t) => self.run(
@@ -1626,6 +1650,29 @@ impl Gui {
         );
     }
 
+    /// The palette while the Ceiling tool runs: the shape of the ceilings it places.
+    pub(crate) fn ceiling_tool_properties(
+        &mut self,
+        grid: &wxdragon::prelude::PropertyGrid,
+    ) -> bool {
+        use wxdragon::prelude::Property;
+        if self.ceiling_tool.is_none() {
+            return false;
+        }
+        grid.append(Property::category("Ceiling tool", "c_ceiltool"));
+        grid.append(Property::enumeration(
+            "Shape",
+            "ceil_tool_shape",
+            vec![("Flat".to_owned(), 0), ("Follow Roof".to_owned(), 1)],
+            i32::from(self.ceiling_follow_roof),
+        ));
+        grid.set_help_string(
+            "ceil_tool_shape",
+            "Follow Roof shapes each ceiling to the underside of the roof over it (vaulted, domed)",
+        );
+        true
+    }
+
     pub(crate) fn end_ceiling_tool(&mut self) -> bool {
         if self.ceiling_tool.take().is_none() {
             return false;
@@ -1691,7 +1738,7 @@ impl Gui {
         };
         match self.run(
             "ceiling.create_auto",
-            json!({ "level_id": level, "point": point }),
+            json!({ "level_id": level, "point": point, "follow_roof": self.ceiling_follow_roof }),
         ) {
             Ok(_) => {
                 self.refresh_scene(&frame);

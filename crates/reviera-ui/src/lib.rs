@@ -242,6 +242,8 @@ struct Gui {
     /// The last array's members and Move To (Last when true).
     array_count: u32,
     array_last: bool,
+    /// Whether the Ceiling tool's ceilings follow the roof over them.
+    ceiling_follow_roof: bool,
     /// The floor type new floors take.
     floor_type: Option<ElementId>,
     /// The last pointer position in the active view (Tab in sketch mode picks there).
@@ -1808,6 +1810,7 @@ impl Gui {
             && (self.grid_tool_properties(grid)
                 || self.column_tool_properties(grid)
                 || self.curtain_tool_properties(grid)
+                || self.ceiling_tool_properties(grid)
                 || self.insert_tool_properties(grid)
                 || self.wall_tool_properties(grid)
                 || self.view_properties(grid))
@@ -2141,6 +2144,10 @@ impl Gui {
             if let Some(t) = text {
                 self.set_cut_plane(&t, frame);
             }
+            return;
+        }
+        if property == "ceil_tool_shape" {
+            self.ceiling_follow_roof = text.as_deref() == Some("Follow Roof");
             return;
         }
         if property == "level_name" {
@@ -3029,6 +3036,7 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 curtain_tool: None,
                 array_count: 4,
                 array_last: false,
+                ceiling_follow_roof: false,
                 floor_type: None,
                 mouse: (0, 0),
                 offset_distance: 1.0,

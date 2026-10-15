@@ -46,6 +46,17 @@ use <b>Modify | Ceilings › Edit Boundary</b> to change its outline. Ceilings a
 <code>IfcCovering</code> (CEILING). <code>ceiling.create_auto</code>,
 <code>ceiling.create</code>, <code>ceiling.edit_boundary</code></p>
 
+<h2 id="vaulted">Ceilings that follow the roof</h2>
+<p>Under a roof, a ceiling can follow the roof's underside instead of being flat: a vaulted
+ceiling under a pitched roof, a barrel under an arched roof, a dome under a dome. Set the Ceiling
+tool's <b>Shape</b> to <i>Follow Roof</i> in Properties before clicking a room, or select a
+ceiling and set its <b>Shape</b>. The ceiling takes the shape of the roof over it, face by face;
+any part the roof does not cover stays flat at its height. It changes with the roof. Such
+ceilings are saved with faceted bodies. <code>ceiling.set_shape</code>,
+<code>ceiling.create_auto</code> (<code>follow_roof</code>)</p>
+<p class="note">A following ceiling's area and the stair headroom check still use its flat
+height.</p>
+
 <h2 id="ceiling-plans">Ceiling plans</h2>
 <p><b>View › Ceiling Plan</b> makes a reflected ceiling plan of a level, cut at 2300 mm and
 looking up. See <a href="reviera:help/views#ceiling">Views</a>.</p>

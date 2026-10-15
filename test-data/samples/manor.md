@@ -60,7 +60,30 @@ Start with **File › New**. The model has Level 1 at 0.
 18. **Deck.** Architecture › **Deck**: a rectangle from (4000, 9200) to (12000, 12500).
     Architecture › **Railing**: sketch its west, north and east edges 50 mm in, then Modify |
     Railings › **Gate** at 7.2 m along it.
-19. **Views.** View › **Floor Plan** for each level, and the 3D view.
+19. **Layered exterior walls.** Select an exterior wall, Properties › Type › *Duplicate Type…*
+    *Exterior - Render on Block 200*; Modify | Walls › **Edit Assembly**: rows Finish 1 *Lime
+    Render* 15, Thermal/Air *Wood Fibre Insulation* 60, Structure *Concrete Block* 110 (Core
+    ticked), Finish 2 *Gypsum Plaster* 15; OK. Select all eight exterior walls and choose the
+    type.
+20. **Cased opening.** Level 1 plan, Architecture › Opening › **Wall Opening**: Width 1800,
+    Height 2200; click the hall partition at 2.5 m from its south end. (Properties › From Wall
+    Start 1600 places it exactly.)
+21. **Garden screen.** Level 1 plan, Architecture › **Curtain Wall**: click (4300, 9000) and
+    (6900, 9000) on the north wall; select it and set Unconnected Height 2500; in its type
+    (*Storefront*) set Vertical Grid Spacing 800 and Horizontal Grid Spacing 2100.
+22. **Service shaft.** Level 1 plan, Architecture › Opening › **Shaft**: a rectangle from
+    (12600, 7900) to (13600, 8600); Finish (it runs up to Level 2, cutting its floor).
+23. **Vaulted ceiling.** Level 2 plan (ceiling plan), Architecture › **Ceiling**: in Properties
+    set Shape *Follow Roof*; click in the bedroom.
+24. **Skylight.** Level 1 plan, Architecture › Opening › **Vertical**: a rectangle from
+    (9600, 6600) to (10800, 7600); Finish (it cuts the roof's north slope).
+25. **Porch columns.** Level 1 plan, Architecture › **Column**: click (2600, −400); Esc. Select
+    it: duplicate its type as *Round Column 250*, Section *Round*, Diameter 250; Unconnected
+    Height 3500. Modify › **Array**: 2 members, Move To *2nd*, click the column's centre and then
+    1800 to the east. Select both, Modify | Columns › **Attach Top**.
+26. **Tower ceiling.** Level 3 plan, Architecture › **Ceiling** › Sketch Ceiling: a circle of
+    radius 2500 about the tower's centre; Finish; Properties › Shape *Follow Roof* (the dome).
+27. **Views.** View › **Floor Plan** for each level, and the 3D view.
 
 ## Gaps
 

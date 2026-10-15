@@ -54,6 +54,17 @@ impl Body {
 
 /// A closed mesh of a plan profile with holes between `z0` and `z1`, facing out.
 pub fn extrude(outer: &[[f64; 2]], holes: &[Vec<[f64; 2]>], z0: f64, z1: f64) -> Mesh {
+    extrude_between(outer, holes, &|_| z0, &|_| z1)
+}
+
+/// A closed mesh of a plan profile with holes between a bottom and a top that may vary over it
+/// (planes over each piece, for ceilings that follow a roof), facing out.
+pub fn extrude_between(
+    outer: &[[f64; 2]],
+    holes: &[Vec<[f64; 2]>],
+    bottom: &dyn Fn([f64; 2]) -> f64,
+    top: &dyn Fn([f64; 2]) -> f64,
+) -> Mesh {
     let mut positions: Vec<[f64; 3]> = Vec::new();
     let mut indices: Vec<u32> = Vec::new();
     let mut points: Vec<[f64; 2]> = outer.to_vec();
@@ -72,9 +83,9 @@ pub fn extrude(outer: &[[f64; 2]], holes: &[Vec<[f64; 2]>], z0: f64, z1: f64) ->
         ];
         (b[0] - a[0]) * (c[1] - a[1]) - (c[0] - a[0]) * (b[1] - a[1])
     };
-    for (z, up) in [(z1, true), (z0, false)] {
+    for (z, up) in [(top, true), (bottom, false)] {
         let base = positions.len() as u32;
-        positions.extend(points.iter().map(|p| [p[0], p[1], z]));
+        positions.extend(points.iter().map(|p| [p[0], p[1], z(*p)]));
         for t in tris.chunks(3) {
             if (area(t) > 0.0) == up {
                 indices.extend([base + t[0], base + t[1], base + t[2]]);
@@ -101,7 +112,7 @@ pub fn extrude(outer: &[[f64; 2]], holes: &[Vec<[f64; 2]>], z0: f64, z1: f64) ->
                 std::mem::swap(&mut a, &mut b);
             }
             let base = positions.len() as u32;
-            for (p, z) in [(a, z0), (b, z0), (b, z1), (a, z1)] {
+            for (p, z) in [(a, bottom(a)), (b, bottom(b)), (b, top(b)), (a, top(a))] {
                 positions.push([p[0], p[1], z]);
             }
             indices.extend([base, base + 1, base + 2, base, base + 2, base + 3]);
@@ -143,15 +154,23 @@ pub fn all(store: &Store) -> Vec<Body> {
     let curved_ends = |id| crate::walls::curved::ends_of(&solved, id);
     for (id, mut body) in solved.bodies.clone() {
         let class = class_of(id, "IfcWall");
+        // A dormer's walls stop at the main roof's underside (ARC-ROOF-007).
+        let base = store
+            .get(id)
+            .and_then(|e| crate::dormers::wall_base_plane(store, e));
+        let trim = |m: Mesh| match base {
+            Some((n, d)) => crate::roofs::eaves::clip_plane(&m, n, d),
+            None => m,
+        };
         if let Some(Ok(a)) = crate::walls::attach::attached_body(store, id, &body) {
             body.geometry.height = a.z_min - body.geometry.base_z;
-            push(id, &class, a.cap, false);
+            push(id, &class, trim(a.cap), false);
         }
         let mesh = match cuts.get(&id) {
             Some(c) => crate::walls::openings::cut_mesh(&body, c),
             None => body.mesh(),
         };
-        push(id, &class, mesh, false);
+        push(id, &class, trim(mesh), false);
     }
     // Curved walls (ARC-WALL-002): pieces along the curve, cut by their openings.
     for e in store.iter() {
@@ -201,6 +220,13 @@ pub fn all(store: &Store) -> Vec<Body> {
             continue;
         }
         let class = class_of(id, "IfcSlab");
+        // A ceiling that follows its roof.
+        if let Some(meshes) = store.get(id).and_then(|e| crate::vaults::meshes(store, e)) {
+            for m in meshes {
+                push(id, &class, m, false);
+            }
+            continue;
+        }
         // Less its vertical openings (ARC-OPEN-002).
         let profiles = match store.get(id) {
             Some(e) => crate::slab_openings::cut_profiles(store, e, &f.profiles),

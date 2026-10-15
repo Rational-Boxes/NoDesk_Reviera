@@ -16,9 +16,10 @@
 //!   The dormer reaches back until its ridge (gable, hip), its rising plane (shed) or its top
 //!   (flat) meets the main roof's top surface. The front and sides overhang; the back does not.
 //! - **Gap walls.** A front wall and two cheek walls, their outer faces on the dormer's outline,
-//!   from the main roof's underside at the front up to the dormer roof (attached to it, so the
-//!   gable and the sloped tops fill exactly). Cheek walls end where the dormer eave meets the main
-//!   roof.
+//!   from the main roof's underside up to the dormer roof (attached to it, so the gable and the
+//!   sloped tops fill exactly). Their bottoms are trimmed to the main roof's underside
+//!   ([`wall_base_plane`]), so the cheek walls follow its slope. Cheek walls end where the dormer
+//!   eave meets the main roof.
 //!
 //! The dormer is an `IfcElementAssembly` (ObjectType "DORMER") whose recipe lists its parts; each
 //! part names its dormer, and goes with it. Editing regenerates the parts.
@@ -355,6 +356,20 @@ pub fn main_top_plane(store: &Store, dormer_roof: &Element) -> Option<([f64; 3],
         q[2] + n[2] * g.thickness,
     ];
     Some((n, n[0] * top[0] + n[1] * top[1] + n[2] * top[2]))
+}
+
+/// The plane of the main roof's underside under a dormer wall (a dormer part): its upward unit
+/// normal and offset (`n · p = d`). The dormer's walls stop at it, so the cheek walls follow the
+/// slope instead of hanging into the room below.
+pub fn wall_base_plane(store: &Store, wall: &Element) -> Option<([f64; 3], f64)> {
+    walls::wall_recipe(wall)?;
+    let dormer = store.get(store.find_by_guid(&GlobalId::parse(dormer_of(wall)?)?)?)?;
+    let r = dormer_recipe(dormer)?;
+    let main = store.get(store.find_by_guid(&GlobalId::parse(&r.roof)?)?)?;
+    let g = roofs::regenerate(store, main).ok()?;
+    let f = g.face_at(r.point)?;
+    let (n, q) = (f.normal, f.bottom[0]);
+    Some((n, n[0] * q[0] + n[1] * q[1] + n[2] * q[2]))
 }
 
 /// The openings the dormers on a roof (GlobalId) cut through it, in plan: each the region inside

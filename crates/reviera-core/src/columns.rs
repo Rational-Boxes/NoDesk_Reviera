@@ -184,13 +184,42 @@ impl ColumnGeometry {
 fn underside(store: &Store, target: &str, p: [f64; 2]) -> Option<f64> {
     let e = store.get(find(store, target)?)?;
     if crate::roofs::roof_recipe(e).is_some() {
-        return crate::roofs::regenerate(store, e).ok()?.underside(p);
+        // The lowest of the roof over `p`: its faces' underside, or an eave's fascia or soffit.
+        let g = crate::roofs::regenerate(store, e).ok()?;
+        let mut z = g.underside(p);
+        for t in &g.trims {
+            let (pts, idx) = &t.mesh;
+            for tri in idx.chunks(3) {
+                let [a, b, c] = [
+                    pts[tri[0] as usize],
+                    pts[tri[1] as usize],
+                    pts[tri[2] as usize],
+                ];
+                if let Some(h) = height_in(p, a, b, c) {
+                    z = Some(z.map_or(h, |z: f64| z.min(h)));
+                }
+            }
+        }
+        return z;
     }
     let f = crate::floors::regenerate(store, e).ok()?;
     f.profiles
         .iter()
         .any(|pr| inside(p, &pr.outer) && !pr.holes.iter().any(|h| inside(p, h)))
         .then_some(f.top - f.thickness)
+}
+
+/// The height over plan point `p` of triangle `a b c`, if `p` is inside its plan (and it is not
+/// vertical).
+fn height_in(p: [f64; 2], a: [f64; 3], b: [f64; 3], c: [f64; 3]) -> Option<f64> {
+    let d = (b[1] - c[1]) * (a[0] - c[0]) + (c[0] - b[0]) * (a[1] - c[1]);
+    if d.abs() < 1e-12 {
+        return None;
+    }
+    let l1 = ((b[1] - c[1]) * (p[0] - c[0]) + (c[0] - b[0]) * (p[1] - c[1])) / d;
+    let l2 = ((c[1] - a[1]) * (p[0] - c[0]) + (a[0] - c[0]) * (p[1] - c[1])) / d;
+    let l3 = 1.0 - l1 - l2;
+    (l1 >= -1e-9 && l2 >= -1e-9 && l3 >= -1e-9).then(|| l1 * a[2] + l2 * b[2] + l3 * c[2])
 }
 
 fn inside(p: [f64; 2], ring: &[[f64; 2]]) -> bool {

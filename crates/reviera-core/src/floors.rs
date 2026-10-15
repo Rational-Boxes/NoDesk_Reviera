@@ -103,6 +103,9 @@ pub struct FloorRecipe {
     pub level: String,
     /// Height of the top above the level (metres).
     pub offset: f64,
+    /// A ceiling that follows a roof's underside: the roof (GlobalId; `vaults`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub follow_roof: Option<String>,
 }
 
 /// The recipe of a Reviera floor.
@@ -341,6 +344,7 @@ pub(crate) fn create_kind(
             SlabKind::Floor => 0.0,
             SlabKind::Ceiling => DEFAULT_CEILING_OFFSET,
         }),
+        follow_roof: None,
     };
     txn.create(
         NewElement::new(kind.class())
@@ -465,6 +469,10 @@ pub struct CreateAutoParams {
     /// Height of the bottom above the level (accepts units); default 2600 mm.
     #[schemars(extend("x-reviera-data-type" = "length"))]
     pub offset: Option<f64>,
+    /// Shape it to the underside of the roof over it (a vaulted or domed ceiling); where the roof
+    /// does not cover it, it stays flat at its height.
+    #[serde(default)]
+    pub follow_roof: bool,
 }
 
 /// An automatic ceiling (ARC-CEIL-001): the loop of wall faces around `point` at the ceiling's
@@ -499,7 +507,7 @@ pub(crate) fn create_auto(
             })
             .collect(),
     ];
-    create_kind(
+    let id = create_kind(
         txn,
         SlabKind::Ceiling,
         CreateParams {
@@ -508,5 +516,16 @@ pub(crate) fn create_auto(
             level_id: p.level_id,
             offset: Some(offset),
         },
-    )
+    )?;
+    if p.follow_roof {
+        crate::vaults::set_shape(
+            txn,
+            crate::vaults::SetShapeParams {
+                ceiling_ids: vec![ElementRef::Id(id)],
+                shape: crate::vaults::CeilingShape::FollowRoof,
+                roof_id: None,
+            },
+        )?;
+    }
+    Ok(id)
 }

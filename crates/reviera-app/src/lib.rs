@@ -127,7 +127,9 @@ fn scene_meshes(meshes: Vec<reviera_ifc::Mesh>, doc: &Document) -> Vec<reviera_r
         .into_iter()
         .filter(|m| m.class != "IfcSpace" && m.class != "IfcOpeningElement" && !m.faces.is_empty())
         .filter_map(|m| {
-            let element = ids.get(m.global_id.as_ref()?).copied();
+            // What is not an element is made from one (a curtain wall's panels and mullions, a
+            // shaft's openings) and drawn from its element.
+            let element = Some(*ids.get(m.global_id.as_ref()?)?);
             Some(reviera_render::SceneMesh {
                 element,
                 color: reviera_render::class_color(&m.class),
@@ -220,9 +222,11 @@ pub struct App {
 }
 
 /// Whether an element's body is regenerated from its Reviera recipe (`bodies`), rather than
-/// tessellated from the IFC file.
+/// tessellated from the IFC file: every element with a recipe (walls, slabs, roofs, stairs,
+/// railings, columns, curtain walls, shafts, dormers …), and the parts and openings of inserts.
 pub(crate) fn regenerated(e: &reviera_core::Element) -> bool {
-    walls::wall_recipe(e).is_some()
+    e.param(walls::RECIPE_KEY).is_some()
+        || walls::wall_recipe(e).is_some()
         || reviera_core::floors::slab_recipe(e).is_some()
         || reviera_core::roofs::roof_recipe(e).is_some()
         || reviera_core::stairs::stair_recipe(e).is_some()

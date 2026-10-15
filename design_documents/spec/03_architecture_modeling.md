@@ -1957,6 +1957,8 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 - [ ] Clicking inside a room enclosed by four walls creates a ceiling whose edges lie on the walls' interior finish faces.
 - [ ] Each ceiling exports as `IfcCovering(CEILING)` with an `IfcRelCoversSpaces` link to the room it covers.
 
+*Built (2026-10-15), ceilings that follow a roof (owner request, 2026-10-15: "non-flat ceilings that hug the contour of the roof for top-floor, vaulted roofs, domes"):* `ceiling.set_shape(ceiling_ids, shape: flat | follow_roof, roof_id?)` and `ceiling.create_auto(…, follow_roof)`; the roof defaults to the one over the ceiling covering most of it, its underside above the level. The ceiling's outline (less its openings) is cut into a piece under each roof face — footprint roofs' faces and arched roofs' and domes' facets — each piece's top on that face's underside and its bottom the ceiling's thickness below; what the roof does not cover stays flat. Written as faceted B-reps. The Ceiling tool's Properties and a ceiling's Properties have a Shape row. Not yet: a gap below the roof, a minimum height (flat where the roof would come lower), areas and headroom measured on the shaped ceiling.
+
 ### 3.6.4 Roof by footprint
 **ID:** ARC-ROOF-001 · **Priority:** P0 · **Ref:** research/02 §7.4 · screenshots/architecture/roof_footprint_sketch_mode.png · screenshots/architecture/roof_different_eave_heights_render.png
 
@@ -2312,6 +2314,8 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 - [ ] A shed (flat-lift) dormer at 15° on a 45° roof ends where its roof meets the main roof, and its cheek walls are trapezoids filling the gap.
 - [ ] The main roof has an opening exactly inside the dormer walls' interior faces. Deleting the dormer closes it.
 - [ ] `dormer.create` from Lua or MCP gives the same model as the window tool.
+
+*Built (2026-10-15), owner fix ("Trim the side-walls to the slope of the roof so they don't extend into the living space within"):* every dormer wall is clipped by the plane of the main roof's underside under the dormer (`dormers::wall_base_plane`), in its displayed body and its IFC B-rep, so the cheek walls follow the slope instead of hanging below the roof; tested by checking that no point of the walls lies below the underside.
 
 **Implementation notes (2026-10-13).**
 - As built:

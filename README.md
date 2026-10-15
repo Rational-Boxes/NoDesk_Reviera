@@ -197,8 +197,10 @@ Create … Boundary* tab:
   extruded profile (`floor.create`, `floor.edit_boundary`, `floor.set_level`).
 - **Ceilings**: Architecture › Ceiling places an automatic ceiling in the room under the cursor
   (its edges follow the walls' finish faces, round rooms included, and move with them), or
-  Sketch Ceiling. Ceilings have types and sit 2600 mm above their level by default. Saved as
-  `IfcCovering` (CEILING) (`ceiling.create_auto`, `ceiling.create`, `ceiling.edit_boundary`).
+  Sketch Ceiling. Ceilings have types and sit 2600 mm above their level by default. A ceiling
+  can follow the roof over it (Shape: Follow Roof, in the Ceiling tool or Properties): vaulted
+  under a pitched roof, curved under an arched roof or a dome. Saved as `IfcCovering` (CEILING)
+  (`ceiling.create_auto`, `ceiling.create`, `ceiling.edit_boundary`, `ceiling.set_shape`).
 - **Curtain walls** (Architecture › Curtain Wall): two clicks draw one; its type lays out the
   vertical and horizontal grid lines (Fixed Distance, Fixed Number, Maximum or Minimum Spacing,
   with the instance's justification and offset), mullions and glazed, solid or empty panels.
@@ -245,7 +247,7 @@ Create … Boundary* tab:
   hips. A roof made from picked walls gets eaves by default (`roof.set_eaves`, `roof.eaves`).
 - **Dormers**: Modify | Roofs › Dormer places gable, hipped, shed (flat lift) or flat dormers
   where you click on a roof, in a plan or 3D. Each comes with its roof, a front wall and cheek
-  walls down to the main roof. Its roof joins the main roof flush: it reaches back until its top
+  walls down to the main roof, trimmed to its underside so the cheeks follow the slope. Its roof joins the main roof flush: it reaches back until its top
   meets the main roof's and is cut along it, so the two meet in valleys and rain runs off. The
   main roof is cut open below the dormer, inside its walls. Windows fit the dormer's front wall.
   Properties change the style, width, front height, slope and overhang; deleting the dormer (or

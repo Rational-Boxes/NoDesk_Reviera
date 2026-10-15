@@ -51,6 +51,7 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(CompoundSetLayers),
         registry.add(CurtainCreate),
         registry.add(CurtainSet),
+        registry.add(CeilingSetShape),
     ];
     for r in results {
         r.expect("architecture commands are valid");
@@ -260,4 +261,17 @@ edit_command!(
     crate::curtain::SetParams,
     (),
     crate::curtain::set
+);
+
+edit_command!(
+    CeilingSetShape,
+    "ceiling.set_shape",
+    "Make ceilings flat or follow the roof",
+    "Makes ceilings `flat`, or `follow_roof`: shaped to the underside of the roof over them (vaulted under \
+     a pitched roof, curved under an arched roof or a dome), piece by piece under its faces; what the roof \
+     does not cover stays flat. The roof is `roof_id`, or by default the roof over each ceiling.",
+    "Ceiling Shape",
+    crate::vaults::SetShapeParams,
+    (),
+    crate::vaults::set_shape
 );
