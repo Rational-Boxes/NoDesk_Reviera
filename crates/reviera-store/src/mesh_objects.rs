@@ -118,7 +118,7 @@ fn collect_refs(v: &AttrValue, out: &mut Vec<u32>) {
 }
 
 /// The type's representation maps written before.
-fn maps_of(ifc: &IfcModel, ty: StepId) -> Result<Vec<StepId>> {
+pub(crate) fn maps_of(ifc: &IfcModel, ty: StepId) -> Result<Vec<StepId>> {
     let mut refs = Vec::new();
     collect_refs(&ifc.attribute(ty, "RepresentationMaps")?, &mut refs);
     Ok(refs.into_iter().map(StepId).collect())
@@ -342,7 +342,21 @@ fn write_copy(
     contexts: geometry::Contexts,
 ) -> Result<()> {
     remove_copy_geometry(ifc, step)?;
-    let p = g.placement;
+    let description = format!("{COPY_TAG}:{sig}");
+    write_mapped(ifc, step, g.placement, map, &description, scale, contexts)
+}
+
+/// Gives `step` a placement and an `IfcMappedItem` body of `map`; `description` marks the
+/// product definition shape.
+pub(crate) fn write_mapped(
+    ifc: &mut IfcModel,
+    step: StepId,
+    p: reviera_core::mesh_objects::Placement,
+    map: StepId,
+    description: &str,
+    scale: f64,
+    contexts: geometry::Contexts,
+) -> Result<()> {
     let location = create(
         ifc,
         "IfcCartesianPoint",
@@ -419,10 +433,7 @@ fn write_copy(
         ifc,
         "IfcProductDefinitionShape",
         &[
-            (
-                "Description",
-                AttrValue::String(format!("{COPY_TAG}:{sig}")),
-            ),
+            ("Description", AttrValue::String(description.to_owned())),
             ("Representations", AttrValue::List(vec![r(rep)])),
         ],
     )?;

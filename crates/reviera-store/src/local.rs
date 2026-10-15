@@ -125,13 +125,9 @@ impl LocalProject {
         objects.sort_by_key(|e| e.id);
         // The openings a shaft derives for each host it cuts are written from the shaft; they
         // are not elements of their own.
-        // So are a curtain wall's panels and mullions.
-        objects.retain(|e| {
-            !matches!(
-                e.class.as_str(),
-                "IfcOpeningElement" | "IfcPlate" | "IfcMember"
-            ) || !is_derived(&ifc, e.id)
-        });
+        // So are a curtain wall's panels and mullions, and a path array's members (of any class
+        // a component may have; only elements carry the mark).
+        objects.retain(|e| !is_derived(&ifc, e.id));
         let length_scale = geometry::length_scale(&ifc)?;
         let (mut values, sets) = params::load(&ifc, &objects, length_scale)?;
         let types: HashSet<StepId> = ifc
@@ -542,6 +538,10 @@ impl LocalProject {
             if recipe_kind == Some(reviera_core::mesh_objects::RECIPE) {
                 crate::mesh_objects::remove_copy_geometry(&mut self.ifc, step)?;
             }
+            if recipe_kind == Some(reviera_core::path_arrays::RECIPE) {
+                crate::path_arrays::remove_members(&mut self.ifc, step)?;
+                crate::mesh_objects::remove_copy_geometry(&mut self.ifc, step)?;
+            }
             if recipe_kind == Some(reviera_core::mesh_objects::TYPE_RECIPE) {
                 crate::mesh_objects::remove_type_geometry(&mut self.ifc, step)?;
             }
@@ -705,6 +705,13 @@ impl LocalProject {
             self.write_skylights(doc)?;
             let owner_history = self.new_owner_history()?;
             crate::mesh_objects::write_mesh_objects(
+                &mut self.ifc,
+                doc,
+                &self.steps,
+                owner_history,
+                self.length_scale,
+            )?;
+            crate::path_arrays::write_path_arrays(
                 &mut self.ifc,
                 doc,
                 &self.steps,
@@ -2146,7 +2153,9 @@ const DERIVED_OPENING: &str = "rxd:shaft";
 /// curtain wall's part.
 fn is_derived(ifc: &IfcModel, id: StepId) -> bool {
     matches!(ifc.attribute(id, "Description"), Ok(AttrValue::String(d))
-        if d.starts_with(DERIVED_OPENING) || d == crate::curtains::PART_TAG)
+        if d.starts_with(DERIVED_OPENING)
+            || d == crate::curtains::PART_TAG
+            || d == crate::path_arrays::PART_TAG)
 }
 
 /// The lowest and highest points of a floor's, ceiling's or roof's body.

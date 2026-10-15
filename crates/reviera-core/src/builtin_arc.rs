@@ -78,6 +78,12 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(LibraryDeleteItems),
         registry.add(LibraryRestoreItems),
         registry.add(ComponentPlace),
+        registry.add(ArrayAlongPath),
+        registry.add(ArraySet),
+        registry.add(ArrayExcludeMember),
+        registry.add(ArrayRestoreMember),
+        registry.add(ArrayMembers),
+        registry.add(ArrayUnarray),
     ];
     for r in results {
         r.expect("architecture commands are valid");
@@ -620,4 +626,80 @@ edit_command!(
     crate::library::PlaceParams,
     Vec<ElementId>,
     crate::library::place
+);
+
+edit_command!(
+    ArrayAlongPath,
+    "array.along_path",
+    "Array along a path",
+    "Array along Path (ARC-MOD-033): repeats components (custom object types, or library items loaded as \
+     types; several with weights for a random choice) along a path: drawn `points` (polyline, closed or \
+     not; `shape` arc through three points; spline through points), a wall or grid `element`, or a floor's, \
+     ceiling's or deck's `host_edges` (copies on its top). `distribution`: number, fixed distance (with \
+     `justify`), max or min spacing; `counts` per side with corners. `corners`: through, every_corner, \
+     skip. `orientation`: follow, fixed, outward, inward, plus `rotation_offset`. `variation`: seeded \
+     random rotation and scale ranges and jitter across the path. The array stays parametric: its \
+     copies regenerate when the path element, count or component changes. Returns the array.",
+    "Array along Path",
+    [Effect::Edit, Effect::FileRead],
+    crate::path_arrays::AlongPathParams,
+    ElementId,
+    crate::path_arrays::along_path
+);
+
+edit_command!(
+    ArraySet,
+    "array.set",
+    "Change a path array",
+    "Changes a path array's components, path, level, offset, distribution, ends, insets, corners, \
+     orientation, variation or height; `reseed` picks a new random arrangement. Omitted values are kept.",
+    "Edit Array",
+    [Effect::Edit, Effect::FileRead],
+    crate::path_arrays::SetParams,
+    (),
+    crate::path_arrays::set
+);
+
+edit_command!(
+    ArrayExcludeMember,
+    "array.exclude_member",
+    "Exclude an array member",
+    "Leaves a gap at a path array member's place (by index), for an entrance between two columns, say.",
+    "Exclude Member",
+    crate::path_arrays::MemberParams,
+    (),
+    crate::path_arrays::exclude_member
+);
+
+edit_command!(
+    ArrayRestoreMember,
+    "array.restore_member",
+    "Restore array members",
+    "Restores an excluded path array member (by index), or all of them (`\"all\"`).",
+    "Restore Member",
+    crate::path_arrays::MemberParams,
+    (),
+    crate::path_arrays::restore_member
+);
+
+read_command!(
+    ArrayMembers,
+    "array.members",
+    "List a path array's members",
+    "A path array's members as they are now: index, point, height, rotation, scale and component type.",
+    crate::path_arrays::ArrayParams,
+    Vec<crate::path_arrays::Member>,
+    crate::path_arrays::list_members
+);
+
+edit_command!(
+    ArrayUnarray,
+    "array.unarray",
+    "Unarray",
+    "Turns a path array's members into independent custom objects where they stand, and deletes the \
+     array. Returns the new objects.",
+    "Unarray",
+    crate::path_arrays::ArrayParams,
+    Vec<ElementId>,
+    crate::path_arrays::unarray
 );

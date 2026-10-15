@@ -82,7 +82,9 @@ impl Gui {
 
     pub(crate) fn skylight_click(&mut self, x: i32, y: i32) {
         let frame = self.frame;
-        let Some(t) = self.skylight_tool.clone() else { return };
+        let Some(t) = self.skylight_tool.clone() else {
+            return;
+        };
         let Some((roof, point)) = self.roof_under(x, y) else {
             return frame.set_status_text("Skylight: click on a roof", 0);
         };
@@ -153,10 +155,22 @@ impl Gui {
         let rows = [
             ("Width", "sk_width", self.format_length(s.width)),
             ("Length", "sk_length", self.format_length(s.length)),
-            ("Rotation", "sk_rotation", format!("{:.1}°", s.rotation.to_degrees())),
+            (
+                "Rotation",
+                "sk_rotation",
+                format!("{:.1}°", s.rotation.to_degrees()),
+            ),
             ("Curb Height", "sk_curb", self.format_length(s.curb)),
-            ("Glass Slope", "sk_pitch", format!("{:.1}°", s.pitch.to_degrees())),
-            ("Largest Pane", "sk_max_pane", self.format_length(s.max_pane)),
+            (
+                "Glass Slope",
+                "sk_pitch",
+                format!("{:.1}°", s.pitch.to_degrees()),
+            ),
+            (
+                "Largest Pane",
+                "sk_max_pane",
+                self.format_length(s.max_pane),
+            ),
         ];
         for (label, name, value) in rows {
             grid.append(Property::string(label, name, value));
@@ -184,7 +198,10 @@ impl Gui {
         let style_of = |label: &str| SkylightStyle::ALL.into_iter().find(|s| s.label() == label);
         if let Some(row) = property.strip_prefix("skt_") {
             let length = self
-                .run("units.parse", json!({ "text": text, "data_type": "length" }))
+                .run(
+                    "units.parse",
+                    json!({ "text": text, "data_type": "length" }),
+                )
                 .ok()
                 .and_then(|v| v.as_f64())
                 .filter(|v| *v > 0.0);

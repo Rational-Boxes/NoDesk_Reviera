@@ -39,7 +39,9 @@ type LinkHandler = Box<dyn Fn(String)>;
 extern "C" fn link_trampoline(user: *mut c_void, href: *const c_char) {
     // SAFETY: `user` is the handler leaked in `HtmlView::new`; `href` is a C string.
     let handler = unsafe { &*(user as *const LinkHandler) };
-    let href = unsafe { CStr::from_ptr(href) }.to_string_lossy().into_owned();
+    let href = unsafe { CStr::from_ptr(href) }
+        .to_string_lossy()
+        .into_owned();
     handler(href);
 }
 

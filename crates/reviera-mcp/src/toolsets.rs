@@ -51,7 +51,7 @@ pub fn toolset_of(command: &str) -> String {
         | "level" | "grid" | "room" | "ceiling" | "insert" | "sketch" | "dormer" | "railing"
         | "deck" | "site" | "cme" | "host" | "numbering" | "decal" | "spatial" | "building"
         | "assembly" | "part" | "geometry" | "opening" | "column" | "compound" | "curtain"
-        | "ramp" | "measure" | "skylight" | "mesh_object" => "modeling",
+        | "ramp" | "measure" | "skylight" | "mesh_object" | "array" => "modeling",
         "view" | "sheet" | "schedule" | "annotate" | "render" | "walkthrough" | "xr" | "ui"
         | "tag" | "text" | "anno" | "dim" | "viewport" | "section" | "inspect" => "documentation",
         "family" | "family_doc" | "type" | "instance" | "library" | "component" | "formula"

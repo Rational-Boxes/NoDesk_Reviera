@@ -12,6 +12,7 @@ mod local;
 mod materials;
 mod mesh_objects;
 pub mod params;
+mod path_arrays;
 mod psets;
 mod spatial;
 

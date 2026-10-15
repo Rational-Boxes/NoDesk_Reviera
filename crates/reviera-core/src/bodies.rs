@@ -294,6 +294,24 @@ pub fn all(store: &Store) -> Vec<Body> {
     for (id, g) in crate::columns::all(store) {
         push(id, "IfcColumn", g.mesh(), false);
     }
+    // Path arrays (ARC-MOD-033): every member's mesh, per slot, in the array's body.
+    for (id, members) in crate::path_arrays::all(store) {
+        for (_, g) in members {
+            let class = g.ty.category.class();
+            for (slot, mesh) in g.slot_meshes() {
+                let color =
+                    g.ty.slots
+                        .get(slot)
+                        .map_or([0.78, 0.78, 0.78, 1.0], |s| s.color);
+                push(
+                    id,
+                    &format!("{class}:{}", crate::mesh_objects::color_hex(color)),
+                    mesh,
+                    false,
+                );
+            }
+        }
+    }
     // Custom objects (DM-IMP-015): one part per material slot, in its colour.
     for (id, g) in crate::mesh_objects::all(store) {
         let class = g.ty.category.class();

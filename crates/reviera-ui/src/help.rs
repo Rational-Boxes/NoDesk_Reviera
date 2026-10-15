@@ -186,9 +186,14 @@ fn plain_html(html: &str, dark: bool) -> String {
         ""
     };
     let mut body = between("<main>", "</main>");
-    let muted = |inner: &str, size: &str| format!("<font color=\"{}\"{size}>{inner}</font>", c.muted);
+    let muted =
+        |inner: &str, size: &str| format!("<font color=\"{}\"{size}>{inner}</font>", c.muted);
     // Paragraph classes.
-    for (class, size) in [("lead", ""), ("note", " size=\"-1\""), ("see", " size=\"-1\"")] {
+    for (class, size) in [
+        ("lead", ""),
+        ("note", " size=\"-1\""),
+        ("see", " size=\"-1\""),
+    ] {
         let open = format!("<p class=\"{class}\">");
         let mut out = String::new();
         let mut rest = body.as_str();
@@ -203,7 +208,10 @@ fn plain_html(html: &str, dark: bool) -> String {
         body = out;
     }
     // A rule under each section heading.
-    body = body.replace("</h2>", &format!("</h2><hr size=\"1\" color=\"{}\">", c.line));
+    body = body.replace(
+        "</h2>",
+        &format!("</h2><hr size=\"1\" color=\"{}\">", c.line),
+    );
     // Tables: full width, padded; the first cell of a row muted.
     body = body.replace("<table class=\"keys\">", "<table>");
     body = body.replace(
@@ -247,7 +255,10 @@ fn plain_html(html: &str, dark: bool) -> String {
     body = body
         .replace(
             "<pre>",
-            &format!("<table width=\"100%\" cellpadding=\"8\" bgcolor=\"{}\"><tr><td><pre>", c.code),
+            &format!(
+                "<table width=\"100%\" cellpadding=\"8\" bgcolor=\"{}\"><tr><td><pre>",
+                c.code
+            ),
         )
         .replace("</pre>", "</pre></td></tr></table>");
     format!(
@@ -569,8 +580,16 @@ impl Gui {
         match h.view {
             HelpView::Web(v) => v.set_page(&html, "about:blank"),
             HelpView::Html(v) => {
-                let anchor = h.here.anchor.as_deref().map(clean_anchor).unwrap_or_default();
-                v.set_page(&plain_html(&html, wxdragon::appearance::is_system_dark_mode()), &anchor);
+                let anchor = h
+                    .here
+                    .anchor
+                    .as_deref()
+                    .map(clean_anchor)
+                    .unwrap_or_default();
+                v.set_page(
+                    &plain_html(&html, wxdragon::appearance::is_system_dark_mode()),
+                    &anchor,
+                );
             }
         }
     }

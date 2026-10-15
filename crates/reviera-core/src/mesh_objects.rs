@@ -264,6 +264,13 @@ pub struct MeshObjectRecipe {
     /// Mirrored across its local x axis (before turning).
     #[serde(default)]
     pub mirror: bool,
+    /// Its own uniform scale, times its type's.
+    #[serde(default = "one", skip_serializing_if = "is_one")]
+    pub scale: f64,
+}
+
+fn is_one(v: &f64) -> bool {
+    *v == 1.0
 }
 
 pub fn mesh_object_recipe(e: &Element) -> Option<MeshObjectRecipe> {
@@ -635,6 +642,19 @@ impl MeshObjectGeometry {
     }
 }
 
+/// A custom object type (by GlobalId) and its decoded mesh.
+pub fn type_geometry(
+    store: &Store,
+    guid: &str,
+) -> Result<(ElementId, MeshObjectType, Arc<Decoded>)> {
+    let id = find(store, guid)
+        .ok_or_else(|| Error::new("mesh_object.no_type", "the component type no longer exists"))?;
+    let ty = mesh_object_type(store.get(id).expect("found"))
+        .ok_or_else(|| Error::new("mesh_object.not_a_type", "not a custom object type"))?;
+    let mesh = ty.mesh.decode()?;
+    Ok((id, ty, mesh))
+}
+
 /// A copy as it is now.
 pub fn regenerate(store: &Store, e: &Element) -> Result<MeshObjectGeometry> {
     let r = mesh_object_recipe(e)
@@ -653,7 +673,7 @@ pub fn regenerate(store: &Store, e: &Element) -> Result<MeshObjectGeometry> {
             origin: [r.point[0], r.point[1], z],
             rotation: r.rotation,
             mirror: r.mirror,
-            scale: ty.scale,
+            scale: ty.scale * r.scale,
         },
         ty,
         mesh,
@@ -876,6 +896,9 @@ pub struct PlaceParams {
     pub rotation: f64,
     #[serde(default)]
     pub mirror: bool,
+    /// Its own uniform scale (times the type's).
+    #[serde(default = "one")]
+    pub scale: f64,
 }
 
 fn level_guid(store: &Store, r: &ElementRef) -> Result<String> {
@@ -903,7 +926,14 @@ pub(crate) fn place(txn: &mut crate::txn::Transaction<'_>, p: PlaceParams) -> Re
         offset: p.offset,
         rotation: p.rotation,
         mirror: p.mirror,
+        scale: p.scale,
     };
+    if !(p.scale > 0.0 && p.scale.is_finite()) {
+        return Err(Error::new(
+            "mesh_object.bad_scale",
+            "the scale must be above zero",
+        ));
+    }
     let type_guid = store.get(type_id).expect("resolved").guid().to_string();
     let id = txn.create(
         NewElement::new(ty.category.class())
@@ -930,6 +960,7 @@ pub struct SetParams {
     #[schemars(extend("x-reviera-data-type" = "angle"))]
     pub rotation: Option<f64>,
     pub mirror: Option<bool>,
+    pub scale: Option<f64>,
 }
 
 fn copies(store: &Store, refs: &[ElementRef]) -> Result<Vec<(ElementId, MeshObjectRecipe)>> {
@@ -983,6 +1014,15 @@ pub(crate) fn set(txn: &mut crate::txn::Transaction<'_>, p: SetParams) -> Result
         }
         if let Some(v) = p.mirror {
             r.mirror = v;
+        }
+        if let Some(v) = p.scale {
+            if !(v > 0.0 && v.is_finite()) {
+                return Err(Error::new(
+                    "mesh_object.bad_scale",
+                    "the scale must be above zero",
+                ));
+            }
+            r.scale = v;
         }
         write(txn, id, &r)?;
     }

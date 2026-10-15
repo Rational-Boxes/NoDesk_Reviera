@@ -1015,6 +1015,7 @@ pub(crate) fn place(
                     offset: p.offset,
                     rotation: p.rotation,
                     mirror: p.mirror,
+                    scale: 1.0,
                 },
             )
         })

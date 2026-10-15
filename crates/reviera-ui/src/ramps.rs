@@ -136,7 +136,9 @@ impl Gui {
     }
 
     fn ramp_prompt(&mut self) {
-        let Some(t) = self.ramp_tool.clone() else { return };
+        let Some(t) = self.ramp_tool.clone() else {
+            return;
+        };
         let mut drawn: f64 = t.points.windows(2).map(|w| len(w[0], w[1])).sum();
         if let (Some(c), Some(last)) = (t.cursor, t.points.last()) {
             drawn += len(*last, c);
@@ -155,7 +157,10 @@ impl Gui {
     }
 
     pub(crate) fn ramp_motion(&mut self, x: i32, y: i32) {
-        let from = self.ramp_tool.as_ref().and_then(|t| t.points.last().copied());
+        let from = self
+            .ramp_tool
+            .as_ref()
+            .and_then(|t| t.points.last().copied());
         let p = self.chain_point(x, y, from);
         let Some(t) = &mut self.ramp_tool else { return };
         t.cursor = p;
@@ -232,7 +237,10 @@ impl Gui {
         grid.append(Property::category("Ramp tool", "c_ramptool"));
         let (h, w) = (self.format_length(t.height), self.format_length(t.width));
         grid.append(Property::string("Height", "rpt_height", h));
-        grid.set_help_string("rpt_height", "How high the ramp climbs from the plan's level");
+        grid.set_help_string(
+            "rpt_height",
+            "How high the ramp climbs from the plan's level",
+        );
         grid.append(Property::string("Width", "rpt_width", w));
         true
     }
@@ -261,13 +269,21 @@ impl Gui {
             grid.set_property_read_only("rp_needed", true);
             grid.append(Property::category("Type", "c_ramp_type"));
             let rows = [
-                ("Maximum Slope 1: (type)", "rpt_max_slope", format!("{}", g.ty.max_slope)),
+                (
+                    "Maximum Slope 1: (type)",
+                    "rpt_max_slope",
+                    format!("{}", g.ty.max_slope),
+                ),
                 (
                     "Maximum Incline Length (type)",
                     "rpt_max_incline",
                     self.format_length(g.ty.max_incline_length),
                 ),
-                ("Thickness (type)", "rpt_thickness", self.format_length(g.ty.thickness)),
+                (
+                    "Thickness (type)",
+                    "rpt_thickness",
+                    self.format_length(g.ty.thickness),
+                ),
             ];
             for (label, name, value) in rows {
                 grid.append(Property::string(label, name, value));
@@ -346,11 +362,17 @@ impl Gui {
         let result: Option<Result<(), String>> = match property {
             "rp_base" => level(&text).map(|l| set(self, json!({ "base_level": l }))),
             "rp_base_off" => Some(set(self, json!({ "base_offset": text }))),
-            "rp_top" if text == "Unconnected" => {
-                Some(set(self, json!({ "top_constraint": { "unconnected": 0.6 } })))
+            "rp_top" if text == "Unconnected" => Some(set(
+                self,
+                json!({ "top_constraint": { "unconnected": 0.6 } }),
+            )),
+            "rp_top" => {
+                level(&text).map(|l| set(self, json!({ "top_constraint": { "level": l } })))
             }
-            "rp_top" => level(&text).map(|l| set(self, json!({ "top_constraint": { "level": l } }))),
-            "rp_height" => Some(set(self, json!({ "top_constraint": { "unconnected": text } }))),
+            "rp_height" => Some(set(
+                self,
+                json!({ "top_constraint": { "unconnected": text } }),
+            )),
             "rp_top_off" => Some(set(self, json!({ "top_offset": text }))),
             "rp_width" => Some(set(self, json!({ "width": text }))),
             "rpt_max_slope" => type_param(self, "max_slope", json!(text)),
@@ -392,13 +414,17 @@ impl Gui {
     }
 
     fn measure_prompt(&mut self) {
-        let Some(t) = self.measure_tool.clone() else { return };
+        let Some(t) = self.measure_tool.clone() else {
+            return;
+        };
         let mut pts = t.points.clone();
         if let (Some(c), false) = (t.cursor, t.points.is_empty()) {
             pts.push(c);
         }
         if pts.len() < 2 {
-            return self.frame.set_status_text("Measure: click the first point", 0);
+            return self
+                .frame
+                .set_status_text("Measure: click the first point", 0);
         }
         let (a, b) = (pts[pts.len() - 2], pts[pts.len() - 1]);
         let seg = len(a, b);
@@ -418,9 +444,14 @@ impl Gui {
     }
 
     pub(crate) fn measure_motion(&mut self, x: i32, y: i32) {
-        let from = self.measure_tool.as_ref().and_then(|t| t.points.last().copied());
+        let from = self
+            .measure_tool
+            .as_ref()
+            .and_then(|t| t.points.last().copied());
         let p = self.chain_point(x, y, from);
-        let Some(t) = &mut self.measure_tool else { return };
+        let Some(t) = &mut self.measure_tool else {
+            return;
+        };
         t.cursor = p;
         let (points, cursor) = (t.points.clone(), t.cursor);
         self.chain_lines(&points, cursor);
@@ -450,7 +481,8 @@ impl Gui {
             if let Some(v) = self.viewport() {
                 v.set_overlay_lines(&[]);
             }
-            self.frame.set_status_text("Measure: click the first point", 0);
+            self.frame
+                .set_status_text("Measure: click the first point", 0);
         }
         true
     }

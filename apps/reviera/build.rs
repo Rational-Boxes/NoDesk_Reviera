@@ -20,7 +20,8 @@ fn main() {
     if std::env::var("CARGO_CFG_TARGET_OS").as_deref() != Ok("windows") {
         return;
     }
-    let dir = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").expect("manifest dir")).join("windows");
+    let dir =
+        PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").expect("manifest dir")).join("windows");
     let out = PathBuf::from(std::env::var("OUT_DIR").expect("OUT_DIR"));
     let rc = dir.join("reviera.rc");
     let compiled = if std::env::var("CARGO_CFG_TARGET_ENV").as_deref() == Ok("msvc") {
@@ -43,7 +44,10 @@ fn main() {
                 "windres".into()
             } else {
                 // x86_64-pc-windows-gnu → x86_64-w64-mingw32-windres
-                format!("{}-w64-mingw32-windres", target.split('-').next().unwrap_or("x86_64"))
+                format!(
+                    "{}-w64-mingw32-windres",
+                    target.split('-').next().unwrap_or("x86_64")
+                )
             }
         });
         let ok = Command::new(&tool)

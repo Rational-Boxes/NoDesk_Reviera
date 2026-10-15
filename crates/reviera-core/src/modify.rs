@@ -283,6 +283,15 @@ pub(crate) fn transform(
             };
             crate::curtain::transform(txn, target, &|p| x.point(p), x.reflects(), dz)?;
             out.push(target);
+        } else if crate::path_arrays::path_array_recipe(e).is_some() {
+            let target = if copy { txn.create(copied(e))? } else { id };
+            let (turn, mirror, dz) = match x {
+                Xform::Translate(v) => (0.0, None, v[2]),
+                Xform::Rotate { angle, .. } => (angle, None, 0.0),
+                Xform::Mirror { a, b } => (0.0, Some((b[1] - a[1]).atan2(b[0] - a[0])), 0.0),
+            };
+            crate::path_arrays::transform(txn, target, &|p| x.point(p), turn, mirror, dz)?;
+            out.push(target);
         } else if crate::mesh_objects::mesh_object_recipe(e).is_some() {
             let target = if copy { txn.create(copied(e))? } else { id };
             let (turn, mirror, dz) = match x {
