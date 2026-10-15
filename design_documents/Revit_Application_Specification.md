@@ -5761,7 +5761,7 @@ DN25,25,37.5,22,Copper
   - a 3D file as it is, such as OBJ, STL, PLY, glTF/GLB, 3MF or OFF;
   - an IFC file: a family package (§2.8.14), a fragment (DM-LIB-003), or any IFC file.
 
-  Stamping a mesh file the first time imports it into the project as a custom object type (DM-IMP-015), with its sidecar's or folder's import options. Later stamps reuse that type.
+  Stamping a mesh file the first time imports it into the project as a custom object type (DM-IMP-015), with the import options from its manifest entry or folder. Later stamps reuse that type.
 - In a project, a stamped type records its library source and the item's content hash in `families/index`, so the Library panel can tell when it is out of date.
 - Pinned and recent stamps are per-user settings, not model data.
 
@@ -5825,10 +5825,10 @@ The Stamp tool itself is the UI over `stamp.place`.
   - **Written by Reviera** (Add to Library, Import to Library): a standalone IFC4 file written as Save Group writes it (ARC-GRP-001). Its RXD carries the group template, the relative levels, the base point and the list of dropped outside references. For Import to Library, it also carries the source file's name and SHA-256.
   - **Any other IFC file** placed in a library folder is a fragment as it is. Stamping it brings its elements in as an IFC merge does (DM-IMP-001):
     - its storeys become relative levels by elevation;
-    - its base point is the bottom-centre, unless its sidecar names one;
+    - its base point is the bottom-centre, unless its manifest entry names one;
     - its types become variants when it has several.
   - Either way, the file opens in other IFC tools as a small model.
-- An item's variants are the types or group types in its file, or several files grouped by their sidecars.
+- An item's variants are the types or group types in its file, or several files grouped as variants in the manifest.
 - In a project, a group type stamped from the library records the item's GUID, variant and content hash in `families/index` (DM-LIB-001), so the Library panel can offer updates.
 
 **Commands.**
@@ -5853,23 +5853,40 @@ The Stamp tool itself is the UI over `stamp.place`.
 **Purpose.** Keep thousands of imported objects and model fragments in order. A library is a tree of nested folders of any depth. It can be browsed, searched, reorganised and shared like a well-kept file system. *(Owner requirement, 2026-10-14: "the library needs to support nested hierarchies to manage large sets of imported and model fragments".)*
 
 **Behaviour & rules.**
-- **Nested folders.** Under each source (DM-LIB-001), items live in folders nested to any depth, for example `Furniture › Office › Chairs › Task chairs`. The tree in the Library panel shows each folder with the count of items in it and below it.
+- **A library is a folder that is opened.** *(Owner clarification, 2026-10-14.)*
+  - **Library › Open Library** (`library.open`) opens any folder on a local disk, a network share or WebDAV as a library, the way a project file is opened.
+  - Its root holds one JSON manifest, `reviera-library.json`; nothing else in the folder is Reviera's own.
+  - Opening a folder that has no manifest offers to create one, or to browse it read-only with defaults.
+  - Open libraries are the sources of the Library panel (DM-LIB-001), are remembered per user, and reopen at start-up.
+  - **Library › New Library** creates a folder with an empty manifest.
+- **Nested folders.** Within a library, items live in folders nested to any depth, for example `Furniture › Office › Chairs › Task chairs`. The tree in the Library panel shows each folder with the count of items in it and below it.
   - Folders are created, renamed, moved and deleted in the panel.
   - Items and folders are moved by drag and drop, or with Cut and Paste.
   - Deleting a folder that holds items asks for confirmation and moves them to the source's *Deleted items* folder, from which they can be restored for 30 days.
-- **The library is a set of physical folders of 3D files.** *(Owner clarification, 2026-10-14.)*
-  - A source is a directory tree on a local disk, a network share or WebDAV. Its sub-directories are the library's folders.
+- **A library is a set of physical folders of 3D files.** *(Owner clarification, 2026-10-14.)*
+  - The library's sub-directories are its folders.
   - Its items are ordinary 3D files, read where they are:
     - OBJ, with its MTL and texture files beside it;
     - STL, PLY, glTF/GLB, 3MF and OFF;
     - IFC files, whether whole models or fragments, written by Reviera or any other tool.
   - Reviera converts nothing and copies nothing into a private store. A file dropped into a library folder by any means is an item after the next refresh. The same folders can be kept in git, synced, or used by other programs.
-- **Sidecar files (optional).** A sidecar beside an item, named `<file>.meta.json`, holds:
-  - tags, description and category;
-  - import options: units, up axis, insertion point and clean-up (DM-IMP-015);
-  - variant grouping.
+- **The manifest** (`reviera-library.json`, in the library's root) is a JSON object:
+  - `format`: `"reviera-library"`, and `version`: 1;
+  - `id` (a UUID, so stamped types can find the library after it is moved or renamed), `name`, `description`, `author`, `licence` (SPDX) and `homepage`;
+  - `defaults`: import options for mesh files (units, up axis, insertion point, clean-up, DM-IMP-015), the default category and the default stamp mode;
+  - `folders`: settings per folder, keyed by the folder's path relative to the root. A folder inherits its parent's settings, and the entry overrides only what it names: category, import options, stamp mode, tags and thumbnail;
+  - `items`: details per item, keyed by the file's path relative to the root:
+    - name, tags, description and category;
+    - import options, and the base point;
+    - its variants (other files, or types within its file);
+    - its SHA-256 and stable item GUID.
+  - `smart_folders`: saved searches shared by everyone using the library.
 
-  A folder's `.meta.json` holds its settings. Items without a sidecar use their folder's settings, then the format's defaults. Reviera writes sidecars only when the user edits an item's details in a writable folder.
+  Every key is optional except `format` and `version`. Files with no entry use their folder's settings, then the format's defaults, so a manifest of only `format`, `version`, `id` and `name` makes any folder of 3D files a working library.
+- **Writing the manifest.** Reviera updates the manifest when the user edits details, moves or renames items or folders, or adds files through the panel. Each update is an atomic replace, with keys in a stable sorted order, so the manifest diffs and merges cleanly in git. Files added or moved outside Reviera are reconciled on refresh:
+  - new files get default details;
+  - a moved file keeps its entry when its SHA-256 matches;
+  - entries for missing files are listed and can be cleaned up.
 - **Thumbnails** are rendered by Reviera and kept in the per-user cache, keyed by the file's hash, not written into library folders.
 - **Folder settings** (inherited by sub-folders unless overridden):
   - default category;
@@ -5883,7 +5900,7 @@ The Stamp tool itself is the UI over `stamp.place`.
   - files unreadable, with the reason;
   - duplicates, by SHA-256.
 
-  Import options (units, up axis, category) can be set for a whole folder at once; they are saved in the folder's `.meta.json`.
+  Import options (units, up axis, category) can be set for a whole folder at once; they are saved in the manifest's `folders` entry.
 - **Bulk edits.** Several selected items can be moved, tagged, re-categorised or deleted together.
 - **Scale.** Loading is lazy, so the panel stays responsive with large libraries:
   - the tree loads folders as they are expanded;
@@ -5891,13 +5908,14 @@ The Stamp tool itself is the UI over `stamp.place`.
   - the index (DM-LIB-001) covers every folder.
 
   A source of 50,000 items in 2,000 folders opens its tree in under 1 s once indexed, and a search over it returns in under 200 ms.
-- **Organisation libraries (P2).** A remote library's index (DM-LIB-001) carries each item's folder path, so the same tree appears for everyone. Remote libraries are read-only. Items are added through the organisation's own process: a git pull request, or a write-enabled WebDAV folder (DM-FILE-007).
+- **Organisation libraries (P2).** A remote library is the same folder layout served over HTTPS or WebDAV. Its `reviera-library.json` doubles as the index of DM-LIB-001: each item's entry carries its SHA-256, so downloads are verified. The same tree appears for everyone. Remote libraries are read-only. Items are added through the organisation's own process: a git pull request, or a write-enabled WebDAV folder (DM-FILE-007).
 - **Project Library.** The Project Library source lists the types, families and group types already in the open project, in the same tree form: by category, or by the folder they were stamped from.
 
-**Data (storage).** A library is its directories and files; the `.meta.json` sidecars are its only Reviera-specific files, and they are optional. The search index and thumbnails are per-user caches (DM-LIB-001), rebuilt when missing. Smart folders, favourites and pinned stamps are per-user settings. No model data.
+**Data (storage).** A library is its directories and files, plus `reviera-library.json` in its root, Reviera's only file there. The search index and thumbnails are per-user caches (DM-LIB-001), rebuilt when missing. Smart folders, favourites and pinned stamps are per-user settings. No model data.
 
 **Commands.**
-`library.folder.create(source_id, path) -> folder_ref` ·
+`library.open(path) -> library_id` · `library.create(path, name) -> library_id` · `library.close(library_id)` ·
+`library.folder.create(library_id, path) -> folder_ref` ·
 `library.folder.rename(folder_ref, name)` ·
 `library.folder.delete(folder_ref)` ·
 `library.move(item_or_folder_refs[], to_folder_ref)` ·
@@ -5915,6 +5933,8 @@ The Stamp tool itself is the UI over `stamp.place`.
 - [ ] A smart folder *Fragments over 2 levels* lists every matching fragment across all sources.
 - [ ] A folder added to the library directory by a file manager appears in the panel after Refresh.
 - [ ] A deleted folder's items can be restored from *Deleted items* the next day.
+- [ ] Library › Open Library on a folder of 3D files with no manifest offers to create one; the created `reviera-library.json` holds only `format`, `version`, `id` and `name`, and every file in the folder is usable.
+- [ ] Moving a library folder to another disk and opening it there keeps every item's details, and stamped types in projects still find the library by its `id`.
 
 ---
 
@@ -8315,7 +8335,7 @@ All commands defined in this chapter. Every command in this table is also a Lua 
 | `library.add_variant` | item_ref, element_ids[], variant_name | variant_ref | No | DM-LIB-003 |
 | `library.import_ifc` | path, folder, filter?, name? | item_ref | No | DM-LIB-003 |
 | `library.inspect` | item_ref | item_report | No | DM-LIB-003 |
-| `library.folder.create` | source_id, path | folder_ref | No | DM-LIB-004 |
+| `library.folder.create` | library_id, path | folder_ref | No | DM-LIB-004 |
 | `library.folder.rename` | folder_ref, name | — | No | DM-LIB-004 |
 | `library.folder.delete` | folder_ref | — | No | DM-LIB-004 |
 | `library.move` | item_or_folder_refs[], to_folder_ref | — | No | DM-LIB-004 |
@@ -8324,6 +8344,9 @@ All commands defined in this chapter. Every command in this table is also a Lua 
 | `library.set_meta` | item_or_folder_refs[], meta | — | No | DM-LIB-004 |
 | `library.restore_deleted` | item_refs[] | — | No | DM-LIB-004 |
 | `library.copy_folder` | path, to_folder_ref, options? | job_id | No | DM-LIB-004 |
+| `library.open` | path | library_id | No | DM-LIB-004 |
+| `library.create` | path, name | library_id | No | DM-LIB-004 |
+| `library.close` | library_id | — | No | DM-LIB-004 |
 | `param.definition` | param_ref | definition | No | DM-PARAM-002 |
 | `param.list` | category?, element_id? | definition[] | No | DM-PARAM-002 |
 | `param.set_ifc_home` | param_ref, category?, pset_name, property_name | — | Yes | DM-PARAM-002 |
@@ -26502,14 +26525,17 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `library.add_item` | 2 | element_or_type_id, library?, name?, tags? | item_ref | No | DM-LIB-002 |
 | `library.add_selection` | 2 | element_ids[], kind: "fragment"\|"object", name, folder?, base_point?, include_hosts?, include_rooms?, tags? | item_ref | No | DM-LIB-003 |
 | `library.add_variant` | 2 | item_ref, element_ids[], variant_name | variant_ref | No | DM-LIB-003 |
+| `library.close` | 2 | library_id | — | No | DM-LIB-004 |
 | `library.copy_folder` | 2 | path, to_folder_ref, options? | job_id | No | DM-LIB-004 |
-| `library.folder.create` | 2 | source_id, path | folder_ref | No | DM-LIB-004 |
+| `library.create` | 2 | path, name | library_id | No | DM-LIB-004 |
+| `library.folder.create` | 2 | library_id, path | folder_ref | No | DM-LIB-004 |
 | `library.folder.delete` | 2 | folder_ref | — | No | DM-LIB-004 |
 | `library.folder.rename` | 2 | folder_ref, name | — | No | DM-LIB-004 |
 | `library.import_ifc` | 2 | path, folder, filter?, name? | item_ref | No | DM-LIB-003 |
 | `library.inspect` | 2 | item_ref | item_report | No | DM-LIB-003 |
 | `library.list` | 2 | folder_ref, recursive?, offset?, limit? | {folders[], items[]} | No | DM-LIB-004 |
 | `library.move` | 2 | item_or_folder_refs[], to_folder_ref | — | No | DM-LIB-004 |
+| `library.open` | 2 | path | library_id | No | DM-LIB-004 |
 | `library.restore_deleted` | 2 | item_refs[] | — | No | DM-LIB-004 |
 | `library.set_meta` | 2 | item_or_folder_refs[], meta | — | No | DM-LIB-004 |
 | `library.smart_folder.save` | 2 | name, query | smart_folder_id | No | DM-LIB-004 |

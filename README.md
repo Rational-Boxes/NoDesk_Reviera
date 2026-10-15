@@ -543,7 +543,8 @@ nearest gaps in what is built:
   hosted elements and rooms) or part of an external IFC file added to the library as a fragment,
   with variants, multi-level fragments and type merging when placed. A library is a physical tree
   of folders of ordinary 3D files (OBJ, STL, PLY, glTF, 3MF, OFF and IFC fragments) read where they
-  are, with optional `.meta.json` sidecars, smart folders and drag-and-drop reorganising.
+  are. A library is a folder that is opened, with one JSON manifest (`reviera-library.json`) in
+  its root, and has smart folders and drag-and-drop reorganising.
   Specified; not built yet.
 - **Stamps** (DM-LIB-002): any library object, family type or model fragment picked up as a stamp
   from the Library panel's Stamps strip (or Alt+click on a placed copy), inserting a copy at each
