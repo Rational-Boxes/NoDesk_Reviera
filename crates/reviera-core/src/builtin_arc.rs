@@ -11,7 +11,7 @@ use crate::id::ElementId;
 
 /// A command that edits the model through one function of a transaction.
 macro_rules! edit_command {
-    ($ty:ident, $name:literal, $summary:literal, $desc:literal, $txn:literal, $params:ty, $out:ty, $f:expr) => {
+    ($ty:ident, $name:literal, $summary:literal, $desc:literal, $txn:literal, [$($eff:expr),*], $params:ty, $out:ty, $f:expr) => {
         #[derive(Debug)]
         struct $ty;
 
@@ -23,7 +23,7 @@ macro_rules! edit_command {
                 version: 1,
                 summary: $summary,
                 description: $desc,
-                effects: &[Effect::Edit],
+                effects: &[$($eff),*],
                 transaction_name: $txn,
             };
 
@@ -32,6 +32,9 @@ macro_rules! edit_command {
                 f(cx.edit()?, p)
             }
         }
+    };
+    ($ty:ident, $name:literal, $summary:literal, $desc:literal, $txn:literal, $params:ty, $out:ty, $f:expr) => {
+        edit_command!($ty, $name, $summary, $desc, $txn, [Effect::Edit], $params, $out, $f);
     };
 }
 
@@ -66,6 +69,15 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(MeshObjectSet),
         registry.add(MeshObjectSetType),
         registry.add(MeshObjectTypes),
+        registry.add(LibraryCreate),
+        registry.add(LibraryOpen),
+        registry.add(LibraryList),
+        registry.add(LibraryImportFiles),
+        registry.add(LibraryGetMeta),
+        registry.add(LibrarySetMeta),
+        registry.add(LibraryDeleteItems),
+        registry.add(LibraryRestoreItems),
+        registry.add(ComponentPlace),
     ];
     for r in results {
         r.expect("architecture commands are valid");
@@ -319,7 +331,7 @@ edit_command!(
 
 /// A read-only command of a pure function.
 macro_rules! read_command {
-    ($ty:ident, $name:literal, $summary:literal, $desc:literal, $params:ty, $out:ty, $f:expr) => {
+    ($ty:ident, $name:literal, $summary:literal, $desc:literal, [$($eff:expr),*], $params:ty, $out:ty, $f:expr) => {
         #[derive(Debug)]
         struct $ty;
 
@@ -331,7 +343,7 @@ macro_rules! read_command {
                 version: 1,
                 summary: $summary,
                 description: $desc,
-                effects: &[Effect::Read],
+                effects: &[$($eff),*],
                 transaction_name: "",
             };
 
@@ -340,6 +352,9 @@ macro_rules! read_command {
                 f(cx.store(), p)
             }
         }
+    };
+    ($ty:ident, $name:literal, $summary:literal, $desc:literal, $params:ty, $out:ty, $f:expr) => {
+        read_command!($ty, $name, $summary, $desc, [Effect::Read], $params, $out, $f);
     };
 }
 
@@ -409,6 +424,7 @@ read_command!(
      insertion point, clean-up) and reports what it holds without importing it (DM-IMP-015): format, \
      triangles, vertices, materials, its size in metres, the units and up axis used and whether the file \
      stated them, open and non-manifold edges and whether it is a closed solid.",
+    [Effect::Read, Effect::FileRead],
     crate::mesh_objects::InspectParams,
     crate::mesh_objects::Report,
     crate::mesh_objects::inspect
@@ -425,6 +441,7 @@ edit_command!(
      1,000,000 triangles need `allow_large`; above 5,000,000 they are refused. Returns the type; place \
      copies with mesh_object.place.",
     "Import Object",
+    [Effect::Edit, Effect::FileRead],
     crate::mesh_objects::ImportParams,
     ElementId,
     crate::mesh_objects::import
@@ -437,6 +454,7 @@ edit_command!(
     "Re-reads a custom object type's mesh from its source file, or from `path`, with its own or new \
      import `options`. Every copy changes; slot colours are kept where slot names still match.",
     "Reload from File",
+    [Effect::Edit, Effect::FileRead],
     crate::mesh_objects::ReloadParams,
     (),
     crate::mesh_objects::reload
@@ -486,4 +504,120 @@ read_command!(
     crate::mesh_objects::TypesParams,
     Vec<crate::mesh_objects::TypeInfo>,
     crate::mesh_objects::list_types
+);
+
+read_command!(
+    LibraryCreate,
+    "library.create",
+    "Make a Component Library",
+    "Makes a Component Library (DM-LIB-004) at `path`: the folder (made when missing) with a \
+     `reviera-library.json` manifest in its root. A folder that already holds 3D files becomes a library \
+     as it is; a manifest already there is kept. Returns the library's summary.",
+    [Effect::FileRead, Effect::FileWrite],
+    crate::library::CreateParams,
+    crate::library::LibraryInfo,
+    crate::library::create
+);
+
+read_command!(
+    LibraryOpen,
+    "library.open",
+    "Open a Component Library",
+    "Opens the Component Library at `path` (a folder with a reviera-library.json): its id, name and item \
+     count. A folder without a manifest is refused (make one with library.create).",
+    [Effect::FileRead],
+    crate::library::OpenParams,
+    crate::library::LibraryInfo,
+    crate::library::open_library
+);
+
+read_command!(
+    LibraryList,
+    "library.list",
+    "List a library folder",
+    "A Component Library folder's sub-folders (with how many items are in and below each) and items: \
+     mesh files (objects) and IFC files (fragments), each with its name, category, tags and format from \
+     the manifest or its folder's settings. `recursive` lists every item below the folder.",
+    [Effect::FileRead],
+    crate::library::ListParams,
+    crate::library::Listing,
+    crate::library::list
+);
+
+read_command!(
+    LibraryImportFiles,
+    "library.import_files",
+    "Import files into a library",
+    "Import into Library: copies `files` (OBJ with its MTL and textures, STL, PLY, glTF with its buffers \
+     and images, GLB, IFC) into `folder` of the library and adds their entries to its manifest, with \
+     `details` (name, category, tags, import options, product data). A file whose content is already in \
+     the library is skipped unless `import_duplicates`; a name in use gets a suffix. Returns what was \
+     imported and skipped.",
+    [Effect::FileRead, Effect::FileWrite],
+    crate::library::ImportFilesParams,
+    crate::library::ImportReport,
+    crate::library::import_files
+);
+
+read_command!(
+    LibraryGetMeta,
+    "library.get_meta",
+    "Get a library item's details",
+    "A library item's details from the manifest (what its file's format may not hold) and the settings \
+     it inherits from its folder.",
+    [Effect::FileRead],
+    crate::library::GetMetaParams,
+    crate::library::ItemMeta,
+    crate::library::get_meta
+);
+
+read_command!(
+    LibrarySetMeta,
+    "library.set_meta",
+    "Set library items' details",
+    "Sets items' details in the library's manifest (name, description, category, tags, import options, \
+     product, provenance, properties; null clears one), or a folder's settings (paths ending in /). The \
+     files themselves are not changed.",
+    [Effect::FileRead, Effect::FileWrite],
+    crate::library::SetMetaParams,
+    (),
+    crate::library::set_meta
+);
+
+read_command!(
+    LibraryDeleteItems,
+    "library.delete_items",
+    "Delete library items",
+    "Moves items (and companion files no other item uses) to the library's .deleted folder with their \
+     manifest entries; library.restore_items brings them back.",
+    [Effect::FileRead, Effect::FileWrite],
+    crate::library::DeleteItemsParams,
+    Vec<String>,
+    crate::library::delete_items
+);
+
+read_command!(
+    LibraryRestoreItems,
+    "library.restore_items",
+    "Restore deleted library items",
+    "Brings items deleted with library.delete_items back to where they were, with their details.",
+    [Effect::FileRead, Effect::FileWrite],
+    crate::library::DeleteItemsParams,
+    Vec<String>,
+    crate::library::restore_items
+);
+
+edit_command!(
+    ComponentPlace,
+    "component.place",
+    "Place components",
+    "Place Component: one copy at each of `points` on `level` (with `offset`, `rotation`, `mirror`) of a \
+     custom object type in the project (`type_id`), or of a Component Library item (`library` and \
+     `item`), which is loaded into the project as a type the first time and reused after. Returns the \
+     copies.",
+    "Place Component",
+    [Effect::Edit, Effect::FileRead],
+    crate::library::PlaceParams,
+    Vec<ElementId>,
+    crate::library::place
 );

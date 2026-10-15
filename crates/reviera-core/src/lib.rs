@@ -33,6 +33,7 @@ pub mod id;
 pub mod inserts;
 pub mod inspect;
 pub mod levels;
+pub mod library;
 pub mod measure;
 pub mod mesh_io;
 pub mod mesh_objects;

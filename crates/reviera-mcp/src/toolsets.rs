@@ -54,9 +54,8 @@ pub fn toolset_of(command: &str) -> String {
         | "ramp" | "measure" | "skylight" | "mesh_object" => "modeling",
         "view" | "sheet" | "schedule" | "annotate" | "render" | "walkthrough" | "xr" | "ui"
         | "tag" | "text" | "anno" | "dim" | "viewport" | "section" | "inspect" => "documentation",
-        "family" | "family_doc" | "type" | "instance" | "library" | "formula" | "subcategory" => {
-            "families"
-        }
+        "family" | "family_doc" | "type" | "instance" | "library" | "component" | "formula"
+        | "subcategory" => "families",
         "material" | "object_style" | "line_pattern" | "line_style" | "line_weight"
         | "fill_pattern" | "image" | "objectstyle" | "lineweight" => "materials",
         "project" | "location" | "coordinates" | "position" | "phase" | "standards" | "units"

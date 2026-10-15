@@ -233,6 +233,9 @@ pub struct MeshObjectType {
     pub size: [f64; 3],
     pub triangle_count: usize,
     pub mesh: StoredMesh,
+    /// The Component Library item it was loaded from, if any.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub library: Option<crate::library::LibraryLink>,
 }
 
 fn one() -> f64 {
@@ -786,6 +789,7 @@ fn type_recipe(
         size: prepared.report.size,
         triangle_count: prepared.report.triangles,
         mesh: StoredMesh::encode(&prepared.positions, &prepared.triangles, &prepared.tri_slot),
+        library: None,
     }
 }
 
@@ -842,6 +846,7 @@ pub(crate) fn reload(txn: &mut crate::txn::Transaction<'_>, p: ReloadParams) -> 
     let options = p.options.unwrap_or(old.options);
     let (prepared, source) = read_prepared(Path::new(&path), &options, true)?;
     let mut recipe = type_recipe(&prepared, source, old.category, options, old.scale);
+    recipe.library = old.library.clone();
     for s in &mut recipe.slots {
         if let Some(o) = old.slots.iter().find(|o| o.name == s.name) {
             s.color = o.color;
@@ -1102,6 +1107,22 @@ pub(crate) fn list_types(store: &Store, _: TypesParams) -> Result<Vec<TypeInfo>>
             copies,
         })
         .collect())
+}
+
+/// Records the library item a type was loaded from.
+pub(crate) fn set_library_link(
+    txn: &mut crate::txn::Transaction<'_>,
+    id: ElementId,
+    link: crate::library::LibraryLink,
+) -> Result<()> {
+    let store = txn.store().clone();
+    let mut t = mesh_object_type(store.get(id).expect("exists")).expect("a custom object type");
+    t.library = Some(link);
+    let value = serde_json::to_value(&t).expect("serialises");
+    txn.modify(id, |e| {
+        e.params.insert(RECIPE_KEY.into(), value);
+    })?;
+    Ok(())
 }
 
 /// Moves, turns or mirrors a copy (Move, Copy, Rotate, Mirror). `mirror` is the mirror line's
