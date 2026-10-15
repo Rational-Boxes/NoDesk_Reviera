@@ -85,6 +85,7 @@ pub(crate) const PAGES: &[Page] = &[
     page!("ramps", "Ramps", ARCHITECTURE),
     page!("railings-decks", "Railings and decks", ARCHITECTURE),
     page!("rooms", "Rooms", ARCHITECTURE),
+    page!("massing", "Massing and model by face", ARCHITECTURE),
 ];
 
 /// The page with `slug`.

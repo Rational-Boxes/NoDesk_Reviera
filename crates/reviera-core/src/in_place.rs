@@ -70,6 +70,16 @@ pub enum Shape {
         z: f64,
         closed: bool,
     },
+    /// Stacked closed profiles (as many points each), each at its offset out of the plane; the
+    /// form's own profile is the first (masses, ARC-MASS-001).
+    Loft { profiles: Vec<LoftProfile> },
+}
+
+/// One profile of a loft.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct LoftProfile {
+    pub offset: f64,
+    pub points: Vec<[f64; 2]>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
@@ -88,6 +98,9 @@ pub struct InPlaceRecipe {
     pub kind: String,
     pub category: String,
     pub forms: Vec<Form>,
+    /// The mass face a roof by face was made from (ARC-ROOF-003).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub by_face: Option<crate::masses::FaceRef>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
@@ -279,6 +292,29 @@ pub fn form_mesh(store: &Store, f: &Form) -> Result<Mesh> {
             }
             crate::wall_sweeps::sweep_mitred(path, *closed, *z, &profile)
         }
+        Shape::Loft { profiles } => {
+            if profiles.len() < 2 || profiles.iter().any(|p| p.points.len() != profile.len()) {
+                return Err(Error::new(
+                    "inplace.loft",
+                    "a loft needs two or more profiles with as many points as its first",
+                ));
+            }
+            let mut sorted = profiles.clone();
+            sorted.sort_by(|a, b| a.offset.total_cmp(&b.offset));
+            let rings: Vec<Vec<[f64; 3]>> = sorted
+                .iter()
+                .map(|lp| {
+                    let mut pts = lp.points.clone();
+                    if crate::polygons::area(&pts) < 0.0 {
+                        pts.reverse();
+                    }
+                    pts.iter()
+                        .map(|p| lift(&plane, p[0], p[1], lp.offset))
+                        .collect()
+                })
+                .collect();
+            loft(&rings, true, &profile)
+        }
     })
 }
 
@@ -397,7 +433,7 @@ pub struct FormArg {
     pub void: bool,
 }
 
-fn form(store: &Store, a: FormArg) -> Result<Form> {
+pub(crate) fn form(store: &Store, a: FormArg) -> Result<Form> {
     let plane = if a.plane.given() {
         a.plane.to_ref(store)?
     } else {
@@ -446,6 +482,7 @@ pub(crate) fn create(txn: &mut Transaction<'_>, p: CreateParams) -> Result<Eleme
         kind: RECIPE.into(),
         category,
         forms,
+        by_face: None,
     };
     let id = txn.create(
         NewElement::new(class)
@@ -525,15 +562,26 @@ pub(crate) fn transform(
 ) -> Result<()> {
     let store = txn.store().clone();
     let mut r = recipe(store.get(id).expect("exists")).expect("an in-place element");
-    for f in &mut r.forms {
+    transform_forms(&store, &mut r.forms, point, dz)?;
+    write(txn, id, &r)
+}
+
+/// Carries forms by a plan transformation (each plane made explicit).
+pub(crate) fn transform_forms(
+    store: &Store,
+    forms: &mut [Form],
+    point: &dyn Fn([f64; 2]) -> [f64; 2],
+    dz: f64,
+) -> Result<()> {
+    for f in forms.iter_mut() {
         // Each form's plane becomes an explicit plane carried by the transformation.
-        let plane = crate::work_planes::resolve(&store, &f.plane)?;
+        let plane = crate::work_planes::resolve(store, &f.plane)?;
         let carried = crate::work_planes::WorkPlaneRef::Explicit {
             origin: plane.origin,
             x_dir: plane.x,
             normal: plane.normal,
         };
-        f.plane = crate::work_planes::transform_frame(&store, &carried, point, dz)?;
+        f.plane = crate::work_planes::transform_frame(store, &carried, point, dz)?;
         if let Shape::Sweep { path, z, .. } = &mut f.shape {
             for p in path.iter_mut() {
                 *p = point(*p);
@@ -541,5 +589,5 @@ pub(crate) fn transform(
             *z += dz;
         }
     }
-    write(txn, id, &r)
+    Ok(())
 }

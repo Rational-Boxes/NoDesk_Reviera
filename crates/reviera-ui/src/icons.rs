@@ -79,6 +79,27 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "equality" => format!(
             r#"<path d="M4 8v16M16 8v16M28 8v16" {s}/><path d="M4 16h24" {sa}/><path d="M8 12h4M8 14h4M20 12h4M20 14h4" {sa}/>"#
         ),
+        "mass" => format!(
+            r#"<path d="M6 26V10l10-6 10 6v16z" fill="{f}" {s}/><path d="M6 10l10 6 10-6M16 16v10" {sa}/>"#
+        ),
+        "mass_floors" => format!(
+            r#"<path d="M6 26V6h20v20z" fill="{f}" {s}/><path d="M6 12h20M6 19h20" {sa}/>"#
+        ),
+        "wall_face" => format!(
+            r#"<path d="M4 26V8l12-4v18z" fill="{f}" {s}/><path d="M18 26V8h8v18z" fill="{f}" {sa}/>"#
+        ),
+        "floor_face" => format!(
+            r#"<path d="M4 8h24v18H4z" fill="none" {s}/><path d="M2 18l10-4h18l-10 4z" fill="{f}" {sa}/>"#
+        ),
+        "roof_face" => format!(
+            r#"<path d="M6 26V14h20v12z" fill="none" {s}/><path d="M3 15L16 5l13 10z" fill="{f}" {sa}/>"#
+        ),
+        "curtain_system" => format!(
+            r#"<path d="M4 26V6h24v20z" fill="{f}" {s}/><path d="M12 6v20M20 6v20M4 16h24" {sa}/>"#
+        ),
+        "update_face" => format!(
+            r#"<path d="M6 26V10h14v16z" fill="{f}" {s}/><path d="M22 6a8 8 0 0 1 4 10" {sa}/><path d="M27 12l-1 4-4-1" {sa}/>"#
+        ),
         "room_separator" => format!(
             r#"<path d="M4 6h24v20H4z" fill="{f}" {s}/><path d="M16 6v20" {sa} stroke-dasharray="3 2"/>"#
         ),

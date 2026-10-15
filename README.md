@@ -381,6 +381,12 @@ Create … Boundary* tab:
   `room.place_automatically`, `room.set`).
 - **Stair annotation**: plans draw stair paths with UP/DN and cut marks; Number Treads numbers a
   stair's treads in a view, kept when it moves (`stair.number_treads`; ARC-STAIR-006).
+- **Masses and model by face** (Massing & Site): in-place masses (extrusions, lofts, …) from
+  model-line loops, mass floors with areas, volumes and exterior surfaces that follow the mass,
+  walls, floors, roofs and curtain systems by face with Update to Face (`mass.create`,
+  `mass.set_floors`, `mass.floors`, `wall.create_by_face`, `floor.create_by_mass_floor`,
+  `roof.create_by_face`, `curtainsystem.create_by_face`, `element.update_to_face`;
+  ARC-MASS-001 … 003, ARC-ROOF-003, ARC-CW-007).
 - **Model In-Place** (Architecture › Model): free-form elements of a chosen category from
   extrusions, blends, revolves and sweeps on work planes, solid or void (voids cut through the
   boolean relations); made in the window from selected model lines (`inplace.create`,
@@ -702,19 +708,19 @@ area by area (a review against the spec on 2026-10-15). Whole areas not started 
   Geometry and hosting in IFC, curved slanted walls,
   selecting stacked sub-walls with Tab, sketching a wall profile in elevation and its mid-end
   faces (ARC-CMPD-003, ARC-WRAP-001, ARC-WALL-009/010/014/015/016).
-- **Curtain extras**: curtain systems by face (needs masses), placing grid lines by clicking,
-  manual lines on sloped glazing (ARC-CW-004/007/008).
-- **Floors and roofs**: roof by face, slope arrows along an edge or above the plate, shape editing
-  of roofs and variable layers, slab edge profiles other than rectangles, parts (ARC-ROOF-003,
-  ARC-ROOF-005, ARC-SHAPE-001, ARC-SLED-001, ARC-PART-001 … 004).
+- **Curtain extras**: placing grid lines by clicking, manual lines on sloped glazing, curved
+  faces for curtain systems (ARC-CW-004/007/008).
+- **Floors and roofs**: slope arrows along an edge or above the plate, shape editing of roofs
+  and variable layers, slab edge profiles other than rectangles, parts (ARC-ROOF-005,
+  ARC-SHAPE-001, ARC-SLED-001, ARC-PART-001 … 004).
 - **Rooms and areas**: drawing area boundaries by hand in the window, the glass line, area tags and
   schedules per scheme, colour fill legends and patterns (ARC-AREA-001, ARC-CLR-001).
 - **Modelling in the project**: the in-place editor session, swept blends, in-place hosts and
   room bounding, TrueType fonts for model text, converting model lines to detail lines
   (ARC-INPL-001, ARC-MTXT-001, ARC-MLIN-001).
-- **Massing and site**: masses, mass floors, model by face, toposolids, sub-divisions and
-  excavation, graded regions, contours, site components, parking and property lines
-  (ARC-MASS-001 … 003, ARC-TOPO-001 … 006, ARC-SITE-001).
+- **Massing and site**: the conceptual design environment, mass voids and families, Show Mass
+  modes; toposolids, sub-divisions and excavation, graded regions, contours, site components,
+  parking and property lines (ARC-MASS-001, ARC-TOPO-001 … 006, ARC-SITE-001).
 - **Groups and selection sets**: detail and nested groups, Save/Load Group, saved selections as
   view filters (ARC-GRP-001 … 003, ARC-SEL-002).
 - **Stair annotation**: path and cut mark types, number styles, riser numbers (ARC-STAIR-006).

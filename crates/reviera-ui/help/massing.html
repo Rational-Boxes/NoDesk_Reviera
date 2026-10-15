@@ -1,0 +1,45 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Copyright (C) 2026 Reviera contributors -->
+<h1>Massing and model by face</h1>
+<p class="lead">Masses are conceptual volumes for early design: their floors give areas and
+volumes per storey, and walls, floors, roofs and curtain systems can be made on their
+faces.</p>
+
+<h2 id="mass">Making a mass</h2>
+<ol>
+  <li>Draw closed loops of model lines (<b>Architecture › Model Line</b>): one loop for a
+    block, or a loop on each of several levels (with as many corners each) for a lofted
+    form.</li>
+  <li>Select them and click <b>Massing &amp; Site › In-Place Mass</b>
+    <a href="reviera:action/mass.create">In-Place Mass</a>. Name it; a single loop asks for the
+    height.</li>
+</ol>
+<p>Masses are drawn translucent. Extrusions, lofts, revolves, blends and sweeps can be made
+with <code>mass.create</code> and <code>mass.add_form</code>; <code>mass.set_form</code>
+stretches an extrusion.</p>
+
+<h2 id="floors">Mass floors</h2>
+<p>Select a mass and click <b>Mass Floors</b>, then tick the levels. Each ticked level that
+crosses the mass (not at its very top) gets a mass floor with its area, perimeter, the volume up
+to the next floor and the exterior surface of that band (the top floor's includes the roof).
+They follow the mass as it changes; a level above it gets a floor once the mass reaches past
+it. <code>mass.set_floors</code>, <code>mass.floors</code></p>
+
+<h2 id="by-face">Model by face</h2>
+<p>Select a mass, click a tool, and tick its faces in the list (named like
+<code>form0.side2</code>, with the way each faces):</p>
+<table>
+  <tr><td><b>Wall by Face</b></td><td>Walls on upright faces, along the face's bottom edge and as
+    high as it, their exterior finish face on the face.</td></tr>
+  <tr><td><b>Floor by Face</b></td><td>Floors on the mass floors.</td></tr>
+  <tr><td><b>Roof by Face</b></td><td>A roof slab on each upward face.</td></tr>
+  <tr><td><b>Curtain System</b></td><td>A curtain grid with panels and mullions on the faces; one
+    mullion where two faces meet.</td></tr>
+</table>
+<p>These remember their faces but do not follow the mass by themselves: select them and click
+<b>Update to Face</b> after changing the mass. <code>wall.create_by_face</code>,
+<code>floor.create_by_mass_floor</code>, <code>roof.create_by_face</code>,
+<code>curtainsystem.create_by_face</code>, <code>element.update_to_face</code>,
+<code>mass.select_dependents</code></p>
+<p class="note">Not yet available: the conceptual design environment (X-Ray, dragging faces and
+edges), voids in masses, Place Mass, Show Mass modes and joined masses.</p>

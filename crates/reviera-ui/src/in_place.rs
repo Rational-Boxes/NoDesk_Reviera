@@ -18,7 +18,7 @@ use super::Gui;
 const KINDS: [&str; 3] = ["Extrusion", "Void Extrusion", "Revolve"];
 
 /// The lines' points joined end to end into one closed loop, if they make one.
-fn closed_loop(lines: &[Vec<[f64; 2]>]) -> Option<Vec<[f64; 2]>> {
+pub(crate) fn closed_loop(lines: &[Vec<[f64; 2]>]) -> Option<Vec<[f64; 2]>> {
     let near = |a: [f64; 2], b: [f64; 2]| (a[0] - b[0]).hypot(a[1] - b[1]) < 1e-4;
     let mut rest: Vec<Vec<[f64; 2]>> = lines.to_vec();
     let mut ring = rest.remove(0);

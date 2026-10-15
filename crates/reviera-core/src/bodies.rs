@@ -359,6 +359,24 @@ pub fn all(store: &Store) -> Vec<Body> {
             push(id, &class, mesh, false);
         }
     }
+    // Masses (ARC-MASS-001) and curtain systems by face (ARC-CW-007).
+    for (id, meshes) in crate::masses::all(store) {
+        for mesh in meshes {
+            push(id, "IfcBuildingElementProxy:mass", mesh, false);
+        }
+    }
+    for e in store.iter() {
+        if let Some(r) = crate::masses::system_recipe(e) {
+            for p in crate::masses::system_parts(&r).parts {
+                let class = if p.mullion {
+                    "IfcMember:metal"
+                } else {
+                    "IfcPlate:glass"
+                };
+                push(e.id(), class, p.mesh, false);
+            }
+        }
+    }
     // Model text (ARC-MTXT-001).
     for (id, meshes) in crate::model_text::all(store) {
         for mesh in meshes {

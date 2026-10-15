@@ -35,6 +35,7 @@ mod inspect;
 mod levels;
 mod linings;
 mod loading;
+mod masses;
 mod model_props;
 mod modify;
 mod native;
@@ -3796,6 +3797,13 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "group.create" => with(gui, Gui::create_group),
         "inplace.create" => with(gui, Gui::model_in_place),
         "stair.number_treads" => with(gui, Gui::number_treads),
+        "mass.create" => with(gui, Gui::in_place_mass),
+        "mass.set_floors" => with(gui, Gui::mass_floors),
+        "wall.create_by_face" => with(gui, |g| g.by_face("wall.create_by_face")),
+        "floor.create_by_mass_floor" => with(gui, |g| g.by_face("floor.create_by_mass_floor")),
+        "roof.create_by_face" => with(gui, |g| g.by_face("roof.create_by_face")),
+        "curtainsystem.create_by_face" => with(gui, |g| g.by_face("curtainsystem.create_by_face")),
+        "element.update_to_face" => with(gui, Gui::update_to_face),
         "modeltext.create" => with(gui, |g| {
             g.start_model_text();
             focus(g);

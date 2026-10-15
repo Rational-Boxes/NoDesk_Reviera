@@ -295,6 +295,14 @@ pub fn transform(
             };
             crate::model_lines::transform(txn, target, &|p| x.point(p), dz)?;
             out.push(target);
+        } else if crate::masses::recipe(e).is_some() {
+            let target = if copy { txn.create(copied(e))? } else { id };
+            let dz = match x {
+                Xform::Translate(v) => v[2],
+                _ => 0.0,
+            };
+            crate::masses::transform(txn, target, &|p| x.point(p), dz)?;
+            out.push(target);
         } else if crate::room_separators::recipe(e).is_some() {
             let target = if copy { txn.create(copied(e))? } else { id };
             crate::room_separators::transform(txn, target, &|p| x.point(p))?;

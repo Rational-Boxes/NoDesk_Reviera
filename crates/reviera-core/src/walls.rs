@@ -123,6 +123,9 @@ pub struct WallRecipe {
     /// Each end's wrapping, by type unless overridden (ARC-WRAP-001).
     #[serde(default, skip_serializing_if = "by_type")]
     pub end_wrap: [layered::EndWrap; 2],
+    /// The mass face a wall by face was made from (ARC-MASS-003).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub by_face: Option<crate::masses::FaceRef>,
 }
 
 fn no_extension(e: &[f64; 2]) -> bool {
@@ -466,6 +469,7 @@ pub(crate) fn create(txn: &mut crate::txn::Transaction<'_>, p: CreateParams) -> 
         geometry_joins: Vec::new(),
         extension: [0.0, 0.0],
         end_wrap: Default::default(),
+        by_face: None,
     };
     let id = txn.create(
         NewElement::new("IfcWall")

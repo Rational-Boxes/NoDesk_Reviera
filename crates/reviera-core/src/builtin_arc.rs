@@ -160,6 +160,18 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(CurtainSetPanelType),
         registry.add(CurtainSetLayout),
         registry.add(RoofCreateGlazingType),
+        registry.add(MassCreate),
+        registry.add(MassAddForm),
+        registry.add(MassSetForm),
+        registry.add(MassSetFloors),
+        registry.add(WallCreateByFace),
+        registry.add(FloorCreateByMassFloor),
+        registry.add(RoofCreateByFace),
+        registry.add(CurtainSystemCreateByFace),
+        registry.add(ElementUpdateToFace),
+        registry.add(MassFloors),
+        registry.add(MassFaces),
+        registry.add(MassSelectDependents),
         registry.add(ModelTextCreate),
         registry.add(StairNumberTreads),
         registry.add(RoomSeparatorCreate),
@@ -2180,6 +2192,138 @@ edit_command!(
     crate::model_text::SetParams,
     (),
     crate::model_text::set
+);
+
+edit_command!(
+    MassCreate,
+    "mass.create",
+    "Create a mass",
+    "An in-place mass (ARC-MASS-001) from forms as for inplace.create, plus `loft` forms (`profiles: [{offset, points}]`, stacked closed profiles with as many points).",
+    "In-Place Mass",
+    crate::masses::CreateParams,
+    crate::id::ElementId,
+    crate::masses::create
+);
+
+edit_command!(
+    MassAddForm,
+    "mass.add_form",
+    "Add a form to a mass",
+    "Adds a form to a mass; returns its index.",
+    "Create Form",
+    crate::masses::AddFormParams,
+    usize,
+    crate::masses::add_form
+);
+
+edit_command!(
+    MassSetForm,
+    "mass.set_form",
+    "Stretch a mass form",
+    "Changes an extrusion form's start and end offsets.",
+    "Edit Form",
+    crate::masses::SetFormParams,
+    (),
+    crate::masses::set_form
+);
+
+edit_command!(
+    MassSetFloors,
+    "mass.set_floors",
+    "Set mass floors",
+    "The levels a mass has floors on (ARC-MASS-002), or `all`. Floors appear where a ticked level crosses the mass (not at its top) and follow it.",
+    "Mass Floors",
+    crate::masses::SetFloorsParams,
+    (),
+    crate::masses::set_floors
+);
+
+edit_command!(
+    WallCreateByFace,
+    "wall.create_by_face",
+    "Walls by face",
+    "Walls on a mass's upright faces (`faces` by name, mass.faces) (ARC-MASS-003): along the face's bottom edge, as high as the face, on `location_line` (default the exterior finish face); they keep their face for element.update_to_face.",
+    "Wall by Face",
+    crate::masses::ByFaceParams,
+    Vec<crate::id::ElementId>,
+    crate::masses::walls_by_face
+);
+
+edit_command!(
+    FloorCreateByMassFloor,
+    "floor.create_by_mass_floor",
+    "Floors by mass floor",
+    "Floors on a mass's mass floors (at `level_ids`, or all) (ARC-MASS-003).",
+    "Floor by Face",
+    crate::masses::FloorsByMassParams,
+    Vec<crate::id::ElementId>,
+    crate::masses::floors_by_mass
+);
+
+edit_command!(
+    RoofCreateByFace,
+    "roof.create_by_face",
+    "Roofs by face",
+    "A roof slab `thickness` thick on each upward mass face (ARC-ROOF-003); they keep their face for element.update_to_face.",
+    "Roof by Face",
+    crate::masses::ByFaceParams,
+    Vec<crate::id::ElementId>,
+    crate::masses::roofs_by_face
+);
+
+edit_command!(
+    CurtainSystemCreateByFace,
+    "curtainsystem.create_by_face",
+    "Curtain system by face",
+    "A curtain system on mass faces (ARC-CW-007): a grid on each face (Grid 1 and Grid 2 rules, default Fixed Distance 1.5 m), panels and mullions, border mullions shared where faces meet.",
+    "Curtain System",
+    crate::masses::SystemParams,
+    crate::id::ElementId,
+    crate::masses::system_by_face
+);
+
+edit_command!(
+    ElementUpdateToFace,
+    "element.update_to_face",
+    "Update to face",
+    "Walls, roofs and curtain systems made by face take their mass faces as they are now (ARC-MASS-003); walls with a level top keep it.",
+    "Update to Face",
+    crate::masses::UpdateParams,
+    (),
+    crate::masses::update_to_face
+);
+
+read_command!(
+    MassFloors,
+    "mass.floors",
+    "A mass's floors",
+    "Its mass floors with area, perimeter, volume and exterior surface area (m², m, m³).",
+    [Effect::Read],
+    crate::masses::MassParams,
+    Vec<crate::masses::MassFloor>,
+    |store, p| crate::masses::floors_of(store, p)
+);
+
+read_command!(
+    MassFaces,
+    "mass.faces",
+    "A mass's faces",
+    "Its named planar faces with their points and outward normals, for the by-face commands.",
+    [Effect::Read],
+    crate::masses::MassParams,
+    Vec<crate::masses::MassFace>,
+    |store, p| crate::masses::faces_of(store, p)
+);
+
+read_command!(
+    MassSelectDependents,
+    "mass.select_dependents",
+    "Elements made from a mass",
+    "The walls, roofs and curtain systems made by face from the mass.",
+    [Effect::Read],
+    crate::masses::MassParams,
+    Vec<crate::id::ElementId>,
+    |store, p| crate::masses::dependents(store, p)
 );
 
 edit_command!(

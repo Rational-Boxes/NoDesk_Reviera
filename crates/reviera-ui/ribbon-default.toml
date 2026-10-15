@@ -941,6 +941,48 @@ icon = "room_separator"
 help = "Draw lines that split space for rooms, like walls (Arc in Properties for curves)"
 
 [[action]]
+id = "mass.create"
+label = "In-Place Mass"
+icon = "mass"
+help = "A mass from selected model lines: one closed loop is extruded; loops on several levels are lofted"
+
+[[action]]
+id = "mass.set_floors"
+label = "Mass Floors"
+icon = "mass_floors"
+help = "Choose the levels the selected mass has floors on: their areas, perimeters and volumes"
+
+[[action]]
+id = "wall.create_by_face"
+label = "Wall by Face"
+icon = "wall_face"
+help = "Walls on faces of the selected mass"
+
+[[action]]
+id = "floor.create_by_mass_floor"
+label = "Floor by Face"
+icon = "floor_face"
+help = "Floors on the selected mass's mass floors"
+
+[[action]]
+id = "roof.create_by_face"
+label = "Roof by Face"
+icon = "roof_face"
+help = "Roofs on upward faces of the selected mass"
+
+[[action]]
+id = "curtainsystem.create_by_face"
+label = "Curtain System"
+icon = "curtain_system"
+help = "A curtain system on faces of the selected mass"
+
+[[action]]
+id = "element.update_to_face"
+label = "Update to Face"
+icon = "update_face"
+help = "Walls, roofs and curtain systems made by face take their mass faces as they are now"
+
+[[action]]
 id = "stair.number_treads"
 label = "Number Treads"
 icon = "tread_numbers"
@@ -1396,6 +1438,31 @@ tools = [
   { action = "group.create", size = "small" },
   { action = "inplace.create", size = "small" },
   { action = "modeltext.create", size = "small" },
+]
+
+[[tab]]
+id = "massing"
+label = "Massing & Site"
+
+[[tab.panel]]
+label = "Select"
+tools = [{ action = "tool.modify", size = "large" }]
+
+[[tab.panel]]
+label = "Conceptual Mass"
+tools = [
+  { action = "mass.create", size = "large" },
+  { action = "mass.set_floors", size = "large" },
+]
+
+[[tab.panel]]
+label = "Model by Face"
+tools = [
+  { action = "wall.create_by_face", size = "large" },
+  { action = "floor.create_by_mass_floor", size = "large" },
+  { action = "roof.create_by_face", size = "large" },
+  { action = "curtainsystem.create_by_face", size = "large" },
+  { action = "element.update_to_face", size = "large" },
 ]
 
 [[tab]]

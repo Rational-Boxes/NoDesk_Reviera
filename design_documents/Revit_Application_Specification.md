@@ -13414,6 +13414,8 @@ All family-editor commands from the DM chapter can be used inside the session.
 - [ ] Selecting three stacked closed profiles and choosing Create Form produces a lofted solid, and its gross volume matches an independent OCCT calculation.
 - [ ] In a plan view whose Mass category is off, *Form and Floors* shows the mass and lets it be selected; printing that view to PDF does not include the mass; switching back to *by View Settings* hides it again and leaves the undo stack unchanged.
 
+**Implementation note (2026-10-15, first build).** As built: in-place masses (`recipe.mass`) from the in-place forms plus lofts of stacked profiles, drawn translucent, B-reps in IFC; `mass.create`, `mass.add_form`, `mass.set_form` (stretch an extrusion); the window: Massing & Site › In-Place Mass from model-line loops (one loop extruded, loops on several levels lofted). Not built yet: the conceptual design environment (gizmos, X-Ray, Add Edge/Profile, Dissolve, Rebuild), Create Form inference from any selection, voids, Place Mass, Show Mass modes, joined masses, the *Export masses* option.
+
 ### 3.11.2 Mass floors
 **ID:** ARC-MASS-002 · **Priority:** P2 · **Ref:** research/02 §12.1 · web: Create Mass Floors; About Mass Floors at the Top of a Mass; About Mass Floors at the Bottom of a Mass
 
@@ -13443,9 +13445,11 @@ All family-editor commands from the DM chapter can be used inside the session.
 **Commands.** `mass.set_floors(mass_id, level_ids | All)`.
 
 **Acceptance criteria.**
-- [ ] A 20 × 30 × 12 m box mass with levels every 3 m creates four mass floors of 600 m² each, and each has a floor volume of 1800 m³.
-- [ ] With a level at the top face of that mass also ticked, no fifth floor is created, and the fourth floor's exterior surface area is 300 m² (sides) + 600 m² (roof) = 900 m².
-- [ ] Ticking a level 3 m above the mass creates nothing; stretching the mass to 15 m creates the floor at that level without reopening the dialog.
+- [x] A 20 × 30 × 12 m box mass with levels every 3 m creates four mass floors of 600 m² each, and each has a floor volume of 1800 m³.
+- [x] With a level at the top face of that mass also ticked, no fifth floor is created, and the fourth floor's exterior surface area is 300 m² (sides) + 600 m² (roof) = 900 m².
+- [x] Ticking a level 3 m above the mass creates nothing; stretching the mass to 15 m creates the floor at that level without reopening the dialog.
+
+**Implementation note (2026-10-15, first build).** As built: mass floors are worked out from the mass (not stored): sections at ticked levels crossing it (none at its top), area, perimeter, volume to the next floor by Simpson's rule on the section area (exact for prisms, lofts and pyramids), exterior surface of the band (with the roof for the top floor); `mass.set_floors` (levels or all), `mass.floors`; the window: Mass Floors. Not built yet: IfcSpace mass floors in IFC, Usage and Mark, tags and schedules.
 
 ### 3.11.3 Model by face and Update to Face
 **ID:** ARC-MASS-003 · **Priority:** P2 · **Ref:** research/02 §4.1, §12.1
@@ -13463,7 +13467,9 @@ All family-editor commands from the DM chapter can be used inside the session.
 - `mass.select_dependents(mass_id) -> [element_id]` *(query)*
 
 **Acceptance criteria.**
-- [ ] After the mass is stretched, Update to Face makes a wall by face match the new face. Before Update to Face, the wall stays unchanged.
+- [x] After the mass is stretched, Update to Face makes a wall by face match the new face. Before Update to Face, the wall stays unchanged.
+
+**Implementation note (2026-10-15, first build).** As built: named planar faces of extrusion and loft forms (`mass.faces`); `wall.create_by_face` (along the face's bottom edge, its height, exterior finish face on it), `floor.create_by_mass_floor`, `roof.create_by_face` (an in-place roof slab on the face, ARC-ROOF-003), `curtainsystem.create_by_face` (ARC-CW-007), each keeping its face; `element.update_to_face`; `mass.select_dependents`. The window: Massing & Site › Model by Face with a face list. Not built yet: picking faces in the view, curved faces, Select Multiple sessions.
 
 ### 3.11.4 Toposolid
 **ID:** ARC-TOPO-001 · **Priority:** P1 · **Ref:** research/02 §1 (2024, 2026), §12.2 · screenshots/architecture/toposolid_site_plan_and_3d.png · web: Toposolid Smooth Shading; Toposolid Enhancements (2025)

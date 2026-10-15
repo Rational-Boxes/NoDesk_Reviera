@@ -398,6 +398,8 @@ pub fn class_color(class: &str) -> [f32; 4] {
     }
     match material.split('/').next().unwrap_or("") {
         "glass" => return [0.62, 0.80, 0.92, 0.35],
+        // Masses show as translucent volumes (ARC-MASS-001).
+        "mass" => return [0.78, 0.68, 0.50, 0.45],
         "metal" => return [0.66, 0.68, 0.71, 1.0],
         // A wall layer's cell (`IfcWall:layer/Brick`): a colour after its material's name.
         "layer" => {

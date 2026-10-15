@@ -536,6 +536,8 @@ impl LocalProject {
                 || recipe_kind == Some(reviera_core::model_text::RECIPE)
                 || recipe_kind == Some(reviera_core::in_place::RECIPE)
                 || recipe_kind == Some(reviera_core::in_place::VOID_RECIPE)
+                || recipe_kind == Some(reviera_core::masses::RECIPE)
+                || recipe_kind == Some(reviera_core::masses::SYSTEM_RECIPE)
             {
                 geometry::remove_breps(&mut self.ifc, step)?;
             }
@@ -1866,6 +1868,19 @@ impl LocalProject {
                 .into_iter()
                 .map(|(id, _, meshes)| (id, meshes)),
         );
+        // Masses and curtain systems by face (ARC-MASS-001, ARC-CW-007).
+        all.extend(reviera_core::masses::all(store));
+        all.extend(store.iter().filter_map(|e| {
+            let r = reviera_core::masses::system_recipe(e)?;
+            Some((
+                e.id(),
+                reviera_core::masses::system_parts(&r)
+                    .parts
+                    .into_iter()
+                    .map(|p| p.mesh)
+                    .collect(),
+            ))
+        }));
         if all.is_empty() {
             return Ok(());
         }
