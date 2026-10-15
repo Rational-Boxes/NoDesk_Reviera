@@ -192,6 +192,26 @@ their cut bodies. <code>wallsweep.create</code>, <code>wallreveal.create</code>,
 <code>wallsweep.set</code>, <code>wallsweep.add_walls</code>,
 <code>wallsweep.remove_walls</code></p>
 
+<h2 id="linings">Linings and hosted walls</h2>
+<p>Finish walls (linings) can be placed against walls or round rooms:</p>
+<ol>
+  <li>Select walls (each is lined along one face) or rooms (each is lined all round, inside).
+    <b>Modify | Walls › Linings</b>.</li>
+  <li>Choose the lining's <b>Type</b>, the <b>Side of the walls</b> to line, and <b>Auto
+    Join</b>: <i>Join</i> joins each lining's geometry to the wall it touches, so doors and
+    windows in either cut both; <i>Join &amp; Lock</i> also locks the touching faces together, so
+    the walls move as one.</li>
+  <li><b>Hosted</b> makes each lining follow the wall it lines: it stays against the face when
+    that wall moves, turns or changes thickness.</li>
+</ol>
+<p>Any straight wall can be hosted on a parallel one: select it, <b>Pick New Host</b>, then
+click the host. <b>Remove Hosted</b> leaves it where it is; <b>Select Main Host</b> selects the
+wall it follows. A wall drawn against another with the <code>auto_join</code> option of
+<code>wall.create</code> is joined the same way. <code>wall.create_by_segment</code>,
+<code>wall.create_by_room</code>, <code>wall.set_host</code>, <code>wall.remove_host</code>,
+<code>wall.select_main_host</code>, <code>geometry.join</code>,
+<code>geometry.unjoin</code></p>
+
 <h2 id="split">Splitting walls</h2>
 <ul>
   <li><b>Split Element</b> <kbd>SL</kbd> splits a wall where you click.</li>

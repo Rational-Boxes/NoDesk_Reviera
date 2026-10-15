@@ -448,7 +448,9 @@ impl CommandRegistry {
         let result = guard(name, || run(&mut cx, args))?;
         // Constraints hold after every edit (ARC-CNST-002): the solver moves what the edit did
         // not, or the edit fails.
+        // Hosted walls follow their hosts (ARC-WALL-016) first.
         if let State::Edit(txn) = &mut cx.state {
+            crate::walls::linings::follow_hosts(txn)?;
             crate::constraints::enforce(txn)?;
         }
         if !commit {

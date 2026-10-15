@@ -29,6 +29,7 @@ mod icons;
 mod inserts;
 mod inspect;
 mod levels;
+mod linings;
 mod loading;
 mod model_props;
 mod modify;
@@ -312,6 +313,8 @@ struct Gui {
     tiled: Option<wx::Layout>,
     /// Walls waiting for the roof they attach to (Attach Top/Base).
     attach_pick: Option<Vec<ElementId>>,
+    /// A wall waiting for its new host (Pick New Host).
+    host_pick: Option<ElementId>,
     /// The Model Tree pane (UI-TREE-001) and its state.
     model_tree: TreeCtrl,
     tree: inspect::ModelTree,
@@ -1304,6 +1307,9 @@ impl Gui {
         }
         if self.attach_pick.take().is_some() {
             return frame.set_status_text("Attach cancelled", 0);
+        }
+        if self.host_pick.take().is_some() {
+            return frame.set_status_text("Pick New Host cancelled", 0);
         }
         match &mut self.tool {
             Some(t) if !t.typed.is_empty() => {
@@ -2573,6 +2579,7 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                     Some(hit) => g.cube_click(hit),
                     None if g.slice_pick.is_some() => g.slice_click(x, y),
                     None if g.attach_pick.is_some() => g.attach_click(x, y, &p),
+                    None if g.host_pick.is_some() => g.host_click(x, y, &p),
                     None if g.sketch.is_some() => g.sketch_click(x, y),
                     None if g.ceiling_tool.is_some() => g.ceiling_click(x, y),
                     None if g.room_tool.is_some() => g.room_click(x, y),
@@ -3196,6 +3203,7 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 slice_pick: None,
                 tiled: None,
                 attach_pick: None,
+                host_pick: None,
                 model_tree,
                 tree: inspect::ModelTree {
                     stale: true,
@@ -3738,6 +3746,13 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "wall.break_up" => with(gui, Gui::break_up),
         "wall.edit_profile" => with(gui, Gui::edit_wall_profile),
         "wallsweep.create" => with(gui, Gui::wall_sweep),
+        "wall.create_by_room" => with(gui, Gui::linings),
+        "wall.set_host" => with(gui, |g| {
+            g.start_host_pick();
+            focus(g);
+        }),
+        "wall.remove_host" => with(gui, Gui::remove_host),
+        "wall.select_main_host" => with(gui, Gui::select_main_host),
         "wallreveal.create" => with(gui, Gui::wall_reveal),
         "slabedge.create" => with(gui, |g| {
             g.start_line_tool(datum_tools::LineMode::SlabEdge);

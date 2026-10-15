@@ -905,6 +905,30 @@ keys = "ST"
 help = "Draw a stair in a plan: click the start and end of each run; landings join the runs"
 
 [[action]]
+id = "wall.create_by_room"
+label = "Linings"
+icon = "lining"
+help = "Line the selected walls' faces, or the selected rooms all round, with finish walls"
+
+[[action]]
+id = "wall.set_host"
+label = "Pick New Host"
+icon = "host_pick"
+help = "Host the selected wall on another: click the wall it should follow"
+
+[[action]]
+id = "wall.remove_host"
+label = "Remove Hosted"
+icon = "host_remove"
+help = "The selected hosted walls stay where they are and stop following their hosts"
+
+[[action]]
+id = "wall.select_main_host"
+label = "Select Main Host"
+icon = "host_select"
+help = "Select the wall the selected hosted wall follows"
+
+[[action]]
 id = "wallsweep.create"
 label = "Sweep"
 icon = "wall_sweep"
@@ -1403,6 +1427,10 @@ panels = [{ label = "Wall", tools = [
   { action = "element.split_with_gap", size = "large" },
   { action = "wall.split_horizontal", size = "large" },
   { action = "wall.edit_profile", size = "large" },
+  { action = "wall.create_by_room", size = "large" },
+  { action = "wall.set_host", size = "small" },
+  { action = "wall.remove_host", size = "small" },
+  { action = "wall.select_main_host", size = "small" },
   { action = "wallsweep.create", size = "large" },
   { action = "wallreveal.create", size = "large" },
   { action = "stackedwall.set_rows", size = "large" },

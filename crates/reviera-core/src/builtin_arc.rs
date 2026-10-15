@@ -143,6 +143,13 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(WallBreakUp),
         registry.add(WallEditProfile),
         registry.add(WallSweepCreate),
+        registry.add(WallCreateBySegment),
+        registry.add(WallCreateByRoom),
+        registry.add(WallSetHost),
+        registry.add(WallRemoveHost),
+        registry.add(WallSelectMainHost),
+        registry.add(GeometryJoin),
+        registry.add(GeometryUnjoin),
         registry.add(WallRevealCreate),
         registry.add(WallSweepAddWalls),
         registry.add(WallSweepRemoveWalls),
@@ -1399,6 +1406,92 @@ read_command!(
     crate::shape_edit::ElementParams,
     crate::shape_edit::Shape,
     crate::shape_edit::get
+);
+
+edit_command!(
+    WallCreateBySegment,
+    "wall.create_by_segment",
+    "Line a wall",
+    "A lining wall against `target_id`'s face on `side` (exterior or interior), as long as the face \
+     after joins, with the target's base and top (ARC-WALL-014). `hosted` makes it follow the \
+     target (ARC-WALL-016); `auto_join` (off, join, join_and_lock) joins its geometry to the target \
+     so doors and windows cut both, and locks the faces together.",
+    "Wall by Segment",
+    crate::walls::linings::BySegmentParams,
+    Vec<crate::id::ElementId>,
+    crate::walls::linings::by_segment
+);
+
+edit_command!(
+    WallCreateByRoom,
+    "wall.create_by_room",
+    "Line a room",
+    "Lining walls round `room_id`'s boundary, one per straight segment, inside the room and joined \
+     at the corners, as high as the room unless `height` is given (ARC-WALL-014). Their exterior \
+     faces the walls unless `flip`. `hosted` hosts each on the wall it lines; `auto_join` as for \
+     `wall.create_by_segment`.",
+    "Walls by Room",
+    crate::walls::linings::ByRoomParams,
+    Vec<crate::id::ElementId>,
+    crate::walls::linings::by_room
+);
+
+edit_command!(
+    WallSetHost,
+    "wall.set_host",
+    "Host a wall on another",
+    "The wall follows `host_wall_id` from now on (ARC-WALL-016): kept against the host's face on \
+     `side` at `offset` (≥ 0; omitted, as now), its ends as far past the host's ends as now. It \
+     must be straight and parallel to the host; cycles are refused.",
+    "Pick New Host",
+    crate::walls::linings::SetHostParams,
+    (),
+    crate::walls::linings::set_host
+);
+
+edit_command!(
+    WallRemoveHost,
+    "wall.remove_host",
+    "Remove hosted relationships",
+    "The walls stay where they are and no longer follow their hosts (ARC-WALL-016).",
+    "Remove Hosted Relationship",
+    crate::walls::linings::WallIdsParams,
+    (),
+    crate::walls::linings::remove_host
+);
+
+read_command!(
+    WallSelectMainHost,
+    "wall.select_main_host",
+    "A hosted wall's host",
+    "The wall a hosted wall follows (ARC-WALL-016), or null.",
+    [Effect::Read],
+    crate::walls::linings::MainHostParams,
+    Option<crate::id::ElementId>,
+    |store, p| crate::walls::linings::main_host(store, p)
+);
+
+edit_command!(
+    GeometryJoin,
+    "geometry.join",
+    "Join geometry",
+    "Joins two walls that touch face to face (ARC-WALL-015): doors, windows and openings in either \
+     cut both. `lock` also locks the touching faces together.",
+    "Join Geometry",
+    crate::walls::linings::JoinParams,
+    (),
+    crate::walls::linings::join
+);
+
+edit_command!(
+    GeometryUnjoin,
+    "geometry.unjoin",
+    "Unjoin geometry",
+    "Removes Join Geometry between the given walls, or all of one wall's joins.",
+    "Unjoin Geometry",
+    crate::walls::linings::UnjoinParams,
+    (),
+    crate::walls::linings::unjoin
 );
 
 edit_command!(

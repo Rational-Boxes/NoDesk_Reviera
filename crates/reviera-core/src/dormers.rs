@@ -310,6 +310,7 @@ fn build(
                 top_offset: 0.0,
                 location_line: walls::LocationLine::WallCenterline,
                 flip: false,
+                auto_join: Default::default(),
             },
         )
     };

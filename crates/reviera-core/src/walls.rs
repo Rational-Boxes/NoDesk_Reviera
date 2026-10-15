@@ -17,6 +17,7 @@ pub mod attach;
 pub mod cross_section;
 pub mod curved;
 pub mod joins;
+pub mod linings;
 pub mod openings;
 pub mod profile;
 pub mod stacked;
@@ -109,6 +110,12 @@ pub struct WallRecipe {
     /// An edited elevation profile (ARC-WALL-009); the rectangle when absent.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub profile: Option<profile::Profile>,
+    /// The wall this one is hosted on (ARC-WALL-016).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub host: Option<linings::WallHost>,
+    /// Walls joined to this one by Join Geometry (GlobalIds, ARC-WALL-015).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub geometry_joins: Vec<String>,
 }
 
 fn both_allowed() -> [bool; 2] {
@@ -285,6 +292,9 @@ pub struct CreateParams {
     pub location_line: LocationLine,
     #[serde(default)]
     pub flip: bool,
+    /// Join Geometry with walls the new one touches face to face, and lock them (ARC-WALL-015).
+    #[serde(default)]
+    pub auto_join: linings::AutoJoin,
 }
 
 fn resolve(store: &Store, r: &ElementRef, what: &str) -> Result<ElementId> {
@@ -391,6 +401,8 @@ pub(crate) fn create(txn: &mut crate::txn::Transaction<'_>, p: CreateParams) -> 
         through,
         cross_section: None,
         profile: None,
+        host: None,
+        geometry_joins: Vec::new(),
     };
     let id = txn.create(
         NewElement::new("IfcWall")
@@ -408,6 +420,7 @@ pub(crate) fn create(txn: &mut crate::txn::Transaction<'_>, p: CreateParams) -> 
     if stacked::of_wall(txn.store(), e).is_some() {
         stacked::layout(txn.store(), e, &g)?;
     }
+    linings::auto_join(txn, id, p.auto_join)?;
     Ok(id)
 }
 

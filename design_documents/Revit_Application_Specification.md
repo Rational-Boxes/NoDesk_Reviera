@@ -10992,6 +10992,8 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 - [ ] By Room in a rectangular room with a column in one corner creates a lining that wraps the column's two exposed faces when columns are included.
 - [ ] By Segment against a wall in a linked model creates the lining in the host model, with no hosting relationship.
 
+**Implementation note (2026-10-15, first build).** As built: `wall.create_by_segment` (a lining against a straight wall's face on a side, as long as the face after joins, with the target's base and top) and `wall.create_by_room` (one lining per straight segment of the room's outer boundary, inset by half its width and meeting at the corners, as high as the room or `height`), each with `hosted` and `auto_join`; linings' exterior faces the target (`flip` for By Room turns them round). The window: Modify | Walls › Linings on selected walls or rooms. Not built yet: columns as targets (the acceptance criterion), room islands, curved targets, linked models, the hover preview, Tab and Spacebar while placing.
+
 ### 3.3.20 Auto Join and Auto Join & Lock
 **ID:** ARC-WALL-015 · **Priority:** P1 · **Ref:** research/02 §1 (2025), §4.2
 
@@ -11007,7 +11009,9 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 **Commands.** The option is passed to `wall.create(type_id, curve, base_level, top_constraint: Level(id) | Unconnected(height), base_offset?, top_offset?, location_line?, flip?: bool, structural?: bool, structural_usage?, room_bounding?: bool, join_status?: Allow|Disallow, auto_join?: Off|Join|JoinAndLock) -> element_id`. Afterward, `geometry.join` and `constraint.lock_alignment` apply.
 
 **Acceptance criteria.**
-- [ ] A door placed in a core wall that was auto-joined to a lining cuts both walls.
+- [x] A door placed in a core wall that was auto-joined to a lining cuts both walls.
+
+**Implementation note (2026-10-15, first build).** As built: Join Geometry between parallel walls that touch face to face, stored on the wall recipe (`geometry_joins`, GlobalIds); each wall's door, window and opening cuts are carried into the walls joined to it. `wall.create` takes `auto_join` (off, join, join_and_lock); Join & Lock adds an alignment constraint between the touching faces (none on slanted walls); stacked walls are skipped. `geometry.join` (walls that touch, for now; `lock`) and `geometry.unjoin`. Not built yet: `IfcRelConnectsElements` "JoinGeometry" in IFC, Join Geometry between other elements, complex insert cuts limited to the first wall.
 
 ### 3.3.21 Hosted walls
 **ID:** ARC-WALL-016 · **Priority:** P1 · **Ref:** research/02 §1 (2027), §4.13
@@ -11034,8 +11038,10 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 - `wall.select_main_host(wall_id) -> element_id` *(query)*
 
 **Acceptance criteria.**
-- [ ] Rotating the host 15° rotates a hosted lining with it and keeps the offset.
-- [ ] Removing the relationship leaves the lining exactly in place.
+- [x] Rotating the host 15° rotates a hosted lining with it and keeps the offset.
+- [x] Removing the relationship leaves the lining exactly in place.
+
+**Implementation note (2026-10-15, first build).** As built: the wall recipe's `host` (host GlobalId, side, offset, and how far the ends reach past the host's ends); after every edit, before constraints are solved, each hosted wall's location line is put back against the host's face, pinned host or not. `wall.set_host` (straight and parallel walls; side and offset default to where it is; cycles refused), `wall.remove_host`, `wall.select_main_host`; hosted linings get Join Geometry. The window: Pick New Host (then click the host), Remove Hosted, Select Main Host. Not built yet: `IfcRelConnectsElements` "HostedWall" and the *Hosted* parameter in IFC and schedules, the 152.4 mm rule (hosted linings always join), following a host's cross-section change.
 
 ### 3.3.22 Other wall behaviours
 **ID:** ARC-WALL-017 · **Priority:** P0 · **Ref:** research/02 §4.13
