@@ -118,6 +118,27 @@ The Greek temple sample's colonnade is one such array.</p>
 <p><code>array.along_path</code>, <code>array.set</code>, <code>array.exclude_member</code>,
 <code>array.restore_member</code>, <code>array.members</code>, <code>array.unarray</code></p>
 
+<h2 id="in-place">Model In-Place</h2>
+<p>A one-off, free-form element modelled in the project:</p>
+<ol>
+  <li>Draw the profile as a closed loop of model lines (<b>Architecture › Model Line</b>), on the
+    level or on a reference plane; for a revolve, draw one more line for the axis.</li>
+  <li>Select the lines and click <b>Architecture › Model › Model In-Place</b>. Name it, choose
+    its category (Generic Models, Walls, Floors, Roofs, Casework, …), and the form: an
+    <b>Extrusion</b> or <b>Void Extrusion</b> from a start to an end offset out of the plane, or a
+    <b>Revolve</b> between two angles.</li>
+  <li>To add more forms, select the in-place element with the lines of the next profile.</li>
+</ol>
+<p>Voids cut the element's solids. Copying it makes another element with its own name.
+Blends and sweeps are made with <code>inplace.create</code> and <code>inplace.add_form</code>
+(kinds <code>blend</code> and <code>sweep</code>).</p>
+
+<h2 id="model-text">Model Text</h2>
+<p><b>Architecture › Model › Model Text</b>: type the text (several lines if you like), its
+letter height and depth (0 for flat), then click in a plan where it starts. It lies on the
+plan's level; <code>modeltext.create</code> also takes a reference plane or grid. Each letter
+is a solid with its holes (the A's triangle). <code>modeltext.set_text</code> changes it.</p>
+
 <h2 id="ifc">In IFC</h2>
 <p>A component type is written as its category's type class (for example
 <code>IfcFurnitureType</code>) with its mesh once, as an <code>IfcRepresentationMap</code> of

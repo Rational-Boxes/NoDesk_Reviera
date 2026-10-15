@@ -935,6 +935,18 @@ icon = "sloped_glazing"
 help = "Turn the selected roofs into sloped glazing (a Sloped Glazing type, made if there is none); change their type back to undo"
 
 [[action]]
+id = "inplace.create"
+label = "Model In-Place"
+icon = "in_place"
+help = "A free-form element from selected model lines: a closed loop extruded or revolved (one more line for the axis), solid or void; with an in-place element selected, a form is added to it"
+
+[[action]]
+id = "modeltext.create"
+label = "Model Text"
+icon = "model_text"
+help = "Three-dimensional lettering: type it, then click where it starts in a plan"
+
+[[action]]
 id = "group.place"
 label = "Place Group"
 icon = "group_place"
@@ -1369,6 +1381,8 @@ label = "Model"
 tools = [
   { action = "group.place", size = "large" },
   { action = "group.create", size = "small" },
+  { action = "inplace.create", size = "small" },
+  { action = "modeltext.create", size = "small" },
 ]
 
 [[tab]]

@@ -13307,7 +13307,9 @@ All family-editor commands from the DM chapter can be used inside the session.
 
 **Acceptance criteria.**
 - [ ] An in-place wall made from an extrusion can host a door, and it bounds rooms.
-- [ ] Copying an in-place element produces a second family with a new name, and editing one copy does not change the other.
+- [x] Copying an in-place element produces a second family with a new name, and editing one copy does not change the other.
+
+**Implementation note (2026-10-15, first build).** As built without the editor session: `inplace.create(name, category, forms)`, `inplace.add_form`, `inplace.remove_form`; forms are extrusions, blends (point-to-point), revolves (about an axis in the profile's plane) and sweeps (along a level path, mitred), each on a work plane, solid or void; the element takes its category's IFC class and a B-rep body; voids are a companion opening subtracted through the boolean relations; moving, rotating and mirroring carry the forms; a copy is independent with its own name. The window: Architecture › Model › Model In-Place from selected model lines. Not built yet: the in-place editor session (`inplace.begin`/`finish`/`cancel`/`edit`) with half-tone, swept blends, sweeps along sloping or picked paths, hosting doors and bounding rooms, attaching walls, Cut/Join Geometry with project elements, CSG in IFC.
 
 ### 3.10.2 Model text
 **ID:** ARC-MTXT-001 · **Priority:** P1 · **Ref:** research/02 §11.2
@@ -13331,7 +13333,9 @@ All family-editor commands from the DM chapter can be used inside the session.
 **Commands.** `modeltext.create(text, work_plane, point, type_id, h_align?, material_id?, depth?) -> element_id` and `modeltext.set_text(element_id, text)`.
 
 **Acceptance criteria.**
-- [ ] The text "ABC" at depth 50 mm produces a solid with three lumps. The "A" has an enclosed hole.
+- [x] The text "ABC" at depth 50 mm produces a solid with three lumps. The "A" has an enclosed hole.
+
+**Implementation note (2026-10-15, first build).** As built with Reviera's stroke font instead of TrueType fonts: each stroke thickened (12 % of the height) and a letter's strokes merged into one outline with its holes, pushed out of the work plane by the depth (1 mm at depth 0); `recipe.model_text` (text, plane, point, rotation, size, depth, alignment, material) on an `IfcBuildingElementProxy` (ObjectType ModelText) with a B-rep; `modeltext.create`, `modeltext.set_text`; moves and rotates with the ordinary tools. The window: Architecture › Model › Model Text. Not built yet: fonts, bold and italic, the depth-0 `IfcAnnotation`, the placement preview.
 
 ### 3.10.3 Model lines
 **ID:** ARC-MLIN-001 · **Priority:** P0 · **Ref:** research/02 §11.3

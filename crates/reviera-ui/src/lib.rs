@@ -29,6 +29,7 @@ mod grids;
 mod groups;
 mod help;
 mod icons;
+mod in_place;
 mod inserts;
 mod inspect;
 mod levels;
@@ -318,6 +319,8 @@ struct Gui {
     attach_pick: Option<Vec<ElementId>>,
     /// A wall waiting for its new host (Pick New Host).
     host_pick: Option<ElementId>,
+    /// Model Text waiting for its click: text, height, depth.
+    text_pick: Option<(String, f64, f64)>,
     /// Place Group: the group type placed at each click.
     group_pick: Option<String>,
     /// The Area tool: its area plan and the area type it places.
@@ -1320,7 +1323,10 @@ impl Gui {
         if self.host_pick.take().is_some() {
             return frame.set_status_text("Pick New Host cancelled", 0);
         }
-        if self.area_pick.take().is_some() || self.group_pick.take().is_some() {
+        if self.area_pick.take().is_some()
+            || self.group_pick.take().is_some()
+            || self.text_pick.take().is_some()
+        {
             return frame.set_status_text("Ready", 0);
         }
         match &mut self.tool {
@@ -2609,6 +2615,7 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                     None if g.host_pick.is_some() => g.host_click(x, y, &p),
                     None if g.area_pick.is_some() => g.area_click(x, y),
                     None if g.group_pick.is_some() => g.group_click(x, y),
+                    None if g.text_pick.is_some() => g.model_text_click(x, y),
                     None if g.sketch.is_some() => g.sketch_click(x, y),
                     None if g.ceiling_tool.is_some() => g.ceiling_click(x, y),
                     None if g.room_tool.is_some() => g.room_click(x, y),
@@ -3235,6 +3242,7 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 host_pick: None,
                 area_pick: None,
                 group_pick: None,
+                text_pick: None,
                 wall_location: Default::default(),
                 model_tree,
                 tree: inspect::ModelTree {
@@ -3786,6 +3794,11 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         }),
         "colorscheme.create" => with(gui, Gui::color_scheme_dialog),
         "group.create" => with(gui, Gui::create_group),
+        "inplace.create" => with(gui, Gui::model_in_place),
+        "modeltext.create" => with(gui, |g| {
+            g.start_model_text();
+            focus(g);
+        }),
         "group.place" => with(gui, |g| {
             g.start_place_group();
             focus(g);

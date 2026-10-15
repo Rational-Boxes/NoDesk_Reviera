@@ -533,6 +533,9 @@ impl LocalProject {
                 || recipe_kind == Some(railings::GATE_RECIPE)
                 || recipe_kind == Some(reviera_core::slab_edges::RECIPE)
                 || recipe_kind == Some(reviera_core::wall_sweeps::RECIPE)
+                || recipe_kind == Some(reviera_core::model_text::RECIPE)
+                || recipe_kind == Some(reviera_core::in_place::RECIPE)
+                || recipe_kind == Some(reviera_core::in_place::VOID_RECIPE)
             {
                 geometry::remove_breps(&mut self.ifc, step)?;
             }
@@ -718,6 +721,7 @@ impl LocalProject {
             self.write_ramps(doc)?;
             self.write_slab_edges(doc)?;
             self.write_wall_sweeps(doc)?;
+            self.write_model_texts(doc)?;
             self.write_skylights(doc)?;
             let owner_history = self.new_owner_history()?;
             crate::mesh_objects::write_mesh_objects(
@@ -1842,6 +1846,66 @@ impl LocalProject {
             )?;
             let storey = reviera_core::wall_sweeps::recipe(store.get(*id).expect("listed"))
                 .and_then(|r| GlobalId::parse(&r.level))
+                .and_then(|g| store.find_by_guid(&g))
+                .and_then(|l| self.steps.get(&l).copied());
+            if let Some(storey) = storey {
+                geometry::contain(&mut self.ifc, step, storey, owner_history)?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Writes every model text (ARC-MTXT-001): its letters as faceted B-reps, contained in its
+    /// work plane's level when it is on one.
+    fn write_model_texts(&mut self, doc: &Document) -> Result<()> {
+        let store = doc.store();
+        // In-place elements and their voids are written the same way (ARC-INPL-001).
+        let mut all = reviera_core::model_text::all(store);
+        all.extend(
+            reviera_core::in_place::all(store)
+                .into_iter()
+                .map(|(id, _, meshes)| (id, meshes)),
+        );
+        if all.is_empty() {
+            return Ok(());
+        }
+        let contexts = geometry::Contexts::find(&self.ifc)?;
+        let owner_history = self.new_owner_history()?;
+        for (id, meshes) in &all {
+            let Some(&step) = self.steps.get(id) else {
+                continue;
+            };
+            let solids: Vec<geometry::Polyhedron> = meshes
+                .iter()
+                .map(|(points, indices)| geometry::Polyhedron {
+                    points: points.clone(),
+                    faces: indices
+                        .chunks(3)
+                        .map(|t| t.iter().map(|i| *i as usize).collect())
+                        .collect(),
+                })
+                .collect();
+            geometry::write_breps(
+                &mut self.ifc,
+                step,
+                geometry::BrepFrame::WORLD,
+                &solids,
+                self.length_scale,
+                contexts,
+            )?;
+            let e = store.get(*id).expect("listed");
+            let plane = reviera_core::model_text::recipe(e)
+                .map(|r| r.plane)
+                .or_else(|| {
+                    reviera_core::in_place::recipe(e)
+                        .and_then(|r| r.forms.first().map(|f| f.plane.clone()))
+                });
+            let storey = plane
+                .and_then(|plane| match plane {
+                    reviera_core::work_planes::WorkPlaneRef::Level { level, .. } => Some(level),
+                    _ => None,
+                })
+                .and_then(|g| GlobalId::parse(&g))
                 .and_then(|g| store.find_by_guid(&g))
                 .and_then(|l| self.steps.get(&l).copied());
             if let Some(storey) = storey {

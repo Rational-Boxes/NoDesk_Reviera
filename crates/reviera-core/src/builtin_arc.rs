@@ -160,6 +160,11 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(CurtainSetPanelType),
         registry.add(CurtainSetLayout),
         registry.add(RoofCreateGlazingType),
+        registry.add(ModelTextCreate),
+        registry.add(InPlaceCreate),
+        registry.add(InPlaceAddForm),
+        registry.add(InPlaceRemoveForm),
+        registry.add(ModelTextSet),
         registry.add(GroupCreate),
         registry.add(GroupPlace),
         registry.add(GroupUngroup),
@@ -2088,6 +2093,67 @@ read_command!(
     crate::selection_sets::ListParams,
     Vec<crate::selection_sets::SetInfo>,
     |store, p| crate::selection_sets::list(store, p)
+);
+
+edit_command!(
+    InPlaceCreate,
+    "inplace.create",
+    "Model in place",
+    "A unique free-form element (ARC-INPL-001) of a `category` (Generic Models, Walls, Floors, Roofs, \
+     Ceilings, Columns, Casework, Furniture, Stairs, Railings), named, with forms: each `kind` \
+     extrusion (`start`, `end` out of its plane), blend (`top` profile, `start`, `end`), revolve \
+     (`axis` two points in the plane, `start`, `end` angles) or sweep (`path` in plan, `z`, \
+     `closed`; the profile x across, y up), with a `profile` in its work plane, solid or `void`.",
+    "Model In-Place",
+    crate::in_place::CreateParams,
+    crate::id::ElementId,
+    crate::in_place::create
+);
+
+edit_command!(
+    InPlaceAddForm,
+    "inplace.add_form",
+    "Add a form to an in-place element",
+    "Adds a solid or void form (as in inplace.create) to an in-place element; returns its index.",
+    "Add Form",
+    crate::in_place::AddFormParams,
+    usize,
+    crate::in_place::add_form
+);
+
+edit_command!(
+    InPlaceRemoveForm,
+    "inplace.remove_form",
+    "Remove a form from an in-place element",
+    "Removes an in-place element's form by index.",
+    "Remove Form",
+    crate::in_place::RemoveFormParams,
+    (),
+    crate::in_place::remove_form
+);
+
+edit_command!(
+    ModelTextCreate,
+    "modeltext.create",
+    "Place model text",
+    "Three-dimensional lettering on a work plane (ARC-MTXT-001): `text` (line breaks for lines), at \
+     `point` in the plane, `size` letter height (default 300 mm), `depth` out of the plane (0 flat), \
+     `rotation`, `align` left, center or right.",
+    "Model Text",
+    crate::model_text::CreateParams,
+    crate::id::ElementId,
+    crate::model_text::create
+);
+
+edit_command!(
+    ModelTextSet,
+    "modeltext.set_text",
+    "Edit model text",
+    "Changes a model text's text, size, depth, alignment or material.",
+    "Edit Text",
+    crate::model_text::SetParams,
+    (),
+    crate::model_text::set
 );
 
 edit_command!(

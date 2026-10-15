@@ -348,6 +348,23 @@ pub fn all(store: &Store) -> Vec<Body> {
     for (id, g) in crate::columns::all(store) {
         push(id, "IfcColumn", g.mesh(), false);
     }
+    // In-place elements (ARC-INPL-001), their voids subtracted through the boolean relations.
+    for (id, void, meshes) in crate::in_place::all(store) {
+        let class = if void {
+            "IfcOpeningElement".to_owned()
+        } else {
+            class_of(id, "IfcBuildingElementProxy")
+        };
+        for mesh in meshes {
+            push(id, &class, mesh, false);
+        }
+    }
+    // Model text (ARC-MTXT-001).
+    for (id, meshes) in crate::model_text::all(store) {
+        for mesh in meshes {
+            push(id, "IfcBuildingElementProxy", mesh, false);
+        }
+    }
     // Slab edges (ARC-SLED-001).
     for (id, g) in crate::slab_edges::all(store) {
         push(id, "IfcSlab", g.mesh, false);

@@ -295,6 +295,40 @@ pub fn transform(
             };
             crate::model_lines::transform(txn, target, &|p| x.point(p), dz)?;
             out.push(target);
+        } else if crate::in_place::recipe(e).is_some() {
+            // A copy is another, independent in-place element, with a name of its own.
+            let target = if copy {
+                let base = e.name.clone().unwrap_or_else(|| "In-Place".into());
+                let taken: Vec<String> = txn
+                    .store()
+                    .iter()
+                    .filter(|o| crate::in_place::recipe(o).is_some())
+                    .filter_map(|o| o.name.clone())
+                    .collect();
+                let name = (2..)
+                    .map(|n| format!("{base} {n}"))
+                    .find(|n| !taken.contains(n))
+                    .expect("a free name");
+                let mut n = copied(e);
+                n.name = Some(name);
+                txn.create(n)?
+            } else {
+                id
+            };
+            let dz = match x {
+                Xform::Translate(v) => v[2],
+                _ => 0.0,
+            };
+            crate::in_place::transform(txn, target, &|p| x.point(p), dz)?;
+            out.push(target);
+        } else if crate::model_text::recipe(e).is_some() {
+            let target = if copy { txn.create(copied(e))? } else { id };
+            let dz = match x {
+                Xform::Translate(v) => v[2],
+                _ => 0.0,
+            };
+            crate::model_text::transform(txn, target, &|p| x.point(p), dz)?;
+            out.push(target);
         } else if let Some(s) = crate::skylights::skylight_recipe(e) {
             // With its roof in the selection, the roof carries it.
             let roof = crate::id::GlobalId::parse(&s.roof).and_then(|g| store.find_by_guid(&g));

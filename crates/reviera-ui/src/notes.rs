@@ -39,7 +39,7 @@ const TAG_ALL: &[(&str, &str)] = &[
 ];
 
 /// Asks for a note's text in a multi-line box; `None` when cancelled.
-fn ask_text(frame: &Frame, title: &str, current: &str) -> Option<String> {
+pub(crate) fn ask_text(frame: &Frame, title: &str, current: &str) -> Option<String> {
     let dialog = Dialog::builder(frame, title)
         .with_style(DialogStyle::DefaultDialogStyle | DialogStyle::ResizeBorder)
         .with_size(460, 280)

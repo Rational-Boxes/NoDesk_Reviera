@@ -379,6 +379,12 @@ Create … Boundary* tab:
   the walls open up. Plans label each room with its name, number and area. Saved as `IfcSpace`
   (Name = Number, LongName = Name) under its storey (`room.place`,
   `room.place_automatically`, `room.set`).
+- **Model In-Place** (Architecture › Model): free-form elements of a chosen category from
+  extrusions, blends, revolves and sweeps on work planes, solid or void (voids cut through the
+  boolean relations); made in the window from selected model lines (`inplace.create`,
+  `inplace.add_form`, `inplace.remove_form`; ARC-INPL-001).
+- **Model Text** (Architecture › Model): 3D lettering on a work plane, each letter a solid with
+  its holes, any depth (`modeltext.create`, `modeltext.set_text`; ARC-MTXT-001).
 - **Groups** (Architecture › Model, Modify | Model Groups): model groups made from a selection
   and placed by clicking, members read-only outside the group editor (Add, Remove, Finish
   remakes every instance, Cancel), excluding and restoring members per instance, Ungroup;
@@ -699,8 +705,9 @@ area by area (a review against the spec on 2026-10-15). Whole areas not started 
   ARC-ROOF-005, ARC-SHAPE-001, ARC-SLED-001, ARC-PART-001 … 004).
 - **Rooms and areas**: drawing area boundaries by hand in the window, the glass line, area tags and
   schedules per scheme, colour fill legends and patterns (ARC-AREA-001, ARC-CLR-001).
-- **Modelling in the project**: Model In-Place, model text, converting model lines to detail
-  lines (ARC-INPL-001, ARC-MTXT-001, ARC-MLIN-001).
+- **Modelling in the project**: the in-place editor session, swept blends, in-place hosts and
+  room bounding, TrueType fonts for model text, converting model lines to detail lines
+  (ARC-INPL-001, ARC-MTXT-001, ARC-MLIN-001).
 - **Massing and site**: masses, mass floors, model by face, toposolids, sub-divisions and
   excavation, graded regions, contours, site components, parking and property lines
   (ARC-MASS-001 … 003, ARC-TOPO-001 … 006, ARC-SITE-001).

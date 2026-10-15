@@ -79,6 +79,12 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "equality" => format!(
             r#"<path d="M4 8v16M16 8v16M28 8v16" {s}/><path d="M4 16h24" {sa}/><path d="M8 12h4M8 14h4M20 12h4M20 14h4" {sa}/>"#
         ),
+        "in_place" => format!(
+            r#"<path d="M6 26V12l10-8 10 8v14z" fill="{f}" {s}/><path d="M12 26v-8h8v8" fill="{paper}" {sa}/>"#
+        ),
+        "model_text" => format!(
+            r#"<path d="M5 26L12 6h3l7 20M8 19h11" fill="none" {s}/><path d="M22 26h6" {sa}/>"#
+        ),
         "group_place" => format!(
             r#"<path d="M4 4h10v10H4zM18 18h10v10H18z" fill="{f}" {s}/><path d="M14 14l4 4" {sa}/>"#
         ),
