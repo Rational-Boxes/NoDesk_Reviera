@@ -13797,13 +13797,13 @@ These tools are on the **Modify** tab and are repeated on every `Modify | <Eleme
 ### 3.12.3a Array along a path
 **ID:** ARC-MOD-033 · **Priority:** P1 · **Ref:** owner requirement (2026-10-14); ARC-MOD-026, DM-IMP-015, DM-LIB-002 … 004; Reviera's own design
 
-**Purpose.** Repeat a component along any path, keeping it parametric: change the path, the count or the spacing, and the copies follow. This holds even when the component is a plain mesh with no parameters of its own. A typical use is a custom column model filling a Greek temple's colonnade: columns round the stylobate, one at every corner, and equal spacing along each side. Other uses are balusters along a curved balcony, lamp posts along a road, trees along an avenue and bollards along a kerb. *(Owner requirement, 2026-10-14: "a duplicate-along-a-path tool… a custom column model to fill in a Greek temple style facade; set the number of duplicates to space along the path; remains parametric even though the individual objects are plain meshes".)*
+**Purpose.** Repeat a component along any path, keeping it parametric: change the path, the count or the spacing, and the copies follow. This holds even when the component is a plain mesh with no parameters of its own. A typical use is a custom column model filling a Greek temple's colonnade: columns round the stylobate, one at every corner, and equal spacing along each side. Other uses are a hedge of shrubs along a curving garden edge, balusters along a curved balcony, lamp posts along a road, trees along an avenue and bollards along a kerb. *(Owner requirement, 2026-10-14: "a duplicate-along-a-path tool… a custom column model to fill in a Greek temple style facade; set the number of duplicates to space along the path; remains parametric even though the individual objects are plain meshes".)*
 
 **Workflow.**
 1. Select what to repeat: a component instance or several elements, or pick a component in the Component Library. Then choose Modify › **Array along Path** (or **Path Array** in the middle-click quick menu, UI-SEL-006).
 2. Give the path, in one of three ways:
    - **Pick** an existing line: a wall's location line, a curtain wall, a grid line, a railing's path, a model line, or an edge of a floor, roof, deck or slab. Several picked lines chain into one path (Tab picks a chain).
-   - **Draw** a line, arc, spline or polyline in a plan or on a work plane.
+   - **Draw** a line, arc, spline or polyline in a plan or on a work plane. A spline is drawn through clicked points and keeps its grips for reshaping.
    - **Use the edges** of a selected floor, deck or roof as one closed path: *Edges of Host*.
 3. Set the distribution in the options bar. A preview shows every copy as the values change. Enter or Finish makes the array.
 
@@ -13825,6 +13825,13 @@ These tools are on the **Modify** tab and are repeated on every `Modify | <Eleme
   - **Fixed:** every copy keeps the source's rotation.
   - **Face outward or inward:** perpendicular to the path, outward from a closed path's centre or inward to it, as columns face out from a temple.
   - Plus a *rotation offset*, and *alternate mirror* (every second copy mirrored, P2).
+- **Variation**, for planting and other natural things, so a hedge does not look stamped out:
+  - a random rotation about the vertical (a range, or any angle);
+  - a random uniform scale within a range, for example 85–115 %;
+  - a random choice among several components, for example three shrub models, with weights;
+  - a small random offset across the path.
+
+  Variation is seeded: it stays the same through regeneration and reopening, and **Reseed** gives a new arrangement. A copy's varied values are kept by index, so adding copies at the end does not reshuffle the rest.
 - **Height:**
   - In plan, copies stand on the array's level, plus an offset.
   - **Follow path height** sets each copy's base from the path's height at that point, as for a sloped edge or a 3D spline.
@@ -13857,7 +13864,7 @@ These tools are on the **Modify** tab and are repeated on every `Modify | <Eleme
 - A drawn path is stored in the recipe. A picked path stores the element's GlobalId and which curve (its location line, or the edge index).
 
 **Commands.**
-`array.along_path(source: element_ids[] | type_id | item_ref, path: {curve} | {element_id, edge?} | {host_edges: element_id}, distribution: {mode: "number"|"fixed"|"max"|"min", value, justify?: "start"|"end"|"centre"}, options?: {include_start?, include_end?, start_inset?, end_inset?, corners?: "through"|"every_corner"|"skip", orientation?: "follow"|"fixed"|"outward"|"inward", rotation_offset?, alternate_mirror?, height?: "level"|"path"|"host_face", level_id?, offset?}) -> array_id` ·
+`array.along_path(source: element_ids[] | type_id | item_ref, path: {curve} | {element_id, edge?} | {host_edges: element_id}, distribution: {mode: "number"|"fixed"|"max"|"min", value, justify?: "start"|"end"|"centre"}, options?: {include_start?, include_end?, start_inset?, end_inset?, corners?: "through"|"every_corner"|"skip", orientation?: "follow"|"fixed"|"outward"|"inward", rotation_offset?, alternate_mirror?, variation?: {rotation_range?, scale_range?, sources?: [{type_id|item_ref, weight}], jitter?, seed?}, height?: "level"|"path"|"host_face", level_id?, offset?}) -> array_id` ·
 `array.set(array_id, {source?, path?, distribution?, options?})` ·
 `array.exclude_member(array_id, index)` · `array.restore_member(array_id, index | "all")` ·
 `array.unarray(array_id) -> element_ids[]`.
@@ -13870,6 +13877,7 @@ These tools are on the **Modify** tab and are repeated on every `Modify | <Eleme
 - [ ] Excluding the middle column of the front row leaves a gap that survives changing the column component to an Ionic one.
 - [ ] Balusters arrayed along a curved railing path with *Maximum Spacing* 110 mm follow the curve, each turned to its tangent, and stay within 110 mm when the railing is lengthened.
 - [ ] Unarray leaves 34 independent columns where they stood, and the array element is gone.
+- [ ] A hedge is made from two shrub meshes arrayed along a drawn spline at a maximum spacing of 0.6 m, with any rotation and a scale of 85–115 %. Dragging a spline grip reshapes the hedge, and each shrub keeps its rotation and scale. Reseed changes the arrangement.
 
 ---
 
