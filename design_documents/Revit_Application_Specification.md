@@ -14078,6 +14078,8 @@ These tools are on the **Modify** tab and are repeated on every `Modify | <Eleme
 - [ ] Ungroup leaves the elements in place as independent elements, and the group type remains in the project.
 - [ ] IFC export writes one `IfcGroup` per instance with the right members, and the file still opens in an IFC viewer after the RXD data has been stripped.
 
+
+**Implementation note (2026-10-15, first build).** As built: model groups. A type (`rxd:group_types` on the project) keeps a template of its members' element data with the frame (origin, rotation) of the instance it was taken from; an instance is an `IfcGroup` with `recipe.group` (type, origin, rotation, members by key, excluded keys) whose members are real elements tagged `rxd:group_member`. Placing makes members from the template, references between members remapped to the new elements, then turned and moved into place (doors and windows follow their walls); members are refused edits outside the editor. IFC: `IfcRelAssignsToGroup` per instance. Commands: `group.create`, `group.place`, `group.swap_type`, `group.duplicate_type`, `group.rename_type`, `group.ungroup`, `group.list`. The window: Architecture › Model (Place Group, Create Group), Modify | Model Groups. Not built yet: detail and attached detail groups, nested groups, member GlobalIds kept when instances are remade, rehosting members whose host is outside the group, the origin's drag controls, Origin Level Offset.
 ### 3.13.2 Group editor
 **ID:** ARC-GRP-002 · **Priority:** P1 · **Ref:** research/02 §14
 
@@ -14098,7 +14100,9 @@ These tools are on the **Modify** tab and are repeated on every `Modify | <Eleme
 - `group.cancel(session_id)`
 
 **Acceptance criteria.**
-- [ ] Cancel in the group editor leaves every instance unchanged.
+- [x] Cancel in the group editor leaves every instance unchanged.
+
+**Implementation note (2026-10-15, first build).** As built: `group.edit` opens the editor on one instance (`rxd:group_edit` on the project), whose members can then be changed; `group.add_members`, `group.remove_members`; `group.finish` takes the template from the instance and remakes the type's other instances; `group.cancel` hands back elements added, takes back members removed and remakes the instance from the template. The window: the Edit Group tab (Add, Remove, Finish, Cancel). Not built yet: half-tone of the elements outside, Attach, the identity warning.
 
 ### 3.13.3 Excluding members, saving, loading and converting to a link
 **ID:** ARC-GRP-003 · **Priority:** P1 · **Ref:** research/02 §14
@@ -14119,8 +14123,10 @@ These tools are on the **Modify** tab and are repeated on every `Modify | <Eleme
 - `group.convert_to_link(instance_ids, target: NewFile(path)|ExistingFile(path)) -> link_id`
 
 **Acceptance criteria.**
-- [ ] An excluded member is absent from the schedule and the IFC export for that instance only.
+- [x] An excluded member is absent from the schedule and the IFC export for that instance only.
 - [ ] A group saved to `.ifc` and loaded into another project produces the same members, with new GlobalIds.
+
+**Implementation note (2026-10-15, first build).** As built: `group.exclude_member` (by element or key) removes the member from that instance (so it is not scheduled or exported there), `group.restore_member` (one or all) makes it again from the template, `group.move_member_to_project` leaves it as an independent element. Not built yet: Save Group, Load as Group, converting to a link.
 
 ---
 
@@ -14244,10 +14250,12 @@ These commands are session-only and are not undoable.
 - `selectionset.rename(id, name)` and `selectionset.list() -> [{id, name, count}]` *(query)*
 
 **Acceptance criteria.**
-- [ ] A saved set of 12 elements, one of which is later deleted, loads 11 elements without error.
+- [x] A saved set of 12 elements, one of which is later deleted, loads 11 elements without error.
 - [ ] Saving a set with the name of an existing view filter offers Replace or Cancel; Cancel changes nothing.
 - [ ] In Edit Selection mode, window-selecting three walls with *Remove from Selection* active and pressing Finish leaves the set three members smaller, as one undo step.
 - [ ] Exporting with *Selection sets as IfcGroup* gives one `IfcGroup` per set, whose `IfcRelAssignsToGroup` lists exactly the member elements.
+
+**Implementation note (2026-10-15, first build).** As built: sets on the project (`rxd:selection_sets`, GlobalIds); `selectionset.save` (a taken name is refused unless `replace`; members of groups join as their group), `selectionset.load`, `selectionset.edit`, `selectionset.delete`, `selectionset.rename`, `selectionset.list`. The window: Manage › Selection › Save Selection (asks to replace a taken name) and Load Selection. Not built yet: the shared name space and use as view filters, Edit Selection mode, the visible-in-view option, `IfcGroup` export.
 
 ---
 

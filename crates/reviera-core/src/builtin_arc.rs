@@ -160,6 +160,27 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(CurtainSetPanelType),
         registry.add(CurtainSetLayout),
         registry.add(RoofCreateGlazingType),
+        registry.add(GroupCreate),
+        registry.add(GroupPlace),
+        registry.add(GroupUngroup),
+        registry.add(GroupSwapType),
+        registry.add(GroupDuplicateType),
+        registry.add(GroupRenameType),
+        registry.add(GroupEdit),
+        registry.add(GroupAddMembers),
+        registry.add(GroupRemoveMembers),
+        registry.add(GroupFinish),
+        registry.add(GroupCancel),
+        registry.add(GroupExcludeMember),
+        registry.add(GroupRestoreMember),
+        registry.add(GroupMoveMemberToProject),
+        registry.add(SelectionSetSave),
+        registry.add(SelectionSetEdit),
+        registry.add(SelectionSetDelete),
+        registry.add(SelectionSetRename),
+        registry.add(GroupList),
+        registry.add(SelectionSetLoad),
+        registry.add(SelectionSetList),
         registry.add(ColorSchemeCreate),
         registry.add(ColorSchemeSetRows),
         registry.add(ColorSchemeDuplicate),
@@ -1836,6 +1857,237 @@ read_command!(
     crate::areas::ListParams,
     Vec<crate::areas::AreaListItem>,
     |store, p| crate::areas::list(store, p)
+);
+
+edit_command!(
+    GroupCreate,
+    "group.create",
+    "Create a group",
+    "Makes the elements (and the doors and windows of walls among them) the first instance of a new group type (ARC-GRP-001); its origin is the middle of their extent. Returns the type's key and the instance.",
+    "Create Group",
+    crate::groups::CreateParams,
+    crate::groups::Created,
+    crate::groups::create
+);
+
+edit_command!(
+    GroupPlace,
+    "group.place",
+    "Place a group",
+    "A new instance of a group type with its origin at `point`, turned by `rotation`: its members are made from the type's template.",
+    "Place Group",
+    crate::groups::PlaceParams,
+    crate::id::ElementId,
+    crate::groups::place
+);
+
+edit_command!(
+    GroupUngroup,
+    "group.ungroup",
+    "Ungroup",
+    "Group instances go; their members stay as independent elements.",
+    "Ungroup",
+    crate::groups::InstancesParams,
+    Vec<crate::id::ElementId>,
+    crate::groups::ungroup
+);
+
+edit_command!(
+    GroupSwapType,
+    "group.swap_type",
+    "Swap group type",
+    "Instances become another group type at their origins.",
+    "Swap Group",
+    crate::groups::SwapParams,
+    (),
+    crate::groups::swap_type
+);
+
+edit_command!(
+    GroupDuplicateType,
+    "group.duplicate_type",
+    "Duplicate a group type",
+    "A copy of a group type under a new name; returns its key.",
+    "Duplicate Group",
+    crate::groups::TypeNameParams,
+    String,
+    crate::groups::duplicate_type
+);
+
+edit_command!(
+    GroupRenameType,
+    "group.rename_type",
+    "Rename a group type",
+    "Renames a group type and its instances.",
+    "Rename Group",
+    crate::groups::TypeNameParams,
+    (),
+    crate::groups::rename_type
+);
+
+edit_command!(
+    GroupEdit,
+    "group.edit",
+    "Edit a group",
+    "Opens the group editor on an instance (ARC-GRP-002): its members can then be changed, added (group.add_members) and removed (group.remove_members) until group.finish or group.cancel.",
+    "Edit Group",
+    crate::groups::InstanceParams,
+    (),
+    crate::groups::edit
+);
+
+edit_command!(
+    GroupAddMembers,
+    "group.add_members",
+    "Add to the edited group",
+    "Elements join the group being edited.",
+    "Add to Group",
+    crate::groups::MembersParams,
+    (),
+    crate::groups::add_members
+);
+
+edit_command!(
+    GroupRemoveMembers,
+    "group.remove_members",
+    "Remove from the edited group",
+    "Members leave the group being edited (they stay as elements).",
+    "Remove from Group",
+    crate::groups::MembersParams,
+    (),
+    crate::groups::remove_members
+);
+
+edit_command!(
+    GroupFinish,
+    "group.finish",
+    "Finish editing a group",
+    "The edited instance becomes its type's template and every other instance of the type is remade from it.",
+    "Finish Group",
+    crate::groups::NoParams,
+    (),
+    crate::groups::finish
+);
+
+edit_command!(
+    GroupCancel,
+    "group.cancel",
+    "Cancel editing a group",
+    "The edited instance is remade from its type as it was; elements added go back to being independent.",
+    "Cancel Group",
+    crate::groups::NoParams,
+    (),
+    crate::groups::cancel
+);
+
+edit_command!(
+    GroupExcludeMember,
+    "group.exclude_member",
+    "Exclude a group member",
+    "A member (by element or key) is gone from this instance only (ARC-GRP-003).",
+    "Exclude",
+    crate::groups::MemberParams,
+    (),
+    crate::groups::exclude_member
+);
+
+edit_command!(
+    GroupRestoreMember,
+    "group.restore_member",
+    "Restore excluded members",
+    "An excluded member (or all, without `member_key`) comes back.",
+    "Restore Excluded",
+    crate::groups::RestoreParams,
+    (),
+    crate::groups::restore_member
+);
+
+edit_command!(
+    GroupMoveMemberToProject,
+    "group.move_member_to_project",
+    "Move a member to the project",
+    "A member leaves this instance as an independent element; returns it.",
+    "Move to Project",
+    crate::groups::MemberParams,
+    crate::id::ElementId,
+    crate::groups::move_member_to_project
+);
+
+edit_command!(
+    SelectionSetSave,
+    "selectionset.save",
+    "Save a selection",
+    "Names a set of elements (ARC-SEL-002); members of groups join as their group. A taken name is refused unless `replace`. Returns its key.",
+    "Save Selection",
+    crate::selection_sets::SaveParams,
+    String,
+    crate::selection_sets::save
+);
+
+edit_command!(
+    SelectionSetEdit,
+    "selectionset.edit",
+    "Edit a saved selection",
+    "Adds and removes members of a saved selection.",
+    "Edit Selection",
+    crate::selection_sets::EditParams,
+    (),
+    crate::selection_sets::edit
+);
+
+edit_command!(
+    SelectionSetDelete,
+    "selectionset.delete",
+    "Delete a saved selection",
+    "Deletes a saved selection.",
+    "Delete Selection",
+    crate::selection_sets::SetParams,
+    (),
+    crate::selection_sets::delete
+);
+
+edit_command!(
+    SelectionSetRename,
+    "selectionset.rename",
+    "Rename a saved selection",
+    "Renames a saved selection.",
+    "Rename Selection",
+    crate::selection_sets::RenameParams,
+    (),
+    crate::selection_sets::rename
+);
+
+read_command!(
+    GroupList,
+    "group.list",
+    "List groups",
+    "Group types with their member counts and instances.",
+    [Effect::Read],
+    crate::groups::NoParams,
+    Vec<crate::groups::TypeInfo>,
+    |store, p| crate::groups::list(store, p)
+);
+
+read_command!(
+    SelectionSetLoad,
+    "selectionset.load",
+    "Load a saved selection",
+    "The members of a saved selection that still exist (select them with selection.set).",
+    [Effect::Read],
+    crate::selection_sets::SetParams,
+    Vec<crate::id::ElementId>,
+    |store, p| crate::selection_sets::load(store, p)
+);
+
+read_command!(
+    SelectionSetList,
+    "selectionset.list",
+    "List saved selections",
+    "Saved selections by name with their member counts.",
+    [Effect::Read],
+    crate::selection_sets::ListParams,
+    Vec<crate::selection_sets::SetInfo>,
+    |store, p| crate::selection_sets::list(store, p)
 );
 
 edit_command!(

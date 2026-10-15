@@ -26,6 +26,7 @@ mod dormers;
 mod drawing_aids;
 mod footprint;
 mod grids;
+mod groups;
 mod help;
 mod icons;
 mod inserts;
@@ -317,6 +318,8 @@ struct Gui {
     attach_pick: Option<Vec<ElementId>>,
     /// A wall waiting for its new host (Pick New Host).
     host_pick: Option<ElementId>,
+    /// Place Group: the group type placed at each click.
+    group_pick: Option<String>,
     /// The Area tool: its area plan and the area type it places.
     area_pick: Option<(ElementId, String)>,
     /// The Location Line the Wall tool draws on (kept between uses).
@@ -1317,7 +1320,7 @@ impl Gui {
         if self.host_pick.take().is_some() {
             return frame.set_status_text("Pick New Host cancelled", 0);
         }
-        if self.area_pick.take().is_some() {
+        if self.area_pick.take().is_some() || self.group_pick.take().is_some() {
             return frame.set_status_text("Ready", 0);
         }
         match &mut self.tool {
@@ -1779,6 +1782,15 @@ impl Gui {
                 .set_context(Some(("Place Room", Some("session.room"))));
             return;
         }
+        // The group editor (ARC-GRP-002).
+        if self
+            .store_now()
+            .is_some_and(|s| reviera_core::groups::editing(&s).is_some())
+        {
+            self.ribbon
+                .set_context(Some(("Edit Group", Some("session.group"))));
+            return;
+        }
         let ids = self.selection();
         let store = self
             .doc
@@ -1805,6 +1817,9 @@ impl Gui {
                         }
                         if reviera_core::path_arrays::path_array_recipe(e).is_some() {
                             return Some("ctx.path_arrays");
+                        }
+                        if reviera_core::groups::instance_of(e).is_some() {
+                            return Some("ctx.groups");
                         }
                         reviera_core::categories::category_of(e).map(|c| c.key)
                     })
@@ -2593,6 +2608,7 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                     None if g.attach_pick.is_some() => g.attach_click(x, y, &p),
                     None if g.host_pick.is_some() => g.host_click(x, y, &p),
                     None if g.area_pick.is_some() => g.area_click(x, y),
+                    None if g.group_pick.is_some() => g.group_click(x, y),
                     None if g.sketch.is_some() => g.sketch_click(x, y),
                     None if g.ceiling_tool.is_some() => g.ceiling_click(x, y),
                     None if g.room_tool.is_some() => g.room_click(x, y),
@@ -3218,6 +3234,7 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 attach_pick: None,
                 host_pick: None,
                 area_pick: None,
+                group_pick: None,
                 wall_location: Default::default(),
                 model_tree,
                 tree: inspect::ModelTree {
@@ -3768,6 +3785,21 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
             focus(g);
         }),
         "colorscheme.create" => with(gui, Gui::color_scheme_dialog),
+        "group.create" => with(gui, Gui::create_group),
+        "group.place" => with(gui, |g| {
+            g.start_place_group();
+            focus(g);
+        }),
+        "group.edit" => with(gui, Gui::edit_group),
+        "group.add_members" => with(gui, Gui::group_add),
+        "group.remove_members" => with(gui, Gui::group_remove),
+        "group.finish" => with(gui, Gui::group_finish),
+        "group.cancel" => with(gui, Gui::group_cancel),
+        "group.exclude_member" => with(gui, Gui::group_exclude),
+        "group.restore_member" => with(gui, Gui::group_restore),
+        "group.ungroup" => with(gui, Gui::ungroup),
+        "selectionset.save" => with(gui, Gui::save_selection),
+        "selectionset.load" => with(gui, Gui::load_selection),
         "roof.create_glazing_type" => with(gui, Gui::sloped_glazing),
         "wallsweep.create" => with(gui, Gui::wall_sweep),
         "wall.create_by_room" => with(gui, Gui::linings),

@@ -935,6 +935,80 @@ icon = "sloped_glazing"
 help = "Turn the selected roofs into sloped glazing (a Sloped Glazing type, made if there is none); change their type back to undo"
 
 [[action]]
+id = "group.place"
+label = "Place Group"
+icon = "group_place"
+help = "Place an instance of a group: choose it, then click where its origin goes in a plan"
+
+[[action]]
+id = "group.create"
+label = "Create Group"
+icon = "group_create"
+help = "Make the selected elements a group; doors and windows of walls come along"
+keys = "GP"
+
+[[action]]
+id = "group.edit"
+label = "Edit Group"
+icon = "group_edit"
+help = "Edit the selected member's group; then Add, Remove, Finish or Cancel"
+keys = "EG"
+
+[[action]]
+id = "group.ungroup"
+label = "Ungroup"
+icon = "group_ungroup"
+help = "Break the selected member's group into independent elements"
+
+[[action]]
+id = "group.add_members"
+label = "Add to Group"
+icon = "group_add"
+help = "While editing a group: add the selected elements to it"
+
+[[action]]
+id = "group.remove_members"
+label = "Remove from Group"
+icon = "group_remove"
+help = "While editing a group: take the selected members out of it"
+
+[[action]]
+id = "group.finish"
+label = "Finish Group"
+icon = "finish"
+help = "Finish editing the group: every instance of it follows"
+
+[[action]]
+id = "group.cancel"
+label = "Cancel Group"
+icon = "cancel"
+help = "Cancel editing the group: it goes back as it was"
+
+[[action]]
+id = "group.exclude_member"
+label = "Exclude"
+icon = "group_exclude"
+help = "Exclude the selected member from its group instance (only this one)"
+
+[[action]]
+id = "group.restore_member"
+label = "Restore Excluded"
+icon = "group_restore"
+help = "Bring back the members excluded from the selected member's group instance"
+
+[[action]]
+id = "selectionset.save"
+label = "Save Selection"
+icon = "selection_save"
+help = "Save the selection under a name"
+
+[[action]]
+id = "selectionset.load"
+label = "Load Selection"
+icon = "selection_load"
+help = "Select a saved selection's elements"
+
+[[action]]
 id = "areaplan.create"
 label = "Area Plan"
 icon = "area_plan"
@@ -1290,6 +1364,13 @@ tools = [
   { action = "modelline.create", size = "small" },
 ]
 
+[[tab.panel]]
+label = "Model"
+tools = [
+  { action = "group.place", size = "large" },
+  { action = "group.create", size = "small" },
+]
+
 [[tab]]
 id = "annotate"
 label = "Annotate"
@@ -1411,6 +1492,13 @@ label = "Manage"
 [[tab.panel]]
 label = "Select"
 tools = [{ action = "tool.modify", size = "large" }]
+
+[[tab.panel]]
+label = "Selection"
+tools = [
+  { action = "selectionset.save", size = "large" },
+  { action = "selectionset.load", size = "large" },
+]
 
 [[tab.panel]]
 label = "Settings"
@@ -1671,6 +1759,26 @@ panels = [{ label = "Datum", tools = [
   { action = "datum.reset_to_3d", size = "large" },
   { action = "datum.maximize_3d", size = "large" },
   { action = "datum.propagate_extents", size = "large" },
+] }]
+
+[[context]]
+category = "ctx.groups"
+label = "Model Groups"
+panels = [{ label = "Group", tools = [
+  { action = "group.edit", size = "large" },
+  { action = "group.ungroup", size = "large" },
+  { action = "group.exclude_member", size = "large" },
+  { action = "group.restore_member", size = "large" },
+] }]
+
+[[context]]
+category = "session.group"
+label = "Edit Group"
+panels = [{ label = "Edit Group", tools = [
+  { action = "group.add_members", size = "large" },
+  { action = "group.remove_members", size = "large" },
+  { action = "group.finish", size = "large" },
+  { action = "group.cancel", size = "large" },
 ] }]
 
 [[context]]

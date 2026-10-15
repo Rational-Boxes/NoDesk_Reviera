@@ -130,6 +130,32 @@ curve).</p>
   <tr><td>Tags, text, viewports</td><td>Drag them in plans and on sheets.</td></tr>
 </table>
 
+<h2 id="groups">Groups</h2>
+<p>A group is a set of elements placed many times and kept identical.</p>
+<ul>
+  <li><b>Architecture › Model › Create Group</b> (<kbd>GP</kbd>) makes the selection a group
+    (doors and windows of its walls come along) and names it.</li>
+  <li><b>Place Group</b>: choose the group, then click in a plan where its origin goes (the
+    middle of the original elements); Esc ends.</li>
+  <li>Members can't be moved or deleted on their own. Select a member and use <b>Modify | Model
+    Groups › Edit Group</b> (<kbd>EG</kbd>): change the members, <b>Add</b> or <b>Remove</b>
+    selected elements, then <b>Finish</b> (every instance follows) or <b>Cancel</b>.</li>
+  <li><b>Exclude</b> removes the selected member from its instance only; <b>Restore
+    Excluded</b> brings such members back. <b>Ungroup</b> leaves the members as ordinary
+    elements.</li>
+</ul>
+<p>Each instance is saved as an <code>IfcGroup</code> with its members assigned to it.
+<code>group.create</code>, <code>group.place</code>, <code>group.edit</code>,
+<code>group.finish</code>, <code>group.cancel</code>, <code>group.exclude_member</code>,
+<code>group.restore_member</code>, <code>group.ungroup</code>, <code>group.swap_type</code></p>
+
+<h2 id="selection-sets">Saved selections</h2>
+<p><b>Manage › Selection › Save Selection</b> names the current selection; <b>Load
+Selection</b> selects a saved set again (deleted members are left out). Members of groups are
+saved as their group. <code>selectionset.save</code>, <code>selectionset.load</code>,
+<code>selectionset.edit</code>, <code>selectionset.rename</code>,
+<code>selectionset.delete</code>, <code>selectionset.list</code></p>
+
 <h2 id="delete">Deleting and pinning</h2>
 <p><b>Delete</b> (<kbd>DE</kbd>, or the <kbd>Delete</kbd> key) deletes the selection along with
 what depends on it: a wall's doors and windows, a dormer's parts. Deleting a level first lists

@@ -379,6 +379,14 @@ Create … Boundary* tab:
   the walls open up. Plans label each room with its name, number and area. Saved as `IfcSpace`
   (Name = Number, LongName = Name) under its storey (`room.place`,
   `room.place_automatically`, `room.set`).
+- **Groups** (Architecture › Model, Modify | Model Groups): model groups made from a selection
+  and placed by clicking, members read-only outside the group editor (Add, Remove, Finish
+  remakes every instance, Cancel), excluding and restoring members per instance, Ungroup;
+  `IfcGroup` with `IfcRelAssignsToGroup` (`group.create`, `group.place`, `group.edit`,
+  `group.finish`, `group.cancel`, `group.exclude_member`, `group.ungroup`, …;
+  ARC-GRP-001 … 003).
+- **Saved selections** (Manage › Selection): Save and Load Selection (`selectionset.save`,
+  `selectionset.load`, `selectionset.edit`, `selectionset.list`; ARC-SEL-002).
 - **Areas and area schemes** (Architecture › Area): Gross Building and Rentable schemes with area
   types and boundary rules, area plans (boundaries on the outside walls), picked boundaries
   placed by the rules for the areas either side, and areas (`areascheme.create`,
@@ -696,8 +704,8 @@ area by area (a review against the spec on 2026-10-15). Whole areas not started 
 - **Massing and site**: masses, mass floors, model by face, toposolids, sub-divisions and
   excavation, graded regions, contours, site components, parking and property lines
   (ARC-MASS-001 … 003, ARC-TOPO-001 … 006, ARC-SITE-001).
-- **Groups and selection sets**: group types, the group editor, excluding members, saved
-  selections (ARC-GRP-001 … 003, ARC-SEL-002).
+- **Groups and selection sets**: detail and nested groups, Save/Load Group, saved selections as
+  view filters (ARC-GRP-001 … 003, ARC-SEL-002).
 - **Stair annotation** (cut mark, path, up/down labels; ARC-STAIR-006).
 
 **Gaps in what is built:**

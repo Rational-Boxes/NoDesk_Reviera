@@ -492,6 +492,7 @@ pub fn dependents_of(store: &crate::store::Store, id: ElementId) -> Vec<ElementI
                 || crate::model_lines::recipe(e)
                     .is_some_and(|r| crate::model_lines::uses(&r, &guid))
                 || crate::slab_edges::recipe(e).is_some_and(|r| crate::slab_edges::uses(&r, &guid))
+                || crate::groups::instance_of(e).as_deref() == Some(guid.as_str())
                 || crate::wall_sweeps::recipe(e).is_some_and(|r| {
                     r.level == guid || (r.walls.len() == 1 && crate::wall_sweeps::uses(&r, &guid))
                 })

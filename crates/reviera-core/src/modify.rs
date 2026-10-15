@@ -45,6 +45,10 @@ pub fn check_unpinned(store: &Store, id: ElementId) -> Result<()> {
             format!("Element is pinned (element {id}); unpin it first"),
         ));
     }
+    // Group members change only in the group editor (ARC-GRP-001).
+    if let Some(e) = store.get(id) {
+        crate::groups::check_editable(store, e)?;
+    }
     Ok(())
 }
 

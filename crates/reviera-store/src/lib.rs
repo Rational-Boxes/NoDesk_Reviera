@@ -10,6 +10,7 @@ mod curves;
 pub mod fragments;
 mod geometry;
 mod grids;
+mod groups;
 mod local;
 mod materials;
 mod mesh_objects;

@@ -79,6 +79,36 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "equality" => format!(
             r#"<path d="M4 8v16M16 8v16M28 8v16" {s}/><path d="M4 16h24" {sa}/><path d="M8 12h4M8 14h4M20 12h4M20 14h4" {sa}/>"#
         ),
+        "group_place" => format!(
+            r#"<path d="M4 4h10v10H4zM18 18h10v10H18z" fill="{f}" {s}/><path d="M14 14l4 4" {sa}/>"#
+        ),
+        "group_create" => format!(
+            r#"<path d="M3 3h26v26H3z" fill="none" {sa} stroke-dasharray="3 2"/><path d="M7 7h8v8H7zM17 17h8v8h-8z" fill="{f}" {s}/>"#
+        ),
+        "group_edit" => format!(
+            r#"<path d="M3 3h26v26H3z" fill="none" {s} stroke-dasharray="3 2"/><path d="M9 23l2-6 10-10 4 4-10 10z" fill="{f}" {sa}/>"#
+        ),
+        "group_ungroup" => format!(
+            r#"<path d="M4 4h9v9H4zM19 19h9v9h-9z" fill="{f}" {s}/><path d="M17 4h11v11" fill="none" {sa} stroke-dasharray="3 2"/>"#
+        ),
+        "group_add" => format!(
+            r#"<path d="M3 3h20v20H3z" fill="none" {s} stroke-dasharray="3 2"/><path d="M24 18v10M19 23h10" {sa}/>"#
+        ),
+        "group_remove" => format!(
+            r#"<path d="M3 3h20v20H3z" fill="none" {s} stroke-dasharray="3 2"/><path d="M19 23h10" {sa}/>"#
+        ),
+        "group_exclude" => format!(
+            r#"<path d="M3 3h26v26H3z" fill="none" {s} stroke-dasharray="3 2"/><path d="M10 10l12 12M22 10L10 22" {sa}/>"#
+        ),
+        "group_restore" => format!(
+            r#"<path d="M3 3h26v26H3z" fill="none" {s} stroke-dasharray="3 2"/><path d="M22 12a7 7 0 1 0 1 8" {sa}/><path d="M22 6v6h-6" {sa}/>"#
+        ),
+        "selection_save" => format!(
+            r#"<path d="M4 4h18v18H4z" fill="none" {s} stroke-dasharray="3 2"/><path d="M16 16h12v12H16z" fill="{f}" {sa}/>"#
+        ),
+        "selection_load" => format!(
+            r#"<path d="M4 4h18v18H4z" fill="none" {sa} stroke-dasharray="3 2"/><path d="M10 10h8v8h-8z" fill="{f}" {s}/>"#
+        ),
         "area_plan" => format!(
             r#"<path d="M4 6h24v20H4z" fill="{f}" {s}/><path d="M4 16h24M16 6v20" {sa} stroke-dasharray="3 2"/>"#
         ),

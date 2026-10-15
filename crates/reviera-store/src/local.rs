@@ -734,6 +734,7 @@ impl LocalProject {
                 owner_history,
                 self.length_scale,
             )?;
+            crate::groups::write_groups(&mut self.ifc, doc, &self.steps, owner_history)?;
             let owner_history = self.new_owner_history()?;
             crate::curtains::write_curtains(
                 &mut self.ifc,
