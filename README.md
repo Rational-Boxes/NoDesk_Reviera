@@ -343,6 +343,15 @@ Create … Boundary* tab:
   continuous, gapped or custom centre segment, and the pens and patterns. Saved as one `IfcGrid`
   with an `IfcGridAxis` per line; axes changed in another tool are taken over on open
   (`grid.create`, `grid.rename`, `grid.set_curve`, `grid.list`).
+- **Datum extents**: levels, grids and reference planes have a 3D extent and, per view, a 2D
+  extent, bubbles and grid elbows; Reset to 3D, Maximize 3D and Propagate Extents on their
+  contextual tab (`datum.set_extent`, `datum.reset_to_3d`, `datum.maximize_3d`,
+  `datum.propagate_extents`, `datum.set_bubble`, `datum.add_elbow`, `datum.get`;
+  ARC-DATUM-001).
+- **Scope boxes** (View › Scope Box): named, turnable boxes; datums assigned to one show only in
+  views that cross it and are clipped to it, following it as it moves. Saved as `IfcAnnotation`
+  with an `IfcBoundingBox` (`scopebox.create`, `scopebox.set_extents`, `scopebox.list`,
+  `datum.assign_scope_box`, `view.assign_scope_box`; ARC-SCOPE-001).
 - **Reference planes** (RP): unbounded construction planes drawn as a line in a plan, named to
   serve as work planes; dashed green in plans and in the sections and elevations that look along
   them. Saved as `IfcAnnotation` with an Axis (`refplane.create`, `refplane.rename`,
@@ -586,9 +595,9 @@ area by area (a review against the spec on 2026-10-15). Whole areas not started 
 
 **Not started (architecture):**
 
-- **Datums and work planes**: scope boxes, 2D/3D datum extents with bubbles per view, picking a
-  face as the work plane, Go To View and the Work Plane Viewer (ARC-SCOPE-001, ARC-DATUM-001,
-  ARC-WP-001).
+- **Datums and work planes**: alignment locks between datum ends, level elbows, view crops that
+  follow a scope box, picking a face as the work plane, Go To View and the Work Plane Viewer
+  (ARC-DATUM-001, ARC-SCOPE-001, ARC-WP-001).
 - **Drawing aids**: temporary dimensions on a selection, typed lengths while drawing (listening
   dimensions), Tab to cycle overlapping picks, and dimension locks, equality constraints and
   their solver (ARC-DIM-001/002, ARC-KEY-001, ARC-CNST-001/002).

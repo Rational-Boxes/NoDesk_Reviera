@@ -933,9 +933,15 @@ impl Gui {
         let Some(e) = store.get(id) else {
             return Vec::new();
         };
+        // A grid's or reference plane's line in this view (its 2D extent, else its 3D one).
+        let view = self
+            .active_view()
+            .and_then(|v| v.element)
+            .and_then(|v| store.get(v))
+            .map(|v| v.guid().to_string());
         let line = reviera_core::walls::wall_recipe(e)
             .map(|r| r.curve)
-            .or_else(|| reviera_core::grids::grid_data(e).map(|g| g.curve));
+            .or_else(|| reviera_core::datum_extents::plan_line(e, view.as_deref()));
         line.map_or_else(Vec::new, |l| vec![(id, 0, l.start), (id, 1, l.end)])
     }
 
@@ -1095,7 +1101,27 @@ impl Gui {
             let result = if is_wall {
                 self.run("wall.set_location", json!({ "wall_id": id, "curve": line }))
             } else {
-                self.run("grid.set_curve", json!({ "grid_id": id, "curve": line }))
+                // A datum's end: in this view only while it has a 2D extent here
+                // (ARC-DATUM-001), else its 3D extent.
+                let view = self.active_view().and_then(|v| v.element);
+                let two_d = self.store_now().is_some_and(|store| {
+                    let guid = view
+                        .and_then(|v| store.get(v))
+                        .map(|v| v.guid().to_string());
+                    store
+                        .get(id)
+                        .zip(guid)
+                        .is_some_and(|(e, g)| reviera_core::datum_extents::in_view(e, &g).is_2d())
+                });
+                self.run(
+                    "datum.set_extent",
+                    json!({
+                        "datum_id": id,
+                        "view_id": if two_d { json!(view) } else { json!(null) },
+                        "end": if end == 0 { "start" } else { "end" },
+                        "point": p,
+                    }),
+                )
             };
             if let Err(e) = result {
                 frame.set_status_text(&e, 0);

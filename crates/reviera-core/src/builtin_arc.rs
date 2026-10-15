@@ -98,6 +98,18 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(ModelLineSet),
         registry.add(ModelLineList),
         registry.add(ModelLineStyles),
+        registry.add(DatumSetExtent),
+        registry.add(DatumResetTo3d),
+        registry.add(DatumMaximize3d),
+        registry.add(DatumPropagateExtents),
+        registry.add(DatumSetBubble),
+        registry.add(DatumAddElbow),
+        registry.add(DatumAssignScopeBox),
+        registry.add(DatumGet),
+        registry.add(ScopeBoxCreate),
+        registry.add(ScopeBoxSetExtents),
+        registry.add(ScopeBoxList),
+        registry.add(ViewAssignScopeBox),
     ];
     for r in results {
         r.expect("architecture commands are valid");
@@ -882,4 +894,147 @@ read_command!(
     crate::builtin::NoParams,
     Vec<crate::model_lines::LineStyle>,
     crate::model_lines::styles_command
+);
+
+edit_command!(
+    DatumSetExtent,
+    "datum.set_extent",
+    "Move a datum's end",
+    "Moves one end (`start` or `end`) of a level, grid or reference plane (ARC-DATUM-001). Without a \
+     view, `point` is `[x, y]` in plan and sets the 3D (model) extent shared by every view. In a plan \
+     view it sets that view's 2D extent; in a section or elevation `point` is `[across, height]` and \
+     sets the view's range (a grid's heights, a level's ends). `model: true` sets the 3D extent from \
+     the view instead.",
+    "Datum Extent",
+    crate::datum_extents::SetExtentParams,
+    (),
+    crate::datum_extents::set_extent
+);
+
+edit_command!(
+    DatumResetTo3d,
+    "datum.reset_to_3d",
+    "Reset to 3D extents",
+    "Removes the datums' 2D extents in a view, so they show their 3D extents there again.",
+    "Reset to 3D Extents",
+    crate::datum_extents::ViewDatumsParams,
+    (),
+    crate::datum_extents::reset_to_3d
+);
+
+edit_command!(
+    DatumMaximize3d,
+    "datum.maximize_3d",
+    "Maximize 3D extents",
+    "Stretches grids and reference planes over the model's bounding box (in plan and in height, with \
+     a 1 m margin); a level crosses every view again.",
+    "Maximize 3D Extents",
+    crate::datum_extents::DatumsParams,
+    (),
+    crate::datum_extents::maximize_3d
+);
+
+edit_command!(
+    DatumPropagateExtents,
+    "datum.propagate_extents",
+    "Propagate extents",
+    "Copies the datums' 2D extents, bubbles and elbows in one view to other views: plans to plans, \
+     sections and elevations to parallel ones.",
+    "Propagate Extents",
+    crate::datum_extents::PropagateParams,
+    (),
+    crate::datum_extents::propagate
+);
+
+edit_command!(
+    DatumSetBubble,
+    "datum.set_bubble",
+    "Show or hide a datum's bubble",
+    "Shows or hides a datum's bubble at one end (`start` or `end`) in one view.",
+    "Datum Bubble",
+    crate::datum_extents::BubbleParams,
+    (),
+    crate::datum_extents::set_bubble
+);
+
+edit_command!(
+    DatumAddElbow,
+    "datum.add_elbow",
+    "Add an elbow to a grid",
+    "Adds a jog near a grid's bubble at one end in one plan: the bubble moves `offset` paper \
+     millimetres to the left of the line's direction (negative: right; 5 by default; 0 removes it).",
+    "Add Elbow",
+    crate::datum_extents::ElbowParams,
+    (),
+    crate::datum_extents::add_elbow
+);
+
+edit_command!(
+    DatumAssignScopeBox,
+    "datum.assign_scope_box",
+    "Assign datums to a scope box",
+    "Assigns levels, grids and reference planes to a scope box (ARC-SCOPE-001), or clears it (`null`). \
+     They then show only in views whose plane crosses the box, and grid and reference plane lines are \
+     clipped to its footprint and follow it. Cleared, they keep their extents.",
+    "Assign Scope Box",
+    crate::datum_extents::AssignParams,
+    (),
+    crate::datum_extents::assign_scope_box
+);
+
+read_command!(
+    DatumGet,
+    "datum.get",
+    "Get a datum's extents",
+    "A datum's 3D extent (line, heights, plan extent, scope box) and, with a view, its 2D extent there \
+     (`mode` 3D or 2D), bubbles and elbows.",
+    crate::datum_extents::GetParams,
+    crate::datum_extents::DatumState,
+    crate::datum_extents::get
+);
+
+edit_command!(
+    ScopeBoxCreate,
+    "scopebox.create",
+    "Create a scope box",
+    "Creates a named scope box (ARC-SCOPE-001) from a rectangle in plan (two opposite corners, square to \
+     an optional `rotation`), from a level (or below the lowest) up `height` (or above the highest level). \
+     Written as an IfcAnnotation (ObjectType ScopeBox) with a Box representation. Returns the box.",
+    "Scope Box",
+    crate::scope_boxes::CreateParams,
+    ElementId,
+    crate::scope_boxes::create
+);
+
+edit_command!(
+    ScopeBoxSetExtents,
+    "scopebox.set_extents",
+    "Change a scope box",
+    "Resizes a scope box to two opposite corners `min` and `max` (`[x, y, z]`, square to its rotation), \
+     turns it (`rotation`) or renames it. Its datums follow.",
+    "Edit Scope Box",
+    crate::scope_boxes::SetExtentsParams,
+    (),
+    crate::scope_boxes::set_extents
+);
+
+read_command!(
+    ScopeBoxList,
+    "scopebox.list",
+    "List scope boxes",
+    "Every scope box: name, centre, size, rotation, heights and the datums assigned to it.",
+    crate::builtin::NoParams,
+    Vec<crate::scope_boxes::ScopeBoxInfo>,
+    crate::scope_boxes::list_command
+);
+
+edit_command!(
+    ViewAssignScopeBox,
+    "view.assign_scope_box",
+    "Assign views to a scope box",
+    "Records the scope box of views (or clears it with `null`); their crop regions will follow it.",
+    "Assign Scope Box",
+    crate::scope_boxes::AssignViewsParams,
+    (),
+    crate::scope_boxes::assign_views
 );

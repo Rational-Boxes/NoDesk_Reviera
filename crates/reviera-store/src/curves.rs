@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Reviera contributors
 
-//! Annotations whose shape is curves: reference planes (an `Axis` representation, ARC-REFP-001)
-//! and model lines (a styled `Annotation` representation, ARC-MLIN-001).
+//! Annotations written by Reviera: reference planes (an `Axis` representation, ARC-REFP-001),
+//! model lines (a styled `Annotation` representation, ARC-MLIN-001) and scope boxes (a `Box`,
+//! ARC-SCOPE-001).
 //!
 //! Each is an `IfcAnnotation` placed at the world origin, with an `IfcProductDefinitionShape` of
 //! one `IfcShapeRepresentation` (`Curve3D`) of `IfcPolyline`s in world coordinates. A model line's
@@ -193,7 +194,107 @@ fn write(
     Ok(())
 }
 
-/// Writes every reference plane and model line.
+/// Writes a scope box: a placement at its centre's bottom, turned by its rotation, and a `Box`
+/// representation (`IfcBoundingBox` from its corner).
+fn write_box(
+    ifc: &mut IfcModel,
+    element: StepId,
+    b: &reviera_core::scope_boxes::ScopeBox,
+    scale: f64,
+    contexts: geometry::Contexts,
+) -> Result<()> {
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    "box".hash(&mut h);
+    for v in [
+        b.center[0],
+        b.center[1],
+        b.width,
+        b.depth,
+        b.rotation,
+        b.bottom,
+        b.height,
+    ] {
+        ((v / scale) * 1e6).round().to_bits().hash(&mut h);
+    }
+    let signature = format!("{TAG}:{:016x}", h.finish());
+    if written_signature(ifc, element)?.as_deref() == Some(signature.as_str()) {
+        return Ok(());
+    }
+    remove(ifc, element)?;
+    let (s, c) = b.rotation.sin_cos();
+    let location = create(
+        ifc,
+        "IfcCartesianPoint",
+        &[(
+            "Coordinates",
+            reals(&[b.center[0] / scale, b.center[1] / scale, b.bottom / scale]),
+        )],
+    )?;
+    let up = create(
+        ifc,
+        "IfcDirection",
+        &[("DirectionRatios", reals(&[0.0, 0.0, 1.0]))],
+    )?;
+    let x = create(
+        ifc,
+        "IfcDirection",
+        &[("DirectionRatios", reals(&[c, s, 0.0]))],
+    )?;
+    let axes = create(
+        ifc,
+        "IfcAxis2Placement3D",
+        &[
+            ("Location", r(location)),
+            ("Axis", r(up)),
+            ("RefDirection", r(x)),
+        ],
+    )?;
+    let placement = create(ifc, "IfcLocalPlacement", &[("RelativePlacement", r(axes))])?;
+    let corner = create(
+        ifc,
+        "IfcCartesianPoint",
+        &[(
+            "Coordinates",
+            reals(&[-b.width / 2.0 / scale, -b.depth / 2.0 / scale, 0.0]),
+        )],
+    )?;
+    let bbox = create(
+        ifc,
+        "IfcBoundingBox",
+        &[
+            ("Corner", r(corner)),
+            ("XDim", AttrValue::Real(b.width / scale)),
+            ("YDim", AttrValue::Real(b.depth / scale)),
+            ("ZDim", AttrValue::Real(b.height / scale)),
+        ],
+    )?;
+    let rep = create(
+        ifc,
+        "IfcShapeRepresentation",
+        &[
+            ("ContextOfItems", r(contexts.body)),
+            ("RepresentationIdentifier", AttrValue::String("Box".into())),
+            (
+                "RepresentationType",
+                AttrValue::String("BoundingBox".into()),
+            ),
+            ("Items", AttrValue::List(vec![r(bbox)])),
+        ],
+    )?;
+    let shape = create(
+        ifc,
+        "IfcProductDefinitionShape",
+        &[
+            ("Description", AttrValue::String(signature)),
+            ("Representations", AttrValue::List(vec![r(rep)])),
+        ],
+    )?;
+    ifc.set_attribute(element, "ObjectPlacement", &r(placement))?;
+    ifc.set_attribute(element, "Representation", &r(shape))?;
+    Ok(())
+}
+
+/// Writes every reference plane, model line and scope box.
 pub(crate) fn write_all(
     ifc: &mut IfcModel,
     doc: &Document,
@@ -210,10 +311,19 @@ pub(crate) fn write_all(
         .iter()
         .filter_map(|e| Some((e.id(), model_lines::recipe(e)?)))
         .collect();
-    if planes.is_empty() && lines.is_empty() {
+    let boxes: Vec<_> = store
+        .iter()
+        .filter_map(|e| Some((e.id(), reviera_core::scope_boxes::recipe(e)?)))
+        .collect();
+    if planes.is_empty() && lines.is_empty() && boxes.is_empty() {
         return Ok(());
     }
     let contexts = geometry::Contexts::find(ifc)?;
+    for (id, b) in boxes {
+        if let Some(&step) = steps.get(&id) {
+            write_box(ifc, step, &b, scale, contexts)?;
+        }
+    }
     for (id, rp) in planes {
         let Some(&step) = steps.get(&id) else {
             continue;

@@ -308,7 +308,14 @@ pub struct GridMark {
     /// A bubble with the name at the start and at the end.
     pub bubbles: [bool; 2],
     pub style: GridStyle,
+    /// Elbows near the start and the end: the bubble's sideways offset, to the left of the line's
+    /// direction (paper millimetres).
+    pub elbows: [Option<f32>; 2],
 }
+
+/// Where an elbow's jog starts and ends, back from the line's end (paper millimetres).
+const ELBOW_FROM_MM: f32 = 8.0;
+const ELBOW_TO_MM: f32 = 4.0;
 
 /// The segments of `a`–`b` drawn with a dash pattern of model lengths (solid when empty). The
 /// pattern starts at `a`.
@@ -350,6 +357,30 @@ pub fn grid_parts(g: &GridMark, scale: f32, z: f32) -> (Vec<Lines>, Vec<Label>) 
     let dir = (end - start) / length;
     let at = |p: Vec2| [p.x, p.y, z];
     let mm = scale / 1000.0;
+    // Elbows: the line stops short of the end, jogs sideways and goes on to the bubble.
+    let left = Vec2::new(-dir.y, dir.x);
+    let mut jogs = Vec::new();
+    let mut bubble_at = [start, end];
+    let (start, end) = {
+        let room = length / 2.0;
+        let mut ends = [start, end];
+        for (k, inward) in [(0usize, dir), (1, -dir)] {
+            if let Some(off) = g.elbows[k] {
+                let p = ends[k];
+                let from = (ELBOW_FROM_MM * mm).min(room);
+                let to = (ELBOW_TO_MM * mm).min(from);
+                let side = left * off * mm;
+                let j1 = p + inward * from;
+                let j2 = p + inward * to + side;
+                bubble_at[k] = p + side;
+                jogs.push([at(j1), at(j2)]);
+                jogs.push([at(j2), at(bubble_at[k])]);
+                ends[k] = j1;
+            }
+        }
+        (ends[0], ends[1])
+    };
+    let length = (end - start).length().max(f32::EPSILON);
     let model = |pattern: &[f32]| pattern.iter().map(|l| l * mm).collect::<Vec<f32>>();
     let st = &g.style;
     let mut ends = Lines {
@@ -381,9 +412,13 @@ pub fn grid_parts(g: &GridMark, scale: f32, z: f32) -> (Vec<Lines>, Vec<Label>) 
             }
         }
     }
+    ends.segments.extend(jogs);
     let radius = BUBBLE_MM * mm / 2.0;
     let mut labels = Vec::new();
-    for (shown, point, outward) in [(g.bubbles[0], start, -dir), (g.bubbles[1], end, dir)] {
+    for (shown, point, outward) in [
+        (g.bubbles[0], bubble_at[0], -dir),
+        (g.bubbles[1], bubble_at[1], dir),
+    ] {
         if !shown || !st.symbol {
             continue;
         }
@@ -469,6 +504,7 @@ mod tests {
             name: "A".into(),
             bubbles: [false, true],
             style: GridStyle::default(),
+            elbows: [None, None],
         };
         let (lines, labels) = grid_parts(&g, 100.0, 0.5);
         assert_eq!(lines.len(), 1);
@@ -502,6 +538,7 @@ mod tests {
             name: "1".into(),
             bubbles: [true, true],
             style: GridStyle::of(&t, &|_| 0.25),
+            elbows: [None, None],
         };
         // 1:100: two 1.5 m end segments, no bubbles or labels.
         let (lines, labels) = grid_parts(&g, 100.0, 0.0);

@@ -59,6 +59,38 @@ line; axes changed in another IFC tool are taken over when the file is opened.
 <code>grid.create</code>, <code>grid.rename</code>, <code>grid.set_curve</code>,
 <code>grid.list</code></p>
 
+<h2 id="extents">Datum extents</h2>
+<p>A level, grid or reference plane has its <b>3D extent</b>, the same in every view: a grid's
+line, and in sections and elevations its heights. A view can give it a <b>2D extent</b> of its
+own. Select the datum and set <b>Extent in View</b> to <i>2D</i> in Properties; dragging its ends
+then changes this view only. <i>3D</i> drags change it everywhere.</p>
+<ul>
+  <li><b>Bubble at Start</b> and <b>Bubble at End</b> show or hide a grid's bubbles in this
+    view; <b>Elbow at Start</b> and <b>Elbow at End</b> jog a grid's line near its bubble, to
+    clear crowded bubbles.</li>
+  <li><b>Modify | Grids › Reset to 3D Extents</b> removes the 2D extent in this view;
+    <b>Maximize 3D Extents</b> stretches grids and reference planes over the whole model;
+    <b>Propagate Extents</b> copies this view's extents to other plans (or to parallel sections
+    and elevations).</li>
+  <li>In sections and elevations a level's extent is its ends across the view.</li>
+</ul>
+<p><code>datum.set_extent</code>, <code>datum.reset_to_3d</code>, <code>datum.maximize_3d</code>,
+<code>datum.propagate_extents</code>, <code>datum.set_bubble</code>, <code>datum.add_elbow</code>,
+<code>datum.get</code></p>
+
+<h2 id="scope-boxes">Scope boxes</h2>
+<p>A scope box is a named box that limits where datums show. <b>View › Create › Scope Box</b>
+<a href="reviera:action/scopebox.create">Scope Box</a> draws one in a plan: click two opposite
+corners. It reaches from below the lowest level to above the highest; set its <b>Height</b>,
+<b>Rotation</b> and <b>Name</b> in Properties.</p>
+<p>Choose a datum's <b>Scope Box</b> in its Properties: it then shows only in the views that
+cross the box, and a grid's or reference plane's line is clipped to the box's footprint.
+Moving, turning or resizing the box carries them with it. Clearing the box keeps the datum's
+extent. Saved as an <code>IfcAnnotation</code> (ObjectType <i>ScopeBox</i>) with an
+<code>IfcBoundingBox</code>.</p>
+<p><code>scopebox.create</code>, <code>scopebox.set_extents</code>, <code>scopebox.list</code>,
+<code>datum.assign_scope_box</code>, <code>view.assign_scope_box</code></p>
+
 <h2 id="ref-planes">Reference planes</h2>
 <p>A reference plane is an unbounded construction plane: a guide to align and dimension to, and a
 plane to draw on. <b>Architecture › Datum &amp; Work Plane › Ref Plane</b>
@@ -103,4 +135,5 @@ their depth, and 3D views all of them. Each is saved as an <code>IfcAnnotation</
 <code>modelline.styles</code></p>
 <p class="note">Not yet available: drawing on a vertical work plane in a section or elevation
 (the commands do it), picking a face as the work plane, the Work Plane Viewer, converting model
-lines to detail lines, and datum extents.</p>
+lines to detail lines, alignment locks between datum ends, elbows on levels, and view crops that
+follow a scope box.</p>

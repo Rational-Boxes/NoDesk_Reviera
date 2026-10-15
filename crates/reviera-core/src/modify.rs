@@ -254,6 +254,14 @@ pub fn transform(
                 crate::wall_openings::move_by(txn, id, v)?;
                 out.push(id);
             }
+        } else if crate::scope_boxes::recipe(e).is_some() {
+            let target = if copy { txn.create(copied(e))? } else { id };
+            let dz = match x {
+                Xform::Translate(v) => v[2],
+                _ => 0.0,
+            };
+            crate::scope_boxes::transform(txn, target, &|p| x.point(p), dz)?;
+            out.push(target);
         } else if crate::ref_planes::recipe(e).is_some() {
             let target = if copy { txn.create(copied(e))? } else { id };
             if copy {

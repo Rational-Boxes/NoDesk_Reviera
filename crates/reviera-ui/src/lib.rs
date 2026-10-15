@@ -1979,8 +1979,12 @@ impl Gui {
                         .find(|g| g.id == id)
                 })
                 .and_then(|g| g.type_id);
+            self.datum_view_rows(grid, id);
             self.grid_type_rows(grid, current);
             return;
+        }
+        if is_level {
+            self.datum_view_rows(grid, id);
         }
         if is_insert {
             self.insert_rows(grid, id);
@@ -2230,6 +2234,7 @@ impl Gui {
             || self.mesh_object_edit(property, text.clone())
             || self.path_array_edit(property, text.clone())
             || self.datum_edit(property, text.clone())
+            || self.datum_view_edit(property, text.clone())
             || self.insert_edit(property, text.clone())
             || self.wall_edit(property, text.clone())
             || self.floor_edit(property, text.clone())
@@ -3850,6 +3855,13 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
             focus(g);
         }),
         "workplane.set" => with(gui, Gui::set_work_plane),
+        "scopebox.create" => with(gui, |g| {
+            g.start_line_tool(datum_tools::LineMode::ScopeBox);
+            focus(g);
+        }),
+        "datum.reset_to_3d" => with(gui, Gui::datum_reset_to_3d),
+        "datum.maximize_3d" => with(gui, Gui::datum_maximize_3d),
+        "datum.propagate_extents" => with(gui, Gui::datum_propagate),
         "workplane.show" => with(gui, Gui::toggle_work_plane),
         "dim.create_aligned" => with(gui, |g| {
             g.start_dim_tool(f);

@@ -137,22 +137,25 @@ impl App {
         // Grids show in every plan, styled by their grid type (ARC-GRID-001).
         let mut annotation = vec![lines];
         // Reference planes and model lines in the view range (ARC-REFP-001, ARC-MLIN-001).
+        let view_guid = e.guid().to_string();
         annotation.extend(reviera_render::datums::plan_lines(
             store,
+            Some(&view_guid),
+            range.cut,
             bottom.min(range.cut),
             range.top.max(range.cut),
             range.cut + 0.002,
             scale,
             &Default::default(),
         ));
-        for g in grids::list(store) {
-            let mark = GridMark {
-                start: g.curve.start,
-                end: g.curve.end,
-                name: g.name,
-                bubbles: g.bubbles,
-                style: GridStyle::of(&g.style, &|p| pens.annotation_width(p) as f32),
-            };
+        annotation.extend(reviera_render::datums::scope_box_lines(
+            store,
+            range.cut,
+            range.cut + 0.002,
+            scale,
+            &Default::default(),
+        ));
+        for (_, mark) in reviera_render::datums::plan_grids(store, Some(&view_guid), range.cut) {
             let (l, t) = grid_parts(&mark, scale as f32, range.cut as f32);
             annotation.extend(l);
             labels.extend(t);
@@ -243,6 +246,7 @@ pub struct SectionParts {
 /// (temporary hiding).
 pub fn section_parts(
     store: &reviera_core::Store,
+    view: Option<&str>,
     scene: &reviera_render::RenderScene,
     def: &reviera_core::sections::SectionDef,
     scale: f32,
@@ -301,6 +305,14 @@ pub fn section_parts(
     let mut labels = Vec::new();
     let (x0, x1) = (-5.0 * mm, frame.width + 5.0 * mm);
     for l in &levels {
+        // A level's extent across the view: its 2D or 3D extent, else the whole view
+        // (ARC-DATUM-001); none outside its scope box.
+        let Some(le) = store.get(l.id) else { continue };
+        if !reviera_core::datum_extents::shows_in_section(store, le, &frame) {
+            continue;
+        }
+        let (x0, x1) = reviera_core::datum_extents::level_range(store, le, view, &frame)
+            .map_or((x0, x1), |r| (r[0], r[1]));
         let y = l.elevation as f32;
         level_lines
             .segments
@@ -333,15 +345,26 @@ pub fn section_parts(
         .chain(model.map(|(_, b)| f64::from(b.y)))
         .fold((0.0f64, 0.0f64), |(a, b), e| (a.min(e), b.max(e)));
     for g in grids::list(store) {
+        let Some(ge) = store.get(g.id) else { continue };
+        if !reviera_core::datum_extents::shows_in_section(store, ge, &frame) {
+            continue;
+        }
         let Some(x) = frame.grid_crossing(g.curve.start, g.curve.end) else {
             continue;
         };
+        // Its 2D or 3D heights (ARC-DATUM-001), else from below the levels to above them.
+        let [bottom, top] = reviera_core::datum_extents::heights(store, ge, view)
+            .unwrap_or([lo - 5.0 * mm, hi + 12.0 * mm]);
+        let bubbles = view
+            .and_then(|v| reviera_core::datum_extents::in_view(ge, v).bubbles)
+            .unwrap_or([false, true]);
         let mark = GridMark {
-            start: [x, lo - 5.0 * mm],
-            end: [x, hi + 12.0 * mm],
+            start: [x, bottom],
+            end: [x, top],
             name: g.name,
-            bubbles: [false, true],
+            bubbles,
             style: GridStyle::of(&g.style, &|p| pens.annotation_width(p) as f32),
+            elbows: [None, None],
         };
         let (l, t) = grid_parts(&mark, scale, z);
         annotation.extend(l);
@@ -350,6 +373,7 @@ pub fn section_parts(
     // Reference planes it looks along and model lines in its depth (ARC-REFP-001, ARC-MLIN-001).
     annotation.extend(reviera_render::datums::section_lines(
         store,
+        view,
         &frame,
         (lo - 5.0 * mm, hi + 5.0 * mm),
         f64::from(z),
@@ -392,7 +416,9 @@ impl App {
             .param(views::VIEW_KEY)
             .and_then(|v| v.get("scale")?.as_f64())
             .unwrap_or(100.0) as f32;
-        let parts = section_parts(store, scene, &def, scale, &|_| true);
+        let parts = section_parts(store, Some(e.guid().as_str()), scene, &def, scale, &|_| {
+            true
+        });
         Ok(PlanDrawing {
             name: e.name.clone().unwrap_or_default(),
             scale,

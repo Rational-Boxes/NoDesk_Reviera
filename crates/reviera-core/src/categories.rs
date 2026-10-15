@@ -251,6 +251,14 @@ pub const CATEGORIES: &[Category] = &[
         false,
     ),
     cat(
+        "cat.scope_boxes",
+        "Scope Boxes",
+        Some("IfcAnnotation"),
+        None,
+        None,
+        false,
+    ),
+    cat(
         "cat.lines",
         "Lines",
         Some("IfcAnnotation"),
@@ -373,6 +381,7 @@ pub fn category_of(e: &Element) -> Option<&'static Category> {
         "IfcSpace" if object_type.starts_with("Area:") => "cat.areas",
         "IfcAnnotation" if object_type == crate::ref_planes::OBJECT_TYPE => "cat.reference_planes",
         "IfcAnnotation" if object_type == crate::model_lines::OBJECT_TYPE => "cat.lines",
+        "IfcAnnotation" if object_type == crate::scope_boxes::OBJECT_TYPE => "cat.scope_boxes",
         "IfcAnnotation" => return None,
         _ => return CATEGORIES.iter().find(|c| c.ifc_class == Some(base)),
     };

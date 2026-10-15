@@ -34,6 +34,8 @@ const PICK_PX: f32 = 6.0;
 pub enum LineMode {
     RefPlane,
     ModelLine,
+    /// Two opposite corners of a scope box (ARC-SCOPE-001).
+    ScopeBox,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -191,8 +193,13 @@ impl Gui {
         let what = match t.mode {
             LineMode::RefPlane => "Reference Plane",
             LineMode::ModelLine => "Model Line",
+            LineMode::ScopeBox => "Scope Box",
         };
         let mut text = match (t.points.len(), t.shape) {
+            (0, _) if t.mode == LineMode::ScopeBox => format!("{what}: click a corner"),
+            (1, _) if t.mode == LineMode::ScopeBox => {
+                "Click the opposite corner. Esc restarts.".to_owned()
+            }
             (0, _) => format!("{what}: click the start point"),
             (1, Shape::Line) => "Click the end point. Esc restarts.".to_owned(),
             (1, Shape::Arc) => "Click the arc's end point. Esc restarts.".to_owned(),
@@ -255,8 +262,8 @@ impl Gui {
         let Some(t) = &mut self.line_tool else { return };
         t.points.push(p.point);
         let needed = match t.shape {
-            Shape::Line => 2,
-            Shape::Arc => 3,
+            Shape::Arc if t.mode != LineMode::ScopeBox => 3,
+            _ => 2,
         };
         if t.points.len() < needed {
             self.line_preview();
@@ -266,6 +273,13 @@ impl Gui {
         let (start, end) = (t.points[0], t.points[1]);
         let through: Vec<[f64; 2]> = t.points.get(2).copied().into_iter().collect();
         let result = match t.mode {
+            LineMode::ScopeBox => {
+                let mut args = json!({ "rectangle": { "corner_a": start, "corner_b": end } });
+                if !t.name.trim().is_empty() {
+                    args["name"] = json!(t.name.trim());
+                }
+                self.run("scopebox.create", args)
+            }
             LineMode::RefPlane => {
                 let level = self.active_view().and_then(|v| v.plan.as_ref()).map(|p| p.level);
                 let mut args = json!({ "start": start, "end": end, "level": level });
@@ -345,6 +359,13 @@ impl Gui {
         }
         if let (Some(&start), Some(c)) = (t.points.first(), t.cursor) {
             let pts: Vec<[f64; 2]> = match (t.shape, t.points.len()) {
+                _ if t.mode == LineMode::ScopeBox => vec![
+                    start,
+                    [c.point[0], start[1]],
+                    c.point,
+                    [start[0], c.point[1]],
+                    start,
+                ],
                 (Shape::Arc, 2) => {
                     let line = reviera_core::walls::Line {
                         start,
@@ -378,6 +399,11 @@ impl Gui {
             LineMode::RefPlane => {
                 grid.append(Property::category("Reference Plane", "c_lt"));
                 grid.append(Property::string("Name", "lt_name", t.name.clone()));
+            }
+            LineMode::ScopeBox => {
+                grid.append(Property::category("Scope Box", "c_lt"));
+                grid.append(Property::string("Name", "lt_name", t.name.clone()));
+                return true;
             }
             LineMode::ModelLine => {
                 grid.append(Property::category("Model Line", "c_lt"));
@@ -430,6 +456,29 @@ impl Gui {
                 self.format_length(len),
             ));
             grid.set_property_read_only("dt_len", true);
+            self.datum_view_rows(grid, id);
+            return true;
+        }
+        if let Some(b) = reviera_core::scope_boxes::recipe(e) {
+            grid.append(Property::category("Scope Box", "c_dt"));
+            grid.append(Property::string(
+                "Name",
+                "dt_sb_name",
+                e.name.clone().unwrap_or_default(),
+            ));
+            grid.append(Property::string(
+                "Height",
+                "dt_sb_height",
+                self.format_length(b.height),
+            ));
+            grid.append(Property::string(
+                "Rotation",
+                "dt_sb_rotation",
+                format!("{:.1}°", b.rotation.to_degrees()),
+            ));
+            let n = reviera_core::datum_extents::assigned_to(&store, e.guid().as_str()).len();
+            grid.append(Property::string("Datums", "dt_sb_datums", n.to_string()));
+            grid.set_property_read_only("dt_sb_datums", true);
             return true;
         }
         if let Some(r) = model_lines::recipe(e) {
@@ -503,6 +552,48 @@ impl Gui {
                 "modelline.set",
                 json!({ "model_line_ids": ids, "line_style": text }),
             ),
+            "sb_name" => self.run(
+                "scopebox.set_extents",
+                json!({ "scope_box_id": id, "name": text }),
+            ),
+            "sb_rotation" => {
+                let deg: Option<f64> = text.trim().trim_end_matches('°').trim().parse().ok();
+                match deg {
+                    Some(d) => self.run(
+                        "scopebox.set_extents",
+                        json!({ "scope_box_id": id, "rotation": d.to_radians() }),
+                    ),
+                    None => Err("Type an angle in degrees".to_owned()),
+                }
+            }
+            "sb_height" => {
+                let height = self
+                    .run(
+                        "units.parse",
+                        json!({ "text": text, "data_type": "length" }),
+                    )
+                    .ok()
+                    .and_then(|v| v.as_f64());
+                let b = self
+                    .store_now()
+                    .and_then(|st| st.get(id).and_then(reviera_core::scope_boxes::recipe));
+                match (height, b) {
+                    (Some(h), Some(b)) => {
+                        let (u, v) = b.axes();
+                        let c = b.corners();
+                        let _ = (u, v);
+                        self.run(
+                            "scopebox.set_extents",
+                            json!({
+                                "scope_box_id": id,
+                                "min": [c[0][0], c[0][1], b.bottom],
+                                "max": [c[2][0], c[2][1], b.bottom + h],
+                            }),
+                        )
+                    }
+                    _ => Err("Type a length".to_owned()),
+                }
+            }
             _ => return true,
         };
         let frame = self.frame;
@@ -529,14 +620,28 @@ impl Gui {
             return Vec::new();
         };
         let (lo, hi) = plan.drawn();
-        reviera_render::datums::plan_lines(
+        let view = v
+            .element
+            .and_then(|e| store.get(e))
+            .map(|e| e.guid().to_string());
+        let mut out = reviera_render::datums::scope_box_lines(
             &store,
+            plan.range.cut,
+            plan.range.cut + 0.002,
+            f64::from(plan.scale),
+            &selected,
+        );
+        out.extend(reviera_render::datums::plan_lines(
+            &store,
+            view.as_deref(),
+            plan.range.cut,
             f64::from(lo),
             f64::from(hi),
             plan.range.cut + 0.002,
             f64::from(plan.scale),
             &selected,
-        )
+        ));
+        out
     }
 
     /// Model lines of 3D view `index` (none in 2D views).
@@ -566,9 +671,26 @@ impl Gui {
                 best = Some((d, id));
             }
         };
+        let view = v
+            .element
+            .and_then(|e| store.get(e))
+            .map(|e| e.guid().to_string());
         for r in reviera_core::ref_planes::list(store) {
-            if r.normal[2].abs() < 1e-9 {
-                consider(r.id, [r.start[0], r.start[1]], [r.end[0], r.end[1]]);
+            let Some(e) = store.get(r.id) else { continue };
+            if r.normal[2].abs() >= 1e-9
+                || !reviera_core::datum_extents::shows_in_plan(store, e, plan.range.cut)
+            {
+                continue;
+            }
+            if let Some(l) = reviera_core::datum_extents::plan_line(e, view.as_deref()) {
+                consider(r.id, l.start, l.end);
+            }
+        }
+        // Scope boxes, by their outlines.
+        for (id, _, b) in reviera_core::scope_boxes::in_plan(store, plan.range.cut) {
+            let c = b.corners();
+            for k in 0..4 {
+                consider(id, c[k], c[(k + 1) % 4]);
             }
         }
         for l in model_lines::all(store) {
@@ -740,5 +862,256 @@ impl Gui {
             width: 0.13,
             segments,
         }]
+    }
+}
+
+impl Gui {
+    /// The active view's element and GlobalId, if it is a plan, section or elevation.
+    fn extent_view(&self) -> Option<(ElementId, String, bool)> {
+        let v = self.active_view()?;
+        let plan = v.plan.is_some();
+        if !plan && v.section.is_none() {
+            return None;
+        }
+        let id = v.element?;
+        let guid = self
+            .app
+            .document(v.doc)?
+            .doc
+            .store()
+            .get(id)?
+            .guid()
+            .to_string();
+        Some((id, guid, plan))
+    }
+
+    /// Rows of a selected level, grid or reference plane: its extents in the active view (3D or
+    /// 2D, bubbles, a grid's elbows) and its scope box (ARC-DATUM-001, ARC-SCOPE-001).
+    pub(crate) fn datum_view_rows(&mut self, grid: &PropertyGrid, id: ElementId) {
+        use reviera_core::datum_extents::{self, Kind};
+        let Some(store) = self.store_now() else {
+            return;
+        };
+        let Some(e) = store.get(id) else { return };
+        let Some(kind) = datum_extents::kind_of(e) else {
+            return;
+        };
+        grid.append(Property::category("Extents", "c_dx"));
+        if let Some((_, guid, plan)) = self.extent_view() {
+            let v = datum_extents::in_view(e, &guid);
+            // Levels show in sections and elevations only.
+            if !(kind == Kind::Level && plan) {
+                grid.append(Property::enumeration(
+                    "Extent in View",
+                    "dx_mode",
+                    vec![("3D".to_owned(), 0), ("2D".to_owned(), 1)],
+                    i32::from(v.is_2d()),
+                ));
+                let default = match kind {
+                    Kind::Grid if plan => reviera_core::grids::list(&store)
+                        .into_iter()
+                        .find(|g| g.id == id)
+                        .map_or([false, true], |g| g.bubbles),
+                    _ => [false, true],
+                };
+                let b = v.bubbles.unwrap_or(default);
+                if kind == Kind::Grid {
+                    grid.append(Property::boolean("Bubble at Start", "dx_b0", b[0]));
+                    grid.append(Property::boolean("Bubble at End", "dx_b1", b[1]));
+                }
+                if kind == Kind::Grid && plan {
+                    grid.append(Property::boolean(
+                        "Elbow at Start",
+                        "dx_e0",
+                        v.elbows[0].is_some(),
+                    ));
+                    grid.append(Property::boolean(
+                        "Elbow at End",
+                        "dx_e1",
+                        v.elbows[1].is_some(),
+                    ));
+                }
+            }
+        }
+        let boxes = reviera_core::scope_boxes::list(&store);
+        let current = datum_extents::extent(e).scope_box;
+        let mut choices = vec![("None".to_owned(), 0)];
+        choices.extend(
+            boxes
+                .iter()
+                .enumerate()
+                .map(|(i, b)| (b.name.clone(), i as i32 + 1)),
+        );
+        let index = current
+            .and_then(|g| boxes.iter().position(|b| b.guid == g))
+            .map_or(0, |i| i as i32 + 1);
+        grid.append(Property::enumeration(
+            "Scope Box",
+            "dx_scope",
+            choices,
+            index,
+        ));
+    }
+
+    /// Edits of the extent rows; `false` if `property` is not one.
+    pub(crate) fn datum_view_edit(&mut self, property: &str, text: Option<String>) -> bool {
+        let Some(row) = property.strip_prefix("dx_") else {
+            return false;
+        };
+        let text = text.unwrap_or_default();
+        let on = text == "true" || text == "1";
+        let Some(&id) = self.selection().first() else {
+            return true;
+        };
+        let view = self.extent_view();
+        let end = |k: &str| if k.ends_with('0') { "start" } else { "end" };
+        let result = match (row, &view) {
+            ("mode", Some((view, guid, plan))) => {
+                if text == "3D" {
+                    self.run(
+                        "datum.reset_to_3d",
+                        json!({ "datum_ids": [id], "view_id": view }),
+                    )
+                } else {
+                    // The 2D extent starts as the 3D one.
+                    let store = self.store_now();
+                    let point = store.as_ref().and_then(|st| {
+                        let e = st.get(id)?;
+                        if *plan {
+                            reviera_core::datum_extents::plan_line(e, Some(guid)).map(|l| l.start)
+                        } else {
+                            let h = reviera_core::datum_extents::heights(st, e, Some(guid))
+                                .unwrap_or_else(|| reviera_core::datum_extents::default_heights(st));
+                            Some([0.0, h[0]])
+                        }
+                    });
+                    match point {
+                        Some(p) => self.run(
+                            "datum.set_extent",
+                            json!({ "datum_id": id, "view_id": view, "end": "start", "point": p }),
+                        ),
+                        None => Ok(Value::Null),
+                    }
+                }
+            }
+            ("b0" | "b1", Some((view, _, _))) => self.run(
+                "datum.set_bubble",
+                json!({ "datum_id": id, "view_id": view, "end": end(row), "visible": on }),
+            ),
+            ("e0" | "e1", Some((view, _, _))) => self.run(
+                "datum.add_elbow",
+                json!({
+                    "datum_id": id, "view_id": view, "end": end(row),
+                    "offset": if on { json!(reviera_core::datum_extents::ELBOW_MM) } else { json!(0.0) },
+                }),
+            ),
+            ("scope", _) => {
+                let guid = self.store_now().and_then(|st| {
+                    reviera_core::scope_boxes::list(&st)
+                        .into_iter()
+                        .find(|b| b.name == text)
+                        .map(|b| b.guid)
+                });
+                self.run(
+                    "datum.assign_scope_box",
+                    json!({ "datum_ids": [id], "scope_box_id": guid }),
+                )
+            }
+            _ => return true,
+        };
+        let frame = self.frame;
+        match result {
+            Ok(_) => {
+                self.refresh_scene(&frame);
+                self.update_grips();
+            }
+            Err(e) => frame.set_status_text(&e, 0),
+        }
+        self.properties_stale = true;
+        true
+    }
+
+    /// Modify | Grids/Levels/Reference Planes › Reset to 3D Extents (the active view).
+    pub(crate) fn datum_reset_to_3d(&mut self) {
+        let frame = self.frame;
+        let Some((view, _, _)) = self.extent_view() else {
+            return frame.set_status_text("Open the plan, section or elevation to reset", 0);
+        };
+        let ids = self.selection();
+        match self.run(
+            "datum.reset_to_3d",
+            json!({ "datum_ids": ids, "view_id": view }),
+        ) {
+            Ok(_) => self.refresh_scene(&frame),
+            Err(e) => frame.set_status_text(&e, 0),
+        }
+        self.update_grips();
+        self.properties_stale = true;
+    }
+
+    /// Maximize 3D Extents.
+    pub(crate) fn datum_maximize_3d(&mut self) {
+        let frame = self.frame;
+        let ids = self.selection();
+        match self.run("datum.maximize_3d", json!({ "datum_ids": ids })) {
+            Ok(_) => self.refresh_scene(&frame),
+            Err(e) => frame.set_status_text(&e, 0),
+        }
+        self.update_grips();
+        self.properties_stale = true;
+    }
+
+    /// Propagate Extents…: the selected datums' extents in this view to chosen views of the same
+    /// kind.
+    pub(crate) fn datum_propagate(&mut self) {
+        let frame = self.frame;
+        let Some((view, _, plan)) = self.extent_view() else {
+            return frame
+                .set_status_text("Open the plan, section or elevation to propagate from", 0);
+        };
+        let Some(store) = self.store_now() else {
+            return;
+        };
+        let candidates: Vec<(ElementId, String)> = store
+            .iter()
+            .filter(|e| e.id() != view)
+            .filter_map(|e| {
+                let d = reviera_core::views::view_data(e)?;
+                let is_plan = reviera_core::plans::is_plan(&d.kind);
+                let is_section = reviera_core::sections::section_of(e).is_some();
+                ((plan && is_plan) || (!plan && is_section))
+                    .then(|| (e.id(), e.name.clone().unwrap_or_default()))
+            })
+            .collect();
+        if candidates.is_empty() {
+            return frame.set_status_text("There is no other view of this kind", 0);
+        }
+        let labels: Vec<&str> = candidates.iter().map(|c| c.1.as_str()).collect();
+        let d = MultiChoiceDialog::builder(
+            &frame,
+            "Propagate the extents to:",
+            "Propagate Extents",
+            &labels,
+        )
+        .build();
+        if d.show_modal() != ID_OK {
+            return;
+        }
+        let targets: Vec<ElementId> = d
+            .get_selections()
+            .into_iter()
+            .filter_map(|i| candidates.get(i as usize).map(|c| c.0))
+            .collect();
+        let ids = self.selection();
+        match self.run(
+            "datum.propagate_extents",
+            json!({ "datum_ids": ids, "source_view_id": view, "target_view_ids": targets }),
+        ) {
+            Ok(_) => {
+                frame.set_status_text(&format!("Extents propagated to {} views", targets.len()), 0);
+                self.refresh_scene(&frame);
+            }
+            Err(e) => frame.set_status_text(&e, 0),
+        }
     }
 }

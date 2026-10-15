@@ -70,6 +70,18 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "model_line" => format!(
             r#"<path d="M4 26L14 12l6 8 8-14" {s}/><path d="M4 26l-1 2M28 6l1-2" {sa}/>"#
         ),
+        "scope_box" => format!(
+            r#"<path d="M5 11l8-6h14l-8 6zM5 11v14h14V11M19 25l8-6V5" fill="{f}" {s} stroke-dasharray="4 2"/>"#
+        ),
+        "datum_reset" => format!(
+            r#"<path d="M6 6v20M26 6v20" {s} stroke-dasharray="4 2"/><path d="M10 16h12" {sa}/><path d="M13 12l-4 4 4 4" {sa}/>"#
+        ),
+        "datum_maximize" => format!(
+            r#"<path d="M16 9v14" {s} stroke-dasharray="4 2"/><path d="M16 3l-4 5h8zM16 29l-4-5h8z" fill="{f}" {sa}/><rect x="5" y="11" width="22" height="10" fill="none" {s}/>"#
+        ),
+        "datum_propagate" => format!(
+            r#"<rect x="3" y="6" width="11" height="14" fill="{f}" {s}/><rect x="18" y="12" width="11" height="14" fill="{f}" {s}/><path d="M8 9v8M24 15v8" {sa}/><path d="M14 13h4" {s}/>"#
+        ),
         "work_plane" => format!(
             r#"<path d="M3 22l10-10h16L19 22z" fill="{f}" {s}/><path d="M8 17h16M13 12l-5 10M21 12l-5 10" {sa}/>"#
         ),

@@ -157,6 +157,30 @@ keys = "LI"
 help = "Draw lines, arcs and chains on the view's work plane; they show in every view"
 
 [[action]]
+id = "scopebox.create"
+label = "Scope Box"
+icon = "scope_box"
+help = "Draw a scope box in a plan: two opposite corners. Datums assigned to it show only where views cross it"
+
+[[action]]
+id = "datum.reset_to_3d"
+label = "Reset to 3D Extents"
+icon = "datum_reset"
+help = "Remove the selected datums' 2D extents in this view"
+
+[[action]]
+id = "datum.maximize_3d"
+label = "Maximize 3D Extents"
+icon = "datum_maximize"
+help = "Stretch the selected grids and reference planes over the model"
+
+[[action]]
+id = "datum.propagate_extents"
+label = "Propagate Extents"
+icon = "datum_propagate"
+help = "Copy the selected datums' extents in this view to other views"
+
+[[action]]
 id = "workplane.set"
 label = "Set"
 icon = "work_plane"
@@ -1135,6 +1159,7 @@ tools = [
   { action = "view.new_schedule", size = "large" },
   { action = "view.default_3d", size = "large" },
   { action = "view.create_3d", size = "small" },
+  { action = "scopebox.create", size = "small" },
 ]
 
 [[tab.panel]]
@@ -1417,6 +1442,33 @@ panels = [
     { action = "sketch.overhang", size = "small" },
   ] },
 ]
+
+[[context]]
+category = "cat.grids"
+label = "Grids"
+panels = [{ label = "Datum", tools = [
+  { action = "datum.reset_to_3d", size = "large" },
+  { action = "datum.maximize_3d", size = "large" },
+  { action = "datum.propagate_extents", size = "large" },
+] }]
+
+[[context]]
+category = "cat.levels"
+label = "Levels"
+panels = [{ label = "Datum", tools = [
+  { action = "datum.reset_to_3d", size = "large" },
+  { action = "datum.maximize_3d", size = "large" },
+  { action = "datum.propagate_extents", size = "large" },
+] }]
+
+[[context]]
+category = "cat.reference_planes"
+label = "Reference Planes"
+panels = [{ label = "Datum", tools = [
+  { action = "datum.reset_to_3d", size = "large" },
+  { action = "datum.maximize_3d", size = "large" },
+  { action = "datum.propagate_extents", size = "large" },
+] }]
 
 [[context]]
 category = "cat.windows"

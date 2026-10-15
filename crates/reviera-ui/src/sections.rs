@@ -82,9 +82,18 @@ impl Gui {
         };
         let def = s.def;
         let scale = s.scale;
-        let parts = reviera_app::output::section_parts(&store, scene, &def, scale, &|e| {
-            visibility.opacity(e).is_some()
-        });
+        let view_guid = v
+            .element
+            .and_then(|e| store.get(e))
+            .map(|e| e.guid().to_string());
+        let parts = reviera_app::output::section_parts(
+            &store,
+            view_guid.as_deref(),
+            scene,
+            &def,
+            scale,
+            &|e| visibility.opacity(e).is_some(),
+        );
         let mut graphics = parts.graphics;
         graphics.lines.extend(parts.annotation);
         graphics.lines.push(Lines {

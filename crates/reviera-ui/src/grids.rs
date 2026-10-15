@@ -237,6 +237,7 @@ impl Gui {
                 name: reviera_core::grids::auto_name(&store),
                 bubbles: t.bubbles,
                 style: GridStyle::of(&t, &|p| pens.annotation_width(p) as f32),
+                elbows: [None, None],
             };
             // The type's patterns and bubbles, in the preview colour.
             for l in grid_lines(&mark, plan.scale, z) {

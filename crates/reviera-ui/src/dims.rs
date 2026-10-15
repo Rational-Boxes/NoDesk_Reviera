@@ -10,7 +10,7 @@ use glam::Vec2;
 use reviera_core::ElementId;
 use reviera_core::annotations;
 use reviera_render::RenderBackend;
-use reviera_render::annotation::{Dimension, GridMark, GridStyle, dimension_lines, grid_lines};
+use reviera_render::annotation::{Dimension, GridMark, dimension_lines, grid_lines};
 use reviera_render::plan::Lines;
 use serde_json::{Value, json};
 use wxdragon::prelude::*;
@@ -44,23 +44,13 @@ pub struct DimTool {
 }
 
 /// The grids of a model, ready to draw in their grid types' styles.
-pub(crate) fn grid_marks(store: &reviera_core::Store) -> Vec<(ElementId, GridMark)> {
-    let pens = reviera_core::standards::pen_set(store);
-    reviera_core::grids::list(store)
-        .into_iter()
-        .map(|g| {
-            (
-                g.id,
-                GridMark {
-                    start: g.curve.start,
-                    end: g.curve.end,
-                    name: g.name,
-                    bubbles: g.bubbles,
-                    style: GridStyle::of(&g.style, &|p| pens.annotation_width(p) as f32),
-                },
-            )
-        })
-        .collect()
+/// The grids a plan shows (view GlobalId, cut height), with its 2D extents, bubbles and elbows.
+pub(crate) fn grid_marks(
+    store: &reviera_core::Store,
+    view: Option<&str>,
+    cut: f64,
+) -> Vec<(ElementId, GridMark)> {
+    reviera_render::datums::plan_grids(store, view, cut)
 }
 
 fn cross(a: [f64; 2], b: [f64; 2]) -> f64 {
@@ -130,7 +120,7 @@ impl Gui {
         }
         // Grids show in every plan, in their types' styles; selected ones highlighted.
         let mut grids = Vec::new();
-        for (id, mark) in grid_marks(&store) {
+        for (id, mark) in grid_marks(&store, Some(view.guid().as_str()), plan.range.cut) {
             for mut l in grid_lines(&mark, plan.scale, z) {
                 if selected.contains(&id) {
                     l.color = reviera_render::HIGHLIGHT;
@@ -150,8 +140,12 @@ impl Gui {
         let plan = v.plan.as_ref()?;
         let store = self.app.document(v.doc)?.doc.store();
         let z = plan.range.cut as f32;
+        let view = v
+            .element
+            .and_then(|e| store.get(e))
+            .map(|e| e.guid().to_string());
         let mut best: Option<(f32, ElementId)> = None;
-        for (id, mut mark) in grid_marks(store) {
+        for (id, mut mark) in grid_marks(store, view.as_deref(), plan.range.cut) {
             mark.name.clear();
             for s in grid_lines(&mark, plan.scale, z)
                 .into_iter()
@@ -381,7 +375,11 @@ impl Gui {
             }
         }
         // Grids, by their line.
-        for (id, g) in grid_marks(store) {
+        let view = v
+            .element
+            .and_then(|e| store.get(e))
+            .map(|e| e.guid().to_string());
+        for (id, g) in grid_marks(store, view.as_deref(), plan.range.cut) {
             let seg = [g.start, g.end];
             let (dx, dy) = (seg[1][0] - seg[0][0], seg[1][1] - seg[0][1]);
             let len = dx.hypot(dy);

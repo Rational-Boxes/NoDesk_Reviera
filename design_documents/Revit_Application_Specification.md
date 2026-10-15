@@ -10193,8 +10193,10 @@ Dragging a control issues the matching command once, on mouse-up. The preview du
 - `datum.set_bubble(datum_id, view_id, end, visible)`
 - `datum.add_elbow(datum_id, view_id, end)`
 
+**Implementation notes (2026-10-15).** As built: a datum's 3D extent is its line (grids, reference planes), `rxd:datum_extent.z` (heights in sections) and `.plan` (a level's plan extent; none crosses every view); per-view 2D extents, bubbles and grid elbows are `rxd:datum_views` keyed by view GlobalId (`line` in plans, `range` in sections and elevations). Commands as above, plus `datum.get`; `datum.set_extent` takes `point` `[x, y]` in plans and `[across, height]` in sections, and `model: true` to change the 3D extent from a view. Window: Extent in View (3D/2D), Bubble and Elbow rows in Properties, grips that drag the 2D or 3D extent, and Reset to 3D, Maximize 3D and Propagate Extents on Modify | Grids, Levels and Reference Planes. Not built yet: alignment locks, elbows on levels, the 3D/2D label on the grip, right-click commands.
+
 **Acceptance criteria.**
-- [ ] Dragging a grid end in 2D mode in plan view A does not change it in plan view B. Propagating the extents to B does.
+- [x] Dragging a grid end in 2D mode in plan view A does not change it in plan view B. Propagating the extents to B does.
 - [ ] Locked aligned level ends move together. After unlocking, they move independently.
 
 ### 3.2.5 Scope boxes
@@ -10223,9 +10225,11 @@ Dragging a control issues the matching command once, on mouse-up. The preview du
 - `datum.assign_scope_box(datum_ids, scope_box_id | null)`
 - `view.assign_scope_box(view_ids, scope_box_id | null)` (DOC owns views, and this command is listed here for completeness)
 
+**Implementation notes (2026-10-15).** As built: `recipe.scope_box` (`center`, `width`, `depth`, `rotation`, `bottom`, `height`); `scopebox.create`, `scopebox.set_extents` (also renames), `scopebox.list`, `datum.assign_scope_box` and `view.assign_scope_box` (`rxd:scope_box` on the view); the Scope Box tool (View › Create) and its Name, Height and Rotation in Properties; a datum's Scope Box in its Properties. Assigned grids and reference planes are clipped to the footprint (and refit when the box moves, turns or resizes); assigned datums show only in plans cut through the box and sections that reach it. IFC: `IfcAnnotation` (ScopeBox) placed at the box's base centre, turned, with a `Box` representation of an `IfcBoundingBox`. Not built yet: crop regions (so views assigned to a box record it only), Views Visible, 3D handles.
+
 **Acceptance criteria.**
-- [ ] Rotating a scope box by 30° rotates the crop region of every assigned view by 30°.
-- [ ] A grid assigned to a box that does not reach Level 3 is not shown on the Level 3 plan.
+- [ ] Rotating a scope box by 30° rotates the crop region of every assigned view by 30°. (Crop regions are not built.)
+- [x] A grid assigned to a box that does not reach Level 3 is not shown on the Level 3 plan.
 
 ### 3.2.6 Work planes
 **ID:** ARC-WP-001 · **Priority:** P0 · **Ref:** research/02 §3.6 · web: Edit with the Workplane Viewer; Zoom to Fit Workplane Viewer

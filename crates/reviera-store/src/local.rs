@@ -540,7 +540,11 @@ impl LocalProject {
             }
             if matches!(
                 recipe_kind,
-                Some(reviera_core::ref_planes::RECIPE | reviera_core::model_lines::RECIPE)
+                Some(
+                    reviera_core::ref_planes::RECIPE
+                        | reviera_core::model_lines::RECIPE
+                        | reviera_core::scope_boxes::RECIPE
+                )
             ) {
                 crate::curves::remove(&mut self.ifc, step)?;
             }
