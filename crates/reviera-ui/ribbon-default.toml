@@ -1031,6 +1031,42 @@ icon = "site_component"
 help = "Place an imported tree, car or other object on the ground; it follows the toposolid under it"
 
 [[action]]
+id = "parts.create"
+label = "Create Parts"
+icon = "parts_create"
+help = "Divide the selected walls (one part per layer), floors, roofs, ceilings, columns and beams into parts that follow them"
+
+[[action]]
+id = "parts.divide"
+label = "Divide Parts"
+icon = "parts_divide"
+help = "Cut the selected parts along selected model lines, or by levels, grids and reference planes, with a gap"
+
+[[action]]
+id = "parts.merge"
+label = "Merge Parts"
+icon = "parts_merge"
+help = "One part from the selected touching parts of the same material"
+
+[[action]]
+id = "parts.exclude"
+label = "Exclude Parts"
+icon = "parts_exclude"
+help = "Keep the selected parts but leave them out of views, schedules and IFC"
+
+[[action]]
+id = "parts.restore"
+label = "Restore Parts"
+icon = "parts_restore"
+help = "Bring back the excluded parts of the selected elements (or all of them)"
+
+[[action]]
+id = "view.set_parts_visibility"
+label = "Parts Visibility"
+icon = "parts_visibility"
+help = "Whether this view shows parts, their original elements, or both"
+
+[[action]]
 id = "stair.number_treads"
 label = "Number Treads"
 icon = "tread_numbers"
@@ -1703,6 +1739,17 @@ tools = [
 [[tab.panel]]
 label = "Measure"
 tools = [{ action = "tool.measure", size = "small" }, { action = "dim.create_aligned", size = "small" }]
+
+[[tab.panel]]
+label = "Parts"
+tools = [
+  { action = "parts.create", size = "large" },
+  { action = "parts.divide", size = "large" },
+  { action = "parts.merge", size = "small" },
+  { action = "parts.exclude", size = "small" },
+  { action = "parts.restore", size = "small" },
+  { action = "view.set_parts_visibility", size = "large" },
+]
 
 # ---- Contextual tabs (§1.9): "Modify | <category>" while elements of one category are
 # selected: the Modify tab's panels, then the category's own. ----

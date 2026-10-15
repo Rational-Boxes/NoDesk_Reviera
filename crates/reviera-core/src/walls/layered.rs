@@ -50,7 +50,7 @@ pub enum EndWrap {
     None,
 }
 
-fn compound_of(store: &Store, e: &Element) -> Option<Compound> {
+pub(crate) fn compound_of(store: &Store, e: &Element) -> Option<Compound> {
     let g = crate::id::GlobalId::parse(e.param("@type")?.as_str()?)?;
     let t = store.get(store.find_by_guid(&g)?)?;
     if crate::walls::stacked::of_type(t).is_some() || !crate::compound::is_layered(t) {

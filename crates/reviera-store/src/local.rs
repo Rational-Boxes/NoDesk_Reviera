@@ -540,6 +540,7 @@ impl LocalProject {
                 || recipe_kind == Some(reviera_core::masses::SYSTEM_RECIPE)
                 || recipe_kind == Some(reviera_core::toposolids::RECIPE)
                 || recipe_kind == Some(reviera_core::toposolids::CUT_RECIPE)
+                || recipe_kind == Some(reviera_core::parts::RECIPE)
             {
                 geometry::remove_breps(&mut self.ifc, step)?;
             }
@@ -726,6 +727,7 @@ impl LocalProject {
             self.write_slab_edges(doc)?;
             self.write_wall_sweeps(doc)?;
             self.write_model_texts(doc)?;
+            self.write_parts(doc)?;
             self.write_skylights(doc)?;
             let owner_history = self.new_owner_history()?;
             crate::mesh_objects::write_mesh_objects(
@@ -1933,6 +1935,61 @@ impl LocalProject {
                 .and_then(|l| self.steps.get(&l).copied());
             if let Some(storey) = storey {
                 geometry::contain(&mut self.ifc, step, storey, owner_history)?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Writes every part (ARC-PART-001) that is drawn as a faceted B-rep, aggregated by its
+    /// original element; excluded parts and divided or merged ones have no body.
+    fn write_parts(&mut self, doc: &Document) -> Result<()> {
+        let store = doc.store();
+        if !store
+            .iter()
+            .any(|e| reviera_core::parts::recipe(e).is_some())
+        {
+            return Ok(());
+        }
+        let bodies = reviera_core::bodies::all(store);
+        let contexts = geometry::Contexts::find(&self.ifc)?;
+        let owner_history = self.new_owner_history()?;
+        for e in store.iter() {
+            let Some(r) = reviera_core::parts::recipe(e) else {
+                continue;
+            };
+            let Some(&step) = self.steps.get(&e.id()) else {
+                continue;
+            };
+            geometry::remove_breps(&mut self.ifc, step)?;
+            let Some(b) = bodies.iter().find(|b| b.element == e.id()) else {
+                continue;
+            };
+            let solids: Vec<geometry::Polyhedron> = b
+                .parts
+                .iter()
+                .map(|p| geometry::Polyhedron {
+                    points: p.mesh.0.clone(),
+                    faces: p
+                        .mesh
+                        .1
+                        .chunks(3)
+                        .map(|t| t.iter().map(|i| *i as usize).collect())
+                        .collect(),
+                })
+                .collect();
+            geometry::write_breps(
+                &mut self.ifc,
+                step,
+                geometry::BrepFrame::WORLD,
+                &solids,
+                self.length_scale,
+                contexts,
+            )?;
+            let source = GlobalId::parse(&r.source)
+                .and_then(|g| store.find_by_guid(&g))
+                .and_then(|s| self.steps.get(&s).copied());
+            if let Some(source) = source {
+                geometry::aggregate(&mut self.ifc, step, source, owner_history)?;
             }
         }
         Ok(())

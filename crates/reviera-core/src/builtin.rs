@@ -498,6 +498,7 @@ pub fn dependents_of(store: &crate::store::Store, id: ElementId) -> Vec<ElementI
                 || crate::toposolids::recipe(e)
                     .is_some_and(|r| r.parent.as_deref() == Some(guid.as_str()))
                 || crate::toposolids::cut_recipe(e).is_some_and(|c| c.of == guid)
+                || crate::parts::depends_on(store, e, &guid)
                 || crate::stair_marks::numbers_recipe(e)
                     .is_some_and(|n| n.stair == guid || n.view == guid)
                 || crate::wall_sweeps::recipe(e).is_some_and(|r| {

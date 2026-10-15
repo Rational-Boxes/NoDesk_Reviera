@@ -142,6 +142,11 @@ impl Gui {
     pub(crate) fn view_visibility(&self, v: &View) -> Visibility {
         let mut vis = self.app.temp_state(v.doc, v.element).visibility();
         vis.virtual_volumes = self.virtual_mode(v);
+        // Parts or their originals, by the view's Parts Visibility (ARC-PART-004).
+        if let Some(d) = self.app.document(v.doc) {
+            vis.hidden
+                .extend(reviera_core::parts::hidden_in(d.doc.store(), v.element));
+        }
         vis
     }
 

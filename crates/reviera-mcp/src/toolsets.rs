@@ -57,7 +57,7 @@ pub fn toolset_of(command: &str) -> String {
             | "slabedge" | "hostsweep" | "shape" | "stackedwall" | "wallsweep" | "wallreveal"
             | "area" | "areascheme" | "areaplan" | "areaboundary" | "group" | "selectionset"
             | "modeltext" | "inplace" | "roomseparator" | "mass" | "curtainsystem"
-            | "toposolid" | "propertyline" | "sitecomponent" => "modeling",
+            | "toposolid" | "propertyline" | "sitecomponent" | "parts" => "modeling",
             "view" | "sheet" | "schedule" | "annotate" | "render" | "walkthrough" | "xr" | "ui"
             | "tag" | "text" | "anno" | "dim" | "viewport" | "section" | "inspect"
             | "colorscheme" => "documentation",

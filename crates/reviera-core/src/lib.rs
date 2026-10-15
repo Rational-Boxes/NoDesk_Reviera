@@ -52,6 +52,7 @@ pub mod origin;
 pub mod overlap;
 pub mod overlap_accept;
 pub mod parameters;
+pub mod parts;
 pub mod path_arrays;
 pub mod plans;
 pub mod polygons;

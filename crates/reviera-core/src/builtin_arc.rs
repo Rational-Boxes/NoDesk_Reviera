@@ -160,6 +160,14 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(CurtainSetPanelType),
         registry.add(CurtainSetLayout),
         registry.add(RoofCreateGlazingType),
+        registry.add(PartsCreate),
+        registry.add(PartsDivide),
+        registry.add(PartsMerge),
+        registry.add(PartsExclude),
+        registry.add(PartsRestore),
+        registry.add(PartsSetOverrides),
+        registry.add(ViewSetPartsVisibility),
+        registry.add(PartsInfo),
         registry.add(ToposolidCreate),
         registry.add(ToposolidSetPoints),
         registry.add(ToposolidSubdivide),
@@ -2456,6 +2464,94 @@ read_command!(
     crate::property_lines::AreaParams,
     Option<f64>,
     |store, p| crate::property_lines::area_of(store, p)
+);
+
+edit_command!(
+    PartsCreate,
+    "parts.create",
+    "Create parts",
+    "Divides each element into parts (ARC-PART-001): one per layer of a straight layered wall (its finished body sliced at the layer boundaries, openings and joins included), or one for the whole body of a single-layer wall, floor, ceiling, roof, column or beam. Parts follow their element. Ineligible elements are skipped with a warning.",
+    "Create Parts",
+    crate::parts::CreateParams,
+    Vec<crate::id::ElementId>,
+    crate::parts::create
+);
+
+edit_command!(
+    PartsDivide,
+    "parts.divide",
+    "Divide parts",
+    "Cuts parts into pieces (ARC-PART-002) along sketched `lines` (each swept along the work plane's `normal`, by default the first part's largest face's) and intersecting `refs` (levels, grids and reference planes with an offset, which the cuts follow), with a `gap` between pieces.",
+    "Divide Parts",
+    crate::parts::DivideParams,
+    crate::parts::Divided,
+    crate::parts::divide
+);
+
+edit_command!(
+    PartsMerge,
+    "parts.merge",
+    "Merge parts",
+    "One part from touching parts of the same material (ARC-PART-003); the merged parts are kept, not drawn, until it is deleted.",
+    "Merge Parts",
+    crate::parts::IdsParams,
+    crate::id::ElementId,
+    crate::parts::merge
+);
+
+edit_command!(
+    PartsExclude,
+    "parts.exclude",
+    "Exclude parts",
+    "Excluded parts stay in the model but are not drawn, scheduled or exported (ARC-PART-003).",
+    "Exclude Parts",
+    crate::parts::IdsParams,
+    (),
+    crate::parts::exclude
+);
+
+edit_command!(
+    PartsRestore,
+    "parts.restore",
+    "Restore parts",
+    "Brings excluded parts back.",
+    "Restore Parts",
+    crate::parts::IdsParams,
+    (),
+    crate::parts::restore
+);
+
+edit_command!(
+    PartsSetOverrides,
+    "parts.set_overrides",
+    "Set part overrides",
+    "A part's own `material` (empty for Material By Original) and Base Level (`base_level_id`, or `base_level`: by_original or non_associated) (ARC-PART-004).",
+    "Part Overrides",
+    crate::parts::OverridesParams,
+    (),
+    crate::parts::set_overrides
+);
+
+edit_command!(
+    ViewSetPartsVisibility,
+    "view.set_parts_visibility",
+    "Set a view's parts visibility",
+    "`show_parts` (sources with parts hidden), `show_original` (parts hidden) or `show_both` (ARC-PART-004).",
+    "Parts Visibility",
+    crate::parts::VisibilityParams,
+    (),
+    crate::parts::set_visibility
+);
+
+read_command!(
+    PartsInfo,
+    "parts.info",
+    "A part's properties",
+    "Volume, largest face area, material (and whether by original), Core or Finish, original category and type, base level, excluded and whether it is divided or merged (ARC-PART-004).",
+    [Effect::Read],
+    crate::parts::InfoParams,
+    crate::parts::PartInfo,
+    |store, p| crate::parts::info(store, p)
 );
 
 edit_command!(

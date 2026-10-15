@@ -537,25 +537,68 @@ pub fn clip_plane(mesh: &Mesh, n: [f64; 3], d: f64) -> Mesh {
     };
     let e2 = cr(n, e1);
     let dot = |a: [f64; 3], b: [f64; 3]| a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-    for lp in loops {
-        let flat: Vec<[f64; 2]> = lp
-            .iter()
-            .map(|i| {
-                let p = out_pts[*i as usize];
-                [dot(p, e1), dot(p, e2)]
+    let flats: Vec<Vec<[f64; 2]>> = loops
+        .iter()
+        .map(|lp| {
+            lp.iter()
+                .map(|i| {
+                    let p = out_pts[*i as usize];
+                    [dot(p, e1), dot(p, e2)]
+                })
+                .collect()
+        })
+        .collect();
+    // Loops inside an odd number of others are holes (a wall's opening seen in a slice); each
+    // goes with the smallest outer loop round it.
+    let inside = |p: [f64; 2], poly: &[[f64; 2]]| {
+        let mut c = false;
+        for k in 0..poly.len() {
+            let (a, b) = (poly[k], poly[(k + 1) % poly.len()]);
+            if (a[1] > p[1]) != (b[1] > p[1])
+                && p[0] < a[0] + (p[1] - a[1]) / (b[1] - a[1]) * (b[0] - a[0])
+            {
+                c = !c;
+            }
+        }
+        c
+    };
+    let area = |poly: &[[f64; 2]]| crate::polygons::area(poly).abs();
+    let containers: Vec<Vec<usize>> = (0..loops.len())
+        .map(|i| {
+            (0..loops.len())
+                .filter(|j| *j != i && area(&flats[*j]) > area(&flats[i]))
+                .filter(|j| inside(flats[i][0], &flats[*j]))
+                .collect()
+        })
+        .collect();
+    for (i, lp) in loops.iter().enumerate() {
+        if containers[i].len() % 2 == 1 {
+            continue;
+        }
+        let holes: Vec<usize> = (0..loops.len())
+            .filter(|h| {
+                containers[*h].len() == containers[i].len() + 1 && containers[*h].contains(&i)
             })
             .collect();
+        let mut ids: Vec<u32> = lp.clone();
+        let mut flat: Vec<[f64; 2]> = flats[i].clone();
+        let mut starts: Vec<u32> = Vec::new();
+        for h in holes {
+            starts.push(flat.len() as u32);
+            ids.extend(&loops[h]);
+            flat.extend(&flats[h]);
+        }
         let mut tris: Vec<u32> = Vec::new();
-        earcut::Earcut::new().earcut(flat.iter().copied(), &[] as &[u32], &mut tris);
+        earcut::Earcut::new().earcut(flat.iter().copied(), &starts, &mut tris);
         for t in tris.chunks(3) {
             let (a, b, c) = (t[0] as usize, t[1] as usize, t[2] as usize);
             let up = (flat[b][0] - flat[a][0]) * (flat[c][1] - flat[a][1])
                 - (flat[b][1] - flat[a][1]) * (flat[c][0] - flat[a][0]);
             // Facing away from n: clockwise seen from n's side.
             if up > 0.0 {
-                out_idx.extend([lp[a], lp[c], lp[b]]);
+                out_idx.extend([ids[a], ids[c], ids[b]]);
             } else {
-                out_idx.extend([lp[a], lp[b], lp[c]]);
+                out_idx.extend([ids[a], ids[b], ids[c]]);
             }
         }
     }

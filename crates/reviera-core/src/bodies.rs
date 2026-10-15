@@ -457,6 +457,21 @@ pub fn all(store: &Store) -> Vec<Body> {
             push(p.id, &format!("{class}{}", material.suffix()), mesh, panel);
         }
     }
+    // Parts (ARC-PART-001), from their sources' finished bodies.
+    for (id, class, meshes) in crate::parts::all(store, &out) {
+        let parts: Vec<Part> = meshes
+            .into_iter()
+            .filter(|m| !m.1.is_empty())
+            .map(|mesh| Part {
+                mesh,
+                class: class.clone(),
+                plan_hidden: false,
+            })
+            .collect();
+        if !parts.is_empty() {
+            out.push(Body { element: id, parts });
+        }
+    }
     out
 }
 

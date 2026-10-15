@@ -12266,11 +12266,13 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 **Commands.** `parts.create(host_ids) -> [element_id]` returns the new parts. Ineligible elements in `host_ids` are skipped and listed in the result warning; if none is eligible the command fails with "No element can be divided into parts".
 
 **Acceptance criteria.**
-- [ ] Create Parts on a wall with brick, cavity insulation, block and plaster layers and a window creates four parts whose volumes add up to the wall's volume within 0.01%, each with the opening cut.
-- [ ] Changing the wall's block thickness from 100 to 140 mm regenerates the parts in place; their GlobalIds and Marks are unchanged.
-- [ ] Changing the wall to a type without the plaster layer deletes the plaster part and reports it.
+- [x] Create Parts on a wall with brick, cavity insulation, block and plaster layers and a window creates four parts whose volumes add up to the wall's volume within 0.01%, each with the opening cut.
+- [x] Changing the wall's block thickness from 100 to 140 mm regenerates the parts in place; their GlobalIds and Marks are unchanged.
+- [x] Changing the wall to a type without the plaster layer deletes the plaster part and reports it.
 - [ ] The IFC export contains one `IfcBuildingElementPart` per part, aggregated by the `IfcWall`, and the `IfcWall` has no `Body` representation; IfcOpenShell's validator reports no errors.
 - [ ] A stacked wall and a curtain wall cannot be picked while Create Parts is active.
+
+**Implementation note (2026-10-15, first build).** As built: `parts.create` makes `IfcBuildingElementPart`s (`recipe.part`): one per non-membrane layer of a straight layered wall, cut from the wall's finished body (joins, openings) at the layer boundaries with capped slices, so they tile it; one whole-body part for single-layer walls, floors, ceilings, roofs, columns and beams. Parts regenerate from their source; a part whose layer leaves the type is deleted with a warning (matched by layer index); deleting the source deletes its parts; a part moves only with its source. IFC: each drawn part is a faceted B-rep aggregated by its source (`IfcRelAggregates`), `INSULATION` for Thermal/Air layers, else `USERDEFINED` with the layer function. The window: Modify › Parts, a Modify | Parts tab. Not built yet: the *Parts: replace source body* export option (the source keeps its body), parts of stacked, curved and curtain walls, layered floors and roofs (they have no layers yet), wrapped layers as their own parts (a wall with wrapping or regions is sliced by plain bands), copying parts with their source, picking-time half-tone of ineligible elements, linked sources, `IfcBuildingElementPart` import.
 
 ### 3.6.12 Dividing parts
 **ID:** ARC-PART-002 · **Priority:** P2 · **Ref:** research/02 §2.3 · web: Divide Parts; Edit a Part Division; Division Instance Properties; Create a Division Profile Family
@@ -12304,10 +12306,12 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 - `parts.division_finish(session_id) -> {division_id, parts: [element_id]}` and `parts.division_cancel(session_id)` end it.
 
 **Acceptance criteria.**
-- [ ] Dividing a 10 m brick part with three vertical sketch lines 2.5 m apart and a 10 mm gap gives four pieces whose lengths are 2.495, 2.49, 2.49 and 2.495 m.
+- [x] Dividing a 10 m brick part with three vertical sketch lines 2.5 m apart and a 10 mm gap gives four pieces whose lengths are 2.495, 2.49, 2.49 and 2.495 m.
 - [ ] Dividing the parts of a 4-storey wall by the intersecting levels with offset +50 mm gives one piece per storey; raising Level 3 by 300 mm moves that cut by 300 mm.
 - [ ] A Complementary tongue-and-groove profile gives matching faces: the two pieces fused together have the same volume as the undivided part minus the gap volume, within 0.01%.
 - [ ] Killing the process during a division session and reopening the file offers to restore the session, and restoring it reproduces the sketched curves exactly.
+
+**Implementation note (2026-10-15, first build).** As built: `parts.divide` with straight `lines` (each swept along the work-plane `normal`, by default the first part's largest face's) and `refs` (levels, grids, reference planes with an offset, followed when they move), and a `gap`; every piece is the parent cut by the planes on its side (`cell`), and the parent stays as a hidden intermediate; pieces can be divided again. Tested: 10 m brick part, three lines, 10 mm gap → 2.495, 2.49, 2.49, 2.495 m; a level cut that moves with the level. The window: Divide Parts with selected model lines or a list of references and a gap. Not built yet: the division session (Edit Division, recovery), arcs and splines, closed loops, division profiles, new pieces appearing when a moved reference makes more of them.
 
 ### 3.6.13 Merging, excluding, restoring and deleting parts
 **ID:** ARC-PART-003 · **Priority:** P2 · **Ref:** research/02 §2.1 · web: Work with Merged Parts; Exclude Parts; Delete a Part
@@ -12337,9 +12341,11 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 
 **Acceptance criteria.**
 - [ ] Merging three adjacent plasterboard pieces gives one part whose volume is their sum and which has no internal faces.
-- [ ] Merging a brick piece with a block piece is refused with the material message.
+- [x] Merging a brick piece with a block piece is refused with the material message.
 - [ ] An excluded part does not appear in a part schedule or in the IFC export, and Restore brings it back with the same GlobalId.
-- [ ] Deleting one of four pieces of a divided brick part deletes all four pieces and shows the undivided brick part again; deleting that part then removes every part of the wall and shows the wall.
+- [x] Deleting one of four pieces of a divided brick part deletes all four pieces and shows the undivided brick part again; deleting that part then removes every part of the wall and shows the wall.
+
+**Implementation note (2026-10-15, first build).** As built: `parts.merge` (same material, boxes touching across the set) keeps the merged parts as hidden intermediates; its geometry is its parts' solids together (not fused, so internal faces remain); `parts.exclude` and `parts.restore` (excluded parts have no body in views or IFC; the element is still written); delete cascades as specified. Not built yet: Edit Merged, the fused merge, the restore control on hover, leaving excluded parts out of schedules (parts are not scheduled yet).
 
 ### 3.6.14 Part properties, visibility and scheduling
 **ID:** ARC-PART-004 · **Priority:** P2 · **Ref:** research/02 §2.2 · web: Part Instance Properties; Control Part Visibility and Appearance
@@ -12376,9 +12382,11 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 
 **Acceptance criteria.**
 - [ ] Turning Material By Original off on one plaster part and choosing lime render changes only that part; changing the wall type's plaster material afterwards changes the other plaster parts but not that one.
-- [ ] A view set to *Show Original* shows and selects the wall, not its parts; *Show Both* lets each be selected separately.
+- [x] A view set to *Show Original* shows and selects the wall, not its parts; *Show Both* lets each be selected separately.
 - [ ] A part schedule grouped by *Original Type* and *Construction* lists core and finish parts separately and omits excluded parts.
 - [ ] Dragging a part's top face up 50 mm with its shape handle survives a later change of the wall's height (the face stays 50 mm above the new top).
+
+**Implementation note (2026-10-15, first build).** As built: `parts.info` (volume, largest face area, material and whether by original, Core or Finish, original category and type, base level, excluded, intermediate), `parts.set_overrides` (material, base level by original, a level or non associated), `view.set_parts_visibility` (Show Parts by default; hidden elements cannot be picked). The window: a Part section in Properties with Material editable; View visibility from Modify › Parts › Parts Visibility. Not built yet: phase overrides, shape handles and face offsets, part schedules and tags, the Parts object style, properties and quantities on the IFC part.
 
 ---
 

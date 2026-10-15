@@ -143,6 +143,8 @@ pub fn transform(
 ) -> Result<Vec<ElementId>> {
     let store = txn.store().clone();
     let ids = resolve_all(&store, refs)?;
+    // Parts follow their originals (ARC-PART-001): carried along, never moved on their own.
+    let ids = crate::parts::without_carried(&store, ids)?;
     if !copy {
         for id in &ids {
             check_unpinned(&store, *id)?;

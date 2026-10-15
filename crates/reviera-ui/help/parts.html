@@ -1,0 +1,58 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Copyright (C) 2026 Reviera contributors -->
+<h1>Parts</h1>
+<p class="lead">Parts break an element into the pieces that are actually built: each layer of a
+wall, then panels, pours or sheets of a layer. They can be scheduled, tagged and given their own
+material, while the element stays the source of their shape: change the wall and its parts
+follow.</p>
+
+<h2 id="create">Creating parts</h2>
+<p>Select walls, floors, ceilings, roofs, columns or beams and click <b>Modify › Parts › Create
+Parts</b> <a href="reviera:action/parts.create">Create Parts</a>. A straight wall with layers
+gives one part per layer, its openings and corner joins included, so the parts fill the wall
+exactly; other elements (and single-layer walls) give one part each. Stacked, curved and curtain
+walls cannot have parts yet. <code>parts.create</code></p>
+<p>When the wall's type changes, its parts change with it; a part whose layer is removed from the
+type is deleted, and the status bar says so.</p>
+
+<h2 id="visibility">Parts Visibility</h2>
+<p>Each view shows <b>parts</b> (the original elements are hidden and cannot be picked — the
+default), the <b>original</b> elements (parts hidden), or <b>both</b>. Click <b>Parts
+Visibility</b> to choose for the active view. <code>view.set_parts_visibility</code></p>
+
+<h2 id="divide">Dividing parts</h2>
+<p>Select parts and click <b>Divide Parts</b>:</p>
+<ul>
+  <li><b>By lines:</b> draw model lines across the parts (on the wall's face for vertical joints,
+    in plan for a floor), select them with the parts, then Divide Parts. Each line cuts along its
+    work plane's normal.</li>
+  <li><b>By references:</b> with no lines selected, tick levels, grids and reference planes in the
+    list; the cuts follow them when they move.</li>
+</ul>
+<p>Type a <b>divider gap</b> to leave a joint between the pieces. The divided part is kept but no
+longer drawn; pieces can be divided again. <code>parts.divide</code> also takes an offset per
+reference.</p>
+
+<h2 id="merge">Merge, exclude, restore, delete</h2>
+<table>
+  <tr><td><b>Merge Parts</b></td><td>One part from touching parts of the same material.</td></tr>
+  <tr><td><b>Exclude Parts</b></td><td>Keeps the parts but leaves them out of views and the IFC
+    export.</td></tr>
+  <tr><td><b>Restore Parts</b></td><td>Brings back the excluded parts of the selected elements
+    (or all of them).</td></tr>
+  <tr><td><b>Delete</b></td><td>Deleting a piece deletes its whole division and shows the part it
+    came from again; deleting a first part deletes all the element's parts.</td></tr>
+</table>
+<p>A part does not move on its own: move its element. <code>parts.merge</code>,
+<code>parts.exclude</code>, <code>parts.restore</code></p>
+
+<h2 id="properties">Properties</h2>
+<p>A selected part shows its material (type one to override the original's; clear it for
+Material By Original), Construction (Core or Finish), original category and type, base level,
+volume and largest face area. <code>parts.info</code>, <code>parts.set_overrides</code> (also
+the base level). In IFC each drawn part is an <code>IfcBuildingElementPart</code> aggregated by
+its element.</p>
+<p class="note">Not yet available: Edit Division and Edit Merged, arcs and splines as division
+lines, division profiles, shape handles, phases, parts of layered floors and roofs, copying
+parts with their element, part schedules and tags, and writing the element without its own body
+in IFC.</p>

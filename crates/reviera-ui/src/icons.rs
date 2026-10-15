@@ -103,6 +103,24 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "site_component" => format!(
             r#"<circle cx="16" cy="12" r="8" fill="{f}" {s}/><path d="M16 20v8M10 28h12" {sa}/>"#
         ),
+        "parts_create" => format!(
+            r#"<path d="M5 6h6v20H5zM13 6h5v20h-5zM20 6h7v20h-7z" fill="{f}" {s}/>"#
+        ),
+        "parts_divide" => format!(
+            r#"<path d="M4 8h24v16H4z" fill="{f}" {s}/><path d="M12 4v24M20 4v24" {sa} stroke-dasharray="3 2"/>"#
+        ),
+        "parts_merge" => format!(
+            r#"<path d="M4 10h10v12H4zM18 10h10v12H18z" fill="{f}" {s}/><path d="M12 16h8M17 13l3 3-3 3" {sa}/>"#
+        ),
+        "parts_exclude" => format!(
+            r#"<path d="M6 6h20v20H6z" fill="none" {s} stroke-dasharray="3 2"/><path d="M10 10l12 12M22 10L10 22" {sa}/>"#
+        ),
+        "parts_restore" => format!(
+            r#"<path d="M6 6h20v20H6z" fill="{f}" {s}/><path d="M11 17l4 4 7-9" {sa}/>"#
+        ),
+        "parts_visibility" => format!(
+            r#"<path d="M3 16q13-12 26 0q-13 12-26 0z" fill="none" {s}/><path d="M12 12h3v8h-3zM17 12h3v8h-3z" fill="{f}" {sa}/>"#
+        ),
         "mass" => format!(
             r#"<path d="M6 26V10l10-6 10 6v16z" fill="{f}" {s}/><path d="M6 10l10 6 10-6M16 16v10" {sa}/>"#
         ),

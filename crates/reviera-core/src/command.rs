@@ -451,6 +451,7 @@ impl CommandRegistry {
         // Hosted walls follow their hosts (ARC-WALL-016) first.
         if let State::Edit(txn) = &mut cx.state {
             crate::walls::linings::follow_hosts(txn)?;
+            crate::parts::prune(txn)?;
             crate::constraints::enforce(txn)?;
         }
         if !commit {

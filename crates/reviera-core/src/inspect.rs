@@ -59,6 +59,10 @@ pub fn in_tree(e: &Element) -> bool {
 /// The parent element of `e` in the tree, before openings are skipped.
 fn raw_parent(store: &Store, e: &Element, imported: &Imported) -> Option<ElementId> {
     let by_guid = |g: &str| GlobalId::parse(g).and_then(|g| store.find_by_guid(&g));
+    // A part sits under its original element (ARC-PART-001).
+    if let Some(r) = crate::parts::recipe(e) {
+        return by_guid(&r.source);
+    }
     if let Some(r) = crate::walls::wall_recipe(e) {
         return by_guid(&r.base_level);
     }

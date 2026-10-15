@@ -395,6 +395,13 @@ Create … Boundary* tab:
   `toposolid.subdivide`, `toposolid.create_graded_region`, `toposolid.cut_fill`,
   `toposolid.simplify`, `site.set_settings`, `propertyline.create`, `sitecomponent.place`;
   ARC-TOPO-001 … 005, ARC-SITE-001).
+- **Parts** (Modify › Parts): walls split into one part per layer (openings and joins
+  included) and floors, ceilings, roofs, columns and beams into one part each, following their
+  element; divided by lines or by levels, grids and reference planes with a gap, merged,
+  excluded and restored; their own material and level; Show Parts, Show Original or Show Both
+  per view; `IfcBuildingElementPart`s aggregated by their element in IFC (`parts.create`,
+  `parts.divide`, `parts.merge`, `parts.exclude`, `parts.restore`, `parts.set_overrides`,
+  `parts.info`, `view.set_parts_visibility`; ARC-PART-001 … 004).
 - **Model In-Place** (Architecture › Model): free-form elements of a chosen category from
   extrusions, blends, revolves and sweeps on work planes, solid or void (voids cut through the
   boolean relations); made in the window from selected model lines (`inplace.create`,
@@ -700,10 +707,10 @@ Open one with `reviera gui test-data/samples/manor.ifc`, or rebuild them with
 ## Not built yet
 
 The specification (`design_documents/spec/`) describes the whole application. Of the 121
-architecture requirements (Chapter 3), the core of each area is built; this is what is not,
-area by area (a review against the spec on 2026-10-15). Whole areas not started are listed first.
+architecture requirements (Chapter 3), every area now has a first build; this is what is not built,
+area by area (reviewed against the spec on 2026-10-15).
 
-**Not started (architecture):**
+**Still to build in the areas begun (architecture):**
 
 - **Datums and work planes**: alignment locks between datum ends, level elbows, view crops that
   follow a scope box, picking a face as the work plane, Go To View and the Work Plane Viewer
@@ -719,8 +726,11 @@ area by area (a review against the spec on 2026-10-15). Whole areas not started 
 - **Curtain extras**: placing grid lines by clicking, manual lines on sloped glazing, curved
   faces for curtain systems (ARC-CW-004/007/008).
 - **Floors and roofs**: slope arrows along an edge or above the plate, shape editing of roofs
-  and variable layers, slab edge profiles other than rectangles, parts (ARC-ROOF-005,
-  ARC-SHAPE-001, ARC-SLED-001, ARC-PART-001 … 004).
+  and variable layers, slab edge profiles other than rectangles (ARC-ROOF-005, ARC-SHAPE-001,
+  ARC-SLED-001).
+- **Parts**: Edit Division and Edit Merged sessions, curved division lines and profiles, fused
+  merges, shape handles, phases, part schedules and tags, parts of stacked, curved and curtain
+  walls, writing the original without its body in IFC (ARC-PART-001 … 004).
 - **Rooms and areas**: drawing area boundaries by hand in the window, the glass line, area tags and
   schedules per scheme, colour fill legends and patterns (ARC-AREA-001, ARC-CLR-001).
 - **Modelling in the project**: the in-place editor session, swept blends, in-place hosts and

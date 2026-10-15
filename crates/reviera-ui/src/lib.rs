@@ -43,6 +43,7 @@ mod nav;
 mod notes;
 mod openings;
 mod overlaps;
+mod parts;
 mod path_arrays;
 mod plans;
 mod railings;
@@ -2069,6 +2070,7 @@ impl Gui {
             || self.ramp_rows(grid, id)
             || self.skylight_rows(grid, id)
             || self.mesh_object_rows(grid, id)
+            || self.part_rows(grid, id)
             || self.path_array_rows(grid, id)
             || self.datum_rows(grid, id)
         {
@@ -2289,6 +2291,7 @@ impl Gui {
             || self.skylight_edit(property, text.clone())
             || self.place_edit(property, text.clone())
             || self.mesh_object_edit(property, text.clone())
+            || self.part_edit(property, text.clone())
             || self.path_array_edit(property, text.clone())
             || self.datum_edit(property, text.clone())
             || self.datum_view_edit(property, text.clone())
@@ -3810,6 +3813,12 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "roof.create_by_face" => with(gui, |g| g.by_face("roof.create_by_face")),
         "curtainsystem.create_by_face" => with(gui, |g| g.by_face("curtainsystem.create_by_face")),
         "element.update_to_face" => with(gui, Gui::update_to_face),
+        "parts.create" => with(gui, Gui::create_parts),
+        "parts.divide" => with(gui, Gui::divide_parts),
+        "parts.merge" => with(gui, Gui::merge_parts),
+        "parts.exclude" => with(gui, Gui::exclude_parts),
+        "parts.restore" => with(gui, Gui::restore_parts),
+        "view.set_parts_visibility" => with(gui, Gui::parts_visibility),
         "toposolid.create" => with(gui, Gui::create_toposolid),
         "toposolid.subdivide" => with(gui, Gui::subdivide_toposolid),
         "toposolid.create_graded_region" => with(gui, Gui::graded_region),
