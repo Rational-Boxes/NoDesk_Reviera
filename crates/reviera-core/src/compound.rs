@@ -132,6 +132,13 @@ pub struct Layer {
     pub structural_material: bool,
     #[serde(default)]
     pub variable: bool,
+    /// The layer's top edge is unlocked: it moves by a wall's Top Extension Distance
+    /// (ARC-CMPD-004).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub extend_top: bool,
+    /// Its bottom edge is unlocked: it moves by the Base Extension Distance.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub extend_base: bool,
 }
 
 impl Layer {
@@ -150,6 +157,66 @@ pub struct Compound {
     pub layers: Vec<Layer>,
     /// The core: layers `core[0]..core[1]` (may be empty).
     pub core: [usize; 2],
+    /// Regions of a vertically compound type (ARC-CMPD-003).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub regions: Vec<Region>,
+    /// Wrapping at Inserts and at Ends (ARC-WRAP-001).
+    #[serde(default, skip_serializing_if = "Wrap::is_none")]
+    pub wrap_inserts: Wrap,
+    #[serde(default, skip_serializing_if = "Wrap::is_none")]
+    pub wrap_ends: Wrap,
+}
+
+/// Which faces' wrapping layers wrap.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum Wrap {
+    #[default]
+    None,
+    Exterior,
+    Interior,
+    Both,
+}
+
+impl Wrap {
+    pub fn is_none(&self) -> bool {
+        *self == Wrap::None
+    }
+
+    pub fn exterior(self) -> bool {
+        matches!(self, Wrap::Exterior | Wrap::Both)
+    }
+
+    pub fn interior(self) -> bool {
+        matches!(self, Wrap::Interior | Wrap::Both)
+    }
+}
+
+/// Where a region's height is measured from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum Anchor {
+    #[default]
+    Base,
+    Top,
+}
+
+/// A region (ARC-CMPD-003): the part of a layer's column within `distance` of the wall's base
+/// or top, in its own material (a brick plinth under render, say). The rest of the column keeps
+/// the layer's.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct Region {
+    /// The layer whose column is split (0 is the exterior layer).
+    pub layer: usize,
+    pub from: Anchor,
+    /// Metres from the base or top.
+    pub distance: f64,
+    /// The region's material.
+    #[serde(default)]
+    pub material: String,
+    /// The row it is assigned to, if any (its function and material).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub row: Option<usize>,
 }
 
 impl Compound {
@@ -180,8 +247,13 @@ impl Compound {
                 wraps: false,
                 structural_material: true,
                 variable: false,
+                extend_top: false,
+                extend_base: false,
             }],
             core: [0, 1],
+            regions: Vec::new(),
+            wrap_inserts: Wrap::None,
+            wrap_ends: Wrap::None,
         }
     }
 
@@ -266,7 +338,66 @@ impl Compound {
         if self.thickness() <= 0.0 {
             return bad("the layers must have some thickness".into());
         }
+        // Extendable edges at each end are one run of adjacent layers (ARC-CMPD-004).
+        for (end, flag) in [
+            (
+                "top",
+                &(|l: &Layer| l.extend_top) as &dyn Fn(&Layer) -> bool,
+            ),
+            ("bottom", &|l: &Layer| l.extend_base),
+        ] {
+            let open: Vec<usize> = (0..n).filter(|i| flag(&self.layers[*i])).collect();
+            if let (Some(&a), Some(&b)) = (open.first(), open.last())
+                && b + 1 - a != open.len()
+            {
+                let names: Vec<String> = open.iter().map(|i| (i + 1).to_string()).collect();
+                return Err(Error::new(
+                    "compound.extendable_adjacent",
+                    format!(
+                        "Extendable layers must be adjacent: the {end} edges of layers {} are unlocked, with locked layers between",
+                        names.join(", ")
+                    ),
+                ));
+            }
+            for &i in &open {
+                if self.layers[i].function == Function::Membrane
+                    && !open.contains(&(i.wrapping_sub(1)))
+                    && !open.contains(&(i + 1))
+                {
+                    return bad(format!(
+                        "{} is a membrane: it follows its neighbours and cannot be unlocked alone",
+                        name(i)
+                    ));
+                }
+            }
+        }
+        for (k, r) in self.regions.iter().enumerate() {
+            if r.layer >= n {
+                return bad(format!(
+                    "region {} is in layer {}, which does not exist",
+                    k + 1,
+                    r.layer + 1
+                ));
+            }
+            if r.distance.is_nan() || r.distance <= 0.0 {
+                return bad(format!(
+                    "region {}: the distance must be greater than 0",
+                    k + 1
+                ));
+            }
+            if r.row.is_some_and(|row| row >= n) {
+                return bad(format!("region {}: its row does not exist", k + 1));
+            }
+        }
         Ok(())
+    }
+
+    /// A region's material: its row's, else its own.
+    pub fn region_material(&self, r: &Region) -> String {
+        match r.row.and_then(|row| self.layers.get(row)) {
+            Some(l) => l.material.clone(),
+            None => r.material.clone(),
+        }
     }
 }
 
@@ -362,6 +493,11 @@ pub struct LayerArg {
     pub structural_material: bool,
     #[serde(default)]
     pub variable: bool,
+    /// Unlocked top and bottom edges (ARC-CMPD-004).
+    #[serde(default)]
+    pub extend_top: bool,
+    #[serde(default)]
+    pub extend_base: bool,
 }
 
 /// Gives a wall type its layers (`compound.set_layers`): its width becomes their total, and
@@ -401,6 +537,8 @@ pub(crate) fn set_layers(txn: &mut crate::txn::Transaction<'_>, p: SetLayersPara
             wraps: a.wraps,
             structural_material: a.structural_material,
             variable: a.variable,
+            extend_top: a.extend_top,
+            extend_base: a.extend_base,
         });
     }
     let structure: Vec<usize> = (0..layers.len())
@@ -412,7 +550,19 @@ pub(crate) fn set_layers(txn: &mut crate::txn::Transaction<'_>, p: SetLayersPara
         p.core_end
             .unwrap_or_else(|| structure.last().map_or(0, |i| i + 1)),
     ];
-    let c = Compound { layers, core };
+    // Regions and wrapping stay as they were (regions of layers that remain).
+    let old = of_wall_type(store.get(id).expect("resolved"));
+    let n = layers.len();
+    let c = Compound {
+        layers,
+        core,
+        regions: old
+            .as_ref()
+            .map(|o| o.regions.iter().filter(|r| r.layer < n).cloned().collect())
+            .unwrap_or_default(),
+        wrap_inserts: old.as_ref().map_or(Wrap::None, |o| o.wrap_inserts),
+        wrap_ends: old.as_ref().map_or(Wrap::None, |o| o.wrap_ends),
+    };
     c.validate()?;
     let mut recipe = store
         .get(id)
@@ -438,6 +588,241 @@ pub(crate) fn set_layers(txn: &mut crate::txn::Transaction<'_>, p: SetLayersPara
     Ok(())
 }
 
+// ---- Regions, extendable layers and wrapping (ARC-CMPD-003/004, ARC-WRAP-001) ----
+
+/// A wall type's own layers to change; a type without layers gets its single layer.
+fn editable(store: &Store, r: &ElementRef) -> Result<(ElementId, Compound)> {
+    let id = wall_type(store, r)?;
+    let t = store.get(id).expect("resolved");
+    if crate::walls::stacked::of_type(t).is_some() {
+        return Err(Error::new(
+            "compound.stacked",
+            "a stacked wall type has rows, not layers",
+        ));
+    }
+    Ok((id, of_wall_type(t).expect("a wall type")))
+}
+
+/// Writes a type's compound and checks every wall of it still regenerates.
+fn store_compound(
+    txn: &mut crate::txn::Transaction<'_>,
+    id: ElementId,
+    c: &Compound,
+) -> Result<()> {
+    c.validate()?;
+    let store = txn.store().clone();
+    let mut recipe = store
+        .get(id)
+        .and_then(|t| t.param(RECIPE_KEY))
+        .cloned()
+        .expect("a wall type recipe");
+    recipe["width"] = c.thickness().into();
+    recipe["compound"] = serde_json::to_value(c).expect("serialises");
+    txn.modify(id, |e| {
+        e.params.insert(RECIPE_KEY.into(), recipe);
+    })
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SetExtendableParams {
+    pub type_id: ElementRef,
+    /// The layer (0 is the exterior layer).
+    pub index: usize,
+    /// Unlock (true) or lock its top edge; omitted, unchanged.
+    pub top: Option<bool>,
+    pub base: Option<bool>,
+}
+
+/// `compound.set_extendable`.
+pub(crate) fn set_extendable(
+    txn: &mut crate::txn::Transaction<'_>,
+    p: SetExtendableParams,
+) -> Result<()> {
+    let store = txn.store().clone();
+    let (id, mut c) = editable(&store, &p.type_id)?;
+    let l = c.layers.get_mut(p.index).ok_or_else(|| {
+        Error::new(
+            "compound.no_layer",
+            format!("there is no layer {}", p.index + 1),
+        )
+    })?;
+    if let Some(v) = p.top {
+        l.extend_top = v;
+    }
+    if let Some(v) = p.base {
+        l.extend_base = v;
+    }
+    store_compound(txn, id, &c)
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SplitRegionParams {
+    pub type_id: ElementRef,
+    /// The layer whose column is split (0 is the exterior layer).
+    pub layer: usize,
+    #[serde(default)]
+    pub from: Anchor,
+    /// The region's height from the base or top (metres).
+    #[schemars(extend("x-reviera-data-type" = "length"))]
+    pub distance: f64,
+    /// The region's material; omitted, the layer's.
+    pub material: Option<String>,
+}
+
+/// `compound.split_region`: a region at the base or top of a layer's column; its index.
+pub(crate) fn split_region(
+    txn: &mut crate::txn::Transaction<'_>,
+    p: SplitRegionParams,
+) -> Result<usize> {
+    let store = txn.store().clone();
+    let (id, mut c) = editable(&store, &p.type_id)?;
+    let material = match p.material {
+        Some(m) => m.trim().to_owned(),
+        None => c
+            .layers
+            .get(p.layer)
+            .map(|l| l.material.clone())
+            .unwrap_or_default(),
+    };
+    c.regions.push(Region {
+        layer: p.layer,
+        from: p.from,
+        distance: p.distance,
+        material,
+        row: None,
+    });
+    store_compound(txn, id, &c)?;
+    Ok(c.regions.len() - 1)
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SetRegionsParams {
+    pub type_id: ElementRef,
+    /// Every region of the type, replacing those it has.
+    pub regions: Vec<Region>,
+}
+
+/// `compound.set_regions`.
+pub(crate) fn set_regions(
+    txn: &mut crate::txn::Transaction<'_>,
+    p: SetRegionsParams,
+) -> Result<()> {
+    let store = txn.store().clone();
+    let (id, mut c) = editable(&store, &p.type_id)?;
+    c.regions = p.regions;
+    store_compound(txn, id, &c)
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct RegionParams {
+    pub type_id: ElementRef,
+    pub region: usize,
+}
+
+/// `compound.merge_regions`: the region merges back into its layer.
+pub(crate) fn merge_regions(txn: &mut crate::txn::Transaction<'_>, p: RegionParams) -> Result<()> {
+    let store = txn.store().clone();
+    let (id, mut c) = editable(&store, &p.type_id)?;
+    if p.region >= c.regions.len() {
+        return Err(Error::new(
+            "compound.no_region",
+            format!("there is no region {}", p.region),
+        ));
+    }
+    c.regions.remove(p.region);
+    store_compound(txn, id, &c)
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct RegionAnchorParams {
+    pub type_id: ElementRef,
+    pub region: usize,
+    pub from: Anchor,
+    #[schemars(extend("x-reviera-data-type" = "length"))]
+    pub distance: f64,
+}
+
+/// `compound.set_region_anchor`.
+pub(crate) fn set_region_anchor(
+    txn: &mut crate::txn::Transaction<'_>,
+    p: RegionAnchorParams,
+) -> Result<()> {
+    let store = txn.store().clone();
+    let (id, mut c) = editable(&store, &p.type_id)?;
+    let r = c.regions.get_mut(p.region).ok_or_else(|| {
+        Error::new(
+            "compound.no_region",
+            format!("there is no region {}", p.region),
+        )
+    })?;
+    r.from = p.from;
+    r.distance = p.distance;
+    store_compound(txn, id, &c)
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct AssignLayerParams {
+    pub type_id: ElementRef,
+    pub regions: Vec<usize>,
+    /// The layer row whose material (and function) the regions take.
+    pub layer_index: usize,
+}
+
+/// `compound.assign_layer`.
+pub(crate) fn assign_layer(
+    txn: &mut crate::txn::Transaction<'_>,
+    p: AssignLayerParams,
+) -> Result<()> {
+    let store = txn.store().clone();
+    let (id, mut c) = editable(&store, &p.type_id)?;
+    for k in &p.regions {
+        let r = c
+            .regions
+            .get_mut(*k)
+            .ok_or_else(|| Error::new("compound.no_region", format!("there is no region {k}")))?;
+        r.row = Some(p.layer_index);
+    }
+    store_compound(txn, id, &c)
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SetWrappingParams {
+    pub type_id: ElementRef,
+    /// Wrapping at Inserts: none, exterior, interior or both.
+    pub at_inserts: Option<Wrap>,
+    /// Wrapping at Ends: none, exterior or interior.
+    pub at_ends: Option<Wrap>,
+}
+
+/// `compound.set_wrapping`.
+pub(crate) fn set_wrapping(
+    txn: &mut crate::txn::Transaction<'_>,
+    p: SetWrappingParams,
+) -> Result<()> {
+    let store = txn.store().clone();
+    let (id, mut c) = editable(&store, &p.type_id)?;
+    if let Some(w) = p.at_inserts {
+        c.wrap_inserts = w;
+    }
+    if let Some(w) = p.at_ends {
+        if w == Wrap::Both {
+            return Err(Error::new(
+                "compound.wrap_ends",
+                "Wrapping at Ends is exterior, interior or none",
+            ));
+        }
+        c.wrap_ends = w;
+    }
+    store_compound(txn, id, &c)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -451,6 +836,8 @@ mod tests {
             wraps: false,
             structural_material: false,
             variable: false,
+            extend_top: false,
+            extend_base: false,
         }
     }
 
@@ -465,6 +852,9 @@ mod tests {
                 layer(Function::Finish2, 0.013),
             ],
             core: [3, 4],
+            regions: Vec::new(),
+            wrap_inserts: Wrap::None,
+            wrap_ends: Wrap::None,
         };
         c.validate().unwrap();
         assert!((c.thickness() - 0.333).abs() < 1e-9);

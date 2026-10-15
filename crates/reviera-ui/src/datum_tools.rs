@@ -1976,3 +1976,119 @@ impl Gui {
         true
     }
 }
+
+impl Gui {
+    /// A layered wall's extension and end-wrapping rows (ARC-CMPD-004, ARC-WRAP-001).
+    pub(crate) fn wall_layer_rows(&mut self, grid: &PropertyGrid, id: ElementId) {
+        use reviera_core::walls::layered::EndWrap;
+        let Some(store) = self.store_now() else {
+            return;
+        };
+        let Some(e) = store.get(id) else { return };
+        let Some(r) = reviera_core::walls::wall_recipe(e) else {
+            return;
+        };
+        let Some(t) = e
+            .param("@type")
+            .and_then(|v| v.as_str())
+            .and_then(reviera_core::GlobalId::parse)
+            .and_then(|g| store.find_by_guid(&g))
+            .and_then(|t| store.get(t))
+        else {
+            return;
+        };
+        if !reviera_core::compound::is_layered(t) || !r.through.is_empty() {
+            return;
+        }
+        let Some(c) = reviera_core::compound::of_wall_type(t) else {
+            return;
+        };
+        grid.append(Property::category("Layers", "c_wl"));
+        let top = c.layers.iter().any(|l| l.extend_top);
+        let base = c.layers.iter().any(|l| l.extend_base);
+        grid.append(Property::string(
+            "Top Extension Distance",
+            "wl_top",
+            self.format_length(r.extension[1]),
+        ));
+        if !top || r.attach_top.is_some() {
+            grid.set_property_read_only("wl_top", true);
+        }
+        grid.append(Property::string(
+            "Base Extension Distance",
+            "wl_base",
+            self.format_length(r.extension[0]),
+        ));
+        if !base {
+            grid.set_property_read_only("wl_base", true);
+        }
+        let modes = || {
+            vec![
+                ("By Type".to_owned(), 0),
+                ("Exterior".to_owned(), 1),
+                ("Interior".to_owned(), 2),
+                ("None".to_owned(), 3),
+            ]
+        };
+        let index = |w: EndWrap| match w {
+            EndWrap::ByType => 0,
+            EndWrap::Exterior => 1,
+            EndWrap::Interior => 2,
+            EndWrap::None => 3,
+        };
+        grid.append(Property::enumeration(
+            "Wrapping at Start",
+            "wl_wrap0",
+            modes(),
+            index(r.end_wrap[0]),
+        ));
+        grid.append(Property::enumeration(
+            "Wrapping at End",
+            "wl_wrap1",
+            modes(),
+            index(r.end_wrap[1]),
+        ));
+    }
+
+    pub(crate) fn wall_layer_edit(&mut self, property: &str, text: Option<String>) -> bool {
+        let Some(row) = property.strip_prefix("wl_") else {
+            return false;
+        };
+        let text = text.unwrap_or_default();
+        let ids = self.selection();
+        let Some(&id) = ids.first() else { return true };
+        let result = match row {
+            "top" | "base" => match self
+                .run(
+                    "units.parse",
+                    json!({ "text": text, "data_type": "length" }),
+                )
+                .ok()
+                .and_then(|v| v.as_f64())
+            {
+                Some(v) => self.run("wall.set_extension", json!({ "wall_ids": ids, row: v })),
+                None => Err("Type a length".to_owned()),
+            },
+            "wrap0" | "wrap1" => {
+                let mode = match text.as_str() {
+                    "Exterior" => "exterior",
+                    "Interior" => "interior",
+                    "None" => "none",
+                    _ => "by_type",
+                };
+                self.run(
+                    "wall.set_end_wrap",
+                    json!({ "wall_id": id, "end": if row == "wrap0" { "start" } else { "end" }, "mode": mode }),
+                )
+            }
+            _ => return true,
+        };
+        let frame = self.frame;
+        match result {
+            Ok(_) => self.refresh_scene(&frame),
+            Err(e) => frame.set_status_text(&e, 0),
+        }
+        self.properties_stale = true;
+        true
+    }
+}

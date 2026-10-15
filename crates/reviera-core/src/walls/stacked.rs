@@ -221,6 +221,18 @@ pub fn layout(store: &Store, e: &Element, g: &WallGeometry) -> Result<Vec<SubWal
 
 /// A sub-wall's body: its band across the stacked wall's joined outline, between its heights.
 pub fn sub_body(body: &WallBody, s: &SubWall) -> WallBody {
+    band(
+        body,
+        s.centre - s.width / 2.0,
+        s.centre + s.width / 2.0,
+        s.z[0],
+        s.z[1],
+    )
+}
+
+/// A band of a wall's joined body: across from `lo` to `hi` along its normal, from `z0` to
+/// `z1`, its ends on the body's end lines.
+pub fn band(body: &WallBody, lo: f64, hi: f64, z0: f64, z1: f64) -> WallBody {
     let g = &body.geometry;
     let f = body.local_footprint();
     let (u, n) = (g.direction(), g.normal());
@@ -232,7 +244,6 @@ pub fn sub_body(body: &WallBody, s: &SubWall) -> WallBody {
             a[0] + (y - a[1]) * (b[0] - a[0]) / (b[1] - a[1])
         }
     };
-    let (lo, hi) = (s.centre - s.width / 2.0, s.centre + s.width / 2.0);
     // Corners 0 and 1 are on one long side, 2 and 3 on the other.
     let (y01, y23) = if f[0][1] <= f[3][1] {
         (lo, hi)
@@ -253,9 +264,9 @@ pub fn sub_body(body: &WallBody, s: &SubWall) -> WallBody {
     };
     WallBody {
         geometry: WallGeometry {
-            base_z: s.z[0],
-            height: s.z[1] - s.z[0],
-            width: s.width,
+            base_z: z0,
+            height: z1 - z0,
+            width: hi - lo,
             ..*g
         },
         footprint: local.map(world),

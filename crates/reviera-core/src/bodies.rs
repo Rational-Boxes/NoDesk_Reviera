@@ -178,6 +178,16 @@ pub fn all(store: &Store) -> Vec<Body> {
             continue;
         }
         let c = cuts.get(&id).map_or(&[][..], Vec::as_slice);
+        // Layer by layer: regions, extensions, wrapping (ARC-CMPD-003/004, ARC-WRAP-001).
+        if let Some(cells) = store
+            .get(id)
+            .and_then(|e| crate::walls::layered::meshes(store, e, &body, &solved, c))
+        {
+            for (material, mesh) in cells {
+                push(id, &format!("{class}:layer/{material}"), trim(mesh), false);
+            }
+            continue;
+        }
         // An edited profile (ARC-WALL-009) or a slanted or tapered wall (ARC-WALL-005).
         let special = store
             .get(id)

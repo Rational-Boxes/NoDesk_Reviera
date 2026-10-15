@@ -829,6 +829,7 @@ impl LocalProject {
         let contexts = geometry::Contexts::find(&self.ifc)?;
         let owner_history = self.new_owner_history()?;
         let mut wall_steps = HashSet::new();
+        let layer_cuts = reviera_core::inserts::cuts_by_host(store);
         for (id, body) in &solved.bodies {
             let e = store.get(*id).expect("solved walls exist");
             let recipe = walls::wall_recipe(e).expect("solved walls have recipes");
@@ -859,6 +860,52 @@ impl LocalProject {
                 continue;
             }
             crate::stacked_walls::remove_subs(&mut self.ifc, step)?;
+            // A wall built layer by layer (ARC-CMPD-003/004, ARC-WRAP-001): its cells as B-reps
+            // in its own frame, cut by its openings (the wrap pockets are part of the body).
+            if let Some(cells) = walls::layered::meshes(
+                store,
+                e,
+                body,
+                &solved,
+                layer_cuts.get(id).map_or(&[][..], Vec::as_slice),
+            ) {
+                let g = &body.geometry;
+                let (u, n) = (g.direction(), g.normal());
+                let local = |p: &[f64; 3]| {
+                    let d = [p[0] - g.start[0], p[1] - g.start[1]];
+                    [
+                        d[0] * u[0] + d[1] * u[1],
+                        d[0] * n[0] + d[1] * n[1],
+                        p[2] - g.base_z,
+                    ]
+                };
+                let solids: Vec<geometry::Polyhedron> = cells
+                    .iter()
+                    .map(|(_, mesh)| geometry::Polyhedron {
+                        points: mesh.0.iter().map(local).collect(),
+                        faces: mesh
+                            .1
+                            .chunks(3)
+                            .map(|t| t.iter().map(|i| *i as usize).collect())
+                            .collect(),
+                    })
+                    .collect();
+                geometry::remove_wall_shape(&mut self.ifc, step)?;
+                geometry::write_breps(
+                    &mut self.ifc,
+                    step,
+                    geometry::BrepFrame {
+                        origin: [g.start[0], g.start[1], g.base_z],
+                        x_dir: u,
+                    },
+                    &solids,
+                    self.length_scale,
+                    contexts,
+                )?;
+                geometry::contain(&mut self.ifc, step, storey, owner_history)?;
+                wall_steps.insert(step);
+                continue;
+            }
             // A slanted or tapered wall (ARC-WALL-005) or an edited profile (ARC-WALL-009): its
             // body as a B-rep in its own frame.
             if let Some(Ok(mesh)) = walls::profile::special_mesh(e, body, &[]) {

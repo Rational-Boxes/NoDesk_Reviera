@@ -143,6 +143,15 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(WallBreakUp),
         registry.add(WallEditProfile),
         registry.add(WallSweepCreate),
+        registry.add(CompoundSetExtendable),
+        registry.add(CompoundSplitRegion),
+        registry.add(CompoundSetRegions),
+        registry.add(CompoundMergeRegions),
+        registry.add(CompoundSetRegionAnchor),
+        registry.add(CompoundAssignLayer),
+        registry.add(CompoundSetWrapping),
+        registry.add(WallSetExtension),
+        registry.add(WallSetEndWrap),
         registry.add(WallCreateBySegment),
         registry.add(WallCreateByRoom),
         registry.add(WallSetHost),
@@ -1492,6 +1501,115 @@ edit_command!(
     crate::walls::linings::UnjoinParams,
     (),
     crate::walls::linings::unjoin
+);
+
+edit_command!(
+    CompoundSetExtendable,
+    "compound.set_extendable",
+    "Unlock a layer's edges",
+    "Unlocks (true) or locks a wall type's layer `index` (0 the exterior layer) at its `top` or \
+     `base` (ARC-CMPD-004): unlocked edges move by walls' Top and Base Extension Distances. The \
+     unlocked layers at each end must be adjacent.",
+    "Extendable Layer",
+    crate::compound::SetExtendableParams,
+    (),
+    crate::compound::set_extendable
+);
+
+edit_command!(
+    CompoundSplitRegion,
+    "compound.split_region",
+    "Split a layer into a region",
+    "Splits wall type layer `layer`'s column (ARC-CMPD-003): the part within `distance` of the \
+     wall's base or top (`from`) becomes a region in its own `material`; on a shorter wall it is \
+     clipped. Returns the region's index.",
+    "Split Region",
+    crate::compound::SplitRegionParams,
+    usize,
+    crate::compound::split_region
+);
+
+edit_command!(
+    CompoundSetRegions,
+    "compound.set_regions",
+    "Set a wall type's regions",
+    "Replaces a wall type's regions (ARC-CMPD-003): each `{layer, from: base|top, distance, \
+     material, row?}`.",
+    "Regions",
+    crate::compound::SetRegionsParams,
+    (),
+    crate::compound::set_regions
+);
+
+edit_command!(
+    CompoundMergeRegions,
+    "compound.merge_regions",
+    "Merge a region back",
+    "Merges a wall type's region back into its layer (ARC-CMPD-003).",
+    "Merge Regions",
+    crate::compound::RegionParams,
+    (),
+    crate::compound::merge_regions
+);
+
+edit_command!(
+    CompoundSetRegionAnchor,
+    "compound.set_region_anchor",
+    "Anchor a region",
+    "Sets a region's height: `distance` from the wall's base or top (ARC-CMPD-003).",
+    "Region Anchor",
+    crate::compound::RegionAnchorParams,
+    (),
+    crate::compound::set_region_anchor
+);
+
+edit_command!(
+    CompoundAssignLayer,
+    "compound.assign_layer",
+    "Assign a layer row to regions",
+    "The regions take layer row `layer_index`'s material (ARC-CMPD-003).",
+    "Assign Layers",
+    crate::compound::AssignLayerParams,
+    (),
+    crate::compound::assign_layer
+);
+
+edit_command!(
+    CompoundSetWrapping,
+    "compound.set_wrapping",
+    "Set a wall type's wrapping",
+    "Wrapping at Inserts (none, exterior, interior, both) and at Ends (none, exterior, interior) \
+     for a wall type (ARC-WRAP-001): its layers with Wraps line openings' jambs back to the core, \
+     and turn round free ends.",
+    "Wrapping",
+    crate::compound::SetWrappingParams,
+    (),
+    crate::compound::set_wrapping
+);
+
+edit_command!(
+    WallSetExtension,
+    "wall.set_extension",
+    "Extend walls' layers",
+    "Sets walls' Top and Base Extension Distances (ARC-CMPD-004): the layers whose edges are \
+     unlocked in the type run that far past the top (positive up) or base (negative down). Not \
+     while the top is attached.",
+    "Layer Extension",
+    crate::walls::layered::SetExtensionParams,
+    (),
+    crate::walls::layered::set_extension
+);
+
+edit_command!(
+    WallSetEndWrap,
+    "wall.set_end_wrap",
+    "Set a wall end's wrapping",
+    "Overrides the type's Wrapping at Ends at one end of a wall (ARC-WRAP-001): by_type, \
+     exterior, interior or none.",
+    "End Wrapping",
+    crate::walls::layered::SetEndWrapParams,
+    (),
+    crate::walls::layered::set_end_wrap
 );
 
 edit_command!(

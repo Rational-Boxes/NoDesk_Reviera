@@ -10560,7 +10560,9 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 - `compound.set_region_anchor(type_id, boundary_key, from: Base|Top, distance)`
 
 **Acceptance criteria.**
-- [ ] A type with a 600 mm brick region anchored to the base shows the brick from 0 to 600 mm on a 3 m wall and on a 1 m wall alike. On a 0.5 m wall the brick region is clipped at 0.5 m.
+- [x] A type with a 600 mm brick region anchored to the base shows the brick from 0 to 600 mm on a 3 m wall and on a 1 m wall alike. On a 0.5 m wall the brick region is clipped at 0.5 m.
+
+**Implementation note (2026-10-15, first build).** As built: regions are horizontal splits of a layer's column (`recipe.compound` `regions`: layer, from base or top, distance, material or an assigned row), so regions do not step in thickness yet. Such walls are built layer by layer (one box per layer cell, cut at the joined ends and by the openings) and each cell is drawn in its material's colour; IFC writes the cells as a B-rep. Commands: `compound.split_region`, `compound.merge_regions`, `compound.set_region_anchor`, `compound.assign_layer`, `compound.set_regions` (an addition). The window: the Regions grid in Edit Assembly. Not built yet: vertical region boundaries, the sample-plane editor with Split/Merge/Assign tools, plan layer lines per region, Parts per layer/region export.
 
 ### 3.3.8 Extendable layers
 **ID:** ARC-CMPD-004 · **Priority:** P1 · **Ref:** research/02 §4.3, §4.5
@@ -10587,9 +10589,11 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 - `wall.set_extension(wall_ids, top?: f64, base?: f64)`.
 
 **Acceptance criteria.**
-- [ ] With an extendable brick layer and Base Extension Distance = −300 mm, the brick stops 300 mm below the wall base, while the other layers stay at the base.
-- [ ] Unlocking the bottom edges of layers 1 and 3 but not layer 2 is refused with a message naming the layers.
+- [x] With an extendable brick layer and Base Extension Distance = −300 mm, the brick stops 300 mm below the wall base, while the other layers stay at the base.
+- [x] Unlocking the bottom edges of layers 1 and 3 but not layer 2 is refused with a message naming the layers.
 - [ ] A window placed in a wall whose brick layer extends 500 mm above the top still cuts the brick, and attaching the wall top to a roof makes Top Extension Distance read-only.
+
+**Implementation note (2026-10-15, first build).** As built: layers' `extend_top`/`extend_base` flags (adjacency and lone-membrane rules), the wall recipe's `extension` (base, top); the layered body moves the unlocked layers' edges; an attached top ignores and refuses the top extension; "Layer extension exceeds wall height" when the layers would be shorter than `TOL_SHORT`. `compound.set_extendable`, `wall.set_extension`; Edit Assembly's Extend Top/Base columns and the wall's Top/Base Extension Distance rows. Not built yet: shape handles with Tab in views, extensions on slanted walls, layer cleanup of extended parts at joins, property values in IFC.
 
 ### 3.3.9 Layer wrapping
 **ID:** ARC-WRAP-001 · **Priority:** P1 · **Ref:** research/02 §4.4, §4.5 (Wrapping), §5.5
@@ -10624,7 +10628,9 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 **Acceptance criteria.**
 - [ ] A 12.5 mm plasterboard layer with Wraps on, and Wrapping at Inserts = Interior, lines all four sides of a window opening up to the window's closure plane. In a plan cut the board turns into the jamb.
 - [ ] A free wall end with Wrapping at Ends = Exterior shows the exterior render wrapping around the end and stopping at the interior face of the core.
-- [ ] A tapered wall ignores all wrapping settings without error.
+- [x] A tapered wall ignores all wrapping settings without error.
+
+**Implementation note (2026-10-15, first build).** As built: Wrapping at Inserts and at Ends on the type (`recipe.compound` `wrap_inserts`, `wrap_ends`) and per-end overrides on the wall (`end_wrap`). At each opening, on a wrapping side, the non-wrapping layers between the face and the core lose the opening grown by the wrapping layers' total, each wrapping layer keeps the opening grown by those outside it and lines the jambs, head and sill back to the core face (the closure depth); at a free end each wrapping layer turns round the end to the core's far face and the other layers on that side and the core stop short. Material volume is kept (checked in tests). `compound.set_wrapping`, `wall.set_end_wrap`; the window: Wrapping choices in Edit Assembly, Wrapping at Start/End rows on walls. Not built yet: family *Wall Closure* planes, shaped openings (they wrap as their bounding rectangle), curved walls, Both at ends.
 
 ### 3.3.10 Slanted and tapered walls
 **ID:** ARC-WALL-005 · **Priority:** P1 · **Ref:** research/02 §4.3, §4.5 · screenshots/architecture/tapered_walls_section.png

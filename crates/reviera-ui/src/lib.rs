@@ -2008,6 +2008,7 @@ impl Gui {
         }
         // Walls go on to their parameters (identity data, type values).
         self.wall_cross_rows(grid, id);
+        self.wall_layer_rows(grid, id);
         self.wall_rows(grid, id);
         if self.deck_rows(grid, id) {
             return;
@@ -2257,6 +2258,7 @@ impl Gui {
             || self.datum_view_edit(property, text.clone())
             || self.dimension_constraint_edit(property, text.clone())
             || self.wall_cross_edit(property, text.clone())
+            || self.wall_layer_edit(property, text.clone())
             || self.insert_edit(property, text.clone())
             || self.wall_edit(property, text.clone())
             || self.floor_edit(property, text.clone())

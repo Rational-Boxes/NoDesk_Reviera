@@ -173,6 +173,13 @@ ribbon's tools, the command shell, Lua and MCP alike.
   locked distance between the new ends, or a lower and upper wall at a level or height, inserts
   going to the part they sit in (`element.split_with_gap`, `wall.split_horizontal`;
   ARC-WALL-011).
+- **Regions, extendable layers and wrapping**: a layer's column split at a height from the base
+  or top into its own material (a brick plinth), unlocked layer edges moved by a wall's Top/Base
+  Extension Distance, and wrapping layers lining openings' jambs and turning round free ends;
+  layered walls drawn in their materials' colours and written as B-reps
+  (`compound.set_regions`, `compound.split_region`, `compound.set_extendable`,
+  `compound.set_wrapping`, `wall.set_extension`, `wall.set_end_wrap`; ARC-CMPD-003/004,
+  ARC-WRAP-001).
 - **Layers** (Modify | Walls › Edit Assembly): a wall type's layers, exterior first, each with a
   function, priority, material, thickness and wrapping, and the core; validated as the
   specification asks. The type's width is their total, plans draw the layer boundaries in cut
@@ -652,12 +659,11 @@ area by area (a review against the spec on 2026-10-15). Whole areas not started 
 - **Drawing aids**: dragging a temporary dimension's witness line to another reference and its
   Make Permanent icon (the command exists), angular and radial constraints, constraints on
   inserts along their walls, Tab through sub-elements (ARC-DIM-001, ARC-CNST-002, ARC-KEY-001).
-- **Wall extras**: vertically compound walls (regions), extendable layers, layer wrapping,
+- **Wall extras**: regions that step in thickness, family closure planes for wrapping,
   profile families, returns and type-level sweeps and reveals, linings round columns, Join
   Geometry and hosting in IFC, curved slanted walls,
   selecting stacked sub-walls with Tab, sketching a wall profile in elevation and its mid-end
-  faces (ARC-CMPD-003/004, ARC-WRAP-001,
-  ARC-WALL-009/010/014/015/016).
+  faces (ARC-CMPD-003, ARC-WRAP-001, ARC-WALL-009/010/014/015/016).
 - **Curtain extras**: manual grid lines and segments, swapping single panels (curtain-wall
   doors), curtain systems by face, sloped glazing (ARC-CW-004/006/007/008).
 - **Floors and roofs**: roof by face, slope arrows along an edge or above the plate, shape editing

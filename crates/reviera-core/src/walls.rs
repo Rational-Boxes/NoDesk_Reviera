@@ -17,6 +17,7 @@ pub mod attach;
 pub mod cross_section;
 pub mod curved;
 pub mod joins;
+pub mod layered;
 pub mod linings;
 pub mod openings;
 pub mod profile;
@@ -116,6 +117,20 @@ pub struct WallRecipe {
     /// Walls joined to this one by Join Geometry (GlobalIds, ARC-WALL-015).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub geometry_joins: Vec<String>,
+    /// Base and Top Extension Distances of the extendable layers (ARC-CMPD-004).
+    #[serde(default, skip_serializing_if = "no_extension")]
+    pub extension: [f64; 2],
+    /// Each end's wrapping, by type unless overridden (ARC-WRAP-001).
+    #[serde(default, skip_serializing_if = "by_type")]
+    pub end_wrap: [layered::EndWrap; 2],
+}
+
+fn no_extension(e: &[f64; 2]) -> bool {
+    *e == [0.0, 0.0]
+}
+
+fn by_type(w: &[layered::EndWrap; 2]) -> bool {
+    *w == [layered::EndWrap::ByType; 2]
 }
 
 fn both_allowed() -> [bool; 2] {
@@ -403,6 +418,8 @@ pub(crate) fn create(txn: &mut crate::txn::Transaction<'_>, p: CreateParams) -> 
         profile: None,
         host: None,
         geometry_joins: Vec::new(),
+        extension: [0.0, 0.0],
+        end_wrap: Default::default(),
     };
     let id = txn.create(
         NewElement::new("IfcWall")

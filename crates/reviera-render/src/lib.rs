@@ -399,6 +399,12 @@ pub fn class_color(class: &str) -> [f32; 4] {
     match material.split('/').next().unwrap_or("") {
         "glass" => return [0.62, 0.80, 0.92, 0.35],
         "metal" => return [0.66, 0.68, 0.71, 1.0],
+        // A wall layer's cell (`IfcWall:layer/Brick`): a colour after its material's name.
+        "layer" => {
+            if let Some(c) = layer_color(material.split_once('/').map_or("", |x| x.1)) {
+                return c;
+            }
+        }
         _ => {}
     }
     let c = class.strip_suffix("StandardCase").unwrap_or(class);
@@ -416,6 +422,29 @@ pub fn class_color(class: &str) -> [f32; 4] {
         "IfcPlate" | "IfcCurtainWall" => [0.50, 0.70, 0.85, 0.5],
         _ => [0.78, 0.78, 0.78, 1.0],
     }
+}
+
+/// A wall layer's colour from words in its material's name.
+fn layer_color(name: &str) -> Option<[f32; 4]> {
+    let n = name.to_ascii_lowercase();
+    let has = |words: &[&str]| words.iter().any(|w| n.contains(w));
+    Some(if has(&["brick", "clay", "terracotta"]) {
+        [0.66, 0.36, 0.28, 1.0]
+    } else if has(&["stone", "granite", "limestone", "sandstone"]) {
+        [0.74, 0.71, 0.64, 1.0]
+    } else if has(&["concrete", "cement", "block", "cmu"]) {
+        [0.68, 0.68, 0.68, 1.0]
+    } else if has(&["timber", "wood", "osb", "ply", "stud"]) {
+        [0.74, 0.57, 0.36, 1.0]
+    } else if has(&["insulation", "mineral", "wool", "eps", "xps"]) {
+        [0.95, 0.86, 0.45, 1.0]
+    } else if has(&["render", "plaster", "stucco", "gypsum", "board"]) {
+        [0.93, 0.91, 0.86, 1.0]
+    } else if has(&["metal", "steel", "alumin"]) {
+        [0.66, 0.68, 0.71, 1.0]
+    } else {
+        return None;
+    })
 }
 
 /// An orbit camera around a target point, Z up (UI-NAV-001).

@@ -16,7 +16,7 @@ use wxdragon::prelude::*;
 
 use super::Gui;
 
-const COLS: [&str; 7] = [
+const COLS: [&str; 9] = [
     "Function",
     "Priority",
     "Material",
@@ -24,6 +24,8 @@ const COLS: [&str; 7] = [
     "Wraps",
     "Core",
     "Variable",
+    "Extend Top",
+    "Extend Base",
 ];
 const FUNCTION: i32 = 0;
 const PRIORITY: i32 = 1;
@@ -32,6 +34,16 @@ const THICKNESS: i32 = 3;
 const WRAPS: i32 = 4;
 const CORE: i32 = 5;
 const VARIABLE: i32 = 6;
+const EXT_TOP: i32 = 7;
+const EXT_BASE: i32 = 8;
+
+const REGION_COLS: [&str; 4] = ["Layer", "From", "Distance", "Material"];
+const WRAP_MODES: [(&str, &str); 4] = [
+    ("none", "Do not wrap"),
+    ("exterior", "Exterior"),
+    ("interior", "Interior"),
+    ("both", "Both"),
+];
 
 fn yes(v: &str) -> bool {
     matches!(v.trim(), "1" | "true" | "yes" | "Yes" | "x" | "X")
@@ -107,6 +119,8 @@ impl Gui {
         grid.set_col_format_bool(WRAPS);
         grid.set_col_format_bool(CORE);
         grid.set_col_format_bool(VARIABLE);
+        grid.set_col_format_bool(EXT_TOP);
+        grid.set_col_format_bool(EXT_BASE);
         for (r, l) in c.layers.iter().enumerate() {
             let r = r as i32;
             grid.set_cell_value(r, FUNCTION, l.function.name());
@@ -117,6 +131,8 @@ impl Gui {
             let core = (c.core[0]..c.core[1]).contains(&(r as usize));
             grid.set_cell_value(r, CORE, if core { "1" } else { "" });
             grid.set_cell_value(r, VARIABLE, if l.variable { "1" } else { "" });
+            grid.set_cell_value(r, EXT_TOP, if l.extend_top { "1" } else { "" });
+            grid.set_cell_value(r, EXT_BASE, if l.extend_base { "1" } else { "" });
         }
         grid.set_col_size(FUNCTION, 130);
         grid.set_col_size(PRIORITY, 70);
@@ -125,7 +141,9 @@ impl Gui {
         grid.set_col_size(WRAPS, 60);
         grid.set_col_size(CORE, 60);
         grid.set_col_size(VARIABLE, 70);
-        grid.set_min_size(Size::new(770, 260));
+        grid.set_col_size(EXT_TOP, 80);
+        grid.set_col_size(EXT_BASE, 85);
+        grid.set_min_size(Size::new(930, 230));
         sizer.add(&grid, 1, SizerFlag::All | SizerFlag::Expand, 10);
 
         let row_buttons = BoxSizer::builder(Orientation::Horizontal).build();
@@ -168,6 +186,94 @@ impl Gui {
         });
         sizer.add_sizer(&row_buttons, 0, SizerFlag::Left | SizerFlag::Right, 6);
 
+        // Wrapping (ARC-WRAP-001).
+        let wrapping = BoxSizer::builder(Orientation::Horizontal).build();
+        let wrap_choice = |label: &str, current: reviera_core::compound::Wrap, options: usize| {
+            let l = StaticText::builder(&dialog).with_label(label).build();
+            let ch = Choice::builder(&dialog)
+                .with_choices(
+                    WRAP_MODES[..options]
+                        .iter()
+                        .map(|w| w.1.to_owned())
+                        .collect(),
+                )
+                .build();
+            let key = serde_json::to_value(current)
+                .ok()
+                .and_then(|v| v.as_str().map(str::to_owned))
+                .unwrap_or_default();
+            ch.set_selection(WRAP_MODES.iter().position(|w| w.0 == key).unwrap_or(0) as u32);
+            wrapping.add(&l, 0, SizerFlag::AlignCenterVertical | SizerFlag::All, 4);
+            wrapping.add(&ch, 0, SizerFlag::All, 4);
+            ch
+        };
+        let wrap_inserts = wrap_choice("Wrapping at Inserts", c.wrap_inserts, 4);
+        let wrap_ends = wrap_choice("Wrapping at Ends", c.wrap_ends, 3);
+        sizer.add_sizer(&wrapping, 0, SizerFlag::Left | SizerFlag::Right, 6);
+
+        // Regions (ARC-CMPD-003): a layer's column split at a height from the base or top.
+        let note = StaticText::builder(&dialog)
+            .with_label(
+                "Regions: the part of a layer's column within Distance of the wall's Base or Top, \
+                 in its own Material (a brick plinth, say). Layer is the row number.",
+            )
+            .build();
+        note.wrap(900);
+        sizer.add(
+            &note,
+            0,
+            SizerFlag::Left | SizerFlag::Right | SizerFlag::Top,
+            10,
+        );
+        let regions = Grid::builder(&dialog).build();
+        regions.create_grid(
+            c.regions.len() as i32,
+            REGION_COLS.len() as i32,
+            GridSelectionMode::Cells,
+        );
+        for (i, h) in REGION_COLS.iter().enumerate() {
+            regions.set_col_label_value(i as i32, h);
+        }
+        for (r, reg) in c.regions.iter().enumerate() {
+            let r = r as i32;
+            regions.set_cell_value(r, 0, &(reg.layer + 1).to_string());
+            regions.set_cell_value(
+                r,
+                1,
+                match reg.from {
+                    reviera_core::compound::Anchor::Base => "Base",
+                    reviera_core::compound::Anchor::Top => "Top",
+                },
+            );
+            regions.set_cell_value(r, 2, &self.format_length(reg.distance));
+            regions.set_cell_value(r, 3, &c.region_material(reg));
+        }
+        regions.set_col_size(0, 70);
+        regions.set_col_size(1, 70);
+        regions.set_col_size(2, 110);
+        regions.set_col_size(3, 220);
+        regions.set_min_size(Size::new(520, 110));
+        sizer.add(&regions, 0, SizerFlag::All | SizerFlag::Expand, 10);
+        let region_buttons = BoxSizer::builder(Orientation::Horizontal).build();
+        let add_region = Button::builder(&dialog).with_label("Add Region").build();
+        let remove_region = Button::builder(&dialog).with_label("Remove Region").build();
+        region_buttons.add(&add_region, 0, SizerFlag::All, 4);
+        region_buttons.add(&remove_region, 0, SizerFlag::All, 4);
+        sizer.add_sizer(&region_buttons, 0, SizerFlag::Left | SizerFlag::Right, 6);
+        add_region.on_click(move |_| {
+            let r = regions.get_number_rows();
+            regions.append_rows(1, true);
+            regions.set_cell_value(r, 0, "1");
+            regions.set_cell_value(r, 1, "Base");
+            regions.set_cell_value(r, 2, "600");
+            regions.set_cell_value(r, 3, "Brick");
+        });
+        remove_region.on_click(move |_| {
+            if regions.get_number_rows() > 0 {
+                regions.delete_rows(regions.get_grid_cursor_row().max(0), 1, true);
+            }
+        });
+
         let ok = Button::builder(&dialog)
             .with_id(ID_OK)
             .with_label("OK")
@@ -189,7 +295,15 @@ impl Gui {
                 break;
             }
             grid.save_edit_control_value();
-            match self.apply_assembly(type_id, &grid) {
+            regions.save_edit_control_value();
+            let wraps = [
+                WRAP_MODES[wrap_inserts.get_selection().unwrap_or(0) as usize % 4].0,
+                WRAP_MODES[wrap_ends.get_selection().unwrap_or(0) as usize % 3].0,
+            ];
+            match self
+                .apply_assembly(type_id, &grid)
+                .and_then(|()| self.apply_regions(type_id, &regions, wraps))
+            {
                 Ok(()) => {
                     self.properties_stale = true;
                     self.refresh_scene(&frame);
@@ -239,6 +353,8 @@ impl Gui {
                 wraps: yes(&cell(WRAPS)),
                 structural_material: false,
                 variable: yes(&cell(VARIABLE)),
+                extend_top: yes(&cell(EXT_TOP)),
+                extend_base: yes(&cell(EXT_BASE)),
             });
         }
         // The core: the ticked rows, which must be together; none ticked is an empty core
@@ -252,7 +368,13 @@ impl Gui {
             }
             _ => [0, 0],
         };
-        let c = Compound { layers, core };
+        let c = Compound {
+            layers,
+            core,
+            regions: Vec::new(),
+            wrap_inserts: Default::default(),
+            wrap_ends: Default::default(),
+        };
         c.validate().map_err(|e| e.message)?;
         let layers: Vec<serde_json::Value> = c
             .layers
@@ -265,6 +387,8 @@ impl Gui {
                     "thickness": l.thickness,
                     "wraps": l.wraps,
                     "variable": l.variable,
+                    "extend_top": l.extend_top,
+                    "extend_base": l.extend_base,
                 })
             })
             .collect();
@@ -274,6 +398,50 @@ impl Gui {
                 "type_id": type_id, "layers": layers,
                 "core_start": c.core[0], "core_end": c.core[1],
             }),
+        )
+        .map(|_| ())
+    }
+
+    /// Reads the regions grid and the wrapping choices into the type.
+    fn apply_regions(
+        &mut self,
+        type_id: ElementId,
+        grid: &Grid,
+        wraps: [&str; 2],
+    ) -> Result<(), String> {
+        let mut regions = Vec::new();
+        for r in 0..grid.get_number_rows() {
+            let cell = |c: i32| grid.get_cell_value(r, c);
+            let layer: usize = cell(0)
+                .trim()
+                .parse::<usize>()
+                .ok()
+                .filter(|l| *l >= 1)
+                .ok_or_else(|| format!("region {}: Layer is a row number", r + 1))?;
+            let from = if cell(1).trim().eq_ignore_ascii_case("top") {
+                "top"
+            } else {
+                "base"
+            };
+            let distance = self
+                .run(
+                    "units.parse",
+                    json!({ "text": cell(2), "data_type": "length" }),
+                )
+                .ok()
+                .and_then(|v| v.as_f64())
+                .ok_or_else(|| format!("region {}: `{}` is not a length", r + 1, cell(2)))?;
+            regions.push(json!({
+                "layer": layer - 1, "from": from, "distance": distance, "material": cell(3).trim(),
+            }));
+        }
+        self.run(
+            "compound.set_regions",
+            json!({ "type_id": type_id, "regions": regions }),
+        )?;
+        self.run(
+            "compound.set_wrapping",
+            json!({ "type_id": type_id, "at_inserts": wraps[0], "at_ends": wraps[1] }),
         )
         .map(|_| ())
     }
