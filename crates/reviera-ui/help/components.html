@@ -47,6 +47,20 @@ component, or one already in the model.</p>
 category, units or up axis there and the library's manifest is updated (the file is not).</p>
 <p><code>component.place</code></p>
 
+<h2 id="create">Creating components from the model</h2>
+<p>Any selection can become a component: select the elements (a desk with its chair and lamp, a
+bathroom's walls and fittings, a stair core), middle-click and choose <b>Create Component…</b>
+(also on the Modify tab). Name it, and it is saved into the Component Library folder shown in
+the panel (or, with no library open, to a file you choose).</p>
+<p>A component made this way is just an IFC file of that piece of the model. It brings along what
+the selection needs: the doors and windows in its walls, their hosts, the types and the levels.
+Its base point (the selection's bottom centre) is its origin and its lowest level is at 0. Other
+IFC tools open it as a small model.</p>
+<p>Placing it copies its elements in with new identities. Its lowest level goes on the level you
+click; its other levels on the levels at the same height above (made when missing). Types the
+model has already are reused.</p>
+<p><code>component.create</code>, <code>component.place_fragment</code></p>
+
 <h2 id="import">Importing a single object</h2>
 <p><b>Architecture › Component › Import Object</b>
 <a href="reviera:action/mesh_object.import">Import Object</a> brings a 3D file straight into the
@@ -109,6 +123,7 @@ triangulated face sets styled in its colours; each copy is an element of the cat
 example <code>IfcFurniture</code>) whose body maps it. A path array is an
 <code>IfcElementAssembly</code> whose members are written as elements of the component's class.
 Other IFC tools show them all.</p>
-<p class="note">Not yet available: IFC components (model fragments) and Create Component, editing a
-component, smart folders, 3MF and OFF files, textures, plan cut outlines of components, and
-reducing a large mesh on import.</p>
+<p class="note">Not yet available: editing a component and updating its copies, placing a component
+as a linked group, IFC components from other tools whose geometry Reviera does not regenerate,
+smart folders, 3MF and OFF files, textures, plan cut outlines of components, and reducing a large
+mesh on import.</p>

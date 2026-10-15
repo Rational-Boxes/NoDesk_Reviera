@@ -131,7 +131,7 @@ fn copied(e: &Element) -> NewElement {
 }
 
 /// Transforms elements, or copies of them. Returns the moved elements, or the copies.
-pub(crate) fn transform(
+pub fn transform(
     txn: &mut Transaction<'_>,
     refs: &[ElementRef],
     x: Xform,

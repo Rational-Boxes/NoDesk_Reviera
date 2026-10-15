@@ -248,6 +248,7 @@ impl Gui {
             item(&menu, "inspect.reset", "&Reset Hide/Isolate (show all)");
         }
         item(&menu, "inspect.selection_box", "Section &Box");
+        item(&menu, "component.create", "Create &Component…");
         let pinned = |e: &reviera_core::Element| reviera_core::modify::is_pinned(e);
         if ids
             .iter()

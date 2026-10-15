@@ -103,12 +103,14 @@ impl Gui {
                 s.get(t)?.name.clone().unwrap_or_default(),
             ))
         });
-        let held = self.place_tool.as_ref().map(|t| {
+        let held = self.place_tool.as_ref().and_then(|t| {
             let source = match &t.source {
                 Source::Type(ty) => json!({ "type_id": ty }),
                 Source::Item { library, item } => json!({ "library": library, "item": item }),
+                // Path arrays of fragments are not built yet.
+                Source::Fragment { .. } => return None,
             };
-            (source, t.name.clone())
+            Some((source, t.name.clone()))
         });
         let Some((source, name)) = picked.or(held) else {
             return error(

@@ -815,6 +815,12 @@ icon = "import_object"
 help = "Copy 3D files (OBJ, STL, PLY, glTF, GLB, IFC) into the folder shown in the Component Library"
 
 [[action]]
+id = "component.create"
+label = "Create Component"
+icon = "component_create"
+help = "Save the selection (with what it hosts and needs: doors, hosts, types, levels) as a component: an IFC file in the Component Library folder shown"
+
+[[action]]
 id = "array.along_path"
 label = "Array along Path"
 icon = "path_array"
@@ -1210,6 +1216,7 @@ tools = [
   { action = "element.array_radial", size = "small" },
   { action = "array.along_path", size = "small" },
   { action = "array.unarray", size = "small" },
+  { action = "component.create", size = "small" },
   { action = "element.trim_corner", size = "small" },
   { action = "element.trim_extend", size = "small" },
   { action = "element.split", size = "small" },
@@ -1265,6 +1272,7 @@ label = "Components"
 panels = [{ label = "Component", tools = [
   { action = "array.along_path", size = "large" },
   { action = "component.place", size = "large" },
+  { action = "component.create", size = "large" },
 ] }]
 
 [[context]]

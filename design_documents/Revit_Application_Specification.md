@@ -5873,6 +5873,26 @@ The Place Component tool is the UI over `component.place`.
 - [ ] Edit Component on a placed bathroom opens its IFC file in a tab. Adding a towel rail and saving updates every placed bathroom in the open project.
 - [ ] A component file written by Reviera, with its RXD removed by another tool, still opens as a model in other IFC viewers and still stamps in Reviera.
 
+**Implementation note (2026-10-14, first build).**
+- **Create Component** (`component.create`, quick menu, Modify tab, Modify | Components) collects:
+  - the selection;
+  - what it hosts: elements naming a member, repeatedly;
+  - everything they name: hosts, types, levels and other referenced elements, all brought in rather than dropped.
+
+  It writes them as a standalone IFC4 model through Reviera's own writer, with the base point (the selection's bottom centre) at the origin and the lowest level at 0. The file goes into the library folder shown, with a manifest entry, or to a chosen file. The model is unchanged; *Replace selection with the component* is not built yet.
+- **Placing** (`component.place_fragment`; the panel's IFC thumbnails, rendered from the fragment's bodies):
+  - elements are copied with new GlobalIds, every GlobalId inside their recipes rewritten;
+  - levels are mapped by height above the lowest, and made when missing;
+  - types are reused by GlobalId, then by class and name, and otherwise copied keeping their GlobalId;
+  - elements are then turned and moved with the Modify tools' transform; openings, dormer parts and gates move with their owners.
+- **Not built yet:**
+  - placing as a group, so that editing changes every copy;
+  - Edit Component;
+  - variants;
+  - Import to Library of parts of external IFC files;
+  - IFC-native elements, which have no recipe to regenerate from;
+  - the outside-references dialog and the type-conflict question.
+
 ### 2.8.18 Library folders and large libraries
 **ID:** DM-LIB-004 · **Priority:** P1 · **Ref:** owner requirement (2026-10-14); DM-LIB-001 … 003; Reviera's own design
 

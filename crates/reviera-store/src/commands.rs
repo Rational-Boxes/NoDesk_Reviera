@@ -17,6 +17,12 @@ use crate::params::{category, infer_type, is_writable};
 pub fn register(registry: &mut CommandRegistry) {
     registry.add(PsetSet).expect("pset.set is valid");
     registry.add(PsetRemove).expect("pset.remove is valid");
+    registry
+        .add(crate::fragments::ComponentCreate)
+        .expect("component.create is valid");
+    registry
+        .add(crate::fragments::ComponentPlaceFragment)
+        .expect("component.place_fragment is valid");
 }
 
 fn resolve(cx: &CommandContext<'_>, r: &ElementRef) -> Result<ElementId> {

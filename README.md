@@ -564,8 +564,10 @@ nearest gaps in what is built:
   the manifest and applied when the item is placed. Libraries have smart folders and
   drag-and-drop reorganising. **Built**: the Component Library panel (libraries, folders,
   thumbnails, Open/New/Import), item details in Properties, Place Component (CM) in plans and on
-  surfaces in 3D, and the commands (`library.*`, `component.place`); still to come: IFC
-  fragments, Create and Edit Component, smart folders, drag and drop.
+  surfaces in 3D, Create Component from any selection (quick menu) and placing IFC components
+  with new identities and levels mapped by height, and the commands (`library.*`,
+  `component.*`); still to come: Edit Component, components as linked groups, smart folders,
+  drag and drop.
 - **Array along a path** (ARC-MOD-033): a component (a plain mesh included) repeated along a picked
   or drawn path or a host's edges, by number or spacing, with copies at every corner and facing
   outward (a temple colonnade), or along a spline with seeded random rotation, scale and choice of

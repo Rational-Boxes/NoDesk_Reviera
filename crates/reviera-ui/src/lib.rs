@@ -3615,6 +3615,7 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
             focus(g);
         }),
         "array.unarray" => with(gui, Gui::unarray_selection),
+        "component.create" => with(gui, Gui::create_component),
         "skylight.create" => with(gui, |g| {
             g.start_skylight_tool();
             focus(g);

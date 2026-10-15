@@ -118,6 +118,8 @@ pub(crate) enum Source {
     Item { library: PathBuf, item: String },
     /// A custom object type in the project.
     Type(ElementId),
+    /// A component that is a model fragment (an IFC file in a library).
+    Fragment { library: PathBuf, item: String },
 }
 
 /// The Place Component tool.
@@ -180,6 +182,70 @@ fn item_mesh(lib: &Path, item: &str) -> Result<mesh_objects::Prepared, String> {
         .unwrap_or_default();
     let raw = reviera_core::mesh_io::read(&lib.join(item)).map_err(|e| e.message)?;
     mesh_objects::prepare(raw, &options).map_err(|e| e.message)
+}
+
+/// A fragment's plan outline: the hull of its bodies (its base point at the origin).
+fn fragment_outline(path: &Path) -> Result<Vec<[f64; 2]>, String> {
+    let (_p, doc, _) = reviera_store::LocalProject::open(path).map_err(|e| e.to_string())?;
+    let bodies = reviera_core::bodies::all(doc.store());
+    let pts = bodies
+        .iter()
+        .flat_map(|b| b.parts.iter().flat_map(|p| p.mesh.0.iter().copied()))
+        .collect::<Vec<_>>();
+    Ok(outline_of(pts.into_iter()))
+}
+
+/// A fragment's bodies as one mesh with a slot per IFC class, coloured as the 3D view does.
+fn fragment_mesh(path: &Path) -> Result<mesh_objects::Prepared, String> {
+    let (_p, doc, _) = reviera_store::LocalProject::open(path).map_err(|e| e.to_string())?;
+    let bodies = reviera_core::bodies::all(doc.store());
+    let mut positions = Vec::new();
+    let mut triangles = Vec::new();
+    let mut tri_slot = Vec::new();
+    let mut slots: Vec<mesh_objects::Slot> = Vec::new();
+    for part in bodies.iter().flat_map(|b| b.parts.iter()) {
+        let slot = match slots.iter().position(|s| s.name == part.class) {
+            Some(k) => k,
+            None => {
+                slots.push(mesh_objects::Slot {
+                    name: part.class.clone(),
+                    color: reviera_render::class_color(&part.class),
+                });
+                slots.len() - 1
+            }
+        };
+        let base = positions.len() as u32;
+        positions.extend(part.mesh.0.iter().copied());
+        for t in part.mesh.1.as_chunks::<3>().0 {
+            triangles.push([base + t[0], base + t[1], base + t[2]]);
+            tri_slot.push(slot as u32);
+        }
+    }
+    if triangles.is_empty() {
+        return Err("the component has no geometry Reviera draws".into());
+    }
+    let report = mesh_objects::Report {
+        format: "IFC".into(),
+        triangles: triangles.len(),
+        vertices: positions.len(),
+        materials: Vec::new(),
+        size: [0.0; 3],
+        units: 1.0,
+        units_from_file: true,
+        y_up: false,
+        open_edges: 0,
+        non_manifold_edges: 0,
+        solid: false,
+        dropped_triangles: 0,
+        welded_vertices: 0,
+    };
+    Ok(mesh_objects::Prepared {
+        positions,
+        triangles,
+        tri_slot,
+        slots,
+        report,
+    })
 }
 
 /// A mesh's plan outline (a hull of a sample of its points).
@@ -443,9 +509,6 @@ impl Gui {
 
     /// A component's thumbnail (RGBA, `THUMB` square), from the cache or rendered now.
     fn thumbnail(&mut self, lib: &Path, it: &ItemInfo) -> Option<Vec<u8>> {
-        if it.kind != ItemKind::Object {
-            return None;
-        }
         let path = lib.join(&it.path);
         let md = std::fs::metadata(&path).ok()?;
         let options = library::get_meta(
@@ -476,7 +539,10 @@ impl Gui {
         {
             return Some(b);
         }
-        let prepared = item_mesh(lib, &it.path).ok()?;
+        let prepared = match it.kind {
+            ItemKind::Object => item_mesh(lib, &it.path).ok()?,
+            ItemKind::Fragment => fragment_mesh(&path).ok()?,
+        };
         let rgba = self.render_thumbnail(&prepared)?;
         if let Some(c) = &cache {
             let _ = std::fs::create_dir_all(c.parent().expect("a folder"));
@@ -548,9 +614,12 @@ impl Gui {
         let lib = p.libraries[i].0.clone();
         let it = it.clone();
         if it.kind == ItemKind::Fragment {
-            return self.frame.set_status_text(
-                "Placing IFC components (model fragments) is not built yet",
-                0,
+            return self.start_place_tool(
+                Source::Fragment {
+                    library: lib,
+                    item: it.path.clone(),
+                },
+                it.name.clone(),
             );
         }
         self.start_place_tool(
@@ -730,6 +799,76 @@ impl Gui {
         }
     }
 
+    /// Create Component: the selection as an IFC component, in the library folder shown (or a
+    /// file).
+    pub(crate) fn create_component(&mut self) {
+        let frame = self.frame;
+        let ids = self.selection();
+        if ids.is_empty() {
+            return frame.set_status_text("Create Component: select the elements first", 0);
+        }
+        let ask = TextEntryDialog::builder(&frame, "Component name:", "Create Component")
+            .with_default_value("New Component")
+            .build();
+        if ask.show_modal() != ID_OK {
+            return;
+        }
+        let Some(name) = ask.get_value().filter(|n| !n.trim().is_empty()) else {
+            return;
+        };
+        let destination = self.library_pane.as_ref().and_then(|p| {
+            p.current.map(|i| {
+                (
+                    p.libraries[i].0.clone(),
+                    p.folder.clone(),
+                    p.libraries[i].1.clone(),
+                )
+            })
+        });
+        let mut args = json!({ "element_ids": ids, "name": name });
+        let shown = match &destination {
+            Some((lib, folder, lib_name)) => {
+                args["library"] = json!(lib);
+                args["folder"] = json!(folder);
+                format!(
+                    "{lib_name} › {}",
+                    if folder.is_empty() { "(top)" } else { folder }
+                )
+            }
+            None => {
+                let d = FileDialog::builder(&frame)
+                    .with_message("Create Component")
+                    .with_wildcard("IFC components (*.ifc)|*.ifc")
+                    .with_style(FileDialogStyle::Save | FileDialogStyle::OverwritePrompt)
+                    .build();
+                if d.show_modal() != ID_OK {
+                    return;
+                }
+                let Some(path) = d.get_path() else { return };
+                args["path"] = json!(path);
+                path
+            }
+        };
+        match self.run("component.create", args) {
+            Ok(v) => {
+                let more = v["brought_in"].as_array().map_or(0, Vec::len);
+                frame.set_status_text(
+                    &format!(
+                        "Component \"{name}\" saved to {shown} ({} elements; {more} brought in with the selection)",
+                        v["elements"]
+                    ),
+                    0,
+                );
+                if let Some((_, folder, _)) = destination {
+                    let current = self.library_pane.as_ref().and_then(|p| p.current);
+                    self.show_library(current);
+                    self.show_folder(&folder);
+                }
+            }
+            Err(e) => error(&frame, &format!("The component was not made:\n{e}")),
+        }
+    }
+
     // ---- Place Component ----
 
     /// Starts the Place Component tool with `source`.
@@ -757,6 +896,10 @@ impl Gui {
                     .map(|p| [p[0] as f64, p[1] as f64, p[2] as f64]);
                 (outline_of(pts), ty.scale)
             }
+            Source::Fragment { library, item } => match fragment_outline(&library.join(item)) {
+                Ok(o) => (o, 1.0),
+                Err(e) => return error(&frame, &e),
+            },
         };
         let keep = self
             .place_tool
@@ -904,6 +1047,21 @@ impl Gui {
             return frame
                 .set_status_text("Place Component: click in a plan, or on a surface in 3D", 0);
         };
+        if let Source::Fragment { library, item } = &t.source {
+            let args = json!({
+                "library": library, "item": item, "point": p, "level": level,
+                "rotation": t.rotation,
+            });
+            match self.run("component.place_fragment", args) {
+                Ok(_) => {
+                    self.refresh_scene(&frame);
+                    self.properties_stale = true;
+                    self.place_motion(x, y);
+                }
+                Err(e) => frame.set_status_text(&e, 0),
+            }
+            return;
+        }
         let mut args = json!({
             "points": [p], "level": level, "offset": height + t.offset,
             "rotation": t.rotation, "mirror": t.mirror,
@@ -914,6 +1072,7 @@ impl Gui {
                 args["item"] = json!(item);
             }
             Source::Type(ty) => args["type_id"] = json!(ty),
+            Source::Fragment { .. } => unreachable!("placed above"),
         }
         match self.run("component.place", args) {
             Ok(v) => {
@@ -1018,6 +1177,15 @@ impl Gui {
             }
             Source::Type(ty) => {
                 self.mesh_type_rows(grid, *ty);
+            }
+            Source::Fragment { item, .. } => {
+                grid.append(Property::category(
+                    "Component (IFC fragment)",
+                    "c_place_frag",
+                ));
+                grid.append(Property::string("File", "pcf_file", item.clone()));
+                grid.set_property_read_only("pcf_file", true);
+                grid.set_help_string("pcf_file", "Its lowest level goes on the level clicked; its other levels on the levels at the same height above");
             }
         }
         true

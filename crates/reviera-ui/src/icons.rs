@@ -304,6 +304,9 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "component" => format!(
             r#"<path d="M7 5h18v4H7zM9 27h14v-3H9z" fill="{f}" {s}/><path d="M11 9h10l-1 15h-8z" fill="{paper}" {s}/><path d="M14 11v11M18 11v11" {sa}/>"#
         ),
+        "component_create" => format!(
+            r#"<rect x="4" y="9" width="12" height="12" fill="{f}" {s}/><path d="M16 15h5M18 12l3 3-3 3" {sa}/><path d="M22 6h7v20h-7" {s}/><path d="M24 11h3M24 16h3M24 21h3" {s}/>"#
+        ),
         "import_object" => format!(
             r#"<path d="M14 15l9-5 6 3v10l-9 5-6-3z" fill="{f}" {s}/><path d="M14 15l6 3 9-5M20 18v10" {s}/><path d="M3 9h9M8 5l4 4-4 4" {sa}/>"#
         ),
