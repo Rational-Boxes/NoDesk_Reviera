@@ -569,33 +569,59 @@ Open one with `reviera gui test-data/samples/manor.ifc`, or rebuild them with
 
 ## Not built yet
 
-The specification (`design_documents/spec/`) describes the whole application; these are the
-nearest gaps in what is built:
+The specification (`design_documents/spec/`) describes the whole application. Of the 121
+architecture requirements (Chapter 3), the core of each area is built; this is what is not,
+area by area (a review against the spec on 2026-10-15). Whole areas not started are listed first.
 
-- **Walls**: location lines other than the centreline, layer cleanup at joins and wrapping,
-  layered floors and roofs, a material library, T joins into the side of a curved wall,
-  attaching bases or to floors and ceilings, and true curved IFC geometry (curved walls, arches
-  and domes are faceted B-reps).
+**Not started (architecture):**
+
+- **Datums and work planes**: reference planes, work planes (setting, showing, picking),
+  scope boxes, and 2D/3D datum extents with bubbles per view (ARC-REFP-001, ARC-WP-001,
+  ARC-SCOPE-001, ARC-DATUM-001).
+- **Drawing aids**: temporary dimensions on a selection, typed lengths while drawing (listening
+  dimensions), Tab to cycle overlapping picks, and dimension locks, equality constraints and
+  their solver (ARC-DIM-001/002, ARC-KEY-001, ARC-CNST-001/002).
+- **Wall extras**: vertically compound walls (regions), extendable layers, layer wrapping,
+  slanted and tapered walls, stacked walls, Edit Profile, sweeps and reveals, Split with Gap
+  and horizontal splits, Walls by Room, Auto Join & Lock, hosted walls (ARC-CMPD-003/004,
+  ARC-WRAP-001, ARC-WALL-005, ARC-STKW-001, ARC-WALL-009/010/014/015/016).
+- **Curtain extras**: manual grid lines and segments, swapping single panels (curtain-wall
+  doors), curtain systems by face, sloped glazing (ARC-CW-004/006/007/008).
+- **Floors and roofs**: slab edges, roof by extrusion, roof by face, slope arrows, Join/Unjoin
+  Roof, shape editing (points and split lines on floors and roofs), parts (ARC-SLED-001,
+  ARC-ROOF-002/003/005/006, ARC-SHAPE-001, ARC-PART-001 … 004).
+- **Rooms and areas**: area plans and area schemes, colour schemes (ARC-AREA-001, ARC-CLR-001).
+- **Modelling in the project**: Model In-Place, model text, model lines (ARC-INPL-001,
+  ARC-MTXT-001, ARC-MLIN-001).
+- **Massing and site**: masses, mass floors, model by face, toposolids, sub-divisions and
+  excavation, graded regions, contours, site components, parking and property lines
+  (ARC-MASS-001 … 003, ARC-TOPO-001 … 006, ARC-SITE-001).
+- **Groups and selection sets**: group types, the group editor, excluding members, saved
+  selections (ARC-GRP-001 … 003, ARC-SEL-002).
+- **Openings by face** (square to a sloped roof or floor; ARC-OPEN-001) and stair annotation
+  (cut mark, path, up/down labels; ARC-STAIR-006).
+
+**Gaps in what is built:**
+
+- **Walls**: location lines other than the centreline, layer cleanup at joins, layered floors
+  and roofs, a material library, T joins into the side of a curved wall, attaching bases or to
+  floors and ceilings, and true curved IFC geometry (curved walls, arches and domes are faceted
+  B-reps).
 - **Windows and doors**: quarter-round fan lights, arcs as true arc segments in IFC (shaped
   outlines are written as polylines), the arch above the cut dashed in plans, and built-in
   shaped types ready in the type list (today a type is duplicated and its Shape set); gate
   swing arcs in plan.
-- **Roofs**: skylight openings square to the roof face, flashing, and skylight types; slope arrows, picking single eave edges in the window,
-  dormer openings as separate IFC opening elements. Gutters and downspouts are planned as part
-  of plumbing (MEP-PIPE-010).
-- **Openings**: openings by face (square to a sloped roof), across roof ridges and in arched
-  roofs and domes, and guards around a stair opening (a Pick Edges railing can follow it).
-- **Stairs, ramps and railings**: winders, supports, editing runs with handles, continuous handrails
-  and baluster families; curved ramps, ramp railings and editing a ramp's path with grips.
+- **Roofs**: skylight openings square to the roof face, flashing, and skylight types; picking
+  single eave edges in the window; dormer openings as separate IFC opening elements. Gutters and
+  downspouts are planned as part of plumbing (MEP-PIPE-010).
+- **Openings**: openings across roof ridges and in arched roofs and domes, vertical openings in
+  roofs, and guards around a stair opening (a Pick Edges railing can follow it).
+- **Stairs, ramps and railings**: winders, supports, editing runs with handles, continuous
+  handrails and baluster families; curved ramps, ramp railings and editing a ramp's path with
+  grips.
 - **Decks**: ledgers, span tables, breakers and board overrides.
 - **Rooms**: room separation lines, tags as elements, other area rules, volumes clipped by floors
   and roofs.
-- **Coordination**: clash tests (COL-CLASH), automatic pipe and duct penetrations (MEP-PEN-001),
-  bathroom fixture clear floor spaces and turning spaces, ISO 21542.
-- **Documentation**: crop regions, jogged sections, interior elevation markers, opening a view
-  from its marker; schedule filters, grouping and calculated fields; title block families,
-  revisions and sheet collections; tags and text in sections and on sheets; the current NBIMS-US
-  COBie layout and a COBie settings dialog.
 - **Components**: Edit Component (opening a component and updating its copies), components placed
   as linked groups, pinned and recent stamps and Alt+click to pick one from the model, rows and
   scatter, smart folders, moving and drag-and-drop in the panel, organisation libraries, 3MF and
@@ -604,8 +630,17 @@ nearest gaps in what is built:
   DM-LIB-002 … 005).
 - **Path arrays**: grips and an on-canvas count label, railing paths, heights following the path
   or a host face, alternate mirroring, arrays of IFC components (ARC-MOD-033).
+
+**Other chapters:**
+
+- **Coordination**: clash tests (COL-CLASH), automatic pipe and duct penetrations (MEP-PEN-001),
+  bathroom fixture clear floor spaces and turning spaces, ISO 21542.
+- **Documentation**: crop regions, jogged sections, interior elevation markers, opening a view
+  from its marker; schedule filters, grouping and calculated fields; title block families,
+  revisions and sheet collections; tags and text in sections and on sheets; the current NBIMS-US
+  COBie layout and a COBie settings dialog.
 - **Interface**: general shape tools; a macOS build (the script is written, not yet run on a
-  Mac); a Windows GUI that opens without a console window beside it.
+  Mac).
 - **MCP**: streamable HTTP with tokens, rate and size limits, subscriptions, prompts,
   `execute_lua` and view images.
 - **Structure, MEP, families and collaboration** (BIMserver, OpenCDE, Godot) are specified but
