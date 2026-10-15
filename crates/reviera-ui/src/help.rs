@@ -137,17 +137,133 @@ fn needs_fallback() -> bool {
     cfg!(windows) && !WebView::is_backend_available(WebViewBackend::Edge)
 }
 
-/// A page for the HTML window: without the stylesheet and script, which it would show as text.
-fn plain_html(html: &str) -> String {
-    let mut out = html.to_owned();
-    for tag in ["style", "script"] {
-        while let Some(start) = out.find(&format!("<{tag}")) {
-            let close = format!("</{tag}>");
-            let Some(end) = out[start..].find(&close) else { break };
-            out.replace_range(start..start + end + close.len(), "");
+/// The help colours (the stylesheet's, light and dark), for the HTML window.
+struct Palette {
+    ink: &'static str,
+    muted: &'static str,
+    line: &'static str,
+    accent: &'static str,
+    paper: &'static str,
+    card: &'static str,
+    code: &'static str,
+}
+
+const LIGHT: Palette = Palette {
+    ink: "#23272e",
+    muted: "#5b6370",
+    line: "#d8dde4",
+    accent: "#2a6edc",
+    paper: "#f7f8fa",
+    card: "#ffffff",
+    code: "#eef1f5",
+};
+
+const DARK: Palette = Palette {
+    ink: "#e6e8eb",
+    muted: "#a3abb8",
+    line: "#3a404a",
+    accent: "#6ea2ff",
+    paper: "#1f2329",
+    card: "#282d34",
+    code: "#2f353d",
+};
+
+/// A page for the HTML window, which knows HTML 3.2 but no CSS: the stylesheet's look redone
+/// with attributes (colours, the header bar, rules under headings, muted first columns, cards
+/// for the samples, shaded code blocks), and without the script.
+fn plain_html(html: &str, dark: bool) -> String {
+    let c = if dark { &DARK } else { &LIGHT };
+    let between = |a: &str, b: &str| -> String {
+        html.split_once(a)
+            .and_then(|(_, rest)| rest.split_once(b))
+            .map(|(x, _)| x.to_owned())
+            .unwrap_or_default()
+    };
+    let title = between("<title>", "</title>");
+    let back = if html.contains("reviera:help-back") {
+        "&nbsp;&nbsp;&nbsp;<a href=\"reviera:help-back\">Back</a>"
+    } else {
+        ""
+    };
+    let mut body = between("<main>", "</main>");
+    let muted = |inner: &str, size: &str| format!("<font color=\"{}\"{size}>{inner}</font>", c.muted);
+    // Paragraph classes.
+    for (class, size) in [("lead", ""), ("note", " size=\"-1\""), ("see", " size=\"-1\"")] {
+        let open = format!("<p class=\"{class}\">");
+        let mut out = String::new();
+        let mut rest = body.as_str();
+        while let Some(i) = rest.find(&open) {
+            out.push_str(&rest[..i]);
+            let after = &rest[i + open.len()..];
+            let j = after.find("</p>").unwrap_or(after.len());
+            out.push_str(&format!("<p>{}</p>", muted(&after[..j], size)));
+            rest = after.get(j + 4..).unwrap_or("");
+        }
+        out.push_str(rest);
+        body = out;
+    }
+    // A rule under each section heading.
+    body = body.replace("</h2>", &format!("</h2><hr size=\"1\" color=\"{}\">", c.line));
+    // Tables: full width, padded; the first cell of a row muted.
+    body = body.replace("<table class=\"keys\">", "<table>");
+    body = body.replace(
+        "<table>",
+        "<table width=\"100%\" cellpadding=\"5\" cellspacing=\"0\" border=\"0\">",
+    );
+    let mut out = String::new();
+    let mut rest = body.as_str();
+    while let Some(i) = rest.find("<tr>") {
+        out.push_str(&rest[..i + 4]);
+        let after = &rest[i + 4..];
+        let lead = after.len() - after.trim_start().len();
+        let row = &after[lead..];
+        if let Some(cell) = row.strip_prefix("<td>")
+            && let Some(j) = cell.find("</td>")
+        {
+            out.push_str(&format!(
+                "<td width=\"32%\" valign=\"top\">{}</td>",
+                muted(&cell[..j], "")
+            ));
+            rest = &cell[j + 5..];
+        } else {
+            rest = after;
         }
     }
-    out
+    out.push_str(rest);
+    body = out.replace("<td>", "<td valign=\"top\">");
+    // Sample cards.
+    body = body
+        .replace(
+            "<div class=\"sample\">",
+            &format!(
+                // A one-pixel frame in the line colour: a table inside a table.
+                "<table width=\"100%\" cellpadding=\"1\" cellspacing=\"0\" bgcolor=\"{}\"><tr><td>\
+                 <table width=\"100%\" cellpadding=\"10\" cellspacing=\"0\" bgcolor=\"{}\"><tr><td>",
+                c.line, c.card
+            ),
+        )
+        .replace("</a></div>", "</a></td></tr></table></td></tr></table><br>");
+    // Code blocks.
+    body = body
+        .replace(
+            "<pre>",
+            &format!("<table width=\"100%\" cellpadding=\"8\" bgcolor=\"{}\"><tr><td><pre>", c.code),
+        )
+        .replace("</pre>", "</pre></td></tr></table>");
+    format!(
+        "<html><head><title>{title}</title></head>\
+         <body bgcolor=\"{paper}\" text=\"{ink}\" link=\"{accent}\">\
+         <table width=\"100%\" cellpadding=\"6\" cellspacing=\"0\" bgcolor=\"{card}\"><tr><td>\
+         &nbsp;&nbsp;<a href=\"reviera:help/index\">Home</a>{back}&nbsp;&nbsp;&nbsp;<font color=\"{muted}\">{title}</font>\
+         </td></tr></table>\
+         <table width=\"100%\" cellpadding=\"20\" cellspacing=\"0\"><tr><td>{body}</td></tr></table>\
+         </body></html>",
+        paper = c.paper,
+        ink = c.ink,
+        accent = c.accent,
+        card = c.card,
+        muted = c.muted,
+    )
 }
 
 /// What a help link asks for.
@@ -454,7 +570,7 @@ impl Gui {
             HelpView::Web(v) => v.set_page(&html, "about:blank"),
             HelpView::Html(v) => {
                 let anchor = h.here.anchor.as_deref().map(clean_anchor).unwrap_or_default();
-                v.set_page(&plain_html(&html), &anchor);
+                v.set_page(&plain_html(&html, wxdragon::appearance::is_system_dark_mode()), &anchor);
             }
         }
     }

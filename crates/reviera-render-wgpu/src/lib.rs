@@ -924,6 +924,10 @@ impl WgpuViewport {
                 pass.draw(0..*count, 0..1);
             }
         }
+        // The pass ends by resolving the whole view into the frame. On the GL backend that is a
+        // framebuffer blit, which the scissor clips: left at the gizmo's rectangle, only the gizmo
+        // would reach the screen (the rest stays black).
+        pass.set_scissor_rect(0, 0, self.size.0, self.size.1);
     }
 
     fn resize_target(&mut self, width: u32, height: u32) {
