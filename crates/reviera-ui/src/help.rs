@@ -13,6 +13,10 @@
 //! A small script in the page catches those clicks and hands the link over through the page's
 //! title, which works with every webview backend.
 //!
+//! Where there is no web view (Windows without the WebView2 runtime: Wine, older Windows,
+//! ReactOS), the pages are shown in wxWidgets' own HTML window instead, without the stylesheet
+//! and script; its links work the same. `REVIERA_HELP_FALLBACK=1` forces it, for testing.
+//!
 //! The pages are HTML compiled into the application: [`PAGES`] lists them, each a body shown in
 //! one frame (`help/shell.html`) with its header, stylesheet and link script. Adding a page is a
 //! line in [`PAGES`] and its `help/<slug>.html`. The landing page's samples section is built
@@ -23,7 +27,7 @@ use std::path::{Path, PathBuf};
 
 use wxdragon::event::WebViewEvents;
 use wxdragon::prelude::*;
-use wxdragon::widgets::WebView;
+use wxdragon::widgets::{WebView, WebViewBackend};
 
 use super::{Gui, error, with};
 
@@ -109,11 +113,41 @@ const BACK_LIMIT: usize = 50;
 /// The open help tab.
 pub struct HelpTab {
     pub panel: Panel,
-    view: WebView,
+    view: HelpView,
     /// The page shown.
     here: Place,
     /// The pages shown before, the latest last (`reviera:help-back`).
     back: Vec<Place>,
+}
+
+/// What shows the pages.
+#[derive(Clone, Copy)]
+enum HelpView {
+    Web(WebView),
+    /// No web view: wxWidgets' HTML window.
+    Html(super::wx::HtmlView),
+}
+
+/// Whether help needs the HTML window: Windows without WebView2 (the IE backend that is left
+/// does not run the pages' script).
+fn needs_fallback() -> bool {
+    if std::env::var_os("REVIERA_HELP_FALLBACK").is_some_and(|v| v == "1") {
+        return true;
+    }
+    cfg!(windows) && !WebView::is_backend_available(WebViewBackend::Edge)
+}
+
+/// A page for the HTML window: without the stylesheet and script, which it would show as text.
+fn plain_html(html: &str) -> String {
+    let mut out = html.to_owned();
+    for tag in ["style", "script"] {
+        while let Some(start) = out.find(&format!("<{tag}")) {
+            let close = format!("</{tag}>");
+            let Some(end) = out[start..].find(&close) else { break };
+            out.replace_range(start..start + end + close.len(), "");
+        }
+    }
+    out
 }
 
 /// What a help link asks for.
@@ -336,36 +370,42 @@ impl Gui {
             return;
         }
         let panel = Panel::builder(&self.notebook).build();
-        let view = WebView::builder(&panel).build();
-        let sizer = BoxSizer::builder(Orientation::Vertical).build();
-        sizer.add(&view, 1, SizerFlag::Expand, 0);
-        panel.set_sizer(sizer, true);
-        if let Some(gui) = self.this.upgrade() {
-            let frame = self.frame;
+        let frame = self.frame;
+        let gui = self.this.clone();
+        let follow = move |href: String| {
+            let Some(gui) = gui.upgrade() else { return };
+            match classify(&href) {
+                Link::Sample(name) => with(&gui, |g| g.open_sample(&name)),
+                Link::Action(action) => super::perform(&gui, &frame, &action),
+                Link::Help(place) => with(&gui, |g| g.help_go(place)),
+                Link::HelpBack => with(&gui, Gui::help_back),
+                Link::External(url) => {
+                    launch_default_browser(&url, BrowserLaunchFlags::Default);
+                }
+                Link::Page => {}
+            }
+        };
+        let view = if needs_fallback() {
+            HelpView::Html(super::wx::HtmlView::new(&panel, follow))
+        } else {
+            let view = WebView::builder(&panel).build();
+            let sizer = BoxSizer::builder(Orientation::Vertical).build();
+            sizer.add(&view, 1, SizerFlag::Expand, 0);
+            panel.set_sizer(sizer, true);
             // The page's script puts a clicked link in its title (`link <n> <href>`): the
             // webview's own navigation events do not carry the URL through wxDragon.
             let v = view;
             view.on_title_changed(move |_| {
                 let title = v.get_current_title();
-                let Some(href) = title
+                if let Some((_, href)) = title
                     .strip_prefix("link ")
                     .and_then(|rest| rest.split_once(' '))
-                    .map(|(_, href)| href.to_owned())
-                else {
-                    return;
-                };
-                match classify(&href) {
-                    Link::Sample(name) => with(&gui, |g| g.open_sample(&name)),
-                    Link::Action(action) => super::perform(&gui, &frame, &action),
-                    Link::Help(place) => with(&gui, |g| g.help_go(place)),
-                    Link::HelpBack => with(&gui, Gui::help_back),
-                    Link::External(url) => {
-                        launch_default_browser(&url, BrowserLaunchFlags::Default);
-                    }
-                    Link::Page => {}
+                {
+                    follow(href.to_owned());
                 }
             });
-        }
+            HelpView::Web(view)
+        };
         self.notebook.add_page(&panel, "Help", true);
         self.help = Some(HelpTab {
             panel,
@@ -410,7 +450,13 @@ impl Gui {
         };
         let html = page_html(&h.here, &samples, !h.back.is_empty())
             .unwrap_or_else(|| landing_html(&samples));
-        h.view.set_page(&html, "about:blank");
+        match h.view {
+            HelpView::Web(v) => v.set_page(&html, "about:blank"),
+            HelpView::Html(v) => {
+                let anchor = h.here.anchor.as_deref().map(clean_anchor).unwrap_or_default();
+                v.set_page(&plain_html(&html), &anchor);
+            }
+        }
     }
 
     /// Help › About: the version, licence and main components.

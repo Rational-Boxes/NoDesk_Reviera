@@ -3,7 +3,7 @@
 
 //! Bindings to `native/wxshim.cpp`: wxWidgets features wxDragon does not wrap yet.
 
-use std::ffi::{c_int, c_void};
+use std::ffi::{CStr, CString, c_char, c_int, c_void};
 
 use wxdragon::prelude::*;
 
@@ -21,6 +21,45 @@ unsafe extern "C" {
     fn reviera_nb_layout_covers(notebook: *mut c_void, layout: *const c_void) -> c_int;
     fn reviera_nb_load_layout(notebook: *mut c_void, layout: *const c_void);
     fn reviera_nb_free_layout(layout: *mut c_void);
+    fn reviera_html_create(panel: *mut c_void) -> *mut c_void;
+    fn reviera_html_bind(
+        html: *mut c_void,
+        callback: extern "C" fn(*mut c_void, *const c_char),
+        user: *mut c_void,
+    );
+    fn reviera_html_set_page(html: *mut c_void, page: *const c_char, anchor: *const c_char);
+}
+
+/// wxWidgets' own HTML window, filling a panel: the help where no web view is available.
+#[derive(Debug, Clone, Copy)]
+pub struct HtmlView(*mut c_void);
+
+type LinkHandler = Box<dyn Fn(String)>;
+
+extern "C" fn link_trampoline(user: *mut c_void, href: *const c_char) {
+    // SAFETY: `user` is the handler leaked in `HtmlView::new`; `href` is a C string.
+    let handler = unsafe { &*(user as *const LinkHandler) };
+    let href = unsafe { CStr::from_ptr(href) }.to_string_lossy().into_owned();
+    handler(href);
+}
+
+impl HtmlView {
+    /// Fills `panel` with an HTML window; `on_link` gets each clicked link (other than anchors
+    /// within the page, which it scrolls to itself).
+    pub fn new(panel: &Panel, on_link: impl Fn(String) + 'static) -> Self {
+        let raw = unsafe { reviera_html_create(ptr(panel)) };
+        // Lives as long as the window: a few bytes, once per help tab opened.
+        let user = Box::into_raw(Box::new(Box::new(on_link) as LinkHandler));
+        unsafe { reviera_html_bind(raw, link_trampoline, user as *mut c_void) };
+        Self(raw)
+    }
+
+    /// Shows `html`, scrolled to `anchor` when it is not empty.
+    pub fn set_page(&self, html: &str, anchor: &str) {
+        let html = CString::new(html.replace('\0', "")).expect("no NULs");
+        let anchor = CString::new(anchor.replace('\0', "")).expect("no NULs");
+        unsafe { reviera_html_set_page(self.0, html.as_ptr(), anchor.as_ptr()) }
+    }
 }
 
 /// A saved arrangement of the view tabs: tab groups, their pages and divider positions.

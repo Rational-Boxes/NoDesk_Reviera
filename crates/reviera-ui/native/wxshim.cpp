@@ -12,6 +12,7 @@
 #include <wx/aui/serializer.h>
 #include <wx/aui/auibar.h>
 #include <wx/bmpbndl.h>
+#include <wx/html/htmlwin.h>
 #include <wx/ribbon/bar.h>
 #include <wx/ribbon/buttonbar.h>
 #include <wx/ribbon/page.h>
@@ -20,7 +21,56 @@
 #include <map>
 #include <vector>
 
+typedef void (*reviera_html_callback)(void* user, const char* href);
+
+// The help fallback where no web view is available (Wine, Windows without WebView2, ReactOS):
+// wxWidgets' own HTML window. Anchors within the page scroll; every other link goes to the
+// callback.
+class RevieraHtml : public wxHtmlWindow {
+public:
+    RevieraHtml(wxWindow* parent) : wxHtmlWindow(parent, wxID_ANY) {}
+    reviera_html_callback callback = nullptr;
+    void* user = nullptr;
+    using wxHtmlWindow::ScrollToAnchor;
+
+    void OnLinkClicked(const wxHtmlLinkInfo& link) override {
+        const wxString href = link.GetHref();
+        if (href.StartsWith("#")) {
+            ScrollToAnchor(href.Mid(1));
+        } else if (callback) {
+            callback(user, href.utf8_str().data());
+        }
+    }
+};
+
 extern "C" {
+
+// Fills `panel` with a new HTML window.
+void* reviera_html_create(void* panel) {
+    auto* p = static_cast<wxWindow*>(panel);
+    auto* h = new RevieraHtml(p);
+    auto* sizer = new wxBoxSizer(wxVERTICAL);
+    sizer->Add(h, 1, wxEXPAND);
+    p->SetSizer(sizer, true);
+    return h;
+}
+
+void reviera_html_bind(void* html, reviera_html_callback callback, void* user) {
+    auto* h = static_cast<RevieraHtml*>(html);
+    h->callback = callback;
+    h->user = user;
+}
+
+// Shows `page` (UTF-8 HTML), at `anchor` when it is not empty.
+void reviera_html_set_page(void* html, const char* page, const char* anchor) {
+    auto* h = static_cast<RevieraHtml*>(html);
+    h->SetPage(wxString::FromUTF8(page));
+    if (anchor && *anchor) {
+        h->ScrollToAnchor(wxString::FromUTF8(anchor));
+    } else {
+        h->Scroll(0, 0);
+    }
+}
 
 typedef void (*reviera_nb_callback)(void* user, int kind, int page);
 
