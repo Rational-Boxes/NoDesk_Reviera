@@ -261,3 +261,100 @@ fn slanted_and_tapered_walls() {
     // Saved as a B-rep.
     project.save(&doc).unwrap();
 }
+
+#[test]
+fn edited_profiles() {
+    let (_t, mut project, mut doc, r, l1, _) = setup();
+    let wall = id(&run(
+        &r,
+        &mut doc,
+        "wall.create",
+        json!({ "curve": { "line": { "start": [0.0, 0.0], "end": [10.0, 0.0] } }, "base_level": l1.0, "top_constraint": { "unconnected": 3.0 } }),
+    )
+    .unwrap());
+    let bounds = |doc: &Document| {
+        reviera_core::bodies::all(doc.store())
+            .into_iter()
+            .find(|b| b.element == wall)
+            .unwrap()
+            .bounds()
+            .unwrap()
+    };
+    // A gable: 1.5 m above the 3 m eaves at the middle.
+    run(
+        &r,
+        &mut doc,
+        "wall.edit_profile",
+        json!({ "wall_id": wall.0, "loops": [[[0.0, 0.0], [10.0, 0.0], [10.0, 3.0], [5.0, 4.5], [0.0, 3.0]]] }),
+    )
+    .unwrap();
+    assert!((bounds(&doc).1[2] - 4.5).abs() < 1e-6);
+    // A 1 m notch at the top of the end, and a hole.
+    run(
+        &r,
+        &mut doc,
+        "wall.edit_profile",
+        json!({ "wall_id": wall.0, "loops": [
+            [[0.0, 0.0], [10.0, 0.0], [10.0, 2.0], [9.0, 2.0], [9.0, 3.0], [0.0, 3.0]],
+            [[2.0, 1.0], [3.0, 1.0], [3.0, 2.0], [2.0, 2.0]],
+        ] }),
+    )
+    .unwrap();
+    // Raising the top keeps the notch 1 m deep.
+    run(
+        &r,
+        &mut doc,
+        "wall.set_constraints",
+        json!({ "wall_id": wall.0, "top_constraint": { "unconnected": 4.0 } }),
+    )
+    .unwrap();
+    let p = run(
+        &r,
+        &mut doc,
+        "wall.get_profile",
+        json!({ "wall_id": wall.0 }),
+    )
+    .unwrap();
+    assert_eq!(p[0][2], json!([10.0, 3.0]));
+    assert_eq!(p[0][4], json!([9.0, 4.0]));
+    assert_eq!(p[1][0], json!([2.0, 1.0]));
+    // The body's volume: 10 × 4 less the 1 × 1 notch and the 1 × 1 hole, by 0.2.
+    let body = reviera_core::bodies::all(doc.store())
+        .into_iter()
+        .find(|b| b.element == wall)
+        .unwrap();
+    let volume: f64 = body
+        .parts
+        .iter()
+        .map(|m| {
+            m.mesh
+                .1
+                .chunks(3)
+                .map(|t| {
+                    let [a, b, c] = [0, 1, 2].map(|k| m.mesh.0[t[k] as usize]);
+                    (a[0] * (b[1] * c[2] - b[2] * c[1]) - a[1] * (b[0] * c[2] - b[2] * c[0])
+                        + a[2] * (b[0] * c[1] - b[1] * c[0]))
+                        / 6.0
+                })
+                .sum::<f64>()
+        })
+        .sum();
+    assert!((volume - 0.2 * 38.0).abs() < 1e-6, "{volume}");
+    // A door still cuts it; curved walls are refused; Reset restores the rectangle.
+    run(
+        &r,
+        &mut doc,
+        "door.place",
+        json!({ "host_wall_id": wall.0, "point_along": 6.0 }),
+    )
+    .unwrap();
+    project.save(&doc).unwrap();
+    run(
+        &r,
+        &mut doc,
+        "wall.reset_profile",
+        json!({ "wall_ids": [wall.0] }),
+    )
+    .unwrap();
+    assert!((bounds(&doc).1[2] - 4.0).abs() < 1e-6);
+}

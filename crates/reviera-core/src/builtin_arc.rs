@@ -138,6 +138,12 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(ShapeReset),
         registry.add(ShapeGet),
         registry.add(WallSetCrossSection),
+        registry.add(StackedWallSetRows),
+        registry.add(StackedWallCreateType),
+        registry.add(WallBreakUp),
+        registry.add(WallEditProfile),
+        registry.add(WallResetProfile),
+        registry.add(WallGetProfile),
     ];
     for r in results {
         r.expect("architecture commands are valid");
@@ -1388,6 +1394,82 @@ read_command!(
     crate::shape_edit::ElementParams,
     crate::shape_edit::Shape,
     crate::shape_edit::get
+);
+
+edit_command!(
+    WallEditProfile,
+    "wall.edit_profile",
+    "Edit a wall's profile",
+    "Changes a straight wall's elevation outline (ARC-WALL-009): `loops` is the outer loop then any \
+     holes, as points `[u, z]` with `u` along the wall from its start and `z` above its base \
+     (metres). Each point keeps to the nearer end and the nearer of base and top, so the top line \
+     follows the wall's top and a notch keeps its size. Doors and windows still cut the body.",
+    "Edit Profile",
+    crate::walls::profile::EditParams,
+    (),
+    crate::walls::profile::edit
+);
+
+edit_command!(
+    WallResetProfile,
+    "wall.reset_profile",
+    "Reset walls' profiles",
+    "Restores the rectangular elevation outline of walls whose profile was edited (ARC-WALL-009).",
+    "Reset Profile",
+    crate::walls::profile::ResetParams,
+    (),
+    crate::walls::profile::reset
+);
+
+read_command!(
+    WallGetProfile,
+    "wall.get_profile",
+    "Get a wall's profile",
+    "A straight wall's elevation outline now, as loops of `[u, z]` points (along from the start, \
+     above the base; metres): the outer loop then holes; the rectangle when not edited.",
+    [Effect::Read],
+    crate::walls::profile::GetParams,
+    Vec<Vec<[f64; 2]>>,
+    |store, p| crate::walls::profile::get(store, p)
+);
+
+edit_command!(
+    StackedWallSetRows,
+    "stackedwall.set_rows",
+    "Set a stacked wall type's rows",
+    "Makes a wall type a stacked wall type (ARC-STKW-001): `rows` from top to bottom, each a basic wall \
+     type with a `height` (exactly one row omits it: the Variable row, which takes the rest of the \
+     wall's height), an `offset` from the `offset_reference` (wall_centerline, core_centerline, \
+     finish_face_exterior, finish_face_interior, core_face_exterior, core_face_interior; positive \
+     toward the exterior) and a `flip`. Every wall of the type must stay taller than its fixed rows.",
+    "Edit Stack",
+    crate::walls::stacked::SetRowsParams,
+    (),
+    crate::walls::stacked::set_rows
+);
+
+edit_command!(
+    StackedWallCreateType,
+    "stackedwall.create_type",
+    "Create a stacked wall type",
+    "A new stacked wall type named `name` with `rows` as for `stackedwall.set_rows`; draw it with \
+     `wall.create` and its `type_id`.",
+    "New Stacked Wall Type",
+    crate::walls::stacked::CreateTypeParams,
+    crate::id::ElementId,
+    crate::walls::stacked::create_type
+);
+
+edit_command!(
+    WallBreakUp,
+    "wall.break_up",
+    "Break up stacked walls",
+    "Turns stacked walls into their sub-walls as basic walls, which keep the sub-walls' GlobalIds, \
+     positions and heights; doors and windows go to the sub-wall their centre is in.",
+    "Break Up",
+    crate::walls::stacked::BreakUpParams,
+    Vec<crate::id::ElementId>,
+    crate::walls::stacked::break_up
 );
 
 edit_command!(

@@ -369,6 +369,12 @@ pub struct LayerArg {
 pub(crate) fn set_layers(txn: &mut crate::txn::Transaction<'_>, p: SetLayersParams) -> Result<()> {
     let store = txn.store().clone();
     let id = wall_type(&store, &p.type_id)?;
+    if crate::walls::stacked::of_type(store.get(id).expect("resolved")).is_some() {
+        return Err(Error::new(
+            "compound.stacked",
+            "a stacked wall type has rows, not layers (stackedwall.set_rows)",
+        ));
+    }
     let settings = crate::units::settings_of(&store);
     let mut layers = Vec::new();
     for (i, a) in p.layers.iter().enumerate() {
@@ -418,6 +424,7 @@ pub(crate) fn set_layers(txn: &mut crate::txn::Transaction<'_>, p: SetLayersPara
     txn.modify(id, |e| {
         e.params.insert(RECIPE_KEY.into(), recipe);
     })?;
+    crate::walls::stacked::refresh_widths(txn)?;
     // Every wall of the type must still regenerate (and its doors and windows fit).
     let store = txn.store().clone();
     let guid = store.get(id).expect("exists").guid().to_string();

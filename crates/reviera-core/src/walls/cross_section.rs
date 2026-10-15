@@ -88,6 +88,12 @@ fn variable_at_top(store: &Store, e: &Element, height: f64, ext: f64, int: f64) 
 /// Checks a cross-section against a wall.
 pub fn check(store: &Store, e: &Element, cs: CrossSection) -> Result<()> {
     let r = wall_recipe(e).expect("a wall");
+    if crate::walls::stacked::of_wall(store, e).is_some() {
+        return Err(Error::new(
+            "wall.cross_section_stacked",
+            "stacked walls stay vertical",
+        ));
+    }
     if !r.through.is_empty() {
         return Err(Error::new(
             "wall.cross_section_curved",

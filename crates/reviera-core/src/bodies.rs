@@ -166,19 +166,26 @@ pub fn all(store: &Store) -> Vec<Body> {
             body.geometry.height = a.z_min - body.geometry.base_z;
             push(id, &class, trim(a.cap), false);
         }
-        let mesh = match cuts.get(&id) {
-            Some(c) => crate::walls::openings::cut_mesh(&body, c),
-            None => body.mesh(),
-        };
-        // A slanted or tapered wall leans (ARC-WALL-005).
-        let mesh = match store.get(id).and_then(crate::walls::wall_recipe) {
-            Some(r) if r.cross_section.is_some() => crate::walls::cross_section::shear(
-                &mesh,
-                &body.geometry,
-                r.flip,
-                r.cross_section.expect("checked"),
-            ),
-            _ => mesh,
+        // A stacked wall is its sub-walls (ARC-STKW-001).
+        if let Some(e) = store
+            .get(id)
+            .filter(|e| crate::walls::stacked::of_wall(store, e).is_some())
+        {
+            let c = cuts.get(&id).map_or(&[][..], Vec::as_slice);
+            for (_, mesh) in crate::walls::stacked::meshes(store, e, &body, c) {
+                push(id, &class, trim(mesh), false);
+            }
+            continue;
+        }
+        let c = cuts.get(&id).map_or(&[][..], Vec::as_slice);
+        // An edited profile (ARC-WALL-009) or a slanted or tapered wall (ARC-WALL-005).
+        let special = store
+            .get(id)
+            .and_then(|e| crate::walls::profile::special_mesh(e, &body, c));
+        let mesh = match special {
+            Some(Ok(m)) => m,
+            _ if c.is_empty() => body.mesh(),
+            _ => crate::walls::openings::cut_mesh(&body, c),
         };
         push(id, &class, trim(mesh), false);
     }

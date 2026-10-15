@@ -150,6 +150,14 @@ ribbon's tools, the command shell, Lua and MCP alike.
   their own exterior and interior angles, the type's variable layer taking the difference
   (refused if it would reach zero); saved as B-reps (`wall.set_cross_section`; the
   Cross-Section rows in Properties; ARC-WALL-005).
+- **Edit Profile** (Modify | Walls): a straight wall's elevation outline as loops of points
+  (gables, steps, notches, holes), points keeping to the nearer end and the nearer of base and
+  top; Reset Profile (`wall.edit_profile`, `wall.reset_profile`, `wall.get_profile`;
+  ARC-WALL-009).
+- **Stacked walls** (Modify | Walls › Edit Stack, Break Up): basic wall types stacked in rows,
+  one Variable, offset from a chosen reference; IFC `ELEMENTEDWALL` aggregating one `IfcWall`
+  per row; Break Up keeps the sub-walls' GlobalIds (`stackedwall.set_rows`,
+  `stackedwall.create_type`, `wall.break_up`; ARC-STKW-001).
 - **Split with Gap and Split Horizontally** (Modify | Walls): a joint gap of 1.6–305 mm held by a
   locked distance between the new ends, or a lower and upper wall at a level or height, inserts
   going to the part they sit in (`element.split_with_gap`, `wall.split_horizontal`;
@@ -634,8 +642,9 @@ area by area (a review against the spec on 2026-10-15). Whole areas not started 
   Make Permanent icon (the command exists), angular and radial constraints, constraints on
   inserts along their walls, Tab through sub-elements (ARC-DIM-001, ARC-CNST-002, ARC-KEY-001).
 - **Wall extras**: vertically compound walls (regions), extendable layers, layer wrapping,
-  stacked walls, Edit Profile, sweeps and reveals, Walls by Room, Auto Join & Lock, hosted
-  walls, curved slanted walls (ARC-CMPD-003/004, ARC-WRAP-001, ARC-STKW-001,
+  sweeps and reveals, Walls by Room, Auto Join & Lock, hosted walls, curved slanted walls,
+  selecting stacked sub-walls with Tab, sketching a wall profile in elevation and its mid-end
+  faces (ARC-CMPD-003/004, ARC-WRAP-001,
   ARC-WALL-009/010/014/015/016).
 - **Curtain extras**: manual grid lines and segments, swapping single panels (curtain-wall
   doors), curtain systems by face, sloped glazing (ARC-CW-004/006/007/008).

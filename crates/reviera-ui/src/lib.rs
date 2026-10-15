@@ -54,7 +54,9 @@ mod sketch_edit;
 mod skylights;
 mod slab_openings;
 mod snap;
+mod stack;
 mod stairs;
+mod wall_profile;
 mod walls;
 mod wx;
 
@@ -3731,6 +3733,9 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
             focus(g);
         }),
         "wall.split_horizontal" => with(gui, Gui::split_horizontal),
+        "stackedwall.set_rows" => with(gui, Gui::edit_stack),
+        "wall.break_up" => with(gui, Gui::break_up),
+        "wall.edit_profile" => with(gui, Gui::edit_wall_profile),
         "slabedge.create" => with(gui, |g| {
             g.start_line_tool(datum_tools::LineMode::SlabEdge);
             focus(g);

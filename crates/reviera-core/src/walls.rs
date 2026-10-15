@@ -18,6 +18,8 @@ pub mod cross_section;
 pub mod curved;
 pub mod joins;
 pub mod openings;
+pub mod profile;
+pub mod stacked;
 
 pub use joins::{End, Join, Solved, WallBody, solve};
 
@@ -104,6 +106,9 @@ pub struct WallRecipe {
     /// A slanted or tapered cross-section (ARC-WALL-005); vertical when absent.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cross_section: Option<cross_section::CrossSection>,
+    /// An edited elevation profile (ARC-WALL-009); the rectangle when absent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub profile: Option<profile::Profile>,
 }
 
 fn both_allowed() -> [bool; 2] {
@@ -385,6 +390,7 @@ pub(crate) fn create(txn: &mut crate::txn::Transaction<'_>, p: CreateParams) -> 
         attach_top: None,
         through,
         cross_section: None,
+        profile: None,
     };
     let id = txn.create(
         NewElement::new("IfcWall")
@@ -396,7 +402,12 @@ pub(crate) fn create(txn: &mut crate::txn::Transaction<'_>, p: CreateParams) -> 
             ),
     )?;
     // Check that the new wall regenerates (for example, a top level below the base fails).
-    regenerate(txn.store(), txn.store().get(id).expect("created"))?;
+    let e = txn.store().get(id).expect("created");
+    let g = regenerate(txn.store(), e)?;
+    // A stacked wall must be taller than its fixed rows (ARC-STKW-001).
+    if stacked::of_wall(txn.store(), e).is_some() {
+        stacked::layout(txn.store(), e, &g)?;
+    }
     Ok(id)
 }
 

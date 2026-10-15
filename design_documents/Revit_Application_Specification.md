@@ -10683,8 +10683,10 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 - `wall.break_up(stacked_wall_ids) -> [element_id]`
 
 **Acceptance criteria.**
-- [ ] A stacked wall with a 900 mm fixed base row and a variable upper row, drawn 2.7 m high, has sub-walls 0.9 m and 1.8 m high.
-- [ ] Break Up produces two basic walls whose IFC GlobalIds are those of the former sub-walls.
+- [x] A stacked wall with a 900 mm fixed base row and a variable upper row, drawn 2.7 m high, has sub-walls 0.9 m and 1.8 m high.
+- [x] Break Up produces two basic walls whose IFC GlobalIds are those of the former sub-walls.
+
+**Implementation note (2026-10-15, first build).** As built: the wall type's recipe carries `stacked_wall` (offset reference and rows, top first); its width is the rows' envelope about the location line, kept in step when a row type's width or layers change. A stacked wall is an ordinary Reviera wall of that type, so drawing, moving, joins and hosting work as for basic walls; its body is one piece per row, the row's band across the wall cut at the stacked wall's joined ends. Sub-walls have GlobalIds derived from the stacked wall's, so they are stable across saves and Break Up keeps them. Commands: `stackedwall.set_rows`, `stackedwall.create_type` (an addition), `wall.break_up`. IFC: the stacked wall is `ELEMENTEDWALL` with no body, aggregating one `IfcWall` per row with a faceted B-rep (cut by the doors and windows), typed by the row's type; tagged `rxd:stacked_wall` and not loaded as elements. Refused: slanted or tapered stacked walls, horizontal splits, a wall too short for its fixed rows (on creation). The window: Modify | Walls › Edit Stack (a grid like Edit Assembly; on a basic wall it makes a new stacked type) and Break Up. Not built yet: Tab-selecting sub-walls and their own parameters, joins per height interval, top and base extensions, curved and elliptical stacked walls, Sample Height.
 
 ### 3.3.12 Wall joins and layer cleanup
 **ID:** ARC-JOIN-001 · **Priority:** P0 · **Ref:** research/02 §1 (2025/2026), §4.5 (Layer join rules), §4.7, §17.4 · screenshots/architecture/compound_layer_priority_joins.png
@@ -10847,7 +10849,9 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 
 **Acceptance criteria.**
 - [ ] A notch 1 m deep and 1 m high in the top corner creates a mid-end face, and a perpendicular wall drawn to that face joins it.
-- [ ] Raising the wall's top constraint moves the locked top line, and the notch keeps its depth.
+- [x] Raising the wall's top constraint moves the locked top line, and the notch keeps its depth.
+
+**Implementation note (2026-10-15, first build).** As built: the wall recipe's `profile` (loops of points, each stored from its reference: the nearer end and the nearer of base and top for the outer loop's points; a hole loop as a whole by its centre, so holes keep their size); the body is the profile (less the wall's door and window cuts, by polygon difference) pushed across the wall between its faces, points on the wall's ends following the joined ends; it combines with a slanted or tapered cross-section. Commands `wall.edit_profile`, `wall.reset_profile` and `wall.get_profile` (an addition). IFC: a faceted B-rep in the wall's frame. The window: Modify | Walls › Edit Profile, a grid of loop points with Gable, Step and Rectangle presets and Reset Profile. Refused: curved and stacked walls. Not built yet: the sketch mode in elevation with dashed reference planes, explicit locking and unlocking, mid-end faces as join targets.
 
 ### 3.3.15 Wall sweeps and reveals
 **ID:** ARC-WALL-010 · **Priority:** P1 · **Ref:** research/02 §4.5 (Sweeps/Reveals), §4.10

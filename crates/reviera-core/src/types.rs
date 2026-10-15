@@ -229,6 +229,12 @@ pub(crate) fn set_param(txn: &mut crate::txn::Transaction<'_>, p: SetParamParams
             "a layered wall type's width is the total of its layers: change them in Edit Assembly (compound.set_layers)",
         ));
     }
+    if p.param == "width" && walls::stacked::of_type(e).is_some() {
+        return Err(Error::new(
+            "type.stacked",
+            "a stacked wall type's width follows its rows (stackedwall.set_rows)",
+        ));
+    }
     if walls::type_width(e).is_some() && p.param == "width" {
         let width = match &p.value {
             Value::Number(n) => n.as_f64().unwrap_or(-1.0),
@@ -248,9 +254,10 @@ pub(crate) fn set_param(txn: &mut crate::txn::Transaction<'_>, p: SetParamParams
             .cloned()
             .expect("a wall type recipe");
         recipe["width"] = width.into();
-        return txn.modify(id, |e| {
+        txn.modify(id, |e| {
             e.params.insert(walls::RECIPE_KEY.into(), recipe);
-        });
+        })?;
+        return walls::stacked::refresh_widths(txn);
     }
     let value = (!p.value.is_null()).then_some(&p.value);
     crate::parameters::set(txn, &[id], &p.param, value).map(|_| ())

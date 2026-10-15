@@ -1777,7 +1777,11 @@ impl Gui {
         else {
             return;
         };
-        if !r.through.is_empty() {
+        let stacked = self.store_now().is_some_and(|s| {
+            s.get(id)
+                .is_some_and(|e| reviera_core::walls::stacked::of_wall(&s, e).is_some())
+        });
+        if !r.through.is_empty() || stacked {
             return;
         }
         grid.append(Property::category("Cross-Section", "c_wc"));

@@ -108,6 +108,8 @@ a wall and click <b>Modify | Walls › Edit Assembly</b>; the dialog lists the l
   <tr><td>Thickness</td><td>In the model's units; at least 3.2 mm except membranes.</td></tr>
   <tr><td>Wraps, Core</td><td>Tick Core on the core's layers, which must be next to each
     other.</td></tr>
+  <tr><td>Variable</td><td>The one layer a tapered wall thins (see
+    <a href="#cross">Slanted and tapered walls</a>).</td></tr>
 </table>
 <p><b>Insert</b>, <b>Delete</b>, <b>Up</b> and <b>Down</b> edit the rows. <b>OK</b> checks the
 layers and applies them to the type, so every wall of the type changes; a problem is shown and
@@ -130,6 +132,45 @@ layers as <b>Structure</b>), and plans draw the boundaries between the layers in
 </ul>
 <p>Doors and windows lean with the wall for now. Slanted walls cannot be split with a gap. In IFC
 the wall is a faceted B-rep. <code>wall.set_cross_section</code></p>
+
+<h2 id="profile">Edit Profile</h2>
+<p>A straight wall's elevation outline can be changed: a gable end, a stepped top, a notch or a
+hole.</p>
+<ol>
+  <li>Select the wall. <b>Modify | Walls › Edit Profile</b>.</li>
+  <li>The grid lists the outline's points: <b>Loop</b> 1 is the outline, loops 2 and up are
+    holes; <b>Along</b> is measured from the wall's start and <b>Height</b> up from its base.
+    <b>Gable</b>, <b>Step</b> and <b>Rectangle</b> fill in a common outline to adjust;
+    <b>Insert</b> and <b>Delete</b> edit the rows.</li>
+  <li><b>OK</b> applies it; <b>Reset Profile</b> restores the rectangle.</li>
+</ol>
+<p>Each outline point keeps to the nearer end of the wall and the nearer of its base and top, so
+the top line follows the wall's top and a notch keeps its size when the wall changes; a hole
+keeps its size and moves with the nearer references. Doors and windows still cut the wall. Not
+for curved or stacked walls. In IFC the wall is a faceted B-rep. <code>wall.edit_profile</code>,
+<code>wall.reset_profile</code>, <code>wall.get_profile</code></p>
+
+<h2 id="stacked">Stacked walls</h2>
+<p>A stacked wall stacks basic wall types one above the other in one wall: a thicker plinth under
+a thinner wall, for example.</p>
+<ol>
+  <li>Select a wall. <b>Modify | Walls › Edit Stack</b>.</li>
+  <li>For a wall whose type is not stacked yet, name the new stacked type. Set the <b>Offset</b>
+    reference (wall centreline, core centreline, a finish face or a core face).</li>
+  <li>Edit the rows, top first: <b>Type</b> (a basic wall type by name), <b>Height</b> (a length,
+    or <i>Variable</i> for the one row that takes the rest of the wall's height), <b>Offset</b>
+    from the reference (toward the exterior) and <b>Flip</b>. <b>Insert</b>, <b>Delete</b>,
+    <b>Up</b>, <b>Down</b> and <b>Variable</b> edit the rows.</li>
+  <li><b>OK</b>: a new stacked type is given to the selected walls; an existing one changes every
+    wall of the type.</li>
+</ol>
+<p>A stacked wall is drawn, moved, joined and hosts doors and windows like any wall; each row is
+cut at the wall's joined ends. A wall shorter than its fixed rows is refused. Stacked walls stay
+vertical and can be split only by a vertical plane. <b>Modify | Walls › Break Up</b> turns
+selected stacked walls into their basic walls, which keep the sub-walls' GlobalIds. In IFC the
+stacked wall is an <code>ELEMENTEDWALL</code> aggregating one <code>IfcWall</code> per row.
+<code>stackedwall.create_type</code>, <code>stackedwall.set_rows</code>,
+<code>wall.break_up</code></p>
 
 <h2 id="split">Splitting walls</h2>
 <ul>

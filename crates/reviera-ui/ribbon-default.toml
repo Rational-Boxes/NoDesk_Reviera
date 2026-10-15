@@ -905,6 +905,24 @@ keys = "ST"
 help = "Draw a stair in a plan: click the start and end of each run; landings join the runs"
 
 [[action]]
+id = "wall.edit_profile"
+label = "Edit Profile"
+icon = "wall_profile"
+help = "Change the selected straight wall's elevation outline: gables, steps, notches and holes"
+
+[[action]]
+id = "stackedwall.set_rows"
+label = "Edit Stack"
+icon = "stack"
+help = "Edit the rows of the selected wall's stacked type, or make a new stacked wall type from it"
+
+[[action]]
+id = "wall.break_up"
+label = "Break Up"
+icon = "break_up"
+help = "Turn the selected stacked walls into their basic walls"
+
+[[action]]
 id = "wall.edit_assembly"
 label = "Edit Assembly"
 icon = "assembly"
@@ -1372,6 +1390,9 @@ panels = [{ label = "Wall", tools = [
   { action = "wall.detach", size = "large" },
   { action = "element.split_with_gap", size = "large" },
   { action = "wall.split_horizontal", size = "large" },
+  { action = "wall.edit_profile", size = "large" },
+  { action = "stackedwall.set_rows", size = "large" },
+  { action = "wall.break_up", size = "large" },
 ] }]
 
 [[context]]

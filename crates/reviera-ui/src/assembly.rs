@@ -16,13 +16,14 @@ use wxdragon::prelude::*;
 
 use super::Gui;
 
-const COLS: [&str; 6] = [
+const COLS: [&str; 7] = [
     "Function",
     "Priority",
     "Material",
     "Thickness",
     "Wraps",
     "Core",
+    "Variable",
 ];
 const FUNCTION: i32 = 0;
 const PRIORITY: i32 = 1;
@@ -30,6 +31,7 @@ const MATERIAL: i32 = 2;
 const THICKNESS: i32 = 3;
 const WRAPS: i32 = 4;
 const CORE: i32 = 5;
+const VARIABLE: i32 = 6;
 
 fn yes(v: &str) -> bool {
     matches!(v.trim(), "1" | "true" | "yes" | "Yes" | "x" | "X")
@@ -85,7 +87,8 @@ impl Gui {
             .with_label(&format!(
                 "Wall type {name} ({walls} walls) · total thickness {} · exterior at the top. \
                  Functions: Structure, Substrate, Thermal/Air, Finish 1, Finish 2, Membrane. \
-                 Priority 1 is the strongest; tick Core for the core's layers.",
+                 Priority 1 is the strongest; tick Core for the core's layers, and Variable \
+                 for the one layer a tapered wall thins.",
                 self.format_length(c.thickness())
             ))
             .build();
@@ -103,6 +106,7 @@ impl Gui {
         }
         grid.set_col_format_bool(WRAPS);
         grid.set_col_format_bool(CORE);
+        grid.set_col_format_bool(VARIABLE);
         for (r, l) in c.layers.iter().enumerate() {
             let r = r as i32;
             grid.set_cell_value(r, FUNCTION, l.function.name());
@@ -112,6 +116,7 @@ impl Gui {
             grid.set_cell_value(r, WRAPS, if l.wraps { "1" } else { "" });
             let core = (c.core[0]..c.core[1]).contains(&(r as usize));
             grid.set_cell_value(r, CORE, if core { "1" } else { "" });
+            grid.set_cell_value(r, VARIABLE, if l.variable { "1" } else { "" });
         }
         grid.set_col_size(FUNCTION, 130);
         grid.set_col_size(PRIORITY, 70);
@@ -119,7 +124,8 @@ impl Gui {
         grid.set_col_size(THICKNESS, 100);
         grid.set_col_size(WRAPS, 60);
         grid.set_col_size(CORE, 60);
-        grid.set_min_size(Size::new(700, 260));
+        grid.set_col_size(VARIABLE, 70);
+        grid.set_min_size(Size::new(770, 260));
         sizer.add(&grid, 1, SizerFlag::All | SizerFlag::Expand, 10);
 
         let row_buttons = BoxSizer::builder(Orientation::Horizontal).build();
@@ -232,7 +238,7 @@ impl Gui {
                 thickness,
                 wraps: yes(&cell(WRAPS)),
                 structural_material: false,
-                variable: false,
+                variable: yes(&cell(VARIABLE)),
             });
         }
         // The core: the ticked rows, which must be together; none ticked is an empty core
@@ -258,6 +264,7 @@ impl Gui {
                     "material": l.material,
                     "thickness": l.thickness,
                     "wraps": l.wraps,
+                    "variable": l.variable,
                 })
             })
             .collect();

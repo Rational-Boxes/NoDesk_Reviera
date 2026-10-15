@@ -475,6 +475,7 @@ pub(crate) fn remove_wall(ifc: &mut IfcModel, wall: StepId) -> Result<()> {
     for rel in ifc.referenced_by(wall, "IfcRelConnectsPathElements")? {
         ifc.remove(rel)?;
     }
+    crate::stacked_walls::remove_subs(ifc, wall)?;
     remove_breps(ifc, wall)?;
     remove_wall_shape(ifc, wall)
 }

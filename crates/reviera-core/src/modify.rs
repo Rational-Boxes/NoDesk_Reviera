@@ -852,6 +852,12 @@ pub(crate) fn split_horizontal(
     let (id, recipe) = wall_of(&store, &p.wall_id)?;
     check_unpinned(&store, id)?;
     let e = store.get(id).expect("resolved");
+    if walls::stacked::of_wall(&store, e).is_some() {
+        return Err(Error::new(
+            "split.stacked",
+            "a stacked wall can be split only by a vertical plane",
+        ));
+    }
     let g = walls::regenerate(&store, e)?;
     let (z, level) = match (&p.z, &p.level_id) {
         (_, Some(l)) => {

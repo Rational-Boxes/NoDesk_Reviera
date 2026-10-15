@@ -17,6 +17,7 @@ pub mod params;
 mod path_arrays;
 mod psets;
 mod spatial;
+mod stacked_walls;
 
 pub use local::{LocalProject, OpenReport, SaveReport};
 

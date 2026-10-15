@@ -836,11 +836,31 @@ impl LocalProject {
             let (Some(&step), Some(storey)) = (self.steps.get(id), storey) else {
                 continue;
             };
-            // A slanted or tapered wall (ARC-WALL-005): its sheared body as a B-rep in its own
-            // frame.
-            if let Some(cs) = recipe.cross_section {
+            // A stacked wall (ARC-STKW-001): no body of its own, its sub-walls aggregated.
+            if walls::stacked::of_wall(store, e).is_some() {
+                let cuts = reviera_core::inserts::cuts_by_host(store);
+                let c = cuts.get(id).map_or(&[][..], Vec::as_slice);
+                let subs = walls::stacked::meshes(store, e, body, c);
+                geometry::remove_wall_shape(&mut self.ifc, step)?;
+                geometry::remove_breps(&mut self.ifc, step)?;
+                crate::stacked_walls::write_subs(
+                    &mut self.ifc,
+                    doc,
+                    &self.steps,
+                    owner_history,
+                    self.length_scale,
+                    *id,
+                    &subs,
+                )?;
+                geometry::contain(&mut self.ifc, step, storey, owner_history)?;
+                wall_steps.insert(step);
+                continue;
+            }
+            crate::stacked_walls::remove_subs(&mut self.ifc, step)?;
+            // A slanted or tapered wall (ARC-WALL-005) or an edited profile (ARC-WALL-009): its
+            // body as a B-rep in its own frame.
+            if let Some(Ok(mesh)) = walls::profile::special_mesh(e, body, &[]) {
                 let g = &body.geometry;
-                let mesh = walls::cross_section::shear(&body.mesh(), g, recipe.flip, cs);
                 let (u, n) = (g.direction(), g.normal());
                 let local = |p: &[f64; 3]| {
                     let d = [p[0] - g.start[0], p[1] - g.start[1]];
@@ -2299,7 +2319,8 @@ fn is_derived(ifc: &IfcModel, id: StepId) -> bool {
     matches!(ifc.attribute(id, "Description"), Ok(AttrValue::String(d))
         if d.starts_with(DERIVED_OPENING)
             || d == crate::curtains::PART_TAG
-            || d == crate::path_arrays::PART_TAG)
+            || d == crate::path_arrays::PART_TAG
+            || d == crate::stacked_walls::PART_TAG)
 }
 
 /// The lowest and highest points of a floor's, ceiling's or roof's body.
