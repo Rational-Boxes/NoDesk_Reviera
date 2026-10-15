@@ -536,6 +536,9 @@ nearest gaps in what is built:
   from its marker; schedule filters, grouping and calculated fields; title block families,
   revisions and sheet collections; tags and text in sections and on sheets; the current NBIMS-US
   COBie layout and a COBie settings dialog.
+- **Custom objects from meshes** (DM-IMP-015): importing OBJ, STL, PLY and glTF/GLB (3MF and OFF
+  later) as reusable object types with a category, material slots and plan outlines, placed many
+  times, reloaded from the file, and saved to an object library. Specified; not built yet.
 - **Interface**: general shape tools; a macOS build (the script is written, not yet run on a
   Mac); a Windows GUI that opens without a console window beside it.
 - **MCP**: streamable HTTP with tokens, rate and size limits, subscriptions, prompts,

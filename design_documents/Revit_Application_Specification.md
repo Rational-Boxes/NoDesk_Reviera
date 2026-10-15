@@ -6910,8 +6910,8 @@ Coordinates ▾: *Acquire Coordinates* (from a link), *Publish Coordinates* (to 
 | DM-IMP-003 | DWG (R13–2018 and later where the library supports it) | ✔ | ✔ | P1 | `acadrust` (MPL-2.0); LibreDWG (GPL-3.0+) as a fallback | Coverage depends on the library. Unsupported entities are listed in a report. Same options and results as DXF. Xrefs are resolved from the DWG's folder and imported as nested groups, or skipped with a warning. Files saved by versions newer than the library supports are refused with the version found and a suggestion to save as DXF from the source tool. |
 | DM-IMP-004 | PDF (as underlay) | ✔ | ✔ | P1 | PDFium (BSD-3/Apache-2.0) | Choose a page, resolution, and vector snapping to the PDF's path geometry. Pages are rendered at 72–600 dpi (default 150) for display; vector paths are extracted once into a snapping cache. Scale is set by the page's declared size or calibrated by two picked points of known distance. Password-protected PDFs are refused. Placed in plan, drafting and sheet views. |
 | DM-IMP-005 | Images (PNG, JPEG, TIFF, BMP, WebP) | ✔ | ✔ | P1 | `image` crate (MIT/Apache-2.0) | Placed in views, or on sheets. Images are RXD assets de-duplicated by hash, or linked by path (§2.10.14, COL-LNK-005). Native size comes from the image's dpi (96 dpi if none); maximum 16,384 × 16,384 pixels. Draw layer background or foreground; scale calibration by two points; alpha transparency kept. |
-| DM-IMP-006 | OBJ, STL, PLY | ✔ (project or family) | — | P1 | Rust crates (MIT/Apache-2.0) | Mesh. Optional decimation, and conversion to `IfcTriangulatedFaceSet`. Options: units (auto from file, or chosen), up-axis (Y or Z), merge coplanar triangles, decimate to a target triangle count, and category. Into a family, the mesh becomes a non-parametric form; into a project, a direct shape (§2.13.10). Non-manifold meshes are accepted for display and flagged. |
-| DM-IMP-007 | glTF 2.0 / GLB | ✔ (project or family) | — | P2 | `gltf` crate (MIT/Apache-2.0) | Mesh with PBR materials (mapped to §2.10.5). Each glTF material becomes a Reviera material (matched by name to existing ones, or created) with its textures as RXD assets. Node hierarchy becomes nested groups or one element per node (option). Animations and cameras are ignored with a note. |
+| DM-IMP-006 | OBJ, STL, PLY | ✔ (project or family; as a custom object, DM-IMP-015) | — | P1 | Rust crates (MIT/Apache-2.0) | Mesh. Optional decimation, and conversion to `IfcTriangulatedFaceSet`. Options: units (auto from file, or chosen), up-axis (Y or Z), merge coplanar triangles, decimate to a target triangle count, and category. Into a family, the mesh becomes a non-parametric form; into a project, a direct shape (§2.13.10). Non-manifold meshes are accepted for display and flagged. |
+| DM-IMP-007 | glTF 2.0 / GLB | ✔ (project or family; as a custom object, DM-IMP-015) | — | P1 *(raised from P2, owner, 2026-10-14)* | `gltf` crate (MIT/Apache-2.0) | Mesh with PBR materials (mapped to §2.10.5). Each glTF material becomes a Reviera material (matched by name to existing ones, or created) with its textures as RXD assets. Node hierarchy becomes nested groups or one element per node (option). Animations and cameras are ignored with a note. |
 | DM-IMP-008 | STEP AP203/AP214/AP242, IGES, BREP | ✔ (project or family) | — | P1 | OCCT (LGPL-2.1 + exception) | Exact B-rep, used for manufacturer content in families. Solids keep exact faces (`IfcAdvancedBrep` on export); assemblies can be imported as one element or one element per part. Units come from the file. Colour and layer attributes (AP214/AP242) set materials and subcategories. Healing (sewing, small-edge removal) runs with a report. |
 | DM-IMP-009 | 3DM (Rhino) | ✔ | — | P2 | openNURBS (licence to be checked) | Only if the licence check passes; otherwise P3. Imports breps, extrusions and meshes with layer names as subcategories; NURBS surfaces kept exact. Block instances become nested groups. Units from the file. |
 | DM-IMP-010 | Point clouds: E57, LAS/LAZ, PLY | — | ✔ | P2 | libE57Format (BSL-1.0), `las`/`laz` crates (MIT/Apache-2.0) | Indexed into an octree cache stored on disk next to the project (not part of IFC or RXD; rebuilt if missing). The link itself is in RXD document `project/links`. Snapping to points. Indexing runs in the background with progress; display uses level-of-detail streaming within a point budget (default 5 million points). Colour by RGB, intensity, elevation or classification. Clipped by section boxes and view ranges. |
@@ -7122,6 +7122,50 @@ Coordinates ▾: *Acquire Coordinates* (from a link), *Publish Coordinates* (to 
 - [ ] With no CADCraft build available, the in-CADCraft checks are reported as skipped.
 - [ ] Upgrading `acadrust` without running the corpus checks is refused by the dependency review (`cargo deny` policy plus the review checklist).
 - [ ] The compatibility matrix names the CADCraft version that produced every corpus file.
+
+### 2.11.12 Custom objects from meshes
+**ID:** DM-IMP-015 · **Priority:** P1 · **Ref:** owner requirement (2026-10-14); DM-IMP-006, DM-IMP-007; Reviera's own design
+
+**Purpose.** Bring any mesh made in another open tool (a chair from a modelling program, a scanned statue, a manufacturer's product, a 3D-print model) into a project as a **custom object**: a type of object, with a category, materials and parameters, placed as many times as needed and treated like Reviera's own elements. *(Owner requirement, 2026-10-14: "import an arbitrary mesh from common open 3D formats as custom objects".)*
+
+**Behaviour & rules.**
+- **Formats.** OBJ (with its MTL materials), STL (ASCII and binary), PLY (ASCII and binary), glTF 2.0 and GLB are P1; 3MF and OFF are P2. Each is read with a GPL-compatible open-source reader (a Rust crate, or Reviera's own reader for the simpler formats), recorded in the research log when chosen. Formats that need proprietary SDKs stay P3 (DM-IMP-001 … 012).
+- **Insert › Import Object** (`mesh_object.import`) opens the file and shows a dialog with a 3D preview:
+  - **Units**: from the file when it states them (glTF is in metres; 3MF states its unit), otherwise chosen (mm, cm, m, in, ft). The preview shows the object's resulting width, depth and height, so a wrong unit is obvious before import.
+  - **Up axis**: Z or Y (glTF's default is Y-up; OBJ, STL and PLY have no convention, so Z-up is the default with a one-click flip).
+  - **Insertion point**: bottom centre (default), the file's origin, or a bounding-box corner. The object's base sits on the level or host where it is placed.
+  - **Category**: the IFC class the object becomes, with a sensible type class: Generic Model (`IfcBuildingElementProxy`), Furniture (`IfcFurniture`), Plumbing Fixture (`IfcSanitaryTerminal`), Lighting Fixture (`IfcLightFixture`), Planting (`IfcGeographicElement`), Equipment (`IfcFurnishingElement`, `IfcElectricAppliance`) and others from the category table (§2.10.3).
+  - **Name**, and the **type name** (the file's name by default).
+  - **Clean-up**: weld coincident vertices (default on), drop degenerate triangles (on), recompute normals (off; on when the file has none), and decimate to a target triangle count (off). A report lists open edges, non-manifold edges and inconsistent winding.
+- **Types and instances.** The import makes a **custom object type** holding the mesh once; instances share it. Placing (`mesh_object.place`) works like placing a column: click in a plan or a 3D view, snapping to the usual snaps; Spacebar turns it 90°; the tool repeats until Esc. An instance has a base level and offset, a rotation, and an optional mirror. Hundreds of instances of one chair store one mesh.
+- **Materials.** Each material of the source (an OBJ `usemtl` group, a glTF material, a PLY or STL colour) becomes a **material slot** of the type, with its colour (and, P2, its textures as RXD assets, mapped to the PBR appearance of §2.10.5). Each slot can be mapped to a project material in the type's properties; a mesh with no materials gets one slot, *Default*.
+- **Plans and sections.** A custom object is drawn in plans by its outline: the mesh cut at the view's cut plane, and the projection of what is below it (computed from the mesh and cached with the type). Above the cut, it is drawn per the category's overhead style, as other elements are. Sections and elevations draw its projection and cut faces.
+- **Modifying.** Instances move, copy, rotate, mirror, array, align, pin and delete like other elements; they are selected by clicking any face. **Type properties** hold the name, category, material slots, a uniform scale, and the import options. **Reload from File** (`mesh_object.reload`) re-reads the source (or a new file) into the type, keeping every instance and the material mapping where slot names still match.
+- **Taking part in the model.** Custom objects appear in schedules by category, carry parameters and property sets like other elements, are hidden and isolated by category, and take part in overlap detection and clash tests (COL-CLASH). A closed, consistently wound mesh is treated as a solid (its volume is reported and booleans may use it, P2); an open mesh is display-only for booleans and its clash results are marked approximate.
+- **Library.** A type can be saved to the user's object library (Manage › Object Library) as a small IFC file with its RXD recipe, and loaded into other projects. The library is a folder; its location is a setting.
+- **Limits.** A type above 1,000,000 triangles asks to decimate before import; above 5,000,000 it is refused with the count found. Import runs in the background with progress and can be cancelled.
+
+**Data (IFC mapping).**
+- The type is the category's type class (for example `IfcFurnitureType`, or `IfcBuildingElementProxyType` for Generic Model) with one `IfcRepresentationMap` whose geometry is an `IfcTriangulatedFaceSet` (or `IfcPolygonalFaceSet` when the source keeps quads or polygons), with `IfcIndexedColourMap` or `IfcStyledItem` per material slot.
+- Each instance is an element of the category's class whose body is an `IfcMappedItem` of the type's map, placed by its `ObjectPlacement`; `ObjectType` names the type.
+- The RXD recipe on the type (`recipe.mesh_object`) records the source file name, its SHA-256, the import options and the slot mapping. The source file itself is stored as an RXD asset only when the user chooses *Keep source* (for Reload from File without the original); otherwise only its hash is kept.
+- Files written this way open in other IFC tools with the objects visible and typed.
+
+**Commands.**
+`mesh_object.inspect(path, options?) -> report` *(query: units, size, triangle count, materials, defects, without importing)* ·
+`mesh_object.import(path, options) -> type_id` ·
+`mesh_object.place(type_id, point, level_id?, rotation?, mirror?) -> element_id` ·
+`mesh_object.reload(type_id, path?, options?)`.
+`import.mesh(path, target: "project", …)` (DM-IMP-006/007) is kept as the one-step form: it imports the type and places one instance at the insertion point.
+
+**Acceptance criteria.**
+- [ ] An OBJ chair with two materials (frame, seat) in centimetres, imported with *Units: cm*, is about 0.45 m wide and gets two material slots; placing it five times stores the mesh once in the saved IFC (one `IfcRepresentationMap`, five `IfcMappedItem`).
+- [ ] A binary STL in millimetres with no units in the file previews at the size chosen in the dialog, and the units choice changes the previewed size before import.
+- [ ] A glTF Y-up model is imported upright with the default up axis, and its glTF material colours appear on the object.
+- [ ] Reload from File with an edited OBJ updates every instance, keeping their positions and the material mapping.
+- [ ] A custom object of category Furniture appears in a furniture schedule, and in a floor plan is drawn by its cut outline at the view's cut plane.
+- [ ] A saved project with custom objects opens in another IFC viewer with the objects visible, typed and in the right places.
+- [ ] Importing a 6,000,000-triangle mesh is refused with the triangle count in the message.
 
 ## 2.12 The command registry
 
@@ -8223,6 +8267,10 @@ All commands defined in this chapter. Every command in this table is also a Lua 
 | `import.pdf` | path, page, view_id, options | element_id | Yes | DM-IMP-004 |
 | `import.image` | path, view_id, placement | element_id | Yes | DM-IMP-005 |
 | `import.mesh` | path, target: "project"\|"family", category?, options | element_id | Yes | DM-IMP-006/007 |
+| `mesh_object.inspect` | path, options? | report | No | DM-IMP-015 |
+| `mesh_object.import` | path, options | type_id | Yes | DM-IMP-015 |
+| `mesh_object.place` | type_id, point, level_id?, rotation?, mirror? | element_id | Yes | DM-IMP-015 |
+| `mesh_object.reload` | type_id, path?, options? | — | Yes | DM-IMP-015 |
 | `import.step` | path, target: "project"\|"family", category? | element_id | Yes | DM-IMP-008 |
 | `link.point_cloud` | path, placement | element_id | Yes | DM-IMP-010 |
 | `import.bcf` | path | topic_id[] | Yes | DM-IMP-011 |
@@ -25969,6 +26017,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | DM-FILE-007 | 2 | 2.11.9 Remote file locations (WebDAV) |
 | DM-IMP-013 | 2 | 2.11.10 CADCraft interoperability |
 | DM-IMP-014 | 2 | 2.11.11 CADCraft compatibility verification |
+| DM-IMP-015 | 2 | 2.11.12 Custom objects from meshes |
 | DM-CMD-002 | 2 | 2.12.2 Command naming and stability |
 | DM-MCP-002 | 2 | 2.16.2 Transports and authentication |
 | DM-MCP-003 | 2 | 2.16.3 Tool catalogue: generation from the registry |
