@@ -79,6 +79,21 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "equality" => format!(
             r#"<path d="M4 8v16M16 8v16M28 8v16" {s}/><path d="M4 16h24" {sa}/><path d="M8 12h4M8 14h4M20 12h4M20 14h4" {sa}/>"#
         ),
+        "shape_point" => format!(
+            r#"<path d="M3 12l13-6 13 6-13 6z" fill="{f}" {s}/><path d="M16 18v8" {sa}/><circle cx="16" cy="18" r="2" fill="{paper}" {sa}/>"#
+        ),
+        "shape_reset" => format!(
+            r#"<path d="M3 16l13-6 13 6-13 6z" fill="{f}" {s}/><path d="M24 6a6 6 0 10-2 8" {sa}/><path d="M24 2v4h-4" {sa}/>"#
+        ),
+        "slab_edge" => format!(
+            r#"<path d="M3 12h26v4H3z" fill="{f}" {s}/><path d="M3 16h6v8H3z" fill="{f}" {sa}/><path d="M23 16h6v8h-6z" fill="{f}" {sa}/>"#
+        ),
+        "join_roof" => format!(
+            r#"<path d="M2 22l10-8 10 8z" fill="{f}" {s}/><path d="M14 18l8-12 8 12" {s}/><path d="M20 16h6" {sa}/>"#
+        ),
+        "slope_arrow" => format!(
+            r#"<path d="M4 26h24L16 8z" fill="{f}" {s}/><path d="M16 25V13" {sa}/><path d="M12 17l4-5 4 5" {sa}/>"#
+        ),
         "roof_extrusion" => format!(
             r#"<path d="M3 20l8-8 8 8M3 20v2M19 20v2" {s}/><path d="M11 12l10-6 8 8-8 8" fill="{f}" {sa}/><path d="M19 20l10-6" {s}/>"#
         ),

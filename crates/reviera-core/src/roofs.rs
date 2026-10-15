@@ -79,6 +79,10 @@ pub struct RoofEdge {
     /// The eave's construction and wall bearing (ARC-ROOF-010).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub eave: Option<eaves::Eave>,
+    /// A slope arrow on an edge that does not define slope (ARC-ROOF-005): the edge then slopes
+    /// as the arrow says.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub arrow: Option<SlopeArrow>,
 }
 
 impl Default for RoofEdge {
@@ -88,7 +92,67 @@ impl Default for RoofEdge {
             slope: None,
             overhang: 0.0,
             eave: None,
+            arrow: None,
         }
+    }
+}
+
+/// A slope arrow (ARC-ROOF-005, ARC-SKCH-003): from its tail on a footprint edge to its head
+/// inside the footprint, the roof rises by its slope along the arrow, or from the tail's height to
+/// the head's.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct SlopeArrow {
+    pub tail: [f64; 2],
+    pub head: [f64; 2],
+    #[serde(flatten)]
+    pub specify: ArrowSpec,
+}
+
+/// What a slope arrow specifies.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(tag = "specify", rename_all = "snake_case")]
+pub enum ArrowSpec {
+    /// A slope along the arrow (radians).
+    Slope { slope: f64 },
+    /// Heights above the plate at the tail and the head (metres).
+    HeightAtTail {
+        #[serde(default)]
+        tail_offset: f64,
+        head_offset: f64,
+    },
+}
+
+impl SlopeArrow {
+    /// The slope square to an edge running along `dir` (unit), toward its inside on the left:
+    /// the arrow's rise over its run across the edge.
+    pub fn slope_across(&self, dir: [f64; 2]) -> Result<f64> {
+        let d = [self.head[0] - self.tail[0], self.head[1] - self.tail[1]];
+        let len = d[0].hypot(d[1]);
+        let inward = [-dir[1], dir[0]];
+        let run = d[0] * inward[0] + d[1] * inward[1];
+        let none = || Error::new("roof.arrow_no_slope", "Slope arrow does not define a slope");
+        if len < 0.01 || run < 0.01 {
+            return Err(none());
+        }
+        let rise = match self.specify {
+            ArrowSpec::Slope { slope } => slope.tan() * len,
+            ArrowSpec::HeightAtTail {
+                tail_offset,
+                head_offset,
+            } => {
+                if tail_offset.abs() > 1e-9 {
+                    return Err(Error::new(
+                        "roof.arrow_tail_offset",
+                        "slope arrows start at the plate for now (Height Offset at Tail 0)",
+                    ));
+                }
+                head_offset - tail_offset
+            }
+        };
+        if rise <= 1e-9 {
+            return Err(none());
+        }
+        Ok((rise / run).atan())
     }
 }
 
@@ -126,6 +190,10 @@ pub struct RoofRecipe {
     /// A roof by extrusion (ARC-ROOF-002); it has no footprint sketch either.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub extrusion: Option<extrusion::Extrusion>,
+    /// Joined edges (ARC-ROOF-006): footprint curve key → the wall or roof (GlobalId) it is
+    /// extended to.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub joins: BTreeMap<String, String>,
 }
 
 impl RoofRecipe {
@@ -420,6 +488,152 @@ fn find(store: &Store, guid: &str) -> Option<ElementId> {
 
 /// Regenerates a roof from its recipe, footprint, levels and type.
 pub fn regenerate(store: &Store, e: &Element) -> Result<RoofGeometry> {
+    regenerate_with(store, e, true)
+}
+
+/// A joined edge's extension: how far it moves out, and the plane (of a target roof's top)
+/// that clips the roof (`n · p = d`, keeping the side `n` points to).
+struct JoinCut {
+    index: usize,
+    delta: f64,
+    clip: Option<([f64; 3], f64)>,
+}
+
+/// The joins of a roof against the current model (the outer loop's corner `i` starts curve
+/// `keys[i]`; the loop counter-clockwise).
+fn join_cuts(
+    store: &Store,
+    r: &RoofRecipe,
+    ring: &[[f64; 2]],
+    keys: &[u32],
+    outer: usize,
+) -> Result<Vec<JoinCut>> {
+    let mut out = Vec::new();
+    for (key, target) in &r.joins {
+        let Some(index) = keys[..outer].iter().position(|k| k.to_string() == *key) else {
+            continue;
+        };
+        let (a, b) = (ring[index], ring[(index + 1) % outer]);
+        let l = (b[0] - a[0]).hypot(b[1] - a[1]).max(1e-12);
+        let dir = [(b[0] - a[0]) / l, (b[1] - a[1]) / l];
+        let out_n = [dir[1], -dir[0]];
+        let across = |p: [f64; 2]| (p[0] - a[0]) * out_n[0] + (p[1] - a[1]) * out_n[1];
+        // A target that is gone leaves the edge where it was.
+        let Some(t) = find(store, target).and_then(|t| store.get(t)) else {
+            continue;
+        };
+        if let Some(w) = crate::walls::wall_recipe(t) {
+            // To the wall's nearer face.
+            let g = crate::walls::regenerate(store, t)?;
+            let wd = g.direction();
+            if (wd[0] * dir[1] - wd[1] * dir[0]).abs() > 1e-3 {
+                return Err(Error::new(
+                    "roof.join_not_parallel",
+                    "a roof edge joins a wall parallel to it",
+                ));
+            }
+            let mid = [
+                (w.curve.start[0] + w.curve.end[0]) / 2.0,
+                (w.curve.start[1] + w.curve.end[1]) / 2.0,
+            ];
+            let delta = across(mid) - g.width / 2.0;
+            if delta <= 1e-6 {
+                return Err(Error::new(
+                    "roof.join_behind",
+                    "the wall is not beyond the roof edge",
+                ));
+            }
+            out.push(JoinCut {
+                index,
+                delta,
+                clip: None,
+            });
+        } else if roof_recipe(t).is_some() {
+            let tg = regenerate_with(store, t, false)?;
+            let far = tg
+                .footprint
+                .iter()
+                .map(|p| across(*p))
+                .fold(f64::NEG_INFINITY, f64::max);
+            if far <= 1e-6 {
+                return Err(Error::new(
+                    "roof.join_behind",
+                    "the target roof is not beyond the roof edge",
+                ));
+            }
+            // The target's face the edge runs into: the first met going out from the edge's
+            // middle.
+            let mid = [(a[0] + b[0]) / 2.0, (a[1] + b[1]) / 2.0];
+            let mut face = None;
+            let mut s = 0.05;
+            while s <= far + 0.05 {
+                if let Some(f) = tg.face_at([mid[0] + out_n[0] * s, mid[1] + out_n[1] * s]) {
+                    face = Some(f.clone());
+                    break;
+                }
+                s += 0.05;
+            }
+            let f = face.ok_or_else(|| {
+                Error::new(
+                    "roof.join_misses",
+                    "the roof edge, extended, does not meet the target roof",
+                )
+            })?;
+            let n = f.normal;
+            let q = f.bottom[0];
+            let top = [
+                q[0] + n[0] * tg.thickness,
+                q[1] + n[1] * tg.thickness,
+                q[2] + n[2] * tg.thickness,
+            ];
+            out.push(JoinCut {
+                index,
+                delta: far + 0.5,
+                clip: Some((n, n[0] * top[0] + n[1] * top[1] + n[2] * top[2])),
+            });
+        } else {
+            return Err(Error::new(
+                "roof.join_target",
+                "a roof edge joins a wall or another roof",
+            ));
+        }
+    }
+    Ok(out)
+}
+
+/// Moves edge `i` of a counter-clockwise loop of `n` corners out by `delta`, its neighbours
+/// stretched to meet it.
+fn push_edge(ring: &mut [[f64; 2]], n: usize, i: usize, delta: f64) {
+    let j = (i + 1) % n;
+    let (a, b) = (ring[i], ring[j]);
+    let l = (b[0] - a[0]).hypot(b[1] - a[1]).max(1e-12);
+    let dir = [(b[0] - a[0]) / l, (b[1] - a[1]) / l];
+    let out_n = [dir[1], -dir[0]];
+    let moved = |p: [f64; 2]| [p[0] + out_n[0] * delta, p[1] + out_n[1] * delta];
+    // Where the moved edge's line meets the neighbour through `p` along `nd`.
+    let meet = |p: [f64; 2], nd: [f64; 2], fallback: [f64; 2]| {
+        let c = nd[0] * dir[1] - nd[1] * dir[0];
+        if c.abs() < 1e-9 {
+            return fallback;
+        }
+        let m = moved(a);
+        let w = [m[0] - p[0], m[1] - p[1]];
+        let t = (w[0] * dir[1] - w[1] * dir[0]) / c;
+        [p[0] + nd[0] * t, p[1] + nd[1] * t]
+    };
+    let prev = ring[(i + n - 1) % n];
+    let next = ring[(j + 1) % n];
+    let unit = |p: [f64; 2], q: [f64; 2]| {
+        let l = (q[0] - p[0]).hypot(q[1] - p[1]).max(1e-12);
+        [(q[0] - p[0]) / l, (q[1] - p[1]) / l]
+    };
+    ring[i] = meet(prev, unit(prev, a), moved(a));
+    ring[j] = meet(next, unit(next, b), moved(b));
+}
+
+/// A roof as it is now; `joins` applies its joined edges (off when it is another roof's join
+/// target, so two roofs joined to each other do not recurse).
+fn regenerate_with(store: &Store, e: &Element, joins: bool) -> Result<RoofGeometry> {
     let r = roof_recipe(e).ok_or_else(|| Error::new("roof.not_reviera", "not a Reviera roof"))?;
     let level = find(store, &r.level)
         .and_then(|l| store.get(l))
@@ -492,6 +706,17 @@ pub fn regenerate(store: &Store, e: &Element) -> Result<RoofGeometry> {
     if let Some(a) = &r.arch {
         return curved::arch(&ring, &keys, a, plate, thickness);
     }
+    // Joined edges reach their walls or roofs (ARC-ROOF-006).
+    let cuts = if joins && !r.joins.is_empty() {
+        let outer = loops.first().copied().unwrap_or(ring.len());
+        let cuts = join_cuts(store, &r, &ring, &keys, outer)?;
+        for c in &cuts {
+            push_edge(&mut ring, outer, c.index, c.delta);
+        }
+        cuts
+    } else {
+        Vec::new()
+    };
     let edges: Vec<RoofEdge> = keys.iter().map(|k| r.edge(*k)).collect();
     // Eaves bear on their walls: their plate lines move, their overhangs are from the walls.
     let (ring, edges, lines) = eaves::prepare(
@@ -510,6 +735,16 @@ pub fn regenerate(store: &Store, e: &Element) -> Result<RoofGeometry> {
         square.push(s);
     }
     g.uncut = cut_holes_with(&mut g, &holes, &square).len();
+    // Joined to a roof: cut along its top surface.
+    for (n, d) in cuts.iter().filter_map(|c| c.clip) {
+        for f in &mut g.faces {
+            f.slab = eaves::clip_plane(&f.slab, n, d);
+            f.faceted = true;
+        }
+        for t in &mut g.trims {
+            t.mesh = eaves::clip_plane(&t.mesh, n, d);
+        }
+    }
     // A dormer's roof joins the main roof flush: cut along the main roof's top surface
     // (ARC-ROOF-007), its top meeting the main roof's in valleys.
     if let Some((n, d)) = crate::dormers::main_top_plane(store, e) {
@@ -777,8 +1012,32 @@ pub fn generate_loops(
     let mut slopes: Vec<Option<f64>> = Vec::with_capacity(n);
     for (i, e) in edges.iter().enumerate() {
         if !e.defines_slope {
-            slopes.push(None);
+            // A slope arrow slopes a gable edge (ARC-ROOF-005).
+            match &e.arrow {
+                Some(a) => {
+                    let (p, q) = (ring[i], ring[next_of[i]]);
+                    let l = (q[0] - p[0]).hypot(q[1] - p[1]).max(1e-12);
+                    let s = a.slope_across([(q[0] - p[0]) / l, (q[1] - p[1]) / l])?;
+                    if s > MAX_SLOPE {
+                        return Err(Error::new(
+                            "roof.bad_slope",
+                            format!("edge {}: the slope arrow is too steep", i + 1),
+                        ));
+                    }
+                    slopes.push(Some(s));
+                }
+                None => slopes.push(None),
+            }
             continue;
+        }
+        if e.arrow.is_some() {
+            return Err(Error::new(
+                "roof.arrow_on_slope",
+                format!(
+                    "edge {}: a slope arrow goes on an edge that does not define slope",
+                    i + 1
+                ),
+            ));
         }
         let s = e.slope.unwrap_or(default_slope);
         if !(s.is_finite() && (0.0..=MAX_SLOPE).contains(&s)) {
@@ -1388,6 +1647,7 @@ fn footprint(
                 .map(|v| number(store, v, "length", "an overhang"))
                 .transpose()?
                 .unwrap_or(0.0),
+            arrow: None,
         };
         if e != RoofEdge::default() {
             edges.insert((i + 1).to_string(), e);
@@ -1468,6 +1728,7 @@ pub(crate) fn create(txn: &mut crate::txn::Transaction<'_>, p: CreateParams) -> 
         arch: None,
         dome: None,
         extrusion: None,
+        joins: BTreeMap::new(),
     };
     let type_guid = txn.store().get(type_id).expect("exists").guid().to_string();
     let id = txn.create(
@@ -1982,6 +2243,7 @@ mod tests {
                 slope: None,
                 overhang: if i % 2 == 0 { 0.5 } else { 0.3 },
                 eave: None,
+                arrow: None,
             }),
             std::f64::consts::FRAC_PI_4,
             3.0,
@@ -2090,4 +2352,195 @@ mod tests {
         .unwrap();
         assert_eq!(pyramid.predefined, "PAVILION_ROOF");
     }
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SlopeArrowParams {
+    pub roof_id: ElementRef,
+    /// The footprint curve (key) the arrow's tail is on; it must not define slope (a gable).
+    pub key: u32,
+    pub tail: [f64; 2],
+    pub head: [f64; 2],
+    /// `slope` (with `slope`, along the arrow) or `height_at_tail` (with `head_offset` above the
+    /// plate; `tail_offset` 0).
+    pub specify: String,
+    #[schemars(extend("x-reviera-data-type" = "angle"))]
+    pub slope: Option<Value>,
+    #[schemars(extend("x-reviera-data-type" = "length"))]
+    pub tail_offset: Option<Value>,
+    #[schemars(extend("x-reviera-data-type" = "length"))]
+    pub head_offset: Option<Value>,
+}
+
+/// `roof.set_slope_arrow`: puts a slope arrow on a footprint curve (replacing its arrow).
+pub(crate) fn set_slope_arrow(
+    txn: &mut crate::txn::Transaction<'_>,
+    p: SlopeArrowParams,
+) -> Result<()> {
+    let store = txn.store().clone();
+    let (id, mut recipe) = resolve_roof(&store, &p.roof_id)?;
+    crate::modify::check_unpinned(&store, id)?;
+    let sketch = sketch::sketch_of(store.get(id).expect("resolved")).unwrap_or_default();
+    let curve = sketch
+        .curves
+        .iter()
+        .find(|c| c.key == p.key)
+        .ok_or_else(|| {
+            Error::new(
+                "roof.no_such_curve",
+                format!("the footprint has no curve {}", p.key),
+            )
+        })?;
+    let line = curve.line;
+    // The tail on the curve.
+    let d = [line.end[0] - line.start[0], line.end[1] - line.start[1]];
+    let l2 = (d[0] * d[0] + d[1] * d[1]).max(1e-12);
+    let t = ((p.tail[0] - line.start[0]) * d[0] + (p.tail[1] - line.start[1]) * d[1]) / l2;
+    let foot = [line.start[0] + d[0] * t, line.start[1] + d[1] * t];
+    if !(-1e-6..=1.0 + 1e-6).contains(&t) || (foot[0] - p.tail[0]).hypot(foot[1] - p.tail[1]) > 1e-3
+    {
+        return Err(Error::new(
+            "roof.arrow_tail",
+            "the slope arrow's tail must lie on its footprint curve",
+        ));
+    }
+    let num = |v: &Option<Value>, ty: &str, what: &str| -> Result<Option<f64>> {
+        v.as_ref().map(|v| number(&store, v, ty, what)).transpose()
+    };
+    let specify = match p.specify.as_str() {
+        "slope" => ArrowSpec::Slope {
+            slope: num(&p.slope, "angle", "the slope")?.unwrap_or(recipe.slope),
+        },
+        "height_at_tail" => ArrowSpec::HeightAtTail {
+            tail_offset: num(&p.tail_offset, "length", "the tail offset")?.unwrap_or(0.0),
+            head_offset: num(&p.head_offset, "length", "the head offset")?.ok_or_else(|| {
+                Error::new("roof.arrow_head", "give the height offset at the head")
+            })?,
+        },
+        other => {
+            return Err(Error::new(
+                "roof.arrow_specify",
+                format!("`specify` is `slope` or `height_at_tail`, not {other:?}"),
+            ));
+        }
+    };
+    let mut e = recipe.edge(p.key);
+    if e.defines_slope {
+        return Err(Error::new(
+            "roof.arrow_on_slope",
+            format!(
+                "curve {} defines slope: clear its Defines Slope first (a slope arrow drives a gable edge)",
+                p.key
+            ),
+        ));
+    }
+    e.arrow = Some(SlopeArrow {
+        tail: p.tail,
+        head: p.head,
+        specify,
+    });
+    recipe.edges.insert(p.key.to_string(), e);
+    let value = serde_json::to_value(&recipe).expect("serialises");
+    txn.modify(id, |el| {
+        el.params.insert(RECIPE_KEY.into(), value);
+    })?;
+    check(txn, id)
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct RemoveArrowParams {
+    pub roof_id: ElementRef,
+    pub key: u32,
+}
+
+/// `roof.remove_slope_arrow`: the curve is a gable again.
+pub(crate) fn remove_slope_arrow(
+    txn: &mut crate::txn::Transaction<'_>,
+    p: RemoveArrowParams,
+) -> Result<()> {
+    let store = txn.store().clone();
+    let (id, mut recipe) = resolve_roof(&store, &p.roof_id)?;
+    let mut e = recipe.edge(p.key);
+    e.arrow = None;
+    if e == RoofEdge::default() {
+        recipe.edges.remove(&p.key.to_string());
+    } else {
+        recipe.edges.insert(p.key.to_string(), e);
+    }
+    let value = serde_json::to_value(&recipe).expect("serialises");
+    txn.modify(id, |el| {
+        el.params.insert(RECIPE_KEY.into(), value);
+    })?;
+    check(txn, id)
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct JoinParams {
+    pub roof_id: ElementRef,
+    /// The footprint curve (key) to extend.
+    pub key: u32,
+    /// The wall (parallel to the edge) or roof it extends to.
+    pub target_id: ElementRef,
+}
+
+/// `roof.join`.
+pub(crate) fn join(txn: &mut crate::txn::Transaction<'_>, p: JoinParams) -> Result<()> {
+    let store = txn.store().clone();
+    let (id, mut recipe) = resolve_roof(&store, &p.roof_id)?;
+    crate::modify::check_unpinned(&store, id)?;
+    if recipe.arch.is_some() || recipe.dome.is_some() || recipe.extrusion.is_some() {
+        return Err(Error::new(
+            "roof.join_kind",
+            "Join Roof extends a footprint roof's edge",
+        ));
+    }
+    let target = store
+        .resolve(&p.target_id)
+        .and_then(|t| store.get(t))
+        .ok_or_else(|| Error::new("element.not_found", "no such wall or roof"))?;
+    if target.id() == id {
+        return Err(Error::new("roof.join_self", "a roof cannot join itself"));
+    }
+    if crate::dormers::dormer_of(store.get(id).expect("resolved")).is_some() {
+        return Err(Error::new(
+            "roof.join_dormer",
+            "dormers join their roof themselves",
+        ));
+    }
+    recipe
+        .joins
+        .insert(p.key.to_string(), target.guid().to_string());
+    let value = serde_json::to_value(&recipe).expect("serialises");
+    txn.modify(id, |el| {
+        el.params.insert(RECIPE_KEY.into(), value);
+    })?;
+    check(txn, id)
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct UnjoinParams {
+    pub roof_id: ElementRef,
+    /// The curve to unjoin; omitted, all of them.
+    pub key: Option<u32>,
+}
+
+/// `roof.unjoin`: the edges end where they did.
+pub(crate) fn unjoin(txn: &mut crate::txn::Transaction<'_>, p: UnjoinParams) -> Result<()> {
+    let store = txn.store().clone();
+    let (id, mut recipe) = resolve_roof(&store, &p.roof_id)?;
+    match p.key {
+        Some(k) => {
+            recipe.joins.remove(&k.to_string());
+        }
+        None => recipe.joins.clear(),
+    }
+    let value = serde_json::to_value(&recipe).expect("serialises");
+    txn.modify(id, |el| {
+        el.params.insert(RECIPE_KEY.into(), value);
+    })?;
+    check(txn, id)
 }

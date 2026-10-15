@@ -143,6 +143,36 @@ keys = "GR"
 help = "Draw grid lines in a plan"
 
 [[action]]
+id = "shape.add_point"
+label = "Add Point"
+icon = "shape_point"
+help = "Raise or lower a point of the selected floor's top (a drain): click it, then type its height"
+
+[[action]]
+id = "shape.reset"
+label = "Reset Shape"
+icon = "shape_reset"
+help = "Make the selected floors flat again"
+
+[[action]]
+id = "slabedge.create"
+label = "Slab Edge"
+icon = "slab_edge"
+help = "Sweep an edge beam along a floor's edges: click them one after another (one run per floor)"
+
+[[action]]
+id = "roof.join"
+label = "Join/Unjoin Roof"
+icon = "join_roof"
+help = "Extend a roof's edge to a wall or another roof: click the edge, then the wall or roof (the same roof unjoins it)"
+
+[[action]]
+id = "roof.set_slope_arrow"
+label = "Slope Arrow"
+icon = "slope_arrow"
+help = "Slope a gable end of the selected roof: click the arrow's tail on the gable edge, then its head toward the ridge"
+
+[[action]]
 id = "roof.create_extrusion"
 label = "Roof by Extrusion"
 icon = "roof_extrusion"
@@ -1343,6 +1373,11 @@ category = "cat.floors"
 label = "Floors"
 panels = [
   { label = "Mode", tools = [{ action = "floor.edit_boundary", size = "large" }] },
+  { label = "Edge", tools = [{ action = "slabedge.create", size = "large" }] },
+  { label = "Shape Editing", tools = [
+    { action = "shape.add_point", size = "large" },
+    { action = "shape.reset", size = "large" },
+  ] },
   { label = "Railing", tools = [{ action = "railing.create_on_edges", size = "large" }] },
 ]
 
@@ -1427,7 +1462,11 @@ panels = [
     { action = "roof.set_eaves", size = "large" },
     { action = "roof.attach_walls", size = "large" },
   ] },
-  { label = "Dormer", tools = [{ action = "dormer.create", size = "large" }] },
+  { label = "Dormer", tools = [
+    { action = "dormer.create", size = "large" },
+    { action = "roof.set_slope_arrow", size = "large" },
+    { action = "roof.join", size = "large" },
+  ] },
   { label = "Railing", tools = [{ action = "railing.create_on_edges", size = "large" }] },
 ]
 
@@ -1547,7 +1586,8 @@ items = [
   "wall.create", "curtain.create", "door.place", "window.place", "column.place_architectural", "floor.create", "floor.edit_boundary",
   "ceiling.create", "ceiling.edit_boundary", "roof.create_footprint", "roof.edit_footprint", "-",
   "room.place", "room.place_automatically", "-",
-  "opening.create_wall", "opening.create_vertical", "opening.create_shaft", "-",
+  "roof.create_extrusion", "slabedge.create", "-",
+  "opening.create_wall", "opening.create_vertical", "opening.create_by_face", "opening.create_shaft", "-",
   "grid.create", "level.create", "refplane.create", "modelline.create", "-",
   "workplane.set", "workplane.show",
 ]

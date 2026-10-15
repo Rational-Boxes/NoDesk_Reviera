@@ -52,7 +52,8 @@ pub fn toolset_of(command: &str) -> String {
         | "deck" | "site" | "cme" | "host" | "numbering" | "decal" | "spatial" | "building"
         | "assembly" | "part" | "geometry" | "opening" | "column" | "compound" | "curtain"
         | "ramp" | "measure" | "skylight" | "mesh_object" | "array" | "refplane" | "workplane"
-        | "modelline" | "datum" | "scopebox" | "constraint" => "modeling",
+        | "modelline" | "datum" | "scopebox" | "constraint" | "slabedge" | "hostsweep"
+        | "shape" => "modeling",
         "view" | "sheet" | "schedule" | "annotate" | "render" | "walkthrough" | "xr" | "ui"
         | "tag" | "text" | "anno" | "dim" | "viewport" | "section" | "inspect" => "documentation",
         "family" | "family_doc" | "type" | "instance" | "library" | "component" | "formula"

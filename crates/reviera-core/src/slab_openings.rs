@@ -355,10 +355,7 @@ pub type Prism = (Vec<[f64; 3]>, Vec<[f64; 3]>);
 /// The prisms of an opening by face in a roof, for its IFC body: per loop, its ring on the face's
 /// underside and the same ring moved along the face's normal through the roof (1 mm beyond each
 /// side). `None` when the host is not a roof, or the loop is not within one planar face.
-pub fn face_prisms(
-    store: &Store,
-    r: &OpeningRecipe,
-) -> Option<Vec<Prism>> {
+pub fn face_prisms(store: &Store, r: &OpeningRecipe) -> Option<Vec<Prism>> {
     if !r.by_face {
         return None;
     }

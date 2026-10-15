@@ -595,6 +595,7 @@ mod tests {
                 slope: None,
                 overhang: 0.5,
                 eave: None,
+                arrow: None,
             })
             .collect();
         let roof = generate(

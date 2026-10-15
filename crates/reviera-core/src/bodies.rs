@@ -227,6 +227,14 @@ pub fn all(store: &Store) -> Vec<Body> {
             }
             continue;
         }
+        // A warped top (ARC-SHAPE-001).
+        if let Some(shape) = store.get(id).and_then(crate::shape_edit::shape_of)
+            && let Some(p) = f.profiles.first()
+            && let Ok(mesh) = crate::shape_edit::slab_mesh(p, &shape, f.top, f.thickness)
+        {
+            push(id, &class, mesh, false);
+            continue;
+        }
         // Less its vertical openings (ARC-OPEN-002).
         let profiles = match store.get(id) {
             Some(e) => crate::slab_openings::cut_profiles(store, e, &f.profiles),
@@ -293,6 +301,10 @@ pub fn all(store: &Store) -> Vec<Body> {
     }
     for (id, g) in crate::columns::all(store) {
         push(id, "IfcColumn", g.mesh(), false);
+    }
+    // Slab edges (ARC-SLED-001).
+    for (id, g) in crate::slab_edges::all(store) {
+        push(id, "IfcSlab", g.mesh, false);
     }
     // Path arrays (ARC-MOD-033): every member's mesh, per slot, in the array's body.
     for (id, members) in crate::path_arrays::all(store) {

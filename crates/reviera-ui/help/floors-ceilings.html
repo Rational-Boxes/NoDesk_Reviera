@@ -65,3 +65,26 @@ looking up. See <a href="reviera:help/views#ceiling">Views</a>.</p>
 <p>A stair offers to open the floors and ceilings above it where headroom is short. Those
 openings can then be reshaped with their grips. See
 <a href="reviera:help/openings">Openings</a>.</p>
+
+<h2 id="slab-edges">Slab edges</h2>
+<p>A slab edge sweeps a profile along a floor's edges: an edge beam, a thickened edge or a curb.
+Select a floor, then <b>Modify | Floors › Slab Edge</b>
+<a href="reviera:action/slabedge.create">Slab Edge</a> and click its edges one after another;
+they form one mitred run (all round, a closed one). In Properties set its <b>Width</b> (away from
+the slab), <b>Depth</b> (down), the profile offsets, and <b>Flip Horizontal</b> (under the slab)
+or <b>Flip Vertical</b> (up from the top). It follows its floor and goes with it. Saved as an
+<code>IfcSlab</code> (ObjectType <i>SLABEDGE</i>).
+<code>slabedge.create</code>, <code>slabedge.set</code>, <code>hostsweep.add_segments</code>,
+<code>hostsweep.remove_segments</code>, <code>hostsweep.flip</code></p>
+
+<h2 id="shape">Shape editing</h2>
+<p>A floor's top can be warped, for falls to a drain. Select the floor, then
+<b>Modify | Floors › Add Point</b> <a href="reviera:action/shape.add_point">Add Point</a>: click
+the point and type its height from the surface there (<code>-50</code> for a drain). The top is
+triangulated through its corners and points into flat facets, and the slab follows it at its
+thickness. <b>Reset Shape</b> <a href="reviera:action/shape.reset">Reset Shape</a> makes it flat
+again. Scripts can also raise corners and add split lines.
+<code>shape.add_point</code>, <code>shape.add_split_line</code>, <code>shape.move</code>,
+<code>shape.set_elevation</code>, <code>shape.reset</code>, <code>shape.get</code></p>
+<p class="note">Not yet available: shape editing on roofs, variable layers (floor types have no
+layers yet), dragging points, and slab edge profiles other than rectangles.</p>

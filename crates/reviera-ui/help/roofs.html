@@ -115,6 +115,21 @@ trapezoid footprint, <b>Taper</b> (<i>Constant Rise</i> or <i>Constant Slope</i>
 rise follows), <b>Sides</b>, <b>Rotation</b>, <b>Rise</b>, the profile's <b>Ratio</b>, an
 <b>Oculus</b> and <b>Faceted</b>. See the <a href="reviera:sample/manor">Manor</a>'s onion dome.
 <code>roof.create_dome</code>, <code>roof.set_dome</code></p>
+<h2 id="slope-arrows">Slope arrows</h2>
+<p>A slope arrow slopes a gable end, for example to make one end of a gable roof a hip. Select the
+roof, then <b>Modify | Roofs › Slope Arrow</b>
+<a href="reviera:action/roof.set_slope_arrow">Slope Arrow</a>: click the arrow's tail on the
+gable edge (an edge that does not define slope), then its head toward the ridge. The plane rises
+from the edge at the roof's slope along the arrow. <code>roof.set_slope_arrow</code> also takes a
+height at the head; <code>roof.remove_slope_arrow</code> makes it a gable again.</p>
+
+<h2 id="join">Join/Unjoin Roof</h2>
+<p><b>Modify | Roofs › Join/Unjoin Roof</b> <a href="reviera:action/roof.join">Join/Unjoin
+Roof</a> extends a roof's edge to a wall or another roof: click the edge, then the wall (parallel
+to it; the roof ends at its face) or the roof (it ends on that roof's top surface, like a porch
+roof running into the main roof). Clicking the edge's own roof unjoins it. The join follows its
+target. <code>roof.join</code>, <code>roof.unjoin</code></p>
+
 <h2 id="extrusion">Roofs by extrusion</h2>
 <p>A roof by extrusion is a profile drawn in a section or elevation, carried across the view:</p>
 <ol>
@@ -132,6 +147,7 @@ them), and give it arcs (a barrel roof) and its Extrusion Start and End.
 <code>roof.create_extrusion</code>, <code>roof.set_extrusion</code></p>
 
 <p>Roofs are saved as <code>IfcRoof</code> with faceted bodies.</p>
-<p class="note">Not yet available: slope arrows, picking single eave edges in the window, openings
-in arched roofs, domes and roofs by extrusion, and editing a roof by extrusion's profile in the
-window. Gutters and downspouts are planned with plumbing.</p>
+<p class="note">Not yet available: slope arrows along an edge or starting above the plate, picking
+single eave edges in the window, openings in arched roofs, domes and roofs by extrusion, and
+editing a roof by extrusion's profile in the window. Gutters and downspouts are planned with
+plumbing.</p>

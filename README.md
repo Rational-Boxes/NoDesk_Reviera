@@ -356,6 +356,15 @@ Create … Boundary* tab:
 - **Roofs by extrusion**: a profile clicked in a section or elevation (Enter), or on a grid or
   reference plane by command, extruded across with the roof's thickness below it; a gable, shed,
   mansard or barrel (`roof.create_extrusion`, `roof.set_extrusion`; ARC-ROOF-002).
+- **Slope arrows and joined roofs**: a slope arrow turns a gable end into a sloped plane (a hip);
+  Join/Unjoin Roof extends a roof's edge to a wall's face or another roof's top surface
+  (`roof.set_slope_arrow`, `roof.remove_slope_arrow`, `roof.join`, `roof.unjoin`;
+  ARC-ROOF-005/006).
+- **Slab edges**: a rectangular profile swept along a floor's edges in one mitred run, flipped and
+  offset, following the floor; `IfcSlab` SLABEDGE (`slabedge.create`, `slabedge.set`,
+  `hostsweep.*`; ARC-SLED-001).
+- **Shape editing**: points and split lines warp a floor's top into flat facets (falls to a
+  drain), the slab following at its thickness; Reset Shape (`shape.*`; ARC-SHAPE-001).
 - **Openings by face**: sketched like vertical openings, cut square to a roof's face; saved as
   an `IfcOpeningElement` along the face's normal (`opening.create_by_face`; ARC-OPEN-001).
 - **Datum extents**: levels, grids and reference planes have a 3D extent and, per view, a 2D
@@ -622,9 +631,9 @@ area by area (a review against the spec on 2026-10-15). Whole areas not started 
   ARC-WRAP-001, ARC-WALL-005, ARC-STKW-001, ARC-WALL-009/010/014/015/016).
 - **Curtain extras**: manual grid lines and segments, swapping single panels (curtain-wall
   doors), curtain systems by face, sloped glazing (ARC-CW-004/006/007/008).
-- **Floors and roofs**: slab edges, roof by face, slope arrows, Join/Unjoin Roof, shape editing
-  (points and split lines on floors and roofs), parts (ARC-SLED-001, ARC-ROOF-003/005/006,
-  ARC-SHAPE-001, ARC-PART-001 … 004).
+- **Floors and roofs**: roof by face, slope arrows along an edge or above the plate, shape editing
+  of roofs and variable layers, slab edge profiles other than rectangles, parts (ARC-ROOF-003,
+  ARC-ROOF-005, ARC-SHAPE-001, ARC-SLED-001, ARC-PART-001 … 004).
 - **Rooms and areas**: area plans and area schemes, colour schemes (ARC-AREA-001, ARC-CLR-001).
 - **Modelling in the project**: Model In-Place, model text, converting model lines to detail
   lines (ARC-INPL-001, ARC-MTXT-001, ARC-MLIN-001).

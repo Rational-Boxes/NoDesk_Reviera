@@ -3719,6 +3719,23 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
             g.start_opening_by_face();
             focus(g);
         }),
+        "shape.add_point" => with(gui, |g| {
+            g.start_line_tool(datum_tools::LineMode::ShapePoint);
+            focus(g);
+        }),
+        "shape.reset" => with(gui, Gui::reset_shape),
+        "slabedge.create" => with(gui, |g| {
+            g.start_line_tool(datum_tools::LineMode::SlabEdge);
+            focus(g);
+        }),
+        "roof.join" => with(gui, |g| {
+            g.start_line_tool(datum_tools::LineMode::JoinRoof);
+            focus(g);
+        }),
+        "roof.set_slope_arrow" => with(gui, |g| {
+            g.start_line_tool(datum_tools::LineMode::SlopeArrow);
+            focus(g);
+        }),
         "roof.create_extrusion" => with(gui, |g| {
             g.start_line_tool(datum_tools::LineMode::RoofExtrusion);
             focus(g);

@@ -11624,8 +11624,10 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 - `hostsweep.remove_segments(id, edge_refs)`
 - `hostsweep.flip(id, axis: Horizontal|Vertical)`
 
+**Implementation notes (2026-10-15).** As built: `recipe.slab_edge` (floor, outline curve keys, `width`, `depth`, offsets, flips); the run follows the floor's outline counter-clockwise, consecutive curves only, closed when it goes all round; the body is the rectangle at each corner's mitre, swept; `slabedge.create`, `slabedge.set`, `hostsweep.add_segments`, `hostsweep.remove_segments`, `hostsweep.flip`; IFC: `IfcSlab` USERDEFINED SLABEDGE with a faceted B-rep, contained in the floor's storey; deleted with its floor; the window's Slab Edge (click edges) and Properties. Not built yet: profile families, Angle, Restart in one element, toposolid and model-line edges, cutting the host.
+
 **Acceptance criteria.**
-- [ ] A slab edge picked along the four edges of a rectangular floor forms one closed, mitered run, and its volume equals the profile area times the centroid path length within 0.5%.
+- [x] A slab edge picked along the four edges of a rectangular floor forms one closed, mitered run, and its volume equals the profile area times the centroid path length within 0.5%.
 
 ### 3.6.3 Ceilings
 **ID:** ARC-CEIL-001 · **Priority:** P0 · **Ref:** research/02 §7.3
@@ -11965,9 +11967,11 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 
 **Commands.** In a sketch session, `sketch.add_curve(session_id, Line{tail, head}, role: "slope_arrow", props: {specify, level_tail, offset_tail, level_head?, offset_head?, slope?}) -> curve_key` and `sketch.edit_curve` for later changes; non-interactively, the `slope_arrows: [SlopeArrow]` parameter of `roof.create_footprint` and `roof.edit_footprint` (ARC-ROOF-001).
 
+**Implementation notes (2026-10-15).** As built: a footprint edge's `arrow` (`tail`, `head`, `specify` = `slope` with `slope`, or `height_at_tail` with `head_offset`); the edge's plane rises from the plate square to the edge at the arrow's rise over its run across the edge (the weighted skeleton keeps planes through their edges' plate lines); `roof.set_slope_arrow` (refused on a slope-defining edge or with the tail off the curve) and `roof.remove_slope_arrow`; the window's Slope Arrow on Modify | Roofs. Not built yet: arrows along an edge (the split-edge dormer), tail offsets above the plate, arrows in floors and ceilings, arrows inside the sketch session.
+
 **Acceptance criteria.**
 - [ ] A dormer made with two arrows from the ends of a 3 m segment to its midpoint, rising 1 m, gives two triangular faces that meet the main roof faces without gaps.
-- [ ] On a 10 × 6 m footprint with only the two long edges slope-defining, an arrow from the middle of one short edge to the ridge with *Specify = Slope* 30° turns that gable into a hip plane at 30°.
+- [x] On a 10 × 6 m footprint with only the two long edges slope-defining, an arrow from the middle of one short edge to the ridge with *Specify = Slope* 30° turns that gable into a hip plane at 30°.
 - [ ] An arrow whose tail is not on a boundary edge, or that sits on a slope-defining edge, is reported on Finish and the sketch stays open.
 
 ### 3.6.8a Dormers (automated)
@@ -12129,8 +12133,10 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 
 **Commands.** `roof.join(roof_id, edge_ref, target_ref)` and `roof.unjoin(roof_id, edge_ref?)`.
 
+**Implementation notes (2026-10-15).** As built: the roof recipe's `joins` (footprint curve key → target GlobalId); toward a wall parallel to the edge, the edge moves out to the wall's nearer face; toward a roof, it extends past the target's footprint and the roof is clipped by the target face it meets (its top plane), keeping what is above; a deleted target leaves the edge as it was; `roof.join(roof_id, key, target_id)` and `roof.unjoin(roof_id, key?)`; refused for dormers, arched roofs, domes and roofs by extrusion; the window's Join/Unjoin Roof (edge, then target; the roof itself unjoins). Not built yet: the IFC `IfcRelConnectsElements`, targets with several faces met along the edge.
+
 **Acceptance criteria.**
-- [ ] A dormer roof joined to the main roof ends exactly on the main roof's top surface, with no gap or overlap greater than `TOL_POINT`.
+- [x] A dormer roof joined to the main roof ends exactly on the main roof's top surface, with no gap or overlap greater than `TOL_POINT`. (Tested with a porch roof; dormers join their roof themselves.)
 
 ### 3.6.10 Shape editing (floors, roofs, structural floors, toposolids)
 **ID:** ARC-SHAPE-001 · **Priority:** P1 · **Ref:** research/02 §1, §7.5, §17.7 · screenshots/architecture/shape_editing_points_toposolid.png
@@ -12188,10 +12194,12 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 - `shape.copy(element_id, keys) -> clip` *(query)*
 - `shape.paste(element_id, clip, offset?)`
 
+**Implementation notes (2026-10-15).** As built for floors: `rxd:shape` (outline corner offsets `v1`…, points `p…`, split lines `l…`, heights relative to the top); the top is a constrained Delaunay triangulation (`spade` 2.15, MIT/Apache-2.0) with the outline, holes and split lines as constraints; the slab follows the top, each underside vertex moved along its averaged normal by the thickness over the smallest cosine to its facets; `shape.add_point`, `shape.add_split_line`, `shape.move`, `shape.set_elevation`, `shape.reset`, `shape.get`; IFC: a faceted B-rep; the window's Add Point and Reset Shape on Modify | Floors. Not built yet: roofs, toposolids and structural floors, variable layers (no layered floor types yet), dragging, Pick Supports, folding-line conversion, copy and paste.
+
 **Acceptance criteria.**
 - [ ] A flat roof with one point dropped 50 mm in the middle of a 10 m × 10 m area, with an insulation layer marked variable, gives four planar facets falling to the drain. The deck stays flat, and the insulation thickness at the drain is reduced by exactly 50 mm.
 - [ ] Without a variable layer, the same edit lowers the whole slab, and the thickness measured perpendicular to each facet stays constant.
-- [ ] Reset Shape restores the original body exactly, and the body's hash matches the one recorded before the edit.
+- [x] Reset Shape restores the original body exactly, and the body's hash matches the one recorded before the edit.
 
 ### 3.6.11 Parts: model and creation
 **ID:** ARC-PART-001 · **Priority:** P2 · **Ref:** research/02 §2.1 (Figure 1, Create panel), §4.5 · web: About Parts; Create Parts

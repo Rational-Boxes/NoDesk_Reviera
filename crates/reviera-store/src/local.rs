@@ -531,6 +531,7 @@ impl LocalProject {
                 || recipe_kind == Some(stairs::STAIR_RECIPE)
                 || recipe_kind == Some(railings::RAILING_RECIPE)
                 || recipe_kind == Some(railings::GATE_RECIPE)
+                || recipe_kind == Some(reviera_core::slab_edges::RECIPE)
             {
                 geometry::remove_breps(&mut self.ifc, step)?;
             }
@@ -714,6 +715,7 @@ impl LocalProject {
             self.write_stairs(doc)?;
             self.write_columns(doc)?;
             self.write_ramps(doc)?;
+            self.write_slab_edges(doc)?;
             self.write_skylights(doc)?;
             let owner_history = self.new_owner_history()?;
             crate::mesh_objects::write_mesh_objects(
@@ -1405,8 +1407,15 @@ impl LocalProject {
                 }
                 continue;
             }
-            // A ceiling that follows its roof: its pieces as faceted B-reps.
-            if let Some(meshes) = reviera_core::vaults::meshes(store, e) {
+            // A ceiling that follows its roof, or a floor with a warped top (ARC-SHAPE-001): its
+            // pieces as faceted B-reps.
+            let shaped = reviera_core::shape_edit::shape_of(e).and_then(|s| {
+                let p = f.profiles.first()?;
+                reviera_core::shape_edit::slab_mesh(p, &s, f.top, f.thickness)
+                    .ok()
+                    .map(|m| vec![m])
+            });
+            if let Some(meshes) = shaped.or_else(|| reviera_core::vaults::meshes(store, e)) {
                 geometry::remove_slab(&mut self.ifc, step)?;
                 let solids: Vec<geometry::Polyhedron> = meshes
                     .into_iter()
@@ -1614,6 +1623,51 @@ impl LocalProject {
             )?;
             let storey = reviera_core::ramps::ramp_recipe(store.get(*id).expect("listed"))
                 .and_then(|r| GlobalId::parse(&r.extent.base_level))
+                .and_then(|g| store.find_by_guid(&g))
+                .and_then(|l| self.steps.get(&l).copied());
+            if let Some(storey) = storey {
+                geometry::contain(&mut self.ifc, step, storey, owner_history)?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Writes every slab edge (ARC-SLED-001): its swept body as a faceted B-rep, contained in its
+    /// floor's level.
+    fn write_slab_edges(&mut self, doc: &Document) -> Result<()> {
+        let store = doc.store();
+        let all = reviera_core::slab_edges::all(store);
+        if all.is_empty() {
+            return Ok(());
+        }
+        let contexts = geometry::Contexts::find(&self.ifc)?;
+        let owner_history = self.new_owner_history()?;
+        for (id, g) in &all {
+            let Some(&step) = self.steps.get(id) else {
+                continue;
+            };
+            let (points, indices) = &g.mesh;
+            let solid = geometry::Polyhedron {
+                points: points.clone(),
+                faces: indices
+                    .chunks(3)
+                    .map(|t| t.iter().map(|i| *i as usize).collect())
+                    .collect(),
+            };
+            geometry::write_breps(
+                &mut self.ifc,
+                step,
+                geometry::BrepFrame::WORLD,
+                &[solid],
+                self.length_scale,
+                contexts,
+            )?;
+            let storey = reviera_core::slab_edges::recipe(store.get(*id).expect("listed"))
+                .and_then(|r| GlobalId::parse(&r.host))
+                .and_then(|g| store.find_by_guid(&g))
+                .and_then(|f| store.get(f))
+                .and_then(reviera_core::floors::floor_recipe)
+                .and_then(|f| GlobalId::parse(&f.level))
                 .and_then(|g| store.find_by_guid(&g))
                 .and_then(|l| self.steps.get(&l).copied());
             if let Some(storey) = storey {

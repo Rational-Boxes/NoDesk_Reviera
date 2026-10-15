@@ -122,6 +122,21 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(ViewRevealConstraints),
         registry.add(RoofCreateExtrusion),
         registry.add(RoofSetExtrusion),
+        registry.add(RoofSetSlopeArrow),
+        registry.add(RoofRemoveSlopeArrow),
+        registry.add(RoofJoin),
+        registry.add(RoofUnjoin),
+        registry.add(SlabEdgeCreate),
+        registry.add(SlabEdgeSet),
+        registry.add(HostSweepAddSegments),
+        registry.add(HostSweepRemoveSegments),
+        registry.add(HostSweepFlip),
+        registry.add(ShapeAddPoint),
+        registry.add(ShapeAddSplitLine),
+        registry.add(ShapeMove),
+        registry.add(ShapeSetElevation),
+        registry.add(ShapeReset),
+        registry.add(ShapeGet),
     ];
     for r in results {
         r.expect("architecture commands are valid");
@@ -1195,4 +1210,181 @@ edit_command!(
     crate::roofs::extrusion::SetParams,
     (),
     crate::roofs::extrusion::set
+);
+
+edit_command!(
+    RoofSetSlopeArrow,
+    "roof.set_slope_arrow",
+    "Put a slope arrow on a roof edge",
+    "Slopes a footprint roof's gable edge with a slope arrow (ARC-ROOF-005): its `tail` on footprint \
+     curve `key` (a gable edge: one that does not define slope) and its `head` inside the footprint. `specify` \
+     is `slope` (the `slope` along the arrow; the roof's by default) or `height_at_tail` (the \
+     `head_offset` above the plate). The edge's plane rises from the plate across the edge, at the \
+     arrow's rise over its run square to the edge: an arrow from a gable to the ridge makes a hip.",
+    "Slope Arrow",
+    crate::roofs::SlopeArrowParams,
+    (),
+    crate::roofs::set_slope_arrow
+);
+
+edit_command!(
+    RoofRemoveSlopeArrow,
+    "roof.remove_slope_arrow",
+    "Remove a slope arrow",
+    "Removes the slope arrow of footprint curve `key`; the edge is a gable again.",
+    "Remove Slope Arrow",
+    crate::roofs::RemoveArrowParams,
+    (),
+    crate::roofs::remove_slope_arrow
+);
+
+edit_command!(
+    RoofJoin,
+    "roof.join",
+    "Join a roof to a wall or roof",
+    "Extends a footprint roof's edge (footprint curve `key`) to a wall parallel to it, ending at the \
+     wall's nearer face, or to another roof, ending on that roof's top surface (ARC-ROOF-006). The \
+     join follows the target. Not for dormers.",
+    "Join Roof",
+    crate::roofs::JoinParams,
+    (),
+    crate::roofs::join
+);
+
+edit_command!(
+    RoofUnjoin,
+    "roof.unjoin",
+    "Unjoin a roof",
+    "Returns a joined roof edge (or all of them) to its own end.",
+    "Unjoin Roof",
+    crate::roofs::UnjoinParams,
+    (),
+    crate::roofs::unjoin
+);
+
+edit_command!(
+    SlabEdgeCreate,
+    "slabedge.create",
+    "Create a slab edge",
+    "Sweeps a rectangular profile (`width` away from the slab × `depth` down; 0.3 × 0.45 m by default, \
+     moved by `horizontal_offset` and `vertical_offset`) along a Reviera floor's outline curves (`keys`, \
+     consecutive; the whole outline by default, a closed mitred run) (ARC-SLED-001). Written as an \
+     IfcSlab (USERDEFINED, ObjectType SLABEDGE). It follows its floor. Returns the slab edge.",
+    "Slab Edge",
+    crate::slab_edges::CreateParams,
+    ElementId,
+    crate::slab_edges::create
+);
+
+edit_command!(
+    SlabEdgeSet,
+    "slabedge.set",
+    "Change a slab edge",
+    "Changes a slab edge's curves, profile size or offsets; omitted values are kept.",
+    "Edit Slab Edge",
+    crate::slab_edges::SetParams,
+    (),
+    crate::slab_edges::set
+);
+
+edit_command!(
+    HostSweepAddSegments,
+    "hostsweep.add_segments",
+    "Add segments to a slab edge",
+    "Adds its floor's outline curves (keys) to a slab edge's run; the run must stay one chain.",
+    "Add Segments",
+    crate::slab_edges::SegmentsParams,
+    (),
+    crate::slab_edges::add_segments
+);
+
+edit_command!(
+    HostSweepRemoveSegments,
+    "hostsweep.remove_segments",
+    "Remove segments from a slab edge",
+    "Removes outline curves (keys) from a slab edge's run; at least one stays.",
+    "Remove Segments",
+    crate::slab_edges::SegmentsParams,
+    (),
+    crate::slab_edges::remove_segments
+);
+
+edit_command!(
+    HostSweepFlip,
+    "hostsweep.flip",
+    "Flip a slab edge's profile",
+    "Mirrors a slab edge's profile `Horizontal`ly (into the slab) or `Vertical`ly (up from the top).",
+    "Flip",
+    crate::slab_edges::FlipParams,
+    (),
+    crate::slab_edges::flip
+);
+
+edit_command!(
+    ShapeAddPoint,
+    "shape.add_point",
+    "Add a shape point",
+    "Adds a point to a floor's top (ARC-SHAPE-001) at `xy`, `along_surface` (the surface's height \
+     there plus `offset`, e.g. -0.05 for a drain) or `absolute` (`z`). The top is triangulated through \
+     its corners, points and split lines, and the slab follows it. Returns the point's key (`p…`).",
+    "Add Point",
+    crate::shape_edit::AddPointParams,
+    String,
+    crate::shape_edit::add_point
+);
+
+edit_command!(
+    ShapeAddSplitLine,
+    "shape.add_split_line",
+    "Add a split line",
+    "Adds a split line through `points` on a floor's top, `along_surface` or `absolute`; it stays an \
+     edge of the triangulation. Returns its key (`l…`).",
+    "Add Split Line",
+    crate::shape_edit::AddLineParams,
+    String,
+    crate::shape_edit::add_split_line
+);
+
+edit_command!(
+    ShapeMove,
+    "shape.move",
+    "Raise or lower shape modifiers",
+    "Raises (or lowers, negative `dz`) a floor's shape points (`p…`), split lines (`l…`) or outline \
+     corners (`v1`… in outline order).",
+    "Modify Sub Elements",
+    crate::shape_edit::MoveParams,
+    (),
+    crate::shape_edit::move_keys
+);
+
+edit_command!(
+    ShapeSetElevation,
+    "shape.set_elevation",
+    "Set shape modifiers' elevation",
+    "Sets shape points, split lines or outline corners to an absolute elevation `z`.",
+    "Modify Sub Elements",
+    crate::shape_edit::ElevationParams,
+    (),
+    crate::shape_edit::set_elevation
+);
+
+edit_command!(
+    ShapeReset,
+    "shape.reset",
+    "Reset Shape",
+    "Removes every shape modifier of a floor: it is flat again.",
+    "Reset Shape",
+    crate::shape_edit::ElementParams,
+    (),
+    crate::shape_edit::reset
+);
+
+read_command!(
+    ShapeGet,
+    "shape.get",
+    "Get a floor's shape modifiers",
+    "A floor's shape modifiers: outline corner offsets, points and split lines (heights relative to its top).",
+    crate::shape_edit::ElementParams,
+    crate::shape_edit::Shape,
+    crate::shape_edit::get
 );

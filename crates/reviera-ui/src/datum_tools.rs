@@ -39,6 +39,15 @@ pub enum LineMode {
     /// A roof by extrusion's open profile, clicked in a section or elevation (ARC-ROOF-002);
     /// Enter finishes it.
     RoofExtrusion,
+    /// A slope arrow on the selected roof: its tail on a gable edge, its head inside
+    /// (ARC-ROOF-005).
+    SlopeArrow,
+    /// Join/Unjoin Roof (ARC-ROOF-006): a roof's edge, then the wall or roof to extend it to.
+    JoinRoof,
+    /// Floor: Slab Edge (ARC-SLED-001): click floor edges, one run per floor.
+    SlabEdge,
+    /// Shape Editing › Add Point on the selected floor (ARC-SHAPE-001).
+    ShapePoint,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -59,6 +68,12 @@ pub struct LineTool {
     style: String,
     /// The name the next reference plane gets.
     name: String,
+    /// The roof a slope arrow goes on.
+    target: Option<ElementId>,
+    /// The roof edge picked for Join Roof: the roof and its footprint curve.
+    join_edge: Option<(ElementId, u32)>,
+    /// The slab edge being built and its floor.
+    sweep: Option<(ElementId, ElementId)>,
     points: Vec<[f64; 2]>,
     cursor: Option<snap::Snap>,
     /// A typed length (ARC-DIM-002) and its direction, frozen when typing began.
@@ -126,7 +141,41 @@ impl Gui {
             || model_lines::DEFAULT_STYLE.to_owned(),
             |t| t.style.clone(),
         );
+        let target = (mode == LineMode::SlopeArrow)
+            .then(|| self.selection())
+            .and_then(|ids| {
+                let store = self.store_now()?;
+                ids.into_iter().find(|id| {
+                    store
+                        .get(*id)
+                        .and_then(reviera_core::roofs::roof_recipe)
+                        .is_some_and(|r| {
+                            r.arch.is_none() && r.dome.is_none() && r.extrusion.is_none()
+                        })
+                })
+            });
+        if mode == LineMode::SlopeArrow && target.is_none() {
+            return frame.set_status_text("Slope Arrow: select a footprint roof first", 0);
+        }
+        let target = if mode == LineMode::ShapePoint {
+            let floor = self.selection().into_iter().find(|id| {
+                self.store_now().is_some_and(|s| {
+                    s.get(*id)
+                        .and_then(reviera_core::floors::floor_recipe)
+                        .is_some()
+                })
+            });
+            if floor.is_none() {
+                return frame.set_status_text("Add Point: select a floor first", 0);
+            }
+            floor
+        } else {
+            target
+        };
         self.line_tool = Some(LineTool {
+            target,
+            join_edge: None,
+            sweep: None,
             mode,
             shape: Shape::Line,
             chain: mode == LineMode::ModelLine,
@@ -210,8 +259,30 @@ impl Gui {
             LineMode::ModelLine => "Model Line",
             LineMode::ScopeBox => "Scope Box",
             LineMode::RoofExtrusion => "Roof by Extrusion",
+            LineMode::SlopeArrow => "Slope Arrow",
+            LineMode::JoinRoof => "Join/Unjoin Roof",
+            LineMode::SlabEdge => "Slab Edge",
+            LineMode::ShapePoint => "Add Point",
         };
         let mut text = match (t.points.len(), t.shape) {
+            _ if t.mode == LineMode::ShapePoint => {
+                format!("{what}: click a point on the floor, then type its height from the surface")
+            }
+            _ if t.mode == LineMode::SlabEdge => {
+                format!("{what}: click a floor's edges; each one joins the run (Esc ends)")
+            }
+            _ if t.mode == LineMode::JoinRoof && t.join_edge.is_none() => {
+                format!("{what}: click the roof edge to extend")
+            }
+            _ if t.mode == LineMode::JoinRoof => {
+                "Click the wall or roof to join it to (the same roof unjoins it)".to_owned()
+            }
+            (0, _) if t.mode == LineMode::SlopeArrow => {
+                format!("{what}: click its tail on a gable edge of the roof")
+            }
+            (1, _) if t.mode == LineMode::SlopeArrow => {
+                "Click its head, inside the roof (toward the ridge)".to_owned()
+            }
             (0, _) if t.mode == LineMode::RoofExtrusion => {
                 format!("{what}: click the profile's first point (the roof's top)")
             }
@@ -294,10 +365,105 @@ impl Gui {
     }
 
     pub(crate) fn line_click(&mut self, x: i32, y: i32) {
+        if self
+            .line_tool
+            .as_ref()
+            .is_some_and(|t| t.mode == LineMode::JoinRoof)
+        {
+            return self.join_click(x, y);
+        }
+        if self
+            .line_tool
+            .as_ref()
+            .is_some_and(|t| t.mode == LineMode::SlabEdge)
+        {
+            return self.slab_edge_click(x, y);
+        }
+        if self
+            .line_tool
+            .as_ref()
+            .is_some_and(|t| t.mode == LineMode::ShapePoint)
+        {
+            return self.shape_point_click(x, y);
+        }
         let Some(p) = self.line_snapped(x, y) else {
             return;
         };
         self.line_click_at(p.point);
+    }
+
+    /// Join/Unjoin Roof: first the roof edge nearest the click (within 0.5 m of a footprint
+    /// roof's curve), then the target under the cursor.
+    fn join_click(&mut self, x: i32, y: i32) {
+        let frame = self.frame;
+        let Some(p) = self.plan_xy(x, y) else { return };
+        let Some(store) = self.store_now() else {
+            return;
+        };
+        let edge = self.line_tool.as_ref().and_then(|t| t.join_edge);
+        match edge {
+            None => {
+                let mut best: Option<(f64, ElementId, u32)> = None;
+                for e in store.iter() {
+                    let Some(r) = reviera_core::roofs::roof_recipe(e) else {
+                        continue;
+                    };
+                    if r.arch.is_some() || r.dome.is_some() || r.extrusion.is_some() {
+                        continue;
+                    }
+                    let Some(sk) = reviera_core::sketch::sketch_of(e) else {
+                        continue;
+                    };
+                    for c in &sk.curves {
+                        let (a, b) = (c.line.start, c.line.end);
+                        let d = [b[0] - a[0], b[1] - a[1]];
+                        let l2 = (d[0] * d[0] + d[1] * d[1]).max(1e-12);
+                        let s =
+                            (((p[0] - a[0]) * d[0] + (p[1] - a[1]) * d[1]) / l2).clamp(0.0, 1.0);
+                        let dist = (a[0] + d[0] * s - p[0]).hypot(a[1] + d[1] * s - p[1]);
+                        if dist < 0.5 && best.is_none_or(|b| dist < b.0) {
+                            best = Some((dist, e.id(), c.key));
+                        }
+                    }
+                }
+                match best {
+                    Some((_, roof, key)) => {
+                        if let Some(t) = &mut self.line_tool {
+                            t.join_edge = Some((roof, key));
+                        }
+                        self.line_prompt();
+                    }
+                    None => frame.set_status_text("Click on a footprint roof's edge", 0),
+                }
+            }
+            Some((roof, key)) => {
+                let panel = match self.active_view() {
+                    Some(v) => v.panel,
+                    None => return,
+                };
+                let Some(target) = self.element_at(x, y, &panel) else {
+                    return frame.set_status_text("Click a wall or a roof", 0);
+                };
+                let result = if target == roof {
+                    self.run("roof.unjoin", json!({ "roof_id": roof, "key": key }))
+                } else {
+                    self.run(
+                        "roof.join",
+                        json!({ "roof_id": roof, "key": key, "target_id": target }),
+                    )
+                };
+                match result {
+                    Ok(_) => {
+                        self.refresh_scene(&frame);
+                        if let Some(t) = &mut self.line_tool {
+                            t.join_edge = None;
+                        }
+                        self.line_prompt();
+                    }
+                    Err(e) => frame.set_status_text(&e, 0),
+                }
+            }
+        }
     }
 
     /// The last point and the cursor of a straight line being drawn (typed lengths apply).
@@ -330,8 +496,37 @@ impl Gui {
         let (start, end) = (t.points[0], t.points[1]);
         let through: Vec<[f64; 2]> = t.points.get(2).copied().into_iter().collect();
         let result = match t.mode {
-            // Finished with Enter (`line_enter`).
-            LineMode::RoofExtrusion => return,
+            // Finished with Enter (`line_enter`), or by its own clicks.
+            LineMode::RoofExtrusion
+            | LineMode::JoinRoof
+            | LineMode::SlabEdge
+            | LineMode::ShapePoint => return,
+            LineMode::SlopeArrow => {
+                let roof = t.target;
+                // The footprint curve nearest the tail.
+                let key = self.store_now().and_then(|st| {
+                    let e = st.get(roof?)?;
+                    let sk = reviera_core::sketch::sketch_of(e)?;
+                    sk.curves
+                        .iter()
+                        .map(|c| {
+                            let (a, b) = (c.line.start, c.line.end);
+                            let d = [b[0] - a[0], b[1] - a[1]];
+                            let l2 = (d[0] * d[0] + d[1] * d[1]).max(1e-12);
+                            let s = (((start[0] - a[0]) * d[0] + (start[1] - a[1]) * d[1]) / l2).clamp(0.0, 1.0);
+                            let f = [a[0] + d[0] * s, a[1] + d[1] * s];
+                            ((f[0] - start[0]).hypot(f[1] - start[1]), c.key, f)
+                        })
+                        .min_by(|x, y| x.0.total_cmp(&y.0))
+                });
+                match key {
+                    Some((_, key, foot)) => self.run(
+                        "roof.set_slope_arrow",
+                        json!({ "roof_id": roof, "key": key, "tail": foot, "head": end, "specify": "slope" }),
+                    ),
+                    None => Err("The selected roof has no footprint".to_owned()),
+                }
+            }
             LineMode::ScopeBox => {
                 let mut args = json!({ "rectangle": { "corner_a": start, "corner_b": end } });
                 if !t.name.trim().is_empty() {
@@ -480,6 +675,22 @@ impl Gui {
                 grid.append(Property::string("Name", "lt_name", t.name.clone()));
                 return true;
             }
+            LineMode::SlopeArrow => {
+                grid.append(Property::category("Slope Arrow", "c_lt"));
+                return true;
+            }
+            LineMode::JoinRoof => {
+                grid.append(Property::category("Join/Unjoin Roof", "c_lt"));
+                return true;
+            }
+            LineMode::SlabEdge => {
+                grid.append(Property::category("Slab Edge", "c_lt"));
+                return true;
+            }
+            LineMode::ShapePoint => {
+                grid.append(Property::category("Add Point", "c_lt"));
+                return true;
+            }
             LineMode::RoofExtrusion => {
                 grid.append(Property::category("Roof by Extrusion", "c_lt"));
                 grid.append(Property::string(
@@ -566,6 +777,42 @@ impl Gui {
             grid.set_property_read_only("dt_sb_datums", true);
             return true;
         }
+        if let Some(r) = reviera_core::slab_edges::recipe(e) {
+            grid.append(Property::category("Slab Edge", "c_dt"));
+            for (label, name, v) in [
+                ("Width", "dt_se_width", r.width),
+                ("Depth", "dt_se_depth", r.depth),
+                ("Horizontal Profile Offset", "dt_se_h", r.horizontal_offset),
+                ("Vertical Profile Offset", "dt_se_v", r.vertical_offset),
+            ] {
+                grid.append(Property::string(label, name, self.format_length(v)));
+            }
+            grid.append(Property::boolean(
+                "Flip Horizontal",
+                "dt_se_fh",
+                r.flip_horizontal,
+            ));
+            grid.append(Property::boolean(
+                "Flip Vertical",
+                "dt_se_fv",
+                r.flip_vertical,
+            ));
+            if let Ok(g) = reviera_core::slab_edges::regenerate(&store, e) {
+                grid.append(Property::string(
+                    "Length",
+                    "dt_se_len",
+                    self.format_length(g.length),
+                ));
+                grid.set_property_read_only("dt_se_len", true);
+                grid.append(Property::string(
+                    "Volume",
+                    "dt_se_vol",
+                    format!("{:.3} m³", g.volume),
+                ));
+                grid.set_property_read_only("dt_se_vol", true);
+            }
+            return true;
+        }
         if let Some(r) = model_lines::recipe(e) {
             grid.append(Property::category("Model Line", "c_dt"));
             grid.append(Property::enumeration(
@@ -636,6 +883,29 @@ impl Gui {
             "ml_style" => self.run(
                 "modelline.set",
                 json!({ "model_line_ids": ids, "line_style": text }),
+            ),
+            "se_width" | "se_depth" | "se_h" | "se_v" => {
+                let v = self
+                    .run(
+                        "units.parse",
+                        json!({ "text": text, "data_type": "length" }),
+                    )
+                    .ok()
+                    .and_then(|v| v.as_f64());
+                let field = match row {
+                    "se_width" => "width",
+                    "se_depth" => "depth",
+                    "se_h" => "horizontal_offset",
+                    _ => "vertical_offset",
+                };
+                match v {
+                    Some(v) => self.run("slabedge.set", json!({ "slab_edge_id": id, field: v })),
+                    None => Err("Type a length".to_owned()),
+                }
+            }
+            "se_fh" | "se_fv" => self.run(
+                "hostsweep.flip",
+                json!({ "id": id, "axis": if row == "se_fh" { "Horizontal" } else { "Vertical" } }),
             ),
             "sb_name" => self.run(
                 "scopebox.set_extents",
@@ -1267,5 +1537,114 @@ impl Gui {
             Err(e) => frame.set_status_text(&e, 0),
         }
         true
+    }
+}
+
+impl Gui {
+    /// Slab Edge: the floor edge nearest the click (within 0.5 m) starts a run, or joins the run on
+    /// the same floor.
+    fn slab_edge_click(&mut self, x: i32, y: i32) {
+        let frame = self.frame;
+        let Some(p) = self.plan_xy(x, y) else { return };
+        let Some(store) = self.store_now() else {
+            return;
+        };
+        let mut best: Option<(f64, ElementId, u32)> = None;
+        for e in store.iter() {
+            if reviera_core::floors::floor_recipe(e).is_none() {
+                continue;
+            }
+            let Some(sk) = reviera_core::sketch::sketch_of(e) else {
+                continue;
+            };
+            for c in &sk.curves {
+                let (a, b) = (c.line.start, c.line.end);
+                let d = [b[0] - a[0], b[1] - a[1]];
+                let l2 = (d[0] * d[0] + d[1] * d[1]).max(1e-12);
+                let s = (((p[0] - a[0]) * d[0] + (p[1] - a[1]) * d[1]) / l2).clamp(0.0, 1.0);
+                let dist = (a[0] + d[0] * s - p[0]).hypot(a[1] + d[1] * s - p[1]);
+                if dist < 0.5 && best.is_none_or(|b| dist < b.0) {
+                    best = Some((dist, e.id(), c.key));
+                }
+            }
+        }
+        let Some((_, floor, key)) = best else {
+            return frame.set_status_text("Click a floor's edge", 0);
+        };
+        let current = self.line_tool.as_ref().and_then(|t| t.sweep);
+        let result = match current {
+            Some((se, f)) if f == floor => self
+                .run(
+                    "hostsweep.add_segments",
+                    json!({ "id": se, "edge_refs": [key] }),
+                )
+                .map(|_| se),
+            _ => self
+                .run(
+                    "slabedge.create",
+                    json!({ "host_id": floor, "keys": [key] }),
+                )
+                .and_then(|v| {
+                    v.as_u64()
+                        .map(ElementId)
+                        .ok_or_else(|| "no slab edge".to_owned())
+                }),
+        };
+        match result {
+            Ok(se) => {
+                if let Some(t) = &mut self.line_tool {
+                    t.sweep = Some((se, floor));
+                }
+                self.refresh_scene(&frame);
+            }
+            Err(e) => frame.set_status_text(&e, 0),
+        }
+    }
+}
+
+impl Gui {
+    /// Add Point: a point on the selected floor, its height typed relative to the surface there.
+    fn shape_point_click(&mut self, x: i32, y: i32) {
+        let frame = self.frame;
+        let Some(p) = self.plan_xy(x, y) else { return };
+        let Some(floor) = self.line_tool.as_ref().and_then(|t| t.target) else {
+            return;
+        };
+        let dialog = TextEntryDialog::builder(
+            &frame,
+            "Height from the floor's surface here (negative lowers it, e.g. -50 for a drain):",
+            "Add Point",
+        )
+        .with_default_value("0")
+        .build();
+        if dialog.show_modal() != ID_OK {
+            return;
+        }
+        let typed = dialog.get_value().unwrap_or_default();
+        let offset = match self.run(
+            "units.parse",
+            json!({ "text": typed, "data_type": "length" }),
+        ) {
+            Ok(v) => v.as_f64().unwrap_or_default(),
+            Err(_) => return frame.set_status_text(&format!("Invalid value: {typed}"), 0),
+        };
+        match self.run(
+            "shape.add_point",
+            json!({ "element_id": floor, "xy": p, "mode": { "along_surface": { "offset": offset } } }),
+        ) {
+            Ok(_) => self.refresh_scene(&frame),
+            Err(e) => frame.set_status_text(&e, 0),
+        }
+    }
+
+    /// Shape Editing › Reset Shape on the selected floors.
+    pub(crate) fn reset_shape(&mut self) {
+        let frame = self.frame;
+        for id in self.selection() {
+            if let Err(e) = self.run("shape.reset", json!({ "element_id": id })) {
+                frame.set_status_text(&e, 0);
+            }
+        }
+        self.refresh_scene(&frame);
     }
 }

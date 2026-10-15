@@ -226,3 +226,157 @@ fn extruded_roofs_and_openings_by_face() {
             .any(|r| r.class == "IFCROOF" && r.attributes.contains(".BARREL_ROOF."))
     );
 }
+
+#[test]
+fn a_slope_arrow_turns_a_gable_into_a_hip() {
+    let tmp = tempfile::tempdir().unwrap();
+    let (_p, mut doc) = LocalProject::new(Schema::Ifc4, &tmp.path().join("arrow.ifc")).unwrap();
+    let r = registry();
+    let l1 = doc
+        .store()
+        .iter()
+        .find(|e| e.class == "IfcBuildingStorey")
+        .unwrap()
+        .id();
+    // 10 × 6 m, the long edges sloping at 30°, the short ends gables.
+    let rect = [[0.0, 0.0], [10.0, 0.0], [10.0, 6.0], [0.0, 6.0]];
+    let curves: Vec<Value> = (0..4)
+        .map(|i| json!({ "line": { "start": rect[i], "end": rect[(i + 1) % 4] }, "defines_slope": i % 2 == 0 }))
+        .collect();
+    let roof = id(&run(
+        &r,
+        &mut doc,
+        "roof.create_footprint",
+        json!({ "curves": curves, "level_id": l1.0, "slope": "30°" }),
+    )
+    .unwrap());
+    let gable_faces = geometry(&doc, roof).faces.len();
+    // An arrow at 30° from the middle of the east end (curve 2) to the ridge.
+    run(
+        &r,
+        &mut doc,
+        "roof.set_slope_arrow",
+        json!({ "roof_id": roof.0, "key": 2, "tail": [10.0, 3.0], "head": [7.0, 3.0], "specify": "slope", "slope": "30°" }),
+    )
+    .unwrap();
+    let g = geometry(&doc, roof);
+    assert!(g.faces.len() > gable_faces, "a hip plane appeared");
+    // The east plane: its normal points east, 30° from vertical.
+    let east = g
+        .faces
+        .iter()
+        .find(|f| f.normal[0] > 0.1)
+        .expect("an east-facing plane");
+    assert!(
+        (east.normal[2] - 30f64.to_radians().cos()).abs() < 1e-6,
+        "{:?}",
+        east.normal
+    );
+    // An arrow on a slope-defining edge, or with its tail off the edge, is refused.
+    assert!(run(
+        &r,
+        &mut doc,
+        "roof.set_slope_arrow",
+        json!({ "roof_id": roof.0, "key": 1, "tail": [5.0, 0.0], "head": [5.0, 3.0], "specify": "slope" }),
+    )
+    .is_err());
+    assert!(run(
+        &r,
+        &mut doc,
+        "roof.set_slope_arrow",
+        json!({ "roof_id": roof.0, "key": 4, "tail": [1.0, 3.0], "head": [3.0, 3.0], "specify": "slope" }),
+    )
+    .is_err());
+    // Removed, the end is a gable again.
+    run(
+        &r,
+        &mut doc,
+        "roof.remove_slope_arrow",
+        json!({ "roof_id": roof.0, "key": 2 }),
+    )
+    .unwrap();
+    assert_eq!(geometry(&doc, roof).faces.len(), gable_faces);
+}
+
+#[test]
+fn a_porch_roof_joined_to_the_main_roof_ends_on_it() {
+    let tmp = tempfile::tempdir().unwrap();
+    let (_p, mut doc) = LocalProject::new(Schema::Ifc4, &tmp.path().join("join.ifc")).unwrap();
+    let r = registry();
+    let l1 = doc
+        .store()
+        .iter()
+        .find(|e| e.class == "IfcBuildingStorey")
+        .unwrap()
+        .id();
+    let line = |a: [f64; 2], b: [f64; 2], slopes: bool| json!({ "line": { "start": a, "end": b }, "defines_slope": slopes });
+    // The main roof: 10 × 6 m, gables east and west, at 3 m, 30°.
+    let main = id(&run(
+        &r,
+        &mut doc,
+        "roof.create_footprint",
+        json!({ "curves": [line([0.0, 0.0], [10.0, 0.0], true), line([10.0, 0.0], [10.0, 6.0], false), line([10.0, 6.0], [0.0, 6.0], true), line([0.0, 6.0], [0.0, 0.0], false)], "level_id": l1.0, "slope": "30°", "base_offset": 3.0 }),
+    )
+    .unwrap());
+    // A shed porch south of it, at 2.5 m, rising north at 20° (only its south edge slopes).
+    let porch = id(&run(
+        &r,
+        &mut doc,
+        "roof.create_footprint",
+        json!({ "curves": [line([2.0, -4.0], [6.0, -4.0], true), line([6.0, -4.0], [6.0, -1.0], false), line([6.0, -1.0], [2.0, -1.0], false), line([2.0, -1.0], [2.0, -4.0], false)], "level_id": l1.0, "slope": "20°", "base_offset": 2.5 }),
+    )
+    .unwrap());
+    let max_y = |g: &roofs::RoofGeometry| {
+        g.faces
+            .iter()
+            .flat_map(|f| f.slab.0.iter().map(|p| p[1]))
+            .fold(f64::NEG_INFINITY, f64::max)
+    };
+    assert!((max_y(&geometry(&doc, porch)) + 1.0).abs() < 1e-6);
+    // Joined (its north edge, curve 3) to the main roof: it reaches in and ends on its top.
+    run(
+        &r,
+        &mut doc,
+        "roof.join",
+        json!({ "roof_id": porch.0, "key": 3, "target_id": main.0 }),
+    )
+    .unwrap();
+    let g = geometry(&doc, porch);
+    assert!(max_y(&g) > -0.5, "{}", max_y(&g));
+    let mg = geometry(&doc, main);
+    let south = mg.faces.iter().find(|f| f.normal[1] < -0.1).unwrap();
+    let n = south.normal;
+    let q = south.bottom[0];
+    let d = n[0] * (q[0] + n[0] * mg.thickness)
+        + n[1] * (q[1] + n[1] * mg.thickness)
+        + n[2] * (q[2] + n[2] * mg.thickness);
+    let below = g
+        .faces
+        .iter()
+        .flat_map(|f| f.slab.0.iter())
+        .map(|p| n[0] * p[0] + n[1] * p[1] + n[2] * p[2] - d)
+        .fold(f64::INFINITY, f64::min);
+    assert!(below > -1e-6, "nothing below the main roof's top: {below}");
+    // Unjoined, it ends where it did.
+    run(&r, &mut doc, "roof.unjoin", json!({ "roof_id": porch.0 })).unwrap();
+    assert!((max_y(&geometry(&doc, porch)) + 1.0).abs() < 1e-6);
+    // Joined to a wall at y = 2 (its south face at 1.9): it ends at that face.
+    let wall = id(&run(
+        &r,
+        &mut doc,
+        "wall.create",
+        json!({ "curve": { "line": { "start": [0.0, 2.0], "end": [10.0, 2.0] } }, "base_level": l1.0, "top_constraint": { "unconnected": 3.0 } }),
+    )
+    .unwrap());
+    let width = reviera_core::walls::regenerate(doc.store(), doc.store().get(wall).unwrap())
+        .unwrap()
+        .width;
+    run(
+        &r,
+        &mut doc,
+        "roof.join",
+        json!({ "roof_id": porch.0, "key": 3, "target_id": wall.0 }),
+    )
+    .unwrap();
+    assert!((max_y(&geometry(&doc, porch)) - (2.0 - width / 2.0)).abs() < 1e-6);
+}

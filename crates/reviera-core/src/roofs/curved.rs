@@ -901,6 +901,7 @@ pub(crate) fn create_dome(
         arch: None,
         dome: Some(d),
         extrusion: None,
+        joins: Default::default(),
     };
     let type_guid = txn.store().get(type_id).expect("exists").guid().to_string();
     let id = txn.create(
