@@ -547,7 +547,10 @@ nearest gaps in what is built:
   PLY, glTF, 3MF, OFF and IFC fragments) read where they are. A library is a folder that is
   opened, with one JSON manifest (`reviera-library.json`) in its root. Import into Library (or
   dropping files on a folder) copies files in a supported 3D format into a folder and adds them to
-  the manifest. Libraries have smart folders and drag-and-drop reorganising. Specified; not built yet.
+  the manifest. The Library panel previews each item and edits details its file format cannot
+  hold (units, category, manufacturer, classification, property sets, material colours), kept in
+  the manifest and applied when the item is placed. Libraries have smart folders and
+  drag-and-drop reorganising. Specified; not built yet.
 - **Stamps** (DM-LIB-002): any library object, family type or model fragment picked up as a stamp
   from the Library panel's Stamps strip (or Alt+click on a placed copy), inserting a copy at each
   click in a plan or on a face in 3D; all copies share one type (Make Unique detaches one); rows
