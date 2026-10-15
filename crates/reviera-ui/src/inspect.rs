@@ -164,7 +164,9 @@ impl Gui {
         let (section_box, slices) = self.view_clip(v);
         let clipping = Clipping::of(section_box.as_ref(), &slices);
         let visibility = self.view_visibility(v);
-        let lines = self.clip_lines(v, section_box.as_ref(), &slices);
+        let mut lines = self.clip_lines(v, section_box.as_ref(), &slices);
+        lines.extend(self.datum_3d_lines(index));
+        lines.extend(self.work_plane_grid(index));
         let v = &mut self.views[index];
         if let Some(vp) = &mut v.viewport {
             vp.set_clipping(&clipping);

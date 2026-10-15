@@ -538,6 +538,12 @@ impl LocalProject {
             if recipe_kind == Some(reviera_core::mesh_objects::RECIPE) {
                 crate::mesh_objects::remove_copy_geometry(&mut self.ifc, step)?;
             }
+            if matches!(
+                recipe_kind,
+                Some(reviera_core::ref_planes::RECIPE | reviera_core::model_lines::RECIPE)
+            ) {
+                crate::curves::remove(&mut self.ifc, step)?;
+            }
             if recipe_kind == Some(reviera_core::path_arrays::RECIPE) {
                 crate::path_arrays::remove_members(&mut self.ifc, step)?;
                 crate::mesh_objects::remove_copy_geometry(&mut self.ifc, step)?;
@@ -728,6 +734,14 @@ impl LocalProject {
             )?;
             self.write_railings(doc)?;
             self.write_rooms(doc)?;
+            let owner_history = self.new_owner_history()?;
+            crate::curves::write_all(
+                &mut self.ifc,
+                doc,
+                &self.steps,
+                self.length_scale,
+                owner_history,
+            )?;
         }
         if grids_touched {
             self.write_grids(doc)?;

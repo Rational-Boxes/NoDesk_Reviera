@@ -40,6 +40,7 @@ impl Gui {
         self.end_tool(&frame);
         self.end_dim_tool();
         self.end_grid_tool();
+        self.end_line_tool();
         self.end_insert_tool();
         self.end_modify();
         self.cancel_sketch();

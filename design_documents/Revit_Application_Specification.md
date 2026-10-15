@@ -10166,8 +10166,10 @@ Dragging a control issues the matching command once, on mouse-up. The preview du
 **Commands.** `refplane.create(p0, p1, view_normal | normal, name?, subcategory?) -> element_id`, `refplane.rename(id, name)`.
 
 **Acceptance criteria.**
-- [ ] A named reference plane appears in the Work Plane › Name list, and a model line can be sketched on it.
-- [ ] A reference plane drawn in plan is invisible in a 3D view and visible in any section cut at right angles to it.
+- [x] A named reference plane appears in the Work Plane › Name list, and a model line can be sketched on it.
+- [x] A reference plane drawn in plan is invisible in a 3D view and visible in any section cut at right angles to it.
+
+**Implementation notes (2026-10-15).** As built: `refplane.create(start, end, z? | level?, view_normal?, name?, subcategory?)` (points `[x, y]` or `[x, y, z]`), `refplane.rename`, `refplane.set` (ends, subcategory) and `refplane.list`; the Ref Plane tool (RP) in plans with Name in Properties; dashed green in plans and in sections and elevations that look along the plane; Move, Copy (unnamed), Rotate and Mirror. The recipe is `recipe.ref_plane` (`start`, `end`, `view_normal`, `subcategory`). Not built yet: extents and their handles, Pick Lines, Is Reference and Defines Origin (families), drawing in sections.
 
 ### 3.2.4 Datum extents
 **ID:** ARC-DATUM-001 · **Priority:** P0 · **Ref:** research/02 §3.1, §3.2, §3.5
@@ -10266,8 +10268,10 @@ Dragging a control issues the matching command once, on mouse-up. The preview du
 - `element.set_work_plane(element_ids, plane | host_ref)`
 - `element.dissociate_work_plane(element_ids)`
 
+**Implementation notes (2026-10-15).** As built: work plane references `{by: level, level, offset} | {by: grid, grid} | {by: ref_plane, ref_plane} | {by: explicit, origin, x_dir, normal}`; a view's setting in `rxd:work_plane` (`plane`, `show`, `grid_spacing`), a plan's level by default; `workplane.set` (one of `level`/`offset`, `grid`, `ref_plane`, `plane`), `workplane.get`, `workplane.show`, `workplane.list` (the Name list); `element.set_work_plane` (projects the element onto the new plane) and `element.dissociate_work_plane` for model lines; Set (by name) and Show (a grid over the model's extent) in the window. Elements on a level move with its elevation; on a grid or reference plane, with it. Not built yet: Pick a Plane (faces), Pick a Line, Go To View, the Work Plane Viewer, and work-plane-based components and model text.
+
 **Acceptance criteria.**
-- [ ] Model text placed on a named reference plane moves with the plane when the plane is moved.
+- [ ] Model text placed on a named reference plane moves with the plane when the plane is moved. (Model lines do.)
 - [ ] Choosing a vertical plane in a plan view offers Go To View with at least one section or elevation.
 - [ ] With a sweep's profile plane selected, Viewer opens a view normal to that plane, zoomed to the model extents. Editing the profile there updates the open 3D view without a refresh, and closing the viewer leaves no new entry in the Project Browser.
 
@@ -13291,8 +13295,10 @@ All family-editor commands from the DM chapter can be used inside the session.
 
 **Commands.** `modelline.create(curves: [curve], work_plane, line_style_id?) -> [element_id]` and `line.convert(element_ids, to: Model|Detail, view_id?) -> [element_id]`.
 
+**Implementation notes (2026-10-15).** As built: `modelline.create(curves: [{line, through?}], level?/offset? | grid? | ref_plane? | plane?, line_style?)` with curves in the work plane's coordinates, one element per curve; `modelline.set` (style, one line's curve), `modelline.list` (world polylines) and `modelline.styles` (Lines, Thin, Medium, Wide, Hidden, Centre and Overhead Lines: pen, pattern, colour); the Model Line tool (LI) in plans (Line or Arc, Chain, Line Style); shown in plans within the view range, sections and elevations within their depth, and 3D; picked in plans. In IFC each is an `IfcAnnotation` (ModelLine) with a `Curve3D` `IfcPolyline` styled by an `IfcCurveStyle`, contained in its level's storey. Not built yet: `line.convert` (detail lines are not built), user line styles, the other Draw gallery shapes.
+
 **Acceptance criteria.**
-- [ ] A model line drawn on Level 1 appears in the floor plan, in elevations and in 3D. Converting it to a detail line in the plan removes it from the other views.
+- [ ] A model line drawn on Level 1 appears in the floor plan, in elevations and in 3D. Converting it to a detail line in the plan removes it from the other views. (Shown in all three; converting is not built.)
 
 ---
 

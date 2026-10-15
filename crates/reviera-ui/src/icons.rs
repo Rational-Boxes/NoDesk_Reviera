@@ -64,6 +64,18 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "grid" => format!(
             r#"<path d="M10 9v20M22 9v20M4 15h24M4 25h24" {s} stroke-dasharray="4 2"/><circle cx="10" cy="5" r="3.5" fill="{paper}" {sa}/><circle cx="22" cy="5" r="3.5" fill="{paper}" {sa}/>"#
         ),
+        "ref_plane" => format!(
+            r#"<path d="M6 28L26 4" {sa} stroke-dasharray="5 3"/><circle cx="6" cy="28" r="2" fill="{f}" {s}/><circle cx="26" cy="4" r="2" fill="{f}" {s}/>"#
+        ),
+        "model_line" => format!(
+            r#"<path d="M4 26L14 12l6 8 8-14" {s}/><path d="M4 26l-1 2M28 6l1-2" {sa}/>"#
+        ),
+        "work_plane" => format!(
+            r#"<path d="M3 22l10-10h16L19 22z" fill="{f}" {s}/><path d="M8 17h16M13 12l-5 10M21 12l-5 10" {sa}/>"#
+        ),
+        "work_plane_show" => format!(
+            r#"<path d="M3 24l10-10h16L19 24z" fill="{f}" {s}/><path d="M8 19h16M13 14l-5 10M21 14l-5 10" {sa}/><circle cx="16" cy="7" r="3" fill="{paper}" {s}/><path d="M10 7q6-6 12 0q-6 6-12 0" {s}/>"#
+        ),
         "level" => format!(
             r#"<path d="M3 12h18M3 24h18" {s} stroke-dasharray="5 2"/><path d="M21 12l4-4 4 4-4 4z" fill="{f}" {sa}/><path d="M21 24l4-4 4 4-4 4z" fill="{f}" {sa}/>"#
         ),

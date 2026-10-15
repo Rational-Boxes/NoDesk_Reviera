@@ -254,6 +254,35 @@ pub fn transform(
                 crate::wall_openings::move_by(txn, id, v)?;
                 out.push(id);
             }
+        } else if crate::ref_planes::recipe(e).is_some() {
+            let target = if copy { txn.create(copied(e))? } else { id };
+            if copy {
+                // Names are unique: a copy is unnamed.
+                txn.modify(target, |n| n.name = None)?;
+            }
+            let dz = match x {
+                Xform::Translate(v) => v[2],
+                _ => 0.0,
+            };
+            crate::ref_planes::transform(txn, target, &|p| x.point(p), dz)?;
+            out.push(target);
+        } else if let Some(r) = crate::model_lines::recipe(e) {
+            // On a reference plane or grid that moves too, it follows it.
+            if !copy
+                && crate::work_planes::host_of(&r.plane).is_some_and(|h| {
+                    !matches!(r.plane, crate::work_planes::WorkPlaneRef::Level { .. })
+                        && host_moves(h)
+                })
+            {
+                continue;
+            }
+            let target = if copy { txn.create(copied(e))? } else { id };
+            let dz = match x {
+                Xform::Translate(v) => v[2],
+                _ => 0.0,
+            };
+            crate::model_lines::transform(txn, target, &|p| x.point(p), dz)?;
+            out.push(target);
         } else if let Some(s) = crate::skylights::skylight_recipe(e) {
             // With its roof in the selection, the roof carries it.
             let roof = crate::id::GlobalId::parse(&s.roof).and_then(|g| store.find_by_guid(&g));

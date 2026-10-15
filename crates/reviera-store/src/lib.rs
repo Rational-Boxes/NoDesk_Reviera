@@ -6,6 +6,7 @@
 
 pub mod commands;
 mod curtains;
+mod curves;
 pub mod fragments;
 mod geometry;
 mod grids;

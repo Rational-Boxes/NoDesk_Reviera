@@ -243,6 +243,22 @@ pub const CATEGORIES: &[Category] = &[
     ),
     cat("cat.grids", "Grids", Some("IfcGrid"), None, None, false),
     cat(
+        "cat.reference_planes",
+        "Reference Planes",
+        Some("IfcAnnotation"),
+        None,
+        None,
+        false,
+    ),
+    cat(
+        "cat.lines",
+        "Lines",
+        Some("IfcAnnotation"),
+        None,
+        None,
+        true,
+    ),
+    cat(
         "cat.openings",
         "Openings",
         Some("IfcOpeningElement"),
@@ -355,6 +371,9 @@ pub fn category_of(e: &Element) -> Option<&'static Category> {
         },
         "IfcFurniture" if object_type == "Casework" => "cat.casework",
         "IfcSpace" if object_type.starts_with("Area:") => "cat.areas",
+        "IfcAnnotation" if object_type == crate::ref_planes::OBJECT_TYPE => "cat.reference_planes",
+        "IfcAnnotation" if object_type == crate::model_lines::OBJECT_TYPE => "cat.lines",
+        "IfcAnnotation" => return None,
         _ => return CATEGORIES.iter().find(|c| c.ifc_class == Some(base)),
     };
     by_key(key)

@@ -158,6 +158,7 @@ impl Gui {
         self.end_tool(&frame);
         self.end_dim_tool();
         self.end_grid_tool();
+        self.end_line_tool();
         self.end_insert_tool();
         self.end_modify();
         self.leave_walk();
@@ -959,6 +960,7 @@ impl Gui {
             || self.ceiling_tool.is_some()
             || self.dim_tool.is_some()
             || self.grid_tool.is_some()
+            || self.line_tool.is_some()
             || self.insert_tool.is_some()
             || self.modify_tool.is_some()
             || self.note_tool.is_some()

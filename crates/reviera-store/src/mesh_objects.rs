@@ -76,7 +76,11 @@ fn copy_signature(g: &MeshObjectGeometry, map: StepId, scale: f64) -> String {
 
 /// Entities reachable from `root` through its attributes that belong to it alone: not rooted
 /// objects, contexts, owner histories, nor anything in `keep`.
-fn owned_tree(ifc: &IfcModel, root: StepId, keep: &HashSet<StepId>) -> Result<Vec<StepId>> {
+pub(crate) fn owned_tree(
+    ifc: &IfcModel,
+    root: StepId,
+    keep: &HashSet<StepId>,
+) -> Result<Vec<StepId>> {
     const SHARED: &[&str] = &[
         "IfcGeometricRepresentationContext",
         "IfcGeometricRepresentationSubContext",

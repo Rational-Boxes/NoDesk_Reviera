@@ -37,6 +37,7 @@ pub mod library;
 pub mod measure;
 pub mod mesh_io;
 pub mod mesh_objects;
+pub mod model_lines;
 pub mod modify;
 pub mod notes;
 pub mod origin;
@@ -48,6 +49,7 @@ pub mod plans;
 pub mod polygons;
 pub mod railings;
 pub mod ramps;
+pub mod ref_planes;
 pub mod roofs;
 pub mod rooms;
 pub mod schedules;
@@ -67,6 +69,7 @@ pub mod vaults;
 pub mod views;
 pub mod wall_openings;
 pub mod walls;
+pub mod work_planes;
 
 pub use change::{ChangeRecord, ChangeSet, ChangedSummary};
 pub use command::{

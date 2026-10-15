@@ -58,3 +58,49 @@ stairs climb between them. Grids are the lines that set out the structure.</p>
 line; axes changed in another IFC tool are taken over when the file is opened.
 <code>grid.create</code>, <code>grid.rename</code>, <code>grid.set_curve</code>,
 <code>grid.list</code></p>
+
+<h2 id="ref-planes">Reference planes</h2>
+<p>A reference plane is an unbounded construction plane: a guide to align and dimension to, and a
+plane to draw on. <b>Architecture › Datum &amp; Work Plane › Ref Plane</b>
+<a href="reviera:action/refplane.create">Ref Plane</a> (<kbd>RP</kbd>) draws one in a plan: click
+the two ends of its line. The plane is vertical, through the line. Give it a <b>Name</b> in
+Properties (while the tool runs, or afterwards) to offer it as a work plane; names are unique.</p>
+<ul>
+  <li>Plans show reference planes as dashed green lines; sections and elevations show the ones
+    they look along. 3D views do not show them.</li>
+  <li>Move, Copy, Rotate and Mirror work on them; model lines drawn on a plane follow it.</li>
+  <li>Saved as an <code>IfcAnnotation</code> (ObjectType <i>ReferencePlane</i>) whose Axis is
+    the line.</li>
+</ul>
+<p><code>refplane.create</code>, <code>refplane.rename</code>, <code>refplane.set</code>,
+<code>refplane.list</code></p>
+
+<h2 id="work-planes">Work planes</h2>
+<p>Every view has a work plane, the plane model lines are drawn on. A plan's is its level until
+you set another. <b>Datum &amp; Work Plane › Set</b>
+<a href="reviera:action/workplane.set">Set</a> chooses one by name: a level, a grid or a named
+reference plane. <b>Show</b> <a href="reviera:action/workplane.show">Show</a> draws it as a grid
+in the view.</p>
+<p>An element on a work plane keeps its place in that plane: raise the level or move the
+reference plane, and it moves with it. Moving the element alone in plan keeps it on a plane
+fixed where it now is.</p>
+<p><code>workplane.set</code>, <code>workplane.get</code>, <code>workplane.show</code>,
+<code>workplane.list</code>, <code>element.set_work_plane</code>,
+<code>element.dissociate_work_plane</code></p>
+
+<h2 id="model-lines">Model lines</h2>
+<p>Model lines are lines in the model, shown in every view, unlike a view's own annotation.
+<b>Datum &amp; Work Plane › Model Line</b> <a href="reviera:action/modelline.create">Model Line</a>
+(<kbd>LI</kbd>) draws on the plan's work plane: click the start, then the end. With
+<b>Chain</b> on, each line starts where the last ended; <b>Shape</b> <i>Arc</i> takes a third click
+on the arc. <kbd>Esc</kbd> ends the chain, then the tool. Choose a <b>Line Style</b> (Lines, Thin,
+Medium or Wide Lines, Hidden, Centre or Overhead Lines) in Properties, for new lines or the
+selected ones.</p>
+<p>Plans show the model lines within their view range, sections and elevations those within
+their depth, and 3D views all of them. Each is saved as an <code>IfcAnnotation</code> (ObjectType
+<i>ModelLine</i>) whose curve is styled with its line style.</p>
+<p><code>modelline.create</code>, <code>modelline.set</code>, <code>modelline.list</code>,
+<code>modelline.styles</code></p>
+<p class="note">Not yet available: drawing on a vertical work plane in a section or elevation
+(the commands do it), picking a face as the work plane, the Work Plane Viewer, converting model
+lines to detail lines, and datum extents.</p>

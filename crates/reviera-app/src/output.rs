@@ -136,6 +136,15 @@ impl App {
         }
         // Grids show in every plan, styled by their grid type (ARC-GRID-001).
         let mut annotation = vec![lines];
+        // Reference planes and model lines in the view range (ARC-REFP-001, ARC-MLIN-001).
+        annotation.extend(reviera_render::datums::plan_lines(
+            store,
+            bottom.min(range.cut),
+            range.top.max(range.cut),
+            range.cut + 0.002,
+            scale,
+            &Default::default(),
+        ));
         for g in grids::list(store) {
             let mark = GridMark {
                 start: g.curve.start,
@@ -338,6 +347,15 @@ pub fn section_parts(
         annotation.extend(l);
         labels.extend(t);
     }
+    // Reference planes it looks along and model lines in its depth (ARC-REFP-001, ARC-MLIN-001).
+    annotation.extend(reviera_render::datums::section_lines(
+        store,
+        &frame,
+        (lo - 5.0 * mm, hi + 5.0 * mm),
+        f64::from(z),
+        f64::from(scale),
+        &Default::default(),
+    ));
     SectionParts {
         scene: local,
         graphics,

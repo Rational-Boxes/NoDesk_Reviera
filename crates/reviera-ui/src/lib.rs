@@ -17,6 +17,7 @@ mod components;
 mod crash;
 mod curtain;
 mod curved;
+mod datum_tools;
 mod decks;
 mod dims;
 mod dormers;
@@ -225,6 +226,7 @@ struct Gui {
     tool: Option<WallTool>,
     dim_tool: Option<dims::DimTool>,
     grid_tool: Option<grids::GridTool>,
+    line_tool: Option<datum_tools::LineTool>,
     insert_tool: Option<inserts::InsertTool>,
     modify_tool: Option<modify::ModifyTool>,
     /// A sketch session (floor boundaries).
@@ -488,6 +490,14 @@ impl Gui {
             }
             "GR" => {
                 self.start_grid_tool();
+                true
+            }
+            "RP" => {
+                self.start_line_tool(datum_tools::LineMode::RefPlane);
+                true
+            }
+            "LI" => {
+                self.start_line_tool(datum_tools::LineMode::ModelLine);
                 true
             }
             "FL" => {
@@ -808,6 +818,7 @@ impl Gui {
             }
             self.end_dim_tool();
             self.end_grid_tool();
+            self.end_line_tool();
             self.end_insert_tool();
             self.end_modify();
             self.cancel_sketch();
@@ -1116,6 +1127,7 @@ impl Gui {
         self.leave_walk();
         self.end_dim_tool();
         self.end_grid_tool();
+        self.end_line_tool();
         self.end_insert_tool();
         self.end_modify();
         let Some(doc) = self.doc.and_then(|id| self.app.document(id)) else {
@@ -1664,6 +1676,7 @@ impl Gui {
         self.note_at(x, y)
             .or_else(|| self.dim_at(x, y))
             .or_else(|| self.grid_at(x, y))
+            .or_else(|| self.datum_at(x, y))
             .or_else(|| self.insert_at(x, y))
             .or_else(|| self.opening_at(x, y))
             .or_else(|| {
@@ -1843,6 +1856,7 @@ impl Gui {
         }
         if ids.is_empty()
             && (self.grid_tool_properties(grid)
+                || self.line_tool_properties(grid)
                 || self.column_tool_properties(grid)
                 || self.curtain_tool_properties(grid)
                 || self.ceiling_tool_properties(grid)
@@ -1935,6 +1949,11 @@ impl Gui {
                 grid.append(Property::string(label, "level_name", value));
                 continue;
             }
+            // And a reference plane's (`refplane.rename`).
+            if reviera_core::ref_planes::recipe(&e).is_some() && label == "Name" {
+                grid.append(Property::string(label, "dt_rp_name", value));
+                continue;
+            }
             // So is a grid's (`grid.rename`).
             if is_grid && label == "Name" {
                 grid.append(Property::string(label, "grid_name", value));
@@ -1992,6 +2011,7 @@ impl Gui {
             || self.skylight_rows(grid, id)
             || self.mesh_object_rows(grid, id)
             || self.path_array_rows(grid, id)
+            || self.datum_rows(grid, id)
         {
             return;
         }
@@ -2209,6 +2229,7 @@ impl Gui {
             || self.place_edit(property, text.clone())
             || self.mesh_object_edit(property, text.clone())
             || self.path_array_edit(property, text.clone())
+            || self.datum_edit(property, text.clone())
             || self.insert_edit(property, text.clone())
             || self.wall_edit(property, text.clone())
             || self.floor_edit(property, text.clone())
@@ -2550,6 +2571,7 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                     None if g.array_tool.is_some() => g.array_click(x, y, &p),
                     None if g.dim_tool.is_some() => g.dim_click(x, y),
                     None if g.grid_tool.is_some() => g.grid_click(x, y),
+                    None if g.line_tool.is_some() => g.line_click(x, y),
                     None if g.insert_tool.is_some() => g.insert_click(x, y),
                     None if g.modify_tool.is_some() => g.modify_click(x, y),
                     None if g.active_view().is_some_and(|v| v.nav.walk.is_some()) => {}
@@ -2642,6 +2664,10 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                     }
                     if g.grid_tool.is_some() {
                         g.grid_motion(x, y);
+                        redraw = true;
+                    }
+                    if g.line_tool.is_some() {
+                        g.line_motion(x, y);
                         redraw = true;
                     }
                     if g.insert_tool.is_some() {
@@ -2816,6 +2842,8 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                             g.dim_escape();
                         } else if g.grid_tool.is_some() {
                             g.grid_escape();
+                        } else if g.line_tool.is_some() {
+                            g.line_escape();
                         } else if g.insert_tool.is_some() {
                             g.end_insert_tool();
                         } else if g.modify_tool.is_some() {
@@ -3093,6 +3121,7 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 tool: None,
                 dim_tool: None,
                 grid_tool: None,
+                line_tool: None,
                 insert_tool: None,
                 modify_tool: None,
                 sketch: None,
@@ -3548,6 +3577,7 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
             g.end_tool(f);
             g.end_dim_tool();
             g.end_grid_tool();
+            g.end_line_tool();
             g.end_insert_tool();
             g.end_modify();
             g.end_room_tool();
@@ -3811,6 +3841,16 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
             g.start_grid_tool();
             focus(g);
         }),
+        "refplane.create" => with(gui, |g| {
+            g.start_line_tool(datum_tools::LineMode::RefPlane);
+            focus(g);
+        }),
+        "modelline.create" => with(gui, |g| {
+            g.start_line_tool(datum_tools::LineMode::ModelLine);
+            focus(g);
+        }),
+        "workplane.set" => with(gui, Gui::set_work_plane),
+        "workplane.show" => with(gui, Gui::toggle_work_plane),
         "dim.create_aligned" => with(gui, |g| {
             g.start_dim_tool(f);
             focus(g);

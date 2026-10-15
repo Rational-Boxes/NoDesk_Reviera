@@ -143,6 +143,32 @@ keys = "GR"
 help = "Draw grid lines in a plan"
 
 [[action]]
+id = "refplane.create"
+label = "Ref Plane"
+icon = "ref_plane"
+keys = "RP"
+help = "Draw a reference plane in a plan: an unbounded vertical construction plane through the line"
+
+[[action]]
+id = "modelline.create"
+label = "Model Line"
+icon = "model_line"
+keys = "LI"
+help = "Draw lines, arcs and chains on the view's work plane; they show in every view"
+
+[[action]]
+id = "workplane.set"
+label = "Set"
+icon = "work_plane"
+help = "Choose the view's work plane by name: a level, grid or named reference plane"
+
+[[action]]
+id = "workplane.show"
+label = "Show"
+icon = "work_plane_show"
+help = "Show or hide the view's work plane as a grid"
+
+[[action]]
 id = "text.create"
 label = "Text"
 icon = "text"
@@ -1057,10 +1083,14 @@ tools = [
 ]
 
 [[tab.panel]]
-label = "Datum"
+label = "Datum & Work Plane"
 tools = [
   { action = "level.create", size = "small" },
   { action = "grid.create", size = "small" },
+  { action = "refplane.create", size = "small" },
+  { action = "workplane.set", size = "small" },
+  { action = "workplane.show", size = "small" },
+  { action = "modelline.create", size = "small" },
 ]
 
 [[tab]]
@@ -1425,7 +1455,8 @@ items = [
   "ceiling.create", "ceiling.edit_boundary", "roof.create_footprint", "roof.edit_footprint", "-",
   "room.place", "room.place_automatically", "-",
   "opening.create_wall", "opening.create_vertical", "opening.create_shaft", "-",
-  "grid.create", "level.create",
+  "grid.create", "level.create", "refplane.create", "modelline.create", "-",
+  "workplane.set", "workplane.show",
 ]
 
 [[menu]]

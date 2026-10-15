@@ -343,6 +343,17 @@ Create … Boundary* tab:
   continuous, gapped or custom centre segment, and the pens and patterns. Saved as one `IfcGrid`
   with an `IfcGridAxis` per line; axes changed in another tool are taken over on open
   (`grid.create`, `grid.rename`, `grid.set_curve`, `grid.list`).
+- **Reference planes** (RP): unbounded construction planes drawn as a line in a plan, named to
+  serve as work planes; dashed green in plans and in the sections and elevations that look along
+  them. Saved as `IfcAnnotation` with an Axis (`refplane.create`, `refplane.rename`,
+  `refplane.set`, `refplane.list`; ARC-REFP-001).
+- **Work planes**: each view's active plane (a plan's level by default), set by name (level,
+  grid, named reference plane) and shown as a grid. Elements on one follow it; Dissociate fixes
+  them where they are (`workplane.set`, `workplane.get`, `workplane.show`, `workplane.list`,
+  `element.set_work_plane`, `element.dissociate_work_plane`; ARC-WP-001).
+- **Model lines** (LI): lines, arcs and chains on a work plane, in seven line styles, shown in
+  plans, sections, elevations and 3D. Saved as styled `IfcAnnotation` curves (`modelline.create`,
+  `modelline.set`, `modelline.list`, `modelline.styles`; ARC-MLIN-001).
 
 ### Components and libraries
 
@@ -575,9 +586,9 @@ area by area (a review against the spec on 2026-10-15). Whole areas not started 
 
 **Not started (architecture):**
 
-- **Datums and work planes**: reference planes, work planes (setting, showing, picking),
-  scope boxes, and 2D/3D datum extents with bubbles per view (ARC-REFP-001, ARC-WP-001,
-  ARC-SCOPE-001, ARC-DATUM-001).
+- **Datums and work planes**: scope boxes, 2D/3D datum extents with bubbles per view, picking a
+  face as the work plane, Go To View and the Work Plane Viewer (ARC-SCOPE-001, ARC-DATUM-001,
+  ARC-WP-001).
 - **Drawing aids**: temporary dimensions on a selection, typed lengths while drawing (listening
   dimensions), Tab to cycle overlapping picks, and dimension locks, equality constraints and
   their solver (ARC-DIM-001/002, ARC-KEY-001, ARC-CNST-001/002).
@@ -591,8 +602,8 @@ area by area (a review against the spec on 2026-10-15). Whole areas not started 
   Roof, shape editing (points and split lines on floors and roofs), parts (ARC-SLED-001,
   ARC-ROOF-002/003/005/006, ARC-SHAPE-001, ARC-PART-001 … 004).
 - **Rooms and areas**: area plans and area schemes, colour schemes (ARC-AREA-001, ARC-CLR-001).
-- **Modelling in the project**: Model In-Place, model text, model lines (ARC-INPL-001,
-  ARC-MTXT-001, ARC-MLIN-001).
+- **Modelling in the project**: Model In-Place, model text, converting model lines to detail
+  lines (ARC-INPL-001, ARC-MTXT-001, ARC-MLIN-001).
 - **Massing and site**: masses, mass floors, model by face, toposolids, sub-divisions and
   excavation, graded regions, contours, site components, parking and property lines
   (ARC-MASS-001 … 003, ARC-TOPO-001 … 006, ARC-SITE-001).

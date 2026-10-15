@@ -232,6 +232,7 @@ impl Gui {
         let f = self.frame;
         self.end_tool(&f);
         self.end_grid_tool();
+        self.end_line_tool();
         self.end_insert_tool();
         self.end_modify();
         self.leave_walk();

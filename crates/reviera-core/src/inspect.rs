@@ -84,6 +84,12 @@ fn raw_parent(store: &Store, e: &Element, imported: &Imported) -> Option<Element
     if let Some(r) = crate::stairs::stair_recipe(e) {
         return by_guid(&r.base_level);
     }
+    if let Some(r) = crate::model_lines::recipe(e) {
+        if let crate::work_planes::WorkPlaneRef::Level { level, .. } = &r.plane {
+            return by_guid(level);
+        }
+        return crate::work_planes::host_of(&r.plane).and_then(by_guid);
+    }
     if let Some(r) = crate::columns::column_recipe(e) {
         return by_guid(&r.extent.base_level);
     }

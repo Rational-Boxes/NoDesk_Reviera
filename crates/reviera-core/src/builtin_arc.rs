@@ -84,6 +84,20 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(ArrayRestoreMember),
         registry.add(ArrayMembers),
         registry.add(ArrayUnarray),
+        registry.add(RefPlaneCreate),
+        registry.add(RefPlaneRename),
+        registry.add(RefPlaneSet),
+        registry.add(RefPlaneList),
+        registry.add(WorkPlaneSet),
+        registry.add(WorkPlaneGet),
+        registry.add(WorkPlaneShow),
+        registry.add(WorkPlaneList),
+        registry.add(ElementSetWorkPlane),
+        registry.add(ElementDissociateWorkPlane),
+        registry.add(ModelLineCreate),
+        registry.add(ModelLineSet),
+        registry.add(ModelLineList),
+        registry.add(ModelLineStyles),
     ];
     for r in results {
         r.expect("architecture commands are valid");
@@ -702,4 +716,170 @@ edit_command!(
     crate::path_arrays::ArrayParams,
     Vec<ElementId>,
     crate::path_arrays::unarray
+);
+
+edit_command!(
+    RefPlaneCreate,
+    "refplane.create",
+    "Create a reference plane",
+    "Creates a reference plane (ARC-REFP-001): an unbounded construction plane through the line from \
+     `start` to `end` and containing the direction of the view it is drawn in (`view_normal`; up for a \
+     plan, so the plane is vertical). Points are `[x, y]` (at `z`, or the `level`'s elevation, else 0) \
+     or `[x, y, z]`. A named plane (names are unique) is offered as a work plane. Written as an \
+     IfcAnnotation (ObjectType ReferencePlane) with its line as the Axis representation. Returns the \
+     plane.",
+    "Reference Plane",
+    crate::ref_planes::CreateParams,
+    ElementId,
+    crate::ref_planes::create
+);
+
+edit_command!(
+    RefPlaneRename,
+    "refplane.rename",
+    "Rename a reference plane",
+    "Renames a reference plane; an empty name unnames it (it then no longer appears among the named \
+     work planes).",
+    "Rename Reference Plane",
+    crate::ref_planes::RenameParams,
+    (),
+    crate::ref_planes::rename
+);
+
+edit_command!(
+    RefPlaneSet,
+    "refplane.set",
+    "Change a reference plane",
+    "Moves a reference plane's line ends (`[x, y]` keeps their heights) or changes its subcategory \
+     (empty clears it). Model lines on the plane follow it.",
+    "Edit Reference Plane",
+    crate::ref_planes::SetParams,
+    (),
+    crate::ref_planes::set
+);
+
+read_command!(
+    RefPlaneList,
+    "refplane.list",
+    "List reference planes",
+    "Every reference plane: its name, line, view direction, normal and subcategory.",
+    crate::builtin::NoParams,
+    Vec<crate::ref_planes::RefPlaneInfo>,
+    crate::ref_planes::list_command
+);
+
+edit_command!(
+    WorkPlaneSet,
+    "workplane.set",
+    "Set a view's work plane",
+    "Sets the active work plane of a view (ARC-WP-001), which the Model Line tool and other \
+     work-plane tools draw on: one of `level` (with an `offset`), `grid`, `ref_plane` or an explicit \
+     `plane` `{origin, x_dir, normal}`. A plan's work plane is its level until one is set.",
+    "Set Work Plane",
+    crate::work_planes::SetParams,
+    crate::work_planes::WorkPlaneInfo,
+    crate::work_planes::set
+);
+
+read_command!(
+    WorkPlaneGet,
+    "workplane.get",
+    "Get a view's work plane",
+    "A view's active work plane: what defines it, a label, the resolved plane (origin, x, y, normal), \
+     and whether its grid is shown.",
+    crate::work_planes::ViewParams,
+    crate::work_planes::WorkPlaneInfo,
+    crate::work_planes::get
+);
+
+edit_command!(
+    WorkPlaneShow,
+    "workplane.show",
+    "Show or hide the work plane",
+    "Shows or hides a view's work plane as a grid (with `grid_spacing`, metres).",
+    "Show Work Plane",
+    crate::work_planes::ShowParams,
+    (),
+    crate::work_planes::show
+);
+
+read_command!(
+    WorkPlaneList,
+    "workplane.list",
+    "List the named work planes",
+    "The planes a work plane can be chosen from by name: levels, grids and named reference planes.",
+    crate::builtin::NoParams,
+    Vec<crate::work_planes::NamedPlane>,
+    crate::work_planes::list_named
+);
+
+edit_command!(
+    ElementSetWorkPlane,
+    "element.set_work_plane",
+    "Move elements to another work plane",
+    "Puts model lines on another work plane (one of `level` with `offset`, `grid`, `ref_plane` or \
+     `plane`), projected onto it where they stand; they then follow that plane.",
+    "Pick New Work Plane",
+    crate::work_planes::SetElementParams,
+    (),
+    crate::work_planes::set_element
+);
+
+edit_command!(
+    ElementDissociateWorkPlane,
+    "element.dissociate_work_plane",
+    "Dissociate elements from their work plane",
+    "Fixes model lines where they are, on a plane that no longer follows its level, grid or \
+     reference plane.",
+    "Dissociate",
+    crate::work_planes::ElementsParams,
+    (),
+    crate::work_planes::dissociate
+);
+
+edit_command!(
+    ModelLineCreate,
+    "modelline.create",
+    "Draw model lines",
+    "Draws model lines (ARC-MLIN-001): 3D lines on a work plane, shown in every view. Each curve \
+     (`line` with optional `through` points: one makes an arc, more a spline) is in the work plane's \
+     coordinates: on a level, plan x and y; on a vertical plane, along its line from its start and up. \
+     The plane is one of `level` (with `offset`), `grid`, `ref_plane` or `plane` (the lowest level when \
+     omitted). `line_style` is one of `modelline.styles`. The lines follow their plane. Written as \
+     IfcAnnotation (ObjectType ModelLine) with a styled 3D polyline. Returns one line per curve.",
+    "Model Lines",
+    crate::model_lines::CreateParams,
+    Vec<ElementId>,
+    crate::model_lines::create
+);
+
+edit_command!(
+    ModelLineSet,
+    "modelline.set",
+    "Change model lines",
+    "Changes model lines' line style, or one line's curve (work plane coordinates).",
+    "Edit Model Lines",
+    crate::model_lines::SetParams,
+    (),
+    crate::model_lines::set
+);
+
+read_command!(
+    ModelLineList,
+    "modelline.list",
+    "List model lines",
+    "Every model line as it is now: its world polyline, line style and work plane.",
+    crate::builtin::NoParams,
+    Vec<crate::model_lines::ModelLineInfo>,
+    crate::model_lines::list_command
+);
+
+read_command!(
+    ModelLineStyles,
+    "modelline.styles",
+    "List line styles",
+    "The line styles model lines can use: name, pen, pattern and colour.",
+    crate::builtin::NoParams,
+    Vec<crate::model_lines::LineStyle>,
+    crate::model_lines::styles_command
 );
