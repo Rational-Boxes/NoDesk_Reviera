@@ -54,6 +54,7 @@ Any source that fails this test is rejected. Rejections are noted in the session
 | `research/03_structure_mep.md` | Structure, Steel, Precast, MEP, analysis |
 | `research/04_documentation_collaboration.md` | Views, annotation, sheets, output, worksharing, linking |
 | `research/05_data_model_platform.md` | Element model, families, parameters, formats, API, releases |
+| `research/06_family_workflow.md` | Families UI and workflow: loading, placing, browsing, editing, saving, libraries, groups |
 | `screenshots/<area>/` | Reference screenshots (internal only; see §6) |
 | `web/reviera_spec.html` | Web version of the specification, built by `tools/build_spec_html.py` and published as a private artifact (https://claude.ai/artifact/N9SBnpssvs4WSrFwh2zrpu). Screenshots are **not** included. |
 | `SOURCE_REGISTER.md` | Full source and screenshot register with public-availability verdicts |
@@ -101,6 +102,15 @@ Any source that fails this test is rejected. Rejections are noted in the session
 - **Output.**
   - `Revit_Application_Specification.md`: about 21,400 lines, 622 numbered requirements (276 P0, 215 P1, 125 P2, 3 P3) and 1,590 commands.
   - It is assembled by `tools/build_spec.py` from `spec/*.md`.
+
+### 2026-10-14 — Session 2: Families UI and workflow research
+
+- **Purpose:** describe how Revit users find, load, place, browse, edit, save and manage families and groups, so that Reviera's component library (DM-LIB-002…004) can feel familiar. Research only; no design.
+- **Output:** `research/06_family_workflow.md` (about 7,500 words of body text plus source tables), complementing `research/05` §1, §4 and §9.
+- **Sources:** 61 public sources (F001–F059a): 43 Autodesk help pages (2014–2027 editions) and 18 public tutorial, reseller, vendor-blog and marketplace pages. All were fetched without authentication (HTTP 200).
+- **Unreachable or rejected:** 18 public URLs returned 403/404, redirected to an unrelated page, or failed a TLS certificate check (help.contentcatalog.autodesk.com). These include Autodesk blogs, autodesk.com/shortcuts, Arkance articles, AUGI, engineering.com and Autodesk forums. The blocks were not bypassed. Where a title or search-engine summary of such a page is mentioned, the research file flags it as unconfirmed.
+- **Methods used:** public web search and HTTP fetch of public pages. No images were downloaded, Revit was not installed or run, and no file formats were examined.
+- **Finding to check:** "Reload Latest" is a worksharing command (Collaborate › Synchronize), not a family command; the wording in `research/05` §4.9 needs checking.
 
 ---
 
@@ -221,3 +231,4 @@ Record anyone who has seen raw reference material (vendor docs, screenshots) and
 | 2026-10-14 | Owner requirement: the Library interface previews items and edits metadata that the file's format may not be able to hold. Added *Item preview and details* to DM-LIB-004. The preview is an interactive 3D, plan and front view, with size, counts, and the elements of IFC fragments. A Details form covers identity, classification, placement, product, provenance, material slots, property sets and thumbnail. Details are stored in the manifest and never in the file; several items can be edited at once. On first stamp they become the type's name, IFC class, `IfcClassificationReference`, property sets and material mapping. For IFC items, file values are shown read-only, manifest overrides are marked, and *Write into File* is optional. Commands: `library.get_meta`, `library.preview`, `library.write_meta_to_file`; `library.set_meta` extended. The IFC entities and the `Pset_ManufacturerTypeInformation` set are from the published IFC4 schema; Uniclass and OmniClass are named only as classification systems. No sources were used. |
 | 2026-10-14 | Owner requirement: a duplicate-along-a-path tool that stays parametric although the copies are plain meshes, for example a custom column model filling a Greek temple facade, with a set number of copies. Added ARC-MOD-033 *Array along a path* (Ch 3 §3.12.3a). Paths are picked (walls, grids, railings, model lines, slab edges), drawn, or a host's edges. Distribution is by Number, Fixed Distance, Maximum or Minimum Spacing (as curtain grids), with corner handling (through, at every corner, skip), orientation (follow, fixed, outward or inward), and height on the level, the path or a host face. The array is one element whose members share one mesh, with exclusions, unarray and IFC as an `IfcGroup` PathArray with members as `IfcMappedItem` elements. Shortcut AP; added to the quick menu. Reviera-originated design; no sources were used. +1 requirement, +5 commands. |
 | 2026-10-14 | Owner confirmation: path arrays run along lines, arcs and splines, for example copies of a tree laid out as a hedge. ARC-MOD-033 gains seeded *Variation*: random rotation, a scale range, a weighted choice among several components and an offset across the path, stable through regeneration, with Reseed. It also gains spline grips and a hedge acceptance test. No sources were used. |
+| 2026-10-14 | Session 2: added `research/06_family_workflow.md` (families UI and workflow; sources F001–F059a, all public). |
