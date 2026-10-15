@@ -177,6 +177,8 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(ElementMirror),
         registry.add(ElementOffset),
         registry.add(ElementSplit),
+        registry.add(ElementSplitWithGap),
+        registry.add(WallSplitHorizontal),
         registry.add(ElementTrimCorner),
         registry.add(ElementTrimExtend),
         registry.add(ElementAlign),
@@ -2092,6 +2094,30 @@ modify_command!(
     modify::SplitParams,
     Vec<ElementId>,
     modify::split
+);
+modify_command!(
+    ElementSplitWithGap,
+    "element.split_with_gap",
+    "Split a wall with a gap",
+    "Splits a straight Reviera wall at a point and cuts out a gap of `gap` (1.6 mm to 305 mm) centred on \
+     it (ARC-WALL-011); the new ends do not join. Returns both walls.",
+    "Split with Gap",
+    modify::SplitGapParams,
+    Vec<ElementId>,
+    modify::split_with_gap
+);
+modify_command!(
+    WallSplitHorizontal,
+    "wall.split_horizontal",
+    "Split a wall horizontally",
+    "Splits a Reviera wall at a height `z` or a level (ARC-WALL-011): the lower wall's top stops there \
+     (at the level, or an unconnected height), the upper wall starts there (on the level, or a base \
+     offset) and keeps the top. Doors and windows go to the part they are in; one crossing the height \
+     is refused. Returns the lower and the upper wall.",
+    "Split Horizontally",
+    modify::SplitHorizontalParams,
+    Vec<ElementId>,
+    modify::split_horizontal
 );
 modify_command!(
     ElementTrimCorner,

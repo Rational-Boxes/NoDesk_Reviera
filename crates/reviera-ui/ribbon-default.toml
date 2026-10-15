@@ -143,6 +143,18 @@ keys = "GR"
 help = "Draw grid lines in a plan"
 
 [[action]]
+id = "element.split_with_gap"
+label = "Split with Gap"
+icon = "split_gap"
+help = "Split a wall with a joint gap: click where the gap goes, then type its width"
+
+[[action]]
+id = "wall.split_horizontal"
+label = "Split Horizontally"
+icon = "split_horizontal"
+help = "Split the selected wall at a level or height into a lower and an upper wall"
+
+[[action]]
 id = "shape.add_point"
 label = "Add Point"
 icon = "shape_point"
@@ -1358,6 +1370,8 @@ panels = [{ label = "Wall", tools = [
   { action = "wall.flip", size = "large" },
   { action = "wall.attach", size = "large" },
   { action = "wall.detach", size = "large" },
+  { action = "element.split_with_gap", size = "large" },
+  { action = "wall.split_horizontal", size = "large" },
 ] }]
 
 [[context]]

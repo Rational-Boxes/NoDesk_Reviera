@@ -48,6 +48,8 @@ pub enum LineMode {
     SlabEdge,
     /// Shape Editing › Add Point on the selected floor (ARC-SHAPE-001).
     ShapePoint,
+    /// Split with Gap (ARC-WALL-011): click a wall where the gap goes.
+    SplitGap,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -263,8 +265,12 @@ impl Gui {
             LineMode::JoinRoof => "Join/Unjoin Roof",
             LineMode::SlabEdge => "Slab Edge",
             LineMode::ShapePoint => "Add Point",
+            LineMode::SplitGap => "Split with Gap",
         };
         let mut text = match (t.points.len(), t.shape) {
+            _ if t.mode == LineMode::SplitGap => {
+                format!("{what}: click a wall where the gap goes")
+            }
             _ if t.mode == LineMode::ShapePoint => {
                 format!("{what}: click a point on the floor, then type its height from the surface")
             }
@@ -386,6 +392,13 @@ impl Gui {
         {
             return self.shape_point_click(x, y);
         }
+        if self
+            .line_tool
+            .as_ref()
+            .is_some_and(|t| t.mode == LineMode::SplitGap)
+        {
+            return self.split_gap_click(x, y);
+        }
         let Some(p) = self.line_snapped(x, y) else {
             return;
         };
@@ -500,7 +513,8 @@ impl Gui {
             LineMode::RoofExtrusion
             | LineMode::JoinRoof
             | LineMode::SlabEdge
-            | LineMode::ShapePoint => return,
+            | LineMode::ShapePoint
+            | LineMode::SplitGap => return,
             LineMode::SlopeArrow => {
                 let roof = t.target;
                 // The footprint curve nearest the tail.
@@ -689,6 +703,10 @@ impl Gui {
             }
             LineMode::ShapePoint => {
                 grid.append(Property::category("Add Point", "c_lt"));
+                return true;
+            }
+            LineMode::SplitGap => {
+                grid.append(Property::category("Split with Gap", "c_lt"));
                 return true;
             }
             LineMode::RoofExtrusion => {
@@ -1646,5 +1664,200 @@ impl Gui {
             }
         }
         self.refresh_scene(&frame);
+    }
+}
+
+impl Gui {
+    /// Split with Gap: the wall under the click, cut there with a typed gap.
+    fn split_gap_click(&mut self, x: i32, y: i32) {
+        let frame = self.frame;
+        let Some(panel) = self.active_view().map(|v| v.panel) else {
+            return;
+        };
+        let Some(p) = self.plan_xy(x, y) else { return };
+        let Some(wall) = self.element_at(x, y, &panel).filter(|w| {
+            self.store_now().is_some_and(|s| {
+                s.get(*w)
+                    .and_then(reviera_core::walls::wall_recipe)
+                    .is_some()
+            })
+        }) else {
+            return frame.set_status_text("Click a wall", 0);
+        };
+        let dialog =
+            TextEntryDialog::builder(&frame, "Joint Gap (1.6 to 305 mm):", "Split with Gap")
+                .with_default_value("20")
+                .build();
+        if dialog.show_modal() != ID_OK {
+            return;
+        }
+        let typed = dialog.get_value().unwrap_or_default();
+        let gap = match self.run(
+            "units.parse",
+            json!({ "text": typed, "data_type": "length" }),
+        ) {
+            Ok(v) => v.as_f64().unwrap_or_default(),
+            Err(_) => return frame.set_status_text(&format!("Invalid value: {typed}"), 0),
+        };
+        match self.run(
+            "element.split_with_gap",
+            json!({ "element_id": wall, "point": p, "gap": gap }),
+        ) {
+            Ok(_) => self.refresh_scene(&frame),
+            Err(e) => frame.set_status_text(&e, 0),
+        }
+    }
+
+    /// Modify | Walls › Split Horizontally: the selected wall at a level it passes, or a height.
+    pub(crate) fn split_horizontal(&mut self) {
+        let frame = self.frame;
+        let Some(store) = self.store_now() else {
+            return;
+        };
+        let Some(wall) = self.selection().into_iter().find(|w| {
+            store
+                .get(*w)
+                .and_then(reviera_core::walls::wall_recipe)
+                .is_some()
+        }) else {
+            return frame.set_status_text("Select a wall first", 0);
+        };
+        let Ok(g) = reviera_core::walls::regenerate(&store, store.get(wall).expect("selected"))
+        else {
+            return;
+        };
+        let (lo, hi) = (g.base_z, g.base_z + g.height);
+        let levels: Vec<(ElementId, String)> = reviera_core::levels::list(&store)
+            .into_iter()
+            .filter(|l| l.elevation > lo + 0.01 && l.elevation < hi - 0.01)
+            .map(|l| (l.id, l.name))
+            .collect();
+        let mut labels: Vec<String> = levels.iter().map(|l| format!("At {}", l.1)).collect();
+        labels.push("At a height…".to_owned());
+        let refs: Vec<&str> = labels.iter().map(String::as_str).collect();
+        let d = SingleChoiceDialog::builder(&frame, "Split the wall:", "Split Horizontally", &refs)
+            .build();
+        if d.show_modal() != ID_OK {
+            return;
+        }
+        let k = usize::try_from(d.get_selection()).unwrap_or(usize::MAX);
+        let args = if let Some((level, _)) = levels.get(k) {
+            json!({ "wall_id": wall, "level_id": level })
+        } else {
+            let t =
+                TextEntryDialog::builder(&frame, "Split at the elevation:", "Split Horizontally")
+                    .with_default_value(&self.format_length((lo + hi) / 2.0))
+                    .build();
+            if t.show_modal() != ID_OK {
+                return;
+            }
+            let typed = t.get_value().unwrap_or_default();
+            match self.run(
+                "units.parse",
+                json!({ "text": typed, "data_type": "length" }),
+            ) {
+                Ok(v) => json!({ "wall_id": wall, "z": v.as_f64().unwrap_or_default() }),
+                Err(_) => return frame.set_status_text(&format!("Invalid value: {typed}"), 0),
+            }
+        };
+        match self.run("wall.split_horizontal", args) {
+            Ok(_) => self.refresh_scene(&frame),
+            Err(e) => frame.set_status_text(&e, 0),
+        }
+    }
+}
+
+impl Gui {
+    /// A straight wall's Cross-Section rows (ARC-WALL-005).
+    pub(crate) fn wall_cross_rows(&mut self, grid: &PropertyGrid, id: ElementId) {
+        use reviera_core::walls::cross_section::CrossSection;
+        let Some(r) = self
+            .store_now()
+            .and_then(|s| s.get(id).and_then(reviera_core::walls::wall_recipe))
+        else {
+            return;
+        };
+        if !r.through.is_empty() {
+            return;
+        }
+        grid.append(Property::category("Cross-Section", "c_wc"));
+        let (mode, a, e, i) = match r.cross_section {
+            None => (0, 0.0, 0.0, 0.0),
+            Some(CrossSection::Slanted { angle }) => (1, angle, 0.0, 0.0),
+            Some(CrossSection::Tapered { exterior, interior }) => (2, 0.0, exterior, interior),
+        };
+        grid.append(Property::enumeration(
+            "Cross-Section",
+            "wc_mode",
+            vec![
+                ("Vertical".to_owned(), 0),
+                ("Slanted".to_owned(), 1),
+                ("Tapered".to_owned(), 2),
+            ],
+            mode,
+        ));
+        let deg = |v: f64| format!("{:.2}°", v.to_degrees());
+        if mode == 1 {
+            grid.append(Property::string("Angle From Vertical", "wc_angle", deg(a)));
+        }
+        if mode == 2 {
+            grid.append(Property::string("Exterior Angle", "wc_ext", deg(e)));
+            grid.append(Property::string("Interior Angle", "wc_int", deg(i)));
+        }
+    }
+
+    pub(crate) fn wall_cross_edit(&mut self, property: &str, text: Option<String>) -> bool {
+        use reviera_core::walls::cross_section::CrossSection;
+        let Some(row) = property.strip_prefix("wc_") else {
+            return false;
+        };
+        let text = text.unwrap_or_default();
+        let ids = self.selection();
+        let Some(&id) = ids.first() else { return true };
+        let current = self
+            .store_now()
+            .and_then(|s| s.get(id).and_then(reviera_core::walls::wall_recipe))
+            .and_then(|r| r.cross_section);
+        let angle = |t: &str| {
+            t.trim()
+                .trim_end_matches('°')
+                .trim()
+                .parse::<f64>()
+                .ok()
+                .map(f64::to_radians)
+        };
+        let (mut a, mut e, mut i) = match current {
+            Some(CrossSection::Slanted { angle }) => (angle, 0.0, 0.0),
+            Some(CrossSection::Tapered { exterior, interior }) => (0.0, exterior, interior),
+            None => (0.0, 0.0, 0.0),
+        };
+        let mut mode = match current {
+            None => "vertical",
+            Some(CrossSection::Slanted { .. }) => "slanted",
+            Some(CrossSection::Tapered { .. }) => "tapered",
+        };
+        match row {
+            "mode" => {
+                mode = match text.as_str() {
+                    "Slanted" => "slanted",
+                    "Tapered" => "tapered",
+                    _ => "vertical",
+                }
+            }
+            "angle" => a = angle(&text).unwrap_or(a),
+            "ext" => e = angle(&text).unwrap_or(e),
+            "int" => i = angle(&text).unwrap_or(i),
+            _ => return true,
+        }
+        let frame = self.frame;
+        match self.run(
+            "wall.set_cross_section",
+            json!({ "wall_ids": ids, "mode": mode, "angle": a, "exterior_angle": e, "interior_angle": i }),
+        ) {
+            Ok(_) => self.refresh_scene(&frame),
+            Err(err) => frame.set_status_text(&err, 0),
+        }
+        self.properties_stale = true;
+        true
     }
 }

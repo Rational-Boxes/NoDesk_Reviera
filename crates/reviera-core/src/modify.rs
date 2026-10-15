@@ -719,6 +719,226 @@ pub(crate) fn split(txn: &mut Transaction<'_>, p: SplitParams) -> Result<Vec<Ele
     Ok(vec![id, new])
 }
 
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SplitGapParams {
+    pub element_id: ElementRef,
+    /// A plan point on the wall: the gap's middle.
+    pub point: [f64; 2],
+    /// The Joint Gap (1.6 mm to 305 mm).
+    #[schemars(extend("x-reviera-data-type" = "length"))]
+    pub gap: f64,
+}
+
+/// Split with Gap (ARC-WALL-011): splits a wall and cuts a gap of `gap` out at the point; the new
+/// ends do not join.
+pub(crate) fn split_with_gap(
+    txn: &mut Transaction<'_>,
+    p: SplitGapParams,
+) -> Result<Vec<ElementId>> {
+    if !(0.0016 - 1e-9..=0.305 + 1e-9).contains(&p.gap) {
+        return Err(Error::new(
+            "split.gap",
+            "the Joint Gap is between 1.6 mm and 305 mm",
+        ));
+    }
+    let store = txn.store().clone();
+    let (_, recipe) = wall_of(&store, &p.element_id)?;
+    if !recipe.through.is_empty() {
+        return Err(Error::new(
+            "split.curved",
+            "Split with Gap works on straight walls",
+        ));
+    }
+    if matches!(
+        recipe.cross_section,
+        Some(walls::cross_section::CrossSection::Slanted { .. })
+    ) {
+        return Err(Error::new(
+            "split.slanted",
+            "a slanted wall cannot be split by a vertical plane",
+        ));
+    }
+    let parts = split(
+        txn,
+        SplitParams {
+            element_id: p.element_id.clone(),
+            point: p.point,
+        },
+    )?;
+    let half = p.gap / 2.0;
+    let (a, b) = (parts[0], parts[1]);
+    let mut ra = walls::wall_recipe(txn.store().get(a).expect("split")).expect("a wall");
+    let mut rb = walls::wall_recipe(txn.store().get(b).expect("split")).expect("a wall");
+    let d = ra.curve.length().max(1e-12);
+    let u = [
+        (ra.curve.end[0] - ra.curve.start[0]) / d,
+        (ra.curve.end[1] - ra.curve.start[1]) / d,
+    ];
+    if ra.curve.length() <= half + walls::TOL_SHORT || rb.curve.length() <= half + walls::TOL_SHORT
+    {
+        return Err(Error::new("element.too_short", "Element too short"));
+    }
+    ra.curve.end = [ra.curve.end[0] - u[0] * half, ra.curve.end[1] - u[1] * half];
+    ra.join_allowed[1] = false;
+    rb.curve.start = [
+        rb.curve.start[0] + u[0] * half,
+        rb.curve.start[1] + u[1] * half,
+    ];
+    rb.join_allowed[0] = false;
+    // Doors and windows of the second part: measured from its new start.
+    let guid_b = txn.store().get(b).expect("split").guid().to_string();
+    for i in inserts::hosted_by(txn.store(), &guid_b) {
+        let mut r = inserts::insert_recipe(txn.store().get(i).expect("hosted")).expect("an insert");
+        r.along -= half;
+        set_recipe(txn, i, &r)?;
+    }
+    set_recipe(txn, a, &ra)?;
+    set_recipe(txn, b, &rb)?;
+    // The gap, held by a locked distance between the new ends.
+    let end = |id: ElementId, sub: &str, point: [f64; 2], txn: &Transaction<'_>| {
+        crate::annotations::DimRef {
+            element: Some(txn.store().get(id).expect("split").guid().to_string()),
+            sub: sub.to_owned(),
+            point,
+            direction: [-u[1], u[0]],
+        }
+    };
+    let refs = vec![
+        end(a, "end:end", ra.curve.end, txn),
+        end(b, "end:start", rb.curve.start, txn),
+    ];
+    crate::constraints::create(
+        txn,
+        &crate::constraints::ConstraintData {
+            kind: crate::constraints::Kind::Distance,
+            refs,
+            across: u,
+            value: Some(p.gap),
+            dimension: None,
+            segment: None,
+        },
+    )?;
+    for id in [a, b] {
+        let store = txn.store().clone();
+        for i in inserts::hosted_by(&store, store.get(id).expect("split").guid().as_str()) {
+            inserts::check_fit(
+                &store,
+                &inserts::resolve(&store, store.get(i).expect("hosted"))?,
+            )?;
+        }
+    }
+    Ok(parts)
+}
+
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SplitHorizontalParams {
+    pub wall_id: ElementRef,
+    /// The height to split at (absolute elevation, metres)…
+    #[schemars(extend("x-reviera-data-type" = "length"))]
+    pub z: Option<f64>,
+    /// …or a level: the lower wall stops at it, the upper one starts on it.
+    pub level_id: Option<ElementRef>,
+}
+
+/// The horizontal split (ARC-WALL-011): a wall cut at a height or level into a lower and an upper
+/// wall; doors and windows go to the part they are in.
+pub(crate) fn split_horizontal(
+    txn: &mut Transaction<'_>,
+    p: SplitHorizontalParams,
+) -> Result<Vec<ElementId>> {
+    let store = txn.store().clone();
+    let (id, recipe) = wall_of(&store, &p.wall_id)?;
+    check_unpinned(&store, id)?;
+    let e = store.get(id).expect("resolved");
+    let g = walls::regenerate(&store, e)?;
+    let (z, level) = match (&p.z, &p.level_id) {
+        (_, Some(l)) => {
+            let lid = store
+                .resolve(l)
+                .filter(|i| {
+                    store
+                        .get(*i)
+                        .is_some_and(|x| x.class == crate::levels::CLASS)
+                })
+                .ok_or_else(|| Error::new("level.not_found", "no such level"))?;
+            let le = store.get(lid).expect("resolved");
+            (crate::levels::elevation(le), Some(le.guid().to_string()))
+        }
+        (Some(z), None) => (*z, None),
+        (None, None) => {
+            return Err(Error::new(
+                "split.height",
+                "give the height `z` or a `level_id`",
+            ));
+        }
+    };
+    let (lo, hi) = (g.base_z, g.base_z + g.height);
+    if z <= lo + walls::TOL_SHORT || z >= hi - walls::TOL_SHORT {
+        return Err(Error::new(
+            "split.height",
+            "the split height must be within the wall, away from its base and top",
+        ));
+    }
+    // Doors and windows may not cross the split.
+    let hosted = inserts::hosted_by(&store, e.guid().as_str());
+    let mut upper_inserts = Vec::new();
+    for i in &hosted {
+        let pl = inserts::resolve(&store, store.get(*i).expect("hosted"))?;
+        let c = pl.cut();
+        if c.z[0] < z - 1e-9 && z < c.z[1] - 1e-9 {
+            return Err(Error::new(
+                "split.through_insert",
+                format!("the split height crosses door or window {i}"),
+            ));
+        }
+        if c.z[0] >= z - 1e-9 {
+            upper_inserts.push(*i);
+        }
+    }
+    let base_elev = crate::levels::elevation_of(&store, &recipe.base_level)?;
+    let mut lower = recipe.clone();
+    let mut upper = recipe.clone();
+    match &level {
+        Some(l) => {
+            lower.top = serde_json::json!({ "level": l });
+            lower.top_offset = 0.0;
+            upper.base_level = l.clone();
+            upper.base_offset = 0.0;
+        }
+        None => {
+            lower.top = serde_json::json!({ "unconnected": z - lo });
+            lower.top_offset = 0.0;
+            upper.base_offset = z - base_elev;
+        }
+    }
+    // The lower part is no longer attached to a roof; the upper keeps the top (an unconnected top
+    // keeps its elevation: the height left above the split).
+    lower.attach_top = None;
+    if upper.top.get("unconnected").is_some() {
+        upper.top = serde_json::json!({ "unconnected": hi - z });
+        upper.top_offset = 0.0;
+    }
+    set_recipe(txn, id, &lower)?;
+    let mut n = copied(e);
+    n.params.insert(
+        RECIPE_KEY.into(),
+        serde_json::to_value(&upper).expect("serialises"),
+    );
+    let new = txn.create(n)?;
+    let new_guid = txn.store().get(new).expect("created").guid().to_string();
+    let new_base = crate::levels::elevation_of(txn.store(), &upper.base_level)?;
+    for i in upper_inserts {
+        let mut r = inserts::insert_recipe(txn.store().get(i).expect("hosted")).expect("an insert");
+        r.host = new_guid.clone();
+        // The sill is measured from the host's base level.
+        r.sill -= new_base - base_elev;
+        set_recipe(txn, i, &r)?;
+    }
+    Ok(vec![id, new])
+}
+
 /// An element and the point picked on the part to keep.
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]

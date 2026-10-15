@@ -170,6 +170,16 @@ pub fn all(store: &Store) -> Vec<Body> {
             Some(c) => crate::walls::openings::cut_mesh(&body, c),
             None => body.mesh(),
         };
+        // A slanted or tapered wall leans (ARC-WALL-005).
+        let mesh = match store.get(id).and_then(crate::walls::wall_recipe) {
+            Some(r) if r.cross_section.is_some() => crate::walls::cross_section::shear(
+                &mesh,
+                &body.geometry,
+                r.flip,
+                r.cross_section.expect("checked"),
+            ),
+            _ => mesh,
+        };
         push(id, &class, trim(mesh), false);
     }
     // Curved walls (ARC-WALL-002): pieces along the curve, cut by their openings.

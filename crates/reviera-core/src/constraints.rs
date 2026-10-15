@@ -383,7 +383,7 @@ fn solve(
     Ok(())
 }
 
-fn create(txn: &mut Transaction<'_>, c: &ConstraintData) -> Result<ElementId> {
+pub(crate) fn create(txn: &mut Transaction<'_>, c: &ConstraintData) -> Result<ElementId> {
     let guid = GlobalId::new();
     txn.create(
         NewElement::new(format!("{CLASS_PREFIX}{}", guid.as_str()))

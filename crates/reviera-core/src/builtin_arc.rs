@@ -137,6 +137,7 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(ShapeSetElevation),
         registry.add(ShapeReset),
         registry.add(ShapeGet),
+        registry.add(WallSetCrossSection),
     ];
     for r in results {
         r.expect("architecture commands are valid");
@@ -1387,4 +1388,19 @@ read_command!(
     crate::shape_edit::ElementParams,
     crate::shape_edit::Shape,
     crate::shape_edit::get
+);
+
+edit_command!(
+    WallSetCrossSection,
+    "wall.set_cross_section",
+    "Slant or taper walls",
+    "Sets straight walls' cross-section (ARC-WALL-005): `vertical`; `slanted` by `angle` from vertical \
+     (a positive angle leans the top to the right of the drawing direction, the interior when not \
+     flipped); or `tapered`, its exterior and interior faces leaning inward by `exterior_angle` and \
+     `interior_angle`, which needs a variable layer in the type that stays thicker than zero at the top. \
+     Written to IFC as a B-rep.",
+    "Cross-Section",
+    crate::walls::cross_section::SetParams,
+    (),
+    crate::walls::cross_section::set
 );

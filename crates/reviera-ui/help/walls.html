@@ -117,6 +117,34 @@ layers as <b>Structure</b>), and plans draw the boundaries between the layers in
 <p>In IFC the type has an <code>IfcMaterialLayerSet</code> and its walls an
 <code>IfcMaterialLayerSetUsage</code>.</p>
 
+<h2 id="cross">Slanted and tapered walls</h2>
+<p>A straight wall's <b>Cross-Section</b> row in Properties is <i>Vertical</i>, <i>Slanted</i> or
+<i>Tapered</i>:</p>
+<ul>
+  <li><b>Slanted</b>: the whole wall leans by <b>Angle From Vertical</b> (degrees, within ±89°);
+    a positive angle leans the top to the right of the drawing direction, toward the interior of
+    an unflipped wall.</li>
+  <li><b>Tapered</b>: the <b>Exterior Angle</b> and <b>Interior Angle</b> lean each face's top
+    inward. The wall's type needs a variable layer (<b>Edit Assembly</b>), which takes the
+    difference; an angle that would thin it to nothing within the wall's height is refused.</li>
+</ul>
+<p>Doors and windows lean with the wall for now. Slanted walls cannot be split with a gap. In IFC
+the wall is a faceted B-rep. <code>wall.set_cross_section</code></p>
+
+<h2 id="split">Splitting walls</h2>
+<ul>
+  <li><b>Split Element</b> <kbd>SL</kbd> splits a wall where you click.</li>
+  <li><b>Modify | Walls › Split with Gap</b>: type the <b>Joint Gap</b> (1.6 mm to 305 mm), then
+    click the wall. The gap is cut out centred on the click; the new ends do not join, and a
+    locked distance between them keeps the gap as either wall moves.</li>
+  <li><b>Modify | Walls › Split Horizontally</b>: select a wall, then choose a level or type a
+    height. The lower wall stops at the level (or gets an unconnected height), and the upper one
+    starts on it (or gets a base offset). Doors and windows above the split go to the upper wall;
+    one that crosses the split stops it.</li>
+</ul>
+<p><code>element.split</code>, <code>element.split_with_gap</code>,
+<code>wall.split_horizontal</code></p>
+
 <h2 id="edit">Editing walls</h2>
 <ul>
   <li>A selected wall shows a grip at each end: drag it to move that end.</li>

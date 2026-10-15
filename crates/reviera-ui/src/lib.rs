@@ -1998,6 +1998,7 @@ impl Gui {
             self.insert_rows(grid, id);
         }
         // Walls go on to their parameters (identity data, type values).
+        self.wall_cross_rows(grid, id);
         self.wall_rows(grid, id);
         if self.deck_rows(grid, id) {
             return;
@@ -2246,6 +2247,7 @@ impl Gui {
             || self.datum_edit(property, text.clone())
             || self.datum_view_edit(property, text.clone())
             || self.dimension_constraint_edit(property, text.clone())
+            || self.wall_cross_edit(property, text.clone())
             || self.insert_edit(property, text.clone())
             || self.wall_edit(property, text.clone())
             || self.floor_edit(property, text.clone())
@@ -3724,6 +3726,11 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
             focus(g);
         }),
         "shape.reset" => with(gui, Gui::reset_shape),
+        "element.split_with_gap" => with(gui, |g| {
+            g.start_line_tool(datum_tools::LineMode::SplitGap);
+            focus(g);
+        }),
+        "wall.split_horizontal" => with(gui, Gui::split_horizontal),
         "slabedge.create" => with(gui, |g| {
             g.start_line_tool(datum_tools::LineMode::SlabEdge);
             focus(g);

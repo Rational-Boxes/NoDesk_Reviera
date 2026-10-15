@@ -35,7 +35,8 @@ pub struct DimRef {
     /// The model element (GlobalId), if any.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub element: Option<String>,
-    /// `face:ext`, `face:int`, `axis` (Reviera walls; `axis` for grids too), or `line`.
+    /// `face:ext`, `face:int`, `axis`, `end:start`, `end:end` (Reviera walls; `axis` for grids
+    /// too), or `line`.
     pub sub: String,
     /// A point on the reference line where it was picked (metres, plan).
     pub point: [f64; 2],
@@ -117,6 +118,12 @@ pub fn resolve_ref(store: &Store, r: &DimRef) -> Option<([f64; 2], [f64; 2])> {
     let g = walls::regenerate(store, e).ok()?;
     let recipe = walls::wall_recipe(e)?;
     let n = g.normal();
+    // A wall's end, square to it (the gap of Split with Gap, ARC-WALL-011).
+    match r.sub.as_str() {
+        "end:start" => return Some((g.start, n)),
+        "end:end" => return Some((g.end, n)),
+        _ => {}
+    }
     // The exterior is on the left (+normal) unless the wall is flipped.
     let ext = if recipe.flip { -1.0 } else { 1.0 };
     let offset = match r.sub.as_str() {

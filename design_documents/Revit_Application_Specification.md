@@ -10653,8 +10653,10 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 **Commands.** `wall.set_cross_section(wall_ids, mode: Vertical|Slanted|Tapered, angle?: f64, exterior_angle?: f64, interior_angle?: f64, override_angles?: bool)`.
 
 **Acceptance criteria.**
-- [ ] A 3 m slanted wall at +10° has its top face displaced by 0.529 m toward the interior.
-- [ ] A tapered type with a 200 mm variable layer, measured at the base, with 1° on each face, built 3 m high, has a variable layer 0.0953 m thick at the top. With 2° on each face the variable layer would reach −0.0095 m within the height, and the change is rejected.
+- [x] A 3 m slanted wall at +10° has its top face displaced by 0.529 m toward the interior.
+- [x] A tapered type with a 200 mm variable layer, measured at the base, with 1° on each face, built 3 m high, has a variable layer 0.0953 m thick at the top. With 2° on each face the variable layer would reach −0.0095 m within the height, and the change is rejected.
+
+**Implementation note (2026-10-15, first build).** As built: the wall recipe's `cross_section` (`slanted` with `angle`, or `tapered` with `exterior` and `interior`, radians); the joined and cut body is sheared (each point moves across the wall by its height times the tangent, proportionally between the faces for a taper); tapered walls need a variable layer and are refused when it would reach zero ("wall.taper_negative"); IFC: a faceted B-rep in the wall's frame; `wall.set_cross_section`; the window's Cross-Section, Angle From Vertical, Exterior Angle and Interior Angle rows. Not built yet: curved walls, in-canvas angle dots, angles from the type with Enable Angle Overrides, Width Measured At top, inserts and sweeps kept vertical, butt-only joins, `IfcMaterialLayerWithOffsets`.
 
 ### 3.3.11 Stacked walls
 **ID:** ARC-STKW-001 · **Priority:** P1 · **Ref:** research/02 §4.6
@@ -10910,7 +10912,9 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 
 **Acceptance criteria.**
 - [ ] Splitting a 10 m wall at 4 m gives walls of 4 m and 6 m. A door at 2 m stays hosted on the first wall, and the IFC export contains the original GlobalId exactly once.
-- [ ] Split with Gap of 20 mm leaves exactly 20 mm between the faces of the new ends, held by a locked dimension.
+- [x] Split with Gap of 20 mm leaves exactly 20 mm between the faces of the new ends, held by a locked dimension.
+
+**Implementation note (2026-10-15).** Split with Gap and Split Horizontally are built for straight walls: `element.split_with_gap` (the gap held by a distance constraint between the new ends, references `end:end` and `end:start`, rather than a drawn dimension; the ends get Disallow Join; slanted walls refused) and `wall.split_horizontal` (z or level; inserts above go to the upper wall with their sills adjusted, one crossing the split refuses it). The window: Modify | Walls › Split with Gap and Split Horizontally. Not built yet: picking the split line in elevation or 3D, a visible locked dimension for the gap, curved walls.
 
 ### 3.3.17 Wall openings
 **ID:** ARC-WALL-012 · **Priority:** P0 · **Ref:** research/02 §4.11, §9

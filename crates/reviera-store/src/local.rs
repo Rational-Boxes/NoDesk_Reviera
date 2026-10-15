@@ -836,6 +836,44 @@ impl LocalProject {
             let (Some(&step), Some(storey)) = (self.steps.get(id), storey) else {
                 continue;
             };
+            // A slanted or tapered wall (ARC-WALL-005): its sheared body as a B-rep in its own
+            // frame.
+            if let Some(cs) = recipe.cross_section {
+                let g = &body.geometry;
+                let mesh = walls::cross_section::shear(&body.mesh(), g, recipe.flip, cs);
+                let (u, n) = (g.direction(), g.normal());
+                let local = |p: &[f64; 3]| {
+                    let d = [p[0] - g.start[0], p[1] - g.start[1]];
+                    [
+                        d[0] * u[0] + d[1] * u[1],
+                        d[0] * n[0] + d[1] * n[1],
+                        p[2] - g.base_z,
+                    ]
+                };
+                let solid = geometry::Polyhedron {
+                    points: mesh.0.iter().map(local).collect(),
+                    faces: mesh
+                        .1
+                        .chunks(3)
+                        .map(|t| t.iter().map(|i| *i as usize).collect())
+                        .collect(),
+                };
+                geometry::remove_wall_shape(&mut self.ifc, step)?;
+                geometry::write_breps(
+                    &mut self.ifc,
+                    step,
+                    geometry::BrepFrame {
+                        origin: [g.start[0], g.start[1], g.base_z],
+                        x_dir: u,
+                    },
+                    &[solid],
+                    self.length_scale,
+                    contexts,
+                )?;
+                geometry::contain(&mut self.ifc, step, storey, owner_history)?;
+                wall_steps.insert(step);
+                continue;
+            }
             // A wall attached to a roof gets a B-rep body in its own frame (where its openings are
             // placed); others keep their extruded body.
             match walls::attach::attached_body(store, *id, body) {

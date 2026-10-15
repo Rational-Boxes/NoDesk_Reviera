@@ -14,6 +14,7 @@
 //! Chapter 3.
 
 pub mod attach;
+pub mod cross_section;
 pub mod curved;
 pub mod joins;
 pub mod openings;
@@ -100,6 +101,9 @@ pub struct WallRecipe {
     /// more a spline (ARC-WALL-002). Empty for a straight wall.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub through: Vec<[f64; 2]>,
+    /// A slanted or tapered cross-section (ARC-WALL-005); vertical when absent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cross_section: Option<cross_section::CrossSection>,
 }
 
 fn both_allowed() -> [bool; 2] {
@@ -380,6 +384,7 @@ pub(crate) fn create(txn: &mut crate::txn::Transaction<'_>, p: CreateParams) -> 
         join_allowed: both_allowed(),
         attach_top: None,
         through,
+        cross_section: None,
     };
     let id = txn.create(
         NewElement::new("IfcWall")

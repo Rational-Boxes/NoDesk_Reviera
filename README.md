@@ -146,6 +146,14 @@ ribbon's tools, the command shell, Lua and MCP alike.
   (`wall.attach`, `wall.detach`; Modify | Walls › Attach Top/Base).
 - **Curved walls** carry doors and windows along the curve (square to it), bound rooms, attach to
   roofs and save as faceted B-reps.
+- **Slanted and tapered walls**: straight walls lean by an angle from vertical, or taper with
+  their own exterior and interior angles, the type's variable layer taking the difference
+  (refused if it would reach zero); saved as B-reps (`wall.set_cross_section`; the
+  Cross-Section rows in Properties; ARC-WALL-005).
+- **Split with Gap and Split Horizontally** (Modify | Walls): a joint gap of 1.6–305 mm held by a
+  locked distance between the new ends, or a lower and upper wall at a level or height, inserts
+  going to the part they sit in (`element.split_with_gap`, `wall.split_horizontal`;
+  ARC-WALL-011).
 - **Layers** (Modify | Walls › Edit Assembly): a wall type's layers, exterior first, each with a
   function, priority, material, thickness and wrapping, and the core; validated as the
   specification asks. The type's width is their total, plans draw the layer boundaries in cut
@@ -626,9 +634,9 @@ area by area (a review against the spec on 2026-10-15). Whole areas not started 
   Make Permanent icon (the command exists), angular and radial constraints, constraints on
   inserts along their walls, Tab through sub-elements (ARC-DIM-001, ARC-CNST-002, ARC-KEY-001).
 - **Wall extras**: vertically compound walls (regions), extendable layers, layer wrapping,
-  slanted and tapered walls, stacked walls, Edit Profile, sweeps and reveals, Split with Gap
-  and horizontal splits, Walls by Room, Auto Join & Lock, hosted walls (ARC-CMPD-003/004,
-  ARC-WRAP-001, ARC-WALL-005, ARC-STKW-001, ARC-WALL-009/010/014/015/016).
+  stacked walls, Edit Profile, sweeps and reveals, Walls by Room, Auto Join & Lock, hosted
+  walls, curved slanted walls (ARC-CMPD-003/004, ARC-WRAP-001, ARC-STKW-001,
+  ARC-WALL-009/010/014/015/016).
 - **Curtain extras**: manual grid lines and segments, swapping single panels (curtain-wall
   doors), curtain systems by face, sloped glazing (ARC-CW-004/006/007/008).
 - **Floors and roofs**: roof by face, slope arrows along an edge or above the plate, shape editing
