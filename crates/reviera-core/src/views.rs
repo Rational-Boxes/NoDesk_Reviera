@@ -131,6 +131,20 @@ pub struct ViewData {
     /// The line and depth of a section or elevation (DOC-VIEW-003/004).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub section: Option<crate::sections::SectionDef>,
+    /// The colour scheme a plan shows (ARC-CLR-001), by key.
+    #[serde(
+        default,
+        rename = "colorScheme",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub color_scheme: Option<String>,
+    /// An area plan's area scheme (ARC-AREA-001), by key.
+    #[serde(
+        default,
+        rename = "areaScheme",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub area_scheme: Option<String>,
 }
 
 /// A section box (DOC-VIEW-008): `min`..`max` in the box's own coordinates, placed by
@@ -262,6 +276,15 @@ fn check_name(store: &Store, kind: &str, name: &str, except: Option<ElementId>) 
     }
 }
 
+/// Writes a view's data.
+pub(crate) fn write_data(
+    txn: &mut crate::txn::Transaction<'_>,
+    id: ElementId,
+    data: &ViewData,
+) -> Result<()> {
+    write(txn, id, data)
+}
+
 fn write(txn: &mut crate::txn::Transaction<'_>, id: ElementId, data: &ViewData) -> Result<()> {
     let value = serde_json::to_value(data).expect("view data serialises");
     txn.modify(id, |e| {
@@ -325,6 +348,8 @@ pub(crate) fn create_3d(
         section_box: None,
         slice_planes: Vec::new(),
         section: None,
+        color_scheme: None,
+        area_scheme: None,
     };
     txn.create(
         NewElement::new(format!("{CLASS_PREFIX}{}", guid.as_str()))

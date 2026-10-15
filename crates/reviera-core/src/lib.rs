@@ -8,6 +8,7 @@
 //! and transactions are opened by the command executor (DM-CORE-001 rule 9).
 
 pub mod annotations;
+pub mod areas;
 pub mod arrangement;
 pub mod bodies;
 pub mod builtin;
@@ -17,6 +18,7 @@ pub mod change;
 pub mod clearances;
 pub mod cobie;
 pub mod codes;
+pub mod color_schemes;
 pub mod columns;
 pub mod command;
 pub mod compound;

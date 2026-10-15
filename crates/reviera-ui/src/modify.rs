@@ -956,6 +956,7 @@ impl Gui {
             && self.slice_pick.is_none()
             && self.attach_pick.is_none()
             && self.host_pick.is_none()
+            && self.area_pick.is_none()
             && !self.in_sheet()
             && !self.active_view().is_some_and(|v| v.nav.walk.is_some())
     }

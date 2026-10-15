@@ -935,6 +935,30 @@ icon = "sloped_glazing"
 help = "Turn the selected roofs into sloped glazing (a Sloped Glazing type, made if there is none); change their type back to undo"
 
 [[action]]
+id = "areaplan.create"
+label = "Area Plan"
+icon = "area_plan"
+help = "An area plan of an area scheme (Gross Building, Rentable, …) for this plan's level, with boundaries on the outside walls"
+
+[[action]]
+id = "areaboundary.create"
+label = "Area Boundary"
+icon = "area_boundary"
+help = "Pick the selected walls as area boundaries in the area plan; the scheme's rules place them"
+
+[[action]]
+id = "area.place"
+label = "Area"
+icon = "area"
+help = "Place areas by clicking inside area boundaries in an area plan"
+
+[[action]]
+id = "colorscheme.create"
+label = "Color Schemes"
+icon = "color_scheme"
+help = "Colour rooms or areas by a parameter's value or range, in this plan"
+
+[[action]]
 id = "curtain.set_layout"
 label = "Edit Grid"
 icon = "curtain_grid"
@@ -1224,6 +1248,15 @@ label = "Room & Area"
 tools = [
   { action = "room.place", size = "large" },
   { action = "room.place_automatically", size = "small" },
+  { action = "colorscheme.create", size = "small" },
+]
+
+[[tab.panel]]
+label = "Area"
+tools = [
+  { action = "areaplan.create", size = "large" },
+  { action = "areaboundary.create", size = "small" },
+  { action = "area.place", size = "small" },
 ]
 
 [[tab.panel]]

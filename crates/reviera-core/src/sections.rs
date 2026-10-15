@@ -206,6 +206,8 @@ fn create(
         section_box: None,
         slice_planes: Vec::new(),
         section: Some(def),
+        color_scheme: None,
+        area_scheme: None,
     };
     let value = serde_json::to_value(&data).expect("view data serialises");
     let guid = GlobalId::new();

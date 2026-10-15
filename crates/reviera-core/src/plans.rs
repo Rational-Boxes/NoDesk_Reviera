@@ -26,7 +26,7 @@ pub const DEFAULT_CEILING_CUT: f64 = 2.3;
 
 /// Whether a view kind is a plan (floor or ceiling plan).
 pub fn is_plan(kind: &str) -> bool {
-    kind == KIND_PLAN || kind == KIND_CEILING_PLAN
+    kind == KIND_PLAN || kind == KIND_CEILING_PLAN || kind == crate::areas::KIND_AREA_PLAN
 }
 /// Default cut plane height above the level (DOC-VR-001).
 pub const DEFAULT_CUT: f64 = 1.2;
@@ -290,6 +290,8 @@ pub(crate) fn create_plan(
             section_box: None,
             slice_planes: Vec::new(),
             section: None,
+            color_scheme: None,
+            area_scheme: None,
         };
         let mut value = serde_json::to_value(&data).expect("view data serialises");
         if let Some(scale) = p.scale {

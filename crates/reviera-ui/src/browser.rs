@@ -43,6 +43,7 @@ impl Gui {
         for (kind, title) in [
             (reviera_core::plans::KIND_PLAN, "Floor Plans"),
             (reviera_core::plans::KIND_CEILING_PLAN, "Ceiling Plans"),
+            (reviera_core::areas::KIND_AREA_PLAN, "Area Plans"),
             (reviera_core::sections::KIND_ELEVATION, "Elevations"),
             (reviera_core::sections::KIND_SECTION, "Sections"),
         ] {

@@ -10,6 +10,7 @@
 //! draws chains of walls on a level with `wall.create`, and they show at once. Every action goes
 //! through `App::execute`, like Lua and MCP. The ribbon and browsers come next.
 
+mod areas;
 mod assembly;
 mod browser;
 mod columns;
@@ -316,6 +317,8 @@ struct Gui {
     attach_pick: Option<Vec<ElementId>>,
     /// A wall waiting for its new host (Pick New Host).
     host_pick: Option<ElementId>,
+    /// The Area tool: its area plan and the area type it places.
+    area_pick: Option<(ElementId, String)>,
     /// The Location Line the Wall tool draws on (kept between uses).
     wall_location: reviera_core::walls::LocationLine,
     /// The Model Tree pane (UI-TREE-001) and its state.
@@ -1313,6 +1316,9 @@ impl Gui {
         }
         if self.host_pick.take().is_some() {
             return frame.set_status_text("Pick New Host cancelled", 0);
+        }
+        if self.area_pick.take().is_some() {
+            return frame.set_status_text("Ready", 0);
         }
         match &mut self.tool {
             Some(t) if !t.typed.is_empty() => {
@@ -2586,6 +2592,7 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                     None if g.slice_pick.is_some() => g.slice_click(x, y),
                     None if g.attach_pick.is_some() => g.attach_click(x, y, &p),
                     None if g.host_pick.is_some() => g.host_click(x, y, &p),
+                    None if g.area_pick.is_some() => g.area_click(x, y),
                     None if g.sketch.is_some() => g.sketch_click(x, y),
                     None if g.ceiling_tool.is_some() => g.ceiling_click(x, y),
                     None if g.room_tool.is_some() => g.room_click(x, y),
@@ -3210,6 +3217,7 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 tiled: None,
                 attach_pick: None,
                 host_pick: None,
+                area_pick: None,
                 wall_location: Default::default(),
                 model_tree,
                 tree: inspect::ModelTree {
@@ -3753,6 +3761,13 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "wall.break_up" => with(gui, Gui::break_up),
         "wall.edit_profile" => with(gui, Gui::edit_wall_profile),
         "curtain.set_layout" => with(gui, Gui::edit_curtain_grid),
+        "areaplan.create" => with(gui, Gui::area_plan_dialog),
+        "areaboundary.create" => with(gui, Gui::area_boundaries),
+        "area.place" => with(gui, |g| {
+            g.start_area_tool();
+            focus(g);
+        }),
+        "colorscheme.create" => with(gui, Gui::color_scheme_dialog),
         "roof.create_glazing_type" => with(gui, Gui::sloped_glazing),
         "wallsweep.create" => with(gui, Gui::wall_sweep),
         "wall.create_by_room" => with(gui, Gui::linings),

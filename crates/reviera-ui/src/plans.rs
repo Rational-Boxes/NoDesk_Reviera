@@ -208,6 +208,9 @@ impl Gui {
         graphics.lines.extend(self.annotation_lines(index));
         graphics.lines.extend(self.note_lines(index));
         graphics.lines.extend(self.room_lines(index));
+        graphics.lines.extend(self.area_lines(index));
+        // Colour scheme fills (ARC-CLR-001), under the cut.
+        graphics.poche.extend(self.color_fills(index));
         graphics.lines.extend(self.section_markers(index));
         graphics.lines.extend(self.insert_symbol_lines(index));
         graphics.lines.extend(self.opening_lines(index));

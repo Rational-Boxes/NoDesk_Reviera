@@ -79,6 +79,18 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "equality" => format!(
             r#"<path d="M4 8v16M16 8v16M28 8v16" {s}/><path d="M4 16h24" {sa}/><path d="M8 12h4M8 14h4M20 12h4M20 14h4" {sa}/>"#
         ),
+        "area_plan" => format!(
+            r#"<path d="M4 6h24v20H4z" fill="{f}" {s}/><path d="M4 16h24M16 6v20" {sa} stroke-dasharray="3 2"/>"#
+        ),
+        "area_boundary" => format!(
+            r#"<path d="M4 6h24v20H4z" fill="{f}" {s}/><path d="M7 9h18v14H7z" fill="none" {sa}/>"#
+        ),
+        "area" => format!(
+            r#"<path d="M4 6h24v20H4z" fill="{f}" {s}/><path d="M9 20l7-10 7 10z" fill="{paper}" {sa}/>"#
+        ),
+        "color_scheme" => format!(
+            r#"<path d="M4 6h12v10H4z" fill="{f}" {s}/><path d="M16 6h12v10H16zM4 16h12v10H4z" fill="{paper}" {sa}/><path d="M16 16h12v10H16z" fill="{f}" {s}/>"#
+        ),
         "sloped_glazing" => format!(
             r#"<path d="M3 24L16 8l13 16z" fill="{f}" {s}/><path d="M9.5 16h13M16 8v16" {sa}/>"#
         ),

@@ -13205,8 +13205,10 @@ These settings apply to the whole project. Walls that came from a non-parametric
 - `area.unplace(ids)`
 
 **Acceptance criteria.**
-- [ ] A Gross Building area plan created with automatic boundaries has its boundary on the exterior faces of the exterior walls, and the area equals the building footprint.
-- [ ] In the Rentable scheme, two Office areas separated by a 200 mm wall share a boundary on the wall centreline. Changing one of them to Exterior Area moves the boundary to the office-side face.
+- [x] A Gross Building area plan created with automatic boundaries has its boundary on the exterior faces of the exterior walls, and the area equals the building footprint.
+- [x] In the Rentable scheme, two Office areas separated by a 200 mm wall share a boundary on the wall centreline. Changing one of them to Exterior Area moves the boundary to the office-side face.
+
+**Implementation note (2026-10-15, first build).** As built: schemes on the project (`rxd:area_schemes`; the two defaults until changed) with area types and rules `{type_a, type_b, position: centerline | face_a | face_b}` (`*` any, `""` outside every area); area plans are plan views of kind `view.area_plan` with their scheme; boundaries are `IfcVirtualElement`s with `recipe.area_boundary` (drawn lines, or picked walls with *Apply Area Rules* or an offset); a rules boundary is split where other boundaries cross its wall and each piece is placed by the areas either side of it, found with every wall boundary on its centreline first; areas are `IfcSpace`s (`recipe.area`, GFA for Gross Building, else USERDEFINED with the scheme as ObjectType) whose region is the boundaries' loop round their point. Commands: `areascheme.create`, `areascheme.set_rules`, `areascheme.list`, `areaplan.create`, `areaboundary.create`, `area.place`, `area.set_type`, `area.list`. The window: Architecture › Area (Area Plan, Area Boundary, Area), area plans in the Project Browser, boundaries and labels drawn. Not built yet: the glass line, drawing boundaries in the window, unplaced areas, area tags and schedules per scheme, `IfcZone` and quantities in IFC.
 
 ### 3.9.4 Colour schemes
 **ID:** ARC-CLR-001 · **Priority:** P1 · **Ref:** research/02 §10.3 · screenshots/architecture/room_color_scheme_by_value.png · screenshots/architecture/room_color_scheme_by_range.png
@@ -13241,8 +13243,10 @@ These settings apply to the whole project. Walls that came from a non-parametric
 - `view.set_color_scheme(view_id, category, scheme_id? (none clears), location?: background|foreground) -> ()`
 
 **Acceptance criteria.**
-- [ ] Colouring by Department with five departments produces five rows, each with a distinct colour. Renaming one room's department to a new value adds a sixth row automatically.
-- [ ] Colouring by Area with ranges at 0, 10, 20 and 50 m² puts a 20.0 m² room in the 20–50 row.
+- [x] Colouring by Department with five departments produces five rows, each with a distinct colour. Renaming one room's department to a new value adds a sixth row automatically.
+- [x] Colouring by Area with ranges at 0, 10, 20 and 50 m² puts a 20.0 m² room in the 20–50 row.
+
+**Implementation note (2026-10-15, first build).** As built: schemes on the project (`rxd:color_schemes`) for rooms or areas, by value (stored rows, plus values found with no row coloured from the golden-ratio pastel palette) or by range; parameters Name, Number, Area, Perimeter or any parameter (project parameters too); plans show their view's scheme as fills under the cut. Commands: `colorscheme.create`, `colorscheme.set_rows`, `colorscheme.duplicate`, `colorscheme.delete`, `colorscheme.legend` (rows now, in use), `view.set_color_scheme`. The window: Room & Area › Color Schemes. Not built yet: fill patterns, Foreground, the placed legend, spaces, zones, ducts and pipes, sections, links, IFC styled items.
 
 ---
 

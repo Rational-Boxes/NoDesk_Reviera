@@ -160,6 +160,20 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(CurtainSetPanelType),
         registry.add(CurtainSetLayout),
         registry.add(RoofCreateGlazingType),
+        registry.add(ColorSchemeCreate),
+        registry.add(ColorSchemeSetRows),
+        registry.add(ColorSchemeDuplicate),
+        registry.add(ColorSchemeDelete),
+        registry.add(ColorSchemeLegend),
+        registry.add(ViewSetColorScheme),
+        registry.add(AreaSchemeCreate),
+        registry.add(AreaSchemeSetRules),
+        registry.add(AreaSchemeList),
+        registry.add(AreaPlanCreate),
+        registry.add(AreaBoundaryCreate),
+        registry.add(AreaPlace),
+        registry.add(AreaSetType),
+        registry.add(AreaList),
         registry.add(RoofSetGlazingType),
         registry.add(WallCreateBySegment),
         registry.add(WallCreateByRoom),
@@ -1655,6 +1669,173 @@ edit_command!(
     crate::curtain::DeleteGridParams,
     (),
     crate::curtain::delete_grid
+);
+
+edit_command!(
+    ColorSchemeCreate,
+    "colorscheme.create",
+    "Create a colour scheme",
+    "A colour scheme (ARC-CLR-001) for `category` cat.rooms (default) or cat.areas, colouring by \
+     `parameter` (Name, Number, Area, Perimeter or a parameter's name) `mode` value or range \
+     (`ranges`: the rows' lower bounds, SI). Returns its key. Show it with view.set_color_scheme.",
+    "Color Scheme",
+    crate::color_schemes::CreateParams,
+    String,
+    crate::color_schemes::create
+);
+
+edit_command!(
+    ColorSchemeSetRows,
+    "colorscheme.set_rows",
+    "Set a colour scheme's rows",
+    "Replaces a colour scheme's rows (`{value | at_least, color: \"#rrggbb\", visible, caption?}`), \
+     and optionally its title, parameter and mode. By value, values with no row are still coloured \
+     from the palette.",
+    "Edit Color Scheme",
+    crate::color_schemes::SetRowsParams,
+    (),
+    crate::color_schemes::set_rows
+);
+
+edit_command!(
+    ColorSchemeDuplicate,
+    "colorscheme.duplicate",
+    "Duplicate a colour scheme",
+    "A copy of a colour scheme under a new name; returns its key.",
+    "Duplicate Color Scheme",
+    crate::color_schemes::DuplicateParams,
+    String,
+    crate::color_schemes::duplicate
+);
+
+edit_command!(
+    ColorSchemeDelete,
+    "colorscheme.delete",
+    "Delete a colour scheme",
+    "Deletes a colour scheme; plans that showed it show none.",
+    "Delete Color Scheme",
+    crate::color_schemes::DeleteParams,
+    (),
+    crate::color_schemes::delete
+);
+
+read_command!(
+    ColorSchemeLegend,
+    "colorscheme.legend",
+    "A colour scheme's rows now",
+    "The rows of a colour scheme as they apply now: stored rows and values found with no row yet \
+     (palette colours), with whether each is in use.",
+    [Effect::Read],
+    crate::color_schemes::LegendParams,
+    Vec<crate::color_schemes::RowNow>,
+    |store, p| crate::color_schemes::legend(store, p)
+);
+
+edit_command!(
+    ViewSetColorScheme,
+    "view.set_color_scheme",
+    "Show a colour scheme in a plan",
+    "Fills a plan's rooms (or an area plan's areas) by a colour scheme (ARC-CLR-001); no \
+     `scheme_id` clears it.",
+    "Color Scheme",
+    crate::color_schemes::SetViewParams,
+    (),
+    crate::color_schemes::set_view
+);
+
+edit_command!(
+    AreaSchemeCreate,
+    "areascheme.create",
+    "Create an area scheme",
+    "An area scheme (ARC-AREA-001) with its area types; returns its key. Gross Building and \
+     Rentable exist from the start.",
+    "Area Scheme",
+    crate::areas::CreateSchemeParams,
+    String,
+    crate::areas::create_scheme
+);
+
+edit_command!(
+    AreaSchemeSetRules,
+    "areascheme.set_rules",
+    "Set an area scheme's rules",
+    "An area scheme's rule table (ARC-AREA-001): for area types `type_a` and `type_b` either side of \
+     a picked wall boundary (`*` any, \"\" outside every area), the boundary's `position`: \
+     centerline, face_a (the face toward type_a) or face_b. Optionally its area types.",
+    "Area Rules",
+    crate::areas::SetRulesParams,
+    (),
+    crate::areas::set_rules
+);
+
+read_command!(
+    AreaSchemeList,
+    "areascheme.list",
+    "List area schemes",
+    "The model's area schemes with their area types and rules.",
+    [Effect::Read],
+    crate::areas::SchemesParams,
+    Vec<crate::areas::AreaScheme>,
+    |store, p| crate::areas::list_schemes(store, p)
+);
+
+edit_command!(
+    AreaPlanCreate,
+    "areaplan.create",
+    "Create area plans",
+    "Area plans of `scheme_id` on levels (ARC-AREA-001); `auto_boundaries` adds boundaries on the \
+     walls round the building's outside, placed by the scheme's rules.",
+    "Area Plan",
+    crate::areas::CreatePlanParams,
+    Vec<crate::id::ElementId>,
+    crate::areas::create_plan
+);
+
+edit_command!(
+    AreaBoundaryCreate,
+    "areaboundary.create",
+    "Add area boundaries",
+    "Area boundary lines in an area plan (ARC-AREA-001): drawn `lines` (fixed) or picked `wall_ids` \
+     (they follow the walls), placed by the scheme's rules with `apply_rules`, else at `offset` from \
+     the wall's centreline toward its exterior.",
+    "Area Boundary",
+    crate::areas::CreateBoundaryParams,
+    Vec<crate::id::ElementId>,
+    crate::areas::create_boundary
+);
+
+edit_command!(
+    AreaPlace,
+    "area.place",
+    "Place an area",
+    "An area at `point` in an area plan (ARC-AREA-001): its region is the loop of the scheme's \
+     boundaries round it. `area_type` one of the scheme's types (default its first).",
+    "Area",
+    crate::areas::PlaceParams,
+    crate::id::ElementId,
+    crate::areas::place
+);
+
+edit_command!(
+    AreaSetType,
+    "area.set_type",
+    "Change areas' type",
+    "Changes areas' area type; boundaries placed by rules move to suit (ARC-AREA-001).",
+    "Area Type",
+    crate::areas::SetTypeParams,
+    (),
+    crate::areas::set_type
+);
+
+read_command!(
+    AreaList,
+    "area.list",
+    "List areas",
+    "Areas (of one scheme, or all) with their type, name, number and area (m²).",
+    [Effect::Read],
+    crate::areas::ListParams,
+    Vec<crate::areas::AreaListItem>,
+    |store, p| crate::areas::list(store, p)
 );
 
 edit_command!(

@@ -43,5 +43,40 @@ has none, numbered in reading order.
 <a href="reviera:help/documentation#schedules">Schedules</a>.</p>
 <p>Rooms are saved as <code>IfcSpace</code> under their storey, with the number as the IFC Name
 and the name as its LongName.</p>
+<h2 id="color-schemes">Colour schemes</h2>
+<p><b>Architecture › Room &amp; Area › Color Schemes</b> colours a plan's rooms (or an area plan's
+areas) by a parameter: Name, Number, Area, Perimeter, or any parameter of rooms, including your
+own (such as Department).</p>
+<ul>
+  <li><b>By value</b>: each value gets a row. Values with no row of their own are coloured from a
+    pastel palette, so a new department shows at once.</li>
+  <li><b>By range</b>: rows by their <i>At least</i> value (m² for Area, m for Perimeter); a room
+    falls in the row with the largest one not above its value.</li>
+</ul>
+<p>Edit a row's colour (<code>#rrggbb</code>) or untick <b>Visible</b> to leave its rooms
+uncoloured. <b>Show in this plan</b> fills the active plan. <code>colorscheme.create</code>,
+<code>colorscheme.set_rows</code>, <code>colorscheme.legend</code>,
+<code>view.set_color_scheme</code></p>
+
+<h2 id="areas">Areas and area plans</h2>
+<p>Areas are measured by <b>area schemes</b>: <i>Gross Building</i> and <i>Rentable</i> to begin
+with, each with area types and rules for where boundaries sit on walls.</p>
+<ol>
+  <li>Open a plan of the level. <b>Architecture › Area › Area Plan</b>: choose the scheme; with
+    <b>Boundaries on the walls round the outside</b>, the outside walls are picked as
+    boundaries. The area plan opens (Project Browser › Area Plans).</li>
+  <li><b>Area Boundary</b> picks the selected walls as more boundaries; they follow their walls,
+    placed by the scheme's rules.</li>
+  <li><b>Area</b>: choose the area type, then click inside boundaries to place areas; Esc
+    ends.</li>
+</ol>
+<p>The rules place a picked wall's boundary by the areas either side: in Gross Building on the
+outside faces of the outside walls, so the area is the building's footprint; in Rentable on the
+centreline between two offices, and on the office's face next to an exterior area or the
+outside. Changing an area's type (<code>area.set_type</code>) moves its boundaries. Areas are
+<code>IfcSpace</code> (GFA for Gross Building) and boundaries <code>IfcVirtualElement</code>.
+<code>areascheme.create</code>, <code>areascheme.set_rules</code>, <code>areaplan.create</code>,
+<code>areaboundary.create</code>, <code>area.place</code>, <code>area.list</code></p>
+
 <p class="note">Not yet available: room separation lines, other area rules, and volumes clipped by
 floors and roofs.</p>

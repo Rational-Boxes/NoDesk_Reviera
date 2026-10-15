@@ -379,6 +379,14 @@ Create … Boundary* tab:
   the walls open up. Plans label each room with its name, number and area. Saved as `IfcSpace`
   (Name = Number, LongName = Name) under its storey (`room.place`,
   `room.place_automatically`, `room.set`).
+- **Areas and area schemes** (Architecture › Area): Gross Building and Rentable schemes with area
+  types and boundary rules, area plans (boundaries on the outside walls), picked boundaries
+  placed by the rules for the areas either side, and areas (`areascheme.create`,
+  `areascheme.set_rules`, `areaplan.create`, `areaboundary.create`, `area.place`,
+  `area.set_type`, `area.list`; ARC-AREA-001).
+- **Colour schemes** (Room & Area › Color Schemes): rooms or areas filled in plans by a
+  parameter's value (new values coloured from a palette) or range (`colorscheme.create`,
+  `colorscheme.set_rows`, `colorscheme.legend`, `view.set_color_scheme`; ARC-CLR-001).
 - **Levels**: Architecture › Level (LL) adds a level with its floor plan, named after the level
   below. Name and Elevation are edited in Properties; moving a level moves the walls on it and
   stretches the walls up to it; deleting one lists what goes with it first. Saved as
@@ -681,7 +689,8 @@ area by area (a review against the spec on 2026-10-15). Whole areas not started 
 - **Floors and roofs**: roof by face, slope arrows along an edge or above the plate, shape editing
   of roofs and variable layers, slab edge profiles other than rectangles, parts (ARC-ROOF-003,
   ARC-ROOF-005, ARC-SHAPE-001, ARC-SLED-001, ARC-PART-001 … 004).
-- **Rooms and areas**: area plans and area schemes, colour schemes (ARC-AREA-001, ARC-CLR-001).
+- **Rooms and areas**: drawing area boundaries by hand in the window, the glass line, area tags and
+  schedules per scheme, colour fill legends and patterns (ARC-AREA-001, ARC-CLR-001).
 - **Modelling in the project**: Model In-Place, model text, converting model lines to detail
   lines (ARC-INPL-001, ARC-MTXT-001, ARC-MLIN-001).
 - **Massing and site**: masses, mass floors, model by face, toposolids, sub-divisions and
