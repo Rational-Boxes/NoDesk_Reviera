@@ -110,6 +110,16 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(ScopeBoxSetExtents),
         registry.add(ScopeBoxList),
         registry.add(ViewAssignScopeBox),
+        registry.add(ConstraintLockDimension),
+        registry.add(ConstraintUnlockDimension),
+        registry.add(ConstraintSetEquality),
+        registry.add(ConstraintLockAlignment),
+        registry.add(ConstraintDelete),
+        registry.add(ConstraintList),
+        registry.add(DimTemporaryQuery),
+        registry.add(DimTemporarySet),
+        registry.add(DimMakePermanent),
+        registry.add(ViewRevealConstraints),
     ];
     for r in results {
         r.expect("architecture commands are valid");
@@ -1037,4 +1047,122 @@ edit_command!(
     crate::scope_boxes::AssignViewsParams,
     (),
     crate::scope_boxes::assign_views
+);
+
+edit_command!(
+    ConstraintLockDimension,
+    "constraint.lock_dimension",
+    "Lock a dimension",
+    "Locks a dimension's segment (or every segment) at its current value (ARC-CNST-001): from then on \
+     moving one of its references moves the other with it. Returns the new constraints.",
+    "Lock Dimension",
+    crate::constraints::LockParams,
+    Vec<ElementId>,
+    crate::constraints::lock_dimension
+);
+
+edit_command!(
+    ConstraintUnlockDimension,
+    "constraint.unlock_dimension",
+    "Unlock a dimension",
+    "Removes the locks of a dimension's segment, or of all its segments.",
+    "Unlock Dimension",
+    crate::constraints::LockParams,
+    (),
+    crate::constraints::unlock_dimension
+);
+
+edit_command!(
+    ConstraintSetEquality,
+    "constraint.set_equality",
+    "Make a dimension's segments equal (EQ)",
+    "Turns EQ on (the dimension's inner references move so its segments are equal, and stay so) or \
+     off. Needs a dimension with at least two segments. Returns the constraint when on.",
+    "EQ",
+    crate::constraints::EqualityParams,
+    Option<ElementId>,
+    crate::constraints::set_equality
+);
+
+edit_command!(
+    ConstraintLockAlignment,
+    "constraint.lock_alignment",
+    "Lock an alignment",
+    "Locks two aligned, parallel references together (references as for `dim.create_aligned`: \
+     `face:ext`, `face:int` or `axis` of walls, `axis` of grids and reference planes). They then move \
+     together. Returns the constraint.",
+    "Lock Alignment",
+    crate::constraints::AlignmentParams,
+    ElementId,
+    crate::constraints::lock_alignment
+);
+
+edit_command!(
+    ConstraintDelete,
+    "constraint.delete",
+    "Delete constraints",
+    "Deletes constraints (Remove Constraints); the elements stay where they are.",
+    "Remove Constraints",
+    crate::constraints::DeleteParams,
+    (),
+    crate::constraints::delete
+);
+
+read_command!(
+    ConstraintList,
+    "constraint.list",
+    "List constraints",
+    "The model's constraints (or those on one element): kind, references, direction, locked value, \
+     the dimension that made it, and whether it holds now.",
+    crate::constraints::ListParams,
+    Vec<crate::constraints::ConstraintInfo>,
+    crate::constraints::list
+);
+
+read_command!(
+    DimTemporaryQuery,
+    "dim.temporary_query",
+    "Temporary dimensions of an element",
+    "The temporary dimensions of an element (ARC-DIM-001): from a straight wall's location line, a grid or \
+     a reference plane to the nearest parallel wall, grid or reference plane on each side (within 30 m); \
+     from a door's or window's centre along its wall to the nearest crossing walls. Each has its ends, \
+     value, the other reference and the direction that lengthens it.",
+    crate::temp_dims::QueryParams,
+    Vec<crate::temp_dims::TempDim>,
+    crate::temp_dims::query
+);
+
+edit_command!(
+    DimTemporarySet,
+    "dim.temporary_set",
+    "Drive a temporary dimension",
+    "Moves an element so its temporary dimension `index` has `value` (metres); the other reference \
+     stays. Doors and windows slide along their wall.",
+    "Move",
+    crate::temp_dims::SetParams,
+    (),
+    crate::temp_dims::set
+);
+
+edit_command!(
+    DimMakePermanent,
+    "dim.make_permanent",
+    "Make a temporary dimension permanent",
+    "Creates an aligned dimension in a view in place of an element's temporary dimension `index`. \
+     Returns the dimension.",
+    "Dimension",
+    crate::temp_dims::PermanentParams,
+    ElementId,
+    crate::temp_dims::make_permanent
+);
+
+edit_command!(
+    ViewRevealConstraints,
+    "view.reveal_constraints",
+    "Reveal constraints",
+    "Shows (or hides) every constraint in a view, drawn in red (ARC-CNST-001).",
+    "Reveal Constraints",
+    crate::constraints::RevealParams,
+    (),
+    crate::constraints::reveal
 );

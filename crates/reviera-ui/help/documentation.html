@@ -78,8 +78,35 @@ note's text, type, width (it wraps) and rotation; notes can have leaders.
   <li>Click the next parallel reference; repeat for a string of dimensions.</li>
   <li>Click in empty space to place the dimension line through the cursor.</li>
 </ol>
-<p>Dimensions to Reviera walls and grids follow them when they move.
+<p>Dimensions to Reviera walls, grids and reference planes follow them when they move.
 <code>dim.create_aligned</code>, <code>anno.list</code></p>
+
+<h3 id="constraints">Locks and EQ</h3>
+<p>A selected dimension's Properties have <b>Lock Segment</b> for each segment and, with two or
+more segments, <b>EQ</b> (also <b>Modify | Dimensions › Lock</b> and <b>EQ</b>):</p>
+<ul>
+  <li>A locked segment keeps its value: moving one of its walls, grids or reference planes moves
+    the other with it. It reads with a padlock.</li>
+  <li>EQ makes the segments equal at once, by moving the references between the ends, and keeps
+    them equal: move an outer wall and the inner ones follow. It reads "EQ".</li>
+  <li>An edit the constraints cannot follow (for example, when the element that would have to
+    move is pinned) is refused with "Constraints are not satisfied"; nothing changes.</li>
+  <li>Constraints are kept when their dimension is deleted, and removed with their elements.
+    <b>View › Reveal Constraints</b> shows them all in red; the selection's show dashed
+    blue.</li>
+</ul>
+<p><code>constraint.lock_dimension</code>, <code>constraint.unlock_dimension</code>,
+<code>constraint.set_equality</code>, <code>constraint.lock_alignment</code>,
+<code>constraint.delete</code>, <code>constraint.list</code>,
+<code>view.reveal_constraints</code></p>
+
+<h3 id="temporary">Temporary dimensions</h3>
+<p>With one wall, grid, reference plane, door or window selected in a plan, blue temporary
+dimensions show its distance to the nearest parallel wall, grid or reference plane on each side
+(a door or window: along its wall to the nearest crossing walls). Click a value and type a new
+one: the selected element moves, the other stays.
+<code>dim.temporary_query</code>, <code>dim.temporary_set</code>,
+<code>dim.make_permanent</code></p>
 
 <h2 id="pdf">Export to PDF</h2>
 <p>Open a plan, ceiling plan, section, elevation or sheet, then <b>File › Export PDF</b>

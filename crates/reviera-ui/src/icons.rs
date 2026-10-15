@@ -70,6 +70,15 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "model_line" => format!(
             r#"<path d="M4 26L14 12l6 8 8-14" {s}/><path d="M4 26l-1 2M28 6l1-2" {sa}/>"#
         ),
+        "reveal_constraints" => format!(
+            r#"<path d="M4 10v14M28 10v14M4 17h24" {s} stroke-dasharray="3 2"/><rect x="12" y="4" width="8" height="7" rx="1" fill="{f}" {sa}/><path d="M14 4V2.5a2 2 0 014 0V4" {sa}/>"#
+        ),
+        "lock" => format!(
+            r#"<rect x="8" y="14" width="16" height="13" rx="2" fill="{f}" {s}/><path d="M11 14V9a5 5 0 0110 0v5" {s}/><circle cx="16" cy="20" r="1.8" fill="{paper}" {sa}/>"#
+        ),
+        "equality" => format!(
+            r#"<path d="M4 8v16M16 8v16M28 8v16" {s}/><path d="M4 16h24" {sa}/><path d="M8 12h4M8 14h4M20 12h4M20 14h4" {sa}/>"#
+        ),
         "scope_box" => format!(
             r#"<path d="M5 11l8-6h14l-8 6zM5 11v14h14V11M19 25l8-6V5" fill="{f}" {s} stroke-dasharray="4 2"/>"#
         ),

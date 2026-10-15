@@ -708,7 +708,139 @@ fn group(int: &str, settings: &UnitSettings, f: &Format) -> String {
 
 /// Parses user input to SI (`units.parse`). Accepts any unit of the right dimension (`3' 6"`,
 /// `5'-6 1/2"`, `1067`, `1.067 m`, `42 in`, `20 °C`); a bare number is in the display unit.
+/// Arithmetic is accepted too (ARC-DIM-002): `1200+600`, `(2*900)/2`, `3 m - 450`, with `+ - * /`
+/// (`×` too) and parentheses; terms are values as above, worked in the display unit.
 pub fn parse(text: &str, data_type: &str, settings: &UnitSettings) -> Result<f64> {
+    // Arithmetic when there is an operator other than a fraction's `/` or the `-` of `5'-6"`.
+    let arithmetic = tokenize(text).iter().enumerate().any(|(i, t)| {
+        matches!(t, Token::Op('+' | '*' | '(' | ')')) || (*t == Token::Op('-') && i > 0)
+    });
+    let plain = if arithmetic {
+        Err(Error::new(
+            "units.parse_failed",
+            format!("`{text}` is arithmetic"),
+        ))
+    } else {
+        parse_value(text, data_type, settings)
+    };
+    match plain {
+        Ok(v) => Ok(v),
+        Err(_) => {
+            let e = parse_value(text, data_type, settings)
+                .err()
+                .unwrap_or_else(|| {
+                    Error::new("units.parse_failed", format!("`{text}` is not a value"))
+                });
+            let has_operator = text.contains(['+', '*', '×', '(', ')', '-', '/']);
+            if !has_operator {
+                return Err(e);
+            }
+            let t = dt(data_type)?;
+            // The unit a bare number is in, which the arithmetic is worked in.
+            let display = unit(&settings.format_for(t).unit).expect("format units exist");
+            let bare = if display.key == "feet_inches" {
+                unit("inch").expect("inch")
+            } else {
+                display
+            };
+            let tokens = tokenize(text);
+            let mut pos = 0;
+            let leaf = |s: &str| {
+                parse_value(s, data_type, settings).map(|v| (v - bare.offset) / bare.scale)
+            };
+            let v = expr(&tokens, &mut pos, &leaf).ok_or_else(|| e.clone())?;
+            if pos != tokens.len() || !v.is_finite() {
+                return Err(e);
+            }
+            Ok(v * bare.scale + bare.offset)
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+enum Token {
+    Op(char),
+    Leaf(String),
+}
+
+/// Splits arithmetic into operators and value terms. A `-` right after a foot mark belongs to the
+/// value (`5'-6"`).
+fn tokenize(text: &str) -> Vec<Token> {
+    let mut out = Vec::new();
+    let mut cur = String::new();
+    for c in text.trim().chars() {
+        let after_feet = cur.trim_end().ends_with('\'');
+        let op = match c {
+            '+' | '*' | '/' | '(' | ')' => Some(c),
+            '×' => Some('*'),
+            '-' if !after_feet => Some('-'),
+            _ => None,
+        };
+        match op {
+            Some(o) => {
+                if !cur.trim().is_empty() {
+                    out.push(Token::Leaf(cur.trim().to_owned()));
+                }
+                cur.clear();
+                out.push(Token::Op(o));
+            }
+            None => cur.push(c),
+        }
+    }
+    if !cur.trim().is_empty() {
+        out.push(Token::Leaf(cur.trim().to_owned()));
+    }
+    out
+}
+
+fn expr(t: &[Token], pos: &mut usize, leaf: &dyn Fn(&str) -> Result<f64>) -> Option<f64> {
+    let mut v = term(t, pos, leaf)?;
+    while let Some(Token::Op(o @ ('+' | '-'))) = t.get(*pos) {
+        *pos += 1;
+        let r = term(t, pos, leaf)?;
+        v = if *o == '+' { v + r } else { v - r };
+    }
+    Some(v)
+}
+
+fn term(t: &[Token], pos: &mut usize, leaf: &dyn Fn(&str) -> Result<f64>) -> Option<f64> {
+    let mut v = factor(t, pos, leaf)?;
+    while let Some(Token::Op(o @ ('*' | '/'))) = t.get(*pos) {
+        *pos += 1;
+        let r = factor(t, pos, leaf)?;
+        v = if *o == '*' { v * r } else { v / r };
+    }
+    Some(v)
+}
+
+fn factor(t: &[Token], pos: &mut usize, leaf: &dyn Fn(&str) -> Result<f64>) -> Option<f64> {
+    match t.get(*pos)? {
+        Token::Op('-') => {
+            *pos += 1;
+            factor(t, pos, leaf).map(|v| -v)
+        }
+        Token::Op('+') => {
+            *pos += 1;
+            factor(t, pos, leaf)
+        }
+        Token::Op('(') => {
+            *pos += 1;
+            let v = expr(t, pos, leaf)?;
+            matches!(t.get(*pos), Some(Token::Op(')'))).then(|| {
+                *pos += 1;
+                v
+            })
+        }
+        Token::Leaf(s) => {
+            *pos += 1;
+            leaf(s).ok()
+        }
+        Token::Op(_) => None,
+    }
+}
+
+/// One value (no arithmetic).
+fn parse_value(text: &str, data_type: &str, settings: &UnitSettings) -> Result<f64> {
     let t = dt(data_type)?;
     let bad = || {
         Error::new(
@@ -737,6 +869,18 @@ pub fn parse(text: &str, data_type: &str, settings: &UnitSettings) -> Result<f64
     let mut terms = 0;
     let mut feet_seen = false;
     let mut rest = body.as_str();
+    // In feet and inches, two bare numbers are feet then inches (`8 6` is 8'-6").
+    if display.key == "feet_inches" {
+        let words: Vec<&str> = body.split_whitespace().collect();
+        if let [f, i] = words[..]
+            && let (Ok(f), Ok(i)) = (f.parse::<f64>(), i.parse::<f64>())
+        {
+            let foot = unit("foot").expect("foot");
+            let inch = unit("inch").expect("inch");
+            let v = f * foot.scale + i * inch.scale;
+            return Ok(if negative { -v } else { v });
+        }
+    }
     while !rest.trim().is_empty() {
         rest = rest.trim_start().trim_start_matches('-').trim_start();
         let (value, after) = read_number(rest).ok_or_else(bad)?;
@@ -836,6 +980,20 @@ mod tests {
 
     fn s() -> UnitSettings {
         UnitSettings::default()
+    }
+
+    #[test]
+    fn typed_arithmetic_and_feet_inches() {
+        let close = |t: &str, v: f64| (parse(t, "length", &s()).unwrap() - v).abs() < 1e-9;
+        assert!(close("1200+600", 1.8));
+        assert!(close("(2*900)/2", 0.9));
+        assert!(close("2 × 450", 0.9));
+        assert!(close("3 m - 450", 2.55));
+        assert!(close("5'-6\" + 6\"", 1.6764 + 0.1524));
+        assert!(parse("abc", "length", &s()).is_err());
+        assert!(parse("(1200", "length", &s()).is_err());
+        let imperial = UnitSettings::preset(Preset::ImperialFtIn);
+        assert!((parse("8 6", "length", &imperial).unwrap() - 2.5908).abs() < 1e-9);
     }
 
     #[test]

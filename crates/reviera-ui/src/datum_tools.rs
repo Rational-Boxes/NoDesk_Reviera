@@ -58,6 +58,9 @@ pub struct LineTool {
     name: String,
     points: Vec<[f64; 2]>,
     cursor: Option<snap::Snap>,
+    /// A typed length (ARC-DIM-002) and its direction, frozen when typing began.
+    pub(crate) typed: String,
+    pub(crate) typed_dir: Option<[f64; 2]>,
     /// Lines to snap to: grids, walls, reference planes, model lines and cut edges.
     lines: Vec<([f64; 2], [f64; 2])>,
 }
@@ -121,6 +124,8 @@ impl Gui {
             name: String::new(),
             points: Vec::new(),
             cursor: None,
+            typed: String::new(),
+            typed_dir: None,
             lines: Vec::new(),
         });
         self.update_line_snaps();
@@ -259,8 +264,22 @@ impl Gui {
         let Some(p) = self.line_snapped(x, y) else {
             return;
         };
+        self.line_click_at(p.point);
+    }
+
+    /// The last point and the cursor of a straight line being drawn (typed lengths apply).
+    pub(crate) fn line_ends(&self) -> Option<([f64; 2], [f64; 2])> {
+        let t = self.line_tool.as_ref()?;
+        (t.shape == Shape::Line || t.mode == LineMode::ScopeBox)
+            .then_some(())
+            .and_then(|_| Some((*t.points.last()?, t.cursor?.point)))
+    }
+
+    pub(crate) fn line_click_at(&mut self, point: [f64; 2]) {
         let Some(t) = &mut self.line_tool else { return };
-        t.points.push(p.point);
+        t.typed.clear();
+        t.typed_dir = None;
+        t.points.push(point);
         let needed = match t.shape {
             Shape::Arc if t.mode != LineMode::ScopeBox => 3,
             _ => 2,
@@ -385,8 +404,10 @@ impl Gui {
                 ]);
             }
         }
+        let mut all = vec![lines];
+        all.extend(self.typed_overlay(z, plan.scale));
         if let Some(v) = self.viewport() {
-            v.set_overlay_lines(&[lines]);
+            v.set_overlay_lines(&all);
         }
     }
 

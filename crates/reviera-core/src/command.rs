@@ -446,6 +446,11 @@ impl CommandRegistry {
             direct_commit: None,
         };
         let result = guard(name, || run(&mut cx, args))?;
+        // Constraints hold after every edit (ARC-CNST-002): the solver moves what the edit did
+        // not, or the edit fails.
+        if let State::Edit(txn) = &mut cx.state {
+            crate::constraints::enforce(txn)?;
+        }
         if !commit {
             let (warnings, changed) = match &cx.state {
                 State::Edit(txn) => (txn.warnings().to_vec(), txn.pending_changes()),

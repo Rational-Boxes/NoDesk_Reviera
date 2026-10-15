@@ -157,6 +157,24 @@ keys = "LI"
 help = "Draw lines, arcs and chains on the view's work plane; they show in every view"
 
 [[action]]
+id = "view.reveal_constraints"
+label = "Reveal Constraints"
+icon = "reveal_constraints"
+help = "Show every constraint in this view, in red (again to hide them)"
+
+[[action]]
+id = "constraint.lock_dimension"
+label = "Lock"
+icon = "lock"
+help = "Lock the selected dimension's segments at their values: moving one reference moves the other"
+
+[[action]]
+id = "constraint.set_equality"
+label = "EQ"
+icon = "equality"
+help = "Make the selected dimension's segments equal and keep them so (again to remove it)"
+
+[[action]]
 id = "scopebox.create"
 label = "Scope Box"
 icon = "scope_box"
@@ -1160,6 +1178,7 @@ tools = [
   { action = "view.default_3d", size = "large" },
   { action = "view.create_3d", size = "small" },
   { action = "scopebox.create", size = "small" },
+  { action = "view.reveal_constraints", size = "small" },
 ]
 
 [[tab.panel]]
@@ -1442,6 +1461,14 @@ panels = [
     { action = "sketch.overhang", size = "small" },
   ] },
 ]
+
+[[context]]
+category = "cat.dimensions"
+label = "Dimensions"
+panels = [{ label = "Constraints", tools = [
+  { action = "constraint.lock_dimension", size = "large" },
+  { action = "constraint.set_equality", size = "large" },
+] }]
 
 [[context]]
 category = "cat.grids"

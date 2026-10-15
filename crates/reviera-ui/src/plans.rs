@@ -214,6 +214,8 @@ impl Gui {
         graphics.lines.extend(self.layer_lines(index));
         graphics.lines.extend(self.datum_plan_lines(index));
         graphics.lines.extend(self.work_plane_grid(index));
+        graphics.lines.extend(self.constraint_lines(index));
+        graphics.lines.extend(self.temp_dim_lines(index));
         let v = &mut self.views[index];
         if let Some(viewport) = &mut v.viewport {
             viewport.set_plan(Some(graphics));

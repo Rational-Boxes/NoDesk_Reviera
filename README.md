@@ -343,6 +343,16 @@ Create … Boundary* tab:
   continuous, gapped or custom centre segment, and the pens and patterns. Saved as one `IfcGrid`
   with an `IfcGridAxis` per line; axes changed in another tool are taken over on open
   (`grid.create`, `grid.rename`, `grid.set_curve`, `grid.list`).
+- **Drawing aids**: typed lengths with arithmetic (`1200+600`, `(2*900)/2`, `8 6`) in the
+  Wall, Grid, Ref Plane, Model Line and Scope Box tools; temporary dimensions on a selected wall,
+  grid, reference plane, door or window, typed to move it (`dim.temporary_query`,
+  `dim.temporary_set`, `dim.make_permanent`; ARC-DIM-001/002); Tab cycles what is under the
+  cursor, the chain of joined walls included (ARC-KEY-001).
+- **Constraints**: dimension locks, EQ and alignment locks between walls, grids and reference
+  planes, kept by a solver in every edit, which refuses edits they cannot follow; Reveal
+  Constraints (`constraint.lock_dimension`, `constraint.unlock_dimension`,
+  `constraint.set_equality`, `constraint.lock_alignment`, `constraint.delete`,
+  `constraint.list`, `view.reveal_constraints`; ARC-CNST-001/002).
 - **Datum extents**: levels, grids and reference planes have a 3D extent and, per view, a 2D
   extent, bubbles and grid elbows; Reset to 3D, Maximize 3D and Propagate Extents on their
   contextual tab (`datum.set_extent`, `datum.reset_to_3d`, `datum.maximize_3d`,
@@ -598,9 +608,9 @@ area by area (a review against the spec on 2026-10-15). Whole areas not started 
 - **Datums and work planes**: alignment locks between datum ends, level elbows, view crops that
   follow a scope box, picking a face as the work plane, Go To View and the Work Plane Viewer
   (ARC-DATUM-001, ARC-SCOPE-001, ARC-WP-001).
-- **Drawing aids**: temporary dimensions on a selection, typed lengths while drawing (listening
-  dimensions), Tab to cycle overlapping picks, and dimension locks, equality constraints and
-  their solver (ARC-DIM-001/002, ARC-KEY-001, ARC-CNST-001/002).
+- **Drawing aids**: dragging a temporary dimension's witness line to another reference and its
+  Make Permanent icon (the command exists), angular and radial constraints, constraints on
+  inserts along their walls, Tab through sub-elements (ARC-DIM-001, ARC-CNST-002, ARC-KEY-001).
 - **Wall extras**: vertically compound walls (regions), extendable layers, layer wrapping,
   slanted and tapered walls, stacked walls, Edit Profile, sweeps and reveals, Split with Gap
   and horizontal splits, Walls by Room, Auto Join & Lock, hosted walls (ARC-CMPD-003/004,

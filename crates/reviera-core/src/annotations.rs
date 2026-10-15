@@ -107,6 +107,13 @@ pub fn resolve_ref(store: &Store, r: &DimRef) -> Option<([f64; 2], [f64; 2])> {
         ];
         return (r.sub == "axis").then_some((c.start, dir));
     }
+    // A vertical reference plane, by its line (ARC-REFP-001).
+    if let Some(rp) = crate::ref_planes::recipe(e) {
+        let (a, b) = ([rp.start[0], rp.start[1]], [rp.end[0], rp.end[1]]);
+        let length = (b[0] - a[0]).hypot(b[1] - a[1]).max(f64::EPSILON);
+        let dir = [(b[0] - a[0]) / length, (b[1] - a[1]) / length];
+        return (r.sub == "axis").then_some((a, dir));
+    }
     let g = walls::regenerate(store, e).ok()?;
     let recipe = walls::wall_recipe(e)?;
     let n = g.normal();

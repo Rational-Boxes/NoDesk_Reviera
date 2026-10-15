@@ -22,6 +22,7 @@
 #include <vector>
 
 typedef void (*reviera_html_callback)(void* user, const char* href);
+typedef void (*reviera_tab_callback)(void* user, int shift);
 
 // The help fallback where no web view is available (Wine, Windows without WebView2, ReactOS):
 // wxWidgets' own HTML window. Anchors within the page scroll; every other link goes to the
@@ -44,6 +45,30 @@ public:
 };
 
 extern "C" {
+
+// A view panel takes Tab and arrow keys itself (Tab cycles what is under the cursor) instead of
+// moving the focus between controls.
+void reviera_wants_chars(void* window) {
+    auto* w = static_cast<wxWindow*>(window);
+    w->SetWindowStyleFlag((w->GetWindowStyleFlag() | wxWANTS_CHARS) & ~wxTAB_TRAVERSAL);
+}
+
+// Tab pressed while a view has the focus goes to `callback` (it cycles what is under the cursor)
+// before wxWidgets moves the focus to the next control; elsewhere Tab navigates as usual.
+void reviera_bind_tab(void* frame, reviera_tab_callback callback, void* user) {
+    auto* f = static_cast<wxWindow*>(frame);
+    f->Bind(wxEVT_CHAR_HOOK, [callback, user](wxKeyEvent& e) {
+        if (e.GetKeyCode() == WXK_TAB && !e.ControlDown() && !e.AltDown()) {
+            for (wxWindow* w = wxWindow::FindFocus(); w; w = w->GetParent()) {
+                if (w->HasFlag(wxWANTS_CHARS)) {
+                    callback(user, e.ShiftDown() ? 1 : 0);
+                    return;
+                }
+            }
+        }
+        e.Skip();
+    });
+}
 
 // Fills `panel` with a new HTML window.
 void* reviera_html_create(void* panel) {

@@ -22,6 +22,12 @@ unsafe extern "C" {
     fn reviera_nb_load_layout(notebook: *mut c_void, layout: *const c_void);
     fn reviera_nb_free_layout(layout: *mut c_void);
     fn reviera_html_create(panel: *mut c_void) -> *mut c_void;
+    fn reviera_wants_chars(window: *mut c_void);
+    fn reviera_bind_tab(
+        frame: *mut c_void,
+        callback: extern "C" fn(*mut c_void, c_int),
+        user: *mut c_void,
+    );
     fn reviera_html_bind(
         html: *mut c_void,
         callback: extern "C" fn(*mut c_void, *const c_char),
@@ -137,6 +143,26 @@ pub fn on_tab_event(notebook: &AuiNotebook, f: impl Fn(TabEvent) + 'static) {
     // Lives as long as the notebook, which lives as long as the main window.
     let user = Box::into_raw(Box::new(Box::new(f) as Handler));
     unsafe { reviera_nb_bind(ptr(notebook), trampoline, user as *mut c_void) }
+}
+
+type TabHandler = Box<dyn Fn(bool)>;
+
+extern "C" fn tab_trampoline(user: *mut c_void, shift: c_int) {
+    // SAFETY: `user` is the handler leaked in `on_view_tab`.
+    let f = unsafe { &*(user as *const TabHandler) };
+    f(shift != 0);
+}
+
+/// Calls `f` (with Shift's state) for Tab pressed while a view has the focus.
+pub fn on_view_tab(frame: &Frame, f: impl Fn(bool) + 'static) {
+    let handler: Box<TabHandler> = Box::new(Box::new(f));
+    let user = Box::into_raw(handler) as *mut c_void;
+    unsafe { reviera_bind_tab(ptr(frame), tab_trampoline, user) }
+}
+
+/// Lets a view panel take Tab and arrow keys itself (not move the focus).
+pub fn wants_chars(w: &impl WxWidget) {
+    unsafe { reviera_wants_chars(ptr(w)) }
 }
 
 /// Gives every view tab a close button, and lets the tabs be dragged: reordered within a tab

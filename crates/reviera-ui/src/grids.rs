@@ -22,6 +22,10 @@ const PREVIEW_COLOR: [f32; 4] = [0.05, 0.35, 0.95, 1.0];
 pub struct GridTool {
     start: Option<[f64; 2]>,
     cursor: Option<snap::Snap>,
+    /// A typed length (ARC-DIM-002) and the direction it is measured in, frozen when typing
+    /// began.
+    pub(crate) typed: String,
+    pub(crate) typed_dir: Option<[f64; 2]>,
     /// Lines to snap to: grids, Reviera walls and the plan's cut edges.
     lines: Vec<([f64; 2], [f64; 2])>,
 }
@@ -165,14 +169,26 @@ impl Gui {
         let Some(p) = self.grid_snapped(x, y) else {
             return;
         };
+        self.grid_click_at(p.point);
+    }
+
+    /// The start and the current cursor point of the grid being drawn.
+    pub(crate) fn grid_ends(&self) -> Option<([f64; 2], [f64; 2])> {
+        let t = self.grid_tool.as_ref()?;
+        Some((t.start?, t.cursor?.point))
+    }
+
+    pub(crate) fn grid_click_at(&mut self, point: [f64; 2]) {
         let Some(t) = &mut self.grid_tool else { return };
+        t.typed.clear();
+        t.typed_dir = None;
         let Some(start) = t.start else {
-            t.start = Some(p.point);
+            t.start = Some(point);
             self.grid_preview();
             return self.grid_prompt();
         };
         let args = json!({
-            "curve": { "line": { "start": start, "end": p.point } },
+            "curve": { "line": { "start": start, "end": point } },
             "type_id": self.tool_grid_type(),
         });
         match self.run("grid.create", args) {
@@ -244,8 +260,10 @@ impl Gui {
                 lines.segments.extend(l.segments);
             }
         }
+        let mut all = vec![lines];
+        all.extend(self.typed_overlay(z, plan.scale));
         if let Some(v) = self.viewport() {
-            v.set_overlay_lines(&[lines]);
+            v.set_overlay_lines(&all);
         }
     }
 }

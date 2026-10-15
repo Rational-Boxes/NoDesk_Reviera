@@ -21,6 +21,7 @@ mod datum_tools;
 mod decks;
 mod dims;
 mod dormers;
+mod drawing_aids;
 mod footprint;
 mod grids;
 mod help;
@@ -227,6 +228,8 @@ struct Gui {
     dim_tool: Option<dims::DimTool>,
     grid_tool: Option<grids::GridTool>,
     line_tool: Option<datum_tools::LineTool>,
+    /// Tab cycling under the cursor (ARC-KEY-001).
+    tab: Option<drawing_aids::TabCycle>,
     insert_tool: Option<inserts::InsertTool>,
     modify_tool: Option<modify::ModifyTool>,
     /// A sketch session (floor boundaries).
@@ -691,6 +694,7 @@ impl Gui {
             return self.activate_view(id);
         }
         let panel = Panel::builder(&self.notebook).build();
+        wx::wants_chars(&panel);
         panel.set_background_style(BackgroundStyle::Paint);
         let id = self.next_view;
         self.next_view += 1;
@@ -1647,6 +1651,10 @@ impl Gui {
         if self.doc.is_none() {
             return;
         }
+        // The candidate Tab shows here (ARC-KEY-001).
+        if let Some(ids) = self.tab_pick(x, y) {
+            return self.select_ids(&ids, combine);
+        }
         // In plans a room is picked by its label, or by its inside where nothing else is.
         let hit = self
             .room_label_at(x, y)
@@ -2029,6 +2037,8 @@ impl Gui {
                 grid.append(Property::string(format!("Segment {}", i + 1), &name, text));
                 grid.set_property_read_only(&name, true);
             }
+            let segments = measured.map_or(0, |m| m.values.len());
+            self.dimension_constraint_rows(grid, id, segments);
             return;
         }
 
@@ -2235,6 +2245,7 @@ impl Gui {
             || self.path_array_edit(property, text.clone())
             || self.datum_edit(property, text.clone())
             || self.datum_view_edit(property, text.clone())
+            || self.dimension_constraint_edit(property, text.clone())
             || self.insert_edit(property, text.clone())
             || self.wall_edit(property, text.clone())
             || self.floor_edit(property, text.clone())
@@ -2582,6 +2593,7 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                     None if g.active_view().is_some_and(|v| v.nav.walk.is_some()) => {}
                     None if g.tool.is_some() => g.wall_click(x, y, &p, &f),
                     None if g.in_sheet() => g.sheet_click(x, y),
+                    None if g.temp_dim_click(x, y) => {}
                     None => g.pick(x, y, &p, select::Combine::of(ctrl, shift)),
                 }
             });
@@ -2832,7 +2844,9 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                 }
                 Some(WXK_ESCAPE) => {
                     with_view(&gui, id, |g| {
-                        if g.active_view().is_some_and(|v| v.nav.walk.is_some()) {
+                        if g.typed_active() {
+                            g.typed_length_key(WXK_ESCAPE);
+                        } else if g.active_view().is_some_and(|v| v.nav.walk.is_some()) {
                             g.toggle_walk();
                         } else if g.sketch.is_some() {
                             let (mx, my) = g.mouse;
@@ -2867,7 +2881,7 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                             used = g.sketch_key(key, mx, my);
                         }
                         if !used && matches!(key, WXK_BACK | WXK_RETURN | WXK_NUMPAD_ENTER) {
-                            used = g.modify_key(key);
+                            used = g.modify_key(key) || g.typed_length_key(key);
                         }
                         if !used {
                             let (mx, my) = g.mouse;
@@ -2931,9 +2945,10 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                         used = true;
                         return;
                     }
-                    used = g.modify_key(key) || g.wall_key(key, &f);
-                    let typing =
-                        g.tool.as_ref().is_some_and(|t| !t.typed.is_empty()) || g.modify_typing();
+                    used = g.modify_key(key) || g.wall_key(key, &f) || g.typed_length_key(key);
+                    let typing = g.tool.as_ref().is_some_and(|t| !t.typed.is_empty())
+                        || g.modify_typing()
+                        || g.typed_active();
                     if !used
                         && !typing
                         && let Some(c) = u32::try_from(key).ok().and_then(char::from_u32)
@@ -3127,6 +3142,7 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 dim_tool: None,
                 grid_tool: None,
                 line_tool: None,
+                tab: None,
                 insert_tool: None,
                 modify_tool: None,
                 sketch: None,
@@ -3458,6 +3474,18 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
         // Reports of failures: one left by a session that closed unexpectedly, now; this
         // session's, when the window is next idle after them.
         crash::show_earlier(&frame);
+        // Tab in a view cycles what is under the cursor (ARC-KEY-001).
+        {
+            let gui = gui.clone();
+            wx::on_view_tab(&frame, move |shift| {
+                with(&gui, |g| {
+                    if let Some(panel) = g.active_view().map(|v| v.panel) {
+                        g.tab_cycle(shift, &panel);
+                        panel.refresh(false, None);
+                    }
+                });
+            });
+        }
         let mut test = crash::test_failure();
         frame.on_idle(move |e| {
             if let Some(kind) = test.take() {
@@ -3860,6 +3888,9 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
             focus(g);
         }),
         "datum.reset_to_3d" => with(gui, Gui::datum_reset_to_3d),
+        "view.reveal_constraints" => with(gui, Gui::toggle_reveal_constraints),
+        "constraint.lock_dimension" => with(gui, Gui::lock_selected_dimensions),
+        "constraint.set_equality" => with(gui, Gui::toggle_dimension_eq),
         "datum.maximize_3d" => with(gui, Gui::datum_maximize_3d),
         "datum.propagate_extents" => with(gui, Gui::datum_propagate),
         "workplane.show" => with(gui, Gui::toggle_work_plane),

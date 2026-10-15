@@ -9954,8 +9954,10 @@ Loop orientation is normalised on Finish: outer loops counter-clockwise and hole
 
 **Commands.** `dim.temporary_query(element_id, view_id) -> [TempDim]` *(query)*. Driving a temporary dimension issues `element.move` or `wall.set_location`. `dim.make_permanent(view_id, temporary_dimension_ref | {ref_a, ref_b}) -> dimension_id` creates the permanent dimension.
 
+**Implementation notes (2026-10-15).** As built: `dim.temporary_query(element_id, view_id?)` (walls of the element's level, or the plan's), `dim.temporary_set(element_id, index, value, view_id?)` (moves the element through `element.move`, so pins and constraints apply) and `dim.make_permanent(view_id, element_id, index)`; the window shows them for one selected wall, grid, reference plane, door or window in a plan, and a click on a value asks for a new one. Not built yet: dragging or cycling the witness-line references, the Make Permanent icon, the Temporary Dimensions settings.
+
 **Acceptance criteria.**
-- [ ] Selecting a door shows dimensions from the door centreline to the nearest perpendicular walls on both sides. Typing a new value moves the door along its host.
+- [x] Selecting a door shows dimensions from the door centreline to the nearest perpendicular walls on both sides. Typing a new value moves the door along its host.
 - [ ] Clicking a wall-reference grip repeatedly cycles through at least four references and then wraps around.
 
 ### 3.1.7 Listening dimensions
@@ -9984,10 +9986,12 @@ Loop orientation is normalised on Finish: outer loops counter-clockwise and hole
 
 **Commands.** No command of its own. The resolved point is passed to the running tool exactly as a click would be; scripts call the creation command (for example `wall.create`) with explicit coordinates.
 
+**Implementation notes (2026-10-15).** As built: typed lengths in the Wall, Grid, Ref Plane, Model Line and Scope Box tools (the Grid and line tools freeze the direction when typing begins), shown in the status bar and beside the cursor; `units.parse` accepts arithmetic (`+ - * × /`, parentheses, unit-suffixed terms, worked in the display unit) and `8 6` as feet and inches. Not built yet: the red error box, angles, the micro-operation log.
+
 **Acceptance criteria.**
-- [ ] Wall tool, first click, type `5000`, Enter: the result is a wall exactly 5.000 m long along the cursor direction.
-- [ ] In an imperial project, typing `8 6` produces 2.5908 m.
-- [ ] Typing `1200+600` in a metric project draws a line 1.800 m long; typing `(2*900)/2` draws 0.900 m.
+- [x] Wall tool, first click, type `5000`, Enter: the result is a wall exactly 5.000 m long along the cursor direction.
+- [x] In an imperial project, typing `8 6` produces 2.5908 m.
+- [x] Typing `1200+600` in a metric project draws a line 1.800 m long; typing `(2*900)/2` draws 0.900 m.
 - [ ] Typing `-300` or `abc` keeps the box open with an error and creates nothing.
 - [ ] Moving the mouse after the box has opened does not change the direction of the committed segment.
 
@@ -10033,8 +10037,10 @@ Loop orientation is normalised on Finish: outer loops counter-clockwise and hole
 - **Spacebar** in Rotate (§3.12) picks a new centre of rotation.
 - Elliptical walls ignore the Spacebar flip.
 
+**Implementation notes (2026-10-15).** As built: Tab and Shift+Tab in a view cycle the element under the cursor, the chain of walls joined end to end with it, and other elements there (annotation, grids, datums, inserts, openings, room labels), naming the candidate in the status bar and highlighting it; the next click there selects it. Not built yet: sub-elements and alternative references.
+
 **Acceptance criteria.**
-- [ ] Hovering a wall joined in a closed rectangle and pressing Tab once highlights all four walls, and a click selects them all.
+- [x] Hovering a wall joined in a closed rectangle and pressing Tab once highlights all four walls, and a click selects them all. (The chain is the second candidate, after the wall itself.)
 - [ ] Spacebar while drawing a wall from left to right puts the exterior face below the wall line in plan.
 
 ### 3.1.10 In-canvas element controls
@@ -14123,11 +14129,13 @@ Temporary dimensions are specified in ARC-DIM-001 and listening dimensions in AR
 - `constraint.list(element_id?) -> [Constraint]` *(query)*
 - `view.reveal_constraints(view_id, on)`
 
+**Implementation notes (2026-10-15).** As built: constraints are RXD records `rxd:model/constraints/<guid>` (`rxd:constraint`: kind, references as dimension references, direction across, value, dimension and segment); kinds Distance, Alignment and Equality between wall faces and location lines, grids and reference planes. The solver runs in every editing command before it commits: per parallel direction, the elements the edit touched (and pinned ones) are fixed, and the least change of the others is solved exactly (an EQ's outer references are held first); an unsatisfiable edit fails with `constraint.unsatisfied` and the constraint IDs, and the transaction rolls back. Commands as above, with `view.reveal_constraints(view_id, on)`. Window: Lock Segment and EQ rows and the Lock and EQ actions on Modify | Dimensions; padlocks and "EQ" in dimension text; constraints of the selection dashed blue, all of them red with Reveal Constraints. Deleting a dimension keeps its constraints (no prompt yet); deleting a referenced element removes them. Not built yet: angle and radius constraints, inserts' positions, soft alignments, the keep-or-remove prompt.
+
 **Acceptance criteria.**
-- [ ] Three walls with an EQ dimension across them stay evenly spaced when the outer wall is moved.
-- [ ] Locking a 3000 mm dimension and then moving one wall drags the other wall by the same amount.
-- [ ] Locking two dimensions that contradict each other (3000 and 3500 between the same references) fails, and offers Remove Constraints.
-- [ ] Deleting a locked dimension prompts to keep or remove its constraint. Keeping it leaves a constraint that Reveal Constraints shows.
+- [x] Three walls with an EQ dimension across them stay evenly spaced when the outer wall is moved.
+- [x] Locking a 3000 mm dimension and then moving one wall drags the other wall by the same amount.
+- [ ] Locking two dimensions that contradict each other (3000 and 3500 between the same references) fails, and offers Remove Constraints. (Unsatisfiable edits fail with the constraints named.)
+- [ ] Deleting a locked dimension prompts to keep or remove its constraint. Keeping it leaves a constraint that Reveal Constraints shows. (It is kept without a prompt.)
 
 ### 3.14.3 Selection
 **ID:** ARC-SEL-001 · **Priority:** P0 · **Ref:** research/02 §15.3

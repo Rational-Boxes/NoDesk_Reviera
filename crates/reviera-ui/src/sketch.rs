@@ -392,7 +392,7 @@ impl Gui {
     }
 
     /// The walls joined end to end with `wall`, in a chain (Tab).
-    fn wall_chain(&self, wall: ElementId) -> Vec<ElementId> {
+    pub(crate) fn wall_chain(&self, wall: ElementId) -> Vec<ElementId> {
         let Some(store) = self.doc.and_then(|d| self.app.document(d)) else {
             return vec![wall];
         };

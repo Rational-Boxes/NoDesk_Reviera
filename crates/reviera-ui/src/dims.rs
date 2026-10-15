@@ -102,7 +102,24 @@ impl Gui {
             let Some(m) = annotations::measure(&store, &data) else {
                 continue;
             };
-            let texts = m.values.iter().map(|v| self.format_length(*v)).collect();
+            let mut texts: Vec<String> = m.values.iter().map(|v| self.format_length(*v)).collect();
+            // EQ segments read "EQ"; locked ones carry a padlock (ARC-CNST-001).
+            if let Some(dim) = store.get(id) {
+                let cons = reviera_core::constraints::of_dimension(&store, dim.guid().as_str());
+                if cons
+                    .iter()
+                    .any(|(_, c)| c.kind == reviera_core::constraints::Kind::Equality)
+                {
+                    texts.iter_mut().for_each(|t| *t = "EQ".to_owned());
+                }
+                for (_, c) in &cons {
+                    if let Some(i) = c.segment
+                        && let Some(t) = texts.get_mut(i)
+                    {
+                        t.push_str(" \u{1F512}");
+                    }
+                }
+            }
             let d = Dimension {
                 points: m.points.clone(),
                 along: m.along,
