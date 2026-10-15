@@ -16,6 +16,7 @@ mod columns;
 mod components;
 mod crash;
 mod curtain;
+mod curtain_grid;
 mod curved;
 mod datum_tools;
 mod decks;
@@ -3751,6 +3752,8 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "stackedwall.set_rows" => with(gui, Gui::edit_stack),
         "wall.break_up" => with(gui, Gui::break_up),
         "wall.edit_profile" => with(gui, Gui::edit_wall_profile),
+        "curtain.set_layout" => with(gui, Gui::edit_curtain_grid),
+        "roof.create_glazing_type" => with(gui, Gui::sloped_glazing),
         "wallsweep.create" => with(gui, Gui::wall_sweep),
         "wall.create_by_room" => with(gui, Gui::linings),
         "wall.set_host" => with(gui, |g| {

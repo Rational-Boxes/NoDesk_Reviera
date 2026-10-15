@@ -25,6 +25,7 @@ fn signature(g: &CurtainGeometry, scale: f64) -> String {
     let mut h = std::collections::hash_map::DefaultHasher::new();
     for p in &g.parts {
         p.mullion.hash(&mut h);
+        (p.panel as u8).hash(&mut h);
         for v in p.x.iter().chain(&p.y).chain(&p.z) {
             v.to_bits().hash(&mut h);
         }
@@ -104,6 +105,9 @@ pub(crate) fn write_curtains(
         for (k, p) in g.parts.iter().enumerate() {
             let (class, name, predefined) = if p.mullion {
                 ("IfcMember", "Mullion", "MULLION")
+            } else if p.panel == curtain::Panel::Door {
+                // A curtain-wall door (ARC-CW-006).
+                ("IfcDoor", "Curtain Wall Door", "DOOR")
             } else {
                 ("IfcPlate", "Panel", "CURTAIN_PANEL")
             };

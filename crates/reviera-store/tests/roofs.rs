@@ -1393,3 +1393,70 @@ fn ids_of(v: Value) -> Vec<ElementId> {
         .map(|x| id(x.clone()))
         .collect()
 }
+
+#[test]
+fn sloped_glazing_on_a_hip_roof() {
+    let dir = tempfile::tempdir().unwrap();
+    let (mut project, mut doc, _, level) = project(dir.path());
+    let r = registry();
+    // 30° planes whose slope is 6 m long: 6 cos 30° = 5.196 m on plan each side.
+    let w = 2.0 * 6.0 * 30f64.to_radians().cos();
+    let pts = [[0.0, 0.0], [16.0, 0.0], [16.0, w], [0.0, w]];
+    let roof = id(run(
+        &r,
+        &mut doc,
+        "roof.create_footprint",
+        json!({ "curves": curves(&pts, |_| json!({})), "level_id": level.0, "base_offset": 3.0, "slope": "30°" }),
+    )
+    .unwrap());
+    assert_eq!(geometry(&doc, roof).predefined, "HIP_ROOF");
+    let t = id(run(
+        &r,
+        &mut doc,
+        "roof.create_glazing_type",
+        json!({ "name": "Sloped Glazing", "grid1": { "layout": "fixed_distance", "spacing": 1.5 } }),
+    )
+    .unwrap());
+    run(
+        &r,
+        &mut doc,
+        "element.set_type",
+        json!({ "element_ids": [roof.0], "type_id": t.0 }),
+    )
+    .unwrap();
+    let gl = roofs::glazing::of(doc.store(), doc.store().get(roof).unwrap()).unwrap();
+    assert_eq!(gl.planes.len(), 4, "four glazed planes");
+    // Every plane (hips too, at the same 30°): three interior Grid 1 lines along the 6 m slope.
+    for p in &gl.planes {
+        assert_eq!(p.grid1.len(), 3, "{:?}", p.grid1);
+        assert!((p.grid1[0] - 1.5).abs() < 1e-6 && (p.grid1[2] - 4.5).abs() < 1e-6);
+    }
+    // Hip mullions sit on the hip lines: every sloping edge shared by two planes has one.
+    let g = geometry(&doc, roof);
+    let mut hips = 0;
+    for f in &g.faces {
+        for k in 0..f.bottom.len() {
+            let (a, b) = (f.bottom[k], f.bottom[(k + 1) % f.bottom.len()]);
+            if (a[2] - b[2]).abs() < 1e-6 {
+                continue;
+            }
+            hips += 1;
+            let on = gl.parts.iter().filter_map(|p| p.axis).any(|[p, q]| {
+                let d = |x: [f64; 3], y: [f64; 3]| {
+                    ((x[0] - y[0]).powi(2) + (x[1] - y[1]).powi(2) + (x[2] - y[2]).powi(2)).sqrt()
+                };
+                (d(p, a) < 1e-6 && d(q, b) < 1e-6) || (d(p, b) < 1e-6 && d(q, a) < 1e-6)
+            });
+            assert!(on, "a hip mullion on {a:?}–{b:?}");
+        }
+    }
+    assert_eq!(hips, 8, "four hips, seen from both planes");
+    // The body is the glazing: glass and mullions, no slab.
+    let body = reviera_core::bodies::all(doc.store())
+        .into_iter()
+        .find(|b| b.element == roof)
+        .unwrap();
+    assert!(body.parts.iter().any(|p| p.class == "IfcPlate:glass"));
+    assert!(body.parts.iter().all(|p| p.class != "IfcRoof"));
+    project.save(&doc).unwrap();
+}

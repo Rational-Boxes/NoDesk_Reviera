@@ -258,6 +258,15 @@ Create … Boundary* tab:
   Drawn along a wall, it cuts its own opening. IFC: `IfcCurtainWall` aggregating `IfcPlate`
   panels and `IfcMember` mullions (`curtain.create`, `curtain.set`; ARC-CW-001 … 006,
   ARC-WALL-013).
+- **Curtain grid edits and doors** (Modify | Curtain Walls › Edit Grid): manual grid lines,
+  removing segments to merge panels, and swapping panels for glazed, solid, empty or a
+  curtain-wall door (an `IfcDoor` in the curtain wall) (`curtain.add_grid`,
+  `curtain.set_grid_segments`, `curtain.move_grid`, `curtain.delete_grid`,
+  `curtain.set_panel_type`, `curtain.set_layout`; ARC-CW-004/006).
+- **Sloped glazing** (Modify | Roofs › Sloped Glazing): a roof of a Sloped Glazing type becomes
+  glass panels and mullions on its planes, Grid 1 parallel to the eaves and Grid 2 up the slope,
+  hip and ridge mullions shared (`roof.create_glazing_type`, `roof.set_glazing_type`;
+  ARC-CW-008).
 - **Columns** (Architecture › Column): architectural columns of rectangular or round types,
   placed by clicking in a plan (Spacebar turns them 90°), from a base level to a top level or a
   height. Attach Top (Modify | Columns) attaches their tops to the roof, floor or ceiling above,
@@ -667,8 +676,8 @@ area by area (a review against the spec on 2026-10-15). Whole areas not started 
   Geometry and hosting in IFC, curved slanted walls,
   selecting stacked sub-walls with Tab, sketching a wall profile in elevation and its mid-end
   faces (ARC-CMPD-003, ARC-WRAP-001, ARC-WALL-009/010/014/015/016).
-- **Curtain extras**: manual grid lines and segments, swapping single panels (curtain-wall
-  doors), curtain systems by face, sloped glazing (ARC-CW-004/006/007/008).
+- **Curtain extras**: curtain systems by face (needs masses), placing grid lines by clicking,
+  manual lines on sloped glazing (ARC-CW-004/007/008).
 - **Floors and roofs**: roof by face, slope arrows along an edge or above the plate, shape editing
   of roofs and variable layers, slab edge profiles other than rectangles, parts (ARC-ROOF-003,
   ARC-ROOF-005, ARC-SHAPE-001, ARC-SLED-001, ARC-PART-001 … 004).

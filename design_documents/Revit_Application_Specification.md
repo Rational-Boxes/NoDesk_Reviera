@@ -11460,7 +11460,9 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 - `curtain.delete_grid(element_id, grid_key)`
 
 **Acceptance criteria.**
-- [ ] Removing the middle segment of a vertical grid line merges two panels into one panel of twice the height. Restoring the segment splits it again, and the original panel type is kept.
+- [x] Removing the middle segment of a vertical grid line merges two panels into one panel of twice the height. Restoring the segment splits it again, and the original panel type is kept.
+
+**Implementation note (2026-10-15, first build).** As built: the curtain wall recipe's `grids` (manual lines by key, direction and position), `removed` (segments by line direction, position and index) and `panels` (overrides by cell); cells joined across removed segments become one panel (a rectangle, else per cell) and the segment's mullion goes; interior vertical mullions are now one piece per row. Commands `curtain.add_grid` (modes all, one, all_except), `curtain.set_grid_segments`, `curtain.move_grid`, `curtain.delete_grid`, and `curtain.set_layout` (an addition, all at once). The window: Modify | Curtain Walls › Edit Grid (lines with segment strings, manual lines, panels). Not built yet: placing lines by hovering edges in elevation or 3D with snaps, temporary dimensions and pins on grid lines.
 
 ### 3.5.5 Mullions
 **ID:** ARC-CW-005 · **Priority:** P1 · **Ref:** research/02 §6.4
@@ -11521,6 +11523,8 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 **Acceptance criteria.**
 - [ ] Swapping a glazed panel for a curtain-wall door turns that cell into an `IfcDoor` aggregated in the `IfcCurtainWall`, and it appears in the door schedule.
 
+**Implementation note (2026-10-15, first build).** As built: `curtain.set_panel_type(curtain_id, cells, panel)` with panels Glazed, Solid, Empty and Door; a door fills its cell from the base and is written as an `IfcDoor` (DOOR) aggregated in the curtain wall. Not built yet: Tab-selecting panels, door families (the door is a plain leaf), the door schedule, wall-type and family panels, pinning.
+
 ### 3.5.7 Curtain systems by face
 **ID:** ARC-CW-007 · **Priority:** P2 · **Ref:** research/02 §6.6, §12.1
 
@@ -11568,10 +11572,12 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 **Commands.** `element.set_type(roof_id, sloped_glazing_type_id)` followed by the `curtain.*` commands.
 
 **Acceptance criteria.**
-- [ ] A hip roof changed to sloped glazing produces four glazed planes whose hip mullions sit on the hip lines.
-- [ ] With Grid 1 at a fixed distance of 1.5 m, a 30° plane whose slope length is 6 m gets three interior Grid 1 lines measured along the slope.
+- [x] A hip roof changed to sloped glazing produces four glazed planes whose hip mullions sit on the hip lines.
+- [x] With Grid 1 at a fixed distance of 1.5 m, a 30° plane whose slope length is 6 m gets three interior Grid 1 lines measured along the slope.
 - [ ] Changing the slope of one footprint edge from 30° to 45° regenerates that plane's grid and keeps manually added grid lines on the other planes.
 - [ ] Changing the roof back to a basic type warns with the number of mullions and panels to be removed and keeps the footprint.
+
+**Implementation note (2026-10-15, first build).** As built: roof types with `glazing` (a curtain layout: `v` is Grid 1, `u` Grid 2); such roofs regenerate each face as panels (cells clipped to the plane) and mullions (interior along the grid lines, border on the edges, one per shared hip, valley or ridge, turned to the planes' bisector); 3D and IFC use them instead of the slab (IFC: the roof's B-rep). `roof.create_glazing_type`, `roof.set_glazing_type`, `element.set_type`; the window's Modify | Roofs › Sloped Glazing. Not built yet: manual lines and panel swaps on glazing planes, Rafter Cut and Fascia Depth, the warning on changing back (the footprint is kept), an `IfcCurtainWall` per plane.
 
 ---
 

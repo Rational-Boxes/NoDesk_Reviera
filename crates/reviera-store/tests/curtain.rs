@@ -89,10 +89,10 @@ fn a_curtain_wall_in_a_wall_with_its_parts_in_ifc() {
     assert_eq!(g.v_lines, vec![1.5]);
     let panels = g.parts.iter().filter(|p| !p.mullion).count();
     assert_eq!(panels, 8);
-    // Mullions: 3 interior verticals and 2 border ones; horizontals between them, at the base,
-    // the transom and the head (4 bays each).
+    // Mullions: 2 border verticals and 3 interior ones in a piece per row (2 rows);
+    // horizontals between them, at the base, the transom and the head (4 bays each).
     let mullions = g.parts.len() - panels;
-    assert_eq!(mullions, 5 + 3 * 4);
+    assert_eq!(mullions, 2 + 3 * 2 + 3 * 4);
 
     // The wall is cut where the curtain wall runs (6 m × 3 m × 0.2 m less).
     let volume = |doc: &Document| -> f64 {
@@ -141,7 +141,7 @@ fn a_curtain_wall_in_a_wall_with_its_parts_in_ifc() {
     };
     assert_eq!(count(&rows, "IFCCURTAINWALL"), 1);
     assert_eq!(count(&rows, "IFCPLATE"), 8);
-    assert_eq!(count(&rows, "IFCMEMBER"), 17);
+    assert_eq!(count(&rows, "IFCMEMBER"), 20);
     // Saved again: the parts are kept, not added.
     project.save(&doc).unwrap();
     let rows = IfcModel::open(&path).unwrap().step_rows().unwrap();
@@ -179,4 +179,112 @@ fn a_curtain_wall_in_a_wall_with_its_parts_in_ifc() {
     let rows = IfcModel::open(&path).unwrap().step_rows().unwrap();
     assert_eq!(count(&rows, "IFCPLATE"), 0);
     assert_eq!(count(&rows, "IFCMEMBER"), 0);
+}
+
+#[test]
+fn manual_grid_lines_segments_and_doors() {
+    let tmp = tempfile::tempdir().unwrap();
+    let path = tmp.path().join("cw.ifc");
+    let (mut project, mut doc) = LocalProject::new(Schema::Ifc4, &path).unwrap();
+    let r = registry();
+    let l1 = doc
+        .store()
+        .iter()
+        .find(|e| e.class == "IfcBuildingStorey")
+        .unwrap()
+        .id();
+    let cw = id(run(
+        &r,
+        &mut doc,
+        "curtain.create",
+        json!({
+            "curve": { "start": [0, 0], "end": [6, 0] },
+            "base_level": l1.0, "top_constraint": { "unconnected": 3.0 },
+        }),
+    )
+    .unwrap());
+    let t = doc
+        .store()
+        .iter()
+        .find(|e| curtain::curtain_type(e).is_some())
+        .unwrap()
+        .id();
+    for (param, value) in [
+        ("u_layout", json!("fixed_number")),
+        ("u_number", json!(1)),
+        ("v_layout", json!("none")),
+    ] {
+        run(
+            &r,
+            &mut doc,
+            "type.set_param",
+            json!({ "type_id": t.0, "param": param, "value": value }),
+        )
+        .unwrap();
+    }
+    let g =
+        |doc: &Document| curtain::regenerate(doc.store(), doc.store().get(cw).unwrap()).unwrap();
+    let panels = |doc: &Document| {
+        g(doc)
+            .parts
+            .into_iter()
+            .filter(|p| !p.mullion)
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(panels(&doc).len(), 2);
+    // A manual horizontal line at 1.5 m: four panels.
+    let key = run(
+        &r,
+        &mut doc,
+        "curtain.add_grid",
+        json!({ "curtain_id": cw.0, "direction": "v", "position": 1.5 }),
+    )
+    .unwrap();
+    assert_eq!(g(&doc).v_lines, vec![1.5]);
+    assert_eq!(panels(&doc).len(), 4);
+    // Removing the vertical line's lower segment merges the two lower panels into one twice as
+    // wide; restoring it splits them again.
+    run(&r, &mut doc, "curtain.set_grid_segments", json!({ "curtain_id": cw.0, "direction": "u", "position": 3.0, "segments_on": [false, true] })).unwrap();
+    let p = panels(&doc);
+    assert_eq!(p.len(), 3);
+    let wide = p.iter().find(|q| q.z[0] < 0.5).unwrap();
+    assert!(wide.x[1] - wide.x[0] > 5.8, "{wide:?}");
+    run(&r, &mut doc, "curtain.set_grid_segments", json!({ "curtain_id": cw.0, "direction": "u", "position": 3.0, "segments_on": [true, true] })).unwrap();
+    assert_eq!(panels(&doc).len(), 4);
+    // Moving and deleting the manual line.
+    run(
+        &r,
+        &mut doc,
+        "curtain.move_grid",
+        json!({ "curtain_id": cw.0, "grid_key": key, "position": 2.1 }),
+    )
+    .unwrap();
+    assert_eq!(g(&doc).v_lines, vec![2.1]);
+    // A door in the lower left cell: an IfcDoor in the curtain wall, standing on its base.
+    run(
+        &r,
+        &mut doc,
+        "curtain.set_panel_type",
+        json!({ "curtain_id": cw.0, "cells": [[0, 0]], "panel": "door" }),
+    )
+    .unwrap();
+    let door = panels(&doc)
+        .into_iter()
+        .find(|q| q.panel == curtain::Panel::Door)
+        .unwrap();
+    assert!((door.z[0]).abs() < 1e-9 && door.x[0] < 0.1);
+    project.save(&doc).unwrap();
+    let text = std::fs::read_to_string(&path).unwrap();
+    assert!(
+        text.contains("IFCDOOR(") && text.contains("'Curtain Wall Door"),
+        "the door is written"
+    );
+    run(
+        &r,
+        &mut doc,
+        "curtain.delete_grid",
+        json!({ "curtain_id": cw.0, "grid_key": key }),
+    )
+    .unwrap();
+    assert!(g(&doc).v_lines.is_empty());
 }

@@ -153,6 +153,14 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(WallSetExtension),
         registry.add(WallSetEndWrap),
         registry.add(WallSetLocationLine),
+        registry.add(CurtainAddGrid),
+        registry.add(CurtainSetGridSegments),
+        registry.add(CurtainMoveGrid),
+        registry.add(CurtainDeleteGrid),
+        registry.add(CurtainSetPanelType),
+        registry.add(CurtainSetLayout),
+        registry.add(RoofCreateGlazingType),
+        registry.add(RoofSetGlazingType),
         registry.add(WallCreateBySegment),
         registry.add(WallCreateByRoom),
         registry.add(WallSetHost),
@@ -1599,6 +1607,105 @@ edit_command!(
     crate::walls::layered::SetExtensionParams,
     (),
     crate::walls::layered::set_extension
+);
+
+edit_command!(
+    CurtainAddGrid,
+    "curtain.add_grid",
+    "Add a curtain grid line",
+    "A manual grid line on a curtain wall (ARC-CW-004): `direction` u (vertical, at `position` along \
+     the wall from its start) or v (horizontal, `position` above its base); `mode` all segments, one \
+     (`segments[0]`) or all_except (`segments`). Returns its key.",
+    "Curtain Grid",
+    crate::curtain::AddGridParams,
+    u32,
+    crate::curtain::add_grid
+);
+
+edit_command!(
+    CurtainSetGridSegments,
+    "curtain.set_grid_segments",
+    "Add or remove grid line segments",
+    "Sets which segments of a curtain wall's grid line (by `direction` and `position`, a type's or a \
+     manual line) are on (ARC-CW-004): removing one merges the panels on either side into one; \
+     restoring it splits them again.",
+    "Add/Remove Segments",
+    crate::curtain::SegmentsParams,
+    (),
+    crate::curtain::set_grid_segments
+);
+
+edit_command!(
+    CurtainMoveGrid,
+    "curtain.move_grid",
+    "Move a curtain grid line",
+    "Moves a manual grid line to `position` (ARC-CW-004).",
+    "Move Grid Line",
+    crate::curtain::MoveGridParams,
+    (),
+    crate::curtain::move_grid
+);
+
+edit_command!(
+    CurtainDeleteGrid,
+    "curtain.delete_grid",
+    "Delete a curtain grid line",
+    "Deletes a manual grid line (ARC-CW-004).",
+    "Delete Grid Line",
+    crate::curtain::DeleteGridParams,
+    (),
+    crate::curtain::delete_grid
+);
+
+edit_command!(
+    RoofCreateGlazingType,
+    "roof.create_glazing_type",
+    "Create a sloped glazing type",
+    "A Sloped Glazing roof type (ARC-CW-008): a roof given it with `element.set_type` becomes glazed \
+     planes, keeping its sketch. `grid1` lays out lines parallel to the eaves, measured up the slope \
+     (default Fixed Distance 1.5 m); `grid2` lines up the slope (default Maximum Spacing 1.2 m); \
+     mullions and panel as for curtain walls.",
+    "Sloped Glazing Type",
+    crate::roofs::glazing::CreateTypeParams,
+    crate::id::ElementId,
+    crate::roofs::glazing::create_type
+);
+
+edit_command!(
+    RoofSetGlazingType,
+    "roof.set_glazing_type",
+    "Change a sloped glazing type",
+    "Changes a Sloped Glazing type's Grid 1 and Grid 2 rules (`{layout, spacing, number}`), mullion \
+     width and depth, or panel (ARC-CW-008).",
+    "Sloped Glazing Type",
+    crate::roofs::glazing::SetTypeParams,
+    (),
+    crate::roofs::glazing::set_type
+);
+
+edit_command!(
+    CurtainSetLayout,
+    "curtain.set_layout",
+    "Set a curtain wall's grid edits",
+    "Replaces a curtain wall's manual grid lines (`{key, dir, at}`), removed segments \
+     (`{dir, at, segment}`) and swapped panels (`{cell, panel}`) in one step (ARC-CW-004/006).",
+    "Edit Grid",
+    crate::curtain::SetLayoutParams,
+    (),
+    crate::curtain::set_layout
+);
+
+edit_command!(
+    CurtainSetPanelType,
+    "curtain.set_panel_type",
+    "Swap curtain panels",
+    "Swaps the panels of curtain wall cells (ARC-CW-006): `cells` as [column, row] from the start and \
+     base; `panel` glazed, solid, empty or door (a curtain-wall door, an IfcDoor in the curtain \
+     wall); null returns to the type's panel. Cells merged by removed segments share one panel.",
+    "Swap Panel",
+    crate::curtain::SetPanelParams,
+    (),
+    crate::curtain::set_panel_type
 );
 
 edit_command!(

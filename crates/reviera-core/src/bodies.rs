@@ -278,6 +278,23 @@ pub fn all(store: &Store) -> Vec<Body> {
     }
     // Roofs: the faces' slabs (a curved roof's one shell), then fascias and soffits.
     for (id, g) in crate::roofs::all(store) {
+        // Sloped glazing (ARC-CW-008): panels and mullions instead of the slab.
+        if let Some(ty) = store
+            .get(id)
+            .and_then(|e| crate::roofs::glazing::of_roof(store, e))
+        {
+            for p in crate::roofs::glazing::regenerate(&g, &ty).parts {
+                let class = if p.mullion {
+                    "IfcMember:metal"
+                } else if p.panel == crate::curtain::Panel::Glazed {
+                    "IfcPlate:glass"
+                } else {
+                    "IfcPlate"
+                };
+                push(id, class, p.mesh, false);
+            }
+            continue;
+        }
         for f in g.faces {
             push(id, "IfcRoof", f.slab, false);
         }
@@ -318,10 +335,12 @@ pub fn all(store: &Store) -> Vec<Body> {
         for p in &g.parts {
             let class = if p.mullion {
                 "IfcMember:metal"
-            } else if g.ty.panel == crate::curtain::Panel::Glazed {
-                "IfcPlate:glass"
             } else {
-                "IfcPlate"
+                match p.panel {
+                    crate::curtain::Panel::Glazed => "IfcPlate:glass",
+                    crate::curtain::Panel::Door => "IfcDoor",
+                    _ => "IfcPlate",
+                }
             };
             push(id, class, g.mesh(p), false);
         }

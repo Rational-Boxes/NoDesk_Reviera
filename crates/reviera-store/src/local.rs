@@ -1592,45 +1592,68 @@ impl LocalProject {
             let Some(&step) = self.steps.get(id) else {
                 continue;
             };
-            let solids: Vec<geometry::Polyhedron> = g
-                .faces
-                .iter()
-                // A curved roof's body is one shell, on its first face.
-                .filter(|f| !f.slab.1.is_empty())
-                .map(|f| {
-                    // A slab with courtyards through it, or clipped, is written as its
-                    // triangles.
-                    if !f.holes.is_empty() || f.faceted {
-                        return geometry::Polyhedron {
-                            points: f.slab.0.clone(),
-                            faces: f
-                                .slab
-                                .1
-                                .chunks(3)
-                                .map(|t| t.iter().map(|i| *i as usize).collect())
-                                .collect(),
-                        };
-                    }
-                    let n = f.slab.0.len() / 2;
-                    let mut faces = vec![(0..n).rev().collect::<Vec<_>>(), (n..2 * n).collect()];
-                    faces.extend((0..n).map(|i| vec![i, (i + 1) % n, n + (i + 1) % n, n + i]));
-                    geometry::Polyhedron {
-                        points: f.slab.0.clone(),
-                        faces,
-                    }
-                })
-                .chain(g.trims.iter().map(|t| {
-                    geometry::Polyhedron {
-                        points: t.mesh.0.clone(),
-                        faces: t
+            // Sloped glazing (ARC-CW-008): the panels' and mullions' B-reps.
+            let glazing = store
+                .get(*id)
+                .and_then(|e| roofs::glazing::of_roof(store, e))
+                .map(|ty| roofs::glazing::regenerate(g, &ty));
+            let glazed: Option<Vec<geometry::Polyhedron>> = glazing.map(|gl| {
+                gl.parts
+                    .iter()
+                    .map(|p| geometry::Polyhedron {
+                        points: p.mesh.0.clone(),
+                        faces: p
                             .mesh
                             .1
                             .chunks(3)
                             .map(|t| t.iter().map(|i| *i as usize).collect())
                             .collect(),
-                    }
-                }))
-                .collect();
+                    })
+                    .collect()
+            });
+            let solids: Vec<geometry::Polyhedron> = if let Some(s) = glazed {
+                s
+            } else {
+                g.faces
+                    .iter()
+                    // A curved roof's body is one shell, on its first face.
+                    .filter(|f| !f.slab.1.is_empty())
+                    .map(|f| {
+                        // A slab with courtyards through it, or clipped, is written as its
+                        // triangles.
+                        if !f.holes.is_empty() || f.faceted {
+                            return geometry::Polyhedron {
+                                points: f.slab.0.clone(),
+                                faces: f
+                                    .slab
+                                    .1
+                                    .chunks(3)
+                                    .map(|t| t.iter().map(|i| *i as usize).collect())
+                                    .collect(),
+                            };
+                        }
+                        let n = f.slab.0.len() / 2;
+                        let mut faces =
+                            vec![(0..n).rev().collect::<Vec<_>>(), (n..2 * n).collect()];
+                        faces.extend((0..n).map(|i| vec![i, (i + 1) % n, n + (i + 1) % n, n + i]));
+                        geometry::Polyhedron {
+                            points: f.slab.0.clone(),
+                            faces,
+                        }
+                    })
+                    .chain(g.trims.iter().map(|t| {
+                        geometry::Polyhedron {
+                            points: t.mesh.0.clone(),
+                            faces: t
+                                .mesh
+                                .1
+                                .chunks(3)
+                                .map(|t| t.iter().map(|i| *i as usize).collect())
+                                .collect(),
+                        }
+                    }))
+                    .collect()
+            };
             geometry::write_breps(
                 &mut self.ifc,
                 step,

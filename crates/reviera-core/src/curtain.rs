@@ -123,6 +123,41 @@ pub enum Panel {
     Glazed,
     Solid,
     Empty,
+    /// A curtain-wall door filling the cell (ARC-CW-006).
+    Door,
+}
+
+/// A grid direction: `u` lines are vertical, along the wall; `v` lines horizontal, up it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum Dir {
+    U,
+    V,
+}
+
+/// A grid line placed by hand (ARC-CW-004).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct ManualGrid {
+    pub key: u32,
+    pub dir: Dir,
+    /// From the wall's start (`u`) or base (`v`), metres.
+    pub at: f64,
+}
+
+/// A removed segment of a grid line: the line by direction and position, and the segment
+/// between the crossing lines (0 from the start or base).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct SegmentOff {
+    pub dir: Dir,
+    pub at: f64,
+    pub segment: usize,
+}
+
+/// A cell's panel instead of the type's (ARC-CW-006): the cell by column (along) and row (up).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct PanelOverride {
+    pub cell: [usize; 2],
+    pub panel: Panel,
 }
 
 /// A mullion's section: across the wall's face (`width`) and through it (`depth`).
@@ -209,6 +244,23 @@ pub struct CurtainRecipe {
     pub u: Placement,
     #[serde(default)]
     pub v: Placement,
+    /// Grid lines placed by hand.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub grids: Vec<ManualGrid>,
+    /// Grid line segments removed (their panels merge).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub removed: Vec<SegmentOff>,
+    /// Panels swapped cell by cell.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub panels: Vec<PanelOverride>,
+}
+
+impl CurtainRecipe {
+    fn off(&self, dir: Dir, at: f64, segment: usize) -> bool {
+        self.removed
+            .iter()
+            .any(|o| o.dir == dir && (o.at - at).abs() < 1e-6 && o.segment == segment)
+    }
 }
 
 pub fn curtain_recipe(e: &Element) -> Option<CurtainRecipe> {
@@ -224,6 +276,10 @@ fn find(store: &Store, guid: &str) -> Option<ElementId> {
 #[derive(Debug, Clone, PartialEq)]
 pub struct CurtainPart {
     pub mullion: bool,
+    /// A panel's kind (mullions: the type's).
+    pub panel: Panel,
+    /// The cell (column, row) of a panel's lowest, first cell.
+    pub cell: [usize; 2],
     /// Along the wall from its start, through it (+ toward its left, the exterior), and up
     /// (absolute).
     pub x: [f64; 2],
@@ -304,82 +360,199 @@ pub fn regenerate(store: &Store, e: &Element) -> Result<CurtainGeometry> {
             "the curtain wall is too short",
         ));
     }
-    let u_lines = solve(ty.u, length, r.u.justification, r.u.offset);
-    let v_lines = solve(ty.v, z1 - z0, r.v.justification, r.v.offset);
+    let height = z1 - z0;
+    // The type's lines and the manual ones.
+    let merge = |mut lines: Vec<f64>, dir: Dir, max: f64| {
+        lines.extend(
+            r.grids
+                .iter()
+                .filter(|g| g.dir == dir && g.at > TOL && g.at < max - TOL)
+                .map(|g| g.at),
+        );
+        lines.sort_by(f64::total_cmp);
+        lines.dedup_by(|a, b| (*a - *b).abs() < TOL);
+        lines
+    };
+    let u_lines = merge(
+        solve(ty.u, length, r.u.justification, r.u.offset),
+        Dir::U,
+        length,
+    );
+    let v_lines = merge(
+        solve(ty.v, height, r.v.justification, r.v.offset),
+        Dir::V,
+        height,
+    );
+    let mut xs = vec![0.0];
+    xs.extend(u_lines.iter().copied());
+    xs.push(length);
+    let mut zs = vec![0.0];
+    zs.extend(v_lines.iter().copied());
+    zs.push(height);
+    let (nx, nz) = (xs.len() - 1, zs.len() - 1);
+    // A vertical line between columns i and i+1 is open at row j; a horizontal line between
+    // rows j and j+1 at column i.
+    let v_open = |i: usize, j: usize| r.off(Dir::U, xs[i + 1], j);
+    let h_open = |i: usize, j: usize| r.off(Dir::V, zs[j + 1], i);
     let mut parts = Vec::new();
     let half = |m: Option<Mullion>| m.map_or(0.0, |m| m.width / 2.0);
     let (bw, iw) = (half(ty.border), half(ty.interior));
-    // The panels: each cell between grid lines, inside the mullions.
-    if ty.panel != Panel::Empty {
-        let t = ty.panel_thickness.max(0.001) / 2.0;
-        let mut xs = vec![0.0];
-        xs.extend(u_lines.iter().copied());
-        xs.push(length);
-        let mut zs = vec![0.0];
-        zs.extend(v_lines.iter().copied());
-        zs.push(z1 - z0);
-        for i in 0..xs.len() - 1 {
-            for j in 0..zs.len() - 1 {
-                let x0 = xs[i] + if i == 0 { bw } else { iw };
-                let x1 = xs[i + 1] - if i + 2 == xs.len() { bw } else { iw };
-                let za = zs[j] + if j == 0 { bw } else { iw };
-                let zb = zs[j + 1] - if j + 2 == zs.len() { bw } else { iw };
-                if x1 - x0 > TOL && zb - za > TOL {
-                    parts.push(CurtainPart {
-                        mullion: false,
-                        x: [x0, x1],
-                        y: [-t, t],
-                        z: [z0 + za, z0 + zb],
-                    });
+    // Cells joined across removed segments form one panel.
+    let mut group: Vec<usize> = (0..nx * nz).collect();
+    fn root(g: &mut [usize], k: usize) -> usize {
+        let mut k = k;
+        while g[k] != k {
+            g[k] = g[g[k]];
+            k = g[k];
+        }
+        k
+    }
+    for i in 0..nx {
+        for j in 0..nz {
+            if i + 1 < nx && v_open(i, j) {
+                let (a, b) = (
+                    root(&mut group, i * nz + j),
+                    root(&mut group, (i + 1) * nz + j),
+                );
+                group[a.max(b)] = a.min(b);
+            }
+            if j + 1 < nz && h_open(i, j) {
+                let (a, b) = (
+                    root(&mut group, i * nz + j),
+                    root(&mut group, i * nz + j + 1),
+                );
+                group[a.max(b)] = a.min(b);
+            }
+        }
+    }
+    let mut groups: std::collections::BTreeMap<usize, Vec<[usize; 2]>> = Default::default();
+    for i in 0..nx {
+        for j in 0..nz {
+            let g = root(&mut group, i * nz + j);
+            groups.entry(g).or_default().push([i, j]);
+        }
+    }
+    let inset_x = |i: usize, left: bool| {
+        if left {
+            if i == 0 { bw } else { iw }
+        } else if i + 1 == nx {
+            bw
+        } else {
+            iw
+        }
+    };
+    let inset_z = |j: usize, low: bool| {
+        if low {
+            if j == 0 { bw } else { iw }
+        } else if j + 1 == nz {
+            bw
+        } else {
+            iw
+        }
+    };
+    for cells in groups.values() {
+        let first = *cells.iter().min().expect("a cell");
+        let kind = r
+            .panels
+            .iter()
+            .rev()
+            .find(|o| cells.contains(&o.cell))
+            .map_or(ty.panel, |o| o.panel);
+        if kind == Panel::Empty {
+            continue;
+        }
+        let t = if kind == Panel::Door {
+            0.025
+        } else {
+            ty.panel_thickness.max(0.001) / 2.0
+        };
+        let (i0, i1) = (
+            cells.iter().map(|c| c[0]).min().expect("a cell"),
+            cells.iter().map(|c| c[0]).max().expect("a cell"),
+        );
+        let (j0, j1) = (
+            cells.iter().map(|c| c[1]).min().expect("a cell"),
+            cells.iter().map(|c| c[1]).max().expect("a cell"),
+        );
+        let rectangular = (i1 - i0 + 1) * (j1 - j0 + 1) == cells.len();
+        let boxes: Vec<([usize; 2], [usize; 2])> = if rectangular {
+            vec![([i0, i1], [j0, j1])]
+        } else {
+            cells.iter().map(|c| ([c[0], c[0]], [c[1], c[1]])).collect()
+        };
+        for (ci, cj) in boxes {
+            // A door stands on the cell's bottom: no sill mullion gap below it.
+            let x0 = xs[ci[0]] + inset_x(ci[0], true);
+            let x1 = xs[ci[1] + 1] - inset_x(ci[1], false);
+            let za = zs[cj[0]]
+                + if kind == Panel::Door && cj[0] == 0 {
+                    0.0
+                } else {
+                    inset_z(cj[0], true)
+                };
+            let zb = zs[cj[1] + 1] - inset_z(cj[1], false);
+            if x1 - x0 > TOL && zb - za > TOL {
+                parts.push(CurtainPart {
+                    mullion: false,
+                    panel: kind,
+                    cell: first,
+                    x: [x0, x1],
+                    y: [-t, t],
+                    z: [z0 + za, z0 + zb],
+                });
+            }
+        }
+    }
+    let mullion = |x: [f64; 2], m: Mullion, z: [f64; 2]| CurtainPart {
+        mullion: true,
+        panel: ty.panel,
+        cell: [0, 0],
+        x,
+        y: [-m.depth / 2.0, m.depth / 2.0],
+        z,
+    };
+    // Vertical mullions: the borders full height, interior lines segment by segment.
+    if let Some(m) = ty.border {
+        for x in [m.width / 2.0, length - m.width / 2.0] {
+            parts.push(mullion([x - m.width / 2.0, x + m.width / 2.0], m, [z0, z1]));
+        }
+    }
+    if let Some(m) = ty.interior {
+        for i in 0..nx.saturating_sub(1) {
+            let x = xs[i + 1];
+            for j in 0..nz {
+                if !v_open(i, j) {
+                    parts.push(mullion(
+                        [x - m.width / 2.0, x + m.width / 2.0],
+                        m,
+                        [z0 + zs[j], z0 + zs[j + 1]],
+                    ));
                 }
             }
         }
     }
-    // The mullions: vertical ones run full height; horizontal ones between them.
-    let mut verticals: Vec<(f64, Mullion)> = Vec::new();
+    // Horizontal mullions, cell by cell between the verticals.
+    let mut horizontals: Vec<(Option<usize>, f64, Mullion)> = Vec::new();
     if let Some(m) = ty.border {
-        verticals.push((m.width / 2.0, m));
-        verticals.push((length - m.width / 2.0, m));
+        horizontals.push((None, m.width / 2.0, m));
+        horizontals.push((None, height - m.width / 2.0, m));
     }
     if let Some(m) = ty.interior {
-        verticals.extend(u_lines.iter().map(|x| (*x, m)));
+        horizontals.extend((0..nz.saturating_sub(1)).map(|j| (Some(j), zs[j + 1], m)));
     }
-    verticals.sort_by(|a, b| a.0.total_cmp(&b.0));
-    for (x, m) in &verticals {
-        parts.push(CurtainPart {
-            mullion: true,
-            x: [x - m.width / 2.0, x + m.width / 2.0],
-            y: [-m.depth / 2.0, m.depth / 2.0],
-            z: [z0, z1],
-        });
-    }
-    let mut horizontals: Vec<(f64, Mullion)> = Vec::new();
-    if let Some(m) = ty.border {
-        horizontals.push((m.width / 2.0, m));
-        horizontals.push((z1 - z0 - m.width / 2.0, m));
-    }
-    if let Some(m) = ty.interior {
-        horizontals.extend(v_lines.iter().map(|z| (*z, m)));
-    }
-    for (z, m) in horizontals {
-        // Between each pair of neighbouring verticals (or the ends).
-        let mut stops: Vec<f64> = vec![0.0];
-        stops.extend(
-            verticals
-                .iter()
-                .flat_map(|(x, vm)| [x - vm.width / 2.0, x + vm.width / 2.0]),
-        );
-        stops.push(length);
-        stops.sort_by(f64::total_cmp);
-        for pair in stops.chunks(2) {
-            let [a, b] = [pair[0], *pair.get(1).unwrap_or(&length)];
+    for (line, z, m) in horizontals {
+        for i in 0..nx {
+            if line.is_some_and(|j| h_open(i, j)) {
+                continue;
+            }
+            let a = xs[i] + inset_x(i, true);
+            let b = xs[i + 1] - inset_x(i, false);
             if b - a > TOL {
-                parts.push(CurtainPart {
-                    mullion: true,
-                    x: [a, b],
-                    y: [-m.depth / 2.0, m.depth / 2.0],
-                    z: [z0 + z - m.width / 2.0, z0 + z + m.width / 2.0],
-                });
+                parts.push(mullion(
+                    [a, b],
+                    m,
+                    [z0 + z - m.width / 2.0, z0 + z + m.width / 2.0],
+                ));
             }
         }
     }
@@ -527,6 +700,9 @@ pub(crate) fn create(txn: &mut crate::txn::Transaction<'_>, p: CreateParams) -> 
         extent,
         u: Placement::default(),
         v: Placement::default(),
+        grids: Vec::new(),
+        removed: Vec::new(),
+        panels: Vec::new(),
     };
     let guid = store.get(type_id).expect("resolved").guid().to_string();
     let id = txn.create(
@@ -808,4 +984,255 @@ mod tests {
         assert!(close(&f, &[1.5, 3.0, 4.5]));
         assert!(solve(Rule::default(), 6.0, Justification::Beginning, 0.0).is_empty());
     }
+}
+
+// ---- Manual grid lines, segments and panels (ARC-CW-004, ARC-CW-006) ----
+
+fn editable(store: &Store, r: &ElementRef) -> Result<(ElementId, CurtainRecipe)> {
+    let id = store
+        .resolve(r)
+        .ok_or_else(|| Error::new("element.not_found", "no such curtain wall"))?;
+    let c = curtain_recipe(store.get(id).expect("resolved")).ok_or_else(|| {
+        Error::new(
+            "curtain.not_reviera",
+            format!("element {id} is not a Reviera curtain wall"),
+        )
+    })?;
+    Ok((id, c))
+}
+
+/// How many segments a line has: the cells across it.
+fn segment_count(store: &Store, id: ElementId, dir: Dir) -> Result<usize> {
+    let g = regenerate(store, store.get(id).expect("exists"))?;
+    Ok(match dir {
+        Dir::U => g.v_lines.len() + 1,
+        Dir::V => g.u_lines.len() + 1,
+    })
+}
+
+/// Which segments of a new line are placed.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum GridMode {
+    /// All segments.
+    #[default]
+    All,
+    /// Only `segments[0]`.
+    One,
+    /// All but `segments`.
+    AllExcept,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct AddGridParams {
+    pub curtain_id: ElementRef,
+    /// `u` a vertical line, `v` a horizontal one.
+    pub direction: Dir,
+    /// From the wall's start (`u`) or base (`v`), metres.
+    #[schemars(extend("x-reviera-data-type" = "length"))]
+    pub position: f64,
+    #[serde(default)]
+    pub mode: GridMode,
+    /// Segments for `one` and `all_except` (0 from the start or base).
+    #[serde(default)]
+    pub segments: Vec<usize>,
+}
+
+/// `curtain.add_grid`: a manual grid line; its key.
+pub(crate) fn add_grid(txn: &mut crate::txn::Transaction<'_>, p: AddGridParams) -> Result<u32> {
+    let store = txn.store().clone();
+    let (id, mut c) = editable(&store, &p.curtain_id)?;
+    crate::modify::check_unpinned(&store, id)?;
+    let g = regenerate(&store, store.get(id).expect("resolved"))?;
+    let max = match p.direction {
+        Dir::U => g.length(),
+        Dir::V => g.z[1] - g.z[0],
+    };
+    if !(p.position > TOL && p.position < max - TOL) {
+        return Err(Error::new(
+            "curtain.grid_outside",
+            "the grid line must be inside the curtain wall",
+        ));
+    }
+    let key = c.grids.iter().map(|g| g.key + 1).max().unwrap_or(1);
+    c.grids.push(ManualGrid {
+        key,
+        dir: p.direction,
+        at: p.position,
+    });
+    let n = segment_count(&store, id, p.direction)?;
+    let off: Vec<usize> = match p.mode {
+        GridMode::All => Vec::new(),
+        GridMode::One => {
+            let keep = *p
+                .segments
+                .first()
+                .ok_or_else(|| Error::new("curtain.segment", "give the segment to place"))?;
+            (0..n).filter(|s| *s != keep).collect()
+        }
+        GridMode::AllExcept => p.segments.clone(),
+    };
+    for segment in off {
+        c.removed.push(SegmentOff {
+            dir: p.direction,
+            at: p.position,
+            segment,
+        });
+    }
+    write(txn, id, &c)?;
+    Ok(key)
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SegmentsParams {
+    pub curtain_id: ElementRef,
+    pub direction: Dir,
+    /// The line's position (a type's line or a manual one).
+    #[schemars(extend("x-reviera-data-type" = "length"))]
+    pub position: f64,
+    /// Each segment on (true) or removed, from the start or base.
+    pub segments_on: Vec<bool>,
+}
+
+/// `curtain.set_grid_segments`: removed segments merge the panels on either side.
+pub(crate) fn set_grid_segments(
+    txn: &mut crate::txn::Transaction<'_>,
+    p: SegmentsParams,
+) -> Result<()> {
+    let store = txn.store().clone();
+    let (id, mut c) = editable(&store, &p.curtain_id)?;
+    let g = regenerate(&store, store.get(id).expect("resolved"))?;
+    let lines = match p.direction {
+        Dir::U => &g.u_lines,
+        Dir::V => &g.v_lines,
+    };
+    let at = lines
+        .iter()
+        .copied()
+        .find(|l| (l - p.position).abs() < 1e-4)
+        .ok_or_else(|| Error::new("curtain.no_grid", "there is no grid line there"))?;
+    c.removed
+        .retain(|o| !(o.dir == p.direction && (o.at - at).abs() < 1e-6));
+    for (segment, on) in p.segments_on.iter().enumerate() {
+        if !on {
+            c.removed.push(SegmentOff {
+                dir: p.direction,
+                at,
+                segment,
+            });
+        }
+    }
+    write(txn, id, &c)
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct MoveGridParams {
+    pub curtain_id: ElementRef,
+    pub grid_key: u32,
+    #[schemars(extend("x-reviera-data-type" = "length"))]
+    pub position: f64,
+}
+
+/// `curtain.move_grid`: a manual line to a new position, its removed segments with it.
+pub(crate) fn move_grid(txn: &mut crate::txn::Transaction<'_>, p: MoveGridParams) -> Result<()> {
+    let store = txn.store().clone();
+    let (id, mut c) = editable(&store, &p.curtain_id)?;
+    let g = c
+        .grids
+        .iter_mut()
+        .find(|g| g.key == p.grid_key)
+        .ok_or_else(|| Error::new("curtain.no_grid", "no manual grid line with that key"))?;
+    let (dir, old) = (g.dir, g.at);
+    g.at = p.position;
+    for o in c.removed.iter_mut() {
+        if o.dir == dir && (o.at - old).abs() < 1e-6 {
+            o.at = p.position;
+        }
+    }
+    write(txn, id, &c)
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct DeleteGridParams {
+    pub curtain_id: ElementRef,
+    pub grid_key: u32,
+}
+
+/// `curtain.delete_grid`: removes a manual line.
+pub(crate) fn delete_grid(
+    txn: &mut crate::txn::Transaction<'_>,
+    p: DeleteGridParams,
+) -> Result<()> {
+    let store = txn.store().clone();
+    let (id, mut c) = editable(&store, &p.curtain_id)?;
+    let Some(k) = c.grids.iter().position(|g| g.key == p.grid_key) else {
+        return Err(Error::new(
+            "curtain.no_grid",
+            "no manual grid line with that key",
+        ));
+    };
+    let g = c.grids.remove(k);
+    c.removed
+        .retain(|o| !(o.dir == g.dir && (o.at - g.at).abs() < 1e-6));
+    write(txn, id, &c)
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SetPanelParams {
+    pub curtain_id: ElementRef,
+    /// Cells by (column along the wall, row up it), from 0 at the start and base.
+    pub cells: Vec<[usize; 2]>,
+    /// `glazed`, `solid`, `empty` or `door` (a curtain-wall door); `null` returns to the type's.
+    pub panel: Option<Panel>,
+}
+
+/// `curtain.set_panel_type`: swaps the panels of cells (ARC-CW-006).
+pub(crate) fn set_panel_type(
+    txn: &mut crate::txn::Transaction<'_>,
+    p: SetPanelParams,
+) -> Result<()> {
+    let store = txn.store().clone();
+    let (id, mut c) = editable(&store, &p.curtain_id)?;
+    let g = regenerate(&store, store.get(id).expect("resolved"))?;
+    let (nx, nz) = (g.u_lines.len() + 1, g.v_lines.len() + 1);
+    for cell in &p.cells {
+        if cell[0] >= nx || cell[1] >= nz {
+            return Err(Error::new(
+                "curtain.no_cell",
+                format!("there is no cell {cell:?} ({nx} × {nz} cells)"),
+            ));
+        }
+        c.panels.retain(|o| o.cell != *cell);
+        if let Some(panel) = p.panel {
+            c.panels.push(PanelOverride { cell: *cell, panel });
+        }
+    }
+    write(txn, id, &c)
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SetLayoutParams {
+    pub curtain_id: ElementRef,
+    /// The manual grid lines (keys are kept or given).
+    pub grids: Vec<ManualGrid>,
+    pub removed: Vec<SegmentOff>,
+    pub panels: Vec<PanelOverride>,
+}
+
+/// `curtain.set_layout`: a curtain wall's manual lines, removed segments and swapped panels at
+/// once (the window's Edit Grid).
+pub(crate) fn set_layout(txn: &mut crate::txn::Transaction<'_>, p: SetLayoutParams) -> Result<()> {
+    let store = txn.store().clone();
+    let (id, mut c) = editable(&store, &p.curtain_id)?;
+    c.grids = p.grids;
+    c.removed = p.removed;
+    c.panels = p.panels;
+    write(txn, id, &c)?;
+    regenerate(txn.store(), txn.store().get(id).expect("exists")).map(|_| ())
 }

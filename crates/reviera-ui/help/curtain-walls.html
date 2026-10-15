@@ -35,6 +35,24 @@ they change every curtain wall of the type; <i>Duplicate Type…</i> makes a new
 <p>Each curtain wall has its own base and top, and for each direction a <b>Justification</b>
 (Beginning, Center, End) and <b>Offset</b> for Fixed Distance lines. <code>curtain.set</code></p>
 
+<h2 id="edit-grid">Edit Grid: lines, segments and panels</h2>
+<p>Select a curtain wall and click <b>Modify | Curtain Walls › Edit Grid</b>:</p>
+<ul>
+  <li><b>Lines</b> lists every grid line: <b>U</b> lines are vertical (Position along the wall
+    from its start), <b>V</b> lines horizontal (up from its base). <b>Add Line</b> places a line
+    by hand (ticked <b>Manual</b>); manual lines can be moved by editing their position, or
+    deleted. The type's lines stay where the type puts them.</li>
+  <li><b>Segments</b> is a row of 1s and 0s, one per segment from the start or base: a 0 removes
+    that segment, so the panels either side become one panel and its mullion goes.</li>
+  <li><b>Panels</b> swaps cells: Column (along) and Row (up), from 0, and the panel: Glazed,
+    Solid, Empty or <b>Door</b>, a curtain-wall door that fills the cell, stands on the base and
+    is written to IFC as an <code>IfcDoor</code> in the curtain wall.</li>
+</ul>
+<p><b>OK</b> applies it all in one step. <code>curtain.add_grid</code>,
+<code>curtain.set_grid_segments</code>, <code>curtain.move_grid</code>,
+<code>curtain.delete_grid</code>, <code>curtain.set_panel_type</code>,
+<code>curtain.set_layout</code></p>
+
 <h2 id="modify">Moving and copying</h2>
 <p>Move, Copy, Rotate and Mirror work on curtain walls. They are deleted with their levels.</p>
 
@@ -42,7 +60,8 @@ they change every curtain wall of the type; <i>Duplicate Type…</i> makes a new
 <p>An <code>IfcCurtainWall</code> of an <code>IfcCurtainWallType</code>, aggregating its panels
 (<code>IfcPlate</code>, <code>CURTAIN_PANEL</code>) and mullions (<code>IfcMember</code>,
 <code>MULLION</code>).</p>
-<p class="note">Not yet available: arc curtain walls, adding or removing single grid lines and
-segments, curtain-wall doors and other panel types, mullion profiles and corner mullions,
-Adjust for Mullion Size, curtain systems by face and sloped glazing; a curtain wall does not yet
-refuse doors or windows in the stretch of wall it replaces.</p>
+<p class="note">Not yet available: arc curtain walls, placing grid lines by clicking in an
+elevation, wall-type and family panels, mullion profiles and corner mullions, Adjust for Mullion
+Size, curtain systems by face; curtain-wall doors are not in door schedules yet, and a curtain
+wall does not yet refuse doors or windows in the stretch of wall it replaces. For sloped glazing
+see <a href="reviera:help/roofs#glazing">Roofs</a>.</p>

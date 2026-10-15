@@ -130,6 +130,17 @@ to it; the roof ends at its face) or the roof (it ends on that roof's top surfac
 roof running into the main roof). Clicking the edge's own roof unjoins it. The join follows its
 target. <code>roof.join</code>, <code>roof.unjoin</code></p>
 
+<h2 id="glazing">Sloped glazing</h2>
+<p>A glazed roof: select footprint or extrusion roofs and click <b>Modify | Roofs › Sloped
+Glazing</b>. They get a <i>Sloped Glazing</i> type (made the first time), and each roof plane
+becomes glass panels between mullions: <b>Grid 1</b> lines run parallel to the plane's eave,
+spaced up the slope from it (Fixed Distance 1.5 m), and <b>Grid 2</b> lines run up the slope
+(at most 1.2 m apart). Hips, valleys and ridges get one mullion each, shared by the two planes.
+The roof keeps its footprint, slopes and joins, so Edit Footprint still works and the glazing
+follows. Change the roof's type back to a basic roof type to undo.
+<code>roof.create_glazing_type</code>, <code>roof.set_glazing_type</code>,
+<code>element.set_type</code></p>
+
 <h2 id="extrusion">Roofs by extrusion</h2>
 <p>A roof by extrusion is a profile drawn in a section or elevation, carried across the view:</p>
 <ol>

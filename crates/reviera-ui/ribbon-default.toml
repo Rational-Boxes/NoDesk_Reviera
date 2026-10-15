@@ -929,6 +929,18 @@ icon = "host_select"
 help = "Select the wall the selected hosted wall follows"
 
 [[action]]
+id = "roof.create_glazing_type"
+label = "Sloped Glazing"
+icon = "sloped_glazing"
+help = "Turn the selected roofs into sloped glazing (a Sloped Glazing type, made if there is none); change their type back to undo"
+
+[[action]]
+id = "curtain.set_layout"
+label = "Edit Grid"
+icon = "curtain_grid"
+help = "Add, move and delete the selected curtain wall's grid lines, remove segments to merge panels, and swap panels (doors)"
+
+[[action]]
 id = "wallsweep.create"
 label = "Sweep"
 icon = "wall_sweep"
@@ -1545,6 +1557,7 @@ panels = [
     { action = "roof.join", size = "large" },
   ] },
   { label = "Railing", tools = [{ action = "railing.create_on_edges", size = "large" }] },
+  { label = "Glazing", tools = [{ action = "roof.create_glazing_type", size = "large" }] },
 ]
 
 [[context]]
@@ -1626,6 +1639,11 @@ panels = [{ label = "Datum", tools = [
   { action = "datum.maximize_3d", size = "large" },
   { action = "datum.propagate_extents", size = "large" },
 ] }]
+
+[[context]]
+category = "cat.curtain_walls"
+label = "Curtain Walls"
+panels = [{ label = "Curtain Wall", tools = [{ action = "curtain.set_layout", size = "large" }] }]
 
 [[context]]
 category = "cat.windows"

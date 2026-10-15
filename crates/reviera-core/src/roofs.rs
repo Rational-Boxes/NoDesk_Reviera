@@ -43,6 +43,7 @@ use crate::walls::{Line, RECIPE_KEY};
 pub mod curved;
 pub mod eaves;
 pub mod extrusion;
+pub mod glazing;
 pub mod skeleton;
 
 use skeleton::{Across, SkelEdge};
