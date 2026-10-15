@@ -967,6 +967,9 @@ impl Gui {
             || self.railing_tool.is_some()
             || self.column_tool.is_some()
             || self.curtain_tool.is_some()
+            || self.ramp_tool.is_some()
+            || self.measure_tool.is_some()
+            || self.skylight_tool.is_some()
     }
 
     /// Shows the grips of the selection (or nothing).

@@ -226,6 +226,12 @@ Create … Boundary* tab:
     ARC-OPEN-004).
   - IFC: an `IfcOpeningElement` voids each host, whose own body stays whole; a shaft is an
     `IfcBuildingElementProxy` (PROVISIONFORVOID) with one derived opening per host.
+- **Skylights** (Architecture › Opening › Skylight): click a roof in a plan or 3D. A pitched
+  roof gets a roof window lying in the slope; a flat roof a flat sheet, a pyramid or a ridge
+  lantern on a curb. A ridge lantern's panes are re-mapped from its length (as many equal panes
+  as keep each within the largest pane size). Each cuts its own opening and moves with its roof.
+  IFC: `IfcWindow` (SKYLIGHT) filling an `IfcOpeningElement` in the roof (`skylight.create`,
+  `skylight.set`; ARC-WIN-001).
 
 #### Roofs
 
@@ -273,6 +279,10 @@ Create … Boundary* tab:
   riser height and warnings. **Spiral Stair** makes a full-step spiral from its centre and a
   point on its walking line. New stairs get railings on both sides. Saved as `IfcStair`
   (`stair.create`, `stair.set_params`).
+- **Ramps** (Architecture › Ramp): click a centreline in a plan from the bottom up. Corners get
+  square landings, and a run longer than the type's maximum incline length (9 m) is split by
+  landings. A slope steeper than the type's maximum (1:12) gives a warning. Thick or solid
+  shapes; `IfcRamp` (`ramp.create`, `ramp.set`; ARC-RAMP-001).
 - **Stairs through floors** (ARC-STAIR-007): a run drawn to within a tread of the top snaps to
   reach the level above and completes the stair; Esc completes it too, the last run carrying on.
   The stair keeps reaching its top as levels move, and its railings extend with it. Where a floor
@@ -416,6 +426,8 @@ Create … Boundary* tab:
   at the cursor; a middle click on empty space offers the reset when anything is hidden. With two elements selected it
   checks whether they overlap and, when they do, offers the booleans: cut either way, intersect,
   union, join or accept (UI-SEL-006).
+- **Measure** (Modify › Measure): click points in a plan; the status bar shows each segment, its
+  angle and the chain's total (`measure.between`, `measure.chain`, `measure.along`; ARC-MOD-023).
 - **Modify tools**: Align (AL), Offset (OF), Mirror by picked or drawn axis (MM, DM), Move (MV),
   Copy (CO), Rotate (RO), Array (AR) and Radial Array (members as independent copies; Move To
   2nd or Last; ARC-MOD-026), Trim/Extend to Corner (TR), Trim/Extend to a boundary, Split (SL),
@@ -501,13 +513,13 @@ nearest gaps in what is built:
   outlines are written as polylines), the arch above the cut dashed in plans, and built-in
   shaped types ready in the type list (today a type is duplicated and its Shape set); gate
   swing arcs in plan.
-- **Roofs**: skylights (vertical openings and shafts do cut roofs), slope arrows, picking single eave edges in the window,
+- **Roofs**: skylight openings square to the roof face, flashing, and skylight types; slope arrows, picking single eave edges in the window,
   dormer openings as separate IFC opening elements. Gutters and downspouts are planned as part
   of plumbing (MEP-PIPE-010).
 - **Openings**: openings by face (square to a sloped roof), across roof ridges and in arched
   roofs and domes, and guards around a stair opening (a Pick Edges railing can follow it).
-- **Stairs and railings**: winders, supports, editing runs with handles, continuous handrails
-  and baluster families.
+- **Stairs, ramps and railings**: winders, supports, editing runs with handles, continuous handrails
+  and baluster families; curved ramps, ramp railings and editing a ramp's path with grips.
 - **Decks**: ledgers, span tables, breakers and board overrides.
 - **Rooms**: room separation lines, tags as elements, other area rules, volumes clipped by floors
   and roofs.

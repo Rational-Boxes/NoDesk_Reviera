@@ -789,6 +789,24 @@ icon = "assembly"
 help = "Edit the layers of the selected wall's type: functions, priorities, materials, thicknesses and the core"
 
 [[action]]
+id = "ramp.create"
+label = "Ramp"
+icon = "ramp"
+help = "Draw a ramp in a plan: click its centreline's points from the bottom up and press Enter; its height and width are in Properties"
+
+[[action]]
+id = "skylight.create"
+label = "Skylight"
+icon = "skylight"
+help = "Place skylights in a roof: a roof window in a pitched roof; a flat, pyramid or ridge lantern skylight on a flat roof (choose in Properties)"
+
+[[action]]
+id = "tool.measure"
+label = "Measure"
+icon = "measure"
+help = "Measure distances in a plan: click points; each segment and the total show in the status bar"
+
+[[action]]
 id = "curtain.create"
 label = "Curtain Wall"
 icon = "curtain_wall"
@@ -970,6 +988,7 @@ label = "Circulation"
 tools = [
   { action = "stair.create", size = "large" },
   { action = "stair.spiral", size = "large" },
+  { action = "ramp.create", size = "large" },
   { action = "railing.create", size = "large" },
   { action = "deck.create", size = "large" },
 ]
@@ -980,6 +999,7 @@ tools = [
   { action = "opening.create_wall", size = "large" },
   { action = "opening.create_vertical", size = "small" },
   { action = "opening.create_shaft", size = "small" },
+  { action = "skylight.create", size = "large" },
 ]
 
 [[tab.panel]]
@@ -1149,7 +1169,7 @@ tools = [
 
 [[tab.panel]]
 label = "Measure"
-tools = [{ action = "dim.create_aligned", size = "small" }]
+tools = [{ action = "tool.measure", size = "small" }, { action = "dim.create_aligned", size = "small" }]
 
 # ---- Contextual tabs (§1.9): "Modify | <category>" while elements of one category are
 # selected: the Modify tab's panels, then the category's own. ----

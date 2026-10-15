@@ -35,6 +35,7 @@ mod openings;
 mod overlaps;
 mod plans;
 mod railings;
+mod ramps;
 mod ribbon;
 mod roofs;
 mod rooms;
@@ -44,6 +45,7 @@ mod sections;
 mod select;
 mod sheets;
 mod sketch;
+mod skylights;
 mod sketch_edit;
 mod slab_openings;
 mod snap;
@@ -239,6 +241,9 @@ struct Gui {
     dome_tool: Option<curved::DomeTool>,
     column_tool: Option<columns::ColumnTool>,
     curtain_tool: Option<curtain::CurtainTool>,
+    ramp_tool: Option<ramps::RampTool>,
+    measure_tool: Option<ramps::MeasureTool>,
+    skylight_tool: Option<skylights::SkylightTool>,
     /// The last array's members and Move To (Last when true).
     array_count: u32,
     array_last: bool,
@@ -1221,6 +1226,9 @@ impl Gui {
         self.end_dome_tool();
         self.end_column_tool();
         self.end_curtain_tool();
+        self.end_ramp_tool();
+        self.end_measure_tool();
+        self.end_skylight_tool();
         if self.tool.take().is_some() {
             if let Some(v) = self.viewport() {
                 v.set_overlay(&[]);
@@ -1250,7 +1258,11 @@ impl Gui {
         if self.railing_tool.is_some() {
             return self.railing_escape();
         }
-        if self.curtain_escape() {
+        if self.curtain_escape()
+            || self.measure_escape()
+            || self.ramp_key(WXK_ESCAPE)
+            || self.end_skylight_tool()
+        {
             return;
         }
         if self.end_feature_tool() || self.end_dome_tool() || self.end_column_tool() {
@@ -1811,6 +1823,8 @@ impl Gui {
                 || self.column_tool_properties(grid)
                 || self.curtain_tool_properties(grid)
                 || self.ceiling_tool_properties(grid)
+                || self.ramp_tool_properties(grid)
+                || self.skylight_tool_properties(grid)
                 || self.insert_tool_properties(grid)
                 || self.wall_tool_properties(grid)
                 || self.view_properties(grid))
@@ -1949,6 +1963,8 @@ impl Gui {
             || self.opening_rows(grid, id)
             || self.column_rows(grid, id)
             || self.curtain_rows(grid, id)
+            || self.ramp_rows(grid, id)
+            || self.skylight_rows(grid, id)
         {
             return;
         }
@@ -2161,6 +2177,8 @@ impl Gui {
             || self.opening_edit(property, text.clone())
             || self.column_edit(property, text.clone())
             || self.curtain_edit(property, text.clone())
+            || self.ramp_edit(property, text.clone())
+            || self.skylight_edit(property, text.clone())
             || self.insert_edit(property, text.clone())
             || self.wall_edit(property, text.clone())
             || self.floor_edit(property, text.clone())
@@ -2495,6 +2513,9 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                     None if g.dome_tool.is_some() => g.dome_click(x, y),
                     None if g.column_tool.is_some() => g.column_click(x, y),
                     None if g.curtain_tool.is_some() => g.curtain_click(x, y),
+                    None if g.ramp_tool.is_some() => g.ramp_click(x, y),
+                    None if g.measure_tool.is_some() => g.measure_click(x, y),
+                    None if g.skylight_tool.is_some() => g.skylight_click(x, y),
                     None if g.dim_tool.is_some() => g.dim_click(x, y),
                     None if g.grid_tool.is_some() => g.grid_click(x, y),
                     None if g.insert_tool.is_some() => g.insert_click(x, y),
@@ -2565,6 +2586,14 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                     }
                     if g.curtain_tool.is_some() {
                         g.curtain_motion(x, y);
+                        redraw = true;
+                    }
+                    if g.ramp_tool.is_some() {
+                        g.ramp_motion(x, y);
+                        redraw = true;
+                    }
+                    if g.measure_tool.is_some() {
+                        g.measure_motion(x, y);
                         redraw = true;
                     }
                     if g.dim_tool.is_some() {
@@ -2770,6 +2799,9 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                         if !used {
                             let (mx, my) = g.mouse;
                             used = g.column_key(key, mx, my);
+                        }
+                        if !used && matches!(key, WXK_RETURN | WXK_NUMPAD_ENTER) {
+                            used = g.ramp_key(key);
                         }
                         if !used {
                             used = g.insert_key(key);
@@ -3034,6 +3066,9 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 dome_tool: None,
                 column_tool: None,
                 curtain_tool: None,
+                ramp_tool: None,
+                measure_tool: None,
+                skylight_tool: None,
                 array_count: 4,
                 array_last: false,
                 ceiling_follow_roof: false,
@@ -3517,6 +3552,18 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
             focus(g);
         }),
         "column.attach" => with(gui, Gui::attach_column_tops),
+        "ramp.create" => with(gui, |g| {
+            g.start_ramp_tool();
+            focus(g);
+        }),
+        "skylight.create" => with(gui, |g| {
+            g.start_skylight_tool();
+            focus(g);
+        }),
+        "tool.measure" => with(gui, |g| {
+            g.start_measure_tool();
+            focus(g);
+        }),
         "curtain.create" => with(gui, |g| {
             g.start_curtain_tool();
             focus(g);

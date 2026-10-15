@@ -217,12 +217,16 @@ IfcUtil::IfcBaseClass* typed_value(IfcParse::IfcFile& file, rust::Str type_name,
 }
 
 // IfcOpenShell builds each schema's tables on first use, which is not thread-safe; build them all
-// once before any file is opened or created.
+// once before any file is opened or created. A function-local static (initialised once, thread
+// safely, by the compiler's guard) rather than std::call_once, whose MinGW implementation hands
+// the function over through thread-local variables that a static winpthreads and the libstdc++
+// DLL each have their own copy of.
 void init_schemas() {
-    static std::once_flag once;
-    std::call_once(once, [] {
+    static const bool built = [] {
         for (const char* name : {"IFC2X3", "IFC4", "IFC4X3_ADD2"}) IfcParse::schema_by_name(name);
-    });
+        return true;
+    }();
+    (void)built;
 }
 
 }  // namespace

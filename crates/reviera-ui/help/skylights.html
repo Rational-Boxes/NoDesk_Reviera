@@ -1,0 +1,58 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Copyright (C) 2026 Reviera contributors -->
+<h1>Skylights</h1>
+<p class="lead">Skylights are glazed units set in a roof. Each cuts its own opening, moves with
+its roof and is deleted with it.</p>
+
+<h2 id="place">Placing skylights</h2>
+<ol>
+  <li>Click <b>Architecture › Opening › Skylight</b>
+    <a href="reviera:action/skylight.create">Skylight</a>.</li>
+  <li>Click a roof where the skylight's middle goes, in a plan or a 3D view. The tool repeats
+    until <kbd>Esc</kbd>.</li>
+</ol>
+<p>With the style left at <i>Automatic</i>, a pitched roof gets a roof window and a flat roof a
+ridge lantern. The tool's Properties choose another style, and a width and length (empty means
+the style's usual size).</p>
+<p><code>skylight.create</code></p>
+
+<h2 id="styles">Styles</h2>
+<table>
+  <tr><td>Roof Window</td><td>For pitched roofs: a frame and glass lying in the slope, its
+    length up the slope and its width across it (780 × 1180 mm).</td></tr>
+  <tr><td>Flat</td><td>For flat roofs: a glass sheet on a curb (1.2 × 1.2 m).</td></tr>
+  <tr><td>Pyramid</td><td>For flat roofs: four glass faces rising at the glass slope to an
+    apex, on a curb (1.2 × 1.2 m).</td></tr>
+  <tr><td>Ridge Lantern</td><td>For flat roofs: two glass slopes rising to a ridge along its
+    length, with glazed gable ends, on a curb (1.5 × 3 m).</td></tr>
+</table>
+
+<h2 id="panes">Lantern panes</h2>
+<p>A ridge lantern's panes follow its length: it has as many equal panes as keep each one no
+wider than its <b>Largest Pane</b> (900 mm), with a glazing bar between each two. Lengthen it and
+panes are added; shorten it and they are taken away. The read-only <b>Panes</b> row shows the
+count.</p>
+
+<h2 id="properties">Properties</h2>
+<table>
+  <tr><td>Style</td><td>Any of the styles above.</td></tr>
+  <tr><td>Width, Length</td><td>The outline. A roof window's length runs up the slope.</td></tr>
+  <tr><td>Rotation</td><td>Turns a flat-roof skylight in plan (a roof window follows its
+    slope).</td></tr>
+  <tr><td>Curb Height</td><td>The curb under a flat-roof skylight (150 mm).</td></tr>
+  <tr><td>Glass Slope</td><td>The slope of a pyramid's or lantern's glass (30°).</td></tr>
+  <tr><td>Largest Pane</td><td>See <a href="#panes">Lantern panes</a>.</td></tr>
+</table>
+<p>A skylight must lie within one roof face, clear of the roof's other openings: a placement or
+change that breaks this is refused. <code>skylight.set</code></p>
+
+<h2 id="modify">Moving and copying</h2>
+<p>Move, Copy, Rotate and Mirror work on skylights; they stay in their roof. When the roof is
+moved, its skylights go with it.</p>
+
+<h2 id="ifc">In IFC</h2>
+<p>A skylight is an <code>IfcWindow</code> (<code>SKYLIGHT</code>) filling an
+<code>IfcOpeningElement</code> in its roof. The opening is cut plumb through the roof under the
+skylight's outline.</p>
+<p class="note">Not yet available: openings cut square to the roof face, flashing, and skylight
+types in the type list.</p>

@@ -1,0 +1,48 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Copyright (C) 2026 Reviera contributors -->
+<h1>Ramps</h1>
+<p class="lead">A ramp is a sloped run between two heights, with landings where it turns and
+where a run would be longer than its type allows.</p>
+
+<h2 id="draw">To draw a ramp</h2>
+<ol>
+  <li>Open a floor plan and click <b>Architecture › Ramp</b>
+    <a href="reviera:action/ramp.create">Ramp</a>.</li>
+  <li>In Properties, set the <b>Height</b> it climbs (600 mm unless you change it) and its
+    <b>Width</b> (1.2 m).</li>
+  <li>Click the points of its centreline from the bottom up. The status bar shows the run the
+    type's maximum slope needs for that height, and how much is drawn so far.</li>
+  <li>Press <kbd>Enter</kbd> to make the ramp. <kbd>Esc</kbd> drops the last point, then ends
+    the tool.</li>
+</ol>
+<p>Each straight segment is a run; where two runs meet, a square landing as wide as the ramp
+turns the corner. A run longer than the type's <b>Maximum Incline Length</b> is split into equal
+flights with a landing between each two, and the landings lengthen the ramp along its path. The
+height is shared so every flight has the same slope.</p>
+<p>A ramp steeper than its type's maximum slope is still made, with a warning: lengthen the path
+or lower the height.</p>
+<p><code>ramp.create</code></p>
+
+<h2 id="properties">Properties</h2>
+<table>
+  <tr><td>Base Constraint, Base Offset</td><td>The level its bottom is on, and how far above
+    it.</td></tr>
+  <tr><td>Top Constraint, Top Offset</td><td>The level its top reaches, or <i>Unconnected</i>
+    with a height.</td></tr>
+  <tr><td>Width</td><td>Across the ramp.</td></tr>
+  <tr><td>Type</td><td><b>Maximum Slope</b> (1 in 12 by default), <b>Maximum Incline
+    Length</b> (9 m), <b>Thickness</b> (150 mm) and <b>Shape</b>: <i>Thick</i>, a slab under the
+    sloped surface, or <i>Solid</i>, filled down to the base. These change every ramp of the
+    type.</td></tr>
+</table>
+<p><code>ramp.set</code>, <code>type.set_param</code></p>
+
+<h2 id="modify">Moving and copying</h2>
+<p>Move, Copy, Rotate and Mirror work on ramps. A ramp is deleted with its base or top
+level.</p>
+
+<h2 id="ifc">In IFC</h2>
+<p>A ramp is an <code>IfcRamp</code> of an <code>IfcRampType</code>, contained in its base
+level, with a faceted B-rep body.</p>
+<p class="note">Not yet available: curved ramps, editing the path with grips, railings that
+follow a ramp, and ramp flights and landings as separate IFC parts.</p>

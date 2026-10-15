@@ -300,6 +300,15 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "model_properties" => format!(
             r#"<path d="M6 4h14l6 6v18H6z" fill="{f}" {s}/><path d="M10 12h12M10 17h12M10 22h7" {s}/><path d="M21 22l2 2 4-5" {sa}/>"#
         ),
+        "skylight" => format!(
+            r#"<path d="M2 26L16 6l14 20z" fill="{f}" {s}/><path d="M12 22l4-8 5 8z" fill="{paper}" {sa}/><path d="M16 14v8M13 18h6" {sa}/>"#
+        ),
+        "ramp" => format!(
+            r#"<path d="M3 27h26V11z" fill="{f}" {s}/><path d="M7 25l18-11" {sa}/><path d="M21 13l4 1-1 4" {sa}/>"#
+        ),
+        "measure" => format!(
+            r#"<rect x="3" y="11" width="26" height="10" fill="{f}" {s}/><path d="M8 11v4M13 11v6M18 11v4M23 11v6" {sa}/>"#
+        ),
         "curtain_wall" => format!(
             r#"<rect x="4" y="4" width="24" height="24" fill="{f}" {s}/><path d="M12 4v24M20 4v24M4 16h24" {sa}/>"#
         ),

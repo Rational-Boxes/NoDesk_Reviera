@@ -260,6 +260,16 @@ pub fn all(store: &Store) -> Vec<Body> {
             push(id, "IfcDoor", mesh, false);
         }
     }
+    for (id, g) in crate::skylights::all(store) {
+        for (mesh, glass) in g.parts {
+            push(id, if glass { "IfcWindow:glass" } else { "IfcWindow:metal" }, mesh, false);
+        }
+    }
+    for (id, g) in crate::ramps::all(store) {
+        for p in &g.pieces {
+            push(id, "IfcRamp", g.mesh(p), false);
+        }
+    }
     for (id, g) in crate::curtain::all(store) {
         for p in &g.parts {
             let class = if p.mullion {
@@ -319,6 +329,9 @@ pub fn related(store: &Store, a: ElementId, b: ElementId) -> bool {
         }
         if let Some((r, _)) = crate::railings::gate_of(e) {
             hosts.push(r);
+        }
+        if let Some(s) = crate::skylights::skylight_recipe(e) {
+            hosts.push(s.roof);
         }
         if let Some(r) = crate::railings::railing_recipe(e) {
             match r.path {

@@ -52,6 +52,13 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(CurtainCreate),
         registry.add(CurtainSet),
         registry.add(CeilingSetShape),
+        registry.add(RampCreate),
+        registry.add(RampSet),
+        registry.add(MeasureBetween),
+        registry.add(MeasureChain),
+        registry.add(MeasureAlong),
+        registry.add(SkylightCreate),
+        registry.add(SkylightSet),
     ];
     for r in results {
         r.expect("architecture commands are valid");
@@ -274,4 +281,115 @@ edit_command!(
     crate::vaults::SetShapeParams,
     (),
     crate::vaults::set_shape
+);
+
+edit_command!(
+    RampCreate,
+    "ramp.create",
+    "Make a ramp",
+    "Makes a ramp (ARC-RAMP-001) along a centreline `path` (from the bottom up; each segment a run, a \
+     square landing at each corner), `width` wide (1.2 m by default), from a base level and offset to a \
+     top level and offset or a height, of a ramp type (the default 1:12, 9 m maximum incline, 150 mm \
+     thick). Runs longer than the maximum incline length get landings as deep as the ramp is wide. A \
+     ramp steeper than its type allows is made, with a warning. Returns the ramp.",
+    "Ramp",
+    crate::ramps::CreateParams,
+    ElementId,
+    crate::ramps::create
+);
+
+edit_command!(
+    RampSet,
+    "ramp.set",
+    "Change ramps",
+    "Changes ramps' path, width, base and top; omitted values are kept. The slope limit, maximum incline \
+     length, thickness and shape (thick, solid) are type parameters (`type.set_param`).",
+    "Edit Ramp",
+    crate::ramps::SetParams,
+    (),
+    crate::ramps::set
+);
+
+/// A read-only command of a pure function.
+macro_rules! read_command {
+    ($ty:ident, $name:literal, $summary:literal, $desc:literal, $params:ty, $out:ty, $f:expr) => {
+        #[derive(Debug)]
+        struct $ty;
+
+        impl Command for $ty {
+            type Params = $params;
+            type Output = $out;
+            const META: CommandMeta = CommandMeta {
+                name: $name,
+                version: 1,
+                summary: $summary,
+                description: $desc,
+                effects: &[Effect::Read],
+                transaction_name: "",
+            };
+
+            fn run(&self, cx: &mut CommandContext<'_>, p: $params) -> Result<$out> {
+                let f: fn(&crate::store::Store, $params) -> Result<$out> = $f;
+                f(cx.store(), p)
+            }
+        }
+    };
+}
+
+read_command!(
+    MeasureBetween,
+    "measure.between",
+    "Measure between two points",
+    "The distance between two points ([x, y] or [x, y, z], metres) (ARC-MOD-023): its x, y and z \
+     components, the plan distance and its angle from the x axis (degrees). Changes nothing.",
+    crate::measure::BetweenParams,
+    crate::measure::Between,
+    |_, p| crate::measure::between(p)
+);
+
+read_command!(
+    MeasureChain,
+    "measure.chain",
+    "Measure a chain of points",
+    "The lengths of the segments of a chain of points, and their total (ARC-MOD-023).",
+    crate::measure::ChainParams,
+    crate::measure::Chain,
+    |_, p| crate::measure::chain(p)
+);
+
+read_command!(
+    MeasureAlong,
+    "measure.along",
+    "Measure along an element",
+    "The length of a wall (along its location curve), curtain wall, ramp (its path) or grid line \
+     (ARC-MOD-023).",
+    crate::measure::AlongParams,
+    f64,
+    crate::measure::along
+);
+
+edit_command!(
+    SkylightCreate,
+    "skylight.create",
+    "Place a skylight in a roof",
+    "Places a skylight in a Reviera footprint roof at plan `point`, cutting its own opening: a `roof_window` \
+     in a pitched roof (in the slope; `width` across it, `length` up it), or on a flat roof on a `curb` \
+     a `flat` glass sheet, a `pyramid`, or a `ridge_lantern` (two glass slopes at `pitch` to a ridge along \
+     its `length`, `rotation` from the x axis), whose panes are re-mapped from its length so none is wider \
+     than `max_pane`. Returns the skylight (an IfcWindow, SKYLIGHT).",
+    "Skylight",
+    crate::skylights::CreateParams,
+    ElementId,
+    crate::skylights::create
+);
+
+edit_command!(
+    SkylightSet,
+    "skylight.set",
+    "Change skylights",
+    "Changes skylights' centre, style, size, rotation, curb, pitch or largest pane; omitted values are kept.",
+    "Edit Skylight",
+    crate::skylights::SetParams,
+    (),
+    crate::skylights::set
 );

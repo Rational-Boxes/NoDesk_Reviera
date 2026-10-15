@@ -1,0 +1,33 @@
+--- a/src/ifcparse/IfcParse.cpp
++++ b/src/ifcparse/IfcParse.cpp
+@@ -65,6 +65,8 @@
+ #else
+ 
+ #if defined(__MINGW64__) || defined(__MINGW32__)
++#include <charconv>
++#include <cstring>
+ #include <locale>
+ #include <sstream>
+ 
+@@ -73,14 +75,13 @@
+ 
+ void init_locale() {}
+ 
+-double strtod_l(const char* start, char** end, locale_t loc) {
+-    double d;
+-    std::stringstream ss;
+-    ss.imbue(std::locale::classic());
+-    ss << start;
+-    ss >> d;
+-    size_t nread = ss.tellg();
+-    *end = const_cast<char*>(start) + nread;
++// std::from_chars is locale-independent. The stringstream this replaces gave tellg() == -1 when
++// the number ran to the end of the token, so such real numbers were rejected.
++double strtod_l(const char* start, char** end, locale_t) {
++    double d = 0.;
++    const char* first = *start == '+' ? start + 1 : start;
++    auto r = std::from_chars(first, first + std::strlen(first), d);
++    *end = const_cast<char*>(r.ec == std::errc() ? r.ptr : start);
+     return d;
+ }
+ 

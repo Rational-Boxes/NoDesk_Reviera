@@ -528,6 +528,8 @@ impl LocalProject {
             }
             if recipe_kind == Some(roofs::ROOF_RECIPE)
                 || recipe_kind == Some(reviera_core::columns::COLUMN_RECIPE)
+                || recipe_kind == Some(reviera_core::ramps::RAMP_RECIPE)
+                || recipe_kind == Some(reviera_core::skylights::SKYLIGHT_RECIPE)
                 || recipe_kind == Some(stairs::STAIR_RECIPE)
                 || recipe_kind == Some(railings::RAILING_RECIPE)
                 || recipe_kind == Some(railings::GATE_RECIPE)
@@ -693,6 +695,8 @@ impl LocalProject {
             self.write_roofs(doc)?;
             self.write_stairs(doc)?;
             self.write_columns(doc)?;
+            self.write_ramps(doc)?;
+            self.write_skylights(doc)?;
             let owner_history = self.new_owner_history()?;
             crate::curtains::write_curtains(
                 &mut self.ifc,
@@ -1495,6 +1499,103 @@ impl LocalProject {
         Ok(())
     }
 
+    /// Writes every Reviera ramp (ARC-RAMP-001): its flights and landings as faceted B-reps,
+    /// contained in its base level.
+    fn write_ramps(&mut self, doc: &Document) -> Result<()> {
+        let store = doc.store();
+        let all = reviera_core::ramps::all(store);
+        if all.is_empty() {
+            return Ok(());
+        }
+        let contexts = geometry::Contexts::find(&self.ifc)?;
+        let owner_history = self.new_owner_history()?;
+        for (id, g) in &all {
+            let Some(&step) = self.steps.get(id) else {
+                continue;
+            };
+            let solids: Vec<geometry::Polyhedron> = g
+                .pieces
+                .iter()
+                .map(|p| {
+                    let (points, _) = g.mesh(p);
+                    geometry::Polyhedron {
+                        points,
+                        faces: vec![
+                            vec![3, 2, 1, 0],
+                            vec![4, 5, 6, 7],
+                            vec![0, 1, 5, 4],
+                            vec![1, 2, 6, 5],
+                            vec![2, 3, 7, 6],
+                            vec![3, 0, 4, 7],
+                        ],
+                    }
+                })
+                .collect();
+            geometry::write_breps(
+                &mut self.ifc,
+                step,
+                geometry::BrepFrame::WORLD,
+                &solids,
+                self.length_scale,
+                contexts,
+            )?;
+            let storey = reviera_core::ramps::ramp_recipe(store.get(*id).expect("listed"))
+                .and_then(|r| GlobalId::parse(&r.extent.base_level))
+                .and_then(|g| store.find_by_guid(&g))
+                .and_then(|l| self.steps.get(&l).copied());
+            if let Some(storey) = storey {
+                geometry::contain(&mut self.ifc, step, storey, owner_history)?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Writes every skylight: its glass and frame as faceted B-reps, contained in its roof's level.
+    fn write_skylights(&mut self, doc: &Document) -> Result<()> {
+        let store = doc.store();
+        let all = reviera_core::skylights::all(store);
+        if all.is_empty() {
+            return Ok(());
+        }
+        let contexts = geometry::Contexts::find(&self.ifc)?;
+        let owner_history = self.new_owner_history()?;
+        for (id, g) in &all {
+            let Some(&step) = self.steps.get(id) else {
+                continue;
+            };
+            let solids: Vec<geometry::Polyhedron> = g
+                .parts
+                .iter()
+                .map(|((points, idx), _)| geometry::Polyhedron {
+                    points: points.clone(),
+                    faces: idx
+                        .chunks(3)
+                        .map(|t| t.iter().map(|i| *i as usize).collect())
+                        .collect(),
+                })
+                .collect();
+            geometry::write_breps(
+                &mut self.ifc,
+                step,
+                geometry::BrepFrame::WORLD,
+                &solids,
+                self.length_scale,
+                contexts,
+            )?;
+            let storey = reviera_core::skylights::skylight_recipe(store.get(*id).expect("listed"))
+                .and_then(|s| GlobalId::parse(&s.roof))
+                .and_then(|g| store.find_by_guid(&g))
+                .and_then(|r| roofs::roof_recipe(store.get(r)?))
+                .and_then(|r| GlobalId::parse(&r.level))
+                .and_then(|g| store.find_by_guid(&g))
+                .and_then(|l| self.steps.get(&l).copied());
+            if let Some(storey) = storey {
+                geometry::contain(&mut self.ifc, step, storey, owner_history)?;
+            }
+        }
+        Ok(())
+    }
+
     /// Writes every Reviera stair (ARC-STAIR-001): one faceted B-rep per run and landing,
     /// contained in its base level.
     fn write_stairs(&mut self, doc: &Document) -> Result<()> {
@@ -1965,7 +2066,8 @@ impl LocalProject {
         ));
         let result = (|| -> Result<()> {
             self.ifc.write(&tmp)?;
-            fs::File::open(&tmp)?.sync_all()?;
+            // Flushing needs write access on Windows (FlushFileBuffers).
+            fs::OpenOptions::new().write(true).open(&tmp)?.sync_all()?;
             fs::rename(&tmp, path)?;
             Ok(())
         })();

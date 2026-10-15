@@ -2,7 +2,7 @@
 -- Copyright (C) 2026 Reviera contributors
 
 -- title: Storefront doors
--- description: A shop front with a revolving door, an automatic sliding door, a pair of glass swing doors and an automatic storefront door.
+-- description: A shop front with a revolving door, an automatic sliding door, a pair of glass swing doors and an automatic storefront door, under two ridge-lantern skylights.
 --
 -- Reviera sample model (test-data/samples): the door operations (ARC-DOOR-002) side by side in a
 -- shop's front wall, and their plan symbols and virtual volumes:
@@ -90,6 +90,11 @@ for i = 1, 4 do
 end
 local roof = reviera.roof.create_footprint{ curves = curves, level_id = l1, base_offset = 4.0 }
 reviera.roof.set_shape{ roof_id = roof, shape = "flat", overhang = 0.3 }
+-- Two ridge lanterns over the shop floor: their panes are re-mapped from their length (none
+-- wider than 900 mm).
+for _, x in ipairs({ 7.0, 17.0 }) do
+  reviera.skylight.create{ roof_id = roof, point = { x, 5.0 }, style = "ridge_lantern", width = 1.6, length = 4.5 }
+end
 reviera.room.place{ level_id = l1, point = {12.0, 5.0}, name = "Shop" }
 
 reviera.view.create_plan{ level_ids = { l1 } }

@@ -37,3 +37,4 @@ __pycache__/
 /packaging/flatpak/repo/
 /packaging/macos/build/
 /packaging/windows/build/
+packaging/windows/cross/build/

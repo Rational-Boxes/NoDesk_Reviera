@@ -115,6 +115,12 @@ pub fn roof_holes(store: &Store, roof: &Element, g: &crate::roofs::RoofGeometry)
                 .flat_map(|(_, r)| r.loops),
         );
     }
+    // Skylights (their outline seen from above).
+    out.extend(
+        crate::skylights::of_roof(store, roof.guid().as_str())
+            .iter()
+            .filter_map(|(_, s)| crate::skylights::hole(s, g)),
+    );
     out
 }
 

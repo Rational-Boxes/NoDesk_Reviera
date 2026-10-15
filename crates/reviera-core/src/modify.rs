@@ -254,6 +254,27 @@ pub(crate) fn transform(
                 crate::wall_openings::move_by(txn, id, v)?;
                 out.push(id);
             }
+        } else if let Some(s) = crate::skylights::skylight_recipe(e) {
+            // With its roof in the selection, the roof carries it.
+            let roof = crate::id::GlobalId::parse(&s.roof).and_then(|g| store.find_by_guid(&g));
+            if roof.is_some_and(|r| selected.contains(&r)) {
+                continue;
+            }
+            let target = if copy { txn.create(copied(e))? } else { id };
+            let turn = match x {
+                Xform::Rotate { angle, .. } => angle,
+                _ => 0.0,
+            };
+            crate::skylights::transform(txn, target, &|p| x.point(p), turn)?;
+            out.push(target);
+        } else if crate::ramps::ramp_recipe(e).is_some() {
+            let target = if copy { txn.create(copied(e))? } else { id };
+            let dz = match x {
+                Xform::Translate(v) => v[2],
+                _ => 0.0,
+            };
+            crate::ramps::transform(txn, target, &|p| x.point(p), dz)?;
+            out.push(target);
         } else if crate::curtain::curtain_recipe(e).is_some() {
             let target = if copy { txn.create(copied(e))? } else { id };
             let dz = match x {
@@ -301,9 +322,10 @@ pub(crate) fn transform(
         {
             let target = if copy { txn.create(copied(e))? } else { id };
             crate::floors::translate(txn, target, &|p| x.point(p), x.reflects())?;
-            // Its vertical openings go with it (a copy is made whole).
+            // Its vertical openings and skylights go with it (a copy is made whole).
             if !copy {
                 crate::slab_openings::follow_host(txn, e.guid().as_str(), &|p| x.point(p))?;
+                crate::skylights::follow_roof(txn, e.guid().as_str(), &|p| x.point(p))?;
             }
             out.push(target);
         } else {

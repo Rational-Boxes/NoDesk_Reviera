@@ -29,6 +29,7 @@ pub const UI_ACTIONS: &[&str] = &[
     "ui.model_properties",
     "help.home",
     "wall.edit_assembly",
+    "tool.measure",
     "help.about",
     "tool.modify",
     "ui.pane.properties",

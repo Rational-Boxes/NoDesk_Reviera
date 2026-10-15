@@ -2,7 +2,7 @@
 -- Copyright (C) 2026 Reviera contributors
 
 -- title: Manor with tower
--- description: A two-storey house and a round three-storey tower with spiral stairs, shaped windows, layered walls, a curtain wall, columns, a shaft, a skylight, vaulted ceilings and a deck.
+-- description: A two-storey house and a round three-storey tower with spiral stairs, shaped windows, layered walls, a curtain wall, columns, a shaft, roof windows, vaulted ceilings and a deck.
 --
 -- Reviera sample model (test-data/samples), a demonstration of most of what Reviera models:
 -- - three levels with plans and a 3D view; the model follows the US residential code (IRC);
@@ -16,7 +16,8 @@
 -- - a deck behind the house with a guard railing and a gate;
 -- - layered exterior walls (render, insulation, block and plaster), a cased opening in the hall
 --   partition, a glazed curtain wall onto the garden, a service shaft, a skylight in the roof,
---   vaulted ceilings upstairs following the roof and a domed one in the tower top, and two round
+--   roof windows and a roof hatch, vaulted ceilings upstairs following the roof and a domed one
+--   in the tower top, and two round
 --   porch columns (the second made by an array) attached to the eave.
 
 reviera.code.set{ code = "irc", occupancy = "dwelling" }
@@ -181,8 +182,12 @@ reviera.insert.set_position{ element_id = dormer_window, along = 0.8 }
 -- A vaulted ceiling upstairs, shaped to the roof's underside (ARC-CEIL-001): the bedroom and
 -- study are open to each other south of the partition, so one ceiling covers both.
 reviera.ceiling.create_auto{ level_id = l2, point = {3.5, 4.5}, follow_roof = true }
--- A skylight over the study, cut plumb through the north slope (ARC-OPEN-002).
+-- A roof hatch over the study, cut plumb through the north slope (ARC-OPEN-002).
 reviera.opening.create_vertical{ host_id = roof, loops = { { {9.6, 6.6}, {10.8, 6.6}, {10.8, 7.6}, {9.6, 7.6} } } }
+-- Two roof windows in the south slope, either side of the dormer, lighting the vaulted rooms.
+for _, x in ipairs({ 3.5, 10.5 }) do
+  reviera.skylight.create{ roof_id = roof, point = { x, 2.2 } }
+end
 -- Two round porch columns by the front door, the second an array of the first (ARC-MOD-026),
 -- their tops attached to the eave over them (ARC-COL-001).
 local porch = reviera.column.place_architectural{
