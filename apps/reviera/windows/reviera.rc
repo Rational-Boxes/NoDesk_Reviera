@@ -1,0 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Reviera contributors
+// Windows resources: the program icon (Explorer shows the first) and the application manifest.
+wxICON_AAA ICON "../../../packaging/icons/reviera.ico"
+1 24 "reviera.exe.manifest"
