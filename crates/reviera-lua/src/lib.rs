@@ -320,6 +320,17 @@ fn ask(host: &mut dyn Host, form: &Form) -> Result<Option<Map<String, Value>>, S
 
 /// Runs `source` (named `name` in error messages) against `host`; returns what it returns.
 pub fn run(host: &mut dyn Host, source: &str, name: &str) -> Result<Value, ScriptError> {
+    run_in(host, source, name, None)
+}
+
+/// As [`run`], for a script read from a file in `dir`: `reviera.script_dir` is that folder, so
+/// the script can use files beside it.
+pub fn run_in(
+    host: &mut dyn Host,
+    source: &str,
+    name: &str,
+    dir: Option<&std::path::Path>,
+) -> Result<Value, ScriptError> {
     let lua = state()?;
     let host = RefCell::new(host);
     let commands = host.borrow().commands();
@@ -384,6 +395,9 @@ pub fn run(host: &mut dyn Host, source: &str, name: &str) -> Result<Value, Scrip
         reviera.set("ui", ui)?;
         reviera.set("print", print.clone())?;
         lua.globals().set("print", print)?;
+        if let Some(dir) = dir {
+            reviera.set("script_dir", dir.to_string_lossy().into_owned())?;
+        }
         lua.globals().set("reviera", reviera)?;
         let v: LuaValue = lua.load(source).set_name(name).eval()?;
         // A plugin module returns its table: run it.

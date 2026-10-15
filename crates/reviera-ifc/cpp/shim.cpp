@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Reviera contributors
 
+#include <unordered_set>
 #include "reviera-ifc/cpp/shim.h"
 
 #include <cmath>
@@ -508,15 +509,34 @@ rust::Vec<StepRow> Model::step_rows() const {
     return out;
 }
 
-rust::Vec<Mesh> Model::tessellate(std::uint32_t threads) const {
+rust::Vec<Mesh> Model::tessellate(std::uint32_t threads, rust::Slice<const std::uint32_t> skip,
+                                 bool skip_derived) const {
     namespace s = ifcopenshell::geometry::settings;
     ifcopenshell::geometry::Settings settings;
     settings.get<s::UseWorldCoords>().value = true;
     settings.get<s::WeldVertices>().value = true;
 
     rust::Vec<Mesh> out;
+    // Left out: the products named (Reviera draws them from their recipes) and the parts Reviera
+    // derives from its elements, marked in their Description (a curtain wall's panels, a path
+    // array's members): their geometry is the elements' own, drawn from them.
+    std::unordered_set<std::uint32_t> skipped(skip.begin(), skip.end());
+    std::vector<IfcGeom::filter_t> filters;
+    filters.push_back([skipped, skip_derived](IfcUtil::IfcBaseEntity* e) {
+        if (skipped.count(static_cast<std::uint32_t>(e->id()))) return false;
+        if (!skip_derived) return true;
+        const auto* decl = e->declaration().as_entity();
+        if (decl && decl->attribute_index("Description") >= 0) {
+            auto d = e->get("Description");
+            if (!d.isNull()) {
+                std::string text = d;
+                if (text == "rxd:curtain" || text == "rxd:path_array") return false;
+            }
+        }
+        return true;
+    });
     IfcGeom::Iterator it(ifcopenshell::geometry::kernels::construct(file_.get(), "opencascade", settings), settings,
-                         file_.get(), static_cast<int>(threads ? threads : 1));
+                         file_.get(), filters, static_cast<int>(threads ? threads : 1));
     if (!it.initialize()) return out;
     do {
         auto* elem = static_cast<const IfcGeom::TriangulationElement*>(it.get());

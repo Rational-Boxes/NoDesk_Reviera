@@ -863,6 +863,15 @@ pub(crate) fn reload(txn: &mut crate::txn::Transaction<'_>, p: ReloadParams) -> 
     let store = txn.store().clone();
     let (id, old) = resolve_type(&store, &p.type_id)?;
     let path = p.path.clone().unwrap_or_else(|| old.source.path.clone());
+    if path.is_empty() {
+        let from = old.library.as_ref().map_or_else(String::new, |l| {
+            format!(" (it came from the library {}, item {})", l.library, l.item)
+        });
+        return Err(Error::new(
+            "mesh_object.no_source",
+            format!("the type does not record its file{from}; give the file's path"),
+        ));
+    }
     let options = p.options.unwrap_or(old.options);
     let (prepared, source) = read_prepared(Path::new(&path), &options, true)?;
     let mut recipe = type_recipe(&prepared, source, old.category, options, old.scale);
@@ -1158,6 +1167,21 @@ pub(crate) fn set_library_link(
     let store = txn.store().clone();
     let mut t = mesh_object_type(store.get(id).expect("exists")).expect("a custom object type");
     t.library = Some(link);
+    let value = serde_json::to_value(&t).expect("serialises");
+    txn.modify(id, |e| {
+        e.params.insert(RECIPE_KEY.into(), value);
+    })?;
+    Ok(())
+}
+
+/// Drops a type's source path (a library-loaded type finds its file through the library).
+pub(crate) fn forget_source_path(
+    txn: &mut crate::txn::Transaction<'_>,
+    id: ElementId,
+) -> Result<()> {
+    let store = txn.store().clone();
+    let mut t = mesh_object_type(store.get(id).expect("exists")).expect("a custom object type");
+    t.source.path.clear();
     let value = serde_json::to_value(&t).expect("serialises");
     txn.modify(id, |e| {
         e.params.insert(RECIPE_KEY.into(), value);

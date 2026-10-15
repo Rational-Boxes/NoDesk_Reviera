@@ -404,9 +404,25 @@ impl IfcModel {
 
     /// Triangulates every product with OpenCASCADE, in world coordinates.
     pub fn tessellate(&self, threads: u32) -> Result<Vec<Mesh>> {
+        self.tessellate_with(threads, &[], false)
+    }
+
+    /// As [`tessellate`](Self::tessellate), leaving out the products in `skip` and the parts
+    /// Reviera derives from its elements (marked `rxd:curtain` or `rxd:path_array`).
+    pub fn tessellate_skipping(&self, threads: u32, skip: &[StepId]) -> Result<Vec<Mesh>> {
+        self.tessellate_with(threads, skip, true)
+    }
+
+    fn tessellate_with(
+        &self,
+        threads: u32,
+        skip: &[StepId],
+        skip_derived: bool,
+    ) -> Result<Vec<Mesh>> {
+        let skip: Vec<u32> = skip.iter().map(|s| s.0).collect();
         Ok(self
             .inner
-            .tessellate(threads)?
+            .tessellate(threads, &skip, skip_derived)?
             .into_iter()
             .map(|m| Mesh {
                 id: StepId(m.id),

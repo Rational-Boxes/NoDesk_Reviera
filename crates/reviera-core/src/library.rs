@@ -876,9 +876,11 @@ fn shared_companion(root: &Path, f: &Path, item: &Path) -> bool {
 
 /// Where a placed type came from, kept in its recipe.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+/// No folder paths are kept, so a model shared with others does not carry the author's folders:
+/// the library is found again by its id among the libraries that are open.
 pub struct LibraryLink {
     pub library_id: String,
-    /// The library's folder when loaded.
+    /// The library's name when loaded.
     pub library: String,
     /// The item's path in it.
     pub item: String,
@@ -970,11 +972,13 @@ pub(crate) fn load_item(
     )?;
     let link = LibraryLink {
         library_id: m.id.clone(),
-        library: root.to_string_lossy().into_owned(),
+        library: m.name.clone(),
         item: key,
         item_guid: details.guid.clone(),
     };
     mesh_objects::set_library_link(txn, id, link)?;
+    // Nor the file's full path (Reload from File finds it through the library).
+    mesh_objects::forget_source_path(txn, id)?;
     Ok(id)
 }
 

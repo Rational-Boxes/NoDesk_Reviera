@@ -61,7 +61,7 @@ public:
     rust::String header_text() const;
     rust::Vec<StepRow> step_rows() const;
 
-    rust::Vec<Mesh> tessellate(std::uint32_t threads) const;
+    rust::Vec<Mesh> tessellate(std::uint32_t threads, rust::Slice<const std::uint32_t> skip, bool skip_derived) const;
 
 private:
     std::unique_ptr<IfcParse::IfcFile> file_;

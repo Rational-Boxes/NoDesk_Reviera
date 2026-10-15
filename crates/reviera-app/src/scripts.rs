@@ -112,6 +112,7 @@ impl App {
         name: &str,
         source: &str,
         answers: Option<Map<String, Value>>,
+        dir: Option<&std::path::Path>,
     ) -> Result<RunResult> {
         let origin = Origin {
             source: reviera_core::Source::Lua,
@@ -131,7 +132,7 @@ impl App {
             interactive,
             output: Vec::new(),
         };
-        let result = reviera_lua::run(&mut host, source, name);
+        let result = reviera_lua::run_in(&mut host, source, name, dir);
         let output = std::mem::take(&mut host.output);
         match result {
             Ok(result) => {
@@ -225,7 +226,8 @@ impl HostCommand for ScriptRun {
             ),
             (None, None) => return Err(Error::new("script.no_source", "give `code` or `file`")),
         };
-        app.run_script(caller, &name, &source, p.answers)
+        let dir = p.file.as_deref().and_then(std::path::Path::parent);
+        app.run_script(caller, &name, &source, p.answers, dir)
     }
 }
 
@@ -305,7 +307,15 @@ impl HostCommand for PluginRun {
             .ok_or_else(|| {
                 Error::new("plugin.not_found", format!("no script named `{}`", p.name))
             })?;
-        app.run_script(caller, &plugin.name, &plugin.source, p.answers)
+        // A plugin's folder (or a script's): files beside it are at `reviera.script_dir`.
+        let dir = plugin.path.as_deref().map(|p| {
+            if p.is_dir() {
+                p
+            } else {
+                p.parent().unwrap_or(p)
+            }
+        });
+        app.run_script(caller, &plugin.name, &plugin.source, p.answers, dir)
     }
 }
 

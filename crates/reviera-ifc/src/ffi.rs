@@ -107,7 +107,14 @@ pub(crate) mod bridge {
         fn header_text(self: &Model) -> Result<String>;
         fn step_rows(self: &Model) -> Result<Vec<StepRow>>;
 
-        fn tessellate(self: &Model, threads: u32) -> Result<Vec<Mesh>>;
+        /// Every product but those in `skip` (and, with `skip_derived`, the parts Reviera derives
+        /// from its elements).
+        fn tessellate(
+            self: &Model,
+            threads: u32,
+            skip: &[u32],
+            skip_derived: bool,
+        ) -> Result<Vec<Mesh>>;
     }
 }
 

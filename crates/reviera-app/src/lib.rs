@@ -96,7 +96,10 @@ impl OpenDocument {
         {
             return Ok(meshes.clone());
         }
-        let meshes = Arc::new(scene_meshes(tessellate(&self.project)?, &self.doc));
+        let meshes = Arc::new(scene_meshes(
+            tessellate(&self.project, &self.doc)?,
+            &self.doc,
+        ));
         *cache = Some((revision, meshes.clone()));
         Ok(meshes)
     }
@@ -106,12 +109,19 @@ impl OpenDocument {
     }
 }
 
-/// Tessellates a project's IFC geometry with OpenCASCADE, on every core.
-fn tessellate(project: &LocalProject) -> Result<Vec<reviera_ifc::Mesh>> {
+/// Tessellates a project's IFC geometry with OpenCASCADE, on every core: the elements Reviera
+/// does not regenerate itself (their bodies come from their recipes instead).
+fn tessellate(project: &LocalProject, doc: &Document) -> Result<Vec<reviera_ifc::Mesh>> {
     let threads = std::thread::available_parallelism().map_or(1, |n| n.get() as u32);
+    let skip: Vec<reviera_ifc::StepId> = doc
+        .store()
+        .iter()
+        .filter(|e| regenerated(e))
+        .filter_map(|e| project.step_of(e.id()))
+        .collect();
     project
         .ifc()
-        .tessellate(threads)
+        .tessellate_skipping(threads, &skip)
         .map_err(|e| err("render.tessellation_failed", e))
 }
 
@@ -180,7 +190,7 @@ pub fn load(path: &Path, stage: &dyn Fn(LoadStage)) -> Result<Loaded> {
     let (project, doc, report) =
         LocalProject::open(path).map_err(|e| err("file.open_failed", e))?;
     stage(LoadStage::Geometry);
-    let meshes = scene_meshes(tessellate(&project)?, &doc);
+    let meshes = scene_meshes(tessellate(&project, &doc)?, &doc);
     Ok(Loaded {
         path: path.to_owned(),
         project,
