@@ -315,6 +315,8 @@ struct Gui {
     attach_pick: Option<Vec<ElementId>>,
     /// A wall waiting for its new host (Pick New Host).
     host_pick: Option<ElementId>,
+    /// The Location Line the Wall tool draws on (kept between uses).
+    wall_location: reviera_core::walls::LocationLine,
     /// The Model Tree pane (UI-TREE-001) and its state.
     model_tree: TreeCtrl,
     tree: inspect::ModelTree,
@@ -1434,6 +1436,7 @@ impl Gui {
             "base_level": t.level,
             "top_constraint": top,
             "flip": t.flip,
+            "location_line": if through.is_empty() { self.wall_location } else { Default::default() },
         });
         if let Some(ty) = self.tool_wall_type() {
             args["type_id"] = json!(ty);
@@ -3206,6 +3209,7 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 tiled: None,
                 attach_pick: None,
                 host_pick: None,
+                wall_location: Default::default(),
                 model_tree,
                 tree: inspect::ModelTree {
                     stale: true,

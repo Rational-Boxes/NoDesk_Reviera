@@ -31,18 +31,9 @@ use crate::walls::{
     RECIPE_KEY, WALL_TYPE_RECIPE, WallGeometry, WallRecipe, type_width, wall_recipe,
 };
 
-/// Where the rows' offsets are measured from, and so each sub-wall's location line.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum OffsetReference {
-    #[default]
-    WallCenterline,
-    CoreCenterline,
-    FinishFaceExterior,
-    FinishFaceInterior,
-    CoreFaceExterior,
-    CoreFaceInterior,
-}
+/// Where the rows' offsets are measured from, and so each sub-wall's location line: the same
+/// choices as a wall's location line.
+pub use crate::walls::LocationLine as OffsetReference;
 
 /// One row of a stacked wall type.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
@@ -117,33 +108,6 @@ pub fn sub_guid(parent: &GlobalId, row: usize) -> GlobalId {
     GlobalId::from_uuid(uuid::Uuid::from_u128(parent.to_uuid().as_u128() ^ mix))
 }
 
-/// Where the offset reference sits across a row, from its centre toward its exterior.
-fn reference_in_row(t: &Element, r: OffsetReference) -> f64 {
-    let c = crate::compound::of_wall_type(t);
-    let w = type_width(t).unwrap_or(0.0);
-    let half = w / 2.0;
-    // Core faces, measured from the exterior face (layers run exterior first).
-    let (core_ext, core_int) = match &c {
-        Some(c) if c.core[1] > c.core[0] => {
-            let before: f64 = c.layers[..c.core[0]].iter().map(|l| l.thickness).sum();
-            let core: f64 = c.layers[c.core[0]..c.core[1]]
-                .iter()
-                .map(|l| l.thickness)
-                .sum();
-            (half - before, half - before - core)
-        }
-        _ => (half, -half),
-    };
-    match r {
-        OffsetReference::WallCenterline => 0.0,
-        OffsetReference::FinishFaceExterior => half,
-        OffsetReference::FinishFaceInterior => -half,
-        OffsetReference::CoreFaceExterior => core_ext,
-        OffsetReference::CoreFaceInterior => core_int,
-        OffsetReference::CoreCenterline => (core_ext + core_int) / 2.0,
-    }
-}
-
 /// Each row's centre across the wall toward its exterior, and width, for a stack.
 fn bands(store: &Store, s: &Stacked) -> Result<Vec<(ElementId, f64, f64)>> {
     s.rows
@@ -166,7 +130,7 @@ fn bands(store: &Store, s: &Stacked) -> Result<Vec<(ElementId, f64, f64)>> {
                 )
             })?;
             // A flipped row has its exterior inside, so its reference is mirrored.
-            let mut at = reference_in_row(t, s.offset_reference);
+            let mut at = crate::walls::line_offset(t, s.offset_reference);
             if row.flip {
                 at = -at;
             }
@@ -503,8 +467,10 @@ pub(crate) fn break_up(txn: &mut Transaction<'_>, p: BreakUpParams) -> Result<Ve
             let t = store.get(s.wall_type).expect("laid out");
             let shift = |p: [f64; 2]| [p[0] + n[0] * s.centre, p[1] + n[1] * s.centre];
             let mut sub = recipe.clone();
-            sub.curve.start = shift(recipe.curve.start);
-            sub.curve.end = shift(recipe.curve.end);
+            // Each sub-wall on its own centreline.
+            sub.curve.start = shift(g.start);
+            sub.curve.end = shift(g.end);
+            sub.location_line = crate::walls::LocationLine::WallCenterline;
             sub.base_offset = s.z[0] - level_z;
             sub.flip = s.flip;
             sub.top_offset = 0.0;

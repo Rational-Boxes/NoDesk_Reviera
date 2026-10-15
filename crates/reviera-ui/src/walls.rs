@@ -14,6 +14,38 @@ use wxdragon::prelude::*;
 use super::{Gui, error};
 
 const DUPLICATE: &str = "Duplicate Type…";
+
+/// Location Line choices (ARC-WALL-002).
+const LOCATION_LINES: [(walls::LocationLine, &str); 6] = [
+    (walls::LocationLine::WallCenterline, "Wall Centerline"),
+    (walls::LocationLine::CoreCenterline, "Core Centerline"),
+    (
+        walls::LocationLine::FinishFaceExterior,
+        "Finish Face: Exterior",
+    ),
+    (
+        walls::LocationLine::FinishFaceInterior,
+        "Finish Face: Interior",
+    ),
+    (walls::LocationLine::CoreFaceExterior, "Core Face: Exterior"),
+    (walls::LocationLine::CoreFaceInterior, "Core Face: Interior"),
+];
+
+fn location_row(grid: &PropertyGrid, current: walls::LocationLine) {
+    grid.append(Property::enumeration(
+        "Location Line",
+        "wl_loc",
+        LOCATION_LINES
+            .iter()
+            .enumerate()
+            .map(|(i, l)| (l.1.to_owned(), i as i32))
+            .collect::<Vec<(String, i32)>>(),
+        LOCATION_LINES
+            .iter()
+            .position(|l| l.0 == current)
+            .unwrap_or(0) as i32,
+    ));
+}
 const UNCONNECTED: &str = "Unconnected";
 
 impl Gui {
@@ -125,6 +157,7 @@ impl Gui {
             return false;
         }
         grid.append(Property::category("Wall tool", "c_walltool"));
+        location_row(grid, self.wall_location);
         let current = self.tool_wall_type();
         self.wall_type_rows(grid, current);
         true
@@ -146,6 +179,7 @@ impl Gui {
             .map(|(i, l)| (l.name.clone(), i as i32 + 1))
             .collect();
         grid.append(Property::category("Constraints", "c_wall"));
+        location_row(grid, r.location_line);
         let base = levels
             .iter()
             .position(|l| l.guid == r.base_level)
@@ -245,6 +279,25 @@ impl Gui {
                 json!({ "top_constraint": { "unconnected": text } }),
             )),
             "wl_top_off" => Some(constraints(self, json!({ "top_offset": text }))),
+            "wl_loc" => {
+                let line = LOCATION_LINES
+                    .iter()
+                    .find(|l| l.1 == text)
+                    .map_or(walls::LocationLine::WallCenterline, |l| l.0);
+                if selected.is_empty() {
+                    // The Wall tool's line, for the walls it draws next.
+                    self.wall_location = line;
+                    Some(Ok(()))
+                } else {
+                    Some(
+                        self.run(
+                            "wall.set_location_line",
+                            json!({ "wall_ids": selected, "location_line": line }),
+                        )
+                        .map(|_| ()),
+                    )
+                }
+            }
             "wt_type" => self.choose_wall_type(&text, &selected),
             "wt_name" => self.wall_type_row.map(|t| {
                 self.run("type.rename", json!({ "type_id": t, "name": text }))

@@ -242,6 +242,50 @@ fn type_of(store: &Store, e: &Element) -> Option<ElementId> {
     store.find_by_guid(&GlobalId::parse(e.param("@type")?.as_str()?)?)
 }
 
+/// Where a location line sits across a wall of type `t`, from the centreline toward the
+/// exterior (metres).
+pub fn line_offset(t: &Element, line: LocationLine) -> f64 {
+    let c = crate::compound::of_wall_type(t);
+    let half = type_width(t).unwrap_or(0.0) / 2.0;
+    // Core faces, measured from the exterior face (layers run exterior first).
+    let (core_ext, core_int) = match &c {
+        Some(c) if c.core[1] > c.core[0] => {
+            let before: f64 = c.layers[..c.core[0]].iter().map(|l| l.thickness).sum();
+            let core: f64 = c.layers[c.core[0]..c.core[1]]
+                .iter()
+                .map(|l| l.thickness)
+                .sum();
+            (half - before, half - before - core)
+        }
+        _ => (half, -half),
+    };
+    match line {
+        LocationLine::WallCenterline => 0.0,
+        LocationLine::FinishFaceExterior => half,
+        LocationLine::FinishFaceInterior => -half,
+        LocationLine::CoreFaceExterior => core_ext,
+        LocationLine::CoreFaceInterior => core_int,
+        LocationLine::CoreCenterline => (core_ext + core_int) / 2.0,
+    }
+}
+
+/// The move from a straight wall's location line to its centreline, in plan (ARC-WALL-002).
+pub fn to_centreline(store: &Store, e: &Element, r: &WallRecipe) -> [f64; 2] {
+    if r.location_line == LocationLine::WallCenterline || !r.through.is_empty() {
+        return [0.0, 0.0];
+    }
+    let Some(t) = type_of(store, e).and_then(|t| store.get(t)) else {
+        return [0.0, 0.0];
+    };
+    let d = line_offset(t, r.location_line) * if r.flip { -1.0 } else { 1.0 };
+    let l = r.curve.length().max(f64::EPSILON);
+    let n = [
+        -(r.curve.end[1] - r.curve.start[1]) / l,
+        (r.curve.end[0] - r.curve.start[0]) / l,
+    ];
+    [-n[0] * d, -n[1] * d]
+}
+
 /// Regenerates a wall's geometry from its recipe, type and levels.
 pub fn regenerate(store: &Store, e: &Element) -> Result<WallGeometry> {
     let r = wall_recipe(e)
@@ -267,9 +311,11 @@ pub fn regenerate(store: &Store, e: &Element) -> Result<WallGeometry> {
             "the wall's top is at or below its base",
         ));
     }
+    // The curve is the location line; the geometry is about the centreline.
+    let shift = to_centreline(store, e, &r);
     Ok(WallGeometry {
-        start: r.curve.start,
-        end: r.curve.end,
+        start: [r.curve.start[0] + shift[0], r.curve.start[1] + shift[1]],
+        end: [r.curve.end[0] + shift[0], r.curve.end[1] + shift[1]],
         base_z,
         height,
         width,
@@ -357,10 +403,10 @@ pub(crate) fn default_type(txn: &mut crate::txn::Transaction<'_>) -> Result<Elem
 }
 
 pub(crate) fn create(txn: &mut crate::txn::Transaction<'_>, p: CreateParams) -> Result<ElementId> {
-    if p.location_line != LocationLine::WallCenterline {
+    if p.location_line != LocationLine::WallCenterline && !p.curve.through.is_empty() {
         return Err(Error::new(
             "wall.unsupported_location_line",
-            "only the wall centreline is supported until layered types exist",
+            "curved walls are drawn on their centreline (for now)",
         ));
     }
     let store = txn.store().clone();
@@ -595,6 +641,46 @@ pub(crate) fn flip(txn: &mut crate::txn::Transaction<'_>, p: FlipParams) -> Resu
         let value = serde_json::to_value(&recipe).expect("recipes serialise");
         txn.modify(id, |e| {
             e.params.insert(RECIPE_KEY.into(), value);
+        })?;
+    }
+    Ok(())
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SetLocationLineParams {
+    pub wall_ids: Vec<ElementRef>,
+    pub location_line: LocationLine,
+}
+
+/// `wall.set_location_line`: the walls keep their bodies where they are; their location
+/// curves move to the new line (ARC-WALL-002).
+pub(crate) fn set_location_line(
+    txn: &mut crate::txn::Transaction<'_>,
+    p: SetLocationLineParams,
+) -> Result<()> {
+    let store = txn.store().clone();
+    for w in &p.wall_ids {
+        let id = resolve(&store, w, "wall")?;
+        let e = store.get(id).expect("resolved");
+        let mut r = wall_recipe(e)
+            .ok_or_else(|| Error::new("wall.not_reviera", "the element is not a Reviera wall"))?;
+        if !r.through.is_empty() && p.location_line != LocationLine::WallCenterline {
+            return Err(Error::new(
+                "wall.unsupported_location_line",
+                "curved walls are drawn on their centreline (for now)",
+            ));
+        }
+        let old = to_centreline(&store, e, &r);
+        r.location_line = p.location_line;
+        let new = to_centreline(&store, e, &r);
+        // Centre = curve + shift, kept: the curve moves by old − new.
+        let d = [old[0] - new[0], old[1] - new[1]];
+        r.curve.start = [r.curve.start[0] + d[0], r.curve.start[1] + d[1]];
+        r.curve.end = [r.curve.end[0] + d[0], r.curve.end[1] + d[1]];
+        let value = serde_json::to_value(&r).expect("recipes serialise");
+        txn.modify(id, |el| {
+            el.params.insert(RECIPE_KEY.into(), value);
         })?;
     }
     Ok(())

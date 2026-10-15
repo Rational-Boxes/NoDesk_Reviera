@@ -2003,24 +2003,24 @@ impl Gui {
         let Some(c) = reviera_core::compound::of_wall_type(t) else {
             return;
         };
-        grid.append(Property::category("Layers", "c_wl"));
+        grid.append(Property::category("Layers", "c_wx"));
         let top = c.layers.iter().any(|l| l.extend_top);
         let base = c.layers.iter().any(|l| l.extend_base);
         grid.append(Property::string(
             "Top Extension Distance",
-            "wl_top",
+            "wx_top",
             self.format_length(r.extension[1]),
         ));
         if !top || r.attach_top.is_some() {
-            grid.set_property_read_only("wl_top", true);
+            grid.set_property_read_only("wx_top", true);
         }
         grid.append(Property::string(
             "Base Extension Distance",
-            "wl_base",
+            "wx_base",
             self.format_length(r.extension[0]),
         ));
         if !base {
-            grid.set_property_read_only("wl_base", true);
+            grid.set_property_read_only("wx_base", true);
         }
         let modes = || {
             vec![
@@ -2038,20 +2038,20 @@ impl Gui {
         };
         grid.append(Property::enumeration(
             "Wrapping at Start",
-            "wl_wrap0",
+            "wx_wrap0",
             modes(),
             index(r.end_wrap[0]),
         ));
         grid.append(Property::enumeration(
             "Wrapping at End",
-            "wl_wrap1",
+            "wx_wrap1",
             modes(),
             index(r.end_wrap[1]),
         ));
     }
 
     pub(crate) fn wall_layer_edit(&mut self, property: &str, text: Option<String>) -> bool {
-        let Some(row) = property.strip_prefix("wl_") else {
+        let Some(row) = property.strip_prefix("wx_") else {
             return false;
         };
         let text = text.unwrap_or_default();

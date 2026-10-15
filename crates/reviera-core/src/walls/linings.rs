@@ -88,10 +88,12 @@ fn hosted_line(store: &Store, e: &Element, h: &WallHost) -> Option<crate::walls:
     let o = outward(&hr, &hg, h.side);
     let d = hg.width / 2.0 + h.offset.max(0.0) + width / 2.0;
     let u = hg.direction();
+    // The hosted wall's centreline, back to its location line.
+    let shift = crate::walls::to_centreline(store, e, &wall_recipe(e)?);
     let at = |p: [f64; 2], along: f64| {
         [
-            p[0] + o[0] * d + u[0] * along,
-            p[1] + o[1] * d + u[1] * along,
+            p[0] + o[0] * d + u[0] * along - shift[0],
+            p[1] + o[1] * d + u[1] * along - shift[1],
         ]
     };
     Some(crate::walls::Line {
@@ -198,14 +200,14 @@ pub(crate) fn set_host(txn: &mut Transaction<'_>, p: SetHostParams) -> Result<()
         std::mem::swap(&mut r.curve.start, &mut r.curve.end);
         r.flip = !r.flip;
     }
-    let hn = hg.normal();
-    let across = dot(
-        [
-            r.curve.start[0] - hg.start[0],
-            r.curve.start[1] - hg.start[1],
-        ],
-        hn,
+    // Measured on its centreline.
+    let sh = crate::walls::to_centreline(&store, store.get(id).expect("resolved"), &r);
+    let (cs, ce) = (
+        [r.curve.start[0] + sh[0], r.curve.start[1] + sh[1]],
+        [r.curve.end[0] + sh[0], r.curve.end[1] + sh[1]],
     );
+    let hn = hg.normal();
+    let across = dot([cs[0] - hg.start[0], cs[1] - hg.start[1]], hn);
     let ext = if hr.flip { -1.0 } else { 1.0 };
     let side = p.side.unwrap_or(if across * ext >= 0.0 {
         Side::Exterior
@@ -221,14 +223,8 @@ pub(crate) fn set_host(txn: &mut Transaction<'_>, p: SetHostParams) -> Result<()
         ));
     }
     let ends = [
-        -dot(
-            [
-                r.curve.start[0] - hg.start[0],
-                r.curve.start[1] - hg.start[1],
-            ],
-            hu,
-        ),
-        dot([r.curve.end[0] - hg.end[0], r.curve.end[1] - hg.end[1]], hu),
+        -dot([cs[0] - hg.start[0], cs[1] - hg.start[1]], hu),
+        dot([ce[0] - hg.end[0], ce[1] - hg.end[1]], hu),
     ];
     r.host = Some(WallHost {
         wall: store.get(host_id).expect("resolved").guid().to_string(),

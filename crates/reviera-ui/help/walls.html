@@ -65,6 +65,11 @@ rooms, attach to roofs and join straight walls with mitred corners.</p>
 <h2 id="properties">Properties</h2>
 <p>Select a wall to see its rows in Properties:</p>
 <table>
+  <tr><td><b>Location Line</b></td><td>The line the wall is drawn on and keeps when its type
+    changes: Wall Centerline, Core Centerline, Finish Face or Core Face (Exterior or Interior).
+    Changing it leaves the wall where it is. With the Wall tool running and nothing selected,
+    it sets the line new walls are drawn on (straight walls; curved walls use the
+    centreline). <code>wall.set_location_line</code></td></tr>
   <tr><td><b>Base Constraint</b>, <b>Base Offset</b></td><td>The level the wall stands on, and
     how far above it its base is.</td></tr>
   <tr><td><b>Top Constraint</b></td><td>A level the top reaches, or <i>Unconnected</i>.</td></tr>
@@ -251,7 +256,6 @@ wall it follows. A wall drawn against another with the <code>auto_join</code> op
 </ul>
 <p>Walls are saved as <code>IfcWall</code> with an axis and a body (curved and attached walls as
 faceted B-reps), typed, contained in their storey and connected to their neighbours.</p>
-<p class="note">Not yet available: location lines other than the centreline, layer cleanup at
-joins and wrapping at ends and openings, layered floors and roofs, a material library, T joins
+<p class="note">Not yet available: layer cleanup at joins, layered floors and roofs, a material library, T joins
 into the side of a curved wall, and attaching wall bases or attaching to floors and
 ceilings.</p>

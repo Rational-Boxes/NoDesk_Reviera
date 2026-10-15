@@ -358,3 +358,84 @@ fn edited_profiles() {
     .unwrap();
     assert!((bounds(&doc).1[2] - 4.0).abs() < 1e-6);
 }
+
+#[test]
+fn location_lines_stay_put() {
+    let (_t, mut project, mut doc, r, l1, _) = setup();
+    // A first wall makes the default type (200 mm); a 300 mm one beside it.
+    let w = id(&run(
+        &r,
+        &mut doc,
+        "wall.create",
+        json!({ "curve": { "line": { "start": [0.0, 0.0], "end": [10.0, 0.0] } }, "base_level": l1.0, "top_constraint": { "unconnected": 3.0 }, "location_line": "finish_face_exterior" }),
+    )
+    .unwrap());
+    let g = |doc: &Document| walls::regenerate(doc.store(), doc.store().get(w).unwrap()).unwrap();
+    // Drawn on its exterior face (the left, +y): the centre is 0.1 m inside.
+    assert!((g(&doc).start[1] + 0.1).abs() < 1e-9, "{:?}", g(&doc));
+    let t200 = doc
+        .store()
+        .iter()
+        .find(|e| e.class == "IfcWallType")
+        .unwrap()
+        .id();
+    let t300 = id(&run(
+        &r,
+        &mut doc,
+        "type.duplicate",
+        json!({ "type_id": t200.0, "new_name": "Generic - 300mm" }),
+    )
+    .unwrap());
+    run(
+        &r,
+        &mut doc,
+        "type.set_param",
+        json!({ "type_id": t300.0, "param": "width", "value": 0.3 }),
+    )
+    .unwrap();
+    // 200 → 300 mm with Finish Face: Exterior leaves the exterior face where it was.
+    run(
+        &r,
+        &mut doc,
+        "element.set_type",
+        json!({ "element_ids": [w.0], "type_id": t300.0 }),
+    )
+    .unwrap();
+    let after = g(&doc);
+    assert!(
+        (after.start[1] + 0.15).abs() < 1e-9 && (after.start[1] + after.width / 2.0).abs() < 1e-9
+    );
+    // Changing the location line keeps the body; the curve moves to the centre.
+    run(
+        &r,
+        &mut doc,
+        "wall.set_location_line",
+        json!({ "wall_ids": [w.0], "location_line": "wall_centerline" }),
+    )
+    .unwrap();
+    assert_eq!(g(&doc), after);
+    let rec = walls::wall_recipe(doc.store().get(w).unwrap()).unwrap();
+    assert!((rec.curve.start[1] + 0.15).abs() < 1e-9);
+    // A core-face line on a layered type: the core's exterior face.
+    run(
+        &r,
+        &mut doc,
+        "compound.set_layers",
+        json!({ "type_id": t300.0, "layers": [
+            { "function": "finish1", "material": "Render", "thickness": 0.05 },
+            { "function": "structure", "material": "Concrete", "thickness": 0.25 },
+        ] }),
+    )
+    .unwrap();
+    run(
+        &r,
+        &mut doc,
+        "wall.set_location_line",
+        json!({ "wall_ids": [w.0], "location_line": "core_face_exterior" }),
+    )
+    .unwrap();
+    let rec = walls::wall_recipe(doc.store().get(w).unwrap()).unwrap();
+    assert!((rec.curve.start[1] + 0.05).abs() < 1e-9, "{:?}", rec.curve);
+    assert_eq!(g(&doc), after);
+    project.save(&doc).unwrap();
+}

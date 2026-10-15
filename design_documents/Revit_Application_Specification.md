@@ -10372,6 +10372,7 @@ Dragging a control issues the matching command once, on mouse-up. The preview du
   - Changing the *Location Line* parameter of a placed wall leaves its geometry where it is. Reviera recomputes the stored location-curve offset so that the body does not move.
   - Flipping mirrors the wall about its **current** location line.
   - The blue end dots are drawn on the location line.
+- **Implementation note (2026-10-15).** Location lines are built for straight walls: the recipe's curve is the location line and the geometry is offset to the centreline by the type's faces and core (`walls::line_offset`), so type changes keep the line and flips mirror about it; `wall.create` takes `location_line`, and `wall.set_location_line` (an addition) changes it without moving the body. The window: the Location Line row on walls and in the Wall tool's palette. Not built yet: curved walls on lines other than the centreline, the tool's preview drawn off the line, the *Offset* option.
 
 **Regeneration.** Edges into the wall: `datum` from the base and top levels; `join` from its join nodes; `type` from the wall type; `attach` from attach targets; `host` from the host wall (hosted walls). Edges out of the wall: `host` to its inserts; `bound` to rooms on the levels the wall spans; `cut` to embedded curtain-wall hosts.
 

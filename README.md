@@ -146,6 +146,9 @@ ribbon's tools, the command shell, Lua and MCP alike.
   (`wall.attach`, `wall.detach`; Modify | Walls › Attach Top/Base).
 - **Curved walls** carry doors and windows along the curve (square to it), bound rooms, attach to
   roofs and save as faceted B-reps.
+- **Location lines**: straight walls drawn on their centreline, core centreline, finish or core
+  face; the line stays put through type changes and flips, and changing it leaves the wall in
+  place (`location_line` on `wall.create`, `wall.set_location_line`; ARC-WALL-002).
 - **Slanted and tapered walls**: straight walls lean by an angle from vertical, or taper with
   their own exterior and interior angles, the type's variable layer taking the difference
   (refused if it would reach zero); saved as B-reps (`wall.set_cross_section`; the
@@ -681,7 +684,7 @@ area by area (a review against the spec on 2026-10-15). Whole areas not started 
 
 **Gaps in what is built:**
 
-- **Walls**: location lines other than the centreline, layer cleanup at joins, layered floors
+- **Walls**: location lines for curved walls, layer cleanup at joins, layered floors
   and roofs, a material library, T joins into the side of a curved wall, attaching bases or to
   floors and ceilings, and true curved IFC geometry (curved walls, arches and domes are faceted
   B-reps).

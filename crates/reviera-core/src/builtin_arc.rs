@@ -152,6 +152,7 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(CompoundSetWrapping),
         registry.add(WallSetExtension),
         registry.add(WallSetEndWrap),
+        registry.add(WallSetLocationLine),
         registry.add(WallCreateBySegment),
         registry.add(WallCreateByRoom),
         registry.add(WallSetHost),
@@ -1598,6 +1599,20 @@ edit_command!(
     crate::walls::layered::SetExtensionParams,
     (),
     crate::walls::layered::set_extension
+);
+
+edit_command!(
+    WallSetLocationLine,
+    "wall.set_location_line",
+    "Change walls' location line",
+    "Sets walls' Location Line (wall_centerline, core_centerline, finish_face_exterior, \
+     finish_face_interior, core_face_exterior, core_face_interior; ARC-WALL-002): the bodies stay \
+     where they are and the location curves move to the new line, which then stays put through \
+     type changes and flips about.",
+    "Location Line",
+    crate::walls::SetLocationLineParams,
+    (),
+    crate::walls::set_location_line
 );
 
 edit_command!(
