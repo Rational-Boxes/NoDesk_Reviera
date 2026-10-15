@@ -323,6 +323,17 @@ pub fn all(store: &Store) -> Vec<Body> {
     for (id, g) in crate::slab_edges::all(store) {
         push(id, "IfcSlab", g.mesh, false);
     }
+    // Wall sweeps and reveals (ARC-WALL-010); a reveal's body is subtracted from its walls.
+    for (id, reveal, meshes) in crate::wall_sweeps::all(store) {
+        let class = if reveal {
+            "IfcOpeningElement"
+        } else {
+            "IfcCovering"
+        };
+        for mesh in meshes {
+            push(id, class, mesh, false);
+        }
+    }
     // Path arrays (ARC-MOD-033): every member's mesh, per slot, in the array's body.
     for (id, members) in crate::path_arrays::all(store) {
         for (_, g) in members {

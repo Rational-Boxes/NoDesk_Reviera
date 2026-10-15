@@ -532,6 +532,7 @@ impl LocalProject {
                 || recipe_kind == Some(railings::RAILING_RECIPE)
                 || recipe_kind == Some(railings::GATE_RECIPE)
                 || recipe_kind == Some(reviera_core::slab_edges::RECIPE)
+                || recipe_kind == Some(reviera_core::wall_sweeps::RECIPE)
             {
                 geometry::remove_breps(&mut self.ifc, step)?;
             }
@@ -716,6 +717,7 @@ impl LocalProject {
             self.write_columns(doc)?;
             self.write_ramps(doc)?;
             self.write_slab_edges(doc)?;
+            self.write_wall_sweeps(doc)?;
             self.write_skylights(doc)?;
             let owner_history = self.new_owner_history()?;
             crate::mesh_objects::write_mesh_objects(
@@ -1726,6 +1728,49 @@ impl LocalProject {
                 .and_then(|f| store.get(f))
                 .and_then(reviera_core::floors::floor_recipe)
                 .and_then(|f| GlobalId::parse(&f.level))
+                .and_then(|g| store.find_by_guid(&g))
+                .and_then(|l| self.steps.get(&l).copied());
+            if let Some(storey) = storey {
+                geometry::contain(&mut self.ifc, step, storey, owner_history)?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Writes every wall sweep and reveal (ARC-WALL-010) as a faceted B-rep, contained in its
+    /// level.
+    fn write_wall_sweeps(&mut self, doc: &Document) -> Result<()> {
+        let store = doc.store();
+        let all = reviera_core::wall_sweeps::all(store);
+        if all.is_empty() {
+            return Ok(());
+        }
+        let contexts = geometry::Contexts::find(&self.ifc)?;
+        let owner_history = self.new_owner_history()?;
+        for (id, _, meshes) in &all {
+            let Some(&step) = self.steps.get(id) else {
+                continue;
+            };
+            let solids: Vec<geometry::Polyhedron> = meshes
+                .iter()
+                .map(|(points, indices)| geometry::Polyhedron {
+                    points: points.clone(),
+                    faces: indices
+                        .chunks(3)
+                        .map(|t| t.iter().map(|i| *i as usize).collect())
+                        .collect(),
+                })
+                .collect();
+            geometry::write_breps(
+                &mut self.ifc,
+                step,
+                geometry::BrepFrame::WORLD,
+                &solids,
+                self.length_scale,
+                contexts,
+            )?;
+            let storey = reviera_core::wall_sweeps::recipe(store.get(*id).expect("listed"))
+                .and_then(|r| GlobalId::parse(&r.level))
                 .and_then(|g| store.find_by_guid(&g))
                 .and_then(|l| self.steps.get(&l).copied());
             if let Some(storey) = storey {

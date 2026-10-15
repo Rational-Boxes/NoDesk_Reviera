@@ -150,6 +150,11 @@ ribbon's tools, the command shell, Lua and MCP alike.
   their own exterior and interior angles, the type's variable layer taking the difference
   (refused if it would reach zero); saved as B-reps (`wall.set_cross_section`; the
   Cross-Section rows in Properties; ARC-WALL-005).
+- **Wall sweeps and reveals** (Modify | Walls › Sweep, Reveal): a rectangular or typed profile
+  along walls' faces, horizontal (continuing round joined walls, mitred) or vertical; reveals,
+  and sweeps that cut, subtract from their walls; IFC `IfcCovering` MOLDING and
+  `IfcOpeningElement` RECESS (`wallsweep.create`, `wallreveal.create`, `wallsweep.set`,
+  `wallsweep.add_walls`, `wallsweep.remove_walls`; ARC-WALL-010).
 - **Edit Profile** (Modify | Walls): a straight wall's elevation outline as loops of points
   (gables, steps, notches, holes), points keeping to the nearer end and the nearer of base and
   top; Reset Profile (`wall.edit_profile`, `wall.reset_profile`, `wall.get_profile`;
@@ -642,7 +647,7 @@ area by area (a review against the spec on 2026-10-15). Whole areas not started 
   Make Permanent icon (the command exists), angular and radial constraints, constraints on
   inserts along their walls, Tab through sub-elements (ARC-DIM-001, ARC-CNST-002, ARC-KEY-001).
 - **Wall extras**: vertically compound walls (regions), extendable layers, layer wrapping,
-  sweeps and reveals, Walls by Room, Auto Join & Lock, hosted walls, curved slanted walls,
+  profile families, returns and type-level sweeps and reveals, Walls by Room, Auto Join & Lock, hosted walls, curved slanted walls,
   selecting stacked sub-walls with Tab, sketching a wall profile in elevation and its mid-end
   faces (ARC-CMPD-003/004, ARC-WRAP-001,
   ARC-WALL-009/010/014/015/016).

@@ -79,6 +79,12 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "equality" => format!(
             r#"<path d="M4 8v16M16 8v16M28 8v16" {s}/><path d="M4 16h24" {sa}/><path d="M8 12h4M8 14h4M20 12h4M20 14h4" {sa}/>"#
         ),
+        "wall_sweep" => format!(
+            r#"<path d="M6 4h12v24H6z" fill="{f}" {s}/><path d="M18 8h6v3l-3 2h-3z" fill="{f}" {sa}/>"#
+        ),
+        "wall_reveal" => format!(
+            r#"<path d="M8 4h12v24H8z" fill="{f}" {s}/><path d="M20 14h-4v4h4" fill="{paper}" {sa}/>"#
+        ),
         "wall_profile" => format!(
             r#"<path d="M3 28V12h10l3-8 3 8h10v16z" fill="{f}" {s}/><path d="M8 18h5v5H8z" fill="{paper}" {sa}/>"#
         ),

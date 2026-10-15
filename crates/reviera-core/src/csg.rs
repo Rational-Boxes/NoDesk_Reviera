@@ -134,6 +134,32 @@ pub(crate) fn boolean(txn: &mut crate::txn::Transaction<'_>, p: BooleanParams) -
     write(txn, &list)
 }
 
+/// Makes `tool` (a GlobalId) act on exactly `targets` with `op`, replacing its other relations
+/// (wall sweeps and reveals keep theirs in step with their walls).
+pub(crate) fn set_tool_targets(
+    txn: &mut crate::txn::Transaction<'_>,
+    tool: &str,
+    targets: &[String],
+    op: CsgOp,
+    hide_tool: bool,
+) -> Result<()> {
+    let mut list = relations(txn.store());
+    let before = list.clone();
+    list.retain(|r| r.tool != tool);
+    for t in targets {
+        list.push(Relation {
+            target: t.clone(),
+            tool: tool.to_owned(),
+            op,
+            hide_tool,
+        });
+    }
+    if list == before {
+        return Ok(());
+    }
+    write(txn, &list)
+}
+
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct RemoveParams {

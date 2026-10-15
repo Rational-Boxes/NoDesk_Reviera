@@ -142,6 +142,11 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(StackedWallCreateType),
         registry.add(WallBreakUp),
         registry.add(WallEditProfile),
+        registry.add(WallSweepCreate),
+        registry.add(WallRevealCreate),
+        registry.add(WallSweepAddWalls),
+        registry.add(WallSweepRemoveWalls),
+        registry.add(WallSweepSet),
         registry.add(WallResetProfile),
         registry.add(WallGetProfile),
     ];
@@ -1394,6 +1399,70 @@ read_command!(
     crate::shape_edit::ElementParams,
     crate::shape_edit::Shape,
     crate::shape_edit::get
+);
+
+edit_command!(
+    WallSweepCreate,
+    "wallsweep.create",
+    "Add a wall sweep",
+    "A profile run along walls' faces (ARC-WALL-010): a cornice or skirting. `orientation` horizontal \
+     (at `offset_from_level` above the first wall's base level, continuing around the walls joined \
+     end to end with it unless `chain` is false, mitred at corners) or vertical (at \
+     `distance_along` the first wall, base to top); `side` exterior or interior; a rectangular \
+     profile `width` out from the face by `height`, or `profile` points (x out from the face, y up \
+     or along); `cuts_wall` also cuts the walls where it overlaps. An IfcCovering (MOLDING).",
+    "Wall Sweep",
+    crate::wall_sweeps::CreateParams,
+    crate::id::ElementId,
+    crate::wall_sweeps::create_sweep
+);
+
+edit_command!(
+    WallRevealCreate,
+    "wallreveal.create",
+    "Add a wall reveal",
+    "A groove cut along walls' faces (ARC-WALL-010), as `wallsweep.create`: the rectangular profile \
+     is `width` into the wall by `height`. It cuts every layer it reaches; an IfcOpeningElement \
+     (RECESS). Not on slanted walls.",
+    "Wall Reveal",
+    crate::wall_sweeps::CreateParams,
+    crate::id::ElementId,
+    crate::wall_sweeps::create_reveal
+);
+
+edit_command!(
+    WallSweepAddWalls,
+    "wallsweep.add_walls",
+    "Add walls to a sweep",
+    "Runs a wall sweep or reveal along more walls (ARC-WALL-010).",
+    "Add Walls",
+    crate::wall_sweeps::WallsParams,
+    (),
+    crate::wall_sweeps::add_walls
+);
+
+edit_command!(
+    WallSweepRemoveWalls,
+    "wallsweep.remove_walls",
+    "Remove walls from a sweep",
+    "Stops a wall sweep or reveal running along walls (ARC-WALL-010); one left with no walls is \
+     deleted.",
+    "Remove Walls",
+    crate::wall_sweeps::WallsParams,
+    (),
+    crate::wall_sweeps::remove_walls
+);
+
+edit_command!(
+    WallSweepSet,
+    "wallsweep.set",
+    "Change a wall sweep",
+    "Changes a wall sweep's or reveal's height above its level, distance along its wall \
+     (vertical), offset from the face, side, profile points, Cuts Wall or material (ARC-WALL-010).",
+    "Wall Sweep",
+    crate::wall_sweeps::SetParams,
+    (),
+    crate::wall_sweeps::set
 );
 
 edit_command!(

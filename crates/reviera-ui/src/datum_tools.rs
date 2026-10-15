@@ -831,6 +831,64 @@ impl Gui {
             }
             return true;
         }
+        if let Some(r) = reviera_core::wall_sweeps::recipe(e) {
+            use reviera_core::wall_sweeps::{Orientation, Side};
+            grid.append(Property::category(
+                if r.reveal {
+                    "Wall Reveal"
+                } else {
+                    "Wall Sweep"
+                },
+                "c_dt",
+            ));
+            grid.append(Property::enumeration(
+                "Side",
+                "dt_ws_side",
+                vec![("Exterior".to_owned(), 0), ("Interior".to_owned(), 1)],
+                i32::from(r.side == Side::Interior),
+            ));
+            let (label, v) = match r.orientation {
+                Orientation::Horizontal => ("Offset From Level", r.offset),
+                Orientation::Vertical => ("Distance Along Wall", r.distance),
+            };
+            grid.append(Property::string(label, "dt_ws_at", self.format_length(v)));
+            grid.append(Property::string(
+                "Wall Offset",
+                "dt_ws_woff",
+                self.format_length(r.wall_offset),
+            ));
+            let (lo, hi) = r
+                .profile
+                .iter()
+                .fold(([f64::MAX; 2], [f64::MIN; 2]), |(lo, hi), p| {
+                    (
+                        [lo[0].min(p[0]), lo[1].min(p[1])],
+                        [hi[0].max(p[0]), hi[1].max(p[1])],
+                    )
+                });
+            // A reveal reaches a millimetre past the face.
+            let depth = if r.reveal { -lo[0] } else { hi[0] - lo[0] };
+            grid.append(Property::string(
+                if r.reveal { "Depth" } else { "Projection" },
+                "dt_ws_w",
+                self.format_length(depth),
+            ));
+            grid.append(Property::string(
+                "Profile Height",
+                "dt_ws_h",
+                self.format_length(hi[1] - lo[1]),
+            ));
+            if !r.reveal {
+                grid.append(Property::boolean("Cuts Wall", "dt_ws_cuts", r.cuts_wall));
+            }
+            grid.append(Property::string(
+                "Walls",
+                "dt_ws_walls",
+                r.walls.len().to_string(),
+            ));
+            grid.set_property_read_only("dt_ws_walls", true);
+            return true;
+        }
         if let Some(r) = model_lines::recipe(e) {
             grid.append(Property::category("Model Line", "c_dt"));
             grid.append(Property::enumeration(
@@ -963,6 +1021,59 @@ impl Gui {
                                 "max": [c[2][0], c[2][1], b.bottom + h],
                             }),
                         )
+                    }
+                    _ => Err("Type a length".to_owned()),
+                }
+            }
+            "ws_side" => self.run(
+                "wallsweep.set",
+                json!({ "sweep_id": id, "side": if text == "Interior" { "interior" } else { "exterior" } }),
+            ),
+            "ws_cuts" => self.run(
+                "wallsweep.set",
+                json!({ "sweep_id": id, "cuts_wall": text == "true" || text == "1" }),
+            ),
+            "ws_at" | "ws_woff" | "ws_w" | "ws_h" => {
+                let v = self
+                    .run("units.parse", json!({ "text": text, "data_type": "length" }))
+                    .ok()
+                    .and_then(|v| v.as_f64());
+                let r = self.store_now().and_then(|s| {
+                    s.get(id).and_then(reviera_core::wall_sweeps::recipe)
+                });
+                match (v, r) {
+                    (Some(v), Some(r)) => {
+                        let vertical =
+                            r.orientation == reviera_core::wall_sweeps::Orientation::Vertical;
+                        let (lo, hi) = r.profile.iter().fold(
+                            ([f64::MAX; 2], [f64::MIN; 2]),
+                            |(lo, hi), p| {
+                                ([lo[0].min(p[0]), lo[1].min(p[1])], [hi[0].max(p[0]), hi[1].max(p[1])])
+                            },
+                        );
+                        let (mut w, mut h) = (
+                            if r.reveal { -lo[0] } else { hi[0] - lo[0] },
+                            hi[1] - lo[1],
+                        );
+                        let args = match row {
+                            "ws_at" if vertical => json!({ "sweep_id": id, "distance_along": v }),
+                            "ws_at" => json!({ "sweep_id": id, "offset_from_level": v }),
+                            "ws_woff" => json!({ "sweep_id": id, "wall_offset": v }),
+                            _ => {
+                                if row == "ws_w" {
+                                    w = v;
+                                } else {
+                                    h = v;
+                                }
+                                let profile = if r.reveal {
+                                    json!([[-w, 0.0], [0.001, 0.0], [0.001, h], [-w, h]])
+                                } else {
+                                    json!([[0.0, 0.0], [w, 0.0], [w, h], [0.0, h]])
+                                };
+                                json!({ "sweep_id": id, "profile": profile })
+                            }
+                        };
+                        self.run("wallsweep.set", args)
                     }
                     _ => Err("Type a length".to_owned()),
                 }

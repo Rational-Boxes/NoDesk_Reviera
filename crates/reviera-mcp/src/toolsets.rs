@@ -53,7 +53,7 @@ pub fn toolset_of(command: &str) -> String {
         | "assembly" | "part" | "geometry" | "opening" | "column" | "compound" | "curtain"
         | "ramp" | "measure" | "skylight" | "mesh_object" | "array" | "refplane" | "workplane"
         | "modelline" | "datum" | "scopebox" | "constraint" | "slabedge" | "hostsweep"
-        | "shape" | "stackedwall" => "modeling",
+        | "shape" | "stackedwall" | "wallsweep" | "wallreveal" => "modeling",
         "view" | "sheet" | "schedule" | "annotate" | "render" | "walkthrough" | "xr" | "ui"
         | "tag" | "text" | "anno" | "dim" | "viewport" | "section" | "inspect" => "documentation",
         "family" | "family_doc" | "type" | "instance" | "library" | "component" | "formula"

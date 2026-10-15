@@ -114,6 +114,17 @@ fn raw_parent(store: &Store, e: &Element, imported: &Imported) -> Option<Element
     if let Some(r) = crate::path_arrays::path_array_recipe(e) {
         return by_guid(&r.level);
     }
+    // A slab edge sits under its floor, a wall sweep or reveal under its first wall.
+    if let Some(r) = crate::slab_edges::recipe(e) {
+        return by_guid(&r.host);
+    }
+    if let Some(r) = crate::wall_sweeps::recipe(e) {
+        return r
+            .walls
+            .first()
+            .and_then(|w| by_guid(w))
+            .or_else(|| by_guid(&r.level));
+    }
     // A dormer's parts sit in the dormer; the dormer on its roof.
     if let Some(d) = crate::dormers::dormer_of(e) {
         return by_guid(d);

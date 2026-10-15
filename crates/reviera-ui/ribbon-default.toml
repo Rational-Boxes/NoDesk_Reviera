@@ -905,6 +905,18 @@ keys = "ST"
 help = "Draw a stair in a plan: click the start and end of each run; landings join the runs"
 
 [[action]]
+id = "wallsweep.create"
+label = "Sweep"
+icon = "wall_sweep"
+help = "Run a profile along the selected walls: a cornice or skirting (horizontal) or a pilaster strip (vertical)"
+
+[[action]]
+id = "wallreveal.create"
+label = "Reveal"
+icon = "wall_reveal"
+help = "Cut a groove along the selected walls"
+
+[[action]]
 id = "wall.edit_profile"
 label = "Edit Profile"
 icon = "wall_profile"
@@ -1391,6 +1403,8 @@ panels = [{ label = "Wall", tools = [
   { action = "element.split_with_gap", size = "large" },
   { action = "wall.split_horizontal", size = "large" },
   { action = "wall.edit_profile", size = "large" },
+  { action = "wallsweep.create", size = "large" },
+  { action = "wallreveal.create", size = "large" },
   { action = "stackedwall.set_rows", size = "large" },
   { action = "wall.break_up", size = "large" },
 ] }]

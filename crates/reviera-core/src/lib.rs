@@ -74,6 +74,7 @@ pub mod units;
 pub mod vaults;
 pub mod views;
 pub mod wall_openings;
+pub mod wall_sweeps;
 pub mod walls;
 pub mod work_planes;
 

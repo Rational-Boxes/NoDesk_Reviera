@@ -172,6 +172,26 @@ stacked wall is an <code>ELEMENTEDWALL</code> aggregating one <code>IfcWall</cod
 <code>stackedwall.create_type</code>, <code>stackedwall.set_rows</code>,
 <code>wall.break_up</code></p>
 
+<h2 id="sweeps">Sweeps and reveals</h2>
+<p>A <b>sweep</b> runs a profile along walls' faces: a cornice, a skirting or a band. A
+<b>reveal</b> cuts a groove.</p>
+<ol>
+  <li>Select one or more straight walls. <b>Modify | Walls › Sweep</b> or <b>Reveal</b>.</li>
+  <li>Choose the <b>Placement</b> (Horizontal, or Vertical from base to top), the <b>Side</b>,
+    the height above the wall's level (horizontal) or the distance along the wall (vertical),
+    and the rectangular profile: its projection (a reveal's depth) and height. A sweep can also
+    <b>cut the wall</b> where it overlaps it.</li>
+  <li>With <b>Continue around joined walls</b>, a horizontal run carries on around the walls
+    joined end to end with the first, mitred at the corners: a cornice on one wall of a room goes
+    round the room.</li>
+</ol>
+<p>Select a sweep or reveal to change its side, height, wall offset, profile and Cuts Wall in
+Properties. In IFC a sweep is an <code>IfcCovering</code> (MOLDING) and a reveal an
+<code>IfcOpeningElement</code> (RECESS), each a faceted B-rep; the walls they cut are written as
+their cut bodies. <code>wallsweep.create</code>, <code>wallreveal.create</code>,
+<code>wallsweep.set</code>, <code>wallsweep.add_walls</code>,
+<code>wallsweep.remove_walls</code></p>
+
 <h2 id="split">Splitting walls</h2>
 <ul>
   <li><b>Split Element</b> <kbd>SL</kbd> splits a wall where you click.</li>

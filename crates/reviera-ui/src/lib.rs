@@ -57,6 +57,7 @@ mod snap;
 mod stack;
 mod stairs;
 mod wall_profile;
+mod wall_sweeps;
 mod walls;
 mod wx;
 
@@ -3736,6 +3737,8 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "stackedwall.set_rows" => with(gui, Gui::edit_stack),
         "wall.break_up" => with(gui, Gui::break_up),
         "wall.edit_profile" => with(gui, Gui::edit_wall_profile),
+        "wallsweep.create" => with(gui, Gui::wall_sweep),
+        "wallreveal.create" => with(gui, Gui::wall_reveal),
         "slabedge.create" => with(gui, |g| {
             g.start_line_tool(datum_tools::LineMode::SlabEdge);
             focus(g);

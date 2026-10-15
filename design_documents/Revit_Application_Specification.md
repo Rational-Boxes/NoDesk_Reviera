@@ -10892,8 +10892,10 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 - `walltype.set_reveals(type_id, rows)`
 
 **Acceptance criteria.**
-- [ ] A cornice placed on one wall of a closed rectangle extends to all four walls on click, with mitered corners.
-- [ ] A reveal 20 mm deep cuts every layer it reaches and appears as an `IfcOpeningElement` (RECESS).
+- [x] A cornice placed on one wall of a closed rectangle extends to all four walls on click, with mitered corners.
+- [x] A reveal 20 mm deep cuts every layer it reaches and appears as an `IfcOpeningElement` (RECESS).
+
+**Implementation note (2026-10-15, first build).** As built: `recipe.wall_sweep` (walls by GlobalId, reveal flag, horizontal at an offset above a level or vertical at a distance along the first wall, side, wall offset, profile polygon, Cuts Wall, material). A horizontal run follows the walls' joined faces, chained end to start and mitred (closed round a room); creation continues around walls joined end to end at the sweep's height through two-wall corners (`chain`). A reveal, and a sweep that cuts its walls, is a subtraction in the model's boolean relations (ARC-MOD-028), so the 3D view, plans and IFC show the cut (the walls written as their cut B-reps with `IfcRelInterferesElements`, rather than `IfcRelVoidsElement`). Commands: `wallsweep.create`, `wallreveal.create`, `wallsweep.add_walls`, `wallsweep.remove_walls`, `wallsweep.set` (an addition). The window: Modify | Walls › Sweep and Reveal (a dialog), and Properties rows for a selected sweep. Not built yet: profile families (rectangle or typed points only), Angled returns and `wallsweep.set_returns`, type-level sweeps and reveals (`walltype.set_sweeps`/`set_reveals`), Cut by Inserts, `IfcRelCoversBldgElements`, curved walls, picking walls in an elevation with a preview.
 
 ### 3.3.16 Split, Split with Gap and horizontal split (walls)
 **ID:** ARC-WALL-011 · **Priority:** P0 · **Ref:** research/02 §4.12, §13
