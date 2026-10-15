@@ -267,6 +267,10 @@ pub struct MeshObjectRecipe {
     /// Its own uniform scale, times its type's.
     #[serde(default = "one", skip_serializing_if = "is_one")]
     pub scale: f64,
+    /// A toposolid it stands on (GlobalId, ARC-SITE-001): its offset is then above the
+    /// surface there.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub host: Option<String>,
 }
 
 fn is_one(v: &f64) -> bool {
@@ -665,7 +669,18 @@ pub fn regenerate(store: &Store, e: &Element) -> Result<MeshObjectGeometry> {
             "the custom object's type no longer exists",
         )
     })?;
-    let z = crate::levels::elevation_of(store, &r.level)? + r.offset;
+    // On a toposolid, its surface under the point; else the level.
+    let surface = r
+        .host
+        .as_deref()
+        .and_then(GlobalId::parse)
+        .and_then(|g| store.find_by_guid(&g))
+        .and_then(|h| store.get(h))
+        .and_then(|h| crate::toposolids::height_at(store, h, r.point));
+    let z = match surface {
+        Some(s) => s + r.offset,
+        None => crate::levels::elevation_of(store, &r.level)? + r.offset,
+    };
     let mesh = ty.mesh.decode()?;
     Ok(MeshObjectGeometry {
         type_id,
@@ -936,6 +951,7 @@ pub(crate) fn place(txn: &mut crate::txn::Transaction<'_>, p: PlaceParams) -> Re
         rotation: p.rotation,
         mirror: p.mirror,
         scale: p.scale,
+        host: None,
     };
     if !(p.scale > 0.0 && p.scale.is_finite()) {
         return Err(Error::new(

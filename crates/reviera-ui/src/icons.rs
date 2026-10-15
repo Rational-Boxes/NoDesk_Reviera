@@ -79,6 +79,30 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "equality" => format!(
             r#"<path d="M4 8v16M16 8v16M28 8v16" {s}/><path d="M4 16h24" {sa}/><path d="M8 12h4M8 14h4M20 12h4M20 14h4" {sa}/>"#
         ),
+        "toposolid" => format!(
+            r#"<path d="M3 24l6-8 6 4 6-9 8 13z" fill="{f}" {s}/><path d="M3 24v3h26v-3" {sa}/>"#
+        ),
+        "topo_subdivide" => format!(
+            r#"<path d="M3 24l6-8 6 4 6-9 8 13z" fill="{f}" {s}/><path d="M10 22h12" {sa} stroke-dasharray="3 2"/>"#
+        ),
+        "topo_graded" => format!(
+            r#"<path d="M3 24l6-8 6 4 6-9 8 13" fill="none" {s} stroke-dasharray="3 2"/><path d="M3 24h8l4-6h4l4 6h6" {sa}/>"#
+        ),
+        "topo_cut_fill" => format!(
+            r#"<path d="M3 20h26" {s}/><path d="M6 20q5-8 10 0z" fill="{f}" {sa}/><path d="M16 20q5 8 10 0z" {sa}/>"#
+        ),
+        "topo_simplify" => format!(
+            r#"<path d="M3 24l4-3 3 2 3-5 3 1 3-4 3 2 4-5 4 12z" fill="none" {s}/><path d="M3 24l10-10 16 10" {sa}/>"#
+        ),
+        "site_settings" => format!(
+            r#"<path d="M4 8q12-6 24 0M4 16q12-6 24 0M4 24q12-6 24 0" fill="none" {s}/>"#
+        ),
+        "property_line" => format!(
+            r#"<path d="M5 6h22v20H5z" fill="none" {s} stroke-dasharray="6 2 1 2"/><circle cx="5" cy="6" r="2" fill="{f}" {sa}/>"#
+        ),
+        "site_component" => format!(
+            r#"<circle cx="16" cy="12" r="8" fill="{f}" {s}/><path d="M16 20v8M10 28h12" {sa}/>"#
+        ),
         "mass" => format!(
             r#"<path d="M6 26V10l10-6 10 6v16z" fill="{f}" {s}/><path d="M6 10l10 6 10-6M16 16v10" {sa}/>"#
         ),

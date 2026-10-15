@@ -401,6 +401,8 @@ pub fn class_color(class: &str) -> [f32; 4] {
         // Masses show as translucent volumes (ARC-MASS-001).
         "mass" => return [0.78, 0.68, 0.50, 0.45],
         "metal" => return [0.66, 0.68, 0.71, 1.0],
+        // Toposolids (ARC-TOPO-001).
+        "earth" => return [0.56, 0.62, 0.40, 1.0],
         // A wall layer's cell (`IfcWall:layer/Brick`): a colour after its material's name.
         "layer" => {
             if let Some(c) = layer_color(material.split_once('/').map_or("", |x| x.1)) {

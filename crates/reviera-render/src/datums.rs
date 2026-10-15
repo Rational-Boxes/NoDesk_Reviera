@@ -18,6 +18,7 @@ use std::collections::HashSet;
 use reviera_core::model_lines::{self, Pattern};
 use reviera_core::sections::SectionFrame;
 use reviera_core::{ElementId, Store, datum_extents, grids, ref_planes, scope_boxes, standards};
+use reviera_core::{property_lines, toposolids};
 
 use crate::annotation::{GridMark, GridStyle};
 use crate::plan::Lines;
@@ -205,6 +206,64 @@ pub fn plan_lines(
             l.id,
             color(style.color),
             pens.model_width(style.pen, scale) as f32,
+            segments,
+        ));
+    }
+    out.extend(site_lines(store, z, scale, selected));
+    out
+}
+
+/// Contours' and property lines' colours.
+pub const CONTOUR_COLOR: [f32; 4] = [0.55, 0.40, 0.22, 1.0];
+pub const PROPERTY_LINE_COLOR: [f32; 4] = [0.75, 0.10, 0.10, 1.0];
+
+/// A site in plan (ARC-TOPO-002, ARC-SITE-001): toposolids' contours at the site settings'
+/// interval (every fifth from the passing elevation heavier), and property lines dash-dotted.
+fn site_lines(store: &Store, z: f64, scale: f64, selected: &HashSet<ElementId>) -> Vec<Lines> {
+    let pens = standards::pen_set(store);
+    let unit = scale / 1000.0;
+    let s = toposolids::settings(store);
+    let mut out = Vec::new();
+    for e in store.iter().filter(|e| toposolids::recipe(e).is_some()) {
+        let (mut minor, mut major) = (Vec::new(), Vec::new());
+        for (h, line) in toposolids::contours(store, e) {
+            let k = ((h - s.passing_elevation) / s.contour_interval).round() as i64;
+            let into = if k.rem_euclid(5) == 0 {
+                &mut major
+            } else {
+                &mut minor
+            };
+            into.extend(
+                line.windows(2)
+                    .map(|w| seg([w[0][0], w[0][1], z], [w[1][0], w[1][1], z])),
+            );
+        }
+        for (segments, pen) in [(minor, 1), (major, 3)] {
+            if !segments.is_empty() {
+                out.push(lines_of(
+                    selected,
+                    e.id(),
+                    CONTOUR_COLOR,
+                    pens.model_width(pen, scale) as f32,
+                    segments,
+                ));
+            }
+        }
+    }
+    for e in store.iter() {
+        let Some(r) = property_lines::recipe(e) else {
+            continue;
+        };
+        let pts: Vec<[f64; 3]> = r.points.iter().map(|p| [p[0], p[1], z]).collect();
+        let segments = model_lines::dashes(&pts, Pattern::Centre, unit)
+            .into_iter()
+            .map(|s| seg(s[0], s[1]))
+            .collect();
+        out.push(lines_of(
+            selected,
+            e.id(),
+            PROPERTY_LINE_COLOR,
+            pens.model_width(3, scale) as f32,
             segments,
         ));
     }

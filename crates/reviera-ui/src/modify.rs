@@ -958,6 +958,7 @@ impl Gui {
             && self.host_pick.is_none()
             && self.area_pick.is_none()
             && self.group_pick.is_none()
+            && self.site_pick.is_none()
             && self.text_pick.is_none()
             && !self.in_sheet()
             && !self.active_view().is_some_and(|v| v.nav.walk.is_some())

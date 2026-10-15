@@ -55,6 +55,7 @@ mod scripts;
 mod sections;
 mod select;
 mod sheets;
+mod site;
 mod sketch;
 mod sketch_edit;
 mod skylights;
@@ -324,6 +325,8 @@ struct Gui {
     text_pick: Option<(String, f64, f64)>,
     /// Place Group: the group type placed at each click.
     group_pick: Option<String>,
+    /// Site Component: the component type being placed.
+    site_pick: Option<ElementId>,
     /// The Area tool: its area plan and the area type it places.
     area_pick: Option<(ElementId, String)>,
     /// The Location Line the Wall tool draws on (kept between uses).
@@ -1326,6 +1329,7 @@ impl Gui {
         }
         if self.area_pick.take().is_some()
             || self.group_pick.take().is_some()
+            || self.site_pick.take().is_some()
             || self.text_pick.take().is_some()
         {
             return frame.set_status_text("Ready", 0);
@@ -2616,6 +2620,7 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                     None if g.host_pick.is_some() => g.host_click(x, y, &p),
                     None if g.area_pick.is_some() => g.area_click(x, y),
                     None if g.group_pick.is_some() => g.group_click(x, y),
+                    None if g.site_pick.is_some() => g.site_click(x, y),
                     None if g.text_pick.is_some() => g.model_text_click(x, y),
                     None if g.sketch.is_some() => g.sketch_click(x, y),
                     None if g.ceiling_tool.is_some() => g.ceiling_click(x, y),
@@ -3243,6 +3248,7 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 host_pick: None,
                 area_pick: None,
                 group_pick: None,
+                site_pick: None,
                 text_pick: None,
                 wall_location: Default::default(),
                 model_tree,
@@ -3804,6 +3810,17 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "roof.create_by_face" => with(gui, |g| g.by_face("roof.create_by_face")),
         "curtainsystem.create_by_face" => with(gui, |g| g.by_face("curtainsystem.create_by_face")),
         "element.update_to_face" => with(gui, Gui::update_to_face),
+        "toposolid.create" => with(gui, Gui::create_toposolid),
+        "toposolid.subdivide" => with(gui, Gui::subdivide_toposolid),
+        "toposolid.create_graded_region" => with(gui, Gui::graded_region),
+        "toposolid.cut_fill" => with(gui, Gui::cut_fill),
+        "toposolid.simplify" => with(gui, Gui::simplify_toposolid),
+        "site.set_settings" => with(gui, Gui::site_settings),
+        "propertyline.create" => with(gui, Gui::property_line),
+        "sitecomponent.place" => with(gui, |g| {
+            g.start_site_component();
+            focus(g);
+        }),
         "modeltext.create" => with(gui, |g| {
             g.start_model_text();
             focus(g);

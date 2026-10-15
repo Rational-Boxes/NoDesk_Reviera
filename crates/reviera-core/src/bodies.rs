@@ -359,6 +359,19 @@ pub fn all(store: &Store) -> Vec<Body> {
             push(id, &class, mesh, false);
         }
     }
+    // Toposolids (ARC-TOPO-001), excavations subtracted through the boolean relations.
+    for (id, cut, mesh) in crate::toposolids::all(store) {
+        push(
+            id,
+            if cut {
+                "IfcOpeningElement"
+            } else {
+                "IfcGeographicElement:earth"
+            },
+            mesh,
+            false,
+        );
+    }
     // Masses (ARC-MASS-001) and curtain systems by face (ARC-CW-007).
     for (id, meshes) in crate::masses::all(store) {
         for mesh in meshes {

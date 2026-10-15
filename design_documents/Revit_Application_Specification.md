@@ -13522,6 +13522,8 @@ All family-editor commands from the DM chapter can be used inside the session.
 - [ ] The IFC export opens in an independent viewer with the terrain visible, both under the `IfcSite` and as an `IfcGeographicElement`.
 - [ ] Turning smooth shading on changes the shaded display of every toposolid without changing its volume, contours or IFC body, and does not add an undo step; with it on, a toposolid's surface pattern is not drawn.
 
+**Implementation note (2026-10-15, first build).** As built: toposolids (`recipe.toposolid`, `IfcGeographicElement` TERRAIN, a B-rep body) from a boundary and points or from points alone (their outline), a constrained Delaunay top (spade), heights for bare boundary corners from the points' surface, one closed solid (the top, the same triangles dropped to a flat bottom `thickness` below the lowest point, walls on the outer edges); `toposolid.create`, `toposolid.set_points` (add, move, remove, lock), `toposolid.info` (area, volume, points, excavation); the window: Massing & Site › Toposolid from a selected model-line loop or a points file (x y z rows). Not built yet: types and layers, the point cap and DWG import, Link Topography, smooth shading, folding-line visibility, the `IfcSite` body, containment in `IfcSite`.
+
 ### 3.11.5 Sub-divisions, split and excavation
 **ID:** ARC-TOPO-002 · **Priority:** P1 · **Ref:** research/02 §1 (2026), §12.2, §12.3 · screenshots/architecture/toposolid_subdivision_road.png · web: Merge Toposurfaces (2016); What's New in Revit Site Planning and Design 2024
 
@@ -13559,10 +13561,12 @@ All family-editor commands from the DM chapter can be used inside the session.
 - `toposolid.merge(toposolid_ids, remove_common_points?: bool = true) -> element_id` returns the surviving toposolid (the first in the list)
 
 **Acceptance criteria.**
-- [ ] A road sub-division with offset −0.3 m over a 100 m² flat region reports an excavation volume of 30 m³.
+- [x] A road sub-division with offset −0.3 m over a 100 m² flat region reports an excavation volume of 30 m³.
 - [ ] A 10 × 10 m basement floor with its top 3 m below a flat terrain removes 300 m³ plus the floor's own volume from the toposolid.
 - [ ] Splitting a toposolid with an open chain and merging the two parts again restores one element with the original GlobalId, the original volume within 0.1%, and no extra points on the former split line.
 - [ ] Merging two toposolids that touch only at a corner, or that use different types, is refused and changes nothing.
+
+**Implementation note (2026-10-15, first build).** As built: `toposolid.subdivide` (a region and an offset): a sub-division's top is its parent's surface clipped to the region and lifted, following the parent; a raised one sits on the parent, a lowered one excavates it through a boolean relation with an `IfcOpeningElement` tool (ARC-MOD-028) and reports its excavation volume; deleting the parent deletes its sub-divisions. The window: Sub-Divide with a model-line loop. Not built yet: sub-division types, IfcRelAggregates, Split and Merge, excavation by floors and pads, Remove Excavation, `IfcEarthworksCut`.
 
 ### 3.11.6 Graded region
 **ID:** ARC-TOPO-003 · **Priority:** P2 · **Ref:** research/02 §12.2
@@ -13583,7 +13587,9 @@ All family-editor commands from the DM chapter can be used inside the session.
 **Commands.** `toposolid.create_graded_region(toposolid_id, mode: Copy|PerimeterOnly) -> element_id` and `toposolid.cut_fill(toposolid_id) -> {cut, fill, net}` *(query)*.
 
 **Acceptance criteria.**
-- [ ] Lowering one interior point by 1 m on a graded copy of a flat 20 × 20 m toposolid, triangulated so that the point's star covers 100 m², reports Cut = 33.33 m³ and Fill = 0.
+- [x] Lowering one interior point by 1 m on a graded copy of a flat 20 × 20 m toposolid, triangulated so that the point's star covers 100 m², reports Cut = 33.33 m³ and Fill = 0.
+
+**Implementation note (2026-10-15, first build).** As built: `toposolid.create_graded_region` (Copy or PerimeterOnly) hides the original and links the copy (`graded_from`); `toposolid.cut_fill` overlays the two surfaces triangle by triangle and integrates Δz exactly, split where it changes sign; the window: Graded Region and Cut/Fill. Not built yet: phases (the original is hidden, not demolished), cut and fill in Properties.
 
 ### 3.11.7 Contours, labels and site settings
 **ID:** ARC-TOPO-004 · **Priority:** P1 · **Ref:** research/02 §1 (2025), §12.2, §12.3 · web: Control Contour Display on Toposolids; Video: Configure Site Settings; Toposurface Settings; Property Line Data Settings
@@ -13620,10 +13626,12 @@ All family-editor commands from the DM chapter can be used inside the session.
 - `site.set_settings(contour_interval?: f64 | None, passing_elevation?, additional_contours?: rows, section_material_id?, poche_base_elevation?, angle_display?: Bearing|Azimuth, angle_units?: DMS|Decimal) -> ()` applies the same values without the dialog.
 
 **Acceptance criteria.**
-- [ ] A plane tilted 10% over 50 m with a 1 m contour interval shows five contours, evenly spaced 10 m apart.
-- [ ] With an interval of 10 m and a passing-through elevation of 5 m, a terrain from −20 m to +20 m shows contours at −15, −5, 5 and 15 m only.
+- [x] A plane tilted 10% over 50 m with a 1 m contour interval shows five contours, evenly spaced 10 m apart.
+- [x] With an interval of 10 m and a passing-through elevation of 5 m, a terrain from −20 m to +20 m shows contours at −15, −5, 5 and 15 m only.
 - [ ] Switching *Angle display* to *Degrees* shows a property-line segment previously listed as N 90°00'00" E as 90°, in the table and in its tag, without changing the geometry.
 - [ ] A Contour Display row with Interval 0 and Range Type Multiple Values blocks OK with an inline error.
+
+**Implementation note (2026-10-15, first build).** As built: contours sliced from the top at the site settings' interval and passing elevation, chained into polylines and drawn in plans (every fifth from the passing elevation heavier); `site.set_settings` (interval, passing elevation; `rxd:site_settings` on the project); the window: Site Settings. Not built yet: the Site Settings dialog's other groups (additional contours, section graphics, property data), per-type contour rows, Label Contours, V/G control.
 
 ### 3.11.8 Simplify surface
 **ID:** ARC-TOPO-005 · **Priority:** P1 · **Ref:** research/02 §1 (2024), §12.2 · web: Simplify Topography
@@ -13650,8 +13658,10 @@ All family-editor commands from the DM chapter can be used inside the session.
 
 **Acceptance criteria.**
 - [ ] Simplifying a 20 000-point terrain to 5 000 points keeps the maximum vertical deviation at or below the reported value, and the boundary is unchanged.
-- [ ] Simplifying with a maximum vertical error of 0 removes only points that lie exactly on the plane of their neighbours, so a perfectly planar terrain is reduced to its boundary vertices plus one point.
-- [ ] Locked survey points are still present after simplifying to the minimum.
+- [x] Simplifying with a maximum vertical error of 0 removes only points that lie exactly on the plane of their neighbours, so a perfectly planar terrain is reduced to its boundary vertices plus one point.
+- [x] Locked survey points are still present after simplifying to the minimum.
+
+**Implementation note (2026-10-15, first build).** As built: `toposolid.simplify` (exactly one of a target point count or a maximum vertical error) removes interior points greedily by the vertical error of re-triangulating without them, keeping boundary and locked points, and reports the remaining count and the deviation measured against the original points; tested on 900 points (the 20 000-point case is not yet timed). The window: Simplify Surface with a point count. Not built yet: the preview overlay, simplifying on import.
 
 ### 3.11.9 Legacy toposurface and building pad
 **ID:** ARC-TOPO-006 · **Priority:** P3 · **Ref:** research/02 §1 (2024), §12.3 · web: Generate a Toposolid from a Toposurface
@@ -13708,8 +13718,10 @@ All family-editor commands from the DM chapter can be used inside the session.
 - `propertyline.to_table(element_id)`
 
 **Acceptance criteria.**
-- [ ] A property line entered as a table with four rows (N 0°E 30 m, N 90°E 20 m, S 0°E 30 m, S 90°W 20 m) closes and reports 600 m².
-- [ ] A tree on a toposolid moves up 1 m when the surface under it is raised 1 m.
+- [x] A property line entered as a table with four rows (N 0°E 30 m, N 90°E 20 m, S 0°E 30 m, S 90°W 20 m) closes and reports 600 m².
+- [x] A tree on a toposolid moves up 1 m when the surface under it is raised 1 m.
+
+**Implementation note (2026-10-15, first build).** As built: `sitecomponent.place` puts a custom object type (ARC-COMP mesh objects) on a toposolid's surface (or a level); it keeps its surface height as the ground changes. `propertyline.create` from points or a table of distances and bearings (N/S … E/W in degrees-minutes-seconds, or an azimuth; lines and arcs with radius and side), an `IfcAnnotation` (`PropertyLine`); a closed line reports its area (`propertyline.area`); drawn dash-dotted in plans. The window: Property Line (a model-line loop or a typed table) and Site Component (pick a type, click in plans). Not built yet: true north, parking components, Pick New Host, Convert to table, property-line tags and the area property, `IfcSite` containment, the 4X3 VEGETATION class.
 
 ---
 

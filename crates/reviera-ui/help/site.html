@@ -1,0 +1,61 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Copyright (C) 2026 Reviera contributors -->
+<h1>Site: toposolids and property lines</h1>
+<p class="lead">A toposolid is solid ground: a triangulated top surface with upright sides and a
+flat bottom. It can be sub-divided into roads and paths, graded with its cut and fill reported,
+and simplified, and trees and other objects stand on it.</p>
+
+<h2 id="toposolid">Making a toposolid</h2>
+<p>Open the plan of the level the site is on and click <b>Massing &amp; Site › Toposolid</b>
+<a href="reviera:action/toposolid.create">Toposolid</a>:</p>
+<ul>
+  <li><b>From a boundary:</b> draw a closed loop of model lines, select it first, and type the
+    ground's height. Points added later shape it.</li>
+  <li><b>From a points file:</b> with nothing selected, pick a CSV, TXT or XYZ file with one
+    point per row (<code>x y z</code> in metres, separated by spaces, tabs or commas; a header row
+    is skipped). The boundary is the points' outline.</li>
+</ul>
+<p>Plans draw contours on toposolids, heavier every fifth, at the interval in <b>Site
+Settings</b> (default 1 m through elevation 0). Toposolids are cut like other elements where
+they rise above the plan's cut plane. <code>toposolid.create</code>,
+<code>toposolid.set_points</code> (add, move, remove or lock points), <code>toposolid.info</code></p>
+
+<h2 id="subdivide">Sub-divisions and excavation</h2>
+<p>Select a toposolid and a closed loop of model lines on it, click <b>Sub-Divide</b>, and type
+its height above the surface. A positive height raises a layer on the ground (a path, a
+planting bed); a negative one excavates it, as for a road: the ground below loses that volume,
+reported as the excavation volume in <code>toposolid.info</code>. Sub-divisions follow the
+ground when its points change. <code>toposolid.subdivide</code></p>
+
+<h2 id="graded">Graded region, cut and fill</h2>
+<ol>
+  <li>Select the existing ground and click <b>Graded Region</b>. Choose to copy every point, or
+    only the boundary's.</li>
+  <li>The existing toposolid is hidden and kept; change the copy's points.</li>
+  <li>Select the copy and click <b>Cut/Fill</b>: the volumes of earth removed and added against
+    the existing ground, and the net.</li>
+</ol>
+<p><code>toposolid.create_graded_region</code>, <code>toposolid.cut_fill</code></p>
+
+<h2 id="simplify">Simplify surface</h2>
+<p>A dense survey makes a slow model. Select the toposolid, click <b>Simplify Surface</b> and type
+how many points to keep. The points that change the surface least go first; boundary and locked
+points always stay, and the status bar says how far the new surface is from the old points at
+most. <code>toposolid.simplify</code> takes a point count or a maximum vertical error.</p>
+
+<h2 id="property">Property lines</h2>
+<p>Click <b>Property Line</b>. With a closed loop of model lines selected it follows them;
+otherwise type a table, one side per row: its distance and its bearing, such as
+<code>30000 N 45°30'00" E</code> (from north or south toward east or west) or an azimuth in
+degrees clockwise from north. A closed line reports its area. Property lines are drawn
+dash-dotted in red. <code>propertyline.create</code> (also arcs: radius and side),
+<code>propertyline.area</code></p>
+
+<h2 id="components">Site components</h2>
+<p>Import a tree, car or bench (<b>Architecture › Component › Import Object</b>), then click <b>Site
+Component</b>, pick it and click in a plan. On a toposolid it stands on the surface and follows
+it when the ground changes. <code>sitecomponent.place</code></p>
+<p class="note">Not yet available: toposolid types and layers, Split and Merge, excavation by
+floors and building pads, DWG import and the point cap, smooth shading, contour labels and
+per-type contour rows, phases for graded regions, parking components, true north for bearings,
+property-line tags and Convert to table.</p>

@@ -538,6 +538,8 @@ impl LocalProject {
                 || recipe_kind == Some(reviera_core::in_place::VOID_RECIPE)
                 || recipe_kind == Some(reviera_core::masses::RECIPE)
                 || recipe_kind == Some(reviera_core::masses::SYSTEM_RECIPE)
+                || recipe_kind == Some(reviera_core::toposolids::RECIPE)
+                || recipe_kind == Some(reviera_core::toposolids::CUT_RECIPE)
             {
                 geometry::remove_breps(&mut self.ifc, step)?;
             }
@@ -1867,6 +1869,12 @@ impl LocalProject {
             reviera_core::in_place::all(store)
                 .into_iter()
                 .map(|(id, _, meshes)| (id, meshes)),
+        );
+        // Toposolids and their excavations (ARC-TOPO-001).
+        all.extend(
+            reviera_core::toposolids::all(store)
+                .into_iter()
+                .map(|(id, _, mesh)| (id, vec![mesh])),
         );
         // Masses and curtain systems by face (ARC-MASS-001, ARC-CW-007).
         all.extend(reviera_core::masses::all(store));

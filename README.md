@@ -387,6 +387,14 @@ Create … Boundary* tab:
   `mass.set_floors`, `mass.floors`, `wall.create_by_face`, `floor.create_by_mass_floor`,
   `roof.create_by_face`, `curtainsystem.create_by_face`, `element.update_to_face`;
   ARC-MASS-001 … 003, ARC-ROOF-003, ARC-CW-007).
+- **Site** (Massing & Site): toposolids from a boundary or a points file, with contours in plans
+  at the site settings' interval; sub-divisions that raise paths or excavate roads (with the
+  excavated volume); graded regions with exact cut and fill; Simplify Surface within a reported
+  vertical error; property lines sketched or typed as distances and bearings, with their area;
+  site components that stand on the ground and follow it (`toposolid.create`,
+  `toposolid.subdivide`, `toposolid.create_graded_region`, `toposolid.cut_fill`,
+  `toposolid.simplify`, `site.set_settings`, `propertyline.create`, `sitecomponent.place`;
+  ARC-TOPO-001 … 005, ARC-SITE-001).
 - **Model In-Place** (Architecture › Model): free-form elements of a chosen category from
   extrusions, blends, revolves and sweeps on work planes, solid or void (voids cut through the
   boolean relations); made in the window from selected model lines (`inplace.create`,
@@ -719,8 +727,9 @@ area by area (a review against the spec on 2026-10-15). Whole areas not started 
   room bounding, TrueType fonts for model text, converting model lines to detail lines
   (ARC-INPL-001, ARC-MTXT-001, ARC-MLIN-001).
 - **Massing and site**: the conceptual design environment, mass voids and families, Show Mass
-  modes; toposolids, sub-divisions and excavation, graded regions, contours, site components,
-  parking and property lines (ARC-MASS-001, ARC-TOPO-001 … 006, ARC-SITE-001).
+  modes; toposolid types and layers, Split and Merge, excavation by floors and pads, DWG
+  import, smooth shading, contour labels, legacy toposurfaces and pads, parking components,
+  true north for bearings (ARC-MASS-001, ARC-TOPO-001 … 006, ARC-SITE-001).
 - **Groups and selection sets**: detail and nested groups, Save/Load Group, saved selections as
   view filters (ARC-GRP-001 … 003, ARC-SEL-002).
 - **Stair annotation**: path and cut mark types, number styles, riser numbers (ARC-STAIR-006).

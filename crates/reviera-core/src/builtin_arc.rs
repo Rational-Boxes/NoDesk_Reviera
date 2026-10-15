@@ -160,6 +160,17 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(CurtainSetPanelType),
         registry.add(CurtainSetLayout),
         registry.add(RoofCreateGlazingType),
+        registry.add(ToposolidCreate),
+        registry.add(ToposolidSetPoints),
+        registry.add(ToposolidSubdivide),
+        registry.add(ToposolidGraded),
+        registry.add(ToposolidSimplify),
+        registry.add(SiteSetSettings),
+        registry.add(PropertyLineCreate),
+        registry.add(SiteComponentPlace),
+        registry.add(ToposolidCutFill),
+        registry.add(ToposolidInfo),
+        registry.add(PropertyLineArea),
         registry.add(MassCreate),
         registry.add(MassAddForm),
         registry.add(MassSetForm),
@@ -2324,6 +2335,127 @@ read_command!(
     crate::masses::MassParams,
     Vec<crate::id::ElementId>,
     |store, p| crate::masses::dependents(store, p)
+);
+
+edit_command!(
+    ToposolidCreate,
+    "toposolid.create",
+    "Create a toposolid",
+    "Solid terrain (ARC-TOPO-001) on a level: a `boundary` (omitted: the points' outline) and `points` (x, y and height above the level), triangulated into its top; `thickness` below its lowest point (default 1 m).",
+    "Toposolid",
+    crate::toposolids::CreateParams,
+    crate::id::ElementId,
+    crate::toposolids::create
+);
+
+edit_command!(
+    ToposolidSetPoints,
+    "toposolid.set_points",
+    "Edit toposolid points",
+    "Adds or moves points (`points`: a point at the same x and y takes the new height), removes points (`remove`) and toggles locks (`lock`).",
+    "Edit Points",
+    crate::toposolids::SetPointsParams,
+    (),
+    crate::toposolids::set_points
+);
+
+edit_command!(
+    ToposolidSubdivide,
+    "toposolid.subdivide",
+    "Sub-divide a toposolid",
+    "A region of a toposolid's surface raised by `offset` (ARC-TOPO-002); negative excavates the toposolid there.",
+    "Sub-Divide",
+    crate::toposolids::SubdivideParams,
+    crate::id::ElementId,
+    crate::toposolids::subdivide
+);
+
+edit_command!(
+    ToposolidGraded,
+    "toposolid.create_graded_region",
+    "Create a graded region",
+    "A copy of a toposolid to grade (ARC-TOPO-003), with all its points (`copy`) or the perimeter's (`perimeter_only`); toposolid.cut_fill measures it against the original.",
+    "Graded Region",
+    crate::toposolids::GradedParams,
+    crate::id::ElementId,
+    crate::toposolids::create_graded
+);
+
+edit_command!(
+    ToposolidSimplify,
+    "toposolid.simplify",
+    "Simplify a toposolid",
+    "Removes interior points that change the surface least, to `target_points` or within `max_vertical_error` (ARC-TOPO-005); reports the points left and the deviation from the original points. Locked points stay.",
+    "Simplify",
+    crate::toposolids::SimplifyParams,
+    crate::toposolids::Simplified,
+    crate::toposolids::simplify
+);
+
+edit_command!(
+    SiteSetSettings,
+    "site.set_settings",
+    "Set site settings",
+    "Contours every `contour_interval` metres, passing through `passing_elevation` (ARC-TOPO-004).",
+    "Site Settings",
+    crate::toposolids::SettingsParams,
+    (),
+    crate::toposolids::set_settings
+);
+
+edit_command!(
+    PropertyLineCreate,
+    "propertyline.create",
+    "Create a property line",
+    "A property line (ARC-SITE-001) sketched as `points`, or a `table` of rows (distance, bearing like N 45°30'00\" E or an azimuth, line or arc with radius and side L or R) from `origin`; reports its area when it closes.",
+    "Property Line",
+    crate::property_lines::CreateParams,
+    crate::property_lines::Created,
+    crate::property_lines::create
+);
+
+edit_command!(
+    SiteComponentPlace,
+    "sitecomponent.place",
+    "Place a site component",
+    "A component (tree, bench, car) at `point`, standing on a toposolid (`host_id`, following its surface) or the level.",
+    "Site Component",
+    crate::toposolids::SiteComponentParams,
+    crate::id::ElementId,
+    crate::toposolids::place_component
+);
+
+read_command!(
+    ToposolidCutFill,
+    "toposolid.cut_fill",
+    "Cut and fill",
+    "A graded region's cut, fill and net against its original (m³), exact for the triangulated surfaces.",
+    [Effect::Read],
+    crate::toposolids::IdParams,
+    crate::toposolids::CutFill,
+    |store, p| crate::toposolids::cut_fill_of(store, p)
+);
+
+read_command!(
+    ToposolidInfo,
+    "toposolid.info",
+    "Toposolid figures",
+    "Its surface area in plan, volume, point count and (sub-divisions) excavated volume.",
+    [Effect::Read],
+    crate::toposolids::IdParams,
+    crate::toposolids::TopoInfo,
+    |store, p| crate::toposolids::info(store, p)
+);
+
+read_command!(
+    PropertyLineArea,
+    "propertyline.area",
+    "A property line's area",
+    "Its area if it closes (m²).",
+    [Effect::Read],
+    crate::property_lines::AreaParams,
+    Option<f64>,
+    |store, p| crate::property_lines::area_of(store, p)
 );
 
 edit_command!(

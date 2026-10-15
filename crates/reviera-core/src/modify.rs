@@ -295,6 +295,18 @@ pub fn transform(
             };
             crate::model_lines::transform(txn, target, &|p| x.point(p), dz)?;
             out.push(target);
+        } else if crate::toposolids::recipe(e).is_some() {
+            let target = if copy { txn.create(copied(e))? } else { id };
+            let dz = match x {
+                Xform::Translate(v) => v[2],
+                _ => 0.0,
+            };
+            crate::toposolids::transform(txn, target, &|p| x.point(p), dz)?;
+            out.push(target);
+        } else if crate::property_lines::recipe(e).is_some() {
+            let target = if copy { txn.create(copied(e))? } else { id };
+            crate::property_lines::transform(txn, target, &|p| x.point(p))?;
+            out.push(target);
         } else if crate::masses::recipe(e).is_some() {
             let target = if copy { txn.create(copied(e))? } else { id };
             let dz = match x {

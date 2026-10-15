@@ -983,6 +983,54 @@ icon = "update_face"
 help = "Walls, roofs and curtain systems made by face take their mass faces as they are now"
 
 [[action]]
+id = "toposolid.create"
+label = "Toposolid"
+icon = "toposolid"
+help = "Ground from a selected closed loop of model lines at a typed height, or from a points file (x y z rows)"
+
+[[action]]
+id = "toposolid.subdivide"
+label = "Sub-Divide"
+icon = "topo_subdivide"
+help = "A region of the selected toposolid inside a selected loop of model lines: raised, or excavated with a negative height"
+
+[[action]]
+id = "toposolid.create_graded_region"
+label = "Graded Region"
+icon = "topo_graded"
+help = "A graded copy of the selected toposolid to reshape; the existing one is hidden and kept for Cut/Fill"
+
+[[action]]
+id = "toposolid.cut_fill"
+label = "Cut/Fill"
+icon = "topo_cut_fill"
+help = "The cut and fill of the selected graded toposolid against the existing ground"
+
+[[action]]
+id = "toposolid.simplify"
+label = "Simplify Surface"
+icon = "topo_simplify"
+help = "Fewer points on the selected toposolid, keeping its boundary; reports how far the surface moved"
+
+[[action]]
+id = "site.set_settings"
+label = "Site Settings"
+icon = "site_settings"
+help = "The contour interval and the elevation contours pass through"
+
+[[action]]
+id = "propertyline.create"
+label = "Property Line"
+icon = "property_line"
+help = "A property line from a selected closed loop of model lines, or a table of distances and bearings; reports its area"
+
+[[action]]
+id = "sitecomponent.place"
+label = "Site Component"
+icon = "site_component"
+help = "Place an imported tree, car or other object on the ground; it follows the toposolid under it"
+
+[[action]]
 id = "stair.number_treads"
 label = "Number Treads"
 icon = "tread_numbers"
@@ -1464,6 +1512,22 @@ tools = [
   { action = "curtainsystem.create_by_face", size = "large" },
   { action = "element.update_to_face", size = "large" },
 ]
+
+[[tab.panel]]
+label = "Model Site"
+tools = [
+  { action = "toposolid.create", size = "large" },
+  { action = "toposolid.subdivide", size = "large" },
+  { action = "toposolid.create_graded_region", size = "large" },
+  { action = "toposolid.cut_fill", size = "small" },
+  { action = "toposolid.simplify", size = "small" },
+  { action = "site.set_settings", size = "small" },
+  { action = "sitecomponent.place", size = "large" },
+]
+
+[[tab.panel]]
+label = "Property Line"
+tools = [{ action = "propertyline.create", size = "large" }]
 
 [[tab]]
 id = "annotate"
