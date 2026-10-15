@@ -141,7 +141,9 @@ fn cross(a: V3, b: V3) -> V3 {
 }
 
 fn norm(a: V3) -> V3 {
-    let l = (a[0] * a[0] + a[1] * a[1] + a[2] * a[2]).sqrt().max(f64::EPSILON);
+    let l = (a[0] * a[0] + a[1] * a[1] + a[2] * a[2])
+        .sqrt()
+        .max(f64::EPSILON);
     mul(a, 1.0 / l)
 }
 
@@ -161,10 +163,15 @@ fn boxed(o: V3, a: V3, b: V3, c: V3) -> Mesh {
         p(1.0, 1.0, 0.0),
         p(0.0, 1.0, 0.0),
     ];
-    pts.extend([p(0.0, 0.0, 1.0), p(1.0, 0.0, 1.0), p(1.0, 1.0, 1.0), p(0.0, 1.0, 1.0)]);
+    pts.extend([
+        p(0.0, 0.0, 1.0),
+        p(1.0, 0.0, 1.0),
+        p(1.0, 1.0, 1.0),
+        p(0.0, 1.0, 1.0),
+    ]);
     let idx = vec![
-        0, 2, 1, 0, 3, 2, 4, 5, 6, 4, 6, 7, 0, 1, 5, 0, 5, 4, 1, 2, 6, 1, 6, 5, 2, 3, 7, 2, 7, 6, 3, 0,
-        4, 3, 4, 7,
+        0, 2, 1, 0, 3, 2, 4, 5, 6, 4, 6, 7, 0, 1, 5, 0, 5, 4, 1, 2, 6, 1, 6, 5, 2, 3, 7, 2, 7, 6,
+        3, 0, 4, 3, 4, 7,
     ];
     (pts, idx)
 }
@@ -224,7 +231,11 @@ fn frame_on(r: &SkylightRecipe, face: &RoofFace, thickness: f64) -> Frame {
     // Up the slope: the steepest ascent in the face's plane.
     let horiz = norm([-n[0], -n[1], 0.0]);
     let along = norm(cross(cross(n, horiz), n));
-    let along = if along[2] < 0.0 { mul(along, -1.0) } else { along };
+    let along = if along[2] < 0.0 {
+        mul(along, -1.0)
+    } else {
+        along
+    };
     let across = norm(cross(n, along));
     Frame {
         o: [p[0], p[1], z_top],
@@ -289,7 +300,10 @@ pub fn regenerate(store: &Store, e: &Element) -> Result<SkylightGeometry> {
         .ok_or_else(|| Error::new("skylight.no_roof", "the skylight's roof no longer exists"))?;
     let g = crate::roofs::regenerate(store, roof)?;
     let face = g.face_at(r.center).ok_or_else(|| {
-        Error::new("skylight.off_roof", "the skylight is not over its roof any more")
+        Error::new(
+            "skylight.off_roof",
+            "the skylight is not over its roof any more",
+        )
     })?;
     let f = frame_on(&r, face, g.thickness);
     if f.flat != r.style.on_flat_roofs() {
@@ -310,16 +324,20 @@ fn build(r: &SkylightRecipe, f: &Frame) -> SkylightGeometry {
     let corner = add(add(f.o, mul(f.along, -l / 2.0)), mul(f.across, -w / 2.0));
     let mut parts: Vec<(Mesh, bool)> = Vec::new();
     // The frame (roof window) or curb (flat roofs): four bars round the opening, outward.
-    let (h, base) = if f.flat {
-        (r.curb, 0.0)
-    } else {
-        (0.12, -0.02)
-    };
+    let (h, base) = if f.flat { (r.curb, 0.0) } else { (0.12, -0.02) };
     let o = add(corner, mul(f.up, base));
     let bars = [
         (o, mul(f.along, l), mul(f.across, FRAME)),
-        (add(o, mul(f.across, w - FRAME)), mul(f.along, l), mul(f.across, FRAME)),
-        (add(o, mul(f.across, FRAME)), mul(f.along, FRAME), mul(f.across, w - 2.0 * FRAME)),
+        (
+            add(o, mul(f.across, w - FRAME)),
+            mul(f.along, l),
+            mul(f.across, FRAME),
+        ),
+        (
+            add(o, mul(f.across, FRAME)),
+            mul(f.along, FRAME),
+            mul(f.across, w - 2.0 * FRAME),
+        ),
         (
             add(add(o, mul(f.across, FRAME)), mul(f.along, l - FRAME)),
             mul(f.along, FRAME),
@@ -330,7 +348,12 @@ fn build(r: &SkylightRecipe, f: &Frame) -> SkylightGeometry {
         parts.push((boxed(p, a, b, mul(f.up, h - base)), false));
     }
     let top = add(corner, mul(f.up, h));
-    let at = |i: f64, j: f64, k: f64| add(add(add(top, mul(f.along, i)), mul(f.across, j)), mul(f.up, k));
+    let at = |i: f64, j: f64, k: f64| {
+        add(
+            add(add(top, mul(f.along, i)), mul(f.across, j)),
+            mul(f.up, k),
+        )
+    };
     let mut panes = 1;
     match r.style {
         SkylightStyle::RoofWindow | SkylightStyle::Flat => {
@@ -345,7 +368,12 @@ fn build(r: &SkylightRecipe, f: &Frame) -> SkylightGeometry {
         SkylightStyle::Pyramid => {
             let rise = r.pitch.tan() * w.min(l) / 2.0;
             let apex = at(l / 2.0, w / 2.0, rise);
-            let c = [at(0.0, 0.0, 0.0), at(l, 0.0, 0.0), at(l, w, 0.0), at(0.0, w, 0.0)];
+            let c = [
+                at(0.0, 0.0, 0.0),
+                at(l, 0.0, 0.0),
+                at(l, w, 0.0),
+                at(0.0, w, 0.0),
+            ];
             for i in 0..4 {
                 parts.push((sheet(&[c[i], c[(i + 1) % 4], apex], GLASS), true));
             }
@@ -356,14 +384,35 @@ fn build(r: &SkylightRecipe, f: &Frame) -> SkylightGeometry {
             let rise = r.pitch.tan() * w / 2.0;
             let ridge = |i: f64| at(i, w / 2.0, rise);
             for k in 0..panes {
-                let (i0, i1) = (l * k as f64 / panes as f64, l * (k + 1) as f64 / panes as f64);
+                let (i0, i1) = (
+                    l * k as f64 / panes as f64,
+                    l * (k + 1) as f64 / panes as f64,
+                );
                 // The two slopes of this bay.
-                parts.push((sheet(&[at(i0, 0.0, 0.0), at(i1, 0.0, 0.0), ridge(i1), ridge(i0)], GLASS), true));
-                parts.push((sheet(&[at(i1, w, 0.0), at(i0, w, 0.0), ridge(i0), ridge(i1)], GLASS), true));
+                parts.push((
+                    sheet(
+                        &[at(i0, 0.0, 0.0), at(i1, 0.0, 0.0), ridge(i1), ridge(i0)],
+                        GLASS,
+                    ),
+                    true,
+                ));
+                parts.push((
+                    sheet(
+                        &[at(i1, w, 0.0), at(i0, w, 0.0), ridge(i0), ridge(i1)],
+                        GLASS,
+                    ),
+                    true,
+                ));
             }
             // Glazed gable ends.
-            parts.push((sheet(&[at(0.0, w, 0.0), at(0.0, 0.0, 0.0), ridge(0.0)], GLASS), true));
-            parts.push((sheet(&[at(l, 0.0, 0.0), at(l, w, 0.0), ridge(l)], GLASS), true));
+            parts.push((
+                sheet(&[at(0.0, w, 0.0), at(0.0, 0.0, 0.0), ridge(0.0)], GLASS),
+                true,
+            ));
+            parts.push((
+                sheet(&[at(l, 0.0, 0.0), at(l, w, 0.0), ridge(l)], GLASS),
+                true,
+            ));
             // Glazing bars: rafters between the panes and at the ends, the ridge, the eaves.
             let bar = 0.04;
             let slope_len = (w / 2.0).hypot(rise);
@@ -380,7 +429,12 @@ fn build(r: &SkylightRecipe, f: &Frame) -> SkylightGeometry {
                 }
             }
             parts.push((
-                boxed(add(ridge(0.0), mul(f.across, -bar / 2.0)), mul(f.along, l), mul(f.across, bar), mul(f.up, bar)),
+                boxed(
+                    add(ridge(0.0), mul(f.across, -bar / 2.0)),
+                    mul(f.along, l),
+                    mul(f.across, bar),
+                    mul(f.up, bar),
+                ),
                 false,
             ));
         }
@@ -460,7 +514,11 @@ fn resolve_roof(store: &Store, r: &ElementRef) -> Result<ElementId> {
     }
 }
 
-fn write_and_check(txn: &mut crate::txn::Transaction<'_>, id: ElementId, r: &SkylightRecipe) -> Result<()> {
+fn write_and_check(
+    txn: &mut crate::txn::Transaction<'_>,
+    id: ElementId,
+    r: &SkylightRecipe,
+) -> Result<()> {
     check(r)?;
     let value = serde_json::to_value(r).expect("serialises");
     txn.modify(id, |e| {
@@ -470,7 +528,9 @@ fn write_and_check(txn: &mut crate::txn::Transaction<'_>, id: ElementId, r: &Sky
     regenerate(&store, store.get(id).expect("exists"))?;
     // It must cut the roof (inside one face, clear of the other openings): no more openings are
     // left uncut than without it.
-    let roof = find(&store, &r.roof).and_then(|i| store.get(i)).expect("checked");
+    let roof = find(&store, &r.roof)
+        .and_then(|i| store.get(i))
+        .expect("checked");
     let with = crate::roofs::regenerate(&store, roof)?.uncut;
     let mut without = store.clone();
     without.remove(id);
@@ -553,7 +613,10 @@ pub(crate) fn set(txn: &mut crate::txn::Transaction<'_>, p: SetParams) -> Result
             .resolve(r)
             .ok_or_else(|| Error::new("element.not_found", "no such skylight"))?;
         let mut s = skylight_recipe(store.get(id).expect("resolved")).ok_or_else(|| {
-            Error::new("skylight.not_reviera", format!("element {id} is not a Reviera skylight"))
+            Error::new(
+                "skylight.not_reviera",
+                format!("element {id} is not a Reviera skylight"),
+            )
         })?;
         crate::modify::check_unpinned(&store, id)?;
         if let Some(v) = p.point {
@@ -648,7 +711,10 @@ mod tests {
         assert_eq!(build(&r(0.9), &f).panes, 1);
         // Glass: two slopes per pane and two gable ends.
         let g = build(&r(3.6), &f);
-        assert_eq!(g.parts.iter().filter(|(_, glass)| *glass).count(), 4 * 2 + 2);
+        assert_eq!(
+            g.parts.iter().filter(|(_, glass)| *glass).count(),
+            4 * 2 + 2
+        );
         // Every part is closed and faces out (a positive volume), in every style.
         for style in SkylightStyle::ALL {
             let mut s = r(2.0);
@@ -658,7 +724,8 @@ mod tests {
                     .1
                     .chunks(3)
                     .map(|t| {
-                        let [a, b, c] = [m.0[t[0] as usize], m.0[t[1] as usize], m.0[t[2] as usize]];
+                        let [a, b, c] =
+                            [m.0[t[0] as usize], m.0[t[1] as usize], m.0[t[2] as usize]];
                         (a[0] * (b[1] * c[2] - b[2] * c[1]) - a[1] * (b[0] * c[2] - b[2] * c[0])
                             + a[2] * (b[0] * c[1] - b[1] * c[0]))
                             / 6.0

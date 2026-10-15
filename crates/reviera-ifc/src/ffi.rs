@@ -56,6 +56,21 @@ pub(crate) mod bridge {
         fn set_ref_list(self: Pin<&mut Model>, id: u32, attr: &str, targets: &[u32]) -> Result<()>;
         fn set_real_list(self: Pin<&mut Model>, id: u32, attr: &str, values: &[f64]) -> Result<()>;
         fn set_int_list(self: Pin<&mut Model>, id: u32, attr: &str, values: &[i32]) -> Result<()>;
+        /// A list of lists, given flat with each inner list's length.
+        fn set_real_list_list(
+            self: Pin<&mut Model>,
+            id: u32,
+            attr: &str,
+            values: &[f64],
+            lengths: &[u32],
+        ) -> Result<()>;
+        fn set_int_list_list(
+            self: Pin<&mut Model>,
+            id: u32,
+            attr: &str,
+            values: &[i32],
+            lengths: &[u32],
+        ) -> Result<()>;
         fn set_typed_string(
             self: Pin<&mut Model>,
             id: u32,

@@ -34,6 +34,8 @@ pub mod inserts;
 pub mod inspect;
 pub mod levels;
 pub mod measure;
+pub mod mesh_io;
+pub mod mesh_objects;
 pub mod modify;
 pub mod notes;
 pub mod origin;

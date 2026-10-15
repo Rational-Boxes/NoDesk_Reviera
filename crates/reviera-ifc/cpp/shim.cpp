@@ -400,6 +400,32 @@ void Model::set_int_list(std::uint32_t id, rust::Str attr, rust::Slice<const std
     inst->set_attribute_value(attr_index(inst, attr), std::vector<int>(values.begin(), values.end()));
 }
 
+// Splits `values` into inner lists of `lengths`.
+template <typename T, typename S>
+static std::vector<std::vector<T>> nested(rust::Slice<const S> values, rust::Slice<const std::uint32_t> lengths) {
+    std::vector<std::vector<T>> out;
+    out.reserve(lengths.size());
+    std::size_t at = 0;
+    for (auto n : lengths) {
+        if (at + n > values.size()) throw std::runtime_error("list of lists: lengths exceed the values");
+        out.emplace_back(values.begin() + at, values.begin() + at + n);
+        at += n;
+    }
+    return out;
+}
+
+void Model::set_real_list_list(std::uint32_t id, rust::Str attr, rust::Slice<const double> values,
+                               rust::Slice<const std::uint32_t> lengths) {
+    auto* inst = instance(*file_, id);
+    inst->set_attribute_value(attr_index(inst, attr), nested<double>(values, lengths));
+}
+
+void Model::set_int_list_list(std::uint32_t id, rust::Str attr, rust::Slice<const std::int32_t> values,
+                              rust::Slice<const std::uint32_t> lengths) {
+    auto* inst = instance(*file_, id);
+    inst->set_attribute_value(attr_index(inst, attr), nested<int>(values, lengths));
+}
+
 void Model::set_typed_string(std::uint32_t id, rust::Str attr, rust::Str type_name, rust::Str value) {
     auto* inst = instance(*file_, id);
     inst->set_attribute_value(attr_index(inst, attr), typed_value(*file_, type_name, str(value)));

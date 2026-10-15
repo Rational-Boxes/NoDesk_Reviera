@@ -314,6 +314,31 @@ impl IfcModel {
                     }
                 }) {
                     m.set_real_list(id.0, name, &reals)?
+                } else if items.iter().all(|v| matches!(v, AttrValue::List(_))) {
+                    // A list of lists of numbers (coordinate lists, triangle indices).
+                    let rows: Vec<&[AttrValue]> = items
+                        .iter()
+                        .filter_map(|v| match v {
+                            AttrValue::List(r) => Some(r.as_slice()),
+                            _ => None,
+                        })
+                        .collect();
+                    let lengths: Vec<u32> = rows.iter().map(|r| r.len() as u32).collect();
+                    let flat: Vec<AttrValue> =
+                        rows.iter().flat_map(|r| r.iter().cloned()).collect();
+                    if let Some(ints) = all(&flat, |v| match v {
+                        AttrValue::Int(i) => i32::try_from(*i).ok(),
+                        _ => None,
+                    }) {
+                        m.set_int_list_list(id.0, name, &ints, &lengths)?
+                    } else if let Some(reals) = all(&flat, |v| match v {
+                        AttrValue::Real(r) => Some(*r),
+                        _ => None,
+                    }) {
+                        m.set_real_list_list(id.0, name, &reals, &lengths)?
+                    } else {
+                        return Err(unsupported());
+                    }
                 } else {
                     return Err(unsupported());
                 }

@@ -45,6 +45,10 @@ public:
     void set_ref_list(std::uint32_t id, rust::Str attr, rust::Slice<const std::uint32_t> targets);
     void set_real_list(std::uint32_t id, rust::Str attr, rust::Slice<const double> values);
     void set_int_list(std::uint32_t id, rust::Str attr, rust::Slice<const std::int32_t> values);
+    void set_real_list_list(std::uint32_t id, rust::Str attr, rust::Slice<const double> values,
+                            rust::Slice<const std::uint32_t> lengths);
+    void set_int_list_list(std::uint32_t id, rust::Str attr, rust::Slice<const std::int32_t> values,
+                           rust::Slice<const std::uint32_t> lengths);
     void set_typed_string(std::uint32_t id, rust::Str attr, rust::Str type_name, rust::Str value);
     void set_typed_real(std::uint32_t id, rust::Str attr, rust::Str type_name, double value);
     void set_typed_int(std::uint32_t id, rust::Str attr, rust::Str type_name, std::int32_t value);

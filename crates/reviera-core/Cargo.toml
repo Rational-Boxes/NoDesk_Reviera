@@ -19,6 +19,8 @@ jsonschema.workspace = true
 imbl.workspace = true
 earcut.workspace = true
 i_overlay.workspace = true
+base64.workspace = true
+sha2.workspace = true
 
 [dev-dependencies]
 schemars.workspace = true

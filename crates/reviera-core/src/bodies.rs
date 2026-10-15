@@ -262,7 +262,16 @@ pub fn all(store: &Store) -> Vec<Body> {
     }
     for (id, g) in crate::skylights::all(store) {
         for (mesh, glass) in g.parts {
-            push(id, if glass { "IfcWindow:glass" } else { "IfcWindow:metal" }, mesh, false);
+            push(
+                id,
+                if glass {
+                    "IfcWindow:glass"
+                } else {
+                    "IfcWindow:metal"
+                },
+                mesh,
+                false,
+            );
         }
     }
     for (id, g) in crate::ramps::all(store) {
@@ -284,6 +293,22 @@ pub fn all(store: &Store) -> Vec<Body> {
     }
     for (id, g) in crate::columns::all(store) {
         push(id, "IfcColumn", g.mesh(), false);
+    }
+    // Custom objects (DM-IMP-015): one part per material slot, in its colour.
+    for (id, g) in crate::mesh_objects::all(store) {
+        let class = g.ty.category.class();
+        for (slot, mesh) in g.slot_meshes() {
+            let color =
+                g.ty.slots
+                    .get(slot)
+                    .map_or([0.78, 0.78, 0.78, 1.0], |s| s.color);
+            push(
+                id,
+                &format!("{class}:{}", crate::mesh_objects::color_hex(color)),
+                mesh,
+                false,
+            );
+        }
     }
     for (id, g) in crate::stairs::all(store) {
         for mesh in g.runs.into_iter().chain(g.landings) {

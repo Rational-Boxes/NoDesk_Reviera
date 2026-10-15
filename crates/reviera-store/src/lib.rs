@@ -10,6 +10,7 @@ mod geometry;
 mod grids;
 mod local;
 mod materials;
+mod mesh_objects;
 pub mod params;
 mod psets;
 mod spatial;

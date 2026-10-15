@@ -371,10 +371,30 @@ fn ray_triangle(origin: Vec3, dir: Vec3, a: Vec3, b: Vec3, c: Vec3) -> Option<f3
 /// The selection highlight colour.
 pub const HIGHLIGHT: [f32; 4] = [0.15, 0.45, 0.95, 1.0];
 
+/// `rrggbb` or `rrggbbaa` as RGBA 0–1.
+fn parse_hex(hex: &str) -> Option<[f32; 4]> {
+    let b = |i: usize| {
+        u8::from_str_radix(hex.get(i..i + 2)?, 16)
+            .ok()
+            .map(|v| v as f32 / 255.0)
+    };
+    match hex.len() {
+        6 => Some([b(0)?, b(2)?, b(4)?, 1.0]),
+        8 => Some([b(0)?, b(2)?, b(4)?, b(6)?]),
+        _ => None,
+    }
+}
+
 /// Default display colours by IFC class, until object styles and materials drive them.
 pub fn class_color(class: &str) -> [f32; 4] {
     // A part's material after the class (`IfcDoor:glass`).
     let (class, material) = class.split_once(':').unwrap_or((class, ""));
+    // An explicit colour (`IfcFurniture:#rrggbbaa`): a custom object's material slot.
+    if let Some(hex) = material.strip_prefix('#')
+        && let Some(c) = parse_hex(hex)
+    {
+        return c;
+    }
     match material.split('/').next().unwrap_or("") {
         "glass" => return [0.62, 0.80, 0.92, 0.35],
         "metal" => return [0.66, 0.68, 0.71, 1.0],

@@ -59,6 +59,13 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(MeasureAlong),
         registry.add(SkylightCreate),
         registry.add(SkylightSet),
+        registry.add(MeshObjectInspect),
+        registry.add(MeshObjectImport),
+        registry.add(MeshObjectReload),
+        registry.add(MeshObjectPlace),
+        registry.add(MeshObjectSet),
+        registry.add(MeshObjectSetType),
+        registry.add(MeshObjectTypes),
     ];
     for r in results {
         r.expect("architecture commands are valid");
@@ -392,4 +399,91 @@ edit_command!(
     crate::skylights::SetParams,
     (),
     crate::skylights::set
+);
+
+read_command!(
+    MeshObjectInspect,
+    "mesh_object.inspect",
+    "Inspect a mesh file",
+    "Reads a mesh file (OBJ with its MTL, STL, PLY, glTF, GLB) with import `options` (units, up axis, \
+     insertion point, clean-up) and reports what it holds without importing it (DM-IMP-015): format, \
+     triangles, vertices, materials, its size in metres, the units and up axis used and whether the file \
+     stated them, open and non-manifold edges and whether it is a closed solid.",
+    crate::mesh_objects::InspectParams,
+    crate::mesh_objects::Report,
+    crate::mesh_objects::inspect
+);
+
+edit_command!(
+    MeshObjectImport,
+    "mesh_object.import",
+    "Import a mesh as a custom object type",
+    "Imports a mesh file (OBJ, STL, PLY, glTF, GLB) as a custom object type (DM-IMP-015): the mesh is \
+     stored once in the type, in metres and Z up, with its insertion point (bottom centre by default) at \
+     the origin; each material becomes a slot with its colour. `category` (generic_model, furniture, \
+     column, plumbing_fixture, lighting_fixture, planting) decides the IFC classes. Meshes above \
+     1,000,000 triangles need `allow_large`; above 5,000,000 they are refused. Returns the type; place \
+     copies with mesh_object.place.",
+    "Import Object",
+    crate::mesh_objects::ImportParams,
+    ElementId,
+    crate::mesh_objects::import
+);
+
+edit_command!(
+    MeshObjectReload,
+    "mesh_object.reload",
+    "Reload a custom object type from its file",
+    "Re-reads a custom object type's mesh from its source file, or from `path`, with its own or new \
+     import `options`. Every copy changes; slot colours are kept where slot names still match.",
+    "Reload from File",
+    crate::mesh_objects::ReloadParams,
+    (),
+    crate::mesh_objects::reload
+);
+
+edit_command!(
+    MeshObjectPlace,
+    "mesh_object.place",
+    "Place a custom object",
+    "Places a copy of a custom object type at plan `point` on `level`, `offset` above it, turned by \
+     `rotation` and optionally mirrored. Copies share the type's mesh. Returns the copy.",
+    "Place Object",
+    crate::mesh_objects::PlaceParams,
+    ElementId,
+    crate::mesh_objects::place
+);
+
+edit_command!(
+    MeshObjectSet,
+    "mesh_object.set",
+    "Change custom objects",
+    "Changes custom objects' point, level, offset, rotation or mirror; omitted values are kept.",
+    "Edit Object",
+    crate::mesh_objects::SetParams,
+    (),
+    crate::mesh_objects::set
+);
+
+edit_command!(
+    MeshObjectSetType,
+    "mesh_object.set_type",
+    "Change a custom object type",
+    "Changes a custom object type's name, uniform `scale` (every copy) and slot colours, and its \
+     `category` while it has no copies.",
+    "Edit Object Type",
+    crate::mesh_objects::SetTypeParams,
+    (),
+    crate::mesh_objects::set_type
+);
+
+read_command!(
+    MeshObjectTypes,
+    "mesh_object.types",
+    "List custom object types",
+    "The project's custom object types: name, category, triangles, size, scale, material slots, source \
+     file and how many copies each has.",
+    crate::mesh_objects::TypesParams,
+    Vec<crate::mesh_objects::TypeInfo>,
+    crate::mesh_objects::list_types
 );

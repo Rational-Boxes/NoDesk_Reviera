@@ -539,6 +539,12 @@ impl LocalProject {
             if recipe_kind == Some(rooms::ROOM_RECIPE) {
                 geometry::remove_slab(&mut self.ifc, step)?;
             }
+            if recipe_kind == Some(reviera_core::mesh_objects::RECIPE) {
+                crate::mesh_objects::remove_copy_geometry(&mut self.ifc, step)?;
+            }
+            if recipe_kind == Some(reviera_core::mesh_objects::TYPE_RECIPE) {
+                crate::mesh_objects::remove_type_geometry(&mut self.ifc, step)?;
+            }
             // The element's own property and quantity sets go with it.
             params::remove_all(&mut self.ifc, &mut self.sets, step)?;
             self.types.remove(&step);
@@ -697,6 +703,14 @@ impl LocalProject {
             self.write_columns(doc)?;
             self.write_ramps(doc)?;
             self.write_skylights(doc)?;
+            let owner_history = self.new_owner_history()?;
+            crate::mesh_objects::write_mesh_objects(
+                &mut self.ifc,
+                doc,
+                &self.steps,
+                owner_history,
+                self.length_scale,
+            )?;
             let owner_history = self.new_owner_history()?;
             crate::curtains::write_curtains(
                 &mut self.ifc,

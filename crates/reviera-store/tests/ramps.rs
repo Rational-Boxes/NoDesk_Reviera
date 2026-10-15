@@ -20,9 +20,8 @@ fn a_ramp_with_landings_its_warning_ifc_and_measures() {
     let path = dir.path().join("r.ifc");
     let (mut project, mut doc) = LocalProject::new(Schema::Ifc4, &path).unwrap();
     let r = registry();
-    let exec = |doc: &mut Document, name: &str, args: Value| {
-        r.execute(doc, name, args, &Caller::user())
-    };
+    let exec =
+        |doc: &mut Document, name: &str, args: Value| r.execute(doc, name, args, &Caller::user());
     let l1 = doc
         .store()
         .iter()

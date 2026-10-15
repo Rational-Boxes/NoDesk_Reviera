@@ -71,7 +71,8 @@ impl Default for RampType {
 
 pub fn ramp_type(e: &Element) -> Option<RampType> {
     let v = e.param(RECIPE_KEY)?;
-    (v.get("kind")?.as_str()? == RAMP_TYPE_RECIPE).then(|| serde_json::from_value(v.clone()).ok())?
+    (v.get("kind")?.as_str()? == RAMP_TYPE_RECIPE)
+        .then(|| serde_json::from_value(v.clone()).ok())?
 }
 
 /// The stored recipe of a ramp.
@@ -131,8 +132,9 @@ impl RampGeometry {
             RampShape::Thick => (z - self.ty.thickness).max(self.z0 - self.ty.thickness),
             RampShape::Solid => self.z0 - self.ty.thickness.min(0.05),
         };
-        let mut positions: Vec<[f64; 3]> =
-            (0..4).map(|i| [p.corners[i][0], p.corners[i][1], bottom(p.z[i])]).collect();
+        let mut positions: Vec<[f64; 3]> = (0..4)
+            .map(|i| [p.corners[i][0], p.corners[i][1], bottom(p.z[i])])
+            .collect();
         positions.extend((0..4).map(|i| [p.corners[i][0], p.corners[i][1], p.z[i]]));
         let indices = vec![
             0, 2, 1, 0, 3, 2, // bottom
@@ -168,7 +170,10 @@ pub fn layout(
     ty: &RampType,
 ) -> Result<(Vec<RampPiece>, f64)> {
     if path.len() < 2 {
-        return Err(Error::new("ramp.bad_path", "a ramp needs at least two points"));
+        return Err(Error::new(
+            "ramp.bad_path",
+            "a ramp needs at least two points",
+        ));
     }
     let half = width / 2.0;
     // Each segment's usable run: less half a landing at each corner.
@@ -256,7 +261,12 @@ pub fn layout(
                 let z1 = z + len * slope;
                 pieces.push(RampPiece {
                     landing: false,
-                    corners: [at(a, n, -half), at(b, n, -half), at(b, n, half), at(a, n, half)],
+                    corners: [
+                        at(a, n, -half),
+                        at(b, n, -half),
+                        at(b, n, half),
+                        at(a, n, half),
+                    ],
                     z: [z, z1, z1, z],
                 });
                 z = z1;
@@ -389,7 +399,10 @@ pub(crate) fn create(txn: &mut crate::txn::Transaction<'_>, p: CreateParams) -> 
     };
     let width = p.width.unwrap_or(1.2);
     if !(0.3..=20.0).contains(&width) {
-        return Err(Error::new("ramp.bad_width", "the width must be between 0.3 m and 20 m"));
+        return Err(Error::new(
+            "ramp.bad_width",
+            "the width must be between 0.3 m and 20 m",
+        ));
     }
     let store = txn.store().clone();
     let extent = Extent::from_args(
@@ -410,7 +423,10 @@ pub(crate) fn create(txn: &mut crate::txn::Transaction<'_>, p: CreateParams) -> 
         NewElement::new("IfcRamp")
             .param("@PredefinedType", "STRAIGHT_RUN_RAMP")
             .param("@type", guid)
-            .param(RECIPE_KEY, serde_json::to_value(&recipe).expect("serialises")),
+            .param(
+                RECIPE_KEY,
+                serde_json::to_value(&recipe).expect("serialises"),
+            ),
     )?;
     warn_if_steep(txn, id)?;
     Ok(id)
@@ -439,7 +455,10 @@ pub(crate) fn set(txn: &mut crate::txn::Transaction<'_>, p: SetParams) -> Result
             .resolve(r)
             .ok_or_else(|| Error::new("element.not_found", "no such ramp"))?;
         let mut rr = ramp_recipe(store.get(id).expect("resolved")).ok_or_else(|| {
-            Error::new("ramp.not_reviera", format!("element {id} is not a Reviera ramp"))
+            Error::new(
+                "ramp.not_reviera",
+                format!("element {id} is not a Reviera ramp"),
+            )
         })?;
         crate::modify::check_unpinned(&store, id)?;
         if let Some(path) = &p.path {
@@ -447,23 +466,27 @@ pub(crate) fn set(txn: &mut crate::txn::Transaction<'_>, p: SetParams) -> Result
         }
         if let Some(w) = p.width {
             if !(0.3..=20.0).contains(&w) {
-                return Err(Error::new("ramp.bad_width", "the width must be between 0.3 m and 20 m"));
+                return Err(Error::new(
+                    "ramp.bad_width",
+                    "the width must be between 0.3 m and 20 m",
+                ));
             }
             rr.width = w;
         }
         let base = match &p.base_level {
             Some(b) => b.clone(),
-            None => ElementRef::Id(find(&store, &rr.extent.base_level).ok_or_else(|| {
-                Error::new("level.missing", "the ramp's base level is gone")
-            })?),
+            None => ElementRef::Id(
+                find(&store, &rr.extent.base_level)
+                    .ok_or_else(|| Error::new("level.missing", "the ramp's base level is gone"))?,
+            ),
         };
         let top = match p.top_constraint {
             Some(t) => t,
             None => match rr.extent.top_level().and_then(|g| find(&store, g)) {
                 Some(l) => TopConstraint::Level(crate::walls::ElementRefValue::Id(l)),
-                None => TopConstraint::Unconnected(
-                    rr.extent.top["unconnected"].as_f64().unwrap_or(0.6),
-                ),
+                None => {
+                    TopConstraint::Unconnected(rr.extent.top["unconnected"].as_f64().unwrap_or(0.6))
+                }
             },
         };
         rr.extent = Extent::from_args(
@@ -579,9 +602,14 @@ mod tests {
         assert!((flights[1].corners[1][0] - 8.4).abs() < 1e-9);
         assert!((flights[1].z[1] - 0.6).abs() < 1e-9);
         // An L-shaped ramp gets a square landing at its corner.
-        let (pieces, _) =
-            layout(&[[0.0, 0.0], [5.0, 0.0], [5.0, 4.0]], 1.2, 0.0, 0.6, &RampType::default())
-                .unwrap();
+        let (pieces, _) = layout(
+            &[[0.0, 0.0], [5.0, 0.0], [5.0, 4.0]],
+            1.2,
+            0.0,
+            0.6,
+            &RampType::default(),
+        )
+        .unwrap();
         assert_eq!(pieces.iter().filter(|p| p.landing).count(), 1);
         let top = pieces.last().unwrap();
         assert!((top.z[2] - 0.6).abs() < 1e-9);

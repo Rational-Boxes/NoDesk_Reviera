@@ -21,7 +21,10 @@ fn xyz(p: &[f64]) -> Result<[f64; 3]> {
     match *p {
         [x, y] => Ok([x, y, 0.0]),
         [x, y, z] => Ok([x, y, z]),
-        _ => Err(Error::new("measure.bad_point", "a point is [x, y] or [x, y, z]")),
+        _ => Err(Error::new(
+            "measure.bad_point",
+            "a point is [x, y] or [x, y, z]",
+        )),
     }
 }
 
@@ -69,9 +72,16 @@ pub struct Chain {
 }
 
 pub(crate) fn chain(p: ChainParams) -> Result<Chain> {
-    let pts = p.points.iter().map(|q| xyz(q)).collect::<Result<Vec<_>>>()?;
+    let pts = p
+        .points
+        .iter()
+        .map(|q| xyz(q))
+        .collect::<Result<Vec<_>>>()?;
     if pts.len() < 2 {
-        return Err(Error::new("measure.bad_chain", "a chain needs two points or more"));
+        return Err(Error::new(
+            "measure.bad_chain",
+            "a chain needs two points or more",
+        ));
     }
     let segments: Vec<f64> = pts
         .windows(2)
