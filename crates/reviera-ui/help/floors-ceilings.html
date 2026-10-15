@@ -77,6 +77,14 @@ or <b>Flip Vertical</b> (up from the top). It follows its floor and goes with it
 <code>slabedge.create</code>, <code>slabedge.set</code>, <code>hostsweep.add_segments</code>,
 <code>hostsweep.remove_segments</code>, <code>hostsweep.flip</code></p>
 
+<h2 id="layers">Layers</h2>
+<p>A floor or ceiling type can have layers like a wall type, listed from the top face down: a
+finish, a screed, the structure. Select a floor or ceiling and click <b>Modify | Floors › Edit
+Assembly</b>. The type's thickness becomes the layers' total, every floor of the type is drawn
+layer by layer in its materials, and in IFC the type has a material layer set that its floors use
+down from their top. Create Parts gives one part per layer. <code>compound.set_layers</code>,
+<code>compound.get</code></p>
+
 <h2 id="shape">Shape editing</h2>
 <p>A floor's top can be warped, for falls to a drain. Select the floor, then
 <b>Modify | Floors › Add Point</b> <a href="reviera:action/shape.add_point">Add Point</a>: click
@@ -86,5 +94,5 @@ thickness. <b>Reset Shape</b> <a href="reviera:action/shape.reset">Reset Shape</
 again. Scripts can also raise corners and add split lines.
 <code>shape.add_point</code>, <code>shape.add_split_line</code>, <code>shape.move</code>,
 <code>shape.set_elevation</code>, <code>shape.reset</code>, <code>shape.get</code></p>
-<p class="note">Not yet available: shape editing on roofs, variable layers (floor types have no
-layers yet), dragging points, and slab edge profiles other than rectangles.</p>
+<p class="note">Not yet available: shape editing on roofs, variable layers (a shape-edited floor
+is drawn as one slab, without its layers), layered roof types, dragging points, and slab edge profiles other than rectangles.</p>

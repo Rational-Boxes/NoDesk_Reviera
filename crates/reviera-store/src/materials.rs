@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Reviera contributors
 
-//! Material layer sets of layered wall types (ARC-CMPD-001).
+//! Material layer sets of layered wall, floor and ceiling types (ARC-CMPD-001).
 //!
 //! Each Reviera wall type with layers of its own gets an `IfcMaterialLayerSet` of
 //! `IfcMaterialLayer`s (exterior first), associated with the type; its walls share one
 //! `IfcMaterialLayerSetUsage` along their axis, centred on the location line (the walls'
-//! centreline). The two `IfcRelAssociatesMaterial`s are marked in their Description
+//! centreline); floors and ceilings share one along AXIS3, down from their top. The two `IfcRelAssociatesMaterial`s are marked in their Description
 //! (`rxd:layers:<type>:<signature>`, `rxd:usage:<type>`), so an unchanged structure is left as it
 //! is and one that changed or went is replaced or removed. Materials are shared by name.
 
@@ -108,7 +108,7 @@ pub(crate) fn write_layer_sets(
                 e.id(),
                 e.guid().to_string(),
                 e.name.clone().unwrap_or_default(),
-                compound::of_wall_type(e)?,
+                compound::of_type(e)?,
             ))
         })
         .collect();
@@ -205,11 +205,16 @@ pub(crate) fn write_layer_sets(
                 set
             }
         };
-        // The walls of the type share one usage, centred on their location line.
+        // The walls of the type share one usage, centred on their location line; floors and
+        // ceilings one down from their top.
+        let slab = store
+            .get(id)
+            .is_some_and(|t| reviera_core::floors::type_kind(t).is_some());
         let walls: Vec<StepId> = store
             .iter()
             .filter(|w| {
-                reviera_core::walls::wall_recipe(w).is_some()
+                (reviera_core::walls::wall_recipe(w).is_some()
+                    || reviera_core::floors::slab_recipe(w).is_some())
                     && w.param("@type").and_then(Value::as_str) == Some(guid.as_str())
             })
             .filter_map(|w| steps.get(&w.id()).copied())
@@ -234,11 +239,21 @@ pub(crate) fn write_layer_sets(
                     "IfcMaterialLayerSetUsage",
                     &[
                         ("ForLayerSet", AttrValue::Ref(set.0)),
-                        ("LayerSetDirection", AttrValue::Enum("AXIS2".into())),
-                        ("DirectionSense", AttrValue::Enum("POSITIVE".into())),
+                        (
+                            "LayerSetDirection",
+                            AttrValue::Enum(if slab { "AXIS3" } else { "AXIS2" }.into()),
+                        ),
+                        (
+                            "DirectionSense",
+                            AttrValue::Enum(if slab { "NEGATIVE" } else { "POSITIVE" }.into()),
+                        ),
                         (
                             "OffsetFromReferenceLine",
-                            AttrValue::Real(-c.thickness() / 2.0 / scale),
+                            AttrValue::Real(if slab {
+                                0.0
+                            } else {
+                                -c.thickness() / 2.0 / scale
+                            }),
                         ),
                     ],
                 )?;

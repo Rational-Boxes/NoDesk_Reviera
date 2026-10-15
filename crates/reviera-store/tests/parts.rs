@@ -487,3 +487,89 @@ fn merging_excluding_overrides_and_visibility() {
     );
     s.project.save(&s.doc).unwrap();
 }
+
+#[test]
+fn a_layered_floor_draws_and_divides_by_layer() {
+    let mut s = setup();
+    let edge = |a: [f64; 2], b: [f64; 2]| json!({ "line": { "start": a, "end": b } });
+    let c = [[0.0, 0.0], [5.0, 0.0], [5.0, 4.0], [0.0, 4.0]];
+    let f = id(&run(
+        &s.r,
+        &mut s.doc,
+        "floor.create",
+        json!({ "loops": [[edge(c[0], c[1]), edge(c[1], c[2]), edge(c[2], c[3]), edge(c[3], c[0])]], "level_id": s.level.0 }),
+    )
+    .unwrap());
+    let ty = reviera_core::GlobalId::parse(
+        s.doc
+            .store()
+            .get(f)
+            .unwrap()
+            .param("@type")
+            .unwrap()
+            .as_str()
+            .unwrap(),
+    )
+    .and_then(|g| s.doc.store().find_by_guid(&g))
+    .unwrap();
+    run(
+        &s.r,
+        &mut s.doc,
+        "compound.set_layers",
+        json!({ "type_id": ty.0, "layers": [
+            { "function": "finish1", "material": "Tile", "thickness": 0.01 },
+            { "function": "substrate", "material": "Screed", "thickness": 0.05 },
+            { "function": "structure", "material": "Concrete", "thickness": 0.2 },
+        ] }),
+    )
+    .unwrap();
+    // Drawn layer by layer, top first, as thick as the layers.
+    let b = reviera_core::bodies::all(s.doc.store());
+    let body = b.iter().find(|x| x.element == f).unwrap();
+    let classes: Vec<&str> = body.parts.iter().map(|p| p.class.as_str()).collect();
+    assert_eq!(
+        classes,
+        [
+            "IfcSlab:layer/Tile",
+            "IfcSlab:layer/Screed",
+            "IfcSlab:layer/Concrete"
+        ]
+    );
+    assert!((body_volume(&s.doc, f) - 20.0 * 0.26).abs() < 1e-9);
+    let top = body.bounds().unwrap().1[2];
+    // Its thickness is its layers'.
+    assert_eq!(
+        run(
+            &s.r,
+            &mut s.doc,
+            "type.set_param",
+            json!({ "type_id": ty.0, "param": "thickness", "value": 0.3 })
+        )
+        .unwrap_err()
+        .code,
+        "type.layered"
+    );
+    // Parts: three horizontal slices.
+    let made = ids(&run(
+        &s.r,
+        &mut s.doc,
+        "parts.create",
+        json!({ "host_ids": [f.0] }),
+    )
+    .unwrap());
+    assert_eq!(made.len(), 3);
+    let b = reviera_core::bodies::all(s.doc.store());
+    let screed = b
+        .iter()
+        .find(|x| x.element == made[1])
+        .unwrap()
+        .bounds()
+        .unwrap();
+    assert!((screed.1[2] - (top - 0.01)).abs() < 1e-9 && (screed.0[2] - (top - 0.06)).abs() < 1e-9);
+    assert!((info(&mut s, made[2])["volume"].as_f64().unwrap() - 4.0).abs() < 1e-9);
+    assert_eq!(info(&mut s, made[0])["construction"], "Finish");
+    // IFC: the type's layer set, used down from the floor's top.
+    s.project.save(&s.doc).unwrap();
+    let text = std::fs::read_to_string(s.t.path().join("p.ifc")).unwrap();
+    assert!(text.contains(".AXIS3.,.NEGATIVE."), "no slab usage");
+}

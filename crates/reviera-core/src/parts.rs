@@ -8,8 +8,9 @@
 //!
 //! - **First-level parts** come from Create Parts: one per layer of a straight layered wall
 //!   (the wall's finished body, joins and openings included, sliced at the layer boundaries, so
-//!   the parts tile it exactly), or one for the whole body of a single-layer wall, a floor,
-//!   ceiling, roof, column or beam. They follow the source as it changes.
+//!   the parts tile it exactly) or of a floor or ceiling with a layered type (sliced
+//!   horizontally), or one for the whole body of a single-layer wall, floor or ceiling, a roof,
+//!   column or beam. They follow the source as it changes.
 //! - **Divided pieces** keep their parent part, the division's cutting planes (sketched lines
 //!   swept along a work-plane normal, or levels, grids and reference planes with an offset, which
 //!   they follow), its gap and which side of each plane they are on.
@@ -21,8 +22,8 @@
 //!
 //! Not built yet: Edit Division and Edit Merged sessions, arcs and splines as division curves,
 //! division profiles, fused merged geometry (a merge keeps its pieces' faces), shape handles,
-//! phase overrides, parts of stacked, curved and curtain walls and of layered floors and roofs
-//! (they have no layers yet), parts that appear when a moved reference makes new pieces,
+//! phase overrides, parts of stacked, curved and curtain walls, layers of roofs (they have none
+//! yet) and of shape-edited floors, parts that appear when a moved reference makes new pieces,
 //! writing the source without its body in IFC, linked sources.
 
 use std::collections::HashSet;
@@ -117,12 +118,17 @@ fn kind_of(e: &Element) -> Option<&str> {
     e.param(RECIPE_KEY)?.get("kind")?.as_str()
 }
 
-/// A source's layers in plan: the wall's centreline start, its normal, and each layer's band
-/// across it (from the centreline along the normal) with its layer index.
+/// A source's layers: a direction across them, and each layer's band along it (`n · p` from
+/// `lo` to `hi`) with its layer index.
 struct Bands {
-    start: [f64; 2],
-    normal: [f64; 2],
+    normal: [f64; 3],
     bands: Vec<(usize, f64, f64)>,
+    compound: crate::compound::Compound,
+}
+
+/// The layers of a source: a wall's or a floor's or ceiling's.
+fn source_compound(store: &Store, s: &Element) -> Option<crate::compound::Compound> {
+    crate::walls::layered::compound_of(store, s).or_else(|| crate::compound::slab_layers(store, s))
 }
 
 /// What a source divides into: its wall layers, or `None` for one part of its whole body.
@@ -152,17 +158,40 @@ fn layers_of(store: &Store, e: &Element) -> std::result::Result<Option<Bands>, &
         let half = g.width / 2.0;
         let ext = if r.flip { -1.0 } else { 1.0 };
         let b = c.boundaries();
+        let n = g.normal();
+        let at = n[0] * g.start[0] + n[1] * g.start[1];
         let bands = (0..c.layers.len())
             .filter(|i| c.layers[*i].thickness > 0.0)
             .map(|i| {
                 let (ya, yb) = (ext * (half - b[i]), ext * (half - b[i + 1]));
-                (i, ya.min(yb), ya.max(yb))
+                (i, at + ya.min(yb), at + ya.max(yb))
             })
             .collect();
         return Ok(Some(Bands {
-            start: g.start,
-            normal: g.normal(),
+            normal: [n[0], n[1], 0.0],
             bands,
+            compound: c,
+        }));
+    }
+    // A layered floor or ceiling: horizontal bands down from its top.
+    if let (Some(c), Some(_)) = (
+        crate::compound::slab_layers(store, e),
+        crate::floors::slab_recipe(e),
+    ) {
+        if crate::shape_edit::shape_of(e).is_some() {
+            return Err("a shape-edited floor with layers");
+        }
+        let f =
+            crate::floors::regenerate(store, e).map_err(|_| "a floor that does not regenerate")?;
+        let b = c.boundaries();
+        let bands = (0..c.layers.len())
+            .filter(|i| c.layers[*i].thickness > 0.0)
+            .map(|i| (i, f.top - b[i + 1], f.top - b[i]))
+            .collect();
+        return Ok(Some(Bands {
+            normal: [0.0, 0.0, 1.0],
+            bands,
+            compound: c,
         }));
     }
     let ok = match e.class.as_str() {
@@ -358,8 +387,8 @@ fn geometry_at(store: &Store, e: &Element, bodies: &[Body], depth: usize) -> Vec
     let Some(&(_, lo, hi)) = b.bands.iter().find(|x| x.0 == i) else {
         return Vec::new();
     };
-    let n = [b.normal[0], b.normal[1], 0.0];
-    let at = b.normal[0] * b.start[0] + b.normal[1] * b.start[1];
+    let n = b.normal;
+    let at = 0.0;
     // The outermost layers keep everything beyond the wall's faces (wrapped ends, sweeps).
     let first = b.bands.iter().map(|x| x.1).fold(f64::MAX, f64::min);
     let last = b.bands.iter().map(|x| x.2).fold(f64::MIN, f64::max);
@@ -397,7 +426,7 @@ pub fn material(store: &Store, r: &PartRecipe) -> String {
     let Some(source) = find(store, &r.source) else {
         return String::new();
     };
-    match (r.layer, crate::walls::layered::compound_of(store, source)) {
+    match (r.layer, source_compound(store, source)) {
         (Some(i), Some(c)) if i < c.layers.len() => {
             let l = &c.layers[i];
             if l.material.trim().is_empty() {
@@ -426,7 +455,7 @@ pub fn construction(store: &Store, r: &PartRecipe) -> &'static str {
         return construction(store, &p);
     }
     let core = find(store, &r.source)
-        .and_then(|s| crate::walls::layered::compound_of(store, s))
+        .and_then(|s| source_compound(store, s))
         .map(|c| c.core);
     match (r.layer, core) {
         (Some(i), Some([a, b])) if !(a..b).contains(&i) => "Finish",
@@ -639,7 +668,7 @@ pub(crate) fn create(txn: &mut Transaction<'_>, p: CreateParams) -> Result<Vec<E
         let rows: Vec<(Option<usize>, String, &str)> = match &layers {
             None => vec![(None, base.clone(), "NOTDEFINED")],
             Some(b) => {
-                let c = crate::walls::layered::compound_of(&store, e).expect("layered");
+                let c = &b.compound;
                 b.bands
                     .iter()
                     .map(|(i, _, _)| {

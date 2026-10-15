@@ -1222,7 +1222,7 @@ help = "Turn the selected stacked walls into their basic walls"
 id = "wall.edit_assembly"
 label = "Edit Assembly"
 icon = "assembly"
-help = "Edit the layers of the selected wall's type: functions, priorities, materials, thicknesses and the core"
+help = "Edit the layers of the selected wall's, floor's or ceiling's type: functions, priorities, materials, thicknesses and the core"
 
 [[action]]
 id = "component.place"
@@ -1787,7 +1787,7 @@ panels = [{ label = "Door", tools = [
 category = "cat.floors"
 label = "Floors"
 panels = [
-  { label = "Mode", tools = [{ action = "floor.edit_boundary", size = "large" }] },
+  { label = "Mode", tools = [{ action = "floor.edit_boundary", size = "large" }, { action = "wall.edit_assembly", size = "large" }] },
   { label = "Edge", tools = [{ action = "slabedge.create", size = "large" }] },
   { label = "Shape Editing", tools = [
     { action = "shape.add_point", size = "large" },
@@ -1841,7 +1841,7 @@ panels = [{ label = "Openings", tools = [
 [[context]]
 category = "cat.ceilings"
 label = "Ceilings"
-panels = [{ label = "Mode", tools = [{ action = "ceiling.edit_boundary", size = "large" }] }]
+panels = [{ label = "Mode", tools = [{ action = "ceiling.edit_boundary", size = "large" }, { action = "wall.edit_assembly", size = "large" }] }]
 
 [[context]]
 category = "session.ceiling"

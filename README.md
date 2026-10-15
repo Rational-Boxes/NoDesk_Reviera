@@ -746,8 +746,8 @@ area by area (reviewed against the spec on 2026-10-15).
 
 **Gaps in what is built:**
 
-- **Walls**: location lines for curved walls, layer cleanup at joins, layered floors
-  and roofs, a material library, T joins into the side of a curved wall, attaching bases or to
+- **Walls**: location lines for curved walls, layer cleanup at joins, layered roofs (floors
+  and ceilings have layers), a material library, T joins into the side of a curved wall, attaching bases or to
   floors and ceilings, and true curved IFC geometry (curved walls, arches and domes are faceted
   B-reps).
 - **Windows and doors**: quarter-round fan lights, arcs as true arc segments in IFC (shaped

@@ -10513,6 +10513,8 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 - [ ] Setting a Finish layer to priority 1 while it lies between a priority-3 layer and the core fails validation with a message naming both layers.
 - [ ] Reading an IFC with Priority 100/90/80 and no RXD data yields Reviera priorities 1/2/3.
 
+**Implementation note (2026-10-15).** Floor and ceiling types take layers too (`compound.set_layers` and `compound.get` accept them; top first); the type's thickness is their total (`type.set_param thickness` is then refused), floors are drawn layer by layer in each layer's material, the IFC type gets an `IfcMaterialLayerSet` and its floors share an `IfcMaterialLayerSetUsage` (AXIS3, NEGATIVE, from the top); Edit Assembly opens from Modify | Floors and Ceilings. Not built yet: roof types' layers, variable layers under a shape-edited top, layer joins between floors and walls.
+
 ### 3.3.6 Edit Assembly dialog
 **ID:** ARC-CMPD-002 · **Priority:** P0 · **Ref:** research/02 §4.5 · screenshots/architecture/wall_edit_assembly_layers_2026.png
 

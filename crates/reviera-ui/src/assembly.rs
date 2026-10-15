@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Reviera contributors
 
-//! Edit Assembly (ARC-CMPD-002): the layers of a wall type in a grid, exterior at the top.
+//! Edit Assembly (ARC-CMPD-002): the layers of a wall type in a grid, exterior at the top (or
+//! a floor or ceiling type's, its top face first).
 //!
 //! Each row is a layer: its function, priority, material, thickness, whether it wraps and
 //! whether it is in the core (the core's rows must be together). Insert, Delete, Up and Down
@@ -65,7 +66,11 @@ impl Gui {
         let store = self.store_now()?;
         let selected = self.selection().into_iter().find_map(|id| {
             let e = store.get(id)?;
-            reviera_core::walls::wall_recipe(e)?;
+            if reviera_core::walls::wall_recipe(e).is_none()
+                && reviera_core::floors::slab_recipe(e).is_none()
+            {
+                return None;
+            }
             let guid = e.param("@type")?.as_str()?.to_owned();
             store.find_by_guid(&reviera_core::GlobalId::parse(&guid)?)
         });
@@ -79,15 +84,19 @@ impl Gui {
     pub(crate) fn edit_assembly(&mut self) {
         let frame = self.frame;
         let Some(type_id) = self.assembly_type() else {
-            return frame.set_status_text("Select a wall to edit its type's layers", 0);
+            return frame.set_status_text(
+                "Select a wall, floor or ceiling to edit its type's layers",
+                0,
+            );
         };
         let Some(store) = self.store_now() else {
             return;
         };
         let Some(t) = store.get(type_id) else { return };
-        let Some(c) = reviera_core::compound::of_wall_type(t) else {
+        let Some(c) = reviera_core::compound::of_type(t) else {
             return;
         };
+        let slab = reviera_core::floors::type_kind(t).is_some();
         let name = t.name.clone().unwrap_or_default();
         let walls = reviera_core::types::instances(&store, t).len();
 
@@ -97,11 +106,14 @@ impl Gui {
         let sizer = BoxSizer::builder(Orientation::Vertical).build();
         let header = StaticText::builder(&dialog)
             .with_label(&format!(
-                "Wall type {name} ({walls} walls) · total thickness {} · exterior at the top. \
+                "{} type {name} ({walls} {}) · total thickness {} · {} at the top. \
                  Functions: Structure, Substrate, Thermal/Air, Finish 1, Finish 2, Membrane. \
                  Priority 1 is the strongest; tick Core for the core's layers, and Variable \
                  for the one layer a tapered wall thins.",
-                self.format_length(c.thickness())
+                if slab { "Floor/ceiling" } else { "Wall" },
+                if slab { "elements" } else { "walls" },
+                self.format_length(c.thickness()),
+                if slab { "the top face" } else { "exterior" }
             ))
             .build();
         header.wrap(640);

@@ -284,6 +284,12 @@ pub(crate) fn set_type_thickness(
         .param(RECIPE_KEY)
         .cloned()
         .expect("a floor type");
+    if recipe.get("compound").is_some_and(|c| !c.is_null()) {
+        return Err(Error::new(
+            "type.layered",
+            "the type's thickness is its layers': edit its structure (compound.set_layers)",
+        ));
+    }
     recipe["thickness"] = t.into();
     txn.modify(id, |e| {
         e.params.insert(RECIPE_KEY.into(), recipe);

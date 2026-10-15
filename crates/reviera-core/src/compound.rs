@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Reviera contributors
 
-//! Compound structures (ARC-CMPD-001): the layers of a wall type.
+//! Compound structures (ARC-CMPD-001): the layers of a wall, floor or ceiling type.
+//!
+//! A floor or ceiling type keeps its layers the same way (top first) in its `recipe.floor_type`
+//! or `recipe.ceiling_type`, its thickness their total; its floors are drawn layer by layer.
 //!
 //! A layered wall type keeps its layers in its `recipe.wall_type` (`layers`, exterior first, and
 //! `core`, the layer range of the core). Its width is the sum of its layers' thicknesses, so a
@@ -416,11 +419,63 @@ pub fn of_wall_type(t: &Element) -> Option<Compound> {
     Some(Compound::single(v.get("width")?.as_f64()?))
 }
 
+/// A floor or ceiling type's layers (top first): its own, else one layer of its thickness.
+pub fn of_slab_type(t: &Element) -> Option<Compound> {
+    crate::floors::type_kind(t)?;
+    let v = t.param(RECIPE_KEY)?;
+    if let Some(c) = v
+        .get("compound")
+        .and_then(|c| serde_json::from_value(c.clone()).ok())
+    {
+        return Some(c);
+    }
+    Some(Compound::single(v.get("thickness")?.as_f64()?))
+}
+
+/// The layers of a floor or ceiling whose type has more than one (top first).
+pub fn slab_layers(store: &Store, e: &Element) -> Option<Compound> {
+    let g = crate::id::GlobalId::parse(e.param("@type")?.as_str()?)?;
+    let t = store.get(store.find_by_guid(&g)?)?;
+    if !is_layered(t) {
+        return None;
+    }
+    let c = of_slab_type(t)?;
+    (c.layers.iter().filter(|l| l.thickness > 0.0).count() > 1).then_some(c)
+}
+
+/// A layer's material name, or its function's when it has none.
+pub fn layer_material(l: &Layer) -> String {
+    if l.material.trim().is_empty() {
+        l.function.name().to_owned()
+    } else {
+        l.material.clone()
+    }
+}
+
+/// A wall, floor or ceiling type's layers.
+pub fn of_type(t: &Element) -> Option<Compound> {
+    of_wall_type(t).or_else(|| of_slab_type(t))
+}
+
 /// Whether a wall type has layers of its own.
 pub fn is_layered(t: &Element) -> bool {
     t.param(RECIPE_KEY)
         .and_then(|v| v.get("compound"))
         .is_some_and(|c| !c.is_null())
+}
+
+/// A wall, floor or ceiling type.
+fn layered_type(store: &Store, r: &ElementRef) -> Result<ElementId> {
+    let id = store
+        .resolve(r)
+        .ok_or_else(|| Error::new("element.not_found", "no such type"))?;
+    if of_type(store.get(id).expect("resolved")).is_none() {
+        return Err(Error::new(
+            "compound.not_layered_type",
+            format!("element {id} is not a wall, floor or ceiling type"),
+        ));
+    }
+    Ok(id)
 }
 
 fn wall_type(store: &Store, r: &ElementRef) -> Result<ElementId> {
@@ -455,9 +510,9 @@ pub struct CompoundReport {
 }
 
 pub(crate) fn get(store: &Store, p: GetParams) -> Result<CompoundReport> {
-    let id = wall_type(store, &p.type_id)?;
+    let id = layered_type(store, &p.type_id)?;
     let t = store.get(id).expect("resolved");
-    let c = of_wall_type(t).expect("a wall type");
+    let c = of_type(t).expect("a layered type");
     Ok(CompoundReport {
         thickness: c.thickness(),
         layered: is_layered(t),
@@ -504,7 +559,8 @@ pub struct LayerArg {
 /// every wall of the type regenerates.
 pub(crate) fn set_layers(txn: &mut crate::txn::Transaction<'_>, p: SetLayersParams) -> Result<()> {
     let store = txn.store().clone();
-    let id = wall_type(&store, &p.type_id)?;
+    let id = layered_type(&store, &p.type_id)?;
+    let slab = crate::floors::type_kind(store.get(id).expect("resolved")).is_some();
     if crate::walls::stacked::of_type(store.get(id).expect("resolved")).is_some() {
         return Err(Error::new(
             "compound.stacked",
@@ -551,7 +607,7 @@ pub(crate) fn set_layers(txn: &mut crate::txn::Transaction<'_>, p: SetLayersPara
             .unwrap_or_else(|| structure.last().map_or(0, |i| i + 1)),
     ];
     // Regions and wrapping stay as they were (regions of layers that remain).
-    let old = of_wall_type(store.get(id).expect("resolved"));
+    let old = of_type(store.get(id).expect("resolved"));
     let n = layers.len();
     let c = Compound {
         layers,
@@ -569,6 +625,20 @@ pub(crate) fn set_layers(txn: &mut crate::txn::Transaction<'_>, p: SetLayersPara
         .and_then(|t| t.param(RECIPE_KEY))
         .cloned()
         .expect("a wall type recipe");
+    if slab {
+        // A floor or ceiling type: its thickness is its layers' (top first).
+        if !c.regions.is_empty() || !c.wrap_inserts.is_none() || !c.wrap_ends.is_none() {
+            return Err(Error::new(
+                "compound.slab_regions",
+                "floor and ceiling types have no regions or wrapping",
+            ));
+        }
+        recipe["thickness"] = c.thickness().into();
+        recipe["compound"] = serde_json::to_value(&c).expect("serialises");
+        return txn.modify(id, |e| {
+            e.params.insert(RECIPE_KEY.into(), recipe);
+        });
+    }
     recipe["width"] = c.thickness().into();
     recipe["compound"] = serde_json::to_value(&c).expect("serialises");
     txn.modify(id, |e| {

@@ -267,6 +267,27 @@ pub fn all(store: &Store) -> Vec<Body> {
             Some(e) => crate::slab_openings::cut_profiles(store, e, &f.profiles),
             None => f.profiles.clone(),
         };
+        // A layered type: each layer in its material, top first (ARC-CMPD-001).
+        if let Some(c) = store
+            .get(id)
+            .and_then(|e| crate::compound::slab_layers(store, e))
+        {
+            let b = c.boundaries();
+            for p in &profiles {
+                for (i, l) in c.layers.iter().enumerate() {
+                    if l.thickness <= 0.0 {
+                        continue;
+                    }
+                    push(
+                        id,
+                        &format!("{class}:layer/{}", crate::compound::layer_material(l)),
+                        extrude(&p.outer, &p.holes, f.top - b[i + 1], f.top - b[i]),
+                        false,
+                    );
+                }
+            }
+            continue;
+        }
         for p in &profiles {
             push(
                 id,
