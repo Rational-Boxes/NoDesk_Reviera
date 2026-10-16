@@ -1,0 +1,30 @@
+[package]
+name = "reviera-compute-proto"
+description = "Reviera remote computation contract: generated gRPC types, negotiation, blob codecs and a runner toolkit (spec Ch 2 §2.17)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license = "MIT"
+authors.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+prost = "0.14.4"
+prost-types = "0.14.4"
+tonic = "0.14.6"
+tonic-prost = "0.14.6"
+tokio = { workspace = true, features = ["net", "fs"] }
+tokio-stream = { version = "0.1.19", features = ["net"] }
+tower = "0.5.3"
+hyper-util = { version = "0.1.21", features = ["tokio"] }
+sha2.workspace = true
+hex.workspace = true
+zstd.workspace = true
+
+[build-dependencies]
+protox = "0.10.0"
+tonic-prost-build = "0.14.6"
+
+[lints]
+workspace = true

@@ -72,7 +72,14 @@ pub fn toolset_of(command: &str) -> String {
             | "history" | "snapshot" | "cobie" => "io",
             "bimserver" | "link" | "workset" | "bcf" | "cde" | "api" | "http" | "overlap"
             | "clash" | "clearance" => "collaboration",
-            "analysis" => "analysis",
+            "analysis"
+            | "analysis_provider"
+            | "analysis_job"
+            | "analysis_result"
+            | "analysis_style"
+            | "compute"
+            | "compute_host"
+            | "structural_analysis" => "analysis",
             "script" | "plugin" | "addin" | "lua" => "scripting",
             "app" | "mcp" | "settings" | "txn" => "admin",
             _ => "other",
@@ -88,6 +95,8 @@ mod tests {
     fn domains_map_to_toolsets() {
         assert_eq!(toolset_of("edit.undo"), "core");
         assert_eq!(toolset_of("file.open"), "io");
+        assert_eq!(toolset_of("compute.submit"), "analysis");
+        assert_eq!(toolset_of("compute_host.list"), "analysis");
         assert_eq!(toolset_of("family_doc.form.extrusion"), "families");
         assert_eq!(
             toolset_of("org.example.roomtools.renumber"),

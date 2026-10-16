@@ -1,0 +1,72 @@
+// SPDX-License-Identifier: MIT
+// Copyright (C) 2026 Reviera contributors
+//
+// Analysis job kinds on the remote computation contract (BIM Reviera spec Ch 4 §4.0.2a,
+// ANA-PLUG-004 … 009). Options travel in SubmitJobRequest.options; inputs are distillation
+// blobs; outputs are result packages, all keyed by the distillation's opaque keys, never by
+// GlobalIds.
+
+syntax = "proto3";
+
+package reviera.analysis.v1;
+
+// ---- Distillation formats ----
+
+// One closed part of an element's body: positions as x, y, z triples (metres) and triangles.
+message MeshPart {
+  repeated double positions = 1 [packed = true];
+  repeated uint32 indices = 2 [packed = true];
+}
+
+// An element's tessellated body (booleans applied), keyed by an opaque key.
+message ElementMesh {
+  string key = 1;
+  string ifc_class = 2;
+  repeated MeshPart parts = 3;
+  // The model the element comes from, for multi-model scopes ("" is the host model).
+  string model = 4;
+}
+
+// A chunk of a bodies distillation (distiller "clash.bodies"): elements sorted by key.
+message MeshSet {
+  repeated ElementMesh elements = 1;
+}
+
+message KeyPair {
+  string a = 1;
+  string b = 2;
+}
+
+// The pairs a clash test leaves out: elements that belong together by design (a window and its
+// wall) and accepted clashes. Keys only.
+message ClashExclusions {
+  repeated KeyPair pairs = 1;
+}
+
+// ---- analysis.clash ----
+
+message ClashOptions {
+  double tolerance = 1;            // metres; touching within it is not a clash (default 0.001)
+  double min_volume = 2;           // cubic metres (default 1e-6)
+  uint32 resolution = 3;           // sampling lines each way per pair (default 48)
+  uint32 limit = 4;                // most clashes reported, largest first (0: all)
+  // Test the elements of these models against those of the others only (multi-model scopes);
+  // empty: every pair.
+  repeated string against_models = 5;
+}
+
+message Clash {
+  string a = 1;
+  string b = 2;
+  double volume = 3;
+  double depth = 4;
+  repeated double min = 5 [packed = true];
+  repeated double max = 6 [packed = true];
+  repeated double centroid = 7 [packed = true];
+}
+
+message ClashResult {
+  repeated Clash clashes = 1;
+  uint32 bodies = 2;
+  uint64 pairs_measured = 3;
+}

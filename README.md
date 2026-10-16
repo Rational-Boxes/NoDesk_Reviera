@@ -36,7 +36,9 @@ operation can be driven by Lua scripts and by AI agents through the Model Contex
 - [What works today](#what-works-today): [platform](#platform-and-file-format),
   [automation](#commands-scripting-and-ai-agents), [modelling](#modelling),
   [components and libraries](#components-and-libraries),
-  [coordination](#overlaps-booleans-and-clearances), [documentation](#views-and-documentation),
+  [coordination](#overlaps-booleans-and-clearances),
+  [analysis and remote computation](#analysis-and-remote-computation-in-development),
+  [documentation](#views-and-documentation),
   [inspecting and editing](#inspecting-and-editing), [the window](#the-window)
 - [Sample models](#sample-models)
 - [Not built yet](#not-built-yet)
@@ -58,10 +60,13 @@ the porch columns and the shaped windows show through the walls.
 
 ![The Manor sample see-through in 3D, its roof selected](design_documents/application_screenshots/manor-transparency.png)
 
-The Greek temple sample: 46 Doric columns from the sample Component Library, placed round the
-stylobate by one parametric path array.
+The Greek temple sample: 46 Doric columns from the sample Component Library (shown in the
+Component Library pane on the right), placed round the stylobate by one parametric path array.
+The array is selected: every copy highlights as one element, the contextual Modify | Path Arrays
+tab offers Unarray, and Properties shows the array's own parameters (46 copies along a drawn
+polyline, distributed by number) for editing.
 
-![The Greek temple sample's colonnade in 3D](design_documents/application_screenshots/temple-colonnade.png)
+![The Greek temple's colonnade in 3D, its path array selected, with the Modify | Path Arrays tab and the Component Library pane](design_documents/application_screenshots/temple-colonnade.png)
 
 ## What works today
 
@@ -561,6 +566,33 @@ Libraries**: plain folders of ordinary 3D files, readable by any other tool.
   elements (`clearance.set_rule_set`, `clearance.list`, `clearance.check`,
   `view.set_virtual_volumes`).
 
+### Analysis and remote computation (in development)
+
+The foundation for analysis is being built (spec Chapter 2 §2.17, Chapter 4 §4.0.2a, overview in
+Chapter 8). Heavy calculations run outside Reviera's process, start only when needed, and send a
+*distillation* of the model (only what the calculation needs) rather than the model. The first
+milestone works end to end, with project-wide clash detection as its first job kind:
+
+- **Clash detection out of process**: the whole model's bodies (booleans applied; pairs that
+  belong together or were accepted left out) are distilled under opaque keys and measured by the
+  built-in runner on the same overlap engine as Check Overlaps, so the results match it exactly;
+  they come back attached to the model's elements (`compute.submit` with `analysis.clash`,
+  `compute.status`, `compute.results`).
+- **Local compute host**: started on demand, keeps a durable job registry, starts runners only
+  for jobs and stops them when idle, enforces a memory limit and lower priority on them, reports
+  crashes, runaways and hangs as failed jobs without affecting Reviera, and exits when idle. Jobs
+  outlive Reviera and are collected later, or from another session (`compute.jobs`,
+  `compute.reattach`, `compute.cancel`, `compute.forget_job`, `compute.kinds`,
+  `compute.distill`).
+- **An open contract**: `reviera.compute.v1` over gRPC, with negotiated compression, numbered and
+  resumable progress events, and resumable result downloads. Its `.proto` files and the Rust
+  client and runner toolkit are MIT (`schemas/compute`, `clients/compute`), so a runner or
+  service under any licence can implement it.
+
+In development next: the Compute Jobs and Analysis Providers panels, IFC filter-profile
+distillations, the analysis provider layer, encryption, LAN and cloud compute hosts, real-time
+simulation sessions, and the first engine runners (see [Not built yet](#not-built-yet)).
+
 ### Views and documentation
 
 - **Views as model objects**: plans, sections, elevations, 3D views, schedules and sheets are
@@ -800,18 +832,14 @@ area by area (reviewed against the spec on 2026-10-15).
   `execute_lua` and view images.
 - **Structure, MEP, families and collaboration** (BIMserver, OpenCDE, Godot) are specified but
   not started.
-- **Remote computation subsystem** (DM-RPC-001 … 010): specified, not built. A foundational
-  subsystem that abstracts calculation workloads from where they run: jobs run against model
-  distillations (mostly a filtering of the IFC model down to what a calculation needs, sent
-  with dictionary-trained and delta compression and end-to-end encryption, both negotiated so
-  new techniques can be added) in a process started on demand,
-  on a paired compute host on the LAN, or on a vendor-neutral cloud cluster that scales to zero,
-  over one gRPC contract with an HTTPS binding. A durable job registry makes long jobs
-  disconnect-safe: Reviera reconnects, even after a restart, and collects the results.
-  Real-time sessions run a heavy simulation on a cloud or LAN host while Reviera, a game
-  engine or a VR headset shows it live, the user changing scenario inputs as it runs. Any job kind can use it: analysis, rendering,
-  large tessellation, batch export, point clouds, project-wide clash runs, studies. Over time a
-  family of cloud-hosted calculation services is offered on it.
+- **Remote computation subsystem** (DM-RPC-001 … 010): in development; the first milestone is
+  built (see [Analysis and remote computation](#analysis-and-remote-computation-in-development)).
+  Still to build: the Compute Jobs panel; IFC filter-profile distillations; dictionary-trained and
+  delta compression; end-to-end encryption and signed results, negotiated so new techniques can be
+  added; the HTTPS binding; paired compute hosts on the LAN; vendor-neutral cloud clusters that
+  scale to zero, with estimates, budgets and a catalogue of hosted calculation services; job sets
+  for parameter studies; real-time simulation sessions shown live in Reviera, a game engine or VR;
+  memory limits on Windows and macOS; and packaging the compute programs in the installers.
 - **Analysis plugin layer** (ANA-PLUG-004 … 009): specified, not built. Calculations that update
   live while modelling run in-process; batch analysis runs are compute jobs, never resident
   when idle. It serves every analysis family: structural and seismic, thermal loads and energy,
@@ -886,9 +914,10 @@ Permission levels are `read_only` (the default), `model_edit` and `full_scriptin
 | `crates/reviera-ui` | The main window (wxWidgets through wxDragon): ribbon, views, tools, panes |
 | `crates/reviera-lua` | The LuaJIT scripting host: the `reviera` API, forms, plugin discovery, the built-in plugins |
 | `crates/reviera-geom` | OpenCASCADE solid kernel (`cxx`): booleans and their cache |
+| `crates/reviera-compute` | Remote computation: the client, distillations, the local compute host (`reviera-compute-host`) and the built-in runner (`reviera-analysis-builtin`) |
 | `crates/reviera-godot`, `reviera-net`, `reviera-bimserver`, `reviera-opencde` | Placeholders for the Godot viewer, networking, BIMserver and OpenCDE |
 | `design_documents/` | The specification (`spec/`), technology stack, research log and source register |
-| `schemas/`, `clients/rsp/` | Open data formats and protocol clients (MIT) |
+| `schemas/`, `clients/` | Open data formats, protocols and their clients (MIT): RXD, the Reviera Scene Protocol, and the remote computation contract (`schemas/compute`, `clients/compute`) |
 | `test-data/ifc/` | Third-party IFC models for tests (see their README for provenance) |
 | `test-data/samples/` | Reviera's own sample models, their Lua scripts and walkthroughs |
 | `test-data/library/` | The sample Component Library (a public-domain Doric column; see its README) |

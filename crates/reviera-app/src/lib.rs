@@ -9,6 +9,7 @@
 
 pub mod cobie;
 mod commands;
+pub mod compute;
 pub mod csg;
 pub mod inspect;
 pub mod notes;
@@ -229,6 +230,8 @@ pub struct App {
     view_requests: Vec<(DocumentId, reviera_core::ElementId)>,
     /// Shows scripts' forms as dialogs (set by the window).
     form_handler: Option<scripts::Handler>,
+    /// The remote computation client, created on first use (`compute.*`).
+    compute: Option<reviera_compute::ComputeClient>,
 }
 
 /// Whether an element's body is regenerated from its Reviera recipe (`bodies`), rather than
@@ -259,6 +262,7 @@ impl App {
             config,
             view_requests: Vec::new(),
             form_handler: None,
+            compute: None,
         }
     }
 

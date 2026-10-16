@@ -20,6 +20,8 @@ members = [
     "crates/reviera-mcp",
     "crates/reviera-ui",
     "clients/rsp/rust",
+    "clients/compute/rust",
+    "crates/reviera-compute",
 ]
 default-members = ["apps/reviera"]
 
@@ -51,6 +53,8 @@ reviera-lua = { path = "crates/reviera-lua" }
 reviera-mcp = { path = "crates/reviera-mcp" }
 reviera-ui = { path = "crates/reviera-ui" }
 reviera-rsp = { path = "clients/rsp/rust" }
+reviera-compute-proto = { path = "clients/compute/rust" }
+reviera-compute = { path = "crates/reviera-compute" }
 # Common
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"

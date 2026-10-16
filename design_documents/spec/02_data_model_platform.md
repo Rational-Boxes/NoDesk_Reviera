@@ -4349,6 +4349,8 @@ Reviera shall have a foundational subsystem, built on one general contract, that
 - `compute.cancel(job_id) -> ()`
 - `compute.results(job_id, path?) -> {manifest, files[]}`
 
+*Built (2026-10-16), milestone 1:* the contract as `.proto` files under `schemas/compute/` (MIT): `reviera/compute/v1/compute.proto` with every RPC of the table except the session RPCs, `reviera/analysis/v1/analysis.proto` (`ClashOptions`, `MeshSet`, `ClashExclusions`, `ClashResult`), `reviera/testing/v1/testing.proto` (`test.fault`), and the technique registry `registry/techniques.json` (`identity-v1`, `zstd-v1`, `sha256-v1`, `none-local-v1`). The MIT crate `reviera-compute-proto` (`clients/compute/rust`) compiles them with protox (no `protoc` needed) and tonic, and provides negotiation, blob hashing, codecs, chunking and checked reassembly, the local transport (a Unix socket with owner-only permissions, loopback TCP elsewhere, a bearer token on every call, reason codes in the `reviera-reason` trailer) and a runner toolkit. Not built yet: the HTTPS/JSON binding, content encryption and signatures (only `none-local-v1`, local sockets), trained dictionaries, content-defined chunking inside blobs, deltas.
+
 **Acceptance criteria.**
 - [ ] A job kind added after release (a test kind with its own options package) runs through `compute.submit` with no change to `reviera.compute.v1`.
 - [ ] Submitting the same client job key twice returns one job.
@@ -4375,6 +4377,8 @@ Reviera shall have a foundational subsystem, built on one general contract, that
 **Commands.**
 - `compute.kinds() -> kinds[]`
 - `compute.register_kind(manifest_path) -> kind`
+
+*Built (2026-10-16), milestone 1:* runners describe their kinds with `--describe` and are found by the host beside its program or through `REVIERA_COMPUTE_RUNNERS`; the JSON job-kind manifest and `compute.register_kind` are not built yet. The built-in runner `reviera-analysis-builtin` serves `analysis.clash` (the project-wide clash test, ANA-CLASH-001, on the overlap engine of ARC-MOD-030) and `test.fault` (delays, failures, crashes, memory runaways and checkpoints, for testing). Commands: `compute.kinds`, `compute.distill`, `compute.submit`, `compute.status`, `compute.results`, `compute.cancel`, `compute.jobs`, `compute.reattach`, `compute.forget_job`.
 
 **Acceptance criteria.**
 - [ ] An add-in that registers a new job kind with a Lua distiller and applier and a Python runner can run jobs on a local runner and on a paired host.
@@ -4403,6 +4407,8 @@ Reviera shall have a foundational subsystem, built on one general contract, that
 - `compute.distill(kind, scope, detail?, anonymise?) -> {distiller, version, blobs[], size_bytes, counts}`
 - `compute.preview_distillation(kind, scope, detail?) -> view_id`
 
+*Built (2026-10-16), milestone 1:* the `clash.bodies` distiller: the bodies of the chosen IFC classes with booleans applied, as `reviera.analysis.v1.MeshSet` chunks of about 2 MB that close at key-defined boundaries (so moving one element re-sends one chunk), under opaque keys derived from GlobalIds, with the excluded pairs (related by design, or accepted) as a separate blob. The key map stays in Reviera's job record. Filter profiles over IFC (IFC4 subsets) are not built yet; the clash distillation is a transform's output, which DM-RPC-003 allows.
+
 **Acceptance criteria.**
 - [ ] Distilling the same model state twice gives byte-identical blobs.
 - [ ] A profile-only distillation (no transforms) of the FZK-Haus sample is a valid IFC4 file that IfcOpenShell opens, holding only the profile's classes, property sets and representations.
@@ -4419,6 +4425,8 @@ Reviera shall have a foundational subsystem, built on one general contract, that
 - **On demand:** a runner process runs only while it has work: *stopped → starting → ready → busy → idle → stopped*. The first job starts it; it stops after an idle timeout (default 120 s; 0 stops it when its last job ends; settable per kind), on request, or when Reviera exits. Opening, editing or viewing results starts no runner. Start-up never blocks the UI: a job waits in *starting*, with progress. A runner that does not answer its health check within 30 s (settable) fails the start with its last output attached.
 - **Limits enforced by the operating system:** a memory ceiling (default half of physical memory, settable), a CPU share or core limit, and lower scheduling priority; on Linux through a cgroup scope (systemd user scope or cgroup v2) with `setrlimit` as the fallback, on Windows through a Job Object with a memory limit and below-normal priority, on macOS through `setrlimit` and the background QoS class. The same limits apply to each job on a host.
 - **Failures stay contained:** a runner over its memory ceiling is stopped and the job fails with `memory_limit`, never by exhausting the machine. A crash, a hang (no progress or heartbeat within the job's heartbeat interval, default 60 s) or a lost connection fails the job and leaves Reviera running; the next job starts the runner again. The runner's stderr and exit status are attached to the failed job.
+
+*Built (2026-10-16), milestone 1:* the local compute host `reviera-compute-host`, started on demand by Reviera in its own session so it outlives Reviera, and exiting when it has no jobs, runners or calls for 120 s. It starts each runner on demand and stops it after 120 s idle; on Linux and other Unix systems under `RLIMIT_DATA` (default half of physical memory), lower priority, and (Linux) exit with the host; a runner that runs out of memory fails its job with `memory_limit`, a crash with `runner_failed` and the runner's last output, a hang after 60 s without events. Runners also exit on their own after 10 minutes without calls. Not built yet: cgroup scopes, Windows Job Objects, macOS QoS.
 
 **Acceptance criteria.**
 - [ ] With a model open and no job running, no runner process exists, and none is started by opening, editing or viewing results.
@@ -4529,6 +4537,8 @@ Reviera shall have a foundational subsystem, built on one general contract, that
 **Commands.**
 - `compute.reattach(job_id?) -> jobs[]` (all outstanding jobs when no ID is given)
 - `compute.forget_job(job_id) -> ()` (removes a job from the client registry; cancels it first if it is still running and the user confirms)
+
+*Built (2026-10-16), milestone 1:* the host's registry is SQLite (`registry.db` in the host's state directory) with every job and numbered event; `WatchJob` resumes from any sequence number and `GetResults` from any byte offset; `AckResults` releases results; a host restart fails running jobs with `host_restarted` and runs queued ones. The client's record is `client-jobs.json` in the host's state directory (merged between clients) rather than the model's RXD document `compute`; jobs are followed in the background with reconnection and backoff, and `compute.reattach` resumes them after a restart.
 
 **Acceptance criteria.**
 - [ ] Killing Reviera during a 30-minute local job and starting it again 10 minutes later shows the job still running; when it finishes, its results are applied without user action.

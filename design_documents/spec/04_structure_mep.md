@@ -5016,6 +5016,8 @@ The job runs in the background with a notification. Spaces that no system serves
 
 **Commands.** See chapter 6 (`interference.run`, `interference.report`). The presets above are ordinary check definitions for those commands.
 
+*Built (2026-10-16):* the whole-model run is out of process: `compute.submit` with kind `analysis.clash` distils the model's bodies (booleans applied; related and accepted pairs left out) and the built-in runner measures them with the same overlap engine as the live checks (ARC-MOD-030), so results match `overlap.find` exactly; `compute.results` attaches them to elements. Multi-model scopes are carried in the format (each element names its model; `ClashOptions.against_models`) but not yet offered. Presets, clearances, BCF and the chapter 6 commands are not built yet.
+
 **Acceptance criteria.**
 - [ ] A bolt that intersects a duct is reported as a clash between Structural Fasteners and Ducts.
 - [ ] An elbow connected to two ducts produces no clash with either duct.

@@ -1,0 +1,19 @@
+// SPDX-License-Identifier: MIT
+// Copyright (C) 2026 Reviera contributors
+//
+// The `test.fault` job kind: a runner behaviour for testing hosts and clients (delays,
+// failures, crashes, memory runaways, checkpoints). Not offered to users.
+
+syntax = "proto3";
+
+package reviera.testing.v1;
+
+message FaultOptions {
+  uint32 steps = 1;                // progress steps (default 10)
+  uint32 step_ms = 2;              // time per step
+  uint32 fail_at_step = 3;         // 0: never; fails with reason runner_failed
+  uint32 crash_at_step = 4;        // 0: never; the runner process aborts
+  uint32 alloc_mb_per_step = 5;    // memory kept per step, to test memory limits
+  uint32 checkpoint_every = 6;     // 0: never
+  uint64 output_bytes = 7;         // size of the output (deterministic bytes)
+}

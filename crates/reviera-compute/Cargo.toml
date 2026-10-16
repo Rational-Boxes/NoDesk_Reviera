@@ -1,0 +1,40 @@
+[package]
+name = "reviera-compute"
+description = "Remote computation: the client, distillation, the local compute host and the built-in runner (spec Ch 2 §2.17)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "reviera-compute-host"
+path = "src/bin/reviera-compute-host.rs"
+
+[[bin]]
+name = "reviera-analysis-builtin"
+path = "src/bin/reviera-analysis-builtin.rs"
+
+[dependencies]
+reviera-core.workspace = true
+reviera-compute-proto.workspace = true
+prost = "0.14.4"
+prost-types = "0.14.4"
+tonic = "0.14.6"
+tokio = { workspace = true, features = ["net", "fs", "process", "signal"] }
+tokio-stream = "0.1.19"
+rusqlite.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+uuid.workspace = true
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2.190"
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true

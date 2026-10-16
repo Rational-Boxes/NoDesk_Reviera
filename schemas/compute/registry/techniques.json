@@ -1,0 +1,16 @@
+{
+  "$comment": "SPDX-License-Identifier: MIT. Technique identifiers for negotiation on the remote computation contract (BIM Reviera spec Ch 2 DM-RPC-001). This registry only grows: identifiers are never reused or removed, only marked deprecated.",
+  "version": 1,
+  "categories": {
+    "compression": [
+      { "id": "identity-v1", "description": "No compression.", "status": "active" },
+      { "id": "zstd-v1", "description": "Zstandard frame (RFC 8878), any level.", "status": "active" }
+    ],
+    "hash": [
+      { "id": "sha256-v1", "description": "SHA-256 of the uncompressed content, lower-case hex.", "status": "active" }
+    ],
+    "content-encryption": [
+      { "id": "none-local-v1", "description": "No content encryption; acceptable only on a local socket with owner-only permissions.", "status": "active", "local_only": true }
+    ]
+  }
+}

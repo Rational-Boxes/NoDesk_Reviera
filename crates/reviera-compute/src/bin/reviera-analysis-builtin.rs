@@ -1,0 +1,18 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Reviera contributors
+
+//! The built-in analysis runner: `analysis.clash` and `test.fault`, served on the remote
+//! computation contract (spec ANA-PLUG-003, ANA-CLASH-001).
+
+use std::sync::Arc;
+
+use reviera_compute::kinds::{ClashKind, FaultKind};
+use reviera_compute_proto::runner::{Runner, main_with};
+
+fn main() -> std::process::ExitCode {
+    main_with(Runner::new(
+        "reviera-analysis-builtin",
+        env!("CARGO_PKG_VERSION"),
+        vec![Arc::new(ClashKind), Arc::new(FaultKind)],
+    ))
+}

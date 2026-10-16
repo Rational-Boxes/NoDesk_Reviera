@@ -18163,6 +18163,7 @@ key_id = &quot;minisign:&lt;publisher public key&gt;&quot;     # signature file:
 - <code>compute.status(job_id) -&gt; {state, progress, phase, host, messages[]}</code>
 - <code>compute.cancel(job_id) -&gt; ()</code>
 - <code>compute.results(job_id, path?) -&gt; {manifest, files[]}</code></p>
+<p><em>Built (2026-10-16), milestone 1:</em> the contract as <code>.proto</code> files under <code>schemas/compute/</code> (MIT): <code>reviera/compute/v1/compute.proto</code> with every RPC of the table except the session RPCs, <code>reviera/analysis/v1/analysis.proto</code> (<code>ClashOptions</code>, <code>MeshSet</code>, <code>ClashExclusions</code>, <code>ClashResult</code>), <code>reviera/testing/v1/testing.proto</code> (<code>test.fault</code>), and the technique registry <code>registry/techniques.json</code> (<code>identity-v1</code>, <code>zstd-v1</code>, <code>sha256-v1</code>, <code>none-local-v1</code>). The MIT crate <code>reviera-compute-proto</code> (<code>clients/compute/rust</code>) compiles them with protox (no <code>protoc</code> needed) and tonic, and provides negotiation, blob hashing, codecs, chunking and checked reassembly, the local transport (a Unix socket with owner-only permissions, loopback TCP elsewhere, a bearer token on every call, reason codes in the <code>reviera-reason</code> trailer) and a runner toolkit. Not built yet: the HTTPS/JSON binding, content encryption and signatures (only <code>none-local-v1</code>, local sockets), trained dictionaries, content-defined chunking inside blobs, deltas.</p>
 <p><strong>Acceptance criteria.</strong>
 - [ ] A job kind added after release (a test kind with its own options package) runs through <code>compute.submit</code> with no change to <code>reviera.compute.v1</code>.
 - [ ] Submitting the same client job key twice returns one job.
@@ -18185,6 +18186,7 @@ key_id = &quot;minisign:&lt;publisher public key&gt;&quot;     # signature file:
 <p><strong>Commands.</strong>
 - <code>compute.kinds() -&gt; kinds[]</code>
 - <code>compute.register_kind(manifest_path) -&gt; kind</code></p>
+<p><em>Built (2026-10-16), milestone 1:</em> runners describe their kinds with <code>--describe</code> and are found by the host beside its program or through <code>REVIERA_COMPUTE_RUNNERS</code>; the JSON job-kind manifest and <code>compute.register_kind</code> are not built yet. The built-in runner <code>reviera-analysis-builtin</code> serves <code>analysis.clash</code> (the project-wide clash test, ANA-CLASH-001, on the overlap engine of ARC-MOD-030) and <code>test.fault</code> (delays, failures, crashes, memory runaways and checkpoints, for testing). Commands: <code>compute.kinds</code>, <code>compute.distill</code>, <code>compute.submit</code>, <code>compute.status</code>, <code>compute.results</code>, <code>compute.cancel</code>, <code>compute.jobs</code>, <code>compute.reattach</code>, <code>compute.forget_job</code>.</p>
 <p><strong>Acceptance criteria.</strong>
 - [ ] An add-in that registers a new job kind with a Lua distiller and applier and a Python runner can run jobs on a local runner and on a paired host.
 - [ ] A manifest whose distiller's licence is not GPL-compatible is refused with the licence field named.
@@ -18207,6 +18209,7 @@ key_id = &quot;minisign:&lt;publisher public key&gt;&quot;     # signature file:
 <p><strong>Commands.</strong>
 - <code>compute.distill(kind, scope, detail?, anonymise?) -&gt; {distiller, version, blobs[], size_bytes, counts}</code>
 - <code>compute.preview_distillation(kind, scope, detail?) -&gt; view_id</code></p>
+<p><em>Built (2026-10-16), milestone 1:</em> the <code>clash.bodies</code> distiller: the bodies of the chosen IFC classes with booleans applied, as <code>reviera.analysis.v1.MeshSet</code> chunks of about 2 MB that close at key-defined boundaries (so moving one element re-sends one chunk), under opaque keys derived from GlobalIds, with the excluded pairs (related by design, or accepted) as a separate blob. The key map stays in Reviera's job record. Filter profiles over IFC (IFC4 subsets) are not built yet; the clash distillation is a transform's output, which DM-RPC-003 allows.</p>
 <p><strong>Acceptance criteria.</strong>
 - [ ] Distilling the same model state twice gives byte-identical blobs.
 - [ ] A profile-only distillation (no transforms) of the FZK-Haus sample is a valid IFC4 file that IfcOpenShell opens, holding only the profile's classes, property sets and representations.
@@ -18220,6 +18223,7 @@ key_id = &quot;minisign:&lt;publisher public key&gt;&quot;     # signature file:
 - <strong>On demand:</strong> a runner process runs only while it has work: <em>stopped → starting → ready → busy → idle → stopped</em>. The first job starts it; it stops after an idle timeout (default 120 s; 0 stops it when its last job ends; settable per kind), on request, or when Reviera exits. Opening, editing or viewing results starts no runner. Start-up never blocks the UI: a job waits in <em>starting</em>, with progress. A runner that does not answer its health check within 30 s (settable) fails the start with its last output attached.
 - <strong>Limits enforced by the operating system:</strong> a memory ceiling (default half of physical memory, settable), a CPU share or core limit, and lower scheduling priority; on Linux through a cgroup scope (systemd user scope or cgroup v2) with <code>setrlimit</code> as the fallback, on Windows through a Job Object with a memory limit and below-normal priority, on macOS through <code>setrlimit</code> and the background QoS class. The same limits apply to each job on a host.
 - <strong>Failures stay contained:</strong> a runner over its memory ceiling is stopped and the job fails with <code>memory_limit</code>, never by exhausting the machine. A crash, a hang (no progress or heartbeat within the job's heartbeat interval, default 60 s) or a lost connection fails the job and leaves Reviera running; the next job starts the runner again. The runner's stderr and exit status are attached to the failed job.</p>
+<p><em>Built (2026-10-16), milestone 1:</em> the local compute host <code>reviera-compute-host</code>, started on demand by Reviera in its own session so it outlives Reviera, and exiting when it has no jobs, runners or calls for 120 s. It starts each runner on demand and stops it after 120 s idle; on Linux and other Unix systems under <code>RLIMIT_DATA</code> (default half of physical memory), lower priority, and (Linux) exit with the host; a runner that runs out of memory fails its job with <code>memory_limit</code>, a crash with <code>runner_failed</code> and the runner's last output, a hang after 60 s without events. Runners also exit on their own after 10 minutes without calls. Not built yet: cgroup scopes, Windows Job Objects, macOS QoS.</p>
 <p><strong>Acceptance criteria.</strong>
 - [ ] With a model open and no job running, no runner process exists, and none is started by opening, editing or viewing results.
 - [ ] After a job, its runner exits within the idle timeout plus 15 s; with the timeout set to 0, within 15 s of the job ending.
@@ -18305,6 +18309,7 @@ key_id = &quot;minisign:&lt;publisher public key&gt;&quot;     # signature file:
 <p><strong>Commands.</strong>
 - <code>compute.reattach(job_id?) -&gt; jobs[]</code> (all outstanding jobs when no ID is given)
 - <code>compute.forget_job(job_id) -&gt; ()</code> (removes a job from the client registry; cancels it first if it is still running and the user confirms)</p>
+<p><em>Built (2026-10-16), milestone 1:</em> the host's registry is SQLite (<code>registry.db</code> in the host's state directory) with every job and numbered event; <code>WatchJob</code> resumes from any sequence number and <code>GetResults</code> from any byte offset; <code>AckResults</code> releases results; a host restart fails running jobs with <code>host_restarted</code> and runs queued ones. The client's record is <code>client-jobs.json</code> in the host's state directory (merged between clients) rather than the model's RXD document <code>compute</code>; jobs are followed in the background with reconnection and backoff, and <code>compute.reattach</code> resumes them after a restart.</p>
 <p><strong>Acceptance criteria.</strong>
 - [ ] Killing Reviera during a 30-minute local job and starting it again 10 minutes later shows the job still running; when it finishes, its results are applied without user action.
 - [ ] Disconnecting the network during a cloud job and reconnecting resumes progress from the last event, with no event shown twice or missed.
@@ -36440,6 +36445,7 @@ No IFC equivalent.
   - An optional <strong>clearance</strong> per category pair (for example 50 mm between ducts and beams for access) reports near misses as soft clashes.
 - <strong>Presets</strong> are stored as named check definitions (RXD document <code>coordination/clash</code>, chapter 6) and can be edited and shared with <em>Transfer Project Standards</em>.</p>
 <p><strong>Commands.</strong> See chapter 6 (<code>interference.run</code>, <code>interference.report</code>). The presets above are ordinary check definitions for those commands.</p>
+<p><em>Built (2026-10-16):</em> the whole-model run is out of process: <code>compute.submit</code> with kind <code>analysis.clash</code> distils the model's bodies (booleans applied; related and accepted pairs left out) and the built-in runner measures them with the same overlap engine as the live checks (ARC-MOD-030), so results match <code>overlap.find</code> exactly; <code>compute.results</code> attaches them to elements. Multi-model scopes are carried in the format (each element names its model; <code>ClashOptions.against_models</code>) but not yet offered. Presets, clearances, BCF and the chapter 6 commands are not built yet.</p>
 <p><strong>Acceptance criteria.</strong>
 - [ ] A bolt that intersects a duct is reported as a clash between Structural Fasteners and Ducts.
 - [ ] An elbow connected to two ducts produces no clash with either duct.
@@ -50254,6 +50260,7 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 </tr>
 </tbody>
 </table></div>
+<p><em>Progress (2026-10-16):</em> step 1 is built apart from the panel and the HTTPS binding, and the first job kind, the project-wide clash test, runs end to end out of process (§2.17 <em>Built</em> notes); step 2's IFC filter profiles and step 3's analysis provider layer are next.</p>
 <p>Structural analysis needs the analytical model first (STR-AM-001 … 004, STR-LOAD-001, STR-LC-001, STR-BC-001), which follows the structural physical elements in the structure build order.</p>
 <h2 id="88-requirement-map">8.8 Requirement map</h2>
 <div class="tbl"><table>
