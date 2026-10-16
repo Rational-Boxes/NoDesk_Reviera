@@ -118,6 +118,12 @@ This is how the requirement that *all* operations are exposed to AI agents is me
 - **Extras:** an `execute_lua` tool for compound operations, gated by permission. Undo/redo tools. Optional "preview/confirm" mode for destructive operations.
 - **Safety:** each agent session gets its own transaction boundary, operations are attributed in undo history, and permission levels are read-only, model-edit and full-scripting.
 
+### 3.6a Remote computation subsystem and analysis engines
+- Specified in spec Ch 2 §2.17 (DM-RPC-001 … 008): a foundational subsystem that abstracts calculation workloads from where they run. Jobs run against **model distillations**, mostly IFC filter profiles (stripped-down IFC4 subsets, like model view definitions) plus transforms where another representation is needed, in a runner process started on demand, on a paired `reviera-compute-host` on the LAN, or on a vendor-neutral cloud cluster that scales to zero. The contract is gRPC (`reviera.compute.v1`, with per-kind packages such as `reviera.analysis.v1`) with an HTTPS/JSON binding. Over time a family of cloud-hosted calculation services is offered on it.
+- Analysis (spec Ch 4 §4.0.2a, ANA-PLUG-004 … 009) is its first user: live calculations run in-process; batch analysis families are job kinds.
+- Proposed libraries (licences to confirm when adopted): `tonic` and `prost` for gRPC and protobuf; `zstd` (with trained dictionaries, long-distance matching and patch-from deltas) for compression; a content-defined chunking crate (FastCDC); `meshopt` or Draco for mesh buffers; an mDNS/DNS-SD crate for host discovery.
+- Runners are never linked into Reviera and hold no memory when idle; each local runner runs in an OS-enforced resource scope (cgroup on Linux, Job Object on Windows, `setrlimit` on macOS).
+
 ### 3.7 Operating modes: Local and BIMserver client
 
 Reviera can be used either on its own or as a client of the **Open Source BIMserver** (github.com/opensourceBIM/BIMserver). BIMserver is an IFC model server written in Java and licensed under AGPL-3.0. The latest release seen was 1.5.188 (2024-07-31). BIMserver stores IFC as objects, not files, and provides revisions, check-in/check-out, server-side queries and change notifications.

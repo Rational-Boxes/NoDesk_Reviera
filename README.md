@@ -789,6 +789,19 @@ area by area (reviewed against the spec on 2026-10-15).
   `execute_lua` and view images.
 - **Structure, MEP, families and collaboration** (BIMserver, OpenCDE, Godot) are specified but
   not started.
+- **Remote computation subsystem** (DM-RPC-001 … 008): specified, not built. A foundational
+  subsystem that abstracts calculation workloads from where they run: jobs run against model
+  distillations (mostly a filtering of the IFC model down to what a calculation needs, sent
+  with dictionary-trained and delta compression and end-to-end encryption, both negotiated so
+  new techniques can be added) in a process started on demand,
+  on a paired compute host on the LAN, or on a vendor-neutral cloud cluster that scales to zero,
+  over one gRPC contract with an HTTPS binding. Any job kind can use it: analysis, rendering,
+  large tessellation, batch export, point clouds, project-wide clash runs, studies. Over time a
+  family of cloud-hosted calculation services is offered on it.
+- **Analysis plugin layer** (ANA-PLUG-004 … 009): specified, not built. Calculations that update
+  live while modelling run in-process; batch analysis runs are compute jobs, never resident
+  when idle. It serves every analysis family: structural and seismic, thermal loads and energy,
+  daylight, sun and shadow, plumbing and stormwater flows, interior airflow and external wind.
 
 ### Working with CADCraft
 

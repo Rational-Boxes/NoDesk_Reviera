@@ -752,6 +752,15 @@ Excluded from the register: two help-site directory roots and one URL template p
 | S0708 | ARC | public guidance (building inspection) | https://surebuildinginspections.au/defects/stair-headroom-insufficient/ | 200 | PASS: public (HTTP 200, unauthenticated) |
 | S0709 | ARC | public guidance (trade reference) | https://www.baunetzwissen.de/glossar/d/durchgangshoehe-10204364 | 200 | PASS: public (HTTP 200, unauthenticated) |
 | S0710 | ASSET | public-domain 3D model (CC0), redistributed in test-data/library | https://commons.wikimedia.org/wiki/File:Antike_griechische_S%C3%A4ule_20220605.stl | 200 | PASS: public (HTTP 200, unauthenticated); CC0 1.0 dedication by its author, no attribution required |
+| S0711 | STR | encyclopedia (OpenSees licence summary) | https://en.wikipedia.org/wiki/OpenSees | 200 | PASS: public (HTTP 200, unauthenticated) |
+| S0712 | STR | open-source project documentation (OpenSees licence) | https://openseesdocumentation.readthedocs.io/en/latest/developer/license.html | 200 | PASS: public (HTTP 200, unauthenticated) |
+| S0713 | STR | open-source project repository (PyNite, MIT) | https://github.com/JWock82/PyNite | 200 | PASS: public (HTTP 200, unauthenticated) |
+| S0714 | STR | open-source project site (Frame3DD, GPL-3.0) | https://frame3dd.sourceforge.net/ | 200 | PASS: public (HTTP 200, unauthenticated) |
+| S0715 | STR | open-source project repository (IfcOpenShell ifc2ca) | https://github.com/IfcOpenShell/IfcOpenShell/tree/v0.8.0/src/ifc2ca | 200 | PASS: public (HTTP 200, unauthenticated) |
+| S0716 | STR | university lab page (xara, BSD-2-Clause OpenSees fork) | https://stairlab.berkeley.edu/software/opensees | 200 | PASS: public (HTTP 200, unauthenticated) |
+| S0717 | STR | open-source project site (xara) | https://xara.so | 200 | PASS: public (HTTP 200, unauthenticated) |
+| S0718 | STR | open-source project documentation (Kratos StructuralMechanicsApplication licence) | https://kratos-docs.onrender.com/da/d9a/structural__mechanics__application_8h_source.html | 200 | PASS: public (HTTP 200, unauthenticated) |
+| S0719 | STR | open-source project site (CalculiX, GPL) | https://dhondt.de/ | 200 | PASS: public (HTTP 200, unauthenticated) |
 
 ## B. Screenshots (142) — internal reference only
 

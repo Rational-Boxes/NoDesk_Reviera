@@ -3887,6 +3887,224 @@ key_id = "minisign:<publisher public key>"     # signature file: reviera-addin.t
 
 ---
 
+## 2.17 Remote computation contract
+
+Reviera shall have a foundational subsystem, built on one general contract, that abstracts calculation workloads from where and how they run: it runs calculation runs against **model distillations** in another process, on this machine, on a more powerful machine on the LAN, or on cloud compute. Analysis is its first user (chapter 4 §4.0.2a), but the contract is not tied to analysis. Rendering, tessellation of large models, batch export, point clouds, project-wide booleans and clash runs, design-space exploration (§2.15.3), and use cases not yet known are all **job kinds** on the same contract. Each job sends only an extract of the model that the calculation needs, never the model, so a job is small enough to send across a network.
+
+**Terms.**
+
+| Term | Meaning |
+|------|---------|
+| **Job kind** | A named, versioned kind of calculation run (for example `analysis.structural`, `render.still`, `export.pdf_set`), declared by a manifest (DM-RPC-002). |
+| **Distiller** | A deterministic function in Reviera's process that turns a model snapshot, a scope, a detail level and options into a distillation (DM-RPC-003). |
+| **Distillation** | The extract a job sends: content-addressed blobs and a key map that stays in Reviera. |
+| **Runner** | The program that performs a job kind; a separate process, started on demand (DM-RPC-004). |
+| **Host** | Where runners run: this machine, a paired machine on the LAN (DM-RPC-005), or a cloud cluster (DM-RPC-006). |
+| **Result applier** | The function in Reviera's process that takes a job's output back into the model: parameters, result packages, files, view overlays. |
+| **Job set** | Many variants of one job submitted together (DM-RPC-007). |
+
+### 2.17.1 Contract and protocol
+**ID:** DM-RPC-001 · **Priority:** P2 · **Ref:** owner requirement (2026-10-15); Reviera-originated design
+
+**Purpose.** One versioned RPC contract between Reviera and any runner or host, whatever the job kind.
+
+**Behaviour & rules.**
+- The contract is the gRPC package **`reviera.compute.v1`**, defined in `.proto` files published with the specification. It changes only by adding fields; a breaking change gets a new package (`v2`), and a host may serve several versions. Reviera is the client; a runner, or a host that forwards to its runners, is the server.
+- An **HTTPS/JSON binding** carries the same operations for Web services and environments without gRPC: `POST /blobs/missing`, `PUT /blobs/{sha256}`, `POST /jobs`, `GET /jobs/{id}` (with a server-sent event stream for progress), `GET /jobs/{id}/results`, `DELETE /jobs/{id}`, described in an OpenAPI document published with the specification.
+- **Job-kind messages** live in their own packages beside the contract: `reviera.analysis.v1` (chapter 4), `reviera.render.v1`, `reviera.export.v1`, and any package a job kind's manifest names. `SubmitJob` carries the kind's options as a typed message (`google.protobuf.Any`), so the contract never changes for a new kind.
+- **Idempotent submission:** every job has a client job key; submitting the same key twice returns the existing job.
+- **Errors** carry a gRPC status and a reason code: `invalid_input`, `unsupported_kind`, `version_mismatch`, `too_large`, `limit_exceeded`, `memory_limit`, `preempted`, `cancelled`, `runner_failed`, `unauthorised`, `negotiation_failed`, with a message and, for runner failures, the runner's last output.
+- **Negotiation is part of the contract.** Compression and encryption are chosen by negotiation, so new techniques are added without changing the contract. Every technique has a registered identifier (for example `zstd-dict-v1`, `aead-aes256gcm`, `kem-x25519-mlkem768`) in a registry published with the specification, which only grows. `Negotiate` exchanges each side's supported identifiers in order of preference, with minimum acceptable versions, and returns the session's choice: the strongest option both sides support, never one either side has marked as deprecated or below its minimum. Every blob and result header records the identifiers used to produce it, so any party can read data written with older choices while new data uses newer ones. A side that cannot agree on an acceptable option fails with `negotiation_failed` naming the category, instead of falling back to something weaker; a client never downgrades because a server asked it to. Administrators set organisation policy (allowed, preferred and minimum identifiers) on hosts and clients.
+- **Encryption, negotiated in layers.** *Transport*: TLS 1.3 at least, preferring hybrid post-quantum key exchange (for example X25519 with ML-KEM-768) where both sides support it; local sockets rely on owner-only permissions and the one-time token. *Content*: blobs and results bound for a LAN or cloud host are also encrypted end to end, independently of TLS, so a gateway, object store or operator that relays or stores them cannot read them. Each job has fresh content keys used with a negotiated AEAD cipher (for example AES-256-GCM or ChaCha20-Poly1305); keys are wrapped for the job's runners with a negotiated key-encapsulation scheme (HPKE, with a hybrid post-quantum KEM preferred) using keys the host's workers publish in `Describe`, and results come back wrapped for the client. *Integrity*: blob names are SHA-256 of the uncompressed plaintext (the hash algorithm is itself negotiable), and result manifests are signed by the runner with a negotiated signature scheme (for example Ed25519, with ML-DSA as it becomes available), so provenance can be verified. Content encryption is on by default for remote and cloud hosts and Web services, and may be off for local runners.
+- **Compression on the wire.** Model transfer uses the strongest codecs available, chosen by the negotiation above; compression is applied before encryption. The baseline is **zstd** (long-distance matching, high levels for uploads) with **trained dictionaries** per filter profile and schema, shipped with Reviera and identified by hash, because IFC text from one profile repeats the same entity names and structures. On top of it: **content-defined chunking** (for example FastCDC) inside large blobs, so an edit moves only the chunks it touches even within one storey; **delta compression** of a changed blob against the version the server already holds (zstd patch-from), when `HasBlobs` reports the earlier hash; **geometry codecs** for meshes produced by transforms (for example meshoptimizer or Draco encoding of vertex and index buffers); and **byte shuffling** before zstd for large numeric arrays (results, fields, sensor grids). Already-compressed blobs are not compressed again at the gRPC or HTTP layer. Format-aware compressors (for example OpenZL) are candidates to evaluate as negotiated codecs [Suggestion]. Compression runs on the worker pool and never blocks the UI.
+- **Provenance:** every result carries a manifest naming the job kind and version, the runner and its version, the distiller and its version, the detail level, the model snapshot hash, the input blob list, the host, and the timings. A result can always say exactly what it was computed from.
+
+| RPC | Kind | Purpose |
+|-----|------|---------|
+| `Negotiate` | unary | Exchanges supported compression, encryption, key-encapsulation, signature and hash identifiers in order of preference with minimum versions, and returns the session's choices (or `negotiation_failed`). Repeated whenever either side's policy changes. |
+| `Describe` | unary | What the server offers: job kinds and versions, runners and their manifests (name, version, SPDX licence, capabilities, accepted formats), resources (cores, memory, GPUs), limits and supported contract versions, and the workers' public keys for content encryption. |
+| `Health` | unary | Ready or not, with load (jobs running and queued, memory in use). Used for start-up, *Best available* and heartbeats. |
+| `HasBlobs` | unary | Which of a list of blob hashes the server already holds. |
+| `PutBlobs` | client streaming | Uploads blobs in chunks of up to 4 MiB, each compressed with a negotiated codec (zstd with a profile dictionary by default, or a delta against a blob the server holds) and named by the SHA-256 of its uncompressed content. Blobs are cached for the server's retention time, so a re-run after a small change sends only the blobs that changed. |
+| `SubmitJob` | unary | Starts a job: kind and version, the kind's options, the distillation's blob list and distiller, the snapshot hash and the client job key. Returns the job ID. |
+| `WatchJob` | server streaming | Progress (fraction and phase), log lines, warnings, heartbeats, checkpoints and the final state (succeeded, failed with reason, cancelled). Reattaching to a running or finished job is the same call. |
+| `GetResults` | server streaming | The job's output (a result package, images or files) in chunks, with its SHA-256 and provenance manifest. |
+| `CancelJob` | unary | Cancels a job; the runner stops work and frees its memory. |
+| `Shutdown` | unary | Asks a local runner to exit cleanly (sent at its idle timeout; the process is killed after a 10 s grace period). |
+
+**Local transport.** On one machine a runner listens on a Unix domain socket (Linux, macOS) or a named pipe (Windows) in a per-user directory with owner-only permissions, so no network port is opened; loopback TCP is the fallback. The socket path and a one-time token are passed on the runner's command line, and every call carries the token.
+
+**Commands.**
+- `compute.submit(kind, scope, options?, detail?, location?) -> job_id`
+- `compute.status(job_id) -> {state, progress, phase, host, messages[]}`
+- `compute.cancel(job_id) -> ()`
+- `compute.results(job_id, path?) -> {manifest, files[]}`
+
+**Acceptance criteria.**
+- [ ] A job kind added after release (a test kind with its own options package) runs through `compute.submit` with no change to `reviera.compute.v1`.
+- [ ] Submitting the same client job key twice returns one job.
+- [ ] The same job run over gRPC and over the HTTPS binding returns identical outputs and provenance apart from timings.
+- [ ] A structural distillation of a 2,000-member model compresses at least 3× better with its profile dictionary than with plain zstd at the same level, and re-sending it after one member changes transfers less than 2% of its compressed size (content-defined chunks and deltas).
+- [ ] A server that does not advertise a codec never receives blobs encoded with it.
+- [ ] Adding a new compression or cipher identifier to client and host enables it with no change to `reviera.compute.v1`; a client and host that share no acceptable cipher fail with `negotiation_failed` and send nothing.
+- [ ] A client whose policy sets a minimum refuses a host that offers only weaker options, and is never downgraded by the host.
+- [ ] On a cloud host, the blobs in object storage cannot be decrypted without the job's wrapped keys, and a tampered result manifest fails signature verification.
+
+### 2.17.2 Job kinds and their extension
+**ID:** DM-RPC-002 · **Priority:** P2 · **Ref:** owner requirement (2026-10-15); Reviera-originated design
+
+**Purpose.** Any eventual use case can be added as a job kind, by Reviera or by an add-in, without changing the contract.
+
+**Behaviour & rules.**
+- A job kind is declared by a JSON manifest: its name and version; its options and result schemas (a protobuf package, or JSON Schema for the HTTPS binding); its **distillers** (DM-RPC-003): a filter profile, plus any named transforms; its **result applier**; its **runner** (a command line, relative to the kind's folder, and the platforms it supports, or a container image for hosts that run containers); resource hints (cores, memory, GPU, typical duration per unit of distillation); whether it supports checkpoints; and the SPDX licences of each part.
+- Filter profiles are data. Transforms and result appliers run in Reviera's process, so they are Rust code in Reviera or Lua in an add-in (§2.14) and must pass the GPL-compatible licence check (TECH_STACK §4.2). Runners are separate programs and are never linked into Reviera; their licences are checked before an official bundle ships one.
+- **Built-in job kinds:** `analysis.<family>` for each batch analysis family (chapter 4 §4.0.2a); `render.still`, `render.panorama`, `render.walkthrough` (chapter 7); `tessellate.ifc` for large models and links; `export.pdf_set`, `export.ifc`, `export.cobie`, `export.dwg`; `pointcloud.index`; `model.boolean_batch` and `model.clash_batch` for project-wide booleans, overlap and clash runs started as a batch (ARC-MOD-028, ARC-MOD-030, ANA-CLASH-001).
+- Interactive work never depends on a job: editing, regeneration, live checks and viewport drawing run in Reviera's process.
+- `compute.register_kind` validates a manifest and refuses one with a missing field, an unknown schema, or an in-process part outside the licence allow-list, naming the field.
+
+**Commands.**
+- `compute.kinds() -> kinds[]`
+- `compute.register_kind(manifest_path) -> kind`
+
+**Acceptance criteria.**
+- [ ] An add-in that registers a new job kind with a Lua distiller and applier and a Python runner can run jobs on a local runner and on a paired host.
+- [ ] A manifest whose distiller's licence is not GPL-compatible is refused with the licence field named.
+
+### 2.17.3 Model distillations
+**ID:** DM-RPC-003 · **Priority:** P2 · **Ref:** owner requirement (2026-10-15); Reviera-originated design
+
+**Purpose.** A job sends an extract of only what its calculation needs, at the level of detail it needs. That makes sending the relevant details to powerful remote compute practical, and keeps the rest of the model at home.
+
+**Behaviour & rules.**
+- **A distillation is mostly a filtered IFC model.** Reviera's model is IFC, so a distiller is first a **filter profile**: a declarative JSON description of what to keep, applied in Reviera's process. A profile names the IFC entity classes to keep (with subtypes and predefined types), the attributes and property sets (and properties within them) to keep, the representation contexts and identifiers to keep (for example `Axis` and `Reference` instead of `Body`), the relationships to follow (aggregation, containment, assignments, materials, structural connections), and the common entities every chunk needs (project, units, contexts, materials, profiles, types). Everything else is dropped. The output is a stripped-down, valid IFC4 subset, much like a model view definition; the IFC4 Structural Analysis View is the model for this, and the structural distiller is that view as a profile.
+- **Transforms only where needed.** Where an analysis needs a representation the model does not hold, a profile adds a named transform written in Rust or Lua: simplifying or decimating bodies, deriving space-boundary surfaces, building a watertight fluid domain, deriving a network graph. A transform's output is still keyed to the IFC entities it came from. Other formats (gbXML, a Radiance scene, an EPANET network, a mesh) are produced from the filtered IFC by such a transform, never from the full model.
+- Each blob is self-describing: media type and schema identifier (for IFC, the schema and the profile's name and version).
+- **Detail levels:** a distiller offers Coarse, Medium and Fine (for example decimation tolerance, minimum feature size, whether small openings and furniture are kept), defaulting to the coarsest the job kind's guidance accepts.
+- **Deterministic and chunked:** the same model state and options give byte-identical blobs: IFC chunks are written with a stable entity order and stable instance numbering, split by a natural unit (storey, zone, member group, sheet), with the shared entities in a common chunk, so after an edit only the changed chunks are sent.
+- **Mapped back locally:** with *Anonymise* on, GlobalIds in the distillation are replaced by short opaque keys; the map from keys to GlobalIds stays in Reviera, and outputs keyed the same way are attached to the right elements by the result applier.
+- **Minimal metadata:** names, comments, author data and properties the job does not use are left out. *Anonymise* (on by default for remote and cloud hosts and Web services) replaces any remaining names with keys.
+- **Shown before sending:** the submit dialog shows the distillation's size, entity counts and destination, can preview it in a temporary 3D view, and warns when it exceeds the destination's maximum job size.
+- **Recorded:** the distiller's name and version and the detail level go into the job's provenance (DM-RPC-001).
+- **Cached** per kind, scope, detail level, options and snapshot until the model changes.
+- A distillation leaves the machine only for a host or service the user has approved. The first job to a remote host or Web service asks for consent, naming the destination and what is sent; consent is remembered per destination and project and can be withdrawn.
+
+**Commands.**
+- `compute.distill(kind, scope, detail?, anonymise?) -> {distiller, version, blobs[], size_bytes, counts}`
+- `compute.preview_distillation(kind, scope, detail?) -> view_id`
+
+**Acceptance criteria.**
+- [ ] Distilling the same model state twice gives byte-identical blobs.
+- [ ] A profile-only distillation (no transforms) of the FZK-Haus sample is a valid IFC4 file that IfcOpenShell opens, holding only the profile's classes, property sets and representations.
+- [ ] With *Anonymise* on, no element name, comment or author field appears in any blob.
+- [ ] Outputs returned keyed by opaque keys attach to the right elements although the host never sees a GlobalId.
+- [ ] No blob is sent to a remote destination before consent is given.
+
+### 2.17.4 Runner lifecycle and isolation
+**ID:** DM-RPC-004 · **Priority:** P2 · **Ref:** owner requirement (2026-10-15); Reviera-originated design
+
+**Purpose.** Runners use memory only while they work, and a runner that fails cannot take Reviera or the machine down with it.
+
+**Behaviour & rules.**
+- **On demand:** a runner process runs only while it has work: *stopped → starting → ready → busy → idle → stopped*. The first job starts it; it stops after an idle timeout (default 120 s; 0 stops it when its last job ends; settable per kind), on request, or when Reviera exits. Opening, editing or viewing results starts no runner. Start-up never blocks the UI: a job waits in *starting*, with progress. A runner that does not answer its health check within 30 s (settable) fails the start with its last output attached.
+- **Limits enforced by the operating system:** a memory ceiling (default half of physical memory, settable), a CPU share or core limit, and lower scheduling priority; on Linux through a cgroup scope (systemd user scope or cgroup v2) with `setrlimit` as the fallback, on Windows through a Job Object with a memory limit and below-normal priority, on macOS through `setrlimit` and the background QoS class. The same limits apply to each job on a host.
+- **Failures stay contained:** a runner over its memory ceiling is stopped and the job fails with `memory_limit`, never by exhausting the machine. A crash, a hang (no progress or heartbeat within the job's heartbeat interval, default 60 s) or a lost connection fails the job and leaves Reviera running; the next job starts the runner again. The runner's stderr and exit status are attached to the failed job.
+
+**Acceptance criteria.**
+- [ ] With a model open and no job running, no runner process exists, and none is started by opening, editing or viewing results.
+- [ ] After a job, its runner exits within the idle timeout plus 15 s; with the timeout set to 0, within 15 s of the job ending.
+- [ ] A runner with a 512 MB ceiling that allocates past it is stopped; its job fails with `memory_limit`, and Reviera's own memory use is unchanged.
+- [ ] Killing a runner during a job fails that job with the exit status attached; Reviera keeps running, and the next job starts the runner again and succeeds.
+
+### 2.17.5 Compute hosts on the LAN
+**ID:** DM-RPC-005 · **Priority:** P2 · **Ref:** owner requirement (2026-10-15); Reviera-originated design
+
+**Purpose.** Send heavy jobs to a more powerful machine on the local network.
+
+**Behaviour & rules.**
+- `reviera-compute-host` is a small service that runs on another machine and starts runners there on demand, with the lifecycle and limits of DM-RPC-004.
+- Hosts advertise themselves by DNS-SD (`_reviera-compute._tcp`) and can be added by address.
+- **Pairing:** the host shows a six-digit code; entering it in Reviera pins the host's TLS certificate fingerprint and issues a per-client token, kept in the operating system's credential store. All traffic is TLS. A host refuses unpaired clients, and can be limited to listed job kinds and a maximum job size.
+- A host advertises its job kinds, runners, cores, memory, GPUs and queue. Each job kind can be set to run *Local*, *On host …* or *Best available* (the least-loaded paired host that has what the job needs, else local).
+- A job on a host survives the client disconnecting: the host keeps it and its results for 24 hours (settable), and Reviera reattaches by job ID. If a host is unreachable when a job starts, Reviera offers to run it locally.
+
+**Commands.**
+- `compute_host.discover(timeout_s?) -> hosts[]`
+- `compute_host.pair(address, code) -> host_id`
+- `compute_host.list() -> hosts[]`
+- `compute_host.forget(host_id) -> ()`
+- `compute.set_location(kind, location: "local"|"best"|host_id, detail?) -> ()`
+
+**Acceptance criteria.**
+- [ ] A job gives the same output, apart from timings, run locally and on a paired host.
+- [ ] Disconnecting during a long job and reconnecting reattaches to it and fetches its results.
+- [ ] An unpaired client is refused.
+- [ ] A 200-sheet PDF export set to *Best available* runs on a paired host, and the files arrive in the chosen folder; with no host reachable it is offered locally.
+
+### 2.17.6 Cloud compute
+**ID:** DM-RPC-006 · **Priority:** P2 · **Ref:** owner requirement (2026-10-15); Reviera-originated design
+
+**Purpose.** Run the most rigorous and largest jobs on elastic cloud compute instead of the workstation, without tying Reviera to a cloud vendor.
+
+**Behaviour & rules.**
+- `reviera-compute-host` also runs as a **cloud cluster**, published as an OCI container image with a **gateway** (the gRPC and HTTPS endpoint, job queue and blob store) and **workers** (runners). Reviera publishes deployment files for Kubernetes and for a single container host. It needs only containers, object storage and an identity provider, from any provider or self-hosted.
+- **Scale to zero:** workers start when jobs are queued and stop when the queue is empty, so a cluster holds no compute when idle; the gateway may also scale to zero where the platform starts it on request. Workers are sized per job from its distillation and the kind's resource hints, and may use pre-emptible capacity for kinds that checkpoint: a pre-empted job resumes from its last checkpoint on another worker.
+- **Connecting:** a cloud host is added by URL; clients sign in with the organisation's OpenID Connect provider or a scoped token; all traffic is TLS.
+- **Data:** only distillations are sent, anonymised by default (DM-RPC-003). Blobs and results are encrypted at rest, kept for a retention period set by the host's administrator (default 7 days), in the region the host is configured for, which the submit dialog shows.
+- **Estimates and budgets:** before submission the host returns an estimate of duration and resources and, where the operator has set prices, of cost. Jobs over a threshold set per user or project ask for confirmation; a project or organisation budget stops new submissions once spent.
+- **Long jobs:** a cloud job may run for hours or days. Reviera can be closed meanwhile; a notification arrives when it finishes, and its results wait on the host until fetched or expired.
+- **Routing by rigour:** each job kind can set where each detail level runs, for example *Coarse: local; Medium: best available; Fine: cloud*.
+- GPL runners in published images are accompanied by their corresponding source, as their licences require.
+- **Hosted calculation services.** Over time a family of cloud-hosted calculation and analysis services is offered on this contract, run on on-demand compute: structural, seismic, energy, daylight, stormwater, CFD and others (chapter 4 §4.15), rendering and large exports. A service is a cloud host (or a set of them) whose job kinds are listed in a catalogue that Reviera reads (`compute.services`): each entry names its job kinds, operator, region, pricing model and licence of its runners. The same service can be run by an organisation itself from the published images, by Reviera's project, or by a third party; Reviera treats them all alike and adds none by default.
+
+**Commands.**
+- `compute_host.add(url, auth: "oidc"|"token", token?) -> host_id`
+- `compute.estimate(kind, scope, options?, detail?, host_id?) -> {duration_s, resources, cost?}`
+- `compute.set_budget(scope: "project"|"user", limit, confirm_over?) -> ()`
+- `compute.services(catalogue_url?) -> services[]`
+
+**Acceptance criteria.**
+- [ ] A cloud host with no queued jobs runs no workers; a submitted job starts a worker sized to it, and workers stop within 5 minutes of the queue emptying.
+- [ ] A job whose estimate exceeds the confirmation threshold is not submitted until confirmed; a spent budget refuses new submissions with a clear message.
+- [ ] Closing Reviera during a cloud job and reopening it later fetches the finished results and attaches them to the right elements.
+- [ ] A pre-empted worker's job resumes from its last checkpoint and finishes with the same output.
+
+### 2.17.7 Job sets and studies
+**ID:** DM-RPC-007 · **Priority:** P2 · **Ref:** owner requirement (2026-10-15); Reviera-originated design
+
+**Purpose.** Run many variants of one job together, fanned out across a host's workers: parameter studies, design-space exploration (§2.15.3), batches of renders or exports.
+
+**Behaviour & rules.**
+- A job set names a base job and its variants, each changing options or a small part of the distillation. Examples: seismic ground-motion suites, orientations and glazing ratios for energy and daylight, storm return periods, wind directions, section alternatives, camera paths for renders.
+- Variants share the base distillation's blobs, so only their differences are uploaded.
+- Progress shows per variant. Results return as one set package with a summary table defined by the job kind (for example peak drift per ground motion) and each variant's own output. A set can be stopped early, keeping finished variants.
+- Sets run on any host; on a cloud host they run in parallel up to the host's or budget's limit.
+
+**Commands.**
+- `compute.run_set(kind, base, variants[], location?) -> set_id`
+
+**Acceptance criteria.**
+- [ ] A 20-variant set uploads the base distillation once, runs the variants in parallel on a cloud host, and returns a summary table with one row per variant.
+
+### 2.17.8 Compute Jobs panel
+**ID:** DM-RPC-008 · **Priority:** P2 · **Ref:** owner requirement (2026-10-15); Reviera-originated design
+
+**Purpose.** One place to see and manage every job of every kind, its runner and its host.
+
+**Behaviour & rules.**
+- *Manage › Compute Jobs* lists jobs (kind, scope, state, progress, host, started, duration, estimate and cost where known) with Cancel, Retry, Reattach and Open Results; a *Hosts* tab lists hosts (local, paired, cloud) with their resources, queues and the job kinds routed to each, and offers Pair Host…, Add Cloud Host… and Forget; a *Job kinds* tab lists registered kinds with their location, detail routing, idle timeout and limits.
+- The status bar shows a compute indicator only while a runner is running or a remote job is in progress, so the user can see that nothing is resident.
+- Every action is a command, equally available to Lua and MCP.
+
+**Commands.**
+- `compute.jobs(host_id?, kind?) -> jobs[]`
+
+**Acceptance criteria.**
+- [ ] `compute.*` and `compute_host.*` give the same results from Lua and MCP as the panel.
+
+**Packaging.** Reviera bundles `reviera-compute-host` beside `reviera` for local runners; the host is also packaged on its own and as a container image for LAN and cloud hosts. Built-in runners ship as separate executables. Reviera ships a Rust runner skeleton and a Python one, so a new job kind's runner can be written in any language with a gRPC library.
+
+---
+
 ## Appendix A — Reference evolution (release history and version notes)
 
 **Ref:** research/05 §14, §15, §13.1, §11.2 · screenshots/platform/wall_tool_ribbon_no_options_bar_2027.png, screenshots/platform/autodesk_assistant_2027.png
@@ -4311,6 +4529,25 @@ All commands defined in this chapter. Every command in this table is also a Lua 
 | `undo` / `redo` / `history` | steps? | — / — / history[] | — (undo operations) | DM-MCP-004 |
 | `preview` | command, arguments | change set, warnings, image? | No (always rolled back) | DM-MCP-004 |
 | `confirm` | preview_token | the command's result | Yes | DM-MCP-004 |
+| `compute.submit` | kind, scope, options?, detail?, location? | job_id | Results only | DM-RPC-001 |
+| `compute.status` | job_id | {state, progress, phase, host, messages[]} | No | DM-RPC-001 |
+| `compute.cancel` | job_id | — | No | DM-RPC-001 |
+| `compute.results` | job_id, path? | {manifest, files[]} | No | DM-RPC-001 |
+| `compute.kinds` | — | kinds[] | No | DM-RPC-002 |
+| `compute.register_kind` | manifest_path | kind | No | DM-RPC-002 |
+| `compute.distill` | kind, scope, detail?, anonymise? | {distiller, version, blobs[], size_bytes, counts} | No | DM-RPC-003 |
+| `compute.preview_distillation` | kind, scope, detail? | view_id | No | DM-RPC-003 |
+| `compute_host.discover` | timeout_s? | hosts[] | No | DM-RPC-005 |
+| `compute_host.pair` | address, code | host_id | No | DM-RPC-005 |
+| `compute_host.list` | — | hosts[] | No | DM-RPC-005 |
+| `compute_host.forget` | host_id | — | No | DM-RPC-005 |
+| `compute.set_location` | kind, location, detail? | — | Yes | DM-RPC-005 |
+| `compute_host.add` | url, auth, token? | host_id | No | DM-RPC-006 |
+| `compute.estimate` | kind, scope, options?, detail?, host_id? | {duration_s, resources, cost?} | No | DM-RPC-006 |
+| `compute.set_budget` | scope, limit, confirm_over? | — | Yes | DM-RPC-006 |
+| `compute.services` | catalogue_url? | services[] | No | DM-RPC-006 |
+| `compute.run_set` | kind, base, variants[], location? | set_id | Results only | DM-RPC-007 |
+| `compute.jobs` | host_id?, kind? | jobs[] | No | DM-RPC-008 |
 
 ---
 

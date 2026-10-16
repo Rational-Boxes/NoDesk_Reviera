@@ -72,9 +72,9 @@ Several capabilities in the reference product depend on proprietary or cloud eng
 
 | ID | Priority | Requirement |
 |----|----------|-------------|
-| ANA-PLUG-001 | P2 | Reviera shall define *analysis provider* interfaces in the command registry, one per analysis family: `structural`, `energy`, `loads`, `daylight`, `solar`, `hydraulic`, `clash`, `route`. Each provider declares its name, version and SPDX licence; its inputs (the model subset and the exchange format); its outputs (a result-package schema); and its capabilities, for example "linear static" or "modal". Families also include `carbon` (ANA-CARB-001). The manifest is a JSON file validated on `analysis_provider.register`; a manifest with an unknown kind, a missing licence or a licence outside the GPL-compatible allow-list (for in-process providers) is refused with the failing field named. Several providers per kind may be registered; one is the project default, stored in RXD document `analysis`. |
-| ANA-PLUG-002 | P2 | A provider may be an in-process Lua add-in or an **external process** that Reviera launches. External engines exchange files or standard I/O and are never linked into the binary. That keeps engines under BSD-style or custom permissive licences clear of linking questions. Engine licences shall still be checked against the GPL-3.0 allow-list before any official bundle ships one (TECH_STACK §4.2). |
-| ANA-PLUG-003 | P2 | Reviera shall ship working **built-in reference providers** for calculations that are simple and well defined: duct and pipe friction sizing, voltage drop, demand factors, the lumen method, 2D path of travel and embodied carbon (quantity × factor). Heavy engines are offered as plugins. Built-in providers register through the same manifest as plugins, appear in `analysis_provider.list` with licence `GPL-3.0-or-later`, and each has a verification test against a published hand-calculated case in the test suite. They work with no network access. |
+| ANA-PLUG-001 | P2 | Reviera shall define *analysis provider* interfaces in the command registry, one per analysis family: `structural`, `seismic`, `energy`, `loads` (thermal heating and cooling loads), `daylight`, `solar` (insolation, sun paths and shadow studies), `hydraulic` (domestic water, fire and plumbing flows), `stormwater` (roof, site and drainage runoff), `airflow` (interior air movement and ventilation, CFD), `wind` (external wind flow and pressures around buildings, CFD), `clash`, `route`. Each provider declares its name, version and SPDX licence; its inputs (the model subset and the exchange format); its outputs (a result-package schema); and its capabilities, for example "linear static" or "modal". Families also include `carbon` (ANA-CARB-001). The manifest is a JSON file validated on `analysis_provider.register`; a manifest with an unknown kind, a missing licence or a licence outside the GPL-compatible allow-list (for in-process providers) is refused with the failing field named. Several providers per kind may be registered; one is the project default, stored in RXD document `analysis`. |
+| ANA-PLUG-002 | P2 | A provider is either **in-process** (a Lua add-in, or a native library loaded on demand) or **out-of-process** (a compute job run locally, on a LAN host or on cloud compute through the remote computation subsystem, chapter 2 §2.17, or a Web service). Live calculations are in-process and batch runs out-of-process (ANA-PLUG-008); the analysis layer is specified in §4.0.2a (ANA-PLUG-004 … 009). Out-of-process engines are never linked into the binary, which keeps engines under BSD-style or custom permissive licences clear of linking questions. Engine licences shall still be checked against the GPL-3.0 allow-list before any official bundle ships one (TECH_STACK §4.2). |
+| ANA-PLUG-003 | P2 | Reviera shall ship working **built-in reference providers** for calculations that are simple and well defined: duct and pipe friction sizing, voltage drop, demand factors, the lumen method, 2D path of travel and embodied carbon (quantity × factor). Heavy engines are offered as plugins. Built-in providers follow the live and batch split (ANA-PLUG-008): their live calculations run in Reviera's process as the user models, and their batch runs are built into one bundled program, `reviera-analysis-builtin`, run as a compute job on demand (DM-RPC-004) and stopped when idle. They register through the same manifest as plugins, appear in `analysis_provider.list` with licence `GPL-3.0-or-later`, and each has a verification test against a published hand-calculated case in the test suite. They work with no network access. |
 
 Engine suggestions in this chapter are marked **[Suggestion]**. They are candidates to evaluate, not commitments. A summary is in §4.15.
 
@@ -83,6 +83,42 @@ Engine suggestions in this chapter are marked **[Suggestion]**. They are candida
 - `analysis_provider.register(manifest_path) -> provider_id`
 - `analysis_job.status(job_id) -> {state, progress, messages}`
 - `analysis_job.cancel(job_id)`
+
+### 4.0.2a Analysis plugin layer
+Ref: owner requirement (2026-10-15); Reviera-originated design.
+
+**Purpose.** Analysis is much more than structural FEA: thermal loads and energy, natural light and shade, earthquake response, plumbing and stormwater flows, interior airflow and external wind. Reviera shall reach every analysis family (ANA-PLUG-001) through one **plugin layer** built on the remote computation subsystem (chapter 2 §2.17, DM-RPC-001 … 008), which abstracts where and how a workload runs: in a local process started on demand, on a more powerful machine on the LAN, or on cloud compute. The direction is to run the most rigorous analyses (fine distillations, nonlinear and time-history runs, high-resolution CFD, annual simulations, large parameter studies) on cloud compute, and the quick screening runs locally. **No analysis engine is memory-resident when it is not in use.**
+
+**Design principles.**
+- **Live in-process, batch out-of-process.** A calculation that updates in real time while the user models runs in Reviera's process. A batch run the user starts, or one over the whole model or a large scope, is a compute job (§2.17) and runs out of process, started or connected to when it is needed (ANA-PLUG-008).
+- **A distillation per family.** A batch analysis sends only what its family needs (ANA-PLUG-009, under the rules of DM-RPC-003).
+- **One contract.** Batch analysis families are job kinds `analysis.<family>` (DM-RPC-002); their messages are the package `reviera.analysis.v1`. A provider can move from local to LAN to cloud to a Web service without changing the analysis commands.
+
+| ID | Priority | Requirement |
+|----|----------|-------------|
+| ANA-PLUG-004 | P2 | **Transports.** A provider manifest shall name its transport. **`in_process`**: required for `live` providers (ANA-PLUG-008) and opt-in for small batch ones: a Lua add-in (ANA-PLUG-002), the built-in live calculations, or a native shared library with Reviera's C ABI (`reviera_analysis_v1` entry point), loaded when first needed and unloaded when idle; third-party in-process providers must pass the GPL-compatible licence check (TECH_STACK §4.2). **`compute`** (the default for `batch` providers): the provider is the runner of a job kind `analysis.<family>` (DM-RPC-002), run locally, on a paired host or on a cloud host (DM-RPC-004 … 006); the built-in batch calculations ship as one runner, `reviera-analysis-builtin`. **`http`**: a Web service reached through the contract's HTTPS binding (DM-RPC-001), batch only. `analysis_provider.register` refuses a manifest whose mode or transport block is missing or inconsistent (a `live` provider that is not `in_process`), naming the field. |
+| ANA-PLUG-005 | P2 | **Provider lifecycle.** A batch provider follows the runner lifecycle and limits of DM-RPC-004 (on demand, idle timeout, OS-enforced memory and CPU limits, contained failures). A live in-process provider holds its working memory only while it computes; a native library is unloaded after the idle timeout where the platform allows. `analysis_provider.start`, `.stop` and `.test` act on the provider's runner; `analysis_job.status` and `.cancel` (ANA-GEN-001) are the analysis view of `compute.status` and `compute.cancel`. |
+| ANA-PLUG-006 | P2 | **Analysis results.** A batch analysis's result package (ANA-FEA-001 for structural; each family's own schema otherwise) is taken back into the model by the family's result applier (DM-RPC-002): result parameters (ANA-GEN-002), result packages referenced by the model (STR-RES-001), and display through Analysis Display Styles (ANA-ADS-001). The package's provenance manifest (DM-RPC-001) is shown in Results Explorer, and a result computed from an older snapshot is marked stale (ANA-GEN-001). |
+| ANA-PLUG-007 | P2 | **Analysis Providers panel.** *Analyze › Analysis Providers* lists every provider: family, mode (live or batch), transport, where it runs (in Reviera, local runner, host, cloud host, Web service), licence, state, and its settings: live budget, idle timeout, limits, and location per detail level (§2.17.6 routing by rigour). It offers Start, Stop, Test and a link to *Manage › Compute Jobs* (DM-RPC-008). Every action is a command, equally available to Lua and MCP. |
+| ANA-PLUG-008 | P2 | **Live and batch calculations.** A provider manifest shall declare its **mode**. **`live`**: a calculation that updates while the user models, for example duct and pipe sizing as a run is drawn, voltage drop as a circuit is built, the lumen method as fixtures are placed, a room's heating load as its walls move, embodied carbon as quantities change, and the modelling checks of the overlap engine (ARC-MOD-030) and clearances (ARC-MOD-031). Live calculations run **in-process** on the core worker pool, on the edited elements only, within a budget of 50 ms per edit on the reference model (settable); one that exceeds its budget three times in a row is suspended for the session with a notice, and its results show as stale until refreshed. **`batch`**: a run the user starts, or one whose scope is the whole model or a large selection, for example a structural or seismic solve, an energy simulation, a daylight or shadow study, a stormwater or hydraulic network run, CFD, or a project-wide clash test (ANA-CLASH-001). Batch runs are compute jobs and never block modelling. A calculation can offer both modes: the built-in duct sizing is live for the run being drawn and batch for *Size whole system*. |
+| ANA-PLUG-009 | P2 | **Analysis distillers.** Each batch analysis family shall define its distiller (DM-RPC-003): mostly an IFC filter profile that keeps only the elements and data the analysis uses, plus transforms where the family needs another representation or format. Contents per family: **structural and seismic**: the IFC4 Structural Analysis View as a profile: analytical members, panels, nodes, links, supports, sections, materials, masses, loads, cases and combinations, no physical geometry, no transform needed (ANA-FEA-001); **energy and thermal loads**: thermal zones, space boundaries as planar surfaces with their constructions, openings with glazing properties, shading surfaces, internal gains, schedules and the site and weather reference (gbXML or IFC space boundaries); **daylight, sun and shadow**: room and shading surfaces as simplified meshes with reflectance and transmittance, glazing, sensor grids, site context and location (a Radiance scene); **hydraulic and plumbing**: the pipe network graph with lengths, sizes, fittings, elevations, fixtures and demands; **stormwater**: roof and paved catchments with area, slope and surface, gutters, downspouts and drainage runs with their sizes and falls; **airflow**: the interior fluid domain as a watertight mesh with inlets, outlets, heat sources and boundary conditions; **wind**: the exterior envelope as a simplified watertight shell with nearby site context and terrain; **clash**: element bodies of the chosen categories only. Each family's results come back keyed to its distillation and are attached by its result applier (ANA-PLUG-006). |
+
+**Packaging.** Reviera's process contains the live calculations. It bundles `reviera-analysis-builtin` (the built-in batch calculations, ANA-PLUG-003) as a runner beside `reviera`. Engine wrappers (for example a CalculiX, Code_Aster, xara or OpenFOAM runner, §4.15) are separate programs, each in its own folder with its job-kind and provider manifests. The Flatpak and the Windows installer bundle no third-party engine by default; *Get Engines…* in the Providers panel installs them.
+
+**Commands.**
+- `analysis_provider.start(provider_id, host_id?) -> {state}`
+- `analysis_provider.stop(provider_id) -> ()`
+- `analysis_provider.status(provider_id?) -> [{provider_id, mode, state, location, pid?, memory_bytes?, jobs[]}]`
+- `analysis_provider.set_options(provider_id, {live_budget_ms?, idle_timeout_s?, memory_limit_bytes?, cpu_limit?, location?}) -> ()`
+- `analysis_provider.test(provider_id, host_id?) -> {ok, manifest, messages[]}`
+
+**Acceptance criteria.**
+- [ ] Drawing a duct run updates its live sizing within the 50 ms budget per edit without starting any process; *Size whole system* on the same model runs as a batch compute job on `reviera-analysis-builtin`, which exits after its idle timeout.
+- [ ] A live provider that overruns its budget three times in a row is suspended with a notice, and modelling stays responsive.
+- [ ] The spec's reference case (a simply supported 6 m beam, 10 kN/m, ANA-FEA-001) gives the same result package, apart from timings, run locally and on a paired compute host.
+- [ ] The structural distillation of the manor sample is under 5% of the size of its IFC file and contains no physical geometry, and its results attach to the right members.
+- [ ] Re-running a 2,000-member model after changing one load sends less than 10% of the first run's bytes.
+- [ ] A daylight job and a structural job run at the same time on two runners, each within its own limits, and both exit after their idle timeouts.
 
 ### 4.0.3 UI conventions for this chapter
 Ref: research/03 §0 (2027 row, Options Bar removed), §15.7
@@ -1531,7 +1567,7 @@ All are connected to their host with `IfcRelConnectsStructuralMember` and record
   - optionally **required reinforcement** areas and **proposed sections**
 - Packages are stored as `.reviera-results` archives that the model references (STR-RES-001). *Update model* applies proposed sections through STR-AM-006.
 - **Partial model transfer:** the scope can be a selection. Nodes on the boundary of the selection get default supports, and the user is warned.
-- **[Suggestion] engines**, each wrapped as an external-process provider, with licences to verify before bundling:
+- **[Suggestion] engines**, each wrapped as a compute runner (ANA-PLUG-004, DM-RPC-002), with licences to verify before bundling:
 
 | Engine | Scope | Notes |
 |--------|-------|-------|
@@ -1539,7 +1575,7 @@ All are connected to their host with `IfcRelConnectsStructuralMember` and record
 | Code_Aster | Advanced FEA | GPL-3.0 |
 | Kratos Multiphysics | Multiphysics | BSD-style |
 | PyNite | Frames and plates | MIT; a lightweight default for linear static frame analysis |
-| OpenSees | Seismic and non-linear | Custom licence; must be checked |
+| xara (OpenSees-based) | Seismic and non-linear | BSD-2-Clause. OpenSees itself is not suggested: its licence needs a UC Berkeley licence for commercial redistribution and for revenue-earning project use |
 
 **Data (IFC mapping).** Results summaries: `IfcStructuralResultGroup` (TheoryType `FIRST_ORDER_THEORY` and so on, ResultForLoadGroup → combination or case, IsLinear). Reactions are written as `IfcStructuralPointReaction` on supports. The full result data is referenced through `IfcDocumentReference` and `IfcRelAssociatesDocument`. The package index (path, hash, stale flag) and results caches are kept in **RXD document** `analysis`.
 
@@ -5190,14 +5226,18 @@ The job runs in the background with a notification. Spaces that no system serves
 
 | Capability | Provider kind | Built-in | Suggested open engine (external process) | Licence note (verify before bundling) |
 |------------|---------------|----------|-------------------------------------------|----------------------------------------|
-| Structural analysis (linear static, modal, non-linear) | `structural` | — | PyNite (frames), CalculiX, Code_Aster, Kratos Multiphysics; OpenSees (seismic) | MIT; GPL-2.0-or-later; GPL-3.0; BSD; custom licence (check) |
+| Structural analysis (linear static, modal, non-linear) | `structural` | — | PyNite or Frame3DD (frames), CalculiX, Code_Aster (via IfcOpenShell's ifc2ca), Kratos Multiphysics; xara (seismic, OpenSees-based), all batch providers as compute jobs (ANA-PLUG-004, §2.17) | MIT or GPL-3.0; GPL-2.0-or-later; GPL-3.0; BSD; BSD-2-Clause (OpenSees itself: commercial licence needed, not suggested) |
+| Earthquake assessment (response spectrum, time history, pushover) | `seismic` | Equivalent lateral force from the building code's spectrum (DM-CODE-001) | xara (OpenSees-based); Code_Aster | BSD-2-Clause; GPL-3.0 |
 | Steel connection checks | `structural` (connection_check) | Sample Lua bolt check | Community providers | Must be GPL-compatible if in-process |
 | Load combination generation | built-in rules | EN 1990 / ASCE 7-style templates as data | — | Templates authored from the published equations, not copied text |
 | Energy simulation and HVAC sizing | `energy` | — | EnergyPlus via OpenStudio | BSD-style |
 | Heating/cooling loads (RTS) | `loads` | Native RTS (optional, §4.17 Q8) | EnergyPlus sizing run | — |
 | Daylight and electric lighting | `daylight` | Lumen method | Radiance | Radiance licence (BSD-like) |
-| Solar insolation and PV | `solar` | Sky-patch cumulative | Radiance; pvlib-python | BSD-like; BSD-3 |
+| Solar insolation, PV, sun paths and shadow studies | `solar` | Sky-patch cumulative | Radiance; pvlib-python | BSD-like; BSD-3 |
 | Hydraulic networks (domestic water, fire) | `hydraulic` | Duct/pipe friction, hydronic loops | EPANET | Public domain/MIT |
+| Stormwater runoff and drainage networks | `stormwater` | Rational-method roof and gutter sizing (MEP-PIPE-010) | EPA SWMM | Public domain (verify) |
+| Interior airflow and ventilation (CFD) | `airflow` | — | OpenFOAM | GPL-3.0 |
+| External wind flow and facade pressures (CFD) | `wind` | — | OpenFOAM | GPL-3.0 |
 | Clash detection | `clash` | OCCT + BVH | — | — |
 | Route analysis | `route` | Visibility graph | Recast/Detour navigation mesh | zlib |
 | Embodied carbon | `carbon` | Quantity × emission factor (ANA-CARB-001) | openLCA, for full life-cycle assessment | MPL-2.0 (verify); data sets have their own licences |
@@ -5215,6 +5255,11 @@ Every command below is registered once in the command registry and is exposed au
 |---------|------------|---------|----------|--------|
 | `analysis_provider.list` | kind? | providers[] | No | ANA-PLUG-001 |
 | `analysis_provider.register` | manifest_path | provider_id | Yes | ANA-PLUG-001 |
+| `analysis_provider.start` | provider_id, host_id? | {state} | No | ANA-PLUG-005 |
+| `analysis_provider.stop` | provider_id | — | No | ANA-PLUG-005 |
+| `analysis_provider.status` | provider_id? | [{provider_id, mode, state, location, pid?, memory_bytes?, jobs[]}] | No | ANA-PLUG-009 |
+| `analysis_provider.set_options` | provider_id, {live_budget_ms?, idle_timeout_s?, memory_limit_bytes?, cpu_limit?, location?} | — | Yes | ANA-PLUG-005 |
+| `analysis_provider.test` | provider_id, host_id? | {ok, manifest, messages[]} | No | ANA-PLUG-009 |
 | `analysis_job.status` | job_id | {state, progress, messages} | No | ANA-GEN-001 |
 | `analysis_job.cancel` | job_id | — | No | ANA-GEN-001 |
 | `column.place` | type_id, point, base_level, top_constraint, base_offset, top_offset, rotation? | element_id | Yes | STR-COL-001 |
