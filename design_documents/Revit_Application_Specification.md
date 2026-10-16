@@ -3,7 +3,7 @@
 **Functional reference:** Autodesk® Revit® 2026/2027, described only from publicly available sources
 **Product:** Reviera, an open-source BIM authoring application (GPL-3.0-or-later; RXD schemas MIT)
 **Compiled from:** `design_documents/spec/*.md` by `tools/build_spec.py`. Edit the chapter files, not this file.
-**Companion documents:** `TECH_STACK.md` (architecture and licensing) · `RESEARCH_LOG.md` (clean-room provenance) · `SOURCE_REGISTER.md` (public sources, reference screenshots) · `research/01–05` (raw research, internal)
+**Companion documents:** `TECH_STACK.md` (architecture and licensing) · `RESEARCH_LOG.md` (clean-room provenance) · `SOURCE_REGISTER.md` (public sources, reference screenshots) · `research/01–07` (raw research, internal)
 
 > Autodesk and Revit are trademarks of Autodesk, Inc., used here only to identify the functional reference. Reviera is not affiliated with or endorsed by Autodesk. Screenshot paths cited in "Ref:" lines point to internal reference material; it is not part of Reviera.
 
@@ -21,6 +21,7 @@
 | [Chapter 5](#chapter-5--views-graphics-annotation-schedules-sheets-and-output) | Views, Graphics, Annotation, Schedules, Sheets and Output | `spec/05_views_documentation.md` |
 | [Chapter 6](#chapter-6--collaboration-linking-and-coordination) | Collaboration, Linking and Coordination | `spec/06_collaboration_coordination.md` |
 | [Chapter 7](#chapter-7--advanced-features) | Advanced Features | `spec/07_advanced_features.md` |
+| [Chapter 8](#chapter-8--remote-computation-and-analysis-overview) | Remote Computation and Analysis (Overview) | `spec/08_remote_computation_analysis.md` |
 | [Appendix A](#appendix-a--consolidated-indexes) | Consolidated Indexes | `spec/A_indexes.md` |
 | [Appendix B](#appendix-b--specification-conventions) | Specification Conventions | `spec/00_conventions.md` |
 
@@ -31,7 +32,7 @@
 **Document:** Functional and technical specification of Reviera, an open-source BIM authoring application
 **Functional reference:** Autodesk® Revit® 2026/2027 (described from public sources only; see `RESEARCH_LOG.md`)
 **Licence of Reviera:** GPL-3.0-or-later
-**Version:** 0.1 (draft) · 2026-10-12 · **Size:** 763 numbered requirements (318 P0 · 265 P1 · 173 P2 · 7 P3), 1,942 commands
+**Version:** 0.1 (draft) · 2026-10-15 · **Size:** 806 numbered requirements (320 P0 · 292 P1 · 187 P2 · 7 P3), 2,055 commands
 
 > **Clean-room statement.** This specification describes features, workflows and behaviour in Reviera's own words. Every input was publicly available: vendor online help, public blogs and tutorials, public forums and open-source repositories. All of it is listed with URLs and access checks in `SOURCE_REGISTER.md`. No proprietary, confidential, leaked or NDA-covered information was used. No vendor code, binaries, file formats or assets were examined or copied. Autodesk and Revit are trademarks of Autodesk, Inc. They are used here only to identify the functional reference. Reviera is not affiliated with or endorsed by Autodesk.
 
@@ -60,7 +61,8 @@ This document covers:
 | 5 | Views, graphics, annotation, schedules, sheets, output |
 | 6 | Collaboration, linking and coordination (Local and BIMserver modes) |
 | 7 | Advanced features beyond the reference product: scene protocol, simulated walkthroughs, Godot translation layer for VR/AR, render bridges |
-| A | Appendix A: requirement summary, shared commands, consolidated command index (1,942 commands; 763 requirements) |
+| 8 | Remote computation and analysis (overview): the remote computation subsystem and the analysis plugin layer, how they fit together, and a build order |
+| A | Appendix A: requirement summary, shared commands, consolidated command index (2,055 commands; 806 requirements) |
 
 Out of scope:
 - reproducing vendor-cloud services such as ACC/Forma and Autodesk Assistant (open alternatives are specified instead)
@@ -8290,6 +8292,253 @@ key_id = "minisign:<publisher public key>"     # signature file: reviera-addin.t
 
 ---
 
+## 2.17 Remote computation contract
+
+Reviera shall have a foundational subsystem, built on one general contract, that abstracts calculation workloads from where and how they run: it runs calculation runs against **model distillations** in another process, on this machine, on a more powerful machine on the LAN, or on cloud compute. Analysis is its first user (chapter 4 §4.0.2a), but the contract is not tied to analysis. Rendering, tessellation of large models, batch export, point clouds, project-wide booleans and clash runs, design-space exploration (§2.15.3), and use cases not yet known are all **job kinds** on the same contract. Each job sends only an extract of the model that the calculation needs, never the model, so a job is small enough to send across a network.
+
+**Terms.**
+
+| Term | Meaning |
+|------|---------|
+| **Job kind** | A named, versioned kind of calculation run (for example `analysis.structural`, `render.still`, `export.pdf_set`), declared by a manifest (DM-RPC-002). |
+| **Distiller** | A deterministic function in Reviera's process that turns a model snapshot, a scope, a detail level and options into a distillation (DM-RPC-003). |
+| **Distillation** | The extract a job sends: content-addressed blobs and a key map that stays in Reviera. |
+| **Runner** | The program that performs a job kind; a separate process, started on demand (DM-RPC-004). |
+| **Host** | Where runners run: this machine, a paired machine on the LAN (DM-RPC-005), or a cloud cluster (DM-RPC-006). |
+| **Result applier** | The function in Reviera's process that takes a job's output back into the model: parameters, result packages, files, view overlays. |
+| **Job set** | Many variants of one job submitted together (DM-RPC-007). |
+
+### 2.17.1 Contract and protocol
+**ID:** DM-RPC-001 · **Priority:** P2 · **Ref:** owner requirement (2026-10-15); Reviera-originated design
+
+**Purpose.** One versioned RPC contract between Reviera and any runner or host, whatever the job kind.
+
+**Behaviour & rules.**
+- The contract is the gRPC package **`reviera.compute.v1`**, defined in `.proto` files published with the specification. It changes only by adding fields; a breaking change gets a new package (`v2`), and a host may serve several versions. Reviera is the client; a runner, or a host that forwards to its runners, is the server.
+- An **HTTPS/JSON binding** carries the same operations for Web services and environments without gRPC: `POST /blobs/missing`, `PUT /blobs/{sha256}`, `POST /jobs`, `GET /jobs/{id}` (with a server-sent event stream for progress), `GET /jobs/{id}/results`, `DELETE /jobs/{id}`, described in an OpenAPI document published with the specification.
+- **Job-kind messages** live in their own packages beside the contract: `reviera.analysis.v1` (chapter 4), `reviera.render.v1`, `reviera.export.v1`, and any package a job kind's manifest names. `SubmitJob` carries the kind's options as a typed message (`google.protobuf.Any`), so the contract never changes for a new kind.
+- **Idempotent submission:** every job has a client job key; submitting the same key twice returns the existing job.
+- **Errors** carry a gRPC status and a reason code: `invalid_input`, `unsupported_kind`, `version_mismatch`, `too_large`, `limit_exceeded`, `memory_limit`, `preempted`, `cancelled`, `runner_failed`, `unauthorised`, `negotiation_failed`, with a message and, for runner failures, the runner's last output.
+- **Negotiation is part of the contract.** Compression and encryption are chosen by negotiation, so new techniques are added without changing the contract. Every technique has a registered identifier (for example `zstd-dict-v1`, `aead-aes256gcm`, `kem-x25519-mlkem768`) in a registry published with the specification, which only grows. `Negotiate` exchanges each side's supported identifiers in order of preference, with minimum acceptable versions, and returns the session's choice: the strongest option both sides support, never one either side has marked as deprecated or below its minimum. Every blob and result header records the identifiers used to produce it, so any party can read data written with older choices while new data uses newer ones. A side that cannot agree on an acceptable option fails with `negotiation_failed` naming the category, instead of falling back to something weaker; a client never downgrades because a server asked it to. Administrators set organisation policy (allowed, preferred and minimum identifiers) on hosts and clients.
+- **Encryption, negotiated in layers.** *Transport*: TLS 1.3 at least, preferring hybrid post-quantum key exchange (for example X25519 with ML-KEM-768) where both sides support it; local sockets rely on owner-only permissions and the one-time token. *Content*: blobs and results bound for a LAN or cloud host are also encrypted end to end, independently of TLS, so a gateway, object store or operator that relays or stores them cannot read them. Each job has fresh content keys used with a negotiated AEAD cipher (for example AES-256-GCM or ChaCha20-Poly1305); keys are wrapped for the job's runners with a negotiated key-encapsulation scheme (HPKE, with a hybrid post-quantum KEM preferred) using keys the host's workers publish in `Describe`, and results come back wrapped for the client. *Integrity*: blob names are SHA-256 of the uncompressed plaintext (the hash algorithm is itself negotiable), and result manifests are signed by the runner with a negotiated signature scheme (for example Ed25519, with ML-DSA as it becomes available), so provenance can be verified. Content encryption is on by default for remote and cloud hosts and Web services, and may be off for local runners.
+- **Compression on the wire.** Model transfer uses the strongest codecs available, chosen by the negotiation above; compression is applied before encryption. The baseline is **zstd** (long-distance matching, high levels for uploads) with **trained dictionaries** per filter profile and schema, shipped with Reviera and identified by hash, because IFC text from one profile repeats the same entity names and structures. On top of it: **content-defined chunking** (for example FastCDC) inside large blobs, so an edit moves only the chunks it touches even within one storey; **delta compression** of a changed blob against the version the server already holds (zstd patch-from), when `HasBlobs` reports the earlier hash; **geometry codecs** for meshes produced by transforms (for example meshoptimizer or Draco encoding of vertex and index buffers); and **byte shuffling** before zstd for large numeric arrays (results, fields, sensor grids). Already-compressed blobs are not compressed again at the gRPC or HTTP layer. Format-aware compressors (for example OpenZL) are candidates to evaluate as negotiated codecs [Suggestion]. Compression runs on the worker pool and never blocks the UI.
+- **Provenance:** every result carries a manifest naming the job kind and version, the runner and its version, the distiller and its version, the detail level, the model snapshot hash, the input blob list, the host, and the timings. A result can always say exactly what it was computed from.
+
+| RPC | Kind | Purpose |
+|-----|------|---------|
+| `Negotiate` | unary | Exchanges supported compression, encryption, key-encapsulation, signature and hash identifiers in order of preference with minimum versions, and returns the session's choices (or `negotiation_failed`). Repeated whenever either side's policy changes. |
+| `Describe` | unary | What the server offers: job kinds and versions, runners and their manifests (name, version, SPDX licence, capabilities, accepted formats), resources (cores, memory, GPUs), limits and supported contract versions, and the workers' public keys for content encryption. |
+| `Health` | unary | Ready or not, with load (jobs running and queued, memory in use). Used for start-up, *Best available* and heartbeats. |
+| `HasBlobs` | unary | Which of a list of blob hashes the server already holds. |
+| `PutBlobs` | client streaming | Uploads blobs in chunks of up to 4 MiB, each compressed with a negotiated codec (zstd with a profile dictionary by default, or a delta against a blob the server holds) and named by the SHA-256 of its uncompressed content. Blobs are cached for the server's retention time, so a re-run after a small change sends only the blobs that changed. |
+| `SubmitJob` | unary | Starts a job: kind and version, the kind's options, the distillation's blob list and distiller, the snapshot hash and the client job key. Returns the job ID. |
+| `ListJobs` | unary | The job registry (DM-RPC-009): the caller's jobs, filtered by state, kind, project or client, with paging. |
+| `GetJob` | unary | One job's registry record: state, progress, timings, host and worker, last event sequence number, result manifest hash and expiry. |
+| `WatchJob` | server streaming | Progress (fraction and phase), log lines, warnings, heartbeats, checkpoints and the final state (succeeded, failed with reason, cancelled). Every event has a sequence number; a client that reconnects passes the last number it saw and receives the events after it, with none lost or repeated. |
+| `GetResults` | server streaming | The job's output (a result package, images or files) in chunks, with its SHA-256 and provenance manifest. Takes a byte offset, so an interrupted download resumes where it stopped. |
+| `AckResults` | unary | The client confirms it has stored a job's results; the server may then release them before their expiry. |
+| `CancelJob` | unary | Cancels a job; the runner stops work and frees its memory. |
+| `Shutdown` | unary | Asks a local runner to exit cleanly (sent at its idle timeout; the process is killed after a 10 s grace period). |
+
+**Local transport.** On one machine a runner listens on a Unix domain socket (Linux, macOS) or a named pipe (Windows) in a per-user directory with owner-only permissions, so no network port is opened; loopback TCP is the fallback. The socket path and a one-time token are passed on the runner's command line, and every call carries the token.
+
+**Commands.**
+- `compute.submit(kind, scope, options?, detail?, location?) -> job_id`
+- `compute.status(job_id) -> {state, progress, phase, host, messages[]}`
+- `compute.cancel(job_id) -> ()`
+- `compute.results(job_id, path?) -> {manifest, files[]}`
+
+**Acceptance criteria.**
+- [ ] A job kind added after release (a test kind with its own options package) runs through `compute.submit` with no change to `reviera.compute.v1`.
+- [ ] Submitting the same client job key twice returns one job.
+- [ ] The same job run over gRPC and over the HTTPS binding returns identical outputs and provenance apart from timings.
+- [ ] A structural distillation of a 2,000-member model compresses at least 3× better with its profile dictionary than with plain zstd at the same level, and re-sending it after one member changes transfers less than 2% of its compressed size (content-defined chunks and deltas).
+- [ ] A server that does not advertise a codec never receives blobs encoded with it.
+- [ ] Adding a new compression or cipher identifier to client and host enables it with no change to `reviera.compute.v1`; a client and host that share no acceptable cipher fail with `negotiation_failed` and send nothing.
+- [ ] A client whose policy sets a minimum refuses a host that offers only weaker options, and is never downgraded by the host.
+- [ ] On a cloud host, the blobs in object storage cannot be decrypted without the job's wrapped keys, and a tampered result manifest fails signature verification.
+
+### 2.17.2 Job kinds and their extension
+**ID:** DM-RPC-002 · **Priority:** P2 · **Ref:** owner requirement (2026-10-15); Reviera-originated design
+
+**Purpose.** Any eventual use case can be added as a job kind, by Reviera or by an add-in, without changing the contract.
+
+**Behaviour & rules.**
+- A job kind is declared by a JSON manifest: its name and version; its options and result schemas (a protobuf package, or JSON Schema for the HTTPS binding); its **distillers** (DM-RPC-003): a filter profile, plus any named transforms; its **result applier**; its **runner** (a command line, relative to the kind's folder, and the platforms it supports, or a container image for hosts that run containers); resource hints (cores, memory, GPU, typical duration per unit of distillation); whether it supports checkpoints; and the SPDX licences of each part.
+- Filter profiles are data. Transforms and result appliers run in Reviera's process, so they are Rust code in Reviera or Lua in an add-in (§2.14) and must pass the GPL-compatible licence check (TECH_STACK §4.2). Runners are separate programs and are never linked into Reviera; their licences are checked before an official bundle ships one.
+- **Built-in job kinds:** `analysis.<family>` for each batch analysis family (chapter 4 §4.0.2a); `render.still`, `render.panorama`, `render.walkthrough` (chapter 7); `tessellate.ifc` for large models and links; `export.pdf_set`, `export.ifc`, `export.cobie`, `export.dwg`; `pointcloud.index`; `model.boolean_batch` and `model.clash_batch` for project-wide booleans, overlap and clash runs started as a batch (ARC-MOD-028, ARC-MOD-030, ANA-CLASH-001).
+- Interactive work never depends on a job: editing, regeneration, live checks and viewport drawing run in Reviera's process.
+- `compute.register_kind` validates a manifest and refuses one with a missing field, an unknown schema, or an in-process part outside the licence allow-list, naming the field.
+
+**Commands.**
+- `compute.kinds() -> kinds[]`
+- `compute.register_kind(manifest_path) -> kind`
+
+**Acceptance criteria.**
+- [ ] An add-in that registers a new job kind with a Lua distiller and applier and a Python runner can run jobs on a local runner and on a paired host.
+- [ ] A manifest whose distiller's licence is not GPL-compatible is refused with the licence field named.
+
+### 2.17.3 Model distillations
+**ID:** DM-RPC-003 · **Priority:** P2 · **Ref:** owner requirement (2026-10-15); Reviera-originated design
+
+**Purpose.** A job sends an extract of only what its calculation needs, at the level of detail it needs. That makes sending the relevant details to powerful remote compute practical, and keeps the rest of the model at home.
+
+**Behaviour & rules.**
+- **A distillation is mostly a filtered IFC model.** Reviera's model is IFC, so a distiller is first a **filter profile**: a declarative JSON description of what to keep, applied in Reviera's process. A profile names the IFC entity classes to keep (with subtypes and predefined types), the attributes and property sets (and properties within them) to keep, the representation contexts and identifiers to keep (for example `Axis` and `Reference` instead of `Body`), the relationships to follow (aggregation, containment, assignments, materials, structural connections), and the common entities every chunk needs (project, units, contexts, materials, profiles, types). Everything else is dropped. The output is a stripped-down, valid IFC4 subset, much like a model view definition; the IFC4 Structural Analysis View is the model for this, and the structural distiller is that view as a profile.
+- **Transforms only where needed.** Where an analysis needs a representation the model does not hold, a profile adds a named transform written in Rust or Lua: simplifying or decimating bodies, deriving space-boundary surfaces, building a watertight fluid domain, deriving a network graph. A transform's output is still keyed to the IFC entities it came from. Other formats (gbXML, a Radiance scene, an EPANET network, a mesh) are produced from the filtered IFC by such a transform, never from the full model.
+- Each blob is self-describing: media type and schema identifier (for IFC, the schema and the profile's name and version).
+- **Detail levels:** a distiller offers Coarse, Medium and Fine (for example decimation tolerance, minimum feature size, whether small openings and furniture are kept), defaulting to the coarsest the job kind's guidance accepts.
+- **Deterministic and chunked:** the same model state and options give byte-identical blobs: IFC chunks are written with a stable entity order and stable instance numbering, split by a natural unit (storey, zone, member group, sheet), with the shared entities in a common chunk, so after an edit only the changed chunks are sent.
+- **Mapped back locally:** with *Anonymise* on, GlobalIds in the distillation are replaced by short opaque keys; the map from keys to GlobalIds stays in Reviera, and outputs keyed the same way are attached to the right elements by the result applier.
+- **Minimal metadata:** names, comments, author data and properties the job does not use are left out. *Anonymise* (on by default for remote and cloud hosts and Web services) replaces any remaining names with keys.
+- **Shown before sending:** the submit dialog shows the distillation's size, entity counts and destination, can preview it in a temporary 3D view, and warns when it exceeds the destination's maximum job size.
+- **Recorded:** the distiller's name and version and the detail level go into the job's provenance (DM-RPC-001).
+- **Cached** per kind, scope, detail level, options and snapshot until the model changes.
+- A distillation leaves the machine only for a host or service the user has approved. The first job to a remote host or Web service asks for consent, naming the destination and what is sent; consent is remembered per destination and project and can be withdrawn.
+
+**Commands.**
+- `compute.distill(kind, scope, detail?, anonymise?) -> {distiller, version, blobs[], size_bytes, counts}`
+- `compute.preview_distillation(kind, scope, detail?) -> view_id`
+
+**Acceptance criteria.**
+- [ ] Distilling the same model state twice gives byte-identical blobs.
+- [ ] A profile-only distillation (no transforms) of the FZK-Haus sample is a valid IFC4 file that IfcOpenShell opens, holding only the profile's classes, property sets and representations.
+- [ ] With *Anonymise* on, no element name, comment or author field appears in any blob.
+- [ ] Outputs returned keyed by opaque keys attach to the right elements although the host never sees a GlobalId.
+- [ ] No blob is sent to a remote destination before consent is given.
+
+### 2.17.4 Runner lifecycle and isolation
+**ID:** DM-RPC-004 · **Priority:** P2 · **Ref:** owner requirement (2026-10-15); Reviera-originated design
+
+**Purpose.** Runners use memory only while they work, and a runner that fails cannot take Reviera or the machine down with it.
+
+**Behaviour & rules.**
+- **On demand:** a runner process runs only while it has work: *stopped → starting → ready → busy → idle → stopped*. The first job starts it; it stops after an idle timeout (default 120 s; 0 stops it when its last job ends; settable per kind), on request, or when Reviera exits. Opening, editing or viewing results starts no runner. Start-up never blocks the UI: a job waits in *starting*, with progress. A runner that does not answer its health check within 30 s (settable) fails the start with its last output attached.
+- **Limits enforced by the operating system:** a memory ceiling (default half of physical memory, settable), a CPU share or core limit, and lower scheduling priority; on Linux through a cgroup scope (systemd user scope or cgroup v2) with `setrlimit` as the fallback, on Windows through a Job Object with a memory limit and below-normal priority, on macOS through `setrlimit` and the background QoS class. The same limits apply to each job on a host.
+- **Failures stay contained:** a runner over its memory ceiling is stopped and the job fails with `memory_limit`, never by exhausting the machine. A crash, a hang (no progress or heartbeat within the job's heartbeat interval, default 60 s) or a lost connection fails the job and leaves Reviera running; the next job starts the runner again. The runner's stderr and exit status are attached to the failed job.
+
+**Acceptance criteria.**
+- [ ] With a model open and no job running, no runner process exists, and none is started by opening, editing or viewing results.
+- [ ] After a job, its runner exits within the idle timeout plus 15 s; with the timeout set to 0, within 15 s of the job ending.
+- [ ] A runner with a 512 MB ceiling that allocates past it is stopped; its job fails with `memory_limit`, and Reviera's own memory use is unchanged.
+- [ ] Killing a runner during a job fails that job with the exit status attached; Reviera keeps running, and the next job starts the runner again and succeeds.
+
+### 2.17.5 Compute hosts on the LAN
+**ID:** DM-RPC-005 · **Priority:** P2 · **Ref:** owner requirement (2026-10-15); Reviera-originated design
+
+**Purpose.** Send heavy jobs to a more powerful machine on the local network.
+
+**Behaviour & rules.**
+- `reviera-compute-host` is a small service that runs on another machine and starts runners there on demand, with the lifecycle and limits of DM-RPC-004.
+- Hosts advertise themselves by DNS-SD (`_reviera-compute._tcp`) and can be added by address.
+- **Pairing:** the host shows a six-digit code; entering it in Reviera pins the host's TLS certificate fingerprint and issues a per-client token, kept in the operating system's credential store. All traffic is TLS. A host refuses unpaired clients, and can be limited to listed job kinds and a maximum job size.
+- A host advertises its job kinds, runners, cores, memory, GPUs and queue. Each job kind can be set to run *Local*, *On host …* or *Best available* (the least-loaded paired host that has what the job needs, else local).
+- A job on a host survives the client disconnecting, and Reviera reattaches to it through the job registry (DM-RPC-009). If a host is unreachable when a job starts, Reviera offers to run it locally.
+
+**Commands.**
+- `compute_host.discover(timeout_s?) -> hosts[]`
+- `compute_host.pair(address, code) -> host_id`
+- `compute_host.list() -> hosts[]`
+- `compute_host.forget(host_id) -> ()`
+- `compute.set_location(kind, location: "local"|"best"|host_id, detail?) -> ()`
+
+**Acceptance criteria.**
+- [ ] A job gives the same output, apart from timings, run locally and on a paired host.
+- [ ] Disconnecting during a long job and reconnecting reattaches to it and fetches its results.
+- [ ] An unpaired client is refused.
+- [ ] A 200-sheet PDF export set to *Best available* runs on a paired host, and the files arrive in the chosen folder; with no host reachable it is offered locally.
+
+### 2.17.6 Cloud compute
+**ID:** DM-RPC-006 · **Priority:** P2 · **Ref:** owner requirement (2026-10-15); Reviera-originated design
+
+**Purpose.** Run the most rigorous and largest jobs on elastic cloud compute instead of the workstation, without tying Reviera to a cloud vendor.
+
+**Behaviour & rules.**
+- `reviera-compute-host` also runs as a **cloud cluster**, published as an OCI container image with a **gateway** (the gRPC and HTTPS endpoint, job queue and blob store) and **workers** (runners). Reviera publishes deployment files for Kubernetes and for a single container host. It needs only containers, object storage and an identity provider, from any provider or self-hosted.
+- **Scale to zero:** workers start when jobs are queued and stop when the queue is empty, so a cluster holds no compute when idle; the gateway may also scale to zero where the platform starts it on request. Workers are sized per job from its distillation and the kind's resource hints, and may use pre-emptible capacity for kinds that checkpoint: a pre-empted job resumes from its last checkpoint on another worker.
+- **Connecting:** a cloud host is added by URL; clients sign in with the organisation's OpenID Connect provider or a scoped token; all traffic is TLS.
+- **Data:** only distillations are sent, anonymised by default (DM-RPC-003). Blobs and results are encrypted at rest, kept for a retention period set by the host's administrator (default 7 days), in the region the host is configured for, which the submit dialog shows.
+- **Estimates and budgets:** before submission the host returns an estimate of duration and resources and, where the operator has set prices, of cost. Jobs over a threshold set per user or project ask for confirmation; a project or organisation budget stops new submissions once spent.
+- **Long jobs:** a cloud job may run for hours or days. Reviera can be closed meanwhile; a notification arrives when it finishes, and its results wait on the host until fetched or expired.
+- **Routing by rigour:** each job kind can set where each detail level runs, for example *Coarse: local; Medium: best available; Fine: cloud*.
+- GPL runners in published images are accompanied by their corresponding source, as their licences require.
+- **Hosted calculation services.** Over time a family of cloud-hosted calculation and analysis services is offered on this contract, run on on-demand compute: structural, seismic, energy, daylight, stormwater, CFD and others (chapter 4 §4.15), rendering and large exports. A service is a cloud host (or a set of them) whose job kinds are listed in a catalogue that Reviera reads (`compute.services`): each entry names its job kinds, operator, region, pricing model and licence of its runners. The same service can be run by an organisation itself from the published images, by Reviera's project, or by a third party; Reviera treats them all alike and adds none by default.
+
+**Commands.**
+- `compute_host.add(url, auth: "oidc"|"token", token?) -> host_id`
+- `compute.estimate(kind, scope, options?, detail?, host_id?) -> {duration_s, resources, cost?}`
+- `compute.set_budget(scope: "project"|"user", limit, confirm_over?) -> ()`
+- `compute.services(catalogue_url?) -> services[]`
+
+**Acceptance criteria.**
+- [ ] A cloud host with no queued jobs runs no workers; a submitted job starts a worker sized to it, and workers stop within 5 minutes of the queue emptying.
+- [ ] A job whose estimate exceeds the confirmation threshold is not submitted until confirmed; a spent budget refuses new submissions with a clear message.
+- [ ] Closing Reviera during a cloud job and reopening it later fetches the finished results and attaches them to the right elements.
+- [ ] A pre-empted worker's job resumes from its last checkpoint and finishes with the same output.
+
+### 2.17.7 Job sets and studies
+**ID:** DM-RPC-007 · **Priority:** P2 · **Ref:** owner requirement (2026-10-15); Reviera-originated design
+
+**Purpose.** Run many variants of one job together, fanned out across a host's workers: parameter studies, design-space exploration (§2.15.3), batches of renders or exports.
+
+**Behaviour & rules.**
+- A job set names a base job and its variants, each changing options or a small part of the distillation. Examples: seismic ground-motion suites, orientations and glazing ratios for energy and daylight, storm return periods, wind directions, section alternatives, camera paths for renders.
+- Variants share the base distillation's blobs, so only their differences are uploaded.
+- Progress shows per variant. Results return as one set package with a summary table defined by the job kind (for example peak drift per ground motion) and each variant's own output. A set can be stopped early, keeping finished variants.
+- Sets run on any host; on a cloud host they run in parallel up to the host's or budget's limit.
+
+**Commands.**
+- `compute.run_set(kind, base, variants[], location?) -> set_id`
+
+**Acceptance criteria.**
+- [ ] A 20-variant set uploads the base distillation once, runs the variants in parallel on a cloud host, and returns a summary table with one row per variant.
+
+### 2.17.8 Compute Jobs panel
+**ID:** DM-RPC-008 · **Priority:** P2 · **Ref:** owner requirement (2026-10-15); Reviera-originated design
+
+**Purpose.** One place to see and manage every job of every kind, its runner and its host.
+
+**Behaviour & rules.**
+- *Manage › Compute Jobs* lists jobs (kind, scope, state, progress, host, started, duration, estimate and cost where known) with Cancel, Retry, Reattach, Forget and Open Results, and marks jobs that are *reconnecting* or whose results are nearing expiry; a *Hosts* tab lists hosts (local, paired, cloud) with their resources, queues and the job kinds routed to each, and offers Pair Host…, Add Cloud Host… and Forget; a *Job kinds* tab lists registered kinds with their location, detail routing, idle timeout and limits.
+- The status bar shows a compute indicator only while a runner is running or a remote job is in progress, so the user can see that nothing is resident.
+- Every action is a command, equally available to Lua and MCP.
+
+**Commands.**
+- `compute.jobs(host_id?, kind?) -> jobs[]`
+
+**Acceptance criteria.**
+- [ ] `compute.*` and `compute_host.*` give the same results from Lua and MCP as the panel.
+
+### 2.17.9 Job registry and reconnection
+**ID:** DM-RPC-009 · **Priority:** P2 · **Ref:** owner requirement (2026-10-15); Reviera-originated design
+
+**Purpose.** A long-running job is safe from disconnection: the client can go away, because of a network drop, a laptop closing, Reviera quitting or crashing, and come back later to follow the job and collect its results.
+
+**Behaviour & rules.**
+- **Server registry.** Every server (a local compute host, a LAN host, a cloud gateway) keeps a durable **registry of jobs**, written before `SubmitJob` returns and updated as each job progresses, so it survives the client disconnecting and the server itself restarting (an embedded database on a single host; the cluster's database on a cloud gateway). A record holds the job ID, the client job key, the owner's identity, the project, the kind and version, the state, submission, start and finish times, the host and worker, progress, the last event sequence number, checkpoints, the result manifest hash, and the expiry.
+- **Jobs outlive their client.** A job keeps running when its client disconnects. Local jobs run under the local compute host (started on demand in the user's session, DM-RPC-004), not as children of Reviera, so they survive Reviera closing or crashing; the local host stays up while it has jobs and exits when it is idle and holds no unfetched results. *Cancel local jobs when Reviera exits* is an option, off by default.
+- **Host restarts.** When a host restarts, jobs it was running resume from their last checkpoint if their kind supports checkpoints; otherwise they are marked failed with reason `host_restarted` and offered for resubmission. Queued jobs stay queued.
+- **Client registry.** Reviera records every job it submits, with its host, job ID, client job key, kind, scope, snapshot hash and last event sequence number, in the model's RXD document `compute` (saved with the model), and in the user's state for models not yet saved. When Reviera starts or opens a model with outstanding jobs, it reconnects to their hosts, resumes `WatchJob` from the last sequence number, downloads finished results (resuming partial downloads), applies them through the result applier, and acknowledges them with `AckResults`. Results computed from an older snapshot are applied and marked stale (ANA-GEN-001), never silently dropped.
+- **Reconnection.** A lost connection is retried with backoff (1 s to 60 s); the job shows *reconnecting* in the Compute Jobs panel meanwhile. Reattaching works from any machine signed in as the job's owner on a LAN or cloud host, so a job started on one workstation can be collected on another.
+- **Retention and expiry.** Results are kept until acknowledged or until the server's retention ends (24 hours on a LAN host, 7 days on a cloud host, both settable), whichever comes later for unacknowledged results; the panel warns about results nearing expiry. An expired job's record stays in the registry, without results, for 30 days.
+- **Access.** A client sees and reattaches to its owner's jobs only; administrators can list all jobs on their hosts.
+
+**Commands.**
+- `compute.reattach(job_id?) -> jobs[]` (all outstanding jobs when no ID is given)
+- `compute.forget_job(job_id) -> ()` (removes a job from the client registry; cancels it first if it is still running and the user confirms)
+
+**Acceptance criteria.**
+- [ ] Killing Reviera during a 30-minute local job and starting it again 10 minutes later shows the job still running; when it finishes, its results are applied without user action.
+- [ ] Disconnecting the network during a cloud job and reconnecting resumes progress from the last event, with no event shown twice or missed.
+- [ ] Interrupting a 500 MB result download at 60% and reconnecting downloads only the remaining 40%.
+- [ ] Restarting a LAN host during a checkpointing job resumes it from its last checkpoint; a non-checkpointing job is reported as `host_restarted` and offered for resubmission.
+- [ ] A job submitted from one workstation is listed, followed and collected from another signed in as the same user.
+- [ ] Saving and reopening the model keeps its outstanding jobs, and reopening reconnects to them.
+
+**Packaging.** Reviera bundles `reviera-compute-host` beside `reviera` for local runners; the host is also packaged on its own and as a container image for LAN and cloud hosts. Built-in runners ship as separate executables. Reviera ships a Rust runner skeleton and a Python one, so a new job kind's runner can be written in any language with a gRPC library.
+
+---
+
 ## Appendix A — Reference evolution (release history and version notes)
 
 **Ref:** research/05 §14, §15, §13.1, §11.2 · screenshots/platform/wall_tool_ribbon_no_options_bar_2027.png, screenshots/platform/autodesk_assistant_2027.png
@@ -8745,6 +8994,27 @@ All commands defined in this chapter. Every command in this table is also a Lua 
 | `undo` / `redo` / `history` | steps? | — / — / history[] | — (undo operations) | DM-MCP-004 |
 | `preview` | command, arguments | change set, warnings, image? | No (always rolled back) | DM-MCP-004 |
 | `confirm` | preview_token | the command's result | Yes | DM-MCP-004 |
+| `compute.submit` | kind, scope, options?, detail?, location? | job_id | Results only | DM-RPC-001 |
+| `compute.status` | job_id | {state, progress, phase, host, messages[]} | No | DM-RPC-001 |
+| `compute.cancel` | job_id | — | No | DM-RPC-001 |
+| `compute.results` | job_id, path? | {manifest, files[]} | No | DM-RPC-001 |
+| `compute.kinds` | — | kinds[] | No | DM-RPC-002 |
+| `compute.register_kind` | manifest_path | kind | No | DM-RPC-002 |
+| `compute.distill` | kind, scope, detail?, anonymise? | {distiller, version, blobs[], size_bytes, counts} | No | DM-RPC-003 |
+| `compute.preview_distillation` | kind, scope, detail? | view_id | No | DM-RPC-003 |
+| `compute_host.discover` | timeout_s? | hosts[] | No | DM-RPC-005 |
+| `compute_host.pair` | address, code | host_id | No | DM-RPC-005 |
+| `compute_host.list` | — | hosts[] | No | DM-RPC-005 |
+| `compute_host.forget` | host_id | — | No | DM-RPC-005 |
+| `compute.set_location` | kind, location, detail? | — | Yes | DM-RPC-005 |
+| `compute_host.add` | url, auth, token? | host_id | No | DM-RPC-006 |
+| `compute.estimate` | kind, scope, options?, detail?, host_id? | {duration_s, resources, cost?} | No | DM-RPC-006 |
+| `compute.set_budget` | scope, limit, confirm_over? | — | Yes | DM-RPC-006 |
+| `compute.services` | catalogue_url? | services[] | No | DM-RPC-006 |
+| `compute.run_set` | kind, base, variants[], location? | set_id | Results only | DM-RPC-007 |
+| `compute.jobs` | host_id?, kind? | jobs[] | No | DM-RPC-008 |
+| `compute.reattach` | job_id? | jobs[] | No | DM-RPC-009 |
+| `compute.forget_job` | job_id | — | No | DM-RPC-009 |
 
 ---
 
@@ -10508,6 +10778,8 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 - `compound.duplicate_layer(type_id, index)`
 - `compound.set_default_wrapping(type_id, at_inserts, at_ends)`
 
+*Built (2026-10-15), walls:* `compound.get` and `compound.set_layers` (layers with function, priority, material by name, thickness accepting units, wraps, structural and variable flags; the core defaults to the Structure layers), validated as above; stored in the wall type's `recipe.wall_type` as `compound`, the type's width becoming the layers' total (`type.set_param width` is refused on a layered type). Plans draw the inner layer boundaries in cut straight walls (between their joined ends, broken by openings). IFC: an `IfcMaterialLayerSet` per layered type (Name, Category, Priority as above; the core's layers described "Core"; IsVentilated false, unset for membranes) and one shared `IfcMaterialLayerSetUsage` (AXIS2, POSITIVE, centred) for its walls, replaced only when the structure changes. Not yet: the separate `compound.insert_layer`/`delete_layer`/`move_layer`/`duplicate_layer` commands (the dialog edits rows and applies them with `set_layers`), default wrapping, floors, roofs and ceilings, import of layer sets without RXD, and Resistance and Thermal Mass.
+
 **Acceptance criteria.**
 - [ ] A type whose layers are all outside the core (empty core) saves, regenerates and round-trips through IFC and RXD.
 - [ ] Setting a Finish layer to priority 1 while it lies between a priority-3 layer and the core fails validation with a message naming both layers.
@@ -10533,7 +10805,9 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 **Commands.** The `compound.*` commands, applied as a batch.
 
 **Acceptance criteria.**
-- [ ] Changing a layer's material and pressing OK updates all instances. Cancel leaves them untouched.
+- [x] Changing a layer's material and pressing OK updates all instances. Cancel leaves them untouched.
+
+*Built (2026-10-15):* Modify | Walls › **Edit Assembly** for the selected wall's type: a grid of Function, Priority, Material, Thickness, Wraps and Core (ticked rows, together), with Insert, Delete, Up and Down; OK validates and applies one `compound.set_layers` (an error keeps the dialog open), Cancel changes nothing. The type's Properties show its layers as *Structure*. Not yet: the header's R and thermal mass, the material browser, the preview pane, Structural Material and Variable columns, default wrapping, and vertical structure.
 
 ### 3.3.7 Vertically compound walls (regions)
 **ID:** ARC-CMPD-003 · **Priority:** P1 · **Ref:** research/02 §4.5
@@ -10971,6 +11245,8 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 
 **Commands.** No command of its own. Embedding is automatic on create or move. `geometry.cut` (ARC-MOD-016) forces a cut manually.
 
+*Built (2026-10-15):* a straight curtain wall whose base line lies within half a straight basic wall's width of its location line cuts an opening through it over the span and heights they share; the two are related (not reported as an overlap). Not yet: refusing doors and windows in the cut span, curved hosts, `geometry.cut`.
+
 **Acceptance criteria.**
 - [ ] Drawing a storefront along a brick wall cuts a matching opening, and moving the storefront moves the opening.
 
@@ -11312,8 +11588,10 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 - `column.detach(column_ids[], end: top|base, target_ids?) -> ()`
 
 **Acceptance criteria.**
-- [ ] A column attached at its top to a sloping roof with Maximum Intersection reaches the highest point where the roof crosses the column's footprint. With Minimum Intersection it reaches the lowest.
+- [x] A column attached at its top to a sloping roof with Maximum Intersection reaches the highest point where the roof crosses the column's footprint. With Minimum Intersection it reaches the lowest.
 - [ ] A column joined to a plastered wall takes the plaster finish on its faces.
+
+*Built (2026-10-15):* `column.place_architectural`, `column.set`, `column.attach` (top only; targets: Reviera roofs, floors and ceilings; Cut Column style: with Maximum and Midline the top is cut by the underside), `column.detach`; column types (`IfcColumnType` with a `recipe.column_type`: rectangular width × depth or round diameter) through `type.duplicate`, `type.set_param` and `element.set_type`. Columns move, rotate, mirror and copy, follow their levels and are deleted with them; an attach target that goes leaves the column at its own top. Architecture › **Column** places them in plans (Spacebar turns 90°), Properties edits constraints, rotation and type, and Modify | Columns › Attach Top / Detach Top attach to what is directly above. IFC: `IfcColumn` (`COLUMN`, `Pset_ColumnCommon.LoadBearing` false) with a faceted B-rep body, contained in its base level. Not yet: attaching bases, Cut Target and Do Not Cut styles, reference planes and levels as targets, wall materials and wrapping, Moves With Grids, Room Bounding.
 
 ### 3.4.6 Flip controls and mirrored state
 **ID:** ARC-FLIP-001 · **Priority:** P0 · **Ref:** research/02 §2.4, §2.5, §4.13, §5.2, §5.3, §13 (Edge cases) · web: About Flip Controls; Flip Elements
@@ -11391,7 +11669,9 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 - Grid lines (U/V positions, segment on/off, pin state, independent flag) are stored in RXD element data (`recipe.curtain_grid`). The type's layout rules are stored in RXD type data (`recipe.curtain_type`).
 
 **Acceptance criteria.**
-- [ ] A 6 m × 3 m curtain wall with three vertical grid lines and one horizontal grid line exports one `IfcCurtainWall` aggregating 8 `IfcPlate` and the matching `IfcMember` parts, and it opens in an independent viewer with every part present.
+- [x] A 6 m × 3 m curtain wall with three vertical grid lines and one horizontal grid line exports one `IfcCurtainWall` aggregating 8 `IfcPlate` and the matching `IfcMember` parts, and it opens in an independent viewer with every part present. *(Checked by test with IfcOpenShell; not yet in another viewer.)*
+
+*Built (2026-10-15):* straight curtain walls (`curtain.create`, `curtain.set`) of curtain wall types (`IfcCurtainWallType` with a `recipe.curtain_type`: U and V layout rules, interior and border mullions as rectangles, Glazed, Solid or Empty system panels and their thickness; values through `type.set_param`, swapped with `element.set_type`; the default type is a *Storefront*). Panels fill the cells inside the mullions; vertical mullions run full height, horizontal ones between them. They move, rotate, mirror and copy and are deleted with their levels. Architecture › **Curtain Wall** draws them with two clicks; Properties edits constraints, justification and offset per direction, and the type. IFC: the parts are derived on save (marked `rxd:curtain`, not loaded as elements), rewritten only when the curtain wall changes. Not yet: an `Axis` representation, arc curtain walls, independent grid lines and segments, curtain-panel and door families, mullion profiles, `Adjust for Mullion Size`, pinned grids, curtain systems and sloped glazing.
 
 ### 3.5.2 Creating curtain walls
 **ID:** ARC-CW-002 · **Priority:** P1 · **Ref:** research/02 §6.2
@@ -11689,6 +11969,8 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 **Acceptance criteria.**
 - [ ] Clicking inside a room enclosed by four walls creates a ceiling whose edges lie on the walls' interior finish faces.
 - [ ] Each ceiling exports as `IfcCovering(CEILING)` with an `IfcRelCoversSpaces` link to the room it covers.
+
+*Built (2026-10-15), ceilings that follow a roof (owner request, 2026-10-15: "non-flat ceilings that hug the contour of the roof for top-floor, vaulted roofs, domes"):* `ceiling.set_shape(ceiling_ids, shape: flat | follow_roof, roof_id?)` and `ceiling.create_auto(…, follow_roof)`; the roof defaults to the one over the ceiling covering most of it, its underside above the level. The ceiling's outline (less its openings) is cut into a piece under each roof face — footprint roofs' faces and arched roofs' and domes' facets — each piece's top on that face's underside and its bottom the ceiling's thickness below; what the roof does not cover stays flat. Written as faceted B-reps. The Ceiling tool's Properties and a ceiling's Properties have a Shape row. Not yet: a gap below the roof, a minimum height (flat where the roof would come lower), areas and headroom measured on the shaped ceiling.
 
 ### 3.6.4 Roof by footprint
 **ID:** ARC-ROOF-001 · **Priority:** P0 · **Ref:** research/02 §7.4 · screenshots/architecture/roof_footprint_sketch_mode.png · screenshots/architecture/roof_different_eave_heights_render.png
@@ -12049,6 +12331,8 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 - [ ] A shed (flat-lift) dormer at 15° on a 45° roof ends where its roof meets the main roof, and its cheek walls are trapezoids filling the gap.
 - [ ] The main roof has an opening exactly inside the dormer walls' interior faces. Deleting the dormer closes it.
 - [ ] `dormer.create` from Lua or MCP gives the same model as the window tool.
+
+*Built (2026-10-15), owner fix ("Trim the side-walls to the slope of the roof so they don't extend into the living space within"):* every dormer wall is clipped by the plane of the main roof's underside under the dormer (`dormers::wall_base_plane`), in its displayed body and its IFC B-rep, so the cheek walls follow the slope instead of hanging below the roof; tested by checking that no point of the walls lies below the underside.
 
 **Implementation notes (2026-10-13).**
 - As built:
@@ -12967,7 +13251,7 @@ These are view annotation and are specified in the DOC chapter. This chapter req
 - [ ] A vertical opening in the upper of two stacked floors leaves the lower floor intact.
 - [ ] Moving the host floor 2 m moves the opening with it.
 
-*Built (2026-10-14):* `opening.create_vertical` and `opening.set_loops` on Reviera floors and ceilings (roofs not yet); loops partly outside notch the edge (polygon booleans by iOverlay); the opening moves and mirrors with its host and is deleted with it; Reviera's display cuts the host while the IFC keeps the host whole and voids it with the opening (an `IfcExtrudedAreaSolid` of the loops through the host plus 1 mm). Plans draw it crossed with grips. Stair openings (ARC-STAIR-007) make them. Not yet: the Opening › Vertical sketch tool and Edit Sketch.
+*Built (2026-10-14):* `opening.create_vertical` and `opening.set_loops` on Reviera floors, ceilings and footprint roofs; loops partly outside notch the edge (polygon booleans by iOverlay); the opening moves and mirrors with its host and is deleted with it; Reviera's display cuts the host while the IFC keeps a slab whole and voids it with the opening (an `IfcExtrudedAreaSolid` of the loops through the host plus 1 mm; a roof's faceted body is written with the hole). Plans draw it crossed with grips. Stair openings (ARC-STAIR-007) make them. *Built (2026-10-15):* Architecture › Opening › **Vertical** sketches the loops on the plan's level; Finish cuts the floor (in a ceiling plan the ceiling) on that level the loops overlap most, else a roof; `opening.create_vertical` also takes sketch `curves`. In a roof an opening must lie within one face. Not yet: picking the host explicitly, Edit Sketch (grips reshape it), openings across roof faces and in arched roofs and domes.
 
 ### 3.8.3 Wall opening
 **ID:** ARC-OPEN-003 · **Priority:** P0 · **Ref:** research/02 §4.11, §9
@@ -12986,7 +13270,9 @@ These are view annotation and are specified in the DOC chapter. This chapter req
 **Commands.** `opening.create_wall(wall_id, u0, u1, base: {level_id, offset}, top: Level{id,offset} | Unconnected(h)) -> element_id`.
 
 **Acceptance criteria.**
-- [ ] A wall opening that follows its base and top levels grows when the top level is raised.
+- [x] A wall opening that follows its base and top levels grows when the top level is raised.
+
+*Built (2026-10-15):* `opening.create_wall` (`wall_id`, `u0`, `u1`, `base_level` defaulting to the wall's, `base_offset`, `top_constraint` defaulting to 2.1 m, `top_offset`) and `opening.edit_wall`, in straight and curved walls; refused where it leaves the wall's clear span or overlaps a door, window or another opening (and doors and windows are refused over it). It slides along the wall with `element.move`, moves and is copied with its wall and is deleted with it or its levels. Architecture › Opening › **Wall Opening** places it by hovering a wall (width and height in Properties); Properties edits its constraints, width and position. IFC: an `IfcOpeningElement` (box through the wall plus 1 mm, in the wall's frame) voiding the wall. Not yet: drag controls in elevations, mid-end faces for joins and wrapping, cased openings.
 
 ### 3.8.4 Shaft opening
 **ID:** ARC-OPEN-004 · **Priority:** P0 · **Ref:** research/02 §9
@@ -13004,8 +13290,10 @@ These are view annotation and are specified in the DOC chapter. This chapter req
 **Commands.** `opening.create_shaft(loops, base_level, base_offset?, top: Level{id,offset} | Unconnected(h), symbolic_lines?: [curve]) -> element_id`.
 
 **Acceptance criteria.**
-- [ ] A shaft from Level 1 to Roof cuts every floor between them. A floor added later in that range is cut automatically.
-- [ ] The IFC export contains one `IfcOpeningElement` per cut host, and each one is voided correctly.
+- [x] A shaft from Level 1 to Roof cuts every floor between them. A floor added later in that range is cut automatically.
+- [x] The IFC export contains one `IfcOpeningElement` per cut host, and each one is voided correctly.
+
+*Built (2026-10-15):* `opening.create_shaft` (loops or sketch curves, base level and offset, top level and offset or a height) and `opening.edit_shaft`; it cuts every Reviera floor, ceiling and footprint roof whose body its extent reaches into (computed on regeneration, so later hosts are cut too) and moves, copies and mirrors with the modify tools. Architecture › Opening › **Shaft** sketches it on the plan's level, up to the next level; plans of every level it passes draw it crossed with grips; Properties edits its extent and lists what it cuts. IFC: the proxy's body is the whole prism; each host gets a derived `IfcOpeningElement` (marked `rxd:shaft <shaft> <host>` in its Description, not loaded as an element) that is updated or removed on save. Not yet: symbolic lines, Pick Walls boundaries, toposolids (none exist yet).
 
 ### 3.8.5 Dormer opening
 **ID:** ARC-OPEN-005 · **Priority:** P1 · **Ref:** research/02 §9
@@ -13967,7 +14255,9 @@ These tools are on the **Modify** tab and are repeated on every `Modify | <Eleme
 
 **Acceptance criteria.**
 - [ ] A linear array of 5 chairs at 0.8 m, with Group and Associate on, can be changed to 7 by editing the count label, and the spacing stays 0.8 m.
-- [ ] A radial array of 8 columns over 360° (Move To: Last, 360°) places the columns 45° apart without duplicating the first one.
+- [x] A radial array of 8 columns over 360° (Move To: Last, 360°) places the columns 45° apart without duplicating the first one.
+
+*Built (2026-10-15):* `element.array_linear` and `element.array_radial` without Group and Associate (refused with `array.group_not_supported` until groups exist): the members are independent copies made through the modify tools' transform, in one undo step. Modify › **Array** (AR) and **Radial Array** ask the number of members and Move To, then take the two picks (or a typed distance or angle) with every member previewed; the radial centre is the selection's centre. Not yet: Group and Associate, array sets and the count label, Constrain, placing the radial centre.
 
 ### 3.12.3a Array along a path
 **ID:** ARC-MOD-033 · **Priority:** P1 · **Ref:** owner requirement (2026-10-14); ARC-MOD-026, DM-IMP-015, DM-LIB-002 … 004; Reviera's own design
@@ -14947,9 +15237,9 @@ Several capabilities in the reference product depend on proprietary or cloud eng
 
 | ID | Priority | Requirement |
 |----|----------|-------------|
-| ANA-PLUG-001 | P2 | Reviera shall define *analysis provider* interfaces in the command registry, one per analysis family: `structural`, `energy`, `loads`, `daylight`, `solar`, `hydraulic`, `clash`, `route`. Each provider declares its name, version and SPDX licence; its inputs (the model subset and the exchange format); its outputs (a result-package schema); and its capabilities, for example "linear static" or "modal". Families also include `carbon` (ANA-CARB-001). The manifest is a JSON file validated on `analysis_provider.register`; a manifest with an unknown kind, a missing licence or a licence outside the GPL-compatible allow-list (for in-process providers) is refused with the failing field named. Several providers per kind may be registered; one is the project default, stored in RXD document `analysis`. |
-| ANA-PLUG-002 | P2 | A provider may be an in-process Lua add-in or an **external process** that Reviera launches. External engines exchange files or standard I/O and are never linked into the binary. That keeps engines under BSD-style or custom permissive licences clear of linking questions. Engine licences shall still be checked against the GPL-3.0 allow-list before any official bundle ships one (TECH_STACK §4.2). |
-| ANA-PLUG-003 | P2 | Reviera shall ship working **built-in reference providers** for calculations that are simple and well defined: duct and pipe friction sizing, voltage drop, demand factors, the lumen method, 2D path of travel and embodied carbon (quantity × factor). Heavy engines are offered as plugins. Built-in providers register through the same manifest as plugins, appear in `analysis_provider.list` with licence `GPL-3.0-or-later`, and each has a verification test against a published hand-calculated case in the test suite. They work with no network access. |
+| ANA-PLUG-001 | P2 | Reviera shall define *analysis provider* interfaces in the command registry, one per analysis family: `structural`, `seismic`, `energy`, `loads` (thermal heating and cooling loads), `daylight`, `solar` (insolation, sun paths and shadow studies), `hydraulic` (domestic water, fire and plumbing flows), `stormwater` (roof, site and drainage runoff), `airflow` (interior air movement and ventilation, CFD), `wind` (external wind flow and pressures around buildings, CFD), `clash`, `route`. Each provider declares its name, version and SPDX licence; its inputs (the model subset and the exchange format); its outputs (a result-package schema); and its capabilities, for example "linear static" or "modal". Families also include `carbon` (ANA-CARB-001). The manifest is a JSON file validated on `analysis_provider.register`; a manifest with an unknown kind, a missing licence or a licence outside the GPL-compatible allow-list (for in-process providers) is refused with the failing field named. Several providers per kind may be registered; one is the project default, stored in RXD document `analysis`. |
+| ANA-PLUG-002 | P2 | A provider is either **in-process** (a Lua add-in, or a native library loaded on demand) or **out-of-process** (a compute job run locally, on a LAN host or on cloud compute through the remote computation subsystem, chapter 2 §2.17, or a Web service). Live calculations are in-process and batch runs out-of-process (ANA-PLUG-008); the analysis layer is specified in §4.0.2a (ANA-PLUG-004 … 009). Out-of-process engines are never linked into the binary, which keeps engines under BSD-style or custom permissive licences clear of linking questions. Engine licences shall still be checked against the GPL-3.0 allow-list before any official bundle ships one (TECH_STACK §4.2). |
+| ANA-PLUG-003 | P2 | Reviera shall ship working **built-in reference providers** for calculations that are simple and well defined: duct and pipe friction sizing, voltage drop, demand factors, the lumen method, 2D path of travel and embodied carbon (quantity × factor). Heavy engines are offered as plugins. Built-in providers follow the live and batch split (ANA-PLUG-008): their live calculations run in Reviera's process as the user models, and their batch runs are built into one bundled program, `reviera-analysis-builtin`, run as a compute job on demand (DM-RPC-004) and stopped when idle. They register through the same manifest as plugins, appear in `analysis_provider.list` with licence `GPL-3.0-or-later`, and each has a verification test against a published hand-calculated case in the test suite. They work with no network access. |
 
 Engine suggestions in this chapter are marked **[Suggestion]**. They are candidates to evaluate, not commitments. A summary is in §4.15.
 
@@ -14958,6 +15248,42 @@ Engine suggestions in this chapter are marked **[Suggestion]**. They are candida
 - `analysis_provider.register(manifest_path) -> provider_id`
 - `analysis_job.status(job_id) -> {state, progress, messages}`
 - `analysis_job.cancel(job_id)`
+
+### 4.0.2a Analysis plugin layer
+Ref: owner requirement (2026-10-15); Reviera-originated design.
+
+**Purpose.** Analysis is much more than structural FEA: thermal loads and energy, natural light and shade, earthquake response, plumbing and stormwater flows, interior airflow and external wind. Reviera shall reach every analysis family (ANA-PLUG-001) through one **plugin layer** built on the remote computation subsystem (chapter 2 §2.17, DM-RPC-001 … 008), which abstracts where and how a workload runs: in a local process started on demand, on a more powerful machine on the LAN, or on cloud compute. The direction is to run the most rigorous analyses (fine distillations, nonlinear and time-history runs, high-resolution CFD, annual simulations, large parameter studies) on cloud compute, and the quick screening runs locally. **No analysis engine is memory-resident when it is not in use.**
+
+**Design principles.**
+- **Live in-process, batch out-of-process.** A calculation that updates in real time while the user models runs in Reviera's process. A batch run the user starts, or one over the whole model or a large scope, is a compute job (§2.17) and runs out of process, started or connected to when it is needed (ANA-PLUG-008).
+- **A distillation per family.** A batch analysis sends only what its family needs (ANA-PLUG-009, under the rules of DM-RPC-003).
+- **One contract.** Batch analysis families are job kinds `analysis.<family>` (DM-RPC-002); their messages are the package `reviera.analysis.v1`. A provider can move from local to LAN to cloud to a Web service without changing the analysis commands.
+
+| ID | Priority | Requirement |
+|----|----------|-------------|
+| ANA-PLUG-004 | P2 | **Transports.** A provider manifest shall name its transport. **`in_process`**: required for `live` providers (ANA-PLUG-008) and opt-in for small batch ones: a Lua add-in (ANA-PLUG-002), the built-in live calculations, or a native shared library with Reviera's C ABI (`reviera_analysis_v1` entry point), loaded when first needed and unloaded when idle; third-party in-process providers must pass the GPL-compatible licence check (TECH_STACK §4.2). **`compute`** (the default for `batch` providers): the provider is the runner of a job kind `analysis.<family>` (DM-RPC-002), run locally, on a paired host or on a cloud host (DM-RPC-004 … 006); the built-in batch calculations ship as one runner, `reviera-analysis-builtin`. **`http`**: a Web service reached through the contract's HTTPS binding (DM-RPC-001), batch only. `analysis_provider.register` refuses a manifest whose mode or transport block is missing or inconsistent (a `live` provider that is not `in_process`), naming the field. |
+| ANA-PLUG-005 | P2 | **Provider lifecycle.** A batch provider follows the runner lifecycle and limits of DM-RPC-004 (on demand, idle timeout, OS-enforced memory and CPU limits, contained failures). A live in-process provider holds its working memory only while it computes; a native library is unloaded after the idle timeout where the platform allows. `analysis_provider.start`, `.stop` and `.test` act on the provider's runner; `analysis_job.status` and `.cancel` (ANA-GEN-001) are the analysis view of `compute.status` and `compute.cancel`. |
+| ANA-PLUG-006 | P2 | **Analysis results.** A batch analysis's result package (ANA-FEA-001 for structural; each family's own schema otherwise) is taken back into the model by the family's result applier (DM-RPC-002): result parameters (ANA-GEN-002), result packages referenced by the model (STR-RES-001), and display through Analysis Display Styles (ANA-ADS-001). The package's provenance manifest (DM-RPC-001) is shown in Results Explorer, and a result computed from an older snapshot is marked stale (ANA-GEN-001). |
+| ANA-PLUG-007 | P2 | **Analysis Providers panel.** *Analyze › Analysis Providers* lists every provider: family, mode (live or batch), transport, where it runs (in Reviera, local runner, host, cloud host, Web service), licence, state, and its settings: live budget, idle timeout, limits, and location per detail level (§2.17.6 routing by rigour). It offers Start, Stop, Test and a link to *Manage › Compute Jobs* (DM-RPC-008). Every action is a command, equally available to Lua and MCP. |
+| ANA-PLUG-008 | P2 | **Live and batch calculations.** A provider manifest shall declare its **mode**. **`live`**: a calculation that updates while the user models, for example duct and pipe sizing as a run is drawn, voltage drop as a circuit is built, the lumen method as fixtures are placed, a room's heating load as its walls move, embodied carbon as quantities change, and the modelling checks of the overlap engine (ARC-MOD-030) and clearances (ARC-MOD-031). Live calculations run **in-process** on the core worker pool, on the edited elements only, within a budget of 50 ms per edit on the reference model (settable); one that exceeds its budget three times in a row is suspended for the session with a notice, and its results show as stale until refreshed. **`batch`**: a run the user starts, or one whose scope is the whole model or a large selection, for example a structural or seismic solve, an energy simulation, a daylight or shadow study, a stormwater or hydraulic network run, CFD, or a project-wide clash test (ANA-CLASH-001). Batch runs are compute jobs and never block modelling. A calculation can offer both modes: the built-in duct sizing is live for the run being drawn and batch for *Size whole system*. |
+| ANA-PLUG-009 | P2 | **Analysis distillers.** Each batch analysis family shall define its distiller (DM-RPC-003): mostly an IFC filter profile that keeps only the elements and data the analysis uses, plus transforms where the family needs another representation or format. Contents per family: **structural and seismic**: the IFC4 Structural Analysis View as a profile: analytical members, panels, nodes, links, supports, sections, materials, masses, loads, cases and combinations, no physical geometry, no transform needed (ANA-FEA-001); **energy and thermal loads**: thermal zones, space boundaries as planar surfaces with their constructions, openings with glazing properties, shading surfaces, internal gains, schedules and the site and weather reference (gbXML or IFC space boundaries); **daylight, sun and shadow**: room and shading surfaces as simplified meshes with reflectance and transmittance, glazing, sensor grids, site context and location (a Radiance scene); **hydraulic and plumbing**: the pipe network graph with lengths, sizes, fittings, elevations, fixtures and demands; **stormwater**: roof and paved catchments with area, slope and surface, gutters, downspouts and drainage runs with their sizes and falls; **airflow**: the interior fluid domain as a watertight mesh with inlets, outlets, heat sources and boundary conditions; **wind**: the exterior envelope as a simplified watertight shell with nearby site context and terrain; **clash**: element bodies of the chosen categories only. Each family's results come back keyed to its distillation and are attached by its result applier (ANA-PLUG-006). |
+
+**Packaging.** Reviera's process contains the live calculations. It bundles `reviera-analysis-builtin` (the built-in batch calculations, ANA-PLUG-003) as a runner beside `reviera`. Engine wrappers (for example a CalculiX, Code_Aster, xara or OpenFOAM runner, §4.15) are separate programs, each in its own folder with its job-kind and provider manifests. The Flatpak and the Windows installer bundle no third-party engine by default; *Get Engines…* in the Providers panel installs them.
+
+**Commands.**
+- `analysis_provider.start(provider_id, host_id?) -> {state}`
+- `analysis_provider.stop(provider_id) -> ()`
+- `analysis_provider.status(provider_id?) -> [{provider_id, mode, state, location, pid?, memory_bytes?, jobs[]}]`
+- `analysis_provider.set_options(provider_id, {live_budget_ms?, idle_timeout_s?, memory_limit_bytes?, cpu_limit?, location?}) -> ()`
+- `analysis_provider.test(provider_id, host_id?) -> {ok, manifest, messages[]}`
+
+**Acceptance criteria.**
+- [ ] Drawing a duct run updates its live sizing within the 50 ms budget per edit without starting any process; *Size whole system* on the same model runs as a batch compute job on `reviera-analysis-builtin`, which exits after its idle timeout.
+- [ ] A live provider that overruns its budget three times in a row is suspended with a notice, and modelling stays responsive.
+- [ ] The spec's reference case (a simply supported 6 m beam, 10 kN/m, ANA-FEA-001) gives the same result package, apart from timings, run locally and on a paired compute host.
+- [ ] The structural distillation of the manor sample is under 5% of the size of its IFC file and contains no physical geometry, and its results attach to the right members.
+- [ ] Re-running a 2,000-member model after changing one load sends less than 10% of the first run's bytes.
+- [ ] A daylight job and a structural job run at the same time on two runners, each within its own limits, and both exit after their idle timeouts.
 
 ### 4.0.3 UI conventions for this chapter
 Ref: research/03 §0 (2027 row, Options Bar removed), §15.7
@@ -16406,7 +16732,7 @@ All are connected to their host with `IfcRelConnectsStructuralMember` and record
   - optionally **required reinforcement** areas and **proposed sections**
 - Packages are stored as `.reviera-results` archives that the model references (STR-RES-001). *Update model* applies proposed sections through STR-AM-006.
 - **Partial model transfer:** the scope can be a selection. Nodes on the boundary of the selection get default supports, and the user is warned.
-- **[Suggestion] engines**, each wrapped as an external-process provider, with licences to verify before bundling:
+- **[Suggestion] engines**, each wrapped as a compute runner (ANA-PLUG-004, DM-RPC-002), with licences to verify before bundling:
 
 | Engine | Scope | Notes |
 |--------|-------|-------|
@@ -16414,7 +16740,7 @@ All are connected to their host with `IfcRelConnectsStructuralMember` and record
 | Code_Aster | Advanced FEA | GPL-3.0 |
 | Kratos Multiphysics | Multiphysics | BSD-style |
 | PyNite | Frames and plates | MIT; a lightweight default for linear static frame analysis |
-| OpenSees | Seismic and non-linear | Custom licence; must be checked |
+| xara (OpenSees-based) | Seismic and non-linear | BSD-2-Clause. OpenSees itself is not suggested: its licence needs a UC Berkeley licence for commercial redistribution and for revenue-earning project use |
 
 **Data (IFC mapping).** Results summaries: `IfcStructuralResultGroup` (TheoryType `FIRST_ORDER_THEORY` and so on, ResultForLoadGroup → combination or case, IsLinear). Reactions are written as `IfcStructuralPointReaction` on supports. The full result data is referenced through `IfcDocumentReference` and `IfcRelAssociatesDocument`. The package index (path, hash, stale flag) and results caches are kept in **RXD document** `analysis`.
 
@@ -20065,14 +20391,18 @@ The job runs in the background with a notification. Spaces that no system serves
 
 | Capability | Provider kind | Built-in | Suggested open engine (external process) | Licence note (verify before bundling) |
 |------------|---------------|----------|-------------------------------------------|----------------------------------------|
-| Structural analysis (linear static, modal, non-linear) | `structural` | — | PyNite (frames), CalculiX, Code_Aster, Kratos Multiphysics; OpenSees (seismic) | MIT; GPL-2.0-or-later; GPL-3.0; BSD; custom licence (check) |
+| Structural analysis (linear static, modal, non-linear) | `structural` | — | PyNite or Frame3DD (frames), CalculiX, Code_Aster (via IfcOpenShell's ifc2ca), Kratos Multiphysics; xara (seismic, OpenSees-based), all batch providers as compute jobs (ANA-PLUG-004, §2.17) | MIT or GPL-3.0; GPL-2.0-or-later; GPL-3.0; BSD; BSD-2-Clause (OpenSees itself: commercial licence needed, not suggested) |
+| Earthquake assessment (response spectrum, time history, pushover) | `seismic` | Equivalent lateral force from the building code's spectrum (DM-CODE-001) | xara (OpenSees-based); Code_Aster | BSD-2-Clause; GPL-3.0 |
 | Steel connection checks | `structural` (connection_check) | Sample Lua bolt check | Community providers | Must be GPL-compatible if in-process |
 | Load combination generation | built-in rules | EN 1990 / ASCE 7-style templates as data | — | Templates authored from the published equations, not copied text |
 | Energy simulation and HVAC sizing | `energy` | — | EnergyPlus via OpenStudio | BSD-style |
 | Heating/cooling loads (RTS) | `loads` | Native RTS (optional, §4.17 Q8) | EnergyPlus sizing run | — |
 | Daylight and electric lighting | `daylight` | Lumen method | Radiance | Radiance licence (BSD-like) |
-| Solar insolation and PV | `solar` | Sky-patch cumulative | Radiance; pvlib-python | BSD-like; BSD-3 |
+| Solar insolation, PV, sun paths and shadow studies | `solar` | Sky-patch cumulative | Radiance; pvlib-python | BSD-like; BSD-3 |
 | Hydraulic networks (domestic water, fire) | `hydraulic` | Duct/pipe friction, hydronic loops | EPANET | Public domain/MIT |
+| Stormwater runoff and drainage networks | `stormwater` | Rational-method roof and gutter sizing (MEP-PIPE-010) | EPA SWMM | Public domain (verify) |
+| Interior airflow and ventilation (CFD) | `airflow` | — | OpenFOAM | GPL-3.0 |
+| External wind flow and facade pressures (CFD) | `wind` | — | OpenFOAM | GPL-3.0 |
 | Clash detection | `clash` | OCCT + BVH | — | — |
 | Route analysis | `route` | Visibility graph | Recast/Detour navigation mesh | zlib |
 | Embodied carbon | `carbon` | Quantity × emission factor (ANA-CARB-001) | openLCA, for full life-cycle assessment | MPL-2.0 (verify); data sets have their own licences |
@@ -20090,6 +20420,11 @@ Every command below is registered once in the command registry and is exposed au
 |---------|------------|---------|----------|--------|
 | `analysis_provider.list` | kind? | providers[] | No | ANA-PLUG-001 |
 | `analysis_provider.register` | manifest_path | provider_id | Yes | ANA-PLUG-001 |
+| `analysis_provider.start` | provider_id, host_id? | {state} | No | ANA-PLUG-005 |
+| `analysis_provider.stop` | provider_id | — | No | ANA-PLUG-005 |
+| `analysis_provider.status` | provider_id? | [{provider_id, mode, state, location, pid?, memory_bytes?, jobs[]}] | No | ANA-PLUG-009 |
+| `analysis_provider.set_options` | provider_id, {live_budget_ms?, idle_timeout_s?, memory_limit_bytes?, cpu_limit?, location?} | — | Yes | ANA-PLUG-005 |
+| `analysis_provider.test` | provider_id, host_id? | {ok, manifest, messages[]} | No | ANA-PLUG-009 |
 | `analysis_job.status` | job_id | {state, progress, messages} | No | ANA-GEN-001 |
 | `analysis_job.cancel` | job_id | — | No | ANA-GEN-001 |
 | `column.place` | type_id, point, base_level, top_constraint, base_offset, top_offset, rotation? | element_id | Yes | STR-COL-001 |
@@ -26507,6 +26842,129 @@ No reference-product sources were used in this chapter.
 
 ---
 
+# Chapter 8 — Remote Computation and Analysis (Overview)
+
+**Status:** Draft 0.1 · 2026-10-15 · **Kind:** overview brief. This chapter adds no requirements. It explains how the remote computation subsystem (Chapter 2 §2.17, DM-RPC-001 … 009) and the analysis plugin layer (Chapter 4 §4.0.2a, ANA-PLUG-001 … 009) fit together, and why. The requirements in those sections are normative; where this chapter and they differ, they win. Research and reasoning: `research/07_analysis_engines_remote_compute.md`.
+
+## 8.0 Scope and provenance
+
+This is Reviera's own design, from owner directives given on 2026-10-15. It has no counterpart in the reference product, which links to a proprietary structural solver and vendor cloud services. The only outside inputs are the scopes and licences of open-source engines (sources S0711–S0719) and the names of published standards and libraries.
+
+## 8.1 Goals
+
+1. **Nothing resident when idle.** No analysis engine, or any other heavy calculation, holds memory or CPU when it is not in use.
+2. **Run work where it makes sense.** Quick work on the workstation; heavy work on a more powerful machine on the LAN; the most rigorous runs on cloud compute; and, in time, a family of cloud-hosted calculation services.
+3. **Any eventual use case.** One foundational subsystem abstracts calculation workloads from where and how they run. Analysis is its first user, not its only one.
+4. **Send only what is needed.** A job carries a distillation of the model, never the model.
+5. **Future-forward.** Compression and encryption are negotiated, so new techniques arrive without changing the contract.
+6. **Contained failures.** A crash or runaway fails its job, never Reviera or the machine.
+7. **Disconnect-safe.** A long job outlives its client: a durable job registry on every server and a record of submitted jobs in the model let Reviera reconnect, follow the job from where it left off and collect its results, even after quitting or moving to another machine.
+
+## 8.2 Architecture at a glance
+
+```
+ Reviera (workstation)                                     Where jobs run
+ ┌──────────────────────────────────────────┐
+ │ Live calculations (in-process, ≤ 50 ms   │
+ │ per edit): duct sizing, voltage drop,    │
+ │ overlap and clearance checks …           │
+ │                                          │   local socket   ┌───────────────────────┐
+ │ Batch job ─► Distiller ─► Negotiate,     │ ───────────────► │ Runner process        │
+ │ (any kind)   (IFC filter  compress,      │                  │ (on demand, OS limits)│
+ │              profile +    encrypt        │                  └───────────────────────┘
+ │              transforms)     │           │   TLS (LAN)      ┌───────────────────────┐
+ │                              └─ blobs ──►│ ───────────────► │ reviera-compute-host  │
+ │                                          │                  │ (paired, on demand)   │
+ │ Result applier ◄─ results (signed) ◄─────│   TLS (cloud)    ┌───────────────────────┐
+ │ (parameters, packages, display styles)   │ ───────────────► │ Cloud cluster: gateway│
+ │                                          │                  │ + workers, scale to 0 │
+ └──────────────────────────────────────────┘                  └───────────────────────┘
+                      contract: reviera.compute.v1 (gRPC; HTTPS/JSON binding)
+```
+
+## 8.3 The two layers
+
+| Layer | Where specified | What it does |
+|-------|-----------------|--------------|
+| **Remote computation subsystem** | Chapter 2 §2.17 | The contract, job kinds, distillations, runner lifecycle, LAN hosts, cloud compute, job sets and the Compute Jobs panel. Knows nothing about analysis. |
+| **Analysis plugin layer** | Chapter 4 §4.0.2a | Analysis families and providers; the split between live (in-process) and batch (compute job) calculations; each family's distiller and result handling; the Analysis Providers panel. |
+
+Other users of the subsystem are rendering (Chapter 7), tessellation of large models and links, batch export (PDF sets, IFC, COBie, DWG), point-cloud indexing, project-wide booleans and clash runs, and design-space exploration (§2.15.3). Add-ins can register new job kinds.
+
+## 8.4 A job, end to end
+
+1. **Choose.** The user (or a script, or an MCP agent) starts a batch run: a job kind, a scope, options and a detail level. Its location (local, a host, *Best available*, or cloud) comes from the kind's routing, which can differ per detail level.
+2. **Distil.** The kind's distiller filters the IFC model down to what the job needs (DM-RPC-003), applies any transforms, splits the result into deterministic chunks and, for remote destinations, anonymises it. The dialog shows the size and destination, and the first remote job asks for consent.
+3. **Negotiate.** Client and server agree on compression, encryption, key encapsulation, signature and hash techniques (DM-RPC-001).
+4. **Upload what is missing.** `HasBlobs` reports which chunks the server holds; only the rest are sent, compressed and encrypted.
+5. **Run.** The server records the job in its registry, starts a runner on demand under memory and CPU limits, and streams numbered progress events. A cloud cluster sizes a worker to the job. Reviera can disconnect, close or crash; the job continues, and Reviera reattaches later from its own record of the job, resuming events and downloads where they stopped (DM-RPC-009).
+6. **Return.** Signed results come back, keyed to the distillation; the result applier attaches them to the right elements, as parameters, result packages or display styles, with their provenance.
+7. **Idle.** The runner exits after its idle timeout; a cloud cluster scales back to zero.
+
+## 8.5 Analysis families
+
+| Family | Typical batch run | Distillation (mostly an IFC filter) | Suggested engines (§4.15) |
+|--------|-------------------|--------------------------------------|---------------------------|
+| Structural | Linear static, modal, non-linear | IFC4 Structural Analysis View | Built-in frame solver (proposed); PyNite or Frame3DD; CalculiX; Code_Aster; Kratos |
+| Seismic | Response spectrum, time history, pushover | Structural view plus masses | xara; Code_Aster |
+| Energy and thermal loads | Annual simulation, heating and cooling loads | Thermal zones, space boundaries, constructions, glazing, gains | EnergyPlus |
+| Daylight, sun and shadow | Daylight factor, annual metrics, shadow studies | Simplified surfaces with optical properties, glazing, sensor grids, site | Radiance; pvlib |
+| Plumbing and hydraulic | Pressure and flow | Pipe network graph | EPANET |
+| Stormwater | Runoff and drainage | Catchments, gutters, downspouts, drainage runs | EPA SWMM |
+| Interior airflow | Ventilation, comfort | Watertight interior fluid domain | OpenFOAM |
+| External wind | Wind flow and facade pressures | Simplified envelope with site context | OpenFOAM |
+| Clash | Project-wide clash test | Bodies of chosen categories | Built-in overlap engine |
+
+Live calculations that update while the user models stay in Reviera's process (ANA-PLUG-008).
+
+## 8.6 Negotiation, compression and encryption
+
+- **Negotiated, never downgraded.** A registry of technique identifiers that only grows; `Negotiate` picks the strongest option both sides allow, honouring minimums and organisation policy; each blob records what produced it.
+- **Compression.** zstd with trained per-profile dictionaries, content-defined chunking, deltas against what the server holds, mesh codecs and byte shuffling; format-aware compressors to evaluate.
+- **Encryption.** TLS 1.3 with hybrid post-quantum key exchange preferred; end-to-end encryption of blobs and results with per-job keys, so relays and storage cannot read them; signed result manifests.
+
+## 8.7 Suggested build order
+
+| Step | Delivers | Requirements |
+|------|----------|--------------|
+| 1 | The contract with local runners: `Negotiate`, blobs, jobs, results; the job registry and reconnection; runner lifecycle and OS limits; the Compute Jobs panel | DM-RPC-001, 004, 008, 009 |
+| 2 | Job kinds and filter-profile distillations; the structural profile | DM-RPC-002, 003; ANA-PLUG-009 |
+| 3 | The analysis layer with live and batch providers; the built-in batch runner and a built-in frame solver | ANA-PLUG-004 … 008 |
+| 4 | LAN compute hosts with pairing, reattachment and *Best available* | DM-RPC-005 |
+| 5 | Cloud clusters: scale to zero, estimates, budgets, end-to-end encryption; the hosted-services catalogue | DM-RPC-006 |
+| 6 | Job sets and studies; further engine runners and job kinds (rendering, export, tessellation) | DM-RPC-007; ANA-PLUG-001 families |
+
+Structural analysis needs the analytical model first (STR-AM-001 … 004, STR-LOAD-001, STR-LC-001, STR-BC-001), which follows the structural physical elements in the structure build order.
+
+## 8.8 Requirement map
+
+| Requirement | Topic | Section |
+|-------------|-------|---------|
+| DM-RPC-001 | Contract and protocol, negotiation, compression, encryption, provenance | §2.17.1 |
+| DM-RPC-002 | Job kinds and their extension | §2.17.2 |
+| DM-RPC-003 | Model distillations (IFC filter profiles and transforms) | §2.17.3 |
+| DM-RPC-004 | Runner lifecycle and isolation | §2.17.4 |
+| DM-RPC-005 | Compute hosts on the LAN | §2.17.5 |
+| DM-RPC-006 | Cloud compute and hosted services | §2.17.6 |
+| DM-RPC-007 | Job sets and studies | §2.17.7 |
+| DM-RPC-008 | Compute Jobs panel | §2.17.8 |
+| DM-RPC-009 | Job registry and reconnection | §2.17.9 |
+| ANA-PLUG-001 … 003 | Provider interfaces, in-process and out-of-process providers, built-in providers | §4.0.2 |
+| ANA-PLUG-004 | Analysis transports | §4.0.2a |
+| ANA-PLUG-005 | Provider lifecycle | §4.0.2a |
+| ANA-PLUG-006 | Analysis results | §4.0.2a |
+| ANA-PLUG-007 | Analysis Providers panel | §4.0.2a |
+| ANA-PLUG-008 | Live and batch calculations | §4.0.2a |
+| ANA-PLUG-009 | Analysis distillers | §4.0.2a |
+| ANA-FEA-001 | Structural analysis provider interface | §4.3.11 |
+
+## 8.9 Open questions
+
+See `research/07_analysis_engines_remote_compute.md` §13: the built-in frame solver, feature requirements for the seismic, stormwater, airflow and wind families, library licence checks, who operates the first hosted services, and the training corpus for compression dictionaries.
+
+
+---
+
 # Appendix A — Consolidated Indexes
 
 Generated by `tools/build_spec.py` from the chapter command catalogs and requirement blocks. The owning chapters are normative; this appendix is only an index.
@@ -26516,15 +26974,15 @@ Generated by `tools/build_spec.py` from the chapter command catalogs and require
 | Area | P0 | P1 | P2 | P3 | Total |
 |------|---:|---:|---:|---:|------:|
 | UI | 76 | 38 | 7 | 0 | 121 |
-| DM | 91 | 58 | 24 | 3 | 176 |
-| ARC | 77 | 59 | 10 | 1 | 147 |
+| DM | 91 | 64 | 32 | 3 | 190 |
+| ARC | 77 | 60 | 10 | 1 | 148 |
 | STR | 0 | 14 | 47 | 0 | 61 |
 | MEP | 0 | 30 | 42 | 0 | 72 |
-| ANA | 0 | 1 | 21 | 0 | 22 |
+| ANA | 0 | 1 | 27 | 0 | 28 |
 | DOC | 68 | 40 | 12 | 1 | 121 |
 | COL | 8 | 45 | 6 | 1 | 60 |
 | ADV | 0 | 0 | 4 | 1 | 5 |
-| **Total** | **320** | **285** | **173** | **7** | **785** |
+| **Total** | **320** | **292** | **187** | **7** | **806** |
 
 Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver)"), it is counted under the first. The non-functional requirements (NFR-…) are in Chapter 0 §0.7 and are not counted here.
 
@@ -26579,7 +27037,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.2a Reviera-originated features
 
-98 requirements are Reviera's own design: owner directives, the technology stack (IFC/RXD storage, live store, BIMserver, MCP, scripting) and extensions beyond the reference product's feature set. Their Ref lines cite no research on the reference product. Listing them separately keeps the clean-room provenance clear: every other requirement traces to public research on the reference product.
+112 requirements are Reviera's own design: owner directives, the technology stack (IFC/RXD storage, live store, BIMserver, MCP, scripting) and extensions beyond the reference product's feature set. Their Ref lines cite no research on the reference product. Listing them separately keeps the clean-room provenance clear: every other requirement traces to public research on the reference product.
 
 | Requirement | Ch | Feature |
 |-------------|----|---------|
@@ -26611,22 +27069,29 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | UI-RECOV-001 | 1 | 1.33.9 Crash recovery and live-store status |
 | DM-RXD-003 | 2 | 2.4.3 Reconciliation |
 | DM-REGEN-004 | 2 | 2.6.5 OCCT threading rules |
+| DM-LIB-002 | 2 | 2.8.16 Stamps: placing components again and again (Place Component) |
+| DM-LIB-003 | 2 | 2.8.17 Model fragments in the library |
+| DM-LIB-004 | 2 | 2.8.18 Library folders and large libraries |
 | DM-CODE-001 | 2 | 2.9.5a Building code |
 | DM-FILE-007 | 2 | 2.11.9 Remote file locations (WebDAV) |
 | DM-IMP-013 | 2 | 2.11.10 CADCraft interoperability |
 | DM-IMP-014 | 2 | 2.11.11 CADCraft compatibility verification |
 | DM-IMP-015 | 2 | 2.11.12 Custom objects from meshes |
-| DM-LIB-002 | 2 | 2.8.16 Stamps: placing library objects again and again |
-| DM-LIB-003 | 2 | 2.8.17 Model fragments in the library |
-| DM-LIB-004 | 2 | 2.8.18 Library folders and large libraries |
-| DM-LIB-005 | 2 | 2.8.19 A familiar workflow, in Reviera's own words |
-| ARC-MOD-033 | 3 | 3.12.3a Array along a path |
 | DM-CMD-002 | 2 | 2.12.2 Command naming and stability |
 | DM-MCP-002 | 2 | 2.16.2 Transports and authentication |
 | DM-MCP-003 | 2 | 2.16.3 Tool catalogue: generation from the registry |
 | DM-MCP-004 | 2 | 2.16.4 Compound and session tools |
 | DM-MCP-005 | 2 | 2.16.5 Permissions and safety |
 | DM-MCP-006 | 2 | 2.16.6 Resource catalogue |
+| DM-RPC-001 | 2 | 2.17.1 Contract and protocol |
+| DM-RPC-002 | 2 | 2.17.2 Job kinds and their extension |
+| DM-RPC-003 | 2 | 2.17.3 Model distillations |
+| DM-RPC-004 | 2 | 2.17.4 Runner lifecycle and isolation |
+| DM-RPC-005 | 2 | 2.17.5 Compute hosts on the LAN |
+| DM-RPC-006 | 2 | 2.17.6 Cloud compute |
+| DM-RPC-007 | 2 | 2.17.7 Job sets and studies |
+| DM-RPC-008 | 2 | 2.17.8 Compute Jobs panel |
+| DM-RPC-009 | 2 | 2.17.9 Job registry and reconnection |
 | DM-RXD-001 | 2a | store non-IFC data only as RXD documents and element data, using the schemas defined in … |
 | DM-RXD-002 | 2a | By default, Reviera shall embed RXD in the IFC file using only `Reviera_*` property sets … |
 | DM-RXD-004 | 2a | support the external carrier (`.reviera` file or folder, `.rvb` bundle) holding identical … |
@@ -26669,6 +27134,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | ARC-MOD-030 | 3 | 3.12.2a Volume overlaps, virtual volumes and their resolution |
 | ARC-MOD-031 | 3 | 3.12.2a Volume overlaps, virtual volumes and their resolution |
 | ARC-MOD-032 | 3 | 3.12.2a Volume overlaps, virtual volumes and their resolution |
+| ARC-MOD-033 | 3 | 3.12.3a Array along a path |
 | MEP-PIPE-010 | 4 | 4.8.10 Roof drainage: gutters and downspouts |
 | MEP-PEN-001 | 4 | 4.8.11 Automatic penetrations for pipes, ducts, conduits and cable trays |
 | DOC-VIEW-014 | 5 | Slice planes |
@@ -26690,7 +27156,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**1993 unique commands** in 405 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**2055 unique commands** in 408 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -26698,7 +27164,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `agent` | 7 |
 | `air_terminal` | 1 |
 | `analysis_job` | 2 |
-| `analysis_provider` | 2 |
+| `analysis_provider` | 7 |
 | `analysis_result` | 2 |
 | `analysis_style` | 2 |
 | `analytical_air_system` | 1 |
@@ -26722,13 +27188,8 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `areaboundary` | 1 |
 | `areaplan` | 1 |
 | `areascheme` | 2 |
-| `array` | 1 |
+| `array` | 6 |
 | `assembly` | 16 |
-| `array.along_path` | 3 | source, path, distribution, options? | array_id | Yes | ARC-MOD-033 |
-| `array.exclude_member` | 3 | array_id, index | — | Yes | ARC-MOD-033 |
-| `array.restore_member` | 3 | array_id, index \| "all" | — | Yes | ARC-MOD-033 |
-| `array.set` | 3 | array_id, {source?, path?, distribution?, options?} | — | Yes | ARC-MOD-033 |
-| `array.unarray` | 3 | array_id | element_ids[] | Yes | ARC-MOD-033 |
 | `assemblytemplate` | 1 |
 | `bcf` | 25 |
 | `beam` | 3 |
@@ -26761,13 +27222,10 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `colorlegend` | 1 |
 | `colorscheme` | 5 |
 | `column` | 7 |
-| `component` | 1 |
+| `component` | 6 |
 | `compound` | 11 |
-| `component.create` | 2 | element_ids[], destination, name, kind?, base_point?, include_hosts?, include_rooms?, replace_selection?, tags? | item_ref | Yes | DM-LIB-003 |
-| `component.edit` | 2 | item_ref \| element_id | document_id | No | DM-LIB-003 |
-| `component.place_row` | 2 | type_id \| {library, item}, start, end, spacing?, count? | element_ids[] | Yes | DM-LIB-002 |
-| `component.reload` | 2 | item_ref | — | Yes | DM-LIB-003 |
-| `component.scatter` | 2 | sources[], points[], rotation_range?, scale_range?, seed? | element_ids[] | Yes | DM-LIB-002 |
+| `compute` | 16 |
+| `compute_host` | 5 |
 | `conductor_size` | 1 |
 | `conductor_table` | 1 |
 | `conduit` | 2 |
@@ -26815,8 +27273,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `electrical_load_area` | 2 |
 | `electrical_load_type` | 1 |
 | `electrical_settings` | 2 |
-| `element` | 38 |
-| `element.make_unique` | 2 | element_id | type_id | Yes | DM-LIB-002 |
+| `element` | 39 |
 | `elevationmarker` | 1 |
 | `embodied_carbon` | 5 |
 | `energy_location` | 1 |
@@ -26887,28 +27344,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `keynotes` | 2 |
 | `legend` | 1 |
 | `level` | 5 |
-| `library` | 6 |
-| `library.add_item` | 2 | element_or_type_id, library?, name?, tags? | item_ref | No | DM-LIB-002 |
-| `library.add_variant` | 2 | item_ref, element_ids[], variant_name | variant_ref | No | DM-LIB-003 |
-| `library.close` | 2 | library_id | — | No | DM-LIB-004 |
-| `library.copy_folder` | 2 | path, to_folder_ref, options? | job_id | No | DM-LIB-004 |
-| `library.create` | 2 | path, name | library_id | No | DM-LIB-004 |
-| `library.folder.create` | 2 | library_id, path | folder_ref | No | DM-LIB-004 |
-| `library.folder.delete` | 2 | folder_ref | — | No | DM-LIB-004 |
-| `library.folder.rename` | 2 | folder_ref, name | — | No | DM-LIB-004 |
-| `library.get_meta` | 2 | item_ref | {details, from_file, overrides} | No | DM-LIB-004 |
-| `library.import_files` | 2 | paths[], to_folder_ref, options? | {item_refs[], report} | No | DM-LIB-004 |
-| `library.import_ifc` | 2 | path, folder, filter?, name? | item_ref | No | DM-LIB-003 |
-| `library.inspect` | 2 | item_ref | item_report | No | DM-LIB-003 |
-| `library.list` | 2 | folder_ref, recursive?, offset?, limit? | {folders[], items[]} | No | DM-LIB-004 |
-| `library.move` | 2 | item_or_folder_refs[], to_folder_ref | — | No | DM-LIB-004 |
-| `library.open` | 2 | path | library_id | No | DM-LIB-004 |
-| `library.preview` | 2 | item_ref, view?, size? | image | No | DM-LIB-004 |
-| `library.restore_deleted` | 2 | item_refs[] | — | No | DM-LIB-004 |
-| `library.set_meta` | 2 | item_or_folder_refs[], meta | — | No | DM-LIB-004 |
-| `library.smart_folder.save` | 2 | name, query | smart_folder_id | No | DM-LIB-004 |
-| `library.undo_import` | 2 | import_id | — | No | DM-LIB-004 |
-| `library.write_meta_to_file` | 2 | item_ref | — | No | DM-LIB-004 |
+| `library` | 27 |
 | `lighting` | 1 |
 | `lighting_fixture` | 1 |
 | `line` | 1 |
@@ -26945,11 +27381,8 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `mep_run` | 5 |
 | `mep_settings` | 1 |
 | `merge` | 7 |
+| `mesh_object` | 4 |
 | `model` | 12 |
-| `mesh_object.import` | 2 | path, options | type_id | Yes | DM-IMP-015 |
-| `mesh_object.inspect` | 2 | path, options? | report | No | DM-IMP-015 |
-| `mesh_object.place` | 2 | type_id, point, level_id?, rotation?, mirror? | element_id | Yes | DM-IMP-015 |
-| `mesh_object.reload` | 2 | type_id, path?, options? | — | Yes | DM-IMP-015 |
 | `modelline` | 1 |
 | `modeltext` | 2 |
 | `mullion` | 2 |
@@ -27163,6 +27596,11 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `analysis_job.status` | 4 | job_id | {state, progress, messages} | No | ANA-GEN-001 |
 | `analysis_provider.list` | 4 | kind? | providers[] | No | ANA-PLUG-001 |
 | `analysis_provider.register` | 4 | manifest_path | provider_id | Yes | ANA-PLUG-001 |
+| `analysis_provider.set_options` | 4 | provider_id, {live_budget_ms?, idle_timeout_s?, memory_limit_bytes?, cpu_limit?, location?} | — | Yes | ANA-PLUG-005 |
+| `analysis_provider.start` | 4 | provider_id, host_id? | {state} | No | ANA-PLUG-005 |
+| `analysis_provider.status` | 4 | provider_id? | [{provider_id, mode, state, location, pid?, memory_bytes?, jobs[]}] | No | ANA-PLUG-009 |
+| `analysis_provider.stop` | 4 | provider_id | — | No | ANA-PLUG-005 |
+| `analysis_provider.test` | 4 | provider_id, host_id? | {ok, manifest, messages[]} | No | ANA-PLUG-009 |
 | `analysis_result.clear` | 4 | view_id, id? | — | Yes | ANA-ADS-001 |
 | `analysis_result.publish` | 4 | view_id, element_or_face_refs[], values[], style_id | id | Yes | ANA-ADS-001 |
 | `analysis_style.create` | 4 | name, settings | id | Yes | ANA-ADS-001 |
@@ -27212,7 +27650,12 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `areaplan.create` | 3 | scheme_id, level_ids, scale, auto_boundaries?: bool | [view_id] | Yes | ARC-AREA-001 |
 | `areascheme.create` | 3 | name, description? | id | Yes | ARC-AREA-001 |
 | `areascheme.set_rules` | 3 | scheme_id, rules: [{type_a, type_b, position}] | — | Yes | ARC-AREA-001 |
+| `array.along_path` | 3 | source, path, distribution, options? | array_id | Yes | ARC-MOD-033 |
+| `array.exclude_member` | 3 | array_id, index | — | Yes | ARC-MOD-033 |
+| `array.restore_member` | 3 | array_id, index \ | "all" | — | Yes |
+| `array.set` | 3 | array_id, {source?, path?, distribution?, options?} | — | Yes | ARC-MOD-033 |
 | `array.set_count` | 3 | array_id, count, append_to_end: bool | — | Yes | ARC-MOD-026 |
+| `array.unarray` | 3 | array_id | element_ids[] | Yes | ARC-MOD-033 |
 | `assembly.acquire_views` | 5 | assembly_id | () | Yes | DOC-ASM-004 |
 | `assembly.apply_template` | 5 | assembly_ids_or_type_ids[], template_id, group_identical?=true, fit_to_sheet?=true | sheet_id[] | Yes | DOC-ASM-005 |
 | `assembly.compare` | 5 | assembly_id_a, assembly_id_b | comparison | No | DOC-ASM-002 |
@@ -27381,7 +27824,12 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `column.place_at_grids` | 4 | type_id, grid_ids[], base_level, top_constraint, rotation? | element_id[] | Yes | STR-COL-001 |
 | `column.place_in_columns` | 4 | type_id, arch_column_ids[] | element_id[] | Yes | STR-COL-001 |
 | `column.place_slanted` | 4 | type_id, p1, p1_level, p1_offset, p2, p2_level, p2_offset, style | element_id | Yes | STR-COL-002 |
-| `component.place` | 3 | type_id \| {library, item}, point \| points[] \| host_ref, rotation?: f64, level_id?, offset?, mirror?, placement?: VerticalFace\|Face\|WorkPlane | element_id \| element_ids[] | Yes | ARC-COMP-001, DM-LIB-002 |
+| `component.create` | 2 | element_ids[], destination, name, kind?, base_point?, include_hosts?, include_rooms?, replace_selection?, tags? | item_ref | Yes | DM-LIB-003 |
+| `component.edit` | 2 | item_ref \ | element_id | document_id | No |
+| `component.place` | 3 | type_id \ | {library, item}, point \ | points[] \ | host_ref, rotation?: f64, level_id?, offset?, mirror?, placement?: VerticalFace\ |
+| `component.place_row` | 2 | type_id \ | {library, item}, start, end, spacing?, count? | element_ids[] | Yes |
+| `component.reload` | 2 | item_ref | — | Yes | DM-LIB-003 |
+| `component.scatter` | 2 | sources[], points[], rotation_range?, scale_range?, seed? | element_ids[] | Yes | DM-LIB-002 |
 | `compound.assign_layer` | 3 | type_id, region_keys, layer_index | — | Yes | ARC-CMPD-003 |
 | `compound.delete_layer` | 3 | type_id, index | — | Yes | ARC-CMPD-001 |
 | `compound.duplicate_layer` | 3 | type_id, index | — | Yes | ARC-CMPD-001 |
@@ -27393,6 +27841,27 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `compound.set_layers` | 3 | type_id, layers: [{function, priority?, material_id, thickness, wraps?, structural_material?, variable?}], core_start, core_end | — | Yes | ARC-CMPD-001 |
 | `compound.set_region_anchor` | 3 | type_id, boundary_key, from: Base\ | Top, distance | — | Yes |
 | `compound.split_region` | 3 | type_id, region_key, orientation: Horizontal\ | Vertical, position | — | Yes |
+| `compute.cancel` | 2 | job_id | — | No | DM-RPC-001 |
+| `compute.distill` | 2 | kind, scope, detail?, anonymise? | {distiller, version, blobs[], size_bytes, counts} | No | DM-RPC-003 |
+| `compute.estimate` | 2 | kind, scope, options?, detail?, host_id? | {duration_s, resources, cost?} | No | DM-RPC-006 |
+| `compute.forget_job` | 2 | job_id | — | No | DM-RPC-009 |
+| `compute.jobs` | 2 | host_id?, kind? | jobs[] | No | DM-RPC-008 |
+| `compute.kinds` | 2 | — | kinds[] | No | DM-RPC-002 |
+| `compute.preview_distillation` | 2 | kind, scope, detail? | view_id | No | DM-RPC-003 |
+| `compute.reattach` | 2 | job_id? | jobs[] | No | DM-RPC-009 |
+| `compute.register_kind` | 2 | manifest_path | kind | No | DM-RPC-002 |
+| `compute.results` | 2 | job_id, path? | {manifest, files[]} | No | DM-RPC-001 |
+| `compute.run_set` | 2 | kind, base, variants[], location? | set_id | Results only | DM-RPC-007 |
+| `compute.services` | 2 | catalogue_url? | services[] | No | DM-RPC-006 |
+| `compute.set_budget` | 2 | scope, limit, confirm_over? | — | Yes | DM-RPC-006 |
+| `compute.set_location` | 2 | kind, location, detail? | — | Yes | DM-RPC-005 |
+| `compute.status` | 2 | job_id | {state, progress, phase, host, messages[]} | No | DM-RPC-001 |
+| `compute.submit` | 2 | kind, scope, options?, detail?, location? | job_id | Results only | DM-RPC-001 |
+| `compute_host.add` | 2 | url, auth, token? | host_id | No | DM-RPC-006 |
+| `compute_host.discover` | 2 | timeout_s? | hosts[] | No | DM-RPC-005 |
+| `compute_host.forget` | 2 | host_id | — | No | DM-RPC-005 |
+| `compute_host.list` | 2 | — | hosts[] | No | DM-RPC-005 |
+| `compute_host.pair` | 2 | address, code | host_id | No | DM-RPC-005 |
 | `conductor_size.create` | 4 | name, area_mm2 \ | gauge, diameter | id | Yes |
 | `conductor_table.import` | 4 | path | — | Yes | MEP-SET-003 |
 | `conduit.create` | 4 | type_id, start, end, diameter, elevation, level | element_ids[] | Yes | MEP-ELEC-017 |
@@ -27576,6 +28045,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `element.flip_state` | 3 | element_id | {facing_flipped, hand_flipped, mirrored, controls: [control_key]} | No (query) | ARC-FLIP-001 |
 | `element.get_ids` | 2 | element_ids[] | [{id, guid}] | No | DM-ID-001 |
 | `element.host_query` | 3 | element_id | host_ref | No (query) | ARC-HOST-001 |
+| `element.make_unique` | 2 | element_id | type_id | Yes | DM-LIB-002 |
 | `element.match_type` | 3 | source_id, target_ids | — | Yes | ARC-MOD-015 |
 | `element.mirror` | 3 | element_ids, axis: Line \ | ref, copy: bool | [element_id] | Yes |
 | `element.move` | 3 | element_ids, vector, disjoin?: bool | [element_id] | Yes | ARC-DIM-001, ARC-MOD-004, ARC-MOD-000 |
@@ -27938,12 +28408,33 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `level.rename` | 3 | level_id, name, rename_views?: bool | — | Yes | ARC-LVL-001 |
 | `level.set_elevation` | 3 | level_id, elevation | — | Yes | ARC-LVL-001 |
 | `level.set_story` | 3 | level_id, is_building_story | — | Yes | ARC-LVL-001 |
+| `library.add_item` | 2 | element_or_type_id, library?, name?, tags? | item_ref | No | DM-LIB-002 |
+| `library.add_variant` | 2 | item_ref, element_ids[], variant_name | variant_ref | No | DM-LIB-003 |
 | `library.browse` | 2 | query?, source? | — | No | DM-LIB-001 |
+| `library.close` | 2 | library_id | — | No | DM-LIB-004 |
+| `library.copy_folder` | 2 | path, to_folder_ref, options? | job_id | No | DM-LIB-004 |
+| `library.create` | 2 | path, name | library_id | No | DM-LIB-004 |
+| `library.folder.create` | 2 | library_id, path | folder_ref | No | DM-LIB-004 |
+| `library.folder.delete` | 2 | folder_ref | — | No | DM-LIB-004 |
+| `library.folder.rename` | 2 | folder_ref, name | — | No | DM-LIB-004 |
+| `library.get_meta` | 2 | item_ref | {details, from_file, overrides} | No | DM-LIB-004 |
+| `library.import_files` | 2 | paths[], to_folder_ref, options? | {item_refs[], report} | No | DM-LIB-004 |
+| `library.import_ifc` | 2 | path, folder, filter?, name? | item_ref | No | DM-LIB-003 |
+| `library.inspect` | 2 | item_ref | item_report | No | DM-LIB-003 |
+| `library.list` | 2 | folder_ref, recursive?, offset?, limit? | {folders[], items[]} | No | DM-LIB-004 |
 | `library.load` | 2 | item_ref, type_names?, place=false | family_id | Yes | DM-LIB-001 |
+| `library.move` | 2 | item_or_folder_refs[], to_folder_ref | — | No | DM-LIB-004 |
+| `library.open` | 2 | path | library_id | No | DM-LIB-004 |
+| `library.preview` | 2 | item_ref, view?, size? | image | No | DM-LIB-004 |
 | `library.refresh` | 2 | source_id? | — | No | DM-LIB-001 |
+| `library.restore_deleted` | 2 | item_refs[] | — | No | DM-LIB-004 |
 | `library.search` | 2 | text?, filters?, source?, limit=100 | library_item[] | No | DM-LIB-001 |
+| `library.set_meta` | 2 | item_or_folder_refs[], meta | — | No | DM-LIB-004 |
+| `library.smart_folder.save` | 2 | name, query | smart_folder_id | No | DM-LIB-004 |
 | `library.source.add` | 2 | path_or_url, name? | source_id | No | DM-LIB-001 |
 | `library.source.remove` | 2 | source_id | — | No | DM-LIB-001 |
+| `library.undo_import` | 2 | import_id | — | No | DM-LIB-004 |
+| `library.write_meta_to_file` | 2 | item_ref | — | No | DM-LIB-004 |
 | `lighting.calc_average` | 4 | space_ids[] \ | "all" | results[] | Results only |
 | `lighting_fixture.place` | 4 | type_id, host_face_ref \ | point, level | id | Yes |
 | `line.convert` | 3 | element_ids, to: Model\ | Detail, view_id? | [element_id] | Yes |
@@ -28083,6 +28574,10 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `merge.resolve` | 6 | conflict_id, choice: mine\ | theirs\ | value, value? | () |
 | `merge.resolve_all` | 6 | filter?, choice: mine\ | theirs | count | No |
 | `merge.three_way` | 6 | base_path, local_path, remote_path, out_path, policy? | merge_report | No | COL-MRG-001 |
+| `mesh_object.import` | 2 | path, options | type_id | Yes | DM-IMP-015 |
+| `mesh_object.inspect` | 2 | path, options? | report | No | DM-IMP-015 |
+| `mesh_object.place` | 2 | type_id, point, level_id?, rotation?, mirror? | element_id | Yes | DM-IMP-015 |
+| `mesh_object.reload` | 2 | type_id, path?, options? | — | Yes | DM-IMP-015 |
 | `model.audit` | 6 | repair? | audit_report | Yes | COL-MNT-002 |
 | `model.export_local_copy` | 6 | path, keep_worksets? | () | No | COL-MODE-002 |
 | `model.list_backups` | 6 | — | backup_info[] | No | COL-MNT-003 |

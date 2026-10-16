@@ -20,6 +20,7 @@ CHAPTERS = [  # (file, chapter label used in indexes)
     ("05_views_documentation.md", "5"),
     ("06_collaboration_coordination.md", "6"),
     ("07_advanced_features.md", "7"),
+    ("08_remote_computation_analysis.md", "8"),
 ]
 AREAS = ["UI", "DM", "ARC", "STR", "MEP", "ANA", "DOC", "COL", "ADV"]
 # Owner of a shared command's signature when it is not the first chapter that lists it.
@@ -150,7 +151,7 @@ HEADER = """# Reviera Application Specification
 **Functional reference:** Autodesk® Revit® 2026/2027, described only from publicly available sources
 **Product:** Reviera, an open-source BIM authoring application (GPL-3.0-or-later; RXD schemas MIT)
 **Compiled from:** `design_documents/spec/*.md` by `tools/build_spec.py`. Edit the chapter files, not this file.
-**Companion documents:** `TECH_STACK.md` (architecture and licensing) · `RESEARCH_LOG.md` (clean-room provenance) · `SOURCE_REGISTER.md` (public sources, reference screenshots) · `research/01–05` (raw research, internal)
+**Companion documents:** `TECH_STACK.md` (architecture and licensing) · `RESEARCH_LOG.md` (clean-room provenance) · `SOURCE_REGISTER.md` (public sources, reference screenshots) · `research/01–07` (raw research, internal)
 
 > Autodesk and Revit are trademarks of Autodesk, Inc., used here only to identify the functional reference. Reviera is not affiliated with or endorsed by Autodesk. Screenshot paths cited in "Ref:" lines point to internal reference material; it is not part of Reviera.
 

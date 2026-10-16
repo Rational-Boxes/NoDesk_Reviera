@@ -1717,6 +1717,359 @@ DN25,25,37.5,22,Copper
 - [ ] A remote library whose package checksum does not match its index entry is refused with an error naming the package, and nothing is loaded.
 - [ ] *Load and Place* on a door with 30 types opens Specify Types, then starts door placement with the chosen type.
 
+### 2.8.16 Stamps: placing components again and again (Place Component)
+**ID:** DM-LIB-002 · **Priority:** P1 · **Ref:** owner requirement (2026-10-14); DM-LIB-001, DM-IMP-015, ARC-COMP-001; Reviera's own design
+
+**Purpose.** Make custom geometry quick to reuse. Any custom object (DM-IMP-015), family type or saved group in a library can be picked up as a **stamp**, and every click in a view inserts another copy. *(Owner requirement, 2026-10-14: "a library system so that custom objects can be used as a stamp to easily insert a duplicate of the object".)*
+
+**Workflow.**
+1. Open the **Library** panel (DM-LIB-001). Its **Stamps** strip, at the top of the panel, shows thumbnails of pinned stamps and the most recently used ones.
+2. Click a stamp, or double-click a library result. The **Place Component** tool (CM, as for components generally, ARC-COMP-001) starts with that component: a see-through preview follows the cursor, snapping like other placement tools.
+3. Click to insert a copy. The tool stays armed, so each further click inserts another, until Esc or another tool.
+4. While stamping:
+   - Spacebar turns the next copy by 90°; Shift+Spacebar mirrors it.
+   - *Click and drag* sets the direction of that copy.
+   - `[` and `]` step through the Stamps strip, and the digit keys 1–9 pick pinned stamps.
+5. **Pick a stamp from the model**: in Place Component, Alt+click an existing instance, or select it and choose *Stamp This*. That instance's type becomes the stamp, with its rotation and offset.
+
+**Behaviour & rules.**
+- **What can be a stamp:**
+  - a custom object type (DM-IMP-015);
+  - a family type (DM-LIB-001);
+  - a model fragment: a set of related elements, for example a desk with its chair and lamp, or a whole bathroom (DM-LIB-003).
+- **Adding to the library:**
+  - **Add to Library** (on a selected instance or type) copies the type into a library folder, with a thumbnail rendered from it.
+  - **Create Component** turns any selection into a new component (DM-LIB-003): an IFC file of the model fragment, saved into a library folder. Alternatively it merges the selection into one custom object.
+  - Library items carry a name, a category, tags and a description, all searchable.
+- **Libraries:**
+  - **My Library** is per user, in the user data folder.
+  - **Project Library** holds the types already in the open project.
+  - Further library folders, including network or WebDAV folders shared by a team, can be added as sources (DM-LIB-001).
+  - Pinned stamps and recent stamps are kept per user.
+- **Copies are duplicates of one type.**
+  - The first stamp of a library item into a project loads its type once. The type keeps the library item's GUID, so it isn't duplicated if stamped again later. Later stamps reuse it.
+  - Every stamped copy is an instance of that type: changing the type (materials, scale, Reload from File) changes every copy.
+  - **Make Unique** gives one copy a type of its own.
+  - When a newer version of the item is in the library, the project offers to update the type (*Reload from library*, DM-LIB-001).
+- **Where copies go:**
+  - In a plan, on the plan's level, at the type's default offset.
+  - In a 3D view, on the face under the cursor: floors, roofs, decks, terrain and the tops of other objects. Optionally the copy turns to the face's slope.
+  - On a work plane when one is set.
+  - A copy's base level is the level it is placed on, or the nearest level below the face it lands on.
+- **Variation (P2).** For planting and scattered objects, a stamp can vary each copy: a random rotation, a random scale within a range (for example 90–110 %), or a choice among several stamps in a set.
+- **Rows of stamps (P2).** Shift+drag stamps a row of evenly spaced copies along the drag. The spacing is the stamp's width plus a gap, or a typed distance; the count shows while dragging.
+- **Undo.** Each click is one undo step; a row or a scatter is one step.
+
+**Data (storage).**
+- A library item is a file in a library folder (DM-LIB-004):
+  - a 3D file as it is, such as OBJ, STL, PLY, glTF/GLB, 3MF or OFF;
+  - an IFC file: a family package (§2.8.14), a fragment (DM-LIB-003), or any IFC file.
+
+  Stamping a mesh file the first time imports it into the project as a custom object type (DM-IMP-015), with the import options from its manifest entry or folder. Later stamps reuse that type.
+- In a project, a stamped type records its library source and the item's content hash in `families/index`, so the Library panel can tell when it is out of date.
+- Pinned and recent stamps are per-user settings, not model data.
+
+**Commands.**
+`library.add_item(element_or_type_id, library?, name?, tags?) -> item_ref` ·
+`component.place(type_id | {library, item}, points[], level, offset?, rotation?, mirror?) -> element_ids[]` (ARC-COMP-001's command, extended: a library item, one copy per point) ·
+`component.place_row(type_id | {library, item}, start, end, spacing?, count?) -> element_ids[]` (P2) ·
+`component.scatter(sources[], points[], rotation_range?, scale_range?, seed?) -> element_ids[]` (P2) ·
+`element.make_unique(element_id) -> type_id`.
+The Place Component tool is the UI over `component.place`.
+
+**Acceptance criteria.**
+- [ ] A custom chair added to My Library appears in the Stamps strip with a thumbnail. Clicking it and then clicking ten times in a plan inserts ten chairs, and the saved IFC holds one chair type with ten instances.
+- [ ] Undo after the tenth click removes only the tenth chair.
+- [ ] Alt+click on a placed table in Place Component makes the table the stamp; the next click inserts a table with the same rotation.
+- [ ] In a 3D view, stamping a lamp on a sloped roof places it on the roof face, and with *Align to face* on, its up direction is the roof's normal.
+- [ ] A desk, chair and lamp added to the library as a fragment stamp as three elements together.
+- [ ] Changing the chair type's material in the project changes all ten stamped chairs. After Make Unique on one, changing the type no longer changes that one.
+- [ ] Stamping the same library item in a second session reuses the type already in the project, not a second copy.
+
+**Implementation note (2026-10-14, first build).**
+- **Placing:** the Component Library panel's thumbnails are the palette. Clicking one starts Place Component, which repeats until Esc, and Spacebar turns the next copy 90°.
+- **Where copies land:** in plans on the plan's level, snapped; in 3D on the surface under the cursor, or on the lowest level's plane over nothing.
+- **First copy:** a library component is loaded as a type on its first copy, and the tool then places that type.
+- **Properties:** they show the placement (rotation, mirror, offset) and the component's details, which are edited into the manifest.
+- **Command:** `component.place` extends ARC-COMP-001's command with a library item and several points.
+- **Not built yet:** pinned and recent stamps, Alt+click to pick a stamp from the model, Shift+Spacebar mirroring (Properties has Mirrored), rows and scatter, drag from the palette, and stamping fragments.
+
+### 2.8.17 Model fragments in the library
+**ID:** DM-LIB-003 · **Priority:** P1 · **Ref:** owner requirement (2026-10-14); DM-LIB-001, DM-LIB-002, ARC-GRP-001 (Save Group, Load as Group); Reviera's own design
+
+**Purpose.** Let a library hold whole pieces of buildings, not only single objects: a bathroom with its walls, door, fixtures and room; a stair core; a kitchen run; a balcony with its railing; a façade bay; or part of a consultant's or manufacturer's IFC model. Like a family in the reference product, a library item is a named, reusable definition that can have several variants. Unlike a family, it may be a full IFC **model fragment** of many related elements. *(Owner requirement, 2026-10-14: "may include full IFC model fragments. A selection of objects in a model could be added to the library.")*
+
+**Behaviour & rules.**
+- **Kinds of library item.** Every item has one of three kinds, shown with a badge in the Library panel:
+  - **Object**: one type, such as a custom mesh object (DM-IMP-015) or a family type.
+  - **Fragment**: a set of related elements, stored as a group template (ARC-GRP-001).
+  - **Collection**: a folder of items (DM-LIB-004).
+- **Create Component from any selection.** *(Owner clarification, 2026-10-14: "any subselection of objects can be used to create a new component; it is just an IFC with the model fragment".)*
+  - **What can be selected:** any selection of objects in a model, of any categories and any number. This includes a sub-selection:
+    - some of a group's or a placed component's members, picked with Tab;
+    - elements of an imported or linked IFC model.
+  - **Create Component** (first in the middle-click quick modify menu, UI-SEL-006; also on the Modify tab, the right-click menu, and Library › Create Component) writes the selection as a new component: **an IFC file of that model fragment**, and nothing else.
+  - **Where it goes:** into a folder of an open library, where it becomes a library item at once, or to any path.
+  - **In the dialog:** name, destination (a library folder, or a file path), tags and description, and the options below.
+  - **Kind**: *Fragment* (default for several elements) or *Object* (merge into one custom object, DM-IMP-015).
+  - **Base point**: the selection's bottom-centre, a picked point, or the project's base point. It becomes the fragment's origin, the point the cursor holds when stamping.
+  - **Include hosts and hosted**, on by default:
+    - selecting a wall brings its doors, windows, openings, curtain panels and wall-hosted fixtures;
+    - selecting a door or window brings its host wall;
+    - selecting a stair brings its railings, and a roof its dormers, skylights and openings.
+  - **Include rooms**: the rooms enclosed by the selected walls (on by default).
+  - **Levels.** A fragment on several levels keeps each member's level as a **relative level**: 0 for its lowest, then 1, 2… by elevation, with each level's height above the lowest.
+  - **Outside references.** Each reference to an element outside the selection is listed, then dropped (with the element left as it is) or brought in. Such references include a wall attached to a roof, a join to another wall, or a stair opening in a floor. The dialog shows the list before saving.
+  - **Replace selection with the component** (on by default): the selected elements become a placed copy of the new component, a group instance (ARC-GRP-001). Copies stamped later are linked to them. Off, the selection is left as it was and only the file is written.
+- **Edit Component.** On a placed copy or a library item, **Edit Component** opens the component's IFC file in its own tab, as a model. Every tool works there, and Save writes the file. Projects open in the session that use the component update their copies; others offer *Reload from library* when next opened (DM-LIB-001). Read-only libraries open the file as a copy, to be saved elsewhere.
+- **Variants.** An item can hold several variants (like the types of a family), for example a bathroom in a left-hand and a right-hand version, or a chair in three sizes. Variants of a fragment are group types of one item; variants of an object are types of one family or custom object. **Add Variant** adds the current selection to an existing item as a new variant.
+- **IFC files as fragments.** An IFC file copied into a library folder is a fragment at once (see Data). **Import to Library** (Manage › Library) writes a part of an external IFC file into a library folder as a new IFC file:
+  - the part is chosen by storey, by IFC class, by system, or by picking in a preview;
+  - elements keep their IFC classes, property sets, materials and geometry;
+  - elements Reviera recognises become Reviera elements (DM-IMP-001 Recognise); the rest stay IFC-native (§2.11.1).
+- **Stamping a fragment** (DM-LIB-002) creates the elements again at the clicked point, in one of two modes, chosen per stamp:
+  - **As a group** (default): a group instance (ARC-GRP-001). Editing the group changes every stamped copy; Ungroup makes one independent.
+  - **As elements**: independent elements with no group.
+
+  In both modes:
+  - **GUIDs**: every element gets new GlobalIds.
+  - **Types**: the fragment's types are merged into the project. A type that already exists (same GUID, or same name and identical parameters) is reused. Otherwise there is a choice: *Use project's*, *Use library's*, or *Keep both* (renamed with a suffix).
+  - **Materials**: matched by name, or created.
+  - **Levels**: relative level 0 is the level clicked on. Higher relative levels map to the project's levels above it by order or by nearest elevation (a setting). When the project has too few levels, the member stays on the highest one with an offset, and a warning lists it.
+  - **Hosts**: members whose host was left out of the fragment are rehosted where the copy lands (ARC-GRP-001 hosted members). An example is a door saved without its wall, stamped onto a wall.
+- **Preview.** Selecting a fragment in the Library panel shows a 3D preview, its plan outline, its member counts by category, its variants, its levels and its size.
+
+**Data (storage).**
+- A fragment is an IFC file in a library folder.
+  - **Written by Reviera** (Create Component, Import to Library): a standalone IFC4 model of the fragment, with:
+    - a project, site and building;
+    - one storey per relative level;
+    - the elements with their types, materials, property sets, openings, hosting and other relationships.
+
+    Its RXD carries the group template, the relative levels, the base point and the list of dropped outside references. For Import to Library, it also carries the source file's name and SHA-256. The RXD is optional to the file's meaning: with it stripped, Reviera still uses the file as an IFC fragment, as below.
+  - **Any other IFC file** placed in a library folder is a fragment as it is. Stamping it brings its elements in as an IFC merge does (DM-IMP-001):
+    - its storeys become relative levels by elevation;
+    - its base point is the bottom-centre, unless its manifest entry names one;
+    - its types become variants when it has several.
+  - Either way, the file opens in other IFC tools as a small model.
+- An item's variants are the types or group types in its file, or several files grouped as variants in the manifest.
+- In a project, a group type stamped from the library records the item's GUID, variant and content hash in `families/index` (DM-LIB-001), so the Library panel can offer updates.
+
+**Commands.**
+`component.create(element_ids[], destination: folder_ref | path, name, kind?: "fragment"|"object", base_point?, include_hosts?: bool, include_rooms?: bool, replace_selection?: bool = true, tags?) -> item_ref` ·
+`component.edit(item_ref | element_id) -> document_id` · `component.reload(item_ref)` ·
+`library.add_variant(item_ref, element_ids[], variant_name) -> variant_ref` ·
+`library.import_ifc(path, folder, filter?: {storeys?, classes?, systems?, element_guids?}, name?) -> item_ref` ·
+`library.inspect(item_ref) -> {kind, variants, members_by_category, levels, size, outside_refs}` *(query)* ·
+`component.place(..., mode?: "group"|"elements", type_conflict?: "project"|"library"|"both")` (DM-LIB-002, extended).
+
+
+**Acceptance criteria.**
+- [ ] Selecting a bathroom's four walls and choosing Create Component (hosts and rooms on) saves an IFC file with the walls, the door, the fixtures and the room, and replaces the selection with a placed copy of it. The saved file opens in another IFC viewer.
+- [ ] Stamping that fragment three times, as groups, places three bathrooms, each with new GlobalIds. Adding a fixture to one bathroom's group adds it to all three.
+- [ ] A fragment of a stair core spanning two levels, stamped on Level 2 of a five-level project, puts its upper part on Level 3.
+- [ ] A fragment whose wall type `Exterior 300` differs from the project's type of the same name asks *Use project's / Use library's / Keep both*. *Keep both* adds `Exterior 300 (2)`.
+- [ ] Import to Library of a manufacturer's IFC file, filtered to `IfcSanitaryTerminal`, adds a fragment of only those elements, with their property sets.
+- [ ] A door saved alone as a fragment, without its wall, is stamped into a wall and cuts it.
+- [ ] Tab-selecting two chairs inside a placed dining-set component and choosing Create Component writes a new IFC file holding only those two chairs.
+- [ ] Edit Component on a placed bathroom opens its IFC file in a tab. Adding a towel rail and saving updates every placed bathroom in the open project.
+- [ ] A component file written by Reviera, with its RXD removed by another tool, still opens as a model in other IFC viewers and still stamps in Reviera.
+
+**Implementation note (2026-10-14, first build).**
+- **Create Component** (`component.create`, quick menu, Modify tab, Modify | Components) collects:
+  - the selection;
+  - what it hosts: elements naming a member, repeatedly;
+  - everything they name: hosts, types, levels and other referenced elements, all brought in rather than dropped.
+
+  It writes them as a standalone IFC4 model through Reviera's own writer, with the base point (the selection's bottom centre) at the origin and the lowest level at 0. The file goes into the library folder shown, with a manifest entry, or to a chosen file. The model is unchanged; *Replace selection with the component* is not built yet.
+- **Placing** (`component.place_fragment`; the panel's IFC thumbnails, rendered from the fragment's bodies):
+  - elements are copied with new GlobalIds, every GlobalId inside their recipes rewritten;
+  - levels are mapped by height above the lowest, and made when missing;
+  - types are reused by GlobalId, then by class and name, and otherwise copied keeping their GlobalId;
+  - elements are then turned and moved with the Modify tools' transform; openings, dormer parts and gates move with their owners.
+- **Not built yet:**
+  - placing as a group, so that editing changes every copy;
+  - Edit Component;
+  - variants;
+  - Import to Library of parts of external IFC files;
+  - IFC-native elements, which have no recipe to regenerate from;
+  - the outside-references dialog and the type-conflict question.
+
+### 2.8.18 Library folders and large libraries
+**ID:** DM-LIB-004 · **Priority:** P1 · **Ref:** owner requirement (2026-10-14); DM-LIB-001 … 003; Reviera's own design
+
+**Purpose.** Keep thousands of imported objects and model fragments in order. A library is a tree of nested folders of any depth. It can be browsed, searched, reorganised and shared like a well-kept file system. *(Owner requirement, 2026-10-14: "the library needs to support nested hierarchies to manage large sets of imported and model fragments".)*
+
+**Behaviour & rules.**
+- **A library is a folder that is opened.** *(Owner clarification, 2026-10-14.)*
+  - **Library › Open Library** (`library.open`) opens any folder on a local disk, a network share or WebDAV as a library, the way a project file is opened.
+  - Its root holds one JSON manifest, `reviera-library.json`; nothing else in the folder is Reviera's own.
+  - Opening a folder that has no manifest offers to create one, or to browse it read-only with defaults.
+  - Open libraries are the sources of the Library panel (DM-LIB-001), are remembered per user, and reopen at start-up.
+  - **Library › New Library** creates a folder with an empty manifest.
+- **Nested folders.** Within a library, items live in folders nested to any depth, for example `Furniture › Office › Chairs › Task chairs`. The tree in the Library panel shows each folder with the count of items in it and below it.
+  - Folders are created, renamed, moved and deleted in the panel.
+  - Items and folders are moved by drag and drop, or with Cut and Paste.
+  - Deleting a folder that holds items asks for confirmation and moves them to the source's *Deleted items* folder, from which they can be restored for 30 days.
+- **A library is a set of physical folders of 3D files.** *(Owner clarification, 2026-10-14.)*
+  - The library's sub-directories are its folders.
+  - Its items are ordinary 3D files, read where they are:
+    - OBJ, with its MTL and texture files beside it;
+    - STL, PLY, glTF/GLB, 3MF and OFF;
+    - IFC files, whether whole models or fragments, written by Reviera or any other tool.
+  - Reviera converts nothing and copies nothing into a private store. A file dropped into a library folder by any means is an item after the next refresh. The same folders can be kept in git, synced, or used by other programs.
+- **The manifest** (`reviera-library.json`, in the library's root) is a JSON object:
+  - `format`: `"reviera-library"`, and `version`: 1;
+  - `id` (a UUID, so stamped types can find the library after it is moved or renamed), `name`, `description`, `author`, `licence` (SPDX) and `homepage`;
+  - `defaults`: import options for mesh files (units, up axis, insertion point, clean-up, DM-IMP-015), the default category and the default stamp mode;
+  - `folders`: settings per folder, keyed by the folder's path relative to the root. A folder inherits its parent's settings, and the entry overrides only what it names: category, import options, stamp mode, tags and thumbnail;
+  - `items`: details per item, keyed by the file's path relative to the root:
+    - name, tags, description and category;
+    - import options, and the base point;
+    - its variants (other files, or types within its file);
+    - its SHA-256 and stable item GUID.
+  - `smart_folders`: saved searches shared by everyone using the library.
+
+  Every key is optional except `format` and `version`. Files with no entry use their folder's settings, then the format's defaults, so a manifest of only `format`, `version`, `id` and `name` makes any folder of 3D files a working library.
+- **Writing the manifest.** Reviera updates the manifest when the user edits details, moves or renames items or folders, or adds files through the panel. Each update is an atomic replace, with keys in a stable sorted order, so the manifest diffs and merges cleanly in git. Files added or moved outside Reviera are reconciled on refresh:
+  - new files get default details;
+  - a moved file keeps its entry when its SHA-256 matches;
+  - entries for missing files are listed and can be cleaned up.
+- **Thumbnails** are rendered by Reviera and kept in the per-user cache, keyed by the file's hash, not written into library folders.
+- **Folder settings** (inherited by sub-folders unless overridden):
+  - default category;
+  - default stamp mode (group or elements);
+  - default tags;
+  - a folder thumbnail, which is otherwise a mosaic of its first four items.
+- **Smart folders.** A smart folder is a saved search: text plus filters over category, kind, tags, source, author, licence, size and date added. It shows matching items from anywhere, without moving them. Examples: *All plumbing fixtures*, *Added this month*, *Fragments over 2 levels*.
+- **Search in a folder.** The search box searches the selected folder and everything below it, or every source; the result list shows each item's folder path.
+- **Item preview and details.** *(Owner requirement, 2026-10-14: "the Library interface would have the ability to preview and edit metadata for a model that may not be possible in the format".)*
+  - Selecting an item in the Library panel shows its **preview**:
+    - an interactive 3D view (orbit, zoom, a plan and a front view);
+    - its size in the model's units, with the item's import options applied;
+    - its triangle or element count, materials, variants and levels.
+
+    For an IFC fragment, the preview also lists its elements by category, and selecting one in the list highlights it in the preview.
+  - The preview renders from the file in the library, without loading anything into the open project; the model's version is unchanged.
+  - The **Details** form beside the preview edits the item's metadata. It is saved in the item's manifest entry, never in the file, so a file is never rewritten to hold what its format cannot. Examples: an STL has no units, name or materials; an OBJ has no units; a PLY has no category; and an IFC from a manufacturer may lack Reviera's tags. The fields are:
+    - **Identity:** name, description, category (the IFC class it becomes, DM-IMP-015), tags, and a classification code (Uniclass, OmniClass or another system, with the code and its title).
+    - **Placement:** units, up axis, insertion point and base point, default stamp mode, default rotation, and a uniform scale. Changing any of these updates the preview at once.
+    - **Product:** manufacturer, model, model number or reference, URL, cost and its currency, and notes.
+    - **Provenance:** author, source URL, licence (SPDX), and the date added.
+    - **Materials:**
+      - a name and a colour for each material slot, including the single slot of a file with no materials;
+      - an optional mapping of a slot to a project material name, applied when the item is first stamped into a project.
+    - **Properties:** any number of further properties (name, data type, value), grouped into property sets. They are written as `IfcPropertySet`s on the type when the item is stamped. Standard sets are offered by category, for example `Pset_ManufacturerTypeInformation` and the category's `Pset_*Common`.
+    - **Thumbnail:** rendered from the preview's current view (*Use this view*) or chosen from an image file in the library. A chosen image is copied into the library folder and named in the manifest.
+  - **Editing several items** at once edits the fields they share. A field whose values differ shows *(various)* and is left as it is unless typed over.
+  - **Stamping uses the details.** When an item is first stamped into a project, its details become the type's name, IFC class, classification (`IfcClassificationReference`), property sets and material mapping, so the metadata reaches the model's IFC even though the source file never held it.
+  - **IFC items:** values already in the IFC file are shown as read-only *from the file*. Details in the manifest add to them; a manifest value with the same name overrides the file's on stamping, and is marked as an override in the form. *Write into File* (for IFC items in a writable library) copies the details into the IFC file itself, as property sets on its types, when the user wants the file to carry them.
+- **Import into Library.** *(Owner requirement, 2026-10-14: "the UI would include an import into a library: copy in a supported 3D format and adjust the manifest".)*
+  - **Library › Import into Library**, or **Import…** on a folder's right-click menu, picks one or more files from anywhere: OBJ, STL, PLY, glTF/GLB, 3MF, OFF or IFC.
+  - **What it does to each file:** copies it into the chosen library folder and adds its entry to the manifest. Nothing else in the library changes.
+    - An OBJ brings its MTL and texture files along, keeping their relative paths.
+    - A glTF brings its `.bin` and image files along.
+  - **One dialog for the batch:**
+    - the destination folder;
+    - name, category and tags, set for all files or file by file;
+    - for mesh files, the import options of DM-IMP-015: units, up axis, insertion point and clean-up. A 3D preview shows each file at its resulting size, so a wrong unit is seen before anything is copied.
+  - The options are written into each file's manifest entry, so later stamps use them without asking.
+  - **Dropping files from the system's file manager** onto a folder in the Library panel opens the same dialog with those files.
+  - **Name clashes:** a file whose name is already used in the destination folder is renamed with a suffix. A file whose SHA-256 matches an item already in the library is reported, with the choice to skip it or to import it again.
+  - **Its own undo:** Import into Library is undone from the panel (*Undo Import*), which removes the copied files and their manifest entries. It is not part of the model's undo history.
+  - **Formats Reviera reads but a library does not hold**, such as STEP (DM-IMP-008), are converted on import into a supported format: IFC for solids, glTF for meshes. The original is copied beside it only when *Keep original* is ticked.
+- **Existing folders.** **Add Folder as Source** adds any directory tree of 3D files as a source as it is. It is indexed in the background, with progress, and its folder structure is the library tree. **Copy Folder into Library** copies a directory tree into a folder of an existing source instead. Both end with a report:
+  - files read;
+  - files unreadable, with the reason;
+  - duplicates, by SHA-256.
+
+  Import options (units, up axis, category) can be set for a whole folder at once; they are saved in the manifest's `folders` entry.
+- **Bulk edits.** Several selected items can be moved, tagged, re-categorised or deleted together.
+- **Scale.** Loading is lazy, so the panel stays responsive with large libraries:
+  - the tree loads folders as they are expanded;
+  - thumbnails load as they scroll into view;
+  - the index (DM-LIB-001) covers every folder.
+
+  A source of 50,000 items in 2,000 folders opens its tree in under 1 s once indexed, and a search over it returns in under 200 ms.
+- **Organisation libraries (P2).** A remote library is the same folder layout served over HTTPS or WebDAV. Its `reviera-library.json` doubles as the index of DM-LIB-001: each item's entry carries its SHA-256, so downloads are verified. The same tree appears for everyone. Remote libraries are read-only. Items are added through the organisation's own process: a git pull request, or a write-enabled WebDAV folder (DM-FILE-007).
+- **Project Library.** The Project Library source lists the types, families and group types already in the open project, in the same tree form: by category, or by the folder they were stamped from.
+
+**Data (storage).** A library is its directories and files, plus `reviera-library.json` in its root, Reviera's only file there. The search index and thumbnails are per-user caches (DM-LIB-001), rebuilt when missing. Smart folders, favourites and pinned stamps are per-user settings. No model data.
+
+**Commands.**
+`library.open(path) -> library_id` · `library.create(path, name) -> library_id` · `library.close(library_id)` ·
+`library.folder.create(library_id, path) -> folder_ref` ·
+`library.folder.rename(folder_ref, name)` ·
+`library.folder.delete(folder_ref)` ·
+`library.move(item_or_folder_refs[], to_folder_ref)` ·
+`library.list(folder_ref, recursive?: bool, offset?, limit?) -> {folders[], items[]}` *(query)* ·
+`library.smart_folder.save(name, query) -> smart_folder_id` ·
+`library.import_files(paths[], to_folder_ref, options?: {name?, category?, tags?, units?, up_axis?, insertion?, cleanup?, per_file?, on_duplicate?: "skip"|"import", keep_original?}) -> {item_refs[], report}` ·
+`library.undo_import(import_id)` ·
+`library.source.add(path)` (DM-LIB-001) adds a folder as a source · `library.copy_folder(path, to_folder_ref, options?) -> job_id` ·
+`library.get_meta(item_ref) -> {details, from_file, overrides}` *(query)* ·
+`library.set_meta(item_or_folder_refs[], {name?, description?, category?, tags?, classification?, placement?, product?, provenance?, materials?, properties?, thumbnail?, settings?})` ·
+`library.preview(item_ref, view?: "3d"|"plan"|"front", size?) -> image` *(query)* ·
+`library.write_meta_to_file(item_ref)` (IFC items only) ·
+`library.restore_deleted(item_refs[])`.
+
+**Acceptance criteria.**
+- [ ] A directory of 3,000 OBJ, STL, glTF and IFC files in 120 nested folders, added with Add Folder as Source, appears as the same tree with item counts per folder, with no file in it changed or added. Duplicates are reported.
+- [ ] An OBJ file copied into a library folder with a file manager can be stamped after Refresh, using its folder's import options.
+- [ ] Import into Library of a chair OBJ, with its MTL and two textures, into `Furniture › Chairs` (units cm) copies all four files there. The manifest gains one entry, with `units: "cm"`. The chair then stamps at its real size without a dialog.
+- [ ] An STL in a library is given, in its Details, the name "Planter", category Planting, units mm, manufacturer and model, and a `Pset_ManufacturerTypeInformation`. The STL file's bytes are unchanged, and the details are in the manifest. Stamped into a project, the type is an `IfcGeographicElementType` named "Planter" carrying that property set in the saved IFC.
+- [ ] Changing an item's units from mm to cm in Details shows it ten times larger in the preview at once.
+- [ ] Selecting a manufacturer's IFC item shows its own property values as read-only *from the file*; a manifest value of the same name is marked as an override and wins when stamped.
+- [ ] Dropping three glTF files from the file manager onto a library folder opens the import dialog for the three. Undo Import afterwards removes the files and their manifest entries.
+- [ ] Dragging the folder `Chairs` from `Furniture › Office` to `Furniture › Lounge` moves its items on disk, and stamps already placed in projects still find their item (by GUID).
+- [ ] A search for "basin" in `Plumbing` returns only items under `Plumbing`, each shown with its folder path.
+- [ ] A smart folder *Fragments over 2 levels* lists every matching fragment across all sources.
+- [ ] A folder added to the library directory by a file manager appears in the panel after Refresh.
+- [ ] A deleted folder's items can be restored from *Deleted items* the next day.
+- [ ] Library › Open Library on a folder of 3D files with no manifest offers to create one; the created `reviera-library.json` holds only `format`, `version`, `id` and `name`, and every file in the folder is usable.
+- [ ] Moving a library folder to another disk and opening it there keeps every item's details, and stamped types in projects still find the library by its `id`.
+
+**Implementation note (2026-10-14, first build).**
+- **Built:** the manifest, folders and settings, listing, Import into Library (with companions, duplicates by SHA-256 and free names), item details, delete and restore through `.deleted`, and the panel.
+- **The panel:** docked on the right (Window › Component Library, CL), it lists the open libraries (kept per user in `libraries.json`; the sample library is offered at first), shows folders with counts, and shows items as thumbnails.
+- **Thumbnails:** rendered offscreen and cached per user by file, date, size and import options.
+- **The sample library:** `test-data/library` ships beside the samples in every package.
+- **Not built yet:** smart folders, moving and renaming in the panel, drag and drop, search, bulk edits and organisation libraries.
+
+### 2.8.19 A familiar workflow, in Reviera's own words
+**ID:** DM-LIB-005 · **Priority:** P1 · **Ref:** owner requirement (2026-10-14); research/06 (the reference product's family UI and workflow); DM-LIB-001 … 004
+
+**Purpose.** Users who know the reference product's families should find components familiar: the same gestures, places and sequence. Reviera keeps its own names and its own model of libraries as folders of ordinary files. *(Owner requirements, 2026-10-14: "not called Families; our term will be Component Libraries"; "differentiate, but be familiar to users with a Revit background"; "stamps just means a quick and easy mechanism to add library items, like a stamp in GIMP".)*
+
+**Behaviour & rules.**
+- **Names.** The feature is **Component Libraries** and its items **components**; the reference product's term is not used in Reviera's interface or help. A component's variants are its **types**.
+- **The same gestures where they fit.** The reference product's patterns (research/06) map onto Reviera like this:
+
+| What users know (research/06) | In Reviera |
+|---|---|
+| Architecture › Component › Place a Component, shortcut CM; places until Esc; Spacebar turns 90° | Architecture › Component › **Component**, shortcut **CM**; places until Esc; Spacebar turns 90° (DM-LIB-002) |
+| Load Family (a file dialog with a preview), then place | The **Component Library** panel: folders and thumbnails; a click picks a component up and places it. Loading happens on the first copy, and the panel stays open. |
+| Load Autodesk Family (a cloud content browser with a tree, search and preview) | The same panel, over folders on disk, a share or WebDAV, with organisation libraries later (DM-LIB-001, DM-LIB-004) |
+| Library locations set in Options (Places) | Libraries opened in the panel (Open…, New…), remembered per user |
+| Type catalogs and Specify Types | Variants in the manifest (DM-LIB-003) |
+| Type Selector and Properties during placement | Properties during Place Component: the component, its details, rotation, mirror and offset |
+| Edit Family, then Load into Project (and Close); Family Already Exists: overwrite, or overwrite with parameter values | **Edit Component**, then Save, which updates placed copies; a type conflict asks *Use project's*, *Use library's* or *Keep both* (DM-LIB-003) |
+| Save As › Library › Family; Save Group and Load as Group for repeated layouts | **Create Component** from any selection, written as an IFC file (DM-LIB-003) |
+| Thumbnails taken from the view saved last | Thumbnails rendered by Reviera from the file, cached per user (DM-LIB-004) |
+| Project Browser › Families: category, family, type; drag a type into a view | The Model Tree and Project Browser list placed components and types; dragging a type from the browser is P2 |
+
+- **Where Reviera differs, on purpose:**
+  - libraries are plain folders of open 3D files and IFC, readable by other tools;
+  - any selection becomes a component, as an IFC file;
+  - placing is stamp-like, from a thumbnail palette, with no separate load step;
+  - components can be arrayed along paths parametrically (ARC-MOD-033).
+
+**Acceptance criteria.**
+- [x] CM starts Place Component, which places copies until Esc; Spacebar turns the next copy 90°. *(Built 2026-10-14.)*
+- [x] The Component Library panel shows a library's folders and thumbnails; clicking a component starts placing it. *(Built 2026-10-14.)*
+- [ ] Neither the interface nor the help uses the word "family" for components.
+- [ ] Edit Component on a placed copy opens its IFC file; saving updates the copies in the open model.
+
 ---
 
 ## 2.9 Parameters and units
@@ -2914,8 +3267,8 @@ Coordinates ▾: *Acquire Coordinates* (from a link), *Publish Coordinates* (to 
 | DM-IMP-003 | DWG (R13–2018 and later where the library supports it) | ✔ | ✔ | P1 | `acadrust` (MPL-2.0); LibreDWG (GPL-3.0+) as a fallback | Coverage depends on the library. Unsupported entities are listed in a report. Same options and results as DXF. Xrefs are resolved from the DWG's folder and imported as nested groups, or skipped with a warning. Files saved by versions newer than the library supports are refused with the version found and a suggestion to save as DXF from the source tool. |
 | DM-IMP-004 | PDF (as underlay) | ✔ | ✔ | P1 | PDFium (BSD-3/Apache-2.0) | Choose a page, resolution, and vector snapping to the PDF's path geometry. Pages are rendered at 72–600 dpi (default 150) for display; vector paths are extracted once into a snapping cache. Scale is set by the page's declared size or calibrated by two picked points of known distance. Password-protected PDFs are refused. Placed in plan, drafting and sheet views. |
 | DM-IMP-005 | Images (PNG, JPEG, TIFF, BMP, WebP) | ✔ | ✔ | P1 | `image` crate (MIT/Apache-2.0) | Placed in views, or on sheets. Images are RXD assets de-duplicated by hash, or linked by path (§2.10.14, COL-LNK-005). Native size comes from the image's dpi (96 dpi if none); maximum 16,384 × 16,384 pixels. Draw layer background or foreground; scale calibration by two points; alpha transparency kept. |
-| DM-IMP-006 | OBJ, STL, PLY | ✔ (project or family) | — | P1 | Rust crates (MIT/Apache-2.0) | Mesh. Optional decimation, and conversion to `IfcTriangulatedFaceSet`. Options: units (auto from file, or chosen), up-axis (Y or Z), merge coplanar triangles, decimate to a target triangle count, and category. Into a family, the mesh becomes a non-parametric form; into a project, a direct shape (§2.13.10). Non-manifold meshes are accepted for display and flagged. |
-| DM-IMP-007 | glTF 2.0 / GLB | ✔ (project or family) | — | P2 | `gltf` crate (MIT/Apache-2.0) | Mesh with PBR materials (mapped to §2.10.5). Each glTF material becomes a Reviera material (matched by name to existing ones, or created) with its textures as RXD assets. Node hierarchy becomes nested groups or one element per node (option). Animations and cameras are ignored with a note. |
+| DM-IMP-006 | OBJ, STL, PLY | ✔ (project or family; as a custom object, DM-IMP-015) | — | P1 | Rust crates (MIT/Apache-2.0) | Mesh. Optional decimation, and conversion to `IfcTriangulatedFaceSet`. Options: units (auto from file, or chosen), up-axis (Y or Z), merge coplanar triangles, decimate to a target triangle count, and category. Into a family, the mesh becomes a non-parametric form; into a project, a direct shape (§2.13.10). Non-manifold meshes are accepted for display and flagged. |
+| DM-IMP-007 | glTF 2.0 / GLB | ✔ (project or family; as a custom object, DM-IMP-015) | — | P1 *(raised from P2, owner, 2026-10-14)* | `gltf` crate (MIT/Apache-2.0) | Mesh with PBR materials (mapped to §2.10.5). Each glTF material becomes a Reviera material (matched by name to existing ones, or created) with its textures as RXD assets. Node hierarchy becomes nested groups or one element per node (option). Animations and cameras are ignored with a note. |
 | DM-IMP-008 | STEP AP203/AP214/AP242, IGES, BREP | ✔ (project or family) | — | P1 | OCCT (LGPL-2.1 + exception) | Exact B-rep, used for manufacturer content in families. Solids keep exact faces (`IfcAdvancedBrep` on export); assemblies can be imported as one element or one element per part. Units come from the file. Colour and layer attributes (AP214/AP242) set materials and subcategories. Healing (sewing, small-edge removal) runs with a report. |
 | DM-IMP-009 | 3DM (Rhino) | ✔ | — | P2 | openNURBS (licence to be checked) | Only if the licence check passes; otherwise P3. Imports breps, extrusions and meshes with layer names as subcategories; NURBS surfaces kept exact. Block instances become nested groups. Units from the file. |
 | DM-IMP-010 | Point clouds: E57, LAS/LAZ, PLY | — | ✔ | P2 | libE57Format (BSL-1.0), `las`/`laz` crates (MIT/Apache-2.0) | Indexed into an octree cache stored on disk next to the project (not part of IFC or RXD; rebuilt if missing). The link itself is in RXD document `project/links`. Snapping to points. Indexing runs in the background with progress; display uses level-of-detail streaming within a point budget (default 5 million points). Colour by RGB, intensity, elevation or classification. Clipped by section boxes and view ranges. |
@@ -3126,6 +3479,58 @@ Coordinates ▾: *Acquire Coordinates* (from a link), *Publish Coordinates* (to 
 - [ ] With no CADCraft build available, the in-CADCraft checks are reported as skipped.
 - [ ] Upgrading `acadrust` without running the corpus checks is refused by the dependency review (`cargo deny` policy plus the review checklist).
 - [ ] The compatibility matrix names the CADCraft version that produced every corpus file.
+
+### 2.11.12 Custom objects from meshes
+**ID:** DM-IMP-015 · **Priority:** P1 · **Ref:** owner requirement (2026-10-14); DM-IMP-006, DM-IMP-007; Reviera's own design
+
+**Purpose.** Bring any mesh made in another open tool (a chair from a modelling program, a scanned statue, a manufacturer's product, a 3D-print model) into a project as a **custom object**: a type of object, with a category, materials and parameters, placed as many times as needed and treated like Reviera's own elements. *(Owner requirement, 2026-10-14: "import an arbitrary mesh from common open 3D formats as custom objects".)*
+
+**Behaviour & rules.**
+- **Formats.** OBJ (with its MTL materials), STL (ASCII and binary), PLY (ASCII and binary), glTF 2.0 and GLB are P1; 3MF and OFF are P2. Each is read with a GPL-compatible open-source reader (a Rust crate, or Reviera's own reader for the simpler formats), recorded in the research log when chosen. Formats that need proprietary SDKs stay P3 (DM-IMP-001 … 012).
+- **Insert › Import Object** (`mesh_object.import`) opens the file and shows a dialog with a 3D preview:
+  - **Units**: from the file when it states them (glTF is in metres; 3MF states its unit), otherwise chosen (mm, cm, m, in, ft). The preview shows the object's resulting width, depth and height, so a wrong unit is obvious before import.
+  - **Up axis**: Z or Y (glTF's default is Y-up; OBJ, STL and PLY have no convention, so Z-up is the default with a one-click flip).
+  - **Insertion point**: bottom centre (default), the file's origin, or a bounding-box corner. The object's base sits on the level or host where it is placed.
+  - **Category**: the IFC class the object becomes, with a sensible type class: Generic Model (`IfcBuildingElementProxy`), Furniture (`IfcFurniture`), Plumbing Fixture (`IfcSanitaryTerminal`), Lighting Fixture (`IfcLightFixture`), Planting (`IfcGeographicElement`), Equipment (`IfcFurnishingElement`, `IfcElectricAppliance`) and others from the category table (§2.10.3).
+  - **Name**, and the **type name** (the file's name by default).
+  - **Clean-up**: weld coincident vertices (default on), drop degenerate triangles (on), recompute normals (off; on when the file has none), and decimate to a target triangle count (off). A report lists open edges, non-manifold edges and inconsistent winding.
+- **Types and instances.** The import makes a **custom object type** holding the mesh once; instances share it. Placing (`mesh_object.place`) works like placing a column: click in a plan or a 3D view, snapping to the usual snaps; Spacebar turns it 90°; the tool repeats until Esc. An instance has a base level and offset, a rotation, and an optional mirror. Hundreds of instances of one chair store one mesh.
+- **Materials.** Each material of the source (an OBJ `usemtl` group, a glTF material, a PLY or STL colour) becomes a **material slot** of the type, with its colour (and, P2, its textures as RXD assets, mapped to the PBR appearance of §2.10.5). Each slot can be mapped to a project material in the type's properties; a mesh with no materials gets one slot, *Default*.
+- **Plans and sections.** A custom object is drawn in plans by its outline: the mesh cut at the view's cut plane, and the projection of what is below it (computed from the mesh and cached with the type). Above the cut, it is drawn per the category's overhead style, as other elements are. Sections and elevations draw its projection and cut faces.
+- **Modifying.** Instances move, copy, rotate, mirror, array, align, pin and delete like other elements; they are selected by clicking any face. **Type properties** hold the name, category, material slots, a uniform scale, and the import options. **Reload from File** (`mesh_object.reload`) re-reads the source (or a new file) into the type, keeping every instance and the material mapping where slot names still match.
+- **Taking part in the model.** Custom objects appear in schedules by category, carry parameters and property sets like other elements, are hidden and isolated by category, and take part in overlap detection and clash tests (COL-CLASH). A closed, consistently wound mesh is treated as a solid (its volume is reported and booleans may use it, P2); an open mesh is display-only for booleans and its clash results are marked approximate.
+- **Library and stamps.** A library is a set of folders of 3D files (DM-LIB-004). Mesh files in them are used directly: stamping one imports it as a custom object type the first time (DM-LIB-002). A type imported elsewhere can be added to a library folder, as its source file or as an IFC file.
+- **Limits.** A type above 1,000,000 triangles asks to decimate before import; above 5,000,000 it is refused with the count found. Import runs in the background with progress and can be cancelled.
+
+**Data (IFC mapping).**
+- The type is the category's type class (for example `IfcFurnitureType`, or `IfcBuildingElementProxyType` for Generic Model) with one `IfcRepresentationMap` whose geometry is an `IfcTriangulatedFaceSet` (or `IfcPolygonalFaceSet` when the source keeps quads or polygons), with `IfcIndexedColourMap` or `IfcStyledItem` per material slot.
+- Each instance is an element of the category's class whose body is an `IfcMappedItem` of the type's map, placed by its `ObjectPlacement`; `ObjectType` names the type.
+- The RXD recipe on the type (`recipe.mesh_object`) records the source file name, its SHA-256, the import options and the slot mapping. The source file itself is stored as an RXD asset only when the user chooses *Keep source* (for Reload from File without the original); otherwise only its hash is kept.
+- Files written this way open in other IFC tools with the objects visible and typed.
+
+**Commands.**
+`mesh_object.inspect(path, options?) -> report` *(query: units, size, triangle count, materials, defects, without importing)* ·
+`mesh_object.import(path, options) -> type_id` ·
+`mesh_object.place(type_id, point, level_id?, rotation?, mirror?) -> element_id` ·
+`mesh_object.reload(type_id, path?, options?)`.
+`import.mesh(path, target: "project", …)` (DM-IMP-006/007) is kept as the one-step form: it imports the type and places one instance at the insertion point.
+
+**Acceptance criteria.**
+- [ ] An OBJ chair with two materials (frame, seat) in centimetres, imported with *Units: cm*, is about 0.45 m wide and gets two material slots; placing it five times stores the mesh once in the saved IFC (one `IfcRepresentationMap`, five `IfcMappedItem`).
+- [ ] A binary STL in millimetres with no units in the file previews at the size chosen in the dialog, and the units choice changes the previewed size before import.
+- [ ] A glTF Y-up model is imported upright with the default up axis, and its glTF material colours appear on the object.
+- [ ] Reload from File with an edited OBJ updates every instance, keeping their positions and the material mapping.
+- [ ] A custom object of category Furniture appears in a furniture schedule, and in a floor plan is drawn by its cut outline at the view's cut plane.
+- [ ] A saved project with custom objects opens in another IFC viewer with the objects visible, typed and in the right places.
+- [ ] Importing a 6,000,000-triangle mesh is refused with the triangle count in the message.
+
+**Implementation note (2026-10-14, first build).**
+- **Readers:** Reviera's own readers, with no new dependencies, for OBJ (with MTL colours), STL (ASCII and binary), PLY (ASCII and binary, both byte orders) and glTF 2.0/GLB (node transforms, base colours; Draco and sparse accessors refused with a message).
+- **Storage:** the type stores its mesh in its RXD recipe (base64 `f32` positions, `u32` triangles, `u16` slots, keyed by a content hash so it is decoded once). In IFC it is written once as an `IfcRepresentationMap` of one `IfcTriangulatedFaceSet` per slot, each with an `IfcStyledItem`. Copies are `IfcMappedItem`s; a mirrored copy uses `IfcCartesianTransformationOperator3DnonUniform`.
+- **Copies:** each has its own scale as well as the type's.
+- **Library-loaded types:** these record the library's id and name and the item's path in it, but no absolute folders, so shared models do not carry the author's paths.
+- **The window:** Import Object (with a size preview that follows the units and up axis), Properties of copies and types (offset, rotation, mirror, scale; type name, category, scale and slot colours).
+- **Not built yet:** 3MF and OFF, textures, decimation, plan cut outlines (plans draw the 3D body), an object library browser for project types, and Reload from File in the window.
 
 ## 2.12 The command registry
 
@@ -3927,8 +4332,11 @@ Reviera shall have a foundational subsystem, built on one general contract, that
 | `HasBlobs` | unary | Which of a list of blob hashes the server already holds. |
 | `PutBlobs` | client streaming | Uploads blobs in chunks of up to 4 MiB, each compressed with a negotiated codec (zstd with a profile dictionary by default, or a delta against a blob the server holds) and named by the SHA-256 of its uncompressed content. Blobs are cached for the server's retention time, so a re-run after a small change sends only the blobs that changed. |
 | `SubmitJob` | unary | Starts a job: kind and version, the kind's options, the distillation's blob list and distiller, the snapshot hash and the client job key. Returns the job ID. |
-| `WatchJob` | server streaming | Progress (fraction and phase), log lines, warnings, heartbeats, checkpoints and the final state (succeeded, failed with reason, cancelled). Reattaching to a running or finished job is the same call. |
-| `GetResults` | server streaming | The job's output (a result package, images or files) in chunks, with its SHA-256 and provenance manifest. |
+| `ListJobs` | unary | The job registry (DM-RPC-009): the caller's jobs, filtered by state, kind, project or client, with paging. |
+| `GetJob` | unary | One job's registry record: state, progress, timings, host and worker, last event sequence number, result manifest hash and expiry. |
+| `WatchJob` | server streaming | Progress (fraction and phase), log lines, warnings, heartbeats, checkpoints and the final state (succeeded, failed with reason, cancelled). Every event has a sequence number; a client that reconnects passes the last number it saw and receives the events after it, with none lost or repeated. |
+| `GetResults` | server streaming | The job's output (a result package, images or files) in chunks, with its SHA-256 and provenance manifest. Takes a byte offset, so an interrupted download resumes where it stopped. |
+| `AckResults` | unary | The client confirms it has stored a job's results; the server may then release them before their expiry. |
 | `CancelJob` | unary | Cancels a job; the runner stops work and frees its memory. |
 | `Shutdown` | unary | Asks a local runner to exit cleanly (sent at its idle timeout; the process is killed after a 10 s grace period). |
 
@@ -4025,7 +4433,7 @@ Reviera shall have a foundational subsystem, built on one general contract, that
 - Hosts advertise themselves by DNS-SD (`_reviera-compute._tcp`) and can be added by address.
 - **Pairing:** the host shows a six-digit code; entering it in Reviera pins the host's TLS certificate fingerprint and issues a per-client token, kept in the operating system's credential store. All traffic is TLS. A host refuses unpaired clients, and can be limited to listed job kinds and a maximum job size.
 - A host advertises its job kinds, runners, cores, memory, GPUs and queue. Each job kind can be set to run *Local*, *On host …* or *Best available* (the least-loaded paired host that has what the job needs, else local).
-- A job on a host survives the client disconnecting: the host keeps it and its results for 24 hours (settable), and Reviera reattaches by job ID. If a host is unreachable when a job starts, Reviera offers to run it locally.
+- A job on a host survives the client disconnecting, and Reviera reattaches to it through the job registry (DM-RPC-009). If a host is unreachable when a job starts, Reviera offers to run it locally.
 
 **Commands.**
 - `compute_host.discover(timeout_s?) -> hosts[]`
@@ -4091,7 +4499,7 @@ Reviera shall have a foundational subsystem, built on one general contract, that
 **Purpose.** One place to see and manage every job of every kind, its runner and its host.
 
 **Behaviour & rules.**
-- *Manage › Compute Jobs* lists jobs (kind, scope, state, progress, host, started, duration, estimate and cost where known) with Cancel, Retry, Reattach and Open Results; a *Hosts* tab lists hosts (local, paired, cloud) with their resources, queues and the job kinds routed to each, and offers Pair Host…, Add Cloud Host… and Forget; a *Job kinds* tab lists registered kinds with their location, detail routing, idle timeout and limits.
+- *Manage › Compute Jobs* lists jobs (kind, scope, state, progress, host, started, duration, estimate and cost where known) with Cancel, Retry, Reattach, Forget and Open Results, and marks jobs that are *reconnecting* or whose results are nearing expiry; a *Hosts* tab lists hosts (local, paired, cloud) with their resources, queues and the job kinds routed to each, and offers Pair Host…, Add Cloud Host… and Forget; a *Job kinds* tab lists registered kinds with their location, detail routing, idle timeout and limits.
 - The status bar shows a compute indicator only while a runner is running or a remote job is in progress, so the user can see that nothing is resident.
 - Every action is a command, equally available to Lua and MCP.
 
@@ -4100,6 +4508,32 @@ Reviera shall have a foundational subsystem, built on one general contract, that
 
 **Acceptance criteria.**
 - [ ] `compute.*` and `compute_host.*` give the same results from Lua and MCP as the panel.
+
+### 2.17.9 Job registry and reconnection
+**ID:** DM-RPC-009 · **Priority:** P2 · **Ref:** owner requirement (2026-10-15); Reviera-originated design
+
+**Purpose.** A long-running job is safe from disconnection: the client can go away, because of a network drop, a laptop closing, Reviera quitting or crashing, and come back later to follow the job and collect its results.
+
+**Behaviour & rules.**
+- **Server registry.** Every server (a local compute host, a LAN host, a cloud gateway) keeps a durable **registry of jobs**, written before `SubmitJob` returns and updated as each job progresses, so it survives the client disconnecting and the server itself restarting (an embedded database on a single host; the cluster's database on a cloud gateway). A record holds the job ID, the client job key, the owner's identity, the project, the kind and version, the state, submission, start and finish times, the host and worker, progress, the last event sequence number, checkpoints, the result manifest hash, and the expiry.
+- **Jobs outlive their client.** A job keeps running when its client disconnects. Local jobs run under the local compute host (started on demand in the user's session, DM-RPC-004), not as children of Reviera, so they survive Reviera closing or crashing; the local host stays up while it has jobs and exits when it is idle and holds no unfetched results. *Cancel local jobs when Reviera exits* is an option, off by default.
+- **Host restarts.** When a host restarts, jobs it was running resume from their last checkpoint if their kind supports checkpoints; otherwise they are marked failed with reason `host_restarted` and offered for resubmission. Queued jobs stay queued.
+- **Client registry.** Reviera records every job it submits, with its host, job ID, client job key, kind, scope, snapshot hash and last event sequence number, in the model's RXD document `compute` (saved with the model), and in the user's state for models not yet saved. When Reviera starts or opens a model with outstanding jobs, it reconnects to their hosts, resumes `WatchJob` from the last sequence number, downloads finished results (resuming partial downloads), applies them through the result applier, and acknowledges them with `AckResults`. Results computed from an older snapshot are applied and marked stale (ANA-GEN-001), never silently dropped.
+- **Reconnection.** A lost connection is retried with backoff (1 s to 60 s); the job shows *reconnecting* in the Compute Jobs panel meanwhile. Reattaching works from any machine signed in as the job's owner on a LAN or cloud host, so a job started on one workstation can be collected on another.
+- **Retention and expiry.** Results are kept until acknowledged or until the server's retention ends (24 hours on a LAN host, 7 days on a cloud host, both settable), whichever comes later for unacknowledged results; the panel warns about results nearing expiry. An expired job's record stays in the registry, without results, for 30 days.
+- **Access.** A client sees and reattaches to its owner's jobs only; administrators can list all jobs on their hosts.
+
+**Commands.**
+- `compute.reattach(job_id?) -> jobs[]` (all outstanding jobs when no ID is given)
+- `compute.forget_job(job_id) -> ()` (removes a job from the client registry; cancels it first if it is still running and the user confirms)
+
+**Acceptance criteria.**
+- [ ] Killing Reviera during a 30-minute local job and starting it again 10 minutes later shows the job still running; when it finishes, its results are applied without user action.
+- [ ] Disconnecting the network during a cloud job and reconnecting resumes progress from the last event, with no event shown twice or missed.
+- [ ] Interrupting a 500 MB result download at 60% and reconnecting downloads only the remaining 40%.
+- [ ] Restarting a LAN host during a checkpointing job resumes it from its last checkpoint; a non-checkpointing job is reported as `host_restarted` and offered for resubmission.
+- [ ] A job submitted from one workstation is listed, followed and collected from another signed in as the same user.
+- [ ] Saving and reopening the model keeps its outstanding jobs, and reopening reconnects to them.
 
 **Packaging.** Reviera bundles `reviera-compute-host` beside `reviera` for local runners; the host is also packaged on its own and as a container image for LAN and cloud hosts. Built-in runners ship as separate executables. Reviera ships a Rust runner skeleton and a Python one, so a new job kind's runner can be written in any language with a gRPC library.
 
@@ -4281,6 +4715,33 @@ All commands defined in this chapter. Every command in this table is also a Lua 
 | `library.source.remove` | source_id | — | No | DM-LIB-001 |
 | `library.refresh` | source_id? | — | No | DM-LIB-001 |
 | `library.load` | item_ref, type_names?, place=false | family_id | Yes | DM-LIB-001 |
+| `library.add_item` | element_or_type_id, library?, name?, tags? | item_ref | No | DM-LIB-002 |
+| `component.place_row` | type_id \| {library, item}, start, end, spacing?, count? | element_ids[] | Yes | DM-LIB-002 |
+| `component.scatter` | sources[], points[], rotation_range?, scale_range?, seed? | element_ids[] | Yes | DM-LIB-002 |
+| `element.make_unique` | element_id | type_id | Yes | DM-LIB-002 |
+| `component.create` | element_ids[], destination, name, kind?, base_point?, include_hosts?, include_rooms?, replace_selection?, tags? | item_ref | Yes | DM-LIB-003 |
+| `component.edit` | item_ref \| element_id | document_id | No | DM-LIB-003 |
+| `component.reload` | item_ref | — | Yes | DM-LIB-003 |
+| `library.add_variant` | item_ref, element_ids[], variant_name | variant_ref | No | DM-LIB-003 |
+| `library.import_ifc` | path, folder, filter?, name? | item_ref | No | DM-LIB-003 |
+| `library.inspect` | item_ref | item_report | No | DM-LIB-003 |
+| `library.folder.create` | library_id, path | folder_ref | No | DM-LIB-004 |
+| `library.folder.rename` | folder_ref, name | — | No | DM-LIB-004 |
+| `library.folder.delete` | folder_ref | — | No | DM-LIB-004 |
+| `library.move` | item_or_folder_refs[], to_folder_ref | — | No | DM-LIB-004 |
+| `library.list` | folder_ref, recursive?, offset?, limit? | {folders[], items[]} | No | DM-LIB-004 |
+| `library.smart_folder.save` | name, query | smart_folder_id | No | DM-LIB-004 |
+| `library.set_meta` | item_or_folder_refs[], meta | — | No | DM-LIB-004 |
+| `library.get_meta` | item_ref | {details, from_file, overrides} | No | DM-LIB-004 |
+| `library.preview` | item_ref, view?, size? | image | No | DM-LIB-004 |
+| `library.write_meta_to_file` | item_ref | — | No | DM-LIB-004 |
+| `library.restore_deleted` | item_refs[] | — | No | DM-LIB-004 |
+| `library.copy_folder` | path, to_folder_ref, options? | job_id | No | DM-LIB-004 |
+| `library.import_files` | paths[], to_folder_ref, options? | {item_refs[], report} | No | DM-LIB-004 |
+| `library.undo_import` | import_id | — | No | DM-LIB-004 |
+| `library.open` | path | library_id | No | DM-LIB-004 |
+| `library.create` | path, name | library_id | No | DM-LIB-004 |
+| `library.close` | library_id | — | No | DM-LIB-004 |
 | `param.definition` | param_ref | definition | No | DM-PARAM-002 |
 | `param.list` | category?, element_id? | definition[] | No | DM-PARAM-002 |
 | `param.set_ifc_home` | param_ref, category?, pset_name, property_name | — | Yes | DM-PARAM-002 |
@@ -4445,6 +4906,10 @@ All commands defined in this chapter. Every command in this table is also a Lua 
 | `import.pdf` | path, page, view_id, options | element_id | Yes | DM-IMP-004 |
 | `import.image` | path, view_id, placement | element_id | Yes | DM-IMP-005 |
 | `import.mesh` | path, target: "project"\|"family", category?, options | element_id | Yes | DM-IMP-006/007 |
+| `mesh_object.inspect` | path, options? | report | No | DM-IMP-015 |
+| `mesh_object.import` | path, options | type_id | Yes | DM-IMP-015 |
+| `mesh_object.place` | type_id, point, level_id?, rotation?, mirror? | element_id | Yes | DM-IMP-015 |
+| `mesh_object.reload` | type_id, path?, options? | — | Yes | DM-IMP-015 |
 | `import.step` | path, target: "project"\|"family", category? | element_id | Yes | DM-IMP-008 |
 | `link.point_cloud` | path, placement | element_id | Yes | DM-IMP-010 |
 | `import.bcf` | path | topic_id[] | Yes | DM-IMP-011 |
@@ -4548,6 +5013,8 @@ All commands defined in this chapter. Every command in this table is also a Lua 
 | `compute.services` | catalogue_url? | services[] | No | DM-RPC-006 |
 | `compute.run_set` | kind, base, variants[], location? | set_id | Results only | DM-RPC-007 |
 | `compute.jobs` | host_id?, kind? | jobs[] | No | DM-RPC-008 |
+| `compute.reattach` | job_id? | jobs[] | No | DM-RPC-009 |
+| `compute.forget_job` | job_id | — | No | DM-RPC-009 |
 
 ---
 

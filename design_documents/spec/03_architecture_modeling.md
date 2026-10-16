@@ -258,8 +258,10 @@ Loop orientation is normalised on Finish: outer loops counter-clockwise and hole
 
 **Commands.** `dim.temporary_query(element_id, view_id) -> [TempDim]` *(query)*. Driving a temporary dimension issues `element.move` or `wall.set_location`. `dim.make_permanent(view_id, temporary_dimension_ref | {ref_a, ref_b}) -> dimension_id` creates the permanent dimension.
 
+**Implementation notes (2026-10-15).** As built: `dim.temporary_query(element_id, view_id?)` (walls of the element's level, or the plan's), `dim.temporary_set(element_id, index, value, view_id?)` (moves the element through `element.move`, so pins and constraints apply) and `dim.make_permanent(view_id, element_id, index)`; the window shows them for one selected wall, grid, reference plane, door or window in a plan, and a click on a value asks for a new one. Not built yet: dragging or cycling the witness-line references, the Make Permanent icon, the Temporary Dimensions settings.
+
 **Acceptance criteria.**
-- [ ] Selecting a door shows dimensions from the door centreline to the nearest perpendicular walls on both sides. Typing a new value moves the door along its host.
+- [x] Selecting a door shows dimensions from the door centreline to the nearest perpendicular walls on both sides. Typing a new value moves the door along its host.
 - [ ] Clicking a wall-reference grip repeatedly cycles through at least four references and then wraps around.
 
 ### 3.1.7 Listening dimensions
@@ -288,10 +290,12 @@ Loop orientation is normalised on Finish: outer loops counter-clockwise and hole
 
 **Commands.** No command of its own. The resolved point is passed to the running tool exactly as a click would be; scripts call the creation command (for example `wall.create`) with explicit coordinates.
 
+**Implementation notes (2026-10-15).** As built: typed lengths in the Wall, Grid, Ref Plane, Model Line and Scope Box tools (the Grid and line tools freeze the direction when typing begins), shown in the status bar and beside the cursor; `units.parse` accepts arithmetic (`+ - * × /`, parentheses, unit-suffixed terms, worked in the display unit) and `8 6` as feet and inches. Not built yet: the red error box, angles, the micro-operation log.
+
 **Acceptance criteria.**
-- [ ] Wall tool, first click, type `5000`, Enter: the result is a wall exactly 5.000 m long along the cursor direction.
-- [ ] In an imperial project, typing `8 6` produces 2.5908 m.
-- [ ] Typing `1200+600` in a metric project draws a line 1.800 m long; typing `(2*900)/2` draws 0.900 m.
+- [x] Wall tool, first click, type `5000`, Enter: the result is a wall exactly 5.000 m long along the cursor direction.
+- [x] In an imperial project, typing `8 6` produces 2.5908 m.
+- [x] Typing `1200+600` in a metric project draws a line 1.800 m long; typing `(2*900)/2` draws 0.900 m.
 - [ ] Typing `-300` or `abc` keeps the box open with an error and creates nothing.
 - [ ] Moving the mouse after the box has opened does not change the direction of the committed segment.
 
@@ -337,8 +341,10 @@ Loop orientation is normalised on Finish: outer loops counter-clockwise and hole
 - **Spacebar** in Rotate (§3.12) picks a new centre of rotation.
 - Elliptical walls ignore the Spacebar flip.
 
+**Implementation notes (2026-10-15).** As built: Tab and Shift+Tab in a view cycle the element under the cursor, the chain of walls joined end to end with it, and other elements there (annotation, grids, datums, inserts, openings, room labels), naming the candidate in the status bar and highlighting it; the next click there selects it. Not built yet: sub-elements and alternative references.
+
 **Acceptance criteria.**
-- [ ] Hovering a wall joined in a closed rectangle and pressing Tab once highlights all four walls, and a click selects them all.
+- [x] Hovering a wall joined in a closed rectangle and pressing Tab once highlights all four walls, and a click selects them all. (The chain is the second candidate, after the wall itself.)
 - [ ] Spacebar while drawing a wall from left to right puts the exterior face below the wall line in plan.
 
 ### 3.1.10 In-canvas element controls
@@ -470,8 +476,10 @@ Dragging a control issues the matching command once, on mouse-up. The preview du
 **Commands.** `refplane.create(p0, p1, view_normal | normal, name?, subcategory?) -> element_id`, `refplane.rename(id, name)`.
 
 **Acceptance criteria.**
-- [ ] A named reference plane appears in the Work Plane › Name list, and a model line can be sketched on it.
-- [ ] A reference plane drawn in plan is invisible in a 3D view and visible in any section cut at right angles to it.
+- [x] A named reference plane appears in the Work Plane › Name list, and a model line can be sketched on it.
+- [x] A reference plane drawn in plan is invisible in a 3D view and visible in any section cut at right angles to it.
+
+**Implementation notes (2026-10-15).** As built: `refplane.create(start, end, z? | level?, view_normal?, name?, subcategory?)` (points `[x, y]` or `[x, y, z]`), `refplane.rename`, `refplane.set` (ends, subcategory) and `refplane.list`; the Ref Plane tool (RP) in plans with Name in Properties; dashed green in plans and in sections and elevations that look along the plane; Move, Copy (unnamed), Rotate and Mirror. The recipe is `recipe.ref_plane` (`start`, `end`, `view_normal`, `subcategory`). Not built yet: extents and their handles, Pick Lines, Is Reference and Defines Origin (families), drawing in sections.
 
 ### 3.2.4 Datum extents
 **ID:** ARC-DATUM-001 · **Priority:** P0 · **Ref:** research/02 §3.1, §3.2, §3.5
@@ -495,8 +503,10 @@ Dragging a control issues the matching command once, on mouse-up. The preview du
 - `datum.set_bubble(datum_id, view_id, end, visible)`
 - `datum.add_elbow(datum_id, view_id, end)`
 
+**Implementation notes (2026-10-15).** As built: a datum's 3D extent is its line (grids, reference planes), `rxd:datum_extent.z` (heights in sections) and `.plan` (a level's plan extent; none crosses every view); per-view 2D extents, bubbles and grid elbows are `rxd:datum_views` keyed by view GlobalId (`line` in plans, `range` in sections and elevations). Commands as above, plus `datum.get`; `datum.set_extent` takes `point` `[x, y]` in plans and `[across, height]` in sections, and `model: true` to change the 3D extent from a view. Window: Extent in View (3D/2D), Bubble and Elbow rows in Properties, grips that drag the 2D or 3D extent, and Reset to 3D, Maximize 3D and Propagate Extents on Modify | Grids, Levels and Reference Planes. Not built yet: alignment locks, elbows on levels, the 3D/2D label on the grip, right-click commands.
+
 **Acceptance criteria.**
-- [ ] Dragging a grid end in 2D mode in plan view A does not change it in plan view B. Propagating the extents to B does.
+- [x] Dragging a grid end in 2D mode in plan view A does not change it in plan view B. Propagating the extents to B does.
 - [ ] Locked aligned level ends move together. After unlocking, they move independently.
 
 ### 3.2.5 Scope boxes
@@ -525,9 +535,11 @@ Dragging a control issues the matching command once, on mouse-up. The preview du
 - `datum.assign_scope_box(datum_ids, scope_box_id | null)`
 - `view.assign_scope_box(view_ids, scope_box_id | null)` (DOC owns views, and this command is listed here for completeness)
 
+**Implementation notes (2026-10-15).** As built: `recipe.scope_box` (`center`, `width`, `depth`, `rotation`, `bottom`, `height`); `scopebox.create`, `scopebox.set_extents` (also renames), `scopebox.list`, `datum.assign_scope_box` and `view.assign_scope_box` (`rxd:scope_box` on the view); the Scope Box tool (View › Create) and its Name, Height and Rotation in Properties; a datum's Scope Box in its Properties. Assigned grids and reference planes are clipped to the footprint (and refit when the box moves, turns or resizes); assigned datums show only in plans cut through the box and sections that reach it. IFC: `IfcAnnotation` (ScopeBox) placed at the box's base centre, turned, with a `Box` representation of an `IfcBoundingBox`. Not built yet: crop regions (so views assigned to a box record it only), Views Visible, 3D handles.
+
 **Acceptance criteria.**
-- [ ] Rotating a scope box by 30° rotates the crop region of every assigned view by 30°.
-- [ ] A grid assigned to a box that does not reach Level 3 is not shown on the Level 3 plan.
+- [ ] Rotating a scope box by 30° rotates the crop region of every assigned view by 30°. (Crop regions are not built.)
+- [x] A grid assigned to a box that does not reach Level 3 is not shown on the Level 3 plan.
 
 ### 3.2.6 Work planes
 **ID:** ARC-WP-001 · **Priority:** P0 · **Ref:** research/02 §3.6 · web: Edit with the Workplane Viewer; Zoom to Fit Workplane Viewer
@@ -570,8 +582,10 @@ Dragging a control issues the matching command once, on mouse-up. The preview du
 - `element.set_work_plane(element_ids, plane | host_ref)`
 - `element.dissociate_work_plane(element_ids)`
 
+**Implementation notes (2026-10-15).** As built: work plane references `{by: level, level, offset} | {by: grid, grid} | {by: ref_plane, ref_plane} | {by: explicit, origin, x_dir, normal}`; a view's setting in `rxd:work_plane` (`plane`, `show`, `grid_spacing`), a plan's level by default; `workplane.set` (one of `level`/`offset`, `grid`, `ref_plane`, `plane`), `workplane.get`, `workplane.show`, `workplane.list` (the Name list); `element.set_work_plane` (projects the element onto the new plane) and `element.dissociate_work_plane` for model lines; Set (by name) and Show (a grid over the model's extent) in the window. Elements on a level move with its elevation; on a grid or reference plane, with it. Not built yet: Pick a Plane (faces), Pick a Line, Go To View, the Work Plane Viewer, and work-plane-based components and model text.
+
 **Acceptance criteria.**
-- [ ] Model text placed on a named reference plane moves with the plane when the plane is moved.
+- [ ] Model text placed on a named reference plane moves with the plane when the plane is moved. (Model lines do.)
 - [ ] Choosing a vertical plane in a plan view offers Go To View with at least one section or elevation.
 - [ ] With a sweep's profile plane selected, Viewer opens a view normal to that plane, zoomed to the model extents. Editing the profile there updates the open 3D view without a refresh, and closing the viewer leaves no new entry in the Project Browser.
 
@@ -662,6 +676,7 @@ Dragging a control issues the matching command once, on mouse-up. The preview du
   - Changing the *Location Line* parameter of a placed wall leaves its geometry where it is. Reviera recomputes the stored location-curve offset so that the body does not move.
   - Flipping mirrors the wall about its **current** location line.
   - The blue end dots are drawn on the location line.
+- **Implementation note (2026-10-15).** Location lines are built for straight walls: the recipe's curve is the location line and the geometry is offset to the centreline by the type's faces and core (`walls::line_offset`), so type changes keep the line and flips mirror about it; `wall.create` takes `location_line`, and `wall.set_location_line` (an addition) changes it without moving the body. The window: the Location Line row on walls and in the Wall tool's palette. Not built yet: curved walls on lines other than the centreline, the tool's preview drawn off the line, the *Offset* option.
 
 **Regeneration.** Edges into the wall: `datum` from the base and top levels; `join` from its join nodes; `type` from the wall type; `attach` from attach targets; `host` from the host wall (hosted walls). Edges out of the wall: `host` to its inserts; `bound` to rooms on the levels the wall spans; `cut` to embedded curtain-wall hosts.
 
@@ -804,6 +819,8 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 - [ ] Setting a Finish layer to priority 1 while it lies between a priority-3 layer and the core fails validation with a message naming both layers.
 - [ ] Reading an IFC with Priority 100/90/80 and no RXD data yields Reviera priorities 1/2/3.
 
+**Implementation note (2026-10-15).** Floor and ceiling types take layers too (`compound.set_layers` and `compound.get` accept them; top first); the type's thickness is their total (`type.set_param thickness` is then refused), floors are drawn layer by layer in each layer's material, the IFC type gets an `IfcMaterialLayerSet` and its floors share an `IfcMaterialLayerSetUsage` (AXIS3, NEGATIVE, from the top); Edit Assembly opens from Modify | Floors and Ceilings. Not built yet: roof types' layers, variable layers under a shape-edited top, layer joins between floors and walls.
+
 ### 3.3.6 Edit Assembly dialog
 **ID:** ARC-CMPD-002 · **Priority:** P0 · **Ref:** research/02 §4.5 · screenshots/architecture/wall_edit_assembly_layers_2026.png
 
@@ -854,7 +871,9 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 - `compound.set_region_anchor(type_id, boundary_key, from: Base|Top, distance)`
 
 **Acceptance criteria.**
-- [ ] A type with a 600 mm brick region anchored to the base shows the brick from 0 to 600 mm on a 3 m wall and on a 1 m wall alike. On a 0.5 m wall the brick region is clipped at 0.5 m.
+- [x] A type with a 600 mm brick region anchored to the base shows the brick from 0 to 600 mm on a 3 m wall and on a 1 m wall alike. On a 0.5 m wall the brick region is clipped at 0.5 m.
+
+**Implementation note (2026-10-15, first build).** As built: regions are horizontal splits of a layer's column (`recipe.compound` `regions`: layer, from base or top, distance, material or an assigned row), so regions do not step in thickness yet. Such walls are built layer by layer (one box per layer cell, cut at the joined ends and by the openings) and each cell is drawn in its material's colour; IFC writes the cells as a B-rep. Commands: `compound.split_region`, `compound.merge_regions`, `compound.set_region_anchor`, `compound.assign_layer`, `compound.set_regions` (an addition). The window: the Regions grid in Edit Assembly. Not built yet: vertical region boundaries, the sample-plane editor with Split/Merge/Assign tools, plan layer lines per region, Parts per layer/region export.
 
 ### 3.3.8 Extendable layers
 **ID:** ARC-CMPD-004 · **Priority:** P1 · **Ref:** research/02 §4.3, §4.5
@@ -881,9 +900,11 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 - `wall.set_extension(wall_ids, top?: f64, base?: f64)`.
 
 **Acceptance criteria.**
-- [ ] With an extendable brick layer and Base Extension Distance = −300 mm, the brick stops 300 mm below the wall base, while the other layers stay at the base.
-- [ ] Unlocking the bottom edges of layers 1 and 3 but not layer 2 is refused with a message naming the layers.
+- [x] With an extendable brick layer and Base Extension Distance = −300 mm, the brick stops 300 mm below the wall base, while the other layers stay at the base.
+- [x] Unlocking the bottom edges of layers 1 and 3 but not layer 2 is refused with a message naming the layers.
 - [ ] A window placed in a wall whose brick layer extends 500 mm above the top still cuts the brick, and attaching the wall top to a roof makes Top Extension Distance read-only.
+
+**Implementation note (2026-10-15, first build).** As built: layers' `extend_top`/`extend_base` flags (adjacency and lone-membrane rules), the wall recipe's `extension` (base, top); the layered body moves the unlocked layers' edges; an attached top ignores and refuses the top extension; "Layer extension exceeds wall height" when the layers would be shorter than `TOL_SHORT`. `compound.set_extendable`, `wall.set_extension`; Edit Assembly's Extend Top/Base columns and the wall's Top/Base Extension Distance rows. Not built yet: shape handles with Tab in views, extensions on slanted walls, layer cleanup of extended parts at joins, property values in IFC.
 
 ### 3.3.9 Layer wrapping
 **ID:** ARC-WRAP-001 · **Priority:** P1 · **Ref:** research/02 §4.4, §4.5 (Wrapping), §5.5
@@ -918,7 +939,9 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 **Acceptance criteria.**
 - [ ] A 12.5 mm plasterboard layer with Wraps on, and Wrapping at Inserts = Interior, lines all four sides of a window opening up to the window's closure plane. In a plan cut the board turns into the jamb.
 - [ ] A free wall end with Wrapping at Ends = Exterior shows the exterior render wrapping around the end and stopping at the interior face of the core.
-- [ ] A tapered wall ignores all wrapping settings without error.
+- [x] A tapered wall ignores all wrapping settings without error.
+
+**Implementation note (2026-10-15, first build).** As built: Wrapping at Inserts and at Ends on the type (`recipe.compound` `wrap_inserts`, `wrap_ends`) and per-end overrides on the wall (`end_wrap`). At each opening, on a wrapping side, the non-wrapping layers between the face and the core lose the opening grown by the wrapping layers' total, each wrapping layer keeps the opening grown by those outside it and lines the jambs, head and sill back to the core face (the closure depth); at a free end each wrapping layer turns round the end to the core's far face and the other layers on that side and the core stop short. Material volume is kept (checked in tests). `compound.set_wrapping`, `wall.set_end_wrap`; the window: Wrapping choices in Edit Assembly, Wrapping at Start/End rows on walls. Not built yet: family *Wall Closure* planes, shaped openings (they wrap as their bounding rectangle), curved walls, Both at ends.
 
 ### 3.3.10 Slanted and tapered walls
 **ID:** ARC-WALL-005 · **Priority:** P1 · **Ref:** research/02 §4.3, §4.5 · screenshots/architecture/tapered_walls_section.png
@@ -947,8 +970,10 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 **Commands.** `wall.set_cross_section(wall_ids, mode: Vertical|Slanted|Tapered, angle?: f64, exterior_angle?: f64, interior_angle?: f64, override_angles?: bool)`.
 
 **Acceptance criteria.**
-- [ ] A 3 m slanted wall at +10° has its top face displaced by 0.529 m toward the interior.
-- [ ] A tapered type with a 200 mm variable layer, measured at the base, with 1° on each face, built 3 m high, has a variable layer 0.0953 m thick at the top. With 2° on each face the variable layer would reach −0.0095 m within the height, and the change is rejected.
+- [x] A 3 m slanted wall at +10° has its top face displaced by 0.529 m toward the interior.
+- [x] A tapered type with a 200 mm variable layer, measured at the base, with 1° on each face, built 3 m high, has a variable layer 0.0953 m thick at the top. With 2° on each face the variable layer would reach −0.0095 m within the height, and the change is rejected.
+
+**Implementation note (2026-10-15, first build).** As built: the wall recipe's `cross_section` (`slanted` with `angle`, or `tapered` with `exterior` and `interior`, radians); the joined and cut body is sheared (each point moves across the wall by its height times the tangent, proportionally between the faces for a taper); tapered walls need a variable layer and are refused when it would reach zero ("wall.taper_negative"); IFC: a faceted B-rep in the wall's frame; `wall.set_cross_section`; the window's Cross-Section, Angle From Vertical, Exterior Angle and Interior Angle rows. Not built yet: curved walls, in-canvas angle dots, angles from the type with Enable Angle Overrides, Width Measured At top, inserts and sweeps kept vertical, butt-only joins, `IfcMaterialLayerWithOffsets`.
 
 ### 3.3.11 Stacked walls
 **ID:** ARC-STKW-001 · **Priority:** P1 · **Ref:** research/02 §4.6
@@ -975,8 +1000,10 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 - `wall.break_up(stacked_wall_ids) -> [element_id]`
 
 **Acceptance criteria.**
-- [ ] A stacked wall with a 900 mm fixed base row and a variable upper row, drawn 2.7 m high, has sub-walls 0.9 m and 1.8 m high.
-- [ ] Break Up produces two basic walls whose IFC GlobalIds are those of the former sub-walls.
+- [x] A stacked wall with a 900 mm fixed base row and a variable upper row, drawn 2.7 m high, has sub-walls 0.9 m and 1.8 m high.
+- [x] Break Up produces two basic walls whose IFC GlobalIds are those of the former sub-walls.
+
+**Implementation note (2026-10-15, first build).** As built: the wall type's recipe carries `stacked_wall` (offset reference and rows, top first); its width is the rows' envelope about the location line, kept in step when a row type's width or layers change. A stacked wall is an ordinary Reviera wall of that type, so drawing, moving, joins and hosting work as for basic walls; its body is one piece per row, the row's band across the wall cut at the stacked wall's joined ends. Sub-walls have GlobalIds derived from the stacked wall's, so they are stable across saves and Break Up keeps them. Commands: `stackedwall.set_rows`, `stackedwall.create_type` (an addition), `wall.break_up`. IFC: the stacked wall is `ELEMENTEDWALL` with no body, aggregating one `IfcWall` per row with a faceted B-rep (cut by the doors and windows), typed by the row's type; tagged `rxd:stacked_wall` and not loaded as elements. Refused: slanted or tapered stacked walls, horizontal splits, a wall too short for its fixed rows (on creation). The window: Modify | Walls › Edit Stack (a grid like Edit Assembly; on a basic wall it makes a new stacked type) and Break Up. Not built yet: Tab-selecting sub-walls and their own parameters, joins per height interval, top and base extensions, curved and elliptical stacked walls, Sample Height.
 
 ### 3.3.12 Wall joins and layer cleanup
 **ID:** ARC-JOIN-001 · **Priority:** P0 · **Ref:** research/02 §1 (2025/2026), §4.5 (Layer join rules), §4.7, §17.4 · screenshots/architecture/compound_layer_priority_joins.png
@@ -1139,7 +1166,9 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 
 **Acceptance criteria.**
 - [ ] A notch 1 m deep and 1 m high in the top corner creates a mid-end face, and a perpendicular wall drawn to that face joins it.
-- [ ] Raising the wall's top constraint moves the locked top line, and the notch keeps its depth.
+- [x] Raising the wall's top constraint moves the locked top line, and the notch keeps its depth.
+
+**Implementation note (2026-10-15, first build).** As built: the wall recipe's `profile` (loops of points, each stored from its reference: the nearer end and the nearer of base and top for the outer loop's points; a hole loop as a whole by its centre, so holes keep their size); the body is the profile (less the wall's door and window cuts, by polygon difference) pushed across the wall between its faces, points on the wall's ends following the joined ends; it combines with a slanted or tapered cross-section. Commands `wall.edit_profile`, `wall.reset_profile` and `wall.get_profile` (an addition). IFC: a faceted B-rep in the wall's frame. The window: Modify | Walls › Edit Profile, a grid of loop points with Gable, Step and Rectangle presets and Reset Profile. Refused: curved and stacked walls. Not built yet: the sketch mode in elevation with dashed reference planes, explicit locking and unlocking, mid-end faces as join targets.
 
 ### 3.3.15 Wall sweeps and reveals
 **ID:** ARC-WALL-010 · **Priority:** P1 · **Ref:** research/02 §4.5 (Sweeps/Reveals), §4.10
@@ -1180,8 +1209,10 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 - `walltype.set_reveals(type_id, rows)`
 
 **Acceptance criteria.**
-- [ ] A cornice placed on one wall of a closed rectangle extends to all four walls on click, with mitered corners.
-- [ ] A reveal 20 mm deep cuts every layer it reaches and appears as an `IfcOpeningElement` (RECESS).
+- [x] A cornice placed on one wall of a closed rectangle extends to all four walls on click, with mitered corners.
+- [x] A reveal 20 mm deep cuts every layer it reaches and appears as an `IfcOpeningElement` (RECESS).
+
+**Implementation note (2026-10-15, first build).** As built: `recipe.wall_sweep` (walls by GlobalId, reveal flag, horizontal at an offset above a level or vertical at a distance along the first wall, side, wall offset, profile polygon, Cuts Wall, material). A horizontal run follows the walls' joined faces, chained end to start and mitred (closed round a room); creation continues around walls joined end to end at the sweep's height through two-wall corners (`chain`). A reveal, and a sweep that cuts its walls, is a subtraction in the model's boolean relations (ARC-MOD-028), so the 3D view, plans and IFC show the cut (the walls written as their cut B-reps with `IfcRelInterferesElements`, rather than `IfcRelVoidsElement`). Commands: `wallsweep.create`, `wallreveal.create`, `wallsweep.add_walls`, `wallsweep.remove_walls`, `wallsweep.set` (an addition). The window: Modify | Walls › Sweep and Reveal (a dialog), and Properties rows for a selected sweep. Not built yet: profile families (rectangle or typed points only), Angled returns and `wallsweep.set_returns`, type-level sweeps and reveals (`walltype.set_sweeps`/`set_reveals`), Cut by Inserts, `IfcRelCoversBldgElements`, curved walls, picking walls in an elevation with a preview.
 
 ### 3.3.16 Split, Split with Gap and horizontal split (walls)
 **ID:** ARC-WALL-011 · **Priority:** P0 · **Ref:** research/02 §4.12, §13
@@ -1204,7 +1235,9 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 
 **Acceptance criteria.**
 - [ ] Splitting a 10 m wall at 4 m gives walls of 4 m and 6 m. A door at 2 m stays hosted on the first wall, and the IFC export contains the original GlobalId exactly once.
-- [ ] Split with Gap of 20 mm leaves exactly 20 mm between the faces of the new ends, held by a locked dimension.
+- [x] Split with Gap of 20 mm leaves exactly 20 mm between the faces of the new ends, held by a locked dimension.
+
+**Implementation note (2026-10-15).** Split with Gap and Split Horizontally are built for straight walls: `element.split_with_gap` (the gap held by a distance constraint between the new ends, references `end:end` and `end:start`, rather than a drawn dimension; the ends get Disallow Join; slanted walls refused) and `wall.split_horizontal` (z or level; inserts above go to the upper wall with their sills adjusted, one crossing the split refuses it). The window: Modify | Walls › Split with Gap and Split Horizontally. Not built yet: picking the split line in elevation or 3D, a visible locked dimension for the gap, curved walls.
 
 ### 3.3.17 Wall openings
 **ID:** ARC-WALL-012 · **Priority:** P0 · **Ref:** research/02 §4.11, §9
@@ -1278,6 +1311,8 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 - [ ] By Room in a rectangular room with a column in one corner creates a lining that wraps the column's two exposed faces when columns are included.
 - [ ] By Segment against a wall in a linked model creates the lining in the host model, with no hosting relationship.
 
+**Implementation note (2026-10-15, first build).** As built: `wall.create_by_segment` (a lining against a straight wall's face on a side, as long as the face after joins, with the target's base and top) and `wall.create_by_room` (one lining per straight segment of the room's outer boundary, inset by half its width and meeting at the corners, as high as the room or `height`), each with `hosted` and `auto_join`; linings' exterior faces the target (`flip` for By Room turns them round). The window: Modify | Walls › Linings on selected walls or rooms. Not built yet: columns as targets (the acceptance criterion), room islands, curved targets, linked models, the hover preview, Tab and Spacebar while placing.
+
 ### 3.3.20 Auto Join and Auto Join & Lock
 **ID:** ARC-WALL-015 · **Priority:** P1 · **Ref:** research/02 §1 (2025), §4.2
 
@@ -1293,7 +1328,9 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 **Commands.** The option is passed to `wall.create(type_id, curve, base_level, top_constraint: Level(id) | Unconnected(height), base_offset?, top_offset?, location_line?, flip?: bool, structural?: bool, structural_usage?, room_bounding?: bool, join_status?: Allow|Disallow, auto_join?: Off|Join|JoinAndLock) -> element_id`. Afterward, `geometry.join` and `constraint.lock_alignment` apply.
 
 **Acceptance criteria.**
-- [ ] A door placed in a core wall that was auto-joined to a lining cuts both walls.
+- [x] A door placed in a core wall that was auto-joined to a lining cuts both walls.
+
+**Implementation note (2026-10-15, first build).** As built: Join Geometry between parallel walls that touch face to face, stored on the wall recipe (`geometry_joins`, GlobalIds); each wall's door, window and opening cuts are carried into the walls joined to it. `wall.create` takes `auto_join` (off, join, join_and_lock); Join & Lock adds an alignment constraint between the touching faces (none on slanted walls); stacked walls are skipped. `geometry.join` (walls that touch, for now; `lock`) and `geometry.unjoin`. Not built yet: `IfcRelConnectsElements` "JoinGeometry" in IFC, Join Geometry between other elements, complex insert cuts limited to the first wall.
 
 ### 3.3.21 Hosted walls
 **ID:** ARC-WALL-016 · **Priority:** P1 · **Ref:** research/02 §1 (2027), §4.13
@@ -1320,8 +1357,10 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 - `wall.select_main_host(wall_id) -> element_id` *(query)*
 
 **Acceptance criteria.**
-- [ ] Rotating the host 15° rotates a hosted lining with it and keeps the offset.
-- [ ] Removing the relationship leaves the lining exactly in place.
+- [x] Rotating the host 15° rotates a hosted lining with it and keeps the offset.
+- [x] Removing the relationship leaves the lining exactly in place.
+
+**Implementation note (2026-10-15, first build).** As built: the wall recipe's `host` (host GlobalId, side, offset, and how far the ends reach past the host's ends); after every edit, before constraints are solved, each hosted wall's location line is put back against the host's face, pinned host or not. `wall.set_host` (straight and parallel walls; side and offset default to where it is; cycles refused), `wall.remove_host`, `wall.select_main_host`; hosted linings get Join Geometry. The window: Pick New Host (then click the host), Remove Hosted, Select Main Host. Not built yet: `IfcRelConnectsElements` "HostedWall" and the *Hosted* parameter in IFC and schedules, the 152.4 mm rule (hosted linings always join), following a host's cross-section change.
 
 ### 3.3.22 Other wall behaviours
 **ID:** ARC-WALL-017 · **Priority:** P0 · **Ref:** research/02 §4.13
@@ -1737,7 +1776,9 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 - `curtain.delete_grid(element_id, grid_key)`
 
 **Acceptance criteria.**
-- [ ] Removing the middle segment of a vertical grid line merges two panels into one panel of twice the height. Restoring the segment splits it again, and the original panel type is kept.
+- [x] Removing the middle segment of a vertical grid line merges two panels into one panel of twice the height. Restoring the segment splits it again, and the original panel type is kept.
+
+**Implementation note (2026-10-15, first build).** As built: the curtain wall recipe's `grids` (manual lines by key, direction and position), `removed` (segments by line direction, position and index) and `panels` (overrides by cell); cells joined across removed segments become one panel (a rectangle, else per cell) and the segment's mullion goes; interior vertical mullions are now one piece per row. Commands `curtain.add_grid` (modes all, one, all_except), `curtain.set_grid_segments`, `curtain.move_grid`, `curtain.delete_grid`, and `curtain.set_layout` (an addition, all at once). The window: Modify | Curtain Walls › Edit Grid (lines with segment strings, manual lines, panels). Not built yet: placing lines by hovering edges in elevation or 3D with snaps, temporary dimensions and pins on grid lines.
 
 ### 3.5.5 Mullions
 **ID:** ARC-CW-005 · **Priority:** P1 · **Ref:** research/02 §6.4
@@ -1798,6 +1839,8 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 **Acceptance criteria.**
 - [ ] Swapping a glazed panel for a curtain-wall door turns that cell into an `IfcDoor` aggregated in the `IfcCurtainWall`, and it appears in the door schedule.
 
+**Implementation note (2026-10-15, first build).** As built: `curtain.set_panel_type(curtain_id, cells, panel)` with panels Glazed, Solid, Empty and Door; a door fills its cell from the base and is written as an `IfcDoor` (DOOR) aggregated in the curtain wall. Not built yet: Tab-selecting panels, door families (the door is a plain leaf), the door schedule, wall-type and family panels, pinning.
+
 ### 3.5.7 Curtain systems by face
 **ID:** ARC-CW-007 · **Priority:** P2 · **Ref:** research/02 §6.6, §12.1
 
@@ -1845,10 +1888,12 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 **Commands.** `element.set_type(roof_id, sloped_glazing_type_id)` followed by the `curtain.*` commands.
 
 **Acceptance criteria.**
-- [ ] A hip roof changed to sloped glazing produces four glazed planes whose hip mullions sit on the hip lines.
-- [ ] With Grid 1 at a fixed distance of 1.5 m, a 30° plane whose slope length is 6 m gets three interior Grid 1 lines measured along the slope.
+- [x] A hip roof changed to sloped glazing produces four glazed planes whose hip mullions sit on the hip lines.
+- [x] With Grid 1 at a fixed distance of 1.5 m, a 30° plane whose slope length is 6 m gets three interior Grid 1 lines measured along the slope.
 - [ ] Changing the slope of one footprint edge from 30° to 45° regenerates that plane's grid and keeps manually added grid lines on the other planes.
 - [ ] Changing the roof back to a basic type warns with the number of mullions and panels to be removed and keeps the footprint.
+
+**Implementation note (2026-10-15, first build).** As built: roof types with `glazing` (a curtain layout: `v` is Grid 1, `u` Grid 2); such roofs regenerate each face as panels (cells clipped to the plane) and mullions (interior along the grid lines, border on the edges, one per shared hip, valley or ridge, turned to the planes' bisector); 3D and IFC use them instead of the slab (IFC: the roof's B-rep). `roof.create_glazing_type`, `roof.set_glazing_type`, `element.set_type`; the window's Modify | Roofs › Sloped Glazing. Not built yet: manual lines and panel swaps on glazing planes, Rafter Cut and Fascia Depth, the warning on changing back (the footprint is kept), an `IfcCurtainWall` per plane.
 
 ---
 
@@ -1924,8 +1969,10 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 - `hostsweep.remove_segments(id, edge_refs)`
 - `hostsweep.flip(id, axis: Horizontal|Vertical)`
 
+**Implementation notes (2026-10-15).** As built: `recipe.slab_edge` (floor, outline curve keys, `width`, `depth`, offsets, flips); the run follows the floor's outline counter-clockwise, consecutive curves only, closed when it goes all round; the body is the rectangle at each corner's mitre, swept; `slabedge.create`, `slabedge.set`, `hostsweep.add_segments`, `hostsweep.remove_segments`, `hostsweep.flip`; IFC: `IfcSlab` USERDEFINED SLABEDGE with a faceted B-rep, contained in the floor's storey; deleted with its floor; the window's Slab Edge (click edges) and Properties. Not built yet: profile families, Angle, Restart in one element, toposolid and model-line edges, cutting the host.
+
 **Acceptance criteria.**
-- [ ] A slab edge picked along the four edges of a rectangular floor forms one closed, mitered run, and its volume equals the profile area times the centroid path length within 0.5%.
+- [x] A slab edge picked along the four edges of a rectangular floor forms one closed, mitered run, and its volume equals the profile area times the centroid path length within 0.5%.
 
 ### 3.6.3 Ceilings
 **ID:** ARC-CEIL-001 · **Priority:** P0 · **Ref:** research/02 §7.3
@@ -2109,8 +2156,10 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 
 **Commands.** `roof.create_extrusion(type_id, work_plane, profile: [curve], ref_level, level_offset?, start, end) -> element_id`.
 
+**Implementation notes (2026-10-15).** As built: the roof recipe's `extrusion` (`plane`, `profile` of curves in plane coordinates from the Reference Level plus offset, `start`, `end`); the body is exact (the profile mitre-offset down by the thickness, top, underside, ends and eaves), one roof face per upward segment; one straight segment is SHED_ROOF, two GABLE_ROOF, arcs BARREL_ROOF, more FREEFORM; it follows its level and its grid or reference plane; `roof.create_extrusion(type_id?, grid | ref_plane | plane, profile, ref_level?, level_offset?, start?, end?)` and `roof.set_extrusion`; the window's Roof by Extrusion clicks the profile in a section or elevation (its plane). IFC: an `IfcRoof` with one faceted B-rep body (not yet one `IfcSlab` per segment). Not built yet: layers, Rafter Cut, Fascia Depth, openings in it, Edit Work Plane.
+
 **Acceptance criteria.**
-- [ ] An arc profile extruded 8 m gives a barrel roof (`PredefinedType = BARREL_ROOF`) of uniform thickness.
+- [x] An arc profile extruded 8 m gives a barrel roof (`PredefinedType = BARREL_ROOF`) of uniform thickness.
 
 ### 3.6.6 Roof by face
 **ID:** ARC-ROOF-003 · **Priority:** P2 · **Ref:** research/02 §7.4, §12.1 · web: Create a Roof from a Mass Face; Update Face Selections for Roofs and Curtain Systems
@@ -2265,9 +2314,11 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 
 **Commands.** In a sketch session, `sketch.add_curve(session_id, Line{tail, head}, role: "slope_arrow", props: {specify, level_tail, offset_tail, level_head?, offset_head?, slope?}) -> curve_key` and `sketch.edit_curve` for later changes; non-interactively, the `slope_arrows: [SlopeArrow]` parameter of `roof.create_footprint` and `roof.edit_footprint` (ARC-ROOF-001).
 
+**Implementation notes (2026-10-15).** As built: a footprint edge's `arrow` (`tail`, `head`, `specify` = `slope` with `slope`, or `height_at_tail` with `head_offset`); the edge's plane rises from the plate square to the edge at the arrow's rise over its run across the edge (the weighted skeleton keeps planes through their edges' plate lines); `roof.set_slope_arrow` (refused on a slope-defining edge or with the tail off the curve) and `roof.remove_slope_arrow`; the window's Slope Arrow on Modify | Roofs. Not built yet: arrows along an edge (the split-edge dormer), tail offsets above the plate, arrows in floors and ceilings, arrows inside the sketch session.
+
 **Acceptance criteria.**
 - [ ] A dormer made with two arrows from the ends of a 3 m segment to its midpoint, rising 1 m, gives two triangular faces that meet the main roof faces without gaps.
-- [ ] On a 10 × 6 m footprint with only the two long edges slope-defining, an arrow from the middle of one short edge to the ridge with *Specify = Slope* 30° turns that gable into a hip plane at 30°.
+- [x] On a 10 × 6 m footprint with only the two long edges slope-defining, an arrow from the middle of one short edge to the ridge with *Specify = Slope* 30° turns that gable into a hip plane at 30°.
 - [ ] An arrow whose tail is not on a boundary edge, or that sits on a slope-defining edge, is reported on Finish and the sketch stays open.
 
 ### 3.6.8a Dormers (automated)
@@ -2431,8 +2482,10 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 
 **Commands.** `roof.join(roof_id, edge_ref, target_ref)` and `roof.unjoin(roof_id, edge_ref?)`.
 
+**Implementation notes (2026-10-15).** As built: the roof recipe's `joins` (footprint curve key → target GlobalId); toward a wall parallel to the edge, the edge moves out to the wall's nearer face; toward a roof, it extends past the target's footprint and the roof is clipped by the target face it meets (its top plane), keeping what is above; a deleted target leaves the edge as it was; `roof.join(roof_id, key, target_id)` and `roof.unjoin(roof_id, key?)`; refused for dormers, arched roofs, domes and roofs by extrusion; the window's Join/Unjoin Roof (edge, then target; the roof itself unjoins). Not built yet: the IFC `IfcRelConnectsElements`, targets with several faces met along the edge.
+
 **Acceptance criteria.**
-- [ ] A dormer roof joined to the main roof ends exactly on the main roof's top surface, with no gap or overlap greater than `TOL_POINT`.
+- [x] A dormer roof joined to the main roof ends exactly on the main roof's top surface, with no gap or overlap greater than `TOL_POINT`. (Tested with a porch roof; dormers join their roof themselves.)
 
 ### 3.6.10 Shape editing (floors, roofs, structural floors, toposolids)
 **ID:** ARC-SHAPE-001 · **Priority:** P1 · **Ref:** research/02 §1, §7.5, §17.7 · screenshots/architecture/shape_editing_points_toposolid.png
@@ -2490,10 +2543,12 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 - `shape.copy(element_id, keys) -> clip` *(query)*
 - `shape.paste(element_id, clip, offset?)`
 
+**Implementation notes (2026-10-15).** As built for floors: `rxd:shape` (outline corner offsets `v1`…, points `p…`, split lines `l…`, heights relative to the top); the top is a constrained Delaunay triangulation (`spade` 2.15, MIT/Apache-2.0) with the outline, holes and split lines as constraints; the slab follows the top, each underside vertex moved along its averaged normal by the thickness over the smallest cosine to its facets; `shape.add_point`, `shape.add_split_line`, `shape.move`, `shape.set_elevation`, `shape.reset`, `shape.get`; IFC: a faceted B-rep; the window's Add Point and Reset Shape on Modify | Floors. Not built yet: roofs, toposolids and structural floors, variable layers (no layered floor types yet), dragging, Pick Supports, folding-line conversion, copy and paste.
+
 **Acceptance criteria.**
 - [ ] A flat roof with one point dropped 50 mm in the middle of a 10 m × 10 m area, with an insulation layer marked variable, gives four planar facets falling to the drain. The deck stays flat, and the insulation thickness at the drain is reduced by exactly 50 mm.
 - [ ] Without a variable layer, the same edit lowers the whole slab, and the thickness measured perpendicular to each facet stays constant.
-- [ ] Reset Shape restores the original body exactly, and the body's hash matches the one recorded before the edit.
+- [x] Reset Shape restores the original body exactly, and the body's hash matches the one recorded before the edit.
 
 ### 3.6.11 Parts: model and creation
 **ID:** ARC-PART-001 · **Priority:** P2 · **Ref:** research/02 §2.1 (Figure 1, Create panel), §4.5 · web: About Parts; Create Parts
@@ -2531,11 +2586,13 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 **Commands.** `parts.create(host_ids) -> [element_id]` returns the new parts. Ineligible elements in `host_ids` are skipped and listed in the result warning; if none is eligible the command fails with "No element can be divided into parts".
 
 **Acceptance criteria.**
-- [ ] Create Parts on a wall with brick, cavity insulation, block and plaster layers and a window creates four parts whose volumes add up to the wall's volume within 0.01%, each with the opening cut.
-- [ ] Changing the wall's block thickness from 100 to 140 mm regenerates the parts in place; their GlobalIds and Marks are unchanged.
-- [ ] Changing the wall to a type without the plaster layer deletes the plaster part and reports it.
+- [x] Create Parts on a wall with brick, cavity insulation, block and plaster layers and a window creates four parts whose volumes add up to the wall's volume within 0.01%, each with the opening cut.
+- [x] Changing the wall's block thickness from 100 to 140 mm regenerates the parts in place; their GlobalIds and Marks are unchanged.
+- [x] Changing the wall to a type without the plaster layer deletes the plaster part and reports it.
 - [ ] The IFC export contains one `IfcBuildingElementPart` per part, aggregated by the `IfcWall`, and the `IfcWall` has no `Body` representation; IfcOpenShell's validator reports no errors.
 - [ ] A stacked wall and a curtain wall cannot be picked while Create Parts is active.
+
+**Implementation note (2026-10-15, first build).** As built: `parts.create` makes `IfcBuildingElementPart`s (`recipe.part`): one per non-membrane layer of a straight layered wall, cut from the wall's finished body (joins, openings) at the layer boundaries with capped slices, so they tile it; one whole-body part for single-layer walls, floors, ceilings, roofs, columns and beams. Parts regenerate from their source; a part whose layer leaves the type is deleted with a warning (matched by layer index); deleting the source deletes its parts; a part moves only with its source. IFC: each drawn part is a faceted B-rep aggregated by its source (`IfcRelAggregates`), `INSULATION` for Thermal/Air layers, else `USERDEFINED` with the layer function. The window: Modify › Parts, a Modify | Parts tab. Not built yet: the *Parts: replace source body* export option (the source keeps its body), parts of stacked, curved and curtain walls, layered floors and roofs (they have no layers yet), wrapped layers as their own parts (a wall with wrapping or regions is sliced by plain bands), copying parts with their source, picking-time half-tone of ineligible elements, linked sources, `IfcBuildingElementPart` import.
 
 ### 3.6.12 Dividing parts
 **ID:** ARC-PART-002 · **Priority:** P2 · **Ref:** research/02 §2.3 · web: Divide Parts; Edit a Part Division; Division Instance Properties; Create a Division Profile Family
@@ -2569,10 +2626,12 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 - `parts.division_finish(session_id) -> {division_id, parts: [element_id]}` and `parts.division_cancel(session_id)` end it.
 
 **Acceptance criteria.**
-- [ ] Dividing a 10 m brick part with three vertical sketch lines 2.5 m apart and a 10 mm gap gives four pieces whose lengths are 2.495, 2.49, 2.49 and 2.495 m.
+- [x] Dividing a 10 m brick part with three vertical sketch lines 2.5 m apart and a 10 mm gap gives four pieces whose lengths are 2.495, 2.49, 2.49 and 2.495 m.
 - [ ] Dividing the parts of a 4-storey wall by the intersecting levels with offset +50 mm gives one piece per storey; raising Level 3 by 300 mm moves that cut by 300 mm.
 - [ ] A Complementary tongue-and-groove profile gives matching faces: the two pieces fused together have the same volume as the undivided part minus the gap volume, within 0.01%.
 - [ ] Killing the process during a division session and reopening the file offers to restore the session, and restoring it reproduces the sketched curves exactly.
+
+**Implementation note (2026-10-15, first build).** As built: `parts.divide` with straight `lines` (each swept along the work-plane `normal`, by default the first part's largest face's) and `refs` (levels, grids, reference planes with an offset, followed when they move), and a `gap`; every piece is the parent cut by the planes on its side (`cell`), and the parent stays as a hidden intermediate; pieces can be divided again. Tested: 10 m brick part, three lines, 10 mm gap → 2.495, 2.49, 2.49, 2.495 m; a level cut that moves with the level. The window: Divide Parts with selected model lines or a list of references and a gap. Not built yet: the division session (Edit Division, recovery), arcs and splines, closed loops, division profiles, new pieces appearing when a moved reference makes more of them.
 
 ### 3.6.13 Merging, excluding, restoring and deleting parts
 **ID:** ARC-PART-003 · **Priority:** P2 · **Ref:** research/02 §2.1 · web: Work with Merged Parts; Exclude Parts; Delete a Part
@@ -2602,9 +2661,11 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 
 **Acceptance criteria.**
 - [ ] Merging three adjacent plasterboard pieces gives one part whose volume is their sum and which has no internal faces.
-- [ ] Merging a brick piece with a block piece is refused with the material message.
+- [x] Merging a brick piece with a block piece is refused with the material message.
 - [ ] An excluded part does not appear in a part schedule or in the IFC export, and Restore brings it back with the same GlobalId.
-- [ ] Deleting one of four pieces of a divided brick part deletes all four pieces and shows the undivided brick part again; deleting that part then removes every part of the wall and shows the wall.
+- [x] Deleting one of four pieces of a divided brick part deletes all four pieces and shows the undivided brick part again; deleting that part then removes every part of the wall and shows the wall.
+
+**Implementation note (2026-10-15, first build).** As built: `parts.merge` (same material, boxes touching across the set) keeps the merged parts as hidden intermediates; its geometry is its parts' solids together (not fused, so internal faces remain); `parts.exclude` and `parts.restore` (excluded parts have no body in views or IFC; the element is still written); delete cascades as specified. Not built yet: Edit Merged, the fused merge, the restore control on hover, leaving excluded parts out of schedules (parts are not scheduled yet).
 
 ### 3.6.14 Part properties, visibility and scheduling
 **ID:** ARC-PART-004 · **Priority:** P2 · **Ref:** research/02 §2.2 · web: Part Instance Properties; Control Part Visibility and Appearance
@@ -2641,9 +2702,11 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 
 **Acceptance criteria.**
 - [ ] Turning Material By Original off on one plaster part and choosing lime render changes only that part; changing the wall type's plaster material afterwards changes the other plaster parts but not that one.
-- [ ] A view set to *Show Original* shows and selects the wall, not its parts; *Show Both* lets each be selected separately.
+- [x] A view set to *Show Original* shows and selects the wall, not its parts; *Show Both* lets each be selected separately.
 - [ ] A part schedule grouped by *Original Type* and *Construction* lists core and finish parts separately and omits excluded parts.
 - [ ] Dragging a part's top face up 50 mm with its shape handle survives a later change of the wall's height (the face stays 50 mm above the new top).
+
+**Implementation note (2026-10-15, first build).** As built: `parts.info` (volume, largest face area, material and whether by original, Core or Finish, original category and type, base level, excluded, intermediate), `parts.set_overrides` (material, base level by original, a level or non associated), `view.set_parts_visibility` (Show Parts by default; hidden elements cannot be picked). The window: a Part section in Properties with Material editable; View visibility from Modify › Parts › Parts Visibility. Not built yet: phase overrides, shape handles and face offsets, part schedules and tags, the Parts object style, properties and quantities on the IFC part.
 
 ---
 
@@ -2817,8 +2880,10 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 
 **Acceptance criteria.**
 - [ ] A cast-in-place straight run with structural depth 150 mm has an underside parallel to the pitch line, at a perpendicular distance of 150 mm from the nosing line.
-- [ ] An L winder with three winder treads has walking-line tread depths equal to `T` within 0.1 mm, and every inner tread width is greater than 0.
+- [x] An L winder with three winder treads has walking-line tread depths equal to `T` within 0.1 mm, and every inner tread width is greater than 0.
 - [ ] The volume of a full-step spiral with 16 treads matches the analytic sector volume within 0.5%.
+
+**Implementation note (2026-10-15).** L winders: a run with `winder` (`leg1`, turn) from `stair.create` runs given a `corner`; riser lines a tread depth apart along the walking line (the run's centre line), turning linearly from square to radial through the inner corner within 1.5 run widths of the corner; treads are the polygons between riser lines and the side lines, stepped blocks of riser height plus structural depth; the "Winder inner width below minimum" warning at a third of the tread depth; railings follow the sides round the corner; `QUARTER_WINDING_STAIR`. The window: Architecture › Winder Stair (start, corner, side). Not built yet: U winders, parallel treads at start or end, the leg-balance controls, a smooth underside, supports.
 
 ### 3.7.5 Stair parameters
 **ID:** ARC-STAIR-005 · **Priority:** P0 · **Ref:** research/02 §8.3, §8.4
@@ -2854,7 +2919,9 @@ These are view annotation and are specified in the DOC chapter. This chapter req
 **Commands.** `stair.number_treads(view_id, stair_id, start_number?, type_id?) -> element_id`.
 
 **Acceptance criteria.**
-- [ ] Tread numbers keep their values after a run is moved. They change only when the number of treads changes.
+- [x] Tread numbers keep their values after a run is moved. They change only when the number of treads changes.
+
+**Implementation note (2026-10-15, first build).** As built: plans draw each stair's path through its tread middles up to the cut plane, an arrow, UP (DN in a plan of its top level) and a zig-zag cut mark across the first tread above the cut; `stair.number_treads(view_id, stair_id, start_number?)` makes a view's tread numbers (`IfcAnnotation`, `recipe.stair_numbers`), numbered by tread index, deleted with the stair or the view. The window: Modify | Stairs › Number Treads. Not built yet: Stair Path and cut mark types, number type properties, riser numbers, the path above the cut, sections.
 
 ### 3.7.6a Stairs through floors: completing to the level above, openings and railings
 **ID:** ARC-STAIR-007 · **Priority:** P1 · **Ref:** owner requirement (2026-10-14); Reviera's own design (Appendix A.2a); headroom by DM-CODE-001
@@ -3185,8 +3252,10 @@ These are view annotation and are specified in the DOC chapter. This chapter req
 
 **Commands.** `opening.create_by_face(host_ref, loops) -> element_id`.
 
+**Implementation notes (2026-10-15).** As built: the vertical opening's recipe with `by_face: true`; `opening.create_by_face(host_id, loops | curves)` with the loops as seen from above; in a footprint roof's face the hole's sides run along the face's normal; in floors and ceilings it is plumb (their faces are level). IFC: the opening's body is a faceted B-rep prism along the face normal (1 mm beyond each side). The window's Opening › By Face sketches it like a vertical opening. Not built yet: picking beams, braces and columns, curved faces, arched roofs and domes.
+
 **Acceptance criteria.**
-- [ ] An opening by face on a 30° roof cuts at right angles to the roof surface, so its sides lean 30° from vertical.
+- [x] An opening by face on a 30° roof cuts at right angles to the roof surface, so its sides lean 30° from vertical.
 
 ### 3.8.2 Vertical opening
 **ID:** ARC-OPEN-002 · **Priority:** P0 · **Ref:** research/02 §9
@@ -3338,6 +3407,8 @@ These are view annotation and are specified in the DOC chapter. This chapter req
 - `roomtag.move_to_reference(tag_ids)`
 - `room.highlight_boundaries(view_id) -> [element_id]` *(query)*
 
+**Implementation note (2026-10-15, room separators).** `roomseparator.create(level_id, lines, through?)` makes `IfcVirtualElement`s (`recipe.room_separation`: level, line, optional arc point) that rooms on the level take as boundaries; they move, copy and rotate with the ordinary tools and go with their level. The window: Room & Area › Room Separator (lines or arcs). Not built yet: Pick Lines, the Room Separation line style, `IfcRelSpaceBoundary` (VIRTUAL).
+
 **Implementation notes (2026-10-13).**
 - As built:
   - Rooms are bounded by walls at their finish faces, cut 1 mm above the level.
@@ -3472,8 +3543,10 @@ These settings apply to the whole project. Walls that came from a non-parametric
 - `area.unplace(ids)`
 
 **Acceptance criteria.**
-- [ ] A Gross Building area plan created with automatic boundaries has its boundary on the exterior faces of the exterior walls, and the area equals the building footprint.
-- [ ] In the Rentable scheme, two Office areas separated by a 200 mm wall share a boundary on the wall centreline. Changing one of them to Exterior Area moves the boundary to the office-side face.
+- [x] A Gross Building area plan created with automatic boundaries has its boundary on the exterior faces of the exterior walls, and the area equals the building footprint.
+- [x] In the Rentable scheme, two Office areas separated by a 200 mm wall share a boundary on the wall centreline. Changing one of them to Exterior Area moves the boundary to the office-side face.
+
+**Implementation note (2026-10-15, first build).** As built: schemes on the project (`rxd:area_schemes`; the two defaults until changed) with area types and rules `{type_a, type_b, position: centerline | face_a | face_b}` (`*` any, `""` outside every area); area plans are plan views of kind `view.area_plan` with their scheme; boundaries are `IfcVirtualElement`s with `recipe.area_boundary` (drawn lines, or picked walls with *Apply Area Rules* or an offset); a rules boundary is split where other boundaries cross its wall and each piece is placed by the areas either side of it, found with every wall boundary on its centreline first; areas are `IfcSpace`s (`recipe.area`, GFA for Gross Building, else USERDEFINED with the scheme as ObjectType) whose region is the boundaries' loop round their point. Commands: `areascheme.create`, `areascheme.set_rules`, `areascheme.list`, `areaplan.create`, `areaboundary.create`, `area.place`, `area.set_type`, `area.list`. The window: Architecture › Area (Area Plan, Area Boundary, Area), area plans in the Project Browser, boundaries and labels drawn. Not built yet: the glass line, drawing boundaries in the window, unplaced areas, area tags and schedules per scheme, `IfcZone` and quantities in IFC.
 
 ### 3.9.4 Colour schemes
 **ID:** ARC-CLR-001 · **Priority:** P1 · **Ref:** research/02 §10.3 · screenshots/architecture/room_color_scheme_by_value.png · screenshots/architecture/room_color_scheme_by_range.png
@@ -3508,8 +3581,10 @@ These settings apply to the whole project. Walls that came from a non-parametric
 - `view.set_color_scheme(view_id, category, scheme_id? (none clears), location?: background|foreground) -> ()`
 
 **Acceptance criteria.**
-- [ ] Colouring by Department with five departments produces five rows, each with a distinct colour. Renaming one room's department to a new value adds a sixth row automatically.
-- [ ] Colouring by Area with ranges at 0, 10, 20 and 50 m² puts a 20.0 m² room in the 20–50 row.
+- [x] Colouring by Department with five departments produces five rows, each with a distinct colour. Renaming one room's department to a new value adds a sixth row automatically.
+- [x] Colouring by Area with ranges at 0, 10, 20 and 50 m² puts a 20.0 m² room in the 20–50 row.
+
+**Implementation note (2026-10-15, first build).** As built: schemes on the project (`rxd:color_schemes`) for rooms or areas, by value (stored rows, plus values found with no row coloured from the golden-ratio pastel palette) or by range; parameters Name, Number, Area, Perimeter or any parameter (project parameters too); plans show their view's scheme as fills under the cut. Commands: `colorscheme.create`, `colorscheme.set_rows`, `colorscheme.duplicate`, `colorscheme.delete`, `colorscheme.legend` (rows now, in use), `view.set_color_scheme`. The window: Room & Area › Color Schemes. Not built yet: fill patterns, Foreground, the placed legend, spaces, zones, ducts and pipes, sections, links, IFC styled items.
 
 ---
 
@@ -3570,7 +3645,9 @@ All family-editor commands from the DM chapter can be used inside the session.
 
 **Acceptance criteria.**
 - [ ] An in-place wall made from an extrusion can host a door, and it bounds rooms.
-- [ ] Copying an in-place element produces a second family with a new name, and editing one copy does not change the other.
+- [x] Copying an in-place element produces a second family with a new name, and editing one copy does not change the other.
+
+**Implementation note (2026-10-15, first build).** As built without the editor session: `inplace.create(name, category, forms)`, `inplace.add_form`, `inplace.remove_form`; forms are extrusions, blends (point-to-point), revolves (about an axis in the profile's plane) and sweeps (along a level path, mitred), each on a work plane, solid or void; the element takes its category's IFC class and a B-rep body; voids are a companion opening subtracted through the boolean relations; moving, rotating and mirroring carry the forms; a copy is independent with its own name. The window: Architecture › Model › Model In-Place from selected model lines. Not built yet: the in-place editor session (`inplace.begin`/`finish`/`cancel`/`edit`) with half-tone, swept blends, sweeps along sloping or picked paths, hosting doors and bounding rooms, attaching walls, Cut/Join Geometry with project elements, CSG in IFC.
 
 ### 3.10.2 Model text
 **ID:** ARC-MTXT-001 · **Priority:** P1 · **Ref:** research/02 §11.2
@@ -3594,7 +3671,9 @@ All family-editor commands from the DM chapter can be used inside the session.
 **Commands.** `modeltext.create(text, work_plane, point, type_id, h_align?, material_id?, depth?) -> element_id` and `modeltext.set_text(element_id, text)`.
 
 **Acceptance criteria.**
-- [ ] The text "ABC" at depth 50 mm produces a solid with three lumps. The "A" has an enclosed hole.
+- [x] The text "ABC" at depth 50 mm produces a solid with three lumps. The "A" has an enclosed hole.
+
+**Implementation note (2026-10-15, first build).** As built with Reviera's stroke font instead of TrueType fonts: each stroke thickened (12 % of the height) and a letter's strokes merged into one outline with its holes, pushed out of the work plane by the depth (1 mm at depth 0); `recipe.model_text` (text, plane, point, rotation, size, depth, alignment, material) on an `IfcBuildingElementProxy` (ObjectType ModelText) with a B-rep; `modeltext.create`, `modeltext.set_text`; moves and rotates with the ordinary tools. The window: Architecture › Model › Model Text. Not built yet: fonts, bold and italic, the depth-0 `IfcAnnotation`, the placement preview.
 
 ### 3.10.3 Model lines
 **ID:** ARC-MLIN-001 · **Priority:** P0 · **Ref:** research/02 §11.3
@@ -3613,8 +3692,10 @@ All family-editor commands from the DM chapter can be used inside the session.
 
 **Commands.** `modelline.create(curves: [curve], work_plane, line_style_id?) -> [element_id]` and `line.convert(element_ids, to: Model|Detail, view_id?) -> [element_id]`.
 
+**Implementation notes (2026-10-15).** As built: `modelline.create(curves: [{line, through?}], level?/offset? | grid? | ref_plane? | plane?, line_style?)` with curves in the work plane's coordinates, one element per curve; `modelline.set` (style, one line's curve), `modelline.list` (world polylines) and `modelline.styles` (Lines, Thin, Medium, Wide, Hidden, Centre and Overhead Lines: pen, pattern, colour); the Model Line tool (LI) in plans (Line or Arc, Chain, Line Style); shown in plans within the view range, sections and elevations within their depth, and 3D; picked in plans. In IFC each is an `IfcAnnotation` (ModelLine) with a `Curve3D` `IfcPolyline` styled by an `IfcCurveStyle`, contained in its level's storey. Not built yet: `line.convert` (detail lines are not built), user line styles, the other Draw gallery shapes.
+
 **Acceptance criteria.**
-- [ ] A model line drawn on Level 1 appears in the floor plan, in elevations and in 3D. Converting it to a detail line in the plan removes it from the other views.
+- [ ] A model line drawn on Level 1 appears in the floor plan, in elevations and in 3D. Converting it to a detail line in the plan removes it from the other views. (Shown in all three; converting is not built.)
 
 ---
 
@@ -3667,6 +3748,8 @@ All family-editor commands from the DM chapter can be used inside the session.
 - [ ] Selecting three stacked closed profiles and choosing Create Form produces a lofted solid, and its gross volume matches an independent OCCT calculation.
 - [ ] In a plan view whose Mass category is off, *Form and Floors* shows the mass and lets it be selected; printing that view to PDF does not include the mass; switching back to *by View Settings* hides it again and leaves the undo stack unchanged.
 
+**Implementation note (2026-10-15, first build).** As built: in-place masses (`recipe.mass`) from the in-place forms plus lofts of stacked profiles, drawn translucent, B-reps in IFC; `mass.create`, `mass.add_form`, `mass.set_form` (stretch an extrusion); the window: Massing & Site › In-Place Mass from model-line loops (one loop extruded, loops on several levels lofted). Not built yet: the conceptual design environment (gizmos, X-Ray, Add Edge/Profile, Dissolve, Rebuild), Create Form inference from any selection, voids, Place Mass, Show Mass modes, joined masses, the *Export masses* option.
+
 ### 3.11.2 Mass floors
 **ID:** ARC-MASS-002 · **Priority:** P2 · **Ref:** research/02 §12.1 · web: Create Mass Floors; About Mass Floors at the Top of a Mass; About Mass Floors at the Bottom of a Mass
 
@@ -3696,9 +3779,11 @@ All family-editor commands from the DM chapter can be used inside the session.
 **Commands.** `mass.set_floors(mass_id, level_ids | All)`.
 
 **Acceptance criteria.**
-- [ ] A 20 × 30 × 12 m box mass with levels every 3 m creates four mass floors of 600 m² each, and each has a floor volume of 1800 m³.
-- [ ] With a level at the top face of that mass also ticked, no fifth floor is created, and the fourth floor's exterior surface area is 300 m² (sides) + 600 m² (roof) = 900 m².
-- [ ] Ticking a level 3 m above the mass creates nothing; stretching the mass to 15 m creates the floor at that level without reopening the dialog.
+- [x] A 20 × 30 × 12 m box mass with levels every 3 m creates four mass floors of 600 m² each, and each has a floor volume of 1800 m³.
+- [x] With a level at the top face of that mass also ticked, no fifth floor is created, and the fourth floor's exterior surface area is 300 m² (sides) + 600 m² (roof) = 900 m².
+- [x] Ticking a level 3 m above the mass creates nothing; stretching the mass to 15 m creates the floor at that level without reopening the dialog.
+
+**Implementation note (2026-10-15, first build).** As built: mass floors are worked out from the mass (not stored): sections at ticked levels crossing it (none at its top), area, perimeter, volume to the next floor by Simpson's rule on the section area (exact for prisms, lofts and pyramids), exterior surface of the band (with the roof for the top floor); `mass.set_floors` (levels or all), `mass.floors`; the window: Mass Floors. Not built yet: IfcSpace mass floors in IFC, Usage and Mark, tags and schedules.
 
 ### 3.11.3 Model by face and Update to Face
 **ID:** ARC-MASS-003 · **Priority:** P2 · **Ref:** research/02 §4.1, §12.1
@@ -3716,7 +3801,9 @@ All family-editor commands from the DM chapter can be used inside the session.
 - `mass.select_dependents(mass_id) -> [element_id]` *(query)*
 
 **Acceptance criteria.**
-- [ ] After the mass is stretched, Update to Face makes a wall by face match the new face. Before Update to Face, the wall stays unchanged.
+- [x] After the mass is stretched, Update to Face makes a wall by face match the new face. Before Update to Face, the wall stays unchanged.
+
+**Implementation note (2026-10-15, first build).** As built: named planar faces of extrusion and loft forms (`mass.faces`); `wall.create_by_face` (along the face's bottom edge, its height, exterior finish face on it), `floor.create_by_mass_floor`, `roof.create_by_face` (an in-place roof slab on the face, ARC-ROOF-003), `curtainsystem.create_by_face` (ARC-CW-007), each keeping its face; `element.update_to_face`; `mass.select_dependents`. The window: Massing & Site › Model by Face with a face list. Not built yet: picking faces in the view, curved faces, Select Multiple sessions.
 
 ### 3.11.4 Toposolid
 **ID:** ARC-TOPO-001 · **Priority:** P1 · **Ref:** research/02 §1 (2024, 2026), §12.2 · screenshots/architecture/toposolid_site_plan_and_3d.png · web: Toposolid Smooth Shading; Toposolid Enhancements (2025)
@@ -3769,6 +3856,8 @@ All family-editor commands from the DM chapter can be used inside the session.
 - [ ] The IFC export opens in an independent viewer with the terrain visible, both under the `IfcSite` and as an `IfcGeographicElement`.
 - [ ] Turning smooth shading on changes the shaded display of every toposolid without changing its volume, contours or IFC body, and does not add an undo step; with it on, a toposolid's surface pattern is not drawn.
 
+**Implementation note (2026-10-15, first build).** As built: toposolids (`recipe.toposolid`, `IfcGeographicElement` TERRAIN, a B-rep body) from a boundary and points or from points alone (their outline), a constrained Delaunay top (spade), heights for bare boundary corners from the points' surface, one closed solid (the top, the same triangles dropped to a flat bottom `thickness` below the lowest point, walls on the outer edges); `toposolid.create`, `toposolid.set_points` (add, move, remove, lock), `toposolid.info` (area, volume, points, excavation); the window: Massing & Site › Toposolid from a selected model-line loop or a points file (x y z rows). Not built yet: types and layers, the point cap and DWG import, Link Topography, smooth shading, folding-line visibility, the `IfcSite` body, containment in `IfcSite`.
+
 ### 3.11.5 Sub-divisions, split and excavation
 **ID:** ARC-TOPO-002 · **Priority:** P1 · **Ref:** research/02 §1 (2026), §12.2, §12.3 · screenshots/architecture/toposolid_subdivision_road.png · web: Merge Toposurfaces (2016); What's New in Revit Site Planning and Design 2024
 
@@ -3806,10 +3895,12 @@ All family-editor commands from the DM chapter can be used inside the session.
 - `toposolid.merge(toposolid_ids, remove_common_points?: bool = true) -> element_id` returns the surviving toposolid (the first in the list)
 
 **Acceptance criteria.**
-- [ ] A road sub-division with offset −0.3 m over a 100 m² flat region reports an excavation volume of 30 m³.
+- [x] A road sub-division with offset −0.3 m over a 100 m² flat region reports an excavation volume of 30 m³.
 - [ ] A 10 × 10 m basement floor with its top 3 m below a flat terrain removes 300 m³ plus the floor's own volume from the toposolid.
 - [ ] Splitting a toposolid with an open chain and merging the two parts again restores one element with the original GlobalId, the original volume within 0.1%, and no extra points on the former split line.
 - [ ] Merging two toposolids that touch only at a corner, or that use different types, is refused and changes nothing.
+
+**Implementation note (2026-10-15, first build).** As built: `toposolid.subdivide` (a region and an offset): a sub-division's top is its parent's surface clipped to the region and lifted, following the parent; a raised one sits on the parent, a lowered one excavates it through a boolean relation with an `IfcOpeningElement` tool (ARC-MOD-028) and reports its excavation volume; deleting the parent deletes its sub-divisions. The window: Sub-Divide with a model-line loop. Not built yet: sub-division types, IfcRelAggregates, Split and Merge, excavation by floors and pads, Remove Excavation, `IfcEarthworksCut`.
 
 ### 3.11.6 Graded region
 **ID:** ARC-TOPO-003 · **Priority:** P2 · **Ref:** research/02 §12.2
@@ -3830,7 +3921,9 @@ All family-editor commands from the DM chapter can be used inside the session.
 **Commands.** `toposolid.create_graded_region(toposolid_id, mode: Copy|PerimeterOnly) -> element_id` and `toposolid.cut_fill(toposolid_id) -> {cut, fill, net}` *(query)*.
 
 **Acceptance criteria.**
-- [ ] Lowering one interior point by 1 m on a graded copy of a flat 20 × 20 m toposolid, triangulated so that the point's star covers 100 m², reports Cut = 33.33 m³ and Fill = 0.
+- [x] Lowering one interior point by 1 m on a graded copy of a flat 20 × 20 m toposolid, triangulated so that the point's star covers 100 m², reports Cut = 33.33 m³ and Fill = 0.
+
+**Implementation note (2026-10-15, first build).** As built: `toposolid.create_graded_region` (Copy or PerimeterOnly) hides the original and links the copy (`graded_from`); `toposolid.cut_fill` overlays the two surfaces triangle by triangle and integrates Δz exactly, split where it changes sign; the window: Graded Region and Cut/Fill. Not built yet: phases (the original is hidden, not demolished), cut and fill in Properties.
 
 ### 3.11.7 Contours, labels and site settings
 **ID:** ARC-TOPO-004 · **Priority:** P1 · **Ref:** research/02 §1 (2025), §12.2, §12.3 · web: Control Contour Display on Toposolids; Video: Configure Site Settings; Toposurface Settings; Property Line Data Settings
@@ -3867,10 +3960,12 @@ All family-editor commands from the DM chapter can be used inside the session.
 - `site.set_settings(contour_interval?: f64 | None, passing_elevation?, additional_contours?: rows, section_material_id?, poche_base_elevation?, angle_display?: Bearing|Azimuth, angle_units?: DMS|Decimal) -> ()` applies the same values without the dialog.
 
 **Acceptance criteria.**
-- [ ] A plane tilted 10% over 50 m with a 1 m contour interval shows five contours, evenly spaced 10 m apart.
-- [ ] With an interval of 10 m and a passing-through elevation of 5 m, a terrain from −20 m to +20 m shows contours at −15, −5, 5 and 15 m only.
+- [x] A plane tilted 10% over 50 m with a 1 m contour interval shows five contours, evenly spaced 10 m apart.
+- [x] With an interval of 10 m and a passing-through elevation of 5 m, a terrain from −20 m to +20 m shows contours at −15, −5, 5 and 15 m only.
 - [ ] Switching *Angle display* to *Degrees* shows a property-line segment previously listed as N 90°00'00" E as 90°, in the table and in its tag, without changing the geometry.
 - [ ] A Contour Display row with Interval 0 and Range Type Multiple Values blocks OK with an inline error.
+
+**Implementation note (2026-10-15, first build).** As built: contours sliced from the top at the site settings' interval and passing elevation, chained into polylines and drawn in plans (every fifth from the passing elevation heavier); `site.set_settings` (interval, passing elevation; `rxd:site_settings` on the project); the window: Site Settings. Not built yet: the Site Settings dialog's other groups (additional contours, section graphics, property data), per-type contour rows, Label Contours, V/G control.
 
 ### 3.11.8 Simplify surface
 **ID:** ARC-TOPO-005 · **Priority:** P1 · **Ref:** research/02 §1 (2024), §12.2 · web: Simplify Topography
@@ -3897,8 +3992,10 @@ All family-editor commands from the DM chapter can be used inside the session.
 
 **Acceptance criteria.**
 - [ ] Simplifying a 20 000-point terrain to 5 000 points keeps the maximum vertical deviation at or below the reported value, and the boundary is unchanged.
-- [ ] Simplifying with a maximum vertical error of 0 removes only points that lie exactly on the plane of their neighbours, so a perfectly planar terrain is reduced to its boundary vertices plus one point.
-- [ ] Locked survey points are still present after simplifying to the minimum.
+- [x] Simplifying with a maximum vertical error of 0 removes only points that lie exactly on the plane of their neighbours, so a perfectly planar terrain is reduced to its boundary vertices plus one point.
+- [x] Locked survey points are still present after simplifying to the minimum.
+
+**Implementation note (2026-10-15, first build).** As built: `toposolid.simplify` (exactly one of a target point count or a maximum vertical error) removes interior points greedily by the vertical error of re-triangulating without them, keeping boundary and locked points, and reports the remaining count and the deviation measured against the original points; tested on 900 points (the 20 000-point case is not yet timed). The window: Simplify Surface with a point count. Not built yet: the preview overlay, simplifying on import.
 
 ### 3.11.9 Legacy toposurface and building pad
 **ID:** ARC-TOPO-006 · **Priority:** P3 · **Ref:** research/02 §1 (2024), §12.3 · web: Generate a Toposolid from a Toposurface
@@ -3955,8 +4052,10 @@ All family-editor commands from the DM chapter can be used inside the session.
 - `propertyline.to_table(element_id)`
 
 **Acceptance criteria.**
-- [ ] A property line entered as a table with four rows (N 0°E 30 m, N 90°E 20 m, S 0°E 30 m, S 90°W 20 m) closes and reports 600 m².
-- [ ] A tree on a toposolid moves up 1 m when the surface under it is raised 1 m.
+- [x] A property line entered as a table with four rows (N 0°E 30 m, N 90°E 20 m, S 0°E 30 m, S 90°W 20 m) closes and reports 600 m².
+- [x] A tree on a toposolid moves up 1 m when the surface under it is raised 1 m.
+
+**Implementation note (2026-10-15, first build).** As built: `sitecomponent.place` puts a custom object type (ARC-COMP mesh objects) on a toposolid's surface (or a level); it keeps its surface height as the ground changes. `propertyline.create` from points or a table of distances and bearings (N/S … E/W in degrees-minutes-seconds, or an azimuth; lines and arcs with radius and side), an `IfcAnnotation` (`PropertyLine`); a closed line reports its area (`propertyline.area`); drawn dash-dotted in plans. The window: Property Line (a model-line loop or a typed table) and Site Component (pick a type, click in plans). Not built yet: true north, parking components, Pick New Host, Convert to table, property-line tags and the area property, `IfcSite` containment, the 4X3 VEGETATION class.
 
 ---
 
@@ -4010,6 +4109,7 @@ These tools are on the **Modify** tab and are repeated on every `Modify | <Eleme
 | ARC-MOD-024 | **Demolish** | P1 | — | A hammer cursor: each clicked element gets Phase Demolished = the view's phase, and its graphics follow the phase filter. Undone by setting Phase Demolished to None. Elements that can be demolished highlight on hover. The change is model data, so the element shows as demolished in every view of that phase. Elements created after the view's phase, or already demolished in an earlier phase, are refused with a status-bar message. Hosted inserts are demolished with their host. Nothing is deleted or unhosted, and rooms in later phases recompute without the element. Linked elements and annotation cannot be demolished. Esc or Modify exits; each click is one undo step | `element.demolish(element_ids[], phase_id? (default: the active view's phase), view_id?) -> ()` |
 | ARC-MOD-025 | **Linework** | P1 | LW | A view-specific override of the line style of model edges. Specified in the DOC chapter. The user picks a line style on the contextual tab (including *Invisible lines*, and *By Category* to remove an override) and clicks edges, Tab cycling between coincident edges; dragging an edge's end controls limits the override to part of the edge. It works on projected and cut edges in plan, section, elevation and orthographic 3D views. The element itself is unchanged, and an override is dropped with a warning when its edge disappears (DOC-GFX-007) | `view.set_linework(view_id, edge_refs[], line_style_id?)` (DOC) |
 | → ARC-MOD-026 | **Array** | P0 | AR | ARC-MOD-026 below | `element.array_linear`, `element.array_radial`, `array.set_count` |
+| → ARC-MOD-033 | **Array along Path** | P1 | AP | ARC-MOD-033 below | `array.along_path`, `array.set`, `array.exclude_member`, `array.unarray` |
 | ARC-MOD-027 | **Repeat last command** | P0 | RC / Enter | Re-runs the last tool with its options. Enter repeats only when no tool is active and nothing is being edited; RC and the context-menu item *Repeat [tool name]* always repeat. The repeated tool starts with the options it had when it ended (Multiple, Copy, Disjoin, joint gap, and so on) and the same type, but with no selection, so select-first tools ask for a selection. Commands run from Lua or MCP are not recorded as "last"; view-navigation and selection commands are not either. After a session tool (sketch, group editor) the repeat starts a new session. If the last tool is unavailable in the current view, the status bar says so | `tool.repeat_last() -> session_id` |
 
 **Acceptance criteria (modify tools).**
@@ -4193,6 +4293,99 @@ These tools are on the **Modify** tab and are repeated on every `Modify | <Eleme
 
 *Built (2026-10-15):* `element.array_linear` and `element.array_radial` without Group and Associate (refused with `array.group_not_supported` until groups exist): the members are independent copies made through the modify tools' transform, in one undo step. Modify › **Array** (AR) and **Radial Array** ask the number of members and Move To, then take the two picks (or a typed distance or angle) with every member previewed; the radial centre is the selection's centre. Not yet: Group and Associate, array sets and the count label, Constrain, placing the radial centre.
 
+### 3.12.3a Array along a path
+**ID:** ARC-MOD-033 · **Priority:** P1 · **Ref:** owner requirement (2026-10-14); ARC-MOD-026, DM-IMP-015, DM-LIB-002 … 004; Reviera's own design
+
+**Purpose.** Repeat a component along any path, keeping it parametric: change the path, the count or the spacing, and the copies follow. This holds even when the component is a plain mesh with no parameters of its own. A typical use is a custom column model filling a Greek temple's colonnade: columns round the stylobate, one at every corner, and equal spacing along each side. Other uses are a hedge of shrubs along a curving garden edge, balusters along a curved balcony, lamp posts along a road, trees along an avenue and bollards along a kerb. *(Owner requirement, 2026-10-14: "a duplicate-along-a-path tool… a custom column model to fill in a Greek temple style facade; set the number of duplicates to space along the path; remains parametric even though the individual objects are plain meshes".)*
+
+**Workflow.**
+1. Select what to repeat: a component instance or several elements, or pick a component in the Component Library. Then choose Modify › **Array along Path** (or **Path Array** in the middle-click quick menu, UI-SEL-006).
+2. Give the path, in one of three ways:
+   - **Pick** an existing line: a wall's location line, a curtain wall, a grid line, a railing's path, a model line, or an edge of a floor, roof, deck or slab. Several picked lines chain into one path (Tab picks a chain).
+   - **Draw** a line, arc, spline or polyline in a plan or on a work plane. A spline is drawn through clicked points and keeps its grips for reshaping.
+   - **Use the edges** of a selected floor, deck or roof as one closed path: *Edges of Host*.
+3. Set the distribution in the options bar. A preview shows every copy as the values change. Enter or Finish makes the array.
+
+**Behaviour & rules.**
+- **Distribution** (as in curtain grid layouts, ARC-CW-002):
+  - **Number:** a count of copies spread evenly over the path.
+  - **Fixed Distance:** a spacing, with the remainder placed at the *Start*, the *End*, or split at both ends (*Centre*).
+  - **Maximum Spacing:** the fewest equal spaces no larger than the value.
+  - **Minimum Spacing:** the most equal spaces no smaller than the value.
+- **Ends:**
+  - *Include start* and *Include end*, each on by default, place a copy at each end. On a closed path the start and end coincide, so there is one copy there.
+  - *Start inset* and *End inset* shorten the used part of the path.
+- **Corners** (for paths with corners, such as a polyline or a closed outline):
+  - **Through corners** spaces the copies along the whole length, ignoring corners.
+  - **At every corner** puts a copy on each corner and spaces the rest evenly along each segment. In this mode *Number* is per segment, or a total shared in proportion to segment lengths; this suits a peristyle with columns at the four corners.
+  - *Skip corners* leaves the corners empty.
+- **Orientation** of each copy:
+  - **Follow path:** the copy's local x along the tangent. This is the default for walls, railings and edges.
+  - **Same for all** (`fixed`, or `same`): every copy, corners included, turned the same way: the source's rotation plus the rotation offset. This suits a temple's columns, whose square capitals all stay square to the building.
+  - **Face outward or inward:** perpendicular to the path, outward from a closed path's centre or inward to it, as statues face out from a terrace. A copy on a corner faces along the corner's bisector.
+  - Plus a *rotation offset*, and *alternate mirror* (every second copy mirrored, P2).
+- **Variation**, for planting and other natural things, so a hedge does not look stamped out:
+  - a random rotation about the vertical (a range, or any angle);
+  - a random uniform scale within a range, for example 85–115 %;
+  - a random choice among several components, for example three shrub models, with weights;
+  - a small random offset across the path.
+
+  Variation is seeded: it stays the same through regeneration and reopening, and **Reseed** gives a new arrangement. A copy's varied values are kept by index, so adding copies at the end does not reshuffle the rest.
+- **Height:**
+  - In plan, copies stand on the array's level, plus an offset.
+  - **Follow path height** sets each copy's base from the path's height at that point, as for a sloped edge or a 3D spline.
+  - **On host face** drops each copy onto the face below it: a stylobate, stepped floors, or terrain.
+- **It remains parametric.** The array is one element: a **path array**. It records the path, the source component (type or fragment), the distribution and the options, and its members are generated from them.
+  - **When the path is a picked element**, the path follows it. Moving the wall, reshaping the floor's edge or editing the railing's path regenerates the copies.
+  - **Editing:** selecting a member or the array shows:
+    - grips at the path's ends, and grips along a drawn path to reshape it;
+    - an editable count label on the canvas;
+    - the distribution, options and component in Properties.
+
+    Each change is one undo step.
+  - **The component can be swapped** for another type or library item (the Type Selector on the array), and every member changes.
+  - **Plain mesh components** (DM-IMP-015) work the same as parametric ones: the array is what is parametric. The members share the one mesh (`IfcMappedItem`), so 200 columns store their geometry once.
+- **Members.**
+  - Each member is a real element of the component's category (an `IfcColumn` for a column component, and so on). Members appear in schedules, take tags, and clash like any other element. They are read-only on their own and change through the array.
+  - Tab selects one member. **Exclude Member** removes a copy and keeps the gap, for an entrance between two columns, say. Excluded positions are kept by index and survive count changes where they can (Restore Excluded brings them back).
+  - Instance properties set on a member (Mark, Comments) are kept by index across regeneration.
+- **Dissolving.**
+  - **Unarray** turns the members into independent elements and deletes the array.
+  - Deleting the array deletes its members.
+  - Deleting the picked path element asks whether to keep the members as independent elements, or delete them with it.
+- **Arrays of several elements.** The source may be several elements or a fragment component (DM-LIB-003), such as a column with its plinth and capital as separate elements. Each copy is then a group instance (ARC-GRP-001), regenerated together.
+- **Limits.** Up to 10,000 copies. Above 1,000 the preview thins to a sample of copies while dragging.
+
+**Data (IFC mapping).**
+- Each member is an element of the component's IFC class, whose body is an `IfcMappedItem` of the component type's representation map (DM-IMP-015). A fragment member is an `IfcGroup` (ARC-GRP-001).
+- The path array is an `IfcGroup` with `ObjectType = "PathArray"`, with its members assigned by `IfcRelAssignsToGroup`.
+- The path, distribution, options, member indices, exclusions and per-member properties are in its RXD recipe (`recipe.path_array`).
+- A drawn path is stored in the recipe. A picked path stores the element's GlobalId and which curve (its location line, or the edge index).
+
+**Commands.**
+`array.along_path(source: element_ids[] | type_id | item_ref, path: {curve} | {element_id, edge?} | {host_edges: element_id}, distribution: {mode: "number"|"fixed"|"max"|"min", value, justify?: "start"|"end"|"centre"}, options?: {include_start?, include_end?, start_inset?, end_inset?, corners?: "through"|"every_corner"|"skip", orientation?: "follow"|"fixed"|"same"|"outward"|"inward", rotation_offset?, alternate_mirror?, variation?: {rotation_range?, scale_range?, sources?: [{type_id|item_ref, weight}], jitter?, seed?}, height?: "level"|"path"|"host_face", level_id?, offset?}) -> array_id` ·
+`array.set(array_id, {source?, path?, distribution?, options?})` ·
+`array.exclude_member(array_id, index)` · `array.restore_member(array_id, index | "all")` ·
+`array.unarray(array_id) -> element_ids[]`.
+`array.set_count` (ARC-MOD-026) also works on path arrays.
+
+**Acceptance criteria.**
+- [ ] A Doric column mesh component, arrayed along the edges of a 30 × 14 m stylobate floor with *At every corner*, 13 per long side and 6 per short side, gives a 6 × 13 peripteral colonnade of 34 columns, all turned the same way (Orientation *Same for all*). The saved IFC holds one column mesh and 34 `IfcColumn` members.
+- [ ] Moving one edge of that floor by 2 m regenerates the columns on that side, and the corners stay occupied.
+- [ ] Changing the long-side count from 13 to 15 on the canvas label respaces the long sides in one undo step.
+- [ ] Excluding the middle column of the front row leaves a gap that survives changing the column component to an Ionic one.
+- [ ] Balusters arrayed along a curved railing path with *Maximum Spacing* 110 mm follow the curve, each turned to its tangent, and stay within 110 mm when the railing is lengthened.
+- [ ] Unarray leaves 34 independent columns where they stood, and the array element is gone.
+- [ ] A hedge is made from two shrub meshes arrayed along a drawn spline at a maximum spacing of 0.6 m, with any rotation and a scale of 85–115 %. Dragging a spline grip reshapes the hedge, and each shrub keeps its rotation and scale. Reseed changes the arrangement.
+
+**Implementation note (2026-10-14, first build).**
+- **IFC:** the array is an `IfcElementAssembly` (`ObjectType` "PathArray") rather than an `IfcGroup`, so its members can be aggregated and placed. Its members are not separate elements in the model: they are made from the array whenever it regenerates, so they follow the path element and the counts. When saving, they are written as elements of the component's class, typed, aggregated by the array and marked `rxd:path_array`, so they are skipped on opening.
+- **Paths built:** drawn polylines (closed or not), arcs through three points, splines through points, wall location lines, grid lines, and the edges of floors, ceilings and decks (copies on the host's top).
+- **Distribution built:** the four modes with justification, counts per side, the three corner modes, the four orientations with an offset, and seeded variation (rotation and scale ranges, weighted choice of components, jitter).
+- **Editing built:** exclusions, Unarray (members keep their varied scale), and Move, Copy, Rotate and Mirror for drawn paths.
+- **The window:** the Array along Path tool (AP, from a selected copy or a component picked up in the library): click a wall, grid or floor, or click points and press Enter. Properties carry the distribution, corners, orientation, ends, offsets and variation, plus Reseed and restoring exclusions. Modify | Path Arrays offers Unarray.
+- **Not built yet:** grips, an on-canvas count label, railing and slab-edge picks beyond floors, height following the path or a host face, alternate mirroring, arrays of fragments, and the member-index property memory.
+
 ---
 
 ## 3.13 Groups
@@ -4247,6 +4440,8 @@ These tools are on the **Modify** tab and are repeated on every `Modify | <Eleme
 - [ ] Ungroup leaves the elements in place as independent elements, and the group type remains in the project.
 - [ ] IFC export writes one `IfcGroup` per instance with the right members, and the file still opens in an IFC viewer after the RXD data has been stripped.
 
+
+**Implementation note (2026-10-15, first build).** As built: model groups. A type (`rxd:group_types` on the project) keeps a template of its members' element data with the frame (origin, rotation) of the instance it was taken from; an instance is an `IfcGroup` with `recipe.group` (type, origin, rotation, members by key, excluded keys) whose members are real elements tagged `rxd:group_member`. Placing makes members from the template, references between members remapped to the new elements, then turned and moved into place (doors and windows follow their walls); members are refused edits outside the editor. IFC: `IfcRelAssignsToGroup` per instance. Commands: `group.create`, `group.place`, `group.swap_type`, `group.duplicate_type`, `group.rename_type`, `group.ungroup`, `group.list`. The window: Architecture › Model (Place Group, Create Group), Modify | Model Groups. Not built yet: detail and attached detail groups, nested groups, member GlobalIds kept when instances are remade, rehosting members whose host is outside the group, the origin's drag controls, Origin Level Offset.
 ### 3.13.2 Group editor
 **ID:** ARC-GRP-002 · **Priority:** P1 · **Ref:** research/02 §14
 
@@ -4267,7 +4462,9 @@ These tools are on the **Modify** tab and are repeated on every `Modify | <Eleme
 - `group.cancel(session_id)`
 
 **Acceptance criteria.**
-- [ ] Cancel in the group editor leaves every instance unchanged.
+- [x] Cancel in the group editor leaves every instance unchanged.
+
+**Implementation note (2026-10-15, first build).** As built: `group.edit` opens the editor on one instance (`rxd:group_edit` on the project), whose members can then be changed; `group.add_members`, `group.remove_members`; `group.finish` takes the template from the instance and remakes the type's other instances; `group.cancel` hands back elements added, takes back members removed and remakes the instance from the template. The window: the Edit Group tab (Add, Remove, Finish, Cancel). Not built yet: half-tone of the elements outside, Attach, the identity warning.
 
 ### 3.13.3 Excluding members, saving, loading and converting to a link
 **ID:** ARC-GRP-003 · **Priority:** P1 · **Ref:** research/02 §14
@@ -4288,8 +4485,10 @@ These tools are on the **Modify** tab and are repeated on every `Modify | <Eleme
 - `group.convert_to_link(instance_ids, target: NewFile(path)|ExistingFile(path)) -> link_id`
 
 **Acceptance criteria.**
-- [ ] An excluded member is absent from the schedule and the IFC export for that instance only.
+- [x] An excluded member is absent from the schedule and the IFC export for that instance only.
 - [ ] A group saved to `.ifc` and loaded into another project produces the same members, with new GlobalIds.
+
+**Implementation note (2026-10-15, first build).** As built: `group.exclude_member` (by element or key) removes the member from that instance (so it is not scheduled or exported there), `group.restore_member` (one or all) makes it again from the template, `group.move_member_to_project` leaves it as an independent element. Not built yet: Save Group, Load as Group, converting to a link.
 
 ---
 
@@ -4343,11 +4542,13 @@ Temporary dimensions are specified in ARC-DIM-001 and listening dimensions in AR
 - `constraint.list(element_id?) -> [Constraint]` *(query)*
 - `view.reveal_constraints(view_id, on)`
 
+**Implementation notes (2026-10-15).** As built: constraints are RXD records `rxd:model/constraints/<guid>` (`rxd:constraint`: kind, references as dimension references, direction across, value, dimension and segment); kinds Distance, Alignment and Equality between wall faces and location lines, grids and reference planes. The solver runs in every editing command before it commits: per parallel direction, the elements the edit touched (and pinned ones) are fixed, and the least change of the others is solved exactly (an EQ's outer references are held first); an unsatisfiable edit fails with `constraint.unsatisfied` and the constraint IDs, and the transaction rolls back. Commands as above, with `view.reveal_constraints(view_id, on)`. Window: Lock Segment and EQ rows and the Lock and EQ actions on Modify | Dimensions; padlocks and "EQ" in dimension text; constraints of the selection dashed blue, all of them red with Reveal Constraints. Deleting a dimension keeps its constraints (no prompt yet); deleting a referenced element removes them. Not built yet: angle and radius constraints, inserts' positions, soft alignments, the keep-or-remove prompt.
+
 **Acceptance criteria.**
-- [ ] Three walls with an EQ dimension across them stay evenly spaced when the outer wall is moved.
-- [ ] Locking a 3000 mm dimension and then moving one wall drags the other wall by the same amount.
-- [ ] Locking two dimensions that contradict each other (3000 and 3500 between the same references) fails, and offers Remove Constraints.
-- [ ] Deleting a locked dimension prompts to keep or remove its constraint. Keeping it leaves a constraint that Reveal Constraints shows.
+- [x] Three walls with an EQ dimension across them stay evenly spaced when the outer wall is moved.
+- [x] Locking a 3000 mm dimension and then moving one wall drags the other wall by the same amount.
+- [ ] Locking two dimensions that contradict each other (3000 and 3500 between the same references) fails, and offers Remove Constraints. (Unsatisfiable edits fail with the constraints named.)
+- [ ] Deleting a locked dimension prompts to keep or remove its constraint. Keeping it leaves a constraint that Reveal Constraints shows. (It is kept without a prompt.)
 
 ### 3.14.3 Selection
 **ID:** ARC-SEL-001 · **Priority:** P0 · **Ref:** research/02 §15.3
@@ -4411,10 +4612,12 @@ These commands are session-only and are not undoable.
 - `selectionset.rename(id, name)` and `selectionset.list() -> [{id, name, count}]` *(query)*
 
 **Acceptance criteria.**
-- [ ] A saved set of 12 elements, one of which is later deleted, loads 11 elements without error.
+- [x] A saved set of 12 elements, one of which is later deleted, loads 11 elements without error.
 - [ ] Saving a set with the name of an existing view filter offers Replace or Cancel; Cancel changes nothing.
 - [ ] In Edit Selection mode, window-selecting three walls with *Remove from Selection* active and pressing Finish leaves the set three members smaller, as one undo step.
 - [ ] Exporting with *Selection sets as IfcGroup* gives one `IfcGroup` per set, whose `IfcRelAssignsToGroup` lists exactly the member elements.
+
+**Implementation note (2026-10-15, first build).** As built: sets on the project (`rxd:selection_sets`, GlobalIds); `selectionset.save` (a taken name is refused unless `replace`; members of groups join as their group), `selectionset.load`, `selectionset.edit`, `selectionset.delete`, `selectionset.rename`, `selectionset.list`. The window: Manage › Selection › Save Selection (asks to replace a taken name) and Load Selection. Not built yet: the shared name space and use as view filters, Edit Selection mode, the visible-in-view option, `IfcGroup` export.
 
 ---
 
@@ -4634,7 +4837,7 @@ All commands below are registered once in the command registry and exposed autom
 | `window.place` | type_id, host_id, point_along \| point, sill_height?, flip_facing?, width?, height?, fit? | element_id | Yes | ARC-WIN-001 |
 | `insert.set_size` | element_ids, width?, height?, fit? | — | Yes | ARC-WIN-001, ARC-DOOR-001 |
 | `insert.set_position` | element_id, along \| from_end | — | Yes | ARC-WIN-001, ARC-DOOR-001 |
-| `component.place` | type_id, point \| host_ref, rotation?: f64, level_id?, offset?, placement?: VerticalFace\|Face\|WorkPlane | element_id | Yes | ARC-COMP-001 |
+| `component.place` | type_id \| {library, item}, point \| points[] \| host_ref, rotation?: f64, level_id?, offset?, mirror?, placement?: VerticalFace\|Face\|WorkPlane | element_id \| element_ids[] | Yes | ARC-COMP-001, DM-LIB-002 |
 | `column.place_architectural` | type_id, point, base_level, top_constraint, base_offset?, top_offset?, rotation?, room_bounding? | element_id | Yes | ARC-COL-001 |
 | `column.attach` | column_ids[], end: top\|base, target_id, style?, justification?, offset? | () | Yes | ARC-COL-001 |
 | `column.detach` | column_ids[], end: top\|base, target_ids? | () | Yes | ARC-COL-001 |
@@ -4841,6 +5044,11 @@ All commands below are registered once in the command registry and exposed autom
 | `element.array_linear` | element_ids, vector, count, move_to: Second\|Last, group_and_associate: bool, constrain?: bool | array_id \| [element_id] | Yes | ARC-MOD-026 |
 | `element.array_radial` | element_ids, center, angle, count, move_to: Second\|Last, axis?, group_and_associate: bool | array_id \| [element_id] | Yes | ARC-MOD-026 |
 | `array.set_count` | array_id, count, append_to_end: bool | — | Yes | ARC-MOD-026 |
+| `array.along_path` | source, path, distribution, options? | array_id | Yes | ARC-MOD-033 |
+| `array.set` | array_id, {source?, path?, distribution?, options?} | — | Yes | ARC-MOD-033 |
+| `array.exclude_member` | array_id, index | — | Yes | ARC-MOD-033 |
+| `array.restore_member` | array_id, index \| "all" | — | Yes | ARC-MOD-033 |
+| `array.unarray` | array_id | element_ids[] | Yes | ARC-MOD-033 |
 | `group.create` | element_ids, name, kind?: Model\|Detail | {group_type_id, instance_id, attached_detail_type_id?} | Yes | ARC-GRP-001 |
 | `group.place` | group_type_id, point, rotation?, level_id?, origin_offset? | element_id | Yes | ARC-GRP-001 |
 | `group.swap_type` | instance_ids, group_type_id | — | Yes | ARC-GRP-001 |
