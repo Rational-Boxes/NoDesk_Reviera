@@ -32,7 +32,7 @@
 **Document:** Functional and technical specification of Reviera, an open-source BIM authoring application
 **Functional reference:** Autodesk® Revit® 2026/2027 (described from public sources only; see `RESEARCH_LOG.md`)
 **Licence of Reviera:** GPL-3.0-or-later
-**Version:** 0.1 (draft) · 2026-10-15 · **Size:** 806 numbered requirements (320 P0 · 292 P1 · 187 P2 · 7 P3), 2,055 commands
+**Version:** 0.1 (draft) · 2026-10-15 · **Size:** 807 numbered requirements (320 P0 · 292 P1 · 188 P2 · 7 P3), 2,061 commands
 
 > **Clean-room statement.** This specification describes features, workflows and behaviour in Reviera's own words. Every input was publicly available: vendor online help, public blogs and tutorials, public forums and open-source repositories. All of it is listed with URLs and access checks in `SOURCE_REGISTER.md`. No proprietary, confidential, leaked or NDA-covered information was used. No vendor code, binaries, file formats or assets were examined or copied. Autodesk and Revit are trademarks of Autodesk, Inc. They are used here only to identify the functional reference. Reviera is not affiliated with or endorsed by Autodesk.
 
@@ -62,7 +62,7 @@ This document covers:
 | 6 | Collaboration, linking and coordination (Local and BIMserver modes) |
 | 7 | Advanced features beyond the reference product: scene protocol, simulated walkthroughs, Godot translation layer for VR/AR, render bridges |
 | 8 | Remote computation and analysis (overview): the remote computation subsystem and the analysis plugin layer, how they fit together, and a build order |
-| A | Appendix A: requirement summary, shared commands, consolidated command index (2,055 commands; 806 requirements) |
+| A | Appendix A: requirement summary, shared commands, consolidated command index (2,061 commands; 807 requirements) |
 
 Out of scope:
 - reproducing vendor-cloud services such as ACC/Forma and Autodesk Assistant (open alternatives are specified instead)
@@ -8294,7 +8294,7 @@ key_id = "minisign:<publisher public key>"     # signature file: reviera-addin.t
 
 ## 2.17 Remote computation contract
 
-Reviera shall have a foundational subsystem, built on one general contract, that abstracts calculation workloads from where and how they run: it runs calculation runs against **model distillations** in another process, on this machine, on a more powerful machine on the LAN, or on cloud compute. Analysis is its first user (chapter 4 §4.0.2a), but the contract is not tied to analysis. Rendering, tessellation of large models, batch export, point clouds, project-wide booleans and clash runs, design-space exploration (§2.15.3), and use cases not yet known are all **job kinds** on the same contract. Each job sends only an extract of the model that the calculation needs, never the model, so a job is small enough to send across a network.
+Reviera shall have a foundational subsystem, built on one general contract, that abstracts calculation workloads from where and how they run: it runs calculation runs, as batch jobs or as real-time sessions (DM-RPC-010), against **model distillations** in another process, on this machine, on a more powerful machine on the LAN, or on cloud compute. Analysis is its first user (chapter 4 §4.0.2a), but the contract is not tied to analysis. Rendering, tessellation of large models, batch export, point clouds, project-wide booleans and clash runs, design-space exploration (§2.15.3), and use cases not yet known are all **job kinds** on the same contract. Each job sends only an extract of the model that the calculation needs, never the model, so a job is small enough to send across a network.
 
 **Terms.**
 
@@ -8307,6 +8307,7 @@ Reviera shall have a foundational subsystem, built on one general contract, that
 | **Host** | Where runners run: this machine, a paired machine on the LAN (DM-RPC-005), or a cloud cluster (DM-RPC-006). |
 | **Result applier** | The function in Reviera's process that takes a job's output back into the model: parameters, result packages, files, view overlays. |
 | **Job set** | Many variants of one job submitted together (DM-RPC-007). |
+| **Session** | A long-lived, stateful simulation that accepts scenario inputs and streams state frames in real time until closed (DM-RPC-010). |
 
 ### 2.17.1 Contract and protocol
 **ID:** DM-RPC-001 · **Priority:** P2 · **Ref:** owner requirement (2026-10-15); Reviera-originated design
@@ -8501,7 +8502,7 @@ Reviera shall have a foundational subsystem, built on one general contract, that
 **Purpose.** One place to see and manage every job of every kind, its runner and its host.
 
 **Behaviour & rules.**
-- *Manage › Compute Jobs* lists jobs (kind, scope, state, progress, host, started, duration, estimate and cost where known) with Cancel, Retry, Reattach, Forget and Open Results, and marks jobs that are *reconnecting* or whose results are nearing expiry; a *Hosts* tab lists hosts (local, paired, cloud) with their resources, queues and the job kinds routed to each, and offers Pair Host…, Add Cloud Host… and Forget; a *Job kinds* tab lists registered kinds with their location, detail routing, idle timeout and limits.
+- *Manage › Compute Jobs* lists jobs and sessions (kind, scope, state, progress, host, started, duration, estimate and cost where known, and for sessions the frame rate, latency and attached viewers) with Cancel, Retry, Reattach, Forget and Open Results, and marks jobs that are *reconnecting* or whose results are nearing expiry; a *Hosts* tab lists hosts (local, paired, cloud) with their resources, queues and the job kinds routed to each, and offers Pair Host…, Add Cloud Host… and Forget; a *Job kinds* tab lists registered kinds with their location, detail routing, idle timeout and limits.
 - The status bar shows a compute indicator only while a runner is running or a remote job is in progress, so the user can see that nothing is resident.
 - Every action is a command, equally available to Lua and MCP.
 
@@ -8536,6 +8537,47 @@ Reviera shall have a foundational subsystem, built on one general contract, that
 - [ ] Restarting a LAN host during a checkpointing job resumes it from its last checkpoint; a non-checkpointing job is reported as `host_restarted` and offered for resubmission.
 - [ ] A job submitted from one workstation is listed, followed and collected from another signed in as the same user.
 - [ ] Saving and reopening the model keeps its outstanding jobs, and reopening reconnects to them.
+
+### 2.17.10 Real-time simulation sessions
+**ID:** DM-RPC-010 · **Priority:** P2 · **Ref:** owner requirement (2026-10-15); Reviera-originated design
+
+**Purpose.** Run a computation-heavy simulation on powerful compute (a cloud cluster or a LAN host) while Reviera, a game engine or a VR headset shows it live: the user changes scenario data (wind speed and direction, sun position, occupancy, a storm's intensity, a load's position, a building's massing) and sees the simulation respond immediately. A batch job runs to completion and returns a result; a **session** stays open, keeps its state on the server, accepts inputs and streams state frames until it is closed.
+
+**Behaviour & rules.**
+- **Opening.** A job kind declares whether it supports sessions, and with what inputs (typed, ranged scenario parameters), outputs (fields, particles, streamlines, scalar probes, element results) and update rate. `OpenSession` starts one from a distillation (DM-RPC-003), like a job, and returns a session ID; the session is recorded in the job registry (DM-RPC-009). While a session is open its workers stay reserved: a cloud host does not scale them to zero, and the panel shows the running cost.
+- **Inputs.** The controlling client sends **scenario inputs** (parameter changes, typed and validated against the kind's declaration), **model edits** (distillation patches: when the user edits the model during a session, Reviera re-distils only what changed and sends it; a kind that cannot take patches restarts from the new distillation, keeping its scenario state), **controls** (pause, resume, step, reset, run faster or slower than real time, save a checkpoint) and **view hints** (the region and level of detail being looked at, so the server can spend effort there). Each input has a sequence number; the server acknowledges the frame in which it first took effect, so the client can show input-to-response latency.
+- **Frames.** The server streams **state frames**: a full **keyframe** on attach and at intervals, then **delta frames** against the last keyframe. Fields are sent progressively (a coarse version first, refined while the scenario is unchanged) and quantised to the precision the display needs, with negotiated compression (DM-RPC-001). Frames carry simulation time and a sequence number; the client interpolates between frames for smooth display.
+- **Latest wins.** When the network or the client cannot keep up, intermediate frames are dropped, never queued: the client declares its maximum frame rate and bandwidth, the server adapts resolution and rate to them, and a newer frame always replaces an older one. Inputs, by contrast, are delivered reliably and in order.
+- **Real-time transport.** Control and inputs travel on the gRPC bidirectional stream `SessionStream`. Frames may use a faster negotiated transport where both sides support it: unreliable, unordered QUIC datagrams or WebTransport over HTTP/3, which avoid head-of-line blocking, falling back to the gRPC stream. The transport is a negotiated technique like compression and encryption (identifiers such as `rt-grpc-stream-v1`, `rt-quic-datagram-v1`), and frames are end-to-end encrypted in the same way. For clients that cannot render the fields themselves, a kind may offer **server-side rendering**: GPU workers render the view and stream video over a negotiated codec and transport (for example AV1 or H.265 over WebRTC), with the camera pose sent as an input.
+- **Visualisation in Reviera.** Frames are shown in the viewport as live analysis results through Analysis Display Styles (ANA-ADS-001): coloured surfaces, section-plane fields, vectors, streamlines and particles, with a legend, and a scenario panel with the kind's inputs as sliders and fields. Display never blocks editing.
+- **Game engines and VR.** Session frames enter the Render Scene as a **simulation layer** and travel to engines through the Reviera Scene Protocol's field messages (ADV-RSP-001), so the Godot translation layer (ADV-XR-001) shows them on the desktop or in VR, where scenario inputs are on the wrist menu and the user can stand inside the simulated wind or daylight at 1:1 scale. For the lowest latency, an engine bridge may also attach to the session directly as an observer, using the MIT client library (TECH_STACK §4.0), while Reviera remains the controller.
+- **Several viewers.** One client controls a session; others attach as **observers** and receive the same frames. Control can be handed over. Observers may be other Reviera instances, engine bridges or headsets, on any machine allowed to see the session (DM-RPC-009 access rules).
+- **Disconnects and idling.** A session survives a client disconnecting: it pauses when no controller has been attached for 2 minutes (settable), and after 10 minutes without any client it saves a checkpoint, releases its workers and becomes *suspended*; reattaching resumes it from the checkpoint and sends a keyframe. A suspended session costs only its storage.
+- **Recording and committing.** A session can be recorded (its inputs and keyframes) for replay, and closed with *Commit*: the server writes a result package of the current state, or of a chosen recorded moment, with provenance that includes the input log, and the result applier brings it into the model like a batch result. Closing without committing discards the state.
+- **Examples.** External wind around a massing study, adjusted by direction and speed; interior airflow and comfort as vents are moved; daylight and shadow as the sun is scrubbed through the day and year; a stormwater event played at chosen intensities; crowd movement and evacuation; a structural model under a load the user drags across a floor; replay of a seismic time history with the structure's response.
+
+| RPC | Kind | Purpose |
+|-----|------|---------|
+| `OpenSession` | unary | Starts a session: kind, distillation blobs, initial scenario, frame preferences (rate, bandwidth, detail, region). Returns the session ID and the negotiated real-time transport. |
+| `SessionStream` | bidirectional streaming | Client to server: scenario inputs, distillation patches, controls, view hints, camera poses for server-side rendering. Server to client: acknowledgements, keyframes and delta frames (when frames are not on the datagram transport), status, cost and warnings. |
+| `AttachSession` | unary | Joins an open or suspended session as controller or observer; returns where the stream resumes and triggers a keyframe. |
+| `CloseSession` | unary | Ends a session, optionally committing a result package of the current or a recorded state. |
+
+**Commands.**
+- `compute.open_session(kind, scope, scenario?, location?, frame_rate?, detail?) -> session_id`
+- `compute.session_input(session_id, inputs) -> {seq}`
+- `compute.session_control(session_id, action: "pause"|"resume"|"step"|"reset"|"checkpoint"|"speed", value?) -> ()`
+- `compute.attach_session(session_id, role: "control"|"observe") -> ()`
+- `compute.close_session(session_id, commit?: bool, at?: "now"|recorded_time) -> {package_id?}`
+- `compute.sessions(host_id?) -> sessions[]`
+
+**Acceptance criteria.**
+- [ ] On a LAN host, a scenario input to the reference wind session (coarse) is visible in Reviera's viewport within 150 ms at 30 frames per second; on a cloud host in the same region, within 300 ms.
+- [ ] With the client's bandwidth capped to a quarter of what the session would use, frames arrive at a reduced resolution or rate without stalling, and inputs still take effect in order.
+- [ ] Disconnecting and reattaching receives a keyframe within 1 s and continues; a session left without clients for 10 minutes suspends, releases its workers, and resumes from its checkpoint when reattached.
+- [ ] A Godot bridge in VR shows the same frames as Reviera's viewport, and changing the wind direction from the wrist menu changes the flow in both.
+- [ ] Committing a session writes a result package whose provenance includes the input log, and its results attach to the model like a batch result.
+- [ ] `compute.open_session`, `.session_input` and `.session_control` driven from Lua or MCP give the same session behaviour as the scenario panel.
 
 **Packaging.** Reviera bundles `reviera-compute-host` beside `reviera` for local runners; the host is also packaged on its own and as a container image for LAN and cloud hosts. Built-in runners ship as separate executables. Reviera ships a Rust runner skeleton and a Python one, so a new job kind's runner can be written in any language with a gRPC library.
 
@@ -9017,6 +9059,12 @@ All commands defined in this chapter. Every command in this table is also a Lua 
 | `compute.jobs` | host_id?, kind? | jobs[] | No | DM-RPC-008 |
 | `compute.reattach` | job_id? | jobs[] | No | DM-RPC-009 |
 | `compute.forget_job` | job_id | — | No | DM-RPC-009 |
+| `compute.open_session` | kind, scope, scenario?, location?, frame_rate?, detail? | session_id | No | DM-RPC-010 |
+| `compute.session_input` | session_id, inputs | {seq} | No | DM-RPC-010 |
+| `compute.session_control` | session_id, action, value? | — | No | DM-RPC-010 |
+| `compute.attach_session` | session_id, role | — | No | DM-RPC-010 |
+| `compute.close_session` | session_id, commit?, at? | {package_id?} | Results only | DM-RPC-010 |
+| `compute.sessions` | host_id? | sessions[] | No | DM-RPC-010 |
 
 ---
 
@@ -15267,7 +15315,7 @@ Ref: owner requirement (2026-10-15); Reviera-originated design.
 | ANA-PLUG-005 | P2 | **Provider lifecycle.** A batch provider follows the runner lifecycle and limits of DM-RPC-004 (on demand, idle timeout, OS-enforced memory and CPU limits, contained failures). A live in-process provider holds its working memory only while it computes; a native library is unloaded after the idle timeout where the platform allows. `analysis_provider.start`, `.stop` and `.test` act on the provider's runner; `analysis_job.status` and `.cancel` (ANA-GEN-001) are the analysis view of `compute.status` and `compute.cancel`. |
 | ANA-PLUG-006 | P2 | **Analysis results.** A batch analysis's result package (ANA-FEA-001 for structural; each family's own schema otherwise) is taken back into the model by the family's result applier (DM-RPC-002): result parameters (ANA-GEN-002), result packages referenced by the model (STR-RES-001), and display through Analysis Display Styles (ANA-ADS-001). The package's provenance manifest (DM-RPC-001) is shown in Results Explorer, and a result computed from an older snapshot is marked stale (ANA-GEN-001). |
 | ANA-PLUG-007 | P2 | **Analysis Providers panel.** *Analyze › Analysis Providers* lists every provider: family, mode (live or batch), transport, where it runs (in Reviera, local runner, host, cloud host, Web service), licence, state, and its settings: live budget, idle timeout, limits, and location per detail level (§2.17.6 routing by rigour). It offers Start, Stop, Test and a link to *Manage › Compute Jobs* (DM-RPC-008). Every action is a command, equally available to Lua and MCP. |
-| ANA-PLUG-008 | P2 | **Live and batch calculations.** A provider manifest shall declare its **mode**. **`live`**: a calculation that updates while the user models, for example duct and pipe sizing as a run is drawn, voltage drop as a circuit is built, the lumen method as fixtures are placed, a room's heating load as its walls move, embodied carbon as quantities change, and the modelling checks of the overlap engine (ARC-MOD-030) and clearances (ARC-MOD-031). Live calculations run **in-process** on the core worker pool, on the edited elements only, within a budget of 50 ms per edit on the reference model (settable); one that exceeds its budget three times in a row is suspended for the session with a notice, and its results show as stale until refreshed. **`batch`**: a run the user starts, or one whose scope is the whole model or a large selection, for example a structural or seismic solve, an energy simulation, a daylight or shadow study, a stormwater or hydraulic network run, CFD, or a project-wide clash test (ANA-CLASH-001). Batch runs are compute jobs and never block modelling. A calculation can offer both modes: the built-in duct sizing is live for the run being drawn and batch for *Size whole system*. |
+| ANA-PLUG-008 | P2 | **Live and batch calculations.** A provider manifest shall declare its **mode**. **`live`**: a calculation that updates while the user models, for example duct and pipe sizing as a run is drawn, voltage drop as a circuit is built, the lumen method as fixtures are placed, a room's heating load as its walls move, embodied carbon as quantities change, and the modelling checks of the overlap engine (ARC-MOD-030) and clearances (ARC-MOD-031). Live calculations run **in-process** on the core worker pool, on the edited elements only, within a budget of 50 ms per edit on the reference model (settable); one that exceeds its budget three times in a row is suspended for the session with a notice, and its results show as stale until refreshed. **`batch`**: a run the user starts, or one whose scope is the whole model or a large selection, for example a structural or seismic solve, an energy simulation, a daylight or shadow study, a stormwater or hydraulic network run, CFD, or a project-wide clash test (ANA-CLASH-001). Batch runs are compute jobs and never block modelling. A calculation can offer both modes: the built-in duct sizing is live for the run being drawn and batch for *Size whole system*. **`interactive`**: a heavy simulation steered in real time, run as a session (DM-RPC-010) on a LAN or cloud host and shown live in the viewport, a game engine or VR while the user changes scenario inputs; for example external wind, interior airflow, daylight and shadow through the day, a stormwater event, or a structure under a moving load. A provider may offer batch and interactive modes for the same engine. |
 | ANA-PLUG-009 | P2 | **Analysis distillers.** Each batch analysis family shall define its distiller (DM-RPC-003): mostly an IFC filter profile that keeps only the elements and data the analysis uses, plus transforms where the family needs another representation or format. Contents per family: **structural and seismic**: the IFC4 Structural Analysis View as a profile: analytical members, panels, nodes, links, supports, sections, materials, masses, loads, cases and combinations, no physical geometry, no transform needed (ANA-FEA-001); **energy and thermal loads**: thermal zones, space boundaries as planar surfaces with their constructions, openings with glazing properties, shading surfaces, internal gains, schedules and the site and weather reference (gbXML or IFC space boundaries); **daylight, sun and shadow**: room and shading surfaces as simplified meshes with reflectance and transmittance, glazing, sensor grids, site context and location (a Radiance scene); **hydraulic and plumbing**: the pipe network graph with lengths, sizes, fittings, elevations, fixtures and demands; **stormwater**: roof and paved catchments with area, slope and surface, gutters, downspouts and drainage runs with their sizes and falls; **airflow**: the interior fluid domain as a watertight mesh with inlets, outlets, heat sources and boundary conditions; **wind**: the exterior envelope as a simplified watertight shell with nearby site context and terrain; **clash**: element bodies of the chosen categories only. Each family's results come back keyed to its distillation and are attached by its result applier (ANA-PLUG-006). |
 
 **Packaging.** Reviera's process contains the live calculations. It bundles `reviera-analysis-builtin` (the built-in batch calculations, ANA-PLUG-003) as a runner beside `reviera`. Engine wrappers (for example a CalculiX, Code_Aster, xara or OpenFOAM runner, §4.15) are separate programs, each in its own folder with its job-kind and provider manifests. The Flatpak and the Windows installer bundle no third-party engine by default; *Get Engines…* in the Providers panel installs them.
@@ -26657,7 +26705,7 @@ This section builds on the pluggable render backend interface in Chapter 5 (DOC-
   - sun and sky: date and time, project location, and sky model
   - other materials data: `KHR_materials_*` extensions where they exist (transmission, IOR, emissive strength, clearcoat, sheen, volume, texture transform)
   - collision hints: for each node, whether it is walkable, a blocker or ignored. This is derived from category (floors, stairs and ramps are walkable; walls, columns and furniture block; openings, annotation and spaces are ignored) and can be overridden per category.
-- **Deltas** are messages on the same connection: `node.add/update/remove`, `mesh.add/remove`, `material.add/update`, `graphics.update` (visibility, override colour, transparency), `light.update`, `sun.update`, `camera.update`, `section.update`. Each carries a monotonically increasing sequence number. Large buffers (meshes, textures) travel as binary frames, or through shared memory when both sides are on one machine. A bridge that falls behind can ask for a fresh snapshot.
+- **Deltas** are messages on the same connection: `node.add/update/remove`, `mesh.add/remove`, `material.add/update`, `graphics.update` (visibility, override colour, transparency), `light.update`, `sun.update`, `camera.update`, `section.update`, and for live simulation sessions (DM-RPC-010) the simulation layer's `field.add/update/remove` (scalar and vector fields on surfaces, section planes or volumes, with their colour map), `particles.update`, `streamlines.update` and `probe.update`, sent as keyframes and deltas with latest-wins delivery. Each carries a monotonically increasing sequence number. Large buffers (meshes, textures) travel as binary frames, or through shared memory when both sides are on one machine. A bridge that falls behind can ask for a fresh snapshot.
 - **Back-channel messages** (bridge → Reviera): `hello` (protocol version, capabilities), `camera.pose`, `pick` (GlobalId), `viewpoint.capture` (camera, image and optional comment, which becomes a BCF viewpoint or a saved view), `walk.path` (recorded path samples), `render.result` (image and metadata for the render gallery), and `log`.
 - **Versioning and publication.** RSP is versioned with semantic versioning, negotiated in `hello`, and described by JSON Schemas for the message envelopes plus the `REVIERA_scene` glTF extension schema. These are published under **MIT**, like the RXD schemas (02a §12), at `https://nodeskreviera.org/schemas/rsp/<major>.<minor>/`. A reference client library (Rust, MIT) and a Python client for Blender are part of the protocol deliverables.
 - **Offline use.** `render.export_scene` writes the same snapshot to a `.glb` file (with the extension), so engines can also import a static model without a live connection. OpenUSD output is a later option, subject to the licence check in Q-DM-09.
@@ -26721,6 +26769,7 @@ This section builds on the pluggable render backend interface in Chapter 5 (DOC-
   - measure between two points
   - capture a viewpoint with a voice or text note as a BCF issue
   - switch design options, time of day and light groups from a wrist menu
+  - during a live simulation session (DM-RPC-010), change its scenario inputs (wind direction and speed, sun position, storm intensity, occupancy) from the wrist menu and see the simulation layer respond around them
 - Scale model mode: shrink the building to tabletop size and grab, rotate or section it with a hand-held section plane. Section planes are session-only.
 - Comfort and safety: the runtime's guardian or boundary is always respected, frame-rate targets are 72/90 Hz with automatic detail reduction, and a single *recentre* action is available.
 
@@ -26846,7 +26895,7 @@ No reference-product sources were used in this chapter.
 
 # Chapter 8 — Remote Computation and Analysis (Overview)
 
-**Status:** Draft 0.1 · 2026-10-15 · **Kind:** overview brief. This chapter adds no requirements. It explains how the remote computation subsystem (Chapter 2 §2.17, DM-RPC-001 … 009) and the analysis plugin layer (Chapter 4 §4.0.2a, ANA-PLUG-001 … 009) fit together, and why. The requirements in those sections are normative; where this chapter and they differ, they win. Research and reasoning: `research/07_analysis_engines_remote_compute.md`.
+**Status:** Draft 0.1 · 2026-10-15 · **Kind:** overview brief. This chapter adds no requirements. It explains how the remote computation subsystem (Chapter 2 §2.17, DM-RPC-001 … 010) and the analysis plugin layer (Chapter 4 §4.0.2a, ANA-PLUG-001 … 009) fit together, and why. The requirements in those sections are normative; where this chapter and they differ, they win. Research and reasoning: `research/07_analysis_engines_remote_compute.md`.
 
 ## 8.0 Scope and provenance
 
@@ -26904,6 +26953,24 @@ Other users of the subsystem are rendering (Chapter 7), tessellation of large mo
 6. **Return.** Signed results come back, keyed to the distillation; the result applier attaches them to the right elements, as parameters, result packages or display styles, with their provenance.
 7. **Idle.** The runner exits after its idle timeout; a cloud cluster scales back to zero.
 
+## 8.4a Real-time sessions
+
+Some simulations are better explored than run: a heavy simulation runs on a cloud cluster or LAN host while Reviera, a game engine or a VR headset shows it live, and the user changes scenario data and sees the result respond at once (DM-RPC-010).
+
+```
+ Reviera (controller)          ── scenario inputs, model patches ──►   Cloud / LAN host
+ viewport + scenario panel     ◄── keyframes + delta frames ───────    simulation session
+        │  Render Scene (simulation layer)                              (workers reserved
+        ▼                                                                while open)
+ RSP field messages ──► Godot translation layer ──► desktop or VR (OpenXR)
+                         (or an engine bridge attached directly as an observer)
+```
+
+- Inputs are reliable and ordered; frames are latest-wins, progressively refined and adapted to the viewer's bandwidth and frame rate, over a negotiated real-time transport (QUIC datagrams or WebTransport where available, otherwise the gRPC stream).
+- Several viewers can watch one session; one controls it.
+- A session survives disconnects, suspends to a checkpoint when nobody is attached, and can be recorded and committed as a result package.
+- Targets: input-to-visible change within 150 ms on a LAN host and 300 ms on a cloud host in the same region, at 30 frames per second for the reference session.
+
 ## 8.5 Analysis families
 
 | Family | Typical batch run | Distillation (mostly an IFC filter) | Suggested engines (§4.15) |
@@ -26936,6 +27003,7 @@ Live calculations that update while the user models stay in Reviera's process (A
 | 4 | LAN compute hosts with pairing, reattachment and *Best available* | DM-RPC-005 |
 | 5 | Cloud clusters: scale to zero, estimates, budgets, end-to-end encryption; the hosted-services catalogue | DM-RPC-006 |
 | 6 | Job sets and studies; further engine runners and job kinds (rendering, export, tessellation) | DM-RPC-007; ANA-PLUG-001 families |
+| 7 | Real-time sessions: the session stream, latest-wins frames, the real-time transport, the scenario panel, the simulation layer in RSP and the Godot/VR layer | DM-RPC-010; ADV-RSP-001; ADV-XR-001 |
 
 Structural analysis needs the analytical model first (STR-AM-001 … 004, STR-LOAD-001, STR-LC-001, STR-BC-001), which follows the structural physical elements in the structure build order.
 
@@ -26952,6 +27020,7 @@ Structural analysis needs the analytical model first (STR-AM-001 … 004, STR-LO
 | DM-RPC-007 | Job sets and studies | §2.17.7 |
 | DM-RPC-008 | Compute Jobs panel | §2.17.8 |
 | DM-RPC-009 | Job registry and reconnection | §2.17.9 |
+| DM-RPC-010 | Real-time simulation sessions | §2.17.10 |
 | ANA-PLUG-001 … 003 | Provider interfaces, in-process and out-of-process providers, built-in providers | §4.0.2 |
 | ANA-PLUG-004 | Analysis transports | §4.0.2a |
 | ANA-PLUG-005 | Provider lifecycle | §4.0.2a |
@@ -26977,7 +27046,7 @@ Generated by `tools/build_spec.py` from the chapter command catalogs and require
 | Area | P0 | P1 | P2 | P3 | Total |
 |------|---:|---:|---:|---:|------:|
 | UI | 76 | 38 | 7 | 0 | 121 |
-| DM | 91 | 64 | 32 | 3 | 190 |
+| DM | 91 | 64 | 33 | 3 | 191 |
 | ARC | 77 | 60 | 10 | 1 | 148 |
 | STR | 0 | 14 | 47 | 0 | 61 |
 | MEP | 0 | 30 | 42 | 0 | 72 |
@@ -26985,7 +27054,7 @@ Generated by `tools/build_spec.py` from the chapter command catalogs and require
 | DOC | 68 | 40 | 12 | 1 | 121 |
 | COL | 8 | 45 | 6 | 1 | 60 |
 | ADV | 0 | 0 | 4 | 1 | 5 |
-| **Total** | **320** | **292** | **187** | **7** | **806** |
+| **Total** | **320** | **292** | **188** | **7** | **807** |
 
 Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver)"), it is counted under the first. The non-functional requirements (NFR-…) are in Chapter 0 §0.7 and are not counted here.
 
@@ -27040,7 +27109,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.2a Reviera-originated features
 
-112 requirements are Reviera's own design: owner directives, the technology stack (IFC/RXD storage, live store, BIMserver, MCP, scripting) and extensions beyond the reference product's feature set. Their Ref lines cite no research on the reference product. Listing them separately keeps the clean-room provenance clear: every other requirement traces to public research on the reference product.
+113 requirements are Reviera's own design: owner directives, the technology stack (IFC/RXD storage, live store, BIMserver, MCP, scripting) and extensions beyond the reference product's feature set. Their Ref lines cite no research on the reference product. Listing them separately keeps the clean-room provenance clear: every other requirement traces to public research on the reference product.
 
 | Requirement | Ch | Feature |
 |-------------|----|---------|
@@ -27095,6 +27164,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | DM-RPC-007 | 2 | 2.17.7 Job sets and studies |
 | DM-RPC-008 | 2 | 2.17.8 Compute Jobs panel |
 | DM-RPC-009 | 2 | 2.17.9 Job registry and reconnection |
+| DM-RPC-010 | 2 | 2.17.10 Real-time simulation sessions |
 | DM-RXD-001 | 2a | store non-IFC data only as RXD documents and element data, using the schemas defined in … |
 | DM-RXD-002 | 2a | By default, Reviera shall embed RXD in the IFC file using only `Reviera_*` property sets … |
 | DM-RXD-004 | 2a | support the external carrier (`.reviera` file or folder, `.rvb` bundle) holding identical … |
@@ -27159,7 +27229,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**2055 unique commands** in 408 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**2061 unique commands** in 408 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -27227,7 +27297,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `column` | 7 |
 | `component` | 6 |
 | `compound` | 11 |
-| `compute` | 16 |
+| `compute` | 22 |
 | `compute_host` | 5 |
 | `conductor_size` | 1 |
 | `conductor_table` | 1 |
@@ -27844,18 +27914,24 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `compound.set_layers` | 3 | type_id, layers: [{function, priority?, material_id, thickness, wraps?, structural_material?, variable?}], core_start, core_end | — | Yes | ARC-CMPD-001 |
 | `compound.set_region_anchor` | 3 | type_id, boundary_key, from: Base\ | Top, distance | — | Yes |
 | `compound.split_region` | 3 | type_id, region_key, orientation: Horizontal\ | Vertical, position | — | Yes |
+| `compute.attach_session` | 2 | session_id, role | — | No | DM-RPC-010 |
 | `compute.cancel` | 2 | job_id | — | No | DM-RPC-001 |
+| `compute.close_session` | 2 | session_id, commit?, at? | {package_id?} | Results only | DM-RPC-010 |
 | `compute.distill` | 2 | kind, scope, detail?, anonymise? | {distiller, version, blobs[], size_bytes, counts} | No | DM-RPC-003 |
 | `compute.estimate` | 2 | kind, scope, options?, detail?, host_id? | {duration_s, resources, cost?} | No | DM-RPC-006 |
 | `compute.forget_job` | 2 | job_id | — | No | DM-RPC-009 |
 | `compute.jobs` | 2 | host_id?, kind? | jobs[] | No | DM-RPC-008 |
 | `compute.kinds` | 2 | — | kinds[] | No | DM-RPC-002 |
+| `compute.open_session` | 2 | kind, scope, scenario?, location?, frame_rate?, detail? | session_id | No | DM-RPC-010 |
 | `compute.preview_distillation` | 2 | kind, scope, detail? | view_id | No | DM-RPC-003 |
 | `compute.reattach` | 2 | job_id? | jobs[] | No | DM-RPC-009 |
 | `compute.register_kind` | 2 | manifest_path | kind | No | DM-RPC-002 |
 | `compute.results` | 2 | job_id, path? | {manifest, files[]} | No | DM-RPC-001 |
 | `compute.run_set` | 2 | kind, base, variants[], location? | set_id | Results only | DM-RPC-007 |
 | `compute.services` | 2 | catalogue_url? | services[] | No | DM-RPC-006 |
+| `compute.session_control` | 2 | session_id, action, value? | — | No | DM-RPC-010 |
+| `compute.session_input` | 2 | session_id, inputs | {seq} | No | DM-RPC-010 |
+| `compute.sessions` | 2 | host_id? | sessions[] | No | DM-RPC-010 |
 | `compute.set_budget` | 2 | scope, limit, confirm_over? | — | Yes | DM-RPC-006 |
 | `compute.set_location` | 2 | kind, location, detail? | — | Yes | DM-RPC-005 |
 | `compute.status` | 2 | job_id | {state, progress, phase, host, messages[]} | No | DM-RPC-001 |

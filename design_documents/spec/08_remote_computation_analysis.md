@@ -1,6 +1,6 @@
 # Chapter 8 — Remote Computation and Analysis (Overview)
 
-**Status:** Draft 0.1 · 2026-10-15 · **Kind:** overview brief. This chapter adds no requirements. It explains how the remote computation subsystem (Chapter 2 §2.17, DM-RPC-001 … 009) and the analysis plugin layer (Chapter 4 §4.0.2a, ANA-PLUG-001 … 009) fit together, and why. The requirements in those sections are normative; where this chapter and they differ, they win. Research and reasoning: `research/07_analysis_engines_remote_compute.md`.
+**Status:** Draft 0.1 · 2026-10-15 · **Kind:** overview brief. This chapter adds no requirements. It explains how the remote computation subsystem (Chapter 2 §2.17, DM-RPC-001 … 010) and the analysis plugin layer (Chapter 4 §4.0.2a, ANA-PLUG-001 … 009) fit together, and why. The requirements in those sections are normative; where this chapter and they differ, they win. Research and reasoning: `research/07_analysis_engines_remote_compute.md`.
 
 ## 8.0 Scope and provenance
 
@@ -58,6 +58,24 @@ Other users of the subsystem are rendering (Chapter 7), tessellation of large mo
 6. **Return.** Signed results come back, keyed to the distillation; the result applier attaches them to the right elements, as parameters, result packages or display styles, with their provenance.
 7. **Idle.** The runner exits after its idle timeout; a cloud cluster scales back to zero.
 
+## 8.4a Real-time sessions
+
+Some simulations are better explored than run: a heavy simulation runs on a cloud cluster or LAN host while Reviera, a game engine or a VR headset shows it live, and the user changes scenario data and sees the result respond at once (DM-RPC-010).
+
+```
+ Reviera (controller)          ── scenario inputs, model patches ──►   Cloud / LAN host
+ viewport + scenario panel     ◄── keyframes + delta frames ───────    simulation session
+        │  Render Scene (simulation layer)                              (workers reserved
+        ▼                                                                while open)
+ RSP field messages ──► Godot translation layer ──► desktop or VR (OpenXR)
+                         (or an engine bridge attached directly as an observer)
+```
+
+- Inputs are reliable and ordered; frames are latest-wins, progressively refined and adapted to the viewer's bandwidth and frame rate, over a negotiated real-time transport (QUIC datagrams or WebTransport where available, otherwise the gRPC stream).
+- Several viewers can watch one session; one controls it.
+- A session survives disconnects, suspends to a checkpoint when nobody is attached, and can be recorded and committed as a result package.
+- Targets: input-to-visible change within 150 ms on a LAN host and 300 ms on a cloud host in the same region, at 30 frames per second for the reference session.
+
 ## 8.5 Analysis families
 
 | Family | Typical batch run | Distillation (mostly an IFC filter) | Suggested engines (§4.15) |
@@ -90,6 +108,7 @@ Live calculations that update while the user models stay in Reviera's process (A
 | 4 | LAN compute hosts with pairing, reattachment and *Best available* | DM-RPC-005 |
 | 5 | Cloud clusters: scale to zero, estimates, budgets, end-to-end encryption; the hosted-services catalogue | DM-RPC-006 |
 | 6 | Job sets and studies; further engine runners and job kinds (rendering, export, tessellation) | DM-RPC-007; ANA-PLUG-001 families |
+| 7 | Real-time sessions: the session stream, latest-wins frames, the real-time transport, the scenario panel, the simulation layer in RSP and the Godot/VR layer | DM-RPC-010; ADV-RSP-001; ADV-XR-001 |
 
 Structural analysis needs the analytical model first (STR-AM-001 … 004, STR-LOAD-001, STR-LC-001, STR-BC-001), which follows the structural physical elements in the structure build order.
 
@@ -106,6 +125,7 @@ Structural analysis needs the analytical model first (STR-AM-001 … 004, STR-LO
 | DM-RPC-007 | Job sets and studies | §2.17.7 |
 | DM-RPC-008 | Compute Jobs panel | §2.17.8 |
 | DM-RPC-009 | Job registry and reconnection | §2.17.9 |
+| DM-RPC-010 | Real-time simulation sessions | §2.17.10 |
 | ANA-PLUG-001 … 003 | Provider interfaces, in-process and out-of-process providers, built-in providers | §4.0.2 |
 | ANA-PLUG-004 | Analysis transports | §4.0.2a |
 | ANA-PLUG-005 | Provider lifecycle | §4.0.2a |

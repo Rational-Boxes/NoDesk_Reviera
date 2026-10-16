@@ -4294,7 +4294,7 @@ key_id = "minisign:<publisher public key>"     # signature file: reviera-addin.t
 
 ## 2.17 Remote computation contract
 
-Reviera shall have a foundational subsystem, built on one general contract, that abstracts calculation workloads from where and how they run: it runs calculation runs against **model distillations** in another process, on this machine, on a more powerful machine on the LAN, or on cloud compute. Analysis is its first user (chapter 4 §4.0.2a), but the contract is not tied to analysis. Rendering, tessellation of large models, batch export, point clouds, project-wide booleans and clash runs, design-space exploration (§2.15.3), and use cases not yet known are all **job kinds** on the same contract. Each job sends only an extract of the model that the calculation needs, never the model, so a job is small enough to send across a network.
+Reviera shall have a foundational subsystem, built on one general contract, that abstracts calculation workloads from where and how they run: it runs calculation runs, as batch jobs or as real-time sessions (DM-RPC-010), against **model distillations** in another process, on this machine, on a more powerful machine on the LAN, or on cloud compute. Analysis is its first user (chapter 4 §4.0.2a), but the contract is not tied to analysis. Rendering, tessellation of large models, batch export, point clouds, project-wide booleans and clash runs, design-space exploration (§2.15.3), and use cases not yet known are all **job kinds** on the same contract. Each job sends only an extract of the model that the calculation needs, never the model, so a job is small enough to send across a network.
 
 **Terms.**
 
@@ -4307,6 +4307,7 @@ Reviera shall have a foundational subsystem, built on one general contract, that
 | **Host** | Where runners run: this machine, a paired machine on the LAN (DM-RPC-005), or a cloud cluster (DM-RPC-006). |
 | **Result applier** | The function in Reviera's process that takes a job's output back into the model: parameters, result packages, files, view overlays. |
 | **Job set** | Many variants of one job submitted together (DM-RPC-007). |
+| **Session** | A long-lived, stateful simulation that accepts scenario inputs and streams state frames in real time until closed (DM-RPC-010). |
 
 ### 2.17.1 Contract and protocol
 **ID:** DM-RPC-001 · **Priority:** P2 · **Ref:** owner requirement (2026-10-15); Reviera-originated design
@@ -4501,7 +4502,7 @@ Reviera shall have a foundational subsystem, built on one general contract, that
 **Purpose.** One place to see and manage every job of every kind, its runner and its host.
 
 **Behaviour & rules.**
-- *Manage › Compute Jobs* lists jobs (kind, scope, state, progress, host, started, duration, estimate and cost where known) with Cancel, Retry, Reattach, Forget and Open Results, and marks jobs that are *reconnecting* or whose results are nearing expiry; a *Hosts* tab lists hosts (local, paired, cloud) with their resources, queues and the job kinds routed to each, and offers Pair Host…, Add Cloud Host… and Forget; a *Job kinds* tab lists registered kinds with their location, detail routing, idle timeout and limits.
+- *Manage › Compute Jobs* lists jobs and sessions (kind, scope, state, progress, host, started, duration, estimate and cost where known, and for sessions the frame rate, latency and attached viewers) with Cancel, Retry, Reattach, Forget and Open Results, and marks jobs that are *reconnecting* or whose results are nearing expiry; a *Hosts* tab lists hosts (local, paired, cloud) with their resources, queues and the job kinds routed to each, and offers Pair Host…, Add Cloud Host… and Forget; a *Job kinds* tab lists registered kinds with their location, detail routing, idle timeout and limits.
 - The status bar shows a compute indicator only while a runner is running or a remote job is in progress, so the user can see that nothing is resident.
 - Every action is a command, equally available to Lua and MCP.
 
@@ -4536,6 +4537,47 @@ Reviera shall have a foundational subsystem, built on one general contract, that
 - [ ] Restarting a LAN host during a checkpointing job resumes it from its last checkpoint; a non-checkpointing job is reported as `host_restarted` and offered for resubmission.
 - [ ] A job submitted from one workstation is listed, followed and collected from another signed in as the same user.
 - [ ] Saving and reopening the model keeps its outstanding jobs, and reopening reconnects to them.
+
+### 2.17.10 Real-time simulation sessions
+**ID:** DM-RPC-010 · **Priority:** P2 · **Ref:** owner requirement (2026-10-15); Reviera-originated design
+
+**Purpose.** Run a computation-heavy simulation on powerful compute (a cloud cluster or a LAN host) while Reviera, a game engine or a VR headset shows it live: the user changes scenario data (wind speed and direction, sun position, occupancy, a storm's intensity, a load's position, a building's massing) and sees the simulation respond immediately. A batch job runs to completion and returns a result; a **session** stays open, keeps its state on the server, accepts inputs and streams state frames until it is closed.
+
+**Behaviour & rules.**
+- **Opening.** A job kind declares whether it supports sessions, and with what inputs (typed, ranged scenario parameters), outputs (fields, particles, streamlines, scalar probes, element results) and update rate. `OpenSession` starts one from a distillation (DM-RPC-003), like a job, and returns a session ID; the session is recorded in the job registry (DM-RPC-009). While a session is open its workers stay reserved: a cloud host does not scale them to zero, and the panel shows the running cost.
+- **Inputs.** The controlling client sends **scenario inputs** (parameter changes, typed and validated against the kind's declaration), **model edits** (distillation patches: when the user edits the model during a session, Reviera re-distils only what changed and sends it; a kind that cannot take patches restarts from the new distillation, keeping its scenario state), **controls** (pause, resume, step, reset, run faster or slower than real time, save a checkpoint) and **view hints** (the region and level of detail being looked at, so the server can spend effort there). Each input has a sequence number; the server acknowledges the frame in which it first took effect, so the client can show input-to-response latency.
+- **Frames.** The server streams **state frames**: a full **keyframe** on attach and at intervals, then **delta frames** against the last keyframe. Fields are sent progressively (a coarse version first, refined while the scenario is unchanged) and quantised to the precision the display needs, with negotiated compression (DM-RPC-001). Frames carry simulation time and a sequence number; the client interpolates between frames for smooth display.
+- **Latest wins.** When the network or the client cannot keep up, intermediate frames are dropped, never queued: the client declares its maximum frame rate and bandwidth, the server adapts resolution and rate to them, and a newer frame always replaces an older one. Inputs, by contrast, are delivered reliably and in order.
+- **Real-time transport.** Control and inputs travel on the gRPC bidirectional stream `SessionStream`. Frames may use a faster negotiated transport where both sides support it: unreliable, unordered QUIC datagrams or WebTransport over HTTP/3, which avoid head-of-line blocking, falling back to the gRPC stream. The transport is a negotiated technique like compression and encryption (identifiers such as `rt-grpc-stream-v1`, `rt-quic-datagram-v1`), and frames are end-to-end encrypted in the same way. For clients that cannot render the fields themselves, a kind may offer **server-side rendering**: GPU workers render the view and stream video over a negotiated codec and transport (for example AV1 or H.265 over WebRTC), with the camera pose sent as an input.
+- **Visualisation in Reviera.** Frames are shown in the viewport as live analysis results through Analysis Display Styles (ANA-ADS-001): coloured surfaces, section-plane fields, vectors, streamlines and particles, with a legend, and a scenario panel with the kind's inputs as sliders and fields. Display never blocks editing.
+- **Game engines and VR.** Session frames enter the Render Scene as a **simulation layer** and travel to engines through the Reviera Scene Protocol's field messages (ADV-RSP-001), so the Godot translation layer (ADV-XR-001) shows them on the desktop or in VR, where scenario inputs are on the wrist menu and the user can stand inside the simulated wind or daylight at 1:1 scale. For the lowest latency, an engine bridge may also attach to the session directly as an observer, using the MIT client library (TECH_STACK §4.0), while Reviera remains the controller.
+- **Several viewers.** One client controls a session; others attach as **observers** and receive the same frames. Control can be handed over. Observers may be other Reviera instances, engine bridges or headsets, on any machine allowed to see the session (DM-RPC-009 access rules).
+- **Disconnects and idling.** A session survives a client disconnecting: it pauses when no controller has been attached for 2 minutes (settable), and after 10 minutes without any client it saves a checkpoint, releases its workers and becomes *suspended*; reattaching resumes it from the checkpoint and sends a keyframe. A suspended session costs only its storage.
+- **Recording and committing.** A session can be recorded (its inputs and keyframes) for replay, and closed with *Commit*: the server writes a result package of the current state, or of a chosen recorded moment, with provenance that includes the input log, and the result applier brings it into the model like a batch result. Closing without committing discards the state.
+- **Examples.** External wind around a massing study, adjusted by direction and speed; interior airflow and comfort as vents are moved; daylight and shadow as the sun is scrubbed through the day and year; a stormwater event played at chosen intensities; crowd movement and evacuation; a structural model under a load the user drags across a floor; replay of a seismic time history with the structure's response.
+
+| RPC | Kind | Purpose |
+|-----|------|---------|
+| `OpenSession` | unary | Starts a session: kind, distillation blobs, initial scenario, frame preferences (rate, bandwidth, detail, region). Returns the session ID and the negotiated real-time transport. |
+| `SessionStream` | bidirectional streaming | Client to server: scenario inputs, distillation patches, controls, view hints, camera poses for server-side rendering. Server to client: acknowledgements, keyframes and delta frames (when frames are not on the datagram transport), status, cost and warnings. |
+| `AttachSession` | unary | Joins an open or suspended session as controller or observer; returns where the stream resumes and triggers a keyframe. |
+| `CloseSession` | unary | Ends a session, optionally committing a result package of the current or a recorded state. |
+
+**Commands.**
+- `compute.open_session(kind, scope, scenario?, location?, frame_rate?, detail?) -> session_id`
+- `compute.session_input(session_id, inputs) -> {seq}`
+- `compute.session_control(session_id, action: "pause"|"resume"|"step"|"reset"|"checkpoint"|"speed", value?) -> ()`
+- `compute.attach_session(session_id, role: "control"|"observe") -> ()`
+- `compute.close_session(session_id, commit?: bool, at?: "now"|recorded_time) -> {package_id?}`
+- `compute.sessions(host_id?) -> sessions[]`
+
+**Acceptance criteria.**
+- [ ] On a LAN host, a scenario input to the reference wind session (coarse) is visible in Reviera's viewport within 150 ms at 30 frames per second; on a cloud host in the same region, within 300 ms.
+- [ ] With the client's bandwidth capped to a quarter of what the session would use, frames arrive at a reduced resolution or rate without stalling, and inputs still take effect in order.
+- [ ] Disconnecting and reattaching receives a keyframe within 1 s and continues; a session left without clients for 10 minutes suspends, releases its workers, and resumes from its checkpoint when reattached.
+- [ ] A Godot bridge in VR shows the same frames as Reviera's viewport, and changing the wind direction from the wrist menu changes the flow in both.
+- [ ] Committing a session writes a result package whose provenance includes the input log, and its results attach to the model like a batch result.
+- [ ] `compute.open_session`, `.session_input` and `.session_control` driven from Lua or MCP give the same session behaviour as the scenario panel.
 
 **Packaging.** Reviera bundles `reviera-compute-host` beside `reviera` for local runners; the host is also packaged on its own and as a container image for LAN and cloud hosts. Built-in runners ship as separate executables. Reviera ships a Rust runner skeleton and a Python one, so a new job kind's runner can be written in any language with a gRPC library.
 
@@ -5017,6 +5059,12 @@ All commands defined in this chapter. Every command in this table is also a Lua 
 | `compute.jobs` | host_id?, kind? | jobs[] | No | DM-RPC-008 |
 | `compute.reattach` | job_id? | jobs[] | No | DM-RPC-009 |
 | `compute.forget_job` | job_id | — | No | DM-RPC-009 |
+| `compute.open_session` | kind, scope, scenario?, location?, frame_rate?, detail? | session_id | No | DM-RPC-010 |
+| `compute.session_input` | session_id, inputs | {seq} | No | DM-RPC-010 |
+| `compute.session_control` | session_id, action, value? | — | No | DM-RPC-010 |
+| `compute.attach_session` | session_id, role | — | No | DM-RPC-010 |
+| `compute.close_session` | session_id, commit?, at? | {package_id?} | Results only | DM-RPC-010 |
+| `compute.sessions` | host_id? | sessions[] | No | DM-RPC-010 |
 
 ---
 
