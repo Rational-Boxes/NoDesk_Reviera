@@ -27,10 +27,17 @@
 #include <TopoDS_Compound.hxx>
 #include <TopoDS_Shell.hxx>
 #include <TopoDS_Solid.hxx>
+#include <gp_Pln.hxx>
 #include <gp_Pnt.hxx>
 
+#include <array>
+#include <cmath>
+#include <map>
+#include <numeric>
 #include <stdexcept>
 #include <string>
+#include <unordered_map>
+#include <vector>
 
 namespace reviera_geom {
 
@@ -40,26 +47,199 @@ gp_Pnt point(const Meshes &m, uint32_t i) {
   return gp_Pnt(m.verts[3 * i], m.verts[3 * i + 1], m.verts[3 * i + 2]);
 }
 
+// Welded vertices: positions equal to within 1e-7 m share an index.
+struct Weld {
+  std::map<std::array<long long, 3>, uint32_t> ids;
+  std::vector<gp_Pnt> points;
+  uint32_t id(const gp_Pnt &p) {
+    std::array<long long, 3> k = {std::llround(p.X() * 1e7), std::llround(p.Y() * 1e7),
+                                  std::llround(p.Z() * 1e7)};
+    auto [it, fresh] = ids.emplace(k, static_cast<uint32_t>(points.size()));
+    if (fresh) {
+      points.push_back(p);
+    }
+    return it->second;
+  }
+};
+
+uint64_t edge_key(uint32_t a, uint32_t b) { return (uint64_t(a) << 32) | b; }
+
+uint32_t find(std::vector<uint32_t> &up, uint32_t i) {
+  while (up[i] != i) {
+    up[i] = up[up[i]];
+    i = up[i];
+  }
+  return i;
+}
+
+TopoDS_Wire polygon_wire(const Weld &w, const std::vector<uint32_t> &loop) {
+  BRepBuilderAPI_MakePolygon poly;
+  for (uint32_t v : loop) {
+    poly.Add(w.points[v]);
+  }
+  poly.Close();
+  return poly.IsDone() ? poly.Wire() : TopoDS_Wire();
+}
+
+// The faces bounding triangles [first, last) of `m`: each connected run of coplanar triangles
+// becomes one planar face (its boundary loops, holes included), so a body cut many times does
+// not keep its pieces as separate faces, and OCCT never sees the slivers between them. The
+// merge is linear in the triangles, unlike ShapeUpgrade_UnifySameDomain on the result, which
+// can loop without bound. A run whose boundary does not form simple loops (it touches itself
+// at a vertex) stays as its triangles.
+std::vector<TopoDS_Face> merged_faces(const Meshes &m, size_t first, size_t last, double tol) {
+  Weld w;
+  std::vector<std::array<uint32_t, 3>> tris;
+  std::vector<gp_Dir> normal;
+  std::vector<double> offset;
+  for (size_t t = first; t < last; ++t) {
+    std::array<uint32_t, 3> v = {w.id(point(m, m.faces[3 * t])), w.id(point(m, m.faces[3 * t + 1])),
+                                 w.id(point(m, m.faces[3 * t + 2]))};
+    if (v[0] == v[1] || v[1] == v[2] || v[2] == v[0]) {
+      continue; // degenerate
+    }
+    const gp_Pnt &p0 = w.points[v[0]];
+    gp_Vec n = gp_Vec(p0, w.points[v[1]]).Crossed(gp_Vec(p0, w.points[v[2]]));
+    if (n.Magnitude() < tol * tol) {
+      continue; // degenerate
+    }
+    gp_Dir d(n);
+    tris.push_back(v);
+    normal.push_back(d);
+    offset.push_back(d.X() * p0.X() + d.Y() * p0.Y() + d.Z() * p0.Z());
+  }
+  // Join neighbours across shared edges when they lie in one plane.
+  std::unordered_map<uint64_t, uint32_t> by_edge;
+  for (uint32_t t = 0; t < tris.size(); ++t) {
+    for (int k = 0; k < 3; ++k) {
+      by_edge.emplace(edge_key(tris[t][k], tris[t][(k + 1) % 3]), t);
+    }
+  }
+  std::vector<uint32_t> up(tris.size());
+  std::iota(up.begin(), up.end(), 0u);
+  for (uint32_t t = 0; t < tris.size(); ++t) {
+    for (int k = 0; k < 3; ++k) {
+      auto it = by_edge.find(edge_key(tris[t][(k + 1) % 3], tris[t][k]));
+      if (it == by_edge.end()) {
+        continue;
+      }
+      uint32_t u = it->second;
+      if (normal[t].Dot(normal[u]) > 1.0 - 1e-9 && std::abs(offset[t] - offset[u]) < tol) {
+        up[find(up, t)] = find(up, u);
+      }
+    }
+  }
+  std::unordered_map<uint32_t, std::vector<uint32_t>> regions;
+  for (uint32_t t = 0; t < tris.size(); ++t) {
+    regions[find(up, t)].push_back(t);
+  }
+  std::vector<TopoDS_Face> faces;
+  auto one_by_one = [&](const std::vector<uint32_t> &ts) {
+    for (uint32_t t : ts) {
+      TopoDS_Wire wire = polygon_wire(w, {tris[t][0], tris[t][1], tris[t][2]});
+      if (wire.IsNull()) {
+        continue;
+      }
+      BRepBuilderAPI_MakeFace face(wire, Standard_True);
+      if (face.IsDone()) {
+        faces.push_back(face.Face());
+      }
+    }
+  };
+  for (auto &[root, ts] : regions) {
+    if (ts.size() == 1) {
+      one_by_one(ts);
+      continue;
+    }
+    // Boundary edges: those whose reverse is not in the run, chained into loops.
+    std::unordered_map<uint64_t, bool> inside;
+    for (uint32_t t : ts) {
+      for (int k = 0; k < 3; ++k) {
+        inside[edge_key(tris[t][k], tris[t][(k + 1) % 3])] = true;
+      }
+    }
+    std::unordered_map<uint32_t, uint32_t> next;
+    bool simple = true;
+    for (uint32_t t : ts) {
+      for (int k = 0; k < 3; ++k) {
+        uint32_t a = tris[t][k], b = tris[t][(k + 1) % 3];
+        if (!inside.count(edge_key(b, a)) && !next.emplace(a, b).second) {
+          simple = false; // the boundary touches itself here
+        }
+      }
+    }
+    std::vector<std::vector<uint32_t>> loops;
+    while (simple && !next.empty()) {
+      uint32_t start = next.begin()->first, v = start;
+      std::vector<uint32_t> loop;
+      while (true) {
+        auto it = next.find(v);
+        if (it == next.end()) {
+          simple = false;
+          break;
+        }
+        loop.push_back(v);
+        v = it->second;
+        next.erase(it);
+        if (v == start) {
+          break;
+        }
+      }
+      if (loop.size() < 3) {
+        simple = false;
+      }
+      loops.push_back(std::move(loop));
+    }
+    // One loop runs anticlockwise about the normal (the outside); the rest are holes.
+    const gp_Dir &n = normal[ts[0]];
+    int outer = -1;
+    for (size_t i = 0; simple && i < loops.size(); ++i) {
+      gp_Vec area(0, 0, 0);
+      for (size_t j = 0; j < loops[i].size(); ++j) {
+        area += gp_Vec(w.points[loops[i][j]].XYZ())
+                    .Crossed(gp_Vec(w.points[loops[i][(j + 1) % loops[i].size()]].XYZ()));
+      }
+      if (area.Dot(gp_Vec(n)) > 0) {
+        simple = simple && outer < 0;
+        outer = static_cast<int>(i);
+      }
+    }
+    if (!simple || outer < 0) {
+      one_by_one(ts);
+      continue;
+    }
+    TopoDS_Wire outside = polygon_wire(w, loops[outer]);
+    if (outside.IsNull()) {
+      one_by_one(ts);
+      continue;
+    }
+    BRepBuilderAPI_MakeFace face(gp_Pln(w.points[loops[outer][0]], n), outside, Standard_True);
+    for (size_t i = 0; face.IsDone() && i < loops.size(); ++i) {
+      if (static_cast<int>(i) != outer) {
+        TopoDS_Wire hole = polygon_wire(w, loops[i]);
+        if (hole.IsNull()) {
+          simple = false;
+          break;
+        }
+        face.Add(hole);
+      }
+    }
+    if (simple && face.IsDone()) {
+      faces.push_back(face.Face());
+    } else {
+      one_by_one(ts);
+    }
+  }
+  return faces;
+}
+
 // The solid bounded by triangles [first, last) of `m`, facing out.
 TopoDS_Shape solid(const Meshes &m, size_t first, size_t last, double tol) {
   BRepBuilderAPI_Sewing sew(tol);
   size_t faces = 0;
-  for (size_t t = first; t < last; ++t) {
-    gp_Pnt p0 = point(m, m.faces[3 * t]), p1 = point(m, m.faces[3 * t + 1]),
-           p2 = point(m, m.faces[3 * t + 2]);
-    gp_Vec n = gp_Vec(p0, p1).Crossed(gp_Vec(p0, p2));
-    if (n.Magnitude() < tol * tol) {
-      continue; // degenerate
-    }
-    BRepBuilderAPI_MakePolygon poly(p0, p1, p2, Standard_True);
-    if (!poly.IsDone()) {
-      continue;
-    }
-    BRepBuilderAPI_MakeFace face(poly.Wire(), Standard_True);
-    if (face.IsDone()) {
-      sew.Add(face.Face());
-      ++faces;
-    }
+  for (const TopoDS_Face &f : merged_faces(m, first, last, tol)) {
+    sew.Add(f);
+    ++faces;
   }
   if (faces < 4) {
     throw std::runtime_error("a part has too few faces to be a solid");

@@ -7,9 +7,11 @@
 //! Built so far: **solid booleans on closed meshes** ([`boolean`]). Each closed part becomes an
 //! OCCT solid (its triangles as planar faces sewn into a shell, turned to face out). The
 //! subtraction, intersection or union runs on the two compounds, and the result is triangulated
-//! back into closed parts. Coplanar faces are not merged (`ShapeUpgrade_UnifySameDomain` can
-//! loop without bound), and inputs over [`MAX_TRIANGLES`] are refused, so a boolean's time and
-//! memory stay bounded by its inputs.
+//! back into closed parts. Each input's coplanar neighbours are merged into one face first (not
+//! the result's, with `ShapeUpgrade_UnifySameDomain`, which can loop without bound), so a body
+//! cut again and again keeps few faces. Inputs over [`MAX_TRIANGLES`] are refused, and so is a
+//! result that is not closed or is far larger than its inputs: the target is then left as it
+//! was rather than shown broken.
 
 pub mod csg;
 mod ffi;
@@ -62,25 +64,55 @@ pub fn boolean(op: Op, a: &[Mesh], b: &[Mesh], tolerance: f64) -> Result<Vec<Mes
     };
     let out = ffi::bridge::mesh_boolean(code, &pack(a), &pack(b), tolerance)
         .map_err(|e| e.what().to_owned())?;
-    // Split back into parts, each with its own vertices.
+    // Split back into parts, each with its own vertices: welded (OCCT gives each face its own
+    // nodes) and without degenerate triangles.
     let mut parts = Vec::new();
     let mut first = 0usize;
+    let mut total = 0usize;
     for n in out.parts {
         let tris = &out.faces[3 * first..3 * (first + n as usize)];
+        first += n as usize;
         let mut map = std::collections::HashMap::new();
         let mut points: Vec<[f64; 3]> = Vec::new();
-        let indices = tris
-            .iter()
-            .map(|&i| {
-                *map.entry(i).or_insert_with(|| {
-                    let k = 3 * i as usize;
-                    points.push([out.verts[k], out.verts[k + 1], out.verts[k + 2]]);
+        let mut id = |i: u32| {
+            let k = 3 * i as usize;
+            let p = [out.verts[k], out.verts[k + 1], out.verts[k + 2]];
+            *map.entry(p.map(|c| (c * 1e7).round() as i64))
+                .or_insert_with(|| {
+                    points.push(p);
                     (points.len() - 1) as u32
                 })
-            })
-            .collect();
+        };
+        let mut indices = Vec::with_capacity(tris.len());
+        for t in tris.chunks(3) {
+            let v = [id(t[0]), id(t[1]), id(t[2])];
+            if v[0] != v[1] && v[1] != v[2] && v[2] != v[0] {
+                indices.extend(v);
+            }
+        }
+        if indices.is_empty() {
+            continue;
+        }
+        // Closed: every edge is met the other way by a neighbour.
+        let mut edges = std::collections::HashMap::<(u32, u32), i32>::new();
+        for t in indices.chunks(3) {
+            for k in 0..3 {
+                let (a, b) = (t[k], t[(k + 1) % 3]);
+                *edges.entry((a.min(b), a.max(b))).or_default() += if a < b { 1 } else { -1 };
+            }
+        }
+        if edges.values().any(|&c| c != 0) {
+            return Err("the boolean's result is not closed".into());
+        }
+        total += indices.len() / 3;
         parts.push((points, indices));
-        first += n as usize;
+    }
+    // A result far larger than its inputs has gone wrong (slivers split again and again).
+    let limit = MAX_TRIANGLES.min(4 * triangles + 2_000);
+    if total > limit {
+        return Err(format!(
+            "the boolean's result is too complex: {total} triangles from {triangles}"
+        ));
     }
     Ok(parts)
 }
