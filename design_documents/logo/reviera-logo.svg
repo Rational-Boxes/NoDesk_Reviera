@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
 <!-- Copyright (C) 2026 Reviera contributors -->
-<!-- NoDesk Reviera logo: an abstract beach at sunset, a palm behind, and an "R" standing on the
+<!-- BIM Reviera logo: an abstract beach at sunset, a palm behind, and an "R" standing on the
      sand in perspective, its depth extruded toward the viewer's right. -->
 <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
      width="512" height="512" viewBox="0 0 512 512" role="img" aria-labelledby="title">
-  <title id="title">NoDesk Reviera</title>
+  <title id="title">BIM Reviera</title>
   <defs>
     <clipPath id="tile">
       <rect x="0" y="0" width="512" height="512" rx="112" ry="112"/>

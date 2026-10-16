@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright (C) 2026 Reviera contributors
 #
-# Builds "NoDesk Reviera.app" and a .dmg on macOS (run it on a Mac; it cannot cross-build).
+# Builds "BIM Reviera.app" and a .dmg on macOS (run it on a Mac; it cannot cross-build).
 #
 #   packaging/macos/build-dmg.sh
 #   REVIERA_VERSION=0.1.0-pre.1 packaging/macos/build-dmg.sh
@@ -11,7 +11,7 @@
 # Prerequisites: Xcode command-line tools (clang, libclang for bindgen, codesign, hdiutil,
 # iconutil, sips), Homebrew, and rustup (rust-toolchain.toml selects Rust 1.99).
 #
-# Output: dist/NoDesk-Reviera-<version>-macos-<arch>.dmg holding "NoDesk Reviera.app" and an
+# Output: dist/BIM-Reviera-<version>-macos-<arch>.dmg holding "BIM Reviera.app" and an
 # Applications link. The app carries its non-system dylibs in Contents/Frameworks, so it runs
 # without Homebrew. It is ad-hoc signed unless CODESIGN_IDENTITY is set.
 #
@@ -31,12 +31,12 @@ VERSION="${REVIERA_VERSION:-0.1.0-pre.1}"
 # CFBundleVersion must be numbers and dots.
 BUNDLE_VERSION="${VERSION%%-*}"
 BUNDLE_ID="io.github.rational_boxes.Reviera"
-APP_NAME="NoDesk Reviera"
+APP_NAME="BIM Reviera"
 ARCH="$(uname -m)"
 WORK="$HERE/build"
 APP="$WORK/$APP_NAME.app"
 DIST="$ROOT/dist"
-DMG="$DIST/NoDesk-Reviera-$VERSION-macos-$ARCH.dmg"
+DMG="$DIST/BIM-Reviera-$VERSION-macos-$ARCH.dmg"
 JOBS="$(sysctl -n hw.ncpu)"
 
 [ "$(uname -s)" = Darwin ] || { echo "build-dmg.sh runs on macOS only" >&2; exit 1; }
@@ -101,12 +101,12 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" "$APP/Contents/Framewor
 cp "$BIN" "$APP/Contents/MacOS/reviera"
 
 # `reviera` without arguments is the command-line tool; the bundle's executable opens the window.
-cat > "$APP/Contents/MacOS/NoDesk Reviera" <<'EOF'
+cat > "$APP/Contents/MacOS/BIM Reviera" <<'EOF'
 #!/bin/sh
 # Launches the Reviera window; the files Finder passes are opened as models.
 exec "$(dirname "$0")/reviera" gui "$@"
 EOF
-chmod 755 "$APP/Contents/MacOS/NoDesk Reviera"
+chmod 755 "$APP/Contents/MacOS/BIM Reviera"
 
 # Samples where crates/reviera-ui/src/help.rs samples_dir() finds them (Contents/Resources).
 mkdir -p "$APP/Contents/Resources/samples"
@@ -136,7 +136,7 @@ cat > "$APP/Contents/Info.plist" <<EOF
   <key>CFBundleName</key><string>$APP_NAME</string>
   <key>CFBundleDisplayName</key><string>$APP_NAME</string>
   <key>CFBundleIdentifier</key><string>$BUNDLE_ID</string>
-  <key>CFBundleExecutable</key><string>NoDesk Reviera</string>
+  <key>CFBundleExecutable</key><string>BIM Reviera</string>
   <key>CFBundleIconFile</key><string>Reviera</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>$BUNDLE_VERSION</string>
@@ -210,7 +210,7 @@ PLIST
     # Libraries first, then the executables, then the bundle.
     find "$APP/Contents/Frameworks" -name '*.dylib' -exec \
         codesign --force --timestamp --options runtime -s "$CODESIGN_IDENTITY" {} +
-    for exe in "$APP/Contents/MacOS/reviera" "$APP/Contents/MacOS/NoDesk Reviera"; do
+    for exe in "$APP/Contents/MacOS/reviera" "$APP/Contents/MacOS/BIM Reviera"; do
         codesign --force --timestamp --options runtime --entitlements "$ENTITLEMENTS" \
             -s "$CODESIGN_IDENTITY" "$exe"
     done

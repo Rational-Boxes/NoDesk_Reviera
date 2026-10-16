@@ -601,13 +601,16 @@ impl Gui {
     /// Help › About: the version, licence and main components.
     pub(crate) fn about(&mut self) {
         let text = format!(
-            "NoDesk Reviera {}\n\nOpen-source building information modelling on IFC.\n\
+            "BIM Reviera {}\n\nOpen-source building information modelling on IFC.\n\
              Licensed under the GNU GPL v3 or later.\n\n\
+             An independent, original application: not a copy or clone of any existing \
+             product. Its workflows follow conventions familiar to the industry; its features \
+             and enhancements are its own.\n\n\
              IFC through IfcOpenShell; geometry through Open CASCADE; the window through \
              wxWidgets (wxDragon); drawing through wgpu; scripting through LuaJIT.",
             env!("CARGO_PKG_VERSION")
         );
-        let dialog = MessageDialog::builder(&self.frame, &text, "About NoDesk Reviera")
+        let dialog = MessageDialog::builder(&self.frame, &text, "About BIM Reviera")
             .with_style(MessageDialogStyle::OK | MessageDialogStyle::IconInformation)
             .build();
         dialog.show_modal();

@@ -91,7 +91,7 @@ static const char* exception_name(DWORD code) {
 }
 
 static void tell(void) {
-    MessageBoxW(NULL, g_message, L"NoDesk Reviera", MB_OK | MB_ICONERROR | MB_TASKMODAL);
+    MessageBoxW(NULL, g_message, L"BIM Reviera", MB_OK | MB_ICONERROR | MB_TASKMODAL);
 }
 
 static LONG WINAPI on_exception(EXCEPTION_POINTERS* e) {

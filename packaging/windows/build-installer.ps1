@@ -2,7 +2,7 @@
 # Copyright (C) 2026 Reviera contributors
 <#
 .SYNOPSIS
-    Builds NoDesk Reviera for Windows (x64): a portable ZIP and an Inno Setup installer.
+    Builds BIM Reviera for Windows (x64): a portable ZIP and an Inno Setup installer.
 
 .DESCRIPTION
     Run it on Windows 10/11 from the repository (any PowerShell; the Visual Studio build
@@ -258,10 +258,10 @@ Copy-Item (Join-Path $Root 'packaging\icons\reviera.ico') $Stage
 
 # ------------------------------------------------------------------ 5. Portable ZIP
 New-Item -ItemType Directory -Force $Dist | Out-Null
-$zip = Join-Path $Dist "NoDesk-Reviera-$Version-windows-x64-portable.zip"
+$zip = Join-Path $Dist "BIM-Reviera-$Version-windows-x64-portable.zip"
 Step "Portable ZIP $zip"
 if (Test-Path $zip) { Remove-Item $zip }
-$zipRoot = Join-Path $Work "NoDesk-Reviera-$Version"
+$zipRoot = Join-Path $Work "BIM-Reviera-$Version"
 if (Test-Path $zipRoot) { Remove-Item -Recurse -Force $zipRoot }
 Copy-Item $Stage $zipRoot -Recurse
 Compress-Archive -Path $zipRoot -DestinationPath $zip
@@ -292,4 +292,4 @@ if (-not $NoInstaller) {
 }
 
 Step 'Done'
-Get-ChildItem $Dist -Filter "NoDesk-Reviera-$Version-windows-*" | Format-Table Name, Length
+Get-ChildItem $Dist -Filter "BIM-Reviera-$Version-windows-*" | Format-Table Name, Length

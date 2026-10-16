@@ -1,4 +1,4 @@
-# Packaging NoDesk Reviera
+# Packaging BIM Reviera
 
 Builders for the three desktop packages of TECH_STACK §5.4. Each one is a script that runs on its
 own platform; there is no hosted CI. The version in file names defaults to the first
@@ -7,9 +7,9 @@ another one (`REVIERA_VERSION=…` or `-Version …`).
 
 | Package | Builder | Output in `dist/` | Status |
 |---|---|---|---|
-| Linux Flatpak | `packaging/flatpak/build.sh` | `NoDesk-Reviera-<ver>-x86_64.flatpak` | Built and tested on Fedora 43 |
-| macOS disk image | `packaging/macos/build-dmg.sh` | `NoDesk-Reviera-<ver>-macos-<arch>.dmg` | Written, **not yet run on a Mac** |
-| Windows installer and ZIP | `packaging/windows/cross/build-cross.sh` (on Linux), `packaging/windows/build-installer.ps1` (on Windows) | `NoDesk-Reviera-<ver>-windows-x64-setup.exe`, `…-portable.zip` | Cross-built on Fedora 43; tested on Windows 11 and under Wine. The MSVC script is **not yet run** |
+| Linux Flatpak | `packaging/flatpak/build.sh` | `BIM-Reviera-<ver>-x86_64.flatpak` | Built and tested on Fedora 43 |
+| macOS disk image | `packaging/macos/build-dmg.sh` | `BIM-Reviera-<ver>-macos-<arch>.dmg` | Written, **not yet run on a Mac** |
+| Windows installer and ZIP | `packaging/windows/cross/build-cross.sh` (on Linux), `packaging/windows/build-installer.ps1` (on Windows) | `BIM-Reviera-<ver>-windows-x64-setup.exe`, `…-portable.zip` | Cross-built on Fedora 43; tested on Windows 11 and under Wine. The MSVC script is **not yet run** |
 
 Every package carries the sample models of the Help page (`test-data/samples`), the GPL
 (`COPYING`) and [`THIRD-PARTY-NOTICES.txt`](THIRD-PARTY-NOTICES.txt). The application icon is
@@ -26,7 +26,7 @@ menu, the macOS bundle) runs `reviera gui`.
 ## Linux: Flatpak
 
 ```sh
-packaging/flatpak/build.sh              # build, then dist/NoDesk-Reviera-0.1.0-pre.1-x86_64.flatpak
+packaging/flatpak/build.sh              # build, then dist/BIM-Reviera-0.1.0-pre.1-x86_64.flatpak
 packaging/flatpak/build.sh --install    # ... and install the bundle for this user
 flatpak run io.github.rational_boxes.Reviera gui            # the window
 flatpak run io.github.rational_boxes.Reviera shell m.ifc    # the command shell
@@ -99,9 +99,9 @@ Prerequisites: Xcode command-line tools, Homebrew and rustup. The script install
 luajit boost eigen nlohmann-json cmake ninja pkgconf dylibbundler` with Homebrew, builds
 IfcOpenShell with `tools/build-ifcopenshell.sh` (portable once it is given OCCT's Homebrew
 paths, the job count and `CMAKE_PREFIX_PATH`), runs `cargo build --release`, and assembles
-`packaging/macos/build/NoDesk Reviera.app`:
+`packaging/macos/build/BIM Reviera.app`:
 
-- `Contents/MacOS/reviera` and a small launcher, `NoDesk Reviera`, that runs `reviera gui`;
+- `Contents/MacOS/reviera` and a small launcher, `BIM Reviera`, that runs `reviera gui`;
 - `Contents/Resources/samples` (found by `samples_dir()` as `<exe>/../Resources/samples`),
   `Reviera.icns` (made with `sips` and `iconutil` from `icons/reviera-1024.png`), `COPYING` and
   the notices;
@@ -159,7 +159,7 @@ Inno Setup under Wine in its own prefix. What it needed:
   OpenGL.
 
 To test under Wine: `WINEPREFIX=$PWD/packaging/windows/cross/build/wine wine
-dist/NoDesk-Reviera-0.1.0-pre.1-windows-x64-setup.exe`. Wine maps the prefix's Documents folder
+dist/BIM-Reviera-0.1.0-pre.1-windows-x64-setup.exe`. Wine maps the prefix's Documents folder
 to your real home folder, so keep test files elsewhere (`C:\reviera-test`).
 
 ### Built on Windows (MSVC)

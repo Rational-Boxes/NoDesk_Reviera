@@ -4,7 +4,7 @@
   <id>io.github.rational_boxes.Reviera</id>
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>GPL-3.0-or-later</project_license>
-  <name>NoDesk Reviera</name>
+  <name>BIM Reviera</name>
   <summary>Model buildings on native IFC</summary>
   <developer id="io.github.rational_boxes">
     <name>Reviera contributors</name>

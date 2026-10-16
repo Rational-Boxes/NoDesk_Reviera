@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright (C) 2026 Reviera contributors
 #
-# Cross-builds NoDesk Reviera for Windows x86-64 on Fedora, with the MinGW-w64 toolchain (GNU
+# Cross-builds BIM Reviera for Windows x86-64 on Fedora, with the MinGW-w64 toolchain (GNU
 # target, x86_64-pc-windows-gnu), and stages a portable folder and a ZIP:
 #
 #   packaging/windows/cross/build-cross.sh            # dependencies (cached), app, stage, zip
@@ -142,7 +142,7 @@ export CARGO_ENCODED_RUSTFLAGS="-L"$'\x1f'"native=$BUILD/link-shims"
 (cd "$ROOT" && cargo build --release --target $TARGET -p reviera --bins)
 
 # ---- Stage: the program, the DLLs it needs, samples and notices ----
-STAGE="$DIST/windows/NoDesk-Reviera"
+STAGE="$DIST/windows/BIM-Reviera"
 rm -rf "$STAGE"
 mkdir -p "$STAGE/samples"
 install -m755 "$ROOT/target/$TARGET/release/reviera.exe" "$STAGE/"
@@ -184,9 +184,9 @@ install -m644 "$ROOT/LICENSE" "$STAGE/COPYING.txt"
 install -m644 "$ROOT/packaging/THIRD-PARTY-NOTICES.txt" "$STAGE/"
 install -m644 "$ROOT/packaging/icons/reviera.ico" "$STAGE/"
 
-ZIP="$DIST/NoDesk-Reviera-$VERSION-windows-x64-portable.zip"
+ZIP="$DIST/BIM-Reviera-$VERSION-windows-x64-portable.zip"
 rm -f "$ZIP"
-(cd "$DIST/windows" && python3 -m zipfile -c "$ZIP" NoDesk-Reviera)
+(cd "$DIST/windows" && python3 -m zipfile -c "$ZIP" BIM-Reviera)
 echo "==> $ZIP ($(du -h "$ZIP" | cut -f1))"
 
 # ---- The installer: Inno Setup under Wine, in a Wine prefix of the build's own ----

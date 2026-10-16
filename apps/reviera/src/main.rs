@@ -33,7 +33,7 @@ fn main() -> ExitCode {
     }
     let mut app = App::new(AppConfig::default());
     println!(
-        "NoDesk Reviera {} ({} commands)",
+        "BIM Reviera {} ({} commands)",
         env!("CARGO_PKG_VERSION"),
         app.registry().len()
     );
@@ -108,7 +108,7 @@ fn mcp_stdio(args: &[String]) -> ExitCode {
     }
     // stdout carries the protocol; everything else goes to stderr.
     eprintln!(
-        "NoDesk Reviera {} MCP server (stdio, {permission:?})",
+        "BIM Reviera {} MCP server (stdio, {permission:?})",
         env!("CARGO_PKG_VERSION")
     );
     let app = reviera_mcp::AppHandle::spawn(move || {

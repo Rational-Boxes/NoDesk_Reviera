@@ -338,9 +338,12 @@ fn forget_keys(dir: &Path) {
             forget_keys(&path);
         } else if path.to_string_lossy().ends_with(".keyid")
             && let Ok(id) = std::fs::read_to_string(&path)
-            && let Ok(entry) = keyring::Entry::new("org.nodeskreviera.live", id.trim())
         {
-            let _ = entry.delete_credential();
+            for service in ["org.bimreviera.live", "org.nodeskreviera.live"] {
+                if let Ok(entry) = keyring::Entry::new(service, id.trim()) {
+                    let _ = entry.delete_credential();
+                }
+            }
         }
     }
 }
@@ -396,4 +399,75 @@ fn keyring_encrypted_store_recovers_and_a_lost_key_is_reported() {
     assert!(reviera_livestore::scan(&o2).unwrap().is_empty());
     // The saved IFC file is unaffected.
     LocalProject::open(&second.path().join("project.ifc")).unwrap();
+}
+
+/// The key ids named by key files under `dir`.
+fn key_ids(dir: &Path) -> Vec<String> {
+    let mut out = Vec::new();
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return out;
+    };
+    for e in entries.flatten() {
+        let path = e.path();
+        if path.is_dir() {
+            out.extend(key_ids(&path));
+        } else if path.to_string_lossy().ends_with(".keyid")
+            && let Ok(id) = std::fs::read_to_string(&path)
+        {
+            out.push(id.trim().to_owned());
+        }
+    }
+    out
+}
+
+#[test]
+fn a_key_under_the_old_keyring_name_is_found_and_moved() {
+    if keyring::Entry::store_status().is_err() {
+        eprintln!("skipped: no OS credential store");
+        return;
+    }
+    let mut opts = options(Path::new("."));
+    opts.encryption = Encryption::OsKeyring;
+    let dir = tempfile::tempdir().unwrap();
+    crash_with("wall", dir.path(), true);
+    // As a store made before the rename: its key under the old service name only.
+    let ids = key_ids(dir.path());
+    assert!(!ids.is_empty());
+    for id in &ids {
+        let new = keyring::Entry::new("org.bimreviera.live", id).unwrap();
+        let hex = new.get_password().unwrap();
+        keyring::Entry::new("org.nodeskreviera.live", id)
+            .unwrap()
+            .set_password(&hex)
+            .unwrap();
+        new.delete_credential().unwrap();
+    }
+    let o = Options {
+        dir: dir.path().join("live"),
+        ..opts
+    };
+    let found = reviera_livestore::scan(&o).unwrap();
+    assert!(found[0].readable);
+    let mut r = reviera_livestore::restore(&found[0].key, None, &o).unwrap();
+    assert_eq!(
+        names(&r.doc),
+        ["Building", "Level 1", "Project", "Site", "Wall 1"]
+    );
+    r.store.close(&mut r.doc).unwrap();
+    // Moved: now under the new name, gone from the old one.
+    for id in &ids {
+        assert!(
+            keyring::Entry::new("org.bimreviera.live", id)
+                .unwrap()
+                .get_password()
+                .is_ok()
+        );
+        assert!(
+            keyring::Entry::new("org.nodeskreviera.live", id)
+                .unwrap()
+                .get_password()
+                .is_err()
+        );
+    }
+    forget_keys(dir.path());
 }

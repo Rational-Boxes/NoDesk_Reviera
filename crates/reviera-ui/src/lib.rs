@@ -651,7 +651,7 @@ impl Gui {
                      were taken from the IFC data and are saved with the next save:\n\n{}",
                     reconciled.join("\n")
                 ),
-                "NoDesk Reviera",
+                "BIM Reviera",
             )
             .with_style(MessageDialogStyle::OK | MessageDialogStyle::IconInformation)
             .build();
@@ -905,7 +905,7 @@ impl Gui {
         let mut save = "no";
         if info.as_ref().is_some_and(|d| d.dirty) {
             let message = format!("Save changes to {} before closing?", self.doc_title(doc));
-            let dialog = MessageDialog::builder(&frame, &message, "NoDesk Reviera")
+            let dialog = MessageDialog::builder(&frame, &message, "BIM Reviera")
                 .with_style(
                     MessageDialogStyle::YesNo
                         | MessageDialogStyle::Cancel
@@ -983,7 +983,7 @@ impl Gui {
         match selected.and_then(|i| self.view_at(i)) {
             Some(v) => self.activate_view(v),
             None if self.views.is_empty() => {
-                frame.set_title("NoDesk Reviera");
+                frame.set_title("BIM Reviera");
                 self.properties_stale = true;
             }
             None => {}
@@ -1096,7 +1096,7 @@ impl Gui {
         let title = info.as_ref().map_or("Untitled".into(), |d| d.title.clone());
         let read_only = info.is_some_and(|d| d.read_only);
         frame.set_title(&format!(
-            "{title}{} - NoDesk Reviera",
+            "{title}{} - BIM Reviera",
             if read_only { " (read-only)" } else { "" }
         ));
     }
@@ -2407,14 +2407,14 @@ fn with(gui: &Rc<RefCell<Gui>>, f: impl FnOnce(&mut Gui)) {
 }
 
 fn ask(frame: &Frame, message: &str) -> bool {
-    let dialog = MessageDialog::builder(frame, message, "NoDesk Reviera")
+    let dialog = MessageDialog::builder(frame, message, "BIM Reviera")
         .with_style(MessageDialogStyle::YesNo | MessageDialogStyle::IconQuestion)
         .build();
     dialog.show_modal() == ID_YES
 }
 
 fn error(frame: &Frame, message: &str) {
-    let dialog = MessageDialog::builder(frame, message, "NoDesk Reviera")
+    let dialog = MessageDialog::builder(frame, message, "BIM Reviera")
         .with_style(MessageDialogStyle::OK | MessageDialogStyle::IconError)
         .build();
     dialog.show_modal();
@@ -3049,7 +3049,7 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
     crash::install();
     wxdragon::main(move |_| {
         let frame = Frame::builder()
-            .with_title("NoDesk Reviera")
+            .with_title("BIM Reviera")
             .with_size(Size::new(1400, 860))
             .build();
 

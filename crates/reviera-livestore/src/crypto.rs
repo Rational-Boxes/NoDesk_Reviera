@@ -18,7 +18,9 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// Credential-store service name for live-store keys.
-const SERVICE: &str = "org.nodeskreviera.live";
+const SERVICE: &str = "org.bimreviera.live";
+/// The service name before the project's rename; keys found under it are moved to [`SERVICE`].
+const LEGACY_SERVICE: &str = "org.nodeskreviera.live";
 
 /// How new stores are encrypted.
 #[derive(Clone, PartialEq, Eq, Default)]
@@ -154,10 +156,13 @@ pub(crate) fn new_key(
 /// Finds the key of an existing store: its keyring entry if there is one, otherwise the configured
 /// passphrase, otherwise none (an unencrypted store).
 pub(crate) fn existing_key(key_id: Option<&str>, encryption: &Encryption) -> StoreKey {
-    if let Some(id) = key_id
-        && let Ok(hex) = keyring::Entry::new(SERVICE, id).and_then(|e| e.get_password())
-    {
-        return raw_key(&hex);
+    if let Some(id) = key_id {
+        if let Ok(hex) = keyring::Entry::new(SERVICE, id).and_then(|e| e.get_password()) {
+            return raw_key(&hex);
+        }
+        if let Some(hex) = migrate_legacy(id) {
+            return raw_key(&hex);
+        }
     }
     match encryption {
         Encryption::Passphrase(p) => passphrase_key(p),
@@ -167,9 +172,25 @@ pub(crate) fn existing_key(key_id: Option<&str>, encryption: &Encryption) -> Sto
 
 /// Removes a store's key from the credential store (when the store itself is deleted for good).
 pub(crate) fn forget(key_id: &str) {
-    if let Ok(e) = keyring::Entry::new(SERVICE, key_id) {
-        let _ = e.delete_credential();
+    for service in [SERVICE, LEGACY_SERVICE] {
+        if let Ok(e) = keyring::Entry::new(service, key_id) {
+            let _ = e.delete_credential();
+        }
     }
+}
+
+/// A key stored under the pre-rename service name: copied to the current one and, once copied,
+/// removed from the old one. The key is returned even if the copy fails, so the store still opens.
+fn migrate_legacy(key_id: &str) -> Option<String> {
+    let old = keyring::Entry::new(LEGACY_SERVICE, key_id).ok()?;
+    let hex = old.get_password().ok()?;
+    if keyring::Entry::new(SERVICE, key_id)
+        .and_then(|e| e.set_password(&hex))
+        .is_ok()
+    {
+        let _ = old.delete_credential();
+    }
+    Some(hex)
 }
 
 fn generate_in_keyring(key_id: &str) -> Result<String, String> {

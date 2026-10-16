@@ -13,7 +13,7 @@
 //! The current NBIMS-US table set follows once its column order is confirmed from the published
 //! standard.
 //!
-//! Every record carries `ExtSystem` = "NoDesk Reviera", `ExtObject` = its IFC class and
+//! Every record carries `ExtSystem` = "BIM Reviera", `ExtObject` = its IFC class and
 //! `ExtIdentifier` = its IFC GlobalId, so a COBie data set and an IFC file describe the same
 //! objects. Values are in SI units (metres, square metres, cubic metres), stated on the Facility
 //! sheet. Required values the model does not have are "n/a"; the export never invents them.
@@ -31,7 +31,7 @@ use crate::store::Store;
 
 pub const SETTINGS_CLASS: &str = "rxd:project/cobie";
 pub const SETTINGS_KEY: &str = "rxd:cobie";
-pub const EXT_SYSTEM: &str = "NoDesk Reviera";
+pub const EXT_SYSTEM: &str = "BIM Reviera";
 const NA: &str = "n/a";
 
 /// A contact (COBie Contact / Company).

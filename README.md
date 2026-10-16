@@ -1,4 +1,4 @@
-# NoDesk Reviera
+# BIM Reviera
 
 **Open-source BIM authoring on native IFC: build anywhere, even from the beach.**
 
@@ -7,6 +7,17 @@
 Reviera is a parametric Building Information Modeling (BIM) application for architecture,
 structure and MEP. IFC is its native file format, so there is no proprietary container. Every
 operation can be driven by Lua scripts and by AI agents through the Model Context Protocol (MCP).
+
+> **Independence.** BIM Reviera is an independent, original application. It is in no way a copy or clone of
+> any existing product, and it does not set out to read or write any existing product's
+> closed, proprietary formats (such as RVT and RFA); IFC is its native format. An existing
+> application was researched, from public sources only, to establish the workflows and
+> user-interface conventions that the industry's users already know, so they can work in
+> Reviera without relearning their trade. Beyond that research, Reviera implements its own
+> features and enhancements: its architecture, native IFC storage, scripting and AI
+> integration, remote computation and analysis, and many of its modelling tools are its
+> own design. Interchange formats used across the industry, such as DWG and DXF, are
+> supported only through open-source libraries, for interoperability.
 
 > **Status: early development.** The specification is complete as a draft. The application
 > already models a small building end to end: straight and curved walls, doors and windows,

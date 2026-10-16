@@ -3125,7 +3125,7 @@ All output commands work on an immutable **model snapshot** taken when the comma
 | Resource, Job, Event, Package, Risk | Written with headers and no rows, unless the project has operations data in RXD for them (not specified yet) |
 
 - **COBie 2.4 (legacy layout)** writes the same data under the earlier names and columns: Contact (for Company), Floor (for Level) and the 2.4 worksheet order. It has Assembly, Connection, Spare, Impact and Issue sheets with headers only. SpaceType values go to the Space sheet's Category column.
-- **Identity columns.** Every record carries `ExtSystem` = "NoDesk Reviera <version>", `ExtObject` = the IFC class, and `ExtIdentifier` = the element's IFC GlobalId. A data set exported twice from an unchanged model is identical except for the Instruction table's date, so re-exports can be compared.
+- **Identity columns.** Every record carries `ExtSystem` = "BIM Reviera <version>", `ExtObject` = the IFC class, and `ExtIdentifier` = the element's IFC GlobalId. A data set exported twice from an unchanged model is identical except for the Instruction table's date, so re-exports can be compared.
 - **Names.** COBie requires a unique Name within each table. Duplicates are reported by validation. With *Make names unique* on, the export suffixes them (" (2)", " (3)") and lists every renamed record in the report; the model is not changed.
 - **Units.** Values are written in the project's units, with the unit names in the Instruction table and the PickList.
 - **Required and optional data.** Columns that COBie requires but the model has no value for are written as "n/a". The export never invents values. The report lists each "n/a" by table and column, so the team can fill them in (typically through a schedule, DOC-SCH-010).

@@ -72,7 +72,7 @@ fn now() -> (String, String) {
 
 fn header(when: &str) -> String {
     format!(
-        "NoDesk Reviera {} error report\nTime: {when}\nSystem: {} {}\n\n",
+        "BIM Reviera {} error report\nTime: {when}\nSystem: {} {}\n\n",
         env!("CARGO_PKG_VERSION"),
         std::env::consts::OS,
         std::env::consts::ARCH,
@@ -86,7 +86,7 @@ pub fn install() {
     let (when, stamp) = now();
     let native = new.join(format!("crash-{stamp}-{}.txt", std::process::id()));
     let message = format!(
-        "NoDesk Reviera has stopped because of an error.\n\nA report was saved to:\n{}\n\n\
+        "BIM Reviera has stopped because of an error.\n\nA report was saved to:\n{}\n\n\
          Unsaved work is kept: Reviera offers to recover it when it opens again.",
         native.display()
     );
@@ -240,7 +240,7 @@ pub fn fail(kind: &str) {
 const ID_FOLDER: i32 = 7101;
 
 fn report_dialog(frame: &Frame, intro: &str, report: &str, path: Option<&Path>) {
-    let dialog = Dialog::builder(frame, "NoDesk Reviera: Error Report")
+    let dialog = Dialog::builder(frame, "BIM Reviera: Error Report")
         .with_style(DialogStyle::DefaultDialogStyle | DialogStyle::ResizeBorder)
         .build();
     let sizer = BoxSizer::builder(Orientation::Vertical).build();

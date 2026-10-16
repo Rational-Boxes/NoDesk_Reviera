@@ -1,7 +1,7 @@
 ; SPDX-License-Identifier: GPL-3.0-or-later
 ; Copyright (C) 2026 Reviera contributors
 ;
-; Inno Setup script (Inno Setup 7, or 6.3 and later) for NoDesk Reviera. build-installer.ps1 compiles it with:
+; Inno Setup script (Inno Setup 7, or 6.3 and later) for BIM Reviera. build-installer.ps1 compiles it with:
 ;   ISCC /DAppVersion=0.1.0-pre.1 /DAppVersionNumeric=0.1.0 /DStageDir=<stage> /DOutputDir=<dist> reviera.iss
 ; The stage folder holds reviera.exe, its DLLs, samples\, COPYING.txt, THIRD-PARTY-NOTICES.txt
 ; and reviera.ico.
@@ -19,7 +19,7 @@
   #define OutputDir "..\..\dist"
 #endif
 
-#define AppName "NoDesk Reviera"
+#define AppName "BIM Reviera"
 #define AppExe "reviera.exe"
 ; Opens the window with no console window (reviera.exe is a console program: the command-line tool).
 #define GuiExe "reviera-gui.exe"
@@ -37,7 +37,7 @@ AppPublisher=Reviera contributors
 AppPublisherURL={#AppUrl}
 AppSupportURL={#AppUrl}/issues
 AppUpdatesURL={#AppUrl}/releases
-DefaultDirName={autopf}\NoDesk Reviera
+DefaultDirName={autopf}\BIM Reviera
 DefaultGroupName={#AppName}
 DisableProgramGroupPage=yes
 ; The GPL is shown on the licence page.
@@ -50,7 +50,7 @@ ArchitecturesInstallIn64BitMode=x64compatible
 ; Windows 10 (TECH_STACK §5.4).
 MinVersion=10.0
 OutputDir={#OutputDir}
-OutputBaseFilename=NoDesk-Reviera-{#AppVersion}-windows-x64-setup
+OutputBaseFilename=BIM-Reviera-{#AppVersion}-windows-x64-setup
 SetupIconFile={#StageDir}\reviera.ico
 UninstallDisplayIcon={app}\reviera.ico
 UninstallDisplayName={#AppName} {#AppVersion}

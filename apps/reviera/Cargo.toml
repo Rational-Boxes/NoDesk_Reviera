@@ -1,6 +1,6 @@
 [package]
 name = "reviera"
-description = "NoDesk Reviera: open-source BIM authoring on native IFC"
+description = "BIM Reviera: open-source BIM authoring on native IFC"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

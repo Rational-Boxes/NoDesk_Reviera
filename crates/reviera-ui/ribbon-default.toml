@@ -56,7 +56,7 @@ help = "Open the help: getting started, navigating, and the sample models"
 
 [[action]]
 id = "help.about"
-label = "About NoDesk Reviera"
+label = "About BIM Reviera"
 icon = "about"
 help = "The version, licence and components"
 

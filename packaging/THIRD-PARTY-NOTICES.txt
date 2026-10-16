@@ -1,7 +1,7 @@
-NoDesk Reviera - third-party notices
+BIM Reviera - third-party notices
 ====================================
 
-NoDesk Reviera is free software under the GNU General Public License, version 3 or (at your
+BIM Reviera is free software under the GNU General Public License, version 3 or (at your
 option) any later version (see COPYING / LICENSE). Its complete source code, including the
 build scripts that produced this package, is at https://github.com/Rational-Boxes/NoDesk_Reviera
 

@@ -304,7 +304,7 @@ fn title_block(
     let mid = x0 + 2.0 * cell;
     out.line(0.25, mid, rows[3], mid, y0);
     out.field(x0, rows[3], "PROJECT NUMBER", v("Project Number"), 2.5);
-    out.field(mid, rows[3], "SOFTWARE", "NoDesk Reviera", 2.5);
+    out.field(mid, rows[3], "SOFTWARE", "BIM Reviera", 2.5);
     // Right column: date and scale, then the sheet number large.
     let scale = match scales {
         [] => String::new(),

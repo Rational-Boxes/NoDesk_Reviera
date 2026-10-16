@@ -1,6 +1,6 @@
 [Desktop Entry]
 Type=Application
-Name=NoDesk Reviera
+Name=BIM Reviera
 GenericName=BIM Modeller
 Comment=Model buildings on native IFC
 Exec=reviera gui %f

@@ -504,7 +504,7 @@ pub fn write_pdf(drawings: &[(PlanDrawing, PageInfo)], path: &Path) -> Result<Ve
         .map_or("Reviera drawing".to_owned(), |(d, i)| {
             format!("{} - {}", i.project, d.name)
         });
-    let creator = format!("NoDesk Reviera {}", env!("CARGO_PKG_VERSION"));
+    let creator = format!("BIM Reviera {}", env!("CARGO_PKG_VERSION"));
     pdf.document_info(info)
         .title(TextStr(&title))
         .creator(TextStr(&creator))
@@ -627,7 +627,7 @@ fn title_strip(c: &mut Content, d: &PlanDrawing, page_info: &PageInfo, sheet: &s
         (
             8.0,
             format!(
-                "Scale 1:{}    {}    {}    NoDesk Reviera",
+                "Scale 1:{}    {}    {}    BIM Reviera",
                 d.scale, sheet, page_info.date
             ),
         ),

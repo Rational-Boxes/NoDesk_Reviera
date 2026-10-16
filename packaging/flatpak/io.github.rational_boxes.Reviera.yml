@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright (C) 2026 Reviera contributors
 #
-# Flatpak manifest for NoDesk Reviera. Built by packaging/flatpak/build.sh; see packaging/README.md.
+# Flatpak manifest for BIM Reviera. Built by packaging/flatpak/build.sh; see packaging/README.md.
 #
 # The build is fully offline (no --share=network at build time): every source is pinned by
 # checksum, and the Rust crates come from cargo-sources.json (flatpak-cargo-generator, rerun by
@@ -186,7 +186,7 @@ modules:
         url: https://static.rust-lang.org/dist/rust-1.99.0-aarch64-unknown-linux-gnu.tar.xz
         sha256: 5a30ce742be0835d9b23fc862db5cbbbc71464e1c9b1fca22917e10e4ba32a92
 
-  # ---------------------------------------------------------------- NoDesk Reviera
+  # ---------------------------------------------------------------- BIM Reviera
   - name: reviera
     buildsystem: simple
     build-options:

@@ -367,7 +367,7 @@ On open, Reviera checks:
   - Third parties may generate their own code from the MIT schemas under any licence.
 - **Contributions.** Changes to `schemas/rxd/` are accepted under MIT. The CI licence check enforces SPDX `MIT` for that path and `GPL-3.0-or-later` everywhere else.
 - **Compatibility.** MIT-licensed files inside a GPL-3.0-or-later project are fully compatible: the combined application is distributed under the GPL, and the schema files keep their MIT terms when distributed on their own.
-- **Schema identifiers.** `$id` URIs use `https://nodeskreviera.org/schemas/rxd/<major>.<minor>/<name>.schema.json` (owner, 2026-10-12, DM-RXD-OD2; one-word domains were taken). The domain is provisional until the project registers it, which must happen before 1.0 ships, and the URLs must then resolve to the published MIT schemas. Once a schema version is released its `$id` never changes, so the domain is effectively permanent from 1.0 on.
+- **Schema identifiers.** `$id` URIs use `https://bimreviera.org/schemas/rxd/<major>.<minor>/<name>.schema.json` (owner, 2026-10-12, DM-RXD-OD2; one-word domains were taken). The domain is provisional until the project registers it, which must happen before 1.0 ships, and the URLs must then resolve to the published MIT schemas. Once a schema version is released its `$id` never changes, so the domain is effectively permanent from 1.0 on.
 
 ## 13. Commands
 

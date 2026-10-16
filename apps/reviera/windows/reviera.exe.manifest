@@ -2,8 +2,8 @@
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
 <assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0"
           xmlns:asmv3="urn:schemas-microsoft-com:asm.v3">
-  <assemblyIdentity type="win32" name="NoDesk.Reviera" version="0.1.0.0" processorArchitecture="amd64"/>
-  <description>NoDesk Reviera</description>
+  <assemblyIdentity type="win32" name="BIM.Reviera" version="0.1.0.0" processorArchitecture="amd64"/>
+  <description>BIM Reviera</description>
   <!-- Common Controls 6: themed controls, and functions such as GetWindowSubclass that the
        older comctl32 Windows loads by default does not have. -->
   <dependency>

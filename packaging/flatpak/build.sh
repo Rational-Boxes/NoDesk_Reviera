@@ -2,9 +2,9 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright (C) 2026 Reviera contributors
 #
-# Builds the NoDesk Reviera Flatpak from the working tree and exports a single-file bundle:
+# Builds the BIM Reviera Flatpak from the working tree and exports a single-file bundle:
 #
-#   packaging/flatpak/build.sh                  # build, then dist/NoDesk-Reviera-<ver>-<arch>.flatpak
+#   packaging/flatpak/build.sh                  # build, then dist/BIM-Reviera-<ver>-<arch>.flatpak
 #   packaging/flatpak/build.sh --install        # ... and install the bundle for this user
 #   REVIERA_VERSION=0.1.0-pre.2 packaging/flatpak/build.sh
 #
@@ -25,7 +25,7 @@ REPO="$HERE/repo"
 DIST="$ROOT/dist"
 ARCH="$(flatpak --default-arch)"
 VERSION="${REVIERA_VERSION:-0.1.0-pre.1}"
-BUNDLE="$DIST/NoDesk-Reviera-$VERSION-$ARCH.flatpak"
+BUNDLE="$DIST/BIM-Reviera-$VERSION-$ARCH.flatpak"
 
 INSTALL=0
 for arg in "$@"; do
@@ -78,7 +78,7 @@ flatpak-builder \
     --state-dir="$STATE" \
     --repo="$REPO" \
     --default-branch=stable \
-    --subject="NoDesk Reviera $VERSION" \
+    --subject="BIM Reviera $VERSION" \
     "$BUILD_DIR" "$MANIFEST"
 
 mkdir -p "$DIST"

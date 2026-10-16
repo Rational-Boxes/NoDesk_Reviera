@@ -631,7 +631,7 @@ impl ServerHandler for McpServer {
         ServerConfig::new(ServerCapabilities::builder().enable_tools().enable_resources().build())
             .with_server_info(Implementation::new("reviera", env!("CARGO_PKG_VERSION")))
             .with_instructions(
-                "NoDesk Reviera: BIM authoring on native IFC. Tools are Reviera commands; use find_commands \
+                "BIM Reviera: BIM authoring on native IFC. Tools are Reviera commands; use find_commands \
                  to discover commands in toolsets that are not enabled, and run_command to call them. Results \
                  are {result, warnings, changed}. Undo only reverts this session's own changes.",
             )
