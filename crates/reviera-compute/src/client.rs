@@ -80,6 +80,9 @@ pub struct LocalJob {
     /// Opaque keys → GlobalIds, to attach results to elements; never sent.
     pub key_map: BTreeMap<String, String>,
     pub results_fetched: bool,
+    /// What the submitter needs to use the results (for example the test that ran); local only.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub context: Option<serde_json::Value>,
 }
 
 impl LocalJob {
@@ -293,11 +296,20 @@ impl ComputeClient {
                 project: project.into(),
                 key_map: distilled.key_map.clone(),
                 results_fetched: false,
+                context: None,
             });
         }
         self.inner.save();
         self.follow(&job_id);
         Ok(job_id)
+    }
+
+    /// Keeps `context` with a job in the client's record.
+    pub fn set_context(&self, job_id: &str, context: serde_json::Value) {
+        if let Some(j) = self.inner.jobs.lock().unwrap().get_mut(job_id) {
+            j.context = Some(context);
+        }
+        self.inner.save();
     }
 
     /// Follows a job in the background until it finishes.

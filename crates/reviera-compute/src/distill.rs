@@ -57,6 +57,18 @@ pub fn clash_bodies(
     excluded: &[(ElementId, ElementId)],
     model: &str,
 ) -> Distilled {
+    clash_bodies_in_sets(bodies, guid, &|_| 0, excluded, model)
+}
+
+/// As [`clash_bodies`], with each element's sets for a set-against-set test (bit 0 set A,
+/// bit 1 set B).
+pub fn clash_bodies_in_sets(
+    bodies: &[Body],
+    guid: &dyn Fn(ElementId) -> Option<String>,
+    sets: &dyn Fn(ElementId) -> u32,
+    excluded: &[(ElementId, ElementId)],
+    model: &str,
+) -> Distilled {
     let mut keyed: Vec<(String, String, &Body)> = bodies
         .iter()
         .filter(|b| !b.parts.is_empty())
@@ -76,7 +88,8 @@ pub fn clash_bodies(
     let mut size = 0usize;
     let mut triangles = 0usize;
     for (key, _, body) in &keyed {
-        let e = element_mesh(key, model, body);
+        let mut e = element_mesh(key, model, body);
+        e.sets = sets(body.element);
         triangles += body.parts.iter().map(|p| p.mesh.1.len() / 3).sum::<usize>();
         size += e.encoded_len();
         current.elements.push(e);

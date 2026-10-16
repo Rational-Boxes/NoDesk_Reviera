@@ -583,6 +583,9 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "script_library" => format!(
             r#"<path d="M4 6h7v21H4zM12 6h7v21h-7z" fill="{f}" {s}/><path d="M21 7l6-1 3 20-6 1z" {s}/><path d="M6 10h3M14 10h3" {sa}/>"#
         ),
+        "clash" => format!(
+            r#"<rect x="3" y="11" width="16" height="10" fill="{f}" {s}/><rect x="13" y="4" width="8" height="24" fill="none" {s}/><path d="M13 11h6v10h-6z" fill="{a}" {s}/><path d="M24 6l5 5M29 6l-5 5" {sa}/>"#
+        ),
         "overlaps" => format!(
             r#"<rect x="4" y="9" width="15" height="15" fill="{f}" {s}/><rect x="13" y="4" width="15" height="15" fill="none" {sa}/><path d="M13 9h6v10h-6z" fill="{a}" {s}/>"#
         ),

@@ -573,11 +573,19 @@ Chapter 8). Heavy calculations run outside Reviera's process, start only when ne
 *distillation* of the model (only what the calculation needs) rather than the model. The first
 milestone works end to end, with project-wide clash detection as its first job kind:
 
-- **Clash detection out of process**: the whole model's bodies (booleans applied; pairs that
-  belong together or were accepted left out) are distilled under opaque keys and measured by the
-  built-in runner on the same overlap engine as Check Overlaps, so the results match it exactly;
-  they come back attached to the model's elements (`compute.submit` with `analysis.clash`,
-  `compute.status`, `compute.results`).
+- **Clash detection**: View › Coordination › Clash Detection opens a pane that runs a clash test
+  of set A against set B (chosen by IFC class, or every element) out of process, with progress,
+  and keeps the results in the model between runs, matched by element: *new* when first found,
+  *active* when found again, *reviewed* or *approved* when you say so, and *resolved* when a run
+  no longer finds them. The list filters by status and shows each clash's elements, category
+  pair, volume and depth. Picking a clash selects its elements and frames the clash; Previous and
+  Next step through them; Isolate shows only the pair (and follows as you step); Section Box boxes
+  it; status and comments are kept with it; Resolve applies the overlap tools (cut, join, move
+  apart, accept); and the report exports as CSV or HTML. The runner measures the whole model's
+  distilled bodies on the same overlap engine as Check Overlaps, so the results match it exactly
+  (`clash.run_basic`, `clash.refresh`, `clash.collect`, `clash.last_report`, `clash.set_status`,
+  `clash.export_report`; any job kind through `compute.submit`, `compute.status`,
+  `compute.results`).
 - **Local compute host**: started on demand, keeps a durable job registry, starts runners only
   for jobs and stops them when idle, enforces a memory limit and lower priority on them, reports
   crashes, runaways and hangs as failed jobs without affecting Reviera, and exits when idle. Jobs
@@ -721,8 +729,9 @@ simulation sessions, and the first engine runners (see [Not built yet](#not-buil
 ## Sample models
 
 `test-data/samples` holds Reviera's own sample models. Each is rebuilt by a Lua script and
-checked by a test (no overlaps, no clearance intrusions, saves and reopens), and each has a
-walkthrough (`house.md`, `observatory.md`, `csg.md`, `manor.md`, `storefront.md`) giving the manual steps to build it in the
+checked by a test (no overlaps beyond those it keeps on purpose, no clearance intrusions, saves
+and reopens), and each has a walkthrough (`house.md`, `observatory.md`, `csg.md`, `manor.md`,
+`manor_before.md`, `storefront.md`) giving the manual steps to build or use it in the
 window, which confirms that every operation it uses has its UI:
 
 - **Storefront doors** (`storefront.ifc`): a shop front with a revolving door, an automatic
@@ -731,7 +740,13 @@ window, which confirms that every operation it uses has its UI:
   door, round-top, Gothic and oculus windows, rooms, ceilings, a hipped roof with eaves and a
   dormer, and a straight stair that completes itself and opens the ceiling and floor over it
   for the IRC's headroom; a round three-storey tower with two spiral stairs opening the floors
-  above them, under an onion dome; and a deck with a gated railing.
+  above them, under an onion dome; and a deck with a gated railing. This is the model *after
+  coordination*: where its parts meet is resolved with booleans.
+- **Manor before coordination** (`manor_before.ifc`): the same model as first modelled, with 19
+  clashes left in it (the castle towers' walls through the house's eaves and walls, the gallery's
+  vault and floor into the round tower), for trying clash detection; its walkthrough runs a clash
+  test, steps through, reviews and resolves the clashes. Both are built by `manor.lua`, with its
+  *Coordinate overlaps* option on or off.
 - **House with dormers** (`house.ifc`): eaves, flush-joined dormers, L and U stairs with
   railings, a gated front railing and a deck with its railing.
 - **Observatory** (`observatory.ifc`): a round drum of arc walls under a dome, a vaulted annex, a

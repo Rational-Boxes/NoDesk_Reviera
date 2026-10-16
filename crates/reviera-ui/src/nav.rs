@@ -234,6 +234,30 @@ impl Gui {
         self.animate_to(to);
     }
 
+    /// Frames a box (model coordinates, metres) with some room around it, so what surrounds it
+    /// stays in view: a clash's box, for example.
+    pub(crate) fn zoom_to_box(&mut self, lo: [f64; 3], hi: [f64; 3]) {
+        let Some(v) = self.active_view() else { return };
+        if v.sheet.is_some() {
+            return self.zoom_to_fit();
+        }
+        let size = (0..3).map(|k| hi[k] - lo[k]).fold(0.0f64, f64::max);
+        let pad = (size * 1.5).max(1.5);
+        let lo = Vec3::new(
+            (lo[0] - pad) as f32,
+            (lo[1] - pad) as f32,
+            (lo[2] - pad) as f32,
+        );
+        let hi = Vec3::new(
+            (hi[0] + pad) as f32,
+            (hi[1] + pad) as f32,
+            (hi[2] + pad) as f32,
+        );
+        let mut to = v.camera;
+        to.fit((lo, hi));
+        self.animate_to(to);
+    }
+
     /// The bounding box of the selected elements in the active view's scene.
     fn selection_bounds(&mut self) -> Option<(Vec3, Vec3)> {
         let selected: HashSet<_> = self.selection().into_iter().collect();

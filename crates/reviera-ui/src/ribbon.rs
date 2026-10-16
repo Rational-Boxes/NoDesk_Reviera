@@ -27,6 +27,7 @@ pub const DEFAULT: &str = include_str!("../ribbon-default.toml");
 pub const UI_ACTIONS: &[&str] = &[
     "app.exit",
     "ui.model_properties",
+    "ui.pane.clash",
     "help.home",
     "wall.edit_assembly",
     "tool.measure",

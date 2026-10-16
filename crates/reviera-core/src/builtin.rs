@@ -76,6 +76,8 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(ViewSetVirtualVolumes),
         registry.add(ClearanceList),
         registry.add(OverlapAccept),
+        registry.add(ClashRecordRun),
+        registry.add(ClashSetStatus),
         registry.add(GeometryBoolean),
         registry.add(GeometryRemoveBoolean),
         registry.add(OverlapAccepted),
@@ -2788,6 +2790,32 @@ modify_command!(
     crate::overlap_accept::AcceptParams,
     (),
     crate::overlap_accept::accept
+);
+
+modify_command!(
+    ClashRecordRun,
+    "clash.record_run",
+    "Record a clash run",
+    "Merges a clash run's results into the model's clash results (COL-CLASH-002), matched by their elements' \
+     GlobalIds: first found are *new*, found again become *active* (reviewed and approved keep their status), \
+     and results the run no longer finds become *resolved*. Also stores the test that ran. Used by \
+     `clash.collect`.",
+    "Clash Run",
+    crate::clashes::RecordRunParams,
+    crate::clashes::RunSummary,
+    crate::clashes::record_run
+);
+
+modify_command!(
+    ClashSetStatus,
+    "clash.set_status",
+    "Set clash results' status",
+    "Sets the status of clash results (`new`, `active`, `reviewed`, `approved`, `resolved`) and adds an \
+     optional comment to each, with who wrote it and when (COL-CLASH-002).",
+    "Clash Status",
+    crate::clashes::SetStatusParams,
+    (),
+    crate::clashes::set_status
 );
 
 modify_command!(

@@ -47,6 +47,7 @@ pub fn element_mesh(key: &str, model: &str, body: &Body) -> an::ElementMesh {
             })
             .collect(),
         model: model.into(),
+        sets: 0,
     }
 }
 
@@ -133,6 +134,7 @@ impl Kind for ClashKind {
             .collect();
         let key = |id: ElementId| elements[id.0 as usize].key.as_str();
         let model = |id: ElementId| elements[id.0 as usize].model.as_str();
+        let sets = |id: ElementId| elements[id.0 as usize].sets;
         ctx.progress(0.1, "measuring");
         let skip = |a: ElementId, b: ElementId| {
             if !o.against_models.is_empty() {
@@ -141,6 +143,13 @@ impl Kind for ClashKind {
                 let la = o.against_models.iter().any(|m| m == ma);
                 let lb = o.against_models.iter().any(|m| m == mb);
                 if la == lb {
+                    return true;
+                }
+            }
+            if o.between_sets {
+                // Set A against set B: one in A and the other in B.
+                let (sa, sb) = (sets(a), sets(b));
+                if !((sa & 1 != 0 && sb & 2 != 0) || (sa & 2 != 0 && sb & 1 != 0)) {
                     return true;
                 }
             }

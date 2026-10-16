@@ -22,13 +22,13 @@ use crate::App;
 
 impl App {
     /// The compute client, created on first use.
-    fn compute(&mut self) -> &ComputeClient {
+    pub(crate) fn compute(&mut self) -> &ComputeClient {
         self.compute.get_or_insert_with(ComputeClient::local)
     }
 }
 
 /// A contract reason code as an error code.
-fn failed(e: reviera_compute::ComputeError) -> Error {
+pub(crate) fn failed(e: reviera_compute::ComputeError) -> Error {
     let code = match e.reason.as_str() {
         "invalid_input" => "compute.invalid_input",
         "unsupported_kind" => "compute.unsupported_kind",
@@ -283,6 +283,7 @@ impl HostCommand for ComputeSubmit {
                     resolution: o.resolution.unwrap_or(48),
                     limit: o.limit.unwrap_or(0),
                     against_models: Vec::new(),
+                    between_sets: false,
                 }))
             }
             _ => None,

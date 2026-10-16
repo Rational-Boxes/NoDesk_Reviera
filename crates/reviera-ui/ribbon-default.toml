@@ -646,6 +646,12 @@ icon = "overlaps"
 help = "Find where elements overlap: listed largest first; pick one to select and frame it"
 
 [[action]]
+id = "ui.pane.clash"
+label = "Clash Detection"
+icon = "clash"
+help = "Run clash tests out of process and step through the results: select and frame each clash, isolate or box it, set its status, comment, resolve and export"
+
+[[action]]
 id = "ui.model_properties"
 label = "Model Properties"
 icon = "model_properties"
@@ -1637,6 +1643,7 @@ tools = [
 [[tab.panel]]
 label = "Coordination"
 tools = [
+  { action = "ui.pane.clash", size = "large" },
   { action = "overlap.find", size = "large" },
   { action = "geometry.remove_boolean", size = "small" },
   { action = "view.set_virtual_volumes", size = "large" },
@@ -2026,7 +2033,7 @@ items = [
   "inspect.hide", "inspect.hide_subtree", "inspect.hide_category", "inspect.hide_type",
   "inspect.isolate", "inspect.isolate_subtree", "inspect.isolate_category", "inspect.isolate_type",
   "inspect.ghost_others", "inspect.translucent", "inspect.translucent_subtree", "inspect.reset", "-",
-  "overlap.find", "view.set_virtual_volumes", "clearance.set_rule_set",
+  "ui.pane.clash", "overlap.find", "view.set_virtual_volumes", "clearance.set_rule_set",
 ]
 
 [[menu]]

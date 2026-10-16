@@ -370,14 +370,19 @@ pub(crate) fn samples(dir: &Path) -> Vec<Sample> {
                 return None;
             }
             let title = s["title"].as_str().unwrap_or(&name).to_owned();
-            // The script's `-- description:` line.
-            let description = std::fs::read_to_string(dir.join(format!("{name}.lua")))
-                .ok()
-                .and_then(|lua| {
-                    lua.lines().find_map(|l| {
-                        l.strip_prefix("-- description:")
-                            .map(|d| d.trim().to_owned())
-                    })
+            // The manifest's description, else the script's `-- description:` line.
+            let description = s["description"]
+                .as_str()
+                .map(str::to_owned)
+                .or_else(|| {
+                    std::fs::read_to_string(dir.join(format!("{name}.lua")))
+                        .ok()
+                        .and_then(|lua| {
+                            lua.lines().find_map(|l| {
+                                l.strip_prefix("-- description:")
+                                    .map(|d| d.trim().to_owned())
+                            })
+                        })
                 })
                 .unwrap_or_default();
             Some(Sample {
@@ -677,7 +682,14 @@ mod tests {
         let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data/samples");
         let list = samples(&dir);
         let names: Vec<&str> = list.iter().map(|s| s.name.as_str()).collect();
-        for n in ["house", "observatory", "csg", "manor", "storefront"] {
+        for n in [
+            "house",
+            "observatory",
+            "csg",
+            "manor",
+            "manor_before",
+            "storefront",
+        ] {
             assert!(names.contains(&n), "{n} in {names:?}");
         }
         assert!(list.iter().all(|s| !s.description.is_empty()));

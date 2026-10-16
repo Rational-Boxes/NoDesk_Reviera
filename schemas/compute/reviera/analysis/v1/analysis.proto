@@ -25,6 +25,8 @@ message ElementMesh {
   repeated MeshPart parts = 3;
   // The model the element comes from, for multi-model scopes ("" is the host model).
   string model = 4;
+  // Which sets of a set-against-set test the element is in: bit 0 set A, bit 1 set B.
+  uint32 sets = 5;
 }
 
 // A chunk of a bodies distillation (distiller "clash.bodies"): elements sorted by key.
@@ -53,6 +55,9 @@ message ClashOptions {
   // Test the elements of these models against those of the others only (multi-model scopes);
   // empty: every pair.
   repeated string against_models = 5;
+  // Test set A against set B only (ElementMesh.sets): a pair clashes when one element is in A
+  // and the other in B. Off: every pair.
+  bool between_sets = 6;
 }
 
 message Clash {

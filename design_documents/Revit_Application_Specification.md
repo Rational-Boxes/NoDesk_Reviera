@@ -25962,6 +25962,8 @@ Common link fields: `id`, `name`, `source` (see each type), `pathType` (relative
 
 **Commands.** `clash.run_basic(set_a{source, categories[]}, set_b{source, categories[]}) -> job_id`; `clash.last_report() -> clash_report` (query); `clash.refresh(report_id) -> job_id`; `clash.export_report(report_id, path, format: html|csv|bcf) -> ()`
 
+*Built (2026-10-16):* View › Coordination › **Clash Detection** opens a dockable pane. *Run Test…* asks for set A and set B as IFC classes (none ticked: every element) and runs the test out of process as an `analysis.clash` compute job (DM-RPC-001; the runner measures on the overlap engine of ARC-MOD-030 rather than OCCT's `BRepAlgoAPI_Common`, so results match Check Overlaps exactly), with progress in the pane; when it finishes, `clash.collect` merges it into the model. The list (filterable by status) shows each clash's status, elements, category pair, volume and depth; picking one selects its elements and frames the clash's own box; Previous and Next step through them; Isolate shows only the pair and keeps isolating each clash shown; Section Box boxes it; *Resolve…* applies the overlap tools (accept, cut, join, move apart, ARC-MOD-032). *Export…* writes CSV or HTML. Commands: `clash.run_basic`, `clash.refresh`, `clash.collect` (new: collects a finished run), `clash.last_report`, `clash.export_report`. Links, BCF export and the category-column dialog are not built yet; the report is kept on the project (`rxd:clash_test`, `rxd:clash_results`) rather than RXD document `coordination/clash`.
+
 **Acceptance criteria.**
 - [ ] A duct passing through a beam is reported; a door in its host wall is not; two walls meeting at a joined corner are not.
 - [ ] The check of 20 000 MEP elements against 5 000 structural elements completes in under one minute on the reference machine.
@@ -25981,6 +25983,8 @@ Common link fields: `id`, `name`, `source` (see each type), `pathType` (relative
 **Data (RXD).** `coordination/clash`: kinds `clash.test` and `clash.result`.
 
 **Commands.** `clash.create_test(name, set_a, set_b, type: hard|clearance|duplicate, tolerance?, auto_run?) -> test_id`; `clash.update_test(test_id, fields) -> ()`; `clash.run(test_ids[]) -> job_id`; `clash.set_status(result_ids[], status, assignee?, comment?) -> ()`; `clash.group(test_id, mode: element|level|proximity, distance?) -> group_id[]`; `clash.to_bcf(result_or_group_ids[]) -> topic_id[]`
+
+*Built (2026-10-16), in part:* results are kept between runs and matched by GlobalId pair, with statuses *new*, *active*, *reviewed*, *approved* and *resolved* (resolved automatically when a run no longer finds a clash, and *active* again if it returns), comments with author and time, and the runs that first and last found each (`clash.record_run`, `clash.set_status`); the pane sets status and adds comments. Saved tests, clearance and duplicate tests, tolerances per test beyond touching, assignees, grouping by level or proximity, BCF issues and automatic runs are not built yet.
 
 **Acceptance criteria.**
 - [ ] A clearance test of 50 mm between pipes and beams reports a pipe 30 mm below a beam and does not report one 80 mm below.
@@ -27019,7 +27023,7 @@ Live calculations that update while the user models stay in Reviera's process (A
 | 6 | Job sets and studies; further engine runners and job kinds (rendering, export, tessellation) | DM-RPC-007; ANA-PLUG-001 families |
 | 7 | Real-time sessions: the session stream, latest-wins frames, the real-time transport, the scenario panel, the simulation layer in RSP and the Godot/VR layer | DM-RPC-010; ADV-RSP-001; ADV-XR-001 |
 
-*Progress (2026-10-16):* step 1 is built apart from the panel and the HTTPS binding, and the first job kind, the project-wide clash test, runs end to end out of process (§2.17 *Built* notes); step 2's IFC filter profiles and step 3's analysis provider layer are next.
+*Progress (2026-10-16):* step 1 is built apart from the Compute Jobs panel and the HTTPS binding, and the first job kind runs end to end out of process: clash detection, with set A against set B, results kept in the model with statuses between runs, and the Clash Detection pane for navigating them (COL-CLASH-001, 002 *Built* notes). The compute host and runner ship in the Flatpak and Windows packages. Step 2's IFC filter profiles and step 3's analysis provider layer are next.
 
 Structural analysis needs the analytical model first (STR-AM-001 … 004, STR-LOAD-001, STR-LC-001, STR-BC-001), which follows the structural physical elements in the structure build order.
 

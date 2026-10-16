@@ -28,6 +28,10 @@ pub struct Accepted {
 }
 
 /// Now, UTC, as RFC 3339 (`2026-10-13T17:05:00Z`).
+pub(crate) fn now_rfc3339() -> String {
+    now()
+}
+
 fn now() -> String {
     let secs = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)

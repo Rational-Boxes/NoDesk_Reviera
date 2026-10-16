@@ -13,6 +13,7 @@
 mod areas;
 mod assembly;
 mod browser;
+mod clash;
 mod columns;
 mod components;
 mod crash;
@@ -269,6 +270,8 @@ struct Gui {
     array_tool: Option<path_arrays::ArrayTool>,
     /// The Component Library panel.
     library_pane: Option<components::LibraryPane>,
+    /// The Clash Detection pane, once opened.
+    clash_pane: Option<clash::ClashPane>,
     /// Renders component thumbnails offscreen (made when first needed).
     thumb_renderer: Option<WgpuViewport>,
     /// The last array's members and Move To (Last when true).
@@ -3221,6 +3224,7 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 place_tool: None,
                 array_tool: None,
                 library_pane: None,
+                clash_pane: None,
                 thumb_renderer: None,
                 array_count: 4,
                 array_last: false,
@@ -3885,6 +3889,7 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "railing.create_on_edges" => with(gui, Gui::guard_edges),
         "railing.create_on_stair" => with(gui, Gui::rail_stairs),
         "overlap.find" => with(gui, Gui::check_overlaps),
+        "ui.pane.clash" => Gui::toggle_clash_pane(gui),
         "script.run" => with(gui, Gui::open_script),
         "script.import" => with(gui, Gui::import_script),
         "ui.scripts.manage" => with(gui, Gui::manage_scripts),

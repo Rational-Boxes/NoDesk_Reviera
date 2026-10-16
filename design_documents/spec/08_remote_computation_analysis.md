@@ -110,7 +110,7 @@ Live calculations that update while the user models stay in Reviera's process (A
 | 6 | Job sets and studies; further engine runners and job kinds (rendering, export, tessellation) | DM-RPC-007; ANA-PLUG-001 families |
 | 7 | Real-time sessions: the session stream, latest-wins frames, the real-time transport, the scenario panel, the simulation layer in RSP and the Godot/VR layer | DM-RPC-010; ADV-RSP-001; ADV-XR-001 |
 
-*Progress (2026-10-16):* step 1 is built apart from the panel and the HTTPS binding, and the first job kind, the project-wide clash test, runs end to end out of process (§2.17 *Built* notes); step 2's IFC filter profiles and step 3's analysis provider layer are next.
+*Progress (2026-10-16):* step 1 is built apart from the Compute Jobs panel and the HTTPS binding, and the first job kind runs end to end out of process: clash detection, with set A against set B, results kept in the model with statuses between runs, and the Clash Detection pane for navigating them (COL-CLASH-001, 002 *Built* notes). The compute host and runner ship in the Flatpak and Windows packages. Step 2's IFC filter profiles and step 3's analysis provider layer are next.
 
 Structural analysis needs the analytical model first (STR-AM-001 … 004, STR-LOAD-001, STR-LC-001, STR-BC-001), which follows the structural physical elements in the structure build order.
 

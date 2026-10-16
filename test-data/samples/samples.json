@@ -59,8 +59,25 @@
     ]
   },
   {
+    "name": "manor_before",
+    "title": "Manor before coordination",
+    "description": "The Manor with tower as first modelled, before coordination: the castle towers' walls run through the house's eaves and walls, and the gallery's vault and floor into the round tower. Run a clash test (View › Coordination › Clash Detection) to find, review and resolve them; the Manor sample is the same model after coordination.",
+    "allow_overlaps": 19,
+    "steps": [
+      {
+        "command": "script.run",
+        "args": {
+          "file": "manor.lua",
+          "answers": {
+            "coordinate": false
+          }
+        }
+      }
+    ]
+  },
+  {
     "name": "manor",
-    "title": "Manor with tower",
+    "title": "Manor after coordination",
     "steps": [
       {
         "command": "script.run",

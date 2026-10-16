@@ -15,6 +15,7 @@ pub mod builtin;
 mod builtin_arc;
 pub mod categories;
 pub mod change;
+pub mod clashes;
 pub mod clearances;
 pub mod cobie;
 pub mod codes;

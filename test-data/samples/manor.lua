@@ -19,6 +19,23 @@
 --   roof windows and a roof hatch, vaulted ceilings upstairs following the roof and a domed one
 --   in the tower top, and two round
 --   porch columns (the second made by an array) attached to the eave.
+--
+-- The script builds the model in two forms (a before-and-after pair of samples for clash
+-- detection, COL-CLASH-001): with *Coordinate overlaps* on (the default, `manor`) the last step
+-- resolves where the parts meet with booleans, so the model has no clashes; off
+-- (`manor_before`), the parts are left overlapping as first modelled: the towers' walls through
+-- the house's eaves and walls, the gallery's vault and floor into the round tower.
+
+local options = reviera.ui.form{
+  title = "Manor with tower",
+  message = "Builds the sample manor.",
+  fields = {
+    { key = "coordinate", label = "Coordinate overlaps", type = "bool", default = true,
+      help = "Resolve where the parts meet with booleans; off leaves the clashes for clash detection" },
+  },
+}
+if not options then return false end
+local coordinate = options.coordinate
 
 reviera.code.set{ code = "irc", occupancy = "dwelling" }
 
@@ -391,15 +408,18 @@ reviera.railing.add_gate{ railing_id = guard, at = 7.2 }
 
 -- ---- Booleans where parts meet (ARC-MOD-028): the house's eaves are cut by the towers, the
 -- towers' walls by the house's, and the gallery's vault and floor by the drum ----
-local cut_by = { [roof] = true, [barrel] = true, [gallery_floor] = true }
-for _, t in ipairs({ sw, se }) do
-  for _, w in pairs(t) do cut_by[w] = true end
-end
-for _, o in ipairs(reviera.overlap.find{}.overlaps) do
-  if cut_by[o.a] then
-    reviera.overlap.resolve{ a = o.a, b = o.b, mode = "cut_a" }
-  elseif cut_by[o.b] then
-    reviera.overlap.resolve{ a = o.a, b = o.b, mode = "cut_b" }
+-- Left out before coordination (the `manor_before` sample), so the clashes stay.
+if coordinate then
+  local cut_by = { [roof] = true, [barrel] = true, [gallery_floor] = true }
+  for _, t in ipairs({ sw, se }) do
+    for _, w in pairs(t) do cut_by[w] = true end
+  end
+  for _, o in ipairs(reviera.overlap.find{}.overlaps) do
+    if cut_by[o.a] then
+      reviera.overlap.resolve{ a = o.a, b = o.b, mode = "cut_a" }
+    elseif cut_by[o.b] then
+      reviera.overlap.resolve{ a = o.a, b = o.b, mode = "cut_b" }
+    end
   end
 end
 
