@@ -839,7 +839,8 @@ area by area (reviewed against the spec on 2026-10-15).
   added; the HTTPS binding; paired compute hosts on the LAN; vendor-neutral cloud clusters that
   scale to zero, with estimates, budgets and a catalogue of hosted calculation services; job sets
   for parameter studies; real-time simulation sessions shown live in Reviera, a game engine or VR;
-  memory limits on Windows and macOS; and packaging the compute programs in the installers.
+  and memory limits on Windows and macOS. (The installers already carry the compute host and
+  the built-in runner.)
 - **Analysis plugin layer** (ANA-PLUG-004 … 009): specified, not built. Calculations that update
   live while modelling run in-process; batch analysis runs are compute jobs, never resident
   when idle. It serves every analysis family: structural and seismic, thermal loads and energy,

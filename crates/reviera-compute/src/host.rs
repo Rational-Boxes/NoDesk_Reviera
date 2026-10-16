@@ -371,7 +371,8 @@ impl Host {
         let run_dir = self.cfg.state_dir.join("run");
         let _ = std::fs::create_dir_all(&run_dir);
         #[cfg(unix)]
-        let address = Address::Unix(run_dir.join(format!("{stem}-{n}.sock")));
+        let address =
+            Address::Unix(paths::socket_dir(&self.cfg.state_dir).join(format!("{stem}-{n}.sock")));
         #[cfg(not(unix))]
         let address = {
             let l = std::net::TcpListener::bind("127.0.0.1:0")
@@ -514,12 +515,18 @@ impl Host {
     }
 
     async fn run_job(self: &Arc<Self>, id: String) {
+        self.run_job_inner(&id).await;
+        // Whatever happened, the job no longer keeps the host busy.
+        self.active.lock().unwrap().remove(&id);
+    }
+
+    async fn run_job_inner(self: &Arc<Self>, id: &str) {
+        let id = id.to_owned();
         let Some(req) = self.db.request(&id) else {
             return;
         };
         // Cancelled while it was queued.
         if self.db.record(&id).is_none_or(|r| is_terminal(r.state)) {
-            self.active.lock().unwrap().remove(&id);
             return;
         }
         let Some(spec) = self.kinds.get(&req.kind).cloned() else {
@@ -543,7 +550,6 @@ impl Host {
             Ok(()) => {}
             Err(f) => self.set_state(&id, JobState::Failed, Some(f)),
         }
-        self.active.lock().unwrap().remove(&id);
         self.release(&spec.exe).await;
     }
 

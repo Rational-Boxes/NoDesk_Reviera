@@ -139,7 +139,7 @@ echo "INPUT($SYSROOT/lib/libstdc++.a)" > "$BUILD/link-shims/libstdc++.dll.a"
 echo "INPUT($SYSROOT/lib/libstdc++.a)" > "$BUILD/link-shims/libc++.a"
 # (Encoded, with 0x1f between arguments: the path may contain spaces.)
 export CARGO_ENCODED_RUSTFLAGS="-L"$'\x1f'"native=$BUILD/link-shims"
-(cd "$ROOT" && cargo build --release --target $TARGET -p reviera --bins)
+(cd "$ROOT" && cargo build --release --target $TARGET -p reviera -p reviera-compute --bins)
 
 # ---- Stage: the program, the DLLs it needs, samples and notices ----
 STAGE="$DIST/windows/BIM-Reviera"
@@ -148,6 +148,9 @@ mkdir -p "$STAGE/samples"
 install -m755 "$ROOT/target/$TARGET/release/reviera.exe" "$STAGE/"
 # The window without a console window: what the shortcuts and the file association start.
 install -m755 "$ROOT/target/$TARGET/release/reviera-gui.exe" "$STAGE/"
+# The local compute host and the built-in runner, beside reviera.exe (DM-RPC-004).
+install -m755 "$ROOT/target/$TARGET/release/reviera-compute-host.exe" \
+    "$ROOT/target/$TARGET/release/reviera-analysis-builtin.exe" "$STAGE/"
 # The DLLs it imports, transitively, from our prefix and the MinGW sysroot (not Windows').
 search=("$PREFIX/bin" "$SYSROOT/bin")
 queue=("$STAGE/reviera.exe")

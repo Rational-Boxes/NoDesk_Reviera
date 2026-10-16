@@ -203,8 +203,11 @@ modules:
         # reviera-ifc's shim includes IfcGeom headers, which include Eigen.
         CPLUS_INCLUDE_PATH: /app/include/eigen3
     build-commands:
-      - cargo --offline build --release --locked -p reviera
+      - cargo --offline build --release --locked -p reviera -p reviera-compute --bins
       - install -Dm755 target/release/reviera -t /app/bin
+      # The local compute host and the built-in runner, beside reviera (DM-RPC-004).
+      - install -Dm755 target/release/reviera-compute-host target/release/reviera-analysis-builtin
+        -t /app/bin
       # Sample models for Help (crates/reviera-ui/src/help.rs: <exe>/../share/reviera/samples).
       - install -Dm644 -t /app/share/reviera/samples test-data/samples/samples.json
         test-data/samples/*.ifc test-data/samples/*.lua test-data/samples/*.md

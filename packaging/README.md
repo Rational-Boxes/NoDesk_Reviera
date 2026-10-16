@@ -23,6 +23,13 @@ renders its PNG sizes at build time.
 `reviera` without arguments is the command-line tool, so every launcher (desktop entry, Start
 menu, the macOS bundle) runs `reviera gui`.
 
+Beside `reviera`, every package installs the local compute host `reviera-compute-host` and the
+built-in runner `reviera-analysis-builtin` (spec Ch 2 §2.17). Reviera starts the host when a job
+needs it (for example the project-wide clash test, `compute.submit`), and the host starts the
+runner; both exit again when idle, so neither is resident otherwise. The host keeps its job
+registry in the per-user state directory (Flatpak: `~/.var/app/<id>/.local/state/reviera/compute`;
+Windows: `%LOCALAPPDATA%\Reviera\compute`).
+
 ## Linux: Flatpak
 
 ```sh

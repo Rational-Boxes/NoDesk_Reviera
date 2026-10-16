@@ -91,7 +91,7 @@ export LIBRARY_PATH="$BREW/lib${LIBRARY_PATH:+:$LIBRARY_PATH}"
 export PKG_CONFIG_PATH="$BREW/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
 # Homebrew bottles target the running macOS, so the bundle cannot claim an older one.
 export MACOSX_DEPLOYMENT_TARGET="${MACOSX_DEPLOYMENT_TARGET:-$(sw_vers -productVersion | cut -d. -f1).0}"
-(cd "$ROOT" && cargo build --release --locked -p reviera)
+(cd "$ROOT" && cargo build --release --locked -p reviera -p reviera-compute --bins)
 BIN="$ROOT/target/release/reviera"
 
 # ------------------------------------------------------------------ 4. The .app bundle
@@ -99,6 +99,9 @@ step "Assembling $APP_NAME.app"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" "$APP/Contents/Frameworks"
 cp "$BIN" "$APP/Contents/MacOS/reviera"
+# The local compute host and the built-in runner, beside reviera (DM-RPC-004).
+cp "$ROOT/target/release/reviera-compute-host" "$ROOT/target/release/reviera-analysis-builtin" \
+    "$APP/Contents/MacOS/"
 
 # `reviera` without arguments is the command-line tool; the bundle's executable opens the window.
 cat > "$APP/Contents/MacOS/BIM Reviera" <<'EOF'
@@ -210,7 +213,8 @@ PLIST
     # Libraries first, then the executables, then the bundle.
     find "$APP/Contents/Frameworks" -name '*.dylib' -exec \
         codesign --force --timestamp --options runtime -s "$CODESIGN_IDENTITY" {} +
-    for exe in "$APP/Contents/MacOS/reviera" "$APP/Contents/MacOS/BIM Reviera"; do
+    for exe in "$APP/Contents/MacOS/reviera" "$APP/Contents/MacOS/reviera-compute-host" \
+        "$APP/Contents/MacOS/reviera-analysis-builtin" "$APP/Contents/MacOS/BIM Reviera"; do
         codesign --force --timestamp --options runtime --entitlements "$ENTITLEMENTS" \
             -s "$CODESIGN_IDENTITY" "$exe"
     done

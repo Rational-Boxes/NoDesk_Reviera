@@ -201,7 +201,7 @@ $env:INCLUDE = @(
 ) -join ';'
 Push-Location $Root
 try {
-    Invoke-Native cargo @('build', '--release', '--locked', '-p', 'reviera', '--bins')
+    Invoke-Native cargo @('build', '--release', '--locked', '-p', 'reviera', '-p', 'reviera-compute', '--bins')
 } finally { Pop-Location }
 $Exe = Join-Path $Root 'target\release\reviera.exe'
 
@@ -212,6 +212,9 @@ New-Item -ItemType Directory -Force $Stage | Out-Null
 Copy-Item $Exe $Stage
 # The window without a console window: what the shortcuts and the file association start.
 Copy-Item (Join-Path $Root 'target\release\reviera-gui.exe') $Stage
+# The local compute host and the built-in runner, beside reviera.exe (DM-RPC-004).
+Copy-Item (Join-Path $Root 'target\release\reviera-compute-host.exe') $Stage
+Copy-Item (Join-Path $Root 'target\release\reviera-analysis-builtin.exe') $Stage
 
 # The DLLs reviera.exe needs from vcpkg, followed recursively (dumpbin /dependents).
 $searchDirs = @((Join-Path $Dyn 'bin'), (Join-Path $BoostDir 'bin'))

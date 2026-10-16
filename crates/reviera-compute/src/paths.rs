@@ -32,11 +32,40 @@ pub fn state_dir() -> PathBuf {
     std::env::temp_dir().join("reviera-compute")
 }
 
+/// Where the host and its runners put their sockets: beside the state when the paths are short
+/// enough for a Unix socket (about 100 bytes), otherwise a short owner-only directory in the
+/// runtime directory (or the temporary directory) named after the state directory.
+pub fn socket_dir(state_dir: &Path) -> PathBuf {
+    let beside = state_dir.join("run");
+    // The longest name used: "<runner>-<n>.sock".
+    if beside
+        .join("reviera-analysis-builtin-9999.sock")
+        .as_os_str()
+        .len()
+        <= 100
+    {
+        return beside;
+    }
+    let base = std::env::var_os("XDG_RUNTIME_DIR")
+        .map(PathBuf::from)
+        .filter(|d| d.is_dir())
+        .unwrap_or_else(std::env::temp_dir);
+    let hash = reviera_compute_proto::blob::sha256_hex(state_dir.as_os_str().as_encoded_bytes());
+    let dir = base.join(format!("rvc-{}", &hash[..12]));
+    let _ = std::fs::create_dir_all(&dir);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700));
+    }
+    dir
+}
+
 /// The address the host listens on for `state_dir`.
 pub fn host_address(state_dir: &Path) -> Address {
     #[cfg(unix)]
     {
-        Address::Unix(state_dir.join("host.sock"))
+        Address::Unix(socket_dir(state_dir).join("host.sock"))
     }
     #[cfg(not(unix))]
     {

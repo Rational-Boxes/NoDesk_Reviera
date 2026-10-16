@@ -282,6 +282,80 @@ fn a_runaway_is_stopped_at_its_memory_limit() {
     assert_eq!(c.wait(&next, WAIT).unwrap().state, "succeeded");
 }
 
+#[cfg(target_os = "linux")]
+#[test]
+fn a_runner_that_cannot_start_fails_its_job_and_the_host_still_exits_when_idle() {
+    use std::os::unix::fs::PermissionsExt;
+    let env = Env::new(&[]);
+    // A runner that describes a kind but cannot serve it.
+    let fake = env.dir.path().join("broken-runner");
+    std::fs::write(
+        &fake,
+        "#!/bin/sh\nif [ \"$1\" = --describe ]; then echo '{\"runner\":\"broken\",\"version\":\"0\",\"kinds\":[{\"kind\":\"test.fault\",\"version\":1,\"licence\":\"MIT\"}]}'; exit 0; fi\necho 'cannot listen' >&2\nexit 1\n",
+    )
+    .unwrap();
+    std::fs::set_permissions(&fake, std::fs::Permissions::from_mode(0o755)).unwrap();
+    let c = env.client().with_host_env(vec![
+        (
+            "REVIERA_COMPUTE_RUNNERS".into(),
+            fake.to_string_lossy().into_owned(),
+        ),
+        ("REVIERA_COMPUTE_HOST_IDLE_S".into(), "2".into()),
+    ]);
+    let id = fault(
+        &c,
+        FaultOptions {
+            steps: 2,
+            ..Default::default()
+        },
+        None,
+    );
+    let j = c.wait(&id, WAIT).unwrap();
+    assert_eq!(j.state, "failed");
+    let f = j.failure.unwrap();
+    assert_eq!(f.reason, "runner_failed");
+    assert!(f.runner_output.contains("cannot listen"), "{f:?}");
+    let pid = env.host_pid().unwrap();
+    let end = Instant::now() + Duration::from_secs(20);
+    while alive(pid) && Instant::now() < end {
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    assert!(
+        !alive(pid),
+        "the host is still running after a failed start"
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn a_long_state_path_still_gets_working_sockets() {
+    // As under Flatpak: ~/.var/app/<id>/.local/state/reviera/compute is over 100 bytes.
+    let env = Env::new(&[]);
+    let long = env
+        .dir
+        .path()
+        .join("a-very-long-directory-name-standing-for-a-flatpak-app-data-folder")
+        .join("and-another-long-one-for-good-measure");
+    let c = ComputeClient::new(
+        long.clone(),
+        Some(env!("CARGO_BIN_EXE_reviera-compute-host").into()),
+    )
+    .with_host_env(vec![(
+        "REVIERA_COMPUTE_RUNNERS".into(),
+        env!("CARGO_BIN_EXE_reviera-analysis-builtin").into(),
+    )]);
+    let id = fault(
+        &c,
+        FaultOptions {
+            steps: 2,
+            ..Default::default()
+        },
+        None,
+    );
+    assert_eq!(c.wait(&id, WAIT).unwrap().state, "succeeded");
+    c.shutdown_host().unwrap();
+}
+
 #[test]
 fn negotiation_without_a_common_technique_fails() {
     let env = Env::new(&[]);
