@@ -15,6 +15,7 @@ This is Reviera's own design, from owner directives given on 2026-10-15. It has 
 5. **Future-forward.** Compression and encryption are negotiated, so new techniques arrive without changing the contract.
 6. **Contained failures.** A crash or runaway fails its job, never Reviera or the machine.
 7. **Disconnect-safe.** A long job outlives its client: a durable job registry on every server and a record of submitted jobs in the model let Reviera reconnect, follow the job from where it left off and collect its results, even after quitting or moving to another machine.
+8. **Licence freedom at the boundary.** Runners and hosted services are separate programs behind a published, arm's-length contract, so Reviera can connect to any of them regardless of licence, and their authors can implement the contract without taking on Reviera's licence (DM-RPC-002, TECH_STACK §4.2).
 
 ## 8.2 Architecture at a glance
 

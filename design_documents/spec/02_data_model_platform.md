@@ -4365,6 +4365,7 @@ Reviera shall have a foundational subsystem, built on one general contract, that
 
 **Behaviour & rules.**
 - A job kind is declared by a JSON manifest: its name and version; its options and result schemas (a protobuf package, or JSON Schema for the HTTPS binding); its **distillers** (DM-RPC-003): a filter profile, plus any named transforms; its **result applier**; its **runner** (a command line, relative to the kind's folder, and the platforms it supports, or a container image for hosts that run containers); resource hints (cores, memory, GPU, typical duration per unit of distillation); whether it supports checkpoints; and the SPDX licences of each part.
+- **Licence boundary.** Runners and hosted services are separate programs reached over the published contract, so Reviera can connect to a runner or service whatever its licence, including proprietary ones, and a runner's author owes nothing to Reviera's licence for implementing the contract (TECH_STACK §4.2). To keep that boundary sound, the contract stays arm's-length: it carries distillations in documented formats, never Reviera's internal data structures; a runner needs none of Reviera's code; and the contract files, technique registry and runner skeletons are published under MIT, as every interface the project defines is (TECH_STACK §4.0). A job kind's manifest records each runner's licence, which the Compute Jobs panel shows; organisations can restrict which licences their hosts run.
 - Filter profiles are data. Transforms and result appliers run in Reviera's process, so they are Rust code in Reviera or Lua in an add-in (§2.14) and must pass the GPL-compatible licence check (TECH_STACK §4.2). Runners are separate programs and are never linked into Reviera; their licences are checked before an official bundle ships one.
 - **Built-in job kinds:** `analysis.<family>` for each batch analysis family (chapter 4 §4.0.2a); `render.still`, `render.panorama`, `render.walkthrough` (chapter 7); `tessellate.ifc` for large models and links; `export.pdf_set`, `export.ifc`, `export.cobie`, `export.dwg`; `pointcloud.index`; `model.boolean_batch` and `model.clash_batch` for project-wide booleans, overlap and clash runs started as a batch (ARC-MOD-028, ARC-MOD-030, ANA-CLASH-001).
 - Interactive work never depends on a job: editing, regeneration, live checks and viewport drawing run in Reviera's process.
@@ -4377,6 +4378,7 @@ Reviera shall have a foundational subsystem, built on one general contract, that
 **Acceptance criteria.**
 - [ ] An add-in that registers a new job kind with a Lua distiller and applier and a Python runner can run jobs on a local runner and on a paired host.
 - [ ] A manifest whose distiller's licence is not GPL-compatible is refused with the licence field named.
+- [ ] A runner under a proprietary licence, built only from the published `.proto` files and skeleton, registers and runs jobs; its licence is shown in the Compute Jobs panel.
 
 ### 2.17.3 Model distillations
 **ID:** DM-RPC-003 · **Priority:** P2 · **Ref:** owner requirement (2026-10-15); Reviera-originated design

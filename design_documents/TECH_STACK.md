@@ -184,10 +184,13 @@ Both modes sit behind one **`ModelStore` trait** in the Rust core. Editing, rege
 
 ### 4.0 Licensing exceptions inside the repository
 
+**Policy (owner decision, 2026-10-15): defined interfaces are MIT.** Every interface the project defines for other software to implement or read is published under MIT, while Reviera's implementation stays GPL-3.0-or-later. That covers schemas and data formats, protocol and contract definitions (`.proto` files, OpenAPI documents, identifier registries), manifest formats (add-in, plugin, provider, job-kind and library manifests), generated API descriptions (the command registry's JSON Schemas as published for MCP and scripting), and the reference client and server skeletons that exist only to implement an interface. New interfaces get a row below when their files are created.
+
 | Path | Licence | Reason |
 |------|---------|--------|
 | `schemas/rxd/` (RXD JSON Schemas, examples, format description) | **MIT** | So any tool can adopt the RXD format (owner decision, 2026-10-12; `spec/02a_extension_data_format.md` §12) |
 | `schemas/rsp/`, `clients/rsp/` (Reviera Scene Protocol schemas, `REVIERA_scene` glTF extension, reference client libraries) | **MIT** | So any renderer, engine or Blender add-on can implement a bridge (spec Ch 5 ADV-RSP-001) |
+| `schemas/compute/`, `clients/compute/` (`reviera.compute.v1` and per-kind `.proto` files, the HTTPS binding's OpenAPI document, the technique-identifier registry, runner and client skeletons) | **MIT** (owner decision, 2026-10-15) | So any runner or hosted service, under any licence, can implement the contract without Reviera's code, keeping runners separate programs (spec Ch 2 DM-RPC-002) |
 | Everything else | GPL-3.0-or-later | Project licence |
 
 ### 4.1 Dependency compatibility
@@ -220,6 +223,7 @@ Both modes sit behind one **`ModelStore` trait** in the Rust core. Editing, rege
   - Any official Reviera add-in registry will only accept add-ins with a compatible SPDX licence and published source code.
   - Users' own private scripts and macros that are never distributed carry no obligations.
   - MCP clients and AI agents are separate programs talking over a protocol, so they are not add-ins and this policy does not apply to them.
+  - **Compute runners and hosted services** (spec Ch 2 §2.17) are separate programs that Reviera talks to over a published, arm's-length protocol, so connecting to them creates no combined work and imposes no licence obligation either way: a runner or service may be under any licence, including proprietary, and Reviera may use it. This holds only while the boundary stays arm's-length: the contract passes distillations in documented formats (IFC subsets and published exchange formats), never Reviera's internal data structures, and a runner needs none of Reviera's code. Parts that run inside Reviera (filter profiles' transforms and result appliers, in-process providers) remain add-ins under the GPL-compatible policy above. Shipping a runner in an official bundle or published image is a distribution of that runner and still needs its own licence check and, for copyleft runners, its source. An AGPL runner's network obligations fall on whoever operates it as a service. This is the project's reading of the licences, not legal advice.
 - **MCP clients:** AI agents talk to the MCP server across a process/network boundary, so they are not derivative works and need no licence obligation.
 - **Bundled data sets.** Data shipped with Reviera (weather, EPD/emission factors, textures, libraries) needs its own licence check, separate from code. Known limits from the gap-fill research (spec Ch 4 ANA-CARB-001): the ICE embodied-carbon database's licence forbids embedding its data in software, so users import it themselves; ÖKOBAUDAT is free to use but its terms exclude some uses, so it is not bundled either. Bundled sets are tracked in the data licence list (spec Q-DM-09).
 - **IFC files:** models created by users are their own data and are not covered by the GPL.
