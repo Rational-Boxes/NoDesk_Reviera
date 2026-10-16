@@ -188,32 +188,107 @@ reviera.opening.create_vertical{ host_id = roof, loops = { { {9.6, 6.6}, {10.8, 
 for _, x in ipairs({ 3.5, 10.5 }) do
   reviera.skylight.create{ roof_id = roof, point = { x, 2.2 } }
 end
--- Two round porch columns by the front door, the second an array of the first (ARC-MOD-026),
--- their tops attached to the eave over them (ARC-COL-001).
-local porch = reviera.column.place_architectural{
-  point = {2.6, -0.4}, base_level = l1, top_constraint = { unconnected = 3.5 },
-}
-local round_column = reviera.type.duplicate{ type_id = type_named("Rectangular Column 400 x 400"), new_name = "Round Column 250" }
-reviera.type.set_param{ type_id = round_column, param = "section", value = "round" }
-reviera.type.set_param{ type_id = round_column, param = "diameter", value = "250 mm" }
-reviera.element.set_type{ element_ids = { porch }, type_id = round_column }
-local copies = reviera.element.array_linear{ element_ids = { porch }, vector = { 1.8, 0, 0 }, count = 2 }
-reviera.column.attach{ column_ids = { porch, copies[1][1] }, target_id = roof }
-
--- ---- The tower: a drum of radius 2.6 east of the house, three storeys ----
-local cx, cy, R = 19.5, 4.5, 2.6
+-- ---- Two castle towers on the front corners, built onto the house ----
+-- Octagons with their facets square to the house; the facet against the house is left out, so
+-- the tower's walls end on the house's side wall and a door leads straight in; where their
+-- ends meet the house's walls at an angle they are cut by them (a boolean, ARC-MOD-028). Three
+-- storeys and a battlement walk behind a parapet of merlons and crenels.
 local TH = 9.4
-local north = wall(l1, {cx - R, cy}, {cx + R, cy}, TH, { {cx, cy + R} })
-local south = wall(l1, {cx + R, cy}, {cx - R, cy}, TH, { {cx, cy - R} })
-reviera.door.place{ type_id = arched_door, host_wall_id = south, point = {cx, cy - R - 0.3} }
--- Gothic windows on every storey, an oculus at the top.
-for _, s in ipairs({ 1.0, 4.0 }) do
-  reviera.window.place{ type_id = gothic, host_wall_id = north, point = {cx - 1.8, cy + 1.9}, sill_height = s }
-  reviera.window.place{ type_id = gothic, host_wall_id = south, point = {cx + 1.8, cy - 1.9}, sill_height = s + 0.4 }
+local A = 2.4                                -- the octagon's apothem, to the walls' centrelines
+local RC = A / math.cos(math.pi / 8)         -- to its corners
+local function oct(cx, cy, r, k)              -- corner k, the facets axis-aligned
+  local a = math.pi / 8 + k * math.pi / 4
+  return { cx + r * math.cos(a), cy + r * math.sin(a) }
 end
-reviera.window.place{ type_id = oculus, host_wall_id = north, point = {cx, cy + R + 0.3}, sill_height = 7.4 }
-reviera.window.place{ type_id = gothic, host_wall_id = south, point = {cx - 1.8, cy - 1.9}, sill_height = 7.0 }
--- Round floors inside the drum on each level.
+local function oct_loop(cx, cy, apothem)
+  local r, out = apothem / math.cos(math.pi / 8), {}
+  for k = 0, 7 do
+    out[#out + 1] = { line = { start = oct(cx, cy, r, k), ["end"] = oct(cx, cy, r, k + 1) } }
+  end
+  return out
+end
+-- `open` is the facet left out (0 east … facet k runs from corner k to k + 1).
+local function castle_tower(cx, cy, open)
+  local walls = {}
+  for k = 0, 7 do
+    if k ~= open then
+      -- Clockwise, so the exterior faces out.
+      walls[k] = reviera.wall.create{
+        curve = { line = { start = oct(cx, cy, RC, k + 1), ["end"] = oct(cx, cy, RC, k) } },
+        base_level = l1, top_constraint = { unconnected = TH - 0.3 },
+      }
+    end
+  end
+  for _, l in ipairs({ l1, l2, l3 }) do
+    reviera.floor.create{ loops = { oct_loop(cx, cy, A - 0.1) }, level_id = l }
+  end
+  -- The battlement walk, and the parapet on the seven outer facets.
+  reviera.floor.create{ loops = { oct_loop(cx, cy, A + 0.1) }, level_id = l3, offset = TH - 6.0 }
+  for k = 0, 7 do
+    if k ~= open then
+      local a, b = oct(cx, cy, RC, k + 1), oct(cx, cy, RC, k)
+      local dx, dy = b[1] - a[1], b[2] - a[2]
+      local p = function(t) return { a[1] + dx * t, a[2] + dy * t } end
+      for _, piece in ipairs({ {0, 0.2, 1.2}, {0.2, 0.4, 0.55}, {0.4, 0.6, 1.2}, {0.6, 0.8, 0.55}, {0.8, 1.0, 1.2} }) do
+        reviera.wall.create{
+          curve = { line = { start = p(piece[1]), ["end"] = p(piece[2]) } },
+          base_level = l3, base_offset = TH - 6.0, top_constraint = { unconnected = piece[3] },
+        }
+      end
+    end
+  end
+  return walls
+end
+-- South-west: its east facet against the west wall; south-east: its west facet against the
+-- east wall. Each stands forward of the front by 1.5 m.
+local sw_cx, se_cx, t_cy = -0.1 - A, W + 0.1 + A, 1.0
+local sw = castle_tower(sw_cx, t_cy, 7)
+local se = castle_tower(se_cx, t_cy, 3)
+-- Doors from the house into the towers on both floors (the west wall runs north from (0, 0),
+-- the east wall south from (14, 9)).
+for _, w in ipairs({ ground[4], upper[4] }) do
+  reviera.door.place{ host_wall_id = w, point_along = t_cy }
+end
+-- The east doors swing into the house, clear of the spiral in the tower.
+for _, w in ipairs({ ground[2], upper[2] }) do
+  reviera.door.place{ host_wall_id = w, point_along = D - t_cy, flip_facing = true }
+end
+-- Gothic windows on the towers' south and outer facets, arrow-slit high on the third storey.
+for _, f in ipairs({ { sw, 5 }, { sw, 4 }, { se, 5 }, { se, 6 } }) do
+  local len = 2 * RC * math.sin(math.pi / 8)
+  for _, sill in ipairs({ 0.9, 3.9 }) do
+    reviera.window.place{ type_id = gothic, host_wall_id = f[1][f[2]], point_along = len / 2, sill_height = sill }
+  end
+  reviera.window.place{ host_wall_id = f[1][f[2]], point_along = len / 2, sill_height = 7.2, width = 0.25, height = 1.2 }
+end
+-- The south-west tower climbs by an L winder (ARC-STAIR-004); the south-east by spirals.
+local winder = reviera.stair.create{
+  base_level = l1, width = 0.8, tread_depth = 0.28,
+  runs = { { start = { sw_cx - 1.6, t_cy - 1.2 }, corner = { sw_cx + 1.2, t_cy - 1.2 }, ["end"] = { sw_cx + 1.2, t_cy + 0.48 } } },
+}
+reviera.stair.create_openings{ stair_id = winder }
+for _, b in ipairs({ l1, l2 }) do
+  local s = reviera.stair.create{
+    base_level = b, width = 0.9,
+    runs = { { start = {se_cx + 1.2, t_cy}, center = {se_cx, t_cy} } },
+  }
+  reviera.stair.create_openings{ stair_id = s }
+end
+
+-- ---- The round tower behind the east wing, joined by a barrel-vaulted gallery ----
+local cx, cy, R = 19.5, 6.9, 2.6
+-- Two arcs split north and south, so the west arc faces the gallery.
+local west_arc = wall(l1, {cx, cy - R}, {cx, cy + R}, TH, { {cx - R, cy} })
+local east_arc = wall(l1, {cx, cy + R}, {cx, cy - R}, TH, { {cx + R, cy} })
+-- In from the gallery (swinging out into it, clear of the spiral stair), and out to the garden.
+reviera.door.place{ type_id = arched_door, host_wall_id = west_arc, point = {cx - R - 0.3, cy} }
+reviera.door.place{ type_id = arched_door, host_wall_id = east_arc, point = {cx + R + 0.3, cy} }
+for _, s in ipairs({ 1.0, 4.0 }) do
+  reviera.window.place{ type_id = gothic, host_wall_id = west_arc, point = {cx - 1.8, cy + 1.9}, sill_height = s }
+  reviera.window.place{ type_id = gothic, host_wall_id = east_arc, point = {cx + 1.8, cy - 1.9}, sill_height = s + 0.4 }
+end
+reviera.window.place{ type_id = oculus, host_wall_id = east_arc, point = {cx + R + 0.3, cy}, sill_height = 7.4 }
+reviera.window.place{ type_id = gothic, host_wall_id = west_arc, point = {cx - 1.8, cy - 1.9}, sill_height = 7.0 }
 local function disc(r)
   local loop, n = {}, 48
   for k = 0, n - 1 do
@@ -226,7 +301,6 @@ end
 for _, l in ipairs({ l1, l2, l3 }) do
   reviera.floor.create{ loops = { disc(R - 0.1) }, level_id = l }
 end
--- Two spiral stairs about the drum's centre, each opening the floor above it.
 for _, b in ipairs({ l1, l2 }) do
   local s = reviera.stair.create{
     base_level = b, width = 0.9,
@@ -235,15 +309,73 @@ for _, b in ipairs({ l1, l2 }) do
   reviera.stair.create_openings{ stair_id = s }
 end
 reviera.room.place{ level_id = l1, point = {cx - 1.6, cy}, name = "Tower" }
--- The tower's top room has a domed ceiling under the onion dome, sketched inside the drum.
 local tower_ceiling = reviera.ceiling.create{ loops = { disc(R - 0.1) }, level_id = l3 }
--- An onion dome over the drum, its walls attached.
 local dome = reviera.roof.create_dome{
   level_id = l1, base_offset = TH, center = {cx, cy},
   plan = { circle = { radius = R + 0.3 } }, profile = "onion",
 }
 reviera.roof.attach_walls{ roof_id = dome }
 reviera.ceiling.set_shape{ ceiling_ids = { tower_ceiling }, shape = "follow_roof", roof_id = dome }
+-- The gallery: walls from the house's east face to the drum (ending where the drum's face
+-- begins), a floor, and a semicircular barrel vault (ARC-ROOF-008).
+local g0, g1 = cy - 0.9, cy + 0.9
+local gx1 = cx - math.sqrt((R + 0.1) ^ 2 - 0.8 ^ 2)
+wall(l1, {gx1, g0}, {W + 0.1, g0})
+wall(l1, {W + 0.1, g1}, {gx1, g1})
+reviera.door.place{ host_wall_id = ground[2], point_along = D - cy }
+local gallery_floor = reviera.floor.create{ loops = { square(W + 0.1, g0 + 0.1, gx1, g1 - 0.1) }, level_id = l1 }
+local vault = {}
+local vf = { {W + 0.1, g0 - 0.1}, {gx1, g0 - 0.1}, {gx1, g1 + 0.1}, {W + 0.1, g1 + 0.1} }
+for i = 1, 4 do
+  vault[i] = { line = { start = vf[i], ["end"] = vf[i % 4 + 1] }, overhang = 0 }
+end
+local barrel = reviera.roof.create_arched{
+  curves = vault, level_id = l1, base_offset = 3.0, profile = "semicircle",
+  overhang = 0, end_overhang = 0,
+}
+
+-- ---- The portico: four Doric columns from the sample Component Library ----
+-- A stone platform with two steps down to the garden, the columns (the temple's, at 45 %),
+-- an entablature, and a pediment: a gable roof extruded from a reference plane on the
+-- portico's front (ARC-ROOF-002, ARC-REFP-001). The house's name runs along the frieze in
+-- model text on the same plane (ARC-MTXT-001).
+local library = reviera.script_dir .. "/../library"
+local stone = {}
+for _, t in ipairs({ 600, 400, 200 }) do
+  stone[t] = reviera.type.duplicate{ type_id = type_named("Generic Floor - 300mm"), new_name = "Stone " .. t }
+  reviera.type.set_param{ type_id = stone[t], param = "thickness", value = t / 1000 }
+end
+local px0, px1, py = 0.3, 6.7, -2.95
+reviera.floor.create{ loops = { square(px0, py, px1, -0.1) }, level_id = l1, type_id = stone[600] }
+reviera.floor.create{ loops = { square(px0, py - 0.3, px1, py) }, level_id = l1, offset = -0.2, type_id = stone[400] }
+reviera.floor.create{ loops = { square(px0, py - 0.6, px1, py - 0.3) }, level_id = l1, offset = -0.4, type_id = stone[200] }
+local colonnade = reviera.array.along_path{
+  name = "Portico",
+  sources = { { library = library, item = "Classical/Columns/parthenon_column.obj" } },
+  path = { points = { {1.1, -2.25}, {5.9, -2.25} } },
+  level = l1,
+  distribution = { mode = "number", value = 4 },
+  orientation = "same",
+}
+for _, t in ipairs(reviera.mesh_object.types()) do
+  reviera.mesh_object.set_type{ type_id = t.id, scale = 0.45 }
+end
+local column_top = 10.43 * 0.45
+local entablature = reviera.type.duplicate{ type_id = type_named("Generic Floor - 300mm"), new_name = "Entablature 600" }
+reviera.type.set_param{ type_id = entablature, param = "thickness", value = 0.6 }
+reviera.floor.create{ loops = { square(px0, py, px1, -0.8) }, level_id = l1, offset = column_top + 0.6, type_id = entablature }
+local front = reviera.refplane.create{ name = "Portico Front", start = {px0 - 0.2, py}, ["end"] = {px1 + 0.2, py} }
+reviera.roof.create_extrusion{
+  ref_plane = front, ref_level = l1, start = 0, ["end"] = -(-0.8 - py),
+  profile = {
+    { line = { start = {0.0, column_top + 0.85}, ["end"] = {3.4, column_top + 1.95} } },
+    { line = { start = {3.4, column_top + 1.95}, ["end"] = {6.8, column_top + 0.85} } },
+  },
+}
+reviera.modeltext.create{
+  ref_plane = front, point = {3.4, column_top + 0.2}, text = "BELMONT", size = 0.3, depth = 0.03,
+  align = "center",
+}
 
 -- ---- A deck behind the house, with a guard railing and a gate ----
 local dk = { {4.0, 9.2}, {12.0, 9.2}, {12.0, 12.5}, {4.0, 12.5} }
@@ -256,6 +388,20 @@ local guard = reviera.railing.create{
   path = { {4.05, 9.25}, {4.05, 12.45}, {11.95, 12.45}, {11.95, 9.25} }, base_level = l1,
 }
 reviera.railing.add_gate{ railing_id = guard, at = 7.2 }
+
+-- ---- Booleans where parts meet (ARC-MOD-028): the house's eaves are cut by the towers, the
+-- towers' walls by the house's, and the gallery's vault and floor by the drum ----
+local cut_by = { [roof] = true, [barrel] = true, [gallery_floor] = true }
+for _, t in ipairs({ sw, se }) do
+  for _, w in pairs(t) do cut_by[w] = true end
+end
+for _, o in ipairs(reviera.overlap.find{}.overlaps) do
+  if cut_by[o.a] then
+    reviera.overlap.resolve{ a = o.a, b = o.b, mode = "cut_a" }
+  elseif cut_by[o.b] then
+    reviera.overlap.resolve{ a = o.a, b = o.b, mode = "cut_b" }
+  end
+end
 
 reviera.view.create_plan{ level_ids = { l1, l2, l3 } }
 reviera.view.create_3d{}

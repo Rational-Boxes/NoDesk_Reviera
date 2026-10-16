@@ -33,9 +33,17 @@ fn the_sample_corpus_builds_cleanly() {
             .as_deref()
             .is_some_and(|l| l == "1" || l.split(',').any(|n| n.trim() == name))
     };
+    // `REVIERA_SAMPLES=a,b` builds only those.
+    let only = std::env::var("REVIERA_SAMPLES").ok();
     let out = tempfile::tempdir().unwrap();
     for sample in &manifest {
         let name = sample["name"].as_str().unwrap();
+        if only
+            .as_deref()
+            .is_some_and(|l| !l.split(',').any(|n| n.trim() == name))
+        {
+            continue;
+        }
         let mut app = App::new(AppConfig {
             live: None,
             untitled_dir: out.path().to_owned(),

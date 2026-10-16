@@ -6,8 +6,10 @@
 //!
 //! Built so far: **solid booleans on closed meshes** ([`boolean`]). Each closed part becomes an
 //! OCCT solid (its triangles as planar faces sewn into a shell, turned to face out). The
-//! subtraction, intersection or union runs on the two compounds, coplanar faces are merged
-//! (`ShapeUpgrade_UnifySameDomain`), and the result is triangulated back into closed parts.
+//! subtraction, intersection or union runs on the two compounds, and the result is triangulated
+//! back into closed parts. Coplanar faces are not merged (`ShapeUpgrade_UnifySameDomain` can
+//! loop without bound), and inputs over [`MAX_TRIANGLES`] are refused, so a boolean's time and
+//! memory stay bounded by its inputs.
 
 pub mod csg;
 mod ffi;
@@ -40,9 +42,19 @@ fn pack(parts: &[Mesh]) -> ffi::bridge::Meshes {
     out
 }
 
+/// The most triangles, both inputs together, a boolean takes. Each triangle becomes an OCCT
+/// face, and a B-rep boolean's memory grows quickly with the face count.
+pub const MAX_TRIANGLES: usize = 20_000;
+
 /// A boolean of two sets of closed parts: the result's closed parts. An empty result (nothing in
 /// common, or everything subtracted) is an empty list.
 pub fn boolean(op: Op, a: &[Mesh], b: &[Mesh], tolerance: f64) -> Result<Vec<Mesh>, String> {
+    let triangles: usize = a.iter().chain(b).map(|m| m.1.len() / 3).sum();
+    if triangles > MAX_TRIANGLES {
+        return Err(format!(
+            "too complex for a boolean: {triangles} triangles (at most {MAX_TRIANGLES})"
+        ));
+    }
     let code = match op {
         Op::Subtract => 0,
         Op::Intersect => 1,
@@ -128,5 +140,16 @@ mod tests {
         let far = [cube([10.0, 10.0, 10.0], [11.0, 11.0, 11.0])];
         assert!(boolean(Op::Intersect, &a, &far, 1e-6).unwrap().is_empty());
         assert!(!occt_version().is_empty());
+    }
+
+    #[test]
+    fn oversized_inputs_are_refused() {
+        // Many small boxes (12 triangles each), past the limit together.
+        let many: Vec<Mesh> = (0..MAX_TRIANGLES / 12 + 1)
+            .map(|i| cube([i as f64, 0.0, 0.0], [i as f64 + 0.5, 1.0, 1.0]))
+            .collect();
+        let b = [cube([0.0, 0.0, 0.0], [1.0, 1.0, 1.0])];
+        let err = boolean(Op::Subtract, &many, &b, 1e-6).unwrap_err();
+        assert!(err.contains("too complex"), "{err}");
     }
 }

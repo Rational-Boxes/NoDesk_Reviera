@@ -3,7 +3,7 @@
 
 // Solid booleans on closed triangle meshes through OpenCASCADE: each closed part becomes a
 // solid (its triangles as planar faces, sewn into a shell), the boolean runs on the compounds,
-// coplanar faces are merged, and the result is triangulated back.
+// and the result is triangulated back.
 
 #include "reviera-geom/cpp/shim.h"
 #include "reviera-geom/src/ffi.rs.h"
@@ -20,7 +20,6 @@
 #include <BRep_Builder.hxx>
 #include <BRep_Tool.hxx>
 #include <Poly_Triangulation.hxx>
-#include <ShapeUpgrade_UnifySameDomain.hxx>
 #include <Standard_Failure.hxx>
 #include <Standard_Version.hxx>
 #include <TopExp_Explorer.hxx>
@@ -165,10 +164,10 @@ Meshes mesh_boolean(uint8_t op, const Meshes &a, const Meshes &b, double toleran
     default:
       throw std::runtime_error("unknown boolean operation");
     }
-    // Merge the triangles that now share planes.
-    ShapeUpgrade_UnifySameDomain unify(result, Standard_True, Standard_True, Standard_False);
-    unify.Build();
-    return triangulate(unify.Shape());
+    // Coplanar faces are not merged: ShapeUpgrade_UnifySameDomain can loop without bound (it
+    // allocated past 8 GB on a roof cut four times over, in the manor sample) and cannot be
+    // interrupted. The result's faces are triangulated as they are.
+    return triangulate(result);
   } catch (const Standard_Failure &e) {
     throw std::runtime_error(std::string("OpenCASCADE: ") + e.GetMessageString());
   }

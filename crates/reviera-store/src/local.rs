@@ -2177,31 +2177,42 @@ impl LocalProject {
             let (Some(&a), Some(&b)) = (self.steps.get(&target), self.steps.get(&tool)) else {
                 continue;
             };
-            geometry::relate_one(
-                &mut self.ifc,
-                "IfcRelInterferesElements",
-                "RelatingElement",
-                a,
-                "RelatedElement",
-                b,
-                owner_history,
-            )?;
             let kind = match op {
                 reviera_core::csg::CsgOp::Subtract => "Subtract",
                 reviera_core::csg::CsgOp::Intersect => "Intersect",
                 reviera_core::csg::CsgOp::Union => "Union",
             };
+            // One relation per pair: a tool may shape several targets.
+            let mut existing = None;
             for rel in self.ifc.referenced_by(b, "IfcRelInterferesElements")? {
-                if self.ifc.attribute(rel, "RelatingElement")? == AttrValue::Ref(a.0) {
-                    self.ifc.set_attribute(
-                        rel,
-                        "InterferenceType",
-                        &AttrValue::String(kind.into()),
-                    )?;
-                    self.ifc
-                        .set_attribute(rel, "ImpliedOrder", &AttrValue::Bool(true))?;
+                if self.ifc.attribute(rel, "RelatedElement")? == AttrValue::Ref(b.0)
+                    && self.ifc.attribute(rel, "RelatingElement")? == AttrValue::Ref(a.0)
+                {
+                    existing = Some(rel);
+                    break;
                 }
             }
+            let rel = match existing {
+                Some(rel) => rel,
+                None => {
+                    let rel = self
+                        .ifc
+                        .create_rooted("IfcRelInterferesElements", &GlobalId::new())?;
+                    if let Some(oh) = owner_history {
+                        self.ifc
+                            .set_attribute(rel, "OwnerHistory", &AttrValue::Ref(oh.0))?;
+                    }
+                    self.ifc
+                        .set_attribute(rel, "RelatingElement", &AttrValue::Ref(a.0))?;
+                    self.ifc
+                        .set_attribute(rel, "RelatedElement", &AttrValue::Ref(b.0))?;
+                    rel
+                }
+            };
+            self.ifc
+                .set_attribute(rel, "InterferenceType", &AttrValue::String(kind.into()))?;
+            self.ifc
+                .set_attribute(rel, "ImpliedOrder", &AttrValue::Bool(true))?;
         }
         Ok(())
     }
