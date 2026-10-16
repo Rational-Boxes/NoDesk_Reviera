@@ -68,6 +68,14 @@ polyline, distributed by number) for editing.
 
 ![The Greek temple's colonnade in 3D, its path array selected, with the Modify | Path Arrays tab and the Component Library pane](design_documents/application_screenshots/temple-colonnade.png)
 
+Clash detection on the *Manor before coordination* sample. A clash test of every element against
+every other ran out of process and found 19 clashes among 201 bodies, listed in the Clash
+Detection pane with their category pair, volume and depth. Clash 3 is picked: the house's roof
+and a castle tower's wall are selected and the 3D view is framed on where the wall runs up
+through the eave, ready to review, comment on or resolve.
+
+![Clash detection on the Manor before coordination: the Clash Detection pane listing 19 new clashes, the third selected and framed in 3D](design_documents/application_screenshots/clash_coordination.png)
+
 ## What works today
 
 Command names are given in `code` after each feature; every one of them can be run from the
