@@ -1440,6 +1440,60 @@ icon = "analytical_merge"
 help = "Merge analytical nodes within the node merge distance and remove nodes no member uses"
 
 [[action]]
+id = "analytical_panel.create_by_boundary"
+label = "Panel by Boundary"
+icon = "analytical_panel"
+help = "Sketch an analytical panel's boundary in a plan, at the plan's level; its corners become nodes shared with members there"
+
+[[action]]
+id = "analytical_panel.create_by_extrusion"
+label = "Panel by Extrusion"
+icon = "analytical_panel_extrude"
+help = "Click a straight profile in a plan; the analytical panel rises from this level to the next"
+
+[[action]]
+id = "ui.analytical_panel_curved"
+label = "Curved Panel"
+icon = "analytical_panel_curved"
+help = "Click an arc's start, a point on it and its end in a plan; the curved analytical panel rises from this level to the next"
+
+[[action]]
+id = "analytical_opening.create"
+label = "Analytical Opening"
+icon = "analytical_opening"
+help = "Sketch an opening inside an analytical panel at this level"
+
+[[action]]
+id = "analytical_panel.split"
+label = "Split Panel"
+icon = "analytical_split"
+help = "Click two points of a line across an analytical panel at this level to split it in two"
+
+[[action]]
+id = "analytical_panel.set_cladding"
+label = "Cladding"
+icon = "analytical_cladding"
+help = "Toggle the selected analytical panels as cladding: they carry loads to their supports but add no stiffness"
+
+[[action]]
+id = "analytical_model.check_supports"
+label = "Check Supports"
+icon = "analytical_check_supports"
+help = "Check that every analytical member is supported (nothing carrying an end, support chains that loop, no supports at all) and list the issues in Analytical Checks"
+
+[[action]]
+id = "analytical_model.check_consistency"
+label = "Check Consistency"
+icon = "analytical_check_consistency"
+help = "Check the analytical model against itself and the physical model: disconnected nodes, parts with no support, drift from physical elements, missing counterparts, instability hints"
+
+[[action]]
+id = "ui.pane.analytical_checks"
+label = "Analytical Checks"
+icon = "analytical_checks"
+help = "Show or hide the Analytical Checks pane: the last check's issues, to select, zoom to, isolate or ignore"
+
+[[action]]
 id = "ui.toggle_analytical"
 label = "Show Analytical"
 icon = "analytical_show"
@@ -1811,6 +1865,25 @@ tools = [
   { action = "analytical_automation.analytical_to_physical", size = "small" },
   { action = "analytical_automation.disconnect", size = "small" },
   { action = "analytical_node.merge", size = "small" },
+]
+
+[[tab.panel]]
+label = "Panels"
+tools = [
+  { action = "analytical_panel.create_by_boundary", size = "large" },
+  { action = "analytical_panel.create_by_extrusion", size = "small" },
+  { action = "ui.analytical_panel_curved", size = "small" },
+  { action = "analytical_opening.create", size = "small" },
+  { action = "analytical_panel.split", size = "small" },
+  { action = "analytical_panel.set_cladding", size = "small" },
+]
+
+[[tab.panel]]
+label = "Checks"
+tools = [
+  { action = "analytical_model.check_supports", size = "large" },
+  { action = "analytical_model.check_consistency", size = "large" },
+  { action = "ui.pane.analytical_checks", size = "small" },
 ]
 
 [[tab.panel]]

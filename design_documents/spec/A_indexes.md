@@ -190,7 +190,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**2088 unique commands** in 410 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**2091 unique commands** in 410 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -207,10 +207,10 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `analytical_link` | 1 |
 | `analytical_link_type` | 1 |
 | `analytical_member` | 4 |
-| `analytical_model` | 6 |
+| `analytical_model` | 7 |
 | `analytical_node` | 2 |
-| `analytical_opening` | 1 |
-| `analytical_panel` | 4 |
+| `analytical_opening` | 2 |
+| `analytical_panel` | 5 |
 | `analytical_pipe_connection` | 1 |
 | `analytical_segment` | 2 |
 | `analytical_water_loop` | 1 |
@@ -655,6 +655,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `analytical_member.set` | 4 | member_ids[], section_type_id?, material?, role?, analyze_as?, rotation? | — | Yes | STR-AM-001 |
 | `analytical_member.set_releases` | 4 | id, end, dof_flags \ | preset | — | Yes |
 | `analytical_model.adjust` | 4 | element_id | tool_session | Yes | STR-AM-008 |
+| `analytical_model.check` | 4 | scope? | report | No | STR-AM-007 |
 | `analytical_model.check_consistency` | 4 | scope? | report | No | STR-AM-007 |
 | `analytical_model.check_supports` | 4 | scope? | report | No | STR-AM-007 |
 | `analytical_model.ignore_issue` | 4 | issue_key, ignore: bool, reason? | — | Yes | STR-AM-007 |
@@ -663,8 +664,10 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `analytical_node.merge` | 4 | tolerance? | — | Yes | STR-AM-003 |
 | `analytical_node.move` | 4 | node_ids[], delta, cs?: "global"\ | "local" | — | Yes |
 | `analytical_opening.create` | 4 | panel_id, boundary_curves[] | id | Yes | STR-AM-002 |
+| `analytical_opening.remove` | 4 | panel_id, opening | — | Yes | STR-AM-002 |
 | `analytical_panel.create_by_boundary` | 4 | plane, boundary_curves[], thickness, material_id, role | id | Yes | STR-AM-002 |
 | `analytical_panel.create_by_extrusion` | 4 | work_plane, profile_curves[], depth, thickness, material_id | id | Yes | STR-AM-002 |
+| `analytical_panel.set` | 4 | panel_id, thickness?, material?, role?, analyze_as? | — | Yes | STR-AM-002 |
 | `analytical_panel.set_cladding` | 4 | id, bool | — | Yes | STR-AM-002 |
 | `analytical_panel.split` | 4 | id, line | ids[] | Yes | STR-AM-002 |
 | `analytical_pipe_connection.create` | 4 | equipment_id, connector_index, pipe_id | id | Yes | MEP-PIPE-009 |

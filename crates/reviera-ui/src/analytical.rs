@@ -18,6 +18,8 @@ const MEMBER: [f32; 4] = [0.85, 0.1, 0.1, 1.0];
 const NODE: [f32; 4] = [0.1, 0.3, 0.9, 1.0];
 const SUPPORT: [f32; 4] = [0.1, 0.6, 0.2, 1.0];
 const LOAD: [f32; 4] = [0.95, 0.5, 0.05, 1.0];
+const PANEL: [f32; 4] = [0.75, 0.2, 0.45, 1.0];
+const CLADDING: [f32; 4] = [0.55, 0.55, 0.6, 1.0];
 
 impl Gui {
     /// The analytical model's lines for a 3D view, when shown.
@@ -111,7 +113,18 @@ impl Gui {
                 }
             }
         }
+        let (panels, cladding) = super::analytical_panels::panel_segments(store);
         vec![
+            Lines {
+                color: PANEL,
+                width: 0.4,
+                segments: panels,
+            },
+            Lines {
+                color: CLADDING,
+                width: 0.3,
+                segments: cladding,
+            },
             Lines {
                 color: MEMBER,
                 width: 0.5,
@@ -225,7 +238,41 @@ impl Gui {
             return g.frame.set_status_text("An analysis is already running", 0);
         }
         let frame = g.frame;
-        match g.run("structural_analysis.run", json!({})) {
+        let mut result = g
+            .app
+            .execute("structural_analysis.run", json!({}), &super::user())
+            .map(|o| o.result);
+        // Errors from the pre-analysis checks (STR-AM-007) hold the run: run anyway, or review.
+        if let Err(e) = &result
+            && e.code == "structural.check_errors"
+        {
+            let n = e.details["issues"].as_array().map_or(0, Vec::len);
+            let d = MessageDialog::builder(
+                &frame,
+                &format!(
+                    "The analytical model checks found {n} error(s), such as parts with no \
+                     supports. The solver would hold the unsupported movements and the results may \
+                     be meaningless.\n\nRun the analysis anyway? Choose No to review the issues."
+                ),
+                "Run Analysis",
+            )
+            .with_style(MessageDialogStyle::YesNo | MessageDialogStyle::IconWarning)
+            .build();
+            if d.show_modal() == ID_YES {
+                result = g
+                    .app
+                    .execute(
+                        "structural_analysis.run",
+                        json!({ "ignore_check_errors": true }),
+                        &super::user(),
+                    )
+                    .map(|o| o.result);
+            } else {
+                drop(g);
+                return Gui::run_analytical_check(gui, true, true);
+            }
+        }
+        match result.map_err(|e| e.to_string()) {
             Ok(v) => {
                 let id = v["job_id"].as_str().unwrap_or_default().to_owned();
                 let timer = Timer::new(&frame);

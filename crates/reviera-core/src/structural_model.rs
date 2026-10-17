@@ -199,6 +199,44 @@ pub fn distill(store: &Store) -> Result<Distilled> {
             });
         }
     }
+    // Panels go to providers that analyse surfaces.
+    let mut panels = Vec::new();
+    for (i, (id, pg)) in crate::analytical_panels::panels(store).into_iter().enumerate() {
+        let key = format!("p{}", i + 1);
+        key_map.insert(key.clone(), guid_of(store, id));
+        let lib = pg
+            .recipe
+            .material
+            .as_deref()
+            .and_then(crate::materials_library::find);
+        let e = lib
+            .as_ref()
+            .and_then(|l| l.properties.get("E_MPa").copied())
+            .map(|v| v * 1e6);
+        let nu = lib.as_ref().and_then(|l| l.properties.get("nu").copied()).or_else(|| {
+            let g = lib.as_ref()?.properties.get("G_MPa").copied()?;
+            Some(e? / (2.0 * g * 1e6) - 1.0)
+        });
+        panels.push(crate::frame::Panel {
+            key,
+            nodes: pg
+                .nodes
+                .iter()
+                .map(|n| node_key.get(&guid_of(store, *n)).cloned().unwrap_or_default())
+                .collect(),
+            outline: pg.outline.clone(),
+            openings: pg.recipe.openings.clone(),
+            thickness: pg.recipe.thickness,
+            e,
+            nu,
+            analyze_as: serde_json::to_value(pg.recipe.analyze_as)
+                .ok()
+                .and_then(|v| v.as_str().map(str::to_owned))
+                .unwrap_or_default(),
+            curved: pg.circle.is_some(),
+            cladding: pg.recipe.cladding,
+        });
+    }
     if members.is_empty() {
         return Err(Error::new(
             "structural.empty",
@@ -213,6 +251,7 @@ pub fn distill(store: &Store) -> Result<Distilled> {
             cases,
             combinations,
             loads,
+            panels,
         },
         key_map,
     })
@@ -233,6 +272,9 @@ pub struct Stored {
     pub snapshot: String,
     pub provider: String,
     pub results: crate::frame::Results,
+    /// Pre-analysis check errors the run went ahead despite (issue keys, STR-AM-007).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub ignored_check_errors: Vec<String>,
 }
 
 /// A hash of the model's current distillation (empty when it has none).
@@ -270,6 +312,9 @@ pub struct RecordParams {
     pub results: crate::frame::Results,
     /// Opaque key → GlobalId.
     pub key_map: BTreeMap<String, String>,
+    /// Pre-analysis check errors the run went ahead despite.
+    #[serde(default)]
+    pub ignored_check_errors: Vec<String>,
 }
 
 /// Keeps a finished analysis's results with the model (`structural_analysis.record`).
@@ -298,6 +343,7 @@ pub(crate) fn record(txn: &mut crate::txn::Transaction<'_>, p: RecordParams) -> 
         snapshot: snapshot(&store),
         provider: p.provider,
         results,
+        ignored_check_errors: p.ignored_check_errors,
     };
     let v = serde_json::to_value(&s).expect("serialises");
     txn.modify(id, |e| {
@@ -341,6 +387,8 @@ pub struct Report {
     /// The model changed since the analysis ran.
     pub stale: bool,
     pub warnings: Vec<String>,
+    /// Pre-analysis check errors the run went ahead despite (issue keys).
+    pub ignored_check_errors: Vec<String>,
     pub cases: Vec<CaseSummary>,
     /// The members' results in `case` (the first case when not given).
     pub members: Vec<MemberSummary>,
@@ -441,6 +489,7 @@ pub fn report(store: &Store, p: &ReportParams) -> Result<Report> {
         at: s.at,
         provider: s.provider,
         warnings: s.results.warnings,
+        ignored_check_errors: s.ignored_check_errors,
         cases,
         members,
     })

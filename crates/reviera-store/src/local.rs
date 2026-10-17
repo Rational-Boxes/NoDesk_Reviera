@@ -1784,11 +1784,12 @@ impl LocalProject {
         let store = doc.store();
         let nodes = reviera_core::analytical::nodes(store);
         let members = reviera_core::analytical::members(store);
+        let panels = reviera_core::analytical_panels::panels(store);
         let model = store
             .iter()
             .find(|e| reviera_core::analytical::is_model(e))
             .and_then(|e| self.steps.get(&e.id()).copied());
-        if nodes.is_empty() && members.is_empty() {
+        if nodes.is_empty() && members.is_empty() && panels.is_empty() {
             return Ok(());
         }
         let contexts = geometry::Contexts::find(&self.ifc)?;
@@ -1798,6 +1799,9 @@ impl LocalProject {
         // Members before nodes: their edges use the nodes' vertices.
         let mut steps: Vec<StepId> = Vec::new();
         for (id, _) in &members {
+            steps.extend(self.steps.get(id).copied());
+        }
+        for (id, _) in &panels {
             steps.extend(self.steps.get(id).copied());
         }
         for (id, _) in &nodes {
@@ -1924,6 +1928,91 @@ impl LocalProject {
                 self.ifc
                     .set_attribute(rel, "RelatedStructuralConnection", &r(ns))?;
                 self.ifc.set_attribute(rel, "AppliedCondition", &r(cond))?;
+            }
+            grouped.push(r(step));
+        }
+        // Panels (STR-AM-002): a face on a plane or a cylinder, bounded by a polyloop through its
+        // outline (arcs sampled), its openings inner bounds; connected to its corner nodes.
+        for (id, pg) in &panels {
+            let Some(&step) = self.steps.get(id) else {
+                continue;
+            };
+            self.ifc.set_attribute(
+                step,
+                "Thickness",
+                &AttrValue::Real(pg.recipe.thickness / scale),
+            )?;
+            let dir = |ifc: &mut IfcModel, v: [f64; 3]| -> Result<StepId> {
+                let d = ifc.create("IfcDirection")?;
+                ifc.set_attribute(
+                    d,
+                    "DirectionRatios",
+                    &AttrValue::List(v.iter().map(|x| AttrValue::Real(*x)).collect()),
+                )?;
+                Ok(d)
+            };
+            let placement = |ifc: &mut IfcModel, o: [f64; 3], z: [f64; 3], x: [f64; 3]| -> Result<StepId> {
+                let a = ifc.create("IfcAxis2Placement3D")?;
+                let l = point(ifc, o)?;
+                ifc.set_attribute(a, "Location", &AttrValue::Ref(l.0))?;
+                let zd = dir(ifc, z)?;
+                ifc.set_attribute(a, "Axis", &AttrValue::Ref(zd.0))?;
+                let xd = dir(ifc, x)?;
+                ifc.set_attribute(a, "RefDirection", &AttrValue::Ref(xd.0))?;
+                Ok(a)
+            };
+            let surface = if let Some((c, radius)) = pg.circle {
+                let z0 = pg.corners[0][2];
+                let pos = placement(&mut self.ifc, [c[0], c[1], z0], [0.0, 0.0, 1.0], [1.0, 0.0, 0.0])?;
+                let cyl = self.ifc.create("IfcCylindricalSurface")?;
+                self.ifc.set_attribute(cyl, "Position", &r(pos))?;
+                self.ifc
+                    .set_attribute(cyl, "Radius", &AttrValue::Real(radius / scale))?;
+                cyl
+            } else {
+                let n = pg.normal.unwrap_or([0.0, 0.0, 1.0]);
+                let o = pg.corners[0];
+                let e = [0, 1, 2].map(|k| pg.corners[1][k] - o[k]);
+                let l = (e[0] * e[0] + e[1] * e[1] + e[2] * e[2]).sqrt().max(1e-12);
+                let pos = placement(&mut self.ifc, o, n, e.map(|v| v / l))?;
+                let plane = self.ifc.create("IfcPlane")?;
+                self.ifc.set_attribute(plane, "Position", &r(pos))?;
+                plane
+            };
+            let mut bounds = Vec::new();
+            let mut rings = vec![(pg.outline.clone(), true)];
+            rings.extend(pg.recipe.openings.iter().map(|o| (o.clone(), false)));
+            for (ring, outer) in rings {
+                let mut pts = Vec::new();
+                for q in &ring {
+                    pts.push(AttrValue::Ref(point(&mut self.ifc, *q)?.0));
+                }
+                let lp = self.ifc.create("IfcPolyLoop")?;
+                self.ifc.set_attribute(lp, "Polygon", &AttrValue::List(pts))?;
+                let b = self.ifc.create(if outer { "IfcFaceOuterBound" } else { "IfcFaceBound" })?;
+                self.ifc.set_attribute(b, "Bound", &r(lp))?;
+                self.ifc.set_attribute(b, "Orientation", &AttrValue::Bool(true))?;
+                bounds.push(r(b));
+            }
+            let face = self.ifc.create("IfcFaceSurface")?;
+            self.ifc.set_attribute(face, "Bounds", &AttrValue::List(bounds))?;
+            self.ifc.set_attribute(face, "FaceSurface", &r(surface))?;
+            self.ifc.set_attribute(face, "SameSense", &AttrValue::Bool(true))?;
+            let shape = topology(&mut self.ifc, "Face", face)?;
+            self.ifc.set_attribute(step, "Representation", &r(shape))?;
+            for node in &pg.nodes {
+                let Some(&ns) = self.steps.get(node) else {
+                    continue;
+                };
+                let rel = self
+                    .ifc
+                    .create_rooted("IfcRelConnectsStructuralMember", &GlobalId::new())?;
+                self.ifc
+                    .set_attribute(rel, "Description", &AttrValue::String(TAG.into()))?;
+                self.ifc
+                    .set_attribute(rel, "RelatingStructuralMember", &r(step))?;
+                self.ifc
+                    .set_attribute(rel, "RelatedStructuralConnection", &r(ns))?;
             }
             grouped.push(r(step));
         }
@@ -2218,6 +2307,29 @@ impl LocalProject {
                 } else if class.eq_ignore_ascii_case("IfcVertexPoint") {
                     for p in refs(self.ifc.attribute(item, "VertexGeometry")?) {
                         self.ifc.remove(p)?;
+                    }
+                    self.ifc.remove(item)?;
+                } else if class.eq_ignore_ascii_case("IfcFaceSurface") {
+                    // A panel's face: its bounds, loops and points, and its surface and placement.
+                    for b in refs(self.ifc.attribute(item, "Bounds")?) {
+                        for lp in refs(self.ifc.attribute(b, "Bound")?) {
+                            for p in refs(self.ifc.attribute(lp, "Polygon")?) {
+                                self.ifc.remove(p)?;
+                            }
+                            self.ifc.remove(lp)?;
+                        }
+                        self.ifc.remove(b)?;
+                    }
+                    for sf in refs(self.ifc.attribute(item, "FaceSurface")?) {
+                        for pos in refs(self.ifc.attribute(sf, "Position")?) {
+                            for attr in ["Location", "Axis", "RefDirection"] {
+                                for x in refs(self.ifc.attribute(pos, attr)?) {
+                                    self.ifc.remove(x)?;
+                                }
+                            }
+                            self.ifc.remove(pos)?;
+                        }
+                        self.ifc.remove(sf)?;
                     }
                     self.ifc.remove(item)?;
                 }

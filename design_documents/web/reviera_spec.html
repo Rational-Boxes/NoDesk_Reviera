@@ -173,7 +173,7 @@ td code { white-space: nowrap; }
         <div class="tb-cell"><span class="tb-label">Revision</span><span class="tb-value">0.1 · Draft</span></div>
         <div class="tb-cell"><span class="tb-label">Date</span><span class="tb-value tb-num">2026-10-12</span></div>
         <div class="tb-cell"><span class="tb-label">Requirements</span><span class="tb-value tb-num">808</span></div>
-        <div class="tb-cell"><span class="tb-label">Commands</span><span class="tb-value tb-num">2,088</span></div>
+        <div class="tb-cell"><span class="tb-label">Commands</span><span class="tb-value tb-num">2,091</span></div>
         <div class="tb-cell"><span class="tb-label">Licence</span><span class="tb-value">GPL-3.0-or-later</span></div>
         <div class="tb-cell last-row"><span class="tb-label">Stack</span><span class="tb-value">IFC · Rust · OCCT · wx · LuaJIT · MCP</span></div>
         <div class="tb-cell last-row" style="grid-column: span 3"><span class="tb-label">By priority</span>
@@ -185,7 +185,7 @@ td code { white-space: nowrap; }
 <p><strong>Document:</strong> Functional and technical specification of Reviera, an open-source BIM authoring application
 <strong>Functional reference:</strong> Autodesk® Revit® 2026/2027 (described from public sources only; see <code>RESEARCH_LOG.md</code>)
 <strong>Licence of Reviera:</strong> GPL-3.0-or-later
-<strong>Version:</strong> 0.1 (draft) · 2026-10-16 · <strong>Size:</strong> 808 numbered requirements (320 P0 · 293 P1 · 188 P2 · 7 P3), 2,088 commands</p>
+<strong>Version:</strong> 0.1 (draft) · 2026-10-16 · <strong>Size:</strong> 808 numbered requirements (320 P0 · 293 P1 · 188 P2 · 7 P3), 2,091 commands</p>
 <blockquote>
 <p><strong>Clean-room statement.</strong> This specification describes features, workflows and behaviour in Reviera's own words. Every input was publicly available: vendor online help, public blogs and tutorials, public forums and open-source repositories. All of it is listed with URLs and access checks in <code>SOURCE_REGISTER.md</code>. No proprietary, confidential, leaked or NDA-covered information was used. No vendor code, binaries, file formats or assets were examined or copied. Autodesk and Revit are trademarks of Autodesk, Inc. They are used here only to identify the functional reference. Reviera is not affiliated with or endorsed by Autodesk.</p>
 <p><strong>Independence statement.</strong> BIM Reviera is an independent, original application. It is in no way a copy or clone of any existing product, and it does not set out to read or write any existing product's closed, proprietary formats (such as RVT and RFA); IFC is its native format. An existing application was researched, from public sources only, to establish the workflows and user-interface conventions that the industry's users already know, so they can work in Reviera without relearning their trade. Beyond that research, Reviera implements its own features and enhancements: its architecture, native IFC storage, scripting and AI integration, remote computation and analysis, and many of its modelling tools are its own design. Interchange formats used across the industry, such as DWG and DXF, are supported only through open-source libraries, for interoperability.</p>
@@ -254,7 +254,7 @@ td code { white-space: nowrap; }
 </tr>
 <tr>
 <td>A</td>
-<td>Appendix A: requirement summary, shared commands, consolidated command index (2,088 commands; 808 requirements)</td>
+<td>Appendix A: requirement summary, shared commands, consolidated command index (2,091 commands; 808 requirements)</td>
 </tr>
 </tbody>
 </table></div>
@@ -32383,7 +32383,7 @@ CREATE TABLE base_rxd (
 - [ ] Settings survive a save and reopen of the <code>.ifc</code> with its RXD data, and a BIMserver check-in and get-latest round trip.
 - [ ] <code>structural_settings.show("analytical")</code> opens the dialog on the Analytical Model page; entering a node merge distance of 400 mm with a support distance of 300 mm disables <em>OK</em> and shows the rule.
 - [ ] Changing three pages and pressing <em>OK</em> creates one undo item; undo restores all three.</p>
-<p><em>Built (2026-10-16):</em> <code>structural_settings.get</code> and <code>structural_settings.set</code> (one <code>key</code> and <code>value</code>, or several <code>values</code> in one undo step; the page rules: offsets and cutbacks 0–100 mm on paper, tolerances above 0 and at most 2000 mm, the node merge distance below the support distance, spacing and load scales above 0; an error names the key). Stored on the project as <code>rxd:structural_settings</code>. Keys: brace and kicker symbols (parallel line or none) and the brace offset, the coarse cutback, point-to-point steel (steel members are not shortened at joins, STR-BEAM-003's switch), the three analytical checks, the four tolerances, boundary condition spacing, the four load display scales and load labels. Structure › Structural Settings opens one dialog of all pages; OK applies them in one step (<code>structural_settings.show</code> is the window's action). In Coarse plans (DOC-GFX-010) beams, braces and truss members are drawn as single lines along their location lines, less the coarse cutback at joined ends, braces with their symbol; their bodies are not drawn. Not yet: the connection and boundary condition symbol families, vertical brace symbols above and below the cut, the load case summaries, Reset page and the template-default markers; the checks themselves (analytical model), and Coarse section views.</p>
+<p><em>Built (2026-10-16):</em> <code>structural_settings.get</code> and <code>structural_settings.set</code> (one <code>key</code> and <code>value</code>, or several <code>values</code> in one undo step; the page rules: offsets and cutbacks 0–100 mm on paper, tolerances above 0 and at most 2000 mm, the node merge distance below the support distance, spacing and load scales above 0; an error names the key). Stored on the project as <code>rxd:structural_settings</code>. Keys: brace and kicker symbols (parallel line or none) and the brace offset, the coarse cutback, point-to-point steel (steel members are not shortened at joins, STR-BEAM-003's switch), the three analytical checks and the consistency criteria (C1–C8, C1–C7 on by default; circular support references on by default), the four tolerances, boundary condition spacing, the four load display scales and load labels. Structure › Structural Settings opens one dialog of all pages; OK applies them in one step (<code>structural_settings.show</code> is the window's action). In Coarse plans (DOC-GFX-010) beams, braces and truss members are drawn as single lines along their location lines, less the coarse cutback at joined ends, braces with their symbol; their bodies are not drawn. Not yet: the connection and boundary condition symbol families, vertical brace symbols above and below the cut, the load case summaries, Reset page and the template-default markers, and Coarse section views. The checks themselves are built (STR-AM-007, 2026-10-16).</p>
 <h3 id="4114-section-catalogues-materials-and-regional-standards">4.1.14 Section catalogues, materials and regional standards</h3>
 <p><strong>ID:</strong> <code class="rid" id="STR-SEC-001">STR-SEC-001</code> · <strong>Priority:</strong> <span class="pri pri-p1">P1</span> · <strong>Ref:</strong> research/08 (S0720–S0822)</p>
 <p><strong>Purpose.</strong> Structural types start from the standard sections, materials and design standards that apply where the building is, so users pick a W10X49 in Chicago, an HEB 300 in Munich or a 254 x 254 x 73 UC in Leeds without typing dimensions.</p>
@@ -32935,10 +32935,13 @@ No IFC equivalent.
 - <code>analytical_panel.create_by_extrusion(work_plane, profile_curves[], depth, thickness, material_id) -&gt; id</code>
 - <code>analytical_panel.split(id, line) -&gt; ids[]</code>
 - <code>analytical_opening.create(panel_id, boundary_curves[]) -&gt; id</code>
-- <code>analytical_panel.set_cladding(id, bool)</code></p>
+- <code>analytical_panel.set_cladding(id, bool)</code>
+- <code>analytical_panel.set(panel_id, thickness?, material?, role?, analyze_as?)</code>
+- <code>analytical_opening.remove(panel_id, opening)</code></p>
 <p><strong>Acceptance criteria.</strong>
-- [ ] A curved panel by extrusion exports as an <code>IfcStructuralSurfaceMember</code> on a cylindrical face.
+- [x] A curved panel by extrusion exports as an <code>IfcStructuralSurfaceMember</code> on a cylindrical face.
 - [ ] A cladding panel loaded with an area wind load is reported to providers with stiffness excluded.</p>
+<p><em>Built (2026-10-16):</em> <code>analytical_panel.create_by_boundary</code> (a planar boundary in metres, checked planar within 1 mm and not crossing itself; thickness, material, role floor/wall/roof, Analyze As shell/membrane/bending plate), <code>analytical_panel.create_by_extrusion</code> (a line or an arc through a point on a horizontal work plane, extruded upwards; an arc makes a curved panel), <code>analytical_panel.split</code> (planar, convex crossings; new shared nodes; openings to their side), <code>analytical_panel.set_cladding</code>, <code>analytical_panel.set</code>, <code>analytical_opening.create</code> and <code>analytical_opening.remove</code>. A panel's corners are analytical nodes, merged with existing ones within the node merge distance, so panels share nodes with members and each other (STR-AM-003); its recipe (<code>recipe.analytical_panel</code>) holds the corners, the arc, thickness, material, role, Analyze As, cladding, openings and associated physical elements. IFC: <code>IfcStructuralSurfaceMember</code> (<code>SHELL</code>, <code>MEMBRANE_ELEMENT</code>, <code>BENDING_ELEMENT</code>; cladding <code>USERDEFINED</code> with ObjectType <code>CLADDING</code>) with its Thickness and a Face topology representation (<code>IfcFaceSurface</code> on an <code>IfcPlane</code> or an <code>IfcCylindricalSurface</code>, outer bound and openings as inner bounds by polyloops), connected to its corner nodes by <code>IfcRelConnectsStructuralMember</code> and grouped in the analysis model. Automation (STR-AM-006): Physical to Analytical makes a panel for each bearing wall (its centre plane from base to top; curved walls on their arc) and structural floor (its top, holes as openings), with the type's structural layer's material; it also splits members where another member's end or a panel's corner lies on their span, so beams framing into girders and columns running past floors are connected. Panels are in <code>analytical_model.info</code>, the checks (S1 unsupported panels, S2, S3, C1, C2 across members and panels, C3 against the default panel's plane and thickness, C4, C5 for bearing walls and structural floors, C6 beam–slab and wall–slab, C8) and the neutral structural model (<code>panels</code>, with moduli, thickness, Analyze As, curved and cladding, the stiffness to be excluded); the built-in frame solver analyses members only and says so. Analyze › Panels: Panel by Boundary (a plan sketch at the level), Panel by Extrusion and Curved Panel (clicks in plan, from the level to the next), Analytical Opening (a sketch), Split Panel (two clicks) and Cladding (toggles the selection); Show Analytical draws panels' outlines, openings and a diagonal. Not yet: area loads (so the second criterion's wind load), editing a panel's sketch or reference plane, inclined work planes, openings and splitting in curved panels, panels in plan views, Properties for panels, panel analysis in a provider.</p>
 <h3 id="433-analytical-nodes-and-links">4.3.3 Analytical nodes and links</h3>
 <p><strong>ID:</strong> <code class="rid" id="STR-AM-003">STR-AM-003</code> · <strong>Priority:</strong> <span class="pri pri-p2">P2</span> · <strong>Ref:</strong> research/03 §4.2</p>
 <p><strong>Behaviour &amp; rules.</strong>
@@ -33150,7 +33153,7 @@ No IFC equivalent.
 <p><strong>Acceptance criteria.</strong>
 - [ ] On a 3-storey, 4 × 3-bay steel frame with slabs, Physical → Analytical creates members for every column and beam and panels for every slab. The nodes are connected, and the solver interface (ANA-FEA-001) reports no unconnected nodes.
 - [x] Changing an analytical member's section and running Analytical → Physical changes the associated beam's type.</p>
-<p><em>Built (2026-10-16):</em> <code>analytical_automation.physical_to_analytical</code> (a member for each structural column, beam, brace and truss member, or the given ones, along its axis; architectural columns and associated elements skipped with reasons; braces pinned, others fixed; nodes merged at the joins, so a frame's members share nodes), <code>analytical_automation.analytical_to_physical</code> (section types to beams and columns) and <code>analytical_automation.disconnect</code>, each returning a report of created, updated and skipped elements with reasons. <code>analytical_model.info</code> lists members, nodes and nodes only one member uses. Analyze › Analytical: Physical to Analytical, Analytical to Physical, Disconnect, Merge Nodes, and Show Analytical (members red, nodes blue, over 3D views). Not yet: panels for walls and slabs (STR-AM-002), alignment to levels and grids within tolerances, Lua rule packages, the run log in the RXD analysis document, manual-adjustment flags, the consistency check after a run.</p>
+<p><em>Built (2026-10-16):</em> <code>analytical_automation.physical_to_analytical</code> (a member for each structural column, beam, brace and truss member, or the given ones, along its axis; architectural columns and associated elements skipped with reasons; braces pinned, others fixed; nodes merged at the joins, so a frame's members share nodes), <code>analytical_automation.analytical_to_physical</code> (section types to beams and columns) and <code>analytical_automation.disconnect</code>, each returning a report of created, updated and skipped elements with reasons. <code>analytical_model.info</code> lists members, nodes and nodes only one member uses. Analyze › Analytical: Physical to Analytical, Analytical to Physical, Disconnect, Merge Nodes, and Show Analytical (members red, nodes blue, over 3D views). Panels for bearing walls and structural floors, and members split where framing meets mid-span, were added with STR-AM-002. Not yet: alignment to levels and grids within tolerances, Lua rule packages, the run log in the RXD analysis document, manual-adjustment flags, the consistency check after a run.</p>
 <h3 id="439-analytical-model-checks-supports-and-consistency">4.3.9 Analytical model checks: supports and consistency</h3>
 <p><strong>ID:</strong> <code class="rid" id="STR-AM-007">STR-AM-007</code> · <strong>Priority:</strong> <span class="pri pri-p2">P2</span> · <strong>Ref:</strong> research/03 §4.1–4.2, §15.1 · web: Analytical Model Settings · web: Modifying Elective Checking Criteria and Tolerances · web: Automatic Checks</p>
 <p><strong>Purpose.</strong> Find problems in the analytical model, and between it and the physical model, before it is sent to an analysis provider: members that nothing supports, nodes that should meet but do not, analytical elements that have drifted from their physical counterparts, and hints of instability.</p>
@@ -33269,16 +33272,18 @@ No IFC equivalent.
 <p><strong>Commands.</strong>
 - <code>analytical_model.check_supports(scope?) -&gt; report</code>
 - <code>analytical_model.check_consistency(scope?) -&gt; report</code>
-- <code>analytical_model.ignore_issue(issue_key, ignore: bool, reason?)</code></p>
+- <code>analytical_model.ignore_issue(issue_key, ignore: bool, reason?)</code>
+- <code>analytical_model.check(scope?) -&gt; report</code> (both checks in one report, as Run Analysis runs them)</p>
 <p><code>scope</code> is <code>"model"</code> (default), <code>"selection"</code>, <code>"view:&lt;view_id&gt;"</code> or a list of element IDs. A report is <code>{run_at, tolerances, issues: [{key, code, severity, message, element_ids[], measured?, tolerance?, ignored}], counts_by_severity}</code>.</p>
 <p><strong>Acceptance criteria.</strong>
-- [ ] A beam whose analytical end node stops 40 mm short of a column's analytical member is reported as C1 "Disconnected nodes" with the measured gap of 40 mm, and <em>Zoom to</em> frames the gap.
-- [ ] A two-storey frame with no boundary conditions reports S3 and C2 as errors, and Run Analysis is held with a <em>Run anyway / Review</em> prompt.
-- [ ] A beam supported at one end only is reported as S1; adding a pinned point boundary condition at the free end clears the issue on <em>Re-check</em>.
-- [ ] Moving a physical beam 200 mm sideways without re-running automation reports C3 on its associated analytical member, with 200 mm against the 150 mm tolerance.
-- [ ] An ignored C5 issue stays ignored after save, reopen and re-check, and reappears when the involved member is moved.
+- [x] A beam whose analytical end node stops 40 mm short of a column's analytical member is reported as C1 "Disconnected nodes" with the measured gap of 40 mm, and <em>Zoom to</em> frames the gap.
+- [x] A two-storey frame with no boundary conditions reports S3 and C2 as errors, and Run Analysis is held with a <em>Run anyway / Review</em> prompt.
+- [x] A beam supported at one end only is reported as S1; adding a pinned point boundary condition at the free end clears the issue on <em>Re-check</em>.
+- [x] Moving a physical beam 200 mm sideways without re-running automation reports C3 on its associated analytical member, with 200 mm against the 150 mm tolerance.
+- [x] An ignored C5 issue stays ignored after save, reopen and re-check, and reappears when the involved member is moved.
 - [ ] With automatic consistency checks on, drawing a new analytical beam that misses a column by 20 mm adds one warning to the warnings list within 1 s of the commit.
-- [ ] Running either check leaves the undo stack unchanged.</p>
+- [x] Running either check leaves the undo stack unchanged.</p>
+<p><em>Built (2026-10-16):</em> <code>analytical_model.check_supports</code>, <code>analytical_model.check_consistency</code> and <code>analytical_model.check</code> (both), read-only, over the whole model or a list of elements (physical elements bring their associated members; issues touching the scope are kept). S1 (a column's lower end, both ends of other members, carried by a boundary condition or by another member sharing the node or within the support distance of its node or axis), S2 (members whose ends are all carried but whose chain of carriers never reaches a boundary condition; one issue per group) and S3. C1 node pairs closer than the support distance but farther than the merge distance (the gap measured), member ends on another member's span with no node there (the solver would not connect them), free ends, and <em>Load off host</em> (a point load beyond its member's ends, a host no member uses or a host gone); C2 parts connected through shared nodes with no boundary condition (error); C3 an associated member farther from its physical element's location line than the analytical-to-physical distance, or with a different section type or material; C4 a member end outside the physical body (a beam's section along its location line, so ends at supports' centrelines pass; a column's section around its axis); C5 analytical-only members (info), members whose physical element was deleted (warning) and structural columns, beams and braces without a member (info); C7 hints (a node where every non-axial member releases all rotations and no support fixes one, torsion released at both ends, a non-axial member pinned at both ends); C8 a member without a section type or structural material. Criteria are chosen in Structural Settings (<code>consistency_criteria</code>). Issues carry a stable key (<code>code.kind:</code> and the sorted GlobalIds), the measured distance and tolerance, a box to zoom to and the ignore state; <code>analytical_model.ignore_issue</code> keeps ignores on the project (<code>rxd:analysis_checks</code>, with who, when, the reason and a hash of the elements' geometry), so they survive saves and lapse when an involved element changes. <code>structural_analysis.run</code> runs both checks first (ANA-FEA-001). Analyze › Checks: Check Supports, Check Consistency and the Analytical Checks pane (scope, re-check, severity filter, <em>Show ignored</em>, <em>Export CSV</em>, Select, Zoom To, Isolate, Reset View, Ignore with a reason, Un-ignore); while it is open, issue locations are boxed in 3D views over the analytical model, the chosen one in yellow. With automatic checks on, the checks run after each change and new issues are reported in the status bar and the pane. Not yet: C6 (needs analytical panels, STR-AM-002) and panels in every check, physical walls, slabs and footings as supports, scope by view, the last report kept in the model, a project warnings list, a background run and the incremental check of only the changed elements, and the 10 000-element performance target (not measured).</p>
 <h3 id="4310-manual-analytical-adjustment-and-reset">4.3.10 Manual analytical adjustment and reset</h3>
 <p><strong>ID:</strong> <code class="rid" id="STR-AM-008">STR-AM-008</code> · <strong>Priority:</strong> <span class="pri pri-p2">P2</span> · <strong>Ref:</strong> research/03 §4.2 ("Analytical Node", "Automation") · web: Modify an Analytical Model</p>
 <p><strong>Purpose.</strong> Let the engineer move analytical nodes, edges and whole analytical elements to idealise the model (for example to bring a beam's analytical line to a column centreline) without changing any physical element, and later restore the default position derived from the physical element.</p>
@@ -33311,7 +33316,8 @@ No IFC equivalent.
 - [ ] Running Physical → Analytical on the adjusted beam without <em>Overwrite manual adjustments</em> leaves it in place and logs it as skipped; <em>Reset</em> then restores its default position and clears the flag.
 - [ ] <em>Reset</em> on an analytical member with no physical association is refused and names the member.
 - [ ] Killing the process during an Adjust session with two moves and restarting offers to resume the session with both moves re-applied.
-- [ ] <code>analytical_node.move([n], {0,0,-100}, "global")</code> lowers node n by 100 mm and flags it as manually adjusted.</p>
+- [x] <code>analytical_node.move([n], {0,0,-100}, "global")</code> lowers node n by 100 mm and flags it as manually adjusted.</p>
+<p><em>Built (2026-10-16), the non-interactive move:</em> <code>analytical_node.move</code> (nodes by a vector in project axes; members, loads and boundary conditions follow; each node keeps its level, its offset recalculated; the node is flagged manually adjusted in its recipe, <code>adjusted</code>). Not yet: Adjust mode, local axes, merging on drop, <code>analytical_model.reset</code>, automation's overwrite option, the flag in Properties and schedules.</p>
 <h3 id="4311-structural-analysis-provider-interface">4.3.11 Structural analysis provider interface</h3>
 <p><strong>ID:</strong> <code class="rid" id="ANA-FEA-001">ANA-FEA-001</code> · <strong>Priority:</strong> <span class="pri pri-p2">P2</span> · <strong>Ref:</strong> research/03 §4.6</p>
 <p><strong>Purpose.</strong> Reviera shall run structural analyses through a pluggable <strong>structural analysis provider</strong>. This replaces the reference product's proprietary solver link.</p>
@@ -33381,7 +33387,7 @@ No IFC equivalent.
 - [ ] With the PyNite suggestion installed, a simply supported 6 m beam under a 10 kN/m line load returns a mid-span moment of 45 kN·m ± 0.5%.
 - [ ] Editing a load after the run marks the result package stale and shows a notice in Results Explorer.
 - [ ] The exported IFC structural model opens in a third-party IFC structural viewer with all members, supports and load cases present.</p>
-<p><em>Built (2026-10-16):</em> a built-in provider: <code>structural_analysis.run</code> distils the analytical model (members with their section's area, second moments and torsion constant, moduli from the materials library, releases and local axes; nodes with supports; cases, a self-weight case's member weights, combinations as case factors; point and line loads) to the neutral structural model (<code>reviera.structural.v1.Model</code>) and runs it out of process as an <code>analysis.structural</code> compute job in the built-in runner: a linear static 3D frame solver by the direct stiffness method (Euler–Bernoulli members, releases condensed, unrestrained mechanism dofs held with a warning, up to 1000 nodes). <code>structural_analysis.collect</code> keeps the results with the model (<code>structural_analysis.record</code>, project RXD <code>rxd:analysis_results</code>, keys mapped back to GlobalIds) and <code>structural_analysis.results</code> reports them: per case and combination the largest displacement and moment and the vertical reactions, and each member's N, Vy, Vz, T, My, Mz at eleven stations; the results go stale (a hash of the distilled model) when the model changes. <code>structural_analysis.export_model</code> writes <code>reviera-structural-model.json</code>. Analyze › Structural Analysis › Run Analysis (followed and collected in the background) and Results. The 6 m beam under 10 kN/m gives 45 kN·m at mid-span (end-to-end test). Not yet: pre-analysis checks (STR-AM-007), scope by selection, modal and other analysis types, panels, the IFC structural analysis view export, <code>.reviera-results</code> archives and <code>IfcStructuralResultGroup</code>, Results Explorer diagrams, proposed sections and <code>update_model</code>, external providers (PyNite, CalculiX, xara) as runners.</p>
+<p><em>Built (2026-10-16):</em> a built-in provider: <code>structural_analysis.run</code> distils the analytical model (members with their section's area, second moments and torsion constant, moduli from the materials library, releases and local axes; nodes with supports; cases, a self-weight case's member weights, combinations as case factors; point and line loads) to the neutral structural model (<code>reviera.structural.v1.Model</code>) and runs it out of process as an <code>analysis.structural</code> compute job in the built-in runner: a linear static 3D frame solver by the direct stiffness method (Euler–Bernoulli members, releases condensed, unrestrained mechanism dofs held with a warning, up to 1000 nodes). <code>structural_analysis.collect</code> keeps the results with the model (<code>structural_analysis.record</code>, project RXD <code>rxd:analysis_results</code>, keys mapped back to GlobalIds) and <code>structural_analysis.results</code> reports them: per case and combination the largest displacement and moment and the vertical reactions, and each member's N, Vy, Vz, T, My, Mz at eleven stations; the results go stale (a hash of the distilled model) when the model changes. <code>structural_analysis.export_model</code> writes <code>reviera-structural-model.json</code>. Analyze › Structural Analysis › Run Analysis (followed and collected in the background) and Results. The 6 m beam under 10 kN/m gives 45 kN·m at mid-span (end-to-end test). Pre-analysis checks (built with STR-AM-007): the run is refused with <code>structural.check_errors</code> and the issues in its details while errors that are not ignored remain, unless <code>ignore_check_errors</code> is passed; the errors it went ahead despite are recorded with the results (<code>ignored_check_errors</code>), and in the window the run asks <em>Run anyway</em> or review (opening Analytical Checks). Not yet: scope by selection, modal and other analysis types, panels, the IFC structural analysis view export, <code>.reviera-results</code> archives and <code>IfcStructuralResultGroup</code>, Results Explorer diagrams, proposed sections and <code>update_model</code>, external providers (PyNite, CalculiX, xara) as runners.</p>
 <h3 id="4312-results-explorer-and-results-manager">4.3.12 Results Explorer and Results Manager</h3>
 <p><strong>ID:</strong> <code class="rid" id="STR-RES-001">STR-RES-001</code> · <strong>Priority:</strong> <span class="pri pri-p2">P2</span> · <strong>Ref:</strong> research/03 §4.6 · screenshots/structure_mep/structural_results_explorer_presets_2027.png · screenshots/structure_mep/structural_results_analysis_insights_2027.png</p>
 <p><strong>Purpose.</strong> Show and manage analysis results inside model views.</p>
@@ -37999,6 +38005,20 @@ No IFC equivalent.
 <td>STR-AM-002</td>
 </tr>
 <tr>
+<td><code>analytical_panel.set</code></td>
+<td>panel_id, thickness?, material?, role?, analyze_as?</td>
+<td>—</td>
+<td>Yes</td>
+<td>STR-AM-002</td>
+</tr>
+<tr>
+<td><code>analytical_opening.remove</code></td>
+<td>panel_id, opening</td>
+<td>—</td>
+<td>Yes</td>
+<td>STR-AM-002</td>
+</tr>
+<tr>
 <td><code>analytical_link.create</code></td>
 <td>node_a, node_b, link_type_id</td>
 <td>id</td>
@@ -38168,6 +38188,13 @@ No IFC equivalent.
 </tr>
 <tr>
 <td><code>analytical_model.check_consistency</code></td>
+<td>scope?</td>
+<td>report</td>
+<td>No</td>
+<td>STR-AM-007</td>
+</tr>
+<tr>
+<td><code>analytical_model.check</code></td>
 <td>scope?</td>
 <td>report</td>
 <td>No</td>
@@ -51506,7 +51533,7 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 </tbody>
 </table></div>
 <h2 id="a3-consolidated-command-index">A.3 Consolidated command index</h2>
-<p><strong>2088 unique commands</strong> in 410 domains. Every command is exposed automatically to the UI, to Lua (<code>reviera.&lt;domain&gt;.&lt;verb&gt;</code>) and to MCP (<code>&lt;domain&gt;_&lt;verb&gt;</code>), subject to its permission class.</p>
+<p><strong>2091 unique commands</strong> in 410 domains. Every command is exposed automatically to the UI, to Lua (<code>reviera.&lt;domain&gt;.&lt;verb&gt;</code>) and to MCP (<code>&lt;domain&gt;_&lt;verb&gt;</code>), subject to its permission class.</p>
 <div class="tbl"><table>
 <thead>
 <tr>
@@ -51569,7 +51596,7 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 </tr>
 <tr>
 <td><code>analytical_model</code></td>
-<td style="text-align: right;">6</td>
+<td style="text-align: right;">7</td>
 </tr>
 <tr>
 <td><code>analytical_node</code></td>
@@ -51577,11 +51604,11 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 </tr>
 <tr>
 <td><code>analytical_opening</code></td>
-<td style="text-align: right;">1</td>
+<td style="text-align: right;">2</td>
 </tr>
 <tr>
 <td><code>analytical_panel</code></td>
-<td style="text-align: right;">4</td>
+<td style="text-align: right;">5</td>
 </tr>
 <tr>
 <td><code>analytical_pipe_connection</code></td>
@@ -53554,6 +53581,14 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 <td>STR-AM-008</td>
 </tr>
 <tr>
+<td><code>analytical_model.check</code></td>
+<td>4</td>
+<td>scope?</td>
+<td>report</td>
+<td>No</td>
+<td>STR-AM-007</td>
+</tr>
+<tr>
 <td><code>analytical_model.check_consistency</code></td>
 <td>4</td>
 <td>scope?</td>
@@ -53618,6 +53653,14 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 <td>STR-AM-002</td>
 </tr>
 <tr>
+<td><code>analytical_opening.remove</code></td>
+<td>4</td>
+<td>panel_id, opening</td>
+<td>—</td>
+<td>Yes</td>
+<td>STR-AM-002</td>
+</tr>
+<tr>
 <td><code>analytical_panel.create_by_boundary</code></td>
 <td>4</td>
 <td>plane, boundary_curves[], thickness, material_id, role</td>
@@ -53630,6 +53673,14 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 <td>4</td>
 <td>work_plane, profile_curves[], depth, thickness, material_id</td>
 <td>id</td>
+<td>Yes</td>
+<td>STR-AM-002</td>
+</tr>
+<tr>
+<td><code>analytical_panel.set</code></td>
+<td>4</td>
+<td>panel_id, thickness?, material?, role?, analyze_as?</td>
+<td>—</td>
 <td>Yes</td>
 <td>STR-AM-002</td>
 </tr>

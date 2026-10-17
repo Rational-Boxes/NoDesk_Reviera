@@ -23,6 +23,8 @@ enum Kind {
     /// A plain number.
     Number,
     Toggle,
+    /// The consistency criteria, a check box each.
+    Criteria,
 }
 
 const SYMBOLS: &[(&str, &str)] = &[("Parallel line", "parallel_line"), ("None", "none")];
@@ -85,6 +87,15 @@ const ROWS: &[(&str, &str, &str, Kind, &str)] = &[
         "circular_references_check",
         Kind::Toggle,
         "Report members that support each other in a loop",
+    ),
+    (
+        "Analytical Model",
+        "Consistency criteria",
+        "consistency_criteria",
+        Kind::Criteria,
+        "C1 disconnected nodes, C2 isolated parts, C3 physical/analytical mismatch, C4 analytical \
+         outside physical, C5 no counterpart, C6 overlap not reflected, C7 instability hints, C8 \
+         missing properties",
     ),
     (
         "Analytical Model",
@@ -161,7 +172,10 @@ const ROWS: &[(&str, &str, &str, Kind, &str)] = &[
 enum Control {
     Choice(Choice),
     Text(TextCtrl),
+    Checks(Vec<(&'static str, CheckBox)>),
 }
+
+const CRITERIA: [&str; 8] = ["C1", "C2", "C3", "C4", "C5", "C6", "C7", "C8"];
 
 impl Gui {
     pub(crate) fn structural_settings(&mut self) {
@@ -218,6 +232,24 @@ impl Gui {
                     let v = self.format_length(value.as_f64().unwrap_or(0.0));
                     Control::Text(TextCtrl::builder(&dialog).with_value(&v).build())
                 }
+                Kind::Criteria => {
+                    let on: Vec<&str> = value
+                        .as_array()
+                        .into_iter()
+                        .flatten()
+                        .filter_map(Value::as_str)
+                        .collect();
+                    Control::Checks(
+                        CRITERIA
+                            .iter()
+                            .map(|c| {
+                                let b = CheckBox::builder(&dialog).with_label(c).build();
+                                b.set_value(on.contains(c));
+                                (*c, b)
+                            })
+                            .collect(),
+                    )
+                }
                 Kind::PaperMm | Kind::Number => {
                     let v = format!("{}", value.as_f64().unwrap_or(0.0));
                     Control::Text(TextCtrl::builder(&dialog).with_value(&v).build())
@@ -232,6 +264,14 @@ impl Gui {
                     t.set_tooltip(tip);
                     t.set_min_size(Size::new(200, -1));
                     grid.add(t, 1, SizerFlag::Expand, 0);
+                }
+                Control::Checks(boxes) => {
+                    let row = BoxSizer::builder(Orientation::Horizontal).build();
+                    for (_, b) in boxes {
+                        b.set_tooltip(tip);
+                        row.add(b, 0, SizerFlag::Right, 6);
+                    }
+                    grid.add_sizer(&row, 1, SizerFlag::Expand, 0);
                 }
             }
             controls.push((*key, *kind, control));
@@ -270,6 +310,13 @@ impl Gui {
                 }
                 (Kind::Toggle, Control::Choice(c)) => json!(c.get_selection() == Some(1)),
                 (Kind::Length, Control::Text(t)) => json!(t.get_value()),
+                (Kind::Criteria, Control::Checks(boxes)) => json!(
+                    boxes
+                        .iter()
+                        .filter(|(_, b)| b.get_value())
+                        .map(|(c, _)| *c)
+                        .collect::<Vec<_>>()
+                ),
                 (_, Control::Text(t)) => match t.get_value().trim().parse::<f64>() {
                     Ok(n) => json!(n),
                     Err(_) => json!(t.get_value()),

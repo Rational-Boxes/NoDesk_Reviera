@@ -34,6 +34,36 @@ pub struct Model {
     pub cases: Vec<Case>,
     pub combinations: Vec<Combination>,
     pub loads: Vec<Load>,
+    /// Analytical panels (STR-AM-002), for providers that analyse surfaces; the built-in frame
+    /// solver does not.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub panels: Vec<Panel>,
+}
+
+/// An analytical panel: its corner nodes, outline (metres; arcs sampled), openings, thickness,
+/// moduli where its material is known, and how it is analysed. A cladding panel transfers loads
+/// but must be left out of the stiffness matrix.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct Panel {
+    pub key: String,
+    pub nodes: Vec<String>,
+    pub outline: Vec<[f64; 3]>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub openings: Vec<Vec<[f64; 3]>>,
+    pub thickness: f64,
+    /// Young's modulus (Pa) and Poisson's ratio, when the material is in the library.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub e: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub nu: Option<f64>,
+    /// `shell`, `membrane` or `bending_plate`.
+    pub analyze_as: String,
+    /// On a cylinder (a curved panel).
+    #[serde(default)]
+    pub curved: bool,
+    /// Stiffness excluded.
+    #[serde(default)]
+    pub cladding: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
@@ -386,6 +416,12 @@ pub fn solve(model: &Model) -> std::result::Result<Results, String> {
         ));
     }
     let mut warnings = Vec::new();
+    if !model.panels.is_empty() {
+        warnings.push(format!(
+            "{} analytical panel(s) are not analysed by the built-in frame solver: members only",
+            model.panels.len()
+        ));
+    }
     let mut prepared: Vec<Prepared> = Vec::new();
     for m in &model.members {
         let (Some(&a), Some(&b)) = (
@@ -897,6 +933,7 @@ mod tests {
         // 6 m, 10 kN/m down: mid-span moment wL²/8 = 45 kN·m, deflection 5wL⁴/384EI.
         let model = Model {
             units: "SI".into(),
+            panels: Vec::new(),
             nodes: vec![
                 Node {
                     key: "a".into(),
@@ -949,6 +986,7 @@ mod tests {
         m.nodes = ["a".into(), "b".into()];
         let model = Model {
             units: "SI".into(),
+            panels: Vec::new(),
             nodes: vec![
                 Node {
                     key: "a".into(),

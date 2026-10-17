@@ -166,7 +166,7 @@ impl Gui {
             .or_else(|| types.first().copied())
     }
 
-    fn beam_point(&self, x: i32, y: i32, from: Option<[f64; 2]>) -> Option<[f64; 2]> {
+    pub(crate) fn beam_point(&self, x: i32, y: i32, from: Option<[f64; 2]>) -> Option<[f64; 2]> {
         let lines = self.snap_lines();
         self.snapped_at(x, y, from, &lines).map(|s| s.point)
     }

@@ -166,4 +166,17 @@ impl Gui {
             );
         }
     }
+
+    /// Analyze › Analytical › Panel by Boundary: sketch the boundary in a plan; Finish makes a
+    /// planar analytical panel at the plan's level.
+    pub(crate) fn start_analytical_panel_sketch(&mut self) {
+        self.start_floor_sketch();
+        if let Some(s) = &mut self.sketch {
+            s.analytical_panel = true;
+            self.frame.set_status_text(
+                "Analytical Panel: sketch the boundary at this level; its corners become nodes, shared with members there. Finish to make it.",
+                0,
+            );
+        }
+    }
 }

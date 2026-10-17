@@ -61,7 +61,7 @@
   {
     "name": "manor_before",
     "title": "Manor before coordination",
-    "description": "The Manor with tower as first modelled, before coordination: the castle towers' walls run through the house's eaves and walls, and the gallery's vault and floor into the round tower. Run a clash test (View › Coordination › Clash Detection) to find, review and resolve them; the Manor sample is the same model after coordination.",
+    "description": "The Manor with tower as first modelled, before coordination: the castle towers' walls run through the house's eaves and walls, and the gallery's vault and floor into the round tower. Run a clash test (View \u203a Coordination \u203a Clash Detection) to find, review and resolve them; the Manor sample is the same model after coordination.",
     "allow_overlaps": 19,
     "steps": [
       {
@@ -107,6 +107,42 @@
         "command": "script.run",
         "args": {
           "file": "temple.lua"
+        }
+      }
+    ]
+  },
+  {
+    "name": "steel_frame",
+    "title": "Steel-framed office",
+    "steps": [
+      {
+        "command": "script.run",
+        "args": {
+          "file": "steel_frame.lua"
+        }
+      }
+    ]
+  },
+  {
+    "name": "timber",
+    "title": "Mass timber frame",
+    "steps": [
+      {
+        "command": "script.run",
+        "args": {
+          "file": "timber.lua"
+        }
+      }
+    ]
+  },
+  {
+    "name": "wood_frame",
+    "title": "Wood-frame house",
+    "steps": [
+      {
+        "command": "script.run",
+        "args": {
+          "file": "wood_frame.lua"
         }
       }
     ]

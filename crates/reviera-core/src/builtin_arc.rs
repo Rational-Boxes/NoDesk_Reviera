@@ -62,12 +62,24 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(AnalyticalMemberSetReleases),
         registry.add(AnalyticalMemberSet),
         registry.add(AnalyticalNodeMerge),
+        registry.add(AnalyticalNodeMove),
+        registry.add(AnalyticalPanelCreateByBoundary),
+        registry.add(AnalyticalPanelCreateByExtrusion),
+        registry.add(AnalyticalPanelSplit),
+        registry.add(AnalyticalPanelSetCladding),
+        registry.add(AnalyticalPanelSet),
+        registry.add(AnalyticalOpeningCreate),
+        registry.add(AnalyticalOpeningRemove),
         registry.add(AnalyticalAssociationAdd),
         registry.add(AnalyticalAssociationRemove),
         registry.add(AnalyticalPhysicalToAnalytical),
         registry.add(AnalyticalAnalyticalToPhysical),
         registry.add(AnalyticalDisconnect),
         registry.add(AnalyticalModelInfo),
+        registry.add(AnalyticalModelCheckSupports),
+        registry.add(AnalyticalModelCheckConsistency),
+        registry.add(AnalyticalModelCheck),
+        registry.add(AnalyticalModelIgnoreIssue),
         registry.add(StructuralCodeSet),
         registry.add(LoadNatureCreate),
         registry.add(LoadCaseCreate),
@@ -860,6 +872,110 @@ edit_command!(
 );
 
 edit_command!(
+    AnalyticalPanelCreateByBoundary,
+    "analytical_panel.create_by_boundary",
+    "Create an analytical panel by boundary",
+    "A planar analytical panel (STR-AM-002) on `boundary` (corner points in metres, planar within 1 mm, \
+     not crossing itself): an IfcStructuralSurfaceMember whose corners are nodes, merged with existing \
+     nodes within the node merge distance so it connects to members and panels there. `thickness` \
+     (default 200 mm), `material`, `role` (floor, wall or roof) and `analyze_as` (shell, membrane or \
+     bending_plate). Returns the panel.",
+    "Analytical Panel",
+    crate::analytical_panels::BoundaryParams,
+    ElementId,
+    crate::analytical_panels::create_by_boundary
+);
+
+edit_command!(
+    AnalyticalPanelCreateByExtrusion,
+    "analytical_panel.create_by_extrusion",
+    "Create an analytical panel by extrusion",
+    "An analytical panel (STR-AM-002) extruded upwards by `depth` (default 3 m) from a profile on a \
+     horizontal work plane at `elevation`: a `line` (a planar panel) or an `arc` from `start` through \
+     `through` to `end` (a curved panel on a cylinder). Role wall by default. Returns the panel.",
+    "Analytical Panel",
+    crate::analytical_panels::ExtrusionParams,
+    ElementId,
+    crate::analytical_panels::create_by_extrusion
+);
+
+edit_command!(
+    AnalyticalPanelSplit,
+    "analytical_panel.split",
+    "Split an analytical panel",
+    "Splits a planar analytical panel along a line through two points (STR-AM-002): two panels sharing \
+     new nodes where the line crosses the boundary, each with the properties, association and the \
+     openings on its side. A line crossing an opening, or crossing a non-convex panel more than once, \
+     is refused. Returns both panels (the original first).",
+    "Split Panel",
+    crate::analytical_panels::SplitParams,
+    Vec<ElementId>,
+    crate::analytical_panels::split
+);
+
+edit_command!(
+    AnalyticalPanelSetCladding,
+    "analytical_panel.set_cladding",
+    "Mark an analytical panel as cladding",
+    "Cladding panels (STR-AM-002) carry wind and snow loads to their supports but add no stiffness: \
+     written as PredefinedType USERDEFINED with ObjectType CLADDING, and reported to analysis providers \
+     with their stiffness excluded.",
+    "Cladding",
+    crate::analytical_panels::CladdingParams,
+    (),
+    crate::analytical_panels::set_cladding
+);
+
+edit_command!(
+    AnalyticalPanelSet,
+    "analytical_panel.set",
+    "Change an analytical panel",
+    "Changes an analytical panel's thickness, material, role (floor, wall, roof) or Analyze As (shell, \
+     membrane, bending_plate).",
+    "Analytical Panel",
+    crate::analytical_panels::SetParams,
+    (),
+    crate::analytical_panels::set
+);
+
+edit_command!(
+    AnalyticalOpeningCreate,
+    "analytical_opening.create",
+    "Create an analytical opening",
+    "An opening in a planar analytical panel (STR-AM-002): its points are put on the panel's plane and \
+     must lie inside the panel and clear of its other openings. Written as an inner bound of the \
+     panel's face. Returns the panel and the opening's index.",
+    "Analytical Opening",
+    crate::analytical_panels::OpeningParams,
+    crate::analytical_panels::OpeningOut,
+    crate::analytical_panels::create_opening
+);
+
+edit_command!(
+    AnalyticalOpeningRemove,
+    "analytical_opening.remove",
+    "Remove an analytical opening",
+    "Removes opening `opening` (its index) from an analytical panel.",
+    "Remove Analytical Opening",
+    crate::analytical_panels::RemoveOpeningParams,
+    (),
+    crate::analytical_panels::remove_opening
+);
+
+edit_command!(
+    AnalyticalNodeMove,
+    "analytical_node.move",
+    "Move analytical nodes",
+    "Moves analytical nodes by `delta` (metres, project axes) and flags them as manually adjusted \
+     (STR-AM-008): the members using them move with them, their loads and boundary conditions follow, \
+     and physical elements stay where they are. Each node keeps its level. Returns the nodes.",
+    "Adjust Analytical Model",
+    crate::analytical::NodeMoveParams,
+    Vec<ElementId>,
+    crate::analytical::move_nodes
+);
+
+edit_command!(
     AnalyticalNodeMerge,
     "analytical_node.merge",
     "Merge analytical nodes",
@@ -1071,6 +1187,19 @@ edit_command!(
     crate::loads::RemoveBoundaryParams,
     (),
     crate::loads::remove_boundary
+);
+
+edit_command!(
+    AnalyticalModelIgnoreIssue,
+    "analytical_model.ignore_issue",
+    "Ignore an analytical check issue",
+    "Ignores (or with `ignore: false` un-ignores) an analytical check issue by its key (STR-AM-007), \
+     with an optional reason. The ignore survives re-checks and saves, and lapses when any element the \
+     issue involves changes geometry.",
+    "Ignore Issue",
+    crate::analytical_checks::IgnoreParams,
+    (),
+    crate::analytical_checks::ignore_issue
 );
 
 edit_command!(
@@ -1515,6 +1644,48 @@ read_command!(
     Option<serde_json::Value>,
     crate::analytical::ModelInfo,
     |s, _| Ok(crate::analytical::info(s))
+);
+
+read_command!(
+    AnalyticalModelCheckSupports,
+    "analytical_model.check_supports",
+    "Check the analytical model's supports",
+    "The support check (STR-AM-007): S1 members not supported at an end that needs it (a column's \
+     lower end, both ends of a beam or brace) within the support distance; S2 groups of members that \
+     carry one another without reaching a boundary condition (when circular references are checked); \
+     S3 no boundary condition at all. `scope` is \"model\" (default) or a list of elements. Read-only: \
+     returns `{run_at, tolerances, issues: [{key, code, severity, message, element_ids, measured?, \
+     tolerance?, min?, max?, ignored}], counts_by_severity}`.",
+    Option<crate::analytical_checks::CheckParams>,
+    crate::analytical_checks::Report,
+    |s, p| crate::analytical_checks::run(s, true, false, &p.unwrap_or_default().scope)
+);
+
+read_command!(
+    AnalyticalModelCheckConsistency,
+    "analytical_model.check_consistency",
+    "Check the analytical model's consistency",
+    "The consistency check (STR-AM-007), with the criteria turned on in Structural Settings: C1 \
+     disconnected nodes (a gap above the merge distance, an end on another member's span with no node \
+     there, free ends) and loads off their host; C2 isolated parts with no boundary condition (error); \
+     C3 analytical members away from their physical element's axis beyond the analytical-to-physical \
+     distance, or with a different section type or material; C4 members leaving the physical body; C5 \
+     elements without a counterpart; C7 instability hints; C8 missing section or material. Read-only; \
+     the same report as `analytical_model.check_supports`.",
+    Option<crate::analytical_checks::CheckParams>,
+    crate::analytical_checks::Report,
+    |s, p| crate::analytical_checks::run(s, false, true, &p.unwrap_or_default().scope)
+);
+
+read_command!(
+    AnalyticalModelCheck,
+    "analytical_model.check",
+    "Check the analytical model",
+    "Both the support and the consistency checks (STR-AM-007) in one report, as Run Analysis runs \
+     them first.",
+    Option<crate::analytical_checks::CheckParams>,
+    crate::analytical_checks::Report,
+    |s, p| crate::analytical_checks::run(s, true, true, &p.unwrap_or_default().scope)
 );
 
 read_command!(

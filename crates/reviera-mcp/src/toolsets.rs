@@ -150,6 +150,8 @@ pub fn toolset_of(command: &str) -> String {
             | "structural_analysis"
             | "analytical_member"
             | "analytical_node"
+            | "analytical_panel"
+            | "analytical_opening"
             | "analytical_association"
             | "analytical_automation"
             | "analytical_model"

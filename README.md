@@ -653,6 +653,20 @@ tools and the datums.
   cases and groups with factors, boundary node conditions) and drawn by Show Analytical
   (`load_case.*`, `load_combination.*`, `load.*`, `boundary_condition.*`; STR-LOAD-001, STR-LC-001,
   STR-BC-001).
+- **Analytical panels**: panels for walls, floors and roofs (IfcStructuralSurfaceMember on a
+  plane or a cylinder), drawn by boundary or extruded from a line or arc, with openings, split,
+  cladding, and made for bearing walls and structural floors by Physical to Analytical, which now
+  also splits members where framing meets mid-span; they share nodes with the frame, take part
+  in the checks and go to analysis providers in the neutral model (`analytical_panel.*`,
+  `analytical_opening.*`; STR-AM-002).
+- **Analytical model checks**: Analyze › Checks › Check Supports and Check Consistency find
+  unsupported members, support chains that never reach a support, nodes that look connected but
+  are not (with the gap measured), parts with no supports, analytical members that have drifted
+  from or left their physical elements, missing counterparts, instability hints and missing
+  properties. The Analytical Checks pane lists them by severity, marks them in 3D, zooms to them
+  and ignores them with a reason until an element changes; Run Analysis is held while errors
+  remain unless you run anyway. `analytical_node.move` adjusts nodes by hand
+  (`analytical_model.check_*`, `.ignore_issue`; STR-AM-007, part of STR-AM-008).
 - **Structural analysis**: Analyze › Run Analysis distils the analytical model, supports, cases,
   combinations and loads to a neutral structural model and solves it out of process on the
   compute host with the built-in linear static 3D frame solver; the results (displacements,
@@ -835,7 +849,7 @@ simulation sessions, and the first engine runners (see [Not built yet](#not-buil
 `test-data/samples` holds Reviera's own sample models. Each is rebuilt by a Lua script and
 checked by a test (no overlaps beyond those it keeps on purpose, no clearance intrusions, saves
 and reopens), and each has a walkthrough (`house.md`, `observatory.md`, `csg.md`, `manor.md`,
-`manor_before.md`, `storefront.md`) giving the manual steps to build or use it in the
+`manor_before.md`, `storefront.md`, `steel_frame.md`, `timber.md`, `wood_frame.md`) giving the manual steps to build or use it in the
 window, which confirms that every operation it uses has its UI:
 
 - **Storefront doors** (`storefront.ifc`): a shop front with a revolving door, an automatic
@@ -863,6 +877,16 @@ window, which confirms that every operation it uses has its UI:
   Commons with a modelled capital.
 - **Overlap resolutions** (`csg.ifc`): one overlap resolved every way, side by side (cut either
   way, join, intersect, union, move apart and accept) next to an unresolved pair.
+- **Steel-framed office** (`steel_frame.ifc`): two storeys of AISC W-shape columns, girders,
+  beams and infill beam systems on a 30 × 25 ft grid, HSS X-bracing, 6" concrete slabs and
+  spread footings, with its analytical model, supports, dead, live and wind loads and ASCE 7
+  combinations, ready for Run Analysis.
+- **Mass timber frame** (`timber.ifc`): three storeys of glulam columns and beams with CLT floors
+  and glulam bracing to Eurocode materials, with its analytical model (CLT panels) and EN 1990
+  combinations.
+- **Wood-frame house** (`wood_frame.ifc`): 2x6 stud bearing walls on strip footings, 2x10 joists
+  at 16" with a flush beam on posts, a plywood subfloor and parallel-chord Howe trusses at 24", with
+  its analytical model and ASCE 7 combinations.
 
 Open one with `reviera gui test-data/samples/manor.ifc`, or rebuild them with
 `REVIERA_REGEN_SAMPLES=1 cargo test -p reviera-app --test samples`.
@@ -953,11 +977,12 @@ area by area (reviewed against the spec on 2026-10-15).
   trusses, braces, generic connections, foundations with piles and pile caps, structural walls and
   floors, Structural Settings with Coarse single-line framing, steel and timber section
   catalogues, a materials library, regional standards and the analytical model's members, nodes,
-  automation, loads, load combinations, point supports and a built-in linear static solver are
-  built (see [Structure](#structure-in-development)). Still to build: the beam join editor and arc
+  panels, automation, checks, loads, load combinations, point supports and a built-in linear static solver
+  are built (see [Structure](#structure-in-development)). Still to build: the beam join editor and arc
   beams, placing braces in elevations, connection types and the connection library, composite
-  decks and span symbols, truss types and profiles, rebar, analytical panels, area loads, the load
-  cases dialog, results diagrams and external analysis providers.
+  decks and span symbols, truss types and profiles, rebar, area loads, the load
+  cases dialog, Adjust mode and Reset for the analytical model, results diagrams and external
+  analysis providers.
 - **MEP, families and collaboration** (BIMserver, OpenCDE, Godot) are specified but not started.
 - **Remote computation subsystem** (DM-RPC-001 … 010): in development; the first milestone is
   built (see [Analysis and remote computation](#analysis-and-remote-computation-in-development)).

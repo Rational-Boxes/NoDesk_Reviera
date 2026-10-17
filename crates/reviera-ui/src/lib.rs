@@ -11,6 +11,8 @@
 //! through `App::execute`, like Lua and MCP. The ribbon and browsers come next.
 
 mod analytical;
+mod analytical_checks;
+mod analytical_panels;
 mod areas;
 mod assembly;
 mod beams;
@@ -274,6 +276,7 @@ struct Gui {
     footing_tool: Option<foundations::FootingTool>,
     beam_system_tool: Option<beams::BeamSystemTool>,
     truss_tool: Option<beams::TrussTool>,
+    panel_tool: Option<analytical_panels::PanelTool>,
     curtain_tool: Option<curtain::CurtainTool>,
     ramp_tool: Option<ramps::RampTool>,
     measure_tool: Option<ramps::MeasureTool>,
@@ -286,6 +289,9 @@ struct Gui {
     library_pane: Option<components::LibraryPane>,
     /// The Clash Detection pane, once opened.
     clash_pane: Option<clash::ClashPane>,
+    checks_pane: Option<analytical_checks::ChecksPane>,
+    /// Issue keys the automatic analytical checks last saw (STR-AM-007).
+    auto_check_keys: Option<std::collections::HashSet<String>>,
     /// Renders component thumbnails offscreen (made when first needed).
     thumb_renderer: Option<WgpuViewport>,
     /// The last array's members and Move To (Last when true).
@@ -1150,6 +1156,7 @@ impl Gui {
         self.tree.stale = true;
         self.sync_views();
         self.refresh_schedules();
+        self.auto_analytical_check();
     }
 
     fn undo_redo(&mut self, command: &str, frame: &Frame) {
@@ -1297,6 +1304,7 @@ impl Gui {
         self.end_footing_tool();
         self.end_beam_system_tool();
         self.end_truss_tool();
+        self.end_panel_tool();
         self.end_curtain_tool();
         self.end_ramp_tool();
         self.end_measure_tool();
@@ -1348,6 +1356,7 @@ impl Gui {
             || self.end_footing_tool()
             || self.end_beam_system_tool()
             || self.end_truss_tool()
+            || self.end_panel_tool()
         {
             return frame.set_status_text("Ready", 0);
         }
@@ -2712,6 +2721,7 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                     None if g.footing_tool.is_some() => g.footing_click(x, y),
                     None if g.beam_system_tool.is_some() => g.beam_system_click(x, y),
                     None if g.truss_tool.is_some() => g.truss_click(x, y),
+                    None if g.panel_tool.is_some() => g.panel_click(x, y),
                     None if g.curtain_tool.is_some() => g.curtain_click(x, y),
                     None if g.ramp_tool.is_some() => g.ramp_click(x, y),
                     None if g.measure_tool.is_some() => g.measure_click(x, y),
@@ -3301,6 +3311,7 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 footing_tool: None,
                 beam_system_tool: None,
                 truss_tool: None,
+                panel_tool: None,
                 curtain_tool: None,
                 ramp_tool: None,
                 measure_tool: None,
@@ -3309,6 +3320,8 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 array_tool: None,
                 library_pane: None,
                 clash_pane: None,
+                checks_pane: None,
+                auto_check_keys: None,
                 thumb_renderer: None,
                 array_count: 4,
                 array_last: false,
@@ -4043,6 +4056,21 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "railing.create_on_stair" => with(gui, Gui::rail_stairs),
         "overlap.find" => with(gui, Gui::check_overlaps),
         "ui.pane.clash" => Gui::toggle_clash_pane(gui),
+        "ui.pane.analytical_checks" => Gui::toggle_checks_pane(gui),
+        "analytical_panel.create_by_boundary" => with(gui, Gui::start_analytical_panel_sketch),
+        "analytical_panel.create_by_extrusion" => with(gui, |g| {
+            g.start_panel_tool(analytical_panels::PanelMode::Extrude)
+        }),
+        "ui.analytical_panel_curved" => with(gui, |g| {
+            g.start_panel_tool(analytical_panels::PanelMode::Curved)
+        }),
+        "analytical_panel.split" => with(gui, |g| {
+            g.start_panel_tool(analytical_panels::PanelMode::Split)
+        }),
+        "analytical_opening.create" => with(gui, Gui::start_analytical_opening_sketch),
+        "analytical_panel.set_cladding" => with(gui, Gui::toggle_panel_cladding),
+        "analytical_model.check_supports" => Gui::run_analytical_check(gui, true, false),
+        "analytical_model.check_consistency" => Gui::run_analytical_check(gui, false, true),
         "script.run" => with(gui, Gui::open_script),
         "script.import" => with(gui, Gui::import_script),
         "ui.scripts.manage" => with(gui, Gui::manage_scripts),

@@ -28,6 +28,8 @@ pub const UI_ACTIONS: &[&str] = &[
     "app.exit",
     "ui.model_properties",
     "ui.pane.clash",
+    "ui.pane.analytical_checks",
+    "ui.analytical_panel_curved",
     "help.home",
     "wall.edit_assembly",
     "tool.measure",

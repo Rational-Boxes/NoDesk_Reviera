@@ -78,6 +78,18 @@ fn a_simply_supported_beam_analysed_out_of_process() {
         "analytical_member.create",
         json!({ "start": [0.0, 0.0, 0.0], "end": [6.0, 0.0, 0.0], "section_type_id": w12 }),
     );
+    // Without supports, the pre-analysis checks (STR-AM-007) hold the run: S3 and C2 are errors.
+    let held = app
+        .execute("structural_analysis.run", json!({}), &Caller::user())
+        .unwrap_err();
+    assert_eq!(held.code, "structural.check_errors", "{held:?}");
+    let codes: Vec<String> = held.details["issues"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|i| i["code"].as_str().unwrap().to_owned())
+        .collect();
+    assert_eq!(codes, ["C2", "S3"]);
     for end in ["start", "end"] {
         run(
             &mut app,

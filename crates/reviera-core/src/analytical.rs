@@ -88,6 +88,9 @@ pub struct NodeRecipe {
     /// A point boundary condition (STR-BC-001).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub support: Option<crate::loads::Support>,
+    /// Moved by hand (STR-AM-008): automation leaves it where it is.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub adjusted: bool,
 }
 
 fn fixed() -> [[bool; 6]; 2] {
@@ -139,7 +142,7 @@ pub fn is_model(e: &Element) -> bool {
         == Some(MODEL_RECIPE)
 }
 
-fn find(store: &Store, guid: &str) -> Option<ElementId> {
+pub(crate) fn find(store: &Store, guid: &str) -> Option<ElementId> {
     store.find_by_guid(&GlobalId::parse(guid)?)
 }
 
@@ -212,7 +215,7 @@ pub(crate) fn ensure_model(txn: &mut crate::txn::Transaction<'_>) -> Result<Elem
 }
 
 /// The node at `p` (within `tolerance`), or a new one there, on the highest level at or below it.
-fn node_at(txn: &mut crate::txn::Transaction<'_>, p: V3, tolerance: f64) -> Result<String> {
+pub(crate) fn node_at(txn: &mut crate::txn::Transaction<'_>, p: V3, tolerance: f64) -> Result<String> {
     let store = txn.store().clone();
     if let Some((id, _)) = nodes(&store)
         .into_iter()
@@ -239,6 +242,7 @@ fn node_at(txn: &mut crate::txn::Transaction<'_>, p: V3, tolerance: f64) -> Resu
         level: level.guid.clone(),
         offset: p[2] - level.elevation,
         support: None,
+        adjusted: false,
     };
     let id = txn.create(
         NewElement::new("IfcStructuralPointConnection")
@@ -247,7 +251,7 @@ fn node_at(txn: &mut crate::txn::Transaction<'_>, p: V3, tolerance: f64) -> Resu
     Ok(txn.store().get(id).expect("created").guid().to_string())
 }
 
-fn tolerance(store: &Store) -> f64 {
+pub(crate) fn tolerance(store: &Store) -> f64 {
     crate::structural::settings(store).node_merge_distance
 }
 
@@ -505,6 +509,50 @@ pub(crate) fn set_member(txn: &mut crate::txn::Transaction<'_>, p: MemberSetPara
     Ok(())
 }
 
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct NodeMoveParams {
+    pub node_ids: Vec<ElementRef>,
+    /// Metres, project axes.
+    pub delta: [f64; 3],
+    /// Only `global` (the default) for now.
+    pub cs: Option<String>,
+}
+
+/// Moves analytical nodes by a vector and flags them as manually adjusted (`analytical_node.move`,
+/// STR-AM-008). Members using them move with them; each node keeps its level, its offset
+/// recalculated. Physical elements never move.
+pub(crate) fn move_nodes(
+    txn: &mut crate::txn::Transaction<'_>,
+    p: NodeMoveParams,
+) -> Result<Vec<ElementId>> {
+    if p.cs.as_deref().is_some_and(|c| c != "global") {
+        return Err(Error::new(
+            "analytical.cs",
+            "only global moves (`cs: \"global\"`) are supported so far",
+        ));
+    }
+    let store = txn.store().clone();
+    let mut out = Vec::new();
+    for r in &p.node_ids {
+        let (id, mut n) = store
+            .resolve(r)
+            .and_then(|id| Some((id, node_recipe(store.get(id)?)?)))
+            .ok_or_else(|| {
+                Error::new("analytical.not_a_node", format!("no analytical node {r:?}"))
+            })?;
+        n.point = [n.point[0] + p.delta[0], n.point[1] + p.delta[1]];
+        n.offset += p.delta[2];
+        n.adjusted = true;
+        let v = serde_json::to_value(&n).expect("serialises");
+        txn.modify(id, |e| {
+            e.params.insert(RECIPE_KEY.into(), v);
+        })?;
+        out.push(id);
+    }
+    Ok(out)
+}
+
 #[derive(Debug, Default, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct MergeParams {
@@ -542,6 +590,24 @@ pub(crate) fn merge(txn: &mut crate::txn::Transaction<'_>, p: MergeParams) -> Re
     }
     let mut used = HashSet::new();
     for e in store.iter() {
+        if let Some(mut r) = crate::analytical_panels::panel_recipe(e) {
+            let mut changed = false;
+            for c in &mut r.corners {
+                if let Some((_, to)) = map.iter().find(|(from, _)| from == c) {
+                    *c = to.clone();
+                    changed = true;
+                }
+            }
+            r.corners.dedup();
+            used.extend(r.corners.iter().cloned());
+            if changed {
+                let v = serde_json::to_value(&r).expect("serialises");
+                txn.modify(e.id(), |x| {
+                    x.params.insert(RECIPE_KEY.into(), v);
+                })?;
+            }
+            continue;
+        }
         let Some(mut m) = member_recipe(e) else {
             continue;
         };
@@ -606,10 +672,35 @@ pub(crate) fn associate(
                 format!("element {id} already belongs to the association of analytical member {m}"),
             ));
         }
+        if let Some(m) = crate::analytical_panels::associated_with(&store, &guid) {
+            return Err(Error::new(
+                "analytical.already_associated",
+                format!("element {id} already belongs to the association of analytical panel {m}"),
+            ));
+        }
         physical.push(guid);
     }
     let mut out = Vec::new();
     for r in &p.analytical_ids {
+        // A panel (STR-AM-002).
+        if let Some((pid, mut pr)) = store
+            .resolve(r)
+            .and_then(|i| Some((i, crate::analytical_panels::panel_recipe(store.get(i)?)?)))
+        {
+            if !pr.physical.is_empty() {
+                return Err(Error::new(
+                    "analytical.already_associated",
+                    format!("analytical panel {pid} already belongs to an association"),
+                ));
+            }
+            pr.physical = physical.clone();
+            let v = serde_json::to_value(&pr).expect("serialises");
+            txn.modify(pid, |e| {
+                e.params.insert(RECIPE_KEY.into(), v);
+            })?;
+            out.push(pid);
+            continue;
+        }
         let (id, mut m) = resolve_member(&store, r)?;
         if !m.physical.is_empty() {
             return Err(Error::new(
@@ -646,6 +737,20 @@ pub(crate) fn disconnect(
     });
     let mut out = Vec::new();
     for e in store.iter() {
+        if let Some(mut r) = crate::analytical_panels::panel_recipe(e)
+            && !r.physical.is_empty()
+            && picked.as_ref().is_none_or(|set| {
+                set.contains(&e.guid().to_string()) || r.physical.iter().any(|g| set.contains(g))
+            })
+        {
+            r.physical.clear();
+            let v = serde_json::to_value(&r).expect("serialises");
+            txn.modify(e.id(), |x| {
+                x.params.insert(RECIPE_KEY.into(), v);
+            })?;
+            out.push(e.id());
+            continue;
+        }
         let Some(mut m) = member_recipe(e) else {
             continue;
         };
@@ -682,7 +787,7 @@ pub struct AutomationReport {
 
 /// A physical framing element's axis and its member defaults: role, section type, material and
 /// end releases.
-fn physical_member(
+pub(crate) fn physical_member(
     store: &Store,
     e: &Element,
 ) -> std::result::Result<(V3, V3, MemberRecipe), String> {
@@ -749,7 +854,12 @@ pub(crate) fn physical_to_analytical(
         None => store
             .iter()
             .filter(|e| {
-                crate::columns::column_recipe(e).is_some() || crate::beams::beam_recipe(e).is_some()
+                crate::columns::column_recipe(e).is_some()
+                    || crate::beams::beam_recipe(e).is_some()
+                    || (crate::walls::wall_recipe(e).is_some()
+                        && crate::structural::wall_usage(e)
+                            != crate::structural::WallUsage::NonBearing)
+                    || crate::structural::is_structural_floor(e)
             })
             .map(Element::id)
             .collect(),
@@ -764,6 +874,20 @@ pub(crate) fn physical_to_analytical(
                 .push((id, format!("already associated with analytical member {m}")));
             continue;
         }
+        // Walls and floors become panels (STR-AM-002).
+        if crate::walls::wall_recipe(e).is_some() || crate::floors::slab_recipe(e).is_some() {
+            if let Some(p) = crate::analytical_panels::associated_with(txn.store(), &guid) {
+                report
+                    .skipped
+                    .push((id, format!("already associated with analytical panel {p}")));
+                continue;
+            }
+            match crate::analytical_panels::from_physical(txn, e) {
+                Ok(p) => report.created.push(p),
+                Err(why) => report.skipped.push((id, why)),
+            }
+            continue;
+        }
         match physical_member(&store, e) {
             Ok((a, b, r)) => match new_member(txn, a, b, r) {
                 Ok(m) => report.created.push(m),
@@ -772,7 +896,73 @@ pub(crate) fn physical_to_analytical(
             Err(why) => report.skipped.push((id, why)),
         }
     }
+    report.created.extend(split_at_framing(txn)?);
     Ok(report)
+}
+
+/// Splits members where another member's end node lies on their span (within the node merge
+/// distance), so framing that meets mid-span is connected: a beam framing into a girder, a
+/// column running past a floor's beams. Each part keeps the recipe and association; the start
+/// part keeps the start release, the end part the end release, and the new joint is continuous.
+/// Returns the members made.
+pub(crate) fn split_at_framing(txn: &mut crate::txn::Transaction<'_>) -> Result<Vec<ElementId>> {
+    let tol = tolerance(txn.store());
+    let mut made = Vec::new();
+    // One split per pass, then look again: a member may be crossed at several points.
+    for _ in 0..10_000 {
+        let store = txn.store().clone();
+        let ms = members(&store);
+        let ends: Vec<(ElementId, V3)> = {
+            let mut v: Vec<(ElementId, V3)> = ms
+                .iter()
+                .flat_map(|(_, m)| [(m.nodes[0], m.start), (m.nodes[1], m.end)])
+                .collect();
+            // Panels' corners too: a column running past a slab meets it there.
+            for (_, pg) in crate::analytical_panels::panels(&store) {
+                v.extend(pg.nodes.iter().copied().zip(pg.corners.iter().copied()));
+            }
+            v.sort_by_key(|(n, _)| *n);
+            v.dedup_by_key(|(n, _)| *n);
+            v
+        };
+        let hit = ms.iter().find_map(|(mid, m)| {
+            let ab = [0, 1, 2].map(|k| m.end[k] - m.start[k]);
+            let l2 = ab.iter().map(|v| v * v).sum::<f64>();
+            if l2 < 1e-12 {
+                return None;
+            }
+            let l = l2.sqrt();
+            ends.iter().find_map(|(n, p)| {
+                if m.nodes.contains(n) {
+                    return None;
+                }
+                let t = (0..3).map(|k| (p[k] - m.start[k]) * ab[k]).sum::<f64>() / l2;
+                if t * l <= tol || (1.0 - t) * l <= tol {
+                    return None;
+                }
+                let q = [0, 1, 2].map(|k| m.start[k] + ab[k] * t);
+                (dist(*p, q) <= tol).then_some((*mid, *n, m.recipe.clone()))
+            })
+        });
+        let Some((mid, node, r)) = hit else {
+            return Ok(made);
+        };
+        let guid = store.get(node).expect("listed").guid().to_string();
+        let mut first = r.clone();
+        first.end = guid.clone();
+        first.releases[1] = [true; 6];
+        write_member(txn, mid, &first)?;
+        let mut second = r;
+        second.start = guid;
+        second.releases[0] = [true; 6];
+        let id = txn.create(
+            NewElement::new("IfcStructuralCurveMember")
+                .param("@PredefinedType", predefined(&second))
+                .param(RECIPE_KEY, serde_json::to_value(&second).expect("serialises")),
+        )?;
+        made.push(id);
+    }
+    Ok(made)
 }
 
 /// Analytical to physical (`analytical_automation.analytical_to_physical`): each associated
@@ -836,9 +1026,27 @@ pub(crate) fn analytical_to_physical(
 #[derive(Debug, Clone, Serialize, JsonSchema)]
 pub struct ModelInfo {
     pub members: Vec<MemberInfo>,
+    pub panels: Vec<PanelInfo>,
     pub nodes: usize,
     /// Nodes used by only one member and without a boundary condition (free ends).
     pub free_nodes: Vec<ElementId>,
+}
+
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+pub struct PanelInfo {
+    pub id: ElementId,
+    pub role: crate::analytical_panels::PanelRole,
+    pub predefined_type: String,
+    pub cladding: bool,
+    pub curved: bool,
+    pub thickness: f64,
+    pub material: Option<String>,
+    pub corners: Vec<[f64; 3]>,
+    pub nodes: Vec<ElementId>,
+    pub openings: usize,
+    /// Square metres, openings removed.
+    pub area: f64,
+    pub physical: Vec<ElementId>,
 }
 
 #[derive(Debug, Clone, Serialize, JsonSchema)]
@@ -864,6 +1072,13 @@ pub fn info(store: &Store) -> ModelInfo {
             *count.entry(n).or_default() += 1;
         }
     }
+    let ps = crate::analytical_panels::panels(store);
+    // A node a panel uses is held by it.
+    for (_, p) in &ps {
+        for n in &p.nodes {
+            *count.entry(*n).or_default() += 2;
+        }
+    }
     // A supported node is not free.
     let supported = |n: &ElementId| {
         store
@@ -878,6 +1093,28 @@ pub fn info(store: &Store) -> ModelInfo {
         .collect();
     free.sort();
     ModelInfo {
+        panels: ps
+            .into_iter()
+            .map(|(id, p)| PanelInfo {
+                id,
+                role: p.recipe.role,
+                predefined_type: crate::analytical_panels::predefined(&p.recipe).into(),
+                cladding: p.recipe.cladding,
+                curved: p.circle.is_some(),
+                thickness: p.recipe.thickness,
+                material: p.recipe.material.clone(),
+                area: p.area(),
+                corners: p.corners.clone(),
+                nodes: p.nodes.clone(),
+                openings: p.recipe.openings.len(),
+                physical: p
+                    .recipe
+                    .physical
+                    .iter()
+                    .filter_map(|g| find(store, g))
+                    .collect(),
+            })
+            .collect(),
         nodes: nodes(store).len(),
         free_nodes: free,
         members: ms

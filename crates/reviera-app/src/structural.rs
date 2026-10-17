@@ -22,6 +22,9 @@ use crate::compute::failed;
 pub struct RunParams {
     /// Only `linear_static` (the built-in provider's analysis).
     pub analysis_type: Option<String>,
+    /// Run although the pre-analysis checks (STR-AM-007) found errors; they are recorded with
+    /// the results.
+    pub ignore_check_errors: Option<bool>,
 }
 
 #[derive(Debug, Serialize, JsonSchema)]
@@ -31,6 +34,8 @@ pub struct RunOut {
     pub members: usize,
     pub cases: usize,
     pub combinations: usize,
+    /// Check errors the run went ahead despite (issue keys).
+    pub ignored_check_errors: Vec<String>,
 }
 
 pub(crate) struct StructuralAnalysisRun;
@@ -52,9 +57,9 @@ impl HostCommand for StructuralAnalysisRun {
     };
 
     fn run(&self, app: &mut App, _: &Caller, p: Option<RunParams>) -> Result<RunOut> {
-        let kind = p
-            .and_then(|p| p.analysis_type)
-            .unwrap_or_else(|| "linear_static".into());
+        let p = p.unwrap_or_default();
+        let force = p.ignore_check_errors.unwrap_or(false);
+        let kind = p.analysis_type.unwrap_or_else(|| "linear_static".into());
         if kind != "linear_static" {
             return Err(Error::new(
                 "structural.analysis_type",
@@ -65,8 +70,29 @@ impl HostCommand for StructuralAnalysisRun {
             .active()
             .ok_or_else(|| Error::new("document.none", "no document is open"))?;
         let store = app.get(doc)?.doc.store();
+        // Pre-analysis checks: errors that are not ignored hold the run.
+        let checks = reviera_core::analytical_checks::run(store, true, true, &None)?;
+        let errors: Vec<&reviera_core::analytical_checks::Issue> = checks.errors().collect();
+        if !errors.is_empty() && !force {
+            let lines: Vec<String> = errors
+                .iter()
+                .map(|i| format!("{} {}: {}", i.code, i.title, i.message))
+                .collect();
+            return Err(Error::new(
+                "structural.check_errors",
+                format!(
+                    "the analytical model checks found {} error(s); fix them, ignore them, or pass \
+                     `ignore_check_errors`:\n{}",
+                    errors.len(),
+                    lines.join("\n")
+                ),
+            )
+            .with_details(json!({ "issues": errors })));
+        }
+        let ignored_check_errors: Vec<String> = errors.iter().map(|i| i.key.clone()).collect();
         let d = reviera_core::structural_model::distill(store)?;
         let out = RunOut {
+            ignored_check_errors,
             job_id: String::new(),
             nodes: d.model.nodes.len(),
             members: d.model.members.len(),
@@ -84,7 +110,13 @@ impl HostCommand for StructuralAnalysisRun {
         let job_id = client
             .submit(STRUCTURAL, None, &distilled, "", None)
             .map_err(failed)?;
-        client.set_context(&job_id, json!({ "structural": { "analysis_type": kind } }));
+        client.set_context(
+            &job_id,
+            json!({ "structural": {
+                "analysis_type": kind,
+                "ignored_check_errors": out.ignored_check_errors,
+            } }),
+        );
         Ok(RunOut { job_id, ..out })
     }
 }
@@ -163,6 +195,11 @@ impl HostCommand for StructuralAnalysisCollect {
                 "provider": "reviera-analysis-builtin (linear static 3D frame)",
                 "results": results,
                 "key_map": job.key_map,
+                "ignored_check_errors": job
+                    .context
+                    .as_ref()
+                    .and_then(|c| c["structural"].get("ignored_check_errors").cloned())
+                    .unwrap_or_else(|| json!([])),
             }),
             caller,
         )?;
@@ -211,6 +248,7 @@ impl HostCommand for StructuralAnalysisExport {
             members: d.model.members.len(),
             cases: d.model.cases.len(),
             combinations: d.model.combinations.len(),
+            ignored_check_errors: Vec::new(),
         })
     }
 }

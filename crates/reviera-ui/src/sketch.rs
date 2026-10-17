@@ -131,6 +131,10 @@ pub struct SketchSession {
     pub arched: bool,
     /// A floor finished as a foundation slab (STR-FND-003).
     pub foundation: bool,
+    /// A boundary finished as an analytical panel at the level (STR-AM-002).
+    pub analytical_panel: bool,
+    /// A loop finished as an opening in the analytical panel it lies on.
+    pub analytical_opening: bool,
     /// A floor finished as a structural floor (STR-FLOOR-001).
     pub structural: bool,
     /// An opening finished as an opening by face (ARC-OPEN-001): its sides square to the
@@ -262,6 +266,8 @@ impl Gui {
             overhang: ROOF_OVERHANG,
             arched: false,
             foundation: false,
+            analytical_panel: false,
+            analytical_opening: false,
             structural: false,
             by_face: false,
             host,
@@ -749,6 +755,33 @@ impl Gui {
                 } else {
                     ("roof.create_footprint", a)
                 }
+            }
+            (None, SketchKind::Slab(SlabKind::Floor)) if s.analytical_opening => {
+                let Some(ring) = sketch_loops(&s.curves).into_iter().next() else {
+                    return frame.set_status_text("Sketch a closed boundary first", 0);
+                };
+                match self.analytical_opening_args(s.level, ring) {
+                    Ok(a) => ("analytical_opening.create", a),
+                    Err(e) => return frame.set_status_text(&e, 0),
+                }
+            }
+            (None, SketchKind::Slab(SlabKind::Floor)) if s.analytical_panel => {
+                let z = self
+                    .store_now()
+                    .and_then(|st| st.get(s.level).map(reviera_core::levels::elevation))
+                    .unwrap_or(0.0);
+                let Some(ring) = sketch_loops(&s.curves).into_iter().next() else {
+                    return frame.set_status_text("Sketch a closed boundary first", 0);
+                };
+                let mut ring: Vec<[f64; 3]> = ring.iter().map(|q| [q[0], q[1], z]).collect();
+                // A closed loop repeats its first point at the end.
+                if ring.len() > 1 && ring.first() == ring.last() {
+                    ring.pop();
+                }
+                (
+                    "analytical_panel.create_by_boundary",
+                    json!({ "boundary": ring }),
+                )
             }
             (None, SketchKind::Slab(SlabKind::Floor)) if s.foundation => (
                 "foundation_slab.create",

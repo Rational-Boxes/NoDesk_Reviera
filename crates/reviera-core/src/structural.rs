@@ -329,6 +329,8 @@ pub struct Settings {
     pub member_supports_check: bool,
     pub consistency_check: bool,
     pub circular_references_check: bool,
+    /// The consistency criteria checked (STR-AM-007): C1–C7 by default, C8 off.
+    pub consistency_criteria: Vec<String>,
     /// Analytical tolerances (metres).
     pub support_distance: f64,
     pub analytical_distance: f64,
@@ -354,7 +356,10 @@ impl Default for Settings {
             point_to_point_steel: false,
             member_supports_check: false,
             consistency_check: false,
-            circular_references_check: false,
+            circular_references_check: true,
+            consistency_criteria: ["C1", "C2", "C3", "C4", "C5", "C6", "C7"]
+                .map(String::from)
+                .to_vec(),
             support_distance: 0.3,
             analytical_distance: 0.15,
             node_merge_distance: 0.005,
@@ -390,6 +395,16 @@ impl Settings {
             if !(v > 0.0 && v <= 2.0) {
                 return Err((k, format!("`{k}` is above 0 and at most 2000 mm")));
             }
+        }
+        if let Some(c) = self
+            .consistency_criteria
+            .iter()
+            .find(|c| !crate::analytical_checks::CRITERIA.contains(&c.as_str()))
+        {
+            return Err((
+                "consistency_criteria",
+                format!("`{c}` is not a consistency criterion (C1 to C8)"),
+            ));
         }
         if self.node_merge_distance >= self.support_distance {
             return Err((

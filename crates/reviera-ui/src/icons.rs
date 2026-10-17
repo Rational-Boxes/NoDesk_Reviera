@@ -630,6 +630,33 @@ fn body(name: &str, dark: bool) -> Option<String> {
             r#"<path d="M6 26V8h20v18M6 8l20 18" stroke="rgb(208,26,26)" stroke-width="2" fill="none"/><circle cx="6" cy="8" r="2" fill="rgb(26,77,208)"/><circle cx="26" cy="8" r="2" fill="rgb(26,77,208)"/>"#
         .to_string()
         }
+        "analytical_panel" => format!(
+            r#"<path d="M4 22l8-14h16l-8 14z" fill="{f}" stroke="rgb(190,50,115)" stroke-width="2"/><circle cx="4" cy="22" r="2" fill="rgb(26,77,208)"/><circle cx="28" cy="8" r="2" fill="rgb(26,77,208)"/>"#
+        ),
+        "analytical_panel_extrude" => format!(
+            r#"<path d="M6 26h20V8H6z" fill="{f}" stroke="rgb(190,50,115)" stroke-width="2"/><path d="M16 22V12M12 16l4-4 4 4" {sa}/>"#
+        ),
+        "analytical_panel_curved" => format!(
+            r#"<path d="M4 26q12-8 24 0V10q-12-8-24 0z" fill="{f}" stroke="rgb(190,50,115)" stroke-width="2"/>"#
+        ),
+        "analytical_opening" => format!(
+            r#"<path d="M4 26h24V6H4z" fill="{f}" stroke="rgb(190,50,115)" stroke-width="2"/><path d="M11 20h10v-8H11z" fill="none" {sa}/>"#
+        ),
+        "analytical_split" => format!(
+            r#"<path d="M4 26h24V6H4z" fill="{f}" stroke="rgb(190,50,115)" stroke-width="2"/><path d="M18 3v26" {sa}/>"#
+        ),
+        "analytical_cladding" => format!(
+            r#"<path d="M4 26h24V6H4z" fill="none" stroke="rgb(140,140,150)" stroke-width="2" stroke-dasharray="3 2"/><path d="M8 10h16M8 16h16M8 22h16" {s}/>"#
+        ),
+        "analytical_check_supports" => format!(
+            r#"<path d="M4 12h18" stroke="rgb(208,26,26)" stroke-width="2"/><path d="M4 12l-2 6h4z" fill="{a}" {s}/><circle cx="24" cy="22" r="6" fill="none" {sa}/><path d="M21 22l2 2 4-4" {sa}/>"#
+        ),
+        "analytical_check_consistency" => format!(
+            r#"<path d="M3 8h10M16 8h10" stroke="rgb(208,26,26)" stroke-width="2"/><circle cx="13" cy="8" r="2" fill="rgb(26,77,208)"/><circle cx="16" cy="8" r="2" fill="rgb(26,77,208)"/><circle cx="22" cy="22" r="6" fill="none" {sa}/><path d="M22 18v5M22 25v1" {sa}/>"#
+        ),
+        "analytical_checks" => format!(
+            r#"<rect x="4" y="4" width="24" height="24" fill="{f}" {s}/><path d="M8 10h3M8 16h3M8 22h3M14 10h10M14 16h10M14 22h10" {s}/><path d="M8 10h3" {sa}/>"#
+        ),
         "column_base_supports" => format!(
             r#"<path d="M13 3h6v17h-6z" fill="{f}" {s}/><path d="M8 28l8-8 8 8z" fill="{a}" {s}/>"#
         ),

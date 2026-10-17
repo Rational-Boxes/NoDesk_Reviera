@@ -8,6 +8,8 @@
 //! and transactions are opened by the command executor (DM-CORE-001 rule 9).
 
 pub mod analytical;
+pub mod analytical_checks;
+pub mod analytical_panels;
 pub mod annotations;
 pub mod areas;
 pub mod arrangement;
