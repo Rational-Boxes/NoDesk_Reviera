@@ -2,6 +2,7 @@
   {
     "name": "house",
     "title": "House with dormers",
+    "group": "Architecture",
     "steps": [
       {
         "command": "script.run",
@@ -14,6 +15,7 @@
   {
     "name": "observatory",
     "title": "Observatory",
+    "group": "Architecture",
     "steps": [
       {
         "command": "script.run",
@@ -46,14 +48,79 @@
     ]
   },
   {
-    "name": "csg",
-    "title": "Overlap resolutions",
-    "allow_overlaps": 1,
+    "name": "manor",
+    "title": "Manor after coordination",
+    "group": "Architecture",
     "steps": [
       {
         "command": "script.run",
         "args": {
-          "file": "csg.lua"
+          "file": "manor.lua"
+        }
+      }
+    ]
+  },
+  {
+    "name": "storefront",
+    "title": "Storefront doors",
+    "group": "Architecture",
+    "steps": [
+      {
+        "command": "script.run",
+        "args": {
+          "file": "storefront.lua"
+        }
+      }
+    ]
+  },
+  {
+    "name": "temple",
+    "title": "Greek temple",
+    "group": "Architecture",
+    "steps": [
+      {
+        "command": "script.run",
+        "args": {
+          "file": "temple.lua"
+        }
+      }
+    ]
+  },
+  {
+    "name": "steel_frame",
+    "title": "Steel-framed office",
+    "group": "Structure",
+    "steps": [
+      {
+        "command": "script.run",
+        "args": {
+          "file": "steel_frame.lua"
+        }
+      }
+    ]
+  },
+  {
+    "name": "timber",
+    "title": "Mass timber frame",
+    "group": "Structure",
+    "steps": [
+      {
+        "command": "script.run",
+        "args": {
+          "file": "timber.lua"
+        }
+      }
+    ]
+  },
+  {
+    "name": "wood_frame",
+    "title": "Wood-frame house",
+    "group": "Structure",
+    "steps": [
+      {
+        "command": "script.run",
+        "args": {
+          "file": "wood_frame.lua"
         }
       }
     ]
@@ -61,6 +128,7 @@
   {
     "name": "manor_before",
     "title": "Manor before coordination",
+    "group": "View",
     "description": "The Manor with tower as first modelled, before coordination: the castle towers' walls run through the house's eaves and walls, and the gallery's vault and floor into the round tower. Run a clash test (View \u203a Coordination \u203a Clash Detection) to find, review and resolve them; the Manor sample is the same model after coordination.",
     "allow_overlaps": 19,
     "steps": [
@@ -76,73 +144,15 @@
     ]
   },
   {
-    "name": "manor",
-    "title": "Manor after coordination",
+    "name": "csg",
+    "title": "Overlap resolutions",
+    "group": "Modify",
+    "allow_overlaps": 1,
     "steps": [
       {
         "command": "script.run",
         "args": {
-          "file": "manor.lua"
-        }
-      }
-    ]
-  },
-  {
-    "name": "storefront",
-    "title": "Storefront doors",
-    "steps": [
-      {
-        "command": "script.run",
-        "args": {
-          "file": "storefront.lua"
-        }
-      }
-    ]
-  },
-  {
-    "name": "temple",
-    "title": "Greek temple",
-    "steps": [
-      {
-        "command": "script.run",
-        "args": {
-          "file": "temple.lua"
-        }
-      }
-    ]
-  },
-  {
-    "name": "steel_frame",
-    "title": "Steel-framed office",
-    "steps": [
-      {
-        "command": "script.run",
-        "args": {
-          "file": "steel_frame.lua"
-        }
-      }
-    ]
-  },
-  {
-    "name": "timber",
-    "title": "Mass timber frame",
-    "steps": [
-      {
-        "command": "script.run",
-        "args": {
-          "file": "timber.lua"
-        }
-      }
-    ]
-  },
-  {
-    "name": "wood_frame",
-    "title": "Wood-frame house",
-    "steps": [
-      {
-        "command": "script.run",
-        "args": {
-          "file": "wood_frame.lua"
+          "file": "csg.lua"
         }
       }
     ]

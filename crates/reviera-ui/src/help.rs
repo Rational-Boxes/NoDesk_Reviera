@@ -345,12 +345,15 @@ pub(crate) fn samples_dir() -> Option<PathBuf> {
         .find(|d| d.join("samples.json").is_file())
 }
 
-/// A sample model: its name (file stem), title and one-line description.
+/// A sample model: its name (file stem), title, one-line description and the part of the
+/// application it shows, named as the ribbon's tabs are (Architecture, Structure, View, Modify …;
+/// empty when the manifest gives none).
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct Sample {
     pub name: String,
     pub title: String,
     pub description: String,
+    pub group: String,
 }
 
 /// The samples listed in `dir`'s `samples.json` whose `.ifc` exists.
@@ -389,6 +392,7 @@ pub(crate) fn samples(dir: &Path) -> Vec<Sample> {
                 name,
                 title,
                 description,
+                group: s["group"].as_str().unwrap_or_default().to_owned(),
             })
         })
         .collect()
@@ -401,24 +405,40 @@ fn escape(s: &str) -> String {
         .replace('"', "&quot;")
 }
 
-/// The landing page's samples section: a card for each sample found, or a note where there are
-/// none.
+/// The landing page's samples section: a card for each sample found, under a heading for each
+/// group in the manifest's order, or a note where there are none.
 fn sample_cards(samples: &[Sample]) -> String {
     if samples.is_empty() {
         return "<p class=\"note\">The sample models were not found beside Reviera (set \
          <code>REVIERA_SAMPLES</code> to their folder).</p>"
             .to_owned();
     }
-    let mut out = String::from("<div class=\"samples\">\n");
+    let mut groups: Vec<&str> = Vec::new();
     for s in samples {
-        out.push_str(&format!(
-            "<div class=\"sample\"><h3>{}</h3><p>{}</p><a class=\"open\" href=\"reviera:sample/{}\">Open</a></div>\n",
-            escape(&s.title),
-            escape(&s.description),
-            escape(&s.name)
-        ));
+        if !groups.contains(&s.group.as_str()) {
+            groups.push(&s.group);
+        }
     }
-    out.push_str("</div>");
+    let mut out = String::new();
+    for g in groups {
+        if !g.is_empty() {
+            out.push_str(&format!(
+                "<h3 class=\"sample-group\" id=\"samples-{}\">{}</h3>\n",
+                clean_anchor(&g.to_lowercase()),
+                escape(g)
+            ));
+        }
+        out.push_str("<div class=\"samples\">\n");
+        for s in samples.iter().filter(|s| s.group == g) {
+            out.push_str(&format!(
+                "<div class=\"sample\"><h3>{}</h3><p>{}</p><a class=\"open\" href=\"reviera:sample/{}\">Open</a></div>\n",
+                escape(&s.title),
+                escape(&s.description),
+                escape(&s.name)
+            ));
+        }
+        out.push_str("</div>\n");
+    }
     out
 }
 
@@ -689,12 +709,34 @@ mod tests {
             "manor",
             "manor_before",
             "storefront",
+            "steel_frame",
+            "timber",
+            "wood_frame",
         ] {
             assert!(names.contains(&n), "{n} in {names:?}");
+        }
+        // The structural samples are listed together under their own heading.
+        let structure: Vec<&str> = list
+            .iter()
+            .filter(|s| s.group == "Structure")
+            .map(|s| s.name.as_str())
+            .collect();
+        assert_eq!(structure, ["steel_frame", "timber", "wood_frame"]);
+        // Every group is a ribbon tab's name.
+        let tabs = crate::ribbon::Catalog::parse(crate::ribbon::DEFAULT).unwrap();
+        for s in &list {
+            assert!(
+                tabs.tabs.iter().any(|t| t.label == s.group),
+                "{}: {} is not a tab",
+                s.name,
+                s.group
+            );
         }
         assert!(list.iter().all(|s| !s.description.is_empty()));
         let html = landing_html(&list);
         assert!(html.contains("href=\"reviera:sample/storefront\""));
+        assert!(html.contains("<h3 class=\"sample-group\" id=\"samples-structure\">Structure</h3>"));
+        assert!(html.contains("href=\"reviera:sample/steel_frame\""));
         assert!(!html.contains("{{"));
     }
 

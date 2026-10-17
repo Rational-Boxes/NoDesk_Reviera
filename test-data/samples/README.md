@@ -15,6 +15,10 @@ REVIERA_REGEN_SAMPLES=1 cargo test -p reviera-app --test samples
 
 or only some of them, by name: `REVIERA_REGEN_SAMPLES=temple,csg`.
 
+Each entry's `group` names the part of the application it shows, as the ribbon's tabs are
+(Architecture, Structure, View, Modify …); Help's landing page lists the samples under those
+headings, in the ribbon's order.
+
 | Sample | Shows |
 |---|---|
 | `house.ifc` (`house.lua`) | Walls, doors and windows. A hipped roof with eaves bearing on the walls (fascia, soffits), walls attached. A gable and a shed dormer joined flush. A U-shaped and an L-shaped stair with railings. A railing with a single gate, a double gate and an opening. A deck with a railing on its boards. Two levels with plans. |
