@@ -310,6 +310,10 @@ impl Gui {
                 if let Ok(g) = reviera_core::columns::regenerate(&store, e) {
                     ring(&mut out, &g.ring);
                 }
+            } else if reviera_core::beams::beam_recipe(e).is_some() {
+                if let Ok(g) = reviera_core::beams::regenerate(&store, e) {
+                    ring(&mut out, &g.plan_outline());
+                }
             } else if reviera_core::curtain::curtain_recipe(e).is_some() {
                 if let Ok(g) = reviera_core::curtain::regenerate(&store, e) {
                     ring(&mut out, &g.footprint());

@@ -463,9 +463,16 @@ impl Ribbon {
         let was_shown = self.context_key.is_some();
         self.context_key = key;
         let Some((label, category)) = context else {
+            // Back to the tab before the selection, unless another was chosen meanwhile.
             unsafe {
+                let active = reviera_rb_active(self.bar);
                 reviera_rb_show_page(self.bar, self.context_index, 0, 0);
-                reviera_rb_set_active(self.bar, self.previous);
+                let back = if active == self.context_index {
+                    self.previous
+                } else {
+                    active
+                };
+                reviera_rb_set_active(self.bar, back);
                 reviera_rb_realize(self.bar);
             }
             return;

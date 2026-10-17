@@ -1,0 +1,89 @@
+{
+ "family": "AISC Pipe, Standard weight (STD)",
+ "standard": "ASTM A53 Gr. B (AISC-listed pipe); AISC Shapes Database v16.0",
+ "units": "in",
+ "shape": "circular_hollow",
+ "default_material": "Steel ASTM A53 Gr B",
+ "source_ids": [
+  "S0720",
+  "S0721",
+  "S0727"
+ ],
+ "sections": [
+  {
+   "name": "Pipe1/2STD",
+   "od": 0.84,
+   "t": 0.109
+  },
+  {
+   "name": "Pipe3/4STD",
+   "od": 1.05,
+   "t": 0.113
+  },
+  {
+   "name": "Pipe1STD",
+   "od": 1.315,
+   "t": 0.133
+  },
+  {
+   "name": "Pipe1-1/4STD",
+   "od": 1.66,
+   "t": 0.14
+  },
+  {
+   "name": "Pipe1-1/2STD",
+   "od": 1.9,
+   "t": 0.145
+  },
+  {
+   "name": "Pipe2STD",
+   "od": 2.375,
+   "t": 0.154
+  },
+  {
+   "name": "Pipe2-1/2STD",
+   "od": 2.875,
+   "t": 0.203
+  },
+  {
+   "name": "Pipe3STD",
+   "od": 3.5,
+   "t": 0.216
+  },
+  {
+   "name": "Pipe3-1/2STD",
+   "od": 4.0,
+   "t": 0.226
+  },
+  {
+   "name": "Pipe4STD",
+   "od": 4.5,
+   "t": 0.237
+  },
+  {
+   "name": "Pipe5STD",
+   "od": 5.563,
+   "t": 0.258
+  },
+  {
+   "name": "Pipe6STD",
+   "od": 6.625,
+   "t": 0.28
+  },
+  {
+   "name": "Pipe8STD",
+   "od": 8.625,
+   "t": 0.322
+  },
+  {
+   "name": "Pipe10STD",
+   "od": 10.75,
+   "t": 0.365
+  },
+  {
+   "name": "Pipe12STD",
+   "od": 12.75,
+   "t": 0.375
+  }
+ ]
+}

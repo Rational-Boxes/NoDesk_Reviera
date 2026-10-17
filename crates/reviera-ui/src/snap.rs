@@ -2,13 +2,15 @@
 // Copyright (C) 2026 Reviera contributors
 
 //! Snapping while drawing (spec Ch 1, snaps): the point under the cursor moves to a nearby wall end,
-//! a wall midpoint, a point on a wall's location line, or the nearest 15° direction from the
+//! a crossing of two lines (grid intersections), a wall midpoint, a point on a wall's location line, or the nearest 15° direction from the
 //! previous point. Distances are measured on screen, so snapping feels the same at any zoom.
 
 /// What the point snapped to.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum SnapKind {
     Endpoint,
+    /// Where two lines cross (a grid intersection).
+    Intersection,
     Midpoint,
     /// On a location line, away from its ends (a T junction).
     Nearest,
@@ -21,6 +23,7 @@ impl SnapKind {
     pub fn label(&self) -> String {
         match self {
             SnapKind::Endpoint => "Endpoint".into(),
+            SnapKind::Intersection => "Intersection".into(),
             SnapKind::Midpoint => "Midpoint".into(),
             SnapKind::Nearest => "Nearest".into(),
             // `+ 0.0` turns -0 into 0.
@@ -67,6 +70,14 @@ pub fn snap(
             kind: SnapKind::Endpoint,
         };
     }
+    let crossings = (0..lines.len())
+        .flat_map(|i| (i + 1..lines.len()).filter_map(move |j| crossing(lines[i], lines[j])));
+    if let Some(p) = closest(&mut crossings.into_iter()) {
+        return Snap {
+            point: p,
+            kind: SnapKind::Intersection,
+        };
+    }
     let mid = |(a, b): &([f64; 2], [f64; 2])| [(a[0] + b[0]) / 2.0, (a[1] + b[1]) / 2.0];
     if let Some(p) = closest(&mut lines.iter().map(mid)) {
         return Snap {
@@ -106,6 +117,21 @@ pub fn snap(
         point: raw,
         kind: SnapKind::None,
     }
+}
+
+/// Where two segments cross, within both.
+fn crossing((p, p2): ([f64; 2], [f64; 2]), (q, q2): ([f64; 2], [f64; 2])) -> Option<[f64; 2]> {
+    let r = [p2[0] - p[0], p2[1] - p[1]];
+    let t = [q2[0] - q[0], q2[1] - q[1]];
+    let den = r[0] * t[1] - r[1] * t[0];
+    if den.abs() < 1e-12 {
+        return None;
+    }
+    let qp = [q[0] - p[0], q[1] - p[1]];
+    let u = (qp[0] * t[1] - qp[1] * t[0]) / den;
+    let v = (qp[0] * r[1] - qp[1] * r[0]) / den;
+    ((-1e-9..=1.0 + 1e-9).contains(&u) && (-1e-9..=1.0 + 1e-9).contains(&v))
+        .then(|| [p[0] + u * r[0], p[1] + u * r[1]])
 }
 
 /// The point of segment `a`–`b` nearest to `p`.
@@ -154,6 +180,20 @@ mod tests {
         let s = snap(raw, cursor, None, &[WALL], screen);
         assert_eq!(s.kind, SnapKind::Nearest);
         assert!((s.point[0] - 3.0).abs() < 1e-12 && s.point[1] == 0.0);
+    }
+
+    #[test]
+    fn crossings_snap_before_lines() {
+        let across = ([2.0, -3.0], [2.0, 3.0]);
+        let (raw, cursor) = at([2.04, 0.06]);
+        let s = snap(raw, cursor, None, &[WALL, across], screen);
+        assert_eq!(
+            s,
+            Snap {
+                point: [2.0, 0.0],
+                kind: SnapKind::Intersection
+            }
+        );
     }
 
     #[test]

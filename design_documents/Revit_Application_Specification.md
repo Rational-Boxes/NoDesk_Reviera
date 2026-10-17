@@ -32,7 +32,7 @@
 **Document:** Functional and technical specification of Reviera, an open-source BIM authoring application
 **Functional reference:** Autodesk® Revit® 2026/2027 (described from public sources only; see `RESEARCH_LOG.md`)
 **Licence of Reviera:** GPL-3.0-or-later
-**Version:** 0.1 (draft) · 2026-10-15 · **Size:** 807 numbered requirements (320 P0 · 292 P1 · 188 P2 · 7 P3), 2,061 commands
+**Version:** 0.1 (draft) · 2026-10-16 · **Size:** 808 numbered requirements (320 P0 · 293 P1 · 188 P2 · 7 P3), 2,070 commands
 
 > **Clean-room statement.** This specification describes features, workflows and behaviour in Reviera's own words. Every input was publicly available: vendor online help, public blogs and tutorials, public forums and open-source repositories. All of it is listed with URLs and access checks in `SOURCE_REGISTER.md`. No proprietary, confidential, leaked or NDA-covered information was used. No vendor code, binaries, file formats or assets were examined or copied. Autodesk and Revit are trademarks of Autodesk, Inc. They are used here only to identify the functional reference. Reviera is not affiliated with or endorsed by Autodesk.
 
@@ -64,7 +64,7 @@ This document covers:
 | 6 | Collaboration, linking and coordination (Local and BIMserver modes) |
 | 7 | Advanced features beyond the reference product: scene protocol, simulated walkthroughs, Godot translation layer for VR/AR, render bridges |
 | 8 | Remote computation and analysis (overview): the remote computation subsystem and the analysis plugin layer, how they fit together, and a build order |
-| A | Appendix A: requirement summary, shared commands, consolidated command index (2,061 commands; 807 requirements) |
+| A | Appendix A: requirement summary, shared commands, consolidated command index (2,070 commands; 808 requirements) |
 
 Out of scope:
 - reproducing vendor-cloud services such as ACC/Forma and Autodesk Assistant (open alternatives are specified instead)
@@ -15430,6 +15430,8 @@ Ref: research/03 §1.1–1.6
 - [ ] A column attached to a sloped floor follows the floor when the floor slope changes, for each of the four attachment justifications.
 - [ ] Exported IFC validates against IFC4 ADD2 TC1, and the column carries `Pset_ColumnCommon.LoadBearing = TRUE`.
 
+*Built (2026-10-16):* `column.place` (vertical structural columns; refuses architectural types with `column.not_structural_type`), `column.place_at_grids` (one column per crossing of the selected grids, in one undo step; a straight-line crossing test, with the grid's own extent), `column.location_mark` (read-only, for example "B-2", or "B-2(+600, -300)" in millimetres when off the crossing) and `column.load_section` / `column.check` (STR-SEC-001). Structural column types share the architectural column's `recipe.column_type` with `structural: true`, a material kind (concrete, steel, precast concrete, wood, other), a material name and a catalogue designation. Shapes: rectangular, round, I (W, IPE, HE, UB, UC), channel, angle, tee, rectangular hollow and circular hollow, with web, flange and wall thicknesses; the type's area and second moments are computed from the outline. The default type, *Concrete Column 400 x 400*, takes its concrete from the model's building code. A new **Structure** tab carries Column (`SC`), At Grids, Load Section, Attach Top and Detach Top, and the datums; box selection in plans now includes grid lines, so At Grids takes a window of grids. IFC: `IfcColumn` (`COLUMN`, `Pset_ColumnCommon.LoadBearing` true) with a faceted B-rep body (hollow sections keep their holes). Not yet: placement previews and Spacebar rotation to grid directions, *At Columns*, Moves With Grids, attaching bases, beams as attachment targets, cut styles and extensions, `IfcExtrudedAreaSolid` with `IfcMaterialProfileSetUsage`, analytical association, coarse stick symbols.
+
 ### 4.1.2 Slanted columns
 **ID:** STR-COL-002 · **Priority:** P1 · **Ref:** research/03 §2.1
 
@@ -15496,6 +15498,8 @@ Ref: research/03 §1.1–1.6
 - [ ] *On Grids* across 3 grid lines that each cross 4 columns creates 9 beams, one per bay.
 - [ ] A purlin exports as `IfcMember` with PredefinedType `PURLIN`.
 
+*Built (2026-10-16):* `beam.create` (a straight location line at a reference level with an offset at each end, so beams slope; the type defaults to the region's usual rolled beam: W12X26, IPE 300 or UB 305x165x40), `beam.create_on_grids` (a beam per bay between consecutive columns on each selected grid line that reach the level; one undo step), `beam.set_usage` (lock, or `automatic`), `beam.set`, `beam.load_section` and `beam.info` (usage, cut length, what each end rests on). Automatic usage follows the supports found from the model: an end inside a column or wall is supported by it; an end on another beam's side frames into it; on columns or walls a girder, on girders a joist, on joists a purlin, otherwise other. The class is chosen when the beam is made (purlins and horizontal bracing as `IfcMember`, others as `IfcBeam`), because a saved element cannot change class; later usage changes set PredefinedType and ObjectType within that class (`BEAM` + ObjectType `GIRDER`, `JOIST`, `PURLIN`, `BRACE`, or `USERDEFINED` with the usage as ObjectType). `Pset_BeamCommon` (or `Pset_MemberCommon`) carries LoadBearing and Span (the cut length). Orientation *normal* or *horizontal* (upright, cut plumb) and cross-section rotation are built. The Structure tab's Framing panel has Beam (`BM`; click a start and an end, chained, snapping to grid crossings), On Grids and Load Beam Section; Properties show the level, end offsets, orientation, rotation, justification, extensions, usage ("Automatic (Joist)"), supports and cut length. IFC: a faceted B-rep body contained in the reference level. Plan snapping gained *Intersection* (where two grid or wall lines cross). Not yet: arc beams, pick lines, 3D snapping, Tag on Placement, the view-range notice, horizontal bracing by drawing, walls and beams as On Grids supports, `IfcExtrudedAreaSolid` bodies, `Qto_BeamBaseQuantities`, and member types (`IfcMemberType`) for members.
+
 ### 4.1.4 Framing justification, extensions, cutback and joins
 **ID:** STR-BEAM-002 · **Priority:** P1 · **Ref:** research/03 §2.2, §2.4
 
@@ -15531,6 +15535,8 @@ Ref: research/03 §1.1–1.6
 - [ ] z Justification = Top with a −50 mm offset puts the top of steel 50 mm below the location line in section.
 - [ ] A concrete beam joined to a steel column cuts the column. Swapping the materials reverses the cut.
 - [ ] Disjoining an end removes the cutback at that end only.
+
+*Built (2026-10-16):* y justification (origin, left, centre, right; offset positive to the left) and z justification (origin, top, centre, bottom; offset positive up) for both ends together (`framing.set_justification`; *Independent* per end is not built); start and end extensions (`framing.set_extension`); automatic joins at supports: a joined end stops at the supporting column's or wall's face, or at the side of the beam it frames into, less its cutback (`framing.set_cutback`; 12.5 mm by default for steel members, none for others); `framing.disjoin` releases an end (no join, no cutback) and `framing.join` joins it again. The body always reflects justification, joins, cutback and extensions. Not yet: the join editor (`framing.join_edit`, mitres, which member runs through), material precedence (concrete cutting steel), `framing.change_reference`, shape handles, `IfcRelConnectsPathElements`, openings in framing.
 
 ### 4.1.5 Point-to-point steel modeling
 **ID:** STR-BEAM-003 · **Priority:** P2 · **Ref:** research/03 §2.2 ("Point-to-point steel modeling")
@@ -15820,6 +15826,31 @@ Each row in a page shows whether the value differs from the project template def
 - [ ] Settings survive a save and reopen of the `.ifc` with its RXD data, and a BIMserver check-in and get-latest round trip.
 - [ ] `structural_settings.show("analytical")` opens the dialog on the Analytical Model page; entering a node merge distance of 400 mm with a support distance of 300 mm disables *OK* and shows the rule.
 - [ ] Changing three pages and pressing *OK* creates one undo item; undo restores all three.
+
+### 4.1.14 Section catalogues, materials and regional standards
+**ID:** STR-SEC-001 · **Priority:** P1 · **Ref:** research/08 (S0720–S0822)
+
+**Purpose.** Structural types start from the standard sections, materials and design standards that apply where the building is, so users pick a W10X49 in Chicago, an HEB 300 in Munich or a 254 x 254 x 73 UC in Leeds without typing dimensions.
+
+**Behaviour & rules.**
+- Reviera ships open **section catalogues** as data files, one per family and standard: AISC W, C, L, WT, rectangular and round HSS and standard pipe (ASTM A6, A500, A53); Euronorm IPE, HEA and HEB (EN 10365); UK UB and UC (BS 4-1). Each lists nominal dimensions only (depth, flange width, web and flange thickness; or height, width and wall; or outside diameter and wall), with its standard, units, shape, default material and sources. Reviera computes area, second moments and radii of gyration from the outline (root fillets are left out, so values are slightly below published ones). Catalogues are small factual subsets; publishers' property tables are not copied.
+- The **region** follows the model's building code (§1.x code settings): United States (IBC/IRC), Canada (NBC), Europe (DIN and custom codes), United Kingdom (Approved Documents) or Australia (NCC). It sets the preferred catalogues (listed first), the default steel grade and concrete class (for example ASTM A992 and f'c 4000 psi; S355 and C30/37; CSA 350W and 30 MPa; 300PLUS and 32 MPa), and the design standards named for loads, steel, concrete and timber (ASCE/SEI 7, AISC 360, ACI 318, NDS; NBC, CSA S16, A23.3, O86; EN 1990–1995; AS/NZS 1170, AS 4100, AS 3600, AS 1720.1).
+- *Load Section* makes a structural column type from a catalogue designation, named for it, with the catalogue's default material unless another is given. Loading the same designation and material again reuses the type.
+- **Advisory checks** (`column.check`) report slenderness against simple code limits: steel KL/r above 200 (AISC 360 user note), concrete k·lu/r above 22 for unbraced columns in the US and Canada (ACI 318), and the slenderness λ for Eurocode regions (EN 1992-1-1 §5.8.3.1, whose limit needs the design load). They are prompts for the engineer, not design checks; design checks belong to analysis providers (§4.0.2a).
+
+**Data.** Catalogues are compiled into Reviera (`crates/reviera-core/data/sections/*.json`, with a provenance README). Types record their catalogue designation and material on the `recipe.column_type`; IFC carries the material name.
+
+**Commands.**
+- `structural.catalogs(catalog?) -> [{id, family, standard, units, shape, default_material, preferred, designations[]}]`
+- `structural.standards() -> {region, catalogs[], steel, concrete, loads, steel_standard, concrete_standard, timber_standard}`
+- `column.load_section(catalog, designation, material?) -> type_id`
+- `column.check(column_ids?) -> [{column_id, length, slenderness, limit?, note}]`
+
+**Acceptance criteria.**
+- [x] Every catalogue section makes a valid type; HEB 300 and W8X24 have their published dimensions, and HEB 300's computed Ix is within 5 % of the published value.
+- [x] A US model lists the AISC catalogues first and loads W shapes in ASTM A992; a DIN model lists HEB, HEA and IPE first with S355 and C30/37.
+- [x] In a US model a Pipe 2 STD column 12 m tall exceeds KL/r 200 and a W10X49 4 m tall does not; a 400 × 400 concrete column 12 m tall exceeds k·lu/r 22. In a DIN model the same column reports λ with no limit, citing EN 1992-1-1.
+- [ ] Timber sections (NIST PS 20 dressed sizes, EN 338 and glulam classes) and a materials library with strengths.
 
 ---
 
@@ -20497,6 +20528,15 @@ Every command below is registered once in the command registry and is exposed au
 | `column.attach` | column_ids[], end: top\|base, target_id, style?, justification?, offset? | () | Yes | STR-COL-001 |
 | `column.detach` | column_ids[], end: top\|base, target_ids? | () | Yes | STR-COL-001 |
 | `column.place_slanted` | type_id, p1, p1_level, p1_offset, p2, p2_level, p2_offset, style | element_id | Yes | STR-COL-002 |
+| `column.location_mark` | column_ids[] | [{column_id, mark?}] | No | STR-COL-001 |
+| `column.load_section` | catalog, designation, material? | type_id | Yes | STR-SEC-001 |
+| `column.check` | column_ids? | [advisory] | No | STR-SEC-001 |
+| `beam.set` | beam_ids[], reference_level?, start_offset?, end_offset?, rotation?, orientation?, y_justification?, y_offset?, z_justification?, z_offset?, start_extension?, end_extension?, usage? | — | Yes | STR-BEAM-001 |
+| `beam.load_section` | catalog, designation, material? | type_id | Yes | STR-SEC-001 |
+| `beam.info` | beam_ids[] | [{beam_id, usage, usage_locked, length, supports, designation, material}] | No | STR-BEAM-001 |
+| `framing.join` | id, end | — | Yes | STR-BEAM-002 |
+| `structural.catalogs` | catalog? | [catalogue] | No | STR-SEC-001 |
+| `structural.standards` | — | {region, catalogs, steel, concrete, standards} | No | STR-SEC-001 |
 | `beam.create` | type_id, curve, reference_level, usage?, orientation?, z_justification?, y_justification? | element_id | Yes | STR-BEAM-001 |
 | `beam.create_on_grids` | type_id, grid_ids[], level | element_id[] | Yes | STR-BEAM-001 |
 | `beam.set_usage` | beam_ids[], usage, lock? | — | Yes | STR-BEAM-001 |
@@ -27068,13 +27108,13 @@ Generated by `tools/build_spec.py` from the chapter command catalogs and require
 | UI | 76 | 38 | 7 | 0 | 121 |
 | DM | 91 | 64 | 33 | 3 | 191 |
 | ARC | 77 | 60 | 10 | 1 | 148 |
-| STR | 0 | 14 | 47 | 0 | 61 |
+| STR | 0 | 15 | 47 | 0 | 62 |
 | MEP | 0 | 30 | 42 | 0 | 72 |
 | ANA | 0 | 1 | 27 | 0 | 28 |
 | DOC | 68 | 40 | 12 | 1 | 121 |
 | COL | 8 | 45 | 6 | 1 | 60 |
 | ADV | 0 | 0 | 4 | 1 | 5 |
-| **Total** | **320** | **292** | **188** | **7** | **807** |
+| **Total** | **320** | **293** | **188** | **7** | **808** |
 
 Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver)"), it is counted under the first. The non-functional requirements (NFR-…) are in Chapter 0 §0.7 and are not counted here.
 
@@ -27249,7 +27289,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**2061 unique commands** in 408 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**2070 unique commands** in 409 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -27285,7 +27325,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `assembly` | 16 |
 | `assemblytemplate` | 1 |
 | `bcf` | 25 |
-| `beam` | 3 |
+| `beam` | 6 |
 | `beam_system` | 4 |
 | `bending_detail` | 1 |
 | `bimserver` | 21 |
@@ -27314,7 +27354,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `code` | 2 |
 | `colorlegend` | 1 |
 | `colorscheme` | 5 |
-| `column` | 7 |
+| `column` | 10 |
 | `component` | 6 |
 | `compound` | 11 |
 | `compute` | 22 |
@@ -27405,7 +27445,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `footing` | 3 |
 | `formula` | 2 |
 | `foundation_slab` | 1 |
-| `framing` | 6 |
+| `framing` | 7 |
 | `gbxml` | 2 |
 | `geom` | 1 |
 | `geometry` | 7 |
@@ -27600,6 +27640,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `steel_modifier` | 4 |
 | `steel_nc` | 1 |
 | `steel_numbering` | 1 |
+| `structural` | 2 |
 | `structural_analysis` | 4 |
 | `structural_code` | 1 |
 | `structural_connection` | 11 |
@@ -27793,6 +27834,9 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `bcf.update_topic` | 6 | topic_id, fields | () | Yes | COL-BCF-001 |
 | `beam.create` | 4 | type_id, curve, reference_level, usage?, orientation?, z_justification?, y_justification? | element_id | Yes | STR-BEAM-001 |
 | `beam.create_on_grids` | 4 | type_id, grid_ids[], level | element_id[] | Yes | STR-BEAM-001 |
+| `beam.info` | 4 | beam_ids[] | [{beam_id, usage, usage_locked, length, supports, designation, material}] | No | STR-BEAM-001 |
+| `beam.load_section` | 4 | catalog, designation, material? | type_id | Yes | STR-SEC-001 |
+| `beam.set` | 4 | beam_ids[], reference_level?, start_offset?, end_offset?, rotation?, orientation?, y_justification?, y_offset?, z_justification?, z_offset?, start_extension?, end_extension?, usage? | — | Yes | STR-BEAM-001 |
 | `beam.set_usage` | 4 | beam_ids[], usage, lock? | — | Yes | STR-BEAM-001 |
 | `beam_system.create_auto` | 4 | view_id, pick_point, type_id, layout_rule, value, justification? | system_id | Yes | STR-BSYS-001 |
 | `beam_system.create_sketch` | 4 | boundary_curves[], direction_edge, type_id, layout_rule, value, lock_to_supports? | system_id | Yes | STR-BSYS-001 |
@@ -27911,7 +27955,10 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `colorscheme.set_entry` | 5 | scheme_id, value_or_range, colour?, pattern_id?, visible? | () | Yes | DOC-ANN-022 |
 | `colorscheme.set_rows` | 3 | scheme_id, rows: [{value \ | at_least, color, pattern?, visible, caption?}] | — | Yes |
 | `column.attach` | 3 | column_ids[], end: top\ | base, target_id, style?, justification?, offset? | () | Yes |
+| `column.check` | 4 | column_ids? | [advisory] | No | STR-SEC-001 |
 | `column.detach` | 3 | column_ids[], end: top\ | base, target_ids? | () | Yes |
+| `column.load_section` | 4 | catalog, designation, material? | type_id | Yes | STR-SEC-001 |
+| `column.location_mark` | 4 | column_ids[] | [{column_id, mark?}] | No | STR-COL-001 |
 | `column.place` | 4 | type_id, point, base_level, top_constraint, base_offset, top_offset, rotation? | element_id | Yes | STR-COL-001 |
 | `column.place_architectural` | 3 | type_id, point, base_level, top_constraint, base_offset?, top_offset?, rotation?, room_bounding? | element_id | Yes | ARC-COL-001 |
 | `column.place_at_grids` | 4 | type_id, grid_ids[], base_level, top_constraint, rotation? | element_id[] | Yes | STR-COL-001 |
@@ -28373,6 +28420,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `foundation_slab.create` | 4 | type_id, boundary, level, offset | — | Yes | STR-FND-003 |
 | `framing.change_reference` | 4 | id, end, reference | — | Yes | STR-BEAM-002 |
 | `framing.disjoin` | 4 | id, end | — | Yes | STR-BEAM-002 |
+| `framing.join` | 4 | id, end | — | Yes | STR-BEAM-002 |
 | `framing.join_edit` | 4 | join_id, through_member_id?, miter? | — | Yes | STR-BEAM-002 |
 | `framing.set_cutback` | 4 | id, end, distance | — | Yes | STR-BEAM-002 |
 | `framing.set_extension` | 4 | id, end, length | — | Yes | STR-BEAM-002 |
@@ -29210,6 +29258,8 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `steel_modifier.shorten` | 4 | member_id, end, length, angle_h?, angle_w? | — | Yes | STR-STL-008 |
 | `steel_nc.export` | 4 | scope, folder, format="dstv" | — | No | STR-STL-010 |
 | `steel_numbering.run` | 4 | scope, options | report | Yes | STR-STL-010 |
+| `structural.catalogs` | 4 | catalog? | [catalogue] | No | STR-SEC-001 |
+| `structural.standards` | 4 | — | {region, catalogs, steel, concrete, standards} | No | STR-SEC-001 |
 | `structural_analysis.export_model` | 4 | path, format: "ifc"\ | "json", scope | — | No |
 | `structural_analysis.import_results` | 4 | path | package_id | Yes | ANA-FEA-001 |
 | `structural_analysis.run` | 4 | provider_id, scope, analysis_type, options | job_id | Results only | ANA-FEA-001 |

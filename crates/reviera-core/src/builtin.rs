@@ -490,6 +490,7 @@ pub fn dependents_of(store: &crate::store::Store, id: ElementId) -> Vec<ElementI
                 || crate::ramps::ramp_recipe(e).is_some_and(|r| r.extent.uses_level(&guid))
                 || crate::curtain::curtain_recipe(e).is_some_and(|r| r.extent.uses_level(&guid))
                 || crate::columns::column_recipe(e).is_some_and(|r| r.extent.uses_level(&guid))
+                || crate::beams::beam_recipe(e).is_some_and(|r| r.level == guid)
                 || crate::mesh_objects::mesh_object_recipe(e).is_some_and(|r| r.level == guid)
                 || crate::model_lines::recipe(e)
                     .is_some_and(|r| crate::model_lines::uses(&r, &guid))

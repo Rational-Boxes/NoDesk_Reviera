@@ -10,6 +10,7 @@
 pub mod annotations;
 pub mod areas;
 pub mod arrangement;
+pub mod beams;
 pub mod bodies;
 pub mod builtin;
 mod builtin_arc;
@@ -78,6 +79,7 @@ pub mod slab_openings;
 pub mod stair_marks;
 pub mod stairs;
 pub mod standards;
+pub mod steel_sections;
 pub mod store;
 pub mod stroke_font;
 pub mod temp_dims;

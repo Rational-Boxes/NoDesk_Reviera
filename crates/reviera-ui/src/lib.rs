@@ -12,6 +12,7 @@
 
 mod areas;
 mod assembly;
+mod beams;
 mod browser;
 mod clash;
 mod columns;
@@ -260,6 +261,7 @@ struct Gui {
     feature_tool: Option<railings::FeatureTool>,
     dome_tool: Option<curved::DomeTool>,
     column_tool: Option<columns::ColumnTool>,
+    beam_tool: Option<beams::BeamTool>,
     curtain_tool: Option<curtain::CurtainTool>,
     ramp_tool: Option<ramps::RampTool>,
     measure_tool: Option<ramps::MeasureTool>,
@@ -1278,6 +1280,7 @@ impl Gui {
         self.end_feature_tool();
         self.end_dome_tool();
         self.end_column_tool();
+        self.end_beam_tool();
         self.end_curtain_tool();
         self.end_ramp_tool();
         self.end_measure_tool();
@@ -1322,7 +1325,11 @@ impl Gui {
         {
             return;
         }
-        if self.end_feature_tool() || self.end_dome_tool() || self.end_column_tool() {
+        if self.end_feature_tool()
+            || self.end_dome_tool()
+            || self.end_column_tool()
+            || self.end_beam_tool()
+        {
             return frame.set_status_text("Ready", 0);
         }
         if self.attach_pick.take().is_some() {
@@ -1915,6 +1922,7 @@ impl Gui {
             && (self.grid_tool_properties(grid)
                 || self.line_tool_properties(grid)
                 || self.column_tool_properties(grid)
+                || self.beam_tool_properties(grid)
                 || self.curtain_tool_properties(grid)
                 || self.ceiling_tool_properties(grid)
                 || self.ramp_tool_properties(grid)
@@ -2069,6 +2077,7 @@ impl Gui {
             || self.stair_rows(grid, id)
             || self.opening_rows(grid, id)
             || self.column_rows(grid, id)
+            || self.beam_rows(grid, id)
             || self.curtain_rows(grid, id)
             || self.ramp_rows(grid, id)
             || self.skylight_rows(grid, id)
@@ -2288,6 +2297,7 @@ impl Gui {
         }
         if self.grid_type_edit(property, text.clone())
             || self.opening_edit(property, text.clone())
+            || self.beam_edit(property, text.clone())
             || self.column_edit(property, text.clone())
             || self.curtain_edit(property, text.clone())
             || self.ramp_edit(property, text.clone())
@@ -2639,6 +2649,7 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                     None if g.feature_tool.is_some() => g.feature_click(x, y, &p),
                     None if g.dome_tool.is_some() => g.dome_click(x, y),
                     None if g.column_tool.is_some() => g.column_click(x, y),
+                    None if g.beam_tool.is_some() => g.beam_click(x, y),
                     None if g.curtain_tool.is_some() => g.curtain_click(x, y),
                     None if g.ramp_tool.is_some() => g.ramp_click(x, y),
                     None if g.measure_tool.is_some() => g.measure_click(x, y),
@@ -2713,6 +2724,10 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                     }
                     if g.column_tool.is_some() {
                         g.column_motion(x, y);
+                        redraw = true;
+                    }
+                    if g.beam_tool.is_some() {
+                        g.beam_motion(x, y);
                         redraw = true;
                     }
                     if g.curtain_tool.is_some() {
@@ -3217,6 +3232,7 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 feature_tool: None,
                 dome_tool: None,
                 column_tool: None,
+                beam_tool: None,
                 curtain_tool: None,
                 ramp_tool: None,
                 measure_tool: None,
@@ -3736,10 +3752,22 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
             focus(g);
         }),
         "column.place_architectural" => with(gui, |g| {
-            g.start_column_tool();
+            g.start_column_tool(false);
             focus(g);
         }),
+        "column.place" => with(gui, |g| {
+            g.start_column_tool(true);
+            focus(g);
+        }),
+        "column.place_at_grids" => with(gui, Gui::columns_at_grids),
+        "column.load_section" => with(gui, Gui::load_column_section),
         "column.attach" => with(gui, Gui::attach_column_tops),
+        "beam.create" => with(gui, |g| {
+            g.start_beam_tool();
+            focus(g);
+        }),
+        "beam.create_on_grids" => with(gui, Gui::beams_on_grids),
+        "beam.load_section" => with(gui, Gui::load_beam_section),
         "ramp.create" => with(gui, |g| {
             g.start_ramp_tool();
             focus(g);

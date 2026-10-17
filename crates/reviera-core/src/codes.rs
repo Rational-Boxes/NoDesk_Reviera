@@ -104,6 +104,72 @@ impl Code {
         }
     }
 
+    /// The structural defaults and design standards that go with this code's region (STR-COL-001,
+    /// research/08 §e).
+    pub fn structural(self) -> StructuralDefaults {
+        let us = StructuralDefaults {
+            region: Region::UnitedStates,
+            catalogs: &[
+                "aisc_w",
+                "aisc_hss_rect",
+                "aisc_hss_round",
+                "aisc_pipe_std",
+                "aisc_c",
+                "aisc_l",
+                "aisc_wt",
+            ],
+            steel: "Steel ASTM A992",
+            concrete: "Concrete f'c 4000 psi",
+            beam: ("aisc_w", "W12X26"),
+            loads: "ASCE/SEI 7",
+            steel_standard: "AISC 360",
+            concrete_standard: "ACI 318",
+            timber_standard: "AWC NDS",
+        };
+        let eu = StructuralDefaults {
+            region: Region::Europe,
+            catalogs: &["eu_heb", "eu_hea", "eu_ipe", "uk_uc", "uk_ub"],
+            steel: "Steel S355 (EN 10025-2)",
+            concrete: "Concrete C30/37",
+            beam: ("eu_ipe", "IPE 300"),
+            loads: "EN 1990, EN 1991 (with the National Annex)",
+            steel_standard: "EN 1993",
+            concrete_standard: "EN 1992",
+            timber_standard: "EN 1995",
+        };
+        match self {
+            Code::Ibc | Code::Irc => us,
+            Code::NbcCanada => StructuralDefaults {
+                region: Region::Canada,
+                steel: "Steel ASTM A992 / CSA G40.21 350W",
+                concrete: "Concrete 30 MPa",
+                loads: "NBC Part 4",
+                steel_standard: "CSA S16",
+                concrete_standard: "CSA A23.3",
+                timber_standard: "CSA O86",
+                ..us
+            },
+            Code::UkAdk => StructuralDefaults {
+                region: Region::UnitedKingdom,
+                catalogs: &["uk_uc", "uk_ub", "eu_heb", "eu_hea", "eu_ipe"],
+                beam: ("uk_ub", "UB 305x165x40"),
+                loads: "EN 1990, EN 1991 (with the UK National Annex)",
+                ..eu
+            },
+            Code::NccAustralia => StructuralDefaults {
+                region: Region::Australia,
+                steel: "Steel AS/NZS 3679.1 300 (300PLUS)",
+                concrete: "Concrete 32 MPa",
+                loads: "AS/NZS 1170",
+                steel_standard: "AS 4100",
+                concrete_standard: "AS 3600",
+                timber_standard: "AS 1720.1",
+                ..eu
+            },
+            Code::Din18065 | Code::Custom => eu,
+        }
+    }
+
     pub fn parse(s: &str) -> Option<Code> {
         let s = s.trim();
         Code::ALL
@@ -156,6 +222,34 @@ impl Code {
             Code::Custom => return None,
         })
     }
+}
+
+/// A region, for its structural defaults.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum Region {
+    UnitedStates,
+    Canada,
+    Europe,
+    UnitedKingdom,
+    Australia,
+}
+
+/// Structural defaults for a region: the section catalogues offered first, the default steel and
+/// concrete, and the design standards that apply (applied by analysis engines, named here).
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, JsonSchema)]
+pub struct StructuralDefaults {
+    pub region: Region,
+    /// Section catalogues (`structural.catalogs`), most usual first.
+    pub catalogs: &'static [&'static str],
+    pub steel: &'static str,
+    pub concrete: &'static str,
+    /// The usual rolled beam (catalogue, designation): the default beam type.
+    pub beam: (&'static str, &'static str),
+    pub loads: &'static str,
+    pub steel_standard: &'static str,
+    pub concrete_standard: &'static str,
+    pub timber_standard: &'static str,
 }
 
 /// The model's code settings (Model Properties).

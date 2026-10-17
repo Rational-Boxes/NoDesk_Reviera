@@ -25,6 +25,18 @@ use wxdragon::prelude::*;
 
 use super::Gui;
 
+/// Whether the segment `a`–`b` crosses an edge of the box `lo`–`hi` (screen coordinates).
+fn segment_crosses_box(a: (f32, f32), b: (f32, f32), lo: (f32, f32), hi: (f32, f32)) -> bool {
+    let corners = [lo, (hi.0, lo.1), hi, (lo.0, hi.1)];
+    let cross = |p: (f32, f32), q: (f32, f32), r: (f32, f32), s: (f32, f32)| {
+        let d = |u: (f32, f32), v: (f32, f32), w: (f32, f32)| {
+            (v.0 - u.0) * (w.1 - u.1) - (v.1 - u.1) * (w.0 - u.0)
+        };
+        (d(p, q, r) > 0.0) != (d(p, q, s) > 0.0) && (d(r, s, p) > 0.0) != (d(r, s, q) > 0.0)
+    };
+    (0..4).any(|i| cross(a, b, corners[i], corners[(i + 1) % 4]))
+}
+
 /// The quick menu's own items: a title, then the booleans by index into [`BOOLEANS`].
 pub(crate) const ID_QUICK_TITLE: i32 = wxdragon::id::ID_HIGHEST + 100;
 pub(crate) const ID_QUICK_FIRST: i32 = wxdragon::id::ID_HIGHEST + 101;
@@ -163,7 +175,7 @@ impl Gui {
         let keep = |p: glam::Vec3| (bottom..=top).contains(&p.z) && clipping.keeps(p);
         let visibility = self.view_visibility(v);
         let camera = *self.camera();
-        let ids = self.scene().boxed(
+        let mut ids = self.scene().boxed(
             &|p| camera.project(p, w, h),
             lo,
             hi,
@@ -171,6 +183,31 @@ impl Gui {
             &keep,
             &visibility,
         );
+        // In plans, grid lines too (drawn as datums, not in the 3D scene): a window takes those
+        // wholly inside it, a crossing those it touches (UI-SEL-002; At Grids needs them).
+        if let (Some(z), Some(store)) = (
+            v.plan.as_ref().map(|p| p.range.cut as f32),
+            self.store_now(),
+        ) {
+            let inside = |q: (f32, f32)| q.0 >= lo.0 && q.0 <= hi.0 && q.1 >= lo.1 && q.1 <= hi.1;
+            for g in reviera_core::grids::list(&store) {
+                let end = |p: [f64; 2]| {
+                    camera.project(glam::Vec3::new(p[0] as f32, p[1] as f32, z), w, h)
+                };
+                let (Some(a), Some(b)) = (end(g.curve.start), end(g.curve.end)) else {
+                    continue;
+                };
+                let hit = match mode {
+                    BoxMode::Window => inside(a) && inside(b),
+                    BoxMode::Crossing => {
+                        inside(a) || inside(b) || segment_crosses_box(a, b, lo, hi)
+                    }
+                };
+                if hit && !ids.contains(&g.id) {
+                    ids.push(g.id);
+                }
+            }
+        }
         self.select_ids(&ids, combine);
         self.update_grips();
         let n = self.selection().len();

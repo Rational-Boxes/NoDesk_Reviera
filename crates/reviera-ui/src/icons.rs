@@ -556,6 +556,21 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "column" => format!(
             r#"<path d="M9 4h14v4H9zM9 25h14v4H9z" fill="{f}" {s}/><path d="M11 8v17M21 8v17" {s}/><path d="M16 10v13" {sa}/>"#
         ),
+        "structural_column" => format!(
+            r#"<path d="M8 4h16v4H8zM8 25h16v4H8z" fill="{a}" {s}/><path d="M15 8h2v17h-2z" fill="{f}" {s}/>"#
+        ),
+        "structural_beam" => format!(
+            r#"<path d="M3 9h26v3H3zM3 20h26v3H3z" fill="{a}" {s}/><path d="M3 12h26v8H3z" fill="{f}" {s}/>"#
+        ),
+        "beams_on_grids" => format!(
+            r#"<path d="M4 16h24M9 4v24M23 4v24" {s} stroke-dasharray="3 2"/><path d="M7 14h4v4H7zM21 14h4v4h-4z" fill="{a}" {s}/><path d="M11 14.5h10v3H11z" fill="{f}" {s}/>"#
+        ),
+        "section_catalog" => format!(
+            r#"<path d="M6 6h12v3h-4v14h4v3H6v-3h4V9H6z" fill="{f}" {s}/><path d="M21 8h7M21 14h7M21 20h7M21 26h5" {sa}/>"#
+        ),
+        "columns_at_grids" => format!(
+            r#"<path d="M4 9h24M4 23h24M9 4v24M23 4v24" {s} stroke-dasharray="3 2"/><path d="M7 7h4v4H7zM21 7h4v4h-4zM7 21h4v4H7zM21 21h4v4h-4z" fill="{a}" {s}/>"#
+        ),
         "column_attach" => format!(
             r#"<path d="M3 10L16 3l13 7" fill="none" {sa}/><path d="M11 9v19h10V6" fill="{f}" {s}/><path d="M16 22v-9M13 16l3-3 3 3" {sa}/>"#
         ),

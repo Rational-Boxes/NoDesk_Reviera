@@ -1306,6 +1306,44 @@ icon = "column"
 help = "Place an architectural column in a plan: click its centre (Spacebar turns it 90°); it runs up to the next level"
 
 [[action]]
+id = "column.place"
+label = "Column"
+icon = "structural_column"
+keys = "SC"
+help = "Place a structural (load-bearing) column in a plan: click its centre (Spacebar turns it 90°); it snaps to grid crossings and runs up to the next level"
+
+[[action]]
+id = "column.load_section"
+label = "Load Section"
+icon = "section_catalog"
+help = "Load a standard steel section (W, HSS, pipe, C, L, WT, IPE, HEA, HEB, UB, UC) as a structural column type; the model's region's catalogues come first"
+
+[[action]]
+id = "column.place_at_grids"
+label = "At Grids"
+icon = "columns_at_grids"
+help = "Place a structural column at every crossing of the selected grid lines, from this plan's level to the next, in one step"
+
+[[action]]
+id = "beam.create"
+label = "Beam"
+icon = "structural_beam"
+keys = "BM"
+help = "Draw structural beams in a plan: click a start and an end (snapping to grid crossings); each end starts the next. Their tops are at the plan's level; each end joins the column, wall or beam it rests on, and the usage (girder, joist, purlin) follows the supports"
+
+[[action]]
+id = "beam.create_on_grids"
+label = "On Grids"
+icon = "beams_on_grids"
+help = "Place a beam in every bay between columns along the selected grid lines, at this plan's level, in one step"
+
+[[action]]
+id = "beam.load_section"
+label = "Load Beam Section"
+icon = "section_catalog"
+help = "Load a standard steel section (W, IPE, UB, HSS, C …) as a beam type for the Beam tool; the model's region's catalogues come first"
+
+[[action]]
 id = "column.attach"
 label = "Attach Top"
 icon = "column_attach"
@@ -1535,6 +1573,40 @@ tools = [
   { action = "group.create", size = "small" },
   { action = "inplace.create", size = "small" },
   { action = "modeltext.create", size = "small" },
+]
+
+[[tab]]
+id = "structure"
+label = "Structure"
+
+[[tab.panel]]
+label = "Select"
+tools = [{ action = "tool.modify", size = "large" }]
+
+[[tab.panel]]
+label = "Structure"
+tools = [
+  { action = "column.place", size = "large" },
+  { action = "column.place_at_grids", size = "large" },
+  { action = "column.load_section", size = "small" },
+  { action = "column.attach", size = "small" },
+  { action = "column.detach", size = "small" },
+]
+
+[[tab.panel]]
+label = "Framing"
+tools = [
+  { action = "beam.create", size = "large" },
+  { action = "beam.create_on_grids", size = "large" },
+  { action = "beam.load_section", size = "small" },
+]
+
+[[tab.panel]]
+label = "Datum"
+tools = [
+  { action = "level.create", size = "small" },
+  { action = "grid.create", size = "small" },
+  { action = "refplane.create", size = "small" },
 ]
 
 [[tab]]

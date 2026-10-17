@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Reviera contributors
 
-//! Architectural columns in the window (ARC-COL-001): the Column tool, a selected column's
-//! Properties (constraints, rotation, type and section), and Attach Top / Detach Top.
+//! Columns in the window: architectural (ARC-COL-001) and structural (STR-COL-001). The Column
+//! tool (Architecture › Column, Structure › Column), At Grids, a selected column's Properties
+//! (constraints, rotation, location mark, type, section, material), and Attach Top / Detach Top.
 //!
 //! The tool works in plans: the column's section follows the cursor (snapping to grid
 //! intersections, wall lines and the like); Spacebar turns it by 90°; a click places it from the
@@ -20,6 +21,7 @@ use super::{Gui, error};
 const PREVIEW: [f32; 4] = [0.05, 0.35, 0.95, 1.0];
 const DUPLICATE: &str = "Duplicate Type…";
 const TYPE_KEY: &str = "IfcColumnType";
+const STRUCTURAL_TYPE_KEY: &str = "IfcColumnType.structural";
 
 /// The Column tool: its level, rotation and the point under the cursor.
 #[derive(Debug, Clone)]
@@ -27,11 +29,33 @@ pub struct ColumnTool {
     level: ElementId,
     rotation: f64,
     cursor: Option<[f64; 2]>,
+    /// Structure › Column: load-bearing columns of structural types.
+    structural: bool,
 }
 
+/// The section kinds, as listed in Properties.
+const SECTIONS: [(&str, Section); 8] = [
+    ("Rectangular", Section::Rectangular),
+    ("Round", Section::Round),
+    ("I or H", Section::IShape),
+    ("Channel", Section::Channel),
+    ("Angle", Section::Angle),
+    ("Tee", Section::Tee),
+    ("Rectangular Hollow", Section::RectangularHollow),
+    ("Round Hollow", Section::CircularHollow),
+];
+
+const MATERIAL_KINDS: [(&str, &str); 5] = [
+    ("Concrete", "concrete"),
+    ("Steel", "steel"),
+    ("Precast Concrete", "precast_concrete"),
+    ("Wood", "wood"),
+    ("Other", "other"),
+];
+
 impl Gui {
-    /// Architecture › Column.
-    pub(crate) fn start_column_tool(&mut self) {
+    /// Architecture › Column (`structural` false) or Structure › Column (true).
+    pub(crate) fn start_column_tool(&mut self, structural: bool) {
         let frame = self.frame;
         if !self.ensure_plan(false) {
             return;
@@ -51,10 +75,15 @@ impl Gui {
             level,
             rotation: 0.0,
             cursor: None,
+            structural,
         });
         self.properties_stale = true;
         frame.set_status_text(
-            "Column: click to place it (Spacebar turns it 90°). Esc ends the tool.",
+            if structural {
+                "Structural Column: click to place it (Spacebar turns it 90°); it snaps to grid crossings. Esc ends the tool."
+            } else {
+                "Column: click to place it (Spacebar turns it 90°). Esc ends the tool."
+            },
             0,
         );
     }
@@ -70,22 +99,34 @@ impl Gui {
         true
     }
 
-    /// The type the tool places: the one last chosen, else the default (if it exists yet).
+    /// The type the tool places: the one last chosen of its kind (structural or not), else the
+    /// default (if it exists yet).
     fn tool_column_type(&self) -> Option<ElementId> {
         let store = self.store_now()?;
+        let structural = self.column_tool.as_ref().is_some_and(|t| t.structural);
         let types: Vec<(ElementId, String)> = store
             .iter()
-            .filter(|e| columns::column_type(e).is_some())
+            .filter(|e| columns::column_type(e).is_some_and(|t| t.structural == structural))
             .map(|e| (e.id(), e.name.clone().unwrap_or_default()))
             .collect();
+        let default = if structural {
+            columns::DEFAULT_STRUCTURAL_TYPE_NAME
+        } else {
+            columns::DEFAULT_TYPE_NAME
+        };
+        let key = if structural {
+            STRUCTURAL_TYPE_KEY
+        } else {
+            TYPE_KEY
+        };
         self.insert_types
-            .get(TYPE_KEY)
+            .get(key)
             .copied()
             .filter(|t| types.iter().any(|(i, _)| i == t))
             .or_else(|| {
                 types
                     .iter()
-                    .find(|(_, n)| n == columns::DEFAULT_TYPE_NAME)
+                    .find(|(_, n)| n == default)
                     .or(types.first())
                     .map(|(i, _)| *i)
             })
@@ -163,7 +204,12 @@ impl Gui {
         if let Some(ty) = self.tool_column_type() {
             args["type_id"] = json!(ty);
         }
-        match self.run("column.place_architectural", args) {
+        let command = if t.structural {
+            "column.place"
+        } else {
+            "column.place_architectural"
+        };
+        match self.run(command, args) {
             Ok(_) => {
                 self.refresh_scene(&frame);
                 self.properties_stale = true;
@@ -186,14 +232,21 @@ impl Gui {
         true
     }
 
-    /// The type selector and the type's section rows (`ct_`), for `current`.
-    fn column_type_rows(&mut self, grid: &PropertyGrid, current: Option<ElementId>) {
+    /// The type selector and the type's section rows (`ct_`), for `current`: the types of the
+    /// same kind (structural or not), the section and its sizes, and for structural types the
+    /// material and designation.
+    fn column_type_rows(
+        &mut self,
+        grid: &PropertyGrid,
+        current: Option<ElementId>,
+        structural: bool,
+    ) {
         let Some(store) = self.store_now() else {
             return;
         };
         let mut types: Vec<(ElementId, String)> = store
             .iter()
-            .filter(|e| columns::column_type(e).is_some())
+            .filter(|e| columns::column_type(e).is_some_and(|t| t.structural == structural))
             .map(|e| (e.id(), e.name.clone().unwrap_or_default()))
             .collect();
         types.sort_by(|a, b| a.1.cmp(&b.1));
@@ -215,21 +268,88 @@ impl Gui {
         else {
             return;
         };
-        let sections = vec![("Rectangular".to_owned(), 0), ("Round".to_owned(), 1)];
-        let round = t.section == Section::Round;
+        self.section_rows(grid, &t);
+    }
+
+    /// A column or beam type's section rows (`ct_`): the section and its sizes, its area, and for
+    /// structural types the material and designation.
+    pub(crate) fn section_rows(&mut self, grid: &PropertyGrid, t: &columns::ColumnType) {
+        let sections: Vec<(String, i32)> = SECTIONS
+            .iter()
+            .enumerate()
+            .map(|(i, (n, _))| ((*n).to_owned(), i as i32))
+            .collect();
+        let at = SECTIONS
+            .iter()
+            .position(|(_, s)| *s == t.section)
+            .unwrap_or(0) as i32;
         grid.append(Property::enumeration(
             "Section (type)",
             "ct_section",
             sections,
-            i32::from(round),
+            at,
         ));
+        let round = matches!(t.section, Section::Round | Section::CircularHollow);
         let w = self.format_length(t.width);
-        if round {
-            grid.append(Property::string("Diameter (type)", "ct_width", w));
-        } else {
-            grid.append(Property::string("Width (type)", "ct_width", w));
+        grid.append(Property::string(
+            if round {
+                "Diameter (type)"
+            } else {
+                "Width (type)"
+            },
+            "ct_width",
+            w,
+        ));
+        if !round {
             let d = self.format_length(t.depth);
             grid.append(Property::string("Depth (type)", "ct_depth", d));
+        }
+        if matches!(t.section, Section::IShape | Section::Channel | Section::Tee) {
+            let v = self.format_length(t.web_thickness);
+            grid.append(Property::string("Web Thickness (type)", "ct_web", v));
+            let v = self.format_length(t.flange_thickness);
+            grid.append(Property::string("Flange Thickness (type)", "ct_flange", v));
+        }
+        if matches!(
+            t.section,
+            Section::Angle | Section::RectangularHollow | Section::CircularHollow
+        ) {
+            let v = self.format_length(t.wall_thickness);
+            grid.append(Property::string("Wall Thickness (type)", "ct_wall", v));
+        }
+        let area = format!("{:.0} mm²", t.area() * 1e6);
+        grid.append(Property::string("Section Area (type)", "ct_area", area));
+        grid.set_property_read_only("ct_area", true);
+        if t.structural {
+            grid.append(Property::category("Structural", "c_col_structural"));
+            let kinds: Vec<(String, i32)> = MATERIAL_KINDS
+                .iter()
+                .enumerate()
+                .map(|(i, (n, _))| ((*n).to_owned(), i as i32))
+                .collect();
+            let kind = t
+                .material_kind
+                .and_then(|k| {
+                    let v = serde_json::to_value(k).ok()?;
+                    MATERIAL_KINDS.iter().position(|(_, s)| v == *s)
+                })
+                .map_or(-1, |i| i as i32);
+            grid.append(Property::enumeration(
+                "Material Kind (type)",
+                "ct_kind",
+                kinds,
+                kind,
+            ));
+            grid.append(Property::string(
+                "Structural Material (type)",
+                "ct_material",
+                t.material.clone().unwrap_or_default(),
+            ));
+            grid.append(Property::string(
+                "Designation (type)",
+                "ct_designation",
+                t.designation.clone().unwrap_or_default(),
+            ));
         }
     }
 
@@ -240,7 +360,8 @@ impl Gui {
         }
         grid.append(Property::category("Column tool", "c_coltool"));
         let current = self.tool_column_type();
-        self.column_type_rows(grid, current);
+        let structural = self.column_tool.as_ref().is_some_and(|t| t.structural);
+        self.column_type_rows(grid, current, structural);
         true
     }
 
@@ -273,12 +394,20 @@ impl Gui {
         grid.set_property_read_only("co_attached", true);
         let degrees = format!("{:.1}°", r.rotation.to_degrees());
         grid.append(Property::string("Rotation", "co_rotation", degrees));
+        // Computed from the nearest grid crossing (STR-COL-001).
+        let mark = columns::location_mark(&store, r.point).unwrap_or_else(|| "—".into());
+        grid.append(Property::string("Column Location Mark", "co_mark", mark));
+        grid.set_property_read_only("co_mark", true);
         let current = e
             .param("@type")
             .and_then(serde_json::Value::as_str)
             .and_then(reviera_core::GlobalId::parse)
             .and_then(|g| store.find_by_guid(&g));
-        self.column_type_rows(grid, current);
+        let structural = current
+            .and_then(|t| store.get(t))
+            .and_then(columns::column_type)
+            .is_some_and(|t| t.structural);
+        self.column_type_rows(grid, current, structural);
         true
     }
 
@@ -291,6 +420,148 @@ impl Gui {
         ids.into_iter()
             .filter(|id| store.get(*id).and_then(columns::column_recipe).is_some())
             .collect()
+    }
+
+    /// Structure › Load Section: a standard section (W, HSS, pipe, IPE, HEA, HEB, UB, UC …)
+    /// from Reviera's catalogues, the model's region's first, as the Column tool's type.
+    pub(crate) fn load_column_section(&mut self) {
+        self.load_section(false);
+    }
+
+    /// Structure › Load Beam Section: the same, as the Beam tool's type.
+    pub(crate) fn load_beam_section(&mut self) {
+        self.load_section(true);
+    }
+
+    fn load_section(&mut self, beam: bool) {
+        let frame = self.frame;
+        let Ok(cats) = self.run("structural.catalogs", json!({})) else {
+            return;
+        };
+        let cats = cats.as_array().cloned().unwrap_or_default();
+        let labels: Vec<String> = cats
+            .iter()
+            .map(|c| {
+                format!(
+                    "{}{} — {}",
+                    if c["preferred"] == true { "★ " } else { "" },
+                    c["family"].as_str().unwrap_or_default(),
+                    c["standard"]
+                        .as_str()
+                        .unwrap_or_default()
+                        .split(';')
+                        .next()
+                        .unwrap_or_default()
+                )
+            })
+            .collect();
+        let refs: Vec<&str> = labels.iter().map(String::as_str).collect();
+        let d = SingleChoiceDialog::builder(
+            &frame,
+            "Section family (★ usual for the model's building code):",
+            "Load Section",
+            &refs,
+        )
+        .build();
+        if d.show_modal() != ID_OK {
+            return;
+        }
+        let Some(cat) = usize::try_from(d.get_selection())
+            .ok()
+            .and_then(|i| cats.get(i))
+        else {
+            return;
+        };
+        let names: Vec<String> = cat["designations"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(|n| n.as_str().map(str::to_owned))
+            .collect();
+        let refs: Vec<&str> = names.iter().map(String::as_str).collect();
+        let d = SingleChoiceDialog::builder(&frame, "Section:", "Load Section", &refs).build();
+        if d.show_modal() != ID_OK {
+            return;
+        }
+        let Some(name) = usize::try_from(d.get_selection())
+            .ok()
+            .and_then(|i| names.get(i))
+        else {
+            return;
+        };
+        let (command, key, tool) = if beam {
+            ("beam.load_section", super::beams::TYPE_KEY, "Beam")
+        } else {
+            ("column.load_section", STRUCTURAL_TYPE_KEY, "Column")
+        };
+        match self.run(
+            command,
+            json!({ "catalog": cat["id"], "designation": name }),
+        ) {
+            Ok(v) => {
+                let t = ElementId(v.as_u64().unwrap_or_default());
+                self.insert_types.insert(key, t);
+                frame.set_status_text(&format!("{name} loaded: Structure › {tool} places it"), 0);
+                self.properties_stale = true;
+            }
+            Err(e) => error(&frame, &format!("The section was not loaded:\n{e}")),
+        }
+    }
+
+    /// Structure › At Grids: a structural column at every crossing of the selected grid lines,
+    /// from the plan's level to the next.
+    pub(crate) fn columns_at_grids(&mut self) {
+        let frame = self.frame;
+        let Some(store) = self.store_now() else {
+            return;
+        };
+        let grids: Vec<ElementId> = self
+            .selection()
+            .into_iter()
+            .filter(|id| store.get(*id).is_some_and(reviera_core::grids::is_grid))
+            .collect();
+        if grids.len() < 2 {
+            return frame.set_status_text(
+                "Select the grid lines first (drag a window or Ctrl+click), then At Grids",
+                0,
+            );
+        }
+        let Some(level) = self
+            .active_view()
+            .and_then(|v| v.plan.as_ref())
+            .map(|p| p.level)
+        else {
+            return frame.set_status_text("At Grids works in plan views", 0);
+        };
+        let z = store
+            .get(level)
+            .map(reviera_core::levels::elevation)
+            .unwrap_or(0.0);
+        let top = reviera_core::levels::list(&store)
+            .into_iter()
+            .find(|l| l.elevation > z + 1e-6)
+            .map_or(json!({ "unconnected": 3.0 }), |l| json!({ "level": l.id }));
+        let mut args = json!({ "grid_ids": grids, "base_level": level, "top_constraint": top });
+        if let Some(t) = self
+            .insert_types
+            .get(STRUCTURAL_TYPE_KEY)
+            .copied()
+            .filter(|t| store.get(*t).is_some())
+        {
+            args["type_id"] = json!(t);
+        }
+        match self.run("column.place_at_grids", args) {
+            Ok(v) => {
+                let n = v.as_array().map_or(0, Vec::len);
+                frame.set_status_text(
+                    &format!("{n} structural columns placed at grid crossings"),
+                    0,
+                );
+                self.clear_selection();
+                self.refresh_scene(&frame);
+            }
+            Err(e) => error(&frame, &format!("The columns were not placed:\n{e}")),
+        }
     }
 
     /// Modify | Columns › Attach Top: each selected column's top to what is directly above it.
@@ -385,22 +656,37 @@ impl Gui {
             }
             "ct_type" => self.choose_column_type(&text, &selected),
             "ct_section" => self.type_rows.map(|t| {
-                let v = if text == "Round" {
-                    "round"
-                } else {
-                    "rectangular"
-                };
+                let section = SECTIONS
+                    .iter()
+                    .find(|(n, _)| *n == text)
+                    .map_or(Section::Rectangular, |(_, s)| *s);
                 self.run(
                     "type.set_param",
-                    json!({ "type_id": t, "param": "section", "value": v }),
+                    json!({ "type_id": t, "param": "section", "value": section }),
                 )
                 .map(|_| ())
             }),
-            "ct_width" | "ct_depth" => self.type_rows.map(|t| {
-                let param = if property == "ct_width" {
-                    "width"
-                } else {
-                    "depth"
+            "ct_kind" => self.type_rows.map(|t| {
+                let kind = MATERIAL_KINDS
+                    .iter()
+                    .find(|(n, _)| *n == text)
+                    .map_or("other", |(_, k)| *k);
+                self.run(
+                    "type.set_param",
+                    json!({ "type_id": t, "param": "material_kind", "value": kind }),
+                )
+                .map(|_| ())
+            }),
+            "ct_width" | "ct_depth" | "ct_web" | "ct_flange" | "ct_wall" | "ct_material"
+            | "ct_designation" => self.type_rows.map(|t| {
+                let param = match property {
+                    "ct_width" => "width",
+                    "ct_depth" => "depth",
+                    "ct_web" => "web_thickness",
+                    "ct_flange" => "flange_thickness",
+                    "ct_wall" => "wall_thickness",
+                    "ct_material" => "material",
+                    _ => "designation",
                 };
                 self.run(
                     "type.set_param",
@@ -450,7 +736,13 @@ impl Gui {
                 .id()
         };
         if selected.is_empty() {
-            self.insert_types.insert(TYPE_KEY, chosen);
+            let structural = self.column_tool.as_ref().is_some_and(|t| t.structural);
+            let key = if structural {
+                STRUCTURAL_TYPE_KEY
+            } else {
+                TYPE_KEY
+            };
+            self.insert_types.insert(key, chosen);
             return Some(Ok(()));
         }
         Some(

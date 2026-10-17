@@ -226,3 +226,360 @@ fn columns_between_levels_attached_to_a_roof_and_in_ifc() {
     .unwrap();
     assert_eq!(columns::all(doc.store()).len(), 3);
 }
+
+/// The volume of a closed mesh.
+fn volume(m: &reviera_core::bodies::Mesh) -> f64 {
+    m.1.chunks(3)
+        .map(|t| {
+            let [a, b, c] = [m.0[t[0] as usize], m.0[t[1] as usize], m.0[t[2] as usize]];
+            (a[0] * (b[1] * c[2] - b[2] * c[1]) - a[1] * (b[0] * c[2] - b[2] * c[0])
+                + a[2] * (b[0] * c[1] - b[1] * c[0]))
+                / 6.0
+        })
+        .sum()
+}
+
+#[test]
+fn structural_columns_sections_grids_marks_and_ifc() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("s.ifc");
+    let (mut project, mut doc) = LocalProject::new(Schema::Ifc4, &path).unwrap();
+    let r = registry();
+    let l1 = doc
+        .store()
+        .iter()
+        .find(|e| e.class == "IfcBuildingStorey")
+        .unwrap()
+        .id();
+    let l2 = id(run(&r, &mut doc, "level.create", json!({ "elevation": 4.0 })).unwrap());
+
+    // The default structural type: 400 x 400 concrete, load-bearing.
+    let c = id(run(
+        &r,
+        &mut doc,
+        "column.place",
+        json!({ "point": [0.0, 0.0], "base_level": l1.0, "top_constraint": { "level": l2.0 } }),
+    )
+    .unwrap());
+    let e = doc.store().get(c).unwrap();
+    assert_eq!(
+        e.param("Pset_ColumnCommon.LoadBearing").unwrap()["value"],
+        true
+    );
+    let g = geometry(&doc, c);
+    assert!(g.ty.structural && g.ty.material_kind == Some(columns::MaterialKind::Concrete));
+    assert!((volume(&g.mesh()) - 0.4 * 0.4 * 4.0).abs() < 1e-9);
+    let concrete = id(json!(
+        doc.store()
+            .get(c)
+            .unwrap()
+            .param("@type")
+            .and_then(|g| g.as_str())
+            .and_then(|g| {
+                reviera_core::GlobalId::parse(g).and_then(|g| doc.store().find_by_guid(&g))
+            })
+            .unwrap()
+            .0
+    ));
+
+    // A steel I section (generic sizes): its body is the section's area times its height.
+    let steel = id(run(
+        &r,
+        &mut doc,
+        "type.duplicate",
+        json!({ "type_id": concrete.0, "new_name": "Steel I 300 x 300" }),
+    )
+    .unwrap());
+    for (param, value) in [
+        ("section", json!("i_shape")),
+        ("width", json!("300 mm")),
+        ("depth", json!("300 mm")),
+        ("web_thickness", json!("11 mm")),
+        ("flange_thickness", json!("19 mm")),
+        ("material", json!("Steel")),
+        ("material_kind", json!("steel")),
+    ] {
+        run(
+            &r,
+            &mut doc,
+            "type.set_param",
+            json!({ "type_id": steel.0, "param": param, "value": value }),
+        )
+        .unwrap_or_else(|e| panic!("{param}: {e:?}"));
+    }
+    // A web thicker than the flange is wide is refused.
+    assert!(
+        run(
+            &r,
+            &mut doc,
+            "type.set_param",
+            json!({ "type_id": steel.0, "param": "web_thickness", "value": "400 mm" })
+        )
+        .is_err()
+    );
+    let i = id(run(
+        &r,
+        &mut doc,
+        "column.place",
+        json!({ "type_id": steel.0, "point": [6.0, 0.0], "base_level": l1.0, "top_constraint": { "level": l2.0 } }),
+    )
+    .unwrap());
+    let g = geometry(&doc, i);
+    let area = 2.0 * 0.3 * 0.019 + (0.3 - 2.0 * 0.019) * 0.011;
+    assert!((g.ty.area() - area).abs() < 1e-12);
+    assert!((volume(&g.mesh()) - area * 4.0).abs() < 1e-9);
+    assert_eq!(g.ring.len(), 12);
+
+    // A round hollow section: a tube, its hole through.
+    let tube = id(run(
+        &r,
+        &mut doc,
+        "type.duplicate",
+        json!({ "type_id": steel.0, "new_name": "Round Hollow 219 x 8" }),
+    )
+    .unwrap());
+    for (param, value) in [
+        ("section", json!("circular_hollow")),
+        ("diameter", json!("219.1 mm")),
+        ("wall_thickness", json!("8 mm")),
+    ] {
+        run(
+            &r,
+            &mut doc,
+            "type.set_param",
+            json!({ "type_id": tube.0, "param": param, "value": value }),
+        )
+        .unwrap();
+    }
+    let h = id(run(
+        &r,
+        &mut doc,
+        "column.place",
+        json!({ "type_id": tube.0, "point": [12.0, 0.0], "base_level": l1.0, "top_constraint": { "unconnected": 3.0 } }),
+    )
+    .unwrap());
+    let g = geometry(&doc, h);
+    assert_eq!(g.holes.len(), 1);
+    assert!((volume(&g.mesh()) - g.ty.area() * 3.0).abs() < 1e-9);
+
+    // An architectural type is refused for a structural column.
+    let arch = id(run(
+        &r,
+        &mut doc,
+        "column.place_architectural",
+        json!({ "point": [20.0, 20.0], "base_level": l1.0, "top_constraint": { "unconnected": 3.0 } }),
+    )
+    .unwrap());
+    let arch_type = reviera_core::GlobalId::parse(
+        doc.store()
+            .get(arch)
+            .unwrap()
+            .param("@type")
+            .unwrap()
+            .as_str()
+            .unwrap(),
+    )
+    .and_then(|g| doc.store().find_by_guid(&g))
+    .unwrap();
+    let e = run(
+        &r,
+        &mut doc,
+        "column.place",
+        json!({ "type_id": arch_type.0, "point": [21.0, 21.0], "base_level": l1.0, "top_constraint": { "unconnected": 3.0 } }),
+    )
+    .unwrap_err();
+    assert_eq!(e.code, "column.not_structural_type");
+
+    // At grids: 3 lettered by 2 numbered lines make 6 columns, in one undo step.
+    let mut grids = Vec::new();
+    for (k, x) in [0.0, 6.0, 12.0].into_iter().enumerate() {
+        grids.push(id(run(
+            &r,
+            &mut doc,
+            "grid.create",
+            json!({ "curve": { "line": { "start": [x, -2.0], "end": [x, 10.0] } }, "name": (["A", "B", "C"][k]) }),
+        )
+        .unwrap()));
+    }
+    for (k, y) in [2.0, 8.0].into_iter().enumerate() {
+        grids.push(id(run(
+            &r,
+            &mut doc,
+            "grid.create",
+            json!({ "curve": { "line": { "start": [-2.0, y], "end": [14.0, y] } }, "name": (["1", "2"][k]) }),
+        )
+        .unwrap()));
+    }
+    let before = columns::all(doc.store()).len();
+    let placed = run(
+        &r,
+        &mut doc,
+        "column.place_at_grids",
+        json!({ "type_id": steel.0, "grid_ids": grids.iter().map(|g| g.0).collect::<Vec<_>>(), "base_level": l1.0, "top_constraint": { "level": l2.0 } }),
+    )
+    .unwrap();
+    let placed: Vec<u64> = placed
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|v| v.as_u64().unwrap())
+        .collect();
+    assert_eq!(placed.len(), 6);
+    assert_eq!(columns::all(doc.store()).len(), before + 6);
+    run(&r, &mut doc, "edit.undo", json!({})).unwrap();
+    assert_eq!(columns::all(doc.store()).len(), before);
+    run(&r, &mut doc, "edit.redo", json!({})).unwrap();
+
+    // Location marks: lettered line first; off a crossing, the offset in millimetres.
+    let marks = run(
+        &r,
+        &mut doc,
+        "column.location_mark",
+        json!({ "column_ids": [placed[0], c.0] }),
+    )
+    .unwrap();
+    let m0 = marks[0]["mark"].as_str().unwrap();
+    assert!(m0.starts_with(['A', 'B', 'C']) && !m0.contains('('), "{m0}");
+    assert_eq!(marks[1]["mark"], "A-1 (+0, -2000)");
+
+    // IFC: load-bearing columns; hollow and I bodies saved and reopened.
+    project.save(&doc).unwrap();
+    let text = std::fs::read_to_string(&path).unwrap();
+    assert!(text.contains("LoadBearing"));
+    drop(project);
+    let (_p, doc2, _) = LocalProject::open(&path).unwrap();
+    let g2 = columns::regenerate(doc2.store(), doc2.store().get(h).unwrap()).unwrap();
+    assert_eq!(g2.holes.len(), 1);
+    assert!(
+        doc2.store()
+            .get(i)
+            .unwrap()
+            .param("Pset_ColumnCommon.LoadBearing")
+            .unwrap()["value"]
+            == true
+    );
+}
+
+#[test]
+fn catalogue_sections_regional_defaults_and_slenderness() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("k.ifc");
+    let (_project, mut doc) = LocalProject::new(Schema::Ifc4, &path).unwrap();
+    let r = registry();
+    let l1 = doc
+        .store()
+        .iter()
+        .find(|e| e.class == "IfcBuildingStorey")
+        .unwrap()
+        .id();
+
+    // A US model: AISC catalogues first, A992 steel, f'c concrete, AISC 360 and ACI 318.
+    run(&r, &mut doc, "code.set", json!({ "code": "ibc" })).unwrap();
+    let s = run(&r, &mut doc, "structural.standards", json!({})).unwrap();
+    assert_eq!(s["region"], "united_states");
+    assert_eq!(s["steel_standard"], "AISC 360");
+    let cats = run(&r, &mut doc, "structural.catalogs", json!({})).unwrap();
+    assert_eq!(cats[0]["id"], "aisc_w");
+    assert_eq!(cats[0]["preferred"], true);
+    // A W shape from the catalogue: its type carries the designation and the usual grade.
+    let w = id(run(
+        &r,
+        &mut doc,
+        "column.load_section",
+        json!({ "catalog": "aisc_w", "designation": "W10X49" }),
+    )
+    .unwrap());
+    // Loading it again reuses the type.
+    assert_eq!(
+        id(run(
+            &r,
+            &mut doc,
+            "column.load_section",
+            json!({ "catalog": "aisc_w", "designation": "W10X49" })
+        )
+        .unwrap()),
+        w
+    );
+    let t = columns::column_type(doc.store().get(w).unwrap()).unwrap();
+    assert_eq!(t.designation.as_deref(), Some("W10X49"));
+    assert_eq!(t.material.as_deref(), Some("Steel ASTM A992"));
+    let c = id(run(
+        &r,
+        &mut doc,
+        "column.place",
+        json!({ "type_id": w.0, "point": [0.0, 0.0], "base_level": l1.0, "top_constraint": { "unconnected": 4.0 } }),
+    )
+    .unwrap());
+    // A default concrete column in a US model is f'c 4000 psi.
+    let k = id(run(
+        &r,
+        &mut doc,
+        "column.place",
+        json!({ "point": [5.0, 0.0], "base_level": l1.0, "top_constraint": { "unconnected": 4.0 } }),
+    )
+    .unwrap());
+    assert_eq!(
+        geometry(&doc, k).ty.material.as_deref(),
+        Some("Concrete f'c 4000 psi")
+    );
+    // A slender pipe column (Pipe 2 STD, 12 m) exceeds the steel guidance; the W10 does not.
+    let pipe = id(run(
+        &r,
+        &mut doc,
+        "column.load_section",
+        json!({ "catalog": "aisc_pipe_std", "designation": "Pipe2STD" }),
+    )
+    .unwrap());
+    let slender = id(run(
+        &r,
+        &mut doc,
+        "column.place",
+        json!({ "type_id": pipe.0, "point": [10.0, 0.0], "base_level": l1.0, "top_constraint": { "unconnected": 12.0 } }),
+    )
+    .unwrap());
+    let adv = run(&r, &mut doc, "column.check", json!({})).unwrap();
+    let find = |c: ElementId| {
+        adv.as_array()
+            .unwrap()
+            .iter()
+            .find(|a| a["column_id"] == c.0)
+            .cloned()
+            .unwrap()
+    };
+    assert_eq!(find(slender)["limit"], 200.0);
+    assert!(find(slender)["note"].as_str().unwrap().contains("AISC 360"));
+    assert!(find(c)["limit"].is_null());
+    // A concrete column 12 m tall: k·lu/r over 22 under ACI 318.
+    let tall = id(run(
+        &r,
+        &mut doc,
+        "column.place",
+        json!({ "point": [15.0, 0.0], "base_level": l1.0, "top_constraint": { "unconnected": 12.0 } }),
+    )
+    .unwrap());
+    let adv = run(
+        &r,
+        &mut doc,
+        "column.check",
+        json!({ "column_ids": [tall.0] }),
+    )
+    .unwrap();
+    assert_eq!(adv[0]["limit"], 22.0);
+
+    // A German model: European sections first, S355 and C30/37, Eurocodes.
+    run(&r, &mut doc, "code.set", json!({ "code": "din_18065" })).unwrap();
+    let s = run(&r, &mut doc, "structural.standards", json!({})).unwrap();
+    assert_eq!(s["concrete"], "Concrete C30/37");
+    assert_eq!(s["steel_standard"], "EN 1993");
+    let cats = run(&r, &mut doc, "structural.catalogs", json!({})).unwrap();
+    assert_eq!(cats[0]["id"], "eu_heb");
+    let adv = run(
+        &r,
+        &mut doc,
+        "column.check",
+        json!({ "column_ids": [tall.0] }),
+    )
+    .unwrap();
+    assert!(adv[0]["limit"].is_null());
+    assert!(adv[0]["note"].as_str().unwrap().contains("EN 1992"));
+}

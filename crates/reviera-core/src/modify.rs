@@ -411,6 +411,15 @@ pub fn transform(
             };
             crate::columns::transform(txn, target, &|p| x.point(p), turn, mirror, dz)?;
             out.push(target);
+        } else if crate::beams::beam_recipe(e).is_some() {
+            let target = if copy { txn.create(copied(e))? } else { id };
+            let (mirror, dz) = match x {
+                Xform::Translate(v) => (false, v[2]),
+                Xform::Rotate { .. } => (false, 0.0),
+                Xform::Mirror { .. } => (true, 0.0),
+            };
+            crate::beams::transform(txn, target, &|p| x.point(p), mirror, dz)?;
+            out.push(target);
         } else if crate::slab_openings::shaft_recipe(e).is_some() {
             let target = if copy { txn.create(copied(e))? } else { id };
             let dz = match x {

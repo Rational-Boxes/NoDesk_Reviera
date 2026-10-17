@@ -1,0 +1,78 @@
+{
+ "family": "AISC HSS round",
+ "standard": "ASTM A500 (also A1085) per AISC; AISC Shapes Database v16.0",
+ "units": "in",
+ "shape": "circular_hollow",
+ "default_material": "Steel ASTM A500 Gr C",
+ "source_ids": [
+  "S0720",
+  "S0721"
+ ],
+ "sections": [
+  {
+   "name": "HSS4.000X0.250",
+   "od": 4.0,
+   "t": 0.25
+  },
+  {
+   "name": "HSS4.500X0.237",
+   "od": 4.5,
+   "t": 0.237
+  },
+  {
+   "name": "HSS5.000X0.250",
+   "od": 5.0,
+   "t": 0.25
+  },
+  {
+   "name": "HSS5.563X0.258",
+   "od": 5.563,
+   "t": 0.258
+  },
+  {
+   "name": "HSS6.000X0.250",
+   "od": 6.0,
+   "t": 0.25
+  },
+  {
+   "name": "HSS6.625X0.280",
+   "od": 6.625,
+   "t": 0.28
+  },
+  {
+   "name": "HSS6.625X0.432",
+   "od": 6.625,
+   "t": 0.432
+  },
+  {
+   "name": "HSS8.625X0.322",
+   "od": 8.625,
+   "t": 0.322
+  },
+  {
+   "name": "HSS8.625X0.500",
+   "od": 8.625,
+   "t": 0.5
+  },
+  {
+   "name": "HSS10.750X0.500",
+   "od": 10.75,
+   "t": 0.5
+  },
+  {
+   "name": "HSS12.750X0.500",
+   "od": 12.75,
+   "t": 0.5
+  },
+  {
+   "name": "HSS14.000X0.500",
+   "od": 14.0,
+   "t": 0.5
+  },
+  {
+   "name": "HSS16.000X0.500",
+   "od": 16.0,
+   "t": 0.5
+  }
+ ]
+}

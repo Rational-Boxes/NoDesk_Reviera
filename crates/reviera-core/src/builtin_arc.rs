@@ -45,6 +45,24 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(OpeningCreateShaft),
         registry.add(OpeningEditShaft),
         registry.add(ColumnPlace),
+        registry.add(ColumnPlaceStructural),
+        registry.add(ColumnPlaceAtGrids),
+        registry.add(ColumnLocationMark),
+        registry.add(ColumnLoadSection),
+        registry.add(StructuralCatalogs),
+        registry.add(ColumnCheck),
+        registry.add(StructuralStandards),
+        registry.add(BeamCreate),
+        registry.add(BeamCreateOnGrids),
+        registry.add(BeamSetUsage),
+        registry.add(BeamSet),
+        registry.add(BeamLoadSection),
+        registry.add(BeamInfo),
+        registry.add(FramingSetJustification),
+        registry.add(FramingSetExtension),
+        registry.add(FramingSetCutback),
+        registry.add(FramingDisjoin),
+        registry.add(FramingJoin),
         registry.add(ColumnSet),
         registry.add(ColumnAttach),
         registry.add(ColumnDetach),
@@ -323,6 +341,34 @@ edit_command!(
 );
 
 edit_command!(
+    ColumnPlaceStructural,
+    "column.place",
+    "Place a structural column",
+    "Places a load-bearing column (STR-COL-001) of a structural column type (the default 400 × 400 mm \
+     concrete type when omitted, made on first use) centred at `point`, rotated by `rotation`, from a \
+     base level and offset to a top level and offset or a height. Structural types carry a section \
+     (rectangular, round, I or H, channel, angle, tee, rectangular or round hollow), a structural \
+     material and a designation. Written as an IfcColumn with Pset_ColumnCommon.LoadBearing true. \
+     Returns the column.",
+    "Structural Column",
+    crate::columns::PlaceParams,
+    ElementId,
+    crate::columns::place_structural
+);
+
+edit_command!(
+    ColumnPlaceAtGrids,
+    "column.place_at_grids",
+    "Place structural columns at grid crossings",
+    "Places a structural column at every point where two of `grid_ids` cross (STR-COL-001), turned to \
+     the grids' direction plus `rotation`; one undo step. Returns the columns.",
+    "Columns at Grids",
+    crate::columns::PlaceAtGridsParams,
+    Vec<ElementId>,
+    crate::columns::place_at_grids
+);
+
+edit_command!(
     ColumnSet,
     "column.set",
     "Change columns",
@@ -526,6 +572,212 @@ macro_rules! read_command {
         read_command!($ty, $name, $summary, $desc, [Effect::Read], $params, $out, $f);
     };
 }
+
+edit_command!(
+    ColumnLoadSection,
+    "column.load_section",
+    "Load a standard section as a column type",
+    "Makes a structural column type from a standard section in Reviera's catalogues (STR-COL-001), \
+     for example `W12x40` (AISC) or `HEB 300` (Euronorm), with its exact dimensions, designation and \
+     the family's usual steel grade as its material (or `material`). An existing type of the same \
+     designation and material is reused. Returns the type.",
+    "Load Section",
+    crate::steel_sections::LoadParams,
+    ElementId,
+    crate::steel_sections::load_column_section
+);
+
+edit_command!(
+    BeamCreate,
+    "beam.create",
+    "Place a beam",
+    "Places a structural beam (STR-BEAM-001) along `curve` (plan, metres) at `reference_level`, each \
+     end `start_offset` / `end_offset` above it (so it can slope). The type defaults to the region's \
+     usual rolled beam (W12X26, IPE 300 or UB 305x165x40), made on first use. By default the location \
+     line is the section's top centre (`z_justification` top, `y_justification` centre). Each end joins \
+     what supports it (a column or wall it ends in, or a beam it frames into), stopping at its face less \
+     the cutback (12.5 mm for steel). Usage `automatic` follows the supports: on columns or walls a \
+     girder, on girders a joist, on joists a purlin; purlins and horizontal bracing are written as \
+     IfcMember, others as IfcBeam. Returns the beam.",
+    "Beam",
+    crate::beams::CreateParams,
+    ElementId,
+    crate::beams::create
+);
+
+edit_command!(
+    BeamCreateOnGrids,
+    "beam.create_on_grids",
+    "Place beams along grid lines",
+    "Along each of `grid_ids`, places a beam in every bay between consecutive columns on the line that \
+     reach `level` (STR-BEAM-001), their tops at the level plus `offset`; one undo step. Returns the \
+     beams.",
+    "Beams on Grids",
+    crate::beams::OnGridsParams,
+    Vec<ElementId>,
+    crate::beams::create_on_grids
+);
+
+edit_command!(
+    BeamSetUsage,
+    "beam.set_usage",
+    "Set beams' structural usage",
+    "Sets and locks beams' structural usage (girder, joist, purlin, horizontal_bracing, other), or \
+     `automatic` to follow their supports again. The IFC PredefinedType and ObjectType follow; the IFC \
+     class (IfcBeam or IfcMember) is the one the beam was made with.",
+    "Beam Usage",
+    crate::beams::SetUsageParams,
+    (),
+    crate::beams::set_usage
+);
+
+edit_command!(
+    BeamSet,
+    "beam.set",
+    "Change beams",
+    "Changes beams' reference level (keeping their ends in place), end offsets, cross-section rotation, \
+     orientation (normal or horizontal), y and z justification and offsets, extensions or usage; \
+     omitted values are kept.",
+    "Edit Beam",
+    crate::beams::SetParams,
+    (),
+    crate::beams::set
+);
+
+edit_command!(
+    BeamLoadSection,
+    "beam.load_section",
+    "Load a standard section as a beam type",
+    "Makes a beam type from a standard section in Reviera's catalogues (STR-SEC-001), for example \
+     `W12X26` (AISC) or `IPE 300` (Euronorm), with its dimensions, designation and usual steel grade \
+     (or `material`). An existing type of the same designation and material is reused. Returns the \
+     type.",
+    "Load Beam Section",
+    crate::steel_sections::LoadParams,
+    ElementId,
+    crate::beams::load_section
+);
+
+edit_command!(
+    FramingSetJustification,
+    "framing.set_justification",
+    "Set framing justification",
+    "Sets where beams' location lines run across their sections (STR-BEAM-002): `y_just` origin, \
+     left, centre or right with `y_offset` (positive to the left), and `z_just` origin, top, centre or \
+     bottom with `z_offset` (positive up).",
+    "Justification",
+    crate::beams::JustificationParams,
+    (),
+    crate::beams::set_justification
+);
+
+edit_command!(
+    FramingSetExtension,
+    "framing.set_extension",
+    "Extend a framing end",
+    "Lengthens (or, negative, shortens) a beam's `end` (start or end) beyond its join by `length` \
+     (STR-BEAM-002); the location line stays.",
+    "Extension",
+    crate::beams::EndLengthParams,
+    (),
+    crate::beams::set_extension
+);
+
+edit_command!(
+    FramingSetCutback,
+    "framing.set_cutback",
+    "Set a framing end's cutback",
+    "Sets the gap a beam's joined `end` leaves at its support's face (STR-BEAM-002); by default \
+     12.5 mm for steel, none for others.",
+    "Cutback",
+    crate::beams::EndLengthParams,
+    (),
+    crate::beams::set_cutback
+);
+
+edit_command!(
+    FramingDisjoin,
+    "framing.disjoin",
+    "Disjoin a framing end",
+    "Releases a beam's `end` from its join (STR-BEAM-002): it runs to its location line's end, with no \
+     cutback. `framing.join` joins it again.",
+    "Disjoin",
+    crate::beams::EndParams,
+    (),
+    crate::beams::disjoin
+);
+
+edit_command!(
+    FramingJoin,
+    "framing.join",
+    "Join a framing end again",
+    "Joins a disjoined beam `end` to its support again (STR-BEAM-002).",
+    "Join",
+    crate::beams::EndParams,
+    (),
+    crate::beams::join
+);
+
+read_command!(
+    ColumnCheck,
+    "column.check",
+    "Slenderness advisories for structural columns",
+    "For each structural column (or `column_ids`), its height over its section's least radius of \
+     gyration (K = 1), and the public guidance for its material and the model's region it exceeds: \
+     steel L/r preferably not over 200 (AISC 360 user note); concrete k·lu/r over 22 (ACI 318, sway \
+     frames) in US and Canadian models; under the Eurocodes λ is reported, its limit depending on the \
+     axial load. Advisories for modelling, not design checks.",
+    Option<crate::columns::CheckParams>,
+    Vec<crate::columns::Advisory>,
+    |s, p| crate::columns::check(s, &p.unwrap_or_default())
+);
+
+read_command!(
+    StructuralStandards,
+    "structural.standards",
+    "The model's structural defaults and standards",
+    "From the model's building code (Model Properties): its region, the section catalogues offered first, \
+     the default steel and concrete, and the design standards that apply there (loads, steel, concrete, \
+     timber). The standards are named for reference; design checks need an analysis provider.",
+    Option<serde_json::Value>,
+    crate::codes::StructuralDefaults,
+    |s, _| Ok(crate::codes::settings(s).code.structural())
+);
+
+read_command!(
+    StructuralCatalogs,
+    "structural.catalogs",
+    "List standard section catalogues",
+    "The standard section catalogues built into Reviera (STR-COL-001): each one's family, standard, \
+     shape, usual steel grade and designations. Their numbers come from public sources recorded in the \
+     research log.",
+    Option<crate::steel_sections::ListParams>,
+    Vec<crate::steel_sections::CatalogInfo>,
+    |s, p| Ok(crate::steel_sections::list(s, &p.unwrap_or_default()))
+);
+
+read_command!(
+    ColumnLocationMark,
+    "column.location_mark",
+    "Columns' location marks",
+    "Each column's location mark (STR-COL-001): the grid crossing nearest it, as its lines' names \
+     (\"C-4\"), with the offset in millimetres when it is off the crossing. Computed, never stored.",
+    crate::columns::MarkParams,
+    Vec<crate::columns::Mark>,
+    |s, p| crate::columns::location_marks(s, &p)
+);
+
+read_command!(
+    BeamInfo,
+    "beam.info",
+    "Beams' usage, length and supports",
+    "For each beam: its structural usage (resolved from its supports when automatic) and whether it is \
+     locked, its cut length, what each end rests on (a column, wall or beam), and its section's \
+     designation and material.",
+    crate::beams::InfoParams,
+    Vec<crate::beams::Info>,
+    |s, p| crate::beams::info(s, &p)
+);
 
 read_command!(
     MeasureBetween,

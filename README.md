@@ -36,7 +36,7 @@ operation can be driven by Lua scripts and by AI agents through the Model Contex
 - [What works today](#what-works-today): [platform](#platform-and-file-format),
   [automation](#commands-scripting-and-ai-agents), [modelling](#modelling),
   [components and libraries](#components-and-libraries),
-  [coordination](#overlaps-booleans-and-clearances),
+  [coordination](#overlaps-booleans-and-clearances), [structure](#structure-in-development),
   [analysis and remote computation](#analysis-and-remote-computation-in-development),
   [documentation](#views-and-documentation),
   [inspecting and editing](#inspecting-and-editing), [the window](#the-window)
@@ -574,6 +574,40 @@ Libraries**: plain folders of ordinary 3D files, readable by any other tool.
   elements (`clearance.set_rule_set`, `clearance.list`, `clearance.check`,
   `view.set_virtual_volumes`).
 
+### Structure (in development)
+
+The Structure epic has begun (spec Chapter 4 §4.1). A **Structure** tab carries the structural
+tools and the datums.
+
+- **Structural columns**: Column (`SC`) places load-bearing columns in plans; **At Grids** puts
+  one at every crossing of the grid lines you select (a window in a plan now selects grids), in
+  one undo step. Shapes are rectangular, round, I, channel, angle, tee and rectangular or round
+  hollow sections, with their area and second moments computed from the outline. Each column
+  shows a read-only location mark such as "B-2" (`column.place`, `column.place_at_grids`,
+  `column.location_mark`; STR-COL-001). Attach Top and Detach Top work as for architectural
+  columns.
+- **Section catalogues**: **Load Section** (and Load Beam Section) makes a column (or beam) type
+  from 257 standard steel sections in 12 catalogues: AISC W, C, L, WT, HSS and pipe; Euronorm IPE,
+  HEA and HEB; UK UB and UC. Catalogues carry nominal dimensions only, with sources
+  (`crates/reviera-core/data/sections`).
+- **Beams**: Beam (`BM`) draws beams in plans, a click at each end, chained; **On Grids** puts one
+  in every bay between columns along the selected grid lines. Their tops are at the level (each
+  end can be offset, so beams slope). Each end joins what it rests on, a column, a wall or the
+  side of another beam, stopping at its face less a 12.5 mm cutback for steel; ends can be
+  disjoined and extended. Usage follows the supports when automatic (on columns a girder, on
+  girders a joist, on joists a purlin, written as IfcMember) or is set by hand. y and z
+  justification, orientation for sloped beams and cross-section rotation are in Properties
+  (`beam.create`, `beam.create_on_grids`, `beam.set`, `beam.set_usage`, `beam.info`,
+  `framing.set_justification`, `framing.set_extension`, `framing.set_cutback`,
+  `framing.disjoin`, `framing.join`; STR-BEAM-001, 002). Plan snapping now finds grid crossings.
+- **Regional standards**: the model's building code sets the region, which catalogues are listed
+  first, the default steel grade and concrete class (ASTM A992 and f'c 4000 psi in the US; S355
+  and C30/37 in Europe; 350W and 30 MPa in Canada; 300PLUS and 32 MPa in Australia) and the design
+  standards named (ASCE 7, AISC 360, ACI 318, NDS; CSA; Eurocodes; AS/NZS). `column.check` flags
+  slender columns against simple code limits, as prompts for the engineer, not design checks
+  (`structural.catalogs`, `structural.standards`, `column.load_section`, `column.check`;
+  STR-SEC-001).
+
 ### Analysis and remote computation (in development)
 
 The foundation for analysis is being built (spec Chapter 2 §2.17, Chapter 4 §4.0.2a, overview in
@@ -853,8 +887,12 @@ area by area (reviewed against the spec on 2026-10-15).
   Mac).
 - **MCP**: streamable HTTP with tokens, rate and size limits, subscriptions, prompts,
   `execute_lua` and view images.
-- **Structure, MEP, families and collaboration** (BIMserver, OpenCDE, Godot) are specified but
-  not started.
+- **Structure** (in development): structural columns, section catalogues and regional
+  standards are built (see [Structure](#structure-in-development)). Still to build: Structural
+  Settings and coarse stick symbols, the beam join editor and arc beams, slanted columns, braces,
+  structural walls and floors, foundations, beam systems, trusses, connections, rebar and the
+  analytical model; timber sections and a materials library with strengths.
+- **MEP, families and collaboration** (BIMserver, OpenCDE, Godot) are specified but not started.
 - **Remote computation subsystem** (DM-RPC-001 … 010): in development; the first milestone is
   built (see [Analysis and remote computation](#analysis-and-remote-computation-in-development)).
   Still to build: the Compute Jobs panel; IFC filter-profile distillations; dictionary-trained and

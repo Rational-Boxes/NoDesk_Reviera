@@ -526,6 +526,7 @@ impl LocalProject {
             }
             if recipe_kind == Some(roofs::ROOF_RECIPE)
                 || recipe_kind == Some(reviera_core::columns::COLUMN_RECIPE)
+                || recipe_kind == Some(reviera_core::beams::BEAM_RECIPE)
                 || recipe_kind == Some(reviera_core::ramps::RAMP_RECIPE)
                 || recipe_kind == Some(reviera_core::skylights::SKYLIGHT_RECIPE)
                 || recipe_kind == Some(stairs::STAIR_RECIPE)
@@ -723,6 +724,7 @@ impl LocalProject {
             self.write_roofs(doc)?;
             self.write_stairs(doc)?;
             self.write_columns(doc)?;
+            self.write_beams(doc)?;
             self.write_ramps(doc)?;
             self.write_slab_edges(doc)?;
             self.write_wall_sweeps(doc)?;
@@ -1684,8 +1686,8 @@ impl LocalProject {
         Ok(())
     }
 
-    /// Writes every Reviera column (ARC-COL-001): its body as a faceted B-rep (its top may follow
-    /// an attached roof), contained in its base level.
+    /// Writes every Reviera column (ARC-COL-001, STR-COL-001): its body as a faceted B-rep (its top
+    /// may follow an attached roof), contained in its base level.
     fn write_columns(&mut self, doc: &Document) -> Result<()> {
         let store = doc.store();
         let all = reviera_core::columns::all(store);
@@ -1698,11 +1700,12 @@ impl LocalProject {
             let Some(&step) = self.steps.get(id) else {
                 continue;
             };
-            let n = g.ring.len();
-            let mut points: Vec<[f64; 3]> = g.ring.iter().map(|p| [p[0], p[1], g.z0]).collect();
-            points.extend(g.ring.iter().zip(&g.tops).map(|(p, z)| [p[0], p[1], *z]));
-            let mut faces = vec![(0..n).rev().collect::<Vec<_>>(), (n..2 * n).collect()];
-            faces.extend((0..n).map(|i| vec![i, (i + 1) % n, n + (i + 1) % n, n + i]));
+            // The body's triangles: any section, with holes, and a top that may follow a roof.
+            let (points, indices) = g.mesh();
+            let faces: Vec<Vec<usize>> = indices
+                .chunks(3)
+                .map(|t| t.iter().map(|i| *i as usize).collect())
+                .collect();
             geometry::write_breps(
                 &mut self.ifc,
                 step,
@@ -1713,6 +1716,44 @@ impl LocalProject {
             )?;
             let storey = reviera_core::columns::column_recipe(store.get(*id).expect("listed"))
                 .and_then(|r| GlobalId::parse(&r.extent.base_level))
+                .and_then(|g| store.find_by_guid(&g))
+                .and_then(|l| self.steps.get(&l).copied());
+            if let Some(storey) = storey {
+                geometry::contain(&mut self.ifc, step, storey, owner_history)?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Writes every Reviera beam (STR-BEAM-001): its body, swept and joined, as a faceted B-rep,
+    /// contained in its reference level.
+    fn write_beams(&mut self, doc: &Document) -> Result<()> {
+        let store = doc.store();
+        let all = reviera_core::beams::all(store);
+        if all.is_empty() {
+            return Ok(());
+        }
+        let contexts = geometry::Contexts::find(&self.ifc)?;
+        let owner_history = self.new_owner_history()?;
+        for (id, g) in &all {
+            let Some(&step) = self.steps.get(id) else {
+                continue;
+            };
+            let (points, indices) = g.mesh();
+            let faces: Vec<Vec<usize>> = indices
+                .chunks(3)
+                .map(|t| t.iter().map(|i| *i as usize).collect())
+                .collect();
+            geometry::write_breps(
+                &mut self.ifc,
+                step,
+                geometry::BrepFrame::WORLD,
+                &[geometry::Polyhedron { points, faces }],
+                self.length_scale,
+                contexts,
+            )?;
+            let storey = reviera_core::beams::beam_recipe(store.get(*id).expect("listed"))
+                .and_then(|r| GlobalId::parse(&r.level))
                 .and_then(|g| store.find_by_guid(&g))
                 .and_then(|l| self.steps.get(&l).copied());
             if let Some(storey) = storey {
