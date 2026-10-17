@@ -177,9 +177,120 @@ pub struct BeamRecipe {
     /// Each end joins its support (stops at its face); `false` once disjoined.
     #[serde(default = "yes")]
     pub joined: [bool; 2],
-    /// Set by the user (locked), or automatic.
+    /// Set by the user (locked), or automatic. Braces' usage is always from their ends.
     #[serde(default)]
     pub usage: Usage,
+    /// A brace (STR-BRACE-001): an `IfcMember` (`BRACE`) whose ends may be at different levels
+    /// and attached to columns and beams.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub brace: bool,
+    /// The end's level (GlobalId), when it is not `level`; `end_offset` is above it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub end_level: Option<String>,
+    /// Each end attached to a column or beam: it follows the member; `start`/`end` and the
+    /// offsets are where it stays if the member goes.
+    #[serde(default, skip_serializing_if = "is_free")]
+    pub attach: [Option<Attachment>; 2],
+    /// A beam of a beam system (STR-BSYS-001) or a member of a truss (STR-TRUSS-001): laid out
+    /// by it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub system: Option<SystemSlot>,
+    /// A vertical member's facing: the plan direction its section's width runs across (a truss
+    /// web kept when its truss is removed).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub side: Option<[f64; 2]>,
+}
+
+/// A beam's place in its beam system: the system (GlobalId), the layout line and the piece of it.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct SystemSlot {
+    pub system: String,
+    pub slot: usize,
+    #[serde(default)]
+    pub piece: usize,
+}
+
+/// A brace end attached to a column's or beam's axis.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct Attachment {
+    /// The column or beam (GlobalId).
+    pub target: String,
+    /// Along its axis from its start (base), 0 to 1; or a distance in metres when `by_distance`.
+    pub at: f64,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub by_distance: bool,
+}
+
+fn is_free(a: &[Option<Attachment>; 2]) -> bool {
+    a.iter().all(Option::is_none)
+}
+
+/// A column's or (non-brace) beam's axis, for attaching to.
+fn target_axis(store: &Store, guid: &str) -> Option<(V3, V3)> {
+    let e = store.get(find(store, guid)?)?;
+    if crate::columns::column_recipe(e).is_some() {
+        return crate::columns::regenerate(store, e).ok().map(|g| g.axis());
+    }
+    let r = beam_recipe(e).filter(|r| !r.brace)?;
+    line_of(store, &r).ok()
+}
+
+/// A recipe's location line, ignoring attachments.
+fn line_of(store: &Store, r: &BeamRecipe) -> Result<(V3, V3)> {
+    let z = crate::levels::elevation_of(store, &r.level)?;
+    let z_end = match &r.end_level {
+        Some(l) => crate::levels::elevation_of(store, l)?,
+        None => z,
+    };
+    Ok((
+        [r.start[0], r.start[1], z + r.start_offset],
+        [r.end[0], r.end[1], z_end + r.end_offset],
+    ))
+}
+
+fn at_attachment(store: &Store, a: &Attachment) -> Option<V3> {
+    let (p, q) = target_axis(store, &a.target)?;
+    let len = dist(p, q);
+    let t = if a.by_distance {
+        if len < 1e-9 { 0.0 } else { a.at / len }
+    } else {
+        a.at
+    };
+    Some(add(p, scale(sub(q, p), t)))
+}
+
+/// The column or beam whose axis passes through `p` (within 50 mm), and how far along it.
+fn attachment_at(store: &Store, p: V3, not: Option<ElementId>) -> Option<Attachment> {
+    let near = |a: V3, b: V3| -> Option<f64> {
+        let ab = sub(b, a);
+        let l2 = ab[0] * ab[0] + ab[1] * ab[1] + ab[2] * ab[2];
+        if l2 < 1e-12 {
+            return None;
+        }
+        let ap = sub(p, a);
+        let t = ((ap[0] * ab[0] + ap[1] * ab[1] + ap[2] * ab[2]) / l2).clamp(0.0, 1.0);
+        (dist(add(a, scale(ab, t)), p) < 0.05).then_some(t)
+    };
+    let columns = crate::columns::all(store)
+        .into_iter()
+        .filter_map(|(id, g)| {
+            let (a, b) = g.axis();
+            Some((id, near(a, b)?))
+        });
+    let beams = store
+        .iter()
+        .filter(|e| Some(e.id()) != not)
+        .filter_map(|e| Some((e.id(), beam_recipe(e).filter(|r| !r.brace)?)))
+        .filter_map(|(id, r)| {
+            let (a, b) = line_of(store, &r).ok()?;
+            Some((id, near(a, b)?))
+        });
+    let (id, t) = columns.chain(beams).next()?;
+    Some(Attachment {
+        target: store.get(id)?.guid().to_string(),
+        at: (t * 1e9).round() / 1e9,
+        by_distance: false,
+    })
 }
 
 fn is_unset(c: &[Option<f64>; 2]) -> bool {
@@ -264,20 +375,36 @@ impl Frame {
         let r =
             beam_recipe(e).ok_or_else(|| Error::new("beam.not_reviera", "not a Reviera beam"))?;
         let ty = type_of(store, e);
-        let z = crate::levels::elevation_of(store, &r.level)?;
-        let a = [r.start[0], r.start[1], z + r.start_offset];
-        let b = [r.end[0], r.end[1], z + r.end_offset];
+        let (mut a, mut b) = line_of(store, &r)?;
+        if let Some((p, q)) = r.system.as_ref().and_then(|s| system_piece(store, s)) {
+            (a, b) = (p, q);
+        }
+        // A truss's vertical web faces across the truss.
+        let side = r
+            .system
+            .as_ref()
+            .and_then(|s| truss_direction(store, s))
+            .or(r.side);
+        if let Some(p) = r.attach[0].as_ref().and_then(|t| at_attachment(store, t)) {
+            a = p;
+        }
+        if let Some(p) = r.attach[1].as_ref().and_then(|t| at_attachment(store, t)) {
+            b = p;
+        }
         let d = sub(b, a);
         let len = (d[0] * d[0] + d[1] * d[1] + d[2] * d[2]).sqrt();
         let plan = d[0].hypot(d[1]);
-        if plan < 1e-3 || len < 1e-3 {
+        if (plan < 1e-3 && side.is_none()) || len < 1e-3 {
             return Err(Error::new(
                 "beam.too_short",
                 "a beam needs two ends apart in plan (use a column for vertical members)",
             ));
         }
         let u = scale(d, 1.0 / len);
-        let left = [-d[1] / plan, d[0] / plan, 0.0];
+        let left = match side {
+            Some(t) if plan < 1e-3 => [-t[1], t[0], 0.0],
+            _ => [-d[1] / plan, d[0] / plan, 0.0],
+        };
         let up = match r.orientation {
             Orientation::Normal => cross(u, left),
             Orientation::Horizontal => [0.0, 0.0, 1.0],
@@ -357,13 +484,18 @@ pub enum Support {
     Beam(ElementId),
 }
 
+/// A column as a support: id, plan ring at the base, base, top, and the top's shift.
+type ColumnSupport = (ElementId, Vec<[f64; 2]>, f64, f64, [f64; 2]);
+
 /// The model's supports, gathered once.
 struct Context {
-    /// Columns: id, plan ring, base and top.
-    columns: Vec<(ElementId, Vec<[f64; 2]>, f64, f64)>,
+    /// Columns: id, plan ring at the base, base and top, and the top's shift (slanted).
+    columns: Vec<ColumnSupport>,
     /// Walls: id, footprint, base and top.
     walls: Vec<(ElementId, Vec<[f64; 2]>, f64, f64)>,
     beams: Vec<Frame>,
+    /// Point-to-point steel (Structural Settings): steel members are not shortened at joins.
+    point_to_point: bool,
 }
 
 impl Context {
@@ -372,7 +504,7 @@ impl Context {
             .into_iter()
             .map(|(id, g)| {
                 let top = g.top();
-                (id, g.ring, g.z0, top)
+                (id, g.ring, g.z0, top, g.shift)
             })
             .collect();
         let walls = store
@@ -397,6 +529,7 @@ impl Context {
             columns,
             walls,
             beams,
+            point_to_point: crate::structural::settings(store).point_to_point_steel,
         }
     }
 
@@ -408,9 +541,15 @@ impl Context {
         let dir = f.plan_dir();
         let inward = if k == 0 { dir } else { [-dir[0], -dir[1]] };
         let tol = TOLERANCE.max(f.depth());
-        for (id, ring, z0, z1) in &self.columns {
-            if p[2] >= z0 - tol && p[2] <= z1 + tol && inside(p2, ring) {
-                return Some((Support::Column(*id), exit(p2, inward, ring)));
+        for (id, ring, z0, z1, shift) in &self.columns {
+            // A slanted column's section where the end meets it.
+            let t = ((p[2] - z0) / (z1 - z0).max(1e-9)).clamp(0.0, 1.0);
+            let ring: Vec<[f64; 2]> = ring
+                .iter()
+                .map(|q| [q[0] + shift[0] * t, q[1] + shift[1] * t])
+                .collect();
+            if p[2] >= z0 - tol && p[2] <= z1 + tol && inside(p2, &ring) {
+                return Some((Support::Column(*id), exit(p2, inward, &ring)));
             }
         }
         for (id, ring, z0, z1) in &self.walls {
@@ -462,6 +601,13 @@ impl Context {
         let Some(f) = self.frame(id) else {
             return Usage::Other;
         };
+        if f.recipe.brace {
+            return if (f.a[2] - f.b[2]).abs() < 1e-3 {
+                Usage::HorizontalBracing
+            } else {
+                Usage::Other
+            };
+        }
         if f.recipe.usage != Usage::Automatic {
             return f.recipe.usage;
         }
@@ -501,7 +647,7 @@ impl Context {
         for k in 0..2 {
             if let Some((s, face)) = self.support(f, k) {
                 supports[k] = Some(s);
-                if f.recipe.joined[k] {
+                if f.recipe.joined[k] && !(steel && self.point_to_point) {
                     let cut =
                         f.recipe.cutback[k].unwrap_or(if steel { STEEL_CUTBACK } else { 0.0 });
                     trims[k] = (face + cut) / along.max(1e-9);
@@ -665,7 +811,18 @@ fn refresh(txn: &mut crate::txn::Transaction<'_>) -> Result<()> {
     let store = txn.store().clone();
     for (id, g) in all(&store) {
         let e = store.get(id).expect("listed");
-        let (predefined, object) = g.usage.ifc(&e.class);
+        let r = beam_recipe(e);
+        let brace = r.as_ref().is_some_and(|r| r.brace);
+        let chord = r
+            .as_ref()
+            .and_then(|r| r.system.as_ref())
+            .and_then(|s| truss_direction(&store, s).map(|_| s.slot < 2));
+        let (predefined, object) = match (brace, chord) {
+            (_, Some(true)) => ("CHORD", None),
+            (_, Some(false)) => ("STRUT", None),
+            (true, None) => ("BRACE", None),
+            (false, None) => g.usage.ifc(&e.class),
+        };
         let pset = if e.class == "IfcMember" {
             "Pset_MemberCommon"
         } else {
@@ -723,22 +880,39 @@ pub(crate) fn load_section(
     txn: &mut crate::txn::Transaction<'_>,
     p: crate::steel_sections::LoadParams,
 ) -> Result<ElementId> {
+    load_section_as(txn, p, "IfcBeamType", "BEAM")
+}
+
+/// Makes (or finds) a brace type (an `IfcMemberType`, `BRACE`) of a catalogue section
+/// (`brace.load_section`).
+pub(crate) fn load_brace_section(
+    txn: &mut crate::txn::Transaction<'_>,
+    p: crate::steel_sections::LoadParams,
+) -> Result<ElementId> {
+    load_section_as(txn, p, "IfcMemberType", "BRACE")
+}
+
+fn load_section_as(
+    txn: &mut crate::txn::Transaction<'_>,
+    p: crate::steel_sections::LoadParams,
+    class: &str,
+    predefined: &str,
+) -> Result<ElementId> {
     let c = crate::steel_sections::catalog(&p.catalog)
         .ok_or_else(|| Error::new("section.no_catalog", format!("no catalogue {}", p.catalog)))?;
-    let mut t = crate::steel_sections::column_type(&c, &p.designation)?;
+    let mut t = crate::steel_sections::section_type(txn.store(), &c, &p.designation, p.material)?;
     t.kind = BEAM_TYPE_RECIPE.into();
-    if let Some(m) = p.material {
-        t.material = Some(m);
-    }
     if let Some(e) = txn.store().iter().find(|e| {
-        beam_type(e).is_some_and(|x| x.designation == t.designation && x.material == t.material)
+        e.class == class
+            && beam_type(e)
+                .is_some_and(|x| x.designation == t.designation && x.material == t.material)
     }) {
         return Ok(e.id());
     }
     txn.create(
-        NewElement::new("IfcBeamType")
+        NewElement::new(class)
             .name(&p.designation)
-            .param("@PredefinedType", "BEAM")
+            .param("@PredefinedType", predefined)
             .param(RECIPE_KEY, serde_json::to_value(t).expect("serialises")),
     )
 }
@@ -844,6 +1018,11 @@ fn create_one(txn: &mut crate::txn::Transaction<'_>, p: CreateParams) -> Result<
         cutback: [None, None],
         joined: [true, true],
         usage: p.usage,
+        brace: false,
+        end_level: None,
+        attach: [None, None],
+        system: None,
+        side: None,
     };
     let guid = store.get(type_id).expect("resolved").guid().to_string();
     let value = serde_json::to_value(&recipe).expect("serialises");
@@ -1005,7 +1184,11 @@ pub(crate) fn set_usage(txn: &mut crate::txn::Transaction<'_>, p: SetUsageParams
 #[serde(deny_unknown_fields)]
 pub struct SetParams {
     pub beam_ids: Vec<ElementRef>,
+    /// A new location line in plan (an attached brace end follows).
+    pub curve: Option<Line>,
     pub reference_level: Option<ElementRef>,
+    /// The end's own level (its offset is kept, now above it).
+    pub end_level: Option<ElementRef>,
     #[schemars(extend("x-reviera-data-type" = "length"))]
     pub start_offset: Option<f64>,
     #[schemars(extend("x-reviera-data-type" = "length"))]
@@ -1034,14 +1217,30 @@ pub(crate) fn set(txn: &mut crate::txn::Transaction<'_>, p: SetParams) -> Result
         .as_ref()
         .map(|r| resolve_level(&store, r))
         .transpose()?;
+    let end_level = p
+        .end_level
+        .as_ref()
+        .map(|r| resolve_level(&store, r))
+        .transpose()?;
     for (id, mut r) in resolve_beams(&store, &p.beam_ids)? {
         if let Some(l) = &level {
             // Keep the ends where they are.
             let dz = crate::levels::elevation_of(&store, &r.level)?
                 - crate::levels::elevation_of(&store, l)?;
             r.start_offset += dz;
-            r.end_offset += dz;
+            if r.end_level.is_none() {
+                r.end_offset += dz;
+            }
             r.level = l.clone();
+        }
+        if let Some(c) = &p.curve {
+            r.start = c.start;
+            r.end = c.end;
+        }
+        if let Some(l) = &end_level {
+            // A new end level frees an attached end.
+            r.end_level = (*l != r.level).then(|| l.clone());
+            r.attach[1] = None;
         }
         macro_rules! take {
             ($($f:ident),*) => { $(if let Some(v) = p.$f { r.$f = v; })* };
@@ -1242,6 +1441,19 @@ pub(crate) fn transform(
 ) -> Result<()> {
     let store = txn.store().clone();
     let mut r = beam_recipe(store.get(id).expect("exists")).expect("a beam");
+    // Where it is now, then moved; a moved member leaves what it was attached to.
+    if let Ok(f) = Frame::new(&store, store.get(id).expect("exists")) {
+        let z = crate::levels::elevation_of(&store, &r.level)?;
+        let z_end = match &r.end_level {
+            Some(l) => crate::levels::elevation_of(&store, l)?,
+            None => z,
+        };
+        r.start = [f.a[0], f.a[1]];
+        r.end = [f.b[0], f.b[1]];
+        r.start_offset = f.a[2] - z;
+        r.end_offset = f.b[2] - z_end;
+    }
+    r.attach = [None, None];
     r.start = x(r.start);
     r.end = x(r.end);
     if mirror {
@@ -1257,6 +1469,1262 @@ pub(crate) fn transform(
     r.end_offset += dz;
     write(txn, id, &r)?;
     refresh(txn)
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct BraceParams {
+    /// A brace type (a beam or brace type); omitted, the region's usual brace section (HSS6X6X3/8,
+    /// HEA 160 or UC 152x152x23), made on first use.
+    pub type_id: Option<ElementRef>,
+    /// Each end's plan point, level and offset above it.
+    pub start_point: [f64; 2],
+    pub start_level: ElementRef,
+    #[serde(default)]
+    #[schemars(extend("x-reviera-data-type" = "length"))]
+    pub start_offset: f64,
+    pub end_point: [f64; 2],
+    pub end_level: ElementRef,
+    #[serde(default)]
+    #[schemars(extend("x-reviera-data-type" = "length"))]
+    pub end_offset: f64,
+    /// Attach the ends to the columns or beams whose axes they lie on (default true).
+    #[serde(default = "yes1")]
+    pub attach: bool,
+}
+
+fn yes1() -> bool {
+    true
+}
+
+/// Places a brace (`brace.create`, STR-BRACE-001): an `IfcMember` (`BRACE`) between two ends,
+/// each at its level and offset. An end on a column's or beam's axis is attached to it (by its
+/// ratio along it) and follows it. Its usage is horizontal bracing when both ends are level,
+/// otherwise other.
+pub(crate) fn create_brace(
+    txn: &mut crate::txn::Transaction<'_>,
+    p: BraceParams,
+) -> Result<ElementId> {
+    let store = txn.store().clone();
+    let level = resolve_level(&store, &p.start_level)?;
+    let end_level = resolve_level(&store, &p.end_level)?;
+    let z0 = crate::levels::elevation_of(&store, &level)? + p.start_offset;
+    let z1 = crate::levels::elevation_of(&store, &end_level)? + p.end_offset;
+    if (p.end_point[0] - p.start_point[0])
+        .hypot(p.end_point[1] - p.start_point[1])
+        .hypot(z1 - z0)
+        < 1e-3
+    {
+        return Err(Error::new(
+            "brace.zero_length",
+            "the brace's ends are in the same place",
+        ));
+    }
+    let type_id = match &p.type_id {
+        Some(r) => resolve_type(&store, r)?,
+        None => {
+            let (catalog, designation) = crate::codes::settings(&store).code.structural().brace;
+            load_brace_section(
+                txn,
+                crate::steel_sections::LoadParams {
+                    catalog: catalog.into(),
+                    designation: designation.into(),
+                    material: None,
+                },
+            )?
+        }
+    };
+    let store = txn.store().clone();
+    let ends = [
+        [p.start_point[0], p.start_point[1], z0],
+        [p.end_point[0], p.end_point[1], z1],
+    ];
+    let end_level = (end_level != level).then_some(end_level);
+    let attach = if p.attach {
+        ends.map(|e| attachment_at(&store, e, None))
+    } else {
+        [None, None]
+    };
+    let recipe = BeamRecipe {
+        kind: BEAM_RECIPE.into(),
+        start: p.start_point,
+        end: p.end_point,
+        level,
+        start_offset: p.start_offset,
+        end_offset: p.end_offset,
+        rotation: 0.0,
+        y_justification: YJustification::Centre,
+        y_offset: 0.0,
+        z_justification: ZJustification::Centre,
+        z_offset: 0.0,
+        orientation: Orientation::Normal,
+        start_extension: 0.0,
+        end_extension: 0.0,
+        cutback: [None, None],
+        joined: [true, true],
+        usage: Usage::Automatic,
+        brace: true,
+        end_level,
+        attach,
+        system: None,
+        side: None,
+    };
+    let guid = store.get(type_id).expect("resolved").guid().to_string();
+    let id = txn.create(NewElement::new("IfcMember").param("@type", guid).param(
+        RECIPE_KEY,
+        serde_json::to_value(&recipe).expect("serialises"),
+    ))?;
+    finish(txn, id, "IfcMember")?;
+    refresh(txn)?;
+    Ok(id)
+}
+
+/// Frees brace ends attached to elements about to be deleted: each end stays where it is now,
+/// and a warning names the brace.
+pub(crate) fn release_attachments(
+    txn: &mut crate::txn::Transaction<'_>,
+    going: &std::collections::BTreeSet<ElementId>,
+) -> Result<()> {
+    let store = txn.store().clone();
+    let guids: HashSet<String> = going
+        .iter()
+        .filter_map(|id| store.get(*id).map(|e| e.guid().to_string()))
+        .collect();
+    for e in store.iter() {
+        let Some(mut r) = beam_recipe(e) else {
+            continue;
+        };
+        if going.contains(&e.id()) || !r.attach.iter().flatten().any(|a| guids.contains(&a.target))
+        {
+            continue;
+        }
+        let f = Frame::new(&store, e)?;
+        let z = crate::levels::elevation_of(&store, &r.level)?;
+        let z_end = match &r.end_level {
+            Some(l) => crate::levels::elevation_of(&store, l)?,
+            None => z,
+        };
+        for k in 0..2 {
+            if r.attach[k]
+                .as_ref()
+                .is_some_and(|a| guids.contains(&a.target))
+            {
+                r.attach[k] = None;
+                let (p, base) = if k == 0 { (f.a, z) } else { (f.b, z_end) };
+                if k == 0 {
+                    r.start = [p[0], p[1]];
+                    r.start_offset = p[2] - base;
+                } else {
+                    r.end = [p[0], p[1]];
+                    r.end_offset = p[2] - base;
+                }
+            }
+        }
+        let id = e.id();
+        write(txn, id, &r)?;
+        txn.warn(crate::txn::Warning {
+            id: "str.brace.end_released".into(),
+            message: format!(
+                "Brace {id} lost what an end was attached to; the end stays where it was"
+            ),
+            element_ids: vec![id],
+        });
+    }
+    Ok(())
+}
+
+// ---- Beam systems (STR-BSYS-001) ----
+
+pub const BEAM_SYSTEM_RECIPE: &str = "recipe.beam_system";
+
+/// How a beam system spaces its beams.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum LayoutRule {
+    /// `value` is the centre spacing.
+    FixedDistance,
+    /// `value` is the number of beams.
+    FixedNumber,
+    /// The fewest beams that keep the spacing at or below `value`.
+    MaximumSpacing,
+    /// `value` is the clear spacing between beam faces.
+    ClearSpacing,
+}
+
+/// Where a spaced layout starts.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum LayoutJustification {
+    #[default]
+    Beginning,
+    End,
+    Centre,
+}
+
+/// The stored recipe of a beam system: its boundary (a plan polygon whose edges may be locked to
+/// their supports), its level and offset, the beams' direction, type and layout.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct SystemRecipe {
+    pub kind: String,
+    pub boundary: Vec<[f64; 2]>,
+    /// Edge `i` (from vertex `i` to `i + 1`) locked to this beam or wall (GlobalId).
+    #[serde(default)]
+    pub supports: Vec<Option<String>>,
+    pub level: String,
+    #[serde(default)]
+    pub offset: f64,
+    /// The beams' direction in plan (a unit vector).
+    pub direction: [f64; 2],
+    pub beam_type: String,
+    pub rule: LayoutRule,
+    pub value: f64,
+    #[serde(default)]
+    pub justification: LayoutJustification,
+}
+
+pub fn system_recipe(e: &Element) -> Option<SystemRecipe> {
+    let v = e.param(RECIPE_KEY)?;
+    (v.get("kind")?.as_str()? == BEAM_SYSTEM_RECIPE)
+        .then(|| serde_json::from_value(v.clone()).ok())?
+}
+
+/// A support's line in plan: a (non-system) beam's location line or a wall's.
+fn support_line(store: &Store, guid: &str) -> Option<([f64; 2], [f64; 2])> {
+    let e = store.get(find(store, guid)?)?;
+    if let Some(r) = beam_recipe(e).filter(|r| r.system.is_none()) {
+        return Some((r.start, r.end));
+    }
+    let w = crate::walls::wall_recipe(e)?;
+    Some((w.curve.start, w.curve.end))
+}
+
+fn meet(a: ([f64; 2], [f64; 2]), b: ([f64; 2], [f64; 2])) -> Option<[f64; 2]> {
+    let r = [a.1[0] - a.0[0], a.1[1] - a.0[1]];
+    let t = [b.1[0] - b.0[0], b.1[1] - b.0[1]];
+    let den = r[0] * t[1] - r[1] * t[0];
+    if den.abs() < 1e-12 {
+        return None;
+    }
+    let qp = [b.0[0] - a.0[0], b.0[1] - a.0[1]];
+    let u = (qp[0] * t[1] - qp[1] * t[0]) / den;
+    Some([a.0[0] + u * r[0], a.0[1] + u * r[1]])
+}
+
+/// A system's boundary as it is now: each locked edge on its support's line, the corners where
+/// consecutive edges meet.
+pub fn system_boundary(store: &Store, r: &SystemRecipe) -> Vec<[f64; 2]> {
+    let n = r.boundary.len();
+    let line = |i: usize| {
+        r.supports
+            .get(i)
+            .and_then(Option::as_deref)
+            .and_then(|g| support_line(store, g))
+            .unwrap_or((r.boundary[i], r.boundary[(i + 1) % n]))
+    };
+    (0..n)
+        .map(|i| meet(line((i + n - 1) % n), line(i)).unwrap_or(r.boundary[i]))
+        .collect()
+}
+
+/// A system's layout: the beams' widths, the offsets across the bay of its layout lines, and the
+/// pieces of each line inside the boundary.
+pub fn system_layout(store: &Store, r: &SystemRecipe) -> Vec<Vec<([f64; 2], [f64; 2])>> {
+    let ring = system_boundary(store, r);
+    let d = r.direction;
+    let n = [-d[1], d[0]];
+    let across: Vec<f64> = ring.iter().map(|p| dot2(*p, n)).collect();
+    let lo = across.iter().copied().fold(f64::INFINITY, f64::min);
+    let hi = across.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+    let w = hi - lo;
+    let width = find(store, &r.beam_type)
+        .and_then(|t| store.get(t))
+        .and_then(beam_type)
+        .map_or(0.15, |t| t.width);
+    let spaced = |s: f64| -> Vec<f64> {
+        if s <= 1e-6 {
+            return Vec::new();
+        }
+        let k = ((w - 1e-6) / s).floor() as i64;
+        match r.justification {
+            LayoutJustification::Beginning => (1..=k).map(|i| lo + i as f64 * s).collect(),
+            LayoutJustification::End => (1..=k).map(|i| hi - i as f64 * s).collect(),
+            LayoutJustification::Centre => {
+                let m = (lo + hi) / 2.0;
+                let count = ((w / s) - 1e-9).floor().max(0.0) as i64;
+                (0..count)
+                    .map(|i| m + (i as f64 - (count - 1) as f64 / 2.0) * s)
+                    .collect()
+            }
+        }
+    };
+    let even = |count: usize| -> Vec<f64> {
+        (1..=count)
+            .map(|i| lo + w * i as f64 / (count + 1) as f64)
+            .collect()
+    };
+    let positions: Vec<f64> = match r.rule {
+        LayoutRule::FixedDistance => spaced(r.value),
+        LayoutRule::ClearSpacing => spaced(r.value + width),
+        LayoutRule::FixedNumber => even(r.value.max(0.0).round() as usize),
+        LayoutRule::MaximumSpacing if r.value > 1e-6 => {
+            even(((w / r.value) - 1e-9).ceil().max(1.0) as usize - 1)
+        }
+        LayoutRule::MaximumSpacing => Vec::new(),
+    };
+    positions
+        .into_iter()
+        .filter(|t| *t > lo + 1e-6 && *t < hi - 1e-6)
+        .map(|t| pieces(&ring, d, n, t))
+        .collect()
+}
+
+/// The pieces of the line `n·p = t` (running along `d`) inside the polygon.
+fn pieces(ring: &[[f64; 2]], d: [f64; 2], n: [f64; 2], t: f64) -> Vec<([f64; 2], [f64; 2])> {
+    let mut hits: Vec<f64> = Vec::new();
+    let m = ring.len();
+    for i in 0..m {
+        let (a, b) = (ring[i], ring[(i + 1) % m]);
+        let (ta, tb) = (dot2(a, n), dot2(b, n));
+        if (ta - t) * (tb - t) < 0.0 || ((ta - t).abs() < 1e-12) != ((tb - t).abs() < 1e-12) {
+            if (ta - tb).abs() < 1e-12 {
+                continue;
+            }
+            let u = (t - ta) / (tb - ta);
+            if (0.0..1.0).contains(&u) || ((tb - t).abs() < 1e-12) {
+                let p = [a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u];
+                hits.push(dot2(p, d));
+            }
+        }
+    }
+    hits.sort_by(f64::total_cmp);
+    hits.dedup_by(|a, b| (*a - *b).abs() < 1e-9);
+    let at = |s: f64| [n[0] * t + d[0] * s, n[1] * t + d[1] * s];
+    hits.chunks(2)
+        .filter(|c| c.len() == 2 && c[1] - c[0] > 1e-6)
+        .map(|c| (at(c[0]), at(c[1])))
+        .collect()
+}
+
+/// A system beam's ends as its system lays it out now.
+fn system_piece(store: &Store, s: &SystemSlot) -> Option<(V3, V3)> {
+    let e = store.get(find(store, &s.system)?)?;
+    if let Some(t) = truss_recipe(e) {
+        let m = truss_members(store, &t).ok()?;
+        return m.get(s.slot).map(|m| (m.0, m.1));
+    }
+    let r = system_recipe(e)?;
+    let z = crate::levels::elevation_of(store, &r.level).ok()? + r.offset;
+    let (a, b) = *system_layout(store, &r).get(s.slot)?.get(s.piece)?;
+    Some(([a[0], a[1], z], [b[0], b[1], z]))
+}
+
+/// Makes a system's beams afresh: deletes those it has and lays out new ones.
+fn relayout(txn: &mut crate::txn::Transaction<'_>, id: ElementId) -> Result<Vec<ElementId>> {
+    let store = txn.store().clone();
+    let e = store.get(id).expect("a system");
+    let guid = e.guid().to_string();
+    let r = system_recipe(e).expect("a system");
+    for b in store.iter() {
+        if beam_recipe(b)
+            .and_then(|r| r.system)
+            .is_some_and(|s| s.system == guid)
+        {
+            txn.delete(b.id())?;
+        }
+    }
+    let type_id = find(&store, &r.beam_type)
+        .ok_or_else(|| Error::new("beam_system.no_type", "the system's beam type is gone"))?;
+    let level_ref = ElementRef::Guid(GlobalId::parse(&r.level).expect("a level's GlobalId"));
+    let mut out = Vec::new();
+    for (slot, line) in system_layout(&store, &r).into_iter().enumerate() {
+        for (piece, (a, b)) in line.into_iter().enumerate() {
+            let beam = create_one(
+                txn,
+                CreateParams {
+                    type_id: Some(ElementRef::Id(type_id)),
+                    curve: Line { start: a, end: b },
+                    reference_level: level_ref.clone(),
+                    start_offset: r.offset,
+                    end_offset: r.offset,
+                    usage: Usage::Automatic,
+                    orientation: Orientation::Normal,
+                    y_justification: None,
+                    z_justification: None,
+                    rotation: 0.0,
+                },
+            )?;
+            let s = txn.store().clone();
+            let mut br = beam_recipe(s.get(beam).expect("created")).expect("a beam");
+            br.system = Some(SystemSlot {
+                system: guid.clone(),
+                slot,
+                piece,
+            });
+            write(txn, beam, &br)?;
+            out.push(beam);
+        }
+    }
+    refresh(txn)?;
+    Ok(out)
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SystemSketchParams {
+    /// The boundary's corners in plan (a closed polygon).
+    pub boundary: Vec<[f64; 2]>,
+    /// The beams run parallel to this edge (from corner `i` to `i + 1`); default 0.
+    #[serde(default)]
+    pub direction_edge: usize,
+    pub type_id: Option<ElementRef>,
+    pub layout_rule: LayoutRule,
+    #[schemars(extend("x-reviera-data-type" = "length"))]
+    pub value: f64,
+    #[serde(default)]
+    pub justification: LayoutJustification,
+    pub level: ElementRef,
+    #[serde(default)]
+    #[schemars(extend("x-reviera-data-type" = "length"))]
+    pub offset: f64,
+    /// Lock edges lying on beams' or walls' location lines to them (default true).
+    #[serde(default = "yes1")]
+    pub lock_to_supports: bool,
+}
+
+/// The beam or wall (not of a system) whose location line an edge lies on.
+fn support_under(store: &Store, a: [f64; 2], b: [f64; 2]) -> Option<String> {
+    let on = |p: [f64; 2], (s, e): ([f64; 2], [f64; 2])| {
+        let d = [e[0] - s[0], e[1] - s[1]];
+        let l = d[0].hypot(d[1]);
+        l > 1e-9 && ((p[0] - s[0]) * d[1] - (p[1] - s[1]) * d[0]).abs() / l < 0.01
+    };
+    store
+        .iter()
+        .filter(|e| {
+            beam_recipe(e).is_some_and(|r| r.system.is_none())
+                || crate::walls::wall_recipe(e).is_some()
+        })
+        .find(|e| support_line(store, &e.guid().to_string()).is_some_and(|l| on(a, l) && on(b, l)))
+        .map(|e| e.guid().to_string())
+}
+
+fn new_system(
+    txn: &mut crate::txn::Transaction<'_>,
+    mut ring: Vec<[f64; 2]>,
+    mut supports: Vec<Option<String>>,
+    direction: [f64; 2],
+    p: (
+        Option<ElementRef>,
+        LayoutRule,
+        f64,
+        LayoutJustification,
+        ElementRef,
+        f64,
+    ),
+) -> Result<ElementId> {
+    let (type_id, rule, value, justification, level, offset) = p;
+    if ring.len() < 3 {
+        return Err(Error::new(
+            "beam_system.boundary",
+            "a boundary needs at least three corners",
+        ));
+    }
+    // Counter-clockwise.
+    if crate::sketch::signed_area(&ring) < 0.0 {
+        // Edge i of the reversed ring is edge n - 2 - i of the original.
+        ring.reverse();
+        supports.reverse();
+        supports.rotate_left(1);
+    }
+    let store = txn.store().clone();
+    let type_id = match &type_id {
+        Some(r) => resolve_type(&store, r)?,
+        None => default_type(txn)?,
+    };
+    let store = txn.store().clone();
+    let l = direction[0].hypot(direction[1]);
+    if l < 1e-9 {
+        return Err(Error::new(
+            "beam_system.direction",
+            "the beam direction has no length",
+        ));
+    }
+    let recipe = SystemRecipe {
+        kind: BEAM_SYSTEM_RECIPE.into(),
+        boundary: ring,
+        supports,
+        level: resolve_level(&store, &level)?,
+        offset,
+        direction: [direction[0] / l, direction[1] / l],
+        beam_type: store.get(type_id).expect("resolved").guid().to_string(),
+        rule,
+        value,
+        justification,
+    };
+    let id = txn.create(
+        NewElement::new("IfcElementAssembly")
+            .param("@PredefinedType", "BEAM_GRID")
+            .param(
+                RECIPE_KEY,
+                serde_json::to_value(&recipe).expect("serialises"),
+            ),
+    )?;
+    relayout(txn, id)?;
+    Ok(id)
+}
+
+/// Creates a beam system from a sketched boundary (`beam_system.create_sketch`).
+pub(crate) fn create_system_sketch(
+    txn: &mut crate::txn::Transaction<'_>,
+    p: SystemSketchParams,
+) -> Result<ElementId> {
+    let n = p.boundary.len();
+    if n < 3 || p.direction_edge >= n {
+        return Err(Error::new(
+            "beam_system.boundary",
+            "a boundary needs at least three corners, and the direction edge one of its edges",
+        ));
+    }
+    let (a, b) = (
+        p.boundary[p.direction_edge],
+        p.boundary[(p.direction_edge + 1) % n],
+    );
+    let store = txn.store().clone();
+    let supports = (0..n)
+        .map(|i| {
+            p.lock_to_supports
+                .then(|| support_under(&store, p.boundary[i], p.boundary[(i + 1) % n]))
+                .flatten()
+        })
+        .collect();
+    new_system(
+        txn,
+        p.boundary,
+        supports,
+        [b[0] - a[0], b[1] - a[1]],
+        (
+            p.type_id,
+            p.layout_rule,
+            p.value,
+            p.justification,
+            p.level,
+            p.offset,
+        ),
+    )
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SystemAutoParams {
+    /// A point in the bay.
+    pub point: [f64; 2],
+    pub level: ElementRef,
+    #[serde(default)]
+    #[schemars(extend("x-reviera-data-type" = "length"))]
+    pub offset: f64,
+    pub type_id: Option<ElementRef>,
+    pub layout_rule: LayoutRule,
+    #[schemars(extend("x-reviera-data-type" = "length"))]
+    pub value: f64,
+    #[serde(default)]
+    pub justification: LayoutJustification,
+}
+
+/// Creates a beam system in the bay around a point (`beam_system.create_auto`): the smallest loop
+/// of beams (at the level) and walls (through it) around the point, its edges locked to them, the
+/// beams parallel to the support nearest the point.
+pub(crate) fn create_system_auto(
+    txn: &mut crate::txn::Transaction<'_>,
+    p: SystemAutoParams,
+) -> Result<ElementId> {
+    let store = txn.store().clone();
+    let level = resolve_level(&store, &p.level)?;
+    let z = crate::levels::elevation_of(&store, &level)? + p.offset;
+    let mut edges = Vec::new();
+    for e in store.iter() {
+        let line = if let Some(r) = beam_recipe(e).filter(|r| r.system.is_none()) {
+            let Ok((a, b)) = line_of(&store, &r) else {
+                continue;
+            };
+            if (a[2] - z).abs() > 0.05 || (b[2] - z).abs() > 0.05 {
+                continue;
+            }
+            Line {
+                start: r.start,
+                end: r.end,
+            }
+        } else if crate::walls::wall_recipe(e).is_some() {
+            let Ok(g) = crate::walls::regenerate(&store, e) else {
+                continue;
+            };
+            if z < g.base_z - 1e-6 || z > g.base_z + g.height + 1e-6 {
+                continue;
+            }
+            Line {
+                start: g.start,
+                end: g.end,
+            }
+        } else {
+            continue;
+        };
+        edges.push(crate::arrangement::Edge {
+            line,
+            lock: Some((e.id(), "support".into())),
+        });
+    }
+    let lp = crate::arrangement::loop_around(&edges, p.point).ok_or_else(|| {
+        Error::new(
+            "beam_system.no_bay",
+            "no closed bay of beams or walls around the point at that level",
+        )
+    })?;
+    let ring: Vec<[f64; 2]> = lp.iter().map(|e| e.line.start).collect();
+    let supports: Vec<Option<String>> = lp
+        .iter()
+        .map(|e| {
+            e.lock
+                .as_ref()
+                .and_then(|(id, _)| store.get(*id))
+                .map(|s| s.guid().to_string())
+        })
+        .collect();
+    // Parallel to the edge nearest the point.
+    let nearest = lp
+        .iter()
+        .min_by(|a, b| {
+            ring_distance(p.point, &[a.line.start, a.line.end])
+                .total_cmp(&ring_distance(p.point, &[b.line.start, b.line.end]))
+        })
+        .expect("a loop has edges");
+    let d = [
+        nearest.line.end[0] - nearest.line.start[0],
+        nearest.line.end[1] - nearest.line.start[1],
+    ];
+    new_system(
+        txn,
+        ring,
+        supports,
+        d,
+        (
+            p.type_id,
+            p.layout_rule,
+            p.value,
+            p.justification,
+            p.level,
+            p.offset,
+        ),
+    )
+}
+
+fn resolve_system(store: &Store, r: &ElementRef) -> Result<(ElementId, SystemRecipe)> {
+    let id = store
+        .resolve(r)
+        .ok_or_else(|| Error::new("element.not_found", format!("no element {r:?}")))?;
+    let recipe = store.get(id).and_then(system_recipe).ok_or_else(|| {
+        Error::new(
+            "beam_system.not_a_system",
+            format!("element {id} is not a beam system"),
+        )
+    })?;
+    Ok((id, recipe))
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SetLayoutParams {
+    pub system_id: ElementRef,
+    pub rule: Option<LayoutRule>,
+    #[schemars(extend("x-reviera-data-type" = "length"))]
+    pub value: Option<f64>,
+    pub justification: Option<LayoutJustification>,
+    pub type_id: Option<ElementRef>,
+}
+
+/// Changes a system's layout (or just lays it out again for its bay as it is now) and makes its
+/// beams afresh (`beam_system.set_layout`).
+pub(crate) fn set_layout(
+    txn: &mut crate::txn::Transaction<'_>,
+    p: SetLayoutParams,
+) -> Result<Vec<ElementId>> {
+    let store = txn.store().clone();
+    let (id, mut r) = resolve_system(&store, &p.system_id)?;
+    if let Some(v) = p.rule {
+        r.rule = v;
+    }
+    if let Some(v) = p.value {
+        r.value = v;
+    }
+    if let Some(v) = p.justification {
+        r.justification = v;
+    }
+    if let Some(t) = &p.type_id {
+        let t = resolve_type(&store, t)?;
+        r.beam_type = store.get(t).expect("resolved").guid().to_string();
+    }
+    let v = serde_json::to_value(&r).expect("serialises");
+    txn.modify(id, |e| {
+        e.params.insert(RECIPE_KEY.into(), v);
+    })?;
+    relayout(txn, id)
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SystemParams {
+    pub system_id: ElementRef,
+}
+
+/// Removes a beam system, keeping its beams as independent framing where they are
+/// (`beam_system.remove`).
+pub(crate) fn remove_system(
+    txn: &mut crate::txn::Transaction<'_>,
+    p: SystemParams,
+) -> Result<Vec<ElementId>> {
+    let store = txn.store().clone();
+    let (id, _) = resolve_system(&store, &p.system_id)?;
+    let guid = store.get(id).expect("resolved").guid().to_string();
+    let kept = release_members(txn, &guid)?;
+    txn.delete(id)?;
+    Ok(kept)
+}
+
+/// A beam system as reported (`beam_system.info`).
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+pub struct SystemInfo {
+    pub system_id: ElementId,
+    pub boundary: Vec<[f64; 2]>,
+    pub direction: [f64; 2],
+    pub rule: LayoutRule,
+    pub value: f64,
+    /// Its beams, and the centre spacing between layout lines (none for one line).
+    pub beams: Vec<ElementId>,
+    pub spacing: Option<f64>,
+}
+
+/// Reports a beam system's boundary, layout and beams (`beam_system.info`).
+pub fn system_info(store: &Store, p: &SystemParams) -> Result<SystemInfo> {
+    let (id, r) = resolve_system(store, &p.system_id)?;
+    let guid = store.get(id).expect("resolved").guid().to_string();
+    let layout = system_layout(store, &r);
+    let n = [-r.direction[1], r.direction[0]];
+    let offs: Vec<f64> = layout
+        .iter()
+        .filter_map(|l| l.first().map(|(a, _)| dot2(*a, n)))
+        .collect();
+    let spacing = (offs.len() >= 2).then(|| (offs[1] - offs[0]).abs());
+    Ok(SystemInfo {
+        system_id: id,
+        boundary: system_boundary(store, &r),
+        direction: r.direction,
+        rule: r.rule,
+        value: r.value,
+        beams: store
+            .iter()
+            .filter(|b| {
+                beam_recipe(b)
+                    .and_then(|r| r.system)
+                    .is_some_and(|s| s.system == guid)
+            })
+            .map(Element::id)
+            .collect(),
+        spacing,
+    })
+}
+
+// ---- Trusses (STR-TRUSS-001) ----
+
+pub const TRUSS_RECIPE: &str = "recipe.truss";
+
+/// A truss's web pattern.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum TrussLayout {
+    /// Verticals, diagonals sloping down toward mid-span.
+    #[default]
+    Pratt,
+    /// Verticals, diagonals sloping up toward mid-span.
+    Howe,
+    /// Alternating diagonals, no interior verticals.
+    Warren,
+}
+
+/// Which chord the truss's line runs along.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum BearingChord {
+    /// The bottom chord on the line, the top chord `height` above.
+    #[default]
+    Bottom,
+    /// The top chord on the line, the bottom chord `height` below.
+    Top,
+}
+
+/// The stored recipe of a truss: its line in plan at a level, its layout and member types.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct TrussRecipe {
+    pub kind: String,
+    pub start: [f64; 2],
+    pub end: [f64; 2],
+    pub level: String,
+    #[serde(default)]
+    pub offset: f64,
+    #[serde(default)]
+    pub layout: TrussLayout,
+    /// Panels along the span (kept when the truss is stretched).
+    pub panels: usize,
+    pub height: f64,
+    #[serde(default)]
+    pub bearing: BearingChord,
+    /// The chords' and webs' types (GlobalIds).
+    pub chord_type: String,
+    pub web_type: String,
+}
+
+pub fn truss_recipe(e: &Element) -> Option<TrussRecipe> {
+    let v = e.param(RECIPE_KEY)?;
+    (v.get("kind")?.as_str()? == TRUSS_RECIPE).then(|| serde_json::from_value(v.clone()).ok())?
+}
+
+/// The plan direction of the truss a member belongs to.
+fn truss_direction(store: &Store, s: &SystemSlot) -> Option<[f64; 2]> {
+    let t = truss_recipe(store.get(find(store, &s.system)?)?)?;
+    let d = [t.end[0] - t.start[0], t.end[1] - t.start[1]];
+    let l = d[0].hypot(d[1]);
+    (l > 1e-9).then(|| [d[0] / l, d[1] / l])
+}
+
+/// A truss's members as they are now: each one's ends and whether it is a chord. The top chord
+/// comes first, then the bottom chord, the verticals and the diagonals.
+pub fn truss_members(store: &Store, t: &TrussRecipe) -> Result<Vec<(V3, V3, bool)>> {
+    let z = crate::levels::elevation_of(store, &t.level)? + t.offset;
+    let (zb, zt) = match t.bearing {
+        BearingChord::Bottom => (z, z + t.height),
+        BearingChord::Top => (z - t.height, z),
+    };
+    let n = t.panels.max(1);
+    let at = |i: usize, top: bool| {
+        let k = i as f64 / n as f64;
+        [
+            t.start[0] + (t.end[0] - t.start[0]) * k,
+            t.start[1] + (t.end[1] - t.start[1]) * k,
+            if top { zt } else { zb },
+        ]
+    };
+    let mut out = vec![
+        (at(0, true), at(n, true), true),
+        (at(0, false), at(n, false), true),
+    ];
+    let verticals: Vec<usize> = match t.layout {
+        TrussLayout::Warren => vec![0, n],
+        _ => (0..=n).collect(),
+    };
+    for i in verticals {
+        out.push((at(i, false), at(i, true), false));
+    }
+    for k in 0..n {
+        let left_half = 2 * k < n;
+        // Which end of panel k is up.
+        let up_at_start = match t.layout {
+            TrussLayout::Pratt => left_half,
+            TrussLayout::Howe => !left_half,
+            TrussLayout::Warren => k % 2 == 1,
+        };
+        out.push(if up_at_start {
+            (at(k, true), at(k + 1, false), false)
+        } else {
+            (at(k, false), at(k + 1, true), false)
+        });
+    }
+    Ok(out)
+}
+
+/// Makes a truss's members afresh.
+fn relayout_truss(txn: &mut crate::txn::Transaction<'_>, id: ElementId) -> Result<Vec<ElementId>> {
+    let store = txn.store().clone();
+    let e = store.get(id).expect("a truss");
+    let guid = e.guid().to_string();
+    let t = truss_recipe(e).expect("a truss");
+    for b in store.iter() {
+        if beam_recipe(b)
+            .and_then(|r| r.system)
+            .is_some_and(|s| s.system == guid)
+        {
+            txn.delete(b.id())?;
+        }
+    }
+    let z = crate::levels::elevation_of(&store, &t.level)?;
+    let mut out = Vec::new();
+    for (slot, (a, b, chord)) in truss_members(&store, &t)?.into_iter().enumerate() {
+        let ty = if chord { &t.chord_type } else { &t.web_type };
+        let recipe = BeamRecipe {
+            kind: BEAM_RECIPE.into(),
+            start: [a[0], a[1]],
+            end: [b[0], b[1]],
+            level: t.level.clone(),
+            start_offset: a[2] - z,
+            end_offset: b[2] - z,
+            rotation: 0.0,
+            y_justification: YJustification::Centre,
+            y_offset: 0.0,
+            z_justification: ZJustification::Centre,
+            z_offset: 0.0,
+            orientation: Orientation::Normal,
+            start_extension: 0.0,
+            end_extension: 0.0,
+            cutback: [None, None],
+            joined: [false, false],
+            usage: Usage::Other,
+            brace: false,
+            end_level: None,
+            attach: [None, None],
+            system: Some(SystemSlot {
+                system: guid.clone(),
+                slot,
+                piece: 0,
+            }),
+            side: None,
+        };
+        let m = txn.create(
+            NewElement::new("IfcMember")
+                .param("@type", ty.clone())
+                .param(
+                    RECIPE_KEY,
+                    serde_json::to_value(&recipe).expect("serialises"),
+                ),
+        )?;
+        finish(txn, m, "IfcMember")?;
+        out.push(m);
+    }
+    refresh(txn)?;
+    Ok(out)
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct TrussParams {
+    /// The truss's line in plan, at `level` + `offset`.
+    pub start: [f64; 2],
+    pub end: [f64; 2],
+    pub level: ElementRef,
+    #[serde(default)]
+    #[schemars(extend("x-reviera-data-type" = "length"))]
+    pub offset: f64,
+    #[serde(default)]
+    pub layout: TrussLayout,
+    /// Default: about one panel per 1.5 m, even, at least 4.
+    pub panels: Option<usize>,
+    /// Default: a tenth of the span, at least 600 mm.
+    #[schemars(extend("x-reviera-data-type" = "length"))]
+    pub height: Option<f64>,
+    #[serde(default)]
+    pub bearing: BearingChord,
+    /// The chords' and webs' types (beam or brace types); default the region's usual brace
+    /// section for both.
+    pub chord_type_id: Option<ElementRef>,
+    pub web_type_id: Option<ElementRef>,
+}
+
+/// Creates a truss (`truss.create`, STR-TRUSS-001): an `IfcElementAssembly` (`TRUSS`) whose chords
+/// (`IfcMember` `CHORD`) and webs (`STRUT`) are members laid out from it.
+pub(crate) fn create_truss(
+    txn: &mut crate::txn::Transaction<'_>,
+    p: TrussParams,
+) -> Result<ElementId> {
+    let store = txn.store().clone();
+    let span = (p.end[0] - p.start[0]).hypot(p.end[1] - p.start[1]);
+    if span < 0.5 {
+        return Err(Error::new(
+            "truss.too_short",
+            "a truss needs a span of at least 500 mm",
+        ));
+    }
+    let default_type = |txn: &mut crate::txn::Transaction<'_>| -> Result<ElementId> {
+        let (catalog, designation) = crate::codes::settings(txn.store()).code.structural().brace;
+        load_brace_section(
+            txn,
+            crate::steel_sections::LoadParams {
+                catalog: catalog.into(),
+                designation: designation.into(),
+                material: None,
+            },
+        )
+    };
+    let chord = match &p.chord_type_id {
+        Some(r) => resolve_type(&store, r)?,
+        None => default_type(txn)?,
+    };
+    let web = match &p.web_type_id {
+        Some(r) => resolve_type(&store, r)?,
+        None => default_type(txn)?,
+    };
+    let store = txn.store().clone();
+    let guid = |id: ElementId| store.get(id).expect("resolved").guid().to_string();
+    let panels = p
+        .panels
+        .unwrap_or_else(|| ((span / 1.5).round() as usize).max(4).div_ceil(2) * 2);
+    if panels == 0 {
+        return Err(Error::new(
+            "truss.panels",
+            "a truss needs at least one panel",
+        ));
+    }
+    let height = p.height.unwrap_or((span / 10.0).max(0.6));
+    if height <= 0.0 {
+        return Err(Error::new(
+            "truss.height",
+            "a truss's height must be above zero",
+        ));
+    }
+    let recipe = TrussRecipe {
+        kind: TRUSS_RECIPE.into(),
+        start: p.start,
+        end: p.end,
+        level: resolve_level(&store, &p.level)?,
+        offset: p.offset,
+        layout: p.layout,
+        panels,
+        height,
+        bearing: p.bearing,
+        chord_type: guid(chord),
+        web_type: guid(web),
+    };
+    let id = txn.create(
+        NewElement::new("IfcElementAssembly")
+            .param("@PredefinedType", "TRUSS")
+            .param(
+                RECIPE_KEY,
+                serde_json::to_value(&recipe).expect("serialises"),
+            ),
+    )?;
+    relayout_truss(txn, id)?;
+    Ok(id)
+}
+
+fn resolve_truss(store: &Store, r: &ElementRef) -> Result<(ElementId, TrussRecipe)> {
+    let id = store
+        .resolve(r)
+        .ok_or_else(|| Error::new("element.not_found", format!("no element {r:?}")))?;
+    let t = store
+        .get(id)
+        .and_then(truss_recipe)
+        .ok_or_else(|| Error::new("truss.not_a_truss", format!("element {id} is not a truss")))?;
+    Ok((id, t))
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct TrussSetParams {
+    pub truss_id: ElementRef,
+    /// A new line (the truss stretches; its panel count stays).
+    pub start: Option<[f64; 2]>,
+    pub end: Option<[f64; 2]>,
+    pub layout: Option<TrussLayout>,
+    pub panels: Option<usize>,
+    #[schemars(extend("x-reviera-data-type" = "length"))]
+    pub height: Option<f64>,
+    pub bearing: Option<BearingChord>,
+    #[schemars(extend("x-reviera-data-type" = "length"))]
+    pub offset: Option<f64>,
+}
+
+/// Changes a truss (`truss.set`): its line (the members follow), or its layout, panels, height or
+/// bearing chord (the members are made afresh when the layout or panels change).
+pub(crate) fn set_truss(txn: &mut crate::txn::Transaction<'_>, p: TrussSetParams) -> Result<()> {
+    let store = txn.store().clone();
+    let (id, mut t) = resolve_truss(&store, &p.truss_id)?;
+    let remake = p.layout.is_some() || p.panels.is_some();
+    if let Some(v) = p.start {
+        t.start = v;
+    }
+    if let Some(v) = p.end {
+        t.end = v;
+    }
+    if let Some(v) = p.layout {
+        t.layout = v;
+    }
+    if let Some(v) = p.panels {
+        if v == 0 {
+            return Err(Error::new(
+                "truss.panels",
+                "a truss needs at least one panel",
+            ));
+        }
+        t.panels = v;
+    }
+    if let Some(v) = p.height {
+        if v <= 0.0 {
+            return Err(Error::new(
+                "truss.height",
+                "a truss's height must be above zero",
+            ));
+        }
+        t.height = v;
+    }
+    if let Some(v) = p.bearing {
+        t.bearing = v;
+    }
+    if let Some(v) = p.offset {
+        t.offset = v;
+    }
+    let v = serde_json::to_value(&t).expect("serialises");
+    txn.modify(id, |e| {
+        e.params.insert(RECIPE_KEY.into(), v);
+    })?;
+    if remake {
+        relayout_truss(txn, id)?;
+    } else {
+        refresh(txn)?;
+    }
+    Ok(())
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct TrussIdParams {
+    pub truss_id: ElementRef,
+}
+
+/// Frees a host's (beam system's or truss's) members where they are now.
+fn release_members(txn: &mut crate::txn::Transaction<'_>, guid: &str) -> Result<Vec<ElementId>> {
+    let store = txn.store().clone();
+    let mut kept = Vec::new();
+    for b in store.iter() {
+        let Some(mut r) = beam_recipe(b) else {
+            continue;
+        };
+        if !r.system.as_ref().is_some_and(|s| s.system == guid) {
+            continue;
+        }
+        if let Ok(f) = Frame::new(&store, b) {
+            let z = crate::levels::elevation_of(&store, &r.level)?;
+            r.start = [f.a[0], f.a[1]];
+            r.end = [f.b[0], f.b[1]];
+            r.start_offset = f.a[2] - z;
+            r.end_offset = f.b[2] - z;
+        }
+        // A vertical web keeps facing across its truss.
+        if (r.start[0] - r.end[0]).hypot(r.start[1] - r.end[1]) < 1e-3 {
+            r.side = r.system.as_ref().and_then(|s| truss_direction(&store, s));
+        }
+        r.system = None;
+        write(txn, b.id(), &r)?;
+        kept.push(b.id());
+    }
+    Ok(kept)
+}
+
+/// Removes a truss, keeping its members as plain framing where they are (`truss.remove`).
+pub(crate) fn remove_truss(
+    txn: &mut crate::txn::Transaction<'_>,
+    p: TrussIdParams,
+) -> Result<Vec<ElementId>> {
+    let store = txn.store().clone();
+    let (id, _) = resolve_truss(&store, &p.truss_id)?;
+    let guid = store.get(id).expect("resolved").guid().to_string();
+    let kept = release_members(txn, &guid)?;
+    txn.delete(id)?;
+    Ok(kept)
+}
+
+/// A truss as reported (`truss.info`).
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+pub struct TrussInfo {
+    pub truss_id: ElementId,
+    pub layout: TrussLayout,
+    pub panels: usize,
+    pub height: f64,
+    pub span: f64,
+    pub chords: Vec<ElementId>,
+    pub webs: Vec<ElementId>,
+}
+
+/// Reports a truss's layout and members (`truss.info`).
+pub fn truss_info(store: &Store, p: &TrussIdParams) -> Result<TrussInfo> {
+    let (id, t) = resolve_truss(store, &p.truss_id)?;
+    let guid = store.get(id).expect("resolved").guid().to_string();
+    let mut members: Vec<(usize, ElementId)> = store
+        .iter()
+        .filter_map(|b| {
+            let s = beam_recipe(b)?.system?;
+            (s.system == guid).then_some((s.slot, b.id()))
+        })
+        .collect();
+    members.sort();
+    Ok(TrussInfo {
+        truss_id: id,
+        layout: t.layout,
+        panels: t.panels,
+        height: t.height,
+        span: (t.end[0] - t.start[0]).hypot(t.end[1] - t.start[1]),
+        chords: members.iter().filter(|m| m.0 < 2).map(|m| m.1).collect(),
+        webs: members.iter().filter(|m| m.0 >= 2).map(|m| m.1).collect(),
+    })
+}
+
+/// A Coarse plan's single line for a member (STR-SET-001).
+#[derive(Debug, Clone, PartialEq)]
+pub struct CoarseLine {
+    pub element: ElementId,
+    pub segment: [[f64; 3]; 2],
+}
+
+/// The single lines of the beams, braces and truss members whose location lines pass between
+/// `z_lo` and `z_hi`, for a Coarse plan drawn at `scale` (100 for 1:100): each along its
+/// location line between its body's ends, less the coarse cutback at joined ends; braces drawn
+/// with their symbol (a parallel line offset to one side, or none).
+pub fn coarse_lines(store: &Store, z_lo: f64, z_hi: f64, drawing_scale: f64) -> Vec<CoarseLine> {
+    let s = crate::structural::settings(store);
+    let paper = |mm: f64| mm * drawing_scale / 1000.0;
+    let mut out = Vec::new();
+    for (id, g) in all(store) {
+        let (lo, hi) = (g.start[2].min(g.end[2]), g.start[2].max(g.end[2]));
+        if hi < z_lo - 1e-6 || lo > z_hi + 1e-6 {
+            continue;
+        }
+        let Some(r) = store.get(id).and_then(beam_recipe) else {
+            continue;
+        };
+        let len = g.length();
+        let cut = paper(s.coarse_cutback).min(len / 4.0);
+        let t0 = if g.supports[0].is_some() && r.joined[0] {
+            cut
+        } else {
+            0.0
+        };
+        let t1 = if g.supports[1].is_some() && r.joined[1] {
+            cut
+        } else {
+            0.0
+        };
+        let mut a = add(g.start, scale(g.u, t0));
+        let mut b = add(g.start, scale(g.u, len - t1));
+        if r.brace {
+            // A kicker: one end on a beam's span.
+            let kicker = r.attach.iter().flatten().any(|t| {
+                find(store, &t.target)
+                    .and_then(|e| store.get(e))
+                    .is_some_and(|e| beam_recipe(e).is_some())
+                    && t.at > 1e-6
+                    && t.at < 1.0 - 1e-6
+            });
+            let symbol = if kicker {
+                s.kicker_symbol
+            } else {
+                s.brace_symbol
+            };
+            if symbol == crate::structural::BraceSymbol::None {
+                continue;
+            }
+            let off = scale(g.left, paper(s.brace_offset));
+            a = add(a, off);
+            b = add(b, off);
+        }
+        out.push(CoarseLine {
+            element: id,
+            segment: [a, b],
+        });
+    }
+    out
 }
 
 #[cfg(test)]

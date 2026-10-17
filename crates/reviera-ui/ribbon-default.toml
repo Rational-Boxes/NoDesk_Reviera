@@ -1316,7 +1316,7 @@ help = "Place a structural (load-bearing) column in a plan: click its centre (Sp
 id = "column.load_section"
 label = "Load Section"
 icon = "section_catalog"
-help = "Load a standard steel section (W, HSS, pipe, C, L, WT, IPE, HEA, HEB, UB, UC) as a structural column type; the model's region's catalogues come first"
+help = "Load a standard section (steel W, HSS, pipe, C, L, WT, IPE, HEA, HEB, UB, UC; sawn lumber and EN 336 timber) as a structural column type; the model's region's catalogues come first"
 
 [[action]]
 id = "column.place_at_grids"
@@ -1332,6 +1332,170 @@ keys = "BM"
 help = "Draw structural beams in a plan: click a start and an end (snapping to grid crossings); each end starts the next. Their tops are at the plan's level; each end joins the column, wall or beam it rests on, and the usage (girder, joist, purlin) follows the supports"
 
 [[action]]
+id = "brace.create"
+label = "Brace"
+icon = "structural_brace"
+keys = "BR"
+help = "Draw braces in a plan: click the foot (on this level), then the head (on the level above). Ends on columns and beams attach to them and follow them; a brace with both ends level is horizontal bracing"
+
+[[action]]
+id = "brace.load_section"
+label = "Load Brace Section"
+icon = "section_catalog"
+help = "Load a standard steel section (HSS, angle, pipe, W …) as a brace type for the Brace tool"
+
+[[action]]
+id = "column.place_slanted"
+label = "Slanted Column"
+icon = "slanted_column"
+help = "Place a slanted structural column in a plan: click its base (on this level), then its top (on the level above)"
+
+[[action]]
+id = "wall.create_structural"
+label = "Wall"
+icon = "structural_wall"
+keys = "SW"
+help = "Draw structural walls (bearing; set Shear or Structural Combined in Properties): load-bearing IfcWall, a host for a wall foundation"
+
+[[action]]
+id = "floor.create_structural"
+label = "Floor"
+icon = "structural_floor"
+keys = "SB"
+help = "Sketch a structural floor: load-bearing, spanning along the first edge you draw (change it in Properties)"
+
+[[action]]
+id = "beam_system.create_auto"
+label = "Beam System"
+icon = "beam_system"
+keys = "BS"
+help = "Fill a bay with beams: click inside a bay of beams or walls on this plan's level; the beams run parallel to the nearest support at the region's usual spacing (change the layout in a beam's Properties)"
+
+[[action]]
+id = "beam_system.remove"
+label = "Remove Beam System"
+icon = "beam_system_remove"
+help = "Remove the beam system of the selected beams, keeping its beams as independent framing"
+
+[[action]]
+id = "truss.create"
+label = "Truss"
+icon = "truss"
+keys = "TS"
+help = "Draw trusses in a plan: click the start and the end; the bottom chord sits at this level. Change the layout (Pratt, Howe, Warren), panels and height in a member's Properties"
+
+[[action]]
+id = "truss.remove"
+label = "Remove Truss"
+icon = "truss_remove"
+help = "Remove the truss of the selected members, keeping its chords and webs as plain framing"
+
+[[action]]
+id = "structural_settings.show"
+label = "Structural Settings"
+icon = "structural_settings"
+help = "The project's structural settings: brace symbols and coarse cutback, point-to-point steel, analytical checks and tolerances, boundary condition spacing, load display scales"
+
+[[action]]
+id = "structural_connection.create"
+label = "Connection"
+icon = "structural_connection"
+keys = "CN"
+help = "Place a generic structural connection at the join of the selected members (main member first): it carries approval, code-check and fabricator information and follows the members"
+
+[[action]]
+id = "pile.place"
+label = "Pile"
+icon = "pile"
+help = "Place piles in a plan: click each centre; the pile's top is at this level"
+
+[[action]]
+id = "pile_cap.place"
+label = "Pile Cap"
+icon = "pile_cap"
+help = "Place pile caps in a plan: click each centre; the cap's top is at this level, its piles under it"
+
+[[action]]
+id = "analytical_automation.physical_to_analytical"
+label = "Physical to Analytical"
+icon = "physical_to_analytical"
+help = "Make analytical members for the selected structural columns, beams, braces and truss members (or every one without an association), their nodes merged at the joins, associated with them"
+
+[[action]]
+id = "analytical_automation.analytical_to_physical"
+label = "Analytical to Physical"
+icon = "analytical_to_physical"
+help = "Give the selected (or all) associated analytical members' section types to their physical beams and columns"
+
+[[action]]
+id = "analytical_automation.disconnect"
+label = "Disconnect"
+icon = "analytical_disconnect"
+help = "Remove the associations between the analytical and physical models (of the selection, or all), keeping both"
+
+[[action]]
+id = "analytical_node.merge"
+label = "Merge Nodes"
+icon = "analytical_merge"
+help = "Merge analytical nodes within the node merge distance and remove nodes no member uses"
+
+[[action]]
+id = "ui.toggle_analytical"
+label = "Show Analytical"
+icon = "analytical_show"
+help = "Show or hide the analytical model (members red, nodes blue) over 3D views"
+
+[[action]]
+id = "boundary_condition.at_column_bases"
+label = "Column Base Supports"
+icon = "column_base_supports"
+help = "Pin the foot of every analytical column that no member reaches from below"
+
+[[action]]
+id = "load_combination.generate"
+label = "Generate Combinations"
+icon = "load_combinations"
+help = "Make load combinations from the model's code template (ASCE 7-22 strength, or EN 1990 6.10 with the recommended factors) over its load cases"
+
+[[action]]
+id = "structural_analysis.run"
+label = "Run Analysis"
+icon = "run_analysis"
+help = "Analyse the analytical model (members, supports, load cases, combinations and loads) out of process with the built-in linear static frame solver; the results are kept with the model"
+
+[[action]]
+id = "structural_analysis.results"
+label = "Results"
+icon = "analysis_results"
+help = "The last structural analysis's results: largest moment and displacement and vertical reactions per case and combination"
+
+[[action]]
+id = "footing.place"
+label = "Isolated"
+icon = "footing"
+keys = "FT"
+help = "Place isolated footings in a plan: click each centre (it snaps to grid crossings); the footing's top is at this level, its thickness below"
+
+[[action]]
+id = "footing.place_at_columns"
+label = "At Columns"
+icon = "footings_at_columns"
+help = "Place an isolated footing under each selected column, joined to it: centred under it, its top at the column's base, following the column"
+
+[[action]]
+id = "wall_foundation.create"
+label = "Wall"
+icon = "wall_foundation"
+keys = "FW"
+help = "Place a wall foundation under each selected wall: bearing (a width centred on the wall) or retaining (toe and heel); it follows the wall"
+
+[[action]]
+id = "foundation_slab.create"
+label = "Slab"
+icon = "foundation_slab"
+help = "Sketch a foundation slab: its top at this level and its thickness below (BASESLAB)"
+
+[[action]]
 id = "beam.create_on_grids"
 label = "On Grids"
 icon = "beams_on_grids"
@@ -1341,7 +1505,7 @@ help = "Place a beam in every bay between columns along the selected grid lines,
 id = "beam.load_section"
 label = "Load Beam Section"
 icon = "section_catalog"
-help = "Load a standard steel section (W, IPE, UB, HSS, C …) as a beam type for the Beam tool; the model's region's catalogues come first"
+help = "Load a standard section (steel W, IPE, UB, HSS, C …; sawn lumber and EN 336 timber) as a beam type for the Beam tool; the model's region's catalogues come first"
 
 [[action]]
 id = "column.attach"
@@ -1588,9 +1752,13 @@ label = "Structure"
 tools = [
   { action = "column.place", size = "large" },
   { action = "column.place_at_grids", size = "large" },
+  { action = "wall.create_structural", size = "large" },
+  { action = "floor.create_structural", size = "large" },
+  { action = "column.place_slanted", size = "small" },
   { action = "column.load_section", size = "small" },
   { action = "column.attach", size = "small" },
   { action = "column.detach", size = "small" },
+  { action = "structural_settings.show", size = "small" },
 ]
 
 [[tab.panel]]
@@ -1598,7 +1766,25 @@ label = "Framing"
 tools = [
   { action = "beam.create", size = "large" },
   { action = "beam.create_on_grids", size = "large" },
+  { action = "brace.create", size = "large" },
+  { action = "beam_system.create_auto", size = "large" },
+  { action = "truss.create", size = "large" },
   { action = "beam.load_section", size = "small" },
+  { action = "brace.load_section", size = "small" },
+  { action = "beam_system.remove", size = "small" },
+  { action = "truss.remove", size = "small" },
+  { action = "structural_connection.create", size = "small" },
+]
+
+[[tab.panel]]
+label = "Foundation"
+tools = [
+  { action = "footing.place", size = "large" },
+  { action = "wall_foundation.create", size = "large" },
+  { action = "foundation_slab.create", size = "large" },
+  { action = "footing.place_at_columns", size = "small" },
+  { action = "pile.place", size = "small" },
+  { action = "pile_cap.place", size = "small" },
 ]
 
 [[tab.panel]]
@@ -1607,6 +1793,38 @@ tools = [
   { action = "level.create", size = "small" },
   { action = "grid.create", size = "small" },
   { action = "refplane.create", size = "small" },
+]
+
+[[tab]]
+id = "analyze"
+label = "Analyze"
+
+[[tab.panel]]
+label = "Select"
+tools = [{ action = "tool.modify", size = "large" }]
+
+[[tab.panel]]
+label = "Analytical"
+tools = [
+  { action = "analytical_automation.physical_to_analytical", size = "large" },
+  { action = "ui.toggle_analytical", size = "large" },
+  { action = "analytical_automation.analytical_to_physical", size = "small" },
+  { action = "analytical_automation.disconnect", size = "small" },
+  { action = "analytical_node.merge", size = "small" },
+]
+
+[[tab.panel]]
+label = "Loads"
+tools = [
+  { action = "boundary_condition.at_column_bases", size = "large" },
+  { action = "load_combination.generate", size = "large" },
+]
+
+[[tab.panel]]
+label = "Structural Analysis"
+tools = [
+  { action = "structural_analysis.run", size = "large" },
+  { action = "structural_analysis.results", size = "large" },
 ]
 
 [[tab]]

@@ -10,6 +10,7 @@
 //! draws chains of walls on a level with `wall.create`, and they show at once. Every action goes
 //! through `App::execute`, like Lua and MCP. The ribbon and browsers come next.
 
+mod analytical;
 mod areas;
 mod assembly;
 mod beams;
@@ -27,6 +28,7 @@ mod dims;
 mod dormers;
 mod drawing_aids;
 mod footprint;
+mod foundations;
 mod grids;
 mod groups;
 mod help;
@@ -66,6 +68,7 @@ mod slab_openings;
 mod snap;
 mod stack;
 mod stairs;
+mod structural_settings;
 mod wall_profile;
 mod wall_sweeps;
 mod walls;
@@ -262,6 +265,15 @@ struct Gui {
     dome_tool: Option<curved::DomeTool>,
     column_tool: Option<columns::ColumnTool>,
     beam_tool: Option<beams::BeamTool>,
+    /// Structure › Analytical › Show Analytical: the analytical model drawn over 3D views.
+    show_analytical: bool,
+    /// A structural analysis being followed (Analyze › Run Analysis).
+    analysis_job: Option<analytical::AnalysisJob>,
+    /// Structure › Wall: the Wall tool makes structural (bearing) walls.
+    structural_walls: bool,
+    footing_tool: Option<foundations::FootingTool>,
+    beam_system_tool: Option<beams::BeamSystemTool>,
+    truss_tool: Option<beams::TrussTool>,
     curtain_tool: Option<curtain::CurtainTool>,
     ramp_tool: Option<ramps::RampTool>,
     measure_tool: Option<ramps::MeasureTool>,
@@ -1156,6 +1168,7 @@ impl Gui {
     }
 
     fn start_shaped_wall_tool(&mut self, frame: &Frame, shape: WallShape) {
+        self.structural_walls = false;
         self.leave_walk();
         self.end_dim_tool();
         self.end_grid_tool();
@@ -1281,6 +1294,9 @@ impl Gui {
         self.end_dome_tool();
         self.end_column_tool();
         self.end_beam_tool();
+        self.end_footing_tool();
+        self.end_beam_system_tool();
+        self.end_truss_tool();
         self.end_curtain_tool();
         self.end_ramp_tool();
         self.end_measure_tool();
@@ -1329,6 +1345,9 @@ impl Gui {
             || self.end_dome_tool()
             || self.end_column_tool()
             || self.end_beam_tool()
+            || self.end_footing_tool()
+            || self.end_beam_system_tool()
+            || self.end_truss_tool()
         {
             return frame.set_status_text("Ready", 0);
         }
@@ -1472,6 +1491,9 @@ impl Gui {
         });
         if let Some(ty) = self.tool_wall_type() {
             args["type_id"] = json!(ty);
+        }
+        if self.structural_walls {
+            args["structural"] = json!(true);
         }
         match self.run("wall.create", args) {
             Ok(_) => {
@@ -2215,6 +2237,29 @@ impl Gui {
                 "view_cut",
                 "Height of the cut plane above the associated level",
             );
+            // DOC-GFX-010.
+            let detail = self
+                .store_now()
+                .and_then(|st| st.get(element).map(reviera_core::views::detail_level))
+                .unwrap_or_default();
+            grid.append(Property::enumeration(
+                "Detail Level",
+                "view_detail",
+                vec![
+                    ("Coarse".to_owned(), 0),
+                    ("Medium".to_owned(), 1),
+                    ("Fine".to_owned(), 2),
+                ],
+                match detail {
+                    reviera_core::views::DetailLevel::Coarse => 0,
+                    reviera_core::views::DetailLevel::Medium => 1,
+                    reviera_core::views::DetailLevel::Fine => 2,
+                },
+            ));
+            grid.set_help_string(
+                "view_detail",
+                "Coarse draws structural framing as single lines",
+            );
             let rows = [
                 ("Associated Level", plan.level_name.clone()),
                 ("Top", fmt(self, plan.range.top)),
@@ -2281,6 +2326,20 @@ impl Gui {
         if property == "view_cut" {
             if let Some(t) = text {
                 self.set_cut_plane(&t, frame);
+            }
+            return;
+        }
+        if property == "view_detail" {
+            let view = self.active_view().and_then(|v| v.element);
+            if let (Some(view), Some(t)) = (view, text) {
+                let level = t.to_lowercase();
+                if let Err(e) = self.run(
+                    "view.set_detail_level",
+                    json!({ "view_id": view, "level": level }),
+                ) {
+                    error(frame, &format!("The change was not made:\n{e}"));
+                }
+                self.refresh_scene(frame);
             }
             return;
         }
@@ -2650,6 +2709,9 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                     None if g.dome_tool.is_some() => g.dome_click(x, y),
                     None if g.column_tool.is_some() => g.column_click(x, y),
                     None if g.beam_tool.is_some() => g.beam_click(x, y),
+                    None if g.footing_tool.is_some() => g.footing_click(x, y),
+                    None if g.beam_system_tool.is_some() => g.beam_system_click(x, y),
+                    None if g.truss_tool.is_some() => g.truss_click(x, y),
                     None if g.curtain_tool.is_some() => g.curtain_click(x, y),
                     None if g.ramp_tool.is_some() => g.ramp_click(x, y),
                     None if g.measure_tool.is_some() => g.measure_click(x, y),
@@ -3233,6 +3295,12 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 dome_tool: None,
                 column_tool: None,
                 beam_tool: None,
+                show_analytical: false,
+                analysis_job: None,
+                structural_walls: false,
+                footing_tool: None,
+                beam_system_tool: None,
+                truss_tool: None,
                 curtain_tool: None,
                 ramp_tool: None,
                 measure_tool: None,
@@ -3763,7 +3831,64 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "column.load_section" => with(gui, Gui::load_column_section),
         "column.attach" => with(gui, Gui::attach_column_tops),
         "beam.create" => with(gui, |g| {
-            g.start_beam_tool();
+            g.start_beam_tool(false);
+            focus(g);
+        }),
+        "brace.create" => with(gui, |g| {
+            g.start_beam_tool(true);
+            focus(g);
+        }),
+        "brace.load_section" => with(gui, Gui::load_brace_section),
+        "footing.place" => with(gui, |g| {
+            g.start_footing_tool("footing.place");
+            focus(g);
+        }),
+        "pile.place" => with(gui, |g| {
+            g.start_footing_tool("pile.place");
+            focus(g);
+        }),
+        "pile_cap.place" => with(gui, |g| {
+            g.start_footing_tool("pile_cap.place");
+            focus(g);
+        }),
+        "structural_connection.create" => with(gui, Gui::connect_members),
+        "ui.toggle_analytical" => with(gui, Gui::toggle_analytical),
+        "structural_analysis.run" => Gui::start_structural_analysis(gui),
+        "structural_analysis.results" => with(gui, Gui::structural_results),
+        "analytical_automation.physical_to_analytical" => with(gui, |g| {
+            g.analytical_automation("analytical_automation.physical_to_analytical")
+        }),
+        "analytical_automation.analytical_to_physical" => with(gui, |g| {
+            g.analytical_automation("analytical_automation.analytical_to_physical")
+        }),
+        "analytical_automation.disconnect" => with(gui, |g| {
+            g.analytical_automation("analytical_automation.disconnect")
+        }),
+        "analytical_node.merge" => with(gui, |g| g.analytical_automation("analytical_node.merge")),
+        "boundary_condition.at_column_bases" => with(gui, |g| {
+            g.analytical_automation("boundary_condition.at_column_bases")
+        }),
+        "load_combination.generate" => with(gui, |g| {
+            g.analytical_automation("load_combination.generate")
+        }),
+        "footing.place_at_columns" => with(gui, Gui::footings_at_columns),
+        "beam_system.create_auto" => with(gui, |g| {
+            g.start_beam_system_tool();
+            focus(g);
+        }),
+        "beam_system.remove" => with(gui, Gui::remove_beam_systems),
+        "truss.create" => with(gui, |g| {
+            g.start_truss_tool();
+            focus(g);
+        }),
+        "truss.remove" => with(gui, Gui::remove_trusses),
+        "wall_foundation.create" => with(gui, Gui::wall_foundations),
+        "foundation_slab.create" => with(gui, |g| {
+            g.start_foundation_slab_sketch();
+            focus(g);
+        }),
+        "column.place_slanted" => with(gui, |g| {
+            g.start_slanted_column_tool();
             focus(g);
         }),
         "beam.create_on_grids" => with(gui, Gui::beams_on_grids),
@@ -3925,6 +4050,7 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "view.set_virtual_volumes" => with(gui, Gui::cycle_virtual_volumes),
         "clearance.set_rule_set" => with(gui, Gui::choose_rule_set),
         "ui.model_properties" => with(gui, Gui::model_properties),
+        "structural_settings.show" => with(gui, Gui::structural_settings),
         "file.close" => with(gui, Gui::close_model),
         "help.home" => with(gui, Gui::show_help),
         "help.about" => with(gui, |g| g.about()),
@@ -4045,6 +4171,18 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         }),
         "wall.create" => with(gui, |g| {
             g.start_wall_tool(f);
+            focus(g);
+        }),
+        "wall.create_structural" => with(gui, |g| {
+            g.start_wall_tool(f);
+            if g.tool.is_some() {
+                g.structural_walls = true;
+                f.set_status_text("Structural Wall: click the start (bearing walls; change the usage in Properties)", 0);
+            }
+            focus(g);
+        }),
+        "floor.create_structural" => with(gui, |g| {
+            g.start_structural_floor_sketch();
             focus(g);
         }),
         "wall.create_arc" => with(gui, |g| {

@@ -129,6 +129,10 @@ pub struct SketchSession {
     pub overhang: f64,
     /// A roof finished as an arched roof (ARC-ROOF-008).
     pub arched: bool,
+    /// A floor finished as a foundation slab (STR-FND-003).
+    pub foundation: bool,
+    /// A floor finished as a structural floor (STR-FLOOR-001).
+    pub structural: bool,
     /// An opening finished as an opening by face (ARC-OPEN-001): its sides square to the
     /// host's face.
     pub by_face: bool,
@@ -257,6 +261,8 @@ impl Gui {
             kind,
             overhang: ROOF_OVERHANG,
             arched: false,
+            foundation: false,
+            structural: false,
             by_face: false,
             host,
             level,
@@ -744,8 +750,13 @@ impl Gui {
                     ("roof.create_footprint", a)
                 }
             }
+            (None, SketchKind::Slab(SlabKind::Floor)) if s.foundation => (
+                "foundation_slab.create",
+                json!({ "boundary": [curves], "level": s.level }),
+            ),
             (None, SketchKind::Slab(SlabKind::Floor)) => {
-                let mut a = json!({ "loops": [curves], "level_id": s.level });
+                let mut a =
+                    json!({ "loops": [curves], "level_id": s.level, "structural": s.structural });
                 if let Some(t) = self.floor_type {
                     a["type_id"] = json!(t);
                 }
@@ -1459,6 +1470,22 @@ impl Gui {
                 "Follow Roof shapes the ceiling to the underside of the roof over it",
             );
         }
+        // STR-FLOOR-001: structural, and its span direction (degrees from x).
+        if reviera_core::floors::slab_recipe(e).map(|(k, _)| k)
+            == Some(reviera_core::floors::SlabKind::Floor)
+        {
+            let span = reviera_core::structural::span(e);
+            grid.append(Property::enumeration(
+                "Structural",
+                "fl_structural",
+                vec![("No".to_owned(), 0), ("Yes".to_owned(), 1)],
+                i32::from(span.is_some()),
+            ));
+            if let Some(s) = span {
+                let a = format!("{:.1}°", s[1].atan2(s[0]).to_degrees());
+                grid.append(Property::string("Span Direction", "fl_span", a));
+            }
+        }
         grid.append(Property::category("Dimensions", "c_floor_dims"));
         let area = self
             .run(
@@ -1543,6 +1570,25 @@ impl Gui {
                 .collect()
         };
         let result = match property {
+            "fl_structural" => self.run(
+                "floor.set_structural",
+                json!({ "floor_ids": floors, "structural": text == "Yes" }),
+            ),
+            "fl_span" => {
+                let deg: f64 = text
+                    .trim()
+                    .trim_end_matches('°')
+                    .trim()
+                    .parse()
+                    .unwrap_or(0.0);
+                let (s, c) = deg.to_radians().sin_cos();
+                floors.first().map_or(Ok(serde_json::Value::Null), |f| {
+                    self.run(
+                        "floor.set_span_direction",
+                        json!({ "floor_id": f, "vector": [c, s] }),
+                    )
+                })
+            }
             "fl_offset" => self.run(
                 "floor.set_level",
                 json!({ "floor_ids": floors, "offset": text }),

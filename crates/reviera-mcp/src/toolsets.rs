@@ -44,47 +44,125 @@ pub fn toolset_of(command: &str) -> String {
     if !RESERVED_DOMAINS.contains(&domain) && parts.len() >= 3 {
         return format!("addin:{}", parts[..parts.len() - 1].join("."));
     }
-    let set = match domain {
-        "element" | "edit" | "model" | "registry" | "param" | "global" | "pset" | "qto"
-        | "warnings" | "failure" | "regen" | "snaps" | "selection" | "graph" => "core",
-        "wall" | "floor" | "roof" | "door" | "window" | "stair" | "modify" | "str"
-        | "structural" | "beam" | "framing" | "mep" | "level" | "grid" | "room" | "ceiling"
-        | "insert" | "sketch" | "dormer" | "railing" | "deck" | "site" | "cme" | "host"
-        | "numbering" | "decal" | "spatial" | "building" | "assembly" | "part" | "geometry"
-        | "opening" | "column" | "compound" | "curtain" | "ramp" | "measure" | "skylight"
-        | "mesh_object" | "array" | "refplane" | "workplane" | "modelline" | "datum"
-        | "scopebox" | "constraint" | "slabedge" | "hostsweep" | "shape" | "stackedwall"
-        | "wallsweep" | "wallreveal" | "area" | "areascheme" | "areaplan" | "areaboundary"
-        | "group" | "selectionset" | "modeltext" | "inplace" | "roomseparator" | "mass"
-        | "curtainsystem" | "toposolid" | "propertyline" | "sitecomponent" | "parts" => "modeling",
-        "view" | "sheet" | "schedule" | "annotate" | "render" | "walkthrough" | "xr" | "ui"
-        | "tag" | "text" | "anno" | "dim" | "viewport" | "section" | "inspect" | "colorscheme" => {
-            "documentation"
-        }
-        "family" | "family_doc" | "type" | "instance" | "library" | "component" | "formula"
-        | "subcategory" => "families",
-        "material" | "object_style" | "line_pattern" | "line_style" | "line_weight"
-        | "fill_pattern" | "image" | "objectstyle" | "lineweight" => "materials",
-        "project" | "location" | "coordinates" | "position" | "phase" | "standards" | "units"
-        | "code" | "purge" | "classification" | "keynotes" | "paramlib" | "external_props" => {
-            "project_setup"
-        }
-        "file" | "import" | "export" | "live" | "recovery" | "validate" | "rxd" | "journal"
-        | "history" | "snapshot" | "cobie" => "io",
-        "bimserver" | "link" | "workset" | "bcf" | "cde" | "api" | "http" | "overlap" | "clash"
-        | "clearance" => "collaboration",
-        "analysis"
-        | "analysis_provider"
-        | "analysis_job"
-        | "analysis_result"
-        | "analysis_style"
-        | "compute"
-        | "compute_host"
-        | "structural_analysis" => "analysis",
-        "script" | "plugin" | "addin" | "lua" => "scripting",
-        "app" | "mcp" | "settings" | "txn" => "admin",
-        _ => "other",
-    };
+    let set =
+        match domain {
+            "element" | "edit" | "model" | "registry" | "param" | "global" | "pset" | "qto"
+            | "warnings" | "failure" | "regen" | "snaps" | "selection" | "graph" => "core",
+            "wall"
+            | "floor"
+            | "roof"
+            | "door"
+            | "window"
+            | "stair"
+            | "modify"
+            | "str"
+            | "structural"
+            | "structural_settings"
+            | "beam"
+            | "structural_connection"
+            | "beam_system"
+            | "truss"
+            | "brace"
+            | "framing"
+            | "footing"
+            | "wall_foundation"
+            | "foundation_slab"
+            | "foundation"
+            | "pile"
+            | "pile_cap"
+            | "mep"
+            | "level"
+            | "grid"
+            | "room"
+            | "ceiling"
+            | "insert"
+            | "sketch"
+            | "dormer"
+            | "railing"
+            | "deck"
+            | "site"
+            | "cme"
+            | "host"
+            | "numbering"
+            | "decal"
+            | "spatial"
+            | "building"
+            | "assembly"
+            | "part"
+            | "geometry"
+            | "opening"
+            | "column"
+            | "compound"
+            | "curtain"
+            | "ramp"
+            | "measure"
+            | "skylight"
+            | "mesh_object"
+            | "array"
+            | "refplane"
+            | "workplane"
+            | "modelline"
+            | "datum"
+            | "scopebox"
+            | "constraint"
+            | "slabedge"
+            | "hostsweep"
+            | "shape"
+            | "stackedwall"
+            | "wallsweep"
+            | "wallreveal"
+            | "area"
+            | "areascheme"
+            | "areaplan"
+            | "areaboundary"
+            | "group"
+            | "selectionset"
+            | "modeltext"
+            | "inplace"
+            | "roomseparator"
+            | "mass"
+            | "curtainsystem"
+            | "toposolid"
+            | "propertyline"
+            | "sitecomponent"
+            | "parts" => "modeling",
+            "view" | "sheet" | "schedule" | "annotate" | "render" | "walkthrough" | "xr" | "ui"
+            | "tag" | "text" | "anno" | "dim" | "viewport" | "section" | "inspect"
+            | "colorscheme" => "documentation",
+            "family" | "family_doc" | "type" | "instance" | "library" | "component" | "formula"
+            | "subcategory" => "families",
+            "material" | "object_style" | "line_pattern" | "line_style" | "line_weight"
+            | "fill_pattern" | "image" | "objectstyle" | "lineweight" => "materials",
+            "project" | "location" | "coordinates" | "position" | "phase" | "standards"
+            | "units" | "code" | "purge" | "classification" | "keynotes" | "paramlib"
+            | "external_props" => "project_setup",
+            "file" | "import" | "export" | "live" | "recovery" | "validate" | "rxd" | "journal"
+            | "history" | "snapshot" | "cobie" => "io",
+            "bimserver" | "link" | "workset" | "bcf" | "cde" | "api" | "http" | "overlap"
+            | "clash" | "clearance" => "collaboration",
+            "analysis"
+            | "analysis_provider"
+            | "analysis_job"
+            | "analysis_result"
+            | "analysis_style"
+            | "compute"
+            | "compute_host"
+            | "structural_analysis"
+            | "analytical_member"
+            | "analytical_node"
+            | "analytical_association"
+            | "analytical_automation"
+            | "analytical_model"
+            | "structural_code"
+            | "load_nature"
+            | "load_case"
+            | "load_combination"
+            | "load"
+            | "boundary_condition" => "analysis",
+            "script" | "plugin" | "addin" | "lua" => "scripting",
+            "app" | "mcp" | "settings" | "txn" => "admin",
+            _ => "other",
+        };
     set.to_owned()
 }
 

@@ -24,6 +24,10 @@ pub const EXCLUSIONS: &str = "reviera.analysis.v1.ClashExclusions";
 pub const CLASH_RESULT: &str = "reviera.analysis.v1.ClashResult";
 pub const PROTOBUF: &str = "application/x-protobuf";
 pub const LICENCE: &str = "GPL-3.0-or-later";
+pub const STRUCTURAL: &str = "analysis.structural";
+pub const STRUCTURAL_MODEL: &str = "reviera.structural.v1.Model";
+pub const STRUCTURAL_RESULTS: &str = "reviera.structural.v1.Results";
+pub const JSON: &str = "application/json";
 
 fn version() -> String {
     env!("CARGO_PKG_VERSION").into()
@@ -203,6 +207,62 @@ impl Kind for ClashKind {
             bytes: result.encode_to_vec(),
             media_type: PROTOBUF.into(),
             schema: CLASH_RESULT.into(),
+        })
+    }
+}
+
+/// `analysis.structural`: a linear static analysis of the neutral structural model (ANA-FEA-001)
+/// by the built-in 3D frame solver ([`reviera_core::frame`]).
+#[derive(Debug, Default)]
+pub struct StructuralKind;
+
+impl Kind for StructuralKind {
+    fn info(&self) -> KindInfo {
+        KindInfo {
+            kind: STRUCTURAL.into(),
+            version: 1,
+            runner: "reviera-analysis-builtin".into(),
+            runner_version: version(),
+            licence: LICENCE.into(),
+            capabilities: vec!["batch".into(), "linear-static".into()],
+            accepted_formats: vec![format!("{JSON};schema={STRUCTURAL_MODEL}")],
+            supports_checkpoints: false,
+            supports_sessions: false,
+        }
+    }
+
+    fn run(
+        &self,
+        ctx: &JobContext,
+        _options: Option<&prost_types::Any>,
+        inputs: &[Blob],
+    ) -> Result<Output, JobFailure> {
+        ctx.progress(0.0, "reading");
+        let blob = inputs
+            .iter()
+            .find(|b| b.reference.schema == STRUCTURAL_MODEL)
+            .ok_or_else(|| JobFailure::new("invalid_input", "no structural model in the inputs"))?;
+        let model: reviera_core::frame::Model = serde_json::from_slice(&blob.raw)
+            .map_err(|e| JobFailure::new("invalid_input", e.to_string()))?;
+        ctx.progress(0.1, "solving");
+        let results =
+            reviera_core::frame::solve(&model).map_err(|e| JobFailure::new("invalid_input", e))?;
+        ctx.log(format!(
+            "{} nodes, {} members, {} free degrees of freedom, {} results",
+            model.nodes.len(),
+            model.members.len(),
+            results.dof,
+            results.results.len()
+        ));
+        for w in &results.warnings {
+            ctx.log(format!("warning: {w}"));
+        }
+        ctx.progress(1.0, "done");
+        Ok(Output {
+            bytes: serde_json::to_vec(&results)
+                .map_err(|e| JobFailure::new("runner_failed", e.to_string()))?,
+            media_type: JSON.into(),
+            schema: STRUCTURAL_RESULTS.into(),
         })
     }
 }

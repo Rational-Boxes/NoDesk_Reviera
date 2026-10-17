@@ -100,6 +100,9 @@ fn raw_parent(store: &Store, e: &Element, imported: &Imported) -> Option<Element
     if let Some(r) = crate::beams::beam_recipe(e) {
         return by_guid(&r.level);
     }
+    if let Some(l) = crate::foundations::level_of(store, e) {
+        return by_guid(&l);
+    }
     if let Some(r) = crate::curtain::curtain_recipe(e) {
         return by_guid(&r.extent.base_level);
     }

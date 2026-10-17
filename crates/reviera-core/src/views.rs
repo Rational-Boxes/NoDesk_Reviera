@@ -145,6 +145,49 @@ pub struct ViewData {
         skip_serializing_if = "Option::is_none"
     )]
     pub area_scheme: Option<String>,
+    /// Coarse, Medium or Fine (DOC-GFX-010); none: Medium.
+    #[serde(
+        default,
+        rename = "detailLevel",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub detail_level: Option<DetailLevel>,
+}
+
+/// How much geometric detail a view shows (DOC-GFX-010).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum DetailLevel {
+    /// Structural framing as single lines (STR-SET-001).
+    Coarse,
+    #[default]
+    Medium,
+    Fine,
+}
+
+/// A view's detail level (Medium when it has none).
+pub fn detail_level(e: &Element) -> DetailLevel {
+    view_data(e)
+        .and_then(|d| d.detail_level)
+        .unwrap_or_default()
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SetDetailLevelParams {
+    pub view_id: ElementRef,
+    pub level: DetailLevel,
+}
+
+/// Sets a view's detail level (`view.set_detail_level`, DOC-GFX-010).
+pub(crate) fn set_detail_level(
+    txn: &mut crate::txn::Transaction<'_>,
+    p: SetDetailLevelParams,
+) -> Result<()> {
+    let store = txn.store().clone();
+    let (id, mut data) = resolve_view(&store, &p.view_id)?;
+    data.detail_level = Some(p.level);
+    write(txn, id, &data)
 }
 
 /// A section box (DOC-VIEW-008): `min`..`max` in the box's own coordinates, placed by
@@ -350,6 +393,7 @@ pub(crate) fn create_3d(
         section: None,
         color_scheme: None,
         area_scheme: None,
+        detail_level: None,
     };
     txn.create(
         NewElement::new(format!("{CLASS_PREFIX}{}", guid.as_str()))

@@ -864,6 +864,10 @@ Excluded from the register: two help-site directory roots and one URL template p
 | S0820 | STR | EUR-Lex: Directive 96/9/EC (databases): Sui generis database right | https://eur-lex.europa.eu/eli/dir/1996/9/oj/eng | 200 | PASS: public (no login);  |
 | S0821 | STR | Steel for Life Blue Book home: Site terms check | https://www.steelforlifebluebook.co.uk/ | 200 | PASS: public (no login); (c) SCI, no terms page |
 | S0822 | STR | ArcelorMittal Sections: terms of use: Site terms | https://sections.arcelormittal.com/Terms_of_use_and_credits/EN | 200 | PASS: public (no login); Personal use; no distribution without consent |
+| S0823 | STR | ideCAD Help: Load Combination and Strength Design per ASCE 7-16 §2.3 (basic and seismic strength combinations) | https://help.idecad.com/ideCAD/load-combination-and-strength-design | 200 | PASS: public (no login); equations only |
+| S0824 | STR | ČSN EN 1990 (Czech edition) Annex A1, Table A1.1 recommended ψ factors for buildings (course extract, VUT Brno) | https://www.fce.vutbr.cz/KDK/bukovska.p/zatizeni002.pdf | 200 | PASS: public (no login); factor table only |
+| S0825 | STR | Web search summary: ASCE 7-22 §2.3.1 basic combinations with rain R (Eq. 2.3-1 to 2.3-4), citing STRUCTURE magazine and ANSI blog pages | https://www.structuremag.org/article/asce-7-22-flat-roof-snow-load-versus-minimum-snow-load/ | 200 | PASS: search-result summary only |
+| S0826 | STR | Web search summary: EN 1990 Table A1.2(B) recommended partial factors for STR (γG,sup 1.35, γG,inf 1.00, γQ 1.50), citing Febelcem and target-reliability papers | https://www.febelcem.be/fileadmin/user_upload/autres-publications/en/eurojm.pdf | 200 | PASS: search-result summary only |
 
 ## B. Screenshots (142) — internal reference only
 

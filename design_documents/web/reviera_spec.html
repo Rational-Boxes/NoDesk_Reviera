@@ -173,7 +173,7 @@ td code { white-space: nowrap; }
         <div class="tb-cell"><span class="tb-label">Revision</span><span class="tb-value">0.1 · Draft</span></div>
         <div class="tb-cell"><span class="tb-label">Date</span><span class="tb-value tb-num">2026-10-12</span></div>
         <div class="tb-cell"><span class="tb-label">Requirements</span><span class="tb-value tb-num">808</span></div>
-        <div class="tb-cell"><span class="tb-label">Commands</span><span class="tb-value tb-num">2,070</span></div>
+        <div class="tb-cell"><span class="tb-label">Commands</span><span class="tb-value tb-num">2,088</span></div>
         <div class="tb-cell"><span class="tb-label">Licence</span><span class="tb-value">GPL-3.0-or-later</span></div>
         <div class="tb-cell last-row"><span class="tb-label">Stack</span><span class="tb-value">IFC · Rust · OCCT · wx · LuaJIT · MCP</span></div>
         <div class="tb-cell last-row" style="grid-column: span 3"><span class="tb-label">By priority</span>
@@ -185,7 +185,7 @@ td code { white-space: nowrap; }
 <p><strong>Document:</strong> Functional and technical specification of Reviera, an open-source BIM authoring application
 <strong>Functional reference:</strong> Autodesk® Revit® 2026/2027 (described from public sources only; see <code>RESEARCH_LOG.md</code>)
 <strong>Licence of Reviera:</strong> GPL-3.0-or-later
-<strong>Version:</strong> 0.1 (draft) · 2026-10-16 · <strong>Size:</strong> 808 numbered requirements (320 P0 · 293 P1 · 188 P2 · 7 P3), 2,070 commands</p>
+<strong>Version:</strong> 0.1 (draft) · 2026-10-16 · <strong>Size:</strong> 808 numbered requirements (320 P0 · 293 P1 · 188 P2 · 7 P3), 2,088 commands</p>
 <blockquote>
 <p><strong>Clean-room statement.</strong> This specification describes features, workflows and behaviour in Reviera's own words. Every input was publicly available: vendor online help, public blogs and tutorials, public forums and open-source repositories. All of it is listed with URLs and access checks in <code>SOURCE_REGISTER.md</code>. No proprietary, confidential, leaked or NDA-covered information was used. No vendor code, binaries, file formats or assets were examined or copied. Autodesk and Revit are trademarks of Autodesk, Inc. They are used here only to identify the functional reference. Reviera is not affiliated with or endorsed by Autodesk.</p>
 <p><strong>Independence statement.</strong> BIM Reviera is an independent, original application. It is in no way a copy or clone of any existing product, and it does not set out to read or write any existing product's closed, proprietary formats (such as RVT and RFA); IFC is its native format. An existing application was researched, from public sources only, to establish the workflows and user-interface conventions that the industry's users already know, so they can work in Reviera without relearning their trade. Beyond that research, Reviera implements its own features and enhancements: its architecture, native IFC storage, scripting and AI integration, remote computation and analysis, and many of its modelling tools are its own design. Interchange formats used across the industry, such as DWG and DXF, are supported only through open-source libraries, for interoperability.</p>
@@ -254,7 +254,7 @@ td code { white-space: nowrap; }
 </tr>
 <tr>
 <td>A</td>
-<td>Appendix A: requirement summary, shared commands, consolidated command index (2,070 commands; 808 requirements)</td>
+<td>Appendix A: requirement summary, shared commands, consolidated command index (2,088 commands; 808 requirements)</td>
 </tr>
 </tbody>
 </table></div>
@@ -31965,6 +31965,7 @@ CREATE TABLE base_rxd (
 <p><strong>Acceptance criteria.</strong>
 - [ ] Changing an angle-driven column from 60° to 75° moves the top point and keeps the base fixed.
 - [ ] Dragging the base above the top produces a warning, and the column remains valid.</p>
+<p><em>Built (2026-10-16):</em> <code>column.place_slanted</code> (two plan points, each with its level and offset; the lower end becomes the base, the ends swapped with a warning when the first is higher) and <code>column.set_slant</code> (vertical, end point driven or angle driven; the base stays put; an angle-driven column keeps its angle when its levels move, so its top moves). The body is the plan section swept up the axis with horizontal ends. Beams and braces find a slanted column's section at their height. Structure › Slanted Column (two clicks: base on the plan's level, top on the next level); Properties' Column Style and Angle From Horizontal rows. Not yet: 3D snapping, perpendicular and vertical end cuts, attaching a slanted column's top, <code>Axis</code> representation, the schedule and Copy/Monitor exclusions, dragging ends.</p>
 <h3 id="413-beams-structural-framing">4.1.3 Beams (structural framing)</h3>
 <p><strong>ID:</strong> <code class="rid" id="STR-BEAM-001">STR-BEAM-001</code> · <strong>Priority:</strong> <span class="pri pri-p1">P1</span> · <strong>Ref:</strong> research/03 §2.2</p>
 <p><strong>Purpose.</strong> Horizontal, sloped or curved framing members. A <strong>structural usage</strong> value controls coarse line style, scheduling and analytical role.</p>
@@ -32127,6 +32128,7 @@ CREATE TABLE base_rxd (
 - [ ] Under Clear Spacing, changing one beam to a wider section moves its neighbours so that clear spacing stays the same.
 - [ ] Moving a support beam 300 mm moves the locked boundary edge and re-lays out the children in one regeneration.
 - [ ] <em>Remove Beam System</em> leaves all child beams in place and editable.</p>
+<p><em>Built (2026-10-16):</em> <code>beam_system.create_auto</code> (the smallest loop of beams at the level and walls through it around a point, via the plan arrangement; edges locked to those supports; beams parallel to the support nearest the point), <code>beam_system.create_sketch</code> (a corner polygon, a direction edge; edges on beams or walls locked to them), <code>beam_system.set_layout</code> (rule, value, justification, type; lays the beams out afresh), <code>beam_system.remove</code> (keeps the beams where they are, independent) and <code>beam_system.info</code>. Rules: fixed distance, fixed number, maximum spacing (the fewest beams with spacing at or below the value) and clear spacing (value plus the type's width); justification beginning, end or centre. The system is an <code>IfcElementAssembly</code> (<code>BEAM_GRID</code>) contained in its level; its beams are ordinary beams (usually joists, joined and cut back at the girders) carrying their place in the layout, aggregated by it through an <code>IfcRelAggregates</code> (<code>rxd:beam_system</code>). A beam's place is recomputed from the system, so when a locking support moves the bay and spacing follow in the same regeneration; the number of beams changes on the next <code>set_layout</code>. Deleting the system deletes its beams. Structure › Beam System (<code>BS</code>): click in a bay (maximum spacing 1200 mm, or 4'-0" in US models); a system beam's Properties show and edit Layout Rule, Spacing or Number of Lines, and Justification; Remove Beam System. Not yet: per-beam sizes under clear spacing, Direction Line justification, 3D (non-planar) systems, walls defining slope, curved boundaries, the warning for bays crossed by other beams, copying and mirroring systems, a plan symbol for the system.</p>
 <h3 id="417-braces">4.1.7 Braces</h3>
 <p><strong>ID:</strong> <code class="rid" id="STR-BRACE-001">STR-BRACE-001</code> · <strong>Priority:</strong> <span class="pri pri-p1">P1</span> · <strong>Ref:</strong> research/03 §2.4</p>
 <p><strong>Purpose.</strong> Diagonal framing that joins to columns and beams.</p>
@@ -32153,6 +32155,7 @@ CREATE TABLE base_rxd (
 - [ ] A brace attached at ratio 0.5 along a 6 m beam stays at mid-span when the beam is stretched to 8 m.
 - [ ] A brace drawn in plan with both ends at Level 2 + 0 shows usage <em>Horizontal Bracing</em>; moving one end to Level 3 changes it to <em>Other</em>.
 - [ ] Deleting the column at one end leaves the brace in place with a free end and one warning that names it.</p>
+<p><em>Built (2026-10-16):</em> <code>brace.create</code> (each end at its own level and offset) and <code>brace.load_section</code>. Braces are beams with <code>brace</code> set in their recipe, written as <code>IfcMember</code> (<code>BRACE</code>) typed by an <code>IfcMemberType</code> (<code>BRACE</code>; the default is the region's usual brace section: HSS6X6X3/8, HEA 160 or UC 152x152x23). An end lying on a column's axis or a beam's location line (within 50 mm) is attached to it by its ratio along it and follows it when the member moves, stretches or changes level; moving the brace itself frees its ends. Deleting the member frees the end where it is, with one warning naming the brace (<code>str.brace.end_released</code>). Usage is horizontal bracing when both ends are level within 1 mm, otherwise other, and cannot be set. Braces join, cut back and extend like beams (<code>framing.*</code>); <code>beam.set</code> gains <code>curve</code> (stretching a beam) and <code>end_level</code>. Structure › Brace (<code>BR</code>): foot on the plan's level, head on the level above. Properties show the end level, the attachments and the usage (read-only). Not yet: elevation placement with 3D snapping, chain, attachments by distance in the UI, <code>IfcRelConnectsPathElements</code>, coarse brace symbols, journalled picks.</p>
 <h3 id="418-trusses">4.1.8 Trusses</h3>
 <p><strong>ID:</strong> <code class="rid" id="STR-TRUSS-001">STR-TRUSS-001</code> · <strong>Priority:</strong> <span class="pri pri-p1">P1</span> · <strong>Ref:</strong> research/03 §2.5</p>
 <p><strong>Purpose.</strong> A truss family defines a <strong>layout</strong> of top chord, bottom chord, vertical web and diagonal web lines. Every type in the family shares that layout but assigns its own framing type to each member group.</p>
@@ -32177,6 +32180,7 @@ CREATE TABLE base_rxd (
 - [ ] A Pratt truss drawn over 12 m and then stretched to 15 m keeps its panel count and re-proportions its webs.
 - [ ] Attaching the top chord to a sloped roof regenerates the chords and webs to the roof underside.
 - [ ] The export contains one <code>IfcElementAssembly</code> (<code>TRUSS</code>) that aggregates all chords and webs.</p>
+<p><em>Built (2026-10-16):</em> <code>truss.create</code> (a line at a level; layout Pratt, Howe or Warren; panels, by default about one per 1.5 m, even, at least 4; height, by default a tenth of the span, at least 600 mm; bearing chord bottom or top on the line; chord and web types, by default the region's usual brace section), <code>truss.set</code> (a new line stretches it, keeping its panels and re-proportioning its webs; height, bearing and offset move the members; layout or panels make them afresh), <code>truss.remove</code> (keeps the members where they are as plain framing; vertical webs keep facing across the truss) and <code>truss.info</code>. The truss is an <code>IfcElementAssembly</code> (<code>TRUSS</code>) contained in its level, aggregating its members (<code>IfcRelAggregates</code>, <code>rxd:beam_system</code>): one top chord and one bottom chord (<code>IfcMember</code> <code>CHORD</code>), verticals and diagonals (<code>STRUT</code>). Each member's ends are recomputed from the truss. Structure › Truss (<code>TS</code>): two clicks; a member's Properties show and edit Layout, Panels, Truss Height and Bearing Chord; Remove Truss. Not yet: truss types (a layout shared by a family of types), chords split at panel points, Edit Profile, attaching chords to roofs and floors, releases, symbolic web cutback, selecting members with Tab, tagging all members.</p>
 <h3 id="419-structural-walls">4.1.9 Structural walls</h3>
 <p><strong>ID:</strong> <code class="rid" id="STR-WALL-001">STR-WALL-001</code> · <strong>Priority:</strong> <span class="pri pri-p1">P1</span> · <strong>Ref:</strong> research/03 §2.6</p>
 <p><strong>Purpose.</strong> Load-bearing and shear walls, built on the architectural wall engine (chapter 3, <code>ARC-WALL-*</code>).</p>
@@ -32191,6 +32195,7 @@ CREATE TABLE base_rxd (
 <p><strong>Acceptance criteria.</strong>
 - [ ] A concrete Bearing wall offers the Rebar tool on its contextual tab. After the change to Non-bearing it no longer does.
 - [ ] Bearing walls export with <code>LoadBearing = TRUE</code>.</p>
+<p><em>Built (2026-10-16):</em> <code>wall.create</code> takes <code>structural</code> (default usage bearing) and <code>structural_usage</code>; <code>wall.set_structural_usage</code>. A structural wall carries the RXD record <code>rxd:structural</code> with its exact usage, PredefinedType <code>SHEAR</code> (shear) or <code>SOLIDWALL</code> (bearing, structural combined) and <code>Pset_WallCommon.LoadBearing</code> true; non-bearing makes it an ordinary wall again (<code>STANDARD</code>, LoadBearing false). Beams resting on walls find them as supports, and wall foundations go beneath them. Structure › Wall (<code>SW</code>) draws bearing walls with the wall tool; Properties' Structural Usage row. Not yet: rebar hosting (no rebar yet), layer material behaviour, slanted-wall analytical warnings.</p>
 <h3 id="4110-structural-floors-and-composite-decks">4.1.10 Structural floors and composite decks</h3>
 <p><strong>ID:</strong> <code class="rid" id="STR-FLOOR-001">STR-FLOOR-001</code> · <strong>Priority:</strong> <span class="pri pri-p1">P1</span> · <strong>Ref:</strong> research/03 §2.7</p>
 <p><strong>Purpose.</strong> Structural slabs with a span direction, optionally on a profiled metal deck.</p>
@@ -32217,6 +32222,7 @@ CREATE TABLE base_rxd (
 <p><strong>Acceptance criteria.</strong>
 - [ ] A composite floor cut perpendicular to its span shows deck ribs at Fine detail and a plain layer at Coarse detail.
 - [ ] Rotating the span direction by 90° changes which sections show the rib profile.</p>
+<p><em>Built (2026-10-16):</em> <code>floor.create</code> takes <code>structural</code> and <code>span_direction_edge</code>; <code>floor.set_structural</code> and <code>floor.set_span_direction</code> (an outline edge or a plan vector). A structural floor carries <code>rxd:structural</code> with its span direction (a unit vector, by default along the first edge) and <code>Pset_SlabCommon.LoadBearing</code> true. Structure › Floor (<code>SB</code>) sketches a structural floor; Properties' Structural and Span Direction rows. Not yet: composite decks and deck profiles, the span symbol in plans, Pick Supports, the layer set's reference direction in IFC, <code>floor_type.set_deck_layer</code>.</p>
 <h3 id="4111-foundations">4.1.11 Foundations</h3>
 <p><strong>ID:</strong> <code class="rid" id="STR-FND-001">STR-FND-001</code> / 002 / 003 / 004 · <strong>Priority:</strong> <span class="pri pri-p1">P1</span> (001–003), P2 (004) · <strong>Ref:</strong> research/03 §2.8</p>
 <div class="tbl"><table>
@@ -32270,6 +32276,7 @@ CREATE TABLE base_rxd (
 - [ ] A retaining wall foundation with Toe 600 mm and Heel 1200 mm shows the correct asymmetric section.
 - [ ] A foundation slab at Level 1 is not visible in a Level 1 plan whose view depth ends at the level, and is visible in the generated foundation plan.
 - [ ] A four-pile cap exports one <code>IfcFooting</code> (<code>PILE_CAP</code>) that aggregates four <code>IfcPile</code> elements.</p>
+<p><em>Built (2026-10-16):</em> STR-FND-001: <code>footing.place</code>, <code>footing.place_at_columns</code> (joined: centred under the column, turned with it, its top at the column's base, following it; freed where it is when the column is deleted; columns that already have one are skipped) and <code>footing.place_at_grids</code>; <code>IfcFooting</code> (<code>PAD_FOOTING</code>) with an <code>IfcFootingType</code> (width, length, thickness, material; default 1800 × 1800 × 500 mm, or 6'-0" × 6'-0" × 1'-6" in US models, in the region's concrete). STR-FND-002: <code>wall_foundation.create</code> (<code>STRIP_FOOTING</code>; bearing width centred on the wall, or retaining toe beyond the exterior face and heel beyond the interior face; end extension; follows the wall and is deleted with it; default bearing 600 × 300 mm or 24" × 12"). STR-FND-003: <code>foundation_slab.create</code>, a floor with PredefinedType <code>BASESLAB</code> and a 300 mm (12") foundation slab type, its top at the level plus offset. <code>foundation.info</code> reports the top, <em>Elevation at Bottom</em>, area, volume and host; <code>type.set_param</code> edits footing and wall foundation types. Structure › Foundation: Isolated (<code>FT</code>), Wall (<code>FW</code>), Slab (a boundary sketch) and At Columns. IFC: faceted B-rep bodies contained in their level. STR-FND-004 (built the same day): <code>pile.place</code> (an <code>IfcPile</code>, <code>BORED</code> or <code>DRIVEN</code> by its <code>IfcPileType</code>: diameter, length, kind; default 450 mm bored, 12 m, or 18" and 40 ft in US models; its top at a level plus an offset, its own length optionally) and <code>pile_cap.place</code> (an <code>IfcFooting</code> <code>PILE_CAP</code> whose footing type carries a pile layout: rows, columns, spacing and pile type; default four piles at three diameters, the cap one diameter beyond them and twice a diameter deep). A cap's piles are laid out from it, follow it and go with it, and are aggregated by it in IFC (<code>IfcRelAggregates</code>, <code>rxd:pile_cap</code>). Structure › Foundation › Pile and Pile Cap. Not yet: editing pile layouts in Properties. Also not yet: Do Not Break At Inserts and openings, joins between slabs and footings, picking walls for a slab boundary, the foundation-plan offer, foundation tags.</p>
 <h3 id="4112-structural-connections-information-carriers">4.1.12 Structural connections (information carriers)</h3>
 <p><strong>ID:</strong> <code class="rid" id="STR-CONN-001">STR-CONN-001</code> · <strong>Priority:</strong> <span class="pri pri-p1">P1</span> (generic) / P2 (detailed types, code checking) · <strong>Ref:</strong> research/03 §2.9 · screenshots/structure_mep/structural_connection_symbols.png</p>
 <p><strong>Purpose.</strong> An element placed at a join of two or more framing members. It carries the information engineers, detailers and fabricators exchange about that join: connection type, connected members, geometry, design forces, materials, fabricator, code-check status, approval status and phase.</p>
@@ -32313,6 +32320,7 @@ CREATE TABLE base_rxd (
 - [ ] For a beam-to-column-flange join, the Type Selector lists shear-plate and end-plate types ahead of base plates.
 - [ ] Unloading a type used by 7 connections asks for confirmation, states the count, and then removes all 7.
 - [ ] With <em>Show Warnings</em> on, an end-plate connection whose beam is deeper than the plate range shows a warning marker whose tooltip names the failing parameter; turning the toggle off removes the marker but the warning stays in the warnings list, and the undo stack is unchanged.</p>
+<p><em>Built (2026-10-16), generic connections:</em> <code>structural_connection.create</code> (two or more beams, braces, truss members or columns whose axes meet within 500 mm; the first is the main member; the join is the member end nearest all the other axes), <code>structural_connection.set</code> (approval status, code-check status not checked/passed/failed, fabricator, override by instance) and <code>structural_connection.info</code>. An <code>IfcElementAssembly</code> (<code>USERDEFINED</code>, ObjectType <code>STRUCTURAL_CONNECTION</code>) contained in the main member's level, its record in <code>recipe.structural_connection</code>; it follows its members and goes with any of them. Plans at Coarse and Medium draw a circle with a spoke toward each member. Structure › Connection (<code>CN</code>) joins the selected members. Not yet: connection types and the connection library, recommended types, Propagate, Break, design forces, <code>IfcRelConnectsWithRealizingElements</code> (it needs plates or fasteners), selecting a connection by its symbol, Show Warnings.</p>
 <h3 id="4113-structural-settings-and-symbolic-representation">4.1.13 Structural settings and symbolic representation</h3>
 <p><strong>ID:</strong> <code class="rid" id="STR-SET-001">STR-SET-001</code> · <strong>Priority:</strong> <span class="pri pri-p1">P1</span> · <strong>Ref:</strong> research/03 §1.6, §15.5–15.6 · web: Analytical Model Settings</p>
 <p><strong>Purpose.</strong> Project-wide structural settings, opened from <em>Manage › Structural Settings</em> or the Structure panel launcher.</p>
@@ -32375,6 +32383,7 @@ CREATE TABLE base_rxd (
 - [ ] Settings survive a save and reopen of the <code>.ifc</code> with its RXD data, and a BIMserver check-in and get-latest round trip.
 - [ ] <code>structural_settings.show("analytical")</code> opens the dialog on the Analytical Model page; entering a node merge distance of 400 mm with a support distance of 300 mm disables <em>OK</em> and shows the rule.
 - [ ] Changing three pages and pressing <em>OK</em> creates one undo item; undo restores all three.</p>
+<p><em>Built (2026-10-16):</em> <code>structural_settings.get</code> and <code>structural_settings.set</code> (one <code>key</code> and <code>value</code>, or several <code>values</code> in one undo step; the page rules: offsets and cutbacks 0–100 mm on paper, tolerances above 0 and at most 2000 mm, the node merge distance below the support distance, spacing and load scales above 0; an error names the key). Stored on the project as <code>rxd:structural_settings</code>. Keys: brace and kicker symbols (parallel line or none) and the brace offset, the coarse cutback, point-to-point steel (steel members are not shortened at joins, STR-BEAM-003's switch), the three analytical checks, the four tolerances, boundary condition spacing, the four load display scales and load labels. Structure › Structural Settings opens one dialog of all pages; OK applies them in one step (<code>structural_settings.show</code> is the window's action). In Coarse plans (DOC-GFX-010) beams, braces and truss members are drawn as single lines along their location lines, less the coarse cutback at joined ends, braces with their symbol; their bodies are not drawn. Not yet: the connection and boundary condition symbol families, vertical brace symbols above and below the cut, the load case summaries, Reset page and the template-default markers; the checks themselves (analytical model), and Coarse section views.</p>
 <h3 id="4114-section-catalogues-materials-and-regional-standards">4.1.14 Section catalogues, materials and regional standards</h3>
 <p><strong>ID:</strong> <code class="rid" id="STR-SEC-001">STR-SEC-001</code> · <strong>Priority:</strong> <span class="pri pri-p1">P1</span> · <strong>Ref:</strong> research/08 (S0720–S0822)</p>
 <p><strong>Purpose.</strong> Structural types start from the standard sections, materials and design standards that apply where the building is, so users pick a W10X49 in Chicago, an HEB 300 in Munich or a 254 x 254 x 73 UC in Leeds without typing dimensions.</p>
@@ -32393,7 +32402,8 @@ CREATE TABLE base_rxd (
 - [x] Every catalogue section makes a valid type; HEB 300 and W8X24 have their published dimensions, and HEB 300's computed Ix is within 5 % of the published value.
 - [x] A US model lists the AISC catalogues first and loads W shapes in ASTM A992; a DIN model lists HEB, HEA and IPE first with S355 and C30/37.
 - [x] In a US model a Pipe 2 STD column 12 m tall exceeds KL/r 200 and a W10X49 4 m tall does not; a 400 × 400 concrete column 12 m tall exceeds k·lu/r 22. In a DIN model the same column reports λ with no limit, citing EN 1992-1-1.
-- [ ] Timber sections (NIST PS 20 dressed sizes, EN 338 and glulam classes) and a materials library with strengths.</p>
+- [x] Timber sections (NIST PS 20 dressed sizes, EN 336 sizes) in the region's timber grade, and a materials library with strengths (steel grades, concrete classes, NDS, EN 338 and EN 14080 timber).</p>
+<p><em>Built (2026-10-16), timber and materials:</em> sawn lumber (<code>na_lumber</code>, PS 20 dry dressed sizes, 26) and EN 336 timber (<code>eu_timber</code>, 42) catalogues of rectangular wood sections; a timber section takes the region's timber grade (Douglas Fir-Larch No.2 in the US, Spruce-Pine-Fir No.1/No.2 in Canada, C24 in Europe, the UK and Australia). <code>structural.materials</code> lists the library (<code>data/materials.json</code>: 35 steel grades, concrete classes and timber grades with their key values in MPa and kg/m³ and their sources), the region's first; every region's default steel, concrete and timber is in it. Properties show a section type's material strength and modulus. <code>column.check</code> applies le/d not over 50 to timber in US and Canadian models (NDS 3.7.1.4; CSA O86) and reports λ elsewhere.</p>
 
 <h2 id="42-reinforcement-rebar">4.2 Reinforcement (rebar)</h2>
 <p>Every reinforcement feature in this section is <strong>P2</strong>, as the priority tiers require, unless stated otherwise. Rebar tools live on the <strong>Concrete</strong> tab. They also appear on the contextual tab of any selected valid host.</p>
@@ -32903,6 +32913,7 @@ No IFC equivalent.
 <p><strong>Acceptance criteria.</strong>
 - [ ] A member created with no physical counterpart persists through save and reload as an <code>IfcStructuralCurveMember</code> with two <code>IfcStructuralPointConnection</code> ends.
 - [ ] Setting both ends to Pinned exports with zero rotational stiffness in the end conditions.</p>
+<p><em>Built (2026-10-16):</em> <code>analytical_member.create</code> (ends in metres; nodes made there or existing ones within the node merge distance used; role, section type, material, release preset), <code>analytical_member.create_vertical</code>, <code>analytical_member.set_releases</code> (start, end or both; fixed, pinned or six flags) and <code>analytical_member.set</code> (section type, material, role, Analyze As, rotation). An <code>IfcStructuralCurveMember</code> (<code>RIGID_JOINED_MEMBER</code>, <code>PIN_JOINED_MEMBER</code> when both ends release every rotation, <code>TENSION_MEMBER</code> or <code>COMPRESSION_MEMBER</code> by Analyze As) with an Axis and an <code>IfcEdge</code> topology representation between its nodes' vertices; each end an <code>IfcRelConnectsStructuralMember</code> whose <code>IfcBoundaryNodeCondition</code> carries its six fixities (<code>IfcBoolean</code>); every analytical element assigned to the <code>IfcStructuralAnalysisModel</code> "Analytical Model" (made on first use) by <code>IfcRelAssignsToGroup</code>; the recipe (<code>recipe.analytical_member</code>) holds the role, section, material, releases and associated physical elements. Analyze › Analytical. Not yet: drawing members interactively (top point, start/end, arcs), material profile set usage, highest and lowest levels, user stiffness values, Properties for analytical elements.</p>
 <h3 id="432-analytical-panels-and-openings">4.3.2 Analytical panels and openings</h3>
 <p><strong>ID:</strong> <code class="rid" id="STR-AM-002">STR-AM-002</code> · <strong>Priority:</strong> <span class="pri pri-p2">P2</span> · <strong>Ref:</strong> research/03 §4.2</p>
 <p><strong>Purpose.</strong> Surface elements that idealise walls, floors and roofs.</p>
@@ -32950,6 +32961,7 @@ No IFC equivalent.
 <p><strong>Acceptance criteria.</strong>
 - [ ] Moving a level by 200 mm moves all nodes associated with it by 200 mm, and the members attached to them follow.
 - [ ] Deleting a node deletes the links attached to it and reports the count.</p>
+<p><em>Built (2026-10-16):</em> nodes (<code>IfcStructuralPointConnection</code> with an <code>IfcVertexPoint</code> topology representation; <code>recipe.analytical_node</code>: plan point, level and offset, so they follow their level) made at member ends and merged within the node merge distance; <code>analytical_node.merge</code> merges nodes and removes unused ones. Deleting a node deletes its members. Not yet: hosted nodes, following grids, analytical links and link types.</p>
 <h3 id="434-physicalanalytical-association">4.3.4 Physical–analytical association</h3>
 <p><strong>ID:</strong> <code class="rid" id="STR-AM-004">STR-AM-004</code> · <strong>Priority:</strong> <span class="pri pri-p2">P2</span> · <strong>Ref:</strong> research/03 §4.2 ("Association")</p>
 <p><strong>Behaviour &amp; rules.</strong>
@@ -32968,6 +32980,7 @@ No IFC equivalent.
 <p><strong>Acceptance criteria.</strong>
 - [ ] Trying to add an element that already belongs to an association is refused, and the existing association is named.
 - [ ] <em>Assisted Association</em> on a 10-column grid frame proposes 10 one-to-one pairs.</p>
+<p><em>Built (2026-10-16):</em> <code>analytical_association.add</code> (physical elements to analytical members; an element already associated is refused, naming the association) and <code>analytical_association.remove</code>; associations are kept on the analytical member. Not yet: many-to-many groups in IFC (<code>IfcRelAssignsToProduct</code>, <code>IfcGroup</code> "AnalyticalAssociation"), Highlight, Assisted Association.</p>
 <h3 id="435-loads">4.3.5 Loads</h3>
 <p><strong>ID:</strong> <code class="rid" id="STR-LOAD-001">STR-LOAD-001</code> · <strong>Priority:</strong> <span class="pri pri-p2">P2</span> · <strong>Ref:</strong> research/03 §4.3</p>
 <p><strong>Purpose.</strong> Point, line and area actions applied to analytical elements.</p>
@@ -33028,6 +33041,7 @@ No IFC equivalent.
 - [ ] Deleting an analytical member deletes its 4 line loads, and the confirmation names the count.
 - [ ] A trapezoidal line load exports as <code>IfcStructuralCurveAction</code> with <code>LINEAR</code> distribution and the correct end values.
 - [ ] Changing a load's case updates its nature display immediately.</p>
+<p><em>Built (2026-10-16):</em> <code>load.create_point</code> (an <code>IfcStructuralPointAction</code> on a node or at a ratio along a member; Fx, Fy, Fz in N and Mx, My, Mz in N·m, project axes) and <code>load.create_line</code> (an <code>IfcStructuralCurveAction</code> along a member, <code>CONST</code> or <code>LINEAR</code> with start and end values in N/m, true or projected length). Each has one host and one case and goes with either. IFC: the applied load (<code>IfcStructuralLoadSingleForce</code>, <code>IfcStructuralLoadLinearForce</code>, or for a linear load an <code>IfcStructuralLoadConfiguration</code> of two linear forces at 0 and the member's length), the host by <code>IfcRelConnectsStructuralActivity</code>, the case by <code>IfcRelAssignsToGroup</code>. Show Analytical draws loads as arrows. Not yet: area loads (with panels), loads along a path or at a picked position, host local and work-plane orientation, Is Reaction, the loads palette.</p>
 <h3 id="436-load-cases-natures-combinations-and-usages">4.3.6 Load cases, natures, combinations and usages</h3>
 <p><strong>ID:</strong> <code class="rid" id="STR-LC-001">STR-LC-001</code> · <strong>Priority:</strong> <span class="pri pri-p2">P2</span> · <strong>Ref:</strong> research/03 §4.4 · screenshots/structure_mep/load_cases_and_combinations_dialog.png</p>
 <p><strong>Purpose.</strong> A single dialog to define how loads are grouped and combined.</p>
@@ -33073,7 +33087,8 @@ No IFC equivalent.
 - [ ] A combination formula <code>1.0*C1</code> where C1 is itself a combination that references the first one is flagged as circular and <em>OK</em> stays disabled.
 - [ ] <code>load_case.manage("combinations")</code> opens the dialog on the <em>Load Combinations</em> tab.
 - [ ] Deleting case Q warns that 12 loads and 3 combinations are affected, and after confirmation removes the loads and strips Q from the 3 formulas.
-- [ ] The EN 1990 template generates ULS and SLS combinations offline, with no network access.</p>
+- [x] The EN 1990 template generates ULS and SLS combinations offline, with no network access.</p>
+<p><em>Built (2026-10-16):</em> <code>structural_code.set</code> (template <code>asce7</code> or <code>en1990</code>; the region's template by default), <code>load_nature.create</code>, <code>load_case.create</code> (an <code>IfcStructuralLoadCase</code> with ActionType and ActionSource from its nature), <code>load_case.delete</code> (deletes its loads, strips it from combinations, reports both counts), <code>load_combination.create</code> (an <code>IfcStructuralLoadGroup</code> <code>LOAD_COMBINATION</code>, limit state in Purpose; formulas parsed, nested combinations expanded to case factors, circular and unknown references refused; names unique without *, + or -), <code>load_combination.generate</code> (offline from <code>data/load_templates.json</code>: ASCE/SEI 7-22 §2.3.1 and §2.3.6 strength combinations, alternatives Lr, S or R one each; EN 1990 expression 6.10 with the recommended γ and ψ, each variable nature leading in turn, plus characteristic and quasi-permanent SLS; unknown natures flagged; <code>add</code> creates them) and <code>load_case.list</code>. Natures and the template are kept on the project (<code>rxd:analysis</code>). IFC: each combination's cases by <code>IfcRelAssignsToGroupByFactor</code>, every group <code>LoadedBy</code> the analysis model. Analyze › Loads › Generate Combinations. Not yet: the Load Cases &amp; Combinations dialog (<code>load_case.manage</code>), usages management, user templates, National Annex sets, 6.10a/b.</p>
 <h3 id="437-boundary-conditions">4.3.7 Boundary conditions</h3>
 <p><strong>ID:</strong> <code class="rid" id="STR-BC-001">STR-BC-001</code> · <strong>Priority:</strong> <span class="pri pri-p2">P2</span> · <strong>Ref:</strong> research/03 §4.5 · screenshots/structure_mep/boundary_conditions_on_analytical_panel.png</p>
 <p><strong>Workflow.</strong> Choose <em>Analyze › Boundary Conditions</em>, then <strong>Point</strong>, <strong>Line</strong> or <strong>Area</strong>. Pick the host. Point conditions can be positioned anywhere on the host with temporary dimensions.</p>
@@ -33112,7 +33127,8 @@ No IFC equivalent.
 <p><strong>Commands.</strong> <code>boundary_condition.create(kind: "point"|"line"|"area", host_id, location?, state, dof?: {tx,ty,tz,rx,ry,rz}) -&gt; id</code></p>
 <p><strong>Acceptance criteria.</strong>
 - [ ] A Pinned point condition exports with all three translations fixed and all rotations released.
-- [ ] A User condition with Tz = Spring of 5 000 kN/m exports <code>TranslationalStiffnessZ</code> = 5.0E6 N/m.</p>
+- [x] A User condition with Tz = Spring of 5 000 kN/m exports <code>TranslationalStiffnessZ</code> = 5.0E6 N/m.</p>
+<p><em>Built (2026-10-16), point conditions:</em> <code>boundary_condition.create</code> (kind <code>point</code> at a node or a member's start or end; Fixed, Pinned, Roller or User with six dof each fixed, released or a spring), <code>boundary_condition.at_column_bases</code> (default pinned) and <code>boundary_condition.remove</code>; kept on the node and written as its <code>AppliedCondition</code> (<code>IfcBoundaryNodeCondition</code>: <code>IfcBoolean</code>, <code>IfcLinearStiffnessMeasure</code> or <code>IfcRotationalStiffnessMeasure</code>). Supported nodes are not free ends in <code>analytical_model.info</code>. Show Analytical draws supports as triangles. Analyze › Loads › Column Base Supports. Not yet: line and area conditions (with panels), symbol families and spacing, tags and schedules.</p>
 <h3 id="438-analytical-automation">4.3.8 Analytical automation</h3>
 <p><strong>ID:</strong> <code class="rid" id="STR-AM-006">STR-AM-006</code> · <strong>Priority:</strong> <span class="pri pri-p2">P2</span> · <strong>Ref:</strong> research/03 §4.2 ("Automation"), §13.7</p>
 <p><strong>Purpose.</strong> Generate or update one model from the other on demand.</p>
@@ -33133,7 +33149,8 @@ No IFC equivalent.
 - <code>analytical_automation.disconnect(element_ids[])</code></p>
 <p><strong>Acceptance criteria.</strong>
 - [ ] On a 3-storey, 4 × 3-bay steel frame with slabs, Physical → Analytical creates members for every column and beam and panels for every slab. The nodes are connected, and the solver interface (ANA-FEA-001) reports no unconnected nodes.
-- [ ] Changing an analytical member's section and running Analytical → Physical changes the associated beam's type.</p>
+- [x] Changing an analytical member's section and running Analytical → Physical changes the associated beam's type.</p>
+<p><em>Built (2026-10-16):</em> <code>analytical_automation.physical_to_analytical</code> (a member for each structural column, beam, brace and truss member, or the given ones, along its axis; architectural columns and associated elements skipped with reasons; braces pinned, others fixed; nodes merged at the joins, so a frame's members share nodes), <code>analytical_automation.analytical_to_physical</code> (section types to beams and columns) and <code>analytical_automation.disconnect</code>, each returning a report of created, updated and skipped elements with reasons. <code>analytical_model.info</code> lists members, nodes and nodes only one member uses. Analyze › Analytical: Physical to Analytical, Analytical to Physical, Disconnect, Merge Nodes, and Show Analytical (members red, nodes blue, over 3D views). Not yet: panels for walls and slabs (STR-AM-002), alignment to levels and grids within tolerances, Lua rule packages, the run log in the RXD analysis document, manual-adjustment flags, the consistency check after a run.</p>
 <h3 id="439-analytical-model-checks-supports-and-consistency">4.3.9 Analytical model checks: supports and consistency</h3>
 <p><strong>ID:</strong> <code class="rid" id="STR-AM-007">STR-AM-007</code> · <strong>Priority:</strong> <span class="pri pri-p2">P2</span> · <strong>Ref:</strong> research/03 §4.1–4.2, §15.1 · web: Analytical Model Settings · web: Modifying Elective Checking Criteria and Tolerances · web: Automatic Checks</p>
 <p><strong>Purpose.</strong> Find problems in the analytical model, and between it and the physical model, before it is sent to an analysis provider: members that nothing supports, nodes that should meet but do not, analytical elements that have drifted from their physical counterparts, and hints of instability.</p>
@@ -33364,6 +33381,7 @@ No IFC equivalent.
 - [ ] With the PyNite suggestion installed, a simply supported 6 m beam under a 10 kN/m line load returns a mid-span moment of 45 kN·m ± 0.5%.
 - [ ] Editing a load after the run marks the result package stale and shows a notice in Results Explorer.
 - [ ] The exported IFC structural model opens in a third-party IFC structural viewer with all members, supports and load cases present.</p>
+<p><em>Built (2026-10-16):</em> a built-in provider: <code>structural_analysis.run</code> distils the analytical model (members with their section's area, second moments and torsion constant, moduli from the materials library, releases and local axes; nodes with supports; cases, a self-weight case's member weights, combinations as case factors; point and line loads) to the neutral structural model (<code>reviera.structural.v1.Model</code>) and runs it out of process as an <code>analysis.structural</code> compute job in the built-in runner: a linear static 3D frame solver by the direct stiffness method (Euler–Bernoulli members, releases condensed, unrestrained mechanism dofs held with a warning, up to 1000 nodes). <code>structural_analysis.collect</code> keeps the results with the model (<code>structural_analysis.record</code>, project RXD <code>rxd:analysis_results</code>, keys mapped back to GlobalIds) and <code>structural_analysis.results</code> reports them: per case and combination the largest displacement and moment and the vertical reactions, and each member's N, Vy, Vz, T, My, Mz at eleven stations; the results go stale (a hash of the distilled model) when the model changes. <code>structural_analysis.export_model</code> writes <code>reviera-structural-model.json</code>. Analyze › Structural Analysis › Run Analysis (followed and collected in the background) and Results. The 6 m beam under 10 kN/m gives 45 kN·m at mid-span (end-to-end test). Not yet: pre-analysis checks (STR-AM-007), scope by selection, modal and other analysis types, panels, the IFC structural analysis view export, <code>.reviera-results</code> archives and <code>IfcStructuralResultGroup</code>, Results Explorer diagrams, proposed sections and <code>update_model</code>, external providers (PyNite, CalculiX, xara) as runners.</p>
 <h3 id="4312-results-explorer-and-results-manager">4.3.12 Results Explorer and Results Manager</h3>
 <p><strong>ID:</strong> <code class="rid" id="STR-RES-001">STR-RES-001</code> · <strong>Priority:</strong> <span class="pri pri-p2">P2</span> · <strong>Ref:</strong> research/03 §4.6 · screenshots/structure_mep/structural_results_explorer_presets_2027.png · screenshots/structure_mep/structural_results_analysis_insights_2027.png</p>
 <p><strong>Purpose.</strong> Show and manage analysis results inside model views.</p>
@@ -37153,6 +37171,139 @@ No IFC equivalent.
 <td>—</td>
 <td>Yes</td>
 <td>STR-BEAM-002</td>
+</tr>
+<tr>
+<td><code>column.set_slant</code></td>
+<td>column_ids[], style: vertical|end_point|angle, top_point?, angle?, azimuth?</td>
+<td>—</td>
+<td>Yes</td>
+<td>STR-COL-002</td>
+</tr>
+<tr>
+<td><code>brace.load_section</code></td>
+<td>catalog, designation, material?</td>
+<td>type_id</td>
+<td>Yes</td>
+<td>STR-BRACE-001</td>
+</tr>
+<tr>
+<td><code>foundation.info</code></td>
+<td>ids[]</td>
+<td>[{id, top, bottom, area, volume, host?}]</td>
+<td>No</td>
+<td>STR-FND-001</td>
+</tr>
+<tr>
+<td><code>floor.set_structural</code></td>
+<td>floor_ids[], structural</td>
+<td>—</td>
+<td>Yes</td>
+<td>STR-FLOOR-001</td>
+</tr>
+<tr>
+<td><code>structural_connection.set</code></td>
+<td>connection_ids[], approval_status?, code_check?, fabricator?, override_by_instance?</td>
+<td>—</td>
+<td>Yes</td>
+<td>STR-CONN-001</td>
+</tr>
+<tr>
+<td><code>structural_connection.info</code></td>
+<td>connection_ids[]</td>
+<td>[{connection_id, connection_type, point?, members[], approval_status?, code_check, fabricator?, override_by_instance}]</td>
+<td>No</td>
+<td>STR-CONN-001</td>
+</tr>
+<tr>
+<td><code>beam_system.info</code></td>
+<td>system_id</td>
+<td>{system_id, boundary, direction, rule, value, beams[], spacing?}</td>
+<td>No</td>
+<td>STR-BSYS-001</td>
+</tr>
+<tr>
+<td><code>structural.materials</code></td>
+<td>kind?</td>
+<td>[{name, kind, standard, regions[], properties, source_ids[], preferred}]</td>
+<td>No</td>
+<td>STR-SEC-001</td>
+</tr>
+<tr>
+<td><code>analytical_member.set</code></td>
+<td>member_ids[], section_type_id?, material?, role?, analyze_as?, rotation?</td>
+<td>—</td>
+<td>Yes</td>
+<td>STR-AM-001</td>
+</tr>
+<tr>
+<td><code>analytical_model.info</code></td>
+<td>—</td>
+<td>{members[], nodes, free_nodes[]}</td>
+<td>No</td>
+<td>STR-AM-001</td>
+</tr>
+<tr>
+<td><code>load_case.delete</code></td>
+<td>case_id</td>
+<td>{loads, combinations}</td>
+<td>Yes</td>
+<td>STR-LC-001</td>
+</tr>
+<tr>
+<td><code>load_case.list</code></td>
+<td>—</td>
+<td>{template, natures[], cases[], combinations[], supports[]}</td>
+<td>No</td>
+<td>STR-LC-001</td>
+</tr>
+<tr>
+<td><code>boundary_condition.at_column_bases</code></td>
+<td>state?</td>
+<td>node_ids[]</td>
+<td>Yes</td>
+<td>STR-BC-001</td>
+</tr>
+<tr>
+<td><code>boundary_condition.remove</code></td>
+<td>node_ids[]</td>
+<td>—</td>
+<td>Yes</td>
+<td>STR-BC-001</td>
+</tr>
+<tr>
+<td><code>structural_analysis.collect</code></td>
+<td>job_id?</td>
+<td>report</td>
+<td>Yes</td>
+<td>ANA-FEA-001</td>
+</tr>
+<tr>
+<td><code>structural_analysis.results</code></td>
+<td>case?</td>
+<td>report</td>
+<td>No</td>
+<td>ANA-FEA-001</td>
+</tr>
+<tr>
+<td><code>structural_analysis.record</code></td>
+<td>job_id, provider, results, key_map</td>
+<td>—</td>
+<td>Yes</td>
+<td>ANA-FEA-001</td>
+</tr>
+<tr>
+<td><code>truss.set</code></td>
+<td>truss_id, start?, end?, layout?, panels?, height?, bearing?, offset?</td>
+<td>—</td>
+<td>Yes</td>
+<td>STR-TRUSS-001</td>
+</tr>
+<tr>
+<td><code>truss.info</code></td>
+<td>truss_id</td>
+<td>{truss_id, layout, panels, height, span, chords[], webs[]}</td>
+<td>No</td>
+<td>STR-TRUSS-001</td>
 </tr>
 <tr>
 <td><code>structural.catalogs</code></td>
@@ -41700,6 +41851,7 @@ No IFC equivalent.
 - [ ] A category override of Fine for Doors in a Coarse plan draws doors at Fine and walls at Coarse.
 - [ ] Creating a 1:20 plan with the default map gives it Fine; changing its scale to 1:200 later leaves it at Fine.
 - [ ] A detail-level map with a gap between 1:50 and 1:75 is rejected with <code>detail_level_map.invalid</code>.</p>
+<p><em>Built (2026-10-16):</em> <code>view.set_detail_level</code> and the view payload's <code>detailLevel</code> (Medium when unset); a plan's Properties show Detail Level. Coarse plans draw structural framing as single lines (STR-SET-001). Not yet: compound layers and coarse fills of walls, floors, roofs and ceilings by detail level, per-category and filter overrides, component geometry by detail level, the scale-to-detail-level map.</p>
 <h3 id="visual-styles">Visual styles</h3>
 <p><strong>ID:</strong> <code class="rid" id="DOC-GFX-011">DOC-GFX-011</code> · <strong>Priority:</strong> <span class="pri pri-p0">P0</span> (Wireframe, Hidden Line, Shaded, Consistent Colours), P1 (Textures, Realistic), P2 (Path traced) · <strong>Ref:</strong> research/04 §3.7 <em>Visual Styles</em></p>
 <p><strong>Purpose.</strong> Choose how surfaces and edges are drawn.</p>
@@ -51354,7 +51506,7 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 </tbody>
 </table></div>
 <h2 id="a3-consolidated-command-index">A.3 Consolidated command index</h2>
-<p><strong>2070 unique commands</strong> in 409 domains. Every command is exposed automatically to the UI, to Lua (<code>reviera.&lt;domain&gt;.&lt;verb&gt;</code>) and to MCP (<code>&lt;domain&gt;_&lt;verb&gt;</code>), subject to its permission class.</p>
+<p><strong>2088 unique commands</strong> in 410 domains. Every command is exposed automatically to the UI, to Lua (<code>reviera.&lt;domain&gt;.&lt;verb&gt;</code>) and to MCP (<code>&lt;domain&gt;_&lt;verb&gt;</code>), subject to its permission class.</p>
 <div class="tbl"><table>
 <thead>
 <tr>
@@ -51413,11 +51565,11 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 </tr>
 <tr>
 <td><code>analytical_member</code></td>
-<td style="text-align: right;">3</td>
+<td style="text-align: right;">4</td>
 </tr>
 <tr>
 <td><code>analytical_model</code></td>
-<td style="text-align: right;">5</td>
+<td style="text-align: right;">6</td>
 </tr>
 <tr>
 <td><code>analytical_node</code></td>
@@ -51497,7 +51649,7 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 </tr>
 <tr>
 <td><code>beam_system</code></td>
-<td style="text-align: right;">4</td>
+<td style="text-align: right;">5</td>
 </tr>
 <tr>
 <td><code>bending_detail</code></td>
@@ -51513,11 +51665,11 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 </tr>
 <tr>
 <td><code>boundary_condition</code></td>
-<td style="text-align: right;">1</td>
+<td style="text-align: right;">3</td>
 </tr>
 <tr>
 <td><code>brace</code></td>
-<td style="text-align: right;">1</td>
+<td style="text-align: right;">2</td>
 </tr>
 <tr>
 <td><code>browser</code></td>
@@ -51609,7 +51761,7 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 </tr>
 <tr>
 <td><code>column</code></td>
-<td style="text-align: right;">10</td>
+<td style="text-align: right;">11</td>
 </tr>
 <tr>
 <td><code>component</code></td>
@@ -51949,7 +52101,7 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 </tr>
 <tr>
 <td><code>floor</code></td>
-<td style="text-align: right;">5</td>
+<td style="text-align: right;">6</td>
 </tr>
 <tr>
 <td><code>floor_type</code></td>
@@ -51966,6 +52118,10 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 <tr>
 <td><code>formula</code></td>
 <td style="text-align: right;">2</td>
+</tr>
+<tr>
+<td><code>foundation</code></td>
+<td style="text-align: right;">1</td>
 </tr>
 <tr>
 <td><code>foundation_slab</code></td>
@@ -52153,7 +52309,7 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 </tr>
 <tr>
 <td><code>load_case</code></td>
-<td style="text-align: right;">3</td>
+<td style="text-align: right;">4</td>
 </tr>
 <tr>
 <td><code>load_classification</code></td>
@@ -52753,11 +52909,11 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 </tr>
 <tr>
 <td><code>structural</code></td>
-<td style="text-align: right;">2</td>
+<td style="text-align: right;">3</td>
 </tr>
 <tr>
 <td><code>structural_analysis</code></td>
-<td style="text-align: right;">4</td>
+<td style="text-align: right;">7</td>
 </tr>
 <tr>
 <td><code>structural_code</code></td>
@@ -52765,7 +52921,7 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 </tr>
 <tr>
 <td><code>structural_connection</code></td>
-<td style="text-align: right;">11</td>
+<td style="text-align: right;">13</td>
 </tr>
 <tr>
 <td><code>structural_settings</code></td>
@@ -52869,7 +53025,7 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 </tr>
 <tr>
 <td><code>truss</code></td>
-<td style="text-align: right;">5</td>
+<td style="text-align: right;">7</td>
 </tr>
 <tr>
 <td><code>txn</code></td>
@@ -53374,6 +53530,14 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 <td>STR-AM-001</td>
 </tr>
 <tr>
+<td><code>analytical_member.set</code></td>
+<td>4</td>
+<td>member_ids[], section_type_id?, material?, role?, analyze_as?, rotation?</td>
+<td>—</td>
+<td>Yes</td>
+<td>STR-AM-001</td>
+</tr>
+<tr>
 <td><code>analytical_member.set_releases</code></td>
 <td>4</td>
 <td>id, end, dof_flags \</td>
@@ -53412,6 +53576,14 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 <td>—</td>
 <td>Yes</td>
 <td>STR-AM-007</td>
+</tr>
+<tr>
+<td><code>analytical_model.info</code></td>
+<td>4</td>
+<td>—</td>
+<td>{members[], nodes, free_nodes[]}</td>
+<td>No</td>
+<td>STR-AM-001</td>
 </tr>
 <tr>
 <td><code>analytical_model.reset</code></td>
@@ -54094,6 +54266,14 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 <td>STR-BSYS-001</td>
 </tr>
 <tr>
+<td><code>beam_system.info</code></td>
+<td>4</td>
+<td>system_id</td>
+<td>{system_id, boundary, direction, rule, value, beams[], spacing?}</td>
+<td>No</td>
+<td>STR-BSYS-001</td>
+</tr>
+<tr>
 <td><code>beam_system.remove</code></td>
 <td>4</td>
 <td>system_id</td>
@@ -54294,6 +54474,14 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 <td>Yes</td>
 </tr>
 <tr>
+<td><code>boundary_condition.at_column_bases</code></td>
+<td>4</td>
+<td>state?</td>
+<td>node_ids[]</td>
+<td>Yes</td>
+<td>STR-BC-001</td>
+</tr>
+<tr>
 <td><code>boundary_condition.create</code></td>
 <td>4</td>
 <td>kind: "point"\</td>
@@ -54302,10 +54490,26 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 <td>id</td>
 </tr>
 <tr>
+<td><code>boundary_condition.remove</code></td>
+<td>4</td>
+<td>node_ids[]</td>
+<td>—</td>
+<td>Yes</td>
+<td>STR-BC-001</td>
+</tr>
+<tr>
 <td><code>brace.create</code></td>
 <td>4</td>
 <td>type_id, start_point, start_level, start_offset, end_point, end_level, end_offset</td>
 <td>element_id</td>
+<td>Yes</td>
+<td>STR-BRACE-001</td>
+</tr>
+<tr>
+<td><code>brace.load_section</code></td>
+<td>4</td>
+<td>catalog, designation, material?</td>
+<td>type_id</td>
 <td>Yes</td>
 <td>STR-BRACE-001</td>
 </tr>
@@ -55084,6 +55288,14 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 <td>element_id</td>
 <td>Yes</td>
 <td>STR-COL-002</td>
+</tr>
+<tr>
+<td><code>column.set_slant</code></td>
+<td>4</td>
+<td>column_ids[], style: vertical\</td>
+<td>end_point\</td>
+<td>angle, top_point?, angle?, azimuth?</td>
+<td>—</td>
 </tr>
 <tr>
 <td><code>component.create</code></td>
@@ -58654,6 +58866,14 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 <td>Yes</td>
 </tr>
 <tr>
+<td><code>floor.set_structural</code></td>
+<td>4</td>
+<td>floor_ids[], structural</td>
+<td>—</td>
+<td>Yes</td>
+<td>STR-FLOOR-001</td>
+</tr>
+<tr>
 <td><code>floor_type.set_deck_layer</code></td>
 <td>4</td>
 <td>type_id, layer_index, profile_family_id, usage</td>
@@ -58708,6 +58928,14 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 <td>null, text</td>
 <td>{ok, type, dimension, errors[], lints[]}</td>
 <td>No</td>
+</tr>
+<tr>
+<td><code>foundation.info</code></td>
+<td>4</td>
+<td>ids[]</td>
+<td>[{id, top, bottom, area, volume, host?}]</td>
+<td>No</td>
+<td>STR-FND-001</td>
 </tr>
 <tr>
 <td><code>foundation_slab.create</code></td>
@@ -60472,9 +60700,17 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 <tr>
 <td><code>load_case.delete</code></td>
 <td>4</td>
-<td>id</td>
-<td>—</td>
+<td>case_id</td>
+<td>{loads, combinations}</td>
 <td>Yes</td>
+<td>STR-LC-001</td>
+</tr>
+<tr>
+<td><code>load_case.list</code></td>
+<td>4</td>
+<td>—</td>
+<td>{template, natures[], cases[], combinations[], supports[]}</td>
+<td>No</td>
 <td>STR-LC-001</td>
 </tr>
 <tr>
@@ -65446,12 +65682,28 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 <td>STR-SEC-001</td>
 </tr>
 <tr>
+<td><code>structural.materials</code></td>
+<td>4</td>
+<td>kind?</td>
+<td>[{name, kind, standard, regions[], properties, source_ids[], preferred}]</td>
+<td>No</td>
+<td>STR-SEC-001</td>
+</tr>
+<tr>
 <td><code>structural.standards</code></td>
 <td>4</td>
 <td>—</td>
 <td>{region, catalogs, steel, concrete, standards}</td>
 <td>No</td>
 <td>STR-SEC-001</td>
+</tr>
+<tr>
+<td><code>structural_analysis.collect</code></td>
+<td>4</td>
+<td>job_id?</td>
+<td>report</td>
+<td>Yes</td>
+<td>ANA-FEA-001</td>
 </tr>
 <tr>
 <td><code>structural_analysis.export_model</code></td>
@@ -65467,6 +65719,22 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 <td>path</td>
 <td>package_id</td>
 <td>Yes</td>
+<td>ANA-FEA-001</td>
+</tr>
+<tr>
+<td><code>structural_analysis.record</code></td>
+<td>4</td>
+<td>job_id, provider, results, key_map</td>
+<td>—</td>
+<td>Yes</td>
+<td>ANA-FEA-001</td>
+</tr>
+<tr>
+<td><code>structural_analysis.results</code></td>
+<td>4</td>
+<td>case?</td>
+<td>report</td>
+<td>No</td>
 <td>ANA-FEA-001</td>
 </tr>
 <tr>
@@ -65542,6 +65810,14 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 <td>STR-STL-003</td>
 </tr>
 <tr>
+<td><code>structural_connection.info</code></td>
+<td>4</td>
+<td>connection_ids[]</td>
+<td>[{connection_id, connection_type, point?, members[], approval_status?, code_check, fabricator?, override_by_instance}]</td>
+<td>No</td>
+<td>STR-CONN-001</td>
+</tr>
+<tr>
 <td><code>structural_connection.override</code></td>
 <td>4</td>
 <td>connection_id, params</td>
@@ -65564,6 +65840,14 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 <td>"matching"</td>
 <td>connection_ids[]</td>
 <td>Yes</td>
+</tr>
+<tr>
+<td><code>structural_connection.set</code></td>
+<td>4</td>
+<td>connection_ids[], approval_status?, code_check?, fabricator?, override_by_instance?</td>
+<td>—</td>
+<td>Yes</td>
+<td>STR-CONN-001</td>
 </tr>
 <tr>
 <td><code>structural_connection.set_type</code></td>
@@ -66430,10 +66714,26 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 <td>STR-TRUSS-001</td>
 </tr>
 <tr>
+<td><code>truss.info</code></td>
+<td>4</td>
+<td>truss_id</td>
+<td>{truss_id, layout, panels, height, span, chords[], webs[]}</td>
+<td>No</td>
+<td>STR-TRUSS-001</td>
+</tr>
+<tr>
 <td><code>truss.remove</code></td>
 <td>4</td>
 <td>truss_id</td>
 <td>member_ids[]</td>
+<td>Yes</td>
+<td>STR-TRUSS-001</td>
+</tr>
+<tr>
+<td><code>truss.set</code></td>
+<td>4</td>
+<td>truss_id, start?, end?, layout?, panels?, height?, bearing?, offset?</td>
+<td>—</td>
 <td>Yes</td>
 <td>STR-TRUSS-001</td>
 </tr>

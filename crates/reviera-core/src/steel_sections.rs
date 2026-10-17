@@ -32,9 +32,12 @@ pub struct Catalog {
     /// The section shape: `i_shape`, `channel`, `angle`, `tee`, `rectangular_hollow`,
     /// `circular_hollow`.
     pub shape: Section,
-    /// The steel grade a section of this family is usually rolled in, as the default material.
+    /// The grade a section of this family usually comes in, as the default material.
     #[serde(default)]
     pub default_material: Option<String>,
+    /// Steel (the default) or wood (timber catalogues).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub material_kind: Option<MaterialKind>,
     #[serde(default)]
     pub source_ids: Vec<String>,
     pub sections: Vec<Value>,
@@ -82,7 +85,7 @@ pub fn column_type(c: &Catalog, designation: &str) -> Result<ColumnType> {
         section: c.shape,
         structural: true,
         material: c.default_material.clone().or_else(|| Some("Steel".into())),
-        material_kind: Some(MaterialKind::Steel),
+        material_kind: Some(c.material_kind.unwrap_or(MaterialKind::Steel)),
         designation: Some(designation.to_owned()),
         ..ColumnType::default()
     };
@@ -103,15 +106,43 @@ pub fn column_type(c: &Catalog, designation: &str) -> Result<ColumnType> {
             t.depth = t.width;
             t.wall_thickness = dim("t")?;
         }
-        Section::Rectangular | Section::Round => {
+        // Sawn timber: thickness `b` across, width `d` deep.
+        Section::Rectangular => {
+            t.width = dim("b")?;
+            t.depth = dim("d")?;
+        }
+        Section::Round => {
             return Err(Error::new(
                 "section.unsupported",
-                "catalogues hold rolled and hollow sections",
+                "catalogues hold rolled, hollow and sawn sections",
             ));
         }
     }
     t.check()
         .map_err(|m| Error::new("section.invalid", format!("{designation}: {m}")))?;
+    Ok(t)
+}
+
+/// A catalogue section as a type in a model: its material `material` if given; else a timber
+/// section takes the model's region's usual timber grade, other sections the catalogue's grade.
+pub fn section_type(
+    store: &crate::store::Store,
+    c: &Catalog,
+    designation: &str,
+    material: Option<String>,
+) -> Result<ColumnType> {
+    let mut t = column_type(c, designation)?;
+    t.material = match material {
+        Some(m) => Some(m),
+        None if c.material_kind == Some(MaterialKind::Wood) => Some(
+            crate::codes::settings(store)
+                .code
+                .structural()
+                .timber
+                .into(),
+        ),
+        None => t.material,
+    };
     Ok(t)
 }
 
@@ -184,10 +215,7 @@ pub(crate) fn load_column_section(
 ) -> Result<crate::id::ElementId> {
     let c = catalog(&p.catalog)
         .ok_or_else(|| Error::new("section.no_catalog", format!("no catalogue {}", p.catalog)))?;
-    let mut t = column_type(&c, &p.designation)?;
-    if let Some(m) = p.material {
-        t.material = Some(m);
-    }
+    let t = section_type(txn.store(), &c, &p.designation, p.material)?;
     // One type per designation and material.
     if let Some(e) = txn.store().iter().find(|e| {
         crate::columns::column_type(e).is_some_and(|x| {

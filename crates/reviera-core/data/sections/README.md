@@ -19,7 +19,7 @@ dimensions.
 Units are those of the family's standard (`in` or `mm`). Keys: I shapes, channels and tees `d`
 (depth), `bf` (flange width), `tw` (web thickness), `tf` (flange thickness), `r` (root radius,
 where given); angles and rectangular hollow sections `h`, `b`, `t`; round hollow sections and
-pipe `od`, `t`. Fillets are not modelled yet.
+pipe `od`, `t`; sawn timber `b` (thickness) and `d` (width). Fillets are not modelled yet.
 
 | File | Family | Standard | Sections | Sources |
 |---|---|---|---:|---|
@@ -35,3 +35,21 @@ pipe `od`, `t`. Fillets are not modelled yet.
 | `eu_ipe.json` | IPE (European I-beam) | EN 10365:2017 (dimensions) | 18 | S0722, S0723 |
 | `uk_ub.json` | UB (UK universal beam) | BS EN 10365:2017 (dimensions | 31 | S0724, S0722 |
 | `uk_uc.json` | UC (UK universal column) | BS EN 10365:2017 (dimensions | 24 | S0725, S0722 |
+| `na_lumber.json` | Sawn lumber, dressed dry (North America) | NIST PS 20-20 Table 3 (minimum dressed sizes, dry) | 26 | S0747, S0748 |
+| `eu_timber.json` | Sawn timber (EN 336 sizes, UK) | EN 336 target sizes, tolerance class 1 | 42 | S0757 |
+
+Timber catalogues carry `material_kind: wood`; a timber section takes the model's region's usual
+timber grade unless one is given.
+
+## Materials (`../materials.json`)
+
+The structural materials library (`structural.materials`): steel grades (ASTM A992, A36,
+A572 Gr 50, A500 Gr B and C, A1085, A53 Gr B; CSA G40.21 350W; AS/NZS 3679.1 300; EN 10025-2
+S235, S275, S355), concrete classes (EN 1992-1-1 C20/25 to C50/60; ACI 318 f'c 3000 to 5000 psi;
+the Canadian and Australian default strength classes) and timber (NDS reference design values for
+Douglas Fir-Larch No.2 and Spruce-Pine-Fir No.1/No.2; EN 338 C16, C24, C30; EN 14080 GL24 to GL32,
+h and c), with key properties in MPa and kg/m³ and each entry's sources. Compiled on 2026-10-16
+from the same research session; values are reference values before design factors, a small
+factual subset of each standard's tables. The Canadian 30 MPa and Australian 32 MPa concrete
+entries record only their specified strength.
+

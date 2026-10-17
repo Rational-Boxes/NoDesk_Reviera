@@ -7,6 +7,7 @@
 //! (TECH_STACK §2, spec Ch 2). The element store can only be changed inside a [`Transaction`],
 //! and transactions are opened by the command executor (DM-CORE-001 rule 9).
 
+pub mod analytical;
 pub mod annotations;
 pub mod areas;
 pub mod arrangement;
@@ -24,6 +25,7 @@ pub mod color_schemes;
 pub mod columns;
 pub mod command;
 pub mod compound;
+pub mod connections;
 pub mod constraints;
 pub mod csg;
 pub mod curtain;
@@ -34,6 +36,8 @@ pub mod dormers;
 pub mod element;
 pub mod error;
 pub mod floors;
+pub mod foundations;
+pub mod frame;
 pub mod grids;
 pub mod groups;
 pub mod id;
@@ -42,7 +46,9 @@ pub mod inserts;
 pub mod inspect;
 pub mod levels;
 pub mod library;
+pub mod loads;
 pub mod masses;
+pub mod materials_library;
 pub mod measure;
 pub mod mesh_io;
 pub mod mesh_objects;
@@ -82,6 +88,8 @@ pub mod standards;
 pub mod steel_sections;
 pub mod store;
 pub mod stroke_font;
+pub mod structural;
+pub mod structural_model;
 pub mod temp_dims;
 pub mod toposolids;
 pub mod txn;

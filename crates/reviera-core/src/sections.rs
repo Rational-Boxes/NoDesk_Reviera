@@ -208,6 +208,7 @@ fn create(
         section: Some(def),
         color_scheme: None,
         area_scheme: None,
+        detail_level: None,
     };
     let value = serde_json::to_value(&data).expect("view data serialises");
     let guid = GlobalId::new();

@@ -17,6 +17,26 @@ use reviera_core::bodies::Body;
 use crate::kinds::{EXCLUSIONS, MESH_SET, PROTOBUF, element_mesh};
 
 pub const CLASH_BODIES: &str = "clash.bodies";
+pub const STRUCTURAL_MODEL: &str = "structural.model";
+
+/// The `structural.model` distillation (ANA-FEA-001): the neutral structural model as one JSON
+/// blob; its keys are opaque, the map back to GlobalIds stays in Reviera.
+pub fn structural_model(d: &reviera_core::structural_model::Distilled) -> Distilled {
+    let raw = serde_json::to_vec(&d.model).expect("the model serialises");
+    let blob = Blob::new(raw, crate::kinds::JSON, crate::kinds::STRUCTURAL_MODEL);
+    let snapshot_hash = blob.reference.sha256.clone();
+    Distilled {
+        distiller: STRUCTURAL_MODEL.into(),
+        version: 1,
+        detail: String::new(),
+        anonymised: true,
+        blobs: vec![blob],
+        key_map: d.key_map.clone(),
+        elements: d.model.members.len(),
+        triangles: 0,
+        snapshot_hash,
+    }
+}
 pub const CLASH_BODIES_VERSION: u32 = 1;
 
 /// Target size of one chunk before encoding.

@@ -490,7 +490,14 @@ pub fn dependents_of(store: &crate::store::Store, id: ElementId) -> Vec<ElementI
                 || crate::ramps::ramp_recipe(e).is_some_and(|r| r.extent.uses_level(&guid))
                 || crate::curtain::curtain_recipe(e).is_some_and(|r| r.extent.uses_level(&guid))
                 || crate::columns::column_recipe(e).is_some_and(|r| r.extent.uses_level(&guid))
-                || crate::beams::beam_recipe(e).is_some_and(|r| r.level == guid)
+                || crate::beams::beam_recipe(e)
+                    .is_some_and(|r| r.level == guid || r.system.is_some_and(|s| s.system == guid))
+                || crate::beams::system_recipe(e).is_some_and(|r| r.level == guid)
+                || crate::beams::truss_recipe(e).is_some_and(|r| r.level == guid)
+                || crate::foundations::uses(e, &guid)
+                || crate::connections::uses(e, &guid)
+                || crate::analytical::uses(e, &guid)
+                || crate::loads::uses(e, &guid)
                 || crate::mesh_objects::mesh_object_recipe(e).is_some_and(|r| r.level == guid)
                 || crate::model_lines::recipe(e)
                     .is_some_and(|r| crate::model_lines::uses(&r, &guid))
@@ -600,6 +607,9 @@ impl Command for ElementDelete {
             }
         }
         let deleted = delete_closure(txn.store(), &queue);
+        // Braces attached to what goes keep their ends where they are (STR-BRACE-001).
+        crate::beams::release_attachments(txn, &deleted)?;
+        crate::foundations::release(txn, &deleted)?;
         for id in &deleted {
             txn.delete(*id)?;
         }
@@ -1288,7 +1298,17 @@ impl Command for WallCreate {
     };
 
     fn run(&self, cx: &mut CommandContext<'_>, p: CreateParams) -> Result<ElementId> {
-        walls::create(cx.edit()?, p)
+        let usage = match (p.structural, p.structural_usage) {
+            (_, Some(u)) => Some(u),
+            (true, None) => Some(crate::structural::WallUsage::Bearing),
+            (false, None) => None,
+        };
+        let txn = cx.edit()?;
+        let id = walls::create(txn, p)?;
+        if let Some(u) = usage {
+            crate::structural::apply_wall_usage(txn, id, u)?;
+        }
+        Ok(id)
     }
 }
 

@@ -369,6 +369,10 @@ pub fn all(store: &Store) -> Vec<Body> {
     for (id, g) in crate::columns::all(store) {
         push(id, "IfcColumn", g.mesh(), false);
     }
+    for (id, g) in crate::foundations::all(store) {
+        let class = store.get(id).map_or("IfcFooting", |e| e.class.as_str());
+        push(id, class, g.mesh(), false);
+    }
     for (id, g) in crate::beams::all(store) {
         let class = store.get(id).map_or("IfcBeam", |e| e.class.as_str());
         push(id, class, g.mesh(), false);

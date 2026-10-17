@@ -152,7 +152,8 @@ impl Gui {
         if !plan.stale || v.viewport.is_none() {
             return;
         }
-        let doc = v.doc;
+        let (doc, view_element) = (v.doc, v.element);
+        let drawn = plan.drawn();
         let (cut, bottom) = (plan.range.cut as f32, plan.far());
         let visibility = self.view_visibility(v);
         let Some(scene) = self.scenes.get(&doc) else {
@@ -163,12 +164,41 @@ impl Gui {
             .entry(doc)
             .or_insert_with(|| Rc::new(reviera_render::plan::feature_edges(scene)))
             .clone();
+        // A Coarse plan draws structural framing as single lines (STR-SET-001), not its bodies.
+        let model = self.app.document(doc).map(|d| d.doc.store().clone());
+        let coarse = model.as_ref().is_some_and(|st| {
+            v.element
+                .and_then(|e| st.get(e))
+                .map(reviera_core::views::detail_level)
+                == Some(reviera_core::views::DetailLevel::Coarse)
+        });
+        let sticks: Vec<reviera_core::beams::CoarseLine> = match (&model, coarse) {
+            (Some(st), true) => {
+                let (lo, hi) = plan.drawn();
+                reviera_core::beams::coarse_lines(
+                    st,
+                    f64::from(lo),
+                    f64::from(hi),
+                    f64::from(plan.scale),
+                )
+            }
+            _ => Vec::new(),
+        };
+        let framing: std::collections::HashSet<ElementId> = match (&model, coarse) {
+            (Some(st), true) => reviera_core::beams::all(st)
+                .into_iter()
+                .map(|(id, _)| id)
+                .collect(),
+            _ => Default::default(),
+        };
         // Temporarily hidden elements are left out of the plan (DOC-GFX-008).
         let filtered;
-        let scene = if visibility.is_empty() {
+        let scene = if visibility.is_empty() && framing.is_empty() {
             scene
         } else {
-            let shown = |e: Option<ElementId>| visibility.opacity(e).is_some();
+            let shown = |e: Option<ElementId>| {
+                visibility.opacity(e).is_some() && !e.is_some_and(|e| framing.contains(&e))
+            };
             edges = Rc::new(edges.iter().filter(|(e, _)| shown(*e)).cloned().collect());
             filtered = reviera_render::RenderScene {
                 meshes: scene
@@ -221,6 +251,62 @@ impl Gui {
         graphics.lines.extend(self.work_plane_grid(index));
         graphics.lines.extend(self.constraint_lines(index));
         graphics.lines.extend(self.temp_dim_lines(index));
+        // Structural connections at Coarse and Medium: a circle with a spoke toward each member.
+        let fine = model.as_ref().is_some_and(|st| {
+            view_element
+                .and_then(|e| st.get(e))
+                .map(reviera_core::views::detail_level)
+                == Some(reviera_core::views::DetailLevel::Fine)
+        });
+        if let (Some(st), false) = (&model, fine) {
+            let (lo, hi) = drawn;
+            let r = 2.5 * f64::from(scale) / 1000.0;
+            for (_, g) in reviera_core::connections::all(st) {
+                let c = g.point;
+                if c[2] < f64::from(lo) - 0.05 || c[2] > f64::from(hi) + 0.05 {
+                    continue;
+                }
+                let z = cut + 0.004;
+                let at =
+                    |a: f64, k: f64| [(c[0] + k * a.cos()) as f32, (c[1] + k * a.sin()) as f32, z];
+                let mut segments: Vec<[[f32; 3]; 2]> = (0..24)
+                    .map(|k| {
+                        let a = std::f64::consts::TAU * k as f64 / 24.0;
+                        let b = std::f64::consts::TAU * (k + 1) as f64 / 24.0;
+                        [at(a, r), at(b, r)]
+                    })
+                    .collect();
+                for s in &g.spokes {
+                    if s[0].hypot(s[1]) > 0.5 {
+                        let a = s[1].atan2(s[0]);
+                        segments.push([at(a, r), at(a, 2.0 * r)]);
+                    }
+                }
+                graphics.lines.push(reviera_render::plan::Lines {
+                    color: [0.0, 0.0, 0.0, 1.0],
+                    width: 0.35,
+                    segments,
+                });
+            }
+        }
+        // Coarse framing, over the datums it usually runs along. Only the user's temporary hiding
+        // hides a single line.
+        let temp = self.app.temp_state(doc, view_element).visibility();
+        for line in &sticks {
+            let w = weights(Some(line.element));
+            let Some(opacity) = temp.opacity(Some(line.element)) else {
+                continue;
+            };
+            let w = reviera_render::plan::Weights { opacity, ..w };
+            // Above the datums (at the cut plus 3 mm), which framing usually runs along.
+            let p = |q: [f64; 3]| [q[0] as f32, q[1] as f32, cut + 0.004];
+            graphics.lines.push(reviera_render::plan::Lines {
+                color: reviera_render::plan::fade([0.0, 0.0, 0.0, 1.0], w.opacity),
+                // A single-line member reads as a heavy line.
+                width: w.projection.max(0.5),
+                segments: vec![[p(line.segment[0]), p(line.segment[1])]],
+            });
+        }
         let v = &mut self.views[index];
         if let Some(viewport) = &mut v.viewport {
             viewport.set_plan(Some(graphics));

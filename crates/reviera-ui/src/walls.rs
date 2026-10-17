@@ -48,6 +48,14 @@ fn location_row(grid: &PropertyGrid, current: walls::LocationLine) {
 }
 const UNCONNECTED: &str = "Unconnected";
 
+/// Structural usages, as listed in Properties (STR-WALL-001).
+const WALL_USAGES: [reviera_core::structural::WallUsage; 4] = [
+    reviera_core::structural::WallUsage::NonBearing,
+    reviera_core::structural::WallUsage::Bearing,
+    reviera_core::structural::WallUsage::Shear,
+    reviera_core::structural::WallUsage::StructuralCombined,
+];
+
 impl Gui {
     fn wall_store(&self) -> Option<reviera_core::Store> {
         Some(self.app.document(self.doc?)?.doc.store().clone())
@@ -218,6 +226,22 @@ impl Gui {
             grid.set_property_read_only("wl_top_off", true);
             grid.set_help_string("wl_top_off", "Applies when the top is a level");
         }
+        // STR-WALL-001.
+        grid.append(Property::category("Structural", "c_wall_str"));
+        let usage = reviera_core::structural::wall_usage(e);
+        grid.append(Property::enumeration(
+            "Structural Usage",
+            "wl_usage",
+            WALL_USAGES
+                .iter()
+                .enumerate()
+                .map(|(i, u)| (u.label().to_owned(), i as i32))
+                .collect::<Vec<_>>(),
+            WALL_USAGES
+                .iter()
+                .position(|u| *u == usage)
+                .map_or(0, |i| i as i32),
+        ));
         let current = e
             .param("@type")
             .and_then(Value::as_str)
@@ -258,6 +282,13 @@ impl Gui {
             Ok(())
         };
         let result: Option<Result<(), String>> = match property {
+            "wl_usage" => WALL_USAGES.iter().find(|u| u.label() == text).map(|u| {
+                self.run(
+                    "wall.set_structural_usage",
+                    json!({ "wall_ids": selected, "usage": u }),
+                )
+                .map(|_| ())
+            }),
             "wl_base" => level(&text).map(|l| constraints(self, json!({ "base_level": l }))),
             "wl_base_off" => Some(constraints(self, json!({ "base_offset": text }))),
             "wl_top" if text == UNCONNECTED => {

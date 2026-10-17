@@ -565,6 +565,83 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "beams_on_grids" => format!(
             r#"<path d="M4 16h24M9 4v24M23 4v24" {s} stroke-dasharray="3 2"/><path d="M7 14h4v4H7zM21 14h4v4h-4z" fill="{a}" {s}/><path d="M11 14.5h10v3H11z" fill="{f}" {s}/>"#
         ),
+        "structural_brace" => format!(
+            r#"<path d="M4 4v24M28 4v24" {s}/><path d="M6 26L26 6l2 2L8 28z" fill="{f}" {s}/>"#
+        ),
+        "slanted_column" => format!(
+            r#"<path d="M4 26h12v3H4zM16 4h12v3H16z" fill="{a}" {s}/><path d="M9 26l10-19h3L12 26z" fill="{f}" {s}/>"#
+        ),
+        "footing" => format!(
+            r#"<path d="M13 4h6v14h-6z" fill="{a}" {s}/><path d="M4 18h24v8H4z" fill="{f}" {s}/>"#
+        ),
+        "footings_at_columns" => format!(
+            r#"<path d="M7 4h4v10H7zM21 4h4v10h-4z" fill="{a}" {s}/><path d="M3 14h12v5H3zM17 14h12v5H17z" fill="{f}" {s}/><path d="M9 22v6M23 22v6" {sa}/>"#
+        ),
+        "wall_foundation" => format!(
+            r#"<path d="M12 3h8v17h-8z" fill="{a}" {s}/><path d="M5 20h22v7H5z" fill="{f}" {s}/>"#
+        ),
+        "foundation_slab" => format!(
+            r#"<path d="M3 13l8-6h18l-8 6z" fill="{a}" {s}/><path d="M3 13h18v8H3zM21 13l8-6v8l-8 6z" fill="{f}" {s}/>"#
+        ),
+        "structural_wall" => format!(
+            r#"<path d="M6 4h20v24H6z" fill="{f}" {s}/><path d="M6 10h20M6 16h20M6 22h20M16 4v6M11 10v6M21 10v6M16 16v6M11 22v6M21 22v6" {sa}/>"#
+        ),
+        "structural_floor" => format!(
+            r#"<path d="M3 14l8-6h18l-8 6z" fill="{a}" {s}/><path d="M3 14h18v6H3zM21 14l8-6v6l-8 6z" fill="{f}" {s}/><path d="M8 24h14M19 21l3 3-3 3" {sa}/>"#
+        ),
+        "beam_system" => format!(
+            r#"<path d="M4 4h24v24H4z" fill="none" {sa}/><path d="M9 4v24M14 4v24M19 4v24M24 4v24" {s}/>"#
+        ),
+        "beam_system_remove" => format!(
+            r#"<path d="M4 4h24v24H4z" fill="none" {sa} stroke-dasharray="3 2"/><path d="M10 4v24M16 4v24M22 4v24" {s}/>"#
+        ),
+        "truss" => format!(
+            r#"<path d="M3 22h26M3 10h26M3 10v12M29 10v12M10 10v12M16 10v12M22 10v12" {s}/><path d="M3 10l7 12M10 10l6 12M22 22l7-12M16 22l6-12" {sa}/>"#
+        ),
+        "truss_remove" => format!(
+            r#"<path d="M3 22h26M3 10h26" {s} stroke-dasharray="3 2"/><path d="M3 10l7 12M10 22l6-12M16 10l6 12M22 22l7-12" {sa}/>"#
+        ),
+        "structural_settings" => format!(
+            r#"<path d="M5 6h14v3H5zM9 9h6v14H9zM5 23h14v3H5z" fill="{f}" {s}/><circle cx="24" cy="20" r="4" fill="none" {sa}/><path d="M24 13v3M24 24v3M17 20h3M28 20h3" {sa}/>"#
+        ),
+        "structural_connection" => format!(
+            r#"<path d="M4 16h24M16 4v24" {s}/><circle cx="16" cy="16" r="5" fill="{a}" {s}/>"#
+        ),
+        "pile" => format!(
+            r#"<path d="M12 4h8v20l-4 5-4-5z" fill="{f}" {s}/>"#
+        ),
+        "pile_cap" => format!(
+            r#"<path d="M4 6h24v8H4z" fill="{a}" {s}/><path d="M7 14h5v12H7zM20 14h5v12h-5z" fill="{f}" {s}/>"#
+        ),
+        "physical_to_analytical" => format!(
+            r#"<path d="M4 6h6v20H4z" fill="{f}" {s}/><path d="M12 16h6M15 13l3 3-3 3" {sa}/><path d="M24 6v20" stroke="rgb(208,26,26)" stroke-width="2"/><circle cx="24" cy="6" r="2" fill="rgb(26,77,208)"/><circle cx="24" cy="26" r="2" fill="rgb(26,77,208)"/>"#
+        ),
+        "analytical_to_physical" => format!(
+            r#"<path d="M6 6v20" stroke="rgb(208,26,26)" stroke-width="2"/><path d="M11 16h6M14 13l3 3-3 3" {sa}/><path d="M21 6h6v20h-6z" fill="{f}" {s}/>"#
+        ),
+        "analytical_disconnect" => format!(
+            r#"<path d="M4 6h6v20H4z" fill="{f}" {s}/><path d="M24 6v20" stroke="rgb(208,26,26)" stroke-width="2"/><path d="M13 12l6 8M19 12l-6 8" {sa}/>"#
+        ),
+        "analytical_merge" => {
+            r#"<path d="M4 8l10 8M4 24l10-8M28 16H14" stroke="rgb(208,26,26)" stroke-width="2"/><circle cx="14" cy="16" r="3" fill="rgb(26,77,208)"/>"#
+        .to_string()
+        }
+        "analytical_show" => {
+            r#"<path d="M6 26V8h20v18M6 8l20 18" stroke="rgb(208,26,26)" stroke-width="2" fill="none"/><circle cx="6" cy="8" r="2" fill="rgb(26,77,208)"/><circle cx="26" cy="8" r="2" fill="rgb(26,77,208)"/>"#
+        .to_string()
+        }
+        "column_base_supports" => format!(
+            r#"<path d="M13 3h6v17h-6z" fill="{f}" {s}/><path d="M8 28l8-8 8 8z" fill="{a}" {s}/>"#
+        ),
+        "load_combinations" => format!(
+            r#"<path d="M8 4v14M4 14l4 4 4-4M20 4v14M16 14l4 4 4-4" {sa}/><path d="M4 24h24M4 28h16" {s}/>"#
+        ),
+        "run_analysis" => format!(
+            r#"<path d="M4 22h24" {s}/><path d="M6 22v-4M26 22v-4" {s}/><path d="M6 18q10 8 20 0" fill="none" {sa}/><path d="M12 4l10 6-10 6z" fill="{a}" {s}/>"#
+        ),
+        "analysis_results" => format!(
+            r#"<path d="M4 26h24M6 26V14M12 26V8M18 26V16M24 26V11" {s}/><path d="M6 14l6-6 6 8 6-5" fill="none" {sa}/>"#
+        ),
         "section_catalog" => format!(
             r#"<path d="M6 6h12v3h-4v14h4v3H6v-3h4V9H6z" fill="{f}" {s}/><path d="M21 8h7M21 14h7M21 20h7M21 26h5" {sa}/>"#
         ),

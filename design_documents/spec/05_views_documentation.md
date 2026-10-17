@@ -1155,6 +1155,8 @@ Further rules:
 - [ ] Creating a 1:20 plan with the default map gives it Fine; changing its scale to 1:200 later leaves it at Fine.
 - [ ] A detail-level map with a gap between 1:50 and 1:75 is rejected with `detail_level_map.invalid`.
 
+*Built (2026-10-16):* `view.set_detail_level` and the view payload's `detailLevel` (Medium when unset); a plan's Properties show Detail Level. Coarse plans draw structural framing as single lines (STR-SET-001). Not yet: compound layers and coarse fills of walls, floors, roofs and ceilings by detail level, per-category and filter overrides, component geometry by detail level, the scale-to-detail-level map.
+
 ### Visual styles
 **ID:** DOC-GFX-011 · **Priority:** P0 (Wireframe, Hidden Line, Shaded, Consistent Colours), P1 (Textures, Realistic), P2 (Path traced) · **Ref:** research/04 §3.7 *Visual Styles*
 

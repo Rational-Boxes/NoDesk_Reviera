@@ -208,6 +208,11 @@ pub(crate) fn set_param(txn: &mut crate::txn::Transaction<'_>, p: SetParamParams
     if inserts::insert_type(e).is_some() {
         return inserts::set_type_param(txn, id, &p.param, &p.value);
     }
+    if crate::foundations::footing_type(e).is_some()
+        || crate::foundations::wall_foundation_type(e).is_some()
+    {
+        return crate::foundations::set_type_param(txn, id, &p.param, &p.value);
+    }
     if crate::columns::section_type(e).is_some() {
         return crate::columns::set_type_param(txn, id, &p.param, &p.value);
     }
@@ -360,6 +365,38 @@ pub(crate) fn set_type(txn: &mut crate::txn::Transaction<'_>, p: SetTypeParams) 
                 w.params.insert("@type".into(), Value::String(guid));
             })?;
             crate::columns::regenerate(txn.store(), txn.store().get(id).expect("exists"))?;
+        } else if crate::foundations::footing_recipe(e).is_some()
+            || crate::foundations::wall_foundation_recipe(e).is_some()
+        {
+            let footing = crate::foundations::footing_recipe(e).is_some();
+            let fits = if footing {
+                crate::foundations::footing_type(ty).is_some()
+            } else {
+                crate::foundations::wall_foundation_type(ty).is_some()
+            };
+            if !fits {
+                return Err(Error::new(
+                    "type.wrong_family",
+                    format!(
+                        "{} {id} needs a {} type",
+                        if footing {
+                            "footing"
+                        } else {
+                            "wall foundation"
+                        },
+                        if footing {
+                            "footing"
+                        } else {
+                            "wall foundation"
+                        }
+                    ),
+                ));
+            }
+            let guid = ty.guid().to_string();
+            txn.modify(id, |w| {
+                w.params.insert("@type".into(), Value::String(guid));
+            })?;
+            crate::foundations::regenerate(txn.store(), txn.store().get(id).expect("exists"))?;
         } else if crate::beams::beam_recipe(e).is_some() {
             if crate::beams::beam_type(ty).is_none() {
                 return Err(Error::new(

@@ -587,9 +587,11 @@ tools and the datums.
   `column.location_mark`; STR-COL-001). Attach Top and Detach Top work as for architectural
   columns.
 - **Section catalogues**: **Load Section** (and Load Beam Section) makes a column (or beam) type
-  from 257 standard steel sections in 12 catalogues: AISC W, C, L, WT, HSS and pipe; Euronorm IPE,
-  HEA and HEB; UK UB and UC. Catalogues carry nominal dimensions only, with sources
-  (`crates/reviera-core/data/sections`).
+  from 325 standard sections in 14 catalogues: AISC W, C, L, WT, HSS and pipe; Euronorm IPE, HEA
+  and HEB; UK UB and UC; North American sawn lumber (PS 20) and EN 336 timber, in the region's
+  timber grade. Catalogues carry nominal dimensions only, with sources
+  (`crates/reviera-core/data/sections`). A **materials library** of 35 steel grades, concrete
+  classes and timber grades gives their strengths and moduli (`structural.materials`).
 - **Beams**: Beam (`BM`) draws beams in plans, a click at each end, chained; **On Grids** puts one
   in every bay between columns along the selected grid lines. Their tops are at the level (each
   end can be offset, so beams slope). Each end joins what it rests on, a column, a wall or the
@@ -600,6 +602,63 @@ tools and the datums.
   (`beam.create`, `beam.create_on_grids`, `beam.set`, `beam.set_usage`, `beam.info`,
   `framing.set_justification`, `framing.set_extension`, `framing.set_cutback`,
   `framing.disjoin`, `framing.join`; STR-BEAM-001, 002). Plan snapping now finds grid crossings.
+- **Beam systems**: Beam System (`BS`) fills a bay of beams or walls with joists, parallel to the
+  nearest support, by maximum spacing, fixed distance, fixed number or clear spacing. The bay's
+  edges are locked to their supports, so the joists re-space when a girder moves; Remove Beam
+  System keeps the joists (`beam_system.create_auto`, `beam_system.create_sketch`,
+  `beam_system.set_layout`, `beam_system.remove`; STR-BSYS-001).
+- **Trusses**: Truss (`TS`) draws Pratt, Howe or Warren trusses; stretched, a truss keeps its
+  panels and re-proportions its webs. It is an IfcElementAssembly (TRUSS) aggregating its chords
+  and webs; Remove Truss keeps the members (`truss.create`, `truss.set`, `truss.remove`;
+  STR-TRUSS-001).
+- **Braces and slanted columns**: Brace (`BR`) draws a brace from this level to the next; an end
+  on a column or beam attaches to it and follows it when it moves, stretches or changes level, and
+  is freed (with a warning) if the member is deleted. Braces are IfcMember (BRACE); level ones are
+  horizontal bracing. Slanted Column places a column from a base to a top on the next level, end
+  point or angle driven (`brace.create`, `column.place_slanted`, `column.set_slant`; STR-BRACE-001,
+  STR-COL-002).
+- **Foundations**: isolated footings, clicked in a plan, at grid crossings, or under the selected
+  columns (joined: they follow the column, their tops at its base); wall foundations under walls,
+  bearing or retaining (toe and heel), following the wall; and foundation slabs, sketched, their
+  thickness below the level. Default sizes follow the region (`footing.place`,
+  `footing.place_at_columns`, `footing.place_at_grids`, `wall_foundation.create`,
+  `foundation_slab.create`, `foundation.info`; STR-FND-001 … 003).
+- **Structural walls and floors**: Structure › Wall draws bearing walls (shear and structural
+  combined in Properties: IfcWall SHEAR or SOLIDWALL, load-bearing); Structure › Floor sketches
+  structural floors with a span direction (`wall.set_structural_usage`, `floor.set_structural`,
+  `floor.set_span_direction`; STR-WALL-001, STR-FLOOR-001).
+- **Structural Settings and Coarse plans**: Structure › Structural Settings edits brace symbols,
+  the coarse cutback, point-to-point steel, analytical tolerances and load display scales; a
+  plan's Detail Level set to Coarse draws beams, braces and truss members as single lines
+  (`structural_settings.get`, `structural_settings.set`, `view.set_detail_level`; STR-SET-001,
+  DOC-GFX-010).
+- **Connections and piles**: Connection (`CN`) places a generic connection at the join of the
+  selected members, carrying approval, code-check and fabricator information (a circle with spokes
+  in plans); Pile and Pile Cap place bored or driven piles, a cap's piles laid out under it and
+  aggregated by it (`structural_connection.create`, `pile.place`, `pile_cap.place`;
+  STR-CONN-001, STR-FND-004).
+- **Analytical model** (first milestone): Analyze › Physical to Analytical makes analytical members
+  (IfcStructuralCurveMember) for columns, beams, braces and truss members, with nodes
+  (IfcStructuralPointConnection) merged at the joins and following their levels, end releases,
+  and associations with the physical elements; Analytical to Physical gives changed sections back;
+  Show Analytical draws the model over 3D views. It is written to IFC as an
+  IfcStructuralAnalysisModel with topology and end conditions (`analytical_member.*`,
+  `analytical_node.merge`, `analytical_association.*`, `analytical_automation.*`; STR-AM-001,
+  003, 004, 006).
+- **Loads and supports**: load natures from the region's code template, load cases, and
+  combinations by formula (nested ones expanded, circular ones refused) or generated offline from
+  ASCE 7-22 strength combinations or EN 1990 6.10 with the recommended factors; point and line
+  loads on analytical members and nodes; pinned, fixed, roller or spring supports at nodes (Column
+  Base Supports puts one under every column). All are written to IFC (structural actions, load
+  cases and groups with factors, boundary node conditions) and drawn by Show Analytical
+  (`load_case.*`, `load_combination.*`, `load.*`, `boundary_condition.*`; STR-LOAD-001, STR-LC-001,
+  STR-BC-001).
+- **Structural analysis**: Analyze › Run Analysis distils the analytical model, supports, cases,
+  combinations and loads to a neutral structural model and solves it out of process on the
+  compute host with the built-in linear static 3D frame solver; the results (displacements,
+  reactions, member forces along each member, per case and combination) are kept with the model
+  and marked stale when it changes. The model also exports as `reviera-structural-model.json`
+  (`structural_analysis.run`, `.collect`, `.results`, `.export_model`; ANA-FEA-001).
 - **Regional standards**: the model's building code sets the region, which catalogues are listed
   first, the default steel grade and concrete class (ASTM A992 and f'c 4000 psi in the US; S355
   and C30/37 in Europe; 350W and 30 MPa in Canada; 300PLUS and 32 MPa in Australia) and the design
@@ -638,6 +697,9 @@ milestone works end to end, with project-wide clash detection as its first job k
   resumable progress events, and resumable result downloads. Its `.proto` files and the Rust
   client and runner toolkit are MIT (`schemas/compute`, `clients/compute`), so a runner or
   service under any licence can implement it.
+
+- **Structural analysis**: `analysis.structural`, the second job kind, solves the neutral structural
+  model with the built-in linear static frame solver (see [Structure](#structure-in-development)).
 
 In development next: the Compute Jobs and Analysis Providers panels, IFC filter-profile
 distillations, the analysis provider layer, encryption, LAN and cloud compute hosts, real-time
@@ -887,11 +949,15 @@ area by area (reviewed against the spec on 2026-10-15).
   Mac).
 - **MCP**: streamable HTTP with tokens, rate and size limits, subscriptions, prompts,
   `execute_lua` and view images.
-- **Structure** (in development): structural columns, section catalogues and regional
-  standards are built (see [Structure](#structure-in-development)). Still to build: Structural
-  Settings and coarse stick symbols, the beam join editor and arc beams, slanted columns, braces,
-  structural walls and floors, foundations, beam systems, trusses, connections, rebar and the
-  analytical model; timber sections and a materials library with strengths.
+- **Structure** (in development): structural columns, slanted columns, beams, beam systems,
+  trusses, braces, generic connections, foundations with piles and pile caps, structural walls and
+  floors, Structural Settings with Coarse single-line framing, steel and timber section
+  catalogues, a materials library, regional standards and the analytical model's members, nodes,
+  automation, loads, load combinations, point supports and a built-in linear static solver are
+  built (see [Structure](#structure-in-development)). Still to build: the beam join editor and arc
+  beams, placing braces in elevations, connection types and the connection library, composite
+  decks and span symbols, truss types and profiles, rebar, analytical panels, area loads, the load
+  cases dialog, results diagrams and external analysis providers.
 - **MEP, families and collaboration** (BIMserver, OpenCDE, Godot) are specified but not started.
 - **Remote computation subsystem** (DM-RPC-001 … 010): in development; the first milestone is
   built (see [Analysis and remote computation](#analysis-and-remote-computation-in-development)).

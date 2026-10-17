@@ -19,6 +19,7 @@ pub mod overlaps;
 pub mod schedules;
 pub mod scripts;
 pub mod sheets;
+pub mod structural;
 pub mod views;
 
 use std::collections::BTreeMap;

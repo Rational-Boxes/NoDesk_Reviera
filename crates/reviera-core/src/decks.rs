@@ -737,6 +737,8 @@ pub(crate) fn create(txn: &mut crate::txn::Transaction<'_>, p: CreateParams) -> 
             loops: p.outline,
             level_id: p.level_id,
             offset: Some(height),
+            structural: false,
+            span_direction_edge: None,
         },
     )?;
     let settings = p.settings.unwrap_or_default();

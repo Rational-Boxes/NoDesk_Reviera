@@ -31,6 +31,8 @@ pub struct ColumnTool {
     cursor: Option<[f64; 2]>,
     /// Structure › Column: load-bearing columns of structural types.
     structural: bool,
+    /// Structure › Slanted Column: two clicks, the base then the top; the base once clicked.
+    slanted: Option<Option<[f64; 2]>>,
 }
 
 /// The section kinds, as listed in Properties.
@@ -43,6 +45,12 @@ const SECTIONS: [(&str, Section); 8] = [
     ("Tee", Section::Tee),
     ("Rectangular Hollow", Section::RectangularHollow),
     ("Round Hollow", Section::CircularHollow),
+];
+
+const COLUMN_STYLES: [(&str, &str); 3] = [
+    ("Vertical", "vertical"),
+    ("Slanted - End Point Driven", "end_point"),
+    ("Slanted - Angle Driven", "angle"),
 ];
 
 const MATERIAL_KINDS: [(&str, &str); 5] = [
@@ -76,6 +84,7 @@ impl Gui {
             rotation: 0.0,
             cursor: None,
             structural,
+            slanted: None,
         });
         self.properties_stale = true;
         frame.set_status_text(
@@ -86,6 +95,18 @@ impl Gui {
             },
             0,
         );
+    }
+
+    /// Structure › Slanted Column: click the base (on this level), then the top (on the next).
+    pub(crate) fn start_slanted_column_tool(&mut self) {
+        self.start_column_tool(true);
+        if let Some(t) = &mut self.column_tool {
+            t.slanted = Some(None);
+            self.frame.set_status_text(
+                "Slanted Column: click its base (on this level), then its top (on the level above). Esc ends the tool.",
+                0,
+            );
+        }
     }
 
     pub(crate) fn end_column_tool(&mut self) -> bool {
@@ -194,6 +215,37 @@ impl Gui {
                 .find(|l| l.elevation > z + 1e-6)
                 .map(|l| l.id)
         });
+        if let Some(base) = t.slanted {
+            let Some(base) = base else {
+                if let Some(t) = &mut self.column_tool {
+                    t.slanted = Some(Some(p));
+                }
+                return frame.set_status_text("Slanted Column: click its top", 0);
+            };
+            let (p2_level, p2_offset) = match top {
+                Some(l) => (l, 0.0),
+                None => (t.level, 3.0),
+            };
+            let mut args = json!({
+                "p1": base, "p1_level": t.level, "p2": p, "p2_level": p2_level,
+                "p2_offset": p2_offset, "rotation": t.rotation,
+            });
+            if let Some(ty) = self.tool_column_type() {
+                args["type_id"] = json!(ty);
+            }
+            match self.run("column.place_slanted", args) {
+                Ok(_) => {
+                    if let Some(t) = &mut self.column_tool {
+                        t.slanted = Some(None);
+                    }
+                    self.refresh_scene(&frame);
+                    self.properties_stale = true;
+                    frame.set_status_text("Slanted column placed; click the next base, or Esc", 0);
+                }
+                Err(e) => frame.set_status_text(&e, 0),
+            }
+            return;
+        }
         let top = match top {
             Some(l) => json!({ "level": l }),
             None => json!({ "unconnected": 3.0 }),
@@ -350,6 +402,28 @@ impl Gui {
                 "ct_designation",
                 t.designation.clone().unwrap_or_default(),
             ));
+            // The material's key values, from the library (STR-SEC-001).
+            if let Some(m) = t
+                .material
+                .as_deref()
+                .and_then(reviera_core::materials_library::find)
+            {
+                let p = &m.properties;
+                let mpa = |k: &str| p.get(k).map(|v| format!("{v:.0} MPa"));
+                let strength = mpa("fy_MPa")
+                    .map(|v| format!("fy {v}"))
+                    .or_else(|| mpa("fck_MPa").map(|v| format!("fck {v}")))
+                    .or_else(|| mpa("fm_k_MPa").map(|v| format!("fm,k {v}")))
+                    .or_else(|| mpa("Fb_MPa").map(|v| format!("Fb {v}")))
+                    .unwrap_or_default();
+                let e = mpa("E_MPa").map(|v| format!(", E {v}")).unwrap_or_default();
+                grid.append(Property::string(
+                    "Material Strength (type)",
+                    "ct_strength",
+                    format!("{strength}{e} — {}", m.standard),
+                ));
+                grid.set_property_read_only("ct_strength", true);
+            }
         }
     }
 
@@ -394,6 +468,26 @@ impl Gui {
         grid.set_property_read_only("co_attached", true);
         let degrees = format!("{:.1}°", r.rotation.to_degrees());
         grid.append(Property::string("Rotation", "co_rotation", degrees));
+        // STR-COL-002: vertical or slanted.
+        let style = match r.slant {
+            None => 0,
+            Some(columns::Slant::EndPoint { .. }) => 1,
+            Some(columns::Slant::Angle { .. }) => 2,
+        };
+        grid.append(Property::enumeration(
+            "Column Style",
+            "co_style",
+            COLUMN_STYLES
+                .iter()
+                .enumerate()
+                .map(|(i, (n, _))| ((*n).to_owned(), i as i32))
+                .collect::<Vec<_>>(),
+            style,
+        ));
+        if let Some(columns::Slant::Angle { angle, .. }) = r.slant {
+            let a = format!("{:.1}°", angle.to_degrees());
+            grid.append(Property::string("Angle From Horizontal", "co_angle", a));
+        }
         // Computed from the nearest grid crossing (STR-COL-001).
         let mark = columns::location_mark(&store, r.point).unwrap_or_else(|| "—".into());
         grid.append(Property::string("Column Location Mark", "co_mark", mark));
@@ -425,15 +519,20 @@ impl Gui {
     /// Structure › Load Section: a standard section (W, HSS, pipe, IPE, HEA, HEB, UB, UC …)
     /// from Reviera's catalogues, the model's region's first, as the Column tool's type.
     pub(crate) fn load_column_section(&mut self) {
-        self.load_section(false);
+        self.load_section("column");
     }
 
     /// Structure › Load Beam Section: the same, as the Beam tool's type.
     pub(crate) fn load_beam_section(&mut self) {
-        self.load_section(true);
+        self.load_section("beam");
     }
 
-    fn load_section(&mut self, beam: bool) {
+    /// Structure › Load Brace Section: the same, as the Brace tool's type.
+    pub(crate) fn load_brace_section(&mut self) {
+        self.load_section("brace");
+    }
+
+    fn load_section(&mut self, kind: &str) {
         let frame = self.frame;
         let Ok(cats) = self.run("structural.catalogs", json!({})) else {
             return;
@@ -489,10 +588,10 @@ impl Gui {
         else {
             return;
         };
-        let (command, key, tool) = if beam {
-            ("beam.load_section", super::beams::TYPE_KEY, "Beam")
-        } else {
-            ("column.load_section", STRUCTURAL_TYPE_KEY, "Column")
+        let (command, key, tool) = match kind {
+            "beam" => ("beam.load_section", super::beams::TYPE_KEY, "Beam"),
+            "brace" => ("brace.load_section", super::beams::BRACE_TYPE_KEY, "Brace"),
+            _ => ("column.load_section", STRUCTURAL_TYPE_KEY, "Column"),
         };
         match self.run(
             command,
@@ -653,6 +752,30 @@ impl Gui {
                     format!("{}°", text.trim())
                 };
                 Some(set(self, json!({ "rotation": t })))
+            }
+            "co_style" => COLUMN_STYLES
+                .iter()
+                .find(|(n, _)| *n == text)
+                .map(|(_, k)| {
+                    self.run(
+                        "column.set_slant",
+                        json!({ "column_ids": selected, "style": k }),
+                    )
+                    .map(|_| ())
+                }),
+            "co_angle" => {
+                let t = if text.trim().ends_with('°') || text.contains("deg") {
+                    text.clone()
+                } else {
+                    format!("{}°", text.trim())
+                };
+                Some(
+                    self.run(
+                        "column.set_slant",
+                        json!({ "column_ids": selected, "style": "angle", "angle": t }),
+                    )
+                    .map(|_| ()),
+                )
             }
             "ct_type" => self.choose_column_type(&text, &selected),
             "ct_section" => self.type_rows.map(|t| {

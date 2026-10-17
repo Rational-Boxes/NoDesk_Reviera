@@ -37,6 +37,21 @@ pub const ATTRIBUTES: &[&str] = &[
     "ObjectType",
     "PredefinedType",
     "LongName",
+    // Structural load groups and actions (STR-LC-001, STR-LOAD-001).
+    "ActionType",
+    "ActionSource",
+    "Purpose",
+    "GlobalOrLocal",
+    "ProjectedOrTrue",
+    "DestabilizingLoad",
+];
+/// Direct attributes whose values are enumerations.
+const ENUM_ATTRIBUTES: &[&str] = &[
+    "PredefinedType",
+    "ActionType",
+    "ActionSource",
+    "GlobalOrLocal",
+    "ProjectedOrTrue",
 ];
 /// Direct attributes that are lengths, exposed in metres.
 pub const LENGTH_ATTRIBUTES: &[&str] = &["Elevation"];
@@ -470,8 +485,9 @@ impl ValueWriter<'_> {
         }
         let v = match value {
             None | Some(Value::Null) => AttrValue::Null,
-            Some(Value::String(s)) if attr == "PredefinedType" => AttrValue::Enum(s.clone()),
+            Some(Value::String(s)) if ENUM_ATTRIBUTES.contains(&attr) => AttrValue::Enum(s.clone()),
             Some(Value::String(s)) => AttrValue::String(s.clone()),
+            Some(Value::Bool(b)) => AttrValue::Bool(*b),
             Some(other) => return Err(unsupported(format!("`@{attr}` must be text, not {other}"))),
         };
         Ok(self.ifc.set_attribute(owner, attr, &v)?)

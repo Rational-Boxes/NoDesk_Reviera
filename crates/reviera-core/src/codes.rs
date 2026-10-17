@@ -117,10 +117,13 @@ impl Code {
                 "aisc_c",
                 "aisc_l",
                 "aisc_wt",
+                "na_lumber",
             ],
             steel: "Steel ASTM A992",
             concrete: "Concrete f'c 4000 psi",
+            timber: "Wood Douglas Fir-Larch No.2",
             beam: ("aisc_w", "W12X26"),
+            brace: ("aisc_hss_rect", "HSS6X6X3/8"),
             loads: "ASCE/SEI 7",
             steel_standard: "AISC 360",
             concrete_standard: "ACI 318",
@@ -128,10 +131,12 @@ impl Code {
         };
         let eu = StructuralDefaults {
             region: Region::Europe,
-            catalogs: &["eu_heb", "eu_hea", "eu_ipe", "uk_uc", "uk_ub"],
+            catalogs: &["eu_heb", "eu_hea", "eu_ipe", "uk_uc", "uk_ub", "eu_timber"],
             steel: "Steel S355 (EN 10025-2)",
             concrete: "Concrete C30/37",
+            timber: "Timber C24 (EN 338)",
             beam: ("eu_ipe", "IPE 300"),
+            brace: ("eu_hea", "HEA 160"),
             loads: "EN 1990, EN 1991 (with the National Annex)",
             steel_standard: "EN 1993",
             concrete_standard: "EN 1992",
@@ -141,7 +146,8 @@ impl Code {
             Code::Ibc | Code::Irc => us,
             Code::NbcCanada => StructuralDefaults {
                 region: Region::Canada,
-                steel: "Steel ASTM A992 / CSA G40.21 350W",
+                steel: "Steel CSA G40.21 350W",
+                timber: "Wood Spruce-Pine-Fir No.1/No.2",
                 concrete: "Concrete 30 MPa",
                 loads: "NBC Part 4",
                 steel_standard: "CSA S16",
@@ -151,8 +157,9 @@ impl Code {
             },
             Code::UkAdk => StructuralDefaults {
                 region: Region::UnitedKingdom,
-                catalogs: &["uk_uc", "uk_ub", "eu_heb", "eu_hea", "eu_ipe"],
+                catalogs: &["uk_uc", "uk_ub", "eu_heb", "eu_hea", "eu_ipe", "eu_timber"],
                 beam: ("uk_ub", "UB 305x165x40"),
+                brace: ("uk_uc", "UC 152x152x23"),
                 loads: "EN 1990, EN 1991 (with the UK National Annex)",
                 ..eu
             },
@@ -244,8 +251,12 @@ pub struct StructuralDefaults {
     pub catalogs: &'static [&'static str],
     pub steel: &'static str,
     pub concrete: &'static str,
+    /// The usual timber grade or strength class (for timber sections without their own).
+    pub timber: &'static str,
     /// The usual rolled beam (catalogue, designation): the default beam type.
     pub beam: (&'static str, &'static str),
+    /// The usual brace section (catalogue, designation): the default brace type.
+    pub brace: (&'static str, &'static str),
     pub loads: &'static str,
     pub steel_standard: &'static str,
     pub concrete_standard: &'static str,

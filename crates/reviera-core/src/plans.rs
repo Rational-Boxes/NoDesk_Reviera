@@ -292,6 +292,7 @@ pub(crate) fn create_plan(
             section: None,
             color_scheme: None,
             area_scheme: None,
+            detail_level: None,
         };
         let mut value = serde_json::to_value(&data).expect("view data serialises");
         if let Some(scale) = p.scale {

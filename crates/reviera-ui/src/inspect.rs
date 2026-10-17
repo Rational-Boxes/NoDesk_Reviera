@@ -144,8 +144,22 @@ impl Gui {
         vis.virtual_volumes = self.virtual_mode(v);
         // Parts or their originals, by the view's Parts Visibility (ARC-PART-004).
         if let Some(d) = self.app.document(v.doc) {
+            let store = d.doc.store();
             vis.hidden
-                .extend(reviera_core::parts::hidden_in(d.doc.store(), v.element));
+                .extend(reviera_core::parts::hidden_in(store, v.element));
+            // A Coarse plan draws structural framing as single lines, not bodies (STR-SET-001).
+            let coarse = v.plan.is_some()
+                && v.element
+                    .and_then(|e| store.get(e))
+                    .map(reviera_core::views::detail_level)
+                    == Some(reviera_core::views::DetailLevel::Coarse);
+            if coarse {
+                vis.hidden.extend(
+                    reviera_core::beams::all(store)
+                        .into_iter()
+                        .map(|(id, _)| id),
+                );
+            }
         }
         vis
     }
@@ -171,6 +185,7 @@ impl Gui {
         let visibility = self.view_visibility(v);
         let mut lines = self.clip_lines(v, section_box.as_ref(), &slices);
         lines.extend(self.datum_3d_lines(index));
+        lines.extend(self.analytical_lines(index));
         lines.extend(self.work_plane_grid(index));
         let v = &mut self.views[index];
         if let Some(vp) = &mut v.viewport {

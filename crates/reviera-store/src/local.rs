@@ -527,6 +527,8 @@ impl LocalProject {
             if recipe_kind == Some(roofs::ROOF_RECIPE)
                 || recipe_kind == Some(reviera_core::columns::COLUMN_RECIPE)
                 || recipe_kind == Some(reviera_core::beams::BEAM_RECIPE)
+                || recipe_kind == Some(reviera_core::foundations::FOOTING_RECIPE)
+                || recipe_kind == Some(reviera_core::foundations::WALL_FOUNDATION_RECIPE)
                 || recipe_kind == Some(reviera_core::ramps::RAMP_RECIPE)
                 || recipe_kind == Some(reviera_core::skylights::SKYLIGHT_RECIPE)
                 || recipe_kind == Some(stairs::STAIR_RECIPE)
@@ -725,6 +727,10 @@ impl LocalProject {
             self.write_stairs(doc)?;
             self.write_columns(doc)?;
             self.write_beams(doc)?;
+            self.write_beam_systems(doc)?;
+            self.write_analytical(doc)?;
+            self.write_loads(doc)?;
+            self.write_foundations(doc)?;
             self.write_ramps(doc)?;
             self.write_slab_edges(doc)?;
             self.write_wall_sweeps(doc)?;
@@ -1752,13 +1758,643 @@ impl LocalProject {
                 self.length_scale,
                 contexts,
             )?;
-            let storey = reviera_core::beams::beam_recipe(store.get(*id).expect("listed"))
+            // A system's beams are aggregated by it, not contained.
+            let recipe = reviera_core::beams::beam_recipe(store.get(*id).expect("listed"));
+            if recipe.as_ref().is_some_and(|r| r.system.is_some()) {
+                continue;
+            }
+            let storey = recipe
                 .and_then(|r| GlobalId::parse(&r.level))
                 .and_then(|g| store.find_by_guid(&g))
                 .and_then(|l| self.steps.get(&l).copied());
             if let Some(storey) = storey {
                 geometry::contain(&mut self.ifc, step, storey, owner_history)?;
             }
+        }
+        Ok(())
+    }
+
+    /// Writes the analytical model (STR-AM-001, 003): each node's vertex and each member's axis and
+    /// edge between its nodes' vertices (`Reference` topology representations), each member end's
+    /// `IfcRelConnectsStructuralMember` with its releases as an `IfcBoundaryNodeCondition`, and the
+    /// members and nodes assigned to the `IfcStructuralAnalysisModel`. Reviera's relations are
+    /// marked `rxd:analytical` and rewritten on every save.
+    fn write_analytical(&mut self, doc: &Document) -> Result<()> {
+        const TAG: &str = "rxd:analytical";
+        let store = doc.store();
+        let nodes = reviera_core::analytical::nodes(store);
+        let members = reviera_core::analytical::members(store);
+        let model = store
+            .iter()
+            .find(|e| reviera_core::analytical::is_model(e))
+            .and_then(|e| self.steps.get(&e.id()).copied());
+        if nodes.is_empty() && members.is_empty() {
+            return Ok(());
+        }
+        let contexts = geometry::Contexts::find(&self.ifc)?;
+        let scale = self.length_scale;
+        let r = |id: StepId| AttrValue::Ref(id.0);
+        // Reviera's earlier relations and representations go first.
+        // Members before nodes: their edges use the nodes' vertices.
+        let mut steps: Vec<StepId> = Vec::new();
+        for (id, _) in &members {
+            steps.extend(self.steps.get(id).copied());
+        }
+        for (id, _) in &nodes {
+            steps.extend(self.steps.get(id).copied());
+        }
+        for &step in &steps {
+            for class in ["IfcRelConnectsStructuralMember", "IfcRelAssignsToGroup"] {
+                for rel in self.ifc.referenced_by(step, class)? {
+                    if matches!(self.ifc.attribute(rel, "Description")?, AttrValue::String(d) if d == TAG)
+                    {
+                        if let AttrValue::Ref(c) = self
+                            .ifc
+                            .attribute(rel, "AppliedCondition")
+                            .unwrap_or(AttrValue::Null)
+                        {
+                            let _ = self.ifc.remove(StepId(c));
+                        }
+                        let _ = self.ifc.remove(rel);
+                    }
+                }
+            }
+            if let AttrValue::Ref(shape) = self.ifc.attribute(step, "Representation")? {
+                self.remove_topology(StepId(shape))?;
+                self.ifc
+                    .set_attribute(step, "Representation", &AttrValue::Null)?;
+            }
+        }
+        let point = |ifc: &mut IfcModel, p: [f64; 3]| -> Result<StepId> {
+            let id = ifc.create("IfcCartesianPoint")?;
+            ifc.set_attribute(
+                id,
+                "Coordinates",
+                &AttrValue::List(p.iter().map(|v| AttrValue::Real(v / scale)).collect()),
+            )?;
+            Ok(id)
+        };
+        let topology = |ifc: &mut IfcModel, kind: &str, item: StepId| -> Result<StepId> {
+            let rep = ifc.create("IfcTopologyRepresentation")?;
+            ifc.set_attribute(rep, "ContextOfItems", &AttrValue::Ref(contexts.axis.0))?;
+            ifc.set_attribute(
+                rep,
+                "RepresentationIdentifier",
+                &AttrValue::String("Reference".into()),
+            )?;
+            ifc.set_attribute(rep, "RepresentationType", &AttrValue::String(kind.into()))?;
+            ifc.set_attribute(rep, "Items", &AttrValue::List(vec![AttrValue::Ref(item.0)]))?;
+            let shape = ifc.create("IfcProductDefinitionShape")?;
+            ifc.set_attribute(
+                shape,
+                "Representations",
+                &AttrValue::List(vec![AttrValue::Ref(rep.0)]),
+            )?;
+            Ok(shape)
+        };
+        let mut vertex: HashMap<ElementId, StepId> = HashMap::new();
+        for (id, p) in &nodes {
+            let Some(&step) = self.steps.get(id) else {
+                continue;
+            };
+            let pt = point(&mut self.ifc, *p)?;
+            let v = self.ifc.create("IfcVertexPoint")?;
+            self.ifc.set_attribute(v, "VertexGeometry", &r(pt))?;
+            vertex.insert(*id, v);
+            let shape = topology(&mut self.ifc, "Vertex", v)?;
+            self.ifc.set_attribute(step, "Representation", &r(shape))?;
+        }
+        let stiff = |fixed: bool| AttrValue::Typed {
+            type_name: "IfcBoolean".into(),
+            value: Box::new(AttrValue::Bool(fixed)),
+        };
+        let mut grouped: Vec<AttrValue> = Vec::new();
+        for (id, m) in &members {
+            let Some(&step) = self.steps.get(id) else {
+                continue;
+            };
+            let (Some(&va), Some(&vb)) = (vertex.get(&m.nodes[0]), vertex.get(&m.nodes[1])) else {
+                continue;
+            };
+            let d = [m.end[0] - m.start[0], m.end[1] - m.start[1]];
+            // The section's local z: up for members that run across, along x for vertical ones.
+            let axis = if d[0].hypot(d[1]) < 1e-6 {
+                [1.0, 0.0, 0.0]
+            } else {
+                [0.0, 0.0, 1.0]
+            };
+            let dir = self.ifc.create("IfcDirection")?;
+            self.ifc.set_attribute(
+                dir,
+                "DirectionRatios",
+                &AttrValue::List(axis.iter().map(|v| AttrValue::Real(*v)).collect()),
+            )?;
+            self.ifc.set_attribute(step, "Axis", &r(dir))?;
+            let edge = self.ifc.create("IfcEdge")?;
+            self.ifc.set_attribute(edge, "EdgeStart", &r(va))?;
+            self.ifc.set_attribute(edge, "EdgeEnd", &r(vb))?;
+            let shape = topology(&mut self.ifc, "Edge", edge)?;
+            self.ifc.set_attribute(step, "Representation", &r(shape))?;
+            for (k, node) in m.nodes.iter().enumerate() {
+                let Some(&ns) = self.steps.get(node) else {
+                    continue;
+                };
+                let f = m.recipe.releases[k];
+                let cond = self.ifc.create("IfcBoundaryNodeCondition")?;
+                for (i, attr) in [
+                    "TranslationalStiffnessX",
+                    "TranslationalStiffnessY",
+                    "TranslationalStiffnessZ",
+                    "RotationalStiffnessX",
+                    "RotationalStiffnessY",
+                    "RotationalStiffnessZ",
+                ]
+                .into_iter()
+                .enumerate()
+                {
+                    self.ifc.set_attribute(cond, attr, &stiff(f[i]))?;
+                }
+                let rel = self
+                    .ifc
+                    .create_rooted("IfcRelConnectsStructuralMember", &GlobalId::new())?;
+                self.ifc
+                    .set_attribute(rel, "Description", &AttrValue::String(TAG.into()))?;
+                self.ifc
+                    .set_attribute(rel, "RelatingStructuralMember", &r(step))?;
+                self.ifc
+                    .set_attribute(rel, "RelatedStructuralConnection", &r(ns))?;
+                self.ifc.set_attribute(rel, "AppliedCondition", &r(cond))?;
+            }
+            grouped.push(r(step));
+        }
+        grouped.extend(
+            nodes
+                .iter()
+                .filter_map(|(id, _)| self.steps.get(id).map(|s| r(*s))),
+        );
+        if let (Some(model), false) = (model, grouped.is_empty()) {
+            let rel = self
+                .ifc
+                .create_rooted("IfcRelAssignsToGroup", &GlobalId::new())?;
+            self.ifc
+                .set_attribute(rel, "Description", &AttrValue::String(TAG.into()))?;
+            self.ifc
+                .set_attribute(rel, "RelatedObjects", &AttrValue::List(grouped))?;
+            self.ifc.set_attribute(rel, "RelatingGroup", &r(model))?;
+        }
+        Ok(())
+    }
+
+    /// Writes loads, load groups and supports (STR-LOAD-001, STR-LC-001, STR-BC-001): each supported
+    /// node's `AppliedCondition` (an `IfcBoundaryNodeCondition`: `IfcBoolean` for fixed or released,
+    /// stiffness measures for springs); each combination's cases by `IfcRelAssignsToGroupByFactor`;
+    /// every load group as `LoadedBy` the analysis model; and each load's applied load (a single
+    /// force, a linear force, or a linear configuration of two), its host by
+    /// `IfcRelConnectsStructuralActivity` and its case by `IfcRelAssignsToGroup`. Reviera's relations
+    /// are marked `rxd:analytical` and rewritten on every save.
+    fn write_loads(&mut self, doc: &Document) -> Result<()> {
+        const TAG: &str = "rxd:analytical";
+        let store = doc.store();
+        let r = |id: StepId| AttrValue::Ref(id.0);
+        let tagged = |ifc: &IfcModel, rel: StepId| -> bool {
+            matches!(ifc.attribute(rel, "Description"), Ok(AttrValue::String(d)) if d == TAG)
+        };
+        // Supports.
+        for e in store.iter() {
+            let Some(n) = reviera_core::analytical::node_recipe(e) else {
+                continue;
+            };
+            let Some(&step) = self.steps.get(&e.id()) else {
+                continue;
+            };
+            if let AttrValue::Ref(old) = self.ifc.attribute(step, "AppliedCondition")? {
+                self.ifc
+                    .set_attribute(step, "AppliedCondition", &AttrValue::Null)?;
+                self.ifc.remove(StepId(old))?;
+            }
+            let Some(sup) = n.support else { continue };
+            let cond = self.ifc.create("IfcBoundaryNodeCondition")?;
+            self.ifc
+                .set_attribute(cond, "Name", &AttrValue::String(format!("{:?}", sup.state)))?;
+            for (i, attr) in [
+                "TranslationalStiffnessX",
+                "TranslationalStiffnessY",
+                "TranslationalStiffnessZ",
+                "RotationalStiffnessX",
+                "RotationalStiffnessY",
+                "RotationalStiffnessZ",
+            ]
+            .into_iter()
+            .enumerate()
+            {
+                let v = match sup.dof[i] {
+                    reviera_core::loads::Dof::Fixed => ("IfcBoolean", AttrValue::Bool(true)),
+                    reviera_core::loads::Dof::Released => ("IfcBoolean", AttrValue::Bool(false)),
+                    reviera_core::loads::Dof::Spring(k) if i < 3 => {
+                        ("IfcLinearStiffnessMeasure", AttrValue::Real(k))
+                    }
+                    reviera_core::loads::Dof::Spring(k) => {
+                        ("IfcRotationalStiffnessMeasure", AttrValue::Real(k))
+                    }
+                };
+                self.ifc.set_attribute(
+                    cond,
+                    attr,
+                    &AttrValue::Typed {
+                        type_name: v.0.into(),
+                        value: Box::new(v.1),
+                    },
+                )?;
+            }
+            self.ifc.set_attribute(step, "AppliedCondition", &r(cond))?;
+        }
+        // Combinations' factors, and the load groups the model is loaded by.
+        let mut groups = Vec::new();
+        for e in store.iter() {
+            let is_case = reviera_core::loads::case_recipe(e).is_some();
+            let combination = reviera_core::loads::combination_recipe(e);
+            if !is_case && combination.is_none() {
+                continue;
+            }
+            let Some(&step) = self.steps.get(&e.id()) else {
+                continue;
+            };
+            groups.push(r(step));
+            for rel in self
+                .ifc
+                .referenced_by(step, "IfcRelAssignsToGroupByFactor")?
+            {
+                if tagged(&self.ifc, rel) {
+                    self.ifc.remove(rel)?;
+                }
+            }
+            let Some(c) = combination else { continue };
+            let name = e.name.clone().unwrap_or_default();
+            let Ok(factors) = reviera_core::loads::factors(store, &c.formula, Some(&name)) else {
+                continue;
+            };
+            for (case, f) in factors {
+                let Some(&cs) = self.steps.get(&case) else {
+                    continue;
+                };
+                let rel = self
+                    .ifc
+                    .create_rooted("IfcRelAssignsToGroupByFactor", &GlobalId::new())?;
+                self.ifc
+                    .set_attribute(rel, "Description", &AttrValue::String(TAG.into()))?;
+                self.ifc
+                    .set_attribute(rel, "RelatedObjects", &AttrValue::List(vec![r(cs)]))?;
+                self.ifc.set_attribute(rel, "RelatingGroup", &r(step))?;
+                self.ifc.set_attribute(rel, "Factor", &AttrValue::Real(f))?;
+            }
+        }
+        if let Some(model) = store
+            .iter()
+            .find(|e| reviera_core::analytical::is_model(e))
+            .and_then(|e| self.steps.get(&e.id()).copied())
+        {
+            self.ifc.set_attribute(
+                model,
+                "LoadedBy",
+                &if groups.is_empty() {
+                    AttrValue::Null
+                } else {
+                    AttrValue::List(groups)
+                },
+            )?;
+        }
+        // Loads.
+        let members = reviera_core::analytical::members(store);
+        let mut by_case: HashMap<String, Vec<AttrValue>> = HashMap::new();
+        for e in store.iter() {
+            let point = reviera_core::loads::point_load(e);
+            let line = reviera_core::loads::line_load(e);
+            if point.is_none() && line.is_none() {
+                continue;
+            }
+            let Some(&step) = self.steps.get(&e.id()) else {
+                continue;
+            };
+            for class in ["IfcRelConnectsStructuralActivity", "IfcRelAssignsToGroup"] {
+                for rel in self.ifc.referenced_by(step, class)? {
+                    if tagged(&self.ifc, rel) {
+                        self.ifc.remove(rel)?;
+                    }
+                }
+            }
+            if let AttrValue::Ref(old) = self.ifc.attribute(step, "AppliedLoad")? {
+                self.ifc
+                    .set_attribute(step, "AppliedLoad", &AttrValue::Null)?;
+                let inner = self
+                    .ifc
+                    .attribute(StepId(old), "Values")
+                    .unwrap_or(AttrValue::Null);
+                self.ifc.remove(StepId(old))?;
+                if let AttrValue::List(items) = inner {
+                    for i in items {
+                        if let AttrValue::Ref(i) = i {
+                            self.ifc.remove(StepId(i))?;
+                        }
+                    }
+                }
+            }
+            let reals = |v: &[f64]| v.iter().map(|x| AttrValue::Real(*x)).collect::<Vec<_>>();
+            let (host, case, load) = if let Some(p) = point {
+                let load = self.ifc.create("IfcStructuralLoadSingleForce")?;
+                for (i, attr) in [
+                    "ForceX", "ForceY", "ForceZ", "MomentX", "MomentY", "MomentZ",
+                ]
+                .into_iter()
+                .enumerate()
+                {
+                    self.ifc
+                        .set_attribute(load, attr, &AttrValue::Real(p.forces[i]))?;
+                }
+                (p.host, p.case, load)
+            } else {
+                let l = line.expect("a line load");
+                let linear = |ifc: &mut IfcModel, v: [f64; 3]| -> Result<StepId> {
+                    let id = ifc.create("IfcStructuralLoadLinearForce")?;
+                    for (i, attr) in ["LinearForceX", "LinearForceY", "LinearForceZ"]
+                        .into_iter()
+                        .enumerate()
+                    {
+                        ifc.set_attribute(id, attr, &AttrValue::Real(v[i]))?;
+                    }
+                    Ok(id)
+                };
+                let load = if l.start == l.end {
+                    linear(&mut self.ifc, l.start)?
+                } else {
+                    let a = linear(&mut self.ifc, l.start)?;
+                    let b = linear(&mut self.ifc, l.end)?;
+                    let length = members
+                        .iter()
+                        .find(|(m, _)| {
+                            store
+                                .get(*m)
+                                .is_some_and(|me| me.guid().to_string() == l.host)
+                        })
+                        .map_or(1.0, |(_, m)| {
+                            let d = [
+                                m.end[0] - m.start[0],
+                                m.end[1] - m.start[1],
+                                m.end[2] - m.start[2],
+                            ];
+                            (d[0] * d[0] + d[1] * d[1] + d[2] * d[2]).sqrt()
+                        });
+                    let cfg = self.ifc.create("IfcStructuralLoadConfiguration")?;
+                    self.ifc
+                        .set_attribute(cfg, "Values", &AttrValue::List(vec![r(a), r(b)]))?;
+                    self.ifc.set_attribute(
+                        cfg,
+                        "Locations",
+                        &AttrValue::List(vec![
+                            AttrValue::List(reals(&[0.0])),
+                            AttrValue::List(reals(&[length / self.length_scale])),
+                        ]),
+                    )?;
+                    cfg
+                };
+                (l.host, l.case, load)
+            };
+            self.ifc.set_attribute(step, "AppliedLoad", &r(load))?;
+            if let Some(&hs) = GlobalId::parse(&host)
+                .and_then(|g| store.find_by_guid(&g))
+                .and_then(|h| self.steps.get(&h))
+            {
+                let rel = self
+                    .ifc
+                    .create_rooted("IfcRelConnectsStructuralActivity", &GlobalId::new())?;
+                self.ifc
+                    .set_attribute(rel, "Description", &AttrValue::String(TAG.into()))?;
+                self.ifc.set_attribute(rel, "RelatingElement", &r(hs))?;
+                self.ifc
+                    .set_attribute(rel, "RelatedStructuralActivity", &r(step))?;
+            }
+            by_case.entry(case).or_default().push(r(step));
+        }
+        for (case, actions) in by_case {
+            let Some(&cs) = GlobalId::parse(&case)
+                .and_then(|g| store.find_by_guid(&g))
+                .and_then(|c| self.steps.get(&c))
+            else {
+                continue;
+            };
+            let rel = self
+                .ifc
+                .create_rooted("IfcRelAssignsToGroup", &GlobalId::new())?;
+            self.ifc
+                .set_attribute(rel, "Description", &AttrValue::String(TAG.into()))?;
+            self.ifc
+                .set_attribute(rel, "RelatedObjects", &AttrValue::List(actions))?;
+            self.ifc.set_attribute(rel, "RelatingGroup", &r(cs))?;
+        }
+        Ok(())
+    }
+
+    /// Removes a topology representation written by [`Self::write_analytical`]: the shape, its
+    /// representations and their vertex and edge items with their points.
+    fn remove_topology(&mut self, shape: StepId) -> Result<()> {
+        let refs = |v: AttrValue| -> Vec<StepId> {
+            match v {
+                AttrValue::Ref(i) => vec![StepId(i)],
+                AttrValue::List(l) => l
+                    .into_iter()
+                    .filter_map(|x| match x {
+                        AttrValue::Ref(i) => Some(StepId(i)),
+                        _ => None,
+                    })
+                    .collect(),
+                _ => Vec::new(),
+            }
+        };
+        for rep in refs(self.ifc.attribute(shape, "Representations")?) {
+            for item in refs(self.ifc.attribute(rep, "Items")?) {
+                let class = self.ifc.class_of(item)?;
+                if class.eq_ignore_ascii_case("IfcEdge") {
+                    // Its vertices are the nodes', removed with them.
+                    self.ifc.remove(item)?;
+                } else if class.eq_ignore_ascii_case("IfcVertexPoint") {
+                    for p in refs(self.ifc.attribute(item, "VertexGeometry")?) {
+                        self.ifc.remove(p)?;
+                    }
+                    self.ifc.remove(item)?;
+                }
+            }
+            self.ifc.remove(rep)?;
+        }
+        Ok(self.ifc.remove(shape)?)
+    }
+
+    /// Writes every beam system (STR-BSYS-001): the `IfcElementAssembly` contained in its level,
+    /// aggregating its beams through an `IfcRelAggregates` marked `rxd:beam_system`.
+    fn write_beam_systems(&mut self, doc: &Document) -> Result<()> {
+        const TAG: &str = "rxd:beam_system";
+        let store = doc.store();
+        let owner_history = self.new_owner_history()?;
+        for e in store.iter() {
+            let Some(level) = reviera_core::beams::system_recipe(e)
+                .map(|r| r.level)
+                .or_else(|| reviera_core::beams::truss_recipe(e).map(|t| t.level))
+            else {
+                continue;
+            };
+            let Some(&step) = self.steps.get(&e.id()) else {
+                continue;
+            };
+            for rel in self.ifc.referenced_by(step, "IfcRelAggregates")? {
+                if matches!(self.ifc.attribute(rel, "Description")?, AttrValue::String(d) if d == TAG)
+                {
+                    self.ifc.remove(rel)?;
+                }
+            }
+            let guid = e.guid().to_string();
+            let parts: Vec<AttrValue> = store
+                .iter()
+                .filter(|b| {
+                    reviera_core::beams::beam_recipe(b)
+                        .and_then(|r| r.system)
+                        .is_some_and(|s| s.system == guid)
+                })
+                .filter_map(|b| self.steps.get(&b.id()).map(|s| AttrValue::Ref(s.0)))
+                .collect();
+            if !parts.is_empty() {
+                let rel = self
+                    .ifc
+                    .create_rooted("IfcRelAggregates", &GlobalId::new())?;
+                self.ifc
+                    .set_attribute(rel, "Description", &AttrValue::String(TAG.into()))?;
+                if let Some(oh) = owner_history {
+                    self.ifc
+                        .set_attribute(rel, "OwnerHistory", &AttrValue::Ref(oh.0))?;
+                }
+                self.ifc
+                    .set_attribute(rel, "RelatingObject", &AttrValue::Ref(step.0))?;
+                self.ifc
+                    .set_attribute(rel, "RelatedObjects", &AttrValue::List(parts))?;
+            }
+            let storey = GlobalId::parse(&level)
+                .and_then(|g| store.find_by_guid(&g))
+                .and_then(|l| self.steps.get(&l).copied());
+            if let Some(storey) = storey {
+                geometry::contain(&mut self.ifc, step, storey, owner_history)?;
+            }
+        }
+        // Structural connections (STR-CONN-001): contained in their main member's level.
+        for e in store.iter() {
+            let Some(c) = reviera_core::connections::recipe(e) else {
+                continue;
+            };
+            let Some(&step) = self.steps.get(&e.id()) else {
+                continue;
+            };
+            let level = c
+                .members
+                .first()
+                .and_then(|g| GlobalId::parse(g))
+                .and_then(|g| store.find_by_guid(&g))
+                .and_then(|m| store.get(m))
+                .and_then(|m| {
+                    reviera_core::beams::beam_recipe(m)
+                        .map(|r| r.level)
+                        .or_else(|| {
+                            reviera_core::columns::column_recipe(m).map(|r| r.extent.base_level)
+                        })
+                });
+            let storey = level
+                .and_then(|g| GlobalId::parse(&g))
+                .and_then(|g| store.find_by_guid(&g))
+                .and_then(|l| self.steps.get(&l).copied());
+            if let Some(storey) = storey {
+                geometry::contain(&mut self.ifc, step, storey, owner_history)?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Writes every Reviera footing and wall foundation (STR-FND-001, 002): its body as a faceted
+    /// B-rep, contained in its level.
+    fn write_foundations(&mut self, doc: &Document) -> Result<()> {
+        let store = doc.store();
+        let all = reviera_core::foundations::all(store);
+        if all.is_empty() {
+            return Ok(());
+        }
+        let contexts = geometry::Contexts::find(&self.ifc)?;
+        let owner_history = self.new_owner_history()?;
+        for (id, g) in &all {
+            let Some(&step) = self.steps.get(id) else {
+                continue;
+            };
+            let (points, indices) = g.mesh();
+            let faces: Vec<Vec<usize>> = indices
+                .chunks(3)
+                .map(|t| t.iter().map(|i| *i as usize).collect())
+                .collect();
+            geometry::write_breps(
+                &mut self.ifc,
+                step,
+                geometry::BrepFrame::WORLD,
+                &[geometry::Polyhedron { points, faces }],
+                self.length_scale,
+                contexts,
+            )?;
+            // A pile cap's piles are aggregated by it, not contained.
+            let e = store.get(*id).expect("listed");
+            if reviera_core::foundations::pile_recipe(e).is_some_and(|r| r.cap.is_some()) {
+                continue;
+            }
+            let storey = reviera_core::foundations::level_of(store, e)
+                .and_then(|g| GlobalId::parse(&g))
+                .and_then(|g| store.find_by_guid(&g))
+                .and_then(|l| self.steps.get(&l).copied());
+            if let Some(storey) = storey {
+                geometry::contain(&mut self.ifc, step, storey, owner_history)?;
+            }
+        }
+        // Each pile cap aggregates its piles (STR-FND-004).
+        const TAG: &str = "rxd:pile_cap";
+        for (id, _) in &all {
+            let e = store.get(*id).expect("listed");
+            if reviera_core::foundations::footing_recipe(e).is_none() {
+                continue;
+            }
+            let Some(&step) = self.steps.get(id) else {
+                continue;
+            };
+            for rel in self.ifc.referenced_by(step, "IfcRelAggregates")? {
+                if matches!(self.ifc.attribute(rel, "Description")?, AttrValue::String(d) if d == TAG)
+                {
+                    self.ifc.remove(rel)?;
+                }
+            }
+            let guid = e.guid().to_string();
+            let parts: Vec<AttrValue> = store
+                .iter()
+                .filter(|p| {
+                    reviera_core::foundations::pile_recipe(p)
+                        .and_then(|r| r.cap)
+                        .is_some_and(|c| c.cap == guid)
+                })
+                .filter_map(|p| self.steps.get(&p.id()).map(|s| AttrValue::Ref(s.0)))
+                .collect();
+            if parts.is_empty() {
+                continue;
+            }
+            let rel = self
+                .ifc
+                .create_rooted("IfcRelAggregates", &GlobalId::new())?;
+            self.ifc
+                .set_attribute(rel, "Description", &AttrValue::String(TAG.into()))?;
+            if let Some(oh) = owner_history {
+                self.ifc
+                    .set_attribute(rel, "OwnerHistory", &AttrValue::Ref(oh.0))?;
+            }
+            self.ifc
+                .set_attribute(rel, "RelatingObject", &AttrValue::Ref(step.0))?;
+            self.ifc
+                .set_attribute(rel, "RelatedObjects", &AttrValue::List(parts))?;
         }
         Ok(())
     }

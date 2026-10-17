@@ -359,6 +359,10 @@ pub struct CreateParams {
     /// Join Geometry with walls the new one touches face to face, and lock them (ARC-WALL-015).
     #[serde(default)]
     pub auto_join: linings::AutoJoin,
+    /// A structural wall (STR-WALL-001), of `structural_usage` (default bearing).
+    #[serde(default)]
+    pub structural: bool,
+    pub structural_usage: Option<crate::structural::WallUsage>,
 }
 
 fn resolve(store: &Store, r: &ElementRef, what: &str) -> Result<ElementId> {

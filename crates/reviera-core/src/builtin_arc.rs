@@ -47,12 +47,68 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(ColumnPlace),
         registry.add(ColumnPlaceStructural),
         registry.add(ColumnPlaceAtGrids),
+        registry.add(ColumnPlaceSlanted),
+        registry.add(ColumnSetSlant),
         registry.add(ColumnLocationMark),
         registry.add(ColumnLoadSection),
         registry.add(StructuralCatalogs),
+        registry.add(StructuralMaterials),
         registry.add(ColumnCheck),
         registry.add(StructuralStandards),
         registry.add(BeamCreate),
+        registry.add(BraceCreate),
+        registry.add(AnalyticalMemberCreate),
+        registry.add(AnalyticalMemberCreateVertical),
+        registry.add(AnalyticalMemberSetReleases),
+        registry.add(AnalyticalMemberSet),
+        registry.add(AnalyticalNodeMerge),
+        registry.add(AnalyticalAssociationAdd),
+        registry.add(AnalyticalAssociationRemove),
+        registry.add(AnalyticalPhysicalToAnalytical),
+        registry.add(AnalyticalAnalyticalToPhysical),
+        registry.add(AnalyticalDisconnect),
+        registry.add(AnalyticalModelInfo),
+        registry.add(StructuralCodeSet),
+        registry.add(LoadNatureCreate),
+        registry.add(LoadCaseCreate),
+        registry.add(LoadCaseDelete),
+        registry.add(LoadCombinationCreate),
+        registry.add(LoadCombinationGenerate),
+        registry.add(LoadCreatePoint),
+        registry.add(LoadCreateLine),
+        registry.add(BoundaryConditionCreate),
+        registry.add(BoundaryConditionAtColumnBases),
+        registry.add(BoundaryConditionRemove),
+        registry.add(LoadCaseList),
+        registry.add(StructuralAnalysisRecord),
+        registry.add(StructuralAnalysisResults),
+        registry.add(ConnectionCreate),
+        registry.add(ConnectionSet),
+        registry.add(ConnectionInfo),
+        registry.add(BeamSystemCreateSketch),
+        registry.add(BeamSystemCreateAuto),
+        registry.add(BeamSystemSetLayout),
+        registry.add(BeamSystemRemove),
+        registry.add(BeamSystemInfo),
+        registry.add(TrussCreate),
+        registry.add(TrussSet),
+        registry.add(TrussRemove),
+        registry.add(TrussInfo),
+        registry.add(FootingPlace),
+        registry.add(PilePlace),
+        registry.add(PileCapPlace),
+        registry.add(WallSetStructuralUsage),
+        registry.add(StructuralSettingsSet),
+        registry.add(StructuralSettingsGet),
+        registry.add(ViewSetDetailLevel),
+        registry.add(FloorSetStructural),
+        registry.add(FloorSetSpanDirection),
+        registry.add(FootingPlaceAtColumns),
+        registry.add(FootingPlaceAtGrids),
+        registry.add(WallFoundationCreate),
+        registry.add(FoundationSlabCreate),
+        registry.add(FoundationInfo),
+        registry.add(BraceLoadSection),
         registry.add(BeamCreateOnGrids),
         registry.add(BeamSetUsage),
         registry.add(BeamSet),
@@ -369,6 +425,32 @@ edit_command!(
 );
 
 edit_command!(
+    ColumnPlaceSlanted,
+    "column.place_slanted",
+    "Place a slanted structural column",
+    "Places an inclined structural column (STR-COL-002) between `p1` and `p2` (plan points), each at \
+     its level and offset; the lower end is the base (the ends are swapped, with a warning, if `p1` is \
+     higher). `style` end_point (the top stays at its point when levels change) or angle (the angle \
+     from horizontal stays, the top moves). Ends are cut horizontally. Returns the column.",
+    "Slanted Column",
+    crate::columns::PlaceSlantedParams,
+    ElementId,
+    crate::columns::place_slanted
+);
+
+edit_command!(
+    ColumnSetSlant,
+    "column.set_slant",
+    "Set columns' slant",
+    "Makes columns vertical, slanted by end point (`top_point`), or slanted by angle (`angle` from \
+     horizontal toward `azimuth`); the base stays put. Omitted values keep the column's current lean.",
+    "Column Slant",
+    crate::columns::SetSlantParams,
+    (),
+    crate::columns::set_slant
+);
+
+edit_command!(
     ColumnSet,
     "column.set",
     "Change columns",
@@ -606,6 +688,595 @@ edit_command!(
 );
 
 edit_command!(
+    BeamSystemCreateSketch,
+    "beam_system.create_sketch",
+    "Create a beam system from a boundary",
+    "Creates a beam system (STR-BSYS-001), an IfcElementAssembly (BEAM_GRID), that fills `boundary` \
+     (plan corners) with parallel beams running along edge `direction_edge`, at `level` + `offset`. \
+     `layout_rule`: fixed_distance (`value` the centre spacing), fixed_number (`value` beams), \
+     maximum_spacing (the fewest beams keeping the spacing at or below `value`) or clear_spacing \
+     (`value` between faces); `justification` beginning, end or centre for spaced rules. Edges on \
+     beams or walls are locked to them, so the beams follow when the supports move. Its beams are \
+     ordinary beams that join their supports (usually joists). Returns the system.",
+    "Beam System",
+    crate::beams::SystemSketchParams,
+    ElementId,
+    crate::beams::create_system_sketch
+);
+
+edit_command!(
+    BeamSystemCreateAuto,
+    "beam_system.create_auto",
+    "Create a beam system in a bay",
+    "Creates a beam system (STR-BSYS-001) in the bay around `point`: the smallest loop of beams at \
+     `level` + `offset` and walls through that height, its edges locked to them, the beams parallel \
+     to the support nearest the point. Layout as beam_system.create_sketch. Returns the system.",
+    "Beam System",
+    crate::beams::SystemAutoParams,
+    ElementId,
+    crate::beams::create_system_auto
+);
+
+edit_command!(
+    BeamSystemSetLayout,
+    "beam_system.set_layout",
+    "Change a beam system's layout",
+    "Changes a beam system's layout rule, value, justification or beam type (any omitted are kept) and \
+     lays its beams out afresh for its bay as it is now. Returns the new beams.",
+    "Beam System Layout",
+    crate::beams::SetLayoutParams,
+    Vec<ElementId>,
+    crate::beams::set_layout
+);
+
+edit_command!(
+    BeamSystemRemove,
+    "beam_system.remove",
+    "Remove a beam system, keeping its beams",
+    "Removes a beam system (STR-BSYS-001) and keeps its beams where they are, as independent beams. \
+     Deleting the system with element.delete deletes its beams too. Returns the beams kept.",
+    "Remove Beam System",
+    crate::beams::SystemParams,
+    Vec<ElementId>,
+    crate::beams::remove_system
+);
+
+edit_command!(
+    TrussCreate,
+    "truss.create",
+    "Create a truss",
+    "Creates a truss (STR-TRUSS-001) from `start` to `end` (plan) at `level` + `offset`: an \
+     IfcElementAssembly (TRUSS) whose chords (IfcMember CHORD) and webs (STRUT) are laid out by \
+     `layout` (pratt, howe or warren) in `panels` panels, `height` deep, the bearing chord (bottom or \
+     top) on the line. The members follow the truss when it is stretched (keeping the panel count). \
+     Returns the truss.",
+    "Truss",
+    crate::beams::TrussParams,
+    ElementId,
+    crate::beams::create_truss
+);
+
+edit_command!(
+    TrussSet,
+    "truss.set",
+    "Change a truss",
+    "Changes a truss's line (it stretches, keeping its panels), height, bearing chord or offset (the \
+     members follow), or its layout or panel count (the members are made afresh).",
+    "Edit Truss",
+    crate::beams::TrussSetParams,
+    (),
+    crate::beams::set_truss
+);
+
+edit_command!(
+    TrussRemove,
+    "truss.remove",
+    "Remove a truss, keeping its members",
+    "Removes a truss (STR-TRUSS-001) and keeps its members where they are, as plain framing. Deleting \
+     the truss with element.delete deletes its members too. Returns the members kept.",
+    "Remove Truss",
+    crate::beams::TrussIdParams,
+    Vec<ElementId>,
+    crate::beams::remove_truss
+);
+
+edit_command!(
+    ConnectionCreate,
+    "structural_connection.create",
+    "Place a structural connection",
+    "Places a generic structural connection (STR-CONN-001) at the join of `member_ids` (two or more \
+     beams, braces, truss members or columns whose axes meet within 500 mm; the first is the main \
+     member): an IfcElementAssembly (USERDEFINED, STRUCTURAL_CONNECTION) carrying the connection's \
+     information. It follows its members and goes when any of them goes. Plans draw it as a circle with \
+     a spoke toward each member. Returns the connection.",
+    "Structural Connection",
+    crate::connections::CreateParams,
+    ElementId,
+    crate::connections::create
+);
+
+edit_command!(
+    ConnectionSet,
+    "structural_connection.set",
+    "Set connections' information",
+    "Sets structural connections' approval status, code-check status (not_checked, passed, failed), \
+     fabricator and override-by-instance flag; an empty text clears it.",
+    "Connection Information",
+    crate::connections::SetParams,
+    (),
+    crate::connections::set
+);
+
+edit_command!(
+    AnalyticalMemberCreate,
+    "analytical_member.create",
+    "Create an analytical member",
+    "Creates an analytical member (STR-AM-001), an IfcStructuralCurveMember, from `start` to `end` \
+     (metres): its nodes are made there, or existing nodes within the node merge distance are used; \
+     `role` beam, column, brace, member or tie; a column or beam `section_type_id`; `material`; both \
+     ends' `releases` (fixed or pinned). It needs no physical element. Returns the member.",
+    "Analytical Member",
+    crate::analytical::CreateParams,
+    ElementId,
+    crate::analytical::create
+);
+
+edit_command!(
+    AnalyticalMemberCreateVertical,
+    "analytical_member.create_vertical",
+    "Create a vertical analytical member",
+    "Creates a vertical analytical member (a column) at `point` from `level` down to the level below \
+     (STR-AM-001). Returns the member.",
+    "Analytical Member",
+    crate::analytical::VerticalParams,
+    ElementId,
+    crate::analytical::create_vertical
+);
+
+edit_command!(
+    AnalyticalMemberSetReleases,
+    "analytical_member.set_releases",
+    "Set analytical members' end releases",
+    "Sets members' end releases (STR-AM-001) at `end` (start, end or both): `preset` fixed or pinned, or \
+     six `flags` (translations x, y, z, rotations x, y, z; true is fixed). A member pinned at both ends \
+     is a PIN_JOINED_MEMBER.",
+    "End Releases",
+    crate::analytical::ReleaseParams,
+    (),
+    crate::analytical::set_releases
+);
+
+edit_command!(
+    AnalyticalMemberSet,
+    "analytical_member.set",
+    "Change analytical members",
+    "Changes analytical members' section type, material, role, Analyze As (releases, tension_only, \
+     compression_only) or cross-section rotation. Physical elements change only through \
+     analytical_automation.analytical_to_physical.",
+    "Analytical Member",
+    crate::analytical::MemberSetParams,
+    (),
+    crate::analytical::set_member
+);
+
+edit_command!(
+    AnalyticalNodeMerge,
+    "analytical_node.merge",
+    "Merge analytical nodes",
+    "Merges analytical nodes within `tolerance` (default the Structural Settings' node merge distance), \
+     re-pointing their members, and removes nodes no member uses (STR-AM-003).",
+    "Merge Nodes",
+    Option<crate::analytical::MergeParams>,
+    crate::analytical::MergeReport,
+    |t, p| crate::analytical::merge(t, p.unwrap_or_default())
+);
+
+edit_command!(
+    AnalyticalAssociationAdd,
+    "analytical_association.add",
+    "Associate physical and analytical elements",
+    "Associates `physical_ids` with the analytical members `analytical_ids` (STR-AM-004). An element \
+     already in an association is refused, and the association is named. Returns the members.",
+    "Association",
+    crate::analytical::AssociationParams,
+    Vec<ElementId>,
+    crate::analytical::associate
+);
+
+edit_command!(
+    AnalyticalAssociationRemove,
+    "analytical_association.remove",
+    "Remove associations",
+    "Removes the associations of the given analytical members or physical elements (all, when \
+     omitted), leaving both models as they are. Returns the members disconnected.",
+    "Remove Association",
+    crate::analytical::DisconnectParams,
+    Vec<ElementId>,
+    crate::analytical::disconnect
+);
+
+edit_command!(
+    AnalyticalPhysicalToAnalytical,
+    "analytical_automation.physical_to_analytical",
+    "Make the analytical model from the physical one",
+    "Physical to analytical (STR-AM-006): an analytical member for each structural column, beam, brace \
+     and truss member (`element_ids`, or every one without an association) along its axis (a column's \
+     axis, a beam's location line), its nodes merged within the node merge distance, associated with it; \
+     braces pinned, others fixed. Returns the report: created, updated, skipped with reasons.",
+    "Physical to Analytical",
+    Option<crate::analytical::AutomationParams>,
+    crate::analytical::AutomationReport,
+    |t, p| crate::analytical::physical_to_analytical(t, p.unwrap_or_default())
+);
+
+edit_command!(
+    AnalyticalAnalyticalToPhysical,
+    "analytical_automation.analytical_to_physical",
+    "Update the physical model from the analytical one",
+    "Analytical to physical (STR-AM-006): each associated analytical member's section type is given to \
+     its physical elements where it differs (a beam type to beams, a column type to columns), for \
+     example a size changed by analysis. Returns the report.",
+    "Analytical to Physical",
+    Option<crate::analytical::AutomationParams>,
+    crate::analytical::AutomationReport,
+    |t, p| crate::analytical::analytical_to_physical(t, p.unwrap_or_default())
+);
+
+edit_command!(
+    AnalyticalDisconnect,
+    "analytical_automation.disconnect",
+    "Disconnect the analytical model",
+    "Removes associations between the analytical and physical models (of the given elements, or all), \
+     leaving both in place (STR-AM-006). Returns the members disconnected.",
+    "Disconnect",
+    crate::analytical::DisconnectParams,
+    Vec<ElementId>,
+    crate::analytical::disconnect
+);
+
+edit_command!(
+    StructuralCodeSet,
+    "structural_code.set",
+    "Choose the load code template",
+    "Chooses the code template for load natures and combinations (STR-LC-001): `asce7` (ASCE/SEI 7-22 \
+     strength design) or `en1990` (EN 1990 expression 6.10 with the recommended factors). Its natures \
+     replace the code natures; user natures stay.",
+    "Load Code",
+    crate::loads::CodeParams,
+    (),
+    crate::loads::set_code
+);
+
+edit_command!(
+    LoadNatureCreate,
+    "load_nature.create",
+    "Add a load nature",
+    "Adds a user load nature: name, symbol, action type (permanent, variable, extraordinary) and IFC \
+     action source (DEAD_LOAD_G, LIVE_LOAD_Q, SNOW_S, WIND_W, …).",
+    "Load Nature",
+    crate::loads::NatureParams,
+    (),
+    crate::loads::create_nature
+);
+
+edit_command!(
+    LoadCaseCreate,
+    "load_case.create",
+    "Create a load case",
+    "Creates a load case (STR-LC-001), an IfcStructuralLoadCase of a nature (name or symbol), with a \
+     category and a self-weight flag. Names are unique and contain no *, + or -. Returns the case.",
+    "Load Case",
+    crate::loads::CaseParams,
+    ElementId,
+    crate::loads::create_case
+);
+
+edit_command!(
+    LoadCaseDelete,
+    "load_case.delete",
+    "Delete a load case",
+    "Deletes a load case: its loads go with it, and it is taken out of the combinations that use it. \
+     Returns how many loads and combinations were affected.",
+    "Delete Load Case",
+    crate::loads::DeleteCaseParams,
+    crate::loads::CaseDeletion,
+    crate::loads::delete_case
+);
+
+edit_command!(
+    LoadCombinationCreate,
+    "load_combination.create",
+    "Create a load combination",
+    "Creates a load combination (STR-LC-001), an IfcStructuralLoadGroup (LOAD_COMBINATION): a `formula` \
+     such as `1.35*G1 + 1.5*Q1` of cases and other combinations (expanded; circular references refused), \
+     a `limit_state` (ultimate, serviceability, quasi_permanent, frequent, rare, accidental, special) \
+     and `usages`. Returns the combination.",
+    "Load Combination",
+    crate::loads::CombinationParams,
+    ElementId,
+    crate::loads::create_combination
+);
+
+edit_command!(
+    LoadCombinationGenerate,
+    "load_combination.generate",
+    "Generate load combinations",
+    "Generates combinations offline from a code template (default the project's): ASCE 7-22 §2.3 \
+     strength combinations over the cases by nature (alternatives such as Lr, S or R one each), or EN \
+     1990 expression 6.10 with each variable nature leading in turn plus the characteristic and \
+     quasi-permanent SLS combinations. Cases of unknown natures are flagged. `add` creates them.",
+    "Generate Combinations",
+    Option<crate::loads::GenerateParams>,
+    crate::loads::Generated,
+    |t, p| crate::loads::generate(t, p.unwrap_or_default())
+);
+
+edit_command!(
+    LoadCreatePoint,
+    "load.create_point",
+    "Place a point load",
+    "Places a point load (STR-LOAD-001), an IfcStructuralPointAction, on an analytical node or at \
+     `position` (0 to 1, default mid-span) along a member, in a case: Fx, Fy, Fz (N), Mx, My, Mz (N·m) \
+     in project axes (gravity is negative Fz). It goes with its host or case. Returns the load.",
+    "Point Load",
+    crate::loads::PointParams,
+    ElementId,
+    crate::loads::create_point
+);
+
+edit_command!(
+    LoadCreateLine,
+    "load.create_line",
+    "Place a line load",
+    "Places a line load (STR-LOAD-001), an IfcStructuralCurveAction, along an analytical member in a \
+     case: force per length (N/m, project axes) at the start and, for a linear load, the end; \
+     `projected` for the projected length. Returns the load.",
+    "Line Load",
+    crate::loads::LineParams,
+    ElementId,
+    crate::loads::create_line
+);
+
+edit_command!(
+    BoundaryConditionCreate,
+    "boundary_condition.create",
+    "Place a boundary condition",
+    "Places a point boundary condition (STR-BC-001) at a node, or a member's start or end: Fixed, \
+     Pinned, Roller (vertical translation only) or User (six dof, each fixed, released or a spring in \
+     N/m or N·m/rad). Returns the node.",
+    "Boundary Condition",
+    crate::loads::BoundaryParams,
+    ElementId,
+    crate::loads::create_boundary
+);
+
+edit_command!(
+    BoundaryConditionAtColumnBases,
+    "boundary_condition.at_column_bases",
+    "Support the analytical columns' feet",
+    "Places a point boundary condition (default pinned) at the foot of every analytical column that no \
+     member reaches from below. Returns the nodes.",
+    "Column Base Supports",
+    crate::loads::ColumnBasesParams,
+    Vec<ElementId>,
+    crate::loads::at_column_bases
+);
+
+edit_command!(
+    BoundaryConditionRemove,
+    "boundary_condition.remove",
+    "Remove boundary conditions",
+    "Removes the point boundary conditions of the given nodes (or members' start nodes).",
+    "Remove Boundary Condition",
+    crate::loads::RemoveBoundaryParams,
+    (),
+    crate::loads::remove_boundary
+);
+
+edit_command!(
+    StructuralAnalysisRecord,
+    "structural_analysis.record",
+    "Keep an analysis's results",
+    "Keeps a finished structural analysis's results with the model (ANA-FEA-001), keys mapped back to \
+     GlobalIds; `structural_analysis.collect` calls it. The previous results are replaced.",
+    "Analysis Results",
+    crate::structural_model::RecordParams,
+    (),
+    crate::structural_model::record
+);
+
+edit_command!(
+    BraceCreate,
+    "brace.create",
+    "Place a brace",
+    "Places a brace (STR-BRACE-001), an IfcMember (BRACE), from `start_point` at `start_level` + \
+     `start_offset` to `end_point` at `end_level` + `end_offset`. An end on a column's or beam's axis \
+     is attached to it at its ratio along it, and follows it when it moves or changes level (`attach` \
+     false: free ends). The type defaults to the region's usual brace section (HSS6X6X3/8, HEA 160 or \
+     UC 152x152x23). Usage: horizontal bracing when both ends are level, otherwise other. Ends join and \
+     cut back like beams' (the framing.* commands). Returns the brace.",
+    "Brace",
+    crate::beams::BraceParams,
+    ElementId,
+    crate::beams::create_brace
+);
+
+edit_command!(
+    StructuralSettingsSet,
+    "structural_settings.set",
+    "Change structural settings",
+    "Changes the project's structural settings (STR-SET-001): `key` and `value`, or several `values`, \
+     with the dialog's rules (offsets and cutbacks 0–100 mm on paper; analytical tolerances above 0 \
+     and at most 2000 mm, the node merge distance below the support distance; spacing and load scales \
+     above 0). An error names the key and the allowed range. Keys: brace_symbol (parallel_line or \
+     none), brace_offset, kicker_symbol, coarse_cutback, point_to_point_steel (steel members are not \
+     shortened where they join), member_supports_check, consistency_check, circular_references_check, \
+     support_distance, analytical_distance, node_merge_distance, alignment_distance, boundary_spacing, \
+     force_scale, linear_force_scale, area_force_scale, moment_scale, label_loads.",
+    "Structural Settings",
+    crate::structural::SetSettingsParams,
+    (),
+    crate::structural::set_settings
+);
+
+edit_command!(
+    ViewSetDetailLevel,
+    "view.set_detail_level",
+    "Set a view's detail level",
+    "Sets a view's detail level (DOC-GFX-010): coarse, medium or fine. In Coarse plans structural \
+     framing is drawn as single lines, braces with their Structural Settings symbol (STR-SET-001).",
+    "Detail Level",
+    crate::views::SetDetailLevelParams,
+    (),
+    crate::views::set_detail_level
+);
+
+edit_command!(
+    WallSetStructuralUsage,
+    "wall.set_structural_usage",
+    "Set walls' structural usage",
+    "Sets walls' structural usage (STR-WALL-001): bearing, shear or structural_combined make them \
+     structural walls (IfcWall SHEAR for shear, SOLIDWALL otherwise, Pset_WallCommon.LoadBearing true, \
+     the exact usage kept in RXD); non_bearing makes them ordinary walls again. `wall.create` takes \
+     `structural` and `structural_usage` too.",
+    "Structural Usage",
+    crate::structural::WallUsageParams,
+    (),
+    crate::structural::set_wall_usage
+);
+
+edit_command!(
+    FloorSetStructural,
+    "floor.set_structural",
+    "Make floors structural",
+    "Makes floors structural (STR-FLOOR-001: Pset_SlabCommon.LoadBearing true, a span direction along \
+     the boundary's first edge unless one is set) or not.",
+    "Structural Floor",
+    crate::structural::FloorStructuralParams,
+    (),
+    crate::structural::set_floor_structural
+);
+
+edit_command!(
+    FloorSetSpanDirection,
+    "floor.set_span_direction",
+    "Set a floor's span direction",
+    "Sets a structural floor's span direction (STR-FLOOR-001) along one of its outline's edges \
+     (`edge_index`) or a plan `vector`; a floor that is not structural becomes structural.",
+    "Span Direction",
+    crate::structural::SpanParams,
+    (),
+    crate::structural::set_span
+);
+
+edit_command!(
+    PilePlace,
+    "pile.place",
+    "Place a pile",
+    "Places a single pile (STR-FND-004), an IfcPile (BORED or DRIVEN by its type), its top centred at \
+     `point` at `level` + `offset`, running down its `length` (default its type's). The default type is \
+     a 450 mm bored pile 12 m long (18\", 40 ft in US models). Returns the pile.",
+    "Pile",
+    crate::foundations::PileParams,
+    ElementId,
+    crate::foundations::place_pile
+);
+
+edit_command!(
+    PileCapPlace,
+    "pile_cap.place",
+    "Place a pile cap with its piles",
+    "Places a pile cap (STR-FND-004): an IfcFooting (PILE_CAP) of a pile cap type, its top at `level` + \
+     `offset`, with its type's grid of piles laid out under it (IfcPile, aggregated by the cap in IFC). \
+     The piles follow the cap and go with it. The default type has four piles at three diameters. \
+     Returns the cap.",
+    "Pile Cap",
+    crate::foundations::PlaceParams,
+    ElementId,
+    crate::foundations::place_pile_cap
+);
+
+edit_command!(
+    FootingPlace,
+    "footing.place",
+    "Place an isolated footing",
+    "Places an isolated footing (STR-FND-001), an IfcFooting (PAD_FOOTING), centred at `point`, its top \
+     at `level` + `offset` and its thickness below, turned by `rotation`. The type defaults to \
+     1800 × 1800 × 500 mm (6'-0\" × 6'-0\" × 1'-6\" in US models) in the region's concrete. Returns the \
+     footing.",
+    "Isolated Footing",
+    crate::foundations::PlaceParams,
+    ElementId,
+    crate::foundations::place
+);
+
+edit_command!(
+    FootingPlaceAtColumns,
+    "footing.place_at_columns",
+    "Place footings under columns",
+    "Places an isolated footing under each of `column_ids` (STR-FND-001), joined to it: centred under it, \
+     turned with it, its top at the column's base, following the column (and staying where it was if \
+     the column is deleted). Columns that already have one are skipped; one undo step.",
+    "Footings at Columns",
+    crate::foundations::AtColumnsParams,
+    Vec<ElementId>,
+    crate::foundations::place_at_columns
+);
+
+edit_command!(
+    FootingPlaceAtGrids,
+    "footing.place_at_grids",
+    "Place footings at grid crossings",
+    "Places an isolated footing at every crossing of `grid_ids` (STR-FND-001), turned to the grids, its \
+     top at `level` + `offset`; one undo step.",
+    "Footings at Grids",
+    crate::foundations::AtGridsParams,
+    Vec<ElementId>,
+    crate::foundations::place_at_grids
+);
+
+edit_command!(
+    WallFoundationCreate,
+    "wall_foundation.create",
+    "Place wall foundations",
+    "Places a wall foundation (STR-FND-002), an IfcFooting (STRIP_FOOTING), under each of `wall_ids`: \
+     along the wall's length plus the type's end extension, its top at the wall's base. Bearing types \
+     are a width centred on the wall; retaining types a toe beyond the exterior face and a heel beyond \
+     the interior face. It follows the wall and is deleted with it. The default type is a bearing \
+     footing 600 × 300 mm (24\" × 12\"). Walls that already have one are skipped.",
+    "Wall Foundation",
+    crate::foundations::WallFoundationParams,
+    Vec<ElementId>,
+    crate::foundations::create_wall_foundations
+);
+
+edit_command!(
+    FoundationSlabCreate,
+    "foundation_slab.create",
+    "Create a foundation slab",
+    "Creates a foundation slab (STR-FND-003): an IfcSlab (BASESLAB) bounded by `boundary` (outer loops \
+     the slab, inner loops openings), its top at `level` + `offset` and its thickness below. The type \
+     defaults to a 300 mm (12\") foundation slab type. Returns the slab.",
+    "Foundation Slab",
+    crate::foundations::SlabParams,
+    ElementId,
+    crate::foundations::create_slab
+);
+
+edit_command!(
+    BraceLoadSection,
+    "brace.load_section",
+    "Load a standard section as a brace type",
+    "Makes a brace type (IfcMemberType, BRACE) from a standard section in Reviera's catalogues \
+     (STR-SEC-001), for example `HSS6X6X3/8` or `L4X4X3/8`, with its usual steel grade (or `material`). \
+     Returns the type.",
+    "Load Brace Section",
+    crate::steel_sections::LoadParams,
+    ElementId,
+    crate::beams::load_brace_section
+);
+
+edit_command!(
     BeamCreateOnGrids,
     "beam.create_on_grids",
     "Place beams along grid lines",
@@ -757,6 +1428,19 @@ read_command!(
 );
 
 read_command!(
+    StructuralMaterials,
+    "structural.materials",
+    "List structural materials",
+    "The structural materials library (STR-SEC-001): steel grades (fy, fu, E), concrete classes (fck, \
+     fctm, Ecm) and timber grades and strength classes (bending, compression, E, density), with their \
+     standards and public sources; the model's region's first (`preferred`). Values in MPa and kg/m³, \
+     before design factors. Types name their material by `name`.",
+    Option<crate::materials_library::ListParams>,
+    Vec<crate::materials_library::Listed>,
+    |s, p| Ok(crate::materials_library::list(s, &p.unwrap_or_default()))
+);
+
+read_command!(
     ColumnLocationMark,
     "column.location_mark",
     "Columns' location marks",
@@ -765,6 +1449,96 @@ read_command!(
     crate::columns::MarkParams,
     Vec<crate::columns::Mark>,
     |s, p| crate::columns::location_marks(s, &p)
+);
+
+read_command!(
+    FoundationInfo,
+    "foundation.info",
+    "Footings' and wall foundations' elevations and sizes",
+    "For each footing or wall foundation: its top, its Elevation at Bottom, its plan area and volume, and \
+     the column or wall it is joined to.",
+    crate::foundations::InfoParams,
+    Vec<crate::foundations::Info>,
+    |s, p| crate::foundations::info(s, &p)
+);
+
+read_command!(
+    BeamSystemInfo,
+    "beam_system.info",
+    "A beam system's bay, layout and beams",
+    "A beam system's boundary as it is now (edges on their supports), beam direction, layout rule and \
+     value, its beams, and the centre spacing between its layout lines.",
+    crate::beams::SystemParams,
+    crate::beams::SystemInfo,
+    |s, p| crate::beams::system_info(s, &p)
+);
+
+read_command!(
+    TrussInfo,
+    "truss.info",
+    "A truss's layout and members",
+    "A truss's layout, panels, height and span, and its chords and webs.",
+    crate::beams::TrussIdParams,
+    crate::beams::TrussInfo,
+    |s, p| crate::beams::truss_info(s, &p)
+);
+
+read_command!(
+    StructuralSettingsGet,
+    "structural_settings.get",
+    "The structural settings",
+    "The project's structural settings (STR-SET-001): symbolic representation (brace and kicker \
+     symbols, brace offset and coarse cutback in paper millimetres), point-to-point steel, analytical \
+     checks and tolerances (metres), boundary condition spacing and load display scales.",
+    Option<serde_json::Value>,
+    crate::structural::Settings,
+    |s, _| Ok(crate::structural::settings(s))
+);
+
+read_command!(
+    ConnectionInfo,
+    "structural_connection.info",
+    "Structural connections' information",
+    "For each connection: its type, join point, members (main first), approval status, code-check \
+     status, fabricator and override flag.",
+    crate::connections::InfoParams,
+    Vec<crate::connections::Info>,
+    |s, p| crate::connections::info(s, &p)
+);
+
+read_command!(
+    AnalyticalModelInfo,
+    "analytical_model.info",
+    "The analytical model",
+    "The analytical model's members (role, PredefinedType, ends, nodes, section type, material, releases, \
+     associated physical elements), its node count, and the nodes only one member uses.",
+    Option<serde_json::Value>,
+    crate::analytical::ModelInfo,
+    |s, _| Ok(crate::analytical::info(s))
+);
+
+read_command!(
+    LoadCaseList,
+    "load_case.list",
+    "Load natures, cases, combinations and supports",
+    "The project's code template and load natures, its load cases with their load counts, its \
+     combinations with each case's factor (nested combinations expanded), and its supported nodes.",
+    Option<serde_json::Value>,
+    crate::loads::Report,
+    |s, _| Ok(crate::loads::report(s))
+);
+
+read_command!(
+    StructuralAnalysisResults,
+    "structural_analysis.results",
+    "The structural analysis results",
+    "The last collected structural analysis (ANA-FEA-001): its job, time, provider, whether the model \
+     changed since (stale), warnings, a summary per case and combination (largest displacement and \
+     moment, total vertical reaction), and each member's internal forces at stations in `case` (default \
+     the first): N, Vy, Vz, T, My, Mz in its local axes (N, N·m).",
+    Option<crate::structural_model::ReportParams>,
+    crate::structural_model::Report,
+    |s, p| crate::structural_model::report(s, &p.unwrap_or_default())
 );
 
 read_command!(

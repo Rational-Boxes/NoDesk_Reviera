@@ -190,7 +190,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**2070 unique commands** in 409 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**2088 unique commands** in 410 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -206,8 +206,8 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `analytical_automation` | 3 |
 | `analytical_link` | 1 |
 | `analytical_link_type` | 1 |
-| `analytical_member` | 3 |
-| `analytical_model` | 5 |
+| `analytical_member` | 4 |
+| `analytical_model` | 6 |
 | `analytical_node` | 2 |
 | `analytical_opening` | 1 |
 | `analytical_panel` | 4 |
@@ -227,12 +227,12 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `assemblytemplate` | 1 |
 | `bcf` | 25 |
 | `beam` | 6 |
-| `beam_system` | 4 |
+| `beam_system` | 5 |
 | `bending_detail` | 1 |
 | `bimserver` | 21 |
 | `bolt_pattern` | 1 |
-| `boundary_condition` | 1 |
-| `brace` | 1 |
+| `boundary_condition` | 3 |
+| `brace` | 2 |
 | `browser` | 10 |
 | `building` | 1 |
 | `building_type` | 1 |
@@ -255,7 +255,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `code` | 2 |
 | `colorlegend` | 1 |
 | `colorscheme` | 5 |
-| `column` | 10 |
+| `column` | 11 |
 | `component` | 6 |
 | `compound` | 11 |
 | `compute` | 22 |
@@ -340,11 +340,12 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `fixture_unit_method` | 1 |
 | `flex_duct` | 1 |
 | `flex_pipe` | 1 |
-| `floor` | 5 |
+| `floor` | 6 |
 | `floor_type` | 1 |
 | `fluid` | 1 |
 | `footing` | 3 |
 | `formula` | 2 |
+| `foundation` | 1 |
 | `foundation_slab` | 1 |
 | `framing` | 7 |
 | `gbxml` | 2 |
@@ -391,7 +392,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `link` | 23 |
 | `live` | 7 |
 | `load` | 3 |
-| `load_case` | 3 |
+| `load_case` | 4 |
 | `load_classification` | 3 |
 | `load_combination` | 2 |
 | `load_nature` | 1 |
@@ -541,10 +542,10 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `steel_modifier` | 4 |
 | `steel_nc` | 1 |
 | `steel_numbering` | 1 |
-| `structural` | 2 |
-| `structural_analysis` | 4 |
+| `structural` | 3 |
+| `structural_analysis` | 7 |
 | `structural_code` | 1 |
-| `structural_connection` | 11 |
+| `structural_connection` | 13 |
 | `structural_settings` | 3 |
 | `study` | 3 |
 | `subcategory` | 3 |
@@ -570,7 +571,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `toposolid` | 12 |
 | `toposolidtype` | 1 |
 | `transformer` | 1 |
-| `truss` | 5 |
+| `truss` | 7 |
 | `txn` | 7 |
 | `type` | 5 |
 | `ui` | 143 |
@@ -651,11 +652,13 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `analytical_link_type.create` | 4 | name, fixity[6] | id | Yes | STR-AM-003 |
 | `analytical_member.create` | 4 | curve, section_type_id, material_id, role, releases? | id | Yes | STR-AM-001 |
 | `analytical_member.create_vertical` | 4 | point, level, section_type_id | id | Yes | STR-AM-001 |
+| `analytical_member.set` | 4 | member_ids[], section_type_id?, material?, role?, analyze_as?, rotation? | — | Yes | STR-AM-001 |
 | `analytical_member.set_releases` | 4 | id, end, dof_flags \ | preset | — | Yes |
 | `analytical_model.adjust` | 4 | element_id | tool_session | Yes | STR-AM-008 |
 | `analytical_model.check_consistency` | 4 | scope? | report | No | STR-AM-007 |
 | `analytical_model.check_supports` | 4 | scope? | report | No | STR-AM-007 |
 | `analytical_model.ignore_issue` | 4 | issue_key, ignore: bool, reason? | — | Yes | STR-AM-007 |
+| `analytical_model.info` | 4 | — | {members[], nodes, free_nodes[]} | No | STR-AM-001 |
 | `analytical_model.reset` | 4 | element_ids[] | — | Yes | STR-AM-008 |
 | `analytical_node.merge` | 4 | tolerance? | — | Yes | STR-AM-003 |
 | `analytical_node.move` | 4 | node_ids[], delta, cs?: "global"\ | "local" | — | Yes |
@@ -741,6 +744,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `beam.set_usage` | 4 | beam_ids[], usage, lock? | — | Yes | STR-BEAM-001 |
 | `beam_system.create_auto` | 4 | view_id, pick_point, type_id, layout_rule, value, justification? | system_id | Yes | STR-BSYS-001 |
 | `beam_system.create_sketch` | 4 | boundary_curves[], direction_edge, type_id, layout_rule, value, lock_to_supports? | system_id | Yes | STR-BSYS-001 |
+| `beam_system.info` | 4 | system_id | {system_id, boundary, direction, rule, value, beams[], spacing?} | No | STR-BSYS-001 |
 | `beam_system.remove` | 4 | system_id | beam_ids[] | Yes | STR-BSYS-001 |
 | `beam_system.set_layout` | 4 | system_id, rule, value, justification | — | Yes | STR-BSYS-001 |
 | `bending_detail.place` | 4 | rebar_id, view_id, point, scale? | id | Yes | STR-RBR-018 |
@@ -766,8 +770,11 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `bimserver.sync` | 6 | comment, relinquish?: {worksets?, elements?}, save_before?, save_after? | sync_report | No | COL-BIM-006 |
 | `bimserver.unsubscribe` | 6 | — | () | No | COL-BIM-007 |
 | `bolt_pattern.create` | 4 | element_ids[], face_ref, pattern: "rect"\ | "circle", params | id | Yes |
+| `boundary_condition.at_column_bases` | 4 | state? | node_ids[] | Yes | STR-BC-001 |
 | `boundary_condition.create` | 4 | kind: "point"\ | "line"\ | "area", host_id, location?, state, dof?: {tx,ty,tz,rx,ry,rz} | id |
+| `boundary_condition.remove` | 4 | node_ids[] | — | Yes | STR-BC-001 |
 | `brace.create` | 4 | type_id, start_point, start_level, start_offset, end_point, end_level, end_offset | element_id | Yes | STR-BRACE-001 |
+| `brace.load_section` | 4 | catalog, designation, material? | type_id | Yes | STR-BRACE-001 |
 | `browser.collapse` | 1 | `node_id | "all"` | `()` | No |
 | `browser.create_organization` | 5 | name, target, group_by[], sort_by | scheme_id | Yes | DOC-VIEW-001 |
 | `browser.expand` | 1 | `node_id`, `recursive?` | `()` | No | UI-PB-001 |
@@ -865,6 +872,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `column.place_at_grids` | 4 | type_id, grid_ids[], base_level, top_constraint, rotation? | element_id[] | Yes | STR-COL-001 |
 | `column.place_in_columns` | 4 | type_id, arch_column_ids[] | element_id[] | Yes | STR-COL-001 |
 | `column.place_slanted` | 4 | type_id, p1, p1_level, p1_offset, p2, p2_level, p2_offset, style | element_id | Yes | STR-COL-002 |
+| `column.set_slant` | 4 | column_ids[], style: vertical\ | end_point\ | angle, top_point?, angle?, azimuth? | — |
 | `component.create` | 2 | element_ids[], destination, name, kind?, base_point?, include_hosts?, include_rooms?, replace_selection?, tags? | item_ref | Yes | DM-LIB-003 |
 | `component.edit` | 2 | item_ref \ | element_id | document_id | No |
 | `component.place` | 3 | type_id \ | {library, item}, point \ | points[] \ | host_ref, rotation?: f64, level_id?, offset?, mirror?, placement?: VerticalFace\ |
@@ -1311,6 +1319,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `floor.edit_boundary` | 3 | floor_id, loops, slope? | — | Yes | ARC-FLR-001 |
 | `floor.set_slope_angle` | 3 | floor_id, angle | — | Yes | ARC-FLR-001 |
 | `floor.set_span_direction` | 4 | floor_id, edge_index \ | vector | — | Yes |
+| `floor.set_structural` | 4 | floor_ids[], structural | — | Yes | STR-FLOOR-001 |
 | `floor_type.set_deck_layer` | 4 | type_id, layer_index, profile_family_id, usage | — | Yes | STR-FLOOR-001 |
 | `fluid.create` | 4 | name, table[] | id | Yes | MEP-SET-001 |
 | `footing.place` | 4 | type_id, point, level, offset | — | Yes | STR-FND-001 |
@@ -1318,6 +1327,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `footing.place_at_grids` | 4 | type_id, grid_ids[] | — | Yes | STR-FND-001 |
 | `formula.evaluate` | 2 | context_id, text | value | No | DM-FRM-001 |
 | `formula.validate` | 2 | context_id, param_id \ | null, text | {ok, type, dimension, errors[], lints[]} | No |
+| `foundation.info` | 4 | ids[] | [{id, top, bottom, area, volume, host?}] | No | STR-FND-001 |
 | `foundation_slab.create` | 4 | type_id, boundary, level, offset | — | Yes | STR-FND-003 |
 | `framing.change_reference` | 4 | id, end, reference | — | Yes | STR-BEAM-002 |
 | `framing.disjoin` | 4 | id, end | — | Yes | STR-BEAM-002 |
@@ -1538,7 +1548,8 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `load.create_line` | 4 | host_id, path?, case_id, start[6], end[6], orientation, projected? | id | Yes | STR-LOAD-001 |
 | `load.create_point` | 4 | host_id, position?, case_id, forces[6], orientation | id | Yes | STR-LOAD-001 |
 | `load_case.create` | 4 | name, nature, category | id | Yes | STR-LC-001 |
-| `load_case.delete` | 4 | id | — | Yes | STR-LC-001 |
+| `load_case.delete` | 4 | case_id | {loads, combinations} | Yes | STR-LC-001 |
+| `load_case.list` | 4 | — | {template, natures[], cases[], combinations[], supports[]} | No | STR-LC-001 |
 | `load_case.manage` | 4 | tab?: code, natures, cases, combinations or usages | — | No | STR-LC-001 |
 | `load_classification.create` | 4 | name, demand_factor_id | id | Yes | MEP-ELEC-009 |
 | `load_classification.delete` | 4 | id, replace_with | — | Yes | MEP-ELEC-009 |
@@ -2160,9 +2171,13 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `steel_nc.export` | 4 | scope, folder, format="dstv" | — | No | STR-STL-010 |
 | `steel_numbering.run` | 4 | scope, options | report | Yes | STR-STL-010 |
 | `structural.catalogs` | 4 | catalog? | [catalogue] | No | STR-SEC-001 |
+| `structural.materials` | 4 | kind? | [{name, kind, standard, regions[], properties, source_ids[], preferred}] | No | STR-SEC-001 |
 | `structural.standards` | 4 | — | {region, catalogs, steel, concrete, standards} | No | STR-SEC-001 |
+| `structural_analysis.collect` | 4 | job_id? | report | Yes | ANA-FEA-001 |
 | `structural_analysis.export_model` | 4 | path, format: "ifc"\ | "json", scope | — | No |
 | `structural_analysis.import_results` | 4 | path | package_id | Yes | ANA-FEA-001 |
+| `structural_analysis.record` | 4 | job_id, provider, results, key_map | — | Yes | ANA-FEA-001 |
+| `structural_analysis.results` | 4 | case? | report | No | ANA-FEA-001 |
 | `structural_analysis.run` | 4 | provider_id, scope, analysis_type, options | job_id | Results only | ANA-FEA-001 |
 | `structural_analysis.update_model` | 4 | package_id, apply_sections?: bool | — | Yes | ANA-FEA-001 |
 | `structural_code.set` | 4 | region, code_id | — | Yes | STR-LC-001 |
@@ -2172,9 +2187,11 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `structural_connection.check` | 4 | connection_ids[], provider_id, code | report | Results only | STR-STL-009 |
 | `structural_connection.create` | 4 | member_ids[], type_id? | connection_id | Yes | STR-CONN-001 |
 | `structural_connection.customize` | 4 | connection_ids[], element_ids[], name | type_id | Yes | STR-STL-003 |
+| `structural_connection.info` | 4 | connection_ids[] | [{connection_id, connection_type, point?, members[], approval_status?, code_check, fabricator?, override_by_instance}] | No | STR-CONN-001 |
 | `structural_connection.override` | 4 | connection_id, params | — | Yes | STR-STL-002 |
 | `structural_connection.presize` | 4 | connection_ids[], provider_id, code | — | Yes | STR-STL-009 |
 | `structural_connection.propagate` | 4 | connection_id, target_join_ids[] \ | "matching" | connection_ids[] | Yes |
+| `structural_connection.set` | 4 | connection_ids[], approval_status?, code_check?, fabricator?, override_by_instance? | — | Yes | STR-CONN-001 |
 | `structural_connection.set_type` | 4 | connection_id, type_id | — | Yes | STR-CONN-001 |
 | `structural_connection.show_warnings` | 4 | view_id, on: bool | — | No | STR-CONN-001 |
 | `structural_settings.get` | 4 | — | table | No | STR-SET-001 |
@@ -2283,7 +2300,9 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `truss.create` | 4 | type_id, start, end, level | truss_id | Yes | STR-TRUSS-001 |
 | `truss.detach` | 4 | truss_id, chord | — | Yes | STR-TRUSS-001 |
 | `truss.edit_profile` | 4 | truss_id, top_curves[], bottom_curves[] | — | Yes | STR-TRUSS-001 |
+| `truss.info` | 4 | truss_id | {truss_id, layout, panels, height, span, chords[], webs[]} | No | STR-TRUSS-001 |
 | `truss.remove` | 4 | truss_id | member_ids[] | Yes | STR-TRUSS-001 |
+| `truss.set` | 4 | truss_id, start?, end?, layout?, panels?, height?, bearing?, offset? | — | Yes | STR-TRUSS-001 |
 | `txn.begin` | 2 | name | — | — (primitive) | DM-TXN-001 |
 | `txn.commit` | 2 | — | — | — (primitive) | DM-TXN-001 |
 | `txn.group_begin` | 2 | name | — | — (primitive) | DM-TXN-001 |

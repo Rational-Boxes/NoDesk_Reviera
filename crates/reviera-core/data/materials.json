@@ -1,0 +1,848 @@
+{
+ "description": "Structural material grades and classes with their key properties (strengths and moduli in MPa, density in kg/m³), compiled from public sources: see the research log and the source register (S-numbers). Small factual subsets; reference values before design factors.",
+ "materials": [
+  {
+   "name": "Steel ASTM A992",
+   "kind": "steel",
+   "standard": "ASTM A992",
+   "regions": [
+    "united_states",
+    "canada"
+   ],
+   "use": "W shapes (US default); also Canada W shapes",
+   "properties": {
+    "fy_MPa": 345,
+    "fu_MPa": 450,
+    "E_MPa": 199948,
+    "G_MPa": 77221,
+    "poisson": 0.3,
+    "density_kg_m3": 7850
+   },
+   "source_ids": [
+    "S0722",
+    "S0763",
+    "S0801",
+    "S0802"
+   ]
+  },
+  {
+   "name": "Steel ASTM A36",
+   "kind": "steel",
+   "standard": "ASTM A36",
+   "regions": [
+    "united_states",
+    "canada"
+   ],
+   "use": "plates, bars; angles/channels in older practice",
+   "properties": {
+    "fy_MPa": 250,
+    "fu_MPa": 400,
+    "E_MPa": 199948,
+    "G_MPa": 77221,
+    "poisson": 0.3,
+    "density_kg_m3": 7850
+   },
+   "source_ids": [
+    "S0722",
+    "S0763",
+    "S0801"
+   ]
+  },
+  {
+   "name": "Steel ASTM A572 Gr 50",
+   "kind": "steel",
+   "standard": "ASTM A572 Gr 50",
+   "regions": [
+    "united_states",
+    "canada"
+   ],
+   "use": "angles, S/M/HP shapes, plates",
+   "properties": {
+    "fy_MPa": 345,
+    "fu_MPa": 450,
+    "E_MPa": 199948,
+    "G_MPa": 77221,
+    "poisson": 0.3,
+    "density_kg_m3": 7850
+   },
+   "source_ids": [
+    "S0722",
+    "S0763",
+    "S0801"
+   ]
+  },
+  {
+   "name": "Steel ASTM A500 Gr B",
+   "kind": "steel",
+   "standard": "ASTM A500 Gr B",
+   "regions": [
+    "united_states",
+    "canada"
+   ],
+   "use": "HSS (older default)",
+   "properties": {
+    "fy_MPa": 317,
+    "fu_MPa": 400,
+    "E_MPa": 199948,
+    "G_MPa": 77221,
+    "poisson": 0.3,
+    "density_kg_m3": 7850
+   },
+   "source_ids": [
+    "S0763",
+    "S0812"
+   ],
+   "note": "Values for rectangular HSS. Before ASTM A500-21 round Gr B was 42/58 ksi; check the current ASTM A500 edition before using a round value."
+  },
+  {
+   "name": "Steel ASTM A500 Gr C",
+   "kind": "steel",
+   "standard": "ASTM A500 Gr C",
+   "regions": [
+    "united_states",
+    "canada"
+   ],
+   "use": "HSS rectangular and round (US default)",
+   "properties": {
+    "fy_MPa": 345,
+    "fu_MPa": 427,
+    "E_MPa": 199948,
+    "G_MPa": 77221,
+    "poisson": 0.3,
+    "density_kg_m3": 7850
+   },
+   "source_ids": [
+    "S0763",
+    "S0801",
+    "S0811"
+   ],
+   "note": "Since ASTM A500-21, 50/62 ksi applies to all HSS shapes including round (round was 46 ksi before 2021). Design wall = 0.93 x nominal (AISC 360 B4.2)."
+  },
+  {
+   "name": "Steel ASTM A1085",
+   "kind": "steel",
+   "standard": "ASTM A1085",
+   "regions": [
+    "united_states",
+    "canada"
+   ],
+   "use": "HSS with tighter tolerances",
+   "properties": {
+    "fy_MPa": 345,
+    "fu_MPa": 448,
+    "E_MPa": 199948,
+    "G_MPa": 77221,
+    "poisson": 0.3,
+    "density_kg_m3": 7850
+   },
+   "source_ids": [
+    "S0763",
+    "S0801"
+   ],
+   "note": "Design wall = nominal (AISC 360 B4.2)."
+  },
+  {
+   "name": "Steel ASTM A53 Gr B",
+   "kind": "steel",
+   "standard": "ASTM A53 Gr B",
+   "regions": [
+    "united_states",
+    "canada"
+   ],
+   "use": "steel pipe (AISC Pipe shapes)",
+   "properties": {
+    "fy_MPa": 241,
+    "fu_MPa": 414,
+    "E_MPa": 199948,
+    "G_MPa": 77221,
+    "poisson": 0.3,
+    "density_kg_m3": 7850
+   },
+   "source_ids": [
+    "S0763",
+    "S0801"
+   ]
+  },
+  {
+   "name": "Steel CSA G40.21 350W",
+   "kind": "steel",
+   "standard": "CSA G40.21 350W",
+   "regions": [
+    "canada"
+   ],
+   "use": "Canada HSS (and formerly W shapes)",
+   "properties": {
+    "fy_MPa": 350,
+    "fu_MPa": 448,
+    "E_MPa": 199948,
+    "G_MPa": 77221,
+    "poisson": 0.3,
+    "density_kg_m3": 7850
+   },
+   "source_ids": [
+    "S0763",
+    "S0802",
+    "S0804"
+   ]
+  },
+  {
+   "name": "Steel AS/NZS 3679.1 300 (300PLUS)",
+   "kind": "steel",
+   "standard": "AS/NZS 3679.1 300PLUS (InfraBuild)",
+   "regions": [
+    "australia"
+   ],
+   "use": "Australia hot-rolled sections",
+   "properties": {
+    "fy_MPa": 300,
+    "fu_MPa": 440,
+    "E_MPa": 199948,
+    "G_MPa": 77221,
+    "poisson": 0.3,
+    "density_kg_m3": 7850
+   },
+   "source_ids": [
+    "S0763",
+    "S0807",
+    "S0808",
+    "S0809"
+   ],
+   "note": "Yield varies with thickness; values from a distributor data sheet (T92), not the mill. Exceeds AS/NZS 3679.1 Grade 300. Grade 300 nominal values recorded; the yield range is 280 to 320 MPa by thickness."
+  },
+  {
+   "name": "Steel S235 (EN 10025-2)",
+   "kind": "steel",
+   "standard": "S235 (EN 10025-2:2019)",
+   "regions": [
+    "europe",
+    "united_kingdom"
+   ],
+   "use": "hot-rolled sections and plates",
+   "properties": {
+    "fy_MPa": 235,
+    "fu_MPa": 360,
+    "E_MPa": 210000,
+    "G_MPa": 81000,
+    "poisson": 0.3,
+    "density_kg_m3": 7850
+   },
+   "source_ids": [
+    "S0722",
+    "S0806",
+    "S0814",
+    "S0815"
+   ],
+   "note": "fy and fu for t <= 40 mm (EN 1993-1-1 Table 3.1)"
+  },
+  {
+   "name": "Steel S275 (EN 10025-2)",
+   "kind": "steel",
+   "standard": "S275 (EN 10025-2:2019)",
+   "regions": [
+    "europe",
+    "united_kingdom"
+   ],
+   "use": "hot-rolled sections and plates",
+   "properties": {
+    "fy_MPa": 275,
+    "fu_MPa": 430,
+    "E_MPa": 210000,
+    "G_MPa": 81000,
+    "poisson": 0.3,
+    "density_kg_m3": 7850
+   },
+   "source_ids": [
+    "S0722",
+    "S0806",
+    "S0814",
+    "S0815"
+   ],
+   "note": "fy and fu for t <= 40 mm (EN 1993-1-1 Table 3.1)"
+  },
+  {
+   "name": "Steel S355 (EN 10025-2)",
+   "kind": "steel",
+   "standard": "S355 (EN 10025-2:2019)",
+   "regions": [
+    "europe",
+    "united_kingdom"
+   ],
+   "use": "hot-rolled sections and plates",
+   "properties": {
+    "fy_MPa": 355,
+    "fu_MPa": 490,
+    "E_MPa": 210000,
+    "G_MPa": 81000,
+    "poisson": 0.3,
+    "density_kg_m3": 7850
+   },
+   "source_ids": [
+    "S0722",
+    "S0806",
+    "S0814",
+    "S0815"
+   ],
+   "note": "fy and fu for t <= 40 mm (EN 1993-1-1 Table 3.1)"
+  },
+  {
+   "name": "Concrete C20/25",
+   "kind": "concrete",
+   "standard": "EN 1992-1-1 / EN 206",
+   "regions": [
+    "europe",
+    "united_kingdom"
+   ],
+   "use": "",
+   "properties": {
+    "fck_MPa": 20,
+    "fck_cube_MPa": 25,
+    "fcm_MPa": 28,
+    "fctm_MPa": 2.21,
+    "E_MPa": 29962,
+    "poisson": 0.2,
+    "density_kg_m3": 2500
+   },
+   "source_ids": [
+    "S0728",
+    "S0729",
+    "S0730"
+   ],
+   "note": "Ecm for quartzite aggregates; density 25 kN/m³ reinforced."
+  },
+  {
+   "name": "Concrete C25/30",
+   "kind": "concrete",
+   "standard": "EN 1992-1-1 / EN 206",
+   "regions": [
+    "europe",
+    "united_kingdom"
+   ],
+   "use": "",
+   "properties": {
+    "fck_MPa": 25,
+    "fck_cube_MPa": 30,
+    "fcm_MPa": 33,
+    "fctm_MPa": 2.56,
+    "E_MPa": 31476,
+    "poisson": 0.2,
+    "density_kg_m3": 2500
+   },
+   "source_ids": [
+    "S0728",
+    "S0729",
+    "S0730"
+   ],
+   "note": "Ecm for quartzite aggregates; density 25 kN/m³ reinforced."
+  },
+  {
+   "name": "Concrete C30/37",
+   "kind": "concrete",
+   "standard": "EN 1992-1-1 / EN 206",
+   "regions": [
+    "europe",
+    "united_kingdom"
+   ],
+   "use": "",
+   "properties": {
+    "fck_MPa": 30,
+    "fck_cube_MPa": 37,
+    "fcm_MPa": 38,
+    "fctm_MPa": 2.9,
+    "E_MPa": 32837,
+    "poisson": 0.2,
+    "density_kg_m3": 2500
+   },
+   "source_ids": [
+    "S0728",
+    "S0729",
+    "S0730"
+   ],
+   "note": "Ecm for quartzite aggregates; density 25 kN/m³ reinforced."
+  },
+  {
+   "name": "Concrete C35/45",
+   "kind": "concrete",
+   "standard": "EN 1992-1-1 / EN 206",
+   "regions": [
+    "europe",
+    "united_kingdom"
+   ],
+   "use": "",
+   "properties": {
+    "fck_MPa": 35,
+    "fck_cube_MPa": 45,
+    "fcm_MPa": 43,
+    "fctm_MPa": 3.21,
+    "E_MPa": 34077,
+    "poisson": 0.2,
+    "density_kg_m3": 2500
+   },
+   "source_ids": [
+    "S0728",
+    "S0729",
+    "S0730"
+   ],
+   "note": "Ecm for quartzite aggregates; density 25 kN/m³ reinforced."
+  },
+  {
+   "name": "Concrete C40/50",
+   "kind": "concrete",
+   "standard": "EN 1992-1-1 / EN 206",
+   "regions": [
+    "europe",
+    "united_kingdom"
+   ],
+   "use": "",
+   "properties": {
+    "fck_MPa": 40,
+    "fck_cube_MPa": 50,
+    "fcm_MPa": 48,
+    "fctm_MPa": 3.51,
+    "E_MPa": 35220,
+    "poisson": 0.2,
+    "density_kg_m3": 2500
+   },
+   "source_ids": [
+    "S0728",
+    "S0729",
+    "S0730"
+   ],
+   "note": "Ecm for quartzite aggregates; density 25 kN/m³ reinforced."
+  },
+  {
+   "name": "Concrete C45/55",
+   "kind": "concrete",
+   "standard": "EN 1992-1-1 / EN 206",
+   "regions": [
+    "europe",
+    "united_kingdom"
+   ],
+   "use": "",
+   "properties": {
+    "fck_MPa": 45,
+    "fck_cube_MPa": 55,
+    "fcm_MPa": 53,
+    "fctm_MPa": 3.8,
+    "E_MPa": 36283,
+    "poisson": 0.2,
+    "density_kg_m3": 2500
+   },
+   "source_ids": [
+    "S0728",
+    "S0729",
+    "S0730"
+   ],
+   "note": "Ecm for quartzite aggregates; density 25 kN/m³ reinforced."
+  },
+  {
+   "name": "Concrete C50/60",
+   "kind": "concrete",
+   "standard": "EN 1992-1-1 / EN 206",
+   "regions": [
+    "europe",
+    "united_kingdom"
+   ],
+   "use": "",
+   "properties": {
+    "fck_MPa": 50,
+    "fck_cube_MPa": 60,
+    "fcm_MPa": 58,
+    "fctm_MPa": 4.07,
+    "E_MPa": 37278,
+    "poisson": 0.2,
+    "density_kg_m3": 2500
+   },
+   "source_ids": [
+    "S0728",
+    "S0729",
+    "S0730"
+   ],
+   "note": "Ecm for quartzite aggregates; density 25 kN/m³ reinforced."
+  },
+  {
+   "name": "Concrete f'c 3000 psi",
+   "kind": "concrete",
+   "standard": "ACI 318",
+   "regions": [
+    "united_states"
+   ],
+   "use": "",
+   "properties": {
+    "fck_MPa": 20.7,
+    "E_MPa": 21525,
+    "density_kg_m3": 2400
+   },
+   "source_ids": [
+    "S0731",
+    "S0733",
+    "S0734",
+    "S0735"
+   ],
+   "note": "f'c (specified compressive strength); Ec = 57,000 √f'c psi, normal-weight concrete."
+  },
+  {
+   "name": "Concrete f'c 4000 psi",
+   "kind": "concrete",
+   "standard": "ACI 318",
+   "regions": [
+    "united_states"
+   ],
+   "use": "",
+   "properties": {
+    "fck_MPa": 27.6,
+    "E_MPa": 24856,
+    "density_kg_m3": 2400
+   },
+   "source_ids": [
+    "S0731",
+    "S0733",
+    "S0734",
+    "S0735"
+   ],
+   "note": "f'c (specified compressive strength); Ec = 57,000 √f'c psi, normal-weight concrete."
+  },
+  {
+   "name": "Concrete f'c 5000 psi",
+   "kind": "concrete",
+   "standard": "ACI 318",
+   "regions": [
+    "united_states"
+   ],
+   "use": "",
+   "properties": {
+    "fck_MPa": 34.5,
+    "E_MPa": 27793,
+    "density_kg_m3": 2400
+   },
+   "source_ids": [
+    "S0731",
+    "S0733",
+    "S0734",
+    "S0735"
+   ],
+   "note": "f'c (specified compressive strength); Ec = 57,000 √f'c psi, normal-weight concrete."
+  },
+  {
+   "name": "Concrete 30 MPa",
+   "kind": "concrete",
+   "standard": "CSA A23.1/A23.3",
+   "regions": [
+    "canada"
+   ],
+   "use": "",
+   "properties": {
+    "fck_MPa": 30,
+    "density_kg_m3": 2400
+   },
+   "source_ids": [],
+   "note": "Specified strength class only; other properties by the design standard."
+  },
+  {
+   "name": "Concrete 32 MPa",
+   "kind": "concrete",
+   "standard": "AS 3600 / AS 1379",
+   "regions": [
+    "australia"
+   ],
+   "use": "",
+   "properties": {
+    "fck_MPa": 32,
+    "density_kg_m3": 2400
+   },
+   "source_ids": [],
+   "note": "Specified strength class only; other properties by the design standard."
+  },
+  {
+   "name": "Wood Douglas Fir-Larch No.2",
+   "kind": "wood",
+   "standard": "AWC NDS 2024, Table 4A (2 to 4 in thick)",
+   "regions": [
+    "united_states",
+    "canada"
+   ],
+   "use": "dimension lumber",
+   "properties": {
+    "Fb_MPa": 6.21,
+    "Ft_MPa": 3.96,
+    "Fv_MPa": 1.24,
+    "Fc_perp_MPa": 4.31,
+    "Fc_MPa": 9.31,
+    "E_MPa": 11032,
+    "Emin_MPa": 3999,
+    "specific_gravity": 0.5
+   },
+   "source_ids": [
+    "S0750",
+    "S0751"
+   ],
+   "note": "Reference design values before adjustment factors."
+  },
+  {
+   "name": "Wood Spruce-Pine-Fir No.1/No.2",
+   "kind": "wood",
+   "standard": "AWC NDS 2024, Table 4A (2 to 4 in thick)",
+   "regions": [
+    "united_states",
+    "canada"
+   ],
+   "use": "dimension lumber",
+   "properties": {
+    "Fb_MPa": 6.03,
+    "Ft_MPa": 3.1,
+    "Fv_MPa": 0.93,
+    "Fc_perp_MPa": 2.93,
+    "Fc_MPa": 7.93,
+    "E_MPa": 9653,
+    "Emin_MPa": 3516,
+    "specific_gravity": 0.42
+   },
+   "source_ids": [
+    "S0750",
+    "S0751"
+   ],
+   "note": "Reference design values before adjustment factors."
+  },
+  {
+   "name": "Timber C16 (EN 338)",
+   "kind": "wood",
+   "standard": "C16 (EN 338:2016)",
+   "regions": [
+    "europe",
+    "united_kingdom",
+    "australia"
+   ],
+   "use": "sawn softwood",
+   "properties": {
+    "fm_k_MPa": 16,
+    "ft0_k_MPa": 8.5,
+    "ft90_k_MPa": 0.4,
+    "fc0_k_MPa": 17,
+    "fc90_k_MPa": 2.2,
+    "fv_k_MPa": 3.2,
+    "E_MPa": 8000,
+    "E05_MPa": 5400,
+    "G_MPa": 500,
+    "density_kg_m3": 370,
+    "density_k_kg_m3": 310
+   },
+   "source_ids": [
+    "S0752",
+    "S0753"
+   ]
+  },
+  {
+   "name": "Timber C24 (EN 338)",
+   "kind": "wood",
+   "standard": "C24 (EN 338:2016)",
+   "regions": [
+    "europe",
+    "united_kingdom",
+    "australia"
+   ],
+   "use": "sawn softwood",
+   "properties": {
+    "fm_k_MPa": 24,
+    "ft0_k_MPa": 14.5,
+    "ft90_k_MPa": 0.4,
+    "fc0_k_MPa": 21,
+    "fc90_k_MPa": 2.5,
+    "fv_k_MPa": 4.0,
+    "E_MPa": 11000,
+    "E05_MPa": 7400,
+    "G_MPa": 690,
+    "density_kg_m3": 420,
+    "density_k_kg_m3": 350
+   },
+   "source_ids": [
+    "S0752",
+    "S0753"
+   ]
+  },
+  {
+   "name": "Timber C30 (EN 338)",
+   "kind": "wood",
+   "standard": "C30 (EN 338:2016)",
+   "regions": [
+    "europe",
+    "united_kingdom",
+    "australia"
+   ],
+   "use": "sawn softwood",
+   "properties": {
+    "fm_k_MPa": 30,
+    "ft0_k_MPa": 19.0,
+    "ft90_k_MPa": 0.4,
+    "fc0_k_MPa": 24,
+    "fc90_k_MPa": 2.7,
+    "fv_k_MPa": 4.0,
+    "E_MPa": 12000,
+    "E05_MPa": 8000,
+    "G_MPa": 750,
+    "density_kg_m3": 460,
+    "density_k_kg_m3": 380
+   },
+   "source_ids": [
+    "S0752",
+    "S0753"
+   ]
+  },
+  {
+   "name": "Glulam GL24h (EN 14080)",
+   "kind": "wood",
+   "standard": "GL24h (EN 14080:2013)",
+   "regions": [
+    "europe",
+    "united_kingdom"
+   ],
+   "use": "glued laminated timber",
+   "properties": {
+    "fm_k_MPa": 24,
+    "ft0_k_MPa": 19.2,
+    "ft90_k_MPa": 0.5,
+    "fc0_k_MPa": 24,
+    "fc90_k_MPa": 2.5,
+    "fv_k_MPa": 3.5,
+    "E_MPa": 11500,
+    "E05_MPa": 9600,
+    "G_MPa": 650,
+    "density_kg_m3": 420,
+    "density_k_kg_m3": 385
+   },
+   "source_ids": [
+    "S0755"
+   ]
+  },
+  {
+   "name": "Glulam GL28h (EN 14080)",
+   "kind": "wood",
+   "standard": "GL28h (EN 14080:2013)",
+   "regions": [
+    "europe",
+    "united_kingdom"
+   ],
+   "use": "glued laminated timber",
+   "properties": {
+    "fm_k_MPa": 28,
+    "ft0_k_MPa": 22.3,
+    "ft90_k_MPa": 0.5,
+    "fc0_k_MPa": 28,
+    "fc90_k_MPa": 2.5,
+    "fv_k_MPa": 3.5,
+    "E_MPa": 12600,
+    "E05_MPa": 10500,
+    "G_MPa": 650,
+    "density_kg_m3": 460,
+    "density_k_kg_m3": 425
+   },
+   "source_ids": [
+    "S0755"
+   ]
+  },
+  {
+   "name": "Glulam GL32h (EN 14080)",
+   "kind": "wood",
+   "standard": "GL32h (EN 14080:2013)",
+   "regions": [
+    "europe",
+    "united_kingdom"
+   ],
+   "use": "glued laminated timber",
+   "properties": {
+    "fm_k_MPa": 32,
+    "ft0_k_MPa": 25.6,
+    "ft90_k_MPa": 0.5,
+    "fc0_k_MPa": 32,
+    "fc90_k_MPa": 2.5,
+    "fv_k_MPa": 3.5,
+    "E_MPa": 14200,
+    "E05_MPa": 11800,
+    "G_MPa": 650,
+    "density_kg_m3": 490,
+    "density_k_kg_m3": 440
+   },
+   "source_ids": [
+    "S0755"
+   ]
+  },
+  {
+   "name": "Glulam GL24c (EN 14080)",
+   "kind": "wood",
+   "standard": "GL24c (EN 14080:2013)",
+   "regions": [
+    "europe",
+    "united_kingdom"
+   ],
+   "use": "glued laminated timber",
+   "properties": {
+    "fm_k_MPa": 24,
+    "ft0_k_MPa": 17,
+    "ft90_k_MPa": 0.5,
+    "fc0_k_MPa": 21.5,
+    "fc90_k_MPa": 2.5,
+    "fv_k_MPa": 3.5,
+    "E_MPa": 11000,
+    "E05_MPa": 9100,
+    "G_MPa": 650,
+    "density_kg_m3": 400,
+    "density_k_kg_m3": 365
+   },
+   "source_ids": [
+    "S0755",
+    "S0756"
+   ]
+  },
+  {
+   "name": "Glulam GL28c (EN 14080)",
+   "kind": "wood",
+   "standard": "GL28c (EN 14080:2013)",
+   "regions": [
+    "europe",
+    "united_kingdom"
+   ],
+   "use": "glued laminated timber",
+   "properties": {
+    "fm_k_MPa": 28,
+    "ft0_k_MPa": 19.5,
+    "ft90_k_MPa": 0.5,
+    "fc0_k_MPa": 24,
+    "fc90_k_MPa": 2.5,
+    "fv_k_MPa": 3.5,
+    "E_MPa": 12500,
+    "E05_MPa": 10400,
+    "G_MPa": 650,
+    "density_kg_m3": 420,
+    "density_k_kg_m3": 390
+   },
+   "source_ids": [
+    "S0755",
+    "S0756"
+   ]
+  },
+  {
+   "name": "Glulam GL32c (EN 14080)",
+   "kind": "wood",
+   "standard": "GL32c (EN 14080:2013)",
+   "regions": [
+    "europe",
+    "united_kingdom"
+   ],
+   "use": "glued laminated timber",
+   "properties": {
+    "fm_k_MPa": 32,
+    "ft0_k_MPa": 19.5,
+    "ft90_k_MPa": 0.5,
+    "fc0_k_MPa": 24.5,
+    "fc90_k_MPa": 2.5,
+    "fv_k_MPa": 3.5,
+    "E_MPa": 13500,
+    "E05_MPa": 11200,
+    "G_MPa": 650,
+    "density_kg_m3": 440,
+    "density_k_kg_m3": 400
+   },
+   "source_ids": [
+    "S0755"
+   ]
+  }
+ ]
+}

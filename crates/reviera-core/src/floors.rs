@@ -311,10 +311,30 @@ pub struct CreateParams {
     /// floors, 2600 mm for ceilings.
     #[schemars(extend("x-reviera-data-type" = "length"))]
     pub offset: Option<f64>,
+    /// A structural floor (STR-FLOOR-001), spanning along `span_direction_edge` (default the
+    /// first edge); floors only.
+    #[serde(default)]
+    pub structural: bool,
+    pub span_direction_edge: Option<usize>,
 }
 
 pub(crate) fn create(txn: &mut crate::txn::Transaction<'_>, p: CreateParams) -> Result<ElementId> {
-    create_kind(txn, SlabKind::Floor, p)
+    let (structural, edge) = (
+        p.structural || p.span_direction_edge.is_some(),
+        p.span_direction_edge,
+    );
+    let id = create_kind(txn, SlabKind::Floor, p)?;
+    if structural {
+        crate::structural::set_span(
+            txn,
+            crate::structural::SpanParams {
+                floor_id: ElementRef::Id(id),
+                edge_index: Some(edge.unwrap_or(0)),
+                vector: None,
+            },
+        )?;
+    }
+    Ok(id)
 }
 
 /// Creates a floor or a ceiling (`offset` omitted: 0 for floors, 2.6 m for ceilings).
@@ -521,6 +541,8 @@ pub(crate) fn create_auto(
             loops,
             level_id: p.level_id,
             offset: Some(offset),
+            structural: false,
+            span_direction_edge: None,
         },
     )?;
     if p.follow_roof {

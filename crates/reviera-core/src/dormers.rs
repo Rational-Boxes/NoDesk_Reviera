@@ -311,6 +311,8 @@ fn build(
                 location_line: walls::LocationLine::WallCenterline,
                 flip: false,
                 auto_join: Default::default(),
+                structural: false,
+                structural_usage: None,
             },
         )
     };

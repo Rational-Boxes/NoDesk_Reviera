@@ -295,6 +295,36 @@ impl ColumnType {
         }
     }
 
+    /// Its torsion constant J (m⁴), approximately: solid rectangles by St Venant's series, round
+    /// and hollow sections exactly or by Bredt's thin-walled formula, open sections as the sum of
+    /// b·t³/3 over their plates.
+    pub fn torsion_constant(&self) -> f64 {
+        let (w, d) = (self.width, self.depth);
+        let (tw, tf, t) = (
+            self.web_thickness,
+            self.flange_thickness,
+            self.wall_thickness,
+        );
+        match self.section {
+            Section::Rectangular => {
+                let (a, b) = (w.max(d), w.min(d));
+                b.powi(3) * a * (1.0 / 3.0 - 0.21 * b / a * (1.0 - b.powi(4) / (12.0 * a.powi(4))))
+            }
+            Section::Round => std::f64::consts::PI * w.powi(4) / 32.0,
+            Section::CircularHollow => {
+                std::f64::consts::PI * (w.powi(4) - (w - 2.0 * t).max(0.0).powi(4)) / 32.0
+            }
+            Section::RectangularHollow => {
+                let (bm, dm) = (w - t, d - t);
+                4.0 * (bm * dm).powi(2) * t / (2.0 * (bm + dm))
+            }
+            Section::IShape => (2.0 * w * tf.powi(3) + (d - 2.0 * tf) * tw.powi(3)) / 3.0,
+            Section::Channel => (2.0 * w * tf.powi(3) + (d - 2.0 * tf) * tw.powi(3)) / 3.0,
+            Section::Tee => (w * tf.powi(3) + (d - tf) * tw.powi(3)) / 3.0,
+            Section::Angle => (w * t.powi(3) + (d - t) * t.powi(3)) / 3.0,
+        }
+    }
+
     /// Whether its sizes make a section: thicknesses positive and leaving room for the rest.
     pub fn check(&self) -> std::result::Result<(), String> {
         let positive = |v: f64, what: &str| {
@@ -378,6 +408,17 @@ pub struct Attach {
     pub offset: f64,
 }
 
+/// A slanted column's lean (STR-COL-002): its top away from its base in plan.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case", tag = "style")]
+pub enum Slant {
+    /// Slanted, end point driven: the top's centre at this plan point.
+    EndPoint { top: [f64; 2] },
+    /// Slanted, angle driven: leaning `angle` from horizontal toward `azimuth` (radians,
+    /// counter-clockwise from x); the base stays put when the angle changes.
+    Angle { angle: f64, azimuth: f64 },
+}
+
 /// The stored recipe of a column.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct ColumnRecipe {
@@ -391,6 +432,9 @@ pub struct ColumnRecipe {
     pub extent: Extent,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub attach_top: Option<Attach>,
+    /// Slanted (STR-COL-002); none for a vertical column.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub slant: Option<Slant>,
 }
 
 pub fn column_recipe(e: &Element) -> Option<ColumnRecipe> {
@@ -406,6 +450,10 @@ fn find(store: &Store, guid: &str) -> Option<ElementId> {
 #[derive(Debug, Clone, PartialEq)]
 pub struct ColumnGeometry {
     pub ty: ColumnType,
+    /// The base's centre in plan.
+    pub point: [f64; 2],
+    /// The top's centre less the base's, in plan: zero for a vertical column.
+    pub shift: [f64; 2],
     /// The section's outline in plan, counter-clockwise.
     pub ring: Vec<[f64; 2]>,
     /// Its holes (hollow sections), clockwise.
@@ -431,9 +479,37 @@ impl ColumnGeometry {
             }
         }
         let top = self.top();
+        if self.shift != [0.0, 0.0] {
+            // Slanted: the plan section swept up the axis, its ends cut horizontally.
+            let (points, indices) = crate::bodies::extrude(&self.ring, &self.holes, 0.0, 1.0);
+            let h = top - self.z0;
+            let points = points
+                .into_iter()
+                .map(|[x, y, s]| {
+                    [
+                        x + self.shift[0] * s,
+                        y + self.shift[1] * s,
+                        self.z0 + h * s,
+                    ]
+                })
+                .collect();
+            return (points, indices);
+        }
         crate::bodies::extrude_between(&self.ring, &self.holes, &|_| self.z0, &|p| {
             heights.get(&key(p)).copied().unwrap_or(top)
         })
+    }
+
+    /// Its axis: the base's centre and the top's.
+    pub fn axis(&self) -> ([f64; 3], [f64; 3]) {
+        (
+            [self.point[0], self.point[1], self.z0],
+            [
+                self.point[0] + self.shift[0],
+                self.point[1] + self.shift[1],
+                self.top(),
+            ],
+        )
     }
 
     /// The highest point of its top.
@@ -583,8 +659,30 @@ pub fn regenerate(store: &Store, e: &Element) -> Result<ColumnGeometry> {
             "the column's top is at or below its base",
         ));
     }
+    let shift = match r.slant {
+        None => [0.0, 0.0],
+        Some(_) if r.attach_top.is_some() => {
+            return Err(Error::new(
+                "column.slanted_attached",
+                "a slanted column's top cannot be attached",
+            ));
+        }
+        Some(Slant::EndPoint { top }) => [top[0] - r.point[0], top[1] - r.point[1]],
+        Some(Slant::Angle { angle, azimuth }) => {
+            if !(angle > 1e-3 && angle < std::f64::consts::FRAC_PI_2 + 1e-9) {
+                return Err(Error::new(
+                    "column.invalid_angle",
+                    "a slanted column's angle is above 0° and at most 90° from horizontal",
+                ));
+            }
+            let run = (z1 - z0) / angle.tan();
+            [run * azimuth.cos(), run * azimuth.sin()]
+        }
+    };
     Ok(ColumnGeometry {
         ty,
+        point: r.point,
+        shift,
         ring,
         holes,
         z0,
@@ -743,6 +841,7 @@ fn place_as(
         rotation: p.rotation,
         extent,
         attach_top: None,
+        slant: None,
     };
     let guid = store.get(type_id).expect("resolved").guid().to_string();
     let id = txn.create(
@@ -942,7 +1041,11 @@ pub fn check(store: &Store, p: &CheckParams) -> Result<Vec<Advisory>> {
         if r <= 0.0 {
             continue;
         }
-        let slenderness = length / r;
+        let mut slenderness = length / r;
+        // Timber: the effective length over the least dimension.
+        if g.ty.material_kind == Some(MaterialKind::Wood) && g.ty.section == Section::Rectangular {
+            slenderness = length / g.ty.width.min(g.ty.depth);
+        }
         let (limit, note) = match (g.ty.material_kind, region.region) {
             (Some(MaterialKind::Steel), _) => (
                 Some(200.0),
@@ -960,6 +1063,17 @@ pub fn check(store: &Store, p: &CheckParams) -> Result<Vec<Advisory>> {
             (Some(MaterialKind::Concrete | MaterialKind::PrecastConcrete), _) => (
                 None,
                 "Concrete: λ = l0/i; its limit depends on the axial load (EN 1992-1-1 5.8.3.1)",
+            ),
+            (
+                Some(MaterialKind::Wood),
+                crate::codes::Region::UnitedStates | crate::codes::Region::Canada,
+            ) if g.ty.section == Section::Rectangular => (
+                Some(50.0),
+                "Timber: le/d not over 50 (NDS 3.7.1.4; CSA O86, Cc not over 50)",
+            ),
+            (Some(MaterialKind::Wood), _) => (
+                None,
+                "Timber: λ = le/i, the relative slenderness checked by EN 1995-1-1 6.3.2",
             ),
             _ => (
                 None,
@@ -1073,6 +1187,166 @@ pub(crate) fn set(txn: &mut crate::txn::Transaction<'_>, p: SetParams) -> Result
     Ok(())
 }
 
+/// How a slanted column is placed or driven.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum SlantStyle {
+    Vertical,
+    #[default]
+    EndPoint,
+    Angle,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct PlaceSlantedParams {
+    /// A structural column type; omitted, the default.
+    pub type_id: Option<ElementRef>,
+    /// The first end's centre in plan, its level and offset.
+    pub p1: [f64; 2],
+    pub p1_level: ElementRef,
+    #[serde(default)]
+    #[schemars(extend("x-reviera-data-type" = "length"))]
+    pub p1_offset: f64,
+    /// The second end's.
+    pub p2: [f64; 2],
+    pub p2_level: ElementRef,
+    #[serde(default)]
+    #[schemars(extend("x-reviera-data-type" = "length"))]
+    pub p2_offset: f64,
+    /// `end_point` (default) or `angle`.
+    #[serde(default)]
+    pub style: SlantStyle,
+    #[serde(default)]
+    #[schemars(extend("x-reviera-data-type" = "angle"))]
+    pub rotation: f64,
+}
+
+fn level_z(store: &Store, r: &ElementRef) -> Result<f64> {
+    store
+        .resolve(r)
+        .and_then(|id| store.get(id))
+        .filter(|e| e.class == crate::levels::CLASS)
+        .map(crate::levels::elevation)
+        .ok_or_else(|| Error::new("level.not_found", format!("no level {r:?}")))
+}
+
+/// Places a slanted structural column (`column.place_slanted`, STR-COL-002) between two ends,
+/// each at its level and offset; the lower end is the base (the ends are swapped, with a warning,
+/// when the first is higher).
+pub(crate) fn place_slanted(
+    txn: &mut crate::txn::Transaction<'_>,
+    p: PlaceSlantedParams,
+) -> Result<ElementId> {
+    let store = txn.store().clone();
+    let mut ends = [
+        (p.p1, p.p1_level.clone(), p.p1_offset),
+        (p.p2, p.p2_level.clone(), p.p2_offset),
+    ];
+    let z = |e: &([f64; 2], ElementRef, f64)| -> Result<f64> { Ok(level_z(&store, &e.1)? + e.2) };
+    if z(&ends[0])? > z(&ends[1])? {
+        ends.swap(0, 1);
+        txn.warn(crate::txn::Warning {
+            id: "str.column.ends_swapped".into(),
+            message: "The first end was above the second: they were swapped, so the base is the lower end".into(),
+            element_ids: Vec::new(),
+        });
+    }
+    let (base, top) = (&ends[0], &ends[1]);
+    let id = place_structural(
+        txn,
+        PlaceParams {
+            type_id: p.type_id,
+            point: base.0,
+            base_level: base.1.clone(),
+            base_offset: base.2,
+            top_constraint: TopConstraint::Level(match &top.1 {
+                ElementRef::Id(i) => crate::walls::ElementRefValue::Id(*i),
+                ElementRef::Guid(g) => crate::walls::ElementRefValue::Id(
+                    store
+                        .find_by_guid(g)
+                        .ok_or_else(|| Error::new("level.not_found", "no such level"))?,
+                ),
+            }),
+            top_offset: top.2,
+            rotation: p.rotation,
+        },
+    )?;
+    set_slant(
+        txn,
+        SetSlantParams {
+            column_ids: vec![ElementRef::Id(id)],
+            style: if p.style == SlantStyle::Vertical {
+                SlantStyle::EndPoint
+            } else {
+                p.style
+            },
+            top_point: Some(top.0),
+            angle: None,
+            azimuth: None,
+        },
+    )?;
+    Ok(id)
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SetSlantParams {
+    pub column_ids: Vec<ElementRef>,
+    /// `vertical`, `end_point` or `angle`; the base stays put.
+    pub style: SlantStyle,
+    /// End point driven: the top's centre in plan (default where it is now).
+    pub top_point: Option<[f64; 2]>,
+    /// Angle driven: from horizontal (default as it is now).
+    #[schemars(extend("x-reviera-data-type" = "angle"))]
+    pub angle: Option<f64>,
+    /// Angle driven: the direction it leans (default as it is now).
+    #[schemars(extend("x-reviera-data-type" = "angle"))]
+    pub azimuth: Option<f64>,
+}
+
+/// Sets columns' style (`column.set_slant`): vertical, slanted by end point, or slanted by angle;
+/// the base stays put.
+pub(crate) fn set_slant(txn: &mut crate::txn::Transaction<'_>, p: SetSlantParams) -> Result<()> {
+    let store = txn.store().clone();
+    for (id, mut r) in resolve_columns(&store, &p.column_ids)? {
+        let g = regenerate(&store, store.get(id).expect("resolved"))?;
+        let (h, run) = (g.top() - g.z0, g.shift[0].hypot(g.shift[1]));
+        let now_top = [r.point[0] + g.shift[0], r.point[1] + g.shift[1]];
+        let now_angle = if run < 1e-9 {
+            std::f64::consts::FRAC_PI_2
+        } else {
+            h.atan2(run)
+        };
+        let now_azimuth = if run < 1e-9 {
+            0.0
+        } else {
+            g.shift[1].atan2(g.shift[0])
+        };
+        r.slant = match p.style {
+            SlantStyle::Vertical => None,
+            SlantStyle::EndPoint => Some(Slant::EndPoint {
+                top: p.top_point.unwrap_or(now_top),
+            }),
+            SlantStyle::Angle => {
+                let (angle, azimuth) = match p.top_point {
+                    Some(t) => {
+                        let d = [t[0] - r.point[0], t[1] - r.point[1]];
+                        (h.atan2(d[0].hypot(d[1])), d[1].atan2(d[0]))
+                    }
+                    None => (now_angle, now_azimuth),
+                };
+                Some(Slant::Angle {
+                    angle: p.angle.unwrap_or(angle),
+                    azimuth: p.azimuth.unwrap_or(azimuth),
+                })
+            }
+        };
+        write(txn, id, &r)?;
+    }
+    Ok(())
+}
+
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct AttachParams {
@@ -1152,6 +1426,17 @@ pub(crate) fn transform(
     r.rotation = match mirror {
         Some(axis) => 2.0 * axis - r.rotation,
         None => r.rotation + turn,
+    };
+    r.slant = match r.slant {
+        Some(Slant::EndPoint { top }) => Some(Slant::EndPoint { top: x(top) }),
+        Some(Slant::Angle { angle, azimuth }) => Some(Slant::Angle {
+            angle,
+            azimuth: match mirror {
+                Some(axis) => 2.0 * axis - azimuth,
+                None => azimuth + turn,
+            },
+        }),
+        None => None,
     };
     r.extent.base_offset += dz;
     if r.extent.top_level().is_some() {
@@ -1252,6 +1537,8 @@ mod tests {
         assert_eq!(round.outline().len(), ROUND_SIDES);
         let g = ColumnGeometry {
             ty: t.clone(),
+            point: [0.0, 0.0],
+            shift: [0.0, 0.0],
             ring: t.outline(),
             holes: Vec::new(),
             z0: 0.0,

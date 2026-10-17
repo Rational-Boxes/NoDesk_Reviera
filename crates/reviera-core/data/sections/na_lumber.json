@@ -1,0 +1,144 @@
+{
+ "family": "Sawn lumber, dressed dry (North America)",
+ "standard": "NIST PS 20-20 American Softwood Lumber Standard, Table 3 minimum dressed sizes (dry, 19% maximum moisture); AWC NDS Supplement Table 1B",
+ "units": "in",
+ "shape": "rectangular",
+ "material_kind": "wood",
+ "default_material": "Wood Douglas Fir-Larch No.2",
+ "source_ids": [
+  "S0747",
+  "S0748"
+ ],
+ "sections": [
+  {
+   "name": "1x2",
+   "b": 0.75,
+   "d": 1.5
+  },
+  {
+   "name": "1x3",
+   "b": 0.75,
+   "d": 2.5
+  },
+  {
+   "name": "1x4",
+   "b": 0.75,
+   "d": 3.5
+  },
+  {
+   "name": "1x6",
+   "b": 0.75,
+   "d": 5.5
+  },
+  {
+   "name": "1x8",
+   "b": 0.75,
+   "d": 7.25
+  },
+  {
+   "name": "1x10",
+   "b": 0.75,
+   "d": 9.25
+  },
+  {
+   "name": "1x12",
+   "b": 0.75,
+   "d": 11.25
+  },
+  {
+   "name": "2x2",
+   "b": 1.5,
+   "d": 1.5
+  },
+  {
+   "name": "2x3",
+   "b": 1.5,
+   "d": 2.5
+  },
+  {
+   "name": "2x4",
+   "b": 1.5,
+   "d": 3.5
+  },
+  {
+   "name": "2x6",
+   "b": 1.5,
+   "d": 5.5
+  },
+  {
+   "name": "2x8",
+   "b": 1.5,
+   "d": 7.25
+  },
+  {
+   "name": "2x10",
+   "b": 1.5,
+   "d": 9.25
+  },
+  {
+   "name": "2x12",
+   "b": 1.5,
+   "d": 11.25
+  },
+  {
+   "name": "2x14",
+   "b": 1.5,
+   "d": 13.25
+  },
+  {
+   "name": "2x16",
+   "b": 1.5,
+   "d": 15.25
+  },
+  {
+   "name": "3x4",
+   "b": 2.5,
+   "d": 3.5
+  },
+  {
+   "name": "3x6",
+   "b": 2.5,
+   "d": 5.5
+  },
+  {
+   "name": "3x8",
+   "b": 2.5,
+   "d": 7.25
+  },
+  {
+   "name": "3x10",
+   "b": 2.5,
+   "d": 9.25
+  },
+  {
+   "name": "3x12",
+   "b": 2.5,
+   "d": 11.25
+  },
+  {
+   "name": "4x4",
+   "b": 3.5,
+   "d": 3.5
+  },
+  {
+   "name": "4x6",
+   "b": 3.5,
+   "d": 5.5
+  },
+  {
+   "name": "4x8",
+   "b": 3.5,
+   "d": 7.25
+  },
+  {
+   "name": "4x10",
+   "b": 3.5,
+   "d": 9.25
+  },
+  {
+   "name": "4x12",
+   "b": 3.5,
+   "d": 11.25
+  }
+ ]
+}
