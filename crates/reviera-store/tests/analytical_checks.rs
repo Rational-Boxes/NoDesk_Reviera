@@ -71,7 +71,12 @@ fn supports_and_consistency_checks() {
         .find(|e| e.class == "IfcBuildingStorey")
         .unwrap()
         .id();
-    let l2 = id(run(&r, &mut doc, "level.create", json!({ "elevation": 4.0 })));
+    let l2 = id(run(
+        &r,
+        &mut doc,
+        "level.create",
+        json!({ "elevation": 4.0 }),
+    ));
     run(&r, &mut doc, "level.create", json!({ "elevation": 8.0 }));
 
     // A two-storey frame with no supports: S3 and C2 are errors.
@@ -101,15 +106,28 @@ fn supports_and_consistency_checks() {
         );
     }
     let report = run(&r, &mut doc, "analytical_model.check", json!({}));
-    assert!(report["counts_by_severity"].get("error").is_none(), "{report:#}");
+    assert!(
+        report["counts_by_severity"].get("error").is_none(),
+        "{report:#}"
+    );
 
     // A beam whose end stops 40 mm short of a column's top node: C1 with the gap measured.
     let short = member(&r, &mut doc, [6.04, 0.0, 8.0], [10.0, 0.0, 8.0], "beam");
-    let report = run(&r, &mut doc, "analytical_model.check_consistency", json!({}));
+    let report = run(
+        &r,
+        &mut doc,
+        "analytical_model.check_consistency",
+        json!({}),
+    );
     let gaps = issues(&report, "C1", "disconnected_nodes");
     assert_eq!(gaps.len(), 1, "{report:#}");
     assert!((gaps[0]["measured"].as_f64().unwrap() - 0.04).abs() < 1e-9);
-    assert!(gaps[0]["message"].as_str().unwrap().contains("node gap 40 mm"));
+    assert!(
+        gaps[0]["message"]
+            .as_str()
+            .unwrap()
+            .contains("node gap 40 mm")
+    );
     assert!(gaps[0]["min"].is_array() && gaps[0]["max"].is_array());
     // Its far end rests on nothing: S1 (supports) and a free end (C1).
     let report = run(&r, &mut doc, "analytical_model.check_supports", json!({}));
@@ -129,7 +147,12 @@ fn supports_and_consistency_checks() {
 
     // A secondary beam framing into the lower beam's mid-span, with no node there: C1.
     member(&r, &mut doc, [3.0, 0.0, 4.0], [3.0, 5.0, 4.0], "beam");
-    let report = run(&r, &mut doc, "analytical_model.check_consistency", json!({}));
+    let report = run(
+        &r,
+        &mut doc,
+        "analytical_model.check_consistency",
+        json!({}),
+    );
     assert_eq!(issues(&report, "C1", "end_on_span").len(), 1, "{report:#}");
 
     // Physical framing: a beam between two structural columns, then its analytical model.
@@ -154,8 +177,16 @@ fn supports_and_consistency_checks() {
         "analytical_automation.physical_to_analytical",
         json!({ "element_ids": [doc_cols[0].0, doc_cols[1].0, beam.0] }),
     );
-    let report = run(&r, &mut doc, "analytical_model.check_consistency", json!({}));
-    assert!(issues(&report, "C3", "position_mismatch").is_empty(), "{report:#}");
+    let report = run(
+        &r,
+        &mut doc,
+        "analytical_model.check_consistency",
+        json!({}),
+    );
+    assert!(
+        issues(&report, "C3", "position_mismatch").is_empty(),
+        "{report:#}"
+    );
     // Analytical-only members are reported for information.
     let c5 = issues(&report, "C5", "no_physical");
     assert!(!c5.is_empty());
@@ -170,7 +201,12 @@ fn supports_and_consistency_checks() {
         "analytical_model.ignore_issue",
         json!({ "issue_key": key, "ignore": true, "reason": "a stub for later" }),
     );
-    let report = run(&r, &mut doc, "analytical_model.check_consistency", json!({}));
+    let report = run(
+        &r,
+        &mut doc,
+        "analytical_model.check_consistency",
+        json!({}),
+    );
     let again = report["issues"]
         .as_array()
         .unwrap()
@@ -187,22 +223,39 @@ fn supports_and_consistency_checks() {
         "element.move",
         json!({ "element_ids": [beam.0], "vector": [0.0, 0.2, 0.0] }),
     );
-    let report = run(&r, &mut doc, "analytical_model.check_consistency", json!({}));
+    let report = run(
+        &r,
+        &mut doc,
+        "analytical_model.check_consistency",
+        json!({}),
+    );
     let c3 = issues(&report, "C3", "position_mismatch");
     assert_eq!(c3.len(), 1, "{report:#}");
     assert!((c3[0]["measured"].as_f64().unwrap() - 0.2).abs() < 1e-6);
     assert!((c3[0]["tolerance"].as_f64().unwrap() - 0.15).abs() < 1e-9);
     assert!(c3[0]["message"].as_str().unwrap().contains("200 mm"));
     // Its axis is still within the tolerance of the beam's body; 500 mm off, it leaves it (C4).
-    assert!(issues(&report, "C4", "outside_physical").is_empty(), "{report:#}");
+    assert!(
+        issues(&report, "C4", "outside_physical").is_empty(),
+        "{report:#}"
+    );
     run(
         &r,
         &mut doc,
         "element.move",
         json!({ "element_ids": [beam.0], "vector": [0.0, 0.3, 0.0] }),
     );
-    let report = run(&r, &mut doc, "analytical_model.check_consistency", json!({}));
-    assert_eq!(issues(&report, "C4", "outside_physical").len(), 1, "{report:#}");
+    let report = run(
+        &r,
+        &mut doc,
+        "analytical_model.check_consistency",
+        json!({}),
+    );
+    assert_eq!(
+        issues(&report, "C4", "outside_physical").len(),
+        1,
+        "{report:#}"
+    );
 
     // Scope: only issues touching the beam.
     let scoped = run(
@@ -223,7 +276,12 @@ fn supports_and_consistency_checks() {
     project.save(&doc).unwrap();
     drop(project);
     let (_p, mut doc2, _) = LocalProject::open(&path).unwrap();
-    let report = run(&r, &mut doc2, "analytical_model.check_consistency", json!({}));
+    let report = run(
+        &r,
+        &mut doc2,
+        "analytical_model.check_consistency",
+        json!({}),
+    );
     let again = report["issues"]
         .as_array()
         .unwrap()
@@ -240,7 +298,12 @@ fn supports_and_consistency_checks() {
         "analytical_node.move",
         json!({ "node_ids": [n], "delta": [0.0, 0.0, -0.1] }),
     );
-    let report = run(&r, &mut doc2, "analytical_model.check_consistency", json!({}));
+    let report = run(
+        &r,
+        &mut doc2,
+        "analytical_model.check_consistency",
+        json!({}),
+    );
     let again = report["issues"]
         .as_array()
         .unwrap()
@@ -250,7 +313,12 @@ fn supports_and_consistency_checks() {
     assert_eq!(again["ignored"], false, "lapses when the member moves");
 
     // C8 is off by default; turned on, members without a section are reported.
-    let report = run(&r, &mut doc2, "analytical_model.check_consistency", json!({}));
+    let report = run(
+        &r,
+        &mut doc2,
+        "analytical_model.check_consistency",
+        json!({}),
+    );
     assert!(issues(&report, "C8", "missing_properties").is_empty());
     run(
         &r,
@@ -258,7 +326,12 @@ fn supports_and_consistency_checks() {
         "structural_settings.set",
         json!({ "key": "consistency_criteria", "value": ["C1", "C8"] }),
     );
-    let report = run(&r, &mut doc2, "analytical_model.check_consistency", json!({}));
+    let report = run(
+        &r,
+        &mut doc2,
+        "analytical_model.check_consistency",
+        json!({}),
+    );
     assert!(!issues(&report, "C8", "missing_properties").is_empty());
     assert!(issues(&report, "C5", "no_physical").is_empty());
     let bad = r

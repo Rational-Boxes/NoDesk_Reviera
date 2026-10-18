@@ -16,7 +16,7 @@
 -- - the analytical model: members for the joists, beam, posts and trusses (split where they
 --   frame together), panels for the bearing walls and the subfloor, pinned supports at the post
 --   bases, the wall bottoms and where joists, beam and trusses bear on the walls, dead, live and
---   snow cases and the ASCE 7 combinations.
+--   snow cases with area loads on the subfloor, and the ASCE 7 combinations.
 
 reviera.code.set{ code = "irc" }
 local FT, IN = 0.3048, 0.0254
@@ -108,7 +108,7 @@ for _, half in ipairs({ { 0, D / 2 }, { D / 2, D } }) do
   }
 end
 local deck = reviera.floor.create{
-  loops = { outline }, level_id = l2, structural = true, span_direction_edge = 1,
+  loops = { outline }, level_id = l2, structural = true, span_direction_edge = 0,
 }
 -- The subfloor: 3/4" plywood.
 local subfloor = reviera.type.duplicate{ type_id = type_named("Generic Floor - 300mm"), new_name = "Subfloor - 3/4\" Plywood" }
@@ -196,7 +196,19 @@ for _, m in ipairs(model.members) do
     end
   end
 end
-reviera.load_case.create{ name = "DL", nature = "D", self_weight = true }
-reviera.load_case.create{ name = "LL", nature = "L" }
+local dl = reviera.load_case.create{ name = "DL", nature = "D", self_weight = true }
+local ll = reviera.load_case.create{ name = "LL", nature = "L" }
 reviera.load_case.create{ name = "SNOW", nature = "S" }
+-- The analytical panel made for a floor.
+local function panel_of(floor)
+  for _, p in ipairs(reviera.analytical_model.info{}.panels) do
+    for _, f in ipairs(p.physical) do
+      if f == floor then return p.id end
+    end
+  end
+end
+-- Area loads on the subfloor: 10 psf dead (0.48 kPa) and 40 psf residential live (1.92 kPa),
+-- carried to the joists.
+reviera.load.create_area{ host_id = panel_of(deck), case_id = dl, value = { 0, 0, -479 } }
+reviera.load.create_area{ host_id = panel_of(deck), case_id = ll, value = { 0, 0, -1915 } }
 reviera.load_combination.generate{ add = true }

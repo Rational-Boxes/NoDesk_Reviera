@@ -252,3 +252,119 @@ impl HostCommand for StructuralAnalysisExport {
         })
     }
 }
+
+/// The `.reviera-results` package format: the kept result set, with a header.
+const PACKAGE_FORMAT: &str = "reviera-results/1";
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct PackagePathParams {
+    pub path: std::path::PathBuf,
+}
+
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct PackageOut {
+    pub package_id: String,
+    pub path: String,
+    pub load_groups: usize,
+    pub stale: bool,
+}
+
+pub(crate) struct ResultsExportPackage;
+
+impl HostCommand for ResultsExportPackage {
+    type Host = App;
+    type Params = PackagePathParams;
+    type Output = PackageOut;
+    const META: CommandMeta = CommandMeta {
+        name: "results.export_package",
+        version: 1,
+        summary: "Export the result set",
+        description: "Writes the analysis results kept with the model as a `.reviera-results` package (STR-RES-001, \
+                      ANA-FEA-001): JSON with its format, the job, time, provider, the model hash it was computed \
+                      for, and the results keyed by GlobalId, so it can be imported into a copy of the model.",
+        effects: &[Effect::Read],
+        transaction_name: "",
+    };
+
+    fn run(&self, app: &mut App, _: &Caller, p: PackagePathParams) -> Result<PackageOut> {
+        let doc = app
+            .active()
+            .ok_or_else(|| Error::new("document.none", "no document is open"))?;
+        let store = app.get(doc)?.doc.store();
+        let s = reviera_core::structural_model::stored(store).ok_or_else(|| {
+            Error::new(
+                "results.none",
+                "no analysis results are kept with the model",
+            )
+        })?;
+        let stale = reviera_core::structural_model::snapshot(store) != s.snapshot;
+        let text = serde_json::to_string_pretty(&json!({ "format": PACKAGE_FORMAT, "package": s }))
+            .expect("serialises");
+        std::fs::write(&p.path, text)
+            .map_err(|e| Error::new("file.write_failed", format!("{}: {e}", p.path.display())))?;
+        Ok(PackageOut {
+            package_id: s.job_id,
+            path: p.path.display().to_string(),
+            load_groups: s.results.results.len(),
+            stale,
+        })
+    }
+}
+
+pub(crate) struct StructuralAnalysisImportResults;
+
+impl HostCommand for StructuralAnalysisImportResults {
+    type Host = App;
+    type Params = PackagePathParams;
+    type Output = PackageOut;
+    const META: CommandMeta = CommandMeta {
+        name: "structural_analysis.import_results",
+        version: 1,
+        summary: "Import a result set",
+        description: "Reads a `.reviera-results` package (ANA-FEA-001) and keeps its results with the model in place of \
+                      any kept ones (one undoable step). Its model hash is kept, so results from another state of the \
+                      model show as stale. Returns the package.",
+        effects: &[Effect::Edit],
+        transaction_name: "",
+    };
+
+    fn run(&self, app: &mut App, caller: &Caller, p: PackagePathParams) -> Result<PackageOut> {
+        let text = std::fs::read_to_string(&p.path)
+            .map_err(|e| Error::new("file.read_failed", format!("{}: {e}", p.path.display())))?;
+        let v: serde_json::Value = serde_json::from_str(&text)
+            .map_err(|e| Error::new("results.bad_package", e.to_string()))?;
+        if v["format"] != PACKAGE_FORMAT {
+            return Err(Error::new(
+                "results.bad_package",
+                format!("not a {PACKAGE_FORMAT} package"),
+            ));
+        }
+        let s: reviera_core::structural_model::Stored =
+            serde_json::from_value(v["package"].clone())
+                .map_err(|e| Error::new("results.bad_package", e.to_string()))?;
+        app.execute(
+            "structural_analysis.record",
+            json!({
+                "job_id": s.job_id,
+                "provider": s.provider,
+                "results": s.results,
+                "key_map": {},
+                "ignored_check_errors": s.ignored_check_errors,
+                "snapshot": s.snapshot,
+                "at": s.at,
+            }),
+            caller,
+        )?;
+        let doc = app
+            .active()
+            .ok_or_else(|| Error::new("document.none", "no document is open"))?;
+        let store = app.get(doc)?.doc.store();
+        Ok(PackageOut {
+            package_id: s.job_id,
+            path: p.path.display().to_string(),
+            load_groups: s.results.results.len(),
+            stale: reviera_core::structural_model::snapshot(store) != s.snapshot,
+        })
+    }
+}

@@ -54,6 +54,8 @@ mod path_arrays;
 mod plans;
 mod railings;
 mod ramps;
+mod results_explorer;
+mod loads_ui;
 mod ribbon;
 mod roofs;
 mod rooms;
@@ -277,6 +279,7 @@ struct Gui {
     beam_system_tool: Option<beams::BeamSystemTool>,
     truss_tool: Option<beams::TrussTool>,
     panel_tool: Option<analytical_panels::PanelTool>,
+    load_tool: Option<loads_ui::LoadTool>,
     curtain_tool: Option<curtain::CurtainTool>,
     ramp_tool: Option<ramps::RampTool>,
     measure_tool: Option<ramps::MeasureTool>,
@@ -290,6 +293,7 @@ struct Gui {
     /// The Clash Detection pane, once opened.
     clash_pane: Option<clash::ClashPane>,
     checks_pane: Option<analytical_checks::ChecksPane>,
+    results_pane: Option<results_explorer::ResultsPane>,
     /// Issue keys the automatic analytical checks last saw (STR-AM-007).
     auto_check_keys: Option<std::collections::HashSet<String>>,
     /// Renders component thumbnails offscreen (made when first needed).
@@ -1305,6 +1309,7 @@ impl Gui {
         self.end_beam_system_tool();
         self.end_truss_tool();
         self.end_panel_tool();
+        self.end_load_tool();
         self.end_curtain_tool();
         self.end_ramp_tool();
         self.end_measure_tool();
@@ -1357,6 +1362,7 @@ impl Gui {
             || self.end_beam_system_tool()
             || self.end_truss_tool()
             || self.end_panel_tool()
+            || self.end_load_tool()
         {
             return frame.set_status_text("Ready", 0);
         }
@@ -2722,6 +2728,7 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                     None if g.beam_system_tool.is_some() => g.beam_system_click(x, y),
                     None if g.truss_tool.is_some() => g.truss_click(x, y),
                     None if g.panel_tool.is_some() => g.panel_click(x, y),
+                    None if g.load_tool.is_some() => g.load_click(x, y),
                     None if g.curtain_tool.is_some() => g.curtain_click(x, y),
                     None if g.ramp_tool.is_some() => g.ramp_click(x, y),
                     None if g.measure_tool.is_some() => g.measure_click(x, y),
@@ -3312,6 +3319,7 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 beam_system_tool: None,
                 truss_tool: None,
                 panel_tool: None,
+                load_tool: None,
                 curtain_tool: None,
                 ramp_tool: None,
                 measure_tool: None,
@@ -3321,6 +3329,7 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 library_pane: None,
                 clash_pane: None,
                 checks_pane: None,
+                results_pane: None,
                 auto_check_keys: None,
                 thumb_renderer: None,
                 array_count: 4,
@@ -4057,6 +4066,12 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "overlap.find" => with(gui, Gui::check_overlaps),
         "ui.pane.clash" => Gui::toggle_clash_pane(gui),
         "ui.pane.analytical_checks" => Gui::toggle_checks_pane(gui),
+        "ui.pane.results" => Gui::toggle_results_pane(gui),
+        "load_case.manage" => Gui::load_cases_dialog(gui, "cases"),
+        "load.create_point" => with(gui, |g| g.start_load_tool("point")),
+        "load.create_line" => with(gui, |g| g.start_load_tool("line")),
+        "load.create_area" => with(gui, |g| g.start_load_tool("area")),
+        "boundary_condition.create" => with(gui, |g| g.start_load_tool("support")),
         "analytical_panel.create_by_boundary" => with(gui, Gui::start_analytical_panel_sketch),
         "analytical_panel.create_by_extrusion" => with(gui, |g| {
             g.start_panel_tool(analytical_panels::PanelMode::Extrude)

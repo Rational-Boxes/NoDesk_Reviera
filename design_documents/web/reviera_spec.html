@@ -173,7 +173,7 @@ td code { white-space: nowrap; }
         <div class="tb-cell"><span class="tb-label">Revision</span><span class="tb-value">0.1 · Draft</span></div>
         <div class="tb-cell"><span class="tb-label">Date</span><span class="tb-value tb-num">2026-10-12</span></div>
         <div class="tb-cell"><span class="tb-label">Requirements</span><span class="tb-value tb-num">808</span></div>
-        <div class="tb-cell"><span class="tb-label">Commands</span><span class="tb-value tb-num">2,091</span></div>
+        <div class="tb-cell"><span class="tb-label">Commands</span><span class="tb-value tb-num">2,102</span></div>
         <div class="tb-cell"><span class="tb-label">Licence</span><span class="tb-value">GPL-3.0-or-later</span></div>
         <div class="tb-cell last-row"><span class="tb-label">Stack</span><span class="tb-value">IFC · Rust · OCCT · wx · LuaJIT · MCP</span></div>
         <div class="tb-cell last-row" style="grid-column: span 3"><span class="tb-label">By priority</span>
@@ -185,7 +185,7 @@ td code { white-space: nowrap; }
 <p><strong>Document:</strong> Functional and technical specification of Reviera, an open-source BIM authoring application
 <strong>Functional reference:</strong> Autodesk® Revit® 2026/2027 (described from public sources only; see <code>RESEARCH_LOG.md</code>)
 <strong>Licence of Reviera:</strong> GPL-3.0-or-later
-<strong>Version:</strong> 0.1 (draft) · 2026-10-16 · <strong>Size:</strong> 808 numbered requirements (320 P0 · 293 P1 · 188 P2 · 7 P3), 2,091 commands</p>
+<strong>Version:</strong> 0.1 (draft) · 2026-10-16 · <strong>Size:</strong> 808 numbered requirements (320 P0 · 293 P1 · 188 P2 · 7 P3), 2,102 commands</p>
 <blockquote>
 <p><strong>Clean-room statement.</strong> This specification describes features, workflows and behaviour in Reviera's own words. Every input was publicly available: vendor online help, public blogs and tutorials, public forums and open-source repositories. All of it is listed with URLs and access checks in <code>SOURCE_REGISTER.md</code>. No proprietary, confidential, leaked or NDA-covered information was used. No vendor code, binaries, file formats or assets were examined or copied. Autodesk and Revit are trademarks of Autodesk, Inc. They are used here only to identify the functional reference. Reviera is not affiliated with or endorsed by Autodesk.</p>
 <p><strong>Independence statement.</strong> BIM Reviera is an independent, original application. It is in no way a copy or clone of any existing product, and it does not set out to read or write any existing product's closed, proprietary formats (such as RVT and RFA); IFC is its native format. An existing application was researched, from public sources only, to establish the workflows and user-interface conventions that the industry's users already know, so they can work in Reviera without relearning their trade. Beyond that research, Reviera implements its own features and enhancements: its architecture, native IFC storage, scripting and AI integration, remote computation and analysis, and many of its modelling tools are its own design. Interchange formats used across the industry, such as DWG and DXF, are supported only through open-source libraries, for interoperability.</p>
@@ -254,7 +254,7 @@ td code { white-space: nowrap; }
 </tr>
 <tr>
 <td>A</td>
-<td>Appendix A: requirement summary, shared commands, consolidated command index (2,091 commands; 808 requirements)</td>
+<td>Appendix A: requirement summary, shared commands, consolidated command index (2,102 commands; 808 requirements)</td>
 </tr>
 </tbody>
 </table></div>
@@ -33044,7 +33044,8 @@ No IFC equivalent.
 - [ ] Deleting an analytical member deletes its 4 line loads, and the confirmation names the count.
 - [ ] A trapezoidal line load exports as <code>IfcStructuralCurveAction</code> with <code>LINEAR</code> distribution and the correct end values.
 - [ ] Changing a load's case updates its nature display immediately.</p>
-<p><em>Built (2026-10-16):</em> <code>load.create_point</code> (an <code>IfcStructuralPointAction</code> on a node or at a ratio along a member; Fx, Fy, Fz in N and Mx, My, Mz in N·m, project axes) and <code>load.create_line</code> (an <code>IfcStructuralCurveAction</code> along a member, <code>CONST</code> or <code>LINEAR</code> with start and end values in N/m, true or projected length). Each has one host and one case and goes with either. IFC: the applied load (<code>IfcStructuralLoadSingleForce</code>, <code>IfcStructuralLoadLinearForce</code>, or for a linear load an <code>IfcStructuralLoadConfiguration</code> of two linear forces at 0 and the member's length), the host by <code>IfcRelConnectsStructuralActivity</code>, the case by <code>IfcRelAssignsToGroup</code>. Show Analytical draws loads as arrows. Not yet: area loads (with panels), loads along a path or at a picked position, host local and work-plane orientation, Is Reaction, the loads palette.</p>
+<p><em>Built (2026-10-16):</em> <code>load.create_point</code> (an <code>IfcStructuralPointAction</code> on a node or at a ratio along a member; Fx, Fy, Fz in N and Mx, My, Mz in N·m, project axes) and <code>load.create_line</code> (an <code>IfcStructuralCurveAction</code> along a member, <code>CONST</code> or <code>LINEAR</code> with start and end values in N/m, true or projected length). Each has one host and one case and goes with either. IFC: the applied load (<code>IfcStructuralLoadSingleForce</code>, <code>IfcStructuralLoadLinearForce</code>, or for a linear load an <code>IfcStructuralLoadConfiguration</code> of two linear forces at 0 and the member's length), the host by <code>IfcRelConnectsStructuralActivity</code>, the case by <code>IfcRelAssignsToGroup</code>. Show Analytical draws loads as arrows.</p>
+<p><em>Built (2026-10-17), area loads and editing:</em> <code>load.create_area</code> (a uniform force per area on an analytical panel, N/m², project or host-local axes, true or projected area; an <code>IfcStructuralPlanarAction</code> with an <code>IfcStructuralLoadPlanarForce</code>, its panel by <code>IfcRelConnectsStructuralActivity</code>), <code>orientation</code> (project or host_local: a member's local axes as the solver takes them, a panel's normal as local z) on point and line loads too, written as <code>GlobalOrLocal</code>, <code>load.set</code> (case, values, position, orientation, projected, Is Reaction). For analysis an area load is carried to the members lying in its panel's plane across its span (the floor's span direction, else along the panel's first edge), each taking the strip halfway to its neighbours or to the panel's edge as a uniform line load; the neutral model keeps the area load itself and marks the line loads carried from it (<code>from_area</code>), so a provider that analyses panels uses the area load instead; loads that cannot be carried (no members across the span, curved panels) or only partly (openings, short members) are noted in the results' warnings. Analyze › Loads: Point Load (a node or a point along a member, clicked in a plan), Line Load (members), Area Load (horizontal panels) and Point Support (nodes), each asking for its case and values first; Show Analytical draws area loads as arrows over their panels. Not yet: three-corner (bilinear) area loads and loads inside a drawn boundary, loads along a path, work-plane orientation, deducting openings from carried area loads, two-way distribution, sloped and wall panels' carrying.</p>
 <h3 id="436-load-cases-natures-combinations-and-usages">4.3.6 Load cases, natures, combinations and usages</h3>
 <p><strong>ID:</strong> <code class="rid" id="STR-LC-001">STR-LC-001</code> · <strong>Priority:</strong> <span class="pri pri-p2">P2</span> · <strong>Ref:</strong> research/03 §4.4 · screenshots/structure_mep/load_cases_and_combinations_dialog.png</p>
 <p><strong>Purpose.</strong> A single dialog to define how loads are grouped and combined.</p>
@@ -33088,10 +33089,11 @@ No IFC equivalent.
 <p><strong>Acceptance criteria.</strong>
 - [ ] Entering <code>1.35*G + 1.5*Q</code> creates a combination with two <code>IfcRelAssignsToGroupByFactor</code> relations, with factors 1.35 and 1.5.
 - [ ] A combination formula <code>1.0*C1</code> where C1 is itself a combination that references the first one is flagged as circular and <em>OK</em> stays disabled.
-- [ ] <code>load_case.manage("combinations")</code> opens the dialog on the <em>Load Combinations</em> tab.
+- [x] <code>load_case.manage("combinations")</code> opens the dialog on the <em>Load Combinations</em> tab.
 - [ ] Deleting case Q warns that 12 loads and 3 combinations are affected, and after confirmation removes the loads and strips Q from the 3 formulas.
 - [x] The EN 1990 template generates ULS and SLS combinations offline, with no network access.</p>
-<p><em>Built (2026-10-16):</em> <code>structural_code.set</code> (template <code>asce7</code> or <code>en1990</code>; the region's template by default), <code>load_nature.create</code>, <code>load_case.create</code> (an <code>IfcStructuralLoadCase</code> with ActionType and ActionSource from its nature), <code>load_case.delete</code> (deletes its loads, strips it from combinations, reports both counts), <code>load_combination.create</code> (an <code>IfcStructuralLoadGroup</code> <code>LOAD_COMBINATION</code>, limit state in Purpose; formulas parsed, nested combinations expanded to case factors, circular and unknown references refused; names unique without *, + or -), <code>load_combination.generate</code> (offline from <code>data/load_templates.json</code>: ASCE/SEI 7-22 §2.3.1 and §2.3.6 strength combinations, alternatives Lr, S or R one each; EN 1990 expression 6.10 with the recommended γ and ψ, each variable nature leading in turn, plus characteristic and quasi-permanent SLS; unknown natures flagged; <code>add</code> creates them) and <code>load_case.list</code>. Natures and the template are kept on the project (<code>rxd:analysis</code>). IFC: each combination's cases by <code>IfcRelAssignsToGroupByFactor</code>, every group <code>LoadedBy</code> the analysis model. Analyze › Loads › Generate Combinations. Not yet: the Load Cases &amp; Combinations dialog (<code>load_case.manage</code>), usages management, user templates, National Annex sets, 6.10a/b.</p>
+<p><em>Built (2026-10-16):</em> <code>structural_code.set</code> (template <code>asce7</code> or <code>en1990</code>; the region's template by default), <code>load_nature.create</code>, <code>load_case.create</code> (an <code>IfcStructuralLoadCase</code> with ActionType and ActionSource from its nature), <code>load_case.delete</code> (deletes its loads, strips it from combinations, reports both counts), <code>load_combination.create</code> (an <code>IfcStructuralLoadGroup</code> <code>LOAD_COMBINATION</code>, limit state in Purpose; formulas parsed, nested combinations expanded to case factors, circular and unknown references refused; names unique without *, + or -), <code>load_combination.generate</code> (offline from <code>data/load_templates.json</code>: ASCE/SEI 7-22 §2.3.1 and §2.3.6 strength combinations, alternatives Lr, S or R one each; EN 1990 expression 6.10 with the recommended γ and ψ, each variable nature leading in turn, plus characteristic and quasi-permanent SLS; unknown natures flagged; <code>add</code> creates them) and <code>load_case.list</code>. Natures and the template are kept on the project (<code>rxd:analysis</code>). IFC: each combination's cases by <code>IfcRelAssignsToGroupByFactor</code>, every group <code>LoadedBy</code> the analysis model. Analyze › Loads › Generate Combinations.</p>
+<p><em>Built (2026-10-17), the dialog:</em> <code>load_case.set</code> (rename, renaming it in every formula; nature, with its IFC action type and source; category; self-weight), <code>load_combination.set</code> (name, renamed in formulas; formula, checked as on creation; limit state; usages) and <code>load_combination.delete</code> (refused while another combination's formula uses it). Analyze › Loads › Load Cases (<code>load_case.manage</code>): tabs Design Code (ASCE 7 or EN 1990), Load Natures (with Add Nature), Load Cases (Add, Edit, Delete with the counts of its loads and the combinations it leaves), Load Combinations (Add, Edit, Delete, Generate… choosing which proposals to add, with the cases the template does not know) and Load Usages (rename or delete a tag across combinations). Changes apply as they are made, each its own undo step, and Cancel undoes them all. Not yet: one undo item for the whole dialog, inline cell editing and validation, per-case factor columns, copy and paste with spreadsheets, user templates, National Annex sets, 6.10a/b.</p>
 <h3 id="437-boundary-conditions">4.3.7 Boundary conditions</h3>
 <p><strong>ID:</strong> <code class="rid" id="STR-BC-001">STR-BC-001</code> · <strong>Priority:</strong> <span class="pri pri-p2">P2</span> · <strong>Ref:</strong> research/03 §4.5 · screenshots/structure_mep/boundary_conditions_on_analytical_panel.png</p>
 <p><strong>Workflow.</strong> Choose <em>Analyze › Boundary Conditions</em>, then <strong>Point</strong>, <strong>Line</strong> or <strong>Area</strong>. Pick the host. Point conditions can be positioned anywhere on the host with temporary dimensions.</p>
@@ -33131,7 +33133,7 @@ No IFC equivalent.
 <p><strong>Acceptance criteria.</strong>
 - [ ] A Pinned point condition exports with all three translations fixed and all rotations released.
 - [x] A User condition with Tz = Spring of 5 000 kN/m exports <code>TranslationalStiffnessZ</code> = 5.0E6 N/m.</p>
-<p><em>Built (2026-10-16), point conditions:</em> <code>boundary_condition.create</code> (kind <code>point</code> at a node or a member's start or end; Fixed, Pinned, Roller or User with six dof each fixed, released or a spring), <code>boundary_condition.at_column_bases</code> (default pinned) and <code>boundary_condition.remove</code>; kept on the node and written as its <code>AppliedCondition</code> (<code>IfcBoundaryNodeCondition</code>: <code>IfcBoolean</code>, <code>IfcLinearStiffnessMeasure</code> or <code>IfcRotationalStiffnessMeasure</code>). Supported nodes are not free ends in <code>analytical_model.info</code>. Show Analytical draws supports as triangles. Analyze › Loads › Column Base Supports. Not yet: line and area conditions (with panels), symbol families and spacing, tags and schedules.</p>
+<p><em>Built (2026-10-16), point conditions:</em> <code>boundary_condition.create</code> (kind <code>point</code> at a node or a member's start or end; Fixed, Pinned, Roller or User with six dof each fixed, released or a spring), <code>boundary_condition.at_column_bases</code> (default pinned) and <code>boundary_condition.remove</code>; kept on the node and written as its <code>AppliedCondition</code> (<code>IfcBoundaryNodeCondition</code>: <code>IfcBoolean</code>, <code>IfcLinearStiffnessMeasure</code> or <code>IfcRotationalStiffnessMeasure</code>). Supported nodes are not free ends in <code>analytical_model.info</code>. Show Analytical draws supports as triangles. Analyze › Loads › Column Base Supports, and Point Support (2026-10-17: pinned, fixed or roller at nodes clicked in a plan). Not yet: line and area conditions (with panels), symbol families and spacing, tags and schedules.</p>
 <h3 id="438-analytical-automation">4.3.8 Analytical automation</h3>
 <p><strong>ID:</strong> <code class="rid" id="STR-AM-006">STR-AM-006</code> · <strong>Priority:</strong> <span class="pri pri-p2">P2</span> · <strong>Ref:</strong> research/03 §4.2 ("Automation"), §13.7</p>
 <p><strong>Purpose.</strong> Generate or update one model from the other on demand.</p>
@@ -33418,10 +33420,14 @@ No IFC equivalent.
 - <code>results.show(view_id, package_id, load_group_id, result_type, style_id?)</code>
 - <code>results.apply_preset(view_id, preset_id)</code>
 - <code>results.extremes(package_id, result_type, load_group_id) -&gt; {min, max, element_ids}</code>
-- <code>results.delete_package(package_id)</code></p>
+- <code>results.delete_package(package_id)</code>
+- <code>results.hide(view_id)</code>, <code>results.overlay(view_id | display) -&gt; overlay</code>
+- <code>results.presets() -&gt; presets[]</code>, <code>results.save_preset(name, view_id) -&gt; preset_id</code>, <code>results.delete_preset(preset_id)</code>
+- <code>results.packages() -&gt; packages[]</code>, <code>results.export_package(path)</code></p>
 <p><strong>Acceptance criteria.</strong>
-- [ ] The "Support Reactions" preset shows reaction arrows with values at every support for the chosen combination.
-- [ ] Insights lists the element with the maximum beam moment, and clicking it zooms to that beam.</p>
+- [x] The "Support Reactions" preset shows reaction arrows with values at every support for the chosen combination.
+- [x] Insights lists the element with the maximum beam moment, and clicking it zooms to that beam.</p>
+<p><em>Built (2026-10-17), for member results:</em> <code>results.show</code> (a 3D view shows one result type of a load case or combination: axial, shear_y, shear_z, torsion, moment_y, moment_z, deformed or reactions; for all members, columns, beams, braces or transfer beams; a scale multiplier, the deformed shape under a force diagram, value labels), <code>results.apply_preset</code>, <code>results.hide</code>, <code>results.overlay</code> (what the view draws), <code>results.extremes</code> (minimum, maximum and the 20 largest members with the analytical member, its physical elements and where along it), <code>results.presets</code> (17 built in: column axial forces, column bending moments, column shear, support reactions, beam moments with deformation, beam shear, beam torsion, transfer beam forces, brace axial forces, deformed shape, and the seven panel presets, listed and refused with the reason until panel results exist), <code>results.save_preset</code> and <code>results.delete_preset</code> (the project's own, <code>rxd:results_presets</code>), <code>results.packages</code> and <code>results.delete_package</code> (the Results Manager), <code>results.export_package</code> and <code>structural_analysis.import_results</code> (a <code>.reviera-results</code> JSON package that keeps the model hash it was computed for, so results from another state show as stale). The display is kept with the view (<code>rxd:results_display</code>) and never changes the model. Force diagrams are drawn off each member in its local plane (Vy and Mz in local y, N, Vz, T and My in local z, moments on the tension side), hatched at the stations, positive blue and negative red, the largest value 8% of the model's size (1.5 to 6 m) times the scale; the deformed shape uses the end displacements and, between them, the deflection from integrating the moment diagram (M / EI) twice, so a loaded span sags (5wL⁴/384EI within 2% for a simply supported beam); reactions are arrows at the supports. Values are drawn in the stroke font. Analyze › Structural Analysis › Results Explorer: a dockable pane with the result set and a stale banner, load case, result, members, scale, deformation and values, Show, Hide, presets, Save Preset, Export, Import and Delete, and Insights (clicking a row selects the member's physical elements and frames it). Not yet: panel stress and moment maps and required reinforcement (no panel results), Analysis Display Styles (ANA-ADS-001) and colour fills, units other than kN, kN·m and mm, results in plan, section and elevation views, several kept result sets at once, <code>IfcStructuralResultGroup</code> and reactions in IFC, labels that face the camera, drawing results through opaque elements.</p>
 
 <h2 id="44-steel-fabrication-detailing">4.4 Steel fabrication detailing</h2>
 <p>All features in this section are <strong>P2</strong>. Steel fabrication elements are shown <strong>only at Fine detail</strong> and need framing families that declare full <strong>section shape parameters</strong>. Reviera ships an <em>Upgrade Steel Families</em> utility that adds missing section parameters to older content.</p>
@@ -38082,6 +38088,34 @@ No IFC equivalent.
 <td>STR-LOAD-001</td>
 </tr>
 <tr>
+<td><code>load.set</code></td>
+<td>load_id, case_id?, forces?, position?, start?, end?, value?, orientation?, projected?, is_reaction?</td>
+<td>—</td>
+<td>Yes</td>
+<td>STR-LOAD-001</td>
+</tr>
+<tr>
+<td><code>load_case.set</code></td>
+<td>case_id, name?, nature?, category?, self_weight?</td>
+<td>—</td>
+<td>Yes</td>
+<td>STR-LC-001</td>
+</tr>
+<tr>
+<td><code>load_combination.set</code></td>
+<td>combination_id, name?, formula?, limit_state?, usages[]?</td>
+<td>—</td>
+<td>Yes</td>
+<td>STR-LC-001</td>
+</tr>
+<tr>
+<td><code>load_combination.delete</code></td>
+<td>combination_id</td>
+<td>—</td>
+<td>Yes</td>
+<td>STR-LC-001</td>
+</tr>
+<tr>
 <td><code>load_case.create</code></td>
 <td>name, nature, category</td>
 <td>id</td>
@@ -38261,6 +38295,55 @@ No IFC equivalent.
 <td>package_id</td>
 <td>—</td>
 <td>Yes</td>
+<td>STR-RES-001</td>
+</tr>
+<tr>
+<td><code>results.hide</code></td>
+<td>view_id</td>
+<td>—</td>
+<td>No</td>
+<td>STR-RES-001</td>
+</tr>
+<tr>
+<td><code>results.overlay</code></td>
+<td>view_id | display</td>
+<td>overlay</td>
+<td>No</td>
+<td>STR-RES-001</td>
+</tr>
+<tr>
+<td><code>results.presets</code></td>
+<td>—</td>
+<td>presets[]</td>
+<td>No</td>
+<td>STR-RES-001</td>
+</tr>
+<tr>
+<td><code>results.save_preset</code></td>
+<td>name, view_id</td>
+<td>preset_id</td>
+<td>Yes</td>
+<td>STR-RES-001</td>
+</tr>
+<tr>
+<td><code>results.delete_preset</code></td>
+<td>preset_id</td>
+<td>—</td>
+<td>Yes</td>
+<td>STR-RES-001</td>
+</tr>
+<tr>
+<td><code>results.packages</code></td>
+<td>—</td>
+<td>packages[]</td>
+<td>No</td>
+<td>STR-RES-001</td>
+</tr>
+<tr>
+<td><code>results.export_package</code></td>
+<td>path</td>
+<td>package</td>
+<td>No</td>
 <td>STR-RES-001</td>
 </tr>
 <tr>
@@ -51533,7 +51616,7 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 </tbody>
 </table></div>
 <h2 id="a3-consolidated-command-index">A.3 Consolidated command index</h2>
-<p><strong>2091 unique commands</strong> in 410 domains. Every command is exposed automatically to the UI, to Lua (<code>reviera.&lt;domain&gt;.&lt;verb&gt;</code>) and to MCP (<code>&lt;domain&gt;_&lt;verb&gt;</code>), subject to its permission class.</p>
+<p><strong>2102 unique commands</strong> in 410 domains. Every command is exposed automatically to the UI, to Lua (<code>reviera.&lt;domain&gt;.&lt;verb&gt;</code>) and to MCP (<code>&lt;domain&gt;_&lt;verb&gt;</code>), subject to its permission class.</p>
 <div class="tbl"><table>
 <thead>
 <tr>
@@ -52332,11 +52415,11 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 </tr>
 <tr>
 <td><code>load</code></td>
-<td style="text-align: right;">3</td>
+<td style="text-align: right;">4</td>
 </tr>
 <tr>
 <td><code>load_case</code></td>
-<td style="text-align: right;">4</td>
+<td style="text-align: right;">5</td>
 </tr>
 <tr>
 <td><code>load_classification</code></td>
@@ -52344,7 +52427,7 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 </tr>
 <tr>
 <td><code>load_combination</code></td>
-<td style="text-align: right;">2</td>
+<td style="text-align: right;">4</td>
 </tr>
 <tr>
 <td><code>load_nature</code></td>
@@ -52724,7 +52807,7 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 </tr>
 <tr>
 <td><code>results</code></td>
-<td style="text-align: right;">4</td>
+<td style="text-align: right;">11</td>
 </tr>
 <tr>
 <td><code>revcloud</code></td>
@@ -60741,6 +60824,14 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 <td>STR-LOAD-001</td>
 </tr>
 <tr>
+<td><code>load.set</code></td>
+<td>4</td>
+<td>load_id, case_id?, forces?, position?, start?, end?, value?, orientation?, projected?, is_reaction?</td>
+<td>—</td>
+<td>Yes</td>
+<td>STR-LOAD-001</td>
+</tr>
+<tr>
 <td><code>load_case.create</code></td>
 <td>4</td>
 <td>name, nature, category</td>
@@ -60770,6 +60861,14 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 <td>tab?: code, natures, cases, combinations or usages</td>
 <td>—</td>
 <td>No</td>
+<td>STR-LC-001</td>
+</tr>
+<tr>
+<td><code>load_case.set</code></td>
+<td>4</td>
+<td>case_id, name?, nature?, category?, self_weight?</td>
+<td>—</td>
+<td>Yes</td>
 <td>STR-LC-001</td>
 </tr>
 <tr>
@@ -60805,10 +60904,26 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 <td>STR-LC-001</td>
 </tr>
 <tr>
+<td><code>load_combination.delete</code></td>
+<td>4</td>
+<td>combination_id</td>
+<td>—</td>
+<td>Yes</td>
+<td>STR-LC-001</td>
+</tr>
+<tr>
 <td><code>load_combination.generate</code></td>
 <td>4</td>
 <td>code_template_id, options</td>
 <td>proposals[]</td>
+<td>Yes</td>
+<td>STR-LC-001</td>
+</tr>
+<tr>
+<td><code>load_combination.set</code></td>
+<td>4</td>
+<td>combination_id, name?, formula?, limit_state?, usages[]?</td>
+<td>—</td>
 <td>Yes</td>
 <td>STR-LC-001</td>
 </tr>
@@ -63693,11 +63808,67 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 <td>STR-RES-001</td>
 </tr>
 <tr>
+<td><code>results.delete_preset</code></td>
+<td>4</td>
+<td>preset_id</td>
+<td>—</td>
+<td>Yes</td>
+<td>STR-RES-001</td>
+</tr>
+<tr>
+<td><code>results.export_package</code></td>
+<td>4</td>
+<td>path</td>
+<td>package</td>
+<td>No</td>
+<td>STR-RES-001</td>
+</tr>
+<tr>
 <td><code>results.extremes</code></td>
 <td>4</td>
 <td>package_id, result_type, load_group_id</td>
 <td>{min, max, element_ids}</td>
 <td>No</td>
+<td>STR-RES-001</td>
+</tr>
+<tr>
+<td><code>results.hide</code></td>
+<td>4</td>
+<td>view_id</td>
+<td>—</td>
+<td>No</td>
+<td>STR-RES-001</td>
+</tr>
+<tr>
+<td><code>results.overlay</code></td>
+<td>4</td>
+<td>view_id \</td>
+<td>display</td>
+<td>overlay</td>
+<td>No</td>
+</tr>
+<tr>
+<td><code>results.packages</code></td>
+<td>4</td>
+<td>—</td>
+<td>packages[]</td>
+<td>No</td>
+<td>STR-RES-001</td>
+</tr>
+<tr>
+<td><code>results.presets</code></td>
+<td>4</td>
+<td>—</td>
+<td>presets[]</td>
+<td>No</td>
+<td>STR-RES-001</td>
+</tr>
+<tr>
+<td><code>results.save_preset</code></td>
+<td>4</td>
+<td>name, view_id</td>
+<td>preset_id</td>
+<td>Yes</td>
 <td>STR-RES-001</td>
 </tr>
 <tr>

@@ -246,8 +246,14 @@ impl PanelGeometry {
         if let Some((c, _)) = self.circle {
             // Between the bottom and top, and within the arc's sweep (by the outline in plan).
             let (lo, hi) = (
-                self.corners.iter().map(|q| q[2]).fold(f64::INFINITY, f64::min),
-                self.corners.iter().map(|q| q[2]).fold(f64::NEG_INFINITY, f64::max),
+                self.corners
+                    .iter()
+                    .map(|q| q[2])
+                    .fold(f64::INFINITY, f64::min),
+                self.corners
+                    .iter()
+                    .map(|q| q[2])
+                    .fold(f64::NEG_INFINITY, f64::max),
             );
             if p[2] < lo - tol || p[2] > hi + tol {
                 return false;
@@ -344,7 +350,11 @@ pub fn geometry(store: &Store, e: &Element) -> Option<PanelGeometry> {
     }
     let (outline, circle) = outline_of(&corners, &r.arc);
     Some(PanelGeometry {
-        normal: if circle.is_none() { normal(&corners) } else { None },
+        normal: if circle.is_none() {
+            normal(&corners)
+        } else {
+            None
+        },
         nodes,
         corners,
         outline,
@@ -440,7 +450,11 @@ fn check_boundary(points: &[V3]) -> Result<Frame> {
             "the boundary's points are in line",
         )
     })?;
-    if let Some((k, p)) = points.iter().enumerate().find(|(_, p)| f.off(**p).abs() > 1e-3) {
+    if let Some((k, p)) = points
+        .iter()
+        .enumerate()
+        .find(|(_, p)| f.off(**p).abs() > 1e-3)
+    {
         return Err(Error::new(
             "analytical.not_planar",
             format!(
@@ -613,7 +627,12 @@ pub(crate) fn create_by_extrusion(
     }
     new_panel(
         txn,
-        &[[a[0], a[1], z0], [b[0], b[1], z0], [b[0], b[1], z1], [a[0], a[1], z1]],
+        &[
+            [a[0], a[1], z0],
+            [b[0], b[1], z0],
+            [b[0], b[1], z1],
+            [a[0], a[1], z1],
+        ],
         r,
     )
 }
@@ -622,12 +641,15 @@ fn resolve(store: &Store, r: &ElementRef) -> Result<(ElementId, PanelGeometry)> 
     let id = store
         .resolve(r)
         .ok_or_else(|| Error::new("element.not_found", format!("no element {r:?}")))?;
-    let g = store.get(id).and_then(|e| geometry(store, e)).ok_or_else(|| {
-        Error::new(
-            "analytical.not_a_panel",
-            format!("element {id} is not an analytical panel"),
-        )
-    })?;
+    let g = store
+        .get(id)
+        .and_then(|e| geometry(store, e))
+        .ok_or_else(|| {
+            Error::new(
+                "analytical.not_a_panel",
+                format!("element {id} is not an analytical panel"),
+            )
+        })?;
     Ok((id, g))
 }
 
@@ -660,9 +682,8 @@ pub(crate) fn create_opening(
             "openings in curved panels are not supported yet",
         ));
     }
-    let f = Frame::of(&g.corners).ok_or_else(|| {
-        Error::new("analytical.degenerate_panel", "the panel is degenerate")
-    })?;
+    let f = Frame::of(&g.corners)
+        .ok_or_else(|| Error::new("analytical.degenerate_panel", "the panel is degenerate"))?;
     if p.boundary.len() < 3 {
         return Err(Error::new(
             "analytical.degenerate_opening",
@@ -744,10 +765,7 @@ pub struct CladdingParams {
 }
 
 /// Marks a panel as cladding, or not (`analytical_panel.set_cladding`).
-pub(crate) fn set_cladding(
-    txn: &mut crate::txn::Transaction<'_>,
-    p: CladdingParams,
-) -> Result<()> {
+pub(crate) fn set_cladding(txn: &mut crate::txn::Transaction<'_>, p: CladdingParams) -> Result<()> {
     let store = txn.store().clone();
     let (id, g) = resolve(&store, &p.panel_id)?;
     let mut r = g.recipe;
@@ -879,18 +897,17 @@ pub(crate) fn split(
         }
     }
     let tol = analytical::tolerance(&store);
-    let corners = |txn: &mut crate::txn::Transaction<'_>,
-                       ring: &[[f64; 2]]|
-     -> Result<Vec<String>> {
-        let mut out: Vec<String> = Vec::new();
-        for q in ring {
-            let g = analytical::node_at(txn, f.to3(*q), tol)?;
-            if out.last() != Some(&g) {
-                out.push(g);
+    let corners =
+        |txn: &mut crate::txn::Transaction<'_>, ring: &[[f64; 2]]| -> Result<Vec<String>> {
+            let mut out: Vec<String> = Vec::new();
+            for q in ring {
+                let g = analytical::node_at(txn, f.to3(*q), tol)?;
+                if out.last() != Some(&g) {
+                    out.push(g);
+                }
             }
-        }
-        Ok(out)
-    };
+            Ok(out)
+        };
     let mut r = g.recipe.clone();
     r.corners = corners(txn, &left)?;
     r.openings = keep_l;
@@ -921,7 +938,12 @@ pub(crate) fn physical_panel(
         let r = crate::walls::wall_recipe(e).expect("checked");
         let (z0, z1) = (w.base_z, w.base_z + w.height);
         let (a, b) = (w.start, w.end);
-        let mut rec = recipe(w.width, wall_material(store, e), PanelRole::Wall, PanelAnalyzeAs::Shell);
+        let mut rec = recipe(
+            w.width,
+            wall_material(store, e),
+            PanelRole::Wall,
+            PanelAnalyzeAs::Shell,
+        );
         rec.physical = vec![e.guid().to_string()];
         if let [m] = r.through.as_slice()
             && crate::walls::curved::circle(a, *m, b).is_some()
@@ -931,7 +953,12 @@ pub(crate) fn physical_panel(
             return Err("spline walls have no analytical panel yet".into());
         }
         return Ok((
-            vec![[a[0], a[1], z0], [b[0], b[1], z0], [b[0], b[1], z1], [a[0], a[1], z1]],
+            vec![
+                [a[0], a[1], z0],
+                [b[0], b[1], z0],
+                [b[0], b[1], z1],
+                [a[0], a[1], z1],
+            ],
             rec,
         ));
     }
@@ -943,12 +970,13 @@ pub(crate) fn physical_panel(
         let [profile] = g.profiles.as_slice() else {
             return Err("a floor of several separate parts: split it first".into());
         };
-        let pts: Vec<V3> = profile
-            .outer
-            .iter()
-            .map(|q| [q[0], q[1], g.top])
-            .collect();
-        let mut rec = recipe(g.thickness, floor_material(store, e), PanelRole::Floor, PanelAnalyzeAs::Shell);
+        let pts: Vec<V3> = profile.outer.iter().map(|q| [q[0], q[1], g.top]).collect();
+        let mut rec = recipe(
+            g.thickness,
+            floor_material(store, e),
+            PanelRole::Floor,
+            PanelAnalyzeAs::Shell,
+        );
         rec.physical = vec![e.guid().to_string()];
         rec.openings = profile
             .holes

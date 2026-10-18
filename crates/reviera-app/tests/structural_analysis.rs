@@ -168,6 +168,34 @@ fn a_simply_supported_beam_analysed_out_of_process() {
     assert_eq!(members.len(), 1);
     assert_eq!(members[0]["member"], m);
 
+    // Exported as a package, deleted, imported back: the same set, not stale.
+    let pkg = work.path().join("beam.reviera-results");
+    let out = run(&mut app, "results.export_package", json!({ "path": pkg }));
+    assert_eq!(out["load_groups"], 2);
+    run(&mut app, "results.delete_package", json!({}));
+    assert!(
+        run(&mut app, "results.packages", json!({}))
+            .as_array()
+            .unwrap()
+            .is_empty()
+    );
+    let back = run(
+        &mut app,
+        "structural_analysis.import_results",
+        json!({ "path": pkg }),
+    );
+    assert_eq!(back["package_id"], id.as_str());
+    assert_eq!(back["stale"], false);
+    let x = run(
+        &mut app,
+        "results.extremes",
+        json!({ "result_type": "moment_y", "load_group": "D" }),
+    );
+    assert!(
+        (x["top"][0]["value"].as_f64().unwrap().abs() - 45.0).abs() < 0.3,
+        "{x:#}"
+    );
+
     // Kept with the model; editing the load makes the results stale.
     let again = run(
         &mut app,
@@ -178,4 +206,11 @@ fn a_simply_supported_beam_analysed_out_of_process() {
     run(&mut app, "element.delete", json!({ "element_ids": [load] }));
     let stale = run(&mut app, "structural_analysis.results", json!({}));
     assert_eq!(stale["stale"], true);
+    // An imported package keeps its model hash: stale now that the load is gone.
+    let back = run(
+        &mut app,
+        "structural_analysis.import_results",
+        json!({ "path": pkg }),
+    );
+    assert_eq!(back["stale"], true);
 }

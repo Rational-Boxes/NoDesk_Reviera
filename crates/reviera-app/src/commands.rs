@@ -71,6 +71,8 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add_host(crate::structural::StructuralAnalysisRun),
         registry.add_host(crate::structural::StructuralAnalysisCollect),
         registry.add_host(crate::structural::StructuralAnalysisExport),
+        registry.add_host(crate::structural::ResultsExportPackage),
+        registry.add_host(crate::structural::StructuralAnalysisImportResults),
         registry.add_host(crate::scripts::ScriptRun),
         registry.add_host(crate::scripts::PluginList),
         registry.add_host(crate::scripts::PluginRun),

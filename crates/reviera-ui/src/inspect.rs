@@ -189,6 +189,7 @@ impl Gui {
         if !self.views[index].is_2d() {
             lines.extend(self.check_marks());
         }
+        lines.extend(self.results_lines(index));
         lines.extend(self.work_plane_grid(index));
         let v = &mut self.views[index];
         if let Some(vp) = &mut v.viewport {

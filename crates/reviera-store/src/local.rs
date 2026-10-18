@@ -1951,19 +1951,25 @@ impl LocalProject {
                 )?;
                 Ok(d)
             };
-            let placement = |ifc: &mut IfcModel, o: [f64; 3], z: [f64; 3], x: [f64; 3]| -> Result<StepId> {
-                let a = ifc.create("IfcAxis2Placement3D")?;
-                let l = point(ifc, o)?;
-                ifc.set_attribute(a, "Location", &AttrValue::Ref(l.0))?;
-                let zd = dir(ifc, z)?;
-                ifc.set_attribute(a, "Axis", &AttrValue::Ref(zd.0))?;
-                let xd = dir(ifc, x)?;
-                ifc.set_attribute(a, "RefDirection", &AttrValue::Ref(xd.0))?;
-                Ok(a)
-            };
+            let placement =
+                |ifc: &mut IfcModel, o: [f64; 3], z: [f64; 3], x: [f64; 3]| -> Result<StepId> {
+                    let a = ifc.create("IfcAxis2Placement3D")?;
+                    let l = point(ifc, o)?;
+                    ifc.set_attribute(a, "Location", &AttrValue::Ref(l.0))?;
+                    let zd = dir(ifc, z)?;
+                    ifc.set_attribute(a, "Axis", &AttrValue::Ref(zd.0))?;
+                    let xd = dir(ifc, x)?;
+                    ifc.set_attribute(a, "RefDirection", &AttrValue::Ref(xd.0))?;
+                    Ok(a)
+                };
             let surface = if let Some((c, radius)) = pg.circle {
                 let z0 = pg.corners[0][2];
-                let pos = placement(&mut self.ifc, [c[0], c[1], z0], [0.0, 0.0, 1.0], [1.0, 0.0, 0.0])?;
+                let pos = placement(
+                    &mut self.ifc,
+                    [c[0], c[1], z0],
+                    [0.0, 0.0, 1.0],
+                    [1.0, 0.0, 0.0],
+                )?;
                 let cyl = self.ifc.create("IfcCylindricalSurface")?;
                 self.ifc.set_attribute(cyl, "Position", &r(pos))?;
                 self.ifc
@@ -1988,16 +1994,24 @@ impl LocalProject {
                     pts.push(AttrValue::Ref(point(&mut self.ifc, *q)?.0));
                 }
                 let lp = self.ifc.create("IfcPolyLoop")?;
-                self.ifc.set_attribute(lp, "Polygon", &AttrValue::List(pts))?;
-                let b = self.ifc.create(if outer { "IfcFaceOuterBound" } else { "IfcFaceBound" })?;
+                self.ifc
+                    .set_attribute(lp, "Polygon", &AttrValue::List(pts))?;
+                let b = self.ifc.create(if outer {
+                    "IfcFaceOuterBound"
+                } else {
+                    "IfcFaceBound"
+                })?;
                 self.ifc.set_attribute(b, "Bound", &r(lp))?;
-                self.ifc.set_attribute(b, "Orientation", &AttrValue::Bool(true))?;
+                self.ifc
+                    .set_attribute(b, "Orientation", &AttrValue::Bool(true))?;
                 bounds.push(r(b));
             }
             let face = self.ifc.create("IfcFaceSurface")?;
-            self.ifc.set_attribute(face, "Bounds", &AttrValue::List(bounds))?;
+            self.ifc
+                .set_attribute(face, "Bounds", &AttrValue::List(bounds))?;
             self.ifc.set_attribute(face, "FaceSurface", &r(surface))?;
-            self.ifc.set_attribute(face, "SameSense", &AttrValue::Bool(true))?;
+            self.ifc
+                .set_attribute(face, "SameSense", &AttrValue::Bool(true))?;
             let shape = topology(&mut self.ifc, "Face", face)?;
             self.ifc.set_attribute(step, "Representation", &r(shape))?;
             for node in &pg.nodes {
@@ -2158,7 +2172,8 @@ impl LocalProject {
         for e in store.iter() {
             let point = reviera_core::loads::point_load(e);
             let line = reviera_core::loads::line_load(e);
-            if point.is_none() && line.is_none() {
+            let area = reviera_core::loads::area_load(e);
+            if point.is_none() && line.is_none() && area.is_none() {
                 continue;
             }
             let Some(&step) = self.steps.get(&e.id()) else {
@@ -2200,6 +2215,16 @@ impl LocalProject {
                         .set_attribute(load, attr, &AttrValue::Real(p.forces[i]))?;
                 }
                 (p.host, p.case, load)
+            } else if let Some(a) = area {
+                let load = self.ifc.create("IfcStructuralLoadPlanarForce")?;
+                for (i, attr) in ["PlanarForceX", "PlanarForceY", "PlanarForceZ"]
+                    .into_iter()
+                    .enumerate()
+                {
+                    self.ifc
+                        .set_attribute(load, attr, &AttrValue::Real(a.value[i]))?;
+                }
+                (a.host, a.case, load)
             } else {
                 let l = line.expect("a line load");
                 let linear = |ifc: &mut IfcModel, v: [f64; 3]| -> Result<StepId> {

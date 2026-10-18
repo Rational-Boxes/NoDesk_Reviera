@@ -23,7 +23,10 @@ fn run(r: &CommandRegistry, doc: &mut Document, name: &str, args: Value) -> Valu
 }
 
 fn refused(r: &CommandRegistry, doc: &mut Document, name: &str, args: Value) -> String {
-    r.execute(doc, name, args, &Caller::user()).unwrap_err().code.to_string()
+    r.execute(doc, name, args, &Caller::user())
+        .unwrap_err()
+        .code
+        .to_string()
 }
 
 fn id(v: Value) -> ElementId {
@@ -135,11 +138,11 @@ fn panels_openings_split_cladding_and_ifc() {
     assert_eq!(info["nodes"], 6);
     let (a, b) = (panel(&info, halves[0]), panel(&info, halves[1]));
     let areas = [a["area"].as_f64().unwrap(), b["area"].as_f64().unwrap()];
-    assert!(
-        (areas[0] + areas[1] - 23.0).abs() < 1e-9,
-        "{areas:?}"
+    assert!((areas[0] + areas[1] - 23.0).abs() < 1e-9, "{areas:?}");
+    assert_eq!(
+        a["openings"].as_u64().unwrap() + b["openings"].as_u64().unwrap(),
+        1
     );
-    assert_eq!(a["openings"].as_u64().unwrap() + b["openings"].as_u64().unwrap(), 1);
     let shared = a["nodes"]
         .as_array()
         .unwrap()
@@ -216,7 +219,12 @@ fn panels_from_walls_and_floors_and_their_checks() {
         .find(|e| e.class == "IfcBuildingStorey")
         .unwrap()
         .id();
-    let l2 = id(run(&r, &mut doc, "level.create", json!({ "elevation": 3.0 })));
+    let l2 = id(run(
+        &r,
+        &mut doc,
+        "level.create",
+        json!({ "elevation": 3.0 }),
+    ));
     // Two bearing walls carrying a structural floor between them, and a column at a corner.
     for y in [0.0, 6.0] {
         run(
@@ -260,7 +268,10 @@ fn panels_from_walls_and_floors_and_their_checks() {
     let c2 = issues(&checks, "C2", "isolated_part");
     assert_eq!(c2.len(), 1, "{checks:#}");
     assert_eq!(c2[0]["element_ids"].as_array().unwrap().len(), 3);
-    assert!(issues(&checks, "C3", "position_mismatch").is_empty(), "{checks:#}");
+    assert!(
+        issues(&checks, "C3", "position_mismatch").is_empty(),
+        "{checks:#}"
+    );
     assert!(issues(&checks, "C6", "wall_slab").is_empty(), "{checks:#}");
 
     // Supports under the walls clear both.
@@ -288,7 +299,10 @@ fn panels_from_walls_and_floors_and_their_checks() {
         );
     }
     let checks = run(&r, &mut doc, "analytical_model.check", json!({}));
-    assert!(checks["counts_by_severity"].get("error").is_none(), "{checks:#}");
+    assert!(
+        checks["counts_by_severity"].get("error").is_none(),
+        "{checks:#}"
+    );
     assert!(issues(&checks, "S1", "unsupported_panel").is_empty());
 
     // A loose panel with nothing under it: S1.
@@ -306,7 +320,12 @@ fn panels_from_walls_and_floors_and_their_checks() {
     // A floor panel 400 mm below the floor's top, on nodes of its own: C3 against the floor's top,
     // and C6 for both walls, whose panels no longer meet it.
     let floor_id = floor["id"].as_u64().unwrap();
-    run(&r, &mut doc, "element.delete", json!({ "element_ids": [floor_id] }));
+    run(
+        &r,
+        &mut doc,
+        "element.delete",
+        json!({ "element_ids": [floor_id] }),
+    );
     let lowered = id(run(
         &r,
         &mut doc,
@@ -319,7 +338,12 @@ fn panels_from_walls_and_floors_and_their_checks() {
         "analytical_association.add",
         json!({ "physical_ids": [f.0], "analytical_ids": [lowered.0] }),
     );
-    let checks = run(&r, &mut doc, "analytical_model.check_consistency", json!({}));
+    let checks = run(
+        &r,
+        &mut doc,
+        "analytical_model.check_consistency",
+        json!({}),
+    );
     let c3 = issues(&checks, "C3", "position_mismatch");
     assert_eq!(c3.len(), 1, "{checks:#}");
     assert!((c3[0]["measured"].as_f64().unwrap() - 0.4).abs() < 1e-6);

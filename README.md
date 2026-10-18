@@ -653,6 +653,11 @@ tools and the datums.
   cases and groups with factors, boundary node conditions) and drawn by Show Analytical
   (`load_case.*`, `load_combination.*`, `load.*`, `boundary_condition.*`; STR-LOAD-001, STR-LC-001,
   STR-BC-001).
+- **Loads in the window**: Analyze › Loads › Load Cases (design code, natures, cases,
+  combinations with Generate…, usages; Cancel undoes the dialog's changes) and Point Load, Line
+  Load, Area Load and Point Support tools placed by clicking in plans. Area loads on panels are
+  carried to the members under them by tributary width for analysis (`load.create_area`,
+  `load.set`, `load_case.set`, `load_combination.set`, `load_combination.delete`).
 - **Analytical panels**: panels for walls, floors and roofs (IfcStructuralSurfaceMember on a
   plane or a cylinder), drawn by boundary or extruded from a line or arc, with openings, split,
   cladding, and made for bearing walls and structural floors by Physical to Analytical, which now
@@ -673,6 +678,13 @@ tools and the datums.
   reactions, member forces along each member, per case and combination) are kept with the model
   and marked stale when it changes. The model also exports as `reviera-structural-model.json`
   (`structural_analysis.run`, `.collect`, `.results`, `.export_model`; ANA-FEA-001).
+- **Results Explorer**: Analyze › Structural Analysis › Results Explorer shows a load case's or
+  combination's member force diagrams (N, Vy, Vz, T, My, Mz) on the tension side, the deformed
+  shape (in-span deflections from the moment diagrams) or reaction arrows in the 3D view, with
+  values, for all members, columns, beams, braces or transfer beams; 17 presets plus your own;
+  Insights lists the largest values and frames their members; the result set exports and imports
+  as a `.reviera-results` package and shows when it is stale (`results.*`; STR-RES-001, member
+  results only).
 - **Regional standards**: the model's building code sets the region, which catalogues are listed
   first, the default steel grade and concrete class (ASTM A992 and f'c 4000 psi in the US; S355
   and C30/37 in Europe; 350W and 30 MPa in Canada; 300PLUS and 32 MPa in Australia) and the design
@@ -977,11 +989,11 @@ area by area (reviewed against the spec on 2026-10-15).
   trusses, braces, generic connections, foundations with piles and pile caps, structural walls and
   floors, Structural Settings with Coarse single-line framing, steel and timber section
   catalogues, a materials library, regional standards and the analytical model's members, nodes,
-  panels, automation, checks, loads, load combinations, point supports and a built-in linear static solver
+  panels, automation, checks, results display, loads, load combinations, point supports and a built-in linear static solver
   are built (see [Structure](#structure-in-development)). Still to build: the beam join editor and arc
   beams, placing braces in elevations, connection types and the connection library, composite
-  decks and span symbols, truss types and profiles, rebar, area loads, the load
-  cases dialog, Adjust mode and Reset for the analytical model, results diagrams and external
+  decks and span symbols, truss types and profiles, rebar, bilinear and two-way area
+  loads, Adjust mode and Reset for the analytical model, panel results and external
   analysis providers.
 - **MEP, families and collaboration** (BIMserver, OpenCDE, Godot) are specified but not started.
 - **Remote computation subsystem** (DM-RPC-001 … 010): in development; the first milestone is

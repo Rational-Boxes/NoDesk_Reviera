@@ -76,6 +76,16 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(AnalyticalAnalyticalToPhysical),
         registry.add(AnalyticalDisconnect),
         registry.add(AnalyticalModelInfo),
+        registry.add(ResultsPresets),
+        registry.add(ResultsExtremes),
+        registry.add(ResultsOverlay),
+        registry.add(ResultsPackages),
+        registry.add(ResultsShow),
+        registry.add(ResultsApplyPreset),
+        registry.add(ResultsHide),
+        registry.add(ResultsSavePreset),
+        registry.add(ResultsDeletePreset),
+        registry.add(ResultsDeletePackage),
         registry.add(AnalyticalModelCheckSupports),
         registry.add(AnalyticalModelCheckConsistency),
         registry.add(AnalyticalModelCheck),
@@ -88,6 +98,11 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(LoadCombinationGenerate),
         registry.add(LoadCreatePoint),
         registry.add(LoadCreateLine),
+        registry.add(LoadCreateArea),
+        registry.add(LoadSet),
+        registry.add(LoadCaseSet),
+        registry.add(LoadCombinationSet),
+        registry.add(LoadCombinationDelete),
         registry.add(BoundaryConditionCreate),
         registry.add(BoundaryConditionAtColumnBases),
         registry.add(BoundaryConditionRemove),
@@ -1141,6 +1156,70 @@ edit_command!(
 );
 
 edit_command!(
+    LoadCreateArea,
+    "load.create_area",
+    "Place an area load",
+    "Places a uniform area load (STR-LOAD-001) on an analytical panel: `value` Fx, Fy, Fz in N/m², in \
+     project axes (gravity is negative z) or the panel's local axes (z its normal), on its true or \
+     projected area. An IfcStructuralPlanarAction with an IfcStructuralLoadPlanarForce, its host by \
+     IfcRelConnectsStructuralActivity, its case by IfcRelAssignsToGroup. For analysis it is carried to \
+     the members lying on the panel by their tributary widths across its span. Returns the load.",
+    "Area Load",
+    crate::loads::AreaParams,
+    ElementId,
+    crate::loads::create_area
+);
+
+edit_command!(
+    LoadSet,
+    "load.set",
+    "Change a load",
+    "Changes a point, line or area load: its case (its nature follows), values (point `forces` and \
+     `position`, line `start` and `end`, area `value`), `orientation` (project or host_local), \
+     `projected` and `is_reaction`.",
+    "Load",
+    crate::loads::SetLoadParams,
+    (),
+    crate::loads::set_load
+);
+
+edit_command!(
+    LoadCaseSet,
+    "load_case.set",
+    "Change a load case",
+    "Changes a load case's name (combination formulas that use it follow), nature (its IFC action type \
+     and source follow), category or self-weight flag.",
+    "Load Case",
+    crate::loads::SetCaseParams,
+    (),
+    crate::loads::set_case
+);
+
+edit_command!(
+    LoadCombinationSet,
+    "load_combination.set",
+    "Change a load combination",
+    "Changes a load combination's name (formulas that use it follow), formula (checked as on creation: \
+     known names, numeric factors, not circular), limit state or usages (tags such as Gravity, Lateral, \
+     Combined).",
+    "Load Combination",
+    crate::loads::SetCombinationParams,
+    (),
+    crate::loads::set_combination
+);
+
+edit_command!(
+    LoadCombinationDelete,
+    "load_combination.delete",
+    "Delete a load combination",
+    "Deletes a load combination; one another combination's formula uses is refused, naming it.",
+    "Delete Load Combination",
+    crate::loads::DeleteCombinationParams,
+    (),
+    crate::loads::delete_combination
+);
+
+edit_command!(
     LoadCreateLine,
     "load.create_line",
     "Place a line load",
@@ -1200,6 +1279,78 @@ edit_command!(
     crate::analytical_checks::IgnoreParams,
     (),
     crate::analytical_checks::ignore_issue
+);
+
+edit_command!(
+    ResultsShow,
+    "results.show",
+    "Show results in a view",
+    "Shows analysis results in a view (STR-RES-001): `result_type` (axial, shear_y, shear_z, torsion, \
+     moment_y, moment_z, deformed, reactions) of `load_group` (a case or combination by name; default the \
+     view's current one, else the first), `scale` (a multiplier on the automatic scale), `deformation` \
+     (the deformed shape under a force diagram), `filter` (all, columns, beams, braces, transfer_beams) and \
+     `labels`. Kept with the view; results never change the model.",
+    "Show Results",
+    crate::results::ShowParams,
+    crate::results::Display,
+    crate::results::show
+);
+
+edit_command!(
+    ResultsApplyPreset,
+    "results.apply_preset",
+    "Show a results preset in a view",
+    "Shows a preset (`results.presets`) in a view, for `load_group` (default the view's current one). The \
+     panel presets are refused with the reason.",
+    "Results Preset",
+    crate::results::PresetParams,
+    crate::results::Display,
+    crate::results::apply_preset
+);
+
+edit_command!(
+    ResultsHide,
+    "results.hide",
+    "Hide results in a view",
+    "Stops showing analysis results in a view.",
+    "Hide Results",
+    crate::results::HideParams,
+    (),
+    crate::results::hide
+);
+
+edit_command!(
+    ResultsSavePreset,
+    "results.save_preset",
+    "Save a results preset",
+    "Saves the display a view shows as a project preset named `name` (its load case is not kept). Returns \
+     the preset's id.",
+    "Save Results Preset",
+    crate::results::SavePresetParams,
+    String,
+    crate::results::save_preset
+);
+
+edit_command!(
+    ResultsDeletePreset,
+    "results.delete_preset",
+    "Delete a results preset",
+    "Deletes a project results preset; built-in presets cannot be deleted.",
+    "Delete Results Preset",
+    crate::results::DeletePresetParams,
+    (),
+    crate::results::delete_preset
+);
+
+edit_command!(
+    ResultsDeletePackage,
+    "results.delete_package",
+    "Delete a result set",
+    "Deletes the analysis results kept with the model (the Results Manager); views showing them stop.",
+    "Delete Results",
+    crate::results::DeletePackageParams,
+    (),
+    crate::results::delete_package
 );
 
 edit_command!(
@@ -1686,6 +1837,59 @@ read_command!(
     Option<crate::analytical_checks::CheckParams>,
     crate::analytical_checks::Report,
     |s, p| crate::analytical_checks::run(s, true, true, &p.unwrap_or_default().scope)
+);
+
+read_command!(
+    ResultsPresets,
+    "results.presets",
+    "Results presets",
+    "The Results Explorer's presets (STR-RES-001): the built-in ones (column axial forces, column bending \
+     moments, column shear, support reactions, beam moments with deformation, beam shear, beam torsion, \
+     transfer beam forces, brace axial forces, deformed shape, and the panel presets, which need panel \
+     results and say so), then the project's own. Each has its display: result type, filter, scale, \
+     deformation and labels.",
+    Option<serde_json::Value>,
+    Vec<crate::results::Preset>,
+    |s, _| Ok(crate::results::presets(s))
+);
+
+read_command!(
+    ResultsExtremes,
+    "results.extremes",
+    "Results extremes",
+    "The smallest and largest value of a result type (axial, shear_y, shear_z, torsion, moment_y, moment_z, \
+     deformed, reactions) in a load case or combination (default the first), optionally for columns, \
+     beams, braces or transfer beams only, with the analytical member (or support node), its physical \
+     elements, where along it and the point; and the 20 members with the largest absolute values. In kN, \
+     kN·m or mm.",
+    Option<crate::results::ExtremesParams>,
+    crate::results::Extremes,
+    |s, p| crate::results::extremes(s, &p.unwrap_or_default())
+);
+
+read_command!(
+    ResultsOverlay,
+    "results.overlay",
+    "A results overlay",
+    "What a view showing results draws (or what a given display would): a force diagram's outline and \
+     hatching off each member in its local plane, positive and negative apart; the deformed members; or \
+     reaction arrows at the supports; with value labels, the title, the extremes and whether the results \
+     are stale. Metres, model coordinates.",
+    Option<crate::results::OverlayParams>,
+    crate::results::Overlay,
+    |s, p| crate::results::overlay_of(s, &p.unwrap_or_default())
+);
+
+read_command!(
+    ResultsPackages,
+    "results.packages",
+    "Result sets",
+    "The Results Manager's list (STR-RES-001): the result set kept with the model, its job, time, \
+     provider, whether the model changed since (stale), its load cases and combinations, members and \
+     warnings.",
+    Option<serde_json::Value>,
+    Vec<crate::results::Package>,
+    |s, _| Ok(crate::results::packages(s))
 );
 
 read_command!(

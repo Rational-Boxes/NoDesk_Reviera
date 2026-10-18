@@ -15,8 +15,8 @@
 -- - glulam diagonal braces 150 × 150 in the end bays on grid A, every storey;
 -- - pad footings under the ground floor columns;
 -- - the analytical model: members for columns, beams and braces, panels for the CLT floors,
---   pinned supports at the column bases, permanent, imposed and snow cases and the EN 1990 6.10
---   combinations.
+--   pinned supports at the column bases, permanent, imposed and snow cases with area loads on
+--   the CLT, and the EN 1990 6.10 combinations.
 
 reviera.code.set{ code = "din_18065" }
 local l1 = reviera.level.list()[1].id
@@ -148,10 +148,29 @@ local function resolve_framing_overlaps()
 end
 resolve_framing_overlaps()
 
--- The analytical model, supports and combinations.
+-- The analytical model, supports, loads and combinations.
 reviera.analytical_automation.physical_to_analytical{}
 reviera.boundary_condition.at_column_bases{}
-reviera.load_case.create{ name = "G", nature = "G", self_weight = true }
-reviera.load_case.create{ name = "Q", nature = "Q" }
-reviera.load_case.create{ name = "S", nature = "S" }
+local g = reviera.load_case.create{ name = "G", nature = "G", self_weight = true }
+local q = reviera.load_case.create{ name = "Q", nature = "Q" }
+local snow = reviera.load_case.create{ name = "S", nature = "S" }
+-- The analytical panel made for a floor.
+local function panel_of(floor)
+  for _, p in ipairs(reviera.analytical_model.info{}.panels) do
+    for _, f in ipairs(p.physical) do
+      if f == floor then return p.id end
+    end
+  end
+end
+-- Area loads on the CLT: 1.5 kPa finishes and services on every floor, 3.0 kPa office imposed
+-- load on Levels 2 and 3, 1.0 kPa snow on the roof. Analysis carries them to the beams.
+for k, f in ipairs(floors) do
+  local panel = panel_of(f)
+  reviera.load.create_area{ host_id = panel, case_id = g, value = { 0, 0, -1500 } }
+  if k < #floors then
+    reviera.load.create_area{ host_id = panel, case_id = q, value = { 0, 0, -3000 } }
+  else
+    reviera.load.create_area{ host_id = panel, case_id = snow, value = { 0, 0, -1000 } }
+  end
+end
 reviera.load_combination.generate{ add = true }

@@ -200,7 +200,9 @@ impl Gui {
     pub(crate) fn toggle_panel_cladding(&mut self) {
         let frame = self.frame;
         let ids = self.selection();
-        let Some(store) = self.store_now() else { return };
+        let Some(store) = self.store_now() else {
+            return;
+        };
         let panels: Vec<(ElementId, bool)> = ids
             .iter()
             .filter_map(|id| {

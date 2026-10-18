@@ -190,7 +190,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**2091 unique commands** in 410 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**2102 unique commands** in 410 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -391,10 +391,10 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `lineweight` | 3 |
 | `link` | 23 |
 | `live` | 7 |
-| `load` | 3 |
-| `load_case` | 4 |
+| `load` | 4 |
+| `load_case` | 5 |
 | `load_classification` | 3 |
-| `load_combination` | 2 |
+| `load_combination` | 4 |
 | `load_nature` | 1 |
 | `load_set` | 1 |
 | `location` | 3 |
@@ -489,7 +489,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `reinforcement_numbering` | 2 |
 | `reinforcement_settings` | 2 |
 | `render` | 15 |
-| `results` | 4 |
+| `results` | 11 |
 | `revcloud` | 2 |
 | `revision` | 8 |
 | `revisionsequence` | 1 |
@@ -1550,15 +1550,19 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `load.create_area` | 4 | host_id, boundary?, case_id, values[3][3], orientation, projected? | id | Yes | STR-LOAD-001 |
 | `load.create_line` | 4 | host_id, path?, case_id, start[6], end[6], orientation, projected? | id | Yes | STR-LOAD-001 |
 | `load.create_point` | 4 | host_id, position?, case_id, forces[6], orientation | id | Yes | STR-LOAD-001 |
+| `load.set` | 4 | load_id, case_id?, forces?, position?, start?, end?, value?, orientation?, projected?, is_reaction? | — | Yes | STR-LOAD-001 |
 | `load_case.create` | 4 | name, nature, category | id | Yes | STR-LC-001 |
 | `load_case.delete` | 4 | case_id | {loads, combinations} | Yes | STR-LC-001 |
 | `load_case.list` | 4 | — | {template, natures[], cases[], combinations[], supports[]} | No | STR-LC-001 |
 | `load_case.manage` | 4 | tab?: code, natures, cases, combinations or usages | — | No | STR-LC-001 |
+| `load_case.set` | 4 | case_id, name?, nature?, category?, self_weight? | — | Yes | STR-LC-001 |
 | `load_classification.create` | 4 | name, demand_factor_id | id | Yes | MEP-ELEC-009 |
 | `load_classification.delete` | 4 | id, replace_with | — | Yes | MEP-ELEC-009 |
 | `load_classification.set` | 4 | id, {name?, demand_factor_id?, space_load?} | — | Yes | MEP-ELEC-009 |
 | `load_combination.create` | 4 | name, formula, limit_state, usages[] | id | Yes | STR-LC-001 |
+| `load_combination.delete` | 4 | combination_id | — | Yes | STR-LC-001 |
 | `load_combination.generate` | 4 | code_template_id, options | proposals[] | Yes | STR-LC-001 |
+| `load_combination.set` | 4 | combination_id, name?, formula?, limit_state?, usages[]? | — | Yes | STR-LC-001 |
 | `load_nature.create` | 4 | name, action_source | id | Yes | STR-LC-001 |
 | `load_set.create` | 4 | load_ids[] | id | Yes | MEP-ELEC-019 |
 | `location.search` | 2 | address | candidates[] | No | DM-LOC-001 |
@@ -1919,7 +1923,14 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `render.stop` | 5 | job_id | () | No | DOC-OUT-011 |
 | `results.apply_preset` | 4 | view_id, preset_id | — | No | STR-RES-001 |
 | `results.delete_package` | 4 | package_id | — | Yes | STR-RES-001 |
+| `results.delete_preset` | 4 | preset_id | — | Yes | STR-RES-001 |
+| `results.export_package` | 4 | path | package | No | STR-RES-001 |
 | `results.extremes` | 4 | package_id, result_type, load_group_id | {min, max, element_ids} | No | STR-RES-001 |
+| `results.hide` | 4 | view_id | — | No | STR-RES-001 |
+| `results.overlay` | 4 | view_id \ | display | overlay | No |
+| `results.packages` | 4 | — | packages[] | No | STR-RES-001 |
+| `results.presets` | 4 | — | presets[] | No | STR-RES-001 |
+| `results.save_preset` | 4 | name, view_id | preset_id | Yes | STR-RES-001 |
 | `results.show` | 4 | view_id, package_id, load_group_id, result_type, style_id? | — | No | STR-RES-001 |
 | `revcloud.create` | 5 | view_id, loops[], revision_id? | annotation_id | Yes | DOC-ANN-021 |
 | `revcloud.set_revision` | 5 | annotation_ids[], revision_id | () | Yes | DOC-ANN-021 |

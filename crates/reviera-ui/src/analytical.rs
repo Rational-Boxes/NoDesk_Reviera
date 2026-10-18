@@ -97,6 +97,19 @@ impl Gui {
                 loads.push([barb, head]);
             }
         };
+        // Area loads: an arrow at the panel's centre and halfway to each corner.
+        for e in store.iter() {
+            if let Some(l) = reviera_core::loads::area_load(e)
+                && let Some(g) = reviera_core::loads::find_panel(store, &l.host)
+            {
+                let n = g.corners.len() as f64;
+                let c = [0, 1, 2].map(|k| g.corners.iter().map(|q| q[k]).sum::<f64>() / n);
+                arrow(c, l.value);
+                for q in &g.corners {
+                    arrow([0, 1, 2].map(|k| (c[k] + q[k]) / 2.0), l.value);
+                }
+            }
+        }
         for e in store.iter() {
             if let Some(l) = reviera_core::loads::point_load(e)
                 && let Some(p) = point_of(&l.host, l.at)
@@ -317,7 +330,10 @@ impl Gui {
             return error(&frame, &format!("The analysis {state}:\n{why}"));
         }
         match self.run("structural_analysis.collect", json!({ "job_id": id })) {
-            Ok(r) => self.show_analysis_report(&r),
+            Ok(r) => {
+                self.refresh_results_pane();
+                self.show_analysis_report(&r);
+            }
             Err(e) => error(&frame, &format!("Collecting the analysis failed:\n{e}")),
         }
     }

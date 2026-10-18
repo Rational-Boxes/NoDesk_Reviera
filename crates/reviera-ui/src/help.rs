@@ -735,7 +735,9 @@ mod tests {
         assert!(list.iter().all(|s| !s.description.is_empty()));
         let html = landing_html(&list);
         assert!(html.contains("href=\"reviera:sample/storefront\""));
-        assert!(html.contains("<h3 class=\"sample-group\" id=\"samples-structure\">Structure</h3>"));
+        assert!(
+            html.contains("<h3 class=\"sample-group\" id=\"samples-structure\">Structure</h3>")
+        );
         assert!(html.contains("href=\"reviera:sample/steel_frame\""));
         assert!(!html.contains("{{"));
     }

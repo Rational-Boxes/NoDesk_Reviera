@@ -36,6 +36,7 @@ pub const CASE_RECIPE: &str = "recipe.load_case";
 pub const COMBINATION_RECIPE: &str = "recipe.load_combination";
 pub const POINT_LOAD_RECIPE: &str = "recipe.load_point";
 pub const LINE_LOAD_RECIPE: &str = "recipe.load_line";
+pub const AREA_LOAD_RECIPE: &str = "recipe.load_area";
 const TEMPLATES: &str = include_str!("../data/load_templates.json");
 
 // ---- Natures and templates ----
@@ -775,8 +776,13 @@ pub struct PointLoadRecipe {
     pub at: f64,
     /// Its case (GlobalId).
     pub case: String,
-    /// Fx, Fy, Fz (N) and Mx, My, Mz (N·m), project axes.
+    /// Fx, Fy, Fz (N) and Mx, My, Mz (N·m), project axes (or the host's local axes).
     pub forces: [f64; 6],
+    #[serde(default)]
+    pub orientation: Orientation,
+    /// A reaction applied as a load (from another model), kept apart in reports.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub is_reaction: bool,
 }
 
 /// The stored recipe of a line load.
@@ -792,6 +798,10 @@ pub struct LineLoadRecipe {
     /// On the projected length rather than the true length.
     #[serde(default)]
     pub projected: bool,
+    #[serde(default)]
+    pub orientation: Orientation,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub is_reaction: bool,
 }
 
 pub fn point_load(e: &Element) -> Option<PointLoadRecipe> {
@@ -805,12 +815,14 @@ fn load_case_of(e: &Element) -> Option<String> {
     point_load(e)
         .map(|l| l.case)
         .or_else(|| line_load(e).map(|l| l.case))
+        .or_else(|| area_load(e).map(|l| l.case))
 }
 
 fn load_host_of(e: &Element) -> Option<String> {
     point_load(e)
         .map(|l| l.host)
         .or_else(|| line_load(e).map(|l| l.host))
+        .or_else(|| area_load(e).map(|l| l.host))
 }
 
 /// Whether an element depends on `guid`: a load on its host or its case.
@@ -837,6 +849,8 @@ pub struct PointParams {
     pub case_id: ElementRef,
     /// Fx, Fy, Fz (N), Mx, My, Mz (N·m); project axes (gravity is negative Fz).
     pub forces: [f64; 6],
+    #[serde(default)]
+    pub orientation: Orientation,
 }
 
 /// Places a point load (`load.create_point`).
@@ -871,10 +885,12 @@ pub(crate) fn create_point(
         at,
         case: resolve_case(&store, &p.case_id)?,
         forces: p.forces,
+        orientation: p.orientation,
+        is_reaction: false,
     };
     txn.create(
         NewElement::new("IfcStructuralPointAction")
-            .param("@GlobalOrLocal", "GLOBAL_COORDS")
+            .param("@GlobalOrLocal", global_or_local(p.orientation))
             .param("@DestabilizingLoad", false)
             .param(RECIPE_KEY, serde_json::to_value(&r).expect("serialises")),
     )
@@ -891,6 +907,8 @@ pub struct LineParams {
     pub end: Option<[f64; 3]>,
     #[serde(default)]
     pub projected: bool,
+    #[serde(default)]
+    pub orientation: Orientation,
 }
 
 /// Places a line load along a member (`load.create_line`).
@@ -912,10 +930,12 @@ pub(crate) fn create_line(
         start: p.start,
         end,
         projected: p.projected,
+        orientation: p.orientation,
+        is_reaction: false,
     };
     txn.create(
         NewElement::new("IfcStructuralCurveAction")
-            .param("@GlobalOrLocal", "GLOBAL_COORDS")
+            .param("@GlobalOrLocal", global_or_local(p.orientation))
             .param("@DestabilizingLoad", false)
             .param(
                 "@ProjectedOrTrue",
@@ -931,6 +951,453 @@ pub(crate) fn create_line(
             )
             .param(RECIPE_KEY, serde_json::to_value(&r).expect("serialises")),
     )
+}
+
+// ---- Area loads, editing loads ----
+
+/// How a load's values are oriented.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum Orientation {
+    /// Project axes (gravity is negative z).
+    #[default]
+    Project,
+    /// The host's local axes: a member's x along it, z toward up (toward x when vertical); a
+    /// panel's z its normal.
+    HostLocal,
+}
+
+/// The stored recipe of an area load.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct AreaLoadRecipe {
+    pub kind: String,
+    /// Its panel (GlobalId).
+    pub host: String,
+    pub case: String,
+    /// Force per area (N/m²), uniform over the panel.
+    pub value: [f64; 3],
+    #[serde(default)]
+    pub orientation: Orientation,
+    /// On the panel's area projected on the plane normal to the force, rather than its true area.
+    #[serde(default)]
+    pub projected: bool,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub is_reaction: bool,
+}
+
+pub fn area_load(e: &Element) -> Option<AreaLoadRecipe> {
+    of_kind(e, AREA_LOAD_RECIPE)
+}
+
+/// The panel with this GlobalId, as it is now.
+pub fn find_panel(store: &Store, guid: &str) -> Option<crate::analytical_panels::PanelGeometry> {
+    let id = find(store, guid)?;
+    crate::analytical_panels::geometry(store, store.get(id)?)
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct AreaParams {
+    /// An analytical panel.
+    pub host_id: ElementRef,
+    pub case_id: ElementRef,
+    /// N/m² (gravity is negative z in project axes; in host local axes negative z presses on the
+    /// panel's face against its normal).
+    pub value: [f64; 3],
+    #[serde(default)]
+    pub orientation: Orientation,
+    #[serde(default)]
+    pub projected: bool,
+}
+
+/// Places an area load on a panel (`load.create_area`).
+pub(crate) fn create_area(txn: &mut crate::txn::Transaction<'_>, p: AreaParams) -> Result<ElementId> {
+    let store = txn.store().clone();
+    let host = store
+        .resolve(&p.host_id)
+        .and_then(|i| store.get(i))
+        .filter(|e| crate::analytical_panels::panel_recipe(e).is_some())
+        .ok_or_else(|| Error::new("load.no_host", "an area load's host is an analytical panel"))?;
+    let r = AreaLoadRecipe {
+        kind: AREA_LOAD_RECIPE.into(),
+        host: host.guid().to_string(),
+        case: resolve_case(&store, &p.case_id)?,
+        value: p.value,
+        orientation: p.orientation,
+        projected: p.projected,
+        is_reaction: false,
+    };
+    txn.create(
+        NewElement::new("IfcStructuralPlanarAction")
+            .param("@GlobalOrLocal", global_or_local(p.orientation))
+            .param("@DestabilizingLoad", false)
+            .param(
+                "@ProjectedOrTrue",
+                if p.projected {
+                    "PROJECTED_LENGTH"
+                } else {
+                    "TRUE_LENGTH"
+                },
+            )
+            .param("@PredefinedType", "CONST")
+            .param(RECIPE_KEY, serde_json::to_value(&r).expect("serialises")),
+    )
+}
+
+fn global_or_local(o: Orientation) -> &'static str {
+    match o {
+        Orientation::Project => "GLOBAL_COORDS",
+        Orientation::HostLocal => "LOCAL_COORDS",
+    }
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SetLoadParams {
+    pub load_id: ElementRef,
+    /// Move it to another case (its nature follows).
+    pub case_id: Option<ElementRef>,
+    /// Point loads: Fx, Fy, Fz, Mx, My, Mz; and where along a member (0 to 1).
+    pub forces: Option<[f64; 6]>,
+    pub position: Option<f64>,
+    /// Line loads: start and end (N/m).
+    pub start: Option<[f64; 3]>,
+    pub end: Option<[f64; 3]>,
+    /// Area loads (N/m²).
+    pub value: Option<[f64; 3]>,
+    pub orientation: Option<Orientation>,
+    pub projected: Option<bool>,
+    pub is_reaction: Option<bool>,
+}
+
+/// Changes a load (`load.set`): its case, values, position, orientation or flags.
+pub(crate) fn set_load(txn: &mut crate::txn::Transaction<'_>, p: SetLoadParams) -> Result<()> {
+    let store = txn.store().clone();
+    let id = store
+        .resolve(&p.load_id)
+        .ok_or_else(|| Error::new("element.not_found", format!("no element {:?}", p.load_id)))?;
+    let e = store.get(id).expect("resolved");
+    let case = p.case_id.as_ref().map(|c| resolve_case(&store, c)).transpose()?;
+    let (value, global, projected, linear) = if let Some(mut r) = point_load(e) {
+        if let Some(c) = case {
+            r.case = c;
+        }
+        if let Some(f) = p.forces {
+            r.forces = f;
+        }
+        if let Some(at) = p.position {
+            if !(0.0..=1.0).contains(&at) {
+                return Err(Error::new("load.position", "the position along the member is 0 to 1"));
+            }
+            r.at = at;
+        }
+        if let Some(o) = p.orientation {
+            r.orientation = o;
+        }
+        if let Some(b) = p.is_reaction {
+            r.is_reaction = b;
+        }
+        (serde_json::to_value(&r).expect("serialises"), global_or_local(r.orientation), None, None)
+    } else if let Some(mut r) = line_load(e) {
+        if let Some(c) = case {
+            r.case = c;
+        }
+        if let Some(s) = p.start {
+            r.start = s;
+            if p.end.is_none() {
+                r.end = s;
+            }
+        }
+        if let Some(s) = p.end {
+            r.end = s;
+        }
+        if let Some(o) = p.orientation {
+            r.orientation = o;
+        }
+        if let Some(b) = p.projected {
+            r.projected = b;
+        }
+        if let Some(b) = p.is_reaction {
+            r.is_reaction = b;
+        }
+        let linear = r.start != r.end;
+        (
+            serde_json::to_value(&r).expect("serialises"),
+            global_or_local(r.orientation),
+            Some(r.projected),
+            Some(linear),
+        )
+    } else if let Some(mut r) = area_load(e) {
+        if let Some(c) = case {
+            r.case = c;
+        }
+        if let Some(v) = p.value {
+            r.value = v;
+        }
+        if let Some(o) = p.orientation {
+            r.orientation = o;
+        }
+        if let Some(b) = p.projected {
+            r.projected = b;
+        }
+        if let Some(b) = p.is_reaction {
+            r.is_reaction = b;
+        }
+        (
+            serde_json::to_value(&r).expect("serialises"),
+            global_or_local(r.orientation),
+            Some(r.projected),
+            Some(false),
+        )
+    } else {
+        return Err(Error::new("load.not_a_load", format!("element {id} is not a load")));
+    };
+    txn.modify(id, |e| {
+        e.params.insert(RECIPE_KEY.into(), value);
+        e.params.insert("@GlobalOrLocal".into(), global.into());
+        if let Some(pr) = projected {
+            e.params.insert(
+                "@ProjectedOrTrue".into(),
+                if pr { "PROJECTED_LENGTH" } else { "TRUE_LENGTH" }.into(),
+            );
+        }
+        if let Some(l) = linear {
+            e.params
+                .insert("@PredefinedType".into(), if l { "LINEAR" } else { "CONST" }.into());
+        }
+    })
+}
+
+/// The loads in a case (load id and kind), for the window's lists.
+pub fn loads_in(store: &Store, case: ElementId) -> Vec<(ElementId, &'static str)> {
+    let Some(guid) = store.get(case).map(|e| e.guid().to_string()) else {
+        return Vec::new();
+    };
+    store
+        .iter()
+        .filter(|e| load_case_of(e).as_deref() == Some(guid.as_str()))
+        .map(|e| {
+            let kind = if point_load(e).is_some() {
+                "point"
+            } else if line_load(e).is_some() {
+                "line"
+            } else {
+                "area"
+            };
+            (e.id(), kind)
+        })
+        .collect()
+}
+
+// ---- Editing cases and combinations ----
+
+fn rename_in_formulas(
+    txn: &mut crate::txn::Transaction<'_>,
+    store: &Store,
+    from: &str,
+    to: &str,
+) -> Result<usize> {
+    let mut n = 0;
+    for c in store.iter() {
+        let Some(mut r) = combination_recipe(c) else {
+            continue;
+        };
+        let Ok(terms) = parse(&r.formula) else {
+            continue;
+        };
+        if !terms.iter().any(|(_, t)| t == from) {
+            continue;
+        }
+        r.formula = format_terms(
+            &terms
+                .into_iter()
+                .map(|(f, t)| (f, if t == from { to.to_owned() } else { t }))
+                .collect::<Vec<_>>(),
+        );
+        let v = serde_json::to_value(&r).expect("serialises");
+        txn.modify(c.id(), |e| {
+            e.params.insert(RECIPE_KEY.into(), v);
+        })?;
+        n += 1;
+    }
+    Ok(n)
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SetCaseParams {
+    pub case_id: ElementRef,
+    /// A new name; formulas that use the old one follow.
+    pub name: Option<String>,
+    pub nature: Option<String>,
+    pub category: Option<String>,
+    pub self_weight: Option<bool>,
+}
+
+/// Changes a load case (`load_case.set`): renaming it renames it in every formula.
+pub(crate) fn set_case(txn: &mut crate::txn::Transaction<'_>, p: SetCaseParams) -> Result<()> {
+    let store = txn.store().clone();
+    let id = store
+        .resolve(&p.case_id)
+        .filter(|i| store.get(*i).and_then(case_recipe).is_some())
+        .ok_or_else(|| Error::new("load.no_case", format!("no load case {:?}", p.case_id)))?;
+    let e = store.get(id).expect("resolved");
+    let mut r = case_recipe(e).expect("checked");
+    let old = e.name.clone().unwrap_or_default();
+    let mut source = None;
+    if let Some(n) = &p.nature {
+        let s = settings(&store);
+        let nature = s
+            .natures
+            .iter()
+            .find(|x| x.name == *n || x.symbol == *n)
+            .ok_or_else(|| Error::new("load.no_nature", format!("no load nature {n}")))?;
+        r.nature = nature.name.clone();
+        source = Some((
+            ifc_action_type(&nature.action_type),
+            nature.action_source.clone(),
+        ));
+    }
+    if let Some(c) = p.category {
+        r.category = c;
+    }
+    if let Some(b) = p.self_weight {
+        r.self_weight = b;
+    }
+    let name = match p.name.map(|n| n.trim().to_owned()).filter(|n| *n != old) {
+        Some(n) => {
+            check_name(&n)?;
+            if named(&store, &n).is_some() {
+                return Err(Error::new(
+                    "load.name_taken",
+                    format!("a case or combination is already named {n}"),
+                ));
+            }
+            rename_in_formulas(txn, &store, &old, &n)?;
+            Some(n)
+        }
+        None => None,
+    };
+    let v = serde_json::to_value(&r).expect("serialises");
+    txn.modify(id, |e| {
+        e.params.insert(RECIPE_KEY.into(), v);
+        if let Some((t, s)) = source {
+            e.params.insert("@ActionType".into(), t.into());
+            e.params.insert("@ActionSource".into(), s.into());
+        }
+        if let Some(n) = name {
+            e.name = Some(n);
+        }
+    })
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SetCombinationParams {
+    pub combination_id: ElementRef,
+    pub name: Option<String>,
+    pub formula: Option<String>,
+    pub limit_state: Option<String>,
+    /// Usage tags (Gravity, Lateral, Combined …).
+    pub usages: Option<Vec<String>>,
+}
+
+fn resolve_combination(store: &Store, r: &ElementRef) -> Result<(ElementId, CombinationRecipe)> {
+    let id = store
+        .resolve(r)
+        .filter(|i| store.get(*i).and_then(combination_recipe).is_some())
+        .ok_or_else(|| Error::new("load.no_combination", format!("no load combination {r:?}")))?;
+    let c = store.get(id).and_then(combination_recipe).expect("checked");
+    Ok((id, c))
+}
+
+/// Changes a load combination (`load_combination.set`): formulas are checked as on creation.
+pub(crate) fn set_combination(
+    txn: &mut crate::txn::Transaction<'_>,
+    p: SetCombinationParams,
+) -> Result<()> {
+    let store = txn.store().clone();
+    let (id, mut r) = resolve_combination(&store, &p.combination_id)?;
+    let old = store.get(id).and_then(|e| e.name.clone()).unwrap_or_default();
+    let name = p
+        .name
+        .map(|n| n.trim().to_owned())
+        .filter(|n| *n != old);
+    if let Some(n) = &name {
+        check_name(n)?;
+        if named(&store, n).is_some() {
+            return Err(Error::new(
+                "load.name_taken",
+                format!("a case or combination is already named {n}"),
+            ));
+        }
+    }
+    if let Some(ls) = &p.limit_state {
+        if !LIMIT_STATES.contains(&ls.as_str()) {
+            return Err(Error::new(
+                "load.limit_state",
+                format!("the limit state is one of {}", LIMIT_STATES.join(", ")),
+            ));
+        }
+        r.limit_state = ls.clone();
+    }
+    if let Some(f) = p.formula {
+        factors(&store, &f, Some(name.as_deref().unwrap_or(&old)))?;
+        r.formula = f;
+    }
+    if let Some(u) = p.usages {
+        let mut u: Vec<String> = u
+            .into_iter()
+            .map(|x| x.trim().to_owned())
+            .filter(|x| !x.is_empty())
+            .collect();
+        u.dedup();
+        r.usages = u;
+    }
+    if let Some(n) = &name {
+        rename_in_formulas(txn, &store, &old, n)?;
+    }
+    let v = serde_json::to_value(&r).expect("serialises");
+    let purpose = r.limit_state.clone();
+    txn.modify(id, |e| {
+        e.params.insert(RECIPE_KEY.into(), v);
+        e.params.insert("@Purpose".into(), purpose.into());
+        if let Some(n) = name {
+            e.name = Some(n);
+        }
+    })
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct DeleteCombinationParams {
+    pub combination_id: ElementRef,
+}
+
+/// Deletes a load combination (`load_combination.delete`); one another combination's formula
+/// uses is refused, naming it.
+pub(crate) fn delete_combination(
+    txn: &mut crate::txn::Transaction<'_>,
+    p: DeleteCombinationParams,
+) -> Result<()> {
+    let store = txn.store().clone();
+    let (id, _) = resolve_combination(&store, &p.combination_id)?;
+    let name = store.get(id).and_then(|e| e.name.clone()).unwrap_or_default();
+    if let Some(user) = store.iter().find(|c| {
+        c.id() != id
+            && combination_recipe(c)
+                .and_then(|r| parse(&r.formula).ok())
+                .is_some_and(|t| t.iter().any(|(_, n)| *n == name))
+    }) {
+        return Err(Error::new(
+            "load.in_use",
+            format!(
+                "combination {} uses {name}: change its formula first",
+                user.name.clone().unwrap_or_default()
+            ),
+        ));
+    }
+    txn.delete(id)
 }
 
 // ---- Boundary conditions ----
@@ -1147,6 +1614,8 @@ pub struct CaseInfo {
     pub id: ElementId,
     pub name: String,
     pub nature: String,
+    pub category: String,
+    pub self_weight: bool,
     pub loads: usize,
 }
 
@@ -1156,6 +1625,7 @@ pub struct CombinationInfo {
     pub name: String,
     pub formula: String,
     pub limit_state: String,
+    pub usages: Vec<String>,
     /// Each case's factor (nested combinations expanded); empty when the formula is broken.
     pub factors: Vec<(ElementId, f64)>,
 }
@@ -1180,6 +1650,8 @@ pub fn report(store: &Store) -> Report {
                     id: e.id(),
                     name: e.name.clone().unwrap_or_default(),
                     nature: c.nature,
+                    category: c.category,
+                    self_weight: c.self_weight,
                     loads: counts.get(&e.guid().to_string()).copied().unwrap_or(0),
                 })
             })
@@ -1197,6 +1669,7 @@ pub fn report(store: &Store) -> Report {
                     name,
                     formula: c.formula,
                     limit_state: c.limit_state,
+                    usages: c.usages,
                 })
             })
             .collect(),

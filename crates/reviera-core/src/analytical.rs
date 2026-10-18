@@ -215,7 +215,11 @@ pub(crate) fn ensure_model(txn: &mut crate::txn::Transaction<'_>) -> Result<Elem
 }
 
 /// The node at `p` (within `tolerance`), or a new one there, on the highest level at or below it.
-pub(crate) fn node_at(txn: &mut crate::txn::Transaction<'_>, p: V3, tolerance: f64) -> Result<String> {
+pub(crate) fn node_at(
+    txn: &mut crate::txn::Transaction<'_>,
+    p: V3,
+    tolerance: f64,
+) -> Result<String> {
     let store = txn.store().clone();
     if let Some((id, _)) = nodes(&store)
         .into_iter()
@@ -958,7 +962,10 @@ pub(crate) fn split_at_framing(txn: &mut crate::txn::Transaction<'_>) -> Result<
         let id = txn.create(
             NewElement::new("IfcStructuralCurveMember")
                 .param("@PredefinedType", predefined(&second))
-                .param(RECIPE_KEY, serde_json::to_value(&second).expect("serialises")),
+                .param(
+                    RECIPE_KEY,
+                    serde_json::to_value(&second).expect("serialises"),
+                ),
         )?;
         made.push(id);
     }

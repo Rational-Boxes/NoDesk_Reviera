@@ -141,6 +141,7 @@ pub fn distill(store: &Store) -> Result<Distilled> {
                     start: [0.0, 0.0, -w],
                     end: [0.0, 0.0, -w],
                     projected: false,
+                    from_area: None,
                 });
             }
         }
@@ -171,17 +172,36 @@ pub fn distill(store: &Store) -> Result<Distilled> {
         });
         key_map.insert(key, e.guid().to_string());
     }
+    // Members' axes by GlobalId, for loads in a host's local axes and for area loads.
+    let geometry: BTreeMap<String, ([f64; 3], [f64; 3])> = crate::analytical::members(store)
+        .into_iter()
+        .map(|(id, m)| (guid_of(store, id), (m.start, m.end)))
+        .collect();
+    let to_global = |host: &str, v: [f64; 3]| -> [f64; 3] {
+        let Some((a, b)) = geometry.get(host) else {
+            return v;
+        };
+        let (_, ax) = crate::results::axes(*a, *b);
+        [0, 1, 2].map(|k| ax[0][k] * v[0] + ax[1][k] * v[1] + ax[2][k] * v[2])
+    };
+    let mut notes = Vec::new();
     for e in store.iter() {
         if let Some(l) = crate::loads::point_load(e) {
             let Some(case) = case_key.get(&l.case).cloned() else {
                 continue;
             };
+            let mut forces = l.forces;
+            if l.orientation == crate::loads::Orientation::HostLocal {
+                let f = to_global(&l.host, [forces[0], forces[1], forces[2]]);
+                let m = to_global(&l.host, [forces[3], forces[4], forces[5]]);
+                forces = [f[0], f[1], f[2], m[0], m[1], m[2]];
+            }
             loads.push(Load::Point {
                 case,
                 node: node_key.get(&l.host).cloned(),
                 member: member_key.get(&l.host).cloned(),
                 at: l.at,
-                forces: l.forces,
+                forces,
             });
         } else if let Some(l) = crate::loads::line_load(e) {
             let (Some(case), Some(member)) = (
@@ -190,18 +210,60 @@ pub fn distill(store: &Store) -> Result<Distilled> {
             ) else {
                 continue;
             };
+            let (start, end) = if l.orientation == crate::loads::Orientation::HostLocal {
+                (to_global(&l.host, l.start), to_global(&l.host, l.end))
+            } else {
+                (l.start, l.end)
+            };
             loads.push(Load::Line {
                 case,
                 member,
-                start: l.start,
-                end: l.end,
+                start,
+                end,
                 projected: l.projected,
+                from_area: None,
             });
+        } else if let Some(l) = crate::loads::area_load(e) {
+            let Some(case) = case_key.get(&l.case).cloned() else {
+                continue;
+            };
+            let Some(pg) = crate::loads::find_panel(store, &l.host) else {
+                continue;
+            };
+            let key = format!("a{}", loads.len() + 1);
+            key_map.insert(key.clone(), e.guid().to_string());
+            let value = area_value(&pg, &l);
+            loads.push(Load::Area {
+                key: key.clone(),
+                case: case.clone(),
+                panel: l.host.clone(),
+                value,
+                projected: false,
+            });
+            let (carried, note) = carry_area(store, &pg, value, &geometry);
+            if let Some(n) = note {
+                notes.push(n);
+            }
+            for (guid, q) in carried {
+                if let Some(member) = member_key.get(&guid).cloned() {
+                    loads.push(Load::Line {
+                        case: case.clone(),
+                        member,
+                        start: q,
+                        end: q,
+                        projected: false,
+                        from_area: Some(key.clone()),
+                    });
+                }
+            }
         }
     }
     // Panels go to providers that analyse surfaces.
     let mut panels = Vec::new();
-    for (i, (id, pg)) in crate::analytical_panels::panels(store).into_iter().enumerate() {
+    for (i, (id, pg)) in crate::analytical_panels::panels(store)
+        .into_iter()
+        .enumerate()
+    {
         let key = format!("p{}", i + 1);
         key_map.insert(key.clone(), guid_of(store, id));
         let lib = pg
@@ -213,16 +275,24 @@ pub fn distill(store: &Store) -> Result<Distilled> {
             .as_ref()
             .and_then(|l| l.properties.get("E_MPa").copied())
             .map(|v| v * 1e6);
-        let nu = lib.as_ref().and_then(|l| l.properties.get("nu").copied()).or_else(|| {
-            let g = lib.as_ref()?.properties.get("G_MPa").copied()?;
-            Some(e? / (2.0 * g * 1e6) - 1.0)
-        });
+        let nu = lib
+            .as_ref()
+            .and_then(|l| l.properties.get("nu").copied())
+            .or_else(|| {
+                let g = lib.as_ref()?.properties.get("G_MPa").copied()?;
+                Some(e? / (2.0 * g * 1e6) - 1.0)
+            });
         panels.push(crate::frame::Panel {
             key,
             nodes: pg
                 .nodes
                 .iter()
-                .map(|n| node_key.get(&guid_of(store, *n)).cloned().unwrap_or_default())
+                .map(|n| {
+                    node_key
+                        .get(&guid_of(store, *n))
+                        .cloned()
+                        .unwrap_or_default()
+                })
                 .collect(),
             outline: pg.outline.clone(),
             openings: pg.recipe.openings.clone(),
@@ -252,6 +322,7 @@ pub fn distill(store: &Store) -> Result<Distilled> {
             combinations,
             loads,
             panels,
+            notes,
         },
         key_map,
     })
@@ -315,6 +386,11 @@ pub struct RecordParams {
     /// Pre-analysis check errors the run went ahead despite.
     #[serde(default)]
     pub ignored_check_errors: Vec<String>,
+    /// The model hash the results were computed for (an imported package keeps its own);
+    /// default the model as it is now.
+    pub snapshot: Option<String>,
+    /// When they were computed; default now.
+    pub at: Option<String>,
 }
 
 /// Keeps a finished analysis's results with the model (`structural_analysis.record`).
@@ -339,8 +415,8 @@ pub(crate) fn record(txn: &mut crate::txn::Transaction<'_>, p: RecordParams) -> 
     }
     let s = Stored {
         job_id: p.job_id,
-        at: crate::overlap_accept::now_rfc3339(),
-        snapshot: snapshot(&store),
+        at: p.at.unwrap_or_else(crate::overlap_accept::now_rfc3339),
+        snapshot: p.snapshot.unwrap_or_else(|| snapshot(&store)),
         provider: p.provider,
         results,
         ignored_check_errors: p.ignored_check_errors,
@@ -493,4 +569,140 @@ pub fn report(store: &Store, p: &ReportParams) -> Result<Report> {
         cases,
         members,
     })
+}
+
+/// An area load's force per true area, global (N/m²): turned from the panel's local axes, and from
+/// a projected area to the true one.
+fn area_value(pg: &crate::analytical_panels::PanelGeometry, l: &crate::loads::AreaLoadRecipe) -> [f64; 3] {
+    let n = pg.normal.unwrap_or([0.0, 0.0, 1.0]);
+    let mut v = l.value;
+    if l.orientation == crate::loads::Orientation::HostLocal {
+        // Local z the normal, x along the first edge, y = z × x.
+        let e = [0, 1, 2].map(|k| pg.corners[1][k] - pg.corners[0][k]);
+        let le = (e[0] * e[0] + e[1] * e[1] + e[2] * e[2]).sqrt().max(1e-12);
+        let x = e.map(|c| c / le);
+        let y = [
+            n[1] * x[2] - n[2] * x[1],
+            n[2] * x[0] - n[0] * x[2],
+            n[0] * x[1] - n[1] * x[0],
+        ];
+        v = [0, 1, 2].map(|k| x[k] * l.value[0] + y[k] * l.value[1] + n[k] * l.value[2]);
+    }
+    if l.projected {
+        let m = (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt();
+        if m > 0.0 {
+            let c = ((n[0] * v[0] + n[1] * v[1] + n[2] * v[2]) / m).abs();
+            v = v.map(|x| x * c);
+        }
+    }
+    v
+}
+
+/// Carries an area load to the members lying on its panel (STR-LOAD-001): the panel spans one way
+/// (its floor's span direction, else along its first edge); members across the span carry the
+/// strip halfway to their neighbours (or to the panel's edge) as a uniform line load. Returns the
+/// line load per member (N/m, global) and a note when some or all of the load could not be
+/// carried.
+fn carry_area(
+    store: &Store,
+    pg: &crate::analytical_panels::PanelGeometry,
+    value: [f64; 3],
+    geometry: &BTreeMap<String, ([f64; 3], [f64; 3])>,
+) -> (Vec<(String, [f64; 3])>, Option<String>) {
+    let d = crate::structural::settings(store).support_distance;
+    let dot = |a: [f64; 3], b: [f64; 3]| a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+    let unit = |a: [f64; 3]| {
+        let l = dot(a, a).sqrt().max(1e-12);
+        a.map(|x| x / l)
+    };
+    let n = pg.normal.unwrap_or([0.0, 0.0, 1.0]);
+    let in_plane = |v: [f64; 3]| {
+        let k = dot(v, n);
+        unit([v[0] - n[0] * k, v[1] - n[1] * k, v[2] - n[2] * k])
+    };
+    // The span direction.
+    let floor_span = pg
+        .recipe
+        .physical
+        .iter()
+        .filter_map(|g| GlobalId::parse(g).and_then(|g| store.find_by_guid(&g)))
+        .filter_map(|id| crate::structural::span(store.get(id)?))
+        .next();
+    let span = match floor_span {
+        Some(s) => in_plane([s[0], s[1], 0.0]),
+        None => in_plane([0, 1, 2].map(|k| pg.corners[1][k] - pg.corners[0][k])),
+    };
+    let name = |s: &str| format!("the area load on analytical panel {s}");
+    let total = dot(value, value).sqrt() * pg.area();
+    if pg.circle.is_some() {
+        return (
+            Vec::new(),
+            Some(format!("{}: curved panels do not carry area loads to members yet", name("(curved)"))),
+        );
+    }
+    // Members lying on the panel, across its span.
+    let mut on: Vec<(String, f64, f64)> = Vec::new();
+    for (guid, (a, b)) in geometry {
+        if !(pg.contains(*a, d) && pg.contains(*b, d)) {
+            continue;
+        }
+        let ab = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+        let l = dot(ab, ab).sqrt();
+        // In the panel's plane (not a stub running up to it), and across its span.
+        if l < 1e-6 || dot(unit(ab), n).abs() > 0.2 || dot(unit(ab), span).abs() > 0.5 {
+            continue;
+        }
+        let mid = [0, 1, 2].map(|k| (a[k] + b[k]) / 2.0);
+        let s = dot([mid[0] - pg.corners[0][0], mid[1] - pg.corners[0][1], mid[2] - pg.corners[0][2]], span);
+        on.push((guid.clone(), s, l));
+    }
+    if on.is_empty() {
+        return (
+            Vec::new(),
+            Some(format!(
+                "{}: no members lie on the panel across its span, so the load is not analysed",
+                name("")
+            )),
+        );
+    }
+    let ss: Vec<f64> = pg
+        .outline
+        .iter()
+        .map(|c| dot([c[0] - pg.corners[0][0], c[1] - pg.corners[0][1], c[2] - pg.corners[0][2]], span))
+        .collect();
+    let (smin, smax) = (
+        ss.iter().cloned().fold(f64::INFINITY, f64::min),
+        ss.iter().cloned().fold(f64::NEG_INFINITY, f64::max),
+    );
+    let mut lines: Vec<f64> = on.iter().map(|(_, s, _)| *s).collect();
+    lines.sort_by(|a, b| a.total_cmp(b));
+    lines.dedup_by(|a, b| (*a - *b).abs() < 0.01);
+    let width = |s: f64| -> f64 {
+        let k = lines
+            .iter()
+            .position(|x| (x - s).abs() < 0.01)
+            .unwrap_or(0);
+        let lo = if k == 0 { smin } else { (lines[k - 1] + lines[k]) / 2.0 };
+        let hi = if k + 1 == lines.len() { smax } else { (lines[k] + lines[k + 1]) / 2.0 };
+        (hi - lo).max(0.0)
+    };
+    let mut carried = 0.0;
+    let out: Vec<(String, [f64; 3])> = on
+        .iter()
+        .map(|(g, s, l)| {
+            let w = width(*s);
+            carried += dot(value, value).sqrt() * w * l;
+            (g.clone(), value.map(|v| v * w))
+        })
+        .collect();
+    let note = (total > 0.0 && (carried - total).abs() / total > 0.05).then(|| {
+        format!(
+            "{}: the members carry {:.1} kN of its {:.1} kN (openings, members short of the edges, or an \
+             irregular outline)",
+            name(""),
+            carried / 1000.0,
+            total / 1000.0
+        )
+    });
+    (out, note)
 }

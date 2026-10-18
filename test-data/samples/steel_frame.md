@@ -21,7 +21,7 @@ Start with **File › New**. Set the code to *IBC* (Manage › Settings › **Mo
 7. **Bracing.** South elevation, Structure › **Brace**: HSS6X6X3/8 crossing bay A–B on grid 1,
    both storeys (each end 6" below its level, except at Level 1).
 8. **Slabs.** Level 2 plan, Structure › **Structural Floor**: the building outline, span along
-   y. Duplicate its type as *Concrete Slab 6"* with one Structure layer of *Concrete f'c 4000
+   x (across the infill beams). Duplicate its type as *Concrete Slab 6"* with one Structure layer of *Concrete f'c 4000
    psi*, 6" (Properties › Type › *Edit Assembly…*). Repeat in the Roof plan.
 9. **Columns through slabs.** View › Coordination › **Clash Detection** (or Modify ›
    **Overlaps**): resolve each column × slab by *Cut B by A*, and accept each brace's ends.
@@ -29,15 +29,15 @@ Start with **File › New**. Set the code to *IBC* (Manage › Settings › **Mo
 11. **Analytical model.** Analyze › Analytical › **Physical to Analytical** (members split where
     the infill beams frame into the girders, panels for the slabs), Loads › **Column Base
     Supports**.
-12. **Load cases and loads.** **[gap]** Create cases DL (dead, self-weight), LL (live), LR (roof
-    live), WIND; put 9.1 kN/m dead and live line loads on the Level 2 girders along grid 2, and
-    15 kN along x at the tops of the grid A columns (`load_case.create`, `load.create_line`,
-    `load.create_point` from the Lua console or MCP).
+12. **Load cases and loads.** Analyze › Loads › **Load Cases**, Load Cases tab: DL (dead,
+    self-weight), LL (live), LR (roof live), WIND. Level 2 plan, Loads › **Area Load**: DL −2.39
+    kPa and LL −2.39 kPa inside the slab; Roof plan: DL and LR −0.96 kPa. Roof plan, Loads ›
+    **Point Load**: WIND, Fx 15 kN, at each grid A column top.
 13. **Combinations.** Analyze › Loads › **Generate Combinations** (ASCE 7).
 14. **Check and run.** Analyze › Checks › **Check Supports** and **Check Consistency** (none);
-    Structural Analysis › **Run Analysis**.
+    Structural Analysis › **Run Analysis**, then **Results Explorer** (for example the *Beam
+    moments with deformation* preset).
 
 ## Gaps
 
-- Load cases and applied loads have no dialog or placement tool yet: create them with the
-  `load_case.*` and `load.*` commands.
+None: every step has its UI.

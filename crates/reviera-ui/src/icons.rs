@@ -630,6 +630,24 @@ fn body(name: &str, dark: bool) -> Option<String> {
             r#"<path d="M6 26V8h20v18M6 8l20 18" stroke="rgb(208,26,26)" stroke-width="2" fill="none"/><circle cx="6" cy="8" r="2" fill="rgb(26,77,208)"/><circle cx="26" cy="8" r="2" fill="rgb(26,77,208)"/>"#
         .to_string()
         }
+        "load_cases" => format!(
+            r#"<rect x="4" y="4" width="24" height="24" fill="{f}" {s}/><path d="M4 11h24M12 4v24" {s}/><path d="M16 15v8M14 21l2 2 2-2M22 15v8M20 21l2 2 2-2" {sa}/>"#
+        ),
+        "point_load" => format!(
+            r#"<path d="M4 24h24" {s}/><path d="M16 4v18M12 17l4 5 4-5" {sa}/>"#
+        ),
+        "line_load" => format!(
+            r#"<path d="M4 24h24" {s}/><path d="M6 8h20" {sa}/><path d="M8 8v14M6 19l2 3 2-3M16 8v14M14 19l2 3 2-3M24 8v14M22 19l2 3 2-3" {sa}/>"#
+        ),
+        "area_load" => format!(
+            r#"<path d="M3 26l6-6h20l-6 6z" fill="{f}" {s}/><path d="M10 4v12M8 13l2 3 2-3M18 4v12M16 13l2 3 2-3M26 4v12M24 13l2 3 2-3" {sa}/>"#
+        ),
+        "point_support" => format!(
+            r#"<circle cx="16" cy="10" r="3" fill="rgb(26,77,208)"/><path d="M16 13l-7 10h14z" fill="{f}" {sa}/><path d="M6 26h20" {s}/>"#
+        ),
+        "results_explorer" => format!(
+            r#"<path d="M3 12h26" {s}/><path d="M3 12q13 16 26 0" fill="{f}" stroke="rgb(26,90,230)" stroke-width="2"/><path d="M9 12v5M16 12v8M23 12v5" stroke="rgb(26,90,230)" stroke-width="1.5"/><path d="M3 12l-1 4h2zM29 12l-1 4h2z" fill="{a}" {s}/>"#
+        ),
         "analytical_panel" => format!(
             r#"<path d="M4 22l8-14h16l-8 14z" fill="{f}" stroke="rgb(190,50,115)" stroke-width="2"/><circle cx="4" cy="22" r="2" fill="rgb(26,77,208)"/><circle cx="28" cy="8" r="2" fill="rgb(26,77,208)"/>"#
         ),

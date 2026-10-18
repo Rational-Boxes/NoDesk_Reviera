@@ -32,7 +32,7 @@
 **Document:** Functional and technical specification of Reviera, an open-source BIM authoring application
 **Functional reference:** Autodesk® Revit® 2026/2027 (described from public sources only; see `RESEARCH_LOG.md`)
 **Licence of Reviera:** GPL-3.0-or-later
-**Version:** 0.1 (draft) · 2026-10-16 · **Size:** 808 numbered requirements (320 P0 · 293 P1 · 188 P2 · 7 P3), 2,091 commands
+**Version:** 0.1 (draft) · 2026-10-16 · **Size:** 808 numbered requirements (320 P0 · 293 P1 · 188 P2 · 7 P3), 2,102 commands
 
 > **Clean-room statement.** This specification describes features, workflows and behaviour in Reviera's own words. Every input was publicly available: vendor online help, public blogs and tutorials, public forums and open-source repositories. All of it is listed with URLs and access checks in `SOURCE_REGISTER.md`. No proprietary, confidential, leaked or NDA-covered information was used. No vendor code, binaries, file formats or assets were examined or copied. Autodesk and Revit are trademarks of Autodesk, Inc. They are used here only to identify the functional reference. Reviera is not affiliated with or endorsed by Autodesk.
 
@@ -64,7 +64,7 @@ This document covers:
 | 6 | Collaboration, linking and coordination (Local and BIMserver modes) |
 | 7 | Advanced features beyond the reference product: scene protocol, simulated walkthroughs, Godot translation layer for VR/AR, render bridges |
 | 8 | Remote computation and analysis (overview): the remote computation subsystem and the analysis plugin layer, how they fit together, and a build order |
-| A | Appendix A: requirement summary, shared commands, consolidated command index (2,091 commands; 808 requirements) |
+| A | Appendix A: requirement summary, shared commands, consolidated command index (2,102 commands; 808 requirements) |
 
 Out of scope:
 - reproducing vendor-cloud services such as ACC/Forma and Autodesk Assistant (open alternatives are specified instead)
@@ -16616,7 +16616,9 @@ Nodes are created at both ends (STR-AM-003).
 - [ ] A trapezoidal line load exports as `IfcStructuralCurveAction` with `LINEAR` distribution and the correct end values.
 - [ ] Changing a load's case updates its nature display immediately.
 
-*Built (2026-10-16):* `load.create_point` (an `IfcStructuralPointAction` on a node or at a ratio along a member; Fx, Fy, Fz in N and Mx, My, Mz in N·m, project axes) and `load.create_line` (an `IfcStructuralCurveAction` along a member, `CONST` or `LINEAR` with start and end values in N/m, true or projected length). Each has one host and one case and goes with either. IFC: the applied load (`IfcStructuralLoadSingleForce`, `IfcStructuralLoadLinearForce`, or for a linear load an `IfcStructuralLoadConfiguration` of two linear forces at 0 and the member's length), the host by `IfcRelConnectsStructuralActivity`, the case by `IfcRelAssignsToGroup`. Show Analytical draws loads as arrows. Not yet: area loads (with panels), loads along a path or at a picked position, host local and work-plane orientation, Is Reaction, the loads palette.
+*Built (2026-10-16):* `load.create_point` (an `IfcStructuralPointAction` on a node or at a ratio along a member; Fx, Fy, Fz in N and Mx, My, Mz in N·m, project axes) and `load.create_line` (an `IfcStructuralCurveAction` along a member, `CONST` or `LINEAR` with start and end values in N/m, true or projected length). Each has one host and one case and goes with either. IFC: the applied load (`IfcStructuralLoadSingleForce`, `IfcStructuralLoadLinearForce`, or for a linear load an `IfcStructuralLoadConfiguration` of two linear forces at 0 and the member's length), the host by `IfcRelConnectsStructuralActivity`, the case by `IfcRelAssignsToGroup`. Show Analytical draws loads as arrows.
+
+*Built (2026-10-17), area loads and editing:* `load.create_area` (a uniform force per area on an analytical panel, N/m², project or host-local axes, true or projected area; an `IfcStructuralPlanarAction` with an `IfcStructuralLoadPlanarForce`, its panel by `IfcRelConnectsStructuralActivity`), `orientation` (project or host_local: a member's local axes as the solver takes them, a panel's normal as local z) on point and line loads too, written as `GlobalOrLocal`, `load.set` (case, values, position, orientation, projected, Is Reaction). For analysis an area load is carried to the members lying in its panel's plane across its span (the floor's span direction, else along the panel's first edge), each taking the strip halfway to its neighbours or to the panel's edge as a uniform line load; the neutral model keeps the area load itself and marks the line loads carried from it (`from_area`), so a provider that analyses panels uses the area load instead; loads that cannot be carried (no members across the span, curved panels) or only partly (openings, short members) are noted in the results' warnings. Analyze › Loads: Point Load (a node or a point along a member, clicked in a plan), Line Load (members), Area Load (horizontal panels) and Point Support (nodes), each asking for its case and values first; Show Analytical draws area loads as arrows over their panels. Not yet: three-corner (bilinear) area loads and loads inside a drawn boundary, loads along a path, work-plane orientation, deducting openings from carried area loads, two-way distribution, sloped and wall panels' carrying.
 
 ### 4.3.6 Load cases, natures, combinations and usages
 **ID:** STR-LC-001 · **Priority:** P2 · **Ref:** research/03 §4.4 · screenshots/structure_mep/load_cases_and_combinations_dialog.png
@@ -16670,11 +16672,13 @@ Grids support copy and paste with spreadsheets as tab-separated text.
 **Acceptance criteria.**
 - [ ] Entering `1.35*G + 1.5*Q` creates a combination with two `IfcRelAssignsToGroupByFactor` relations, with factors 1.35 and 1.5.
 - [ ] A combination formula `1.0*C1` where C1 is itself a combination that references the first one is flagged as circular and *OK* stays disabled.
-- [ ] `load_case.manage("combinations")` opens the dialog on the *Load Combinations* tab.
+- [x] `load_case.manage("combinations")` opens the dialog on the *Load Combinations* tab.
 - [ ] Deleting case Q warns that 12 loads and 3 combinations are affected, and after confirmation removes the loads and strips Q from the 3 formulas.
 - [x] The EN 1990 template generates ULS and SLS combinations offline, with no network access.
 
-*Built (2026-10-16):* `structural_code.set` (template `asce7` or `en1990`; the region's template by default), `load_nature.create`, `load_case.create` (an `IfcStructuralLoadCase` with ActionType and ActionSource from its nature), `load_case.delete` (deletes its loads, strips it from combinations, reports both counts), `load_combination.create` (an `IfcStructuralLoadGroup` `LOAD_COMBINATION`, limit state in Purpose; formulas parsed, nested combinations expanded to case factors, circular and unknown references refused; names unique without *, + or -), `load_combination.generate` (offline from `data/load_templates.json`: ASCE/SEI 7-22 §2.3.1 and §2.3.6 strength combinations, alternatives Lr, S or R one each; EN 1990 expression 6.10 with the recommended γ and ψ, each variable nature leading in turn, plus characteristic and quasi-permanent SLS; unknown natures flagged; `add` creates them) and `load_case.list`. Natures and the template are kept on the project (`rxd:analysis`). IFC: each combination's cases by `IfcRelAssignsToGroupByFactor`, every group `LoadedBy` the analysis model. Analyze › Loads › Generate Combinations. Not yet: the Load Cases & Combinations dialog (`load_case.manage`), usages management, user templates, National Annex sets, 6.10a/b.
+*Built (2026-10-16):* `structural_code.set` (template `asce7` or `en1990`; the region's template by default), `load_nature.create`, `load_case.create` (an `IfcStructuralLoadCase` with ActionType and ActionSource from its nature), `load_case.delete` (deletes its loads, strips it from combinations, reports both counts), `load_combination.create` (an `IfcStructuralLoadGroup` `LOAD_COMBINATION`, limit state in Purpose; formulas parsed, nested combinations expanded to case factors, circular and unknown references refused; names unique without *, + or -), `load_combination.generate` (offline from `data/load_templates.json`: ASCE/SEI 7-22 §2.3.1 and §2.3.6 strength combinations, alternatives Lr, S or R one each; EN 1990 expression 6.10 with the recommended γ and ψ, each variable nature leading in turn, plus characteristic and quasi-permanent SLS; unknown natures flagged; `add` creates them) and `load_case.list`. Natures and the template are kept on the project (`rxd:analysis`). IFC: each combination's cases by `IfcRelAssignsToGroupByFactor`, every group `LoadedBy` the analysis model. Analyze › Loads › Generate Combinations.
+
+*Built (2026-10-17), the dialog:* `load_case.set` (rename, renaming it in every formula; nature, with its IFC action type and source; category; self-weight), `load_combination.set` (name, renamed in formulas; formula, checked as on creation; limit state; usages) and `load_combination.delete` (refused while another combination's formula uses it). Analyze › Loads › Load Cases (`load_case.manage`): tabs Design Code (ASCE 7 or EN 1990), Load Natures (with Add Nature), Load Cases (Add, Edit, Delete with the counts of its loads and the combinations it leaves), Load Combinations (Add, Edit, Delete, Generate… choosing which proposals to add, with the cases the template does not know) and Load Usages (rename or delete a tag across combinations). Changes apply as they are made, each its own undo step, and Cancel undoes them all. Not yet: one undo item for the whole dialog, inline cell editing and validation, per-case factor columns, copy and paste with spreadsheets, user templates, National Annex sets, 6.10a/b.
 
 ### 4.3.7 Boundary conditions
 **ID:** STR-BC-001 · **Priority:** P2 · **Ref:** research/03 §4.5 · screenshots/structure_mep/boundary_conditions_on_analytical_panel.png
@@ -16702,7 +16706,7 @@ All are connected to their host with `IfcRelConnectsStructuralMember` and record
 - [ ] A Pinned point condition exports with all three translations fixed and all rotations released.
 - [x] A User condition with Tz = Spring of 5 000 kN/m exports `TranslationalStiffnessZ` = 5.0E6 N/m.
 
-*Built (2026-10-16), point conditions:* `boundary_condition.create` (kind `point` at a node or a member's start or end; Fixed, Pinned, Roller or User with six dof each fixed, released or a spring), `boundary_condition.at_column_bases` (default pinned) and `boundary_condition.remove`; kept on the node and written as its `AppliedCondition` (`IfcBoundaryNodeCondition`: `IfcBoolean`, `IfcLinearStiffnessMeasure` or `IfcRotationalStiffnessMeasure`). Supported nodes are not free ends in `analytical_model.info`. Show Analytical draws supports as triangles. Analyze › Loads › Column Base Supports. Not yet: line and area conditions (with panels), symbol families and spacing, tags and schedules.
+*Built (2026-10-16), point conditions:* `boundary_condition.create` (kind `point` at a node or a member's start or end; Fixed, Pinned, Roller or User with six dof each fixed, released or a spring), `boundary_condition.at_column_bases` (default pinned) and `boundary_condition.remove`; kept on the node and written as its `AppliedCondition` (`IfcBoundaryNodeCondition`: `IfcBoolean`, `IfcLinearStiffnessMeasure` or `IfcRotationalStiffnessMeasure`). Supported nodes are not free ends in `analytical_model.info`. Show Analytical draws supports as triangles. Analyze › Loads › Column Base Supports, and Point Support (2026-10-17: pinned, fixed or roller at nodes clicked in a plan). Not yet: line and area conditions (with panels), symbol families and spacing, tags and schedules.
 
 ### 4.3.8 Analytical automation
 **ID:** STR-AM-006 · **Priority:** P2 · **Ref:** research/03 §4.2 ("Automation"), §13.7
@@ -16931,10 +16935,15 @@ All are connected to their host with `IfcRelConnectsStructuralMember` and record
 - `results.apply_preset(view_id, preset_id)`
 - `results.extremes(package_id, result_type, load_group_id) -> {min, max, element_ids}`
 - `results.delete_package(package_id)`
+- `results.hide(view_id)`, `results.overlay(view_id | display) -> overlay`
+- `results.presets() -> presets[]`, `results.save_preset(name, view_id) -> preset_id`, `results.delete_preset(preset_id)`
+- `results.packages() -> packages[]`, `results.export_package(path)`
 
 **Acceptance criteria.**
-- [ ] The "Support Reactions" preset shows reaction arrows with values at every support for the chosen combination.
-- [ ] Insights lists the element with the maximum beam moment, and clicking it zooms to that beam.
+- [x] The "Support Reactions" preset shows reaction arrows with values at every support for the chosen combination.
+- [x] Insights lists the element with the maximum beam moment, and clicking it zooms to that beam.
+
+*Built (2026-10-17), for member results:* `results.show` (a 3D view shows one result type of a load case or combination: axial, shear_y, shear_z, torsion, moment_y, moment_z, deformed or reactions; for all members, columns, beams, braces or transfer beams; a scale multiplier, the deformed shape under a force diagram, value labels), `results.apply_preset`, `results.hide`, `results.overlay` (what the view draws), `results.extremes` (minimum, maximum and the 20 largest members with the analytical member, its physical elements and where along it), `results.presets` (17 built in: column axial forces, column bending moments, column shear, support reactions, beam moments with deformation, beam shear, beam torsion, transfer beam forces, brace axial forces, deformed shape, and the seven panel presets, listed and refused with the reason until panel results exist), `results.save_preset` and `results.delete_preset` (the project's own, `rxd:results_presets`), `results.packages` and `results.delete_package` (the Results Manager), `results.export_package` and `structural_analysis.import_results` (a `.reviera-results` JSON package that keeps the model hash it was computed for, so results from another state show as stale). The display is kept with the view (`rxd:results_display`) and never changes the model. Force diagrams are drawn off each member in its local plane (Vy and Mz in local y, N, Vz, T and My in local z, moments on the tension side), hatched at the stations, positive blue and negative red, the largest value 8% of the model's size (1.5 to 6 m) times the scale; the deformed shape uses the end displacements and, between them, the deflection from integrating the moment diagram (M / EI) twice, so a loaded span sags (5wL⁴/384EI within 2% for a simply supported beam); reactions are arrows at the supports. Values are drawn in the stroke font. Analyze › Structural Analysis › Results Explorer: a dockable pane with the result set and a stale banner, load case, result, members, scale, deformation and values, Show, Hide, presets, Save Preset, Export, Import and Delete, and Insights (clicking a row selects the member's physical elements and frames it). Not yet: panel stress and moment maps and required reinforcement (no panel results), Analysis Display Styles (ANA-ADS-001) and colour fills, units other than kN, kN·m and mm, results in plan, section and elevation views, several kept result sets at once, `IfcStructuralResultGroup` and reactions in IFC, labels that face the camera, drawing results through opaque elements.
 
 ---
 
@@ -20709,6 +20718,10 @@ Every command below is registered once in the command registry and is exposed au
 | `load.create_point` | host_id, position?, case_id, forces[6], orientation | id | Yes | STR-LOAD-001 |
 | `load.create_line` | host_id, path?, case_id, start[6], end[6], orientation, projected? | id | Yes | STR-LOAD-001 |
 | `load.create_area` | host_id, boundary?, case_id, values[3][3], orientation, projected? | id | Yes | STR-LOAD-001 |
+| `load.set` | load_id, case_id?, forces?, position?, start?, end?, value?, orientation?, projected?, is_reaction? | — | Yes | STR-LOAD-001 |
+| `load_case.set` | case_id, name?, nature?, category?, self_weight? | — | Yes | STR-LC-001 |
+| `load_combination.set` | combination_id, name?, formula?, limit_state?, usages[]? | — | Yes | STR-LC-001 |
+| `load_combination.delete` | combination_id | — | Yes | STR-LC-001 |
 | `load_case.create` | name, nature, category | id | Yes | STR-LC-001 |
 | `load_case.delete` | id | — | Yes | STR-LC-001 |
 | `load_combination.create` | name, formula, limit_state, usages[] | id | Yes | STR-LC-001 |
@@ -20735,6 +20748,13 @@ Every command below is registered once in the command registry and is exposed au
 | `results.apply_preset` | view_id, preset_id | — | No | STR-RES-001 |
 | `results.extremes` | package_id, result_type, load_group_id | {min, max, element_ids} | No | STR-RES-001 |
 | `results.delete_package` | package_id | — | Yes | STR-RES-001 |
+| `results.hide` | view_id | — | No | STR-RES-001 |
+| `results.overlay` | view_id \| display | overlay | No | STR-RES-001 |
+| `results.presets` | — | presets[] | No | STR-RES-001 |
+| `results.save_preset` | name, view_id | preset_id | Yes | STR-RES-001 |
+| `results.delete_preset` | preset_id | — | Yes | STR-RES-001 |
+| `results.packages` | — | packages[] | No | STR-RES-001 |
+| `results.export_package` | path | package | No | STR-RES-001 |
 | `steel_families.upgrade` | family_ids[] \| "all" | report | Yes | STR-STL-001 |
 | `connection_library.install` | path | — | Yes | STR-STL-002 |
 | `connection_type.edit_parameters` | type_id, params | — | Yes | STR-STL-002 |
@@ -27358,7 +27378,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**2091 unique commands** in 410 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**2102 unique commands** in 410 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -27559,10 +27579,10 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `lineweight` | 3 |
 | `link` | 23 |
 | `live` | 7 |
-| `load` | 3 |
-| `load_case` | 4 |
+| `load` | 4 |
+| `load_case` | 5 |
 | `load_classification` | 3 |
-| `load_combination` | 2 |
+| `load_combination` | 4 |
 | `load_nature` | 1 |
 | `load_set` | 1 |
 | `location` | 3 |
@@ -27657,7 +27677,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `reinforcement_numbering` | 2 |
 | `reinforcement_settings` | 2 |
 | `render` | 15 |
-| `results` | 4 |
+| `results` | 11 |
 | `revcloud` | 2 |
 | `revision` | 8 |
 | `revisionsequence` | 1 |
@@ -28718,15 +28738,19 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `load.create_area` | 4 | host_id, boundary?, case_id, values[3][3], orientation, projected? | id | Yes | STR-LOAD-001 |
 | `load.create_line` | 4 | host_id, path?, case_id, start[6], end[6], orientation, projected? | id | Yes | STR-LOAD-001 |
 | `load.create_point` | 4 | host_id, position?, case_id, forces[6], orientation | id | Yes | STR-LOAD-001 |
+| `load.set` | 4 | load_id, case_id?, forces?, position?, start?, end?, value?, orientation?, projected?, is_reaction? | — | Yes | STR-LOAD-001 |
 | `load_case.create` | 4 | name, nature, category | id | Yes | STR-LC-001 |
 | `load_case.delete` | 4 | case_id | {loads, combinations} | Yes | STR-LC-001 |
 | `load_case.list` | 4 | — | {template, natures[], cases[], combinations[], supports[]} | No | STR-LC-001 |
 | `load_case.manage` | 4 | tab?: code, natures, cases, combinations or usages | — | No | STR-LC-001 |
+| `load_case.set` | 4 | case_id, name?, nature?, category?, self_weight? | — | Yes | STR-LC-001 |
 | `load_classification.create` | 4 | name, demand_factor_id | id | Yes | MEP-ELEC-009 |
 | `load_classification.delete` | 4 | id, replace_with | — | Yes | MEP-ELEC-009 |
 | `load_classification.set` | 4 | id, {name?, demand_factor_id?, space_load?} | — | Yes | MEP-ELEC-009 |
 | `load_combination.create` | 4 | name, formula, limit_state, usages[] | id | Yes | STR-LC-001 |
+| `load_combination.delete` | 4 | combination_id | — | Yes | STR-LC-001 |
 | `load_combination.generate` | 4 | code_template_id, options | proposals[] | Yes | STR-LC-001 |
+| `load_combination.set` | 4 | combination_id, name?, formula?, limit_state?, usages[]? | — | Yes | STR-LC-001 |
 | `load_nature.create` | 4 | name, action_source | id | Yes | STR-LC-001 |
 | `load_set.create` | 4 | load_ids[] | id | Yes | MEP-ELEC-019 |
 | `location.search` | 2 | address | candidates[] | No | DM-LOC-001 |
@@ -29087,7 +29111,14 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `render.stop` | 5 | job_id | () | No | DOC-OUT-011 |
 | `results.apply_preset` | 4 | view_id, preset_id | — | No | STR-RES-001 |
 | `results.delete_package` | 4 | package_id | — | Yes | STR-RES-001 |
+| `results.delete_preset` | 4 | preset_id | — | Yes | STR-RES-001 |
+| `results.export_package` | 4 | path | package | No | STR-RES-001 |
 | `results.extremes` | 4 | package_id, result_type, load_group_id | {min, max, element_ids} | No | STR-RES-001 |
+| `results.hide` | 4 | view_id | — | No | STR-RES-001 |
+| `results.overlay` | 4 | view_id \ | display | overlay | No |
+| `results.packages` | 4 | — | packages[] | No | STR-RES-001 |
+| `results.presets` | 4 | — | presets[] | No | STR-RES-001 |
+| `results.save_preset` | 4 | name, view_id | preset_id | Yes | STR-RES-001 |
 | `results.show` | 4 | view_id, package_id, load_group_id, result_type, style_id? | — | No | STR-RES-001 |
 | `revcloud.create` | 5 | view_id, loops[], revision_id? | annotation_id | Yes | DOC-ANN-021 |
 | `revcloud.set_revision` | 5 | annotation_ids[], revision_id | () | Yes | DOC-ANN-021 |

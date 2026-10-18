@@ -1488,6 +1488,42 @@ icon = "analytical_check_consistency"
 help = "Check the analytical model against itself and the physical model: disconnected nodes, parts with no support, drift from physical elements, missing counterparts, instability hints"
 
 [[action]]
+id = "load_case.manage"
+label = "Load Cases"
+icon = "load_cases"
+help = "Design code, load natures, cases, combinations and usages in one dialog; changes apply as you make them and Cancel undoes them"
+
+[[action]]
+id = "load.create_point"
+label = "Point Load"
+icon = "point_load"
+help = "Enter a force, then click near analytical nodes or along members in a plan to load them"
+
+[[action]]
+id = "load.create_line"
+label = "Line Load"
+icon = "line_load"
+help = "Enter a force per length (uniform or varying), then click analytical members in a plan to load them"
+
+[[action]]
+id = "load.create_area"
+label = "Area Load"
+icon = "area_load"
+help = "Enter a pressure, then click inside analytical panels in a plan; analysis carries it to the members under the panel"
+
+[[action]]
+id = "boundary_condition.create"
+label = "Point Support"
+icon = "point_support"
+help = "Choose pinned, fixed or roller, then click near analytical nodes in a plan to support them"
+
+[[action]]
+id = "ui.pane.results"
+label = "Results Explorer"
+icon = "results_explorer"
+help = "Show analysis results in the 3D view: force diagrams, the deformed shape or reactions for a load case or combination, presets, and the largest values"
+
+[[action]]
 id = "ui.pane.analytical_checks"
 label = "Analytical Checks"
 icon = "analytical_checks"
@@ -1889,15 +1925,21 @@ tools = [
 [[tab.panel]]
 label = "Loads"
 tools = [
-  { action = "boundary_condition.at_column_bases", size = "large" },
-  { action = "load_combination.generate", size = "large" },
+  { action = "load_case.manage", size = "large" },
+  { action = "load.create_point", size = "small" },
+  { action = "load.create_line", size = "small" },
+  { action = "load.create_area", size = "small" },
+  { action = "boundary_condition.create", size = "small" },
+  { action = "boundary_condition.at_column_bases", size = "small" },
+  { action = "load_combination.generate", size = "small" },
 ]
 
 [[tab.panel]]
 label = "Structural Analysis"
 tools = [
   { action = "structural_analysis.run", size = "large" },
-  { action = "structural_analysis.results", size = "large" },
+  { action = "ui.pane.results", size = "large" },
+  { action = "structural_analysis.results", size = "small" },
 ]
 
 [[tab]]

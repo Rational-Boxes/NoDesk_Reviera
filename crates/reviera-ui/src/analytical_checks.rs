@@ -68,7 +68,11 @@ fn capitalised(s: &str) -> String {
 
 fn corner(v: &Value) -> Option<[f64; 3]> {
     let a = v.as_array()?;
-    Some([a.first()?.as_f64()?, a.get(1)?.as_f64()?, a.get(2)?.as_f64()?])
+    Some([
+        a.first()?.as_f64()?,
+        a.get(1)?.as_f64()?,
+        a.get(2)?.as_f64()?,
+    ])
 }
 
 impl Gui {
@@ -112,9 +116,7 @@ impl Gui {
             filter.append(label);
         }
         filter.set_selection(0);
-        let show_ignored = CheckBox::builder(&panel)
-            .with_label("Show ignored")
-            .build();
+        let show_ignored = CheckBox::builder(&panel).with_label("Show ignored").build();
         let export = button(&panel, "Export CSV…", "Write the issues as CSV");
         let info = StaticText::builder(&panel)
             .with_label("No check has run yet.")
@@ -390,11 +392,20 @@ impl Gui {
             n("info"),
             r["ignored"].as_u64().unwrap_or(0),
             r["tolerances"]["support_distance"].as_f64().unwrap_or(0.0) * 1000.0,
-            r["tolerances"]["analytical_distance"].as_f64().unwrap_or(0.0) * 1000.0,
-            r["tolerances"]["node_merge_distance"].as_f64().unwrap_or(0.0) * 1000.0,
+            r["tolerances"]["analytical_distance"]
+                .as_f64()
+                .unwrap_or(0.0)
+                * 1000.0,
+            r["tolerances"]["node_merge_distance"]
+                .as_f64()
+                .unwrap_or(0.0)
+                * 1000.0,
         );
         for nc in r["not_checked"].as_array().into_iter().flatten() {
-            text.push_str(&format!(" Not checked: {}.", nc.as_str().unwrap_or_default()));
+            text.push_str(&format!(
+                " Not checked: {}.",
+                nc.as_str().unwrap_or_default()
+            ));
         }
         p.info.set_label(&text);
         self.refresh_check_marks();
@@ -414,10 +425,7 @@ impl Gui {
             p.reason
                 .set_value(item["ignore_reason"].as_str().unwrap_or_default());
         }
-        let ids: Vec<Value> = item["element_ids"]
-            .as_array()
-            .cloned()
-            .unwrap_or_default();
+        let ids: Vec<Value> = item["element_ids"].as_array().cloned().unwrap_or_default();
         if !ids.is_empty() {
             let _ = self.run("selection.set", json!({ "ids": ids }));
             self.selection_changed();
@@ -496,7 +504,11 @@ impl Gui {
                 .flatten()
                 .map(|v| v.to_string())
                 .collect();
-            let mm = |v: &Value| v.as_f64().map(|x| format!("{:.1}", x * 1000.0)).unwrap_or_default();
+            let mm = |v: &Value| {
+                v.as_f64()
+                    .map(|x| format!("{:.1}", x * 1000.0))
+                    .unwrap_or_default()
+            };
             out.push_str(&format!(
                 "{},{},{},{},{},{},{},{},{}\n",
                 i["severity"].as_str().unwrap_or_default(),
@@ -511,10 +523,9 @@ impl Gui {
             ));
         }
         match std::fs::write(&path, out) {
-            Ok(()) => self.frame.set_status_text(
-                &format!("Exported {} issue(s) to {path}", issues.len()),
-                0,
-            ),
+            Ok(()) => self
+                .frame
+                .set_status_text(&format!("Exported {} issue(s) to {path}", issues.len()), 0),
             Err(e) => error(&self.frame, &format!("{path}: {e}")),
         }
     }

@@ -38,6 +38,9 @@ pub struct Model {
     /// solver does not.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub panels: Vec<Panel>,
+    /// What the distiller wants the results to say (for example area loads it could not carry).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub notes: Vec<String>,
 }
 
 /// An analytical panel: its corner nodes, outline (metres; arcs sampled), openings, thickness,
@@ -127,6 +130,20 @@ pub enum Load {
         member: String,
         start: [f64; 3],
         end: [f64; 3],
+        #[serde(default)]
+        projected: bool,
+        /// Carried from this area load (its key): a provider that analyses panels takes the area
+        /// load itself and leaves these out.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        from_area: Option<String>,
+    },
+    /// A uniform force per area (N/m², global) on a panel, for providers that analyse surfaces;
+    /// the built-in solver takes the line loads carried from it instead.
+    Area {
+        key: String,
+        case: String,
+        panel: String,
+        value: [f64; 3],
         #[serde(default)]
         projected: bool,
     },
@@ -415,7 +432,7 @@ pub fn solve(model: &Model) -> std::result::Result<Results, String> {
             model.nodes.len()
         ));
     }
-    let mut warnings = Vec::new();
+    let mut warnings = model.notes.clone();
     if !model.panels.is_empty() {
         warnings.push(format!(
             "{} analytical panel(s) are not analysed by the built-in frame solver: members only",
@@ -509,12 +526,14 @@ pub fn solve(model: &Model) -> std::result::Result<Results, String> {
                         .push((at * p.l, f));
                 }
             }
+            Load::Area { .. } => {}
             Load::Line {
                 case,
                 member,
                 start,
                 end,
                 projected,
+                ..
             } => {
                 let Some(&mi) = member_index.get(member.as_str()) else {
                     continue;
@@ -934,6 +953,7 @@ mod tests {
         let model = Model {
             units: "SI".into(),
             panels: Vec::new(),
+            notes: Vec::new(),
             nodes: vec![
                 Node {
                     key: "a".into(),
@@ -962,6 +982,7 @@ mod tests {
                 start: [0.0, 0.0, -10_000.0],
                 end: [0.0, 0.0, -10_000.0],
                 projected: false,
+                from_area: None,
             }],
         };
         let r = solve(&model).unwrap();
@@ -987,6 +1008,7 @@ mod tests {
         let model = Model {
             units: "SI".into(),
             panels: Vec::new(),
+            notes: Vec::new(),
             nodes: vec![
                 Node {
                     key: "a".into(),
@@ -1042,6 +1064,7 @@ mod tests {
                 start: [0.0, 0.0, -10_000.0],
                 end: [0.0, 0.0, -10_000.0],
                 projected: false,
+                from_area: None,
             }],
             ..model
         };

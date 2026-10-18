@@ -28,11 +28,12 @@ Properties**): the European region, so Eurocode materials and EN 1990 combinatio
 9. **Footings.** Select the Level 1 columns, Structure › Foundation › **At Columns**.
 10. **Analytical model.** Analyze › Analytical › **Physical to Analytical** (columns split where
     the floors and beams meet them, panels for the CLT), Loads › **Column Base Supports**.
-11. **Load cases.** **[gap]** Create G (permanent, self-weight), Q (imposed) and S (snow)
-    (`load_case.create`).
+11. **Load cases and loads.** Analyze › Loads › **Load Cases**: G (permanent, self-weight), Q
+    (imposed) and S (snow). In each upper plan, Loads › **Area Load** inside the CLT: G −1.5 kPa on
+    every floor, Q −3.0 kPa on Levels 2 and 3, S −1.0 kPa on the roof.
 12. **Combinations.** Analyze › Loads › **Generate Combinations** (EN 1990 6.10).
 13. **Check.** Analyze › Checks › **Check Supports** and **Check Consistency** (none).
 
 ## Gaps
 
-- Load cases have no dialog yet: create them with `load_case.create`.
+None: every step has its UI.

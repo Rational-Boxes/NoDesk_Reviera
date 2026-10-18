@@ -327,11 +327,7 @@ impl<'a> Model<'a> {
             for n in &ns {
                 panel_at_node[*n].push(panels.len());
             }
-            panels.push(Panel {
-                id,
-                g,
-                nodes: ns,
-            });
+            panels.push(Panel { id, g, nodes: ns });
         }
         let points: Vec<V3> = nodes.iter().map(|n| n.p).collect();
         let grid = Grid::new(&points, settings.support_distance);
@@ -939,7 +935,9 @@ fn overlaps(m: &Model<'_>, d: f64, out: &mut Vec<Found>) {
     let floors: Vec<&Panel> = m
         .panels
         .iter()
-        .filter(|p| p.g.recipe.role != crate::analytical_panels::PanelRole::Wall && p.g.normal.is_some())
+        .filter(|p| {
+            p.g.recipe.role != crate::analytical_panels::PanelRole::Wall && p.g.normal.is_some()
+        })
         .filter(|p| !p.g.recipe.physical.is_empty())
         .collect();
     if floors.is_empty() {
@@ -988,7 +986,8 @@ fn overlaps(m: &Model<'_>, d: f64, out: &mut Vec<Found>) {
             });
         }
         for w in m.panels.iter().filter(|p| {
-            p.g.recipe.role == crate::analytical_panels::PanelRole::Wall && !p.g.recipe.physical.is_empty()
+            p.g.recipe.role == crate::analytical_panels::PanelRole::Wall
+                && !p.g.recipe.physical.is_empty()
         }) {
             // The wall's top edge: its third and fourth corners.
             let Some(top) = w.g.corners.get(2..4) else {
@@ -1088,9 +1087,16 @@ fn panel_counterparts(m: &Model<'_>, a_tol: f64, out: &mut Vec<Found>) {
                 continue;
             };
             // The default panel's surface, from its corners (the arc's circle when curved).
-            let (outline, circle) = (pts.clone(), defaults.arc.as_ref().and_then(|a| {
-                crate::walls::curved::circle([pts[0][0], pts[0][1]], a.through, [pts[1][0], pts[1][1]])
-            }));
+            let (outline, circle) = (
+                pts.clone(),
+                defaults.arc.as_ref().and_then(|a| {
+                    crate::walls::curved::circle(
+                        [pts[0][0], pts[0][1]],
+                        a.through,
+                        [pts[1][0], pts[1][1]],
+                    )
+                }),
+            );
             let reference = crate::analytical_panels::PanelGeometry {
                 nodes: Vec::new(),
                 normal: if circle.is_none() {
@@ -1152,7 +1158,11 @@ fn panel_counterparts(m: &Model<'_>, a_tol: f64, out: &mut Vec<Found>) {
                     at: pan.g.corners.clone(),
                 });
             }
-            if c3 && r.material.is_some() && defaults.material.is_some() && r.material != defaults.material {
+            if c3
+                && r.material.is_some()
+                && defaults.material.is_some()
+                && r.material != defaults.material
+            {
                 out.push(Found {
                     code: "C3",
                     kind: "material_mismatch",

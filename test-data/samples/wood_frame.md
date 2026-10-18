@@ -23,17 +23,21 @@ Start with **File › New**. Set the code to *IRC* (Manage › Settings › **Mo
    Structure › Foundation › **At Columns**.
 7. **Joists.** Level 2 plan, Structure › **Beam System** in each half (wall to beam): 2x10,
    layout *Fixed Distance* 16", spanning across the house, offset −3/4".
-8. **Subfloor.** Structure › **Structural Floor**: the outline; duplicate its type as *Subfloor -
-   3/4" Plywood*, one Structure layer of Douglas Fir-Larch, 3/4".
+8. **Subfloor.** Structure › **Structural Floor**: the outline, span along x (across the joists);
+   duplicate its type as *Subfloor - 3/4" Plywood*, one Structure layer of Douglas Fir-Larch,
+   3/4".
 9. **Slab on grade.** Level 1 plan, Structure › Foundation › **Slab**: the outline.
 10. **Trusses.** Roof Plate plan, Structure › **Truss**: Howe, 8 panels, 6'-0" high, chords 2x6,
     webs 2x4, across the 24' width every 24" (17 trusses).
 11. **Bearings.** Modify › **Overlaps**: accept the truss members at their joints and on the
     walls, and the footings under the slab.
 12. **Analytical model.** Analyze › Analytical › **Physical to Analytical**, Loads › **Column
-    Base Supports**. **[gap]** Pin the wall panels' bottom corners and the joist, beam and truss
-    ends over the exterior walls (`boundary_condition.create`).
-13. **Load cases.** **[gap]** DL (dead, self-weight), LL (live), SNOW (`load_case.create`).
+    Base Supports**. Loads › **Point Support** (pinned): click the wall panels' bottom corners in
+    the Level 1 plan, and the joist, beam and truss ends over the exterior walls in the Level 2
+    and Roof Plate plans.
+13. **Load cases and loads.** Analyze › Loads › **Load Cases**: DL (dead, self-weight), LL
+    (live), SNOW. Level 2 plan, Loads › **Area Load** inside the subfloor: DL −0.48 kPa, LL −1.92
+    kPa.
 14. **Combinations.** Analyze › Loads › **Generate Combinations** (ASCE 7).
 15. **Check.** Analyze › Checks › **Check Consistency**: seven warnings where the wall panels'
     top corners sit a joist's depth below the joist ends (the joists bear on the walls through
@@ -41,6 +45,5 @@ Start with **File › New**. Set the code to *IRC* (Manage › Settings › **Mo
 
 ## Gaps
 
-- Boundary conditions at chosen nodes have no tool yet (only Column Base Supports): use
-  `boundary_condition.create`.
-- Load cases have no dialog yet: create them with `load_case.create`.
+None: every step has its UI (clicking many supports one by one is slow: the script does it in
+a loop).

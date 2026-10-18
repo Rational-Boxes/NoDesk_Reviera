@@ -16,8 +16,9 @@
 -- - a spread footing under each column;
 -- - the analytical model made from the physical one (members split where beams frame into
 --   girders, panels for the slabs), pinned supports at the column bases, dead, live, roof live
---   and wind load cases with line loads on the Level 2 girders, and the ASCE 7 strength
---   combinations. Run Analyze › Structural Analysis › Run Analysis to analyse it.
+--   and wind load cases with area loads on the slabs (carried to the beams under them) and wind
+--   at the roof, and the ASCE 7 strength combinations. Run Analyze › Structural Analysis › Run
+--   Analysis, then the Results Explorer.
 
 reviera.code.set{ code = "ibc" }
 local l1 = reviera.level.list()[1].id
@@ -113,7 +114,7 @@ local outline = {
 local slabs = {}
 for _, level in ipairs({ l2, roof }) do
   slabs[#slabs + 1] = reviera.floor.create{
-    loops = { outline }, level_id = level, structural = true, span_direction_edge = 1,
+    loops = { outline }, level_id = level, structural = true, span_direction_edge = 0,
   }
 end
 -- A 6" normal-weight concrete slab type for both.
@@ -168,20 +169,25 @@ reviera.analytical_automation.physical_to_analytical{}
 reviera.boundary_condition.at_column_bases{}
 local dead = reviera.load_case.create{ name = "DL", nature = "D", self_weight = true }
 local live = reviera.load_case.create{ name = "LL", nature = "L" }
-reviera.load_case.create{ name = "LR", nature = "Lr" }
+local lr = reviera.load_case.create{ name = "LR", nature = "Lr" }
 local wind = reviera.load_case.create{ name = "WIND", nature = "Wind" }
--- Slab and finishes, and office live load, on the Level 2 girders as line loads: 50 psf dead
--- and 50 psf live over half a bay each side (12.5 ft), about 9.1 kN/m each.
-local model = reviera.analytical_model.info{}
-local q = 9100.0
-for _, m in ipairs(model.members) do
-  local z = m.start[3]
-  if m.role == "beam" and math.abs(m.start[2] - m["end"][2]) < 1e-6
-      and math.abs(z - (4.2672 - SLAB)) < 0.2 and math.abs(m.start[2] - ys[2]) < 1e-6 then
-    reviera.load.create_line{ host_id = m.id, case_id = dead, start = { 0, 0, -q } }
-    reviera.load.create_line{ host_id = m.id, case_id = live, start = { 0, 0, -q } }
+-- The analytical panel made for a floor.
+local function panel_of(floor)
+  for _, p in ipairs(reviera.analytical_model.info{}.panels) do
+    for _, f in ipairs(p.physical) do
+      if f == floor then return p.id end
+    end
   end
 end
+-- Area loads on the slabs: 50 psf (2.39 kPa) superimposed dead and 50 psf office live on Level
+-- 2, 20 psf (0.96 kPa) dead and roof live on the roof. Analysis carries them to the infill beams
+-- and the beams on the grid letters, the slabs spanning between them.
+local PSF = 47.88
+reviera.load.create_area{ host_id = panel_of(slabs[1]), case_id = dead, value = { 0, 0, -50 * PSF } }
+reviera.load.create_area{ host_id = panel_of(slabs[1]), case_id = live, value = { 0, 0, -50 * PSF } }
+reviera.load.create_area{ host_id = panel_of(slabs[2]), case_id = dead, value = { 0, 0, -20 * PSF } }
+reviera.load.create_area{ host_id = panel_of(slabs[2]), case_id = lr, value = { 0, 0, -20 * PSF } }
+local model = reviera.analytical_model.info{}
 -- Wind on the roof at grid A, along x.
 for _, n in ipairs(model.members) do
   if n.role == "column" and n["end"][3] > 8.0 and math.abs(n["end"][1]) < 1e-6 then
