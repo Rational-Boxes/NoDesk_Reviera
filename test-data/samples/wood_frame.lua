@@ -2,7 +2,7 @@
 -- Copyright (C) 2026 Reviera contributors
 
 -- title: Wood-frame house
--- description: A two-storey light wood-frame house to US residential practice: 2x6 stud bearing walls on strip footings, 2x10 floor joists at 16" with a flush built-up beam on posts, a plywood subfloor, Howe roof trusses at 24", and its analytical model with supports and ASCE 7 combinations.
+-- description: A two-storey light wood-frame house to US residential practice: 2x6 stud bearing walls on strip footings, 2x10 floor joists at 16" with a flush built-up beam on posts, a plywood subfloor, gable Fink roof trusses at 24" (a 6:12 roof), and its analytical model with supports and ASCE 7 combinations.
 --
 -- Reviera sample model (test-data/samples): platform framing (IRC; dimension lumber from the NA
 -- lumber catalogue, PS 20 dressed sizes, in Spruce-Pine-Fir No.1/No.2 or Douglas Fir-Larch No.2):
@@ -12,7 +12,7 @@
 -- - Level 2 floor joists of 2x10 at 16" o.c. as beam systems, spanning 12 ft from the exterior
 --   walls to a flush beam of 4x12 down the middle, carried by 4x6 posts on spread footings;
 -- - a 3/4" plywood subfloor on the joists, structural; Level 2 walls on it;
--- - Howe roof trusses of 2x6 chords and 2x4 webs at 24" o.c., bearing on the walls;
+-- - gable Fink roof trusses (6:12) of 2x6 chords and 2x4 webs at 24" o.c., bearing on the walls;
 -- - the analytical model: members for the joists, beam, posts and trusses (split where they
 --   frame together), panels for the bearing walls and the subfloor, pinned supports at the post
 --   bases, the wall bottoms and where joists, beam and trusses bear on the walls, dead, live and
@@ -119,12 +119,13 @@ reviera.element.set_type{ element_ids = { deck }, type_id = subfloor }
 -- The slab on grade (after the subfloor, which made the generic floor type).
 reviera.foundation_slab.create{ boundary = { outline }, level = l1 }
 
--- Howe trusses at 24" o.c., 6 ft high, spanning the 24 ft width, bearing on the walls.
+-- Gable Fink trusses at 24" o.c.: a 6:12 roof, 6 ft high at the ridge over the 24 ft width,
+-- bearing on the walls.
 local n = math.floor(W / (24 * IN))
 for k = 0, n do
   local x = math.min(k * 24 * IN, W)
   reviera.truss.create{
-    start = { x, 0 }, ["end"] = { x, D }, level = plate, layout = "howe", panels = 8,
+    start = { x, 0 }, ["end"] = { x, D }, level = plate, layout = "fink", profile = "gable",
     height = 6 * FT, chord_type_id = chord, web_type_id = web,
   }
 end

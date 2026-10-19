@@ -607,10 +607,12 @@ tools and the datums.
   edges are locked to their supports, so the joists re-space when a girder moves; Remove Beam
   System keeps the joists (`beam_system.create_auto`, `beam_system.create_sketch`,
   `beam_system.set_layout`, `beam_system.remove`; STR-BSYS-001).
-- **Trusses**: Truss (`TS`) draws Pratt, Howe or Warren trusses; stretched, a truss keeps its
-  panels and re-proportions its webs. It is an IfcElementAssembly (TRUSS) aggregating its chords
-  and webs; Remove Truss keeps the members (`truss.create`, `truss.set`, `truss.remove`;
-  STR-TRUSS-001).
+- **Trusses**: Truss (`TS`) draws Pratt, Howe, Warren, Fink, King post or Queen post trusses,
+  flat, gable, mono-pitch, scissor or bowstring, with heel posts, or any chord shape (Edit
+  Profile); a top chord can follow a roof's underside. Stretched, a truss keeps its panels and
+  re-proportions its webs. It is an IfcElementAssembly (TRUSS) aggregating its chords (split
+  where they bend) and webs; Remove Truss keeps the members (`truss.create`, `.set`,
+  `.edit_profile`, `.attach`, `.detach`, `.remove`; STR-TRUSS-001).
 - **Braces and slanted columns**: Brace (`BR`) draws a brace from this level to the next; an end
   on a column or beam attaches to it and follows it when it moves, stretches or changes level, and
   is freed (with a warning) if the member is deleted. Braces are IfcMember (BRACE); level ones are
@@ -861,7 +863,8 @@ simulation sessions, and the first engine runners (see [Not built yet](#not-buil
 `test-data/samples` holds Reviera's own sample models. Each is rebuilt by a Lua script and
 checked by a test (no overlaps beyond those it keeps on purpose, no clearance intrusions, saves
 and reopens), and each has a walkthrough (`house.md`, `observatory.md`, `csg.md`, `manor.md`,
-`manor_before.md`, `storefront.md`, `steel_frame.md`, `timber.md`, `wood_frame.md`) giving the manual steps to build or use it in the
+`manor_before.md`, `storefront.md`, `steel_frame.md`, `timber.md`, `wood_frame.md`,
+`structural_checks.md`) giving the manual steps to build or use it in the
 window, which confirms that every operation it uses has its UI:
 
 - **Storefront doors** (`storefront.ifc`): a shop front with a revolving door, an automatic
@@ -897,8 +900,13 @@ window, which confirms that every operation it uses has its UI:
   and glulam bracing to Eurocode materials, with its analytical model (CLT panels) and EN 1990
   combinations.
 - **Wood-frame house** (`wood_frame.ifc`): 2x6 stud bearing walls on strip footings, 2x10 joists
-  at 16" with a flush beam on posts, a plywood subfloor and parallel-chord Howe trusses at 24", with
-  its analytical model and ASCE 7 combinations.
+  at 16" with a flush beam on posts, a plywood subfloor and gable Fink trusses (6:12) at 24", with
+  its analytical model, area loads and ASCE 7 combinations.
+- **Structural model with problems** (`structural_checks.ifc`): a small steel frame with
+  deliberate faults, each labelled, for Check Supports and Check Consistency to find (a floating
+  ring of beams, a beam resting on nothing, a 40 mm gap, members framing mid-span with no node, a
+  girder off its analytical line, missing counterparts, a member pinned at both ends, a slab
+  below its beams); its walkthrough says what each reports and how to fix it.
 
 Open one with `reviera gui test-data/samples/manor.ifc`, or rebuild them with
 `REVIERA_REGEN_SAMPLES=1 cargo test -p reviera-app --test samples`.
@@ -992,7 +1000,7 @@ area by area (reviewed against the spec on 2026-10-15).
   panels, automation, checks, results display, loads, load combinations, point supports and a built-in linear static solver
   are built (see [Structure](#structure-in-development)). Still to build: the beam join editor and arc
   beams, placing braces in elevations, connection types and the connection library, composite
-  decks and span symbols, truss types and profiles, rebar, bilinear and two-way area
+  decks and span symbols, truss families (a layout shared by types), rebar, bilinear and two-way area
   loads, Adjust mode and Reset for the analytical model, panel results and external
   analysis providers.
 - **MEP, families and collaboration** (BIMserver, OpenCDE, Godot) are specified but not started.

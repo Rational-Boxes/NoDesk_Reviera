@@ -119,6 +119,9 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(BeamSystemInfo),
         registry.add(TrussCreate),
         registry.add(TrussSet),
+        registry.add(TrussEditProfile),
+        registry.add(TrussAttach),
+        registry.add(TrussDetach),
         registry.add(TrussRemove),
         registry.add(TrussInfo),
         registry.add(FootingPlace),
@@ -784,11 +787,49 @@ edit_command!(
 );
 
 edit_command!(
+    TrussEditProfile,
+    "truss.edit_profile",
+    "Edit a truss's profile",
+    "Edit Profile (STR-TRUSS-001): the chords' shapes as points (fraction along the span 0 to 1, height \
+     above the truss's base in metres); the top chord must stay above the bottom one. The profile becomes \
+     Custom and the members are made afresh, the chords split at each point.",
+    "Edit Truss Profile",
+    crate::beams::TrussProfileParams,
+    (),
+    crate::beams::edit_truss_profile
+);
+
+edit_command!(
+    TrussAttach,
+    "truss.attach",
+    "Attach a truss's top chord to a roof",
+    "Attaches a truss's top chord to a roof that covers it (STR-TRUSS-001): the chord follows the roof's \
+     underside, less half its depth, at each panel point, and keeps following it when the roof changes.",
+    "Attach Truss",
+    crate::beams::TrussAttachParams,
+    (),
+    crate::beams::attach_truss
+);
+
+edit_command!(
+    TrussDetach,
+    "truss.detach",
+    "Detach a truss's top chord",
+    "Detaches a truss's top chord from its roof; it returns to the truss's profile.",
+    "Detach Truss",
+    crate::beams::TrussDetachParams,
+    (),
+    crate::beams::detach_truss
+);
+
+edit_command!(
     TrussSet,
     "truss.set",
     "Change a truss",
     "Changes a truss's line (it stretches, keeping its panels), height, bearing chord or offset (the \
-     members follow), or its layout or panel count (the members are made afresh).",
+     members follow), or its layout (pratt, howe, warren, fink, king_post, queen_post), panel count, \
+     profile (flat, gable, mono, scissor, bowstring), heel height or a scissor's bottom rise (the members \
+     are made afresh).",
     "Edit Truss",
     crate::beams::TrussSetParams,
     (),

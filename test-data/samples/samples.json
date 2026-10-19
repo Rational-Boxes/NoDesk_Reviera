@@ -126,6 +126,21 @@
     ]
   },
   {
+    "name": "structural_checks",
+    "title": "Structural model with problems",
+    "group": "Structure",
+    "description": "A small steel frame with deliberate faults, each labelled in the Level 2 plan, for Analyze \u203a Checks \u203a Check Supports and Check Consistency to find: a floating ring of beams, a beam resting on nothing, a member 40 mm short of a column, members framing mid-span with no node, a girder moved off its analytical line, a beam with no analytical member, a member pinned at both ends and a slab well below its beams. The ring's beams, the moved girder and the cantilever also overlap where they meet (left on purpose).",
+    "allow_overlaps": 6,
+    "steps": [
+      {
+        "command": "script.run",
+        "args": {
+          "file": "structural_checks.lua"
+        }
+      }
+    ]
+  },
+  {
     "name": "manor_before",
     "title": "Manor before coordination",
     "group": "View",

@@ -816,7 +816,7 @@ fn refresh(txn: &mut crate::txn::Transaction<'_>) -> Result<()> {
         let chord = r
             .as_ref()
             .and_then(|r| r.system.as_ref())
-            .and_then(|s| truss_direction(&store, s).map(|_| s.slot < 2));
+            .and_then(|s| truss_chord(&store, s));
         let (predefined, object) = match (brace, chord) {
             (_, Some(true)) => ("CHORD", None),
             (_, Some(false)) => ("STRUT", None),
@@ -2246,6 +2246,32 @@ pub enum TrussLayout {
     Howe,
     /// Alternating diagonals, no interior verticals.
     Warren,
+    /// A gable truss's W of webs: from the bottom chord's third points to the top chord's
+    /// quarter points and apex (panels do not apply).
+    Fink,
+    /// One vertical at mid-span.
+    KingPost,
+    /// Verticals at the third points, diagonals from their feet to mid-span.
+    QueenPost,
+}
+
+/// The shape of a truss's chords.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum TrussProfile {
+    /// Parallel chords.
+    #[default]
+    Flat,
+    /// The top chord rises from the heels to the truss's height at mid-span.
+    Gable,
+    /// The top chord rises from the heel at the start to the height at the end.
+    Mono,
+    /// A gable whose bottom chord rises too (`bottom_rise` of the height at mid-span).
+    Scissor,
+    /// A curved (parabolic) top chord, split at each panel point.
+    Bowstring,
+    /// The chords as given (`top`, `bottom`: fraction along the span and height above the base).
+    Custom,
 }
 
 /// Which chord the truss's line runs along.
@@ -2278,11 +2304,33 @@ pub struct TrussRecipe {
     /// The chords' and webs' types (GlobalIds).
     pub chord_type: String,
     pub web_type: String,
+    #[serde(default)]
+    pub profile: TrussProfile,
+    /// The height at the bearing ends of a pitched truss (metres).
+    #[serde(default)]
+    pub heel: f64,
+    /// A scissor truss's bottom chord rise at mid-span, as a fraction of the height.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bottom_rise: Option<f64>,
+    /// A custom profile's chords: (fraction along the span, height above the base).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub top: Vec<[f64; 2]>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub bottom: Vec<[f64; 2]>,
+    /// The roof the top chord follows (GlobalId).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub attach_top: Option<String>,
 }
 
 pub fn truss_recipe(e: &Element) -> Option<TrussRecipe> {
     let v = e.param(RECIPE_KEY)?;
     (v.get("kind")?.as_str()? == TRUSS_RECIPE).then(|| serde_json::from_value(v.clone()).ok())?
+}
+
+/// Whether a truss member is a chord (`None` when it is not a truss's).
+fn truss_chord(store: &Store, s: &SystemSlot) -> Option<bool> {
+    let t = truss_recipe(store.get(find(store, &s.system)?)?)?;
+    truss_members(store, &t).ok()?.get(s.slot).map(|m| m.2)
 }
 
 /// The plan direction of the truss a member belongs to.
@@ -2293,49 +2341,169 @@ fn truss_direction(store: &Store, s: &SystemSlot) -> Option<[f64; 2]> {
     (l > 1e-9).then(|| [d[0] / l, d[1] / l])
 }
 
-/// A truss's members as they are now: each one's ends and whether it is a chord. The top chord
-/// comes first, then the bottom chord, the verticals and the diagonals.
+/// A truss's members as they are now: each one's ends and whether it is a chord. The top chord's
+/// pieces come first, then the bottom chord's, then the webs (heel posts, verticals, diagonals).
+/// Chords are split where the profile bends (a gable's apex, each panel point of a curved or
+/// attached chord).
 pub fn truss_members(store: &Store, t: &TrussRecipe) -> Result<Vec<(V3, V3, bool)>> {
     let z = crate::levels::elevation_of(store, &t.level)? + t.offset;
-    let (zb, zt) = match t.bearing {
-        BearingChord::Bottom => (z, z + t.height),
-        BearingChord::Top => (z - t.height, z),
+    let base = match t.bearing {
+        BearingChord::Bottom => z,
+        BearingChord::Top => z - t.height,
     };
     let n = t.panels.max(1);
-    let at = |i: usize, top: bool| {
-        let k = i as f64 / n as f64;
+    let (top, bottom) = chord_shapes(store, t, base);
+    let height = |shape: &[[f64; 2]], s: f64| -> f64 {
+        if shape.is_empty() {
+            return 0.0;
+        }
+        if s <= shape[0][0] {
+            return shape[0][1];
+        }
+        for w in shape.windows(2) {
+            if s <= w[1][0] {
+                let f = (s - w[0][0]) / (w[1][0] - w[0][0]).max(1e-12);
+                return w[0][1] + (w[1][1] - w[0][1]) * f;
+            }
+        }
+        shape[shape.len() - 1][1]
+    };
+    let at = |s: f64, top_chord: bool| -> V3 {
+        let h = if top_chord { height(&top, s) } else { height(&bottom, s) };
         [
-            t.start[0] + (t.end[0] - t.start[0]) * k,
-            t.start[1] + (t.end[1] - t.start[1]) * k,
-            if top { zt } else { zb },
+            t.start[0] + (t.end[0] - t.start[0]) * s,
+            t.start[1] + (t.end[1] - t.start[1]) * s,
+            base + h,
         ]
     };
-    let mut out = vec![
-        (at(0, true), at(n, true), true),
-        (at(0, false), at(n, false), true),
-    ];
-    let verticals: Vec<usize> = match t.layout {
-        TrussLayout::Warren => vec![0, n],
-        _ => (0..=n).collect(),
+    let mut out: Vec<(V3, V3, bool)> = Vec::new();
+    for shape in [&top, &bottom] {
+        let is_top = std::ptr::eq(shape, &top);
+        for w in shape.windows(2) {
+            out.push((at(w[0][0], is_top), at(w[1][0], is_top), true));
+        }
+    }
+    let mut webs: Vec<(V3, V3)> = Vec::new();
+    let vertical = |s: f64| (at(s, false), at(s, true));
+    // Verticals in order along the span: the heel post at the start where the truss has height
+    // there, the layout's interior verticals, the heel post at the end.
+    let heel_post = |s: f64, webs: &mut Vec<(V3, V3)>| {
+        let (a, b) = vertical(s);
+        if b[2] - a[2] > 0.01 {
+            webs.push((a, b));
+        }
     };
-    for i in verticals {
-        out.push((at(i, false), at(i, true), false));
+    heel_post(0.0, &mut webs);
+    let k = |i: usize| i as f64 / n as f64;
+    if matches!(t.layout, TrussLayout::Pratt | TrussLayout::Howe) {
+        for i in 1..n {
+            webs.push(vertical(k(i)));
+        }
     }
-    for k in 0..n {
-        let left_half = 2 * k < n;
-        // Which end of panel k is up.
-        let up_at_start = match t.layout {
-            TrussLayout::Pratt => left_half,
-            TrussLayout::Howe => !left_half,
-            TrussLayout::Warren => k % 2 == 1,
-        };
-        out.push(if up_at_start {
-            (at(k, true), at(k + 1, false), false)
-        } else {
-            (at(k, false), at(k + 1, true), false)
-        });
+    heel_post(1.0, &mut webs);
+    match t.layout {
+        TrussLayout::Pratt | TrussLayout::Howe | TrussLayout::Warren => {
+            for i in 0..n {
+                let left_half = 2 * i < n;
+                let up_at_start = match t.layout {
+                    TrussLayout::Pratt => left_half,
+                    TrussLayout::Howe => !left_half,
+                    _ => i % 2 == 1,
+                };
+                webs.push(if up_at_start {
+                    (at(k(i), true), at(k(i + 1), false))
+                } else {
+                    (at(k(i), false), at(k(i + 1), true))
+                });
+            }
+        }
+        TrussLayout::Fink => {
+            for (b, tp) in [(1.0 / 3.0, 0.25), (1.0 / 3.0, 0.5), (2.0 / 3.0, 0.5), (2.0 / 3.0, 0.75)] {
+                webs.push((at(b, false), at(tp, true)));
+            }
+        }
+        TrussLayout::KingPost => webs.push(vertical(0.5)),
+        TrussLayout::QueenPost => {
+            webs.push(vertical(1.0 / 3.0));
+            webs.push(vertical(2.0 / 3.0));
+            webs.push((at(1.0 / 3.0, false), at(0.5, true)));
+            webs.push((at(2.0 / 3.0, false), at(0.5, true)));
+        }
     }
+    let len = |a: V3, b: V3| ((b[0] - a[0]).powi(2) + (b[1] - a[1]).powi(2) + (b[2] - a[2]).powi(2)).sqrt();
+    out.extend(
+        webs.into_iter()
+            .filter(|(a, b)| len(*a, *b) > 0.01)
+            .map(|(a, b)| (a, b, false)),
+    );
     Ok(out)
+}
+
+/// The chords' shapes: (fraction along the span, height above the truss's base) at each point
+/// where they bend, from the profile (or the roof the top chord is attached to).
+pub fn chord_shapes(store: &Store, t: &TrussRecipe, base: f64) -> (Vec<[f64; 2]>, Vec<[f64; 2]>) {
+    let h = t.height;
+    let heel = t.heel.clamp(0.0, h);
+    let n = t.panels.max(1);
+    let panel_points = |f: &dyn Fn(f64) -> f64| -> Vec<[f64; 2]> {
+        (0..=n).map(|i| {
+            let s = i as f64 / n as f64;
+            [s, f(s)]
+        }).collect()
+    };
+    let flat_bottom = vec![[0.0, 0.0], [1.0, 0.0]];
+    // A top chord attached to a roof follows its underside, less half the chord's depth.
+    if let Some(roof) = &t.attach_top
+        && let Some(g) = find(store, roof)
+            .and_then(|id| store.get(id))
+            .and_then(|e| crate::roofs::regenerate(store, e).ok())
+    {
+        let half = find(store, &t.chord_type)
+            .and_then(|id| store.get(id))
+            .and_then(beam_type)
+            .map_or(0.0, |c| c.depth / 2.0);
+        let top = panel_points(&|s| {
+            let p = [
+                t.start[0] + (t.end[0] - t.start[0]) * s,
+                t.start[1] + (t.end[1] - t.start[1]) * s,
+            ];
+            g.underside(p).map_or(h, |u| (u - half - base).max(0.0))
+        });
+        return (top, flat_bottom);
+    }
+    let gable = |s: f64| heel + (h - heel) * (1.0 - (2.0 * s - 1.0).abs());
+    match t.profile {
+        TrussProfile::Flat => (vec![[0.0, h], [1.0, h]], flat_bottom),
+        TrussProfile::Gable => (vec![[0.0, heel], [0.5, h], [1.0, heel]], flat_bottom),
+        TrussProfile::Mono => (vec![[0.0, heel], [1.0, h]], flat_bottom),
+        TrussProfile::Scissor => {
+            let r = t.bottom_rise.unwrap_or(0.5).clamp(0.0, 0.9);
+            (
+                vec![[0.0, heel], [0.5, h], [1.0, heel]],
+                vec![[0.0, 0.0], [0.5, r * h], [1.0, 0.0]],
+            )
+        }
+        TrussProfile::Bowstring => (
+            panel_points(&|s| heel + (h - heel) * 4.0 * s * (1.0 - s)),
+            flat_bottom,
+        ),
+        TrussProfile::Custom => {
+            let norm = |pts: &[[f64; 2]], fallback: Vec<[f64; 2]>| -> Vec<[f64; 2]> {
+                let mut p: Vec<[f64; 2]> = pts
+                    .iter()
+                    .map(|q| [q[0].clamp(0.0, 1.0), q[1]])
+                    .collect();
+                p.sort_by(|a, b| a[0].total_cmp(&b[0]));
+                p.dedup_by(|a, b| (a[0] - b[0]).abs() < 1e-9);
+                if p.len() < 2 { fallback } else { p }
+            };
+            let _ = gable;
+            (
+                norm(&t.top, vec![[0.0, h], [1.0, h]]),
+                norm(&t.bottom, flat_bottom.clone()),
+            )
+        }
+    }
 }
 
 /// Makes a truss's members afresh.
@@ -2422,6 +2590,13 @@ pub struct TrussParams {
     /// section for both.
     pub chord_type_id: Option<ElementRef>,
     pub web_type_id: Option<ElementRef>,
+    #[serde(default)]
+    pub profile: TrussProfile,
+    /// Pitched profiles: the height at the bearing ends (default 0).
+    #[schemars(extend("x-reviera-data-type" = "length"))]
+    pub heel: Option<f64>,
+    /// Scissor: the bottom chord's rise at mid-span as a fraction of the height (default 0.5).
+    pub bottom_rise: Option<f64>,
 }
 
 /// Creates a truss (`truss.create`, STR-TRUSS-001): an `IfcElementAssembly` (`TRUSS`) whose chords
@@ -2468,7 +2643,13 @@ pub(crate) fn create_truss(
             "a truss needs at least one panel",
         ));
     }
-    let height = p.height.unwrap_or((span / 10.0).max(0.6));
+    // Pitched trusses default to a quarter of the span high (a 6:12 roof) and an even panel
+    // count, so the apex is a panel point.
+    let pitched = !matches!(p.profile, TrussProfile::Flat);
+    let panels = if pitched { panels.div_ceil(2) * 2 } else { panels };
+    let height = p
+        .height
+        .unwrap_or(if pitched { span / 4.0 } else { (span / 10.0).max(0.6) });
     if height <= 0.0 {
         return Err(Error::new(
             "truss.height",
@@ -2487,6 +2668,12 @@ pub(crate) fn create_truss(
         bearing: p.bearing,
         chord_type: guid(chord),
         web_type: guid(web),
+        profile: p.profile,
+        heel: p.heel.unwrap_or(0.0),
+        bottom_rise: p.bottom_rise,
+        top: Vec::new(),
+        bottom: Vec::new(),
+        attach_top: None,
     };
     let id = txn.create(
         NewElement::new("IfcElementAssembly")
@@ -2525,6 +2712,10 @@ pub struct TrussSetParams {
     pub bearing: Option<BearingChord>,
     #[schemars(extend("x-reviera-data-type" = "length"))]
     pub offset: Option<f64>,
+    pub profile: Option<TrussProfile>,
+    #[schemars(extend("x-reviera-data-type" = "length"))]
+    pub heel: Option<f64>,
+    pub bottom_rise: Option<f64>,
 }
 
 /// Changes a truss (`truss.set`): its line (the members follow), or its layout, panels, height or
@@ -2532,7 +2723,27 @@ pub struct TrussSetParams {
 pub(crate) fn set_truss(txn: &mut crate::txn::Transaction<'_>, p: TrussSetParams) -> Result<()> {
     let store = txn.store().clone();
     let (id, mut t) = resolve_truss(&store, &p.truss_id)?;
-    let remake = p.layout.is_some() || p.panels.is_some();
+    let remake = p.layout.is_some()
+        || p.panels.is_some()
+        || p.profile.is_some()
+        || p.heel.is_some()
+        || p.bottom_rise.is_some();
+    if let Some(v) = p.profile {
+        t.profile = v;
+        if v != TrussProfile::Custom {
+            t.top.clear();
+            t.bottom.clear();
+        }
+    }
+    if let Some(v) = p.heel {
+        if v < 0.0 {
+            return Err(Error::new("truss.heel", "a heel height cannot be negative"));
+        }
+        t.heel = v;
+    }
+    if let Some(v) = p.bottom_rise {
+        t.bottom_rise = Some(v);
+    }
     if let Some(v) = p.start {
         t.start = v;
     }
@@ -2575,6 +2786,156 @@ pub(crate) fn set_truss(txn: &mut crate::txn::Transaction<'_>, p: TrussSetParams
     } else {
         refresh(txn)?;
     }
+    Ok(())
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct TrussProfileParams {
+    pub truss_id: ElementRef,
+    /// The top chord: points (fraction along the span 0 to 1, height above the truss's base in
+    /// metres), at least two.
+    pub top: Vec<[f64; 2]>,
+    /// The bottom chord likewise; default flat at the base.
+    #[serde(default)]
+    pub bottom: Vec<[f64; 2]>,
+}
+
+/// Edit Profile (`truss.edit_profile`): the chords' shapes as given; the members are made afresh.
+pub(crate) fn edit_truss_profile(
+    txn: &mut crate::txn::Transaction<'_>,
+    p: TrussProfileParams,
+) -> Result<()> {
+    let store = txn.store().clone();
+    let (id, mut t) = resolve_truss(&store, &p.truss_id)?;
+    if p.top.len() < 2 {
+        return Err(Error::new("truss.profile", "the top chord needs at least two points"));
+    }
+    let check = |pts: &[[f64; 2]], which: &str| -> Result<()> {
+        if pts.iter().any(|q| !(0.0..=1.0).contains(&q[0])) {
+            return Err(Error::new(
+                "truss.profile",
+                format!("the {which} chord's points run from 0 to 1 along the span"),
+            ));
+        }
+        Ok(())
+    };
+    check(&p.top, "top")?;
+    check(&p.bottom, "bottom")?;
+    // The top chord stays above the bottom one.
+    let probe = TrussRecipe {
+        profile: TrussProfile::Custom,
+        top: p.top.clone(),
+        bottom: p.bottom.clone(),
+        attach_top: None,
+        ..t.clone()
+    };
+    let (top, bottom) = chord_shapes(&store, &probe, 0.0);
+    let h = |shape: &[[f64; 2]], s: f64| {
+        shape
+            .windows(2)
+            .find(|w| s >= w[0][0] && s <= w[1][0])
+            .map_or(shape[0][1], |w| {
+                w[0][1] + (w[1][1] - w[0][1]) * (s - w[0][0]) / (w[1][0] - w[0][0]).max(1e-12)
+            })
+    };
+    if (0..=20).any(|i| {
+        let s = i as f64 / 20.0;
+        h(&top, s) < h(&bottom, s) - 1e-6
+    }) {
+        return Err(Error::new(
+            "truss.profile",
+            "the top chord must not pass below the bottom chord",
+        ));
+    }
+    t.profile = TrussProfile::Custom;
+    t.top = top;
+    t.bottom = bottom;
+    t.attach_top = None;
+    t.height = t.top.iter().map(|q| q[1]).fold(0.0, f64::max).max(0.01);
+    write_truss(txn, id, &t)?;
+    relayout_truss(txn, id)?;
+    Ok(())
+}
+
+fn write_truss(txn: &mut crate::txn::Transaction<'_>, id: ElementId, t: &TrussRecipe) -> Result<()> {
+    let v = serde_json::to_value(t).expect("serialises");
+    txn.modify(id, |e| {
+        e.params.insert(RECIPE_KEY.into(), v);
+    })
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct TrussAttachParams {
+    pub truss_id: ElementRef,
+    /// Only `top` for now.
+    #[serde(default = "top_chord")]
+    pub chord: String,
+    /// A roof.
+    pub target_id: ElementRef,
+}
+
+fn top_chord() -> String {
+    "top".into()
+}
+
+/// Attaches a truss's top chord to a roof (`truss.attach`): the chord follows the roof's
+/// underside (less half its depth) at each panel point, and keeps following it.
+pub(crate) fn attach_truss(
+    txn: &mut crate::txn::Transaction<'_>,
+    p: TrussAttachParams,
+) -> Result<()> {
+    let store = txn.store().clone();
+    let (id, mut t) = resolve_truss(&store, &p.truss_id)?;
+    if p.chord != "top" {
+        return Err(Error::new(
+            "truss.chord",
+            "only the top chord can be attached so far",
+        ));
+    }
+    let roof = store
+        .resolve(&p.target_id)
+        .and_then(|i| store.get(i))
+        .filter(|e| crate::roofs::regenerate(&store, e).is_ok())
+        .ok_or_else(|| Error::new("truss.not_a_roof", "the target is not a roof"))?;
+    let g = crate::roofs::regenerate(&store, roof).expect("checked");
+    let covered = [t.start, t.end, [(t.start[0] + t.end[0]) / 2.0, (t.start[1] + t.end[1]) / 2.0]]
+        .iter()
+        .all(|q| g.underside(*q).is_some());
+    if !covered {
+        return Err(Error::new(
+            "truss.not_under_roof",
+            "the roof does not cover the whole truss",
+        ));
+    }
+    t.attach_top = Some(roof.guid().to_string());
+    write_truss(txn, id, &t)?;
+    relayout_truss(txn, id)?;
+    Ok(())
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct TrussDetachParams {
+    pub truss_id: ElementRef,
+    #[serde(default = "top_chord")]
+    pub chord: String,
+}
+
+/// Detaches a truss's top chord (`truss.detach`): it returns to its profile.
+pub(crate) fn detach_truss(
+    txn: &mut crate::txn::Transaction<'_>,
+    p: TrussDetachParams,
+) -> Result<()> {
+    let store = txn.store().clone();
+    let (id, mut t) = resolve_truss(&store, &p.truss_id)?;
+    if t.attach_top.take().is_none() {
+        return Err(Error::new("truss.not_attached", "the truss's top chord is not attached"));
+    }
+    let _ = p.chord;
+    write_truss(txn, id, &t)?;
+    relayout_truss(txn, id)?;
     Ok(())
 }
 
@@ -2636,6 +2997,10 @@ pub struct TrussInfo {
     pub span: f64,
     pub chords: Vec<ElementId>,
     pub webs: Vec<ElementId>,
+    pub profile: TrussProfile,
+    pub heel: f64,
+    /// The roof its top chord follows.
+    pub attach_top: Option<ElementId>,
 }
 
 /// Reports a truss's layout and members (`truss.info`).
@@ -2650,14 +3015,26 @@ pub fn truss_info(store: &Store, p: &TrussIdParams) -> Result<TrussInfo> {
         })
         .collect();
     members.sort();
+    let layout = truss_members(store, &t)?;
     Ok(TrussInfo {
         truss_id: id,
         layout: t.layout,
         panels: t.panels,
         height: t.height,
         span: (t.end[0] - t.start[0]).hypot(t.end[1] - t.start[1]),
-        chords: members.iter().filter(|m| m.0 < 2).map(|m| m.1).collect(),
-        webs: members.iter().filter(|m| m.0 >= 2).map(|m| m.1).collect(),
+        chords: members
+            .iter()
+            .filter(|m| layout.get(m.0).is_some_and(|x| x.2))
+            .map(|m| m.1)
+            .collect(),
+        webs: members
+            .iter()
+            .filter(|m| !layout.get(m.0).is_some_and(|x| x.2))
+            .map(|m| m.1)
+            .collect(),
+        profile: t.profile,
+        heel: t.heel,
+        attach_top: t.attach_top.as_deref().and_then(|g| find(store, g)),
     })
 }
 

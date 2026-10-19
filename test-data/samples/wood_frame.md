@@ -27,8 +27,9 @@ Start with **File › New**. Set the code to *IRC* (Manage › Settings › **Mo
    duplicate its type as *Subfloor - 3/4" Plywood*, one Structure layer of Douglas Fir-Larch,
    3/4".
 9. **Slab on grade.** Level 1 plan, Structure › Foundation › **Slab**: the outline.
-10. **Trusses.** Roof Plate plan, Structure › **Truss**: Howe, 8 panels, 6'-0" high, chords 2x6,
-    webs 2x4, across the 24' width every 24" (17 trusses).
+10. **Trusses.** Roof Plate plan, Structure › **Truss**: across the 24' width every 24" (17
+    trusses); in a member's Properties set Layout *Fink*, Profile *Gable*, Truss Height 6'-0"
+    (a 6:12 roof), chords 2x6 and webs 2x4.
 11. **Bearings.** Modify › **Overlaps**: accept the truss members at their joints and on the
     walls, and the footings under the slab.
 12. **Analytical model.** Analyze › Analytical › **Physical to Analytical**, Loads › **Column

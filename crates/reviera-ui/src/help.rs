@@ -721,7 +721,10 @@ mod tests {
             .filter(|s| s.group == "Structure")
             .map(|s| s.name.as_str())
             .collect();
-        assert_eq!(structure, ["steel_frame", "timber", "wood_frame"]);
+        assert_eq!(
+            structure,
+            ["steel_frame", "timber", "wood_frame", "structural_checks"]
+        );
         // Every group is a ribbon tab's name.
         let tabs = crate::ribbon::Catalog::parse(crate::ribbon::DEFAULT).unwrap();
         for s in &list {

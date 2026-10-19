@@ -106,3 +106,66 @@ fn the_sample_corpus_builds_cleanly() {
         );
     }
 }
+
+/// The structural problems sample (STR-AM-007) reports exactly the faults it was built with, from
+/// its saved file.
+#[test]
+fn the_structural_checks_sample_reports_its_faults() {
+    let file = samples().join("structural_checks.ifc");
+    let work = tempfile::tempdir().unwrap();
+    let copy = work.path().join("structural_checks.ifc");
+    std::fs::copy(&file, &copy).unwrap();
+    let mut app = App::new(AppConfig {
+        live: None,
+        untitled_dir: work.path().to_owned(),
+    });
+    run(&mut app, "file.open", json!({ "path": copy })).unwrap();
+    let report = run(&mut app, "analytical_model.check", json!({})).unwrap();
+    let mut found: Vec<(String, String)> = report["issues"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|i| {
+            (
+                i["code"].as_str().unwrap().to_owned(),
+                i["kind"].as_str().unwrap().to_owned(),
+            )
+        })
+        .collect();
+    found.sort();
+    let mut want: Vec<(String, String)> = [
+        ("C1", "disconnected_nodes"),
+        ("C1", "end_on_span"),
+        ("C1", "end_on_span"),
+        ("C1", "free_end"),
+        ("C2", "isolated_part"),
+        ("C2", "isolated_part"),
+        ("C2", "isolated_part"),
+        ("C3", "position_mismatch"),
+        ("C4", "outside_physical"),
+        ("C5", "no_analytical"),
+        ("C5", "no_physical"),
+        ("C5", "no_physical"),
+        ("C6", "beam_slab"),
+        ("C6", "beam_slab"),
+        ("C6", "beam_slab"),
+        ("C6", "beam_slab"),
+        ("C7", "pinned_both_ends"),
+        ("S1", "unsupported_member"),
+        ("S1", "unsupported_panel"),
+        ("S2", "circular_support"),
+    ]
+    .iter()
+    .map(|(c, k)| (c.to_string(), k.to_string()))
+    .collect();
+    want.sort();
+    assert_eq!(found, want, "{report:#}");
+    // The 40 mm gap is measured.
+    let gap = report["issues"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|i| i["kind"] == "disconnected_nodes")
+        .unwrap();
+    assert!((gap["measured"].as_f64().unwrap() - 0.04).abs() < 1e-6);
+}

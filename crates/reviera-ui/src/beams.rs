@@ -30,8 +30,22 @@ pub struct TrussTool {
     start: Option<[f64; 2]>,
 }
 
-const TRUSS_LAYOUTS: [(&str, &str); 3] =
-    [("Pratt", "pratt"), ("Howe", "howe"), ("Warren", "warren")];
+const TRUSS_LAYOUTS: [(&str, &str); 6] = [
+    ("Pratt", "pratt"),
+    ("Howe", "howe"),
+    ("Warren", "warren"),
+    ("Fink", "fink"),
+    ("King Post", "king_post"),
+    ("Queen Post", "queen_post"),
+];
+const TRUSS_PROFILES: [(&str, &str); 6] = [
+    ("Flat", "flat"),
+    ("Gable", "gable"),
+    ("Mono-pitch", "mono"),
+    ("Scissor", "scissor"),
+    ("Bowstring", "bowstring"),
+    ("Custom", "custom"),
+];
 const BEARINGS: [(&str, &str); 2] = [("Bottom", "bottom"), ("Top", "top")];
 
 /// The Beam System tool: its level.
@@ -500,6 +514,17 @@ impl Gui {
             let h = self.format_length(t.height);
             grid.append(Property::string("Truss Height", "tr_height", h));
             grid.append(Property::enumeration(
+                "Profile",
+                "tr_profile",
+                choices(&TRUSS_PROFILES),
+                pick(
+                    &TRUSS_PROFILES,
+                    serde_json::to_value(t.profile).unwrap_or_default(),
+                ),
+            ));
+            let heel = self.format_length(t.heel);
+            grid.append(Property::string("Heel Height", "tr_heel", heel));
+            grid.append(Property::enumeration(
                 "Bearing Chord",
                 "tr_bearing",
                 choices(&BEARINGS),
@@ -785,6 +810,12 @@ impl Gui {
                     .ok()
                     .map(|n| json!({ "panels": n })),
                 "tr_height" => Some(json!({ "height": text })),
+                "tr_heel" => Some(json!({ "heel": text })),
+                "tr_profile" => TRUSS_PROFILES
+                    .iter()
+                    .find(|(n, _)| *n == text)
+                    .filter(|(_, k)| *k != "custom")
+                    .map(|(_, k)| json!({ "profile": k })),
                 _ => None,
             };
             if let Some(mut a) = args {
