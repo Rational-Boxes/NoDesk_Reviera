@@ -90,6 +90,44 @@ impl Gui {
             ));
             grid.set_property_read_only("cn_fab", true);
         }
+        // Code checking (STR-STL-009): the design forces, typed as `group: N, V, Vh, M` in kN and
+        // kN·m, groups separated by `;`, and the last check's status.
+        if let Ok(st) = self.run("structural_connection.check_status", json!({ "connection_ids": [cid] })) {
+            let st = &st[0];
+            grid.append(Property::category("Code Check", "c_conn_check"));
+            let forces: Vec<String> = st["design_forces"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .map(|f| {
+                    let k = |n: &str| f[n].as_f64().unwrap_or(0.0) / 1000.0;
+                    format!("{}: {}, {}, {}, {}", f["group"].as_str().unwrap_or(""), k("n"), k("v"), k("vh"), k("m"))
+                })
+                .collect();
+            grid.append(Property::string("Design forces (N, V, Vh kN; M kN·m)", "cn_forces", forces.join("; ")));
+            grid.set_help_string(
+                "cn_forces",
+                "Per load case or combination: group: N, V, Vh, M (kN, kN·m), groups separated by ; (for example ULS: 0, 120, 0, 0)",
+            );
+            let status = match st["status"].as_str() {
+                Some("ok") => format!("OK (utilisation {:.2})", st["check"]["utilisation"].as_f64().unwrap_or(0.0)),
+                Some("failed") => format!("Failed (utilisation {:.2})", st["check"]["utilisation"].as_f64().unwrap_or(0.0)),
+                _ => format!("Not calculated ({})", st["reason"].as_str().unwrap_or("")),
+            };
+            grid.append(Property::string("Status", "cn_check_status", status));
+            grid.set_property_read_only("cn_check_status", true);
+            if let Some(items) = st["check"]["items"].as_array() {
+                for (k, it) in items.iter().enumerate() {
+                    let name = format!("cn_item_{k}");
+                    grid.append(Property::string(
+                        it["name"].as_str().unwrap_or("Check"),
+                        &name,
+                        format!("{:.2} {}", it["ratio"].as_f64().unwrap_or(0.0), if it["ok"] == true { "OK" } else { "fails" }),
+                    ));
+                    grid.set_property_read_only(&name, true);
+                }
+            }
+        }
         true
     }
 
@@ -121,6 +159,19 @@ impl Gui {
                 ),
                 None => Err(format!("`{text}` is not a number or a length")),
             }
+        } else if property == "cn_forces" {
+            let forces: Vec<Value> = text
+                .split(';')
+                .map(str::trim)
+                .filter(|g| !g.is_empty())
+                .map(|g| {
+                    let (group, nums) = g.split_once(':').unwrap_or(("Design", g));
+                    let n: Vec<f64> = nums.split(',').map(|v| v.trim().parse::<f64>().unwrap_or(0.0) * 1000.0).collect();
+                    let at = |k: usize| n.get(k).copied().unwrap_or(0.0);
+                    json!({ "group": group.trim(), "n": at(0), "v": at(1), "vh": at(2), "m": at(3) })
+                })
+                .collect();
+            self.run("structural_connection.set_design_forces", json!({ "connection_ids": [cid], "forces": forces }))
         } else if property == "cn_type_params" {
             // `key=value` changes the type's value for the project.
             let Some((k, v)) = text.split_once('=') else {

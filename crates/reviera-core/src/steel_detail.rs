@@ -98,6 +98,7 @@ pub fn faces_of(store: &Store, e: &Element) -> Vec<&'static str> {
 
 /// A framing member's frame: its start and end on the section's centre, the axis, the section's
 /// width direction and depth direction, and its section.
+#[derive(Debug, Clone)]
 pub(crate) struct Frame {
     pub start: V3,
     pub end: V3,
@@ -234,7 +235,7 @@ pub fn plate_recipe(e: &Element) -> Option<PlateRecipe> {
     (v.get("kind")?.as_str()? == PLATE_RECIPE).then(|| serde_json::from_value(v.clone()).ok())?
 }
 
-fn plate_plane(store: &Store, r: &PlateRecipe) -> Plane {
+pub(crate) fn plate_plane(store: &Store, r: &PlateRecipe) -> Plane {
     plane_of(store, &r.plane, &r.fallback)
 }
 
@@ -676,7 +677,7 @@ pub fn bolt_length(standard: &str, diameter: f64, grip: f64) -> f64 {
     (l / step - 1e-9).ceil() * step
 }
 
-fn pattern_plane(store: &Store, r: &PatternRecipe) -> Plane {
+pub(crate) fn pattern_plane(store: &Store, r: &PatternRecipe) -> Plane {
     plane_of(store, &r.plane, &r.fallback)
 }
 
@@ -898,7 +899,7 @@ fn us(store: &Store) -> bool {
     crate::steel_fab::us_region(store)
 }
 
-fn create_pattern(
+pub(crate) fn create_pattern(
     txn: &mut crate::txn::Transaction<'_>,
     p: PatternCreateParams,
     kind: PatternKind,

@@ -178,6 +178,15 @@ pub const CATEGORIES: &[Category] = &[
         None,
         true,
     ),
+    // Rebar sets (STR-RBR-003).
+    cat(
+        "cat.structural_rebar",
+        "Structural Rebar",
+        Some("IfcReinforcingBar"),
+        Some("IfcReinforcingBarType"),
+        None,
+        true,
+    ),
     cat(
         "cat.furniture",
         "Furniture",
@@ -353,6 +362,7 @@ pub fn category_of(e: &Element) -> Option<&'static Category> {
         || crate::steel_detail::is_detail(e)
         || crate::steel_cuts::cut_recipe(e).is_some()
         || crate::steel_cuts::is_sub_connection(e)
+        || crate::steel_numbering::assembly_parts_kind(e)
     {
         return category("cat.structural_connections");
     }

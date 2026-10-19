@@ -80,7 +80,7 @@ impl Gui {
             .collect()
     }
 
-    /// Structure › Connection: a generic connection at the join of the selected members.
+    /// Steel › Connection: a generic connection at the join of the selected members.
     pub(crate) fn connect_members(&mut self) {
         let frame = self.frame;
         let members = self.selected_of(|e| {
@@ -111,6 +111,16 @@ impl Gui {
                 choices.push((
                     t["id"].as_str().unwrap_or_default().to_owned(),
                     format!("{} — {}", t["name"].as_str().unwrap_or_default(), t["group"].as_str().unwrap_or_default()),
+                ));
+            }
+        }
+        // The project's custom types with as many members (they check the join when placed).
+        let custom = self.run("custom_connection.list", json!({})).unwrap_or_default();
+        for t in custom.as_array().into_iter().flatten() {
+            if t["members"].as_array().map_or(0, Vec::len) == members.len() {
+                choices.push((
+                    t["id"].as_str().unwrap_or_default().to_owned(),
+                    format!("{} — Custom", t["name"].as_str().unwrap_or_default()),
                 ));
             }
         }

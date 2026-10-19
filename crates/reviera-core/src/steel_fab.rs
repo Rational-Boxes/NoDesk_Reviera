@@ -139,7 +139,7 @@ pub fn connection_type(id: &str) -> Option<ConnectionType> {
     library().into_iter().find(|t| t.id == id)
 }
 
-pub(crate) fn us_region(store: &Store) -> bool {
+pub fn us_region(store: &Store) -> bool {
     matches!(
         crate::codes::settings(store).code,
         crate::codes::Code::Ibc | crate::codes::Code::Irc

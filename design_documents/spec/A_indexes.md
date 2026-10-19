@@ -190,7 +190,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**2117 unique commands** in 411 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**2125 unique commands** in 412 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -264,6 +264,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `conductor_table` | 1 |
 | `conduit` | 2 |
 | `conduit_fitting` | 1 |
+| `connection_check` | 1 |
 | `connection_library` | 3 |
 | `connection_type` | 2 |
 | `connector` | 3 |
@@ -276,7 +277,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `curtain` | 7 |
 | `curtainsystem` | 1 |
 | `curtaintype` | 2 |
-| `custom_connection` | 3 |
+| `custom_connection` | 5 |
 | `datum` | 8 |
 | `daylight` | 2 |
 | `decal` | 4 |
@@ -542,11 +543,11 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `steel_families` | 1 |
 | `steel_modifier` | 4 |
 | `steel_nc` | 1 |
-| `steel_numbering` | 1 |
+| `steel_numbering` | 2 |
 | `structural` | 3 |
 | `structural_analysis` | 7 |
 | `structural_code` | 1 |
-| `structural_connection` | 16 |
+| `structural_connection` | 20 |
 | `structural_settings` | 3 |
 | `study` | 3 |
 | `subcategory` | 3 |
@@ -926,6 +927,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `conduit.create` | 4 | type_id, start, end, diameter, elevation, level | element_ids[] | Yes | MEP-ELEC-017 |
 | `conduit.create_parallel` | 4 | run_ids[], h_count, v_count, h_offset, v_offset, bend: "same"\ | "concentric" | element_ids[] | Yes |
 | `conduit_fitting.place` | 4 | type_id, host_id?, point?, params | id | Yes | MEP-ELEC-017 |
+| `connection_check.providers` | 4 | — | providers | No | STR-STL-009 |
 | `connection_library.install` | 4 | path | — | Yes | STR-STL-002 |
 | `connection_library.load` | 4 | type_ids[] | — | Yes | STR-CONN-001 |
 | `connection_library.unload` | 4 | type_ids[] | — | Yes | STR-CONN-001 |
@@ -988,7 +990,9 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `curtaintype.set_mullions` | 3 | type_id, interior_v, border1_v, border2_v, interior_h, border1_h, border2_h | — | Yes | ARC-CW-005 |
 | `custom_connection.add_elements` | 4 | type_id, element_ids[] | — | Yes | STR-STL-003 |
 | `custom_connection.expose_parameter` | 4 | type_id, path | — | Yes | STR-STL-003 |
+| `custom_connection.list` | 4 | — | types | No | STR-STL-003 |
 | `custom_connection.remove_elements` | 4 | type_id, element_ids[] | — | Yes | STR-STL-003 |
+| `custom_connection.set_parameter` | 4 | type_id, path, value | instances | Yes | STR-STL-003 |
 | `datum.add_elbow` | 3 | datum_id, view_id, end | — | Yes | ARC-DATUM-001 |
 | `datum.assign_scope_box` | 3 | datum_ids, scope_box_id \ | null | — | Yes |
 | `datum.maximize_3d` | 3 | datum_ids | — | Yes | ARC-DATUM-001 |
@@ -2191,6 +2195,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `steel_modifier.corner_cut` | 4 | plate_id, corner_ref, kind, size | — | Yes | STR-STL-008 |
 | `steel_modifier.shorten` | 4 | member_id, end, length, angle_h?, angle_w? | — | Yes | STR-STL-008 |
 | `steel_nc.export` | 4 | scope, folder, format="dstv" | — | No | STR-STL-010 |
+| `steel_numbering.preview` | 4 | options? | report | No | STR-STL-010 |
 | `steel_numbering.run` | 4 | scope, options | report | Yes | STR-STL-010 |
 | `structural.catalogs` | 4 | catalog? | [catalogue] | No | STR-SEC-001 |
 | `structural.materials` | 4 | kind? | [{name, kind, standard, regions[], properties, source_ids[], preferred}] | No | STR-SEC-001 |
@@ -2208,14 +2213,18 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `structural_connection.automation_csv` | 4 | report | CSV text | No | STR-STL-004 |
 | `structural_connection.break` | 4 | connection_id | element_ids[] | Yes | STR-CONN-001 |
 | `structural_connection.check` | 4 | connection_ids[], provider_id, code | report | Results only | STR-STL-009 |
+| `structural_connection.check_report` | 4 | connection_ids[], path | path | No | STR-STL-009 |
+| `structural_connection.check_status` | 4 | connection_ids[] | statuses | No | STR-STL-009 |
 | `structural_connection.create` | 4 | member_ids[], type_id? | connection_id | Yes | STR-CONN-001 |
 | `structural_connection.customize` | 4 | connection_ids[], element_ids[], name | type_id | Yes | STR-STL-003 |
 | `structural_connection.info` | 4 | connection_ids[] | [{connection_id, connection_type, point?, members[], approval_status?, code_check, fabricator?, override_by_instance}] | No | STR-CONN-001 |
 | `structural_connection.override` | 4 | connection_id, params | — | Yes | STR-STL-002 |
 | `structural_connection.presize` | 4 | connection_ids[], provider_id, code | — | Yes | STR-STL-009 |
 | `structural_connection.propagate` | 4 | connection_id, target_join_ids[] \ | "matching" | connection_ids[] | Yes |
+| `structural_connection.record_check` | 4 | connection_id, provider, code, output, params? | record | Yes | STR-STL-009 |
 | `structural_connection.rule_sets` | 4 | — | rule sets, ranges, runs | No | STR-STL-004 |
 | `structural_connection.set` | 4 | connection_ids[], approval_status?, code_check?, fabricator?, override_by_instance? | — | Yes | STR-CONN-001 |
+| `structural_connection.set_design_forces` | 4 | connection_ids[], forces[{group, n, v, vh, m}] | — | Yes | STR-STL-009 |
 | `structural_connection.set_rule_set` | 4 | name, rules[] \ | null | count | Yes |
 | `structural_connection.set_type` | 4 | connection_id, type_id | — | Yes | STR-CONN-001 |
 | `structural_connection.show_warnings` | 4 | view_id, on: bool | — | No | STR-CONN-001 |

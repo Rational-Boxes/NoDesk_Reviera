@@ -1,0 +1,15 @@
+[package]
+name = "reviera-dstv"
+description = "DSTV NC1 (Standard Description for Steel Structure Pieces for the Numerical Controls) writer and reader"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license = "MIT"
+authors.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+
+[lints]
+workspace = true

@@ -1,0 +1,11 @@
+{
+  "catalogue": "bs8666",
+  "title": "BS 8666:2020 shape codes (subset)",
+  "note": "Shape codes and dimension letters follow the published structure of BS 8666:2020; dimensions are outside dimensions. Reviera's own data, not a copy of the standard.",
+  "shapes": [
+    { "code": "00", "name": "Straight", "dimensions": ["A"], "style": "standard", "bends": 0 },
+    { "code": "11", "name": "L bar (one 90° bend)", "dimensions": ["A", "B"], "style": "standard", "bends": 1 },
+    { "code": "21", "name": "U bar (two 90° bends)", "dimensions": ["A", "B", "C"], "style": "standard", "bends": 2 },
+    { "code": "51", "name": "Closed link with 135° hooks", "dimensions": ["A", "B", "C", "D"], "style": "stirrup_tie", "bends": 5 }
+  ]
+}

@@ -1,0 +1,91 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Copyright (C) 2026 Reviera contributors -->
+<h1>Reinforcement</h1>
+<p class="lead">Rebar sets in concrete columns, beams, floors and walls, on the <b>Concrete</b>
+tab. A set is one element: a shape, a bar type and a layout, worked out from its host inside
+the host's cover. When the host changes, its bars follow.</p>
+
+<h2 id="hosts">What can hold rebar</h2>
+<ul>
+  <li>Structural columns of concrete or precast concrete, and concrete beams.</li>
+  <li>Structural floors, and bearing, shear or combined structural walls, whose type has a
+    concrete layer. A generic type's structure layer with no material named counts as
+    concrete.</li>
+</ul>
+<p>If a host stops qualifying (it is made non-structural, or its material changes), its rebar
+is kept and shown as <b>orphaned</b> in Properties, with the reason. Move it to another host
+with <code>rebar.rehost</code>, or delete it. Rebar is deleted with its host, and the delete
+confirmation counts it under <i>Structural Rebar</i>.</p>
+
+<h2 id="placing">Placing rebar</h2>
+<p>Select one or more hosts and click <a href="reviera:action/rebar.place">Rebar</a>. The dialog
+offers the placements the selected kind of host takes:</p>
+<ul>
+  <li><b>Links in the section</b> (columns and beams): closed links (shape 51) with 135° hooks
+    into the core, spread along the member.</li>
+  <li><b>Bars at a face</b> (columns and beams): straight, L or U bars (shapes 00, 11, 21)
+    running along the member at its top, bottom, left or right face, spread across it. The legs
+    of L and U bars turn into the section.</li>
+  <li><b>Floor layers</b>: straight bars in the bottom or top layer, in a plan direction (0° is
+    along x). Each bar is clipped to the floor's outline and openings, less the edge cover.</li>
+  <li><b>Wall faces</b>: straight bars at the exterior or interior face, vertical or
+    horizontal.</li>
+</ul>
+<p>Bars keep inside each face's cover. If a shape cannot fit, it is refused and the message
+names the width, depth or length that is too small.</p>
+
+<h2 id="layouts">Layouts</h2>
+<table>
+  <tr><th>Rule</th><th>Input</th><th>Bars</th></tr>
+  <tr><td>Single</td><td>—</td><td>One bar.</td></tr>
+  <tr><td>Fixed number</td><td>n</td><td>n bars spread evenly.</td></tr>
+  <tr><td>Maximum spacing</td><td>s</td><td>The fewest bars that keep the centre spacing at or
+    below s.</td></tr>
+  <tr><td>Number with spacing</td><td>n, s</td><td>n bars at s; refused if they run past the
+    host.</td></tr>
+  <tr><td>Minimum clear spacing</td><td>c</td><td>A clear gap of at least c, so a bigger bar
+    gives fewer bars.</td></tr>
+  <tr><td>Custom formula</td><td>formula</td><td><code>3x100; ?x200; 5x100</code> (count ×
+    spacing) or <code>1400@100; 900@300</code> (distance @ spacing), in mm. One <code>?</code>
+    count takes up the rest.</td></tr>
+</table>
+<p>The bars run between the covers, so the outer bars' surfaces sit at the cover. A selected
+set's Properties show its shape, bar type, quantity, bar length, total length, mass and shape
+dimensions. You can change its Rule, Number, Spacing and Formula there.</p>
+
+<h2 id="cover">Cover</h2>
+<p>Each host face (top, bottom, exterior, interior, other) uses a named cover type. The defaults
+depend on the kind of host: columns and beams use <i>Beams and columns</i> (35 mm, or 1 1/2" in
+US models), floors use <i>Interior</i>, and walls use <i>Exterior</i> outside. Select hosts and
+click <a href="reviera:action/rebar_cover.assign">Cover</a> to give one face, or all faces, a
+cover type. Their rebar moves to suit. A cover type in use can be deleted only after choosing a
+replacement (<code>rebar_cover_type.delete</code>).</p>
+
+<h2 id="settings">Reinforcement Settings</h2>
+<p><a href="reviera:action/reinforcement_settings.show">Reinforcement Settings</a> holds:</p>
+<ul>
+  <li><b>Rounding</b> of bar lengths: nearest, up or down, to an increment of at most 100 mm.
+    Rounded lengths are shown as <i>exact [rounded]</i>, for example 2437 [2440].</li>
+  <li><b>Hooks in shape definitions</b>, which is decided before the first rebar is
+    placed.</li>
+  <li>The project's <b>cover types</b>, one per line as <code>name = mm</code>. Change an
+    offset, or add a line to make a new type.</li>
+</ul>
+
+<h2 id="types">Bars, hooks and shapes</h2>
+<p>Bar types come from the region's catalogue: ASTM A615 #3 to #18 in US models, or 6 to 50 mm
+B500B bars elsewhere. Bend diameters follow ACI 318 or EN 1992-1-1. Shapes come from an open
+BS 8666 shape-code catalogue: 00 straight, 11 L, 21 U and 51 closed link. The default bend and
+hook values are a starting point, so check them against the governing code. Scripts can add
+project bar and hook types (<code>rebar_bar_type.create</code>,
+<code>rebar_hook_type.create</code>).</p>
+
+<h2 id="ifc">In IFC</h2>
+<p>Each set is an <code>IfcReinforcingBar</code> (<code>MAIN</code>, or <code>LIGATURE</code>
+for links) with a body for every bar, its diameter, area and length. It is typed by an
+<code>IfcReinforcingBarType</code> that carries the shape code as <code>BendingShapeCode</code>
+and the A, B, C… dimensions as <code>BendingParameters</code>. Each host aggregates its sets.</p>
+
+<h2 id="not-yet">Not yet</h2>
+<p>Placing by two points or by sketch, varying sets, cranks and spirals, area, path and fabric
+reinforcement, rebar numbering and tags, and per-view presentation.</p>

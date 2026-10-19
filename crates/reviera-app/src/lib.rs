@@ -9,6 +9,8 @@
 
 pub mod clash;
 pub mod cobie;
+mod steel_nc;
+mod connection_check;
 mod commands;
 pub mod compute;
 pub mod csg;

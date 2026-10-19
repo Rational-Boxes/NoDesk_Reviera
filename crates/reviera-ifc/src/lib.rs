@@ -314,6 +314,9 @@ impl IfcModel {
                     }
                 }) {
                     m.set_real_list(id.0, name, &reals)?
+                } else if let Some((ty, reals)) = typed_reals(items) {
+                    // A list of selects of one defined type.
+                    m.set_typed_real_list(id.0, name, &ty, &reals)?
                 } else if items.iter().all(|v| matches!(v, AttrValue::List(_))) {
                     // A list of lists of numbers (coordinate lists, triangle indices).
                     let rows: Vec<&[AttrValue]> = items
@@ -449,4 +452,19 @@ fn path_str(path: &Path) -> Result<String> {
     path.to_str().map(str::to_owned).ok_or_else(|| {
         IfcError::Unsupported(format!("path is not valid UTF-8: {}", path.display()))
     })
+}
+
+/// The defined type and values of a non-empty list of reals all typed alike.
+fn typed_reals(items: &[AttrValue]) -> Option<(String, Vec<f64>)> {
+    let AttrValue::Typed { type_name, .. } = items.first()? else {
+        return None;
+    };
+    let reals = all(items, |v| match v {
+        AttrValue::Typed { type_name: t, value } if t == type_name => match value.as_ref() {
+            AttrValue::Real(r) => Some(*r),
+            _ => None,
+        },
+        _ => None,
+    })?;
+    Some((type_name.clone(), reals))
 }

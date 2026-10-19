@@ -182,6 +182,55 @@ a face of the selected element, as for a plate.</li>
 <p>In IFC each cut is an <code>IfcOpeningElement</code> voiding its element, named by its kind
 (COPE, MITER, …); the cuts made together form a sub-connection.</p>
 
+<h2 id="custom">Custom connections</h2>
+<p>Select the connections at a join and any plates, bolts and welds you added there, then
+<a href="reviera:action/structural_connection.customize">Customize</a> (Steel › Custom) and name
+the new connection type. It can join at most three members. The selection becomes its first
+instance. <a href="reviera:action/structural_connection.create">Connection</a> then offers the
+type for joins with as many members, and places it where the members have the same roles and
+sections and meet the same way (a beam meeting a column's web is not one meeting its flange): the
+connections are made for the new members and the plates, bolts and welds where the type puts
+them.</p>
+<p><a href="reviera:action/custom_connection.add_elements">Add to Custom</a> adds loose plates,
+bolts or welds placed at an instance to its type, and
+<a href="reviera:action/custom_connection.remove_elements">Remove from Custom</a> removes
+selected parts; both change every instance, after asking. <a
+href="reviera:action/custom_connection.set_parameter">Custom Parameter</a> makes a part's
+thickness, bolt diameter, weld throat or connection parameter a type parameter and sets it for
+every instance.</p>
+
+<h2 id="checking">Checking connections</h2>
+<p>Select a connection (or one of its plates or bolts) and type its <b>design forces</b> in
+Properties, per load case or combination: <code>ULS: 0, 200, 0, 0</code> is a group named ULS
+with N 0, V 200, Vh 0 and M 0 (kN and kN·m; tension positive; V along the connected member's
+depth, as a beam's end reaction). Separate groups with <code>;</code>.</p>
+<p><a href="reviera:action/structural_connection.check">Check</a> (Steel › Connections) asks a
+connection design provider and design code, then checks the selected connections: Properties
+show the status, the largest utilisation and each check's ratio.
+<a href="reviera:action/structural_connection.presize">Presize</a> makes failing connections
+bigger step by step (bolt size and count, plate thickness, weld size) until they pass, in one
+undo step. <a href="reviera:action/structural_connection.check_report">Check Report</a> writes an
+HTML report. A check goes back to <i>not calculated</i> when the connection, its members or its
+forces change.</p>
+<p>The <b>sample provider</b> checks bolt shear, bearing and tear-out, bolt tension and fillet
+welds to AISC 360 or EN 1993-1-8 in a simplified way (no eccentricity, prying or block shear):
+it shows how providers work and is not a complete connection design. Providers are Lua plugins
+with <code>capability = "connection_check"</code> and a <code>check(input)</code> function.</p>
+
+<h2 id="fabrication">Numbering and NC files</h2>
+<p><a href="reviera:action/steel_numbering.run">Numbering</a> (Steel › Fabrication) gives
+every steel part a <b>part mark</b> and every shop assembly an <b>assembly mark</b>, and lists
+them. Identical parts share a mark however they are placed: a member by its section, length,
+holes and cuts; a plate by its thickness, outline and holes. Marks are <code>c</code>,
+<code>b</code>, <code>br</code> and <code>p</code> and a number. An assembly is a member and
+everything shop-welded to it, its own shop welds and its connections' welded plates (a base
+plate with its column, a shear plate with the column it is welded to); site welds and bolts do
+not join. Its mark is the prefix in capitals. Each element's marks are in Properties and its
+part mark is its IFC <code>Tag</code>. Number again after changing the model.</p>
+<p><a href="reviera:action/steel_nc.export">NC Export</a> writes one DSTV NC1 file per part mark
+(<code>b1.nc1</code>, …) to a folder, for saws, drills and cutting machines: a member's profile,
+length and holes on its web and flanges, a plate's outline and holes, and how many to make.</p>
+
 <h2 id="coarse">Coarse views</h2>
 <p>Set a plan's <b>Detail Level</b> to Coarse and beams, braces and truss members are drawn as
 single lines along their location lines, braces with their symbol, cut back at joints by the

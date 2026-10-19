@@ -331,6 +331,29 @@ pub fn run_in(
     name: &str,
     dir: Option<&std::path::Path>,
 ) -> Result<Value, ScriptError> {
+    run_entry(host, source, name, dir, None)
+}
+
+/// Loads a plugin module and calls its function `function` with `arg` (for providers: a
+/// connection check provider's `check(input)`); returns what it returns.
+pub fn call(
+    host: &mut dyn Host,
+    source: &str,
+    name: &str,
+    dir: Option<&std::path::Path>,
+    function: &str,
+    arg: &Value,
+) -> Result<Value, ScriptError> {
+    run_entry(host, source, name, dir, Some((function, arg)))
+}
+
+fn run_entry(
+    host: &mut dyn Host,
+    source: &str,
+    name: &str,
+    dir: Option<&std::path::Path>,
+    entry: Option<(&str, &Value)>,
+) -> Result<Value, ScriptError> {
     let lua = state()?;
     let host = RefCell::new(host);
     let commands = host.borrow().commands();
@@ -400,9 +423,21 @@ pub fn run_in(
         }
         lua.globals().set("reviera", reviera)?;
         let v: LuaValue = lua.load(source).set_name(name).eval()?;
-        // A plugin module returns its table: run it.
-        let v = match &v {
-            LuaValue::Table(t) => match t.get::<Option<mlua::Function>>("run")? {
+        let v = match (entry, &v) {
+            // A named function of the module, with its argument.
+            (Some((function, arg)), LuaValue::Table(t)) => {
+                let f = t.get::<Option<mlua::Function>>(function)?.ok_or_else(|| {
+                    mlua::Error::RuntimeError(format!("the plugin has no `{function}` function"))
+                })?;
+                f.call::<LuaValue>(to_lua(&lua, arg)?)?
+            }
+            (Some((function, _)), _) => {
+                return Err(mlua::Error::RuntimeError(format!(
+                    "the script is not a plugin module with a `{function}` function"
+                )));
+            }
+            // A plugin module returns its table: run it.
+            (None, LuaValue::Table(t)) => match t.get::<Option<mlua::Function>>("run")? {
                 Some(f) => f.call::<LuaValue>(())?,
                 None => v,
             },
@@ -422,13 +457,22 @@ pub struct Plugin {
     pub description: String,
     /// Where it was found; `None` for a built-in plugin.
     pub path: Option<PathBuf>,
+    /// What else it provides (`connection_check` for a connection design provider).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub capability: Option<String>,
+    /// The design codes a provider offers.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub codes: Vec<String>,
     #[serde(skip)]
     pub source: String,
 }
 
 /// The plugins that ship with Reviera.
 pub fn builtin_plugins() -> Vec<Plugin> {
-    [("turret", include_str!("../plugins/turret/plugin.lua"))]
+    [
+        ("turret", include_str!("../plugins/turret/plugin.lua")),
+        ("connection_check_sample", include_str!("../plugins/connection_check_sample/plugin.lua")),
+    ]
         .into_iter()
         .filter_map(|(name, source)| describe(name, source, None))
         .collect()
@@ -451,6 +495,8 @@ fn describe(name: &str, source: &str, path: Option<PathBuf>) -> Option<Plugin> {
             .flatten()
             .unwrap_or_default(),
         path,
+        capability: t.get::<Option<String>>("capability").ok().flatten(),
+        codes: t.get::<Option<Vec<String>>>("codes").ok().flatten().unwrap_or_default(),
         source: source.to_owned(),
     })
 }
@@ -477,6 +523,8 @@ fn describe_file(path: &Path) -> Option<Plugin> {
         description: header("description:").unwrap_or_default(),
         name,
         path: Some(path.to_owned()),
+        capability: None,
+        codes: Vec::new(),
         source,
     })
 }

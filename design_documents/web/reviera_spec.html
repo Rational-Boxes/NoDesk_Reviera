@@ -173,7 +173,7 @@ td code { white-space: nowrap; }
         <div class="tb-cell"><span class="tb-label">Revision</span><span class="tb-value">0.1 · Draft</span></div>
         <div class="tb-cell"><span class="tb-label">Date</span><span class="tb-value tb-num">2026-10-12</span></div>
         <div class="tb-cell"><span class="tb-label">Requirements</span><span class="tb-value tb-num">808</span></div>
-        <div class="tb-cell"><span class="tb-label">Commands</span><span class="tb-value tb-num">2,117</span></div>
+        <div class="tb-cell"><span class="tb-label">Commands</span><span class="tb-value tb-num">2,125</span></div>
         <div class="tb-cell"><span class="tb-label">Licence</span><span class="tb-value">GPL-3.0-or-later</span></div>
         <div class="tb-cell last-row"><span class="tb-label">Stack</span><span class="tb-value">IFC · Rust · OCCT · wx · LuaJIT · MCP</span></div>
         <div class="tb-cell last-row" style="grid-column: span 3"><span class="tb-label">By priority</span>
@@ -185,7 +185,7 @@ td code { white-space: nowrap; }
 <p><strong>Document:</strong> Functional and technical specification of Reviera, an open-source BIM authoring application
 <strong>Functional reference:</strong> Autodesk® Revit® 2026/2027 (described from public sources only; see <code>RESEARCH_LOG.md</code>)
 <strong>Licence of Reviera:</strong> GPL-3.0-or-later
-<strong>Version:</strong> 0.1 (draft) · 2026-10-16 · <strong>Size:</strong> 808 numbered requirements (320 P0 · 293 P1 · 188 P2 · 7 P3), 2,117 commands</p>
+<strong>Version:</strong> 0.1 (draft) · 2026-10-16 · <strong>Size:</strong> 808 numbered requirements (320 P0 · 293 P1 · 188 P2 · 7 P3), 2,125 commands</p>
 <blockquote>
 <p><strong>Clean-room statement.</strong> This specification describes features, workflows and behaviour in Reviera's own words. Every input was publicly available: vendor online help, public blogs and tutorials, public forums and open-source repositories. All of it is listed with URLs and access checks in <code>SOURCE_REGISTER.md</code>. No proprietary, confidential, leaked or NDA-covered information was used. No vendor code, binaries, file formats or assets were examined or copied. Autodesk and Revit are trademarks of Autodesk, Inc. They are used here only to identify the functional reference. Reviera is not affiliated with or endorsed by Autodesk.</p>
 <p><strong>Independence statement.</strong> BIM Reviera is an independent, original application. It is in no way a copy or clone of any existing product, and it does not set out to read or write any existing product's closed, proprietary formats (such as RVT and RFA); IFC is its native format. An existing application was researched, from public sources only, to establish the workflows and user-interface conventions that the industry's users already know, so they can work in Reviera without relearning their trade. Beyond that research, Reviera implements its own features and enhancements: its architecture, native IFC storage, scripting and AI integration, remote computation and analysis, and many of its modelling tools are its own design. Interchange formats used across the industry, such as DWG and DXF, are supported only through open-source libraries, for interoperability.</p>
@@ -254,7 +254,7 @@ td code { white-space: nowrap; }
 </tr>
 <tr>
 <td>A</td>
-<td>Appendix A: requirement summary, shared commands, consolidated command index (2,117 commands; 808 requirements)</td>
+<td>Appendix A: requirement summary, shared commands, consolidated command index (2,125 commands; 808 requirements)</td>
 </tr>
 </tbody>
 </table></div>
@@ -32283,7 +32283,7 @@ CREATE TABLE base_rxd (
 <p><strong>ID:</strong> <code class="rid" id="STR-CONN-001">STR-CONN-001</code> · <strong>Priority:</strong> <span class="pri pri-p1">P1</span> (generic) / P2 (detailed types, code checking) · <strong>Ref:</strong> research/03 §2.9 · screenshots/structure_mep/structural_connection_symbols.png</p>
 <p><strong>Purpose.</strong> An element placed at a join of two or more framing members. It carries the information engineers, detailers and fabricators exchange about that join: connection type, connected members, geometry, design forces, materials, fabricator, code-check status, approval status and phase.</p>
 <p><strong>Workflow.</strong>
-1. Choose <em>Structure › Connection</em> or <em>Steel › Connection</em>.
+1. Choose <em>Steel › Connection</em> or <em>Steel › Connection</em>.
 2. Pick the members with Ctrl+click or a window, then press <strong>Enter</strong> or <strong>Spacebar</strong>.
 3. If members were already selected, the generic connection is placed at once, or the last-used type.</p>
 <p><strong>UI.</strong>
@@ -32322,7 +32322,7 @@ CREATE TABLE base_rxd (
 - [ ] For a beam-to-column-flange join, the Type Selector lists shear-plate and end-plate types ahead of base plates.
 - [ ] Unloading a type used by 7 connections asks for confirmation, states the count, and then removes all 7.
 - [ ] With <em>Show Warnings</em> on, an end-plate connection whose beam is deeper than the plate range shows a warning marker whose tooltip names the failing parameter; turning the toggle off removes the marker but the warning stays in the warnings list, and the undo stack is unchanged.</p>
-<p><em>Built (2026-10-16), generic connections:</em> <code>structural_connection.create</code> (two or more beams, braces, truss members or columns whose axes meet within 500 mm; the first is the main member; the join is the member end nearest all the other axes), <code>structural_connection.set</code> (approval status, code-check status not checked/passed/failed, fabricator, override by instance) and <code>structural_connection.info</code>. An <code>IfcElementAssembly</code> (<code>USERDEFINED</code>, ObjectType <code>STRUCTURAL_CONNECTION</code>) contained in the main member's level, its record in <code>recipe.structural_connection</code>; it follows its members and goes with any of them. Plans at Coarse and Medium draw a circle with a spoke toward each member. Structure › Connection (<code>CN</code>) joins the selected members. Not yet: connection types and the connection library, recommended types, Propagate, Break, design forces, <code>IfcRelConnectsWithRealizingElements</code> (it needs plates or fasteners), selecting a connection by its symbol, Show Warnings.</p>
+<p><em>Built (2026-10-16), generic connections:</em> <code>structural_connection.create</code> (two or more beams, braces, truss members or columns whose axes meet within 500 mm; the first is the main member; the join is the member end nearest all the other axes), <code>structural_connection.set</code> (approval status, code-check status not checked/passed/failed, fabricator, override by instance) and <code>structural_connection.info</code>. An <code>IfcElementAssembly</code> (<code>USERDEFINED</code>, ObjectType <code>STRUCTURAL_CONNECTION</code>) contained in the main member's level, its record in <code>recipe.structural_connection</code>; it follows its members and goes with any of them. Plans at Coarse and Medium draw a circle with a spoke toward each member. Steel › Connection (<code>CN</code>) joins the selected members. Not yet: connection types and the connection library, recommended types, Propagate, Break, design forces, <code>IfcRelConnectsWithRealizingElements</code> (it needs plates or fasteners), selecting a connection by its symbol, Show Warnings.</p>
 <h3 id="4113-structural-settings-and-symbolic-representation">4.1.13 Structural settings and symbolic representation</h3>
 <p><strong>ID:</strong> <code class="rid" id="STR-SET-001">STR-SET-001</code> · <strong>Priority:</strong> <span class="pri pri-p1">P1</span> · <strong>Ref:</strong> research/03 §1.6, §15.5–15.6 · web: Analytical Model Settings</p>
 <p><strong>Purpose.</strong> Project-wide structural settings, opened from <em>Manage › Structural Settings</em> or the Structure panel launcher.</p>
@@ -32422,7 +32422,8 @@ CREATE TABLE base_rxd (
 <p><strong>Commands.</strong> <code>rebar.can_host(element_id) -&gt; bool</code>, <code>rebar.rehost(rebar_ids[], host_id)</code></p>
 <p><strong>Acceptance criteria.</strong>
 - [ ] A floor whose concrete layer is changed to timber flags its rebar as orphaned and keeps it in place.
-- [ ] Deleting a host column with 3 rebar sets shows "3 reinforcement elements will be deleted" and removes them in the same transaction.</p>
+- [x] Deleting a host column with 3 rebar sets shows "3 reinforcement elements will be deleted" and removes them in the same transaction.</p>
+<p><em>Built (2026-10-19), first milestone:</em> <code>rebar.can_host</code> (with the host kind, the reason it cannot, and each face's cover type) and <code>rebar.rehost</code>. Hosts are structural concrete columns (material kind concrete or precast concrete) and concrete beams, structural floors and structural (bearing, shear or combined) walls whose type has a concrete layer; a generic type's structure layer with no material named counts as concrete. A set whose host stops qualifying is kept, and <code>rebar.info</code> reports it orphaned with the reason; deleting the host deletes its sets in the same step, and the delete confirmation counts them under <em>Structural Rebar</em>. IFC: each host aggregates its sets (<code>IfcRelAggregates</code>, <code>rxd:rebar</code>), and the set's recipe keeps the host's GlobalId. Not yet: foundations, connections, slab edges, parts, Component Library components with <em>Can Host Rebar</em>, braces, the orphan warning in the warnings list.</p>
 <h3 id="422-reinforcement-settings-rounding-and-cover">4.2.2 Reinforcement settings, rounding and cover</h3>
 <p><strong>ID:</strong> <code class="rid" id="STR-RBR-002">STR-RBR-002</code> · <strong>Priority:</strong> <span class="pri pri-p2">P2</span> · <strong>Ref:</strong> research/03 §3.1</p>
 <p><strong>Purpose.</strong> Project-level rules for reinforcement.</p>
@@ -32456,10 +32457,11 @@ No IFC equivalent.
 - <code>rebar_cover_type.manage()</code>
 - <code>rebar_cover.assign(host_id, face_ref? , cover_type_id)</code></p>
 <p><strong>Acceptance criteria.</strong>
-- [ ] With Nearest/10 mm rounding, a computed bar length of 2 437 mm displays as "2437 [2440]", and schedules use 2 440 mm.
+- [x] With Nearest/10 mm rounding, a computed bar length of 2 437 mm displays as "2437 [2440]", and schedules use 2 440 mm.
 - [ ] Trying to change the area/path mode after an area system exists is refused, with an explanation.
-- [ ] Deleting a cover type used by 12 faces asks for a replacement type; after <em>OK</em> the 12 faces use the replacement and their rebar regenerates in the same transaction.
-- [ ] Changing the offset of cover type "Interior 25" to 30 mm moves every bar constrained to faces of that type by 5 mm.</p>
+- [x] Deleting a cover type used by 12 faces asks for a replacement type; after <em>OK</em> the 12 faces use the replacement and their rebar regenerates in the same transaction.
+- [x] Changing the offset of cover type "Interior 25" to 30 mm moves every bar constrained to faces of that type by 5 mm.</p>
+<p><em>Built (2026-10-19):</em> <code>reinforcement_settings.get</code> (with each cover type's uses and the locked settings) and <code>reinforcement_settings.set</code> (rounding on, method, bar and segment increments above 0 and at most 100 mm; hooks in shape definitions, locked once rebar is placed; the area and path mode). <code>rebar_cover_type.create</code>, <code>.set</code> (name, offset 0–500 mm) and <code>.delete</code> (refused with the use count unless a replacement is given; returns the faces moved; a project keeps at least one), and <code>rebar_cover.assign</code> (one face or all). The settings and cover types are kept on the project (<code>rxd:rebar</code>); each host's face assignments in <code>rxd:rebar_cover</code>, defaulting by the host's kind (columns and beams <em>Beams and columns</em>, floors <em>Interior</em>, walls <em>Exterior</em> outside and <em>Interior</em> elsewhere; 35/25/40/75 mm, or 1 1/2"/3/4"/2"/3" in US models). <code>rebar.info</code> gives each bar's exact and rounded length and the first as "exact [rounded]". Concrete › Settings › <strong>Reinforcement Settings</strong> (rounding, hooks, and the cover types as editable <code>name = mm</code> lines with their uses) and Concrete › <strong>Cover</strong> (faces, then a cover type). Not yet: presentation defaults, abbreviations, fabric-sheet rounding, per-bar-type rounding, per-face overrides by face id, the grid-style Cover Settings dialog with Duplicate.</p>
 <h3 id="423-standard-shape-driven-rebar-placement">4.2.3 Standard (shape-driven) rebar placement</h3>
 <p><strong>ID:</strong> <code class="rid" id="STR-RBR-003">STR-RBR-003</code> · <strong>Priority:</strong> <span class="pri pri-p2">P2</span> · <strong>Ref:</strong> research/03 §3.2</p>
 <p><strong>Purpose.</strong> Place planar or multi-planar bars from a library of shape families into a host.</p>
@@ -32488,8 +32490,9 @@ No IFC equivalent.
 - <code>rebar.place(host_id, shape_id, bar_type_id, method: "expand"|"two_points"|"sketch", plane, orientation, points?, layout?) -&gt; rebar_id</code>
 - <code>rebar_shape_browser.show()</code></p>
 <p><strong>Acceptance criteria.</strong>
-- [ ] Expand-to-Host of a closed stirrup shape in a 300 × 600 column section with 40 mm cover produces a stirrup whose outer dimensions equal the host dimensions minus twice the cover.
-- [ ] A placed bar exports as <code>IfcReinforcingBar</code> with its type's <code>BendingShapeCode</code> equal to the shape code of the shape family.</p>
+- [x] Expand-to-Host of a closed stirrup shape in a 300 × 600 column section with 40 mm cover produces a stirrup whose outer dimensions equal the host dimensions minus twice the cover.
+- [x] A placed bar exports as <code>IfcReinforcingBar</code> with its type's <code>BendingShapeCode</code> equal to the shape code of the shape family.</p>
+<p><em>Built (2026-10-19), Expand to Host:</em> <code>rebar.place</code> with <code>placement</code> <em>section</em> (closed links, shape 51, with 135° hooks into the core, spread along a rectangular column or beam), <em>face</em> (straight, L or U bars along a member at its top, bottom, left or right face, their legs turned into the section) or <em>layer</em> (straight bars in a floor's top or bottom layer in a plan direction, or a wall's exterior or interior face, vertical or horizontal, each bar clipped to the outline and its openings less the edge cover; <code>offset</code> sets a second layer further in). Bars keep inside each face's cover; a shape that cannot fit is refused (<code>rebar.no_fit</code>), naming the width, depth or length. <code>rebar.set</code> changes the bar type, shape or placement, and <code>rebar.info</code> reports the set. Bends are drawn at the bar type's bend diameters. IFC: <code>IfcReinforcingBar</code> (<code>MAIN</code> or <code>LIGATURE</code>) with NominalDiameter, CrossSectionArea, BarLength and BarSurface <code>TEXTURED</code>, a faceted tube body per bar, and a synthesized <code>IfcReinforcingBarType</code> per set (marked <code>rxd:rebar_type</code>, rewritten on each save) with the shape code as <code>BendingShapeCode</code> and the A, B, C… dimensions as <code>BendingParameters</code>. Rebar in its host is not a clash. Concrete › <strong>Rebar</strong> places a set in each selected host from a dialog of the placements that host takes, the shapes, the bar types and the layout. Not yet: By Two Points, Sketch and Free Form, placement planes and orientations, varying sets, the Shape Browser, view visibility (STR-RBR-017), <code>IfcSweptDiskSolid</code> bodies with mapped items, round columns (spirals).</p>
 <h3 id="424-rebar-set-layouts">4.2.4 Rebar set layouts</h3>
 <p><strong>ID:</strong> <code class="rid" id="STR-RBR-004">STR-RBR-004</code> · <strong>Priority:</strong> <span class="pri pri-p2">P2</span> · <strong>Ref:</strong> research/03 §3.2 ("Rebar set layout rules")</p>
 <p><strong>Purpose.</strong> Distribute identical bars along a direction.</p>
@@ -32543,8 +32546,9 @@ No IFC equivalent.
 <p><strong>Data (IFC mapping).</strong> The IFC body carries one swept solid per bar, so other tools see the true count. <strong>RXD element data</strong> (<code>rebar</code>) holds the layout recipe: LayoutRule, Quantity, Spacing, ArrayLength and CustomSpacingFormula.</p>
 <p><strong>Commands.</strong> <code>rebar.set_layout(rebar_id, rule, n?, spacing?, clear?, formula?)</code></p>
 <p><strong>Acceptance criteria.</strong>
-- [ ] <code>3x100; ?x200; 5x100</code> over 2 000 mm yields 3 spaces of 100 mm, then 6 of 200 mm, then 5 of 100 mm. That is 14 spaces filling 300 + 1 200 + 500 = 2 000 mm, so 15 bars, with the first bar at 0.
-- [ ] With Minimum Clear Spacing 50 mm, changing the bar diameter from 12 to 20 mm reduces the count where needed so the clear gap stays at least 50 mm.</p>
+- [x] <code>3x100; ?x200; 5x100</code> over 2 000 mm yields 3 spaces of 100 mm, then 6 of 200 mm, then 5 of 100 mm. That is 14 spaces filling 300 + 1 200 + 500 = 2 000 mm, so 15 bars, with the first bar at 0.
+- [x] With Minimum Clear Spacing 50 mm, changing the bar diameter from 12 to 20 mm reduces the count where needed so the clear gap stays at least 50 mm.</p>
+<p><em>Built (2026-10-19):</em> every rule of the table, in <code>rebar.place</code> and <code>rebar.set_layout</code> (several sets at once). Maximum spacing spreads the fewest bars evenly; number with spacing that runs past the array is refused; custom formulas take both syntaxes, and a formula with two <code>?</code>, a non-number or a total past the array is refused with the reason (<code>rebar.formula</code>). The array runs between the covers less a bar, so the outer bars' surfaces sit at the cover. A set is one element with its quantity; its body has a tube per bar. A set's Properties show the shape, bar type, quantity, length ("exact [rounded]"), total length, mass and dimensions, and edit its Rule, Number, Spacing and Formula. Not yet: hiding and resetting individual bars (STR-RBR-006), the inline formula error in the Properties row.</p>
 <h3 id="425-varying-rebar-sets">4.2.5 Varying rebar sets</h3>
 <p><strong>ID:</strong> <code class="rid" id="STR-RBR-005">STR-RBR-005</code> · <strong>Priority:</strong> <span class="pri pri-p2">P2</span> · <strong>Ref:</strong> research/03 §3.2 ("Varying rebar set")</p>
 <p><strong>Purpose.</strong> Sets whose bar lengths change across inclined or skewed straight host faces.</p>
@@ -32644,6 +32648,7 @@ No IFC equivalent.
 - [ ] Sketching an L-bar that matches an existing L shape reuses that shape and does not create a new family.
 - [ ] Adding a 135° hook to the same sketch creates a new shape, because the hook count differs.
 - [ ] An exported bar carries the shape code and parameters in both <code>IfcReinforcingBarType</code> and the matching standard pset.</p>
+<p><em>Built (2026-10-19), the catalogue:</em> an open BS 8666 shape-code catalogue (<code>data/rebar/shapes_bs8666.json</code>: 00 straight, 11 L, 21 U, 51 closed link with 135° hooks, authored from the code structure), listed by <code>rebar_shape.list</code> with each shape's dimensions, style and bends; the code and dimensions go to <code>BendingShapeCode</code> and <code>BendingParameters</code>. Not yet: shape families with sketched centrelines, shape matching, the status checker, more catalogues and <code>rebar_shape_catalogue.load</code>, the standard bending psets.</p>
 <h3 id="429-bar-types-hooks-and-cranks">4.2.9 Bar types, hooks and cranks</h3>
 <p><strong>ID:</strong> <code class="rid" id="STR-RBR-009">STR-RBR-009</code> · <strong>Priority:</strong> <span class="pri pri-p2">P2</span> · <strong>Ref:</strong> research/03 §3.2 ("Rebar instance and type data", "Hooks", "Cranks")</p>
 <p><strong>Behaviour &amp; rules.</strong>
@@ -32669,6 +32674,7 @@ No IFC equivalent.
 - <code>rebar.add_crank(rebar_id, segment, position, length, offset, angle)</code></p>
 <p><strong>Acceptance criteria.</strong>
 - [ ] Adding a 75 mm crank to segment A of a straight bar produces a bar whose crank stays inside cover, and a matching cranked shape is used or created.</p>
+<p><em>Built (2026-10-19), bar and hook types:</em> the region's bar catalogue (<code>data/rebar/bar_sizes.json</code>: ASTM A615 #3–#18 in US models, 6–50 mm B500B bars elsewhere) with bar and model diameters, deformation, material and inside bend diameters for standard bends, hooks and stirrups (ACI 318-19 Tables 25.3.1 and 25.3.2; EN 1992-1-1 Table 8.1N); the region's hook types (90°, 180°, 135° stirrup/tie, with extension multipliers and minimum lengths); <code>rebar_bar_type.list</code> / <code>.create</code> and <code>rebar_hook_type.list</code> / <code>.create</code> (project types kept in <code>rxd:rebar</code>). Not yet: hook length tables per bar type, maximum bend radius, rounding overrides, cranks, spirals.</p>
 <h3 id="4210-area-reinforcement">4.2.10 Area reinforcement</h3>
 <p><strong>ID:</strong> <code class="rid" id="STR-RBR-010">STR-RBR-010</code> · <strong>Priority:</strong> <span class="pri pri-p2">P2</span> · <strong>Ref:</strong> research/03 §3.3</p>
 <p><strong>Purpose.</strong> Lay out orthogonal bar layers over a region of a floor, wall or foundation slab.</p>
@@ -33539,10 +33545,11 @@ No IFC equivalent.
 - <code>custom_connection.remove_elements(type_id, element_ids[])</code>
 - <code>custom_connection.expose_parameter(type_id, path)</code></p>
 <p><strong>Acceptance criteria.</strong>
-- [ ] A custom connection built from an end plate and an extra stiffener can be placed on another matching join, where it recreates both.
-- [ ] Customizing a selection with four connected members is refused with a message.
-- [ ] Removing a plate from a custom type used by 5 instances asks for confirmation with the count, then removes the plate from all 5.
-- [ ] Exposing <code>Stiffener 1.Thickness</code> adds a type parameter whose change from 10 mm to 12 mm updates every instance.</p>
+- [x] A custom connection built from an end plate and an extra stiffener can be placed on another matching join, where it recreates both.
+- [x] Customizing a selection with four connected members is refused with a message.
+- [x] Removing a plate from a custom type used by 5 instances asks for confirmation with the count, then removes the plate from all 5.
+- [x] Exposing <code>Stiffener 1.Thickness</code> adds a type parameter whose change from 10 mm to 12 mm updates every instance.</p>
+<p><em>Built (2026-10-19):</em> <code>structural_connection.customize</code> takes connections at one join and loose plates, fastener patterns and welds there (at most three members, else <code>custom.members</code>; a unique name), and stores a custom type in the project (<code>rxd:custom_connection_types</code>): the members' roles, section families and which face of the main member each connected member meets (flange or web); each nested connection with its type, own parameters and members; each plate (contour, plane and thickness, and the member it sits on), pattern and weld in the join's frame (its point, the main member's axis and the direction the connected member leaves in). What was chosen becomes the first instance, kept and tagged (<code>rxd:custom_part</code>). <code>structural_connection.create</code> with the type's id (<code>custom:&lt;n&gt;</code>) on a join of the same signature makes an instance there: nested connections for the new members, plates hosted on the new member's matching face (so they follow it), patterns and welds in the join's frame; other joins are refused with the reason (<code>custom.inputs</code>). <code>custom_connection.add_elements</code> and <code>remove_elements</code> change the type and remake every instance, needing <code>confirm</code> with more than one (the refusal states the count); a removed plate takes its patterns and welds. <code>custom_connection.expose_parameter</code> makes <code>&lt;sub-element&gt;.&lt;parameter&gt;</code> (a plate's thickness, a pattern's diameter, a weld's a, a nested connection's parameters) a type parameter, and <code>set_parameter</code> changes it for every instance; <code>custom_connection.list</code> reports types and instances. Deleting an instance deletes its parts. Steel › Connections › Custom: Customize, Add to Custom, Remove from Custom and Custom Parameter (asking to confirm the instance count); the Connection tool offers custom types for joins with as many members. Not yet: profiles and parametric cuts as sub-elements, the edit mode with half-toning and journalled picks, patterns and welds following members after placement, exporting types as library packages.</p>
 <h3 id="444-connection-automation">4.4.4 Connection automation</h3>
 <p><strong>ID:</strong> <code class="rid" id="STR-STL-004">STR-STL-004</code> · <strong>Priority:</strong> <span class="pri pri-p2">P2</span> · <strong>Ref:</strong> research/03 §5.2 ("Connection automation")</p>
 <p><strong>Purpose.</strong> Place connections on many joins at once from rules, instead of one by one.</p>
@@ -33567,7 +33574,7 @@ No IFC equivalent.
 - [x] Re-running automation on the same joins with <em>Skip</em> changes nothing and logs all 200 as skipped (already connected).
 - [x] Preview mode leaves the undo stack and model unchanged until <em>Apply</em>.
 - [x] The log saved as CSV has one row per join with status and reason.</p>
-<p><em>Built (2026-10-18):</em> <code>structural_connection.automate</code> finds the joins in the framing (each column's foot where no column stands below; each beam end on the column or girder it rests on, from the beams' supports; each brace end at the column, else the beam, its axis meets within 500 mm), limited to the given members' joins, and gives each the type of the first matching rule. Rules match the join kind (<code>column_base</code>, <code>beam_column</code>, <code>beam_beam</code>, <code>brace</code>), the main and connected members' sections and the connected member's depth range; a rule without a range uses its type's range of applicability (shear plate 150–920 mm, end plate 200–920 mm deep). The built-in <em>Default</em> rule set gives base plates, shear plates (beam–column and beam–beam) and gussets; projects keep their own in <code>rxd:connection_rules</code> (<code>structural_connection.set_rule_set</code>, <code>rule_sets</code>), or <code>rules</code> are passed with the call (a Lua or JSON table). Only steel members are connected; joins with a connection on the same members are skipped (<em>Skip</em>) or a generic one gets the type (<em>Replace generic only</em>); where a generator fails a generic connection marked Failed holds the join. A preview changes nothing (not even the undo history); <code>apply_automation</code> takes the preview's report itself rather than an id. Runs (time, rule set, counts) are kept in <code>rxd:connection_runs</code>. Structure › Framing › <strong>Automate Connections</strong>: the rule set, the existing-joins choice and Preview; the preview marks each join in 3D views by type (grey where skipped), with the log (status, join, type, members, reason), Apply and Save CSV. Gussets now stop at the bottom of a beam framing into the column at a brace's top (or the top of one at its foot), and their bolts with them. Not yet: background jobs, angle and grade conditions in rules, a rule set editor dialog, and classifying joins by section family beyond sections.</p>
+<p><em>Built (2026-10-18):</em> <code>structural_connection.automate</code> finds the joins in the framing (each column's foot where no column stands below; each beam end on the column or girder it rests on, from the beams' supports; each brace end at the column, else the beam, its axis meets within 500 mm), limited to the given members' joins, and gives each the type of the first matching rule. Rules match the join kind (<code>column_base</code>, <code>beam_column</code>, <code>beam_beam</code>, <code>brace</code>), the main and connected members' sections and the connected member's depth range; a rule without a range uses its type's range of applicability (shear plate 150–920 mm, end plate 200–920 mm deep). The built-in <em>Default</em> rule set gives base plates, shear plates (beam–column and beam–beam) and gussets; projects keep their own in <code>rxd:connection_rules</code> (<code>structural_connection.set_rule_set</code>, <code>rule_sets</code>), or <code>rules</code> are passed with the call (a Lua or JSON table). Only steel members are connected; joins with a connection on the same members are skipped (<em>Skip</em>) or a generic one gets the type (<em>Replace generic only</em>); where a generator fails a generic connection marked Failed holds the join. A preview changes nothing (not even the undo history); <code>apply_automation</code> takes the preview's report itself rather than an id. Runs (time, rule set, counts) are kept in <code>rxd:connection_runs</code>. Steel › Connections › <strong>Automate Connections</strong>: the rule set, the existing-joins choice and Preview; the preview marks each join in 3D views by type (grey where skipped), with the log (status, join, type, members, reason), Apply and Save CSV. Gussets now stop at the bottom of a beam framing into the column at a brace's top (or the top of one at its foot), and their bolts with them. Not yet: background jobs, angle and grade conditions in rules, a rule set editor dialog, and classifying joins by section family beyond sections.</p>
 <h3 id="445-plates">4.4.5 Plates</h3>
 <p><strong>ID:</strong> <code class="rid" id="STR-STL-005">STR-STL-005</code> · <strong>Priority:</strong> <span class="pri pri-p2">P2</span> · <strong>Ref:</strong> research/03 §5.3</p>
 <p><strong>Workflow.</strong>
@@ -33589,7 +33596,7 @@ No IFC equivalent.
 - [ ] A contour with a gap of 2 mm is refused at <em>Finish</em> and the open segment end is highlighted.
 - [x] A 15 mm plate with <em>Bottom</em> justification on a flange face sits fully outside the flange, with its bottom face on the flange face.
 - [x] Moving the hosting column moves the plate with it.</p>
-<p><em>Built (2026-10-18):</em> <code>plate.create</code> on any work plane or on a named <strong>face</strong> of a column, beam, brace or plate (<code>face.list</code>: flange_1, flange_2, web_1, web_2, start, end; top, bottom), the face plane following its element. The contour is corners or line and arc segments (arcs flattened); it must close within 0.1 mm (<code>plate.open_contour</code> names the segment), not cross itself and have an area; thickness 1–200 mm (default 10 mm); justification bottom (outside a face), centre or top; material, coating and role (<code>Pset_PlateCommon.Reference</code>). <code>plate.set</code> (Edit Contour and the rest) and <code>plate.info</code>. A plate on a face moves with its element; when the element is deleted the plate stays where it was, unhosted. Plates move, rotate and mirror with Modify (their plane is then fixed in space). IfcPlate (SHEET) with a B-rep body, drawn at Fine detail, category Structural Connections. Structure › Steel › <strong>Plate</strong>: with one element selected, pick its face; otherwise the view's work plane; click the corners, Enter finishes. Properties: thickness, justification, role, material, the plane and whether hosted. The gap check refuses the contour but the window cannot yet highlight the open end (sketches are closed by clicks). Not yet: arcs kept as arcs, corner cuts, <code>IfcMaterialLayerSetUsage</code>, extruded-solid bodies, folded plates, the sketch journal.</p>
+<p><em>Built (2026-10-18):</em> <code>plate.create</code> on any work plane or on a named <strong>face</strong> of a column, beam, brace or plate (<code>face.list</code>: flange_1, flange_2, web_1, web_2, start, end; top, bottom), the face plane following its element. The contour is corners or line and arc segments (arcs flattened); it must close within 0.1 mm (<code>plate.open_contour</code> names the segment), not cross itself and have an area; thickness 1–200 mm (default 10 mm); justification bottom (outside a face), centre or top; material, coating and role (<code>Pset_PlateCommon.Reference</code>). <code>plate.set</code> (Edit Contour and the rest) and <code>plate.info</code>. A plate on a face moves with its element; when the element is deleted the plate stays where it was, unhosted. Plates move, rotate and mirror with Modify (their plane is then fixed in space). IfcPlate (SHEET) with a B-rep body, drawn at Fine detail, category Structural Connections. Steel › <strong>Plate</strong>: with one element selected, pick its face; otherwise the view's work plane; click the corners, Enter finishes. Properties: thickness, justification, role, material, the plane and whether hosted. The gap check refuses the contour but the window cannot yet highlight the open end (sketches are closed by clicks). Not yet: arcs kept as arcs, corner cuts, <code>IfcMaterialLayerSetUsage</code>, extruded-solid bodies, folded plates, the sketch journal.</p>
 <h3 id="446-bolts-anchors-holes-and-shear-studs">4.4.6 Bolts, anchors, holes and shear studs</h3>
 <p><strong>ID:</strong> <code class="rid" id="STR-STL-006">STR-STL-006</code> · <strong>Priority:</strong> <span class="pri pri-p2">P2</span> · <strong>Ref:</strong> research/03 §5.3 · screenshots/structure_mep/steel_fabrication_elements_plate_anchors.png</p>
 <p><strong>Workflow.</strong>
@@ -33647,7 +33654,7 @@ No IFC equivalent.
 <p><strong>Acceptance criteria.</strong>
 - [x] A 2 × 3 M20 bolt pattern through a 15 mm plate and a 10 mm web reports a grip length of 25 mm and creates 6 holes in each element.
 - [x] An exported bolt is an <code>IfcMechanicalFastener</code> with <code>NominalDiameter</code> = 20 mm.</p>
-<p><em>Built (2026-10-18):</em> <code>bolt_pattern.create</code>, <code>anchor_pattern.create</code>, <code>hole_pattern.create</code> and <code>shear_stud_pattern.create</code>: the elements, the plane the fasteners are square to (a work plane or a face) and a layout (<code>rect</code>: rows, columns, spacings, centre; <code>circle</code>: count, radius, centre, start angle). Each fastener runs along the plane's normal; the grip (from the first element's entry to the last one's exit, taking each element's first solid run, so an I-section's far flange is not counted, plus a grip increase), the bolt length under the head (grip, two washers, a nut and thread beyond, rounded up to 5 mm or 1/4"), and the holes made in each element are found from the elements' bodies when the pattern is made or edited and kept with it. Bolt proportions come from generic metric and inch tables (not a standard's copyrighted table); hole tolerance 2 mm or 1/16"; slots, inverted bolts, shop or site, coating, anchors' and studs' lengths. The pattern is an IfcElementAssembly (USERDEFINED, FASTENER_GROUP) aggregating IfcMechanicalFastener elements (BOLT, ANCHORBOLT, STUDSHEARCONNECTOR) with NominalDiameter and NominalLength; each hole is an IfcOpeningElement (OPENING, marked <code>rxd:hole</code>) voiding its element, rewritten on save, and is cut in the element's body by the solid kernel (so views and the overlap finder show it). <code>fastener_pattern.set</code> edits a pattern and finds its grip again; <code>fastener_pattern.info</code> reports it. A pattern goes when one of its elements is deleted. Structure › Steel › <strong>Bolts</strong>: kind, face and layout in a dialog, then a click for the centre; Properties show diameter, grip, length, hole size, holes per element and location. Not yet: user bolt tables, the hole definition per element, finishing the grip at a gap, editing the pattern's shape by grips, <code>IfcRelConnectsWithRealizingElements</code>.</p>
+<p><em>Built (2026-10-18):</em> <code>bolt_pattern.create</code>, <code>anchor_pattern.create</code>, <code>hole_pattern.create</code> and <code>shear_stud_pattern.create</code>: the elements, the plane the fasteners are square to (a work plane or a face) and a layout (<code>rect</code>: rows, columns, spacings, centre; <code>circle</code>: count, radius, centre, start angle). Each fastener runs along the plane's normal; the grip (from the first element's entry to the last one's exit, taking each element's first solid run, so an I-section's far flange is not counted, plus a grip increase), the bolt length under the head (grip, two washers, a nut and thread beyond, rounded up to 5 mm or 1/4"), and the holes made in each element are found from the elements' bodies when the pattern is made or edited and kept with it. Bolt proportions come from generic metric and inch tables (not a standard's copyrighted table); hole tolerance 2 mm or 1/16"; slots, inverted bolts, shop or site, coating, anchors' and studs' lengths. The pattern is an IfcElementAssembly (USERDEFINED, FASTENER_GROUP) aggregating IfcMechanicalFastener elements (BOLT, ANCHORBOLT, STUDSHEARCONNECTOR) with NominalDiameter and NominalLength; each hole is an IfcOpeningElement (OPENING, marked <code>rxd:hole</code>) voiding its element, rewritten on save, and is cut in the element's body by the solid kernel (so views and the overlap finder show it). <code>fastener_pattern.set</code> edits a pattern and finds its grip again; <code>fastener_pattern.info</code> reports it. A pattern goes when one of its elements is deleted. Steel › <strong>Bolts</strong>: kind, face and layout in a dialog, then a click for the centre; Properties show diameter, grip, length, hole size, holes per element and location. Not yet: user bolt tables, the hole definition per element, finishing the grip at a gap, editing the pattern's shape by grips, <code>IfcRelConnectsWithRealizingElements</code>.</p>
 <h3 id="447-welds">4.4.7 Welds</h3>
 <p><strong>ID:</strong> <code class="rid" id="STR-STL-007">STR-STL-007</code> · <strong>Priority:</strong> <span class="pri pri-p2">P2</span> · <strong>Ref:</strong> research/03 §5.3</p>
 <p><strong>Purpose.</strong> Record shop and site welds between steel elements, with the data a fabricator needs.</p>
@@ -33668,8 +33675,8 @@ No IFC equivalent.
 - [x] Moving a plate with a weld marks the weld "needs review" and leaves its position unchanged.
 - [x] Picking an edge where the selected elements do not touch is not possible: the edge is not highlighted.
 - [x] A 6 mm fillet weld exports as <code>IfcFastener</code> (<code>WELD</code>) with <code>Pset_FastenerWeld.a</code> = 6 mm.
-- [ ] A plate shop-welded to a beam gets the beam's assembly mark; the same plate site-welded does not.</p>
-<p><em>Built (2026-10-18):</em> <code>weld.edges</code> lists the edges of the selected elements (where their faces fold) that touch every other element within 1 mm along their length; <code>weld.create</code> refuses any other edge (<code>weld.not_touching</code>). The weld fills the corner between the faces at the edge (its legs along them, leaving out the faces where the elements bear on each other), with type and second type, throat <code>a</code> (default 6 mm), length (from the edge's start), surface, preparation, shop or site and intermittent segments, values checked against the open weld table (<code>data/steel/weld_types.json</code>, <code>weld.tables</code>). Welds keep their place: each element's shape is recorded, and <code>weld.info</code> and <code>weld.review</code> report <em>needs review</em> once one changes until <code>weld.set</code> with <code>accept</code>. A weld goes when one of its elements is deleted. IfcFastener (WELD) with <code>Pset_FastenerWeld</code> (Type1, Type2, Surface1, a, l, Intermittent, Process). Structure › Steel › <strong>Weld</strong>: in a 3D view the touching edges are drawn, the one under the cursor highlighted; click it, then type, throat and location. Properties: type, throat, length, location, review status and Accept. Not yet: assembly marks from shop welds (STR-STL-010), weld symbols in drawings, project additions to the weld table, the pick journal.</p>
+- [x] A plate shop-welded to a beam gets the beam's assembly mark; the same plate site-welded does not.</p>
+<p><em>Built (2026-10-18):</em> <code>weld.edges</code> lists the edges of the selected elements (where their faces fold) that touch every other element within 1 mm along their length; <code>weld.create</code> refuses any other edge (<code>weld.not_touching</code>). The weld fills the corner between the faces at the edge (its legs along them, leaving out the faces where the elements bear on each other), with type and second type, throat <code>a</code> (default 6 mm), length (from the edge's start), surface, preparation, shop or site and intermittent segments, values checked against the open weld table (<code>data/steel/weld_types.json</code>, <code>weld.tables</code>). Welds keep their place: each element's shape is recorded, and <code>weld.info</code> and <code>weld.review</code> report <em>needs review</em> once one changes until <code>weld.set</code> with <code>accept</code>. A weld goes when one of its elements is deleted. IfcFastener (WELD) with <code>Pset_FastenerWeld</code> (Type1, Type2, Surface1, a, l, Intermittent, Process). Steel › <strong>Weld</strong>: in a 3D view the touching edges are drawn, the one under the cursor highlighted; click it, then type, throat and location. Properties: type, throat, length, location, review status and Accept. Not yet: assembly marks from shop welds (STR-STL-010), weld symbols in drawings, project additions to the weld table, the pick journal.</p>
 <h3 id="448-modifiers-and-parametric-cuts">4.4.8 Modifiers and parametric cuts</h3>
 <p><strong>ID:</strong> <code class="rid" id="STR-STL-008">STR-STL-008</code> · <strong>Priority:</strong> <span class="pri pri-p2">P2</span> · <strong>Ref:</strong> research/03 §5.4</p>
 <div class="tbl"><table>
@@ -33735,7 +33742,7 @@ No IFC equivalent.
 - [x] A cope between a secondary beam and a girder removes the girder's flange zone from the secondary beam's end and updates when the girder depth changes.
 - [x] <em>Uncope</em> on that secondary beam restores its full end profile, deletes the now-empty sub-connection and is undone in one step.
 - [ ] <em>Uncope</em> on a beam whose cope belongs to a shear-plate connection leaves the cope and reports it as skipped.</p>
-<p><em>Built (2026-10-18):</em> every cut is an element of its own (IfcOpeningElement, USERDEFINED with ObjectType COPE, COPE_SKEWED, MITER, SAW_CUT, SHORTEN, CONTOUR_CUT, CUT_THROUGH or CUT_BY) whose cutter solid is worked out from the members whenever bodies are built, and subtracted from the target's body by the solid kernel (so the 3D view, plans and the overlap finder see it); IFC gets the opening's B-rep voiding the target. The cuts one command makes form a sub-connection (IfcElementAssembly SUB_CONNECTION). <code>steel_cut.cope</code> cuts the member whose end is at the joint (or the one named) by the other's flange zones (flange thickness plus a clearance, 13 mm or 1/2", across the flange width plus the clearance), following its depth; <code>steel_modifier.cope_skewed</code> notches a member end's top and/or bottom by depth, length and angle; <code>steel_cut.miter</code> cuts two members on the plane halving their corner; <code>steel_cut.saw</code> cuts a member flush with another's nearer flange or web face; <code>steel_modifier.shorten</code> moves a beam or brace end back (forward when negative) through its end extension, with angles across the height and width for a diagonal end; <code>steel_modifier.contour_cut</code> cuts a sketched contour on a work plane or face, through or to a depth; <code>steel_cut.cut_through</code> (with a gap) and <code>steel_cut.cut_by</code> subtract another element's body; <code>steel_modifier.corner_cut</code> cuts a plate's corner straight, convex or concave. <code>steel_cut.uncope</code> removes copes and empty sub-connections in one step, skipping copes owned by a connection (none of the built-in library types make copes yet, so this path is untested) and failing with <code>uncope.nothing</code> when there is nothing to remove; <code>steel_cut.list</code> reports the cuts. Cuts go when their elements go. Structure › Steel has Cope, Miter, Saw Cut, Cut Through, Cut By, Uncope, Shorten, Corner Cut and Contour Cut (sketched like a plate). Not yet: the dashed sub-connection box in views, shape handles past a shorten, boring and boundary distances on contour cuts, and copes made by connection types.</p>
+<p><em>Built (2026-10-18):</em> every cut is an element of its own (IfcOpeningElement, USERDEFINED with ObjectType COPE, COPE_SKEWED, MITER, SAW_CUT, SHORTEN, CONTOUR_CUT, CUT_THROUGH or CUT_BY) whose cutter solid is worked out from the members whenever bodies are built, and subtracted from the target's body by the solid kernel (so the 3D view, plans and the overlap finder see it); IFC gets the opening's B-rep voiding the target. The cuts one command makes form a sub-connection (IfcElementAssembly SUB_CONNECTION). <code>steel_cut.cope</code> cuts the member whose end is at the joint (or the one named) by the other's flange zones (flange thickness plus a clearance, 13 mm or 1/2", across the flange width plus the clearance), following its depth; <code>steel_modifier.cope_skewed</code> notches a member end's top and/or bottom by depth, length and angle; <code>steel_cut.miter</code> cuts two members on the plane halving their corner; <code>steel_cut.saw</code> cuts a member flush with another's nearer flange or web face; <code>steel_modifier.shorten</code> moves a beam or brace end back (forward when negative) through its end extension, with angles across the height and width for a diagonal end; <code>steel_modifier.contour_cut</code> cuts a sketched contour on a work plane or face, through or to a depth; <code>steel_cut.cut_through</code> (with a gap) and <code>steel_cut.cut_by</code> subtract another element's body; <code>steel_modifier.corner_cut</code> cuts a plate's corner straight, convex or concave. <code>steel_cut.uncope</code> removes copes and empty sub-connections in one step, skipping copes owned by a connection (none of the built-in library types make copes yet, so this path is untested) and failing with <code>uncope.nothing</code> when there is nothing to remove; <code>steel_cut.list</code> reports the cuts. Cuts go when their elements go. the Steel tab has Cope, Miter, Saw Cut, Cut Through, Cut By, Uncope, Shorten, Corner Cut and Contour Cut (sketched like a plate). Not yet: the dashed sub-connection box in views, shape handles past a shorten, boring and boundary distances on contour cuts, and copes made by connection types.</p>
 <h3 id="449-connection-code-checking-provider">4.4.9 Connection code checking (provider)</h3>
 <p><strong>ID:</strong> <code class="rid" id="STR-STL-009">STR-STL-009</code> · <strong>Priority:</strong> <span class="pri pri-p2">P2</span> · <strong>Ref:</strong> research/03 §2.9 ("Code checking"), §5.2</p>
 <p><strong>Purpose.</strong> Check detailed connections against a design code, and size them, through a pluggable provider rather than a built-in proprietary checker.</p>
@@ -33758,10 +33765,11 @@ No IFC equivalent.
 - <code>structural_connection.check(connection_ids[], provider_id, code) -&gt; report</code>
 - <code>structural_connection.presize(connection_ids[], provider_id, code)</code></p>
 <p><strong>Acceptance criteria.</strong>
-- [ ] With the sample provider, a bolt group whose design shear exceeds its capacity gets status Failed and a report that shows the utilisation ratio.
-- [ ] Presize on that connection increases the bolt diameter until the utilisation is ≤ 1.0, sets status OK, and is undone in one step.
-- [ ] Changing the beam size after a successful check resets the status to <em>NotCalculated</em>.
-- [ ] Checking a connection with no design forces is refused with a message naming it.</p>
+- [x] With the sample provider, a bolt group whose design shear exceeds its capacity gets status Failed and a report that shows the utilisation ratio.
+- [x] Presize on that connection increases the bolt diameter until the utilisation is ≤ 1.0, sets status OK, and is undone in one step.
+- [x] Changing the beam size after a successful check resets the status to <em>NotCalculated</em>.
+- [x] Checking a connection with no design forces is refused with a message naming it.</p>
+<p><em>Built (2026-10-19):</em> connections keep design forces per load case or combination (<code>structural_connection.set_design_forces</code>: N tension positive, V in the connected member's depth direction, Vh across, M; N and N·m), edited in Properties as <code>group: N, V, Vh, M</code> in kN. A provider is a Lua plugin with <code>capability = "connection_check"</code>, its <code>codes</code> and a <code>check(input)</code> function, run against a read-only host (it cannot run commands); <code>connection_check.providers</code> lists them. Its input (<code>reviera_core::connection_check::CheckInput</code>, SI units) carries the code, the connection's type and parameters, the bolt group (count, diameter, area, grade with fub and the AISC nominal shear stress, hole size, pitch, edge), the plies the bolts bear on (plate, the beam's web, the column's flange, a tube's wall, with fy and fu from the materials library), the weld lines (size, length, electrode strength), the members' sections and materials, and the forces; its answer is a list of items (name, load group, action, resistance, ratio, ok, and the parameter that would strengthen it). <code>structural_connection.check</code> records the answer (<code>record_check</code>): status OK when every item passes, utilisation the largest ratio, provider, code and date, and a hash of the input answered, so any later change to the connection, its members or its forces shows <em>not calculated</em> (<code>check_status</code>); the connection's code-check flag (STR-CONN-001) follows. <code>structural_connection.presize</code> asks again with the failing items' parameters one step larger (bolt, plate and weld tables by region; bolt counts by one), at most 20 rounds, then sets the sizes and records the answer, all one undo step; one that cannot pass is recorded as failed with the items still failing. <code>structural_connection.check_report</code> writes an HTML report. The built-in sample provider (MIT, <code>connection_check_sample</code>) checks bolt shear, bearing and tear-out on each ply, bolt tension and fillet welds to AISC 360-16 LRFD or EN 1993-1-8 (simplified: no eccentricity, prying or block shear); bearing on a member's web grows the bolt count, as bigger bolts only shorten the tear-out edge. Steel › Connections › Check, Presize and Check Report (asking for the provider and code); Properties show the status and each item's ratio. Not yet: forces taken from analysis results, background jobs, the provider kinds of ANA-PLUG-001 (only Lua plugins), anchor rod checks, and the report as an <code>IfcDocumentReference</code>.</p>
 <h3 id="4410-steel-interoperability-and-fabrication-output">4.4.10 Steel interoperability and fabrication output</h3>
 <p><strong>ID:</strong> <code class="rid" id="STR-STL-010">STR-STL-010</code> · <strong>Priority:</strong> <span class="pri pri-p2">P2</span> · <strong>Ref:</strong> research/03 §5.5</p>
 <p><strong>Behaviour &amp; rules.</strong>
@@ -33776,7 +33784,8 @@ No IFC equivalent.
 - <code>steel_numbering.run(scope, options) -&gt; report</code>
 - <code>steel_nc.export(scope, folder, format="dstv")</code> (plugin)</p>
 <p><strong>Acceptance criteria.</strong>
-- [ ] Two identical beams with identical holes get the same part mark. Adding one hole to one beam gives it a new mark.</p>
+- [x] Two identical beams with identical holes get the same part mark. Adding one hole to one beam gives it a new mark.</p>
+<p><em>Built (2026-10-19):</em> <code>steel_numbering.run</code> (and <code>steel_numbering.preview</code>, which changes nothing). Parts are steel columns, beams and braces, plates placed by hand and connection plates. A member's mark compares its section, length, holes (fastener patterns' and connection bolts', in standard holes 2 mm or 1/16" over) and cut solids in its own frame, either way round (and mirrored for symmetric sections); a plate's compares its thickness, outline, holes and cuts in every start corner, direction and mirror of its outline, so a plate turned or moved keeps its mark. Marks are a prefix and a number by kind (<code>c</code>, <code>b</code>, <code>br</code>, <code>p</code>; options for prefixes and the first number). An assembly is a main member (the longest; else the biggest plate) and everything shop-welded to it: shop welds, and connection plates welded to their member (shear plate and gusset to the main member, end plate to the beam, base plate to the column); site welds and bolts do not join. Identical assemblies (the main mark and the other parts' marks and places in its frame) share a mark in capitals. The part mark goes to <code>Tag</code> and <code>rxd:steel_marks</code> (with the assembly mark and options); each assembly is an IfcElementAssembly (USERDEFINED STEEL_ASSEMBLY) tagged with its mark, aggregating its members and hand-placed plates in IFC (connection plates stay aggregated by their connections, beam system and truss members by theirs), made again on every run. NC export (<code>steel_nc.export</code>, built in rather than a plugin) writes one DSTV NC1 file per part mark with its quantity through the MIT <code>reviera-dstv</code> crate (<code>clients/dstv</code>; writer and reader of the 7th edition's ST header, BO, AK, IK and EN blocks): members with profile code, dimensions, weight and painting surface per metre and holes on the web (<code>v</code>, <code>h</code>) and flanges (<code>o</code>, <code>u</code>); plates (<code>B</code>) in their smallest rectangle with their outline (<code>AK</code>, anticlockwise) and holes. Steel › Fabrication › <strong>Numbering</strong> (with the marks listed) and <strong>NC Export</strong>; Properties show an element's part and assembly marks. Not yet: member copes and cuts as NC contours, skew cut angles, keeping marks stable across model changes, and marks in schedules and tags on drawings.</p>
 
 <h2 id="45-concrete-detailing-and-precast">4.5 Concrete detailing and precast</h2>
 <p>All features in this section are <strong>P2</strong>. Precast tools are on <em>Concrete › Precast Detailing</em> and <em>Precast Settings</em>. Precast is a <strong>rule-driven pipeline</strong>:
@@ -38421,6 +38430,20 @@ No IFC equivalent.
 <td>STR-STL-003</td>
 </tr>
 <tr>
+<td><code>custom_connection.set_parameter</code></td>
+<td>type_id, path, value</td>
+<td>instances</td>
+<td>Yes</td>
+<td>STR-STL-003</td>
+</tr>
+<tr>
+<td><code>custom_connection.list</code></td>
+<td>—</td>
+<td>types</td>
+<td>No</td>
+<td>STR-STL-003</td>
+</tr>
+<tr>
 <td><code>structural_connection.automate</code></td>
 <td>scope, rule_set_id?, options?: {existing: "skip"|"replace_generic", preview: bool}</td>
 <td>report</td>
@@ -38659,10 +38682,52 @@ No IFC equivalent.
 <td>STR-STL-009</td>
 </tr>
 <tr>
+<td><code>structural_connection.set_design_forces</code></td>
+<td>connection_ids[], forces[{group, n, v, vh, m}]</td>
+<td>—</td>
+<td>Yes</td>
+<td>STR-STL-009</td>
+</tr>
+<tr>
+<td><code>structural_connection.record_check</code></td>
+<td>connection_id, provider, code, output, params?</td>
+<td>record</td>
+<td>Yes</td>
+<td>STR-STL-009</td>
+</tr>
+<tr>
+<td><code>structural_connection.check_status</code></td>
+<td>connection_ids[]</td>
+<td>statuses</td>
+<td>No</td>
+<td>STR-STL-009</td>
+</tr>
+<tr>
+<td><code>structural_connection.check_report</code></td>
+<td>connection_ids[], path</td>
+<td>path</td>
+<td>No</td>
+<td>STR-STL-009</td>
+</tr>
+<tr>
+<td><code>connection_check.providers</code></td>
+<td>—</td>
+<td>providers</td>
+<td>No</td>
+<td>STR-STL-009</td>
+</tr>
+<tr>
 <td><code>steel_numbering.run</code></td>
 <td>scope, options</td>
 <td>report</td>
 <td>Yes</td>
+<td>STR-STL-010</td>
+</tr>
+<tr>
+<td><code>steel_numbering.preview</code></td>
+<td>options?</td>
+<td>report</td>
+<td>No</td>
 <td>STR-STL-010</td>
 </tr>
 <tr>
@@ -51732,7 +51797,7 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 </tbody>
 </table></div>
 <h2 id="a3-consolidated-command-index">A.3 Consolidated command index</h2>
-<p><strong>2117 unique commands</strong> in 411 domains. Every command is exposed automatically to the UI, to Lua (<code>reviera.&lt;domain&gt;.&lt;verb&gt;</code>) and to MCP (<code>&lt;domain&gt;_&lt;verb&gt;</code>), subject to its permission class.</p>
+<p><strong>2125 unique commands</strong> in 412 domains. Every command is exposed automatically to the UI, to Lua (<code>reviera.&lt;domain&gt;.&lt;verb&gt;</code>) and to MCP (<code>&lt;domain&gt;_&lt;verb&gt;</code>), subject to its permission class.</p>
 <div class="tbl"><table>
 <thead>
 <tr>
@@ -52022,6 +52087,10 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 <td style="text-align: right;">1</td>
 </tr>
 <tr>
+<td><code>connection_check</code></td>
+<td style="text-align: right;">1</td>
+</tr>
+<tr>
 <td><code>connection_library</code></td>
 <td style="text-align: right;">3</td>
 </tr>
@@ -52071,7 +52140,7 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 </tr>
 <tr>
 <td><code>custom_connection</code></td>
-<td style="text-align: right;">3</td>
+<td style="text-align: right;">5</td>
 </tr>
 <tr>
 <td><code>datum</code></td>
@@ -53135,7 +53204,7 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 </tr>
 <tr>
 <td><code>steel_numbering</code></td>
-<td style="text-align: right;">1</td>
+<td style="text-align: right;">2</td>
 </tr>
 <tr>
 <td><code>structural</code></td>
@@ -53151,7 +53220,7 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 </tr>
 <tr>
 <td><code>structural_connection</code></td>
-<td style="text-align: right;">16</td>
+<td style="text-align: right;">20</td>
 </tr>
 <tr>
 <td><code>structural_settings</code></td>
@@ -55944,6 +56013,14 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 <td>MEP-ELEC-017</td>
 </tr>
 <tr>
+<td><code>connection_check.providers</code></td>
+<td>4</td>
+<td>—</td>
+<td>providers</td>
+<td>No</td>
+<td>STR-STL-009</td>
+</tr>
+<tr>
 <td><code>connection_library.install</code></td>
 <td>4</td>
 <td>path</td>
@@ -56440,10 +56517,26 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 <td>STR-STL-003</td>
 </tr>
 <tr>
+<td><code>custom_connection.list</code></td>
+<td>4</td>
+<td>—</td>
+<td>types</td>
+<td>No</td>
+<td>STR-STL-003</td>
+</tr>
+<tr>
 <td><code>custom_connection.remove_elements</code></td>
 <td>4</td>
 <td>type_id, element_ids[]</td>
 <td>—</td>
+<td>Yes</td>
+<td>STR-STL-003</td>
+</tr>
+<tr>
+<td><code>custom_connection.set_parameter</code></td>
+<td>4</td>
+<td>type_id, path, value</td>
+<td>instances</td>
 <td>Yes</td>
 <td>STR-STL-003</td>
 </tr>
@@ -66064,6 +66157,14 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 <td>STR-STL-010</td>
 </tr>
 <tr>
+<td><code>steel_numbering.preview</code></td>
+<td>4</td>
+<td>options?</td>
+<td>report</td>
+<td>No</td>
+<td>STR-STL-010</td>
+</tr>
+<tr>
 <td><code>steel_numbering.run</code></td>
 <td>4</td>
 <td>scope, options</td>
@@ -66200,6 +66301,22 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 <td>STR-STL-009</td>
 </tr>
 <tr>
+<td><code>structural_connection.check_report</code></td>
+<td>4</td>
+<td>connection_ids[], path</td>
+<td>path</td>
+<td>No</td>
+<td>STR-STL-009</td>
+</tr>
+<tr>
+<td><code>structural_connection.check_status</code></td>
+<td>4</td>
+<td>connection_ids[]</td>
+<td>statuses</td>
+<td>No</td>
+<td>STR-STL-009</td>
+</tr>
+<tr>
 <td><code>structural_connection.create</code></td>
 <td>4</td>
 <td>member_ids[], type_id?</td>
@@ -66248,6 +66365,14 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 <td>Yes</td>
 </tr>
 <tr>
+<td><code>structural_connection.record_check</code></td>
+<td>4</td>
+<td>connection_id, provider, code, output, params?</td>
+<td>record</td>
+<td>Yes</td>
+<td>STR-STL-009</td>
+</tr>
+<tr>
 <td><code>structural_connection.rule_sets</code></td>
 <td>4</td>
 <td>—</td>
@@ -66262,6 +66387,14 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 <td>—</td>
 <td>Yes</td>
 <td>STR-CONN-001</td>
+</tr>
+<tr>
+<td><code>structural_connection.set_design_forces</code></td>
+<td>4</td>
+<td>connection_ids[], forces[{group, n, v, vh, m}]</td>
+<td>—</td>
+<td>Yes</td>
+<td>STR-STL-009</td>
 </tr>
 <tr>
 <td><code>structural_connection.set_rule_set</code></td>

@@ -387,6 +387,9 @@ pub fn all(store: &Store) -> Vec<Body> {
             push(e.id(), "IfcPlate", crate::steel_detail::plate_mesh(store, &r), false);
         } else if let Some(r) = crate::steel_detail::weld_recipe(e) {
             push(e.id(), "IfcFastener", crate::steel_detail::weld_mesh(&r), false);
+        } else if let Some(m) = crate::rebar::mesh(store, e) {
+            // Reinforcement (STR-RBR-004).
+            push(e.id(), "IfcReinforcingBar", m, false);
         }
     }
     // In-place elements (ARC-INPL-001), their voids subtracted through the boolean relations.
@@ -593,6 +596,16 @@ pub fn related(store: &Store, a: ElementId, b: ElementId) -> bool {
         || crate::csg::related(store, a, b)
         || embedded()
         || fabricated_together(store, a, b)
+        || reinforcing(store, a, b)
+}
+
+/// Rebar sits in its host (STR-RBR-004).
+fn reinforcing(store: &Store, a: ElementId, b: ElementId) -> bool {
+    let one_way = |bar: ElementId, host: ElementId| {
+        let (Some(x), Some(h)) = (store.get(bar), store.get(host)) else { return false };
+        crate::rebar::rebar_recipe(x).is_some_and(|r| r.host == h.guid().to_string())
+    };
+    one_way(a, b) || one_way(b, a)
 }
 
 /// A steel connection's plates, bolts and welds belong together and pass through its members,

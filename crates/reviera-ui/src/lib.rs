@@ -61,6 +61,8 @@ mod adjust;
 mod steel_auto_ui;
 mod steel_detail_ui;
 mod steel_cut_ui;
+mod custom_ui;
+mod rebar_ui;
 mod steel_ui;
 mod ribbon;
 mod roofs;
@@ -286,7 +288,7 @@ struct Gui {
     truss_tool: Option<beams::TrussTool>,
     panel_tool: Option<analytical_panels::PanelTool>,
     load_tool: Option<loads_ui::LoadTool>,
-    /// Structure › Steel: Plate, Bolts or Weld in progress.
+    /// Steel › Detailing: Plate, Bolts or Weld in progress.
     steel_tool: Option<steel_detail_ui::SteelTool>,
     /// Contour Cut: the element the sketch cuts.
     contour_target: Option<ElementId>,
@@ -2128,6 +2130,7 @@ impl Gui {
             self.room_rows(grid, id);
             return;
         }
+        self.steel_mark_rows(grid, id);
         if self.note_rows(grid, id)
             || self.stair_rows(grid, id)
             || self.opening_rows(grid, id)
@@ -2135,6 +2138,7 @@ impl Gui {
             || self.beam_rows(grid, id)
             || self.analytical_rows(grid, id)
             || self.connection_rows(grid, id)
+            || self.rebar_rows(grid, id)
             || self.detail_rows(grid, id)
             || self.curtain_rows(grid, id)
             || self.ramp_rows(grid, id)
@@ -2418,6 +2422,7 @@ impl Gui {
             || self.beam_edit(property, text.clone())
             || self.analytical_edit(property, text.clone())
             || self.connection_edit(property, text.clone())
+            || self.rebar_edit(property, text.clone())
             || self.detail_edit(property, text.clone())
             || self.column_edit(property, text.clone())
             || self.curtain_edit(property, text.clone())
@@ -3947,6 +3952,18 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "steel_modifier.shorten" => with(gui, Gui::shorten_member),
         "steel_modifier.corner_cut" => with(gui, Gui::corner_cut),
         "steel_modifier.contour_cut" => with(gui, Gui::start_contour_cut),
+        "steel_numbering.run" => with(gui, Gui::steel_numbering),
+        "steel_nc.export" => with(gui, Gui::steel_nc_export),
+        "structural_connection.check" => with(gui, |g| g.check_connections(false)),
+        "structural_connection.presize" => with(gui, |g| g.check_connections(true)),
+        "structural_connection.check_report" => with(gui, Gui::check_report),
+        "structural_connection.customize" => with(gui, Gui::customize_connection),
+        "custom_connection.add_elements" => with(gui, Gui::add_to_custom),
+        "custom_connection.remove_elements" => with(gui, Gui::remove_from_custom),
+        "custom_connection.set_parameter" => with(gui, Gui::custom_parameter),
+        "rebar.place" => with(gui, Gui::place_rebar),
+        "rebar_cover.assign" => with(gui, Gui::rebar_cover),
+        "reinforcement_settings.show" => with(gui, Gui::reinforcement_settings),
         "ui.toggle_analytical" => with(gui, Gui::toggle_analytical),
         "structural_analysis.run" => Gui::start_structural_analysis(gui),
         "structural_analysis.results" => with(gui, Gui::structural_results),

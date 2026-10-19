@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Reviera contributors
 
-//! Structure › Steel cuts and modifiers (STR-STL-008): Cope, Miter, Saw Cut, Cut Through and
+//! Steel › Cuts and Modifiers (STR-STL-008): Cope, Miter, Saw Cut, Cut Through and
 //! Cut By on two selected elements (the first is cut), Uncope on the selected members, Shorten on
 //! a beam or brace, Corner Cut on a plate; Contour Cut sketches like Plate
 //! (`steel_detail_ui`).
@@ -196,6 +196,174 @@ impl Gui {
         if go {
             let r = self.run("steel_modifier.corner_cut", args);
             self.cut_done("The corner cut", r);
+        }
+    }
+}
+
+impl Gui {
+    /// A numbered element's part and assembly marks.
+    pub(crate) fn steel_mark_rows(&mut self, grid: &PropertyGrid, id: reviera_core::ElementId) {
+        let Some(store) = self.store_now() else { return };
+        let Some((part, assembly)) = store.get(id).and_then(reviera_core::steel_numbering::marks_of) else {
+            return;
+        };
+        grid.append(Property::category("Steel Marks", "c_marks"));
+        grid.append(Property::string("Part mark", "mk_part", part));
+        grid.set_property_read_only("mk_part", true);
+        grid.append(Property::string("Assembly mark", "mk_assembly", assembly.unwrap_or_default()));
+        grid.set_property_read_only("mk_assembly", true);
+    }
+
+    /// Steel › Numbering.
+    pub(crate) fn steel_numbering(&mut self) {
+        let frame = self.frame;
+        match self.run("steel_numbering.run", json!({})) {
+            Ok(r) => {
+                self.properties_stale = true;
+                let n = |k: &str| r[k].as_array().map_or(0, Vec::len);
+                let mut text = format!("{} part mark(s), {} assembly mark(s):\n\n", n("parts"), n("assemblies"));
+                for p in r["parts"].as_array().into_iter().flatten() {
+                    text.push_str(&format!(
+                        "{} × {}  {}\n",
+                        p["mark"].as_str().unwrap_or(""),
+                        p["count"],
+                        p["description"].as_str().unwrap_or("")
+                    ));
+                }
+                text.push('\n');
+                for a in r["assemblies"].as_array().into_iter().flatten() {
+                    let parts: Vec<&str> = a["parts"].as_array().into_iter().flatten().filter_map(|m| m.as_str()).collect();
+                    text.push_str(&format!("{} × {}  ({})\n", a["mark"].as_str().unwrap_or(""), a["count"], parts.join(", ")));
+                }
+                frame.set_status_text("Steel numbered: marks are in each element's Properties and its IFC Tag", 0);
+                let d = MessageDialog::builder(&frame, &text, "Steel Numbering").with_style(MessageDialogStyle::OK).build();
+                d.show_modal();
+            }
+            Err(e) => error(&frame, &format!("The steel was not numbered:\n{e}")),
+        }
+    }
+
+    /// Steel › NC Export.
+    pub(crate) fn steel_nc_export(&mut self) {
+        let frame = self.frame;
+        let d = DirDialog::builder(&frame, "Export DSTV NC1 Files To", "").build();
+        if d.show_modal() != ID_OK {
+            return;
+        }
+        let Some(folder) = d.get_path() else { return };
+        let r = self.run("steel_nc.export", json!({ "folder": folder, "overwrite": true }));
+        match r {
+            Ok(files) => {
+                let n = files.as_array().map_or(0, Vec::len);
+                frame.set_status_text(&format!("{n} DSTV NC1 file(s) written to {folder}"), 0);
+            }
+            Err(e) => error(&frame, &format!("The NC files were not written:\n{e}")),
+        }
+    }
+}
+
+impl Gui {
+    /// The connections selected, or those whose plates, bolts or welds are.
+    fn selected_connections(&mut self) -> Vec<reviera_core::ElementId> {
+        let Some(store) = self.store_now() else { return Vec::new() };
+        let mut out = Vec::new();
+        for id in self.selection() {
+            let Some(e) = store.get(id) else { continue };
+            let c = if reviera_core::connections::recipe(e).is_some() {
+                Some(id)
+            } else {
+                reviera_core::steel_fab::fab_recipe(e)
+                    .and_then(|r| reviera_core::id::GlobalId::parse(&r.connection))
+                    .and_then(|g| store.find_by_guid(&g))
+                    .filter(|c| store.get(*c).and_then(reviera_core::connections::recipe).is_some())
+            };
+            if let Some(c) = c
+                && !out.contains(&c)
+            {
+                out.push(c);
+            }
+        }
+        out
+    }
+
+    /// The provider and code to use: asked when there is a choice.
+    fn choose_provider(&mut self) -> Option<(String, String)> {
+        let frame = self.frame;
+        let providers = self.run("connection_check.providers", json!({})).ok()?;
+        let mut choices: Vec<(String, String, String)> = Vec::new();
+        for p in providers.as_array().into_iter().flatten() {
+            let id = p["id"].as_str().unwrap_or("").to_owned();
+            for c in p["codes"].as_array().into_iter().flatten() {
+                let code = c.as_str().unwrap_or("").to_owned();
+                choices.push((id.clone(), code.clone(), format!("{} — {code}", p["title"].as_str().unwrap_or(&id))));
+            }
+        }
+        if choices.is_empty() {
+            error(&frame, "There is no connection design provider (a Lua plugin with capability \"connection_check\").");
+            return None;
+        }
+        // The region's code first.
+        let us = self.store_now().is_some_and(|s| reviera_core::steel_fab::us_region(&s));
+        choices.sort_by_key(|c| (c.1 != if us { "aisc360" } else { "en1993" }, c.2.clone()));
+        let labels: Vec<&str> = choices.iter().map(|c| c.2.as_str()).collect();
+        let d = SingleChoiceDialog::builder(&frame, "Provider and design code:", "Check Connections", &labels).build();
+        if d.show_modal() != ID_OK {
+            return None;
+        }
+        let c = choices.get(usize::try_from(d.get_selection()).ok()?)?;
+        Some((c.0.clone(), c.1.clone()))
+    }
+
+    /// Steel › Fabrication › Check (and Presize).
+    pub(crate) fn check_connections(&mut self, presize: bool) {
+        let frame = self.frame;
+        let ids = self.selected_connections();
+        if ids.is_empty() {
+            return frame.set_status_text("Select the connections to check (or their plates or bolts) first", 0);
+        }
+        let Some((provider, code)) = self.choose_provider() else { return };
+        let command = if presize { "structural_connection.presize" } else { "structural_connection.check" };
+        match self.run(command, json!({ "connection_ids": ids, "provider_id": provider, "code": code })) {
+            Ok(r) => {
+                self.properties_stale = true;
+                self.refresh_scene(&frame);
+                let list = r.as_array().cloned().unwrap_or_default();
+                let ok = list.iter().filter(|c| c["record"]["ok"] == true).count();
+                let worst = list.iter().filter_map(|c| c["record"]["utilisation"].as_f64()).fold(0.0, f64::max);
+                frame.set_status_text(
+                    &format!(
+                        "{} connection(s) {}: {ok} OK, {} failing; largest utilisation {worst:.2} (Properties lists each check)",
+                        list.len(),
+                        if presize { "presized" } else { "checked" },
+                        list.len() - ok
+                    ),
+                    0,
+                );
+            }
+            Err(e) => error(&frame, &format!("The connections were not checked:\n{e}")),
+        }
+    }
+
+    /// Steel › Fabrication › Check Report.
+    pub(crate) fn check_report(&mut self) {
+        let frame = self.frame;
+        let ids = self.selected_connections();
+        if ids.is_empty() {
+            return frame.set_status_text("Select the connections for the report first", 0);
+        }
+        let d = FileDialog::builder(&frame)
+            .with_message("Save the Connection Check Report")
+            .with_wildcard("HTML files (*.html)|*.html")
+            .with_style(FileDialogStyle::Save | FileDialogStyle::OverwritePrompt)
+            .with_default_file("connection checks.html")
+            .build();
+        if d.show_modal() != ID_OK {
+            return;
+        }
+        let Some(path) = d.get_path() else { return };
+        match self.run("structural_connection.check_report", json!({ "connection_ids": ids, "path": path })) {
+            Ok(_) => frame.set_status_text(&format!("Connection check report written to {path}"), 0),
+            Err(e) => error(&frame, &format!("The report was not written:\n{e}")),
         }
     }
 }

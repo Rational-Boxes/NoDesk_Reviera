@@ -1,0 +1,18 @@
+{
+  "note": "Nominal diameters are facts of the product standards; bend diameters and hook extensions are defaults from ACI 318-19 Tables 25.3.1 and 25.3.2 (US) and EN 1992-1-1 Table 8.1N and 8.5 (elsewhere). Check them against the governing code.",
+  "us": {
+    "standard": "ASTM A615/A706",
+    "material": "Rebar ASTM A615 Grade 60",
+    "sizes": [
+      { "id": "#3", "diameter_in": 0.375 }, { "id": "#4", "diameter_in": 0.5 }, { "id": "#5", "diameter_in": 0.625 },
+      { "id": "#6", "diameter_in": 0.75 }, { "id": "#7", "diameter_in": 0.875 }, { "id": "#8", "diameter_in": 1.0 },
+      { "id": "#9", "diameter_in": 1.128 }, { "id": "#10", "diameter_in": 1.27 }, { "id": "#11", "diameter_in": 1.41 },
+      { "id": "#14", "diameter_in": 1.693 }, { "id": "#18", "diameter_in": 2.257 }
+    ]
+  },
+  "metric": {
+    "standard": "EN 10080 / BS 4449",
+    "material": "Rebar B500B",
+    "sizes": [6, 8, 10, 12, 16, 20, 25, 32, 40, 50]
+  }
+}

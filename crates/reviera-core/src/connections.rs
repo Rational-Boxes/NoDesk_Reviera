@@ -53,6 +53,12 @@ pub struct ConnectionRecipe {
     /// This connection's own parameter values (STR-STL-002).
     #[serde(default, skip_serializing_if = "serde_json::Map::is_empty")]
     pub params: serde_json::Map<String, serde_json::Value>,
+    /// Design forces per load case or combination (STR-STL-009).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub design_forces: Vec<crate::connection_check::DesignForce>,
+    /// The last code check (STR-STL-009).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub check: Option<crate::connection_check::CheckRecord>,
 }
 
 fn generic() -> String {
@@ -70,6 +76,8 @@ pub fn blank() -> ConnectionRecipe {
         fabricator: None,
         override_by_instance: false,
         params: serde_json::Map::new(),
+        design_forces: Vec::new(),
+        check: None,
     }
 }
 
@@ -224,6 +232,9 @@ pub struct CreateParams {
 
 /// Places a generic connection at the join of members (`structural_connection.create`).
 pub(crate) fn create(txn: &mut crate::txn::Transaction<'_>, p: CreateParams) -> Result<ElementId> {
+    if let Some(t) = p.type_id.as_deref().filter(|t| t.starts_with(crate::custom_connections::PREFIX)) {
+        return crate::custom_connections::place(txn, &p.member_ids, t);
+    }
     let store = txn.store().clone();
     let ty = match p.type_id.as_deref() {
         None | Some("generic") => None,
@@ -291,6 +302,8 @@ pub(crate) fn create(txn: &mut crate::txn::Transaction<'_>, p: CreateParams) -> 
         fabricator: None,
         override_by_instance: false,
         params: serde_json::Map::new(),
+        design_forces: Vec::new(),
+        check: None,
     };
     if let Some(t) = &ty {
         crate::steel_fab::check_inputs(&store, t, &recipe.members)?;

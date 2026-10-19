@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Reviera contributors
 
-//! Structure › Steel: Plate, Bolts and Weld (STR-STL-005, STR-STL-006, STR-STL-007).
+//! Steel › Detailing: Plate, Bolts and Weld (STR-STL-005, STR-STL-006, STR-STL-007).
 //!
 //! - **Plate**: with one column, beam, brace or plate selected, choose its face; otherwise the
 //!   view's work plane (a plan's level). Click the contour's corners; Enter (or a click on the
@@ -97,14 +97,14 @@ impl Gui {
         reviera_core::steel_detail::face_plane(&store, store.get(id)?, face).ok()
     }
 
-    /// Structure › Steel › Plate.
+    /// Steel › Plate.
     pub(crate) fn start_plate_tool(&mut self) {
         let frame = self.frame;
         self.end_tool(&frame);
         self.sketch_on_selection("Plate", "The plate goes on the face:");
     }
 
-    /// Structure › Steel › Contour Cut: sketch on a face of the selected element.
+    /// Steel › Contour Cut: sketch on a face of the selected element.
     pub(crate) fn start_contour_cut(&mut self) {
         let frame = self.frame;
         self.end_tool(&frame);
@@ -375,7 +375,7 @@ impl Gui {
         }
     }
 
-    /// Structure › Steel › Bolts.
+    /// Steel › Bolts.
     pub(crate) fn start_pattern_tool(&mut self) {
         let frame = self.frame;
         self.end_tool(&frame);
@@ -455,7 +455,7 @@ impl Gui {
         frame.set_status_text("Fasteners: click where the pattern's centre goes on the face (Esc ends)", 0);
     }
 
-    /// Structure › Steel › Weld.
+    /// Steel › Weld.
     pub(crate) fn start_weld_tool(&mut self) {
         let frame = self.frame;
         self.end_tool(&frame);

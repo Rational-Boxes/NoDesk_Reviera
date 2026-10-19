@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Reviera contributors
 
-//! Structure › Framing › Automate Connections (STR-STL-004): the rule set, what to do with joins
+//! Steel › Connections › Automate Connections (STR-STL-004): the rule set, what to do with joins
 //! that have a connection and whether to preview; then the log, a line per join. A preview marks
 //! each join in 3D views, coloured by the type it would get (grey where skipped), and Apply places
 //! them as previewed. The log saves as CSV.
@@ -30,7 +30,7 @@ fn type_name(id: &str) -> String {
 }
 
 impl Gui {
-    /// Structure › Framing › Automate Connections.
+    /// Steel › Connections › Automate Connections.
     pub(crate) fn automate_connections(&mut self) {
         let frame = self.frame;
         let info = match self.run("structural_connection.rule_sets", json!({})) {

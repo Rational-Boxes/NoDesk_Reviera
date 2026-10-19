@@ -85,6 +85,13 @@ pub(crate) mod bridge {
             type_name: &str,
             value: f64,
         ) -> Result<()>;
+        fn set_typed_real_list(
+            self: Pin<&mut Model>,
+            id: u32,
+            attr: &str,
+            type_name: &str,
+            values: &[f64],
+        ) -> Result<()>;
         fn set_typed_int(
             self: Pin<&mut Model>,
             id: u32,

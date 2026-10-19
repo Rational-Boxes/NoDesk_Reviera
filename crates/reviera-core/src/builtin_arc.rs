@@ -78,6 +78,34 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(AnalyticalDisconnect),
         registry.add(AnalyticalModelInfo),
         registry.add(ConnectionTypeList),
+        registry.add(RebarPlace),
+        registry.add(RebarSetLayout),
+        registry.add(RebarSet),
+        registry.add(RebarRehost),
+        registry.add(RebarInfoCmd),
+        registry.add(RebarCanHost),
+        registry.add(RebarBarTypeList),
+        registry.add(RebarBarTypeCreate),
+        registry.add(RebarHookTypeList),
+        registry.add(RebarHookTypeCreate),
+        registry.add(RebarShapeList),
+        registry.add(ReinforcementSettingsGet),
+        registry.add(ReinforcementSettingsSet),
+        registry.add(RebarCoverTypeCreate),
+        registry.add(RebarCoverTypeSet),
+        registry.add(RebarCoverTypeDelete),
+        registry.add(RebarCoverAssign),
+        registry.add(CustomCustomize),
+        registry.add(CustomAdd),
+        registry.add(CustomRemove),
+        registry.add(CustomExpose),
+        registry.add(CustomSet),
+        registry.add(CustomList),
+        registry.add(CheckSetForces),
+        registry.add(CheckRecord),
+        registry.add(CheckStatus),
+        registry.add(NumberingRun),
+        registry.add(NumberingPreview),
         registry.add(CutCope),
         registry.add(CutMiter),
         registry.add(CutSaw),
@@ -2455,6 +2483,367 @@ edit_command!(
     crate::steel_cuts::CornerCutParams,
     (),
     crate::steel_cuts::corner_cut
+);
+
+edit_command!(
+    NumberingRun,
+    "steel_numbering.run",
+    "Number the steel",
+    "Gives the model's steel parts their part marks and its shop assemblies their assembly marks \
+     (STR-STL-010). Parts are steel columns, beams and braces, plates placed by hand and connection \
+     plates; identical parts (a member's section, length, holes and cuts in its own frame, either way \
+     round; a plate's thickness, outline and holes, however placed) share a mark, `c1`, `b1`, `br1`, \
+     `p1` by kind (`options`: prefixes and the first number). An assembly is a main member and \
+     everything shop-welded to it (shop welds; a connection's plates to their member); identical \
+     assemblies share a mark, the prefix in capitals. Part marks go to each element's Tag and \
+     `rxd:steel_marks`; each assembly becomes an IfcElementAssembly (STEEL_ASSEMBLY) tagged with its \
+     mark, made again on each run. Returns the marks with their counts and elements.",
+    "Steel Numbering",
+    crate::steel_numbering::RunParams,
+    crate::steel_numbering::Report,
+    crate::steel_numbering::run
+);
+
+read_command!(
+    NumberingPreview,
+    "steel_numbering.preview",
+    "Preview steel numbering",
+    "The part and assembly marks `steel_numbering.run` would give, without changing the model \
+     (STR-STL-010).",
+    crate::steel_numbering::RunParams,
+    crate::steel_numbering::Report,
+    |s, p| crate::steel_numbering::preview(s, p)
+);
+
+edit_command!(
+    CheckSetForces,
+    "structural_connection.set_design_forces",
+    "Set connections' design forces",
+    "Sets the design forces connection code checks use (STR-STL-009): per load case or combination \
+     (`group`), the axial force `n` (tension positive), the shear `v` in the connected member's depth \
+     direction (a beam's end reaction), the shear `vh` across it and the moment `m` (N, N·m). An \
+     empty list clears them.",
+    "Design Forces",
+    crate::connection_check::ForcesParams,
+    (),
+    crate::connection_check::set_design_forces
+);
+
+edit_command!(
+    CheckRecord,
+    "structural_connection.record_check",
+    "Record a connection check",
+    "Records a connection design provider's answer on a connection (STR-STL-009): its check items \
+     (name, group, action, resistance, ratio, ok, the parameter that would strengthen it), after \
+     setting `params` (Presize's sizes) if given. The status is ok when every item passes; the \
+     utilisation is the largest ratio; the input answered is hashed so later changes show the status \
+     as not calculated. `structural_connection.check` and `presize` call providers and record their \
+     answers.",
+    "Connection Check",
+    crate::connection_check::RecordParams,
+    crate::connection_check::CheckRecord,
+    crate::connection_check::record
+);
+
+read_command!(
+    CheckStatus,
+    "structural_connection.check_status",
+    "Connections' check status",
+    "For each connection: its code check status (not_calculated, failed or ok; not calculated when \
+     never checked or when it, its members or its design forces changed since), the last check's \
+     provider, code, date, utilisation and items, and its design forces (STR-STL-009).",
+    crate::connection_check::StatusParams,
+    Vec<crate::connection_check::StatusInfo>,
+    |s, p| crate::connection_check::status(s, p)
+);
+
+edit_command!(
+    CustomCustomize,
+    "structural_connection.customize",
+    "Make a custom connection type",
+    "Makes a named custom connection type (STR-STL-003) of standard or generic connections at one \
+     join (`connection_ids`) and loose plates, fastener patterns and welds there (`element_ids`): \
+     at most three members; the type records the members' roles and section families, each nested \
+     connection with its parameters, and each plate, pattern and weld relative to the join (its point, \
+     the main member's axis, the way the connected member leaves). What was chosen becomes the first \
+     instance. Place the type with `structural_connection.create` and its `type_id` on joins with the \
+     same members' roles and section families. Returns the type and the instance.",
+    "Customize Connection",
+    crate::custom_connections::CustomizeParams,
+    crate::custom_connections::Customized,
+    crate::custom_connections::customize
+);
+
+edit_command!(
+    CustomAdd,
+    "custom_connection.add_elements",
+    "Add to a custom connection type",
+    "Adds plates, fastener patterns or welds placed at one of a custom type's instances to the type, \
+     and remakes every instance with them (STR-STL-003). With more than one instance it needs \
+     `confirm` (the refusal states the count). Returns the instances remade.",
+    "Edit Custom Connection",
+    crate::custom_connections::EditParams,
+    usize,
+    crate::custom_connections::add_elements
+);
+
+edit_command!(
+    CustomRemove,
+    "custom_connection.remove_elements",
+    "Remove from a custom connection type",
+    "Removes sub-elements, picked in any instance, from a custom type and every instance \
+     (STR-STL-003); patterns and welds on a removed plate go with it. With more than one instance it \
+     needs `confirm` (the refusal states the count). Returns the instances remade.",
+    "Edit Custom Connection",
+    crate::custom_connections::EditParams,
+    usize,
+    crate::custom_connections::remove_elements
+);
+
+edit_command!(
+    CustomExpose,
+    "custom_connection.expose_parameter",
+    "Expose a custom connection parameter",
+    "Makes a sub-element's parameter a type parameter of a custom connection (STR-STL-003): `path` \
+     is `<sub-element name>.<parameter>` (a plate's thickness, a pattern's diameter, a weld's a, a \
+     nested connection's parameters). Returns its current value.",
+    "Expose Parameter",
+    crate::custom_connections::ExposeParams,
+    f64,
+    crate::custom_connections::expose
+);
+
+edit_command!(
+    CustomSet,
+    "custom_connection.set_parameter",
+    "Set a custom connection parameter",
+    "Sets an exposed type parameter of a custom connection and remakes every instance \
+     (STR-STL-003). Returns the instances remade.",
+    "Custom Connection Parameter",
+    crate::custom_connections::SetParams,
+    usize,
+    crate::custom_connections::set_parameter
+);
+
+edit_command!(
+    RebarPlace,
+    "rebar.place",
+    "Place a rebar set",
+    "Places a rebar set in a concrete host by Expand to Host (STR-RBR-004): `placement` is \
+     `{kind: section}` for closed links (shape 51) in a column or beam's section spread along it, \
+     `{kind: face, face: top|bottom|left|right}` for straight, L or U bars (00, 11, 21) along a \
+     member at a face, or `{kind: layer, face, angle, vertical, offset}` for straight bars in a \
+     floor's top or bottom layer or a wall's exterior or interior face, each clipped to the \
+     outline less the edge cover. `layout` (STR-RBR-008): `rule` single, fixed_number (n), \
+     maximum_spacing (spacing), number_with_spacing (n, spacing), minimum_clear_spacing (clear) or \
+     custom (formula like `3x100; ?x200; 5x100` or `1400@100; 900@300`, mm). Bars keep inside the \
+     host faces' covers; a shape that cannot fit is refused naming the dimension. Returns the set.",
+    "Place Rebar",
+    crate::rebar::PlaceParams,
+    ElementId,
+    crate::rebar::place
+);
+
+edit_command!(
+    RebarSetLayout,
+    "rebar.set_layout",
+    "Change rebar sets' layout",
+    "Changes the layout rule of rebar sets (STR-RBR-008): `rule` with `n`, `spacing` (m), `clear` \
+     (m) or `formula` as `rebar.place` takes them. A layout that does not fit is refused.",
+    "Rebar Layout",
+    crate::rebar::LayoutParams,
+    (),
+    crate::rebar::set_layout
+);
+
+edit_command!(
+    RebarSet,
+    "rebar.set",
+    "Change rebar sets",
+    "Changes rebar sets' bar type, shape code or placement (STR-RBR-004); the bars are worked out \
+     again from the host, and a change that does not fit is refused.",
+    "Modify Rebar",
+    crate::rebar::SetParams,
+    (),
+    crate::rebar::set
+);
+
+edit_command!(
+    RebarRehost,
+    "rebar.rehost",
+    "Move rebar sets to another host",
+    "Moves rebar sets to another host that can hold rebar (STR-RBR-001), working their bars out \
+     again in it; an orphaned set is put back in order this way.",
+    "Rehost Rebar",
+    crate::rebar::RehostParams,
+    (),
+    crate::rebar::rehost
+);
+
+read_command!(
+    RebarInfoCmd,
+    "rebar.info",
+    "Rebar sets",
+    "Each rebar set (STR-RBR-004): host, whether it is orphaned and why, shape, bar type and \
+     diameter, bar count, layout, the length the bars spread over, each bar's exact and rounded \
+     length (STR-RBR-002), the first as Properties show it (`exact [rounded]`, mm), total length \
+     and mass, the shape's dimensions, role (main or ligature) and centrelines.",
+    crate::rebar::InfoParams,
+    Vec<crate::rebar::RebarInfo>,
+    crate::rebar::info
+);
+
+read_command!(
+    RebarCanHost,
+    "rebar.can_host",
+    "Whether an element can host rebar",
+    "Whether an element can hold rebar (STR-RBR-001): structural concrete columns and beams, \
+     structural floors and walls with a concrete layer. With its host kind, the reason when it \
+     cannot, and each face's cover type.",
+    crate::rebar::CanHostParams,
+    crate::rebar::CanHost,
+    crate::rebar::can_host
+);
+
+read_command!(
+    RebarBarTypeList,
+    "rebar_bar_type.list",
+    "Rebar bar types",
+    "The region's bar catalogue (ASTM A615 #3–#18, or 6–50 mm bars) and the project's own bar types \
+     (STR-RBR-003), with diameters, material and inside bend diameters for standard bends, hooks \
+     and stirrups.",
+    Option<serde_json::Value>,
+    Vec<crate::rebar::BarType>,
+    |s, _| Ok(crate::rebar::bar_types(s))
+);
+
+edit_command!(
+    RebarBarTypeCreate,
+    "rebar_bar_type.create",
+    "Make a rebar bar type",
+    "Makes a project bar type (STR-RBR-003): name, diameter (m), material and inside bend diameter \
+     (default by the region's rule). Returns its id.",
+    "New Bar Type",
+    crate::rebar::BarTypeParams,
+    String,
+    crate::rebar::bar_type_create
+);
+
+read_command!(
+    RebarHookTypeList,
+    "rebar_hook_type.list",
+    "Rebar hook types",
+    "The region's standard hooks (90°, 180°, 135° stirrup or tie) and the project's own (STR-RBR-003): \
+     angle and extension as a multiple of the bar diameter with a minimum length.",
+    Option<serde_json::Value>,
+    Vec<crate::rebar::HookType>,
+    |s, _| Ok(crate::rebar::all_hook_types(s))
+);
+
+edit_command!(
+    RebarHookTypeCreate,
+    "rebar_hook_type.create",
+    "Make a rebar hook type",
+    "Makes a project hook type (STR-RBR-003): name, angle (degrees), extension multiplier of the bar \
+     diameter and minimum extension (m). Returns its id.",
+    "New Hook Type",
+    crate::rebar::HookTypeParams,
+    String,
+    crate::rebar::hook_type_create
+);
+
+read_command!(
+    RebarShapeList,
+    "rebar_shape.list",
+    "Rebar shapes",
+    "The rebar shape catalogue (STR-RBR-003): each shape code with its name, dimensions, style \
+     (standard or stirrup/tie) and bend count.",
+    Option<serde_json::Value>,
+    crate::rebar::ShapeCatalogue,
+    |_, _| Ok(crate::rebar::shapes())
+);
+
+read_command!(
+    ReinforcementSettingsGet,
+    "reinforcement_settings.get",
+    "Reinforcement settings",
+    "The project's reinforcement settings (STR-RBR-002): rounding (on, method, bar and segment \
+     increments), hooks in shape definitions, area and path rebar, cover types with their uses, \
+     the project's bar and hook types, and which settings are locked and why.",
+    Option<serde_json::Value>,
+    crate::rebar::SettingsInfo,
+    |s, _| Ok(crate::rebar::settings_info(s))
+);
+
+edit_command!(
+    ReinforcementSettingsSet,
+    "reinforcement_settings.set",
+    "Change a reinforcement setting",
+    "Changes a reinforcement setting (STR-RBR-002): `rounding.on`, `rounding.method` (nearest, up, \
+     down), `rounding.bar_length` or `rounding.segment_length` (m, at most 0.1), `hooks_in_shape` \
+     (locked once rebar is placed) or `area_path_rebar`.",
+    "Reinforcement Settings",
+    crate::rebar::SetSettingParams,
+    (),
+    crate::rebar::set_setting
+);
+
+edit_command!(
+    RebarCoverTypeCreate,
+    "rebar_cover_type.create",
+    "Make a rebar cover type",
+    "Makes a named rebar cover type with its offset (m, 0 to 0.5) (STR-RBR-009). Returns its id.",
+    "New Cover Type",
+    crate::rebar::CoverTypeParams,
+    String,
+    crate::rebar::cover_type_create
+);
+
+edit_command!(
+    RebarCoverTypeSet,
+    "rebar_cover_type.set",
+    "Change a rebar cover type",
+    "Renames a cover type or changes its offset (STR-RBR-009); bars on faces using it follow.",
+    "Modify Cover Type",
+    crate::rebar::CoverTypeSetParams,
+    (),
+    crate::rebar::cover_type_set
+);
+
+edit_command!(
+    RebarCoverTypeDelete,
+    "rebar_cover_type.delete",
+    "Delete a rebar cover type",
+    "Deletes a cover type (STR-RBR-009). When host faces use it a `replacement` is required, else \
+     it is refused with the count; returns the faces moved.",
+    "Delete Cover Type",
+    crate::rebar::CoverTypeDeleteParams,
+    usize,
+    crate::rebar::cover_type_delete
+);
+
+edit_command!(
+    RebarCoverAssign,
+    "rebar_cover.assign",
+    "Assign rebar cover to host faces",
+    "Gives hosts' faces a cover type (STR-RBR-009): `face` top, bottom, exterior, interior or other \
+     (every face when omitted). Their rebar follows.",
+    "Rebar Cover",
+    crate::rebar::AssignParams,
+    (),
+    crate::rebar::assign
+);
+
+read_command!(
+    CustomList,
+    "custom_connection.list",
+    "Custom connection types",
+    "The project's custom connection types (STR-STL-003): id, name, members' roles and section \
+     families, nested connections, plates, patterns and welds, exposed parameters, sub-element names \
+     and instances.",
+    Option<serde_json::Value>,
+    Vec<crate::custom_connections::TypeInfo>,
+    |s, _| Ok(crate::custom_connections::list(s))
 );
 
 read_command!(

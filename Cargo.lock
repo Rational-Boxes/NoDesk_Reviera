@@ -2909,6 +2909,7 @@ dependencies = [
  "prost",
  "reviera-compute",
  "reviera-core",
+ "reviera-dstv",
  "reviera-geom",
  "reviera-ifc",
  "reviera-livestore",
@@ -2978,6 +2979,7 @@ dependencies = [
  "i_overlay",
  "imbl",
  "jsonschema",
+ "reviera-dstv",
  "schemars",
  "serde",
  "serde_json",
@@ -2986,6 +2988,10 @@ dependencies = [
  "thiserror",
  "uuid",
 ]
+
+[[package]]
+name = "reviera-dstv"
+version = "0.1.0"
 
 [[package]]
 name = "reviera-geom"
@@ -3130,6 +3136,7 @@ name = "reviera-store"
 version = "0.1.0"
 dependencies = [
  "reviera-core",
+ "reviera-dstv",
  "reviera-geom",
  "reviera-ifc",
  "reviera-rxd",

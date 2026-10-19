@@ -51,6 +51,7 @@ public:
                            rust::Slice<const std::uint32_t> lengths);
     void set_typed_string(std::uint32_t id, rust::Str attr, rust::Str type_name, rust::Str value);
     void set_typed_real(std::uint32_t id, rust::Str attr, rust::Str type_name, double value);
+    void set_typed_real_list(std::uint32_t id, rust::Str attr, rust::Str type_name, rust::Slice<const double> values);
     void set_typed_int(std::uint32_t id, rust::Str attr, rust::Str type_name, std::int32_t value);
     void set_typed_bool(std::uint32_t id, rust::Str attr, rust::Str type_name, bool value);
     rust::Vec<std::uint32_t> referenced_by(std::uint32_t id, rust::Str class_name) const;

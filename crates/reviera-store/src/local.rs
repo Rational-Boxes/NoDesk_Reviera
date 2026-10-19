@@ -732,6 +732,7 @@ impl LocalProject {
             self.write_loads(doc)?;
             self.write_foundations(doc)?;
             self.write_fabrication(doc)?;
+            self.write_rebar(doc)?;
             self.write_ramps(doc)?;
             self.write_slab_edges(doc)?;
             self.write_wall_sweeps(doc)?;
@@ -2454,6 +2455,40 @@ impl LocalProject {
         }
         self.write_holes(doc)?;
         self.write_cuts(doc)?;
+        // Each steel assembly (STR-STL-010) aggregates its members and plates placed by hand;
+        // connection plates stay with their connections (an object has one aggregation).
+        for e in store.iter() {
+            let Some(parts) = reviera_core::steel_numbering::assembly_parts(store, e) else {
+                continue;
+            };
+            let Some(&step) = self.steps.get(&e.id()) else {
+                continue;
+            };
+            let parts: Vec<AttrValue> = parts
+                .into_iter()
+                // Beam system and truss members are aggregated by those.
+                .filter(|p| {
+                    store.get(*p).is_some_and(|f| {
+                        reviera_core::steel_fab::fab_recipe(f).is_none()
+                            && reviera_core::beams::beam_recipe(f).is_none_or(|r| r.system.is_none())
+                    })
+                })
+                .filter_map(|p| self.steps.get(&p).map(|s| AttrValue::Ref(s.0)))
+                .collect();
+            for rel in self.ifc.referenced_by(step, "IfcRelAggregates")? {
+                self.ifc.remove(rel)?;
+            }
+            if parts.is_empty() {
+                continue;
+            }
+            let rel = self.ifc.create_rooted("IfcRelAggregates", &GlobalId::new())?;
+            self.ifc.set_attribute(rel, "Description", &AttrValue::String("rxd:steel_assembly".into()))?;
+            if let Some(h) = owner_history {
+                self.ifc.set_attribute(rel, "OwnerHistory", &AttrValue::Ref(h.0))?;
+            }
+            self.ifc.set_attribute(rel, "RelatingObject", &AttrValue::Ref(step.0))?;
+            self.ifc.set_attribute(rel, "RelatedObjects", &AttrValue::List(parts))?;
+        }
         // Each connection (and fastener pattern) aggregates its fabrication elements.
         for e in store.iter() {
             if reviera_core::connections::recipe(e).is_none()
@@ -2490,6 +2525,95 @@ impl LocalProject {
             self.ifc.set_attribute(rel, "RelatingObject", &AttrValue::Ref(step.0))?;
             self.ifc
                 .set_attribute(rel, "RelatedObjects", &AttrValue::List(parts))?;
+        }
+        Ok(())
+    }
+
+    /// Writes rebar sets (STR-RBR-004): each `IfcReinforcingBar` gets a tube body along its bars,
+    /// its diameter, cross-section area and bar length, and a synthesized `IfcReinforcingBarType`
+    /// (marked `rxd:rebar_type`, rewritten on every save) with its shape code and dimensions as
+    /// `BendingShapeCode` and `BendingParameters`; each host aggregates its sets (`rxd:rebar`).
+    fn write_rebar(&mut self, doc: &Document) -> Result<()> {
+        const TAG: &str = "rxd:rebar";
+        let store = doc.store();
+        for t in self.ifc.entities_of_type("IfcReinforcingBarType")? {
+            let t = t.id;
+            if matches!(self.ifc.attribute(t, "Description")?, AttrValue::String(d) if d == REBAR_TYPE_TAG) {
+                for rel in self.ifc.referenced_by(t, "IfcRelDefinesByType")? {
+                    self.ifc.remove(rel)?;
+                }
+                self.ifc.remove(t)?;
+            }
+        }
+        let sets: Vec<ElementId> = store.iter().filter(|e| reviera_core::rebar::rebar_recipe(e).is_some()).map(|e| e.id()).collect();
+        if sets.is_empty() {
+            return Ok(());
+        }
+        let owner_history = self.new_owner_history()?;
+        let contexts = geometry::Contexts::find(&self.ifc)?;
+        let infos = reviera_core::rebar::info(store, reviera_core::rebar::InfoParams { rebar_ids: sets.iter().map(|i| reviera_core::ElementRef::Id(*i)).collect() })
+            .unwrap_or_default();
+        let len = |v: f64| AttrValue::Typed { type_name: "IfcPositiveLengthMeasure".into(), value: Box::new(AttrValue::Real(v)) };
+        let mut by_host: BTreeMap<ElementId, Vec<AttrValue>> = BTreeMap::new();
+        for i in &infos {
+            let Some(&step) = self.steps.get(&i.id) else { continue };
+            let e = store.get(i.id).expect("a set");
+            if let Some(mesh) = reviera_core::rebar::mesh(store, e) {
+                let (points, indices) = mesh;
+                let faces: Vec<Vec<usize>> = indices.chunks(3).map(|t| t.iter().map(|k| *k as usize).collect()).collect();
+                geometry::write_breps(&mut self.ifc, step, geometry::BrepFrame::WORLD, &[geometry::Polyhedron { points, faces }], self.length_scale, contexts)?;
+            }
+            let sc = self.length_scale;
+            let area = std::f64::consts::PI * i.diameter * i.diameter / 4.0;
+            self.ifc.set_attribute(step, "NominalDiameter", &AttrValue::Real(i.diameter / sc))?;
+            self.ifc.set_attribute(step, "CrossSectionArea", &AttrValue::Real(area / sc / sc))?;
+            if let Some(l) = i.rounded_lengths.first() {
+                self.ifc.set_attribute(step, "BarLength", &AttrValue::Real(l / sc))?;
+            }
+            let predefined = if i.role == "ligature" { "LIGATURE" } else { "MAIN" };
+            self.ifc.set_attribute(step, "PredefinedType", &AttrValue::Enum(predefined.into()))?;
+            self.ifc.set_attribute(step, "BarSurface", &AttrValue::Enum("TEXTURED".into()))?;
+            let ty = self.ifc.create_rooted("IfcReinforcingBarType", &GlobalId::new())?;
+            self.ifc.set_attribute(ty, "Name", &AttrValue::String(format!("{} shape {}", i.bar_type, i.shape)))?;
+            self.ifc.set_attribute(ty, "Description", &AttrValue::String(REBAR_TYPE_TAG.into()))?;
+            if let Some(h) = owner_history {
+                self.ifc.set_attribute(ty, "OwnerHistory", &AttrValue::Ref(h.0))?;
+            }
+            self.ifc.set_attribute(ty, "PredefinedType", &AttrValue::Enum(predefined.into()))?;
+            self.ifc.set_attribute(ty, "NominalDiameter", &AttrValue::Real(i.diameter / sc))?;
+            self.ifc.set_attribute(ty, "CrossSectionArea", &AttrValue::Real(area / sc / sc))?;
+            if let Some(l) = i.rounded_lengths.first() {
+                self.ifc.set_attribute(ty, "BarLength", &AttrValue::Real(l / sc))?;
+            }
+            self.ifc.set_attribute(ty, "BarSurface", &AttrValue::Enum("TEXTURED".into()))?;
+            self.ifc.set_attribute(ty, "BendingShapeCode", &AttrValue::String(i.shape.clone()))?;
+            let params: Vec<AttrValue> = i.dimensions.iter().map(|(_, v)| len(v / sc)).collect();
+            self.ifc.set_attribute(ty, "BendingParameters", &AttrValue::List(params))?;
+            let typing = self.ifc.create_rooted("IfcRelDefinesByType", &GlobalId::new())?;
+            self.ifc.set_attribute(typing, "Description", &AttrValue::String(REBAR_TYPE_TAG.into()))?;
+            if let Some(h) = owner_history {
+                self.ifc.set_attribute(typing, "OwnerHistory", &AttrValue::Ref(h.0))?;
+            }
+            self.ifc.set_attribute(typing, "RelatedObjects", &AttrValue::List(vec![AttrValue::Ref(step.0)]))?;
+            self.ifc.set_attribute(typing, "RelatingType", &AttrValue::Ref(ty.0))?;
+            if let Some(h) = i.host {
+                by_host.entry(h).or_default().push(AttrValue::Ref(step.0));
+            }
+        }
+        for (host, bars) in by_host {
+            let Some(&step) = self.steps.get(&host) else { continue };
+            for rel in self.ifc.referenced_by(step, "IfcRelAggregates")? {
+                if matches!(self.ifc.attribute(rel, "Description")?, AttrValue::String(d) if d == TAG) {
+                    self.ifc.remove(rel)?;
+                }
+            }
+            let rel = self.ifc.create_rooted("IfcRelAggregates", &GlobalId::new())?;
+            self.ifc.set_attribute(rel, "Description", &AttrValue::String(TAG.into()))?;
+            if let Some(h) = owner_history {
+                self.ifc.set_attribute(rel, "OwnerHistory", &AttrValue::Ref(h.0))?;
+            }
+            self.ifc.set_attribute(rel, "RelatingObject", &AttrValue::Ref(step.0))?;
+            self.ifc.set_attribute(rel, "RelatedObjects", &AttrValue::List(bars))?;
         }
         Ok(())
     }
@@ -3634,6 +3758,9 @@ impl RxdRecord {
     }
 }
 
+/// The Description that marks a bar type synthesized for rebar sets (STR-RBR-003).
+const REBAR_TYPE_TAG: &str = "rxd:rebar_type";
+
 /// The built-in project template.
 /// The Description that marks an opening a shaft derived for one of its hosts.
 const DERIVED_OPENING: &str = "rxd:shaft";
@@ -3645,7 +3772,8 @@ fn is_derived(ifc: &IfcModel, id: StepId) -> bool {
         if d.starts_with(DERIVED_OPENING)
             || d == crate::curtains::PART_TAG
             || d == crate::path_arrays::PART_TAG
-            || d == crate::stacked_walls::PART_TAG)
+            || d == crate::stacked_walls::PART_TAG
+            || d == REBAR_TYPE_TAG)
 }
 
 /// The lowest and highest points of a floor's, ceiling's or roof's body.

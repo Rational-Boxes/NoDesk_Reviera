@@ -437,6 +437,15 @@ void Model::set_typed_real(std::uint32_t id, rust::Str attr, rust::Str type_name
     inst->set_attribute_value(attr_index(inst, attr), typed_value(*file_, type_name, value));
 }
 
+// A list of selects, each a defined-type value (e.g. IfcBendingParameterSelect lengths).
+void Model::set_typed_real_list(std::uint32_t id, rust::Str attr, rust::Str type_name,
+                                rust::Slice<const double> values) {
+    auto* inst = instance(*file_, id);
+    auto list = aggregate_of_instance::ptr(new aggregate_of_instance);
+    for (auto v : values) list->push(typed_value(*file_, type_name, v));
+    inst->set_attribute_value(attr_index(inst, attr), list);
+}
+
 void Model::set_typed_int(std::uint32_t id, rust::Str attr, rust::Str type_name, std::int32_t value) {
     auto* inst = instance(*file_, id);
     inst->set_attribute_value(attr_index(inst, attr), typed_value(*file_, type_name, static_cast<int>(value)));

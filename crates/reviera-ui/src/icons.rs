@@ -601,11 +601,47 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "truss_remove" => format!(
             r#"<path d="M3 22h26M3 10h26" {s} stroke-dasharray="3 2"/><path d="M3 10l7 12M10 22l6-12M16 10l6 12M22 22l7-12" {sa}/>"#
         ),
+        "rebar" => format!(
+            r#"<rect x="5" y="5" width="22" height="22" fill="{f}" {s}/><rect x="9" y="9" width="14" height="14" rx="2" fill="none" {sa}/><circle cx="11" cy="11" r="1.6" fill="{a}"/><circle cx="21" cy="11" r="1.6" fill="{a}"/><circle cx="11" cy="21" r="1.6" fill="{a}"/><circle cx="21" cy="21" r="1.6" fill="{a}"/>"#
+        ),
+        "rebar_cover" => format!(
+            r#"<rect x="5" y="5" width="22" height="22" fill="{f}" {s}/><path d="M5 22h22" {sa} stroke-dasharray="2 2"/><path d="M16 22v5M14 24l2-2 2 2M14 25l2 2 2-2" {sa}/>"#
+        ),
+        "rebar_settings" => format!(
+            r#"<rect x="4" y="6" width="16" height="16" fill="{f}" {s}/><path d="M7 9h10v10H7z" fill="none" {sa}/><circle cx="24" cy="20" r="4" fill="none" {sa}/><path d="M24 13v3M24 24v3M17 20h3M28 20h3" {sa}/>"#
+        ),
         "structural_settings" => format!(
             r#"<path d="M5 6h14v3H5zM9 9h6v14H9zM5 23h14v3H5z" fill="{f}" {s}/><circle cx="24" cy="20" r="4" fill="none" {sa}/><path d="M24 13v3M24 24v3M17 20h3M28 20h3" {sa}/>"#
         ),
         "structural_connection" => format!(
             r#"<path d="M4 16h24M16 4v24" {s}/><circle cx="16" cy="16" r="5" fill="{a}" {s}/>"#
+        ),
+        "connection_customize" => format!(
+            r#"<path d="M4 16h24M16 4v24" {s}/><circle cx="16" cy="16" r="5" fill="{a}" {s}/><path d="M22 6l4 4-8 8h-4v-4z" fill="{f}" {s}/>"#
+        ),
+        "connection_add" => format!(
+            r#"<circle cx="13" cy="16" r="6" fill="{a}" {s}/><path d="M24 10v12M18 16h12" {sa}/>"#
+        ),
+        "connection_remove" => format!(
+            r#"<circle cx="13" cy="16" r="6" fill="{a}" {s}/><path d="M18 16h12" {sa}/>"#
+        ),
+        "connection_parameter" => format!(
+            r#"<circle cx="12" cy="16" r="6" fill="{a}" {s}/><path d="M20 10h8M20 16h8M20 22h8" {sa}/>"#
+        ),
+        "connection_check" => format!(
+            r#"<path d="M4 16h24M16 4v24" {s}/><circle cx="16" cy="16" r="5" fill="{a}" {s}/><path d="M19 26l3 3 6-7" {sa}/>"#
+        ),
+        "connection_presize" => format!(
+            r#"<circle cx="12" cy="16" r="4" fill="{f}" {s}/><circle cx="22" cy="16" r="7" fill="{a}" {s}/>"#
+        ),
+        "connection_report" => format!(
+            r#"<path d="M6 4h14l6 6v18H6z" fill="{f}" {s}/><path d="M10 22l4-5 4 3 4-6" {sa}/>"#
+        ),
+        "steel_numbering" => format!(
+            r#"<path d="M4 10h24v12H4z" fill="{f}" {s}/><path d="M9 14v4M13 14h3l-3 4h3M19 14h3v2h-3v2h3" {sa}/>"#
+        ),
+        "steel_nc" => format!(
+            r#"<path d="M6 4h14l6 6v18H6z" fill="{f}" {s}/><path d="M10 14h12M10 18h12M10 22h8" {sa}/>"#
         ),
         "steel_cope" => format!(
             r#"<path d="M4 12h12v4h12v6H4z" fill="{f}" {s}/><path d="M16 8v8" {sa}/>"#

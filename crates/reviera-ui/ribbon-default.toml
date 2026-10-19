@@ -1391,6 +1391,24 @@ icon = "truss_remove"
 help = "Remove the truss of the selected members, keeping its chords and webs as plain framing"
 
 [[action]]
+id = "rebar.place"
+label = "Rebar"
+icon = "rebar"
+help = "Place a rebar set in each selected concrete column, beam, structural floor or wall, expanded to the host inside its cover: links in a section, bars at a face, or a floor's or wall's layer, with a layout rule"
+
+[[action]]
+id = "rebar_cover.assign"
+label = "Cover"
+icon = "rebar_cover"
+help = "Give the selected concrete hosts' faces a rebar cover type; their rebar follows"
+
+[[action]]
+id = "reinforcement_settings.show"
+label = "Reinforcement Settings"
+icon = "rebar_settings"
+help = "Rebar length rounding, hooks in shape definitions, and the project's cover types"
+
+[[action]]
 id = "structural_settings.show"
 label = "Structural Settings"
 icon = "structural_settings"
@@ -1474,6 +1492,60 @@ id = "steel_modifier.contour_cut"
 label = "Contour Cut"
 icon = "steel_contour_cut"
 help = "Sketch a hole or notch on a face of the selected element and cut it out"
+
+[[action]]
+id = "structural_connection.check"
+label = "Check"
+icon = "connection_check"
+help = "Check the selected connections against a design code with a connection design provider (their design forces are in Properties)"
+
+[[action]]
+id = "structural_connection.presize"
+label = "Presize"
+icon = "connection_presize"
+help = "Grow the selected connections' bolts, plates and welds step by step until the provider's checks pass"
+
+[[action]]
+id = "structural_connection.check_report"
+label = "Check Report"
+icon = "connection_report"
+help = "Write the selected connections' last checks as an HTML report"
+
+[[action]]
+id = "structural_connection.customize"
+label = "Customize"
+icon = "connection_customize"
+help = "Make a custom connection type of the selected connections and plates, bolts and welds at one join (at most three members); place it with Connection on matching joins"
+
+[[action]]
+id = "custom_connection.add_elements"
+label = "Add to Custom"
+icon = "connection_add"
+help = "Add the selected loose plates, bolts or welds to the selected custom connection's type, remaking every instance"
+
+[[action]]
+id = "custom_connection.remove_elements"
+label = "Remove from Custom"
+icon = "connection_remove"
+help = "Remove the selected parts from their custom connection's type, remaking every instance"
+
+[[action]]
+id = "custom_connection.set_parameter"
+label = "Custom Parameter"
+icon = "connection_parameter"
+help = "Make a part's parameter (a plate's thickness, a bolt diameter, a weld throat) a type parameter of the selected custom connection and set it for every instance"
+
+[[action]]
+id = "steel_numbering.run"
+label = "Numbering"
+icon = "steel_numbering"
+help = "Give the steel parts their part marks and the shop assemblies (a member and everything shop-welded to it) their assembly marks; identical parts and assemblies share a mark"
+
+[[action]]
+id = "steel_nc.export"
+label = "NC Export"
+icon = "steel_nc"
+help = "Write one DSTV NC1 file per steel part mark (profile, length, holes; plates with their outline) to a folder"
 
 [[action]]
 id = "structural_connection.automate"
@@ -1953,25 +2025,6 @@ tools = [
   { action = "brace.load_section", size = "small" },
   { action = "beam_system.remove", size = "small" },
   { action = "truss.remove", size = "small" },
-  { action = "structural_connection.create", size = "small" },
-  { action = "structural_connection.automate", size = "small" },
-]
-
-[[tab.panel]]
-label = "Steel"
-tools = [
-  { action = "plate.create", size = "large" },
-  { action = "bolt_pattern.create", size = "large" },
-  { action = "weld.create", size = "large" },
-  { action = "steel_cut.cope", size = "small" },
-  { action = "steel_cut.miter", size = "small" },
-  { action = "steel_cut.saw", size = "small" },
-  { action = "steel_cut.cut_through", size = "small" },
-  { action = "steel_cut.cut_by", size = "small" },
-  { action = "steel_cut.uncope", size = "small" },
-  { action = "steel_modifier.shorten", size = "small" },
-  { action = "steel_modifier.corner_cut", size = "small" },
-  { action = "steel_modifier.contour_cut", size = "small" },
 ]
 
 [[tab.panel]]
@@ -1991,6 +2044,88 @@ tools = [
   { action = "level.create", size = "small" },
   { action = "grid.create", size = "small" },
   { action = "refplane.create", size = "small" },
+]
+
+[[tab]]
+id = "steel"
+label = "Steel"
+
+[[tab.panel]]
+label = "Select"
+tools = [{ action = "tool.modify", size = "large" }]
+
+[[tab.panel]]
+label = "Connections"
+tools = [
+  { action = "structural_connection.create", size = "large" },
+  { action = "structural_connection.automate", size = "large" },
+  { action = "structural_connection.check", size = "small" },
+  { action = "structural_connection.presize", size = "small" },
+  { action = "structural_connection.check_report", size = "small" },
+]
+
+[[tab.panel]]
+label = "Custom"
+tools = [
+  { action = "structural_connection.customize", size = "large" },
+  { action = "custom_connection.add_elements", size = "small" },
+  { action = "custom_connection.remove_elements", size = "small" },
+  { action = "custom_connection.set_parameter", size = "small" },
+]
+
+[[tab.panel]]
+label = "Detailing"
+tools = [
+  { action = "plate.create", size = "large" },
+  { action = "bolt_pattern.create", size = "large" },
+  { action = "weld.create", size = "large" },
+]
+
+[[tab.panel]]
+label = "Cuts"
+tools = [
+  { action = "steel_cut.cope", size = "small" },
+  { action = "steel_cut.miter", size = "small" },
+  { action = "steel_cut.saw", size = "small" },
+  { action = "steel_cut.cut_through", size = "small" },
+  { action = "steel_cut.cut_by", size = "small" },
+  { action = "steel_cut.uncope", size = "small" },
+]
+
+[[tab.panel]]
+label = "Modifiers"
+tools = [
+  { action = "steel_modifier.shorten", size = "small" },
+  { action = "steel_modifier.corner_cut", size = "small" },
+  { action = "steel_modifier.contour_cut", size = "small" },
+]
+
+[[tab.panel]]
+label = "Fabrication"
+tools = [
+  { action = "steel_numbering.run", size = "large" },
+  { action = "steel_nc.export", size = "large" },
+]
+
+[[tab]]
+id = "concrete"
+label = "Concrete"
+
+[[tab.panel]]
+label = "Select"
+tools = [{ action = "tool.modify", size = "large" }]
+
+[[tab.panel]]
+label = "Reinforcement"
+tools = [
+  { action = "rebar.place", size = "large" },
+  { action = "rebar_cover.assign", size = "large" },
+]
+
+[[tab.panel]]
+label = "Settings"
+tools = [
+  { action = "reinforcement_settings.show", size = "large" },
 ]
 
 [[tab]]

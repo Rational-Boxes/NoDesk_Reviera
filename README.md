@@ -652,7 +652,7 @@ tools and the datums.
   `structural_connection.override`; STR-STL-001, STR-STL-002). Not yet: Lua library packages,
   the other connection groups (clip angles, splices, haunches, stiffeners), the Modify Parameters
   dialog with live preview, copes and cuts.
-- **Steel detailing** (Structure › Steel): plates sketched on a face of a column, beam, brace or
+- **Steel detailing** (the Steel tab): plates sketched on a face of a column, beam, brace or
   plate (following it) or on a work plane, with thickness, justification and role; bolt, anchor,
   hole and shear stud patterns through the selected elements, their grip, bolt length and holes
   found from the elements' bodies (holes cut in them and written to IFC as openings); welds on an edge where the
@@ -667,6 +667,36 @@ tools and the datums.
   kernel and written to IFC as openings, grouped in sub-connections (`steel_cut.*`,
   `steel_modifier.*`; STR-STL-008). Not yet: the sub-connection box in views, shape handles,
   copes made by connection types.
+- **Custom connections**: Customize makes a connection type of the connections, plates, bolts and
+  welds at a join (up to three members), placed on joins with the same members' roles, sections
+  and way of meeting; Add, Remove and exposed parameters change every instance after confirming
+  the count (`structural_connection.customize`, `custom_connection.*`; STR-STL-003). Not yet:
+  profiles and cuts as parts, the edit mode with half-toning.
+- **Connection code checking**: design forces on connections, checks through connection design
+  providers (Lua plugins with `capability = "connection_check"`; a simplified MIT sample for bolt
+  shear, bearing, tension and fillet welds to AISC 360 or EN 1993-1-8), Presize growing bolts,
+  plates and welds until they pass, stale status after changes, and an HTML report
+  (`structural_connection.check`, `presize`, `set_design_forces`, `check_status`,
+  `check_report`; STR-STL-009). The steel tools are on their own Steel tab. Not yet: forces from
+  analysis results, anchor rod checks.
+- **Reinforcement** (first milestone): rebar sets in concrete columns, beams, structural floors
+  and walls, placed by Expand to Host (links in a section, straight, L or U bars at a face, a
+  floor's or wall's layers clipped to its outline), kept inside named cover types per host
+  face; the layout rules single, fixed number, maximum spacing, number with spacing, minimum
+  clear spacing and custom formulas (`3x100; ?x200; 5x100`); length rounding shown as
+  "exact [rounded]"; the region's bar and hook types and an open BS 8666 shape-code catalogue;
+  orphaned sets kept, sets deleted with their host; IFC `IfcReinforcingBar` typed with
+  `BendingShapeCode` and `BendingParameters`, aggregated by the host (`rebar.*`,
+  `rebar_cover_type.*`, `rebar_cover.assign`, `reinforcement_settings.*`,
+  `rebar_bar_type.*`, `rebar_hook_type.*`, `rebar_shape.list`; STR-RBR-001…004, 008, 009). On
+  a new Concrete tab. Not yet: two-point and sketched bars, varying sets, cranks and spirals,
+  shape matching, area, path and fabric reinforcement, rebar numbering and views.
+- **Steel numbering and NC files**: part marks for identical members and plates (section,
+  length, holes and cuts; however placed), assembly marks for identical shop assemblies (a member
+  and everything shop-welded to it), written to IFC `Tag`s and STEEL_ASSEMBLY assemblies; DSTV
+  NC1 export, one file per part mark, through the MIT `reviera-dstv` crate (`clients/dstv`)
+  (`steel_numbering.run`, `steel_numbering.preview`, `steel_nc.export`; STR-STL-010). Not yet: copes
+  and cuts as NC contours, marks kept stable across changes.
 - **Connection automation**: Automate Connections finds the joins in the framing (column feet,
   beam ends on columns and girders, brace ends) and places library types by an ordered rule set
   (join kind, sections, depth ranges; the Default set or the project's), skipping connected
@@ -1034,11 +1064,11 @@ area by area (reviewed against the spec on 2026-10-15).
   trusses, braces, generic connections, foundations with piles and pile caps, structural walls and
   floors, Structural Settings with Coarse single-line framing, steel and timber section
   catalogues, a materials library, regional standards and the analytical model's members, nodes,
-  panels, automation, checks, results display, loads, load combinations, point supports, steel connections (four built-in types, with automation) and a built-in linear static solver
+  panels, automation, checks, results display, loads, load combinations, point supports, steel connections (four built-in types, with automation), rebar sets (the first milestone) and a built-in linear static solver
   are built (see [Structure](#structure-in-development)). Still to build: the beam join editor and arc
   beams, placing braces in elevations, the connection library's packages and its other
   connection groups, composite decks and span symbols, truss families (a layout shared by types),
-  rebar, bilinear and two-way area loads, panel results and external analysis providers.
+  further rebar (two-point, sketched, varying, area, path and fabric), bilinear and two-way area loads, panel results and external analysis providers.
 - **MEP, families and collaboration** (BIMserver, OpenCDE, Godot) are specified but not started.
 - **Remote computation subsystem** (DM-RPC-001 … 010): in development; the first milestone is
   built (see [Analysis and remote computation](#analysis-and-remote-computation-in-development)).
@@ -1126,7 +1156,7 @@ Permission levels are `read_only` (the default), `model_edit` and `full_scriptin
 | `crates/reviera-compute` | Remote computation: the client, distillations, the local compute host (`reviera-compute-host`) and the built-in runner (`reviera-analysis-builtin`) |
 | `crates/reviera-godot`, `reviera-net`, `reviera-bimserver`, `reviera-opencde` | Placeholders for the Godot viewer, networking, BIMserver and OpenCDE |
 | `design_documents/` | The specification (`spec/`), technology stack, research log and source register |
-| `schemas/`, `clients/` | Open data formats, protocols and their clients (MIT): RXD, the Reviera Scene Protocol, and the remote computation contract (`schemas/compute`, `clients/compute`) |
+| `schemas/`, `clients/` | Open data formats, protocols and their clients (MIT): RXD, the Reviera Scene Protocol, the remote computation contract (`schemas/compute`, `clients/compute`) and the DSTV NC1 writer (`clients/dstv`) |
 | `test-data/ifc/` | Third-party IFC models for tests (see their README for provenance) |
 | `test-data/samples/` | Reviera's own sample models, their Lua scripts and walkthroughs |
 | `test-data/library/` | The sample Component Library (a public-domain Doric column; see its README) |
