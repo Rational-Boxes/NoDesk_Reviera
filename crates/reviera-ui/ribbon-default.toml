@@ -1288,6 +1288,13 @@ icon = "skylight"
 help = "Place skylights in a roof: a roof window in a pitched roof; a flat, pyramid or ridge lantern skylight on a flat roof (choose in Properties)"
 
 [[action]]
+id = "coordinates.edit"
+label = "Coordinates"
+icon = "coordinates"
+keys = "XY"
+help = "Type exact coordinates: the points of the sketch or tool in progress (to adjust what was sketched, or to add points as if clicked), or the ends, contour, boundary or path of the selected element"
+
+[[action]]
 id = "tool.measure"
 label = "Measure"
 icon = "measure"
@@ -1401,6 +1408,72 @@ id = "rebar_cover.assign"
 label = "Cover"
 icon = "rebar_cover"
 help = "Give the selected concrete hosts' faces a rebar cover type; their rebar follows"
+
+[[action]]
+id = "area_reinforcement.create"
+label = "Area"
+icon = "area_reinforcement"
+help = "Lay area reinforcement over the selected structural floor or wall: top and bottom (or exterior and interior) layers, major and minor, over the whole host or a boundary, cut by its openings"
+
+[[action]]
+id = "path_reinforcement.create"
+label = "Path"
+icon = "path_reinforcement"
+help = "Lay bars square to a path along the selected floor's or wall's edge, with optional alternating bars of another length or offset"
+
+[[action]]
+id = "fabric_area.create"
+label = "Fabric Area"
+icon = "fabric_area"
+help = "Lay welded fabric sheets over the selected floor or wall from a major edge, lapped, aligned or staggered, cut by the boundary, openings and cover"
+
+[[action]]
+id = "fabric_sheet.place"
+label = "Fabric Sheet"
+icon = "fabric_sheet"
+help = "Place one welded fabric sheet in the selected floor or wall at a corner point and rotation"
+
+[[action]]
+id = "area_reinforcement.remove_system"
+label = "Remove Area System"
+icon = "area_remove"
+help = "Remove the selected area reinforcement and keep its layers as rebar sets (area and path rebar must be real rebar)"
+
+[[action]]
+id = "rebar_view.all"
+label = "Show All"
+icon = "rebar_show_all"
+help = "Draw every bar of the selected rebar sets in this view"
+
+[[action]]
+id = "rebar_view.first_last"
+label = "First/Last"
+icon = "rebar_first_last"
+help = "Draw only the first and last bars of the selected sets in this view, with the set's extent line"
+
+[[action]]
+id = "rebar_view.middle"
+label = "Middle"
+icon = "rebar_middle"
+help = "Draw only the middle bar of the selected sets in this view, with the set's extent line"
+
+[[action]]
+id = "rebar_view.select"
+label = "Select Bars"
+icon = "rebar_select"
+help = "Pick the bars of the selected set to draw in this view; Enter finishes"
+
+[[action]]
+id = "rebar_view.states"
+label = "View Visibility States"
+icon = "rebar_visibility"
+help = "Per view, whether the selected rebar shows through its host (Unobscured) and as solid (3D views)"
+
+[[action]]
+id = "reinforcement_numbering.show"
+label = "Reinforcement Numbers"
+icon = "rebar_numbers"
+help = "Rebar and fabric numbers per partition: renumber, remove gaps, change or lock numbers, select the elements of a number"
 
 [[action]]
 id = "reinforcement_settings.show"
@@ -2119,13 +2192,20 @@ tools = [{ action = "tool.modify", size = "large" }]
 label = "Reinforcement"
 tools = [
   { action = "rebar.place", size = "large" },
-  { action = "rebar_cover.assign", size = "large" },
+  { action = "area_reinforcement.create", size = "large" },
+  { action = "path_reinforcement.create", size = "large" },
+  { action = "fabric_area.create", size = "large" },
+  { action = "fabric_sheet.place", size = "small" },
+  { action = "area_reinforcement.remove_system", size = "small" },
+  { action = "rebar_cover.assign", size = "small" },
+  { action = "coordinates.edit", size = "small" },
 ]
 
 [[tab.panel]]
 label = "Settings"
 tools = [
   { action = "reinforcement_settings.show", size = "large" },
+  { action = "reinforcement_numbering.show", size = "large" },
 ]
 
 [[tab]]
@@ -2402,7 +2482,7 @@ tools = [
 
 [[tab.panel]]
 label = "Measure"
-tools = [{ action = "tool.measure", size = "small" }, { action = "dim.create_aligned", size = "small" }]
+tools = [{ action = "tool.measure", size = "small" }, { action = "dim.create_aligned", size = "small" }, { action = "coordinates.edit", size = "small" }]
 
 [[tab.panel]]
 label = "Parts"
@@ -2417,6 +2497,56 @@ tools = [
 
 # ---- Contextual tabs (§1.9): "Modify | <category>" while elements of one category are
 # selected: the Modify tab's panels, then the category's own. ----
+
+[[context]]
+category = "cat.structural_rebar"
+label = "Structural Rebar"
+panels = [
+  { label = "Presentation", tools = [
+    { action = "rebar_view.all", size = "large" },
+    { action = "rebar_view.first_last", size = "large" },
+    { action = "rebar_view.middle", size = "large" },
+    { action = "rebar_view.select", size = "large" },
+  ] },
+  { label = "View", tools = [{ action = "rebar_view.states", size = "large" }] },
+  { label = "Numbers", tools = [{ action = "reinforcement_numbering.show", size = "large" }] },
+]
+
+[[context]]
+category = "cat.structural_area_reinforcement"
+label = "Area Reinforcement"
+panels = [
+  { label = "View", tools = [{ action = "rebar_view.states", size = "large" }] },
+  { label = "System", tools = [
+    { action = "area_reinforcement.remove_system", size = "large" },
+    { action = "coordinates.edit", size = "large" },
+  ] },
+]
+
+[[context]]
+category = "cat.structural_path_reinforcement"
+label = "Path Reinforcement"
+panels = [
+  { label = "View", tools = [{ action = "rebar_view.states", size = "large" }] },
+  { label = "Path", tools = [{ action = "coordinates.edit", size = "large" }] },
+]
+
+[[context]]
+category = "cat.structural_fabric_areas"
+label = "Fabric Area"
+panels = [
+  { label = "View", tools = [{ action = "rebar_view.states", size = "large" }] },
+  { label = "Boundary", tools = [{ action = "coordinates.edit", size = "large" }] },
+  { label = "Numbers", tools = [{ action = "reinforcement_numbering.show", size = "large" }] },
+]
+
+[[context]]
+category = "cat.structural_fabric_reinforcement"
+label = "Fabric Sheet"
+panels = [
+  { label = "View", tools = [{ action = "rebar_view.states", size = "large" }] },
+  { label = "Numbers", tools = [{ action = "reinforcement_numbering.show", size = "large" }] },
+]
 
 [[context]]
 category = "cat.walls"
@@ -2530,6 +2660,7 @@ panels = [
     { action = "sketch.rectangle", size = "small" },
     { action = "sketch.arc", size = "small" },
     { action = "sketch.circle", size = "small" },
+    { action = "coordinates.edit", size = "small" },
   ] },
 ]
 
@@ -2593,6 +2724,7 @@ panels = [
     { action = "sketch.rectangle", size = "small" },
     { action = "sketch.defines_slope", size = "large" },
     { action = "sketch.overhang", size = "small" },
+    { action = "coordinates.edit", size = "small" },
   ] },
 ]
 

@@ -62,7 +62,10 @@ mod steel_auto_ui;
 mod steel_detail_ui;
 mod steel_cut_ui;
 mod custom_ui;
+mod coords;
 mod rebar_ui;
+mod rebar_view_ui;
+mod reinforcement_ui;
 mod steel_ui;
 mod ribbon;
 mod roofs;
@@ -233,6 +236,8 @@ struct View {
     nav: nav::Nav,
     /// A section box or slice plane being dragged.
     clip_edit: Option<inspect::ClipEdit>,
+    /// The rebar segments this view draws, for picking (STR-RBR-017).
+    rebar_picks: rebar_view_ui::RebarPicks,
 }
 
 struct Gui {
@@ -290,6 +295,10 @@ struct Gui {
     load_tool: Option<loads_ui::LoadTool>,
     /// Steel › Detailing: Plate, Bolts or Weld in progress.
     steel_tool: Option<steel_detail_ui::SteelTool>,
+    /// Concrete › Area, Path, Fabric Area or Fabric Sheet being sketched.
+    rebar_sketch: Option<reinforcement_ui::RebarSketch>,
+    /// Select Bars in progress (STR-RBR-017).
+    bar_pick: Option<rebar_view_ui::BarPick>,
     /// Contour Cut: the element the sketch cuts.
     contour_target: Option<ElementId>,
     adjust: Option<adjust::AdjustSession>,
@@ -532,6 +541,10 @@ impl Gui {
                 self.history(true);
                 true
             }
+            "XY" => {
+                self.coordinates();
+                true
+            }
             "ZN" => {
                 self.history(false);
                 true
@@ -635,7 +648,7 @@ impl Gui {
                 true
             }
             "Z" | "W" | "P" | "D" | "L" | "G" | "M" | "C" | "R" | "A" | "O" | "T" | "S" | "U"
-            | "F" | "H" | "I" | "B" => false,
+            | "F" | "H" | "I" | "B" | "X" => false,
             _ => {
                 self.keys.0.clear();
                 false
@@ -839,6 +852,7 @@ impl Gui {
             camera,
             drag: None,
             clip_edit: None,
+            rebar_picks: Vec::new(),
             press: None,
             nav,
         };
@@ -1326,6 +1340,8 @@ impl Gui {
         self.end_panel_tool();
         self.end_load_tool();
         self.end_steel_tool();
+        self.end_rebar_sketch();
+        self.end_bar_pick();
         self.end_curtain_tool();
         self.end_ramp_tool();
         self.end_measure_tool();
@@ -1380,6 +1396,8 @@ impl Gui {
             || self.end_panel_tool()
             || self.end_load_tool()
             || self.end_steel_tool()
+            || self.end_rebar_sketch()
+            || self.end_bar_pick()
             || self.cancel_adjust()
         {
             return frame.set_status_text("Ready", 0);
@@ -1412,8 +1430,270 @@ impl Gui {
         }
     }
 
+    /// Whether a tool that takes clicked points is in progress.
+    pub(crate) fn tool_active(&self) -> bool {
+        self.adjust.is_some()
+            || self.bar_pick.is_some()
+            || self.slice_pick.is_some()
+            || self.attach_pick.is_some()
+            || self.host_pick.is_some()
+            || self.area_pick.is_some()
+            || self.group_pick.is_some()
+            || self.site_pick.is_some()
+            || self.text_pick.is_some()
+            || self.sketch.is_some()
+            || self.ceiling_tool.is_some()
+            || self.room_tool.is_some()
+            || self.section_tool.is_some()
+            || self.note_tool.is_some()
+            || self.stair_tool.is_some()
+            || self.dormer_tool.is_some()
+            || self.railing_tool.is_some()
+            || self.feature_tool.is_some()
+            || self.dome_tool.is_some()
+            || self.column_tool.is_some()
+            || self.beam_tool.is_some()
+            || self.footing_tool.is_some()
+            || self.beam_system_tool.is_some()
+            || self.truss_tool.is_some()
+            || self.panel_tool.is_some()
+            || self.load_tool.is_some()
+            || self.steel_tool.is_some()
+            || self.rebar_sketch.is_some()
+            || self.curtain_tool.is_some()
+            || self.ramp_tool.is_some()
+            || self.measure_tool.is_some()
+            || self.skylight_tool.is_some()
+            || self.place_tool.is_some()
+            || self.array_tool.is_some()
+            || self.dim_tool.is_some()
+            || self.grid_tool.is_some()
+            || self.line_tool.is_some()
+            || self.insert_tool.is_some()
+            || self.modify_tool.is_some()
+            || self.tool.is_some()
+    }
+
+    /// A key handed to the tools in progress; `true` when one used it.
+    pub(crate) fn tools_key(&mut self, key: i32, shift: bool, f: &Frame) -> bool {
+        let mut used = self.adjust_key(key) || self.bar_pick_key(key) || self.steel_key(key) || self.rebar_sketch_key(key) || self.walk_key(key, true, shift);
+        if !used && self.sketch.is_some() {
+            let (mx, my) = self.mouse;
+            used = self.sketch_key(key, mx, my);
+        }
+        if !used && matches!(key, WXK_BACK | WXK_RETURN | WXK_NUMPAD_ENTER) {
+            used =
+                self.modify_key(key) || self.typed_length_key(key) || self.line_enter(key);
+        }
+        if !used {
+            let (mx, my) = self.mouse;
+            used = self.column_key(key, mx, my) || self.place_key(key, mx, my);
+        }
+        if !used && matches!(key, WXK_RETURN | WXK_NUMPAD_ENTER) {
+            used = self.ramp_key(key) || self.array_key(key);
+        }
+        if !used {
+            used = self.insert_key(key);
+        }
+        if !used
+            && matches!(key, WXK_SPACE | WXK_BACK | WXK_RETURN | WXK_NUMPAD_ENTER)
+        {
+            used = self.wall_key(key, f);
+        }
+        used
+    }
+
+    /// A click handed to the tool in progress (or a typed point fed to it, as if clicked);
+    /// `false` when no tool takes clicks.
+    pub(crate) fn tools_click(&mut self, x: i32, y: i32, p: &Panel, f: &Frame) -> bool {
+        if self.adjust.is_some() {
+            self.adjust_click(x, y);
+        } else if self.bar_pick.is_some() {
+            self.bar_pick_click(x, y);
+        } else if self.slice_pick.is_some() {
+            self.slice_click(x, y);
+        } else if self.attach_pick.is_some() {
+            self.attach_click(x, y, p);
+        } else if self.host_pick.is_some() {
+            self.host_click(x, y, p);
+        } else if self.area_pick.is_some() {
+            self.area_click(x, y);
+        } else if self.group_pick.is_some() {
+            self.group_click(x, y);
+        } else if self.site_pick.is_some() {
+            self.site_click(x, y);
+        } else if self.text_pick.is_some() {
+            self.model_text_click(x, y);
+        } else if self.sketch.is_some() {
+            self.sketch_click(x, y);
+        } else if self.ceiling_tool.is_some() {
+            self.ceiling_click(x, y);
+        } else if self.room_tool.is_some() {
+            self.room_click(x, y);
+        } else if self.section_tool.is_some() {
+            self.section_click(x, y);
+        } else if self.note_tool.is_some() {
+            self.note_click(x, y, p);
+        } else if self.stair_tool.is_some() {
+            self.stair_click(x, y);
+        } else if self.dormer_tool.is_some() {
+            self.dormer_click(x, y, p);
+        } else if self.railing_tool.is_some() {
+            self.railing_click(x, y);
+        } else if self.feature_tool.is_some() {
+            self.feature_click(x, y, p);
+        } else if self.dome_tool.is_some() {
+            self.dome_click(x, y);
+        } else if self.column_tool.is_some() {
+            self.column_click(x, y);
+        } else if self.beam_tool.is_some() {
+            self.beam_click(x, y);
+        } else if self.footing_tool.is_some() {
+            self.footing_click(x, y);
+        } else if self.beam_system_tool.is_some() {
+            self.beam_system_click(x, y);
+        } else if self.truss_tool.is_some() {
+            self.truss_click(x, y);
+        } else if self.panel_tool.is_some() {
+            self.panel_click(x, y);
+        } else if self.load_tool.is_some() {
+            self.load_click(x, y);
+        } else if self.steel_tool.is_some() {
+            self.steel_click(x, y);
+        } else if self.rebar_sketch.is_some() {
+            self.rebar_sketch_click(x, y);
+        } else if self.curtain_tool.is_some() {
+            self.curtain_click(x, y);
+        } else if self.ramp_tool.is_some() {
+            self.ramp_click(x, y);
+        } else if self.measure_tool.is_some() {
+            self.measure_click(x, y);
+        } else if self.skylight_tool.is_some() {
+            self.skylight_click(x, y);
+        } else if self.place_tool.is_some() {
+            self.place_click(x, y);
+        } else if self.array_tool.is_some() {
+            self.array_click(x, y, p);
+        } else if self.dim_tool.is_some() {
+            self.dim_click(x, y);
+        } else if self.grid_tool.is_some() {
+            self.grid_click(x, y);
+        } else if self.line_tool.is_some() {
+            self.line_click(x, y);
+        } else if self.insert_tool.is_some() {
+            self.insert_click(x, y);
+        } else if self.modify_tool.is_some() {
+            self.modify_click(x, y);
+        } else if self.active_view().is_some_and(|v| v.nav.walk.is_some()) {
+        } else if self.tool.is_some() {
+            self.wall_click(x, y, p, f);
+        } else {
+            return false;
+        }
+        true
+    }
+
+    /// Mouse movement handed to the tools in progress; `true` when the view needs redrawing.
+    pub(crate) fn tools_motion(&mut self, x: i32, y: i32, p: &Panel, f: &Frame) -> bool {
+        let mut redraw = false;
+        if self.sketch.is_some() {
+            self.sketch_motion(x, y);
+            redraw = true;
+        }
+        if self.ceiling_tool.is_some() {
+            self.ceiling_motion(x, y);
+            redraw = true;
+        }
+        if self.room_tool.is_some() {
+            self.room_motion(x, y);
+            redraw = true;
+        }
+        if self.section_tool.is_some() {
+            self.section_motion(x, y);
+            redraw = true;
+        }
+        if self.stair_tool.is_some() {
+            self.stair_motion(x, y);
+            redraw = true;
+        }
+        if self.railing_tool.is_some() {
+            self.railing_motion(x, y);
+            redraw = true;
+        }
+        if self.dome_tool.is_some() {
+            self.dome_motion(x, y);
+            redraw = true;
+        }
+        if self.column_tool.is_some() {
+            self.column_motion(x, y);
+            redraw = true;
+        }
+        if self.steel_tool.is_some() {
+            self.steel_motion(x, y);
+        }
+        if self.rebar_sketch.is_some() {
+            self.rebar_sketch_motion(x, y);
+        }
+        if self.beam_tool.is_some() {
+            self.beam_motion(x, y);
+            redraw = true;
+        }
+        if self.adjust.is_some() {
+            self.adjust_motion(x, y);
+            redraw = true;
+        }
+        if self.curtain_tool.is_some() {
+            self.curtain_motion(x, y);
+            redraw = true;
+        }
+        if self.ramp_tool.is_some() {
+            self.ramp_motion(x, y);
+            redraw = true;
+        }
+        if self.measure_tool.is_some() {
+            self.measure_motion(x, y);
+            redraw = true;
+        }
+        if self.place_tool.is_some() {
+            self.place_motion(x, y);
+            redraw = true;
+        }
+        if self.array_tool.is_some() {
+            self.array_motion(x, y);
+            redraw = true;
+        }
+        if self.dim_tool.is_some() {
+            self.dim_motion(x, y);
+            redraw = true;
+        }
+        if self.grid_tool.is_some() {
+            self.grid_motion(x, y);
+            redraw = true;
+        }
+        if self.line_tool.is_some() {
+            self.line_motion(x, y);
+            redraw = true;
+        }
+        if self.insert_tool.is_some() {
+            self.insert_motion(x, y);
+            redraw = true;
+        }
+        if self.modify_tool.is_some() {
+            self.modify_motion(x, y);
+            redraw = true;
+        }
+        if self.tool.is_some() {
+            self.wall_motion(x, y, p, f);
+            redraw = true;
+        }
+        redraw
+    }
+
     /// The point on the tool's level plane under pixel (`x`, `y`).
     fn plane_point(&self, x: i32, y: i32, panel: &Panel) -> Option<[f64; 2]> {
+        if let Some(p) = crate::coords::typed() {
+            return Some(p);
+        }
         let t = self.tool.as_ref()?;
         let size = panel.get_client_size();
         let (o, d) = self
@@ -1757,6 +2037,7 @@ impl Gui {
         // In plans a room is picked by its label, or by its inside where nothing else is.
         let hit = self
             .room_label_at(x, y)
+            .or_else(|| self.rebar_line_at(x, y))
             .or_else(|| self.element_at(x, y, panel))
             .or_else(|| self.room_inside(x, y));
         match hit {
@@ -2139,6 +2420,7 @@ impl Gui {
             || self.analytical_rows(grid, id)
             || self.connection_rows(grid, id)
             || self.rebar_rows(grid, id)
+            || self.reinforcement_system_rows(grid, id)
             || self.detail_rows(grid, id)
             || self.curtain_rows(grid, id)
             || self.ramp_rows(grid, id)
@@ -2423,6 +2705,7 @@ impl Gui {
             || self.analytical_edit(property, text.clone())
             || self.connection_edit(property, text.clone())
             || self.rebar_edit(property, text.clone())
+            || self.reinforcement_system_edit(property, text.clone())
             || self.detail_edit(property, text.clone())
             || self.column_edit(property, text.clone())
             || self.curtain_edit(property, text.clone())
@@ -2757,45 +3040,7 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                 }
                 match cube {
                     Some(hit) => g.cube_click(hit),
-                    None if g.adjust.is_some() => g.adjust_click(x, y),
-                    None if g.slice_pick.is_some() => g.slice_click(x, y),
-                    None if g.attach_pick.is_some() => g.attach_click(x, y, &p),
-                    None if g.host_pick.is_some() => g.host_click(x, y, &p),
-                    None if g.area_pick.is_some() => g.area_click(x, y),
-                    None if g.group_pick.is_some() => g.group_click(x, y),
-                    None if g.site_pick.is_some() => g.site_click(x, y),
-                    None if g.text_pick.is_some() => g.model_text_click(x, y),
-                    None if g.sketch.is_some() => g.sketch_click(x, y),
-                    None if g.ceiling_tool.is_some() => g.ceiling_click(x, y),
-                    None if g.room_tool.is_some() => g.room_click(x, y),
-                    None if g.section_tool.is_some() => g.section_click(x, y),
-                    None if g.note_tool.is_some() => g.note_click(x, y, &p),
-                    None if g.stair_tool.is_some() => g.stair_click(x, y),
-                    None if g.dormer_tool.is_some() => g.dormer_click(x, y, &p),
-                    None if g.railing_tool.is_some() => g.railing_click(x, y),
-                    None if g.feature_tool.is_some() => g.feature_click(x, y, &p),
-                    None if g.dome_tool.is_some() => g.dome_click(x, y),
-                    None if g.column_tool.is_some() => g.column_click(x, y),
-                    None if g.beam_tool.is_some() => g.beam_click(x, y),
-                    None if g.footing_tool.is_some() => g.footing_click(x, y),
-                    None if g.beam_system_tool.is_some() => g.beam_system_click(x, y),
-                    None if g.truss_tool.is_some() => g.truss_click(x, y),
-                    None if g.panel_tool.is_some() => g.panel_click(x, y),
-                    None if g.load_tool.is_some() => g.load_click(x, y),
-                    None if g.steel_tool.is_some() => g.steel_click(x, y),
-                    None if g.curtain_tool.is_some() => g.curtain_click(x, y),
-                    None if g.ramp_tool.is_some() => g.ramp_click(x, y),
-                    None if g.measure_tool.is_some() => g.measure_click(x, y),
-                    None if g.skylight_tool.is_some() => g.skylight_click(x, y),
-                    None if g.place_tool.is_some() => g.place_click(x, y),
-                    None if g.array_tool.is_some() => g.array_click(x, y, &p),
-                    None if g.dim_tool.is_some() => g.dim_click(x, y),
-                    None if g.grid_tool.is_some() => g.grid_click(x, y),
-                    None if g.line_tool.is_some() => g.line_click(x, y),
-                    None if g.insert_tool.is_some() => g.insert_click(x, y),
-                    None if g.modify_tool.is_some() => g.modify_click(x, y),
-                    None if g.active_view().is_some_and(|v| v.nav.walk.is_some()) => {}
-                    None if g.tool.is_some() => g.wall_click(x, y, &p, &f),
+                    None if g.tools_click(x, y, &p, &f) => {}
                     None if g.in_sheet() => g.sheet_click(x, y),
                     None if g.temp_dim_click(x, y) => {}
                     None => g.pick(x, y, &p, select::Combine::of(ctrl, shift)),
@@ -2827,93 +3072,7 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                     }
                     redraw |= g.cube_hover(Some((x, y)));
                     g.mouse = (x, y);
-                    if g.sketch.is_some() {
-                        g.sketch_motion(x, y);
-                        redraw = true;
-                    }
-                    if g.ceiling_tool.is_some() {
-                        g.ceiling_motion(x, y);
-                        redraw = true;
-                    }
-                    if g.room_tool.is_some() {
-                        g.room_motion(x, y);
-                        redraw = true;
-                    }
-                    if g.section_tool.is_some() {
-                        g.section_motion(x, y);
-                        redraw = true;
-                    }
-                    if g.stair_tool.is_some() {
-                        g.stair_motion(x, y);
-                        redraw = true;
-                    }
-                    if g.railing_tool.is_some() {
-                        g.railing_motion(x, y);
-                        redraw = true;
-                    }
-                    if g.dome_tool.is_some() {
-                        g.dome_motion(x, y);
-                        redraw = true;
-                    }
-                    if g.column_tool.is_some() {
-                        g.column_motion(x, y);
-                        redraw = true;
-                    }
-                    if g.steel_tool.is_some() {
-                        g.steel_motion(x, y);
-                    }
-                    if g.beam_tool.is_some() {
-                        g.beam_motion(x, y);
-                        redraw = true;
-                    }
-                    if g.adjust.is_some() {
-                        g.adjust_motion(x, y);
-                        redraw = true;
-                    }
-                    if g.curtain_tool.is_some() {
-                        g.curtain_motion(x, y);
-                        redraw = true;
-                    }
-                    if g.ramp_tool.is_some() {
-                        g.ramp_motion(x, y);
-                        redraw = true;
-                    }
-                    if g.measure_tool.is_some() {
-                        g.measure_motion(x, y);
-                        redraw = true;
-                    }
-                    if g.place_tool.is_some() {
-                        g.place_motion(x, y);
-                        redraw = true;
-                    }
-                    if g.array_tool.is_some() {
-                        g.array_motion(x, y);
-                        redraw = true;
-                    }
-                    if g.dim_tool.is_some() {
-                        g.dim_motion(x, y);
-                        redraw = true;
-                    }
-                    if g.grid_tool.is_some() {
-                        g.grid_motion(x, y);
-                        redraw = true;
-                    }
-                    if g.line_tool.is_some() {
-                        g.line_motion(x, y);
-                        redraw = true;
-                    }
-                    if g.insert_tool.is_some() {
-                        g.insert_motion(x, y);
-                        redraw = true;
-                    }
-                    if g.modify_tool.is_some() {
-                        g.modify_motion(x, y);
-                        redraw = true;
-                    }
-                    if g.tool.is_some() {
-                        g.wall_motion(x, y, &p, &f);
-                        redraw = true;
-                    }
+                    redraw |= g.tools_motion(x, y, &p, &f);
                     return;
                 };
                 match kind {
@@ -3090,30 +3249,7 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                 }
                 Some(key) => {
                     with_view(&gui, id, |g| {
-                        used = g.adjust_key(key) || g.steel_key(key) || g.walk_key(key, true, shift);
-                        if !used && g.sketch.is_some() {
-                            let (mx, my) = g.mouse;
-                            used = g.sketch_key(key, mx, my);
-                        }
-                        if !used && matches!(key, WXK_BACK | WXK_RETURN | WXK_NUMPAD_ENTER) {
-                            used =
-                                g.modify_key(key) || g.typed_length_key(key) || g.line_enter(key);
-                        }
-                        if !used {
-                            let (mx, my) = g.mouse;
-                            used = g.column_key(key, mx, my) || g.place_key(key, mx, my);
-                        }
-                        if !used && matches!(key, WXK_RETURN | WXK_NUMPAD_ENTER) {
-                            used = g.ramp_key(key) || g.array_key(key);
-                        }
-                        if !used {
-                            used = g.insert_key(key);
-                        }
-                        if !used
-                            && matches!(key, WXK_SPACE | WXK_BACK | WXK_RETURN | WXK_NUMPAD_ENTER)
-                        {
-                            used = g.wall_key(key, &f);
-                        }
+                        used = g.tools_key(key, shift, &f);
                     });
                 }
                 None => {}
@@ -3382,6 +3518,8 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 panel_tool: None,
                 load_tool: None,
                 steel_tool: None,
+                rebar_sketch: None,
+                bar_pick: None,
                 contour_target: None,
                 adjust: None,
                 auto_preview: None,
@@ -3780,7 +3918,7 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
     let mut sketching = false;
     with(gui, |g| sketching = g.sketch.is_some());
     let allowed = [
-        "sketch.", "view.", "window.", "ui.", "file.", "edit.", "app.",
+        "sketch.", "coordinates.", "view.", "window.", "ui.", "file.", "edit.", "app.",
     ];
     if sketching && !allowed.iter().any(|p| action.starts_with(p)) {
         return f.set_status_text("Finish ✓ or Cancel ✗ the sketch first", 0);
@@ -3963,6 +4101,11 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "custom_connection.set_parameter" => with(gui, Gui::custom_parameter),
         "rebar.place" => with(gui, Gui::place_rebar),
         "rebar_cover.assign" => with(gui, Gui::rebar_cover),
+        "area_reinforcement.create" => with(gui, Gui::place_area_reinforcement),
+        "area_reinforcement.remove_system" => with(gui, Gui::remove_area_system),
+        "path_reinforcement.create" => with(gui, Gui::place_path_reinforcement),
+        "fabric_area.create" => with(gui, Gui::place_fabric_area),
+        "fabric_sheet.place" => with(gui, Gui::place_fabric_sheet),
         "reinforcement_settings.show" => with(gui, Gui::reinforcement_settings),
         "ui.toggle_analytical" => with(gui, Gui::toggle_analytical),
         "structural_analysis.run" => Gui::start_structural_analysis(gui),
@@ -4368,6 +4511,13 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "datum.maximize_3d" => with(gui, Gui::datum_maximize_3d),
         "datum.propagate_extents" => with(gui, Gui::datum_propagate),
         "workplane.show" => with(gui, Gui::toggle_work_plane),
+        "coordinates.edit" => with(gui, Gui::coordinates),
+        "rebar_view.all" => with(gui, |g| g.rebar_presentation(reviera_core::rebar_views::Mode::All)),
+        "rebar_view.first_last" => with(gui, |g| g.rebar_presentation(reviera_core::rebar_views::Mode::FirstLast)),
+        "rebar_view.middle" => with(gui, |g| g.rebar_presentation(reviera_core::rebar_views::Mode::Middle)),
+        "rebar_view.select" => with(gui, |g| g.rebar_presentation(reviera_core::rebar_views::Mode::Select)),
+        "rebar_view.states" => with(gui, Gui::rebar_view_states),
+        "reinforcement_numbering.show" => with(gui, Gui::reinforcement_numbers),
         "dim.create_aligned" => with(gui, |g| {
             g.start_dim_tool(f);
             focus(g);

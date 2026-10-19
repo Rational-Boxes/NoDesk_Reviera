@@ -1,0 +1,31 @@
+{
+  "note": "Standard fabric designations: BS 4483 square (A) and structural (B) meshes, and WRI welded wire reinforcement styles (W number = wire area in hundredths of a square inch). Wire sizes, spacings and sheet sizes are the published designations; overhangs default to half the crossing wires' spacing. Reviera's own data: check against the supplier.",
+  "metric": {
+    "standard": "BS 4483",
+    "material": "Fabric B500A",
+    "length": 4.8,
+    "width": 2.4,
+    "wires_mm": [6, 7, 8, 10, 12],
+    "sheets": [
+      { "name": "A142", "major": 6, "minor": 6, "major_spacing": 200, "minor_spacing": 200 },
+      { "name": "A193", "major": 7, "minor": 7, "major_spacing": 200, "minor_spacing": 200 },
+      { "name": "A252", "major": 8, "minor": 8, "major_spacing": 200, "minor_spacing": 200 },
+      { "name": "A393", "major": 10, "minor": 10, "major_spacing": 200, "minor_spacing": 200 },
+      { "name": "B385", "major": 7, "minor": 7, "major_spacing": 100, "minor_spacing": 200 },
+      { "name": "B503", "major": 8, "minor": 8, "major_spacing": 100, "minor_spacing": 200 }
+    ]
+  },
+  "us": {
+    "standard": "WRI / ASTM A1064",
+    "material": "Welded wire ASTM A1064",
+    "length_ft": 20,
+    "width_ft": 8,
+    "wires": ["W1.4", "W2.1", "W2.9", "W4.0"],
+    "sheets": [
+      { "name": "6x6-W1.4xW1.4", "major": "W1.4", "minor": "W1.4", "spacing_in": 6 },
+      { "name": "6x6-W2.1xW2.1", "major": "W2.1", "minor": "W2.1", "spacing_in": 6 },
+      { "name": "6x6-W2.9xW2.9", "major": "W2.9", "minor": "W2.9", "spacing_in": 6 },
+      { "name": "6x6-W4.0xW4.0", "major": "W4.0", "minor": "W4.0", "spacing_in": 6 }
+    ]
+  }
+}

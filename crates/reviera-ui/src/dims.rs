@@ -292,6 +292,9 @@ impl Gui {
 
     /// The plan point under pixel (`x`, `y`) of the active view.
     pub(crate) fn plan_xy(&self, x: i32, y: i32) -> Option<[f64; 2]> {
+        if let Some(p) = crate::coords::typed() {
+            return Some(p);
+        }
         let v = self.active_view()?;
         let size = v.panel.get_client_size();
         let (o, _) = v

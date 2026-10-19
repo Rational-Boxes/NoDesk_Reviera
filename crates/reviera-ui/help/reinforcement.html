@@ -1,8 +1,8 @@
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
 <!-- Copyright (C) 2026 Reviera contributors -->
 <h1>Reinforcement</h1>
-<p class="lead">Rebar sets in concrete columns, beams, floors and walls, on the <b>Concrete</b>
-tab. A set is one element: a shape, a bar type and a layout, worked out from its host inside
+<p class="lead">Rebar sets in concrete columns, beams, floors and walls, and area, path and
+fabric reinforcement in floors and walls, on the <b>Concrete</b> tab. A set is one element: a shape, a bar type and a layout, worked out from its host inside
 the host's cover. When the host changes, its bars follow.</p>
 
 <h2 id="hosts">What can hold rebar</h2>
@@ -86,6 +86,94 @@ for links) with a body for every bar, its diameter, area and length. It is typed
 <code>IfcReinforcingBarType</code> that carries the shape code as <code>BendingShapeCode</code>
 and the A, B, C… dimensions as <code>BendingParameters</code>. Each host aggregates its sets.</p>
 
+<h2 id="area">Area reinforcement</h2>
+<p>Select a structural floor or wall, click <a href="reviera:action/area_reinforcement.create">Area</a>
+and set the layers. Then lay it over the whole host, or <b>sketch the boundary</b> on the host:
+on a floor's top in a plan or 3D view, on a wall's face in a 3D view. Click its corners; they
+snap to the host's corners and edges. A click on the first corner (or Enter) closes it, and
+<kbd>R</kbd> draws it as a rectangle by two corners. The <b>major direction</b> edge is drawn
+doubled; <kbd>M</kbd> moves it to the next edge. The major bars run along it and the minor ones
+square to it. <kbd>X</kbd><kbd>Y</kbd> opens <a href="reviera:help/coordinates">Coordinates</a> to type
+the corners or correct the sketched ones.</p>
+<ul>
+  <li>Up to four layers: top and bottom (exterior and interior for walls), each major and minor.
+    Each face's minor layer sits inside its major one.</li>
+  <li>One bar type and a maximum spacing or a number of bars, with optional hooks turned into the
+    host. Additional offsets move a face's layers further in, to stack systems.</li>
+  <li>The boundary and the host's openings cut the bars, less the edge cover.</li>
+</ul>
+<p>The system's Properties list its layers and edit their spacing. With a system selected,
+<a href="reviera:action/coordinates.edit">Coordinates</a> edits its boundary or path.
+<a href="reviera:action/area_reinforcement.remove_system">Remove Area System</a> keeps the layers
+as ordinary rebar sets. It needs <i>area and path reinforcement as real rebar</i> on
+(<code>reinforcement_settings.set</code> <code>area_path_rebar</code>), which is decided before the
+first area or path system.</p>
+
+<h2 id="path">Path reinforcement</h2>
+<p><a href="reviera:action/path_reinforcement.create">Path</a> lays bars square to an open path
+that you sketch along the host, usually on a slab's edge (Enter finishes). Ticks show the side
+the bars go; <kbd>F</kbd> flips it. The bars are spaced along the path between
+its end covers. The primary bars have a type, a length and optional legs turned into the host at
+both ends. Alternating bars take every second place, with their own type, length and an offset
+from the path. Properties show the counts, length, mass and steel volume, and change the side and
+spacing.</p>
+
+<h2 id="fabric">Fabric</h2>
+<p>Sheet types come from the region's catalogue (BS 4483 A142 … A393, B385 and B503 in
+4.8 × 2.4 m sheets; WRI 6x6 W1.4 … W4.0 styles in 8 × 20 ft sheets) or the project's own
+(<code>fabric_sheet_type.create</code>, <code>fabric_wire_type.create</code>). Check them against
+the supplier.</p>
+<ul>
+  <li><a href="reviera:action/fabric_area.create">Fabric Area</a> lays sheets over a sketched
+    boundary or the whole host from its major edge, the sheets' length along it. They overlap by the end and
+    side laps; leave them blank for a crossing spacing plus 50 mm. <b>Staggered</b> starts every
+    second row half a sheet back. Each sheet is cut by the boundary, the openings and the cover,
+    and Properties count the cut sheets.</li>
+  <li><a href="reviera:action/fabric_sheet.place">Fabric Sheet</a> places one sheet: click its
+    first corner, then a point along its length (Enter keeps the plane's x direction). The
+    sheet's outline follows the cursor. It is cut by the host's cover when asked.</li>
+</ul>
+<p>In IFC, area, path and fabric systems are <code>IfcElementAssembly</code>
+(<code>REINFORCEMENT_UNIT</code>) elements. Their bars (<code>IfcReinforcingBar</code>) and sheets
+(<code>IfcReinforcingMesh</code>, typed by <code>IfcReinforcingMeshType</code> with sizes and
+spacings) are written under them each time the model is saved. Rebar inside its concrete is drawn
+but hidden by it. Hide the host (<b>HH</b>) to see the bars.</p>
+
+<h2 id="numbers">Rebar numbers and partitions</h2>
+<p>Every rebar set and fabric sheet has a <b>Rebar Number</b>, shown in Properties. Identical
+ones share it within their <b>partition</b>: same bar type, shape and segment values after
+rounding, or the same sheet type and cut. Partition is free text (a level, phase, top or
+bottom…), edited in Properties; a fabric area's sheets take the area's. Rebar and fabric number
+separately. A new identity takes the next free number and keeps it, so numbers do not move when
+other bars go. <a href="reviera:action/reinforcement_numbering.show">Reinforcement Numbers</a>
+(Concrete › Settings) shows a partition's sequence:</p>
+<ul>
+  <li>Change a number in the grid. A number another row has is refused, and that row is
+    marked.</li>
+  <li>Tick <b>Locked</b> to keep a number through renumbering.</li>
+  <li><b>Start number</b>, <b>Remove gaps</b> (1, 2, 4, 7 becomes 1, 2, 3, 4) and
+    <b>Renumber</b> in creation order skip locked numbers.</li>
+  <li><b>Select Elements</b> selects the elements of the row under the cursor.</li>
+</ul>
+<p>The number is written as the bar's or sheet's IFC <code>Tag</code>.</p>
+
+<h2 id="views">Rebar in views</h2>
+<p>Each view decides how it draws each set or system:</p>
+<ul>
+  <li><b>Unobscured</b>: the bars show through their concrete. Otherwise the concrete hides
+    them, as any solid would.</li>
+  <li><b>Solid</b> (3D views only): tubes at Fine detail. Everywhere else bars are drawn as
+    centrelines.</li>
+  <li><b>Presentation</b> (sets): <i>Show All</i>, <i>First/Last</i>, <i>Middle</i>, or
+    <i>Select Bars</i>, where you click the bars to show and press Enter. First/Last and Middle
+    also draw the set's extent line with end ticks.</li>
+</ul>
+<p>Set them from the contextual tab of a selected set, or for several views at once in
+<a href="reviera:action/rebar_view.states">View Visibility States</a>. Presentation only changes
+what is drawn: quantities, numbers and the IFC export keep every bar. Clicking a drawn bar
+selects its set. The presentation of sets with none of their own comes from Reinforcement
+Settings.</p>
+
 <h2 id="not-yet">Not yet</h2>
-<p>Placing by two points or by sketch, varying sets, cranks and spirals, area, path and fabric
-reinforcement, rebar numbering and tags, and per-view presentation.</p>
+<p>Placing rebar sets by two points or by sketch, varying sets, cranks and spirals, bent and custom fabric sheets, reinforcement symbols, rebar tags, bending
+details and schedules.</p>

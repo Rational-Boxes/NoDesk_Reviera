@@ -3362,6 +3362,8 @@ This builds on §1.29.4. A **layout bookmark** stores *where things are*. A **wo
 - [ ] Typing `@3000,0` after the first wall point places the end point 3 000 mm along X.
 - [ ] Three arrow nudges within one second produce one undo entry.
 
+*Built (2026-10-19), coordinate entry:* **Coordinates** (`coordinates.edit`, sequence `XY`, on Modify › Measure and in every sketch tab) takes points as `x, y`, `@dx, dy` (from the point before, or the tool's last clicked point) and `@distance<angle` or `<distance<angle`, lengths in project units with suffixes. It edits what is in progress or selected: sketch mode lists each curve as `start; end` (`via x, y` for arcs) to correct sketched curves exactly or add more, then optionally finishes; plate, area, path and fabric sketches list their points; any other point tool (walls, beams, columns, grids, lines, railings, stairs, measuring, …) receives the points one by one exactly as clicks, through the tools' own snapping and point functions, optionally followed by Enter; a selected wall, beam, grid, plate or area, fabric or path system has its ends, contour, boundary or path changed in one step. Not yet: typing straight into the canvas without the dialog, the inline error marking, 3D picks for tools that pick surfaces (Place Component in 3D, hosts under the cursor).
+
 ### 1.33.2 Visual accessibility
 **ID:** UI-A11Y-002 · **Priority:** P1
 

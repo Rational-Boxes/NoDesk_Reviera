@@ -2545,8 +2545,10 @@ impl LocalProject {
                 self.ifc.remove(t)?;
             }
         }
+        self.remove_rebar_parts()?;
         let sets: Vec<ElementId> = store.iter().filter(|e| reviera_core::rebar::rebar_recipe(e).is_some()).map(|e| e.id()).collect();
-        if sets.is_empty() {
+        let systems: Vec<ElementId> = store.iter().filter(|e| reviera_core::rebar_systems::system_kind(e).is_some()).map(|e| e.id()).collect();
+        if sets.is_empty() && systems.is_empty() {
             return Ok(());
         }
         let owner_history = self.new_owner_history()?;
@@ -2573,6 +2575,10 @@ impl LocalProject {
             let predefined = if i.role == "ligature" { "LIGATURE" } else { "MAIN" };
             self.ifc.set_attribute(step, "PredefinedType", &AttrValue::Enum(predefined.into()))?;
             self.ifc.set_attribute(step, "BarSurface", &AttrValue::Enum("TEXTURED".into()))?;
+            // The rebar number (STR-RBR-016).
+            if let Some(n) = i.number {
+                self.ifc.set_attribute(step, "Tag", &AttrValue::String(n.to_string()))?;
+            }
             let ty = self.ifc.create_rooted("IfcReinforcingBarType", &GlobalId::new())?;
             self.ifc.set_attribute(ty, "Name", &AttrValue::String(format!("{} shape {}", i.bar_type, i.shape)))?;
             self.ifc.set_attribute(ty, "Description", &AttrValue::String(REBAR_TYPE_TAG.into()))?;
@@ -2600,6 +2606,18 @@ impl LocalProject {
                 by_host.entry(h).or_default().push(AttrValue::Ref(step.0));
             }
         }
+        // Area, path and fabric systems and single sheets (STR-RBR-010 … 012).
+        for id in systems {
+            let Some(&step) = self.steps.get(&id) else { continue };
+            let e = store.get(id).expect("a system");
+            self.write_rebar_parts(store, e, step, owner_history, contexts)?;
+            if let Some(h) = reviera_core::rebar_systems::info(store, reviera_core::rebar_systems::InfoParams { system_ids: vec![reviera_core::ElementRef::Id(id)] })
+                .ok()
+                .and_then(|i| i.first().and_then(|i| i.host))
+            {
+                by_host.entry(h).or_default().push(AttrValue::Ref(step.0));
+            }
+        }
         for (host, bars) in by_host {
             let Some(&step) = self.steps.get(&host) else { continue };
             for rel in self.ifc.referenced_by(step, "IfcRelAggregates")? {
@@ -2615,6 +2633,165 @@ impl LocalProject {
             self.ifc.set_attribute(rel, "RelatingObject", &AttrValue::Ref(step.0))?;
             self.ifc.set_attribute(rel, "RelatedObjects", &AttrValue::List(bars))?;
         }
+        Ok(())
+    }
+
+    /// Removes the bars and sheets written under reinforcement systems, with their types.
+    fn remove_rebar_parts(&mut self) -> Result<()> {
+        for rel in self.ifc.entities_of_type("IfcRelAggregates")? {
+            if !matches!(self.ifc.attribute(rel.id, "Description")?, AttrValue::String(d) if d == REBAR_PART_TAG) {
+                continue;
+            }
+            if let AttrValue::List(parts) = self.ifc.attribute(rel.id, "RelatedObjects")? {
+                for p in parts {
+                    let AttrValue::Ref(p) = p else { continue };
+                    let p = StepId(p);
+                    for typing in self.ifc.referenced_by(p, "IfcRelDefinesByType")? {
+                        self.ifc.remove(typing)?;
+                    }
+                    geometry::remove_breps(&mut self.ifc, p)?;
+                    self.ifc.remove(p)?;
+                }
+            }
+            self.ifc.remove(rel.id)?;
+        }
+        if self.ifc.schema() != "IFC2X3" {
+            for t in self.ifc.entities_of_type("IfcReinforcingMeshType")? {
+                if matches!(self.ifc.attribute(t.id, "Description")?, AttrValue::String(d) if d == REBAR_TYPE_TAG) {
+                    for rel in self.ifc.referenced_by(t.id, "IfcRelDefinesByType")? {
+                        self.ifc.remove(rel)?;
+                    }
+                    self.ifc.remove(t.id)?;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Sets a fabric sheet's attributes, and types it by a sheet type made for it (IFC4).
+    fn write_mesh_attributes(&mut self, step: StepId, t: &reviera_core::rebar_systems::SheetType, da: f64, db: f64, owner_history: Option<StepId>) -> Result<()> {
+        let sc = self.length_scale;
+        let area = |d: f64| std::f64::consts::PI * d * d / 4.0 / sc / sc;
+        let ifc4 = self.ifc.schema() != "IFC2X3";
+        let attrs = [
+            ("MeshLength", AttrValue::Real(t.length / sc)),
+            ("MeshWidth", AttrValue::Real(t.width / sc)),
+            ("LongitudinalBarNominalDiameter", AttrValue::Real(da / sc)),
+            ("TransverseBarNominalDiameter", AttrValue::Real(db / sc)),
+            ("LongitudinalBarCrossSectionArea", AttrValue::Real(area(da))),
+            ("TransverseBarCrossSectionArea", AttrValue::Real(area(db))),
+            ("LongitudinalBarSpacing", AttrValue::Real(t.major_spacing / sc)),
+            ("TransverseBarSpacing", AttrValue::Real(t.minor_spacing / sc)),
+        ];
+        for (k, v) in &attrs {
+            self.ifc.set_attribute(step, k, v)?;
+        }
+        if !ifc4 {
+            return Ok(());
+        }
+        self.ifc.set_attribute(step, "PredefinedType", &AttrValue::Enum("NOTDEFINED".into()))?;
+        let ty = self.ifc.create_rooted("IfcReinforcingMeshType", &GlobalId::new())?;
+        self.ifc.set_attribute(ty, "Name", &AttrValue::String(t.name.clone()))?;
+        self.ifc.set_attribute(ty, "Description", &AttrValue::String(REBAR_TYPE_TAG.into()))?;
+        if let Some(h) = owner_history {
+            self.ifc.set_attribute(ty, "OwnerHistory", &AttrValue::Ref(h.0))?;
+        }
+        self.ifc.set_attribute(ty, "PredefinedType", &AttrValue::Enum("NOTDEFINED".into()))?;
+        for (k, v) in &attrs {
+            self.ifc.set_attribute(ty, k, v)?;
+        }
+        let typing = self.ifc.create_rooted("IfcRelDefinesByType", &GlobalId::new())?;
+        self.ifc.set_attribute(typing, "Description", &AttrValue::String(REBAR_TYPE_TAG.into()))?;
+        if let Some(h) = owner_history {
+            self.ifc.set_attribute(typing, "OwnerHistory", &AttrValue::Ref(h.0))?;
+        }
+        self.ifc.set_attribute(typing, "RelatedObjects", &AttrValue::List(vec![AttrValue::Ref(step.0)]))?;
+        self.ifc.set_attribute(typing, "RelatingType", &AttrValue::Ref(ty.0))?;
+        Ok(())
+    }
+
+    /// Writes a reinforcement system's bars (`IfcReinforcingBar` by group) or sheets
+    /// (`IfcReinforcingMesh`) aggregated under it, or a single sheet's body and attributes.
+    fn write_rebar_parts(
+        &mut self,
+        store: &reviera_core::Store,
+        e: &reviera_core::Element,
+        step: StepId,
+        owner_history: Option<StepId>,
+        contexts: geometry::Contexts,
+    ) -> Result<()> {
+        use reviera_core::rebar_systems::{self as rs, Part};
+        let sc = self.length_scale;
+        let poly = |(points, indices): reviera_core::bodies::Mesh| geometry::Polyhedron {
+            points,
+            faces: indices.chunks(3).map(|t| t.iter().map(|k| *k as usize).collect()).collect(),
+        };
+        let numbers = reviera_core::rebar_numbers::number_of(store, e.id());
+        if let Some((t, da, db)) = rs::single_sheet_type(store, e) {
+            if let Some(m) = rs::mesh(store, e) {
+                geometry::write_breps(&mut self.ifc, step, geometry::BrepFrame::WORLD, &[poly(m)], sc, contexts)?;
+            }
+            if let Some(n) = numbers.first() {
+                self.ifc.set_attribute(step, "Tag", &AttrValue::String(n.to_string()))?;
+            }
+            return self.write_mesh_attributes(step, &t, da, db, owner_history);
+        }
+        let mut parts = Vec::new();
+        let mut sheet = 0;
+        for part in rs::parts(store, e) {
+            match part {
+                Part::Bars { group, mesh } => {
+                    if group.bars.is_empty() {
+                        continue;
+                    }
+                    let p = self.ifc.create_rooted("IfcReinforcingBar", &GlobalId::new())?;
+                    self.ifc.set_attribute(p, "Name", &AttrValue::String(format!("{} {}", group.name, group.bar_type)))?;
+                    self.ifc.set_attribute(p, "Description", &AttrValue::String(REBAR_PART_TAG.into()))?;
+                    if let Some(h) = owner_history {
+                        self.ifc.set_attribute(p, "OwnerHistory", &AttrValue::Ref(h.0))?;
+                    }
+                    geometry::write_breps(&mut self.ifc, p, geometry::BrepFrame::WORLD, &[poly(mesh)], sc, contexts)?;
+                    let area = std::f64::consts::PI * group.diameter * group.diameter / 4.0;
+                    self.ifc.set_attribute(p, "NominalDiameter", &AttrValue::Real(group.diameter / sc))?;
+                    self.ifc.set_attribute(p, "CrossSectionArea", &AttrValue::Real(area / sc / sc))?;
+                    if let Some(l) = group.lengths.iter().copied().reduce(f64::max) {
+                        self.ifc.set_attribute(p, "BarLength", &AttrValue::Real(l / sc))?;
+                    }
+                    if self.ifc.schema() != "IFC2X3" {
+                        self.ifc.set_attribute(p, "PredefinedType", &AttrValue::Enum("MAIN".into()))?;
+                    } else {
+                        self.ifc.set_attribute(p, "BarRole", &AttrValue::Enum("MAIN".into()))?;
+                    }
+                    self.ifc.set_attribute(p, "BarSurface", &AttrValue::Enum("TEXTURED".into()))?;
+                    parts.push(AttrValue::Ref(p.0));
+                }
+                Part::Sheet { sheet_type, major_diameter, minor_diameter, mesh, name } => {
+                    let p = self.ifc.create_rooted("IfcReinforcingMesh", &GlobalId::new())?;
+                    self.ifc.set_attribute(p, "Name", &AttrValue::String(name))?;
+                    self.ifc.set_attribute(p, "Description", &AttrValue::String(REBAR_PART_TAG.into()))?;
+                    if let Some(h) = owner_history {
+                        self.ifc.set_attribute(p, "OwnerHistory", &AttrValue::Ref(h.0))?;
+                    }
+                    geometry::write_breps(&mut self.ifc, p, geometry::BrepFrame::WORLD, &[poly(mesh)], sc, contexts)?;
+                    if let Some(n) = numbers.get(sheet) {
+                        self.ifc.set_attribute(p, "Tag", &AttrValue::String(n.to_string()))?;
+                    }
+                    sheet += 1;
+                    self.write_mesh_attributes(p, &sheet_type, major_diameter, minor_diameter, owner_history)?;
+                    parts.push(AttrValue::Ref(p.0));
+                }
+            }
+        }
+        if parts.is_empty() {
+            return Ok(());
+        }
+        let rel = self.ifc.create_rooted("IfcRelAggregates", &GlobalId::new())?;
+        self.ifc.set_attribute(rel, "Description", &AttrValue::String(REBAR_PART_TAG.into()))?;
+        if let Some(h) = owner_history {
+            self.ifc.set_attribute(rel, "OwnerHistory", &AttrValue::Ref(h.0))?;
+        }
+        self.ifc.set_attribute(rel, "RelatingObject", &AttrValue::Ref(step.0))?;
+        self.ifc.set_attribute(rel, "RelatedObjects", &AttrValue::List(parts))?;
         Ok(())
     }
 
@@ -3760,6 +3937,8 @@ impl RxdRecord {
 
 /// The Description that marks a bar type synthesized for rebar sets (STR-RBR-003).
 const REBAR_TYPE_TAG: &str = "rxd:rebar_type";
+/// Bars and sheets written under area, path and fabric systems (STR-RBR-010 … 012).
+const REBAR_PART_TAG: &str = "rxd:rebar_part";
 
 /// The built-in project template.
 /// The Description that marks an opening a shaft derived for one of its hosts.
@@ -3773,7 +3952,8 @@ fn is_derived(ifc: &IfcModel, id: StepId) -> bool {
             || d == crate::curtains::PART_TAG
             || d == crate::path_arrays::PART_TAG
             || d == crate::stacked_walls::PART_TAG
-            || d == REBAR_TYPE_TAG)
+            || d == REBAR_TYPE_TAG
+            || d == REBAR_PART_TAG)
 }
 
 /// The lowest and highest points of a floor's, ceiling's or roof's body.

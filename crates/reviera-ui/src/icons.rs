@@ -607,6 +607,42 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "rebar_cover" => format!(
             r#"<rect x="5" y="5" width="22" height="22" fill="{f}" {s}/><path d="M5 22h22" {sa} stroke-dasharray="2 2"/><path d="M16 22v5M14 24l2-2 2 2M14 25l2 2 2-2" {sa}/>"#
         ),
+        "rebar_show_all" => format!(
+            r#"<rect x="4" y="6" width="24" height="20" fill="{f}" {s}/><path d="M8 10v12M12 10v12M16 10v12M20 10v12M24 10v12" {sa}/>"#
+        ),
+        "rebar_first_last" => format!(
+            r#"<rect x="4" y="6" width="24" height="20" fill="{f}" {s}/><path d="M8 10v12M24 10v12" {sa}/><path d="M8 16h16M8 14v4M24 14v4" {s} stroke-dasharray="2 2"/>"#
+        ),
+        "rebar_middle" => format!(
+            r#"<rect x="4" y="6" width="24" height="20" fill="{f}" {s}/><path d="M16 10v12" {sa}/><path d="M8 16h16M8 14v4M24 14v4" {s} stroke-dasharray="2 2"/>"#
+        ),
+        "rebar_select" => format!(
+            r#"<rect x="4" y="6" width="24" height="20" fill="{f}" {s}/><path d="M10 10v12M20 10v12" {sa}/><path d="M22 18l6 6-3 1 2 3-2 1-2-3-2 2z" fill="{a}"/>"#
+        ),
+        "rebar_visibility" => format!(
+            r#"<rect x="4" y="8" width="18" height="18" fill="{f}" {s} stroke-dasharray="3 2"/><path d="M8 12v10M13 12v10M18 12v10" {sa}/><path d="M18 8c4-4 10-1 12 3-2 4-8 7-12 3" fill="none" {s}/><circle cx="24" cy="10" r="1.6" fill="{a}"/>"#
+        ),
+        "rebar_numbers" => format!(
+            r#"<rect x="4" y="6" width="24" height="20" fill="{f}" {s}/><path d="M9 12l2-2v12M15 12c0-3 5-3 5 0 0 2-5 5-5 10h5M23 10h4l-2 4c3 0 3 8-2 8" fill="none" {sa}/>"#
+        ),
+        "coordinates" => format!(
+            r#"<path d="M6 26V6M6 26h20" {s}/><path d="M6 6l-2 3M6 6l2 3M26 26l-3-2M26 26l-3 2" {s}/><circle cx="19" cy="13" r="2.2" fill="{a}"/><path d="M19 13H6M19 13v13" {sa} stroke-dasharray="2 2"/>"#
+        ),
+        "area_reinforcement" => format!(
+            r#"<rect x="4" y="4" width="24" height="24" fill="{f}" {s}/><path d="M8 11h16M8 16h16M8 21h16M11 8v16M16 8v16M21 8v16" {sa}/>"#
+        ),
+        "path_reinforcement" => format!(
+            r#"<rect x="4" y="4" width="24" height="24" fill="{f}" {s}/><path d="M4 26h24" {s} stroke-width="2"/><path d="M8 26V12M13 26V17M18 26V12M23 26V17" {sa}/>"#
+        ),
+        "fabric_area" => format!(
+            r#"<path d="M4 4h24v24H4z" fill="{f}" {s}/><path d="M6 6h12v10H6zM14 14h12v10H14z" fill="none" {sa}/><path d="M9 6v10M12 6v10M15 6v10M6 9h12M6 12h12" {sa} stroke-width="0.8"/>"#
+        ),
+        "fabric_sheet" => format!(
+            r#"<path d="M6 8h20v16H6z" fill="{f}" {sa}/><path d="M10 8v16M14 8v16M18 8v16M22 8v16M6 12h20M6 16h20M6 20h20" {sa} stroke-width="0.8"/>"#
+        ),
+        "area_remove" => format!(
+            r#"<rect x="4" y="4" width="20" height="20" fill="{f}" {s} stroke-dasharray="3 2"/><path d="M8 10h12M8 15h12M8 20h12" {sa}/><path d="M22 22l7 7M29 22l-7 7" {s}/>"#
+        ),
         "rebar_settings" => format!(
             r#"<rect x="4" y="6" width="16" height="16" fill="{f}" {s}/><path d="M7 9h10v10H7z" fill="none" {sa}/><circle cx="24" cy="20" r="4" fill="none" {sa}/><path d="M24 13v3M24 24v3M17 20h3M28 20h3" {sa}/>"#
         ),

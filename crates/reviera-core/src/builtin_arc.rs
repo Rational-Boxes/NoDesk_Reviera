@@ -95,6 +95,27 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(RebarCoverTypeSet),
         registry.add(RebarCoverTypeDelete),
         registry.add(RebarCoverAssign),
+        registry.add(AreaReinforcementCreate),
+        registry.add(AreaReinforcementSet),
+        registry.add(AreaReinforcementRemoveSystem),
+        registry.add(PathReinforcementCreate),
+        registry.add(PathReinforcementSet),
+        registry.add(FabricAreaCreate),
+        registry.add(FabricAreaSet),
+        registry.add(FabricSheetPlace),
+        registry.add(FabricWireTypeList),
+        registry.add(FabricWireTypeCreate),
+        registry.add(FabricSheetTypeList),
+        registry.add(FabricSheetTypeCreate),
+        registry.add(ReinforcementSystemInfo),
+        registry.add(RebarSetViewVisibility),
+        registry.add(RebarSetPresentation),
+        registry.add(RebarViewStates),
+        registry.add(RebarSetPartition),
+        registry.add(ReinforcementNumberingList),
+        registry.add(ReinforcementNumberingRenumber),
+        registry.add(ReinforcementNumberingSet),
+        registry.add(ReinforcementNumberingApply),
         registry.add(CustomCustomize),
         registry.add(CustomAdd),
         registry.add(CustomRemove),
@@ -2832,6 +2853,269 @@ edit_command!(
     crate::rebar::AssignParams,
     (),
     crate::rebar::assign
+);
+
+edit_command!(
+    AreaReinforcementCreate,
+    "area_reinforcement.create",
+    "Lay area reinforcement",
+    "Lays area reinforcement in a structural floor or wall (STR-RBR-010): `boundary` a closed loop \
+     of [x, y] points in the host's plane (plan for floors; along the wall and up from its base for \
+     walls) or `whole_host`; `major_edge` the loop's edge the major bars follow; `layers` each with \
+     `face` (top, bottom; exterior, interior), `direction` (major, minor), `on`, `bar_type`, \
+     `hook`, `hook_flip`, `spacing` or `n`; `layout_rule` maximum_spacing or fixed_number; \
+     `additional_top` and `additional_bottom` offsets (m). Openings and the boundary cut the bars. \
+     Returns the system (IfcElementAssembly REINFORCEMENT_UNIT).",
+    "Area Reinforcement",
+    crate::rebar_systems::AreaCreateParams,
+    ElementId,
+    crate::rebar_systems::area_create
+);
+
+edit_command!(
+    AreaReinforcementSet,
+    "area_reinforcement.set",
+    "Change area reinforcement",
+    "Changes area systems' layers, layout rule, boundary, major edge or additional offsets \
+     (STR-RBR-010); refused when the bars would not fit.",
+    "Modify Area Reinforcement",
+    crate::rebar_systems::AreaSetParams,
+    (),
+    crate::rebar_systems::area_set
+);
+
+edit_command!(
+    AreaReinforcementRemoveSystem,
+    "area_reinforcement.remove_system",
+    "Remove an area system, keeping its bars",
+    "Removes an area system and keeps its layers as ordinary rebar sets, returned (STR-RBR-010). \
+     Needs area and path reinforcement as real rebar (`reinforcement_settings.set` \
+     `area_path_rebar`).",
+    "Remove Area System",
+    crate::rebar_systems::RemoveSystemParams,
+    Vec<ElementId>,
+    crate::rebar_systems::area_remove_system
+);
+
+edit_command!(
+    PathReinforcementCreate,
+    "path_reinforcement.create",
+    "Lay path reinforcement",
+    "Lays bars square to an open `path` ([x, y] points in the host's plane) in a structural floor \
+     or wall (STR-RBR-011), on its left (or right with `flip`), at `face`, spaced along it by \
+     `spacing` or `count` (both: number with spacing). `primary` and optional `alternating` bars \
+     each have `bar_type`, `length`, `legs` (segments into the host at both ends), `start_hook`, \
+     `end_hook` and `offset` (where they start from the path). Returns the system.",
+    "Path Reinforcement",
+    crate::rebar_systems::PathCreateParams,
+    ElementId,
+    crate::rebar_systems::path_create
+);
+
+edit_command!(
+    PathReinforcementSet,
+    "path_reinforcement.set",
+    "Change path reinforcement",
+    "Changes path systems' `path`, side (`flip`), `layout`, `primary` or `alternating` bars \
+     (`null` removes them) (STR-RBR-011).",
+    "Modify Path Reinforcement",
+    crate::rebar_systems::PathSetParams,
+    (),
+    crate::rebar_systems::path_set
+);
+
+edit_command!(
+    FabricAreaCreate,
+    "fabric_area.create",
+    "Lay a fabric area",
+    "Lays fabric sheets over a `boundary` (or `whole_host`) of a structural floor or wall \
+     (STR-RBR-012) from its `major_edge`, the sheets' length along it: `sheet_type_id`, \
+     `lap_position` (aligned, staggered: every second row's end laps half a sheet along), \
+     `major_lap` and `minor_lap` (m), `face`, `offset`. Sheets are cut by the boundary, the host's \
+     openings and its cover. Returns the system.",
+    "Fabric Area",
+    crate::rebar_systems::FabricAreaParams,
+    ElementId,
+    crate::rebar_systems::fabric_area_create
+);
+
+edit_command!(
+    FabricAreaSet,
+    "fabric_area.set",
+    "Change fabric areas",
+    "Changes fabric areas' sheet type, lap position, laps, major edge or boundary (STR-RBR-012).",
+    "Modify Fabric Area",
+    crate::rebar_systems::FabricAreaSetParams,
+    (),
+    crate::rebar_systems::fabric_area_set
+);
+
+edit_command!(
+    FabricSheetPlace,
+    "fabric_sheet.place",
+    "Place a fabric sheet",
+    "Places one fabric sheet (IfcReinforcingMesh) in a structural floor or wall (STR-RBR-012): its \
+     first corner `point` in the host's plane, `rotation` (degrees), `cut_by_cover` to clip it to \
+     the host less the cover, `face`, `offset`.",
+    "Fabric Sheet",
+    crate::rebar_systems::FabricSheetParams,
+    ElementId,
+    crate::rebar_systems::fabric_sheet_place
+);
+
+read_command!(
+    FabricWireTypeList,
+    "fabric_wire_type.list",
+    "Fabric wire types",
+    "Fabric wire types (STR-RBR-012): the region's catalogue (BS 4483 or WRI) and the project's own, \
+     with diameter and material.",
+    Option<serde_json::Value>,
+    Vec<crate::rebar_systems::WireType>,
+    |s, _| Ok(crate::rebar_systems::wire_types(s))
+);
+
+edit_command!(
+    FabricWireTypeCreate,
+    "fabric_wire_type.create",
+    "Make a fabric wire type",
+    "Makes a project fabric wire type: `name`, `diameter` (m), `material` (STR-RBR-012).",
+    "New Wire Type",
+    crate::rebar_systems::WireTypeParams,
+    String,
+    crate::rebar_systems::wire_type_create
+);
+
+read_command!(
+    FabricSheetTypeList,
+    "fabric_sheet_type.list",
+    "Fabric sheet types",
+    "Fabric sheet types (STR-RBR-012): major and minor wire types and spacings, length, width, \
+     overhangs and mass per square metre.",
+    Option<serde_json::Value>,
+    Vec<crate::rebar_systems::SheetTypeInfo>,
+    |s, _| Ok(crate::rebar_systems::sheet_type_list(s))
+);
+
+edit_command!(
+    FabricSheetTypeCreate,
+    "fabric_sheet_type.create",
+    "Make a fabric sheet type",
+    "Makes a project fabric sheet type: `name`, `major_wire`, `minor_wire`, `major_spacing`, \
+     `minor_spacing`, `length`, `width` (m), optional overhangs (STR-RBR-012).",
+    "New Sheet Type",
+    crate::rebar_systems::SheetTypeParams,
+    String,
+    crate::rebar_systems::sheet_type_create
+);
+
+read_command!(
+    ReinforcementSystemInfo,
+    "reinforcement_system.info",
+    "Area, path and fabric reinforcement",
+    "Each area, path or fabric system (STR-RBR-010 … 012): kind, host, whether orphaned and why, \
+     whether its bars are real rebar, bar groups (area layers; primary and alternating path bars) \
+     with counts, lengths and mass, fabric sheets with corners, wires, cuts and mass, totals and \
+     the steel's volume.",
+    crate::rebar_systems::InfoParams,
+    Vec<crate::rebar_systems::SystemInfo>,
+    crate::rebar_systems::info
+);
+
+edit_command!(
+    RebarSetViewVisibility,
+    "rebar.set_view_visibility",
+    "Set rebar's view visibility states",
+    "Sets whether rebar sets or area, path or fabric systems show unobscured (through their host) \
+     and as solid (3D views only; tubes at Fine detail, centrelines otherwise) in a view \
+     (STR-RBR-017). View data: nothing is written to the rebar.",
+    "View Visibility States",
+    crate::rebar_views::VisibilityParams,
+    (),
+    crate::rebar_views::set_view_visibility
+);
+
+edit_command!(
+    RebarSetPresentation,
+    "rebar.set_presentation",
+    "Set rebar sets' presentation in a view",
+    "Which bars of rebar sets a view draws (STR-RBR-017): `mode` all, first_last, middle or select \
+     (with `selected_indices`, from 0). First/Last and Middle add the set's extent line. Counts, \
+     schedules and the export keep every bar.",
+    "Rebar Presentation",
+    crate::rebar_views::PresentationParams,
+    (),
+    crate::rebar_views::set_presentation
+);
+
+read_command!(
+    RebarViewStates,
+    "rebar.view_states",
+    "A rebar element's view states",
+    "A rebar set's or system's states in every view (STR-RBR-017): unobscured, solid, presentation \
+     and selected bars, with whether the view is 3D (only 3D views take solid).",
+    crate::rebar_views::ViewStatesParams,
+    Vec<crate::rebar_views::ViewState>,
+    crate::rebar_views::view_states
+);
+
+edit_command!(
+    RebarSetPartition,
+    "rebar.set_partition",
+    "Put rebar in a partition",
+    "Puts rebar sets, fabric sheets and fabric areas in a partition (free text; empty for none) \
+     (STR-RBR-016). Identical elements share a number within their partition.",
+    "Rebar Partition",
+    crate::rebar_numbers::PartitionParams,
+    (),
+    crate::rebar_numbers::set_partition
+);
+
+read_command!(
+    ReinforcementNumberingList,
+    "reinforcement_numbering.list",
+    "Reinforcement numbers",
+    "The rebar and fabric number sequences per partition (STR-RBR-016): start number and each \
+     number in use with its identity, summary, count, elements and lock.",
+    crate::rebar_numbers::ListParams,
+    Vec<crate::rebar_numbers::SequenceInfo>,
+    |s, p| Ok(crate::rebar_numbers::list(s, p))
+);
+
+edit_command!(
+    ReinforcementNumberingRenumber,
+    "reinforcement_numbering.renumber",
+    "Renumber reinforcement",
+    "Numbers a partition's rebar or fabric sequence again (STR-RBR-016): in creation order, or \
+     with `remove_gaps` closing the gaps in number order; `start` sets the first number. Locked \
+     numbers stay and are skipped.",
+    "Renumber Reinforcement",
+    crate::rebar_numbers::RenumberParams,
+    (),
+    crate::rebar_numbers::renumber
+);
+
+edit_command!(
+    ReinforcementNumberingSet,
+    "reinforcement_numbering.set",
+    "Set a reinforcement number",
+    "Gives an identity in a partition's sequence a number, or locks or unlocks it (STR-RBR-016). \
+     A number another identity in use has is refused (`reinforcement_numbering.taken`, naming it).",
+    "Reinforcement Number",
+    crate::rebar_numbers::SetNumberParams,
+    (),
+    crate::rebar_numbers::set_number
+);
+
+edit_command!(
+    ReinforcementNumberingApply,
+    "reinforcement_numbering.apply",
+    "Apply reinforcement number edits",
+    "The Reinforcement Numbers dialog's edits as one step (STR-RBR-016): `rows` with an identity's \
+     new `number` or `locked`, then `start`, then `remove_gaps` or `renumber`.",
+    "Reinforcement Numbers",
+    crate::rebar_numbers::ApplyParams,
+    (),
+    crate::rebar_numbers::apply
 );
 
 read_command!(

@@ -196,8 +196,11 @@ impl Gui {
         let v = &self.views[index];
         let (section_box, slices) = self.view_clip(v);
         let clipping = Clipping::of(section_box.as_ref(), &slices);
-        let visibility = self.view_visibility(v);
+        let mut visibility = self.view_visibility(v);
         let mut lines = self.clip_lines(v, section_box.as_ref(), &slices);
+        // Rebar as this view presents it (STR-RBR-017).
+        let (rebar_lines, rebar_top, rebar_picks) = self.rebar_view_drawing(index, &mut visibility);
+        lines.extend(rebar_lines);
         lines.extend(self.datum_3d_lines(index));
         lines.extend(self.analytical_lines(index));
         if !self.views[index].is_2d() {
@@ -208,10 +211,12 @@ impl Gui {
         lines.extend(self.automation_lines(index));
         lines.extend(self.work_plane_grid(index));
         let v = &mut self.views[index];
+        v.rebar_picks = rebar_picks;
         if let Some(vp) = &mut v.viewport {
             vp.set_clipping(&clipping);
             vp.set_visibility(&visibility);
             vp.set_view_lines(&lines);
+            vp.set_view_lines_on_top(&rebar_top);
         }
     }
 

@@ -3571,6 +3571,8 @@ This builds on §1.29.4. A **layout bookmark** stores *where things are*. A **wo
 - [ ] Typing `@3000,0` after the first wall point places the end point 3 000 mm along X.
 - [ ] Three arrow nudges within one second produce one undo entry.
 
+*Built (2026-10-19), coordinate entry:* **Coordinates** (`coordinates.edit`, sequence `XY`, on Modify › Measure and in every sketch tab) takes points as `x, y`, `@dx, dy` (from the point before, or the tool's last clicked point) and `@distance<angle` or `<distance<angle`, lengths in project units with suffixes. It edits what is in progress or selected: sketch mode lists each curve as `start; end` (`via x, y` for arcs) to correct sketched curves exactly or add more, then optionally finishes; plate, area, path and fabric sketches list their points; any other point tool (walls, beams, columns, grids, lines, railings, stairs, measuring, …) receives the points one by one exactly as clicks, through the tools' own snapping and point functions, optionally followed by Enter; a selected wall, beam, grid, plate or area, fabric or path system has its ends, contour, boundary or path changed in one step. Not yet: typing straight into the canvas without the dialog, the inline error marking, 3D picks for tools that pick surfaces (Place Component in 3D, hosts under the cursor).
+
 ### 1.33.2 Visual accessibility
 **ID:** UI-A11Y-002 · **Priority:** P1
 
@@ -15945,7 +15947,7 @@ No IFC equivalent.
 
 **Acceptance criteria.**
 - [x] With Nearest/10 mm rounding, a computed bar length of 2 437 mm displays as "2437 [2440]", and schedules use 2 440 mm.
-- [ ] Trying to change the area/path mode after an area system exists is refused, with an explanation.
+- [x] Trying to change the area/path mode after an area system exists is refused, with an explanation.
 - [x] Deleting a cover type used by 12 faces asks for a replacement type; after *OK* the 12 faces use the replacement and their rebar regenerates in the same transaction.
 - [x] Changing the offset of cover type "Interior 25" to 30 mm moves every bar constrained to faces of that type by 5 mm.
 
@@ -16208,8 +16210,10 @@ The *Whole Host* option uses the host outline as the boundary.
 - `area_reinforcement.remove_system(system_id) -> rebar_ids[]`
 
 **Acceptance criteria.**
-- [ ] A 6 × 4 m slab region with top and bottom × major and minor at 200 mm produces four layers, cut around a 1 × 1 m opening.
-- [ ] *Remove Area System* in real-rebar mode leaves four rebar sets that can be scheduled.
+- [x] A 6 × 4 m slab region with top and bottom × major and minor at 200 mm produces four layers, cut around a 1 × 1 m opening.
+- [x] *Remove Area System* in real-rebar mode leaves four rebar sets that can be scheduled.
+
+*Built (2026-10-19):* `area_reinforcement.create` lays layers over a closed `boundary` (points in the host's plane: plan for floors, along the wall and up from its base for walls) or the whole host, the major bars along the chosen edge of the boundary or outline and the minor ones square to it. Layers are top and bottom (exterior and interior for walls) × major and minor, each with on/off, bar type, hook type (turned into the host, or out with `hook_flip`) and spacing or number under maximum spacing or fixed number; each face's minor layer sits inside its major one, and `additional_top` and `additional_bottom` stack them further in. Bars are clipped to the boundary, the host's outline and its openings (sketch holes, vertical openings and shafts) less the edge cover. `area_reinforcement.set` changes it; `area_reinforcement.remove_system` (only with real rebar on) keeps the layers as ordinary rebar sets, returned. The system is an `IfcElementAssembly` `REINFORCEMENT_UNIT` with its recipe; on export one `IfcReinforcingBar` per layer (marked `rxd:rebar_part`, rewritten on each save, not read back as elements) is aggregated under it, and the host aggregates the system. `reinforcement_system.info` reports the layers with counts, lengths and mass, and the steel's volume. The real-rebar setting is locked once an area or path system exists. Concrete › **Area** sets the layers, then the boundary is sketched on the host's plane (a floor's top in a plan or 3D view, a wall's face in 3D), snapping to its corners and edges, closed by the first corner or Enter, or drawn as a rectangle (R), with the major-direction edge drawn doubled and moved with M; or the whole host. Coordinates (UI-A11Y-001) types or corrects the corners, and edits a placed system's boundary. **Remove Area System**; Properties show the layers and edit the spacing. Not yet: the reinforcement symbol and tag, wall openings cutting wall layers, hook orientation per layer by name.
 
 ### 4.2.11 Path reinforcement
 **ID:** STR-RBR-011 · **Priority:** P2 · **Ref:** research/03 §3.4
@@ -16230,7 +16234,9 @@ The *Whole Host* option uses the host outline as the boundary.
 **Commands.** `path_reinforcement.create(host_id, path_curves[], side, primary, alternating?, spacing | count, face) -> system_id`
 
 **Acceptance criteria.**
-- [ ] A 5 m path at 150 mm spacing with alternating bars offset by 300 mm produces primary and alternating bars in the correct pattern.
+- [x] A 5 m path at 150 mm spacing with alternating bars offset by 300 mm produces primary and alternating bars in the correct pattern.
+
+*Built (2026-10-19):* `path_reinforcement.create` lays bars square to an open polyline in the host's plane, on its left (or right with `flip`), at a face, spaced along the path between its end covers by `spacing` or `count` (both: number with spacing). The primary bar has a type, length, legs turned into the host at both ends (a U, 0 for straight), start and end hooks and an offset from the path; optional alternating bars take every second place with their own type, length, legs, hooks and offset. Bars are clipped to the host less its cover. `path_reinforcement.set` changes the side, layout or bars; `reinforcement_system.info` gives the primary and alternating counts, lengths, mass and the reinforcement volume. IFC as area reinforcement (an `IfcReinforcingBar` each for the primary and alternating bars). Concrete › **Path** sets the bars, then the path is sketched on the host (Enter finishes), ticks showing the bars' side and F flipping it; Coordinates types or corrects its points, and edits a placed path (`path_reinforcement.set` takes `path`). Properties edit the side and spacing. Not yet: curved paths, path boundary visibility overrides.
 
 ### 4.2.12 Fabric (welded wire) reinforcement
 **ID:** STR-RBR-012 · **Priority:** P2 · **Ref:** research/03 §3.5 · screenshots/structure_mep/fabric_area_sheet_layout.png
@@ -16258,8 +16264,10 @@ The *Whole Host* option uses the host outline as the boundary.
 - `fabric_sheet.create_bent(host_id, profile_curves[], sheet_type_id, extent) -> id`
 
 **Acceptance criteria.**
-- [ ] A fabric area over a slab with one opening produces sheets clipped by both the boundary and the opening, with the configured lap lengths.
-- [ ] Switching from Aligned to Staggered moves every second row of lap splices by half a sheet length.
+- [x] A fabric area over a slab with one opening produces sheets clipped by both the boundary and the opening, with the configured lap lengths.
+- [x] Switching from Aligned to Staggered moves every second row of lap splices by half a sheet length.
+
+*Built (2026-10-19):* fabric wire and sheet types from the region's catalogue (`data/rebar/fabric.json`: BS 4483 A142, A193, A252, A393, B385, B503 in 4.8 × 2.4 m sheets; WRI 6x6-W1.4xW1.4 … W4.0xW4.0 in 8 × 20 ft sheets, wire diameters from the W area) or the project's own (`fabric_wire_type.list` / `.create`, `fabric_sheet_type.list` / `.create`, with mass per square metre; overhangs default to half the crossing wires' spacing). `fabric_area.create` lays sheets over a boundary or the whole host from its major edge, their length along it, stepping by the sheet less the end lap (`major_lap`) and side lap (`minor_lap`; by default a crossing spacing plus 50 mm); *Staggered* starts every second row half a sheet back. Each sheet's wires are cut by the boundary, the host's openings and its cover, and the sheet reports whether it was cut; major wires lie at the cover, minor ones on them. `fabric_area.set` changes the sheet type, laps, lap position or major edge. `fabric_sheet.place` places one sheet (`IfcReinforcingMesh`) at a corner point and rotation, cut by the host's cover when asked. IFC: a fabric area is an `IfcElementAssembly` `REINFORCEMENT_UNIT` aggregating an `IfcReinforcingMesh` per sheet; sheets carry MeshLength, MeshWidth, the longitudinal and transverse diameters, areas and spacings, typed by an `IfcReinforcingMeshType` (IFC4). Concrete › **Fabric Area** (the boundary sketched as for area reinforcement, or the whole host; `fabric_area.set` takes a new `boundary`) and **Fabric Sheet** (click the first corner, then a point along its length, the sheet's outline following the cursor); Properties show the sheet count (and how many are cut) and edit the lap position and laps. Not yet: edge controls in the view, the start-edge choice, snapping single sheets to cover, sheet edges and laps, bent sheets (`fabric_sheet.create_bent`), custom sheets, `BendingShapeCode` for bent sheets.
 
 ### 4.2.13 Free-form rebar
 **ID:** STR-RBR-013 · **Priority:** P2 · **Ref:** research/03 §3.6
@@ -16369,10 +16377,12 @@ The *Whole Host* option uses the host outline as the boundary.
 - `rebar.set_partition(ids[], name)`
 
 **Acceptance criteria.**
-- [ ] Two identical stirrup sets in partition "L1" share number 5. Moving one to partition "L2" gives it a number in L2's sequence.
-- [ ] *Remove gaps* turns the sequence 1, 2, 4, 7 into 1, 2, 3, 4 without changing which elements share numbers.
-- [ ] In the dialog, typing number 3 for a row when 3 belongs to another identity in the same partition and kind is refused and the other row is highlighted.
-- [ ] Renumbering a sequence with number 4 locked keeps 4 on its elements and numbers the others 1, 2, 3, 5, ….
+- [x] Two identical stirrup sets in partition "L1" share number 5. Moving one to partition "L2" gives it a number in L2's sequence.
+- [x] *Remove gaps* turns the sequence 1, 2, 4, 7 into 1, 2, 3, 4 without changing which elements share numbers.
+- [x] In the dialog, typing number 3 for a row when 3 belongs to another identity in the same partition and kind is refused and the other row is highlighted.
+- [x] Renumbering a sequence with number 4 locked keeps 4 on its elements and numbers the others 1, 2, 3, 5, ….
+
+*Built (2026-10-19):* every rebar set and fabric sheet (placed alone or laid by a fabric area) has a number, shared by identical ones in the same partition: rebar by bar type, shape code and segment values after segment rounding; fabric by sheet type and, for a cut sheet, its wires' lengths. `rebar.set_partition` puts sets, sheets and fabric areas in a partition (`rxd:rebar_partition`; a fabric area's sheets take its partition). Sequences per partition and kind (rebar, fabric) are kept on the project (`rxd:rebar_numbers`: start, each identity's number, locks). An identity met first takes the next free number in creation order and keeps it, so numbers do not move when other elements go and gaps can appear; numbers are kept on every rebar and fabric change. `reinforcement_numbering.list`, `.renumber` (creation order, or `remove_gaps` in number order; locked numbers stay and are skipped; `start`), `.set` (a number another identity in use has is refused, naming it; lock) and `.apply` (the dialog's edits as one step). `rebar.info` reports the number and partition; the number is the set's or sheet's IFC `Tag`. Concrete › Settings › **Reinforcement Numbers** (choose a partition and sequence; a grid of numbers with count, elements and lock; start, Remove gaps, Renumber; a clashing number marks the other row; Select Elements); Properties show Rebar Number and edit Partition. Not yet: couplers, `Pset_PrecastConcreteElementFabrication.PieceMark`, the filter box, the varying-set ranges (STR-RBR-005).
 
 ### 4.2.17 Rebar visibility and presentation
 **ID:** STR-RBR-017 · **Priority:** P2 · **Ref:** research/03 §3.2 ("Rebar presentation", "View visibility"), §3.8
@@ -16405,10 +16415,12 @@ The *Whole Host* option uses the host outline as the boundary.
 - `rebar.set_presentation(rebar_ids[], view_id, mode, selected_indices?)`
 
 **Acceptance criteria.**
-- [ ] *Show Middle* in a plan view draws one representative bar and the set extent line, and other views are not affected.
-- [ ] A set set to *Unobscured* in a 3D view is visible through its concrete host there, and stays hidden by the host in a second 3D view.
+- [x] *Show Middle* in a plan view draws one representative bar and the set extent line, and other views are not affected.
+- [x] A set set to *Unobscured* in a 3D view is visible through its concrete host there, and stays hidden by the host in a second 3D view.
 - [ ] A set of 15 bars shown with *Show First/Last* still tags as quantity 15 and exports 15 bar bodies.
-- [ ] *Solid* cannot be ticked for a plan view in the View Visibility States grid.
+- [x] *Solid* cannot be ticked for a plan view in the View Visibility States grid.
+
+*Built (2026-10-19):* per view and per rebar set or area, path or fabric system, `rebar.set_view_visibility` (unobscured; solid, refused for views that are not 3D) and `rebar.set_presentation` (all, first_last, middle, select with indices) store view data (`rxd:rebar_view` on the view, by GlobalId; nothing on the rebar), and `rebar.view_states` lists a set's states in every view. Each view draws its rebar accordingly: tubes for solid sets in 3D views at Fine detail, centrelines otherwise; unobscured rebar through its host (a renderer x-ray layer for geometry and lines); First/Last and Middle with the set's extent line and end ticks; Select's picks past the bar count dropped, falling back to all. Clicking a drawn bar selects its set. The default presentation for sets without their own comes from Reinforcement Settings (`presentation`). Counts, numbers and the export keep every bar. The contextual tab of a set has **Show All**, **First/Last**, **Middle**, **Select Bars** (click bars, Enter finishes) and **View Visibility States** (a grid of the views, Solid only for 3D views); an unsaved `{3D}` view is saved first. Not yet: the default of showing rebar only in its placement and section views, spliced-set presentation, view template defaults, journaling of Select picks, and the tag quantity check (tags are STR-RBR-018).
 
 ### 4.2.18 Rebar documentation
 **ID:** STR-RBR-018 · **Priority:** P2 · **Ref:** research/03 §3.8

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Reviera contributors
 
-//! Reinforcement, first milestone (STR-RBR-001, 002, 003, 004, 008, 009).
+//! Reinforcement (STR-RBR-001, 002, 003, 004, 008, 009).
 //!
 //! **Hosts** are concrete structural columns and beams, and structural floors and walls with a
 //! concrete layer. A bar set whose host stops qualifying is kept and reported **orphaned**; it
@@ -28,9 +28,12 @@
 //! number with spacing, minimum clear spacing, or a custom formula (`3x100; ?x200; 5x100` or
 //! `1400@100; 900@300`, at most one `?`).
 //!
+//! Area, path and fabric reinforcement are in `rebar_systems`, numbering in `rebar_numbers`,
+//! and visibility and presentation per view in `rebar_views`.
+//!
 //! Not yet: placement by two points and sketched bars, varying sets, cranks, spirals, shape
-//! matching of sketched bars, area, path and fabric reinforcement, numbering, presentation per
-//! view, the Pset_ReinforcingBarBendings property sets, swept-disk IFC bodies.
+//! matching of sketched bars, the Pset_ReinforcingBarBendings property sets, swept-disk IFC
+//! bodies.
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -48,29 +51,29 @@ pub const COVER_KEY: &str = "rxd:rebar_cover";
 
 const IN: f64 = 0.0254;
 
-type V3 = [f64; 3];
+pub(crate) type V3 = [f64; 3];
 
-fn add(a: V3, b: V3) -> V3 {
+pub(crate) fn add(a: V3, b: V3) -> V3 {
     [a[0] + b[0], a[1] + b[1], a[2] + b[2]]
 }
-fn sub(a: V3, b: V3) -> V3 {
+pub(crate) fn sub(a: V3, b: V3) -> V3 {
     [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
 }
-fn mul(a: V3, s: f64) -> V3 {
+pub(crate) fn mul(a: V3, s: f64) -> V3 {
     [a[0] * s, a[1] * s, a[2] * s]
 }
-fn dot(a: V3, b: V3) -> f64 {
+pub(crate) fn dot(a: V3, b: V3) -> f64 {
     a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
 }
-fn len(a: V3) -> f64 {
+pub(crate) fn len(a: V3) -> f64 {
     dot(a, a).sqrt()
 }
-fn unit(a: V3) -> V3 {
+pub(crate) fn unit(a: V3) -> V3 {
     let l = len(a);
     if l < 1e-12 { a } else { mul(a, 1.0 / l) }
 }
 
-fn us(store: &Store) -> bool {
+pub(crate) fn us(store: &Store) -> bool {
     crate::steel_fab::us_region(store)
 }
 
@@ -307,6 +310,14 @@ pub struct Settings {
     pub bar_types: Vec<BarType>,
     #[serde(default)]
     pub hook_types: Vec<HookType>,
+    /// The project's own fabric wire and sheet types (STR-RBR-012).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub fabric_wires: Vec<crate::rebar_systems::WireType>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub fabric_sheets: Vec<crate::rebar_systems::SheetType>,
+    /// How sets show in views that give them no presentation of their own (STR-RBR-017).
+    #[serde(default)]
+    pub presentation: crate::rebar_views::Mode,
 }
 
 fn default_covers(us_region: bool) -> Vec<CoverType> {
@@ -328,7 +339,7 @@ fn default_covers(us_region: bool) -> Vec<CoverType> {
     }
 }
 
-fn project(store: &Store) -> Option<&Element> {
+pub(crate) fn project(store: &Store) -> Option<&Element> {
     store.iter().find(|e| e.class == "IfcProject")
 }
 
@@ -343,10 +354,13 @@ pub fn settings(store: &Store) -> Settings {
             cover_types: default_covers(us(store)),
             bar_types: Vec::new(),
             hook_types: Vec::new(),
+            fabric_wires: Vec::new(),
+            fabric_sheets: Vec::new(),
+            presentation: crate::rebar_views::Mode::All,
         })
 }
 
-fn save(txn: &mut crate::txn::Transaction<'_>, s: &Settings) -> Result<()> {
+pub(crate) fn save(txn: &mut crate::txn::Transaction<'_>, s: &Settings) -> Result<()> {
     let store = txn.store().clone();
     let pid = project(&store).map(|e| e.id()).ok_or_else(|| Error::new("project.missing", "the model has no project"))?;
     txn.set_param(pid, SETTINGS_KEY, serde_json::to_value(s).expect("serialises"))
@@ -365,11 +379,18 @@ pub fn all_hook_types(store: &Store) -> Vec<HookType> {
     v
 }
 
-fn bar_type(store: &Store, id: &str) -> Result<BarType> {
+pub(crate) fn bar_type(store: &Store, id: &str) -> Result<BarType> {
     bar_types(store)
         .into_iter()
         .find(|b| b.id == id || b.name == id)
         .ok_or_else(|| Error::new("rebar.bar_type", format!("no bar type {id}")))
+}
+
+pub(crate) fn hook_type(store: &Store, id: &str) -> Result<HookType> {
+    all_hook_types(store)
+        .into_iter()
+        .find(|h| h.id == id || h.name == id)
+        .ok_or_else(|| Error::new("rebar.hook_type", format!("no hook type {id}")))
 }
 
 fn hook(store: &Store, id: &str) -> HookType {
@@ -379,7 +400,7 @@ fn hook(store: &Store, id: &str) -> HookType {
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
 pub struct SetSettingParams {
     /// `rounding.on`, `rounding.method`, `rounding.bar_length`, `rounding.segment_length`,
-    /// `hooks_in_shape` or `area_path_rebar`.
+    /// `hooks_in_shape`, `area_path_rebar` or `presentation` (all, first_last, middle).
     pub key: String,
     pub value: Value,
 }
@@ -388,7 +409,7 @@ pub struct SetSettingParams {
 pub(crate) fn set_setting(txn: &mut crate::txn::Transaction<'_>, p: SetSettingParams) -> Result<()> {
     let store = txn.store().clone();
     let mut s = settings(&store);
-    let any_rebar = store.iter().any(|e| rebar_recipe(e).is_some());
+    let any_rebar = store.iter().any(|e| rebar_recipe(e).is_some() || crate::rebar_systems::system_kind(e).is_some());
     let bad = |m: &str| Error::new("reinforcement_settings.value", m.to_owned());
     let num = |v: &Value| v.as_f64().ok_or_else(|| bad("a number of metres"));
     match p.key.as_str() {
@@ -417,8 +438,16 @@ pub(crate) fn set_setting(txn: &mut crate::txn::Transaction<'_>, p: SetSettingPa
             s.hooks_in_shape = p.value.as_bool().ok_or_else(|| bad("true or false"))?;
         }
         "area_path_rebar" => {
-            // Locked once an area or path system exists (none can yet).
+            if crate::rebar_systems::any_area_or_path(&store) {
+                return Err(Error::new(
+                    "reinforcement_settings.locked",
+                    "area and path rebar as real rebar is decided before the first area or path system",
+                ));
+            }
             s.area_path_rebar = p.value.as_bool().ok_or_else(|| bad("true or false"))?;
+        }
+        "presentation" => {
+            s.presentation = serde_json::from_value(p.value.clone()).map_err(|_| bad("all, first_last, middle or select"))?;
         }
         k => return Err(Error::new("reinforcement_settings.key", format!("no reinforcement setting {k}"))),
     }
@@ -567,7 +596,7 @@ pub enum HostKind {
 }
 
 /// What kind of host an element would be (whatever its material).
-fn host_kind(store: &Store, e: &Element) -> Option<HostKind> {
+pub(crate) fn host_kind(store: &Store, e: &Element) -> Option<HostKind> {
     let _ = store;
     if crate::columns::column_recipe(e).is_some() {
         Some(HostKind::Column)
@@ -640,7 +669,7 @@ pub fn host_check(store: &Store, e: &Element) -> std::result::Result<HostKind, S
 }
 
 /// The faces of a host and their cover types: assigned, else by the host's kind.
-fn faces_of(store: &Store, e: &Element, kind: HostKind) -> std::collections::BTreeMap<String, String> {
+pub(crate) fn faces_of(store: &Store, e: &Element, kind: HostKind) -> std::collections::BTreeMap<String, String> {
     let _ = store;
     let default = match kind {
         HostKind::Column | HostKind::Beam => [("top", "beams"), ("bottom", "beams"), ("other", "beams")].as_slice(),
@@ -660,7 +689,7 @@ fn faces_of(store: &Store, e: &Element, kind: HostKind) -> std::collections::BTr
 }
 
 /// A host face's cover (metres).
-fn cover(store: &Store, e: &Element, kind: HostKind, face: &str) -> f64 {
+pub(crate) fn cover(store: &Store, e: &Element, kind: HostKind, face: &str) -> f64 {
     let faces = faces_of(store, e, kind);
     let id = faces.get(face).or_else(|| faces.get("other")).cloned().unwrap_or_default();
     let s = settings(store);
@@ -857,6 +886,15 @@ pub enum Placement {
         /// Further in from the cover (metres), for a second layer.
         #[serde(default)]
         offset: f64,
+        /// Only inside this region of the host's plane (plan x, y for floors; along the wall and
+        /// up from its base for walls), as area reinforcement lays its layers (STR-RBR-010).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        boundary: Option<Vec<[f64; 2]>>,
+        /// A hook type at both ends, turned into the host (or out of the face with `hook_flip`).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        hook: Option<String>,
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        hook_flip: bool,
     },
 }
 
@@ -888,7 +926,7 @@ impl Bar {
 }
 
 /// A polyline with its corners rounded (radius `r` on the centreline).
-fn rounded(points: &[V3], r: f64) -> Vec<V3> {
+pub(crate) fn rounded(points: &[V3], r: f64) -> Vec<V3> {
     if points.len() < 3 || r <= 0.0 {
         return points.to_vec();
     }
@@ -933,7 +971,7 @@ pub struct SetGeometry {
     pub array_length: f64,
 }
 
-fn chord(polys: &[Vec<[f64; 2]>], o: [f64; 2], d: [f64; 2]) -> Vec<(f64, f64)> {
+pub(crate) fn chord(polys: &[Vec<[f64; 2]>], o: [f64; 2], d: [f64; 2]) -> Vec<(f64, f64)> {
     // Where the line o + t d crosses the outlines, as inside intervals.
     let mut ts = Vec::new();
     for poly in polys {
@@ -955,6 +993,118 @@ fn chord(polys: &[Vec<[f64; 2]>], o: [f64; 2], d: [f64; 2]) -> Vec<(f64, f64)> {
     }
     ts.sort_by(f64::total_cmp);
     ts.chunks(2).filter(|c| c.len() == 2).map(|c| (c[0], c[1])).collect()
+}
+
+/// A floor's or wall's plane at a layer of bars: its outline less its openings in the plane's
+/// coordinates (plan x, y for floors; along the wall and up from its base for walls), where the
+/// plane lies, and which way is into the host.
+pub(crate) struct HostPlane {
+    pub shapes: Vec<crate::polygons::Shape>,
+    pub o: V3,
+    pub ex: V3,
+    pub ey: V3,
+    /// From the layer towards the opposite face.
+    pub inward: V3,
+    /// From the layer's bar centres to the opposite face's cover, for hooks and legs.
+    pub room: f64,
+}
+
+impl HostPlane {
+    pub fn at(&self, q: [f64; 2]) -> V3 {
+        add(self.o, add(mul(self.ex, q[0]), mul(self.ey, q[1])))
+    }
+
+    /// The outline's rings, cut to a boundary.
+    pub fn clipped(&self, boundary: Option<&[[f64; 2]]>) -> Vec<Vec<[f64; 2]>> {
+        let shapes = match boundary {
+            Some(b) => crate::polygons::intersection(&self.shapes, &[crate::polygons::Shape { outer: b.to_vec(), holes: Vec::new() }]),
+            None => self.shapes.clone(),
+        };
+        shapes.into_iter().flat_map(|s| std::iter::once(s.outer).chain(s.holes)).collect()
+    }
+}
+
+/// The plane of a floor's `top` or `bottom` layer, or a wall's `exterior` or `interior` one, for
+/// bars of diameter `d` an extra `offset` in from the cover.
+pub(crate) fn host_plane(store: &Store, host: &Element, kind: HostKind, face: &str, d: f64, offset: f64) -> Result<HostPlane> {
+    let cov = |f: &str| cover(store, host, kind, f);
+    match kind {
+        HostKind::Floor => {
+            let g = crate::floors::regenerate(store, host)?;
+            let z = match face {
+                "top" => g.top - cov("top") - d / 2.0 - offset,
+                "bottom" => g.top - g.thickness + cov("bottom") + d / 2.0 + offset,
+                other => return Err(Error::new("rebar.face", format!("a floor's layers are top or bottom, not {other}"))),
+            };
+            if cov("top") + cov("bottom") + 2.0 * d > g.thickness {
+                return Err(Error::new("rebar.no_fit", format!("the bars do not fit: the floor is {:.0} mm thick", g.thickness * 1000.0)));
+            }
+            let shapes = crate::slab_openings::cut_profiles(store, host, &g.profiles)
+                .into_iter()
+                .map(|p| crate::polygons::Shape { outer: p.outer, holes: p.holes })
+                .collect();
+            Ok(HostPlane {
+                shapes,
+                o: [0.0, 0.0, z],
+                ex: [1.0, 0.0, 0.0],
+                ey: [0.0, 1.0, 0.0],
+                inward: [0.0, 0.0, if face == "top" { -1.0 } else { 1.0 }],
+                room: g.thickness - cov("top") - cov("bottom") - d - offset,
+            })
+        }
+        HostKind::Wall => {
+            let g = crate::walls::regenerate(store, host)?;
+            let (dir, nrm) = (g.direction(), g.normal());
+            let side = match face {
+                "exterior" => 1.0,
+                "interior" => -1.0,
+                other => return Err(Error::new("rebar.face", format!("a wall's layers are exterior or interior, not {other}"))),
+            };
+            let inset = g.width / 2.0 - cov(face) - d / 2.0 - offset;
+            if inset < d / 2.0 {
+                return Err(Error::new("rebar.no_fit", format!("the bars do not fit: the wall is {:.0} mm thick", g.width * 1000.0)));
+            }
+            let l = g.length();
+            Ok(HostPlane {
+                shapes: vec![crate::polygons::Shape { outer: vec![[0.0, 0.0], [l, 0.0], [l, g.height], [0.0, g.height]], holes: Vec::new() }],
+                o: [g.start[0] + nrm[0] * side * inset, g.start[1] + nrm[1] * side * inset, g.base_z],
+                ex: [dir[0], dir[1], 0.0],
+                ey: [0.0, 0.0, 1.0],
+                inward: [-nrm[0] * side, -nrm[1] * side, 0.0],
+                room: g.width - cov("exterior") - cov("interior") - d - offset,
+            })
+        }
+        _ => Err(Error::new("rebar.placement", "only floors and walls have layers")),
+    }
+}
+
+/// A hook at a bar's end: the points from the end (where the bar turns) along the tail. `out`
+/// runs out of the bar there; the tail turns `inward`, kept within `room`.
+pub(crate) fn hook_points(end: V3, out: V3, inward: V3, h: &HookType, bt: &BarType, room: f64) -> Vec<V3> {
+    let d = bt.diameter;
+    let r = bt.hook_bend / 2.0 + d / 2.0;
+    let mut ext = extension(h, d);
+    let th = h.angle.to_radians();
+    if th < 1e-6 {
+        return vec![end, add(end, mul(out, ext))];
+    }
+    if h.angle <= 90.0 + 1e-9 {
+        let tail = unit(add(mul(out, th.cos()), mul(inward, th.sin())));
+        let reach = (r + ext) * th.sin();
+        if reach > room && room > 0.0 {
+            ext = (room / th.sin() - r).max(d);
+        }
+        return vec![end, add(end, mul(tail, r + ext))];
+    }
+    // Past a right angle: down a bend's width, then the tail turned back.
+    let w = 2.0 * r;
+    let tail = unit(add(mul(out, th.cos()), mul(inward, th.sin())));
+    let reach = w + ext * th.sin();
+    if reach > room && room > w {
+        ext = ((room - w) / th.sin().max(1e-6)).max(d);
+    }
+    let corner = add(end, mul(inward, w));
+    vec![end, corner, add(corner, mul(tail, ext))]
 }
 
 /// Works out a set's bars from its host.
@@ -1079,68 +1229,51 @@ pub fn geometry(store: &Store, r: &RebarRecipe) -> Result<SetGeometry> {
             };
             Ok(SetGeometry { bars, dimensions: dims, role: "main".into(), array_length: spread })
         }
-        (Placement::Layer { face, angle, vertical, offset }, HostKind::Floor | HostKind::Wall) => {
+        (Placement::Layer { face, angle, vertical, offset, boundary, hook: hook_id, hook_flip }, HostKind::Floor | HostKind::Wall) => {
             if sh.code != "00" {
-                return Err(Error::new("rebar.shape", "layers in floors and walls take shape 00 (straight) for now"));
+                return Err(Error::new("rebar.shape", "layers in floors and walls take shape 00 (straight), with hooks if wanted"));
             }
-            let edge = cov("other");
-            // In the host's plane: its outline (u, v), the plane's origin and axes, and the
-            // layer's place across it.
-            let (polys, o, ex, ey, depth): (Vec<Vec<[f64; 2]>>, V3, V3, V3, V3) = if kind == HostKind::Floor {
-                let g = crate::floors::regenerate(store, host)?;
-                let z = match face.as_str() {
-                    "top" => g.top - cov("top") - d / 2.0 - offset,
-                    "bottom" => g.top - g.thickness + cov("bottom") + d / 2.0 + offset,
-                    other => return Err(Error::new("rebar.face", format!("a floor's layers are top or bottom, not {other}"))),
-                };
-                if cov("top") + cov("bottom") + 2.0 * d > g.thickness {
-                    return Err(Error::new("rebar.no_fit", format!("the bars do not fit: the floor is {:.0} mm thick", g.thickness * 1000.0)));
-                }
-                let polys = g.profiles.iter().flat_map(|p| std::iter::once(p.outer.clone()).chain(p.holes.iter().cloned())).collect();
-                (polys, [0.0, 0.0, z], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0])
-            } else {
-                let g = crate::walls::regenerate(store, host)?;
-                let (dir, nrm) = (g.direction(), g.normal());
-                let side = match face.as_str() {
-                    "exterior" => 1.0,
-                    "interior" => -1.0,
-                    other => return Err(Error::new("rebar.face", format!("a wall's layers are exterior or interior, not {other}"))),
-                };
-                let inset = g.width / 2.0 - cov(face) - d / 2.0 - offset;
-                if inset < d / 2.0 {
-                    return Err(Error::new("rebar.no_fit", format!("the bars do not fit: the wall is {:.0} mm thick", g.width * 1000.0)));
-                }
-                let o = [g.start[0] + nrm[0] * side * inset, g.start[1] + nrm[1] * side * inset, g.base_z];
-                let l = g.length();
-                let poly = vec![[0.0, 0.0], [l, 0.0], [l, g.height], [0.0, g.height]];
-                (vec![poly], o, [dir[0], dir[1], 0.0], [0.0, 0.0, 1.0], [nrm[0], nrm[1], 0.0])
-            };
-            let _ = depth;
+            let pl = host_plane(store, host, kind, face, d, *offset)?;
+            let polys = pl.clipped(boundary.as_deref());
+            if polys.is_empty() {
+                return Err(Error::new("rebar.no_fit", "the boundary does not overlap the host"));
+            }
             // The bars' direction in the plane, and the direction they spread in.
-            let a = if kind == HostKind::Wall { if *vertical { 90.0f64 } else { 0.0 } } else { *angle }.to_radians();
+            let a = if kind == HostKind::Wall && *vertical { 90.0f64 } else { *angle }.to_radians();
+            let wall_vertical = kind == HostKind::Wall && (a.sin().abs() > 1.0 - 1e-9);
+            let wall_horizontal = kind == HostKind::Wall && (a.cos().abs() > 1.0 - 1e-9);
             let (bd, sd) = ([a.cos(), a.sin()], [-a.sin(), a.cos()]);
             let proj = |p: &[f64; 2], v: [f64; 2]| p[0] * v[0] + p[1] * v[1];
-            let outer = &polys[0];
-            let (lo, hi) = outer.iter().fold((f64::INFINITY, f64::NEG_INFINITY), |(a, b), p| (a.min(proj(p, sd)), b.max(proj(p, sd))));
+            let (lo, hi) = polys.iter().flatten().fold((f64::INFINITY, f64::NEG_INFINITY), |(a, b), p| (a.min(proj(p, sd)), b.max(proj(p, sd))));
+            let edge = cov("other");
             let (wall_top, wall_bottom) = (cov("top"), cov("bottom"));
-            let (s0, s1) = if kind == HostKind::Wall && !*vertical { (lo + wall_bottom, hi - wall_top) } else { (lo + edge, hi - edge) };
+            let (s0, s1) = if wall_horizontal { (lo + wall_bottom, hi - wall_top) } else { (lo + edge, hi - edge) };
             let spread = fit("width", s1 - s0)? - d;
             let pos = positions(&r.layout, spread, d)?;
+            let hk = hook_id.as_deref().map(|h| hook_type(store, h)).transpose()?;
+            let inward = if *hook_flip { mul(pl.inward, -1.0) } else { pl.inward };
             let mut bars = Vec::new();
             for t in pos {
                 let at = s0 + d / 2.0 + t;
                 let p = [sd[0] * at, sd[1] * at];
                 for (t0, t1) in chord(&polys, p, bd) {
-                    let (e0, e1) = if kind == HostKind::Wall && *vertical { (wall_bottom, wall_top) } else { (edge, edge) };
+                    let (e0, e1) = if wall_vertical { (wall_bottom, wall_top) } else { (edge, edge) };
                     let (t0, t1) = (t0 + e0, t1 - e1);
                     if t1 - t0 <= d {
                         continue;
                     }
-                    let w = |s: f64| {
-                        let q = [p[0] + bd[0] * s, p[1] + bd[1] * s];
-                        add(o, add(mul(ex, q[0]), mul(ey, q[1])))
+                    let (a3, b3) = (pl.at([p[0] + bd[0] * t0, p[1] + bd[1] * t0]), pl.at([p[0] + bd[0] * t1, p[1] + bd[1] * t1]));
+                    let pts = match &hk {
+                        Some(h) => {
+                            let dir = unit(sub(b3, a3));
+                            let mut v = hook_points(a3, mul(dir, -1.0), inward, h, &bt, pl.room);
+                            v.reverse();
+                            v.extend(hook_points(b3, dir, inward, h, &bt, pl.room));
+                            rounded(&v, bt.hook_bend / 2.0 + d / 2.0)
+                        }
+                        None => vec![a3, b3],
                     };
-                    bars.push(Bar { points: vec![w(t0), w(t1)] });
+                    bars.push(Bar { points: pts });
                 }
             }
             let longest = bars.iter().map(Bar::length).fold(0.0, f64::max);
@@ -1194,11 +1327,13 @@ pub(crate) fn place(txn: &mut crate::txn::Transaction<'_>, p: PlaceParams) -> Re
     };
     let g = geometry(&store, &r)?;
     let predefined = if g.role == "ligature" { "LIGATURE" } else { "MAIN" };
-    txn.create(
+    let id = txn.create(
         NewElement::new("IfcReinforcingBar")
             .param("@PredefinedType", predefined)
             .param(RECIPE_KEY, serde_json::to_value(&r).expect("serialises")),
-    )
+    )?;
+    crate::rebar_numbers::persist(txn)?;
+    Ok(id)
 }
 
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
@@ -1218,7 +1353,7 @@ pub(crate) fn set_layout(txn: &mut crate::txn::Transaction<'_>, p: LayoutParams)
         geometry(&store, &rec)?;
         txn.set_param(id, RECIPE_KEY, serde_json::to_value(&rec).expect("serialises"))?;
     }
-    Ok(())
+    crate::rebar_numbers::persist(txn)
 }
 
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
@@ -1250,7 +1385,7 @@ pub(crate) fn set(txn: &mut crate::txn::Transaction<'_>, p: SetParams) -> Result
         geometry(&store, &rec)?;
         txn.set_param(id, RECIPE_KEY, serde_json::to_value(&rec).expect("serialises"))?;
     }
-    Ok(())
+    crate::rebar_numbers::persist(txn)
 }
 
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
@@ -1272,7 +1407,7 @@ pub(crate) fn rehost(txn: &mut crate::txn::Transaction<'_>, p: RehostParams) -> 
         geometry(&store, &rec)?;
         txn.set_param(id, RECIPE_KEY, serde_json::to_value(&rec).expect("serialises"))?;
     }
-    Ok(())
+    crate::rebar_numbers::persist(txn)
 }
 
 #[derive(Debug, Clone, Serialize, JsonSchema)]
@@ -1298,6 +1433,9 @@ pub struct RebarInfo {
     pub dimensions: Vec<(String, f64)>,
     pub role: String,
     pub bars: Vec<Bar>,
+    /// The rebar number (STR-RBR-016) and partition ("" for none).
+    pub number: Option<u32>,
+    pub partition: String,
 }
 
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
@@ -1307,6 +1445,7 @@ pub struct InfoParams {
 
 pub fn info(store: &Store, p: InfoParams) -> Result<Vec<RebarInfo>> {
     let s = settings(store);
+    let numbers = crate::rebar_numbers::numbers(store);
     p.rebar_ids
         .iter()
         .map(|r| {
@@ -1346,6 +1485,8 @@ pub fn info(store: &Store, p: InfoParams) -> Result<Vec<RebarInfo>> {
                 dimensions: g.dimensions.clone(),
                 role: g.role.clone(),
                 bars: g.bars,
+                number: numbers.iter().find(|(i, _)| i.element == id).map(|(_, n)| *n),
+                partition: store.get(id).map(crate::rebar_numbers::partition).unwrap_or_default(),
             })
         })
         .collect()
@@ -1477,6 +1618,9 @@ pub fn settings_info(store: &Store) -> SettingsInfo {
     let mut locked = std::collections::BTreeMap::new();
     if store.iter().any(|e| rebar_recipe(e).is_some()) {
         locked.insert("hooks_in_shape".into(), "rebar has been placed".into());
+    }
+    if crate::rebar_systems::any_area_or_path(store) {
+        locked.insert("area_path_rebar".into(), "an area or path system exists".into());
     }
     SettingsInfo {
         cover_usage: s.cover_types.iter().map(|c| (c.id.clone(), usage(store, &c.id))).collect(),

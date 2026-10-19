@@ -74,6 +74,9 @@ impl Gui {
     /// The plan point under the cursor: in a plan, where it points; in 3D, where it hits the
     /// model.
     pub(crate) fn model_point(&self, x: i32, y: i32, panel: &Panel) -> Option<[f64; 2]> {
+        if let Some(p) = crate::coords::typed() {
+            return Some(p);
+        }
         if self.in_plan() {
             return self.plan_xy(x, y);
         }

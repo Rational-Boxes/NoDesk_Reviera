@@ -333,6 +333,9 @@ impl Gui {
     }
 
     fn line_snapped(&self, x: i32, y: i32) -> Option<snap::Snap> {
+        if let Some(p) = crate::coords::typed() {
+            return Some(snap::Snap { point: p, kind: snap::SnapKind::None });
+        }
         let t = self.line_tool.as_ref()?;
         let v = self.active_view()?;
         // In a section or elevation: the point on the view's plane (across, up), to the mm.

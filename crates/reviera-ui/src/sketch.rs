@@ -294,6 +294,11 @@ impl Gui {
         self.sketch_preview();
     }
 
+    /// The end of the line chain being drawn.
+    pub(crate) fn sketch_last(&self) -> Option<[f64; 2]> {
+        self.sketch.as_ref().and_then(|s| s.last)
+    }
+
     /// Ends the session without changing the model.
     pub(crate) fn cancel_sketch(&mut self) {
         if self.sketch.take().is_none() {

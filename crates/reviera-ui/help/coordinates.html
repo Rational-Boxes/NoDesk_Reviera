@@ -1,0 +1,40 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Copyright (C) 2026 Reviera contributors -->
+<h1>Exact coordinates</h1>
+<p class="lead">Every tool that takes points can be sketched with the mouse or given exact
+coordinates. <a href="reviera:action/coordinates.edit">Coordinates</a> (<kbd>X</kbd><kbd>Y</kbd>,
+on the Modify tab and in every sketch tab) opens a list of points to type or correct.</p>
+
+<h2 id="what">What it edits</h2>
+<table>
+  <tr><th>When</th><th>The dialog shows</th><th>Apply</th></tr>
+  <tr><td>In sketch mode (floors, ceilings, decks, roofs, openings, shafts)</td>
+    <td>Each curve on its own line: <code>start; end</code>. More points chain lines;
+    <code>via x, y</code> makes an arc.</td>
+    <td>Replaces the curves, so a roughly sketched line can be put exactly in place. New lines
+    add curves. <i>Finish the sketch</i> finishes it too.</td></tr>
+  <tr><td>Sketching area, path or fabric reinforcement, or a plate's contour</td>
+    <td>The points so far, one per line, in the sketch's own plane.</td>
+    <td>Replaces them; <i>Finish</i> makes the element.</td></tr>
+  <tr><td>With any other tool running (walls, beams, columns, grids, lines, railings, stairs,
+    measuring, …)</td>
+    <td>An empty list.</td>
+    <td>Hands the points to the tool one by one, exactly as clicks; the option presses Enter
+    afterwards.</td></tr>
+  <tr><td>With one wall, beam, grid, plate or reinforcement system selected</td>
+    <td>Its ends, contour, boundary or path.</td>
+    <td>Changes it in one undoable step.</td></tr>
+</table>
+
+<h2 id="syntax">Typing points</h2>
+<ul>
+  <li><code>x, y</code>: absolute, in project units (unit suffixes such as <code>m</code> or
+    <code>'</code> are accepted).</li>
+  <li><code>@dx, dy</code>: from the point before (for the first point given to a tool, its
+    last clicked point).</li>
+  <li><code>@distance&lt;angle</code> or <code>&lt;distance&lt;angle</code>: polar from the
+    point before, the angle in degrees counter-clockwise from the x axis.</li>
+</ul>
+<p>Plan tools use plan x, y. Reinforcement sketches use the host's plane (plan x, y for floors;
+along the wall and up from its base for walls), and plates use their face's or work plane's
+own axes.</p>

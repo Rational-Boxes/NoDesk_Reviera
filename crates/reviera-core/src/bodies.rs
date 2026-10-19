@@ -390,6 +390,9 @@ pub fn all(store: &Store) -> Vec<Body> {
         } else if let Some(m) = crate::rebar::mesh(store, e) {
             // Reinforcement (STR-RBR-004).
             push(e.id(), "IfcReinforcingBar", m, false);
+        } else if let Some(m) = crate::rebar_systems::mesh(store, e) {
+            // Area, path and fabric reinforcement (STR-RBR-010 … 012).
+            push(e.id(), if e.class == "IfcReinforcingMesh" { "IfcReinforcingMesh" } else { "IfcReinforcingBar" }, m, false);
         }
     }
     // In-place elements (ARC-INPL-001), their voids subtracted through the boolean relations.
@@ -605,7 +608,7 @@ fn reinforcing(store: &Store, a: ElementId, b: ElementId) -> bool {
         let (Some(x), Some(h)) = (store.get(bar), store.get(host)) else { return false };
         crate::rebar::rebar_recipe(x).is_some_and(|r| r.host == h.guid().to_string())
     };
-    one_way(a, b) || one_way(b, a)
+    one_way(a, b) || one_way(b, a) || crate::rebar_systems::reinforces(store, a, b) || crate::rebar_systems::reinforces(store, b, a)
 }
 
 /// A steel connection's plates, bolts and welds belong together and pass through its members,

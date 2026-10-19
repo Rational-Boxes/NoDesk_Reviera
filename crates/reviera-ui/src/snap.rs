@@ -55,6 +55,10 @@ pub fn snap(
     lines: &[([f64; 2], [f64; 2])],
     to_screen: impl Fn([f64; 2]) -> Option<(f32, f32)>,
 ) -> Snap {
+    // A point typed in the Coordinates dialog is taken as it is.
+    if let Some(point) = crate::coords::typed() {
+        return Snap { point, kind: SnapKind::None };
+    }
     let pixels =
         |p: [f64; 2]| to_screen(p).map_or(f32::MAX, |(x, y)| (x - cursor.0).hypot(y - cursor.1));
     let closest = |points: &mut dyn Iterator<Item = [f64; 2]>| {

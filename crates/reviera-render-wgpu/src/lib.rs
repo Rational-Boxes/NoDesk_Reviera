@@ -223,6 +223,11 @@ pub struct WgpuViewport {
     /// Plan graphics: clipping range, cut poché and lines (DOC-VIEW-002, interim GPU drawing).
     plan: Option<PlanGpu>,
     line_pipeline: wgpu::RenderPipeline,
+    /// Geometry and lines drawn through the model (unobscured rebar).
+    xray_pipeline: wgpu::RenderPipeline,
+    xray_line_pipeline: wgpu::RenderPipeline,
+    xray: Option<(wgpu::Buffer, u32)>,
+    xray_lines: Option<(wgpu::Buffer, u32)>,
     /// Uniforms of unlit, unclipped plan graphics.
     plan_uniforms: (wgpu::Buffer, wgpu::BindGroup),
     size: (u32, u32),
@@ -425,9 +430,11 @@ impl WgpuViewport {
         });
         // `gizmo`: blended like transparent geometry, but writing depth (the Orientation Cube
         // hides what is behind it, and fades as a whole).
-        let pipeline = |transparent: bool, gizmo: bool, line: bool| {
+        let pipeline = |transparent: bool, gizmo: bool, line: bool, on_top: bool| {
             device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-                label: Some(if gizmo {
+                label: Some(if on_top {
+                    "on top"
+                } else if gizmo {
                     "gizmo"
                 } else if transparent {
                     "transparent"
@@ -470,8 +477,8 @@ impl WgpuViewport {
                 },
                 depth_stencil: Some(wgpu::DepthStencilState {
                     format: DEPTH,
-                    depth_write_enabled: Some(!transparent || gizmo),
-                    depth_compare: Some(wgpu::CompareFunction::LessEqual),
+                    depth_write_enabled: Some((!transparent || gizmo) && !on_top),
+                    depth_compare: Some(if on_top { wgpu::CompareFunction::Always } else { wgpu::CompareFunction::LessEqual }),
                     stencil: Default::default(),
                     bias: Default::default(),
                 }),
@@ -483,10 +490,12 @@ impl WgpuViewport {
                 cache: None,
             })
         };
-        let opaque_pipeline = pipeline(false, false, false);
-        let transparent_pipeline = pipeline(true, false, false);
-        let gizmo_pipeline = pipeline(true, true, false);
-        let line_pipeline = pipeline(false, false, true);
+        let opaque_pipeline = pipeline(false, false, false, false);
+        let transparent_pipeline = pipeline(true, false, false, false);
+        let gizmo_pipeline = pipeline(true, true, false, false);
+        let line_pipeline = pipeline(false, false, true, false);
+        let xray_pipeline = pipeline(false, false, false, true);
+        let xray_line_pipeline = pipeline(false, false, true, true);
         let uniform_set = || {
             let buffer = device.create_buffer(&wgpu::BufferDescriptor {
                 label: Some("gizmo uniforms"),
@@ -537,6 +546,10 @@ impl WgpuViewport {
             gizmo: None,
             plan: None,
             line_pipeline,
+            xray_pipeline,
+            xray_line_pipeline,
+            xray: None,
+            xray_lines: None,
             plan_uniforms,
         }
     }
@@ -717,9 +730,9 @@ fn vertices(
     solids: &[Option<bool>],
     highlight: &std::collections::HashSet<reviera_core::ElementId>,
     visibility: &reviera_render::Visibility,
-) -> (Vec<Vertex>, Vec<Vertex>) {
-    let (mut opaque, mut transparent) = (Vec::new(), Vec::new());
-    for (k, m) in meshes.iter().enumerate() {
+) -> (Vec<Vertex>, Vec<Vertex>, Vec<Vertex>) {
+    let (mut opaque, mut transparent, mut xray) = (Vec::new(), Vec::new(), Vec::new());
+    for (k, m) in meshes.iter().chain(&visibility.extra).enumerate() {
         let Some(alpha) = visibility.opacity(m.element) else {
             continue;
         };
@@ -740,7 +753,9 @@ fn vertices(
             }
         }
         color[3] *= alpha;
-        let out = if color[3] < 0.99 {
+        let out = if m.element.is_some_and(|e| visibility.xray.contains(&e)) {
+            &mut xray
+        } else if color[3] < 0.99 {
             &mut transparent
         } else {
             &mut opaque
@@ -765,7 +780,7 @@ fn vertices(
             }
         }
     }
-    (opaque, transparent)
+    (opaque, transparent, xray)
 }
 
 /// [`vertices`] of geometry that is never cut, hidden or capped (overlays, gizmos, plan poché).
@@ -773,8 +788,9 @@ fn plain_vertices(
     meshes: &[reviera_render::SceneMesh],
     highlight: &std::collections::HashSet<reviera_core::ElementId>,
 ) -> Vec<Vertex> {
-    let (mut v, t) = vertices(meshes, &[], highlight, &Default::default());
+    let (mut v, t, x) = vertices(meshes, &[], highlight, &Default::default());
     v.extend(t);
+    v.extend(x);
     v
 }
 
@@ -792,6 +808,11 @@ impl RenderBackend for WgpuViewport {
     fn set_view_lines(&mut self, lines: &[reviera_render::plan::Lines]) {
         let v = line_vertices(lines);
         self.view_lines = self.buffer(&v);
+    }
+
+    fn set_view_lines_on_top(&mut self, lines: &[reviera_render::plan::Lines]) {
+        let v = line_vertices(lines);
+        self.xray_lines = self.buffer(&v);
     }
 
     fn set_visibility(&mut self, visibility: &reviera_render::Visibility) {
@@ -877,7 +898,7 @@ impl WgpuViewport {
     }
 
     fn upload(&mut self) {
-        let (opaque, transparent) = vertices(
+        let (opaque, transparent, xray) = vertices(
             &self.scene.meshes,
             &self.solids,
             &self.highlight,
@@ -885,6 +906,7 @@ impl WgpuViewport {
         );
         self.opaque = self.buffer(&opaque);
         self.transparent = self.buffer(&transparent);
+        self.xray = self.buffer(&xray);
     }
 
     /// Draws the gizmo into its rectangle, over the scene, with a fresh depth buffer.
@@ -1096,6 +1118,7 @@ impl WgpuViewport {
             for (pipeline, mesh, model) in [
                 (&self.opaque_pipeline, &self.opaque, true),
                 (&self.transparent_pipeline, &self.transparent, true),
+                (&self.xray_pipeline, &self.xray, true),
                 (&self.transparent_pipeline, &self.overlay, false),
             ] {
                 if model && look_up {
@@ -1120,11 +1143,12 @@ impl WgpuViewport {
                     (&self.line_pipeline, lines),
                     (&self.line_pipeline, &self.overlay_lines),
                     (&self.line_pipeline, &self.view_lines),
+                    (&self.xray_line_pipeline, &self.xray_lines),
                 ] {
                     if let Some((buffer, count)) = mesh {
                         pass.set_pipeline(pipeline);
                         pass.set_vertex_buffer(0, buffer.slice(..));
-                        if std::ptr::eq(pipeline, &self.line_pipeline) {
+                        if std::ptr::eq(pipeline, &self.line_pipeline) || std::ptr::eq(pipeline, &self.xray_line_pipeline) {
                             // Six vertices (two triangles) per segment instance.
                             pass.draw(0..6, 0..*count);
                         } else {

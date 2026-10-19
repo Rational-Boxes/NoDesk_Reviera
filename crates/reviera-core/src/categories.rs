@@ -187,6 +187,18 @@ pub const CATEGORIES: &[Category] = &[
         None,
         true,
     ),
+    // Area, path and fabric reinforcement (STR-RBR-010 … 012).
+    cat("cat.structural_area_reinforcement", "Structural Area Reinforcement", None, None, None, true),
+    cat("cat.structural_path_reinforcement", "Structural Path Reinforcement", None, None, None, true),
+    cat("cat.structural_fabric_areas", "Structural Fabric Areas", None, None, None, true),
+    cat(
+        "cat.structural_fabric_reinforcement",
+        "Structural Fabric Reinforcement",
+        Some("IfcReinforcingMesh"),
+        Some("IfcReinforcingMeshType"),
+        None,
+        true,
+    ),
     cat(
         "cat.furniture",
         "Furniture",
@@ -365,6 +377,12 @@ pub fn category_of(e: &Element) -> Option<&'static Category> {
         || crate::steel_numbering::assembly_parts_kind(e)
     {
         return category("cat.structural_connections");
+    }
+    match crate::rebar_systems::system_kind(e) {
+        Some("area") => return category("cat.structural_area_reinforcement"),
+        Some("path") => return category("cat.structural_path_reinforcement"),
+        Some("fabric_area") => return category("cat.structural_fabric_areas"),
+        _ => {}
     }
     let class = e.class.strip_suffix("StandardCase").unwrap_or(&e.class);
     let class = match class {

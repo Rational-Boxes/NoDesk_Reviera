@@ -66,6 +66,7 @@ pub(crate) const PAGES: &[Page] = &[
     page!("window", "The window", CORE),
     page!("views", "Views and navigation", CORE),
     page!("selecting", "Selecting and modifying", CORE),
+    page!("coordinates", "Exact coordinates", CORE),
     page!("settings", "Model properties and units", CORE),
     page!("types", "Types and parameters", CORE),
     page!("coordination", "Overlaps, booleans and clearances", CORE),

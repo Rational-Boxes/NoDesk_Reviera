@@ -65,7 +65,7 @@ fn layout(rule: &str, n: &str, spacing: &str, formula: &str) -> Value {
     l
 }
 
-fn row(dialog: &Dialog, grid: &FlexGridSizer, label: &str) {
+pub(super) fn row(dialog: &Dialog, grid: &FlexGridSizer, label: &str) {
     let l = StaticText::builder(dialog).with_label(label).build();
     grid.add(&l, 0, SizerFlag::AlignCenterVertical, 0);
 }
@@ -284,6 +284,12 @@ impl Gui {
             hooks.set_tooltip(&format!("Locked: {why}"));
         }
         grid.add(&hooks, 1, SizerFlag::Expand, 0);
+        row(&dialog, &grid, "Presentation of new sets");
+        let modes = ["all", "first_last", "middle"];
+        let presentation = Choice::builder(&dialog).with_choices(vec!["Show All".into(), "First/Last".into(), "Middle".into()]).build();
+        presentation.set_selection(modes.iter().position(|m| s["presentation"] == *m).unwrap_or(0) as u32);
+        presentation.set_tooltip("How sets show in views that give them no presentation of their own");
+        grid.add(&presentation, 1, SizerFlag::Expand, 0);
         // Cover types: one per line, `name = offset mm`; new lines make new types.
         row(&dialog, &grid, "Cover types (name = mm)");
         let lines: Vec<String> = s["cover_types"]
@@ -339,6 +345,10 @@ impl Gui {
         if locked.is_none() {
             steps.push(("reinforcement_settings.set", json!({ "key": "hooks_in_shape", "value": hooks.get_value() })));
         }
+        steps.push((
+            "reinforcement_settings.set",
+            json!({ "key": "presentation", "value": modes[presentation.get_selection().map_or(0, |i| i as usize).min(2)] }),
+        ));
         let existing: Vec<(String, String, f64)> = s["cover_types"]
             .as_array()
             .into_iter()
@@ -391,6 +401,9 @@ impl Gui {
             grid.append(Property::string(label, name, value));
             grid.set_property_read_only(name, true);
         };
+        ro(grid, "Rebar Number", "rb_number", i["number"].as_u64().map_or(String::new(), |n| n.to_string()));
+        grid.append(Property::string("Partition", "rb_partition", i["partition"].as_str().unwrap_or("").to_owned()));
+        grid.set_help_string("rb_partition", "Identical sets share a number within a partition (phase, location, top or bottom, …)");
         ro(grid, "Shape", "rb_shape", i["shape"].as_str().unwrap_or("").to_owned());
         ro(grid, "Bar type", "rb_bar", i["bar_type"].as_str().unwrap_or("").to_owned());
         ro(grid, "Quantity", "rb_count", format!("{}", i["count"].as_u64().unwrap_or(0)));
@@ -432,6 +445,14 @@ impl Gui {
         }
         let frame = self.frame;
         let Some(id) = self.selection().first().copied() else { return true };
+        if property == "rb_partition" {
+            let ids: Vec<ElementId> = self.selection();
+            if let Err(e) = self.run("rebar.set_partition", json!({ "ids": ids, "name": text.unwrap_or_default() })) {
+                error(&frame, &format!("The partition was not changed:\n{e}"));
+            }
+            self.properties_stale = true;
+            return true;
+        }
         let Ok(i) = self.run("rebar.info", json!({ "rebar_ids": [id] })) else { return true };
         let l = &i[0]["layout"];
         let text = text.unwrap_or_default();

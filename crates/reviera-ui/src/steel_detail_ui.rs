@@ -146,13 +146,16 @@ impl Gui {
         };
         self.steel_tool = Some(SteelTool::Plate { placement, plane, points: Vec::new(), cursor: None });
         frame.set_status_text(
-            "Plate: click the contour's corners; Enter or the first corner finishes, Backspace takes one back, Esc ends",
+            "Plate: click the contour's corners; Enter or the first corner finishes, Backspace takes one back, XY types coordinates, Esc ends",
             0,
         );
     }
 
     /// Where pixel (`x`, `y`) meets a plane, in its coordinates.
     fn on_plane(&self, plane: &Plane, x: i32, y: i32) -> Option<[f64; 2]> {
+        if let Some(p) = crate::coords::typed() {
+            return Some(p);
+        }
         let v = self.active_view()?;
         if v.section.is_some() {
             return None;

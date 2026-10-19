@@ -152,6 +152,11 @@ pub struct Visibility {
     pub isolated: Option<Isolation>,
     /// How virtual volumes show.
     pub virtual_volumes: VirtualMode,
+    /// Elements drawn through whatever is in front of them (unobscured rebar, STR-RBR-017).
+    pub xray: HashSet<ElementId>,
+    /// Geometry this view draws in place of hidden elements' own (a rebar set's representative
+    /// bars, STR-RBR-017).
+    pub extra: Vec<SceneMesh>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -756,6 +761,8 @@ pub trait RenderBackend {
     /// Lines that belong to the view rather than to a tool (the section box and slice planes
     /// with their grips), drawn over the scene, unlit and unclipped.
     fn set_view_lines(&mut self, lines: &[plan::Lines]);
+    /// View lines drawn through the model (unobscured rebar centrelines, STR-RBR-017).
+    fn set_view_lines_on_top(&mut self, _lines: &[plan::Lines]) {}
     /// Temporary hide, isolate and translucency (DOC-GFX-008).
     fn set_visibility(&mut self, visibility: &Visibility);
     /// The section box and slice planes of a 3D view (DOC-VIEW-008, DOC-VIEW-014).

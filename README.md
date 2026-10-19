@@ -468,6 +468,12 @@ Create … Boundary* tab:
   grid, reference plane, door or window, typed to move it (`dim.temporary_query`,
   `dim.temporary_set`, `dim.make_permanent`; ARC-DIM-001/002); Tab cycles what is under the
   cursor, the chain of joined walls included (ARC-KEY-001).
+- **Exact coordinates**: every tool that takes points is sketched with the mouse or given
+  exact coordinates. Coordinates (`XY`) lists the points of the sketch in progress to type or
+  correct (a sketched line put exactly in place), hands typed points to any other tool as
+  clicks, or edits a selected wall's, beam's, grid's, plate's or reinforcement system's ends,
+  contour, boundary or path; `x, y`, `@dx, dy` and `@distance<angle` (UI-A11Y-001). Not yet:
+  typing straight into the canvas without the dialog.
 - **Constraints**: dimension locks, EQ and alignment locks between walls, grids and reference
   planes, kept by a solver in every edit, which refuses edits they cannot follow; Reveal
   Constraints (`constraint.lock_dimension`, `constraint.unlock_dimension`,
@@ -679,7 +685,7 @@ tools and the datums.
   (`structural_connection.check`, `presize`, `set_design_forces`, `check_status`,
   `check_report`; STR-STL-009). The steel tools are on their own Steel tab. Not yet: forces from
   analysis results, anchor rod checks.
-- **Reinforcement** (first milestone): rebar sets in concrete columns, beams, structural floors
+- **Reinforcement**: rebar sets in concrete columns, beams, structural floors
   and walls, placed by Expand to Host (links in a section, straight, L or U bars at a face, a
   floor's or wall's layers clipped to its outline), kept inside named cover types per host
   face; the layout rules single, fixed number, maximum spacing, number with spacing, minimum
@@ -689,8 +695,22 @@ tools and the datums.
   `BendingShapeCode` and `BendingParameters`, aggregated by the host (`rebar.*`,
   `rebar_cover_type.*`, `rebar_cover.assign`, `reinforcement_settings.*`,
   `rebar_bar_type.*`, `rebar_hook_type.*`, `rebar_shape.list`; STR-RBR-001…004, 008, 009). On
-  a new Concrete tab. Not yet: two-point and sketched bars, varying sets, cranks and spirals,
-  shape matching, area, path and fabric reinforcement, rebar numbering and views.
+  a new Concrete tab. Area reinforcement (top and bottom or exterior and interior layers, major
+  and minor, over a boundary or the whole host, cut by its openings; Remove Area System keeps them
+  as sets), path reinforcement (bars square to a path, with alternating bars), fabric areas
+  (BS 4483 and WRI sheets laid from a major edge with end and side laps, aligned or staggered, cut
+  by the boundary, openings and cover) and single fabric sheets, written to IFC as
+  REINFORCEMENT_UNIT assemblies of `IfcReinforcingBar` and `IfcReinforcingMesh`
+  (`area_reinforcement.*`, `path_reinforcement.*`, `fabric_area.*`, `fabric_sheet.place`,
+  `fabric_wire_type.*`, `fabric_sheet_type.*`, `reinforcement_system.info`; STR-RBR-010…012).
+  Boundaries, paths and sheets are sketched on the host's plane (snapping to its outline) or
+  typed. Rebar numbers shared by identical sets and sheets per partition, with renumbering,
+  gap removal and locks, written to IFC `Tag`s (`rebar.set_partition`,
+  `reinforcement_numbering.*`; STR-RBR-016); per-view visibility (unobscured through the host,
+  solid or centrelines) and presentation (all, first/last, middle, picked bars, with the set's
+  extent line) (`rebar.set_view_visibility`, `rebar.set_presentation`; STR-RBR-017). Not yet:
+  two-point and sketched bars, varying sets, cranks and spirals, shape matching, bent fabric,
+  rebar tags, bending details and schedules.
 - **Steel numbering and NC files**: part marks for identical members and plates (section,
   length, holes and cuts; however placed), assembly marks for identical shop assemblies (a member
   and everything shop-welded to it), written to IFC `Tag`s and STEEL_ASSEMBLY assemblies; DSTV
@@ -1064,11 +1084,11 @@ area by area (reviewed against the spec on 2026-10-15).
   trusses, braces, generic connections, foundations with piles and pile caps, structural walls and
   floors, Structural Settings with Coarse single-line framing, steel and timber section
   catalogues, a materials library, regional standards and the analytical model's members, nodes,
-  panels, automation, checks, results display, loads, load combinations, point supports, steel connections (four built-in types, with automation), rebar sets (the first milestone) and a built-in linear static solver
+  panels, automation, checks, results display, loads, load combinations, point supports, steel connections (four built-in types, with automation), rebar sets with area, path and fabric reinforcement, numbering and per-view presentation and a built-in linear static solver
   are built (see [Structure](#structure-in-development)). Still to build: the beam join editor and arc
   beams, placing braces in elevations, the connection library's packages and its other
   connection groups, composite decks and span symbols, truss families (a layout shared by types),
-  further rebar (two-point, sketched, varying, area, path and fabric), bilinear and two-way area loads, panel results and external analysis providers.
+  further rebar (two-point, sketched, varying, bent fabric, tags and schedules), bilinear and two-way area loads, panel results and external analysis providers.
 - **MEP, families and collaboration** (BIMserver, OpenCDE, Godot) are specified but not started.
 - **Remote computation subsystem** (DM-RPC-001 … 010): in development; the first milestone is
   built (see [Analysis and remote computation](#analysis-and-remote-computation-in-development)).
