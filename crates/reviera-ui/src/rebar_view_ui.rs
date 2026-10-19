@@ -496,3 +496,148 @@ impl Gui {
         }
     }
 }
+
+/// A rebar annotation tool waiting for its point in a plan (STR-RBR-018).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AnnoTool {
+    Tag,
+    Aligned,
+    Linear,
+    Bending,
+}
+
+impl Gui {
+    /// The rebar annotations of plan view `index` as lines: multi-rebar dimensions and bending
+    /// details, the selected ones highlighted; also the segments to pick them by.
+    pub(crate) fn rebar_annotation_lines(&self, index: usize, selected: &std::collections::HashSet<ElementId>) -> (Vec<Lines>, RebarPicks) {
+        let v = &self.views[index];
+        let (Some(element), Some(plan)) = (v.element, v.plan.as_ref()) else { return Default::default() };
+        let Some(doc) = self.app.document(v.doc) else { return Default::default() };
+        let store = doc.doc.store();
+        let Some(view) = store.get(element) else { return Default::default() };
+        let z = plan.range.cut as f32 + 0.002;
+        let scale = plan.scale;
+        let width = reviera_core::standards::pen_set(store).annotation_width(1) as f32;
+        let (mut normal, mut lit) = (
+            Lines { color: [0.0, 0.0, 0.0, 1.0], width, segments: Vec::new() },
+            Lines { color: reviera_render::HIGHLIGHT, width, segments: Vec::new() },
+        );
+        let mut picks = Vec::new();
+        for a in reviera_core::rebar_docs::of_view(store, view.guid().as_str()) {
+            let (id, segs) = match a {
+                reviera_core::rebar_docs::Drawn::Multi { id, drawn, .. } => {
+                    let d = reviera_render::annotation::Dimension { points: drawn.points, along: drawn.along, line: drawn.line, texts: vec![drawn.text] };
+                    (id, reviera_render::annotation::dimension_lines(&d, scale, z))
+                }
+                reviera_core::rebar_docs::Drawn::Bending { id, drawn, .. } => {
+                    let mut segs: Vec<[[f32; 3]; 2]> = drawn
+                        .segments
+                        .iter()
+                        .map(|s| [[s[0][0] as f32, s[0][1] as f32, z], [s[1][0] as f32, s[1][1] as f32, z]])
+                        .collect();
+                    // The shape code and segment values under the detail, 2.5 mm high on paper.
+                    let h = 2.5 * scale / 1000.0;
+                    let labels: Vec<reviera_render::annotation::Label> = drawn
+                        .lines
+                        .iter()
+                        .enumerate()
+                        .map(|(k, t)| reviera_render::annotation::Label {
+                            origin: [drawn.text_at[0] as f32, drawn.text_at[1] as f32 - h * 1.6 * (k as f32 + 1.0), z],
+                            right: [1.0, 0.0, 0.0],
+                            up: [0.0, 1.0, 0.0],
+                            height: h,
+                            text: t.clone(),
+                        })
+                        .collect();
+                    segs.extend(reviera_render::annotation::label_strokes(&labels));
+                    (id, segs)
+                }
+            };
+            picks.extend(segs.iter().map(|s| (id, *s)));
+            if selected.contains(&id) { &mut lit } else { &mut normal }.segments.extend(segs);
+        }
+        (vec![normal, lit], picks)
+    }
+
+    /// The rebar annotation under pixel (`x`, `y`) of the active plan.
+    pub(crate) fn rebar_annotation_at(&self, x: i32, y: i32) -> Option<ElementId> {
+        let index = self.views.iter().position(|v| Some(v.id) == self.active)?;
+        let z = self.views[index].plan.as_ref()?.range.cut as f32;
+        let (_, picks) = self.rebar_annotation_lines(index, &Default::default());
+        picks
+            .into_iter()
+            .map(|(id, s)| (id, self.pixel_distance(x, y, [[f64::from(s[0][0]), f64::from(s[0][1])], [f64::from(s[1][0]), f64::from(s[1][1])]], z)))
+            .filter(|(_, d)| *d <= 8.0)
+            .min_by(|a, b| a.1.total_cmp(&b.1))
+            .map(|(id, _)| id)
+    }
+
+    /// Rebar Tag, Multi-Rebar (Aligned or Linear) or Bending Detail: click where it goes.
+    pub(crate) fn start_rebar_annotation(&mut self, tool: AnnoTool) {
+        let frame = self.frame;
+        let sets = self.selected_reinforcement(true);
+        if sets.is_empty() {
+            return frame.set_status_text("Select rebar sets first", 0);
+        }
+        if !self.in_plan() {
+            return frame.set_status_text("Rebar tags, multi-rebar annotations and bending details are placed in plans", 0);
+        }
+        if matches!(tool, AnnoTool::Tag | AnnoTool::Bending) && sets.len() > 1 {
+            return frame.set_status_text("Select one rebar set", 0);
+        }
+        let Some(view) = self.active_view().and_then(|v| v.element) else { return };
+        let end = self.frame;
+        self.end_tool(&end);
+        self.rebar_anno = Some((tool, sets, view));
+        frame.set_status_text(
+            match tool {
+                AnnoTool::Tag => "Rebar Tag: click where the tag goes",
+                AnnoTool::Aligned | AnnoTool::Linear => "Multi-Rebar Annotation: click where the dimension line goes",
+                AnnoTool::Bending => "Bending Detail: click where the detail goes",
+            },
+            0,
+        );
+    }
+
+    pub(crate) fn end_rebar_annotation(&mut self) -> bool {
+        self.rebar_anno.take().is_some()
+    }
+
+    pub(crate) fn rebar_annotation_click(&mut self, x: i32, y: i32) {
+        let frame = self.frame;
+        let Some((tool, sets, view)) = self.rebar_anno.clone() else { return };
+        let Some(p) = self.plan_xy(x, y) else { return };
+        let (cmd, args) = match tool {
+            AnnoTool::Tag => ("rebar_tag.place", json!({ "rebar_id": sets[0], "view_id": view, "point": p })),
+            AnnoTool::Aligned | AnnoTool::Linear => (
+                "multi_rebar_annotation.place",
+                json!({ "rebar_ids": sets, "view_id": view, "kind": if tool == AnnoTool::Linear { "linear" } else { "aligned" }, "line": p }),
+            ),
+            AnnoTool::Bending => ("bending_detail.place", json!({ "rebar_id": sets[0], "view_id": view, "point": p })),
+        };
+        match self.run(cmd, args) {
+            Ok(_) => {
+                self.rebar_anno = None;
+                self.refresh_scene(&frame);
+                frame.set_status_text("Placed", 0);
+            }
+            Err(e) => {
+                self.rebar_anno = None;
+                error(&frame, &format!("It was not placed:\n{e}"));
+            }
+        }
+    }
+
+    /// Concrete › Bar Bending Schedule: a schedule of the rebar grouped by partition and number.
+    pub(crate) fn rebar_schedule(&mut self) {
+        let frame = self.frame;
+        let Some(doc) = self.doc else { return };
+        match self.run("rebar_schedule.create", json!({})) {
+            Ok(v) => {
+                self.browser_stale = true;
+                self.open_view(doc, v.as_u64().map(ElementId));
+            }
+            Err(e) => error(&frame, &format!("The schedule was not made:\n{e}")),
+        }
+    }
+}

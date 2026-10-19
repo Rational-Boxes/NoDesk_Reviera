@@ -137,6 +137,15 @@ pub fn available_fields(store: &Store, category: &str) -> Vec<FieldInfo> {
             info("roof.volume", "Volume", true),
             info("roof.slope", "Slope", false),
         ]),
+        // Rebar sets (STR-RBR-018): number, shape, segments A–R, quantity, lengths and mass.
+        "cat.structural_rebar" => {
+            out.extend(crate::rebar_docs::FIELDS.iter().map(|(k, n, sum)| info(k, n, *sum)));
+            out.extend(
+                crate::rebar_docs::SEGMENTS
+                    .chars()
+                    .map(|c| info(&format!("rebar.{c}"), &c.to_string(), false)),
+            );
+        }
         _ => {}
     }
     if category != "cat.rooms" {
@@ -200,6 +209,18 @@ pub fn default_fields(category: &str) -> Vec<&'static str> {
             "slab.volume",
         ],
         "cat.roofs" => vec!["type", "level", "roof.slope", "roof.area", "roof.volume"],
+        "cat.structural_rebar" => vec![
+            "rebar.number",
+            "rebar.shape",
+            "rebar.bar_type",
+            "rebar.A",
+            "rebar.B",
+            "rebar.C",
+            "rebar.D",
+            "rebar.quantity",
+            "rebar.total_length",
+            "rebar.mass",
+        ],
         _ => vec!["type", "level", "count"],
     }
 }
@@ -240,6 +261,8 @@ struct Context<'a> {
     rooms: HashMap<ElementId, crate::rooms::RoomGeometry>,
     walls: crate::walls::joins::Solved,
     settings: crate::units::UnitSettings,
+    /// Rebar sets' info, worked out once (STR-RBR-018).
+    rebar: HashMap<ElementId, crate::rebar::RebarInfo>,
 }
 
 /// Reads field values of elements as schedules show them (tags label with them, DOC-ANN-010).
@@ -274,6 +297,7 @@ impl<'a> Context<'a> {
                 .collect(),
             walls: crate::walls::solve(store),
             settings: crate::units::settings_of(store),
+            rebar: crate::rebar_docs::infos(store),
         }
     }
 }
@@ -398,6 +422,17 @@ impl Context<'_> {
                     _ => none(),
                 }
             }
+            k if k.starts_with("rebar.") => match self.rebar.get(&e.id()) {
+                Some(i) => match crate::rebar_docs::field(self.store, i, k) {
+                    Some((text, value)) => Cell {
+                        text,
+                        value,
+                        editable: false,
+                    },
+                    None => none(),
+                },
+                None => none(),
+            },
             other => match other.strip_prefix("param:") {
                 Some(reference) => match crate::parameters::get(self.store, e.id(), reference) {
                     Ok(v) => Cell {
@@ -555,6 +590,11 @@ pub fn table(
                             value: Some(v),
                             editable: false,
                         },
+                        k if k.starts_with("rebar.") => Cell {
+                            text: crate::rebar_docs::total_text(k, v),
+                            value: Some(v),
+                            editable: false,
+                        },
                         k if k.ends_with("area") => cx.fmt(v, "area"),
                         k if k.ends_with("volume") => cx.fmt(v, "volume"),
                         _ => cx.fmt(v, "length"),
@@ -577,6 +617,7 @@ pub fn table(
                 let sum: f64 = rows.iter().filter_map(|r| r.cells[i].value).sum();
                 match def.fields[i].key.as_str() {
                     "count" => format!("{n}"),
+                    k if k.starts_with("rebar.") => crate::rebar_docs::total_text(k, sum),
                     k if k.ends_with("area") => cx.fmt(sum, "area").text,
                     k if k.ends_with("volume") => cx.fmt(sum, "volume").text,
                     _ => cx.fmt(sum, "length").text,

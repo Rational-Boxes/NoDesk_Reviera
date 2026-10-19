@@ -709,8 +709,12 @@ tools and the datums.
   `reinforcement_numbering.*`; STR-RBR-016); per-view visibility (unobscured through the host,
   solid or centrelines) and presentation (all, first/last, middle, picked bars, with the set's
   extent line) (`rebar.set_view_visibility`, `rebar.set_presentation`; STR-RBR-017). Not yet:
-  two-point and sketched bars, varying sets, cranks and spirals, shape matching, bent fabric,
-  rebar tags, bending details and schedules.
+  two-point and sketched bars, varying sets, cranks and spirals, shape matching, bent fabric.
+  Rebar documentation: a Rebar Tag (number and "15 Ø12 @ 150"), multi-rebar annotations across
+  parallel sets, bending details with segment values, and a Bar Bending Schedule grouped by
+  partition and number with mass from nominal kg/m (`rebar_tag.place`,
+  `multi_rebar_annotation.place`, `bending_detail.place`, `rebar_schedule.create`;
+  STR-RBR-018).
 - **Steel numbering and NC files**: part marks for identical members and plates (section,
   length, holes and cuts; however placed), assembly marks for identical shop assemblies (a member
   and everything shop-welded to it), written to IFC `Tag`s and STEEL_ASSEMBLY assemblies; DSTV
@@ -1084,11 +1088,11 @@ area by area (reviewed against the spec on 2026-10-15).
   trusses, braces, generic connections, foundations with piles and pile caps, structural walls and
   floors, Structural Settings with Coarse single-line framing, steel and timber section
   catalogues, a materials library, regional standards and the analytical model's members, nodes,
-  panels, automation, checks, results display, loads, load combinations, point supports, steel connections (four built-in types, with automation), rebar sets with area, path and fabric reinforcement, numbering and per-view presentation and a built-in linear static solver
+  panels, automation, checks, results display, loads, load combinations, point supports, steel connections (four built-in types, with automation), rebar sets with area, path and fabric reinforcement, numbering, per-view presentation, tags, annotations and bending schedules and a built-in linear static solver
   are built (see [Structure](#structure-in-development)). Still to build: the beam join editor and arc
   beams, placing braces in elevations, the connection library's packages and its other
   connection groups, composite decks and span symbols, truss families (a layout shared by types),
-  further rebar (two-point, sketched, varying, bent fabric, tags and schedules), bilinear and two-way area loads, panel results and external analysis providers.
+  further rebar (two-point, sketched, varying, bent fabric), bilinear and two-way area loads, panel results and external analysis providers.
 - **MEP, families and collaboration** (BIMserver, OpenCDE, Godot) are specified but not started.
 - **Remote computation subsystem** (DM-RPC-001 … 010): in development; the first milestone is
   built (see [Analysis and remote computation](#analysis-and-remote-computation-in-development)).

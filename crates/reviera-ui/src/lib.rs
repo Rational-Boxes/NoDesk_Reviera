@@ -299,6 +299,8 @@ struct Gui {
     rebar_sketch: Option<reinforcement_ui::RebarSketch>,
     /// Select Bars in progress (STR-RBR-017).
     bar_pick: Option<rebar_view_ui::BarPick>,
+    /// A rebar annotation waiting for its point (STR-RBR-018): the tool, the sets and the plan.
+    rebar_anno: Option<(rebar_view_ui::AnnoTool, Vec<ElementId>, ElementId)>,
     /// Contour Cut: the element the sketch cuts.
     contour_target: Option<ElementId>,
     adjust: Option<adjust::AdjustSession>,
@@ -1342,6 +1344,7 @@ impl Gui {
         self.end_steel_tool();
         self.end_rebar_sketch();
         self.end_bar_pick();
+        self.end_rebar_annotation();
         self.end_curtain_tool();
         self.end_ramp_tool();
         self.end_measure_tool();
@@ -1398,6 +1401,7 @@ impl Gui {
             || self.end_steel_tool()
             || self.end_rebar_sketch()
             || self.end_bar_pick()
+            || self.end_rebar_annotation()
             || self.cancel_adjust()
         {
             return frame.set_status_text("Ready", 0);
@@ -1434,6 +1438,7 @@ impl Gui {
     pub(crate) fn tool_active(&self) -> bool {
         self.adjust.is_some()
             || self.bar_pick.is_some()
+            || self.rebar_anno.is_some()
             || self.slice_pick.is_some()
             || self.attach_pick.is_some()
             || self.host_pick.is_some()
@@ -1510,6 +1515,8 @@ impl Gui {
             self.adjust_click(x, y);
         } else if self.bar_pick.is_some() {
             self.bar_pick_click(x, y);
+        } else if self.rebar_anno.is_some() {
+            self.rebar_annotation_click(x, y);
         } else if self.slice_pick.is_some() {
             self.slice_click(x, y);
         } else if self.attach_pick.is_some() {
@@ -2065,6 +2072,7 @@ impl Gui {
         self.analytical_pick(x, y, size.width as f32, size.height as f32)
             .or_else(|| self.note_at(x, y))
             .or_else(|| self.dim_at(x, y))
+            .or_else(|| self.rebar_annotation_at(x, y))
             .or_else(|| self.grid_at(x, y))
             .or_else(|| self.datum_at(x, y))
             .or_else(|| self.insert_at(x, y))
@@ -3520,6 +3528,7 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 steel_tool: None,
                 rebar_sketch: None,
                 bar_pick: None,
+                rebar_anno: None,
                 contour_target: None,
                 adjust: None,
                 auto_preview: None,
@@ -4518,6 +4527,11 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "rebar_view.select" => with(gui, |g| g.rebar_presentation(reviera_core::rebar_views::Mode::Select)),
         "rebar_view.states" => with(gui, Gui::rebar_view_states),
         "reinforcement_numbering.show" => with(gui, Gui::reinforcement_numbers),
+        "rebar_tag.place" => with(gui, |g| g.start_rebar_annotation(rebar_view_ui::AnnoTool::Tag)),
+        "multi_rebar_annotation.place" => with(gui, |g| g.start_rebar_annotation(rebar_view_ui::AnnoTool::Aligned)),
+        "rebar_view.multi_linear" => with(gui, |g| g.start_rebar_annotation(rebar_view_ui::AnnoTool::Linear)),
+        "bending_detail.place" => with(gui, |g| g.start_rebar_annotation(rebar_view_ui::AnnoTool::Bending)),
+        "rebar_schedule.create" => with(gui, Gui::rebar_schedule),
         "dim.create_aligned" => with(gui, |g| {
             g.start_dim_tool(f);
             focus(g);

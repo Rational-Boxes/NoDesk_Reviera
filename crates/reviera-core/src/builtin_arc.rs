@@ -116,6 +116,11 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(ReinforcementNumberingRenumber),
         registry.add(ReinforcementNumberingSet),
         registry.add(ReinforcementNumberingApply),
+        registry.add(RebarTagPlace),
+        registry.add(MultiRebarAnnotationPlace),
+        registry.add(BendingDetailPlace),
+        registry.add(RebarAnnotationList),
+        registry.add(RebarScheduleCreate),
         registry.add(CustomCustomize),
         registry.add(CustomAdd),
         registry.add(CustomRemove),
@@ -3116,6 +3121,69 @@ edit_command!(
     crate::rebar_numbers::ApplyParams,
     (),
     crate::rebar_numbers::apply
+);
+
+edit_command!(
+    RebarTagPlace,
+    "rebar_tag.place",
+    "Tag a rebar set",
+    "Tags a rebar set in a plan (STR-RBR-018) with the Rebar Tag (its number and \"15 Ø12 @ 150\") \
+     or another tag type: `point` the tag's centre (with a leader), else on the middle bar.",
+    "Rebar Tag",
+    crate::rebar_docs::TagParams,
+    ElementId,
+    crate::rebar_docs::place_tag
+);
+
+edit_command!(
+    MultiRebarAnnotationPlace,
+    "multi_rebar_annotation.place",
+    "Place a multi-rebar annotation",
+    "Places a dimension across one or more parallel rebar sets in a plan (STR-RBR-018), measuring \
+     from their first bar to their last, reading quantity, size and spacing: `kind` aligned \
+     (square to the bars) or linear (along x or y), `line` a point on the dimension line. Sets \
+     that are not parallel are refused. It follows the sets and goes with the last of them.",
+    "Multi-Rebar Annotation",
+    crate::rebar_docs::MultiParams,
+    ElementId,
+    crate::rebar_docs::place_multi
+);
+
+edit_command!(
+    BendingDetailPlace,
+    "bending_detail.place",
+    "Place a bending detail",
+    "Places a set's bending detail in a plan (STR-RBR-018): its bar flattened in its own plane at \
+     `point`, `scale` (drawn over real size, default 0.25) and `rotation` (degrees), with the shape \
+     code and the segment values after rounding. It updates with the set.",
+    "Bending Detail",
+    crate::rebar_docs::BendingParams,
+    ElementId,
+    crate::rebar_docs::place_bending
+);
+
+read_command!(
+    RebarAnnotationList,
+    "rebar_annotation.list",
+    "Rebar annotations of a plan",
+    "The multi-rebar annotations and bending details of a plan as drawn now (STR-RBR-018): their \
+     points, extent and text, or their segments and lines.",
+    crate::rebar_docs::InfoParams,
+    Vec<crate::rebar_docs::Drawn>,
+    crate::rebar_docs::list
+);
+
+edit_command!(
+    RebarScheduleCreate,
+    "rebar_schedule.create",
+    "Make a bar bending schedule",
+    "Makes a rebar schedule (STR-RBR-018) grouped by partition and rebar number: shape code, bar \
+     type, segments A–E, quantity, bar length, total length and mass (kg, from the bar's nominal \
+     mass per metre). Returns the schedule.",
+    "Bar Bending Schedule",
+    crate::rebar_docs::ScheduleParams,
+    ElementId,
+    crate::rebar_docs::create_schedule
 );
 
 read_command!(

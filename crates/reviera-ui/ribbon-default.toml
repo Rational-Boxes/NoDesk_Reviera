@@ -1476,6 +1476,36 @@ icon = "rebar_numbers"
 help = "Rebar and fabric numbers per partition: renumber, remove gaps, change or lock numbers, select the elements of a number"
 
 [[action]]
+id = "rebar_tag.place"
+label = "Rebar Tag"
+icon = "rebar_tag"
+help = "Tag the selected rebar set in this plan with its number and quantity, size and spacing; click where the tag goes"
+
+[[action]]
+id = "multi_rebar_annotation.place"
+label = "Multi-Rebar Aligned"
+icon = "multi_rebar"
+help = "A dimension across the selected parallel sets, square to their bars, reading quantity, size and spacing; click where its line goes"
+
+[[action]]
+id = "rebar_view.multi_linear"
+label = "Multi-Rebar Linear"
+icon = "multi_rebar"
+help = "A dimension across the selected parallel sets along x or y, reading quantity, size and spacing; click where its line goes"
+
+[[action]]
+id = "bending_detail.place"
+label = "Bending Detail"
+icon = "bending_detail"
+help = "Draw the selected set's bar shape with its shape code and segment values in this plan; click where it goes"
+
+[[action]]
+id = "rebar_schedule.create"
+label = "Bar Bending Schedule"
+icon = "rebar_schedule"
+help = "A schedule of the rebar grouped by partition and number: shape, bar type, segments A–E, quantity, lengths and mass"
+
+[[action]]
 id = "reinforcement_settings.show"
 label = "Reinforcement Settings"
 icon = "rebar_settings"
@@ -2202,6 +2232,16 @@ tools = [
 ]
 
 [[tab.panel]]
+label = "Documentation"
+tools = [
+  { action = "rebar_tag.place", size = "large" },
+  { action = "multi_rebar_annotation.place", size = "small" },
+  { action = "rebar_view.multi_linear", size = "small" },
+  { action = "bending_detail.place", size = "small" },
+  { action = "rebar_schedule.create", size = "large" },
+]
+
+[[tab.panel]]
 label = "Settings"
 tools = [
   { action = "reinforcement_settings.show", size = "large" },
@@ -2509,6 +2549,12 @@ panels = [
     { action = "rebar_view.select", size = "large" },
   ] },
   { label = "View", tools = [{ action = "rebar_view.states", size = "large" }] },
+  { label = "Annotate", tools = [
+    { action = "rebar_tag.place", size = "large" },
+    { action = "multi_rebar_annotation.place", size = "small" },
+    { action = "rebar_view.multi_linear", size = "small" },
+    { action = "bending_detail.place", size = "small" },
+  ] },
   { label = "Numbers", tools = [{ action = "reinforcement_numbering.show", size = "large" }] },
 ]
 

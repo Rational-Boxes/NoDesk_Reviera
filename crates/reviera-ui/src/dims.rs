@@ -148,6 +148,8 @@ impl Gui {
         let mut out = vec![normal, orphaned];
         out.extend(grids);
         out.push(highlighted);
+        // Multi-rebar annotations and bending details (STR-RBR-018).
+        out.extend(self.rebar_annotation_lines(index, &selected).0);
         out
     }
 

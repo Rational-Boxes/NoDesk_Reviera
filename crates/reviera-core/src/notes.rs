@@ -85,6 +85,13 @@ pub const TAG_TYPES: &[TagType] = &[
         fields: &["type"],
         frame: Frame::Box,
     },
+    // Rebar sets (STR-RBR-018): number and "15 Ø12 @ 150".
+    TagType {
+        name: "Rebar Tag",
+        categories: &["cat.structural_rebar"],
+        fields: &["rebar.number", "rebar.description"],
+        frame: Frame::Box,
+    },
     TagType {
         name: "Multi-Category Tag",
         categories: &[],
@@ -274,6 +281,9 @@ pub fn host_anchor(store: &Store, host: &Element) -> Option<[f64; 2]> {
         return crate::rooms::regenerate(store, host)
             .ok()
             .map(|g| g.tag_point);
+    }
+    if let Some(a) = crate::rebar_docs::anchor(store, host) {
+        return Some(a);
     }
     None
 }

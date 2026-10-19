@@ -16453,10 +16453,12 @@ The *Whole Host* option uses the host outline as the boundary.
 - `bending_detail.place(rebar_id, view_id, point, scale?) -> id`
 
 **Acceptance criteria.**
-- [ ] Changing segment B of a bar updates its bending detail and the schedule's B column in the same regeneration.
-- [ ] A multi-rebar annotation on a set of 15 Ø12 bars at 150 mm reads "15 Ø12 @ 150" and its dimension equals the set extent (2 100 mm).
-- [ ] Picking two non-parallel sets for one multi-rebar annotation is refused with a message.
-- [ ] The schedule's mass column for 10 bars of 6 m Ø16 (1.578 kg/m) shows 94.7 kg.
+- [x] Changing segment B of a bar updates its bending detail and the schedule's B column in the same regeneration.
+- [x] A multi-rebar annotation on a set of 15 Ø12 bars at 150 mm reads "15 Ø12 @ 150" and its dimension equals the set extent (2 100 mm).
+- [x] Picking two non-parallel sets for one multi-rebar annotation is refused with a message.
+- [x] The schedule's mass column for 10 bars of 6 m Ø16 (1.578 kg/m) shows 94.7 kg.
+
+*Built (2026-10-19):* rebar sets schedule with the fields `rebar.number`, `rebar.partition`, `rebar.shape`, `rebar.bar_type`, `rebar.quantity`, `rebar.spacing`, `rebar.bar_length`, `rebar.total_length`, `rebar.mass` (rounded total length × the bar's nominal mass per metre, π d²/4 × 7 850 kg/m³), `rebar.A` … `rebar.R` (after segment rounding) and `rebar.description` ("15 Ø12 @ 150"); `rebar_schedule.create` makes the shipped Bar Bending Schedule (partition, number, shape, bar type, A–E, quantity, lengths, mass), grouped by partition and number. The **Rebar Tag** reads the number and description; `rebar_tag.place` tags a set in a plan, hanging from its middle bar. `multi_rebar_annotation.place` (aligned square to the bars, or linear along x or y) is a dimension from the first bar to the last of one or more parallel sets (others refused) reading quantity, size and spacing; `bending_detail.place` draws the middle bar flattened in its own plane at a point, scale and rotation, with the number, bar type, shape code and segment values. Both are plan annotations (`anno.multi_rebar`, `anno.bending_detail`) that read their sets when drawn, so a set's change shows at once; a multi-rebar annotation goes with the last set it references and a bending detail with its set; `rebar_annotation.list` reports them as drawn. The stroke font gains Ø, @ and :. Concrete › Documentation (Rebar Tag, Multi-Rebar Aligned and Linear, Bending Detail, Bar Bending Schedule) and the set's contextual tab; click where each goes. Not yet: tags in sections and 3D views, multi-rebar annotations with a separate tag placement, hook angles drawn on bending details, varying-set ranges, schedule filters by partition (sort and group work), fabric and coupler schedules.
 
 ---
 

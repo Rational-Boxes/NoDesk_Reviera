@@ -607,6 +607,18 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "rebar_cover" => format!(
             r#"<rect x="5" y="5" width="22" height="22" fill="{f}" {s}/><path d="M5 22h22" {sa} stroke-dasharray="2 2"/><path d="M16 22v5M14 24l2-2 2 2M14 25l2 2 2-2" {sa}/>"#
         ),
+        "rebar_tag" => format!(
+            r#"<path d="M6 24L26 8" {sa}/><rect x="12" y="5" width="16" height="9" fill="{f}" {s}/><path d="M15 9.5h10" {s}/>"#
+        ),
+        "multi_rebar" => format!(
+            r#"<path d="M8 6v20M14 6v20M20 6v20" {sa}/><path d="M4 22h24M8 20v4M20 20v4" {s}/><path d="M9 14h11" {s} stroke-dasharray="2 1"/>"#
+        ),
+        "bending_detail" => format!(
+            r#"<path d="M6 8v16h20V8" fill="none" {sa}/><path d="M6 6h3M23 6h3M12 27h8" {s}/>"#
+        ),
+        "rebar_schedule" => format!(
+            r#"<rect x="4" y="5" width="24" height="22" fill="{f}" {s}/><path d="M4 11h24M4 17h24M4 22h24M12 5v22M20 5v22" {s}/><path d="M22 14v6h4v-6" fill="none" {sa}/>"#
+        ),
         "rebar_show_all" => format!(
             r#"<rect x="4" y="6" width="24" height="20" fill="{f}" {s}/><path d="M8 10v12M12 10v12M16 10v12M20 10v12M24 10v12" {sa}/>"#
         ),
