@@ -496,6 +496,7 @@ pub fn dependents_of(store: &crate::store::Store, id: ElementId) -> Vec<ElementI
                 || crate::beams::truss_recipe(e).is_some_and(|r| r.level == guid)
                 || crate::foundations::uses(e, &guid)
                 || crate::connections::uses(e, &guid)
+                || crate::steel_fab::uses(e, &guid)
                 || crate::analytical::uses(e, &guid)
                 || crate::analytical_panels::uses(e, &guid)
                 || crate::loads::uses(e, &guid)

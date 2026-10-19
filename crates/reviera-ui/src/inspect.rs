@@ -160,6 +160,20 @@ impl Gui {
                         .map(|(id, _)| id),
                 );
             }
+            // Steel connections' plates, bolts and welds are drawn at Fine detail only
+            // (STR-STL-001).
+            let fine = v.element
+                .and_then(|e| store.get(e))
+                .map(reviera_core::views::detail_level)
+                == Some(reviera_core::views::DetailLevel::Fine);
+            if !fine {
+                vis.hidden.extend(
+                    store
+                        .iter()
+                        .filter(|e| reviera_core::steel_fab::fab_recipe(e).is_some())
+                        .map(|e| e.id()),
+                );
+            }
         }
         vis
     }
@@ -190,6 +204,8 @@ impl Gui {
             lines.extend(self.check_marks());
         }
         lines.extend(self.results_lines(index));
+        lines.extend(self.adjust_lines(index));
+        lines.extend(self.automation_lines(index));
         lines.extend(self.work_plane_grid(index));
         let v = &mut self.views[index];
         if let Some(vp) = &mut v.viewport {

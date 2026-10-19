@@ -1,0 +1,147 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Copyright (C) 2026 Reviera contributors -->
+<h1>Structural framing</h1>
+<p class="lead">Structural columns, beams, braces, beam systems and trusses on the
+<b>Structure</b> tab. Each has a type that carries its section (from a standard catalogue or
+your own), its structural material and its designation. The samples
+<a href="reviera:sample/steel_frame">Steel-framed office</a>,
+<a href="reviera:sample/timber">Mass timber frame</a> and
+<a href="reviera:sample/wood_frame">Wood-frame house</a> show them together.</p>
+
+<h2 id="sections">Sections</h2>
+<p><b>Structure › Load Section</b> <a href="reviera:action/column.load_section">Load Section</a>
+(columns), <a href="reviera:action/beam.load_section">Load Beam Section</a> and
+<a href="reviera:action/brace.load_section">Load Brace Section</a> make a type from a standard
+section: AISC W, C, L, WT, HSS and pipe; EN IPE, HEA and HEB; UK UB and UC; North American
+dimension lumber (PS 20 dressed sizes) and European sawn and glued-laminated timber. The
+catalogues usual for the model's building code are starred. The type takes the region's usual
+grade (ASTM A992 steel, S355, 350W …) unless you choose another
+<a href="reviera:help/structural-settings#materials">material</a>.</p>
+
+<h2 id="columns">Structural columns</h2>
+<ul>
+  <li><a href="reviera:action/column.place">Column</a>: click in a plan; the column runs from the
+    plan's level to the next. <a href="reviera:action/column.place_at_grids">At Grids</a> puts
+    one at every crossing of the chosen grids.</li>
+  <li><a href="reviera:action/column.place_slanted">Slanted Column</a>: click its foot, then its
+    head on the level above (or give an angle).</li>
+  <li><a href="reviera:action/column.attach">Attach Top</a> and
+    <a href="reviera:action/column.detach">Detach Top</a> join a column's top to the beam, floor
+    or roof above it.</li>
+  <li>Timber columns are checked for slenderness (le/d ≤ 50, NDS and CSA O86):
+    <code>column.check</code>.</li>
+</ul>
+
+<h2 id="beams">Beams</h2>
+<p><a href="reviera:action/beam.create">Beam</a> (<kbd>B</kbd> <kbd>M</kbd>): click its start
+and end in a plan, at the plan's level (an offset at each end slopes it). Beams join columns,
+walls and other beams where they meet and are cut back there; their usage (girder, joist,
+purlin …) follows from what they rest on unless you lock it.
+<a href="reviera:action/beam.create_on_grids">On Grids</a> runs beams along chosen grid lines
+between the columns. Properties: <b>Start/End Level Offset</b> (set them to the slab's depth,
+negative, so the slab sits on the beams), <b>y</b> and <b>z justification</b>, rotation,
+cutback and usage.</p>
+
+<h2 id="braces">Braces</h2>
+<p><a href="reviera:action/brace.create">Brace</a> (<kbd>B</kbd> <kbd>R</kbd>): click its two
+ends in a plan; it runs from this level to the next, each end at its own offset, attached to the
+columns or beams it meets. Draw two crossing braces for X-bracing.</p>
+
+<h2 id="systems">Beam systems</h2>
+<p><a href="reviera:action/beam_system.create_auto">Beam System</a>: click inside a bay
+bounded by beams or walls: infill beams are laid across it, along the bay's first edge or a
+chosen direction, by a fixed distance, a fixed number, a maximum spacing or a clear spacing,
+justified to the start, end, centre or the edges. Changing the bay moves the beams.
+<a href="reviera:action/beam_system.remove">Remove Beam System</a> keeps them as plain beams.
+Scripts draw a system's boundary themselves (<code>beam_system.create_sketch</code>).</p>
+
+<h2 id="trusses">Trusses</h2>
+<p><a href="reviera:action/truss.create">Truss</a> (<kbd>T</kbd> <kbd>S</kbd>): click its
+start and end; the truss's bottom chord (or top, with <b>Bearing Chord</b>) lies on that line at
+the level. Select one of its members to set, in Properties:</p>
+<table>
+  <tr><td>Layout</td><td>Pratt, Howe, Warren, Fink (the W of a pitched roof truss), King post or
+    Queen post.</td></tr>
+  <tr><td>Profile</td><td>Flat, Gable (rising to the height at mid-span), Mono-pitch, Scissor (the
+    bottom chord rises too) or Bowstring (curved).</td></tr>
+  <tr><td>Panels, Truss Height, Heel Height</td><td>A pitched truss with a heel has posts at its
+    bearings. Stretching a truss keeps its panels.</td></tr>
+</table>
+<p>Chords are split where they bend. Scripts can give any chord shape
+(<code>truss.edit_profile</code>) and make the top chord follow a roof's underside
+(<code>truss.attach</code>, <code>truss.detach</code>). <a href="reviera:action/truss.remove">Remove
+Truss</a> keeps the members as plain framing.</p>
+
+<h2 id="walls-floors">Structural walls and floors</h2>
+<p><a href="reviera:action/wall.create_structural">Wall</a> draws bearing walls; Properties'
+<b>Structural Usage</b> sets bearing, shear, structural combined or non-bearing.
+<a href="reviera:action/floor.create_structural">Floor</a> sketches a structural floor; its span
+direction is the first edge drawn, or any edge (<code>floor.set_span_direction</code>). Analysis
+carries a floor's area loads across its span.</p>
+
+<h2 id="connections">Connections</h2>
+<p>Select the members meeting at a joint and click
+<a href="reviera:action/structural_connection.create">Connection</a>, then choose a type
+that fits the members:</p>
+<ul>
+<li><b>Shear Plate</b>: a column (or girder) then a beam; a single plate welded to the main
+member and bolted through the beam's web, its height following the bolt rows.</li>
+<li><b>Extended End Plate</b>: a column then a beam; a plate welded across the beam's end,
+bolted to the column's flange in pairs above and below the beam.</li>
+<li><b>Base Plate</b>: one or more columns, each getting its own; a plate under the column
+with four anchor rods into the footing, welded all round.</li>
+<li><b>Gusset</b>: a column or beam then a brace; a plate on the brace's line, bolted through
+it. At a column's foot it stops at the column's base, above the base plate.</li>
+<li><b>Generic</b>: any two or more members; a symbol in plans with no parts.</li>
+</ul>
+<p>Every connection keeps its approval status and fabricator. Its plates, bolts and welds are
+elements of their own, shown only in views at <b>Detail Level</b> Fine (3D views have the
+row in their Properties) and kept in step with the members: move a beam and its plates
+follow; delete the connection and they go with it.</p>
+<p>Select a connection, or one of its plates, bolts or welds, and Properties shows its
+<b>Connection Type</b> (change it to give the connection another type) and the type's
+parameters by tab: plates, bolts, welds and layout. Changing a parameter changes it for this
+connection only, its row marked ●. To change a value for every connection of
+the type, type <code>key=value</code> into <b>Type Parameters…</b> (for example
+<code>bolt_diameter=7/8"</code>); the row's help names the keys. The defaults follow the
+region: inch sizes under US codes, millimetres elsewhere.</p>
+
+<h2 id="automate">Automating connections</h2>
+<p><a href="reviera:action/structural_connection.automate">Automate Connections</a> places
+library connections on every join in the model at once, or on the joins of the selected
+members: base plates under columns (where no column stands below), shear plates where beams
+meet columns or girders, and gussets at braces' ends. Choose:</p>
+<ul>
+<li><b>Rule set</b>: <i>Default</i>, or one of the project's. A rule set is an ordered list of
+rules; a join gets the type of the first rule that matches its kind, its members' sections and
+the connected member's depth. A rule without a depth range uses the type's range: shear plates
+for beams 150–920 mm deep, end plates 200–920 mm. Scripts save rule sets with
+<code>structural_connection.set_rule_set</code>.</li>
+<li><b>Joins that already have a connection</b>: skip them, or give generic connections the
+matched type. A detailed connection is never changed.</li>
+<li><b>Preview first</b>: each join is marked in 3D views, coloured by the type it would get
+(blue base plate, green shear plate, purple end plate, orange gusset, grey skipped), and the
+log lists every join with its status and reason. <b>Apply</b> places them as previewed; nothing
+changes before.</li>
+</ul>
+<p>Only steel members are connected. Where a type cannot be made, a generic connection marked
+Failed holds the join. The run is one undo step, kept in the project's run history; the log
+saves as CSV.</p>
+
+<h2 id="coarse">Coarse views</h2>
+<p>Set a plan's <b>Detail Level</b> to Coarse and beams, braces and truss members are drawn as
+single lines along their location lines, braces with their symbol, cut back at joints by the
+distance in <a href="reviera:help/structural-settings">Structural Settings</a>.</p>
+
+<h2 id="ifc">In IFC</h2>
+<p>Columns are <code>IfcColumn</code> (<code>LoadBearing</code> true), beams
+<code>IfcBeam</code>, braces <code>IfcMember</code> (<code>BRACE</code>); beam systems and trusses
+are <code>IfcElementAssembly</code> aggregating their members (truss chords
+<code>CHORD</code>, webs <code>STRUT</code>); sections are <code>IfcProfileDef</code>s on the
+types. A connection's plates are <code>IfcPlate</code>, its bolts and anchor rods
+<code>IfcMechanicalFastener</code> (<code>BOLT</code>, <code>ANCHORBOLT</code>, with their
+nominal diameter and length) and its welds <code>IfcFastener</code> (<code>WELD</code>), all
+aggregated by the connection.</p>
+<p class="note">Not yet available: the beam join editor, arc beams, placing braces in
+elevations, truss families, moment and bracing connections beyond the four library types, connection
+code checking, cope and cut detailing and rebar.</p>

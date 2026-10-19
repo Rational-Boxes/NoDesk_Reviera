@@ -60,6 +60,7 @@ pub fn toolset_of(command: &str) -> String {
             | "structural_settings"
             | "beam"
             | "structural_connection"
+            | "connection_type"
             | "beam_system"
             | "truss"
             | "brace"

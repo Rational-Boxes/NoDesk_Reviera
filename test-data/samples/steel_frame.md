@@ -37,6 +37,13 @@ Start with **File › New**. Set the code to *IBC* (Manage › Settings › **Mo
 14. **Check and run.** Analyze › Checks › **Check Supports** and **Check Consistency** (none);
     Structural Analysis › **Run Analysis**, then **Results Explorer** (for example the *Beam
     moments with deformation* preset).
+15. **Connections.** Select every column, Structure › **Connection**, *Base Plate*: a pinned
+    base plate with four anchor rods under each. At Level 2, select a column and a W18X35
+    girder that frames into it, **Connection**, *Shear Plate*; repeat at each girder end. At each
+    brace's foot, select the column then the brace, **Connection**, *Gusset*. Set the 3D view's
+    Detail Level to *Fine* to see their plates, bolts and welds; a connection's Properties show
+    its type and parameters. Accept the brace tops against the girders' shear plates (Modify ›
+    **Overlaps**).
 
 ## Gaps
 

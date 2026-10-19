@@ -731,6 +731,7 @@ impl LocalProject {
             self.write_analytical(doc)?;
             self.write_loads(doc)?;
             self.write_foundations(doc)?;
+            self.write_fabrication(doc)?;
             self.write_ramps(doc)?;
             self.write_slab_edges(doc)?;
             self.write_wall_sweeps(doc)?;
@@ -2362,6 +2363,95 @@ impl LocalProject {
             self.ifc.remove(rep)?;
         }
         Ok(self.ifc.remove(shape)?)
+    }
+
+    /// Writes steel connections' fabrication elements (STR-STL-002): each plate, bolt, anchor rod
+    /// and weld as a faceted body (bolts with their nominal diameter and length), aggregated by
+    /// its connection through an `IfcRelAggregates` marked `rxd:connection`.
+    fn write_fabrication(&mut self, doc: &Document) -> Result<()> {
+        const TAG: &str = "rxd:connection";
+        let store = doc.store();
+        let all = reviera_core::steel_fab::all(store);
+        let owner_history = self.new_owner_history()?;
+        if !all.is_empty() {
+            let contexts = geometry::Contexts::find(&self.ifc)?;
+            for (id, part) in &all {
+                let Some(&step) = self.steps.get(id) else {
+                    continue;
+                };
+                let (points, indices) = part.mesh();
+                let faces: Vec<Vec<usize>> = indices
+                    .chunks(3)
+                    .map(|t| t.iter().map(|i| *i as usize).collect())
+                    .collect();
+                geometry::write_breps(
+                    &mut self.ifc,
+                    step,
+                    geometry::BrepFrame::WORLD,
+                    &[geometry::Polyhedron { points, faces }],
+                    self.length_scale,
+                    contexts,
+                )?;
+                if let reviera_core::steel_fab::Part::Bolt {
+                    start,
+                    end,
+                    diameter,
+                    ..
+                } = part
+                {
+                    let len = ((end[0] - start[0]).powi(2)
+                        + (end[1] - start[1]).powi(2)
+                        + (end[2] - start[2]).powi(2))
+                    .sqrt();
+                    self.ifc.set_attribute(
+                        step,
+                        "NominalDiameter",
+                        &AttrValue::Real(diameter / self.length_scale),
+                    )?;
+                    self.ifc.set_attribute(
+                        step,
+                        "NominalLength",
+                        &AttrValue::Real(len / self.length_scale),
+                    )?;
+                }
+            }
+        }
+        // Each connection aggregates its fabrication elements.
+        for e in store.iter() {
+            if reviera_core::connections::recipe(e).is_none() {
+                continue;
+            }
+            let Some(&step) = self.steps.get(&e.id()) else {
+                continue;
+            };
+            for rel in self.ifc.referenced_by(step, "IfcRelAggregates")? {
+                if matches!(self.ifc.attribute(rel, "Description")?, AttrValue::String(d) if d == TAG)
+                {
+                    self.ifc.remove(rel)?;
+                }
+            }
+            let guid = e.guid().to_string();
+            let parts: Vec<AttrValue> = store
+                .iter()
+                .filter(|f| reviera_core::steel_fab::fab_recipe(f).is_some_and(|r| r.connection == guid))
+                .filter_map(|f| self.steps.get(&f.id()).map(|s| AttrValue::Ref(s.0)))
+                .collect();
+            if parts.is_empty() {
+                continue;
+            }
+            let rel = self
+                .ifc
+                .create_rooted("IfcRelAggregates", &GlobalId::new())?;
+            self.ifc
+                .set_attribute(rel, "Description", &AttrValue::String(TAG.into()))?;
+            if let Some(h) = owner_history {
+                self.ifc.set_attribute(rel, "OwnerHistory", &AttrValue::Ref(h.0))?;
+            }
+            self.ifc.set_attribute(rel, "RelatingObject", &AttrValue::Ref(step.0))?;
+            self.ifc
+                .set_attribute(rel, "RelatedObjects", &AttrValue::List(parts))?;
+        }
+        Ok(())
     }
 
     /// Writes every beam system (STR-BSYS-001): the `IfcElementAssembly` contained in its level,

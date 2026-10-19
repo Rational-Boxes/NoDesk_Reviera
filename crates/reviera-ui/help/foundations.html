@@ -1,0 +1,40 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Copyright (C) 2026 Reviera contributors -->
+<h1>Foundations</h1>
+<p class="lead">Footings, wall foundations, foundation slabs, piles and pile caps, on
+<b>Structure › Foundation</b>. Their types default to the region's concrete and sizes (for
+example 1800 × 1800 × 500 mm pads, or 6'-0" × 6'-0" × 1'-6" in US models).</p>
+
+<h2 id="footings">Isolated footings</h2>
+<ul>
+  <li><a href="reviera:action/footing.place">Isolated</a> (<kbd>F</kbd> <kbd>T</kbd>): click
+    in a plan; the footing's top is at the level.</li>
+  <li><a href="reviera:action/footing.place_at_columns">At Columns</a>: one under each selected
+    column, centred, turned with it, its top at the column's base, following the column when it
+    moves; columns that have one are skipped. Scripts can also place them at grid crossings
+    (<code>footing.place_at_grids</code>).</li>
+</ul>
+
+<h2 id="walls">Wall foundations</h2>
+<p>Select structural walls and click <a href="reviera:action/wall_foundation.create">Wall</a>
+(<kbd>F</kbd> <kbd>W</kbd>): a strip footing under each, bearing (a width centred on the wall) or
+retaining (a toe beyond the exterior face and a heel beyond the interior one), with an end
+extension. It follows its wall and goes with it.</p>
+
+<h2 id="slab">Foundation slabs</h2>
+<p><a href="reviera:action/foundation_slab.create">Slab</a>: sketch the boundary; the slab's top
+is at the level and its thickness below it (a slab on grade or a raft).</p>
+
+<h2 id="piles">Piles and pile caps</h2>
+<p><a href="reviera:action/pile.place">Pile</a> places single piles, bored or driven, their top
+at the level. <a href="reviera:action/pile_cap.place">Pile Cap</a> places a cap with its piles
+laid out under it (rows, columns and spacing from the cap's type; four piles by default), which
+follow it and go with it.</p>
+
+<h2 id="info">Information and IFC</h2>
+<p><code>foundation.info</code> reports each foundation's top, Elevation at Bottom, area, volume
+and host. Footings are <code>IfcFooting</code> (<code>PAD_FOOTING</code>,
+<code>STRIP_FOOTING</code>, <code>PILE_CAP</code> aggregating its <code>IfcPile</code>s);
+foundation slabs <code>IfcSlab</code> (<code>BASESLAB</code>).</p>
+<p class="note">Not yet available: editing pile layouts in Properties, joins between slabs and
+footings, picking walls for a slab's boundary, foundation tags.</p>

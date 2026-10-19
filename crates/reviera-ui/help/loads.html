@@ -1,0 +1,46 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Copyright (C) 2026 Reviera contributors -->
+<h1>Loads and supports</h1>
+<p class="lead">Load cases, their combinations, the loads in them and the supports the model
+stands on, on <b>Analyze › Loads</b>.</p>
+
+<h2 id="cases">Load cases</h2>
+<p><a href="reviera:action/load_case.manage">Load Cases</a> opens one dialog: the design code
+(ASCE 7 or EN 1990), load natures (dead, live, roof live, snow, wind … from the code, and your
+own), load cases (each with a nature, a category and self-weight), combinations and usage tags.
+Changes apply as you make them; <b>Cancel</b> undoes them all. Renaming a case renames it in the
+formulas; deleting it deletes its loads and takes it out of the combinations, after saying how
+many.</p>
+
+<h2 id="combinations">Combinations</h2>
+<p>A combination is a formula such as <code>1.2*DL + 1.6*LL + 0.5*SNOW</code> over cases or other
+combinations, with a limit state and usages. <b>Generate…</b> (or
+<a href="reviera:action/load_combination.generate">Generate Combinations</a>) proposes the code's
+combinations offline: ASCE/SEI 7-22 strength combinations, or EN 1990 expression 6.10 with each
+variable action leading in turn and the serviceability ones. Cases whose nature the code does not
+know are named.</p>
+
+<h2 id="loads">Placing loads</h2>
+<p>Each tool asks for its case and values, then places on what you click in a plan at its
+level:</p>
+<ul>
+  <li><a href="reviera:action/load.create_point">Point Load</a>: at a node, or at the clicked
+    point along a member (Fx, Fy, Fz in kN).</li>
+  <li><a href="reviera:action/load.create_line">Line Load</a>: along a member, uniform or varying
+    (kN/m).</li>
+  <li><a href="reviera:action/load.create_area">Area Load</a>: on a horizontal panel (kPa). For
+    analysis it is carried to the members lying on the panel across its span, each taking the
+    strip halfway to its neighbours.</li>
+</ul>
+<p>Values are in project axes (gravity is negative z) or a host's own axes; <code>load.set</code>
+changes a load's case and values.</p>
+
+<h2 id="supports">Supports</h2>
+<p><a href="reviera:action/boundary_condition.at_column_bases">Column Base Supports</a> pins
+every column's foot; <a href="reviera:action/boundary_condition.create">Point Support</a> places
+pinned, fixed or roller supports at clicked nodes. Scripts can give each degree of freedom fixed,
+released or a spring.</p>
+<p><code>load_case.*</code>, <code>load_combination.*</code>, <code>load.*</code>,
+<code>boundary_condition.*</code></p>
+<p class="note">Not yet available: loads varying across a panel or inside a drawn boundary,
+two-way slabs, line and area supports.</p>

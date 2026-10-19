@@ -7,6 +7,7 @@
 
 use reviera_core::ElementId;
 use serde_json::json;
+use wxdragon::prelude::*;
 
 use super::{Gui, error};
 
@@ -86,22 +87,83 @@ impl Gui {
             reviera_core::beams::beam_recipe(e).is_some()
                 || reviera_core::columns::column_recipe(e).is_some()
         });
-        if members.len() < 2 {
+        if members.is_empty() {
             return frame.set_status_text(
-                "Select the members that meet (Ctrl+click or a window), main member first, then Connection",
+                "Select the members that meet (Ctrl+click or a window), main member first, then Connection; or columns for base plates",
                 0,
             );
         }
-        match self.run(
-            "structural_connection.create",
-            json!({ "member_ids": members }),
-        ) {
-            Ok(_) => {
-                frame.set_status_text("Connection placed at the join", 0);
-                self.clear_selection();
-                self.refresh_scene(&frame);
+        // The types that fit: generic for two or more members; a library type by its inputs.
+        let lib = self.run("connection_type.list", json!({})).unwrap_or_default();
+        let all_columns = self.store_now().is_some_and(|s| {
+            members
+                .iter()
+                .all(|m| s.get(*m).and_then(reviera_core::columns::column_recipe).is_some())
+        });
+        let mut choices: Vec<(String, String)> = Vec::new();
+        if members.len() >= 2 {
+            choices.push(("generic".into(), "Generic (a symbol and its information)".into()));
+        }
+        for t in lib.as_array().into_iter().flatten() {
+            let inputs = t["inputs"].as_array().map_or(0, Vec::len);
+            let fits = inputs == members.len() || (inputs == 1 && all_columns);
+            if fits {
+                choices.push((
+                    t["id"].as_str().unwrap_or_default().to_owned(),
+                    format!("{} — {}", t["name"].as_str().unwrap_or_default(), t["group"].as_str().unwrap_or_default()),
+                ));
             }
-            Err(e) => error(&frame, &format!("The connection was not placed:\n{e}")),
+        }
+        if choices.is_empty() {
+            return frame.set_status_text("No connection type takes that selection", 0);
+        }
+        let labels: Vec<&str> = choices.iter().map(|c| c.1.as_str()).collect();
+        let d = SingleChoiceDialog::builder(&frame, "Connection type:", "Connection", &labels).build();
+        if d.show_modal() != ID_OK {
+            return;
+        }
+        let Some((ty, _)) = usize::try_from(d.get_selection()).ok().and_then(|i| choices.get(i)) else {
+            return;
+        };
+        // A one-member type (a base plate) goes on each selected column.
+        let groups: Vec<Vec<ElementId>> = if all_columns
+            && lib.as_array().into_iter().flatten().any(|t| t["id"] == ty.as_str() && t["inputs"].as_array().map_or(0, Vec::len) == 1)
+        {
+            members.iter().map(|m| vec![*m]).collect()
+        } else {
+            vec![members.clone()]
+        };
+        let (mut placed, mut had) = (0, 0);
+        for g in groups {
+            match self.run(
+                "structural_connection.create",
+                json!({ "member_ids": g, "type_id": ty }),
+            ) {
+                Ok(_) => placed += 1,
+                Err(e) if e.contains("connection.exists") => had += 1,
+                Err(e) => {
+                    error(&frame, &format!("The connection was not placed:\n{e}"));
+                    break;
+                }
+            }
+        }
+        let already = if had > 0 {
+            format!(" ({had} already had one)")
+        } else {
+            String::new()
+        };
+        if placed == 0 && had > 0 {
+            frame.set_status_text(&format!("No connection placed: the members already have one of that type{already}"), 0);
+        }
+        if placed > 0 {
+            frame.set_status_text(
+                &format!(
+                    "{placed} connection(s) placed{already}; their plates, bolts and welds show in views at Fine detail"
+                ),
+                0,
+            );
+            self.clear_selection();
+            self.refresh_scene(&frame);
         }
     }
 

@@ -56,6 +56,10 @@ mod railings;
 mod ramps;
 mod results_explorer;
 mod loads_ui;
+mod analytical_props;
+mod adjust;
+mod steel_auto_ui;
+mod steel_ui;
 mod ribbon;
 mod roofs;
 mod rooms;
@@ -280,6 +284,9 @@ struct Gui {
     truss_tool: Option<beams::TrussTool>,
     panel_tool: Option<analytical_panels::PanelTool>,
     load_tool: Option<loads_ui::LoadTool>,
+    adjust: Option<adjust::AdjustSession>,
+    /// A connection automation preview's report, marked in 3D views.
+    auto_preview: Option<serde_json::Value>,
     curtain_tool: Option<curtain::CurtainTool>,
     ramp_tool: Option<ramps::RampTool>,
     measure_tool: Option<ramps::MeasureTool>,
@@ -1363,6 +1370,7 @@ impl Gui {
             || self.end_truss_tool()
             || self.end_panel_tool()
             || self.end_load_tool()
+            || self.cancel_adjust()
         {
             return frame.set_status_text("Ready", 0);
         }
@@ -1761,8 +1769,10 @@ impl Gui {
             .active_view()
             .and_then(|v| v.plan.as_ref())
             .map_or((f32::NEG_INFINITY, f32::INFINITY), plans::PlanState::drawn);
-        // In plans, annotation, grids, doors and windows are picked before the model.
-        self.note_at(x, y)
+        // In plans, annotation, grids, doors and windows are picked before the model; in 3D
+        // views showing it, the analytical model is.
+        self.analytical_pick(x, y, size.width as f32, size.height as f32)
+            .or_else(|| self.note_at(x, y))
             .or_else(|| self.dim_at(x, y))
             .or_else(|| self.grid_at(x, y))
             .or_else(|| self.datum_at(x, y))
@@ -2115,6 +2125,8 @@ impl Gui {
             || self.opening_rows(grid, id)
             || self.column_rows(grid, id)
             || self.beam_rows(grid, id)
+            || self.analytical_rows(grid, id)
+            || self.connection_rows(grid, id)
             || self.curtain_rows(grid, id)
             || self.ramp_rows(grid, id)
             || self.skylight_rows(grid, id)
@@ -2311,6 +2323,29 @@ impl Gui {
             grid.append(Property::string(label, &key, value));
             grid.set_property_read_only(&key, true);
         }
+        // DOC-GFX-010: Fine shows steel connections' plates, bolts and welds.
+        let detail = self
+            .store_now()
+            .and_then(|st| st.get(element).map(reviera_core::views::detail_level))
+            .unwrap_or_default();
+        grid.append(Property::enumeration(
+            "Detail Level",
+            "view_detail",
+            vec![
+                ("Coarse".to_owned(), 0),
+                ("Medium".to_owned(), 1),
+                ("Fine".to_owned(), 2),
+            ],
+            match detail {
+                reviera_core::views::DetailLevel::Coarse => 0,
+                reviera_core::views::DetailLevel::Medium => 1,
+                reviera_core::views::DetailLevel::Fine => 2,
+            },
+        ));
+        grid.set_help_string(
+            "view_detail",
+            "Fine shows steel connections' plates, bolts and welds",
+        );
         // Extents (DOC-VIEW-008, DOC-VIEW-014).
         let (section_box, slices) = self.view_clip(self.active_view().expect("checked"));
         grid.append(Property::category("Extents", "c_extents"));
@@ -2372,6 +2407,8 @@ impl Gui {
         if self.grid_type_edit(property, text.clone())
             || self.opening_edit(property, text.clone())
             || self.beam_edit(property, text.clone())
+            || self.analytical_edit(property, text.clone())
+            || self.connection_edit(property, text.clone())
             || self.column_edit(property, text.clone())
             || self.curtain_edit(property, text.clone())
             || self.ramp_edit(property, text.clone())
@@ -2705,6 +2742,7 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                 }
                 match cube {
                     Some(hit) => g.cube_click(hit),
+                    None if g.adjust.is_some() => g.adjust_click(x, y),
                     None if g.slice_pick.is_some() => g.slice_click(x, y),
                     None if g.attach_pick.is_some() => g.attach_click(x, y, &p),
                     None if g.host_pick.is_some() => g.host_click(x, y, &p),
@@ -2807,6 +2845,10 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                     }
                     if g.beam_tool.is_some() {
                         g.beam_motion(x, y);
+                        redraw = true;
+                    }
+                    if g.adjust.is_some() {
+                        g.adjust_motion(x, y);
                         redraw = true;
                     }
                     if g.curtain_tool.is_some() {
@@ -3029,7 +3071,7 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                 }
                 Some(key) => {
                     with_view(&gui, id, |g| {
-                        used = g.walk_key(key, true, shift);
+                        used = g.adjust_key(key) || g.walk_key(key, true, shift);
                         if !used && g.sketch.is_some() {
                             let (mx, my) = g.mouse;
                             used = g.sketch_key(key, mx, my);
@@ -3320,6 +3362,8 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 truss_tool: None,
                 panel_tool: None,
                 load_tool: None,
+                adjust: None,
+                auto_preview: None,
                 curtain_tool: None,
                 ramp_tool: None,
                 measure_tool: None,
@@ -3874,6 +3918,7 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
             focus(g);
         }),
         "structural_connection.create" => with(gui, Gui::connect_members),
+        "structural_connection.automate" => with(gui, Gui::automate_connections),
         "ui.toggle_analytical" => with(gui, Gui::toggle_analytical),
         "structural_analysis.run" => Gui::start_structural_analysis(gui),
         "structural_analysis.results" => with(gui, Gui::structural_results),
@@ -4068,6 +4113,8 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "ui.pane.analytical_checks" => Gui::toggle_checks_pane(gui),
         "ui.pane.results" => Gui::toggle_results_pane(gui),
         "load_case.manage" => Gui::load_cases_dialog(gui, "cases"),
+        "analytical_model.reset" => with(gui, Gui::reset_analytical),
+        "analytical_model.adjust" => with(gui, Gui::start_adjust),
         "load.create_point" => with(gui, |g| g.start_load_tool("point")),
         "load.create_line" => with(gui, |g| g.start_load_tool("line")),
         "load.create_area" => with(gui, |g| g.start_load_tool("area")),

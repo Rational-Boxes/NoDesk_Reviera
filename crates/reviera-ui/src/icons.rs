@@ -607,6 +607,9 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "structural_connection" => format!(
             r#"<path d="M4 16h24M16 4v24" {s}/><circle cx="16" cy="16" r="5" fill="{a}" {s}/>"#
         ),
+        "connection_automate" => format!(
+            r#"<path d="M4 12h16M12 4v16" {s}/><circle cx="12" cy="12" r="4" fill="{a}" {s}/><path d="M18 22l3 3 6-7" {sa}/>"#
+        ),
         "pile" => format!(
             r#"<path d="M12 4h8v20l-4 5-4-5z" fill="{f}" {s}/>"#
         ),
@@ -644,6 +647,12 @@ fn body(name: &str, dark: bool) -> Option<String> {
         ),
         "point_support" => format!(
             r#"<circle cx="16" cy="10" r="3" fill="rgb(26,77,208)"/><path d="M16 13l-7 10h14z" fill="{f}" {sa}/><path d="M6 26h20" {s}/>"#
+        ),
+        "analytical_adjust" => format!(
+            r#"<path d="M4 24L16 12l12 12" stroke="rgb(208,26,26)" stroke-width="2" fill="none"/><circle cx="16" cy="12" r="3" fill="rgb(26,77,208)"/><path d="M16 9V3M13 6l3-3 3 3M22 12h5M24 9l3 3-3 3" {sa}/>"#
+        ),
+        "analytical_reset" => format!(
+            r#"<path d="M6 22h20" stroke="rgb(208,26,26)" stroke-width="2"/><path d="M6 12h20" stroke="rgb(208,26,26)" stroke-width="1.5" stroke-dasharray="3 2"/><path d="M16 12v8M13 17l3 3 3-3" {sa}/>"#
         ),
         "results_explorer" => format!(
             r#"<path d="M3 12h26" {s}/><path d="M3 12q13 16 26 0" fill="{f}" stroke="rgb(26,90,230)" stroke-width="2"/><path d="M9 12v5M16 12v8M23 12v5" stroke="rgb(26,90,230)" stroke-width="1.5"/><path d="M3 12l-1 4h2zM29 12l-1 4h2z" fill="{a}" {s}/>"#

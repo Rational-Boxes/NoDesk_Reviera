@@ -332,7 +332,9 @@ Turning the setting on or off regenerates every affected member in one transacti
 **Commands.** `structural_settings.set(key="point_to_point_steel", value)`
 
 **Acceptance criteria.**
-- [ ] With the setting on, a steel beam clicked from (0,0) to (6000,0) and joined to columns at both ends reports Cut Length = 6000 mm.
+- [x] With the setting on, a steel beam clicked from (0,0) to (6000,0) and joined to columns at both ends reports Cut Length = 6000 mm.
+
+*Built (2026-10-16, with STR-SET-001):* `structural_settings.set(point_to_point_steel)`: steel beams and braces are not shortened at their joins (their cut length is the length clicked), timber and concrete ones still are, and columns are unchanged; turning it on or off regenerates every affected member in one step. Not yet: locking the start extension, Change Reference being unavailable, the weight in quantities.
 
 ### 4.1.6 Beam systems
 **ID:** STR-BSYS-001 · **Priority:** P1 · **Ref:** research/03 §2.3
@@ -1615,13 +1617,15 @@ All are connected to their host with `IfcRelConnectsStructuralMember` and record
 
 **Acceptance criteria.**
 - [ ] In Adjust mode, moving a beam's end node 150 mm to a column's centreline moves the beam's analytical end and the column's top node together, leaves the physical beam and column unchanged, and creates one undo item on *Finish*.
-- [ ] *Cancel* after three node moves leaves the analytical model exactly as before.
+- [x] *Cancel* after three node moves leaves the analytical model exactly as before.
 - [ ] Running Physical → Analytical on the adjusted beam without *Overwrite manual adjustments* leaves it in place and logs it as skipped; *Reset* then restores its default position and clears the flag.
-- [ ] *Reset* on an analytical member with no physical association is refused and names the member.
+- [x] *Reset* on an analytical member with no physical association is refused and names the member.
 - [ ] Killing the process during an Adjust session with two moves and restarting offers to resume the session with both moves re-applied.
 - [x] `analytical_node.move([n], {0,0,-100}, "global")` lowers node n by 100 mm and flags it as manually adjusted.
 
-*Built (2026-10-16), the non-interactive move:* `analytical_node.move` (nodes by a vector in project axes; members, loads and boundary conditions follow; each node keeps its level, its offset recalculated; the node is flagged manually adjusted in its recipe, `adjusted`). Not yet: Adjust mode, local axes, merging on drop, `analytical_model.reset`, automation's overwrite option, the flag in Properties and schedules.
+*Built (2026-10-16), the non-interactive move:* `analytical_node.move` (nodes by a vector in project axes; members, loads and boundary conditions follow; each node keeps its level, its offset recalculated; the node is flagged manually adjusted in its recipe, `adjusted`).
+
+*Built (2026-10-18), Reset and Properties:* `analytical_model.reset` (members and panels, or those of given physical elements, back to the position their physical element gives them, keeping GlobalIds, sections, releases, loads and supports, and clearing the adjusted flags; a node only the element uses moves, a node at the target is reused, a node shared with elements not being reset stays and is reported; elements with no physical element are refused by name). Analyze › Analytical › Reset on the selection. Properties for analytical elements: a member's role, section (read only), material, start and end release (Fixed, Pinned, or Custom shown), Analyze As and physical elements; a panel's role, thickness, material, Analyze As, cladding, openings and area; a node's point, support and Manually Adjusted flag. With Show Analytical on, analytical nodes, members and panel edges are picked in 3D views ahead of the physical model. Analyze › Analytical › Adjust (2026-10-18): in a 3D view, click a node, then where it goes, in its horizontal plane or along X, Y or Z, snapping onto other nodes, or type the move in millimetres; the members using moved nodes are previewed; Enter finishes all the session's moves as one undo step (`analytical_node.move` with `moves`), merging nodes dropped on others (`merge`), and Esc cancels them. Not yet: the 3D move control in member and panel local axes, picking panel edges and whole members to move, half-toning non-analytical elements, the session journal and crash recovery, automation's overwrite option, the flag in schedules.
 
 ### 4.3.11 Structural analysis provider interface
 **ID:** ANA-FEA-001 · **Priority:** P2 · **Ref:** research/03 §4.6
@@ -1752,6 +1756,8 @@ Ref: research/03 §5.1
 - [ ] Placing a shear-plate connection on a beam whose family lacks section parameters is refused with a message naming the beam and the upgrade utility.
 - [ ] Upgrading a legacy W-shape family adds its section parameters with values equal to the profile dimensions, and the type then exports an `IfcIShapeProfileDef`.
 
+*Built (2026-10-18):* the Fine-only rule for connection plates, bolts and welds (STR-STL-002): they are elements of their own, hidden in plans, sections and 3D views below Fine detail (3D views gained a Detail Level row) and always written to IFC. Steel connections take members whose types carry section dimensions (every catalogue section loaded with *Load Section* does). Not yet: `steel_families.upgrade`, refusing members without section parameters with the upgrade message, the steel-material check, cuts, and scheduling and numbering fabrication elements.
+
 ### 4.4.2 Open parametric connection library
 **ID:** STR-STL-002 · **Priority:** P2 · **Ref:** research/03 §5.2
 
@@ -1782,13 +1788,16 @@ Ref: research/03 §5.1
 
 **Commands.**
 - `connection_library.install(path)`
+- `connection_type.list() -> types`
 - `connection_type.edit_parameters(type_id, params)`
 - `structural_connection.override(connection_id, params)`
 
 **Acceptance criteria.**
-- [ ] A shear-plate connection between a W-beam and a column flange creates a plate, a bolt group and welds at Fine detail.
-- [ ] Changing the bolt row count from 3 to 4 in the dialog regenerates the plate height.
+- [x] A shear-plate connection between a W-beam and a column flange creates a plate, a bolt group and welds at Fine detail.
+- [x] Changing the bolt row count from 3 to 4 in the dialog regenerates the plate height.
 - [ ] A model whose library package has been removed still opens and shows all plates and bolts, with a warning that the connection cannot be edited.
+
+*Built (2026-10-18):* a built-in library of four types, written in Rust rather than as Lua packages for now: **Shear Plate** (column or girder + beam), **Extended End Plate** (column + beam), **Base Plate** (one column; pinned, four anchor rods) and **Gusset** (column or beam + brace; stops at a column's base, above its base plate). Each declares its input signature (refused with `connection.inputs`) and a parameter schema by tab (plates, bolts, welds, layout) with region defaults (inch sizes under US codes, millimetres elsewhere). Values are layered: region default, then the project's value for the type (`connection_type.edit_parameters`, stored in `rxd:connection_types`), then the connection's own (`structural_connection.override`). `connection_type.list`, `structural_connection.set_type` and `structural_connection.create` with a `type_id` generate the plates, bolts and welds as elements (`IfcPlate`; `IfcMechanicalFastener` `BOLT` or `ANCHORBOLT` with NominalDiameter and NominalLength; `IfcFastener` `WELD`) aggregated by the connection (`rxd:connection`); they follow the members and go when the connection is deleted. The overlap finder treats a connection's parts, its members and the footing under its column as belonging together. The Connection tool asks for a type that fits the selection (base plates go on each selected column); Properties show a connection's type, its parameters by tab (an override marked ●) and a *Type Parameters…* row for project values. The steel sample uses all four. Not yet: Lua packages and `connection_library.install`, the other library groups (clip angles, seated beams, moment flange plates, splices, haunches, stiffeners), the Modify Parameters dialog with live preview, ranges of applicability, copes and cuts, and the library-removed warning.
 
 ### 4.4.3 Custom connections
 **ID:** STR-STL-003 · **Priority:** P2 · **Ref:** research/03 §5.2 ("Custom connections") · screenshots/structure_mep/steel_custom_connections.png
@@ -1849,13 +1858,15 @@ Ref: research/03 §5.1
 
 **Data (IFC mapping).** Placed connections as in STR-CONN-001. Rule sets are project-level data in RXD document `model/structural` (`settings.connection_rules`), or external files referenced by path; run logs (date, rule set, counts) are kept there too.
 
-**Commands.** `structural_connection.automate(scope, rule_set_id?, options?: {existing: "skip"|"replace_generic", preview: bool}) -> report`. The report lists `{join, members[], type_id?, status: placed|skipped|failed, reason}` per join. A preview report can be applied with `structural_connection.apply_automation(report_id)`.
+**Commands.** `structural_connection.automate(scope, rule_set_id?, options?: {existing: "skip"|"replace_generic", preview: bool}) -> report`. The report lists `{join, members[], type_id?, status: placed|skipped|failed, reason}` per join. A preview report can be applied with `structural_connection.apply_automation(report_id)`. `structural_connection.rule_sets() -> {rule_sets, ranges, runs}`, `structural_connection.set_rule_set(name, rules[] | null)`, `structural_connection.automation_csv(report) -> text`.
 
 **Acceptance criteria.**
 - [ ] Automating 200 beam–column joins places a type on every join whose profiles fall within a range, and logs the rest.
-- [ ] Re-running automation on the same joins with *Skip* changes nothing and logs all 200 as skipped (already connected).
-- [ ] Preview mode leaves the undo stack and model unchanged until *Apply*.
-- [ ] The log saved as CSV has one row per join with status and reason.
+- [x] Re-running automation on the same joins with *Skip* changes nothing and logs all 200 as skipped (already connected).
+- [x] Preview mode leaves the undo stack and model unchanged until *Apply*.
+- [x] The log saved as CSV has one row per join with status and reason.
+
+*Built (2026-10-18):* `structural_connection.automate` finds the joins in the framing (each column's foot where no column stands below; each beam end on the column or girder it rests on, from the beams' supports; each brace end at the column, else the beam, its axis meets within 500 mm), limited to the given members' joins, and gives each the type of the first matching rule. Rules match the join kind (`column_base`, `beam_column`, `beam_beam`, `brace`), the main and connected members' sections and the connected member's depth range; a rule without a range uses its type's range of applicability (shear plate 150–920 mm, end plate 200–920 mm deep). The built-in *Default* rule set gives base plates, shear plates (beam–column and beam–beam) and gussets; projects keep their own in `rxd:connection_rules` (`structural_connection.set_rule_set`, `rule_sets`), or `rules` are passed with the call (a Lua or JSON table). Only steel members are connected; joins with a connection on the same members are skipped (*Skip*) or a generic one gets the type (*Replace generic only*); where a generator fails a generic connection marked Failed holds the join. A preview changes nothing (not even the undo history); `apply_automation` takes the preview's report itself rather than an id. Runs (time, rule set, counts) are kept in `rxd:connection_runs`. Structure › Framing › **Automate Connections**: the rule set, the existing-joins choice and Preview; the preview marks each join in 3D views by type (grey where skipped), with the log (status, join, type, members, reason), Apply and Save CSV. Gussets now stop at the bottom of a beam framing into the column at a brace's top (or the top of one at its foot), and their bolts with them. Not yet: background jobs, angle and grade conditions in rules, a rule set editor dialog, and classifying joins by section family beyond sections.
 
 ### 4.4.5 Plates
 **ID:** STR-STL-005 · **Priority:** P2 · **Ref:** research/03 §5.3
@@ -5532,6 +5543,7 @@ Every command below is registered once in the command registry and is exposed au
 | `results.export_package` | path | package | No | STR-RES-001 |
 | `steel_families.upgrade` | family_ids[] \| "all" | report | Yes | STR-STL-001 |
 | `connection_library.install` | path | — | Yes | STR-STL-002 |
+| `connection_type.list` | — | types | No | STR-STL-002 |
 | `connection_type.edit_parameters` | type_id, params | — | Yes | STR-STL-002 |
 | `structural_connection.override` | connection_id, params | — | Yes | STR-STL-002 |
 | `structural_connection.customize` | connection_ids[], element_ids[], name | type_id | Yes | STR-STL-003 |
@@ -5540,6 +5552,9 @@ Every command below is registered once in the command registry and is exposed au
 | `custom_connection.expose_parameter` | type_id, path | — | Yes | STR-STL-003 |
 | `structural_connection.automate` | scope, rule_set_id?, options?: {existing: "skip"\|"replace_generic", preview: bool} | report | Yes | STR-STL-004 |
 | `structural_connection.apply_automation` | report_id | report | Yes | STR-STL-004 |
+| `structural_connection.rule_sets` | — | rule sets, ranges, runs | No | STR-STL-004 |
+| `structural_connection.set_rule_set` | name, rules[] \| null | count | Yes | STR-STL-004 |
+| `structural_connection.automation_csv` | report | CSV text | No | STR-STL-004 |
 | `plate.create` | work_plane \| face_ref, contour_curves[], thickness, material_id, justification | id | Yes | STR-STL-005 |
 | `bolt_pattern.create` | element_ids[], face_ref, pattern: "rect"\|"circle", params | id | Yes | STR-STL-006 |
 | `anchor_pattern.create` | ... | — | Yes | STR-STL-006 |

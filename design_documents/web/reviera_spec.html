@@ -173,7 +173,7 @@ td code { white-space: nowrap; }
         <div class="tb-cell"><span class="tb-label">Revision</span><span class="tb-value">0.1 · Draft</span></div>
         <div class="tb-cell"><span class="tb-label">Date</span><span class="tb-value tb-num">2026-10-12</span></div>
         <div class="tb-cell"><span class="tb-label">Requirements</span><span class="tb-value tb-num">808</span></div>
-        <div class="tb-cell"><span class="tb-label">Commands</span><span class="tb-value tb-num">2,102</span></div>
+        <div class="tb-cell"><span class="tb-label">Commands</span><span class="tb-value tb-num">2,106</span></div>
         <div class="tb-cell"><span class="tb-label">Licence</span><span class="tb-value">GPL-3.0-or-later</span></div>
         <div class="tb-cell last-row"><span class="tb-label">Stack</span><span class="tb-value">IFC · Rust · OCCT · wx · LuaJIT · MCP</span></div>
         <div class="tb-cell last-row" style="grid-column: span 3"><span class="tb-label">By priority</span>
@@ -185,7 +185,7 @@ td code { white-space: nowrap; }
 <p><strong>Document:</strong> Functional and technical specification of Reviera, an open-source BIM authoring application
 <strong>Functional reference:</strong> Autodesk® Revit® 2026/2027 (described from public sources only; see <code>RESEARCH_LOG.md</code>)
 <strong>Licence of Reviera:</strong> GPL-3.0-or-later
-<strong>Version:</strong> 0.1 (draft) · 2026-10-16 · <strong>Size:</strong> 808 numbered requirements (320 P0 · 293 P1 · 188 P2 · 7 P3), 2,102 commands</p>
+<strong>Version:</strong> 0.1 (draft) · 2026-10-16 · <strong>Size:</strong> 808 numbered requirements (320 P0 · 293 P1 · 188 P2 · 7 P3), 2,106 commands</p>
 <blockquote>
 <p><strong>Clean-room statement.</strong> This specification describes features, workflows and behaviour in Reviera's own words. Every input was publicly available: vendor online help, public blogs and tutorials, public forums and open-source repositories. All of it is listed with URLs and access checks in <code>SOURCE_REGISTER.md</code>. No proprietary, confidential, leaked or NDA-covered information was used. No vendor code, binaries, file formats or assets were examined or copied. Autodesk and Revit are trademarks of Autodesk, Inc. They are used here only to identify the functional reference. Reviera is not affiliated with or endorsed by Autodesk.</p>
 <p><strong>Independence statement.</strong> BIM Reviera is an independent, original application. It is in no way a copy or clone of any existing product, and it does not set out to read or write any existing product's closed, proprietary formats (such as RVT and RFA); IFC is its native format. An existing application was researched, from public sources only, to establish the workflows and user-interface conventions that the industry's users already know, so they can work in Reviera without relearning their trade. Beyond that research, Reviera implements its own features and enhancements: its architecture, native IFC storage, scripting and AI integration, remote computation and analysis, and many of its modelling tools are its own design. Interchange formats used across the industry, such as DWG and DXF, are supported only through open-source libraries, for interoperability.</p>
@@ -254,7 +254,7 @@ td code { white-space: nowrap; }
 </tr>
 <tr>
 <td>A</td>
-<td>Appendix A: requirement summary, shared commands, consolidated command index (2,102 commands; 808 requirements)</td>
+<td>Appendix A: requirement summary, shared commands, consolidated command index (2,106 commands; 808 requirements)</td>
 </tr>
 </tbody>
 </table></div>
@@ -32071,7 +32071,8 @@ CREATE TABLE base_rxd (
 <p><strong>Data (IFC mapping).</strong> Geometry and <code>Qto_BeamBaseQuantities</code> reflect the result. <strong>RXD document</strong> <code>model/structural</code> (<code>settings.point_to_point_steel</code>).</p>
 <p><strong>Commands.</strong> <code>structural_settings.set(key="point_to_point_steel", value)</code></p>
 <p><strong>Acceptance criteria.</strong>
-- [ ] With the setting on, a steel beam clicked from (0,0) to (6000,0) and joined to columns at both ends reports Cut Length = 6000 mm.</p>
+- [x] With the setting on, a steel beam clicked from (0,0) to (6000,0) and joined to columns at both ends reports Cut Length = 6000 mm.</p>
+<p><em>Built (2026-10-16, with STR-SET-001):</em> <code>structural_settings.set(point_to_point_steel)</code>: steel beams and braces are not shortened at their joins (their cut length is the length clicked), timber and concrete ones still are, and columns are unchanged; turning it on or off regenerates every affected member in one step. Not yet: locking the start extension, Change Reference being unavailable, the weight in quantities.</p>
 <h3 id="416-beam-systems">4.1.6 Beam systems</h3>
 <p><strong>ID:</strong> <code class="rid" id="STR-BSYS-001">STR-BSYS-001</code> · <strong>Priority:</strong> <span class="pri pri-p1">P1</span> · <strong>Ref:</strong> research/03 §2.3</p>
 <p><strong>Purpose.</strong> A parametric host element that fills a bay with parallel beams according to a layout rule. The beams it creates are ordinary framing occurrences.</p>
@@ -33315,12 +33316,13 @@ No IFC equivalent.
 - <code>analytical_model.reset(element_ids[])</code></p>
 <p><strong>Acceptance criteria.</strong>
 - [ ] In Adjust mode, moving a beam's end node 150 mm to a column's centreline moves the beam's analytical end and the column's top node together, leaves the physical beam and column unchanged, and creates one undo item on <em>Finish</em>.
-- [ ] <em>Cancel</em> after three node moves leaves the analytical model exactly as before.
+- [x] <em>Cancel</em> after three node moves leaves the analytical model exactly as before.
 - [ ] Running Physical → Analytical on the adjusted beam without <em>Overwrite manual adjustments</em> leaves it in place and logs it as skipped; <em>Reset</em> then restores its default position and clears the flag.
-- [ ] <em>Reset</em> on an analytical member with no physical association is refused and names the member.
+- [x] <em>Reset</em> on an analytical member with no physical association is refused and names the member.
 - [ ] Killing the process during an Adjust session with two moves and restarting offers to resume the session with both moves re-applied.
 - [x] <code>analytical_node.move([n], {0,0,-100}, "global")</code> lowers node n by 100 mm and flags it as manually adjusted.</p>
-<p><em>Built (2026-10-16), the non-interactive move:</em> <code>analytical_node.move</code> (nodes by a vector in project axes; members, loads and boundary conditions follow; each node keeps its level, its offset recalculated; the node is flagged manually adjusted in its recipe, <code>adjusted</code>). Not yet: Adjust mode, local axes, merging on drop, <code>analytical_model.reset</code>, automation's overwrite option, the flag in Properties and schedules.</p>
+<p><em>Built (2026-10-16), the non-interactive move:</em> <code>analytical_node.move</code> (nodes by a vector in project axes; members, loads and boundary conditions follow; each node keeps its level, its offset recalculated; the node is flagged manually adjusted in its recipe, <code>adjusted</code>).</p>
+<p><em>Built (2026-10-18), Reset and Properties:</em> <code>analytical_model.reset</code> (members and panels, or those of given physical elements, back to the position their physical element gives them, keeping GlobalIds, sections, releases, loads and supports, and clearing the adjusted flags; a node only the element uses moves, a node at the target is reused, a node shared with elements not being reset stays and is reported; elements with no physical element are refused by name). Analyze › Analytical › Reset on the selection. Properties for analytical elements: a member's role, section (read only), material, start and end release (Fixed, Pinned, or Custom shown), Analyze As and physical elements; a panel's role, thickness, material, Analyze As, cladding, openings and area; a node's point, support and Manually Adjusted flag. With Show Analytical on, analytical nodes, members and panel edges are picked in 3D views ahead of the physical model. Analyze › Analytical › Adjust (2026-10-18): in a 3D view, click a node, then where it goes, in its horizontal plane or along X, Y or Z, snapping onto other nodes, or type the move in millimetres; the members using moved nodes are previewed; Enter finishes all the session's moves as one undo step (<code>analytical_node.move</code> with <code>moves</code>), merging nodes dropped on others (<code>merge</code>), and Esc cancels them. Not yet: the 3D move control in member and panel local axes, picking panel edges and whole members to move, half-toning non-analytical elements, the session journal and crash recovery, automation's overwrite option, the flag in schedules.</p>
 <h3 id="4311-structural-analysis-provider-interface">4.3.11 Structural analysis provider interface</h3>
 <p><strong>ID:</strong> <code class="rid" id="ANA-FEA-001">ANA-FEA-001</code> · <strong>Priority:</strong> <span class="pri pri-p2">P2</span> · <strong>Ref:</strong> research/03 §4.6</p>
 <p><strong>Purpose.</strong> Reviera shall run structural analyses through a pluggable <strong>structural analysis provider</strong>. This replaces the reference product's proprietary solver link.</p>
@@ -33451,6 +33453,7 @@ No IFC equivalent.
 - [ ] A bolt group is counted in a schedule and exported to IFC when every view in the model is at Coarse detail.
 - [ ] Placing a shear-plate connection on a beam whose family lacks section parameters is refused with a message naming the beam and the upgrade utility.
 - [ ] Upgrading a legacy W-shape family adds its section parameters with values equal to the profile dimensions, and the type then exports an <code>IfcIShapeProfileDef</code>.</p>
+<p><em>Built (2026-10-18):</em> the Fine-only rule for connection plates, bolts and welds (STR-STL-002): they are elements of their own, hidden in plans, sections and 3D views below Fine detail (3D views gained a Detail Level row) and always written to IFC. Steel connections take members whose types carry section dimensions (every catalogue section loaded with <em>Load Section</em> does). Not yet: <code>steel_families.upgrade</code>, refusing members without section parameters with the upgrade message, the steel-material check, cuts, and scheduling and numbering fabrication elements.</p>
 <h3 id="442-open-parametric-connection-library">4.4.2 Open parametric connection library</h3>
 <p><strong>ID:</strong> <code class="rid" id="STR-STL-002">STR-STL-002</code> · <strong>Priority:</strong> <span class="pri pri-p2">P2</span> · <strong>Ref:</strong> research/03 §5.2</p>
 <p><strong>Purpose.</strong> Reviera needs its own library of standard steel connections, because the reference product's connection engine and content are proprietary.</p>
@@ -33503,12 +33506,14 @@ No IFC equivalent.
 <p><strong>Data (IFC mapping).</strong> See STR-CONN-001. Library packages are external, but the generated sub-elements are fully written to IFC, so a model opens without the library. The library package and version are recorded in RXD element data (<code>structural</code>), and the type recipe in an RXD family recipe.</p>
 <p><strong>Commands.</strong>
 - <code>connection_library.install(path)</code>
+- <code>connection_type.list() -&gt; types</code>
 - <code>connection_type.edit_parameters(type_id, params)</code>
 - <code>structural_connection.override(connection_id, params)</code></p>
 <p><strong>Acceptance criteria.</strong>
-- [ ] A shear-plate connection between a W-beam and a column flange creates a plate, a bolt group and welds at Fine detail.
-- [ ] Changing the bolt row count from 3 to 4 in the dialog regenerates the plate height.
+- [x] A shear-plate connection between a W-beam and a column flange creates a plate, a bolt group and welds at Fine detail.
+- [x] Changing the bolt row count from 3 to 4 in the dialog regenerates the plate height.
 - [ ] A model whose library package has been removed still opens and shows all plates and bolts, with a warning that the connection cannot be edited.</p>
+<p><em>Built (2026-10-18):</em> a built-in library of four types, written in Rust rather than as Lua packages for now: <strong>Shear Plate</strong> (column or girder + beam), <strong>Extended End Plate</strong> (column + beam), <strong>Base Plate</strong> (one column; pinned, four anchor rods) and <strong>Gusset</strong> (column or beam + brace; stops at a column's base, above its base plate). Each declares its input signature (refused with <code>connection.inputs</code>) and a parameter schema by tab (plates, bolts, welds, layout) with region defaults (inch sizes under US codes, millimetres elsewhere). Values are layered: region default, then the project's value for the type (<code>connection_type.edit_parameters</code>, stored in <code>rxd:connection_types</code>), then the connection's own (<code>structural_connection.override</code>). <code>connection_type.list</code>, <code>structural_connection.set_type</code> and <code>structural_connection.create</code> with a <code>type_id</code> generate the plates, bolts and welds as elements (<code>IfcPlate</code>; <code>IfcMechanicalFastener</code> <code>BOLT</code> or <code>ANCHORBOLT</code> with NominalDiameter and NominalLength; <code>IfcFastener</code> <code>WELD</code>) aggregated by the connection (<code>rxd:connection</code>); they follow the members and go when the connection is deleted. The overlap finder treats a connection's parts, its members and the footing under its column as belonging together. The Connection tool asks for a type that fits the selection (base plates go on each selected column); Properties show a connection's type, its parameters by tab (an override marked ●) and a <em>Type Parameters…</em> row for project values. The steel sample uses all four. Not yet: Lua packages and <code>connection_library.install</code>, the other library groups (clip angles, seated beams, moment flange plates, splices, haunches, stiffeners), the Modify Parameters dialog with live preview, ranges of applicability, copes and cuts, and the library-removed warning.</p>
 <h3 id="443-custom-connections">4.4.3 Custom connections</h3>
 <p><strong>ID:</strong> <code class="rid" id="STR-STL-003">STR-STL-003</code> · <strong>Priority:</strong> <span class="pri pri-p2">P2</span> · <strong>Ref:</strong> research/03 §5.2 ("Custom connections") · screenshots/structure_mep/steel_custom_connections.png</p>
 <p><strong>Workflow.</strong>
@@ -33556,12 +33561,13 @@ No IFC equivalent.
 - Rule sets that map profile sizes to connection types are Lua or JSON tables.
 - The applied run is one undoable transaction; its log is kept with the run history.</p>
 <p><strong>Data (IFC mapping).</strong> Placed connections as in STR-CONN-001. Rule sets are project-level data in RXD document <code>model/structural</code> (<code>settings.connection_rules</code>), or external files referenced by path; run logs (date, rule set, counts) are kept there too.</p>
-<p><strong>Commands.</strong> <code>structural_connection.automate(scope, rule_set_id?, options?: {existing: "skip"|"replace_generic", preview: bool}) -&gt; report</code>. The report lists <code>{join, members[], type_id?, status: placed|skipped|failed, reason}</code> per join. A preview report can be applied with <code>structural_connection.apply_automation(report_id)</code>.</p>
+<p><strong>Commands.</strong> <code>structural_connection.automate(scope, rule_set_id?, options?: {existing: "skip"|"replace_generic", preview: bool}) -&gt; report</code>. The report lists <code>{join, members[], type_id?, status: placed|skipped|failed, reason}</code> per join. A preview report can be applied with <code>structural_connection.apply_automation(report_id)</code>. <code>structural_connection.rule_sets() -&gt; {rule_sets, ranges, runs}</code>, <code>structural_connection.set_rule_set(name, rules[] | null)</code>, <code>structural_connection.automation_csv(report) -&gt; text</code>.</p>
 <p><strong>Acceptance criteria.</strong>
 - [ ] Automating 200 beam–column joins places a type on every join whose profiles fall within a range, and logs the rest.
-- [ ] Re-running automation on the same joins with <em>Skip</em> changes nothing and logs all 200 as skipped (already connected).
-- [ ] Preview mode leaves the undo stack and model unchanged until <em>Apply</em>.
-- [ ] The log saved as CSV has one row per join with status and reason.</p>
+- [x] Re-running automation on the same joins with <em>Skip</em> changes nothing and logs all 200 as skipped (already connected).
+- [x] Preview mode leaves the undo stack and model unchanged until <em>Apply</em>.
+- [x] The log saved as CSV has one row per join with status and reason.</p>
+<p><em>Built (2026-10-18):</em> <code>structural_connection.automate</code> finds the joins in the framing (each column's foot where no column stands below; each beam end on the column or girder it rests on, from the beams' supports; each brace end at the column, else the beam, its axis meets within 500 mm), limited to the given members' joins, and gives each the type of the first matching rule. Rules match the join kind (<code>column_base</code>, <code>beam_column</code>, <code>beam_beam</code>, <code>brace</code>), the main and connected members' sections and the connected member's depth range; a rule without a range uses its type's range of applicability (shear plate 150–920 mm, end plate 200–920 mm deep). The built-in <em>Default</em> rule set gives base plates, shear plates (beam–column and beam–beam) and gussets; projects keep their own in <code>rxd:connection_rules</code> (<code>structural_connection.set_rule_set</code>, <code>rule_sets</code>), or <code>rules</code> are passed with the call (a Lua or JSON table). Only steel members are connected; joins with a connection on the same members are skipped (<em>Skip</em>) or a generic one gets the type (<em>Replace generic only</em>); where a generator fails a generic connection marked Failed holds the join. A preview changes nothing (not even the undo history); <code>apply_automation</code> takes the preview's report itself rather than an id. Runs (time, rule set, counts) are kept in <code>rxd:connection_runs</code>. Structure › Framing › <strong>Automate Connections</strong>: the rule set, the existing-joins choice and Preview; the preview marks each join in 3D views by type (grey where skipped), with the log (status, join, type, members, reason), Apply and Save CSV. Gussets now stop at the bottom of a beam framing into the column at a brace's top (or the top of one at its foot), and their bolts with them. Not yet: background jobs, angle and grade conditions in rules, a rule set editor dialog, and classifying joins by section family beyond sections.</p>
 <h3 id="445-plates">4.4.5 Plates</h3>
 <p><strong>ID:</strong> <code class="rid" id="STR-STL-005">STR-STL-005</code> · <strong>Priority:</strong> <span class="pri pri-p2">P2</span> · <strong>Ref:</strong> research/03 §5.3</p>
 <p><strong>Workflow.</strong>
@@ -38362,6 +38368,13 @@ No IFC equivalent.
 <td>STR-STL-002</td>
 </tr>
 <tr>
+<td><code>connection_type.list</code></td>
+<td>—</td>
+<td>types</td>
+<td>No</td>
+<td>STR-STL-002</td>
+</tr>
+<tr>
 <td><code>connection_type.edit_parameters</code></td>
 <td>type_id, params</td>
 <td>—</td>
@@ -38415,6 +38428,27 @@ No IFC equivalent.
 <td>report_id</td>
 <td>report</td>
 <td>Yes</td>
+<td>STR-STL-004</td>
+</tr>
+<tr>
+<td><code>structural_connection.rule_sets</code></td>
+<td>—</td>
+<td>rule sets, ranges, runs</td>
+<td>No</td>
+<td>STR-STL-004</td>
+</tr>
+<tr>
+<td><code>structural_connection.set_rule_set</code></td>
+<td>name, rules[] | null</td>
+<td>count</td>
+<td>Yes</td>
+<td>STR-STL-004</td>
+</tr>
+<tr>
+<td><code>structural_connection.automation_csv</code></td>
+<td>report</td>
+<td>CSV text</td>
+<td>No</td>
 <td>STR-STL-004</td>
 </tr>
 <tr>
@@ -51617,7 +51651,7 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 </tbody>
 </table></div>
 <h2 id="a3-consolidated-command-index">A.3 Consolidated command index</h2>
-<p><strong>2102 unique commands</strong> in 410 domains. Every command is exposed automatically to the UI, to Lua (<code>reviera.&lt;domain&gt;.&lt;verb&gt;</code>) and to MCP (<code>&lt;domain&gt;_&lt;verb&gt;</code>), subject to its permission class.</p>
+<p><strong>2106 unique commands</strong> in 410 domains. Every command is exposed automatically to the UI, to Lua (<code>reviera.&lt;domain&gt;.&lt;verb&gt;</code>) and to MCP (<code>&lt;domain&gt;_&lt;verb&gt;</code>), subject to its permission class.</p>
 <div class="tbl"><table>
 <thead>
 <tr>
@@ -51912,7 +51946,7 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 </tr>
 <tr>
 <td><code>connection_type</code></td>
-<td style="text-align: right;">1</td>
+<td style="text-align: right;">2</td>
 </tr>
 <tr>
 <td><code>connector</code></td>
@@ -53032,7 +53066,7 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 </tr>
 <tr>
 <td><code>structural_connection</code></td>
-<td style="text-align: right;">13</td>
+<td style="text-align: right;">16</td>
 </tr>
 <tr>
 <td><code>structural_settings</code></td>
@@ -55854,6 +55888,14 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 <td>type_id, params</td>
 <td>—</td>
 <td>Yes</td>
+<td>STR-STL-002</td>
+</tr>
+<tr>
+<td><code>connection_type.list</code></td>
+<td>4</td>
+<td>—</td>
+<td>types</td>
+<td>No</td>
 <td>STR-STL-002</td>
 </tr>
 <tr>
@@ -66001,6 +66043,14 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 <td>Yes</td>
 </tr>
 <tr>
+<td><code>structural_connection.automation_csv</code></td>
+<td>4</td>
+<td>report</td>
+<td>CSV text</td>
+<td>No</td>
+<td>STR-STL-004</td>
+</tr>
+<tr>
 <td><code>structural_connection.break</code></td>
 <td>4</td>
 <td>connection_id</td>
@@ -66065,12 +66115,28 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 <td>Yes</td>
 </tr>
 <tr>
+<td><code>structural_connection.rule_sets</code></td>
+<td>4</td>
+<td>—</td>
+<td>rule sets, ranges, runs</td>
+<td>No</td>
+<td>STR-STL-004</td>
+</tr>
+<tr>
 <td><code>structural_connection.set</code></td>
 <td>4</td>
 <td>connection_ids[], approval_status?, code_check?, fabricator?, override_by_instance?</td>
 <td>—</td>
 <td>Yes</td>
 <td>STR-CONN-001</td>
+</tr>
+<tr>
+<td><code>structural_connection.set_rule_set</code></td>
+<td>4</td>
+<td>name, rules[] \</td>
+<td>null</td>
+<td>count</td>
+<td>Yes</td>
 </tr>
 <tr>
 <td><code>structural_connection.set_type</code></td>

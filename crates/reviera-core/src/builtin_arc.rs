@@ -63,6 +63,7 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(AnalyticalMemberSet),
         registry.add(AnalyticalNodeMerge),
         registry.add(AnalyticalNodeMove),
+        registry.add(AnalyticalModelReset),
         registry.add(AnalyticalPanelCreateByBoundary),
         registry.add(AnalyticalPanelCreateByExtrusion),
         registry.add(AnalyticalPanelSplit),
@@ -76,6 +77,15 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(AnalyticalAnalyticalToPhysical),
         registry.add(AnalyticalDisconnect),
         registry.add(AnalyticalModelInfo),
+        registry.add(ConnectionTypeList),
+        registry.add(ConnectionRuleSets),
+        registry.add(ConnectionReportCsv),
+        registry.add(ConnectionAutomate),
+        registry.add(ConnectionApplyAutomation),
+        registry.add(ConnectionSetRuleSet),
+        registry.add(ConnectionTypeEditParameters),
+        registry.add(StructuralConnectionSetType),
+        registry.add(StructuralConnectionOverride),
         registry.add(ResultsPresets),
         registry.add(ResultsExtremes),
         registry.add(ResultsOverlay),
@@ -849,6 +859,54 @@ edit_command!(
 );
 
 edit_command!(
+    ConnectionAutomate,
+    "structural_connection.automate",
+    "Automate connections",
+    "Places library connections on many joins at once (STR-STL-004). Joins are found in the framing \
+     (`element_ids` limits them to those members' joins): each column's foot where no column stands \
+     below, each beam end on the column or girder it rests on, and each brace end at the column (else \
+     beam) its axis meets. Each gets the type of the first rule that matches (`rule_set` by name, \
+     Default when omitted, or `rules` given here); a rule without a depth range uses its type's range \
+     of applicability. Only steel members are connected. A join with a connection on the same members \
+     is skipped, or with `existing: replace_generic` a generic one gets the type. Where the generator \
+     fails a generic connection marked Failed holds the join. With `preview` nothing changes. Returns \
+     the report: a line per join with its kind, point, members, type, status (placed, skipped, failed) \
+     and reason, and the counts. The run is one undo step and is logged with the project.",
+    "Automate Connections",
+    crate::steel_auto::AutomateParams,
+    crate::steel_auto::Report,
+    crate::steel_auto::automate
+);
+
+edit_command!(
+    ConnectionApplyAutomation,
+    "structural_connection.apply_automation",
+    "Apply an automation preview",
+    "Applies a preview's report from `structural_connection.automate` as it stands (STR-STL-004): \
+     its placed lines are placed (skipped again where a member has gone or a detailed connection has \
+     appeared since). Returns the report of what was done.",
+    "Automate Connections",
+    crate::steel_auto::ApplyParams,
+    crate::steel_auto::Report,
+    crate::steel_auto::apply_report
+);
+
+edit_command!(
+    ConnectionSetRuleSet,
+    "structural_connection.set_rule_set",
+    "Save a connection rule set",
+    "Saves one of the project's connection automation rule sets by `name` (STR-STL-004): an ordered \
+     list of `rules`, each a library `type_id`, a `join` (column_base, beam_column, beam_beam, brace), \
+     and optional `main_sections`, `sections` (i_shape, channel, angle, tee, rectangular_hollow, \
+     circular_hollow, …), `depth_min` and `depth_max` (metres, of the connected member). Null `rules` \
+     removes it. Returns how many rule sets the project has.",
+    "Connection Rule Set",
+    crate::steel_auto::SetRuleSetParams,
+    usize,
+    crate::steel_auto::set_rule_set
+);
+
+edit_command!(
     ConnectionCreate,
     "structural_connection.create",
     "Place a structural connection",
@@ -1019,12 +1077,29 @@ edit_command!(
 );
 
 edit_command!(
+    AnalyticalModelReset,
+    "analytical_model.reset",
+    "Reset analytical elements",
+    "Reset (STR-AM-008): analytical members and panels (or those of the given physical elements) back to \
+     the position their physical element gives them, keeping their GlobalIds, sections, releases, loads \
+     and supports, and clearing the manually adjusted flag. A node shared with elements not being reset \
+     stays where it is and the reset element gets its own; those nodes are reported. Elements with no \
+     physical element are refused, by name.",
+    "Reset Analytical",
+    crate::analytical::ResetParams,
+    crate::analytical::ResetReport,
+    crate::analytical::reset
+);
+
+edit_command!(
     AnalyticalNodeMove,
     "analytical_node.move",
     "Move analytical nodes",
-    "Moves analytical nodes by `delta` (metres, project axes) and flags them as manually adjusted \
-     (STR-AM-008): the members using them move with them, their loads and boundary conditions follow, \
-     and physical elements stay where they are. Each node keeps its level. Returns the nodes.",
+    "Moves analytical nodes by `delta` (metres, project axes), or each by its own vector (`moves`), \
+     as one undo step, and flags them as manually adjusted (STR-AM-008): the members using them move \
+     with them, their loads and boundary conditions follow, and physical elements stay where they are. \
+     Each node keeps its level. With `merge`, nodes then within the merge distance are merged (a node \
+     dropped on another joins it). Returns the nodes.",
     "Adjust Analytical Model",
     crate::analytical::NodeMoveParams,
     Vec<ElementId>,
@@ -1392,6 +1467,43 @@ edit_command!(
     crate::results::DeletePackageParams,
     (),
     crate::results::delete_package
+);
+
+edit_command!(
+    ConnectionTypeEditParameters,
+    "connection_type.edit_parameters",
+    "Change a connection type's parameters",
+    "Changes a steel connection type's parameters for this project (metres or counts; null returns one to \
+     the region's default); every connection of the type is made afresh. Returns how many.",
+    "Connection Type Parameters",
+    crate::steel_fab::EditTypeParams,
+    usize,
+    crate::steel_fab::edit_type
+);
+
+edit_command!(
+    StructuralConnectionSetType,
+    "structural_connection.set_type",
+    "Give connections a type",
+    "Gives connections a steel connection type (or `generic`): their members must fit the type's input \
+     signature (count and roles); its plates, bolts, anchor rods and welds are made as fabrication \
+     elements (IfcPlate, IfcMechanicalFastener, IfcFastener) aggregated by the connection.",
+    "Connection Type",
+    crate::steel_fab::SetTypeParams,
+    Vec<ElementId>,
+    crate::steel_fab::set_type
+);
+
+edit_command!(
+    StructuralConnectionOverride,
+    "structural_connection.override",
+    "Override a connection's parameters",
+    "Gives one connection its own parameter values (null returns one to the type's); its fabrication \
+     elements are made afresh and it is flagged as overridden.",
+    "Connection Parameters",
+    crate::steel_fab::OverrideParams,
+    (),
+    crate::steel_fab::override_params
 );
 
 edit_command!(
@@ -1931,6 +2043,45 @@ read_command!(
     Option<serde_json::Value>,
     Vec<crate::results::Package>,
     |s, _| Ok(crate::results::packages(s))
+);
+
+read_command!(
+    ConnectionTypeList,
+    "connection_type.list",
+    "The steel connection library",
+    "The built-in steel connection types (STR-STL-002), authored from first principles: shear plate \
+     (fin plate), extended end plate, pinned base plate and brace gusset plate. Each has its group, \
+     input signature (members and roles), parameters (key, label, length or count, tab, metric and \
+     US defaults) with this project's values, and how many connections use it.",
+    Option<serde_json::Value>,
+    Vec<crate::steel_fab::TypeInfo>,
+    |s, _| Ok(crate::steel_fab::list(s))
+);
+
+read_command!(
+    ConnectionRuleSets,
+    "structural_connection.rule_sets",
+    "Connection automation rule sets",
+    "The rule sets connection automation can use (STR-STL-004): the built-in Default (base plates \
+     under columns, shear plates where beams meet columns or girders, gussets at braces' ends) and \
+     the project's own, each an ordered list of rules (a type, the join kind: column_base, \
+     beam_column, beam_beam or brace, optional main and connected sections and a depth range); the \
+     library types' ranges of applicability (connected member depth, metres); and the runs so far.",
+    Option<serde_json::Value>,
+    crate::steel_auto::RulesInfo,
+    |s, _| Ok(crate::steel_auto::rules_info(s))
+);
+
+read_command!(
+    ConnectionReportCsv,
+    "structural_connection.automation_csv",
+    "An automation report as CSV",
+    "An automation report (from `structural_connection.automate` or `apply_automation`) as CSV: one \
+     row per join with its kind, point, members, type, status (placed, skipped, failed), reason and \
+     connection.",
+    crate::steel_auto::CsvParams,
+    serde_json::Value,
+    |_, p| Ok(crate::steel_auto::report_csv(p))
 );
 
 read_command!(

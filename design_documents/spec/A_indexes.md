@@ -190,7 +190,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**2102 unique commands** in 410 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**2106 unique commands** in 410 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -265,7 +265,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `conduit` | 2 |
 | `conduit_fitting` | 1 |
 | `connection_library` | 3 |
-| `connection_type` | 1 |
+| `connection_type` | 2 |
 | `connector` | 3 |
 | `constraint` | 6 |
 | `contour` | 1 |
@@ -545,7 +545,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `structural` | 3 |
 | `structural_analysis` | 7 |
 | `structural_code` | 1 |
-| `structural_connection` | 13 |
+| `structural_connection` | 16 |
 | `structural_settings` | 3 |
 | `study` | 3 |
 | `subcategory` | 3 |
@@ -929,6 +929,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `connection_library.load` | 4 | type_ids[] | — | Yes | STR-CONN-001 |
 | `connection_library.unload` | 4 | type_ids[] | — | Yes | STR-CONN-001 |
 | `connection_type.edit_parameters` | 4 | type_id, params | — | Yes | STR-STL-002 |
+| `connection_type.list` | 4 | — | types | No | STR-STL-002 |
 | `connector.add` | 4 | family_id, domain, face_ref \ | plane, params | connector_id | Yes |
 | `connector.list` | 4 | element_id | connectors[] | No | MEP-CONN-001 |
 | `connector.set` | 4 | element_id, connector_index, params | — | Yes | MEP-CONN-001 |
@@ -2197,6 +2198,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `structural_code.set` | 4 | region, code_id | — | Yes | STR-LC-001 |
 | `structural_connection.apply_automation` | 4 | report_id | report | Yes | STR-STL-004 |
 | `structural_connection.automate` | 4 | scope, rule_set_id?, options?: {existing: "skip"\ | "replace_generic", preview: bool} | report | Yes |
+| `structural_connection.automation_csv` | 4 | report | CSV text | No | STR-STL-004 |
 | `structural_connection.break` | 4 | connection_id | element_ids[] | Yes | STR-CONN-001 |
 | `structural_connection.check` | 4 | connection_ids[], provider_id, code | report | Results only | STR-STL-009 |
 | `structural_connection.create` | 4 | member_ids[], type_id? | connection_id | Yes | STR-CONN-001 |
@@ -2205,7 +2207,9 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `structural_connection.override` | 4 | connection_id, params | — | Yes | STR-STL-002 |
 | `structural_connection.presize` | 4 | connection_ids[], provider_id, code | — | Yes | STR-STL-009 |
 | `structural_connection.propagate` | 4 | connection_id, target_join_ids[] \ | "matching" | connection_ids[] | Yes |
+| `structural_connection.rule_sets` | 4 | — | rule sets, ranges, runs | No | STR-STL-004 |
 | `structural_connection.set` | 4 | connection_ids[], approval_status?, code_check?, fabricator?, override_by_instance? | — | Yes | STR-CONN-001 |
+| `structural_connection.set_rule_set` | 4 | name, rules[] \ | null | count | Yes |
 | `structural_connection.set_type` | 4 | connection_id, type_id | — | Yes | STR-CONN-001 |
 | `structural_connection.show_warnings` | 4 | view_id, on: bool | — | No | STR-CONN-001 |
 | `structural_settings.get` | 4 | — | table | No | STR-SET-001 |

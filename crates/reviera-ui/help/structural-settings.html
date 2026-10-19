@@ -1,0 +1,36 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Copyright (C) 2026 Reviera contributors -->
+<h1>Structural settings, materials and standards</h1>
+<p class="lead">How the model's structure is drawn and checked, and which standards and
+materials it uses by default.</p>
+
+<h2 id="settings">Structural Settings</h2>
+<p><b>Structure › Structural Settings</b>
+<a href="reviera:action/structural_settings.show">Structural Settings</a> opens one dialog; OK
+applies every change as one step.</p>
+<table>
+  <tr><td>Symbolic representation</td><td>The brace symbol in Coarse plans and its offset, the
+    kicker brace symbol, and the cutback at joints in Coarse views.</td></tr>
+  <tr><td>Structural steel</td><td>Point-to-point steel: members are not shortened where they
+    join.</td></tr>
+  <tr><td>Analytical model</td><td>Automatic <a href="reviera:help/analytical-model#checks">checks</a>
+    (member supports, consistency) after each change, circular support references, the
+    consistency criteria C1–C8, and the tolerances: support distance (300 mm), analytical to
+    physical (150 mm), node merge (5 mm), alignment.</td></tr>
+  <tr><td>Boundary conditions, loads</td><td>Symbol spacing; arrow lengths per kN, kN/m, kN/m²
+    and kN·m; load labels.</td></tr>
+</table>
+<p><code>structural_settings.get</code>, <code>structural_settings.set</code></p>
+
+<h2 id="standards">Regional standards</h2>
+<p>The model's building code (<a href="reviera:help/settings">Model Properties</a>) sets its
+region: which section catalogues come first, the default steel grade and concrete class (ASTM
+A992 and 4000 psi in the US; S355 and C30/37 in Europe; 350W and 30 MPa in Canada; 300PLUS and
+32 MPa in Australia), the timber grades, and the load combination template (ASCE 7 or EN 1990,
+see <a href="reviera:help/loads#combinations">Loads</a>).</p>
+
+<h2 id="materials">Materials</h2>
+<p>The materials library holds steels, concretes, sawn timber and glulam with their strengths and
+moduli (E, G, density), used by the analysis for stiffness and self-weight. A section type's
+structural material is a Properties row; a wall's or floor's is its type's structure layer.</p>
+<p><code>structural.catalogs</code>, <code>structural.materials</code></p>

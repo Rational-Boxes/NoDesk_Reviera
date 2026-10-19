@@ -50,10 +50,35 @@ pub struct ConnectionRecipe {
     pub fabricator: Option<String>,
     #[serde(default)]
     pub override_by_instance: bool,
+    /// This connection's own parameter values (STR-STL-002).
+    #[serde(default, skip_serializing_if = "serde_json::Map::is_empty")]
+    pub params: serde_json::Map<String, serde_json::Value>,
 }
 
 fn generic() -> String {
     "generic".into()
+}
+
+/// A connection recipe with no members (to read a type's parameters).
+pub fn blank() -> ConnectionRecipe {
+    ConnectionRecipe {
+        kind: RECIPE.into(),
+        members: Vec::new(),
+        connection_type: generic(),
+        approval_status: None,
+        code_check: CodeCheck::NotChecked,
+        fabricator: None,
+        override_by_instance: false,
+        params: serde_json::Map::new(),
+    }
+}
+
+/// A lone column's foot (where a base plate goes).
+fn column_foot(store: &Store, id: ElementId) -> Option<V3> {
+    let e = store.get(id)?;
+    crate::columns::column_recipe(e)?;
+    let (a, b) = crate::columns::regenerate(store, e).ok()?.axis();
+    Some(if a[2] <= b[2] { a } else { b })
 }
 
 pub fn recipe(e: &Element) -> Option<ConnectionRecipe> {
@@ -131,7 +156,11 @@ pub fn regenerate(store: &Store, e: &Element) -> Result<ConnectionGeometry> {
         .iter()
         .filter_map(|m| member_axis(store, *m))
         .collect();
-    let point = join_point(&axes).ok_or_else(|| {
+    let point = match members.as_slice() {
+        [one] => column_foot(store, *one),
+        _ => join_point(&axes),
+    }
+    .ok_or_else(|| {
         Error::new(
             "connection.no_join",
             "the connection's members no longer meet",
@@ -188,19 +217,20 @@ pub struct CreateParams {
     /// Two or more beams, braces, truss members or columns that meet; the first is the main
     /// member.
     pub member_ids: Vec<ElementRef>,
-    /// The connection type; only `generic` until the connection library is built.
+    /// The connection type: `generic` (the default) or one of `connection_type.list` (a base
+    /// plate takes one column).
     pub type_id: Option<String>,
 }
 
 /// Places a generic connection at the join of members (`structural_connection.create`).
 pub(crate) fn create(txn: &mut crate::txn::Transaction<'_>, p: CreateParams) -> Result<ElementId> {
     let store = txn.store().clone();
-    if p.type_id.as_deref().is_some_and(|t| t != "generic") {
-        return Err(Error::new(
-            "connection.unknown_type",
-            "only the generic connection type exists until the connection library is built",
-        ));
-    }
+    let ty = match p.type_id.as_deref() {
+        None | Some("generic") => None,
+        Some(t) => Some(crate::steel_fab::connection_type(t).ok_or_else(|| {
+            Error::new("connection.unknown_type", format!("no connection type {t}"))
+        })?),
+    };
     let mut ids = Vec::new();
     for r in &p.member_ids {
         let id = store
@@ -216,14 +246,34 @@ pub(crate) fn create(txn: &mut crate::txn::Transaction<'_>, p: CreateParams) -> 
             ids.push(id);
         }
     }
-    if ids.len() < 2 {
+    let single = ty.as_ref().is_some_and(|t| t.inputs.len() == 1);
+    if ids.len() < 2 && !single {
         return Err(Error::new(
             "connection.members",
             "a connection joins two or more members",
         ));
     }
+    // One connection of a type per joint: the same type on the same members is refused.
+    if let Some(t) = &ty {
+        let mut want: Vec<String> = ids
+            .iter()
+            .filter_map(|m| store.get(*m).map(|e| e.guid().to_string()))
+            .collect();
+        want.sort();
+        let exists = store.iter().filter_map(recipe).any(|c| {
+            let mut have = c.members.clone();
+            have.sort();
+            c.connection_type == t.id && have == want
+        });
+        if exists {
+            return Err(Error::new(
+                "connection.exists",
+                format!("these members already have a {} connection", t.name),
+            ));
+        }
+    }
     let axes: Vec<(V3, V3)> = ids.iter().filter_map(|m| member_axis(&store, *m)).collect();
-    if join_point(&axes).is_none() {
+    if !single && join_point(&axes).is_none() {
         return Err(Error::new(
             "connection.no_join",
             "the members do not meet (their axes pass more than 500 mm apart)",
@@ -240,8 +290,16 @@ pub(crate) fn create(txn: &mut crate::txn::Transaction<'_>, p: CreateParams) -> 
         code_check: CodeCheck::NotChecked,
         fabricator: None,
         override_by_instance: false,
+        params: serde_json::Map::new(),
     };
-    txn.create(
+    if let Some(t) = &ty {
+        crate::steel_fab::check_inputs(&store, t, &recipe.members)?;
+    }
+    let recipe = ConnectionRecipe {
+        connection_type: ty.as_ref().map_or_else(generic, |t| t.id.to_owned()),
+        ..recipe
+    };
+    let id = txn.create(
         NewElement::new("IfcElementAssembly")
             .param("@PredefinedType", "USERDEFINED")
             .param("@ObjectType", "STRUCTURAL_CONNECTION")
@@ -249,7 +307,11 @@ pub(crate) fn create(txn: &mut crate::txn::Transaction<'_>, p: CreateParams) -> 
                 RECIPE_KEY,
                 serde_json::to_value(&recipe).expect("serialises"),
             ),
-    )
+    )?;
+    if ty.is_some() {
+        crate::steel_fab::relayout(txn, id)?;
+    }
+    Ok(id)
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -320,6 +382,12 @@ pub struct Info {
     pub code_check: CodeCheck,
     pub fabricator: Option<String>,
     pub override_by_instance: bool,
+    /// The parameters in effect (a typed connection's).
+    pub params: std::collections::BTreeMap<String, f64>,
+    /// Its fabrication elements: plates, bolts, anchor rods, welds.
+    pub plates: Vec<ElementId>,
+    pub bolts: Vec<ElementId>,
+    pub welds: Vec<ElementId>,
 }
 
 /// Reports connections (`structural_connection.info`).
@@ -338,7 +406,22 @@ pub fn info(store: &Store, p: &InfoParams) -> Result<Vec<Info>> {
                 )
             })?;
             let g = regenerate(store, e).ok();
+            let guid = e.guid().to_string();
+            let fab = |class: &str| -> Vec<ElementId> {
+                store
+                    .iter()
+                    .filter(|f| {
+                        f.class == class
+                            && crate::steel_fab::fab_recipe(f).is_some_and(|r| r.connection == guid)
+                    })
+                    .map(Element::id)
+                    .collect()
+            };
             Ok(Info {
+                params: crate::steel_fab::params(store, &c),
+                plates: fab("IfcPlate"),
+                bolts: fab("IfcMechanicalFastener"),
+                welds: fab("IfcFastener"),
                 connection_id: id,
                 connection_type: c.connection_type,
                 point: g.as_ref().map(|g| g.point),

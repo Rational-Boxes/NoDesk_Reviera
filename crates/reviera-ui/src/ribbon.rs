@@ -31,6 +31,7 @@ pub const UI_ACTIONS: &[&str] = &[
     "ui.pane.analytical_checks",
     "ui.pane.results",
     "load_case.manage",
+    "analytical_model.adjust",
     "ui.analytical_panel_curved",
     "help.home",
     "wall.edit_assembly",

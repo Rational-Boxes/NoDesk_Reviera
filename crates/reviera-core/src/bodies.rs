@@ -377,6 +377,10 @@ pub fn all(store: &Store) -> Vec<Body> {
         let class = store.get(id).map_or("IfcBeam", |e| e.class.as_str());
         push(id, class, g.mesh(), false);
     }
+    // Steel connections' plates, bolts and welds (STR-STL-002).
+    for (id, part) in crate::steel_fab::all(store) {
+        push(id, part.class().0, part.mesh(), false);
+    }
     // In-place elements (ARC-INPL-001), their voids subtracted through the boolean relations.
     for (id, void, meshes) in crate::in_place::all(store) {
         let class = if void {
@@ -580,4 +584,30 @@ pub fn related(store: &Store, a: ElementId, b: ElementId) -> bool {
         || same_dormer
         || crate::csg::related(store, a, b)
         || embedded()
+        || fabricated_together(store, a, b)
+}
+
+/// A steel connection's plates, bolts and welds belong together and pass through its members,
+/// and anchor rods and base plates sit in the footing under its column (STR-STL-002).
+fn fabricated_together(store: &Store, a: ElementId, b: ElementId) -> bool {
+    let connection = |id: ElementId| {
+        let r = crate::steel_fab::fab_recipe(store.get(id)?)?;
+        crate::id::GlobalId::parse(&r.connection).and_then(|g| store.find_by_guid(&g))
+    };
+    let one_way = |part: ElementId, other: ElementId| {
+        let Some(c) = connection(part) else { return false };
+        if connection(other) == Some(c) {
+            return true;
+        }
+        let Some(members) = store.get(c).and_then(crate::connections::recipe).map(|r| r.members) else {
+            return false;
+        };
+        let Some(o) = store.get(other) else { return false };
+        let guid = o.guid().to_string();
+        members.contains(&guid)
+            || crate::foundations::footing_recipe(o)
+                .and_then(|f| f.column)
+                .is_some_and(|col| members.contains(&col))
+    };
+    one_way(a, b) || one_way(b, a)
 }

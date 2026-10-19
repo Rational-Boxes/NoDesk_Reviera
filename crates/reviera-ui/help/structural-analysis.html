@@ -1,0 +1,40 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Copyright (C) 2026 Reviera contributors -->
+<h1>Structural analysis and results</h1>
+<p class="lead">Reviera analyses the analytical model with its built-in linear static 3D frame
+solver, out of process, and shows the results in the model's views.</p>
+
+<h2 id="run">Running an analysis</h2>
+<p><a href="reviera:action/structural_analysis.run">Run Analysis</a> first runs the
+<a href="reviera:help/analytical-model#checks">checks</a>: if they find errors (a part with no
+support, no supports at all) it asks whether to run anyway or review them. The analysis runs in
+the background; when it finishes its results are kept with the model and a summary per case and
+combination is shown (largest moment, displacement and the vertical reactions). The results go
+stale when the model changes. <a href="reviera:action/structural_analysis.results">Results</a>
+shows the summary again.</p>
+<p>The built-in solver analyses members (panels are passed on to providers that analyse
+surfaces; their area loads are carried to the members). <code>structural_analysis.export_model</code>
+writes the neutral model (<code>reviera-structural-model.json</code>) for other programs.</p>
+
+<h2 id="explorer">Results Explorer</h2>
+<p><a href="reviera:action/ui.pane.results">Results Explorer</a> shows, in the 3D view, one load
+case or combination's:</p>
+<ul>
+  <li>member force diagrams: N, Vy, Vz, T, My, Mz, drawn off each member on the tension side,
+    positive blue and negative red, with values;</li>
+  <li>the deformed shape, including each span's sag between its supports;</li>
+  <li>the reactions, as arrows at the supports.</li>
+</ul>
+<p>Choose all members, columns, beams, braces or transfer beams, a scale, and the deformed shape
+under a force diagram. <b>Presets</b> (column axial forces, support reactions, beam moments with
+deformation …) set it all at once; <b>Save Preset…</b> keeps your own. <b>Insights</b> lists the
+largest values: click one to select its member and frame it. Opaque elements hide results behind
+them: use Hide/Isolate or a section box.</p>
+
+<h2 id="manage">Managing results</h2>
+<p><b>Export…</b> writes the result set as a <code>.reviera-results</code> package and
+<b>Import…</b> reads one back (results from another state of the model show as stale);
+<b>Delete</b> removes it. <code>results.*</code>,
+<code>structural_analysis.import_results</code></p>
+<p class="note">Not yet available: panel stresses and moments, modal and other analysis types,
+external providers (PyNite, CalculiX, xara), results in plans and sections.</p>

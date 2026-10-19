@@ -2,7 +2,7 @@
 -- Copyright (C) 2026 Reviera contributors
 
 -- title: Steel-framed office
--- description: A two-storey steel frame on a 30 × 25 ft grid: W-shape columns, girders and beams, infill beam systems, HSS X-bracing, a concrete slab on the framing, footings, and its analytical model with supports, loads and ASCE 7 combinations ready to analyse.
+-- description: A two-storey steel frame on a 30 × 25 ft grid: W-shape columns, girders and beams, infill beam systems, HSS X-bracing, a concrete slab on the framing, footings, steel connections (base plates, shear plates, gussets), and its analytical model with supports, loads and ASCE 7 combinations ready to analyse.
 --
 -- Reviera sample model (test-data/samples): structural steel framing to US practice (IBC; AISC
 -- shapes in ASTM A992, HSS in A500 Gr C):
@@ -14,6 +14,8 @@
 -- - X-bracing of HSS6X6X3/8 in bay A–B on grid 1, both storeys;
 -- - a 6" concrete slab on Level 2 and a roof slab, both structural, spanning across the beams;
 -- - a spread footing under each column;
+-- - steel connections from the library: a base plate with anchor rods under each column, shear
+--   plates at Level 2's girder ends, and gussets at the braces' feet (seen at Fine detail);
 -- - the analytical model made from the physical one (members split where beams frame into
 --   girders, panels for the slabs), pinned supports at the column bases, dead, live, roof live
 --   and wind load cases with area loads on the slabs (carried to the beams under them) and wind
@@ -59,14 +61,18 @@ local cols = reviera.column.place_at_grids{
 
 -- Framing at each floor, 6" below the level for the slab.
 local SLAB = 0.1524
+local girders = {}  -- Level 2's girders, for their connections
 for _, level in ipairs({ l2, roof }) do
   for _, y in ipairs(ys) do
     for i = 1, 3 do
-      reviera.beam.create{
+      local g = reviera.beam.create{
         type_id = girder, reference_level = level,
         curve = { start = { xs[i], y }, ["end"] = { xs[i + 1], y } },
         start_offset = -SLAB, end_offset = -SLAB,
       }
+      if level == l2 then
+        girders[#girders + 1] = { id = g, a = { xs[i], y }, b = { xs[i + 1], y } }
+      end
     end
   end
   for _, x in ipairs(xs) do
@@ -195,3 +201,32 @@ for _, n in ipairs(model.members) do
   end
 end
 reviera.load_combination.generate{ add = true }
+
+-- Steel connections from the built-in library (STR-STL-002): a pinned base plate with four
+-- anchor rods under every column, a shear plate at each end of Level 2's girders, and a gusset
+-- where each brace meets a column at its foot. Their plates, bolts and welds show at Fine detail.
+local function column_at(pt)
+  for _, m in ipairs(reviera.analytical_model.info{}.members) do
+    if m.role == "column" and math.abs(m.start[1] - pt[1]) < 1e-6 and math.abs(m.start[2] - pt[2]) < 1e-6 then
+      return m.physical[1]
+    end
+  end
+end
+for _, c in ipairs(cols) do
+  reviera.structural_connection.create{ member_ids = { c }, type_id = "base_plate" }
+end
+for _, g in ipairs(girders) do
+  for _, pt in ipairs({ g.a, g.b }) do
+    reviera.structural_connection.create{ member_ids = { column_at(pt), g.id }, type_id = "shear_plate" }
+  end
+end
+for _, m in ipairs(reviera.analytical_model.info{}.members) do
+  if m.role == "brace" and m.start[3] < 0.5 then
+    reviera.structural_connection.create{
+      member_ids = { column_at(m.start), m.physical[1] }, type_id = "gusset",
+    }
+  end
+end
+-- A brace's top meets its column where Level 2's girder has its shear plate; accepted with the
+-- rest of the framing's meetings.
+resolve_framing_overlaps()

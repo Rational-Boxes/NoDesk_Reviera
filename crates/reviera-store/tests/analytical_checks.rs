@@ -344,3 +344,139 @@ fn supports_and_consistency_checks() {
         .unwrap_err();
     assert_eq!(bad.code, "structural_settings.out_of_range");
 }
+
+/// Reset (STR-AM-008): a beam's end node moved by hand (taking the column's top with it, as the
+/// node is shared) goes back with the beam and the column reset together; a member with no
+/// physical element is refused by name.
+#[test]
+fn reset_returns_members_to_their_physical_position() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("reset.ifc");
+    let (_project, mut doc) = LocalProject::new(Schema::Ifc4, &path).unwrap();
+    let r = registry();
+    let l1 = doc
+        .store()
+        .iter()
+        .find(|e| e.class == "IfcBuildingStorey")
+        .unwrap()
+        .id();
+    let l2 = id(run(&r, &mut doc, "level.create", json!({ "elevation": 4.0 })));
+    let mut cols = Vec::new();
+    for x in [0.0, 6.0] {
+        cols.push(id(run(
+            &r,
+            &mut doc,
+            "column.place",
+            json!({ "point": [x, 0.0], "base_level": l1.0, "top_constraint": { "level": l2.0 } }),
+        )));
+    }
+    let beam = id(run(
+        &r,
+        &mut doc,
+        "beam.create",
+        json!({ "curve": { "start": [0.0, 0.0], "end": [6.0, 0.0] }, "reference_level": l2.0 }),
+    ));
+    run(&r, &mut doc, "analytical_automation.physical_to_analytical", json!({}));
+    let info = run(&r, &mut doc, "analytical_model.info", json!({}));
+    let bm = info["members"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|m| m["physical"][0] == beam.0)
+        .unwrap()
+        .clone();
+    let end = bm["nodes"][1].as_u64().unwrap();
+    run(
+        &r,
+        &mut doc,
+        "analytical_node.move",
+        json!({ "node_ids": [end], "delta": [0.0, 0.3, 0.0] }),
+    );
+    let report = run(&r, &mut doc, "analytical_model.check_consistency", json!({}));
+    assert!(!issues(&report, "C3", "position_mismatch").is_empty());
+    // Reset the beam and the column it shares the node with: back in place, one node, no C3.
+    let res = run(
+        &r,
+        &mut doc,
+        "analytical_model.reset",
+        json!({ "element_ids": [beam.0, cols[1].0] }),
+    );
+    assert_eq!(res["reset"].as_array().unwrap().len(), 2, "{res:#}");
+    let report = run(&r, &mut doc, "analytical_model.check_consistency", json!({}));
+    assert!(issues(&report, "C3", "position_mismatch").is_empty(), "{report:#}");
+    assert!(issues(&report, "C1", "disconnected_nodes").is_empty(), "{report:#}");
+    let info = run(&r, &mut doc, "analytical_model.info", json!({}));
+    let bm = info["members"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|m| m["physical"][0] == beam.0)
+        .unwrap()
+        .clone();
+    assert!((bm["end"][1].as_f64().unwrap()).abs() < 1e-9);
+    let col = info["members"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|m| m["physical"][0] == cols[1].0)
+        .unwrap()
+        .clone();
+    assert!(
+        col["nodes"].as_array().unwrap().contains(&bm["nodes"][1]),
+        "the beam and column share their node again"
+    );
+    // An analytical-only member has no default position.
+    let loose = run(
+        &r,
+        &mut doc,
+        "analytical_member.create",
+        json!({ "start": [20.0, 0.0, 0.0], "end": [24.0, 0.0, 0.0] }),
+    );
+    let err = r
+        .execute(
+            &mut doc,
+            "analytical_model.reset",
+            json!({ "element_ids": [loose] }),
+            &Caller::user(),
+        )
+        .unwrap_err();
+    assert_eq!(err.code, "analytical.no_default");
+    assert!(err.message.contains(&format!("analytical member {loose}")));
+}
+
+/// Adjust's moves (STR-AM-008): several nodes, each by its own vector, as one undo step; a node
+/// dropped on another merges with it.
+#[test]
+fn adjust_moves_are_one_step_and_merge_on_drop() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("adjust.ifc");
+    let (_project, mut doc) = LocalProject::new(Schema::Ifc4, &path).unwrap();
+    let r = registry();
+    let a = member(&r, &mut doc, [0.0, 0.0, 0.0], [5.0, 0.0, 0.0], "beam");
+    let b = member(&r, &mut doc, [5.04, 0.0, 0.0], [10.0, 0.0, 0.0], "beam");
+    let (a_end, b_start, b_end) = (
+        node(&r, &mut doc, a, 1),
+        node(&r, &mut doc, b, 0),
+        node(&r, &mut doc, b, 1),
+    );
+    let undo_before = doc.undo_history().count();
+    run(
+        &r,
+        &mut doc,
+        "analytical_node.move",
+        json!({ "moves": [[b_start, [-0.04, 0.0, 0.0]], [b_end, [0.0, 0.0, 0.5]]], "merge": true }),
+    );
+    assert_eq!(doc.undo_history().count(), undo_before + 1, "one undo step");
+    // The gap closed: the two members share a node, and b's far end rose.
+    assert_eq!(node(&r, &mut doc, b, 0), a_end);
+    let info = run(&r, &mut doc, "analytical_model.info", json!({}));
+    let mb = info["members"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|m| m["id"] == b)
+        .unwrap()
+        .clone();
+    assert!((mb["end"][2].as_f64().unwrap() - 0.5).abs() < 1e-9);
+    assert_eq!(info["nodes"], 3);
+}

@@ -1,0 +1,79 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Copyright (C) 2026 Reviera contributors -->
+<h1>The analytical model and its checks</h1>
+<p class="lead">The analytical model is what the analysis sees: members along the framing's
+axes, panels for walls and slabs, nodes where they meet, and supports. It is kept apart from the
+physical model, associated with it, and made from it on request. Everything is on the
+<b>Analyze</b> tab.</p>
+
+<h2 id="show">Seeing it</h2>
+<p><a href="reviera:action/ui.toggle_analytical">Show Analytical</a> draws it over 3D views:
+members red, nodes blue, panels magenta with a diagonal, supports green, loads orange.</p>
+
+<h2 id="automation">From the physical model</h2>
+<ul>
+  <li><a href="reviera:action/analytical_automation.physical_to_analytical">Physical to
+    Analytical</a> makes a member for each structural column, beam, brace and truss member, and a
+    panel for each bearing wall and structural floor, associated with them. Nodes merge at the
+    joints, and members are split where others frame into their span (a beam into a girder, a
+    floor at a column), so the frame is connected.</li>
+  <li><a href="reviera:action/analytical_automation.analytical_to_physical">Analytical to
+    Physical</a> gives changed section types back to the beams and columns.</li>
+  <li><a href="reviera:action/analytical_automation.disconnect">Disconnect</a> removes the
+    associations; <a href="reviera:action/analytical_node.merge">Merge Nodes</a> merges nodes
+    closer than the merge distance.</li>
+  <li><a href="reviera:action/analytical_model.adjust">Adjust</a> moves analytical nodes by hand
+    in a 3D view, without moving any physical element: click a node, then where it goes. It stays
+    at its height (<kbd>X</kbd>, <kbd>Y</kbd> or <kbd>Z</kbd> keeps it on that axis), snaps onto
+    other nodes, and the members using it follow in the preview; <kbd>Enter</kbd> with a node
+    picked types the move in millimetres. <kbd>Enter</kbd> finishes every move as one undo step,
+    a node dropped on another joining it; <kbd>Esc</kbd> cancels them. Moved nodes are flagged
+    as manually adjusted.</li>
+  <li><a href="reviera:action/analytical_model.reset">Reset</a> puts the selected analytical
+    elements (or those of the selected physical elements) back where their physical elements put
+    them, keeping their sections, releases, loads and supports.</li>
+</ul>
+<p>Selected analytical members, panels and nodes show their own rows in Properties: a member's
+role, material, start and end releases (Fixed or Pinned) and Analyze As; a panel's role,
+thickness, material, Analyze As and cladding; a node's support. With Show Analytical on, click
+them in a 3D view (a node, a member's line or a panel's edge), or select them from the
+Analytical Checks pane or Results Explorer's Insights.</p>
+
+<h2 id="panels">Panels</h2>
+<p><a href="reviera:action/analytical_panel.create_by_boundary">Panel by Boundary</a> sketches a
+flat panel at a plan's level; <a href="reviera:action/analytical_panel.create_by_extrusion">Panel
+by Extrusion</a> and <a href="reviera:action/ui.analytical_panel_curved">Curved Panel</a> click a
+line or an arc that rises to the next level. <a href="reviera:action/analytical_opening.create">Analytical
+Opening</a>, <a href="reviera:action/analytical_panel.split">Split Panel</a> and
+<a href="reviera:action/analytical_panel.set_cladding">Cladding</a> (loads but no stiffness)
+complete them.</p>
+
+<h2 id="checks">Checking it</h2>
+<p><a href="reviera:action/analytical_model.check_supports">Check Supports</a> and
+<a href="reviera:action/analytical_model.check_consistency">Check Consistency</a> open the
+<a href="reviera:action/ui.pane.analytical_checks">Analytical Checks</a> pane, listing issues by
+severity with the distance measured against its tolerance:</p>
+<table>
+  <tr><td>S1</td><td>A member or panel with nothing carrying it (a column's foot, a beam's
+    ends).</td></tr>
+  <tr><td>S2</td><td>Members carrying one another without reaching a support.</td></tr>
+  <tr><td>S3</td><td>No supports at all (an error).</td></tr>
+  <tr><td>C1</td><td>Nodes that look connected but are not; an end on another member's span with
+    no node there; a free end; a load off its host.</td></tr>
+  <tr><td>C2</td><td>A part with no support: the solver would see a mechanism (an error).</td></tr>
+  <tr><td>C3, C4</td><td>Analytical elements away from, or outside, their physical
+    ones.</td></tr>
+  <tr><td>C5</td><td>Elements without a counterpart.</td></tr>
+  <tr><td>C6</td><td>A beam or wall under a slab whose analytical elements do not meet.</td></tr>
+  <tr><td>C7, C8</td><td>Instability hints; missing sections or materials (C8 is off by
+    default).</td></tr>
+</table>
+<p>Select an issue to select its elements; <b>Zoom To</b> frames it; <b>Ignore</b> keeps it out
+of the list, with a reason, until one of its elements changes. Errors hold
+<a href="reviera:help/structural-analysis">Run Analysis</a>. Open the
+<a href="reviera:sample/structural_checks">Structural model with problems</a> sample to see every
+issue, each labelled in its plan.</p>
+<p><code>analytical_model.check_supports</code>, <code>analytical_model.check_consistency</code>,
+<code>analytical_model.ignore_issue</code>, <code>analytical_node.move</code></p>
+<p class="note">Not yet available: a move control in member or panel axes, moving whole members
+and panel edges in Adjust, alignment to levels and grids, the analytical model in plans.</p>

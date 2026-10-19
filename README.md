@@ -104,8 +104,10 @@ ribbon's tools, the command shell, Lua and MCP alike.
   every length field accepts typed units (`4.5 m`, `12' 6"`) (`units.get`, `units.set_preset`,
   `units.set_format`, `units.set_number_format`, `units.format`, `units.parse`).
 - **Help** (Help › Reviera Help, F1): a help tab beside the views with getting started,
-  navigation and selection basics, and the sample models, each opened (as a fresh copy) from its
-  link. Help › About gives the version and licence.
+  navigation and selection basics, pages for the Architecture and Structure tools (framing,
+  foundations, settings and standards, the analytical model and its checks, loads, analysis and
+  results), and the sample models grouped by the part of the application they show, each opened
+  (as a fresh copy) from its link. Help › About gives the version and licence.
 - **Several models at once**: each opens in its own tabs; File › Close Model (Ctrl+Shift+W)
   closes the active one and its views, asking to save changes.
 - **Model Properties** (Manage › Settings, UN; File menu): the model-wide settings in one dialog:
@@ -634,11 +636,29 @@ tools and the datums.
   plan's Detail Level set to Coarse draws beams, braces and truss members as single lines
   (`structural_settings.get`, `structural_settings.set`, `view.set_detail_level`; STR-SET-001,
   DOC-GFX-010).
-- **Connections and piles**: Connection (`CN`) places a generic connection at the join of the
+- **Connections and piles**: Connection (`CN`) places a connection at the join of the
   selected members, carrying approval, code-check and fabricator information (a circle with spokes
   in plans); Pile and Pile Cap place bored or driven piles, a cap's piles laid out under it and
   aggregated by it (`structural_connection.create`, `pile.place`, `pile_cap.place`;
   STR-CONN-001, STR-FND-004).
+- **Steel connection library** (built-in types): Connection offers the types that fit the
+  selection: Shear Plate, Extended End Plate, Base Plate (with anchor rods, one per selected
+  column) and Gusset (for braces), or Generic. They make plates, bolts and welds as elements of
+  their own (IfcPlate, IfcMechanicalFastener, IfcFastener, aggregated by the connection), drawn
+  only at Fine detail and kept in step with the members. Parameters come from the region's
+  defaults, the project's values for the type, then the connection's own overrides; Properties
+  show a connection's type and parameters by tab (`connection_type.list`,
+  `connection_type.edit_parameters`, `structural_connection.set_type`,
+  `structural_connection.override`; STR-STL-001, STR-STL-002). Not yet: Lua library packages,
+  the other connection groups (clip angles, splices, haunches, stiffeners), the Modify Parameters
+  dialog with live preview, copes and cuts.
+- **Connection automation**: Automate Connections finds the joins in the framing (column feet,
+  beam ends on columns and girders, brace ends) and places library types by an ordered rule set
+  (join kind, sections, depth ranges; the Default set or the project's), skipping connected
+  joins or upgrading generic ones, with a 3D preview colour-coded by type, Apply, a log saved as
+  CSV and a run history (`structural_connection.automate`, `apply_automation`, `rule_sets`,
+  `set_rule_set`, `automation_csv`; STR-STL-004). Not yet: background jobs, angle and grade
+  conditions, a rule set editor dialog.
 - **Analytical model** (first milestone): Analyze › Physical to Analytical makes analytical members
   (IfcStructuralCurveMember) for columns, beams, braces and truss members, with nodes
   (IfcStructuralPointConnection) merged at the joins and following their levels, end releases,
@@ -672,8 +692,10 @@ tools and the datums.
   from or left their physical elements, missing counterparts, instability hints and missing
   properties. The Analytical Checks pane lists them by severity, marks them in 3D, zooms to them
   and ignores them with a reason until an element changes; Run Analysis is held while errors
-  remain unless you run anyway. `analytical_node.move` adjusts nodes by hand
-  (`analytical_model.check_*`, `.ignore_issue`; STR-AM-007, part of STR-AM-008).
+  remain unless you run anyway. Analyze › Analytical › Adjust moves nodes by hand in 3D
+  (snapping, one undo step for the session, merging on drop), Reset puts elements back where their physical elements put them, and selected
+  analytical members, panels and nodes have their own Properties rows (`analytical_model.check_*`,
+  `.ignore_issue`, `.reset`; STR-AM-007, part of STR-AM-008).
 - **Structural analysis**: Analyze › Run Analysis distils the analytical model, supports, cases,
   combinations and loads to a neutral structural model and solves it out of process on the
   compute host with the built-in linear static 3D frame solver; the results (displacements,
@@ -997,12 +1019,11 @@ area by area (reviewed against the spec on 2026-10-15).
   trusses, braces, generic connections, foundations with piles and pile caps, structural walls and
   floors, Structural Settings with Coarse single-line framing, steel and timber section
   catalogues, a materials library, regional standards and the analytical model's members, nodes,
-  panels, automation, checks, results display, loads, load combinations, point supports and a built-in linear static solver
+  panels, automation, checks, results display, loads, load combinations, point supports, steel connections (four built-in types, with automation) and a built-in linear static solver
   are built (see [Structure](#structure-in-development)). Still to build: the beam join editor and arc
-  beams, placing braces in elevations, connection types and the connection library, composite
-  decks and span symbols, truss families (a layout shared by types), rebar, bilinear and two-way area
-  loads, Adjust mode and Reset for the analytical model, panel results and external
-  analysis providers.
+  beams, placing braces in elevations, the connection library's packages and its other
+  connection groups, composite decks and span symbols, truss families (a layout shared by types),
+  rebar, bilinear and two-way area loads, panel results and external analysis providers.
 - **MEP, families and collaboration** (BIMserver, OpenCDE, Godot) are specified but not started.
 - **Remote computation subsystem** (DM-RPC-001 … 010): in development; the first milestone is
   built (see [Analysis and remote computation](#analysis-and-remote-computation-in-development)).

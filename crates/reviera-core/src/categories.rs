@@ -169,6 +169,15 @@ pub const CATEGORIES: &[Category] = &[
         Some("Pset_FootingCommon"),
         true,
     ),
+    // A steel connection and its plates, bolts and welds (STR-STL-002).
+    cat(
+        "cat.structural_connections",
+        "Structural Connections",
+        None,
+        None,
+        None,
+        true,
+    ),
     cat(
         "cat.furniture",
         "Furniture",
@@ -339,6 +348,9 @@ pub fn category_of(e: &Element) -> Option<&'static Category> {
     if crate::grids::is_grid(e) || crate::grids::is_grid_type(e) {
         return category("cat.grids");
     }
+    if crate::connections::recipe(e).is_some() || crate::steel_fab::fab_recipe(e).is_some() {
+        return category("cat.structural_connections");
+    }
     let class = e.class.strip_suffix("StandardCase").unwrap_or(&e.class);
     let class = match class {
         "IfcDoorStyle" => "IfcDoorType",
@@ -361,6 +373,7 @@ pub fn category_of(e: &Element) -> Option<&'static Category> {
         "IfcMember" if predefined == "MULLION" => "cat.curtain_mullions",
         "IfcMember" => "cat.structural_framing",
         "IfcPlate" => "cat.curtain_panels",
+        "IfcMechanicalFastener" | "IfcFastener" => "cat.structural_connections",
         "IfcColumn" => {
             let load_bearing = e
                 .param("Pset_ColumnCommon.LoadBearing")

@@ -516,9 +516,18 @@ pub(crate) fn set_member(txn: &mut crate::txn::Transaction<'_>, p: MemberSetPara
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct NodeMoveParams {
+    /// Nodes all moved by `delta` …
+    #[serde(default)]
     pub node_ids: Vec<ElementRef>,
     /// Metres, project axes.
+    #[serde(default)]
     pub delta: [f64; 3],
+    /// … and/or each by its own vector (Adjust mode's moves, one undo step).
+    #[serde(default)]
+    pub moves: Vec<(ElementRef, [f64; 3])>,
+    /// Then merge nodes within the merge distance (a node dropped on another joins it).
+    #[serde(default)]
+    pub merge: bool,
     /// Only `global` (the default) for now.
     pub cs: Option<String>,
 }
@@ -538,15 +547,24 @@ pub(crate) fn move_nodes(
     }
     let store = txn.store().clone();
     let mut out = Vec::new();
-    for r in &p.node_ids {
+    let all: Vec<(&ElementRef, [f64; 3])> = p
+        .node_ids
+        .iter()
+        .map(|r| (r, p.delta))
+        .chain(p.moves.iter().map(|(r, d)| (r, *d)))
+        .collect();
+    if all.is_empty() {
+        return Err(Error::new("analytical.no_nodes", "give node_ids or moves"));
+    }
+    for (r, delta) in all {
         let (id, mut n) = store
             .resolve(r)
             .and_then(|id| Some((id, node_recipe(store.get(id)?)?)))
             .ok_or_else(|| {
                 Error::new("analytical.not_a_node", format!("no analytical node {r:?}"))
             })?;
-        n.point = [n.point[0] + p.delta[0], n.point[1] + p.delta[1]];
-        n.offset += p.delta[2];
+        n.point = [n.point[0] + delta[0], n.point[1] + delta[1]];
+        n.offset += delta[2];
         n.adjusted = true;
         let v = serde_json::to_value(&n).expect("serialises");
         txn.modify(id, |e| {
@@ -554,7 +572,182 @@ pub(crate) fn move_nodes(
         })?;
         out.push(id);
     }
+    if p.merge {
+        merge(txn, MergeParams::default())?;
+    }
     Ok(out)
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ResetParams {
+    /// Analytical members and panels, or physical elements (their analytical ones are reset).
+    pub element_ids: Vec<ElementRef>,
+}
+
+/// What a reset did.
+#[derive(Debug, Clone, Default, Serialize, JsonSchema)]
+pub struct ResetReport {
+    pub reset: Vec<ElementId>,
+    /// Elements with no physical element have no default position.
+    pub refused: Vec<(ElementId, String)>,
+    /// Shared nodes left where they were: the reset element got a node of its own.
+    pub disconnected: Vec<ElementId>,
+}
+
+/// How many members and panels use a node.
+fn users(store: &Store, guid: &str) -> usize {
+    store
+        .iter()
+        .filter(|e| {
+            member_recipe(e).is_some_and(|m| m.start == guid || m.end == guid)
+                || crate::analytical_panels::panel_recipe(e)
+                    .is_some_and(|p| p.corners.iter().any(|c| c == guid))
+        })
+        .count()
+}
+
+/// The node for an end being reset to `target`: the node itself moved there when nothing else
+/// uses it, else a node of its own there (one within the merge distance, or a new one).
+fn reset_node(
+    txn: &mut crate::txn::Transaction<'_>,
+    guid: &str,
+    target: V3,
+    report: &mut ResetReport,
+) -> Result<String> {
+    let store = txn.store().clone();
+    let tol = tolerance(&store);
+    let Some(id) = find(&store, guid) else {
+        return node_at(txn, target, tol);
+    };
+    let e = store.get(id).expect("found");
+    let (Some(mut r), Some(now)) = (node_recipe(e), node_point(&store, e)) else {
+        return node_at(txn, target, tol);
+    };
+    if dist(now, target) <= tol {
+        if r.adjusted {
+            r.adjusted = false;
+            let v = serde_json::to_value(&r).expect("serialises");
+            txn.modify(id, |e| {
+                e.params.insert(RECIPE_KEY.into(), v);
+            })?;
+        }
+        return Ok(guid.to_owned());
+    }
+    // A node already at the target (another element's, perhaps reset just before): use it.
+    if let Some((other, _)) = nodes(&store)
+        .into_iter()
+        .filter(|(n, q)| *n != id && dist(*q, target) <= tol)
+        .min_by(|a, b| dist(a.1, target).total_cmp(&dist(b.1, target)))
+    {
+        if users(&store, guid) > 1 {
+            report.disconnected.push(id);
+        }
+        return Ok(store.get(other).expect("listed").guid().to_string());
+    }
+    if users(&store, guid) <= 1 {
+        let z0 = crate::levels::elevation_of(&store, &r.level)?;
+        r.point = [target[0], target[1]];
+        r.offset = target[2] - z0;
+        r.adjusted = false;
+        let v = serde_json::to_value(&r).expect("serialises");
+        txn.modify(id, |e| {
+            e.params.insert(RECIPE_KEY.into(), v);
+        })?;
+        return Ok(guid.to_owned());
+    }
+    report.disconnected.push(id);
+    node_at(txn, target, tol)
+}
+
+/// Reset (`analytical_model.reset`, STR-AM-008): each analytical member or panel back to the
+/// position its physical element gives it, keeping its GlobalId, section, releases, loads and
+/// supports and clearing the manually adjusted flag. A node it shares with elements not being
+/// reset stays; the reset element gets a node of its own and the shared one is reported.
+pub(crate) fn reset(txn: &mut crate::txn::Transaction<'_>, p: ResetParams) -> Result<ResetReport> {
+    let store = txn.store().clone();
+    let mut targets: Vec<ElementId> = Vec::new();
+    for r in &p.element_ids {
+        let id = store
+            .resolve(r)
+            .ok_or_else(|| Error::new("element.not_found", format!("no element {r:?}")))?;
+        let e = store.get(id).expect("resolved");
+        if member_recipe(e).is_some() || crate::analytical_panels::panel_recipe(e).is_some() {
+            targets.push(id);
+            continue;
+        }
+        // A physical element: its analytical elements.
+        let guid = e.guid().to_string();
+        let mine: Vec<ElementId> = store
+            .iter()
+            .filter(|a| {
+                member_recipe(a).is_some_and(|m| m.physical.contains(&guid))
+                    || crate::analytical_panels::panel_recipe(a)
+                        .is_some_and(|p| p.physical.contains(&guid))
+            })
+            .map(Element::id)
+            .collect();
+        if mine.is_empty() {
+            return Err(Error::new(
+                "analytical.not_analytical",
+                format!("element {id} is neither analytical nor associated with an analytical element"),
+            ));
+        }
+        targets.extend(mine);
+    }
+    targets.sort();
+    targets.dedup();
+    let mut report = ResetReport::default();
+    for id in targets {
+        let store = txn.store().clone();
+        let e = store.get(id).expect("listed");
+        if let Some(mut m) = member_recipe(e) {
+            let Some(pe) = m.physical.iter().filter_map(|g| find(&store, g)).filter_map(|i| store.get(i)).next() else {
+                report.refused.push((id, format!("analytical member {id} has no physical element, so no default position")));
+                continue;
+            };
+            let (a, b, _) = match physical_member(&store, pe) {
+                Ok(x) => x,
+                Err(why) => {
+                    report.refused.push((id, why));
+                    continue;
+                }
+            };
+            m.start = reset_node(txn, &m.start.clone(), a, &mut report)?;
+            m.end = reset_node(txn, &m.end.clone(), b, &mut report)?;
+            write_member(txn, id, &m)?;
+            report.reset.push(id);
+        } else if let Some(mut pr) = crate::analytical_panels::panel_recipe(e) {
+            let Some(pe) = pr.physical.iter().filter_map(|g| find(&store, g)).filter_map(|i| store.get(i)).next() else {
+                report.refused.push((id, format!("analytical panel {id} has no physical element, so no default position")));
+                continue;
+            };
+            let (pts, defaults) = match crate::analytical_panels::physical_panel(&store, pe) {
+                Ok(x) => x,
+                Err(why) => {
+                    report.refused.push((id, why));
+                    continue;
+                }
+            };
+            let mut corners = Vec::new();
+            for (k, q) in pts.iter().enumerate() {
+                let old = pr.corners.get(k).cloned().unwrap_or_default();
+                corners.push(reset_node(txn, &old, *q, &mut report)?);
+            }
+            pr.corners = corners;
+            pr.arc = defaults.arc;
+            let v = serde_json::to_value(&pr).expect("serialises");
+            txn.modify(id, |e| {
+                e.params.insert(RECIPE_KEY.into(), v);
+            })?;
+            report.reset.push(id);
+        }
+    }
+    if report.reset.is_empty() && !report.refused.is_empty() {
+        let names: Vec<String> = report.refused.iter().map(|(_, w)| w.clone()).collect();
+        return Err(Error::new("analytical.no_default", names.join("; ")));
+    }
+    Ok(report)
 }
 
 #[derive(Debug, Default, Deserialize, JsonSchema)]

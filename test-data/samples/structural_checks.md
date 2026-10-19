@@ -25,17 +25,21 @@ labelled in the Level 2 plan.
 5. Fix them and re-check:
    - fault 1: put columns under the ring, or Loads › **Point Support** at its corners;
    - fault 2: a column under the cantilever's end, or delete it;
-   - fault 3: select the member and its column's top node, Analyze › Analytical › **Merge Nodes**
-     (the merge distance in Structural Settings must reach 40 mm), or redraw it to the node;
+   - fault 3: Analyze › Analytical › **Adjust**, click the member's end by the column, click the
+     same spot again (it snaps onto the column's node) and press Enter: the two nodes merge;
    - fault 4: delete the hand-drawn member and run **Physical to Analytical** for the beam (it
      splits the girders where the beam frames in);
-   - fault 5: move the girder back (Modify › **Move**, 250 mm), or Disconnect and run Physical
-     to Analytical again;
-   - fault 6: select the member and set its releases back to fixed (`analytical_member.set_releases`);
+   - fault 5: select the girder and click Analyze › Analytical › **Reset** to bring its
+     analytical member to it, or move the girder back (Modify › **Move**, 250 mm);
+   - fault 6: select the issue (**Select** in the pane) and set **Start Release** and **End
+     Release** back to *Fixed* in Properties;
    - fault 7: set the slab's offset back to −300 mm.
 6. Manage › **Structural Settings**: turn on C8 to see the hand-drawn members without a section,
    and the automatic checks to have them run after each change.
 
+Selected analytical members, panels and nodes show their own rows in Properties: role, material,
+releases and Analyze As; a panel's thickness and cladding; a node's support.
+
 ## Gaps
 
-Setting a member's releases has no Properties row yet: use `analytical_member.set_releases`.
+None: every step has its UI.

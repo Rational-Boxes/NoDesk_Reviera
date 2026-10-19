@@ -1401,7 +1401,13 @@ id = "structural_connection.create"
 label = "Connection"
 icon = "structural_connection"
 keys = "CN"
-help = "Place a generic structural connection at the join of the selected members (main member first): it carries approval, code-check and fabricator information and follows the members"
+help = "Place a connection at the join of the selected members (main member first), choosing a type that fits: shear plate, end plate, base plate (one per selected column), gusset, or generic. It carries approval, code-check and fabricator information and follows the members; its plates, bolts and welds show at Fine detail"
+
+[[action]]
+id = "structural_connection.automate"
+label = "Automate Connections"
+icon = "connection_automate"
+help = "Place library connections on every join (or the selected members' joins) by a rule set: base plates under columns, shear plates where beams meet columns or girders, gussets at braces' ends. Preview marks each join in 3D views before Apply; the log saves as CSV"
 
 [[action]]
 id = "pile.place"
@@ -1438,6 +1444,18 @@ id = "analytical_node.merge"
 label = "Merge Nodes"
 icon = "analytical_merge"
 help = "Merge analytical nodes within the node merge distance and remove nodes no member uses"
+
+[[action]]
+id = "analytical_model.adjust"
+label = "Adjust"
+icon = "analytical_adjust"
+help = "Move analytical nodes by hand in a 3D view: click a node, then where it goes (X, Y or Z for an axis; Enter types a move); Enter finishes, Esc cancels. Physical elements stay where they are"
+
+[[action]]
+id = "analytical_model.reset"
+label = "Reset"
+icon = "analytical_reset"
+help = "Put the selected analytical elements (or those of the selected physical elements) back where their physical elements put them"
 
 [[action]]
 id = "analytical_panel.create_by_boundary"
@@ -1864,6 +1882,7 @@ tools = [
   { action = "beam_system.remove", size = "small" },
   { action = "truss.remove", size = "small" },
   { action = "structural_connection.create", size = "small" },
+  { action = "structural_connection.automate", size = "small" },
 ]
 
 [[tab.panel]]
@@ -1901,6 +1920,8 @@ tools = [
   { action = "analytical_automation.analytical_to_physical", size = "small" },
   { action = "analytical_automation.disconnect", size = "small" },
   { action = "analytical_node.merge", size = "small" },
+  { action = "analytical_model.adjust", size = "small" },
+  { action = "analytical_model.reset", size = "small" },
 ]
 
 [[tab.panel]]
