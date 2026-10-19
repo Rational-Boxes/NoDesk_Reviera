@@ -173,7 +173,7 @@ td code { white-space: nowrap; }
         <div class="tb-cell"><span class="tb-label">Revision</span><span class="tb-value">0.1 · Draft</span></div>
         <div class="tb-cell"><span class="tb-label">Date</span><span class="tb-value tb-num">2026-10-12</span></div>
         <div class="tb-cell"><span class="tb-label">Requirements</span><span class="tb-value tb-num">808</span></div>
-        <div class="tb-cell"><span class="tb-label">Commands</span><span class="tb-value tb-num">2,106</span></div>
+        <div class="tb-cell"><span class="tb-label">Commands</span><span class="tb-value tb-num">2,117</span></div>
         <div class="tb-cell"><span class="tb-label">Licence</span><span class="tb-value">GPL-3.0-or-later</span></div>
         <div class="tb-cell last-row"><span class="tb-label">Stack</span><span class="tb-value">IFC · Rust · OCCT · wx · LuaJIT · MCP</span></div>
         <div class="tb-cell last-row" style="grid-column: span 3"><span class="tb-label">By priority</span>
@@ -185,7 +185,7 @@ td code { white-space: nowrap; }
 <p><strong>Document:</strong> Functional and technical specification of Reviera, an open-source BIM authoring application
 <strong>Functional reference:</strong> Autodesk® Revit® 2026/2027 (described from public sources only; see <code>RESEARCH_LOG.md</code>)
 <strong>Licence of Reviera:</strong> GPL-3.0-or-later
-<strong>Version:</strong> 0.1 (draft) · 2026-10-16 · <strong>Size:</strong> 808 numbered requirements (320 P0 · 293 P1 · 188 P2 · 7 P3), 2,106 commands</p>
+<strong>Version:</strong> 0.1 (draft) · 2026-10-16 · <strong>Size:</strong> 808 numbered requirements (320 P0 · 293 P1 · 188 P2 · 7 P3), 2,117 commands</p>
 <blockquote>
 <p><strong>Clean-room statement.</strong> This specification describes features, workflows and behaviour in Reviera's own words. Every input was publicly available: vendor online help, public blogs and tutorials, public forums and open-source repositories. All of it is listed with URLs and access checks in <code>SOURCE_REGISTER.md</code>. No proprietary, confidential, leaked or NDA-covered information was used. No vendor code, binaries, file formats or assets were examined or copied. Autodesk and Revit are trademarks of Autodesk, Inc. They are used here only to identify the functional reference. Reviera is not affiliated with or endorsed by Autodesk.</p>
 <p><strong>Independence statement.</strong> BIM Reviera is an independent, original application. It is in no way a copy or clone of any existing product, and it does not set out to read or write any existing product's closed, proprietary formats (such as RVT and RFA); IFC is its native format. An existing application was researched, from public sources only, to establish the workflows and user-interface conventions that the industry's users already know, so they can work in Reviera without relearning their trade. Beyond that research, Reviera implements its own features and enhancements: its architecture, native IFC storage, scripting and AI integration, remote computation and analysis, and many of its modelling tools are its own design. Interchange formats used across the industry, such as DWG and DXF, are supported only through open-source libraries, for interoperability.</p>
@@ -254,7 +254,7 @@ td code { white-space: nowrap; }
 </tr>
 <tr>
 <td>A</td>
-<td>Appendix A: requirement summary, shared commands, consolidated command index (2,106 commands; 808 requirements)</td>
+<td>Appendix A: requirement summary, shared commands, consolidated command index (2,117 commands; 808 requirements)</td>
 </tr>
 </tbody>
 </table></div>
@@ -24502,7 +24502,7 @@ CREATE TABLE base_rxd (
 - <code>workplane.viewer(view_id? (default: the active view)) -&gt; view_id</code> opens or re-aims the Work Plane Viewer and returns its transient view ID, which is valid only for the session
 - <code>element.set_work_plane(element_ids, plane | host_ref)</code>
 - <code>element.dissociate_work_plane(element_ids)</code></p>
-<p><strong>Implementation notes (2026-10-15).</strong> As built: work plane references <code>{by: level, level, offset} | {by: grid, grid} | {by: ref_plane, ref_plane} | {by: explicit, origin, x_dir, normal}</code>; a view's setting in <code>rxd:work_plane</code> (<code>plane</code>, <code>show</code>, <code>grid_spacing</code>), a plan's level by default; <code>workplane.set</code> (one of <code>level</code>/<code>offset</code>, <code>grid</code>, <code>ref_plane</code>, <code>plane</code>), <code>workplane.get</code>, <code>workplane.show</code>, <code>workplane.list</code> (the Name list); <code>element.set_work_plane</code> (projects the element onto the new plane) and <code>element.dissociate_work_plane</code> for model lines; Set (by name) and Show (a grid over the model's extent) in the window. Elements on a level move with its elevation; on a grid or reference plane, with it. Not built yet: Pick a Plane (faces), Pick a Line, Go To View, the Work Plane Viewer, and work-plane-based components and model text.</p>
+<p><strong>Implementation notes (2026-10-15).</strong> As built: work plane references <code>{by: level, level, offset} | {by: grid, grid} | {by: ref_plane, ref_plane} | {by: explicit, origin, x_dir, normal}</code>; a view's setting in <code>rxd:work_plane</code> (<code>plane</code>, <code>show</code>, <code>grid_spacing</code>), a plan's level by default; <code>workplane.set</code> (one of <code>level</code>/<code>offset</code>, <code>grid</code>, <code>ref_plane</code>, <code>plane</code>), <code>workplane.get</code>, <code>workplane.show</code>, <code>workplane.list</code> (the Name list); <code>element.set_work_plane</code> (projects the element onto the new plane) and <code>element.dissociate_work_plane</code> for model lines; Set (by name) and Show (a grid over the model's extent) in the window. Elements on a level move with its elevation; on a grid or reference plane, with it. Not built yet: Pick a Plane (faces), Pick a Line, Go To View, the Work Plane Viewer, and work-plane-based components and model text. Faces (2026-10-18): <code>{by: face, element, face, offset}</code> names a face of a column, beam, brace or steel plate (flange_1, flange_2, web_1, web_2, start, end; top, bottom), and every command taking a work plane accepts <code>face: {element, face, offset}</code>; a plane on a face follows its element (<code>face.list</code> lists them; STR-STL-005). Picking a face with the mouse to set a view's work plane is still to come.</p>
 <p><strong>Acceptance criteria.</strong>
 - [ ] Model text placed on a named reference plane moves with the plane when the plane is moved. (Model lines do.)
 - [ ] Choosing a vertical plane in a plan view offers Go To View with at least one section or elevation.
@@ -33585,10 +33585,11 @@ No IFC equivalent.
 <p><strong>Data (IFC mapping).</strong> <code>IfcPlate</code> (PredefinedType <code>SHEET</code>, or <code>USERDEFINED</code> "FOLDED"), typed by <code>IfcPlateType</code>. <code>Pset_PlateCommon</code>. Geometry: an extruded area solid from the contour. Material: <code>IfcMaterialLayerSetUsage</code> with one layer of the plate thickness. The editable contour, justification and host face reference are RXD element data (<code>constraints</code>).</p>
 <p><strong>Commands.</strong> <code>plate.create(work_plane | face_ref, contour_curves[], thickness, material_id, justification) -&gt; id</code></p>
 <p><strong>Acceptance criteria.</strong>
-- [ ] A plate sketched on a column flange face exports as <code>IfcPlate</code> with the correct thickness.
+- [x] A plate sketched on a column flange face exports as <code>IfcPlate</code> with the correct thickness.
 - [ ] A contour with a gap of 2 mm is refused at <em>Finish</em> and the open segment end is highlighted.
-- [ ] A 15 mm plate with <em>Bottom</em> justification on a flange face sits fully outside the flange, with its bottom face on the flange face.
-- [ ] Moving the hosting column moves the plate with it.</p>
+- [x] A 15 mm plate with <em>Bottom</em> justification on a flange face sits fully outside the flange, with its bottom face on the flange face.
+- [x] Moving the hosting column moves the plate with it.</p>
+<p><em>Built (2026-10-18):</em> <code>plate.create</code> on any work plane or on a named <strong>face</strong> of a column, beam, brace or plate (<code>face.list</code>: flange_1, flange_2, web_1, web_2, start, end; top, bottom), the face plane following its element. The contour is corners or line and arc segments (arcs flattened); it must close within 0.1 mm (<code>plate.open_contour</code> names the segment), not cross itself and have an area; thickness 1–200 mm (default 10 mm); justification bottom (outside a face), centre or top; material, coating and role (<code>Pset_PlateCommon.Reference</code>). <code>plate.set</code> (Edit Contour and the rest) and <code>plate.info</code>. A plate on a face moves with its element; when the element is deleted the plate stays where it was, unhosted. Plates move, rotate and mirror with Modify (their plane is then fixed in space). IfcPlate (SHEET) with a B-rep body, drawn at Fine detail, category Structural Connections. Structure › Steel › <strong>Plate</strong>: with one element selected, pick its face; otherwise the view's work plane; click the corners, Enter finishes. Properties: thickness, justification, role, material, the plane and whether hosted. The gap check refuses the contour but the window cannot yet highlight the open end (sketches are closed by clicks). Not yet: arcs kept as arcs, corner cuts, <code>IfcMaterialLayerSetUsage</code>, extruded-solid bodies, folded plates, the sketch journal.</p>
 <h3 id="446-bolts-anchors-holes-and-shear-studs">4.4.6 Bolts, anchors, holes and shear studs</h3>
 <p><strong>ID:</strong> <code class="rid" id="STR-STL-006">STR-STL-006</code> · <strong>Priority:</strong> <span class="pri pri-p2">P2</span> · <strong>Ref:</strong> research/03 §5.3 · screenshots/structure_mep/steel_fabrication_elements_plate_anchors.png</p>
 <p><strong>Workflow.</strong>
@@ -33644,8 +33645,9 @@ No IFC equivalent.
 - <code>hole_pattern.create(...)</code>
 - <code>shear_stud_pattern.create(...)</code></p>
 <p><strong>Acceptance criteria.</strong>
-- [ ] A 2 × 3 M20 bolt pattern through a 15 mm plate and a 10 mm web reports a grip length of 25 mm and creates 6 holes in each element.
-- [ ] An exported bolt is an <code>IfcMechanicalFastener</code> with <code>NominalDiameter</code> = 20 mm.</p>
+- [x] A 2 × 3 M20 bolt pattern through a 15 mm plate and a 10 mm web reports a grip length of 25 mm and creates 6 holes in each element.
+- [x] An exported bolt is an <code>IfcMechanicalFastener</code> with <code>NominalDiameter</code> = 20 mm.</p>
+<p><em>Built (2026-10-18):</em> <code>bolt_pattern.create</code>, <code>anchor_pattern.create</code>, <code>hole_pattern.create</code> and <code>shear_stud_pattern.create</code>: the elements, the plane the fasteners are square to (a work plane or a face) and a layout (<code>rect</code>: rows, columns, spacings, centre; <code>circle</code>: count, radius, centre, start angle). Each fastener runs along the plane's normal; the grip (from the first element's entry to the last one's exit, taking each element's first solid run, so an I-section's far flange is not counted, plus a grip increase), the bolt length under the head (grip, two washers, a nut and thread beyond, rounded up to 5 mm or 1/4"), and the holes made in each element are found from the elements' bodies when the pattern is made or edited and kept with it. Bolt proportions come from generic metric and inch tables (not a standard's copyrighted table); hole tolerance 2 mm or 1/16"; slots, inverted bolts, shop or site, coating, anchors' and studs' lengths. The pattern is an IfcElementAssembly (USERDEFINED, FASTENER_GROUP) aggregating IfcMechanicalFastener elements (BOLT, ANCHORBOLT, STUDSHEARCONNECTOR) with NominalDiameter and NominalLength; each hole is an IfcOpeningElement (OPENING, marked <code>rxd:hole</code>) voiding its element, rewritten on save, and is cut in the element's body by the solid kernel (so views and the overlap finder show it). <code>fastener_pattern.set</code> edits a pattern and finds its grip again; <code>fastener_pattern.info</code> reports it. A pattern goes when one of its elements is deleted. Structure › Steel › <strong>Bolts</strong>: kind, face and layout in a dialog, then a click for the centre; Properties show diameter, grip, length, hole size, holes per element and location. Not yet: user bolt tables, the hole definition per element, finishing the grip at a gap, editing the pattern's shape by grips, <code>IfcRelConnectsWithRealizingElements</code>.</p>
 <h3 id="447-welds">4.4.7 Welds</h3>
 <p><strong>ID:</strong> <code class="rid" id="STR-STL-007">STR-STL-007</code> · <strong>Priority:</strong> <span class="pri pri-p2">P2</span> · <strong>Ref:</strong> research/03 §5.3</p>
 <p><strong>Purpose.</strong> Record shop and site welds between steel elements, with the data a fabricator needs.</p>
@@ -33663,10 +33665,11 @@ No IFC equivalent.
 <p><strong>Data (IFC mapping).</strong> <code>IfcFastener</code> with PredefinedType <code>WELD</code>, and <code>Pset_FastenerWeld</code> (Type1, Type2, Surface1, Surface2, Process, a, l, Intermittent, …). Related with <code>IfcRelConnectsWithRealizingElements</code>. The picked edge reference, location (site or shop) and review status are RXD element data (<code>structural</code>).</p>
 <p><strong>Commands.</strong> <code>weld.create(element_ids[], edge_ref, params) -&gt; id</code></p>
 <p><strong>Acceptance criteria.</strong>
-- [ ] Moving a plate with a weld marks the weld "needs review" and leaves its position unchanged.
-- [ ] Picking an edge where the selected elements do not touch is not possible: the edge is not highlighted.
-- [ ] A 6 mm fillet weld exports as <code>IfcFastener</code> (<code>WELD</code>) with <code>Pset_FastenerWeld.a</code> = 6 mm.
+- [x] Moving a plate with a weld marks the weld "needs review" and leaves its position unchanged.
+- [x] Picking an edge where the selected elements do not touch is not possible: the edge is not highlighted.
+- [x] A 6 mm fillet weld exports as <code>IfcFastener</code> (<code>WELD</code>) with <code>Pset_FastenerWeld.a</code> = 6 mm.
 - [ ] A plate shop-welded to a beam gets the beam's assembly mark; the same plate site-welded does not.</p>
+<p><em>Built (2026-10-18):</em> <code>weld.edges</code> lists the edges of the selected elements (where their faces fold) that touch every other element within 1 mm along their length; <code>weld.create</code> refuses any other edge (<code>weld.not_touching</code>). The weld fills the corner between the faces at the edge (its legs along them, leaving out the faces where the elements bear on each other), with type and second type, throat <code>a</code> (default 6 mm), length (from the edge's start), surface, preparation, shop or site and intermittent segments, values checked against the open weld table (<code>data/steel/weld_types.json</code>, <code>weld.tables</code>). Welds keep their place: each element's shape is recorded, and <code>weld.info</code> and <code>weld.review</code> report <em>needs review</em> once one changes until <code>weld.set</code> with <code>accept</code>. A weld goes when one of its elements is deleted. IfcFastener (WELD) with <code>Pset_FastenerWeld</code> (Type1, Type2, Surface1, a, l, Intermittent, Process). Structure › Steel › <strong>Weld</strong>: in a 3D view the touching edges are drawn, the one under the cursor highlighted; click it, then type, throat and location. Properties: type, throat, length, location, review status and Accept. Not yet: assembly marks from shop welds (STR-STL-010), weld symbols in drawings, project additions to the weld table, the pick journal.</p>
 <h3 id="448-modifiers-and-parametric-cuts">4.4.8 Modifiers and parametric cuts</h3>
 <p><strong>ID:</strong> <code class="rid" id="STR-STL-008">STR-STL-008</code> · <strong>Priority:</strong> <span class="pri pri-p2">P2</span> · <strong>Ref:</strong> research/03 §5.4</p>
 <div class="tbl"><table>
@@ -33729,9 +33732,10 @@ No IFC equivalent.
 <p><strong>Data (IFC mapping).</strong> Cuts are <code>IfcOpeningElement</code> (PredefinedType <code>OPENING</code>, or <code>USERDEFINED</code> "COPE", "MITER", …) with <code>IfcRelVoidsElement</code>. Their parameters are RXD element data (<code>constraints</code>). A sub-connection is an <code>IfcElementAssembly</code> <code>USERDEFINED</code> "SUB_CONNECTION".</p>
 <p><strong>Commands.</strong> The commands are listed in the table above, plus <code>steel_cut.uncope(member_ids[])</code>.</p>
 <p><strong>Acceptance criteria.</strong>
-- [ ] A cope between a secondary beam and a girder removes the girder's flange zone from the secondary beam's end and updates when the girder depth changes.
-- [ ] <em>Uncope</em> on that secondary beam restores its full end profile, deletes the now-empty sub-connection and is undone in one step.
+- [x] A cope between a secondary beam and a girder removes the girder's flange zone from the secondary beam's end and updates when the girder depth changes.
+- [x] <em>Uncope</em> on that secondary beam restores its full end profile, deletes the now-empty sub-connection and is undone in one step.
 - [ ] <em>Uncope</em> on a beam whose cope belongs to a shear-plate connection leaves the cope and reports it as skipped.</p>
+<p><em>Built (2026-10-18):</em> every cut is an element of its own (IfcOpeningElement, USERDEFINED with ObjectType COPE, COPE_SKEWED, MITER, SAW_CUT, SHORTEN, CONTOUR_CUT, CUT_THROUGH or CUT_BY) whose cutter solid is worked out from the members whenever bodies are built, and subtracted from the target's body by the solid kernel (so the 3D view, plans and the overlap finder see it); IFC gets the opening's B-rep voiding the target. The cuts one command makes form a sub-connection (IfcElementAssembly SUB_CONNECTION). <code>steel_cut.cope</code> cuts the member whose end is at the joint (or the one named) by the other's flange zones (flange thickness plus a clearance, 13 mm or 1/2", across the flange width plus the clearance), following its depth; <code>steel_modifier.cope_skewed</code> notches a member end's top and/or bottom by depth, length and angle; <code>steel_cut.miter</code> cuts two members on the plane halving their corner; <code>steel_cut.saw</code> cuts a member flush with another's nearer flange or web face; <code>steel_modifier.shorten</code> moves a beam or brace end back (forward when negative) through its end extension, with angles across the height and width for a diagonal end; <code>steel_modifier.contour_cut</code> cuts a sketched contour on a work plane or face, through or to a depth; <code>steel_cut.cut_through</code> (with a gap) and <code>steel_cut.cut_by</code> subtract another element's body; <code>steel_modifier.corner_cut</code> cuts a plate's corner straight, convex or concave. <code>steel_cut.uncope</code> removes copes and empty sub-connections in one step, skipping copes owned by a connection (none of the built-in library types make copes yet, so this path is untested) and failing with <code>uncope.nothing</code> when there is nothing to remove; <code>steel_cut.list</code> reports the cuts. Cuts go when their elements go. Structure › Steel has Cope, Miter, Saw Cut, Cut Through, Cut By, Uncope, Shorten, Corner Cut and Contour Cut (sketched like a plate). Not yet: the dashed sub-connection box in views, shape handles past a shorten, boring and boundary distances on contour cuts, and copes made by connection types.</p>
 <h3 id="449-connection-code-checking-provider">4.4.9 Connection code checking (provider)</h3>
 <p><strong>ID:</strong> <code class="rid" id="STR-STL-009">STR-STL-009</code> · <strong>Priority:</strong> <span class="pri pri-p2">P2</span> · <strong>Ref:</strong> research/03 §2.9 ("Code checking"), §5.2</p>
 <p><strong>Purpose.</strong> Check detailed connections against a design code, and size them, through a pluggable provider rather than a built-in proprietary checker.</p>
@@ -38494,6 +38498,76 @@ No IFC equivalent.
 <td>STR-STL-007</td>
 </tr>
 <tr>
+<td><code>plate.set</code></td>
+<td>plate_ids[], contour?, thickness?, justification?, material?, coating?, role?</td>
+<td>—</td>
+<td>Yes</td>
+<td>STR-STL-005</td>
+</tr>
+<tr>
+<td><code>plate.info</code></td>
+<td>element_ids[]</td>
+<td>plates</td>
+<td>No</td>
+<td>STR-STL-005</td>
+</tr>
+<tr>
+<td><code>face.list</code></td>
+<td>element_ids[]</td>
+<td>faces</td>
+<td>No</td>
+<td>STR-STL-005</td>
+</tr>
+<tr>
+<td><code>fastener_pattern.set</code></td>
+<td>pattern_ids[], layout?, diameter?, grip_increase?, …</td>
+<td>—</td>
+<td>Yes</td>
+<td>STR-STL-006</td>
+</tr>
+<tr>
+<td><code>fastener_pattern.info</code></td>
+<td>element_ids[]</td>
+<td>patterns</td>
+<td>No</td>
+<td>STR-STL-006</td>
+</tr>
+<tr>
+<td><code>weld.edges</code></td>
+<td>element_ids[]</td>
+<td>edges</td>
+<td>No</td>
+<td>STR-STL-007</td>
+</tr>
+<tr>
+<td><code>weld.set</code></td>
+<td>weld_ids[], type?, a?, …, accept?</td>
+<td>—</td>
+<td>Yes</td>
+<td>STR-STL-007</td>
+</tr>
+<tr>
+<td><code>weld.info</code></td>
+<td>element_ids[]</td>
+<td>welds</td>
+<td>No</td>
+<td>STR-STL-007</td>
+</tr>
+<tr>
+<td><code>weld.review</code></td>
+<td>—</td>
+<td>weld ids</td>
+<td>No</td>
+<td>STR-STL-007</td>
+</tr>
+<tr>
+<td><code>weld.tables</code></td>
+<td>—</td>
+<td>types, surfaces, preparations</td>
+<td>No</td>
+<td>STR-STL-007</td>
+</tr>
+<tr>
 <td><code>steel_modifier.corner_cut</code></td>
 <td>plate_id, corner_ref, kind, size</td>
 <td>—</td>
@@ -38561,6 +38635,13 @@ No IFC equivalent.
 <td>member_ids[]</td>
 <td>—</td>
 <td>Yes</td>
+<td>STR-STL-008</td>
+</tr>
+<tr>
+<td><code>steel_cut.list</code></td>
+<td>element_ids[]?</td>
+<td>cuts</td>
+<td>No</td>
 <td>STR-STL-008</td>
 </tr>
 <tr>
@@ -51651,7 +51732,7 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 </tbody>
 </table></div>
 <h2 id="a3-consolidated-command-index">A.3 Consolidated command index</h2>
-<p><strong>2106 unique commands</strong> in 410 domains. Every command is exposed automatically to the UI, to Lua (<code>reviera.&lt;domain&gt;.&lt;verb&gt;</code>) and to MCP (<code>&lt;domain&gt;_&lt;verb&gt;</code>), subject to its permission class.</p>
+<p><strong>2117 unique commands</strong> in 411 domains. Every command is exposed automatically to the UI, to Lua (<code>reviera.&lt;domain&gt;.&lt;verb&gt;</code>) and to MCP (<code>&lt;domain&gt;_&lt;verb&gt;</code>), subject to its permission class.</p>
 <div class="tbl"><table>
 <thead>
 <tr>
@@ -52194,7 +52275,7 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 </tr>
 <tr>
 <td><code>face</code></td>
-<td style="text-align: right;">4</td>
+<td style="text-align: right;">5</td>
 </tr>
 <tr>
 <td><code>failure</code></td>
@@ -52215,6 +52296,10 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 <tr>
 <td><code>fascia</code></td>
 <td style="text-align: right;">1</td>
+</tr>
+<tr>
+<td><code>fastener_pattern</code></td>
+<td style="text-align: right;">2</td>
 </tr>
 <tr>
 <td><code>file</code></td>
@@ -52694,7 +52779,7 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 </tr>
 <tr>
 <td><code>plate</code></td>
-<td style="text-align: right;">1</td>
+<td style="text-align: right;">3</td>
 </tr>
 <tr>
 <td><code>plumbing_fixture</code></td>
@@ -53034,7 +53119,7 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 </tr>
 <tr>
 <td><code>steel_cut</code></td>
-<td style="text-align: right;">6</td>
+<td style="text-align: right;">7</td>
 </tr>
 <tr>
 <td><code>steel_families</code></td>
@@ -53262,7 +53347,7 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 </tr>
 <tr>
 <td><code>weld</code></td>
-<td style="text-align: right;">1</td>
+<td style="text-align: right;">6</td>
 </tr>
 <tr>
 <td><code>window</code></td>
@@ -58115,6 +58200,14 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 <td>MEP-FAB-007</td>
 </tr>
 <tr>
+<td><code>face.list</code></td>
+<td>4</td>
+<td>element_ids[]</td>
+<td>faces</td>
+<td>No</td>
+<td>STR-STL-005</td>
+</tr>
+<tr>
 <td><code>face.paint</code></td>
 <td>3</td>
 <td>face_refs, material_id</td>
@@ -58729,6 +58822,22 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 <td>element_id</td>
 <td>Yes</td>
 <td>ARC-ROOF-004</td>
+</tr>
+<tr>
+<td><code>fastener_pattern.info</code></td>
+<td>4</td>
+<td>element_ids[]</td>
+<td>patterns</td>
+<td>No</td>
+<td>STR-STL-006</td>
+</tr>
+<tr>
+<td><code>fastener_pattern.set</code></td>
+<td>4</td>
+<td>pattern_ids[], layout?, diameter?, grip_increase?, …</td>
+<td>—</td>
+<td>Yes</td>
+<td>STR-STL-006</td>
 </tr>
 <tr>
 <td><code>file.backups</code></td>
@@ -62771,6 +62880,22 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 <td>Yes</td>
 </tr>
 <tr>
+<td><code>plate.info</code></td>
+<td>4</td>
+<td>element_ids[]</td>
+<td>plates</td>
+<td>No</td>
+<td>STR-STL-005</td>
+</tr>
+<tr>
+<td><code>plate.set</code></td>
+<td>4</td>
+<td>plate_ids[], contour?, thickness?, justification?, material?, coating?, role?</td>
+<td>—</td>
+<td>Yes</td>
+<td>STR-STL-005</td>
+</tr>
+<tr>
 <td><code>plumbing_fixture.place</code></td>
 <td>4</td>
 <td>type_id, host_face_ref \</td>
@@ -65856,6 +65981,14 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 <td>cut_id, cutter_id, gap</td>
 <td>—</td>
 <td>Yes</td>
+<td>STR-STL-008</td>
+</tr>
+<tr>
+<td><code>steel_cut.list</code></td>
+<td>4</td>
+<td>element_ids[]?</td>
+<td>cuts</td>
+<td>No</td>
 <td>STR-STL-008</td>
 </tr>
 <tr>
@@ -69880,6 +70013,46 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 <td>element_ids[], edge_ref, params</td>
 <td>id</td>
 <td>Yes</td>
+<td>STR-STL-007</td>
+</tr>
+<tr>
+<td><code>weld.edges</code></td>
+<td>4</td>
+<td>element_ids[]</td>
+<td>edges</td>
+<td>No</td>
+<td>STR-STL-007</td>
+</tr>
+<tr>
+<td><code>weld.info</code></td>
+<td>4</td>
+<td>element_ids[]</td>
+<td>welds</td>
+<td>No</td>
+<td>STR-STL-007</td>
+</tr>
+<tr>
+<td><code>weld.review</code></td>
+<td>4</td>
+<td>—</td>
+<td>weld ids</td>
+<td>No</td>
+<td>STR-STL-007</td>
+</tr>
+<tr>
+<td><code>weld.set</code></td>
+<td>4</td>
+<td>weld_ids[], type?, a?, …, accept?</td>
+<td>—</td>
+<td>Yes</td>
+<td>STR-STL-007</td>
+</tr>
+<tr>
+<td><code>weld.tables</code></td>
+<td>4</td>
+<td>—</td>
+<td>types, surfaces, preparations</td>
+<td>No</td>
 <td>STR-STL-007</td>
 </tr>
 <tr>

@@ -496,6 +496,8 @@ struct Context {
     beams: Vec<Frame>,
     /// Point-to-point steel (Structural Settings): steel members are not shortened at joins.
     point_to_point: bool,
+    /// Shorten modifiers by beam: [start, end] (STR-STL-008).
+    shortenings: std::collections::HashMap<ElementId, [f64; 2]>,
 }
 
 impl Context {
@@ -530,6 +532,10 @@ impl Context {
             walls,
             beams,
             point_to_point: crate::structural::settings(store).point_to_point_steel,
+            shortenings: crate::steel_cuts::shortenings(store)
+                .into_iter()
+                .filter_map(|(g, s)| Some((crate::id::GlobalId::parse(&g).and_then(|g| store.find_by_guid(&g))?, s)))
+                .collect(),
         }
     }
 
@@ -655,8 +661,9 @@ impl Context {
             }
         }
         let len = dist(f.a, f.b);
-        let t0 = trims[0] - f.recipe.start_extension;
-        let t1 = len - trims[1] + f.recipe.end_extension;
+        let short = self.shortenings.get(&f.id).copied().unwrap_or([0.0; 2]);
+        let t0 = trims[0] - f.recipe.start_extension + short[0];
+        let t1 = len - trims[1] + f.recipe.end_extension - short[1];
         let usage = self.usage(f.id, &mut HashSet::new());
         BeamGeometry {
             ty: f.ty.clone(),

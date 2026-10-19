@@ -280,6 +280,20 @@ pub fn transform(
             };
             crate::ref_planes::transform(txn, target, &|p| x.point(p), dz)?;
             out.push(target);
+        } else if let Some(plane) = crate::steel_detail::plane_ref(e) {
+            // On a face of an element that moves too, it follows it.
+            if !copy && crate::work_planes::host_of(&plane).is_some_and(|h| {
+                matches!(plane, crate::work_planes::WorkPlaneRef::Face { .. }) && host_moves(h)
+            }) {
+                continue;
+            }
+            let target = if copy { txn.create(copied(e))? } else { id };
+            let dz = match x {
+                Xform::Translate(v) => v[2],
+                _ => 0.0,
+            };
+            crate::steel_detail::transform(txn, target, &|p| x.point(p), dz)?;
+            out.push(target);
         } else if let Some(r) = crate::model_lines::recipe(e) {
             // On a reference plane or grid that moves too, it follows it.
             if !copy

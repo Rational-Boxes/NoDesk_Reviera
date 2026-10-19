@@ -32,7 +32,7 @@
 **Document:** Functional and technical specification of Reviera, an open-source BIM authoring application
 **Functional reference:** Autodesk® Revit® 2026/2027 (described from public sources only; see `RESEARCH_LOG.md`)
 **Licence of Reviera:** GPL-3.0-or-later
-**Version:** 0.1 (draft) · 2026-10-16 · **Size:** 808 numbered requirements (320 P0 · 293 P1 · 188 P2 · 7 P3), 2,106 commands
+**Version:** 0.1 (draft) · 2026-10-16 · **Size:** 808 numbered requirements (320 P0 · 293 P1 · 188 P2 · 7 P3), 2,117 commands
 
 > **Clean-room statement.** This specification describes features, workflows and behaviour in Reviera's own words. Every input was publicly available: vendor online help, public blogs and tutorials, public forums and open-source repositories. All of it is listed with URLs and access checks in `SOURCE_REGISTER.md`. No proprietary, confidential, leaked or NDA-covered information was used. No vendor code, binaries, file formats or assets were examined or copied. Autodesk and Revit are trademarks of Autodesk, Inc. They are used here only to identify the functional reference. Reviera is not affiliated with or endorsed by Autodesk.
 
@@ -64,7 +64,7 @@ This document covers:
 | 6 | Collaboration, linking and coordination (Local and BIMserver modes) |
 | 7 | Advanced features beyond the reference product: scene protocol, simulated walkthroughs, Godot translation layer for VR/AR, render bridges |
 | 8 | Remote computation and analysis (overview): the remote computation subsystem and the analysis plugin layer, how they fit together, and a build order |
-| A | Appendix A: requirement summary, shared commands, consolidated command index (2,106 commands; 808 requirements) |
+| A | Appendix A: requirement summary, shared commands, consolidated command index (2,117 commands; 808 requirements) |
 
 Out of scope:
 - reproducing vendor-cloud services such as ACC/Forma and Autodesk Assistant (open alternatives are specified instead)
@@ -10610,7 +10610,7 @@ Dragging a control issues the matching command once, on mouse-up. The preview du
 - `element.set_work_plane(element_ids, plane | host_ref)`
 - `element.dissociate_work_plane(element_ids)`
 
-**Implementation notes (2026-10-15).** As built: work plane references `{by: level, level, offset} | {by: grid, grid} | {by: ref_plane, ref_plane} | {by: explicit, origin, x_dir, normal}`; a view's setting in `rxd:work_plane` (`plane`, `show`, `grid_spacing`), a plan's level by default; `workplane.set` (one of `level`/`offset`, `grid`, `ref_plane`, `plane`), `workplane.get`, `workplane.show`, `workplane.list` (the Name list); `element.set_work_plane` (projects the element onto the new plane) and `element.dissociate_work_plane` for model lines; Set (by name) and Show (a grid over the model's extent) in the window. Elements on a level move with its elevation; on a grid or reference plane, with it. Not built yet: Pick a Plane (faces), Pick a Line, Go To View, the Work Plane Viewer, and work-plane-based components and model text.
+**Implementation notes (2026-10-15).** As built: work plane references `{by: level, level, offset} | {by: grid, grid} | {by: ref_plane, ref_plane} | {by: explicit, origin, x_dir, normal}`; a view's setting in `rxd:work_plane` (`plane`, `show`, `grid_spacing`), a plan's level by default; `workplane.set` (one of `level`/`offset`, `grid`, `ref_plane`, `plane`), `workplane.get`, `workplane.show`, `workplane.list` (the Name list); `element.set_work_plane` (projects the element onto the new plane) and `element.dissociate_work_plane` for model lines; Set (by name) and Show (a grid over the model's extent) in the window. Elements on a level move with its elevation; on a grid or reference plane, with it. Not built yet: Pick a Plane (faces), Pick a Line, Go To View, the Work Plane Viewer, and work-plane-based components and model text. Faces (2026-10-18): `{by: face, element, face, offset}` names a face of a column, beam, brace or steel plate (flange_1, flange_2, web_1, web_2, start, end; top, bottom), and every command taking a work plane accepts `face: {element, face, offset}`; a plane on a face follows its element (`face.list` lists them; STR-STL-005). Picking a face with the mouse to set a view's work plane is still to come.
 
 **Acceptance criteria.**
 - [ ] Model text placed on a named reference plane moves with the plane when the plane is moved. (Model lines do.)
@@ -17117,10 +17117,12 @@ Ref: research/03 §5.1
 **Commands.** `plate.create(work_plane | face_ref, contour_curves[], thickness, material_id, justification) -> id`
 
 **Acceptance criteria.**
-- [ ] A plate sketched on a column flange face exports as `IfcPlate` with the correct thickness.
+- [x] A plate sketched on a column flange face exports as `IfcPlate` with the correct thickness.
 - [ ] A contour with a gap of 2 mm is refused at *Finish* and the open segment end is highlighted.
-- [ ] A 15 mm plate with *Bottom* justification on a flange face sits fully outside the flange, with its bottom face on the flange face.
-- [ ] Moving the hosting column moves the plate with it.
+- [x] A 15 mm plate with *Bottom* justification on a flange face sits fully outside the flange, with its bottom face on the flange face.
+- [x] Moving the hosting column moves the plate with it.
+
+*Built (2026-10-18):* `plate.create` on any work plane or on a named **face** of a column, beam, brace or plate (`face.list`: flange_1, flange_2, web_1, web_2, start, end; top, bottom), the face plane following its element. The contour is corners or line and arc segments (arcs flattened); it must close within 0.1 mm (`plate.open_contour` names the segment), not cross itself and have an area; thickness 1–200 mm (default 10 mm); justification bottom (outside a face), centre or top; material, coating and role (`Pset_PlateCommon.Reference`). `plate.set` (Edit Contour and the rest) and `plate.info`. A plate on a face moves with its element; when the element is deleted the plate stays where it was, unhosted. Plates move, rotate and mirror with Modify (their plane is then fixed in space). IfcPlate (SHEET) with a B-rep body, drawn at Fine detail, category Structural Connections. Structure › Steel › **Plate**: with one element selected, pick its face; otherwise the view's work plane; click the corners, Enter finishes. Properties: thickness, justification, role, material, the plane and whether hosted. The gap check refuses the contour but the window cannot yet highlight the open end (sketches are closed by clicks). Not yet: arcs kept as arcs, corner cuts, `IfcMaterialLayerSetUsage`, extruded-solid bodies, folded plates, the sketch journal.
 
 ### 4.4.6 Bolts, anchors, holes and shear studs
 **ID:** STR-STL-006 · **Priority:** P2 · **Ref:** research/03 §5.3 · screenshots/structure_mep/steel_fabrication_elements_plate_anchors.png
@@ -17164,8 +17166,10 @@ A pattern is an `IfcElementAssembly` `USERDEFINED` "FASTENER_GROUP" that aggrega
 - `shear_stud_pattern.create(...)`
 
 **Acceptance criteria.**
-- [ ] A 2 × 3 M20 bolt pattern through a 15 mm plate and a 10 mm web reports a grip length of 25 mm and creates 6 holes in each element.
-- [ ] An exported bolt is an `IfcMechanicalFastener` with `NominalDiameter` = 20 mm.
+- [x] A 2 × 3 M20 bolt pattern through a 15 mm plate and a 10 mm web reports a grip length of 25 mm and creates 6 holes in each element.
+- [x] An exported bolt is an `IfcMechanicalFastener` with `NominalDiameter` = 20 mm.
+
+*Built (2026-10-18):* `bolt_pattern.create`, `anchor_pattern.create`, `hole_pattern.create` and `shear_stud_pattern.create`: the elements, the plane the fasteners are square to (a work plane or a face) and a layout (`rect`: rows, columns, spacings, centre; `circle`: count, radius, centre, start angle). Each fastener runs along the plane's normal; the grip (from the first element's entry to the last one's exit, taking each element's first solid run, so an I-section's far flange is not counted, plus a grip increase), the bolt length under the head (grip, two washers, a nut and thread beyond, rounded up to 5 mm or 1/4"), and the holes made in each element are found from the elements' bodies when the pattern is made or edited and kept with it. Bolt proportions come from generic metric and inch tables (not a standard's copyrighted table); hole tolerance 2 mm or 1/16"; slots, inverted bolts, shop or site, coating, anchors' and studs' lengths. The pattern is an IfcElementAssembly (USERDEFINED, FASTENER_GROUP) aggregating IfcMechanicalFastener elements (BOLT, ANCHORBOLT, STUDSHEARCONNECTOR) with NominalDiameter and NominalLength; each hole is an IfcOpeningElement (OPENING, marked `rxd:hole`) voiding its element, rewritten on save, and is cut in the element's body by the solid kernel (so views and the overlap finder show it). `fastener_pattern.set` edits a pattern and finds its grip again; `fastener_pattern.info` reports it. A pattern goes when one of its elements is deleted. Structure › Steel › **Bolts**: kind, face and layout in a dialog, then a click for the centre; Properties show diameter, grip, length, hole size, holes per element and location. Not yet: user bolt tables, the hole definition per element, finishing the grip at a gap, editing the pattern's shape by grips, `IfcRelConnectsWithRealizingElements`.
 
 ### 4.4.7 Welds
 **ID:** STR-STL-007 · **Priority:** P2 · **Ref:** research/03 §5.3
@@ -17190,10 +17194,12 @@ A pattern is an `IfcElementAssembly` `USERDEFINED` "FASTENER_GROUP" that aggrega
 **Commands.** `weld.create(element_ids[], edge_ref, params) -> id`
 
 **Acceptance criteria.**
-- [ ] Moving a plate with a weld marks the weld "needs review" and leaves its position unchanged.
-- [ ] Picking an edge where the selected elements do not touch is not possible: the edge is not highlighted.
-- [ ] A 6 mm fillet weld exports as `IfcFastener` (`WELD`) with `Pset_FastenerWeld.a` = 6 mm.
+- [x] Moving a plate with a weld marks the weld "needs review" and leaves its position unchanged.
+- [x] Picking an edge where the selected elements do not touch is not possible: the edge is not highlighted.
+- [x] A 6 mm fillet weld exports as `IfcFastener` (`WELD`) with `Pset_FastenerWeld.a` = 6 mm.
 - [ ] A plate shop-welded to a beam gets the beam's assembly mark; the same plate site-welded does not.
+
+*Built (2026-10-18):* `weld.edges` lists the edges of the selected elements (where their faces fold) that touch every other element within 1 mm along their length; `weld.create` refuses any other edge (`weld.not_touching`). The weld fills the corner between the faces at the edge (its legs along them, leaving out the faces where the elements bear on each other), with type and second type, throat `a` (default 6 mm), length (from the edge's start), surface, preparation, shop or site and intermittent segments, values checked against the open weld table (`data/steel/weld_types.json`, `weld.tables`). Welds keep their place: each element's shape is recorded, and `weld.info` and `weld.review` report *needs review* once one changes until `weld.set` with `accept`. A weld goes when one of its elements is deleted. IfcFastener (WELD) with `Pset_FastenerWeld` (Type1, Type2, Surface1, a, l, Intermittent, Process). Structure › Steel › **Weld**: in a 3D view the touching edges are drawn, the one under the cursor highlighted; click it, then type, throat and location. Properties: type, throat, length, location, review status and Accept. Not yet: assembly marks from shop welds (STR-STL-010), weld symbols in drawings, project additions to the weld table, the pick journal.
 
 ### 4.4.8 Modifiers and parametric cuts
 **ID:** STR-STL-008 · **Priority:** P2 · **Ref:** research/03 §5.4
@@ -17221,9 +17227,11 @@ A pattern is an `IfcElementAssembly` `USERDEFINED` "FASTENER_GROUP" that aggrega
 **Commands.** The commands are listed in the table above, plus `steel_cut.uncope(member_ids[])`.
 
 **Acceptance criteria.**
-- [ ] A cope between a secondary beam and a girder removes the girder's flange zone from the secondary beam's end and updates when the girder depth changes.
-- [ ] *Uncope* on that secondary beam restores its full end profile, deletes the now-empty sub-connection and is undone in one step.
+- [x] A cope between a secondary beam and a girder removes the girder's flange zone from the secondary beam's end and updates when the girder depth changes.
+- [x] *Uncope* on that secondary beam restores its full end profile, deletes the now-empty sub-connection and is undone in one step.
 - [ ] *Uncope* on a beam whose cope belongs to a shear-plate connection leaves the cope and reports it as skipped.
+
+*Built (2026-10-18):* every cut is an element of its own (IfcOpeningElement, USERDEFINED with ObjectType COPE, COPE_SKEWED, MITER, SAW_CUT, SHORTEN, CONTOUR_CUT, CUT_THROUGH or CUT_BY) whose cutter solid is worked out from the members whenever bodies are built, and subtracted from the target's body by the solid kernel (so the 3D view, plans and the overlap finder see it); IFC gets the opening's B-rep voiding the target. The cuts one command makes form a sub-connection (IfcElementAssembly SUB_CONNECTION). `steel_cut.cope` cuts the member whose end is at the joint (or the one named) by the other's flange zones (flange thickness plus a clearance, 13 mm or 1/2", across the flange width plus the clearance), following its depth; `steel_modifier.cope_skewed` notches a member end's top and/or bottom by depth, length and angle; `steel_cut.miter` cuts two members on the plane halving their corner; `steel_cut.saw` cuts a member flush with another's nearer flange or web face; `steel_modifier.shorten` moves a beam or brace end back (forward when negative) through its end extension, with angles across the height and width for a diagonal end; `steel_modifier.contour_cut` cuts a sketched contour on a work plane or face, through or to a depth; `steel_cut.cut_through` (with a gap) and `steel_cut.cut_by` subtract another element's body; `steel_modifier.corner_cut` cuts a plate's corner straight, convex or concave. `steel_cut.uncope` removes copes and empty sub-connections in one step, skipping copes owned by a connection (none of the built-in library types make copes yet, so this path is untested) and failing with `uncope.nothing` when there is nothing to remove; `steel_cut.list` reports the cuts. Cuts go when their elements go. Structure › Steel has Cope, Miter, Saw Cut, Cut Through, Cut By, Uncope, Shorten, Corner Cut and Contour Cut (sketched like a plate). Not yet: the dashed sub-connection box in views, shape handles past a shorten, boring and boundary distances on contour cuts, and copes made by connection types.
 
 ### 4.4.9 Connection code checking (provider)
 **ID:** STR-STL-009 · **Priority:** P2 · **Ref:** research/03 §2.9 ("Code checking"), §5.2
@@ -20788,6 +20796,16 @@ Every command below is registered once in the command registry and is exposed au
 | `hole_pattern.create` | ... | — | Yes | STR-STL-006 |
 | `shear_stud_pattern.create` | ... | — | Yes | STR-STL-006 |
 | `weld.create` | element_ids[], edge_ref, params | id | Yes | STR-STL-007 |
+| `plate.set` | plate_ids[], contour?, thickness?, justification?, material?, coating?, role? | — | Yes | STR-STL-005 |
+| `plate.info` | element_ids[] | plates | No | STR-STL-005 |
+| `face.list` | element_ids[] | faces | No | STR-STL-005 |
+| `fastener_pattern.set` | pattern_ids[], layout?, diameter?, grip_increase?, … | — | Yes | STR-STL-006 |
+| `fastener_pattern.info` | element_ids[] | patterns | No | STR-STL-006 |
+| `weld.edges` | element_ids[] | edges | No | STR-STL-007 |
+| `weld.set` | weld_ids[], type?, a?, …, accept? | — | Yes | STR-STL-007 |
+| `weld.info` | element_ids[] | welds | No | STR-STL-007 |
+| `weld.review` | — | weld ids | No | STR-STL-007 |
+| `weld.tables` | — | types, surfaces, preparations | No | STR-STL-007 |
 | `steel_modifier.corner_cut` | plate_id, corner_ref, kind, size | — | Yes | STR-STL-008 |
 | `steel_modifier.cope_skewed` | member_id, end, params | — | Yes | STR-STL-008 |
 | `steel_modifier.shorten` | member_id, end, length, angle_h?, angle_w? | — | Yes | STR-STL-008 |
@@ -20798,6 +20816,7 @@ Every command below is registered once in the command registry and is exposed au
 | `steel_cut.cut_through` | cut_id, cutter_id, gap | — | Yes | STR-STL-008 |
 | `steel_cut.cut_by` | cut_id, cutter_id | — | Yes | STR-STL-008 |
 | `steel_cut.uncope` | member_ids[] | — | Yes | STR-STL-008 |
+| `steel_cut.list` | element_ids[]? | cuts | No | STR-STL-008 |
 | `structural_connection.check` | connection_ids[], provider_id, code | report | Results only | STR-STL-009 |
 | `structural_connection.presize` | connection_ids[], provider_id, code | — | Yes | STR-STL-009 |
 | `steel_numbering.run` | scope, options | report | Yes | STR-STL-010 |
@@ -27395,7 +27414,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**2106 unique commands** in 410 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**2117 unique commands** in 411 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -27532,12 +27551,13 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `fabrication_route` | 5 |
 | `fabrication_settings` | 4 |
 | `fabrication_spool` | 3 |
-| `face` | 4 |
+| `face` | 5 |
 | `failure` | 1 |
 | `family` | 12 |
 | `family_doc` | 58 |
 | `family_template` | 1 |
 | `fascia` | 1 |
+| `fastener_pattern` | 2 |
 | `file` | 15 |
 | `fill_pattern` | 5 |
 | `fillpattern` | 4 |
@@ -27657,7 +27677,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `pipe_segment` | 1 |
 | `placeholder` | 1 |
 | `planregion` | 1 |
-| `plate` | 1 |
+| `plate` | 3 |
 | `plumbing_fixture` | 1 |
 | `pointcloud` | 1 |
 | `position` | 8 |
@@ -27742,7 +27762,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `stair` | 15 |
 | `standards` | 2 |
 | `stash` | 3 |
-| `steel_cut` | 6 |
+| `steel_cut` | 7 |
 | `steel_families` | 1 |
 | `steel_modifier` | 4 |
 | `steel_nc` | 1 |
@@ -27799,7 +27819,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `walltype` | 2 |
 | `warnings` | 6 |
 | `weather` | 1 |
-| `weld` | 1 |
+| `weld` | 6 |
 | `window` | 8 |
 | `wire` | 2 |
 | `wiring_type` | 1 |
@@ -28412,6 +28432,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `fabrication_spool.add` | 4 | spool_id, part_ids[] | — | Yes | MEP-FAB-007 |
 | `fabrication_spool.create` | 4 | part_ids[], name | id | Yes | MEP-FAB-007 |
 | `fabrication_spool.remove` | 4 | spool_id, part_ids[] | — | Yes | MEP-FAB-007 |
+| `face.list` | 4 | element_ids[] | faces | No | STR-STL-005 |
 | `face.paint` | 3 | face_refs, material_id | — | Yes | ARC-MOD-020 |
 | `face.remove_paint` | 3 | face_refs | — | Yes | ARC-MOD-020 |
 | `face.set_pattern_alignment` | 5 | element_id, face_ref, origin, angle | () | Yes | DOC-GFX-014 |
@@ -28489,6 +28510,8 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `family_doc.visibility.set` | 2 | element_ids[], {coarse, medium, fine, plan, front_back, left_right, only_when_cut, visible_param?} | — | Yes | DM-FED-007 |
 | `family_template.list` | 2 | locale? | template[] | No | DM-FED-001 |
 | `fascia.create` | 3 | type_id, edge_refs, mitering? | element_id | Yes | ARC-ROOF-004 |
+| `fastener_pattern.info` | 4 | element_ids[] | patterns | No | STR-STL-006 |
+| `fastener_pattern.set` | 4 | pattern_ids[], layout?, diameter?, grip_increase?, … | — | Yes | STR-STL-006 |
 | `file.backups` | 2 | document_id | backup[] | No | DM-FILE-002 |
 | `file.close` | 2 | document_id, save?: "ask"\ | "yes"\ | "no" | — |
 | `file.convert_schema` | 2 | document_id, target: "IFC4"\ | "IFC4X3_ADD2" | report | No (clears undo) |
@@ -28994,6 +29017,8 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `placeholder.convert` | 4 | ids[] | element_ids[] | Yes | MEP-DUCT-007 |
 | `planregion.set_view_range` | 5 | region_id, top, cut, bottom, depth | () | Yes | DOC-VR-003 |
 | `plate.create` | 4 | work_plane \ | face_ref, contour_curves[], thickness, material_id, justification | id | Yes |
+| `plate.info` | 4 | element_ids[] | plates | No | STR-STL-005 |
+| `plate.set` | 4 | plate_ids[], contour?, thickness?, justification?, material?, coating?, role? | — | Yes | STR-STL-005 |
 | `plumbing_fixture.place` | 4 | type_id, host_face_ref \ | work_plane, point, rotation | id | Yes |
 | `pointcloud.reindex` | 6 | link_id | job_id | No | COL-LNK-003 |
 | `position.assign` | 5 | view_ids[], position_id? | () | Yes | DOC-SHT-005 |
@@ -29380,6 +29405,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `steel_cut.cope` | 4 | member_ids[], cut_member_id? | — | Yes | STR-STL-008 |
 | `steel_cut.cut_by` | 4 | cut_id, cutter_id | — | Yes | STR-STL-008 |
 | `steel_cut.cut_through` | 4 | cut_id, cutter_id, gap | — | Yes | STR-STL-008 |
+| `steel_cut.list` | 4 | element_ids[]? | cuts | No | STR-STL-008 |
 | `steel_cut.miter` | 4 | a, b | — | Yes | STR-STL-008 |
 | `steel_cut.saw` | 4 | a, b, part: "flange"\ | "web" | — | Yes |
 | `steel_cut.uncope` | 4 | member_ids[] | — | Yes | STR-STL-008 |
@@ -29883,6 +29909,11 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `warnings.show` | 2 | warning_id | — | No | DM-FAIL-001 |
 | `weather.import` | 4 | path | id | Yes | ANA-EM-001 |
 | `weld.create` | 4 | element_ids[], edge_ref, params | id | Yes | STR-STL-007 |
+| `weld.edges` | 4 | element_ids[] | edges | No | STR-STL-007 |
+| `weld.info` | 4 | element_ids[] | welds | No | STR-STL-007 |
+| `weld.review` | 4 | — | weld ids | No | STR-STL-007 |
+| `weld.set` | 4 | weld_ids[], type?, a?, …, accept? | — | Yes | STR-STL-007 |
+| `weld.tables` | 4 | — | types, surfaces, preparations | No | STR-STL-007 |
 | `window.dock_to_main` | 1 | `view_id` | `()` | No | UI-VIEWWIN-003 |
 | `window.float` | 1 | `view_id`, `rect?`, `monitor?` | `frame_id` | No | UI-VIEWWIN-003 |
 | `window.list` | 1 | — | `[WindowInfo]` | No | UI-VIEWWIN-001 |

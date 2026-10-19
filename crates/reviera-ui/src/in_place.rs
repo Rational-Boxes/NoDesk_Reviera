@@ -181,20 +181,7 @@ impl Gui {
         ) else {
             return frame.set_status_text("Type the start and end", 0);
         };
-        let plane_args = match &plane {
-            reviera_core::work_planes::WorkPlaneRef::Level { level, offset } => {
-                json!({ "level": level, "offset": offset })
-            }
-            reviera_core::work_planes::WorkPlaneRef::Grid { grid } => json!({ "grid": grid }),
-            reviera_core::work_planes::WorkPlaneRef::RefPlane { ref_plane } => {
-                json!({ "ref_plane": ref_plane })
-            }
-            reviera_core::work_planes::WorkPlaneRef::Explicit {
-                origin,
-                x_dir,
-                normal,
-            } => json!({ "plane": { "origin": origin, "x_dir": x_dir, "normal": normal } }),
-        };
+        let plane_args = crate::datum_tools::plane_args(&plane);
         let mut form = if revolve {
             json!({ "kind": "revolve", "axis": axis, "start": s, "end": e, "profile": profile })
         } else {

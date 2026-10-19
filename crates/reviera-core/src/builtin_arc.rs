@@ -78,6 +78,33 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(AnalyticalDisconnect),
         registry.add(AnalyticalModelInfo),
         registry.add(ConnectionTypeList),
+        registry.add(CutCope),
+        registry.add(CutMiter),
+        registry.add(CutSaw),
+        registry.add(CutThrough),
+        registry.add(CutBy),
+        registry.add(CutUncope),
+        registry.add(CutList),
+        registry.add(ModShorten),
+        registry.add(ModCopeSkewed),
+        registry.add(ModContourCut),
+        registry.add(ModCornerCut),
+        registry.add(PlateCreate),
+        registry.add(PlateSet),
+        registry.add(PlateInfo),
+        registry.add(BoltPatternCreate),
+        registry.add(AnchorPatternCreate),
+        registry.add(HolePatternCreate),
+        registry.add(StudPatternCreate),
+        registry.add(PatternSet),
+        registry.add(PatternInfo),
+        registry.add(WeldCreate),
+        registry.add(WeldSet),
+        registry.add(WeldInfo),
+        registry.add(WeldEdges),
+        registry.add(WeldReview),
+        registry.add(WeldTables),
+        registry.add(FaceList),
         registry.add(ConnectionRuleSets),
         registry.add(ConnectionReportCsv),
         registry.add(ConnectionAutomate),
@@ -2082,6 +2109,352 @@ read_command!(
     crate::steel_auto::CsvParams,
     serde_json::Value,
     |_, p| Ok(crate::steel_auto::report_csv(p))
+);
+
+edit_command!(
+    PlateCreate,
+    "plate.create",
+    "Place a steel plate",
+    "Places a plate (STR-STL-005): a single closed `contour` (corners, or `segments` of lines and \
+     arcs through a middle point, which must join within 0.1 mm and not cross) in the coordinates \
+     of a work plane (`level` with `offset`, `grid`, `ref_plane`, an explicit `plane`) or of a \
+     `face` of a column, beam, brace or plate (`{element, face, offset}`; faces from `face.list`). \
+     `thickness` 1–200 mm (default 10 mm); `justification` bottom (the default: the plate on the \
+     normal's side, outside a face), centre or top; `material`, `coating` and `role` (stiffener, \
+     cap plate, …). A plate on a face moves with its element and stays where it was, unhosted, if \
+     the element is deleted. IfcPlate (SHEET), drawn at Fine detail. Returns the plate.",
+    "Plate",
+    crate::steel_detail::PlateCreateParams,
+    ElementId,
+    crate::steel_detail::plate_create
+);
+
+edit_command!(
+    PlateSet,
+    "plate.set",
+    "Edit plates",
+    "Changes plates' `contour` (Edit Contour), `thickness`, `justification`, `material`, `coating` \
+     or `role` (STR-STL-005).",
+    "Edit Plate",
+    crate::steel_detail::PlateSetParams,
+    (),
+    crate::steel_detail::plate_set
+);
+
+read_command!(
+    PlateInfo,
+    "plate.info",
+    "Plates' contour and placement",
+    "For each plate: its plane (and whether it is still hosted by a face), contour in the plane and \
+     in the world, normal, thickness, justification, area, material, coating and role.",
+    crate::steel_detail::IdsParams,
+    Vec<crate::steel_detail::PlateInfo>,
+    |s, p| crate::steel_detail::plate_info(s, p)
+);
+
+edit_command!(
+    BoltPatternCreate,
+    "bolt_pattern.create",
+    "Place a bolt pattern",
+    "Places bolts through the elements they join (STR-STL-006): `element_ids` (two or more), the \
+     plane they are square to (a work plane or a `face`), and a `layout`: `{shape: rect, rows, \
+     columns, spacing_x, spacing_y, centre}` or `{shape: circle, count, radius, centre, \
+     start_angle}` in the plane. `diameter` (default M20, 3/4\" under US codes), `standard` \
+     (generic_metric or generic_inch proportions), `grade`, `grip_increase`, `hole_tolerance` \
+     (2 mm or 1/16\"), `slot`, `inverted`, `location` (shop, site), `coating`. The grip (first entry \
+     to last exit through the elements), the bolt length under the head (grip, two washers, a nut \
+     and thread, rounded up to 5 mm or 1/4\") and the holes in each element are found from the \
+     elements' bodies. An IfcElementAssembly (FASTENER_GROUP) aggregating IfcMechanicalFastener \
+     (BOLT) elements; holes are written to IFC as openings. Returns the pattern.",
+    "Bolt Pattern",
+    crate::steel_detail::PatternCreateParams,
+    ElementId,
+    crate::steel_detail::bolt_pattern_create
+);
+
+edit_command!(
+    AnchorPatternCreate,
+    "anchor_pattern.create",
+    "Place an anchor pattern",
+    "Places anchor rods between steel and concrete (STR-STL-006), as `bolt_pattern.create` with \
+     `length` (default 400 mm): each rod from a nut above the steel down into the concrete \
+     (IfcMechanicalFastener ANCHORBOLT).",
+    "Anchor Pattern",
+    crate::steel_detail::PatternCreateParams,
+    ElementId,
+    crate::steel_detail::anchor_pattern_create
+);
+
+edit_command!(
+    HolePatternCreate,
+    "hole_pattern.create",
+    "Place a hole pattern",
+    "Places holes through elements without fasteners (STR-STL-006), as `bolt_pattern.create`: the \
+     holes in each element are found and written to IFC as openings.",
+    "Hole Pattern",
+    crate::steel_detail::PatternCreateParams,
+    ElementId,
+    crate::steel_detail::hole_pattern_create
+);
+
+edit_command!(
+    StudPatternCreate,
+    "shear_stud_pattern.create",
+    "Place shear studs",
+    "Places headed shear studs on one steel element's face (STR-STL-006): a `layout` in the plane, \
+     `diameter` (default 19 mm) and `length` (default 100 mm), each stud standing out along the \
+     face's normal (IfcMechanicalFastener STUDSHEARCONNECTOR).",
+    "Shear Studs",
+    crate::steel_detail::PatternCreateParams,
+    ElementId,
+    crate::steel_detail::stud_pattern_create
+);
+
+edit_command!(
+    PatternSet,
+    "fastener_pattern.set",
+    "Edit fastener patterns",
+    "Changes fastener patterns' `layout`, `diameter`, `grip_increase`, `hole_tolerance`, \
+     `inverted`, `location`, `length` or `grade` (STR-STL-006), finding their grips and holes again \
+     (with no changes, after the joined elements changed).",
+    "Edit Fastener Pattern",
+    crate::steel_detail::PatternSetParams,
+    (),
+    crate::steel_detail::pattern_set
+);
+
+read_command!(
+    PatternInfo,
+    "fastener_pattern.info",
+    "Fastener patterns",
+    "For each bolt, anchor, hole or shear stud pattern: its kind, elements, plane, positions, count, \
+     diameter, standard and grade, grip, length, hole diameter (and slot), holes in each element, \
+     location, whether inverted, and its fastener elements.",
+    crate::steel_detail::IdsParams,
+    Vec<crate::steel_detail::PatternInfo>,
+    |s, p| crate::steel_detail::pattern_info(s, p)
+);
+
+read_command!(
+    WeldEdges,
+    "weld.edges",
+    "Edges that can be welded",
+    "The edges of the given elements where they touch each other within 1 mm (STR-STL-007): the \
+     edges `weld.create` accepts, as pairs of points.",
+    crate::steel_detail::IdsParams,
+    Vec<[[f64; 3]; 2]>,
+    |s, p| crate::steel_detail::weld_edges(s, p)
+);
+
+edit_command!(
+    WeldCreate,
+    "weld.create",
+    "Place a weld",
+    "Places a weld (STR-STL-007) along an `edge` where `element_ids` (two or more) touch within \
+     1 mm (from `weld.edges`): `weld_type` and `weld_type_2` (fillet by default), `a` (the throat, \
+     default 6 mm), `length` (from the edge's start; the whole edge by default), `surface`, \
+     `preparation`, `location` (shop, site) and `intermittent` `{length, pitch}`; values from the \
+     weld table (`weld.tables`). The weld keeps its place when the elements move and is flagged for \
+     review; it goes when one of them is deleted. IfcFastener (WELD) with Pset_FastenerWeld. \
+     Returns the weld.",
+    "Weld",
+    crate::steel_detail::WeldCreateParams,
+    ElementId,
+    crate::steel_detail::weld_create
+);
+
+edit_command!(
+    WeldSet,
+    "weld.set",
+    "Edit welds",
+    "Changes welds' type, throat, length, surface, preparation, location or intermittence, or with \
+     `accept` clears *needs review* after their elements changed (STR-STL-007).",
+    "Edit Weld",
+    crate::steel_detail::WeldSetParams,
+    (),
+    crate::steel_detail::weld_set
+);
+
+read_command!(
+    WeldInfo,
+    "weld.info",
+    "Welds",
+    "For each weld: its elements, edge, types, throat, length, surface, preparation, location, \
+     intermittence and whether it needs review (an element changed since it was placed or \
+     accepted).",
+    crate::steel_detail::IdsParams,
+    Vec<crate::steel_detail::WeldInfo>,
+    |s, p| crate::steel_detail::weld_info(s, p)
+);
+
+read_command!(
+    WeldReview,
+    "weld.review",
+    "Welds needing review",
+    "The welds whose elements changed since they were placed or accepted (STR-STL-007).",
+    Option<serde_json::Value>,
+    Vec<ElementId>,
+    |s, _| Ok(crate::steel_detail::weld_review(s))
+);
+
+read_command!(
+    WeldTables,
+    "weld.tables",
+    "The weld table",
+    "The weld types, surface shapes and preparations welds take their values from (an open data \
+     file, STR-STL-007).",
+    Option<serde_json::Value>,
+    crate::steel_detail::WeldTables,
+    |_, _| Ok(crate::steel_detail::weld_tables())
+);
+
+read_command!(
+    FaceList,
+    "face.list",
+    "Elements' faces",
+    "The named faces of columns, beams, braces and steel plates (STR-STL-005): flange_1, \
+     flange_2, web_1, web_2, start and end for framing, top and bottom for plates, each with its \
+     plane's origin, x direction and outward normal. Plates and fastener patterns are placed on them \
+     with `face: {element, face}`.",
+    crate::steel_detail::IdsParams,
+    Vec<crate::steel_detail::FaceInfo>,
+    |s, p| crate::steel_detail::face_list(s, p)
+);
+
+edit_command!(
+    CutCope,
+    "steel_cut.cope",
+    "Cope a member",
+    "Copes one of two members that meet (STR-STL-008): the member whose end is at the joint (or \
+     `cut_member_id`) loses what lies in the other's flange zones (their thickness plus \
+     `clearance`, default 13 mm or 1/2\"), across its flange width plus the clearance. The cope \
+     follows the main member (its depth). An IfcOpeningElement (USERDEFINED COPE) voiding the \
+     member, in a new sub-connection. Returns the cuts and the sub-connection.",
+    "Cope",
+    crate::steel_cuts::CopeParams,
+    crate::steel_cuts::Made,
+    crate::steel_cuts::cope
+);
+
+edit_command!(
+    CutMiter,
+    "steel_cut.miter",
+    "Miter two members",
+    "Cuts two members meeting at their ends on the plane halving the angle between them \
+     (STR-STL-008), one cut on each, in a sub-connection.",
+    "Miter",
+    crate::steel_cuts::PairParams,
+    crate::steel_cuts::Made,
+    crate::steel_cuts::miter
+);
+
+edit_command!(
+    CutSaw,
+    "steel_cut.saw",
+    "Saw cut a member's end",
+    "Cuts member `a`'s end flush with member `b`'s nearer flange (`part: flange`, the default) or \
+     web face (`part: web`) (STR-STL-008).",
+    "Saw Cut",
+    crate::steel_cuts::PairParams,
+    crate::steel_cuts::Made,
+    crate::steel_cuts::saw
+);
+
+edit_command!(
+    CutThrough,
+    "steel_cut.cut_through",
+    "Cut through",
+    "Cuts `cut_id` by the body of `cutter_id` grown by `gap` (STR-STL-008); the cut follows both.",
+    "Cut Through",
+    crate::steel_cuts::CutParams,
+    crate::steel_cuts::Made,
+    crate::steel_cuts::cut_through
+);
+
+edit_command!(
+    CutBy,
+    "steel_cut.cut_by",
+    "Cut by",
+    "Cuts `cut_id` by the body of `cutter_id` where they intersect (STR-STL-008).",
+    "Cut By",
+    crate::steel_cuts::CutParams,
+    crate::steel_cuts::Made,
+    crate::steel_cuts::cut_by
+);
+
+edit_command!(
+    CutUncope,
+    "steel_cut.uncope",
+    "Uncope members",
+    "Removes every cope (and skewed cope) on `member_ids` (STR-STL-008); a sub-connection left \
+     with no cuts is deleted. Copes belonging to a connection are skipped and listed. With nothing \
+     to remove it fails (`uncope.nothing`) and changes nothing.",
+    "Uncope",
+    crate::steel_cuts::UncopeParams,
+    crate::steel_cuts::UncopeReport,
+    crate::steel_cuts::uncope
+);
+
+read_command!(
+    CutList,
+    "steel_cut.list",
+    "Steel cuts",
+    "The cuts and modifiers on elements (every one when `element_ids` is omitted): kind and \
+     parameters, target and sub-connection (STR-STL-008).",
+    crate::steel_cuts::ListParams,
+    Vec<crate::steel_cuts::CutInfo>,
+    |s, p| crate::steel_cuts::list(s, p)
+);
+
+edit_command!(
+    ModShorten,
+    "steel_modifier.shorten",
+    "Shorten a member end",
+    "Moves a beam's or brace's `end` (start or end) back by `length` (forward when negative), \
+     through its end extension; `angle_h` and `angle_w` (degrees) tilt the cut across its height and \
+     width for a diagonal end (STR-STL-008).",
+    "Shorten",
+    crate::steel_cuts::ShortenParams,
+    crate::steel_cuts::Made,
+    crate::steel_cuts::shorten
+);
+
+edit_command!(
+    ModCopeSkewed,
+    "steel_modifier.cope_skewed",
+    "Cope a member end",
+    "Notches a member's `end`: `length` back from it and `depth` down from the top (`top`, the \
+     default) and/or up from the bottom (`bottom`), the notch's inner face turned by `angle` \
+     degrees (STR-STL-008).",
+    "Skewed Cope",
+    crate::steel_cuts::CopeSkewedParams,
+    crate::steel_cuts::Made,
+    crate::steel_cuts::cope_skewed
+);
+
+edit_command!(
+    ModContourCut,
+    "steel_modifier.contour_cut",
+    "Cut a contour",
+    "Cuts a closed `contour` (corners or segments) on a work plane or `face` out of an element, \
+     `depth` into it (through by default) (STR-STL-008).",
+    "Contour Cut",
+    crate::steel_cuts::ContourCutParams,
+    crate::steel_cuts::Made,
+    crate::steel_cuts::contour_cut
+);
+
+edit_command!(
+    ModCornerCut,
+    "steel_modifier.corner_cut",
+    "Cut a plate's corner",
+    "Cuts a plate's `corner` (from 0, in contour order): `straight` (a chamfer), `convex` (rounded) \
+     or `concave` (a notch arc), `size` along each edge from the corner; size 0 removes the cut \
+     (STR-STL-008).",
+    "Corner Cut",
+    crate::steel_cuts::CornerCutParams,
+    (),
+    crate::steel_cuts::corner_cut
 );
 
 read_command!(

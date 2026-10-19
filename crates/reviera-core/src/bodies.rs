@@ -381,6 +381,14 @@ pub fn all(store: &Store) -> Vec<Body> {
     for (id, part) in crate::steel_fab::all(store) {
         push(id, part.class().0, part.mesh(), false);
     }
+    // Plates and welds placed by hand (STR-STL-005, STR-STL-007).
+    for e in store.iter() {
+        if let Some(r) = crate::steel_detail::plate_recipe(e) {
+            push(e.id(), "IfcPlate", crate::steel_detail::plate_mesh(store, &r), false);
+        } else if let Some(r) = crate::steel_detail::weld_recipe(e) {
+            push(e.id(), "IfcFastener", crate::steel_detail::weld_mesh(&r), false);
+        }
+    }
     // In-place elements (ARC-INPL-001), their voids subtracted through the boolean relations.
     for (id, void, meshes) in crate::in_place::all(store) {
         let class = if void {

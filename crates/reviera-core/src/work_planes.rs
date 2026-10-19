@@ -46,6 +46,14 @@ pub enum WorkPlaneRef {
     Grid { grid: String },
     /// A reference plane (GlobalId).
     RefPlane { ref_plane: String },
+    /// A face of a column, beam, brace or steel plate (GlobalId and face name: STR-STL-005),
+    /// moved off it along its normal by `offset`; it follows the element.
+    Face {
+        element: String,
+        face: String,
+        #[serde(default)]
+        offset: f64,
+    },
     /// A plane fixed in space: origin, x direction and normal (its y is normal × x).
     Explicit {
         origin: [f64; 3],
@@ -130,6 +138,10 @@ impl Plane {
     }
 }
 
+fn add3(a: [f64; 3], b: [f64; 3]) -> [f64; 3] {
+    [a[0] + b[0], a[1] + b[1], a[2] + b[2]]
+}
+
 pub fn scale(a: [f64; 3], s: f64) -> [f64; 3] {
     [a[0] * s, a[1] * s, a[2] * s]
 }
@@ -171,6 +183,13 @@ pub fn resolve(store: &Store, r: &WorkPlaneRef) -> Result<Plane> {
             })?;
             crate::ref_planes::plane_of(&r)
         }
+        WorkPlaneRef::Face { element, face, offset } => {
+            let e = by_guid(store, element).ok_or_else(|| {
+                Error::new("workplane.missing", format!("the element {element} with the face is gone"))
+            })?;
+            let p = crate::steel_detail::face_plane(store, e, face)?;
+            Plane::new(add3(p.origin, scale(p.normal, *offset)), p.x, p.normal)
+        }
         WorkPlaneRef::Explicit {
             origin,
             x_dir,
@@ -185,6 +204,7 @@ pub fn host_of(r: &WorkPlaneRef) -> Option<&str> {
         WorkPlaneRef::Level { level, .. } => Some(level),
         WorkPlaneRef::Grid { grid } => Some(grid),
         WorkPlaneRef::RefPlane { ref_plane } => Some(ref_plane),
+        WorkPlaneRef::Face { element, .. } => Some(element),
         WorkPlaneRef::Explicit { .. } => None,
     }
 }
@@ -213,6 +233,10 @@ pub fn label(store: &Store, r: &WorkPlaneRef) -> String {
         WorkPlaneRef::Level { level, .. } => format!("Level: {}", name(level)),
         WorkPlaneRef::Grid { grid } => format!("Grid: {}", name(grid)),
         WorkPlaneRef::RefPlane { ref_plane } => format!("Reference Plane: {}", name(ref_plane)),
+        WorkPlaneRef::Face { element, face, .. } => {
+            let what = by_guid(store, element).map_or_else(|| "(gone)".to_owned(), |e| format!("{} {}", e.class, e.id()));
+            format!("Face: {what} {face}")
+        }
         WorkPlaneRef::Explicit { .. } => "<not associated>".to_owned(),
     }
 }
@@ -229,6 +253,20 @@ pub struct PlaneArgs {
     pub ref_plane: Option<ElementRef>,
     /// An explicit plane: `{origin, x_dir, normal}`.
     pub plane: Option<ExplicitPlane>,
+    /// A face of a column, beam, brace or steel plate: `{element, face, offset}` (faces from
+    /// `face.list`).
+    #[serde(default)]
+    pub face: Option<FaceArgs>,
+}
+
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+pub struct FaceArgs {
+    pub element: ElementRef,
+    /// flange_1, flange_2, web_1, web_2, start, end (framing) or top, bottom (plates).
+    pub face: String,
+    /// Off the face along its normal (metres).
+    #[serde(default)]
+    pub offset: f64,
 }
 
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
@@ -244,6 +282,7 @@ impl PlaneArgs {
             || self.grid.is_some()
             || self.ref_plane.is_some()
             || self.plane.is_some()
+            || self.face.is_some()
     }
 
     /// The reference these arguments name (exactly one of them).
@@ -253,6 +292,7 @@ impl PlaneArgs {
             self.grid.is_some(),
             self.ref_plane.is_some(),
             self.plane.is_some(),
+            self.face.is_some(),
         ]
         .iter()
         .filter(|b| **b)
@@ -260,7 +300,7 @@ impl PlaneArgs {
         if n != 1 {
             return Err(Error::new(
                 "workplane.args",
-                "give exactly one of `level`, `grid`, `ref_plane` or `plane`",
+                "give exactly one of `level`, `grid`, `ref_plane`, `plane` or `face`",
             ));
         }
         let guid = |r: &ElementRef, what: &str, ok: &dyn Fn(&Element) -> bool| -> Result<String> {
@@ -286,6 +326,13 @@ impl PlaneArgs {
                     crate::ref_planes::recipe(e).is_some()
                 })?,
             }
+        } else if let Some(f) = &self.face {
+            let e = store
+                .resolve(&f.element)
+                .and_then(|id| store.get(id))
+                .ok_or_else(|| Error::new("workplane.not_found", format!("no element {:?}", f.element)))?;
+            crate::steel_detail::face_plane(store, e, &f.face)?;
+            WorkPlaneRef::Face { element: e.guid().to_string(), face: f.face.clone(), offset: f.offset }
         } else {
             let p = self.plane.as_ref().expect("counted");
             WorkPlaneRef::Explicit {

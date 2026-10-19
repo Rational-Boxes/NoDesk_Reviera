@@ -607,6 +607,42 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "structural_connection" => format!(
             r#"<path d="M4 16h24M16 4v24" {s}/><circle cx="16" cy="16" r="5" fill="{a}" {s}/>"#
         ),
+        "steel_cope" => format!(
+            r#"<path d="M4 12h12v4h12v6H4z" fill="{f}" {s}/><path d="M16 8v8" {sa}/>"#
+        ),
+        "steel_miter" => format!(
+            r#"<path d="M4 20h14l6-6V4h-6v8l-2 2H4z" fill="{f}" {s}/><path d="M16 14l8-8" {sa}/>"#
+        ),
+        "steel_saw" => format!(
+            r#"<path d="M4 12h16v8H4z" fill="{f}" {s}/><path d="M22 6v20" {sa}/><path d="M24 6v20" {s}/>"#
+        ),
+        "steel_cut_through" => format!(
+            r#"<path d="M4 10h24v12H4z" fill="{f}" {s}/><circle cx="16" cy="16" r="5" fill="none" {sa}/>"#
+        ),
+        "steel_cut_by" => format!(
+            r#"<path d="M4 10h24v12H4z" fill="{f}" {s}/><path d="M12 4h8v24h-8z" fill="none" {sa}/>"#
+        ),
+        "steel_uncope" => format!(
+            r#"<path d="M4 12h24v10H4z" fill="{f}" {s}/><path d="M16 4l6 6M22 4l-6 6" {sa}/>"#
+        ),
+        "steel_shorten" => format!(
+            r#"<path d="M4 12h16v8H4z" fill="{f}" {s}/><path d="M28 16h-6M24 13l-3 3 3 3" {sa}/>"#
+        ),
+        "steel_corner_cut" => format!(
+            r#"<path d="M4 6h18l6 6v14H4z" fill="{f}" {s}/><path d="M22 6l6 6" {sa}/>"#
+        ),
+        "steel_contour_cut" => format!(
+            r#"<path d="M4 6h24v20H4z" fill="{f}" {s}/><path d="M11 12h10v8H11z" fill="none" {sa}/>"#
+        ),
+        "steel_plate" => format!(
+            r#"<path d="M6 10l14-4 6 6-14 4z" fill="{a}" {s}/><path d="M6 10v4l6 6v-4M12 16v4l14-4v-4" fill="{f}" {s}/>"#
+        ),
+        "bolt_pattern" => format!(
+            r#"<path d="M4 12h24v8H4z" fill="{f}" {s}/><path d="M10 6v20M16 6v20M22 6v20" {sa}/><path d="M8 6h4M14 6h4M20 6h4" {s}/>"#
+        ),
+        "weld" => format!(
+            r#"<path d="M4 22h24M14 4v18" {s}/><path d="M14 22v-6l-6 6z" fill="{a}" {s}/><path d="M18 10l4-4M20 12l4-4" {sa}/>"#
+        ),
         "connection_automate" => format!(
             r#"<path d="M4 12h16M12 4v16" {s}/><circle cx="12" cy="12" r="4" fill="{a}" {s}/><path d="M18 22l3 3 6-7" {sa}/>"#
         ),

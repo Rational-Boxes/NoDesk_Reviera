@@ -2397,6 +2397,11 @@ impl LocalProject {
                     end,
                     diameter,
                     ..
+                }
+                | reviera_core::steel_fab::Part::Stud {
+                    start,
+                    end,
+                    diameter,
                 } = part
                 {
                     let len = ((end[0] - start[0]).powi(2)
@@ -2416,9 +2421,44 @@ impl LocalProject {
                 }
             }
         }
-        // Each connection aggregates its fabrication elements.
+        // Plates and welds placed by hand (STR-STL-005, STR-STL-007).
+        let mut contexts = None;
         for e in store.iter() {
-            if reviera_core::connections::recipe(e).is_none() {
+            let mesh = if let Some(r) = reviera_core::steel_detail::plate_recipe(e) {
+                reviera_core::steel_detail::plate_mesh(store, &r)
+            } else if let Some(r) = reviera_core::steel_detail::weld_recipe(e) {
+                reviera_core::steel_detail::weld_mesh(&r)
+            } else {
+                continue;
+            };
+            let Some(&step) = self.steps.get(&e.id()) else {
+                continue;
+            };
+            let c = match contexts {
+                Some(c) => c,
+                None => *contexts.insert(geometry::Contexts::find(&self.ifc)?),
+            };
+            let (points, indices) = mesh;
+            let faces: Vec<Vec<usize>> = indices
+                .chunks(3)
+                .map(|t| t.iter().map(|i| *i as usize).collect())
+                .collect();
+            geometry::write_breps(
+                &mut self.ifc,
+                step,
+                geometry::BrepFrame::WORLD,
+                &[geometry::Polyhedron { points, faces }],
+                self.length_scale,
+                c,
+            )?;
+        }
+        self.write_holes(doc)?;
+        self.write_cuts(doc)?;
+        // Each connection (and fastener pattern) aggregates its fabrication elements.
+        for e in store.iter() {
+            if reviera_core::connections::recipe(e).is_none()
+                && reviera_core::steel_detail::pattern_recipe(e).is_none()
+            {
                 continue;
             }
             let Some(&step) = self.steps.get(&e.id()) else {
@@ -2450,6 +2490,116 @@ impl LocalProject {
             self.ifc.set_attribute(rel, "RelatingObject", &AttrValue::Ref(step.0))?;
             self.ifc
                 .set_attribute(rel, "RelatedObjects", &AttrValue::List(parts))?;
+        }
+        Ok(())
+    }
+
+    /// Writes steel cuts (STR-STL-008): each cut's opening gets its cutter solid and voids its
+    /// target (`IfcRelVoidsElement`).
+    fn write_cuts(&mut self, doc: &Document) -> Result<()> {
+        let store = doc.store();
+        let cuts = reviera_core::steel_cuts::all(store);
+        if cuts.is_empty() {
+            return Ok(());
+        }
+        let bodies = reviera_core::bodies::all(store);
+        let body_of = |id: ElementId| -> Option<Vec<reviera_core::bodies::Mesh>> {
+            bodies.iter().find(|b| b.element == id).map(|b| b.parts.iter().map(|p| p.mesh.clone()).collect())
+        };
+        let contexts = geometry::Contexts::find(&self.ifc)?;
+        let owner_history = self.new_owner_history()?;
+        for (cut, target, r) in cuts {
+            let (Some(&opening), Some(&host)) = (self.steps.get(&cut), self.steps.get(&target)) else {
+                continue;
+            };
+            let Some(tools) = reviera_core::steel_cuts::cutter(store, &r, &body_of) else {
+                continue;
+            };
+            if tools.is_empty() {
+                continue;
+            }
+            let solids: Vec<geometry::Polyhedron> = tools
+                .into_iter()
+                .map(|(points, indices)| geometry::Polyhedron {
+                    points,
+                    faces: indices.chunks(3).map(|t| t.iter().map(|i| *i as usize).collect()).collect(),
+                })
+                .collect();
+            geometry::write_breps(&mut self.ifc, opening, geometry::BrepFrame::WORLD, &solids, self.length_scale, contexts)?;
+            geometry::relate_one(
+                &mut self.ifc,
+                "IfcRelVoidsElement",
+                "RelatingBuildingElement",
+                host,
+                "RelatedOpeningElement",
+                opening,
+                owner_history,
+            )?;
+        }
+        Ok(())
+    }
+
+    /// Writes the holes fastener patterns make (STR-STL-006): an `IfcOpeningElement` (marked
+    /// `rxd:hole`) voiding each pierced element, rewritten on every save.
+    fn write_holes(&mut self, doc: &Document) -> Result<()> {
+        const TAG: &str = "rxd:hole";
+        for o in self.ifc.entities_of_type("IfcOpeningElement")? {
+            if !matches!(self.ifc.attribute(o.id, "Description")?, AttrValue::String(d) if d == TAG) {
+                continue;
+            }
+            for rel in self.ifc.referenced_by(o.id, "IfcRelVoidsElement")? {
+                self.ifc.remove(rel)?;
+            }
+            geometry::remove_breps(&mut self.ifc, o.id)?;
+            self.ifc.remove(o.id)?;
+        }
+        let store = doc.store();
+        let holes: Vec<_> = store
+            .iter()
+            .flat_map(|e| reviera_core::steel_detail::holes(store, e))
+            .collect();
+        if holes.is_empty() {
+            return Ok(());
+        }
+        let contexts = geometry::Contexts::find(&self.ifc)?;
+        let owner_history = self.new_owner_history()?;
+        let ifc4 = self.ifc.schema() != "IFC2X3";
+        for (element, a, b, d) in holes {
+            let Some(&host) = self.steps.get(&element) else {
+                continue;
+            };
+            let opening = self.ifc.create_rooted("IfcOpeningElement", &GlobalId::new())?;
+            self.ifc.set_attribute(opening, "Name", &AttrValue::String("Hole".into()))?;
+            self.ifc.set_attribute(opening, "Description", &AttrValue::String(TAG.into()))?;
+            if ifc4 {
+                self.ifc.set_attribute(opening, "PredefinedType", &AttrValue::Enum("OPENING".into()))?;
+            }
+            if let Some(h) = owner_history {
+                self.ifc.set_attribute(opening, "OwnerHistory", &AttrValue::Ref(h.0))?;
+            }
+            // A little longer than the element is thick, so it cuts clean through.
+            let axis = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+            let l = (axis[0] * axis[0] + axis[1] * axis[1] + axis[2] * axis[2]).sqrt().max(1e-9);
+            let ext = |p: [f64; 3], s: f64| [p[0] + axis[0] / l * s, p[1] + axis[1] / l * s, p[2] + axis[2] / l * s];
+            let (points, indices) = reviera_core::steel_fab::cylinder(ext(a, -0.001), ext(b, 0.001), d / 2.0, 12);
+            let faces: Vec<Vec<usize>> = indices.chunks(3).map(|t| t.iter().map(|i| *i as usize).collect()).collect();
+            geometry::write_breps(
+                &mut self.ifc,
+                opening,
+                geometry::BrepFrame::WORLD,
+                &[geometry::Polyhedron { points, faces }],
+                self.length_scale,
+                contexts,
+            )?;
+            geometry::relate_one(
+                &mut self.ifc,
+                "IfcRelVoidsElement",
+                "RelatingBuildingElement",
+                host,
+                "RelatedOpeningElement",
+                opening,
+                owner_history,
+            )?;
         }
         Ok(())
     }

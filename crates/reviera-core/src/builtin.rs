@@ -497,6 +497,8 @@ pub fn dependents_of(store: &crate::store::Store, id: ElementId) -> Vec<ElementI
                 || crate::foundations::uses(e, &guid)
                 || crate::connections::uses(e, &guid)
                 || crate::steel_fab::uses(e, &guid)
+                || crate::steel_detail::uses(e, &guid)
+                || crate::steel_cuts::uses(e, &guid)
                 || crate::analytical::uses(e, &guid)
                 || crate::analytical_panels::uses(e, &guid)
                 || crate::loads::uses(e, &guid)
@@ -612,6 +614,7 @@ impl Command for ElementDelete {
         // Braces attached to what goes keep their ends where they are (STR-BRACE-001).
         crate::beams::release_attachments(txn, &deleted)?;
         crate::foundations::release(txn, &deleted)?;
+        crate::steel_detail::release(txn, &deleted)?;
         for id in &deleted {
             txn.delete(*id)?;
         }

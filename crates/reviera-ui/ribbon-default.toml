@@ -1404,6 +1404,78 @@ keys = "CN"
 help = "Place a connection at the join of the selected members (main member first), choosing a type that fits: shear plate, end plate, base plate (one per selected column), gusset, or generic. It carries approval, code-check and fabricator information and follows the members; its plates, bolts and welds show at Fine detail"
 
 [[action]]
+id = "plate.create"
+label = "Plate"
+icon = "steel_plate"
+help = "Sketch a steel plate: on the face of the selected column, beam or plate, or on the view's work plane. Click the corners; Enter finishes. Thickness, justification and role in Properties"
+
+[[action]]
+id = "bolt_pattern.create"
+label = "Bolts"
+icon = "bolt_pattern"
+help = "Place bolts, anchors, holes or shear studs through the selected steel elements: choose the face and layout, then click the pattern's centre. The grip, bolt length and holes are found from the elements"
+
+[[action]]
+id = "weld.create"
+label = "Weld"
+icon = "weld"
+help = "Weld the selected elements: click one of the highlighted edges where they touch (in a 3D view). The weld keeps its place and is flagged for review when the elements change"
+
+[[action]]
+id = "steel_cut.cope"
+label = "Cope"
+icon = "steel_cope"
+help = "Cope the first selected member where it meets the second: its end loses the other's flange zones plus a clearance, following the other's depth"
+
+[[action]]
+id = "steel_cut.miter"
+label = "Miter"
+icon = "steel_miter"
+help = "Miter two selected members meeting at their ends, on the plane halving the angle between them"
+
+[[action]]
+id = "steel_cut.saw"
+label = "Saw Cut"
+icon = "steel_saw"
+help = "Cut the first selected member's end flush with the second's flange or web face"
+
+[[action]]
+id = "steel_cut.cut_through"
+label = "Cut Through"
+icon = "steel_cut_through"
+help = "Cut the first selected element by the second's body grown by a gap"
+
+[[action]]
+id = "steel_cut.cut_by"
+label = "Cut By"
+icon = "steel_cut_by"
+help = "Cut the first selected element by the second's body where they intersect"
+
+[[action]]
+id = "steel_cut.uncope"
+label = "Uncope"
+icon = "steel_uncope"
+help = "Remove the copes on the selected members (copes belonging to connections are left)"
+
+[[action]]
+id = "steel_modifier.shorten"
+label = "Shorten"
+icon = "steel_shorten"
+help = "Shorten (or, negative, extend) the selected beam's or brace's end, with angles for a diagonal cut"
+
+[[action]]
+id = "steel_modifier.corner_cut"
+label = "Corner Cut"
+icon = "steel_corner_cut"
+help = "Cut a corner of the selected plate: straight, convex (rounded) or concave (notch)"
+
+[[action]]
+id = "steel_modifier.contour_cut"
+label = "Contour Cut"
+icon = "steel_contour_cut"
+help = "Sketch a hole or notch on a face of the selected element and cut it out"
+
+[[action]]
 id = "structural_connection.automate"
 label = "Automate Connections"
 icon = "connection_automate"
@@ -1883,6 +1955,23 @@ tools = [
   { action = "truss.remove", size = "small" },
   { action = "structural_connection.create", size = "small" },
   { action = "structural_connection.automate", size = "small" },
+]
+
+[[tab.panel]]
+label = "Steel"
+tools = [
+  { action = "plate.create", size = "large" },
+  { action = "bolt_pattern.create", size = "large" },
+  { action = "weld.create", size = "large" },
+  { action = "steel_cut.cope", size = "small" },
+  { action = "steel_cut.miter", size = "small" },
+  { action = "steel_cut.saw", size = "small" },
+  { action = "steel_cut.cut_through", size = "small" },
+  { action = "steel_cut.cut_by", size = "small" },
+  { action = "steel_cut.uncope", size = "small" },
+  { action = "steel_modifier.shorten", size = "small" },
+  { action = "steel_modifier.corner_cut", size = "small" },
+  { action = "steel_modifier.contour_cut", size = "small" },
 ]
 
 [[tab.panel]]

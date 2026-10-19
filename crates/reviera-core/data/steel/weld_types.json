@@ -1,0 +1,5 @@
+{
+  "types": ["fillet", "square_butt", "single_v_butt", "single_bevel_butt", "double_v_butt", "double_bevel_butt", "j_butt", "u_butt", "plug", "slot", "spot", "seam", "flare_v", "flare_bevel"],
+  "surfaces": ["flat", "convex", "concave"],
+  "preparations": ["none", "ground_flush", "machined", "back_gouged", "backing_strip"]
+}

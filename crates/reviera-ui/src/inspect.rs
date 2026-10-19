@@ -170,7 +170,7 @@ impl Gui {
                 vis.hidden.extend(
                     store
                         .iter()
-                        .filter(|e| reviera_core::steel_fab::fab_recipe(e).is_some())
+                        .filter(|e| reviera_core::steel_fab::fab_recipe(e).is_some() || reviera_core::steel_detail::is_detail(e))
                         .map(|e| e.id()),
                 );
             }

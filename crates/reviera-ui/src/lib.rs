@@ -59,6 +59,8 @@ mod loads_ui;
 mod analytical_props;
 mod adjust;
 mod steel_auto_ui;
+mod steel_detail_ui;
+mod steel_cut_ui;
 mod steel_ui;
 mod ribbon;
 mod roofs;
@@ -284,6 +286,10 @@ struct Gui {
     truss_tool: Option<beams::TrussTool>,
     panel_tool: Option<analytical_panels::PanelTool>,
     load_tool: Option<loads_ui::LoadTool>,
+    /// Structure › Steel: Plate, Bolts or Weld in progress.
+    steel_tool: Option<steel_detail_ui::SteelTool>,
+    /// Contour Cut: the element the sketch cuts.
+    contour_target: Option<ElementId>,
     adjust: Option<adjust::AdjustSession>,
     /// A connection automation preview's report, marked in 3D views.
     auto_preview: Option<serde_json::Value>,
@@ -1317,6 +1323,7 @@ impl Gui {
         self.end_truss_tool();
         self.end_panel_tool();
         self.end_load_tool();
+        self.end_steel_tool();
         self.end_curtain_tool();
         self.end_ramp_tool();
         self.end_measure_tool();
@@ -1370,6 +1377,7 @@ impl Gui {
             || self.end_truss_tool()
             || self.end_panel_tool()
             || self.end_load_tool()
+            || self.end_steel_tool()
             || self.cancel_adjust()
         {
             return frame.set_status_text("Ready", 0);
@@ -2127,6 +2135,7 @@ impl Gui {
             || self.beam_rows(grid, id)
             || self.analytical_rows(grid, id)
             || self.connection_rows(grid, id)
+            || self.detail_rows(grid, id)
             || self.curtain_rows(grid, id)
             || self.ramp_rows(grid, id)
             || self.skylight_rows(grid, id)
@@ -2409,6 +2418,7 @@ impl Gui {
             || self.beam_edit(property, text.clone())
             || self.analytical_edit(property, text.clone())
             || self.connection_edit(property, text.clone())
+            || self.detail_edit(property, text.clone())
             || self.column_edit(property, text.clone())
             || self.curtain_edit(property, text.clone())
             || self.ramp_edit(property, text.clone())
@@ -2767,6 +2777,7 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                     None if g.truss_tool.is_some() => g.truss_click(x, y),
                     None if g.panel_tool.is_some() => g.panel_click(x, y),
                     None if g.load_tool.is_some() => g.load_click(x, y),
+                    None if g.steel_tool.is_some() => g.steel_click(x, y),
                     None if g.curtain_tool.is_some() => g.curtain_click(x, y),
                     None if g.ramp_tool.is_some() => g.ramp_click(x, y),
                     None if g.measure_tool.is_some() => g.measure_click(x, y),
@@ -2842,6 +2853,9 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                     if g.column_tool.is_some() {
                         g.column_motion(x, y);
                         redraw = true;
+                    }
+                    if g.steel_tool.is_some() {
+                        g.steel_motion(x, y);
                     }
                     if g.beam_tool.is_some() {
                         g.beam_motion(x, y);
@@ -3071,7 +3085,7 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                 }
                 Some(key) => {
                     with_view(&gui, id, |g| {
-                        used = g.adjust_key(key) || g.walk_key(key, true, shift);
+                        used = g.adjust_key(key) || g.steel_key(key) || g.walk_key(key, true, shift);
                         if !used && g.sketch.is_some() {
                             let (mx, my) = g.mouse;
                             used = g.sketch_key(key, mx, my);
@@ -3362,6 +3376,8 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 truss_tool: None,
                 panel_tool: None,
                 load_tool: None,
+                steel_tool: None,
+                contour_target: None,
                 adjust: None,
                 auto_preview: None,
                 curtain_tool: None,
@@ -3919,6 +3935,18 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         }),
         "structural_connection.create" => with(gui, Gui::connect_members),
         "structural_connection.automate" => with(gui, Gui::automate_connections),
+        "plate.create" => with(gui, Gui::start_plate_tool),
+        "bolt_pattern.create" => with(gui, Gui::start_pattern_tool),
+        "weld.create" => with(gui, Gui::start_weld_tool),
+        "steel_cut.cope" => with(gui, |g| g.pair_cut("steel_cut.cope")),
+        "steel_cut.miter" => with(gui, |g| g.pair_cut("steel_cut.miter")),
+        "steel_cut.saw" => with(gui, |g| g.pair_cut("steel_cut.saw")),
+        "steel_cut.cut_through" => with(gui, |g| g.pair_cut("steel_cut.cut_through")),
+        "steel_cut.cut_by" => with(gui, |g| g.pair_cut("steel_cut.cut_by")),
+        "steel_cut.uncope" => with(gui, Gui::uncope),
+        "steel_modifier.shorten" => with(gui, Gui::shorten_member),
+        "steel_modifier.corner_cut" => with(gui, Gui::corner_cut),
+        "steel_modifier.contour_cut" => with(gui, Gui::start_contour_cut),
         "ui.toggle_analytical" => with(gui, Gui::toggle_analytical),
         "structural_analysis.run" => Gui::start_structural_analysis(gui),
         "structural_analysis.results" => with(gui, Gui::structural_results),

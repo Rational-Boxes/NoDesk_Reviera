@@ -139,7 +139,7 @@ pub fn connection_type(id: &str) -> Option<ConnectionType> {
     library().into_iter().find(|t| t.id == id)
 }
 
-fn us_region(store: &Store) -> bool {
+pub(crate) fn us_region(store: &Store) -> bool {
     matches!(
         crate::codes::settings(store).code,
         crate::codes::Code::Ibc | crate::codes::Code::Irc
@@ -194,6 +194,8 @@ pub enum Part {
     Bolt { start: V3, end: V3, diameter: f64, anchor: bool },
     /// A fillet weld along `path`, its legs along `a` and `b` (unit vectors) of length `size`.
     Weld { path: Vec<V3>, a: V3, b: V3, size: f64 },
+    /// A headed shear stud standing from `start` (on the steel) to `end` (its head).
+    Stud { start: V3, end: V3, diameter: f64 },
 }
 
 impl Part {
@@ -203,6 +205,7 @@ impl Part {
             Part::Bolt { anchor: false, .. } => ("IfcMechanicalFastener", "BOLT"),
             Part::Bolt { anchor: true, .. } => ("IfcMechanicalFastener", "ANCHORBOLT"),
             Part::Weld { .. } => ("IfcFastener", "WELD"),
+            Part::Stud { .. } => ("IfcMechanicalFastener", "STUDSHEARCONNECTOR"),
         }
     }
 }
@@ -295,6 +298,9 @@ fn main_face(store: &Store, main: ElementId, into: V3) -> f64 {
 
 /// The fabrication elements a connection's type makes, in order (their slots).
 pub fn parts(store: &Store, e: &Element) -> Result<Vec<Part>> {
+    if let Some(p) = crate::steel_detail::pattern_recipe(e) {
+        return crate::steel_detail::pattern_parts(store, &p);
+    }
     let c = connections::recipe(e)
         .ok_or_else(|| Error::new("connection.not_a_connection", "not a connection"))?;
     let Some(t) = connection_type(&c.connection_type) else {
@@ -622,7 +628,7 @@ fn prism(outline: &[V3], normal: V3, thickness: f64) -> crate::bodies::Mesh {
     (pts, idx)
 }
 
-fn cylinder(a: V3, b: V3, r: f64, sides: usize) -> crate::bodies::Mesh {
+pub fn cylinder(a: V3, b: V3, r: f64, sides: usize) -> crate::bodies::Mesh {
     let axis = unit(sub(b, a));
     let helper = if axis[2].abs() < 0.9 { [0.0, 0.0, 1.0] } else { [1.0, 0.0, 0.0] };
     let u = unit(cross(axis, helper));
@@ -637,7 +643,7 @@ fn cylinder(a: V3, b: V3, r: f64, sides: usize) -> crate::bodies::Mesh {
     prism(&ring.iter().map(|q| at(*q, &[(axis, len / 2.0)])).collect::<Vec<_>>(), axis, len)
 }
 
-fn join(meshes: Vec<crate::bodies::Mesh>) -> crate::bodies::Mesh {
+pub(crate) fn join(meshes: Vec<crate::bodies::Mesh>) -> crate::bodies::Mesh {
     let mut pts = Vec::new();
     let mut idx = Vec::new();
     for (p, i) in meshes {
@@ -675,6 +681,12 @@ impl Part {
                     parts.push(prism(&mid, along, len));
                 }
                 join(parts)
+            }
+            Part::Stud { start, end, diameter } => {
+                let r = diameter / 2.0;
+                let axis = unit(sub(*end, *start));
+                let head = at(*end, &[(axis, -diameter * 0.5)]);
+                join(vec![cylinder(*start, head, r, 8), cylinder(head, *end, r * 1.6, 8)])
             }
         }
     }
@@ -743,7 +755,7 @@ pub(crate) fn relayout(txn: &mut crate::txn::Transaction<'_>, id: ElementId) -> 
     for (slot, p) in ps.iter().enumerate() {
         let (class, predefined) = p.class();
         let bolt = match p {
-            Part::Bolt { diameter, start, end, .. } => {
+            Part::Bolt { diameter, start, end, .. } | Part::Stud { diameter, start, end } => {
                 Some((*diameter, dot(sub(*end, *start), sub(*end, *start)).sqrt()))
             }
             _ => None,

@@ -128,6 +128,60 @@ changes before.</li>
 Failed holds the join. The run is one undo step, kept in the project's run history; the log
 saves as CSV.</p>
 
+<h2 id="detailing">Plates, bolts and welds</h2>
+<p>Structure › <b>Steel</b> details steelwork by hand. Everything placed here is drawn only in
+views at Detail Level Fine.</p>
+<ul>
+<li><a href="reviera:action/plate.create">Plate</a>: select one column, beam, brace or plate and
+choose its face (flange 1 or 2, web 1 or 2, start or end; a plate's top or bottom), or select
+nothing to use the view's work plane (a plan's level). Click the contour's corners; Enter, or a
+click on the first corner, finishes. The plate is 10 mm thick and sits on the face's outside
+(justification <i>Bottom</i>); change its thickness, justification, role and material in
+Properties. A plate on a face moves with its element, and stays where it was if the element is
+deleted.</li>
+<li><a href="reviera:action/bolt_pattern.create">Bolts</a>: select the elements to join (one
+for shear studs). Choose bolts, anchors, holes or shear studs, the face the fasteners are square
+to, and a rectangular or circular layout, then click where the pattern's centre goes. Reviera
+finds the grip through the elements (an I-section's far flange is not counted), the bolt length
+(grip, two washers, a nut and thread, rounded up) and the holes in each element, shown in
+Properties.</li>
+<li><a href="reviera:action/weld.create">Weld</a>: select the elements to weld and, in a 3D view,
+the edges where they touch are drawn; the one under the cursor turns red. Click it, then choose
+the weld type, throat and shop or site. A weld keeps its place when the elements change and is
+marked <i>needs review</i> in Properties until you accept it there. It goes when one of its
+elements is deleted.</li>
+</ul>
+<p>In IFC, plates are <code>IfcPlate</code>, bolt patterns <code>IfcElementAssembly</code>
+(<code>FASTENER_GROUP</code>) aggregating <code>IfcMechanicalFastener</code> bolts, anchors and
+studs, holes <code>IfcOpeningElement</code>s voiding their elements, and welds
+<code>IfcFastener</code> with <code>Pset_FastenerWeld</code>.</p>
+
+<h2 id="cuts">Cuts and modifiers</h2>
+<p>The small Steel buttons cut members and plates. Cuts are parametric: they follow the members
+they are made from, and Edit › Undo takes each back in one step.</p>
+<ul>
+<li><a href="reviera:action/steel_cut.cope">Cope</a>: select two members that meet. The one whose
+end is at the joint loses what lies in the other's flange zones, plus a 13 mm (1/2") clearance;
+make the girder deeper and the cope follows.
+<a href="reviera:action/steel_cut.uncope">Uncope</a> removes the copes on the selected
+members.</li>
+<li><a href="reviera:action/steel_cut.miter">Miter</a>: two members meeting at their ends are cut
+on the plane halving the corner.</li>
+<li><a href="reviera:action/steel_cut.saw">Saw Cut</a>: the first selected member's end is cut
+flush with the second's flange or web.</li>
+<li><a href="reviera:action/steel_cut.cut_through">Cut Through</a> and
+<a href="reviera:action/steel_cut.cut_by">Cut By</a>: the first selected element loses the
+second's shape (with a gap, for Cut Through).</li>
+<li><a href="reviera:action/steel_modifier.shorten">Shorten</a>: a beam's or brace's end moves
+back (a negative length extends it), with angles for a diagonal end.</li>
+<li><a href="reviera:action/steel_modifier.corner_cut">Corner Cut</a>: a plate's corner is cut
+straight, rounded or notched.</li>
+<li><a href="reviera:action/steel_modifier.contour_cut">Contour Cut</a>: sketch a hole or notch on
+a face of the selected element, as for a plate.</li>
+</ul>
+<p>In IFC each cut is an <code>IfcOpeningElement</code> voiding its element, named by its kind
+(COPE, MITER, …); the cuts made together form a sub-connection.</p>
+
 <h2 id="coarse">Coarse views</h2>
 <p>Set a plan's <b>Detail Level</b> to Coarse and beams, braces and truss members are drawn as
 single lines along their location lines, braces with their symbol, cut back at joints by the

@@ -113,6 +113,9 @@ pub(crate) fn plane_args(r: &WorkPlaneRef) -> Value {
         WorkPlaneRef::Level { level, offset } => json!({ "level": level, "offset": offset }),
         WorkPlaneRef::Grid { grid } => json!({ "grid": grid }),
         WorkPlaneRef::RefPlane { ref_plane } => json!({ "ref_plane": ref_plane }),
+        WorkPlaneRef::Face { element, face, offset } => {
+            json!({ "face": { "element": element, "face": face, "offset": offset } })
+        }
         WorkPlaneRef::Explicit {
             origin,
             x_dir,

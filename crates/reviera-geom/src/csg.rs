@@ -53,11 +53,18 @@ impl Cache {
     }
 }
 
-/// The elements a boolean involves (targets and tools).
+/// The elements a boolean involves (targets and tools), and those steel cuts cut.
 pub fn involved(store: &Store) -> std::collections::HashSet<reviera_core::ElementId> {
     reviera_core::csg::resolved(store)
         .into_iter()
         .flat_map(|(t, u, _, _)| [t, u])
+        .chain(reviera_core::steel_cuts::all(store).into_iter().map(|(_, t, _)| t))
+        .chain(store.iter().filter_map(reviera_core::steel_detail::pattern_recipe).flat_map(|r| {
+            r.elements
+                .iter()
+                .filter_map(|g| reviera_core::id::GlobalId::parse(g).and_then(|g| store.find_by_guid(&g)))
+                .collect::<Vec<_>>()
+        }))
         .collect()
 }
 
@@ -107,4 +114,85 @@ pub fn apply(cache: &Cache, store: &Store, bodies: &mut Vec<Body>) {
         }
     }
     bodies.retain(|b| !hidden.contains(&b.element));
+    apply_cuts(cache, store, bodies);
+}
+
+/// Steel cuts (STR-STL-008): each target loses its cutters' solids.
+fn apply_cuts(cache: &Cache, store: &Store, bodies: &mut [Body]) {
+    // Fastener holes (STR-STL-006), found in the bodies as they are before any cut.
+    let merged = |id: reviera_core::ElementId, bodies: &[Body]| -> Option<Mesh> {
+        let b = bodies.iter().find(|b| b.element == id)?;
+        let mut m: Mesh = (Vec::new(), Vec::new());
+        for p in b.parts.iter().filter(|p| !p.plan_hidden) {
+            let base = m.0.len() as u32;
+            m.0.extend(p.mesh.0.iter().copied());
+            m.1.extend(p.mesh.1.iter().map(|i| i + base));
+        }
+        Some(m)
+    };
+    let mut holes: Vec<(reviera_core::ElementId, Mesh)> = Vec::new();
+    for e in store.iter() {
+        if reviera_core::steel_detail::pattern_recipe(e).is_none() {
+            continue;
+        }
+        for (id, a, b, d) in reviera_core::steel_detail::holes_in(store, e, &|i| merged(i, bodies)) {
+            // A little past each face, so the hole cuts clean through.
+            let ax = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+            let l = (ax[0] * ax[0] + ax[1] * ax[1] + ax[2] * ax[2]).sqrt().max(1e-9);
+            let ext = |p: [f64; 3], s: f64| [p[0] + ax[0] / l * s, p[1] + ax[1] / l * s, p[2] + ax[2] / l * s];
+            holes.push((id, reviera_core::steel_fab::cylinder(ext(a, -0.001), ext(b, 0.001), d / 2.0, 12)));
+        }
+    }
+    let cuts = reviera_core::steel_cuts::all(store);
+    if cuts.is_empty() && holes.is_empty() {
+        return;
+    }
+    let mut by_target: std::collections::BTreeMap<reviera_core::ElementId, Vec<Mesh>> = Default::default();
+    for (id, m) in holes {
+        by_target.entry(id).or_default().push(m);
+    }
+    for (target, tools) in by_target {
+        subtract(cache, bodies, target, &tools);
+    }
+    for (_, target, r) in cuts {
+        let Some(ti) = bodies.iter().position(|b| b.element == target) else {
+            continue;
+        };
+        let body_of = |id: reviera_core::ElementId| -> Option<Vec<Mesh>> {
+            bodies
+                .iter()
+                .find(|b| b.element == id)
+                .map(|b| b.parts.iter().filter(|p| !p.plan_hidden).map(|p| p.mesh.clone()).collect())
+        };
+        let Some(tools) = reviera_core::steel_cuts::cutter(store, &r, &body_of) else {
+            continue;
+        };
+        if tools.is_empty() {
+            continue;
+        }
+        let _ = ti;
+        subtract(cache, bodies, target, &tools);
+    }
+}
+
+/// Replaces an element's body by its subtraction by `tools`.
+fn subtract(cache: &Cache, bodies: &mut [Body], target: reviera_core::ElementId, tools: &[Mesh]) {
+    let Some(ti) = bodies.iter().position(|b| b.element == target) else {
+        return;
+    };
+    let a: Vec<Mesh> = bodies[ti]
+        .parts
+        .iter()
+        .filter(|p| !p.plan_hidden)
+        .map(|p| p.mesh.clone())
+        .collect();
+    if let Ok(result) = cache.boolean(CsgOp::Subtract, &a, tools) {
+        let class = bodies[ti].parts.first().map_or_else(String::new, |p| p.class.clone());
+        let mut parts: Vec<Part> = result
+            .into_iter()
+            .map(|mesh| Part { mesh, class: class.clone(), plan_hidden: false })
+            .collect();
+        parts.extend(bodies[ti].parts.iter().filter(|p| p.plan_hidden).cloned());
+        bodies[ti].parts = parts;
+    }
 }

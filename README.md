@@ -652,6 +652,21 @@ tools and the datums.
   `structural_connection.override`; STR-STL-001, STR-STL-002). Not yet: Lua library packages,
   the other connection groups (clip angles, splices, haunches, stiffeners), the Modify Parameters
   dialog with live preview, copes and cuts.
+- **Steel detailing** (Structure › Steel): plates sketched on a face of a column, beam, brace or
+  plate (following it) or on a work plane, with thickness, justification and role; bolt, anchor,
+  hole and shear stud patterns through the selected elements, their grip, bolt length and holes
+  found from the elements' bodies (holes cut in them and written to IFC as openings); welds on an edge where the
+  elements touch within 1 mm, flagged for review when the elements change (`plate.create`,
+  `bolt_pattern.create`, `anchor_pattern.create`, `hole_pattern.create`,
+  `shear_stud_pattern.create`, `weld.create`, `weld.edges`, `face.list`; STR-STL-005/006/007).
+  Any command taking a work plane also takes a face. Not yet: assembly marks, weld symbols in
+  drawings.
+- **Steel cuts and modifiers**: cope (following the main member's depth), skewed cope, miter,
+  saw cut, shorten and extend, contour cut, cut through and cut by, plate corner cuts, and
+  Uncope; cuts are elements whose cutters are subtracted from the members' bodies by the solid
+  kernel and written to IFC as openings, grouped in sub-connections (`steel_cut.*`,
+  `steel_modifier.*`; STR-STL-008). Not yet: the sub-connection box in views, shape handles,
+  copes made by connection types.
 - **Connection automation**: Automate Connections finds the joins in the framing (column feet,
   beam ends on columns and girders, brace ends) and places library types by an ordered rule set
   (join kind, sections, depth ranges; the Default set or the project's), skipping connected

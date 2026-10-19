@@ -190,7 +190,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**2106 unique commands** in 410 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**2117 unique commands** in 411 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -327,12 +327,13 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `fabrication_route` | 5 |
 | `fabrication_settings` | 4 |
 | `fabrication_spool` | 3 |
-| `face` | 4 |
+| `face` | 5 |
 | `failure` | 1 |
 | `family` | 12 |
 | `family_doc` | 58 |
 | `family_template` | 1 |
 | `fascia` | 1 |
+| `fastener_pattern` | 2 |
 | `file` | 15 |
 | `fill_pattern` | 5 |
 | `fillpattern` | 4 |
@@ -452,7 +453,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `pipe_segment` | 1 |
 | `placeholder` | 1 |
 | `planregion` | 1 |
-| `plate` | 1 |
+| `plate` | 3 |
 | `plumbing_fixture` | 1 |
 | `pointcloud` | 1 |
 | `position` | 8 |
@@ -537,7 +538,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `stair` | 15 |
 | `standards` | 2 |
 | `stash` | 3 |
-| `steel_cut` | 6 |
+| `steel_cut` | 7 |
 | `steel_families` | 1 |
 | `steel_modifier` | 4 |
 | `steel_nc` | 1 |
@@ -594,7 +595,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `walltype` | 2 |
 | `warnings` | 6 |
 | `weather` | 1 |
-| `weld` | 1 |
+| `weld` | 6 |
 | `window` | 8 |
 | `wire` | 2 |
 | `wiring_type` | 1 |
@@ -1207,6 +1208,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `fabrication_spool.add` | 4 | spool_id, part_ids[] | — | Yes | MEP-FAB-007 |
 | `fabrication_spool.create` | 4 | part_ids[], name | id | Yes | MEP-FAB-007 |
 | `fabrication_spool.remove` | 4 | spool_id, part_ids[] | — | Yes | MEP-FAB-007 |
+| `face.list` | 4 | element_ids[] | faces | No | STR-STL-005 |
 | `face.paint` | 3 | face_refs, material_id | — | Yes | ARC-MOD-020 |
 | `face.remove_paint` | 3 | face_refs | — | Yes | ARC-MOD-020 |
 | `face.set_pattern_alignment` | 5 | element_id, face_ref, origin, angle | () | Yes | DOC-GFX-014 |
@@ -1284,6 +1286,8 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `family_doc.visibility.set` | 2 | element_ids[], {coarse, medium, fine, plan, front_back, left_right, only_when_cut, visible_param?} | — | Yes | DM-FED-007 |
 | `family_template.list` | 2 | locale? | template[] | No | DM-FED-001 |
 | `fascia.create` | 3 | type_id, edge_refs, mitering? | element_id | Yes | ARC-ROOF-004 |
+| `fastener_pattern.info` | 4 | element_ids[] | patterns | No | STR-STL-006 |
+| `fastener_pattern.set` | 4 | pattern_ids[], layout?, diameter?, grip_increase?, … | — | Yes | STR-STL-006 |
 | `file.backups` | 2 | document_id | backup[] | No | DM-FILE-002 |
 | `file.close` | 2 | document_id, save?: "ask"\ | "yes"\ | "no" | — |
 | `file.convert_schema` | 2 | document_id, target: "IFC4"\ | "IFC4X3_ADD2" | report | No (clears undo) |
@@ -1789,6 +1793,8 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `placeholder.convert` | 4 | ids[] | element_ids[] | Yes | MEP-DUCT-007 |
 | `planregion.set_view_range` | 5 | region_id, top, cut, bottom, depth | () | Yes | DOC-VR-003 |
 | `plate.create` | 4 | work_plane \ | face_ref, contour_curves[], thickness, material_id, justification | id | Yes |
+| `plate.info` | 4 | element_ids[] | plates | No | STR-STL-005 |
+| `plate.set` | 4 | plate_ids[], contour?, thickness?, justification?, material?, coating?, role? | — | Yes | STR-STL-005 |
 | `plumbing_fixture.place` | 4 | type_id, host_face_ref \ | work_plane, point, rotation | id | Yes |
 | `pointcloud.reindex` | 6 | link_id | job_id | No | COL-LNK-003 |
 | `position.assign` | 5 | view_ids[], position_id? | () | Yes | DOC-SHT-005 |
@@ -2175,6 +2181,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `steel_cut.cope` | 4 | member_ids[], cut_member_id? | — | Yes | STR-STL-008 |
 | `steel_cut.cut_by` | 4 | cut_id, cutter_id | — | Yes | STR-STL-008 |
 | `steel_cut.cut_through` | 4 | cut_id, cutter_id, gap | — | Yes | STR-STL-008 |
+| `steel_cut.list` | 4 | element_ids[]? | cuts | No | STR-STL-008 |
 | `steel_cut.miter` | 4 | a, b | — | Yes | STR-STL-008 |
 | `steel_cut.saw` | 4 | a, b, part: "flange"\ | "web" | — | Yes |
 | `steel_cut.uncope` | 4 | member_ids[] | — | Yes | STR-STL-008 |
@@ -2678,6 +2685,11 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `warnings.show` | 2 | warning_id | — | No | DM-FAIL-001 |
 | `weather.import` | 4 | path | id | Yes | ANA-EM-001 |
 | `weld.create` | 4 | element_ids[], edge_ref, params | id | Yes | STR-STL-007 |
+| `weld.edges` | 4 | element_ids[] | edges | No | STR-STL-007 |
+| `weld.info` | 4 | element_ids[] | welds | No | STR-STL-007 |
+| `weld.review` | 4 | — | weld ids | No | STR-STL-007 |
+| `weld.set` | 4 | weld_ids[], type?, a?, …, accept? | — | Yes | STR-STL-007 |
+| `weld.tables` | 4 | — | types, surfaces, preparations | No | STR-STL-007 |
 | `window.dock_to_main` | 1 | `view_id` | `()` | No | UI-VIEWWIN-003 |
 | `window.float` | 1 | `view_id`, `rect?`, `monitor?` | `frame_id` | No | UI-VIEWWIN-003 |
 | `window.list` | 1 | — | `[WindowInfo]` | No | UI-VIEWWIN-001 |

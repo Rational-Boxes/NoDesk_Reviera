@@ -348,7 +348,12 @@ pub fn category_of(e: &Element) -> Option<&'static Category> {
     if crate::grids::is_grid(e) || crate::grids::is_grid_type(e) {
         return category("cat.grids");
     }
-    if crate::connections::recipe(e).is_some() || crate::steel_fab::fab_recipe(e).is_some() {
+    if crate::connections::recipe(e).is_some()
+        || crate::steel_fab::fab_recipe(e).is_some()
+        || crate::steel_detail::is_detail(e)
+        || crate::steel_cuts::cut_recipe(e).is_some()
+        || crate::steel_cuts::is_sub_connection(e)
+    {
         return category("cat.structural_connections");
     }
     let class = e.class.strip_suffix("StandardCase").unwrap_or(&e.class);
