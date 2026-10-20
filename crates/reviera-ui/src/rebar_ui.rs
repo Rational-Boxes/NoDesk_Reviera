@@ -72,7 +72,7 @@ pub(super) fn row(dialog: &Dialog, grid: &FlexGridSizer, label: &str) {
 }
 
 impl Gui {
-    fn rebar_hosts(&mut self) -> Vec<(ElementId, HostKind)> {
+    pub(crate) fn rebar_hosts(&mut self) -> Vec<(ElementId, HostKind)> {
         let Some(store) = self.store_now() else { return Vec::new() };
         self.selection()
             .into_iter()
@@ -445,12 +445,22 @@ impl Gui {
             .map(|d| format!("{} {:.0}", d[0].as_str().unwrap_or(""), d[1].as_f64().unwrap_or(0.0) * 1000.0))
             .collect();
         ro(grid, "Dimensions (mm)", "rb_dims", dims.join(", "));
-        // Each segment can be set by hand (STR-RBR-006); blank resets it.
+        // Each segment can be set by hand (STR-RBR-006); blank resets it. A sketched bar's follow
+        // its sketch and constraints (STR-RBR-007).
+        let sketched = self
+            .store_now()
+            .and_then(|s| s.get(id).and_then(reviera_core::rebar::rebar_recipe))
+            .is_some_and(|r| matches!(r.placement, reviera_core::rebar::Placement::Sketch(_)));
         for d in i["dimensions"].as_array().into_iter().flatten() {
             let letter = d[0].as_str().unwrap_or("");
             let name = format!("rb_seg_{letter}");
             grid.append(Property::string(format!("Segment {letter} (mm)"), &name, format!("{:.0}", d[1].as_f64().unwrap_or(0.0) * 1000.0)));
-            grid.set_help_string(&name, "Set this segment's length; blank goes back to what the host gives");
+            if sketched {
+                grid.set_property_read_only(&name, true);
+                grid.set_help_string(&name, "A sketched bar's segments follow its sketch and constraints (Edit Constraints)");
+            } else {
+                grid.set_help_string(&name, "Set this segment's length; blank goes back to what the host gives");
+            }
         }
         if i["orphaned"] == true {
             ro(grid, "Orphaned", "rb_orphan", i["orphan_reason"].as_str().unwrap_or("").to_owned());

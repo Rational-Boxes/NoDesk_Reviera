@@ -199,7 +199,8 @@ impl Gui {
         let mut visibility = self.view_visibility(v);
         let mut lines = self.clip_lines(v, section_box.as_ref(), &slices);
         // Rebar as this view presents it (STR-RBR-017).
-        let (rebar_lines, rebar_top, rebar_picks) = self.rebar_view_drawing(index, &mut visibility);
+        let (rebar_lines, mut rebar_top, rebar_picks) = self.rebar_view_drawing(index, &mut visibility);
+        rebar_top.extend(self.constraint_lines.iter().cloned());
         lines.extend(rebar_lines);
         lines.extend(self.datum_3d_lines(index));
         lines.extend(self.analytical_lines(index));

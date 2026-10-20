@@ -190,7 +190,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**2125 unique commands** in 412 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**2126 unique commands** in 412 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -471,7 +471,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `railing` | 12 |
 | `railingtype` | 5 |
 | `ramp` | 2 |
-| `rebar` | 24 |
+| `rebar` | 25 |
 | `rebar_bar_type` | 1 |
 | `rebar_coupler` | 1 |
 | `rebar_cover` | 1 |
@@ -1863,6 +1863,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `rebar.add_crank` | 4 | rebar_id, segment, position, length, offset, angle | — | Yes | STR-RBR-009 |
 | `rebar.can_host` | 4 | element_id | bool | No | STR-RBR-001 |
 | `rebar.constrain` | 4 | rebar_id, handle_id, target_kind, target_ref, offset | — | Yes | STR-RBR-007 |
+| `rebar.constraints` | 4 | rebar_id | {handles[], faces[]} | No | STR-RBR-007 |
 | `rebar.convert_to_standard` | 4 | rebar_ids | — | Yes | STR-RBR-005 |
 | `rebar.convert_to_varying` | 4 | rebar_ids | — | Yes | STR-RBR-005 |
 | `rebar.distribute_along_path` | 4 | main_rebar_id, edge_refs[], range? | rebar_id | Yes | STR-RBR-014 |

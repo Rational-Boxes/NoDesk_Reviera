@@ -117,6 +117,150 @@ impl Gui {
         }
     }
 
+    /// Edit Constraints (STR-RBR-007): each handle of the selected sketched set kept to a host
+    /// face's cover, a face, or another bar in the host, with its offset. While the dialog is open
+    /// the bar and its references are drawn in the view.
+    pub(crate) fn edit_rebar_constraints(&mut self) {
+        let frame = self.frame;
+        let Some(set) = self.one_set("Edit Constraints") else { return };
+        let info = match self.run("rebar.constraints", json!({ "rebar_id": set })) {
+            Ok(i) => i,
+            Err(e) => return error(&frame, &format!("Edit Constraints:\n{e}")),
+        };
+        let Some(store) = self.store_now() else { return };
+        // The other sets in the same host, as bar references.
+        let host = store.get(set).and_then(reviera_core::rebar::rebar_recipe).map(|r| r.host).unwrap_or_default();
+        let others: Vec<ElementId> = store
+            .iter()
+            .filter(|e| e.id() != set && reviera_core::rebar::rebar_recipe(e).is_some_and(|r| r.host == host))
+            .map(|e| e.id())
+            .collect();
+        let faces: Vec<String> = info["faces"].as_array().into_iter().flatten().filter_map(|f| f["name"].as_str().map(str::to_owned)).collect();
+        let mut options: Vec<(String, Value)> = vec![("Free".into(), json!({ "kind": "none" }))];
+        options.extend(faces.iter().map(|f| (format!("Cover: {f}"), json!({ "kind": "cover", "face": f }))));
+        options.extend(faces.iter().map(|f| (format!("Face: {f}"), json!({ "kind": "surface", "face": f }))));
+        options.extend(others.iter().map(|o| (format!("Bar of set {o}"), json!({ "kind": "bar", "set": o.0 }))));
+        let current = |c: &Value| -> usize {
+            let t = &c["target"];
+            options
+                .iter()
+                .position(|(_, o)| match t["kind"].as_str() {
+                    Some("bar") => o["kind"] == "bar" && store.get(ElementId(o["set"].as_u64().unwrap_or(0))).is_some_and(|e| e.guid().to_string() == t["rebar"].as_str().unwrap_or("")),
+                    Some(k) => o["kind"] == k && o["face"] == t["face"],
+                    None => false,
+                })
+                .unwrap_or(0)
+        };
+        let handles: Vec<Value> = info["handles"].as_array().cloned().unwrap_or_default();
+        let centre: Vec<Value> = self
+            .run("rebar.info", json!({ "rebar_ids": [set] }))
+            .ok()
+            .and_then(|i| i[0]["bars"][0]["points"].as_array().cloned())
+            .unwrap_or_default();
+        self.constraint_overlay(&centre, &handles);
+        let f = super::reinforcement_ui::Form::new(&frame, "Edit Constraints");
+        let names: Vec<String> = options.iter().map(|o| o.0.clone()).collect();
+        let rows: Vec<(String, Choice, TextCtrl, usize, String)> = handles
+            .iter()
+            .map(|h| {
+                let id = h["id"].as_str().unwrap_or("").to_owned();
+                let label = match id.as_str() {
+                    "start" => "Start".to_owned(),
+                    "end" => "End".to_owned(),
+                    s => format!("Segment {}", s.trim_start_matches("segment:").parse::<usize>().map_or(0, |k| k + 1)),
+                };
+                let was = if h["constraint"].is_null() { 0 } else { current(&h["constraint"]) };
+                let off = h["constraint"]["offset"].as_f64().map_or(String::new(), |v| format!("{}", (v * 1e6).round() / 1000.0));
+                let c = f.choice(&label, &names, was);
+                let t = f.text("    offset (mm)", &off, "Further in from the reference; empty for 0 from a cover, else where the handle is now");
+                (id, c, t, was, off)
+            })
+            .collect();
+        let ok = f.show("Constrained handles follow the host; a reference must be within 6° of parallel (of square, for an end)", "Apply");
+        let picks: Vec<(String, usize, String, usize, String)> = rows
+            .iter()
+            .map(|(id, c, t, was, off)| (id.clone(), c.get_selection().map_or(0, |i| i as usize), t.get_value().trim().to_owned(), *was, off.clone()))
+            .collect();
+        f.dialog.destroy();
+        self.constraint_lines.clear();
+        if !ok {
+            return self.refresh_scene(&frame);
+        }
+        let mut failed = Vec::new();
+        let mut changed = 0;
+        for (id, k, off, was, was_off) in picks {
+            if k == was && off == was_off {
+                continue;
+            }
+            let o = &options[k.min(options.len() - 1)].1;
+            let mut args = json!({ "rebar_id": set, "handle_id": id, "target_kind": o["kind"] });
+            match o["kind"].as_str() {
+                Some("bar") => args["target_ref"] = o["set"].clone(),
+                Some("cover" | "surface") => args["target_ref"] = o["face"].clone(),
+                _ => {}
+            }
+            if let Ok(v) = off.parse::<f64>() {
+                args["offset"] = json!(v / 1000.0);
+            }
+            match self.run("rebar.constrain", args) {
+                Ok(_) => changed += 1,
+                Err(e) => failed.push(format!("{id}: {e}")),
+            }
+        }
+        self.refresh_scene(&frame);
+        if !failed.is_empty() {
+            error(&frame, &format!("Some constraints were not set:\n{}", failed.join("\n")));
+        }
+        frame.set_status_text(&format!("Edit Constraints: {changed} handle(s) changed"), 0);
+    }
+
+    /// Draws a set's bar and each constrained handle's reference: a line to its plane and a
+    /// cross on it.
+    fn constraint_overlay(&mut self, centre: &[Value], handles: &[Value]) {
+        use reviera_render::plan::Lines;
+        let plan_z = self.active_view().and_then(|v| v.plan.as_ref()).map(|pl| pl.range.cut as f32 + 0.004);
+        let width = if plan_z.is_some() { 0.6 } else { 0.1 };
+        let v3 = |v: &Value| -> Option<[f64; 3]> { Some([v[0].as_f64()?, v[1].as_f64()?, v[2].as_f64()?]) };
+        let f = |p: [f64; 3]| [p[0] as f32, p[1] as f32, plan_z.unwrap_or(p[2] as f32)];
+        let pts: Vec<[f64; 3]> = centre.iter().filter_map(v3).collect();
+        let bar: Vec<[[f32; 3]; 2]> = pts.windows(2).map(|w| [f(w[0]), f(w[1])]).collect();
+        let mut target = Vec::new();
+        for h in handles {
+            let (Some(at), Some(dir)) = (v3(&h["at"]), v3(&h["direction"])) else { continue };
+            let (Some(p), Some(n)) = (v3(&h["target_point"]), v3(&h["target_normal"])) else { continue };
+            let d = (at[0] - p[0]) * n[0] + (at[1] - p[1]) * n[1] + (at[2] - p[2]) * n[2];
+            let foot = [at[0] - n[0] * d, at[1] - n[1] * d, at[2] - n[2] * d];
+            target.push([f(at), f(foot)]);
+            // A cross on the plane: along the handle and square to it.
+            let side = [n[1] * dir[2] - n[2] * dir[1], n[2] * dir[0] - n[0] * dir[2], n[0] * dir[1] - n[1] * dir[0]];
+            for a in [dir, side] {
+                target.push([f([foot[0] - a[0] * 0.1, foot[1] - a[1] * 0.1, foot[2] - a[2] * 0.1]), f([foot[0] + a[0] * 0.1, foot[1] + a[1] * 0.1, foot[2] + a[2] * 0.1])]);
+            }
+        }
+        // Drawn over the host, which hides the bar inside it.
+        self.constraint_lines = vec![
+            Lines { color: reviera_render::CONSTRAINT_BAR, width: width * 2.0, segments: bar },
+            Lines { color: reviera_render::CONSTRAINT_TARGET, width, segments: target },
+        ];
+        // Drawn now: the dialog is modal.
+        if let Some(id) = self.active {
+            self.draw(id);
+        }
+    }
+
+    /// Reset Constraints: the selected sketched sets' handles freed where they are.
+    pub(crate) fn reset_rebar_constraints(&mut self) {
+        let frame = self.frame;
+        let Some(set) = self.one_set("Reset Constraints") else { return };
+        match self.run("rebar.reset_constraints", json!({ "rebar_id": set })) {
+            Ok(_) => {
+                self.refresh_scene(&frame);
+                frame.set_status_text("Constraints removed; the bar stays where it is", 0);
+            }
+            Err(e) => error(&frame, &format!("The constraints were not reset:\n{e}")),
+        }
+    }
+
     /// Convert to Varying (`true`) or to Standard (STR-RBR-005).
     pub(crate) fn convert_rebar_sets(&mut self, varying: bool) {
         let frame = self.frame;

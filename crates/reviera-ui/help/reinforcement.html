@@ -188,6 +188,24 @@ what is drawn: quantities, numbers and the IFC export keep every bar. Clicking a
 selects its set. The presentation of sets with none of their own comes from Reinforcement
 Settings.</p>
 
+<h2 id="sketch">Sketched bars and constraints</h2>
+<p>Select a host and click <a href="reviera:action/rebar.sketch">Sketch Rebar</a>. Choose the bar
+type, style (standard, or stirrup or tie), hooks and layout, then click the bar's corners in the
+host's plane. That plane is a floor's mid-depth, a wall's location line, or the long section of a
+beam or column through its axis. Upright planes are sketched in a 3D view. Or type the corners in
+the Coordinates dialog (<kbd>X</kbd><kbd>Y</kbd>). Enter finishes; clicking the first corner
+again closes a link. The bar is matched to shape 00, 11, 21 or 51, or else gets 99, the code for
+a special shape. A set spreads square to the plane, as far as the far face's cover.</p>
+<p><b>Edit Constraints</b> on the set's tab keeps each handle (the start, each segment, the end)
+to a host face's cover, a host face, or a bar of another set in the host, with an offset further
+in. While the dialog is open the bar is drawn over the host, and each reference shows as a line
+to its plane with a cross on it. Constrained handles follow the host: change a cover from 40 to
+50 mm and a bar kept to that cover moves 10 mm. Unconstrained handles stay where they are. A
+reference must be within 6° of parallel to a segment, or of square to an end. Otherwise it is
+refused and the message gives the angle. <b>Reset Constraints</b> frees every handle where it
+is. A sketched bar's segments follow its sketch and constraints, so they are not set in
+Properties.</p>
+
 <h2 id="editing">Editing sets</h2>
 <p>The contextual tab of a selected set:</p>
 <ul>
@@ -226,5 +244,5 @@ bar and total length, and mass (the bars' nominal mass per metre times their rou
 Any rebar schedule can show these fields, and R and the other segments, through Fields.</p>
 
 <h2 id="not-yet">Not yet</h2>
-<p>Placing rebar sets by two points or by sketch, shape handles, splice and coupler types, varying sets other than bars through a wall (and a schedule row per length), cranks and spirals, bent and custom fabric sheets, reinforcement symbols, tags outside plans, hook angles on bending details, and fabric
+<p>Placing rebar sets by two points, shape handles, stirrup attachment and dragging handles of sketched bars, splice and coupler types, varying sets other than bars through a wall (and a schedule row per length), cranks and spirals, bent and custom fabric sheets, reinforcement symbols, tags outside plans, hook angles on bending details, and fabric
 schedules.</p>

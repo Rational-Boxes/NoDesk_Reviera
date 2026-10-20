@@ -173,7 +173,7 @@ td code { white-space: nowrap; }
         <div class="tb-cell"><span class="tb-label">Revision</span><span class="tb-value">0.1 · Draft</span></div>
         <div class="tb-cell"><span class="tb-label">Date</span><span class="tb-value tb-num">2026-10-12</span></div>
         <div class="tb-cell"><span class="tb-label">Requirements</span><span class="tb-value tb-num">808</span></div>
-        <div class="tb-cell"><span class="tb-label">Commands</span><span class="tb-value tb-num">2,125</span></div>
+        <div class="tb-cell"><span class="tb-label">Commands</span><span class="tb-value tb-num">2,126</span></div>
         <div class="tb-cell"><span class="tb-label">Licence</span><span class="tb-value">GPL-3.0-or-later</span></div>
         <div class="tb-cell last-row"><span class="tb-label">Stack</span><span class="tb-value">IFC · Rust · OCCT · wx · LuaJIT · MCP</span></div>
         <div class="tb-cell last-row" style="grid-column: span 3"><span class="tb-label">By priority</span>
@@ -32612,10 +32612,12 @@ No IFC equivalent.
 <p><strong>Commands.</strong>
 - <code>rebar.sketch(host_id, plane, curves[], bar_type_id, style, hooks?) -&gt; rebar_id</code>
 - <code>rebar.constrain(rebar_id, handle_id, target_kind, target_ref, offset)</code>
-- <code>rebar.reset_constraints(rebar_id)</code></p>
+- <code>rebar.reset_constraints(rebar_id)</code>
+- <code>rebar.constraints(rebar_id) -&gt; {handles[], faces[]}</code></p>
 <p><strong>Acceptance criteria.</strong>
-- [ ] A longitudinal bar constrained to the top cover moves when the cover type changes from 40 to 50 mm.
-- [ ] A constraint to a face 10° away from parallel is refused, with an explanation.</p>
+- [x] A longitudinal bar constrained to the top cover moves when the cover type changes from 40 to 50 mm.
+- [x] A constraint to a face 10° away from parallel is refused, with an explanation.</p>
+<p><em>Built (2026-10-19):</em> <code>rebar.sketch</code> draws a bar's centreline as lines and arcs (<code>{line: {start, end}}</code>, <code>{arc: {start, end, through}}</code>, end to end) in a plane inside any concrete host, in the plane's coordinates; <code>plane</code> <code>{origin, x, normal}</code> defaults to the host's own (a floor's mid-depth, a wall's location line, a beam's or column's long section through its axis). The result is matched to a loaded shape (00 straight, 11 one 90° bend, 21 two 90° bends to one side, 51 a closed rectangle); anything else, and anything with an arc (tessellated into eight segments), becomes <strong>99</strong>, the special-shape code, added to the catalogue. Corners are bent at the bar type's standard or stirrup bend; segment dimensions are the corners' runs plus half a bar at each bend. <code>style</code> standard or stirrup_tie (role ligature); <code>hook_start</code>, <code>hook_end</code> turn square to the bar toward the host's middle. The set spreads along the plane's normal to the far face's cover by <code>layout</code> (a single bar by default). The corners are kept in world coordinates in the recipe (<code>placement: {kind: sketch, points, normal, style, hooks, constraints}</code>; the RXD <code>constraints</code> entries live there). Handles are <code>start</code>, <code>segment:N</code> and <code>end</code>. <code>rebar.constrain</code> keeps one to a host face's <strong>cover</strong> (the plane at the cover plus half a bar), a host <strong>surface</strong>, or another set's <strong>bar</strong> (its nearest segment), with an offset further in (default 0 from a cover, otherwise where the handle is, so it does not move); <code>target_kind: none</code> frees a handle. The faces are <code>top</code>, <code>bottom</code>, <code>left</code>, <code>right</code>, <code>start</code>, <code>end</code> for beams and columns, <code>exterior</code>, <code>interior</code>, <code>top</code>, <code>bottom</code>, <code>start</code>, <code>end</code> for straight walls, <code>top</code>, <code>bottom</code> and <code>edge:N</code> for floors; each takes its host's cover by kind. A reference more than 6° from parallel to a segment (or from square to an end, or another bar's direction) is refused (<code>rebar.not_parallel</code>, naming the angle). Constraints are solved each time the bars are worked out, by projecting each handle onto its plane in turn until they agree (a segment moves square to its plane, an end along its bar), so constrained handles follow host and cover changes and unconstrained ones keep their absolute positions; a bar-to-bar reference is followed one level deep, so two bars referencing each other settle. Changing or removing constraints keeps the handles where the old ones put them. <code>rebar.constraints</code> lists the handles (where, direction, constraint, reference plane) and the host's faces. Sketched sets are not propagated, and their segments are not set by hand (refused, naming why). Concrete › <strong>Sketch Rebar</strong> (bar type, style, hooks, layout; then click the corners in the host's plane, the first corner closing a link, or type them in Coordinates, XY); the set's tab › Constraints › <strong>Edit Constraints</strong> (each handle: Free, a face's cover, a face, or a bar of another set in the host, with its offset; while open the bar is drawn in the CONSTRAINT_BAR colour over the host and each reference as a line to its plane and a cross on it in CONSTRAINT_TARGET) and <strong>Reset Constraints</strong>. Not yet: stirrup-bend attachment at 45° increments, the in-view editable offset dimension and handle dragging, editing several sets together, cranked bars, theme-switchable colours (the two are named view colours), sketching in section views.</p>
 <h3 id="428-rebar-shapes-shape-codes-and-shape-matching">4.2.8 Rebar shapes, shape codes and shape matching</h3>
 <p><strong>ID:</strong> <code class="rid" id="STR-RBR-008">STR-RBR-008</code> · <strong>Priority:</strong> <span class="pri pri-p2">P2</span> · <strong>Ref:</strong> research/03 §3.2 ("Rebar shapes and shape codes")</p>
 <p><strong>Purpose.</strong> Reviera shall support a parametric family kind, the <strong>rebar shape family</strong>. It defines a bar's centreline and its dimensions, and a <strong>shape code</strong> that is used in tags, schedules and bending details.</p>
@@ -37800,6 +37802,13 @@ No IFC equivalent.
 <td>rebar_id</td>
 <td>—</td>
 <td>Yes</td>
+<td>STR-RBR-007</td>
+</tr>
+<tr>
+<td><code>rebar.constraints</code></td>
+<td>rebar_id</td>
+<td>{handles[], faces[]}</td>
+<td>No</td>
 <td>STR-RBR-007</td>
 </tr>
 <tr>
@@ -51807,7 +51816,7 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 </tbody>
 </table></div>
 <h2 id="a3-consolidated-command-index">A.3 Consolidated command index</h2>
-<p><strong>2125 unique commands</strong> in 412 domains. Every command is exposed automatically to the UI, to Lua (<code>reviera.&lt;domain&gt;.&lt;verb&gt;</code>) and to MCP (<code>&lt;domain&gt;_&lt;verb&gt;</code>), subject to its permission class.</p>
+<p><strong>2126 unique commands</strong> in 412 domains. Every command is exposed automatically to the UI, to Lua (<code>reviera.&lt;domain&gt;.&lt;verb&gt;</code>) and to MCP (<code>&lt;domain&gt;_&lt;verb&gt;</code>), subject to its permission class.</p>
 <div class="tbl"><table>
 <thead>
 <tr>
@@ -52926,7 +52935,7 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 </tr>
 <tr>
 <td><code>rebar</code></td>
-<td style="text-align: right;">24</td>
+<td style="text-align: right;">25</td>
 </tr>
 <tr>
 <td><code>rebar_bar_type</code></td>
@@ -63508,6 +63517,14 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 <td>rebar_id, handle_id, target_kind, target_ref, offset</td>
 <td>—</td>
 <td>Yes</td>
+<td>STR-RBR-007</td>
+</tr>
+<tr>
+<td><code>rebar.constraints</code></td>
+<td>4</td>
+<td>rebar_id</td>
+<td>{handles[], faces[]}</td>
+<td>No</td>
 <td>STR-RBR-007</td>
 </tr>
 <tr>

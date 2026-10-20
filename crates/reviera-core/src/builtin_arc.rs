@@ -127,6 +127,10 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(RebarResetBars),
         registry.add(RebarSplitSet),
         registry.add(RebarConvertToVarying),
+        registry.add(RebarSketch),
+        registry.add(RebarConstrain),
+        registry.add(RebarResetConstraints),
+        registry.add(RebarConstraints),
         registry.add(RebarConvertToStandard),
         registry.add(RebarPropagate),
         registry.add(RebarPickNewHost),
@@ -2735,6 +2739,18 @@ read_command!(
 );
 
 read_command!(
+    RebarConstraints,
+    "rebar.constraints",
+    "A sketched set's handles and constraints",
+    "A sketched set's handles (STR-RBR-007): `start`, `segment:N` and `end`, each with where it is, \
+     its direction, its constraint and where its reference plane is; and the host's faces a handle \
+     can reference.",
+    crate::rebar_sketch::ResetParams,
+    crate::rebar_sketch::ConstraintsInfo,
+    crate::rebar_sketch::constraints
+);
+
+read_command!(
     RebarCanHost,
     "rebar.can_host",
     "Whether an element can host rebar",
@@ -3245,6 +3261,50 @@ edit_command!(
     crate::rebar_edit::ResetParams,
     (),
     crate::rebar_edit::reset_bars
+);
+
+edit_command!(
+    RebarSketch,
+    "rebar.sketch",
+    "Sketch a rebar set",
+    "Sketches a bar's centreline in a plane inside a concrete host (STR-RBR-007): `curves` are lines \
+     `{line: {start, end}}` and arcs `{arc: {start, end, through}}` end to end, in the plane's \
+     coordinates (metres); `plane` `{origin, x, normal}` defaults to the host's own (a floor's or \
+     wall's middle, a beam's or column's long section through its axis). The shape is matched to \
+     00, 11, 21 or 51, else 99 (special); corners are bent at the bar type's bend diameter. \
+     `style` standard or stirrup_tie; `hook_start`, `hook_end` hook types. The set spreads along the \
+     plane's normal to the far face's cover by `layout` (a single bar by default). Returns the set.",
+    "Sketch Rebar",
+    crate::rebar_sketch::SketchParams,
+    ElementId,
+    crate::rebar_sketch::sketch
+);
+
+edit_command!(
+    RebarConstrain,
+    "rebar.constrain",
+    "Constrain a rebar handle",
+    "Constrains a sketched set's handle (STR-RBR-007): `handle_id` `segment:N`, `start` or `end`; \
+     `target_kind` cover (a host face's cover), surface (a host face) or bar (another set, \
+     `bar_index`), or none to remove it; `target_ref` the face (`top`, `bottom`, `left`, `right`, \
+     `start`, `end`, `exterior`, `interior`, `edge:N`) or the set; `offset` further in (metres; \
+     defaults to 0 from a cover, else where the handle is). The reference must be within 6° of \
+     parallel to a segment, or of square to an end. Constrained handles follow the host.",
+    "Constrain Rebar",
+    crate::rebar_sketch::ConstrainParams,
+    (),
+    crate::rebar_sketch::constrain
+);
+
+edit_command!(
+    RebarResetConstraints,
+    "rebar.reset_constraints",
+    "Remove a set's constraints",
+    "Removes a sketched set's constraints (STR-RBR-007); its handles stay where they are.",
+    "Reset Constraints",
+    crate::rebar_sketch::ResetParams,
+    (),
+    crate::rebar_sketch::reset_constraints
 );
 
 edit_command!(

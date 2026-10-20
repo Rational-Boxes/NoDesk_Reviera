@@ -377,6 +377,12 @@ fn ray_triangle(origin: Vec3, dir: Vec3, a: Vec3, b: Vec3, c: Vec3) -> Option<f3
 /// The selection highlight colour.
 pub const HIGHLIGHT: [f32; 4] = [0.15, 0.45, 0.95, 1.0];
 
+/// A bar whose constraints are being edited (STR-RBR-007).
+pub const CONSTRAINT_BAR: [f32; 4] = [0.95, 0.45, 0.05, 1.0];
+
+/// A constrained handle's reference.
+pub const CONSTRAINT_TARGET: [f32; 4] = [0.1, 0.65, 0.3, 1.0];
+
 /// `rrggbb` or `rrggbbaa` as RGBA 0–1.
 fn parse_hex(hex: &str) -> Option<[f32; 4]> {
     let b = |i: usize| {

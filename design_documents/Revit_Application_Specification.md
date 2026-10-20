@@ -16104,10 +16104,13 @@ No IFC equivalent.
 - `rebar.sketch(host_id, plane, curves[], bar_type_id, style, hooks?) -> rebar_id`
 - `rebar.constrain(rebar_id, handle_id, target_kind, target_ref, offset)`
 - `rebar.reset_constraints(rebar_id)`
+- `rebar.constraints(rebar_id) -> {handles[], faces[]}`
 
 **Acceptance criteria.**
-- [ ] A longitudinal bar constrained to the top cover moves when the cover type changes from 40 to 50 mm.
-- [ ] A constraint to a face 10° away from parallel is refused, with an explanation.
+- [x] A longitudinal bar constrained to the top cover moves when the cover type changes from 40 to 50 mm.
+- [x] A constraint to a face 10° away from parallel is refused, with an explanation.
+
+*Built (2026-10-19):* `rebar.sketch` draws a bar's centreline as lines and arcs (`{line: {start, end}}`, `{arc: {start, end, through}}`, end to end) in a plane inside any concrete host, in the plane's coordinates; `plane` `{origin, x, normal}` defaults to the host's own (a floor's mid-depth, a wall's location line, a beam's or column's long section through its axis). The result is matched to a loaded shape (00 straight, 11 one 90° bend, 21 two 90° bends to one side, 51 a closed rectangle); anything else, and anything with an arc (tessellated into eight segments), becomes **99**, the special-shape code, added to the catalogue. Corners are bent at the bar type's standard or stirrup bend; segment dimensions are the corners' runs plus half a bar at each bend. `style` standard or stirrup_tie (role ligature); `hook_start`, `hook_end` turn square to the bar toward the host's middle. The set spreads along the plane's normal to the far face's cover by `layout` (a single bar by default). The corners are kept in world coordinates in the recipe (`placement: {kind: sketch, points, normal, style, hooks, constraints}`; the RXD `constraints` entries live there). Handles are `start`, `segment:N` and `end`. `rebar.constrain` keeps one to a host face's **cover** (the plane at the cover plus half a bar), a host **surface**, or another set's **bar** (its nearest segment), with an offset further in (default 0 from a cover, otherwise where the handle is, so it does not move); `target_kind: none` frees a handle. The faces are `top`, `bottom`, `left`, `right`, `start`, `end` for beams and columns, `exterior`, `interior`, `top`, `bottom`, `start`, `end` for straight walls, `top`, `bottom` and `edge:N` for floors; each takes its host's cover by kind. A reference more than 6° from parallel to a segment (or from square to an end, or another bar's direction) is refused (`rebar.not_parallel`, naming the angle). Constraints are solved each time the bars are worked out, by projecting each handle onto its plane in turn until they agree (a segment moves square to its plane, an end along its bar), so constrained handles follow host and cover changes and unconstrained ones keep their absolute positions; a bar-to-bar reference is followed one level deep, so two bars referencing each other settle. Changing or removing constraints keeps the handles where the old ones put them. `rebar.constraints` lists the handles (where, direction, constraint, reference plane) and the host's faces. Sketched sets are not propagated, and their segments are not set by hand (refused, naming why). Concrete › **Sketch Rebar** (bar type, style, hooks, layout; then click the corners in the host's plane, the first corner closing a link, or type them in Coordinates, XY); the set's tab › Constraints › **Edit Constraints** (each handle: Free, a face's cover, a face, or a bar of another set in the host, with its offset; while open the bar is drawn in the CONSTRAINT_BAR colour over the host and each reference as a line to its plane and a cross on it in CONSTRAINT_TARGET) and **Reset Constraints**. Not yet: stirrup-bend attachment at 45° increments, the in-view editable offset dimension and handle dragging, editing several sets together, cranked bars, theme-switchable colours (the two are named view colours), sketching in section views.
 
 ### 4.2.8 Rebar shapes, shape codes and shape matching
 **ID:** STR-RBR-008 · **Priority:** P2 · **Ref:** research/03 §3.2 ("Rebar shapes and shape codes")
@@ -20732,6 +20735,7 @@ Every command below is registered once in the command registry and is exposed au
 | `rebar.sketch` | host_id, plane, curves[], bar_type_id, style, hooks? | rebar_id | Yes | STR-RBR-007 |
 | `rebar.constrain` | rebar_id, handle_id, target_kind, target_ref, offset | — | Yes | STR-RBR-007 |
 | `rebar.reset_constraints` | rebar_id | — | Yes | STR-RBR-007 |
+| `rebar.constraints` | rebar_id | {handles[], faces[]} | No | STR-RBR-007 |
 | `rebar_shape.create_from_sketch` | curves[], params, code? | shape_id | Yes | STR-RBR-008 |
 | `rebar_shape.match` | rebar_id | shape_id \| null | No | STR-RBR-008 |
 | `rebar_shape.check` | shape_id | issues[] | No | STR-RBR-008 |
@@ -27460,7 +27464,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**2125 unique commands** in 412 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**2126 unique commands** in 412 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -27741,7 +27745,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `railing` | 12 |
 | `railingtype` | 5 |
 | `ramp` | 2 |
-| `rebar` | 24 |
+| `rebar` | 25 |
 | `rebar_bar_type` | 1 |
 | `rebar_coupler` | 1 |
 | `rebar_cover` | 1 |
@@ -29133,6 +29137,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `rebar.add_crank` | 4 | rebar_id, segment, position, length, offset, angle | — | Yes | STR-RBR-009 |
 | `rebar.can_host` | 4 | element_id | bool | No | STR-RBR-001 |
 | `rebar.constrain` | 4 | rebar_id, handle_id, target_kind, target_ref, offset | — | Yes | STR-RBR-007 |
+| `rebar.constraints` | 4 | rebar_id | {handles[], faces[]} | No | STR-RBR-007 |
 | `rebar.convert_to_standard` | 4 | rebar_ids | — | Yes | STR-RBR-005 |
 | `rebar.convert_to_varying` | 4 | rebar_ids | — | Yes | STR-RBR-005 |
 | `rebar.distribute_along_path` | 4 | main_rebar_id, edge_refs[], range? | rebar_id | Yes | STR-RBR-014 |

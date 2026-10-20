@@ -19,14 +19,14 @@ use super::rebar_ui::row;
 use super::{Gui, error};
 
 /// A dialog of labelled fields.
-struct Form {
-    dialog: Dialog,
+pub(crate) struct Form {
+    pub(crate) dialog: Dialog,
     sizer: BoxSizer,
     grid: FlexGridSizer,
 }
 
 impl Form {
-    fn new(frame: &Frame, title: &str) -> Self {
+    pub(crate) fn new(frame: &Frame, title: &str) -> Self {
         let dialog = Dialog::builder(frame, title).with_style(DialogStyle::DefaultDialogStyle).build();
         let sizer = BoxSizer::builder(Orientation::Vertical).build();
         let grid = FlexGridSizer::builder(0, 2).with_vgap(6).with_hgap(10).build();
@@ -34,7 +34,7 @@ impl Form {
         Form { dialog, sizer, grid }
     }
 
-    fn text(&self, label: &str, value: &str, tip: &str) -> TextCtrl {
+    pub(crate) fn text(&self, label: &str, value: &str, tip: &str) -> TextCtrl {
         row(&self.dialog, &self.grid, label);
         let t = TextCtrl::builder(&self.dialog).with_value(value).build();
         if !tip.is_empty() {
@@ -45,7 +45,7 @@ impl Form {
         t
     }
 
-    fn choice(&self, label: &str, items: &[String], selected: usize) -> Choice {
+    pub(crate) fn choice(&self, label: &str, items: &[String], selected: usize) -> Choice {
         row(&self.dialog, &self.grid, label);
         let c = Choice::builder(&self.dialog).with_choices(items.to_vec()).build();
         c.set_selection(selected.min(items.len().saturating_sub(1)) as u32);
@@ -53,7 +53,7 @@ impl Form {
         c
     }
 
-    fn check(&self, label: &str, text: &str, value: bool) -> CheckBox {
+    pub(crate) fn check(&self, label: &str, text: &str, value: bool) -> CheckBox {
         row(&self.dialog, &self.grid, label);
         let c = CheckBox::builder(&self.dialog).with_label(text).build();
         c.set_value(value);
@@ -62,7 +62,7 @@ impl Form {
     }
 
     /// Shows the form; `true` when accepted (destroy the dialog after reading it).
-    fn show(&self, note: &str, ok_label: &str) -> bool {
+    pub(crate) fn show(&self, note: &str, ok_label: &str) -> bool {
         self.sizer.add_sizer(&self.grid, 1, SizerFlag::All | SizerFlag::Expand, 12);
         if !note.is_empty() {
             let n = StaticText::builder(&self.dialog).with_label(note).build();
@@ -102,6 +102,8 @@ pub enum SketchWhat {
     Path,
     FabricArea,
     FabricSheet,
+    /// A bar's centreline (STR-RBR-007).
+    Bar,
 }
 
 /// A boundary, path or sheet placement sketched on a floor's or wall's plane (the same
@@ -241,6 +243,69 @@ impl Gui {
         }
         let r = self.run("area_reinforcement.create", args);
         self.placed("Area reinforcement", r);
+    }
+
+    /// Concrete › Reinforcement › Sketch Rebar (STR-RBR-007): the bar's options, then its
+    /// corners in the host's plane.
+    pub(crate) fn sketch_rebar(&mut self) {
+        let frame = self.frame;
+        let Some(&(host, kind)) = self.rebar_hosts().first() else {
+            return frame.set_status_text("Sketch Rebar: select a concrete column, beam, structural floor or wall first", 0);
+        };
+        let Some(store) = self.store_now() else { return };
+        let Some(e) = store.get(host) else { return };
+        let outline = match kind {
+            HostKind::Floor | HostKind::Wall => reviera_core::rebar_systems::outline(&store, e).unwrap_or_default(),
+            HostKind::Beam | HostKind::Column => {
+                // The long section through the axis: along and up for a beam, across and up for a
+                // column, from the host's own plane.
+                let plane = reviera_core::rebar_sketch::host_plane(&store, e);
+                let corners: Vec<[f64; 2]> = reviera_core::rebar_sketch::host_faces(&store, e, kind)
+                    .unwrap_or_default()
+                    .iter()
+                    .filter_map(|f| plane.map(|p| p.to_local(f.point)))
+                    .collect();
+                let (lo, hi) = corners.iter().fold(([f64::INFINITY; 2], [f64::NEG_INFINITY; 2]), |(l, h), q| ([l[0].min(q[0]), l[1].min(q[1])], [h[0].max(q[0]), h[1].max(q[1])]));
+                if corners.is_empty() { Vec::new() } else { vec![lo, [hi[0], lo[1]], hi, [lo[0], hi[1]]] }
+            }
+        };
+        let (bar_ids, bar_names) = self.bar_list();
+        let hooks = self.run("rebar_hook_type.list", json!({})).unwrap_or_default();
+        let hook_ids: Vec<String> = hooks.as_array().into_iter().flatten().filter_map(|h| h["id"].as_str().map(str::to_owned)).collect();
+        let mut hook_names = vec!["None".to_owned()];
+        hook_names.extend(hooks.as_array().into_iter().flatten().filter_map(|h| h["name"].as_str().map(str::to_owned)));
+        let f = Form::new(&frame, "Sketch Rebar");
+        let bar = f.choice("Bar type", &bar_names, 3);
+        let style = f.choice("Style", &["Standard".into(), "Stirrup or tie".into()], 0);
+        let hook_start = f.choice("Start hook", &hook_names, 0);
+        let hook_end = f.choice("End hook", &hook_names, 0);
+        let rule = f.choice("Layout", &["Single".into(), "Fixed number".into(), "Maximum spacing".into()], 0);
+        let amount = f.text("Number or spacing (mm)", "3", "The set spreads square to the sketch plane, to the far face's cover");
+        if !f.show("Then click the bar's corners in the host's plane; it is matched to a shape code (or 99, special)", "Sketch") {
+            f.dialog.destroy();
+            return;
+        }
+        let hook = |c: &Choice| at(c).checked_sub(1).and_then(|i| hook_ids.get(i).cloned());
+        let v = amount.get_value().trim().parse::<f64>().unwrap_or(0.0);
+        let layout = match at(&rule) {
+            1 => json!({ "rule": "fixed_number", "n": v.round().max(1.0) as usize }),
+            2 => json!({ "rule": "maximum_spacing", "spacing": v / 1000.0 }),
+            _ => json!({ "rule": "single" }),
+        };
+        let mut args = json!({
+            "host_id": host,
+            "bar_type": bar_ids.get(at(&bar)).cloned().unwrap_or_default(),
+            "style": if at(&style) == 1 { "stirrup_tie" } else { "standard" },
+            "layout": layout,
+        });
+        if let Some(h) = hook(&hook_start) {
+            args["hook_start"] = json!(h);
+        }
+        if let Some(h) = hook(&hook_end) {
+            args["hook_end"] = json!(h);
+        }
+        f.dialog.destroy();
+        self.start_rebar_sketch(SketchWhat::Bar, host, outline, args);
     }
 
     /// Concrete › Reinforcement › Path.
@@ -511,11 +576,18 @@ impl Gui {
     fn start_rebar_sketch(&mut self, what: SketchWhat, host: ElementId, outline: Vec<[f64; 2]>, args: Value) {
         let frame = self.frame;
         let Some(store) = self.store_now() else { return };
-        let Some(plane) = store.get(host).and_then(|e| reviera_core::rebar_systems::sketch_plane(&store, e)) else {
+        let plane = store.get(host).and_then(|e| {
+            if what == SketchWhat::Bar { reviera_core::rebar_sketch::host_plane(&store, e) } else { reviera_core::rebar_systems::sketch_plane(&store, e) }
+        });
+        let Some(plane) = plane else {
             return frame.set_status_text("The host's plane cannot be worked out", 0);
         };
         if !plane.is_horizontal() && self.active_view().is_some_and(|v| v.plan.is_some()) {
-            frame.set_status_text("A wall's face is sketched in a 3D view; the Coordinates dialog (XY) works anywhere", 0);
+            frame.set_status_text(if what == SketchWhat::Bar {
+                "This host's plane is upright: sketch in a 3D view; the Coordinates dialog (XY) works anywhere"
+            } else {
+"A wall's face is sketched in a 3D view; the Coordinates dialog (XY) works anywhere"
+            }, 0);
         }
         let sheet = (what == SketchWhat::FabricSheet)
             .then(|| {
@@ -567,6 +639,9 @@ impl Gui {
             ),
             SketchWhat::FabricSheet if n == 0 => "Fabric Sheet: click the sheet's first corner (XY types it)".to_owned(),
             SketchWhat::FabricSheet => "Fabric Sheet: click a point along its length, or Enter for the plane's x direction".to_owned(),
+            SketchWhat::Bar => format!(
+                "Sketch Rebar: {n} corner(s); click the bar's corners, Enter finishes, the first corner closes a link; Backspace undoes, XY types coordinates"
+            ),
         };
         self.frame.set_status_text(&text, 0);
     }
@@ -634,8 +709,10 @@ impl Gui {
         if t.closed() && !t.rectangle && t.points.len() >= 3 && t.points[0] == p && crate::coords::typed().is_none() {
             return self.finish_rebar_sketch();
         }
+        // A click on the first corner closes a link.
+        let closes = t.what == SketchWhat::Bar && t.points.len() >= 3 && t.points[0] == p;
         t.points.push(p);
-        let done = (t.rectangle && t.points.len() == 2) || (t.what == SketchWhat::FabricSheet && t.points.len() == 2);
+        let done = closes || (t.rectangle && t.points.len() == 2) || (t.what == SketchWhat::FabricSheet && t.points.len() == 2);
         if done {
             return self.finish_rebar_sketch();
         }
@@ -704,6 +781,13 @@ impl Gui {
                 args["point"] = json!(a);
                 args["rotation"] = json!(pts.get(1).map_or(0.0, |b| (b[1] - a[1]).atan2(b[0] - a[0]).to_degrees()));
                 ("fabric_sheet.place", "Fabric sheet")
+            }
+            SketchWhat::Bar => {
+                if pts.len() < 2 {
+                    return frame.set_status_text("A bar needs at least two corners", 0);
+                }
+                args["curves"] = json!(pts.windows(2).map(|w| json!({ "line": { "start": w[0], "end": w[1] } })).collect::<Vec<_>>());
+                ("rebar.sketch", "Sketched rebar")
             }
         };
         match self.run(command, args) {

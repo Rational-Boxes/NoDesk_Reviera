@@ -6,6 +6,7 @@
     { "code": "00", "name": "Straight", "dimensions": ["A"], "style": "standard", "bends": 0 },
     { "code": "11", "name": "L bar (one 90° bend)", "dimensions": ["A", "B"], "style": "standard", "bends": 1 },
     { "code": "21", "name": "U bar (two 90° bends)", "dimensions": ["A", "B", "C"], "style": "standard", "bends": 2 },
-    { "code": "51", "name": "Closed link with 135° hooks", "dimensions": ["A", "B", "C", "D"], "style": "stirrup_tie", "bends": 5 }
+    { "code": "51", "name": "Closed link with 135° hooks", "dimensions": ["A", "B", "C", "D"], "style": "stirrup_tie", "bends": 5 },
+    { "code": "99", "name": "Special shape (sketched)", "dimensions": [], "style": "standard", "bends": 0 }
   ]
 }

@@ -1524,6 +1524,24 @@ icon = "rebar_move_bar"
 help = "Click a bar of the selected set, then give how far to move it along the set"
 
 [[action]]
+id = "rebar.sketch"
+label = "Sketch Rebar"
+icon = "rebar_sketch"
+help = "Sketch a bar's centreline in the selected host's plane: click its corners (XY types them); the shape is matched to a shape code"
+
+[[action]]
+id = "rebar.constrain"
+label = "Edit Constraints"
+icon = "rebar_constraints"
+help = "Keep each handle of the selected sketched set to a host face's cover, a face or another bar, with an offset; constrained handles follow the host"
+
+[[action]]
+id = "rebar.reset_constraints"
+label = "Reset Constraints"
+icon = "rebar_reset"
+help = "Remove the selected sketched set's constraints; the bar stays where it is"
+
+[[action]]
 id = "rebar.convert_to_varying"
 label = "Convert to Varying"
 icon = "rebar_varying"
@@ -2282,6 +2300,7 @@ tools = [{ action = "tool.modify", size = "large" }]
 label = "Reinforcement"
 tools = [
   { action = "rebar.place", size = "large" },
+  { action = "rebar.sketch", size = "large" },
   { action = "area_reinforcement.create", size = "large" },
   { action = "path_reinforcement.create", size = "large" },
   { action = "fabric_area.create", size = "large" },
@@ -2622,6 +2641,10 @@ panels = [
   { label = "Set Type", tools = [
     { action = "rebar.convert_to_varying", size = "small" },
     { action = "rebar.convert_to_standard", size = "small" },
+  ] },
+  { label = "Constraints", tools = [
+    { action = "rebar.constrain", size = "large" },
+    { action = "rebar.reset_constraints", size = "small" },
   ] },
   { label = "Annotate", tools = [
     { action = "rebar_tag.place", size = "large" },

@@ -243,7 +243,7 @@ fn shape(code: &str) -> Result<Shape> {
         .shapes
         .into_iter()
         .find(|s| s.code == code)
-        .ok_or_else(|| Error::new("rebar.shape", format!("no shape {code} (00, 11, 21, 51)")))
+        .ok_or_else(|| Error::new("rebar.shape", format!("no shape {code} (00, 11, 21, 51, 99)")))
 }
 
 // ---- Settings ----
@@ -899,6 +899,9 @@ pub enum Placement {
     /// Straight bars through a wall's thickness, between its exterior and interior covers, at
     /// `along` metres from the wall's start, spread up the wall (STR-RBR-005).
     Through { along: f64 },
+    /// A bar sketched in a plane inside the host, spread along the plane's normal, its handles
+    /// constrained to the host or other bars (STR-RBR-007).
+    Sketch(crate::rebar_sketch::SketchPlacement),
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
@@ -1406,6 +1409,7 @@ fn base_geometry(store: &Store, r: &RebarRecipe) -> Result<SetGeometry> {
             let longest = bars.iter().map(Bar::length).fold(0.0, f64::max);
             Ok(SetGeometry { bars, dimensions: vec![("A".into(), longest)], role: "main".into(), array_length: spread, indices: Vec::new() })
         }
+        (Placement::Sketch(s), _) => crate::rebar_sketch::geometry(store, r, host, kind, &bt, s),
         (Placement::Through { along }, HostKind::Wall) => {
             if sh.code != "00" {
                 return Err(Error::new("rebar.shape", "bars through a wall take shape 00 (straight)"));

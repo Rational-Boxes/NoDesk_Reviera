@@ -214,8 +214,14 @@ impl Gui {
             }
             Target::Rebar => {
                 let pts = self.rebar_sketch.as_ref().map(|t| t.points.clone()).unwrap_or_default();
+                let bar = self.rebar_sketch.as_ref().is_some_and(|t| t.what == super::reinforcement_ui::SketchWhat::Bar);
                 let lines: Vec<String> = pts.into_iter().map(|p| self.show_point(p)).collect();
-                ("Reinforcement Sketch", "In the host's plane: plan x, y for floors; along the wall and up from its base for walls. One point per line.", lines.join("\n"), Some("Finish"))
+                let about = if bar {
+                    "The bar's corners in the host's plane, one per line: plan x, y for floors (at mid-depth); along the wall and up from its base for walls (on its location line); along a beam and up from its axis; across a column and up from its base."
+                } else {
+                    "In the host's plane: plan x, y for floors; along the wall and up from its base for walls. One point per line."
+                };
+                ("Reinforcement Sketch", about, lines.join("\n"), Some("Finish"))
             }
             Target::Plate => {
                 let pts = match &self.steel_tool {

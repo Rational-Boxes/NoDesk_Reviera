@@ -302,6 +302,8 @@ struct Gui {
     bar_pick: Option<rebar_view_ui::BarPick>,
     /// A rebar annotation waiting for its point (STR-RBR-018): the tool, the sets and the plan.
     rebar_anno: Option<(rebar_view_ui::AnnoTool, Vec<ElementId>, ElementId)>,
+    /// A sketched set's bar and references while Edit Constraints is open (STR-RBR-007).
+    constraint_lines: Vec<reviera_render::plan::Lines>,
     /// Propagate or Pick New Host in progress (STR-RBR-006).
     rebar_host_pick: Option<rebar_edit_ui::HostPick>,
     /// Coupler in progress (STR-RBR-015).
@@ -3544,6 +3546,7 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 rebar_sketch: None,
                 bar_pick: None,
                 rebar_anno: None,
+                constraint_lines: Vec::new(),
                 rebar_host_pick: None,
                 end_pick: None,
                 contour_target: None,
@@ -4554,6 +4557,9 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "rebar.move_bar_in_set" => with(gui, |g| g.start_bar_edit(rebar_view_ui::BarPurpose::Move)),
         "rebar.reset_bars" => with(gui, Gui::reset_rebar_bars),
         "rebar.convert_to_varying" => with(gui, |g| g.convert_rebar_sets(true)),
+        "rebar.sketch" => with(gui, Gui::sketch_rebar),
+        "rebar.constrain" => with(gui, Gui::edit_rebar_constraints),
+        "rebar.reset_constraints" => with(gui, Gui::reset_rebar_constraints),
         "rebar.convert_to_standard" => with(gui, |g| g.convert_rebar_sets(false)),
         "rebar.propagate" => with(gui, |g| g.start_rebar_host_pick(true)),
         "rebar.pick_new_host" => with(gui, |g| g.start_rebar_host_pick(false)),
