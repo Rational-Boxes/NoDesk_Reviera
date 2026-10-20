@@ -36,6 +36,8 @@ fn placements(kind: HostKind) -> Vec<(&'static str, Value, &'static [&'static st
             ("Interior face, horizontal", json!({ "kind": "layer", "face": "interior", "vertical": false }), &["00"]),
             ("Through the wall, spread up it", json!({ "kind": "through", "along": 0.0 }), &["00"]),
         ],
+        // Roofs take free-form distributions (Free Form Rebar).
+        HostKind::Roof => Vec::new(),
     }
 }
 
@@ -100,6 +102,9 @@ impl Gui {
         };
         let hosts: Vec<ElementId> = hosts.iter().filter(|h| h.1 == kind).map(|h| h.0).collect();
         let options = placements(kind);
+        if options.is_empty() {
+            return frame.set_status_text("Rebar: a roof takes Free Form Rebar (Concrete › Reinforcement)", 0);
+        }
         let bars = self.run("rebar_bar_type.list", json!({})).unwrap_or_default();
         let bar_ids: Vec<String> = bars.as_array().into_iter().flatten().filter_map(|b| b["id"].as_str().map(str::to_owned)).collect();
         let bar_names: Vec<String> = bars.as_array().into_iter().flatten().filter_map(|b| b["name"].as_str().map(str::to_owned)).collect();

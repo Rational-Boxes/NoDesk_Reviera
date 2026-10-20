@@ -1530,6 +1530,12 @@ icon = "rebar_sketch"
 help = "Sketch a bar's centreline in the selected host's plane: click its corners (XY types them); the shape is matched to a shape code"
 
 [[action]]
+id = "rebar.place_free_form"
+label = "Free Form"
+icon = "rebar_free_form"
+help = "Bars over a concrete roof's shell between two planes at the cover, or closed links square to a member's path following its section"
+
+[[action]]
 id = "rebar.constrain"
 label = "Edit Constraints"
 icon = "rebar_constraints"
@@ -2301,6 +2307,7 @@ label = "Reinforcement"
 tools = [
   { action = "rebar.place", size = "large" },
   { action = "rebar.sketch", size = "large" },
+  { action = "rebar.place_free_form", size = "large" },
   { action = "area_reinforcement.create", size = "large" },
   { action = "path_reinforcement.create", size = "large" },
   { action = "fabric_area.create", size = "large" },

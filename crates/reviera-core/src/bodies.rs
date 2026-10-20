@@ -121,9 +121,24 @@ pub fn extrude_between(
     (positions, indices)
 }
 
+thread_local! {
+    /// Bodies are being worked out for a host's shape, without reinforcement (whose own shape
+    /// may come from its host's body, STR-RBR-013).
+    static WITHOUT_REINFORCEMENT: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// The bodies of every element except reinforcement.
+pub fn all_but_reinforcement(store: &Store) -> Vec<Body> {
+    let was = WITHOUT_REINFORCEMENT.with(|c| c.replace(true));
+    let out = all(store);
+    WITHOUT_REINFORCEMENT.with(|c| c.set(was));
+    out
+}
+
 /// The bodies of every Reviera element that regenerates, in a stable order (walls, decks,
 /// floors and ceilings, roofs, railings, gates, stairs, doors and windows).
 pub fn all(store: &Store) -> Vec<Body> {
+    let reinforcement = !WITHOUT_REINFORCEMENT.with(std::cell::Cell::get);
     let mut out: Vec<Body> = Vec::new();
     let mut push = |element: ElementId, class: &str, mesh: Mesh, plan_hidden: bool| {
         if mesh.1.is_empty() {
@@ -387,6 +402,8 @@ pub fn all(store: &Store) -> Vec<Body> {
             push(e.id(), "IfcPlate", crate::steel_detail::plate_mesh(store, &r), false);
         } else if let Some(r) = crate::steel_detail::weld_recipe(e) {
             push(e.id(), "IfcFastener", crate::steel_detail::weld_mesh(&r), false);
+        } else if !reinforcement {
+            continue;
         } else if let Some(m) = crate::rebar::mesh(store, e) {
             // Reinforcement (STR-RBR-004).
             push(e.id(), "IfcReinforcingBar", m, false);

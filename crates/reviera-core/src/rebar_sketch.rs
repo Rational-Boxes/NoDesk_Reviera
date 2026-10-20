@@ -124,6 +124,7 @@ pub fn host_faces(store: &Store, host: &Element, kind: HostKind) -> Result<Vec<F
             }
             Ok(out)
         }
+        HostKind::Roof => Err(Error::new("rebar.curved", "a roof's faces are not planes here: use a free-form distribution")),
         HostKind::Wall => {
             let w = crate::walls::wall_recipe(host).ok_or_else(|| Error::new("rebar.no_host", "the host is not a Reviera wall"))?;
             if !w.through.is_empty() {
@@ -144,6 +145,11 @@ pub fn host_faces(store: &Store, host: &Element, kind: HostKind) -> Result<Vec<F
             ])
         }
     }
+}
+
+/// The cover face a host face takes.
+pub fn face_cover(f: &Face) -> &'static str {
+    f.cover
 }
 
 fn find_face<'a>(faces: &'a [Face], name: &str) -> Result<&'a Face> {
@@ -177,6 +183,7 @@ pub fn host_plane(store: &Store, host: &Element) -> Option<crate::work_planes::P
             let f = crate::steel_detail::member_frame(store, host)?;
             Plane::new(f.start, f.across, cross(f.across, f.axis)).ok()
         }
+        HostKind::Roof => None,
     }
 }
 

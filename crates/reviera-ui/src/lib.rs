@@ -4558,6 +4558,7 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "rebar.reset_bars" => with(gui, Gui::reset_rebar_bars),
         "rebar.convert_to_varying" => with(gui, |g| g.convert_rebar_sets(true)),
         "rebar.sketch" => with(gui, Gui::sketch_rebar),
+        "rebar.place_free_form" => with(gui, Gui::place_free_form_rebar),
         "rebar.constrain" => with(gui, Gui::edit_rebar_constraints),
         "rebar.reset_constraints" => with(gui, Gui::reset_rebar_constraints),
         "rebar.convert_to_standard" => with(gui, |g| g.convert_rebar_sets(false)),

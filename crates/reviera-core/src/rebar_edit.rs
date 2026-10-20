@@ -69,8 +69,8 @@ pub struct SegmentParams {
 pub(crate) fn set_segment_length(txn: &mut crate::txn::Transaction<'_>, p: SegmentParams) -> Result<()> {
     let store = txn.store().clone();
     let (id, mut rec) = set_of(&store, &p.rebar_id)?;
-    if matches!(rec.placement, rebar::Placement::Sketch(_)) {
-        return Err(Error::new("rebar.segment", "a sketched bar's segments follow its sketch and constraints; edit those instead"));
+    if matches!(rec.placement, rebar::Placement::Sketch(_) | rebar::Placement::FreeForm(_)) {
+        return Err(Error::new("rebar.segment", "a sketched or free-form bar's segments follow its sketch and constraints; edit those instead"));
     }
     let s = rebar::settings(&store);
     match p.length {
@@ -228,8 +228,8 @@ pub(crate) fn propagate(txn: &mut crate::txn::Transaction<'_>, p: PropagateParam
                 out.failed.push((hid, format!("set {sid} is in a different kind of host")));
                 continue;
             }
-            if matches!(rec.placement, rebar::Placement::Sketch(_)) {
-                out.failed.push((hid, format!("set {sid} is sketched; sketched sets are not propagated yet")));
+            if matches!(rec.placement, rebar::Placement::Sketch(_) | rebar::Placement::FreeForm(_)) {
+                out.failed.push((hid, format!("set {sid} is sketched or free-form; those sets are not propagated yet")));
                 continue;
             }
             let mut copy = RebarRecipe { host: host.guid().to_string(), splice: None, ..rec.clone() };
@@ -240,7 +240,7 @@ pub(crate) fn propagate(txn: &mut crate::txn::Transaction<'_>, p: PropagateParam
                 match &mut copy.placement {
                     rebar::Placement::Face { face } => *face = f.clone(),
                     rebar::Placement::Layer { face, .. } => *face = f.clone(),
-                    rebar::Placement::Section | rebar::Placement::Through { .. } | rebar::Placement::Sketch(_) => {}
+                    rebar::Placement::Section | rebar::Placement::Through { .. } | rebar::Placement::Sketch(_) | rebar::Placement::FreeForm(_) => {}
                 }
             }
             match rebar::geometry(&store, &copy) {

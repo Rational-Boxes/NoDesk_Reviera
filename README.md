@@ -724,6 +724,10 @@ tools and the datums.
   when the host or cover changes; Edit Constraints draws the bar and its references
   (`rebar.sketch`, `rebar.constrain`, `rebar.reset_constraints`, `rebar.constraints`;
   STR-RBR-007). Not yet: stirrup attachment, dragging handles, cranked bars.
+  Free-form rebar: bars following a concrete dome's or vault's shell at the cover between two
+  planes, and closed links square to a member's path that follow a varying section, such as up
+  a tapered wall (`rebar.place_free_form`; STR-RBR-013). Not yet: picking faces and path edges
+  in the view, tapered beams, B-spline centrelines.
   Rebar documentation: a Rebar Tag (number and "15 Ø12 @ 150"), multi-rebar annotations across
   parallel sets, bending details with segment values, and a Bar Bending Schedule grouped by
   partition and number with mass from nominal kg/m (`rebar_tag.place`,

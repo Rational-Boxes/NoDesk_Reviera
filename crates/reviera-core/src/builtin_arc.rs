@@ -128,6 +128,7 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(RebarSplitSet),
         registry.add(RebarConvertToVarying),
         registry.add(RebarSketch),
+        registry.add(RebarPlaceFreeForm),
         registry.add(RebarConstrain),
         registry.add(RebarResetConstraints),
         registry.add(RebarConstraints),
@@ -3278,6 +3279,24 @@ edit_command!(
     crate::rebar_sketch::SketchParams,
     ElementId,
     crate::rebar_sketch::sketch
+);
+
+edit_command!(
+    RebarPlaceFreeForm,
+    "rebar.place_free_form",
+    "Place free-form rebar",
+    "Places a free-form set (STR-RBR-013). `kind` surface: bars on a concrete roof's shell (dome, \
+     vault or pitched), at the `face` bottom or top cover, where planes interpolated from \
+     `start_plane` to `end_plane` ({origin, normal}) cut it (or `direction` x or y: planes square \
+     to it across the roof), trimmed by the edge cover. `kind` aligned: closed links with 135° \
+     hooks where planes square to a `path` (points, or `path_ref` axis for beams and columns, \
+     along or up for walls) cut the host's body, each side inset by its own face's cover, so links \
+     follow a varying section. `layout` spaces the bars between the planes or along the path. \
+     Free-form sets are varying: each rounded length takes its own number. Returns the set.",
+    "Free Form Rebar",
+    crate::rebar_free::PlaceParams,
+    ElementId,
+    crate::rebar_free::place
 );
 
 edit_command!(

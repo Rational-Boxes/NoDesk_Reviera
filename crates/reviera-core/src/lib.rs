@@ -79,6 +79,7 @@ pub mod steel_detail;
 pub mod rebar;
 pub mod rebar_docs;
 pub mod rebar_edit;
+pub mod rebar_free;
 pub mod rebar_sketch;
 pub mod rebar_numbers;
 pub mod rebar_systems;

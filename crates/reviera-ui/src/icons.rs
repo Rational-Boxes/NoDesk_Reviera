@@ -619,6 +619,9 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "rebar_reset" => format!(
             r#"<path d="M8 8v16M14 8v16M20 8v16" {sa}/><path d="M24 10a7 7 0 1 1-2-4M24 4v4h-4" fill="none" {s}/>"#
         ),
+        "rebar_free_form" => format!(
+            r#"<path d="M3 26C6 10 26 10 29 26" fill="none" {s}/><path d="M7 25C10 14 22 14 25 25M11 25c2-6 8-6 10 0" fill="none" {sa}/>"#
+        ),
         "rebar_sketch" => format!(
             r#"<rect x="3" y="7" width="26" height="18" fill="{f}" {s}/><path d="M7 21V12l3-2h12l3 2v9" fill="none" {sa}/><path d="M20 28l7-7 2 2-7 7z" fill="{a}"/>"#
         ),

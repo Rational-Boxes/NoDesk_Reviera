@@ -593,6 +593,8 @@ pub enum HostKind {
     Beam,
     Floor,
     Wall,
+    /// A concrete roof: a shell, dome or vault (STR-RBR-013).
+    Roof,
 }
 
 /// What kind of host an element would be (whatever its material).
@@ -606,6 +608,8 @@ pub(crate) fn host_kind(store: &Store, e: &Element) -> Option<HostKind> {
         Some(HostKind::Floor)
     } else if crate::walls::wall_recipe(e).is_some() {
         Some(HostKind::Wall)
+    } else if crate::roofs::roof_recipe(e).is_some() {
+        Some(HostKind::Roof)
     } else {
         None
     }
@@ -621,7 +625,7 @@ fn concrete_name(n: &str) -> bool {
 /// Whether an element can host rebar, and why not.
 pub fn host_check(store: &Store, e: &Element) -> std::result::Result<HostKind, String> {
     use crate::columns::MaterialKind;
-    let kind = host_kind(store, e).ok_or_else(|| "not a column, beam, floor or wall".to_owned())?;
+    let kind = host_kind(store, e).ok_or_else(|| "not a column, beam, floor, wall or roof".to_owned())?;
     let layers_concrete = |t: Option<&Element>| -> bool {
         t.and_then(crate::compound::of_type)
             .is_some_and(|c| {
@@ -665,6 +669,17 @@ pub fn host_check(store: &Store, e: &Element) -> std::result::Result<HostKind, S
             }
             if layers_concrete(type_of(e)) { Ok(kind) } else { Err("its type has no concrete layer".into()) }
         }
+        HostKind::Roof => {
+            // A roof type names its material, or is named for it.
+            let t = type_of(e);
+            let material = t.and_then(|t| t.param(crate::walls::RECIPE_KEY)).and_then(|v| v.get("material")).and_then(Value::as_str).map(str::to_owned);
+            let name = t.and_then(|t| t.name.clone()).unwrap_or_default();
+            if material.as_deref().is_some_and(concrete_name) || name.to_ascii_lowercase().contains("concrete") {
+                Ok(kind)
+            } else {
+                Err("its type is not concrete (name it so, or give it a concrete material)".into())
+            }
+        }
     }
 }
 
@@ -675,6 +690,7 @@ pub(crate) fn faces_of(store: &Store, e: &Element, kind: HostKind) -> std::colle
         HostKind::Column | HostKind::Beam => [("top", "beams"), ("bottom", "beams"), ("other", "beams")].as_slice(),
         HostKind::Floor => &[("top", "interior"), ("bottom", "interior"), ("other", "interior")],
         HostKind::Wall => &[("exterior", "exposed"), ("interior", "interior"), ("top", "interior"), ("bottom", "interior"), ("other", "interior")],
+        HostKind::Roof => &[("top", "exposed"), ("bottom", "interior"), ("other", "interior")],
     };
     let mut out: std::collections::BTreeMap<String, String> =
         default.iter().map(|(f, c)| ((*f).to_owned(), (*c).to_owned())).collect();
@@ -902,6 +918,8 @@ pub enum Placement {
     /// A bar sketched in a plane inside the host, spread along the plane's normal, its handles
     /// constrained to the host or other bars (STR-RBR-007).
     Sketch(crate::rebar_sketch::SketchPlacement),
+    /// A surface or aligned distribution (STR-RBR-013).
+    FreeForm(crate::rebar_free::FreeFormPlacement),
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
@@ -1410,6 +1428,7 @@ fn base_geometry(store: &Store, r: &RebarRecipe) -> Result<SetGeometry> {
             Ok(SetGeometry { bars, dimensions: vec![("A".into(), longest)], role: "main".into(), array_length: spread, indices: Vec::new() })
         }
         (Placement::Sketch(s), _) => crate::rebar_sketch::geometry(store, r, host, kind, &bt, s),
+        (Placement::FreeForm(f), _) => crate::rebar_free::geometry(store, r, host, kind, &bt, f),
         (Placement::Through { along }, HostKind::Wall) => {
             if sh.code != "00" {
                 return Err(Error::new("rebar.shape", "bars through a wall take shape 00 (straight)"));
@@ -1491,7 +1510,7 @@ fn base_geometry(store: &Store, r: &RebarRecipe) -> Result<SetGeometry> {
         }
         (p, k) => Err(Error::new(
             "rebar.placement",
-            format!("a {k:?} takes {}, not {p:?}", match k { HostKind::Floor => "layers", HostKind::Wall => "layers or bars through it", _ => "section or face placements" }),
+            format!("a {k:?} takes {}, not {p:?}", match k { HostKind::Floor => "layers", HostKind::Wall => "layers or bars through it", HostKind::Roof => "free-form distributions", _ => "section or face placements" }),
         )),
     }
 }
@@ -1668,6 +1687,7 @@ pub(crate) fn rehost(txn: &mut crate::txn::Transaction<'_>, p: RehostParams) -> 
 fn varying_check(r: &RebarRecipe) -> Result<()> {
     match r.placement {
         Placement::Through { .. } => Ok(()),
+        Placement::FreeForm(_) => Err(Error::new("rebar.not_varying", "a free-form set is always varying: each bar is worked out on its own")),
         _ => Err(Error::new(
             "rebar.not_varying",
             "only bars through a wall's thickness can vary yet; layers already follow the host's outline bar by bar",
@@ -1728,6 +1748,9 @@ pub(crate) fn convert_to_standard(txn: &mut crate::txn::Transaction<'_>, p: Conv
         let mut rec = store.get(id).and_then(rebar_recipe).ok_or_else(|| Error::new("rebar.not_rebar", format!("element {id} is not a rebar set")))?;
         if !rec.varying {
             continue;
+        }
+        if matches!(rec.placement, Placement::FreeForm(_)) {
+            return Err(Error::new("rebar.not_varying", "a free-form set is always varying: each bar is worked out on its own"));
         }
         let groups = length_groups(&store, &geometry(&store, &rec)?);
         if groups.len() > 1 {

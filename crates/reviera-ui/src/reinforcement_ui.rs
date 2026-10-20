@@ -252,10 +252,14 @@ impl Gui {
         let Some(&(host, kind)) = self.rebar_hosts().first() else {
             return frame.set_status_text("Sketch Rebar: select a concrete column, beam, structural floor or wall first", 0);
         };
+        if kind == HostKind::Roof {
+            return frame.set_status_text("Sketch Rebar: a roof's faces are not planes; use Free Form Rebar", 0);
+        }
         let Some(store) = self.store_now() else { return };
         let Some(e) = store.get(host) else { return };
         let outline = match kind {
             HostKind::Floor | HostKind::Wall => reviera_core::rebar_systems::outline(&store, e).unwrap_or_default(),
+            HostKind::Roof => Vec::new(),
             HostKind::Beam | HostKind::Column => {
                 // The long section through the axis: along and up for a beam, across and up for a
                 // column, from the host's own plane.
@@ -306,6 +310,60 @@ impl Gui {
         }
         f.dialog.destroy();
         self.start_rebar_sketch(SketchWhat::Bar, host, outline, args);
+    }
+
+    /// Concrete › Reinforcement › Free Form (STR-RBR-013): bars over a roof's shell between two
+    /// planes, or closed links square to a member's path.
+    pub(crate) fn place_free_form_rebar(&mut self) {
+        let frame = self.frame;
+        let Some(&(host, kind)) = self.rebar_hosts().first() else {
+            return frame.set_status_text("Free Form Rebar: select a concrete roof, column, beam, floor or wall first", 0);
+        };
+        let (bar_ids, bar_names) = self.bar_list();
+        let paths: Vec<(&str, &str)> = match kind {
+            HostKind::Beam | HostKind::Column => vec![("axis", "Along its axis")],
+            HostKind::Wall => vec![("up", "Up the wall, at its middle"), ("along", "Along the wall, at mid-height")],
+            _ => Vec::new(),
+        };
+        let f = Form::new(&frame, "Free Form Rebar");
+        let surface = kind == HostKind::Roof;
+        let (face, direction, path) = if surface {
+            (
+                Some(f.choice("Layer", &["Bottom".into(), "Top".into()], 0)),
+                Some(f.choice("Bars run", &["Across x (planes square to x)".into(), "Across y (planes square to y)".into()], 0)),
+                None,
+            )
+        } else if paths.is_empty() {
+            return frame.set_status_text("Free Form Rebar: a floor takes layers or area reinforcement", 0);
+        } else {
+            (None, None, Some(f.choice("Path", &paths.iter().map(|p| p.1.to_owned()).collect::<Vec<_>>(), 0)))
+        };
+        let bar = f.choice("Bar type", &bar_names, if surface { 3 } else { 1 });
+        let rule = f.choice("Layout", &["Maximum spacing".into(), "Fixed number".into()], 0);
+        let amount = f.text("Spacing (mm) or number", if surface { "300" } else { "200" }, "");
+        let note = if surface {
+            "Bars follow the shell at the cover, between the planes, trimmed by the edge cover"
+        } else {
+            "Closed links square to the path, each side inside its face's cover, following the section"
+        };
+        if !f.show(note, "Place") {
+            f.dialog.destroy();
+            return;
+        }
+        let v = amount.get_value().trim().parse::<f64>().unwrap_or(0.0);
+        let layout = if at(&rule) == 1 { json!({ "rule": "fixed_number", "n": v.round().max(1.0) as usize }) } else { json!({ "rule": "maximum_spacing", "spacing": v / 1000.0 }) };
+        let mut args = json!({ "host_id": host, "bar_type": bar_ids.get(at(&bar)).cloned().unwrap_or_default(), "layout": layout });
+        if surface {
+            args["kind"] = json!("surface");
+            args["face"] = json!(if face.as_ref().map_or(0, at) == 1 { "top" } else { "bottom" });
+            args["direction"] = json!(if direction.as_ref().map_or(0, at) == 1 { "y" } else { "x" });
+        } else {
+            args["kind"] = json!("aligned");
+            args["path_ref"] = json!(paths[path.as_ref().map_or(0, at).min(paths.len() - 1)].0);
+        }
+        f.dialog.destroy();
+        let r = self.run("rebar.place_free_form", args);
+        self.placed("Free form rebar", r);
     }
 
     /// Concrete › Reinforcement › Path.

@@ -206,6 +206,19 @@ refused and the message gives the angle. <b>Reset Constraints</b> frees every ha
 is. A sketched bar's segments follow its sketch and constraints, so they are not set in
 Properties.</p>
 
+<h2 id="free-form">Free-form rebar</h2>
+<p>Select a host and click <a href="reviera:action/rebar.place_free_form">Free Form</a>.</p>
+<ul>
+  <li><b>On a concrete roof</b> (a dome, vault or pitched roof whose type is named for concrete):
+    bars follow the shell at the bottom or top cover. Each bar is where a plane square to x (or
+    y) cuts the shell, trimmed by the edge cover at both ends, spaced by the layout.</li>
+  <li><b>On a beam, column or wall</b>: closed links square to a path (a member's axis; up or
+    along a wall), each side inside the cover of the face it faces, with 135° hooks into the core.
+    Where the section changes, as up a tapered wall, the links change with it.</li>
+</ul>
+<p>A free-form set is always varying: each length has its own number. A rectangular link is
+shape 51; other shapes are 99 and report their total length.</p>
+
 <h2 id="editing">Editing sets</h2>
 <p>The contextual tab of a selected set:</p>
 <ul>
@@ -244,5 +257,5 @@ bar and total length, and mass (the bars' nominal mass per metre times their rou
 Any rebar schedule can show these fields, and R and the other segments, through Fields.</p>
 
 <h2 id="not-yet">Not yet</h2>
-<p>Placing rebar sets by two points, shape handles, stirrup attachment and dragging handles of sketched bars, splice and coupler types, varying sets other than bars through a wall (and a schedule row per length), cranks and spirals, bent and custom fabric sheets, reinforcement symbols, tags outside plans, hook angles on bending details, and fabric
+<p>Placing rebar sets by two points, picking free-form faces and paths in the view, shape handles, stirrup attachment and dragging handles of sketched bars, splice and coupler types, varying sets other than bars through a wall (and a schedule row per length), cranks and spirals, bent and custom fabric sheets, reinforcement symbols, tags outside plans, hook angles on bending details, and fabric
 schedules.</p>
