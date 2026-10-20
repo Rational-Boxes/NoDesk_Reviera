@@ -53,6 +53,7 @@ mod parts;
 mod path_arrays;
 mod radial;
 mod mep_ui;
+mod mep_runs_ui;
 mod fullscreen;
 mod plans;
 mod railings;
@@ -283,6 +284,8 @@ struct Gui {
     dormer_tool: Option<dormers::DormerTool>,
     /// The Railing tool.
     railing_tool: Option<railings::RailingTool>,
+    /// The Duct or Pipe tool (MEP-DUCT-001, MEP-PIPE-001).
+    run_tool: Option<mep_runs_ui::RunTool>,
     feature_tool: Option<railings::FeatureTool>,
     dome_tool: Option<curved::DomeTool>,
     column_tool: Option<columns::ColumnTool>,
@@ -1356,6 +1359,7 @@ impl Gui {
         self.end_stair_tool();
         self.end_dormer_tool();
         self.end_railing_tool();
+        self.end_run_tool();
         self.end_feature_tool();
         self.end_dome_tool();
         self.end_column_tool();
@@ -1405,6 +1409,9 @@ impl Gui {
         }
         if self.railing_tool.is_some() {
             return self.railing_escape();
+        }
+        if self.run_tool.is_some() {
+            return self.run_escape();
         }
         if self.curtain_escape()
             || self.measure_escape()
@@ -1492,6 +1499,7 @@ impl Gui {
             || self.stair_tool.is_some()
             || self.dormer_tool.is_some()
             || self.railing_tool.is_some()
+            || self.run_tool.is_some()
             || self.feature_tool.is_some()
             || self.dome_tool.is_some()
             || self.column_tool.is_some()
@@ -1519,7 +1527,7 @@ impl Gui {
 
     /// A key handed to the tools in progress; `true` when one used it.
     pub(crate) fn tools_key(&mut self, key: i32, shift: bool, f: &Frame) -> bool {
-        let mut used = self.adjust_key(key) || self.bar_pick_key(key) || self.rebar_host_key(key) || self.coupler_key(key) || self.steel_key(key) || self.rebar_sketch_key(key) || self.walk_key(key, true, shift);
+        let mut used = self.run_key(key) || self.adjust_key(key) || self.bar_pick_key(key) || self.rebar_host_key(key) || self.coupler_key(key) || self.steel_key(key) || self.rebar_sketch_key(key) || self.walk_key(key, true, shift);
         if !used && self.sketch.is_some() {
             let (mx, my) = self.mouse;
             used = self.sketch_key(key, mx, my);
@@ -1589,6 +1597,8 @@ impl Gui {
             self.dormer_click(x, y, p);
         } else if self.railing_tool.is_some() {
             self.railing_click(x, y);
+        } else if self.run_tool.is_some() {
+            self.run_click(x, y);
         } else if self.feature_tool.is_some() {
             self.feature_click(x, y, p);
         } else if self.dome_tool.is_some() {
@@ -1667,6 +1677,10 @@ impl Gui {
         }
         if self.railing_tool.is_some() {
             self.railing_motion(x, y);
+            redraw = true;
+        }
+        if self.run_tool.is_some() {
+            self.run_motion(x, y);
             redraw = true;
         }
         if self.dome_tool.is_some() {
@@ -3610,6 +3624,7 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 stair_tool: None,
                 dormer_tool: None,
                 railing_tool: None,
+                run_tool: None,
                 feature_tool: None,
                 dome_tool: None,
                 column_tool: None,
@@ -4439,6 +4454,15 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "mep_type.load_starters" => with(gui, Gui::load_mep_types),
         "mep.place_component" => with(gui, Gui::place_mep_component),
         "mep.connect_touching" => with(gui, Gui::connect_touching),
+        "duct.create" => with(gui, |g| {
+            g.start_run_tool(reviera_core::mep::Domain::Duct);
+            focus(g);
+        }),
+        "pipe.create" => with(gui, |g| {
+            g.start_run_tool(reviera_core::mep::Domain::Pipe);
+            focus(g);
+        }),
+        "duct.cap_open_ends" => with(gui, Gui::cap_open_ends),
         "system.create" => with(gui, Gui::create_system),
         "system.add" => with(gui, |g| g.system_members(true)),
         "system.remove" => with(gui, |g| g.system_members(false)),

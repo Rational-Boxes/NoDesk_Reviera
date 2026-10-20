@@ -988,6 +988,7 @@ impl Gui {
             || self.stair_tool.is_some()
             || self.dormer_tool.is_some()
             || self.railing_tool.is_some()
+            || self.run_tool.is_some()
             || self.column_tool.is_some()
             || self.curtain_tool.is_some()
             || self.ramp_tool.is_some()

@@ -830,8 +830,8 @@ tools and the datums.
 ### MEP (in development)
 
 The MEP epic has begun with its foundations (spec Chapter 4 §4.6): connectors, the connectivity
-graph, system types, systems and system checks. Ducts, pipes, fittings, electrical circuits and
-the System Browser are next.
+graph, system types, systems and system checks, the System Browser, and ducts and pipes with
+their fittings. Electrical circuits, cable tray and conduit, and sizing are next.
 
 - **Connectors** on component types: duct, pipe, electrical, cable tray and conduit connectors with
   their point and direction, shape and size, system classification, flow direction and
@@ -851,8 +851,15 @@ the System Browser are next.
   fixtures and equipment, with equipment, add, remove, divide and rename (`system.*`).
 - **Checks**: not well connected, flow and demand mismatches, flow direction mismatches
   (`mep_check.systems`) and open connectors (`mep_check.show_disconnects`).
+- **Ducts and pipes** (Systems › HVAC & Piping › Duct `DT`, Pipe `PL`): click a run's points in a
+  plan at a middle elevation (E changes it, making a riser); elbows go at the corners and a tee or
+  tap where the run ends on another duct or pipe, chosen by the type's routing preferences; pipes
+  can slope. Runs connect to the equipment they meet and join its system (`duct.create`,
+  `pipe.create`, `duct.set_size`, `duct.cap_open_ends`, `mep_segment_type.*`,
+  `routing_preferences.*`, `mep_run.reapply_type`).
 - **IFC**: ports as `IfcDistributionPort` nested in their elements, connections as
-  `IfcRelConnectsPorts`, systems as `IfcDistributionSystem` with their members and building.
+  `IfcRelConnectsPorts`, systems as `IfcDistributionSystem` with their members and building;
+  `IfcDuctSegment`, `IfcDuctFitting`, `IfcPipeSegment` and `IfcPipeFitting` with their types.
 
 ### Analysis and remote computation (in development)
 
@@ -1171,9 +1178,9 @@ area by area (reviewed against the spec on 2026-10-15).
   beams, placing braces in elevations, the connection library's packages and its other
   connection groups, composite decks and span symbols, truss families (a layout shared by types),
   further rebar (two-point, varying sets beyond bars through walls, bent fabric), bilinear and two-way area loads, panel results and external analysis providers.
-- **MEP** (in development): ducts, pipes, fittings, routing preferences, cable tray and conduit,
-  electrical circuits, panels and switch systems, sizing and calculations, the System Browser, the
-  System Editor, placing connectors on faces in a component editor, fabrication, P&ID and spaces
+- **MEP** (in development): fittings placed and edited by hand, moving runs, flex duct, cable tray and conduit,
+  electrical circuits, panels and switch systems, sizing and calculations, the System Browser's
+  zones, columns and search, the System Editor, placing connectors on faces in a component editor, fabrication, P&ID and spaces
   and zones are specified but not built.
 - **Families and collaboration** (BIMserver, OpenCDE, Godot) are specified but not started.
 - **Remote computation subsystem** (DM-RPC-001 … 010): in development; the first milestone is

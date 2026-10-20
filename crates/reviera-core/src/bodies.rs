@@ -521,6 +521,20 @@ pub fn all(store: &Store) -> Vec<Body> {
             );
         }
     }
+    // Ducts, pipes and their fittings (MEP-DUCT-001, MEP-PIPE-001), in their system's colour.
+    let run_colors = crate::mep_runs::colors(store);
+    for (id, domain, segment, solids) in crate::mep_runs::all(store) {
+        let class = match (domain, segment) {
+            (crate::mep::Domain::Pipe, true) => "IfcPipeSegment",
+            (crate::mep::Domain::Pipe, false) => "IfcPipeFitting",
+            (_, true) => "IfcDuctSegment",
+            (_, false) => "IfcDuctFitting",
+        };
+        let color = run_colors.get(&id).copied().unwrap_or([0.74, 0.76, 0.80, 1.0]);
+        for s in solids {
+            push(id, &format!("{class}:{}", crate::mesh_objects::color_hex(color)), s.mesh(), false);
+        }
+    }
     for (id, g) in crate::stairs::all(store) {
         for mesh in g.runs.into_iter().chain(g.landings) {
             push(id, "IfcStair", mesh, false);

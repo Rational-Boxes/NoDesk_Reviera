@@ -476,7 +476,7 @@ pub fn validate(mut c: Connector) -> Result<Connector> {
     Ok(c)
 }
 
-fn new_connector(domain: Domain) -> Connector {
+pub(crate) fn new_connector(domain: Domain) -> Connector {
     Connector {
         name: String::new(),
         domain,
@@ -525,10 +525,11 @@ fn overrides(e: &Element) -> BTreeMap<usize, ConnectorParams> {
         .unwrap_or_default()
 }
 
-/// A copy's ports (none for elements without connectors).
+/// An element's ports: a component copy's connectors, or a duct or pipe segment's or fitting's
+/// ends (none for other elements).
 pub fn ports(store: &Store, e: &Element) -> Vec<Port> {
     if mesh_objects::mesh_object_recipe(e).is_none() {
-        return Vec::new();
+        return crate::mep_runs::ports(store, e);
     }
     let Ok(g) = mesh_objects::regenerate(store, e) else {
         return Vec::new();
@@ -560,7 +561,7 @@ pub fn ports(store: &Store, e: &Element) -> Vec<Port> {
 pub fn all_ports(store: &Store) -> Vec<Port> {
     store
         .iter()
-        .filter(|e| mesh_objects::mesh_object_recipe(e).is_some())
+        .filter(|e| mesh_objects::mesh_object_recipe(e).is_some() || crate::mep_runs::is_run_element(e))
         .flat_map(|e| ports(store, e))
         .collect()
 }
@@ -605,7 +606,7 @@ fn project(store: &Store) -> Option<&Element> {
     store.iter().find(|e| e.class == "IfcProject")
 }
 
-fn stored_links(store: &Store) -> Vec<Link> {
+pub(crate) fn stored_links(store: &Store) -> Vec<Link> {
     project(store)
         .and_then(|p| p.param(CONNECTIONS_KEY))
         .and_then(|v| serde_json::from_value(v.clone()).ok())
@@ -615,7 +616,10 @@ fn stored_links(store: &Store) -> Vec<Link> {
 fn resolve(store: &Store, p: &StoredPort) -> Option<(ElementId, usize)> {
     let id = store.find_by_guid(&GlobalId::parse(&p.element)?)?;
     let e = store.get(id)?;
-    let n = mesh_objects::type_of(store, e).map_or(0, |(_, t)| t.connectors.len());
+    let n = match mesh_objects::type_of(store, e) {
+        Some((_, t)) => t.connectors.len(),
+        None => crate::mep_runs::port_count(e),
+    };
     (p.port < n).then_some((id, p.port))
 }
 
@@ -642,7 +646,7 @@ pub fn partners(store: &Store) -> HashMap<(ElementId, usize), Vec<(ElementId, us
     m
 }
 
-fn save_links(txn: &mut Transaction<'_>, links: Vec<Link>) -> Result<()> {
+pub(crate) fn save_links(txn: &mut Transaction<'_>, links: Vec<Link>) -> Result<()> {
     let store = txn.store().clone();
     // Links to elements since deleted are dropped as the list is written.
     let mut keep: Vec<Link> = links
@@ -657,14 +661,14 @@ fn save_links(txn: &mut Transaction<'_>, links: Vec<Link>) -> Result<()> {
     txn.set_param(pid, CONNECTIONS_KEY, serde_json::to_value(keep).expect("serialises"))
 }
 
-fn stored(store: &Store, id: ElementId, port: usize) -> StoredPort {
+pub(crate) fn stored(store: &Store, id: ElementId, port: usize) -> StoredPort {
     StoredPort {
         element: store.get(id).map(|e| e.guid().to_string()).unwrap_or_default(),
         port,
     }
 }
 
-fn same_size(a: &Connector, b: &Connector) -> bool {
+pub(crate) fn same_size(a: &Connector, b: &Connector) -> bool {
     let eq = |x: f64, y: f64| (x - y).abs() <= POSITION_TOLERANCE;
     if a.domain == Domain::Electrical {
         return true;

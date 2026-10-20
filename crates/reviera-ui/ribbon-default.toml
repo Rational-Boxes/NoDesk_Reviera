@@ -2179,6 +2179,26 @@ icon = "mep_types"
 help = "Load Reviera's starter MEP component types: air handling unit, diffuser, grille, fan, water heater, pump, lavatory, WC, distribution board, receptacle and luminaire, each with its connectors"
 
 [[action]]
+id = "duct.create"
+label = "Duct"
+icon = "duct"
+keys = "DT"
+help = "Draw a duct run: elbows at corners, a tee or tap where it ends on a duct, by the type's routing preferences (MEP-DUCT-001)"
+
+[[action]]
+id = "pipe.create"
+label = "Pipe"
+icon = "pipe"
+keys = "PL"
+help = "Draw a pipe run, optionally sloped: elbows at corners, a tee where it ends on a pipe (MEP-PIPE-001)"
+
+[[action]]
+id = "duct.cap_open_ends"
+label = "Cap Open Ends"
+icon = "cap_ends"
+help = "Cap the open ends of the selected ducts, pipes and fittings"
+
+[[action]]
 id = "mep.place_component"
 label = "MEP Component"
 icon = "mep_component"
@@ -2522,6 +2542,14 @@ label = "Systems"
 [[tab.panel]]
 label = "Select"
 tools = [{ action = "tool.modify", size = "large" }]
+
+[[tab.panel]]
+label = "HVAC & Piping"
+tools = [
+  { action = "duct.create", size = "large" },
+  { action = "pipe.create", size = "large" },
+  { action = "duct.cap_open_ends", size = "small" },
+]
 
 [[tab.panel]]
 label = "Components"

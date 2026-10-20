@@ -734,6 +734,7 @@ impl LocalProject {
             self.write_fabrication(doc)?;
             self.write_rebar(doc)?;
             self.write_ramps(doc)?;
+            self.write_mep_runs(doc)?;
             self.write_slab_edges(doc)?;
             self.write_wall_sweeps(doc)?;
             self.write_model_texts(doc)?;
@@ -3219,6 +3220,41 @@ impl LocalProject {
 
     /// Writes every Reviera ramp (ARC-RAMP-001): its flights and landings as faceted B-reps,
     /// contained in its base level.
+    /// Writes every duct, pipe and fitting (MEP-DUCT-001, MEP-PIPE-001): its body as faceted
+    /// B-reps, contained in its level.
+    fn write_mep_runs(&mut self, doc: &Document) -> Result<()> {
+        let store = doc.store();
+        let all = reviera_core::mep_runs::all(store);
+        if all.is_empty() {
+            return Ok(());
+        }
+        let contexts = geometry::Contexts::find(&self.ifc)?;
+        let owner_history = self.new_owner_history()?;
+        for (id, _, _, solids) in &all {
+            let Some(&step) = self.steps.get(id) else {
+                continue;
+            };
+            let polys: Vec<geometry::Polyhedron> = solids
+                .iter()
+                .map(|s| geometry::Polyhedron { points: s.points.clone(), faces: s.faces.clone() })
+                .collect();
+            geometry::write_breps(&mut self.ifc, step, geometry::BrepFrame::WORLD, &polys, self.length_scale, contexts)?;
+            let e = store.get(*id).expect("listed");
+            let level = reviera_core::mep_runs::segment_recipe(e)
+                .map(|r| r.level)
+                .or_else(|| reviera_core::mep_runs::fitting_recipe(e).map(|f| f.level));
+            let storey = level
+                .as_deref()
+                .and_then(GlobalId::parse)
+                .and_then(|g| store.find_by_guid(&g))
+                .and_then(|l| self.steps.get(&l).copied());
+            if let Some(storey) = storey {
+                geometry::contain(&mut self.ifc, step, storey, owner_history)?;
+            }
+        }
+        Ok(())
+    }
+
     fn write_ramps(&mut self, doc: &Document) -> Result<()> {
         let store = doc.store();
         let all = reviera_core::ramps::all(store);

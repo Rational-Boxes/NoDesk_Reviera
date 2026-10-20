@@ -92,6 +92,17 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(SystemUnassigned),
         registry.add(MepCheckSystems),
         registry.add(MepCheckDisconnects),
+        registry.add(DuctCreate),
+        registry.add(PipeCreate),
+        registry.add(DuctSetSize),
+        registry.add(PipeSetSize),
+        registry.add(DuctCapOpenEnds),
+        registry.add(PipeCapOpenEnds),
+        registry.add(MepSegmentTypeCreate),
+        registry.add(MepSegmentTypeList),
+        registry.add(RoutingPreferencesGet),
+        registry.add(RoutingPreferencesSet),
+        registry.add(MepRunReapplyType),
     ];
     for r in results {
         r.expect("MEP commands are valid");
@@ -355,3 +366,121 @@ read_command!(
     crate::mep_systems::disconnects
 );
 
+edit_command!(
+    DuctCreate,
+    "duct.create",
+    "Draw a duct run",
+    "Draws a duct run (MEP-DUCT-001) along `points` ([x, y] at `middle_elevation` above `level`, 2.7 m by default, or [x, y, z] with z above the level) of a `shape` (rectangular, round, oval; the type's) and size (`width` × `height`, or `diameter`), of `type_id` (the built-in Rectangular, Round or Oval Duct when omitted), carrying `system_type_id`. An elbow goes at each corner by the type's routing preferences (a change of height is a riser between two elbows), and a tee or tap where the run ends or starts on an existing duct's side (square to it); where no routing row fits, nothing is inserted and a warning names the role and size. Its ends connect to the connectors they meet, and it joins the system of what it connects to. Returns the segments, fittings, what it connected to and the system.",
+    "Duct",
+    crate::mep_runs::CreateParams,
+    crate::mep_runs::RunReport,
+    crate::mep_runs::create_duct
+);
+
+edit_command!(
+    PipeCreate,
+    "pipe.create",
+    "Draw a pipe run",
+    "Draws a pipe run (MEP-PIPE-001) as `duct.create` does a duct run, round only (`diameter`), at 2.4 m by default, of `type_id` (the built-in Standard Pipe when omitted); `slope` makes level legs fall (rise over run, 0.01 for 1 %) from the first point.",
+    "Pipe",
+    crate::mep_runs::CreateParams,
+    crate::mep_runs::RunReport,
+    crate::mep_runs::create_pipe
+);
+
+edit_command!(
+    DuctSetSize,
+    "duct.set_size",
+    "Resize ducts",
+    "Gives duct segments a new size (`width`, `height`, `diameter`); the legs of the fittings joined to them follow.",
+    "Duct Size",
+    crate::mep_runs::SetSizeParams,
+    (),
+    crate::mep_runs::set_size
+);
+
+edit_command!(
+    PipeSetSize,
+    "pipe.set_size",
+    "Resize pipes",
+    "Gives pipe segments a new `diameter`; the legs of the fittings joined to them follow.",
+    "Pipe Size",
+    crate::mep_runs::SetSizeParams,
+    (),
+    crate::mep_runs::set_size
+);
+
+edit_command!(
+    DuctCapOpenEnds,
+    "duct.cap_open_ends",
+    "Cap open duct ends",
+    "Caps the open ends of the given ducts and duct fittings (all when empty) with the routing preferences' cap; returns the caps.",
+    "Cap Open Ends",
+    crate::mep_runs::CapParams,
+    Vec<ElementId>,
+    crate::mep_runs::cap_open_ends
+);
+
+edit_command!(
+    PipeCapOpenEnds,
+    "pipe.cap_open_ends",
+    "Cap open pipe ends",
+    "Caps the open ends of the given pipes and pipe fittings (all when empty) with the routing preferences' cap; returns the caps.",
+    "Cap Open Ends",
+    crate::mep_runs::CapParams,
+    Vec<ElementId>,
+    crate::mep_runs::cap_open_ends
+);
+
+edit_command!(
+    MepSegmentTypeCreate,
+    "mep_segment_type.create",
+    "Make a duct or pipe type",
+    "Makes a duct or pipe type (`domain` duct or pipe; `shape` round, rectangular, oval; pipes round) named `name` with `routing` preferences (MEP-DUCT-002: rows {part, min, max} per role elbow, junction (tee, tap), cross, transition, cap, and `preferred_junction` tee or tap; one row of each by default), `material` and `roughness`. Returns the type.",
+    "Duct or Pipe Type",
+    crate::mep_runs::CreateTypeParams,
+    ElementId,
+    crate::mep_runs::create_type
+);
+
+read_command!(
+    MepSegmentTypeList,
+    "mep_segment_type.list",
+    "The duct and pipe types",
+    "Every duct and pipe type (or those of `domain`) with its shape, routing preferences, material and roughness.",
+    crate::mep_runs::ListTypesParams,
+    Vec<crate::mep_runs::TypeInfo>,
+    crate::mep_runs::list_types
+);
+
+read_command!(
+    RoutingPreferencesGet,
+    "routing_preferences.get",
+    "A type's routing preferences",
+    "The routing preferences of a duct or pipe type (MEP-DUCT-002).",
+    crate::mep_runs::RoutingGetParams,
+    crate::mep_runs::Routing,
+    crate::mep_runs::routing_get
+);
+
+edit_command!(
+    RoutingPreferencesSet,
+    "routing_preferences.set",
+    "Set a type's routing preferences",
+    "Replaces a duct or pipe type's routing preferences (MEP-DUCT-002); runs drawn from now on use them, and `mep_run.reapply_type` refits existing fittings.",
+    "Routing Preferences",
+    crate::mep_runs::RoutingSetParams,
+    (),
+    crate::mep_runs::routing_set
+);
+
+edit_command!(
+    MepRunReapplyType,
+    "mep_run.reapply_type",
+    "Refit fittings by routing preferences",
+    "Re-chooses fittings (or those joined to the given segments; all when empty) by their segments' types' routing preferences (MEP-DUCT-002): a fitting whose part changes is remade; one whose role has no row that fits is removed with a warning, its ends left open. Returns what was replaced and removed.",
+    "Reapply Type",
+    crate::mep_runs::ReapplyParams,
+    crate::mep_runs::ReapplyReport,
+    crate::mep_runs::reapply_type
+);

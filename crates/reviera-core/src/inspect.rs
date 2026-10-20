@@ -87,6 +87,13 @@ fn raw_parent(store: &Store, e: &Element, imported: &Imported) -> Option<Element
     if let Some(r) = crate::walls::wall_recipe(e) {
         return by_guid(&r.base_level);
     }
+    // Ducts, pipes and fittings under the level they were drawn from (MEP-DUCT-001).
+    if let Some(r) = crate::mep_runs::segment_recipe(e) {
+        return by_guid(&r.level);
+    }
+    if let Some(r) = crate::mep_runs::fitting_recipe(e) {
+        return by_guid(&r.level);
+    }
     if let Some((_, r)) = crate::floors::slab_recipe(e) {
         return by_guid(&r.level);
     }

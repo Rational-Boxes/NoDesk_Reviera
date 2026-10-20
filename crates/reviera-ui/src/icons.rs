@@ -328,6 +328,15 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "tab_all" => format!(
             r#"<path d="M4 10h8l2-4h6l2 4h6v18H4z" fill="{f}" {s}/><path d="M4 10h24" {sa}/>"#
         ),
+        "duct" => format!(
+            r#"<path d="M3 11h16v10H3z" fill="{f}" {s}/><path d="M19 11h4l6 6v-6M19 21h10" {s}/><path d="M23 11v10" {sa}/>"#
+        ),
+        "pipe" => format!(
+            r#"<path d="M3 13h14a4 4 0 0 1 4 4v12" fill="none" stroke-width="5" {s}/><path d="M3 13h14a4 4 0 0 1 4 4v12" {sa}/>"#
+        ),
+        "cap_ends" => format!(
+            r#"<path d="M3 11h18v10H3z" fill="{f}" {s}/><path d="M23 9v14" stroke-width="3" {sa}/>"#
+        ),
         "system_browser" => format!(
             r#"<path d="M6 5v22M6 10h5M6 18h5M6 26h5" {s}/><circle cx="16" cy="10" r="3" fill="{f}" {s}/><circle cx="16" cy="18" r="3" fill="{f}" {s}/><circle cx="16" cy="26" r="3" fill="{f}" {s}/><path d="M19 10h8M19 18h8M19 26h8" {sa}/>"#
         ),

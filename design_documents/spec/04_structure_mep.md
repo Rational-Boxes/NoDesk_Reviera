@@ -2799,10 +2799,12 @@ On a selected duct the canvas shows end grips, editable size text, fitting "+" a
 - `duct.set_size(ids[], size)`
 - `duct.cap_open_ends(ids[])`
 
+*Built (2026-10-20):* `duct.create(type_id?, points, level, middle_elevation?, shape?, width/height or diameter, system_type_id?)` draws a run through `points` ([x, y] at the middle elevation, 2.7 m by default, or [x, y, z] above the level), dropping collinear points: an elbow at each corner by the type's routing preferences (a change of height is a riser between two elbows; a rectangular duct keeps its across direction up a riser), segments between the fittings' legs, and a tee or tap where the run starts or ends on an existing duct's side (it must meet it square, within 1°; a tee cuts the duct in two and keeps its end connection and taps on the right halves). Without a type, the built-in Rectangular, Round or Oval Duct (galvanised steel) is made on first use. Its ends connect to the connectors they meet (MEP-CONN-002), and it joins the system of what it connects to when it carries that system's classification (or none). `duct.set_size` resizes segments and the legs of the fittings joined to them; `duct.cap_open_ends` caps open ends with the cap row. Segments are `IfcDuctSegment` RIGIDSEGMENT typed by `IfcDuctSegmentType`, with faceted B-rep bodies, contained in their level; their ports and connections as MEP-CONN-002. Members of a system are drawn in its type's colour. Systems › HVAC & Piping › **Duct** (`DT`): a form (type, shape, width, height or diameter in mm, middle elevation, system type), then clicks in a plan; **E** sets a new elevation with a riser at the last point; **Enter** or **Esc** makes the run, and the tool stays for the next. **Cap Open Ends** for the selection. Not yet: justification other than the centreline and offsets, Automatically Connect to ducts crossed mid-run, Inherit Elevation and Size, sloped connection options, Tag on Placement, size and elevation locks, the in-canvas grips, size text, "+"/"−" controls and context menu, moving and stretching runs (Move does not take segments yet), the Angles setting, `Pset_DuctSegmentOccurrence` and `Qto_DuctSegmentBaseQuantities`, drawing in sections and elevations.
+
 **Acceptance criteria.**
-- [ ] Drawing an L-shaped 600 × 300 run inserts one elbow from the routing preferences.
-- [ ] Changing the middle elevation from 3.0 m to 3.6 m mid-draw and pressing Apply inserts two elbows and a vertical segment.
-- [ ] The exported run contains `IfcDuctSegment` and `IfcDuctFitting` elements linked by `IfcRelConnectsPorts`.
+- [x] Drawing an L-shaped 600 × 300 run inserts one elbow from the routing preferences. *(Built 2026-10-20.)*
+- [x] Changing the middle elevation from 3.0 m to 3.6 m mid-draw and pressing Apply inserts two elbows and a vertical segment. *(E in the Duct tool.)*
+- [x] The exported run contains `IfcDuctSegment` and `IfcDuctFitting` elements linked by `IfcRelConnectsPorts`.
 
 ### 4.7.2 Routing preferences
 **ID:** MEP-DUCT-002 · **Priority:** P1 · **Ref:** research/03 §8.1 ("Routing Preferences"), §15.3
@@ -2833,9 +2835,11 @@ Each row has a part and a minimum and maximum size. Rows are tried from top to b
 - `mep_run.reapply_type(element_ids[])`
 - `mep_run.change_type(element_ids[], type_id)`
 
+*Built (2026-10-20):* duct and pipe types (`mep_segment_type.create`, `.list`) carry routing preferences in their recipe: rows `{part, min, max}` (metres; `max` 0 for no limit) per role elbow, junction (tee or tap), cross, transition and cap, and a preferred junction (tee or tap, taken first among the junction rows that fit); rows are tried top to bottom by the nominal size (the diameter or the larger side; a junction by its branch). A part that does not belong to a role is refused. Where no row fits, nothing is inserted, the connection is left open and a warning names the role and size. `routing_preferences.get` and `.set`; `mep_run.reapply_type` re-chooses existing fittings (or those joined to given segments): a changed part is remade, one with no fitting row is removed with a warning and its ends left open; a tee that would become a tap (or back) is warned about and left, since it would change the host. The parts are Reviera's own (mitred elbow, tee, tap, cross, transition, cap; sizes as MEP-DUCT-003); stored per type rather than in `mep_settings`. Not yet: the Type Properties grid, segment rows (material and schedule) and union and multi-shape transition roles, parts from component types, `mep_run.change_type`, Angles.
+
 **Acceptance criteria.**
-- [ ] With Junction rows "Tap ≤ 300 mm, Tee > 300 mm", a 250 mm branch gets a tap and a 400 mm branch gets a tee.
-- [ ] After a row is removed, *Reapply Type* replaces the affected fittings and warns where no row fits.
+- [x] With Junction rows "Tap ≤ 300 mm, Tee > 300 mm", a 250 mm branch gets a tap and a 400 mm branch gets a tee. *(Built 2026-10-20.)*
+- [x] After a row is removed, *Reapply Type* replaces the affected fittings and warns where no row fits.
 
 ### 4.7.3 Duct fittings and fitting controls
 **ID:** MEP-DUCT-003 · **Priority:** P1 · **Ref:** research/03 §8.3
@@ -2858,6 +2862,8 @@ Each row has a part and a minimum and maximum size. Rows are tried from top to b
 - `mep_fitting.downgrade(id, leg)`
 - `mep_fitting.flip(id)`
 - `mep_fitting.rotate(id, angle)`
+
+*Built (2026-10-20), the parts Reviera makes:* `IfcDuctFitting` and `IfcPipeFitting` with PredefinedType BEND (elbow), JUNCTION (tee, tap, cross), TRANSITION and OBSTRUCTION (cap), named by their part, each leg a port. An elbow's legs run 0.6 of the section's extent in the plane of the bend plus 50 mm from the corner (a rectangular duct rising uses its height); a tee's main legs 0.6 of the main's size plus 50 mm and its branch from the main's surface; a tap stands on the duct's side, which gets a tap port; a cap is a short plug over the end. Bodies are mitred: each leg a prism from just behind the centre. These sizes are Reviera's own. Not yet: Duct Fitting placement by hand (`duct_fitting.place`), the fitting controls (size per leg with automatic transitions, flip, rotate, "+"/"−", `mep_fitting.*`), radius elbows, crosses and transitions made by drawing (only through routing), dampers, loss coefficients, `IfcDuctFittingType`.
 
 **Acceptance criteria.**
 - [ ] "+" on an elbow whose run continues straight turns it into a tee with an open third leg. "−" on that unused leg turns it back.
@@ -3344,9 +3350,11 @@ Risers can also be drawn by changing the middle elevation mid-run and pressing *
 
 **Commands.** `pipe.create(type_id, start, end, diameter, middle_elevation, level_id, system_type_id?, slope?) -> element_ids[]`
 
+*Built (2026-10-20):* `pipe.create` draws a pipe run as `duct.create` does a duct run: round only, 2.4 m by default, the built-in Standard Pipe (copper) type when none is given, elbows and tees by routing preferences; `slope` (rise over run) makes each level leg fall from the first point onward, kept as the segment's slope and written as `Pset_PipeSegmentOccurrence.Gradient`. `pipe.set_size`, `pipe.cap_open_ends`. `IfcPipeSegment` and `IfcPipeFitting`. Systems › HVAC & Piping › **Pipe** (`PL`, since `PI` is Perspective/Isometric): as the Duct tool, with a slope in percent. Not yet: Slope Up/Off controls and the slope tooltip, sloped connection options, parallel pipes, the segment and size catalogues of Mechanical Settings (sizes are free), `Qto_PipeSegmentBaseQuantities`.
+
 **Acceptance criteria.**
-- [ ] Drawing a 50 mm copper pipe with an elbow uses the segment and elbow given by the routing preferences for 50 mm.
-- [ ] A pipe drawn at 1% Slope Down exports `Gradient` = 0.01.
+- [x] Drawing a 50 mm copper pipe with an elbow uses the segment and elbow given by the routing preferences for 50 mm. *(The elbow row; segment rows are not built.)*
+- [x] A pipe drawn at 1% Slope Down exports `Gradient` = 0.01.
 
 ### 4.8.2 Sloped piping and the slope editor
 **ID:** MEP-PIPE-002 · **Priority:** P1 · **Ref:** research/03 §9.1 ("Sloped piping")
@@ -5996,7 +6004,7 @@ Every command below is registered once in the command registry and is exposed au
 | Q11 | Bundled engines | Which suggested engines, if any, ship with official installers. Each needs a licence review and a build for every target platform. *Deferred to the post-Alpha/POC review (owner, 2026-10-12).* |
 | Q12 | ~~Cross-reference numbering~~ | **Resolved**: collaboration is Chapter 6 and its file is `06_collaboration_coordination.md`. |
 | Q13 | Precast pieces and their source in IFC | **Deferred (owner, 2026-10-12): not implemented in the initial version.** IFC allows one decomposition parent, so a piece cannot be aggregated by both its source element and its piece assembly. The initial version writes only the assembly aggregation and keeps the source link in RXD (STR-PRE-002). A real decision needs advice from an IFC and precast domain expert (buildingSMART precast/structural guidance, and how receiving tools behave). Candidate to evaluate: `IfcRelAssignsToProduct` from source to pieces. |
-| Q14 | Engineering defaults awaiting subject-matter expert review | **Open (owner, 2026-10-19): use the most logical provisional values and have them reviewed by a subject-matter expert.** The list, with each value, its reasoning and where it is used, is `design_documents/EXPERT_REVIEW.md`: concrete density (2.5 t/m³), precast wall and slab segmentation defaults, the default lap (50 bar diameters), coupler sleeve proportions, cover on leaning faces, concrete roofs as hosts, morphed bar placement, free-form shell cover, rebar steel mass. Help pages call these values provisional. |
+| Q14 | Engineering defaults awaiting subject-matter expert review | **Open (owner, 2026-10-19): use the most logical provisional values and have them reviewed by a subject-matter expert.** The list, with each value, its reasoning and where it is used, is `design_documents/EXPERT_REVIEW.md`: concrete density (2.5 t/m³), precast wall and slab segmentation defaults, the default lap (50 bar diameters), coupler sleeve proportions, cover on leaning faces, concrete roofs as hosts, morphed bar placement, free-form shell cover, rebar steel mass; and for MEP (E-16 … E-18) the starter component types' sizes, flows and loads, the built-in system types' fluid temperatures, and the fitting proportions and duct and pipe roughness. Help pages call these values provisional. |
 
 ---
 

@@ -7,6 +7,7 @@ fixtures and equipment are grouped into <b>systems</b> such as Supply Air 1 or D
 Water 1. The tools are on the <b>Systems</b> tab.</p>
 <nav class="toc">
   <a href="#components">Components with connectors</a>
+  <a href="#runs">Ducts and pipes</a>
   <a href="#connections">Connections</a>
   <a href="#systems">Systems</a>
   <a href="#types">System types</a>
@@ -30,6 +31,29 @@ load and power factor. Scripts and agents add connectors to any component type w
 <p>When elements with connectors are selected, each connector is drawn as a ring with a stalk
 pointing out: blue for ducts, green for pipes, orange for electrical, and red while it is
 open.</p>
+
+<h2 id="runs">Ducts and pipes</h2>
+<p><a href="reviera:action/duct.create">Duct</a> (<kbd>DT</kbd>) and
+<a href="reviera:action/pipe.create">Pipe</a> (<kbd>PL</kbd>) ask for the type, shape and size, the
+middle elevation (the centreline's height above the level), the system type and, for pipes, a
+slope. Then click the run's points in a plan:</p>
+<ul>
+  <li>an <b>elbow</b> goes at every corner;</li>
+  <li>press <kbd>E</kbd> to change the elevation: the run rises or drops at the last point, with an
+    elbow at each end of the riser;</li>
+  <li>end (or start) the run on the side of another duct or pipe, square to it, and a <b>tee</b> or
+    a <b>tap</b> joins them;</li>
+  <li><kbd>Enter</kbd> or <kbd>Esc</kbd> makes the run; the tool stays for the next one.</li>
+</ul>
+<p>A run that meets a connector connects to it, and joins that connector's system when it carries
+the same system type. Pipes drawn with a slope fall along their level legs from the first point.
+<a href="reviera:action/duct.cap_open_ends">Cap Open Ends</a> closes the selection's open ends.</p>
+<p>Which elbow, tee, tap or cap is used comes from the type's <b>routing preferences</b>: for each
+role a list of parts with a size range, tried from the top. Where none fits, nothing is inserted,
+the end is left open and a warning says so. <code>routing_preferences.set</code> changes them and
+<code>mep_run.reapply_type</code> refits existing runs. The fittings are Reviera's own compact
+mitred parts; their proportions, like the starter types' sizes and flows, are provisional values
+awaiting review by an engineer.</p>
 
 <h2 id="connections">Connections</h2>
 <p>Placing or moving a component connects its open connectors that meet another's: in the same
