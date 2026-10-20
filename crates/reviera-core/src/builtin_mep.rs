@@ -131,6 +131,15 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(PanelScheduleChangePanel),
         registry.add(PanelLoadsSummary),
         registry.add(LoadClassificationList),
+        registry.add(CircuitProperties),
+        registry.add(CircuitSizeCable),
+        registry.add(CircuitSetPath),
+        registry.add(CircuitResetPath),
+        registry.add(CircuitPath),
+        registry.add(ConductorSizeCreate),
+        registry.add(CableTypeCreate),
+        registry.add(ConductorAmpacitySet),
+        registry.add(WiringSet),
         registry.add(CableTrayCreate),
         registry.add(ConduitCreate),
         registry.add(CableTraySplit),
@@ -700,7 +709,7 @@ edit_command!(
     CircuitSet,
     "circuit.set",
     "Set a circuit's load name and rating",
-    "Sets a circuit's `load_name` (empty: made from its loads again, the load classification and first device, or for a feeder the panel it feeds) and `rating` (the protective device, amperes; 0 clears it) (MEP-ELEC-005). Panel schedules show both and edit them in their cells.",
+    "Sets a circuit's `load_name` (empty: made from its loads again, the load classification and first device, or for a feeder the panel it feeds), `rating` (the protective device, amperes; 0 clears it), `cable_type` (a cable type's id; empty: the project's default), `cable_size` (a conductor size's id for the phase conductors, kept with a warning when it fails the checks; empty: sized automatically) and `runs` (parallel sets) (MEP-ELEC-005). Sizing re-runs on every change. Panel schedules show and edit the load name and rating.",
     "Circuit Properties",
     crate::mep_electrical::CircuitSetParams,
     (),
@@ -955,4 +964,101 @@ edit_command!(
     crate::mep_runs::SetSizeParams,
     (),
     crate::mep_runs::set_size
+);
+
+read_command!(
+    CircuitProperties,
+    "circuit.properties",
+    "A circuit's calculated properties",
+    "A circuit's calculated properties (MEP-ELEC-005): number, load name, phase labels, elements, apparent load (VA), power factor, design current (A), rating, path mode, offset, points and length (m) and whether a custom path is out of date (MEP-ELEC-004), cable type, conductor size (sized automatically unless given, `cable_size_auto`), runs, voltage drop (V and % of the circuit's voltage) against its limit, the corrected ampacity where the table gives one, and warnings (a size that fails, no ampacity table, no panel).",
+    crate::mep_cables::CircuitRefParams,
+    crate::mep_cables::CircuitCalc,
+    crate::mep_cables::properties
+);
+
+edit_command!(
+    CircuitSizeCable,
+    "circuit.size_cable",
+    "Size a circuit's cable",
+    "Sizes a circuit's phase conductors again (a size given by hand is dropped), optionally with its own voltage drop limit `max_vd_percent` (MEP-ELEC-005): the smallest size of the cable type's size system whose voltage drop over the path length is within the limit and which, where the ampacity table has rows for the cable's material and insulation, carries the rating (or the design current) after the correction factor. Returns the circuit's properties.",
+    "Size Cable",
+    crate::mep_cables::SizeParams,
+    crate::mep_cables::CircuitCalc,
+    crate::mep_cables::size_cable
+);
+
+edit_command!(
+    CircuitSetPath,
+    "circuit.set_path",
+    "Set a circuit's path",
+    "Sets a circuit's path (MEP-ELEC-004): `mode` farthest_device (the orthogonal route, X then Y then Z, from the panel's connector to the most distant device), all_devices (a daisy chain through every device by nearest neighbour) or custom (`nodes` [x, y, z] after the panel, then the farthest device; flagged when devices move), and `offset` (metres, −10 to 10: horizontal runs above the higher end, or below the lower for a negative one). Refused for a circuit without a panel.",
+    "Circuit Path",
+    crate::mep_cables::PathParams,
+    (),
+    crate::mep_cables::set_path
+);
+
+edit_command!(
+    CircuitResetPath,
+    "circuit.reset_path",
+    "Reset a circuit's path",
+    "Drops a custom path's nodes: the circuit runs to its farthest device again (MEP-ELEC-004).",
+    "Reset Path",
+    crate::mep_cables::CircuitRefParams,
+    (),
+    crate::mep_cables::reset_path
+);
+
+read_command!(
+    CircuitPath,
+    "circuit.path",
+    "A circuit's path",
+    "A circuit's path mode, nodes, offset, points, length (m) and whether it may be out of date (MEP-ELEC-004).",
+    crate::mep_cables::CircuitRefParams,
+    crate::mep_cables::PathOut,
+    crate::mep_cables::path_command
+);
+
+edit_command!(
+    ConductorSizeCreate,
+    "conductor_size.create",
+    "Add a conductor size",
+    "Adds a conductor size (MEP-SET-003): `name` and `area_mm2`, or an AWG `gauge` (14, 2, 1/0 … 4/0; its area from the AWG definition). Built in: IEC 1–300 mm² and AWG 22 to 4/0 with 250–500 kcmil. Returns its id.",
+    "Conductor Size",
+    crate::mep_cables::ConductorSizeParams,
+    String,
+    crate::mep_cables::create_conductor_size
+);
+
+edit_command!(
+    CableTypeCreate,
+    "cable_type.create",
+    "Add a cable type",
+    "Adds a cable type (MEP-SET-003): `name`, `material_id` (copper, aluminium), `insulation_id` (pvc 70 °C, xlpe 90 °C, thhn 90 °C), and either `size_system` (iec or awg: circuits using it are sized from those sizes) or fixed `phase_conductors` {count, size_id}; `neutral` and `ground`. Built in: Cu/PVC (the default), Cu/XLPE, Al/XLPE and Cu THHN (AWG). Returns its id.",
+    "Cable Type",
+    crate::mep_cables::CableTypeParams,
+    String,
+    crate::mep_cables::create_cable_type
+);
+
+edit_command!(
+    ConductorAmpacitySet,
+    "conductor_ampacity.set",
+    "Set conductor ampacities",
+    "Sets rows of the ampacity table (MEP-SET-003) `rows` [{material, insulation, size, amperes}] (amperes 0 removes a row). Reviera ships no ampacities, as code tables may be copyrighted: enter your code's values. Sizing checks current capacity only for cables whose material and insulation have rows. Returns the table's row count.",
+    "Ampacities",
+    crate::mep_cables::AmpacityParams,
+    usize,
+    crate::mep_cables::set_ampacities
+);
+
+edit_command!(
+    WiringSet,
+    "wiring.set",
+    "Change the wiring settings",
+    "Sets the project's wiring settings (MEP-SET-002): `default_cable_type`, `max_voltage_drop_percent` (3 by default), `correction_factor` applied to ampacities (ambient and grouping together; 1 by default), `path_offset` (metres) and conductor `reactance` (Ω/m, 0.00008 by default).",
+    "Wiring Settings",
+    crate::mep_cables::WiringParams,
+    (),
+    crate::mep_cables::set_wiring
 );

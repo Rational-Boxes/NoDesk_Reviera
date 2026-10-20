@@ -23,8 +23,9 @@
 //! Feeders and transformers (MEP-ELEC-006) are here too; panel schedules are
 //! [`crate::mep_panel_schedule`], load classifications and demand factors [`crate::mep_loads`].
 //!
-//! Not built yet: custom naming schemes, wires and circuit paths, cable sizing, switch systems,
-//! the Edit Circuit mode.
+//! Circuit paths and cable sizing are [`crate::mep_cables`].
+//!
+//! Not built yet: custom naming schemes, wires, switch systems, the Edit Circuit mode.
 
 use std::collections::BTreeMap;
 
@@ -114,6 +115,10 @@ pub struct ElectricalSettings {
     pub demand_factors: Vec<crate::mep_loads::DemandFactor>,
     /// Conduit standards and their sizes (MEP-ELEC-017).
     pub conduit_standards: Vec<ConduitStandard>,
+    /// Conductor materials, insulations, sizes, ampacities and cable types (MEP-SET-003).
+    pub conductors: crate::mep_cables::Conductors,
+    /// Wiring: the default cable type, voltage drop limit, correction factor, path offset.
+    pub wiring: crate::mep_cables::Wiring,
 }
 
 /// A conduit standard: the sizes conduit of it comes in (MEP-ELEC-017).
@@ -200,6 +205,8 @@ impl Default for ElectricalSettings {
             load_classifications: crate::mep_loads::default_classifications(),
             demand_factors: crate::mep_loads::default_demand_factors(),
             conduit_standards: default_conduit_standards(),
+            conductors: crate::mep_cables::Conductors::default(),
+            wiring: crate::mep_cables::Wiring::default(),
         }
     }
 }
@@ -554,6 +561,20 @@ pub struct CircuitRecipe {
     /// The protective device's rating (amperes).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rating: Option<f64>,
+    /// Its cable type (the project's default when none) and a phase conductor size given by
+    /// hand (sized when none), in `runs` parallel sets (MEP-ELEC-005).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cable_type: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cable_size: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub runs: Option<u32>,
+    /// Its own voltage drop limit (%).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_voltage_drop_percent: Option<f64>,
+    /// Its path (MEP-ELEC-004).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub path: Option<crate::mep_cables::PathDef>,
 }
 
 fn one() -> u8 {
@@ -961,6 +982,11 @@ pub(crate) fn create(txn: &mut Transaction<'_>, p: CreateParams) -> Result<Circu
         lugs: false,
         load_name: None,
         rating: None,
+        cable_type: None,
+        cable_size: None,
+        runs: None,
+        max_voltage_drop_percent: None,
+        path: None,
     };
     let mut report = CircuitReport::default();
     take_members(txn, None, &mut r, &members, &mut report)?;
@@ -1234,6 +1260,11 @@ pub(crate) fn create_feeder(txn: &mut Transaction<'_>, p: FeederParams) -> Resul
         lugs: p.connection == Connection::Lugs,
         load_name: None,
         rating: None,
+        cable_type: None,
+        cable_size: None,
+        runs: None,
+        max_voltage_drop_percent: None,
+        path: None,
     };
     let id = txn.create(
         NewElement::new(CLASS)
@@ -1431,6 +1462,12 @@ pub struct CircuitSetParams {
     pub load_name: Option<String>,
     /// The protective device's rating (amperes); 0 clears it.
     pub rating: Option<f64>,
+    /// A cable type's id; empty: the project's default.
+    pub cable_type: Option<String>,
+    /// A conductor size's id for the phase conductors; empty: sized automatically.
+    pub cable_size: Option<String>,
+    /// Parallel sets (1–20).
+    pub runs: Option<u32>,
 }
 
 /// `circuit.set`: a circuit's load name and rating (MEP-ELEC-005).
@@ -1450,6 +1487,25 @@ pub(crate) fn set_circuit(txn: &mut Transaction<'_>, p: CircuitSetParams) -> Res
             return Err(bad("circuit.rating", "a rating runs from 0 to 10 000 A"));
         }
         r.rating = (a > 0.0).then_some(a);
+    }
+    let s = settings(&store);
+    if let Some(t) = p.cable_type.map(|t| t.trim().to_owned()) {
+        if !t.is_empty() && !s.conductors.cable_types.iter().any(|c| c.id == t) {
+            return Err(bad("cable_type.not_found", format!("no cable type {t:?}")));
+        }
+        r.cable_type = (!t.is_empty()).then_some(t);
+    }
+    if let Some(z) = p.cable_size.map(|z| z.trim().to_owned()) {
+        if !z.is_empty() && !s.conductors.sizes.iter().any(|c| c.id == z) {
+            return Err(bad("conductor_size.not_found", format!("no conductor size {z:?}")));
+        }
+        r.cable_size = (!z.is_empty()).then_some(z);
+    }
+    if let Some(n) = p.runs {
+        if !(1..=20).contains(&n) {
+            return Err(bad("circuit.runs", "a circuit has 1 to 20 parallel sets"));
+        }
+        r.runs = (n > 1).then_some(n);
     }
     write(txn, id, &r)
 }

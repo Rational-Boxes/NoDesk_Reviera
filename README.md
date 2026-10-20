@@ -842,7 +842,7 @@ in Reviera, and your own agent settings are never changed (UI-AGENT-004).
 The MEP epic has begun with its foundations (spec Chapter 4 §4.6): connectors, the connectivity
 graph, system types, systems and system checks, the System Browser, and ducts and pipes with
 their fittings, cable tray and conduit, and electrical circuits, panels, feeders and panel
-schedules. Sizing is next.
+schedules, circuit paths, cable sizing and voltage drop.
 
 - **Connectors** on component types: duct, pipe, electrical, cable tray and conduit connectors with
   their point and direction, shape and size, system classification, flow direction and
@@ -891,6 +891,15 @@ schedules. Sizing is next.
   `IfcJunctionBox` with CABLECARRIER ports (`cable_tray.*`, `conduit.*`,
   `cable_tray_fitting.place`, `conduit_fitting.place`, `mep_fitting.upgrade/downgrade`,
   `conduit_standard.create`).
+- **Cable sizing and voltage drop** (Systems › Electrical › Circuit Properties): each circuit's
+  apparent load, power factor, design current, phases and path (Farthest Device, All Devices or
+  custom nodes, orthogonal with a path offset, drawn dashed when selected), and its cable: the
+  smallest conductor of its cable type (Cu/PVC, Cu/XLPE, Al/XLPE in mm², Cu THHN in AWG) within
+  the voltage drop limit (3 %) that carries the rating where your ampacity table has rows, or a
+  size you give, kept with a warning when it fails; voltage drop in V and %. Reviera ships
+  physical conductor data (resistivity, areas) but no ampacities, which you enter under Manage ›
+  MEP Settings › Wiring (`circuit.properties`, `circuit.size_cable`, `circuit.set_path`,
+  `cable_type.create`, `conductor_size.create`, `conductor_ampacity.set`, `wiring.set`).
 - **Panel schedules** (Analyze › Reports & Schedules, or Systems › Electrical): a live schedule of
   a panel, under *Panel Schedules* in the Project Browser: the header (panel, distribution system,
   supply, slots), every slot in order with the circuit's number, load name, classification, trip,
@@ -1248,7 +1257,7 @@ area by area (reviewed against the spec on 2026-10-15).
   connection groups, composite decks and span symbols, truss families (a layout shared by types),
   further rebar (two-point, varying sets beyond bars through walls, bent fabric), bilinear and two-way area loads, panel results and external analysis providers.
 - **MEP** (in development): duct and pipe fittings placed and edited in the view, the fitting controls and grips, MEP runs above the cut plane shown in plans, surface connectors for conduit, moving runs, flex duct,
-  wires, panel schedule templates and editing (moves, spares, rebalancing), the two-column layout, custom circuit naming, switch systems, cable sizing
+  wires, panel schedule templates and editing (moves, spares, rebalancing), the two-column layout, custom circuit naming, switch systems, the Edit Path tool, duct and pipe sizing
   and calculations, the System Browser's
   zones, columns and search, the System Editor, placing connectors on faces in a component editor, fabrication, P&ID and spaces
   and zones are specified but not built.

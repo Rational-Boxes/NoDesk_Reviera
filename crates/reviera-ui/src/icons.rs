@@ -340,6 +340,12 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "panel_settings" => format!(
             r#"<rect x="4" y="4" width="12" height="24" fill="{f}" {s}/><path d="M7 9h6M7 14h6M7 19h6" {s}/><circle cx="24" cy="20" r="4" {sa}/><path d="M24 13v3M24 24v3M17 20h3M28 20h3" {sa}/>"#
         ),
+        "circuit_properties" => format!(
+            r#"<rect x="4" y="4" width="18" height="24" fill="{f}" {s}/><path d="M8 10h10M8 15h10M8 20h6" {s}/><path d="M24 12l-4 7h5l-4 8" {sa}/>"#
+        ),
+        "wiring" => format!(
+            r#"<path d="M4 8c8 0 8 16 16 16h8M4 16h8M4 24c4 0 6-4 8-8" fill="none" {sa}/><circle cx="28" cy="24" r="2" {s}/>"#
+        ),
         "cable_tray" => format!(
             r#"<path d="M3 12l7-5h19l-7 5z" fill="{f}" {s}/><path d="M3 12v8l7-5V7M22 12v8l7-5" {s}/><path d="M3 20h19v-8" {s}/><path d="M9 12l3 8M15 12l3 8" {sa}/>"#
         ),

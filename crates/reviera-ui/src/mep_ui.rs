@@ -67,6 +67,8 @@ fn domain_colour(d: Domain) -> [f32; 4] {
 type Segment = [[f32; 3]; 2];
 
 const OPEN: [f32; 4] = [0.90, 0.10, 0.10, 1.0];
+/// A circuit's path.
+const PATH: [f32; 4] = [0.85, 0.35, 0.05, 1.0];
 const WARN: [f32; 4] = [0.95, 0.65, 0.05, 1.0];
 
 /// "duct systems", "pipe systems", "circuits".
@@ -179,13 +181,18 @@ impl Gui {
             if !sel.iter().any(|s| c.elements.contains(s) || c.panel == Some(*s) || c.id == *s) {
                 continue;
             }
-            let home = c.panel.and_then(|pid| {
-                let e = store.get(pid)?;
-                mep::ports(&store, e).into_iter().find(|p| p.connector.domain == Domain::Electrical).map(|p| p.position)
-            });
+            // Its path (MEP-ELEC-004), and straight dashes to devices off it.
+            let def = store.get(c.id).and_then(reviera_core::mep_electrical::recipe).and_then(|r| r.path).unwrap_or_default();
+            let (path, _) = reviera_core::mep_cables::path(&store, &c, &def, &reviera_core::mep_electrical::settings(&store));
+            for w in path.windows(2) {
+                add(PATH, dashed(w[0], w[1]));
+            }
+            let home = path.first().copied();
+            let on_path = |q: [f64; 3]| path.iter().any(|p| (p[0] - q[0]).abs() + (p[1] - q[1]).abs() + (p[2] - q[2]).abs() < 1e-6);
             for (e, k) in &c.ports {
                 let Some(p) = mep::port(&store, *e, *k) else { continue };
                 match home {
+                    Some(_) if on_path(p.position) => {}
                     Some(h) => add(domain_colour(Domain::Electrical), dashed(h, p.position)),
                     // No panel: a short home-run arrow up from the device.
                     None => {

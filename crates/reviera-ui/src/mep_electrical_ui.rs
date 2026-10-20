@@ -31,7 +31,7 @@ fn label(c: &CircuitInfo) -> String {
 }
 
 impl Gui {
-    fn choose_circuit(&mut self, title: &str, keep: &dyn Fn(&CircuitInfo) -> bool) -> Option<CircuitInfo> {
+    pub(crate) fn choose_circuit(&mut self, title: &str, keep: &dyn Fn(&CircuitInfo) -> bool) -> Option<CircuitInfo> {
         let frame = self.frame;
         let store = self.store_now()?;
         let all: Vec<CircuitInfo> = mep_electrical::circuits(&store).into_iter().filter(|c| keep(c)).collect();

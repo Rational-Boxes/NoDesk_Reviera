@@ -2360,6 +2360,18 @@ icon = "system_disconnect"
 help = "Take a circuit off its panel; it keeps its devices and loses its number"
 
 [[action]]
+id = "circuit.properties"
+label = "Circuit Properties"
+icon = "circuit_properties"
+help = "A circuit's load, current, path length, cable, voltage drop and warnings; its load name, rating, cable type and size (or Auto), runs, path and voltage drop limit (MEP-ELEC-004, 005)"
+
+[[action]]
+id = "wiring.settings"
+label = "Wiring"
+icon = "wiring"
+help = "The default cable type, voltage drop limit, correction factor, path offset and your ampacity table (MEP-SET-002, 003)"
+
+[[action]]
 id = "panel.set_supply"
 label = "Select Supply"
 icon = "panel_supply"
@@ -2724,6 +2736,7 @@ tools = [
 label = "Electrical"
 tools = [
   { action = "circuit.create", size = "large" },
+  { action = "circuit.properties", size = "large" },
   { action = "circuit.add", size = "small" },
   { action = "circuit.remove", size = "small" },
   { action = "circuit.select_panel", size = "small" },
@@ -3002,6 +3015,7 @@ label = "MEP Settings"
 tools = [
   { action = "load_classification.manage", size = "large" },
   { action = "demand_factor.manage", size = "large" },
+  { action = "wiring.settings", size = "large" },
 ]
 
 [[tab]]

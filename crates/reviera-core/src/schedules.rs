@@ -906,6 +906,9 @@ pub(crate) fn set_cell(txn: &mut crate::txn::Transaction<'_>, p: SetCellParams) 
                     circuit_id: ElementRef::Id(*id),
                     load_name: None,
                     rating: None,
+                    cable_type: None,
+                    cable_size: None,
+                    runs: None,
                 };
                 if p.field == "circuit.load_name" {
                     params.load_name = Some(text.clone());

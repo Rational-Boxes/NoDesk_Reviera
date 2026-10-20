@@ -18063,8 +18063,10 @@ The dialog supports both IEC (mm²) and AWG/kcmil conventions. Reviera ships sta
 - `cable_type.create(name, material_id, insulation_id, phase_conductors: {count, size_id}, neutral?: size_id, ground?: size_id) -> id`
 - `conductor_table.import(path)`
 
+*Built (2026-10-20), the data and commands:* in the electrical settings, conductor materials (copper ρ₂₀ 0.017241 Ω·mm²/m, α 0.00393; aluminium 0.028264, 0.00403), insulations (PVC 70 °C, XLPE 90 °C, THHN 90 °C), conductor sizes (IEC 1–300 mm²; AWG 22 to 4/0 with areas from the AWG definition, and 250–500 kcmil), cable types (Cu/PVC, the default, Cu/XLPE, Al/XLPE, Cu THHN (AWG); a type sizes from its system or has fixed phase conductors) and an ampacity table that ships empty: `conductor_size.create(name, area_mm2 | gauge)`, `cable_type.create(name, material_id, insulation_id, size_system | phase_conductors, neutral, ground)`, `conductor_ampacity.set(rows)`. Manage › MEP Settings › **Wiring** edits the default cable type, voltage drop limit, correction factor, path offset and the ampacity table (one row per line). Not yet: the six-grid dialog, new materials and insulations, `conductor_table.import`, `IfcCableSegmentType` export.
+
 **Acceptance criteria.**
-- [ ] A 5 × 2.5 mm² Cu/PVC cable type can be defined and chosen on a circuit, and voltage drop uses its conductor resistance.
+- [x] A 5 × 2.5 mm² Cu/PVC cable type can be defined and chosen on a circuit, and voltage drop uses its conductor resistance.
 
 ### 4.6.10 MEP settings dialogs (common shell)
 **ID:** MEP-SET-004 · **Priority:** P1 (mechanical, electrical) / P2 (other kinds) · **Ref:** research/03 §1.6, §7.3, §10.4, §11, §12.1, §14
@@ -19169,10 +19171,12 @@ The edit mode itself runs as a tool session through `tool.start`, `tool.finish` 
 
 The *Edit Path* mode runs as a tool session (`tool.start`/`tool.finish`/`tool.cancel`, Chapter 1).
 
+*Built (2026-10-20), without the Edit Path mode:* `circuit.set_path(circuit_id, mode, nodes?, offset?)`, `circuit.reset_path`, `circuit.path`; Circuit Properties sets the mode and offset. *Farthest Device* (default) is the orthogonal route, X then Y then Z, from the panel's connector (its first electrical connector other than its feed) to the device whose route is longest; *All Devices* chains the devices by nearest neighbour from the panel; *Custom* runs from the panel through the nodes to the farthest device, and is flagged "path may be out of date" (in `circuit.properties` warnings) when its devices have moved since it was set, until Reset Path. The offset (−10 to 10 m; the project's `wiring.path_offset` by default) puts the horizontal runs that far above the higher end (below the lower for a negative offset), so +1 m adds 2 m. A circuit without a panel has no path (`circuit.no_panel`). The selected circuit's path is drawn dashed in the view. Not yet: the Edit Path tool session with node grips, risers as node elevations, the drop allowance per device, the micro-operations, the length in a pset.
+
 **Acceptance criteria.**
-- [ ] Switching from Farthest Device to All Devices increases the reported length by the extra daisy-chain distance, and voltage drop updates.
-- [ ] Raising a 4-device circuit's offset by 1 m increases the Farthest Device length by 2 m (up and down), and nothing else changes.
-- [ ] Moving a device on a Custom-path circuit flags the path as possibly out of date; *Reset Path* clears the flag.
+- [x] Switching from Farthest Device to All Devices increases the reported length by the extra daisy-chain distance, and voltage drop updates.
+- [x] Raising a 4-device circuit's offset by 1 m increases the Farthest Device length by 2 m (up and down), and nothing else changes.
+- [x] Moving a device on a Custom-path circuit flags the path as possibly out of date; *Reset Path* clears the flag.
 - [ ] Adding a riser node 3 m above the previous node adds exactly 3 m to the circuit length.
 
 ### 4.9.5 Circuit properties, cable sizing and voltage drop
@@ -19208,9 +19212,11 @@ The *Edit Path* mode runs as a tool session (`tool.start`/`tool.finish`/`tool.ca
 
 *Built (2026-10-20), load name and rating:* `circuit.set(circuit_id, load_name?, rating?)`: a circuit's load name is made from its loads (the load classification and first device's name, "Lighting – Downlight", *Mixed* when they differ; a feeder's is the panel it feeds; other kinds their kind) until edited, and an empty name goes back to it; `circuit.list` reports `load_name`, `load_name_edited` and `rating` (amperes). Panel schedules show and edit both. Not yet: the other calculated properties (current per phase, power factor, length, voltage drop), cable type, runs and size, automatic cable sizing.
 
+*Built (2026-10-20), sizing and voltage drop:* `circuit.properties` gives the number, load name, phase labels (A/B/C by slot), elements, apparent load, power factor (real over apparent power of the members), design current (S/V, or S/(√3 V) three-phase), rating, path and length, cable type, conductor size (sized, or given by hand) and runs, voltage drop in V and % of the circuit's voltage against its limit, the corrected ampacity and warnings. The drop is k × I × L × (R cos φ + X sin φ) / runs with k = 2 single-phase and √3 three-phase, R at the insulation's maximum temperature (ρ₂₀(1 + α(T − 20)) / A), X the project's reactance (0.08 mΩ/m). Sizing picks the smallest conductor of the cable type's size system (IEC or AWG) within the limit (3 % by default, per circuit with `circuit.size_cable(max_vd_percent)`) that, where the user's ampacity table has rows for the cable's material and insulation, carries the rating (or design current) × runs × the correction factor; it re-runs whenever the circuit, its devices, path or the settings change. A size given with `circuit.set(cable_size)` is kept, with a warning when it fails either check; `circuit.size_cable` sizes again. `circuit.set` also takes `cable_type` and `runs`. Systems › Electrical › **Circuit Properties** shows it all and edits the load name, rating, cable type, size (or Auto), runs, path mode, offset and limit. Not yet: connection type editing, the cable as `IfcCableSegment`, protective devices in IFC, writing the voltage drop to psets, per-size reactance, ambient and grouping factors as separate tables.
+
 **Acceptance criteria.**
-- [ ] A 16 A, 230 V single-phase circuit 40 m long with a 2 kW load gets the smallest conductor in the cable table whose voltage drop is ≤ 3%. The reported drop matches a hand calculation within 0.1 percentage points.
-- [ ] Editing *Rating* to 20 A re-runs cable sizing.
+- [x] A 16 A, 230 V single-phase circuit 40 m long with a 2 kW load gets the smallest conductor in the cable table whose voltage drop is ≤ 3%. The reported drop matches a hand calculation within 0.1 percentage points.
+- [x] Editing *Rating* to 20 A re-runs cable sizing.
 
 ### 4.9.6 Panel connections, feeders and transformers
 **ID:** MEP-ELEC-006 · **Priority:** P2 · **Ref:** research/03 §10.2 ("Panel connections")

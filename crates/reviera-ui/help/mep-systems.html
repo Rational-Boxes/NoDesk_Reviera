@@ -13,6 +13,7 @@ Water 1. The tools are on the <b>Systems</b> tab.</p>
   <a href="#circuits">Electrical circuits</a>
   <a href="#tray">Cable tray and conduit</a>
   <a href="#feeders">Feeders and transformers</a>
+  <a href="#sizing">Cable sizing and voltage drop</a>
   <a href="#schedules">Panel schedules</a>
   <a href="#loads">Load classifications and demand factors</a>
   <a href="#types">System types</a>
@@ -130,6 +131,24 @@ feeder takes slots on a breaker, or none on the source's <b>feed-through lugs</b
 Panel Settings; one feeder per panel). The fed panel's whole load then counts on its source.
 <a href="reviera:action/panel.hierarchy">Panel Hierarchy</a> shows the tree from the supplies
 down, with each panel's connected load.</p>
+
+<h2 id="sizing">Cable sizing and voltage drop</h2>
+<p>Select a device or panel and choose <a href="reviera:action/circuit.properties">Circuit
+Properties</a>. It shows the circuit's load, power factor, current, the length of its
+<b>path</b> from the panel, its cable and its <b>voltage drop</b>. The path is drawn dashed in the
+view while the circuit is selected. <i>Farthest Device</i> runs square to the axes to the
+furthest device. <i>All Devices</i> runs from device to device. The <b>path offset</b> raises
+the horizontal runs, for example into a ceiling void.</p>
+<p>Unless you choose a conductor size, Reviera picks the smallest one of the cable type whose
+voltage drop stays within the limit (3 % unless you change it). It also has to carry the circuit's
+rating, wherever your ampacity table gives a value for that conductor. A size you choose is
+kept, and the dialog warns you when it fails. Sizing runs again whenever the circuit, its
+devices, its path or the settings change.</p>
+<p>Reviera does not ship ampacity tables, because code tables can be copyrighted. Enter your
+code's values under <a href="reviera:action/wiring.settings">Manage › MEP Settings › Wiring</a>,
+one row per line (for example <code>copper, pvc, 2_5mm2, 24</code>). That dialog also holds the
+default cable type, the voltage drop limit, a correction factor for ampacities and the default
+path offset.</p>
 
 <h2 id="schedules">Panel schedules</h2>
 <p>Select a panel and choose <a href="reviera:action/panel_schedule.create">Panel Schedules</a>
