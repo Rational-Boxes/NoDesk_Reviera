@@ -709,11 +709,16 @@ tools and the datums.
   `reinforcement_numbering.*`; STR-RBR-016); per-view visibility (unobscured through the host,
   solid or centrelines) and presentation (all, first/last, middle, picked bars, with the set's
   extent line) (`rebar.set_view_visibility`, `rebar.set_presentation`; STR-RBR-017). Not yet:
-  two-point and sketched bars, varying sets, cranks and spirals, shape matching, bent fabric.
+  two-point and sketched bars, cranks and spirals, shape matching, bent fabric.
   Editing: segments set by hand, bars removed, moved and reset, Split Set, Propagate to other
   hosts and Pick New Host; lap splices (with stagger) and couplers between bar ends
   (`rebar.set_segment_length`, `rebar.split_set`, `rebar.propagate`, `rebar.splice`,
   `rebar_coupler.place`, …; STR-RBR-006, STR-RBR-015).
+  Varying sets: bars through a wall's thickness, each fitted at its own height, so they follow a
+  slanted or tapered wall; each length takes its own number (tags and schedules show the
+  range); exported as a REINFORCEMENT_UNIT assembly of one bar per length
+  (`rebar.convert_to_varying`, `rebar.convert_to_standard`; STR-RBR-005). Not yet: other
+  placements varying, a schedule row per length.
   Rebar documentation: a Rebar Tag (number and "15 Ø12 @ 150"), multi-rebar annotations across
   parallel sets, bending details with segment values, and a Bar Bending Schedule grouped by
   partition and number with mass from nominal kg/m (`rebar_tag.place`,
@@ -1096,7 +1101,7 @@ area by area (reviewed against the spec on 2026-10-15).
   are built (see [Structure](#structure-in-development)). Still to build: the beam join editor and arc
   beams, placing braces in elevations, the connection library's packages and its other
   connection groups, composite decks and span symbols, truss families (a layout shared by types),
-  further rebar (two-point, sketched, varying, bent fabric), bilinear and two-way area loads, panel results and external analysis providers.
+  further rebar (two-point, sketched, varying sets beyond bars through walls, bent fabric), bilinear and two-way area loads, panel results and external analysis providers.
 - **MEP, families and collaboration** (BIMserver, OpenCDE, Godot) are specified but not started.
 - **Remote computation subsystem** (DM-RPC-001 … 010): in development; the first milestone is
   built (see [Analysis and remote computation](#analysis-and-remote-computation-in-development)).

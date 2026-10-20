@@ -42,6 +42,8 @@ pub const FIELDS: &[(&str, &str, bool)] = &[
     ("rebar.quantity", "Quantity", true),
     ("rebar.spacing", "Spacing", false),
     ("rebar.bar_length", "Bar Length", false),
+    ("rebar.min_length", "Minimum Bar Length", false),
+    ("rebar.max_length", "Maximum Bar Length", false),
     ("rebar.total_length", "Total Length", true),
     ("rebar.mass", "Mass", true),
     ("rebar.description", "Description", false),
@@ -93,8 +95,18 @@ pub fn infos(store: &Store) -> std::collections::HashMap<ElementId, RebarInfo> {
 /// A rebar field of a set: its text and number (for sorting and totals).
 pub fn field(store: &Store, i: &RebarInfo, key: &str) -> Option<(String, Option<f64>)> {
     let mm = |v: f64| (format!("{:.0}", v * 1000.0), Some(v));
+    // A varying set's lengths and numbers show as ranges (STR-RBR-005).
+    let range = |(lo, hi): (f64, f64)| (format!("{:.0}–{:.0}", lo * 1000.0, hi * 1000.0), Some(hi));
+    let min = i.rounded_lengths.iter().copied().reduce(f64::min);
+    let max = i.rounded_lengths.iter().copied().reduce(f64::max);
     Some(match key {
-        "rebar.number" => (i.number.map(|n| n.to_string()).unwrap_or_default(), i.number.map(f64::from)),
+        "rebar.number" => match i.number_range() {
+            Some((lo, hi)) => (format!("{lo}–{hi}"), Some(f64::from(lo))),
+            None => (i.number.map(|n| n.to_string()).unwrap_or_default(), i.number.map(f64::from)),
+        },
+        "rebar.bar_length" | "rebar.A" if i.varying && i.length_range().is_some() => range(i.length_range()?),
+        "rebar.min_length" => min.map_or((String::new(), None), mm),
+        "rebar.max_length" => max.map_or((String::new(), None), mm),
         "rebar.partition" => (i.partition.clone(), None),
         "rebar.shape" => (i.shape.clone(), None),
         "rebar.bar_type" => (i.bar_type.clone(), None),

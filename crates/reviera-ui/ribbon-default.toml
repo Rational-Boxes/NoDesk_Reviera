@@ -1524,6 +1524,18 @@ icon = "rebar_move_bar"
 help = "Click a bar of the selected set, then give how far to move it along the set"
 
 [[action]]
+id = "rebar.convert_to_varying"
+label = "Convert to Varying"
+icon = "rebar_varying"
+help = "Fit each bar of the selected sets to the host at its own place: bars through a tapered wall follow the taper"
+
+[[action]]
+id = "rebar.convert_to_standard"
+label = "Convert to Standard"
+icon = "rebar_standard"
+help = "Give every bar of the selected varying sets the first bar's length; refused while their lengths differ"
+
+[[action]]
 id = "rebar.reset_bars"
 label = "Reset Bars"
 icon = "rebar_reset"
@@ -2606,6 +2618,10 @@ panels = [
     { action = "rebar.pick_new_host", size = "small" },
     { action = "rebar.splice", size = "small" },
     { action = "rebar_coupler.place", size = "small" },
+  ] },
+  { label = "Set Type", tools = [
+    { action = "rebar.convert_to_varying", size = "small" },
+    { action = "rebar.convert_to_standard", size = "small" },
   ] },
   { label = "Annotate", tools = [
     { action = "rebar_tag.place", size = "large" },

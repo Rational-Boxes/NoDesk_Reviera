@@ -126,6 +126,8 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(RebarRemoveBar),
         registry.add(RebarResetBars),
         registry.add(RebarSplitSet),
+        registry.add(RebarConvertToVarying),
+        registry.add(RebarConvertToStandard),
         registry.add(RebarPropagate),
         registry.add(RebarPickNewHost),
         registry.add(RebarSplice),
@@ -2670,7 +2672,10 @@ edit_command!(
      `{kind: face, face: top|bottom|left|right}` for straight, L or U bars (00, 11, 21) along a \
      member at a face, or `{kind: layer, face, angle, vertical, offset}` for straight bars in a \
      floor's top or bottom layer or a wall's exterior or interior face, each clipped to the \
-     outline less the edge cover. `layout` (STR-RBR-008): `rule` single, fixed_number (n), \
+     outline less the edge cover, or `{kind: through, along}` for straight bars through a wall's \
+     thickness `along` metres from its start, spread up it. `varying` (STR-RBR-005) fits each bar \
+     to the host at its own place (bars through a slanted or tapered wall); a standard set's bars \
+     all take the first one's length. `layout` (STR-RBR-008): `rule` single, fixed_number (n), \
      maximum_spacing (spacing), number_with_spacing (n, spacing), minimum_clear_spacing (clear) or \
      custom (formula like `3x100; ?x200; 5x100` or `1400@100; 900@300`, mm). Bars keep inside the \
      host faces' covers; a shape that cannot fit is refused naming the dimension. Returns the set.",
@@ -3240,6 +3245,31 @@ edit_command!(
     crate::rebar_edit::ResetParams,
     (),
     crate::rebar_edit::reset_bars
+);
+
+edit_command!(
+    RebarConvertToVarying,
+    "rebar.convert_to_varying",
+    "Make rebar sets varying",
+    "Makes sets varying (STR-RBR-005): each bar fitted to the host at its own place, so bars through \
+     a tapered wall follow the taper. Each distinct rounded length takes its own rebar number. Only \
+     bars through a wall's thickness vary yet.",
+    "Convert to Varying",
+    crate::rebar::ConvertParams,
+    (),
+    crate::rebar::convert_to_varying
+);
+
+edit_command!(
+    RebarConvertToStandard,
+    "rebar.convert_to_standard",
+    "Make varying rebar sets standard",
+    "Makes varying sets standard (STR-RBR-005), every bar the first one's length; refused while the \
+     bars have more than one rounded length, naming how many.",
+    "Convert to Standard",
+    crate::rebar::ConvertParams,
+    (),
+    crate::rebar::convert_to_standard
 );
 
 edit_command!(

@@ -1863,8 +1863,8 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `rebar.add_crank` | 4 | rebar_id, segment, position, length, offset, angle | — | Yes | STR-RBR-009 |
 | `rebar.can_host` | 4 | element_id | bool | No | STR-RBR-001 |
 | `rebar.constrain` | 4 | rebar_id, handle_id, target_kind, target_ref, offset | — | Yes | STR-RBR-007 |
-| `rebar.convert_to_standard` | 4 | rebar_id | — | Yes | STR-RBR-005 |
-| `rebar.convert_to_varying` | 4 | rebar_id | — | Yes | STR-RBR-005 |
+| `rebar.convert_to_standard` | 4 | rebar_ids | — | Yes | STR-RBR-005 |
+| `rebar.convert_to_varying` | 4 | rebar_ids | — | Yes | STR-RBR-005 |
 | `rebar.distribute_along_path` | 4 | main_rebar_id, edge_refs[], range? | rebar_id | Yes | STR-RBR-014 |
 | `rebar.distribute_morphed` | 4 | driver_stirrup_set_id, bar_type_id, count \ | spacing | rebar_id | Yes |
 | `rebar.move_bar_in_set` | 4 | rebar_id, bar_index, delta | — | Yes | STR-RBR-006 |

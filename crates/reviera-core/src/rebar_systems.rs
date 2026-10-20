@@ -285,6 +285,7 @@ pub fn area_sets(store: &Store, r: &AreaRecipe) -> Result<Vec<(usize, RebarRecip
                 layout,
                 edits: rebar::BarEdits::default(),
                 splice: None,
+                varying: false,
             },
         ));
     }

@@ -814,13 +814,15 @@ No IFC equivalent.
 
 **Data (IFC mapping).** One `IfcReinforcingBar` per distinct length group, aggregated under one `IfcElementAssembly` (`REINFORCEMENT_UNIT`), with the varying flag in RXD element data (`rebar`). Each group's `BarLength` is its own length; the set-level layout recipe (STR-RBR-004) is stored once on the assembly.
 
-**Commands.** `rebar.convert_to_varying(rebar_id)`, `rebar.convert_to_standard(rebar_id)`
+**Commands.** `rebar.convert_to_varying(rebar_ids)`, `rebar.convert_to_standard(rebar_ids)`
 
 **Acceptance criteria.**
-- [ ] A set in a tapered wall produces bars whose lengths follow the taper, and the schedule shows a length range.
-- [ ] Converting a varying set in a tapered wall back to standard is refused and the message names the number of differing lengths.
-- [ ] A varying set with five distinct rounded lengths exports one `IfcElementAssembly` (`REINFORCEMENT_UNIT`) aggregating five `IfcReinforcingBar` groups.
-- [ ] Placing a varying set against a curved wall face is refused with an explanation.
+- [x] A set in a tapered wall produces bars whose lengths follow the taper, and the schedule shows a length range.
+- [x] Converting a varying set in a tapered wall back to standard is refused and the message names the number of differing lengths.
+- [x] A varying set with five distinct rounded lengths exports one `IfcElementAssembly` (`REINFORCEMENT_UNIT`) aggregating five `IfcReinforcingBar` groups.
+- [x] Placing a varying set against a curved wall face is refused with an explanation.
+
+*Built (2026-10-19):* a new placement, `{kind: through, along}`: straight bars across a wall's thickness between its exterior and interior covers, `along` metres from its start, spread up the wall by any layout rule (spacing measured up the wall). `rebar.place` takes `varying`; a varying set fits each bar to the wall's faces at its own height (slanted and tapered cross-sections, ARC-WALL-005; the cover measured square to a leaning face), a standard set's bars all take the first bar's length, centred in their section. `rebar.convert_to_varying` and `rebar.convert_to_standard` take `rebar_ids`; Convert to Standard is refused while the bars have more than one rounded length (`rebar.lengths_differ`, naming how many and which); a set that regenerates to one length stays varying until converted. Curved walls are refused (`rebar.curved`, saying why). Placements other than Through are refused (`rebar.not_varying`): layers in floors and walls already fit each bar to the outline. Each distinct rounded length is its own numbering identity (the same as a standard straight bar of that length), so a varying set carries several numbers; `rebar.info` gives `varying`, `length_groups` (length, count, number) and a length range in `length_text`; the Rebar Tag, Properties and the schedule's Rebar Number show the number range ("8–18"); Bar Length and segment A show the length range, with *Minimum Bar Length* and *Maximum Bar Length* fields. IFC: the set's own `IfcReinforcingBar` is the first length group; the other groups are derived `IfcReinforcingBar`s, all aggregated under a derived `IfcElementAssembly` (`REINFORCEMENT_UNIT`) that the host aggregates, rewritten on every save and skipped on load (the recipe stays on the set). The Rebar dialog has *Through the wall* with *Along the wall* and *Set type*; the set's tab has a Set Type panel (Convert to Varying, Convert to Standard); Properties show Set type. Not yet: varying for other placements (sloped floor edges, beams of varying depth), shape handles, a schedule row per length.
 
 ### 4.2.6 Rebar editing, propagation and splitting
 **ID:** STR-RBR-006 · **Priority:** P2 · **Ref:** research/03 §3.2 ("Editing")
@@ -5489,8 +5491,8 @@ Every command below is registered once in the command registry and is exposed au
 | `rebar.place` | host_id, shape_id, bar_type_id, method: "expand"\|"two_points"\|"sketch", plane, orientation, points?, layout? | rebar_id | Yes | STR-RBR-003 |
 | `rebar_shape_browser.show` | — | — | No | STR-RBR-003 |
 | `rebar.set_layout` | rebar_id, rule, n?, spacing?, clear?, formula? | — | Yes | STR-RBR-004 |
-| `rebar.convert_to_varying` | rebar_id | — | Yes | STR-RBR-005 |
-| `rebar.convert_to_standard` | rebar_id | — | Yes | STR-RBR-005 |
+| `rebar.convert_to_varying` | rebar_ids | — | Yes | STR-RBR-005 |
+| `rebar.convert_to_standard` | rebar_ids | — | Yes | STR-RBR-005 |
 | `rebar.set_segment_length` | rebar_id, segment, length | — | Yes | STR-RBR-006 |
 | `rebar.move_bar_in_set` | rebar_id, bar_index, delta | — | Yes | STR-RBR-006 |
 | `rebar.remove_bar` | rebar_id, index | — | Yes | STR-RBR-006 |

@@ -896,6 +896,9 @@ pub enum Placement {
         #[serde(default, skip_serializing_if = "std::ops::Not::not")]
         hook_flip: bool,
     },
+    /// Straight bars through a wall's thickness, between its exterior and interior covers, at
+    /// `along` metres from the wall's start, spread up the wall (STR-RBR-005).
+    Through { along: f64 },
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
@@ -912,6 +915,10 @@ pub struct RebarRecipe {
     /// The set's part of a splice (STR-RBR-015).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub splice: Option<Splice>,
+    /// Each bar fitted to the host at its own place (STR-RBR-005); a standard set's bars are
+    /// all the first one's length.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub varying: bool,
 }
 
 /// Edits to a set's bars (STR-RBR-006), by layout position.
@@ -1399,9 +1406,88 @@ fn base_geometry(store: &Store, r: &RebarRecipe) -> Result<SetGeometry> {
             let longest = bars.iter().map(Bar::length).fold(0.0, f64::max);
             Ok(SetGeometry { bars, dimensions: vec![("A".into(), longest)], role: "main".into(), array_length: spread, indices: Vec::new() })
         }
+        (Placement::Through { along }, HostKind::Wall) => {
+            if sh.code != "00" {
+                return Err(Error::new("rebar.shape", "bars through a wall take shape 00 (straight)"));
+            }
+            let w = crate::walls::wall_recipe(host).ok_or_else(|| Error::new("rebar.no_host", "the host is not a Reviera wall"))?;
+            if !w.through.is_empty() {
+                return Err(Error::new(
+                    "rebar.curved",
+                    "the wall is curved: bars through it need straight faces (inclined faces are fine, arcs and splines are not yet)",
+                ));
+            }
+            let g = crate::walls::regenerate(store, host)?;
+            let (dir, nrm) = (g.direction(), g.normal());
+            let ext = if w.flip { -1.0 } else { 1.0 };
+            let l = g.length();
+            let edge = cov("other") + d / 2.0;
+            if *along < edge - 1e-9 || *along > l - edge + 1e-9 {
+                return Err(Error::new(
+                    "rebar.no_fit",
+                    format!("{:.0} mm along is outside the wall's {:.0} mm less its cover", along * 1000.0, l * 1000.0),
+                ));
+            }
+            let (cb, ct) = (cov("bottom"), cov("top"));
+            let span = fit("height", g.height - cb - ct)? - d;
+            let pos = positions(&r.layout, span, d)?;
+            // Each face's place across the wall (toward its exterior from the location line) at
+            // a height, and its lean from vertical.
+            let half = g.width / 2.0;
+            let (lean_e, lean_i) = match w.cross_section {
+                Some(crate::walls::cross_section::CrossSection::Slanted { angle }) => (angle, angle),
+                Some(crate::walls::cross_section::CrossSection::Tapered { exterior, interior }) => (exterior, interior),
+                None => (0.0, 0.0),
+            };
+            let faces = |h: f64| match w.cross_section {
+                Some(crate::walls::cross_section::CrossSection::Slanted { angle }) => {
+                    let shift = -h * angle.tan() * ext;
+                    (half + shift, -half + shift)
+                }
+                Some(crate::walls::cross_section::CrossSection::Tapered { exterior, interior }) => (half - h * exterior.tan(), -half + h * interior.tan()),
+                None => (half, -half),
+            };
+            // The covers measured across the wall, square to the leaning faces.
+            let (ce, ci) = (cov("exterior") / lean_e.cos(), cov("interior") / lean_i.cos());
+            let fitted: Vec<(f64, f64, f64)> = pos
+                .iter()
+                .map(|t| {
+                    let h = cb + d / 2.0 + t;
+                    let (se, si) = faces(h);
+                    let (s0, s1) = (si + ci, se - ce);
+                    if s1 - s0 <= d {
+                        return Err(Error::new(
+                            "rebar.no_fit",
+                            format!("the bars do not fit: {:.0} mm up the wall is {:.0} mm inside the cover", h * 1000.0, (s1 - s0).max(0.0) * 1000.0),
+                        ));
+                    }
+                    Ok((h, s0, s1))
+                })
+                .collect::<Result<_>>()?;
+            // A standard set's bars all take the first one's length, centred in their section.
+            let first = fitted.first().map_or(0.0, |(_, s0, s1)| s1 - s0);
+            let first = segment_override(r, "A", first)?.min(first);
+            let at = |h: f64, s: f64| {
+                let q = [g.start[0] + dir[0] * along + nrm[0] * ext * s, g.start[1] + dir[1] * along + nrm[1] * ext * s];
+                [q[0], q[1], g.base_z + h]
+            };
+            let bars = fitted
+                .iter()
+                .map(|&(h, s0, s1)| {
+                    let (s0, s1) = if r.varying {
+                        (s0, s1)
+                    } else {
+                        let m = (s0 + s1) / 2.0;
+                        (m - first / 2.0, m + first / 2.0)
+                    };
+                    Bar { points: vec![at(h, s0), at(h, s1)] }
+                })
+                .collect();
+            Ok(SetGeometry { bars, dimensions: vec![("A".into(), first)], role: "main".into(), array_length: span, indices: Vec::new() })
+        }
         (p, k) => Err(Error::new(
             "rebar.placement",
-            format!("a {k:?} takes {}, not {p:?}", match k { HostKind::Floor | HostKind::Wall => "layers", _ => "section or face placements" }),
+            format!("a {k:?} takes {}, not {p:?}", match k { HostKind::Floor => "layers", HostKind::Wall => "layers or bars through it", _ => "section or face placements" }),
         )),
     }
 }
@@ -1421,6 +1507,9 @@ pub struct PlaceParams {
     pub placement: Placement,
     #[serde(default)]
     pub layout: Layout,
+    /// A varying set: each bar fitted to the host at its own place (STR-RBR-005).
+    #[serde(default)]
+    pub varying: bool,
 }
 
 fn expand() -> String {
@@ -1446,7 +1535,11 @@ pub(crate) fn place(txn: &mut crate::txn::Transaction<'_>, p: PlaceParams) -> Re
         layout: p.layout.clone(),
         edits: BarEdits::default(),
         splice: None,
+        varying: p.varying,
     };
+    if p.varying {
+        varying_check(&r)?;
+    }
     let g = geometry(&store, &r)?;
     let predefined = if g.role == "ligature" { "LIGATURE" } else { "MAIN" };
     let id = txn.create(
@@ -1565,6 +1658,90 @@ pub(crate) fn rehost(txn: &mut crate::txn::Transaction<'_>, p: RehostParams) -> 
     crate::rebar_numbers::persist(txn)
 }
 
+// ---- Varying sets (STR-RBR-005) ----
+
+/// Whether a set can vary: only bars through a wall's thickness yet.
+fn varying_check(r: &RebarRecipe) -> Result<()> {
+    match r.placement {
+        Placement::Through { .. } => Ok(()),
+        _ => Err(Error::new(
+            "rebar.not_varying",
+            "only bars through a wall's thickness can vary yet; layers already follow the host's outline bar by bar",
+        )),
+    }
+}
+
+/// A bar length as schedules and numbers take it: bar-length rounding, else to the millimetre.
+pub fn rounded_length(store: &Store, l: f64) -> f64 {
+    let s = settings(store);
+    if s.rounding.on { s.rounding.round(l, s.rounding.bar_length) } else { (l * 1000.0).round() / 1000.0 }
+}
+
+/// A set's bars grouped by rounded length, in the order the lengths first appear: each group's
+/// length and its bars' places in the set.
+pub fn length_groups(store: &Store, g: &SetGeometry) -> Vec<(f64, Vec<usize>)> {
+    let mut out: Vec<(f64, Vec<usize>)> = Vec::new();
+    for (k, b) in g.bars.iter().enumerate() {
+        let l = rounded_length(store, b.length());
+        match out.iter_mut().find(|(m, _)| (m - l).abs() < 1e-9) {
+            Some((_, v)) => v.push(k),
+            None => out.push((l, vec![k])),
+        }
+    }
+    out
+}
+
+/// Whether a set is varying.
+pub fn is_varying(e: &Element) -> bool {
+    rebar_recipe(e).is_some_and(|r| r.varying)
+}
+
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+pub struct ConvertParams {
+    pub rebar_ids: Vec<ElementRef>,
+}
+
+/// Makes sets varying (`rebar.convert_to_varying`).
+pub(crate) fn convert_to_varying(txn: &mut crate::txn::Transaction<'_>, p: ConvertParams) -> Result<()> {
+    for r in &p.rebar_ids {
+        let store = txn.store().clone();
+        let id = store.resolve(r).ok_or_else(|| Error::new("element.not_found", format!("no element {r:?}")))?;
+        let mut rec = store.get(id).and_then(rebar_recipe).ok_or_else(|| Error::new("rebar.not_rebar", format!("element {id} is not a rebar set")))?;
+        varying_check(&rec)?;
+        rec.varying = true;
+        geometry(&store, &rec)?;
+        txn.set_param(id, RECIPE_KEY, serde_json::to_value(&rec).expect("serialises"))?;
+    }
+    crate::rebar_numbers::persist(txn)
+}
+
+/// Makes varying sets standard (`rebar.convert_to_standard`), refused while their bars have
+/// more than one length.
+pub(crate) fn convert_to_standard(txn: &mut crate::txn::Transaction<'_>, p: ConvertParams) -> Result<()> {
+    for r in &p.rebar_ids {
+        let store = txn.store().clone();
+        let id = store.resolve(r).ok_or_else(|| Error::new("element.not_found", format!("no element {r:?}")))?;
+        let mut rec = store.get(id).and_then(rebar_recipe).ok_or_else(|| Error::new("rebar.not_rebar", format!("element {id} is not a rebar set")))?;
+        if !rec.varying {
+            continue;
+        }
+        let groups = length_groups(&store, &geometry(&store, &rec)?);
+        if groups.len() > 1 {
+            let mut ls: Vec<f64> = groups.iter().map(|(l, _)| *l).collect();
+            ls.sort_by(f64::total_cmp);
+            let list: Vec<String> = ls.iter().map(|l| format!("{:.0}", l * 1000.0)).collect();
+            return Err(Error::new(
+                "rebar.lengths_differ",
+                format!("set {id}'s bars have {} different lengths ({} mm); a standard set needs one length", groups.len(), list.join(", ")),
+            )
+            .with_details(serde_json::json!({ "lengths": groups.len() })));
+        }
+        rec.varying = false;
+        txn.set_param(id, RECIPE_KEY, serde_json::to_value(&rec).expect("serialises"))?;
+    }
+    crate::rebar_numbers::persist(txn)
+}
+
 #[derive(Debug, Clone, Serialize, JsonSchema)]
 pub struct RebarInfo {
     pub id: ElementId,
@@ -1593,6 +1770,33 @@ pub struct RebarInfo {
     /// The rebar number (STR-RBR-016) and partition ("" for none).
     pub number: Option<u32>,
     pub partition: String,
+    /// Each bar fitted at its own place (STR-RBR-005).
+    pub varying: bool,
+    /// A varying set's length groups: rounded length, bar count and number.
+    pub length_groups: Vec<LengthGroup>,
+}
+
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+pub struct LengthGroup {
+    pub length: f64,
+    pub count: usize,
+    pub number: Option<u32>,
+}
+
+impl RebarInfo {
+    /// The shortest and longest rounded length, when they differ.
+    pub fn length_range(&self) -> Option<(f64, f64)> {
+        let lo = self.rounded_lengths.iter().copied().reduce(f64::min)?;
+        let hi = self.rounded_lengths.iter().copied().reduce(f64::max)?;
+        (hi - lo > 1e-9).then_some((lo, hi))
+    }
+
+    /// The numbers of a varying set's groups, lowest and highest, when they differ.
+    pub fn number_range(&self) -> Option<(u32, u32)> {
+        let lo = self.length_groups.iter().filter_map(|g| g.number).min()?;
+        let hi = self.length_groups.iter().filter_map(|g| g.number).max()?;
+        (hi > lo).then_some((lo, hi))
+    }
 }
 
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
@@ -1616,12 +1820,25 @@ pub fn info(store: &Store, p: InfoParams) -> Result<Vec<RebarInfo>> {
             let g = geometry(store, &rec)?;
             let lengths: Vec<f64> = g.bars.iter().map(Bar::length).collect();
             let rounded: Vec<f64> = lengths.iter().map(|l| s.rounding.round(*l, s.rounding.bar_length)).collect();
+            let lo = rounded.iter().copied().fold(f64::INFINITY, f64::min);
+            let hi = rounded.iter().copied().fold(f64::NEG_INFINITY, f64::max);
             let text = match (lengths.first(), rounded.first()) {
+                _ if rec.varying && hi - lo > 1e-9 => format!("{:.0}–{:.0}", lo * 1000.0, hi * 1000.0),
                 (Some(l), Some(r)) if s.rounding.on => format!("{:.0} [{:.0}]", l * 1000.0, r * 1000.0),
                 (Some(l), _) => format!("{:.0}", l * 1000.0),
                 _ => String::new(),
             };
             let total: f64 = rounded.iter().sum();
+            let mine: Vec<u32> = numbers.iter().filter(|(i, _)| i.element == id).map(|(_, n)| *n).collect();
+            let groups = if rec.varying {
+                length_groups(store, &g)
+                    .into_iter()
+                    .enumerate()
+                    .map(|(k, (length, bars))| LengthGroup { length, count: bars.len(), number: mine.get(k).copied() })
+                    .collect()
+            } else {
+                Vec::new()
+            };
             let area = std::f64::consts::PI * bt.diameter * bt.diameter / 4.0;
             Ok(RebarInfo {
                 id,
@@ -1643,8 +1860,10 @@ pub fn info(store: &Store, p: InfoParams) -> Result<Vec<RebarInfo>> {
                 role: g.role.clone(),
                 bar_indices: g.indices.clone(),
                 bars: g.bars,
-                number: numbers.iter().find(|(i, _)| i.element == id).map(|(_, n)| *n),
+                number: mine.first().copied(),
                 partition: store.get(id).map(crate::rebar_numbers::partition).unwrap_or_default(),
+                varying: rec.varying,
+                length_groups: groups,
             })
         })
         .collect()
@@ -1655,15 +1874,36 @@ pub fn mesh(store: &Store, e: &Element) -> Option<crate::bodies::Mesh> {
     let r = rebar_recipe(e)?;
     let bt = bar_type(store, &r.bar_type).ok()?;
     let g = geometry(store, &r).ok()?;
+    Some(bars_mesh(&g.bars.iter().collect::<Vec<_>>(), bt.model_diameter))
+}
+
+/// Tubes along bars of a diameter.
+pub fn bars_mesh(bars: &[&Bar], diameter: f64) -> crate::bodies::Mesh {
     let mut parts = Vec::new();
-    for b in &g.bars {
+    for b in bars {
         for w in b.points.windows(2) {
             if len(sub(w[1], w[0])) > 1e-6 {
-                parts.push(crate::steel_fab::cylinder(w[0], w[1], bt.model_diameter / 2.0, 8));
+                parts.push(crate::steel_fab::cylinder(w[0], w[1], diameter / 2.0, 8));
             }
         }
     }
-    Some(crate::steel_fab::join(parts))
+    crate::steel_fab::join(parts)
+}
+
+/// A varying set's length groups for IFC (STR-RBR-005): each group's rounded length, number and
+/// body.
+pub fn varying_parts(store: &Store, e: &Element) -> Option<Vec<(f64, Option<u32>, crate::bodies::Mesh)>> {
+    let r = rebar_recipe(e).filter(|r| r.varying)?;
+    let bt = bar_type(store, &r.bar_type).ok()?;
+    let g = geometry(store, &r).ok()?;
+    let numbers = crate::rebar_numbers::number_of(store, e.id());
+    Some(
+        length_groups(store, &g)
+            .into_iter()
+            .enumerate()
+            .map(|(k, (l, idx))| (l, numbers.get(k).copied(), bars_mesh(&idx.iter().map(|i| &g.bars[*i]).collect::<Vec<_>>(), bt.model_diameter)))
+            .collect(),
+    )
 }
 
 /// Whether an element goes with `guid`: a set in it.

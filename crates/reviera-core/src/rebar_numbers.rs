@@ -83,6 +83,8 @@ pub struct Item {
     pub element: ElementId,
     /// A fabric area's sheet, by its place in the area's list.
     pub sheet: Option<usize>,
+    /// A varying set's length group, by its place in the set's groups (STR-RBR-005).
+    pub group: Option<usize>,
     pub kind: Kind,
     pub partition: String,
     pub identity: String,
@@ -101,9 +103,27 @@ pub fn items(store: &Store) -> Vec<Item> {
             let Ok(g) = rebar::geometry(store, &r) else { continue };
             let dims: Vec<String> = g.dimensions.iter().map(|(k, v)| format!("{k}{}", mm(store, *v))).collect();
             let bar = rebar::bar_types(store).into_iter().find(|b| b.id == r.bar_type).map_or(r.bar_type.clone(), |b| b.name);
+            // Each length of a varying set is its own identity, as a standard set of that
+            // length would be.
+            if r.varying {
+                for (k, (l, _)) in rebar::length_groups(store, &g).into_iter().enumerate() {
+                    let dims = format!("A{}", mm(store, l));
+                    out.push(Item {
+                        element: e.id(),
+                        sheet: None,
+                        group: Some(k),
+                        kind: Kind::Rebar,
+                        partition: part.clone(),
+                        identity: format!("{}|{}|{dims}", r.bar_type, r.shape),
+                        summary: format!("{bar} shape {} {dims} (varying)", r.shape),
+                    });
+                }
+                continue;
+            }
             out.push(Item {
                 element: e.id(),
                 sheet: None,
+                group: None,
                 kind: Kind::Rebar,
                 partition: part,
                 identity: format!("{}|{}|{}", r.bar_type, r.shape, dims.join(" ")),
@@ -121,6 +141,7 @@ pub fn items(store: &Store) -> Vec<Item> {
                 out.push(Item {
                     element: e.id(),
                     sheet: rs::fabric_area_recipe(e).is_some().then_some(k),
+                    group: None,
                     kind: Kind::Fabric,
                     partition: part.clone(),
                     identity: format!("{t}|{shape}"),

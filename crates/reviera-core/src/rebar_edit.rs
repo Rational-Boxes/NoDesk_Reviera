@@ -233,7 +233,7 @@ pub(crate) fn propagate(txn: &mut crate::txn::Transaction<'_>, p: PropagateParam
                 match &mut copy.placement {
                     rebar::Placement::Face { face } => *face = f.clone(),
                     rebar::Placement::Layer { face, .. } => *face = f.clone(),
-                    rebar::Placement::Section => {}
+                    rebar::Placement::Section | rebar::Placement::Through { .. } => {}
                 }
             }
             match rebar::geometry(&store, &copy) {

@@ -30,7 +30,21 @@ offers the placements the selected kind of host takes:</p>
     along x). Each bar is clipped to the floor's outline and openings, less the edge cover.</li>
   <li><b>Wall faces</b>: straight bars at the exterior or interior face, vertical or
     horizontal.</li>
+  <li><b>Through the wall</b>: straight bars across the wall's thickness, between its exterior
+    and interior covers, spread up the wall. Give how far along the wall (empty for its
+    middle).</li>
 </ul>
+<p><b>Set type</b>: a <i>Standard</i> set's bars all take the first bar's length. A
+<i>Varying</i> set fits each bar to the host at its own place, so bars through a slanted or
+tapered wall follow its faces (the cover is measured square to a leaning face). Curved walls are
+refused. Convert to Varying and Convert to Standard on the set's tab change it later; Convert to
+Standard is refused while the bars have more than one length, and the message says how many.
+Each length of a varying set has its own rebar number, so its tag and schedule row show the
+range ("8–18"). The schedule's Bar Length shows the range of lengths, with Minimum and Maximum
+Bar Length as their own fields. In IFC a varying set is an <code>IfcElementAssembly</code>
+(REINFORCEMENT_UNIT) of one <code>IfcReinforcingBar</code> per length; the set itself is the
+first. Only bars through a wall vary yet. Layers in floors and walls already follow the
+outline bar by bar.</p>
 <p>Bars keep inside each face's cover. If a shape cannot fit, it is refused and the message
 names the width, depth or length that is too small.</p>
 
@@ -212,5 +226,5 @@ bar and total length, and mass (the bars' nominal mass per metre times their rou
 Any rebar schedule can show these fields, and R and the other segments, through Fields.</p>
 
 <h2 id="not-yet">Not yet</h2>
-<p>Placing rebar sets by two points or by sketch, shape handles, splice and coupler types, varying sets, cranks and spirals, bent and custom fabric sheets, reinforcement symbols, tags outside plans, hook angles on bending details, and fabric
+<p>Placing rebar sets by two points or by sketch, shape handles, splice and coupler types, varying sets other than bars through a wall (and a schedule row per length), cranks and spirals, bent and custom fabric sheets, reinforcement symbols, tags outside plans, hook angles on bending details, and fabric
 schedules.</p>

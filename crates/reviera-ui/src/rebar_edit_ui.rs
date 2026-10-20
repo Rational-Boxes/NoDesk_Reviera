@@ -117,6 +117,23 @@ impl Gui {
         }
     }
 
+    /// Convert to Varying (`true`) or to Standard (STR-RBR-005).
+    pub(crate) fn convert_rebar_sets(&mut self, varying: bool) {
+        let frame = self.frame;
+        let sets = self.selected_reinforcement(true);
+        if sets.is_empty() {
+            return frame.set_status_text("Select rebar sets first", 0);
+        }
+        let name = if varying { "rebar.convert_to_varying" } else { "rebar.convert_to_standard" };
+        match self.run(name, json!({ "rebar_ids": sets })) {
+            Ok(_) => {
+                self.refresh_scene(&frame);
+                frame.set_status_text(&format!("{} set(s) now {}", sets.len(), if varying { "varying" } else { "standard" }), 0);
+            }
+            Err(e) => error(&frame, &format!("The sets were not converted:\n{e}")),
+        }
+    }
+
     /// Propagate (`true`) or Pick New Host: click hosts.
     pub(crate) fn start_rebar_host_pick(&mut self, propagate: bool) {
         let frame = self.frame;

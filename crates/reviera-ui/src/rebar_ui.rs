@@ -34,6 +34,7 @@ fn placements(kind: HostKind) -> Vec<(&'static str, Value, &'static [&'static st
             ("Exterior face, horizontal", json!({ "kind": "layer", "face": "exterior", "vertical": false }), &["00"]),
             ("Interior face, vertical", json!({ "kind": "layer", "face": "interior", "vertical": true }), &["00"]),
             ("Interior face, horizontal", json!({ "kind": "layer", "face": "interior", "vertical": false }), &["00"]),
+            ("Through the wall, spread up it", json!({ "kind": "through", "along": 0.0 }), &["00"]),
         ],
     }
 }
@@ -142,6 +143,15 @@ impl Gui {
         let angle = TextCtrl::builder(&dialog).with_value("0").build();
         angle.set_tooltip("Floors: the bars' direction, 0 along x");
         grid.add(&angle, 1, SizerFlag::Expand, 0);
+        row(&dialog, &grid, "Along the wall (mm)");
+        let along = TextCtrl::builder(&dialog).with_value("").build();
+        along.set_tooltip("Bars through a wall: how far from the wall's start; empty for its middle");
+        grid.add(&along, 1, SizerFlag::Expand, 0);
+        row(&dialog, &grid, "Set type");
+        let set_type = Choice::builder(&dialog).with_choices(vec!["Standard".to_owned(), "Varying".to_owned()]).build();
+        set_type.set_selection(0);
+        set_type.set_tooltip("Varying fits each bar to the host at its own place, so bars through a tapered wall follow the taper; standard bars all take the first bar's length");
+        grid.add(&set_type, 1, SizerFlag::Expand, 0);
         row(&dialog, &grid, "Layout");
         let rule = Choice::builder(&dialog).with_choices(RULES.iter().map(|r| r.0.to_owned()).collect()).build();
         rule.set_selection(0);
@@ -183,13 +193,23 @@ impl Gui {
             placement["angle"] = json!(angle.get_value().trim().parse::<f64>().unwrap_or(0.0));
         }
         let bar_id = bar_ids.get(at(&bar)).cloned().unwrap_or_default();
+        let varying = at(&set_type) == 1;
+        let along_mm = along.get_value().trim().parse::<f64>().ok();
         let lay = layout(RULES[at(&rule).min(RULES.len() - 1)].1, &n.get_value(), &spacing.get_value(), &formula.get_value());
         dialog.destroy();
         let (mut placed, mut failed) = (Vec::new(), Vec::new());
         for h in &hosts {
+            if placement["kind"] == "through" {
+                // From the wall's start, else its middle.
+                let middle = self
+                    .store_now()
+                    .and_then(|st| st.get(*h).and_then(|e| reviera_core::walls::regenerate(&st, e).ok()))
+                    .map_or(0.0, |g| g.length() / 2.0);
+                placement["along"] = json!(along_mm.map_or(middle, |v| v / 1000.0));
+            }
             match self.run(
                 "rebar.place",
-                json!({ "host_id": h, "shape": code, "bar_type": bar_id, "placement": placement, "layout": lay }),
+                json!({ "host_id": h, "shape": code, "bar_type": bar_id, "placement": placement, "layout": lay, "varying": varying }),
             ) {
                 Ok(v) => placed.push(v),
                 Err(e) => failed.push(format!("{h}: {e}")),
@@ -401,7 +421,15 @@ impl Gui {
             grid.append(Property::string(label, name, value));
             grid.set_property_read_only(name, true);
         };
-        ro(grid, "Rebar Number", "rb_number", i["number"].as_u64().map_or(String::new(), |n| n.to_string()));
+        // A varying set's lengths each have a number: shown as their range (STR-RBR-005).
+        let nums: Vec<u64> = i["length_groups"].as_array().into_iter().flatten().filter_map(|g| g["number"].as_u64()).collect();
+        let number = match (nums.iter().min(), nums.iter().max()) {
+            (Some(lo), Some(hi)) if hi > lo => format!("{lo}–{hi}"),
+            _ => i["number"].as_u64().map_or(String::new(), |n| n.to_string()),
+        };
+        ro(grid, "Rebar Number", "rb_number", number);
+        ro(grid, "Set type", "rb_set_type", if i["varying"] == true { "Varying".to_owned() } else { "Standard".to_owned() });
+        grid.set_help_string("rb_set_type", "Varying: each bar fitted at its own place (Convert to Varying or Standard on the tab)");
         grid.append(Property::string("Partition", "rb_partition", i["partition"].as_str().unwrap_or("").to_owned()));
         grid.set_help_string("rb_partition", "Identical sets share a number within a partition (phase, location, top or bottom, …)");
         ro(grid, "Shape", "rb_shape", i["shape"].as_str().unwrap_or("").to_owned());

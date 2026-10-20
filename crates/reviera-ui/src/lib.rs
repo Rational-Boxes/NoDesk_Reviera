@@ -4553,6 +4553,8 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "rebar.split_set" => with(gui, |g| g.start_bar_edit(rebar_view_ui::BarPurpose::Split)),
         "rebar.move_bar_in_set" => with(gui, |g| g.start_bar_edit(rebar_view_ui::BarPurpose::Move)),
         "rebar.reset_bars" => with(gui, Gui::reset_rebar_bars),
+        "rebar.convert_to_varying" => with(gui, |g| g.convert_rebar_sets(true)),
+        "rebar.convert_to_standard" => with(gui, |g| g.convert_rebar_sets(false)),
         "rebar.propagate" => with(gui, |g| g.start_rebar_host_pick(true)),
         "rebar.pick_new_host" => with(gui, |g| g.start_rebar_host_pick(false)),
         "rebar.splice" => with(gui, Gui::splice_rebar),
