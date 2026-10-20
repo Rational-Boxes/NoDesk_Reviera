@@ -89,28 +89,86 @@ impl Default for SlabSegmentation {
     }
 }
 
+/// Area bars for pieces between two thicknesses (STR-PRE-003): one bar type and spacing both
+/// ways on each face.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct AreaType {
+    pub id: String,
+    pub name: String,
+    /// Piece thickness range (metres).
+    pub min_thickness: f64,
+    pub max_thickness: f64,
+    pub bar_type: String,
+    pub spacing: f64,
+}
+
+/// U-bars round openings and free edges (STR-PRE-003).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct EdgeType {
+    pub id: String,
+    pub name: String,
+    pub min_thickness: f64,
+    pub max_thickness: f64,
+    pub bar_type: String,
+    pub spacing: f64,
+    /// How far each leg runs into the piece from the edge (the lap with the area bars).
+    pub leg: f64,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(default)]
+pub struct ReinforcementConfig {
+    pub area_types: Vec<AreaType>,
+    pub edge_types: Vec<EdgeType>,
+}
+
+impl ReinforcementConfig {
+    /// Provisional starting types (see EXPERT_REVIEW.md E-12).
+    fn walls() -> Self {
+        let area = |id: &str, lo: f64, hi: f64, bar: &str, s: f64| AreaType { id: id.into(), name: format!("{bar} @ {:.0} each face", s * 1000.0), min_thickness: lo, max_thickness: hi, bar_type: bar.into(), spacing: s };
+        Self {
+            area_types: vec![area("A10-150", 0.12, 0.25, "d10", 0.15), area("A12-150", 0.25, 0.40, "d12", 0.15)],
+            edge_types: vec![EdgeType { id: "U10-200".into(), name: "U-bars d10 @ 200".into(), min_thickness: 0.12, max_thickness: 0.40, bar_type: "d10".into(), spacing: 0.2, leg: 0.5 }],
+        }
+    }
+
+    fn slabs() -> Self {
+        Self {
+            area_types: vec![AreaType { id: "S10-150".into(), name: "d10 @ 150 both ways, top and bottom".into(), min_thickness: 0.10, max_thickness: 0.35, bar_type: "d10".into(), spacing: 0.15 }],
+            edge_types: Vec::new(),
+        }
+    }
+}
+
 /// One kind of piece: its segmentation and the nodes the later steps fill.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(default, bound(deserialize = "S: Deserialize<'de> + Default"))]
 #[schemars(bound = "S: JsonSchema + Default")]
 pub struct KindConfig<S> {
     pub segmentation: S,
-    pub reinforcement: Value,
+    pub reinforcement: ReinforcementConfig,
     pub connections: Value,
     pub shop_drawing: Value,
 }
 
 impl<S: Default> Default for KindConfig<S> {
     fn default() -> Self {
-        Self { segmentation: S::default(), reinforcement: json!({}), connections: json!({}), shop_drawing: json!({}) }
+        Self { segmentation: S::default(), reinforcement: ReinforcementConfig::default(), connections: json!({}), shop_drawing: json!({}) }
     }
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(default)]
 pub struct WallKinds {
     pub solid: KindConfig<WallSegmentation>,
     pub double: KindConfig<WallSegmentation>,
+}
+
+impl Default for WallKinds {
+    fn default() -> Self {
+        let kind = || KindConfig::<WallSegmentation> { reinforcement: ReinforcementConfig::walls(), ..KindConfig::default() };
+        Self { solid: kind(), double: kind() }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
@@ -127,7 +185,8 @@ impl Default for SlabKinds {
         hollow.segmentation.min_width = 0.3;
         hollow.segmentation.max_width = 1.2;
         hollow.segmentation.strand_diameter = 0.0125;
-        Self { solid: KindConfig::default(), hollow_core: hollow, lattice_girder: KindConfig::default() }
+        let slab = || KindConfig::<SlabSegmentation> { reinforcement: ReinforcementConfig::slabs(), ..KindConfig::default() };
+        Self { solid: slab(), hollow_core: hollow, lattice_girder: slab() }
     }
 }
 
@@ -237,6 +296,38 @@ pub fn problems(c: &Config) -> Vec<(String, String)> {
         }
         if s.strand_diameter < 0.0 {
             bad(&p("strand_diameter"), "the strand diameter cannot be negative");
+        }
+    }
+    // Reinforcement types: sound values, ranges not overlapping within each list.
+    let kinds = [
+        ("wall.solid", &c.wall.solid.reinforcement),
+        ("wall.double", &c.wall.double.reinforcement),
+        ("slab.solid", &c.slab.solid.reinforcement),
+        ("slab.hollow_core", &c.slab.hollow_core.reinforcement),
+        ("slab.lattice_girder", &c.slab.lattice_girder.reinforcement),
+    ];
+    for (kind, r) in kinds {
+        let ranges = |list: Vec<(&str, f64, f64)>, what: &str, bad: &mut dyn FnMut(&str, &str)| {
+            for (i, (id, lo, hi)) in list.iter().enumerate() {
+                if *lo <= 0.0 || hi <= lo {
+                    bad(&format!("{kind}.reinforcement.{what}"), &format!("type {id}: its thickness range must run upward from above 0"));
+                }
+                if let Some((other, _, _)) = list[..i].iter().find(|(_, a, b)| lo < b && a < hi) {
+                    bad(&format!("{kind}.reinforcement.{what}"), &format!("types {other} and {id}: thickness ranges must not overlap"));
+                }
+            }
+        };
+        ranges(r.area_types.iter().map(|t| (t.id.as_str(), t.min_thickness, t.max_thickness)).collect(), "area_types", &mut bad);
+        ranges(r.edge_types.iter().map(|t| (t.id.as_str(), t.min_thickness, t.max_thickness)).collect(), "edge_types", &mut bad);
+        for t in &r.area_types {
+            if t.spacing <= 0.0 || t.bar_type.is_empty() {
+                bad(&format!("{kind}.reinforcement.area_types"), &format!("type {}: give a bar type and a spacing above 0", t.id));
+            }
+        }
+        for t in &r.edge_types {
+            if t.spacing <= 0.0 || t.leg <= 0.0 || t.bar_type.is_empty() {
+                bad(&format!("{kind}.reinforcement.edge_types"), &format!("type {}: give a bar type, a spacing and a leg above 0", t.id));
+            }
         }
     }
     // The filename rule: balanced braces around known names.
@@ -447,6 +538,9 @@ pub struct AssemblyRecipe {
     /// The divisions the split made, and whether it made the source's first parts.
     pub divisions: Vec<String>,
     pub created_parts: bool,
+    /// Reinforcement generated for the piece (GlobalIds, STR-PRE-003).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub reinforcement: Vec<String>,
 }
 
 pub fn assembly_recipe(e: &Element) -> Option<AssemblyRecipe> {
@@ -553,6 +647,8 @@ struct Plan {
     rules: String,
     /// The direction pieces are counted along (plan).
     along: [f64; 2],
+    /// Which pass cuts rows (walls taller than the maximum height).
+    rows_pass: Option<usize>,
 }
 
 type V3 = [f64; 3];
@@ -599,7 +695,8 @@ fn wall_plan(store: &Store, e: &Element, c: &Config, double: bool) -> Result<Pla
         let zs: Vec<f64> = (1..rows).map(|r| g.base_z + row_h * r as f64).collect();
         passes.push((zs.iter().map(|z| (at(0.0, *z), at(l, *z))).collect(), [nrm[0], nrm[1], 0.0], s.joint_gap_horizontal));
     }
-    Ok(Plan { piece: if double { PieceKind::DoubleWall } else { PieceKind::SolidWall }, passes, rules: fxhash(&serde_json::to_string(kind).expect("serialises")), along: dir })
+    let rows_pass = (rows > 1).then(|| passes.len() - 1);
+    Ok(Plan { piece: if double { PieceKind::DoubleWall } else { PieceKind::SolidWall }, passes, rules: fxhash(&serde_json::to_string(kind).expect("serialises")), along: dir, rows_pass })
 }
 
 fn slab_plan(store: &Store, e: &Element, c: &Config, kind: PieceKind) -> Result<Plan> {
@@ -666,7 +763,7 @@ fn slab_plan(store: &Store, e: &Element, c: &Config, kind: PieceKind) -> Result<
     let z = g.top;
     let at = |u: f64, v: f64| [axis[0] * (lo + u) + perp[0] * v, axis[1] * (lo + u) + perp[1] * v, z];
     let passes = if xs.is_empty() { Vec::new() } else { vec![(xs.iter().map(|u| (at(*u, plo - 1.0), at(*u, phi + 1.0))).collect(), [0.0, 0.0, 1.0], s.joint_gap)] };
-    Ok(Plan { piece: kind, passes, rules: fxhash(&serde_json::to_string(k).expect("serialises")), along: axis })
+    Ok(Plan { piece: kind, passes, rules: fxhash(&serde_json::to_string(k).expect("serialises")), along: axis, rows_pass: None })
 }
 
 /// A piece's cells in the split's divisions (the same for each layer's part of it).
@@ -759,12 +856,23 @@ pub(crate) fn split(txn: &mut Transaction<'_>, p: SplitParams) -> Result<Vec<Ele
             let g = groups.entry(cells_key(&store, &pr, &divisions)).or_insert_with(|| (Vec::new(), mid));
             g.0.push(pe.guid().to_string());
         }
+        // Rows by the row cut's cell (an opening moves a piece's middle, so not by height), in
+        // order up by their pieces' mean height.
         let along = plan.along;
-        let mut zs: Vec<f64> = groups.values().map(|g| g.1[2]).collect();
-        zs.sort_by(f64::total_cmp);
-        zs.dedup_by(|a, b| (*a - *b).abs() < 0.05);
-        let row_of = |z: f64| zs.iter().position(|r| (r - z).abs() < 0.05).unwrap_or(0);
-        let mut ordered: Vec<(usize, f64, Vec<String>)> = groups.into_values().map(|(parts, mid)| (row_of(mid[2]), mid[0] * along[0] + mid[1] * along[1], parts)).collect();
+        let row_key = |k: &Vec<String>| plan.rows_pass.and_then(|i| k.get(i).cloned()).unwrap_or_default();
+        let mut row_keys: Vec<(String, f64)> = Vec::new();
+        for (k, (_, mid)) in &groups {
+            let rk = row_key(k);
+            let zs: Vec<f64> = groups.iter().filter(|(k2, _)| row_key(k2) == rk).map(|(_, g)| g.1[2]).collect();
+            if !row_keys.iter().any(|(r, _)| *r == rk) {
+                row_keys.push((rk, zs.iter().sum::<f64>() / zs.len().max(1) as f64));
+            }
+            let _ = mid;
+        }
+        row_keys.sort_by(|a, b| a.1.total_cmp(&b.1));
+        let rows = row_keys.len().max(1);
+        let row_of = |k: &Vec<String>| row_keys.iter().position(|(r, _)| *r == row_key(k)).unwrap_or(0);
+        let mut ordered: Vec<(usize, f64, Vec<String>)> = groups.into_iter().map(|(k, (parts, mid))| (row_of(&k), mid[0] * along[0] + mid[1] * along[1], parts)).collect();
         ordered.sort_by(|a, b| a.0.cmp(&b.0).then(a.1.total_cmp(&b.1)));
         let mut placed: Vec<((usize, usize), Vec<String>)> = Vec::new();
         for (row, _, parts) in ordered {
@@ -774,7 +882,6 @@ pub(crate) fn split(txn: &mut Transaction<'_>, p: SplitParams) -> Result<Vec<Ele
         let letter = if matches!(plan.piece, PieceKind::SolidWall | PieceKind::DoubleWall) { "W" } else { "S" };
         let sources: std::collections::BTreeSet<String> = store.iter().filter_map(assembly_recipe).filter(|a| a.mark.starts_with(letter)).map(|a| a.source).collect();
         let n = sources.len() + 1;
-        let rows = zs.len().max(1);
         for ((i, row), parts) in placed {
             let mark = if rows > 1 { format!("{letter}{n}-{}{}", i + 1, (b'A' + row as u8) as char) } else { format!("{letter}{n}-{}", i + 1) };
             let rec = AssemblyRecipe {
@@ -789,6 +896,7 @@ pub(crate) fn split(txn: &mut Transaction<'_>, p: SplitParams) -> Result<Vec<Ele
                 rules: plan.rules.clone(),
                 divisions: divisions.clone(),
                 created_parts: !had,
+                reinforcement: Vec::new(),
             };
             let label = |v: &str| json!({ "type": "IfcLabel", "value": v });
             let a = txn.create(
@@ -844,6 +952,8 @@ pub(crate) fn resplit(txn: &mut Transaction<'_>, p: ResplitParams) -> Result<Vec
             })
             .map(|e| e.id())
             .chain(assemblies.iter().map(|(i, _)| *i))
+            // The pieces' generated reinforcement goes with them (STR-PRE-003).
+            .chain(assemblies.iter().flat_map(|(_, r)| r.reinforcement.iter().filter_map(|g| by_guid(&store, g).map(|e| e.id()))))
             .collect();
         for id in doomed {
             if txn.store().get(id).is_some() {

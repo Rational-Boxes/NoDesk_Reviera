@@ -190,7 +190,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**2129 unique commands** in 412 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**2130 unique commands** in 412 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -458,7 +458,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `plumbing_fixture` | 1 |
 | `pointcloud` | 1 |
 | `position` | 8 |
-| `precast` | 9 |
+| `precast` | 10 |
 | `precast_config` | 7 |
 | `pressure_loss_report` | 1 |
 | `print` | 4 |
@@ -1814,6 +1814,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `precast.info` | 4 | assembly_ids[]? | assemblies[] | No | STR-PRE-002 |
 | `precast.place_mounting_parts` | 4 | assembly_ids[] | report | Yes | STR-PRE-005 |
 | `precast.reinforce` | 4 | assembly_ids[], area_type_id, edge_type_id? | report | Yes | STR-PRE-003 |
+| `precast.reinforcement_types` | 4 | assembly_ids[] | {thickness, area_types[], edge_types[]} | No | STR-PRE-003 |
 | `precast.resplit` | 4 | assembly_ids[] | — | Yes | STR-PRE-002 |
 | `precast.set_auto_update` | 4 | bool | — | Yes | STR-PRE-002 |
 | `precast.shop_drawings` | 4 | assembly_ids[], template_id?, group_identical?: bool | sheet_ids[] | Yes | STR-PRE-006 |

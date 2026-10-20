@@ -138,6 +138,8 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(PrecastResplit),
         registry.add(PrecastSetAutoUpdate),
         registry.add(PrecastInfo),
+        registry.add(PrecastReinforce),
+        registry.add(PrecastReinforcementTypes),
         registry.add(RebarPlaceFreeForm),
         registry.add(RebarDistributeAlongPath),
         registry.add(RebarDistributeMorphed),
@@ -3388,6 +3390,35 @@ edit_command!(
     crate::precast::AutoUpdateParams,
     u32,
     crate::precast::set_auto_update
+);
+
+edit_command!(
+    PrecastReinforce,
+    "precast.reinforce",
+    "Reinforce precast pieces",
+    "Reinforces precast assemblies of one kind (STR-PRE-003) with the configuration's types: \
+     `area_type_id` area bars (walls: vertical and horizontal at both faces; slabs: both ways at \
+     top and bottom), clipped to the piece less the edge cover and cut round openings with the \
+     cover; walls also `edge_type_id` U-bars round each opening side and free edge. A type whose \
+     thickness range does not hold a piece is refused, as are pieces of different kinds. Sets are \
+     hosted by the element split, carry the piece mark as their partition and belong to the \
+     assembly. Running again removes the generated sets that are as made and keeps those edited \
+     since and any added by hand. Returns a report per assembly.",
+    "Auto Reinforce",
+    crate::precast_rebar::ReinforceParams,
+    crate::precast_rebar::Report,
+    crate::precast_rebar::reinforce
+);
+
+read_command!(
+    PrecastReinforcementTypes,
+    "precast.reinforcement_types",
+    "Reinforcement types for precast pieces",
+    "The area and edge reinforcement types (STR-PRE-003) whose thickness range holds every \
+     selected precast assembly's piece, and the pieces' thickness range.",
+    crate::precast_rebar::TypesParams,
+    crate::precast_rebar::OfferedTypes,
+    crate::precast_rebar::offered
 );
 
 read_command!(

@@ -2649,7 +2649,14 @@ impl LocalProject {
             }
             self.ifc.set_attribute(typing, "RelatedObjects", &AttrValue::List(vec![AttrValue::Ref(step.0)]))?;
             self.ifc.set_attribute(typing, "RelatingType", &AttrValue::Ref(ty.0))?;
-            if let Some(h) = i.host {
+            // Generated for a precast piece: its assembly holds it (STR-PRE-003); else its host.
+            let assembly = reviera_core::precast_rebar::generated_for(e)
+                .and_then(|g| GlobalId::parse(&g))
+                .and_then(|g| store.find_by_guid(&g))
+                .and_then(|a| self.steps.get(&a).copied());
+            if let Some(a) = assembly {
+                geometry::aggregate(&mut self.ifc, held, a, owner_history)?;
+            } else if let Some(h) = i.host {
                 by_host.entry(h).or_default().push(AttrValue::Ref(held.0));
             }
         }

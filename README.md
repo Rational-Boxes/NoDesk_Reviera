@@ -736,8 +736,11 @@ tools and the datums.
   (`precast_config.*`; STR-PRE-001); walls and floors split into the fewest pieces within length,
   height and weight, joints gapped and kept off openings, hollow-core in standard widths, each
   piece an `IfcElementAssembly` with its piece mark, re-split when the rules change
-  (`precast.split`, `precast.resplit`; STR-PRE-002). Not yet: automatic precast reinforcement,
-  custom fabric sheets, mounting parts, shop drawings and CAM export (STR-PRE-003 … 007).
+  (`precast.split`, `precast.resplit`; STR-PRE-002); automatic reinforcement of pieces by type
+  and thickness: face meshes cut round openings and U-bars round edges and openings, partitioned
+  by piece mark, re-run keeping edited and added bars (`precast.reinforce`; STR-PRE-003). Not
+  yet: lattice girders, custom fabric sheets, mounting parts, shop drawings and CAM export
+  (STR-PRE-004 … 007).
   Rebar documentation: a Rebar Tag (number and "15 Ø12 @ 150"), multi-rebar annotations across
   parallel sets, bending details with segment values, and a Bar Bending Schedule grouped by
   partition and number with mass from nominal kg/m (`rebar_tag.place`,

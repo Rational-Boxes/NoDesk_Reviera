@@ -1542,6 +1542,12 @@ icon = "precast_split"
 help = "Split the selected walls or floors into precast pieces by the configuration's rules, each piece an assembly with its piece mark"
 
 [[action]]
+id = "precast.reinforce"
+label = "Auto Reinforce"
+icon = "precast_reinforce"
+help = "Reinforce the selected precast pieces with the configuration's types for their thickness: area bars cut round openings, U-bars round openings and edges"
+
+[[action]]
 id = "precast.resplit"
 label = "Re-split"
 icon = "precast_resplit"
@@ -2351,6 +2357,7 @@ tools = [
 label = "Precast Detailing"
 tools = [
   { action = "precast.split", size = "large" },
+  { action = "precast.reinforce", size = "large" },
   { action = "precast.resplit", size = "small" },
 ]
 

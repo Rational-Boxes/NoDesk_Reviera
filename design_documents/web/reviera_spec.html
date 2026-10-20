@@ -173,7 +173,7 @@ td code { white-space: nowrap; }
         <div class="tb-cell"><span class="tb-label">Revision</span><span class="tb-value">0.1 · Draft</span></div>
         <div class="tb-cell"><span class="tb-label">Date</span><span class="tb-value tb-num">2026-10-12</span></div>
         <div class="tb-cell"><span class="tb-label">Requirements</span><span class="tb-value tb-num">808</span></div>
-        <div class="tb-cell"><span class="tb-label">Commands</span><span class="tb-value tb-num">2,129</span></div>
+        <div class="tb-cell"><span class="tb-label">Commands</span><span class="tb-value tb-num">2,130</span></div>
         <div class="tb-cell"><span class="tb-label">Licence</span><span class="tb-value">GPL-3.0-or-later</span></div>
         <div class="tb-cell last-row"><span class="tb-label">Stack</span><span class="tb-value">IFC · Rust · OCCT · wx · LuaJIT · MCP</span></div>
         <div class="tb-cell last-row" style="grid-column: span 3"><span class="tb-label">By priority</span>
@@ -33915,8 +33915,8 @@ No IFC equivalent.
 <p><strong>Acceptance criteria.</strong>
 - [x] A 30 m × 3 m wall with maximum length 8 m and maximum weight 12 t is split into the fewest pieces that satisfy both limits, with the configured gaps.
 - [x] No joint lies closer to an opening than the minimum distance.
-- [ ] Each piece exports as an <code>IfcElementAssembly</code> that contains the concrete element and its reinforcement.</p>
-<p><em>Built (2026-10-19):</em> <code>precast.split</code> on straight walls (solid or double) and floors (solid, hollow-core or lattice-girder). A wall gets rows of equal height when taller than the maximum height, then joints along it: the fewest pieces with every piece within the minimum and maximum length and the maximum weight (its concrete volume, less openings, × density; the heaviest row counts), and no joint within the minimum distance of an opening; the pieces are made even where that keeps every rule, otherwise each joint goes as far along as the rules allow (stepping back off an opening). A 30 m × 3 m × 250 mm wall at 8 m and 12 t gives five 6 m pieces (four would weigh 14 t). A floor is cut into strips side by side along its longest outline edge: hollow-core in standard (maximum) widths with the rest last (the last two shared if the rest is under the minimum), others like walls. Its parts are divided (made first if it has none: one per layer) with the configured gaps, and each piece's parts go in an <code>IfcElementAssembly</code> (USERDEFINED, ObjectType <code>PRECAST_ASSEMBLY</code>) with a piece mark (W1-1, W1-2, … or S1-…; a row letter when there are rows) and <code>Pset_PrecastConcreteElementFabrication</code> PieceMark and TypeDesignator on it and its parts. The assembly's recipe (<code>recipe.precast_assembly</code>) keeps the source, kind, parts, mark, place, configuration version, a hash of the kind's rules, and the divisions it made. In IFC the parts are aggregated by their assembly, not by the source (the source-to-piece link stays in RXD, per the owner decision above), and the assembly is contained in the source's storey. Splitting an element already split is refused naming its assemblies (the window offers to re-split); <code>precast.resplit</code> removes the split's pieces and assemblies and splits again with the current rules; <code>precast.set_auto_update</code> sets the configuration's flag (nothing is regenerated yet: STR-PRE-003, 005); <code>precast.info</code> gives each assembly's mark, kind, source, parts, volume, weight, version and place. Deleting the source deletes its assemblies. Concrete › Precast Detailing › <strong>Split</strong> (the wall or slab kind) and <strong>Re-split</strong>; the Model Tree shows the assemblies under the element split and their parts under them. The third criterion waits for STR-PRE-003, which puts reinforcement in the assemblies. Not yet: curved walls, double walls as one three-layer piece, profile overlap between rows, joints kept off openings in floors, hollow-core division profiles, independent lattice girders, the <em>Multiple</em> option.</p>
+- [x] Each piece exports as an <code>IfcElementAssembly</code> that contains the concrete element and its reinforcement.</p>
+<p><em>Built (2026-10-19):</em> <code>precast.split</code> on straight walls (solid or double) and floors (solid, hollow-core or lattice-girder). A wall gets rows of equal height when taller than the maximum height, then joints along it: the fewest pieces with every piece within the minimum and maximum length and the maximum weight (its concrete volume, less openings, × density; the heaviest row counts), and no joint within the minimum distance of an opening; the pieces are made even where that keeps every rule, otherwise each joint goes as far along as the rules allow (stepping back off an opening). A 30 m × 3 m × 250 mm wall at 8 m and 12 t gives five 6 m pieces (four would weigh 14 t). A floor is cut into strips side by side along its longest outline edge: hollow-core in standard (maximum) widths with the rest last (the last two shared if the rest is under the minimum), others like walls. Its parts are divided (made first if it has none: one per layer) with the configured gaps, and each piece's parts go in an <code>IfcElementAssembly</code> (USERDEFINED, ObjectType <code>PRECAST_ASSEMBLY</code>) with a piece mark (W1-1, W1-2, … or S1-…; a row letter when there are rows) and <code>Pset_PrecastConcreteElementFabrication</code> PieceMark and TypeDesignator on it and its parts. The assembly's recipe (<code>recipe.precast_assembly</code>) keeps the source, kind, parts, mark, place, configuration version, a hash of the kind's rules, and the divisions it made. In IFC the parts are aggregated by their assembly, not by the source (the source-to-piece link stays in RXD, per the owner decision above), and the assembly is contained in the source's storey. Splitting an element already split is refused naming its assemblies (the window offers to re-split); <code>precast.resplit</code> removes the split's pieces and assemblies and splits again with the current rules; <code>precast.set_auto_update</code> sets the configuration's flag (nothing is regenerated yet: STR-PRE-003, 005); <code>precast.info</code> gives each assembly's mark, kind, source, parts, volume, weight, version and place. Deleting the source deletes its assemblies. Concrete › Precast Detailing › <strong>Split</strong> (the wall or slab kind) and <strong>Re-split</strong>; the Model Tree shows the assemblies under the element split and their parts under them. Since STR-PRE-003, the assembly also holds the reinforcement generated for its piece. Pieces are put in rows by the row cut, not by height (an opening moves a piece's middle). Not yet: curved walls, double walls as one three-layer piece, profile overlap between rows, joints kept off openings in floors, hollow-core division profiles, independent lattice girders, the <em>Multiple</em> option.</p>
 <h3 id="453-automatic-precast-reinforcement">4.5.3 Automatic precast reinforcement</h3>
 <p><strong>ID:</strong> <code class="rid" id="STR-PRE-003">STR-PRE-003</code> · <strong>Priority:</strong> <span class="pri pri-p2">P2</span> · <strong>Ref:</strong> research/03 §6.3 · screenshots/structure_mep/precast_wall_auto_reinforcement.png</p>
 <p><strong>Workflow.</strong> Choose <em>Auto Reinforce</em>. Select an assembly, or several assemblies of the same kind. Choose the <strong>area reinforcement type</strong> and, for walls, the <strong>edge reinforcement type</strong>. Click OK.</p>
@@ -33933,12 +33933,13 @@ No IFC equivalent.
 - Generated reinforcement gets partition = the assembly's piece mark, so numbering (STR-RBR-016) is per piece.
 - The report lists, per assembly, the bars, sheets and girders created, kept or skipped, and why.</p>
 <p><strong>Data (IFC mapping).</strong> Generated rebar and mesh as in §4.2, aggregated into the piece assembly. Lattice girders are <code>IfcReinforcingElement</code> subtypes: <code>IfcReinforcingBar</code> chords and diagonals grouped in an <code>IfcElementAssembly</code> <code>USERDEFINED</code> "LATTICE_GIRDER". The generated flag, the reinforcement type used and the rule snapshot hash are RXD element data (<code>rebar</code>) on each generated element.</p>
-<p><strong>Commands.</strong> <code>precast.reinforce(assembly_ids[], area_type_id, edge_type_id?) -&gt; report</code></p>
+<p><strong>Commands.</strong> <code>precast.reinforce(assembly_ids[], area_type_id, edge_type_id?) -&gt; report</code>, <code>precast.reinforcement_types(assembly_ids[]) -&gt; {thickness, area_types[], edge_types[]}</code></p>
 <p><strong>Acceptance criteria.</strong>
-- [ ] Reinforcing a wall piece with a 1.2 × 2.1 m door opening places U-bars around the opening edges and mesh cut around it.
-- [ ] Re-running on that piece after the user added one extra bar keeps the extra bar and replaces only generated reinforcement.
-- [ ] A 200 mm wall piece is offered only reinforcement types whose thickness range contains 200 mm.
-- [ ] Generated bars carry the piece mark as their partition.</p>
+- [x] Reinforcing a wall piece with a 1.2 × 2.1 m door opening places U-bars around the opening edges and mesh cut around it.
+- [x] Re-running on that piece after the user added one extra bar keeps the extra bar and replaces only generated reinforcement.
+- [x] A 200 mm wall piece is offered only reinforcement types whose thickness range contains 200 mm.
+- [x] Generated bars carry the piece mark as their partition.</p>
+<p><em>Built (2026-10-19):</em> reinforcement types are in the configuration per kind (<code>&lt;kind&gt;.reinforcement.area_types</code> and, for walls, <code>edge_types</code>): id, name, thickness range, bar type, spacing and, for edge types, the leg; thickness ranges may not overlap within a list (refused naming both types). Provisional starting types (expert review E-12): walls <code>A10-150</code> (120–250 mm, Ø10 @ 150 each face), <code>A12-150</code> (250–400 mm, Ø12 @ 150) and <code>U10-200</code> (120–400 mm, Ø10 U-bars @ 200, 500 mm legs); solid and lattice-girder slabs <code>S10-150</code> (100–350 mm, Ø10 @ 150 both ways, top and bottom); hollow-core none. <code>precast.reinforcement_types</code> gives the types whose range holds every selected piece; <code>precast.reinforce(assembly_ids, area_type_id, edge_type_id?)</code> refuses pieces of different kinds (<code>precast.mixed</code>) and a type whose range does not hold a piece (<code>precast.thickness</code>, naming the range and the piece). Wall pieces get vertical bars (outside) and horizontal bars (inside them) at both faces as layer sets of the element split, bounded by the piece (its parts' extent along and up the wall) less the edge cover; layer bars are now cut round a wall's openings and keep the edge cover beside an opening's sides too (a bar is kept only where lines a cover either side of it are inside the concrete). Edge types add U-bar sets (sketched, shape 21) round each free edge of the piece (less where an opening meets it) and each side, head and sill of an opening in it: the web across the thickness at the edge cover, both legs the type's leg into the piece, spaced along the edge (expert review E-13). Slab pieces get bars both ways at the top and the bottom, bounded by the piece's strip. Every generated set's partition is the piece mark, and it carries <code>rxd:precast_generated</code> (assembly, type, a hash of its recipe as made); the assembly lists them (<code>reinforcement</code>) and holds them in IFC instead of the host. Running again removes generated sets as made and keeps, and reports, those edited since and sets added by hand in the piece's partition; re-splitting removes them with their pieces; deleting the assembly deletes them. The report gives per assembly the sets made, replaced and kept (with why) and what was skipped. Concrete › Precast Detailing › <strong>Auto Reinforce</strong> (the types the pieces allow; a report after); the configuration's Reinforcement pages edit the types, one per line. Not yet: lattice girders (<code>LATTICE_GIRDER</code> assemblies) and double walls' girders, meshes (fabric) as area reinforcement, an opening clearance other than the cover, laps between area bars and U-bars checked, regeneration on piece changes with automatic updates on (the assembly is not yet flagged out of date), editing a type offering to re-run.</p>
 <h3 id="454-custom-fabric-sheets">4.5.4 Custom fabric sheets</h3>
 <p><strong>ID:</strong> <code class="rid" id="STR-PRE-004">STR-PRE-004</code> · <strong>Priority:</strong> <span class="pri pri-p2">P2</span> · <strong>Ref:</strong> research/03 §3.5, §6.3</p>
 <p><strong>Purpose.</strong> Generate a fabric sheet shaped to each precast piece, instead of cutting standard sheets, so that the plant can produce one welded mesh per piece.</p>
@@ -38845,6 +38846,13 @@ No IFC equivalent.
 <td>assembly_ids[], area_type_id, edge_type_id?</td>
 <td>report</td>
 <td>Yes</td>
+<td>STR-PRE-003</td>
+</tr>
+<tr>
+<td><code>precast.reinforcement_types</code></td>
+<td>assembly_ids[]</td>
+<td>{thickness, area_types[], edge_types[]}</td>
+<td>No</td>
 <td>STR-PRE-003</td>
 </tr>
 <tr>
@@ -51849,7 +51857,7 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 </tbody>
 </table></div>
 <h2 id="a3-consolidated-command-index">A.3 Consolidated command index</h2>
-<p><strong>2129 unique commands</strong> in 412 domains. Every command is exposed automatically to the UI, to Lua (<code>reviera.&lt;domain&gt;.&lt;verb&gt;</code>) and to MCP (<code>&lt;domain&gt;_&lt;verb&gt;</code>), subject to its permission class.</p>
+<p><strong>2130 unique commands</strong> in 412 domains. Every command is exposed automatically to the UI, to Lua (<code>reviera.&lt;domain&gt;.&lt;verb&gt;</code>) and to MCP (<code>&lt;domain&gt;_&lt;verb&gt;</code>), subject to its permission class.</p>
 <div class="tbl"><table>
 <thead>
 <tr>
@@ -52916,7 +52924,7 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 </tr>
 <tr>
 <td><code>precast</code></td>
-<td style="text-align: right;">9</td>
+<td style="text-align: right;">10</td>
 </tr>
 <tr>
 <td><code>precast_config</code></td>
@@ -63158,6 +63166,14 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 <td>assembly_ids[], area_type_id, edge_type_id?</td>
 <td>report</td>
 <td>Yes</td>
+<td>STR-PRE-003</td>
+</tr>
+<tr>
+<td><code>precast.reinforcement_types</code></td>
+<td>4</td>
+<td>assembly_ids[]</td>
+<td>{thickness, area_types[], edge_types[]}</td>
+<td>No</td>
 <td>STR-PRE-003</td>
 </tr>
 <tr>

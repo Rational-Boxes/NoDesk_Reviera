@@ -20,6 +20,9 @@ enum Unit {
     Number,
     Text,
     Bool,
+    /// Reinforcement types, one per line (STR-PRE-003).
+    AreaTypes,
+    EdgeTypes,
 }
 
 /// The fields of a page: path, label, unit.
@@ -53,6 +56,13 @@ const GENERAL: Fields = &[
     ("data_folder", "Data folder", Unit::Text),
 ];
 
+const WALL_REBAR: Fields = &[
+    ("reinforcement.area_types", "Area types", Unit::AreaTypes),
+    ("reinforcement.edge_types", "Edge U-bar types", Unit::EdgeTypes),
+];
+
+const SLAB_REBAR: Fields = &[("reinforcement.area_types", "Area types", Unit::AreaTypes)];
+
 const CAM: Fields = &[("cam.format", "Format", Unit::Text), ("cam.folder", "Output folder", Unit::Text), ("cam.filename", "Filename rule", Unit::Text)];
 
 enum Ctl {
@@ -76,12 +86,53 @@ fn at_mut<'a>(v: &'a mut Value, path: &str) -> Option<&'a mut Value> {
 }
 
 fn shown(v: Option<&Value>, unit: Unit) -> String {
+    let mm = |v: &Value| format!("{}", (v.as_f64().unwrap_or(0.0) * 1e6).round() / 1000.0);
     match (v, unit) {
+        (Some(Value::Array(list)), Unit::AreaTypes | Unit::EdgeTypes) => list
+            .iter()
+            .map(|t| {
+                let mut cells = vec![
+                    t["id"].as_str().unwrap_or("").to_owned(),
+                    format!("{}-{}", mm(&t["min_thickness"]), mm(&t["max_thickness"])),
+                    t["bar_type"].as_str().unwrap_or("").to_owned(),
+                    mm(&t["spacing"]),
+                ];
+                if unit == Unit::EdgeTypes {
+                    cells.push(mm(&t["leg"]));
+                }
+                cells.push(t["name"].as_str().unwrap_or("").to_owned());
+                cells.join("; ")
+            })
+            .collect::<Vec<_>>()
+            .join("\n"),
         (Some(Value::Number(n)), Unit::Mm) => format!("{}", (n.as_f64().unwrap_or(0.0) * 1e6).round() / 1000.0),
         (Some(Value::Number(n)), _) => format!("{}", n.as_f64().unwrap_or(0.0)),
         (Some(Value::String(s)), _) => s.clone(),
         _ => String::new(),
     }
+}
+
+/// Reinforcement types from lines `id; min-max mm; bar type; spacing mm; [leg mm;] name`.
+fn types(text: &str, edge: bool) -> Option<Value> {
+    let mut out = Vec::new();
+    for line in text.lines().map(str::trim).filter(|l| !l.is_empty()) {
+        let c: Vec<&str> = line.split(';').map(str::trim).collect();
+        let need = if edge { 5 } else { 4 };
+        if c.len() < need {
+            return None;
+        }
+        let (lo, hi) = c[1].split_once('-')?;
+        let mm = |s: &str| s.trim().parse::<f64>().ok().map(|v| v / 1000.0);
+        let mut t = json!({
+            "id": c[0], "min_thickness": mm(lo)?, "max_thickness": mm(hi)?, "bar_type": c[2], "spacing": mm(c[3])?,
+            "name": c.get(need).copied().unwrap_or(c[0]),
+        });
+        if edge {
+            t["leg"] = json!(mm(c[4])?);
+        }
+        out.push(t);
+    }
+    Some(Value::Array(out))
 }
 
 /// The dialog's values over `base`; the paths whose text is not a number.
@@ -92,6 +143,13 @@ fn read(base: &Value, fields: &[Field]) -> (Value, Vec<String>) {
         let value = match (&f.ctl, f.unit) {
             (Ctl::Check(c), _) => json!(c.get_value()),
             (Ctl::Text(t), Unit::Text) => json!(t.get_value()),
+            (Ctl::Text(t), u @ (Unit::AreaTypes | Unit::EdgeTypes)) => match types(&t.get_value(), u == Unit::EdgeTypes) {
+                Some(list) => list,
+                None => {
+                    bad.push(f.path.clone());
+                    continue;
+                }
+            },
             (Ctl::Text(t), u) => match t.get_value().trim().parse::<f64>() {
                 Ok(x) => json!(if u == Unit::Mm { x / 1000.0 } else { x }),
                 Err(_) => {
@@ -133,6 +191,16 @@ impl Gui {
                     c.set_value(at(&base, &full).and_then(Value::as_bool).unwrap_or(false));
                     grid.add(&c, 1, SizerFlag::Expand, 0);
                     Ctl::Check(c)
+                } else if matches!(unit, Unit::AreaTypes | Unit::EdgeTypes) {
+                    let t = TextCtrl::builder(&panel).with_value(&shown(at(&base, &full), *unit)).with_style(TextCtrlStyle::MultiLine).build();
+                    t.set_min_size(Size::new(420, 110));
+                    t.set_tooltip(if *unit == Unit::EdgeTypes {
+                        "One type per line: id; thickness from-to (mm); bar type; spacing (mm); leg (mm); name"
+                    } else {
+                        "One type per line: id; thickness from-to (mm); bar type; spacing (mm); name"
+                    });
+                    grid.add(&t, 1, SizerFlag::Expand, 0);
+                    Ctl::Text(t)
                 } else {
                     let t = TextCtrl::builder(&panel).with_value(&shown(at(&base, &full), *unit)).build();
                     t.set_min_size(Size::new(220, -1));
@@ -170,7 +238,8 @@ impl Gui {
         ] {
             page(label, "", &[], false, &mut fields, &mut pages);
             page("Segmentation", prefix, list, true, &mut fields, &mut pages);
-            for node in ["Reinforcement", "Connections", "Shop Drawing"] {
+            page("Reinforcement", prefix, if prefix.starts_with("wall") { WALL_REBAR } else { SLAB_REBAR }, true, &mut fields, &mut pages);
+            for node in ["Connections", "Shop Drawing"] {
                 page(node, "", &[], true, &mut fields, &mut pages);
             }
         }
@@ -219,7 +288,7 @@ impl Gui {
                 }
                 let mut bad_pages = vec![false; pages.len()];
                 for f in fields.iter() {
-                    let is_bad = wrong.iter().any(|(p, _)| *p == f.path);
+                    let is_bad = wrong.iter().any(|(p, _)| *p == f.path || p.starts_with(&format!("{}.", f.path)));
                     if is_bad {
                         bad_pages[f.page] = true;
                     }
@@ -372,11 +441,11 @@ impl Gui {
         }
     }
 
-    /// Re-split: the selected precast assemblies (or those of the selected elements).
-    pub(crate) fn precast_resplit(&mut self) {
-        let Some(store) = self.store_now() else { return };
+    /// The precast assemblies the selection names: assemblies, their parts or the split elements.
+    fn selected_assemblies(&mut self) -> Vec<u64> {
+        let Some(store) = self.store_now() else { return Vec::new() };
         let sel = self.selection();
-        let assemblies: Vec<u64> = store
+        store
             .iter()
             .filter(|a| {
                 reviera_core::precast::assembly_recipe(a).is_some_and(|r| {
@@ -384,7 +453,71 @@ impl Gui {
                 })
             })
             .map(|a| a.id().0)
-            .collect();
+            .collect()
+    }
+
+    /// Concrete › Precast Detailing › Auto Reinforce (STR-PRE-003).
+    pub(crate) fn precast_reinforce(&mut self) {
+        let frame = self.frame;
+        let assemblies = self.selected_assemblies();
+        if assemblies.is_empty() {
+            return frame.set_status_text("Auto Reinforce: select precast assemblies, their pieces or the split elements", 0);
+        }
+        let offered = match self.run("precast.reinforcement_types", json!({ "assembly_ids": assemblies })) {
+            Ok(o) => o,
+            Err(e) => return error(&frame, &format!("Auto Reinforce:\n{e}")),
+        };
+        let list = |k: &str| -> Vec<(String, String)> {
+            offered[k].as_array().into_iter().flatten().map(|t| (t["id"].as_str().unwrap_or("").to_owned(), format!("{} — {}", t["id"].as_str().unwrap_or(""), t["name"].as_str().unwrap_or("")))).collect()
+        };
+        let (area, edge) = (list("area_types"), list("edge_types"));
+        let t = &offered["thickness"];
+        let range = format!("{:.0}–{:.0} mm", t[0].as_f64().unwrap_or(0.0) * 1000.0, t[1].as_f64().unwrap_or(0.0) * 1000.0);
+        if area.is_empty() {
+            return error(&frame, &format!("No area reinforcement type holds these pieces ({range}). Add one in Precast Settings › Configuration › Reinforcement."));
+        }
+        let f = super::reinforcement_ui::Form::new(&frame, "Auto Reinforce");
+        let a = f.choice("Area reinforcement", &area.iter().map(|x| x.1.clone()).collect::<Vec<_>>(), 0);
+        let mut edge_names = vec!["None".to_owned()];
+        edge_names.extend(edge.iter().map(|x| x.1.clone()));
+        let e = (!edge.is_empty()).then(|| f.choice("Edge U-bars", &edge_names, 1));
+        if !f.show(&format!("{} piece(s), {range}: only the types whose thickness range holds them", assemblies.len()), "OK") {
+            f.dialog.destroy();
+            return;
+        }
+        let mut args = json!({ "assembly_ids": assemblies, "area_type_id": area[a.get_selection().map_or(0, |i| i as usize).min(area.len() - 1)].0 });
+        if let Some(k) = e.as_ref().and_then(|c| c.get_selection()).and_then(|i| (i as usize).checked_sub(1)) {
+            args["edge_type_id"] = json!(edge[k.min(edge.len() - 1)].0);
+        }
+        f.dialog.destroy();
+        match self.run("precast.reinforce", args) {
+            Ok(r) => {
+                self.refresh_scene(&frame);
+                let lines: Vec<String> = r["assemblies"]
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .map(|a| {
+                        let n = |k: &str| a[k].as_array().map_or(0, Vec::len);
+                        let mut l = format!("{}: {} set(s) made, {} replaced, {} kept", a["mark"].as_str().unwrap_or(""), n("created"), a["removed"].as_u64().unwrap_or(0), n("kept"));
+                        for k in a["kept"].as_array().into_iter().flatten() {
+                            l += &format!("\n    set {} {}", k["id"], k["why"].as_str().unwrap_or(""));
+                        }
+                        for s in a["skipped"].as_array().into_iter().flatten() {
+                            l += &format!("\n    skipped: {}", s.as_str().unwrap_or(""));
+                        }
+                        l
+                    })
+                    .collect();
+                MessageDialog::builder(&frame, &lines.join("\n"), "Auto Reinforce").with_style(MessageDialogStyle::OK | MessageDialogStyle::IconInformation).build().show_modal();
+            }
+            Err(e) => error(&frame, &format!("Not reinforced:\n{e}")),
+        }
+    }
+
+    /// Re-split: the selected precast assemblies (or those of the selected elements).
+    pub(crate) fn precast_resplit(&mut self) {
+        let assemblies = self.selected_assemblies();
         if assemblies.is_empty() {
             return self.frame.set_status_text("Re-split: select precast assemblies, their pieces or the split elements", 0);
         }

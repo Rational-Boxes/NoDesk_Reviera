@@ -4562,6 +4562,7 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "rebar.place_free_form" => with(gui, Gui::place_free_form_rebar),
         "precast.split" => with(gui, Gui::precast_split),
         "precast.resplit" => with(gui, Gui::precast_resplit),
+        "precast.reinforce" => with(gui, Gui::precast_reinforce),
         "precast_config.show" => with(gui, Gui::precast_configuration),
         "rebar.distribute_along_path" => with(gui, Gui::distribute_along_path),
         "rebar.distribute_morphed" => with(gui, Gui::distribute_morphed),

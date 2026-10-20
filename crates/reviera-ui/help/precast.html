@@ -24,8 +24,8 @@ rule, and OK stays disabled until it is fixed. Each OK raises the configuration'
 dialog says how many assemblies an older version made and can re-split them. <b>Export…</b> and
 <b>Import…</b> share the rules between projects as a JSON file. The defaults are provisional
 starting points, not values from a standard, and are awaiting review by a subject-matter expert.</p>
-<p>The Reinforcement, Connections and Shop Drawing pages, Annotations and Dimensioning are for
-the later precast steps. They are not built yet.</p>
+<p>The Connections and Shop Drawing pages, Annotations and Dimensioning are for the later
+precast steps. They are not built yet.</p>
 
 <h2 id="split">Split</h2>
 <p>Select straight walls or floors and click
@@ -47,7 +47,25 @@ the Model Tree the assemblies sit under the element. In IFC each is an
 <a href="reviera:action/precast.resplit">Re-split</a> splits again with the current rules.
 Splitting an element twice asks to re-split instead.</p>
 
+<h2 id="reinforce">Auto Reinforce</h2>
+<p>Select precast assemblies (or their pieces, or the elements split) of one kind and click
+<a href="reviera:action/precast.reinforce">Auto Reinforce</a>. Only the reinforcement types
+whose thickness range holds the pieces are offered.</p>
+<ul>
+  <li><b>Area reinforcement</b>: vertical and horizontal bars at both faces of a wall piece, or
+    bars both ways at the top and bottom of a slab piece. They stay inside the piece less the
+    edge cover and are cut round openings with the cover.</li>
+  <li><b>Edge U-bars</b> (walls): round every free edge of the piece and every side, head and
+    sill of an opening. The web is across the thickness and the legs run into the piece.</li>
+</ul>
+<p>The bars' partition is the piece mark, so each piece is numbered on its own, and the piece's
+assembly holds them in IFC. Running again replaces what the last run made and keeps sets you
+edited since, and bars you added in the piece's partition. A report lists what was made,
+replaced, kept and skipped. The types are edited in Configuration › Reinforcement, one per line:
+<code>id; from-to (mm); bar type; spacing (mm); [leg (mm);] name</code>. The starting types are
+provisional and are awaiting review by a subject-matter expert.</p>
+
 <h2 id="not-yet">Not yet</h2>
-<p>Automatic reinforcement, custom fabric sheets, mounting parts, shop drawings and CAM export
+<p>Lattice girders, fabric as area reinforcement, custom fabric sheets, mounting parts, shop drawings and CAM export
 (the later precast steps); curved walls; double walls as one three-layer piece; profile overlap
 between rows; and lattice girders.</p>

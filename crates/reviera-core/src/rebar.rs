@@ -1070,6 +1070,20 @@ pub(crate) fn chord(polys: &[Vec<[f64; 2]>], o: [f64; 2], d: [f64; 2]) -> Vec<(f
     ts.chunks(2).filter(|c| c.len() == 2).map(|c| (c[0], c[1])).collect()
 }
 
+/// Where two sets of intervals overlap.
+pub(crate) fn overlap(a: &[(f64, f64)], b: &[(f64, f64)]) -> Vec<(f64, f64)> {
+    let mut out = Vec::new();
+    for (a0, a1) in a {
+        for (b0, b1) in b {
+            let (lo, hi) = (a0.max(*b0), a1.min(*b1));
+            if hi > lo {
+                out.push((lo, hi));
+            }
+        }
+    }
+    out
+}
+
 /// A floor's or wall's plane at a layer of bars: its outline less its openings in the plane's
 /// coordinates (plan x, y for floors; along the wall and up from its base for walls), where the
 /// plane lies, and which way is into the host.
@@ -1140,8 +1154,23 @@ pub(crate) fn host_plane(store: &Store, host: &Element, kind: HostKind, face: &s
                 return Err(Error::new("rebar.no_fit", format!("the bars do not fit: the wall is {:.0} mm thick", g.width * 1000.0)));
             }
             let l = g.length();
+            // Less its openings (doors, windows, plain openings), in the plane's along and up.
+            let cuts: Vec<Vec<[f64; 2]>> = crate::inserts::cuts_by_host(store)
+                .remove(&host.id())
+                .unwrap_or_default()
+                .into_iter()
+                .map(|c| {
+                    if c.outline.is_empty() {
+                        let (z0, z1) = (c.z[0] - g.base_z, c.z[1] - g.base_z);
+                        vec![[c.x[0], z0], [c.x[1], z0], [c.x[1], z1], [c.x[0], z1]]
+                    } else {
+                        c.outline.iter().map(|q| [q[0], q[1] - g.base_z]).collect()
+                    }
+                })
+                .collect();
+            let whole = vec![crate::polygons::Shape { outer: vec![[0.0, 0.0], [l, 0.0], [l, g.height], [0.0, g.height]], holes: Vec::new() }];
             Ok(HostPlane {
-                shapes: vec![crate::polygons::Shape { outer: vec![[0.0, 0.0], [l, 0.0], [l, g.height], [0.0, g.height]], holes: Vec::new() }],
+                shapes: crate::polygons::difference(&whole, &cuts),
                 o: [g.start[0] + nrm[0] * side * inset, g.start[1] + nrm[1] * side * inset, g.base_z],
                 ex: [dir[0], dir[1], 0.0],
                 ey: [0.0, 0.0, 1.0],
@@ -1397,7 +1426,12 @@ fn base_geometry(store: &Store, r: &RebarRecipe) -> Result<SetGeometry> {
             for t in pos {
                 let at = s0 + d / 2.0 + t;
                 let p = [sd[0] * at, sd[1] * at];
-                for (t0, t1) in chord(&polys, p, bd) {
+                // Where the bar has the edge cover on both sides too, so a bar beside an
+                // opening's side keeps clear of it (lines just inside the cover either side).
+                let side = edge * 0.999;
+                let beside = |k: f64| chord(&polys, [p[0] + sd[0] * side * k, p[1] + sd[1] * side * k], bd);
+                let clear = overlap(&overlap(&chord(&polys, p, bd), &beside(-1.0)), &beside(1.0));
+                for (t0, t1) in clear {
                     let (e0, e1) = if wall_vertical { (wall_bottom, wall_top) } else { (edge, edge) };
                     let (t0, t1) = (t0 + e0, t1 - e1);
                     if t1 - t0 <= d {
