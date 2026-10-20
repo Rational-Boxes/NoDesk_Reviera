@@ -3849,6 +3849,8 @@ The *Edit Path* mode runs as a tool session (`tool.start`/`tool.finish`/`tool.ca
 - `circuit.set(circuit_id, {load_name?, rating?, cable_type?, runs?, cable_size?})`
 - `circuit.size_cable(circuit_id, max_vd_percent?) -> size`
 
+*Built (2026-10-20), load name and rating:* `circuit.set(circuit_id, load_name?, rating?)`: a circuit's load name is made from its loads (the load classification and first device's name, "Lighting – Downlight", *Mixed* when they differ; a feeder's is the panel it feeds; other kinds their kind) until edited, and an empty name goes back to it; `circuit.list` reports `load_name`, `load_name_edited` and `rating` (amperes). Panel schedules show and edit both. Not yet: the other calculated properties (current per phase, power factor, length, voltage drop), cable type, runs and size, automatic cable sizing.
+
 **Acceptance criteria.**
 - [ ] A 16 A, 230 V single-phase circuit 40 m long with a 2 kW load gets the smallest conductor in the cable table whose voltage drop is ≤ 3%. The reported drop matches a hand calculation within 0.1 percentage points.
 - [ ] Editing *Rating* to 20 A re-runs cable sizing.
@@ -3880,10 +3882,12 @@ The *Edit Path* mode runs as a tool session (`tool.start`/`tool.finish`/`tool.ca
 - `transformer.set_secondary(transformer_id, distribution_system_id)`
 - `panel.hierarchy(root_id?) -> tree`
 
+*Built (2026-10-20), the window:* Systems › Electrical › **Select Supply** offers, for the selected panel or transformer, only the sources that would accept it (each tried with `panel.set_supply`), on a breaker or, where the source has them, its feed-through lugs; **Panel Hierarchy** shows the tree with each panel's connected load; Panel Settings sets *Feed-through lugs* and a transformer's *Secondary system*. The demand a parent sees is summed by load classification through its sub-panels (MEP-ELEC-010, in its panel schedule and `panel.loads_summary`).
+
 *Built (2026-10-20), as commands:* `panel.create_feeder(child_panel_id, parent_panel_id, connection: breaker|lugs)` makes a feeder circuit (`recipe.circuit` with `feeder`) from the parent to the child's feed connector (the starter Distribution Board gained a *Feed* connector; a new starter *Transformer*, `IfcTransformer`, has a primary and a secondary); on a breaker it takes the parent's first free slots (three poles on three-phase), on feed-through lugs no slot, one per parent, only when the parent's *feed-through lugs* are on (`panel.set`). The child's distribution system must match what the parent gives in phase, configuration and line-to-line voltage; a transformer gives its secondary (`panel.set(secondary)`), refused with "Transformer has no secondary distribution system" until set. A loop is refused with the chain named. `panel.set_supply` moves a panel's feeder (or makes one); `panel.hierarchy` gives the tree with each panel's connected load. A feeder's load is the connected load of everything below it, so a parent's summary includes its sub-panels. Not yet: demand factors on the roll-up (connected load only), the window's Select Supply and feeder tools, Pset_TransformerTypeCommon, "No supply" reporting after a parent is deleted, IFC grouping of child boards into the parent's circuit (the feeder groups the child).
 
 **Acceptance criteria.**
-- [ ] A sub-panel with 12 kVA of connected lighting load shows that load, with demand applied, on the parent panel's schedule summary.
+- [x] A sub-panel with 12 kVA of connected lighting load shows that load, with demand applied, on the parent panel's schedule summary.
 - [x] A 120/208 V panel cannot be fed directly from a 480 V board, but is accepted when fed through a transformer whose secondary distribution system is 120/208 V. *(Built 2026-10-20.)*
 - [x] Trying to make panel A feed panel B when B already feeds A is refused, and the message names both panels.
 - [x] A lug-connected feeder occupies no slot in the parent's schedule. *(No slot on the panel; schedules are not built.)*
@@ -3981,11 +3985,13 @@ The edit mode runs as a tool session (`tool.start`/`tool.finish`/`tool.cancel`, 
 - `load_classification.delete(id, replace_with)`
 - `connector.set(element_id, index, {load_classification})`
 
+*Built (2026-10-20):* Manage › MEP Settings › **Load Classifications**: a list (classification, demand factor, space load, connectors using it) with New…, Edit… (name, demand factor, space load), Delete… (asks for the replacement while connectors use it, *Other* proposed) and Demand Factors…; the five defaults are renamable but not deletable (`load_classification.default`); names unique without case and 1–64 characters, at most 256. Renaming renames it on every connector naming it (types and copies' overrides); connectors name classifications by name, matched without case, an unknown name counting as *Other*. `load_classification.create/set/delete/list`. Lighting and Power have the space-load flag by default. Not yet: sub-classifications, connector classification shared parameters, the space load densities (ANA-HCL-001), writing it to device psets.
+
 **Acceptance criteria.**
-- [ ] Changing a classification's demand factor changes every panel schedule summary row that uses it.
-- [ ] Deleting "Kitchen Equipment" while 12 connectors use it asks for a replacement, and afterwards all 12 show the replacement.
-- [ ] Deleting the default *Lighting* classification is refused.
-- [ ] Creating a second classification named "hvac" is refused as a duplicate.
+- [x] Changing a classification's demand factor changes every panel schedule summary row that uses it.
+- [x] Deleting "Kitchen Equipment" while 12 connectors use it asks for a replacement, and afterwards all 12 show the replacement.
+- [x] Deleting the default *Lighting* classification is refused.
+- [x] Creating a second classification named "hvac" is refused as a duplicate.
 
 ### 4.9.10 Demand factors
 **ID:** MEP-ELEC-010 · **Priority:** P2 · **Ref:** research/03 §10.4
@@ -4009,9 +4015,11 @@ The edit mode runs as a tool session (`tool.start`/`tool.finish`/`tool.cancel`, 
 - `demand_factor.create(name, method, ranges[], incremental?: bool) -> id`
 - `demand_factor.evaluate(id, loads[]) -> demand`
 
+*Built (2026-10-20):* demand factors in the electrical settings: constant, by quantity or by load (VA), ranges `{from, to?, percent}`, whole (the total at the percentage of the range it falls in) or incremental (each range's percentage on the part of the load in it; by quantity, the n-th largest load takes the percentage of the range n falls in), and the largest-motor rule (motor loads in descending order at the given percentages, the last for the rest). The default *100 %* is kept; one in use is refused for deletion. The Demand Factors dialog lists them and edits ranges as text (`0-10000: 100; 10000-: 50`). `demand_factor.create/set/delete/evaluate`. Applied in panel schedule summaries and `panel.loads_summary`. Not yet: `Pset_ElectricDistributionBoardOccurrence` demand totals, demand in feeder sizing.
+
 **Acceptance criteria.**
-- [ ] Incremental by load, with the first 10 kVA at 100% and the rest at 50%, gives 17.5 kVA for 25 kVA connected.
-- [ ] Constant 80% gives 8 kVA for 10 kVA connected.
+- [x] Incremental by load, with the first 10 kVA at 100% and the rest at 50%, gives 17.5 kVA for 25 kVA connected.
+- [x] Constant 80% gives 8 kVA for 10 kVA connected.
 
 ### 4.9.11 Circuit naming
 **ID:** MEP-ELEC-012 · **Priority:** P2 · **Ref:** research/03 §10.5
@@ -4075,9 +4083,11 @@ Panel schedules appear in the Project Browser under *Panel Schedules* and are pl
 
 **Commands.** `panel_schedule.create(panel_ids[], template_id?) -> view_ids[]`
 
+*Built (2026-10-20):* Analyze › Reports & Schedules › **Panel Schedules** (also Systems › Electrical): a schedule per selected panel (or one chosen), a schedule of kind `schedule.panel` naming the panel's GlobalId, opened in a tab and listed under *Panel Schedules* in the Project Browser, with a contextual *Panel Schedule* tab (Change Panel, Export, Load Classifications, Panel Hierarchy). The table, one column in slot order: the header (panel, distribution system, supply, slots used), every slot with the circuit starting there (number, load name, classification, trip, poles, load, load per phase; slots 1–2 on phase A, 3–4 B, 5–6 C, …; one load per pole on unbalanced connectors, otherwise shared), the further poles (↳), empty slots, feeders on lugs, the totals and currents per phase, and the loads summary by load classification (connected, demand factor, demand) with sub-panels' loads rolling up by their own classifications. Load name and trip cells are editable. Live: it is rebuilt from the circuits whenever the model changes; CSV export as other schedules. `panel_schedule.create`, `panel_schedule.change_panel`, `panel.loads_summary`. Not yet: templates and the two-column layout (MEP-ELEC-014), header fields beyond these (mains rating, mounting, enclosure, location), manufacturer and notes, placing on sheets.
+
 **Acceptance criteria.**
-- [ ] A schedule for a panel with 18 circuits lists them in slot order, with per-phase totals that match the sum of the circuit loads.
-- [ ] Changing a circuit's load name in the model updates the schedule cell, and editing the cell updates the model.
+- [x] A schedule for a panel with 18 circuits lists them in slot order, with per-phase totals that match the sum of the circuit loads.
+- [x] Changing a circuit's load name in the model updates the schedule cell, and editing the cell updates the model.
 
 ### 4.9.13 Panel schedule templates
 **ID:** MEP-ELEC-014 · **Priority:** P2 · **Ref:** research/03 §10.6 ("Templates")

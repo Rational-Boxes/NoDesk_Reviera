@@ -980,7 +980,7 @@ fn resolve_type(store: &Store, r: &ElementRef) -> Result<(ElementId, MeshObjectT
     Ok((id, t))
 }
 
-fn write_type(txn: &mut Transaction<'_>, id: ElementId, t: &MeshObjectType) -> Result<()> {
+pub(crate) fn write_type(txn: &mut Transaction<'_>, id: ElementId, t: &MeshObjectType) -> Result<()> {
     let value = serde_json::to_value(t).expect("serialises");
     txn.modify(id, |e| {
         e.params.insert(RECIPE_KEY.into(), value);

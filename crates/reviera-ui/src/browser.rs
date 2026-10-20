@@ -67,31 +67,40 @@ impl Gui {
             }
         }
         // Schedules (DOC-SCH-001).
-        let schedules: Vec<(ElementId, String)> = self
+        let schedules: Vec<(ElementId, String, bool)> = self
             .app
             .document(doc)
             .map(|d| {
-                let mut v: Vec<(ElementId, String)> = d
+                let mut v: Vec<(ElementId, String, bool)> = d
                     .doc
                     .store()
                     .iter()
                     .filter(|e| reviera_core::schedules::is_schedule(e))
-                    .map(|e| (e.id(), e.name.clone().unwrap_or_default()))
+                    .map(|e| {
+                        let panel = reviera_core::schedules::schedule_def(e)
+                            .is_some_and(|d| d.kind == reviera_core::mep_panel_schedule::KIND_PANEL);
+                        (e.id(), e.name.clone().unwrap_or_default(), panel)
+                    })
                     .collect();
                 v.sort_by(|a, b| reviera_core::schedules::natural(&a.1, &b.1));
                 v
             })
             .unwrap_or_default();
-        if !schedules.is_empty()
-            && let Some(group) = self
-                .browser
-                .append_item(&root, "Schedules/Quantities", None, None)
-        {
-            for (id, name) in schedules {
+        // Panel schedules (MEP-ELEC-013) have their own group.
+        for (label, panels) in [("Schedules/Quantities", false), ("Panel Schedules", true)] {
+            let these: Vec<&(ElementId, String, bool)> =
+                schedules.iter().filter(|s| s.2 == panels).collect();
+            if these.is_empty() {
+                continue;
+            }
+            let Some(group) = self.browser.append_item(&root, label, None, None) else {
+                continue;
+            };
+            for (id, name, _) in these {
                 if let Some(item) = self
                     .browser
-                    .append_item_with_data(&group, &name, id.0, None, None)
-                    && open.contains(&id)
+                    .append_item_with_data(&group, name, id.0, None, None)
+                    && open.contains(id)
                 {
                     self.browser.set_item_bold(&item, true);
                 }

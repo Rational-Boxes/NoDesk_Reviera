@@ -33,6 +33,8 @@ pub const UI_ACTIONS: &[&str] = &[
     "ui.pane.system_browser",
     "ui.pane.terminal",
     "ui.remote_analysis",
+    "load_classification.manage",
+    "demand_factor.manage",
     "mep.place_component",
     "system_type.edit",
     "mep_check.duct",

@@ -841,7 +841,7 @@ in Reviera, and your own agent settings are never changed (UI-AGENT-004).
 
 The MEP epic has begun with its foundations (spec Chapter 4 §4.6): connectors, the connectivity
 graph, system types, systems and system checks, the System Browser, and ducts and pipes with
-their fittings, and electrical circuits, panels and feeders. Panel schedules, cable tray and
+their fittings, and electrical circuits, panels, feeders and panel schedules. Cable tray and
 conduit, and sizing are next.
 
 - **Connectors** on component types: duct, pipe, electrical, cable tray and conduit connectors with
@@ -875,7 +875,24 @@ conduit, and sizing are next.
   circuit and panel; feeders between panels (on a breaker or feed-through lugs) and transformers
   bridging distribution systems, loads rolling up to the main board, loops refused; Check Circuits;
   circuits drawn dashed to their panel and listed in the System Browser (`circuit.*`, `panel.*`, `distribution_system.create`, `voltage.create`,
-  `electrical_settings.*`).
+  `electrical_settings.*`). *Select Supply* feeds the selected panel or transformer from a source
+  that would accept it (breaker or feed-through lugs) and *Panel Hierarchy* shows the distribution
+  tree; Panel Settings sets feed-through lugs and a transformer's secondary system. Circuits have
+  a load name (made from the classification and first device until edited) and a trip rating
+  (`circuit.set`).
+- **Panel schedules** (Analyze › Reports & Schedules, or Systems › Electrical): a live schedule of
+  a panel, under *Panel Schedules* in the Project Browser: the header (panel, distribution system,
+  supply, slots), every slot in order with the circuit's number, load name, classification, trip,
+  poles, load and load per phase (slots alternate A, B, C), the further poles of multi-pole
+  circuits, feeders on lugs, totals and currents per phase, and the loads summary by load
+  classification with demand factors, sub-panels rolling up by their own classifications. Load
+  names and trips are edited in their cells; Change Panel points it at another panel; CSV export
+  (`panel_schedule.create`, `panel_schedule.change_panel`, `panel.loads_summary`).
+- **Load classifications and demand factors** (Manage › MEP Settings): Lighting, Power, HVAC,
+  Motor and Other by default (renamable, not deletable), new ones (unique names; deleting one in
+  use asks for a replacement, and renaming renames it on connectors), each with a demand factor:
+  constant, by quantity or by load, ranges at percentages, whole or incremental, with an optional
+  largest-motor rule (`load_classification.*`, `demand_factor.*`).
 - **IFC**: ports as `IfcDistributionPort` nested in their elements, connections as
   `IfcRelConnectsPorts`, systems as `IfcDistributionSystem` with their members and building;
   `IfcDuctSegment`, `IfcDuctFitting`, `IfcPipeSegment` and `IfcPipeFitting` with their types;
@@ -1220,7 +1237,7 @@ area by area (reviewed against the spec on 2026-10-15).
   connection groups, composite decks and span symbols, truss families (a layout shared by types),
   further rebar (two-point, varying sets beyond bars through walls, bent fabric), bilinear and two-way area loads, panel results and external analysis providers.
 - **MEP** (in development): fittings placed and edited by hand, moving runs, flex duct, cable tray and conduit,
-  wires, panel schedules, demand factors, custom circuit naming, switch systems, sizing
+  wires, panel schedule templates and editing (moves, spares, rebalancing), the two-column layout, custom circuit naming, switch systems, cable sizing
   and calculations, the System Browser's
   zones, columns and search, the System Editor, placing connectors on faces in a component editor, fabrication, P&ID and spaces
   and zones are specified but not built.

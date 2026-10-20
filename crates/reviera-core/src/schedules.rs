@@ -72,6 +72,9 @@ pub struct ScheduleDef {
     pub itemize: bool,
     #[serde(default = "yes")]
     pub grand_totals: bool,
+    /// A panel schedule's panel (GlobalId, MEP-ELEC-013).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub panel: Option<String>,
 }
 
 pub fn is_schedule(e: &Element) -> bool {
@@ -502,6 +505,9 @@ pub fn table(
 ) -> Result<Table> {
     let def =
         schedule_def(schedule).ok_or_else(|| Error::new("schedule.not_found", "not a schedule"))?;
+    if def.kind == crate::mep_panel_schedule::KIND_PANEL {
+        return crate::mep_panel_schedule::table(store, schedule, &def);
+    }
     let elements: Vec<&Element> = store
         .iter()
         .filter(|e| !crate::categories::is_type(e) && crate::inspect::in_tree(e))
@@ -678,6 +684,12 @@ fn resolve(store: &Store, r: &ElementRef) -> Result<(ElementId, ScheduleDef)> {
             format!("element {id} is not a schedule"),
         )
     })?;
+    if def.kind == crate::mep_panel_schedule::KIND_PANEL {
+        return Err(Error::new(
+            "schedule.panel_schedule",
+            "a panel schedule's columns are set by its template",
+        ));
+    }
     Ok((id, def))
 }
 
@@ -761,6 +773,7 @@ pub(crate) fn create(txn: &mut crate::txn::Transaction<'_>, p: CreateParams) -> 
         sort,
         itemize: true,
         grand_totals: true,
+        panel: None,
     };
     let guid = GlobalId::new();
     txn.create(
@@ -881,6 +894,34 @@ pub(crate) fn set_cell(txn: &mut crate::txn::Transaction<'_>, p: SetCellParams) 
             let params: crate::rooms::SetParams = serde_json::from_value(args)
                 .map_err(|e| Error::new("schedule.bad_value", e.to_string()))?;
             crate::rooms::set(txn, params)
+        }
+        "circuit.load_name" | "circuit.rating" => {
+            let text = match &p.value {
+                Value::String(s) => s.clone(),
+                Value::Null => String::new(),
+                other => other.to_string(),
+            };
+            for id in &ids {
+                let mut params = crate::mep_electrical::CircuitSetParams {
+                    circuit_id: ElementRef::Id(*id),
+                    load_name: None,
+                    rating: None,
+                };
+                if p.field == "circuit.load_name" {
+                    params.load_name = Some(text.clone());
+                } else {
+                    let t = text.trim().trim_end_matches(['A', 'a']).trim();
+                    params.rating = Some(if t.is_empty() {
+                        0.0
+                    } else {
+                        t.parse().map_err(|_| {
+                            Error::new("schedule.bad_value", format!("{text:?} is not a rating in amperes"))
+                        })?
+                    });
+                }
+                crate::mep_electrical::set_circuit(txn, params)?;
+            }
+            Ok(())
         }
         f => match f.strip_prefix("param:") {
             Some(reference) => {

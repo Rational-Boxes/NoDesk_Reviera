@@ -11,6 +11,9 @@ Water 1. The tools are on the <b>Systems</b> tab.</p>
   <a href="#connections">Connections</a>
   <a href="#systems">Systems</a>
   <a href="#circuits">Electrical circuits</a>
+  <a href="#feeders">Feeders and transformers</a>
+  <a href="#schedules">Panel schedules</a>
+  <a href="#loads">Load classifications and demand factors</a>
   <a href="#types">System types</a>
   <a href="#browser">System Browser</a>
   <a href="#checks">Checking systems</a>
@@ -95,6 +98,44 @@ numbered by the scheme: <b>Panel Name + Number</b> (LP1-7), <b>Numerical</b> (13
 <p>Select a device or a panel to see its circuits drawn dashed from the panel to each device. The
 System Browser lists panels, their circuits with the load, and their devices. <b>Check
 Circuits</b> marks circuits with no panel or on a panel that does not fit them.</p>
+
+<h2 id="feeders">Feeders and transformers</h2>
+<p>Select a panel or a transformer and choose
+<a href="reviera:action/panel.set_supply">Select Supply</a>. The list offers only the panels that
+can feed it: their distribution system must match (a transformer gives its <b>secondary</b>
+system, set in Panel Settings), they need free slots, and the choice must not make a loop. A
+feeder takes slots on a breaker, or none on the source's <b>feed-through lugs</b> (turned on in
+Panel Settings; one feeder per panel). The fed panel's whole load then counts on its source.
+<a href="reviera:action/panel.hierarchy">Panel Hierarchy</a> shows the tree from the supplies
+down, with each panel's connected load.</p>
+
+<h2 id="schedules">Panel schedules</h2>
+<p>Select a panel and choose <a href="reviera:action/panel_schedule.create">Panel Schedules</a>
+(Analyze › Reports &amp; Schedules). The schedule opens in a tab and is listed under <i>Panel
+Schedules</i> in the Project Browser. It shows the panel's supply and slots, then every slot in
+order: the circuit's number, load name, classification, trip rating, poles, load, and its load on
+each phase. Slots alternate phases in pairs (1 and 2 on A, 3 and 4 on B, 5 and 6 on C). Below are
+the totals and currents per phase and the <b>loads summary</b>: the connected load of each load
+classification, its demand factor and the estimated demand, including the loads of sub-panels.</p>
+<p>Type in a <b>Load Name</b> or <b>Trip</b> cell to change the circuit. Load names are made from
+the loads (for example <i>Lighting – Ceiling Luminaire</i>) until you type one; clearing it goes
+back. The schedule is live: it changes as soon as the circuits do. <b>Change Panel</b> shows
+another panel, and <b>Export</b> writes CSV.</p>
+
+<h2 id="loads">Load classifications and demand factors</h2>
+<p><a href="reviera:action/load_classification.manage">Manage › MEP Settings › Load
+Classifications</a> lists the classifications connectors name (Lighting, Power, HVAC, Motor and
+Other to begin with), each with its <b>demand factor</b>: how much of the connected load is
+expected at once. New classifications need a unique name. Renaming one also renames it on every
+connector. Deleting one that connectors use asks which classification they take instead. The five
+defaults can be renamed but not deleted.</p>
+<p><a href="reviera:action/demand_factor.manage">Demand Factors</a> are <b>constant</b> (80 %),
+<b>by quantity</b> (the number of loads) or <b>by load</b> (their total in VA). Ranges are written
+as <code>from-to: percent</code>, separated by semicolons, for example
+<code>0-10000: 100; 10000-: 50</code>. <b>Incremental</b> applies each range's percentage to the part
+of the load that falls in it, so 25 kVA becomes 10 + 7.5 = 17.5 kVA. Without it, the whole load
+takes the percentage of its range. The <b>largest motor rule</b> weights motor loads, largest
+first (for example 125, 100, 75).</p>
 
 <h2 id="types">System types</h2>
 <p>Every classification has a built-in type of its name with an abbreviation (SA, RA, DCW, …) and

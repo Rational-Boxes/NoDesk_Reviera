@@ -58,6 +58,8 @@ pub mod mesh_objects;
 pub mod mep;
 pub mod mep_runs;
 pub mod mep_electrical;
+pub mod mep_loads;
+pub mod mep_panel_schedule;
 pub mod mep_systems;
 pub mod model_lines;
 pub mod model_text;

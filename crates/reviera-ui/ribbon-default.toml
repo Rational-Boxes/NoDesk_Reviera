@@ -2314,6 +2314,42 @@ icon = "system_disconnect"
 help = "Take a circuit off its panel; it keeps its devices and loses its number"
 
 [[action]]
+id = "panel.set_supply"
+label = "Select Supply"
+icon = "panel_supply"
+help = "Feed the selected panel or transformer from another, on a breaker or feed-through lugs; only sources that would accept it are offered (MEP-ELEC-006)"
+
+[[action]]
+id = "panel.hierarchy"
+label = "Panel Hierarchy"
+icon = "panel_hierarchy"
+help = "The distribution tree from the supplies down, with each panel's connected load"
+
+[[action]]
+id = "panel_schedule.create"
+label = "Panel Schedules"
+icon = "schedule"
+help = "A live schedule of the selected panel's circuits: slots, load names, trips, loads per phase and the loads summary with demand factors (MEP-ELEC-013)"
+
+[[action]]
+id = "panel_schedule.change_panel"
+label = "Change Panel"
+icon = "panel_settings"
+help = "Show another panel in this panel schedule (MEP-ELEC-015)"
+
+[[action]]
+id = "load_classification.manage"
+label = "Load Classifications"
+icon = "load_classes"
+help = "The load classifications loads are grouped by in panel schedules, and their demand factors (MEP-ELEC-009)"
+
+[[action]]
+id = "demand_factor.manage"
+label = "Demand Factors"
+icon = "demand_factor"
+help = "Constant, by-quantity and by-load demand factors with incremental ranges and the largest-motor rule (MEP-ELEC-010)"
+
+[[action]]
 id = "panel.settings"
 label = "Panel Settings"
 icon = "panel_settings"
@@ -2635,6 +2671,9 @@ tools = [
   { action = "circuit.select_panel", size = "small" },
   { action = "circuit.disconnect_panel", size = "small" },
   { action = "panel.settings", size = "small" },
+  { action = "panel.set_supply", size = "small" },
+  { action = "panel.hierarchy", size = "small" },
+  { action = "panel_schedule.create", size = "small" },
 ]
 
 [[tab.panel]]
@@ -2708,6 +2747,10 @@ tools = [
   { action = "ui.pane.results", size = "large" },
   { action = "structural_analysis.results", size = "small" },
 ]
+
+[[tab.panel]]
+label = "Reports & Schedules"
+tools = [{ action = "panel_schedule.create", size = "large" }]
 
 [[tab.panel]]
 label = "Remote Analysis"
@@ -2894,6 +2937,13 @@ tools = [
   { action = "ui.model_properties", size = "large" },
   { action = "clearance.set_rule_set", size = "large" },
   { action = "ui.remote_analysis", size = "large" },
+]
+
+[[tab.panel]]
+label = "MEP Settings"
+tools = [
+  { action = "load_classification.manage", size = "large" },
+  { action = "demand_factor.manage", size = "large" },
 ]
 
 [[tab]]
@@ -3169,6 +3219,16 @@ panels = [{ label = "Schedule", tools = [
   { action = "schedule.edit_sort", size = "large" },
   { action = "schedule.itemize", size = "large" },
   { action = "schedule.export", size = "large" },
+] }]
+
+[[context]]
+category = "session.panel_schedule"
+label = "Panel Schedule"
+panels = [{ label = "Panel Schedule", tools = [
+  { action = "panel_schedule.change_panel", size = "large" },
+  { action = "schedule.export", size = "large" },
+  { action = "load_classification.manage", size = "large" },
+  { action = "panel.hierarchy", size = "large" },
 ] }]
 
 [[context]]

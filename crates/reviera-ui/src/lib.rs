@@ -56,6 +56,7 @@ mod mep_ui;
 mod remote_analysis_ui;
 mod terminal_ui;
 mod mep_electrical_ui;
+mod mep_loads_ui;
 mod mep_runs_ui;
 mod fullscreen;
 mod plans;
@@ -2176,8 +2177,16 @@ impl Gui {
     fn update_ribbon_context(&mut self) {
         self.update_view_actions();
         if self.active_view().is_some_and(|v| v.schedule.is_some()) {
-            self.ribbon
-                .set_context(Some(("Schedule", Some("session.schedule"))));
+            let panel = self.active_view().and_then(|v| {
+                let def = reviera_core::schedules::schedule_def(self.app.document(v.doc)?.doc.store().get(v.element?)?)?;
+                Some(def.kind == reviera_core::mep_panel_schedule::KIND_PANEL)
+            });
+            let context = if panel == Some(true) {
+                ("Panel Schedule", Some("session.panel_schedule"))
+            } else {
+                ("Schedule", Some("session.schedule"))
+            };
+            self.ribbon.set_context(Some(context));
             return;
         }
         if self.in_sheet() {
@@ -4495,6 +4504,12 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "circuit.select_panel" => with(gui, Gui::select_circuit_panel),
         "circuit.disconnect_panel" => with(gui, Gui::disconnect_circuit_panel),
         "panel.settings" => with(gui, Gui::panel_settings),
+        "panel.set_supply" => with(gui, Gui::select_supply),
+        "panel.hierarchy" => with(gui, Gui::panel_hierarchy),
+        "panel_schedule.create" => with(gui, Gui::create_panel_schedules),
+        "panel_schedule.change_panel" => with(gui, Gui::change_schedule_panel),
+        "load_classification.manage" => with(gui, Gui::load_classifications),
+        "demand_factor.manage" => with(gui, Gui::demand_factors),
         "ui.pane.analytical_checks" => Gui::toggle_checks_pane(gui),
         "ui.pane.results" => Gui::toggle_results_pane(gui),
         "load_case.manage" => Gui::load_cases_dialog(gui, "cases"),

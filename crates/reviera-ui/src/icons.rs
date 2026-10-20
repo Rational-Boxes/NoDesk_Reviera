@@ -349,6 +349,18 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "cap_ends" => format!(
             r#"<path d="M3 11h18v10H3z" fill="{f}" {s}/><path d="M23 9v14" stroke-width="3" {sa}/>"#
         ),
+        "panel_supply" => format!(
+            r#"<rect x="3" y="3" width="10" height="12" fill="{f}" {s}/><rect x="19" y="17" width="10" height="12" fill="{f}" {s}/><path d="M8 15v8h11" {sa}/><path d="M16 20l3 3-3 3" {sa}/>"#
+        ),
+        "panel_hierarchy" => format!(
+            r#"<rect x="11" y="3" width="10" height="7" fill="{f}" {s}/><rect x="3" y="22" width="10" height="7" fill="{f}" {s}/><rect x="19" y="22" width="10" height="7" fill="{f}" {s}/><path d="M16 10v6M8 16h16M8 16v6M24 16v6" {sa}/>"#
+        ),
+        "load_classes" => format!(
+            r#"<rect x="4" y="5" width="8" height="6" fill="{f}" {s}/><rect x="4" y="14" width="8" height="6" fill="{f}" {s}/><rect x="4" y="23" width="8" height="6" fill="{f}" {s}/><path d="M15 8h13M15 17h10M15 26h7" {sa}/>"#
+        ),
+        "demand_factor" => format!(
+            r#"<path d="M4 28V4M4 28h24" {s}/><path d="M4 10h10l6 8h8" fill="none" {sa}/><circle cx="19" cy="5" r="1.6" {s}/><circle cx="26" cy="11" r="1.6" {s}/><path d="M27 4l-9 8" {s}/>"#
+        ),
         "remote_analysis" => format!(
             r#"<path d="M8 22a5 5 0 0 1 1-10 7 7 0 0 1 13-2 5 5 0 0 1 3 9.5" fill="{f}" {s}/><rect x="11" y="18" width="10" height="9" rx="1" {sa}/><path d="M13 18v-3a3 3 0 0 1 6 0v3" {sa}/>"#
         ),

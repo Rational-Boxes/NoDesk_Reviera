@@ -73,6 +73,7 @@ impl Gui {
                     text.push_str(&format!("; {} skipped ({})", s.len(), s[0]["reason"].as_str().unwrap_or("")));
                 }
                 self.refresh_active();
+                self.refresh_schedules();
                 frame.set_status_text(&text, 0);
             }
             Err(e) => error(&frame, &format!("No circuit was made:\n{e}")),
@@ -93,6 +94,7 @@ impl Gui {
         match self.run(command, json!({ "circuit_id": c.id, "element_ids": ids })) {
             Ok(_) => {
                 self.refresh_active();
+                self.refresh_schedules();
                 frame.set_status_text(title, 0);
             }
             Err(e) => error(&frame, &format!("{title}:\n{e}")),
@@ -135,6 +137,7 @@ impl Gui {
         match self.run("circuit.select_panel", json!({ "circuit_id": c.id, "panel_id": pid })) {
             Ok(v) => {
                 self.refresh_active();
+                self.refresh_schedules();
                 frame.set_status_text(&format!("The circuit is {} on the panel", v.as_str().unwrap_or("")), 0);
             }
             Err(e) => error(&frame, &format!("Select Panel:\n{e}")),
@@ -150,6 +153,7 @@ impl Gui {
         match self.run("circuit.disconnect_panel", json!({ "circuit_id": c.id })) {
             Ok(_) => {
                 self.refresh_active();
+                self.refresh_schedules();
                 frame.set_status_text("The circuit is off its panel and has no number", 0);
             }
             Err(e) => error(&frame, &format!("Disconnect Panel:\n{e}")),
@@ -189,6 +193,14 @@ impl Gui {
             &namings.iter().map(|n| n.1.to_owned()).collect::<Vec<_>>(),
             namings.iter().position(|n| n.0 == current).unwrap_or(0),
         );
+        let lugs = f.check("Feed-through lugs", "One feeder may leave from lugs, taking no slot", pn.feed_through_lugs);
+        let transformer = e.class == "IfcTransformer";
+        let mut secondaries = vec!["(none)".to_owned()];
+        secondaries.extend(systems.iter().cloned());
+        let secondary = transformer.then(|| {
+            let at = pn.secondary.as_ref().and_then(|id| settings.distribution_systems.iter().position(|d| &d.id == id)).map_or(0, |k| k + 1);
+            f.choice("Secondary system", &secondaries, at)
+        });
         if !f.show("Circuits are renumbered when the panel changes", "OK") {
             f.dialog.destroy();
             return;
@@ -199,14 +211,177 @@ impl Gui {
             "distribution_system": settings.distribution_systems[system.get_selection().map_or(0, |i| i as usize).min(systems.len() - 1)].id,
             "slots": slots.get_value().trim().parse::<u32>().unwrap_or(pn.slots),
             "naming": namings[naming.get_selection().map_or(0, |i| i as usize).min(3)].0,
+            "feed_through_lugs": lugs.get_value(),
         });
+        let mut args = args;
+        if let Some(k) = secondary.and_then(|c| c.get_selection()).filter(|k| *k > 0) {
+            args["secondary"] = json!(settings.distribution_systems[k as usize - 1].id);
+        }
         f.dialog.destroy();
         match self.run("panel.set", args) {
             Ok(_) => {
                 self.refresh_active();
+                self.refresh_schedules();
                 frame.set_status_text("Panel settings saved", 0);
             }
             Err(e) => error(&frame, &format!("The panel settings were not saved:\n{e}")),
+        }
+    }
+}
+
+impl Gui {
+    /// The one selected panel (or transformer), or a status message.
+    fn selected_panel(&mut self, title: &str) -> Option<ElementId> {
+        let store = self.store_now()?;
+        let panels: Vec<ElementId> = self
+            .selection()
+            .into_iter()
+            .filter(|i| store.get(*i).is_some_and(|e| mep_electrical::is_panel(&store, e)))
+            .collect();
+        match panels[..] {
+            [p] => Some(p),
+            _ => {
+                self.frame.set_status_text(&format!("{title}: select one panel or transformer first"), 0);
+                None
+            }
+        }
+    }
+
+    /// Systems › Select Supply: the panel or transformer the selected one is fed from, on a
+    /// breaker or the source's feed-through lugs. Only sources that would accept it are offered.
+    pub(crate) fn select_supply(&mut self) {
+        let frame = self.frame;
+        let Some(pid) = self.selected_panel("Select Supply") else { return };
+        let Some(store) = self.store_now() else { return };
+        let me = store.get(pid).map(mep_electrical::panel_name).unwrap_or_default();
+        let settings = mep_electrical::settings(&store);
+        let mut options: Vec<(ElementId, &str, String)> = Vec::new();
+        let mut refused = Vec::new();
+        for e in store.iter().filter(|e| e.id() != pid && mep_electrical::is_panel(&store, e)) {
+            let pn = mep_electrical::panel(e);
+            let gives = if e.class == "IfcTransformer" { pn.secondary.clone() } else { Some(pn.distribution_system.clone()) };
+            let system = gives
+                .and_then(|g| settings.distribution_systems.iter().find(|d| d.id == g).map(|d| d.name.clone()))
+                .unwrap_or_else(|| "no secondary system".into());
+            for connection in ["breaker", "lugs"] {
+                if connection == "lugs" && !pn.feed_through_lugs {
+                    continue;
+                }
+                let args = json!({ "panel_id": pid, "source_id": e.id(), "connection": connection });
+                match self.app.preview("panel.set_supply", args, &super::user()) {
+                    Ok(_) => {
+                        let how = if connection == "lugs" { "feed-through lugs" } else { "breaker" };
+                        options.push((e.id(), connection, format!("{} — {system}, {how}", mep_electrical::panel_name(e))));
+                    }
+                    Err(err) if connection == "breaker" => refused.push(format!("{}: {}", mep_electrical::panel_name(e), err.message)),
+                    Err(_) => {}
+                }
+            }
+        }
+        if options.is_empty() {
+            let why = if refused.is_empty() { "there is no other panel".to_owned() } else { refused.join("\n") };
+            return error(&frame, &format!("{me} cannot be fed from any panel:\n{why}"));
+        }
+        let labels: Vec<&str> = options.iter().map(|o| o.2.as_str()).collect();
+        let current = mep_electrical::supply_of(&store, pid).and_then(|f| f.panel);
+        let d = SingleChoiceDialog::builder(&frame, &format!("Feed {me} from:"), "Select Supply", &labels).build();
+        if let Some(k) = current.and_then(|c| options.iter().position(|o| o.0 == c)) {
+            d.set_selection(k as i32);
+        }
+        if d.show_modal() != ID_OK {
+            return;
+        }
+        let Some((src, connection, label)) = usize::try_from(d.get_selection()).ok().and_then(|k| options.get(k)).cloned() else { return };
+        match self.run("panel.set_supply", json!({ "panel_id": pid, "source_id": src, "connection": connection })) {
+            Ok(_) => {
+                self.refresh_active();
+                self.refresh_schedules();
+                frame.set_status_text(&format!("{me} is fed from {label}"), 0);
+            }
+            Err(e) => error(&frame, &format!("Select Supply:\n{e}")),
+        }
+    }
+
+    /// Systems › Panel Hierarchy: the distribution tree with each panel's connected load.
+    pub(crate) fn panel_hierarchy(&mut self) {
+        let frame = self.frame;
+        let tree = match self.run("panel.hierarchy", json!({})) {
+            Ok(v) => v,
+            Err(e) => return error(&frame, &e),
+        };
+        fn walk(n: &serde_json::Value, depth: usize, out: &mut String) {
+            let indent = if depth == 0 { String::new() } else { format!("{}└ ", "    ".repeat(depth - 1)) };
+            out.push_str(&format!("{indent}{}   {:.0} VA\n", n["name"].as_str().unwrap_or(""), n["load"].as_f64().unwrap_or(0.0)));
+            for c in n["children"].as_array().into_iter().flatten() {
+                walk(c, depth + 1, out);
+            }
+        }
+        let mut text = String::new();
+        for root in tree.as_array().into_iter().flatten() {
+            walk(root, 0, &mut text);
+        }
+        if text.is_empty() {
+            return frame.set_status_text("Panel Hierarchy: there are no panels", 0);
+        }
+        let f = super::reinforcement_ui::Form::new(&frame, "Panel Hierarchy");
+        let t = f.lines("Distribution", &text, "Panels from the supplies down, with their connected load (sub-panels included)");
+        t.set_min_size(Size::new(420, 260));
+        f.show("Select Supply chooses what a panel is fed from.", "Close");
+        f.dialog.destroy();
+    }
+
+    /// Analyze › Panel Schedules: a schedule for each selected panel (or a chosen one), opened.
+    pub(crate) fn create_panel_schedules(&mut self) {
+        let frame = self.frame;
+        let Some(doc) = self.doc else { return };
+        let Some(store) = self.store_now() else { return };
+        let mut panels: Vec<ElementId> = self
+            .selection()
+            .into_iter()
+            .filter(|i| store.get(*i).is_some_and(|e| mep_electrical::is_panel(&store, e)))
+            .collect();
+        if panels.is_empty() {
+            let all: Vec<(ElementId, String)> =
+                store.iter().filter(|e| mep_electrical::is_panel(&store, e)).map(|e| (e.id(), mep_electrical::panel_name(e))).collect();
+            if all.is_empty() {
+                return frame.set_status_text("Panel Schedules: there are no panels (a distribution board is one)", 0);
+            }
+            let labels: Vec<&str> = all.iter().map(|p| p.1.as_str()).collect();
+            let d = SingleChoiceDialog::builder(&frame, "Panel:", "Panel Schedule", &labels).build();
+            if d.show_modal() != ID_OK {
+                return;
+            }
+            let Some(p) = usize::try_from(d.get_selection()).ok().and_then(|k| all.get(k)) else { return };
+            panels.push(p.0);
+        }
+        match self.run("panel_schedule.create", json!({ "panel_ids": panels })) {
+            Ok(v) => {
+                self.browser_stale = true;
+                if let Some(first) = v[0].as_u64() {
+                    self.open_view(doc, Some(ElementId(first)));
+                }
+            }
+            Err(e) => error(&frame, &format!("No panel schedule was made:\n{e}")),
+        }
+    }
+}
+
+impl Gui {
+    /// Panel Schedule › Change Panel: the open panel schedule shows another panel.
+    pub(crate) fn change_schedule_panel(&mut self) {
+        let frame = self.frame;
+        let Some(sid) = self.active_view().filter(|v| v.schedule.is_some()).and_then(|v| v.element) else { return };
+        let Some(store) = self.store_now() else { return };
+        let all: Vec<(ElementId, String)> = store.iter().filter(|e| mep_electrical::is_panel(&store, e)).map(|e| (e.id(), mep_electrical::panel_name(e))).collect();
+        let labels: Vec<&str> = all.iter().map(|p| p.1.as_str()).collect();
+        let d = SingleChoiceDialog::builder(&frame, "Show the panel:", "Change Panel", &labels).build();
+        if d.show_modal() != ID_OK {
+            return;
+        }
+        let Some(p) = usize::try_from(d.get_selection()).ok().and_then(|k| all.get(k)) else { return };
+        match self.run("panel_schedule.change_panel", json!({ "view_id": sid, "panel_id": p.0 })) {
+            Ok(_) => self.refresh_schedules(),
+            Err(e) => error(&frame, &format!("Change Panel:\n{e}")),
         }
     }
 }

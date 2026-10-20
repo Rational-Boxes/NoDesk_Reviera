@@ -119,6 +119,18 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(PanelCreateFeeder),
         registry.add(PanelSetSupply),
         registry.add(PanelHierarchy),
+        registry.add(CircuitSet),
+        registry.add(LoadClassificationCreate),
+        registry.add(LoadClassificationSet),
+        registry.add(LoadClassificationDelete),
+        registry.add(DemandFactorCreate),
+        registry.add(DemandFactorSet),
+        registry.add(DemandFactorDelete),
+        registry.add(DemandFactorEvaluate),
+        registry.add(PanelScheduleCreate),
+        registry.add(PanelScheduleChangePanel),
+        registry.add(PanelLoadsSummary),
+        registry.add(LoadClassificationList),
     ];
     for r in results {
         r.expect("MEP commands are valid");
@@ -670,4 +682,133 @@ read_command!(
     crate::mep_electrical::HierarchyParams,
     Vec<crate::mep_electrical::PanelNode>,
     crate::mep_electrical::hierarchy
+);
+
+edit_command!(
+    CircuitSet,
+    "circuit.set",
+    "Set a circuit's load name and rating",
+    "Sets a circuit's `load_name` (empty: made from its loads again, the load classification and first device, or for a feeder the panel it feeds) and `rating` (the protective device, amperes; 0 clears it) (MEP-ELEC-005). Panel schedules show both and edit them in their cells.",
+    "Circuit Properties",
+    crate::mep_electrical::CircuitSetParams,
+    (),
+    crate::mep_electrical::set_circuit
+);
+
+edit_command!(
+    LoadClassificationCreate,
+    "load_classification.create",
+    "Make a load classification",
+    "Adds a load classification (MEP-ELEC-009): `name` (1–64 characters, unique without case), `demand_factor_id` (default constant 100 %) and `space_load`. Connectors name it in `electrical.load_classification`. Returns its id.",
+    "Load Classification",
+    crate::mep_loads::ClassificationCreateParams,
+    String,
+    crate::mep_loads::create_classification
+);
+
+edit_command!(
+    LoadClassificationSet,
+    "load_classification.set",
+    "Change a load classification",
+    "Renames a load classification (every connector naming it is renamed too) or changes its `demand_factor_id` or `space_load` (MEP-ELEC-009). Panel schedule summaries follow.",
+    "Load Classification",
+    crate::mep_loads::ClassificationSetParams,
+    (),
+    crate::mep_loads::set_classification
+);
+
+edit_command!(
+    LoadClassificationDelete,
+    "load_classification.delete",
+    "Delete a load classification",
+    "Deletes a load classification (MEP-ELEC-009); while connectors use it, `replace_with` (another classification's id) is required and they take it. The defaults (Lighting, Power, HVAC, Motor, Other) cannot be deleted. Returns how many connectors moved.",
+    "Delete Load Classification",
+    crate::mep_loads::ClassificationDeleteParams,
+    usize,
+    crate::mep_loads::delete_classification
+);
+
+edit_command!(
+    DemandFactorCreate,
+    "demand_factor.create",
+    "Make a demand factor",
+    "Adds a demand factor (MEP-ELEC-010): `name`, `method` (constant, quantity: by the number of loads, load: by their total VA), `ranges` [{from, to?, percent}] (one for constant), `incremental` (each range's percentage on the part in it; otherwise the whole total at the percentage of its range) and `motor_percents` (the largest-motor rule: motor loads in descending order, the last percentage for the rest). Returns its id.",
+    "Demand Factor",
+    crate::mep_loads::DemandFactorParams,
+    String,
+    crate::mep_loads::create_demand_factor
+);
+
+edit_command!(
+    DemandFactorSet,
+    "demand_factor.set",
+    "Change a demand factor",
+    "Changes a demand factor's name, method, ranges, incremental flag or motor percentages (MEP-ELEC-010).",
+    "Demand Factor",
+    crate::mep_loads::DemandFactorSetParams,
+    (),
+    crate::mep_loads::set_demand_factor
+);
+
+edit_command!(
+    DemandFactorDelete,
+    "demand_factor.delete",
+    "Delete a demand factor",
+    "Deletes a demand factor no load classification uses (MEP-ELEC-010); the 100 % default is kept.",
+    "Delete Demand Factor",
+    crate::mep_loads::DemandFactorDeleteParams,
+    (),
+    crate::mep_loads::delete_demand_factor
+);
+
+read_command!(
+    DemandFactorEvaluate,
+    "demand_factor.evaluate",
+    "Apply a demand factor",
+    "The demand (VA) of `loads` (VA each, or {va, motor}) under a demand factor (MEP-ELEC-010).",
+    crate::mep_loads::EvaluateParams,
+    f64,
+    crate::mep_loads::evaluate_command
+);
+
+edit_command!(
+    PanelScheduleCreate,
+    "panel_schedule.create",
+    "Make panel schedules",
+    "Makes a panel schedule for each of `panel_ids` (MEP-ELEC-013): a live schedule view of the panel's circuits in slot order (number, load name, trip, poles, load per phase, total, classification), feeders on lugs, the totals and currents per phase, and the loads summary by load classification with demand factors (sub-panels rolling up by their own classifications). Load names and trips are edited in their cells. Returns the schedules.",
+    "Panel Schedule",
+    crate::mep_panel_schedule::CreateParams,
+    Vec<ElementId>,
+    crate::mep_panel_schedule::create
+);
+
+edit_command!(
+    PanelScheduleChangePanel,
+    "panel_schedule.change_panel",
+    "Show another panel in a panel schedule",
+    "Points a panel schedule (`view_id`) at another panel (MEP-ELEC-015).",
+    "Change Panel",
+    crate::mep_panel_schedule::ChangePanelParams,
+    (),
+    crate::mep_panel_schedule::change_panel
+);
+
+read_command!(
+    PanelLoadsSummary,
+    "panel.loads_summary",
+    "A panel's loads by classification",
+    "A panel's connected load by load classification, through its sub-panels, with each classification's demand factor and the estimated demand (VA) (MEP-ELEC-010, 013).",
+    crate::mep_panel_schedule::SummaryParams,
+    Vec<crate::mep_panel_schedule::SummaryLine>,
+    crate::mep_panel_schedule::summary_command
+);
+
+read_command!(
+    LoadClassificationList,
+    "load_classification.list",
+    "The load classifications",
+    "The load classifications (MEP-ELEC-009) with their demand factor, space-load flag, how many connectors name them and whether they are defaults. Demand factors are in `electrical_settings.get`.",
+    crate::mep_electrical::Empty,
+    Vec<crate::mep_loads::ClassificationInfo>,
+    crate::mep_loads::list_classifications
 );

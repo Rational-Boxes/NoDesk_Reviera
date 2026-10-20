@@ -20,9 +20,11 @@
 //!   panel whose distribution system gives that voltage (line-to-ground for one pole, line-to-line
 //!   for two or three, three only on three-phase systems) and has the free slots.
 //!
-//! Not built yet: custom naming schemes, feeders and transformers (MEP-ELEC-006), wires and
-//! circuit paths, panel schedules, demand factors and load classifications beyond the
-//! connector's own, switch systems, the Edit Circuit mode.
+//! Feeders and transformers (MEP-ELEC-006) are here too; panel schedules are
+//! [`crate::mep_panel_schedule`], load classifications and demand factors [`crate::mep_loads`].
+//!
+//! Not built yet: custom naming schemes, wires and circuit paths, cable sizing, switch systems,
+//! the Edit Circuit mode.
 
 use std::collections::BTreeMap;
 
@@ -106,6 +108,10 @@ pub struct ElectricalSettings {
     pub naming: NamingScheme,
     /// A multi-pole circuit's name uses its first slot only.
     pub first_slot_only: bool,
+    /// Load classifications (MEP-ELEC-009).
+    pub load_classifications: Vec<crate::mep_loads::LoadClassification>,
+    /// Demand factors (MEP-ELEC-010).
+    pub demand_factors: Vec<crate::mep_loads::DemandFactor>,
 }
 
 impl Default for ElectricalSettings {
@@ -137,6 +143,8 @@ impl Default for ElectricalSettings {
             ],
             naming: NamingScheme::PanelNameNumber,
             first_slot_only: false,
+            load_classifications: crate::mep_loads::default_classifications(),
+            demand_factors: crate::mep_loads::default_demand_factors(),
         }
     }
 }
@@ -152,7 +160,7 @@ pub fn settings(store: &Store) -> ElectricalSettings {
         .unwrap_or_default()
 }
 
-fn save_settings(txn: &mut Transaction<'_>, s: &ElectricalSettings) -> Result<()> {
+pub(crate) fn save_settings(txn: &mut Transaction<'_>, s: &ElectricalSettings) -> Result<()> {
     let pid = project(txn.store()).map(|p| p.id()).ok_or_else(|| bad("project.missing", "the model has no project"))?;
     txn.set_param(pid, SETTINGS_KEY, serde_json::to_value(s).expect("serialises"))
 }
@@ -485,6 +493,12 @@ pub struct CircuitRecipe {
     /// A feeder on the parent's feed-through lugs: no slot.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub lugs: bool,
+    /// The load name, when edited by hand (MEP-ELEC-005); otherwise it is made from the loads.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub load_name: Option<String>,
+    /// The protective device's rating (amperes).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rating: Option<f64>,
 }
 
 fn one() -> u8 {
@@ -514,6 +528,13 @@ pub struct CircuitInfo {
     pub load: f64,
     pub feeder: bool,
     pub lugs: bool,
+    /// The load name: edited by hand, or made from the load classification and first device
+    /// (a feeder: the panel it feeds).
+    pub load_name: String,
+    /// Whether the load name was edited by hand.
+    pub load_name_edited: bool,
+    /// Amperes, when set.
+    pub rating: Option<f64>,
 }
 
 fn find(store: &Store, guid: &str) -> Option<ElementId> {
@@ -542,6 +563,7 @@ fn info(store: &Store, e: &Element, r: &CircuitRecipe) -> CircuitInfo {
         }
     }
     let panel = r.panel.as_deref().and_then(|g| find(store, g));
+    let auto = r.load_name.as_ref().filter(|n| !n.trim().is_empty()).is_none().then(|| auto_load_name(store, r, &ports));
     CircuitInfo {
         id: e.id(),
         name: e.name.clone().unwrap_or_default(),
@@ -559,7 +581,40 @@ fn info(store: &Store, e: &Element, r: &CircuitRecipe) -> CircuitInfo {
         load,
         feeder: r.feeder,
         lugs: r.lugs,
+        load_name: auto.unwrap_or_else(|| r.load_name.clone().unwrap_or_default()),
+        load_name_edited: r.load_name.as_ref().is_some_and(|n| !n.trim().is_empty()),
+        rating: r.rating,
     }
+}
+
+/// A load name made from the loads: the classification and the first device's name ("Lighting
+/// – Downlight"), or for a feeder the panel it feeds.
+fn auto_load_name(store: &Store, r: &CircuitRecipe, ports: &[(ElementId, usize)]) -> String {
+    let Some(&(first, _)) = ports.first() else { return String::new() };
+    let name = |id: ElementId| {
+        store
+            .get(id)
+            .and_then(|e| e.name.clone().filter(|n| !n.is_empty()).or_else(|| crate::mesh_objects::type_of(store, e).and_then(|(t, _)| store.get(t)?.name.clone())))
+            .unwrap_or_default()
+    };
+    if r.feeder {
+        return store.get(first).map(panel_name).unwrap_or_default();
+    }
+    if r.circuit_kind != CircuitKind::Power {
+        return format!("{} – {}", r.circuit_kind.label(), name(first));
+    }
+    let s = settings(store);
+    let classes: Vec<String> = ports
+        .iter()
+        .filter_map(|(id, k)| mep::port(store, *id, *k)?.connector.electrical.map(|el| crate::mep_loads::classify(&s, &el.load_classification).name.clone()))
+        .collect();
+    let class = match classes.first() {
+        Some(c) if classes.iter().all(|x| x == c) => c.clone(),
+        Some(_) => "Mixed".into(),
+        None => "Power".into(),
+    };
+    let n = name(first);
+    if n.is_empty() { class } else { format!("{class} – {n}") }
 }
 
 /// Every circuit; a feeder's load is the connected load of the panel it feeds, through any
@@ -849,6 +904,8 @@ pub(crate) fn create(txn: &mut Transaction<'_>, p: CreateParams) -> Result<Circu
         start_slot: None,
         feeder: false,
         lugs: false,
+        load_name: None,
+        rating: None,
     };
     let mut report = CircuitReport::default();
     take_members(txn, None, &mut r, &members, &mut report)?;
@@ -1120,6 +1177,8 @@ pub(crate) fn create_feeder(txn: &mut Transaction<'_>, p: FeederParams) -> Resul
         start_slot: (p.connection == Connection::Breaker).then_some(start),
         feeder: true,
         lugs: p.connection == Connection::Lugs,
+        load_name: None,
+        rating: None,
     };
     let id = txn.create(
         NewElement::new(CLASS)
@@ -1307,4 +1366,35 @@ mod tests {
         let single = &s.distribution_systems[1];
         assert!(fits_system(single, 400.0, 3, CircuitKind::Power).unwrap_err().contains("three-phase"));
     }
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct CircuitSetParams {
+    pub circuit_id: ElementRef,
+    /// The load name; empty goes back to the name made from the loads.
+    pub load_name: Option<String>,
+    /// The protective device's rating (amperes); 0 clears it.
+    pub rating: Option<f64>,
+}
+
+/// `circuit.set`: a circuit's load name and rating (MEP-ELEC-005).
+pub(crate) fn set_circuit(txn: &mut Transaction<'_>, p: CircuitSetParams) -> Result<()> {
+    let store = txn.store().clone();
+    let id = store.resolve(&p.circuit_id).ok_or_else(|| bad("element.not_found", "no such circuit"))?;
+    let mut r = store.get(id).and_then(recipe).ok_or_else(|| bad("circuit.not_a_circuit", format!("element {id} is not a circuit")))?;
+    if let Some(n) = p.load_name {
+        let n = n.trim().to_owned();
+        if n.chars().count() > 128 {
+            return Err(bad("circuit.load_name", "a load name has at most 128 characters"));
+        }
+        r.load_name = (!n.is_empty()).then_some(n);
+    }
+    if let Some(a) = p.rating {
+        if !(0.0..=10_000.0).contains(&a) || !a.is_finite() {
+            return Err(bad("circuit.rating", "a rating runs from 0 to 10 000 A"));
+        }
+        r.rating = (a > 0.0).then_some(a);
+    }
+    write(txn, id, &r)
 }
