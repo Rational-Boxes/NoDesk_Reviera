@@ -2402,8 +2402,10 @@ Ref: research/03 §6.1
 - `connector.set(element_id, connector_index, params)`
 - `connector.list(element_id) -> connectors[]`
 
+*Built (2026-10-20):* connectors are defined on component types (custom object types, `recipe.mesh_object_type.connectors`) in the type's own frame: name, domain, origin, outward direction (made unit), shape and diameter or width × height, and the domain's values (classification checked against the domain: air classifications only on duct connectors, the others only on pipe connectors, Other, Fitting and Global on either; flow direction, configuration, flow in m³/s, flow factor 0–1, loss method, utility, fixture units, connection type; electrical system, voltage, 1–3 poles, load per phase in VA, power factor 0–1 lagging or leading, load classification, motor; conduit surface connectors). Pipe connectors are round; cable tray and conduit carry size and shape only. Each placed copy has a port per connector moved with it; `connector.set` on a copy overrides only its system and flow values (`rxd:connector_overrides`) and refuses geometry and size, which belong to the type. `connector.remove` drops the connections to it and renumbers the copies' later ports with their connections and overrides. Component types for MEP: `mep_type.create` (a box of a size and category with connectors) and `mep_type.load_starters` (Air Handling Unit, Supply Diffuser 600, Return Grille 600, Exhaust Fan, Water Heater, Circulation Pump, Lavatory, Water Closet, Distribution Board, Receptacle, Ceiling Luminaire: Reviera's own provisional sizes and flows). New categories and classes: Mechanical Equipment (IfcUnitaryEquipment), Air Terminals (IfcAirTerminal), Electrical Equipment (IfcElectricDistributionBoard), Electrical Fixtures (IfcOutlet), Lighting Fixtures (IfcLightFixture), Sprinklers (IfcFireSuppressionTerminal). IFC: each port an `IfcDistributionPort` placed at the port (Z the outward direction), nested in order by one `IfcRelNests` per element, with FlowDirection, PredefinedType, SystemType (its system's type, else its classification's), `Pset_DistributionPortCommon.PortNumber` and the size in `Pset_DistributionPortTypeDuct` or `…Pipe`; GlobalIds made from the element's and the index, so they are stable across saves; marked so they are not read back as elements. Not yet: the component editor's Create › Connector on a face or plane, connector parameters linked to type parameters, fittings and part types (the routing-preference criterion waits for fittings), the snap-point preview, electrical values in `Pset_ElectricalDeviceCommon`, writing IFC2X3.
+
 **Acceptance criteria.**
-- [ ] A VAV box family with one inlet and one outlet duct connector exports two `IfcDistributionPort`s nested with `IfcRelNests`, with `SINK` and `SOURCE` flow directions.
+- [x] A VAV box family with one inlet and one outlet duct connector exports two `IfcDistributionPort`s nested with `IfcRelNests`, with `SINK` and `SOURCE` flow directions. *(Built 2026-10-20.)*
 - [ ] A fitting family whose part type is Tee is offered by routing preferences only in Junction rows.
 
 ### 4.6.2 Physical connections and the connectivity graph
@@ -2430,11 +2432,13 @@ Ref: research/03 §6.1
 - `mep.disconnect(port_a, port_b)`
 - `mep.network_of(element_id) -> element_ids[]`
 
+*Built (2026-10-20):* connections are kept on the project (`rxd:mep_connections`, by GlobalId and port index) and the graph is derived from them each time, so undo and redo restore it exactly; links to deleted elements drop out. `mep.connect` refuses a port joined to itself, different domains, electrical ports ("join through circuits"), a port that already has a partner (conduit surface connectors take any number) and different shapes or sizes (within 0.5 mm) with "Connectors differ in size or shape and no transition is available" and the two sizes; nothing is written when refused. Placing (`mesh_object.place`) or moving (`mesh_object.set`) a component connects its open ports that coincide with another's open port: within 0.5 mm, facing each other within 0.5°, same domain, shape and size; `mep.connect_touching` does it on demand. `mep.disconnect`, `mep.network_of` (breadth-first, the element first) and the open ports for Show Disconnects. IFC: one `IfcRelConnectsPorts` per connection. Not yet: implicit connections by drawing ducts, pipes, tray and conduit (not built), fittings and transitions, dragging connected neighbours and the warning on dropped connections, incremental updates and parallel network ids (computed on demand), reading connections from IFC files Reviera did not write, links.
+
 **Acceptance criteria.**
 - [ ] Drawing a duct from an equipment port creates `IfcRelConnectsPorts` between the equipment port and the duct's start port.
-- [ ] Deleting a fitting in a run leaves two open ports, which *Show Disconnects* reports.
-- [ ] `mep.connect` between a duct port and a pipe port is refused, and no relationship is written.
-- [ ] Undoing a connection and redoing it gives the same network ID membership for every element in the network.
+- [x] Deleting a fitting in a run leaves two open ports, which *Show Disconnects* reports. *(Shown with an element between two others; fittings are not built.)*
+- [x] `mep.connect` between a duct port and a pipe port is refused, and no relationship is written.
+- [x] Undoing a connection and redoing it gives the same network ID membership for every element in the network.
 
 ### 4.6.3 System classifications and system types
 **ID:** MEP-SYS-001 · **Priority:** P1 · **Ref:** research/03 §7.2
@@ -2476,9 +2480,11 @@ Ref: research/03 §6.1
 - `system_type.create(classification, name, params) -> type_id`
 - `system_type.set(type_id, params)`
 
+*Built (2026-10-20):* each classification (but Fitting and Global) has a built-in system type of its name (`supply_air`, `domestic_cold_water`, …) with an abbreviation (SA, RA, EA, OA, HS, HR, DHW, DCW, SAN, V, FPW, FPD, FPP, FPO, OTH), a colour, a solid line pattern, All calculations and, for piping, water at a typical temperature (Reviera's own starting values). `system_type.create` makes one from its classification's (ids `t1`, `t2`, …; names unique, case aside), `system_type.set` changes any (colour 0–1, the hydronic IFC override HEATING or CHILLEDWATER), `system_type.list`. Only made or changed types are stored, in `rxd:mep_settings.system_types`. `IfcDistributionSystem` PredefinedType by the table (Supply Air AIRCONDITIONING, Sanitary DRAINAGE; hydronic CHILLEDWATER below 20 °C fluid, else HEATING, unless overridden) and the type's name as ObjectType; members by `IfcRelAssignsToGroup`, the building by `IfcRelServicesBuildings`. Members of a system are drawn in their system type's colour in every view (the first system's, where an element is in several), so changing a type's colour recolours them. Systems › **System Types**: rename a type, change its abbreviation and colour (a colour dialog), or duplicate it. Not yet: system types in the Project Browser, line patterns and materials applied, rise and drop symbols drawn, `Pset_DistributionSystemCommon`.
+
 **Acceptance criteria.**
-- [ ] Changing a system type's colour override recolours every element of every system of that type in all views.
-- [ ] A domestic cold water system exports as `IfcDistributionSystem` with PredefinedType `DOMESTICCOLDWATER`, assigned to its pipes, fittings and fixtures.
+- [x] Changing a system type's colour override recolours every element of every system of that type in all views.
+- [x] A domestic cold water system exports as `IfcDistributionSystem` with PredefinedType `DOMESTICCOLDWATER`, assigned to its pipes, fittings and fixtures. *(Fixtures and equipment; pipes and fittings are not built.)*
 
 ### 4.6.4 Creating and editing systems
 **ID:** MEP-SYS-002 · **Priority:** P1 · **Ref:** research/03 §7.2
@@ -2519,9 +2525,11 @@ A **System Selector** drop-down on systems contextual tabs switches between the 
 - `system.divide(system_id) -> system_ids[]`
 - `system.disconnect_equipment(system_id)`
 
+*Built (2026-10-20):* `system.create(kind: duct|piping, element_ids, system_type_id?, name?)` joins each element by its free connectors of the type's classification (or Fitting/Global ones); an element without one is refused naming it, and a connector already in a system is refused naming that system. Without a type the first member's classification gives the built-in one; without a name, the type's name and the first free number ("Supply Air 1"). `system.add`, `system.remove` (equipment among them stops serving), `system.select_equipment` (joins by its connector of the classification), `system.disconnect_equipment` (leaves the system), `system.divide` (one system per network, "Name 1", "Name 2", …, the first keeping the original's identity, the equipment with its network; refused for one network), `system.set` (rename, unique within the classification: "A system with this name already exists"; another type of the same classification), `system.list`, `system.unassigned` (duct and pipe ports in no system, by domain). Not yet: power, data and switch systems (with circuits, §4.9), systems by drawing from a connector, the System Editor mode and System Selector, Generate Layout and Generate Placeholder. In the window, the **Systems** tab: Components › MEP Component (a type with connectors, placed with the Place Component tool; its ports connect to those they meet), Load MEP Types, Connect (the selection's meeting ports); Systems › Create System (the type chosen among the classifications the selection's connectors offer, the name proposed), Add To System and Remove From System, Select Equipment (the selected element), Disconnect Equipment, Divide System; the selected elements' connectors drawn as rings with stalks, coloured by domain and red when open.
+
 **Acceptance criteria.**
-- [ ] Creating a supply air system from 8 diffusers and then selecting an AHU as equipment gives a system with 9 members and the AHU as source.
-- [ ] *Divide System* on a system that spans two unconnected networks creates two systems with suffixes 1 and 2.
+- [x] Creating a supply air system from 8 diffusers and then selecting an AHU as equipment gives a system with 9 members and the AHU as source.
+- [x] *Divide System* on a system that spans two unconnected networks creates two systems with suffixes 1 and 2.
 
 ### 4.6.5 System Browser
 **ID:** MEP-SYS-003 · **Priority:** P1 · **Ref:** research/03 §7.2 · screenshots/structure_mep/system_browser_analytical_systems.png
@@ -2552,9 +2560,11 @@ A **System Selector** drop-down on systems contextual tabs switches between the 
 
 **Commands.** `system_browser.show(view: "systems"|"zones"|"analytical", discipline?)`. Context-menu items call existing commands: `selection.set`, `pressure_loss_report.export` (MEP-CALC-004), `system.divide` and `element.delete`.
 
+*Built (2026-10-20), the Systems view:* Systems › Browser › **System Browser** (F9, also in the Window menu) is a dockable tree: Mechanical and Piping, then each classification, then each system ("Supply Air 1 (Supply Air, 5)": name, type, element count) with its equipment ("No equipment" when it has none) and its members by name and id; and **Unassigned** with the duct and pipe connectors in no system, by domain, with the count. Selecting any node selects its elements in the model. It refills when the model changes (checked when the window is idle), so it follows every command, undo and redo. Not yet: the Zones and Analytical Systems views, the discipline filter, columns (Flow, Size, …), the search box, renaming in place, the context menu (Select, Show, Pressure Loss Report, Delete, Properties), "n not visible", the virtualised tree for 100 000 elements, linked models, electrical systems.
+
 **Acceptance criteria.**
-- [ ] Selecting a system node selects all its members in the active view.
-- [ ] The *Unassigned* node lists a newly placed diffuser that is not in any system.
+- [x] Selecting a system node selects all its members in the active view. *(Built 2026-10-20.)*
+- [x] The *Unassigned* node lists a newly placed diffuser that is not in any system.
 - [ ] Deleting a system from the browser leaves its 8 diffusers in the model and lists them under *Unassigned*.
 - [ ] Renaming a system to the name of another system of the same classification is refused with a message.
 
@@ -2590,11 +2600,13 @@ A **System Selector** drop-down on systems contextual tabs switches between the 
 - `mep_check.systems(kind: "duct"|"pipe"|"circuit", view_id, on: bool) -> issues[]`: each issue is `{kind, element_ids[], connector_refs[], message}`.
 - `mep_check.show_disconnects(view_id, domains[], on: bool) -> ports[]`
 
+*Built (2026-10-20), as commands:* `mep_check.systems(kind: duct|pipe)` reports systems with no equipment and members not connected to their equipment (not well connected), a preset equipment flow differing by more than 1 % from its preset terminals' total and a calculated outlet with nothing connected (flow mismatches), and connected connectors both In or both Out (flow direction, naming both); `circuit` waits for circuits. `mep_check.show_disconnects(domains)` lists open duct, pipe, cable tray and conduit ports with their positions (electrical ports join through circuits and are not listed). They change nothing. In the window, Systems › Check Systems › **Check Duct Systems** and **Check Pipe Systems** toggle markers in the active view (per view, for the session; redrawn from the model each time, so they follow every change): a "!" triangle on a stalk over each issue's connectors (and lying flat beside them, for plans), at most 5 000; the count and the first issue go to the status bar. **Show Disconnects** asks for the domains (Duct, Pipe, Cable Tray, Conduit) and marks each open connector with a red double ring; pressing it again turns them off. Not yet: dashed links to the offending element, Check Circuits, the markers opening the warning, warnings in the warnings list, the print setting (markers are never printed: they are view overlays).
+
 **Acceptance criteria.**
-- [ ] A pipe run with one unconnected end shows one disconnect marker. Connecting the end removes the marker without a manual refresh.
-- [ ] Two connected connectors both set to Out produce one *flow direction mismatch* issue naming both elements.
-- [ ] A supply-air system with no equipment selected is reported as not well connected.
-- [ ] *Show Disconnects* with only the Conduit domain ticked shows no markers on open duct ends.
+- [x] A pipe run with one unconnected end shows one disconnect marker. Connecting the end removes the marker without a manual refresh. *(With components; pipes are not built.)*
+- [x] Two connected connectors both set to Out produce one *flow direction mismatch* issue naming both elements.
+- [x] A supply-air system with no equipment selected is reported as not well connected.
+- [x] *Show Disconnects* with only the Conduit domain ticked shows no markers on open duct ends. *(As `mep_check.show_disconnects`; markers are not drawn yet.)*
 
 ### 4.6.7 Mechanical settings
 **ID:** MEP-SET-001 · **Priority:** P1 · **Ref:** research/03 §7.3

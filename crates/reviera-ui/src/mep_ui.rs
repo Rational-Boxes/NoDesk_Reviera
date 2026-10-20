@@ -1,0 +1,696 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Reviera contributors
+
+//! The MEP foundations in the window (Ch 4 §4.6): the Systems tab, the System Browser, connector
+//! glyphs and the system check markers.
+//!
+//! - **Systems › Components**: Load MEP Types (the starter component types) and Place MEP
+//!   Component (a type with connectors, placed with the Place Component tool, so its ports
+//!   connect to those they meet). **Connect** joins the selection's ports that meet.
+//! - **Systems › Systems**: Create System from the selected terminals, fixtures and equipment
+//!   (the kind and the type from their connectors; a name proposed), Add To and Remove From
+//!   System, Select Equipment, Disconnect Equipment, Divide System and System Types (colour,
+//!   abbreviation; Duplicate).
+//! - **Systems › Check Systems**: Check Duct Systems, Check Pipe Systems and Show Disconnects
+//!   toggle markers in the active view (per view, for the session): a "!" marker on a stalk
+//!   over each issue's connectors; a red ring on each open connector. The issues are listed in
+//!   the status bar as they are counted.
+//! - **System Browser** (`F9`): systems by discipline and classification, then system, its
+//!   equipment and members; and Unassigned connectors by domain. Selecting a node selects its
+//!   elements. It refreshes when the model changes.
+//! - The selected elements' connectors are drawn as a ring square to their direction with a
+//!   stalk outward, coloured by domain (red when open).
+
+use std::cell::RefCell;
+use std::collections::HashMap;
+use std::rc::Rc;
+
+use reviera_core::mep::{self, Domain};
+use reviera_core::mep_systems;
+use reviera_app::DocumentId;
+use reviera_core::ElementId;
+use reviera_render::plan::Lines;
+use serde_json::json;
+use wxdragon::prelude::*;
+
+use super::{Gui, with};
+
+/// Markers turned on in one view.
+#[derive(Debug, Clone, Default)]
+pub(crate) struct MepMarks {
+    pub duct: bool,
+    pub pipe: bool,
+    /// Show Disconnects, for these domains.
+    pub disconnects: Option<Vec<Domain>>,
+}
+
+pub(crate) struct SystemBrowser {
+    tree: TreeCtrl,
+    /// Each node's elements, by its custom data index.
+    nodes: Vec<Vec<ElementId>>,
+    /// The model state it shows.
+    shown: Option<(DocumentId, reviera_core::ModelVersion)>,
+    quiet: bool,
+}
+
+fn domain_colour(d: Domain) -> [f32; 4] {
+    match d {
+        Domain::Duct => [0.15, 0.45, 0.90, 1.0],
+        Domain::Pipe => [0.10, 0.65, 0.35, 1.0],
+        Domain::Electrical => [0.95, 0.60, 0.10, 1.0],
+        Domain::CableTray | Domain::Conduit => [0.55, 0.40, 0.75, 1.0],
+    }
+}
+
+/// A line segment in model coordinates.
+type Segment = [[f32; 3]; 2];
+
+const OPEN: [f32; 4] = [0.90, 0.10, 0.10, 1.0];
+const WARN: [f32; 4] = [0.95, 0.65, 0.05, 1.0];
+
+/// A ring of radius `r` at `c` square to `n`, as segments.
+fn ring(c: [f64; 3], n: [f64; 3], r: f64) -> Vec<Segment> {
+    let a = if n[2].abs() < 0.9 { [0.0, 0.0, 1.0] } else { [1.0, 0.0, 0.0] };
+    let cross = |u: [f64; 3], v: [f64; 3]| [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]];
+    let unit = |v: [f64; 3]| {
+        let l = (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt().max(1e-12);
+        v.map(|x| x / l)
+    };
+    let u = unit(cross(n, a));
+    let w = cross(n, u);
+    let at = |t: f64| {
+        let (s, k) = t.sin_cos();
+        [0, 1, 2].map(|i| (c[i] + r * (u[i] * k + w[i] * s)) as f32)
+    };
+    let steps = 20;
+    (0..steps)
+        .map(|i| {
+            let t0 = std::f64::consts::TAU * i as f64 / steps as f64;
+            let t1 = std::f64::consts::TAU * (i + 1) as f64 / steps as f64;
+            [at(t0), at(t1)]
+        })
+        .collect()
+}
+
+fn f32s(p: [f64; 3]) -> [f32; 3] {
+    p.map(|v| v as f32)
+}
+
+/// A "!" marker on a stalk above `p`.
+fn marker(p: [f64; 3]) -> Vec<Segment> {
+    let top = [p[0], p[1], p[2] + 0.6];
+    let mut s = vec![[f32s(p), f32s(top)]];
+    // A triangle around a bar and a dot, in the vertical plane through x.
+    let (h, w) = (0.32, 0.2);
+    let base = [top[0], top[1], top[2]];
+    let a = [base[0] - w, base[1], base[2]];
+    let b = [base[0] + w, base[1], base[2]];
+    let c = [base[0], base[1], base[2] + h];
+    s.extend([[f32s(a), f32s(b)], [f32s(b), f32s(c)], [f32s(c), f32s(a)]]);
+    s.push([f32s([base[0], base[1], base[2] + 0.1]), f32s([base[0], base[1], base[2] + 0.22])]);
+    s.push([f32s([base[0], base[1], base[2] + 0.05]), f32s([base[0], base[1], base[2] + 0.065])]);
+    // The same triangle lying flat beside the connector, for plans.
+    let (x, y, z) = (p[0] + 0.25, p[1], p[2]);
+    let a = [x - w, y - h / 2.0, z];
+    let b = [x + w, y - h / 2.0, z];
+    let c = [x, y + h / 2.0, z];
+    s.extend([[f32s(a), f32s(b)], [f32s(b), f32s(c)], [f32s(c), f32s(a)]]);
+    s.push([f32s([x, y - 0.02, z]), f32s([x, y + 0.1, z])]);
+    s.push([f32s([x, y - 0.1, z]), f32s([x, y - 0.075, z])]);
+    s.push([f32s(p), f32s([x - w / 2.0, y, z])]);
+    s
+}
+
+impl Gui {
+    /// The connector glyphs of the selected elements and the active view's check markers.
+    pub(crate) fn mep_lines(&mut self, index: usize) -> Vec<Lines> {
+        let Some(store) = self.store_now() else {
+            return Vec::new();
+        };
+        let mut out = Vec::new();
+        let partners = mep::partners(&store);
+        let mut by_colour: HashMap<[u32; 4], (Vec<Segment>, [f32; 4])> = HashMap::new();
+        let mut add = |c: [f32; 4], segs: Vec<Segment>| {
+            by_colour.entry(c.map(f32::to_bits)).or_insert_with(|| (Vec::new(), c)).0.extend(segs);
+        };
+        for id in self.selection() {
+            let Some(e) = store.get(id) else { continue };
+            for p in mep::ports(&store, e) {
+                let size = match p.connector.shape {
+                    mep::Shape::Round => p.connector.diameter,
+                    _ => p.connector.width.max(p.connector.height),
+                };
+                let r = (size / 2.0).max(0.04);
+                let open = !p.connector.surface
+                    && p.connector.domain != Domain::Electrical
+                    && !partners.contains_key(&(p.element, p.index));
+                let colour = if open { OPEN } else { domain_colour(p.connector.domain) };
+                let mut segs = ring(p.position, p.direction, r);
+                let tip = [0, 1, 2].map(|k| p.position[k] + p.direction[k] * (r + 0.1));
+                segs.push([f32s(p.position), f32s(tip)]);
+                add(colour, segs);
+            }
+        }
+        let Some(view) = self.views.get(index) else {
+            return Vec::new();
+        };
+        if let Some(marks) = self.mep_marks.get(&view.id) {
+            for (on, kind) in [(marks.duct, mep_systems::CheckKind::Duct), (marks.pipe, mep_systems::CheckKind::Pipe)] {
+                if !on {
+                    continue;
+                }
+                let issues = mep_systems::check(&store, mep_systems::CheckParams { kind, view_id: None, on: true }).unwrap_or_default();
+                for i in issues.iter().take(5000) {
+                    for (e, k) in &i.connector_refs {
+                        if let Some(p) = mep::port(&store, *e, *k) {
+                            add(WARN, marker(p.position));
+                        }
+                    }
+                }
+            }
+            if let Some(domains) = &marks.disconnects {
+                for p in mep::open_ports(&store, domains) {
+                    let size = p.connector.diameter.max(p.connector.width).max(0.1);
+                    let mut segs = ring(p.position, p.direction, size / 2.0 + 0.08);
+                    segs.extend(ring(p.position, p.direction, size / 2.0 + 0.12));
+                    add(OPEN, segs);
+                }
+            }
+        }
+        for (_, (segments, color)) in by_colour {
+            out.push(Lines { color, width: 0.5, segments });
+        }
+        out
+    }
+
+    // ---- Components ----
+
+    /// Loads the starter MEP types (Systems › Load MEP Types).
+    pub(crate) fn load_mep_types(&mut self) {
+        let frame = self.frame;
+        match self.run("mep_type.load_starters", json!({})) {
+            Ok(v) => frame.set_status_text(
+                &format!("{} MEP component types are in the model: Place MEP Component places them", v.as_object().map_or(0, |m| m.len())),
+                0,
+            ),
+            Err(e) => error(&frame, &format!("The MEP types were not loaded:\n{e}")),
+        }
+    }
+
+    /// Places a component type with connectors (Systems › Place MEP Component).
+    pub(crate) fn place_mep_component(&mut self) {
+        let frame = self.frame;
+        let Some(store) = self.store_now() else {
+            return frame.set_status_text("Open or create a project first (File > New)", 0);
+        };
+        let mut types: Vec<(ElementId, String)> = store
+            .iter()
+            .filter_map(|e| {
+                let t = reviera_core::mesh_objects::mesh_object_type(e)?;
+                (!t.connectors.is_empty()).then(|| (e.id(), format!("{} ({})", e.name.clone().unwrap_or_default(), t.category.label())))
+            })
+            .collect();
+        if types.is_empty() {
+            self.load_mep_types();
+            let Some(store) = self.store_now() else { return };
+            types = store
+                .iter()
+                .filter_map(|e| {
+                    let t = reviera_core::mesh_objects::mesh_object_type(e)?;
+                    (!t.connectors.is_empty()).then(|| (e.id(), format!("{} ({})", e.name.clone().unwrap_or_default(), t.category.label())))
+                })
+                .collect();
+        }
+        types.sort_by(|a, b| a.1.cmp(&b.1));
+        let labels: Vec<&str> = types.iter().map(|t| t.1.as_str()).collect();
+        let d = SingleChoiceDialog::builder(&frame, "Component type:", "Place MEP Component", &labels).build();
+        if d.show_modal() != ID_OK {
+            return;
+        }
+        let Some((id, label)) = usize::try_from(d.get_selection()).ok().and_then(|k| types.get(k)).cloned() else {
+            return;
+        };
+        let name = label.split(" (").next().unwrap_or(&label).to_owned();
+        self.start_place_tool(super::components::Source::Type(id), name);
+    }
+
+    /// Connects the selection's ports that meet (Systems › Connect).
+    pub(crate) fn connect_touching(&mut self) {
+        let frame = self.frame;
+        let ids = self.selection();
+        match self.run("mep.connect_touching", json!({ "element_ids": ids })) {
+            Ok(v) => {
+                let n = v.as_array().map_or(0, Vec::len);
+                frame.set_status_text(&format!("{n} connection(s) made"), 0);
+                self.refresh_active();
+            }
+            Err(e) => error(&frame, &format!("Not connected:\n{e}")),
+        }
+    }
+
+    // ---- Systems ----
+
+    /// The systems, labelled, optionally only those whose classification `keep` accepts.
+    fn system_choices(&self, keep: &dyn Fn(&mep_systems::SystemInfo) -> bool) -> Vec<(ElementId, String)> {
+        let Some(store) = self.store_now() else { return Vec::new() };
+        mep_systems::systems(&store)
+            .into_iter()
+            .filter(|s| keep(s))
+            .map(|s| (s.id, format!("{} ({}, {} elements)", s.name, s.type_name, s.elements.len())))
+            .collect()
+    }
+
+    fn choose_system(&self, title: &str, keep: &dyn Fn(&mep_systems::SystemInfo) -> bool) -> Option<ElementId> {
+        let frame = self.frame;
+        let systems = self.system_choices(keep);
+        if systems.is_empty() {
+            frame.set_status_text(&format!("{title}: there is no such system yet (Create System makes one)"), 0);
+            return None;
+        }
+        let labels: Vec<&str> = systems.iter().map(|s| s.1.as_str()).collect();
+        let d = SingleChoiceDialog::builder(&frame, "System:", title, &labels).build();
+        if d.show_modal() != ID_OK {
+            return None;
+        }
+        usize::try_from(d.get_selection()).ok().and_then(|k| systems.get(k)).map(|s| s.0)
+    }
+
+    /// Makes a system of the selection (Systems › Create System).
+    pub(crate) fn create_system(&mut self) {
+        let frame = self.frame;
+        let ids = self.selection();
+        let Some(store) = self.store_now() else { return };
+        // The classifications the selection's connectors offer.
+        let mut classes: Vec<mep::Classification> = Vec::new();
+        for id in &ids {
+            if let Some(e) = store.get(*id) {
+                for p in mep::ports(&store, e) {
+                    if let Some(c) = p.connector.classification
+                        && !c.is_wildcard()
+                        && !classes.contains(&c)
+                    {
+                        classes.push(c);
+                    }
+                }
+            }
+        }
+        if classes.is_empty() {
+            return frame.set_status_text("Create System: select terminals, fixtures or equipment with duct or pipe connectors first", 0);
+        }
+        let types: Vec<mep_systems::SystemType> = mep_systems::system_types(&store)
+            .into_iter()
+            .filter(|t| classes.contains(&t.classification))
+            .collect();
+        let f = super::reinforcement_ui::Form::new(&frame, "Create System");
+        let labels: Vec<String> = types.iter().map(|t| format!("{} ({})", t.name, t.classification.label())).collect();
+        let choice = f.choice("System type", &labels, 0);
+        let name = f.text("Name", "", "Leave empty for the type's name and the next number");
+        if !f.show(&format!("{} element(s) join by their connectors of the type's classification", ids.len()), "Create") {
+            f.dialog.destroy();
+            return;
+        }
+        let t = types[choice.get_selection().map_or(0, |i| i as usize).min(types.len() - 1)].clone();
+        let n = name.get_value();
+        f.dialog.destroy();
+        let kind = if t.classification.is_air() { "duct" } else { "piping" };
+        let mut args = json!({ "kind": kind, "element_ids": ids, "system_type_id": t.id });
+        if !n.trim().is_empty() {
+            args["name"] = json!(n.trim());
+        }
+        match self.run("system.create", args) {
+            Ok(v) => {
+                let name = self
+                    .store_now()
+                    .and_then(|s| s.get(ElementId(v.as_u64().unwrap_or(0))).and_then(|e| e.name.clone()))
+                    .unwrap_or_default();
+                self.refresh_scene(&frame);
+                frame.set_status_text(&format!("Made the system {name}: Select Equipment sets what serves it"), 0);
+            }
+            Err(e) => error(&frame, &format!("No system was made:\n{e}")),
+        }
+    }
+
+    /// Adds the selection to a system, or takes it out (Systems › Add To / Remove From System).
+    pub(crate) fn system_members(&mut self, add: bool) {
+        let frame = self.frame;
+        let ids = self.selection();
+        if ids.is_empty() {
+            return frame.set_status_text("Select the elements first", 0);
+        }
+        let title = if add { "Add To System" } else { "Remove From System" };
+        let keep = |s: &mep_systems::SystemInfo| add || ids.iter().any(|i| s.elements.contains(i));
+        let Some(system) = self.choose_system(title, &keep) else { return };
+        let command = if add { "system.add" } else { "system.remove" };
+        match self.run(command, json!({ "system_id": system, "element_ids": ids })) {
+            Ok(_) => {
+                self.refresh_scene(&frame);
+                frame.set_status_text(if add { "Added to the system" } else { "Removed from the system" }, 0);
+            }
+            Err(e) => error(&frame, &format!("{title}:\n{e}")),
+        }
+    }
+
+    /// Sets the selected element as a system's equipment (Systems › Select Equipment).
+    pub(crate) fn select_system_equipment(&mut self) {
+        let frame = self.frame;
+        let ids = self.selection();
+        let [eq] = ids[..] else {
+            return frame.set_status_text("Select Equipment: select one piece of equipment first", 0);
+        };
+        let Some(system) = self.choose_system("Select Equipment", &|_| true) else { return };
+        match self.run("system.select_equipment", json!({ "system_id": system, "equipment_id": eq })) {
+            Ok(_) => {
+                self.refresh_scene(&frame);
+                frame.set_status_text("The equipment serves the system", 0);
+            }
+            Err(e) => error(&frame, &format!("Select Equipment:\n{e}")),
+        }
+    }
+
+    /// Systems › Disconnect Equipment and Divide System.
+    pub(crate) fn system_action(&mut self, command: &str, title: &str) {
+        let frame = self.frame;
+        let sel = self.selection();
+        let keep = |s: &mep_systems::SystemInfo| sel.is_empty() || sel.iter().any(|i| s.elements.contains(i));
+        let Some(system) = self.choose_system(title, &keep) else { return };
+        match self.run(command, json!({ "system_id": system })) {
+            Ok(v) => {
+                self.refresh_scene(&frame);
+                let text = match v.as_array() {
+                    Some(parts) => format!("Divided into {} systems", parts.len()),
+                    None => format!("{title}: done"),
+                };
+                frame.set_status_text(&text, 0);
+            }
+            Err(e) => error(&frame, &format!("{title}:\n{e}")),
+        }
+    }
+
+    /// System types: colour and abbreviation, or Duplicate (Systems › System Types).
+    pub(crate) fn edit_system_types(&mut self) {
+        let frame = self.frame;
+        let Some(store) = self.store_now() else { return };
+        let types = mep_systems::system_types(&store);
+        let labels: Vec<String> = types.iter().map(|t| format!("{} ({}, {})", t.name, t.abbreviation, t.classification.label())).collect();
+        let refs: Vec<&str> = labels.iter().map(String::as_str).collect();
+        let d = SingleChoiceDialog::builder(&frame, "System type:", "System Types", &refs).build();
+        if d.show_modal() != ID_OK {
+            return;
+        }
+        let Some(t) = usize::try_from(d.get_selection()).ok().and_then(|k| types.get(k)).cloned() else { return };
+        let f = super::reinforcement_ui::Form::new(&frame, "System Type");
+        let action = f.choice("Change", &["This type".to_owned(), "A duplicate of it".to_owned()], 0);
+        let name = f.text("Name", &t.name, "The duplicate's name, or this type's new name");
+        let abbr = f.text("Abbreviation", &t.abbreviation, "Shown in tags and the System Browser");
+        let colour = f.check("Colour", "Choose a new colour after OK", false);
+        if !f.show(&format!("{}: the colour draws every member of its systems", t.classification.label()), "OK") {
+            f.dialog.destroy();
+            return;
+        }
+        let duplicate = action.get_selection() == Some(1);
+        let (name, abbr, pick) = (name.get_value(), abbr.get_value(), colour.is_checked());
+        f.dialog.destroy();
+        let mut params = json!({ "abbreviation": abbr.trim() });
+        if pick {
+            let [r, g, b, _] = t.color.map(|c| (c * 255.0).round() as u8);
+            let cd = ColourDialog::builder(&frame)
+                .with_title("System Type Colour")
+                .with_initial_colour(Colour::new(r, g, b, 255))
+                .build();
+            if cd.show_modal() == ID_OK
+                && let Some(c) = cd.get_colour()
+            {
+                params["color"] = json!([c.r as f32 / 255.0, c.g as f32 / 255.0, c.b as f32 / 255.0, 1.0]);
+            }
+        }
+        let result = if duplicate {
+            params["classification"] = json!(t.classification);
+            params["name"] = json!(name.trim());
+            self.run("system_type.create", params).map(|_| ())
+        } else {
+            if name.trim() != t.name {
+                params["name"] = json!(name.trim());
+            }
+            params["type_id"] = json!(t.id);
+            self.run("system_type.set", params).map(|_| ())
+        };
+        match result {
+            Ok(()) => {
+                self.refresh_scene(&frame);
+                frame.set_status_text("System type saved", 0);
+            }
+            Err(e) => error(&frame, &format!("The system type was not saved:\n{e}")),
+        }
+    }
+
+    // ---- Check Systems ----
+
+    /// Turns a check's markers on or off in the active view.
+    pub(crate) fn toggle_mep_check(&mut self, kind: mep_systems::CheckKind) {
+        let frame = self.frame;
+        let Some(view) = self.active else { return };
+        let Some(store) = self.store_now() else { return };
+        let marks = self.mep_marks.entry(view).or_default();
+        let (on, label) = match kind {
+            mep_systems::CheckKind::Duct => {
+                marks.duct = !marks.duct;
+                (marks.duct, "duct")
+            }
+            mep_systems::CheckKind::Pipe => {
+                marks.pipe = !marks.pipe;
+                (marks.pipe, "pipe")
+            }
+            mep_systems::CheckKind::Circuit => {
+                return frame.set_status_text("Check Circuits comes with circuits, which are not built yet", 0);
+            }
+        };
+        if on {
+            let issues = mep_systems::check(&store, mep_systems::CheckParams { kind, view_id: None, on }).unwrap_or_default();
+            let text = match issues.first() {
+                None => format!("Check {label} systems: no issues"),
+                Some(i) => format!("Check {label} systems: {} issue(s); first: {}", issues.len(), i.message),
+            };
+            frame.set_status_text(&text, 0);
+        } else {
+            frame.set_status_text(&format!("Check {label} systems off"), 0);
+        }
+        self.refresh_active();
+    }
+
+    /// Show Disconnects: chooses the domains, or turns the markers off.
+    pub(crate) fn show_disconnects(&mut self) {
+        let frame = self.frame;
+        let Some(view) = self.active else { return };
+        if self.mep_marks.get(&view).is_some_and(|m| m.disconnects.is_some()) {
+            if let Some(m) = self.mep_marks.get_mut(&view) {
+                m.disconnects = None;
+            }
+            frame.set_status_text("Show Disconnects off", 0);
+            return self.refresh_active();
+        }
+        let f = super::reinforcement_ui::Form::new(&frame, "Show Disconnects");
+        let boxes: Vec<(Domain, CheckBox)> = [Domain::Duct, Domain::Pipe, Domain::CableTray, Domain::Conduit]
+            .into_iter()
+            .map(|d| (d, f.check(d.label(), "Show open connectors", true)))
+            .collect();
+        if !f.show("Open connectors are marked with a red ring until they are connected", "Show") {
+            f.dialog.destroy();
+            return;
+        }
+        let domains: Vec<Domain> = boxes.iter().filter(|(_, b)| b.is_checked()).map(|(d, _)| *d).collect();
+        f.dialog.destroy();
+        let n = self.store_now().map_or(0, |s| mep::open_ports(&s, &domains).len());
+        self.mep_marks.entry(view).or_default().disconnects = Some(domains);
+        frame.set_status_text(&format!("Show Disconnects: {n} open connector(s)"), 0);
+        self.refresh_active();
+    }
+
+    // ---- System Browser ----
+
+    /// Shows or hides the System Browser (F9), making it on first use.
+    pub(crate) fn toggle_system_browser(gui: &Rc<RefCell<Gui>>) {
+        if gui.borrow().system_browser.is_some() {
+            with(gui, |g| {
+                g.toggle_pane("system_browser");
+                g.rebuild_system_browser();
+            });
+            return;
+        }
+        let (frame, aui) = {
+            let g = gui.borrow();
+            (g.frame, g.aui)
+        };
+        let tree = TreeCtrl::builder(&frame)
+            .with_style(TreeCtrlStyle::Default | TreeCtrlStyle::HasButtons | TreeCtrlStyle::LinesAtRoot | TreeCtrlStyle::HideRoot)
+            .build();
+        aui.add_pane_with_info(
+            &tree,
+            AuiPaneInfo::new()
+                .with_name("system_browser")
+                .with_caption("System Browser")
+                .right()
+                .layer(1)
+                .best_size(320, 500)
+                .min_size(220, 160)
+                .close_button(true)
+                .floatable(true),
+        );
+        aui.update();
+        {
+            let gui = gui.clone();
+            tree.on_selection_changed(move |e| {
+                if let Some(item) = e.get_item()
+                    && let Ok(mut g) = gui.try_borrow_mut()
+                {
+                    g.system_browser_selected(&item);
+                }
+            });
+        }
+        with(gui, |g| {
+            g.system_browser = Some(SystemBrowser { tree, nodes: Vec::new(), shown: None, quiet: false });
+            g.rebuild_system_browser();
+        });
+    }
+
+    /// Refreshes the System Browser when the model has changed since it was filled.
+    pub(crate) fn system_browser_idle(&mut self) {
+        let Some(b) = &self.system_browser else { return };
+        if !self.aui.is_pane_shown("system_browser") {
+            return;
+        }
+        let now = self.doc.and_then(|d| Some((d, self.app.document(d)?.doc.version())));
+        if now != b.shown {
+            self.rebuild_system_browser();
+        }
+    }
+
+    fn rebuild_system_browser(&mut self) {
+        let now = self.doc.and_then(|d| Some((d, self.app.document(d)?.doc.version())));
+        let store = self.store_now();
+        let Some(b) = &mut self.system_browser else { return };
+        b.shown = now;
+        b.quiet = true;
+        let t = b.tree;
+        t.delete_all_items();
+        b.nodes.clear();
+        let Some(store) = store else {
+            b.quiet = false;
+            return;
+        };
+        let Some(root) = t.add_root("Systems", None, None) else {
+            b.quiet = false;
+            return;
+        };
+        // A copy by its own name, else its type's, with its id.
+        let label = |id: ElementId| {
+            store
+                .get(id)
+                .map(|e| {
+                    let name = e
+                        .name
+                        .clone()
+                        .filter(|n| !n.is_empty())
+                        .or_else(|| {
+                            let (t, _) = reviera_core::mesh_objects::type_of(&store, e)?;
+                            store.get(t)?.name.clone()
+                        })
+                        .unwrap_or_else(|| e.class.trim_start_matches("Ifc").to_owned());
+                    format!("{name} {}", id.0)
+                })
+                .unwrap_or_default()
+        };
+        let push = |nodes: &mut Vec<Vec<ElementId>>, parent: &TreeItemId, text: &str, ids: Vec<ElementId>| {
+            nodes.push(ids);
+            t.append_item_with_data(parent, text, (nodes.len() - 1) as u64, None, None)
+        };
+        let systems = mep_systems::systems(&store);
+        for (discipline, air) in [("Mechanical", true), ("Piping", false)] {
+            let mine: Vec<&mep_systems::SystemInfo> = systems.iter().filter(|s| s.classification.is_air() == air).collect();
+            if mine.is_empty() {
+                continue;
+            }
+            let all: Vec<ElementId> = mine.iter().flat_map(|s| s.elements.iter().copied()).collect();
+            let Some(d) = push(&mut b.nodes, &root, &format!("{discipline} ({})", mine.len()), all) else { continue };
+            let mut classes: Vec<mep::Classification> = mine.iter().map(|s| s.classification).collect();
+            classes.sort();
+            classes.dedup();
+            for c in classes {
+                let of: Vec<&&mep_systems::SystemInfo> = mine.iter().filter(|s| s.classification == c).collect();
+                let all: Vec<ElementId> = of.iter().flat_map(|s| s.elements.iter().copied()).collect();
+                let Some(ci) = push(&mut b.nodes, &d, c.label(), all) else { continue };
+                for s in of {
+                    let text = format!("{} ({}, {})", s.name, s.type_name, s.elements.len());
+                    let Some(si) = push(&mut b.nodes, &ci, &text, s.elements.clone()) else { continue };
+                    if let Some(eq) = s.equipment {
+                        push(&mut b.nodes, &si, &format!("Equipment: {}", label(eq)), vec![eq]);
+                    } else {
+                        push(&mut b.nodes, &si, "No equipment", Vec::new());
+                    }
+                    for e in s.elements.iter().filter(|e| Some(**e) != s.equipment) {
+                        push(&mut b.nodes, &si, &label(*e), vec![*e]);
+                    }
+                    t.expand(&si);
+                }
+                t.expand(&ci);
+            }
+            t.expand(&d);
+        }
+        let unassigned = mep_systems::unassigned(&store);
+        let mut by_domain: Vec<(Domain, Vec<ElementId>)> = Vec::new();
+        for p in &unassigned {
+            match by_domain.iter_mut().find(|(d, _)| *d == p.connector.domain) {
+                Some((_, v)) => {
+                    if !v.contains(&p.element) {
+                        v.push(p.element);
+                    }
+                }
+                None => by_domain.push((p.connector.domain, vec![p.element])),
+            }
+        }
+        let all: Vec<ElementId> = by_domain.iter().flat_map(|(_, v)| v.iter().copied()).collect();
+        if let Some(u) = push(&mut b.nodes, &root, &format!("Unassigned ({})", all.len()), all) {
+            for (d, ids) in by_domain {
+                if let Some(di) = push(&mut b.nodes, &u, &format!("{} ({})", d.label(), ids.len()), ids.clone()) {
+                    for e in ids {
+                        push(&mut b.nodes, &di, &label(e), vec![e]);
+                    }
+                }
+            }
+            t.expand(&u);
+        }
+        b.quiet = false;
+    }
+
+    /// Selecting a node selects its elements.
+    fn system_browser_selected(&mut self, item: &TreeItemId) {
+        let Some(b) = &self.system_browser else { return };
+        if b.quiet {
+            return;
+        }
+        let Some(ids) = b
+            .tree
+            .get_custom_data(item)
+            .and_then(|d| d.downcast_ref::<u64>().copied())
+            .and_then(|i| b.nodes.get(i as usize))
+            .cloned()
+        else {
+            return;
+        };
+        if ids.is_empty() {
+            return;
+        }
+        if self.run("selection.set", json!({ "ids": ids })).is_ok() {
+            self.selection_changed();
+            let n = ids.len();
+            self.frame.set_status_text(&format!("{n} element(s) selected"), 0);
+            self.refresh_active();
+        }
+    }
+}
+
+fn error(frame: &Frame, message: &str) {
+    let d = MessageDialog::builder(frame, message, "BIM Reviera")
+        .with_style(MessageDialogStyle::OK | MessageDialogStyle::IconWarning)
+        .build();
+    d.show_modal();
+}

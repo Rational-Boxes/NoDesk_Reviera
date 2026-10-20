@@ -53,16 +53,26 @@ pub enum Category {
     PlumbingFixture,
     LightingFixture,
     Planting,
+    MechanicalEquipment,
+    AirTerminal,
+    ElectricalEquipment,
+    ElectricalFixture,
+    Sprinkler,
 }
 
 impl Category {
-    pub const ALL: [Category; 6] = [
+    pub const ALL: [Category; 11] = [
         Category::GenericModel,
         Category::Furniture,
         Category::Column,
         Category::PlumbingFixture,
         Category::LightingFixture,
         Category::Planting,
+        Category::MechanicalEquipment,
+        Category::AirTerminal,
+        Category::ElectricalEquipment,
+        Category::ElectricalFixture,
+        Category::Sprinkler,
     ];
 
     pub fn label(self) -> &'static str {
@@ -73,6 +83,11 @@ impl Category {
             Category::PlumbingFixture => "Plumbing Fixture",
             Category::LightingFixture => "Lighting Fixture",
             Category::Planting => "Planting",
+            Category::MechanicalEquipment => "Mechanical Equipment",
+            Category::AirTerminal => "Air Terminal",
+            Category::ElectricalEquipment => "Electrical Equipment",
+            Category::ElectricalFixture => "Electrical Fixture",
+            Category::Sprinkler => "Sprinkler",
         }
     }
 
@@ -85,6 +100,11 @@ impl Category {
             Category::PlumbingFixture => "IfcSanitaryTerminal",
             Category::LightingFixture => "IfcLightFixture",
             Category::Planting => "IfcGeographicElement",
+            Category::MechanicalEquipment => "IfcUnitaryEquipment",
+            Category::AirTerminal => "IfcAirTerminal",
+            Category::ElectricalEquipment => "IfcElectricDistributionBoard",
+            Category::ElectricalFixture => "IfcOutlet",
+            Category::Sprinkler => "IfcFireSuppressionTerminal",
         }
     }
 
@@ -97,12 +117,18 @@ impl Category {
             Category::PlumbingFixture => "IfcSanitaryTerminalType",
             Category::LightingFixture => "IfcLightFixtureType",
             Category::Planting => "IfcGeographicElementType",
+            Category::MechanicalEquipment => "IfcUnitaryEquipmentType",
+            Category::AirTerminal => "IfcAirTerminalType",
+            Category::ElectricalEquipment => "IfcElectricDistributionBoardType",
+            Category::ElectricalFixture => "IfcOutletType",
+            Category::Sprinkler => "IfcFireSuppressionTerminalType",
         }
     }
 
     fn predefined(self) -> &'static str {
         match self {
             Category::Column => "COLUMN",
+            Category::Sprinkler => "SPRINKLER",
             _ => "NOTDEFINED",
         }
     }
@@ -236,6 +262,9 @@ pub struct MeshObjectType {
     /// The Component Library item it was loaded from, if any.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub library: Option<crate::library::LibraryLink>,
+    /// MEP connectors (MEP-CONN-001), in the type's frame.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub connectors: Vec<crate::mep::Connector>,
 }
 
 fn one() -> f64 {
@@ -597,6 +626,13 @@ impl Placement {
             self.origin[2] + z,
         ]
     }
+
+    /// A type-space direction in project coordinates (unit length kept).
+    pub fn apply_direction(&self, d: [f64; 3]) -> [f64; 3] {
+        let y = if self.mirror { -d[1] } else { d[1] };
+        let (s, c) = self.rotation.sin_cos();
+        [d[0] * c - y * s, d[0] * s + y * c, d[2]]
+    }
 }
 
 /// A copy as it is now: its placement, type, and the type's decoded mesh.
@@ -825,7 +861,56 @@ fn type_recipe(
         triangle_count: prepared.report.triangles,
         mesh: StoredMesh::encode(&prepared.positions, &prepared.triangles, &prepared.tri_slot),
         library: None,
+        connectors: Vec::new(),
     }
+}
+
+/// Makes a type from a mesh Reviera generated (metres, Z up, insertion point at the origin), one
+/// slot of `color`, with `connectors` (MEP starter and box types).
+pub(crate) fn create_generated_type(
+    txn: &mut crate::txn::Transaction<'_>,
+    name: &str,
+    category: Category,
+    positions: &[[f64; 3]],
+    triangles: &[[u32; 3]],
+    color: [f32; 4],
+    connectors: Vec<crate::mep::Connector>,
+) -> Result<ElementId> {
+    let mut lo = [f64::MAX; 3];
+    let mut hi = [f64::MIN; 3];
+    for p in positions {
+        for k in 0..3 {
+            lo[k] = lo[k].min(p[k]);
+            hi[k] = hi[k].max(p[k]);
+        }
+    }
+    let recipe = MeshObjectType {
+        kind: TYPE_RECIPE.into(),
+        category,
+        slots: vec![Slot {
+            name: "Body".into(),
+            color,
+        }],
+        source: Source {
+            file: String::new(),
+            path: String::new(),
+            format: "generated".into(),
+            sha256: String::new(),
+        },
+        options: ImportOptions::default(),
+        scale: 1.0,
+        size: [hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]],
+        triangle_count: triangles.len(),
+        mesh: StoredMesh::encode(positions, triangles, &vec![0; triangles.len()]),
+        library: None,
+        connectors,
+    };
+    txn.create(
+        NewElement::new(category.type_class())
+            .name(name)
+            .param("@PredefinedType", category.predefined())
+            .param(RECIPE_KEY, serde_json::to_value(&recipe).expect("serialises")),
+    )
 }
 
 /// Imports a mesh file as a custom object type (`mesh_object.import`).
@@ -891,6 +976,7 @@ pub(crate) fn reload(txn: &mut crate::txn::Transaction<'_>, p: ReloadParams) -> 
     let (prepared, source) = read_prepared(Path::new(&path), &options, true)?;
     let mut recipe = type_recipe(&prepared, source, old.category, options, old.scale);
     recipe.library = old.library.clone();
+    recipe.connectors = old.connectors.clone();
     for s in &mut recipe.slots {
         if let Some(o) = old.slots.iter().find(|o| o.name == s.name) {
             s.color = o.color;
@@ -971,6 +1057,7 @@ pub(crate) fn place(txn: &mut crate::txn::Transaction<'_>, p: PlaceParams) -> Re
     )?;
     let store = txn.store().clone();
     regenerate(&store, store.get(id).expect("created"))?;
+    crate::mep::connect_coincident(txn, &[id])?;
     Ok(id)
 }
 
@@ -1050,6 +1137,7 @@ pub(crate) fn set(txn: &mut crate::txn::Transaction<'_>, p: SetParams) -> Result
             r.scale = v;
         }
         write(txn, id, &r)?;
+        crate::mep::connect_coincident(txn, &[id])?;
     }
     Ok(())
 }

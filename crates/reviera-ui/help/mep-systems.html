@@ -1,0 +1,82 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Copyright (C) 2026 Reviera contributors -->
+<h1>MEP connectors and systems</h1>
+<p class="lead">Mechanical, plumbing and electrical components carry <b>connectors</b>: the points
+where ducts, pipes and cables join them. Connected components form networks, and terminals,
+fixtures and equipment are grouped into <b>systems</b> such as Supply Air 1 or Domestic Cold
+Water 1. The tools are on the <b>Systems</b> tab.</p>
+<nav class="toc">
+  <a href="#components">Components with connectors</a>
+  <a href="#connections">Connections</a>
+  <a href="#systems">Systems</a>
+  <a href="#types">System types</a>
+  <a href="#browser">System Browser</a>
+  <a href="#checks">Checking systems</a>
+</nav>
+
+<h2 id="components">Components with connectors</h2>
+<p><a href="reviera:action/mep_type.load_starters">Load MEP Types</a> adds Reviera's starter types:
+Air Handling Unit, Supply Diffuser, Return Grille, Exhaust Fan, Water Heater, Circulation Pump,
+Lavatory, Water Closet, Distribution Board, Receptacle and Ceiling Luminaire. They are simple
+boxes with typical connectors, for laying out systems before you have manufacturers' content;
+their sizes and flows are placeholders to change. <a href="reviera:action/mep.place_component">MEP
+Component</a> places any type that has connectors, like Place Component.</p>
+<p>A connector has a <b>domain</b> (Duct, Pipe, Electrical, Cable Tray or Conduit), a point and an
+outward direction, a shape and size, and for ducts and pipes a <b>system classification</b>
+(Supply Air, Return Air, Exhaust Air, Domestic Cold Water, Sanitary, Hydronic Supply, …), a flow
+direction (In, Out or Bidirectional) and a flow. Electrical connectors carry the voltage, poles,
+load and power factor. Scripts and agents add connectors to any component type with
+<code>connector.add</code>; a placed copy can have its own flow (<code>connector.set</code>).</p>
+<p>When elements with connectors are selected, each connector is drawn as a ring with a stalk
+pointing out: blue for ducts, green for pipes, orange for electrical, and red while it is
+open.</p>
+
+<h2 id="connections">Connections</h2>
+<p>Placing or moving a component connects its open connectors that meet another's: in the same
+place, facing each other, of the same domain, shape and size.
+<a href="reviera:action/mep.connect_touching">Connect</a> does it for the selection.
+<code>mep.connect</code> and <code>mep.disconnect</code> join and separate two connectors by hand;
+a duct connector never joins a pipe connector, and different sizes are refused until fittings
+with transitions exist.</p>
+
+<h2 id="systems">Systems</h2>
+<p>Select terminals, fixtures or equipment and choose
+<a href="reviera:action/system.create">Create System</a>. Pick the system type (the list offers the
+classifications of the selection's connectors) and a name, or leave the name empty for the next
+free one. Each element joins by its connectors of that classification; a supply diffuser cannot
+join a return air system, and a connector is in one system at a time.</p>
+<ul>
+  <li><b>Select Equipment</b>: select the air handling unit, pump or water heater that serves a
+    system, then choose the system.</li>
+  <li><b>Add To System</b> and <b>Remove From System</b> change the members.</li>
+  <li><b>Divide System</b> splits a system whose members form separate networks into Name 1,
+    Name 2, and so on.</li>
+  <li><b>Disconnect Equipment</b> stops the equipment serving the system.</li>
+</ul>
+
+<h2 id="types">System types</h2>
+<p>Every classification has a built-in type of its name with an abbreviation (SA, RA, DCW, …) and
+a colour. Members of a system are drawn in their type's colour.
+<a href="reviera:action/system_type.edit">System Types</a> renames a type, changes its
+abbreviation and colour, or makes a duplicate, for example a separate Supply Air type for
+laboratories.</p>
+
+<h2 id="browser">System Browser</h2>
+<p><a href="reviera:action/ui.pane.system_browser">System Browser</a> (<kbd>F9</kbd>) lists every
+system by discipline and classification, with its equipment and members, and the connectors that
+are in no system under <b>Unassigned</b>. Click a node to select its elements. It follows every
+change to the model.</p>
+
+<h2 id="checks">Checking systems</h2>
+<p><b>Check Duct Systems</b> and <b>Check Pipe Systems</b> mark problems in the view with a
+"!" triangle; the status bar gives the count and the first one:</p>
+<ul>
+  <li>a system <b>not well connected</b>: it has no equipment, or some members are not connected
+    to the equipment;</li>
+  <li>a <b>flow mismatch</b>: the equipment's preset flow differs from its terminals' total, or a
+    calculated outlet has nothing connected;</li>
+  <li>a <b>flow direction mismatch</b>: two connected connectors both flowing in, or both out.</li>
+</ul>
+<p><b>Show Disconnects</b> asks which domains to check and marks every open connector with a red
+ring until it is connected. Press each button again to turn its markers off. The checks never
+change the model. <code>mep_check.systems</code>, <code>mep_check.show_disconnects</code></p>

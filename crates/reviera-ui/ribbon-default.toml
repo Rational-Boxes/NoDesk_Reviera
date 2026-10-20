@@ -2165,6 +2165,91 @@ actions = ["file.open", "file.save", "edit.undo", "edit.redo", "view.default_3d"
 
 # ---- Ribbon tabs (default order, §1.8.1) ----
 
+[[action]]
+id = "ui.pane.system_browser"
+label = "System Browser"
+icon = "system_browser"
+accel = "F9"
+help = "Show or hide the System Browser: every MEP system with its equipment and members, and the unassigned connectors (MEP-SYS-003)"
+
+[[action]]
+id = "mep_type.load_starters"
+label = "Load MEP Types"
+icon = "mep_types"
+help = "Load Reviera's starter MEP component types: air handling unit, diffuser, grille, fan, water heater, pump, lavatory, WC, distribution board, receptacle and luminaire, each with its connectors"
+
+[[action]]
+id = "mep.place_component"
+label = "MEP Component"
+icon = "mep_component"
+help = "Place an MEP component type (one with connectors); its connectors connect to those they meet"
+
+[[action]]
+id = "mep.connect_touching"
+label = "Connect"
+icon = "mep_connect"
+help = "Connect the selected elements' connectors that meet (same domain, size and shape, facing each other)"
+
+[[action]]
+id = "system.create"
+label = "Create System"
+icon = "system_create"
+help = "Make a duct or piping system of the selected terminals, fixtures and equipment (MEP-SYS-002)"
+
+[[action]]
+id = "system.add"
+label = "Add To System"
+icon = "system_add"
+help = "Add the selected elements to a system by their connectors of its classification"
+
+[[action]]
+id = "system.remove"
+label = "Remove From System"
+icon = "system_remove"
+help = "Take the selected elements out of a system"
+
+[[action]]
+id = "system.select_equipment"
+label = "Select Equipment"
+icon = "system_equipment"
+help = "Make the selected equipment serve a system"
+
+[[action]]
+id = "system.disconnect_equipment"
+label = "Disconnect Equipment"
+icon = "system_disconnect"
+help = "Stop a system's equipment serving it"
+
+[[action]]
+id = "system.divide"
+label = "Divide System"
+icon = "system_divide"
+help = "Split a system whose members form separate networks into one system per network"
+
+[[action]]
+id = "system_type.edit"
+label = "System Types"
+icon = "system_types"
+help = "Change a system type's name, abbreviation and colour, or duplicate it (MEP-SYS-001)"
+
+[[action]]
+id = "mep_check.duct"
+label = "Check Duct Systems"
+icon = "check_duct"
+help = "Mark duct systems not well connected, flow mismatches and flow direction mismatches in this view (MEP-SYS-005)"
+
+[[action]]
+id = "mep_check.pipe"
+label = "Check Pipe Systems"
+icon = "check_pipe"
+help = "Mark pipe systems not well connected, flow mismatches and flow direction mismatches in this view (MEP-SYS-005)"
+
+[[action]]
+id = "mep_check.show_disconnects"
+label = "Show Disconnects"
+icon = "show_disconnects"
+help = "Mark the open connectors of the chosen domains in this view"
+
 [[tab]]
 id = "architecture"
 label = "Architecture"
@@ -2429,6 +2514,46 @@ tools = [
   { action = "reinforcement_settings.show", size = "large" },
   { action = "reinforcement_numbering.show", size = "large" },
 ]
+
+[[tab]]
+id = "systems"
+label = "Systems"
+
+[[tab.panel]]
+label = "Select"
+tools = [{ action = "tool.modify", size = "large" }]
+
+[[tab.panel]]
+label = "Components"
+tools = [
+  { action = "mep.place_component", size = "large" },
+  { action = "mep_type.load_starters", size = "small" },
+  { action = "mep.connect_touching", size = "small" },
+]
+
+[[tab.panel]]
+label = "Systems"
+tools = [
+  { action = "system.create", size = "large" },
+  { action = "system.add", size = "small" },
+  { action = "system.remove", size = "small" },
+  { action = "system.select_equipment", size = "small" },
+  { action = "system.disconnect_equipment", size = "small" },
+  { action = "system.divide", size = "small" },
+  { action = "system_type.edit", size = "small" },
+]
+
+[[tab.panel]]
+label = "Check Systems"
+tools = [
+  { action = "mep_check.duct", size = "small" },
+  { action = "mep_check.pipe", size = "small" },
+  { action = "mep_check.show_disconnects", size = "small" },
+]
+
+[[tab.panel]]
+label = "Browser"
+tools = [{ action = "ui.pane.system_browser", size = "large" }]
 
 [[tab]]
 id = "analyze"
@@ -3106,7 +3231,7 @@ items = ["script.run", "script.import", "ui.scripts.manage", "-"]
 label = "&Window"
 items = [
   "view.create_3d", "window.close", "-", "window.next", "window.previous", "-",
-  "window.tile", "window.tab_all", "-", "ui.pane.properties", "ui.pane.browser", "ui.pane.model_tree", "ui.pane.components", "-",
+  "window.tile", "window.tab_all", "-", "ui.pane.properties", "ui.pane.browser", "ui.pane.model_tree", "ui.pane.components", "ui.pane.system_browser", "-",
   "ui.fullscreen.toggle", "ui.focus_mode.toggle", "ui.radial.toggle",
 ]
 

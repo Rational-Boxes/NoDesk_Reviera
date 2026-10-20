@@ -328,6 +328,48 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "tab_all" => format!(
             r#"<path d="M4 10h8l2-4h6l2 4h6v18H4z" fill="{f}" {s}/><path d="M4 10h24" {sa}/>"#
         ),
+        "system_browser" => format!(
+            r#"<path d="M6 5v22M6 10h5M6 18h5M6 26h5" {s}/><circle cx="16" cy="10" r="3" fill="{f}" {s}/><circle cx="16" cy="18" r="3" fill="{f}" {s}/><circle cx="16" cy="26" r="3" fill="{f}" {s}/><path d="M19 10h8M19 18h8M19 26h8" {sa}/>"#
+        ),
+        "mep_types" => format!(
+            r#"<rect x="4" y="12" width="14" height="14" fill="{f}" {s}/><path d="M18 19h6" {sa}/><circle cx="25" cy="19" r="2.5" {sa}/><path d="M11 12V6h12" {s}/>"#
+        ),
+        "mep_component" => format!(
+            r#"<rect x="6" y="10" width="20" height="14" fill="{f}" {s}/><path d="M26 17h4M2 17h4" {sa}/><circle cx="16" cy="17" r="3" {s}/>"#
+        ),
+        "mep_connect" => format!(
+            r#"<rect x="3" y="11" width="10" height="10" fill="{f}" {s}/><rect x="19" y="11" width="10" height="10" fill="{f}" {s}/><path d="M13 16h6" {sa}/>"#
+        ),
+        "system_create" => format!(
+            r#"<rect x="4" y="4" width="10" height="8" fill="{f}" {s}/><path d="M9 12v6h12M9 18v6h12" {s}/><circle cx="23" cy="18" r="2.5" {sa}/><circle cx="23" cy="24" r="2.5" {sa}/><path d="M25 5v6M22 8h6" {sa}/>"#
+        ),
+        "system_add" => format!(
+            r#"<path d="M5 8h14M5 16h14M5 24h8" {s}/><path d="M23 18v10M18 23h10" {sa}/>"#
+        ),
+        "system_remove" => format!(
+            r#"<path d="M5 8h14M5 16h14M5 24h8" {s}/><path d="M18 23h10" {sa}/>"#
+        ),
+        "system_equipment" => format!(
+            r#"<rect x="4" y="9" width="14" height="14" fill="{f}" {s}/><path d="M18 16h10" {s}/><path d="M24 12l4 4-4 4" {sa}/>"#
+        ),
+        "system_disconnect" => format!(
+            r#"<rect x="4" y="9" width="14" height="14" fill="{f}" {s}/><path d="M18 16h3M25 16h3" {s}/><path d="M21 12l4 8" {sa}/>"#
+        ),
+        "system_divide" => format!(
+            r#"<path d="M4 10h10M4 22h10" {s}/><path d="M18 10h10M18 22h10" {sa}/><path d="M16 4v24" stroke-dasharray="2 2" {s}/>"#
+        ),
+        "system_types" => format!(
+            r#"<rect x="4" y="5" width="10" height="6" fill="{f}" {s}/><rect x="4" y="13" width="10" height="6" fill="{f}" {s}/><rect x="4" y="21" width="10" height="6" fill="{f}" {s}/><path d="M17 8h11M17 16h11M17 24h11" {sa}/>"#
+        ),
+        "check_duct" => format!(
+            r#"<rect x="3" y="12" width="20" height="8" fill="{f}" {s}/><path d="M26 6l4 8h-8z" {sa}/><path d="M26 9v2" {sa}/>"#
+        ),
+        "check_pipe" => format!(
+            r#"<path d="M3 16h20" stroke-width="5" {s}/><path d="M26 6l4 8h-8z" {sa}/><path d="M26 9v2" {sa}/>"#
+        ),
+        "show_disconnects" => format!(
+            r#"<path d="M3 16h10M19 16h10" {s}/><circle cx="16" cy="16" r="5" {sa}/>"#
+        ),
         "full_screen" => format!(
             r#"<rect x="7" y="9" width="18" height="14" fill="{f}" {s}/><path d="M4 10V4h6M22 4h6v6M28 22v6h-6M10 28H4v-6" {sa}/>"#
         ),

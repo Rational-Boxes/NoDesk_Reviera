@@ -827,6 +827,33 @@ tools and the datums.
   (`structural.catalogs`, `structural.standards`, `column.load_section`, `column.check`;
   STR-SEC-001).
 
+### MEP (in development)
+
+The MEP epic has begun with its foundations (spec Chapter 4 §4.6): connectors, the connectivity
+graph, system types, systems and system checks. Ducts, pipes, fittings, electrical circuits and
+the System Browser are next.
+
+- **Connectors** on component types: duct, pipe, electrical, cable tray and conduit connectors with
+  their point and direction, shape and size, system classification, flow direction and
+  configuration, flow, loss method, fixture units, and electrical system, voltage, poles, load and
+  power factor (`connector.add`, `connector.set`, `connector.remove`, `connector.list`). A placed
+  copy may override its connectors' flow and system values.
+- **Starter component types**: Air Handling Unit, Supply Diffuser, Return Grille, Exhaust Fan,
+  Water Heater, Circulation Pump, Lavatory, Water Closet, Distribution Board, Receptacle and Ceiling
+  Luminaire (`mep_type.load_starters`), or any box-shaped type with connectors (`mep_type.create`).
+  New categories: Mechanical Equipment, Air Terminals, Electrical Equipment, Electrical Fixtures,
+  Lighting Fixtures and Sprinklers.
+- **Connections**: placing or moving a component connects ports that meet (same domain, size and
+  shape, facing each other); `mep.connect` and `mep.disconnect` join and separate them by hand,
+  refusing mismatched domains and sizes; `mep.network_of` walks a network.
+- **Systems**: built-in system types per classification and made ones with colour, material,
+  abbreviation, fluid and temperature (`system_type.*`); duct and piping systems of terminals,
+  fixtures and equipment, with equipment, add, remove, divide and rename (`system.*`).
+- **Checks**: not well connected, flow and demand mismatches, flow direction mismatches
+  (`mep_check.systems`) and open connectors (`mep_check.show_disconnects`).
+- **IFC**: ports as `IfcDistributionPort` nested in their elements, connections as
+  `IfcRelConnectsPorts`, systems as `IfcDistributionSystem` with their members and building.
+
 ### Analysis and remote computation (in development)
 
 The foundation for analysis is being built (spec Chapter 2 §2.17, Chapter 4 §4.0.2a, overview in
@@ -1144,7 +1171,11 @@ area by area (reviewed against the spec on 2026-10-15).
   beams, placing braces in elevations, the connection library's packages and its other
   connection groups, composite decks and span symbols, truss families (a layout shared by types),
   further rebar (two-point, varying sets beyond bars through walls, bent fabric), bilinear and two-way area loads, panel results and external analysis providers.
-- **MEP, families and collaboration** (BIMserver, OpenCDE, Godot) are specified but not started.
+- **MEP** (in development): ducts, pipes, fittings, routing preferences, cable tray and conduit,
+  electrical circuits, panels and switch systems, sizing and calculations, the System Browser, the
+  System Editor, placing connectors on faces in a component editor, fabrication, P&ID and spaces
+  and zones are specified but not built.
+- **Families and collaboration** (BIMserver, OpenCDE, Godot) are specified but not started.
 - **Remote computation subsystem** (DM-RPC-001 … 010): in development; the first milestone is
   built (see [Analysis and remote computation](#analysis-and-remote-computation-in-development)).
   Still to build: the Compute Jobs panel; IFC filter-profile distillations; dictionary-trained and

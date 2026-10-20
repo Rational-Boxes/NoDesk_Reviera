@@ -52,6 +52,7 @@ mod overlaps;
 mod parts;
 mod path_arrays;
 mod radial;
+mod mep_ui;
 mod fullscreen;
 mod plans;
 mod railings;
@@ -406,6 +407,10 @@ struct Gui {
     ui_settings: radial::UiSettings,
     /// Full-screen and focus mode (UI-DOCK-004).
     chrome: fullscreen::Chrome,
+    /// The System Browser (MEP-SYS-003), made on first use.
+    system_browser: Option<mep_ui::SystemBrowser>,
+    /// MEP check markers turned on, by view.
+    mep_marks: HashMap<u32, mep_ui::MepMarks>,
 }
 
 impl View {
@@ -3655,6 +3660,8 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 radial: None,
                 ui_settings: radial::UiSettings::load(),
                 chrome: fullscreen::Chrome::default(),
+                system_browser: None,
+                mep_marks: HashMap::new(),
                 help: None,
                 script_units: Rc::new(RefCell::new(Default::default())),
                 timer: Some(Timer::new(&frame)),
@@ -3856,6 +3863,7 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                         }
                     }
                     gui.sync_views();
+                    gui.system_browser_idle();
                     if gui.browser_stale {
                         gui.rebuild_browser();
                     }
@@ -4427,6 +4435,20 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "railing.create_on_stair" => with(gui, Gui::rail_stairs),
         "overlap.find" => with(gui, Gui::check_overlaps),
         "ui.pane.clash" => Gui::toggle_clash_pane(gui),
+        "ui.pane.system_browser" => Gui::toggle_system_browser(gui),
+        "mep_type.load_starters" => with(gui, Gui::load_mep_types),
+        "mep.place_component" => with(gui, Gui::place_mep_component),
+        "mep.connect_touching" => with(gui, Gui::connect_touching),
+        "system.create" => with(gui, Gui::create_system),
+        "system.add" => with(gui, |g| g.system_members(true)),
+        "system.remove" => with(gui, |g| g.system_members(false)),
+        "system.select_equipment" => with(gui, Gui::select_system_equipment),
+        "system.disconnect_equipment" => with(gui, |g| g.system_action("system.disconnect_equipment", "Disconnect Equipment")),
+        "system.divide" => with(gui, |g| g.system_action("system.divide", "Divide System")),
+        "system_type.edit" => with(gui, Gui::edit_system_types),
+        "mep_check.duct" => with(gui, |g| g.toggle_mep_check(reviera_core::mep_systems::CheckKind::Duct)),
+        "mep_check.pipe" => with(gui, |g| g.toggle_mep_check(reviera_core::mep_systems::CheckKind::Pipe)),
+        "mep_check.show_disconnects" => with(gui, Gui::show_disconnects),
         "ui.pane.analytical_checks" => Gui::toggle_checks_pane(gui),
         "ui.pane.results" => Gui::toggle_results_pane(gui),
         "load_case.manage" => Gui::load_cases_dialog(gui, "cases"),

@@ -201,6 +201,8 @@ impl Gui {
         // Rebar as this view presents it (STR-RBR-017).
         let (rebar_lines, mut rebar_top, rebar_picks) = self.rebar_view_drawing(index, &mut visibility);
         rebar_top.extend(self.constraint_lines.iter().cloned());
+        // MEP connector glyphs and check markers (Ch 4 §4.6), drawn through the model.
+        rebar_top.extend(self.mep_lines(index));
         lines.extend(rebar_lines);
         lines.extend(self.datum_3d_lines(index));
         lines.extend(self.analytical_lines(index));

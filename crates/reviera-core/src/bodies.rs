@@ -502,14 +502,17 @@ pub fn all(store: &Store) -> Vec<Body> {
             }
         }
     }
-    // Custom objects (DM-IMP-015): one part per material slot, in its colour.
+    // Custom objects (DM-IMP-015): one part per material slot, in its colour; members of MEP
+    // systems in their system type's colour (MEP-SYS-001).
+    let system_colors = crate::mep_systems::element_colors(store);
     for (id, g) in crate::mesh_objects::all(store) {
         let class = g.ty.category.class();
         for (slot, mesh) in g.slot_meshes() {
-            let color =
+            let color = system_colors.get(&id).copied().unwrap_or_else(|| {
                 g.ty.slots
                     .get(slot)
-                    .map_or([0.78, 0.78, 0.78, 1.0], |s| s.color);
+                    .map_or([0.78, 0.78, 0.78, 1.0], |s| s.color)
+            });
             push(
                 id,
                 &format!("{class}:{}", crate::mesh_objects::color_hex(color)),

@@ -46,6 +46,7 @@ pub(crate) struct Page {
 const CORE: Option<&str> = Some("Using Reviera");
 const ARCHITECTURE: Option<&str> = Some("Architecture");
 const STRUCTURE: Option<&str> = Some("Structure");
+const MEP: Option<&str> = Some("MEP");
 
 macro_rules! page {
     ($slug:literal, $title:literal, $group:expr) => {
@@ -102,6 +103,7 @@ pub(crate) const PAGES: &[Page] = &[
     page!("analytical-model", "The analytical model and its checks", STRUCTURE),
     page!("loads", "Loads and supports", STRUCTURE),
     page!("structural-analysis", "Structural analysis and results", STRUCTURE),
+    page!("mep-systems", "MEP connectors and systems", MEP),
 ];
 
 /// The page with `slug`.

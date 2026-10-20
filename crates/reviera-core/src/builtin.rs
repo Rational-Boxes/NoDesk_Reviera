@@ -197,6 +197,7 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         r.expect("core commands are valid");
     }
     crate::builtin_arc::register(registry);
+    crate::builtin_mep::register(registry);
 }
 
 /// Arguments of a command that takes none.
