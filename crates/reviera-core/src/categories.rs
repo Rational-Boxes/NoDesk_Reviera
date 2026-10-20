@@ -403,6 +403,30 @@ pub const CATEGORIES: &[Category] = &[
         true,
     ),
     cat(
+        "cat.cable_trays",
+        "Cable Trays",
+        Some("IfcCableCarrierSegment"),
+        Some("IfcCableCarrierSegmentType"),
+        Some("Pset_CableCarrierSegmentTypeCableTraySegment"),
+        true,
+    ),
+    cat(
+        "cat.conduits",
+        "Conduits",
+        None,
+        None,
+        Some("Pset_CableCarrierSegmentTypeConduitSegment"),
+        true,
+    ),
+    cat(
+        "cat.junction_boxes",
+        "Junction Boxes",
+        Some("IfcJunctionBox"),
+        Some("IfcJunctionBoxType"),
+        Some("Pset_JunctionBoxTypeCommon"),
+        true,
+    ),
+    cat(
         "cat.parts",
         "Parts",
         Some("IfcBuildingElementPart"),
@@ -460,6 +484,13 @@ pub fn category_of(e: &Element) -> Option<&'static Category> {
         Some("path") => return category("cat.structural_path_reinforcement"),
         Some("fabric_area") => return category("cat.structural_fabric_areas"),
         _ => {}
+    }
+    // Conduit shares its IFC class with cable tray.
+    if e.class.starts_with("IfcCableCarrierSegment")
+        && (text(e, "@PredefinedType") == Some("CONDUITSEGMENT")
+            || crate::mep_runs::segment_type(e).is_some_and(|t| t.domain == crate::mep::Domain::Conduit))
+    {
+        return category("cat.conduits");
     }
     let class = e.class.strip_suffix("StandardCase").unwrap_or(&e.class);
     let class = match class {

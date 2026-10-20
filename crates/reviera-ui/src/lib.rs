@@ -4487,6 +4487,25 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
             focus(g);
         }),
         "duct.cap_open_ends" => with(gui, Gui::cap_open_ends),
+        "cable_tray.create" => with(gui, |g| {
+            g.start_run_tool(reviera_core::mep::Domain::CableTray);
+            focus(g);
+        }),
+        "conduit.create" => with(gui, |g| {
+            g.start_run_tool(reviera_core::mep::Domain::Conduit);
+            focus(g);
+        }),
+        "cable_tray_fitting.place" => with(gui, |g| {
+            g.start_fitting_tool(reviera_core::mep::Domain::CableTray);
+            focus(g);
+        }),
+        "conduit_fitting.place" => with(gui, |g| {
+            g.start_fitting_tool(reviera_core::mep::Domain::Conduit);
+            focus(g);
+        }),
+        "mep_fitting.upgrade" => with(gui, |g| g.fitting_grade(true)),
+        "mep_fitting.downgrade" => with(gui, |g| g.fitting_grade(false)),
+        "conduit.create_parallel" => with(gui, Gui::parallel_conduits),
         "system.create" => with(gui, Gui::create_system),
         "system.add" => with(gui, |g| g.system_members(true)),
         "system.remove" => with(gui, |g| g.system_members(false)),

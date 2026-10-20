@@ -1,7 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Reviera contributors
 
-//! Ducts, pipes and their fittings (MEP-DUCT-001, MEP-DUCT-002, MEP-DUCT-003, MEP-PIPE-001).
+//! Ducts, pipes, cable tray, conduit and their fittings (MEP-DUCT-001, MEP-DUCT-002,
+//! MEP-DUCT-003, MEP-PIPE-001, MEP-ELEC-016, MEP-ELEC-017).
+//!
+//! - Cable tray and conduit are `IfcCableCarrierSegment` and `…Fitting` (boxes
+//!   `IfcJunctionBox`). Their bends have a radius (tray: width × the type's multiplier; conduit:
+//!   the standard's radius for the diameter, else diameter × multiplier). A type **without
+//!   fittings** draws its bends as curved segments, and refuses fittings placed by hand.
+//!   Conduit sizes come from the type's standard (Electrical Settings).
 //!
 //! - A **segment type** (`IfcDuctSegmentType`, `IfcPipeSegmentType` with
 //!   `recipe.mep_segment_type`) has a domain, a shape and **routing preferences**: per role
@@ -23,8 +30,8 @@
 //!
 //! Not built yet: fittings and segments from component types, radius elbows, the Angles
 //! setting, offsets and justification other than the centre, size and elevation locks, moving
-//! and stretching runs with their fittings, flex duct, the in-canvas fitting controls
-//! ("+"/"−", flip, rotate).
+//! and stretching runs with their fittings, flex duct, flip and rotate, the fitting controls in
+//! the view ("+" and "−" are commands: [`upgrade`], [`downgrade`]).
 
 use std::collections::BTreeMap;
 
@@ -106,8 +113,11 @@ impl Size {
         if !ok {
             return Err(bad("mep_run.size", "give a diameter, or a width and height, above zero"));
         }
-        if domain == Domain::Pipe && self.shape != Shape::Round {
-            return Err(bad("mep_run.shape", "pipes are round"));
+        if matches!(domain, Domain::Pipe | Domain::Conduit) && self.shape != Shape::Round {
+            return Err(bad("mep_run.shape", format!("{} is round", domain.label().to_lowercase())));
+        }
+        if domain == Domain::CableTray && self.shape != Shape::Rectangular {
+            return Err(bad("mep_run.shape", "cable tray is rectangular"));
         }
         Ok(())
     }
@@ -142,6 +152,10 @@ pub enum Part {
     Cross,
     Transition,
     Cap,
+    /// A coupling (union) joining two lengths.
+    Coupling,
+    /// A pull or junction box (conduit).
+    Box,
 }
 
 impl Part {
@@ -153,6 +167,27 @@ impl Part {
             Part::Cross => "Cross",
             Part::Transition => "Transition",
             Part::Cap => "Cap",
+            Part::Coupling => "Coupling",
+            Part::Box => "Junction Box",
+        }
+    }
+
+    /// The predefined type and object type of a fitting of this part in a domain.
+    pub fn ifc_in(self, domain: Domain) -> (&'static str, Option<&'static str>) {
+        if matches!(domain, Domain::CableTray | Domain::Conduit) {
+            return match self {
+                Part::Elbow => ("BEND", None),
+                Part::Tee | Part::Tap => ("TEE", None),
+                Part::Cross => ("CROSS", None),
+                Part::Transition => ("REDUCER", None),
+                Part::Cap => ("USERDEFINED", Some("CAP")),
+                Part::Coupling => ("USERDEFINED", Some("COUPLING")),
+                Part::Box => ("POWER", None),
+            };
+        }
+        match self {
+            Part::Coupling => ("CONNECTOR", None),
+            p => (p.ifc(), None),
         }
     }
 
@@ -163,6 +198,8 @@ impl Part {
             Part::Tee | Part::Tap | Part::Cross => "JUNCTION",
             Part::Transition => "TRANSITION",
             Part::Cap => "OBSTRUCTION",
+            Part::Coupling => "CONNECTOR",
+            Part::Box => "JUNCTION",
         }
     }
 }
@@ -201,6 +238,8 @@ pub struct Routing {
     pub cross: Vec<Row>,
     pub transition: Vec<Row>,
     pub cap: Vec<Row>,
+    /// Couplings where a straight is split; none: the halves join directly.
+    pub union: Vec<Row>,
 }
 
 impl Default for Routing {
@@ -213,6 +252,7 @@ impl Default for Routing {
             cross: any(Part::Cross),
             transition: any(Part::Transition),
             cap: any(Part::Cap),
+            union: Vec::new(),
         }
     }
 }
@@ -225,6 +265,7 @@ impl Routing {
             Role::Cross => &self.cross,
             Role::Transition => &self.transition,
             Role::Cap => &self.cap,
+            Role::Union => &self.union,
         }
     }
 
@@ -251,6 +292,7 @@ impl Routing {
             ("cross", &self.cross, &[Part::Cross][..]),
             ("transition", &self.transition, &[Part::Transition][..]),
             ("cap", &self.cap, &[Part::Cap][..]),
+            ("union", &self.union, &[Part::Coupling][..]),
         ] {
             for r in rows {
                 if !allowed.contains(&r.part) {
@@ -272,6 +314,7 @@ pub enum Role {
     Cross,
     Transition,
     Cap,
+    Union,
 }
 
 impl Role {
@@ -282,6 +325,7 @@ impl Role {
             Role::Cross => "cross",
             Role::Transition => "transition",
             Role::Cap => "cap",
+            Role::Union => "union",
         }
     }
 }
@@ -299,6 +343,99 @@ pub struct SegmentType {
     /// Absolute roughness (metres).
     #[serde(default)]
     pub roughness: f64,
+    /// Tray and conduit: bends are fittings; without, they are curved segments.
+    #[serde(default = "yes")]
+    pub with_fittings: bool,
+    /// Cable tray: ladder, channel, solid bottom or trough.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tray_kind: Option<TrayKind>,
+    /// Tray and conduit: bend radius over width or diameter (where the standard gives none).
+    #[serde(default = "one")]
+    pub bend_radius_multiplier: f64,
+    /// Conduit: its standard's id (Electrical Settings).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub standard: Option<String>,
+}
+
+fn yes() -> bool {
+    true
+}
+
+fn one() -> f64 {
+    1.0
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum TrayKind {
+    #[default]
+    Ladder,
+    Channel,
+    SolidBottom,
+    Trough,
+}
+
+impl TrayKind {
+    /// `IfcCableCarrierSegmentTypeEnum`.
+    pub fn ifc(self) -> &'static str {
+        match self {
+            TrayKind::Ladder => "CABLELADDERSEGMENT",
+            TrayKind::Channel | TrayKind::SolidBottom => "CABLETRAYSEGMENT",
+            TrayKind::Trough => "CABLETRUNKINGSEGMENT",
+        }
+    }
+}
+
+impl SegmentType {
+    /// The segment's predefined type.
+    fn predefined(&self) -> &'static str {
+        match self.domain {
+            Domain::CableTray => self.tray_kind.unwrap_or_default().ifc(),
+            Domain::Conduit => "CONDUITSEGMENT",
+            _ => "RIGIDSEGMENT",
+        }
+    }
+
+    /// Whether its bends have a radius (tray and conduit).
+    fn radius_bends(&self) -> bool {
+        matches!(self.domain, Domain::CableTray | Domain::Conduit)
+    }
+
+    /// Checks a size against the type: its shape, and for conduit its standard.
+    fn check_size(&self, store: &Store, size: &Size) -> Result<()> {
+        size.check(self.domain)?;
+        if self.domain == Domain::Conduit
+            && let Some(id) = &self.standard
+        {
+            let s = crate::mep_electrical::settings(store);
+            let std = s
+                .conduit_standards
+                .iter()
+                .find(|c| &c.id == id)
+                .ok_or_else(|| bad("conduit_standard.not_found", format!("the type's conduit standard {id:?} is not in the Electrical Settings")))?;
+            if std.size(size.diameter).is_none() {
+                let list: Vec<String> = std.sizes.iter().map(|z| format!("{:.1}", z.diameter * 1000.0).trim_end_matches(".0").to_owned()).collect();
+                return Err(bad(
+                    "conduit.size",
+                    format!("{} conduit comes in {} mm, not {:.1} mm", std.name, list.join(", "), size.diameter * 1000.0),
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    /// The default bend radius of a size (metres).
+    pub fn bend_radius(&self, store: &Store, size: &Size) -> f64 {
+        if self.domain == Domain::Conduit
+            && let Some(r) = self.standard.as_ref().and_then(|id| {
+                crate::mep_electrical::settings(store).conduit_standards.into_iter().find(|c| &c.id == id)?.size(size.diameter)?.bend_radius
+            })
+        {
+            return r;
+        }
+        let base = if size.shape == Shape::Round { size.diameter } else { size.width };
+        base * self.bend_radius_multiplier
+    }
 }
 
 pub fn segment_type(e: &Element) -> Option<SegmentType> {
@@ -307,21 +444,36 @@ pub fn segment_type(e: &Element) -> Option<SegmentType> {
 }
 
 fn type_class(domain: Domain) -> &'static str {
-    if domain == Domain::Pipe { "IfcPipeSegmentType" } else { "IfcDuctSegmentType" }
+    match domain {
+        Domain::Pipe => "IfcPipeSegmentType",
+        Domain::CableTray | Domain::Conduit => "IfcCableCarrierSegmentType",
+        _ => "IfcDuctSegmentType",
+    }
 }
 
 fn segment_class(domain: Domain) -> &'static str {
-    if domain == Domain::Pipe { "IfcPipeSegment" } else { "IfcDuctSegment" }
+    match domain {
+        Domain::Pipe => "IfcPipeSegment",
+        Domain::CableTray | Domain::Conduit => "IfcCableCarrierSegment",
+        _ => "IfcDuctSegment",
+    }
 }
 
-fn fitting_class(domain: Domain) -> &'static str {
-    if domain == Domain::Pipe { "IfcPipeFitting" } else { "IfcDuctFitting" }
+fn fitting_class(domain: Domain, part: Part) -> &'static str {
+    match (domain, part) {
+        (_, Part::Box) => "IfcJunctionBox",
+        (Domain::Pipe, _) => "IfcPipeFitting",
+        (Domain::CableTray | Domain::Conduit, _) => "IfcCableCarrierFitting",
+        _ => "IfcDuctFitting",
+    }
 }
 
 /// The built-in type names, by domain and shape.
 fn default_name(domain: Domain, shape: Shape) -> &'static str {
     match (domain, shape) {
         (Domain::Pipe, _) => "Standard Pipe",
+        (Domain::CableTray, _) => "Ladder Cable Tray",
+        (Domain::Conduit, _) => "Conduit",
         (_, Shape::Round) => "Round Duct",
         (_, Shape::Rectangular) => "Rectangular Duct",
         (_, Shape::Oval) => "Oval Duct",
@@ -342,16 +494,38 @@ fn default_type(txn: &mut Transaction<'_>, domain: Domain, shape: Shape) -> Resu
         kind: TYPE_RECIPE.into(),
         domain,
         shape,
-        routing: Routing::default(),
+        routing: default_routing(domain),
         material: if domain == Domain::Pipe { "Copper".into() } else { "Galvanised Steel".into() },
-        roughness: if domain == Domain::Pipe { 1.5e-6 } else { 9.0e-5 },
+        roughness: match domain {
+            Domain::Pipe => 1.5e-6,
+            Domain::Duct => 9.0e-5,
+            _ => 0.0,
+        },
+        with_fittings: true,
+        tray_kind: (domain == Domain::CableTray).then_some(TrayKind::Ladder),
+        bend_radius_multiplier: default_multiplier(domain),
+        standard: (domain == Domain::Conduit).then(|| "iec_61386".into()),
     };
     txn.create(
         NewElement::new(type_class(domain))
             .name(name)
-            .param("@PredefinedType", "RIGIDSEGMENT")
+            .param("@PredefinedType", t.predefined())
             .param(RECIPE_KEY, serde_json::to_value(&t).expect("serialises")),
     )
+}
+
+/// A domain's default routing: conduit splits with a coupling.
+fn default_routing(domain: Domain) -> Routing {
+    let mut r = Routing::default();
+    if domain == Domain::Conduit {
+        r.union = vec![Row { part: Part::Coupling, min: 0.0, max: 0.0 }];
+    }
+    r
+}
+
+/// The default bend radius multiplier: 1 × width for tray, 6 × diameter for conduit.
+fn default_multiplier(domain: Domain) -> f64 {
+    if domain == Domain::Conduit { 6.0 } else { 1.0 }
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -367,16 +541,44 @@ pub struct CreateTypeParams {
     pub material: Option<String>,
     #[serde(default)]
     pub roughness: Option<f64>,
+    /// Tray and conduit: bends are fittings (default) or curved segments.
+    pub with_fittings: Option<bool>,
+    /// Cable tray: ladder (default), channel, solid_bottom, trough.
+    pub tray_kind: Option<TrayKind>,
+    /// Tray and conduit: bend radius over width or diameter (default 1 for tray, 6 for conduit).
+    pub bend_radius_multiplier: Option<f64>,
+    /// Conduit: a standard's id (default `iec_61386`).
+    pub standard: Option<String>,
 }
 
-/// Makes a duct or pipe type (`mep_segment_type.create`).
+/// Makes a duct, pipe, cable tray or conduit type (`mep_segment_type.create`).
 pub(crate) fn create_type(txn: &mut Transaction<'_>, p: CreateTypeParams) -> Result<ElementId> {
-    if !matches!(p.domain, Domain::Duct | Domain::Pipe) {
-        return Err(bad("mep_segment_type.domain", "segment types are duct or pipe types (tray and conduit come later)"));
+    if p.domain == Domain::Electrical {
+        return Err(bad("mep_segment_type.domain", "segment types are duct, pipe, cable tray or conduit types"));
     }
-    if p.domain == Domain::Pipe && p.shape != Shape::Round {
-        return Err(bad("mep_run.shape", "pipes are round"));
+    let shape = match p.domain {
+        Domain::Conduit | Domain::Pipe => Shape::Round,
+        Domain::CableTray => Shape::Rectangular,
+        _ => p.shape,
+    };
+    if shape != p.shape && p.shape != Shape::default() {
+        return Err(bad("mep_run.shape", format!("{} is {}", p.domain.label().to_lowercase(), if shape == Shape::Round { "round" } else { "rectangular" })));
     }
+    let m = p.bend_radius_multiplier.unwrap_or(default_multiplier(p.domain));
+    if !(m > 0.0 && m <= 100.0) {
+        return Err(bad("mep_segment_type.bend_radius", "the bend radius multiplier runs above 0 to 100"));
+    }
+    let standard = match (p.domain, p.standard) {
+        (Domain::Conduit, Some(id)) => {
+            if !crate::mep_electrical::settings(txn.store()).conduit_standards.iter().any(|c| c.id == id) {
+                return Err(bad("conduit_standard.not_found", format!("no conduit standard {id:?}")));
+            }
+            Some(id)
+        }
+        (Domain::Conduit, None) => Some("iec_61386".into()),
+        (_, Some(_)) => return Err(bad("mep_segment_type.standard", "only conduit types have a standard")),
+        (_, None) => None,
+    };
     let name = p.name.trim().to_owned();
     if name.is_empty() {
         return Err(bad("mep_segment_type.name", "a type needs a name"));
@@ -384,20 +586,25 @@ pub(crate) fn create_type(txn: &mut Transaction<'_>, p: CreateTypeParams) -> Res
     if txn.store().iter().any(|e| segment_type(e).is_some() && e.name.as_deref().is_some_and(|n| n.eq_ignore_ascii_case(&name))) {
         return Err(bad("mep_segment_type.duplicate", format!("there is already a type named {name:?}")));
     }
-    let routing = p.routing.unwrap_or_default();
+    let routing = p.routing.unwrap_or_else(|| default_routing(p.domain));
     routing.check()?;
+    let radius = matches!(p.domain, Domain::CableTray | Domain::Conduit);
     let t = SegmentType {
         kind: TYPE_RECIPE.into(),
         domain: p.domain,
-        shape: p.shape,
+        shape,
         routing,
         material: p.material.unwrap_or_default(),
         roughness: p.roughness.unwrap_or(0.0),
+        with_fittings: !radius || p.with_fittings.unwrap_or(true),
+        tray_kind: (p.domain == Domain::CableTray).then(|| p.tray_kind.unwrap_or_default()),
+        bend_radius_multiplier: m,
+        standard,
     };
     txn.create(
         NewElement::new(type_class(p.domain))
             .name(name)
-            .param("@PredefinedType", "RIGIDSEGMENT")
+            .param("@PredefinedType", t.predefined())
             .param(RECIPE_KEY, serde_json::to_value(&t).expect("serialises")),
     )
 }
@@ -499,6 +706,10 @@ pub struct SegmentRecipe {
     /// (vertical runs keep their neighbours').
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub across: Option<V3>,
+    /// A curved segment (a bend of a tray or conduit type without fittings): the corner its
+    /// arc turns about, tangent to the lines to `start` and `end`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub corner: Option<V3>,
 }
 
 fn is_zero(v: &f64) -> bool {
@@ -526,6 +737,9 @@ pub struct FittingRecipe {
     pub level: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub classification: Option<Classification>,
+    /// A bend's radius (tray and conduit); none: mitred.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub radius: Option<f64>,
 }
 
 pub fn segment_recipe(e: &Element) -> Option<SegmentRecipe> {
@@ -555,9 +769,10 @@ pub fn port_count(e: &Element) -> usize {
 }
 
 fn port_connector(domain: Domain, size: &Size, c: Option<Classification>, name: &str) -> Connector {
+    let carrier = matches!(domain, Domain::CableTray | Domain::Conduit);
     Connector {
         name: name.into(),
-        classification: Some(c.unwrap_or(Classification::Global)),
+        classification: if carrier { None } else { Some(c.unwrap_or(Classification::Global)) },
         flow_direction: FlowDirection::Bidirectional,
         ..size.connector(domain)
     }
@@ -567,9 +782,14 @@ fn port_connector(domain: Domain, size: &Size, c: Option<Classification>, name: 
 pub fn ports(_: &Store, e: &Element) -> Vec<Port> {
     if let Some(s) = segment_recipe(e) {
         let Some(axis) = unit(sub(s.end, s.start)) else { return Vec::new() };
+        // A curved segment leaves along the lines to its corner.
+        let (out_start, out_end) = match s.corner {
+            Some(c) => (unit(sub(s.start, c)).unwrap_or(mul(axis, -1.0)), unit(sub(s.end, c)).unwrap_or(axis)),
+            None => (mul(axis, -1.0), axis),
+        };
         let mut out = vec![
-            Port { element: e.id(), index: 0, connector: port_connector(s.domain, &s.size, s.classification, "Start"), position: s.start, direction: mul(axis, -1.0) },
-            Port { element: e.id(), index: 1, connector: port_connector(s.domain, &s.size, s.classification, "End"), position: s.end, direction: axis },
+            Port { element: e.id(), index: 0, connector: port_connector(s.domain, &s.size, s.classification, "Start"), position: s.start, direction: out_start },
+            Port { element: e.id(), index: 1, connector: port_connector(s.domain, &s.size, s.classification, "End"), position: s.end, direction: out_end },
         ];
         for (k, t) in s.taps.iter().enumerate() {
             out.push(Port {
@@ -669,15 +889,109 @@ fn loft(a: V3, b: V3, sa: &Size, sb: &Size, across: Option<V3>) -> Option<Solid>
     Some(Solid { points, faces })
 }
 
-/// A segment's body.
+/// The arc from `a` to `b` turning about `corner` (tangent to the lines from the corner):
+/// its points and tangents, `n` steps; none when the three are in line.
+fn arc(a: V3, corner: V3, b: V3, n: usize) -> Option<Vec<(V3, V3)>> {
+    let t0 = unit(sub(corner, a))?;
+    let t1 = unit(sub(b, corner))?;
+    let theta = dot(t0, t1).clamp(-1.0, 1.0).acos();
+    if theta < 1e-6 {
+        return None;
+    }
+    let axis = unit(cross(t0, t1))?;
+    let r = len(sub(corner, a)) / (theta / 2.0).tan();
+    let inward = cross(axis, t0);
+    let centre = add(a, mul(inward, r));
+    let v0 = sub(a, centre);
+    Some(
+        (0..=n)
+            .map(|k| {
+                let f = theta * k as f64 / n as f64;
+                let (c, sn) = (f.cos(), f.sin());
+                let p = add(centre, add(mul(v0, c), mul(cross(axis, v0), sn)));
+                let t = add(mul(t0, c), mul(cross(axis, t0), sn));
+                (p, t)
+            })
+            .collect(),
+    )
+}
+
+/// The radius of the arc from `a` about `corner` to `b`.
+pub fn arc_radius(a: V3, corner: V3, b: V3) -> Option<f64> {
+    let (t0, t1) = (unit(sub(corner, a))?, unit(sub(b, corner))?);
+    let theta = dot(t0, t1).clamp(-1.0, 1.0).acos();
+    (theta > 1e-6).then(|| len(sub(corner, a)) / (theta / 2.0).tan())
+}
+
+/// A section swept along the arc from `a` about `corner` to `b`: one solid of rings.
+fn sweep(a: V3, corner: V3, b: V3, s: &Size, across: Option<V3>) -> Option<Solid> {
+    let t0 = unit(sub(corner, a))?;
+    let t1 = unit(sub(b, corner))?;
+    let theta = dot(t0, t1).clamp(-1.0, 1.0).acos();
+    let steps = ((theta / (std::f64::consts::PI / 16.0)).ceil() as usize).max(2);
+    let path = arc(a, corner, b, steps)?;
+    // A level bend keeps its section level; one in a vertical plane keeps its across
+    // direction square to that plane.
+    let normal = unit(cross(t0, t1))?;
+    let across = if normal[2].abs() > 0.7 { None } else { across.or(Some(normal)) };
+    let rings: Vec<Vec<V3>> = path.iter().map(|(p, t)| section(*p, *t, s, across)).collect();
+    let m = rings[0].len();
+    let mut points = Vec::new();
+    for r in &rings {
+        points.extend(r.iter().copied());
+    }
+    let last = (rings.len() - 1) * m;
+    let mut faces = vec![(0..m).rev().collect::<Vec<_>>(), (last..last + m).collect()];
+    for k in 0..rings.len() - 1 {
+        for j in 0..m {
+            let (a, b) = (k * m + j, k * m + (j + 1) % m);
+            faces.push(vec![a, b, b + m, a + m]);
+        }
+    }
+    Some(Solid { points, faces })
+}
+
+/// A segment's body (a curved one swept along its arc).
 pub fn segment_solid(s: &SegmentRecipe) -> Vec<Solid> {
+    if let Some(c) = s.corner {
+        return sweep(s.start, c, s.end, &s.size, s.across).into_iter().collect();
+    }
     loft(s.start, s.end, &s.size, &s.size, s.across).into_iter().collect()
+}
+
+/// A junction box's side: room round its largest connection.
+fn box_side(size: &Size) -> f64 {
+    (size.nominal() * 2.5 + 0.04).max(0.1)
 }
 
 /// A fitting's body: each leg from just behind the centre to its end; a transition as one loft;
 /// a cap a short plug.
 pub fn fitting_solids(f: &FittingRecipe) -> Vec<Solid> {
     match f.part {
+        Part::Elbow if f.radius.is_some() && f.legs.len() == 2 => {
+            let a = add(f.centre, mul(f.legs[0].direction, f.legs[0].length));
+            let b = add(f.centre, mul(f.legs[1].direction, f.legs[1].length));
+            sweep(a, f.centre, b, &f.legs[0].size, f.legs[0].across).into_iter().collect()
+        }
+        Part::Box => {
+            let side = f.legs.iter().map(|l| box_side(&l.size)).fold(0.1, f64::max);
+            let h = side / 2.0;
+            let c = f.centre;
+            let points: Vec<V3> = [(-h, -h, -h), (h, -h, -h), (h, h, -h), (-h, h, -h), (-h, -h, h), (h, -h, h), (h, h, h), (-h, h, h)]
+                .iter()
+                .map(|(x, y, z)| [c[0] + x, c[1] + y, c[2] + z])
+                .collect();
+            vec![Solid {
+                points,
+                faces: vec![vec![3, 2, 1, 0], vec![4, 5, 6, 7], vec![0, 1, 5, 4], vec![1, 2, 6, 5], vec![2, 3, 7, 6], vec![3, 0, 4, 7]],
+            }]
+        }
+        Part::Coupling if f.legs.len() == 2 => {
+            let grow = |s: Size| Size { diameter: s.diameter * 1.12, width: s.width * 1.06, height: s.height * 1.06, ..s };
+            let a = add(f.centre, mul(f.legs[0].direction, f.legs[0].length));
+            let b = add(f.centre, mul(f.legs[1].direction, f.legs[1].length));
+            loft(a, b, &grow(f.legs[0].size), &grow(f.legs[0].size), f.legs[0].across).into_iter().collect()
+        }
         Part::Transition if f.legs.len() == 2 => {
             let a = add(f.centre, mul(f.legs[0].direction, f.legs[0].length));
             let b = add(f.centre, mul(f.legs[1].direction, f.legs[1].length));
@@ -779,6 +1093,9 @@ pub struct CreateParams {
     /// point).
     #[serde(default)]
     pub slope: f64,
+    /// Tray and conduit: the bends' radius (metres); the type's default when omitted.
+    #[schemars(extend("x-reviera-data-type" = "length"))]
+    pub bend_radius: Option<f64>,
 }
 
 /// What a run made.
@@ -794,6 +1111,8 @@ pub struct RunReport {
 
 struct Ctx {
     domain: Domain,
+    /// The segments' predefined type.
+    predefined: &'static str,
     type_guid: String,
     routing: Routing,
     level: String,
@@ -802,6 +1121,11 @@ struct Ctx {
 
 #[allow(clippy::too_many_arguments)]
 fn make_segment(txn: &mut Transaction<'_>, cx: &Ctx, a: V3, b: V3, size: Size, slope: f64, across: Option<V3>) -> Result<ElementId> {
+    make_segment_c(txn, cx, a, b, size, slope, across, None)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn make_segment_c(txn: &mut Transaction<'_>, cx: &Ctx, a: V3, b: V3, size: Size, slope: f64, across: Option<V3>, corner: Option<V3>) -> Result<ElementId> {
     let r = SegmentRecipe {
         kind: SEGMENT.into(),
         domain: cx.domain,
@@ -814,9 +1138,10 @@ fn make_segment(txn: &mut Transaction<'_>, cx: &Ctx, a: V3, b: V3, size: Size, s
         taps: Vec::new(),
         slope,
         across,
+        corner,
     };
     let mut e = NewElement::new(segment_class(cx.domain))
-        .param("@PredefinedType", "RIGIDSEGMENT")
+        .param("@PredefinedType", cx.predefined)
         .param("@type", cx.type_guid.clone())
         .param(RECIPE_KEY, serde_json::to_value(&r).expect("serialises"));
     if slope != 0.0 {
@@ -829,6 +1154,10 @@ fn make_segment(txn: &mut Transaction<'_>, cx: &Ctx, a: V3, b: V3, size: Size, s
 }
 
 fn make_fitting(txn: &mut Transaction<'_>, cx: &Ctx, part: Part, centre: V3, legs: Vec<Leg>) -> Result<ElementId> {
+    make_fitting_r(txn, cx, part, centre, legs, None)
+}
+
+fn make_fitting_r(txn: &mut Transaction<'_>, cx: &Ctx, part: Part, centre: V3, legs: Vec<Leg>, radius: Option<f64>) -> Result<ElementId> {
     let r = FittingRecipe {
         kind: FITTING.into(),
         domain: cx.domain,
@@ -837,13 +1166,17 @@ fn make_fitting(txn: &mut Transaction<'_>, cx: &Ctx, part: Part, centre: V3, leg
         legs,
         level: cx.level.clone(),
         classification: cx.classification,
+        radius,
     };
-    txn.create(
-        NewElement::new(fitting_class(cx.domain))
-            .name(part.label())
-            .param("@PredefinedType", part.ifc())
-            .param(RECIPE_KEY, serde_json::to_value(&r).expect("serialises")),
-    )
+    let (pre, object) = part.ifc_in(cx.domain);
+    let mut e = NewElement::new(fitting_class(cx.domain, part))
+        .name(part.label())
+        .param("@PredefinedType", pre)
+        .param(RECIPE_KEY, serde_json::to_value(&r).expect("serialises"));
+    if let Some(o) = object {
+        e = e.param("@ObjectType", o);
+    }
+    txn.create(e)
 }
 
 /// An existing segment the point lies on, away from its ends: the segment, its recipe and the
@@ -851,7 +1184,7 @@ fn make_fitting(txn: &mut Transaction<'_>, cx: &Ctx, part: Part, centre: V3, leg
 fn host_at(store: &Store, domain: Domain, p: V3) -> Option<(ElementId, SegmentRecipe, V3)> {
     store.iter().find_map(|e| {
         let s = segment_recipe(e)?;
-        if s.domain != domain {
+        if s.domain != domain || s.corner.is_some() {
             return None;
         }
         let d = sub(s.end, s.start);
@@ -870,6 +1203,11 @@ fn warn(txn: &mut Transaction<'_>, id: &str, msg: String, ids: Vec<ElementId>) {
 }
 
 fn draw(txn: &mut Transaction<'_>, domain: Domain, p: CreateParams) -> Result<RunReport> {
+    draw_with(txn, domain, p, None)
+}
+
+/// Draws a run; `radii` gives each corner's bend radius (parallel conduits).
+fn draw_with(txn: &mut Transaction<'_>, domain: Domain, p: CreateParams, radii: Option<Vec<f64>>) -> Result<RunReport> {
     let store = txn.store().clone();
     let (level, z0) = level_of(&store, &p.level)?;
     let given_type = p.type_id.as_ref().map(|t| resolve_type(&store, t)).transpose()?;
@@ -878,7 +1216,10 @@ fn draw(txn: &mut Transaction<'_>, domain: Domain, p: CreateParams) -> Result<Ru
     {
         return Err(bad("mep_segment_type.domain", format!("that is a {} type", t.domain.label().to_lowercase())));
     }
-    let shape = p.shape.or(given_type.as_ref().map(|t| t.1.shape)).unwrap_or(if domain == Domain::Pipe { Shape::Round } else { Shape::Rectangular });
+    let shape = p.shape.or(given_type.as_ref().map(|t| t.1.shape)).unwrap_or(match domain {
+        Domain::Pipe | Domain::Conduit => Shape::Round,
+        _ => Shape::Rectangular,
+    });
     let size = Size {
         shape,
         diameter: p.diameter.unwrap_or(0.0),
@@ -892,6 +1233,10 @@ fn draw(txn: &mut Transaction<'_>, domain: Domain, p: CreateParams) -> Result<Ru
     };
     let store = txn.store().clone();
     let t = segment_type(store.get(type_id).expect("made")).expect("a type");
+    t.check_size(&store, &size)?;
+    if p.system_type_id.is_some() && t.radius_bends() {
+        return Err(bad("mep_run.classification", "cable tray and conduit carry no system type"));
+    }
     let classification = p
         .system_type_id
         .as_deref()
@@ -909,13 +1254,19 @@ fn draw(txn: &mut Transaction<'_>, domain: Domain, p: CreateParams) -> Result<Ru
         .transpose()?;
     let cx = Ctx {
         domain,
+        predefined: t.predefined(),
         type_guid: store.get(type_id).expect("made").guid().to_string(),
         routing: t.routing.clone(),
         level,
         classification,
     };
     // The points in project coordinates, collinear ones dropped.
-    let mid = p.middle_elevation.unwrap_or(if domain == Domain::Pipe { 2.4 } else { 2.7 });
+    let mid = p.middle_elevation.unwrap_or(match domain {
+        Domain::Pipe => 2.4,
+        Domain::CableTray => 3.0,
+        Domain::Conduit => 2.8,
+        _ => 2.7,
+    });
     let mut pts: Vec<V3> = Vec::new();
     for q in &p.points {
         let v = match q.as_slice() {
@@ -980,8 +1331,41 @@ fn draw(txn: &mut Transaction<'_>, domain: Domain, p: CreateParams) -> Result<Ru
         })
         .collect();
     let across_of = |k: usize| across[k].unwrap_or_else(|| frame(dirs[k]).0);
+    let mut corners_made: Vec<(V3, V3, V3, Option<V3>)> = Vec::new();
     for k in 1..n - 1 {
         let (a, b) = (mul(dirs[k - 1], -1.0), dirs[k]);
+        if t.radius_bends() {
+            // A radius bend: a fitting, or for a type without fittings a curved segment.
+            let r = radii.as_ref().and_then(|r| r.get(k - 1).copied()).or(p.bend_radius).unwrap_or_else(|| t.bend_radius(&store, &size));
+            if r.is_nan() || r <= 0.0 || (domain == Domain::CableTray && r < size.width / 2.0 - 1e-9) {
+                return Err(bad("mep_run.bend_radius", format!("a bend radius of {:.0} mm is below half the tray's width", r * 1000.0)));
+            }
+            let theta = dot(dirs[k - 1], dirs[k]).clamp(-1.0, 1.0).acos();
+            let leg = r * (theta / 2.0).tan();
+            if t.with_fittings {
+                let Some(part) = cx.routing.choose(Role::Elbow, size.nominal()) else {
+                    warn(txn, "mep.routing.no_part", format!("no bend in the routing preferences fits {}; the corner is left open", size.text()), Vec::new());
+                    continue;
+                };
+                let id = make_fitting_r(
+                    txn,
+                    &cx,
+                    part,
+                    pts[k],
+                    vec![
+                        Leg { direction: a, length: leg, size, across: Some(across_of(k - 1)) },
+                        Leg { direction: b, length: leg, size, across: Some(across_of(k)) },
+                    ],
+                    Some(r),
+                )?;
+                report.fittings.push(id);
+            } else {
+                corners_made.push((add(pts[k], mul(a, leg)), pts[k], add(pts[k], mul(b, leg)), across[k - 1].or(across[k])));
+            }
+            ends[k - 1] = add(pts[k], mul(a, leg));
+            starts[k] = add(pts[k], mul(b, leg));
+            continue;
+        }
         match cx.routing.choose(Role::Elbow, size.nominal()) {
             Some(part) => {
                 let leg = elbow_leg(&size, dirs[k - 1], dirs[k], Some(across_of(k - 1)));
@@ -1096,6 +1480,9 @@ fn draw(txn: &mut Transaction<'_>, domain: Domain, p: CreateParams) -> Result<Ru
         let slope = if domain == Domain::Pipe { p.slope } else { 0.0 };
         report.segments.push(make_segment(txn, &cx, starts[k], ends[k], size, slope, across[k])?);
     }
+    for (a, c, b, across) in corners_made {
+        report.segments.push(make_segment_c(txn, &cx, a, b, size, 0.0, across, Some(c))?);
+    }
     // Connect everything made, then to what it meets.
     let made: Vec<ElementId> = report.segments.iter().chain(&report.fittings).copied().collect();
     let before: Vec<ElementId> = store.iter().map(|e| e.id()).collect();
@@ -1169,6 +1556,16 @@ pub(crate) fn create_pipe(txn: &mut Transaction<'_>, p: CreateParams) -> Result<
     draw(txn, Domain::Pipe, p)
 }
 
+/// Draws a cable tray run (`cable_tray.create`).
+pub(crate) fn create_tray(txn: &mut Transaction<'_>, p: CreateParams) -> Result<RunReport> {
+    draw(txn, Domain::CableTray, p)
+}
+
+/// Draws a conduit run (`conduit.create`).
+pub(crate) fn create_conduit(txn: &mut Transaction<'_>, p: CreateParams) -> Result<RunReport> {
+    draw(txn, Domain::Conduit, p)
+}
+
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct SetSizeParams {
@@ -1200,7 +1597,10 @@ pub(crate) fn set_size(txn: &mut Transaction<'_>, p: SetSizeParams) -> Result<()
         if let Some(h) = p.height {
             s.size.height = h;
         }
-        s.size.check(s.domain)?;
+        match type_of_segment(&store, &s) {
+            Some((_, t)) => t.check_size(&store, &s.size)?,
+            None => s.size.check(s.domain)?,
+        }
         let v = serde_json::to_value(&s).expect("serialises");
         txn.modify(id, |e| {
             e.params.insert(RECIPE_KEY.into(), v);
@@ -1263,7 +1663,7 @@ pub(crate) fn cap_open_ends(txn: &mut Transaction<'_>, p: CapParams) -> Result<V
             warn(txn, "mep.routing.no_part", format!("no cap in the routing preferences fits {}", size.text()), vec![port.element]);
             continue;
         };
-        let cx = Ctx { domain, type_guid: String::new(), routing, level, classification: class_ };
+        let cx = Ctx { domain, predefined: "RIGIDSEGMENT", type_guid: String::new(), routing, level, classification: class_ };
         // The cap's one leg points back into the end it closes, so the two ports face.
         let centre = add(port.position, mul(port.direction, 0.03));
         let id = make_fitting(txn, &cx, part, centre, vec![Leg { direction: mul(port.direction, -1.0), length: 0.03, size, across: None }])?;
@@ -1324,6 +1724,9 @@ pub(crate) fn reapply_type(txn: &mut Transaction<'_>, p: ReapplyParams) -> Resul
             Part::Cross => Role::Cross,
             Part::Transition => Role::Transition,
             Part::Cap => Role::Cap,
+            Part::Coupling => Role::Union,
+            // Boxes are placed by hand.
+            Part::Box => continue,
         };
         // The routing of a segment it joins.
         let routing = (0..f.legs.len())
@@ -1348,10 +1751,11 @@ pub(crate) fn reapply_type(txn: &mut Transaction<'_>, p: ReapplyParams) -> Resul
                 let mut nf = f.clone();
                 nf.part = part;
                 let v = serde_json::to_value(&nf).expect("serialises");
+                let (pre, _) = part.ifc_in(f.domain);
                 txn.modify(fid, |e| {
                     e.params.insert(RECIPE_KEY.into(), v);
                     e.name = Some(part.label().into());
-                    e.params.insert("@PredefinedType".into(), Value::from(part.ifc()));
+                    e.params.insert("@PredefinedType".into(), Value::from(pre));
                 })?;
                 report.replaced.push(fid);
             }
@@ -1374,6 +1778,655 @@ pub(crate) fn reapply_type(txn: &mut Transaction<'_>, p: ReapplyParams) -> Resul
     Ok(report)
 }
 
+// ---- Fittings by hand, split, "+" and "−", parallel conduits ----
+
+/// A segment's type and recipe.
+fn type_of_segment(store: &Store, s: &SegmentRecipe) -> Option<(ElementId, SegmentType)> {
+    let t = store.find_by_guid(&GlobalId::parse(&s.segment_type)?)?;
+    Some((t, segment_type(store.get(t)?)?))
+}
+
+/// The type a run element belongs to: a segment's own, or a fitting's neighbours'.
+fn type_of_element(store: &Store, id: ElementId) -> Option<(ElementId, SegmentType)> {
+    let e = store.get(id)?;
+    if let Some(s) = segment_recipe(e) {
+        return type_of_segment(store, &s);
+    }
+    let f = fitting_recipe(e)?;
+    let partners = mep::partners(store);
+    (0..f.legs.len())
+        .flat_map(|k| partners.get(&(id, k)).into_iter().flatten())
+        .find_map(|(o, _)| type_of_segment(store, &store.get(*o).and_then(segment_recipe)?))
+}
+
+/// The level-left direction square to `axis` (X for a vertical one).
+fn side_of(axis: V3) -> V3 {
+    unit(cross([0.0, 0.0, 1.0], axis)).unwrap_or([1.0, 0.0, 0.0])
+}
+
+/// Cuts a straight segment at `q` (on its axis) with a gap of `half` each side: the first part
+/// keeps the element, the second is new and takes over the end's connection. Returns the second.
+fn cut(txn: &mut Transaction<'_>, host: ElementId, hs: &SegmentRecipe, q: V3, half: f64) -> Result<ElementId> {
+    let store = txn.store().clone();
+    let axis = unit(sub(hs.end, hs.start)).expect("a segment");
+    let mut first = hs.clone();
+    first.end = add(q, mul(axis, -half));
+    let mut second = hs.clone();
+    second.start = add(q, mul(axis, half));
+    let along = |p: V3| dot(sub(p, hs.start), axis);
+    let at = along(q);
+    first.taps.retain(|t| along(t.at) < at);
+    second.taps.retain(|t| along(t.at) > at);
+    if len(sub(first.end, first.start)) < 0.01 || len(sub(second.end, second.start)) < 0.01 {
+        return Err(bad("mep_run.too_short", "the point is too near the segment's end"));
+    }
+    let v1 = serde_json::to_value(&first).expect("serialises");
+    txn.modify(host, |e| {
+        e.params.insert(RECIPE_KEY.into(), v1);
+    })?;
+    let he = store.get(host).expect("host");
+    let mut params = he.params.clone();
+    params.insert(RECIPE_KEY.into(), serde_json::to_value(&second).expect("serialises"));
+    let new_half = txn.create(NewElement { class: he.class.clone(), name: he.name.clone(), params, guid: None })?;
+    retarget_end(txn, host, new_half)?;
+    Ok(new_half)
+}
+
+/// Where on a run a point is: the open port nearest it, or a straight segment it lies over.
+enum Target {
+    End(Port),
+    Along(ElementId, SegmentRecipe, V3),
+}
+
+fn target_at(store: &Store, domain: Domain, host: Option<ElementId>, point: Option<V3>) -> Result<Target> {
+    let open = mep::open_ports(store, &[domain]);
+    let ours = |id: ElementId| host.is_none_or(|h| h == id);
+    // In plan the height does not count, unless the point gives one.
+    let dist = |a: V3, b: V3, plan: bool| if plan { ((a[0] - b[0]).powi(2) + (a[1] - b[1]).powi(2)).sqrt() } else { len(sub(a, b)) };
+    let (p, plan) = match point {
+        Some(p) => (p, p[2].is_nan()),
+        None => {
+            // The host's middle, or its one open end.
+            let h = host.ok_or_else(|| bad("mep_fitting.where", "give a point or an element"))?;
+            if let Some(s) = store.get(h).and_then(segment_recipe)
+                && s.corner.is_none()
+            {
+                let q = mul(add(s.start, s.end), 0.5);
+                return Ok(Target::Along(h, s, q));
+            }
+            let port = open.iter().find(|o| o.element == h).cloned().ok_or_else(|| bad("mep_fitting.where", "the element has no open end"))?;
+            return Ok(Target::End(port));
+        }
+    };
+    let best_end = open
+        .iter()
+        .filter(|o| ours(o.element) && store.get(o.element).is_some_and(is_run_element))
+        .map(|o| (dist(o.position, p, plan), o))
+        .filter(|(d, o)| *d <= o.connector.width.max(o.connector.diameter).max(0.1) + 0.15)
+        .min_by(|a, b| a.0.total_cmp(&b.0));
+    let best_along = store
+        .iter()
+        .filter(|e| ours(e.id()))
+        .filter_map(|e| {
+            let s = segment_recipe(e)?;
+            if s.domain != domain || s.corner.is_some() {
+                return None;
+            }
+            let u = unit(sub(s.end, s.start))?;
+            let l = len(sub(s.end, s.start));
+            // Along the axis to the point's foot: in plan, by the plan length.
+            let t = if plan {
+                let lh = (u[0] * u[0] + u[1] * u[1]).sqrt();
+                if lh < 1e-6 {
+                    return None;
+                }
+                ((p[0] - s.start[0]) * u[0] + (p[1] - s.start[1]) * u[1]) / (lh * lh)
+            } else {
+                dot(sub(p, s.start), u)
+            };
+            if !(0.0..=l).contains(&t) {
+                return None;
+            }
+            let pp = p;
+            let q = add(s.start, mul(u, t));
+            let d = dist(q, pp, plan);
+            (d <= s.size.nominal() / 2.0 + 0.1).then(|| (d, e.id(), s, q))
+        })
+        .min_by(|a, b| a.0.total_cmp(&b.0));
+    match (best_end, best_along) {
+        (Some((de, port)), Some((da, ..))) if de <= da + 0.05 => Ok(Target::End(port.clone())),
+        (_, Some((_, id, s, q))) => Ok(Target::Along(id, s, q)),
+        (Some((_, port)), None) => Ok(Target::End(port.clone())),
+        (None, None) => Err(bad("mep_fitting.where", format!("there is no {} at that point", domain.label().to_lowercase()))),
+    }
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct PlaceFittingParams {
+    /// elbow, tee, cross, coupling, cap or (conduit) box.
+    pub part: Part,
+    /// A tray or conduit (or an element with an open end); found from `point` when omitted.
+    pub host_id: Option<ElementRef>,
+    /// Where: `[x, y]` in plan (any height) or `[x, y, z]`; the host's middle (or open end)
+    /// when omitted.
+    pub point: Option<Vec<f64>>,
+    /// Elbows: the turn in degrees (default 90).
+    pub angle: Option<f64>,
+    /// The direction a tee's branch or an elbow's turn goes (default level, to the left).
+    pub direction: Option<V3>,
+    /// Boxes: how many connectors (2–6; default 2).
+    pub connectors: Option<usize>,
+    /// Elbows: the bend radius (default the type's).
+    #[schemars(extend("x-reviera-data-type" = "length"))]
+    pub bend_radius: Option<f64>,
+}
+
+/// What a placed fitting made.
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+pub struct PlaceReport {
+    pub fitting: ElementId,
+    /// The new part of a split segment.
+    pub split: Option<ElementId>,
+}
+
+fn place_fitting(txn: &mut Transaction<'_>, domain: Domain, p: PlaceFittingParams) -> Result<PlaceReport> {
+    let store = txn.store().clone();
+    let host = p.host_id.as_ref().map(|r| store.resolve(r).ok_or_else(|| bad("element.not_found", "no such element"))).transpose()?;
+    if p.part == Part::Box && domain != Domain::Conduit {
+        return Err(bad("mep_fitting.part", "boxes go on conduit"));
+    }
+    if matches!(p.part, Part::Tap | Part::Transition) {
+        return Err(bad("mep_fitting.part", "taps and transitions are placed by drawing runs"));
+    }
+    let point = match p.point.as_deref() {
+        None => None,
+        Some([x, y]) => Some([*x, *y, f64::NAN]),
+        Some([x, y, z]) => Some([*x, *y, *z]),
+        Some(_) => return Err(bad("mep_fitting.point", "a point is [x, y] or [x, y, z]")),
+    };
+    let target = target_at(&store, domain, host, point)?;
+    let on = match &target {
+        Target::End(port) => port.element,
+        Target::Along(id, ..) => *id,
+    };
+    let (_, ty) = type_of_element(&store, on).ok_or_else(|| bad("mep_fitting.where", "the element has no tray or conduit type"))?;
+    if ty.domain != domain {
+        return Err(bad("mep_fitting.where", format!("that is a {}", ty.domain.label().to_lowercase())));
+    }
+    if !ty.with_fittings {
+        let name = store
+            .iter()
+            .find(|e| segment_type(e).is_some_and(|t| t == ty))
+            .and_then(|e| e.name.clone())
+            .unwrap_or_default();
+        return Err(bad(
+            "mep_fitting.no_fittings",
+            format!("{name} is a {} type without fittings: its bends are part of its segments, and fittings cannot be placed on it", domain.label().to_lowercase()),
+        ));
+    }
+    let (level, classification) = match store.get(on).and_then(segment_recipe) {
+        Some(s) => (s.level, s.classification),
+        None => {
+            let f = store.get(on).and_then(fitting_recipe).expect("a run element");
+            (f.level, f.classification)
+        }
+    };
+    let cx = Ctx { domain, predefined: ty.predefined(), type_guid: String::new(), routing: ty.routing.clone(), level, classification };
+    let short = |size: &Size| (size.nominal() * 0.3 + 0.02).max(0.03);
+    let (fitting, split) = match target {
+        Target::Along(id, hs, q) => {
+            let axis = unit(sub(hs.end, hs.start)).expect("a segment");
+            let side = p.direction.and_then(unit).map(|d| unit(sub(d, mul(axis, dot(d, axis)))).unwrap_or(side_of(axis))).unwrap_or_else(|| side_of(axis));
+            let size = hs.size;
+            let (half, mut legs) = match p.part {
+                Part::Tee | Part::Cross => {
+                    let l = leg_length(&size);
+                    let mut legs = vec![
+                        Leg { direction: mul(axis, -1.0), length: l, size, across: hs.across },
+                        Leg { direction: axis, length: l, size, across: hs.across },
+                        Leg { direction: side, length: l, size, across: None },
+                    ];
+                    if p.part == Part::Cross {
+                        legs.push(Leg { direction: mul(side, -1.0), length: l, size, across: None });
+                    }
+                    (l, legs)
+                }
+                Part::Coupling => {
+                    let l = short(&size);
+                    (l, vec![Leg { direction: mul(axis, -1.0), length: l, size, across: hs.across }, Leg { direction: axis, length: l, size, across: hs.across }])
+                }
+                Part::Box => {
+                    let h = box_side(&size) / 2.0;
+                    (h, vec![Leg { direction: mul(axis, -1.0), length: h, size, across: hs.across }, Leg { direction: axis, length: h, size, across: hs.across }])
+                }
+                _ => return Err(bad("mep_fitting.part", format!("a {} goes on an open end, not along a run", p.part.label().to_lowercase()))),
+            };
+            if p.part == Part::Box {
+                add_box_legs(&mut legs, p.connectors.unwrap_or(2), axis, side, size)?;
+            }
+            let second = cut(txn, id, &hs, q, half)?;
+            let f = make_fitting(txn, &cx, p.part, q, legs)?;
+            (f, Some(second))
+        }
+        Target::End(port) => {
+            let d = port.direction;
+            let size = Size { shape: port.connector.shape, diameter: port.connector.diameter, width: port.connector.width, height: port.connector.height };
+            let side = p.direction.and_then(unit).map(|x| unit(sub(x, mul(d, dot(x, d)))).unwrap_or(side_of(d))).unwrap_or_else(|| side_of(d));
+            match p.part {
+                Part::Cap => {
+                    let c = add(port.position, mul(d, 0.03));
+                    (make_fitting(txn, &cx, Part::Cap, c, vec![Leg { direction: mul(d, -1.0), length: 0.03, size, across: None }])?, None)
+                }
+                Part::Coupling => {
+                    let l = short(&size);
+                    let c = add(port.position, mul(d, l));
+                    (make_fitting(txn, &cx, Part::Coupling, c, vec![Leg { direction: mul(d, -1.0), length: l, size, across: None }, Leg { direction: d, length: l, size, across: None }])?, None)
+                }
+                Part::Elbow => {
+                    let theta = p.angle.unwrap_or(90.0);
+                    if !(1.0..=179.0).contains(&theta) {
+                        return Err(bad("mep_fitting.angle", "an elbow turns from 1° to 179°"));
+                    }
+                    let th = theta.to_radians();
+                    let out = unit(add(mul(d, th.cos()), mul(side, th.sin()))).expect("turned");
+                    let r = p.bend_radius.unwrap_or_else(|| ty.bend_radius(&store, &size));
+                    if domain == Domain::CableTray && r < size.width / 2.0 - 1e-9 {
+                        return Err(bad("mep_run.bend_radius", format!("a bend radius of {:.0} mm is below half the tray's width", r * 1000.0)));
+                    }
+                    let l = r * (th / 2.0).tan();
+                    let c = add(port.position, mul(d, l));
+                    (make_fitting_r(txn, &cx, Part::Elbow, c, vec![Leg { direction: mul(d, -1.0), length: l, size, across: None }, Leg { direction: out, length: l, size, across: None }], Some(r))?, None)
+                }
+                Part::Tee | Part::Cross => {
+                    let l = leg_length(&size);
+                    let c = add(port.position, mul(d, l));
+                    let mut legs = vec![Leg { direction: mul(d, -1.0), length: l, size, across: None }, Leg { direction: d, length: l, size, across: None }, Leg { direction: side, length: l, size, across: None }];
+                    if p.part == Part::Cross {
+                        legs.push(Leg { direction: mul(side, -1.0), length: l, size, across: None });
+                    }
+                    (make_fitting(txn, &cx, p.part, c, legs)?, None)
+                }
+                Part::Box => {
+                    let h = box_side(&size) / 2.0;
+                    let c = add(port.position, mul(d, h));
+                    let mut legs = vec![Leg { direction: mul(d, -1.0), length: h, size, across: None }, Leg { direction: d, length: h, size, across: None }];
+                    add_box_legs(&mut legs, p.connectors.unwrap_or(2), d, side, size)?;
+                    (make_fitting(txn, &cx, Part::Box, c, legs)?, None)
+                }
+                _ => unreachable!("refused above"),
+            }
+        }
+    };
+    let mut made = vec![fitting];
+    made.extend(split);
+    made.push(on);
+    mep::connect_coincident(txn, &made)?;
+    Ok(PlaceReport { fitting, split })
+}
+
+/// A box's further connectors, on its other faces (2 to 6 in all).
+fn add_box_legs(legs: &mut Vec<Leg>, n: usize, axis: V3, side: V3, size: Size) -> Result<()> {
+    if !(2..=6).contains(&n) {
+        return Err(bad("mep_fitting.connectors", "a box has 2 to 6 connectors"));
+    }
+    let h = legs[0].length;
+    let up = unit(cross(axis, side)).unwrap_or([0.0, 0.0, 1.0]);
+    for d in [side, mul(side, -1.0), up, mul(up, -1.0)].into_iter().take(n - 2) {
+        legs.push(Leg { direction: d, length: h, size, across: None });
+    }
+    Ok(())
+}
+
+/// Places a cable tray fitting (`cable_tray_fitting.place`).
+pub(crate) fn place_tray_fitting(txn: &mut Transaction<'_>, p: PlaceFittingParams) -> Result<PlaceReport> {
+    place_fitting(txn, Domain::CableTray, p)
+}
+
+/// Places a conduit fitting or box (`conduit_fitting.place`).
+pub(crate) fn place_conduit_fitting(txn: &mut Transaction<'_>, p: PlaceFittingParams) -> Result<PlaceReport> {
+    place_fitting(txn, Domain::Conduit, p)
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SplitParams {
+    pub id: ElementRef,
+    /// Where (`[x, y]` in plan or `[x, y, z]`); the middle when omitted.
+    pub point: Option<Vec<f64>>,
+}
+
+/// What a split made.
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+pub struct SplitReport {
+    pub segments: Vec<ElementId>,
+    /// The coupling, when the type's routing has one.
+    pub coupling: Option<ElementId>,
+}
+
+/// Splits a straight segment in two, with a coupling where the type's routing gives one
+/// (`cable_tray.split`, `conduit.split`).
+pub(crate) fn split(txn: &mut Transaction<'_>, p: SplitParams) -> Result<SplitReport> {
+    let store = txn.store().clone();
+    let id = store.resolve(&p.id).ok_or_else(|| bad("element.not_found", "no such segment"))?;
+    let hs = store.get(id).and_then(segment_recipe).filter(|s| s.corner.is_none()).ok_or_else(|| bad("mep_run.not_a_segment", format!("element {id} is not a straight segment")))?;
+    let axis = unit(sub(hs.end, hs.start)).expect("a segment");
+    let q = match p.point.as_deref() {
+        None => mul(add(hs.start, hs.end), 0.5),
+        Some([x, y]) | Some([x, y, _]) => {
+            let pp = [*x, *y, hs.start[2]];
+            let uh = unit([axis[0], axis[1], 0.0]);
+            let t = match uh {
+                Some(uh) => dot(sub(pp, hs.start), uh) / dot(axis, uh),
+                None => p.point.as_ref().and_then(|v| v.get(2)).map_or(len(sub(hs.end, hs.start)) / 2.0, |z| z - hs.start[2]),
+            };
+            add(hs.start, mul(axis, t))
+        }
+        Some(_) => return Err(bad("mep_fitting.point", "a point is [x, y] or [x, y, z]")),
+    };
+    let routing = type_of_segment(&store, &hs).map(|t| t.1.routing).unwrap_or_default();
+    let coupling_part = routing.choose(Role::Union, hs.size.nominal());
+    let half = if coupling_part.is_some() { (hs.size.nominal() * 0.3 + 0.02).max(0.03) } else { 0.0 };
+    let second = cut(txn, id, &hs, q, half)?;
+    let mut report = SplitReport { segments: vec![id, second], coupling: None };
+    if let Some(part) = coupling_part {
+        let cx = Ctx { domain: hs.domain, predefined: "RIGIDSEGMENT", type_guid: String::new(), routing, level: hs.level.clone(), classification: hs.classification };
+        let f = make_fitting(txn, &cx, part, q, vec![Leg { direction: mul(axis, -1.0), length: half, size: hs.size, across: hs.across }, Leg { direction: axis, length: half, size: hs.size, across: hs.across }])?;
+        report.coupling = Some(f);
+        mep::connect_coincident(txn, &[f, id, second])?;
+    } else {
+        mep::connect_coincident(txn, &[id, second])?;
+    }
+    Ok(report)
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct FittingParams {
+    pub fitting_id: ElementRef,
+    /// Downgrade: the open leg to remove (by index); the last open one when omitted.
+    pub leg: Option<usize>,
+}
+
+fn write_fitting(txn: &mut Transaction<'_>, id: ElementId, f: &FittingRecipe) -> Result<()> {
+    let v = serde_json::to_value(f).expect("serialises");
+    let (pre, object) = f.part.ifc_in(f.domain);
+    let class = fitting_class(f.domain, f.part).to_owned();
+    txn.modify(id, |e| {
+        e.params.insert(RECIPE_KEY.into(), v);
+        e.name = Some(f.part.label().into());
+        e.class = class;
+        e.params.insert("@PredefinedType".into(), Value::from(pre));
+        match object {
+            Some(o) => e.params.insert("@ObjectType".into(), Value::from(o)),
+            None => e.params.remove("@ObjectType"),
+        };
+    })
+}
+
+/// "+" (`mep_fitting.upgrade`): an elbow becomes a tee, its run continuing straight with an
+/// open leg; a tee becomes a cross.
+pub(crate) fn upgrade(txn: &mut Transaction<'_>, p: FittingParams) -> Result<Part> {
+    let store = txn.store().clone();
+    let id = store.resolve(&p.fitting_id).ok_or_else(|| bad("element.not_found", "no such fitting"))?;
+    let mut f = store.get(id).and_then(fitting_recipe).ok_or_else(|| bad("mep_fitting.not_a_fitting", format!("element {id} is not a fitting")))?;
+    match f.part {
+        Part::Elbow if f.legs.len() == 2 => {
+            // The new leg carries on from the incoming one; leg indices stay, so connections do.
+            let a = f.legs[0];
+            f.legs.push(Leg { direction: mul(a.direction, -1.0), ..a });
+            f.part = Part::Tee;
+            f.radius = None;
+        }
+        Part::Tee if f.legs.len() == 3 => {
+            // Opposite the branch: the leg with no opposite.
+            let opp = |k: usize| f.legs.iter().enumerate().any(|(j, l)| j != k && dot(l.direction, f.legs[k].direction) < -0.999);
+            let b = (0..3).find(|k| !opp(*k)).ok_or_else(|| bad("mep_fitting.upgrade", "the tee has no branch to oppose"))?;
+            let l = f.legs[b];
+            f.legs.push(Leg { direction: mul(l.direction, -1.0), ..l });
+            f.part = Part::Cross;
+        }
+        other => return Err(bad("mep_fitting.upgrade", format!("a {} cannot be upgraded", other.label().to_lowercase()))),
+    }
+    write_fitting(txn, id, &f)?;
+    Ok(f.part)
+}
+
+/// "−" (`mep_fitting.downgrade`): removes an open leg: a cross becomes a tee, a tee whose two
+/// other legs turn becomes an elbow. A box has no "−".
+pub(crate) fn downgrade(txn: &mut Transaction<'_>, p: FittingParams) -> Result<Part> {
+    let store = txn.store().clone();
+    let id = store.resolve(&p.fitting_id).ok_or_else(|| bad("element.not_found", "no such fitting"))?;
+    let mut f = store.get(id).and_then(fitting_recipe).ok_or_else(|| bad("mep_fitting.not_a_fitting", format!("element {id} is not a fitting")))?;
+    if !matches!(f.part, Part::Cross | Part::Tee) {
+        return Err(bad("mep_fitting.downgrade", format!("a {} cannot be downgraded", f.part.label().to_lowercase())));
+    }
+    let partners = mep::partners(&store);
+    let open: Vec<usize> = (0..f.legs.len()).filter(|k| partners.get(&(id, *k)).is_none_or(Vec::is_empty)).collect();
+    let k = match p.leg {
+        Some(k) if open.contains(&k) => k,
+        Some(k) => return Err(bad("mep_fitting.downgrade", format!("leg {k} is connected"))),
+        None => *open.last().ok_or_else(|| bad("mep_fitting.downgrade", "every leg is connected"))?,
+    };
+    f.legs.remove(k);
+    f.part = match f.part {
+        Part::Cross => Part::Tee,
+        _ => {
+            if dot(f.legs[0].direction, f.legs[1].direction) < -0.999 {
+                return Err(bad("mep_fitting.downgrade", "the tee's other legs are in line; delete it and join the segments"));
+            }
+            Part::Elbow
+        }
+    };
+    if f.part == Part::Elbow && matches!(f.domain, Domain::CableTray | Domain::Conduit) {
+        let theta = (-dot(f.legs[0].direction, f.legs[1].direction)).clamp(-1.0, 1.0).acos();
+        f.radius = Some(f.legs[0].length / (theta / 2.0).tan().max(1e-9));
+    }
+    // Later legs move down one: their connections follow.
+    let guid = store.get(id).expect("found").guid().to_string();
+    let links: Vec<mep::Link> = mep::stored_links(&store)
+        .into_iter()
+        .map(|mut l| {
+            for end in [&mut l.a, &mut l.b] {
+                if end.element == guid && end.port > k {
+                    end.port -= 1;
+                }
+            }
+            l
+        })
+        .collect();
+    write_fitting(txn, id, &f)?;
+    mep::save_links(txn, links)?;
+    Ok(f.part)
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum BendMode {
+    /// Every conduit bends at the same radius.
+    #[default]
+    Same,
+    /// Bends share their centre: radii grow by the offset outward (types without fittings).
+    Concentric,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ParallelParams {
+    /// Elements of the conduit run (any one finds the whole run).
+    pub run_ids: Vec<ElementRef>,
+    /// Conduits across, the original included (at least 1).
+    pub h_count: usize,
+    /// Rows up, the original included (at least 1).
+    #[serde(default = "one_usize")]
+    pub v_count: usize,
+    /// Between conduits across, to the left of the run's direction (metres; negative: right).
+    #[schemars(extend("x-reviera-data-type" = "length"))]
+    pub h_offset: f64,
+    /// Between rows, upward (metres).
+    #[serde(default)]
+    #[schemars(extend("x-reviera-data-type" = "length"))]
+    pub v_offset: f64,
+    #[serde(default)]
+    pub bend: BendMode,
+}
+
+fn one_usize() -> usize {
+    1
+}
+
+/// A run's centreline: its ends and corners, from one open end to the other.
+fn run_line(store: &Store, start: ElementId, domain: Domain) -> Result<(Vec<V3>, Vec<ElementId>)> {
+    let partners = mep::partners(store);
+    let in_run = |id: ElementId| store.get(id).is_some_and(|e| {
+        segment_recipe(e).is_some_and(|s| s.domain == domain) || fitting_recipe(e).is_some_and(|f| f.domain == domain)
+    });
+    let count = |id: ElementId| store.get(id).map_or(0, port_count);
+    // Walk to one end first.
+    let mut members = vec![start];
+    let mut stack = vec![start];
+    while let Some(x) = stack.pop() {
+        for k in 0..count(x) {
+            for (o, _) in partners.get(&(x, k)).into_iter().flatten() {
+                if in_run(*o) && !members.contains(o) {
+                    members.push(*o);
+                    stack.push(*o);
+                }
+            }
+        }
+    }
+    for m in &members {
+        let e = store.get(*m).expect("member");
+        if fitting_recipe(e).is_some_and(|f| f.legs.len() > 2) || segment_recipe(e).is_some_and(|s| !s.taps.is_empty()) {
+            return Err(bad("conduit.parallel_branches", "parallel conduits follow a run without branches"));
+        }
+    }
+    let linked = |x: ElementId, k: usize| partners.get(&(x, k)).into_iter().flatten().find(|(o, _)| members.contains(o)).copied();
+    let first = *members
+        .iter()
+        .find(|m| (0..count(**m)).any(|k| linked(**m, k).is_none()))
+        .ok_or_else(|| bad("conduit.parallel_loop", "the run closes on itself"))?;
+    let mut pts: Vec<V3> = Vec::new();
+    let mut at = first;
+    let mut entered = (0..count(first)).find(|k| linked(first, *k).is_none()).expect("an open end");
+    let mut seen = Vec::new();
+    loop {
+        seen.push(at);
+        let e = store.get(at).expect("member");
+        let exit = if count(at) == 2 { 1 - entered } else { entered };
+        if let Some(s) = segment_recipe(e) {
+            let (a, b) = if entered == 0 { (s.start, s.end) } else { (s.end, s.start) };
+            pts.push(a);
+            if let Some(c) = s.corner {
+                pts.push(c);
+            }
+            pts.push(b);
+        } else if let Some(f) = fitting_recipe(e) {
+            pts.push(f.centre);
+        }
+        match linked(at, exit) {
+            Some((next, port)) if !seen.contains(&next) => {
+                at = next;
+                entered = port;
+            }
+            _ => break,
+        }
+    }
+    // Drop repeats and points in line.
+    pts.dedup_by(|a, b| len(sub(*a, *b)) < 1e-6);
+    let mut i = 1;
+    while i + 1 < pts.len() {
+        let (a, b) = (unit(sub(pts[i], pts[i - 1])), unit(sub(pts[i + 1], pts[i])));
+        match (a, b) {
+            (Some(a), Some(b)) if dot(a, b) > 0.9999 => {
+                pts.remove(i);
+            }
+            _ => i += 1,
+        }
+    }
+    Ok((pts, members))
+}
+
+/// Parallel conduits (`conduit.create_parallel`): copies of a run offset across and up, bent
+/// at the same radius or concentrically. Returns every element made.
+pub(crate) fn create_parallel(txn: &mut Transaction<'_>, p: ParallelParams) -> Result<Vec<ElementId>> {
+    let store = txn.store().clone();
+    if p.h_count == 0 || p.v_count == 0 || p.h_count * p.v_count < 2 || p.h_count * p.v_count > 64 {
+        return Err(bad("conduit.parallel_count", "give 1 or more across and up, 2 to 64 conduits in all"));
+    }
+    if (p.h_count > 1 && p.h_offset.abs() < 1e-6) || (p.v_count > 1 && p.v_offset.abs() < 1e-6) {
+        return Err(bad("conduit.parallel_offset", "give the offset between conduits"));
+    }
+    let first = p.run_ids.first().and_then(|r| store.resolve(r)).ok_or_else(|| bad("element.not_found", "no such conduit"))?;
+    let seg_of = |id: ElementId| store.get(id).and_then(segment_recipe);
+    let (pts, members) = run_line(&store, first, Domain::Conduit)?;
+    let s0 = members.iter().find_map(|m| seg_of(*m)).ok_or_else(|| bad("conduit.not_a_run", "the elements are not a conduit run"))?;
+    if s0.domain != Domain::Conduit {
+        return Err(bad("conduit.not_a_run", "parallel runs are conduit"));
+    }
+    let (type_id, ty) = type_of_segment(&store, &s0).ok_or_else(|| bad("conduit.not_a_run", "the conduit has no type"))?;
+    if p.bend == BendMode::Concentric && ty.with_fittings {
+        return Err(bad("conduit.concentric", "concentric bends are for conduit types without fittings, whose bends are part of the conduit"));
+    }
+    let dirs: Vec<V3> = pts.windows(2).map(|w| unit(sub(w[1], w[0])).expect("distinct")).collect();
+    if dirs.iter().any(|d| d[2].abs() > 1e-6) {
+        return Err(bad("conduit.parallel_level", "parallel conduits follow level runs"));
+    }
+    let left = |d: V3| [-d[1], d[0], 0.0];
+    let base_r = ty.bend_radius(&store, &s0.size);
+    // The level's elevation: points are given above it.
+    let lid = store.find_by_guid(&GlobalId::parse(&s0.level).ok_or_else(|| bad("level.not_found", "the run's level"))?).ok_or_else(|| bad("level.not_found", "the run's level"))?;
+    let z0 = crate::levels::elevation_of(&store, &s0.level)?;
+    let mut made = Vec::new();
+    for j in 0..p.v_count {
+        for i in 0..p.h_count {
+            if i == 0 && j == 0 {
+                continue;
+            }
+            let d = p.h_offset * i as f64;
+            let up = p.v_offset * j as f64;
+            let mut line: Vec<V3> = Vec::new();
+            let mut radii = Vec::new();
+            for k in 0..pts.len() {
+                let off = if k == 0 {
+                    mul(left(dirs[0]), d)
+                } else if k == pts.len() - 1 {
+                    mul(left(dirs[k - 1]), d)
+                } else {
+                    let (n0, n1) = (left(dirs[k - 1]), left(dirs[k]));
+                    let turn = dirs[k - 1][0] * dirs[k][1] - dirs[k - 1][1] * dirs[k][0];
+                    // Inside the turn the radius shrinks by the offset, outside it grows.
+                    let r = if p.bend == BendMode::Concentric { base_r - turn.signum() * d } else { base_r };
+                    if r <= s0.size.diameter / 2.0 {
+                        return Err(bad("conduit.concentric", format!("conduit {} would bend tighter than its size allows; offset it the other way", i + 1)));
+                    }
+                    radii.push(r);
+                    mul(add(n0, n1), d / (1.0 + dot(n0, n1)))
+                };
+                let q = add(pts[k], off);
+                line.push([q[0], q[1], q[2] - z0 + up]);
+            }
+            let params = CreateParams {
+                type_id: Some(ElementRef::Id(type_id)),
+                points: line.iter().map(|v| v.to_vec()).collect(),
+                level: ElementRef::Id(lid),
+                middle_elevation: None,
+                shape: Some(Shape::Round),
+                diameter: Some(s0.size.diameter),
+                width: None,
+                height: None,
+                system_type_id: None,
+                slope: 0.0,
+                bend_radius: None,
+            };
+            let r = draw_with(txn, Domain::Conduit, params, Some(radii))?;
+            made.extend(r.segments);
+            made.extend(r.fittings);
+        }
+    }
+    Ok(made)
+}
+
 /// Moves a segment or fitting: its points through `point` in plan and `dz` up; its directions
 /// turned (and mirrored) with them.
 pub(crate) fn transform(txn: &mut Transaction<'_>, id: ElementId, point: &dyn Fn([f64; 2]) -> [f64; 2], dz: f64) -> Result<()> {
@@ -1391,6 +2444,7 @@ pub(crate) fn transform(txn: &mut Transaction<'_>, id: ElementId, point: &dyn Fn
     let value = if let Some(mut s) = segment_recipe(&e) {
         s.start = p3(s.start);
         s.end = p3(s.end);
+        s.corner = s.corner.map(p3);
         s.across = s.across.map(d3);
         for t in &mut s.taps {
             t.at = p3(t.at);
@@ -1419,8 +2473,12 @@ pub fn colors(store: &Store) -> BTreeMap<ElementId, [f32; 4]> {
         .iter()
         .filter(|e| is_run_element(e))
         .map(|e| {
-            let duct = segment_recipe(e).map(|s| s.domain).or(fitting_recipe(e).map(|f| f.domain)) == Some(Domain::Duct);
-            let base = if duct { [0.74, 0.76, 0.80, 1.0] } else { [0.62, 0.66, 0.60, 1.0] };
+            let base = match segment_recipe(e).map(|s| s.domain).or(fitting_recipe(e).map(|f| f.domain)) {
+                Some(Domain::Duct) => [0.74, 0.76, 0.80, 1.0],
+                Some(Domain::CableTray) => [0.70, 0.62, 0.48, 1.0],
+                Some(Domain::Conduit) => [0.60, 0.60, 0.66, 1.0],
+                _ => [0.62, 0.66, 0.60, 1.0],
+            };
             (e.id(), by_system.get(&e.id()).copied().unwrap_or(base))
         })
         .collect()

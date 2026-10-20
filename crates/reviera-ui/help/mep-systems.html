@@ -11,6 +11,7 @@ Water 1. The tools are on the <b>Systems</b> tab.</p>
   <a href="#connections">Connections</a>
   <a href="#systems">Systems</a>
   <a href="#circuits">Electrical circuits</a>
+  <a href="#tray">Cable tray and conduit</a>
   <a href="#feeders">Feeders and transformers</a>
   <a href="#schedules">Panel schedules</a>
   <a href="#loads">Load classifications and demand factors</a>
@@ -98,6 +99,27 @@ numbered by the scheme: <b>Panel Name + Number</b> (LP1-7), <b>Numerical</b> (13
 <p>Select a device or a panel to see its circuits drawn dashed from the panel to each device. The
 System Browser lists panels, their circuits with the load, and their devices. <b>Check
 Circuits</b> marks circuits with no panel or on a panel that does not fit them.</p>
+
+<h2 id="tray">Cable tray and conduit</h2>
+<p><a href="reviera:action/cable_tray.create">Cable Tray</a> (<kbd>C</kbd><kbd>T</kbd>) and
+<a href="reviera:action/conduit.create">Conduit</a> (<kbd>C</kbd><kbd>N</kbd>) draw runs like ducts:
+set the size and height, click the points, and press <kbd>E</kbd> to rise or drop. Corners get
+<b>bends</b> with a radius: for tray, its width times the type's multiplier; for conduit, the
+radius its standard gives for the diameter (otherwise the diameter times the multiplier). You can
+type another radius in the form. Conduit sizes come from the type's <b>standard</b>, IEC 61386
+(16 to 63 mm) or EMT (1/2" to 2"); a size the standard does not list is refused. A type made
+<b>without fittings</b> draws its bends as curved lengths of tray or conduit instead.</p>
+<p><a href="reviera:action/cable_tray_fitting.place">Cable Tray Fitting</a> and
+<a href="reviera:action/conduit_fitting.place">Conduit Fitting</a> ask for the part (tee, cross,
+elbow, coupling, cap, junction box, or Split) and then place it where you click: on an open
+end, or along a run, which is split around it and stays connected. Types without fittings
+refuse them. <b>Upgrade Fitting (+)</b> turns the selected elbow into a tee and a tee into a
+cross; <b>Downgrade Fitting (−)</b> removes an open leg. <a
+href="reviera:action/conduit.create_parallel">Parallel Conduits</a> copies the selected conduit
+run side by side and in rows. <i>Concentric</i> bends share their centre, so the outer conduits
+bend wider; this works for conduit types without fittings.</p>
+<p>Trays and conduits above the plan's cut height are not drawn in plans yet. Check them in a 3D
+view.</p>
 
 <h2 id="feeders">Feeders and transformers</h2>
 <p>Select a panel or a transformer and choose

@@ -340,6 +340,27 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "panel_settings" => format!(
             r#"<rect x="4" y="4" width="12" height="24" fill="{f}" {s}/><path d="M7 9h6M7 14h6M7 19h6" {s}/><circle cx="24" cy="20" r="4" {sa}/><path d="M24 13v3M24 24v3M17 20h3M28 20h3" {sa}/>"#
         ),
+        "cable_tray" => format!(
+            r#"<path d="M3 12l7-5h19l-7 5z" fill="{f}" {s}/><path d="M3 12v8l7-5V7M22 12v8l7-5" {s}/><path d="M3 20h19v-8" {s}/><path d="M9 12l3 8M15 12l3 8" {sa}/>"#
+        ),
+        "conduit" => format!(
+            r#"<path d="M3 22h10a8 8 0 0 0 8-8V4" fill="none" stroke-width="5" {s}/><path d="M3 22h10a8 8 0 0 0 8-8V4" {sa}/>"#
+        ),
+        "tray_fitting" => format!(
+            r#"<path d="M3 13h26v7H3z" fill="{f}" {s}/><path d="M13 13V4h7v9" fill="{f}" {s}/><path d="M13 13h7" {sa}/>"#
+        ),
+        "conduit_fitting" => format!(
+            r#"<rect x="11" y="10" width="11" height="11" fill="{f}" {s}/><path d="M3 15.5h8M22 15.5h8M16.5 10V3" stroke-width="3" {sa}/>"#
+        ),
+        "parallel_conduits" => format!(
+            r#"<path d="M3 9h12a6 6 0 0 1 6 6v14M3 15h12M3 21h6" fill="none" {sa}/><path d="M15 15v14M9 21v8" {s}/>"#
+        ),
+        "fitting_plus" => format!(
+            r#"<path d="M4 20h10v-10" fill="none" stroke-width="4" {s}/><path d="M22 6v10M17 11h10" {sa}/>"#
+        ),
+        "fitting_minus" => format!(
+            r#"<path d="M4 20h18M13 20v-10" fill="none" stroke-width="4" {s}/><path d="M18 8h10" {sa}/>"#
+        ),
         "duct" => format!(
             r#"<path d="M3 11h16v10H3z" fill="{f}" {s}/><path d="M19 11h4l6 6v-6M19 21h10" {s}/><path d="M23 11v10" {sa}/>"#
         ),

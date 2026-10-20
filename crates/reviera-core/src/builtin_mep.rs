@@ -131,6 +131,18 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(PanelScheduleChangePanel),
         registry.add(PanelLoadsSummary),
         registry.add(LoadClassificationList),
+        registry.add(CableTrayCreate),
+        registry.add(ConduitCreate),
+        registry.add(CableTraySplit),
+        registry.add(ConduitSplit),
+        registry.add(CableTrayFittingPlace),
+        registry.add(ConduitFittingPlace),
+        registry.add(MepFittingUpgrade),
+        registry.add(MepFittingDowngrade),
+        registry.add(ConduitCreateParallel),
+        registry.add(ConduitStandardCreate),
+        registry.add(CableTraySetSize),
+        registry.add(ConduitSetSize),
     ];
     for r in results {
         r.expect("MEP commands are valid");
@@ -463,9 +475,9 @@ edit_command!(
 edit_command!(
     MepSegmentTypeCreate,
     "mep_segment_type.create",
-    "Make a duct or pipe type",
-    "Makes a duct or pipe type (`domain` duct or pipe; `shape` round, rectangular, oval; pipes round) named `name` with `routing` preferences (MEP-DUCT-002: rows {part, min, max} per role elbow, junction (tee, tap), cross, transition, cap, and `preferred_junction` tee or tap; one row of each by default), `material` and `roughness`. Returns the type.",
-    "Duct or Pipe Type",
+    "Make a duct, pipe, cable tray or conduit type",
+    "Makes a segment type (`domain` duct, pipe, cable_tray or conduit; `shape` round, rectangular, oval; pipes and conduit round, tray rectangular) named `name` with `routing` preferences (MEP-DUCT-002: rows {part, min, max} per role elbow, junction (tee, tap), cross, transition, cap, union (coupling), and `preferred_junction` tee or tap; one row of each by default, a coupling union for conduit), `material` and `roughness`. Tray and conduit: `with_fittings` (default true; without, bends are curved segments and fittings cannot be placed), `bend_radius_multiplier` (bend radius over width or diameter; 1 for tray, 6 for conduit by default), tray `tray_kind` (ladder, channel, solid_bottom, trough) and conduit `standard` (a conduit standard's id: iec_61386, emt, or one made with conduit_standard.create). Returns the type.",
+    "Segment Type",
     crate::mep_runs::CreateTypeParams,
     ElementId,
     crate::mep_runs::create_type
@@ -811,4 +823,136 @@ read_command!(
     crate::mep_electrical::Empty,
     Vec<crate::mep_loads::ClassificationInfo>,
     crate::mep_loads::list_classifications
+);
+
+edit_command!(
+    CableTrayCreate,
+    "cable_tray.create",
+    "Draw a cable tray run",
+    "Draws a cable tray run (MEP-ELEC-016) along `points` ([x, y] at `middle_elevation` above `level`, 3.0 m by default, or [x, y, z]), `width` × `height`, of `type_id` (the built-in Ladder Cable Tray when omitted). Bends go at corners with a radius of the width × the type's multiplier (or `bend_radius`; below half the width is refused): fittings, or for a type without fittings curved segments; a change of height is a riser between two bends; a tee where the run ends on a tray's side. Returns the segments, fittings and what it connected to.",
+    "Cable Tray",
+    crate::mep_runs::CreateParams,
+    crate::mep_runs::RunReport,
+    crate::mep_runs::create_tray
+);
+
+edit_command!(
+    ConduitCreate,
+    "conduit.create",
+    "Draw a conduit run",
+    "Draws a conduit run (MEP-ELEC-017) along `points` ([x, y] at `middle_elevation`, 2.8 m by default, or [x, y, z]) of `diameter` (one of the type's standard's sizes; others are refused), of `type_id` (the built-in Conduit, IEC 61386, when omitted). Bends take the standard's radius for the diameter, else the diameter × the type's multiplier (or `bend_radius`): fittings, or for a type without fittings curved segments. Returns the segments, fittings and what it connected to.",
+    "Conduit",
+    crate::mep_runs::CreateParams,
+    crate::mep_runs::RunReport,
+    crate::mep_runs::create_conduit
+);
+
+edit_command!(
+    CableTraySplit,
+    "cable_tray.split",
+    "Split a cable tray",
+    "Cuts a straight tray segment (`id`) at `point` ([x, y] in plan, or [x, y, z]; the middle when omitted) into two connected segments, with a coupling where the type's routing has a union row. Returns the segments and coupling.",
+    "Split",
+    crate::mep_runs::SplitParams,
+    crate::mep_runs::SplitReport,
+    crate::mep_runs::split
+);
+
+edit_command!(
+    ConduitSplit,
+    "conduit.split",
+    "Split a conduit",
+    "Cuts a straight conduit (`id`) at `point` into two connected lengths, with a coupling where the type's routing has one (the built-in conduit type does). Returns the segments and coupling.",
+    "Split",
+    crate::mep_runs::SplitParams,
+    crate::mep_runs::SplitReport,
+    crate::mep_runs::split
+);
+
+edit_command!(
+    CableTrayFittingPlace,
+    "cable_tray_fitting.place",
+    "Place a cable tray fitting",
+    "Places a tray fitting (MEP-ELEC-016) of `part` (elbow, tee, cross, coupling, cap) at `point` ([x, y] in plan or [x, y, z]) or on `host_id`: on an open end it takes the end's size and connects (an elbow turns `angle` degrees, 90 by default, towards `direction`, level left by default, with the type's bend radius or `bend_radius`); along a tray a tee, cross or coupling splits it and keeps both parts connected (a tee's branch towards `direction`). Refused on types without fittings, naming the type. Returns the fitting and the new part of a split tray.",
+    "Cable Tray Fitting",
+    crate::mep_runs::PlaceFittingParams,
+    crate::mep_runs::PlaceReport,
+    crate::mep_runs::place_tray_fitting
+);
+
+edit_command!(
+    ConduitFittingPlace,
+    "conduit_fitting.place",
+    "Place a conduit fitting or box",
+    "Places a conduit fitting (MEP-ELEC-017) of `part` (elbow, tee, cross, coupling, cap, box) as `cable_tray_fitting.place` does; a `box` (an IfcJunctionBox) has 2 to 6 `connectors`, and along a conduit splits it. Refused on types without fittings. Returns the fitting and the new part of a split conduit.",
+    "Conduit Fitting",
+    crate::mep_runs::PlaceFittingParams,
+    crate::mep_runs::PlaceReport,
+    crate::mep_runs::place_conduit_fitting
+);
+
+edit_command!(
+    MepFittingUpgrade,
+    "mep_fitting.upgrade",
+    "Upgrade a fitting (\"+\")",
+    "Turns an elbow into a tee, its run continuing straight with an open leg, or a tee into a cross (MEP-DUCT-003, MEP-ELEC-016). Connections are kept. Returns the new part.",
+    "Upgrade Fitting",
+    crate::mep_runs::FittingParams,
+    crate::mep_runs::Part,
+    crate::mep_runs::upgrade
+);
+
+edit_command!(
+    MepFittingDowngrade,
+    "mep_fitting.downgrade",
+    "Downgrade a fitting (\"−\")",
+    "Removes an open leg (`leg`, or the last open one): a cross becomes a tee, a tee whose other legs turn becomes an elbow; refused when the leg is connected, when the remaining legs are in line, and for boxes. Returns the new part.",
+    "Downgrade Fitting",
+    crate::mep_runs::FittingParams,
+    crate::mep_runs::Part,
+    crate::mep_runs::downgrade
+);
+
+edit_command!(
+    ConduitCreateParallel,
+    "conduit.create_parallel",
+    "Make parallel conduits",
+    "Copies a level conduit run (`run_ids`, any of its elements) `h_count` across (the original included) at `h_offset` to the left of its direction (negative: right) and `v_count` up at `v_offset` (MEP-ELEC-017), with `bend` same (every bend the type's radius) or concentric (the bends share their centres, so radii grow by the offset outward; only for conduit types without fittings). Runs with branches or vertical legs are refused. Returns the elements made.",
+    "Parallel Conduits",
+    crate::mep_runs::ParallelParams,
+    Vec<ElementId>,
+    crate::mep_runs::create_parallel
+);
+
+edit_command!(
+    ConduitStandardCreate,
+    "conduit_standard.create",
+    "Make a conduit standard",
+    "Adds a conduit standard to the Electrical Settings (MEP-ELEC-017): `name` and its `sizes` [{diameter (outside, metres), name?, bend_radius? (metres)}]. Conduit types name a standard; only its sizes can be drawn. Built in: iec_61386 (16–63 mm) and emt (1/2\" to 2\" with their bend radii). Returns its id.",
+    "Conduit Standard",
+    crate::mep_electrical::ConduitStandardParams,
+    String,
+    crate::mep_electrical::create_conduit_standard
+);
+
+edit_command!(
+    CableTraySetSize,
+    "cable_tray.set_size",
+    "Resize cable tray",
+    "Gives tray segments a new `width` and `height`; the legs of the fittings joined to them follow.",
+    "Cable Tray Size",
+    crate::mep_runs::SetSizeParams,
+    (),
+    crate::mep_runs::set_size
+);
+
+edit_command!(
+    ConduitSetSize,
+    "conduit.set_size",
+    "Resize conduit",
+    "Gives conduit a new `diameter` (one of its type's standard's sizes); the legs of the fittings joined to it follow.",
+    "Conduit Size",
+    crate::mep_runs::SetSizeParams,
+    (),
+    crate::mep_runs::set_size
 );

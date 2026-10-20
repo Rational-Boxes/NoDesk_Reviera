@@ -2192,6 +2192,52 @@ icon = "mep_types"
 help = "Load Reviera's starter MEP component types: air handling unit, diffuser, grille, fan, water heater, pump, lavatory, WC, distribution board, receptacle and luminaire, each with its connectors"
 
 [[action]]
+id = "cable_tray.create"
+label = "Cable Tray"
+icon = "cable_tray"
+keys = "CT"
+help = "Draw a cable tray run: bends at corners with a radius of the width × the type's multiplier, tees where it ends on a tray (MEP-ELEC-016)"
+
+[[action]]
+id = "conduit.create"
+label = "Conduit"
+icon = "conduit"
+keys = "CN"
+help = "Draw a conduit run of a size from its type's standard, with bends at the standard's radius (MEP-ELEC-017)"
+
+[[action]]
+id = "cable_tray_fitting.place"
+label = "Cable Tray Fitting"
+icon = "tray_fitting"
+keys = "TF"
+help = "Place a tee, cross, elbow, coupling or cap on a tray, or split it: on an open end, or along a tray (splitting it)"
+
+[[action]]
+id = "conduit_fitting.place"
+label = "Conduit Fitting"
+icon = "conduit_fitting"
+keys = "NF"
+help = "Place a conduit fitting or junction box, or split a conduit: on an open end, or along a conduit (splitting it)"
+
+[[action]]
+id = "conduit.create_parallel"
+label = "Parallel Conduits"
+icon = "parallel_conduits"
+help = "Copy the selected conduit run across and up at offsets, with the same or concentric bend radii"
+
+[[action]]
+id = "mep_fitting.upgrade"
+label = "Upgrade Fitting (+)"
+icon = "fitting_plus"
+help = "Turn the selected elbow into a tee, or a tee into a cross"
+
+[[action]]
+id = "mep_fitting.downgrade"
+label = "Downgrade Fitting (−)"
+icon = "fitting_minus"
+help = "Remove the selected fitting's open leg: a cross becomes a tee, a tee an elbow"
+
+[[action]]
 id = "duct.create"
 label = "Duct"
 icon = "duct"
@@ -2660,6 +2706,18 @@ tools = [
   { action = "system.disconnect_equipment", size = "small" },
   { action = "system.divide", size = "small" },
   { action = "system_type.edit", size = "small" },
+]
+
+[[tab.panel]]
+label = "Cable Tray & Conduit"
+tools = [
+  { action = "cable_tray.create", size = "large" },
+  { action = "conduit.create", size = "large" },
+  { action = "cable_tray_fitting.place", size = "small" },
+  { action = "conduit_fitting.place", size = "small" },
+  { action = "conduit.create_parallel", size = "small" },
+  { action = "mep_fitting.upgrade", size = "small" },
+  { action = "mep_fitting.downgrade", size = "small" },
 ]
 
 [[tab.panel]]

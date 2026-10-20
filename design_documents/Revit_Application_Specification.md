@@ -19570,11 +19570,13 @@ Panel schedules appear in the Project Browser under *Panel Schedules* and are pl
 - `cable_tray_fitting.place(type_id, host_id?, point?, params) -> id` (`host_id` is a tray or an open end's element; `params` holds angle, leg sizes and bend radius)
 - The shared fitting controls `mep_fitting.upgrade`, `mep_fitting.downgrade`, `mep_fitting.flip` and `mep_fitting.rotate` (MEP-DUCT-003) also apply to tray fittings.
 
+*Built (2026-10-20):* Systems › Cable Tray & Conduit › **Cable Tray** (`CT`): a form (type, width, height, middle elevation, optional bend radius), then clicks in a plan, E for a rise or drop, Enter or Esc to finish (`cable_tray.create`; the built-in *Ladder Cable Tray*). Segments are `IfcCableCarrierSegment` (CABLELADDERSEGMENT for ladder, CABLETRAYSEGMENT for channel and solid bottom, CABLETRUNKINGSEGMENT for trough) and fittings `IfcCableCarrierFitting` (BEND, TEE, CROSS, REDUCER; caps and couplings USERDEFINED with ObjectType CAP or COUPLING), with CABLECARRIER ports. Bends have a radius, width × the type's multiplier (1.0 by default) or `bend_radius`, refused below half the width; a 90° bend's legs are the radius long and its body is swept along the arc. A type *without fittings* (`mep_segment_type.create` `with_fittings: false`) draws each bend as a curved segment (an arc tangent at both ends, one `IfcCableCarrierSegment`). **Cable Tray Fitting** (`TF`, `cable_tray_fitting.place`): tee, cross, elbow (angle, turn direction, radius), coupling, cap or Split, placed by clicking: on an open end it takes the end's size and connects; along a tray a tee, cross or coupling splits it and keeps both parts connected; refused on types without fittings, naming the type. `cable_tray.split` adds a coupling where the routing has a *union* row. **Upgrade/Downgrade Fitting** ("+"/"−", `mep_fitting.upgrade`/`downgrade`, all domains): elbow → tee with an open leg carrying on straight → cross, and back by removing an open leg (connections kept, later legs renumbered). `cable_tray.set_size`. Not yet: the in-canvas fitting controls, grips and size text, change angle and bend-radius grips, flip and rotate, automatic transitions between widths, crosses where a run meets two trays, the micro-operation replay, showing trays above the cut plane in plans (ducts too), fill.
+
 **Acceptance criteria.**
-- [ ] A ladder tray drawn around a corner gets a bend whose radius is width × the type multiplier.
-- [ ] Placing a tee fitting along a 300 mm tray splits it into two segments, and all three elements are connected.
-- [ ] `cable_tray_fitting.place` on a type without fittings is refused with a message naming the type.
-- [ ] "+" on a bend whose run continues straight turns it into a tee with an open third leg.
+- [x] A ladder tray drawn around a corner gets a bend whose radius is width × the type multiplier.
+- [x] Placing a tee fitting along a 300 mm tray splits it into two segments, and all three elements are connected.
+- [x] `cable_tray_fitting.place` on a type without fittings is refused with a message naming the type.
+- [x] "+" on a bend whose run continues straight turns it into a tee with an open third leg.
 
 ### 4.9.16 Conduit and parallel conduits
 **ID:** MEP-ELEC-017 · **Priority:** P1 · **Ref:** research/03 §10.7, §7.3 ("Conduit Settings")
@@ -19599,11 +19601,13 @@ Panel schedules appear in the Project Browser under *Panel Schedules* and are pl
 
 The drawing tool uses the micro-operation schema of MEP-ELEC-016 with the `conduit.` prefix.
 
+*Built (2026-10-20):* Systems › Cable Tray & Conduit › **Conduit** (`CN`, `conduit.create`): diameters from the type's **standard** (Electrical Settings `conduit_standards`: built in *IEC 61386 (metric)* 16–63 mm and *EMT* 1/2"–2" outside diameters with the NEC Chapter 9 Table 2 bend radii; `conduit_standard.create` adds one); a size outside it is refused listing the sizes. Bends take the standard's radius for the diameter, else diameter × the type's multiplier (6 by default). Segments are `IfcCableCarrierSegment` CONDUITSEGMENT; types with or without fittings as for tray. **Conduit Fitting** (`NF`, `conduit_fitting.place`): elbow, tee, cross, coupling, cap and **junction box** (`IfcJunctionBox` POWER, 2–6 connectors, a cube sized to its connections) on an open end or along a conduit (splitting it); "−" is refused on a box. `conduit.split` puts a coupling in (the built-in conduit routing has a union row). **Parallel Conduits** (`conduit.create_parallel`): copies a level run without branches across (to the left, or right with a negative offset) and up, with *Same* or *Concentric* bends (concentric only for types without fittings: radii grow by the offset on the outside of each turn and shrink inside, refused where they would be too tight). `conduit.set_size` checks the standard. Not yet: surface connectors and *Connect Conduit to Equipment*, parallel runs needing a surface connector or tray, rise and drop symbols, the fitting controls in the view, `IfcJunctionBox` DATA and its pset, box connector layouts beyond the faces.
+
 **Acceptance criteria.**
-- [ ] Concentric parallel conduits around a 90° bend have bend radii that increase by the offset for each conduit.
-- [ ] Concentric mode is refused on a conduit type with fittings.
-- [ ] A junction box placed along a 25 mm conduit splits it, and the box exports as `IfcJunctionBox` connected to both conduits.
-- [ ] A 32 mm conduit cannot be drawn with a type whose standard lists only 16, 20 and 25 mm.
+- [x] Concentric parallel conduits around a 90° bend have bend radii that increase by the offset for each conduit.
+- [x] Concentric mode is refused on a conduit type with fittings.
+- [x] A junction box placed along a 25 mm conduit splits it, and the box exports as `IfcJunctionBox` connected to both conduits.
+- [x] A 32 mm conduit cannot be drawn with a type whose standard lists only 16, 20 and 25 mm.
 
 ### 4.9.17 Electrical analytical loads (preliminary design)
 **ID:** MEP-ELEC-019 · **Priority:** P2 · **Ref:** research/03 §10.8

@@ -841,8 +841,8 @@ in Reviera, and your own agent settings are never changed (UI-AGENT-004).
 
 The MEP epic has begun with its foundations (spec Chapter 4 §4.6): connectors, the connectivity
 graph, system types, systems and system checks, the System Browser, and ducts and pipes with
-their fittings, and electrical circuits, panels, feeders and panel schedules. Cable tray and
-conduit, and sizing are next.
+their fittings, cable tray and conduit, and electrical circuits, panels, feeders and panel
+schedules. Sizing is next.
 
 - **Connectors** on component types: duct, pipe, electrical, cable tray and conduit connectors with
   their point and direction, shape and size, system classification, flow direction and
@@ -880,6 +880,17 @@ conduit, and sizing are next.
   tree; Panel Settings sets feed-through lugs and a transformer's secondary system. Circuits have
   a load name (made from the classification and first device until edited) and a trip rating
   (`circuit.set`).
+- **Cable tray and conduit** (Systems › Cable Tray & Conduit; CT, CN): runs drawn like ducts,
+  with radius bends (tray: width × the type's multiplier; conduit: its standard's radius, else
+  diameter × multiplier), or curved segments for types without fittings; conduit sizes from
+  IEC 61386 or EMT standards (or your own); tray kinds ladder, channel, solid bottom and trough.
+  Cable Tray Fitting and Conduit Fitting (TF, NF) place tees, crosses, elbows, couplings, caps
+  and junction boxes on open ends or along a run (splitting it), or split it; "+" and "−"
+  upgrade an elbow to a tee to a cross and back; Parallel Conduits copies a run across and up
+  with the same or concentric bends. Exported as `IfcCableCarrierSegment`/`…Fitting` and
+  `IfcJunctionBox` with CABLECARRIER ports (`cable_tray.*`, `conduit.*`,
+  `cable_tray_fitting.place`, `conduit_fitting.place`, `mep_fitting.upgrade/downgrade`,
+  `conduit_standard.create`).
 - **Panel schedules** (Analyze › Reports & Schedules, or Systems › Electrical): a live schedule of
   a panel, under *Panel Schedules* in the Project Browser: the header (panel, distribution system,
   supply, slots), every slot in order with the circuit's number, load name, classification, trip,
@@ -1236,7 +1247,7 @@ area by area (reviewed against the spec on 2026-10-15).
   beams, placing braces in elevations, the connection library's packages and its other
   connection groups, composite decks and span symbols, truss families (a layout shared by types),
   further rebar (two-point, varying sets beyond bars through walls, bent fabric), bilinear and two-way area loads, panel results and external analysis providers.
-- **MEP** (in development): fittings placed and edited by hand, moving runs, flex duct, cable tray and conduit,
+- **MEP** (in development): duct and pipe fittings placed and edited in the view, the fitting controls and grips, MEP runs above the cut plane shown in plans, surface connectors for conduit, moving runs, flex duct,
   wires, panel schedule templates and editing (moves, spares, rebalancing), the two-column layout, custom circuit naming, switch systems, cable sizing
   and calculations, the System Browser's
   zones, columns and search, the System Editor, placing connectors on faces in a component editor, fabrication, P&ID and spaces

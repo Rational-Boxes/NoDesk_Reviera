@@ -112,6 +112,60 @@ pub struct ElectricalSettings {
     pub load_classifications: Vec<crate::mep_loads::LoadClassification>,
     /// Demand factors (MEP-ELEC-010).
     pub demand_factors: Vec<crate::mep_loads::DemandFactor>,
+    /// Conduit standards and their sizes (MEP-ELEC-017).
+    pub conduit_standards: Vec<ConduitStandard>,
+}
+
+/// A conduit standard: the sizes conduit of it comes in (MEP-ELEC-017).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct ConduitStandard {
+    pub id: String,
+    pub name: String,
+    pub sizes: Vec<ConduitSize>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct ConduitSize {
+    /// A trade size such as `3/4"`, when the standard names its sizes so.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub name: String,
+    /// Outside diameter (metres).
+    pub diameter: f64,
+    /// The bend radius the standard gives (metres); otherwise the diameter × the type's
+    /// multiplier.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bend_radius: Option<f64>,
+}
+
+impl ConduitStandard {
+    /// The size of a diameter, within 0.1 mm.
+    pub fn size(&self, diameter: f64) -> Option<&ConduitSize> {
+        self.sizes.iter().find(|s| (s.diameter - diameter).abs() < 1e-4)
+    }
+}
+
+/// The built-in conduit standards: IEC 61386 metric sizes, and EMT trade sizes (outside
+/// diameters, and the bend radii of NEC Chapter 9 Table 2 for other bends).
+fn default_conduit_standards() -> Vec<ConduitStandard> {
+    let mm = |d: f64| d / 1000.0;
+    vec![
+        ConduitStandard {
+            id: "iec_61386".into(),
+            name: "IEC 61386 (metric)".into(),
+            sizes: [16.0, 20.0, 25.0, 32.0, 40.0, 50.0, 63.0]
+                .iter()
+                .map(|d| ConduitSize { name: format!("{d:.0} mm"), diameter: mm(*d), bend_radius: None })
+                .collect(),
+        },
+        ConduitStandard {
+            id: "emt".into(),
+            name: "EMT".into(),
+            sizes: [("1/2\"", 17.9, 4.0), ("3/4\"", 23.4, 4.5), ("1\"", 29.5, 5.75), ("1-1/4\"", 38.4, 7.25), ("1-1/2\"", 44.2, 8.25), ("2\"", 55.8, 9.5)]
+                .iter()
+                .map(|(n, d, r)| ConduitSize { name: (*n).into(), diameter: mm(*d), bend_radius: Some(r * 0.0254) })
+                .collect(),
+        },
+    ]
 }
 
 impl Default for ElectricalSettings {
@@ -145,6 +199,7 @@ impl Default for ElectricalSettings {
             first_slot_only: false,
             load_classifications: crate::mep_loads::default_classifications(),
             demand_factors: crate::mep_loads::default_demand_factors(),
+            conduit_standards: default_conduit_standards(),
         }
     }
 }
@@ -1397,4 +1452,34 @@ pub(crate) fn set_circuit(txn: &mut Transaction<'_>, p: CircuitSetParams) -> Res
         r.rating = (a > 0.0).then_some(a);
     }
     write(txn, id, &r)
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ConduitStandardParams {
+    pub name: String,
+    /// The sizes: outside diameter (metres), and optionally a trade-size name and the bend
+    /// radius (metres).
+    pub sizes: Vec<ConduitSize>,
+}
+
+/// `conduit_standard.create`; returns its id.
+pub(crate) fn create_conduit_standard(txn: &mut Transaction<'_>, p: ConduitStandardParams) -> Result<String> {
+    let mut s = settings(txn.store());
+    let name = p.name.trim().to_owned();
+    if name.is_empty() || s.conduit_standards.iter().any(|c| c.name.eq_ignore_ascii_case(&name)) {
+        return Err(bad("conduit_standard.name", format!("the name {name:?} is empty or taken")));
+    }
+    if p.sizes.is_empty() || p.sizes.iter().any(|z| !(z.diameter > 0.0 && z.diameter < 1.0) || z.bend_radius.is_some_and(|r| r <= 0.0)) {
+        return Err(bad("conduit_standard.sizes", "give the sizes: diameters from 0 to 1 m, bend radii above zero"));
+    }
+    let id = slug(&name);
+    if s.conduit_standards.iter().any(|c| c.id == id) {
+        return Err(bad("conduit_standard.name", format!("the name {name:?} is taken")));
+    }
+    let mut sizes = p.sizes;
+    sizes.sort_by(|a, b| a.diameter.total_cmp(&b.diameter));
+    s.conduit_standards.push(ConduitStandard { id: id.clone(), name, sizes });
+    save_settings(txn, &s)?;
+    Ok(id)
 }
