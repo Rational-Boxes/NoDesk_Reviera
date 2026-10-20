@@ -53,6 +53,18 @@ impl Form {
         c
     }
 
+    /// A text box of several lines.
+    pub(crate) fn lines(&self, label: &str, value: &str, tip: &str) -> TextCtrl {
+        row(&self.dialog, &self.grid, label);
+        let t = TextCtrl::builder(&self.dialog).with_value(value).with_style(TextCtrlStyle::MultiLine).build();
+        if !tip.is_empty() {
+            t.set_tooltip(tip);
+        }
+        t.set_min_size(Size::new(260, 110));
+        self.grid.add(&t, 1, SizerFlag::Expand, 0);
+        t
+    }
+
     pub(crate) fn check(&self, label: &str, text: &str, value: bool) -> CheckBox {
         row(&self.dialog, &self.grid, label);
         let c = CheckBox::builder(&self.dialog).with_label(text).build();

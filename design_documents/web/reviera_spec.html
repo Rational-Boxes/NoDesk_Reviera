@@ -32776,11 +32776,12 @@ No IFC equivalent.
 - <strong>Morphed distribution:</strong> select a transverse stirrup set (circular, spiral or multi-segment). Longitudinal bars are generated that follow the stirrup shape, and they update when the stirrups change.</p>
 <p><strong>Data (IFC mapping).</strong> <code>IfcReinforcingBar</code>. RXD element data (<code>rebar</code>) records Distribution = "Path" or "Morphed", with the driver set's GlobalId (morphed) or PathEdgeRefs (path).</p>
 <p><strong>Commands.</strong>
-- <code>rebar.distribute_along_path(main_rebar_id, edge_refs[], range?) -&gt; rebar_id</code>
+- <code>rebar.distribute_along_path(main_rebar_id, path | path_ref, range?, layout?) -&gt; rebar_id</code>
 - <code>rebar.distribute_morphed(driver_stirrup_set_id, bar_type_id, count | spacing) -&gt; rebar_id</code></p>
 <p><strong>Acceptance criteria.</strong>
-- [ ] Changing a driver stirrup set's diameter regenerates the morphed longitudinal bars inside the new stirrup outline.
-- [ ] A path distribution along a 3D-curved edge keeps each bar plane perpendicular to the path tangent.</p>
+- [x] Changing a driver stirrup set's diameter regenerates the morphed longitudinal bars inside the new stirrup outline.
+- [x] A path distribution along a 3D-curved edge keeps each bar plane perpendicular to the path tangent.</p>
+<p><em>Built (2026-10-19):</em> the recipe's placement <code>{kind: distributed, distribution: path|morphed, …}</code> keeps its source set's GlobalId and is worked out from it every time, so the set follows the source and is deleted with it. <code>rebar.distribute_along_path</code> takes the main set's first bar (any placement; its shape code and bar type) and a path: <code>path</code> points, or <code>path_ref</code> a named path of the main set's host (<code>axis</code>, <code>along</code>, <code>up</code>, kept by name so it follows the host), with <code>range</code> [from, to] metres along it and a <code>layout</code>. The main bar must lie square to the path where it starts (refused, <code>rebar.path</code>, saying how far it reaches along it). A frame is carried along the path, each segment's turned onto it by the rotation between their directions, so the bars twist no more than the path does; every bar's plane is square to the tangent of the path segment it lies on (checked along a polyline curving in plan and rising). <code>rebar.distribute_morphed</code> takes a driver set of at least two closed stirrups or ties (section links, aligned free-form links, sketched links), a bar type and a <code>count</code> round the stirrups (or a <code>spacing</code> along the first): the stirrups' loops (without their hooks) are walked by equal shares of their length from their first corner, each point moved square to the stirrup, in its plane and toward its inside, by half the stirrup's bar plus half its own, and joined from the first stirrup to the last. Changing the links from Ø10 to Ø16 moves the bars in with the new outline and the thicker link. Morphed sets are varying (each length its own number), shape 00 when straight, else 99. Neither is propagated, split by segment or converted. The set's tab › <strong>Distribute</strong> › <em>Path Distribution</em> (its host's path, or typed x, y, z points in mm; range; layout) and <em>Morphed</em> (bar type; count or spacing). Not yet: picking path edges in the view and sketching a 3D path, constraining bar segments to edges, putting morphed bars at the stirrups' corners first, a main bar that changes its bar type carrying it to the path set.</p>
 <h3 id="4215-splices-and-couplers">4.2.15 Splices and couplers</h3>
 <p><strong>ID:</strong> <code class="rid" id="STR-RBR-015">STR-RBR-015</code> · <strong>Priority:</strong> <span class="pri pri-p2">P2</span> · <strong>Ref:</strong> research/03 §3.7 · screenshots/structure_mep/rebar_couplers.png</p>
 <p><strong>Behaviour &amp; rules.</strong>
@@ -37912,7 +37913,7 @@ No IFC equivalent.
 </tr>
 <tr>
 <td><code>rebar.distribute_along_path</code></td>
-<td>main_rebar_id, edge_refs[], range?</td>
+<td>main_rebar_id, path | path_ref, range?, layout?</td>
 <td>rebar_id</td>
 <td>Yes</td>
 <td>STR-RBR-014</td>
@@ -63547,10 +63548,10 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 <tr>
 <td><code>rebar.distribute_along_path</code></td>
 <td>4</td>
-<td>main_rebar_id, edge_refs[], range?</td>
+<td>main_rebar_id, path \</td>
+<td>path_ref, range?, layout?</td>
 <td>rebar_id</td>
 <td>Yes</td>
-<td>STR-RBR-014</td>
 </tr>
 <tr>
 <td><code>rebar.distribute_morphed</code></td>

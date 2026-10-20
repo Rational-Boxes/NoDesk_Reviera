@@ -248,6 +248,97 @@ impl Gui {
         }
     }
 
+    /// Path Distribution (STR-RBR-014): the selected set's first bar carried along a path — its
+    /// host's axis, along or up, or typed points.
+    pub(crate) fn distribute_along_path(&mut self) {
+        let frame = self.frame;
+        let Some(set) = self.one_set("Path Distribution") else { return };
+        let kind = self.store_now().and_then(|s| {
+            let r = s.get(set).and_then(reviera_core::rebar::rebar_recipe)?;
+            let h = reviera_core::GlobalId::parse(&r.host).and_then(|g| s.find_by_guid(&g)).and_then(|i| s.get(i))?;
+            reviera_core::rebar::host_check(&s, h).ok()
+        });
+        use reviera_core::rebar::HostKind;
+        let mut paths: Vec<(&str, &str)> = match kind {
+            Some(HostKind::Beam | HostKind::Column) => vec![("axis", "Its host's axis")],
+            Some(HostKind::Wall) => vec![("up", "Up its wall"), ("along", "Along its wall")],
+            _ => Vec::new(),
+        };
+        paths.push(("", "The points below"));
+        let f = super::reinforcement_ui::Form::new(&frame, "Path Distribution");
+        let which = f.choice("Path", &paths.iter().map(|p| p.1.to_owned()).collect::<Vec<_>>(), 0);
+        let points = f.lines("Points (mm)", "", "x, y, z per line, starting where the main bar lies, square to it");
+        let from = f.text("From (mm along it)", "", "Empty for its start");
+        let to = f.text("To (mm along it)", "", "Empty for its end");
+        let rule = f.choice("Layout", &["Maximum spacing".into(), "Fixed number".into()], 0);
+        let amount = f.text("Spacing (mm) or number", "200", "");
+        if !f.show("The main bar must lie square to the path where it starts; each bar stays square to the path", "Distribute") {
+            f.dialog.destroy();
+            return;
+        }
+        let k = which.get_selection().map_or(0, |i| i as usize).min(paths.len() - 1);
+        let pts: Vec<[f64; 3]> = points
+            .get_value()
+            .lines()
+            .filter_map(|l| {
+                let v: Vec<f64> = l.split(',').filter_map(|x| x.trim().parse::<f64>().ok()).collect();
+                (v.len() == 3).then(|| [v[0] / 1000.0, v[1] / 1000.0, v[2] / 1000.0])
+            })
+            .collect();
+        let mm = |t: &TextCtrl| t.get_value().trim().parse::<f64>().ok().map(|v| v / 1000.0);
+        let v = amount.get_value().trim().parse::<f64>().unwrap_or(0.0);
+        let layout = if rule.get_selection() == Some(1) { json!({ "rule": "fixed_number", "n": v.round().max(1.0) as usize }) } else { json!({ "rule": "maximum_spacing", "spacing": v / 1000.0 }) };
+        let mut args = json!({ "main_rebar_id": set, "layout": layout });
+        if paths[k].0.is_empty() {
+            args["path"] = json!(pts);
+        } else {
+            args["path_ref"] = json!(paths[k].0);
+        }
+        if let (Some(a), Some(b)) = (mm(&from), mm(&to)) {
+            args["range"] = json!([a, b]);
+        }
+        f.dialog.destroy();
+        match self.run("rebar.distribute_along_path", args) {
+            Ok(v) => {
+                self.refresh_scene(&frame);
+                frame.set_status_text(&format!("Path distribution: placed as element {v}"), 0);
+            }
+            Err(e) => error(&frame, &format!("The bars were not distributed:\n{e}")),
+        }
+    }
+
+    /// Morphed (STR-RBR-014): longitudinal bars through the selected stirrup set.
+    pub(crate) fn distribute_morphed(&mut self) {
+        let frame = self.frame;
+        let Some(set) = self.one_set("Morphed Distribution") else { return };
+        let bars = self.run("rebar_bar_type.list", json!({})).unwrap_or_default();
+        let ids: Vec<String> = bars.as_array().into_iter().flatten().filter_map(|b| b["id"].as_str().map(str::to_owned)).collect();
+        let names: Vec<String> = bars.as_array().into_iter().flatten().filter_map(|b| b["name"].as_str().map(str::to_owned)).collect();
+        let f = super::reinforcement_ui::Form::new(&frame, "Morphed Distribution");
+        let bar = f.choice("Bar type", &names, 4);
+        let by = f.choice("Spread", &["A number round the stirrups".into(), "A spacing along the first (mm)".into()], 0);
+        let amount = f.text("Number or spacing", "8", "");
+        if !f.show("Bars run through every stirrup, touching it, and follow the stirrups when they change", "Place") {
+            f.dialog.destroy();
+            return;
+        }
+        let v = amount.get_value().trim().parse::<f64>().unwrap_or(0.0);
+        let mut args = json!({ "driver_stirrup_set_id": set, "bar_type": ids.get(bar.get_selection().map_or(0, |i| i as usize)).cloned().unwrap_or_default() });
+        if by.get_selection() == Some(1) {
+            args["spacing"] = json!(v / 1000.0);
+        } else {
+            args["count"] = json!(v.round().max(1.0) as usize);
+        }
+        f.dialog.destroy();
+        match self.run("rebar.distribute_morphed", args) {
+            Ok(v) => {
+                self.refresh_scene(&frame);
+                frame.set_status_text(&format!("Morphed distribution: placed as element {v}"), 0);
+            }
+            Err(e) => error(&frame, &format!("The bars were not placed:\n{e}")),
+        }
+    }
+
     /// Reset Constraints: the selected sketched sets' handles freed where they are.
     pub(crate) fn reset_rebar_constraints(&mut self) {
         let frame = self.frame;

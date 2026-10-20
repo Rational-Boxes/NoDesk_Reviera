@@ -1536,6 +1536,18 @@ icon = "rebar_free_form"
 help = "Bars over a concrete roof's shell between two planes at the cover, or closed links square to a member's path following its section"
 
 [[action]]
+id = "rebar.distribute_along_path"
+label = "Path Distribution"
+icon = "rebar_path_distribution"
+help = "Carry the selected set's bar along a path (its host's axis, or typed points), each bar square to the path"
+
+[[action]]
+id = "rebar.distribute_morphed"
+label = "Morphed"
+icon = "rebar_morphed"
+help = "Longitudinal bars through the selected stirrup set, touching every stirrup and following them when they change"
+
+[[action]]
 id = "rebar.constrain"
 label = "Edit Constraints"
 icon = "rebar_constraints"
@@ -2648,6 +2660,10 @@ panels = [
   { label = "Set Type", tools = [
     { action = "rebar.convert_to_varying", size = "small" },
     { action = "rebar.convert_to_standard", size = "small" },
+  ] },
+  { label = "Distribute", tools = [
+    { action = "rebar.distribute_along_path", size = "small" },
+    { action = "rebar.distribute_morphed", size = "small" },
   ] },
   { label = "Constraints", tools = [
     { action = "rebar.constrain", size = "large" },

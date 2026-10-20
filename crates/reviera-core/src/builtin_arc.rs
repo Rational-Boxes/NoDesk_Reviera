@@ -129,6 +129,8 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(RebarConvertToVarying),
         registry.add(RebarSketch),
         registry.add(RebarPlaceFreeForm),
+        registry.add(RebarDistributeAlongPath),
+        registry.add(RebarDistributeMorphed),
         registry.add(RebarConstrain),
         registry.add(RebarResetConstraints),
         registry.add(RebarConstraints),
@@ -3297,6 +3299,35 @@ edit_command!(
     crate::rebar_free::PlaceParams,
     ElementId,
     crate::rebar_free::place
+);
+
+edit_command!(
+    RebarDistributeAlongPath,
+    "rebar.distribute_along_path",
+    "Distribute a bar along a path",
+    "Carries a main set's first bar along a 3D path (STR-RBR-014): `path` points, or `path_ref` a \
+     named path of its host (axis, along, up); `range` [from, to] metres along it; `layout` spaces \
+     the bars. The main bar must lie square to the path where it starts; every bar's plane is \
+     square to the path's tangent where it lies, its frame carried without extra twist. The set \
+     follows the main set and goes with it. Returns the set.",
+    "Path Distribution",
+    crate::rebar_paths::PathParams,
+    ElementId,
+    crate::rebar_paths::along_path
+);
+
+edit_command!(
+    RebarDistributeMorphed,
+    "rebar.distribute_morphed",
+    "Morph longitudinal bars through stirrups",
+    "Longitudinal bars through a set of closed stirrups (STR-RBR-014): `count` bars spread round \
+     each stirrup (or `spacing` along the first), each moved in to touch it, joined from the first \
+     stirrup to the last. They follow the stirrups' shape, size and bar type, and go with them. \
+     Returns the set.",
+    "Morphed Distribution",
+    crate::rebar_paths::MorphedParams,
+    ElementId,
+    crate::rebar_paths::morphed
 );
 
 edit_command!(

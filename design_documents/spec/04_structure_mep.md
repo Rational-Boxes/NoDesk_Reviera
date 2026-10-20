@@ -1091,12 +1091,14 @@ The *Whole Host* option uses the host outline as the boundary.
 **Data (IFC mapping).** `IfcReinforcingBar`. RXD element data (`rebar`) records Distribution = "Path" or "Morphed", with the driver set's GlobalId (morphed) or PathEdgeRefs (path).
 
 **Commands.**
-- `rebar.distribute_along_path(main_rebar_id, edge_refs[], range?) -> rebar_id`
+- `rebar.distribute_along_path(main_rebar_id, path | path_ref, range?, layout?) -> rebar_id`
 - `rebar.distribute_morphed(driver_stirrup_set_id, bar_type_id, count | spacing) -> rebar_id`
 
 **Acceptance criteria.**
-- [ ] Changing a driver stirrup set's diameter regenerates the morphed longitudinal bars inside the new stirrup outline.
-- [ ] A path distribution along a 3D-curved edge keeps each bar plane perpendicular to the path tangent.
+- [x] Changing a driver stirrup set's diameter regenerates the morphed longitudinal bars inside the new stirrup outline.
+- [x] A path distribution along a 3D-curved edge keeps each bar plane perpendicular to the path tangent.
+
+*Built (2026-10-19):* the recipe's placement `{kind: distributed, distribution: path|morphed, …}` keeps its source set's GlobalId and is worked out from it every time, so the set follows the source and is deleted with it. `rebar.distribute_along_path` takes the main set's first bar (any placement; its shape code and bar type) and a path: `path` points, or `path_ref` a named path of the main set's host (`axis`, `along`, `up`, kept by name so it follows the host), with `range` [from, to] metres along it and a `layout`. The main bar must lie square to the path where it starts (refused, `rebar.path`, saying how far it reaches along it). A frame is carried along the path, each segment's turned onto it by the rotation between their directions, so the bars twist no more than the path does; every bar's plane is square to the tangent of the path segment it lies on (checked along a polyline curving in plan and rising). `rebar.distribute_morphed` takes a driver set of at least two closed stirrups or ties (section links, aligned free-form links, sketched links), a bar type and a `count` round the stirrups (or a `spacing` along the first): the stirrups' loops (without their hooks) are walked by equal shares of their length from their first corner, each point moved square to the stirrup, in its plane and toward its inside, by half the stirrup's bar plus half its own, and joined from the first stirrup to the last. Changing the links from Ø10 to Ø16 moves the bars in with the new outline and the thicker link. Morphed sets are varying (each length its own number), shape 00 when straight, else 99. Neither is propagated, split by segment or converted. The set's tab › **Distribute** › *Path Distribution* (its host's path, or typed x, y, z points in mm; range; layout) and *Morphed* (bar type; count or spacing). Not yet: picking path edges in the view and sketching a 3D path, constraining bar segments to edges, putting morphed bars at the stirrups' corners first, a main bar that changes its bar type carrying it to the path set.
 
 ### 4.2.15 Splices and couplers
 **ID:** STR-RBR-015 · **Priority:** P2 · **Ref:** research/03 §3.7 · screenshots/structure_mep/rebar_couplers.png
@@ -5523,7 +5525,7 @@ Every command below is registered once in the command registry and is exposed au
 | `fabric_sheet.place` | host_id, sheet_type_id, point, rotation, cut_by_cover? | id | Yes | STR-RBR-012 |
 | `fabric_sheet.create_bent` | host_id, profile_curves[], sheet_type_id, extent | id | Yes | STR-RBR-012 |
 | `rebar.place_free_form` | host_id, kind: "surface"\|"aligned", start_face, end_face, path_edges?, bar_type_id, layout | rebar_id | Yes | STR-RBR-013 |
-| `rebar.distribute_along_path` | main_rebar_id, edge_refs[], range? | rebar_id | Yes | STR-RBR-014 |
+| `rebar.distribute_along_path` | main_rebar_id, path \| path_ref, range?, layout? | rebar_id | Yes | STR-RBR-014 |
 | `rebar.distribute_morphed` | driver_stirrup_set_id, bar_type_id, count \| spacing | rebar_id | Yes | STR-RBR-014 |
 | `rebar.splice` | rebar_id, mode: "line"\|"length", line? , length?, splice_type_id? | rebar_ids[] | Yes | STR-RBR-015 |
 | `rebar_coupler.place` | bar_end_refs[1..2], type_id? | coupler_id | Yes | STR-RBR-015 |

@@ -920,6 +920,8 @@ pub enum Placement {
     Sketch(crate::rebar_sketch::SketchPlacement),
     /// A surface or aligned distribution (STR-RBR-013).
     FreeForm(crate::rebar_free::FreeFormPlacement),
+    /// Along a path, or morphed through stirrups (STR-RBR-014).
+    Distributed(crate::rebar_paths::DistributedPlacement),
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
@@ -1429,6 +1431,7 @@ fn base_geometry(store: &Store, r: &RebarRecipe) -> Result<SetGeometry> {
         }
         (Placement::Sketch(s), _) => crate::rebar_sketch::geometry(store, r, host, kind, &bt, s),
         (Placement::FreeForm(f), _) => crate::rebar_free::geometry(store, r, host, kind, &bt, f),
+        (Placement::Distributed(d), _) => crate::rebar_paths::geometry(store, r, &bt, d),
         (Placement::Through { along }, HostKind::Wall) => {
             if sh.code != "00" {
                 return Err(Error::new("rebar.shape", "bars through a wall take shape 00 (straight)"));
@@ -1687,7 +1690,7 @@ pub(crate) fn rehost(txn: &mut crate::txn::Transaction<'_>, p: RehostParams) -> 
 fn varying_check(r: &RebarRecipe) -> Result<()> {
     match r.placement {
         Placement::Through { .. } => Ok(()),
-        Placement::FreeForm(_) => Err(Error::new("rebar.not_varying", "a free-form set is always varying: each bar is worked out on its own")),
+        Placement::FreeForm(_) | Placement::Distributed(_) => Err(Error::new("rebar.not_varying", "a free-form or distributed set is worked out from its source and cannot be converted")),
         _ => Err(Error::new(
             "rebar.not_varying",
             "only bars through a wall's thickness can vary yet; layers already follow the host's outline bar by bar",
@@ -1749,8 +1752,8 @@ pub(crate) fn convert_to_standard(txn: &mut crate::txn::Transaction<'_>, p: Conv
         if !rec.varying {
             continue;
         }
-        if matches!(rec.placement, Placement::FreeForm(_)) {
-            return Err(Error::new("rebar.not_varying", "a free-form set is always varying: each bar is worked out on its own"));
+        if matches!(rec.placement, Placement::FreeForm(_) | Placement::Distributed(_)) {
+            return Err(Error::new("rebar.not_varying", "a free-form or distributed set is worked out from its source and cannot be converted"));
         }
         let groups = length_groups(&store, &geometry(&store, &rec)?);
         if groups.len() > 1 {
@@ -1935,7 +1938,8 @@ pub fn varying_parts(store: &Store, e: &Element) -> Option<Vec<(f64, Option<u32>
 
 /// Whether an element goes with `guid`: a set in it.
 pub fn uses(e: &Element, guid: &str) -> bool {
-    rebar_recipe(e).is_some_and(|r| r.host == guid)
+    // In it, or distributed from it (STR-RBR-014).
+    rebar_recipe(e).is_some_and(|r| r.host == guid || crate::rebar_paths::source(&r) == Some(guid))
 }
 
 #[derive(Debug, Clone, Deserialize, JsonSchema)]

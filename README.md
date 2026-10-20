@@ -728,6 +728,9 @@ tools and the datums.
   planes, and closed links square to a member's path that follow a varying section, such as up
   a tapered wall (`rebar.place_free_form`; STR-RBR-013). Not yet: picking faces and path edges
   in the view, tapered beams, B-spline centrelines.
+  Path and morphed distributions: a bar carried along a 3D path square to it, and longitudinal
+  bars through a stirrup set that follow it (`rebar.distribute_along_path`,
+  `rebar.distribute_morphed`; STR-RBR-014). Not yet: picking path edges in the view.
   Rebar documentation: a Rebar Tag (number and "15 Ø12 @ 150"), multi-rebar annotations across
   parallel sets, bending details with segment values, and a Bar Bending Schedule grouped by
   partition and number with mass from nominal kg/m (`rebar_tag.place`,
