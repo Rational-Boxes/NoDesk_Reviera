@@ -35,6 +35,8 @@ pub const UI_ACTIONS: &[&str] = &[
     "system_type.edit",
     "mep_check.duct",
     "mep_check.pipe",
+    "mep_check.circuits",
+    "panel.settings",
     "ui.pane.clash",
     "ui.pane.analytical_checks",
     "ui.pane.results",

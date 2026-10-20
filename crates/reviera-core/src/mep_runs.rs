@@ -1374,6 +1374,44 @@ pub(crate) fn reapply_type(txn: &mut Transaction<'_>, p: ReapplyParams) -> Resul
     Ok(report)
 }
 
+/// Moves a segment or fitting: its points through `point` in plan and `dz` up; its directions
+/// turned (and mirrored) with them.
+pub(crate) fn transform(txn: &mut Transaction<'_>, id: ElementId, point: &dyn Fn([f64; 2]) -> [f64; 2], dz: f64) -> Result<()> {
+    let e = txn.store().get(id).cloned().ok_or_else(|| bad("element.not_found", "no such element"))?;
+    let p3 = |p: V3| {
+        let q = point([p[0], p[1]]);
+        [q[0], q[1], p[2] + dz]
+    };
+    // A direction through the plan map: the image of its tip less the image of its tail.
+    let d3 = |d: V3| {
+        let (o, t) = (point([0.0, 0.0]), point([d[0], d[1]]));
+        let v = [t[0] - o[0], t[1] - o[1], d[2]];
+        unit(v).unwrap_or(d)
+    };
+    let value = if let Some(mut s) = segment_recipe(&e) {
+        s.start = p3(s.start);
+        s.end = p3(s.end);
+        s.across = s.across.map(d3);
+        for t in &mut s.taps {
+            t.at = p3(t.at);
+            t.direction = d3(t.direction);
+        }
+        serde_json::to_value(&s).expect("serialises")
+    } else if let Some(mut f) = fitting_recipe(&e) {
+        f.centre = p3(f.centre);
+        for l in &mut f.legs {
+            l.direction = d3(l.direction);
+            l.across = l.across.map(d3);
+        }
+        serde_json::to_value(&f).expect("serialises")
+    } else {
+        return Err(bad("mep_run.not_a_run", format!("element {id} is not a duct, pipe or fitting")));
+    };
+    txn.modify(id, |e| {
+        e.params.insert(RECIPE_KEY.into(), value);
+    })
+}
+
 /// The colour each segment and fitting shows: its system type's, else a domain grey.
 pub fn colors(store: &Store) -> BTreeMap<ElementId, [f32; 4]> {
     let by_system = crate::mep_systems::element_colors(store);

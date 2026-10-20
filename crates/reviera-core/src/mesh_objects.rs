@@ -58,10 +58,11 @@ pub enum Category {
     ElectricalEquipment,
     ElectricalFixture,
     Sprinkler,
+    Transformer,
 }
 
 impl Category {
-    pub const ALL: [Category; 11] = [
+    pub const ALL: [Category; 12] = [
         Category::GenericModel,
         Category::Furniture,
         Category::Column,
@@ -73,6 +74,7 @@ impl Category {
         Category::ElectricalEquipment,
         Category::ElectricalFixture,
         Category::Sprinkler,
+        Category::Transformer,
     ];
 
     pub fn label(self) -> &'static str {
@@ -88,6 +90,7 @@ impl Category {
             Category::ElectricalEquipment => "Electrical Equipment",
             Category::ElectricalFixture => "Electrical Fixture",
             Category::Sprinkler => "Sprinkler",
+            Category::Transformer => "Transformer",
         }
     }
 
@@ -105,6 +108,7 @@ impl Category {
             Category::ElectricalEquipment => "IfcElectricDistributionBoard",
             Category::ElectricalFixture => "IfcOutlet",
             Category::Sprinkler => "IfcFireSuppressionTerminal",
+            Category::Transformer => "IfcTransformer",
         }
     }
 
@@ -122,6 +126,7 @@ impl Category {
             Category::ElectricalEquipment => "IfcElectricDistributionBoardType",
             Category::ElectricalFixture => "IfcOutletType",
             Category::Sprinkler => "IfcFireSuppressionTerminalType",
+            Category::Transformer => "IfcTransformerType",
         }
     }
 

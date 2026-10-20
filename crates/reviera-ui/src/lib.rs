@@ -53,6 +53,7 @@ mod parts;
 mod path_arrays;
 mod radial;
 mod mep_ui;
+mod mep_electrical_ui;
 mod mep_runs_ui;
 mod fullscreen;
 mod plans;
@@ -4473,6 +4474,13 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "mep_check.duct" => with(gui, |g| g.toggle_mep_check(reviera_core::mep_systems::CheckKind::Duct)),
         "mep_check.pipe" => with(gui, |g| g.toggle_mep_check(reviera_core::mep_systems::CheckKind::Pipe)),
         "mep_check.show_disconnects" => with(gui, Gui::show_disconnects),
+        "mep_check.circuits" => with(gui, |g| g.toggle_mep_check(reviera_core::mep_systems::CheckKind::Circuit)),
+        "circuit.create" => with(gui, Gui::create_circuit),
+        "circuit.add" => with(gui, |g| g.circuit_members(true)),
+        "circuit.remove" => with(gui, |g| g.circuit_members(false)),
+        "circuit.select_panel" => with(gui, Gui::select_circuit_panel),
+        "circuit.disconnect_panel" => with(gui, Gui::disconnect_circuit_panel),
+        "panel.settings" => with(gui, Gui::panel_settings),
         "ui.pane.analytical_checks" => Gui::toggle_checks_pane(gui),
         "ui.pane.results" => Gui::toggle_results_pane(gui),
         "load_case.manage" => Gui::load_cases_dialog(gui, "cases"),

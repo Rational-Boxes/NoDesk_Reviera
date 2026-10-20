@@ -831,6 +831,55 @@ pub(crate) fn connect_coincident(txn: &mut Transaction<'_>, ids: &[ElementId]) -
     Ok(made)
 }
 
+/// After a move: a connection whose two ports met before and no longer do is dropped, with a
+/// warning listing the newly open ports; moved copies connect where they meet.
+pub(crate) fn after_move(txn: &mut Transaction<'_>, before: &Store, moved: &[ElementId], copy: bool) -> Result<()> {
+    if copy {
+        connect_coincident(txn, moved)?;
+        return Ok(());
+    }
+    let now = txn.store().clone();
+    let links = stored_links(&now);
+    let mut keep = Vec::new();
+    let mut opened: Vec<ElementId> = Vec::new();
+    let mut opened_ports = Vec::new();
+    for l in links {
+        let (Some(a), Some(b)) = (resolve(&now, &l.a), resolve(&now, &l.b)) else {
+            keep.push(l);
+            continue;
+        };
+        if !moved.contains(&a.0) && !moved.contains(&b.0) {
+            keep.push(l);
+            continue;
+        }
+        let met = |s: &Store| match (port(s, a.0, a.1), port(s, b.0, b.1)) {
+            (Some(p), Some(q)) => coincide(&p, &q),
+            _ => false,
+        };
+        if met(before) && !met(&now) {
+            for (e, k) in [a, b] {
+                if !opened.contains(&e) {
+                    opened.push(e);
+                }
+                opened_ports.push(format!("{} port {}", e.0, k));
+            }
+        } else {
+            keep.push(l);
+        }
+    }
+    if !opened.is_empty() {
+        save_links(txn, keep)?;
+        txn.warn(crate::txn::Warning {
+            id: "mep.connection_dropped".into(),
+            message: format!("The move separated connected connectors; now open: {}", opened_ports.join(", ")),
+            element_ids: opened,
+        });
+    }
+    // What moved may now meet other open ports.
+    connect_coincident(txn, moved)?;
+    Ok(())
+}
+
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ConnectTouchingParams {
@@ -1353,7 +1402,20 @@ fn starters() -> Vec<Starter> {
             category: C::ElectricalEquipment,
             size: [0.6, 0.2, 1.0],
             color: grey,
-            connectors: vec![power("Supply", [0.0, 0.0, 1.0], up, D::Out, 400.0, 3, 0.0, "Power")],
+            connectors: vec![
+                power("Supply", [0.0, 0.0, 1.0], up, D::Out, 400.0, 3, 0.0, "Power"),
+                power("Feed", [0.0, 0.0, 0.0], down, D::In, 400.0, 3, 0.0, "Power"),
+            ],
+        },
+        Starter {
+            name: "Transformer",
+            category: C::Transformer,
+            size: [1.2, 0.8, 1.4],
+            color: grey,
+            connectors: vec![
+                power("Primary", [0.0, 0.0, 0.0], down, D::In, 400.0, 3, 0.0, "Power"),
+                power("Secondary", [0.0, 0.0, 1.4], up, D::Out, 208.0, 3, 0.0, "Power"),
+            ],
         },
         Starter {
             name: "Receptacle",

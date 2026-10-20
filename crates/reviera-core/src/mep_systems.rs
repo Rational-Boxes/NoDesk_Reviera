@@ -855,9 +855,7 @@ pub fn check(store: &Store, p: CheckParams) -> Result<Vec<Issue>> {
     let air = match p.kind {
         CheckKind::Duct => true,
         CheckKind::Pipe => false,
-        CheckKind::Circuit => {
-            return Err(bad("mep_check.not_built", "circuits (MEP-ELEC) are not built yet"));
-        }
+        CheckKind::Circuit => return Ok(crate::mep_electrical::check(store)),
     };
     let domain = if air { Domain::Duct } else { Domain::Pipe };
     let mut out = Vec::new();

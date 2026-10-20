@@ -328,6 +328,18 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "tab_all" => format!(
             r#"<path d="M4 10h8l2-4h6l2 4h6v18H4z" fill="{f}" {s}/><path d="M4 10h24" {sa}/>"#
         ),
+        "check_circuits" => format!(
+            r#"<path d="M3 20l5-8 4 6 4-10" {s}/><path d="M26 6l4 8h-8z" {sa}/><path d="M26 9v2" {sa}/>"#
+        ),
+        "circuit_create" => format!(
+            r#"<rect x="3" y="4" width="8" height="12" fill="{f}" {s}/><path d="M11 10c6 0 6 8 12 8" stroke-dasharray="2 2" {s}/><circle cx="25" cy="18" r="3" {sa}/><path d="M25 3v6M22 6h6" {sa}/>"#
+        ),
+        "circuit_panel" => format!(
+            r#"<rect x="4" y="4" width="12" height="24" fill="{f}" {s}/><path d="M7 9h6M7 14h6M7 19h6" {s}/><path d="M16 14h12" stroke-dasharray="2 2" {sa}/>"#
+        ),
+        "panel_settings" => format!(
+            r#"<rect x="4" y="4" width="12" height="24" fill="{f}" {s}/><path d="M7 9h6M7 14h6M7 19h6" {s}/><circle cx="24" cy="20" r="4" {sa}/><path d="M24 13v3M24 24v3M17 20h3M28 20h3" {sa}/>"#
+        ),
         "duct" => format!(
             r#"<path d="M3 11h16v10H3z" fill="{f}" {s}/><path d="M19 11h4l6 6v-6M19 21h10" {s}/><path d="M23 11v10" {sa}/>"#
         ),

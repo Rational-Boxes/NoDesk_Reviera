@@ -831,7 +831,8 @@ tools and the datums.
 
 The MEP epic has begun with its foundations (spec Chapter 4 §4.6): connectors, the connectivity
 graph, system types, systems and system checks, the System Browser, and ducts and pipes with
-their fittings. Electrical circuits, cable tray and conduit, and sizing are next.
+their fittings, and electrical circuits, panels and feeders. Panel schedules, cable tray and
+conduit, and sizing are next.
 
 - **Connectors** on component types: duct, pipe, electrical, cable tray and conduit connectors with
   their point and direction, shape and size, system classification, flow direction and
@@ -857,9 +858,18 @@ their fittings. Electrical circuits, cable tray and conduit, and sizing are next
   can slope. Runs connect to the equipment they meet and join its system (`duct.create`,
   `pipe.create`, `duct.set_size`, `duct.cap_open_ends`, `mep_segment_type.*`,
   `routing_preferences.*`, `mep_run.reapply_type`).
+- **Electrical circuits** (Systems › Electrical): power, data and other circuits of selected
+  devices (incompatible ones skipped and listed); panels with a distribution system (230/400 V,
+  120/208 V, …), slots and circuit naming (LP1-7, 13,15,17, C7); Select Panel offers only
+  compatible panels with free slots; Add to, Remove from and Disconnect Panel; loads summed per
+  circuit and panel; feeders between panels (on a breaker or feed-through lugs) and transformers
+  bridging distribution systems, loads rolling up to the main board, loops refused; Check Circuits;
+  circuits drawn dashed to their panel and listed in the System Browser (`circuit.*`, `panel.*`, `distribution_system.create`, `voltage.create`,
+  `electrical_settings.*`).
 - **IFC**: ports as `IfcDistributionPort` nested in their elements, connections as
   `IfcRelConnectsPorts`, systems as `IfcDistributionSystem` with their members and building;
-  `IfcDuctSegment`, `IfcDuctFitting`, `IfcPipeSegment` and `IfcPipeFitting` with their types.
+  `IfcDuctSegment`, `IfcDuctFitting`, `IfcPipeSegment` and `IfcPipeFitting` with their types;
+  circuits as `IfcDistributionCircuit` with their members.
 
 ### Analysis and remote computation (in development)
 
@@ -1179,7 +1189,8 @@ area by area (reviewed against the spec on 2026-10-15).
   connection groups, composite decks and span symbols, truss families (a layout shared by types),
   further rebar (two-point, varying sets beyond bars through walls, bent fabric), bilinear and two-way area loads, panel results and external analysis providers.
 - **MEP** (in development): fittings placed and edited by hand, moving runs, flex duct, cable tray and conduit,
-  electrical circuits, panels and switch systems, sizing and calculations, the System Browser's
+  wires, panel schedules, demand factors, custom circuit naming, switch systems, sizing
+  and calculations, the System Browser's
   zones, columns and search, the System Editor, placing connectors on faces in a component editor, fabrication, P&ID and spaces
   and zones are specified but not built.
 - **Families and collaboration** (BIMserver, OpenCDE, Godot) are specified but not started.

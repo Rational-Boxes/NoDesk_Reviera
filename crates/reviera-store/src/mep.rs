@@ -287,6 +287,21 @@ pub(crate) fn write_mep(
         ifc.set_attribute(rel, "RelatingPort", &r(a))?;
         ifc.set_attribute(rel, "RelatedPort", &r(b))?;
     }
+    // Circuits: their members by IfcRelAssignsToGroup (MEP-ELEC-002).
+    for c in reviera_core::mep_electrical::circuits(store) {
+        let Some(&step) = steps.get(&c.id) else { continue };
+        let members: Vec<AttrValue> = c.elements.iter().filter_map(|e| steps.get(e)).map(|s| r(*s)).collect();
+        if members.is_empty() {
+            continue;
+        }
+        let rel = ifc.create_rooted("IfcRelAssignsToGroup", &GlobalId::new())?;
+        if let Some(oh) = owner_history {
+            ifc.set_attribute(rel, "OwnerHistory", &r(oh))?;
+        }
+        ifc.set_attribute(rel, "Description", &s(TAG))?;
+        ifc.set_attribute(rel, "RelatedObjects", &AttrValue::List(members))?;
+        ifc.set_attribute(rel, "RelatingGroup", &r(step))?;
+    }
     let building = store
         .iter()
         .find(|e| e.class == "IfcBuilding")

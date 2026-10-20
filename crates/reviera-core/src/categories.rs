@@ -363,6 +363,22 @@ pub const CATEGORIES: &[Category] = &[
         true,
     ),
     cat(
+        "cat.transformers",
+        "Transformers",
+        Some("IfcTransformer"),
+        Some("IfcTransformerType"),
+        Some("Pset_TransformerTypeCommon"),
+        true,
+    ),
+    cat(
+        "cat.electrical_circuits",
+        "Electrical Circuits",
+        Some("IfcDistributionCircuit"),
+        None,
+        None,
+        false,
+    ),
+    cat(
         "cat.mep_systems",
         "MEP Systems",
         Some("IfcDistributionSystem"),

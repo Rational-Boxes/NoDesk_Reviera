@@ -502,6 +502,15 @@ pub fn transform(
                 crate::skylights::follow_roof(txn, e.guid().as_str(), &|p| x.point(p))?;
             }
             out.push(target);
+        } else if crate::mep_runs::is_run_element(e) {
+            // Ducts, pipes and fittings (MEP-DUCT-001): their points and directions.
+            let target = if copy { txn.create(copied(e))? } else { id };
+            let dz = match x {
+                Xform::Translate(v) => v[2],
+                _ => 0.0,
+            };
+            crate::mep_runs::transform(txn, target, &|p| x.point(p), dz)?;
+            out.push(target);
         } else {
             return Err(Error::new(
                 "element.not_movable",
@@ -509,6 +518,9 @@ pub fn transform(
             ));
         }
     }
+    // Connections whose ports met and no longer do are dropped; copies connect where they meet
+    // (MEP-CONN-002).
+    crate::mep::after_move(txn, &store, &out, copy)?;
     Ok(out)
 }
 

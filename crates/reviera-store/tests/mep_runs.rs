@@ -103,6 +103,21 @@ fn duct_runs_fittings_and_ifc() {
     let f = reviera_core::mep_runs::fitting_recipe(doc.store().get(elbow).unwrap()).unwrap();
     assert!(f.legs.iter().any(|l| (l.size.width - 0.8).abs() < 1e-9), "{f:?}");
 
+    // Moving the whole L-run keeps it connected; moving one segment alone separates it, with a
+    // warning; a copy of the run is connected within itself.
+    let run_ids: Vec<u64> = ok(&r, &mut doc, "mep.network_of", json!({ "element_id": elbow.0 })).as_array().unwrap().iter().map(|v| v.as_u64().unwrap()).collect();
+    let out = run(&r, &mut doc, "element.move", json!({ "element_ids": run_ids, "vector": [0, -5, 0] })).unwrap();
+    assert!(out.warnings.is_empty(), "{:?}", out.warnings);
+    assert_eq!(ok(&r, &mut doc, "mep.network_of", json!({ "element_id": elbow.0 })).as_array().unwrap().len(), 3);
+    let copies = ok(&r, &mut doc, "element.copy", json!({ "element_ids": run_ids, "vectors": [[0, -10, 0]] }));
+    let copy0 = copies[0][0].as_u64().unwrap();
+    assert_eq!(ok(&r, &mut doc, "mep.network_of", json!({ "element_id": copy0 })).as_array().unwrap().len(), 3);
+    let out = run(&r, &mut doc, "element.move", json!({ "element_ids": [l_seg.0], "vector": [0, 0, 1] })).unwrap();
+    assert!(out.warnings.iter().any(|w| w.id == "mep.connection_dropped"), "{:?}", out.warnings);
+    assert_eq!(ok(&r, &mut doc, "mep.network_of", json!({ "element_id": l_seg.0 })), json!([l_seg.0]));
+    ok(&r, &mut doc, "edit.undo", json!({}));
+    assert_eq!(ok(&r, &mut doc, "mep.network_of", json!({ "element_id": l_seg.0 })).as_array().unwrap().len(), 3);
+
     // Caps on the L-run's open ends.
     let caps = ok(&r, &mut doc, "duct.cap_open_ends", json!({ "element_ids": [l_seg.0] }));
     assert_eq!(caps.as_array().unwrap().len(), 1);

@@ -103,6 +103,22 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(RoutingPreferencesGet),
         registry.add(RoutingPreferencesSet),
         registry.add(MepRunReapplyType),
+        registry.add(ElectricalSettingsGet),
+        registry.add(ElectricalSettingsSet),
+        registry.add(DistributionSystemCreate),
+        registry.add(VoltageCreate),
+        registry.add(PanelSet),
+        registry.add(PanelList),
+        registry.add(CircuitCreate),
+        registry.add(CircuitAdd),
+        registry.add(CircuitRemove),
+        registry.add(CircuitSelectPanel),
+        registry.add(CircuitDisconnectPanel),
+        registry.add(CircuitCompatiblePanels),
+        registry.add(CircuitList),
+        registry.add(PanelCreateFeeder),
+        registry.add(PanelSetSupply),
+        registry.add(PanelHierarchy),
     ];
     for r in results {
         r.expect("MEP commands are valid");
@@ -350,7 +366,7 @@ read_command!(
     MepCheckSystems,
     "mep_check.systems",
     "Check duct or pipe systems",
-    "Checks duct or pipe systems (`kind`: duct, pipe; circuit comes with circuits) (MEP-SYS-005): systems not well connected (no equipment, or members not connected to it), flow and demand mismatches (a preset equipment flow unlike its preset terminals' total; a calculated outlet with nothing downstream) and flow direction mismatches (connected connectors both In or both Out). Each issue: kind, elements, connectors and message. Changes nothing.",
+    "Checks duct or pipe systems or circuits (`kind`: duct, pipe, circuit) (MEP-SYS-005); circuits: no panel, or a panel whose distribution system does not fit. Systems: systems not well connected (no equipment, or members not connected to it), flow and demand mismatches (a preset equipment flow unlike its preset terminals' total; a calculated outlet with nothing downstream) and flow direction mismatches (connected connectors both In or both Out). Each issue: kind, elements, connectors and message. Changes nothing.",
     crate::mep_systems::CheckParams,
     Vec<crate::mep_systems::Issue>,
     crate::mep_systems::check
@@ -483,4 +499,175 @@ edit_command!(
     crate::mep_runs::ReapplyParams,
     crate::mep_runs::ReapplyReport,
     crate::mep_runs::reapply_type
+);
+
+read_command!(
+    ElectricalSettingsGet,
+    "electrical_settings.get",
+    "The electrical settings",
+    "The project's electrical settings (MEP-SET-002): voltage definitions (value, minimum, maximum), distribution systems (phase single or three, wye or delta, wires, line-to-line and line-to-ground voltage), the circuit naming scheme (numerical, prefixed, panel_name_number) and whether multi-pole circuits are named by their first slot only.",
+    crate::mep_electrical::Empty,
+    crate::mep_electrical::ElectricalSettings,
+    crate::mep_electrical::get_settings
+);
+
+edit_command!(
+    ElectricalSettingsSet,
+    "electrical_settings.set",
+    "Change the electrical settings",
+    "Sets the project's circuit naming scheme (`naming`: numerical, prefixed, panel_name_number) and `first_slot_only` (MEP-ELEC-012); every circuit on a panel set to By Project is renamed.",
+    "Electrical Settings",
+    crate::mep_electrical::SetSettingsParams,
+    (),
+    crate::mep_electrical::set_settings
+);
+
+edit_command!(
+    DistributionSystemCreate,
+    "distribution_system.create",
+    "Make a distribution system",
+    "Adds a distribution system (MEP-SET-002): `name`, `phase` (single, three), `configuration` (wye, delta), `wires` (2–4), `v_ll` and `v_lg` (volts; three-phase needs v_ll). Returns its id.",
+    "Distribution System",
+    crate::mep_electrical::DistributionParams,
+    String,
+    crate::mep_electrical::create_distribution
+);
+
+edit_command!(
+    VoltageCreate,
+    "voltage.create",
+    "Make a voltage definition",
+    "Adds a voltage definition (MEP-SET-002): `name`, `value`, `min` and `max` (volts). Returns its id.",
+    "Voltage",
+    crate::mep_electrical::VoltageParams,
+    String,
+    crate::mep_electrical::create_voltage
+);
+
+edit_command!(
+    PanelSet,
+    "panel.set",
+    "Set a panel's name, distribution system and slots",
+    "Sets a panel's (electrical equipment with an electrical connector) `name` (shown in circuit numbers), `distribution_system`, `slots` (1–168; poles take every second slot) and `naming` (by_project, numerical, prefixed, panel_name_number). Refused when its circuits would no longer fit. Circuits are renumbered.",
+    "Panel",
+    crate::mep_electrical::PanelSetParams,
+    (),
+    crate::mep_electrical::set_panel
+);
+
+read_command!(
+    PanelList,
+    "panel.list",
+    "The panels",
+    "Every panel with its distribution system, slots, naming, circuits, used slots and connected load (VA).",
+    crate::mep_electrical::Empty,
+    Vec<crate::mep_electrical::PanelInfo>,
+    crate::mep_electrical::list_panels
+);
+
+edit_command!(
+    CircuitCreate,
+    "circuit.create",
+    "Make a circuit",
+    "Makes a circuit (MEP-ELEC-002) of `kind` (power, data, telephone, security, fire_alarm, nurse_call, controls, communication) of devices and fixtures by their electrical connectors of the kind; power circuits have a `voltage` and `poles` (the first device's when omitted), and devices of another voltage or pole count are skipped and reported, with warnings. A device on another circuit moves to it. Returns the circuit, the devices added, skipped (with the reason) and moved.",
+    "Create Circuit",
+    crate::mep_electrical::CreateParams,
+    crate::mep_electrical::CircuitReport,
+    crate::mep_electrical::create
+);
+
+edit_command!(
+    CircuitAdd,
+    "circuit.add",
+    "Add devices to a circuit",
+    "Adds devices to a circuit (MEP-ELEC-003); an incompatible one is refused with \"Incompatible: <reason>\"; one on another circuit is moved off it.",
+    "Add to Circuit",
+    crate::mep_electrical::MembersParams,
+    crate::mep_electrical::CircuitReport,
+    crate::mep_electrical::add
+);
+
+edit_command!(
+    CircuitRemove,
+    "circuit.remove",
+    "Remove devices from a circuit",
+    "Takes devices off a circuit (MEP-ELEC-003); removing the last one deletes the circuit.",
+    "Remove from Circuit",
+    crate::mep_electrical::MembersParams,
+    (),
+    crate::mep_electrical::remove
+);
+
+edit_command!(
+    CircuitSelectPanel,
+    "circuit.select_panel",
+    "Put a circuit on a panel",
+    "Puts a circuit on a panel in the first free slots that fit its poles (MEP-ELEC-003): refused when the panel's distribution system does not give the circuit's voltage (line to ground for one pole, line to line for two or three; three poles need three phases) or it is full. The circuit is numbered by the panel's naming scheme. Returns its number.",
+    "Select Panel",
+    crate::mep_electrical::PanelParams,
+    String,
+    crate::mep_electrical::select_panel
+);
+
+edit_command!(
+    CircuitDisconnectPanel,
+    "circuit.disconnect_panel",
+    "Take a circuit off its panel",
+    "Frees the circuit's slots (MEP-ELEC-003); it keeps its members and loses its number.",
+    "Disconnect Panel",
+    crate::mep_electrical::CircuitParams,
+    (),
+    crate::mep_electrical::disconnect_panel
+);
+
+read_command!(
+    CircuitCompatiblePanels,
+    "circuit.compatible_panels",
+    "Panels a circuit can go on",
+    "The panels whose distribution system fits a circuit and that have free slots for it, optionally those whose name contains `search`, with their distribution system and free slots.",
+    crate::mep_electrical::CompatibleParams,
+    Vec<crate::mep_electrical::PanelChoice>,
+    crate::mep_electrical::compatible_panels
+);
+
+read_command!(
+    CircuitList,
+    "circuit.list",
+    "The circuits",
+    "Every circuit (or those on a panel or with a device): number, kind, voltage, poles, members, panel, slots and load (VA).",
+    crate::mep_electrical::ListParams,
+    Vec<crate::mep_electrical::CircuitInfo>,
+    crate::mep_electrical::list
+);
+
+edit_command!(
+    PanelCreateFeeder,
+    "panel.create_feeder",
+    "Feed a panel from another",
+    "Feeds a panel or transformer (`child_panel_id`) from another (`parent_panel_id`) (MEP-ELEC-006): a feeder circuit from the parent to the child's feed connector, on a `connection` breaker (taking slots) or the parent's feed-through lugs (no slot; one per parent, the parent's lugs on). The child's distribution system must match what the parent gives (a transformer gives its secondary: \"Transformer has no secondary distribution system\" until it is set). Loops are refused naming the chain. The parent then carries the child's whole connected load. Returns the feeder.",
+    "Feeder",
+    crate::mep_electrical::FeederParams,
+    ElementId,
+    crate::mep_electrical::create_feeder
+);
+
+edit_command!(
+    PanelSetSupply,
+    "panel.set_supply",
+    "Choose a panel's supply",
+    "Moves a panel's feeder to another source (`source_id`), with the checks of `panel.create_feeder`, or makes one. Returns the feeder.",
+    "Select Supply",
+    crate::mep_electrical::SupplyParams,
+    ElementId,
+    crate::mep_electrical::set_supply
+);
+
+read_command!(
+    PanelHierarchy,
+    "panel.hierarchy",
+    "The distribution tree",
+    "The panels from `root_id` (or every panel without a supply) down through their feeders: name, connected load (VA, sub-panels included), feeder and children.",
+    crate::mep_electrical::HierarchyParams,
+    Vec<crate::mep_electrical::PanelNode>,
+    crate::mep_electrical::hierarchy
 );

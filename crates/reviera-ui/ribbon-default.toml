@@ -2265,6 +2265,48 @@ icon = "check_pipe"
 help = "Mark pipe systems not well connected, flow mismatches and flow direction mismatches in this view (MEP-SYS-005)"
 
 [[action]]
+id = "mep_check.circuits"
+label = "Check Circuits"
+icon = "check_circuits"
+help = "Mark circuits with no panel, or on a panel whose distribution system does not fit them, in this view (MEP-SYS-005)"
+
+[[action]]
+id = "circuit.create"
+label = "Create Circuit"
+icon = "circuit_create"
+help = "Make a power, data or other circuit of the selected devices; incompatible devices are skipped and listed (MEP-ELEC-002)"
+
+[[action]]
+id = "circuit.add"
+label = "Add to Circuit"
+icon = "system_add"
+help = "Add the selected devices to a circuit (moved off any other)"
+
+[[action]]
+id = "circuit.remove"
+label = "Remove from Circuit"
+icon = "system_remove"
+help = "Take the selected devices off a circuit"
+
+[[action]]
+id = "circuit.select_panel"
+label = "Select Panel"
+icon = "circuit_panel"
+help = "Put a circuit on a compatible panel with free slots; it is numbered by the panel's scheme (MEP-ELEC-003)"
+
+[[action]]
+id = "circuit.disconnect_panel"
+label = "Disconnect Panel"
+icon = "system_disconnect"
+help = "Take a circuit off its panel; it keeps its devices and loses its number"
+
+[[action]]
+id = "panel.settings"
+label = "Panel Settings"
+icon = "panel_settings"
+help = "A panel's name, distribution system, slots and circuit naming"
+
+[[action]]
 id = "mep_check.show_disconnects"
 label = "Show Disconnects"
 icon = "show_disconnects"
@@ -2572,10 +2614,22 @@ tools = [
 ]
 
 [[tab.panel]]
+label = "Electrical"
+tools = [
+  { action = "circuit.create", size = "large" },
+  { action = "circuit.add", size = "small" },
+  { action = "circuit.remove", size = "small" },
+  { action = "circuit.select_panel", size = "small" },
+  { action = "circuit.disconnect_panel", size = "small" },
+  { action = "panel.settings", size = "small" },
+]
+
+[[tab.panel]]
 label = "Check Systems"
 tools = [
   { action = "mep_check.duct", size = "small" },
   { action = "mep_check.pipe", size = "small" },
+  { action = "mep_check.circuits", size = "small" },
   { action = "mep_check.show_disconnects", size = "small" },
 ]
 

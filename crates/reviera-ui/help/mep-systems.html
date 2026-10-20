@@ -10,6 +10,7 @@ Water 1. The tools are on the <b>Systems</b> tab.</p>
   <a href="#runs">Ducts and pipes</a>
   <a href="#connections">Connections</a>
   <a href="#systems">Systems</a>
+  <a href="#circuits">Electrical circuits</a>
   <a href="#types">System types</a>
   <a href="#browser">System Browser</a>
   <a href="#checks">Checking systems</a>
@@ -77,6 +78,23 @@ join a return air system, and a connector is in one system at a time.</p>
     Name 2, and so on.</li>
   <li><b>Disconnect Equipment</b> stops the equipment serving the system.</li>
 </ul>
+
+<h2 id="circuits">Electrical circuits</h2>
+<p>Select receptacles, luminaires or other devices and choose
+<a href="reviera:action/circuit.create">Create Circuit</a>, then the kind (Power, Data, Fire Alarm,
+…). Devices join by their electrical connector of that kind; for power, those of another voltage
+or number of poles are skipped and listed. A device can be on one circuit at a time: adding it to
+another moves it.</p>
+<p>A <b>panel</b> is a distribution board. <a href="reviera:action/panel.settings">Panel
+Settings</a> gives it a name, a distribution system (230/400 V wye, 120/208 V wye, …), its number of
+slots and how its circuits are named. <a href="reviera:action/circuit.select_panel">Select
+Panel</a> lists only the panels that give the circuit's voltage and have free slots, and puts the
+circuit in the first free ones: a two- or three-pole circuit takes every second slot. Circuits are
+numbered by the scheme: <b>Panel Name + Number</b> (LP1-7), <b>Numerical</b> (13,15,17) or
+<b>Prefixed</b> (C7). <b>Disconnect Panel</b> takes it off again; it keeps its devices.</p>
+<p>Select a device or a panel to see its circuits drawn dashed from the panel to each device. The
+System Browser lists panels, their circuits with the load, and their devices. <b>Check
+Circuits</b> marks circuits with no panel or on a panel that does not fit them.</p>
 
 <h2 id="types">System types</h2>
 <p>Every classification has a built-in type of its name with an abbreviation (SA, RA, DCW, …) and

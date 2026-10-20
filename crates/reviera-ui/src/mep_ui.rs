@@ -40,6 +40,7 @@ use super::{Gui, with};
 pub(crate) struct MepMarks {
     pub duct: bool,
     pub pipe: bool,
+    pub circuit: bool,
     /// Show Disconnects, for these domains.
     pub disconnects: Option<Vec<Domain>>,
 }
@@ -67,6 +68,27 @@ type Segment = [[f32; 3]; 2];
 
 const OPEN: [f32; 4] = [0.90, 0.10, 0.10, 1.0];
 const WARN: [f32; 4] = [0.95, 0.65, 0.05, 1.0];
+
+/// "duct systems", "pipe systems", "circuits".
+fn plural(label: &str) -> String {
+    if label == "circuit" { "circuits".into() } else { format!("{label} systems") }
+}
+
+/// A dashed line from `a` to `b`.
+fn dashed(a: [f64; 3], b: [f64; 3]) -> Vec<Segment> {
+    let d = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+    let l = (d[0] * d[0] + d[1] * d[1] + d[2] * d[2]).sqrt();
+    let n = ((l / 0.3).ceil() as usize).max(1);
+    (0..n)
+        .filter(|k| k % 2 == 0)
+        .map(|k| {
+            let t0 = k as f64 / n as f64;
+            let t1 = ((k + 1) as f64 / n as f64).min(1.0);
+            let at = |t: f64| [a[0] + d[0] * t, a[1] + d[1] * t, a[2] + d[2] * t];
+            [f32s(at(t0)), f32s(at(t1))]
+        })
+        .collect()
+}
 
 /// A ring of radius `r` at `c` square to `n`, as segments.
 fn ring(c: [f64; 3], n: [f64; 3], r: f64) -> Vec<Segment> {
@@ -151,11 +173,40 @@ impl Gui {
                 add(colour, segs);
             }
         }
+        // Circuits of the selection: dashed from the panel's connector to each device's.
+        let sel = self.selection();
+        for c in reviera_core::mep_electrical::circuits(&store) {
+            if !sel.iter().any(|s| c.elements.contains(s) || c.panel == Some(*s) || c.id == *s) {
+                continue;
+            }
+            let home = c.panel.and_then(|pid| {
+                let e = store.get(pid)?;
+                mep::ports(&store, e).into_iter().find(|p| p.connector.domain == Domain::Electrical).map(|p| p.position)
+            });
+            for (e, k) in &c.ports {
+                let Some(p) = mep::port(&store, *e, *k) else { continue };
+                match home {
+                    Some(h) => add(domain_colour(Domain::Electrical), dashed(h, p.position)),
+                    // No panel: a short home-run arrow up from the device.
+                    None => {
+                        let up = [p.position[0], p.position[1], p.position[2] + 0.4];
+                        let mut segs = vec![[f32s(p.position), f32s(up)]];
+                        segs.push([f32s(up), f32s([up[0] - 0.08, up[1], up[2] - 0.1])]);
+                        segs.push([f32s(up), f32s([up[0] + 0.08, up[1], up[2] - 0.1])]);
+                        add(OPEN, segs);
+                    }
+                }
+            }
+        }
         let Some(view) = self.views.get(index) else {
             return Vec::new();
         };
         if let Some(marks) = self.mep_marks.get(&view.id) {
-            for (on, kind) in [(marks.duct, mep_systems::CheckKind::Duct), (marks.pipe, mep_systems::CheckKind::Pipe)] {
+            for (on, kind) in [
+                (marks.duct, mep_systems::CheckKind::Duct),
+                (marks.pipe, mep_systems::CheckKind::Pipe),
+                (marks.circuit, mep_systems::CheckKind::Circuit),
+            ] {
                 if !on {
                     continue;
                 }
@@ -461,18 +512,19 @@ impl Gui {
                 (marks.pipe, "pipe")
             }
             mep_systems::CheckKind::Circuit => {
-                return frame.set_status_text("Check Circuits comes with circuits, which are not built yet", 0);
+                marks.circuit = !marks.circuit;
+                (marks.circuit, "circuit")
             }
         };
         if on {
             let issues = mep_systems::check(&store, mep_systems::CheckParams { kind, view_id: None, on }).unwrap_or_default();
             let text = match issues.first() {
-                None => format!("Check {label} systems: no issues"),
-                Some(i) => format!("Check {label} systems: {} issue(s); first: {}", issues.len(), i.message),
+                None => format!("Check {}: no issues", plural(label)),
+                Some(i) => format!("Check {}: {} issue(s); first: {}", plural(label), issues.len(), i.message),
             };
             frame.set_status_text(&text, 0);
         } else {
-            frame.set_status_text(&format!("Check {label} systems off"), 0);
+            frame.set_status_text(&format!("Check {} off", plural(label)), 0);
         }
         self.refresh_active();
     }
@@ -635,9 +687,48 @@ impl Gui {
             }
             t.expand(&d);
         }
+        // Electrical: panels, their circuits and devices; circuits with no panel.
+        let circuits = reviera_core::mep_electrical::circuits(&store);
+        if !circuits.is_empty() || store.iter().any(|e| reviera_core::mep_electrical::is_panel(&store, e)) {
+            let all: Vec<ElementId> = circuits.iter().flat_map(|c| c.elements.iter().copied()).collect();
+            if let Some(el) = push(&mut b.nodes, &root, &format!("Electrical ({})", circuits.len()), all) {
+                let mut panels: Vec<(Option<ElementId>, String)> = store
+                    .iter()
+                    .filter(|e| reviera_core::mep_electrical::is_panel(&store, e))
+                    .map(|e| (Some(e.id()), reviera_core::mep_electrical::panel_name(e)))
+                    .collect();
+                panels.push((None, "No panel".into()));
+                for (pid, pname) in panels {
+                    let on: Vec<&reviera_core::mep_electrical::CircuitInfo> = circuits.iter().filter(|c| c.panel == pid).collect();
+                    if pid.is_none() && on.is_empty() {
+                        continue;
+                    }
+                    let mut ids: Vec<ElementId> = pid.into_iter().collect();
+                    ids.extend(on.iter().flat_map(|c| c.elements.iter().copied()));
+                    let load: f64 = on.iter().map(|c| c.load).sum();
+                    let Some(pi) = push(&mut b.nodes, &el, &format!("{pname} ({} circuits, {:.1} kVA)", on.len(), load / 1000.0), ids) else { continue };
+                    for c in on {
+                        let num = if c.name.is_empty() { "(no number)".to_owned() } else { c.name.clone() };
+                        let text = format!("{num}: {} {:.0} V {}P, {:.0} VA", c.kind.label(), c.voltage, c.poles, c.load);
+                        let Some(ci) = push(&mut b.nodes, &pi, &text, c.elements.clone()) else { continue };
+                        for e in &c.elements {
+                            push(&mut b.nodes, &ci, &label(*e), vec![*e]);
+                        }
+                    }
+                    t.expand(&pi);
+                }
+                t.expand(&el);
+            }
+        }
         let unassigned = mep_systems::unassigned(&store);
+        let on_circuit = reviera_core::mep_electrical::port_circuits(&store);
+        let electrical: Vec<mep::Port> = mep::all_ports(&store)
+            .into_iter()
+            .filter(|p| p.connector.domain == Domain::Electrical && p.connector.flow_direction != mep::FlowDirection::Out)
+            .filter(|p| !on_circuit.contains_key(&(p.element, p.index)))
+            .collect();
         let mut by_domain: Vec<(Domain, Vec<ElementId>)> = Vec::new();
-        for p in &unassigned {
+        for p in unassigned.iter().chain(&electrical) {
             match by_domain.iter_mut().find(|(d, _)| *d == p.connector.domain) {
                 Some((_, v)) => {
                     if !v.contains(&p.element) {
