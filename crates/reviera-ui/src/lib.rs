@@ -63,6 +63,7 @@ mod steel_detail_ui;
 mod steel_cut_ui;
 mod custom_ui;
 mod coords;
+mod precast_ui;
 mod rebar_edit_ui;
 mod rebar_ui;
 mod rebar_view_ui;
@@ -4559,6 +4560,9 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "rebar.convert_to_varying" => with(gui, |g| g.convert_rebar_sets(true)),
         "rebar.sketch" => with(gui, Gui::sketch_rebar),
         "rebar.place_free_form" => with(gui, Gui::place_free_form_rebar),
+        "precast.split" => with(gui, Gui::precast_split),
+        "precast.resplit" => with(gui, Gui::precast_resplit),
+        "precast_config.show" => with(gui, Gui::precast_configuration),
         "rebar.distribute_along_path" => with(gui, Gui::distribute_along_path),
         "rebar.distribute_morphed" => with(gui, Gui::distribute_morphed),
         "rebar.constrain" => with(gui, Gui::edit_rebar_constraints),

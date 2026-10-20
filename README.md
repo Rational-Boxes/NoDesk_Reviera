@@ -731,6 +731,13 @@ tools and the datums.
   Path and morphed distributions: a bar carried along a 3D path square to it, and longitudinal
   bars through a stirrup set that follow it (`rebar.distribute_along_path`,
   `rebar.distribute_morphed`; STR-RBR-014). Not yet: picking path edges in the view.
+- **Precast**: one versioned configuration of precast rules per project (segmentation per wall
+  and slab kind, density, CAM filename rule), checked rule by rule, exported and imported as JSON
+  (`precast_config.*`; STR-PRE-001); walls and floors split into the fewest pieces within length,
+  height and weight, joints gapped and kept off openings, hollow-core in standard widths, each
+  piece an `IfcElementAssembly` with its piece mark, re-split when the rules change
+  (`precast.split`, `precast.resplit`; STR-PRE-002). Not yet: automatic precast reinforcement,
+  custom fabric sheets, mounting parts, shop drawings and CAM export (STR-PRE-003 … 007).
   Rebar documentation: a Rebar Tag (number and "15 Ø12 @ 150"), multi-rebar annotations across
   parallel sets, bending details with segment values, and a Bar Bending Schedule grouped by
   partition and number with mass from nominal kg/m (`rebar_tag.place`,

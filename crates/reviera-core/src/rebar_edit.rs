@@ -11,8 +11,8 @@
 //! face given), reporting the hosts where they do not fit.
 //!
 //! **Splices** cut a set of straight bars (shape 00) at a point along them, by a distance or
-//! where a plan line crosses them, into two sets that overlap by the lap (by default the bar
-//! type's, 40 diameters); a stagger moves every second bar's splice. The two keep each other
+//! where a plan line crosses them, into two sets that overlap by the lap (by default 50 of the
+//! bar type's diameters, provisional); a stagger moves every second bar's splice. The two keep each other
 //! (GlobalIds) and change together.
 //!
 //! **Couplers** (`IfcMechanicalFastener`, ObjectType COUPLER) join two bar ends no more than
@@ -282,7 +282,7 @@ pub struct SpliceParams {
     /// For `length`: from the bars' start (metres).
     #[serde(default)]
     pub length: Option<f64>,
-    /// The lap (metres); default 40 bar diameters.
+    /// The lap (metres); default 50 bar diameters (provisional: see EXPERT_REVIEW.md).
     #[serde(default)]
     pub lap: Option<f64>,
     /// Every second bar's splice moves this far along (metres).
@@ -311,7 +311,7 @@ pub(crate) fn splice(txn: &mut crate::txn::Transaction<'_>, p: SpliceParams) -> 
         _ => return Err(Error::new("rebar.splice", "give a length, or a line crossing the bars")),
     };
     let d = rebar::bar_types(&store).into_iter().find(|b| b.id == rec.bar_type).map_or(0.012, |b| b.diameter);
-    let lap = p.lap.unwrap_or(40.0 * d);
+    let lap = p.lap.unwrap_or(50.0 * d);
     if lap <= 0.0 || at - lap / 2.0 <= d || at + lap / 2.0 + p.stagger >= full - d {
         return Err(Error::new("rebar.splice", format!("the splice and its {:.0} mm lap must lie inside the {:.0} mm bars", lap * 1000.0, full * 1000.0)));
     }

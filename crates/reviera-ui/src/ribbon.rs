@@ -42,6 +42,7 @@ pub const UI_ACTIONS: &[&str] = &[
     "rebar_view.middle",
     "rebar_view.select",
     "rebar_view.states",
+    "precast_config.show",
     "rebar_view.multi_linear",
     "reinforcement_numbering.show",
     "help.about",

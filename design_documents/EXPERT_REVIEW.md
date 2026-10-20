@@ -1,0 +1,24 @@
+# Items for subject-matter expert review
+
+Engineering values and domain choices that Reviera uses as defaults or rules but that no
+standard, manufacturer or expert has yet confirmed. Each was chosen as the most logical starting
+point, as reasoned below, and is marked **provisional** until a subject-matter expert (structural
+or precast engineer, detailer, or IFC specialist as noted) reviews it. When an item is reviewed,
+record the reviewer's role (not name), the date, the decision and any source in the table and in
+`RESEARCH_LOG.md`, and change the code, spec, help and tests to match.
+
+Spec cross-reference: Chapter 4 open question **Q14** (and Q13 for the IFC item).
+
+| # | Item | Provisional choice | Why this is the most logical start | Where | Reviewer | Status |
+|---|------|--------------------|-------------------------------------|-------|----------|--------|
+| E-1 | Concrete density for precast piece weights | 2.5 t/m³ | The usual unit weight of normal-weight reinforced concrete (about 25 kN/m³). Lightweight or heavy concrete needs its own value, which the configuration allows. | STR-PRE-001/002; `precast.rs` `Config::density` | Structural / precast engineer | Open |
+| E-2 | Precast wall segmentation defaults | Length 0.6–8 m, height 0.3–4 m, 12 t, 20 mm joints both ways, 200 mm from openings, no profile overlap | 8 m and 4 m keep a panel within ordinary road-transport length and height on a frame; 12 t is within common plant and site crane capacity; 20 mm is a typical sealed panel joint; 200 mm keeps a joint clear of an opening's corner zone. All plant- and project-specific. | STR-PRE-002; `precast.rs` `WallSegmentation::default` | Precast engineer / manufacturer | Open |
+| E-3 | Precast slab segmentation defaults | Solid and lattice-girder 0.6–2.5 m wide; hollow-core 0.3–1.2 m with 12.5 mm strands; 12 t; 20 mm joints | 2.5 m stays within normal road-transport width; 1.2 m is the common nominal hollow-core width and 12.5 mm a common strand size; narrower hollow-core cuts are rarely practical. | STR-PRE-002; `precast.rs` `SlabKinds::default` | Precast engineer / manufacturer | Open |
+| E-4 | Default lap length for splices | 50 bar diameters (raised from 40 on 2026-10-19) | Tension laps with all bars lapped at one section commonly come to about 50 diameters or more, and 40 diameters suits only staggered or compression laps. A safety-related default should err long; the user can always give the lap. The governing code's formula (bond, concrete class, bar position, percentage lapped) should replace it. | STR-RBR-015; `rebar_edit.rs` `splice` | Structural engineer | Open |
+| E-5 | Coupler sleeve size (drawn and clash-checked) | Outside diameter 1.6 bar diameters, length 6 bar diameters | A typical sleeve's proportions, for drawing and clashes only; it carries no capacity. Real sizes come from the supplier's product. | STR-RBR-015; `rebar_edit.rs` coupler mesh | Detailer / supplier data | Open |
+| E-6 | Cover on a slanted or tapered wall face | Measured square to the leaning face (horizontal offset = cover ÷ cos of the lean) | Cover is the shortest distance from a bar's surface to the concrete surface, which is square to the face. | STR-RBR-005; `rebar.rs` Through placement | Structural engineer | Open |
+| E-7 | When a roof counts as concrete (can hold rebar) | Its type is named for concrete or has a concrete `material` | Roof types carry no material yet; a material on the roof type is the proper source and should replace the name test. | STR-RBR-013; `rebar.rs` `host_check` | BIM / product owner | Open |
+| E-8 | Morphed longitudinal bars' places round stirrups | Equal shares of the stirrup's length from its first corner | Even spacing is the neutral choice. Detailing practice usually puts a bar in every corner first, then spaces the rest, which may be the better default. | STR-RBR-014; `rebar_paths.rs` | Detailer | Open |
+| E-9 | Free-form surface cover where shell faces have different covers | The bottom (or top) cover for the whole shell | The spec asks for the largest cover; not yet done. Taking the largest is the safe choice once covers can differ across a shell. | STR-RBR-013; `rebar_free.rs` | Structural engineer | Open |
+| E-10 | Rebar steel mass | 7850 kg/m³ times the nominal bar area | The nominal mass per metre of reinforcing bar is defined from this density. | STR-RBR-018; `rebar.rs` `info`, `rebar_docs.rs` | Detailer | Open (low risk) |
+| E-11 | Precast piece to source element link in IFC | Not written in IFC; kept in RXD | IFC gives an element one decomposition parent, here its piece assembly. See Chapter 4 Q13. | STR-PRE-002 | IFC specialist | Open (Q13) |

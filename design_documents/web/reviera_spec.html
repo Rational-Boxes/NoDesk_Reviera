@@ -173,7 +173,7 @@ td code { white-space: nowrap; }
         <div class="tb-cell"><span class="tb-label">Revision</span><span class="tb-value">0.1 · Draft</span></div>
         <div class="tb-cell"><span class="tb-label">Date</span><span class="tb-value tb-num">2026-10-12</span></div>
         <div class="tb-cell"><span class="tb-label">Requirements</span><span class="tb-value tb-num">808</span></div>
-        <div class="tb-cell"><span class="tb-label">Commands</span><span class="tb-value tb-num">2,126</span></div>
+        <div class="tb-cell"><span class="tb-label">Commands</span><span class="tb-value tb-num">2,129</span></div>
         <div class="tb-cell"><span class="tb-label">Licence</span><span class="tb-value">GPL-3.0-or-later</span></div>
         <div class="tb-cell last-row"><span class="tb-label">Stack</span><span class="tb-value">IFC · Rust · OCCT · wx · LuaJIT · MCP</span></div>
         <div class="tb-cell last-row" style="grid-column: span 3"><span class="tb-label">By priority</span>
@@ -32808,7 +32808,7 @@ No IFC equivalent.
 <p><strong>Acceptance criteria.</strong>
 - [x] Placing a coupler between two Ø25 bar ends 300 mm apart is refused, because the gap is more than 10 diameters (250 mm).
 - [x] A spliced set exports two bars per splice location, connected by the configured lap length.</p>
-<p><em>Built (2026-10-19):</em> <code>rebar.splice</code> cuts a set of straight bars (shape 00, not hooked or already spliced; links, bent, area, path and free-form bars are refused) by a distance from their start or where a plan line crosses them into two sets overlapping by the lap (default 40 bar diameters), every second bar's splice moved by the stagger; each keeps the other's GlobalId (<code>splice</code> in its recipe) and a change of layout, bar type, placement or host to one is made to both. <code>rebar_coupler.place</code> puts a coupler (<code>IfcMechanicalFastener</code> USERDEFINED, ObjectType COUPLER) on one bar end or between two of the same size no more than 10 diameters apart and 3 off line (refused naming the distance and limit); it is a sleeve 1.6 bar diameters across and 6 long, sits in the <em>Structural Rebar Couplers</em> category, is not a clash with its bars or their host, is deleted with its bars, and exports with <code>IfcRelConnectsWithRealizingElements</code> between the two sets; <code>rebar_coupler.info</code>. Splice (position, lap, stagger) and Coupler (click one or two bar ends) are on the set's contextual tab. Not yet: splice and coupler types, end treatments shortening bars, arc bars, coupler numbering, schedules, tags, propagation and Align to View.</p>
+<p><em>Built (2026-10-19):</em> <code>rebar.splice</code> cuts a set of straight bars (shape 00, not hooked or already spliced; links, bent, area, path and free-form bars are refused) by a distance from their start or where a plan line crosses them into two sets overlapping by the lap (default 50 bar diameters, provisional pending expert review, Q14), every second bar's splice moved by the stagger; each keeps the other's GlobalId (<code>splice</code> in its recipe) and a change of layout, bar type, placement or host to one is made to both. <code>rebar_coupler.place</code> puts a coupler (<code>IfcMechanicalFastener</code> USERDEFINED, ObjectType COUPLER) on one bar end or between two of the same size no more than 10 diameters apart and 3 off line (refused naming the distance and limit); it is a sleeve 1.6 bar diameters across and 6 long, sits in the <em>Structural Rebar Couplers</em> category, is not a clash with its bars or their host, is deleted with its bars, and exports with <code>IfcRelConnectsWithRealizingElements</code> between the two sets; <code>rebar_coupler.info</code>. Splice (position, lap, stagger) and Coupler (click one or two bar ends) are on the set's contextual tab. Not yet: splice and coupler types, end treatments shortening bars, arc bars, coupler numbering, schedules, tags, propagation and Align to View.</p>
 <h3 id="4216-reinforcement-numbering-and-partitions">4.2.16 Reinforcement numbering and partitions</h3>
 <p><strong>ID:</strong> <code class="rid" id="STR-RBR-016">STR-RBR-016</code> · <strong>Priority:</strong> <span class="pri pri-p2">P2</span> · <strong>Ref:</strong> research/03 §3.1 ("Reinforcement numbering and partitions") · screenshots/structure_mep/rebar_partitions_by_level.png</p>
 <p><strong>Purpose.</strong> Give identical reinforcement elements identical numbers within a partition.</p>
@@ -33877,14 +33877,17 @@ No IFC equivalent.
 - <code>precast_config.get(path) -&gt; value</code>
 - <code>precast_config.set(path, value)</code>
 - <code>precast_config.export(file)</code>
-- <code>precast_config.import(file)</code>
+- <code>precast_config.import(file) -&gt; {version, missing[]}</code>
+- <code>precast_config.apply(config) -&gt; version</code>
+- <code>precast_config.affected() -&gt; {version, older[]}</code>
 - <code>precast_config.show()</code></p>
 <p><code>path</code> addresses a node and key, for example <code>wall.solid.segmentation.max_length</code>. <code>set</code> applies the dialog's validation and returns an error naming the rule.</p>
 <p><strong>Acceptance criteria.</strong>
-- [ ] A configuration exported from one project and imported into another produces identical segmentation results on an identical wall.
-- [ ] Entering a minimum wall length of 9 m with a maximum of 8 m marks the Segmentation node invalid and disables <em>OK</em>.
-- [ ] After changing the maximum weight, the dialog reports how many existing assemblies used the previous version and offers to re-run on them.
-- [ ] <code>precast_config.set("wall.solid.segmentation.max_length", -1)</code> fails with a message naming the rule.</p>
+- [x] A configuration exported from one project and imported into another produces identical segmentation results on an identical wall.
+- [x] Entering a minimum wall length of 9 m with a maximum of 8 m marks the Segmentation node invalid and disables <em>OK</em>.
+- [x] After changing the maximum weight, the dialog reports how many existing assemblies used the previous version and offers to re-run on them.
+- [x] <code>precast_config.set("wall.solid.segmentation.max_length", -1)</code> fails with a message naming the rule.</p>
+<p><em>Built (2026-10-19):</em> the configuration is the RXD document <code>rxd:fabrication</code> on the project (JSON: <code>version</code>, <code>density</code> in t/m³, <code>auto_update</code>, <code>wall.{solid,double}</code> and <code>slab.{solid,hollow_core,lattice_girder}</code> each with <code>segmentation</code>, <code>reinforcement</code>, <code>connections</code>, <code>shop_drawing</code>; <code>annotations</code>, <code>dimensioning</code>, <code>cam.{format,folder,filename}</code>, <code>data_folder</code>; lengths in metres, weights in tonnes). Starting values, Reviera's own, provisional pending subject-matter expert review (Q14, <code>EXPERT_REVIEW.md</code>): walls 0.6–8 m long, 0.3–4 m high, 12 t, 20 mm joints, 200 mm from openings; slabs 0.6–2.5 m wide (hollow-core 0.3–1.2 m, 12.5 mm strands), 12 t, 20 mm joints; density 2.5 t/m³. <code>precast_config.get</code> and <code>.set</code> address values by dotted path; <code>.set</code> keeps a value's type, refuses an unknown path, and checks every rule (positive lengths, minimum ≤ maximum, gaps 0–100 mm, weights and density above 0, the CAM filename's placeholders, an existing data folder), refusing with <code>precast_config.invalid</code> and the path and rule; every change raises the version. <code>.apply</code> replaces the whole document as one step (the dialog's OK). <code>.export</code> writes <code>{schema: 1, kind: "reviera.precast_configuration", configuration}</code>; <code>.import</code> checks it and the rules, replaces the document and lists the slab components and division profiles it names that the project lacks. <code>.affected</code> gives the version and the assemblies made with an older one. Concrete › Precast Settings › <strong>Configuration</strong>: a tree (General; Solid Wall, Double Wall, Solid Slab, Hollow-core Slab, Lattice-girder Slab each with Segmentation, Reinforcement, Connections, Shop Drawing; Annotations; Dimensioning; CAM Export) checked as you type: a field that breaks a rule turns red, its page is marked "(!)", the rule shows under the tree and OK is disabled. A check box re-splits the assemblies an older version made after OK. Export… and Import… buttons. Not yet: the reinforcement, connections, shop-drawing, annotation and dimensioning nodes' contents (their steps are not built), families checked as loaded, the template's own configuration.</p>
 <h3 id="452-segmentation-split">4.5.2 Segmentation (split)</h3>
 <p><strong>ID:</strong> <code class="rid" id="STR-PRE-002">STR-PRE-002</code> · <strong>Priority:</strong> <span class="pri pri-p2">P2</span> · <strong>Ref:</strong> research/03 §6.2</p>
 <p><strong>Workflow.</strong>
@@ -33907,11 +33910,13 @@ No IFC equivalent.
 <p><strong>Commands.</strong>
 - <code>precast.split(element_ids[], slab_kind?) -&gt; assembly_ids[]</code>
 - <code>precast.resplit(assembly_ids[])</code>
-- <code>precast.set_auto_update(bool)</code></p>
+- <code>precast.set_auto_update(bool)</code>
+- <code>precast.info(assembly_ids[]?) -&gt; assemblies[]</code></p>
 <p><strong>Acceptance criteria.</strong>
-- [ ] A 30 m × 3 m wall with maximum length 8 m and maximum weight 12 t is split into the fewest pieces that satisfy both limits, with the configured gaps.
-- [ ] No joint lies closer to an opening than the minimum distance.
+- [x] A 30 m × 3 m wall with maximum length 8 m and maximum weight 12 t is split into the fewest pieces that satisfy both limits, with the configured gaps.
+- [x] No joint lies closer to an opening than the minimum distance.
 - [ ] Each piece exports as an <code>IfcElementAssembly</code> that contains the concrete element and its reinforcement.</p>
+<p><em>Built (2026-10-19):</em> <code>precast.split</code> on straight walls (solid or double) and floors (solid, hollow-core or lattice-girder). A wall gets rows of equal height when taller than the maximum height, then joints along it: the fewest pieces with every piece within the minimum and maximum length and the maximum weight (its concrete volume, less openings, × density; the heaviest row counts), and no joint within the minimum distance of an opening; the pieces are made even where that keeps every rule, otherwise each joint goes as far along as the rules allow (stepping back off an opening). A 30 m × 3 m × 250 mm wall at 8 m and 12 t gives five 6 m pieces (four would weigh 14 t). A floor is cut into strips side by side along its longest outline edge: hollow-core in standard (maximum) widths with the rest last (the last two shared if the rest is under the minimum), others like walls. Its parts are divided (made first if it has none: one per layer) with the configured gaps, and each piece's parts go in an <code>IfcElementAssembly</code> (USERDEFINED, ObjectType <code>PRECAST_ASSEMBLY</code>) with a piece mark (W1-1, W1-2, … or S1-…; a row letter when there are rows) and <code>Pset_PrecastConcreteElementFabrication</code> PieceMark and TypeDesignator on it and its parts. The assembly's recipe (<code>recipe.precast_assembly</code>) keeps the source, kind, parts, mark, place, configuration version, a hash of the kind's rules, and the divisions it made. In IFC the parts are aggregated by their assembly, not by the source (the source-to-piece link stays in RXD, per the owner decision above), and the assembly is contained in the source's storey. Splitting an element already split is refused naming its assemblies (the window offers to re-split); <code>precast.resplit</code> removes the split's pieces and assemblies and splits again with the current rules; <code>precast.set_auto_update</code> sets the configuration's flag (nothing is regenerated yet: STR-PRE-003, 005); <code>precast.info</code> gives each assembly's mark, kind, source, parts, volume, weight, version and place. Deleting the source deletes its assemblies. Concrete › Precast Detailing › <strong>Split</strong> (the wall or slab kind) and <strong>Re-split</strong>; the Model Tree shows the assemblies under the element split and their parts under them. The third criterion waits for STR-PRE-003, which puts reinforcement in the assemblies. Not yet: curved walls, double walls as one three-layer piece, profile overlap between rows, joints kept off openings in floors, hollow-core division profiles, independent lattice girders, the <em>Multiple</em> option.</p>
 <h3 id="453-automatic-precast-reinforcement">4.5.3 Automatic precast reinforcement</h3>
 <p><strong>ID:</strong> <code class="rid" id="STR-PRE-003">STR-PRE-003</code> · <strong>Priority:</strong> <span class="pri pri-p2">P2</span> · <strong>Ref:</strong> research/03 §6.3 · screenshots/structure_mep/precast_wall_auto_reinforcement.png</p>
 <p><strong>Workflow.</strong> Choose <em>Auto Reinforce</em>. Select an assembly, or several assemblies of the same kind. Choose the <strong>area reinforcement type</strong> and, for walls, the <strong>edge reinforcement type</strong>. Click OK.</p>
@@ -38782,8 +38787,22 @@ No IFC equivalent.
 <tr>
 <td><code>precast_config.import</code></td>
 <td>file</td>
-<td>—</td>
+<td>{version, missing[]}</td>
 <td>Yes</td>
+<td>STR-PRE-001</td>
+</tr>
+<tr>
+<td><code>precast_config.apply</code></td>
+<td>config</td>
+<td>version</td>
+<td>Yes</td>
+<td>STR-PRE-001</td>
+</tr>
+<tr>
+<td><code>precast_config.affected</code></td>
+<td>—</td>
+<td>{version, older[]}</td>
+<td>No</td>
 <td>STR-PRE-001</td>
 </tr>
 <tr>
@@ -38812,6 +38831,13 @@ No IFC equivalent.
 <td>bool</td>
 <td>—</td>
 <td>Yes</td>
+<td>STR-PRE-002</td>
+</tr>
+<tr>
+<td><code>precast.info</code></td>
+<td>assembly_ids[]?</td>
+<td>assemblies[]</td>
+<td>No</td>
 <td>STR-PRE-002</td>
 </tr>
 <tr>
@@ -40873,6 +40899,11 @@ No IFC equivalent.
 <td>Q13</td>
 <td>Precast pieces and their source in IFC</td>
 <td><strong>Deferred (owner, 2026-10-12): not implemented in the initial version.</strong> IFC allows one decomposition parent, so a piece cannot be aggregated by both its source element and its piece assembly. The initial version writes only the assembly aggregation and keeps the source link in RXD (STR-PRE-002). A real decision needs advice from an IFC and precast domain expert (buildingSMART precast/structural guidance, and how receiving tools behave). Candidate to evaluate: <code>IfcRelAssignsToProduct</code> from source to pieces.</td>
+</tr>
+<tr>
+<td>Q14</td>
+<td>Engineering defaults awaiting subject-matter expert review</td>
+<td><strong>Open (owner, 2026-10-19): use the most logical provisional values and have them reviewed by a subject-matter expert.</strong> The list, with each value, its reasoning and where it is used, is <code>design_documents/EXPERT_REVIEW.md</code>: concrete density (2.5 t/m³), precast wall and slab segmentation defaults, the default lap (50 bar diameters), coupler sleeve proportions, cover on leaning faces, concrete roofs as hosts, morphed bar placement, free-form shell cover, rebar steel mass. Help pages call these values provisional.</td>
 </tr>
 </tbody>
 </table></div>
@@ -51818,7 +51849,7 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 </tbody>
 </table></div>
 <h2 id="a3-consolidated-command-index">A.3 Consolidated command index</h2>
-<p><strong>2126 unique commands</strong> in 412 domains. Every command is exposed automatically to the UI, to Lua (<code>reviera.&lt;domain&gt;.&lt;verb&gt;</code>) and to MCP (<code>&lt;domain&gt;_&lt;verb&gt;</code>), subject to its permission class.</p>
+<p><strong>2129 unique commands</strong> in 412 domains. Every command is exposed automatically to the UI, to Lua (<code>reviera.&lt;domain&gt;.&lt;verb&gt;</code>) and to MCP (<code>&lt;domain&gt;_&lt;verb&gt;</code>), subject to its permission class.</p>
 <div class="tbl"><table>
 <thead>
 <tr>
@@ -52885,11 +52916,11 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 </tr>
 <tr>
 <td><code>precast</code></td>
-<td style="text-align: right;">8</td>
+<td style="text-align: right;">9</td>
 </tr>
 <tr>
 <td><code>precast_config</code></td>
-<td style="text-align: right;">5</td>
+<td style="text-align: right;">7</td>
 </tr>
 <tr>
 <td><code>pressure_loss_report</code></td>
@@ -63106,6 +63137,14 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 <td>STR-PRE-004</td>
 </tr>
 <tr>
+<td><code>precast.info</code></td>
+<td>4</td>
+<td>assembly_ids[]?</td>
+<td>assemblies[]</td>
+<td>No</td>
+<td>STR-PRE-002</td>
+</tr>
+<tr>
 <td><code>precast.place_mounting_parts</code></td>
 <td>4</td>
 <td>assembly_ids[]</td>
@@ -63154,6 +63193,22 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 <td>STR-PRE-002</td>
 </tr>
 <tr>
+<td><code>precast_config.affected</code></td>
+<td>4</td>
+<td>—</td>
+<td>{version, older[]}</td>
+<td>No</td>
+<td>STR-PRE-001</td>
+</tr>
+<tr>
+<td><code>precast_config.apply</code></td>
+<td>4</td>
+<td>config</td>
+<td>version</td>
+<td>Yes</td>
+<td>STR-PRE-001</td>
+</tr>
+<tr>
 <td><code>precast_config.export</code></td>
 <td>4</td>
 <td>file</td>
@@ -63173,7 +63228,7 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 <td><code>precast_config.import</code></td>
 <td>4</td>
 <td>file</td>
-<td>—</td>
+<td>{version, missing[]}</td>
 <td>Yes</td>
 <td>STR-PRE-001</td>
 </tr>

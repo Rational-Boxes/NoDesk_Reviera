@@ -1,0 +1,53 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Copyright (C) 2026 Reviera contributors -->
+<h1>Precast</h1>
+<p class="lead">Walls and floors split into precast pieces by rules you set once per project, on
+the <b>Concrete</b> tab. Each piece is an assembly with its piece mark.</p>
+
+<h2 id="configuration">Configuration</h2>
+<p><a href="reviera:action/precast_config.show">Precast Settings › Configuration</a> holds the
+rules as a tree:</p>
+<ul>
+  <li><b>General</b>: the concrete density that gives weights (2.5 t/m³ by default), automatic
+    updates, and the data folder.</li>
+  <li><b>Solid Wall</b> and <b>Double Wall</b> › Segmentation: minimum and maximum length and
+    height, maximum weight, the vertical and horizontal joint gaps, the minimum distance from a
+    joint to an opening, and the profile overlap height.</li>
+  <li><b>Solid</b>, <b>Hollow-core</b> and <b>Lattice-girder Slab</b> › Segmentation: minimum
+    and maximum width, maximum weight and joint gap; for hollow-core also the slab component,
+    division profile and strand diameter.</li>
+  <li><b>CAM Export</b>: format, folder and filename rule (<code>{mark}</code>,
+    <code>{project}</code>, <code>{source}</code>, <code>{index}</code>).</li>
+</ul>
+<p>A value that breaks a rule turns red, its page is marked (!), the message below names the
+rule, and OK stays disabled until it is fixed. Each OK raises the configuration's version. The
+dialog says how many assemblies an older version made and can re-split them. <b>Export…</b> and
+<b>Import…</b> share the rules between projects as a JSON file. The defaults are provisional
+starting points, not values from a standard, and are awaiting review by a subject-matter expert.</p>
+<p>The Reinforcement, Connections and Shop Drawing pages, Annotations and Dimensioning are for
+the later precast steps. They are not built yet.</p>
+
+<h2 id="split">Split</h2>
+<p>Select straight walls or floors and click
+<a href="reviera:action/precast.split">Split</a>. Choose the wall kind (solid or double) or the
+slab kind (solid, hollow-core or lattice-girder).</p>
+<ul>
+  <li>A wall makes the fewest pieces within the maximum length and weight. Rows of equal height
+    are added when it is taller than the maximum height. No joint comes nearer an opening than
+    the minimum distance, and pieces are as even as that allows.</li>
+  <li>A floor is cut into strips along its longest edge. Hollow-core slabs take standard widths
+    with the rest in the last piece.</li>
+  <li>Joints are the configured gap wide. Weights are volume × density.</li>
+</ul>
+<p>The element's parts are divided (they are made first if it has none). Each piece's parts go
+in an assembly marked W1-1, W1-2, … (S for slabs; a letter for the row when there are rows). In
+the Model Tree the assemblies sit under the element. In IFC each is an
+<code>IfcElementAssembly</code> (PRECAST_ASSEMBLY) holding its parts, with
+<code>Pset_PrecastConcreteElementFabrication</code> PieceMark and TypeDesignator.
+<a href="reviera:action/precast.resplit">Re-split</a> splits again with the current rules.
+Splitting an element twice asks to re-split instead.</p>
+
+<h2 id="not-yet">Not yet</h2>
+<p>Automatic reinforcement, custom fabric sheets, mounting parts, shop drawings and CAM export
+(the later precast steps); curved walls; double walls as one three-layer piece; profile overlap
+between rows; and lattice girders.</p>

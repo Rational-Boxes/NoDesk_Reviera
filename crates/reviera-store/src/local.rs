@@ -3416,6 +3416,11 @@ impl LocalProject {
         let bodies = reviera_core::bodies::all(store);
         let contexts = geometry::Contexts::find(&self.ifc)?;
         let owner_history = self.new_owner_history()?;
+        let in_assembly: std::collections::HashMap<String, ElementId> = store
+            .iter()
+            .filter_map(|e| reviera_core::precast::assembly_recipe(e).map(|a| (e.id(), a)))
+            .flat_map(|(id, a)| a.parts.into_iter().map(move |p| (p, id)))
+            .collect();
         for e in store.iter() {
             let Some(r) = reviera_core::parts::recipe(e) else {
                 continue;
@@ -3448,11 +3453,32 @@ impl LocalProject {
                 self.length_scale,
                 contexts,
             )?;
+            // A precast piece's parts belong to its assembly (STR-PRE-002), not to the source.
+            let assembly = in_assembly.get(e.guid().as_str()).and_then(|a| self.steps.get(a).copied());
             let source = GlobalId::parse(&r.source)
                 .and_then(|g| store.find_by_guid(&g))
                 .and_then(|s| self.steps.get(&s).copied());
-            if let Some(source) = source {
-                geometry::aggregate(&mut self.ifc, step, source, owner_history)?;
+            if let Some(whole) = assembly.or(source) {
+                geometry::aggregate(&mut self.ifc, step, whole, owner_history)?;
+            }
+        }
+        // Each assembly in its source's storey.
+        for e in store.iter() {
+            let Some(a) = reviera_core::precast::assembly_recipe(e) else { continue };
+            let Some(&step) = self.steps.get(&e.id()) else { continue };
+            let level = GlobalId::parse(&a.source)
+                .and_then(|g| store.find_by_guid(&g))
+                .and_then(|s| store.get(s))
+                .and_then(|s| {
+                    reviera_core::walls::wall_recipe(s)
+                        .map(|w| w.base_level)
+                        .or_else(|| reviera_core::floors::slab_recipe(s).map(|(_, f)| f.level))
+                })
+                .and_then(|l| GlobalId::parse(&l))
+                .and_then(|g| store.find_by_guid(&g))
+                .and_then(|l| self.steps.get(&l).copied());
+            if let Some(storey) = level {
+                geometry::contain(&mut self.ifc, step, storey, owner_history)?;
             }
         }
         Ok(())

@@ -468,7 +468,7 @@ impl Gui {
         let full = i[0]["lengths"][0].as_f64().unwrap_or(0.0);
         let d = TextEntryDialog::builder(
             &frame,
-            &format!("The bars are {:.0} mm long. Splice at (mm from their start), lap (mm, blank for 40 diameters), stagger (mm):", full * 1000.0),
+            &format!("The bars are {:.0} mm long. Splice at (mm from their start), lap (mm, blank for 50 diameters), stagger (mm):", full * 1000.0),
             "Splice",
         )
         .with_default_value(&format!("{:.0}, , 0", full * 500.0))

@@ -1536,6 +1536,24 @@ icon = "rebar_free_form"
 help = "Bars over a concrete roof's shell between two planes at the cover, or closed links square to a member's path following its section"
 
 [[action]]
+id = "precast.split"
+label = "Split"
+icon = "precast_split"
+help = "Split the selected walls or floors into precast pieces by the configuration's rules, each piece an assembly with its piece mark"
+
+[[action]]
+id = "precast.resplit"
+label = "Re-split"
+icon = "precast_resplit"
+help = "Split the selected assemblies' walls or floors again with the current precast rules"
+
+[[action]]
+id = "precast_config.show"
+label = "Configuration"
+icon = "precast_config"
+help = "The precast rules: segmentation per wall and slab kind, density, automatic updates, CAM export; export and import them"
+
+[[action]]
 id = "rebar.distribute_along_path"
 label = "Path Distribution"
 icon = "rebar_path_distribution"
@@ -2328,6 +2346,17 @@ tools = [
   { action = "rebar_cover.assign", size = "small" },
   { action = "coordinates.edit", size = "small" },
 ]
+
+[[tab.panel]]
+label = "Precast Detailing"
+tools = [
+  { action = "precast.split", size = "large" },
+  { action = "precast.resplit", size = "small" },
+]
+
+[[tab.panel]]
+label = "Precast Settings"
+tools = [{ action = "precast_config.show", size = "large" }]
 
 [[tab.panel]]
 label = "Documentation"

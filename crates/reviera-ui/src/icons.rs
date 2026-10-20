@@ -625,6 +625,15 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "rebar_morphed" => format!(
             r#"<circle cx="10" cy="16" r="6" fill="none" {s}/><circle cx="22" cy="16" r="6" fill="none" {s}/><path d="M4 12h24M4 20h24" {sa}/>"#
         ),
+        "precast_split" => format!(
+            r#"<rect x="3" y="9" width="8" height="14" fill="{f}" {s}/><rect x="12" y="9" width="8" height="14" fill="{f}" {s}/><rect x="21" y="9" width="8" height="14" fill="{f}" {s}/><path d="M11.5 5v22M20.5 5v22" {sa} stroke-dasharray="2 2"/>"#
+        ),
+        "precast_resplit" => format!(
+            r#"<rect x="4" y="12" width="11" height="14" fill="{f}" {s}/><rect x="17" y="12" width="11" height="14" fill="{f}" {s}/><path d="M24 8a8 6 0 1 0-16 0M24 3v5h-5" fill="none" {sa}/>"#
+        ),
+        "precast_config" => format!(
+            r#"<rect x="4" y="4" width="24" height="24" fill="{f}" {s}/><path d="M8 10h4M8 16h4M8 22h4M14 10h10M16 16h8M16 22h8" {sa}/><path d="M12 10v12" {s}/>"#
+        ),
         "rebar_free_form" => format!(
             r#"<path d="M3 26C6 10 26 10 29 26" fill="none" {s}/><path d="M7 25C10 14 22 14 25 25M11 25c2-6 8-6 10 0" fill="none" {sa}/>"#
         ),

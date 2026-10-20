@@ -59,9 +59,13 @@ pub fn in_tree(e: &Element) -> bool {
 /// The parent element of `e` in the tree, before openings are skipped.
 fn raw_parent(store: &Store, e: &Element, imported: &Imported) -> Option<ElementId> {
     let by_guid = |g: &str| GlobalId::parse(g).and_then(|g| store.find_by_guid(&g));
-    // A part sits under its original element (ARC-PART-001).
-    if let Some(r) = crate::parts::recipe(e) {
+    // A precast piece's parts sit under its assembly, the assembly under the element split
+    // (STR-PRE-002); other parts under their original element (ARC-PART-001).
+    if let Some(r) = crate::precast::assembly_recipe(e) {
         return by_guid(&r.source);
+    }
+    if let Some(r) = crate::parts::recipe(e) {
+        return crate::precast::assembly_of(store, e.guid().as_str()).or_else(|| by_guid(&r.source));
     }
     // Rebar and area, path and fabric systems sit under their host, couplers under their bars
     // (STR-RBR-001, STR-RBR-015).

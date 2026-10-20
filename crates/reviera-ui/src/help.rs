@@ -93,6 +93,7 @@ pub(crate) const PAGES: &[Page] = &[
     page!("structural-framing", "Structural framing", STRUCTURE),
     page!("foundations", "Foundations", STRUCTURE),
     page!("reinforcement", "Reinforcement", STRUCTURE),
+    page!("precast", "Precast", STRUCTURE),
     page!(
         "structural-settings",
         "Structural settings, materials and standards",

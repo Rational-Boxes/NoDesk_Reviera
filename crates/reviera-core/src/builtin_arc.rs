@@ -128,6 +128,16 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(RebarSplitSet),
         registry.add(RebarConvertToVarying),
         registry.add(RebarSketch),
+        registry.add(PrecastConfigGet),
+        registry.add(PrecastConfigSet),
+        registry.add(PrecastConfigApply),
+        registry.add(PrecastConfigExport),
+        registry.add(PrecastConfigImport),
+        registry.add(PrecastConfigAffected),
+        registry.add(PrecastSplit),
+        registry.add(PrecastResplit),
+        registry.add(PrecastSetAutoUpdate),
+        registry.add(PrecastInfo),
         registry.add(RebarPlaceFreeForm),
         registry.add(RebarDistributeAlongPath),
         registry.add(RebarDistributeMorphed),
@@ -3266,6 +3276,131 @@ edit_command!(
     crate::rebar_edit::reset_bars
 );
 
+read_command!(
+    PrecastConfigGet,
+    "precast_config.get",
+    "A precast configuration value",
+    "A value of the precast configuration (STR-PRE-001) by its dotted path, for example \
+     `wall.solid.segmentation.max_length`; the whole configuration for an empty path. Lengths in \
+     metres, weights in tonnes, the density in t/m³.",
+    crate::precast::GetParams,
+    serde_json::Value,
+    crate::precast::get
+);
+
+edit_command!(
+    PrecastConfigSet,
+    "precast_config.set",
+    "Set a precast configuration value",
+    "Sets one value of the precast configuration (STR-PRE-001) by its dotted path. Refused, naming \
+     the rule, when it breaks one (minimum above maximum, gaps outside 0–100 mm, weights not above \
+     0, an unknown filename placeholder, a data folder that is not there). Raises the version and \
+     returns it.",
+    "Precast Configuration",
+    crate::precast::SetParams,
+    u32,
+    crate::precast::set
+);
+
+edit_command!(
+    PrecastConfigApply,
+    "precast_config.apply",
+    "Replace the precast configuration",
+    "Replaces the whole precast configuration (STR-PRE-001) as one step, as the Configuration \
+     dialog's OK does; refused naming the first broken rule. Returns the new version.",
+    "Precast Configuration",
+    crate::precast::ApplyParams,
+    u32,
+    crate::precast::apply
+);
+
+read_command!(
+    PrecastConfigExport,
+    "precast_config.export",
+    "Export the precast configuration",
+    "Writes the precast configuration (STR-PRE-001) to a JSON file with its schema version, to \
+     share between projects.",
+    crate::precast::FileParams,
+    (),
+    crate::precast::export
+);
+
+edit_command!(
+    PrecastConfigImport,
+    "precast_config.import",
+    "Import a precast configuration",
+    "Replaces the precast configuration (STR-PRE-001) with a file's, after checking its rules; \
+     returns the new version and the components it names that the project does not have.",
+    "Import Precast Configuration",
+    crate::precast::FileParams,
+    crate::precast::Imported,
+    crate::precast::import
+);
+
+read_command!(
+    PrecastConfigAffected,
+    "precast_config.affected",
+    "Assemblies made with older precast rules",
+    "The precast configuration's version and the precast assemblies made with an older one \
+     (STR-PRE-001), to re-split.",
+    crate::precast::AffectedParams,
+    crate::precast::Affected,
+    crate::precast::affected_cmd
+);
+
+edit_command!(
+    PrecastSplit,
+    "precast.split",
+    "Split walls and floors into precast pieces",
+    "Splits straight walls and floors into precast pieces (STR-PRE-002) by the configuration's \
+     rules: the fewest pieces within the maximum length (width for floors), height and weight \
+     (volume × density), joints the configured gap wide and none nearer an opening than the \
+     minimum distance, pieces as even as that allows (hollow-core: standard widths and the rest). \
+     `slab_kind` solid, hollow_core or lattice_girder for floors; solid or double for walls. The \
+     element's parts are divided (made first if it has none) and each piece's parts go in an \
+     IfcElementAssembly (PRECAST_ASSEMBLY) with a piece mark (W1-1, W1-2A, S1-3 …). An element \
+     already split is refused, naming its assemblies. Returns the assemblies.",
+    "Split",
+    crate::precast::SplitParams,
+    Vec<ElementId>,
+    crate::precast::split
+);
+
+edit_command!(
+    PrecastResplit,
+    "precast.resplit",
+    "Split precast assemblies' sources again",
+    "Removes the pieces and assemblies a split made of the assemblies' sources and splits them \
+     again with the current configuration (STR-PRE-002). Returns the new assemblies.",
+    "Re-split",
+    crate::precast::ResplitParams,
+    Vec<ElementId>,
+    crate::precast::resplit
+);
+
+edit_command!(
+    PrecastSetAutoUpdate,
+    "precast.set_auto_update",
+    "Turn precast automatic updates on or off",
+    "Whether pieces' reinforcement and mounting parts are made again when pieces change \
+     (STR-PRE-002). Returns the configuration's new version.",
+    "Automatic Updates",
+    crate::precast::AutoUpdateParams,
+    u32,
+    crate::precast::set_auto_update
+);
+
+read_command!(
+    PrecastInfo,
+    "precast.info",
+    "Precast assemblies",
+    "Precast assemblies (STR-PRE-002): piece mark, kind, source, parts, volume (m³) and weight \
+     (t), the configuration version they were made with, and their place along and up.",
+    crate::precast::InfoParams,
+    Vec<crate::precast::AssemblyInfo>,
+    crate::precast::info
+);
+
 edit_command!(
     RebarSketch,
     "rebar.sketch",
@@ -3424,7 +3559,7 @@ edit_command!(
     "Splice a rebar set",
     "Splices a set of straight bars (STR-RBR-015) by `length` from their start or where a plan \
      `line` crosses them: the set keeps the first part, a new set takes the second, overlapping by \
-     `lap` (default 40 diameters); `stagger` moves every second bar's splice. The two change \
+     `lap` (default 50 diameters); `stagger` moves every second bar's splice. The two change \
      together. Returns both.",
     "Splice",
     crate::rebar_edit::SpliceParams,
