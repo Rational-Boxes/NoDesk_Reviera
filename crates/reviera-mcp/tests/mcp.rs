@@ -408,3 +408,82 @@ async fn resources_expose_documents_elements_and_commands() {
             .any(|t| t.uri_template == "reviera://element/{id_or_guid}")
     );
 }
+
+/// The local bridge (UI-AGENT-004): a session secret connects and gets the tools; a wrong one
+/// is refused; a destructive call waits for the window's approver, which here rejects it.
+#[cfg(unix)]
+#[tokio::test(flavor = "multi_thread")]
+async fn bridge_sessions_and_approval() {
+    use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+    let dir = tempfile::tempdir().unwrap();
+    let (live_dir, untitled) = (dir.path().join("live"), dir.path().join("untitled"));
+    let app = AppHandle::spawn(move || {
+        let live = reviera_livestore::Options {
+            dir: live_dir,
+            group_commit: Duration::from_millis(20),
+            encryption: reviera_livestore::Encryption::Passphrase("test".into()),
+            ..Default::default()
+        };
+        let mut app = App::new(AppConfig { live: Some(live), untitled_dir: untitled });
+        let registry = app.registry_mut().unwrap();
+        registry.add(AddWall).unwrap();
+        registry.add(DeleteElement).unwrap();
+        app.execute("file.new", json!({}), &Caller::user()).unwrap();
+        app
+    });
+    let endpoint = reviera_mcp::bridge::Endpoint::start(app, &dir.path().join("run")).unwrap();
+    let mut config = McpConfig::new(Permission::ModelEdit);
+    config.client_name = Some("Test Agent 1".into());
+    config.toolsets.push("modeling".into());
+    let asked = std::sync::Arc::new(std::sync::Mutex::new(Vec::<String>::new()));
+    let log = asked.clone();
+    config.approver = Some(std::sync::Arc::new(move |a: reviera_mcp::Approval| {
+        log.lock().unwrap().push(format!("{}: {}", a.client, a.command));
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        let _ = tx.send(false);
+        rx
+    }));
+    let secret = endpoint.issue(config);
+
+    // A wrong secret is refused and counted.
+    let mut bad = tokio::net::UnixStream::connect(&endpoint.address).await.unwrap();
+    bad.write_all(b"REVIERA-MCP nope\n").await.unwrap();
+    let mut line = String::new();
+    BufReader::new(&mut bad).read_line(&mut line).await.unwrap();
+    assert_eq!(line, "ERR unauthorised\n");
+    assert_eq!(endpoint.refused(), 1);
+
+    // The right one: MCP over the socket.
+    let stream = tokio::net::UnixStream::connect(&endpoint.address).await.unwrap();
+    let (read, mut write) = tokio::io::split(stream);
+    write.write_all(format!("REVIERA-MCP {secret}\n").as_bytes()).await.unwrap();
+    let mut reader = BufReader::new(read);
+    let mut ok = String::new();
+    reader.read_line(&mut ok).await.unwrap();
+    assert_eq!(ok, "OK\n");
+    let info = ClientConfig::new(ClientCapabilities::default(), Implementation::new("agent", "1.0"));
+    let client = info.serve((reader, write)).await.unwrap();
+    let tools = client.list_all_tools().await.unwrap();
+    assert!(tools.iter().any(|t| t.name == "find_commands"), "{:?}", tools.iter().map(|t| t.name.clone()).collect::<Vec<_>>());
+    let call = |name: &str, args: Value| {
+        let mut p = CallToolRequestParams::new(name.to_owned());
+        if let Value::Object(m) = args {
+            p = p.with_arguments(m);
+        }
+        p
+    };
+    let r = client.call_tool(call("wall.add_test", json!({ "name": "W1" }))).await.unwrap();
+    assert_ne!(r.is_error, Some(true), "{r:?}");
+    let id = r.structured_content.unwrap()["result"].clone();
+    let r = client.call_tool(call("element.delete_test", json!({ "id": id }))).await.unwrap();
+    assert_eq!(r.is_error, Some(true));
+    assert_eq!(r.structured_content.unwrap()["error"]["code"], "approval.rejected");
+    assert_eq!(asked.lock().unwrap().as_slice(), ["Test Agent 1: element.delete_test"]);
+    // Revoked: a new connection with the secret is refused.
+    endpoint.revoke(&secret);
+    let mut again = tokio::net::UnixStream::connect(&endpoint.address).await.unwrap();
+    again.write_all(format!("REVIERA-MCP {secret}\n").as_bytes()).await.unwrap();
+    let mut line = String::new();
+    BufReader::new(&mut again).read_line(&mut line).await.unwrap();
+    assert_eq!(line, "ERR unauthorised\n");
+}

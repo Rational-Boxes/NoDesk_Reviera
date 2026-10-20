@@ -827,6 +827,16 @@ tools and the datums.
   (`structural.catalogs`, `structural.standards`, `column.load_section`, `column.check`;
   STR-SEC-001).
 
+### Agent terminal
+
+View › User Interface › **Terminal** (Ctrl+Shift+T) opens a Terminal pane under the views: a real
+terminal (colours, full-screen programs, scrollback, copy and paste) with tabs for your shell and
+for command-line AI agents: **Claude Code**, **Gemini CLI**, **Qwen Code** and **Codex CLI**, plus
+your own presets. An agent tab starts the agent already connected to the open model through
+Reviera's MCP server, via `reviera mcp-bridge` over a private local socket with a per-session
+secret; the agent's edits are ordinary undoable commands, destructive ones wait for your approval
+in Reviera, and your own agent settings are never changed (UI-AGENT-004).
+
 ### MEP (in development)
 
 The MEP epic has begun with its foundations (spec Chapter 4 §4.6): connectors, the connectivity
@@ -1177,10 +1187,8 @@ area by area (reviewed against the spec on 2026-10-15).
   Mac); for the radial menu, its commands for Lua and MCP, icons and the accessibility
   settings; for full-screen, panes laid over the view rather than docked, Ctrl+Cmd+F on macOS and
   touch swipes (UI-SEL-007, UI-DOCK-004).
-- **Agent terminal** (UI-AGENT-004): a Terminal pane running a shell and command-line AI agents
-  (Claude Code, Gemini CLI, Qwen Code, Codex CLI, custom presets) in a real terminal, each
-  started connected to the open model through a `reviera mcp-bridge` stdio bridge over a private
-  local socket, edits with confirmation by default, the agents' own settings never changed.
+- **Agent terminal** (UI-AGENT-004): the tab menu (permission, restart, follow active model),
+  mouse selection, Manage Presets, and checking the Windows pipe beyond compiling.
 - **Remote analysis subscriptions** (DM-RPC-011): Options › Remote Analysis with secure service
   URLs and key:secret credentials (secrets in the OS keychain, exchanged for short-lived tokens),
   status, plan, usage and expiry; the remote analysis server itself is a separate project.

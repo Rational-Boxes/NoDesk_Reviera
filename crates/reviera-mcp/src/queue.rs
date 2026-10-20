@@ -9,7 +9,8 @@ use std::thread::JoinHandle;
 
 use reviera_app::App;
 
-type Job = Box<dyn FnOnce(&mut App) + Send>;
+/// A request to run on the thread that owns the [`App`].
+pub type Job = Box<dyn FnOnce(&mut App) + Send>;
 
 /// A handle to the application thread. When the last handle is dropped, the thread finishes the
 /// queued jobs, flushes unsaved work and stops before the drop returns, so the process never exits
@@ -65,6 +66,21 @@ impl AppHandle {
         }
     }
 
+    /// A handle whose jobs the caller runs itself, on the thread that already owns an [`App`] (the
+    /// window's UI thread, which drains the receiver with [`run_job`]).
+    pub fn external() -> (Self, mpsc::Receiver<Job>) {
+        let (tx, rx) = mpsc::channel::<Job>();
+        (
+            Self {
+                inner: Arc::new(Inner {
+                    tx: Some(tx),
+                    thread: Mutex::new(None),
+                }),
+            },
+            rx,
+        )
+    }
+
     /// Runs `f` on the application thread and waits for its result.
     pub async fn call<R: Send + 'static>(
         &self,
@@ -81,4 +97,9 @@ impl AppHandle {
             .map_err(|_| Stopped)?;
         rx.await.map_err(|_| Stopped)
     }
+}
+
+/// Runs one queued job on `app` (for [`AppHandle::external`]).
+pub fn run_job(job: Job, app: &mut App) {
+    job(app);
 }

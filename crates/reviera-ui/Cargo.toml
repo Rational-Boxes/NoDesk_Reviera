@@ -24,6 +24,12 @@ raw-window-handle.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 toml_edit = "0.25"
+# The Terminal pane (UI-AGENT-004): pseudo-terminals and the VT emulator.
+portable-pty = "0.9"
+vt100 = "0.18"
+reviera-mcp.workspace = true
+tokio.workspace = true
+uuid.workspace = true
 
 [build-dependencies]
 cc.workspace = true

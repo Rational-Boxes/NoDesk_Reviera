@@ -1,0 +1,54 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Copyright (C) 2026 Reviera contributors -->
+<h1>Terminal and AI agents</h1>
+<p class="lead">The Terminal pane runs your shell and command-line AI agents inside Reviera. An
+agent started here is already connected to the model you have open: it can look at the model and
+change it through Reviera's own commands, as you would.</p>
+<nav class="toc">
+  <a href="#open">Opening a terminal</a>
+  <a href="#agents">Agents</a>
+  <a href="#safety">What an agent may do</a>
+  <a href="#presets">Your own presets</a>
+</nav>
+
+<h2 id="open">Opening a terminal</h2>
+<p><a href="reviera:action/ui.pane.terminal">View › User Interface › Terminal</a>
+(<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd>) opens the pane under the views with a Shell tab.
+Choose a preset in the list and press <b>Open</b> for another tab; <b>Close Tab</b> ends the
+selected one (asking first while its program runs). The terminal is a real one: colours,
+full-screen programs, the mouse wheel scrolls back through 10 000 lines,
+<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>C</kbd> copies the screen and
+<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> pastes.</p>
+
+<h2 id="agents">Agents</h2>
+<p>The presets start <b>Claude Code</b>, <b>Gemini CLI</b>, <b>Qwen Code</b> and <b>Codex
+CLI</b>, if they are installed and on your PATH (Reviera does not install them, and their logins
+and API keys stay theirs). Each agent tab gets its own connection to Reviera's MCP server, set up
+for that session only: your agent's own settings files are never changed. Ask the agent about the
+model ("how many doors are on level 1?") or to change it ("make the south wall 300 mm thick").</p>
+<p>Qwen Code starts in a session folder Reviera prepares, since that is where it reads its
+connection settings; the other agents start in the model's folder.</p>
+<p>In the Flatpak, terminal tabs run on your computer outside the sandbox, so the Shell is your
+own login shell and the agents are the ones installed on your system. They reach Reviera through
+<code>flatpak run</code>.</p>
+
+<h2 id="safety">What an agent may do</h2>
+<ul>
+  <li>An agent's changes are ordinary commands: they undo with <kbd>Ctrl</kbd>+<kbd>Z</kbd> like
+    your own, and the views update as they happen.</li>
+  <li>Anything destructive (deleting, purging, overwriting) waits for you: Reviera asks
+    "<i>Claude Code 2 wants to run element.delete… Allow it?</i>". <b>No</b> tells the agent it was
+    refused and changes nothing.</li>
+  <li>The connection is private to you: a local socket only your user can open, guarded by a secret
+    made for each tab. Closing the tab, or the agent ending, ends the connection.</li>
+</ul>
+
+<h2 id="presets">Your own presets</h2>
+<p>Add presets in <code>terminal-presets.json</code> in Reviera's settings folder
+(<code>~/.config/reviera</code>, or <code>%APPDATA%\Reviera</code>): a list of objects with an
+<code>id</code>, a <code>name</code>, the <code>program</code> and its <code>args</code>, and how it
+takes MCP servers (<code>mcp</code>: <code>none</code>, <code>json_argument</code> with
+<code>{mcp_json}</code> in the arguments, <code>settings_env</code> with the variable in
+<code>setting</code>, <code>session_folder</code> with the settings file's path in
+<code>setting</code>, or <code>arguments</code> using <code>{bridge}</code> and
+<code>{session_file}</code>). A preset with the same id as a built-in one replaces it.</p>

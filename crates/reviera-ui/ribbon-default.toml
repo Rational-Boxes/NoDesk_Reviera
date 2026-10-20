@@ -2166,6 +2166,13 @@ actions = ["file.open", "file.save", "edit.undo", "edit.redo", "view.default_3d"
 # ---- Ribbon tabs (default order, §1.8.1) ----
 
 [[action]]
+id = "ui.pane.terminal"
+label = "Terminal"
+icon = "terminal"
+accel = "Ctrl+Shift+T"
+help = "Show or hide the Terminal pane: a shell and CLI AI agents (Claude Code, Gemini CLI, Qwen Code, Codex CLI) started connected to the open model (UI-AGENT-004)"
+
+[[action]]
 id = "ui.pane.system_browser"
 label = "System Browser"
 icon = "system_browser"
@@ -2850,6 +2857,7 @@ tools = [
   { action = "ui.pane.browser", size = "small" },
   { action = "ui.pane.model_tree", size = "small" },
   { action = "ui.pane.components", size = "small" },
+  { action = "ui.pane.terminal", size = "large" },
   { action = "ui.fullscreen.toggle", size = "large" },
   { action = "ui.focus_mode.toggle", size = "small" },
   { action = "ui.radial.toggle", size = "small" },
@@ -3313,7 +3321,7 @@ items = ["script.run", "script.import", "ui.scripts.manage", "-"]
 label = "&Window"
 items = [
   "view.create_3d", "window.close", "-", "window.next", "window.previous", "-",
-  "window.tile", "window.tab_all", "-", "ui.pane.properties", "ui.pane.browser", "ui.pane.model_tree", "ui.pane.components", "ui.pane.system_browser", "-",
+  "window.tile", "window.tab_all", "-", "ui.pane.properties", "ui.pane.browser", "ui.pane.model_tree", "ui.pane.components", "ui.pane.system_browser", "ui.pane.terminal", "-",
   "ui.fullscreen.toggle", "ui.focus_mode.toggle", "ui.radial.toggle",
 ]
 

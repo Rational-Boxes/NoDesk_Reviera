@@ -26,6 +26,9 @@ finish-args:
   - --filesystem=home
   # Live-store encryption keys in the user's keyring (keyring crate, Secret Service over D-Bus).
   - --talk-name=org.freedesktop.secrets
+  # The Terminal pane (UI-AGENT-004) runs the user's shell and CLI agents on the host through
+  # `flatpak-spawn --host`; this lets the app start host programs, as terminal apps do.
+  - --talk-name=org.freedesktop.Flatpak
 
 build-options:
   append-path: /usr/lib/sdk/llvm22/bin

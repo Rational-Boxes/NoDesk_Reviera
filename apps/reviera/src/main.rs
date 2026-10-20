@@ -7,6 +7,9 @@
 //! - `reviera FILE`: opens an IFC file and prints a summary.
 //! - `reviera gui [FILE]`: the main window with the 3D viewport.
 //! - `reviera shell [FILE]`: reads `<command> [JSON arguments]` lines and runs them as the user.
+//! - `reviera mcp-bridge [--session-file PATH]`: an agent's stdio MCP server that relays to the
+//!   running window (UI-AGENT-004); its endpoint and session secret come from the session file
+//!   the Terminal pane writes, or from `REVIERA_MCP_ENDPOINT` and `REVIERA_MCP_SECRET`.
 //! - `reviera --mcp-stdio [--permission LEVEL] [--toolsets a,b] [FILE]`: headless MCP server on
 //!   stdin/stdout (spec DM-MCP-002). LEVEL is `read_only` (default), `model_edit` or `full_scripting`.
 
@@ -21,6 +24,9 @@ fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     if args.first().map(String::as_str) == Some("--mcp-stdio") {
         return mcp_stdio(&args[1..]);
+    }
+    if args.first().map(String::as_str) == Some("mcp-bridge") {
+        return mcp_bridge(&args[1..]);
     }
     // On Windows a double click on reviera.exe (a console of its own, no arguments) opens the
     // window too.
@@ -248,4 +254,33 @@ fn print_json(v: &Value) {
 fn fail(msg: &str) -> ExitCode {
     eprintln!("{msg}");
     ExitCode::FAILURE
+}
+
+/// `reviera mcp-bridge [--session-file PATH]`: relays stdin and stdout to the window's MCP
+/// endpoint. The endpoint and secret come from the session file (two lines, made by the Terminal
+/// pane with owner-only permissions), or from the environment.
+fn mcp_bridge(args: &[String]) -> ExitCode {
+    use reviera_mcp::bridge::{ENDPOINT_ENV, SECRET_ENV, run_bridge};
+    let from_file = match args {
+        [flag, path, ..] if flag == "--session-file" => match std::fs::read_to_string(path) {
+            Ok(text) => {
+                let mut lines = text.lines();
+                lines.next().map(str::to_owned).zip(lines.next().map(str::to_owned))
+            }
+            Err(e) => return fail(&format!("reviera mcp-bridge: cannot read the session file: {e}")),
+        },
+        _ => None,
+    };
+    let session = from_file.or_else(|| std::env::var(ENDPOINT_ENV).ok().zip(std::env::var(SECRET_ENV).ok()));
+    let Some((endpoint, secret)) = session else {
+        return fail("reviera mcp-bridge is started by Reviera's Terminal pane, with a session file or REVIERA_MCP_ENDPOINT and REVIERA_MCP_SECRET");
+    };
+    let runtime = match tokio::runtime::Builder::new_current_thread().enable_all().build() {
+        Ok(r) => r,
+        Err(e) => return fail(&e.to_string()),
+    };
+    match runtime.block_on(run_bridge(&endpoint, &secret)) {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(e) => fail(&e.to_string()),
+    }
 }

@@ -349,6 +349,9 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "cap_ends" => format!(
             r#"<path d="M3 11h18v10H3z" fill="{f}" {s}/><path d="M23 9v14" stroke-width="3" {sa}/>"#
         ),
+        "terminal" => format!(
+            r#"<rect x="3" y="5" width="26" height="22" rx="2" fill="{f}" {s}/><path d="M8 12l5 4-5 4" {sa}/><path d="M15 21h8" {s}/>"#
+        ),
         "system_browser" => format!(
             r#"<path d="M6 5v22M6 10h5M6 18h5M6 26h5" {s}/><circle cx="16" cy="10" r="3" fill="{f}" {s}/><circle cx="16" cy="18" r="3" fill="{f}" {s}/><circle cx="16" cy="26" r="3" fill="{f}" {s}/><path d="M19 10h8M19 18h8M19 26h8" {sa}/>"#
         ),

@@ -14,12 +14,13 @@
 //! mode (DM-MCP-005) and the core resources (DM-MCP-006). Not yet: streamable HTTP and tokens,
 //! rate and size limits, path allow-lists, subscriptions, prompts, `execute_lua`, view images.
 
+pub mod bridge;
 mod queue;
 mod server;
 pub mod toolsets;
 
-pub use queue::{AppHandle, Stopped};
-pub use server::{McpConfig, McpServer};
+pub use queue::{AppHandle, Job, Stopped, run_job};
+pub use server::{Approval, Approver, McpConfig, McpServer};
 
 /// Serves MCP on stdin/stdout until the client disconnects (`reviera --mcp-stdio`).
 pub async fn run_stdio(

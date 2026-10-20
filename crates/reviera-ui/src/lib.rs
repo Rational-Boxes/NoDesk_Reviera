@@ -53,6 +53,7 @@ mod parts;
 mod path_arrays;
 mod radial;
 mod mep_ui;
+mod terminal_ui;
 mod mep_electrical_ui;
 mod mep_runs_ui;
 mod fullscreen;
@@ -415,6 +416,8 @@ struct Gui {
     system_browser: Option<mep_ui::SystemBrowser>,
     /// MEP check markers turned on, by view.
     mep_marks: HashMap<u32, mep_ui::MepMarks>,
+    /// The Terminal pane (UI-AGENT-004), made on first use.
+    terminal: Option<terminal_ui::TerminalPane>,
 }
 
 impl View {
@@ -1079,11 +1082,17 @@ impl Gui {
 
     /// Closes every view; `false` when the user cancelled.
     fn close_all(&mut self) -> bool {
+        // Agents running in the Terminal pane stop with Reviera: asked first.
+        let running = self.terminal.as_ref().map_or(0, |t| t.tabs.len());
+        if running > 0 && !ask(&self.frame, &format!("{running} terminal tab(s) are open. Close them and exit?")) {
+            return false;
+        }
         while let Some(id) = self.views.last().map(|v| v.id) {
             if !self.close_view(id) {
                 return false;
             }
         }
+        self.close_all_terminals();
         true
     }
 
@@ -3678,6 +3687,7 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 chrome: fullscreen::Chrome::default(),
                 system_browser: None,
                 mep_marks: HashMap::new(),
+                terminal: None,
                 help: None,
                 script_units: Rc::new(RefCell::new(Default::default())),
                 timer: Some(Timer::new(&frame)),
@@ -3994,6 +4004,7 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
         // Reports of failures: one left by a session that closed unexpectedly, now; this
         // session's, when the window is next idle after them.
         crash::show_earlier(&frame);
+        terminal_ui::remove_stale_sessions();
         // Tab in a view cycles what is under the cursor (ARC-KEY-001).
         {
             let gui = gui.clone();
@@ -4452,6 +4463,7 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "overlap.find" => with(gui, Gui::check_overlaps),
         "ui.pane.clash" => Gui::toggle_clash_pane(gui),
         "ui.pane.system_browser" => Gui::toggle_system_browser(gui),
+        "ui.pane.terminal" => Gui::toggle_terminal(gui),
         "mep_type.load_starters" => with(gui, Gui::load_mep_types),
         "mep.place_component" => with(gui, Gui::place_mep_component),
         "mep.connect_touching" => with(gui, Gui::connect_touching),

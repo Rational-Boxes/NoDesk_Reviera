@@ -25,7 +25,19 @@ use crate::queue::AppHandle;
 use crate::toolsets::{TOOLSETS, toolset_of};
 
 /// Session settings (per stdio process or, later, per client token).
+/// Asks the user to approve a destructive call: the session's name, the command and a summary of
+/// what it would change; the answer arrives on the returned channel.
+pub type Approver = Arc<dyn Fn(Approval) -> tokio::sync::oneshot::Receiver<bool> + Send + Sync>;
+
+/// A destructive call waiting for the user.
 #[derive(Debug, Clone)]
+pub struct Approval {
+    pub client: String,
+    pub command: String,
+    pub summary: String,
+}
+
+#[derive(Clone)]
 pub struct McpConfig {
     pub permission: Permission,
     /// Toolsets enabled at start; `core` is always included.
@@ -37,6 +49,25 @@ pub struct McpConfig {
     pub agent_may_confirm: bool,
     /// Expose `wall.create` as `wall_create`, for clients that reject `.` in tool names.
     pub underscore_names: bool,
+    /// With a window attached: destructive calls in confirm mode wait for the user's answer here
+    /// instead of returning a preview token (UI-AGENT-004).
+    pub approver: Option<Approver>,
+    /// The session's name, shown in approvals and undo attribution.
+    pub client_name: Option<String>,
+}
+
+impl std::fmt::Debug for McpConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("McpConfig")
+            .field("permission", &self.permission)
+            .field("toolsets", &self.toolsets)
+            .field("confirm_mode", &self.confirm_mode)
+            .field("agent_may_confirm", &self.agent_may_confirm)
+            .field("underscore_names", &self.underscore_names)
+            .field("approver", &self.approver.is_some())
+            .field("client_name", &self.client_name)
+            .finish()
+    }
 }
 
 impl McpConfig {
@@ -47,6 +78,8 @@ impl McpConfig {
             confirm_mode: permission == Permission::ModelEdit,
             agent_may_confirm: true,
             underscore_names: false,
+            approver: None,
+            client_name: None,
         }
     }
 }
@@ -74,7 +107,7 @@ impl McpServer {
         let mut enabled: BTreeSet<String> = config.toolsets.iter().cloned().collect();
         enabled.insert("core".into());
         let session = Session {
-            client: "agent".into(),
+            client: config.client_name.clone().unwrap_or_else(|| "agent".into()),
             enabled,
             previews: HashMap::new(),
         };
@@ -154,6 +187,29 @@ impl McpServer {
             ));
         };
         let caller = self.caller();
+        // With a window: the user approves or rejects in Reviera.
+        if self.config.confirm_mode
+            && spec.effects.contains(&Effect::Destructive)
+            && let Some(approver) = self.config.approver.clone()
+        {
+            let (c, a, cl) = (command.clone(), args.clone(), caller.clone());
+            let preview = self.app.call(move |app| app.preview(&c, a, &cl)).await.map_err(internal)?;
+            let changed = match &preview {
+                Ok(o) => {
+                    let ch = json!(o.changed);
+                    let n = |k: &str| ch.get(k).and_then(Value::as_array).map_or(0, Vec::len);
+                    format!("{} added, {} changed, {} deleted", n("added"), n("modified"), n("deleted"))
+                }
+                Err(e) => return Ok(Err(json!(e))),
+            };
+            let client = self.session.lock().unwrap().client.clone();
+            let answer = approver(Approval { client, command: command.clone(), summary: changed });
+            if !answer.await.unwrap_or(false) {
+                return Ok(Err(json!({"code": "approval.rejected", "message": "the user rejected this call in Reviera"})));
+            }
+            let outcome = self.app.call(move |app| app.execute(&command, args, &caller)).await.map_err(internal)?;
+            return Ok(outcome.map(|o| json!(o)).map_err(|e| json!(e)));
+        }
         if self.config.confirm_mode && spec.effects.contains(&Effect::Destructive) {
             let (c, a, cl) = (command.clone(), args.clone(), caller.clone());
             let preview = self
@@ -663,7 +719,10 @@ impl ServerHandler for McpServer {
         context: RequestContext<RoleServer>,
     ) -> Result<CallToolResponse, McpError> {
         if let Some(info) = context.peer.peer_info() {
-            self.session.lock().unwrap().client = info.client_info.name.clone();
+            // A session the window named (UI-AGENT-004) keeps its name; others take the client's.
+            if self.config.client_name.is_none() {
+                self.session.lock().unwrap().client = info.client_info.name.clone();
+            }
         }
         let args = Value::Object(request.arguments.clone().unwrap_or_default());
         let outcome = self.call(&request.name, args).await?;
