@@ -11,6 +11,7 @@ publish.workspace = true
 
 [dependencies]
 reviera-dstv.workspace = true
+reviera-precast-cam.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true

@@ -720,6 +720,41 @@ impl Gui {
         }
     }
 
+    /// Concrete › Precast Detailing › CAM Export (STR-PRE-007): the selected pieces (or all).
+    pub(crate) fn precast_cam_export(&mut self) {
+        let frame = self.frame;
+        let assemblies = self.selected_assemblies();
+        let writers = self.run("cam_writer.list", json!({})).unwrap_or_default();
+        let list: Vec<(String, String)> = writers.as_array().into_iter().flatten().map(|w| (w["id"].as_str().unwrap_or("").to_owned(), format!("{} ({}, .{})", w["name"].as_str().unwrap_or(""), w["license"].as_str().unwrap_or(""), w["extension"].as_str().unwrap_or("")))).collect();
+        let cam = self.run("precast_config.get", json!({ "path": "cam" })).unwrap_or_default();
+        let folder0 = cam["folder"].as_str().filter(|f| !f.is_empty()).map(str::to_owned).unwrap_or_else(|| std::env::temp_dir().join("reviera-cam").display().to_string());
+        let f = super::reinforcement_ui::Form::new(&frame, "CAM Export");
+        let writer = f.choice("Writer", &list.iter().map(|x| x.1.clone()).collect::<Vec<_>>(), list.iter().position(|w| cam["format"] == w.0.as_str()).unwrap_or(0));
+        let folder = f.text("Folder", &folder0, "Where the files go");
+        let rule = f.text("Filename rule", cam["filename"].as_str().unwrap_or("{Mark}"), "{Var:Length:MinLength:Pad:Align} fields of Name, ProdNo, Date, Time and Mark; for this export only");
+        let what = if assemblies.is_empty() { "every precast piece".to_owned() } else { format!("{} piece(s)", assemblies.len()) };
+        if !f.show(&format!("Exports {what}; the model is not changed"), "Export") {
+            f.dialog.destroy();
+            return;
+        }
+        let w = list.get(writer.get_selection().map_or(0, |i| i as usize)).map(|x| x.0.clone()).unwrap_or_default();
+        let (folder, rule) = (folder.get_value(), rule.get_value());
+        f.dialog.destroy();
+        match self.run("precast.cam_export", json!({ "assembly_ids": assemblies, "writer_id": w, "folder": folder, "filename_rule": rule })) {
+            Ok(r) => {
+                let mut text = format!("{} file(s) written to {folder}", r["files"].as_array().map_or(0, Vec::len));
+                for x in r["renamed"].as_array().into_iter().flatten() {
+                    text += &format!("\nrenamed: {}", x.as_str().unwrap_or(""));
+                }
+                for x in r["warnings"].as_array().into_iter().flatten() {
+                    text += &format!("\nwarning: {}", x.as_str().unwrap_or(""));
+                }
+                MessageDialog::builder(&frame, &text, "CAM Export").with_style(MessageDialogStyle::OK | MessageDialogStyle::IconInformation).build().show_modal();
+            }
+            Err(e) => error(&frame, &format!("Nothing exported:\n{e}")),
+        }
+    }
+
     /// Re-split: the selected precast assemblies (or those of the selected elements).
     pub(crate) fn precast_resplit(&mut self) {
         let assemblies = self.selected_assemblies();

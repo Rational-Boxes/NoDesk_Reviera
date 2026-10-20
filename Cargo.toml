@@ -22,6 +22,7 @@ members = [
     "clients/rsp/rust",
     "clients/compute/rust",
     "clients/dstv/rust",
+    "clients/precast-cam/rust",
     "crates/reviera-compute",
 ]
 default-members = ["apps/reviera"]
@@ -55,6 +56,7 @@ reviera-mcp = { path = "crates/reviera-mcp" }
 reviera-ui = { path = "crates/reviera-ui" }
 reviera-rsp = { path = "clients/rsp/rust" }
 reviera-dstv = { path = "clients/dstv/rust" }
+reviera-precast-cam = { path = "clients/precast-cam/rust" }
 reviera-compute-proto = { path = "clients/compute/rust" }
 reviera-compute = { path = "crates/reviera-compute" }
 # Common

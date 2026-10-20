@@ -2980,6 +2980,7 @@ dependencies = [
  "imbl",
  "jsonschema",
  "reviera-dstv",
+ "reviera-precast-cam",
  "schemars",
  "serde",
  "serde_json",
@@ -3081,6 +3082,14 @@ version = "0.1.0"
 dependencies = [
  "reviera-core",
  "reviera-net",
+]
+
+[[package]]
+name = "reviera-precast-cam"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

@@ -142,6 +142,8 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(PrecastCustomFabric),
         registry.add(PrecastMountingParts),
         registry.add(PrecastShopDrawings),
+        registry.add(PrecastCamExport),
+        registry.add(CamWriterList),
         registry.add(MountingPartPlace),
         registry.add(PrecastReinforcementTypes),
         registry.add(RebarPlaceFreeForm),
@@ -3412,6 +3414,36 @@ edit_command!(
     crate::precast_rebar::ReinforceParams,
     crate::precast_rebar::Report,
     crate::precast_rebar::reinforce
+);
+
+read_command!(
+    PrecastCamExport,
+    "precast.cam_export",
+    "Export precast pieces for production",
+    "Writes one file per precast piece (STR-PRE-007; every assembly when `assembly_ids` is empty) \
+     with a CAM writer (`cam_writer.list`): the built-in neutral JSON or CSV piece model (outline, \
+     openings, lifting anchors, bars by set with shape and bar, fabric wires, marks; millimetres in \
+     the piece's production system: origin at the lower-left of its front face, X along, Y up or \
+     across, Z in), or an external writer. Files go in `folder`, named by `filename_rule` (else the \
+     configuration's): `{Var:Length:MinLength:Pad:Align}` fields of Name, ProdNo, Date, Time and \
+     Mark, checked before anything is written (the error gives the position); colliding names get \
+     a number. Pieces without reinforcement or mounting parts are warned about. The model is not \
+     changed. Returns the files, renames and warnings.",
+    crate::precast_cam::ExportParams,
+    crate::precast_cam::ExportReport,
+    crate::precast_cam::export
+);
+
+read_command!(
+    CamWriterList,
+    "cam_writer.list",
+    "CAM writers",
+    "The CAM writers there are (STR-PRE-007): the built-in neutral JSON and CSV writers, and the \
+     external ones whose manifests (id, name, version, SPDX licence, extension, command) are in the \
+     precast data folder's `cam_writers`; each with its format and version.",
+    crate::precast_cam::ListParams,
+    Vec<crate::precast_cam::WriterInfo>,
+    crate::precast_cam::list
 );
 
 edit_command!(

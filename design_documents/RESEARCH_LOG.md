@@ -275,3 +275,4 @@ Record anyone who has seen raw reference material (vendor docs, screenshots) and
 | 2026-10-19 | Structure epic, custom fabric sheets for precast pieces (STR-PRE-004), built from the spec, no outside sources. The starting rule is provisional and listed for expert review (E-14). |
 | 2026-10-19 | Structure epic, mounting parts for precast pieces (STR-PRE-005), built from the spec, no outside sources. The lifting-anchor rules are provisional and listed for expert review (E-15). |
 | 2026-10-20 | Structure epic, precast shop drawings (STR-PRE-006), built from the spec, no outside sources. Also fixed: model rebar lines were drawn into sheet and schedule tabs. |
+| 2026-10-20 | Structure epic, precast CAM export (STR-PRE-007), built from the spec, no outside sources: the neutral piece model, its JSON and CSV writers and the filename rules are an MIT interop crate (`clients/precast-cam`), per the standing interop policy; no proprietary CAM format was implemented. |

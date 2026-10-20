@@ -4564,6 +4564,7 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "precast.resplit" => with(gui, Gui::precast_resplit),
         "precast.reinforce" => with(gui, Gui::precast_reinforce),
         "precast.shop_drawings" => with(gui, Gui::precast_shop_drawings),
+        "precast.cam_export" => with(gui, Gui::precast_cam_export),
         "precast.place_mounting_parts" => with(gui, Gui::precast_mounting_parts),
         "precast.generate_custom_fabric" => with(gui, Gui::precast_custom_fabric),
         "precast_config.show" => with(gui, Gui::precast_configuration),

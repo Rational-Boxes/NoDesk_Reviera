@@ -115,7 +115,24 @@ reinforcement, sheets and anchors to the millimetre. The sheet shows:</p>
 <p>The drawing is worked out from the pieces each time the sheet is shown or printed, so it
 follows changes. Making shop drawings again replaces the earlier sheets for those pieces.</p>
 
+<h2 id="cam">CAM export</h2>
+<p>Select precast assemblies (or none, for all) and click
+<a href="reviera:action/precast.cam_export">CAM Export</a>. Choose a writer and a folder.</p>
+<ul>
+  <li>The built-in writers give each piece as a neutral JSON or CSV file: its outline and
+    openings, lifting anchors, every bar with its shape, fabric wires and marks. Coordinates are
+    in millimetres from the lower-left corner of the piece's front face.</li>
+  <li>Other writers are programs installed with a manifest in the data folder's
+    <code>cam_writers</code>. They are given the neutral JSON.</li>
+  <li>Files are named by the filename rule, for example
+    <code>{Name:12:4:0:left}_{ProdNo}</code>, from the variables Name, ProdNo, Date, Time and
+    Mark. A mistake in the rule is reported with its position before anything is written. Names
+    that would collide get a number.</li>
+</ul>
+<p>The export does not change the model. Pieces without reinforcement or mounting parts are
+listed as warnings.</p>
+
 <h2 id="not-yet">Not yet</h2>
 <p>Lattice girders; loops, bushings and connectors; fabric as area reinforcement; shop-drawing templates and
-model viewports on them; CAM export; curved walls; double walls as one three-layer piece;
+model viewports on them; Lua CAM writers and the Unitechnik and PXML formats; curved walls; double walls as one three-layer piece;
 and profile overlap between rows.</p>

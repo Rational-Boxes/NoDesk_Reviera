@@ -99,6 +99,7 @@ pub fn toolset_of(command: &str) -> String {
             | "precast"
             | "precast_config"
             | "mounting_part"
+            | "cam_writer"
             | "beam_system"
             | "truss"
             | "brace"

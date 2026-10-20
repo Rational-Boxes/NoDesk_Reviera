@@ -745,9 +745,12 @@ tools and the datums.
   about each piece's centre of gravity and clear of ends and openings, kept when moved by hand
   (`precast.place_mounting_parts`, `mounting_part.place`; STR-PRE-005); shop-drawing sheets per
   piece or per group of identical pieces, drawn live from the model: dimensioned front view and
-  section, centre of gravity and bill of materials (`precast.shop_drawings`; STR-PRE-006). Not
-  yet: lattice girders, other mounting parts, shop-drawing templates with model viewports, CAM
-  export (STR-PRE-007).
+  section, centre of gravity and bill of materials (`precast.shop_drawings`; STR-PRE-006); CAM
+  export of pieces as the neutral JSON or CSV piece model of the MIT `reviera-precast-cam` crate
+  (`clients/precast-cam`), or through external writers named by manifests, with checked filename
+  rules (`precast.cam_export`, `cam_writer.list`; STR-PRE-007). Not yet: lattice girders, other
+  mounting parts, shop-drawing templates with model viewports, Lua CAM writers, Unitechnik and
+  PXML.
   Rebar documentation: a Rebar Tag (number and "15 Ø12 @ 150"), multi-rebar annotations across
   parallel sets, bending details with segment values, and a Bar Bending Schedule grouped by
   partition and number with mass from nominal kg/m (`rebar_tag.place`,

@@ -195,13 +195,14 @@ impl Default for SlabKinds {
 pub struct CamConfig {
     pub format: String,
     pub folder: String,
-    /// `{mark}`, `{project}`, `{source}` and `{index}` are filled in.
+    /// `{Var:Length:MinLength:Pad:Align}` fields of `Name`, `ProdNo`, `Date`, `Time` and `Mark`
+    /// (STR-PRE-007).
     pub filename: String,
 }
 
 impl Default for CamConfig {
     fn default() -> Self {
-        Self { format: "unitechnik".into(), folder: String::new(), filename: "{mark}".into() }
+        Self { format: "neutral_json".into(), folder: String::new(), filename: "{Mark}".into() }
     }
 }
 
@@ -353,19 +354,9 @@ pub fn problems(c: &Config) -> Vec<(String, String)> {
             bad(&format!("fabric_rules.{}", r.id), "rule ids must be unique");
         }
     }
-    // The filename rule: balanced braces around known names.
-    let mut rest = c.cam.filename.as_str();
-    while let Some(i) = rest.find('{') {
-        match rest[i..].find('}') {
-            Some(j) if ["mark", "project", "source", "index"].contains(&&rest[i + 1..i + j]) => rest = &rest[i + j + 1..],
-            _ => {
-                bad("cam.filename", "the filename rule takes {mark}, {project}, {source} and {index}, each in braces");
-                break;
-            }
-        }
-    }
-    if c.cam.filename.contains('}') && !c.cam.filename.contains('{') {
-        bad("cam.filename", "the filename rule takes {mark}, {project}, {source} and {index}, each in braces");
+    // The filename rule.
+    if let Err(e) = reviera_precast_cam::FilenameRule::parse(&c.cam.filename) {
+        bad("cam.filename", &format!("the filename rule is malformed {e}"));
     }
     if !c.data_folder.is_empty() && !std::path::Path::new(&c.data_folder).is_dir() {
         bad("data_folder", "the data folder must exist and be a folder");

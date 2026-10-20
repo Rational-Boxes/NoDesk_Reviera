@@ -17562,14 +17562,16 @@ Ref: research/03 §6.1
 **Data (IFC mapping).** Reads the precast assemblies, pieces, reinforcement and mounting parts of STR-PRE-002 to 005 and `Pset_PrecastConcreteElementFabrication` (PieceMark, ProductionLotId, SerialNumber). Writer settings and filename rules are stored in the precast configuration (RXD document `fabrication`). Nothing is written back.
 
 **Commands.**
-- `precast.cam_export(assembly_ids[], writer_id, folder, filename_rule?) -> files[]`
+- `precast.cam_export(assembly_ids[], writer_id, folder, filename_rule?) -> {files[], renamed[], warnings[]}`
 - `cam_writer.list() -> writers[]`
 
 **Acceptance criteria.**
-- [ ] The rule `{Name:12:4:0:left}_{ProdNo}` names files with zero-padded, left-aligned piece names and the production number.
-- [ ] The rule `{Nme}_{ProdNo}` is rejected before any file is written, with the position of the unknown variable.
-- [ ] The neutral JSON export of a wall piece with one opening lists the outline, the opening, every bar with its shape and the lifting anchors, with coordinates in the piece's local system.
-- [ ] Exporting leaves the undo stack unchanged.
+- [x] The rule `{Name:12:4:0:left}_{ProdNo}` names files with zero-padded, left-aligned piece names and the production number.
+- [x] The rule `{Nme}_{ProdNo}` is rejected before any file is written, with the position of the unknown variable.
+- [x] The neutral JSON export of a wall piece with one opening lists the outline, the opening, every bar with its shape and the lifting anchors, with coordinates in the piece's local system.
+- [x] Exporting leaves the undo stack unchanged.
+
+*Built (2026-10-20):* the neutral piece model, its JSON and CSV writers and the filename rules are the MIT crate `reviera-precast-cam` (`clients/precast-cam`, schema 1): mark, name, production number, kind, length, height, thickness, volume and weight; the outline and openings; embeds (kind, name, head, direction, diameter, length); bar sets (number, shape code, bar, diameter, each bar's centreline); fabric sheets (number, wires); millimetres with the origin at the lower-left of the piece's front face (a wall's exterior, a slab's underside), X along, Y up or across, Z in. Filename rules parse `{Var:Length:MinLength:Pad:Align}` (variables Name, ProdNo, Date, Time, Mark; length truncates, the minimum pads with the pad character on the side away from the alignment) and reject an unknown variable, a malformed field, an unclosed brace or a character no file system takes with its character position (`cam.filename_rule`, `position` in the details); the configuration's `cam.filename` (`{Mark}` by default) is checked the same way. `cam_writer.list` gives the built-in `neutral_json` and `neutral_csv` writers and external writers from manifests in the configuration's data folder (`cam_writers/*.json`: id, name, version, SPDX licence, extension, command); an external writer is run with the piece's neutral JSON on its input and its output saved as the file. `precast.cam_export(assembly_ids (all when empty), writer_id, folder, filename_rule?)` builds every piece and every name before writing anything, numbers colliding names (`_2` …, reported), writes one file per piece and reports pieces without reinforcement or mounting parts as warnings; it is a read command, so the model and the undo stack are untouched. Production numbers run in export order (pieces sorted by mark when all are exported). Concrete › Precast Detailing › **CAM Export** (writer, folder, filename rule for this run; a summary after). Not yet: Lua writers, Unitechnik and PXML plugins (P3; openly documented formats only), running in the background, a confirmation listing out-of-date pieces (there is no out-of-date flag yet), ProductionLotId and SerialNumber from `Pset_PrecastConcreteElementFabrication`.
 
 ---
 
