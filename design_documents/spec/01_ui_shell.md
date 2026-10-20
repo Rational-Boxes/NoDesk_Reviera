@@ -1613,18 +1613,26 @@ The following context panels are part of the default layout. Owners are authorit
 
 **Behaviour & rules.**
 - View › Windows › **User Interface** lists check boxes for: Orientation Cube, Navigation Bar, Project Browser, System Browser, Properties, Status Bar, Status Bar – Worksets, Status Bar – Design Options, Agent, Notifications, Lua Console, plus discipline panes (Fabrication Parts, P&ID Modeler, Reconcile Hosting) and add-in panes.
-- **Focus mode** (Reviera addition, P1, **Ctrl+Shift+F11**): hides all panes, the status bar and collapses the ribbon to tabs; pressing again restores the previous arrangement.
+- **Full-screen** (Reviera addition, P1, **F11**): the main window goes OS full-screen and all chrome is hidden (menu bar, ribbon including its tab row, QAT, panes, status bar, View Control Bar and view tabs); only the canvas remains. *(Owner requirement, 2026-10-20, CIRCLE_MENU_FULL_SCREEN.md: "Option to go full-screen on F11. When in full-screen pushing the mouse pointer against the top will show the menu and ribbon menus, and the exit full-screen button. Pushing against the bottom of the screen cause the palette menus to appear and clicking on the model dismisses the panels.")*
+- **Focus mode** (**Ctrl+Shift+F11**) is the same chrome-free state and the same edge reveals without OS full-screen: the window keeps its size and the desktop's title bar. Focus mode and full-screen are one mode with two window states; switching between them (F11 while in focus mode, or the reverse) keeps the hidden state and changes only the window.
+- **Top-edge reveal.** Pushing the pointer against the top edge of the screen (or window, in focus mode) for 150 ms (the dwell, adjustable in Options › User Interface) slides in the menu bar and the ribbon over the canvas, with an **Exit full-screen** button at the right end of the tab row. The overlay stays while the pointer is over it or a ribbon menu or dialog it opened is open; it hides 600 ms after the pointer leaves it, or at once when the pointer clicks the model. Starting a tool from it hides it, and the tool's options appear in the floating options strip.
+- **Bottom-edge reveal.** Pushing against the bottom edge slides in all the panes that were visible before full-screen (Properties, Project Browser, System Browser, Agent, Lua Console, discipline and add-in panes) together with the status bar, as one overlay over the lower part of the canvas, in their docked arrangement compressed to a strip of up to 40 % of the canvas height (the height is draggable and remembered for the session). The canvas does not resize. A click on the model, a left click in the canvas outside the overlay, or Esc dismisses it; editing a pane value does not.
+- **Defaults confirmed by the owner (2026-10-20):** the 150 ms reveal dwell, 500 ms on an edge shared with another monitor, the bottom overlay at up to 40 % of the canvas height, Ctrl+Cmd+F for full-screen on macOS and Ctrl+Alt+T for Background tasks.
+- **Edge reveal rules.** Reveals never trigger while a mouse button is held (so drags and box selections reaching an edge do not open them) or while a tool's rubber-band is active. On a multi-monitor setup the edges are those of the monitor the window is on, and an edge shared with another monitor triggers only after a dwell of 500 ms, as the pointer can cross it. Reduce motion (§1.27.2) shows and hides them without sliding. Touch and pen: a swipe in from the edge does the same.
 - **Chrome element ids.** Each check box maps to an id used by commands, layout bookmarks and scenarios: `orientation_cube`, `navigation_bar`, `status_bar`, `status_bar.worksets`, `status_bar.design_options`, `view_control_bar`, `view_tabs`, `qat`, plus every pane id of UI-DOCK-001 (`properties`, `project_browser`, `system_browser`, `agent`, `notifications`, `lua_console`, `history`, …). Panes are shown and hidden with `ui.pane.*`; the other ids with `ui.chrome.set_visible`.
 - **What hiding does.** Hiding a pane keeps its dock position and size, so showing it again restores it where it was. Hiding the Orientation Cube or Navigation Bar applies to every view window, including floating frames. Hiding the View Control Bar or view tabs is allowed only through `ui.chrome.set_visible` and the *Presentation* layout (UI-LAYOUT-002); the menu shows them so the user can bring them back.
-- **Never hidden.** The ribbon tab row and the canvas cannot be hidden (§1.2). The File button stays reachable with Alt, F.
-- **Focus mode details.** It remembers the exact pre-focus state, including floating panes and the ribbon state, in memory only. Leaving it (Ctrl+Shift+F11, Esc with nothing selected and no tool, or the "Exit focus mode" chip at the top-right of the canvas) restores that state. Applying a layout bookmark while in focus mode leaves focus mode first. Focus mode does not persist across restart.
+- **Never hidden.** The ribbon tab row and the canvas cannot be hidden (§1.2), except that full-screen and focus mode hide the tab row until the top-edge reveal brings it back. The File button stays reachable with Alt, F.
+- **Full-screen and focus mode details.** They remember the exact prior state, including floating panes, the window's size and position and the ribbon state, in memory only. Floating panes and floating view frames on other monitors stay where they are. Leaving (F11 or Ctrl+Shift+F11 as entered, Esc with nothing selected, no tool and no overlay shown, or the Exit full-screen button of the top reveal) restores that state. Applying a layout bookmark leaves the mode first. The mode does not persist across restart. On macOS F11 is taken by the system, so full-screen uses Ctrl+Cmd+F, the system's own shortcut, and the green window button enters the same mode; on Wayland the compositor's full-screen request is used and the reveals work on the window's own edges.
 - **Storage.** Visibility flags are stored in `layout.toml` and are the *Visible panels* part of a layout bookmark (UI-LAYOUT-001).
 
-**Commands.** `ui.chrome.get() -> {element_id: bool}`, `ui.chrome.set_visible(element_id, visible: bool) -> ()`, `ui.focus_mode.toggle() -> ()`; panes use `ui.pane.show`, `ui.pane.hide` and `ui.pane.toggle` (UI-DOCK-001).
+**Commands.** `ui.chrome.get() -> {element_id: bool}`, `ui.chrome.set_visible(element_id, visible: bool) -> ()`, `ui.focus_mode.toggle() -> ()`, `ui.fullscreen.toggle() -> ()`, `ui.fullscreen.reveal(edge: top|bottom|none) -> ()` (shows or hides an overlay, for scripts and tests), `ui.fullscreen.get() -> {mode: off|focus|fullscreen, revealed: top|bottom|none}`; panes use `ui.pane.show`, `ui.pane.hide` and `ui.pane.toggle` (UI-DOCK-001).
 
 **Acceptance criteria.**
 - [ ] Unticking Status Bar hides it; re-ticking restores it at the same height.
 - [ ] Focus mode toggles twice back to the identical layout.
+- [ ] F11 makes the window full-screen with only the canvas; pushing the pointer to the top shows the menu, the ribbon and Exit full-screen; clicking Exit full-screen restores the window and every pane where it was.
+- [ ] In full-screen, pushing the pointer to the bottom shows Properties and the Project Browser as an overlay; changing a wall's height in it keeps the overlay; clicking the model dismisses it and the canvas never resized.
+- [ ] A box selection dragged to the bottom edge does not open the bottom overlay.
 - [ ] Hiding the Navigation Bar removes it from a floating view frame on a second monitor as well.
 - [ ] Hiding Properties, restarting, and showing it again restores it at its previous dock position and width.
 
@@ -1889,7 +1897,7 @@ The following context panels are part of the default layout. Owners are authorit
 | Exclude Options | Exclude design-option elements from selection | `selection.options.set{exclude_options}` (UI) | P1 |
 | Editable Only | Restrict selection to elements the user may edit (ownership) | `selection.options.set{editable_only}` (UI) | P1 |
 | Select Links / Underlay / Pinned / by Face / Drag on Selection | Five selection toggles (§1.21.4) | `selection.options.set{…}` (UI) | P0 |
-| Background Tasks | Spinner while background tasks run (colour fills, analysis, background export, server sync); click lists tasks with progress and Cancel; warning icon when background processing is disabled | `ui.background_tasks` (UI), F11 | P0 |
+| Background Tasks | Spinner while background tasks run (colour fills, analysis, background export, server sync); click lists tasks with progress and Cancel; warning icon when background processing is disabled | `ui.background_tasks` (UI), Ctrl+Alt+T | P0 |
 | Agent activity | Shows when an MCP/agent session is connected or running a command; click opens the Agent pane or the MCP sessions list | §1.31 | P1 |
 | Selection count / Filter | Funnel with the number of selected elements; click opens the Filter dialog | `selection.filter_dialog` (UI) | P0 |
 
@@ -2026,6 +2034,32 @@ The following context panels are part of the default layout. Owners are authorit
 - [x] A middle click on an unselected element selects it and opens its menu; a middle drag pans.
 - [x] Make Translucent, then the menu again, offers Make Opaque; after Hide in View, a middle click on empty space offers Reset Hide/Isolate, which shows the element again.
 - [ ] Selecting a desk, its chair and its lamp, then middle-clicking one of them and choosing Create Component…, saves an IFC component of the three into the library folder used last, and the three become one placed copy of it.
+
+### 1.21.7 Radial menu (experimental)
+**ID:** UI-SEL-007 · **Priority:** P2 · **Ref:** owner requirement (2026-10-20, CIRCLE_MENU_FULL_SCREEN.md); Reviera's own design
+
+**Purpose.** A ring menu at the pointer as an alternative presentation of the middle-click menu, reaching every ribbon tool by direction rather than by travelling to the ribbon. *(Owner requirement, 2026-10-20: "Center click radial menu. … The radial menu is a ring around the mouse pointer with a maximum of 8 items. A left click dismisses the menu. When the mouse pointer touches a menu item, it re-centers and the ring updates to the next tier of menus. Center click on an element presents the same menus as currently. Center click on the background opens a menu set that mirrors the main menu and ribbon items. Make the radial menu a user controllable application feature, it is experimental.")*
+
+**Behaviour & rules.**
+- **Experimental and off by default.** Options › User Interface › Experimental › **Radial menu** (§1.27.2) turns it on. Off, the middle click opens the popup of UI-SEL-006 as before. The setting is per user and takes effect at once.
+- **Opening.** A middle click (press and release without moving; a middle drag still pans) opens the ring centred on the pointer. The pointer is never moved: where the pointer is too close to the canvas edge for the ring to fit, the ring is drawn whole, shifted inside the canvas, and its centre dead zone is where it is drawn. The ring is drawn by Reviera over the canvas (not a native menu), so it looks the same on every platform and under Wayland.
+- **Layout.** At most 8 wedges per tier, the first at the top, then clockwise. Each wedge shows its icon and a short label; the selected element's name or count is in the centre. A tier with more than 8 items shows 7 and a **More…** wedge (bottom) that opens the rest as the next tier. Disabled items are shown dimmed and cannot be entered or run.
+- **Moving through tiers.** The pointer touching a wedge that has a submenu (crossing into the wedge's ring band) makes it the active tier: the ring re-centres on the pointer and shows that wedge's items, with the path (e.g. *Architecture › Build › Wall*) in a breadcrumb above the ring. Moving the pointer back into the centre dead zone returns to the previous tier, re-centring the ring there. Wedges have a hysteresis of 4 px so jitter on a boundary does not flip tiers.
+- **Leaf items.** Touching a leaf wedge only highlights it and shows its tooltip; a **left click** on the highlighted wedge runs it, through the same command as its ribbon button. A left click anywhere else (on the model or the centre), Esc, or a right click dismisses the ring without running anything. Keyboard: arrow keys move between wedges, Enter enters or runs, Backspace goes back a tier.
+- **On an element.** The items are those of the quick modify menu (UI-SEL-006) in the same order, grouped into tiers of 8 where needed (Move/Copy/Rotate/Mirror; Hide/Isolate/Translucent/Section Box; Overlap booleans when two overlapping elements are selected; Component and Path Array; Pin/Unpin; Delete). The selection rules of UI-SEL-006 apply unchanged.
+- **On the background.** The first tier mirrors the main menu and ribbon: one wedge per visible ribbon tab (respecting the Disciplines and tools check boxes of §1.7.7, contextual tabs included while active), plus a **Menu** wedge for the File/main menu, overflowing into More… past 7. Each tab's next tier is its panels, then each panel's tools, including split-button and drop-down items as one further tier. A background middle click while the view has temporary hiding or isolation adds a Reset Hide/Isolate wedge first. While a tool runs it still does nothing.
+- **Add-ins and scripts.** Ribbon items added by Lua or add-ins (§1.7) appear in their tab and panel like built-in ones; nothing has to be registered twice.
+- **Defaults confirmed by the owner (2026-10-20):** off by default; at most 8 wedges with More… past 7; the pointer never moved; touch highlights and left click runs; a right click also dismisses; arrow keys, Enter and Backspace work in the ring; 4 px wedge hysteresis.
+- **Accessibility.** Reduce motion turns off the re-centring animation; the Larger grips and hit targets setting enlarges the ring. A screen reader announces the active tier and highlighted wedge.
+
+**Commands.** `ui.radial.open(x?, y?, target: element|background)` (opens the ring at a canvas point, default the pointer), `ui.radial.tree(target) -> RadialTier` (the tiers as the ring would show them, for scripts, MCP and tests), `ui.radial.close()`. The items themselves run the registry's commands.
+
+**Acceptance criteria.**
+- [ ] With the experimental setting off, a middle click on a wall opens the popup menu as before; with it on, it opens the ring around the pointer and the pointer has not moved.
+- [ ] On the background, touching Architecture then Build re-centres the ring twice and shows Build's tools; moving back to the centre shows the Architecture tier again; touching Wall highlights it and a left click starts the wall tool.
+- [ ] A ribbon panel with 11 tools shows 7 and More…, and More… shows the other 4.
+- [ ] A left click on the model with the ring open dismisses it and runs nothing; a middle drag pans with the setting on.
+- [ ] `ui.radial.tree{background}` lists every visible ribbon tab and the Menu wedge, and no tier has more than 8 items.
 ---
 
 ## 1.22 In-canvas controls
@@ -2338,7 +2372,8 @@ These bindings are fixed and cannot be reassigned (Ctrl reads Cmd on macOS):
 | F8, Shift+W | Orbit (dynamic view) / Navigation Wheel | `ui.nav.orbit_mode`, `ui.nav.wheel` |
 | F9 | System Browser | `ui.pane.toggle{system_browser}` |
 | F10, Alt | Keytips | `ui.keytips.show` |
-| F11 | Background tasks | `ui.background_tasks` |
+| F11 | Full-screen (Ctrl+Cmd+F on macOS) | `ui.fullscreen.toggle` |
+| Ctrl+Alt+T | Background tasks | `ui.background_tasks` |
 | Shift+F10, Menu key | Context menu | — |
 | Tab / Shift+Tab | Cycle candidates forward / backward | — |
 | Esc | Cancel step / clear selection / leave tool | — |
@@ -2379,7 +2414,7 @@ These bindings are fixed and cannot be reassigned (Ctrl reads Cmd on macOS):
 **Rules applied in building the map.**
 - Two-letter mnemonics are used where they are widely known in the industry so that users can transfer muscle memory; Reviera's map is maintained as its own data file (`shortcuts-default.toml`) keyed by Reviera command ids.
 - **No default sequence is bound to two commands.** Where traditional mnemonics collide, Reviera gives the sequence to one command (the more frequent) and leaves the other unbound: `RC` → Repeat Last Command (coping removal has none); `RG` → Remove from Group (render gallery has none); `PC` → Check Pipe Systems (point-cloud snap override moves to `SY`); `SZ` → Close-loop snap (system-zone sketch has none); `SE` → Endpoint snap (Section has none); `ME` → Mechanical Equipment (Measure has none); `ST` → Tangent snap (Stair has none).
-- Additions not found in the traditional scheme: `3D` default 3D view, `ZN` next pan/zoom, `CI` check in, `FL` floor, Ctrl+K Command Search, Ctrl+J Agent pane, Ctrl+Shift+L Lua Console, Ctrl+Shift+O focus tool options, Ctrl+Shift+F11 focus mode, Ctrl+A select all visible.
+- Additions not found in the traditional scheme: `3D` default 3D view, `ZN` next pan/zoom, `CI` check in, `FL` floor, Ctrl+K Command Search, Ctrl+J Agent pane, Ctrl+Shift+L Lua Console, Ctrl+Shift+O focus tool options, F11 full-screen, Ctrl+Shift+F11 focus mode, Ctrl+Alt+T background tasks, Ctrl+A select all visible.
 - Scoped bindings (text editor, rebar placement) apply only in their scope.
 
 **Modify and edit (global scope)**
@@ -2512,6 +2547,7 @@ These bindings are fixed and cannot be reassigned (Ctrl reads Cmd on macOS):
 | KS | `ui.shortcuts.dialog` | FF | `browser.reveal` |
 | 32 / 3O / 3W / 3F | `ui.nav.device_mode{2d|object|walk|fly}` | Ctrl+J | `ui.pane.toggle{agent}` |
 | Ctrl+Shift+L | `ui.pane.toggle{lua_console}` | Ctrl+Shift+F11 | `ui.focus_mode.toggle` |
+| F11 | `ui.fullscreen.toggle` | Ctrl+Alt+T | `ui.background_tasks` |
 
 **Settings and collaboration**
 
@@ -2558,7 +2594,7 @@ These bindings are fixed and cannot be reassigned (Ctrl reads Cmd on macOS):
 | Page | Settings | Pri |
 |---|---|---|
 | **General** | Save reminder interval (off, 15 min … 4 h); Sync/Check-in reminder interval (BIMserver mode); user name (§1.6.3); log file retention (count and age of session logs, the counterpart of journals); default view discipline; start-up behaviour (Show Home / Reopen last session / Open nothing); language; units display defaults for new models; autosave of recovery copies (interval, location) | P0 |
-| **User Interface** | Disciplines and tools check boxes (§1.7.7); Keyboard shortcuts Customize…; Double-click actions Customize… (§1.21.5); Tooltip assistance (None / Minimal / Normal / High); Show recent files on Home and count; Tab-switching behaviour (after clearing selection or finishing: stay on Modify / return to previous, for model and family editor); Activate contextual tab on selection; View switching order (tab position / most recently used); Show tool options strip (P2); Ribbon state reset; Reset all UI | P0 |
+| **User Interface** | Disciplines and tools check boxes (§1.7.7); Keyboard shortcuts Customize…; Double-click actions Customize… (§1.21.5); Tooltip assistance (None / Minimal / Normal / High); Show recent files on Home and count; Tab-switching behaviour (after clearing selection or finishing: stay on Modify / return to previous, for model and family editor); Activate contextual tab on selection; View switching order (tab position / most recently used); Show tool options strip (P2); Ribbon state reset; Reset all UI; **Experimental**: Radial menu on middle click (off by default, §1.21.7); edge reveal dwell time in full-screen (§1.15.2) | P0 |
 | **Appearance** | UI theme (Light / Dark / Follow system, default Follow system); Canvas scheme (Light / Dark); canvas colours: Background, Selection (+semi-transparent), Pre-selection, Alert, Calculating, Editing (dimmed), Reveal Hidden, mode border colours; icon theme (Standard / High contrast); UI font size (90–200 %); reduce motion (disables animated transitions) | P0 |
 | **Graphics** | Allow navigation during redraw; simplify display during navigation; anti-aliasing (off / per view / all views); temporary dimension text size and background; draw visible elements only (occlusion culling); frame-rate target; transparency quality | P0 |
 | **Hardware** | Detected GPU, driver and API (Vulkan / Metal / DirectX 12 / OpenGL fallback) with a compliance check list; Use hardware acceleration; GPU memory budget; renderer back-end override (requires restart) | P0 |
@@ -3536,6 +3572,12 @@ All commands defined by this chapter (owner UI). Commands of other chapters that
 | `ui.pane.dock` | `pane_id`, `side`, `position?` | `()` | No | UI-DOCK-001 |
 | `ui.pane.group` | `pane_id`, `with_pane_id` | `()` | No | UI-DOCK-001 |
 | `ui.focus_mode.toggle` | — | `()` | No | UI-DOCK-004 |
+| `ui.fullscreen.toggle` | — | `()` | No | UI-DOCK-004 |
+| `ui.fullscreen.reveal` | `edge: top|bottom|none` | `()` | No | UI-DOCK-004 |
+| `ui.fullscreen.get` | — | `{mode, revealed}` | No | UI-DOCK-004 |
+| `ui.radial.open` | `x?`, `y?`, `target: element|background` | `()` | No | UI-SEL-007 |
+| `ui.radial.tree` | `target` | `RadialTier` | No | UI-SEL-007 |
+| `ui.radial.close` | — | `()` | No | UI-SEL-007 |
 | `ui.chrome.get` | — | `{element_id: bool}` | No | UI-DOCK-004 |
 | `ui.chrome.set_visible` | `element_id`, `visible: bool` | `()` | No | UI-DOCK-004 |
 | `ui.layout.load` | `name` | `()` (short form of `ui.layout.apply`) | No | UI-LAYOUT-001 |

@@ -1122,7 +1122,11 @@ area by area (reviewed against the spec on 2026-10-15).
   revisions and sheet collections; tags and text in sections and on sheets; the current NBIMS-US
   COBie layout and a COBie settings dialog.
 - **Interface**: general shape tools; a macOS build (the script is written, not yet run on a
-  Mac).
+  Mac); an experimental **radial menu** on middle click, a ring of up to 8 items at the pointer
+  that steps through tiers as the pointer touches them, mirroring the ribbon on the background
+  and the quick modify menu on elements, off by default (UI-SEL-007); **full-screen** on F11, with
+  the menu and ribbon revealed by pushing the pointer to the top edge and the panes by pushing
+  it to the bottom, merged with focus mode (UI-DOCK-004).
 - **MCP**: streamable HTTP with tokens, rate and size limits, subscriptions, prompts,
   `execute_lua` and view images.
 - **Structure** (in development): structural columns, slanted columns, beams, beam systems,
