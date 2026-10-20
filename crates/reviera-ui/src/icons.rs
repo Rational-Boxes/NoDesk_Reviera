@@ -634,6 +634,9 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "precast_reinforce" => format!(
             r#"<rect x="4" y="5" width="24" height="22" fill="{f}" {s}/><rect x="12" y="10" width="8" height="12" fill="none" {s}/><path d="M8 9v18M24 9v18M4 13h8M20 13h8" {sa}/>"#
         ),
+        "precast_fabric" => format!(
+            r#"<rect x="4" y="5" width="24" height="22" fill="{f}" {s}/><path d="M8 9v14M12 9v14M16 9v4M16 19v4M20 9v14M24 9v14M6 11h20M6 15h7M19 15h7M6 19h20" {sa}/><rect x="13" y="13" width="6" height="6" fill="none" {s}/>"#
+        ),
         "precast_config" => format!(
             r#"<rect x="4" y="4" width="24" height="24" fill="{f}" {s}/><path d="M8 10h4M8 16h4M8 22h4M14 10h10M16 16h8M16 22h8" {sa}/><path d="M12 10v12" {s}/>"#
         ),

@@ -23,6 +23,8 @@ enum Unit {
     /// Reinforcement types, one per line (STR-PRE-003).
     AreaTypes,
     EdgeTypes,
+    /// Custom fabric sheet rules, one per line (STR-PRE-004).
+    FabricRules,
 }
 
 /// The fields of a page: path, label, unit.
@@ -63,6 +65,8 @@ const WALL_REBAR: Fields = &[
 
 const SLAB_REBAR: Fields = &[("reinforcement.area_types", "Area types", Unit::AreaTypes)];
 
+const FABRIC: Fields = &[("fabric_rules", "Rules", Unit::FabricRules)];
+
 const CAM: Fields = &[("cam.format", "Format", Unit::Text), ("cam.folder", "Output folder", Unit::Text), ("cam.filename", "Filename rule", Unit::Text)];
 
 enum Ctl {
@@ -88,6 +92,19 @@ fn at_mut<'a>(v: &'a mut Value, path: &str) -> Option<&'a mut Value> {
 fn shown(v: Option<&Value>, unit: Unit) -> String {
     let mm = |v: &Value| format!("{}", (v.as_f64().unwrap_or(0.0) * 1e6).round() / 1000.0);
     match (v, unit) {
+        (Some(Value::Array(list)), Unit::FabricRules) => list
+            .iter()
+            .map(|t| {
+                let mut c = vec![t["id"].as_str().unwrap_or("").to_owned(), t["major_wire"].as_str().unwrap_or("").to_owned(), t["minor_wire"].as_str().unwrap_or("").to_owned()];
+                for k in ["major_spacing", "minor_spacing", "edge_outer", "edge_joint", "opening_clearance", "min_wire_length", "max_length", "max_width", "lap"] {
+                    c.push(mm(&t[k]));
+                }
+                c.push(t["layer"].as_str().unwrap_or("both").to_owned());
+                c.push(t["name"].as_str().unwrap_or("").to_owned());
+                c.join("; ")
+            })
+            .collect::<Vec<_>>()
+            .join("\n"),
         (Some(Value::Array(list)), Unit::AreaTypes | Unit::EdgeTypes) => list
             .iter()
             .map(|t| {
@@ -135,6 +152,27 @@ fn types(text: &str, edge: bool) -> Option<Value> {
     Some(Value::Array(out))
 }
 
+/// Custom fabric rules from lines `id; major wire; minor wire; major spacing; minor spacing;
+/// outer edge; joint edge; opening clearance; shortest wire; largest length; largest width; lap
+/// (mm); layer; name`.
+fn fabric_rules(text: &str) -> Option<Value> {
+    let mut out = Vec::new();
+    for line in text.lines().map(str::trim).filter(|l| !l.is_empty()) {
+        let c: Vec<&str> = line.split(';').map(str::trim).collect();
+        if c.len() < 13 {
+            return None;
+        }
+        let mm = |s: &str| s.parse::<f64>().ok().map(|v| v / 1000.0);
+        let keys = ["major_spacing", "minor_spacing", "edge_outer", "edge_joint", "opening_clearance", "min_wire_length", "max_length", "max_width", "lap"];
+        let mut r = json!({ "id": c[0], "major_wire": c[1], "minor_wire": c[2], "layer": c[12], "name": c.get(13).copied().unwrap_or(c[0]) });
+        for (k, v) in keys.iter().zip(&c[3..12]) {
+            r[*k] = json!(mm(v)?);
+        }
+        out.push(r);
+    }
+    Some(Value::Array(out))
+}
+
 /// The dialog's values over `base`; the paths whose text is not a number.
 fn read(base: &Value, fields: &[Field]) -> (Value, Vec<String>) {
     let mut v = base.clone();
@@ -143,6 +181,13 @@ fn read(base: &Value, fields: &[Field]) -> (Value, Vec<String>) {
         let value = match (&f.ctl, f.unit) {
             (Ctl::Check(c), _) => json!(c.get_value()),
             (Ctl::Text(t), Unit::Text) => json!(t.get_value()),
+            (Ctl::Text(t), Unit::FabricRules) => match fabric_rules(&t.get_value()) {
+                Some(list) => list,
+                None => {
+                    bad.push(f.path.clone());
+                    continue;
+                }
+            },
             (Ctl::Text(t), u @ (Unit::AreaTypes | Unit::EdgeTypes)) => match types(&t.get_value(), u == Unit::EdgeTypes) {
                 Some(list) => list,
                 None => {
@@ -191,6 +236,12 @@ impl Gui {
                     c.set_value(at(&base, &full).and_then(Value::as_bool).unwrap_or(false));
                     grid.add(&c, 1, SizerFlag::Expand, 0);
                     Ctl::Check(c)
+                } else if *unit == Unit::FabricRules {
+                    let t = TextCtrl::builder(&panel).with_value(&shown(at(&base, &full), *unit)).with_style(TextCtrlStyle::MultiLine).build();
+                    t.set_min_size(Size::new(560, 120));
+                    t.set_tooltip("One rule per line: id; main wire; cross wire; main spacing; cross spacing; outer edge; joint edge; opening clearance; shortest wire; largest length; largest width; lap (mm); layer (outer, inner, both); name");
+                    grid.add(&t, 1, SizerFlag::Expand, 0);
+                    Ctl::Text(t)
                 } else if matches!(unit, Unit::AreaTypes | Unit::EdgeTypes) {
                     let t = TextCtrl::builder(&panel).with_value(&shown(at(&base, &full), *unit)).with_style(TextCtrlStyle::MultiLine).build();
                     t.set_min_size(Size::new(420, 110));
@@ -243,6 +294,7 @@ impl Gui {
                 page(node, "", &[], true, &mut fields, &mut pages);
             }
         }
+        page("Custom Fabric Sheet Rules", "", FABRIC, false, &mut fields, &mut pages);
         page("Annotations", "-", &[], false, &mut fields, &mut pages);
         page("Dimensioning", "-", &[], false, &mut fields, &mut pages);
         page("CAM Export", "", CAM, false, &mut fields, &mut pages);
@@ -512,6 +564,54 @@ impl Gui {
                 MessageDialog::builder(&frame, &lines.join("\n"), "Auto Reinforce").with_style(MessageDialogStyle::OK | MessageDialogStyle::IconInformation).build().show_modal();
             }
             Err(e) => error(&frame, &format!("Not reinforced:\n{e}")),
+        }
+    }
+
+    /// Concrete › Precast Detailing › Custom Fabric Sheets (STR-PRE-004).
+    pub(crate) fn precast_custom_fabric(&mut self) {
+        let frame = self.frame;
+        let assemblies = self.selected_assemblies();
+        if assemblies.is_empty() {
+            return frame.set_status_text("Custom Fabric Sheets: select precast assemblies, their pieces or the split elements", 0);
+        }
+        let rules = self.run("precast_config.get", json!({ "path": "fabric_rules" })).unwrap_or_default();
+        let list: Vec<(String, String)> = rules.as_array().into_iter().flatten().map(|r| (r["id"].as_str().unwrap_or("").to_owned(), format!("{} — {}", r["id"].as_str().unwrap_or(""), r["name"].as_str().unwrap_or("")))).collect();
+        if list.is_empty() {
+            return error(&frame, "The configuration has no custom fabric sheet rule. Add one in Precast Settings › Configuration.");
+        }
+        let f = super::reinforcement_ui::Form::new(&frame, "Custom Fabric Sheets");
+        let rule = f.choice("Rule", &list.iter().map(|x| x.1.clone()).collect::<Vec<_>>(), 0);
+        if !f.show(&format!("{} piece(s): sheets shaped to each, cut round openings, lapped where a piece is larger than a sheet", assemblies.len()), "OK") {
+            f.dialog.destroy();
+            return;
+        }
+        let id = list[rule.get_selection().map_or(0, |i| i as usize).min(list.len() - 1)].0.clone();
+        f.dialog.destroy();
+        match self.run("precast.generate_custom_fabric", json!({ "assembly_ids": assemblies, "rule_id": id })) {
+            Ok(r) => {
+                self.refresh_scene(&frame);
+                let lines: Vec<String> = r
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .map(|a| {
+                        let mut l = format!(
+                            "{}: {} sheet(s), {} replaced, {} kept, {} short wire(s) left out",
+                            a["mark"].as_str().unwrap_or(""),
+                            a["sheets"].as_array().map_or(0, Vec::len),
+                            a["removed"].as_u64().unwrap_or(0),
+                            a["kept"].as_array().map_or(0, Vec::len),
+                            a["dropped_wires"].as_u64().unwrap_or(0)
+                        );
+                        for s in a["skipped"].as_array().into_iter().flatten() {
+                            l += &format!("\n    skipped: {}", s.as_str().unwrap_or(""));
+                        }
+                        l
+                    })
+                    .collect();
+                MessageDialog::builder(&frame, &lines.join("\n"), "Custom Fabric Sheets").with_style(MessageDialogStyle::OK | MessageDialogStyle::IconInformation).build().show_modal();
+            }
+            Err(e) => error(&frame, &format!("No sheets made:\n{e}")),
         }
     }
 

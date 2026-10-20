@@ -139,6 +139,7 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(PrecastSetAutoUpdate),
         registry.add(PrecastInfo),
         registry.add(PrecastReinforce),
+        registry.add(PrecastCustomFabric),
         registry.add(PrecastReinforcementTypes),
         registry.add(RebarPlaceFreeForm),
         registry.add(RebarDistributeAlongPath),
@@ -3408,6 +3409,24 @@ edit_command!(
     crate::precast_rebar::ReinforceParams,
     crate::precast_rebar::Report,
     crate::precast_rebar::reinforce
+);
+
+edit_command!(
+    PrecastCustomFabric,
+    "precast.generate_custom_fabric",
+    "Custom fabric sheets for precast pieces",
+    "Makes welded fabric sheets shaped to each precast piece (STR-PRE-004) by a custom fabric rule \
+     of the precast configuration (`rule_id`, the first by default): wires of the rule's types and \
+     spacings, ending at the edge distance from the piece's outer edges and joints and at the \
+     clearance round openings; wires shorter than the minimum left out and counted; a piece larger \
+     than the largest sheet split square to the main wires (and across when too wide) into lapped \
+     sheets; at the outer, inner or both faces. Sheets are IfcReinforcingMesh, numbered like fabric \
+     (identical sheets share a number), partitioned by piece mark and held by the assembly. Running \
+     again replaces sheets as made and keeps edited ones. Returns a report per assembly.",
+    "Custom Fabric Sheets",
+    crate::precast_fabric::GenerateParams,
+    Vec<crate::precast_fabric::SheetReport>,
+    crate::precast_fabric::generate
 );
 
 read_command!(

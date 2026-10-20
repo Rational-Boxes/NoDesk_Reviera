@@ -57,7 +57,7 @@ pub struct State {
 /// Whether an element is reinforcement with view states: a set, or an area, path or fabric
 /// system or sheet.
 pub fn is_reinforcement(e: &Element) -> bool {
-    rebar::rebar_recipe(e).is_some() || crate::rebar_systems::system_kind(e).is_some()
+    rebar::rebar_recipe(e).is_some() || crate::rebar_systems::system_kind(e).is_some() || crate::precast_fabric::recipe(e).is_some()
 }
 
 fn states(view: &Element) -> BTreeMap<String, State> {

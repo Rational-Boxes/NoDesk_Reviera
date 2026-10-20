@@ -1548,6 +1548,12 @@ icon = "precast_reinforce"
 help = "Reinforce the selected precast pieces with the configuration's types for their thickness: area bars cut round openings, U-bars round openings and edges"
 
 [[action]]
+id = "precast.generate_custom_fabric"
+label = "Custom Fabric"
+icon = "precast_fabric"
+help = "Welded fabric sheets shaped to each selected precast piece by a custom fabric rule: cut round openings, lapped where a piece is larger than a sheet"
+
+[[action]]
 id = "precast.resplit"
 label = "Re-split"
 icon = "precast_resplit"
@@ -2358,6 +2364,7 @@ label = "Precast Detailing"
 tools = [
   { action = "precast.split", size = "large" },
   { action = "precast.reinforce", size = "large" },
+  { action = "precast.generate_custom_fabric", size = "small" },
   { action = "precast.resplit", size = "small" },
 ]
 

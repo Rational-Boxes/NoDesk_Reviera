@@ -129,6 +129,9 @@ pub fn items(store: &Store) -> Vec<Item> {
                 identity: format!("{}|{}|{}", r.bar_type, r.shape, dims.join(" ")),
                 summary: format!("{bar} shape {} {}", r.shape, dims.join(" ")),
             });
+        } else if let Some(identity) = crate::precast_fabric::identity(store, e) {
+            // A custom sheet: identical sheets (wires, lengths, places) share a number.
+            out.push(Item { element: e.id(), sheet: None, group: None, kind: Kind::Fabric, partition: part.clone(), identity, summary: "custom sheet".into() });
         } else if let Some((t, sheets)) = sheets_of(store, e) {
             for (k, s) in sheets.iter().enumerate() {
                 // A cut sheet is told apart by its wires' lengths.

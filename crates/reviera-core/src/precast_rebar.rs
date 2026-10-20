@@ -219,7 +219,8 @@ pub(crate) fn reinforce(txn: &mut Transaction<'_>, p: ReinforceParams) -> Result
         let aguid = store.get(aid).expect("resolved").guid().to_string();
         let mut r = AssemblyReport { assembly: aid, mark: a.mark.clone(), created: Vec::new(), removed: 0, kept: Vec::new(), skipped: Vec::new() };
         // The last run's sets: removed if as made, kept if edited; sets added by hand stay.
-        let mut still: Vec<String> = Vec::new();
+        // Custom sheets (STR-PRE-004) stay listed; they have their own command.
+        let mut still: Vec<String> = a.reinforcement.iter().filter(|g| by_guid(&store, g).is_some_and(|e| crate::precast_fabric::recipe(e).is_some())).cloned().collect();
         for e in store.iter().filter(|e| generated_for(e).as_deref() == Some(aguid.as_str())) {
             let made = e.param(GENERATED_KEY).and_then(|g| g.get("hash")).and_then(Value::as_str).unwrap_or("");
             if made == recipe_hash(e) {

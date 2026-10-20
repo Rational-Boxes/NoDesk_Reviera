@@ -65,7 +65,24 @@ replaced, kept and skipped. The types are edited in Configuration › Reinforcem
 <code>id; from-to (mm); bar type; spacing (mm); [leg (mm);] name</code>. The starting types are
 provisional and are awaiting review by a subject-matter expert.</p>
 
+<h2 id="custom-fabric">Custom fabric sheets</h2>
+<p>Select precast assemblies and click
+<a href="reviera:action/precast.generate_custom_fabric">Custom Fabric</a>, then choose a rule.
+Each piece gets welded sheets shaped to it, at the rule's face or faces:</p>
+<ul>
+  <li>The main wires run along the piece's longer side.</li>
+  <li>Wires stop at the rule's clearance round openings and at its edge distance from the piece's
+    outer edges and from its joints with other pieces. Wires shorter than the shortest allowed
+    are left out and counted.</li>
+  <li>A piece larger than the largest sheet gets several sheets, lapped by the rule's lap.</li>
+</ul>
+<p>Sheets are numbered like other fabric, so identical pieces share sheet numbers. Their
+partition is the piece mark, and the piece's assembly holds them. Running again replaces sheets
+as they were made and keeps sheets you edited. Rules are edited in Configuration › Custom Fabric
+Sheet Rules, one per line. The starting rule is provisional and is awaiting review by a
+subject-matter expert.</p>
+
 <h2 id="not-yet">Not yet</h2>
-<p>Lattice girders, fabric as area reinforcement, custom fabric sheets, mounting parts, shop drawings and CAM export
+<p>Lattice girders, fabric as area reinforcement, mounting parts, shop drawings and CAM export
 (the later precast steps); curved walls; double walls as one three-layer piece; profile overlap
 between rows; and lattice girders.</p>

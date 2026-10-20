@@ -80,6 +80,7 @@ pub mod rebar;
 pub mod rebar_docs;
 pub mod rebar_edit;
 pub mod precast;
+pub mod precast_fabric;
 pub mod precast_rebar;
 pub mod rebar_free;
 pub mod rebar_paths;

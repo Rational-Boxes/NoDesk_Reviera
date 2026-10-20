@@ -410,6 +410,9 @@ pub fn all(store: &Store) -> Vec<Body> {
         } else if let Some(m) = crate::rebar_edit::coupler_mesh(store, e) {
             // Rebar couplers (STR-RBR-015).
             push(e.id(), "IfcMechanicalFastener", m, false);
+        } else if let Some(m) = crate::precast_fabric::mesh(store, e) {
+            // Custom fabric sheets of precast pieces (STR-PRE-004).
+            push(e.id(), "IfcReinforcingMesh", m, false);
         } else if let Some(m) = crate::rebar_systems::mesh(store, e) {
             // Area, path and fabric reinforcement (STR-RBR-010 … 012).
             push(e.id(), if e.class == "IfcReinforcingMesh" { "IfcReinforcingMesh" } else { "IfcReinforcingBar" }, m, false);

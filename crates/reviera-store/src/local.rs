@@ -2548,7 +2548,8 @@ impl LocalProject {
         self.remove_rebar_parts()?;
         let sets: Vec<ElementId> = store.iter().filter(|e| reviera_core::rebar::rebar_recipe(e).is_some()).map(|e| e.id()).collect();
         let systems: Vec<ElementId> = store.iter().filter(|e| reviera_core::rebar_systems::system_kind(e).is_some()).map(|e| e.id()).collect();
-        if sets.is_empty() && systems.is_empty() {
+        let custom: Vec<ElementId> = store.iter().filter(|e| reviera_core::precast_fabric::recipe(e).is_some()).map(|e| e.id()).collect();
+        if sets.is_empty() && systems.is_empty() && custom.is_empty() {
             return Ok(());
         }
         let owner_history = self.new_owner_history()?;
@@ -2696,6 +2697,28 @@ impl LocalProject {
                 .ok()
                 .and_then(|i| i.first().and_then(|i| i.host))
             {
+                by_host.entry(h).or_default().push(AttrValue::Ref(step.0));
+            }
+        }
+        // Custom fabric sheets of precast pieces (STR-PRE-004): held by their assembly.
+        for id in custom {
+            let Some(&step) = self.steps.get(&id) else { continue };
+            let e = store.get(id).expect("a sheet");
+            if let Some((points, indices)) = reviera_core::precast_fabric::mesh(store, e) {
+                let faces: Vec<Vec<usize>> = indices.chunks(3).map(|t| t.iter().map(|k| *k as usize).collect()).collect();
+                geometry::write_breps(&mut self.ifc, step, geometry::BrepFrame::WORLD, &[geometry::Polyhedron { points, faces }], self.length_scale, contexts)?;
+            }
+            if let Some(n) = reviera_core::rebar_numbers::number_of(store, id).first() {
+                self.ifc.set_attribute(step, "Tag", &AttrValue::String(n.to_string()))?;
+            }
+            if let Some((t, da, db)) = reviera_core::precast_fabric::as_sheet_type(store, e) {
+                self.write_mesh_attributes(step, &t, da, db, owner_history)?;
+            }
+            let r = reviera_core::precast_fabric::recipe(e).expect("a sheet");
+            let assembly = GlobalId::parse(&r.assembly).and_then(|g| store.find_by_guid(&g)).and_then(|a| self.steps.get(&a).copied());
+            if let Some(a) = assembly {
+                geometry::aggregate(&mut self.ifc, step, a, owner_history)?;
+            } else if let Some(h) = GlobalId::parse(&r.host).and_then(|g| store.find_by_guid(&g)) {
                 by_host.entry(h).or_default().push(AttrValue::Ref(step.0));
             }
         }

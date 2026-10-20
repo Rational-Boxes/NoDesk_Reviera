@@ -220,6 +220,8 @@ pub struct Config {
     pub dimensioning: Value,
     pub cam: CamConfig,
     pub data_folder: String,
+    /// Custom fabric sheet rules (STR-PRE-004).
+    pub fabric_rules: Vec<crate::precast_fabric::FabricRule>,
 }
 
 impl Default for Config {
@@ -234,6 +236,7 @@ impl Default for Config {
             dimensioning: json!({}),
             cam: CamConfig::default(),
             data_folder: String::new(),
+            fabric_rules: vec![crate::precast_fabric::FabricRule::default_rule()],
         }
     }
 }
@@ -328,6 +331,15 @@ pub fn problems(c: &Config) -> Vec<(String, String)> {
             if t.spacing <= 0.0 || t.leg <= 0.0 || t.bar_type.is_empty() {
                 bad(&format!("{kind}.reinforcement.edge_types"), &format!("type {}: give a bar type, a spacing and a leg above 0", t.id));
             }
+        }
+    }
+    // Custom fabric rules: sound values, ids unique.
+    for (i, r) in c.fabric_rules.iter().enumerate() {
+        for (path, rule) in crate::precast_fabric::rule_problems(r) {
+            bad(&path, &rule);
+        }
+        if c.fabric_rules[..i].iter().any(|o| o.id == r.id) {
+            bad(&format!("fabric_rules.{}", r.id), "rule ids must be unique");
         }
     }
     // The filename rule: balanced braces around known names.
