@@ -121,6 +121,16 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(BendingDetailPlace),
         registry.add(RebarAnnotationList),
         registry.add(RebarScheduleCreate),
+        registry.add(RebarSetSegmentLength),
+        registry.add(RebarMoveBar),
+        registry.add(RebarRemoveBar),
+        registry.add(RebarResetBars),
+        registry.add(RebarSplitSet),
+        registry.add(RebarPropagate),
+        registry.add(RebarPickNewHost),
+        registry.add(RebarSplice),
+        registry.add(RebarCouplerPlace),
+        registry.add(RebarCouplerInfo),
         registry.add(CustomCustomize),
         registry.add(CustomAdd),
         registry.add(CustomRemove),
@@ -3184,6 +3194,125 @@ edit_command!(
     crate::rebar_docs::ScheduleParams,
     ElementId,
     crate::rebar_docs::create_schedule
+);
+
+edit_command!(
+    RebarSetSegmentLength,
+    "rebar.set_segment_length",
+    "Set a rebar segment",
+    "Sets one segment (A, B, …; outside dimension in metres, rounded to the segment increment) of a \
+     set's shape (STR-RBR-006); `null` resets it. Refused past what the host's cover leaves room for.",
+    "Segment Length",
+    crate::rebar_edit::SegmentParams,
+    (),
+    crate::rebar_edit::set_segment_length
+);
+
+edit_command!(
+    RebarMoveBar,
+    "rebar.move_bar_in_set",
+    "Move a bar in its set",
+    "Moves one bar of a set (its layout position, from 0) along the set's array by `delta` metres \
+     (STR-RBR-006).",
+    "Move Rebar in Set",
+    crate::rebar_edit::MoveBarParams,
+    (),
+    crate::rebar_edit::move_bar
+);
+
+edit_command!(
+    RebarRemoveBar,
+    "rebar.remove_bar",
+    "Remove a bar from its set",
+    "Removes one bar (its layout position) from a set (STR-RBR-006); the quantity drops.",
+    "Remove Bar",
+    crate::rebar_edit::BarParams,
+    (),
+    crate::rebar_edit::remove_bar
+);
+
+edit_command!(
+    RebarResetBars,
+    "rebar.reset_bars",
+    "Reset a set's bars",
+    "Brings back a set's removed and moved bars (STR-RBR-006).",
+    "Reset Bars",
+    crate::rebar_edit::ResetParams,
+    (),
+    crate::rebar_edit::reset_bars
+);
+
+edit_command!(
+    RebarSplitSet,
+    "rebar.split_set",
+    "Split a rebar set",
+    "Splits a set at one of its bars (from 0) (STR-RBR-006): it keeps the bars before, a new set of \
+     the same type and shape takes the rest. Returns the new set.",
+    "Split Set",
+    crate::rebar_edit::SplitParams,
+    ElementId,
+    crate::rebar_edit::split_set
+);
+
+edit_command!(
+    RebarPropagate,
+    "rebar.propagate",
+    "Propagate rebar to other hosts",
+    "Copies sets to other hosts of the same kind (STR-RBR-006), each worked out in its own host: \
+     `mode` host (each host's frame) or face (bars at a face moved to `face_ref`). Returns the new \
+     sets and the hosts where a set does not fit, with why.",
+    "Propagate Rebar",
+    crate::rebar_edit::PropagateParams,
+    crate::rebar_edit::PropagateOut,
+    crate::rebar_edit::propagate
+);
+
+edit_command!(
+    RebarPickNewHost,
+    "rebar.pick_new_host",
+    "Move rebar sets to a new host",
+    "Moves rebar sets to another host that can hold rebar (STR-RBR-006; as `rebar.rehost`).",
+    "Pick New Host",
+    crate::rebar::RehostParams,
+    (),
+    crate::rebar::rehost
+);
+
+edit_command!(
+    RebarSplice,
+    "rebar.splice",
+    "Splice a rebar set",
+    "Splices a set of straight bars (STR-RBR-015) by `length` from their start or where a plan \
+     `line` crosses them: the set keeps the first part, a new set takes the second, overlapping by \
+     `lap` (default 40 diameters); `stagger` moves every second bar's splice. The two change \
+     together. Returns both.",
+    "Splice",
+    crate::rebar_edit::SpliceParams,
+    Vec<ElementId>,
+    crate::rebar_edit::splice
+);
+
+edit_command!(
+    RebarCouplerPlace,
+    "rebar_coupler.place",
+    "Place a rebar coupler",
+    "Places a coupler (IfcMechanicalFastener, COUPLER) on one bar end or between two (STR-RBR-015): \
+     `bar_end_refs` each a set, bar (from 0) and end (start, end). Two ends must be the same size, \
+     at most 10 diameters apart and 3 off line. Sized to the bar; deleted with its bars.",
+    "Coupler",
+    crate::rebar_edit::CouplerParams,
+    ElementId,
+    crate::rebar_edit::place_coupler
+);
+
+read_command!(
+    RebarCouplerInfo,
+    "rebar_coupler.info",
+    "Rebar couplers",
+    "Each coupler's sets, diameter, length and axis (STR-RBR-015).",
+    crate::rebar_edit::CouplerInfoParams,
+    Vec<crate::rebar_edit::CouplerInfo>,
+    crate::rebar_edit::coupler_info
 );
 
 read_command!(

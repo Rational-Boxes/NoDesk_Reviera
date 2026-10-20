@@ -1506,6 +1506,54 @@ icon = "rebar_schedule"
 help = "A schedule of the rebar grouped by partition and number: shape, bar type, segments A–E, quantity, lengths and mass"
 
 [[action]]
+id = "rebar.remove_bar"
+label = "Remove Bar"
+icon = "rebar_remove_bar"
+help = "Click bars of the selected set to remove them (the quantity drops); Reset Bars brings them back"
+
+[[action]]
+id = "rebar.split_set"
+label = "Split Set"
+icon = "rebar_split"
+help = "Click the bar where the selected set splits: it keeps the bars before, a new set takes the rest"
+
+[[action]]
+id = "rebar.move_bar_in_set"
+label = "Move Bar"
+icon = "rebar_move_bar"
+help = "Click a bar of the selected set, then give how far to move it along the set"
+
+[[action]]
+id = "rebar.reset_bars"
+label = "Reset Bars"
+icon = "rebar_reset"
+help = "Bring back the selected set's removed and moved bars"
+
+[[action]]
+id = "rebar.propagate"
+label = "Propagate"
+icon = "rebar_propagate"
+help = "Copy the selected sets to other hosts of the same kind: click the hosts, Enter finishes; each set is worked out in its own host"
+
+[[action]]
+id = "rebar.pick_new_host"
+label = "Pick New Host"
+icon = "rebar_new_host"
+help = "Move the selected sets to the host you click"
+
+[[action]]
+id = "rebar.splice"
+label = "Splice"
+icon = "rebar_splice"
+help = "Cut the selected set's straight bars into two sets that overlap by a lap, optionally staggered"
+
+[[action]]
+id = "rebar_coupler.place"
+label = "Coupler"
+icon = "rebar_coupler"
+help = "Join two bar ends of the selected sets with a coupler (at most 10 diameters apart), or put one on a bar end"
+
+[[action]]
 id = "reinforcement_settings.show"
 label = "Reinforcement Settings"
 icon = "rebar_settings"
@@ -2549,6 +2597,16 @@ panels = [
     { action = "rebar_view.select", size = "large" },
   ] },
   { label = "View", tools = [{ action = "rebar_view.states", size = "large" }] },
+  { label = "Edit", tools = [
+    { action = "rebar.remove_bar", size = "small" },
+    { action = "rebar.move_bar_in_set", size = "small" },
+    { action = "rebar.reset_bars", size = "small" },
+    { action = "rebar.split_set", size = "large" },
+    { action = "rebar.propagate", size = "large" },
+    { action = "rebar.pick_new_host", size = "small" },
+    { action = "rebar.splice", size = "small" },
+    { action = "rebar_coupler.place", size = "small" },
+  ] },
   { label = "Annotate", tools = [
     { action = "rebar_tag.place", size = "large" },
     { action = "multi_rebar_annotation.place", size = "small" },

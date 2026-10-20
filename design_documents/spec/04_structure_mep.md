@@ -842,8 +842,10 @@ No IFC equivalent.
 - `rebar.pick_new_host(rebar_ids[], host_id)`
 
 **Acceptance criteria.**
-- [ ] Propagating a stirrup set from one beam to 10 beams of different lengths produces 10 sets, each spanning its own beam between covers.
-- [ ] Splitting a 20-bar set at bar 8 yields two sets of 8 and 12 bars with identical type and shape.
+- [x] Propagating a stirrup set from one beam to 10 beams of different lengths produces 10 sets, each spanning its own beam between covers.
+- [x] Splitting a 20-bar set at bar 8 yields two sets of 8 and 12 bars with identical type and shape.
+
+*Built (2026-10-19):* edits stay parametric in the set's recipe (`edits`, by each bar's index before edits, reported by `rebar.info` as `bar_indices`): `rebar.set_segment_length` (A, B, …; rounded to the segment increment; refused past the room inside the cover; `null` resets: a link's A and B, a face bar's run and legs, a layer bar's A capping each bar from its start), `rebar.move_bar_in_set`, `rebar.remove_bar` (the quantity drops), `rebar.reset_bars`, `rebar.split_set` (the set keeps bars before the one given, a new set of the same type, shape and partition takes the rest), `rebar.propagate` (copies to other hosts of the same kind, each worked out in its own host since sets are placed relative to their host; `face` mode moves bars at a face to the face given; returns the new sets and the hosts where they do not fit, with why) and `rebar.pick_new_host`. Rebar sits under its host in the model tree. The set's contextual tab has Remove Bar, Move Bar and Split Set (click the bar), Reset Bars, Propagate (click hosts, Enter) and Pick New Host; Properties edit each segment. Not yet: shape handles and in-canvas segment controls, Select Host, hook length overrides, Align by Face with a picked face (faces are named).
 
 ### 4.2.7 Sketched rebar and rebar constraints
 **ID:** STR-RBR-007 · **Priority:** P2 · **Ref:** research/03 §3.2 ("Rebar constraints"), §3.2 "Shape matching"
@@ -1117,8 +1119,10 @@ The *Whole Host* option uses the host outline as the boundary.
 - `rebar_coupler.place(bar_end_refs[1..2], type_id?) -> coupler_id`
 
 **Acceptance criteria.**
-- [ ] Placing a coupler between two Ø25 bar ends 300 mm apart is refused, because the gap is more than 10 diameters (250 mm).
-- [ ] A spliced set exports two bars per splice location, connected by the configured lap length.
+- [x] Placing a coupler between two Ø25 bar ends 300 mm apart is refused, because the gap is more than 10 diameters (250 mm).
+- [x] A spliced set exports two bars per splice location, connected by the configured lap length.
+
+*Built (2026-10-19):* `rebar.splice` cuts a set of straight bars (shape 00, not hooked or already spliced; links, bent, area, path and free-form bars are refused) by a distance from their start or where a plan line crosses them into two sets overlapping by the lap (default 40 bar diameters), every second bar's splice moved by the stagger; each keeps the other's GlobalId (`splice` in its recipe) and a change of layout, bar type, placement or host to one is made to both. `rebar_coupler.place` puts a coupler (`IfcMechanicalFastener` USERDEFINED, ObjectType COUPLER) on one bar end or between two of the same size no more than 10 diameters apart and 3 off line (refused naming the distance and limit); it is a sleeve 1.6 bar diameters across and 6 long, sits in the *Structural Rebar Couplers* category, is not a clash with its bars or their host, is deleted with its bars, and exports with `IfcRelConnectsWithRealizingElements` between the two sets; `rebar_coupler.info`. Splice (position, lap, stagger) and Coupler (click one or two bar ends) are on the set's contextual tab. Not yet: splice and coupler types, end treatments shortening bars, arc bars, coupler numbering, schedules, tags, propagation and Align to View.
 
 ### 4.2.16 Reinforcement numbering and partitions
 **ID:** STR-RBR-016 · **Priority:** P2 · **Ref:** research/03 §3.1 ("Reinforcement numbering and partitions") · screenshots/structure_mep/rebar_partitions_by_level.png

@@ -906,6 +906,49 @@ pub struct RebarRecipe {
     pub bar_type: String,
     pub placement: Placement,
     pub layout: Layout,
+    /// Bars removed, moved, kept to a range or with segments set (STR-RBR-006).
+    #[serde(default, skip_serializing_if = "BarEdits::is_empty")]
+    pub edits: BarEdits,
+    /// The set's part of a splice (STR-RBR-015).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub splice: Option<Splice>,
+}
+
+/// Edits to a set's bars (STR-RBR-006), by layout position.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct BarEdits {
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub removed: Vec<usize>,
+    /// Moves along the array (metres), by bar.
+    #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+    pub moved: std::collections::BTreeMap<usize, f64>,
+    /// The layout positions this set keeps, `from..to` (a split set's part).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub range: Option<(usize, usize)>,
+    /// Segment values set by hand (outside dimensions, metres): A, B, ….
+    #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+    pub segments: std::collections::BTreeMap<String, f64>,
+}
+
+impl BarEdits {
+    pub fn is_empty(&self) -> bool {
+        self.removed.is_empty() && self.moved.is_empty() && self.range.is_none() && self.segments.is_empty()
+    }
+}
+
+/// Which part of a lap splice a set is: its bars end (`first`) or start (`second`) around the
+/// splice point, the two overlapping by the lap; every second bar's splice point moves by the
+/// stagger.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct Splice {
+    pub first: bool,
+    /// The splice point's distance from the bars' start (metres).
+    pub at: f64,
+    pub lap: f64,
+    #[serde(default)]
+    pub stagger: f64,
+    /// The other part (GlobalId).
+    pub partner: String,
 }
 
 pub fn rebar_recipe(e: &Element) -> Option<RebarRecipe> {
@@ -969,6 +1012,8 @@ pub struct SetGeometry {
     /// `main` or `ligature`.
     pub role: String,
     pub array_length: f64,
+    /// Each bar's index among the set's bars before its edits (what bar edits refer to).
+    pub indices: Vec<usize>,
 }
 
 pub(crate) fn chord(polys: &[Vec<[f64; 2]>], o: [f64; 2], d: [f64; 2]) -> Vec<(f64, f64)> {
@@ -1078,6 +1123,18 @@ pub(crate) fn host_plane(store: &Store, host: &Element, kind: HostKind, face: &s
     }
 }
 
+/// A segment's value set by hand, refused past what the host leaves room for.
+fn segment_override(r: &RebarRecipe, letter: &str, room: f64) -> Result<f64> {
+    match r.edits.segments.get(letter) {
+        Some(v) if *v > room + 1e-9 => Err(Error::new(
+            "rebar.segment",
+            format!("segment {letter} can be at most {:.0} mm here, inside the cover", room * 1000.0),
+        )),
+        Some(v) => Ok(*v),
+        None => Ok(room),
+    }
+}
+
 /// A hook at a bar's end: the points from the end (where the bar turns) along the tail. `out`
 /// runs out of the bar there; the tail turns `inward`, kept within `room`.
 pub(crate) fn hook_points(end: V3, out: V3, inward: V3, h: &HookType, bt: &BarType, room: f64) -> Vec<V3> {
@@ -1108,7 +1165,56 @@ pub(crate) fn hook_points(end: V3, out: V3, inward: V3, h: &HookType, bt: &BarTy
 }
 
 /// Works out a set's bars from its host.
+/// Works out a set's bars from its host, with its edits and splice applied.
 pub fn geometry(store: &Store, r: &RebarRecipe) -> Result<SetGeometry> {
+    let mut g = base_geometry(store, r)?;
+    let n = g.bars.len();
+    // The array direction, from the first bar's start to the last's.
+    let along = if n > 1 { unit(sub(g.bars[n - 1].points[0], g.bars[0].points[0])) } else { [0.0, 0.0, 0.0] };
+    let (from, to) = r.edits.range.unwrap_or((0, n));
+    let mut bars = Vec::new();
+    let mut indices = Vec::new();
+    for (i, mut b) in g.bars.into_iter().enumerate() {
+        if i < from || i >= to.min(n) || r.edits.removed.contains(&i) {
+            continue;
+        }
+        indices.push(i);
+        if let Some(dt) = r.edits.moved.get(&i) {
+            b.points.iter_mut().for_each(|p| *p = add(*p, mul(along, *dt)));
+        }
+        if let Some(sp) = &r.splice {
+            let shift = if i % 2 == 1 { sp.stagger } else { 0.0 };
+            spliced(&mut b, sp.at + shift, sp.lap, sp.first);
+        }
+        bars.push(b);
+    }
+    if bars.is_empty() {
+        return Err(Error::new("rebar.no_bars", "every bar of the set is removed"));
+    }
+    if let Some(sp) = &r.splice {
+        let full = g.dimensions.iter().find(|(k, _)| k == "A").map_or(0.0, |x| x.1);
+        let part = if sp.first { sp.at + sp.lap / 2.0 } else { full - sp.at + sp.lap / 2.0 };
+        g.dimensions = vec![("A".into(), part.min(full))];
+    }
+    g.bars = bars;
+    g.indices = indices;
+    Ok(g)
+}
+
+/// Cuts a straight bar at a splice: the first part runs to `at` plus half the lap, the second
+/// from `at` less half the lap.
+fn spliced(b: &mut Bar, at: f64, lap: f64, first: bool) {
+    let (a, e) = (b.points[0], b.points[b.points.len() - 1]);
+    let l = len(sub(e, a));
+    if l < 1e-9 {
+        return;
+    }
+    let dir = unit(sub(e, a));
+    let (s0, s1) = if first { (0.0, (at + lap / 2.0).min(l)) } else { ((at - lap / 2.0).max(0.0), l) };
+    b.points = vec![add(a, mul(dir, s0)), add(a, mul(dir, s1))];
+}
+
+fn base_geometry(store: &Store, r: &RebarRecipe) -> Result<SetGeometry> {
     let host = GlobalId::parse(&r.host)
         .and_then(|g| store.find_by_guid(&g))
         .and_then(|i| store.get(i))
@@ -1135,8 +1241,8 @@ pub fn geometry(store: &Store, r: &RebarRecipe) -> Result<SetGeometry> {
                 return Err(Error::new("rebar.shape", "links need a rectangular section (round columns take spirals, not yet)"));
             }
             let (top, bottom, side) = if kind == HostKind::Beam { (cov("top"), cov("bottom"), cov("other")) } else { (cov("other"), cov("other"), cov("other")) };
-            let w = fit("width", f.ty.width - 2.0 * side)?;
-            let h = fit("depth", f.ty.depth - top - bottom)?;
+            let w = segment_override(r, "A", fit("width", f.ty.width - 2.0 * side)?)?;
+            let h = segment_override(r, "B", fit("depth", f.ty.depth - top - bottom)?)?;
             let axis_len = len(sub(f.end, f.start));
             let (c0, c1) = if kind == HostKind::Column { (cov("bottom"), cov("top")) } else { (cov("other"), cov("other")) };
             let span = fit("length", axis_len - c0 - c1)? - d;
@@ -1174,6 +1280,7 @@ pub fn geometry(store: &Store, r: &RebarRecipe) -> Result<SetGeometry> {
                 dimensions: vec![("A".into(), w), ("B".into(), h), ("C".into(), ext), ("D".into(), ext)],
                 role: "ligature".into(),
                 array_length: span,
+                indices: Vec::new(),
             })
         }
         (Placement::Face { face }, HostKind::Column | HostKind::Beam) => {
@@ -1201,17 +1308,21 @@ pub fn geometry(store: &Store, r: &RebarRecipe) -> Result<SetGeometry> {
             };
             let leg = if legs > 0 {
                 let want = extension(&hook(store, "standard_90"), d) + bt.standard_bend / 2.0 + d;
-                fit("depth", depth_in)?.min(want) - d / 2.0
+                let room = fit("depth", depth_in)?;
+                let letter = if legs == 1 { "B" } else { "A" };
+                segment_override(r, letter, room.min(want))? .min(room) - d / 2.0
             } else {
                 0.0
             };
+            // A run set by hand starts where the bar starts.
+            let run = segment_override(r, if legs == 2 { "B" } else { "A" }, run)?;
             let rad = bt.standard_bend / 2.0 + d / 2.0;
             let bars = pos
                 .iter()
                 .map(|t| {
                     let base = add(add(f.start, mul(n, half_n - c_n - d / 2.0)), mul(across, -half_a + c_a + d / 2.0 + t));
                     let a = add(base, mul(f.axis, c0));
-                    let b = add(base, mul(f.axis, axis_len - c1));
+                    let b = add(a, mul(f.axis, run));
                     let down = mul(n, -leg);
                     let pts = match legs {
                         0 => vec![a, b],
@@ -1227,7 +1338,7 @@ pub fn geometry(store: &Store, r: &RebarRecipe) -> Result<SetGeometry> {
                 1 => vec![("A".into(), run), ("B".into(), outside(leg))],
                 _ => vec![("A".into(), outside(leg)), ("B".into(), run), ("C".into(), outside(leg))],
             };
-            Ok(SetGeometry { bars, dimensions: dims, role: "main".into(), array_length: spread })
+            Ok(SetGeometry { bars, dimensions: dims, role: "main".into(), array_length: spread, indices: Vec::new() })
         }
         (Placement::Layer { face, angle, vertical, offset, boundary, hook: hook_id, hook_flip }, HostKind::Floor | HostKind::Wall) => {
             if sh.code != "00" {
@@ -1276,8 +1387,17 @@ pub fn geometry(store: &Store, r: &RebarRecipe) -> Result<SetGeometry> {
                     bars.push(Bar { points: pts });
                 }
             }
+            // A length set by hand caps every bar from its start.
+            if let Some(cap) = r.edits.segments.get("A") {
+                for b in &mut bars {
+                    let (a, e) = (b.points[0], b.points[b.points.len() - 1]);
+                    if b.points.len() == 2 && len(sub(e, a)) > *cap {
+                        b.points[1] = add(a, mul(unit(sub(e, a)), *cap));
+                    }
+                }
+            }
             let longest = bars.iter().map(Bar::length).fold(0.0, f64::max);
-            Ok(SetGeometry { bars, dimensions: vec![("A".into(), longest)], role: "main".into(), array_length: spread })
+            Ok(SetGeometry { bars, dimensions: vec![("A".into(), longest)], role: "main".into(), array_length: spread, indices: Vec::new() })
         }
         (p, k) => Err(Error::new(
             "rebar.placement",
@@ -1324,6 +1444,8 @@ pub(crate) fn place(txn: &mut crate::txn::Transaction<'_>, p: PlaceParams) -> Re
         bar_type: bt.id.clone(),
         placement: p.placement.clone(),
         layout: p.layout.clone(),
+        edits: BarEdits::default(),
+        splice: None,
     };
     let g = geometry(&store, &r)?;
     let predefined = if g.role == "ligature" { "LIGATURE" } else { "MAIN" };
@@ -1352,6 +1474,17 @@ pub(crate) fn set_layout(txn: &mut crate::txn::Transaction<'_>, p: LayoutParams)
         rec.layout = p.layout.clone();
         geometry(&store, &rec)?;
         txn.set_param(id, RECIPE_KEY, serde_json::to_value(&rec).expect("serialises"))?;
+        // A spliced set's other part changes with it (STR-RBR-015).
+        if let Some(pid) = crate::rebar_edit::partner(&store, &rec)
+            && let Some(mut other) = store.get(pid).and_then(rebar_recipe)
+        {
+            other.layout = rec.layout.clone();
+            other.bar_type = rec.bar_type.clone();
+            other.placement = rec.placement.clone();
+            other.host = rec.host.clone();
+            geometry(&store, &other)?;
+            txn.set_param(pid, RECIPE_KEY, serde_json::to_value(&other).expect("serialises"))?;
+        }
     }
     crate::rebar_numbers::persist(txn)
 }
@@ -1384,6 +1517,17 @@ pub(crate) fn set(txn: &mut crate::txn::Transaction<'_>, p: SetParams) -> Result
         }
         geometry(&store, &rec)?;
         txn.set_param(id, RECIPE_KEY, serde_json::to_value(&rec).expect("serialises"))?;
+        // A spliced set's other part changes with it (STR-RBR-015).
+        if let Some(pid) = crate::rebar_edit::partner(&store, &rec)
+            && let Some(mut other) = store.get(pid).and_then(rebar_recipe)
+        {
+            other.layout = rec.layout.clone();
+            other.bar_type = rec.bar_type.clone();
+            other.placement = rec.placement.clone();
+            other.host = rec.host.clone();
+            geometry(&store, &other)?;
+            txn.set_param(pid, RECIPE_KEY, serde_json::to_value(&other).expect("serialises"))?;
+        }
     }
     crate::rebar_numbers::persist(txn)
 }
@@ -1406,6 +1550,17 @@ pub(crate) fn rehost(txn: &mut crate::txn::Transaction<'_>, p: RehostParams) -> 
         rec.host = host.guid().to_string();
         geometry(&store, &rec)?;
         txn.set_param(id, RECIPE_KEY, serde_json::to_value(&rec).expect("serialises"))?;
+        // A spliced set's other part changes with it (STR-RBR-015).
+        if let Some(pid) = crate::rebar_edit::partner(&store, &rec)
+            && let Some(mut other) = store.get(pid).and_then(rebar_recipe)
+        {
+            other.layout = rec.layout.clone();
+            other.bar_type = rec.bar_type.clone();
+            other.placement = rec.placement.clone();
+            other.host = rec.host.clone();
+            geometry(&store, &other)?;
+            txn.set_param(pid, RECIPE_KEY, serde_json::to_value(&other).expect("serialises"))?;
+        }
     }
     crate::rebar_numbers::persist(txn)
 }
@@ -1433,6 +1588,8 @@ pub struct RebarInfo {
     pub dimensions: Vec<(String, f64)>,
     pub role: String,
     pub bars: Vec<Bar>,
+    /// Each bar's index before the set's edits (for removing, moving and splitting).
+    pub bar_indices: Vec<usize>,
     /// The rebar number (STR-RBR-016) and partition ("" for none).
     pub number: Option<u32>,
     pub partition: String,
@@ -1484,6 +1641,7 @@ pub fn info(store: &Store, p: InfoParams) -> Result<Vec<RebarInfo>> {
                 mass: total * area * 7850.0,
                 dimensions: g.dimensions.clone(),
                 role: g.role.clone(),
+                bar_indices: g.indices.clone(),
                 bars: g.bars,
                 number: numbers.iter().find(|(i, _)| i.element == id).map(|(_, n)| *n),
                 partition: store.get(id).map(crate::rebar_numbers::partition).unwrap_or_default(),

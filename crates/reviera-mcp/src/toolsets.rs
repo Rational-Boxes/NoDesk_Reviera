@@ -95,6 +95,7 @@ pub fn toolset_of(command: &str) -> String {
             | "bending_detail"
             | "rebar_annotation"
             | "rebar_schedule"
+            | "rebar_coupler"
             | "beam_system"
             | "truss"
             | "brace"

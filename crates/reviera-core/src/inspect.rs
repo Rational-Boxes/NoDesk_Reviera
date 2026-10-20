@@ -63,6 +63,17 @@ fn raw_parent(store: &Store, e: &Element, imported: &Imported) -> Option<Element
     if let Some(r) = crate::parts::recipe(e) {
         return by_guid(&r.source);
     }
+    // Rebar and area, path and fabric systems sit under their host, couplers under their bars
+    // (STR-RBR-001, STR-RBR-015).
+    if let Some(r) = crate::rebar::rebar_recipe(e) {
+        return by_guid(&r.host);
+    }
+    if crate::rebar_systems::system_kind(e).is_some() {
+        return e.param(crate::walls::RECIPE_KEY)?.get("host")?.as_str().and_then(by_guid);
+    }
+    if let Some(r) = crate::rebar_edit::coupler_recipe(e) {
+        return r.ends.first().and_then(|b| by_guid(&b.rebar));
+    }
     if let Some(r) = crate::walls::wall_recipe(e) {
         return by_guid(&r.base_level);
     }

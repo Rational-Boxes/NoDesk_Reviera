@@ -417,6 +417,13 @@ impl Gui {
             .map(|d| format!("{} {:.0}", d[0].as_str().unwrap_or(""), d[1].as_f64().unwrap_or(0.0) * 1000.0))
             .collect();
         ro(grid, "Dimensions (mm)", "rb_dims", dims.join(", "));
+        // Each segment can be set by hand (STR-RBR-006); blank resets it.
+        for d in i["dimensions"].as_array().into_iter().flatten() {
+            let letter = d[0].as_str().unwrap_or("");
+            let name = format!("rb_seg_{letter}");
+            grid.append(Property::string(format!("Segment {letter} (mm)"), &name, format!("{:.0}", d[1].as_f64().unwrap_or(0.0) * 1000.0)));
+            grid.set_help_string(&name, "Set this segment's length; blank goes back to what the host gives");
+        }
         if i["orphaned"] == true {
             ro(grid, "Orphaned", "rb_orphan", i["orphan_reason"].as_str().unwrap_or("").to_owned());
         }
@@ -445,6 +452,15 @@ impl Gui {
         }
         let frame = self.frame;
         let Some(id) = self.selection().first().copied() else { return true };
+        if let Some(letter) = property.strip_prefix("rb_seg_") {
+            let length = text.as_deref().and_then(|t| t.trim().parse::<f64>().ok()).map(|v| v / 1000.0);
+            if let Err(e) = self.run("rebar.set_segment_length", json!({ "rebar_id": id, "segment": letter, "length": length })) {
+                error(&frame, &format!("The segment was not changed:\n{e}"));
+            }
+            self.refresh_scene(&frame);
+            self.properties_stale = true;
+            return true;
+        }
         if property == "rb_partition" {
             let ids: Vec<ElementId> = self.selection();
             if let Err(e) = self.run("rebar.set_partition", json!({ "ids": ids, "name": text.unwrap_or_default() })) {

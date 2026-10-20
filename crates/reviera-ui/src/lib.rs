@@ -63,6 +63,7 @@ mod steel_detail_ui;
 mod steel_cut_ui;
 mod custom_ui;
 mod coords;
+mod rebar_edit_ui;
 mod rebar_ui;
 mod rebar_view_ui;
 mod reinforcement_ui;
@@ -301,6 +302,10 @@ struct Gui {
     bar_pick: Option<rebar_view_ui::BarPick>,
     /// A rebar annotation waiting for its point (STR-RBR-018): the tool, the sets and the plan.
     rebar_anno: Option<(rebar_view_ui::AnnoTool, Vec<ElementId>, ElementId)>,
+    /// Propagate or Pick New Host in progress (STR-RBR-006).
+    rebar_host_pick: Option<rebar_edit_ui::HostPick>,
+    /// Coupler in progress (STR-RBR-015).
+    end_pick: Option<rebar_edit_ui::EndPick>,
     /// Contour Cut: the element the sketch cuts.
     contour_target: Option<ElementId>,
     adjust: Option<adjust::AdjustSession>,
@@ -1345,6 +1350,8 @@ impl Gui {
         self.end_rebar_sketch();
         self.end_bar_pick();
         self.end_rebar_annotation();
+        self.end_rebar_host_pick();
+        self.end_coupler();
         self.end_curtain_tool();
         self.end_ramp_tool();
         self.end_measure_tool();
@@ -1402,6 +1409,8 @@ impl Gui {
             || self.end_rebar_sketch()
             || self.end_bar_pick()
             || self.end_rebar_annotation()
+            || self.end_rebar_host_pick()
+            || self.end_coupler()
             || self.cancel_adjust()
         {
             return frame.set_status_text("Ready", 0);
@@ -1439,6 +1448,8 @@ impl Gui {
         self.adjust.is_some()
             || self.bar_pick.is_some()
             || self.rebar_anno.is_some()
+            || self.rebar_host_pick.is_some()
+            || self.end_pick.is_some()
             || self.slice_pick.is_some()
             || self.attach_pick.is_some()
             || self.host_pick.is_some()
@@ -1481,7 +1492,7 @@ impl Gui {
 
     /// A key handed to the tools in progress; `true` when one used it.
     pub(crate) fn tools_key(&mut self, key: i32, shift: bool, f: &Frame) -> bool {
-        let mut used = self.adjust_key(key) || self.bar_pick_key(key) || self.steel_key(key) || self.rebar_sketch_key(key) || self.walk_key(key, true, shift);
+        let mut used = self.adjust_key(key) || self.bar_pick_key(key) || self.rebar_host_key(key) || self.coupler_key(key) || self.steel_key(key) || self.rebar_sketch_key(key) || self.walk_key(key, true, shift);
         if !used && self.sketch.is_some() {
             let (mx, my) = self.mouse;
             used = self.sketch_key(key, mx, my);
@@ -1517,6 +1528,10 @@ impl Gui {
             self.bar_pick_click(x, y);
         } else if self.rebar_anno.is_some() {
             self.rebar_annotation_click(x, y);
+        } else if self.rebar_host_pick.is_some() {
+            self.rebar_host_click(x, y, p);
+        } else if self.end_pick.is_some() {
+            self.coupler_click(x, y);
         } else if self.slice_pick.is_some() {
             self.slice_click(x, y);
         } else if self.attach_pick.is_some() {
@@ -3529,6 +3544,8 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 rebar_sketch: None,
                 bar_pick: None,
                 rebar_anno: None,
+                rebar_host_pick: None,
+                end_pick: None,
                 contour_target: None,
                 adjust: None,
                 auto_preview: None,
@@ -4532,6 +4549,14 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "rebar_view.multi_linear" => with(gui, |g| g.start_rebar_annotation(rebar_view_ui::AnnoTool::Linear)),
         "bending_detail.place" => with(gui, |g| g.start_rebar_annotation(rebar_view_ui::AnnoTool::Bending)),
         "rebar_schedule.create" => with(gui, Gui::rebar_schedule),
+        "rebar.remove_bar" => with(gui, |g| g.start_bar_edit(rebar_view_ui::BarPurpose::Remove)),
+        "rebar.split_set" => with(gui, |g| g.start_bar_edit(rebar_view_ui::BarPurpose::Split)),
+        "rebar.move_bar_in_set" => with(gui, |g| g.start_bar_edit(rebar_view_ui::BarPurpose::Move)),
+        "rebar.reset_bars" => with(gui, Gui::reset_rebar_bars),
+        "rebar.propagate" => with(gui, |g| g.start_rebar_host_pick(true)),
+        "rebar.pick_new_host" => with(gui, |g| g.start_rebar_host_pick(false)),
+        "rebar.splice" => with(gui, Gui::splice_rebar),
+        "rebar_coupler.place" => with(gui, Gui::start_coupler),
         "dim.create_aligned" => with(gui, |g| {
             g.start_dim_tool(f);
             focus(g);

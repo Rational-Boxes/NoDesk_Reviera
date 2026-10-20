@@ -2606,6 +2606,33 @@ impl LocalProject {
                 by_host.entry(h).or_default().push(AttrValue::Ref(step.0));
             }
         }
+        // Couplers (STR-RBR-015): a sleeve body, connecting the two sets they join.
+        const COUPLER_TAG: &str = "rxd:rebar_coupler";
+        for rel in self.ifc.entities_of_type("IfcRelConnectsWithRealizingElements")? {
+            if matches!(self.ifc.attribute(rel.id, "Description")?, AttrValue::String(d) if d == COUPLER_TAG) {
+                self.ifc.remove(rel.id)?;
+            }
+        }
+        for e in store.iter().filter(|e| reviera_core::rebar_edit::coupler_recipe(e).is_some()) {
+            let Some(&step) = self.steps.get(&e.id()) else { continue };
+            if let Some((points, indices)) = reviera_core::rebar_edit::coupler_mesh(store, e) {
+                let faces: Vec<Vec<usize>> = indices.chunks(3).map(|t| t.iter().map(|k| *k as usize).collect()).collect();
+                geometry::write_breps(&mut self.ifc, step, geometry::BrepFrame::WORLD, &[geometry::Polyhedron { points, faces }], self.length_scale, contexts)?;
+            }
+            let sets = reviera_core::rebar_edit::coupled(store, e);
+            if let [a, b] = sets[..]
+                && let (Some(&sa), Some(&sb)) = (self.steps.get(&a), self.steps.get(&b))
+            {
+                let rel = self.ifc.create_rooted("IfcRelConnectsWithRealizingElements", &GlobalId::new())?;
+                self.ifc.set_attribute(rel, "Description", &AttrValue::String(COUPLER_TAG.into()))?;
+                if let Some(h) = owner_history {
+                    self.ifc.set_attribute(rel, "OwnerHistory", &AttrValue::Ref(h.0))?;
+                }
+                self.ifc.set_attribute(rel, "RelatingElement", &AttrValue::Ref(sa.0))?;
+                self.ifc.set_attribute(rel, "RelatedElement", &AttrValue::Ref(sb.0))?;
+                self.ifc.set_attribute(rel, "RealizingElements", &AttrValue::List(vec![AttrValue::Ref(step.0)]))?;
+            }
+        }
         // Area, path and fabric systems and single sheets (STR-RBR-010 … 012).
         for id in systems {
             let Some(&step) = self.steps.get(&id) else { continue };

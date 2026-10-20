@@ -607,6 +607,30 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "rebar_cover" => format!(
             r#"<rect x="5" y="5" width="22" height="22" fill="{f}" {s}/><path d="M5 22h22" {sa} stroke-dasharray="2 2"/><path d="M16 22v5M14 24l2-2 2 2M14 25l2 2 2-2" {sa}/>"#
         ),
+        "rebar_remove_bar" => format!(
+            r#"<path d="M8 6v20M14 6v20M26 6v20" {sa}/><path d="M17 12l6 8M23 12l-6 8" {s}/>"#
+        ),
+        "rebar_split" => format!(
+            r#"<path d="M6 6v20M10 6v20M14 6v20M20 6v20M24 6v20" {sa}/><path d="M17 4v24" {s} stroke-dasharray="2 2"/>"#
+        ),
+        "rebar_move_bar" => format!(
+            r#"<path d="M8 6v20M24 6v20" {sa}/><path d="M14 6v20" {sa} stroke-dasharray="2 2"/><path d="M14 16h6M18 13l3 3-3 3" {s}/>"#
+        ),
+        "rebar_reset" => format!(
+            r#"<path d="M8 8v16M14 8v16M20 8v16" {sa}/><path d="M24 10a7 7 0 1 1-2-4M24 4v4h-4" fill="none" {s}/>"#
+        ),
+        "rebar_propagate" => format!(
+            r#"<rect x="3" y="12" width="8" height="8" fill="{f}" {s}/><rect x="21" y="6" width="8" height="8" fill="{f}" {s}/><rect x="21" y="18" width="8" height="8" fill="{f}" {s}/><path d="M11 16l10-6M11 16l10 6" {sa}/>"#
+        ),
+        "rebar_new_host" => format!(
+            r#"<rect x="4" y="8" width="10" height="16" fill="{f}" {s} stroke-dasharray="2 2"/><rect x="18" y="8" width="10" height="16" fill="{f}" {s}/><path d="M9 12v8M23 12v8" {sa}/><path d="M12 6c4-3 8-3 11 0" fill="none" {s}/>"#
+        ),
+        "rebar_splice" => format!(
+            r#"<path d="M3 13h18M11 19h18" {sa}/><path d="M11 10v12M21 10v12" {s} stroke-dasharray="2 1"/>"#
+        ),
+        "rebar_coupler" => format!(
+            r#"<path d="M3 16h9M20 16h9" {sa}/><rect x="11" y="12" width="10" height="8" rx="1" fill="{f}" {s}/>"#
+        ),
         "rebar_tag" => format!(
             r#"<path d="M6 24L26 8" {sa}/><rect x="12" y="5" width="16" height="9" fill="{f}" {s}/><path d="M15 9.5h10" {s}/>"#
         ),

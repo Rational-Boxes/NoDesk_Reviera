@@ -710,6 +710,10 @@ tools and the datums.
   solid or centrelines) and presentation (all, first/last, middle, picked bars, with the set's
   extent line) (`rebar.set_view_visibility`, `rebar.set_presentation`; STR-RBR-017). Not yet:
   two-point and sketched bars, varying sets, cranks and spirals, shape matching, bent fabric.
+  Editing: segments set by hand, bars removed, moved and reset, Split Set, Propagate to other
+  hosts and Pick New Host; lap splices (with stagger) and couplers between bar ends
+  (`rebar.set_segment_length`, `rebar.split_set`, `rebar.propagate`, `rebar.splice`,
+  `rebar_coupler.place`, …; STR-RBR-006, STR-RBR-015).
   Rebar documentation: a Rebar Tag (number and "15 Ø12 @ 150"), multi-rebar annotations across
   parallel sets, bending details with segment values, and a Bar Bending Schedule grouped by
   partition and number with mass from nominal kg/m (`rebar_tag.place`,

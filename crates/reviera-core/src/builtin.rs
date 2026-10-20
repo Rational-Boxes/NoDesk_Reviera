@@ -503,6 +503,7 @@ pub fn dependents_of(store: &crate::store::Store, id: ElementId) -> Vec<ElementI
                 || crate::rebar::uses(e, &guid)
                 || crate::rebar_systems::uses(e, &guid)
                 || crate::rebar_docs::uses(store, e, &guid)
+                || crate::rebar_edit::uses(e, &guid)
                 || crate::analytical::uses(e, &guid)
                 || crate::analytical_panels::uses(e, &guid)
                 || crate::loads::uses(e, &guid)

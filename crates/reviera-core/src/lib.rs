@@ -78,6 +78,7 @@ pub mod steel_cuts;
 pub mod steel_detail;
 pub mod rebar;
 pub mod rebar_docs;
+pub mod rebar_edit;
 pub mod rebar_numbers;
 pub mod rebar_systems;
 pub mod rebar_views;

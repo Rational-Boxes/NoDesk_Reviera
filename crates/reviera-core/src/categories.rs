@@ -187,6 +187,8 @@ pub const CATEGORIES: &[Category] = &[
         None,
         true,
     ),
+    // Rebar couplers (STR-RBR-015).
+    cat("cat.structural_rebar_couplers", "Structural Rebar Couplers", None, None, None, true),
     // Area, path and fabric reinforcement (STR-RBR-010 … 012).
     cat("cat.structural_area_reinforcement", "Structural Area Reinforcement", None, None, None, true),
     cat("cat.structural_path_reinforcement", "Structural Path Reinforcement", None, None, None, true),
@@ -368,6 +370,9 @@ fn text<'a>(e: &'a Element, key: &str) -> Option<&'a str> {
 pub fn category_of(e: &Element) -> Option<&'static Category> {
     if crate::grids::is_grid(e) || crate::grids::is_grid_type(e) {
         return category("cat.grids");
+    }
+    if crate::rebar_edit::coupler_recipe(e).is_some() {
+        return category("cat.structural_rebar_couplers");
     }
     if crate::connections::recipe(e).is_some()
         || crate::steel_fab::fab_recipe(e).is_some()

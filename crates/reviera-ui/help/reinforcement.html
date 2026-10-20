@@ -174,6 +174,24 @@ what is drawn: quantities, numbers and the IFC export keep every bar. Clicking a
 selects its set. The presentation of sets with none of their own comes from Reinforcement
 Settings.</p>
 
+<h2 id="editing">Editing sets</h2>
+<p>The contextual tab of a selected set:</p>
+<ul>
+  <li><b>Remove Bar</b>, <b>Move Bar</b> and <b>Split Set</b>: click the bar.</li>
+  <li><b>Reset Bars</b> brings removed and moved bars back. A split set keeps its part.</li>
+  <li><b>Propagate</b>: click other hosts of the same kind and press Enter. Each copy is worked
+    out in its own host, and hosts where it does not fit are listed.</li>
+  <li><b>Pick New Host</b> moves the set to the host you click.</li>
+  <li>Each segment (A, B, …) can be set in Properties, rounded to the segment increment. Clear
+    it to go back to what the host gives.</li>
+</ul>
+<p><b>Splice</b> cuts a set of straight bars into two sets that overlap by the lap: give where,
+the lap (default 40 diameters) and a stagger for every second bar. The two change together.
+<b>Coupler</b> joins two bar ends of the same size no more than 10 diameters apart and 3 off
+line, or sits on one end. Click the ends. It is exported as an
+<code>IfcMechanicalFastener</code> (COUPLER) connecting the two sets. The default lap and the
+coupler's size are starting points to check against the governing code and the supplier.</p>
+
 <h2 id="documentation">Tags, annotations and schedules</h2>
 <p>In a plan, select a set and use Concrete › Documentation (or the set's contextual tab), then
 click where the annotation goes:</p>
@@ -194,5 +212,5 @@ bar and total length, and mass (the bars' nominal mass per metre times their rou
 Any rebar schedule can show these fields, and R and the other segments, through Fields.</p>
 
 <h2 id="not-yet">Not yet</h2>
-<p>Placing rebar sets by two points or by sketch, varying sets, cranks and spirals, bent and custom fabric sheets, reinforcement symbols, tags outside plans, hook angles on bending details, and fabric
+<p>Placing rebar sets by two points or by sketch, shape handles, splice and coupler types, varying sets, cranks and spirals, bent and custom fabric sheets, reinforcement symbols, tags outside plans, hook angles on bending details, and fabric
 schedules.</p>

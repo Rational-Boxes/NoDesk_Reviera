@@ -390,6 +390,9 @@ pub fn all(store: &Store) -> Vec<Body> {
         } else if let Some(m) = crate::rebar::mesh(store, e) {
             // Reinforcement (STR-RBR-004).
             push(e.id(), "IfcReinforcingBar", m, false);
+        } else if let Some(m) = crate::rebar_edit::coupler_mesh(store, e) {
+            // Rebar couplers (STR-RBR-015).
+            push(e.id(), "IfcMechanicalFastener", m, false);
         } else if let Some(m) = crate::rebar_systems::mesh(store, e) {
             // Area, path and fabric reinforcement (STR-RBR-010 … 012).
             push(e.id(), if e.class == "IfcReinforcingMesh" { "IfcReinforcingMesh" } else { "IfcReinforcingBar" }, m, false);
@@ -608,7 +611,19 @@ fn reinforcing(store: &Store, a: ElementId, b: ElementId) -> bool {
         let (Some(x), Some(h)) = (store.get(bar), store.get(host)) else { return false };
         crate::rebar::rebar_recipe(x).is_some_and(|r| r.host == h.guid().to_string())
     };
-    one_way(a, b) || one_way(b, a) || crate::rebar_systems::reinforces(store, a, b) || crate::rebar_systems::reinforces(store, b, a)
+    // A coupler sits on its bars and in their host.
+    let coupler = |c: ElementId, other: ElementId| {
+        let (Some(x), Some(o)) = (store.get(c), store.get(other)) else { return false };
+        let sets = crate::rebar_edit::coupled(store, x);
+        sets.contains(&other)
+            || sets.iter().any(|s| store.get(*s).and_then(crate::rebar::rebar_recipe).is_some_and(|r| r.host == o.guid().to_string()))
+    };
+    one_way(a, b)
+        || one_way(b, a)
+        || crate::rebar_systems::reinforces(store, a, b)
+        || crate::rebar_systems::reinforces(store, b, a)
+        || coupler(a, b)
+        || coupler(b, a)
 }
 
 /// A steel connection's plates, bolts and welds belong together and pass through its members,

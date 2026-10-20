@@ -283,6 +283,8 @@ pub fn area_sets(store: &Store, r: &AreaRecipe) -> Result<Vec<(usize, RebarRecip
                     hook_flip: l.hook_flip,
                 },
                 layout,
+                edits: rebar::BarEdits::default(),
+                splice: None,
             },
         ));
     }

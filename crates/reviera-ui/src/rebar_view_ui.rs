@@ -26,12 +26,26 @@ const PICKED: [f32; 4] = [0.95, 0.45, 0.0, 1.0];
 /// The bar segments a view draws, by set, for picking.
 pub(crate) type RebarPicks = Vec<(ElementId, [[f32; 3]; 2])>;
 
-/// Select Bars in progress: the set, the view, its bars and the picks.
+/// What clicking a bar does.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BarPurpose {
+    /// Select Bars: pick bars to show, Enter finishes.
+    Present,
+    /// Remove Bar, Split Set and Move Bar act on the bar clicked (STR-RBR-006).
+    Remove,
+    Split,
+    Move,
+}
+
+/// A bar pick in progress: the set, the view, its bars (with their indices before edits) and
+/// the picks.
 #[derive(Debug, Clone)]
 pub struct BarPick {
+    pub purpose: BarPurpose,
     pub set: ElementId,
     pub view: ElementId,
     pub bars: Vec<Vec<[f64; 3]>>,
+    pub indices: Vec<usize>,
     pub picked: Vec<usize>,
 }
 
@@ -127,7 +141,7 @@ impl Gui {
         self.active_view().and_then(|v| v.element)
     }
 
-    fn selected_reinforcement(&mut self, sets_only: bool) -> Vec<ElementId> {
+    pub(crate) fn selected_reinforcement(&mut self, sets_only: bool) -> Vec<ElementId> {
         let Some(store) = self.store_now() else { return Vec::new() };
         self.selection()
             .into_iter()
@@ -156,9 +170,10 @@ impl Gui {
                 .flatten()
                 .map(|b| serde_json::from_value(b["points"].clone()).unwrap_or_default())
                 .collect();
+            let indices: Vec<usize> = serde_json::from_value(i[0]["bar_indices"].clone()).unwrap_or_default();
             let end_tool = self.frame;
             self.end_tool(&end_tool);
-            self.bar_pick = Some(BarPick { set, view, bars, picked: Vec::new() });
+            self.bar_pick = Some(BarPick { purpose: BarPurpose::Present, set, view, bars, indices, picked: Vec::new() });
             self.bar_pick_preview();
             return frame.set_status_text("Select Bars: click the bars to show (again to drop one); Enter finishes, Esc cancels", 0);
         }
@@ -231,8 +246,11 @@ impl Gui {
             .map(|(i, _)| i);
         let frame = self.frame;
         let Some(i) = near else {
-            return frame.set_status_text("Select Bars: click on a bar of the set", 0);
+            return frame.set_status_text("Click on a bar of the set", 0);
         };
+        if self.bar_pick.as_ref().is_some_and(|p| p.purpose != BarPurpose::Present) {
+            return self.bar_edit(i);
+        }
         if let Some(p) = &mut self.bar_pick {
             match p.picked.iter().position(|k| *k == i) {
                 Some(k) => {
@@ -247,7 +265,7 @@ impl Gui {
 
     /// Enter finishes Select Bars.
     pub(crate) fn bar_pick_key(&mut self, key: i32) -> bool {
-        if self.bar_pick.is_none() || !matches!(key, WXK_RETURN | WXK_NUMPAD_ENTER) {
+        if self.bar_pick.as_ref().is_none_or(|p| p.purpose != BarPurpose::Present) || !matches!(key, WXK_RETURN | WXK_NUMPAD_ENTER) {
             return false;
         }
         let frame = self.frame;
