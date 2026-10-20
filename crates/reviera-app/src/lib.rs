@@ -22,6 +22,7 @@ pub mod schedules;
 pub mod scripts;
 pub mod sheets;
 pub mod structural;
+pub mod subscriptions;
 pub mod views;
 
 use std::collections::BTreeMap;
@@ -236,6 +237,8 @@ pub struct App {
     form_handler: Option<scripts::Handler>,
     /// The remote computation client, created on first use (`compute.*`).
     compute: Option<reviera_compute::ComputeClient>,
+    /// Remote analysis subscriptions: settings, secrets and connections (`subscription.*`).
+    subscriptions: subscriptions::Subscriptions,
 }
 
 /// Whether an element's body is regenerated from its Reviera recipe (`bodies`), rather than
@@ -267,6 +270,7 @@ impl App {
             view_requests: Vec::new(),
             form_handler: None,
             compute: None,
+            subscriptions: subscriptions::Subscriptions::default(),
         }
     }
 

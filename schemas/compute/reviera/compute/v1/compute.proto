@@ -10,7 +10,8 @@
 //
 // Errors are gRPC statuses with a reason code in the `reviera-reason` trailer: invalid_input,
 // unsupported_kind, version_mismatch, too_large, limit_exceeded, memory_limit, preempted,
-// cancelled, runner_failed, unauthorised, negotiation_failed, host_restarted, not_found.
+// cancelled, runner_failed, unauthorised, negotiation_failed, host_restarted, not_found,
+// subscription_inactive, quota_exceeded (remote analysis subscriptions, subscription.proto).
 //
 // Calls carry `authorization: Bearer <token>`; on a local socket the token is one-time, passed
 // to the server when it is started.

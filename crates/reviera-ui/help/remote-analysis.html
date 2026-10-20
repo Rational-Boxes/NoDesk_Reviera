@@ -1,0 +1,54 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Copyright (C) 2026 Reviera contributors -->
+<h1>Remote analysis subscriptions</h1>
+<p class="lead">A subscription to a remote analysis service lets heavy analyses run on that
+service's computers. Reviera ships with none and connects to no service until you add one.</p>
+<nav class="toc">
+  <a href="#add">Adding a subscription</a>
+  <a href="#status">Status and warnings</a>
+  <a href="#security">How the key and secret are kept</a>
+  <a href="#advanced">Self-hosted services</a>
+</nav>
+
+<h2 id="add">Adding a subscription</h2>
+<p><a href="reviera:action/ui.remote_analysis">Analyze › Remote Analysis</a> (also on Manage ›
+Settings and the File menu) lists your subscriptions. <b>Add…</b> asks for a name, the
+service's address (it must start with <code>https://</code>) and the <b>API key</b> and
+<b>secret</b> your service gave you. You can paste them as one <code>key:secret</code> in the key
+field and leave Secret empty. Reviera tests the connection before saving; if the test fails, it
+says why and nothing is saved.</p>
+<p><b>Edit…</b> changes the name, address, key or advanced settings, or replaces the secret
+(the stored secret is never shown; leave the field empty to keep it). <b>Remove</b> deletes the
+subscription and its secret. Jobs already on the service keep running there, but can only be
+fetched after you add the subscription again. <b>Set as Default</b> chooses the subscription
+used when none is named, for every job kind or for one.</p>
+
+<h2 id="status">Status and warnings</h2>
+<p>The list shows each subscription's status (<i>Active</i>, <i>Trial</i>, <i>Suspended</i>,
+<i>Expired</i>, <i>Key refused</i>, <i>Unreachable</i>, <i>Secret needed</i> or <i>Not
+checked</i>), plan, usage, and when the period ends. Under the list, the selected one shows
+what is left of the allowance, the job kinds it offers and its limits. <b>Refresh</b> asks the
+service for the current status. <b>Test Connection</b> signs in afresh first. Reviera warns
+when the period ends within 7 days and when 90 % of the allowance is used.</p>
+<p>When the service refuses the key, Reviera does not keep trying it: change the key or secret
+with Edit…, or ask your administrator.</p>
+
+<h2 id="security">How the key and secret are kept</h2>
+<ul>
+<li>The secret is kept in your system's keychain (the Secret Service on Linux, Keychain on
+macOS, Credential Manager on Windows). If there is no keychain, it is kept only until Reviera
+closes, and the subscription then shows <i>Secret needed</i>.</li>
+<li>The key and secret are sent only to the subscription's own address, over a secure
+connection, to sign in. Every other request carries a short-lived token instead, which Reviera
+renews before it runs out.</li>
+<li>The secret never appears in your settings files, in results, or in logs. AI agents and MCP
+clients can list subscriptions and read their status, but cannot add, change, test or remove
+them.</li>
+</ul>
+
+<h2 id="advanced">Self-hosted services</h2>
+<p>A service with its own certificate authority can be trusted by giving that CA's PEM file
+under <b>Advanced: CA file</b>. A <b>pin</b> (the SHA-256 of the service's certificate, 64 hex
+digits) accepts exactly that certificate instead. <b>Development</b> allows a service on this
+computer at <code>http://localhost</code>, for people writing a service. The service's side of
+the connection is described in <code>schemas/compute/reviera/compute/v1/subscription.proto</code>.</p>

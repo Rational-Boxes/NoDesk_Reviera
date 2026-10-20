@@ -32,6 +32,7 @@ pub const UI_ACTIONS: &[&str] = &[
     "ui.radial.toggle",
     "ui.pane.system_browser",
     "ui.pane.terminal",
+    "ui.remote_analysis",
     "mep.place_component",
     "system_type.edit",
     "mep_check.duct",

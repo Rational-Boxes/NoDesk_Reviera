@@ -53,6 +53,7 @@ mod parts;
 mod path_arrays;
 mod radial;
 mod mep_ui;
+mod remote_analysis_ui;
 mod terminal_ui;
 mod mep_electrical_ui;
 mod mep_runs_ui;
@@ -4464,6 +4465,7 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "ui.pane.clash" => Gui::toggle_clash_pane(gui),
         "ui.pane.system_browser" => Gui::toggle_system_browser(gui),
         "ui.pane.terminal" => Gui::toggle_terminal(gui),
+        "ui.remote_analysis" => with(gui, Gui::remote_analysis),
         "mep_type.load_starters" => with(gui, Gui::load_mep_types),
         "mep.place_component" => with(gui, Gui::place_mep_component),
         "mep.connect_touching" => with(gui, Gui::connect_touching),

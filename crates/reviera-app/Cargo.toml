@@ -16,6 +16,8 @@ pdf-writer.workspace = true
 reviera-core.workspace = true
 reviera-dstv.workspace = true
 reviera-compute.workspace = true
+reviera-compute-proto = { workspace = true, features = ["subscription"] }
+keyring.workspace = true
 prost = "0.14.4"
 reviera-ifc.workspace = true
 reviera-store.workspace = true
@@ -29,6 +31,7 @@ uuid.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true
+base64.workspace = true
 
 [lints]
 workspace = true

@@ -7,6 +7,7 @@ fn main() {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../schemas/compute");
     let files = [
         "reviera/compute/v1/compute.proto",
+        "reviera/compute/v1/subscription.proto",
         "reviera/analysis/v1/analysis.proto",
         "reviera/testing/v1/testing.proto",
     ];

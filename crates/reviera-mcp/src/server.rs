@@ -7,6 +7,11 @@ use std::collections::{BTreeSet, HashMap};
 use std::sync::{Arc, Mutex};
 
 use reviera_app::App;
+
+/// Whether agents may see and call a command: not those that take or test credentials.
+fn for_agents(command: &str) -> bool {
+    !reviera_app::subscriptions::NOT_FOR_AGENTS.contains(&command)
+}
 use reviera_core::{
     Caller, CommandSpec, Effect, Element, ElementRef, GroupEnd, Origin, Permission,
 };
@@ -135,9 +140,10 @@ impl McpServer {
         }
     }
 
+    /// Commands that handle credentials are not offered to agents at all (DM-RPC-011).
     async fn specs(&self) -> Result<Vec<CommandSpec>, McpError> {
         self.app
-            .call(|app| app.registry().iter().cloned().collect())
+            .call(|app| app.registry().iter().filter(|s| for_agents(&s.name)).cloned().collect())
             .await
             .map_err(internal)
     }
@@ -145,7 +151,7 @@ impl McpServer {
     async fn spec(&self, command: &str) -> Result<Option<CommandSpec>, McpError> {
         let command = command.to_owned();
         self.app
-            .call(move |app| app.registry().get(&command).cloned())
+            .call(move |app| app.registry().get(&command).filter(|s| for_agents(&s.name)).cloned())
             .await
             .map_err(internal)
     }

@@ -2166,6 +2166,12 @@ actions = ["file.open", "file.save", "edit.undo", "edit.redo", "view.default_3d"
 # ---- Ribbon tabs (default order, §1.8.1) ----
 
 [[action]]
+id = "ui.remote_analysis"
+label = "Remote Analysis"
+icon = "remote_analysis"
+help = "Subscriptions to remote analysis services: add one with its https:// URL and API key and secret, see its plan, usage and period, test it and choose the default (DM-RPC-011)"
+
+[[action]]
 id = "ui.pane.terminal"
 label = "Terminal"
 icon = "terminal"
@@ -2703,6 +2709,10 @@ tools = [
   { action = "structural_analysis.results", size = "small" },
 ]
 
+[[tab.panel]]
+label = "Remote Analysis"
+tools = [{ action = "ui.remote_analysis", size = "large" }]
+
 [[tab]]
 id = "massing"
 label = "Massing & Site"
@@ -2883,6 +2893,7 @@ label = "Settings"
 tools = [
   { action = "ui.model_properties", size = "large" },
   { action = "clearance.set_rule_set", size = "large" },
+  { action = "ui.remote_analysis", size = "large" },
 ]
 
 [[tab]]
@@ -3265,7 +3276,7 @@ panels = [{ label = "Window", tools = [{ action = "insert.flip_facing", size = "
 
 [[menu]]
 label = "&File"
-items = ["file.new", "file.open", "file.save", "file.save_as", "file.close", "-", "ui.model_properties", "-", "export.pdf", "export.cobie", "-", "app.exit"]
+items = ["file.new", "file.open", "file.save", "file.save_as", "file.close", "-", "ui.model_properties", "ui.remote_analysis", "-", "export.pdf", "export.cobie", "-", "app.exit"]
 
 [[menu]]
 label = "&Edit"

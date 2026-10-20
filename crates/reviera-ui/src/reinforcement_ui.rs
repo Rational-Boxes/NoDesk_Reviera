@@ -45,6 +45,18 @@ impl Form {
         t
     }
 
+    /// A masked text box (a secret).
+    pub(crate) fn password(&self, label: &str, tip: &str) -> TextCtrl {
+        row(&self.dialog, &self.grid, label);
+        let t = TextCtrl::builder(&self.dialog).with_style(TextCtrlStyle::Password).build();
+        if !tip.is_empty() {
+            t.set_tooltip(tip);
+        }
+        t.set_min_size(Size::new(260, -1));
+        self.grid.add(&t, 1, SizerFlag::Expand, 0);
+        t
+    }
+
     pub(crate) fn choice(&self, label: &str, items: &[String], selected: usize) -> Choice {
         row(&self.dialog, &self.grid, label);
         let c = Choice::builder(&self.dialog).with_choices(items.to_vec()).build();

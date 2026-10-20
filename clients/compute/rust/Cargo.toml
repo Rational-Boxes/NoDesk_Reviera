@@ -21,6 +21,19 @@ hyper-util = { version = "0.1.21", features = ["tokio"] }
 sha2.workspace = true
 hex.workspace = true
 zstd.workspace = true
+# The `subscription` feature: the HTTPS client for remote analysis services (DM-RPC-011).
+reqwest = { workspace = true, optional = true }
+rustls = { workspace = true, optional = true }
+rustls-platform-verifier = { version = "0.6", optional = true }
+serde = { workspace = true, optional = true }
+serde_json = { workspace = true, optional = true }
+base64 = { workspace = true, optional = true }
+
+[features]
+subscription = ["dep:reqwest", "dep:rustls", "dep:rustls-platform-verifier", "dep:serde", "dep:serde_json", "dep:base64"]
+
+[dev-dependencies]
+rcgen = { version = "0.14", default-features = false, features = ["crypto", "pem", "ring"] }
 
 [build-dependencies]
 protox = "0.10.0"
@@ -28,3 +41,7 @@ tonic-prost-build = "0.14.6"
 
 [lints]
 workspace = true
+
+[[test]]
+name = "subscription"
+required-features = ["subscription"]

@@ -85,7 +85,9 @@ clap = { version = "4.6.7", features = ["derive"] }
 
 # Integrations, adopted crate by crate as each one is implemented
 tokio = { version = "1.53.2", features = ["rt-multi-thread", "macros", "sync", "time", "io-util", "io-std"] }
-reqwest = { version = "0.13.5", features = ["json"] }
+# rustls on ring (no aws-lc: simpler to cross-build), the TLS configuration built by the caller.
+reqwest = { version = "0.13.5", default-features = false, features = ["json", "blocking", "rustls-no-provider"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12", "logging"] }
 keyring = "4.2.0"
 getrandom = "0.4.3"
 # SQLCipher with vendored OpenSSL: encryption at rest for the live store (DM-LIVE-016).

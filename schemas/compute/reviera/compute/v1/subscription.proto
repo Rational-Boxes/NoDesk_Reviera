@@ -1,0 +1,75 @@
+// SPDX-License-Identifier: MIT
+// Copyright (C) 2026 Reviera contributors
+//
+// Remote analysis subscriptions (BIM Reviera spec Ch 2 §2.17.11, DM-RPC-011): the calls a
+// remote analysis service implements so that Reviera can authenticate a subscription and show
+// its status. The service is a separate project; this file is its half of the contract.
+//
+// A subscription is identified by an API key and proved by its secret. The key and secret are
+// sent only to the service's token endpoint, only over TLS (1.2 or newer), in exchange for a
+// short-lived bearer token; every other call, here and in reviera.compute.v1, carries
+// `authorization: Bearer <token>`.
+//
+// The same two calls are offered over HTTPS with JSON bodies (what Reviera uses today):
+//
+//   POST /v1/auth/token        Authorization: Basic base64(key:secret), empty body
+//     200 {"access_token": "...", "expires_at": "2026-10-20T12:00:00Z", "subscription_id": "..."}
+//   GET  /v1/subscription      Authorization: Bearer <access_token>
+//     200 the Subscription message below, field names as written here (snake_case)
+//
+// Paths are relative to the service URL the user enters (which may itself have a path).
+// Times are RFC 3339 in UTC. Errors are a non-2xx status with the body
+//   {"reason": "<code>", "message": "<for people>", ...details}
+// where the reason is one of the contract's codes; the subscription codes are
+//   unauthorised           (401) the key or secret was refused, or the token is invalid
+//   subscription_inactive  (403) suspended or expired; detail `state` and `since`
+//   quota_exceeded         (429) the period's allowance is used; detail `allowance`, `unit`, `resets_at`
+//   unsupported_kind       (400) a job kind the subscription does not offer
+// A client must not retry with the same credentials after `unauthorised`.
+
+syntax = "proto3";
+
+package reviera.compute.v1;
+
+service Subscriptions {
+  // Exchanges the key and secret (gRPC: in the `authorization: Basic …` metadata) for a token.
+  rpc Authenticate(AuthenticateRequest) returns (AccessToken);
+  // The subscription the bearer token belongs to.
+  rpc GetSubscription(GetSubscriptionRequest) returns (Subscription);
+}
+
+message AuthenticateRequest {}
+
+message AccessToken {
+  string access_token = 1;
+  // RFC 3339, UTC. Clients renew before this time.
+  string expires_at = 2;
+  string subscription_id = 3;
+}
+
+message GetSubscriptionRequest {}
+
+message SubscriptionLimits {
+  // The largest distillation accepted, in bytes; 0 means no stated limit.
+  uint64 max_job_bytes = 1;
+  // Jobs that may run at once; 0 means no stated limit.
+  uint32 concurrent_jobs = 2;
+}
+
+message Subscription {
+  string name = 1;
+  string plan = 2;
+  // "active", "trial", "suspended" or "expired".
+  string state = 3;
+  string period_start = 4;
+  string period_end = 5;
+  // The period's allowance and what has been used of it, in `unit`
+  // ("compute_hours", "credits" or "jobs"). An allowance of 0 means unlimited.
+  double allowance = 6;
+  double usage = 7;
+  string unit = 8;
+  repeated string job_kinds = 9;
+  repeated string regions = 10;
+  SubscriptionLimits limits = 11;
+  string terms_url = 12;
+}

@@ -11,6 +11,8 @@
 pub mod blob;
 pub mod negotiate;
 pub mod runner;
+#[cfg(feature = "subscription")]
+pub mod subscription;
 pub mod transport;
 
 /// `reviera.compute.v1`: the contract.

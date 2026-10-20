@@ -914,6 +914,21 @@ milestone works end to end, with project-wide clash detection as its first job k
 
 - **Structural analysis**: `analysis.structural`, the second job kind, solves the neutral structural
   model with the built-in linear static frame solver (see [Structure](#structure-in-development)).
+- **Remote analysis subscriptions** (DM-RPC-011): Analyze › Remote Analysis (also Manage ›
+  Settings and the File menu) lists subscriptions to remote analysis services with their status,
+  plan, usage, remaining allowance, period end and warnings (period ending within 7 days, 90 % of
+  the allowance used). *Add…* takes a name, the `https://` service URL and the API key and secret
+  (masked; `key:secret` in one field works too) and tests the connection before saving; *Edit…*,
+  *Remove*, *Test Connection*, *Refresh* and *Set as Default* (overall or per job kind) complete
+  it. Plain `http://` is refused (`http://localhost` only with the Development setting);
+  certificates are checked against the system's store, an extra CA, or a pinned SHA-256. The key
+  and secret go only to the service's token endpoint as HTTP Basic credentials, in exchange for a
+  short-lived bearer token that is renewed before it expires; the secret is kept in the OS
+  keychain (or for the session where there is none) and never appears in settings, results, MCP
+  or logs. `subscription.list` and `.status` are open to MCP; `add`, `set`, `remove`, `test` and
+  `set_default` are for the dialog and Lua only. The service's half of the contract (`Authenticate`,
+  `GetSubscription` and their HTTPS binding) is in `schemas/compute` and the MIT client in
+  `clients/compute`; the server itself is a separate project.
 
 In development next: the Compute Jobs and Analysis Providers panels, IFC filter-profile
 distillations, the analysis provider layer, encryption, LAN and cloud compute hosts, real-time
@@ -1189,9 +1204,10 @@ area by area (reviewed against the spec on 2026-10-15).
   touch swipes (UI-SEL-007, UI-DOCK-004).
 - **Agent terminal** (UI-AGENT-004): the tab menu (permission, restart, follow active model),
   mouse selection, Manage Presets, and checking the Windows pipe beyond compiling.
-- **Remote analysis subscriptions** (DM-RPC-011): Options › Remote Analysis with secure service
-  URLs and key:secret credentials (secrets in the OS keychain, exchanged for short-lived tokens),
-  status, plan, usage and expiry; the remote analysis server itself is a separate project.
+- **Remote analysis subscriptions** (DM-RPC-011): running jobs on a subscription (it is not yet
+  a compute host in the job list and submit dialog), the start-up status refresh, an encrypted
+  file for secrets where there is no keychain, administrator-provisioned subscriptions, and a
+  project's preferred subscription; the remote analysis server itself is a separate project.
 - **MCP**: streamable HTTP with tokens, rate and size limits, subscriptions, prompts,
   `execute_lua` and view images.
 - **Structure** (in development): structural columns, slanted columns, beams, beam systems,

@@ -202,6 +202,7 @@ pub fn toolset_of(command: &str) -> String {
             | "analysis_style"
             | "compute"
             | "compute_host"
+            | "subscription"
             | "structural_analysis"
             | "results"
             | "analytical_member"
