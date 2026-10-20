@@ -1177,6 +1177,13 @@ area by area (reviewed against the spec on 2026-10-15).
   Mac); for the radial menu, its commands for Lua and MCP, icons and the accessibility
   settings; for full-screen, panes laid over the view rather than docked, Ctrl+Cmd+F on macOS and
   touch swipes (UI-SEL-007, UI-DOCK-004).
+- **Agent terminal** (UI-AGENT-004): a Terminal pane running a shell and command-line AI agents
+  (Claude Code, Gemini CLI, Qwen Code, Codex CLI, custom presets) in a real terminal, each
+  started connected to the open model through a `reviera mcp-bridge` stdio bridge over a private
+  local socket, edits with confirmation by default, the agents' own settings never changed.
+- **Remote analysis subscriptions** (DM-RPC-011): Options › Remote Analysis with secure service
+  URLs and key:secret credentials (secrets in the OS keychain, exchanged for short-lived tokens),
+  status, plan, usage and expiry; the remote analysis server itself is a separate project.
 - **MCP**: streamable HTTP with tokens, rate and size limits, subscriptions, prompts,
   `execute_lua` and view images.
 - **Structure** (in development): structural columns, slanted columns, beams, beam systems,

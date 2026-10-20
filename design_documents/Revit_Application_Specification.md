@@ -2817,6 +2817,7 @@ These bindings are fixed and cannot be reassigned (Ctrl reads Cmd on macOS):
 | **Navigation** | Orientation Cube options (§1.19.2); Navigation Bar options; Navigation Wheel options (§1.19.4); mouse profile (standard / left-button); trackpad gestures; zoom direction invert; 3D mouse settings | P0 (wheel P2) |
 | **Scripting & Add-ins** | Application scripts enabled; model-embedded scripts policy (ask / disable / enable, default disable); Lua sandbox trust levels; add-in folders; licence-check override for non-GPL-compatible add-ins (clearly labelled, off by default, TECH_STACK §4.2) | P0 |
 | **AI & MCP** | MCP server enabled (default on, stdio only); streamable-HTTP transport (off by default; bind address, port, TLS, token management); default permission level per transport (read-only / model-edit / full-scripting); preview/confirm for destructive operations; Agent pane: model provider(s), endpoints, model names, API keys (stored in the OS keychain), local-only mode, tool approval policy, context attachments policy, transcript retention (§1.31) | P0 (agent P1) |
+| **Remote Analysis** | Subscriptions to remote analysis services: name, secure service URL, API key and secret (the secret in the OS keychain), status, plan, usage and expiry, Test Connection, Refresh, Set as Default, Advanced (CA certificate, certificate pin) (DM-RPC-011) | P2 |
 | **Server** | Saved BIMserver connections (URL, user, remember token in keychain); local working-copy cache location (with free-space check) and size limit; notification preferences (in-app / OS / none; poll interval fallback); auto Get Latest before Check In; default check-in comment template | P1 |
 | **Accessibility** | Larger grips and hit targets; cursor size; high-contrast canvas palette; colour-vision-deficiency safe palette; keyboard focus ring thickness; screen-reader verbosity for canvas announcements; reduce motion; sequence timeout (§1.26.1) | P1 |
 
@@ -3451,6 +3452,36 @@ This builds on §1.29.4. A **layout bookmark** stores *where things are*. A **wo
 - [ ] "Undo agent turn" after a turn that created 12 tags removes all 12 in one step.
 - [ ] With retention "never", closing the conversation leaves no transcript on disk.
 
+### 1.31.4 Agent terminal (external CLI agents)
+**ID:** UI-AGENT-004 · **Priority:** P1 · **Ref:** owner requirement (2026-10-20); Reviera's own design
+
+**Purpose.** Run the command-line AI agents people already use (Claude Code, Gemini CLI, Qwen Code, Codex CLI and others) inside Reviera, in a real terminal, already connected to the model open in the window through Reviera's MCP server. *(Owner requirement, 2026-10-20: "Terminal panel that runs the CLI AI agents (Claude, Gemini, Qwen, etc,) started and connectioned to the MCP provider." Follow-up answers: a stdio bridge to the running window; model-edit with confirmation by default; a general terminal with agent presets; per-session temporary MCP configuration that never changes the user's own agent settings.)*
+
+**UI.** A dockable **Terminal** pane (default: bottom dock, hidden; View › User Interface › Terminal, `Ctrl+Shift+T`) with a tab per session. The **+** button and its drop-down open a new tab: **Shell** (the user's login shell), one entry per **agent preset**, and *Manage Presets…*. Each tab's caption shows the preset and, for agent tabs, a coloured dot for the MCP session (connected, waiting, disconnected) and its permission level; the tab's context menu has *Permission ›* (Read-only, Edit with confirmation, Edit, Full scripting), *Restart*, *Close*, *Copy*, *Paste*, *Clear Scrollback*.
+
+**Behaviour & rules.**
+- **Terminal.** Each tab runs its process in a pseudo-terminal (POSIX `openpty` on Linux and macOS, ConPTY on Windows) with an xterm-compatible emulator (UTF-8, 256 colours and true colour, the alternate screen, bracketed paste, mouse reporting, cursor styles), so full-screen terminal programs such as the agents' own interfaces work. Scrollback is 10 000 lines (configurable). Copy and paste use the system clipboard; pasting several lines asks first unless the program enabled bracketed paste. The pane follows the UI theme's terminal palette and a monospace font of the UI font size. Resizing the pane resizes the terminal (the program receives the new size).
+- **Agent presets.** A preset is: a name, an executable and arguments, a working directory (the model's folder by default), extra environment variables, and **how the agent takes MCP servers**: a configuration file named on its command line, a configuration file found through an environment variable, or a settings file in a working directory Reviera prepares for the session. Reviera ships presets for Claude Code, Gemini CLI, Qwen Code and Codex CLI, each written from that agent's own published documentation when it is built (recorded in the research log), and the user may add, edit, duplicate or delete presets (stored per user, not in the model). A preset whose executable is not found opens a tab that says so and offers *Edit Preset*; Reviera never installs agents.
+- **Connection (stdio bridge).** Opening an agent tab creates an MCP session for it and writes a temporary configuration, in a directory only the user can read, naming Reviera's bridge as the agent's MCP server: `reviera mcp-bridge` with the session's endpoint and secret in its environment. The bridge is a small stdio process: it relays the agent's MCP messages to the running window over a private local endpoint (a Unix-domain socket in the user's runtime directory with mode 0600 on Linux and macOS; a named pipe restricted to the user on Windows) after presenting the session's one-time secret. No network port is opened. The window serves the session with the same MCP server, tool catalogue, queue, transactions and undo attribution as any other client (DM-MCP-001 … 006): the actor is the preset's name and the tab number.
+- **Never the user's own settings.** Reviera does not change the agents' global or project settings, and removes the session's temporary files when the tab closes or Reviera exits (stale ones from a crash are removed at the next start).
+- **Permission.** Each agent session starts at *Edit with confirmation* (Options › AI & MCP › Terminal agents changes the default): model edits run, and destructive operations (delete, purge, overwrite, check-in) and `execute_lua` wait for approval in a Reviera dialog naming the tab, the tool and a plain-language summary, since the agent's terminal cannot show Reviera's prompt. The level can be changed from the tab's menu; lowering it applies to the next call. Approval dialogs are UI-only; no MCP or Lua call can approve them (as UI-AGENT-003).
+- **Scope.** A session sees the model of the active view when the tab was opened; *Follow active model* in the tab's menu switches it to whichever model is active.
+- **Lifetime.** Closing a tab ends its process (after asking when it is still running) and revokes its session; a bridge whose secret is revoked or whose window has gone exits with an MCP error. Closing a model with agent sessions on it asks first and disconnects them. Sessions appear in the AI Agents panel (DM-MCP-002) with *Disconnect*.
+- **Keys and accounts.** The agents' own logins and API keys stay the agents' business: Reviera passes no credentials to them and reads none from them.
+- **Flatpak and sandboxes.** In the Flatpak the agents run on the host (`flatpak-spawn --host`), the bridge runs inside the sandbox through the same spawn, and the endpoint lives in the app's runtime directory; the Flatpak's permissions are documented in its notes. Where host programs cannot be started, the pane says so.
+
+**Data.** Presets and the pane's settings are per-user application settings; sessions and their secrets are memory only. Nothing is written to the model or its RXD.
+
+**Commands.** `terminal.open(preset_id?, cwd?) -> tab_id`, `terminal.list() -> tabs[]`, `terminal.close(tab_id)`, `terminal.send_text(tab_id, text)`, `agent_preset.list() -> presets[]`, `agent_preset.set(preset)`, `agent_preset.delete(preset_id)`. These are window commands for Lua and the UI only; they are **not** exposed to MCP, so an agent cannot start other agents or type into terminals. The bridge is `reviera mcp-bridge` (a command-line mode of the application; it takes its endpoint and secret from its environment and refuses to run without them).
+
+**Acceptance criteria.**
+- [ ] Opening a Claude Code tab with Claude Code installed starts it in the model's folder, and asking it to list the walls returns the open model's walls through Reviera's MCP tools.
+- [ ] The agent's `element.delete` call shows a Reviera approval dialog naming the tab; Reject returns an error to the agent and deletes nothing; the agent's edits undo in the window like any other.
+- [ ] No file in the user's agent settings (for example `~/.claude.json` or `~/.gemini/settings.json`) changes when an agent tab is opened and closed.
+- [ ] A process that connects to the endpoint without the session's secret is refused and logged; closing the tab revokes the secret.
+- [ ] A Shell tab runs the user's shell; a full-screen program (for example `vim` or the agent's own interface) draws and resizes correctly.
+- [ ] A preset whose executable is missing opens a tab that says so and changes nothing else.
+
 ---
 
 ## 1.32 BIMserver-mode user interface
@@ -3913,6 +3944,11 @@ All commands defined by this chapter (owner UI). Commands of other chapters that
 | `agent.send` | `conversation_id`, `text`, `attachments?` (Lua only) | `()` | No | UI-AGENT-002 |
 | `agent.stop` | `conversation_id` (Lua only) | `()` | No | UI-AGENT-002 |
 | `agent.approve` / `agent.reject` | `call_id` (UI only) | `()` | No | UI-AGENT-003 |
+| `terminal.open` | `preset_id?`, `cwd?` (Lua and UI only) | `tab_id` | No | UI-AGENT-004 |
+| `terminal.list` | — (Lua and UI only) | `tabs[]` | No | UI-AGENT-004 |
+| `terminal.close` | `tab_id` (Lua and UI only) | `()` | No | UI-AGENT-004 |
+| `terminal.send_text` | `tab_id`, `text` (Lua and UI only) | `()` | No | UI-AGENT-004 |
+| `agent_preset.list` / `agent_preset.set` / `agent_preset.delete` | `preset` / `preset_id` (Lua and UI only) | `presets[]` / `()` | No | UI-AGENT-004 |
 | `agent.undo_turn` | `conversation_id`, `turn_id` (Lua only) | `()` | Yes (undoes the turn's group) | UI-AGENT-003 |
 | `agent.history` | `filter?` (Lua only) | `[ConversationSummary]` | No | UI-AGENT-002 |
 | `ui.layout.list` | `group?` (builtin, org, personal) | `[LayoutInfo]` | No | UI-LAYOUT-001/002 |
@@ -8207,6 +8243,7 @@ key_id = "minisign:<publisher public key>"     # signature file: reviera-addin.t
 - **Streamable HTTP** (when the UI is running). The server listens on `127.0.0.1` (default port 47800, configurable). Binding to other interfaces requires TLS and an explicit setting.
   - **Authentication**: bearer tokens created in Manage › AI Agents › *New client token*. Each token has a name, a permission level, an optional expiry and an optional document scope. Tokens are stored hashed. Remote deployments may use OAuth 2.1 authorisation as the MCP specification describes (P2).
   - The `Origin` header is checked to prevent DNS rebinding attacks. CORS is closed by default.
+- **Local bridge** (when the UI is running; UI-AGENT-004). The window listens on a private endpoint (a Unix-domain socket with mode 0600 in the user's runtime directory; a named pipe restricted to the user on Windows), never a network port. `reviera mcp-bridge` is a stdio MCP server process that relays to it, so agents that only start stdio servers reach the running window's model. Each connection must first present a one-time per-session secret the window issued (in the bridge's environment); a wrong or revoked secret is refused and logged. A session's permission level is the one the window gave it.
 - **Status UI.** An *AI Agents* panel shows connected clients, their permission levels, active sessions, recent tool calls (from the journal), and a **Disconnect** / **Revoke** button for each one. A status-bar icon shows when an agent is connected, and pulses while an agent is running a tool.
 
 **Commands.** `mcp.start(transport, options)` · `mcp.stop()` · `mcp.token.create(name, level, expiry?, document_scope?) -> token` · `mcp.token.revoke(token_id)` · `mcp.sessions() -> session[]` · `mcp.session.disconnect(session_id)`
@@ -8526,7 +8563,7 @@ Reviera shall have a foundational subsystem, built on one general contract, that
 - **Hosted calculation services.** Over time a family of cloud-hosted calculation and analysis services is offered on this contract, run on on-demand compute: structural, seismic, energy, daylight, stormwater, CFD and others (chapter 4 §4.15), rendering and large exports. A service is a cloud host (or a set of them) whose job kinds are listed in a catalogue that Reviera reads (`compute.services`): each entry names its job kinds, operator, region, pricing model and licence of its runners. The same service can be run by an organisation itself from the published images, by Reviera's project, or by a third party; Reviera treats them all alike and adds none by default.
 
 **Commands.**
-- `compute_host.add(url, auth: "oidc"|"token", token?) -> host_id`
+- `compute_host.add(url, auth: "oidc"|"token"|"api_key", token?) -> host_id` (an `api_key` host is made by adding a subscription, DM-RPC-011)
 - `compute.estimate(kind, scope, options?, detail?, host_id?) -> {duration_s, resources, cost?}`
 - `compute.set_budget(scope: "project"|"user", limit, confirm_over?) -> ()`
 - `compute.services(catalogue_url?) -> services[]`
@@ -8638,6 +8675,39 @@ Reviera shall have a foundational subsystem, built on one general contract, that
 - [ ] A Godot bridge in VR shows the same frames as Reviera's viewport, and changing the wind direction from the wrist menu changes the flow in both.
 - [ ] Committing a session writes a result package whose provenance includes the input log, and its results attach to the model like a batch result.
 - [ ] `compute.open_session`, `.session_input` and `.session_control` driven from Lua or MCP give the same session behaviour as the scenario panel.
+
+### 2.17.11 Remote analysis subscriptions
+**ID:** DM-RPC-011 · **Priority:** P2 · **Ref:** owner requirement (2026-10-20); Reviera-originated design
+
+**Purpose.** Let a user (or an organisation) subscribe to a remote analysis service and run jobs on it through the compute contract, by entering the service's secure URL and an API key and secret. *(Owner requirement, 2026-10-20: "Subscription management for running analysis on a remote host via API. Connecting will require the secure service URL and key:secret authentication. We will be starting a separate project to implement the remote analysis server later in development.")* The server is a separate project; this requirement defines the client side and the contract additions that server implements.
+
+**UI.** Options › **Remote Analysis** (also Analyze › Remote Analysis › *Subscriptions…*): a list of subscriptions with name, service URL, status (*Active*, *Trial*, *Suspended*, *Expired*, *Unreachable*, *Not checked*), plan, the period's usage and remaining allowance, and renewal or expiry date; buttons *Add…*, *Edit…*, *Remove*, *Test Connection*, *Refresh*, *Set as Default*. *Add* asks for a name, the **service URL** and the **API key and secret** (one field taking `key:secret`, or two fields), then tests the connection before saving. The secret field is masked and never shown again after saving; *Edit* can replace it but not reveal it.
+
+**Behaviour & rules.**
+- **Secure URL only.** The URL must be `https://`; TLS 1.2 or newer with the system's certificate store; certificate errors refuse the connection with the reason (a self-hosted service can add its CA under the subscription's *Advanced* section, or pin its certificate's SHA-256). Plain HTTP is refused, except `http://localhost` with an explicit *development* setting.
+- **Key:secret authentication.** The key identifies the subscription; the secret proves it. Reviera sends them only to the subscription's own URL, only over TLS, only to obtain a short-lived **access token** (the contract's `Authenticate` exchange, below): the key and secret go in an HTTP `Authorization: Basic` header to the service's token endpoint, which returns a bearer token and its expiry; every other call carries the bearer token, and Reviera renews it before it expires. The secret is never put in URLs, logs, journals, crash reports, the model, RXD, MCP results or Lua values.
+- **Storage.** The secret is kept in the operating system's keychain (Secret Service on Linux, Keychain on macOS, Credential Manager on Windows) under the subscription's id; the URL, name, key and settings are per-user settings. Where no keychain is available, Reviera says so and keeps the secret for the session only unless the user chooses an encrypted file protected by a passphrase. Administrators may provision subscriptions through the defaults file (URL and key; the secret still entered by the user or supplied by the OS keychain).
+- **Status.** *Test Connection* and *Refresh* call the contract's `GetSubscription`: plan name, state, period start and end, allowance and usage (in the service's units: compute-hours, credits or jobs), job kinds offered, regions, limits (maximum job size, concurrent jobs) and the operator's terms URL. Reviera refreshes the status at start-up (at most daily) and before a submission; it warns 7 days before expiry and when 90 % of the allowance is used.
+- **Use.** Each active subscription is a compute host (DM-RPC-006) with authentication `api_key`: its job kinds appear in the Compute Jobs panel and the submit dialog, with estimates and costs from the service. A default subscription can be set overall and per job kind; a project may name its preferred subscription (stored per user, by subscription name, never with credentials). The consent rules for sending distillations to a remote destination (DM-RPC-003) apply per subscription.
+- **Errors.** The reason codes `unauthorised` (key or secret refused: "The service refused the key; check it or ask your administrator"), `subscription_inactive` (suspended or expired, with the date), `quota_exceeded` (with the allowance and reset date) and `unsupported_kind` are shown in the panel and the job list; nothing is retried with the same credentials after `unauthorised`.
+- **Removal.** *Remove* deletes the keychain entry and the settings; jobs already on the service keep running there and stay listed until fetched or expired, but can only be fetched after the subscription is added again.
+- **Nothing by default.** Reviera ships with no subscription and makes no connection until the user adds one.
+
+**Contract additions** (MIT, in `schemas/compute/` and `clients/compute`, for the separate server project):
+- `Authenticate` (HTTPS `POST /v1/auth/token` with Basic `key:secret`; gRPC unary with the same credentials in metadata) → `{access_token, expires_at, subscription_id}`.
+- `GetSubscription` (unary, bearer) → `{name, plan, state, period_start, period_end, allowance, usage, unit, job_kinds[], regions[], limits, terms_url}`.
+- The reason codes above added to the error list (DM-RPC-001). Existing RPCs take the bearer token as today.
+
+**Data.** Per-user settings (`remote_analysis` in the user settings) and keychain entries; no model data.
+
+**Commands.** `subscription.add(name, url, key, secret) -> subscription_id` (tests the connection first; the secret is never returned), `subscription.set(subscription_id, {name?, url?, key?, secret?, ca?, pin?})`, `subscription.remove(subscription_id)`, `subscription.list() -> subscriptions[]` (no secrets), `subscription.test(subscription_id) -> status`, `subscription.status(subscription_id) -> status`, `subscription.set_default(subscription_id, job_kind?)`. `subscription.list` and `.status` are read-only and may be exposed to MCP; `add`, `set`, `remove` and `test` are UI and Lua only, so no agent handles credentials.
+
+**Acceptance criteria.**
+- [ ] Adding a subscription with an `http://` URL is refused; with an `https://` URL whose certificate does not verify, the test fails with the certificate's reason and nothing is saved.
+- [ ] After a subscription is added, its secret is in the OS keychain and appears in no settings file, log or journal, and `subscription.list` returns the key but not the secret.
+- [ ] With a wrong secret the test reports "The service refused the key"; with the right one it shows the plan, state, usage and expiry from `GetSubscription`.
+- [ ] Every call after authentication carries a bearer token, never the secret; a token near expiry is renewed without the user noticing.
+- [ ] A suspended subscription's job kinds are greyed out in the submit dialog with the reason; a quota-exceeded submission is refused with the allowance and reset date.
 
 **Packaging.** Reviera bundles `reviera-compute-host` beside `reviera` for local runners; the host is also packaged on its own and as a container image for LAN and cloud hosts. Built-in runners ship as separate executables. Reviera ships a Rust runner skeleton and a Python one, so a new job kind's runner can be written in any language with a gRPC library.
 
@@ -9112,6 +9182,13 @@ All commands defined in this chapter. Every command in this table is also a Lua 
 | `compute_host.forget` | host_id | — | No | DM-RPC-005 |
 | `compute.set_location` | kind, location, detail? | — | Yes | DM-RPC-005 |
 | `compute_host.add` | url, auth, token? | host_id | No | DM-RPC-006 |
+| `subscription.add` | name, url, key, secret (UI and Lua only) | subscription_id | No | DM-RPC-011 |
+| `subscription.set` | subscription_id, name?, url?, key?, secret?, ca?, pin? (UI and Lua only) | — | No | DM-RPC-011 |
+| `subscription.remove` | subscription_id (UI and Lua only) | — | No | DM-RPC-011 |
+| `subscription.list` | — | subscriptions[] (no secrets) | No | DM-RPC-011 |
+| `subscription.test` | subscription_id (UI and Lua only) | status | No | DM-RPC-011 |
+| `subscription.status` | subscription_id | status | No | DM-RPC-011 |
+| `subscription.set_default` | subscription_id, job_kind? | — | No | DM-RPC-011 |
 | `compute.estimate` | kind, scope, options?, detail?, host_id? | {duration_s, resources, cost?} | No | DM-RPC-006 |
 | `compute.set_budget` | scope, limit, confirm_over? | — | Yes | DM-RPC-006 |
 | `compute.services` | catalogue_url? | services[] | No | DM-RPC-006 |
@@ -27383,8 +27460,8 @@ Generated by `tools/build_spec.py` from the chapter command catalogs and require
 
 | Area | P0 | P1 | P2 | P3 | Total |
 |------|---:|---:|---:|---:|------:|
-| UI | 76 | 38 | 8 | 0 | 122 |
-| DM | 91 | 64 | 33 | 3 | 191 |
+| UI | 76 | 39 | 8 | 0 | 123 |
+| DM | 91 | 64 | 34 | 3 | 192 |
 | ARC | 77 | 60 | 10 | 1 | 148 |
 | STR | 0 | 15 | 47 | 0 | 62 |
 | MEP | 0 | 30 | 42 | 0 | 72 |
@@ -27392,7 +27469,7 @@ Generated by `tools/build_spec.py` from the chapter command catalogs and require
 | DOC | 68 | 40 | 12 | 1 | 121 |
 | COL | 8 | 45 | 6 | 1 | 60 |
 | ADV | 0 | 0 | 4 | 1 | 5 |
-| **Total** | **320** | **293** | **189** | **7** | **809** |
+| **Total** | **320** | **294** | **190** | **7** | **811** |
 
 Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver)"), it is counted under the first. The non-functional requirements (NFR-…) are in Chapter 0 §0.7 and are not counted here.
 
@@ -27447,7 +27524,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.2a Reviera-originated features
 
-114 requirements are Reviera's own design: owner directives, the technology stack (IFC/RXD storage, live store, BIMserver, MCP, scripting) and extensions beyond the reference product's feature set. Their Ref lines cite no research on the reference product. Listing them separately keeps the clean-room provenance clear: every other requirement traces to public research on the reference product.
+116 requirements are Reviera's own design: owner directives, the technology stack (IFC/RXD storage, live store, BIMserver, MCP, scripting) and extensions beyond the reference product's feature set. Their Ref lines cite no research on the reference product. Listing them separately keeps the clean-room provenance clear: every other requirement traces to public research on the reference product.
 
 | Requirement | Ch | Feature |
 |-------------|----|---------|
@@ -27468,6 +27545,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | UI-API-006 | 1 | 1.30.6 Concurrency with the user |
 | UI-AGENT-002 | 1 | 1.31.2 Conversation UI |
 | UI-AGENT-003 | 1 | 1.31.3 Approval, safety and undo |
+| UI-AGENT-004 | 1 | 1.31.4 Agent terminal (external CLI agents) |
 | UI-SRV-001 | 1 | 1.32.1 Connect and log in |
 | UI-SRV-003 | 1 | 1.32.3 Check In |
 | UI-SRV-004 | 1 | 1.32.4 Get Latest and Sync |
@@ -27504,6 +27582,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | DM-RPC-008 | 2 | 2.17.8 Compute Jobs panel |
 | DM-RPC-009 | 2 | 2.17.9 Job registry and reconnection |
 | DM-RPC-010 | 2 | 2.17.10 Real-time simulation sessions |
+| DM-RPC-011 | 2 | 2.17.11 Remote analysis subscriptions |
 | DM-RXD-001 | 2a | store non-IFC data only as RXD documents and element data, using the schemas defined in … |
 | DM-RXD-002 | 2a | By default, Reviera shall embed RXD in the IFC file using only `Reviera_*` property sets … |
 | DM-RXD-004 | 2a | support the external carrier (`.reviera` file or folder, `.rvb` bundle) holding identical … |
@@ -27568,12 +27647,13 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**2137 unique commands** in 413 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**2151 unique commands** in 416 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
 | `addin` | 13 |
 | `agent` | 7 |
+| `agent_preset` | 3 |
 | `air_terminal` | 1 |
 | `analysis_job` | 2 |
 | `analysis_provider` | 7 |
@@ -27930,6 +28010,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `structural_settings` | 3 |
 | `study` | 3 |
 | `subcategory` | 3 |
+| `subscription` | 7 |
 | `sun` | 1 |
 | `surfacepattern` | 1 |
 | `switch_system` | 4 |
@@ -27944,6 +28025,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `tag` | 14 |
 | `tempdim` | 4 |
 | `template` | 7 |
+| `terminal` | 4 |
 | `text` | 10 |
 | `texttype` | 2 |
 | `titleblock` | 4 |
@@ -28008,6 +28090,9 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `agent.send` | 1 | `conversation_id`, `text`, `attachments?` (Lua only) | `()` | No | UI-AGENT-002 |
 | `agent.stop` | 1 | `conversation_id` (Lua only) | `()` | No | UI-AGENT-002 |
 | `agent.undo_turn` | 1 | `conversation_id`, `turn_id` (Lua only) | `()` | Yes (undoes the turn's group) | UI-AGENT-003 |
+| `agent_preset.delete` | 1 | `preset` / `preset_id` (Lua and UI only) | `presets[]` / `()` | No | UI-AGENT-004 |
+| `agent_preset.list` | 1 | `preset` / `preset_id` (Lua and UI only) | `presets[]` / `()` | No | UI-AGENT-004 |
+| `agent_preset.set` | 1 | `preset` / `preset_id` (Lua and UI only) | `presets[]` / `()` | No | UI-AGENT-004 |
 | `air_terminal.place` | 4 | type_id, point \ | duct_face_ref, level, flow? | id | Yes |
 | `analysis_job.cancel` | 4 | job_id | — | No | ANA-GEN-001 |
 | `analysis_job.status` | 4 | job_id | {state, progress, messages} | No | ANA-GEN-001 |
@@ -29622,6 +29707,13 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `subcategory.create` | 2 | parent_category, name | element_id | Yes | DM-CATG-001 |
 | `subcategory.delete` | 2 | subcategory_id, reassign_to? | — | Yes | DM-CATG-001 |
 | `subcategory.rename` | 2 | subcategory_id, name | — | Yes | DM-CATG-001 |
+| `subscription.add` | 2 | name, url, key, secret (UI and Lua only) | subscription_id | No | DM-RPC-011 |
+| `subscription.list` | 2 | — | subscriptions[] (no secrets) | No | DM-RPC-011 |
+| `subscription.remove` | 2 | subscription_id (UI and Lua only) | — | No | DM-RPC-011 |
+| `subscription.set` | 2 | subscription_id, name?, url?, key?, secret?, ca?, pin? (UI and Lua only) | — | No | DM-RPC-011 |
+| `subscription.set_default` | 2 | subscription_id, job_kind? | — | No | DM-RPC-011 |
+| `subscription.status` | 2 | subscription_id | status | No | DM-RPC-011 |
+| `subscription.test` | 2 | subscription_id (UI and Lua only) | status | No | DM-RPC-011 |
 | `sun.settings` | 5 | — | () | No | DOC-GFX-012 |
 | `surfacepattern.align` | 3 | element_id, face_ref, origin?, angle? | — | Yes | ARC-CEIL-001 |
 | `switch_system.add` | 4 | id, fixture_ids[] | — | Yes | MEP-ELEC-008 |
@@ -29672,6 +29764,10 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `template.manage` | 5 | — | () | No | DOC-GFX-004 |
 | `template.set_include` | 5 | template_id, property, included | () | Yes | DOC-GFX-004 |
 | `template.set_property` | 5 | template_id, name, value | () | Yes | DOC-GFX-004 |
+| `terminal.close` | 1 | `tab_id` (Lua and UI only) | `()` | No | UI-AGENT-004 |
+| `terminal.list` | 1 | — (Lua and UI only) | `tabs[]` | No | UI-AGENT-004 |
+| `terminal.open` | 1 | `preset_id?`, `cwd?` (Lua and UI only) | `tab_id` | No | UI-AGENT-004 |
+| `terminal.send_text` | 1 | `tab_id`, `text` (Lua and UI only) | `()` | No | UI-AGENT-004 |
 | `text.add_leader` | 5 | annotation_id, side, attach, points[], shape?: straight\ | arc | () | Yes |
 | `text.check_spelling` | 5 | scope?: view\ | selection | spelling_issue[] | No |
 | `text.close_editor` | 5 | — | () | No | DOC-ANN-009 |

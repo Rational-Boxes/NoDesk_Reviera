@@ -2608,6 +2608,7 @@ These bindings are fixed and cannot be reassigned (Ctrl reads Cmd on macOS):
 | **Navigation** | Orientation Cube options (§1.19.2); Navigation Bar options; Navigation Wheel options (§1.19.4); mouse profile (standard / left-button); trackpad gestures; zoom direction invert; 3D mouse settings | P0 (wheel P2) |
 | **Scripting & Add-ins** | Application scripts enabled; model-embedded scripts policy (ask / disable / enable, default disable); Lua sandbox trust levels; add-in folders; licence-check override for non-GPL-compatible add-ins (clearly labelled, off by default, TECH_STACK §4.2) | P0 |
 | **AI & MCP** | MCP server enabled (default on, stdio only); streamable-HTTP transport (off by default; bind address, port, TLS, token management); default permission level per transport (read-only / model-edit / full-scripting); preview/confirm for destructive operations; Agent pane: model provider(s), endpoints, model names, API keys (stored in the OS keychain), local-only mode, tool approval policy, context attachments policy, transcript retention (§1.31) | P0 (agent P1) |
+| **Remote Analysis** | Subscriptions to remote analysis services: name, secure service URL, API key and secret (the secret in the OS keychain), status, plan, usage and expiry, Test Connection, Refresh, Set as Default, Advanced (CA certificate, certificate pin) (DM-RPC-011) | P2 |
 | **Server** | Saved BIMserver connections (URL, user, remember token in keychain); local working-copy cache location (with free-space check) and size limit; notification preferences (in-app / OS / none; poll interval fallback); auto Get Latest before Check In; default check-in comment template | P1 |
 | **Accessibility** | Larger grips and hit targets; cursor size; high-contrast canvas palette; colour-vision-deficiency safe palette; keyboard focus ring thickness; screen-reader verbosity for canvas announcements; reduce motion; sequence timeout (§1.26.1) | P1 |
 
@@ -3242,6 +3243,36 @@ This builds on §1.29.4. A **layout bookmark** stores *where things are*. A **wo
 - [ ] "Undo agent turn" after a turn that created 12 tags removes all 12 in one step.
 - [ ] With retention "never", closing the conversation leaves no transcript on disk.
 
+### 1.31.4 Agent terminal (external CLI agents)
+**ID:** UI-AGENT-004 · **Priority:** P1 · **Ref:** owner requirement (2026-10-20); Reviera's own design
+
+**Purpose.** Run the command-line AI agents people already use (Claude Code, Gemini CLI, Qwen Code, Codex CLI and others) inside Reviera, in a real terminal, already connected to the model open in the window through Reviera's MCP server. *(Owner requirement, 2026-10-20: "Terminal panel that runs the CLI AI agents (Claude, Gemini, Qwen, etc,) started and connectioned to the MCP provider." Follow-up answers: a stdio bridge to the running window; model-edit with confirmation by default; a general terminal with agent presets; per-session temporary MCP configuration that never changes the user's own agent settings.)*
+
+**UI.** A dockable **Terminal** pane (default: bottom dock, hidden; View › User Interface › Terminal, `Ctrl+Shift+T`) with a tab per session. The **+** button and its drop-down open a new tab: **Shell** (the user's login shell), one entry per **agent preset**, and *Manage Presets…*. Each tab's caption shows the preset and, for agent tabs, a coloured dot for the MCP session (connected, waiting, disconnected) and its permission level; the tab's context menu has *Permission ›* (Read-only, Edit with confirmation, Edit, Full scripting), *Restart*, *Close*, *Copy*, *Paste*, *Clear Scrollback*.
+
+**Behaviour & rules.**
+- **Terminal.** Each tab runs its process in a pseudo-terminal (POSIX `openpty` on Linux and macOS, ConPTY on Windows) with an xterm-compatible emulator (UTF-8, 256 colours and true colour, the alternate screen, bracketed paste, mouse reporting, cursor styles), so full-screen terminal programs such as the agents' own interfaces work. Scrollback is 10 000 lines (configurable). Copy and paste use the system clipboard; pasting several lines asks first unless the program enabled bracketed paste. The pane follows the UI theme's terminal palette and a monospace font of the UI font size. Resizing the pane resizes the terminal (the program receives the new size).
+- **Agent presets.** A preset is: a name, an executable and arguments, a working directory (the model's folder by default), extra environment variables, and **how the agent takes MCP servers**: a configuration file named on its command line, a configuration file found through an environment variable, or a settings file in a working directory Reviera prepares for the session. Reviera ships presets for Claude Code, Gemini CLI, Qwen Code and Codex CLI, each written from that agent's own published documentation when it is built (recorded in the research log), and the user may add, edit, duplicate or delete presets (stored per user, not in the model). A preset whose executable is not found opens a tab that says so and offers *Edit Preset*; Reviera never installs agents.
+- **Connection (stdio bridge).** Opening an agent tab creates an MCP session for it and writes a temporary configuration, in a directory only the user can read, naming Reviera's bridge as the agent's MCP server: `reviera mcp-bridge` with the session's endpoint and secret in its environment. The bridge is a small stdio process: it relays the agent's MCP messages to the running window over a private local endpoint (a Unix-domain socket in the user's runtime directory with mode 0600 on Linux and macOS; a named pipe restricted to the user on Windows) after presenting the session's one-time secret. No network port is opened. The window serves the session with the same MCP server, tool catalogue, queue, transactions and undo attribution as any other client (DM-MCP-001 … 006): the actor is the preset's name and the tab number.
+- **Never the user's own settings.** Reviera does not change the agents' global or project settings, and removes the session's temporary files when the tab closes or Reviera exits (stale ones from a crash are removed at the next start).
+- **Permission.** Each agent session starts at *Edit with confirmation* (Options › AI & MCP › Terminal agents changes the default): model edits run, and destructive operations (delete, purge, overwrite, check-in) and `execute_lua` wait for approval in a Reviera dialog naming the tab, the tool and a plain-language summary, since the agent's terminal cannot show Reviera's prompt. The level can be changed from the tab's menu; lowering it applies to the next call. Approval dialogs are UI-only; no MCP or Lua call can approve them (as UI-AGENT-003).
+- **Scope.** A session sees the model of the active view when the tab was opened; *Follow active model* in the tab's menu switches it to whichever model is active.
+- **Lifetime.** Closing a tab ends its process (after asking when it is still running) and revokes its session; a bridge whose secret is revoked or whose window has gone exits with an MCP error. Closing a model with agent sessions on it asks first and disconnects them. Sessions appear in the AI Agents panel (DM-MCP-002) with *Disconnect*.
+- **Keys and accounts.** The agents' own logins and API keys stay the agents' business: Reviera passes no credentials to them and reads none from them.
+- **Flatpak and sandboxes.** In the Flatpak the agents run on the host (`flatpak-spawn --host`), the bridge runs inside the sandbox through the same spawn, and the endpoint lives in the app's runtime directory; the Flatpak's permissions are documented in its notes. Where host programs cannot be started, the pane says so.
+
+**Data.** Presets and the pane's settings are per-user application settings; sessions and their secrets are memory only. Nothing is written to the model or its RXD.
+
+**Commands.** `terminal.open(preset_id?, cwd?) -> tab_id`, `terminal.list() -> tabs[]`, `terminal.close(tab_id)`, `terminal.send_text(tab_id, text)`, `agent_preset.list() -> presets[]`, `agent_preset.set(preset)`, `agent_preset.delete(preset_id)`. These are window commands for Lua and the UI only; they are **not** exposed to MCP, so an agent cannot start other agents or type into terminals. The bridge is `reviera mcp-bridge` (a command-line mode of the application; it takes its endpoint and secret from its environment and refuses to run without them).
+
+**Acceptance criteria.**
+- [ ] Opening a Claude Code tab with Claude Code installed starts it in the model's folder, and asking it to list the walls returns the open model's walls through Reviera's MCP tools.
+- [ ] The agent's `element.delete` call shows a Reviera approval dialog naming the tab; Reject returns an error to the agent and deletes nothing; the agent's edits undo in the window like any other.
+- [ ] No file in the user's agent settings (for example `~/.claude.json` or `~/.gemini/settings.json`) changes when an agent tab is opened and closed.
+- [ ] A process that connects to the endpoint without the session's secret is refused and logged; closing the tab revokes the secret.
+- [ ] A Shell tab runs the user's shell; a full-screen program (for example `vim` or the agent's own interface) draws and resizes correctly.
+- [ ] A preset whose executable is missing opens a tab that says so and changes nothing else.
+
 ---
 
 ## 1.32 BIMserver-mode user interface
@@ -3704,6 +3735,11 @@ All commands defined by this chapter (owner UI). Commands of other chapters that
 | `agent.send` | `conversation_id`, `text`, `attachments?` (Lua only) | `()` | No | UI-AGENT-002 |
 | `agent.stop` | `conversation_id` (Lua only) | `()` | No | UI-AGENT-002 |
 | `agent.approve` / `agent.reject` | `call_id` (UI only) | `()` | No | UI-AGENT-003 |
+| `terminal.open` | `preset_id?`, `cwd?` (Lua and UI only) | `tab_id` | No | UI-AGENT-004 |
+| `terminal.list` | — (Lua and UI only) | `tabs[]` | No | UI-AGENT-004 |
+| `terminal.close` | `tab_id` (Lua and UI only) | `()` | No | UI-AGENT-004 |
+| `terminal.send_text` | `tab_id`, `text` (Lua and UI only) | `()` | No | UI-AGENT-004 |
+| `agent_preset.list` / `agent_preset.set` / `agent_preset.delete` | `preset` / `preset_id` (Lua and UI only) | `presets[]` / `()` | No | UI-AGENT-004 |
 | `agent.undo_turn` | `conversation_id`, `turn_id` (Lua only) | `()` | Yes (undoes the turn's group) | UI-AGENT-003 |
 | `agent.history` | `filter?` (Lua only) | `[ConversationSummary]` | No | UI-AGENT-002 |
 | `ui.layout.list` | `group?` (builtin, org, personal) | `[LayoutInfo]` | No | UI-LAYOUT-001/002 |

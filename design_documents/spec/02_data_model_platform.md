@@ -4157,6 +4157,7 @@ key_id = "minisign:<publisher public key>"     # signature file: reviera-addin.t
 - **Streamable HTTP** (when the UI is running). The server listens on `127.0.0.1` (default port 47800, configurable). Binding to other interfaces requires TLS and an explicit setting.
   - **Authentication**: bearer tokens created in Manage › AI Agents › *New client token*. Each token has a name, a permission level, an optional expiry and an optional document scope. Tokens are stored hashed. Remote deployments may use OAuth 2.1 authorisation as the MCP specification describes (P2).
   - The `Origin` header is checked to prevent DNS rebinding attacks. CORS is closed by default.
+- **Local bridge** (when the UI is running; UI-AGENT-004). The window listens on a private endpoint (a Unix-domain socket with mode 0600 in the user's runtime directory; a named pipe restricted to the user on Windows), never a network port. `reviera mcp-bridge` is a stdio MCP server process that relays to it, so agents that only start stdio servers reach the running window's model. Each connection must first present a one-time per-session secret the window issued (in the bridge's environment); a wrong or revoked secret is refused and logged. A session's permission level is the one the window gave it.
 - **Status UI.** An *AI Agents* panel shows connected clients, their permission levels, active sessions, recent tool calls (from the journal), and a **Disconnect** / **Revoke** button for each one. A status-bar icon shows when an agent is connected, and pulses while an agent is running a tool.
 
 **Commands.** `mcp.start(transport, options)` · `mcp.stop()` · `mcp.token.create(name, level, expiry?, document_scope?) -> token` · `mcp.token.revoke(token_id)` · `mcp.sessions() -> session[]` · `mcp.session.disconnect(session_id)`
@@ -4476,7 +4477,7 @@ Reviera shall have a foundational subsystem, built on one general contract, that
 - **Hosted calculation services.** Over time a family of cloud-hosted calculation and analysis services is offered on this contract, run on on-demand compute: structural, seismic, energy, daylight, stormwater, CFD and others (chapter 4 §4.15), rendering and large exports. A service is a cloud host (or a set of them) whose job kinds are listed in a catalogue that Reviera reads (`compute.services`): each entry names its job kinds, operator, region, pricing model and licence of its runners. The same service can be run by an organisation itself from the published images, by Reviera's project, or by a third party; Reviera treats them all alike and adds none by default.
 
 **Commands.**
-- `compute_host.add(url, auth: "oidc"|"token", token?) -> host_id`
+- `compute_host.add(url, auth: "oidc"|"token"|"api_key", token?) -> host_id` (an `api_key` host is made by adding a subscription, DM-RPC-011)
 - `compute.estimate(kind, scope, options?, detail?, host_id?) -> {duration_s, resources, cost?}`
 - `compute.set_budget(scope: "project"|"user", limit, confirm_over?) -> ()`
 - `compute.services(catalogue_url?) -> services[]`
@@ -4588,6 +4589,39 @@ Reviera shall have a foundational subsystem, built on one general contract, that
 - [ ] A Godot bridge in VR shows the same frames as Reviera's viewport, and changing the wind direction from the wrist menu changes the flow in both.
 - [ ] Committing a session writes a result package whose provenance includes the input log, and its results attach to the model like a batch result.
 - [ ] `compute.open_session`, `.session_input` and `.session_control` driven from Lua or MCP give the same session behaviour as the scenario panel.
+
+### 2.17.11 Remote analysis subscriptions
+**ID:** DM-RPC-011 · **Priority:** P2 · **Ref:** owner requirement (2026-10-20); Reviera-originated design
+
+**Purpose.** Let a user (or an organisation) subscribe to a remote analysis service and run jobs on it through the compute contract, by entering the service's secure URL and an API key and secret. *(Owner requirement, 2026-10-20: "Subscription management for running analysis on a remote host via API. Connecting will require the secure service URL and key:secret authentication. We will be starting a separate project to implement the remote analysis server later in development.")* The server is a separate project; this requirement defines the client side and the contract additions that server implements.
+
+**UI.** Options › **Remote Analysis** (also Analyze › Remote Analysis › *Subscriptions…*): a list of subscriptions with name, service URL, status (*Active*, *Trial*, *Suspended*, *Expired*, *Unreachable*, *Not checked*), plan, the period's usage and remaining allowance, and renewal or expiry date; buttons *Add…*, *Edit…*, *Remove*, *Test Connection*, *Refresh*, *Set as Default*. *Add* asks for a name, the **service URL** and the **API key and secret** (one field taking `key:secret`, or two fields), then tests the connection before saving. The secret field is masked and never shown again after saving; *Edit* can replace it but not reveal it.
+
+**Behaviour & rules.**
+- **Secure URL only.** The URL must be `https://`; TLS 1.2 or newer with the system's certificate store; certificate errors refuse the connection with the reason (a self-hosted service can add its CA under the subscription's *Advanced* section, or pin its certificate's SHA-256). Plain HTTP is refused, except `http://localhost` with an explicit *development* setting.
+- **Key:secret authentication.** The key identifies the subscription; the secret proves it. Reviera sends them only to the subscription's own URL, only over TLS, only to obtain a short-lived **access token** (the contract's `Authenticate` exchange, below): the key and secret go in an HTTP `Authorization: Basic` header to the service's token endpoint, which returns a bearer token and its expiry; every other call carries the bearer token, and Reviera renews it before it expires. The secret is never put in URLs, logs, journals, crash reports, the model, RXD, MCP results or Lua values.
+- **Storage.** The secret is kept in the operating system's keychain (Secret Service on Linux, Keychain on macOS, Credential Manager on Windows) under the subscription's id; the URL, name, key and settings are per-user settings. Where no keychain is available, Reviera says so and keeps the secret for the session only unless the user chooses an encrypted file protected by a passphrase. Administrators may provision subscriptions through the defaults file (URL and key; the secret still entered by the user or supplied by the OS keychain).
+- **Status.** *Test Connection* and *Refresh* call the contract's `GetSubscription`: plan name, state, period start and end, allowance and usage (in the service's units: compute-hours, credits or jobs), job kinds offered, regions, limits (maximum job size, concurrent jobs) and the operator's terms URL. Reviera refreshes the status at start-up (at most daily) and before a submission; it warns 7 days before expiry and when 90 % of the allowance is used.
+- **Use.** Each active subscription is a compute host (DM-RPC-006) with authentication `api_key`: its job kinds appear in the Compute Jobs panel and the submit dialog, with estimates and costs from the service. A default subscription can be set overall and per job kind; a project may name its preferred subscription (stored per user, by subscription name, never with credentials). The consent rules for sending distillations to a remote destination (DM-RPC-003) apply per subscription.
+- **Errors.** The reason codes `unauthorised` (key or secret refused: "The service refused the key; check it or ask your administrator"), `subscription_inactive` (suspended or expired, with the date), `quota_exceeded` (with the allowance and reset date) and `unsupported_kind` are shown in the panel and the job list; nothing is retried with the same credentials after `unauthorised`.
+- **Removal.** *Remove* deletes the keychain entry and the settings; jobs already on the service keep running there and stay listed until fetched or expired, but can only be fetched after the subscription is added again.
+- **Nothing by default.** Reviera ships with no subscription and makes no connection until the user adds one.
+
+**Contract additions** (MIT, in `schemas/compute/` and `clients/compute`, for the separate server project):
+- `Authenticate` (HTTPS `POST /v1/auth/token` with Basic `key:secret`; gRPC unary with the same credentials in metadata) → `{access_token, expires_at, subscription_id}`.
+- `GetSubscription` (unary, bearer) → `{name, plan, state, period_start, period_end, allowance, usage, unit, job_kinds[], regions[], limits, terms_url}`.
+- The reason codes above added to the error list (DM-RPC-001). Existing RPCs take the bearer token as today.
+
+**Data.** Per-user settings (`remote_analysis` in the user settings) and keychain entries; no model data.
+
+**Commands.** `subscription.add(name, url, key, secret) -> subscription_id` (tests the connection first; the secret is never returned), `subscription.set(subscription_id, {name?, url?, key?, secret?, ca?, pin?})`, `subscription.remove(subscription_id)`, `subscription.list() -> subscriptions[]` (no secrets), `subscription.test(subscription_id) -> status`, `subscription.status(subscription_id) -> status`, `subscription.set_default(subscription_id, job_kind?)`. `subscription.list` and `.status` are read-only and may be exposed to MCP; `add`, `set`, `remove` and `test` are UI and Lua only, so no agent handles credentials.
+
+**Acceptance criteria.**
+- [ ] Adding a subscription with an `http://` URL is refused; with an `https://` URL whose certificate does not verify, the test fails with the certificate's reason and nothing is saved.
+- [ ] After a subscription is added, its secret is in the OS keychain and appears in no settings file, log or journal, and `subscription.list` returns the key but not the secret.
+- [ ] With a wrong secret the test reports "The service refused the key"; with the right one it shows the plan, state, usage and expiry from `GetSubscription`.
+- [ ] Every call after authentication carries a bearer token, never the secret; a token near expiry is renewed without the user noticing.
+- [ ] A suspended subscription's job kinds are greyed out in the submit dialog with the reason; a quota-exceeded submission is refused with the allowance and reset date.
 
 **Packaging.** Reviera bundles `reviera-compute-host` beside `reviera` for local runners; the host is also packaged on its own and as a container image for LAN and cloud hosts. Built-in runners ship as separate executables. Reviera ships a Rust runner skeleton and a Python one, so a new job kind's runner can be written in any language with a gRPC library.
 
@@ -5062,6 +5096,13 @@ All commands defined in this chapter. Every command in this table is also a Lua 
 | `compute_host.forget` | host_id | — | No | DM-RPC-005 |
 | `compute.set_location` | kind, location, detail? | — | Yes | DM-RPC-005 |
 | `compute_host.add` | url, auth, token? | host_id | No | DM-RPC-006 |
+| `subscription.add` | name, url, key, secret (UI and Lua only) | subscription_id | No | DM-RPC-011 |
+| `subscription.set` | subscription_id, name?, url?, key?, secret?, ca?, pin? (UI and Lua only) | — | No | DM-RPC-011 |
+| `subscription.remove` | subscription_id (UI and Lua only) | — | No | DM-RPC-011 |
+| `subscription.list` | — | subscriptions[] (no secrets) | No | DM-RPC-011 |
+| `subscription.test` | subscription_id (UI and Lua only) | status | No | DM-RPC-011 |
+| `subscription.status` | subscription_id | status | No | DM-RPC-011 |
+| `subscription.set_default` | subscription_id, job_kind? | — | No | DM-RPC-011 |
 | `compute.estimate` | kind, scope, options?, detail?, host_id? | {duration_s, resources, cost?} | No | DM-RPC-006 |
 | `compute.set_budget` | scope, limit, confirm_over? | — | Yes | DM-RPC-006 |
 | `compute.services` | catalogue_url? | services[] | No | DM-RPC-006 |
