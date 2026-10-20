@@ -741,8 +741,10 @@ tools and the datums.
   by piece mark, re-run keeping edited and added bars (`precast.reinforce`; STR-PRE-003); custom
   welded fabric sheets shaped to each piece, cut round openings with a clearance, lapped when a
   piece is larger than a sheet, numbered so identical pieces share sheets
-  (`precast.generate_custom_fabric`; STR-PRE-004). Not yet: lattice girders, mounting parts,
-  shop drawings and CAM export (STR-PRE-005 … 007).
+  (`precast.generate_custom_fabric`; STR-PRE-004); lifting anchors by weight band, symmetric
+  about each piece's centre of gravity and clear of ends and openings, kept when moved by hand
+  (`precast.place_mounting_parts`, `mounting_part.place`; STR-PRE-005). Not yet: lattice
+  girders, other mounting parts, shop drawings and CAM export (STR-PRE-006, 007).
   Rebar documentation: a Rebar Tag (number and "15 Ø12 @ 150"), multi-rebar annotations across
   parallel sets, bending details with segment values, and a Bar Bending Schedule grouped by
   partition and number with mass from nominal kg/m (`rebar_tag.place`,

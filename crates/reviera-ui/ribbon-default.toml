@@ -1554,6 +1554,12 @@ icon = "precast_fabric"
 help = "Welded fabric sheets shaped to each selected precast piece by a custom fabric rule: cut round openings, lapped where a piece is larger than a sheet"
 
 [[action]]
+id = "precast.place_mounting_parts"
+label = "Mounting Parts"
+icon = "precast_anchor"
+help = "Lifting anchors on the selected precast pieces by weight band, symmetric about each piece's centre of gravity, clear of its ends and openings"
+
+[[action]]
 id = "precast.resplit"
 label = "Re-split"
 icon = "precast_resplit"
@@ -2365,6 +2371,7 @@ tools = [
   { action = "precast.split", size = "large" },
   { action = "precast.reinforce", size = "large" },
   { action = "precast.generate_custom_fabric", size = "small" },
+  { action = "precast.place_mounting_parts", size = "small" },
   { action = "precast.resplit", size = "small" },
 ]
 

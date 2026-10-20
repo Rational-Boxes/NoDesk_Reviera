@@ -173,7 +173,7 @@ td code { white-space: nowrap; }
         <div class="tb-cell"><span class="tb-label">Revision</span><span class="tb-value">0.1 · Draft</span></div>
         <div class="tb-cell"><span class="tb-label">Date</span><span class="tb-value tb-num">2026-10-12</span></div>
         <div class="tb-cell"><span class="tb-label">Requirements</span><span class="tb-value tb-num">808</span></div>
-        <div class="tb-cell"><span class="tb-label">Commands</span><span class="tb-value tb-num">2,130</span></div>
+        <div class="tb-cell"><span class="tb-label">Commands</span><span class="tb-value tb-num">2,131</span></div>
         <div class="tb-cell"><span class="tb-label">Licence</span><span class="tb-value">GPL-3.0-or-later</span></div>
         <div class="tb-cell last-row"><span class="tb-label">Stack</span><span class="tb-value">IFC · Rust · OCCT · wx · LuaJIT · MCP</span></div>
         <div class="tb-cell last-row" style="grid-column: span 3"><span class="tb-label">By priority</span>
@@ -33972,11 +33972,12 @@ No IFC equivalent.
 - Re-running replaces only parts the rules generated; parts added or moved by hand are kept and reported.
 - Mounting parts host on the piece and move with it; deleting the piece deletes them (STR-GEN-002).</p>
 <p><strong>Data (IFC mapping).</strong> <code>IfcMechanicalFastener</code> (<code>USERDEFINED</code> "LIFTING_ANCHOR", "BUSHING", …) or <code>IfcDiscreteAccessory</code> (<code>USERDEFINED</code> "CONNECTOR", or <code>ANCHORPLATE</code>), aggregated into the piece assembly. The generated flag and the rule that placed each part are RXD element data (<code>structural</code>). The piece weight is written as NetWeight in <code>Qto_WallBaseQuantities</code> or <code>Qto_SlabBaseQuantities</code> of the piece.</p>
-<p><strong>Commands.</strong> <code>precast.place_mounting_parts(assembly_ids[]) -&gt; report</code></p>
+<p><strong>Commands.</strong> <code>precast.place_mounting_parts(assembly_ids[]) -&gt; report</code>, <code>mounting_part.place(assembly_id, point) -&gt; part_id</code></p>
 <p><strong>Acceptance criteria.</strong>
-- [ ] A 9 t wall piece configured for "2 anchors up to 10 t" receives 2 lifting anchors placed symmetrically about the centre of gravity.
-- [ ] A 20 t piece with bands only up to 16 t receives no anchors and is listed in the report.
-- [ ] Re-running after the user moved one anchor keeps the moved anchor and reports it.</p>
+- [x] A 9 t wall piece configured for "2 anchors up to 10 t" receives 2 lifting anchors placed symmetrically about the centre of gravity.
+- [x] A 20 t piece with bands only up to 16 t receives no anchors and is listed in the report.
+- [x] Re-running after the user moved one anchor keeps the moved anchor and reports it.</p>
+<p><em>Built (2026-10-19):</em> each kind's <code>connections</code> node holds the mounting rules: the part's name, weight bands (<code>max_weight</code> in tonnes and <code>count</code>, ascending, checked to be contiguous), the distance from the piece's ends (and a slab's edges) and from openings, and the anchor's diameter and depth; provisional starting rules (expert review E-15): 2 anchors up to 10 t, 4 up to 16 t, 300 mm from ends and openings, Ø30 × 200 mm. <code>precast.place_mounting_parts</code> weighs each piece by its parts' bodies (openings removed) × density and finds its centre of gravity from their volume; the first band holding the weight gives the count, and a heavier piece gets none and a warning in the report. Wall anchors go on the piece's top edge on the location line, slab anchors on its top face (one row along the long side for two, two rows for more), spread symmetrically about the centre of gravity and drawn in until every one keeps the distances (openings that reach within the anchor's depth and the opening distance of the top edge count for walls); when none does, each goes to the nearest valid place and the report warns. An anchor is an <code>IfcMechanicalFastener</code> (USERDEFINED <code>LIFTING_ANCHOR</code>, <code>recipe.mounting_part</code>: assembly, head point, size) with a rod body; it moves, rotates and mirrors with element.move etc. and goes with its assembly; the assembly lists its parts (<code>mounting</code>) and holds them in IFC, and gets the piece weight as <code>Qto_WallBaseQuantities</code> / <code>Qto_SlabBaseQuantities</code> NetWeight (kg). Running again replaces parts as placed and keeps, and reports, those moved since and those placed by hand (<code>mounting_part.place</code>). Concrete › Precast Detailing › <strong>Mounting Parts</strong> (a report after) and the configuration's Connections pages (bands one per line). Not yet: loops, bushings, connectors and lattice girders as parts, Component Library families with dimension references, placement by Split with automatic updates, the NetWeight on the pieces themselves, anchors turned to a sloping or curved top.</p>
 <h3 id="456-shop-drawings">4.5.6 Shop drawings</h3>
 <p><strong>ID:</strong> <code class="rid" id="STR-PRE-006">STR-PRE-006</code> · <strong>Priority:</strong> <span class="pri pri-p2">P2</span> · <strong>Ref:</strong> research/03 §6.4 · screenshots/structure_mep/precast_shop_drawing.png</p>
 <p><strong>Workflow.</strong> Select assemblies and choose <em>Shop Drawings</em>. Reviera creates one sheet per assembly, or per group of identical assemblies, from the shop-drawing template configured for that element kind.</p>
@@ -38867,6 +38868,13 @@ No IFC equivalent.
 <td><code>precast.place_mounting_parts</code></td>
 <td>assembly_ids[]</td>
 <td>report</td>
+<td>Yes</td>
+<td>STR-PRE-005</td>
+</tr>
+<tr>
+<td><code>mounting_part.place</code></td>
+<td>assembly_id, point</td>
+<td>part_id</td>
 <td>Yes</td>
 <td>STR-PRE-005</td>
 </tr>
@@ -51858,7 +51866,7 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 </tbody>
 </table></div>
 <h2 id="a3-consolidated-command-index">A.3 Consolidated command index</h2>
-<p><strong>2130 unique commands</strong> in 412 domains. Every command is exposed automatically to the UI, to Lua (<code>reviera.&lt;domain&gt;.&lt;verb&gt;</code>) and to MCP (<code>&lt;domain&gt;_&lt;verb&gt;</code>), subject to its permission class.</p>
+<p><strong>2131 unique commands</strong> in 413 domains. Every command is exposed automatically to the UI, to Lua (<code>reviera.&lt;domain&gt;.&lt;verb&gt;</code>) and to MCP (<code>&lt;domain&gt;_&lt;verb&gt;</code>), subject to its permission class.</p>
 <div class="tbl"><table>
 <thead>
 <tr>
@@ -52778,6 +52786,10 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 <tr>
 <td><code>modeltext</code></td>
 <td style="text-align: right;">2</td>
+</tr>
+<tr>
+<td><code>mounting_part</code></td>
+<td style="text-align: right;">1</td>
 </tr>
 <tr>
 <td><code>mullion</code></td>
@@ -62000,6 +62012,14 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 <td>—</td>
 <td>Yes</td>
 <td>ARC-MTXT-001</td>
+</tr>
+<tr>
+<td><code>mounting_part.place</code></td>
+<td>4</td>
+<td>assembly_id, point</td>
+<td>part_id</td>
+<td>Yes</td>
+<td>STR-PRE-005</td>
 </tr>
 <tr>
 <td><code>mullion.add</code></td>

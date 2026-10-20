@@ -25,6 +25,8 @@ enum Unit {
     EdgeTypes,
     /// Custom fabric sheet rules, one per line (STR-PRE-004).
     FabricRules,
+    /// Weight bands, one per line (STR-PRE-005).
+    Bands,
 }
 
 /// The fields of a page: path, label, unit.
@@ -65,6 +67,15 @@ const WALL_REBAR: Fields = &[
 
 const SLAB_REBAR: Fields = &[("reinforcement.area_types", "Area types", Unit::AreaTypes)];
 
+const CONNECTIONS: Fields = &[
+    ("connections.part", "Part", Unit::Text),
+    ("connections.bands", "Weight bands", Unit::Bands),
+    ("connections.edge_distance", "From the ends (mm)", Unit::Mm),
+    ("connections.opening_distance", "From openings (mm)", Unit::Mm),
+    ("connections.diameter", "Part diameter (mm)", Unit::Mm),
+    ("connections.depth", "Part depth (mm)", Unit::Mm),
+];
+
 const FABRIC: Fields = &[("fabric_rules", "Rules", Unit::FabricRules)];
 
 const CAM: Fields = &[("cam.format", "Format", Unit::Text), ("cam.folder", "Output folder", Unit::Text), ("cam.filename", "Filename rule", Unit::Text)];
@@ -92,6 +103,11 @@ fn at_mut<'a>(v: &'a mut Value, path: &str) -> Option<&'a mut Value> {
 fn shown(v: Option<&Value>, unit: Unit) -> String {
     let mm = |v: &Value| format!("{}", (v.as_f64().unwrap_or(0.0) * 1e6).round() / 1000.0);
     match (v, unit) {
+        (Some(Value::Array(list)), Unit::Bands) => list
+            .iter()
+            .map(|b| format!("{}; {}", b["max_weight"].as_f64().unwrap_or(0.0), b["count"].as_u64().unwrap_or(0)))
+            .collect::<Vec<_>>()
+            .join("\n"),
         (Some(Value::Array(list)), Unit::FabricRules) => list
             .iter()
             .map(|t| {
@@ -152,6 +168,16 @@ fn types(text: &str, edge: bool) -> Option<Value> {
     Some(Value::Array(out))
 }
 
+/// Weight bands from lines `up to (t); count`.
+fn bands(text: &str) -> Option<Value> {
+    let mut out = Vec::new();
+    for line in text.lines().map(str::trim).filter(|l| !l.is_empty()) {
+        let (w, n) = line.split_once(';')?;
+        out.push(json!({ "max_weight": w.trim().parse::<f64>().ok()?, "count": n.trim().parse::<u64>().ok()? }));
+    }
+    Some(Value::Array(out))
+}
+
 /// Custom fabric rules from lines `id; major wire; minor wire; major spacing; minor spacing;
 /// outer edge; joint edge; opening clearance; shortest wire; largest length; largest width; lap
 /// (mm); layer; name`.
@@ -181,6 +207,13 @@ fn read(base: &Value, fields: &[Field]) -> (Value, Vec<String>) {
         let value = match (&f.ctl, f.unit) {
             (Ctl::Check(c), _) => json!(c.get_value()),
             (Ctl::Text(t), Unit::Text) => json!(t.get_value()),
+            (Ctl::Text(t), Unit::Bands) => match bands(&t.get_value()) {
+                Some(list) => list,
+                None => {
+                    bad.push(f.path.clone());
+                    continue;
+                }
+            },
             (Ctl::Text(t), Unit::FabricRules) => match fabric_rules(&t.get_value()) {
                 Some(list) => list,
                 None => {
@@ -236,6 +269,12 @@ impl Gui {
                     c.set_value(at(&base, &full).and_then(Value::as_bool).unwrap_or(false));
                     grid.add(&c, 1, SizerFlag::Expand, 0);
                     Ctl::Check(c)
+                } else if *unit == Unit::Bands {
+                    let t = TextCtrl::builder(&panel).with_value(&shown(at(&base, &full), *unit)).with_style(TextCtrlStyle::MultiLine).build();
+                    t.set_min_size(Size::new(220, 80));
+                    t.set_tooltip("One band per line: up to (t); number of parts. Ascending; a heavier piece gets none and is reported");
+                    grid.add(&t, 1, SizerFlag::Expand, 0);
+                    Ctl::Text(t)
                 } else if *unit == Unit::FabricRules {
                     let t = TextCtrl::builder(&panel).with_value(&shown(at(&base, &full), *unit)).with_style(TextCtrlStyle::MultiLine).build();
                     t.set_min_size(Size::new(560, 120));
@@ -290,9 +329,8 @@ impl Gui {
             page(label, "", &[], false, &mut fields, &mut pages);
             page("Segmentation", prefix, list, true, &mut fields, &mut pages);
             page("Reinforcement", prefix, if prefix.starts_with("wall") { WALL_REBAR } else { SLAB_REBAR }, true, &mut fields, &mut pages);
-            for node in ["Connections", "Shop Drawing"] {
-                page(node, "", &[], true, &mut fields, &mut pages);
-            }
+            page("Connections", prefix, CONNECTIONS, true, &mut fields, &mut pages);
+            page("Shop Drawing", "", &[], true, &mut fields, &mut pages);
         }
         page("Custom Fabric Sheet Rules", "", FABRIC, false, &mut fields, &mut pages);
         page("Annotations", "-", &[], false, &mut fields, &mut pages);
@@ -612,6 +650,44 @@ impl Gui {
                 MessageDialog::builder(&frame, &lines.join("\n"), "Custom Fabric Sheets").with_style(MessageDialogStyle::OK | MessageDialogStyle::IconInformation).build().show_modal();
             }
             Err(e) => error(&frame, &format!("No sheets made:\n{e}")),
+        }
+    }
+
+    /// Concrete › Precast Detailing › Mounting Parts (STR-PRE-005).
+    pub(crate) fn precast_mounting_parts(&mut self) {
+        let frame = self.frame;
+        let assemblies = self.selected_assemblies();
+        if assemblies.is_empty() {
+            return frame.set_status_text("Mounting Parts: select precast assemblies, their pieces or the split elements", 0);
+        }
+        match self.run("precast.place_mounting_parts", json!({ "assembly_ids": assemblies })) {
+            Ok(r) => {
+                self.refresh_scene(&frame);
+                let lines: Vec<String> = r
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .map(|a| {
+                        let mut l = format!(
+                            "{} ({:.1} t): {} part(s) placed, {} replaced, {} kept",
+                            a["mark"].as_str().unwrap_or(""),
+                            a["weight"].as_f64().unwrap_or(0.0),
+                            a["created"].as_array().map_or(0, Vec::len),
+                            a["removed"].as_u64().unwrap_or(0),
+                            a["kept"].as_array().map_or(0, Vec::len)
+                        );
+                        for k in a["kept"].as_array().into_iter().flatten() {
+                            l += &format!("\n    part {} {}", k["id"], k["why"].as_str().unwrap_or(""));
+                        }
+                        for w in a["warnings"].as_array().into_iter().flatten() {
+                            l += &format!("\n    {}", w.as_str().unwrap_or(""));
+                        }
+                        l
+                    })
+                    .collect();
+                MessageDialog::builder(&frame, &lines.join("\n"), "Mounting Parts").with_style(MessageDialogStyle::OK | MessageDialogStyle::IconInformation).build().show_modal();
+            }
+            Err(e) => error(&frame, &format!("No parts placed:\n{e}")),
         }
     }
 

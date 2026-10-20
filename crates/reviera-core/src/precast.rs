@@ -147,13 +147,13 @@ impl ReinforcementConfig {
 pub struct KindConfig<S> {
     pub segmentation: S,
     pub reinforcement: ReinforcementConfig,
-    pub connections: Value,
+    pub connections: crate::precast_parts::MountingRules,
     pub shop_drawing: Value,
 }
 
 impl<S: Default> Default for KindConfig<S> {
     fn default() -> Self {
-        Self { segmentation: S::default(), reinforcement: ReinforcementConfig::default(), connections: json!({}), shop_drawing: json!({}) }
+        Self { segmentation: S::default(), reinforcement: ReinforcementConfig::default(), connections: crate::precast_parts::MountingRules::default(), shop_drawing: json!({}) }
     }
 }
 
@@ -309,6 +309,17 @@ pub fn problems(c: &Config) -> Vec<(String, String)> {
         ("slab.hollow_core", &c.slab.hollow_core.reinforcement),
         ("slab.lattice_girder", &c.slab.lattice_girder.reinforcement),
     ];
+    for (kind, r) in [
+        ("wall.solid", &c.wall.solid.connections),
+        ("wall.double", &c.wall.double.connections),
+        ("slab.solid", &c.slab.solid.connections),
+        ("slab.hollow_core", &c.slab.hollow_core.connections),
+        ("slab.lattice_girder", &c.slab.lattice_girder.connections),
+    ] {
+        for (path, rule) in crate::precast_parts::rule_problems(kind, r) {
+            bad(&path, &rule);
+        }
+    }
     for (kind, r) in kinds {
         let ranges = |list: Vec<(&str, f64, f64)>, what: &str, bad: &mut dyn FnMut(&str, &str)| {
             for (i, (id, lo, hi)) in list.iter().enumerate() {
@@ -553,6 +564,9 @@ pub struct AssemblyRecipe {
     /// Reinforcement generated for the piece (GlobalIds, STR-PRE-003).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub reinforcement: Vec<String>,
+    /// Mounting parts of the piece (GlobalIds, STR-PRE-005).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub mounting: Vec<String>,
 }
 
 pub fn assembly_recipe(e: &Element) -> Option<AssemblyRecipe> {
@@ -909,6 +923,7 @@ pub(crate) fn split(txn: &mut Transaction<'_>, p: SplitParams) -> Result<Vec<Ele
                 divisions: divisions.clone(),
                 created_parts: !had,
                 reinforcement: Vec::new(),
+                mounting: Vec::new(),
             };
             let label = |v: &str| json!({ "type": "IfcLabel", "value": v });
             let a = txn.create(
@@ -965,7 +980,7 @@ pub(crate) fn resplit(txn: &mut Transaction<'_>, p: ResplitParams) -> Result<Vec
             .map(|e| e.id())
             .chain(assemblies.iter().map(|(i, _)| *i))
             // The pieces' generated reinforcement goes with them (STR-PRE-003).
-            .chain(assemblies.iter().flat_map(|(_, r)| r.reinforcement.iter().filter_map(|g| by_guid(&store, g).map(|e| e.id()))))
+            .chain(assemblies.iter().flat_map(|(_, r)| r.reinforcement.iter().chain(&r.mounting).filter_map(|g| by_guid(&store, g).map(|e| e.id()))))
             .collect();
         for id in doomed {
             if txn.store().get(id).is_some() {

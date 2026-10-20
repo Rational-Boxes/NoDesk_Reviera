@@ -2277,12 +2277,14 @@ Ref: research/03 §6.1
 
 **Data (IFC mapping).** `IfcMechanicalFastener` (`USERDEFINED` "LIFTING_ANCHOR", "BUSHING", …) or `IfcDiscreteAccessory` (`USERDEFINED` "CONNECTOR", or `ANCHORPLATE`), aggregated into the piece assembly. The generated flag and the rule that placed each part are RXD element data (`structural`). The piece weight is written as NetWeight in `Qto_WallBaseQuantities` or `Qto_SlabBaseQuantities` of the piece.
 
-**Commands.** `precast.place_mounting_parts(assembly_ids[]) -> report`
+**Commands.** `precast.place_mounting_parts(assembly_ids[]) -> report`, `mounting_part.place(assembly_id, point) -> part_id`
 
 **Acceptance criteria.**
-- [ ] A 9 t wall piece configured for "2 anchors up to 10 t" receives 2 lifting anchors placed symmetrically about the centre of gravity.
-- [ ] A 20 t piece with bands only up to 16 t receives no anchors and is listed in the report.
-- [ ] Re-running after the user moved one anchor keeps the moved anchor and reports it.
+- [x] A 9 t wall piece configured for "2 anchors up to 10 t" receives 2 lifting anchors placed symmetrically about the centre of gravity.
+- [x] A 20 t piece with bands only up to 16 t receives no anchors and is listed in the report.
+- [x] Re-running after the user moved one anchor keeps the moved anchor and reports it.
+
+*Built (2026-10-19):* each kind's `connections` node holds the mounting rules: the part's name, weight bands (`max_weight` in tonnes and `count`, ascending, checked to be contiguous), the distance from the piece's ends (and a slab's edges) and from openings, and the anchor's diameter and depth; provisional starting rules (expert review E-15): 2 anchors up to 10 t, 4 up to 16 t, 300 mm from ends and openings, Ø30 × 200 mm. `precast.place_mounting_parts` weighs each piece by its parts' bodies (openings removed) × density and finds its centre of gravity from their volume; the first band holding the weight gives the count, and a heavier piece gets none and a warning in the report. Wall anchors go on the piece's top edge on the location line, slab anchors on its top face (one row along the long side for two, two rows for more), spread symmetrically about the centre of gravity and drawn in until every one keeps the distances (openings that reach within the anchor's depth and the opening distance of the top edge count for walls); when none does, each goes to the nearest valid place and the report warns. An anchor is an `IfcMechanicalFastener` (USERDEFINED `LIFTING_ANCHOR`, `recipe.mounting_part`: assembly, head point, size) with a rod body; it moves, rotates and mirrors with element.move etc. and goes with its assembly; the assembly lists its parts (`mounting`) and holds them in IFC, and gets the piece weight as `Qto_WallBaseQuantities` / `Qto_SlabBaseQuantities` NetWeight (kg). Running again replaces parts as placed and keeps, and reports, those moved since and those placed by hand (`mounting_part.place`). Concrete › Precast Detailing › **Mounting Parts** (a report after) and the configuration's Connections pages (bands one per line). Not yet: loops, bushings, connectors and lattice girders as parts, Component Library families with dimension references, placement by Split with automatic updates, the NetWeight on the pieces themselves, anchors turned to a sloping or curved top.
 
 ### 4.5.6 Shop drawings
 **ID:** STR-PRE-006 · **Priority:** P2 · **Ref:** research/03 §6.4 · screenshots/structure_mep/precast_shop_drawing.png
@@ -5672,6 +5674,7 @@ Every command below is registered once in the command registry and is exposed au
 | `precast.reinforcement_types` | assembly_ids[] | {thickness, area_types[], edge_types[]} | No | STR-PRE-003 |
 | `precast.generate_custom_fabric` | assembly_ids[], rule_id? | — | Yes | STR-PRE-004 |
 | `precast.place_mounting_parts` | assembly_ids[] | report | Yes | STR-PRE-005 |
+| `mounting_part.place` | assembly_id, point | part_id | Yes | STR-PRE-005 |
 | `precast.shop_drawings` | assembly_ids[], template_id?, group_identical?: bool | sheet_ids[] | Yes | STR-PRE-006 |
 | `precast.cam_export` | assembly_ids[], writer_id, folder, filename_rule? | files[] | No | STR-PRE-007 |
 | `cam_writer.list` | — | writers[] | No | STR-PRE-007 |

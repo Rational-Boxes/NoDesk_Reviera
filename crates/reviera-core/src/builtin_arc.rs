@@ -140,6 +140,8 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(PrecastInfo),
         registry.add(PrecastReinforce),
         registry.add(PrecastCustomFabric),
+        registry.add(PrecastMountingParts),
+        registry.add(MountingPartPlace),
         registry.add(PrecastReinforcementTypes),
         registry.add(RebarPlaceFreeForm),
         registry.add(RebarDistributeAlongPath),
@@ -3409,6 +3411,36 @@ edit_command!(
     crate::precast_rebar::ReinforceParams,
     crate::precast_rebar::Report,
     crate::precast_rebar::reinforce
+);
+
+edit_command!(
+    PrecastMountingParts,
+    "precast.place_mounting_parts",
+    "Place mounting parts on precast pieces",
+    "Places lifting anchors on precast pieces by the kind's mounting rules (STR-PRE-005): the weight \
+     band holding the piece's weight (its parts' volume × density) gives the count; a piece heavier \
+     than the last band gets none and is reported. Anchors go on a wall's top edge or a slab's top \
+     face, symmetric about the piece's centre of gravity, the edge distance from its ends and the \
+     opening distance from openings; when no symmetric places keep those, the nearest valid places \
+     with a warning. IfcMechanicalFastener (LIFTING_ANCHOR) held by the assembly, which gets the \
+     piece's NetWeight. Running again replaces parts as placed and keeps moved and hand-placed ones. \
+     Returns a report per assembly.",
+    "Mounting Parts",
+    crate::precast_parts::PlaceParams,
+    Vec<crate::precast_parts::PartsReport>,
+    crate::precast_parts::place
+);
+
+edit_command!(
+    MountingPartPlace,
+    "mounting_part.place",
+    "Place a mounting part by hand",
+    "Places a lifting anchor on a precast piece by hand at `point` (its head; it runs down into the \
+     piece), held by the assembly; later rule runs keep it (STR-PRE-005). Returns the part.",
+    "Place Mounting Part",
+    crate::precast_parts::HandParams,
+    ElementId,
+    crate::precast_parts::place_by_hand
 );
 
 edit_command!(

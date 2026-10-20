@@ -98,6 +98,7 @@ pub fn toolset_of(command: &str) -> String {
             | "rebar_coupler"
             | "precast"
             | "precast_config"
+            | "mounting_part"
             | "beam_system"
             | "truss"
             | "brace"

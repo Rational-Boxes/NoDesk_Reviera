@@ -24,8 +24,8 @@ rule, and OK stays disabled until it is fixed. Each OK raises the configuration'
 dialog says how many assemblies an older version made and can re-split them. <b>Export…</b> and
 <b>Import…</b> share the rules between projects as a JSON file. The defaults are provisional
 starting points, not values from a standard, and are awaiting review by a subject-matter expert.</p>
-<p>The Connections and Shop Drawing pages, Annotations and Dimensioning are for the later
-precast steps. They are not built yet.</p>
+<p>The Shop Drawing pages, Annotations and Dimensioning are for the later precast steps. They
+are not built yet.</p>
 
 <h2 id="split">Split</h2>
 <p>Select straight walls or floors and click
@@ -82,7 +82,24 @@ as they were made and keeps sheets you edited. Rules are edited in Configuration
 Sheet Rules, one per line. The starting rule is provisional and is awaiting review by a
 subject-matter expert.</p>
 
+<h2 id="mounting">Mounting parts</h2>
+<p>Select precast assemblies and click
+<a href="reviera:action/precast.place_mounting_parts">Mounting Parts</a>.</p>
+<ul>
+  <li>Each piece is weighed from its volume (openings removed) and the density. The weight band
+    that holds it gives the number of lifting anchors. A piece heavier than the last band gets
+    none and is listed.</li>
+  <li>The anchors go on a wall piece's top edge, or a slab piece's top face, symmetric about the
+    piece's centre of gravity. They keep the configured distance from the ends and from openings.
+    When no symmetric places do, they go to the nearest valid places and you are warned.</li>
+  <li>Anchors move like other elements. Running again replaces anchors as placed and keeps those
+    you moved, and anchors you placed by hand.</li>
+  <li>The piece's assembly holds them, and gets its weight as NetWeight in IFC.</li>
+</ul>
+<p>The weight bands and distances are edited in Configuration › (kind) › Connections. The starting
+rules are provisional and are awaiting review by a subject-matter expert.</p>
+
 <h2 id="not-yet">Not yet</h2>
-<p>Lattice girders, fabric as area reinforcement, mounting parts, shop drawings and CAM export
-(the later precast steps); curved walls; double walls as one three-layer piece; profile overlap
-between rows; and lattice girders.</p>
+<p>Lattice girders; loops, bushings and connectors; fabric as area reinforcement; shop drawings
+and CAM export (the later precast steps); curved walls; double walls as one three-layer piece;
+and profile overlap between rows.</p>

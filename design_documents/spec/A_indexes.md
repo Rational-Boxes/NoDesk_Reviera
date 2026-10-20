@@ -190,7 +190,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**2130 unique commands** in 412 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**2131 unique commands** in 413 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -422,6 +422,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `model` | 12 |
 | `modelline` | 1 |
 | `modeltext` | 2 |
+| `mounting_part` | 1 |
 | `mullion` | 2 |
 | `multi_rebar_annotation` | 1 |
 | `numbering` | 8 |
@@ -1668,6 +1669,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `modelline.create` | 3 | curves: [curve], work_plane, line_style_id? | [element_id] | Yes | ARC-MLIN-001 |
 | `modeltext.create` | 3 | text, work_plane, point, type_id, h_align?, material_id?, depth? | element_id | Yes | ARC-MTXT-001 |
 | `modeltext.set_text` | 3 | element_id, text | — | Yes | ARC-MTXT-001 |
+| `mounting_part.place` | 4 | assembly_id, point | part_id | Yes | STR-PRE-005 |
 | `mullion.add` | 3 | element_id, target: GridLine(key) \ | Segment(key, idx) \ | AllGridLines \ | Border(edge), type_id |
 | `mullion.set_continuity` | 3 | mullion_id, mode: Continuous\ | Break | — | Yes |
 | `multi_rebar_annotation.place` | 4 | rebar_ids[], view_id, kind: "aligned"\ | "linear", line | id | Yes |

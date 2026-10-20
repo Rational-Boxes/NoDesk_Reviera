@@ -361,6 +361,15 @@ pub fn transform(
             };
             crate::in_place::transform(txn, target, &|p| x.point(p), dz)?;
             out.push(target);
+        } else if crate::precast_parts::recipe(e).is_some() {
+            // A precast piece's mounting part (STR-PRE-005).
+            let target = if copy { txn.create(copied(e))? } else { id };
+            let dz = match x {
+                Xform::Translate(v) => v[2],
+                _ => 0.0,
+            };
+            crate::precast_parts::transform(txn, target, &|p| x.point(p), dz)?;
+            out.push(target);
         } else if crate::model_text::recipe(e).is_some() {
             let target = if copy { txn.create(copied(e))? } else { id };
             let dz = match x {

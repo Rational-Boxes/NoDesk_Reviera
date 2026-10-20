@@ -3511,6 +3511,19 @@ impl LocalProject {
                 geometry::contain(&mut self.ifc, step, storey, owner_history)?;
             }
         }
+        // Mounting parts (STR-PRE-005): a body each, held by their piece's assembly.
+        for e in store.iter() {
+            let Some(r) = reviera_core::precast_parts::recipe(e) else { continue };
+            let Some(&step) = self.steps.get(&e.id()) else { continue };
+            geometry::remove_breps(&mut self.ifc, step)?;
+            if let Some((points, indices)) = reviera_core::precast_parts::mesh(e) {
+                let faces: Vec<Vec<usize>> = indices.chunks(3).map(|t| t.iter().map(|k| *k as usize).collect()).collect();
+                geometry::write_breps(&mut self.ifc, step, geometry::BrepFrame::WORLD, &[geometry::Polyhedron { points, faces }], self.length_scale, contexts)?;
+            }
+            if let Some(a) = GlobalId::parse(&r.assembly).and_then(|g| store.find_by_guid(&g)).and_then(|a| self.steps.get(&a).copied()) {
+                geometry::aggregate(&mut self.ifc, step, a, owner_history)?;
+            }
+        }
         Ok(())
     }
 

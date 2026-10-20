@@ -67,6 +67,9 @@ fn raw_parent(store: &Store, e: &Element, imported: &Imported) -> Option<Element
     if let Some(r) = crate::precast_fabric::recipe(e) {
         return by_guid(&r.assembly);
     }
+    if let Some(r) = crate::precast_parts::recipe(e) {
+        return by_guid(&r.assembly);
+    }
     if let Some(r) = crate::parts::recipe(e) {
         return crate::precast::assembly_of(store, e.guid().as_str()).or_else(|| by_guid(&r.source));
     }
