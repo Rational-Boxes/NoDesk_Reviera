@@ -65,6 +65,17 @@ pub struct ScheduleInstance {
     pub position: [f64; 2],
 }
 
+/// A precast shop drawing on a sheet (STR-PRE-006): drawn from its pieces each time.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ShopDrawingItem {
+    pub id: u32,
+    /// The precast assemblies it stands for (identical pieces; GlobalIds).
+    pub assemblies: Vec<String>,
+    /// Its top-left corner on the paper, millimetres.
+    pub position: [f64; 2],
+}
+
 /// A sheet's data.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
@@ -79,6 +90,8 @@ pub struct SheetData {
     pub viewports: Vec<Viewport>,
     #[serde(default)]
     pub schedules: Vec<ScheduleInstance>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub shop_drawings: Vec<ShopDrawingItem>,
 }
 
 impl SheetData {
@@ -95,6 +108,7 @@ impl SheetData {
             .iter()
             .map(|v| v.id)
             .chain(self.schedules.iter().map(|s| s.id))
+            .chain(self.shop_drawings.iter().map(|s| s.id))
             .max()
             .unwrap_or(0)
             + 1
@@ -195,6 +209,7 @@ pub(crate) fn create(txn: &mut crate::txn::Transaction<'_>, p: CreateParams) -> 
         parameters: Default::default(),
         viewports: Vec::new(),
         schedules: Vec::new(),
+        shop_drawings: Vec::new(),
     };
     let guid = GlobalId::new();
     txn.create(
@@ -409,6 +424,16 @@ pub(crate) fn delete(txn: &mut crate::txn::Transaction<'_>, p: DeleteParams) -> 
     Ok(())
 }
 
+/// Puts a precast shop drawing of `assemblies` (GlobalIds) on a sheet, its top-left corner at
+/// `position` (mm).
+pub(crate) fn add_shop_drawing(txn: &mut crate::txn::Transaction<'_>, sheet: ElementId, assemblies: Vec<String>, position: [f64; 2]) -> Result<u32> {
+    let mut data = sheet_data(txn.store().get(sheet).ok_or_else(|| Error::new("sheet.not_found", "no such sheet"))?).ok_or_else(|| Error::new("sheet.not_found", format!("element {sheet} is not a sheet")))?;
+    let id = data.next_id();
+    data.shop_drawings.push(ShopDrawingItem { id, assemblies, position });
+    write(txn, sheet, &data)?;
+    Ok(id)
+}
+
 /// Removes viewports and placed schedules whose view or schedule no longer exists.
 pub(crate) fn drop_missing_viewports(txn: &mut crate::txn::Transaction<'_>) -> Result<()> {
     let store = txn.store().clone();
@@ -421,10 +446,15 @@ pub(crate) fn drop_missing_viewports(txn: &mut crate::txn::Transaction<'_>) -> R
         let Some(mut data) = sheet_data(e) else {
             continue;
         };
-        let before = (data.viewports.len(), data.schedules.len());
+        let before = (data.viewports.len(), data.schedules.len(), data.shop_drawings.len());
         data.viewports.retain(|v| exists(&v.view));
         data.schedules.retain(|s| exists(&s.schedule));
-        if before != (data.viewports.len(), data.schedules.len()) {
+        // A shop drawing goes when none of its pieces is left.
+        for s in &mut data.shop_drawings {
+            s.assemblies.retain(|a| exists(a));
+        }
+        data.shop_drawings.retain(|s| !s.assemblies.is_empty());
+        if before != (data.viewports.len(), data.schedules.len(), data.shop_drawings.len()) {
             write(txn, e.id(), &data)?;
         }
     }
@@ -451,6 +481,7 @@ pub fn title_values(store: &Store, sheet: &Element) -> Vec<(String, String)> {
         parameters: Default::default(),
         viewports: Vec::new(),
         schedules: Vec::new(),
+        shop_drawings: Vec::new(),
     });
     let project = store.iter().find(|e| e.class == "IfcProject");
     let text = |e: Option<&Element>, key: &str| {

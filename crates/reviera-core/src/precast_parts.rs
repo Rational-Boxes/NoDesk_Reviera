@@ -150,7 +150,7 @@ fn rules(c: &precast::Config, k: PieceKind) -> &MountingRules {
 }
 
 /// A closed mesh's volume and centroid.
-fn volume_centroid(meshes: &[crate::bodies::Mesh]) -> (f64, V3) {
+pub(crate) fn volume_centroid(meshes: &[crate::bodies::Mesh]) -> (f64, V3) {
     let (mut v, mut c) = (0.0, [0.0; 3]);
     for (pts, idx) in meshes {
         for t in idx.chunks(3) {

@@ -59,6 +59,10 @@ impl Gui {
     /// top) and the segments a click can pick.
     pub(crate) fn rebar_view_drawing(&self, index: usize, vis: &mut Visibility) -> (Vec<Lines>, Vec<Lines>, RebarPicks) {
         let v = &self.views[index];
+        // A sheet or schedule draws no model rebar of its own.
+        if v.sheet.is_some() || v.schedule.is_some() {
+            return Default::default();
+        }
         let Some(doc) = self.app.document(v.doc) else { return Default::default() };
         let store = doc.doc.store();
         let view = v.element.and_then(|e| store.get(e));

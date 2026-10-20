@@ -1560,6 +1560,12 @@ icon = "precast_anchor"
 help = "Lifting anchors on the selected precast pieces by weight band, symmetric about each piece's centre of gravity, clear of its ends and openings"
 
 [[action]]
+id = "precast.shop_drawings"
+label = "Shop Drawings"
+icon = "precast_shop"
+help = "A3 shop-drawing sheets for the selected precast pieces, one per group of identical pieces: dimensioned views, centre of gravity and bill of materials"
+
+[[action]]
 id = "precast.resplit"
 label = "Re-split"
 icon = "precast_resplit"
@@ -2372,6 +2378,7 @@ tools = [
   { action = "precast.reinforce", size = "large" },
   { action = "precast.generate_custom_fabric", size = "small" },
   { action = "precast.place_mounting_parts", size = "small" },
+  { action = "precast.shop_drawings", size = "large" },
   { action = "precast.resplit", size = "small" },
 ]
 

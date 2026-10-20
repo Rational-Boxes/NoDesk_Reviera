@@ -141,6 +141,7 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(PrecastReinforce),
         registry.add(PrecastCustomFabric),
         registry.add(PrecastMountingParts),
+        registry.add(PrecastShopDrawings),
         registry.add(MountingPartPlace),
         registry.add(PrecastReinforcementTypes),
         registry.add(RebarPlaceFreeForm),
@@ -3411,6 +3412,24 @@ edit_command!(
     crate::precast_rebar::ReinforceParams,
     crate::precast_rebar::Report,
     crate::precast_rebar::reinforce
+);
+
+edit_command!(
+    PrecastShopDrawings,
+    "precast.shop_drawings",
+    "Shop drawings for precast pieces",
+    "Makes an A3 shop-drawing sheet per precast piece, or per group of identical pieces with \
+     `group_identical` (default; same kind, outline, openings, reinforcement, sheets and anchors to \
+     the millimetre) (STR-PRE-006). Each sheet carries a shop drawing drawn from the model whenever \
+     shown or printed: the front view at the largest standard scale that fits with chain dimensions \
+     of the ends, openings and anchors and the height, opening sizes, the centre-of-gravity symbol \
+     with its distances, a section through the thickness, a bill of materials (concrete, rebar by \
+     number, fabric, mounting parts) and the piece marks. Sheets made before for the same pieces \
+     are replaced. `template_id`: only the built-in `default`. Returns the sheets.",
+    "Shop Drawings",
+    crate::precast_shop::ShopParams,
+    Vec<ElementId>,
+    crate::precast_shop::shop_drawings
 );
 
 edit_command!(

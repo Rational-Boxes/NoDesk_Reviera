@@ -36,6 +36,8 @@ const MM: f32 = 0.001;
 pub enum ItemKind {
     Viewport,
     Schedule,
+    /// A precast shop drawing (STR-PRE-006).
+    ShopDrawing,
 }
 
 /// A viewport or placed schedule on a sheet and where it is drawn (paper metres).
@@ -234,6 +236,28 @@ impl App {
                 position: inst.position,
                 min: [x * MM, (y - th) * MM],
                 max: [(x + tw) * MM, y * MM],
+            });
+        }
+
+        // Precast shop drawings, drawn from their pieces now (STR-PRE-006).
+        for item in &data.shop_drawings {
+            let Some((g, size)) = reviera_core::precast_shop::sheet_graphics(store, item) else {
+                continue;
+            };
+            for (width, a, b) in &g.lines {
+                out.line(*width as f32, a[0] as f32, a[1] as f32, b[0] as f32, b[1] as f32);
+            }
+            for (at, height, text) in &g.texts {
+                out.text(at[0] as f32, at[1] as f32, *height as f32, text);
+            }
+            let (x, y) = (item.position[0] as f32, item.position[1] as f32);
+            items.push(SheetItem {
+                id: item.id,
+                kind: ItemKind::ShopDrawing,
+                element: e.id(),
+                position: item.position,
+                min: [x * MM, (y - size[1] as f32) * MM],
+                max: [(x + size[0] as f32) * MM, y * MM],
             });
         }
 

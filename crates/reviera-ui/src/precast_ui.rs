@@ -691,6 +691,35 @@ impl Gui {
         }
     }
 
+    /// Concrete › Precast Detailing › Shop Drawings (STR-PRE-006): a sheet per group of identical
+    /// pieces; the first opens.
+    pub(crate) fn precast_shop_drawings(&mut self) {
+        let frame = self.frame;
+        let assemblies = self.selected_assemblies();
+        if assemblies.is_empty() {
+            return frame.set_status_text("Shop Drawings: select precast assemblies, their pieces or the split elements", 0);
+        }
+        let f = super::reinforcement_ui::Form::new(&frame, "Shop Drawings");
+        let group = f.check("Sheets", "One sheet per group of identical pieces", true);
+        if !f.show(&format!("{} piece(s): A3 sheets from the built-in template; sheets made before for them are replaced", assemblies.len()), "Create") {
+            f.dialog.destroy();
+            return;
+        }
+        let grouped = group.get_value();
+        f.dialog.destroy();
+        match self.run("precast.shop_drawings", json!({ "assembly_ids": assemblies, "group_identical": grouped })) {
+            Ok(v) => {
+                let sheets: Vec<u64> = v.as_array().into_iter().flatten().filter_map(Value::as_u64).collect();
+                self.rebuild_browser();
+                if let (Some(first), Some(doc)) = (sheets.first(), self.doc) {
+                    self.open_view(doc, Some(ElementId(*first)));
+                }
+                frame.set_status_text(&format!("Shop Drawings: {} sheet(s)", sheets.len()), 0);
+            }
+            Err(e) => error(&frame, &format!("No shop drawings:\n{e}")),
+        }
+    }
+
     /// Re-split: the selected precast assemblies (or those of the selected elements).
     pub(crate) fn precast_resplit(&mut self) {
         let assemblies = self.selected_assemblies();

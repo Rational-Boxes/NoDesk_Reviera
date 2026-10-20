@@ -640,6 +640,9 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "precast_anchor" => format!(
             r#"<rect x="4" y="14" width="24" height="14" fill="{f}" {s}/><path d="M11 8v12M21 8v12" {sa}/><path d="M8 8a3 3 0 0 1 6 0M18 8a3 3 0 0 1 6 0" fill="none" {s}/>"#
         ),
+        "precast_shop" => format!(
+            r#"<rect x="3" y="5" width="26" height="22" fill="{f}" {s}/><rect x="6" y="8" width="13" height="9" fill="none" {sa}/><path d="M6 20h13M22 8h4M22 12h4M22 16h4M22 20h4M22 24h4" {s}/>"#
+        ),
         "precast_config" => format!(
             r#"<rect x="4" y="4" width="24" height="24" fill="{f}" {s}/><path d="M8 10h4M8 16h4M8 22h4M14 10h10M16 16h8M16 22h8" {sa}/><path d="M12 10v12" {s}/>"#
         ),
