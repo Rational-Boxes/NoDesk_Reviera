@@ -940,6 +940,14 @@ simulation sessions, and the first engine runners (see [Not built yet](#not-buil
   Pin/Unpin and Delete at the cursor; a middle click on empty space offers the reset when anything is hidden. With two elements selected it
   checks whether they overlap and, when they do, offers the booleans: cut either way, intersect,
   union, join or accept (UI-SEL-006).
+- **Radial menu** (experimental, View › User Interface › Radial Menu): with it on, a middle click
+  opens a ring of up to eight items at the pointer instead. Touching an item with a ▸ moves the
+  ring to the pointer and shows the next tier; the centre goes back; a left click runs the
+  highlighted command. On an element it holds the quick modify menu; on empty space the menu bar
+  and every ribbon tab, panel and tool, with More… past eight (UI-SEL-007).
+- **Full screen and focus mode** (F11, Ctrl+Shift+F11): only the views show. Pushing the pointer
+  to the top edge brings back the menus and ribbon with Exit Full Screen; to the bottom, the panes
+  in a row with the status bar; a click in the view puts them away (UI-DOCK-004).
 - **Measure** (Modify › Measure): click points in a plan; the status bar shows each segment, its
   angle and the chain's total (`measure.between`, `measure.chain`, `measure.along`; ARC-MOD-023).
 - **Modify tools**: Align (AL), Offset (OF), Mirror by picked or drawn axis (MM, DM), Move (MV),
@@ -1122,11 +1130,9 @@ area by area (reviewed against the spec on 2026-10-15).
   revisions and sheet collections; tags and text in sections and on sheets; the current NBIMS-US
   COBie layout and a COBie settings dialog.
 - **Interface**: general shape tools; a macOS build (the script is written, not yet run on a
-  Mac); an experimental **radial menu** on middle click, a ring of up to 8 items at the pointer
-  that steps through tiers as the pointer touches them, mirroring the ribbon on the background
-  and the quick modify menu on elements, off by default (UI-SEL-007); **full-screen** on F11, with
-  the menu and ribbon revealed by pushing the pointer to the top edge and the panes by pushing
-  it to the bottom, merged with focus mode (UI-DOCK-004).
+  Mac); for the radial menu, its commands for Lua and MCP, icons and the accessibility
+  settings; for full-screen, panes laid over the view rather than docked, Ctrl+Cmd+F on macOS and
+  touch swipes (UI-SEL-007, UI-DOCK-004).
 - **MCP**: streamable HTTP with tokens, rate and size limits, subscriptions, prompts,
   `execute_lua` and view images.
 - **Structure** (in development): structural columns, slanted columns, beams, beam systems,

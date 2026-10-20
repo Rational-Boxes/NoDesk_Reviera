@@ -17,6 +17,7 @@ pub mod datums;
 pub mod font;
 pub mod notes;
 pub mod plan;
+pub mod radial;
 pub mod solid;
 pub mod viewcube;
 
@@ -757,6 +758,9 @@ pub trait RenderBackend {
     /// A gizmo drawn in a corner over the scene with its own camera, such as the Orientation
     /// Cube; `None` hides it.
     fn set_gizmo(&mut self, gizmo: Option<Gizmo>);
+    /// Screen-space geometry drawn over everything, gizmo included, such as the radial menu
+    /// (UI-SEL-007); `None` hides it. Only its flat geometry is drawn.
+    fn set_hud(&mut self, _hud: Option<Gizmo>) {}
     /// Draws these elements in the highlight colour.
     fn set_highlight(&mut self, elements: &[ElementId]);
     /// Transient geometry drawn over the scene, such as the preview of a wall being drawn.

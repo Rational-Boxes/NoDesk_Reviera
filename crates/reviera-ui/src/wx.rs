@@ -34,6 +34,51 @@ unsafe extern "C" {
         user: *mut c_void,
     );
     fn reviera_html_set_page(html: *mut c_void, page: *const c_char, anchor: *const c_char);
+    fn reviera_frame_show_menu_bar(frame: *mut c_void, show: c_int);
+    fn reviera_frame_show_status_bar(frame: *mut c_void, show: c_int);
+    fn reviera_pointer_state(frame: *mut c_void, views: *mut c_void, out: *mut c_int);
+}
+
+/// The pointer against the window's edges (UI-DOCK-004), in screen pixels.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PointerState {
+    pub x: i32,
+    pub y: i32,
+    /// A mouse button is held.
+    pub held: bool,
+    /// The edges: the display in full-screen, else the window (left, top, right, bottom).
+    pub area: [i32; 4],
+    /// The views area's top and bottom.
+    pub views: [i32; 2],
+}
+
+/// Where the pointer is, for edge reveals.
+pub fn pointer_state(frame: &Frame, views: &impl WxWidget) -> PointerState {
+    let mut o = [0 as c_int; 9];
+    unsafe {
+        reviera_pointer_state(
+            frame.handle_ptr() as *mut c_void,
+            views.handle_ptr() as *mut c_void,
+            o.as_mut_ptr(),
+        )
+    };
+    PointerState {
+        x: o[0],
+        y: o[1],
+        held: o[2] != 0,
+        area: [o[3], o[4], o[5], o[6]],
+        views: [o[7], o[8]],
+    }
+}
+
+/// Shows or hides the frame's menu bar, keeping its accelerators (UI-DOCK-004).
+pub fn show_menu_bar(frame: &Frame, show: bool) {
+    unsafe { reviera_frame_show_menu_bar(frame.handle_ptr() as *mut c_void, c_int::from(show)) }
+}
+
+/// Shows or hides the frame's status bar.
+pub fn show_status_bar(frame: &Frame, show: bool) {
+    unsafe { reviera_frame_show_status_bar(frame.handle_ptr() as *mut c_void, c_int::from(show)) }
 }
 
 /// wxWidgets' own HTML window, filling a panel: the help where no web view is available.

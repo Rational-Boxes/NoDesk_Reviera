@@ -42,7 +42,7 @@ pub(crate) const THUMB: u32 = 96;
 
 /// Where per-user settings live: `%APPDATA%\Reviera`, else `$XDG_CONFIG_HOME/reviera` (or
 /// `~/.config/reviera`).
-fn config_dir() -> Option<PathBuf> {
+pub(crate) fn config_dir() -> Option<PathBuf> {
     if let Some(a) = std::env::var_os("APPDATA") {
         return Some(Path::new(&a).join("Reviera"));
     }

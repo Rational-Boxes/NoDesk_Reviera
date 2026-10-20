@@ -46,6 +46,42 @@ pub(crate) const ID_QUICK_TRANSLUCENT: i32 = wxdragon::id::ID_HIGHEST + 110;
 /// The boolean modes of `overlap.resolve` the quick menu offers.
 pub(crate) const BOOLEANS: &[&str] = &["cut_a", "cut_b", "intersect", "union", "join", "accept"];
 
+/// The groups of the quick menu: separated in the popup, tiers of the radial menu.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum QuickGroup {
+    Transform,
+    Visibility,
+    Element,
+    Overlap,
+}
+
+/// One item of the quick menu: its label (with `&` mnemonics), the wx id it runs and its group.
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct QuickItem {
+    pub label: String,
+    pub id: i32,
+    pub enabled: bool,
+    pub group: QuickGroup,
+}
+
+impl QuickItem {
+    fn new(label: &str, id: i32, group: QuickGroup) -> Self {
+        Self {
+            label: label.to_owned(),
+            id,
+            enabled: true,
+            group,
+        }
+    }
+}
+
+/// The quick menu: the selection's name (empty over nothing) and the items.
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct QuickMenu {
+    pub title: String,
+    pub items: Vec<QuickItem>,
+}
+
 /// How a pick changes the selection.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Combine {
@@ -218,6 +254,37 @@ impl Gui {
     /// The quick modify menu for a middle click at (`x`, `y`): `None` over nothing, with a tool
     /// running, or on a sheet.
     pub(crate) fn quick_menu(&mut self, x: i32, y: i32, panel: &Panel, add: bool) -> Option<Menu> {
+        let q = self.quick_items(x, y, panel, add)?;
+        let menu = Menu::builder().build();
+        if !q.title.is_empty() {
+            menu.append(ID_QUICK_TITLE, &q.title, "", ItemKind::Normal);
+            menu.enable_item(ID_QUICK_TITLE, false);
+        }
+        let mut group = None;
+        for item in &q.items {
+            if group.is_some_and(|g| g != item.group) || (group.is_none() && !q.title.is_empty())
+            {
+                menu.append_separator();
+            }
+            group = Some(item.group);
+            menu.append(item.id, &item.label, "", ItemKind::Normal);
+            if !item.enabled {
+                menu.enable_item(item.id, false);
+            }
+        }
+        Some(menu)
+    }
+
+    /// The items of the quick modify menu for a middle click at (`x`, `y`), shared by the popup
+    /// menu (UI-SEL-006) and the radial menu (UI-SEL-007): `None` over nothing, with a tool
+    /// running, or on a sheet. Over nothing the title is empty.
+    pub(crate) fn quick_items(
+        &mut self,
+        x: i32,
+        y: i32,
+        panel: &Panel,
+        add: bool,
+    ) -> Option<QuickMenu> {
         self.quick_pair = None;
         if self.doc.is_none() || self.any_tool() || self.in_sheet() {
             return None;
@@ -232,9 +299,10 @@ impl Gui {
             .or_else(|| self.element_at(x, y, panel))
         else {
             let id = self.ribbon.id_of("inspect.reset").filter(|_| temporary)?;
-            let menu = Menu::builder().build();
-            menu.append(id, "&Reset Hide/Isolate (show all)", "", ItemKind::Normal);
-            return Some(menu);
+            return Some(QuickMenu {
+                title: String::new(),
+                items: vec![QuickItem::new("&Reset Hide/Isolate (show all)", id, QuickGroup::Visibility)],
+            });
         };
         let mut ids = self.selection();
         if !ids.contains(&hit) {
@@ -248,64 +316,66 @@ impl Gui {
         } else {
             format!("{} elements selected", ids.len())
         };
-        let menu = Menu::builder().build();
-        menu.append(ID_QUICK_TITLE, &title, "", ItemKind::Normal);
-        menu.enable_item(ID_QUICK_TITLE, false);
-        menu.append_separator();
-        let item = |menu: &Menu, action: &str, label: &str| {
+        let mut items = Vec::new();
+        let mut item = |action: &str, label: &str, group: QuickGroup| {
             if let Some(id) = self.ribbon.id_of(action) {
-                menu.append(id, label, "", ItemKind::Normal);
+                items.push(QuickItem::new(label, id, group));
             }
         };
-        item(&menu, "element.move", "&Move");
-        item(&menu, "element.copy", "&Copy");
-        item(&menu, "element.rotate", "&Rotate");
-        item(&menu, "element.mirror_pick", "Mirror – &Pick Axis");
-        item(&menu, "element.mirror_draw", "Mirror – &Draw Axis");
+        use QuickGroup::{Element, Transform, Visibility};
+        item("element.move", "&Move", Transform);
+        item("element.copy", "&Copy", Transform);
+        item("element.rotate", "&Rotate", Transform);
+        item("element.mirror_pick", "Mirror – &Pick Axis", Transform);
+        item("element.mirror_draw", "Mirror – &Draw Axis", Transform);
         let all = |f: &dyn Fn(&reviera_core::Element) -> bool| {
             ids.iter().all(|i| store.get(*i).is_some_and(f))
         };
         if all(&|e| reviera_core::walls::wall_recipe(e).is_some()) {
-            item(&menu, "wall.flip", "&Flip Wall");
+            item("wall.flip", "&Flip Wall", Transform);
         }
         if all(&|e| reviera_core::inserts::kind_of(e).is_some()) {
-            item(&menu, "insert.flip_hand", "Flip &Hand");
-            item(&menu, "insert.flip_facing", "Flip &Facing");
+            item("insert.flip_hand", "Flip &Hand", Transform);
+            item("insert.flip_facing", "Flip &Facing", Transform);
         }
-        menu.append_separator();
-        item(&menu, "inspect.hide", "&Hide in View");
+        item("inspect.hide", "&Hide in View", Visibility);
         let label = if self.all_translucent(&ids) {
             "Make &Opaque"
         } else {
             "Make &Translucent"
         };
-        menu.append(ID_QUICK_TRANSLUCENT, label, "", ItemKind::Normal);
-        item(&menu, "inspect.isolate", "&Isolate");
+        let mut late = vec![QuickItem::new(label, ID_QUICK_TRANSLUCENT, Visibility)];
+        let mut item = |action: &str, label: &str, group: QuickGroup| {
+            if let Some(id) = self.ribbon.id_of(action) {
+                late.push(QuickItem::new(label, id, group));
+            }
+        };
+        item("inspect.isolate", "&Isolate", Visibility);
         if temporary {
-            item(&menu, "inspect.reset", "&Reset Hide/Isolate (show all)");
+            item("inspect.reset", "&Reset Hide/Isolate (show all)", Visibility);
         }
-        item(&menu, "inspect.selection_box", "Section &Box");
-        item(&menu, "component.create", "Create &Component…");
+        item("inspect.selection_box", "Section &Box", Visibility);
+        item("component.create", "Create &Component…", Element);
         let pinned = |e: &reviera_core::Element| reviera_core::modify::is_pinned(e);
         if ids
             .iter()
             .any(|i| store.get(*i).is_some_and(|e| !pinned(e)))
         {
-            item(&menu, "element.pin", "Pi&n");
+            item("element.pin", "Pi&n", Element);
         }
         if ids.iter().any(|i| store.get(*i).is_some_and(pinned)) {
-            item(&menu, "element.unpin", "&Unpin");
+            item("element.unpin", "&Unpin", Element);
         }
-        item(&menu, "element.delete", "&Delete");
+        item("element.delete", "&Delete", Element);
+        items.extend(late);
         if let [a, b] = ids[..] {
-            self.quick_booleans(&menu, a, b);
+            items.extend(self.quick_booleans(a, b));
         }
-        Some(menu)
+        Some(QuickMenu { title, items })
     }
 
     /// The booleans of the quick menu for two selected elements, when they overlap.
-    fn quick_booleans(&mut self, menu: &Menu, a: ElementId, b: ElementId) {
-        menu.append_separator();
+    fn quick_booleans(&mut self, a: ElementId, b: ElementId) -> Vec<QuickItem> {
         let found = self.run(
             "overlap.find",
             json!({ "element_ids": [a], "against": [b], "include_accepted": true }),
@@ -313,11 +383,11 @@ impl Gui {
         let overlap: Option<Value> = found
             .ok()
             .and_then(|v| v["overlaps"].as_array()?.first().cloned());
+        let heading = ID_QUICK_FIRST + BOOLEANS.len() as i32;
         let Some(o) = overlap else {
-            let id = ID_QUICK_FIRST + BOOLEANS.len() as i32;
-            menu.append(id, "No overlap to combine", "", ItemKind::Normal);
-            menu.enable_item(id, false);
-            return;
+            let mut none = QuickItem::new("No overlap to combine", heading, QuickGroup::Overlap);
+            none.enabled = false;
+            return vec![none];
         };
         let (a_label, b_label) = (self.element_label(&json!(a)), self.element_label(&json!(b)));
         let volume = o["volume"].as_f64().unwrap_or(0.0);
@@ -334,16 +404,11 @@ impl Gui {
             "Join (by precedence)".to_owned(),
             "Accept the Overlap".to_owned(),
         ];
-        let heading = ID_QUICK_FIRST + BOOLEANS.len() as i32;
-        menu.append(
-            heading,
-            &format!("Overlap of {amount}:"),
-            "",
-            ItemKind::Normal,
-        );
-        menu.enable_item(heading, false);
+        let mut title = QuickItem::new(&format!("Overlap of {amount}:"), heading, QuickGroup::Overlap);
+        title.enabled = false;
+        let mut out = vec![title];
         for (k, label) in labels.iter().enumerate() {
-            menu.append(ID_QUICK_FIRST + k as i32, label, "", ItemKind::Normal);
+            out.push(QuickItem::new(label, ID_QUICK_FIRST + k as i32, QuickGroup::Overlap));
         }
         self.quick_pair = Some(QuickPair {
             a,
@@ -351,6 +416,7 @@ impl Gui {
             a_label,
             b_label,
         });
+        out
     }
 
     /// Whether every one of `ids` is drawn translucent in the active view for now.

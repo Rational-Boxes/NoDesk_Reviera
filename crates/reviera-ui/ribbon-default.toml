@@ -398,6 +398,26 @@ icon = "tab_all"
 help = "Put every view back in one tab group"
 
 [[action]]
+id = "ui.fullscreen.toggle"
+label = "Full Screen"
+icon = "full_screen"
+accel = "F11"
+help = "Full-screen with only the views: push the pointer to the top for the menus and ribbon, to the bottom for the panes (UI-DOCK-004)"
+
+[[action]]
+id = "ui.focus_mode.toggle"
+label = "Focus Mode"
+icon = "focus_mode"
+accel = "Ctrl+Shift+F11"
+help = "Hide all chrome without going full-screen; the edges reveal it as in full-screen (UI-DOCK-004)"
+
+[[action]]
+id = "ui.radial.toggle"
+label = "Radial Menu (Experimental)"
+icon = "radial_menu"
+help = "Middle click opens a ring menu at the pointer instead of the popup quick menu (UI-SEL-007); remembered per user"
+
+[[action]]
 id = "ui.pane.properties"
 label = "Properties"
 icon = "properties"
@@ -2623,6 +2643,9 @@ tools = [
   { action = "ui.pane.browser", size = "small" },
   { action = "ui.pane.model_tree", size = "small" },
   { action = "ui.pane.components", size = "small" },
+  { action = "ui.fullscreen.toggle", size = "large" },
+  { action = "ui.focus_mode.toggle", size = "small" },
+  { action = "ui.radial.toggle", size = "small" },
 ]
 
 [[tab]]
@@ -3083,7 +3106,8 @@ items = ["script.run", "script.import", "ui.scripts.manage", "-"]
 label = "&Window"
 items = [
   "view.create_3d", "window.close", "-", "window.next", "window.previous", "-",
-  "window.tile", "window.tab_all", "-", "ui.pane.properties", "ui.pane.browser", "ui.pane.model_tree", "ui.pane.components",
+  "window.tile", "window.tab_all", "-", "ui.pane.properties", "ui.pane.browser", "ui.pane.model_tree", "ui.pane.components", "-",
+  "ui.fullscreen.toggle", "ui.focus_mode.toggle", "ui.radial.toggle",
 ]
 
 [[menu]]

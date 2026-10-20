@@ -12,6 +12,7 @@
 #include <wx/aui/serializer.h>
 #include <wx/aui/auibar.h>
 #include <wx/bmpbndl.h>
+#include <wx/display.h>
 #include <wx/html/htmlwin.h>
 #include <wx/ribbon/bar.h>
 #include <wx/ribbon/buttonbar.h>
@@ -392,4 +393,60 @@ void reviera_aui_tool_svg(void* toolbar, int id, const char* svg, int size) {
     tb->SetToolBitmap(id, svg_bundle(svg, size));
 }
 
+// Full-screen and focus mode (UI-DOCK-004): the menu bar and status bar hidden and shown again.
+// The menu bar stays attached so its accelerators keep working: on GTK it is a widget that is
+// hidden; on Windows the native menu is taken off the window; on macOS the menu bar belongs to
+// the system and stays.
+void reviera_frame_show_menu_bar(void* frame, int show) {
+    auto* f = static_cast<wxFrame*>(frame);
+    wxMenuBar* mb = f->GetMenuBar();
+    if (!mb) {
+        return;
+    }
+#if defined(__WXGTK__)
+    mb->Show(show != 0);
+    f->SendSizeEvent();
+#elif defined(__WXMSW__)
+    ::SetMenu(static_cast<HWND>(f->GetHWND()), show ? static_cast<HMENU>(mb->GetHMenu()) : nullptr);
+    f->SendSizeEvent();
+#else
+    (void)show;
+#endif
 }
+
+void reviera_frame_show_status_bar(void* frame, int show) {
+    auto* f = static_cast<wxFrame*>(frame);
+    if (wxStatusBar* sb = f->GetStatusBar()) {
+        sb->Show(show != 0);
+        f->SendSizeEvent();
+    }
+}
+
+// The pointer for full-screen edge reveals: its screen position, whether a button is held, the
+// edges it is pushed against (the display in full-screen, else the window) and the top and bottom
+// of the views notebook on screen. out: x, y, held, left, top, right, bottom, views_top,
+// views_bottom.
+void reviera_pointer_state(void* frame, void* views, int* out) {
+    auto* f = static_cast<wxFrame*>(frame);
+    wxMouseState ms = wxGetMouseState();
+    wxRect area = f->GetScreenRect();
+    if (f->IsFullScreen()) {
+        int d = wxDisplay::GetFromWindow(f);
+        if (d != wxNOT_FOUND) {
+            area = wxDisplay(static_cast<unsigned>(d)).GetGeometry();
+        }
+    }
+    wxRect v = static_cast<wxWindow*>(views)->GetScreenRect();
+    out[0] = ms.GetX();
+    out[1] = ms.GetY();
+    out[2] = (ms.LeftIsDown() || ms.MiddleIsDown() || ms.RightIsDown()) ? 1 : 0;
+    out[3] = area.GetLeft();
+    out[4] = area.GetTop();
+    out[5] = area.GetRight();
+    out[6] = area.GetBottom();
+    out[7] = v.GetTop();
+    out[8] = v.GetBottom();
+}
+
+}
+

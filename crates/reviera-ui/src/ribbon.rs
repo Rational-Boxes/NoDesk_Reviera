@@ -27,6 +27,9 @@ pub const DEFAULT: &str = include_str!("../ribbon-default.toml");
 pub const UI_ACTIONS: &[&str] = &[
     "app.exit",
     "ui.model_properties",
+    "ui.fullscreen.toggle",
+    "ui.focus_mode.toggle",
+    "ui.radial.toggle",
     "ui.pane.clash",
     "ui.pane.analytical_checks",
     "ui.pane.results",
@@ -376,7 +379,7 @@ unsafe extern "C" {
 }
 
 /// Whether the chrome is dark (icons are drawn to match).
-fn dark() -> bool {
+pub(crate) fn dark() -> bool {
     wxdragon::appearance::is_system_dark_mode()
 }
 
@@ -403,6 +406,10 @@ pub struct Ribbon {
     /// The page that was active before the contextual tab appeared.
     previous: i32,
     menu_bar: Option<MenuBar>,
+    /// Actions disabled now, for the radial menu (UI-SEL-007).
+    disabled: std::cell::RefCell<std::collections::HashSet<String>>,
+    /// The contextual tab shown now: its label and panels.
+    context_shown: Option<(String, Vec<PanelDef>)>,
 }
 
 impl Ribbon {
@@ -424,6 +431,8 @@ impl Ribbon {
             context_key: None,
             previous: 0,
             menu_bar: None,
+            disabled: Default::default(),
+            context_shown: None,
         };
         for tab in r.catalog.tabs.clone() {
             let page = unsafe { reviera_rb_page(bar, c(&tab.label).as_ptr()) };
@@ -481,6 +490,7 @@ impl Ribbon {
         }
         let was_shown = self.context_key.is_some();
         self.context_key = key;
+        self.context_shown = None;
         let Some((label, category)) = context else {
             // Back to the tab before the selection, unless another was chosen meanwhile.
             unsafe {
@@ -521,6 +531,7 @@ impl Ribbon {
             reviera_rb_set_page_label(self.context_page, c(&format!("Modify | {label}")).as_ptr());
         }
         self.fill(self.context_page, &panels);
+        self.context_shown = Some((format!("Modify | {label}"), panels));
         unsafe {
             reviera_rb_show_page(self.bar, self.context_index, 1, 1);
             reviera_rb_realize(self.bar);
@@ -537,6 +548,12 @@ impl Ribbon {
     /// Enables or disables an action's ribbon buttons and menu items.
     pub fn enable(&self, action: &str, enable: bool) {
         if let Some(id) = self.catalog.id_of(action) {
+            let mut disabled = self.disabled.borrow_mut();
+            if enable {
+                disabled.remove(action);
+            } else {
+                disabled.insert(action.to_owned());
+            }
             unsafe { reviera_rb_enable(id, c_int::from(enable)) }
             if let Some(bar) = &self.menu_bar {
                 bar.enable_item(id, enable);
@@ -547,6 +564,21 @@ impl Ribbon {
     /// The wx id of an action.
     pub fn id_of(&self, action: &str) -> Option<i32> {
         self.catalog.id_of(action)
+    }
+
+    /// Whether an action is enabled now.
+    pub fn enabled(&self, action: &str) -> bool {
+        !self.disabled.borrow().contains(action)
+    }
+
+    /// The catalog the ribbon was built from.
+    pub fn catalog(&self) -> &Catalog {
+        &self.catalog
+    }
+
+    /// The contextual tab shown now: its label and panels.
+    pub fn context_shown(&self) -> Option<(&str, &[PanelDef])> {
+        self.context_shown.as_ref().map(|(l, p)| (l.as_str(), p.as_slice()))
     }
 
     /// The menu bar whose items follow the ribbon's enabled state.
@@ -569,6 +601,12 @@ pub fn quick_access(frame: &Frame, catalog: &Catalog) -> AuiToolBar {
     }
     tb.realize();
     tb
+}
+
+/// Sets an AUI toolbar tool's icon from the icon set.
+pub fn set_tool_icon(tb: &AuiToolBar, id: i32, icon: &str) {
+    let svg = c(&icons::svg(icon, dark()));
+    unsafe { reviera_aui_tool_svg(tb.handle_ptr() as *mut c_void, id, svg.as_ptr(), 16) };
 }
 
 /// Builds the menu bar from the catalog; `submenu` supplies `@name` submenus.

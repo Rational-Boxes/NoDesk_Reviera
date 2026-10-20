@@ -3171,6 +3171,7 @@ dependencies = [
  "reviera-render",
  "reviera-render-wgpu",
  "reviera-store",
+ "serde",
  "serde_json",
  "toml_edit",
  "wxdragon",

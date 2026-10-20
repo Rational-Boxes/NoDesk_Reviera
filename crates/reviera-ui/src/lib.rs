@@ -51,6 +51,8 @@ mod openings;
 mod overlaps;
 mod parts;
 mod path_arrays;
+mod radial;
+mod fullscreen;
 mod plans;
 mod railings;
 mod ramps;
@@ -396,6 +398,14 @@ struct Gui {
     /// The Model Tree pane (UI-TREE-001) and its state.
     model_tree: TreeCtrl,
     tree: inspect::ModelTree,
+    /// Runs a menu id as the menus do (set once the menus are bound).
+    menu_runner: Option<MenuRunner>,
+    /// The open radial menu (UI-SEL-007).
+    radial: Option<radial::RadialMenu>,
+    /// Per-user interface settings (the experimental radial menu, the reveal dwell).
+    ui_settings: radial::UiSettings,
+    /// Full-screen and focus mode (UI-DOCK-004).
+    chrome: fullscreen::Chrome,
 }
 
 impl View {
@@ -516,6 +526,7 @@ impl Gui {
         self.update_sheet_graphics(index);
         self.update_inspection(index);
         self.update_gizmo(index, scale);
+        self.update_hud(index, scale);
         let view = &mut self.views[index];
         if let Some(v) = &mut view.viewport
             && let Err(e) = v.render(&view.camera)
@@ -1442,7 +1453,15 @@ impl Gui {
                 self.tool_prompt(frame);
             }
             Some(_) => self.end_tool(frame),
-            None => self.clear_selection(),
+            // A reveal goes first; with nothing selected, Esc leaves full-screen or focus mode.
+            None if self.chrome.revealed.is_some() => self.reveal(None),
+            None => {
+                if self.chrome.mode != fullscreen::Mode::Off && self.selection().is_empty() {
+                    self.leave_chrome();
+                } else {
+                    self.clear_selection();
+                }
+            }
         }
     }
 
@@ -2921,6 +2940,18 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
             let mut menu = None;
             if let Some((x, y)) = position(&e) {
                 with_view(&gui, id, |g| {
+                    // With the ring open, left and right act on release; a middle press closes
+                    // it (a middle click opens a new one). A press in the view dismisses a
+                    // full-screen reveal.
+                    if g.radial.is_some() {
+                        if button != 1 {
+                            return;
+                        }
+                        g.radial = None;
+                    }
+                    if button == 0 && g.chrome_press() {
+                        return;
+                    }
                     let cube = g.cube_pick(x, y);
                     if button == 2 && cube.is_some() {
                         menu = Some(g.cube_menu());
@@ -2998,7 +3029,23 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
         let handler = move |e: WindowEventData| {
             let (shift, ctrl) = modifiers();
             let mut menu = None;
+            let mut run: Option<(MenuRunner, i32)> = None;
             with_view(&gui, id, |g| {
+                if button == 0 && std::mem::take(&mut g.chrome.swallow_up) {
+                    return;
+                }
+                if g.radial.is_some() && button != 1 {
+                    if let Some((x, y)) = position(&e) {
+                        let chosen = if button == 0 {
+                            g.radial_click(x, y, &p)
+                        } else {
+                            g.radial = None;
+                            None
+                        };
+                        run = chosen.and_then(|i| Some((g.menu_runner.clone()?, i)));
+                    }
+                    return;
+                }
                 let Some(v) = g.active_view_mut() else { return };
                 let drag = v.drag.take();
                 let press = v.press.take();
@@ -3058,7 +3105,9 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                 }
                 // A middle click (a middle drag pans): the quick modify menu.
                 if button == 1 && click {
-                    menu = g.quick_menu(x, y, &p, ctrl);
+                    if !(g.ui_settings.radial_menu && g.open_radial(x, y, &p, ctrl)) {
+                        menu = g.quick_menu(x, y, &p, ctrl);
+                    }
                     return;
                 }
                 if button != 0 || !click {
@@ -3076,6 +3125,9 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
             if let Some(mut menu) = menu {
                 p.popup_menu(&mut menu, None);
             }
+            if let Some((runner, id)) = run {
+                runner(id);
+            }
         };
         match button {
             0 => panel.on_mouse_left_up(handler),
@@ -3089,6 +3141,11 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
             let Some((x, y)) = position(&e) else { return };
             let mut redraw = false;
             with(&gui, |g| {
+                // The radial menu (UI-SEL-007) takes the pointer while open.
+                if g.radial.as_ref().is_some_and(|r| r.view == id) {
+                    redraw = g.radial_motion(x, y, &p);
+                    return;
+                }
                 let Some(v) = g.views.iter().find(|v| v.id == id) else {
                     return;
                 };
@@ -3223,6 +3280,23 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                 _ => (None, false, false),
             };
             let mut used = false;
+            // The radial menu takes arrows, Enter, Backspace and Esc while open.
+            let mut ring: Option<(bool, Option<i32>, Option<MenuRunner>)> = None;
+            if let Some(code) = code {
+                with(&gui, |g| {
+                    if g.radial.is_some() {
+                        let (took, run) = g.radial_key(code, &p);
+                        ring = Some((took, run, g.menu_runner.clone()));
+                    }
+                });
+            }
+            if let Some((true, run, runner)) = ring {
+                p.refresh(false, None);
+                if let (Some(id), Some(runner)) = (run, runner) {
+                    runner(id);
+                }
+                return;
+            }
             match code {
                 // Ctrl+Tab / Ctrl+Shift+Tab switch views (GTK menus cannot bind them).
                 Some(WXK_TAB) if ctrl => {
@@ -3577,6 +3651,10 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 wall_type: None,
                 wall_type_row: None,
                 quick_pair: None,
+                menu_runner: None,
+                radial: None,
+                ui_settings: radial::UiSettings::load(),
+                chrome: fullscreen::Chrome::default(),
                 help: None,
                 script_units: Rc::new(RefCell::new(Default::default())),
                 timer: Some(Timer::new(&frame)),
@@ -3811,7 +3889,11 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 }));
             }
             let dispatch = dispatch.clone();
-            frame.on_menu(move |e| match e.get_id() {
+            let gui_runner = gui.clone();
+            // Menu ids run here, from menus and from the radial menu (UI-SEL-007); false when the
+            // id is not one of ours.
+            let run_id: MenuRunner = Rc::new(move |id| {
+                match id {
                 id if id >= ribbon::ID_ACTION_FIRST => {
                     if let Ok(d) = dispatch.try_borrow()
                         && let Some(d) = d.as_ref()
@@ -3847,7 +3929,6 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 }
                 ID_BROWSER_OPEN | ID_BROWSER_RENAME | ID_BROWSER_DUPLICATE | ID_BROWSER_DELETE
                 | ID_BROWSER_ELEVATION => {
-                    let id = e.get_id();
                     with(&gui, |g| {
                         let Some(view) = g.browser_target.take() else {
                             return;
@@ -3868,7 +3949,15 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                         }
                     });
                 }
-                _ => e.skip(true),
+                _ => return false,
+                }
+                true
+            });
+            gui_runner.borrow_mut().menu_runner = Some(run_id.clone());
+            frame.on_menu(move |e| {
+                if !run_id(e.get_id()) {
+                    e.skip(true);
+                }
             });
         }
 
@@ -3919,6 +4008,8 @@ fn modifiers() -> (bool, bool) {
 
 /// Runs the action of a wx id (ribbon, Quick Access Toolbar and menus share one dispatcher).
 type Dispatch = Box<dyn Fn(i32)>;
+/// Runs a menu id as the frame's menus do; false when the id is not one of ours.
+type MenuRunner = Rc<dyn Fn(i32) -> bool>;
 
 /// The elevation of a level element.
 fn levels_elevation(store: &reviera_core::Store, level: ElementId) -> Option<f64> {
@@ -3952,6 +4043,14 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
     ];
     if sketching && !allowed.iter().any(|p| action.starts_with(p)) {
         return f.set_status_text("Finish ✓ or Cancel ✗ the sketch first", 0);
+    }
+    // A command started from the top reveal hides it (UI-DOCK-004).
+    if !action.starts_with("ui.") {
+        with(gui, |g| {
+            if g.chrome.revealed == Some(fullscreen::Edge::Top) {
+                g.reveal(None);
+            }
+        });
     }
     let focus = |g: &mut Gui| {
         if let Some(v) = g.active_view() {
@@ -4358,6 +4457,25 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "view.set_virtual_volumes" => with(gui, Gui::cycle_virtual_volumes),
         "clearance.set_rule_set" => with(gui, Gui::choose_rule_set),
         "ui.model_properties" => with(gui, Gui::model_properties),
+        // F11 also leaves focus mode (the Exit Full Screen button runs it in either mode).
+        "ui.fullscreen.toggle" => with(gui, |g| {
+            if g.chrome.mode == fullscreen::Mode::Focus {
+                g.leave_chrome();
+            } else {
+                g.toggle_chrome(true);
+            }
+        }),
+        "ui.focus_mode.toggle" => with(gui, |g| g.toggle_chrome(false)),
+        "ui.radial.toggle" => with(gui, |g| {
+            g.ui_settings.radial_menu = !g.ui_settings.radial_menu;
+            g.ui_settings.save();
+            let text = if g.ui_settings.radial_menu {
+                "Radial menu on: middle click opens the ring (experimental)"
+            } else {
+                "Radial menu off: middle click opens the quick menu"
+            };
+            g.frame.set_status_text(text, 0);
+        }),
         "structural_settings.show" => with(gui, Gui::structural_settings),
         "file.close" => with(gui, Gui::close_model),
         "help.home" => with(gui, Gui::show_help),

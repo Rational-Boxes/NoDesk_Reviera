@@ -220,6 +220,8 @@ pub struct WgpuViewport {
     gizmo_uniforms: [(wgpu::Buffer, wgpu::BindGroup); 2],
     /// The gizmo: pixel rectangle, matrices, and vertex buffers (lit, flat).
     gizmo: Option<GizmoGpu>,
+    /// Screen-space geometry over everything (the radial menu).
+    hud: Option<GizmoGpu>,
     /// Plan graphics: clipping range, cut poché and lines (DOC-VIEW-002, interim GPU drawing).
     plan: Option<PlanGpu>,
     line_pipeline: wgpu::RenderPipeline,
@@ -544,6 +546,7 @@ impl WgpuViewport {
             gizmo_pipeline,
             gizmo_uniforms,
             gizmo: None,
+            hud: None,
             plan: None,
             line_pipeline,
             xray_pipeline,
@@ -874,6 +877,16 @@ impl RenderBackend for WgpuViewport {
         });
     }
 
+    fn set_hud(&mut self, hud: Option<reviera_render::Gizmo>) {
+        self.hud = hud.map(|g| GizmoGpu {
+            rect: g.rect,
+            view_proj: g.view_proj,
+            eye: g.eye,
+            lit: None,
+            flat: self.buffer(&plain_vertices(&g.flat, &Default::default())),
+        });
+    }
+
     fn resize(&mut self, width: u32, height: u32) {
         self.resize_target(width, height);
     }
@@ -909,12 +922,14 @@ impl WgpuViewport {
         self.xray = self.buffer(&xray);
     }
 
-    /// Draws the gizmo into its rectangle, over the scene, with a fresh depth buffer.
+    /// Draws the gizmo into its rectangle, over the scene, with a fresh depth buffer; the `last`
+    /// pass resolves into the frame, earlier ones keep the multisampled target for the next.
     fn draw_gizmo(
         &self,
         encoder: &mut wgpu::CommandEncoder,
         view: &wgpu::TextureView,
         g: &GizmoGpu,
+        last: bool,
     ) {
         let (w, h) = (self.size.0 as f32, self.size.1 as f32);
         let [x, y, rw, rh] = g.rect;
@@ -935,17 +950,21 @@ impl WgpuViewport {
             self.queue
                 .write_buffer(&self.gizmo_uniforms[k].0, 0, bytemuck::bytes_of(&u));
         };
-        write(0, g.view_proj, g.eye.extend(1.0).to_array());
+        // Buffer writes all land before the frame's passes run: a pass without lit geometry (the
+        // radial menu) leaves the gizmo's lit uniforms alone. The flat ones are the same for all.
+        if g.lit.is_some() {
+            write(0, g.view_proj, g.eye.extend(1.0).to_array());
+        }
         write(1, glam::Mat4::IDENTITY, [0.0, 0.0, 1.0, 0.0]);
         let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("gizmo"),
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                 view: &self.msaa,
                 depth_slice: None,
-                resolve_target: Some(view),
+                resolve_target: last.then_some(view),
                 ops: wgpu::Operations {
                     load: wgpu::LoadOp::Load,
-                    store: wgpu::StoreOp::Discard,
+                    store: if last { wgpu::StoreOp::Discard } else { wgpu::StoreOp::Store },
                 },
             })],
             depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
@@ -1085,7 +1104,7 @@ impl WgpuViewport {
         let mut encoder = self.device.create_command_encoder(&Default::default());
         {
             // Resolved into the frame here, or after the gizmo pass when there is one.
-            let resolve = self.gizmo.is_none().then_some(&view);
+            let resolve = (self.gizmo.is_none() && self.hud.is_none()).then_some(&view);
             let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("viewport"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
@@ -1159,7 +1178,10 @@ impl WgpuViewport {
             }
         }
         if let Some(g) = &self.gizmo {
-            self.draw_gizmo(&mut encoder, &view, g);
+            self.draw_gizmo(&mut encoder, &view, g, self.hud.is_none());
+        }
+        if let Some(g) = &self.hud {
+            self.draw_gizmo(&mut encoder, &view, g, true);
         }
         self.queue.submit([encoder.finish()]);
         if let Some(f) = frame {

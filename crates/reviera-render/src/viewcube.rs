@@ -377,12 +377,12 @@ type Group = ([f32; 4], Vec<[f32; 3]>, Vec<u32>);
 
 /// Triangles grouped by colour (a scene mesh has one colour).
 #[derive(Default)]
-struct Mesh {
+pub(crate) struct Mesh {
     groups: Vec<Group>,
 }
 
 impl Mesh {
-    fn tri(&mut self, p: [Vec3; 3], color: [f32; 4]) {
+    pub(crate) fn tri(&mut self, p: [Vec3; 3], color: [f32; 4]) {
         let k = match self.groups.iter().position(|g| g.0 == color) {
             Some(k) => k,
             None => {
@@ -396,12 +396,12 @@ impl Mesh {
         indices.extend([base, base + 1, base + 2]);
     }
 
-    fn quad(&mut self, p: [Vec3; 4], color: [f32; 4]) {
+    pub(crate) fn quad(&mut self, p: [Vec3; 4], color: [f32; 4]) {
         self.tri([p[0], p[1], p[2]], color);
         self.tri([p[0], p[2], p[3]], color);
     }
 
-    fn into_scene(self, out: &mut Vec<SceneMesh>) {
+    pub(crate) fn into_scene(self, out: &mut Vec<SceneMesh>) {
         out.extend(
             self.groups
                 .into_iter()
@@ -418,7 +418,7 @@ impl Mesh {
 
 /// Lays out `s` centred at `centre`, reading along `right` with `up` upward, letters `height`
 /// tall, as thin quads (the strokes of [`crate::font`]).
-fn text(
+pub(crate) fn text(
     mesh: &mut Mesh,
     s: &str,
     centre: Vec3,

@@ -328,6 +328,15 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "tab_all" => format!(
             r#"<path d="M4 10h8l2-4h6l2 4h6v18H4z" fill="{f}" {s}/><path d="M4 10h24" {sa}/>"#
         ),
+        "full_screen" => format!(
+            r#"<rect x="7" y="9" width="18" height="14" fill="{f}" {s}/><path d="M4 10V4h6M22 4h6v6M28 22v6h-6M10 28H4v-6" {sa}/>"#
+        ),
+        "focus_mode" => format!(
+            r#"<rect x="4" y="5" width="24" height="22" fill="{f}" {s}/><path d="M4 10h24" {s}/><rect x="9" y="14" width="14" height="9" {sa}/>"#
+        ),
+        "radial_menu" => format!(
+            r#"<circle cx="16" cy="16" r="12" fill="{f}" {s}/><circle cx="16" cy="16" r="4" {s}/><path d="M16 4v8M16 20v8M4 16h8M20 16h8" {s}/><path d="M24.5 7.5l-5.7 5.7" {sa}/>"#
+        ),
         "properties" => format!(
             r#"<rect x="5" y="4" width="22" height="24" fill="{f}" {s}/><path d="M9 10h6M9 16h6M9 22h6" {s}/><path d="M18 10h5M18 16h5M18 22h5" {sa}/>"#
         ),
