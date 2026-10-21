@@ -106,7 +106,7 @@ pub fn friction_factor(re: f64, rel: f64, eq: Equation) -> f64 {
 }
 
 /// Area (m²) and hydraulic diameter (m) of a size.
-fn section(s: &Size) -> (f64, f64) {
+pub(crate) fn section(s: &Size) -> (f64, f64) {
     match s.shape {
         Shape::Round => (std::f64::consts::PI * s.diameter * s.diameter / 4.0, s.diameter),
         _ => (s.width * s.height, 2.0 * s.width * s.height / (s.width + s.height)),
@@ -201,14 +201,44 @@ pub fn parse_fixture_csv(text: &str, unit: &str) -> Result<Vec<[f64; 3]>> {
 // ---- Flows through a system ----
 
 /// Each element's design flow (m³/s) and fixture units beyond it, from the system's equipment.
-struct Flows {
-    flow: HashMap<ElementId, f64>,
-    units: HashMap<ElementId, f64>,
+pub(crate) struct Flows {
+    pub(crate) flow: HashMap<ElementId, f64>,
+    pub(crate) units: HashMap<ElementId, f64>,
     /// Terminals (neither runs nor the equipment) joined to each run element.
-    terminal_of: HashMap<ElementId, ElementId>,
+    pub(crate) terminal_of: HashMap<ElementId, ElementId>,
 }
 
-fn flows(store: &Store, sys: &crate::mep_systems::SystemInfo) -> Result<Flows> {
+impl Flows {
+    /// An element's design flow (m³/s): its fixture units converted by `table` where it has
+    /// any, else the terminals' flows beyond it.
+    pub(crate) fn design(&self, id: ElementId, table: Option<&FixtureTable>, flush_valves: bool) -> f64 {
+        let units = self.units.get(&id).copied().unwrap_or(0.0);
+        match table {
+            Some(t) if units > 0.0 => t.flow(units, flush_valves) / 1000.0,
+            _ => self.flow.get(&id).copied().unwrap_or(0.0),
+        }
+    }
+}
+
+/// The fluid of a system: density (kg/m³) and viscosity (Pa·s).
+pub(crate) fn fluid_of(sys: &crate::mep_systems::SystemInfo, st: &crate::mep_systems::SystemType) -> Result<(f64, f64)> {
+    if sys.classification.is_air() {
+        return Ok(AIR);
+    }
+    match st.fluid.as_deref() {
+        Some(f) if f.eq_ignore_ascii_case("water") => water(st.fluid_temperature.unwrap_or(20.0)),
+        Some(f) => Err(bad("mep_size.fluid", format!("{}: the fluid {f:?} has no property table; only water is built in", sys.name))),
+        None => water(20.0),
+    }
+}
+
+/// The fixture-unit table a domestic water system converts with, if any.
+pub(crate) fn table_of<'a>(sys: &crate::mep_systems::SystemInfo, st: &crate::mep_systems::SystemType, tables: &'a [FixtureTable]) -> Option<&'a FixtureTable> {
+    let domestic = matches!(sys.classification, Classification::DomesticColdWater | Classification::DomesticHotWater);
+    domestic.then(|| tables.iter().find(|t| t.id == st.flow_conversion).or(tables.first())).flatten()
+}
+
+pub(crate) fn flows(store: &Store, sys: &crate::mep_systems::SystemInfo) -> Result<Flows> {
     let rec = store.get(sys.id).and_then(crate::mep_systems::recipe).expect("a system");
     let root = rec
         .equipment
@@ -418,18 +448,10 @@ pub(crate) fn size(txn: &mut Transaction<'_>, p: SizeParams) -> Result<SizeRepor
             return Err(bad("mep_size.sanitary", format!("{}: sanitary and vent pipes are not sized by flow", sys.name)));
         }
         let air = sys.classification.is_air();
-        let fluid = if air {
-            AIR
-        } else {
-            match st.fluid.as_deref() {
-                Some(f) if f.eq_ignore_ascii_case("water") => water(st.fluid_temperature.unwrap_or(20.0))?,
-                Some(f) => return Err(bad("mep_size.fluid", format!("{}: the fluid {f:?} has no property table; only water is built in", sys.name))),
-                None => water(20.0)?,
-            }
-        };
+        let fluid = fluid_of(sys, &st)?;
         let fl = flows(&store, sys)?;
         let domestic = matches!(sys.classification, Classification::DomesticColdWater | Classification::DomesticHotWater);
-        let table = domestic.then(|| tables.iter().find(|t| t.id == st.flow_conversion).or(tables.first())).flatten();
+        let table = table_of(sys, &st, &tables);
         if domestic {
             report.conversion = Some(match table {
                 Some(t) => format!("{} ({}), {} curve", t.name, t.source, if p.flush_valves { "flush valve" } else { "flush tank" }),
@@ -456,10 +478,7 @@ pub(crate) fn size(txn: &mut Transaction<'_>, p: SizeParams) -> Result<SizeRepor
                 continue;
             };
             let units = fl.units.get(&sid).copied().unwrap_or(0.0);
-            let q = match table {
-                Some(t) if units > 0.0 => t.flow(units, p.flush_valves) / 1000.0,
-                _ => fl.flow.get(&sid).copied().unwrap_or(0.0),
-            };
+            let q = fl.design(sid, table, p.flush_valves);
             if q <= 0.0 {
                 report.warnings.push(format!("Segment {} carries no flow (its terminals have none); it is left as it is", sid.0));
                 continue;

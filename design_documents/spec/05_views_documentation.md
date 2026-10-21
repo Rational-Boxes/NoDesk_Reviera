@@ -2219,7 +2219,8 @@ Schedules are tabular views of live model data. Every schedule definition is an 
 - Schedules are RXD-only elements (`rxd:schedules/<guid>`) with the definition in `rxd:schedule`.
 - Fields are computed fields (count, type, level, IFC class and GlobalId, room, insert, wall, slab and roof quantities) or `param:<reference>` for any parameter of the category.
 - The view is a grid tab with a Schedule contextual tab (Fields, Sort, Itemize, Export).
-- Filters, header and footer groups, calculated and combined fields, key schedules, phases and links come later.
+  - `schedule.set_filters(schedule_id, filters[{field, op: equals|not_equals|contains|greater_than|less_than, value}])` (built 2026-10-21): rows show only elements passing every filter; numbers compare by value, text ignoring case; Modify Schedule › **Filter…** sets one. Ducts and Pipes schedules have Size, Length and the kept network results (MEP-CALC-002).
+- Filter groups in the dialog, header and footer groups, calculated and combined fields, key schedules, phases and links come later.
 
 **Acceptance criteria.**
 - [ ] A door schedule lists every door of the schedule's phase and gains a row when a door is placed.

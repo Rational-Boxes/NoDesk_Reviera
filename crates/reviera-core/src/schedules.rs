@@ -75,6 +75,45 @@ pub struct ScheduleDef {
     /// A panel schedule's panel (GlobalId, MEP-ELEC-013).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub panel: Option<String>,
+    /// Rows must pass every filter.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub filters: Vec<Filter>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum FilterOp {
+    Equals,
+    NotEquals,
+    Contains,
+    GreaterThan,
+    LessThan,
+}
+
+/// A schedule filter: a field of the schedule compared with a value (numbers by value, text
+/// ignoring case).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct Filter {
+    pub field: String,
+    pub op: FilterOp,
+    pub value: String,
+}
+
+impl Filter {
+    fn passes(&self, c: &Cell) -> bool {
+        use std::cmp::Ordering;
+        let order = match (c.value, self.value.trim().parse::<f64>()) {
+            (Some(x), Ok(y)) => x.total_cmp(&y),
+            _ => c.text.to_lowercase().cmp(&self.value.to_lowercase()),
+        };
+        match self.op {
+            FilterOp::Equals => order == Ordering::Equal,
+            FilterOp::NotEquals => order != Ordering::Equal,
+            FilterOp::Contains => c.text.to_lowercase().contains(&self.value.to_lowercase()),
+            FilterOp::GreaterThan => order == Ordering::Greater,
+            FilterOp::LessThan => order == Ordering::Less,
+        }
+    }
 }
 
 pub fn is_schedule(e: &Element) -> bool {
@@ -139,6 +178,17 @@ pub fn available_fields(store: &Store, category: &str) -> Vec<FieldInfo> {
             info("roof.area", "Area", true),
             info("roof.volume", "Volume", true),
             info("roof.slope", "Slope", false),
+        ]),
+        // Ducts and pipes with their kept network results (MEP-CALC-002).
+        "cat.ducts" | "cat.pipes" => out.extend([
+            info("mep.size", "Size", false),
+            info("mep.length", "Length", true),
+            info("mep.flow", "Flow", false),
+            info("mep.velocity", "Velocity", false),
+            info("mep.friction", "Friction", false),
+            info("mep.pressure_drop", "Pressure Drop", true),
+            info("mep.network", "Network ID", false),
+            info("mep.critical_path", "Critical Path", false),
         ]),
         // Rebar sets (STR-RBR-018): number, shape, segments A–R, quantity, lengths and mass.
         "cat.structural_rebar" => {
@@ -306,6 +356,38 @@ impl<'a> Context<'a> {
 }
 
 impl Context<'_> {
+    /// Ducts' and pipes' fields: size and length, then the kept network results.
+    fn mep(&self, e: &Element, key: &str) -> Cell {
+        let Some(s) = crate::mep_runs::segment_recipe(e) else {
+            return Context::text("");
+        };
+        let kept = |f: &str| crate::mep_network::kept_value(e, f);
+        let number = |f: &str, unit: &str, places: usize| match kept(f).and_then(Value::as_f64) {
+            Some(v) => Cell { text: format!("{v:.places$} {unit}"), value: Some(v), editable: false },
+            None => Context::text(""),
+        };
+        match key {
+            "mep.size" => Context::text(s.size.text()),
+            "mep.length" => {
+                let d: f64 = (0..3).map(|i| (s.end[i] - s.start[i]).powi(2)).sum::<f64>().sqrt();
+                self.fmt(d, "length")
+            }
+            "mep.flow" => number("flow", "m³/s", 4),
+            "mep.velocity" => number("velocity", "m/s", 2),
+            "mep.friction" => number("friction", "Pa/m", 2),
+            "mep.pressure_drop" => number("loss", "Pa", 1),
+            "mep.network" => match kept("network_id").and_then(Value::as_u64) {
+                Some(n) => Cell { text: n.to_string(), value: Some(n as f64), editable: false },
+                None => Context::text(""),
+            },
+            "mep.critical_path" => match kept("critical").and_then(Value::as_bool) {
+                Some(c) => Context::text(if c { "Yes" } else { "No" }),
+                None => Context::text(""),
+            },
+            _ => Context::text(""),
+        }
+    }
+
     fn fmt(&self, v: f64, data_type: &str) -> Cell {
         Cell {
             text: crate::units::format(v, data_type, &self.settings, None)
@@ -425,6 +507,7 @@ impl Context<'_> {
                     _ => none(),
                 }
             }
+            k if k.starts_with("mep.") => self.mep(e, k),
             k if k.starts_with("rebar.") => match self.rebar.get(&e.id()) {
                 Some(i) => match crate::rebar_docs::field(self.store, i, k) {
                     Some((text, value)) => Cell {
@@ -530,6 +613,7 @@ pub fn table(
         .collect();
     let mut rows: Vec<Row> = elements
         .iter()
+        .filter(|e| def.filters.iter().all(|f| f.passes(&cx.cell(e, &f.field))))
         .map(|e| Row {
             elements: vec![e.id()],
             cells: def.fields.iter().map(|f| cx.cell(e, &f.key)).collect(),
@@ -774,6 +858,7 @@ pub(crate) fn create(txn: &mut crate::txn::Transaction<'_>, p: CreateParams) -> 
         itemize: true,
         grand_totals: true,
         panel: None,
+        filters: Vec::new(),
     };
     let guid = GlobalId::new();
     txn.create(
@@ -852,6 +937,26 @@ pub(crate) fn set_sort(txn: &mut crate::txn::Transaction<'_>, p: SetSortParams) 
     if let Some(g) = p.grand_totals {
         def.grand_totals = g;
     }
+    write(txn, id, &def)
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SetFiltersParams {
+    pub schedule_id: ElementRef,
+    /// Every filter must pass; none: every element.
+    pub filters: Vec<Filter>,
+}
+
+/// Sets a schedule's filters (fields of its category, shown or not).
+pub(crate) fn set_filters(txn: &mut crate::txn::Transaction<'_>, p: SetFiltersParams) -> Result<()> {
+    let store = txn.store().clone();
+    let (id, mut def) = resolve(&store, &p.schedule_id)?;
+    let known = available_fields(&store, &def.category);
+    if let Some(f) = p.filters.iter().find(|f| !known.iter().any(|k| k.key == f.field)) {
+        return Err(Error::new("schedule.unknown_field", format!("`{}` is not a field of {}", f.field, def.category)));
+    }
+    def.filters = p.filters;
     write(txn, id, &def)
 }
 

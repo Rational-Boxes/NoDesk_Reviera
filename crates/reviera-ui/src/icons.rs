@@ -352,6 +352,18 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "mep_size" => format!(
             r#"<path d="M3 12h12v8H3zM15 13h8v6h-8z" fill="{f}" {s}/><path d="M26 6v20M23 9l3-3 3 3M23 23l3 3 3-3" {sa}/>"#
         ),
+        "schedule_filter" => format!(
+            r#"<path d="M4 5h24l-9 11v9l-6 3V16z" fill="{f}" {s}/><path d="M22 22h7M22 26h5" {sa}/>"#
+        ),
+        "mep_network" => format!(
+            r#"<path d="M3 8h10v6H3zM13 10h8l4 4v12" fill="none" {s}/><circle cx="25" cy="27" r="2" fill="{f}" {s}/><path d="M6 20c3-3 5 3 8 0s5 3 8 0" fill="none" {sa}/>"#
+        ),
+        "analytical_segments" => format!(
+            r#"<path d="M3 16h8M21 16h8" stroke-width="3" {s}/><path d="M11 16h10" stroke-width="3" {sa}/><circle cx="11" cy="16" r="2" fill="{f}" {s}/><circle cx="21" cy="16" r="2" fill="{f}" {s}/><path d="M13 9h6M16 6v6" {sa}/>"#
+        ),
+        "pressure_report" => format!(
+            r#"<path d="M6 3h14l6 6v20H6z" fill="{f}" {s}/><path d="M20 3v6h6" fill="none" {s}/><path d="M10 24l4-6 4 3 5-8" fill="none" {sa}/>"#
+        ),
         "fixture_units" => format!(
             r#"<path d="M6 6h14v6a7 7 0 0 1-14 0z" fill="{f}" {s}/><path d="M13 19v8M8 27h10" {s}/><path d="M23 10h6M23 16h6M23 22h6" {sa}/>"#
         ),

@@ -321,6 +321,43 @@ impl Gui {
         self.refresh_schedules();
     }
 
+    /// Modify Schedule › Filter: show only rows whose field compares with a value (one filter
+    /// here; `schedule.set_filters` takes several).
+    pub(crate) fn schedule_filter(&mut self) {
+        let frame = self.frame;
+        let Some((id, def)) = self.active_schedule() else {
+            return frame.set_status_text("Open a schedule to filter it", 0);
+        };
+        let Ok(list) = self.run("schedule.fields", json!({ "category": def.category })) else {
+            return;
+        };
+        let fields: Vec<schedules::FieldInfo> = serde_json::from_value(list).unwrap_or_default();
+        let mut names = vec!["(none: every element)".to_owned()];
+        names.extend(fields.iter().map(|f| f.name.clone()));
+        let current = def.filters.first();
+        let at = current.and_then(|c| fields.iter().position(|f| f.key == c.field)).map_or(0, |k| k + 1);
+        let ops = [("equals", "equals"), ("not_equals", "does not equal"), ("contains", "contains"), ("greater_than", "is greater than"), ("less_than", "is less than")];
+        let op_at = current.and_then(|c| ops.iter().position(|o| serde_json::to_value(c.op).ok().and_then(|v| v.as_str().map(|s| s == o.0)).unwrap_or(false))).unwrap_or(0);
+        let f = super::reinforcement_ui::Form::new(&frame, "Schedule Filter");
+        let field = f.choice("Field", &names, at);
+        let op = f.choice("Condition", &ops.iter().map(|o| o.1.to_owned()).collect::<Vec<_>>(), op_at);
+        let value = f.text("Value", current.map_or("", |c| c.value.as_str()), "Numbers compare by value, text ignoring case");
+        let ok = f.show("Rows show only the elements that pass.", "OK");
+        let (k, o, v) = (field.get_selection().map_or(0, |k| k as usize), op.get_selection().map_or(0, |k| k as usize).min(4), value.get_value());
+        f.dialog.destroy();
+        if !ok {
+            return;
+        }
+        let filters = match k.checked_sub(1).and_then(|k| fields.get(k)) {
+            Some(fd) => json!([{ "field": fd.key, "op": ops[o].0, "value": v }]),
+            None => json!([]),
+        };
+        if let Err(e) = self.run("schedule.set_filters", json!({ "schedule_id": id, "filters": filters })) {
+            return error(&frame, &format!("The filter was not changed:\n{e}"));
+        }
+        self.refresh_schedules();
+    }
+
     /// Modify Schedule › Itemize: one row per element, or one per group of the sorted values.
     pub(crate) fn schedule_itemize(&mut self) {
         let Some((id, def)) = self.active_schedule() else {

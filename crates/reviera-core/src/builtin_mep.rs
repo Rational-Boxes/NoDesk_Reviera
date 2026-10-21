@@ -141,6 +141,12 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(ConductorAmpacitySet),
         registry.add(WiringSet),
         registry.add(MepSize),
+        registry.add(MepNetworkCalculate),
+        registry.add(AnalyticalSegmentList),
+        registry.add(AnalyticalSegmentOverride),
+        registry.add(MepSettingsSetFrictionEquation),
+        registry.add(PressureLossReportExport),
+        registry.add(PressureLossReportSavePreset),
         registry.add(MepPenetrations),
         registry.add(GutterCreate),
         registry.add(GutterSet),
@@ -1082,6 +1088,72 @@ edit_command!(
     crate::mep_sizing::SizeParams,
     crate::mep_sizing::SizeReport,
     crate::mep_sizing::size
+);
+
+edit_command!(
+    MepNetworkCalculate,
+    "mep_network.calculate",
+    "Calculate pressure drop",
+    "Calculates a duct or pipe system's network (`system_id`; every duct and pipe system when omitted, refusals then being warnings) from its equipment (MEP-CALC-002): each segment's and fitting's design flow, velocity, friction (Darcy–Weisbach; `equation` colebrook or haaland, the project's setting by default) and loss (segments by friction over their length, fittings by Reviera's coefficients of the velocity pressure, taps by the branch coefficient, terminals by their connector's coefficient or specific loss; overrides win), the critical path to the terminal with the highest loss, static pressures and terminals' excess pressure. Systems whose type calculates Flow Only get flows and velocities without losses. The results are kept on the system and its elements until their inputs change (then stale). Returns each system's critical loss and how many analytical segments it has.",
+    "Calculate Network",
+    crate::mep_network::CalculateParams,
+    crate::mep_network::CalculateReport,
+    crate::mep_network::calculate
+);
+
+read_command!(
+    AnalyticalSegmentList,
+    "analytical_segment.list",
+    "A system's analytical segments",
+    "The kept network results of a system (MEP-CALC-002): its analytical segments (one per segment and fitting: network id, size, flow m³/s, velocity m/s, length, friction Pa/m, coefficient, loss Pa, static pressure Pa, critical, overridden, branches), terminals (own and path loss, excess pressure), the critical path from the equipment, the critical loss and total flow, and `stale` when the model has changed since it was calculated. Refused when never calculated.",
+    crate::mep_network::ListParams,
+    crate::mep_network::NetworkResult,
+    crate::mep_network::list
+);
+
+edit_command!(
+    AnalyticalSegmentOverride,
+    "analytical_segment.override",
+    "Override a segment's loss",
+    "Gives a duct or pipe segment or fitting a measured or given `loss` (Pa), or a fitting a `coefficient`, in place of the calculated one; `clear` removes them (MEP-CALC-002). The network's results become stale until it is calculated again; reports mark it overridden.",
+    "Override Loss",
+    crate::mep_network::OverrideParams,
+    (),
+    crate::mep_network::set_override
+);
+
+edit_command!(
+    MepSettingsSetFrictionEquation,
+    "mep_settings.set_friction_equation",
+    "Set the friction equation",
+    "Sets the project's friction equation for network calculations: colebrook (default) or haaland (MEP-CALC-002).",
+    "Friction Equation",
+    crate::mep_network::EquationParams,
+    (),
+    crate::mep_network::set_equation
+);
+
+edit_command!(
+    PressureLossReportExport,
+    "pressure_loss_report.export",
+    "Write a pressure loss report",
+    "Writes the pressure loss report of `system_ids` to `path` as `format` csv (SI base units, a header naming them; one row per segment, fitting, total and critical-path step) or html (the project's units) (MEP-CALC-004). `settings`: a `preset_id`, or `sections` (project, system, total, segments, fittings, critical_path; all by default), `without_fittings`, `without_critical_path`. Only systems whose type calculates All, with equipment, are reported; stale or missing results are calculated first (an undoable change). `overwrite` to replace a file.",
+    "Pressure Loss Report",
+    [Effect::Edit, Effect::FileWrite],
+    crate::mep_network::ReportParams,
+    crate::mep_network::ReportResult,
+    crate::mep_network::export_report
+);
+
+edit_command!(
+    PressureLossReportSavePreset,
+    "pressure_loss_report.save_preset",
+    "Save pressure loss report settings",
+    "Saves report settings (sections, without_fittings, without_critical_path) as a named preset in the MEP settings, so a team uses one format (MEP-CALC-004). Returns its id.",
+    "Report Preset",
+    crate::mep_network::PresetParams,
+    String,
+    crate::mep_network::save_preset
 );
 
 edit_command!(

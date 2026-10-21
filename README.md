@@ -919,6 +919,21 @@ schedules, circuit paths, cable sizing and voltage drop.
   or Haaland, air at 20 °C and water by temperature; domestic water by the sum of fixture units
   converted with your imported fixture-unit table (`mep.size`, `mep_run.lock_size`,
   `fixture_unit_method.set`).
+- **Pressure drop and analytical segments** (Analyze › Pressure Drop): each duct and pipe system
+  calculated from its equipment: every segment's and fitting's flow, velocity, friction and loss
+  (friction over the length; Reviera's provisional fitting coefficients by elbow angle, straight
+  or branch flow and area ratio; terminals' connector coefficient or specific loss), static
+  pressures, the critical path to the terminal with the highest loss and each terminal's excess
+  pressure. Results are kept on the model and marked stale when anything they depend on changes;
+  losses and fitting coefficients can be overridden; Ducts and Pipes schedules show Flow,
+  Velocity, Friction, Pressure Drop, Network ID and Critical Path, and schedules can be filtered;
+  flows and velocities go to the IFC ports (`mep_network.calculate`, `analytical_segment.list`,
+  `analytical_segment.override`, `mep_settings.set_friction_equation`, `schedule.set_filters`).
+- **Pressure loss report** (Analyze › Reports & Schedules): the chosen systems (whose type
+  calculates All) as CSV in SI units or HTML in project units: system information, total loss,
+  segment and fitting detail with overridden losses marked, and the critical path; stale results
+  are calculated first; settings saved as team presets (`pressure_loss_report.export`,
+  `pressure_loss_report.save_preset`).
 - **Panel schedules** (Analyze › Reports & Schedules, or Systems › Electrical): a live schedule of
   a panel, under *Panel Schedules* in the Project Browser: the header (panel, distribution system,
   supply, slots), every slot in order with the circuit's number, load name, classification, trip,
@@ -1251,7 +1266,7 @@ area by area (reviewed against the spec on 2026-10-15).
 - **Coordination**: clash tests (COL-CLASH), automatic pipe and duct penetrations (MEP-PEN-001),
   bathroom fixture clear floor spaces and turning spaces, ISO 21542.
 - **Documentation**: crop regions, jogged sections, interior elevation markers, opening a view
-  from its marker; schedule filters, grouping and calculated fields; title block families,
+  from its marker; schedule filters in the Filter dialog beyond one condition (several are taken by `schedule.set_filters`), grouping and calculated fields; title block families,
   revisions and sheet collections; tags and text in sections and on sheets; the current NBIMS-US
   COBie layout and a COBie settings dialog.
 - **Interface**: general shape tools; a macOS build (the script is written, not yet run on a
@@ -1276,7 +1291,7 @@ area by area (reviewed against the spec on 2026-10-15).
   connection groups, composite decks and span symbols, truss families (a layout shared by types),
   further rebar (two-point, varying sets beyond bars through walls, bent fabric), bilinear and two-way area loads, panel results and external analysis providers.
 - **MEP** (in development): duct and pipe fittings placed and edited in the view, the fitting controls and grips, surface connectors for conduit, moving runs, flex duct,
-  wires, panel schedule templates and editing (moves, spares, rebalancing), the two-column layout, custom circuit naming, switch systems, the Edit Path tool, Static Regain and pressure-drop reports, a built-in fixture-unit curve
+  wires, panel schedule templates and editing (moves, spares, rebalancing), the two-column layout, custom circuit naming, switch systems, the Edit Path tool, Static Regain, the System Inspector, background network calculation, a built-in fixture-unit curve
   and calculations, the System Browser's
   zones, columns and search, the System Editor, placing connectors on faces in a component editor, fabrication, P&ID and spaces
   and zones are specified but not built.

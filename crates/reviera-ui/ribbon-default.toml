@@ -863,6 +863,12 @@ icon = "fields"
 help = "Choose the schedule's columns"
 
 [[action]]
+id = "schedule.edit_filter"
+label = "Filter..."
+icon = "schedule_filter"
+help = "Show only the rows whose field compares with a value"
+
+[[action]]
 id = "schedule.edit_sort"
 label = "Sort..."
 icon = "sort"
@@ -2384,6 +2390,24 @@ icon = "mep_size"
 help = "Size the selection's ducts or pipes from their flow: Equal Friction, Friction or Velocity, restrictions and branch rules (MEP-CALC-001)"
 
 [[action]]
+id = "mep_network.calculate"
+label = "Calculate Networks"
+icon = "mep_network"
+help = "Calculate pressure drop in every duct and pipe system from its equipment: flows, velocities, friction, fitting losses and the critical path (MEP-CALC-002)"
+
+[[action]]
+id = "analytical_segment.list"
+label = "Analytical Segments"
+icon = "analytical_segments"
+help = "A system's analytical segments: flow, velocity, friction, loss, static pressure and the critical path; select them, override a loss, recalculate (MEP-CALC-002)"
+
+[[action]]
+id = "pressure_loss_report.export"
+label = "Pressure Loss Report"
+icon = "pressure_report"
+help = "Write a duct or pipe system's pressure losses by section, segment and fitting, with its critical path, as CSV or HTML (MEP-CALC-004)"
+
+[[action]]
 id = "fixture_unit_method.set"
 label = "Fixture-Unit Table"
 icon = "fixture_units"
@@ -2858,8 +2882,19 @@ label = "Sizing"
 tools = [{ action = "mep.size", size = "large" }]
 
 [[tab.panel]]
+label = "Pressure Drop"
+tools = [
+  { action = "mep_network.calculate", size = "large" },
+  { action = "analytical_segment.list", size = "small" },
+  { action = "pressure_loss_report.export", size = "small" },
+]
+
+[[tab.panel]]
 label = "Reports & Schedules"
-tools = [{ action = "panel_schedule.create", size = "large" }]
+tools = [
+  { action = "panel_schedule.create", size = "large" },
+  { action = "pressure_loss_report.export", size = "large" },
+]
 
 [[tab.panel]]
 label = "Remote Analysis"
@@ -3328,6 +3363,7 @@ label = "Schedule"
 panels = [{ label = "Schedule", tools = [
   { action = "schedule.edit_fields", size = "large" },
   { action = "schedule.edit_sort", size = "large" },
+  { action = "schedule.edit_filter", size = "large" },
   { action = "schedule.itemize", size = "large" },
   { action = "schedule.export", size = "large" },
 ] }]

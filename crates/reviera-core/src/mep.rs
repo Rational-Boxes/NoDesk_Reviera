@@ -316,6 +316,10 @@ pub struct Connector {
     pub flow_factor: f64,
     #[serde(default)]
     pub loss_method: LossMethod,
+    /// The loss through it: a coefficient (Coefficient, of the velocity pressure at the
+    /// connector) or a pressure drop in Pa (Specific Loss).
+    #[serde(default)]
+    pub loss: f64,
     #[serde(default)]
     pub utility: bool,
     #[serde(default)]
@@ -355,6 +359,8 @@ pub struct ConnectorParams {
     pub flow: Option<f64>,
     pub flow_factor: Option<f64>,
     pub loss_method: Option<LossMethod>,
+    /// A coefficient (Coefficient) or Pa (Specific Loss).
+    pub loss: Option<f64>,
     pub utility: Option<bool>,
     pub fixture_units: Option<f64>,
     pub connection_type: Option<String>,
@@ -387,7 +393,7 @@ impl ConnectorParams {
         macro_rules! take {
             ($($f:ident),*) => { $( if let Some(v) = &self.$f { c.$f = v.clone(); } )* };
         }
-        take!(name, domain, origin, shape, diameter, width, height, flow_direction, flow_config, flow, flow_factor, loss_method, utility, fixture_units, connection_type, surface);
+        take!(name, domain, origin, shape, diameter, width, height, flow_direction, flow_config, flow, flow_factor, loss_method, loss, utility, fixture_units, connection_type, surface);
         if let Some(d) = self.direction {
             c.direction = d;
         }
@@ -436,6 +442,9 @@ pub fn validate(mut c: Connector) -> Result<Connector> {
     }
     if c.domain == Domain::Pipe && c.shape != Shape::Round {
         return Err(bad("connector.shape", "pipe connectors are round"));
+    }
+    if !(c.loss.is_finite() && c.loss >= 0.0) {
+        return Err(bad("connector.loss", "a loss is a number of zero or more"));
     }
     match c.domain {
         Domain::Duct | Domain::Pipe => {
@@ -496,6 +505,7 @@ pub(crate) fn new_connector(domain: Domain) -> Connector {
         flow: 0.0,
         flow_factor: 0.0,
         loss_method: LossMethod::NotDefined,
+        loss: 0.0,
         utility: false,
         fixture_units: 0.0,
         connection_type: String::new(),
@@ -1062,7 +1072,7 @@ pub(crate) fn set(txn: &mut Transaction<'_>, p: SetParams) -> Result<()> {
     macro_rules! merge {
         ($($f:ident),*) => { $( if p.params.$f.is_some() { entry.$f = p.params.$f.clone(); } )* };
     }
-    merge!(classification, flow_direction, flow_config, flow, flow_factor, loss_method, utility, fixture_units, electrical);
+    merge!(classification, flow_direction, flow_config, flow, flow_factor, loss_method, loss, utility, fixture_units, electrical);
     let mut check = base;
     entry.apply(&mut check);
     validate(check)?;

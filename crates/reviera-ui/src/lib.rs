@@ -58,6 +58,7 @@ mod terminal_ui;
 mod mep_electrical_ui;
 mod mep_cables_ui;
 mod mep_sizing_ui;
+mod mep_network_ui;
 mod mep_gutters_ui;
 mod mep_loads_ui;
 mod mep_runs_ui;
@@ -4531,6 +4532,9 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "panel.set_supply" => with(gui, Gui::select_supply),
         "circuit.properties" => with(gui, Gui::circuit_properties),
         "mep.size" => with(gui, Gui::size_runs),
+        "mep_network.calculate" => with(gui, Gui::calculate_networks),
+        "analytical_segment.list" => with(gui, Gui::analytical_segments),
+        "pressure_loss_report.export" => with(gui, Gui::pressure_loss_report),
         "mep.penetrations" => with(gui, Gui::penetrations),
         "fixture_unit_method.set" => with(gui, Gui::import_fixture_table),
         "wiring.settings" => with(gui, Gui::wiring_settings),
@@ -4625,6 +4629,7 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "sheet.open_view" => with(gui, Gui::open_sheet_view),
         "schedule.edit_fields" => with(gui, Gui::schedule_fields),
         "schedule.edit_sort" => with(gui, Gui::schedule_sort),
+        "schedule.edit_filter" => with(gui, Gui::schedule_filter),
         "schedule.itemize" => with(gui, Gui::schedule_itemize),
         "schedule.export" => with(gui, Gui::export_schedule),
         "export.cobie" => with(gui, Gui::export_cobie),

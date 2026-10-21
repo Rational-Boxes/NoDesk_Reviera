@@ -243,21 +243,35 @@ pub(crate) fn write_mep(
         }
         pset(ifc, owner_history, port, "Pset_DistributionPortCommon", &common)?;
         let len = |v: f64| typed("IfcPositiveLengthMeasure", AttrValue::Real(v / scale));
+        // The kept network results of segments and fittings (MEP-CALC-002), in SI units.
+        let kept = store.get(p.element).map(|el| {
+            let v = |f: &str| reviera_core::mep_network::kept_value(el, f).and_then(serde_json::Value::as_f64);
+            (v("flow"), v("velocity"))
+        });
+        let mut results = Vec::new();
+        if let Some((flow, velocity)) = kept {
+            if let Some(q) = flow {
+                results.push(("VolumetricFlowRate", typed("IfcVolumetricFlowRateMeasure", AttrValue::Real(q))));
+            }
+            if let Some(v) = velocity {
+                results.push(("Velocity", typed("IfcLinearVelocityMeasure", AttrValue::Real(v))));
+            }
+        }
         match (p.connector.domain, p.connector.shape) {
             (Domain::Duct, mep::Shape::Round) => {
-                pset(ifc, owner_history, port, "Pset_DistributionPortTypeDuct", &[("NominalDiameterOrWidth", len(p.connector.diameter))])?;
+                let mut props = vec![("NominalDiameterOrWidth", len(p.connector.diameter))];
+                props.extend(results);
+                pset(ifc, owner_history, port, "Pset_DistributionPortTypeDuct", &props)?;
             }
             (Domain::Duct, _) => {
-                pset(
-                    ifc,
-                    owner_history,
-                    port,
-                    "Pset_DistributionPortTypeDuct",
-                    &[("NominalDiameterOrWidth", len(p.connector.width)), ("NominalHeight", len(p.connector.height))],
-                )?;
+                let mut props = vec![("NominalDiameterOrWidth", len(p.connector.width)), ("NominalHeight", len(p.connector.height))];
+                props.extend(results);
+                pset(ifc, owner_history, port, "Pset_DistributionPortTypeDuct", &props)?;
             }
             (Domain::Pipe, _) => {
-                pset(ifc, owner_history, port, "Pset_DistributionPortTypePipe", &[("NominalDiameter", len(p.connector.diameter))])?;
+                let mut props = vec![("NominalDiameter", len(p.connector.diameter))];
+                props.extend(results);
+                pset(ifc, owner_history, port, "Pset_DistributionPortTypePipe", &props)?;
             }
             _ => {}
         }

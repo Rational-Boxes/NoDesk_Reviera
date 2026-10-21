@@ -104,6 +104,7 @@ pub const UI_ACTIONS: &[&str] = &[
     "sheet.open_view",
     "schedule.edit_fields",
     "schedule.edit_sort",
+    "schedule.edit_filter",
     "schedule.itemize",
     "sketch.overhang",
     "view.create_ceiling_plan",

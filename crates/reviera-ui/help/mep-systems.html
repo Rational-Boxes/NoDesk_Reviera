@@ -17,6 +17,7 @@ Water 1. The tools are on the <b>Systems</b> tab.</p>
   <a href="#schedules">Panel schedules</a>
   <a href="#loads">Load classifications and demand factors</a>
   <a href="#sizing-ducts">Sizing ducts and pipes</a>
+  <a href="#pressure">Pressure drop and the loss report</a>
   <a href="#gutters">Gutters and downspouts</a>
   <a href="#penetrations">Openings for runs</a>
   <a href="#types">System types</a>
@@ -195,6 +196,30 @@ with your code's fixture-unit table. Import it as a CSV of <code>fixture_units, 
 flow_valve</code> rows under Manage › MEP Settings › <a
 href="reviera:action/fixture_unit_method.set">Fixture-Unit Table</a>. Reviera does not yet ship a
 table. Without one, the connectors' own flows are added up and the report says so.</p>
+
+<h2 id="pressure">Pressure drop and the loss report</h2>
+<p><a href="reviera:action/mep_network.calculate">Calculate Networks</a> (Analyze › Pressure Drop)
+works out the pressure lost in every duct and pipe system, counting from its equipment. Segments
+lose friction along their length. Fittings lose a share of the velocity pressure: more for a
+sharp elbow than a gentle one, and more for flow turning into a branch than for flow going
+straight through. Terminals lose what their connector's <i>loss</i> says, either a coefficient or
+a fixed pressure drop in Pa. The <b>critical path</b> is the route to the terminal that loses the
+most, and the equipment has to supply that much pressure. Every other terminal has some
+<b>excess pressure</b> left over.</p>
+<p><a href="reviera:action/analytical_segment.list">Analytical Segments</a> shows one row per
+segment and fitting, in flow order. Each row gives the flow, velocity, friction, loss, static
+pressure and whether it is on the critical path. <b>Select Critical Path</b> selects the whole
+route. <b>Override Loss…</b> replaces a calculated loss with a measured one, or a fitting's
+coefficient with your own. Reviera keeps the results with the model. Change anything they depend
+on and they become stale, then they are calculated again the next time you open the table. The
+Ducts and Pipes schedules can show Flow, Velocity, Friction, Pressure Drop and Critical Path.
+Schedules also have a <b>Filter…</b> button, for example to list only the critical path.</p>
+<p><a href="reviera:action/pressure_loss_report.export">Pressure Loss Report</a> (Analyze ›
+Reports &amp; Schedules) writes a file for the systems you tick. It can be CSV, in SI units, or
+HTML, in the project's units. Only systems whose type has <i>Calculations</i> set to All can be
+reported, and the dialog says why any other system can't. Choose the sections you want and save
+them as a preset so the team uses the same format. Overridden losses are marked in the report.
+Reviera's fitting coefficients are provisional values awaiting review by an engineer.</p>
 
 <h2 id="gutters">Gutters and downspouts</h2>
 <p>Select a roof and choose <a href="reviera:action/gutter.create">Gutter</a> (Systems › HVAC &amp;

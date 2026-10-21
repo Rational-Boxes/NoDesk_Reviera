@@ -114,6 +114,7 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(CobieSetSettings),
         registry.add(ScheduleSetFields),
         registry.add(ScheduleSetSort),
+        registry.add(ScheduleSetFilters),
         registry.add(ScheduleSetCell),
         registry.add(ScheduleFields),
         registry.add(SheetCreate),
@@ -2339,6 +2340,16 @@ modify_command!(
     crate::schedules::SetSortParams,
     (),
     crate::schedules::set_sort
+);
+modify_command!(
+    ScheduleSetFilters,
+    "schedule.set_filters",
+    "Set a schedule's filters",
+    "Sets a schedule's filters: rows show only elements whose `field` (a field of the schedule's category) is equals, not_equals, contains, greater_than or less_than `value` (numbers by value, text ignoring case); every filter must pass. An empty list removes them.",
+    "Schedule Filters",
+    crate::schedules::SetFiltersParams,
+    (),
+    crate::schedules::set_filters
 );
 modify_command!(
     ScheduleSetCell,

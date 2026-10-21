@@ -94,6 +94,10 @@ pub struct MepSettings {
     pub fixture_unit_tables: Vec<crate::mep_sizing::FixtureTable>,
     /// Penetration rules (MEP-PEN-001) the user set; defaults otherwise.
     pub penetration_rules: Vec<crate::mep_penetrations::Rule>,
+    /// The friction equation of network calculations (MEP-CALC-002).
+    pub friction_equation: crate::mep_sizing::Equation,
+    /// Pressure loss report presets (MEP-CALC-004).
+    pub report_presets: Vec<crate::mep_network::ReportPreset>,
 }
 
 fn slug(c: Classification) -> String {
