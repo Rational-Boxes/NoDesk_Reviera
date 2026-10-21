@@ -1451,8 +1451,49 @@ fn starters() -> Vec<Starter> {
             color: white,
             connectors: vec![power("Power", [0.0, 0.0, 0.08], up, D::In, 230.0, 1, 36.0, "Lighting")],
         },
-        // Control devices (MEP-DUCT-012): their insertion point at the back, against the wall,
-        // facing +y; a controls connector at the back.
+        // More plumbing fixtures (MEP-PIPE-006): connectors at the back (+y, against a wall) or
+        // below; fixture units as for the lavatory and water closet.
+        Starter {
+            name: "Kitchen Sink",
+            category: C::PlumbingFixture,
+            size: [0.8, 0.55, 0.9],
+            color: white,
+            connectors: vec![
+                pipe("Cold", [-0.08, 0.27, 0.6], [0.0, 1.0, 0.0], K::DomesticColdWater, D::In, 0.015, 1.5),
+                pipe("Hot", [0.08, 0.27, 0.6], [0.0, 1.0, 0.0], K::DomesticHotWater, D::In, 0.015, 1.5),
+                pipe("Waste", [0.0, 0.27, 0.45], [0.0, 1.0, 0.0], K::Sanitary, D::Out, 0.05, 2.0),
+            ],
+        },
+        Starter {
+            name: "Shower",
+            category: C::PlumbingFixture,
+            size: [0.9, 0.9, 0.1],
+            color: white,
+            connectors: vec![
+                pipe("Cold", [-0.08, 0.45, 1.0], [0.0, 1.0, 0.0], K::DomesticColdWater, D::In, 0.015, 2.0),
+                pipe("Hot", [0.08, 0.45, 1.0], [0.0, 1.0, 0.0], K::DomesticHotWater, D::In, 0.015, 2.0),
+                pipe("Waste", [0.0, 0.0, 0.0], down, K::Sanitary, D::Out, 0.05, 2.0),
+            ],
+        },
+        Starter {
+            name: "Urinal",
+            category: C::PlumbingFixture,
+            size: [0.4, 0.35, 0.65],
+            color: white,
+            connectors: vec![
+                pipe("Cold", [0.0, 0.17, 0.6], [0.0, 1.0, 0.0], K::DomesticColdWater, D::In, 0.015, 2.0),
+                pipe("Waste", [0.0, 0.17, 0.1], [0.0, 1.0, 0.0], K::Sanitary, D::Out, 0.05, 2.0),
+            ],
+        },
+        Starter {
+            name: "Floor Drain",
+            category: C::WasteTerminal,
+            size: [0.15, 0.15, 0.08],
+            color: grey,
+            connectors: vec![pipe("Waste", [0.0, 0.0, 0.0], down, K::Sanitary, D::Out, 0.075, 2.0)],
+        },
+        // Control devices (MEP-DUCT-012): their back (+y, as fixtures') against the wall; a
+        // controls connector at the back.
         Starter { name: "Thermostat", category: C::ControlElement, size: [0.08, 0.025, 0.12], color: white, connectors: vec![controls([0.0, 0.0, 0.06])] },
         Starter { name: "Humidistat", category: C::ControlElement, size: [0.08, 0.025, 0.12], color: white, connectors: vec![controls([0.0, 0.0, 0.06])] },
         Starter { name: "Temperature Sensor", category: C::Sensor, size: [0.07, 0.025, 0.07], color: white, connectors: vec![controls([0.0, 0.0, 0.035])] },
@@ -1479,7 +1520,7 @@ fn controls(origin: V3) -> Connector {
     Connector {
         name: "Controls".into(),
         origin,
-        direction: [0.0, -1.0, 0.0],
+        direction: [0.0, 1.0, 0.0],
         flow_direction: FlowDirection::In,
         electrical: Some(Electrical {
             system: ElectricalSystem::Controls,
@@ -1505,6 +1546,12 @@ fn starter_predefined(name: &str) -> Option<&'static str> {
         "Pressure Sensor" => "PRESSURESENSOR",
         "DDC Controller" => "PROGRAMMABLE",
         "VAV Box" => "VARIABLEFLOWPRESSUREDEPENDANT",
+        "Lavatory" => "WASHHANDBASIN",
+        "Water Closet" => "TOILETPAN",
+        "Kitchen Sink" => "SINK",
+        "Shower" => "SHOWER",
+        "Urinal" => "URINAL",
+        "Floor Drain" => "FLOORTRAP",
         _ => return None,
     })
 }

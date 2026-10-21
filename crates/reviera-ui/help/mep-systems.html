@@ -16,6 +16,7 @@ Water 1. The tools are on the <b>Systems</b> tab.</p>
   <a href="#sizing">Cable sizing and voltage drop</a>
   <a href="#schedules">Panel schedules</a>
   <a href="#loads">Load classifications and demand factors</a>
+  <a href="#fixtures">Plumbing fixtures</a>
   <a href="#accessories">Pipe fittings, valves and accessories</a>
   <a href="#slopes">Sloped pipes and parallel pipes</a>
   <a href="#controls">Thermostats, sensors and controllers</a>
@@ -185,6 +186,14 @@ as <code>from-to: percent</code>, separated by semicolons, for example
 of the load that falls in it, so 25 kVA becomes 10 + 7.5 = 17.5 kVA. Without it, the whole load
 takes the percentage of its range. The <b>largest motor rule</b> weights motor loads, largest
 first (for example 125, 100, 75).</p>
+
+<h2 id="fixtures">Plumbing fixtures</h2>
+<p><a href="reviera:action/plumbing_fixture.place">Plumbing Fixture</a> (<kbd>P</kbd> <kbd>X</kbd>)
+places basins, WCs, sinks, showers, urinals and floor drains. Click near a wall and the fixture
+goes against it, with its pipe connections at the back. It moves with the wall, and if the wall is
+deleted it stays where it was. To make a system, select the fixtures and choose Create System. A
+fixture that has no connector for the chosen system (a WC in a hot water system, say) is left
+out, and Reviera tells you which ones.</p>
 
 <h2 id="accessories">Pipe fittings, valves and accessories</h2>
 <p><a href="reviera:action/pipe_fitting.place">Pipe Fitting</a> (<kbd>P</kbd> <kbd>F</kbd>) places an

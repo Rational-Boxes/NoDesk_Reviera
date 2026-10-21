@@ -933,6 +933,12 @@ schedules, circuit paths, cable sizing and voltage drop.
   Velocity, Friction, Pressure Drop, Network ID and Critical Path, and schedules can be filtered;
   flows and velocities go to the IFC ports (`mep_network.calculate`, `analytical_segment.list`,
   `analytical_segment.override`, `mep_settings.set_friction_equation`, `schedule.set_filters`).
+- **Plumbing fixtures** (Systems › HVAC & Piping › Plumbing Fixture `PX`): basins, WCs, sinks,
+  showers, urinals and floor drains placed against the nearest wall (following it; left in place
+  with a warning if it is deleted) or on the work plane, as `IfcSanitaryTerminal` and
+  `IfcWasteTerminal` of their types; Create System leaves out fixtures without a connector of
+  the system's classification and lists them (`plumbing_fixture.place`,
+  `system.create(skip_incompatible)`).
 - **Pipe fittings and accessories** (Systems › HVAC & Piping › Pipe Fitting `PF`, Pipe Accessory
   `PA`, Change Tee to Cross): elbows, tees, crosses, couplings and caps on pipe ends or along
   pipes (elbows only on ends); gate, ball, butterfly, globe, check, pressure-reducing and relief

@@ -1082,13 +1082,22 @@ impl Gui {
             Source::Fragment { .. } => unreachable!("placed above"),
         }
         // Control devices go on the nearest wall face, at their mounting height (MEP-DUCT-012).
-        let device = match &t.source {
-            Source::Type(ty) => self.store_now().and_then(|s| s.get(*ty).and_then(mesh_objects::mesh_object_type)).is_some_and(|ty| ty.category.is_control_device()),
-            _ => false,
+        // Plumbing fixtures too (MEP-PIPE-006).
+        let hosted = match &t.source {
+            Source::Type(ty) => self.store_now().and_then(|s| s.get(*ty).and_then(mesh_objects::mesh_object_type)).and_then(|ty| {
+                if ty.category.is_control_device() {
+                    Some("mech_control_device.place")
+                } else if ty.category.is_plumbing_fixture() {
+                    Some("plumbing_fixture.place")
+                } else {
+                    None
+                }
+            }),
+            _ => None,
         };
-        if device && let Source::Type(ty) = &t.source {
+        if let (Some(command), Source::Type(ty)) = (hosted, &t.source) {
             let args = json!({ "type_id": ty, "point": p, "level": level, "offset": height + t.offset, "rotation": t.rotation });
-            match self.run("mech_control_device.place", args) {
+            match self.run(command, args) {
                 Ok(_) => {
                     self.refresh_scene(&frame);
                     self.properties_stale = true;

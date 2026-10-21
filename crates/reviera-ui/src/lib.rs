@@ -4569,6 +4569,7 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "mep.size" => with(gui, Gui::size_runs),
         "mep_run.create_riser" => with(gui, Gui::create_riser),
         "mech_control_device.place" => with(gui, Gui::place_control_device),
+        "plumbing_fixture.place" => with(gui, Gui::place_plumbing_fixture),
         "mech_control_device.assign" => with(gui, Gui::assign_controlled),
         "mep_run.bind_riser" => with(gui, Gui::bind_riser),
         "mep_network.calculate" => with(gui, Gui::calculate_networks),

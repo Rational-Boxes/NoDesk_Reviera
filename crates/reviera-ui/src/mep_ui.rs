@@ -297,13 +297,27 @@ impl Gui {
     /// controller type and its mounting height; each click puts one on the nearest wall face (or
     /// on the work plane away from walls).
     pub(crate) fn place_control_device(&mut self) {
+        let names = ["Thermostat", "Humidistat", "Temperature Sensor", "CO2 Sensor", "Humidity Sensor", "Occupancy Sensor", "Pressure Sensor", "DDC Controller"];
+        self.place_wall_component(reviera_core::mesh_objects::Category::is_control_device, &names, "Mechanical Control Device", 1500.0);
+    }
+
+    /// Systems › Plumbing & Piping › Plumbing Fixture (`PX`, MEP-PIPE-006): a fixture type and its
+    /// height; each click puts one against the nearest wall face (or on the work plane).
+    pub(crate) fn place_plumbing_fixture(&mut self) {
+        let names = ["Lavatory", "Water Closet", "Kitchen Sink", "Shower", "Urinal", "Floor Drain"];
+        self.place_wall_component(reviera_core::mesh_objects::Category::is_plumbing_fixture, &names, "Plumbing Fixture", 0.0);
+    }
+
+    /// A type of the categories `accepts` and a height, then the Place Component tool (clicks
+    /// near a wall go on its face).
+    fn place_wall_component(&mut self, accepts: fn(reviera_core::mesh_objects::Category) -> bool, starters: &[&str], title: &str, default_mm: f64) {
         let frame = self.frame;
         let devices = |store: &reviera_core::Store| -> Vec<(ElementId, String)> {
             let mut v: Vec<(ElementId, String)> = store
                 .iter()
                 .filter_map(|e| {
                     let t = reviera_core::mesh_objects::mesh_object_type(e)?;
-                    t.category.is_control_device().then(|| (e.id(), format!("{} ({})", e.name.clone().unwrap_or_default(), t.category.label())))
+                    accepts(t.category).then(|| (e.id(), format!("{} ({})", e.name.clone().unwrap_or_default(), t.category.label())))
                 })
                 .collect();
             v.sort_by(|a, b| a.1.cmp(&b.1));
@@ -314,20 +328,19 @@ impl Gui {
         };
         let mut types = devices(&store);
         if types.is_empty() {
-            let names = ["Thermostat", "Humidistat", "Temperature Sensor", "CO2 Sensor", "Humidity Sensor", "Occupancy Sensor", "Pressure Sensor", "DDC Controller"];
-            if let Err(e) = self.run("mep_type.load_starters", json!({ "names": names })) {
+            if let Err(e) = self.run("mep_type.load_starters", json!({ "names": starters })) {
                 return error(&frame, &e);
             }
             let Some(store) = self.store_now() else { return };
             types = devices(&store);
         }
-        let f = super::reinforcement_ui::Form::new(&frame, "Mechanical Control Device");
+        let f = super::reinforcement_ui::Form::new(&frame, title);
         let names: Vec<String> = types.iter().map(|t| t.1.clone()).collect();
         let ty = f.choice("Type", &names, 0);
-        let height = f.text("Mounting height (mm)", "1500", "Above the level");
+        let height = f.text("Mounting height (mm)", &format!("{default_mm:.0}"), "Above the level");
         let ok = f.show("Click near a wall to put it on that face (it follows the wall); away from walls it stands on the work plane. Spacebar turns it there.", "Place");
         let k = ty.get_selection().map_or(0, |k| k as usize);
-        let h = height.get_value().trim().replace(',', ".").parse::<f64>().unwrap_or(1500.0) / 1000.0;
+        let h = height.get_value().trim().replace(',', ".").parse::<f64>().unwrap_or(default_mm) / 1000.0;
         f.dialog.destroy();
         let Some((id, label)) = types.get(k).cloned().filter(|_| ok) else { return };
         let name = label.split(" (").next().unwrap_or(&label).to_owned();
@@ -440,20 +453,24 @@ impl Gui {
         let n = name.get_value();
         f.dialog.destroy();
         let kind = if t.classification.is_air() { "duct" } else { "piping" };
-        let mut args = json!({ "kind": kind, "element_ids": ids, "system_type_id": t.id });
+        // Elements without a connector of the type's classification are left out and listed.
+        let mut args = json!({ "kind": kind, "element_ids": ids, "system_type_id": t.id, "skip_incompatible": true });
         if !n.trim().is_empty() {
             args["name"] = json!(n.trim());
         }
-        match self.run("system.create", args) {
-            Ok(v) => {
+        match self.app.execute("system.create", args, &reviera_core::Caller::user()) {
+            Ok(o) => {
                 let name = self
                     .store_now()
-                    .and_then(|s| s.get(ElementId(v.as_u64().unwrap_or(0))).and_then(|e| e.name.clone()))
+                    .and_then(|s| s.get(ElementId(o.result.as_u64().unwrap_or(0))).and_then(|e| e.name.clone()))
                     .unwrap_or_default();
                 self.refresh_scene(&frame);
-                frame.set_status_text(&format!("Made the system {name}: Select Equipment sets what serves it"), 0);
+                match o.warnings.iter().find(|w| w.id == "system.skipped") {
+                    Some(w) => error(&frame, &format!("Made the system {name}.\n\n{}", w.message)),
+                    None => frame.set_status_text(&format!("Made the system {name}: Select Equipment sets what serves it"), 0),
+                }
             }
-            Err(e) => error(&frame, &format!("No system was made:\n{e}")),
+            Err(e) => error(&frame, &format!("No system was made:\n{}", e.message)),
         }
     }
 

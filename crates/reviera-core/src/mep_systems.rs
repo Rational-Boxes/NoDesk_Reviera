@@ -579,6 +579,10 @@ pub struct CreateParams {
     /// classification's built-in type when omitted.
     pub system_type_id: Option<String>,
     pub name: Option<String>,
+    /// Leave out members without a free connector of the system's classification (listed in a
+    /// warning) instead of refusing.
+    #[serde(default)]
+    pub skip_incompatible: bool,
 }
 
 /// Makes a system of elements (`system.create`).
@@ -603,6 +607,23 @@ pub(crate) fn create(txn: &mut Transaction<'_>, p: CreateParams) -> Result<Eleme
         }
     };
     kind_fits(p.kind, t.classification)?;
+    let members = if p.skip_incompatible {
+        let (keep, skip): (Vec<ElementId>, Vec<ElementId>) = members.iter().partition(|id| member_ports(&store, &[**id], t.classification, None).is_ok());
+        if !skip.is_empty() {
+            let names: Vec<String> = skip.iter().map(|id| element_label(&store, *id)).collect();
+            txn.warn(crate::txn::Warning {
+                id: "system.skipped".into(),
+                message: format!("Left out, with no free {} connector: {}", t.classification.label(), names.join(", ")),
+                element_ids: skip.clone(),
+            });
+        }
+        if keep.is_empty() {
+            return Err(bad("system.incompatible", format!("none of the elements has a free {} connector", t.classification.label())));
+        }
+        keep
+    } else {
+        members
+    };
     let ports = member_ports(&store, &members, t.classification, None)?;
     let name = match &p.name {
         Some(n) => {

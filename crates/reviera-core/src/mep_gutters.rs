@@ -562,7 +562,7 @@ pub(crate) fn add_outlet(txn: &mut Transaction<'_>, p: OutletParams) -> Result<O
             members.extend(downspout.iter().map(|e| ElementRef::Id(*e)));
             crate::mep_systems::create(
                 txn,
-                crate::mep_systems::CreateParams { kind: crate::mep_systems::SystemKind::Piping, element_ids: members, system_type_id: Some("storm_drainage".into()), name: None },
+                crate::mep_systems::CreateParams { kind: crate::mep_systems::SystemKind::Piping, element_ids: members, system_type_id: Some("storm_drainage".into()), name: None, skip_incompatible: false },
             )?
         }
     };

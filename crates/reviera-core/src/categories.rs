@@ -435,6 +435,14 @@ pub const CATEGORIES: &[Category] = &[
         true,
     ),
     cat(
+        "cat.waste_terminals",
+        "Waste Terminals",
+        Some("IfcWasteTerminal"),
+        Some("IfcWasteTerminalType"),
+        Some("Pset_WasteTerminalTypeCommon"),
+        true,
+    ),
+    cat(
         "cat.duct_fittings",
         "Duct Fittings",
         Some("IfcDuctFitting"),

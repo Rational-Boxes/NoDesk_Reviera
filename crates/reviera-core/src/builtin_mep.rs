@@ -149,6 +149,7 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(MepSettingsSetSlopes),
         registry.add(MepSettingsSlopes),
         registry.add(MechControlDevicePlace),
+        registry.add(PlumbingFixturePlace),
         registry.add(MechControlDeviceAssign),
         registry.add(MechControlDeviceList),
         registry.add(MepRunCreateRiser),
@@ -1113,6 +1114,17 @@ edit_command!(
     crate::mep_controls::PlaceParams,
     crate::ElementId,
     crate::mep_controls::place
+);
+
+edit_command!(
+    PlumbingFixturePlace,
+    "plumbing_fixture.place",
+    "Place a plumbing fixture",
+    "Places a plumbing fixture or waste terminal (a component type of the Plumbing Fixture or Waste Terminal category: basins, WCs, sinks, showers, urinals, floor drains) at `point` on `level`, `offset` above it (0 by default) (MEP-PIPE-006): on the face of `host_wall` (`side`), or of the nearest wall face within 300 mm, its back (+y, where its connectors are) against the face; it then follows the wall, and stays where it is with a warning if the wall is deleted. With `work_plane`, or no wall near, free (`rotation`). Returns its id.",
+    "Place Plumbing Fixture",
+    crate::mep_controls::PlaceParams,
+    crate::ElementId,
+    crate::mep_controls::place_fixture
 );
 
 edit_command!(

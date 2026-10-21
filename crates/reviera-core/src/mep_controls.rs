@@ -2,7 +2,8 @@
 // Copyright (C) 2026 Reviera contributors
 
 //! Mechanical control devices (MEP-DUCT-012): thermostats, humidistats, sensors and controllers,
-//! components of the Mechanical Control Device, Sensor and Controller categories.
+//! components of the Mechanical Control Device, Sensor and Controller categories; and the same
+//! wall-face placement for plumbing fixtures (MEP-PIPE-006).
 //!
 //! - **Placing**: on a wall's face (given, or the nearest within 300 mm of the point), at a
 //!   mounting height above the level; the device then follows the face as the wall moves or
@@ -67,10 +68,10 @@ pub struct PlaceParams {
     /// In plan (metres): on a wall, where along it and which side.
     pub point: [f64; 2],
     pub level: ElementRef,
-    /// Mounting height above the level (metres; 1.5 by default).
-    #[serde(default = "mounting")]
+    /// Mounting height above the level (metres; 1.5 for control devices, 0 for fixtures by
+    /// default).
     #[schemars(extend("x-reviera-data-type" = "length"))]
-    pub offset: f64,
+    pub offset: Option<f64>,
     /// Off a wall: counter-clockwise turn.
     #[serde(default)]
     #[schemars(extend("x-reviera-data-type" = "angle"))]
@@ -86,10 +87,6 @@ pub struct PlaceParams {
     /// Elements it controls.
     #[serde(default)]
     pub controlled_ids: Vec<ElementRef>,
-}
-
-fn mounting() -> f64 {
-    1.5
 }
 
 /// The face of `wall` nearest `p`, with its distance: (side, along, distance from the face).
@@ -108,12 +105,27 @@ fn face_of(store: &Store, wall: &Element, p: [f64; 2]) -> Option<(f64, f64, f64)
 
 /// `mech_control_device.place`.
 pub(crate) fn place(txn: &mut Transaction<'_>, p: PlaceParams) -> Result<ElementId> {
+    place_hosted(txn, p, mesh_objects::Category::is_control_device, "mech_control_device.not_a_device", "a control device", 1.5)
+}
+
+/// `plumbing_fixture.place` (MEP-PIPE-006): a plumbing fixture or waste terminal on a wall face
+/// (following it) or the work plane, as control devices are placed.
+pub(crate) fn place_fixture(txn: &mut Transaction<'_>, p: PlaceParams) -> Result<ElementId> {
+    if !p.controlled_ids.is_empty() {
+        return Err(bad("plumbing_fixture.controlled", "fixtures control nothing"));
+    }
+    place_hosted(txn, p, mesh_objects::Category::is_plumbing_fixture, "plumbing_fixture.not_a_fixture", "a plumbing fixture", 0.0)
+}
+
+/// Places a copy of a type the check accepts, on the nearest wall face or the work plane.
+fn place_hosted(txn: &mut Transaction<'_>, p: PlaceParams, accepts: fn(mesh_objects::Category) -> bool, code: &'static str, what: &str, height: f64) -> Result<ElementId> {
     let store = txn.store().clone();
     let type_id = store.resolve(&p.type_id).ok_or_else(|| bad("element.not_found", "no such type"))?;
     let ty = store.get(type_id).and_then(mesh_objects::mesh_object_type).ok_or_else(|| bad("mesh_object.not_a_type", format!("element {type_id} is not a component type")))?;
-    if !ty.category.is_control_device() {
-        return Err(bad("mech_control_device.not_a_device", format!("{} is a {}, not a control device", store.get(type_id).and_then(|e| e.name.clone()).unwrap_or_default(), ty.category.label())));
+    if !accepts(ty.category) {
+        return Err(bad(code, format!("{} is a {}, not {what}", store.get(type_id).and_then(|e| e.name.clone()).unwrap_or_default(), ty.category.label())));
     }
+    let offset = p.offset.unwrap_or(height);
     // The wall face: given, or the nearest within reach.
     let face = if p.work_plane {
         None
@@ -139,7 +151,7 @@ pub(crate) fn place(txn: &mut Transaction<'_>, p: PlaceParams) -> Result<Element
                 .map(|(w, side, along, _)| FaceHost { wall: w.guid().to_string(), side, along }),
         }
     };
-    let args = serde_json::json!({ "type_id": type_id.0, "point": p.point, "level": p.level, "offset": p.offset, "rotation": p.rotation });
+    let args = serde_json::json!({ "type_id": type_id.0, "point": p.point, "level": p.level, "offset": offset, "rotation": p.rotation });
     let id = mesh_objects::place(txn, serde_json::from_value(args).map_err(|e| bad("mech_control_device.params", e.to_string()))?)?;
     if let Some(f) = face {
         let mut r = mesh_objects::mesh_object_recipe(txn.store().get(id).expect("placed")).expect("a copy");
@@ -256,7 +268,7 @@ pub(crate) fn release(txn: &mut Transaction<'_>, deleted: &std::collections::BTr
             x.params.insert(crate::walls::RECIPE_KEY.into(), v);
         })?;
         txn.warn(Warning {
-            id: "mech_control_device.unhosted".into(),
+            id: "mep.unhosted".into(),
             message: format!("{} lost its host wall; it stays where it was, unhosted", g.ty.category.label()),
             element_ids: vec![e.id()],
         });

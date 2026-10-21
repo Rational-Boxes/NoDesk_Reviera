@@ -65,10 +65,12 @@ pub enum Category {
     Controller,
     /// VAV and constant-volume boxes.
     AirTerminalBox,
+    /// Floor drains and gullies (MEP-PIPE-006).
+    WasteTerminal,
 }
 
 impl Category {
-    pub const ALL: [Category; 16] = [
+    pub const ALL: [Category; 17] = [
         Category::GenericModel,
         Category::Furniture,
         Category::Column,
@@ -85,6 +87,7 @@ impl Category {
         Category::Sensor,
         Category::Controller,
         Category::AirTerminalBox,
+        Category::WasteTerminal,
     ];
 
     pub fn label(self) -> &'static str {
@@ -105,6 +108,7 @@ impl Category {
             Category::Sensor => "Sensor",
             Category::Controller => "Controller",
             Category::AirTerminalBox => "Air Terminal Box",
+            Category::WasteTerminal => "Waste Terminal",
         }
     }
 
@@ -127,6 +131,7 @@ impl Category {
             Category::Sensor => "IfcSensor",
             Category::Controller => "IfcController",
             Category::AirTerminalBox => "IfcAirTerminalBox",
+            Category::WasteTerminal => "IfcWasteTerminal",
         }
     }
 
@@ -149,7 +154,13 @@ impl Category {
             Category::Sensor => "IfcSensorType",
             Category::Controller => "IfcControllerType",
             Category::AirTerminalBox => "IfcAirTerminalBoxType",
+            Category::WasteTerminal => "IfcWasteTerminalType",
         }
+    }
+
+    /// Plumbing fixtures and waste terminals (MEP-PIPE-006).
+    pub fn is_plumbing_fixture(self) -> bool {
+        matches!(self, Category::PlumbingFixture | Category::WasteTerminal)
     }
 
     /// Control devices: thermostats, humidistats, sensors and controllers (MEP-DUCT-012).
@@ -360,7 +371,7 @@ pub struct FaceHost {
 }
 
 /// A face-hosted copy's point and rotation from its wall as it is now, if the wall is there:
-/// on the face, its back to the wall (local −y toward the wall).
+/// on the face, its back to the wall (local +y toward the wall, as fixtures' connectors are).
 pub fn face_point(store: &Store, f: &FaceHost) -> Option<([f64; 2], f64)> {
     let w = store.find_by_guid(&GlobalId::parse(&f.wall)?).and_then(|id| store.get(id))?;
     let g = crate::walls::regenerate(store, w).ok()?;
@@ -370,9 +381,9 @@ pub fn face_point(store: &Store, f: &FaceHost) -> Option<([f64; 2], f64)> {
         g.start[0] + d[0] * f.along + n[0] * s * g.width / 2.0,
         g.start[1] + d[1] * f.along + n[1] * s * g.width / 2.0,
     ];
-    // Facing away from the wall: local +y along the face's outward normal.
+    // Facing away from the wall: local +y toward it, against the face's outward normal.
     let out = [n[0] * s, n[1] * s];
-    Some((at, out[1].atan2(out[0]) - std::f64::consts::FRAC_PI_2))
+    Some((at, out[1].atan2(out[0]) + std::f64::consts::FRAC_PI_2))
 }
 
 /// Re-reads a face-hosted copy's place along its wall from its point (after a move), keeping the
@@ -805,8 +816,9 @@ pub fn regenerate(store: &Store, e: &Element) -> Result<MeshObjectGeometry> {
     let (point, rotation) = match r.face.as_ref().and_then(|f| face_point(store, f)) {
         // Its back against the face: a generated box is centred on its insertion point.
         Some((at, rot)) => {
+            // Out from the face: against local +y.
             let half = ty.size[1] * ty.scale * r.scale / 2.0;
-            ([at[0] - rot.sin() * half, at[1] + rot.cos() * half], rot)
+            ([at[0] + rot.sin() * half, at[1] - rot.cos() * half], rot)
         }
         None => (r.point, r.rotation),
     };

@@ -2296,6 +2296,13 @@ keys = "PL"
 help = "Draw a pipe run, optionally sloped: elbows at corners, a tee where it ends on a pipe (MEP-PIPE-001)"
 
 [[action]]
+id = "plumbing_fixture.place"
+label = "Plumbing Fixture"
+icon = "plumbing_fixture"
+keys = "PX"
+help = "Place basins, WCs, sinks, showers, urinals and floor drains: near a wall they go on its face, their connectors against it, and follow it (MEP-PIPE-006)"
+
+[[action]]
 id = "mech_control_device.place"
 label = "Mechanical Control Device"
 icon = "thermostat"
@@ -2836,6 +2843,7 @@ tools = [
   { action = "duct.cap_open_ends", size = "small" },
   { action = "mep_run.create_riser", size = "small" },
   { action = "mep_run.bind_riser", size = "small" },
+  { action = "plumbing_fixture.place", size = "small" },
   { action = "pipe_fitting.place", size = "small" },
   { action = "pipe_accessory.place", size = "small" },
   { action = "mep_fitting.tee_to_cross", size = "small" },

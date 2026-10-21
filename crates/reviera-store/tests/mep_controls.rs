@@ -49,10 +49,10 @@ fn a_thermostat_on_a_wall_controls_a_vav_box() {
     assert_eq!(face.side, -1.0);
     let at = |doc: &Document| regenerate(doc.store(), doc.store().get(th).unwrap()).unwrap().placement;
     let p = at(&doc);
-    // Its back on the face (half its 25 mm depth out from it), 1.5 m up, facing away (−y).
+    // Its back (+y) on the face (half its 25 mm depth out from it), 1.5 m up, facing away (−y).
     assert!((p.origin[0] - 2.0).abs() < 1e-9 && (p.origin[1] + width / 2.0 + 0.0125).abs() < 1e-9, "{:?}", p.origin);
     assert!((p.origin[2] - z0 - 1.5).abs() < 1e-9);
-    assert!((p.rotation.abs() - std::f64::consts::PI).abs() < 1e-9, "{}", p.rotation);
+    assert!(p.rotation.abs() < 1e-9, "{}", p.rotation);
     // The wall moves 1 m: the thermostat with it.
     ok(&r, &mut doc, "element.move", json!({ "element_ids": [wall.0], "vector": [0.0, 1.0, 0.0] }));
     assert!((at(&doc).origin[1] - (1.0 - width / 2.0 - 0.0125)).abs() < 1e-9, "{:?}", at(&doc).origin);
@@ -98,7 +98,7 @@ fn a_thermostat_on_a_wall_controls_a_vav_box() {
     // The wall deleted: the thermostat stays where it was, unhosted, with a warning.
     let before = at(&doc);
     let out = run(&r, &mut doc, "element.delete", json!({ "element_ids": [wall.0] })).unwrap();
-    assert!(out.warnings.iter().any(|w| w.id == "mech_control_device.unhosted"), "{:?}", out.warnings);
+    assert!(out.warnings.iter().any(|w| w.id == "mep.unhosted"), "{:?}", out.warnings);
     assert!(doc.store().get(th).is_some());
     assert!(mesh_object_recipe(doc.store().get(th).unwrap()).unwrap().face.is_none());
     let after = at(&doc);
