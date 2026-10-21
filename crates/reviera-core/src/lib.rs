@@ -60,6 +60,7 @@ pub mod mep_runs;
 pub mod mep_electrical;
 pub mod mep_cables;
 pub mod mep_loads;
+pub mod mep_sizing;
 pub mod mep_panel_schedule;
 pub mod mep_systems;
 pub mod model_lines;

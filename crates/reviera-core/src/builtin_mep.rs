@@ -140,6 +140,10 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(CableTypeCreate),
         registry.add(ConductorAmpacitySet),
         registry.add(WiringSet),
+        registry.add(MepSize),
+        registry.add(MepRunLockSize),
+        registry.add(FixtureUnitMethodSet),
+        registry.add(FixtureUnitMethodEvaluate),
         registry.add(CableTrayCreate),
         registry.add(ConduitCreate),
         registry.add(CableTraySplit),
@@ -1061,4 +1065,47 @@ edit_command!(
     crate::mep_cables::WiringParams,
     (),
     crate::mep_cables::set_wiring
+);
+
+edit_command!(
+    MepSize,
+    "mep.size",
+    "Size ducts or pipes",
+    "Sizes the segments of a system (`system_id`) or those given (`element_ids`) from their design flow, summed from the terminals beyond each one, walking from the system's equipment (MEP-CALC-001, MEP-PIPE-005): `method` equal_friction (default; `targets.friction` 1 Pa/m for ducts, 300 Pa/m for pipes), friction, velocity (`targets.velocity`, 8 m/s for ducts, 1.5 m/s for pipes) or friction_velocity with `combine` and/or; the smallest size of the segment type's sizing table meeting them, within `restrict` {height, width, inner_diameter} (restrictions win, with a warning; rectangles keep an aspect ratio up to 4); `branch_rule` calculated_only, match_connector or larger_of for branches to terminals; `equation` colebrook or haaland. Domestic water converts the fixture units beyond each segment with the fixture-unit table (`flush_valves` for the flush-valve curve). Air at 20 °C; water by the system type's temperature. Size-locked segments are skipped; sanitary and vent systems are refused. Returns the report.",
+    "Size",
+    crate::mep_sizing::SizeParams,
+    crate::mep_sizing::SizeReport,
+    crate::mep_sizing::size
+);
+
+edit_command!(
+    MepRunLockSize,
+    "mep_run.lock_size",
+    "Lock segments' sizes",
+    "Size-locks (`locked` true) or unlocks segments: sizing leaves locked ones as they are and lists them as skipped (MEP-CALC-001). Returns how many changed.",
+    "Lock Size",
+    crate::mep_sizing::LockParams,
+    usize,
+    crate::mep_sizing::lock_size
+);
+
+edit_command!(
+    FixtureUnitMethodSet,
+    "fixture_unit_method.set",
+    "Import a fixture-unit table",
+    "Imports a fixture-unit table (MEP-PIPE-005): `name`, `source` (code and edition), `csv` with rows `fixture_units, flow_tank, flow_valve` ascending (a header line is skipped; a row out of order is refused naming its line), in `unit` l/s or gpm; for `system_types` (domestic water type ids), else as the default. Domestic water sizing converts the fixture units beyond each segment with it. Reviera ships none. Returns its id.",
+    "Fixture-Unit Table",
+    crate::mep_sizing::FixtureTableParams,
+    String,
+    crate::mep_sizing::set_fixture_table
+);
+
+read_command!(
+    FixtureUnitMethodEvaluate,
+    "fixture_unit_method.evaluate",
+    "Convert fixture units to flow",
+    "The flow (l/s) of a `fixture_units` total by a table (`table_id`, the default when omitted), on the flush-tank or (`flush_valves`) flush-valve curve, interpolated.",
+    crate::mep_sizing::EvaluateFixtureParams,
+    f64,
+    crate::mep_sizing::evaluate_fixture
 );

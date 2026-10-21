@@ -901,6 +901,12 @@ schedules, circuit paths, cable sizing and voltage drop.
   physical conductor data (resistivity, areas) but no ampacities, which you enter under Manage ›
   MEP Settings › Wiring (`circuit.properties`, `circuit.size_cable`, `circuit.set_path`,
   `cable_type.create`, `conductor_size.create`, `conductor_ampacity.set`, `wiring.set`).
+- **Duct and pipe sizing** (Analyze › Sizing): segments sized from the flow beyond them, walked
+  from the system's equipment, by Equal Friction, Friction, Velocity or both, with height, width
+  and diameter restrictions, branch rules and size locks; Darcy–Weisbach friction with Colebrook
+  or Haaland, air at 20 °C and water by temperature; domestic water by the sum of fixture units
+  converted with your imported fixture-unit table (`mep.size`, `mep_run.lock_size`,
+  `fixture_unit_method.set`).
 - **Panel schedules** (Analyze › Reports & Schedules, or Systems › Electrical): a live schedule of
   a panel, under *Panel Schedules* in the Project Browser: the header (panel, distribution system,
   supply, slots), every slot in order with the circuit's number, load name, classification, trip,
@@ -1258,7 +1264,7 @@ area by area (reviewed against the spec on 2026-10-15).
   connection groups, composite decks and span symbols, truss families (a layout shared by types),
   further rebar (two-point, varying sets beyond bars through walls, bent fabric), bilinear and two-way area loads, panel results and external analysis providers.
 - **MEP** (in development): duct and pipe fittings placed and edited in the view, the fitting controls and grips, surface connectors for conduit, moving runs, flex duct,
-  wires, panel schedule templates and editing (moves, spares, rebalancing), the two-column layout, custom circuit naming, switch systems, the Edit Path tool, duct and pipe sizing
+  wires, panel schedule templates and editing (moves, spares, rebalancing), the two-column layout, custom circuit naming, switch systems, the Edit Path tool, Static Regain and pressure-drop reports, a built-in fixture-unit curve
   and calculations, the System Browser's
   zones, columns and search, the System Editor, placing connectors on faces in a component editor, fabrication, P&ID and spaces
   and zones are specified but not built.

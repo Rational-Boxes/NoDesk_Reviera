@@ -2360,6 +2360,18 @@ icon = "system_disconnect"
 help = "Take a circuit off its panel; it keeps its devices and loses its number"
 
 [[action]]
+id = "mep.size"
+label = "Duct/Pipe Sizing"
+icon = "mep_size"
+help = "Size the selection's ducts or pipes from their flow: Equal Friction, Friction or Velocity, restrictions and branch rules (MEP-CALC-001)"
+
+[[action]]
+id = "fixture_unit_method.set"
+label = "Fixture-Unit Table"
+icon = "fixture_units"
+help = "Import your code's fixture-unit table (fixture_units, flow_tank, flow_valve) for domestic water sizing (MEP-PIPE-005)"
+
+[[action]]
 id = "circuit.properties"
 label = "Circuit Properties"
 icon = "circuit_properties"
@@ -2698,6 +2710,7 @@ tools = [
   { action = "duct.create", size = "large" },
   { action = "pipe.create", size = "large" },
   { action = "duct.cap_open_ends", size = "small" },
+  { action = "mep.size", size = "small" },
 ]
 
 [[tab.panel]]
@@ -2818,6 +2831,10 @@ tools = [
   { action = "ui.pane.results", size = "large" },
   { action = "structural_analysis.results", size = "small" },
 ]
+
+[[tab.panel]]
+label = "Sizing"
+tools = [{ action = "mep.size", size = "large" }]
 
 [[tab.panel]]
 label = "Reports & Schedules"
@@ -3016,6 +3033,7 @@ tools = [
   { action = "load_classification.manage", size = "large" },
   { action = "demand_factor.manage", size = "large" },
   { action = "wiring.settings", size = "large" },
+  { action = "fixture_unit_method.set", size = "large" },
 ]
 
 [[tab]]

@@ -18495,10 +18495,12 @@ Each row has a part and a minimum and maximum size. Rows are tried from top to b
 
 **Commands.** `mep.size(element_ids[] | system_id, method, targets: {friction?, velocity?}, combine, branch_rule, restrict?: {height?, width?, inner_diameter?}) -> report`
 
+*Built (2026-10-20):* Analyze › Sizing › **Duct/Pipe Sizing** (also Systems › HVAC & Piping) and `mep.size(system_id | element_ids, method, targets, combine, branch_rule, restrict, equation, flush_valves) -> report`. Flow: the system's network is walked from its equipment (refused without one, `mep_size.no_equipment`), each segment carrying the sum of the terminals' connector flows beyond it. Friction: Darcy–Weisbach on the hydraulic diameter with Colebrook (default) or Haaland, laminar 64/Re; air at 20 °C (1.204 kg/m³, 1.81 × 10⁻⁵ Pa·s), water by the system type's temperature from a 0–100 °C density and viscosity table ("Temperature outside fluid table range" outside it); other fluids refused. Methods Equal Friction (1 Pa/m ducts, 300 Pa/m pipes by default), Friction, Velocity (8 m/s ducts, 1.5 m/s pipes by default) and Friction and Velocity combined by And or Or; the smallest size of the segment type's *sizing table* (`mep_segment_type.create(sizes)`; by default round ducts EN 1506's 100–1250 mm, rectangle sides 100–2000 mm with aspect ratios up to 4, pipes DN 10–300) meeting them within the height, width and diameter restrictions (restrictions win, warned). Branch rule for segments joined to a terminal: calculated, the terminal connector's size, or the larger. `mep_run.lock_size` locks sizes; locked segments are reported as skipped. Fitting legs follow their segments. Sanitary and vent systems are refused. Not yet: Static Regain, fitting loss coefficients and pressure drop (MEP-CALC-002), transitions where sizes change at a straight joint, the System Inspector.
+
 **Acceptance criteria.**
-- [ ] Equal Friction at 1 Pa/m on a 3-branch supply system sizes each segment to the smallest size in the *Used in Sizing* table whose friction is at or below 1 Pa/m.
-- [ ] Restrict Height = 300 mm keeps every rectangular segment at or below 300 mm high and widens segments to compensate.
-- [ ] Size-locked segments keep their size, and the report lists them as skipped.
+- [x] Equal Friction at 1 Pa/m on a 3-branch supply system sizes each segment to the smallest size in the *Used in Sizing* table whose friction is at or below 1 Pa/m.
+- [x] Restrict Height = 300 mm keeps every rectangular segment at or below 300 mm high and widens segments to compensate.
+- [x] Size-locked segments keep their size, and the report lists them as skipped.
 
 ### 4.7.12 Pressure drop and analytical segments
 **ID:** MEP-CALC-002 · **Priority:** P2 · **Ref:** research/03 §8.5 · screenshots/structure_mep/analytical_duct_segments_tag.png · screenshots/structure_mep/analytical_duct_segment_schedule_critical_path.png
@@ -18862,11 +18864,13 @@ Allowed values come from Mechanical Settings › Slopes. Fabrication pipework ca
 - `fixture_unit_method.set(method_id | table_path)`
 - `mep.size(...)` (shared with MEP-CALC-001)
 
+*Built (2026-10-20), with user tables:* domestic cold and hot water segments are sized for the conversion of the *sum of fixture units* beyond them (connector `fixture_units`), on the flush-tank or flush-valve curve (`flush_valves`, a system-wide choice for now), by a fixture-unit table imported with `fixture_unit_method.set(name, source, csv, unit l/s | gpm, system_types?)` (Manage › MEP Settings › Fixture-Unit Table): rows `fixture_units, flow_tank, flow_valve`, ascending, interpolated linearly; a row out of order is refused naming its line; the report names the table, its source and the curve. Without a table, connector flows are summed and the report says so. `fixture_unit_method.evaluate`. Colebrook and Haaland as MEP-CALC-001. Not yet: the built-in public-domain curve (a search found only code-table reproductions, which are not used; RESEARCH_LOG, S0840), the per-fixture flush-valve flag, velocity by operating hours, fluids other than water.
+
 **Acceptance criteria.**
 - [ ] For a given fixture-unit total, the built-in method returns the documented flow within 2%.
-- [ ] Colebrook and Haaland agree within 2% for turbulent flow in 50 mm steel pipe.
-- [ ] A segment downstream of fixtures totalling 40 fixture units is sized for the converted flow of 40 units, not the sum of the fixtures' individual flows.
-- [ ] Importing a fixture-unit CSV with a non-ascending row is refused and the message names the line.
+- [x] Colebrook and Haaland agree within 2% for turbulent flow in 50 mm steel pipe.
+- [x] A segment downstream of fixtures totalling 40 fixture units is sized for the converted flow of 40 units, not the sum of the fixtures' individual flows.
+- [x] Importing a fixture-unit CSV with a non-ascending row is refused and the message names the line.
 
 ### 4.8.6 Plumbing fixtures, equipment and sanitary workflow
 **ID:** MEP-PIPE-006 · **Priority:** P1 · **Ref:** research/03 §9.2

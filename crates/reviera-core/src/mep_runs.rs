@@ -355,6 +355,10 @@ pub struct SegmentType {
     /// Conduit: its standard's id (Electrical Settings).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub standard: Option<String>,
+    /// The sizes sizing chooses from (metres: diameters, or rectangle sides); the domain's
+    /// standard series when empty.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub sizes: Vec<f64>,
 }
 
 fn yes() -> bool {
@@ -387,6 +391,20 @@ impl TrayKind {
 }
 
 impl SegmentType {
+    /// The sizes sizing chooses from: the type's table, or the domain's series (round ducts
+    /// EN 1506's 100–1250 mm, rectangle sides 100–2000 mm, pipes DN 10–300).
+    pub fn sizing_sizes(&self, shape: Shape) -> Vec<f64> {
+        if !self.sizes.is_empty() {
+            return self.sizes.clone();
+        }
+        let mm: &[f64] = match (self.domain, shape) {
+            (Domain::Duct, Shape::Round) => &[100.0, 125.0, 150.0, 160.0, 200.0, 250.0, 315.0, 355.0, 400.0, 450.0, 500.0, 560.0, 630.0, 710.0, 800.0, 900.0, 1000.0, 1120.0, 1250.0],
+            (Domain::Duct, _) => &[100.0, 150.0, 200.0, 250.0, 300.0, 350.0, 400.0, 450.0, 500.0, 600.0, 700.0, 800.0, 900.0, 1000.0, 1200.0, 1400.0, 1600.0, 1800.0, 2000.0],
+            _ => &[10.0, 15.0, 20.0, 25.0, 32.0, 40.0, 50.0, 65.0, 80.0, 100.0, 125.0, 150.0, 200.0, 250.0, 300.0],
+        };
+        mm.iter().map(|v| v / 1000.0).collect()
+    }
+
     /// The segment's predefined type.
     fn predefined(&self) -> &'static str {
         match self.domain {
@@ -505,6 +523,7 @@ fn default_type(txn: &mut Transaction<'_>, domain: Domain, shape: Shape) -> Resu
         tray_kind: (domain == Domain::CableTray).then_some(TrayKind::Ladder),
         bend_radius_multiplier: default_multiplier(domain),
         standard: (domain == Domain::Conduit).then(|| "iec_61386".into()),
+        sizes: Vec::new(),
     };
     txn.create(
         NewElement::new(type_class(domain))
@@ -549,6 +568,8 @@ pub struct CreateTypeParams {
     pub bend_radius_multiplier: Option<f64>,
     /// Conduit: a standard's id (default `iec_61386`).
     pub standard: Option<String>,
+    /// Duct and pipe: the sizes sizing chooses from (metres; diameters, or rectangle sides).
+    pub sizes: Option<Vec<f64>>,
 }
 
 /// Makes a duct, pipe, cable tray or conduit type (`mep_segment_type.create`).
@@ -600,6 +621,15 @@ pub(crate) fn create_type(txn: &mut Transaction<'_>, p: CreateTypeParams) -> Res
         tray_kind: (p.domain == Domain::CableTray).then(|| p.tray_kind.unwrap_or_default()),
         bend_radius_multiplier: m,
         standard,
+        sizes: {
+            let mut v = p.sizes.unwrap_or_default();
+            if v.iter().any(|x| !(*x > 0.0 && *x < 10.0)) {
+                return Err(bad("mep_segment_type.sizes", "sizes run above 0 to 10 m"));
+            }
+            v.sort_by(f64::total_cmp);
+            v.dedup();
+            v
+        },
     };
     txn.create(
         NewElement::new(type_class(p.domain))
@@ -710,6 +740,9 @@ pub struct SegmentRecipe {
     /// arc turns about, tangent to the lines to `start` and `end`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub corner: Option<V3>,
+    /// Sizing leaves it as it is (MEP-CALC-001).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub size_locked: bool,
 }
 
 fn is_zero(v: &f64) -> bool {
@@ -1139,6 +1172,7 @@ fn make_segment_c(txn: &mut Transaction<'_>, cx: &Ctx, a: V3, b: V3, size: Size,
         slope,
         across,
         corner,
+        size_locked: false,
     };
     let mut e = NewElement::new(segment_class(cx.domain))
         .param("@PredefinedType", cx.predefined)

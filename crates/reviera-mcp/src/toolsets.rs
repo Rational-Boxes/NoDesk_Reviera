@@ -118,6 +118,7 @@ pub fn toolset_of(command: &str) -> String {
             | "cable_type"
             | "conductor_ampacity"
             | "wiring"
+            | "fixture_unit_method"
             | "mep_fitting"
             | "mep_segment_type"
             | "routing_preferences"

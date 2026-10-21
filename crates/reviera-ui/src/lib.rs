@@ -57,6 +57,7 @@ mod remote_analysis_ui;
 mod terminal_ui;
 mod mep_electrical_ui;
 mod mep_cables_ui;
+mod mep_sizing_ui;
 mod mep_loads_ui;
 mod mep_runs_ui;
 mod fullscreen;
@@ -4526,6 +4527,8 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "panel.settings" => with(gui, Gui::panel_settings),
         "panel.set_supply" => with(gui, Gui::select_supply),
         "circuit.properties" => with(gui, Gui::circuit_properties),
+        "mep.size" => with(gui, Gui::size_runs),
+        "fixture_unit_method.set" => with(gui, Gui::import_fixture_table),
         "wiring.settings" => with(gui, Gui::wiring_settings),
         "panel.hierarchy" => with(gui, Gui::panel_hierarchy),
         "panel_schedule.create" => with(gui, Gui::create_panel_schedules),

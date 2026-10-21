@@ -90,6 +90,8 @@ pub struct SystemType {
 pub struct MepSettings {
     /// The types made or changed; the built-in ones not here are as shipped.
     pub system_types: Vec<SystemType>,
+    /// Fixture-unit tables (MEP-PIPE-005); the first is the default.
+    pub fixture_unit_tables: Vec<crate::mep_sizing::FixtureTable>,
 }
 
 fn slug(c: Classification) -> String {
@@ -144,7 +146,17 @@ pub fn settings(store: &Store) -> MepSettings {
         .unwrap_or_default()
 }
 
-fn save_settings(txn: &mut Transaction<'_>, s: &MepSettings) -> Result<()> {
+/// Points a system type at a fixture-unit table (MEP-PIPE-005).
+pub(crate) fn set_flow_conversion(txn: &mut Transaction<'_>, type_id: &str, table: &str) -> Result<()> {
+    let mut s = settings(txn.store());
+    let mut t = system_type(txn.store(), type_id).ok_or_else(|| Error::new("system_type.not_found", format!("no system type {type_id:?}")))?;
+    t.flow_conversion = table.to_owned();
+    s.system_types.retain(|x| x.id != t.id);
+    s.system_types.push(t);
+    save_settings(txn, &s)
+}
+
+pub(crate) fn save_settings(txn: &mut Transaction<'_>, s: &MepSettings) -> Result<()> {
     let pid = project(txn.store())
         .map(|p| p.id())
         .ok_or_else(|| bad("project.missing", "the model has no project"))?;

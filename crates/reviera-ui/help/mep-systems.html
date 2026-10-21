@@ -16,6 +16,7 @@ Water 1. The tools are on the <b>Systems</b> tab.</p>
   <a href="#sizing">Cable sizing and voltage drop</a>
   <a href="#schedules">Panel schedules</a>
   <a href="#loads">Load classifications and demand factors</a>
+  <a href="#sizing-ducts">Sizing ducts and pipes</a>
   <a href="#types">System types</a>
   <a href="#browser">System Browser</a>
   <a href="#checks">Checking systems</a>
@@ -177,6 +178,21 @@ as <code>from-to: percent</code>, separated by semicolons, for example
 of the load that falls in it, so 25 kVA becomes 10 + 7.5 = 17.5 kVA. Without it, the whole load
 takes the percentage of its range. The <b>largest motor rule</b> weights motor loads, largest
 first (for example 125, 100, 75).</p>
+
+<h2 id="sizing-ducts">Sizing ducts and pipes</h2>
+<p>Select a duct or pipe of a system and choose <a href="reviera:action/mep.size">Duct/Pipe
+Sizing</a> (Analyze › Sizing). Reviera works out each segment's flow from the terminals beyond it,
+counting from the system's equipment, so the system needs its equipment selected. Then it picks the
+smallest size from the type's sizing table that meets your targets. <b>Equal Friction</b> keeps
+friction at or below 1 Pa/m for ducts. <b>Velocity</b> limits the speed, and you can combine
+the two. Restrictions on height, width or diameter win over the targets: a duct kept at most
+300 mm high is widened instead. Branches to terminals can keep the terminal's connector size. A
+size-locked segment (<code>mep_run.lock_size</code>) is left as it is.</p>
+<p>Domestic water is sized for the <b>fixture units</b> beyond each pipe, converted to a flow
+with your code's fixture-unit table. Import it as a CSV of <code>fixture_units, flow_tank,
+flow_valve</code> rows under Manage › MEP Settings › <a
+href="reviera:action/fixture_unit_method.set">Fixture-Unit Table</a>. Reviera does not yet ship a
+table. Without one, the connectors' own flows are added up and the report says so.</p>
 
 <h2 id="types">System types</h2>
 <p>Every classification has a built-in type of its name with an abbreviation (SA, RA, DCW, …) and

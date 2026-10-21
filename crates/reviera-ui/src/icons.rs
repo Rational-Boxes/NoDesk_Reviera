@@ -340,6 +340,12 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "panel_settings" => format!(
             r#"<rect x="4" y="4" width="12" height="24" fill="{f}" {s}/><path d="M7 9h6M7 14h6M7 19h6" {s}/><circle cx="24" cy="20" r="4" {sa}/><path d="M24 13v3M24 24v3M17 20h3M28 20h3" {sa}/>"#
         ),
+        "mep_size" => format!(
+            r#"<path d="M3 12h12v8H3zM15 13h8v6h-8z" fill="{f}" {s}/><path d="M26 6v20M23 9l3-3 3 3M23 23l3 3 3-3" {sa}/>"#
+        ),
+        "fixture_units" => format!(
+            r#"<path d="M6 6h14v6a7 7 0 0 1-14 0z" fill="{f}" {s}/><path d="M13 19v8M8 27h10" {s}/><path d="M23 10h6M23 16h6M23 22h6" {sa}/>"#
+        ),
         "circuit_properties" => format!(
             r#"<rect x="4" y="4" width="18" height="24" fill="{f}" {s}/><path d="M8 10h10M8 15h10M8 20h6" {s}/><path d="M24 12l-4 7h5l-4 8" {sa}/>"#
         ),
