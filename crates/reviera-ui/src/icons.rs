@@ -367,6 +367,9 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "plumbing_fixture" => format!(
             r#"<path d="M4 12h24v3a12 9 0 0 1-24 0z" fill="{f}" {s}/><path d="M16 6v6M12 6h8M16 24v5" {sa}/><path d="M2 12h28" {s}/>"#
         ),
+        "sprinkler" => format!(
+            r#"<path d="M16 2v8" stroke-width="4" {s}/><path d="M12 10h8l-2 8h-4z" fill="{f}" {s}/><path d="M8 22h16" {s}/><path d="M9 26l-3 4M16 26v4M23 26l3 4" {sa}/>"#
+        ),
         "pipe_fitting" => format!(
             r#"<path d="M3 20h10a6 6 0 0 0 6-6V3" fill="none" stroke-width="6" {s}/><path d="M3 20h10a6 6 0 0 0 6-6V3" fill="none" stroke-width="4" stroke="{f}"/><path d="M11 16v8M15 10h8" {sa}/>"#
         ),

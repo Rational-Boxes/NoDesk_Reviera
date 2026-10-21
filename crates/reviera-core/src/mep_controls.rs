@@ -118,7 +118,7 @@ pub(crate) fn place_fixture(txn: &mut Transaction<'_>, p: PlaceParams) -> Result
 }
 
 /// Places a copy of a type the check accepts, on the nearest wall face or the work plane.
-fn place_hosted(txn: &mut Transaction<'_>, p: PlaceParams, accepts: fn(mesh_objects::Category) -> bool, code: &'static str, what: &str, height: f64) -> Result<ElementId> {
+pub(crate) fn place_hosted(txn: &mut Transaction<'_>, p: PlaceParams, accepts: fn(mesh_objects::Category) -> bool, code: &'static str, what: &str, height: f64) -> Result<ElementId> {
     let store = txn.store().clone();
     let type_id = store.resolve(&p.type_id).ok_or_else(|| bad("element.not_found", "no such type"))?;
     let ty = store.get(type_id).and_then(mesh_objects::mesh_object_type).ok_or_else(|| bad("mesh_object.not_a_type", format!("element {type_id} is not a component type")))?;
@@ -248,7 +248,9 @@ pub(crate) fn list(store: &Store, _: ListParams) -> Result<Vec<DeviceInfo>> {
 pub(crate) fn release(txn: &mut Transaction<'_>, deleted: &std::collections::BTreeSet<ElementId>) -> Result<()> {
     let store = txn.store().clone();
     let walls: Vec<String> = deleted.iter().filter_map(|d| store.get(*d)).filter(|e| crate::walls::wall_recipe(e).is_some()).map(|e| e.guid().to_string()).collect();
-    if walls.is_empty() {
+    // Sprinklers under a deleted ceiling too (MEP-PIPE-007).
+    let ceilings: Vec<String> = deleted.iter().filter_map(|d| store.get(*d)).filter(|e| crate::floors::slab_recipe(e).is_some()).map(|e| e.guid().to_string()).collect();
+    if walls.is_empty() && ceilings.is_empty() {
         return Ok(());
     }
     for e in store.iter() {
@@ -256,20 +258,28 @@ pub(crate) fn release(txn: &mut Transaction<'_>, deleted: &std::collections::BTr
             continue;
         }
         let Some(mut r) = mesh_objects::mesh_object_recipe(e) else { continue };
-        if !r.face.as_ref().is_some_and(|f| walls.contains(&f.wall)) {
+        let on_wall = r.face.as_ref().is_some_and(|f| walls.contains(&f.wall));
+        let on_ceiling = r.ceiling.as_ref().is_some_and(|c| ceilings.contains(c));
+        if !on_wall && !on_ceiling {
             continue;
         }
         let g = mesh_objects::regenerate(&store, e)?;
         r.point = [g.placement.origin[0], g.placement.origin[1]];
         r.rotation = g.placement.rotation;
-        r.face = None;
+        if on_wall {
+            r.face = None;
+        }
+        if on_ceiling {
+            r.ceiling = None;
+            r.offset = g.placement.origin[2] - crate::levels::elevation_of(&store, &r.level)?;
+        }
         let v = serde_json::to_value(&r).expect("serialises");
         txn.modify(e.id(), |x| {
             x.params.insert(crate::walls::RECIPE_KEY.into(), v);
         })?;
         txn.warn(Warning {
             id: "mep.unhosted".into(),
-            message: format!("{} lost its host wall; it stays where it was, unhosted", g.ty.category.label()),
+            message: format!("{} lost its host {}; it stays where it was, unhosted", g.ty.category.label(), if on_wall { "wall" } else { "ceiling" }),
             element_ids: vec![e.id()],
         });
     }

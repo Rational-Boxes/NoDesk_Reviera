@@ -911,7 +911,7 @@ impl Gui {
         let keep = self
             .place_tool
             .as_ref()
-            .map(|t| (t.rotation, t.mirror, t.offset));
+            .map(|t| (t.rotation, t.mirror, if t.offset.is_nan() { 0.0 } else { t.offset }));
         self.end_tool(&frame);
         self.end_insert_tool();
         self.end_modify();
@@ -1082,13 +1082,15 @@ impl Gui {
             Source::Fragment { .. } => unreachable!("placed above"),
         }
         // Control devices go on the nearest wall face, at their mounting height (MEP-DUCT-012).
-        // Plumbing fixtures too (MEP-PIPE-006).
+        // Plumbing fixtures too (MEP-PIPE-006), and sprinklers (MEP-PIPE-007).
         let hosted = match &t.source {
             Source::Type(ty) => self.store_now().and_then(|s| s.get(*ty).and_then(mesh_objects::mesh_object_type)).and_then(|ty| {
                 if ty.category.is_control_device() {
                     Some("mech_control_device.place")
                 } else if ty.category.is_plumbing_fixture() {
                     Some("plumbing_fixture.place")
+                } else if ty.category == mesh_objects::Category::Sprinkler {
+                    Some("sprinkler.place")
                 } else {
                     None
                 }
@@ -1096,7 +1098,11 @@ impl Gui {
             _ => None,
         };
         if let (Some(command), Source::Type(ty)) = (hosted, &t.source) {
-            let args = json!({ "type_id": ty, "point": p, "level": level, "offset": height + t.offset, "rotation": t.rotation });
+            let mut args = json!({ "type_id": ty, "point": p, "level": level, "offset": height + t.offset, "rotation": t.rotation });
+            // An automatic height (sprinklers): the command chooses it.
+            if t.offset.is_nan() {
+                args.as_object_mut().expect("an object").remove("offset");
+            }
             match self.run(command, args) {
                 Ok(_) => {
                     self.refresh_scene(&frame);
@@ -1157,7 +1163,7 @@ impl Gui {
             format!("{:.1}°", t.rotation.to_degrees()),
         ));
         grid.append(Property::boolean("Mirrored", "pc_mirror", t.mirror));
-        let off = self.format_length(t.offset);
+        let off = if t.offset.is_nan() { "Automatic".to_owned() } else { self.format_length(t.offset) };
         grid.append(Property::string("Offset", "pc_offset", off));
         grid.set_help_string(
             "pc_offset",

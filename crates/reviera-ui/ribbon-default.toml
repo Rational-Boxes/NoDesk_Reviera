@@ -1691,7 +1691,7 @@ help = "The project's structural settings: brace symbols and coarse cutback, poi
 id = "structural_connection.create"
 label = "Connection"
 icon = "structural_connection"
-keys = "CN"
+keys = "JN"
 help = "Place a connection at the join of the selected members (main member first), choosing a type that fits: shear plate, end plate, base plate (one per selected column), gusset, or generic. It carries approval, code-check and fabricator information and follows the members; its plates, bolts and welds show at Fine detail"
 
 [[action]]
@@ -2303,6 +2303,13 @@ keys = "PX"
 help = "Place basins, WCs, sinks, showers, urinals and floor drains: near a wall they go on its face, their connectors against it, and follow it (MEP-PIPE-006)"
 
 [[action]]
+id = "sprinkler.place"
+label = "Sprinkler"
+icon = "sprinkler"
+keys = "SK"
+help = "Place sprinkler heads: pendent heads hang from the ceiling over the point and follow it, upright heads stand on the pipe, sidewall heads go on a wall face (MEP-PIPE-007)"
+
+[[action]]
 id = "mech_control_device.place"
 label = "Mechanical Control Device"
 icon = "thermostat"
@@ -2844,6 +2851,7 @@ tools = [
   { action = "mep_run.create_riser", size = "small" },
   { action = "mep_run.bind_riser", size = "small" },
   { action = "plumbing_fixture.place", size = "small" },
+  { action = "sprinkler.place", size = "small" },
   { action = "pipe_fitting.place", size = "small" },
   { action = "pipe_accessory.place", size = "small" },
   { action = "mep_fitting.tee_to_cross", size = "small" },

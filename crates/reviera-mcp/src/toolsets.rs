@@ -138,6 +138,8 @@ pub fn toolset_of(command: &str) -> String {
             | "pipe_fitting"
             | "pipe_accessory"
             | "plumbing_fixture"
+            | "sprinkler"
+            | "sprinkler_type"
             | "mounting_part"
             | "cam_writer"
             | "beam_system"

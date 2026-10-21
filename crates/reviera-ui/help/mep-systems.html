@@ -195,6 +195,18 @@ deleted it stays where it was. To make a system, select the fixtures and choose 
 fixture that has no connector for the chosen system (a WC in a hot water system, say) is left
 out, and Reviera tells you which ones.</p>
 
+<h2 id="sprinklers">Sprinklers</h2>
+<p><a href="reviera:action/sprinkler.place">Sprinkler</a> (<kbd>S</kbd> <kbd>K</kbd>) places sprinkler
+heads. Choose a head type and leave the height blank to let Reviera place it by how the head is
+mounted. A pendent head clicked under a ceiling hangs from it, with its top at the ceiling's
+underside, and moves up and down with the ceiling. An upright head stands 3 m above the level. A
+sidewall head goes on the nearest wall face. Type a height to place the head there instead.</p>
+<p>Reviera does not choose heads for you. You set each head type's K-factor, temperature rating,
+response, coverage and connection size with <code>sprinkler_type.set</code>. These are saved in the
+IFC file as <code>Pset_FireSuppressionTerminalTypeSprinkler</code>. The glass bulb's colour follows
+the temperature rating: red for 68 °C, for example. Fire-protection systems can be Wet, Dry,
+Pre-Action or Other. The starter heads connect to Wet systems.</p>
+
 <h2 id="accessories">Pipe fittings, valves and accessories</h2>
 <p><a href="reviera:action/pipe_fitting.place">Pipe Fitting</a> (<kbd>P</kbd> <kbd>F</kbd>) places an
 elbow, tee, cross, coupling or cap. Click a pipe's open end and the fitting takes the pipe's size

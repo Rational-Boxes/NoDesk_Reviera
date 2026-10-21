@@ -661,9 +661,30 @@ pub fn menu_bar(
     bar.build()
 }
 
+/// The built-in catalog's key sequences (`keys`, upper case) and their actions.
+pub fn key_sequences() -> &'static [(String, String)] {
+    static KEYS: std::sync::OnceLock<Vec<(String, String)>> = std::sync::OnceLock::new();
+    KEYS.get_or_init(|| {
+        Catalog::parse(DEFAULT)
+            .map(|c| c.actions.iter().filter_map(|a| Some((a.keys.as_deref()?.to_ascii_uppercase(), a.id.clone()))).collect())
+            .unwrap_or_default()
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn key_sequences_are_unique() {
+        let mut seen = std::collections::BTreeMap::new();
+        for (k, id) in key_sequences() {
+            if let Some(other) = seen.insert(k.clone(), id.clone()) {
+                panic!("{k} is the keys of both {other} and {id}");
+            }
+        }
+        assert!(key_sequences().iter().any(|(k, id)| k == "SK" && id == "sprinkler.place"));
+    }
 
     #[test]
     fn the_default_catalog_uses_known_actions_and_icons() {

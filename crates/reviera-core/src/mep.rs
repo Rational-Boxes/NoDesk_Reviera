@@ -1492,6 +1492,29 @@ fn starters() -> Vec<Starter> {
             color: grey,
             connectors: vec![pipe("Waste", [0.0, 0.0, 0.0], down, K::Sanitary, D::Out, 0.075, 2.0)],
         },
+        // Sprinkler heads (MEP-PIPE-007): pendent piped from above, upright from below, sidewall
+        // from the back (+y, against the wall).
+        Starter {
+            name: "Pendent Sprinkler",
+            category: C::Sprinkler,
+            size: [0.05, 0.05, 0.07],
+            color: [0.80, 0.15, 0.15, 1.0],
+            connectors: vec![pipe("Inlet", [0.0, 0.0, 0.07], up, K::FireProtectionWet, D::In, 0.015, 0.0)],
+        },
+        Starter {
+            name: "Upright Sprinkler",
+            category: C::Sprinkler,
+            size: [0.05, 0.05, 0.07],
+            color: [0.80, 0.15, 0.15, 1.0],
+            connectors: vec![pipe("Inlet", [0.0, 0.0, 0.0], down, K::FireProtectionWet, D::In, 0.015, 0.0)],
+        },
+        Starter {
+            name: "Sidewall Sprinkler",
+            category: C::Sprinkler,
+            size: [0.05, 0.08, 0.05],
+            color: [0.80, 0.15, 0.15, 1.0],
+            connectors: vec![pipe("Inlet", [0.0, 0.04, 0.025], [0.0, 1.0, 0.0], K::FireProtectionWet, D::In, 0.015, 0.0)],
+        },
         // Control devices (MEP-DUCT-012): their back (+y, as fixtures') against the wall; a
         // controls connector at the back.
         Starter { name: "Thermostat", category: C::ControlElement, size: [0.08, 0.025, 0.12], color: white, connectors: vec![controls([0.0, 0.0, 0.06])] },
@@ -1589,7 +1612,11 @@ pub(crate) fn load_starters(txn: &mut Transaction<'_>, p: LoadStartersParams) ->
             None => {
                 let connectors = s.connectors.into_iter().map(validate).collect::<Result<Vec<_>>>()?;
                 let (positions, triangles) = box_mesh(s.size);
-                mesh_objects::create_generated_type(txn, s.name, s.category, &positions, &triangles, s.color, connectors, starter_predefined(s.name))?
+                let id = mesh_objects::create_generated_type(txn, s.name, s.category, &positions, &triangles, s.color, connectors, starter_predefined(s.name))?;
+                if let Some(head) = crate::mep_sprinklers::starter_head(s.name) {
+                    crate::mep_sprinklers::set_type(txn, crate::mep_sprinklers::SetTypeParams { type_id: ElementRef::Id(id), ..head })?;
+                }
+                id
             }
         };
         out.insert(s.name.to_owned(), id);

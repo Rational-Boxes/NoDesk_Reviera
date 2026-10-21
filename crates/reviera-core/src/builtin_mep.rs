@@ -150,6 +150,8 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(MepSettingsSlopes),
         registry.add(MechControlDevicePlace),
         registry.add(PlumbingFixturePlace),
+        registry.add(SprinklerPlace),
+        registry.add(SprinklerTypeSet),
         registry.add(MechControlDeviceAssign),
         registry.add(MechControlDeviceList),
         registry.add(MepRunCreateRiser),
@@ -1125,6 +1127,28 @@ edit_command!(
     crate::mep_controls::PlaceParams,
     crate::ElementId,
     crate::mep_controls::place_fixture
+);
+
+edit_command!(
+    SprinklerPlace,
+    "sprinkler.place",
+    "Place a sprinkler",
+    "Places a sprinkler head (a component type of the Sprinkler category) at `point` on `level` (MEP-PIPE-007), by its type's mounting: pendent (and recessed, concealed, ceiling) heads hang from `host_ceiling`, or the ceiling on the level over the point, their top at its underside (`offset` from the underside), and follow it; with no ceiling, at the default ceiling height. Upright heads stand 3 m above the level, or on `host_ceiling`. Sidewall heads go on the face of `host_wall` or the nearest wall within 300 mm, 2.45 m up, their back against it. `work_plane`: hosted by nothing, `offset` above the level. Returns its id.",
+    "Place Sprinkler",
+    crate::mep_sprinklers::PlaceParams,
+    crate::ElementId,
+    crate::mep_sprinklers::place
+);
+
+edit_command!(
+    SprinklerTypeSet,
+    "sprinkler_type.set",
+    "Set sprinkler head properties",
+    "Sets a sprinkler type's head (MEP-PIPE-007): `mounting` (pendant, recessed_pendant, concealed, ceiling, upright, sidewall, cutoff, other), `k_factor` (L/min/bar^½), `activation_temperature` (°C), `response` (quick, standard), `activation` (bulb, fusible_solder), `coverage_area` (m²), `connection_size` (m). Kept as Pset_FireSuppressionTerminalTypeSprinkler on the type: the K-factor as DischargeCoefficient, the temperature in kelvin; a bulb's liquid colour follows its rating. Heads are chosen, not sized: Reviera does not select them. Returns the type.",
+    "Sprinkler Type Properties",
+    crate::mep_sprinklers::SetTypeParams,
+    crate::ElementId,
+    crate::mep_sprinklers::set_type
 );
 
 edit_command!(

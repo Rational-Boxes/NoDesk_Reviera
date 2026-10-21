@@ -939,6 +939,12 @@ schedules, circuit paths, cable sizing and voltage drop.
   `IfcWasteTerminal` of their types; Create System leaves out fixtures without a connector of
   the system's classification and lists them (`plumbing_fixture.place`,
   `system.create(skip_incompatible)`).
+- **Sprinklers** (Systems › HVAC & Piping › Sprinkler `SK`): pendent heads hang from the ceiling
+  over the point and follow it, upright heads stand on their pipe, sidewall heads go on a wall
+  face; heads are chosen by K-factor, temperature rating, response and connection size, kept in
+  `Pset_FireSuppressionTerminalTypeSprinkler` on the type (K-factor as `DischargeCoefficient`;
+  a bulb's colour follows its rating), as `IfcFireSuppressionTerminal` SPRINKLER
+  (`sprinkler.place`, `sprinkler_type.set`). Not built yet: the hydraulic calculation provider.
 - **Pipe fittings and accessories** (Systems › HVAC & Piping › Pipe Fitting `PF`, Pipe Accessory
   `PA`, Change Tee to Cross): elbows, tees, crosses, couplings and caps on pipe ends or along
   pipes (elbows only on ends); gate, ball, butterfly, globe, check, pressure-reducing and relief

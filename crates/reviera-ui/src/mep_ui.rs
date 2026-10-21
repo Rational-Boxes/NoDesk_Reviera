@@ -298,19 +298,28 @@ impl Gui {
     /// on the work plane away from walls).
     pub(crate) fn place_control_device(&mut self) {
         let names = ["Thermostat", "Humidistat", "Temperature Sensor", "CO2 Sensor", "Humidity Sensor", "Occupancy Sensor", "Pressure Sensor", "DDC Controller"];
-        self.place_wall_component(reviera_core::mesh_objects::Category::is_control_device, &names, "Mechanical Control Device", 1500.0);
+        self.place_wall_component(reviera_core::mesh_objects::Category::is_control_device, &names, "Mechanical Control Device", Some(1500.0));
     }
 
     /// Systems › Plumbing & Piping › Plumbing Fixture (`PX`, MEP-PIPE-006): a fixture type and its
     /// height; each click puts one against the nearest wall face (or on the work plane).
     pub(crate) fn place_plumbing_fixture(&mut self) {
         let names = ["Lavatory", "Water Closet", "Kitchen Sink", "Shower", "Urinal", "Floor Drain"];
-        self.place_wall_component(reviera_core::mesh_objects::Category::is_plumbing_fixture, &names, "Plumbing Fixture", 0.0);
+        self.place_wall_component(reviera_core::mesh_objects::Category::is_plumbing_fixture, &names, "Plumbing Fixture", Some(0.0));
+    }
+
+    /// Systems › Plumbing & Piping › Sprinkler (`SK`, MEP-PIPE-007): a head type; each click puts
+    /// a pendent head under the ceiling there (following it), an upright head on its pipe height,
+    /// a sidewall head on the nearest wall face. A height overrides the automatic one.
+    pub(crate) fn place_sprinkler(&mut self) {
+        let names = ["Pendent Sprinkler", "Upright Sprinkler", "Sidewall Sprinkler"];
+        self.place_wall_component(|c| c == reviera_core::mesh_objects::Category::Sprinkler, &names, "Sprinkler", None);
     }
 
     /// A type of the categories `accepts` and a height, then the Place Component tool (clicks
     /// near a wall go on its face).
-    fn place_wall_component(&mut self, accepts: fn(reviera_core::mesh_objects::Category) -> bool, starters: &[&str], title: &str, default_mm: f64) {
+    /// With no default height, a blank height is automatic (`sprinkler.place` chooses it).
+    fn place_wall_component(&mut self, accepts: fn(reviera_core::mesh_objects::Category) -> bool, starters: &[&str], title: &str, default_mm: Option<f64>) {
         let frame = self.frame;
         let devices = |store: &reviera_core::Store| -> Vec<(ElementId, String)> {
             let mut v: Vec<(ElementId, String)> = store
@@ -337,10 +346,19 @@ impl Gui {
         let f = super::reinforcement_ui::Form::new(&frame, title);
         let names: Vec<String> = types.iter().map(|t| t.1.clone()).collect();
         let ty = f.choice("Type", &names, 0);
-        let height = f.text("Mounting height (mm)", &format!("{default_mm:.0}"), "Above the level");
-        let ok = f.show("Click near a wall to put it on that face (it follows the wall); away from walls it stands on the work plane. Spacebar turns it there.", "Place");
+        let height = match default_mm {
+            Some(mm) => f.text("Mounting height (mm)", &format!("{mm:.0}"), "Above the level"),
+            None => f.text("Height (mm)", "", "Blank: under the ceiling (pendent), 3000 (upright), 2450 (sidewall)"),
+        };
+        let hint = if default_mm.is_some() {
+            "Click near a wall to put it on that face (it follows the wall); away from walls it stands on the work plane. Spacebar turns it there."
+        } else {
+            "Click under a ceiling to hang a pendent head from it (it follows the ceiling); sidewall heads go on the nearest wall face."
+        };
+        let ok = f.show(hint, "Place");
         let k = ty.get_selection().map_or(0, |k| k as usize);
-        let h = height.get_value().trim().replace(',', ".").parse::<f64>().unwrap_or(default_mm) / 1000.0;
+        // Automatic: NaN, which the place tool leaves out.
+        let h = height.get_value().trim().replace(',', ".").parse::<f64>().ok().or(default_mm).map_or(f64::NAN, |mm| mm / 1000.0);
         f.dialog.destroy();
         let Some((id, label)) = types.get(k).cloned().filter(|_| ok) else { return };
         let name = label.split(" (").next().unwrap_or(&label).to_owned();

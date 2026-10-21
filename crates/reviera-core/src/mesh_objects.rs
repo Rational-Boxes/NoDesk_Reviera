@@ -357,6 +357,10 @@ pub struct MeshObjectRecipe {
     /// derived from the wall.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub face: Option<FaceHost>,
+    /// A ceiling it hangs from (GlobalId, MEP-PIPE-007): its offset is then from the ceiling's
+    /// underside, and it follows the ceiling up and down.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ceiling: Option<String>,
 }
 
 /// A copy mounted on a wall's face.
@@ -807,9 +811,19 @@ pub fn regenerate(store: &Store, e: &Element) -> Result<MeshObjectGeometry> {
         .and_then(|g| store.find_by_guid(&g))
         .and_then(|h| store.get(h))
         .and_then(|h| crate::toposolids::height_at(store, h, r.point));
-    let z = match surface {
-        Some(s) => s + r.offset,
-        None => crate::levels::elevation_of(store, &r.level)? + r.offset,
+    // Under a ceiling, its underside as it is now.
+    let ceiling = r
+        .ceiling
+        .as_deref()
+        .and_then(GlobalId::parse)
+        .and_then(|g| store.find_by_guid(&g))
+        .and_then(|c| store.get(c))
+        .and_then(|c| crate::floors::regenerate(store, c).ok())
+        .map(|g| g.top - g.thickness);
+    let z = match (ceiling, surface) {
+        (Some(c), _) => c + r.offset,
+        (None, Some(s)) => s + r.offset,
+        (None, None) => crate::levels::elevation_of(store, &r.level)? + r.offset,
     };
     let mesh = ty.mesh.decode()?;
     // On a wall face, where the face is now; unhosted (the wall gone), where it was put.
@@ -1147,6 +1161,7 @@ pub(crate) fn place(txn: &mut crate::txn::Transaction<'_>, p: PlaceParams) -> Re
         scale: p.scale,
         host: None,
         face: None,
+        ceiling: None,
     };
     if !(p.scale > 0.0 && p.scale.is_finite()) {
         return Err(Error::new(

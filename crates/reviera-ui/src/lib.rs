@@ -391,6 +391,8 @@ struct Gui {
     plan_edges: HashMap<DocumentId, Rc<Vec<reviera_render::plan::Edge>>>,
     /// Letters typed toward a keyboard sequence such as `ZF` (§1.26.4), and when.
     keys: (String, std::time::Instant),
+    /// A catalog action a key sequence asked for, run once the GUI is no longer borrowed.
+    key_action: Option<String>,
     /// A slice tool waiting for its click.
     slice_pick: Option<inspect::SliceKind>,
     /// The tiled arrangement Tab Views left, for Tile to restore.
@@ -694,10 +696,19 @@ impl Gui {
             }
             "Z" | "W" | "P" | "D" | "L" | "G" | "M" | "C" | "R" | "A" | "O" | "T" | "S" | "U"
             | "F" | "H" | "I" | "B" | "X" => false,
-            _ => {
-                self.keys.0.clear();
-                false
-            }
+            // The catalog's sequences (`keys` of its actions: PX, SK, ...).
+            typed => match ribbon::key_sequences().iter().find(|(k, _)| k == typed) {
+                Some((_, action)) => {
+                    self.key_action = Some(action.clone());
+                    true
+                }
+                None => {
+                    if !ribbon::key_sequences().iter().any(|(k, _)| k.starts_with(typed)) {
+                        self.keys.0.clear();
+                    }
+                    false
+                }
+            },
         };
         if done {
             self.keys.0.clear();
@@ -3466,6 +3477,11 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                         used = g.sequence_key(c);
                     }
                 });
+                let mut action = None;
+                with(&gui, |g| action = g.key_action.take());
+                if let Some(a) = action {
+                    perform(&gui, &f, &a);
+                }
             }
             if used {
                 p.refresh(false, None);
@@ -3734,6 +3750,7 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 browser_target: None,
                 plan_edges: HashMap::new(),
                 keys: (String::new(), std::time::Instant::now()),
+                key_action: None,
                 slice_pick: None,
                 tiled: None,
                 attach_pick: None,
@@ -4570,6 +4587,7 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "mep_run.create_riser" => with(gui, Gui::create_riser),
         "mech_control_device.place" => with(gui, Gui::place_control_device),
         "plumbing_fixture.place" => with(gui, Gui::place_plumbing_fixture),
+        "sprinkler.place" => with(gui, Gui::place_sprinkler),
         "mech_control_device.assign" => with(gui, Gui::assign_controlled),
         "mep_run.bind_riser" => with(gui, Gui::bind_riser),
         "mep_network.calculate" => with(gui, Gui::calculate_networks),

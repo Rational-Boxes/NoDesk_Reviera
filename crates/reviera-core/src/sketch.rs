@@ -81,6 +81,11 @@ impl Profile {
             .map(|l| ring_length(l))
             .sum()
     }
+
+    /// Whether a point in plan is inside the outer boundary and outside every hole.
+    pub fn contains(&self, p: [f64; 2]) -> bool {
+        inside(p, &self.outer) && !self.holes.iter().any(|h| inside(p, h))
+    }
 }
 
 fn ring_length(l: &[[f64; 2]]) -> f64 {
