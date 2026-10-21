@@ -16,6 +16,7 @@ Water 1. The tools are on the <b>Systems</b> tab.</p>
   <a href="#sizing">Cable sizing and voltage drop</a>
   <a href="#schedules">Panel schedules</a>
   <a href="#loads">Load classifications and demand factors</a>
+  <a href="#risers">Risers</a>
   <a href="#sizing-ducts">Sizing ducts and pipes</a>
   <a href="#pressure">Pressure drop and the loss report</a>
   <a href="#gutters">Gutters and downspouts</a>
@@ -181,6 +182,20 @@ as <code>from-to: percent</code>, separated by semicolons, for example
 of the load that falls in it, so 25 kVA becomes 10 + 7.5 = 17.5 kVA. Without it, the whole load
 takes the percentage of its range. The <b>largest motor rule</b> weights motor loads, largest
 first (for example 125, 100, 75).</p>
+
+<h2 id="risers">Risers</h2>
+<p>Select a duct or pipe with an open end and choose <a
+href="reviera:action/mep_run.create_riser">Create Riser</a> (Systems › HVAC &amp; Piping). Pick the
+level it should reach and an offset above that level. A level below the start gives a drop.
+Reviera adds an elbow and one vertical length of the same size and system, and leaves its far end
+open. With <b>Bind top to level</b> ticked, the riser keeps to that level: move the level, and the
+riser stretches and the run joined on top of it moves too. <a
+href="reviera:action/mep_run.bind_riser">Bind Riser</a> binds an existing vertical length, or
+frees it. If no elbow suits the size, nothing is made and Reviera says why.</p>
+<p>Plans mark vertical runs with <b>rise</b> and <b>drop</b> symbols. A rise is a run that starts in
+the view and goes up out of it. A drop comes up from below the view and stops under the cut plane.
+A vertical branch off a tee gets tee-up and tee-down symbols. At Coarse detail they are
+single-line symbols (also at Medium for pipes), and otherwise two-line.</p>
 
 <h2 id="sizing-ducts">Sizing ducts and pipes</h2>
 <p>Select a duct or pipe of a system and choose <a href="reviera:action/mep.size">Duct/Pipe

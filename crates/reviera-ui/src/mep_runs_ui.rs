@@ -17,6 +17,10 @@
 //! where each click falls on a tray or conduit: on an open end, or along one (splitting it).
 //! "+" and "−" upgrade and downgrade the selected fitting; Parallel Conduits copies the selected
 //! conduit run.
+//!
+//! Systems › Risers (MEP-DUCT-011): **Create Riser** rises from an open end of the selected run
+//! (the open connector chosen when there are several) to a level and offset, bound to the level
+//! by default; **Bind Riser** binds or unbinds a selected vertical segment's end.
 
 use reviera_core::ElementId;
 use reviera_core::mep::{self, Domain};
@@ -544,4 +548,111 @@ fn error(frame: &Frame, message: &str) {
         .with_style(MessageDialogStyle::OK | MessageDialogStyle::IconWarning)
         .build();
     d.show_modal();
+}
+
+impl Gui {
+    /// The model's levels, lowest first: (GlobalId's element, label).
+    fn level_choices(store: &reviera_core::Store) -> Vec<(ElementId, String)> {
+        reviera_core::plans::levels(store)
+            .into_iter()
+            .map(|(z, _, id)| (id, format!("{} ({:.0} mm)", store.get(id).and_then(|e| e.name.clone()).unwrap_or_default(), z * 1000.0)))
+            .collect()
+    }
+
+    /// Systems › Risers › Create Riser.
+    pub(crate) fn create_riser(&mut self) {
+        let frame = self.frame;
+        let Some(store) = self.store_now() else { return };
+        let sel = self.selection();
+        let partners = mep::partners(&store);
+        // The selection's open connectors of the four routing domains.
+        let open: Vec<(ElementId, mep::Port)> = sel
+            .iter()
+            .filter_map(|id| store.get(*id).map(|e| (*id, e)))
+            .flat_map(|(id, e)| mep::ports(&store, e).into_iter().map(move |p| (id, p)))
+            .filter(|(id, p)| {
+                matches!(p.connector.domain, Domain::Duct | Domain::Pipe | Domain::CableTray | Domain::Conduit)
+                    && !p.connector.surface
+                    && !partners.contains_key(&(*id, p.index))
+            })
+            .collect();
+        if open.is_empty() {
+            return frame.set_status_text("Create Riser: select a duct, pipe, cable tray or conduit with an open end", 0);
+        }
+        let (element, port) = if open.len() == 1 {
+            open[0].clone()
+        } else {
+            let labels: Vec<String> = open
+                .iter()
+                .map(|(id, p)| format!("Element {} connector {} at {:.2}, {:.2}, {:.2} m", id.0, p.index, p.position[0], p.position[1], p.position[2]))
+                .collect();
+            let refs: Vec<&str> = labels.iter().map(String::as_str).collect();
+            let d = SingleChoiceDialog::builder(&frame, "Rise from:", "Create Riser", &refs).build();
+            if d.show_modal() != ID_OK {
+                return;
+            }
+            open[d.get_selection().max(0) as usize].clone()
+        };
+        let levels = Self::level_choices(&store);
+        let f = super::reinforcement_ui::Form::new(&frame, "Create Riser");
+        let names: Vec<String> = levels.iter().map(|l| l.1.clone()).collect();
+        let level = f.choice("Target level", &names, levels.len().saturating_sub(1));
+        let offset = f.text("Offset (mm)", "0", "Above the target level; a target below the start makes a drop");
+        let bind = f.check("", "Bind top to level", true);
+        let ok = f.show("An elbow from the routing preferences and one vertical segment of the same type, size and system; its far end is left open.", "Finish");
+        let k = level.get_selection().map_or(0, |k| k as usize);
+        let off = offset.get_value().trim().replace(',', ".").parse::<f64>().unwrap_or(0.0) / 1000.0;
+        let b = bind.get_value();
+        f.dialog.destroy();
+        if !ok {
+            return;
+        }
+        let Some((level_id, _)) = levels.get(k) else { return };
+        let args = json!({ "element_id": element, "connector_index": port.index, "top_level": level_id, "top_offset": off, "bind": b });
+        match self.run("mep_run.create_riser", args) {
+            Ok(r) => {
+                self.refresh_scene(&frame);
+                let made: Vec<ElementId> = ["segments", "fittings"]
+                    .iter()
+                    .flat_map(|k| r[*k].as_array().cloned().unwrap_or_default())
+                    .filter_map(|v| v.as_u64().map(ElementId))
+                    .collect();
+                self.select_ids(&made, super::select::Combine::Replace);
+                frame.set_status_text("Riser created", 0);
+            }
+            Err(e) => super::error(&frame, &format!("The riser was not created:\n{e}")),
+        }
+    }
+
+    /// Systems › Risers › Bind Riser: the selected vertical segment's top level and offset.
+    pub(crate) fn bind_riser(&mut self) {
+        let frame = self.frame;
+        let Some(store) = self.store_now() else { return };
+        let sel = self.selection();
+        let Some((id, s)) = sel.first().and_then(|id| store.get(*id).and_then(reviera_core::mep_runs::segment_recipe).map(|s| (*id, s))) else {
+            return frame.set_status_text("Bind Riser: select a vertical segment", 0);
+        };
+        let levels = Self::level_choices(&store);
+        let mut names = vec!["(not bound)".to_owned()];
+        names.extend(levels.iter().map(|l| l.1.clone()));
+        let current = s.riser.as_ref().and_then(|r| levels.iter().position(|(lid, _)| store.get(*lid).is_some_and(|e| e.guid().to_string() == r.level)));
+        let f = super::reinforcement_ui::Form::new(&frame, "Bind Riser");
+        let level = f.choice("Top level", &names, current.map_or(0, |k| k + 1));
+        let offset = f.text("Top offset (mm)", &format!("{:.0}", s.riser.as_ref().map_or(0.0, |r| r.offset) * 1000.0), "Above the level");
+        let ok = f.show("A bound riser's end keeps to its level when the level moves; the runs beyond it move with it. Unbinding keeps the geometry.", "OK");
+        let k = level.get_selection().map_or(0, |k| k as usize);
+        let off = offset.get_value().trim().replace(',', ".").parse::<f64>().unwrap_or(0.0) / 1000.0;
+        f.dialog.destroy();
+        if !ok {
+            return;
+        }
+        let args = match k.checked_sub(1).and_then(|k| levels.get(k)) {
+            Some((lid, _)) => json!({ "element_id": id, "top_level": lid, "top_offset": off }),
+            None => json!({ "element_id": id }),
+        };
+        match self.run("mep_run.bind_riser", args) {
+            Ok(_) => self.refresh_scene(&frame),
+            Err(e) => super::error(&frame, &format!("The riser was not bound:\n{e}")),
+        }
+    }
 }

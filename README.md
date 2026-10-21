@@ -929,6 +929,12 @@ schedules, circuit paths, cable sizing and voltage drop.
   Velocity, Friction, Pressure Drop, Network ID and Critical Path, and schedules can be filtered;
   flows and velocities go to the IFC ports (`mep_network.calculate`, `analytical_segment.list`,
   `analytical_segment.override`, `mep_settings.set_friction_equation`, `schedule.set_filters`).
+- **Risers** (Systems › HVAC & Piping › Create Riser, Bind Riser): from an open duct, pipe, tray
+  or conduit end, an elbow and a vertical segment of the same type, size and system up or down to
+  a level plus an offset, bound to the level (it stretches when the level moves, and the run
+  beyond moves with it); refused with no elbow for the size or a zero length. Plans show rise and
+  drop symbols (and tee up and down) by geometry, single-line at Coarse, two-line otherwise
+  (`mep_run.create_riser`, `mep_run.bind_riser`).
 - **Sizing Calculator** (Window, Analyze › Sizing, or the middle-click menu of a duct or pipe): a
   docked pane listing the candidate sizes for the selected duct or pipe (its flow, shape and
   roughness read from the model) or for a typed flow, against friction and velocity targets with

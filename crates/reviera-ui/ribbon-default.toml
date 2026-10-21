@@ -2264,6 +2264,18 @@ keys = "PL"
 help = "Draw a pipe run, optionally sloped: elbows at corners, a tee where it ends on a pipe (MEP-PIPE-001)"
 
 [[action]]
+id = "mep_run.create_riser"
+label = "Create Riser"
+icon = "riser"
+help = "Rise (or drop) from the selected run's open end to a level and offset: an elbow and one vertical segment of the same type, size and system, bound to the level (MEP-DUCT-011)"
+
+[[action]]
+id = "mep_run.bind_riser"
+label = "Bind Riser"
+icon = "bind_riser"
+help = "Bind the selected vertical segment's end to a level and offset, so it follows the level, or unbind it (MEP-DUCT-011)"
+
+[[action]]
 id = "duct.cap_open_ends"
 label = "Cap Open Ends"
 icon = "cap_ends"
@@ -2778,6 +2790,8 @@ tools = [
   { action = "gutter.create", size = "small" },
   { action = "gutter.add_outlet", size = "small" },
   { action = "duct.cap_open_ends", size = "small" },
+  { action = "mep_run.create_riser", size = "small" },
+  { action = "mep_run.bind_riser", size = "small" },
   { action = "mep.size", size = "small" },
 ]
 

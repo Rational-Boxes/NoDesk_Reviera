@@ -352,6 +352,9 @@ pub(crate) fn set_elevation(
     txn.modify(id, |e| {
         e.params.insert(ELEVATION_KEY.into(), p.elevation.into());
     })?;
+    // Level-bound risers follow it (MEP-DUCT-011).
+    let guid = txn.store().get(id).expect("a level").guid().to_string();
+    crate::mep_runs::follow_level(txn, &guid)?;
     check_walls(txn.store(), id)
 }
 

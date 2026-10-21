@@ -244,6 +244,33 @@ impl Gui {
             graphics.lines.extend(reviera_render::plan::above_cut_lines(
                 &edges, cut, top, scale, &weights,
             ));
+            // Rise and drop symbols of vertical runs (MEP-DUCT-011).
+            let detail = v
+                .element
+                .and_then(|e| store.get(e))
+                .map(reviera_core::views::detail_level)
+                .unwrap_or_default();
+            let z = cut + 0.004;
+            let symbols = reviera_core::mep_risers::symbols(
+                &store,
+                plan.range.bottom,
+                plan.range.cut,
+                plan.range.top,
+                detail,
+                f64::from(scale),
+            );
+            // On a cut (filled) riser, the symbol is drawn in the paper colour.
+            for (on_fill, color) in [(false, [0.1, 0.1, 0.1, 1.0]), (true, [1.0, 1.0, 1.0, 1.0])] {
+                let segments: Vec<[[f32; 3]; 2]> = symbols
+                    .iter()
+                    .filter(|s| s.cut == on_fill && visibility.opacity(Some(s.element)).is_some())
+                    .flat_map(|s| s.lines.iter())
+                    .map(|[a, b]| [[a[0] as f32, a[1] as f32, z], [b[0] as f32, b[1] as f32, z]])
+                    .collect();
+                if !segments.is_empty() {
+                    graphics.lines.push(reviera_render::plan::Lines { color, width: 0.25, segments });
+                }
+            }
         }
         let cut_edges = Rc::new(std::mem::take(&mut graphics.cut_edges));
         graphics.lines.extend(self.annotation_lines(index));

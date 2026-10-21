@@ -358,6 +358,12 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "system_inspector" => format!(
             r#"<path d="M3 10h14M17 10l-4-3M17 10l-4 3M3 20h10" fill="none" {s}/><circle cx="21" cy="19" r="5" fill="{f}" {sa}/><path d="M25 23l5 5" stroke-width="2.5" {sa}/>"#
         ),
+        "riser" => format!(
+            r#"<path d="M3 24h12a4 4 0 0 0 4-4V6" fill="none" stroke-width="5" {s}/><path d="M3 24h12a4 4 0 0 0 4-4V6" fill="none" stroke-width="3" stroke="{f}"/><path d="M15 9l4-5 4 5" fill="none" {sa}/><path d="M24 4h6" {sa}/>"#
+        ),
+        "bind_riser" => format!(
+            r#"<path d="M12 28V8" stroke-width="5" {s}/><path d="M12 28V8" stroke-width="3" stroke="{f}"/><path d="M4 6h24" stroke-dasharray="3 2" {sa}/><path d="M18 14l4-4 4 4M22 10v10" fill="none" {sa}/>"#
+        ),
         "sizing_calculator" => format!(
             r#"<rect x="5" y="3" width="18" height="26" rx="2" fill="{f}" {s}/><rect x="8" y="6" width="12" height="5" {s}/><path d="M9 16h2M13 16h2M17 16h2M9 20h2M13 20h2M17 20h2M9 24h2M13 24h2" {s}/><path d="M25 10v16M23 12l2-2 2 2M23 24l2 2 2-2" {sa}/>"#
         ),

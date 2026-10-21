@@ -743,6 +743,19 @@ pub struct SegmentRecipe {
     /// Sizing leaves it as it is (MEP-CALC-001).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub size_locked: bool,
+    /// A level-bound riser: its `end` stays at this level's elevation plus the offset
+    /// (MEP-DUCT-011).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub riser: Option<RiserTop>,
+}
+
+/// A riser's binding of its end to a level.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct RiserTop {
+    /// The level (GlobalId).
+    pub level: String,
+    /// Metres above it.
+    pub offset: f64,
 }
 
 fn is_zero(v: &f64) -> bool {
@@ -1179,6 +1192,7 @@ fn make_segment_c(txn: &mut Transaction<'_>, cx: &Ctx, a: V3, b: V3, size: Size,
         across,
         corner,
         size_locked: false,
+        riser: None,
     };
     let mut e = NewElement::new(segment_class(cx.domain))
         .param("@PredefinedType", cx.predefined)
@@ -2573,4 +2587,226 @@ mod tests {
         // Across is x for a run along y; up is z.
         assert!((pts[1][0] - pts[0][0]).abs() - 0.6 < 1e-9 && (pts[2][2] - pts[1][2] - 0.3).abs() < 1e-9, "{pts:?}");
     }
+}
+
+// ---- Risers (MEP-DUCT-011) ----
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct RiserParams {
+    /// A duct, pipe, cable tray or conduit segment, or an element with a connector.
+    pub element_id: ElementRef,
+    /// The open connector to rise from (a segment's 0 start, 1 end).
+    #[serde(default)]
+    pub connector_index: usize,
+    pub top_level: ElementRef,
+    /// Metres above the top level.
+    #[serde(default)]
+    #[schemars(extend("x-reviera-data-type" = "length"))]
+    pub top_offset: f64,
+    /// Keep the end at the level as it moves (default on).
+    #[serde(default = "yes")]
+    pub bind: bool,
+}
+
+/// `mep_run.create_riser`: an elbow at an open connector and one vertical segment of the same
+/// type, size and system to a level plus an offset; its far end is left open.
+pub(crate) fn create_riser(txn: &mut Transaction<'_>, p: RiserParams) -> Result<RunReport> {
+    let store = txn.store().clone();
+    let id = store.resolve(&p.element_id).ok_or_else(|| bad("element.not_found", "no such element"))?;
+    let e = store.get(id).expect("resolved");
+    let port = mep::port(&store, id, p.connector_index).ok_or_else(|| bad("riser.connector", format!("element {id} has no connector {}", p.connector_index)))?;
+    let c = &port.connector;
+    if !matches!(c.domain, Domain::Duct | Domain::Pipe | Domain::CableTray | Domain::Conduit) {
+        return Err(bad("riser.domain", "risers rise from duct, pipe, cable tray and conduit connectors"));
+    }
+    if c.surface {
+        return Err(bad("riser.surface", "a surface connector cannot rise: rise from a run's open end"));
+    }
+    if mep::partners(&store).contains_key(&(id, p.connector_index)) {
+        return Err(bad("riser.not_open", format!("connector {} is not open", p.connector_index)));
+    }
+    let size = Size { shape: c.shape, diameter: c.diameter, width: c.width, height: c.height };
+    let (top_guid, top_z) = level_of(&store, &p.top_level)?;
+    let target = top_z + p.top_offset;
+    if !target.is_finite() {
+        return Err(bad("riser.offset", "the offset is not a number"));
+    }
+    let at = port.position;
+    if (target - at[2]).abs() < 1e-6 {
+        return Err(bad("riser.zero", "Riser length is zero"));
+    }
+    let up: V3 = if target > at[2] { [0.0, 0.0, 1.0] } else { [0.0, 0.0, -1.0] };
+    let d = port.direction;
+    let vertical = d[2].abs() >= 0.999;
+    if vertical && dot(d, up) < 0.0 {
+        return Err(bad("riser.direction", "the connector points the other way"));
+    }
+    // Its type, level and system: the segment's own, else the built-in type's.
+    let seg = segment_recipe(e);
+    let known = seg.as_ref().and_then(|s| type_of_segment(&store, s));
+    if let Some((_, t)) = &known {
+        t.check_size(&store, &size)?;
+    }
+    let routing = known.as_ref().map(|(_, t)| t.routing.clone()).unwrap_or_else(|| default_routing(c.domain));
+    let radius = known.as_ref().filter(|(_, t)| t.radius_bends()).map(|(_, t)| (t.bend_radius(&store, &size), t.with_fittings));
+    let elbow = if vertical {
+        None
+    } else {
+        match radius {
+            Some((_, false)) => None,
+            _ => Some(routing.choose(Role::Elbow, size.nominal()).ok_or_else(|| {
+                bad("riser.no_elbow", format!("No Elbow in routing preferences for {:.0} mm", size.nominal() * 1000.0))
+            })?),
+        }
+    };
+    let across = seg.as_ref().and_then(|s| s.across).or_else(|| (!vertical).then(|| frame(d).0));
+    let leg = if vertical {
+        0.0
+    } else {
+        match radius {
+            Some((r, _)) => r,
+            None => elbow_leg(&size, d, up, across),
+        }
+    };
+    let corner = add(at, mul(d, leg));
+    let bottom = add(corner, mul(up, leg));
+    let top = [corner[0], corner[1], target];
+    if dot(sub(top, bottom), up) < 0.01 {
+        return Err(bad("riser.too_short", "the target is too close for the elbow: the riser would have no length"));
+    }
+    // Everything checked: nothing has been made yet.
+    let type_id = match &known {
+        Some((t, _)) => *t,
+        None => default_type(txn, c.domain, size.shape)?,
+    };
+    let store = txn.store().clone();
+    let t = segment_type(store.get(type_id).expect("made")).expect("a type");
+    let level = match &seg {
+        Some(s) => s.level.clone(),
+        None => crate::plans::levels(&store).into_iter().rev().find(|(z, _, _)| *z <= at[2] + 1e-6).map(|(_, g, _)| g).unwrap_or_else(|| top_guid.clone()),
+    };
+    let cx = Ctx {
+        domain: c.domain,
+        predefined: t.predefined(),
+        type_guid: store.get(type_id).expect("made").guid().to_string(),
+        routing: t.routing.clone(),
+        level,
+        classification: seg.as_ref().and_then(|s| s.classification).or(c.classification.filter(|cl| cl.fits(c.domain))),
+    };
+    let mut report = RunReport::default();
+    let legs = vec![Leg { direction: mul(d, -1.0), length: leg, size, across }, Leg { direction: up, length: leg, size, across }];
+    match (elbow, radius) {
+        (Some(part), Some((r, true))) => report.fittings.push(make_fitting_r(txn, &cx, part, corner, legs, Some(r))?),
+        (Some(part), _) => report.fittings.push(make_fitting(txn, &cx, part, corner, legs)?),
+        (None, Some((_, false))) if !vertical => {
+            // A type without fittings bends in a curved segment.
+            report.segments.push(make_segment_c(txn, &cx, at, bottom, size, 0.0, across, Some(corner))?);
+        }
+        _ => {}
+    }
+    let riser = make_segment(txn, &cx, bottom, top, size, 0.0, across)?;
+    if p.bind {
+        let mut r = segment_recipe(txn.store().get(riser).expect("made")).expect("a segment");
+        r.riser = Some(RiserTop { level: top_guid, offset: p.top_offset });
+        let v = serde_json::to_value(&r).expect("serialises");
+        txn.modify(riser, |e| {
+            e.params.insert(RECIPE_KEY.into(), v);
+        })?;
+    }
+    report.segments.push(riser);
+    let made: Vec<ElementId> = report.segments.iter().chain(&report.fittings).copied().collect();
+    for cn in mep::connect_coincident(txn, &made)? {
+        for e in [cn.a.0, cn.b.0] {
+            if !made.contains(&e) && !report.connected_to.contains(&e) {
+                report.connected_to.push(e);
+            }
+        }
+    }
+    report.system = join_system(txn, &made, cx.classification)?;
+    Ok(report)
+}
+
+/// Moves a bound riser's end to its level and offset, and the runs joined beyond it with it.
+fn follow_riser(txn: &mut Transaction<'_>, id: ElementId) -> Result<()> {
+    let store = txn.store().clone();
+    let Some(mut s) = store.get(id).and_then(segment_recipe) else { return Ok(()) };
+    let Some(b) = s.riser.clone() else { return Ok(()) };
+    let target = crate::levels::elevation_of(&store, &b.level)? + b.offset;
+    let dz = target - s.end[2];
+    if dz.abs() < 1e-9 {
+        return Ok(());
+    }
+    if (target - s.start[2]) * (s.end[2] - s.start[2]) < 1e-4 {
+        return Err(bad("riser.inverted", format!("the riser {id} would turn back on itself: its level moved past its other end")));
+    }
+    s.end[2] = target;
+    let v = serde_json::to_value(&s).expect("serialises");
+    txn.modify(id, |e| {
+        e.params.insert(RECIPE_KEY.into(), v);
+    })?;
+    // Segments and fittings beyond its end move up or down with it.
+    let partners = mep::partners(&store);
+    let mut seen = std::collections::HashSet::from([id]);
+    let mut queue: Vec<ElementId> = partners.get(&(id, 1)).into_iter().flatten().map(|(o, _)| *o).collect();
+    while let Some(x) = queue.pop() {
+        if !seen.insert(x) || !store.get(x).is_some_and(is_run_element) {
+            continue;
+        }
+        transform(txn, x, &|p| p, dz)?;
+        let n = store.get(x).map_or(0, port_count);
+        for k in 0..n {
+            queue.extend(partners.get(&(x, k)).into_iter().flatten().map(|(o, _)| *o));
+        }
+    }
+    Ok(())
+}
+
+/// Bound risers follow a level whose elevation changed (`level.set_elevation`).
+pub(crate) fn follow_level(txn: &mut Transaction<'_>, level: &str) -> Result<()> {
+    let ids: Vec<ElementId> = txn
+        .store()
+        .iter()
+        .filter(|e| segment_recipe(e).and_then(|s| s.riser).is_some_and(|r| r.level == level))
+        .map(|e| e.id())
+        .collect();
+    for id in ids {
+        follow_riser(txn, id)?;
+    }
+    Ok(())
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct BindRiserParams {
+    /// A vertical segment.
+    pub element_id: ElementRef,
+    /// The level its upper (or, for a drop, lower) end keeps to; none unbinds it, keeping its
+    /// geometry.
+    pub top_level: Option<ElementRef>,
+    /// Metres above the level (default 0).
+    #[serde(default)]
+    #[schemars(extend("x-reviera-data-type" = "length"))]
+    pub top_offset: f64,
+}
+
+/// `mep_run.bind_riser`: binds a vertical segment's end to a level (moving it there) or unbinds
+/// it.
+pub(crate) fn bind_riser(txn: &mut Transaction<'_>, p: BindRiserParams) -> Result<()> {
+    let store = txn.store().clone();
+    let id = store.resolve(&p.element_id).ok_or_else(|| bad("element.not_found", "no such segment"))?;
+    let mut s = store.get(id).and_then(segment_recipe).ok_or_else(|| bad("mep_run.not_a_segment", format!("element {id} is not a segment")))?;
+    let d = sub(s.end, s.start);
+    if d[2].abs() < 0.999 * len(d) {
+        return Err(bad("riser.not_vertical", "only vertical segments are risers"));
+    }
+    s.riser = match &p.top_level {
+        Some(l) => Some(RiserTop { level: level_of(&store, l)?.0, offset: p.top_offset }),
+        None => None,
+    };
+    let v = serde_json::to_value(&s).expect("serialises");
+    txn.modify(id, |e| {
+        e.params.insert(RECIPE_KEY.into(), v);
+    })?;
+    follow_riser(txn, id)
 }

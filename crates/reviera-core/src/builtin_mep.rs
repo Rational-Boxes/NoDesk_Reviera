@@ -141,6 +141,8 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(ConductorAmpacitySet),
         registry.add(WiringSet),
         registry.add(MepSize),
+        registry.add(MepRunCreateRiser),
+        registry.add(MepRunBindRiser),
         registry.add(SizingCalculatorCandidates),
         registry.add(MepNetworkCalculate),
         registry.add(AnalyticalSegmentList),
@@ -1090,6 +1092,28 @@ edit_command!(
     crate::mep_sizing::SizeParams,
     crate::mep_sizing::SizeReport,
     crate::mep_sizing::size
+);
+
+edit_command!(
+    MepRunCreateRiser,
+    "mep_run.create_riser",
+    "Create a riser",
+    "From an open duct, pipe, cable tray or conduit connector (`element_id`, `connector_index`: a segment's 0 start or 1 end), an elbow from the routing preferences and one vertical segment of the same type, size and system up (or down, a drop) to `top_level` + `top_offset`, its far end open (MEP-DUCT-011). With `bind` (default) the end keeps to the level when the level's elevation changes, and the runs joined beyond it move with it. Refused, creating nothing: a connector that is not open, a surface connector, no elbow row for the size (\"No Elbow in routing preferences for 300 mm\"), the target at the start (\"Riser length is zero\") or too close for the elbow. Returns the segment and fitting.",
+    "Create Riser",
+    crate::mep_runs::RiserParams,
+    crate::mep_runs::RunReport,
+    crate::mep_runs::create_riser
+);
+
+edit_command!(
+    MepRunBindRiser,
+    "mep_run.bind_riser",
+    "Bind a riser to a level",
+    "Binds a vertical segment's end to `top_level` + `top_offset`, moving it (and the runs beyond it) there; without `top_level`, unbinds it, keeping its geometry (MEP-DUCT-011).",
+    "Bind Riser",
+    crate::mep_runs::BindRiserParams,
+    (),
+    crate::mep_runs::bind_riser
 );
 
 read_command!(

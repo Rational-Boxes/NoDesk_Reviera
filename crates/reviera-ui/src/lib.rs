@@ -4550,6 +4550,8 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "panel.set_supply" => with(gui, Gui::select_supply),
         "circuit.properties" => with(gui, Gui::circuit_properties),
         "mep.size" => with(gui, Gui::size_runs),
+        "mep_run.create_riser" => with(gui, Gui::create_riser),
+        "mep_run.bind_riser" => with(gui, Gui::bind_riser),
         "mep_network.calculate" => with(gui, Gui::calculate_networks),
         "analytical_segment.list" => with(gui, Gui::analytical_segments),
         "system_inspector.start" => with(gui, Gui::start_inspector),
