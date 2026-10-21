@@ -12,7 +12,7 @@ use reviera_core::{
 use reviera_mcp::{AppHandle, McpConfig, McpServer};
 use rmcp::ServiceExt;
 use rmcp::model::{
-    CallToolRequestParams, ClientCapabilities, ClientConfig, Implementation,
+    CallToolRequestParams, ClientCapabilities, ClientConfig, ContentBlock, Implementation,
     ReadResourceRequestParams, ResourceContents,
 };
 use rmcp::service::{RoleClient, RunningService};
@@ -486,4 +486,31 @@ async fn bridge_sessions_and_approval() {
     let mut line = String::new();
     BufReader::new(&mut again).read_line(&mut line).await.unwrap();
     assert_eq!(line, "ERR unauthorised\n");
+}
+
+#[tokio::test]
+async fn view_images_without_a_window() {
+    use base64::Engine;
+    let h = Harness::start(Permission::ReadOnly).await;
+    assert!(h.tool_names().await.contains(&"get_view_image".to_owned()));
+    let mut params = CallToolRequestParams::new("get_view_image".to_owned());
+    params = params.with_arguments(json!({ "max_size": 256 }).as_object().unwrap().clone());
+    let r = h.client.call_tool(params).await.unwrap();
+    if r.is_error == Some(true) {
+        let e = r.structured_content.clone().unwrap_or(Value::Null);
+        // No graphics adapter here: nothing more to check.
+        assert_eq!(e["error"]["code"], "view_image.gpu", "{e}");
+        return;
+    }
+    // A PNG image and a line about it.
+    let ContentBlock::Image(img) = &r.content[0] else { panic!("{:?}", r.content) };
+    assert_eq!(img.mime_type, "image/png");
+    let png = base64::engine::general_purpose::STANDARD.decode(&img.data).unwrap();
+    assert_eq!(&png[..8], b"\x89PNG\r\n\x1a\n");
+    let ContentBlock::Text(t) = &r.content[1] else { panic!("{:?}", r.content) };
+    let meta: Value = serde_json::from_str(&t.text).unwrap();
+    assert_eq!((meta["width"].as_u64(), meta["source"].as_str()), (Some(256), Some("offscreen")));
+    // An unknown view is an error the agent can read.
+    let e = h.call("get_view_image", json!({ "view_id": 999_999 })).await.unwrap_err();
+    assert_eq!(e["code"], "view.not_found");
 }

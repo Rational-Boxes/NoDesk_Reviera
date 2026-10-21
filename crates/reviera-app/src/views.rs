@@ -165,7 +165,7 @@ impl App {
     }
 
     /// A camera framing the model, for views that never had one.
-    fn fitting_camera(&self, doc: DocumentId) -> ViewCamera {
+    pub(crate) fn fitting_camera(&self, doc: DocumentId) -> ViewCamera {
         match self.render_scene(doc).ok().and_then(|s| s.bounds()) {
             Some((lo, hi)) => {
                 ViewCamera::fitting(lo.to_array().map(f64::from), hi.to_array().map(f64::from))

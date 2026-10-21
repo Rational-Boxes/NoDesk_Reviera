@@ -17,12 +17,12 @@ raw-window-handle.workspace = true
 pollster.workspace = true
 bytemuck = { workspace = true, features = ["derive"] }
 glam.workspace = true
+png = "0.18"
 
 [dev-dependencies]
 reviera-app.workspace = true
 reviera-core.workspace = true
 serde_json.workspace = true
-png = "0.18"
 
 [lints]
 workspace = true

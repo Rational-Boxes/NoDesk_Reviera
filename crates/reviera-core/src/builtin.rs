@@ -626,6 +626,8 @@ impl Command for ElementDelete {
         crate::beams::release_attachments(txn, &deleted)?;
         crate::foundations::release(txn, &deleted)?;
         crate::steel_detail::release(txn, &deleted)?;
+        // Control devices on a wall that goes stay where they are (MEP-DUCT-012).
+        crate::mep_controls::release(txn, &deleted)?;
         for id in &deleted {
             txn.delete(*id)?;
         }

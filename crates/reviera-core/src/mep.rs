@@ -1209,6 +1209,9 @@ pub struct CreateTypeParams {
     pub color: Option<[f32; 4]>,
     #[serde(default)]
     pub connectors: Vec<AddConnector>,
+    /// The IFC predefined type of its copies (THERMOSTAT, CO2SENSOR, …).
+    #[serde(default)]
+    pub predefined: Option<String>,
 }
 
 /// A connector of a new type.
@@ -1268,7 +1271,7 @@ pub(crate) fn create_type(txn: &mut Transaction<'_>, p: CreateTypeParams) -> Res
         .collect::<Result<Vec<_>>>()?;
     let (positions, triangles) = box_mesh(p.size);
     let color = p.color.unwrap_or([0.72, 0.74, 0.78, 1.0]);
-    mesh_objects::create_generated_type(txn, &p.name, p.category, &positions, &triangles, color, connectors)
+    mesh_objects::create_generated_type(txn, &p.name, p.category, &positions, &triangles, color, connectors, p.predefined.as_deref())
 }
 
 /// One starter type: name, category, size, colour and connectors.
@@ -1448,7 +1451,62 @@ fn starters() -> Vec<Starter> {
             color: white,
             connectors: vec![power("Power", [0.0, 0.0, 0.08], up, D::In, 230.0, 1, 36.0, "Lighting")],
         },
+        // Control devices (MEP-DUCT-012): their insertion point at the back, against the wall,
+        // facing +y; a controls connector at the back.
+        Starter { name: "Thermostat", category: C::ControlElement, size: [0.08, 0.025, 0.12], color: white, connectors: vec![controls([0.0, 0.0, 0.06])] },
+        Starter { name: "Humidistat", category: C::ControlElement, size: [0.08, 0.025, 0.12], color: white, connectors: vec![controls([0.0, 0.0, 0.06])] },
+        Starter { name: "Temperature Sensor", category: C::Sensor, size: [0.07, 0.025, 0.07], color: white, connectors: vec![controls([0.0, 0.0, 0.035])] },
+        Starter { name: "CO2 Sensor", category: C::Sensor, size: [0.09, 0.03, 0.09], color: white, connectors: vec![controls([0.0, 0.0, 0.045])] },
+        Starter { name: "Humidity Sensor", category: C::Sensor, size: [0.07, 0.025, 0.07], color: white, connectors: vec![controls([0.0, 0.0, 0.035])] },
+        Starter { name: "Occupancy Sensor", category: C::Sensor, size: [0.1, 0.04, 0.1], color: white, connectors: vec![controls([0.0, 0.0, 0.05])] },
+        Starter { name: "Pressure Sensor", category: C::Sensor, size: [0.08, 0.05, 0.08], color: grey, connectors: vec![controls([0.0, 0.0, 0.04])] },
+        Starter { name: "DDC Controller", category: C::Controller, size: [0.3, 0.1, 0.4], color: grey, connectors: vec![controls([0.0, 0.0, 0.2])] },
+        Starter {
+            name: "VAV Box",
+            category: C::AirTerminalBox,
+            size: [0.9, 0.5, 0.35],
+            color: grey,
+            connectors: vec![
+                duct("Inlet", [-0.45, 0.0, 0.175], [-1.0, 0.0, 0.0], K::SupplyAir, D::In, F::Calculated, 0.0, 0.25),
+                duct("Outlet", [0.45, 0.0, 0.175], [1.0, 0.0, 0.0], K::SupplyAir, D::Out, F::Calculated, 0.0, 0.25),
+            ],
+        },
     ]
+}
+
+/// A control device's controls connector, at its back.
+fn controls(origin: V3) -> Connector {
+    Connector {
+        name: "Controls".into(),
+        origin,
+        direction: [0.0, -1.0, 0.0],
+        flow_direction: FlowDirection::In,
+        electrical: Some(Electrical {
+            system: ElectricalSystem::Controls,
+            voltage: 24.0,
+            poles: 1,
+            load: vec![2.0],
+            load_classification: "Other".into(),
+            ..Electrical::default()
+        }),
+        ..new_connector(Domain::Electrical)
+    }
+}
+
+/// A starter type's IFC predefined type, where its category's is not enough.
+fn starter_predefined(name: &str) -> Option<&'static str> {
+    Some(match name {
+        "Thermostat" => "THERMOSTAT",
+        "Humidistat" => "HUMIDISTAT",
+        "Temperature Sensor" => "TEMPERATURESENSOR",
+        "CO2 Sensor" => "CO2SENSOR",
+        "Humidity Sensor" => "HUMIDITYSENSOR",
+        "Occupancy Sensor" => "MOVEMENTSENSOR",
+        "Pressure Sensor" => "PRESSURESENSOR",
+        "DDC Controller" => "PROGRAMMABLE",
+        "VAV Box" => "VARIABLEFLOWPRESSUREDEPENDANT",
+        _ => return None,
+    })
 }
 
 /// The starter types' names.
@@ -1484,7 +1542,7 @@ pub(crate) fn load_starters(txn: &mut Transaction<'_>, p: LoadStartersParams) ->
             None => {
                 let connectors = s.connectors.into_iter().map(validate).collect::<Result<Vec<_>>>()?;
                 let (positions, triangles) = box_mesh(s.size);
-                mesh_objects::create_generated_type(txn, s.name, s.category, &positions, &triangles, s.color, connectors)?
+                mesh_objects::create_generated_type(txn, s.name, s.category, &positions, &triangles, s.color, connectors, starter_predefined(s.name))?
             }
         };
         out.insert(s.name.to_owned(), id);

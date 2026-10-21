@@ -149,7 +149,11 @@ ribbon's tools, the command shell, Lua and MCP alike.
   collaboration, analysis, scripting, admin) that agents enable as needed, with discovery
   tools, `query_elements` and `get_element`, undo/redo/history, undo groups, preview and
   confirm for destructive changes, and resources for documents and elements. Agents get the
-  same transactions, warnings and permission checks as the user.
+  same transactions, warnings and permission checks as the user. **`get_view_image`** gives
+  multimodal agents a PNG of a view so they can look at what they did: from the agent terminal,
+  the view exactly as the user sees it in the window (camera, plan graphics, annotation,
+  selection), after the agent's calls have been drawn; headless, plans and 3D views rendered
+  offscreen.
 
 ### Modelling
 
@@ -929,6 +933,13 @@ schedules, circuit paths, cable sizing and voltage drop.
   Velocity, Friction, Pressure Drop, Network ID and Critical Path, and schedules can be filtered;
   flows and velocities go to the IFC ports (`mep_network.calculate`, `analytical_segment.list`,
   `analytical_segment.override`, `mep_settings.set_friction_equation`, `schedule.set_filters`).
+- **Mechanical control devices** (Systems › HVAC & Piping › Mechanical Control Device, Assign
+  Controlled Element): thermostats, humidistats, sensors and controllers (starter types with a
+  Controls connector) placed on the nearest wall face at a mounting height, following the wall,
+  or on the work plane; assigned to the equipment, VAV boxes or terminals they control; a deleted
+  host wall leaves them in place with a warning. IFC: `IfcUnitaryControlElement`, `IfcSensor`
+  or `IfcController` with the predefined type, `IfcRelConnectsElements` to the wall and
+  `IfcRelFlowControlElements` (`mech_control_device.place`, `.assign`, `.list`).
 - **Risers** (Systems › HVAC & Piping › Create Riser, Bind Riser): from an open duct, pipe, tray
   or conduit end, an elbow and a vertical segment of the same type, size and system up or down to
   a level plus an offset, bound to the level (it stretches when the level moves, and the run
@@ -1298,7 +1309,7 @@ area by area (reviewed against the spec on 2026-10-15).
   file for secrets where there is no keychain, administrator-provisioned subscriptions, and a
   project's preferred subscription; the remote analysis server itself is a separate project.
 - **MCP**: streamable HTTP with tokens, rate and size limits, subscriptions, prompts,
-  `execute_lua` and view images.
+  `execute_lua`, and view images in `preview`.
 - **Structure** (in development): structural columns, slanted columns, beams, beam systems,
   trusses, braces, generic connections, foundations with piles and pile caps, structural walls and
   floors, Structural Settings with Coarse single-line framing, steel and timber section

@@ -16,6 +16,7 @@ Water 1. The tools are on the <b>Systems</b> tab.</p>
   <a href="#sizing">Cable sizing and voltage drop</a>
   <a href="#schedules">Panel schedules</a>
   <a href="#loads">Load classifications and demand factors</a>
+  <a href="#controls">Thermostats, sensors and controllers</a>
   <a href="#risers">Risers</a>
   <a href="#sizing-ducts">Sizing ducts and pipes</a>
   <a href="#pressure">Pressure drop and the loss report</a>
@@ -182,6 +183,15 @@ as <code>from-to: percent</code>, separated by semicolons, for example
 of the load that falls in it, so 25 kVA becomes 10 + 7.5 = 17.5 kVA. Without it, the whole load
 takes the percentage of its range. The <b>largest motor rule</b> weights motor loads, largest
 first (for example 125, 100, 75).</p>
+
+<h2 id="controls">Thermostats, sensors and controllers</h2>
+<p><a href="reviera:action/mech_control_device.place">Mechanical Control Device</a> (Systems ›
+HVAC &amp; Piping) places a thermostat, humidistat, sensor or controller. Choose its type and mounting
+height, then click near a wall: it goes on that face of the wall, facing into the room, and moves
+when the wall moves. Away from walls it stands where you click. To say what a device controls,
+select it together with the equipment, VAV box or terminal and choose <a
+href="reviera:action/mech_control_device.assign">Assign Controlled Element</a>. If its wall is
+deleted, the device stays where it was and Reviera warns you.</p>
 
 <h2 id="risers">Risers</h2>
 <p>Select a duct or pipe with an open end and choose <a

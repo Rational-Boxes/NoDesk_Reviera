@@ -18,7 +18,7 @@ use reviera_core::{
 use rmcp::ErrorData as McpError;
 use rmcp::handler::server::ServerHandler;
 use rmcp::model::{
-    CallToolRequestParams, CallToolResponse, CallToolResult, Implementation, JsonObject,
+    CallToolRequestParams, CallToolResponse, CallToolResult, ContentBlock, Implementation, JsonObject,
     ListResourceTemplatesResult, ListResourcesResult, ListToolsResult, PaginatedRequestParams,
     ReadResourceRequestParams, ReadResourceResponse, ReadResourceResult, Resource,
     ResourceContents, ResourceTemplate, ServerCapabilities, ServerConfig, Tool, ToolAnnotations,
@@ -574,6 +574,69 @@ impl McpServer {
     }
 }
 
+/// What the application thread did with a view image request.
+enum ImageStep {
+    Done(reviera_core::Result<reviera_app::view_image::ViewImage>),
+    /// The window captures it.
+    Wait(std::sync::mpsc::Receiver<reviera_core::Result<reviera_app::view_image::ViewImage>>),
+}
+
+impl McpServer {
+    /// `get_view_image`: the window captures the view, or it is rendered offscreen.
+    async fn view_image(&self, args: Value) -> Result<CallToolResult, McpError> {
+        use base64::Engine;
+        let view: Option<reviera_core::ElementRef> = match args.get("view_id") {
+            Some(Value::Number(n)) => n.as_u64().map(|v| reviera_core::ElementRef::Id(reviera_core::ElementId(v))),
+            Some(Value::String(g)) => match reviera_core::GlobalId::parse(g) {
+                Some(g) => Some(reviera_core::ElementRef::Guid(g)),
+                None => return Ok(CallToolResult::structured_error(json!({ "error": { "code": "view.not_found", "message": format!("{g:?} is not a GlobalId") } }))),
+            },
+            _ => None,
+        };
+        let max = args.get("max_size").and_then(Value::as_u64).unwrap_or(1024).clamp(64, 4096) as u32;
+        let gizmos = args.get("gizmos").and_then(Value::as_bool).unwrap_or(false);
+        let step = self
+            .app
+            .call(move |app| {
+                let Some(doc) = app.active() else {
+                    return ImageStep::Done(Err(reviera_core::Error::new("document.none", "no document is open")));
+                };
+                let view = match &view {
+                    Some(r) => match app.document(doc).and_then(|d| d.doc.store().resolve(r)) {
+                        Some(v) => Some(v),
+                        None => return ImageStep::Done(Err(reviera_core::Error::new("view.not_found", "no such view"))),
+                    },
+                    None => None,
+                };
+                if app.has_window() {
+                    let (reply, rx) = std::sync::mpsc::channel();
+                    app.request_view_image(reviera_app::view_image::ImageRequest { doc, view, max_size: max, gizmos, reply });
+                    ImageStep::Wait(rx)
+                } else {
+                    ImageStep::Done(app.render_view_image(doc, view, max))
+                }
+            })
+            .await
+            .map_err(internal)?;
+        let result = match step {
+            ImageStep::Done(r) => r,
+            ImageStep::Wait(rx) => tokio::task::spawn_blocking(move || {
+                rx.recv_timeout(std::time::Duration::from_secs(30))
+                    .unwrap_or_else(|_| Err(reviera_core::Error::new("view_image.timeout", "the window did not capture the view in time")))
+            })
+            .await
+            .map_err(internal)?,
+        };
+        Ok(match result {
+            Ok(img) => CallToolResult::success(vec![
+                ContentBlock::image(base64::engine::general_purpose::STANDARD.encode(&img.png), "image/png"),
+                ContentBlock::text(json!({ "view": img.view, "width": img.width, "height": img.height, "source": img.source }).to_string()),
+            ]),
+            Err(e) => CallToolResult::structured_error(json!({ "error": { "code": e.code, "message": e.message } })),
+        })
+    }
+}
+
 fn active_doc(app: &App) -> Result<&reviera_core::Document, Value> {
     app.active()
         .and_then(|id| app.document(id))
@@ -665,6 +728,8 @@ fn session_tools() -> Vec<Tool> {
             schema(json!({"mode": {"enum": ["assimilate", "commit", "rollback"]}}), &["mode"])).with_annotations(rw()),
         Tool::new("preview", "Run a command and roll it back, reporting what it would change.",
             schema(json!({"command": {"type": "string"}, "arguments": {"type": "object"}}), &["command"])).with_annotations(ro()),
+        Tool::new("get_view_image", "A PNG image of a view as it is now, so you can look at the model: the view as the user sees it in the window (its camera, plan graphics, annotation, selection), or rendered offscreen without a window (plans and 3D views). view_id: the view's id or GlobalId (the active view when omitted; view.list finds views); max_size: the longest side in pixels (1024 by default); gizmos: keep the view cube.",
+            schema(json!({"view_id": {"type": ["integer", "string"]}, "max_size": {"type": "integer", "minimum": 64, "maximum": 4096}, "gizmos": {"type": "boolean"}}), &[])).with_annotations(ro()),
         Tool::new("confirm", "Run a destructive command previewed in confirm mode.",
             schema(json!({"preview_token": {"type": "string"}}), &["preview_token"])).with_annotations(ToolAnnotations::new().destructive(true)),
     ]
@@ -686,6 +751,7 @@ const SESSION_TOOLS: &[&str] = &[
     "session.end_group",
     "preview",
     "confirm",
+    "get_view_image",
 ];
 
 impl ServerHandler for McpServer {
@@ -695,7 +761,8 @@ impl ServerHandler for McpServer {
             .with_instructions(
                 "BIM Reviera: BIM authoring on native IFC. Tools are Reviera commands; use find_commands \
                  to discover commands in toolsets that are not enabled, and run_command to call them. Results \
-                 are {result, warnings, changed}. Undo only reverts this session's own changes.",
+                 are {result, warnings, changed}. Undo only reverts this session's own changes. \
+                 get_view_image returns a PNG of a view, to look at what you did.",
             )
     }
 
@@ -731,6 +798,10 @@ impl ServerHandler for McpServer {
             }
         }
         let args = Value::Object(request.arguments.clone().unwrap_or_default());
+        // Images are content blocks, not structured results (DM-MCP-004).
+        if request.name == "get_view_image" {
+            return Ok(self.view_image(args).await?.into());
+        }
         let outcome = self.call(&request.name, args).await?;
         Ok(match outcome {
             Ok(v) => CallToolResult::structured(v),

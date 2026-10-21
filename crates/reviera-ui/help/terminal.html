@@ -26,6 +26,9 @@ CLI</b>, if they are installed and on your PATH (Reviera does not install them, 
 and API keys stay theirs). Each agent tab gets its own connection to Reviera's MCP server, set up
 for that session only: your agent's own settings files are never changed. Ask the agent about the
 model ("how many doors are on level 1?") or to change it ("make the south wall 300 mm thick").</p>
+<p>Agents that can read images can also <b>look at the model</b>. When an agent asks for a
+picture of a view, it gets the view exactly as you see it in the window, taken after its own
+changes have been drawn. Ask, for example, "check the stair looks right in the 3D view".</p>
 <p>Qwen Code starts in a session folder Reviera prepares, since that is where it reads its
 connection settings; the other agents start in the model's folder.</p>
 <p>In the Flatpak, terminal tabs run on your computer outside the sandbox, so the Shell is your

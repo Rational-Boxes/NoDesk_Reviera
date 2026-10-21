@@ -19,6 +19,7 @@ serde_json.workspace = true
 schemars.workspace = true
 uuid.workspace = true
 thiserror.workspace = true
+base64 = "0.23.1"
 
 [dev-dependencies]
 tempfile.workspace = true

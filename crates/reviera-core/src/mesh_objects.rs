@@ -59,10 +59,16 @@ pub enum Category {
     ElectricalFixture,
     Sprinkler,
     Transformer,
+    /// Thermostats and humidistats (MEP-DUCT-012).
+    ControlElement,
+    Sensor,
+    Controller,
+    /// VAV and constant-volume boxes.
+    AirTerminalBox,
 }
 
 impl Category {
-    pub const ALL: [Category; 12] = [
+    pub const ALL: [Category; 16] = [
         Category::GenericModel,
         Category::Furniture,
         Category::Column,
@@ -75,6 +81,10 @@ impl Category {
         Category::ElectricalFixture,
         Category::Sprinkler,
         Category::Transformer,
+        Category::ControlElement,
+        Category::Sensor,
+        Category::Controller,
+        Category::AirTerminalBox,
     ];
 
     pub fn label(self) -> &'static str {
@@ -91,6 +101,10 @@ impl Category {
             Category::ElectricalFixture => "Electrical Fixture",
             Category::Sprinkler => "Sprinkler",
             Category::Transformer => "Transformer",
+            Category::ControlElement => "Mechanical Control Device",
+            Category::Sensor => "Sensor",
+            Category::Controller => "Controller",
+            Category::AirTerminalBox => "Air Terminal Box",
         }
     }
 
@@ -109,6 +123,10 @@ impl Category {
             Category::ElectricalFixture => "IfcOutlet",
             Category::Sprinkler => "IfcFireSuppressionTerminal",
             Category::Transformer => "IfcTransformer",
+            Category::ControlElement => "IfcUnitaryControlElement",
+            Category::Sensor => "IfcSensor",
+            Category::Controller => "IfcController",
+            Category::AirTerminalBox => "IfcAirTerminalBox",
         }
     }
 
@@ -127,7 +145,16 @@ impl Category {
             Category::ElectricalFixture => "IfcOutletType",
             Category::Sprinkler => "IfcFireSuppressionTerminalType",
             Category::Transformer => "IfcTransformerType",
+            Category::ControlElement => "IfcUnitaryControlElementType",
+            Category::Sensor => "IfcSensorType",
+            Category::Controller => "IfcControllerType",
+            Category::AirTerminalBox => "IfcAirTerminalBoxType",
         }
+    }
+
+    /// Control devices: thermostats, humidistats, sensors and controllers (MEP-DUCT-012).
+    pub fn is_control_device(self) -> bool {
+        matches!(self, Category::ControlElement | Category::Sensor | Category::Controller)
     }
 
     fn predefined(self) -> &'static str {
@@ -270,6 +297,16 @@ pub struct MeshObjectType {
     /// MEP connectors (MEP-CONN-001), in the type's frame.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub connectors: Vec<crate::mep::Connector>,
+    /// The IFC predefined type of its copies (THERMOSTAT, CO2SENSOR, …); the category's when none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub predefined: Option<String>,
+}
+
+impl MeshObjectType {
+    /// The IFC predefined type of its copies.
+    pub fn predefined_type(&self) -> &str {
+        self.predefined.as_deref().unwrap_or(self.category.predefined())
+    }
 }
 
 fn one() -> f64 {
@@ -305,6 +342,47 @@ pub struct MeshObjectRecipe {
     /// surface there.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub host: Option<String>,
+    /// A wall face it is mounted on (MEP-DUCT-012): it follows the face, its point and rotation
+    /// derived from the wall.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub face: Option<FaceHost>,
+}
+
+/// A copy mounted on a wall's face.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct FaceHost {
+    /// The wall (GlobalId).
+    pub wall: String,
+    /// 1 on the exterior (left of the wall's direction), −1 on the interior.
+    pub side: f64,
+    /// Metres along the wall's location line from its start.
+    pub along: f64,
+}
+
+/// A face-hosted copy's point and rotation from its wall as it is now, if the wall is there:
+/// on the face, its back to the wall (local −y toward the wall).
+pub fn face_point(store: &Store, f: &FaceHost) -> Option<([f64; 2], f64)> {
+    let w = store.find_by_guid(&GlobalId::parse(&f.wall)?).and_then(|id| store.get(id))?;
+    let g = crate::walls::regenerate(store, w).ok()?;
+    let (d, n) = (g.direction(), g.normal());
+    let s = f.side.signum();
+    let at = [
+        g.start[0] + d[0] * f.along + n[0] * s * g.width / 2.0,
+        g.start[1] + d[1] * f.along + n[1] * s * g.width / 2.0,
+    ];
+    // Facing away from the wall: local +y along the face's outward normal.
+    let out = [n[0] * s, n[1] * s];
+    Some((at, out[1].atan2(out[0]) - std::f64::consts::FRAC_PI_2))
+}
+
+/// Re-reads a face-hosted copy's place along its wall from its point (after a move), keeping the
+/// side.
+fn rehost(store: &Store, r: &mut MeshObjectRecipe) {
+    let Some(f) = &mut r.face else { return };
+    let Some(w) = GlobalId::parse(&f.wall).and_then(|g| store.find_by_guid(&g)).and_then(|id| store.get(id)) else { return };
+    let Ok(g) = crate::walls::regenerate(store, w) else { return };
+    let d = g.direction();
+    f.along = ((r.point[0] - g.start[0]) * d[0] + (r.point[1] - g.start[1]) * d[1]).clamp(0.0, g.length());
 }
 
 fn is_one(v: &f64) -> bool {
@@ -723,11 +801,20 @@ pub fn regenerate(store: &Store, e: &Element) -> Result<MeshObjectGeometry> {
         None => crate::levels::elevation_of(store, &r.level)? + r.offset,
     };
     let mesh = ty.mesh.decode()?;
+    // On a wall face, where the face is now; unhosted (the wall gone), where it was put.
+    let (point, rotation) = match r.face.as_ref().and_then(|f| face_point(store, f)) {
+        // Its back against the face: a generated box is centred on its insertion point.
+        Some((at, rot)) => {
+            let half = ty.size[1] * ty.scale * r.scale / 2.0;
+            ([at[0] - rot.sin() * half, at[1] + rot.cos() * half], rot)
+        }
+        None => (r.point, r.rotation),
+    };
     Ok(MeshObjectGeometry {
         type_id,
         placement: Placement {
-            origin: [r.point[0], r.point[1], z],
-            rotation: r.rotation,
+            origin: [point[0], point[1], z],
+            rotation,
             mirror: r.mirror,
             scale: ty.scale * r.scale,
         },
@@ -867,11 +954,13 @@ fn type_recipe(
         mesh: StoredMesh::encode(&prepared.positions, &prepared.triangles, &prepared.tri_slot),
         library: None,
         connectors: Vec::new(),
+        predefined: None,
     }
 }
 
 /// Makes a type from a mesh Reviera generated (metres, Z up, insertion point at the origin), one
 /// slot of `color`, with `connectors` (MEP starter and box types).
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn create_generated_type(
     txn: &mut crate::txn::Transaction<'_>,
     name: &str,
@@ -880,6 +969,7 @@ pub(crate) fn create_generated_type(
     triangles: &[[u32; 3]],
     color: [f32; 4],
     connectors: Vec<crate::mep::Connector>,
+    predefined: Option<&str>,
 ) -> Result<ElementId> {
     let mut lo = [f64::MAX; 3];
     let mut hi = [f64::MIN; 3];
@@ -909,11 +999,12 @@ pub(crate) fn create_generated_type(
         mesh: StoredMesh::encode(positions, triangles, &vec![0; triangles.len()]),
         library: None,
         connectors,
+        predefined: predefined.map(str::to_owned),
     };
     txn.create(
         NewElement::new(category.type_class())
             .name(name)
-            .param("@PredefinedType", category.predefined())
+            .param("@PredefinedType", predefined.unwrap_or(category.predefined()).to_owned())
             .param(RECIPE_KEY, serde_json::to_value(&recipe).expect("serialises")),
     )
 }
@@ -1043,6 +1134,7 @@ pub(crate) fn place(txn: &mut crate::txn::Transaction<'_>, p: PlaceParams) -> Re
         mirror: p.mirror,
         scale: p.scale,
         host: None,
+        face: None,
     };
     if !(p.scale > 0.0 && p.scale.is_finite()) {
         return Err(Error::new(
@@ -1053,7 +1145,7 @@ pub(crate) fn place(txn: &mut crate::txn::Transaction<'_>, p: PlaceParams) -> Re
     let type_guid = store.get(type_id).expect("resolved").guid().to_string();
     let id = txn.create(
         NewElement::new(ty.category.class())
-            .param("@PredefinedType", ty.category.predefined())
+            .param("@PredefinedType", ty.predefined_type().to_owned())
             .param("@type", type_guid)
             .param(
                 RECIPE_KEY,
@@ -1119,6 +1211,7 @@ pub(crate) fn set(txn: &mut crate::txn::Transaction<'_>, p: SetParams) -> Result
     for (id, mut r) in copies(&store, &p.element_ids)? {
         if let Some(v) = p.point {
             r.point = v;
+            rehost(&store, &mut r);
         }
         if let Some(l) = &level {
             r.level = l.clone();
@@ -1310,7 +1403,13 @@ pub(crate) fn transform(
 ) -> Result<()> {
     let store = txn.store().clone();
     let mut r = mesh_object_recipe(store.get(id).expect("exists")).expect("a custom object");
+    // A face-hosted copy moves from where it is drawn, and stays on its face.
+    if let Some((at, rot)) = r.face.as_ref().and_then(|f| face_point(&store, f)) {
+        r.point = at;
+        r.rotation = rot;
+    }
     r.point = x(r.point);
+    rehost(&store, &mut r);
     match mirror {
         Some(axis) => {
             r.rotation = 2.0 * axis - r.rotation;

@@ -24,6 +24,7 @@ pub mod sheets;
 pub mod structural;
 pub mod subscriptions;
 pub mod views;
+pub mod view_image;
 
 use std::collections::BTreeMap;
 use std::fmt::Display;
@@ -239,6 +240,10 @@ pub struct App {
     compute: Option<reviera_compute::ComputeClient>,
     /// Remote analysis subscriptions: settings, secrets and connections (`subscription.*`).
     subscriptions: subscriptions::Subscriptions,
+    /// A window is there to capture views (DM-MCP-004).
+    window: bool,
+    /// View captures asked of the window.
+    image_requests: Vec<view_image::ImageRequest>,
 }
 
 /// Whether an element's body is regenerated from its Reviera recipe (`bodies`), rather than
@@ -271,6 +276,8 @@ impl App {
             form_handler: None,
             compute: None,
             subscriptions: subscriptions::Subscriptions::default(),
+            window: false,
+            image_requests: Vec::new(),
         }
     }
 

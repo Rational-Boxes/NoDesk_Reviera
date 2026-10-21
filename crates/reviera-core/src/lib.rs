@@ -62,6 +62,7 @@ pub mod mep_electrical;
 pub mod mep_cables;
 pub mod mep_gutters;
 pub mod mep_calculator;
+pub mod mep_controls;
 pub mod mep_loads;
 pub mod mep_network;
 pub mod mep_penetrations;

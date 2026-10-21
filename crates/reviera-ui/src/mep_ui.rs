@@ -293,6 +293,74 @@ impl Gui {
         self.start_place_tool(super::components::Source::Type(id), name);
     }
 
+    /// Systems › Mechanical › Mechanical Control Device: a thermostat, humidistat, sensor or
+    /// controller type and its mounting height; each click puts one on the nearest wall face (or
+    /// on the work plane away from walls).
+    pub(crate) fn place_control_device(&mut self) {
+        let frame = self.frame;
+        let devices = |store: &reviera_core::Store| -> Vec<(ElementId, String)> {
+            let mut v: Vec<(ElementId, String)> = store
+                .iter()
+                .filter_map(|e| {
+                    let t = reviera_core::mesh_objects::mesh_object_type(e)?;
+                    t.category.is_control_device().then(|| (e.id(), format!("{} ({})", e.name.clone().unwrap_or_default(), t.category.label())))
+                })
+                .collect();
+            v.sort_by(|a, b| a.1.cmp(&b.1));
+            v
+        };
+        let Some(store) = self.store_now() else {
+            return frame.set_status_text("Open or create a project first (File > New)", 0);
+        };
+        let mut types = devices(&store);
+        if types.is_empty() {
+            let names = ["Thermostat", "Humidistat", "Temperature Sensor", "CO2 Sensor", "Humidity Sensor", "Occupancy Sensor", "Pressure Sensor", "DDC Controller"];
+            if let Err(e) = self.run("mep_type.load_starters", json!({ "names": names })) {
+                return error(&frame, &e);
+            }
+            let Some(store) = self.store_now() else { return };
+            types = devices(&store);
+        }
+        let f = super::reinforcement_ui::Form::new(&frame, "Mechanical Control Device");
+        let names: Vec<String> = types.iter().map(|t| t.1.clone()).collect();
+        let ty = f.choice("Type", &names, 0);
+        let height = f.text("Mounting height (mm)", "1500", "Above the level");
+        let ok = f.show("Click near a wall to put it on that face (it follows the wall); away from walls it stands on the work plane. Spacebar turns it there.", "Place");
+        let k = ty.get_selection().map_or(0, |k| k as usize);
+        let h = height.get_value().trim().replace(',', ".").parse::<f64>().unwrap_or(1500.0) / 1000.0;
+        f.dialog.destroy();
+        let Some((id, label)) = types.get(k).cloned().filter(|_| ok) else { return };
+        let name = label.split(" (").next().unwrap_or(&label).to_owned();
+        self.start_place_tool(super::components::Source::Type(id), name);
+        self.set_place_offset(h);
+    }
+
+    /// Systems › Mechanical › Assign Controlled Element: the selected control devices control the
+    /// rest of the selection.
+    pub(crate) fn assign_controlled(&mut self) {
+        let frame = self.frame;
+        let Some(store) = self.store_now() else { return };
+        let sel = self.selection();
+        let (devices, others): (Vec<ElementId>, Vec<ElementId>) =
+            sel.iter().partition(|id| store.get(**id).is_some_and(|e| reviera_core::mep_controls::is_device(&store, e)));
+        if devices.is_empty() {
+            return frame.set_status_text("Assign Controlled Element: select a control device and what it controls", 0);
+        }
+        for d in &devices {
+            if let Err(e) = self.run("mech_control_device.assign", json!({ "device_id": d, "controlled_ids": others, "add": !others.is_empty() })) {
+                return error(&frame, &e);
+            }
+        }
+        frame.set_status_text(
+            &if others.is_empty() {
+                "The device controls nothing now".to_owned()
+            } else {
+                format!("{} device(s) control {} element(s)", devices.len(), others.len())
+            },
+            0,
+        );
+    }
+
     /// Connects the selection's ports that meet (Systems › Connect).
     pub(crate) fn connect_touching(&mut self) {
         let frame = self.frame;

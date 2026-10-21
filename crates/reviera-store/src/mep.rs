@@ -80,7 +80,7 @@ fn is_ours(ifc: &IfcModel, id: StepId) -> bool {
 /// Removes what an earlier save wrote: the tagged relationships and the nested ports with their
 /// placements and property sets.
 fn remove_earlier(ifc: &mut IfcModel) -> Result<()> {
-    for class in ["IfcRelConnectsPorts", "IfcRelServicesBuildings"] {
+    for class in ["IfcRelConnectsPorts", "IfcRelServicesBuildings", "IfcRelFlowControlElements", "IfcRelConnectsElements"] {
         for rel in ifc.entities_of_type(class)? {
             if is_ours(ifc, rel.id) {
                 ifc.remove(rel.id)?;
@@ -301,6 +301,46 @@ pub(crate) fn write_mep(
         ifc.set_attribute(rel, "RelatingPort", &r(a))?;
         ifc.set_attribute(rel, "RelatedPort", &r(b))?;
     }
+    // Control devices (MEP-DUCT-012): hosted to their wall, and related to what they control.
+    let mut controlling: Vec<(ElementId, Vec<StepId>)> = Vec::new();
+    for e in store.iter().filter(|e| reviera_core::mep_controls::is_device(store, e)) {
+        let Some(&dev) = steps.get(&e.id()) else { continue };
+        let wall = reviera_core::mesh_objects::mesh_object_recipe(e)
+            .and_then(|r| r.face)
+            .and_then(|f| GlobalId::parse(&f.wall))
+            .and_then(|g| store.find_by_guid(&g))
+            .and_then(|w| steps.get(&w).copied());
+        if let Some(wall) = wall {
+            let rel = ifc.create_rooted("IfcRelConnectsElements", &GlobalId::new())?;
+            if let Some(oh) = owner_history {
+                ifc.set_attribute(rel, "OwnerHistory", &r(oh))?;
+            }
+            ifc.set_attribute(rel, "Description", &s(TAG))?;
+            ifc.set_attribute(rel, "RelatingElement", &r(wall))?;
+            ifc.set_attribute(rel, "RelatedElement", &r(dev))?;
+        }
+        for c in reviera_core::mep_controls::controlled(store, e) {
+            // Only distribution flow elements take the relationship; other controlled elements
+            // stay in the model's data.
+            if !store.get(c).is_some_and(|x| is_flow_element(&x.class)) {
+                continue;
+            }
+            match controlling.iter_mut().find(|(x, _)| *x == c) {
+                Some((_, v)) => v.push(dev),
+                None => controlling.push((c, vec![dev])),
+            }
+        }
+    }
+    for (c, devices) in controlling {
+        let Some(&flow) = steps.get(&c) else { continue };
+        let rel = ifc.create_rooted("IfcRelFlowControlElements", &GlobalId::new())?;
+        if let Some(oh) = owner_history {
+            ifc.set_attribute(rel, "OwnerHistory", &r(oh))?;
+        }
+        ifc.set_attribute(rel, "Description", &s(TAG))?;
+        ifc.set_attribute(rel, "RelatedControlElements", &AttrValue::List(devices.into_iter().map(r).collect()))?;
+        ifc.set_attribute(rel, "RelatingFlowElement", &r(flow))?;
+    }
     // Circuits: their members by IfcRelAssignsToGroup (MEP-ELEC-002).
     for c in reviera_core::mep_electrical::circuits(store) {
         let Some(&step) = steps.get(&c.id) else { continue };
@@ -343,4 +383,31 @@ pub(crate) fn write_mep(
         }
     }
     Ok(())
+}
+
+/// Whether an IFC class is an `IfcDistributionFlowElement` Reviera writes.
+fn is_flow_element(class: &str) -> bool {
+    matches!(
+        class,
+        "IfcUnitaryEquipment"
+            | "IfcAirTerminal"
+            | "IfcAirTerminalBox"
+            | "IfcDamper"
+            | "IfcFan"
+            | "IfcPump"
+            | "IfcValve"
+            | "IfcDuctSegment"
+            | "IfcDuctFitting"
+            | "IfcPipeSegment"
+            | "IfcPipeFitting"
+            | "IfcSanitaryTerminal"
+            | "IfcFireSuppressionTerminal"
+            | "IfcLightFixture"
+            | "IfcOutlet"
+            | "IfcElectricDistributionBoard"
+            | "IfcTransformer"
+            | "IfcCableCarrierSegment"
+            | "IfcCableCarrierFitting"
+            | "IfcJunctionBox"
+    )
 }

@@ -872,6 +872,13 @@ impl Gui {
     // ---- Place Component ----
 
     /// Starts the Place Component tool with `source`.
+    /// The running Place Component tool's height above the level (metres).
+    pub(crate) fn set_place_offset(&mut self, offset: f64) {
+        if let Some(t) = &mut self.place_tool {
+            t.offset = offset;
+        }
+    }
+
     pub(crate) fn start_place_tool(&mut self, source: Source, name: String) {
         let frame = self.frame;
         if self.doc.is_none() {
@@ -1073,6 +1080,23 @@ impl Gui {
             }
             Source::Type(ty) => args["type_id"] = json!(ty),
             Source::Fragment { .. } => unreachable!("placed above"),
+        }
+        // Control devices go on the nearest wall face, at their mounting height (MEP-DUCT-012).
+        let device = match &t.source {
+            Source::Type(ty) => self.store_now().and_then(|s| s.get(*ty).and_then(mesh_objects::mesh_object_type)).is_some_and(|ty| ty.category.is_control_device()),
+            _ => false,
+        };
+        if device && let Source::Type(ty) = &t.source {
+            let args = json!({ "type_id": ty, "point": p, "level": level, "offset": height + t.offset, "rotation": t.rotation });
+            match self.run("mech_control_device.place", args) {
+                Ok(_) => {
+                    self.refresh_scene(&frame);
+                    self.properties_stale = true;
+                    self.place_motion(x, y);
+                }
+                Err(e) => frame.set_status_text(&e, 0),
+            }
+            return;
         }
         match self.run("component.place", args) {
             Ok(v) => {

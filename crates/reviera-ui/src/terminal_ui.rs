@@ -854,6 +854,8 @@ impl Gui {
             self.browser_stale = true;
             self.tree.stale = true;
         }
+        // Views the agents asked to see, now that their calls are drawn (DM-MCP-004).
+        self.serve_image_requests();
         let pending = self.terminal.as_ref().and_then(|t| t.approvals.lock().expect("approvals").pop_front());
         let Some(t) = &mut self.terminal else { return pending };
         for (k, tab) in t.tabs.iter_mut().enumerate() {

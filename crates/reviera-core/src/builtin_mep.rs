@@ -141,6 +141,9 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(ConductorAmpacitySet),
         registry.add(WiringSet),
         registry.add(MepSize),
+        registry.add(MechControlDevicePlace),
+        registry.add(MechControlDeviceAssign),
+        registry.add(MechControlDeviceList),
         registry.add(MepRunCreateRiser),
         registry.add(MepRunBindRiser),
         registry.add(SizingCalculatorCandidates),
@@ -1092,6 +1095,38 @@ edit_command!(
     crate::mep_sizing::SizeParams,
     crate::mep_sizing::SizeReport,
     crate::mep_sizing::size
+);
+
+edit_command!(
+    MechControlDevicePlace,
+    "mech_control_device.place",
+    "Place a control device",
+    "Places a thermostat, humidistat, sensor or controller (a component type of the Mechanical Control Device, Sensor or Controller category) at `point` on `level`, `offset` (mounting height, 1.5 m by default) above it (MEP-DUCT-012): on the face of `host_wall` (`side` exterior or interior, else the side the point is on), or of the nearest wall face within 300 mm; with `work_plane`, or no wall near, free (`rotation`). On a wall it follows the face, its back against it. `controlled_ids` as mech_control_device.assign. Returns its id.",
+    "Place Control Device",
+    crate::mep_controls::PlaceParams,
+    crate::ElementId,
+    crate::mep_controls::place
+);
+
+edit_command!(
+    MechControlDeviceAssign,
+    "mech_control_device.assign",
+    "Assign controlled elements",
+    "Sets the elements a control device controls (`add` to add to them): equipment, VAV boxes, dampers, terminals, of any discipline; not the device itself, another control device or a type (MEP-DUCT-012). In IFC: an IfcRelFlowControlElements to each distribution flow element.",
+    "Assign Controlled Element",
+    crate::mep_controls::AssignParams,
+    (),
+    crate::mep_controls::assign
+);
+
+read_command!(
+    MechControlDeviceList,
+    "mech_control_device.list",
+    "Control devices",
+    "Every control device: its type name, IFC class and predefined type, host wall and the elements it controls (MEP-DUCT-012).",
+    crate::mep_controls::ListParams,
+    Vec<crate::mep_controls::DeviceInfo>,
+    crate::mep_controls::list
 );
 
 edit_command!(

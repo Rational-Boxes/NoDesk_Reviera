@@ -358,6 +358,12 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "system_inspector" => format!(
             r#"<path d="M3 10h14M17 10l-4-3M17 10l-4 3M3 20h10" fill="none" {s}/><circle cx="21" cy="19" r="5" fill="{f}" {sa}/><path d="M25 23l5 5" stroke-width="2.5" {sa}/>"#
         ),
+        "thermostat" => format!(
+            r#"<rect x="8" y="4" width="16" height="24" rx="3" fill="{f}" {s}/><circle cx="16" cy="13" r="5" fill="none" {sa}/><path d="M16 13l3-3" {sa}/><path d="M12 22h8" {s}/>"#
+        ),
+        "assign_control" => format!(
+            r#"<rect x="3" y="8" width="8" height="12" rx="2" fill="{f}" {s}/><rect x="19" y="10" width="10" height="10" fill="{f}" {s}/><path d="M11 14h8M16 11l3 3-3 3" fill="none" {sa}/>"#
+        ),
         "riser" => format!(
             r#"<path d="M3 24h12a4 4 0 0 0 4-4V6" fill="none" stroke-width="5" {s}/><path d="M3 24h12a4 4 0 0 0 4-4V6" fill="none" stroke-width="3" stroke="{f}"/><path d="M15 9l4-5 4 5" fill="none" {sa}/><path d="M24 4h6" {sa}/>"#
         ),

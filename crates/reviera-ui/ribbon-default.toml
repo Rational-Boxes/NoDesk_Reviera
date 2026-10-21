@@ -2264,6 +2264,18 @@ keys = "PL"
 help = "Draw a pipe run, optionally sloped: elbows at corners, a tee where it ends on a pipe (MEP-PIPE-001)"
 
 [[action]]
+id = "mech_control_device.place"
+label = "Mechanical Control Device"
+icon = "thermostat"
+help = "Place thermostats, humidistats, sensors and controllers on wall faces (they follow the wall) or the work plane, at a mounting height (MEP-DUCT-012)"
+
+[[action]]
+id = "mech_control_device.assign"
+label = "Assign Controlled Element"
+icon = "assign_control"
+help = "The selected control devices control the rest of the selection: equipment, VAV boxes, dampers, terminals (MEP-DUCT-012)"
+
+[[action]]
 id = "mep_run.create_riser"
 label = "Create Riser"
 icon = "riser"
@@ -2792,6 +2804,8 @@ tools = [
   { action = "duct.cap_open_ends", size = "small" },
   { action = "mep_run.create_riser", size = "small" },
   { action = "mep_run.bind_riser", size = "small" },
+  { action = "mech_control_device.place", size = "small" },
+  { action = "mech_control_device.assign", size = "small" },
   { action = "mep.size", size = "small" },
 ]
 

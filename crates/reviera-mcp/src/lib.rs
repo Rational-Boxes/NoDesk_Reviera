@@ -11,8 +11,9 @@
 //! Built so far: stdio transport (DM-MCP-002), the generated tool catalogue with toolsets and
 //! discovery tools (DM-MCP-003), the session tools `undo`/`redo`/`history`, `query_elements`,
 //! `get_element`, `session.begin_group`/`end_group`, `preview`/`confirm` (DM-MCP-004), confirm
-//! mode (DM-MCP-005) and the core resources (DM-MCP-006). Not yet: streamable HTTP and tokens,
-//! rate and size limits, path allow-lists, subscriptions, prompts, `execute_lua`, view images.
+//! mode (DM-MCP-005), the core resources (DM-MCP-006) and `get_view_image` (a PNG of a view:
+//! captured by the window, or rendered offscreen headless). Not yet: streamable HTTP and tokens,
+//! rate and size limits, path allow-lists, subscriptions, prompts, `execute_lua`.
 
 pub mod bridge;
 mod queue;

@@ -566,6 +566,33 @@ impl WgpuViewport {
         self.size
     }
 
+    /// Draws the current frame (scene, plan graphics, overlays, highlight, clipping) into an
+    /// offscreen texture the size of the viewport and reads it back as tightly packed RGBA rows,
+    /// for window viewports too (MCP `get_view_image`). With `gizmos` false, the view cube and
+    /// other on-screen controls are left out.
+    pub fn capture(&mut self, camera: &Camera, gizmos: bool) -> Result<(u32, u32, Vec<u8>), String> {
+        let (w, h) = self.size;
+        let texture = offscreen_texture(&self.device, self.format, w, h);
+        let target = std::mem::replace(&mut self.target, Target::Offscreen { texture });
+        let hidden = std::mem::replace(&mut self.hidden, false);
+        let (gizmo, hud) = if gizmos { (None, None) } else { (self.gizmo.take(), self.hud.take()) };
+        let drawn = self.draw(camera);
+        let pixels = drawn.and_then(|()| self.read_pixels().ok_or_else(|| "the frame could not be read back".to_owned()));
+        self.target = target;
+        self.hidden = hidden;
+        if !gizmos {
+            self.gizmo = gizmo;
+            self.hud = hud;
+        }
+        let mut pixels = pixels?;
+        if matches!(self.format, wgpu::TextureFormat::Bgra8Unorm | wgpu::TextureFormat::Bgra8UnormSrgb) {
+            for p in pixels.as_chunks_mut::<4>().0 {
+                p.swap(0, 2);
+            }
+        }
+        Ok((w, h, pixels))
+    }
+
     /// Reads back an offscreen frame as tightly packed RGBA rows; `None` for window viewports.
     pub fn read_pixels(&self) -> Option<Vec<u8>> {
         let Target::Offscreen { texture } = &self.target else {
@@ -1189,4 +1216,36 @@ impl WgpuViewport {
         }
         Ok(())
     }
+}
+
+/// Encodes tightly packed RGBA rows as a PNG.
+pub fn encode_png(width: u32, height: u32, rgba: &[u8]) -> Result<Vec<u8>, String> {
+    let mut out = Vec::new();
+    {
+        let mut e = png::Encoder::new(&mut out, width, height);
+        e.set_color(png::ColorType::Rgba);
+        e.set_depth(png::BitDepth::Eight);
+        let mut w = e.write_header().map_err(|e| e.to_string())?;
+        w.write_image_data(rgba).map_err(|e| e.to_string())?;
+    }
+    Ok(out)
+}
+
+/// Halves an RGBA image (box filter) until it fits `max` pixels on its longer side.
+pub fn fit_image(mut w: u32, mut h: u32, mut px: Vec<u8>, max: u32) -> (u32, u32, Vec<u8>) {
+    while w.max(h) > max.max(16) && w >= 2 && h >= 2 {
+        let (nw, nh) = (w / 2, h / 2);
+        let mut out = vec![0u8; (nw * nh * 4) as usize];
+        for y in 0..nh {
+            for x in 0..nw {
+                for c in 0..4 {
+                    let at = |xx: u32, yy: u32| u32::from(px[((yy * w + xx) * 4 + c) as usize]);
+                    let s = at(2 * x, 2 * y) + at(2 * x + 1, 2 * y) + at(2 * x, 2 * y + 1) + at(2 * x + 1, 2 * y + 1);
+                    out[((y * nw + x) * 4 + c) as usize] = (s / 4) as u8;
+                }
+            }
+        }
+        (w, h, px) = (nw, nh, out);
+    }
+    (w, h, px)
 }

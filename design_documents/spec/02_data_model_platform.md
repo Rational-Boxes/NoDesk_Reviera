@@ -4213,7 +4213,9 @@ key_id = "minisign:<publisher public key>"     # signature file: reviera-addin.t
 **Acceptance criteria.**
 - [ ] An agent creates 4 walls and a floor inside `session.begin_group("Create room")` … `end_group("assimilate")`. The UI shows one undo item named "Create room (agent: <client>)", and one undo removes everything.
 - [ ] `preview("element.delete", …)` returns the dependents that would be deleted, and leaves the model unchanged (same model version).
-- [ ] `get_view_image` returns a PNG that matches the view's current state after the agent's last transaction.
+- [x] `get_view_image` returns a PNG that matches the view's current state after the agent's last transaction.
+
+*Built (2026-10-21), `get_view_image`:* a session tool (read_only) `get_view_image(view_id?, max_size?, gizmos?)` returning MCP image content (`image/png`, base64) and a text line `{view, width, height, source}`; the active view when `view_id` (id or GlobalId) is omitted; `max_size` is the longest side (1024 by default, 64–4096). From the agent terminal (the window's bridge, UI-AGENT-004) the request is queued on the application and answered by the window after the agents' calls of that tick have run and the scene has refreshed: the view as the user sees it (its camera, plan, section or sheet graphics, annotation, selection highlight, section box), drawn into an offscreen copy of its frame, without the view cube and other controls unless `gizmos`, halved until it fits `max_size`; a view not open in a tab is rendered offscreen. Headless (`reviera --mcp-stdio`): plans (plan graphics and annotation, from their camera or from above fitted to the drawing) and 3D views (their camera, or a south-east isometric of the whole model) are rendered offscreen at `max_size` × ¾; sections, elevations, sheets and schedules are refused there with a hint to open them in the window; no graphics adapter is the error `view_image.gpu`. Not yet: `width`/`height` and `options` (the size is `max_size`), images in `preview`, the image resource.
 
 ### 2.16.5 Permissions and safety
 **ID:** DM-MCP-005 · **Priority:** P0 · **Ref:** TECH_STACK §3.6

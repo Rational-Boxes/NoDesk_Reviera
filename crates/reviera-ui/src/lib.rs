@@ -60,6 +60,7 @@ mod mep_cables_ui;
 mod mep_sizing_ui;
 mod mep_network_ui;
 mod mep_calculator_ui;
+mod view_capture;
 mod mep_gutters_ui;
 mod mep_loads_ui;
 mod mep_runs_ui;
@@ -3633,7 +3634,12 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
 
         let gui = Rc::new_cyclic(|this| {
             RefCell::new(Gui {
-                app: App::new(AppConfig::default()),
+                app: {
+                    // The window captures views for agents (DM-MCP-004).
+                    let mut app = App::new(AppConfig::default());
+                    app.set_window(true);
+                    app
+                },
                 this: this.clone(),
                 frame,
                 notebook,
@@ -4551,6 +4557,8 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "circuit.properties" => with(gui, Gui::circuit_properties),
         "mep.size" => with(gui, Gui::size_runs),
         "mep_run.create_riser" => with(gui, Gui::create_riser),
+        "mech_control_device.place" => with(gui, Gui::place_control_device),
+        "mech_control_device.assign" => with(gui, Gui::assign_controlled),
         "mep_run.bind_riser" => with(gui, Gui::bind_riser),
         "mep_network.calculate" => with(gui, Gui::calculate_networks),
         "analytical_segment.list" => with(gui, Gui::analytical_segments),

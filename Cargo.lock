@@ -3187,6 +3187,7 @@ dependencies = [
  "reviera-livestore",
  "reviera-lua",
  "reviera-render",
+ "reviera-render-wgpu",
  "reviera-store",
  "rust_xlsxwriter",
  "schemars",
@@ -3338,6 +3339,7 @@ dependencies = [
 name = "reviera-mcp"
 version = "0.1.0"
 dependencies = [
+ "base64 0.23.1",
  "reviera-app",
  "reviera-core",
  "reviera-livestore",
