@@ -142,6 +142,7 @@ pub fn toolset_of(command: &str) -> String {
             | "sprinkler_type"
             | "hydronic"
             | "hydraulic_separation"
+            | "analytical_pipe_connection"
             | "mounting_part"
             | "cam_writer"
             | "beam_system"

@@ -4589,6 +4589,7 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "plumbing_fixture.place" => with(gui, Gui::place_plumbing_fixture),
         "sprinkler.place" => with(gui, Gui::place_sprinkler),
         "hydronic.analyze" => with(gui, Gui::hydronic_analysis),
+        "analytical_pipe_connection.create_auto" => with(gui, Gui::analytical_connections),
         "hydraulic_separation.add" => with(gui, |g| g.hydraulic_separation(true)),
         "hydraulic_separation.remove" => with(gui, |g| g.hydraulic_separation(false)),
         "mech_control_device.assign" => with(gui, Gui::assign_controlled),

@@ -675,6 +675,12 @@ pub(crate) fn save_links(txn: &mut Transaction<'_>, links: Vec<Link>) -> Result<
     let pid = project(&store)
         .map(|p| p.id())
         .ok_or_else(|| bad("project.missing", "the model has no project"))?;
+    // A physical connection replaces an analytical one on the same connector (MEP-PIPE-009).
+    let joined: std::collections::BTreeSet<(String, usize)> =
+        keep.iter().flat_map(|l| [(l.a.element.clone(), l.a.port), (l.b.element.clone(), l.b.port)]).collect();
+    for id in crate::mep_analytical::replaced(&store, &joined) {
+        txn.delete(id)?;
+    }
     txn.set_param(pid, CONNECTIONS_KEY, serde_json::to_value(keep).expect("serialises"))
 }
 
@@ -926,6 +932,11 @@ pub fn network(store: &Store, start: ElementId) -> Vec<ElementId> {
         adj.entry(c.a.0).or_default().insert(c.b.0);
         adj.entry(c.b.0).or_default().insert(c.a.0);
     }
+    // Analytical pipe connections join too (MEP-PIPE-009).
+    for c in crate::mep_analytical::all(store) {
+        adj.entry(c.equipment).or_default().insert(c.pipe);
+        adj.entry(c.pipe).or_default().insert(c.equipment);
+    }
     let mut seen = BTreeSet::from([start]);
     let mut order = vec![start];
     let mut queue = VecDeque::from([start]);
@@ -977,11 +988,13 @@ pub(crate) fn network_of(store: &Store, p: NetworkParams) -> Result<Vec<ElementI
 /// electrical ports join through circuits and are not listed.
 pub fn open_ports(store: &Store, domains: &[Domain]) -> Vec<Port> {
     let taken = partners(store);
+    // Joined analytically (MEP-PIPE-009): connected for checks.
+    let analytical = crate::mep_analytical::connected_ports(store);
     all_ports(store)
         .into_iter()
         .filter(|p| domains.is_empty() || domains.contains(&p.connector.domain))
         .filter(|p| p.connector.domain != Domain::Electrical)
-        .filter(|p| !p.connector.surface && !taken.contains_key(&(p.element, p.index)))
+        .filter(|p| !p.connector.surface && !taken.contains_key(&(p.element, p.index)) && !analytical.contains(&(p.element, p.index)))
         .collect()
 }
 

@@ -27,6 +27,9 @@
 //!   pump's head is the largest. Across a separation the loop beyond is not seen: a secondary
 //!   pump's head excludes the chiller's pressure drop.
 //!
+//! Analytical pipe connections (MEP-PIPE-009) join equipment to pipes here as if piped, with
+//! their fixed loss.
+//!
 //! Results are computed when asked (`hydronic.analyze`); nothing is kept.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
@@ -46,6 +49,9 @@ use crate::mep_systems;
 use crate::mesh_objects::{self, Category};
 use crate::store::Store;
 use crate::txn::Transaction;
+
+/// Port numbers of analytical connections' virtual ports on pipes.
+const VIRTUAL: usize = 1_000_000;
 
 /// RXD element data on a separating pipe, fitting or tank: `{"hydraulic_separation": true}`.
 pub const ANALYSIS_KEY: &str = "rxd:analysis";
@@ -331,6 +337,25 @@ pub fn analyze(store: &Store, _: AnalyzeParams) -> Result<HydronicReport> {
             }
         }
     }
+    // Analytical connections (MEP-PIPE-009): a virtual port on the pipe where each attaches,
+    // joined to the equipment's connector, with its fixed loss.
+    let mut fixed: HashMap<(ElementId, usize), f64> = HashMap::new();
+    for (n, ac) in crate::mep_analytical::all(store).into_iter().enumerate() {
+        let Some(mut vport) = net.ports.get(&ac.equipment).and_then(|v| v.iter().find(|p| p.index == ac.connector)).cloned() else { continue };
+        if !net.ports.contains_key(&ac.pipe) {
+            continue;
+        }
+        let vi = VIRTUAL + n;
+        vport.element = ac.pipe;
+        vport.index = vi;
+        vport.position = ac.point;
+        net.ports.get_mut(&ac.pipe).expect("a pipe").push(vport);
+        net.partners.entry((ac.pipe, vi)).or_default().push((ac.equipment, ac.connector));
+        net.partners.entry((ac.equipment, ac.connector)).or_default().push((ac.pipe, vi));
+        if let Some(l) = ac.loss {
+            fixed.insert((ac.pipe, vi), l);
+        }
+    }
     // Separation nodes: each separation and the tees and crosses joined directly to it.
     let mut groups: Vec<BTreeSet<ElementId>> = Vec::new();
     for e in store.iter().filter(|e| is_separation(e) && net.ports.contains_key(&e.id())) {
@@ -556,11 +581,17 @@ pub fn analyze(store: &Store, _: AnalyzeParams) -> Result<HydronicReport> {
                 let ov = override_of(e);
                 if let Some(sr) = mep_runs::segment_recipe(e) {
                     let roughness = GlobalId::parse(&sr.segment_type).and_then(|g| store.find_by_guid(&g)).and_then(|t| store.get(t)).and_then(mep_runs::segment_type).map_or(0.0, |t| t.roughness);
-                    let len = match sr.corner {
-                        Some(c) => dist(sr.start, c) + dist(c, sr.end),
-                        None => dist(sr.start, sr.end),
+                    // End to end its length; to or from a tap or an analytical connection, the
+                    // distance between them.
+                    let len = match (s.k < 2 && s.j < 2, net.port(s.x, s.k), net.port(s.x, s.j)) {
+                        (false, Some(a), Some(b)) => dist(a.position, b.position),
+                        _ => match sr.corner {
+                            Some(c) => dist(sr.start, c) + dist(c, sr.end),
+                            None => dist(sr.start, sr.end),
+                        },
                     };
                     loss += ov.loss.unwrap_or(flow_in(q, &sr.size, roughness, fluid, equation).1 * len);
+                    loss += fixed.get(&(s.x, s.k)).or_else(|| fixed.get(&(s.x, s.j))).copied().unwrap_or(0.0);
                 } else if let Some(fr) = mep_runs::fitting_recipe(e) {
                     let (Some(i), Some(o)) = (net.port(s.x, s.k), net.port(s.x, s.j)) else { continue };
                     let kk = ov.coefficient.unwrap_or_else(|| if fr.part == Part::Valve { valve_coefficient(fr.accessory.as_deref()) } else { coefficient(fr.domain, fr.part, i, o) });

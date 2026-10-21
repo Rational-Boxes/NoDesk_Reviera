@@ -949,6 +949,7 @@ pub fn check(store: &Store, p: CheckParams) -> Result<Vec<Issue>> {
         }
     }
     let partners = mep::partners(store);
+    let analytical = crate::mep_analytical::connected_ports(store);
     let all = mep::all_ports(store);
     let by: HashMap<(ElementId, usize), &mep::Port> = all.iter().map(|p| ((p.element, p.index), p)).collect();
     for p in all.iter().filter(|p| p.connector.domain == domain) {
@@ -957,6 +958,7 @@ pub fn check(store: &Store, p: CheckParams) -> Result<Vec<Issue>> {
         if p.connector.flow_config == mep::FlowConfig::Calculated
             && p.connector.flow_direction == mep::FlowDirection::Out
             && mine.is_none()
+            && !analytical.contains(&key)
         {
             out.push(Issue {
                 kind: IssueKind::FlowMismatch,

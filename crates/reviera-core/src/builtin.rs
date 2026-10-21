@@ -564,8 +564,10 @@ pub fn delete_closure(
                 queue.extend(dependents_of(store, id));
             }
         }
-        // A grid system goes with its last line.
+        // A grid system goes with its last line; analytical pipe connections with their
+        // equipment or pipe (MEP-PIPE-009).
         queue = crate::grids::emptied_systems(store, &deleted);
+        queue.extend(crate::mep_analytical::orphaned(store, &deleted));
         if queue.is_empty() {
             return deleted;
         }

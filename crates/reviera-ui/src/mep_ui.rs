@@ -67,6 +67,8 @@ fn domain_colour(d: Domain) -> [f32; 4] {
 type Segment = [[f32; 3]; 2];
 
 const OPEN: [f32; 4] = [0.90, 0.10, 0.10, 1.0];
+/// Analytical pipe connections.
+const ANALYTICAL: [f32; 4] = [0.10, 0.55, 0.30, 1.0];
 /// A circuit's path.
 const PATH: [f32; 4] = [0.85, 0.35, 0.05, 1.0];
 pub(crate) const WARN: [f32; 4] = [0.95, 0.65, 0.05, 1.0];
@@ -173,6 +175,14 @@ impl Gui {
                 let tip = [0, 1, 2].map(|k| p.position[k] + p.direction[k] * (r + 0.1));
                 segs.push([f32s(p.position), f32s(tip)]);
                 add(colour, segs);
+            }
+        }
+        // Analytical pipe connections (MEP-PIPE-009): dashed from the connector to where it
+        // attaches on the pipe, in every view.
+        let hidden = self.views.get(index).map(|v| self.view_visibility(v).hidden).unwrap_or_default();
+        for c in reviera_core::mep_analytical::all(&store) {
+            if !hidden.contains(&c.id) {
+                add(ANALYTICAL, dashed(c.from, c.point));
             }
         }
         // Circuits of the selection: dashed from the panel's connector to each device's.
@@ -403,6 +413,42 @@ impl Gui {
                 self.refresh_active();
             }
             Err(e) => error(&frame, &format!("Not connected:\n{e}")),
+        }
+    }
+
+    /// Analytical Connections (MEP-PIPE-009): each open pipe connector of the selected equipment
+    /// joined logically to the nearest pipe of its classification within a search radius.
+    pub(crate) fn analytical_connections(&mut self) {
+        let frame = self.frame;
+        let Some(store) = self.store_now() else { return };
+        let equipment: Vec<ElementId> = self
+            .selection()
+            .into_iter()
+            .filter(|id| store.get(*id).is_some_and(|e| reviera_core::mesh_objects::mesh_object_recipe(e).is_some() && mep::ports(&store, e).iter().any(|p| p.connector.domain == Domain::Pipe)))
+            .collect();
+        if equipment.is_empty() {
+            return frame.set_status_text("Analytical Connections: select equipment with pipe connectors", 0);
+        }
+        let f = super::reinforcement_ui::Form::new(&frame, "Analytical Connections");
+        let radius = f.text("Search radius (mm)", "3000", "Each open connector joins the nearest pipe of its classification within it");
+        let ok = f.show("Connectors are joined logically, without modelling the pipe: they count as connected and carry flow in the hydronic analysis.", "Connect");
+        let r = radius.get_value().trim().replace(',', ".").parse::<f64>().unwrap_or(3000.0) / 1000.0;
+        f.dialog.destroy();
+        if !ok {
+            return;
+        }
+        match self.run("analytical_pipe_connection.create_auto", json!({ "equipment_ids": equipment, "radius": r })) {
+            Ok(v) => {
+                let made = v["created"].as_array().map_or(0, Vec::len);
+                let skipped: Vec<&str> = v["skipped"].as_array().into_iter().flatten().filter_map(serde_json::Value::as_str).collect();
+                self.refresh_active();
+                if skipped.is_empty() {
+                    frame.set_status_text(&format!("{made} analytical connection(s) made"), 0);
+                } else {
+                    error(&frame, &format!("{made} analytical connection(s) made. Not connected:\n{}", skipped.join("\n")));
+                }
+            }
+            Err(e) => error(&frame, &e),
         }
     }
 

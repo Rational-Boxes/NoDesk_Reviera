@@ -70,6 +70,7 @@ pub mod mep_sizing;
 pub mod mep_slopes;
 pub mod mep_sprinklers;
 pub mod mep_hydronic;
+pub mod mep_analytical;
 pub mod mep_panel_schedule;
 pub mod mep_systems;
 pub mod model_lines;

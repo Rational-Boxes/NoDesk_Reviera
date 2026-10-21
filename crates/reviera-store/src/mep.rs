@@ -8,7 +8,8 @@
 //!   its `FlowDirection`, `PredefinedType` (DUCT, PIPE, CABLE, CABLECARRIER) and `SystemType`
 //!   (from its system's type or its classification), and `Pset_DistributionPortCommon`
 //!   (`PortNumber`) with its size in `Pset_DistributionPortTypeDuct` or `…Pipe`.
-//! - Each connection is an `IfcRelConnectsPorts`.
+//! - Each connection is an `IfcRelConnectsPorts`; an analytical pipe connection (MEP-PIPE-009)
+//!   connects the equipment's port to a virtual port nested in the pipe, with no realizing element.
 //! - Each system gets its members by `IfcRelAssignsToGroup` and the building it serves by
 //!   `IfcRelServicesBuildings`.
 //!
@@ -281,6 +282,37 @@ pub(crate) fn write_mep(
             _ => by_element.push((p.element, vec![port])),
         }
     }
+    // Analytical pipe connections (MEP-PIPE-009): a virtual port nested in the pipe where the
+    // connection attaches, no realizing element, connected to the equipment's port.
+    let mut analytical: Vec<(StepId, StepId)> = Vec::new();
+    for ac in reviera_core::mep_analytical::all(store) {
+        let (Some(_), Some(&eq_port), Some(conn)) = (steps.get(&ac.pipe), port_steps.get(&(ac.equipment, ac.connector)), store.get(ac.id)) else { continue };
+        let Some(p) = ports.iter().find(|p| p.element == ac.equipment && p.index == ac.connector) else { continue };
+        let port = ifc.create_rooted("IfcDistributionPort", &port_guid(conn.guid(), 0))?;
+        if let Some(oh) = owner_history {
+            ifc.set_attribute(port, "OwnerHistory", &r(oh))?;
+        }
+        ifc.set_attribute(port, "Name", &s("Analytical connection"))?;
+        ifc.set_attribute(port, "Description", &s(TAG))?;
+        let toward = [ac.from[0] - ac.point[0], ac.from[1] - ac.point[1], ac.from[2] - ac.point[2]];
+        let n = (toward[0].powi(2) + toward[1].powi(2) + toward[2].powi(2)).sqrt();
+        let z = if n > 1e-9 { [toward[0] / n, toward[1] / n, toward[2] / n] } else { [-p.direction[0], -p.direction[1], -p.direction[2]] };
+        let pl = placement(ifc, ac.point, z, scale)?;
+        ifc.set_attribute(port, "ObjectPlacement", &r(pl))?;
+        let dir = match p.connector.flow_direction {
+            FlowDirection::In => "SOURCE",
+            FlowDirection::Out => "SINK",
+            FlowDirection::Bidirectional => "SOURCEANDSINK",
+        };
+        ifc.set_attribute(port, "FlowDirection", &e(dir))?;
+        ifc.set_attribute(port, "PredefinedType", &e("PIPE"))?;
+        ifc.set_attribute(port, "SystemType", &e(system_enum(p.connector.classification, Domain::Pipe)))?;
+        match by_element.iter_mut().find(|(el, _)| *el == ac.pipe) {
+            Some((_, v)) => v.push(port),
+            None => by_element.push((ac.pipe, vec![port])),
+        }
+        analytical.push((eq_port, port));
+    }
     for (el, nested) in by_element {
         let Some(&host) = steps.get(&el) else { continue };
         let rel = ifc.create_rooted("IfcRelNests", &GlobalId::new())?;
@@ -293,6 +325,15 @@ pub(crate) fn write_mep(
     }
     for c in mep::connections(store) {
         let (Some(&a), Some(&b)) = (port_steps.get(&c.a), port_steps.get(&c.b)) else { continue };
+        let rel = ifc.create_rooted("IfcRelConnectsPorts", &GlobalId::new())?;
+        if let Some(oh) = owner_history {
+            ifc.set_attribute(rel, "OwnerHistory", &r(oh))?;
+        }
+        ifc.set_attribute(rel, "Description", &s(TAG))?;
+        ifc.set_attribute(rel, "RelatingPort", &r(a))?;
+        ifc.set_attribute(rel, "RelatedPort", &r(b))?;
+    }
+    for (a, b) in analytical {
         let rel = ifc.create_rooted("IfcRelConnectsPorts", &GlobalId::new())?;
         if let Some(oh) = owner_history {
             ifc.set_attribute(rel, "OwnerHistory", &r(oh))?;

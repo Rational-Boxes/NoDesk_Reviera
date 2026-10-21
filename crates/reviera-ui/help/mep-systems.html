@@ -219,6 +219,19 @@ Each loop then needs its own pump. A secondary pump's head covers only its own l
 chiller or boiler. The primary pump carries the flow of the loops it serves. If two pumps end up
 in one loop, the analysis says so and asks for a separation between them.</p>
 
+<h2 id="analytical-connections">Analytical connections</h2>
+<p>Early in design you may want to calculate a loop before the short pipes to each fan coil are
+drawn. Select the equipment and choose
+<a href="reviera:action/analytical_pipe_connection.create_auto">Analytical Connections</a>. Each open
+pipe connector is joined to the nearest pipe of the same kind (supply to supply, return to return)
+within the search radius, 3 m by default. Reviera lists the connectors it could not join and
+says why.</p>
+<p>The connection is shown as a dashed line from the connector to the pipe. It attaches square to
+the pipe, or at the pipe's end if the connector is beyond it, and follows both when they move. It
+counts as connected in the system checks and carries flow in the hydronic analysis. Draw a real
+pipe from the connector and the analytical connection goes away by itself. Deleting the equipment
+or the pipe deletes it too.</p>
+
 <h2 id="accessories">Pipe fittings, valves and accessories</h2>
 <p><a href="reviera:action/pipe_fitting.place">Pipe Fitting</a> (<kbd>P</kbd> <kbd>F</kbd>) places an
 elbow, tee, cross, coupling or cap. Click a pipe's open end and the fitting takes the pipe's size

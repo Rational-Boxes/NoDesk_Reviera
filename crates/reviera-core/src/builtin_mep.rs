@@ -156,6 +156,10 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(HydronicAnalyze),
         registry.add(HydraulicSeparationAdd),
         registry.add(HydraulicSeparationRemove),
+        registry.add(AnalyticalPipeConnectionCreate),
+        registry.add(AnalyticalPipeConnectionCreateAuto),
+        registry.add(AnalyticalPipeConnectionSet),
+        registry.add(AnalyticalPipeConnectionList),
         registry.add(MechControlDeviceAssign),
         registry.add(MechControlDeviceList),
         registry.add(MepRunCreateRiser),
@@ -1196,6 +1200,49 @@ edit_command!(
     crate::mep_hydronic::SeparationParams,
     (),
     crate::mep_hydronic::remove
+);
+
+edit_command!(
+    AnalyticalPipeConnectionCreate,
+    "analytical_pipe_connection.create",
+    "Connect equipment to a pipe analytically",
+    "Joins an equipment connector to a pipe logically, without modelling the connection (MEP-PIPE-009): it attaches at the connector's perpendicular projection onto the pipe's centreline, or the nearer pipe end beyond it, and follows both as they move. Only an open pipe connector whose classification matches the pipe's (its own or its system's) is joined (\"Connector 2: Hydronic Return, pipe is Hydronic Supply\" otherwise). The connector then counts as connected, the equipment joins the pipe's system, and flow passes in the hydronic analysis. Deleting the equipment or the pipe deletes it (`element.delete` deletes it alone); a physical pipe on the same connector replaces it. Returns its id.",
+    "Analytical Connection",
+    crate::mep_analytical::CreateParams,
+    crate::ElementId,
+    crate::mep_analytical::create
+);
+
+edit_command!(
+    AnalyticalPipeConnectionCreateAuto,
+    "analytical_pipe_connection.create_auto",
+    "Connect equipment to the nearest pipes analytically",
+    "Joins each open pipe connector of the equipment analytically to the nearest pipe of its classification within `radius` (3 m by default) (MEP-PIPE-009). Connectors with no such pipe are skipped and listed (`skipped`, and the warning `analytical_connection.skipped`). Returns the connections made.",
+    "Analytical Connections",
+    crate::mep_analytical::AutoParams,
+    crate::mep_analytical::AutoReport,
+    crate::mep_analytical::create_auto
+);
+
+edit_command!(
+    AnalyticalPipeConnectionSet,
+    "analytical_pipe_connection.set",
+    "Set an analytical connection's loss",
+    "Sets an analytical pipe connection's fixed loss (Pa; null for none), counted in the hydronic analysis (MEP-PIPE-009).",
+    "Analytical Connection Loss",
+    crate::mep_analytical::SetParams,
+    (),
+    crate::mep_analytical::set
+);
+
+read_command!(
+    AnalyticalPipeConnectionList,
+    "analytical_pipe_connection.list",
+    "List analytical pipe connections",
+    "Every analytical pipe connection (MEP-PIPE-009): its equipment, connector and pipe, where it attaches (and whether at a pipe end), and its fixed loss.",
+    crate::mep_analytical::ListParams,
+    Vec<crate::mep_analytical::Resolved>,
+    crate::mep_analytical::list
 );
 
 edit_command!(

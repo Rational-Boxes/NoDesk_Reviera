@@ -946,6 +946,12 @@ schedules, circuit paths, cable sizing and voltage drop.
   primary pump carrying the loops it serves; Pumps, Boilers and Chillers categories
   (`hydronic.set_enabled`, `hydronic.analyze`, `hydraulic_separation.add`/`remove`). Not built
   yet: results on pumps in IFC, pump curves and flow balancing.
+- **Analytical pipe connections** (Systems › Components › Analytical Connections): equipment
+  connectors joined logically to the nearest pipe of their classification (or a chosen one), at
+  the perpendicular projection or the nearer pipe end, following both; they count as connected,
+  carry flow in the hydronic analysis, are replaced by a real pipe on the connector and export as
+  a virtual port in the pipe (`analytical_pipe_connection.create`, `.create_auto`, `.set`,
+  `.list`). Not built yet: picking pipes per connector in the window.
 - **Sprinklers** (Systems › HVAC & Piping › Sprinkler `SK`): pendent heads hang from the ceiling
   over the point and follow it, upright heads stand on their pipe, sidewall heads go on a wall
   face; heads are chosen by K-factor, temperature rating, response and connection size, kept in

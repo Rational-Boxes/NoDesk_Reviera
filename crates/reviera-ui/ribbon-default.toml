@@ -2365,6 +2365,12 @@ icon = "mep_component"
 help = "Place an MEP component type (one with connectors); its connectors connect to those they meet"
 
 [[action]]
+id = "analytical_pipe_connection.create_auto"
+label = "Analytical Connections"
+icon = "analytical_connection"
+help = "Join the selected equipment's open pipe connectors logically to the nearest pipes of their classification, without modelling the pipe; they carry flow in the hydronic analysis (MEP-PIPE-009)"
+
+[[action]]
 id = "mep.connect_touching"
 label = "Connect"
 icon = "mep_connect"
@@ -2890,6 +2896,7 @@ tools = [
   { action = "mep.place_component", size = "large" },
   { action = "mep_type.load_starters", size = "small" },
   { action = "mep.connect_touching", size = "small" },
+  { action = "analytical_pipe_connection.create_auto", size = "small" },
 ]
 
 [[tab.panel]]

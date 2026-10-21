@@ -3648,10 +3648,12 @@ Allowed values come from Mechanical Settings › Slopes. Fabrication pipework ca
 - Connections are deleted with `element.delete`.
 
 **Acceptance criteria.**
-- [ ] A fan-coil connected only through analytical connections contributes its flow to the loop pump.
-- [ ] A connector whose projection falls beyond the end of the pipe attaches to the nearest pipe end.
-- [ ] Drawing a physical pipe from the same connector removes the analytical connection.
-- [ ] A hydronic return connector is not connected to a supply pipe, and the skip is listed.
+- [x] A fan-coil connected only through analytical connections contributes its flow to the loop pump.
+- [x] A connector whose projection falls beyond the end of the pipe attaches to the nearest pipe end.
+- [x] Drawing a physical pipe from the same connector removes the analytical connection.
+- [x] A hydronic return connector is not connected to a supply pipe, and the skip is listed.
+
+*Built (2026-10-21):* `analytical_pipe_connection.create(equipment_id, connector_index, pipe_id)`, `.create_auto(equipment_ids, radius = 3 m)` (each open pipe connector to the nearest pipe of its classification within the radius; the rest skipped and listed in `skipped` and the warning `analytical_connection.skipped`), `.set(connection_id, loss)` (a fixed loss in Pa) and `.list`. Each connection is an RXD element `rxd:mep/analytical_connections/<guid>` (equipment and pipe GlobalIds, connector, loss). The attachment is computed as the model is now: the connector's perpendicular projection onto the pipe's centreline, or the nearer end beyond it (`at_end`), so it follows both. Refused: a connector already connected, not a pipe connector, or whose classification differs from the pipe's own or its system's ("Connector 2: Hydronic Return, pipe is Hydronic Supply"). The connector counts as connected for Show Disconnects and Check Systems (the element network, and "calculated but has nothing downstream"); the equipment joins the pipe's system when the pipe is in one; the hydronic analysis (MEP-PIPE-008) passes through it as a virtual port on the pipe (friction only between the ports used) with its fixed loss. Deleting the equipment or pipe deletes it; any physical connection on the same connector replaces it. Drawn dashed from the connector to the attachment in plans and 3D. IFC: a virtual `IfcDistributionPort` ("Analytical connection") nested in the pipe at the attachment, with no realizing element, and an `IfcRelConnectsPorts` to the equipment's port. Systems › Components › **Analytical Connections** (a search radius, then the connections for the selected equipment). Not yet: picking the target pipe per connector and the pipes-first workflow in the window, the preview and Finish, journalled picks, its own subcategory (there is no per-view category visibility yet; temporary hide works), the fixed loss's own RXD `analysis` data on the virtual port (it is on the connection record), Design to Fabrication's refusal (MEP-FAB-006 is not built).
 
 ---
 
