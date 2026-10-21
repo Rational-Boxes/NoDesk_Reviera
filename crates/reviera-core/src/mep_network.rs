@@ -98,7 +98,7 @@ fn length(a: [f64; 3], b: [f64; 3]) -> f64 {
     ((a[0] - b[0]).powi(2) + (a[1] - b[1]).powi(2) + (a[2] - b[2]).powi(2)).sqrt()
 }
 
-fn size_of(c: &mep::Connector) -> Size {
+pub(crate) fn size_of(c: &mep::Connector) -> Size {
     Size { shape: c.shape, diameter: c.diameter, width: c.width, height: c.height }
 }
 
@@ -282,7 +282,7 @@ fn hash(text: &str, mut h: u64) -> u64 {
     h
 }
 
-fn override_of(e: &crate::element::Element) -> Override {
+pub(crate) fn override_of(e: &crate::element::Element) -> Override {
     e.param(KEY).and_then(|v| v.get("override")).and_then(|v| serde_json::from_value(v.clone()).ok()).unwrap_or_default()
 }
 

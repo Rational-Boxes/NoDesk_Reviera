@@ -2246,6 +2246,25 @@ keys = "PA"
 help = "Insert a valve, strainer or water meter in a pipe: it splits the pipe, takes its size and gets flanges from the routing preferences when flanged (MEP-PIPE-004)"
 
 [[action]]
+id = "hydronic.analyze"
+label = "Hydronic Analysis"
+icon = "hydronic"
+keys = "HA"
+help = "Each closed hydronic loop's pump flow and head, primary, secondary and tertiary across hydraulic separations; turns the analysis on if it is off (MEP-PIPE-008)"
+
+[[action]]
+id = "hydraulic_separation.add"
+label = "Add Hydraulic Separation"
+icon = "hydraulic_separation"
+help = "Make the selected common pipe, tee or tank a decoupler: it splits the network into primary and secondary loops, each pump reporting only its own loop (MEP-PIPE-008)"
+
+[[action]]
+id = "hydraulic_separation.remove"
+label = "Remove Hydraulic Separation"
+icon = "hydraulic_separation"
+help = "Remove the hydraulic separation from the selected pipe, fitting or tank (MEP-PIPE-008)"
+
+[[action]]
 id = "mep_fitting.tee_to_cross"
 label = "Change Tee to Cross"
 icon = "tee_to_cross"
@@ -2855,6 +2874,9 @@ tools = [
   { action = "pipe_fitting.place", size = "small" },
   { action = "pipe_accessory.place", size = "small" },
   { action = "mep_fitting.tee_to_cross", size = "small" },
+  { action = "hydronic.analyze", size = "small" },
+  { action = "hydraulic_separation.add", size = "small" },
+  { action = "hydraulic_separation.remove", size = "small" },
   { action = "mep_run.set_slope", size = "small" },
   { action = "pipe.create_parallel", size = "small" },
   { action = "mech_control_device.place", size = "small" },

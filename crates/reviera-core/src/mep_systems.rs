@@ -100,6 +100,8 @@ pub struct MepSettings {
     pub report_presets: Vec<crate::mep_network::ReportPreset>,
     /// Allowed pipe slopes, rise over run (MEP-PIPE-002); Reviera's defaults when empty.
     pub slopes: Vec<f64>,
+    /// Hydronic network analysis (MEP-PIPE-008): Mechanical Settings › Pipe › Calculation.
+    pub hydronic_analysis: bool,
 }
 
 fn slug(c: Classification) -> String {

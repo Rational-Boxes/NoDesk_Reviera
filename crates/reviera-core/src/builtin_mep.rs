@@ -152,6 +152,10 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(PlumbingFixturePlace),
         registry.add(SprinklerPlace),
         registry.add(SprinklerTypeSet),
+        registry.add(HydronicSetEnabled),
+        registry.add(HydronicAnalyze),
+        registry.add(HydraulicSeparationAdd),
+        registry.add(HydraulicSeparationRemove),
         registry.add(MechControlDeviceAssign),
         registry.add(MechControlDeviceList),
         registry.add(MepRunCreateRiser),
@@ -292,7 +296,7 @@ edit_command!(
     MepTypeLoadStarters,
     "mep_type.load_starters",
     "Load the starter MEP component types",
-    "Loads Reviera's starter MEP component types (`names`, all when empty): Air Handling Unit, Supply Diffuser 600, Return Grille 600, Exhaust Fan, Water Heater, Circulation Pump, Lavatory, Water Closet, Distribution Board, Receptacle and Ceiling Luminaire: simple boxes with connectors, sizes and flows Reviera's own provisional values, for laying out systems before manufacturers' content. A type of the same name already in the model is reused. Returns the types by name.",
+    "Loads Reviera's starter MEP component types (`names`, all when empty): Air Handling Unit, Supply Diffuser 600, Return Grille 600, Exhaust Fan, Water Heater, Circulation Pump, Lavatory, Water Closet, Distribution Board, Receptacle, Ceiling Luminaire, the plumbing fixtures, control devices, VAV Box, Pendent, Upright and Sidewall Sprinkler, Chiller, Boiler and Fan Coil Unit (an unknown name is refused listing them all): simple boxes with connectors, sizes and flows Reviera's own provisional values, for laying out systems before manufacturers' content. A type of the same name already in the model is reused. Returns the types by name.",
     "Load MEP Types",
     crate::mep::LoadStartersParams,
     std::collections::BTreeMap<String, ElementId>,
@@ -1149,6 +1153,49 @@ edit_command!(
     crate::mep_sprinklers::SetTypeParams,
     crate::ElementId,
     crate::mep_sprinklers::set_type
+);
+
+edit_command!(
+    HydronicSetEnabled,
+    "hydronic.set_enabled",
+    "Turn hydronic network analysis on or off",
+    "Turns hydronic network analysis on or off (Mechanical Settings › Pipe › Calculation, MEP-PIPE-008). Off by default.",
+    "Hydronic Network Analysis",
+    crate::mep_hydronic::EnabledParams,
+    (),
+    crate::mep_hydronic::set_enabled
+);
+
+read_command!(
+    HydronicAnalyze,
+    "hydronic.analyze",
+    "Analyse hydronic loops",
+    "Analyses the closed-loop hydronic networks (MEP-PIPE-008; the analysis must be on): the loops left joined when hydraulic separations are taken out, each with one pump, primary where a boiler or chiller is, secondary and tertiary across separations. Per loop: the pump's flow (its terminals' design flows, plus the flows of the loops beyond the separations it serves) and head (the largest circuit loss from discharge through a terminal or separation back to suction, from pipe friction, fitting and equipment connector losses), the critical terminal and each load's circuit loss. Loops that cannot be analysed are listed in `problems` (two pumps in one loop, no source, no pipes, no terminals, an open circuit).",
+    crate::mep_hydronic::AnalyzeParams,
+    crate::mep_hydronic::HydronicReport,
+    crate::mep_hydronic::analyze
+);
+
+edit_command!(
+    HydraulicSeparationAdd,
+    "hydraulic_separation.add",
+    "Add a hydraulic separation",
+    "Marks a pipe, pipe fitting or tank as a hydraulic separation (a decoupler, MEP-PIPE-008): with the tees joined directly to it (a common pipe between close tees) it splits the network into primary, secondary and tertiary loops, each pump reporting only its own loop's pressure drop. Returns the element.",
+    "Add Hydraulic Separation",
+    crate::mep_hydronic::SeparationParams,
+    crate::ElementId,
+    crate::mep_hydronic::add
+);
+
+edit_command!(
+    HydraulicSeparationRemove,
+    "hydraulic_separation.remove",
+    "Remove a hydraulic separation",
+    "Removes the hydraulic separation mark from a pipe, fitting or tank (MEP-PIPE-008).",
+    "Remove Hydraulic Separation",
+    crate::mep_hydronic::SeparationParams,
+    (),
+    crate::mep_hydronic::remove
 );
 
 edit_command!(

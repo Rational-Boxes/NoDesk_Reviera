@@ -939,6 +939,13 @@ schedules, circuit paths, cable sizing and voltage drop.
   `IfcWasteTerminal` of their types; Create System leaves out fixtures without a connector of
   the system's classification and lists them (`plumbing_fixture.place`,
   `system.create(skip_incompatible)`).
+- **Hydronic network analysis** (Systems › HVAC & Piping › Hydronic Analysis `HA`, Add/Remove
+  Hydraulic Separation): closed loops from pumps through boilers, chillers and terminals, split
+  into primary, secondary and tertiary loops at decouplers (a common pipe between close tees, or
+  a tank); each pump's flow and head, a secondary pump's head excluding the chiller's drop, the
+  primary pump carrying the loops it serves; Pumps, Boilers and Chillers categories
+  (`hydronic.set_enabled`, `hydronic.analyze`, `hydraulic_separation.add`/`remove`). Not built
+  yet: results on pumps in IFC, pump curves and flow balancing.
 - **Sprinklers** (Systems › HVAC & Piping › Sprinkler `SK`): pendent heads hang from the ceiling
   over the point and follow it, upright heads stand on their pipe, sidewall heads go on a wall
   face; heads are chosen by K-factor, temperature rating, response and connection size, kept in

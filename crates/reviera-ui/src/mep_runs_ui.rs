@@ -552,6 +552,77 @@ impl Gui {
         frame.set_status_text(&format!("{} tee(s) changed to crosses; the new legs are open", tees.len()), 0);
     }
 
+    /// Systems › HVAC & Piping › Hydronic Analysis (MEP-PIPE-008): turns the analysis on if it
+    /// is off (asking first), then shows each loop's pump flow and head and what cannot be analysed.
+    pub(crate) fn hydronic_analysis(&mut self) {
+        let frame = self.frame;
+        let mut result = self.run("hydronic.analyze", json!({}));
+        if result.as_ref().is_err_and(|e| e.contains("is off")) {
+            let d = MessageDialog::builder(&frame, "Hydronic network analysis is off (Mechanical Settings › Pipe › Calculation).\n\nTurn it on?", "Hydronic Analysis")
+                .with_style(MessageDialogStyle::YesNo | MessageDialogStyle::IconQuestion)
+                .build();
+            if d.show_modal() != ID_YES {
+                return;
+            }
+            if let Err(e) = self.run("hydronic.set_enabled", json!({ "enabled": true })) {
+                return error(&frame, &e);
+            }
+            result = self.run("hydronic.analyze", json!({}));
+        }
+        let rep: reviera_core::mep_hydronic::HydronicReport = match result.map(serde_json::from_value) {
+            Ok(Ok(r)) => r,
+            Ok(Err(e)) => return error(&frame, &e.to_string()),
+            Err(e) => return error(&frame, &e),
+        };
+        let Some(store) = self.store_now() else { return };
+        let name = |id: ElementId| {
+            let e = store.get(id);
+            let ty = e.and_then(|e| reviera_core::mesh_objects::type_of(&store, e)).and_then(|(t, _)| store.get(t)).and_then(|t| t.name.clone());
+            format!("{} {}", ty.or_else(|| e.and_then(|e| e.name.clone())).unwrap_or_else(|| "Element".into()), id.0)
+        };
+        let mut text = String::new();
+        if rep.loops.is_empty() && rep.problems.is_empty() {
+            text.push_str("No hydronic loops: place pumps and connect them with pipes.\n");
+        }
+        for l in &rep.loops {
+            let mut role = l.role.clone();
+            if let Some(c) = role.get_mut(0..1) {
+                c.make_ascii_uppercase();
+            }
+            text.push_str(&format!(
+                "{role} loop {}: {}\n  flow {:.2} L/s, head {:.1} kPa{}\n",
+                l.id,
+                name(l.pump),
+                l.flow * 1000.0,
+                l.head / 1000.0,
+                l.critical.map(|c| format!(" (critical: {})", name(c))).unwrap_or_default()
+            ));
+        }
+        if !rep.problems.is_empty() {
+            text.push_str(&format!("\nNot analysed:\n{}", rep.problems.join("\n")));
+        }
+        frame.set_status_text(&format!("Hydronic analysis: {} loop(s)", rep.loops.len()), 0);
+        MessageDialog::builder(&frame, &text, "Hydronic Analysis").with_style(MessageDialogStyle::OK | MessageDialogStyle::IconInformation).build().show_modal();
+    }
+
+    /// Systems › HVAC & Piping › Hydraulic Separation Add / Remove on the selected pipe, fitting
+    /// or tank (MEP-PIPE-008).
+    pub(crate) fn hydraulic_separation(&mut self, add: bool) {
+        let frame = self.frame;
+        let sel = self.selection();
+        if sel.is_empty() {
+            return frame.set_status_text("Hydraulic Separation: select a pipe, pipe fitting or tank", 0);
+        }
+        let command = if add { "hydraulic_separation.add" } else { "hydraulic_separation.remove" };
+        for id in &sel {
+            if let Err(e) = self.run(command, json!({ "element_id": id })) {
+                return error(&frame, &e);
+            }
+        }
+        self.properties_stale = true;
+        frame.set_status_text(&format!("{} {} hydraulic separation(s)", if add { "Added" } else { "Removed" }, sel.len()), 0);
+    }
+
     /// "+" and "−" on the selected fitting.
     pub(crate) fn fitting_grade(&mut self, up: bool) {
         let frame = self.frame;

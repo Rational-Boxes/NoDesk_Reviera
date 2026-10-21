@@ -207,6 +207,18 @@ IFC file as <code>Pset_FireSuppressionTerminalTypeSprinkler</code>. The glass bu
 the temperature rating: red for 68 °C, for example. Fire-protection systems can be Wet, Dry,
 Pre-Action or Other. The starter heads connect to Wet systems.</p>
 
+<h2 id="hydronic">Hydronic analysis</h2>
+<p><a href="reviera:action/hydronic.analyze">Hydronic Analysis</a> (<kbd>H</kbd> <kbd>A</kbd>) works out
+each pump's flow and head in closed heating and chilled water loops. It is off until you turn it
+on (Reviera asks the first time). Reviera follows the pipes from each pump through the boilers,
+chillers and terminals (fan coils, coils) and back. A terminal's flow is its supply connector's
+design flow.</p>
+<p>Where a primary loop feeds secondary loops through a common pipe between two close tees, select
+that pipe and choose <a href="reviera:action/hydraulic_separation.add">Add Hydraulic Separation</a>.
+Each loop then needs its own pump. A secondary pump's head covers only its own loop, not the
+chiller or boiler. The primary pump carries the flow of the loops it serves. If two pumps end up
+in one loop, the analysis says so and asks for a separation between them.</p>
+
 <h2 id="accessories">Pipe fittings, valves and accessories</h2>
 <p><a href="reviera:action/pipe_fitting.place">Pipe Fitting</a> (<kbd>P</kbd> <kbd>F</kbd>) places an
 elbow, tee, cross, coupling or cap. Click a pipe's open end and the fitting takes the pipe's size

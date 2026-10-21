@@ -67,10 +67,14 @@ pub enum Category {
     AirTerminalBox,
     /// Floor drains and gullies (MEP-PIPE-006).
     WasteTerminal,
+    /// Pumps, boilers and chillers (MEP-PIPE-008): what hydronic network analysis looks for.
+    Pump,
+    Boiler,
+    Chiller,
 }
 
 impl Category {
-    pub const ALL: [Category; 17] = [
+    pub const ALL: [Category; 20] = [
         Category::GenericModel,
         Category::Furniture,
         Category::Column,
@@ -88,6 +92,9 @@ impl Category {
         Category::Controller,
         Category::AirTerminalBox,
         Category::WasteTerminal,
+        Category::Pump,
+        Category::Boiler,
+        Category::Chiller,
     ];
 
     pub fn label(self) -> &'static str {
@@ -109,6 +116,9 @@ impl Category {
             Category::Controller => "Controller",
             Category::AirTerminalBox => "Air Terminal Box",
             Category::WasteTerminal => "Waste Terminal",
+            Category::Pump => "Pump",
+            Category::Boiler => "Boiler",
+            Category::Chiller => "Chiller",
         }
     }
 
@@ -132,6 +142,9 @@ impl Category {
             Category::Controller => "IfcController",
             Category::AirTerminalBox => "IfcAirTerminalBox",
             Category::WasteTerminal => "IfcWasteTerminal",
+            Category::Pump => "IfcPump",
+            Category::Boiler => "IfcBoiler",
+            Category::Chiller => "IfcChiller",
         }
     }
 
@@ -155,6 +168,9 @@ impl Category {
             Category::Controller => "IfcControllerType",
             Category::AirTerminalBox => "IfcAirTerminalBoxType",
             Category::WasteTerminal => "IfcWasteTerminalType",
+            Category::Pump => "IfcPumpType",
+            Category::Boiler => "IfcBoilerType",
+            Category::Chiller => "IfcChillerType",
         }
     }
 

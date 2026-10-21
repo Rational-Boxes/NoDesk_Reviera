@@ -1378,7 +1378,7 @@ fn starters() -> Vec<Starter> {
         },
         Starter {
             name: "Water Heater",
-            category: C::MechanicalEquipment,
+            category: C::Boiler,
             size: [0.6, 0.6, 1.5],
             color: white,
             connectors: vec![
@@ -1388,7 +1388,7 @@ fn starters() -> Vec<Starter> {
         },
         Starter {
             name: "Circulation Pump",
-            category: C::MechanicalEquipment,
+            category: C::Pump,
             size: [0.4, 0.25, 0.3],
             color: [0.20, 0.36, 0.62, 1.0],
             connectors: vec![
@@ -1492,6 +1492,38 @@ fn starters() -> Vec<Starter> {
             color: grey,
             connectors: vec![pipe("Waste", [0.0, 0.0, 0.0], down, K::Sanitary, D::Out, 0.075, 2.0)],
         },
+        // Hydronic plant and terminals (MEP-PIPE-008): supply out and return in on the plant,
+        // supply in and return out on the terminal; losses Reviera's provisional values (E-28).
+        Starter {
+            name: "Chiller",
+            category: C::Chiller,
+            size: [2.0, 1.0, 1.2],
+            color: grey,
+            connectors: vec![
+                hydronic("Supply", [1.0, 0.0, 0.15], [1.0, 0.0, 0.0], K::HydronicSupply, D::Out, 0.05, 0.0, 0.0),
+                hydronic("Return", [-1.0, 0.0, 0.15], [-1.0, 0.0, 0.0], K::HydronicReturn, D::In, 0.05, 0.0, 50_000.0),
+            ],
+        },
+        Starter {
+            name: "Boiler",
+            category: C::Boiler,
+            size: [1.0, 0.8, 1.2],
+            color: grey,
+            connectors: vec![
+                hydronic("Supply", [0.5, 0.0, 0.15], [1.0, 0.0, 0.0], K::HydronicSupply, D::Out, 0.05, 0.0, 0.0),
+                hydronic("Return", [-0.5, 0.0, 0.15], [-1.0, 0.0, 0.0], K::HydronicReturn, D::In, 0.05, 0.0, 15_000.0),
+            ],
+        },
+        Starter {
+            name: "Fan Coil Unit",
+            category: C::MechanicalEquipment,
+            size: [1.0, 0.5, 0.3],
+            color: grey,
+            connectors: vec![
+                hydronic("Supply", [-0.5, 0.0, 0.15], [-1.0, 0.0, 0.0], K::HydronicSupply, D::In, 0.05, 0.0002, 20_000.0),
+                hydronic("Return", [0.5, 0.0, 0.15], [1.0, 0.0, 0.0], K::HydronicReturn, D::Out, 0.05, 0.0002, 0.0),
+            ],
+        },
         // Sprinkler heads (MEP-PIPE-007): pendent piped from above, upright from below, sidewall
         // from the back (+y, against the wall).
         Starter {
@@ -1538,6 +1570,23 @@ fn starters() -> Vec<Starter> {
     ]
 }
 
+/// A hydronic connector with a design flow (m³/s) and a specific loss (Pa) on its inlet.
+#[allow(clippy::too_many_arguments)]
+fn hydronic(name: &str, origin: V3, direction: V3, cl: Classification, dir: FlowDirection, d: f64, flow: f64, loss: f64) -> Connector {
+    Connector {
+        name: name.into(),
+        origin,
+        direction,
+        diameter: d,
+        classification: Some(cl),
+        flow_direction: dir,
+        flow,
+        loss_method: if loss > 0.0 { LossMethod::SpecificLoss } else { LossMethod::NotDefined },
+        loss,
+        ..new_connector(Domain::Pipe)
+    }
+}
+
 /// A control device's controls connector, at its back.
 fn controls(origin: V3) -> Connector {
     Connector {
@@ -1575,6 +1624,10 @@ fn starter_predefined(name: &str) -> Option<&'static str> {
         "Shower" => "SHOWER",
         "Urinal" => "URINAL",
         "Floor Drain" => "FLOORTRAP",
+        "Circulation Pump" => "CIRCULATOR",
+        "Water Heater" => "WATER",
+        "Boiler" => "WATER",
+        "Chiller" => "WATERCOOLED",
         _ => return None,
     })
 }

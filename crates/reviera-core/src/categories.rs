@@ -442,6 +442,9 @@ pub const CATEGORIES: &[Category] = &[
         Some("Pset_WasteTerminalTypeCommon"),
         true,
     ),
+    cat("cat.pumps", "Pumps", Some("IfcPump"), Some("IfcPumpType"), Some("Pset_PumpTypeCommon"), true),
+    cat("cat.boilers", "Boilers", Some("IfcBoiler"), Some("IfcBoilerType"), Some("Pset_BoilerTypeCommon"), true),
+    cat("cat.chillers", "Chillers", Some("IfcChiller"), Some("IfcChillerType"), Some("Pset_ChillerTypeCommon"), true),
     cat(
         "cat.duct_fittings",
         "Duct Fittings",
