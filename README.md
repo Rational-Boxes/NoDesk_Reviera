@@ -929,6 +929,12 @@ schedules, circuit paths, cable sizing and voltage drop.
   Velocity, Friction, Pressure Drop, Network ID and Critical Path, and schedules can be filtered;
   flows and velocities go to the IFC ports (`mep_network.calculate`, `analytical_segment.list`,
   `analytical_segment.override`, `mep_settings.set_friction_equation`, `schedule.set_filters`).
+- **System Inspector** (Analyze › Pressure Drop): a view session on a calculated system: a flow
+  arrow on every section (constant flow between junctions), the critical path thick in the warning
+  colour, a section's flow, velocity, static pressure in and out and loss on hover, and the
+  sections with the terminals' excess pressure in Properties; refused with the first failing
+  condition (open connectors counted: "Run Show Disconnects"); editing the model ends it
+  (`system_inspector.start`).
 - **Pressure loss report** (Analyze › Reports & Schedules): the chosen systems (whose type
   calculates All) as CSV in SI units or HTML in project units: system information, total loss,
   segment and fitting detail with overridden losses marked, and the critical path; stale results
@@ -1291,7 +1297,7 @@ area by area (reviewed against the spec on 2026-10-15).
   connection groups, composite decks and span symbols, truss families (a layout shared by types),
   further rebar (two-point, varying sets beyond bars through walls, bent fabric), bilinear and two-way area loads, panel results and external analysis providers.
 - **MEP** (in development): duct and pipe fittings placed and edited in the view, the fitting controls and grips, surface connectors for conduit, moving runs, flex duct,
-  wires, panel schedule templates and editing (moves, spares, rebalancing), the two-column layout, custom circuit naming, switch systems, the Edit Path tool, Static Regain, the System Inspector, background network calculation, a built-in fixture-unit curve
+  wires, panel schedule templates and editing (moves, spares, rebalancing), the two-column layout, custom circuit naming, switch systems, the Edit Path tool, Static Regain, the System Inspector's on-canvas legend, background network calculation, a built-in fixture-unit curve
   and calculations, the System Browser's
   zones, columns and search, the System Editor, placing connectors on faces in a component editor, fabrication, P&ID and spaces
   and zones are specified but not built.

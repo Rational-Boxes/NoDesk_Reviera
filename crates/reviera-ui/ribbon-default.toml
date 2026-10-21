@@ -2402,6 +2402,24 @@ icon = "analytical_segments"
 help = "A system's analytical segments: flow, velocity, friction, loss, static pressure and the critical path; select them, override a loss, recalculate (MEP-CALC-002)"
 
 [[action]]
+id = "system_inspector.start"
+label = "System Inspector"
+icon = "system_inspector"
+help = "Inspect a calculated duct or pipe system in the view: flow arrows, the critical path highlighted, each section's flow, static pressure and loss on hover (MEP-CALC-003)"
+
+[[action]]
+id = "system_inspector.properties"
+label = "Properties"
+icon = "properties"
+help = "The inspected system's sections: flow, velocity, loss and static pressure in and out, and the terminals' excess pressure"
+
+[[action]]
+id = "system_inspector.stop"
+label = "Exit"
+icon = "finish"
+help = "End the System Inspector"
+
+[[action]]
 id = "pressure_loss_report.export"
 label = "Pressure Loss Report"
 icon = "pressure_report"
@@ -2886,6 +2904,7 @@ label = "Pressure Drop"
 tools = [
   { action = "mep_network.calculate", size = "large" },
   { action = "analytical_segment.list", size = "small" },
+  { action = "system_inspector.start", size = "small" },
   { action = "pressure_loss_report.export", size = "small" },
 ]
 
@@ -3366,6 +3385,15 @@ panels = [{ label = "Schedule", tools = [
   { action = "schedule.edit_filter", size = "large" },
   { action = "schedule.itemize", size = "large" },
   { action = "schedule.export", size = "large" },
+] }]
+
+[[context]]
+category = "session.system_inspector"
+label = "System Inspector"
+panels = [{ label = "System Inspector", tools = [
+  { action = "system_inspector.start", size = "large" },
+  { action = "system_inspector.properties", size = "large" },
+  { action = "system_inspector.stop", size = "large" },
 ] }]
 
 [[context]]

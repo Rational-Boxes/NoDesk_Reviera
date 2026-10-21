@@ -143,6 +143,7 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(MepSize),
         registry.add(MepNetworkCalculate),
         registry.add(AnalyticalSegmentList),
+        registry.add(SystemInspectorStart),
         registry.add(AnalyticalSegmentOverride),
         registry.add(MepSettingsSetFrictionEquation),
         registry.add(PressureLossReportExport),
@@ -1109,6 +1110,16 @@ read_command!(
     crate::mep_network::ListParams,
     crate::mep_network::NetworkResult,
     crate::mep_network::list
+);
+
+read_command!(
+    SystemInspectorStart,
+    "system_inspector.start",
+    "Inspect a system's pressure",
+    "Starts the System Inspector on a duct or pipe system (MEP-CALC-003): refused for fire protection, without equipment, unless its type's Calculations is All or Performance, with open connectors (\"System has open connectors: N. Run Show Disconnects\"), or while its results are stale (run mep_network.calculate). Returns its kept results with its sections: stretches of constant flow between junctions, each with its elements, flow, velocity, loss, static pressure in and out, critical flag, centreline and terminal; and terminals' excess pressure. In the window the inspector draws flow arrows, highlights the critical path and shows a section's values on hover; it changes nothing and ends when the model is edited.",
+    crate::mep_network::InspectParams,
+    crate::mep_network::NetworkResult,
+    crate::mep_network::inspect
 );
 
 edit_command!(

@@ -422,6 +422,8 @@ struct Gui {
     system_browser: Option<mep_ui::SystemBrowser>,
     /// MEP check markers turned on, by view.
     mep_marks: HashMap<u32, mep_ui::MepMarks>,
+    /// The System Inspector session (MEP-CALC-003), in one view.
+    inspector: Option<mep_network_ui::Inspector>,
     /// The Terminal pane (UI-AGENT-004), made on first use.
     terminal: Option<terminal_ui::TerminalPane>,
 }
@@ -1671,6 +1673,9 @@ impl Gui {
     /// Mouse movement handed to the tools in progress; `true` when the view needs redrawing.
     pub(crate) fn tools_motion(&mut self, x: i32, y: i32, p: &Panel, f: &Frame) -> bool {
         let mut redraw = false;
+        if self.inspector.is_some() {
+            redraw |= self.inspector_motion(x, y, p);
+        }
         if self.sketch.is_some() {
             self.sketch_motion(x, y);
             redraw = true;
@@ -2191,6 +2196,11 @@ impl Gui {
                 ("Schedule", Some("session.schedule"))
             };
             self.ribbon.set_context(Some(context));
+            return;
+        }
+        if self.inspector.as_ref().is_some_and(|i| Some(i.view) == self.active) {
+            self.ribbon
+                .set_context(Some(("System Inspector", Some("session.system_inspector"))));
             return;
         }
         if self.in_sheet() {
@@ -3701,6 +3711,7 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 chrome: fullscreen::Chrome::default(),
                 system_browser: None,
                 mep_marks: HashMap::new(),
+                inspector: None,
                 terminal: None,
                 help: None,
                 script_units: Rc::new(RefCell::new(Default::default())),
@@ -3904,6 +3915,7 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                     }
                     gui.sync_views();
                     gui.system_browser_idle();
+                    gui.inspector_idle();
                     if gui.browser_stale {
                         gui.rebuild_browser();
                     }
@@ -4534,6 +4546,9 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "mep.size" => with(gui, Gui::size_runs),
         "mep_network.calculate" => with(gui, Gui::calculate_networks),
         "analytical_segment.list" => with(gui, Gui::analytical_segments),
+        "system_inspector.start" => with(gui, Gui::start_inspector),
+        "system_inspector.properties" => with(gui, Gui::inspector_properties),
+        "system_inspector.stop" => with(gui, |g| g.stop_inspector("System Inspector closed")),
         "pressure_loss_report.export" => with(gui, Gui::pressure_loss_report),
         "mep.penetrations" => with(gui, Gui::penetrations),
         "fixture_unit_method.set" => with(gui, Gui::import_fixture_table),

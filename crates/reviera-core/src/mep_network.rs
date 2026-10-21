@@ -198,6 +198,34 @@ pub struct TerminalResult {
     pub critical: bool,
 }
 
+/// A stretch of the network with constant flow between two junctions (or a junction and a
+/// terminal or open end).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct Section {
+    /// 1, 2, … from the equipment outward.
+    pub id: usize,
+    /// Its segments and fittings in flow order.
+    pub elements: Vec<ElementId>,
+    /// m³/s.
+    pub flow: f64,
+    /// m/s, in its first element.
+    pub velocity: f64,
+    /// Pa: the loss entering it from the junction before, along it, and into the terminal after.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub loss: Option<f64>,
+    /// Static pressure where it starts and ends (Pa).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pressure_in: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pressure_out: Option<f64>,
+    pub critical: bool,
+    /// Its centreline in flow order (metres), for flow arrows.
+    pub points: Vec<[f64; 3]>,
+    /// The terminal it feeds, if it ends at one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub terminal: Option<ElementId>,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct NetworkResult {
     pub system: ElementId,
@@ -217,6 +245,9 @@ pub struct NetworkResult {
     pub critical_path: Vec<ElementId>,
     pub segments: Vec<AnalyticalSegment>,
     pub terminals: Vec<TerminalResult>,
+    /// Stretches of constant flow between junctions, from the equipment outward (MEP-CALC-003).
+    #[serde(default)]
+    pub sections: Vec<Section>,
     #[serde(default)]
     pub warnings: Vec<String>,
     /// The inputs have changed since it was calculated.
@@ -471,6 +502,77 @@ pub fn compute(store: &Store, sys: &SystemInfo, equation: Equation) -> Result<Ne
         }
     }
 
+    // Sections: chains of run elements with one way on, split at junctions.
+    let mut children: HashMap<ElementId, Vec<ElementId>> = HashMap::new();
+    for &x in order.iter().skip(1) {
+        children.entry(parent[&x].0).or_default().push(x);
+    }
+    let mut sections = Vec::new();
+    let mut starts: VecDeque<ElementId> = children.get(&root).into_iter().flatten().copied().filter(|c| is_run(*c)).collect();
+    while let Some(start) = starts.pop_front() {
+        let mut chain = vec![start];
+        let mut x = start;
+        let mut terminal = None;
+        loop {
+            let kids = children.get(&x).cloned().unwrap_or_default();
+            if kids.len() == 1 && is_run(kids[0]) {
+                x = kids[0];
+                chain.push(x);
+                continue;
+            }
+            if kids.len() == 1 {
+                terminal = Some(kids[0]);
+            }
+            starts.extend(kids.into_iter().filter(|k| is_run(*k)));
+            break;
+        }
+        let leave = |a: ElementId, b: ElementId| leaving.get(&(a, b)).map_or(0.0, |l| l.1);
+        let from = parent[&start].0;
+        let entry = if from == root { 0.0 } else { leave(from, start) };
+        let mut loss = entry;
+        for (k, e) in chain.iter().enumerate() {
+            if store.get(*e).and_then(mep_runs::segment_recipe).is_some() {
+                loss += own.get(e).copied().unwrap_or(0.0);
+            }
+            if let Some(n) = chain.get(k + 1) {
+                loss += leave(*e, *n);
+            }
+        }
+        if let Some(t) = terminal {
+            loss += leave(*chain.last().expect("one"), t);
+        }
+        let mut points: Vec<[f64; 3]> = Vec::new();
+        for e in &chain {
+            let Some(el) = store.get(*e) else { continue };
+            let pts = if let Some(sr) = mep_runs::segment_recipe(el) {
+                if parent[e].2 == 1 { vec![sr.end, sr.start] } else { vec![sr.start, sr.end] }
+            } else if let Some(fr) = mep_runs::fitting_recipe(el) {
+                vec![fr.centre]
+            } else {
+                Vec::new()
+            };
+            for p in pts {
+                if points.last().is_none_or(|q| length(*q, p) > 1e-6) {
+                    points.push(p);
+                }
+            }
+        }
+        let first = rows.get(&start);
+        let pressure_in = critical_loss.map(|c| c - upstream[&start] + entry);
+        sections.push(Section {
+            id: sections.len() + 1,
+            flow: q(start),
+            velocity: first.map_or(0.0, |r| r.velocity),
+            loss: losses.then_some(loss),
+            pressure_in,
+            pressure_out: pressure_in.map(|p| p - loss),
+            critical: on_path.contains(&start),
+            elements: chain,
+            points,
+            terminal,
+        });
+    }
+
     // Members the walk did not reach: numbered networks of their own, without results.
     let mut rest: Vec<ElementId> = sys.elements.iter().copied().filter(|e| !parent.contains_key(e) && *e != root && is_run(*e)).collect();
     rest.sort();
@@ -538,6 +640,7 @@ pub fn compute(store: &Store, sys: &SystemInfo, equation: Equation) -> Result<Ne
         critical_path,
         segments,
         terminals,
+        sections,
         warnings,
         stale: false,
     })
@@ -650,6 +753,64 @@ pub struct ListParams {
 pub(crate) fn list(store: &Store, p: ListParams) -> Result<NetworkResult> {
     let sys = system_of(store, &p.system_id)?;
     kept(store, &sys).ok_or_else(|| bad("mep_network.not_calculated", format!("{} has not been calculated: run mep_network.calculate", sys.name)))
+}
+
+/// Why the System Inspector cannot inspect a system, if it cannot (MEP-CALC-003): no equipment,
+/// Calculations not All or Performance, open connectors, or fire protection.
+pub fn inspect_refusal(store: &Store, sys: &SystemInfo) -> Option<Error> {
+    use Classification::*;
+    if matches!(sys.classification, FireProtectionWet | FireProtectionDry | FireProtectionPreAction | FireProtectionOther) {
+        return Some(bad("system_inspector.fire_protection", "The System Inspector is not offered for fire protection systems"));
+    }
+    if matches!(sys.classification, Sanitary | Vent | StormDrainage) || !(sys.classification.fits(Domain::Duct) || sys.classification.fits(Domain::Pipe)) {
+        return Some(bad("system_inspector.kind", format!("{} is not a duct or pressure pipe system", sys.name)));
+    }
+    if sys.equipment.is_none() {
+        return Some(bad("system_inspector.no_equipment", "System has no equipment: Select Equipment first"));
+    }
+    let st = mep_systems::system_type(store, &sys.system_type).unwrap_or_else(|| mep_systems::builtin(sys.classification));
+    if !matches!(st.calculations, Calculations::All | Calculations::Performance) {
+        return Some(bad("system_inspector.calculations", format!("{}: its system type's Calculations must be All or Performance", sys.name)));
+    }
+    // Open connectors: every port of its segments and fittings, and the member ports of the rest.
+    let partners = mep::partners(store);
+    let mut open = 0;
+    for e in sys.elements.iter().chain(sys.equipment.as_ref()) {
+        let Some(el) = store.get(*e) else { continue };
+        let run = mep_runs::is_run_element(el);
+        for p in mep::ports(store, el) {
+            let member = run || sys.ports.contains(&(*e, p.index));
+            if member && !p.connector.surface && p.connector.domain != Domain::Electrical && !partners.contains_key(&(*e, p.index)) {
+                open += 1;
+            }
+        }
+    }
+    if open > 0 {
+        return Some(bad("system_inspector.open_connectors", format!("System has open connectors: {open}. Run Show Disconnects")));
+    }
+    None
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct InspectParams {
+    pub system_id: ElementRef,
+    /// The view it is shown in (the window keeps the session); scripts may omit it.
+    #[serde(default)]
+    pub view_id: Option<String>,
+}
+
+/// `system_inspector.start`: the preconditions, then the system's kept results with its
+/// sections (refused while they are stale or missing).
+pub(crate) fn inspect(store: &Store, p: InspectParams) -> Result<NetworkResult> {
+    let sys = system_of(store, &p.system_id)?;
+    if let Some(e) = inspect_refusal(store, &sys) {
+        return Err(e);
+    }
+    match kept(store, &sys) {
+        Some(r) if !r.stale => Ok(r),
+        _ => Err(bad("system_inspector.stale", format!("{}'s results are stale or missing: run mep_network.calculate first", sys.name))),
+    }
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]

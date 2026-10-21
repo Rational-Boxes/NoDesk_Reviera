@@ -355,6 +355,9 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "schedule_filter" => format!(
             r#"<path d="M4 5h24l-9 11v9l-6 3V16z" fill="{f}" {s}/><path d="M22 22h7M22 26h5" {sa}/>"#
         ),
+        "system_inspector" => format!(
+            r#"<path d="M3 10h14M17 10l-4-3M17 10l-4 3M3 20h10" fill="none" {s}/><circle cx="21" cy="19" r="5" fill="{f}" {sa}/><path d="M25 23l5 5" stroke-width="2.5" {sa}/>"#
+        ),
         "mep_network" => format!(
             r#"<path d="M3 8h10v6H3zM13 10h8l4 4v12" fill="none" {s}/><circle cx="25" cy="27" r="2" fill="{f}" {s}/><path d="M6 20c3-3 5 3 8 0s5 3 8 0" fill="none" {sa}/>"#
         ),

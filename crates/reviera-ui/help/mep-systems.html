@@ -214,6 +214,14 @@ coefficient with your own. Reviera keeps the results with the model. Change anyt
 on and they become stale, then they are calculated again the next time you open the table. The
 Ducts and Pipes schedules can show Flow, Velocity, Friction, Pressure Drop and Critical Path.
 Schedules also have a <b>Filter…</b> button, for example to list only the critical path.</p>
+<p><a href="reviera:action/system_inspector.start">System Inspector</a> (Analyze › Pressure Drop)
+shows a calculated system in the view. An arrow on each stretch of duct or pipe shows which way the
+air or water flows, and the critical path is drawn thick in the warning colour. Hover over a
+stretch to see its flow, its static pressure where it starts and ends, and what it loses.
+<b>Properties</b> lists every stretch and how much spare pressure each terminal has. The
+inspector needs the system's equipment and no open connectors. If any connectors are open, it says
+how many, and <a href="reviera:action/mep_check.show_disconnects">Show Disconnects</a> finds them.
+It changes nothing in the model, and any edit to the model ends it.</p>
 <p><a href="reviera:action/pressure_loss_report.export">Pressure Loss Report</a> (Analyze ›
 Reports &amp; Schedules) writes a file for the systems you tick. It can be CSV, in SI units, or
 HTML, in the project's units. Only systems whose type has <i>Calculations</i> set to All can be

@@ -132,6 +132,7 @@ pub fn toolset_of(command: &str) -> String {
             | "mep_settings"
             | "analytical_segment"
             | "pressure_loss_report"
+            | "system_inspector"
             | "mounting_part"
             | "cam_writer"
             | "beam_system"

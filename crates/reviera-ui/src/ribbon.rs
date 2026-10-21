@@ -105,6 +105,8 @@ pub const UI_ACTIONS: &[&str] = &[
     "schedule.edit_fields",
     "schedule.edit_sort",
     "schedule.edit_filter",
+    "system_inspector.properties",
+    "system_inspector.stop",
     "schedule.itemize",
     "sketch.overhang",
     "view.create_ceiling_plan",

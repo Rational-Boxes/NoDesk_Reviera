@@ -69,7 +69,7 @@ type Segment = [[f32; 3]; 2];
 const OPEN: [f32; 4] = [0.90, 0.10, 0.10, 1.0];
 /// A circuit's path.
 const PATH: [f32; 4] = [0.85, 0.35, 0.05, 1.0];
-const WARN: [f32; 4] = [0.95, 0.65, 0.05, 1.0];
+pub(crate) const WARN: [f32; 4] = [0.95, 0.65, 0.05, 1.0];
 
 /// "duct systems", "pipe systems", "circuits".
 fn plural(label: &str) -> String {
@@ -238,6 +238,7 @@ impl Gui {
         for (_, (segments, color)) in by_colour {
             out.push(Lines { color, width: 0.5, segments });
         }
+        out.extend(self.inspector_lines(index));
         out
     }
 

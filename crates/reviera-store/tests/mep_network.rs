@@ -147,6 +147,42 @@ fn supply_air_pressure_drop() {
     let ifc = std::fs::read_to_string(&path).unwrap();
     assert!(ifc.contains("'VolumetricFlowRate'") && ifc.contains("IFCVOLUMETRICFLOWRATEMEASURE"));
 
+    // The System Inspector (MEP-CALC-003): the main's far end is open, so it is refused.
+    let e = run(&r, &mut doc, "system_inspector.start", json!({ "system_id": sys.0 })).unwrap_err();
+    assert_eq!(e.message, "System has open connectors: 1. Run Show Disconnects");
+    ok(&r, &mut doc, "duct.cap_open_ends", json!({}));
+    // Capped, the results are stale until calculated.
+    assert_eq!(run(&r, &mut doc, "system_inspector.start", json!({ "system_id": sys.0 })).unwrap_err().code, "system_inspector.stale");
+    ok(&r, &mut doc, "mep_network.calculate", json!({ "system_id": sys.0 }));
+    let n: NetworkResult = serde_json::from_value(ok(&r, &mut doc, "system_inspector.start", json!({ "system_id": sys.0 }))).unwrap();
+    let crit = n.critical_loss.unwrap();
+    // Every joined segment and fitting is in exactly one section.
+    let mut seen: Vec<ElementId> = n.sections.iter().flat_map(|s| s.elements.clone()).collect();
+    seen.sort();
+    let mut all: Vec<ElementId> = n.segments.iter().filter(|a| a.connected).map(|a| a.element).collect();
+    all.sort();
+    assert_eq!(seen, all);
+    // The first section leaves the AHU with all the flow at its full pressure; each section
+    // starts where the one before it ended, less the junction's branch loss.
+    let first = &n.sections[0];
+    assert!(first.critical && (first.flow - 0.3).abs() < 1e-9 && (first.pressure_in.unwrap() - crit).abs() < 1e-9);
+    // The critical chain's losses add up to the critical loss with the diffuser's 25 Pa, and the
+    // last critical section ends with the 25 Pa the diffuser takes.
+    let chain: Vec<_> = n.sections.iter().filter(|s| s.critical).collect();
+    let total: f64 = chain.iter().map(|s| s.loss.unwrap()).sum::<f64>() + 25.0;
+    assert!((total - crit).abs() < 1e-6, "{total} {crit}");
+    // (The 40 Pa override above may have moved the critical path to another diffuser.)
+    let ct = *n.critical_path.last().unwrap();
+    let last = chain.last().unwrap();
+    assert_eq!(last.terminal, Some(ct));
+    assert!((last.pressure_out.unwrap() - 25.0).abs() < 1e-6);
+    // Branch sections carry a diffuser's 0.1 m³/s; the terminals' excess pressure.
+    let other = *diffusers.iter().find(|d| **d != ct).unwrap();
+    assert!(n.sections.iter().any(|s| !s.critical && (s.flow - 0.1).abs() < 1e-9 && s.terminal == Some(other)));
+    assert!(n.sections.iter().all(|s| s.points.len() >= 2));
+    let t0 = n.terminals.iter().find(|t| t.element == other).unwrap();
+    assert!((t0.excess - (crit - t0.path_loss)).abs() < 1.0 && t0.excess > 0.0);
+
     // Flow Only: flows without losses, and no report.
     ok(&r, &mut doc, "system_type.set", json!({ "type_id": "supply_air", "calculations": "flow_only" }));
     ok(&r, &mut doc, "mep_network.calculate", json!({ "system_id": sys.0 }));
