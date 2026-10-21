@@ -901,6 +901,12 @@ schedules, circuit paths, cable sizing and voltage drop.
   physical conductor data (resistivity, areas) but no ampacities, which you enter under Manage ›
   MEP Settings › Wiring (`circuit.properties`, `circuit.size_cable`, `circuit.set_path`,
   `cable_type.create`, `conductor_size.create`, `conductor_ampacity.set`, `wiring.set`).
+- **Gutters and downspouts** (Systems › HVAC & Piping › Gutter, Gutter Outlet; MEP-PIPE-010):
+  a gutter along a roof's eaves (half-round, K-style or box), hung on the fascias, mitred, falling
+  toward its outlets and following the roof as its overhang or fascia changes; outlets with
+  downspouts that bend back to the wall and run down to a level; one Storm Drainage system; a
+  size check of gutter and downspouts against the roof area draining to each outlet at a design
+  rainfall (`gutter.create`, `gutter.add_outlet`, `gutter.size`, `gutter.set`).
 - **Automatic penetrations** (MEP-PEN-001): where a duct, pipe, tray or conduit passes through a
   wall, floor or ceiling, an opening (its section plus 25 mm clearance, round or rectangular) is
   made, follows the run as it moves or resizes and goes with it; crossings of beams are flagged

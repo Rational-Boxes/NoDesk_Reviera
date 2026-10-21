@@ -798,6 +798,9 @@ pub fn port_count(e: &Element) -> usize {
     if let Some(s) = segment_recipe(e) {
         return 2 + s.taps.len();
     }
+    if let Some(g) = crate::mep_gutters::gutter_recipe(e) {
+        return g.outlets.len();
+    }
     fitting_recipe(e).map_or(0, |f| f.legs.len())
 }
 
@@ -1051,13 +1054,16 @@ pub fn fitting_solids(f: &FittingRecipe) -> Vec<Solid> {
     }
 }
 
-/// Every segment and fitting with its solids.
+/// Every segment and fitting (and gutter) with its solids.
 pub fn all(store: &Store) -> Vec<(ElementId, Domain, bool, Vec<Solid>)> {
     store
         .iter()
         .filter_map(|e| {
             if let Some(s) = segment_recipe(e) {
                 return Some((e.id(), s.domain, true, segment_solid(&s)));
+            }
+            if let Some(g) = crate::mep_gutters::gutter_recipe(e) {
+                return Some((e.id(), Domain::Pipe, true, crate::mep_gutters::geometry(store, &g).ok()?.solids));
             }
             let f = fitting_recipe(e)?;
             Some((e.id(), f.domain, false, fitting_solids(&f)))
@@ -1588,6 +1594,27 @@ pub(crate) fn create_duct(txn: &mut Transaction<'_>, p: CreateParams) -> Result<
 /// Draws a pipe run (`pipe.create`).
 pub(crate) fn create_pipe(txn: &mut Transaction<'_>, p: CreateParams) -> Result<RunReport> {
     draw(txn, Domain::Pipe, p)
+}
+
+/// How long an outlet fitting under a gutter is.
+pub const OUTLET_LENGTH: f64 = 0.06;
+
+/// An outlet under a gutter (MEP-PIPE-010): an `IfcPipeFitting` (CONNECTOR) with a leg up to the
+/// gutter's port at `top` and one down to the downspout.
+pub(crate) fn make_outlet(txn: &mut Transaction<'_>, level: &str, top: V3, diameter: f64) -> Result<ElementId> {
+    let size = Size { shape: Shape::Round, diameter, width: 0.0, height: 0.0 };
+    let cx = Ctx { domain: Domain::Pipe, predefined: "RIGIDSEGMENT", type_guid: String::new(), routing: Routing::default(), level: level.to_owned(), classification: Some(Classification::StormDrainage) };
+    let centre = [top[0], top[1], top[2] - OUTLET_LENGTH / 2.0];
+    make_fitting(
+        txn,
+        &cx,
+        Part::Coupling,
+        centre,
+        vec![
+            Leg { direction: [0.0, 0.0, 1.0], length: OUTLET_LENGTH / 2.0, size, across: None },
+            Leg { direction: [0.0, 0.0, -1.0], length: OUTLET_LENGTH / 2.0, size, across: None },
+        ],
+    )
 }
 
 /// Draws a cable tray run (`cable_tray.create`).

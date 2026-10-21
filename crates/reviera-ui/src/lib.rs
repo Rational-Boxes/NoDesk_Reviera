@@ -58,6 +58,7 @@ mod terminal_ui;
 mod mep_electrical_ui;
 mod mep_cables_ui;
 mod mep_sizing_ui;
+mod mep_gutters_ui;
 mod mep_loads_ui;
 mod mep_runs_ui;
 mod fullscreen;
@@ -4489,6 +4490,8 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
             focus(g);
         }),
         "duct.cap_open_ends" => with(gui, Gui::cap_open_ends),
+        "gutter.create" => with(gui, Gui::create_gutter),
+        "gutter.add_outlet" => with(gui, Gui::gutter_outlet),
         "cable_tray.create" => with(gui, |g| {
             g.start_run_tool(reviera_core::mep::Domain::CableTray);
             focus(g);

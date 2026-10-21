@@ -480,6 +480,7 @@ pub enum AboveCut {
 /// fittings and air terminals, so services at ceiling height show in plans; hidden otherwise.
 pub fn above_cut(e: &Element) -> AboveCut {
     if crate::mep_runs::is_run_element(e)
+        || crate::mep_gutters::gutter_recipe(e).is_some()
         || matches!(e.class.as_str(), "IfcAirTerminal" | "IfcJunctionBox" | "IfcDuctFitting" | "IfcPipeFitting" | "IfcCableCarrierFitting")
     {
         return AboveCut::Projection;

@@ -3286,9 +3286,28 @@ impl LocalProject {
                 .collect();
             geometry::write_breps(&mut self.ifc, step, geometry::BrepFrame::WORLD, &polys, self.length_scale, contexts)?;
             let e = store.get(*id).expect("listed");
+            let gutter = reviera_core::mep_gutters::gutter_recipe(e);
             let level = reviera_core::mep_runs::segment_recipe(e)
                 .map(|r| r.level)
-                .or_else(|| reviera_core::mep_runs::fitting_recipe(e).map(|f| f.level));
+                .or_else(|| reviera_core::mep_runs::fitting_recipe(e).map(|f| f.level))
+                .or_else(|| gutter.as_ref().map(|g| g.level.clone()));
+            // A gutter hangs on its roof (MEP-PIPE-010).
+            if let Some(roof) = gutter
+                .as_ref()
+                .and_then(|g| GlobalId::parse(&g.roof))
+                .and_then(|g| store.find_by_guid(&g))
+                .and_then(|r| self.steps.get(&r).copied())
+            {
+                geometry::relate_one(
+                    &mut self.ifc,
+                    "IfcRelConnectsElements",
+                    "RelatingElement",
+                    roof,
+                    "RelatedElement",
+                    step,
+                    owner_history,
+                )?;
+            }
             let storey = level
                 .as_deref()
                 .and_then(GlobalId::parse)

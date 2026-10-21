@@ -17,6 +17,7 @@ Water 1. The tools are on the <b>Systems</b> tab.</p>
   <a href="#schedules">Panel schedules</a>
   <a href="#loads">Load classifications and demand factors</a>
   <a href="#sizing-ducts">Sizing ducts and pipes</a>
+  <a href="#gutters">Gutters and downspouts</a>
   <a href="#penetrations">Openings for runs</a>
   <a href="#types">System types</a>
   <a href="#browser">System Browser</a>
@@ -194,6 +195,17 @@ with your code's fixture-unit table. Import it as a CSV of <code>fixture_units, 
 flow_valve</code> rows under Manage › MEP Settings › <a
 href="reviera:action/fixture_unit_method.set">Fixture-Unit Table</a>. Reviera does not yet ship a
 table. Without one, the connectors' own flows are added up and the report says so.</p>
+
+<h2 id="gutters">Gutters and downspouts</h2>
+<p>Select a roof and choose <a href="reviera:action/gutter.create">Gutter</a> (Systems › HVAC &amp;
+Piping). Tick the eaves it runs along, in order round the roof. The gutter hangs on the fascia,
+or at the eave when there is no fascia, is mitred at corners, and falls toward its outlets (1 in
+500 unless you set another fall). It belongs to the roof's eaves: change the overhang or the
+fascia and it moves with them. Select the gutter and choose <a
+href="reviera:action/gutter.add_outlet">Gutter Outlet</a> to add an outlet. Its downspout drops
+from the outlet, bends back to the wall and runs down to the level you pick. The gutter, outlets
+and downspouts form one Storm Drainage system. After each outlet, Reviera checks the roof area
+draining to it at 75 mm/h of rain, and warns when the gutter or downspout is too small.</p>
 
 <h2 id="penetrations">Openings for runs</h2>
 <p>Where a duct, pipe, cable tray or conduit passes through a wall, floor or ceiling, Reviera opens

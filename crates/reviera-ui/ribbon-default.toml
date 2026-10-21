@@ -2360,6 +2360,18 @@ icon = "system_disconnect"
 help = "Take a circuit off its panel; it keeps its devices and loses its number"
 
 [[action]]
+id = "gutter.create"
+label = "Gutter"
+icon = "gutter"
+help = "Hang a gutter along the selected roof's eaves, mitred at corners and following the roof (MEP-PIPE-010)"
+
+[[action]]
+id = "gutter.add_outlet"
+label = "Gutter Outlet"
+icon = "downspout"
+help = "Add an outlet to the selected gutter, with a downspout bending back to the wall and down to a level; the sizes are checked"
+
+[[action]]
 id = "mep.penetrations"
 label = "Penetrations"
 icon = "penetrations"
@@ -2715,6 +2727,8 @@ label = "HVAC & Piping"
 tools = [
   { action = "duct.create", size = "large" },
   { action = "pipe.create", size = "large" },
+  { action = "gutter.create", size = "small" },
+  { action = "gutter.add_outlet", size = "small" },
   { action = "duct.cap_open_ends", size = "small" },
   { action = "mep.size", size = "small" },
 ]

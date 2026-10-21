@@ -142,6 +142,10 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(WiringSet),
         registry.add(MepSize),
         registry.add(MepPenetrations),
+        registry.add(GutterCreate),
+        registry.add(GutterSet),
+        registry.add(GutterAddOutlet),
+        registry.add(GutterSize),
         registry.add(MepSetPenetrationRule),
         registry.add(MepRunLockSize),
         registry.add(FixtureUnitMethodSet),
@@ -1131,4 +1135,47 @@ edit_command!(
     crate::mep_penetrations::RuleParams,
     (),
     crate::mep_penetrations::set_rule
+);
+
+edit_command!(
+    GutterCreate,
+    "gutter.create",
+    "Hang a gutter along a roof's eaves",
+    "Makes a gutter (MEP-PIPE-010) along `roof_id`'s eave curves `edges` (keys from roof.eaves, in order round the roof; every eave when empty): an IfcPipeSegment (GUTTER) of `profile` half_round (default), k_style or box, `width` (125 mm) and `depth` (half the width), hung on the fascia (or at the eave), mitred at corners, falling at `fall` (1:500) toward its outlets. It follows the roof: changing the overhang, fascia or bearing moves it. Returns the gutter.",
+    "Gutter",
+    crate::mep_gutters::CreateParams,
+    ElementId,
+    crate::mep_gutters::create
+);
+
+edit_command!(
+    GutterSet,
+    "gutter.set",
+    "Change a gutter",
+    "Changes a gutter's `profile`, `width`, `depth` or `fall` (MEP-PIPE-010).",
+    "Gutter",
+    crate::mep_gutters::SetParams,
+    (),
+    crate::mep_gutters::set
+);
+
+edit_command!(
+    GutterAddOutlet,
+    "gutter.add_outlet",
+    "Add an outlet and downspout to a gutter",
+    "Adds an outlet to a gutter (MEP-PIPE-010) `at` metres along it, or nearest a plan `point` (its middle when neither): an IfcPipeFitting (CONNECTOR) of the downspout's `diameter` (68 mm), with, given `downspout_to` ({level: id} or {point: [x, y, z]}), a downspout: down from the outlet, back toward the wall by the eave's offset with bends, then down to that level (or point). The gutter, outlet and downspout join one Storm Drainage system (made when needed); the gutter now falls toward the outlet. Returns where, the fitting, the downspout and the system.",
+    "Gutter Outlet",
+    crate::mep_gutters::OutletParams,
+    crate::mep_gutters::OutletReport,
+    crate::mep_gutters::add_outlet
+);
+
+read_command!(
+    GutterSize,
+    "gutter.size",
+    "Check a gutter's and downspouts' sizes",
+    "Checks a gutter (MEP-PIPE-010) at a design `rainfall` intensity (mm/h, 75 by default): the plan area of the roof faces draining to it, shared between its outlets by the length nearest each, gives each outlet's flow, checked against the gutter's capacity (Manning flowing full, n 0.012, at its fall) and the downspout's (an orifice under half the gutter's depth); too small ones are flagged.",
+    crate::mep_gutters::SizeParams,
+    crate::mep_gutters::SizeReport,
+    crate::mep_gutters::size
 );

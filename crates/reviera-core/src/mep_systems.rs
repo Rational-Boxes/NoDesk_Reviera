@@ -113,6 +113,7 @@ pub fn builtin(c: Classification) -> SystemType {
         K::DomesticHotWater => ("DHW", [0.90, 0.35, 0.25, 1.0], Some("Water"), Some(60.0)),
         K::DomesticColdWater => ("DCW", [0.15, 0.55, 0.85, 1.0], Some("Water"), Some(10.0)),
         K::Sanitary => ("SAN", [0.45, 0.35, 0.25, 1.0], Some("Water"), Some(20.0)),
+        K::StormDrainage => ("SD", [0.30, 0.60, 0.65, 1.0], Some("Water"), Some(10.0)),
         K::Vent => ("V", [0.55, 0.55, 0.55, 1.0], None, None),
         K::FireProtectionWet => ("FPW", [0.90, 0.10, 0.10, 1.0], Some("Water"), Some(10.0)),
         K::FireProtectionDry => ("FPD", [0.80, 0.25, 0.25, 1.0], None, None),
@@ -445,6 +446,7 @@ pub fn ifc_predefined(t: &SystemType) -> &'static str {
         K::DomesticColdWater => "DOMESTICCOLDWATER",
         K::DomesticHotWater => "DOMESTICHOTWATER",
         K::Sanitary => "DRAINAGE",
+        K::StormDrainage => "STORMWATER",
         K::Vent => "VENT",
         K::FireProtectionWet | K::FireProtectionDry | K::FireProtectionPreAction | K::FireProtectionOther => "FIREPROTECTION",
         K::Other | K::Fitting | K::Global => "USERDEFINED",
@@ -633,6 +635,11 @@ fn system(store: &Store, r: &ElementRef) -> Result<(ElementId, SystemRecipe)> {
 pub struct MembersParams {
     pub system_id: ElementRef,
     pub element_ids: Vec<ElementRef>,
+}
+
+/// Adds elements to a system (for tools that make runs, such as gutters).
+pub(crate) fn add_members(txn: &mut Transaction<'_>, system: ElementId, ids: &[ElementId]) -> Result<()> {
+    add(txn, MembersParams { system_id: ElementRef::Id(system), element_ids: ids.iter().map(|i| ElementRef::Id(*i)).collect() })
 }
 
 /// Adds elements to a system (`system.add`).

@@ -100,6 +100,8 @@ pub enum Classification {
     DomesticColdWater,
     Sanitary,
     Vent,
+    /// Rainwater from roofs: gutters and downspouts (MEP-PIPE-010).
+    StormDrainage,
     FireProtectionWet,
     FireProtectionDry,
     FireProtectionPreAction,
@@ -111,7 +113,7 @@ pub enum Classification {
 }
 
 impl Classification {
-    pub const ALL: [Classification; 17] = [
+    pub const ALL: [Classification; 18] = [
         Classification::SupplyAir,
         Classification::ReturnAir,
         Classification::ExhaustAir,
@@ -122,6 +124,7 @@ impl Classification {
         Classification::DomesticColdWater,
         Classification::Sanitary,
         Classification::Vent,
+        Classification::StormDrainage,
         Classification::FireProtectionWet,
         Classification::FireProtectionDry,
         Classification::FireProtectionPreAction,
@@ -143,6 +146,7 @@ impl Classification {
             Classification::DomesticColdWater => "Domestic Cold Water",
             Classification::Sanitary => "Sanitary",
             Classification::Vent => "Vent",
+            Classification::StormDrainage => "Storm Drainage",
             Classification::FireProtectionWet => "Fire Protection Wet",
             Classification::FireProtectionDry => "Fire Protection Dry",
             Classification::FireProtectionPreAction => "Fire Protection Pre-Action",
@@ -528,6 +532,9 @@ fn overrides(e: &Element) -> BTreeMap<usize, ConnectorParams> {
 /// An element's ports: a component copy's connectors, or a duct or pipe segment's or fitting's
 /// ends (none for other elements).
 pub fn ports(store: &Store, e: &Element) -> Vec<Port> {
+    if crate::mep_gutters::gutter_recipe(e).is_some() {
+        return crate::mep_gutters::ports(store, e);
+    }
     if mesh_objects::mesh_object_recipe(e).is_none() {
         return crate::mep_runs::ports(store, e);
     }
@@ -561,7 +568,7 @@ pub fn ports(store: &Store, e: &Element) -> Vec<Port> {
 pub fn all_ports(store: &Store) -> Vec<Port> {
     store
         .iter()
-        .filter(|e| mesh_objects::mesh_object_recipe(e).is_some() || crate::mep_runs::is_run_element(e))
+        .filter(|e| mesh_objects::mesh_object_recipe(e).is_some() || crate::mep_runs::is_run_element(e) || crate::mep_gutters::gutter_recipe(e).is_some())
         .flat_map(|e| ports(store, e))
         .collect()
 }
