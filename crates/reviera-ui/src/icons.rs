@@ -358,6 +358,9 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "system_inspector" => format!(
             r#"<path d="M3 10h14M17 10l-4-3M17 10l-4 3M3 20h10" fill="none" {s}/><circle cx="21" cy="19" r="5" fill="{f}" {sa}/><path d="M25 23l5 5" stroke-width="2.5" {sa}/>"#
         ),
+        "sizing_calculator" => format!(
+            r#"<rect x="5" y="3" width="18" height="26" rx="2" fill="{f}" {s}/><rect x="8" y="6" width="12" height="5" {s}/><path d="M9 16h2M13 16h2M17 16h2M9 20h2M13 20h2M17 20h2M9 24h2M13 24h2" {s}/><path d="M25 10v16M23 12l2-2 2 2M23 24l2 2 2-2" {sa}/>"#
+        ),
         "mep_network" => format!(
             r#"<path d="M3 8h10v6H3zM13 10h8l4 4v12" fill="none" {s}/><circle cx="25" cy="27" r="2" fill="{f}" {s}/><path d="M6 20c3-3 5 3 8 0s5 3 8 0" fill="none" {sa}/>"#
         ),

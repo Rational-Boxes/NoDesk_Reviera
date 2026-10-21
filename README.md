@@ -929,6 +929,12 @@ schedules, circuit paths, cable sizing and voltage drop.
   Velocity, Friction, Pressure Drop, Network ID and Critical Path, and schedules can be filtered;
   flows and velocities go to the IFC ports (`mep_network.calculate`, `analytical_segment.list`,
   `analytical_segment.override`, `mep_settings.set_friction_equation`, `schedule.set_filters`).
+- **Sizing Calculator** (Window, Analyze › Sizing, or the middle-click menu of a duct or pipe): a
+  docked pane listing the candidate sizes for the selected duct or pipe (its flow, shape and
+  roughness read from the model) or for a typed flow, against friction and velocity targets with
+  ± tolerance sliders and an aspect-ratio maximum, within height, width and diameter
+  restrictions; sortable, rectangles swappable; Apply resizes the selection (refused on
+  size-locked segments) (`sizing_calculator.candidates`, `duct.set_size`, `pipe.set_size`).
 - **System Inspector** (Analyze › Pressure Drop): a view session on a calculated system: a flow
   arrow on every section (constant flow between junctions), the critical path thick in the warning
   colour, a section's flow, velocity, static pressure in and out and loss on hover, and the

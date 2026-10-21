@@ -141,6 +141,7 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(ConductorAmpacitySet),
         registry.add(WiringSet),
         registry.add(MepSize),
+        registry.add(SizingCalculatorCandidates),
         registry.add(MepNetworkCalculate),
         registry.add(AnalyticalSegmentList),
         registry.add(SystemInspectorStart),
@@ -458,7 +459,7 @@ edit_command!(
     DuctSetSize,
     "duct.set_size",
     "Resize ducts",
-    "Gives duct segments a new size (`width`, `height`, `diameter`); the legs of the fittings joined to them follow.",
+    "Gives duct segments a new size (`width`, `height`, `diameter`); the legs of the fittings joined to them follow. Refused on size-locked segments (\"Element is size-locked\").",
     "Duct Size",
     crate::mep_runs::SetSizeParams,
     (),
@@ -469,7 +470,7 @@ edit_command!(
     PipeSetSize,
     "pipe.set_size",
     "Resize pipes",
-    "Gives pipe segments a new `diameter`; the legs of the fittings joined to them follow.",
+    "Gives pipe segments a new `diameter`; the legs of the fittings joined to them follow. Refused on size-locked segments (\"Element is size-locked\").",
     "Pipe Size",
     crate::mep_runs::SetSizeParams,
     (),
@@ -1089,6 +1090,16 @@ edit_command!(
     crate::mep_sizing::SizeParams,
     crate::mep_sizing::SizeReport,
     crate::mep_sizing::size
+);
+
+read_command!(
+    SizingCalculatorCandidates,
+    "sizing_calculator.candidates",
+    "Candidate sizes for a duct or pipe",
+    "The Sizing Calculator (MEP-CALC-005): candidate sizes for one duct or pipe segment (`element_id`: its flow, kept or from its system, domain, shape, type and roughness) or a `flow` in m³/s with `domain` and `shape`, against `friction` (Pa/m) and `velocity` (m/s) bands {target, tolerance 0–0.5, 10 % by default; targets 1 Pa/m and 5 m/s for ducts, 300 Pa/m and 1.5 m/s for pipes} and an `aspect` maximum {max, 3 by default}; with no basis, friction. From the type's sizing table (rectangles wider than high, or `swap`), within `restrict`; each with friction, velocity, aspect ratio, equivalent diameter and deviations, closest to the friction target first. When none meets every basis, the three nearest, with the note \"No size within tolerance\". Nothing changes; apply with duct.set_size or pipe.set_size.",
+    crate::mep_calculator::CandidatesParams,
+    crate::mep_calculator::CandidatesResult,
+    crate::mep_calculator::candidates
 );
 
 edit_command!(

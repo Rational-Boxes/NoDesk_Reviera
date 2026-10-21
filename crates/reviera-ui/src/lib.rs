@@ -59,6 +59,7 @@ mod mep_electrical_ui;
 mod mep_cables_ui;
 mod mep_sizing_ui;
 mod mep_network_ui;
+mod mep_calculator_ui;
 mod mep_gutters_ui;
 mod mep_loads_ui;
 mod mep_runs_ui;
@@ -424,6 +425,8 @@ struct Gui {
     mep_marks: HashMap<u32, mep_ui::MepMarks>,
     /// The System Inspector session (MEP-CALC-003), in one view.
     inspector: Option<mep_network_ui::Inspector>,
+    /// The Sizing Calculator palette (MEP-CALC-005), made on first use.
+    calculator: Option<mep_calculator_ui::SizingCalculator>,
     /// The Terminal pane (UI-AGENT-004), made on first use.
     terminal: Option<terminal_ui::TerminalPane>,
 }
@@ -3712,6 +3715,7 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 system_browser: None,
                 mep_marks: HashMap::new(),
                 inspector: None,
+                calculator: None,
                 terminal: None,
                 help: None,
                 script_units: Rc::new(RefCell::new(Default::default())),
@@ -3916,6 +3920,7 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                     gui.sync_views();
                     gui.system_browser_idle();
                     gui.inspector_idle();
+                    gui.calculator_sync(false);
                     if gui.browser_stale {
                         gui.rebuild_browser();
                     }
@@ -4490,6 +4495,7 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "ui.pane.clash" => Gui::toggle_clash_pane(gui),
         "ui.pane.system_browser" => Gui::toggle_system_browser(gui),
         "ui.pane.terminal" => Gui::toggle_terminal(gui),
+        "ui.pane.sizing_calculator" => Gui::toggle_sizing_calculator(gui),
         "ui.remote_analysis" => with(gui, Gui::remote_analysis),
         "mep_type.load_starters" => with(gui, Gui::load_mep_types),
         "mep.place_component" => with(gui, Gui::place_mep_component),

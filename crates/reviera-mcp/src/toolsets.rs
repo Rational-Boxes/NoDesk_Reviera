@@ -133,6 +133,7 @@ pub fn toolset_of(command: &str) -> String {
             | "analytical_segment"
             | "pressure_loss_report"
             | "system_inspector"
+            | "sizing_calculator"
             | "mounting_part"
             | "cam_writer"
             | "beam_system"

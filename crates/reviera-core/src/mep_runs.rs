@@ -1649,6 +1649,9 @@ pub(crate) fn set_size(txn: &mut Transaction<'_>, p: SetSizeParams) -> Result<()
             .get(id)
             .and_then(segment_recipe)
             .ok_or_else(|| bad("mep_run.not_a_segment", format!("element {id} is not a duct or pipe segment")))?;
+        if s.size_locked {
+            return Err(bad("mep_run.size_locked", "Element is size-locked"));
+        }
         if let Some(d) = p.diameter {
             s.size.diameter = d;
         }

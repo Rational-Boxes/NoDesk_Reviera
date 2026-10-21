@@ -2185,6 +2185,12 @@ accel = "Ctrl+Shift+T"
 help = "Show or hide the Terminal pane: a shell and CLI AI agents (Claude Code, Gemini CLI, Qwen Code, Codex CLI) started connected to the open model (UI-AGENT-004)"
 
 [[action]]
+id = "ui.pane.sizing_calculator"
+label = "Sizing Calculator"
+icon = "sizing_calculator"
+help = "Show or hide the Sizing Calculator: candidate sizes for the selected duct or pipe, or a flow typed in, against friction, velocity and aspect-ratio targets; Apply resizes the selection (MEP-CALC-005)"
+
+[[action]]
 id = "ui.pane.system_browser"
 label = "System Browser"
 icon = "system_browser"
@@ -2897,7 +2903,10 @@ tools = [
 
 [[tab.panel]]
 label = "Sizing"
-tools = [{ action = "mep.size", size = "large" }]
+tools = [
+  { action = "mep.size", size = "large" },
+  { action = "ui.pane.sizing_calculator", size = "large" },
+]
 
 [[tab.panel]]
 label = "Pressure Drop"
@@ -3567,7 +3576,7 @@ items = ["script.run", "script.import", "ui.scripts.manage", "-"]
 label = "&Window"
 items = [
   "view.create_3d", "window.close", "-", "window.next", "window.previous", "-",
-  "window.tile", "window.tab_all", "-", "ui.pane.properties", "ui.pane.browser", "ui.pane.model_tree", "ui.pane.components", "ui.pane.system_browser", "ui.pane.terminal", "-",
+  "window.tile", "window.tab_all", "-", "ui.pane.properties", "ui.pane.browser", "ui.pane.model_tree", "ui.pane.components", "ui.pane.system_browser", "ui.pane.sizing_calculator", "ui.pane.terminal", "-",
   "ui.fullscreen.toggle", "ui.focus_mode.toggle", "ui.radial.toggle",
 ]
 

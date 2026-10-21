@@ -396,7 +396,7 @@ pub struct SizeReport {
 }
 
 /// The sizes of a type's sizing table, smallest area first, that a restriction allows.
-fn candidates(t: &mep_runs::SegmentType, shape: Shape, r: &Restrict) -> Vec<Size> {
+pub(crate) fn candidates(t: &mep_runs::SegmentType, shape: Shape, r: &Restrict) -> Vec<Size> {
     let sides = t.sizing_sizes(shape);
     let mut out: Vec<Size> = match shape {
         Shape::Round => sides

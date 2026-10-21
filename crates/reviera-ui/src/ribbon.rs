@@ -32,6 +32,7 @@ pub const UI_ACTIONS: &[&str] = &[
     "ui.radial.toggle",
     "ui.pane.system_browser",
     "ui.pane.terminal",
+    "ui.pane.sizing_calculator",
     "ui.remote_analysis",
     "load_classification.manage",
     "demand_factor.manage",

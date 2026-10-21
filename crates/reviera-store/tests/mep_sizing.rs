@@ -137,3 +137,45 @@ fn domestic_water_by_fixture_units() {
     ok(&r, &mut doc, "system_type.set", json!({ "type_id": "domestic_hot_water", "fluid_temperature": 120.0 }));
     assert_eq!(run(&r, &mut doc, "mep.size", json!({ "system_id": sys.0 })).unwrap_err().message, "Temperature outside fluid table range");
 }
+
+#[test]
+fn sizing_calculator() {
+    let dir = tempfile::tempdir().unwrap();
+    let (_p, mut doc) = LocalProject::new(Schema::Ifc4, &dir.path().join("calc.ifc")).unwrap();
+    let r = registry();
+    let l1 = doc.store().iter().find(|e| e.class == "IfcBuildingStorey").unwrap().id();
+    // 1 000 l/s in rectangular duct at 1 Pa/m ± 10 %: every candidate in 0.9–1.1 Pa/m.
+    let c = ok(&r, &mut doc, "sizing_calculator.candidates", json!({ "flow": 1.0, "domain": "duct", "shape": "rectangular", "friction": { "target": 1.0, "tolerance": 0.1 } }));
+    let list = c["candidates"].as_array().unwrap();
+    assert!(!list.is_empty() && c["note"].is_null());
+    assert!(list.iter().all(|x| (0.9..=1.1).contains(&x["friction"].as_f64().unwrap())), "{c}");
+    // Closest to the target first; wider than high unless swapped.
+    let dev = |x: &Value| x["friction_deviation"].as_f64().unwrap().abs();
+    assert!(list.windows(2).all(|w| dev(&w[0]) <= dev(&w[1]) + 1e-12));
+    assert!(list.iter().all(|x| x["width"].as_f64() >= x["height"].as_f64()));
+    // With an aspect ratio of at most 1:3 too.
+    let c = ok(&r, &mut doc, "sizing_calculator.candidates", json!({ "flow": 1.0, "domain": "duct", "shape": "rectangular", "friction": { "target": 1.0 }, "aspect": { "max": 3.0 }, "swap": true }));
+    let list = c["candidates"].as_array().unwrap();
+    assert!(!list.is_empty() && list.iter().all(|x| x["aspect"].as_f64().unwrap() <= 3.0 + 1e-9 && x["height"].as_f64() >= x["width"].as_f64()));
+    // Nothing within: the three nearest, noted.
+    let c = ok(&r, &mut doc, "sizing_calculator.candidates", json!({ "flow": 1.0, "domain": "duct", "friction": { "target": 1.0, "tolerance": 0.0 }, "velocity": { "target": 2.0, "tolerance": 0.0 } }));
+    assert_eq!(c["note"], "No size within tolerance");
+    assert_eq!(c["candidates"].as_array().unwrap().len(), 3);
+    assert!(c["candidates"].as_array().unwrap().iter().all(|x| x["within"] == false));
+
+    // A duct selected: its flow typed in, Apply resizes it; size-locked, Apply is refused.
+    let d = ok(&r, &mut doc, "duct.create", json!({ "points": [[0, 0], [6, 0]], "level": l1.0, "shape": "rectangular", "width": 0.4, "height": 0.3 }));
+    let seg = id(&d["segments"][0]);
+    let c = ok(&r, &mut doc, "sizing_calculator.candidates", json!({ "element_id": seg.0, "flow": 1.0 }));
+    assert_eq!((c["shape"].as_str(), c["current"].as_str(), c["size_locked"].as_bool()), (Some("rectangular"), Some("400×300"), Some(false)), "{c}");
+    let best = &c["candidates"][0];
+    ok(&r, &mut doc, "duct.set_size", json!({ "element_ids": [seg.0], "width": best["width"], "height": best["height"] }));
+    let z = segment_recipe(doc.store().get(seg).unwrap()).unwrap().size;
+    assert_eq!((z.width, z.height), (best["width"].as_f64().unwrap(), best["height"].as_f64().unwrap()));
+    ok(&r, &mut doc, "mep_run.lock_size", json!({ "element_ids": [seg.0], "locked": true }));
+    let e = run(&r, &mut doc, "duct.set_size", json!({ "element_ids": [seg.0], "width": 0.5, "height": 0.5 })).unwrap_err();
+    assert_eq!(e.message, "Element is size-locked");
+    assert_eq!(segment_recipe(doc.store().get(seg).unwrap()).unwrap().size, z);
+    // No flow: refused until one is typed.
+    assert_eq!(run(&r, &mut doc, "sizing_calculator.candidates", json!({ "element_id": seg.0 })).unwrap_err().code, "sizing_calculator.flow");
+}

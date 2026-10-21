@@ -191,6 +191,15 @@ friction at or below 1 Pa/m for ducts. <b>Velocity</b> limits the speed, and you
 the two. Restrictions on height, width or diameter win over the targets: a duct kept at most
 300 mm high is widened instead. Branches to terminals can keep the terminal's connector size. A
 size-locked segment (<code>mep_run.lock_size</code>) is left as it is.</p>
+<p>To size one duct or pipe by hand, open the <a
+href="reviera:action/ui.pane.sizing_calculator">Sizing Calculator</a> (Analyze › Sizing, or the
+middle-click menu of a selected duct or pipe). Reviera reads the selected duct's or pipe's flow,
+shape and roughness, or you can tick <b>User value</b> and type a flow. Set a friction or velocity
+target and drag its slider to set how far either side of it a size may fall. For rectangular
+ducts, you can also tick a largest aspect ratio. <b>Show Best Sizes</b> lists the sizes that meet
+every target, closest first, and you can click a column to sort by it. <b>Apply</b> resizes the
+selection to the chosen size. A size-locked duct or pipe is never resized. With nothing selected
+it works as a plain calculator.</p>
 <p>Domestic water is sized for the <b>fixture units</b> beyond each pipe, converted to a flow
 with your code's fixture-unit table. Import it as a CSV of <code>fixture_units, flow_tank,
 flow_valve</code> rows under Manage › MEP Settings › <a

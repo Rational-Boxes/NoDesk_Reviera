@@ -338,6 +338,11 @@ impl Gui {
             item("insert.flip_hand", "Flip &Hand", Transform);
             item("insert.flip_facing", "Flip &Facing", Transform);
         }
+        if ids.len() == 1
+            && all(&|e| reviera_core::mep_runs::segment_recipe(e).is_some_and(|s| matches!(s.domain, reviera_core::mep::Domain::Duct | reviera_core::mep::Domain::Pipe)))
+        {
+            item("ui.pane.sizing_calculator", "&Sizing Calculator", Transform);
+        }
         item("inspect.hide", "&Hide in View", Visibility);
         let label = if self.all_translucent(&ids) {
             "Make &Opaque"
