@@ -965,6 +965,20 @@ schedules, circuit paths, cable sizing and voltage drop.
   routing preferences when flanged; tees changed to crosses. IFC `IfcValve`, `IfcFilter`,
   `IfcFlowMeter`, flanges as `IfcPipeFitting` (`pipe_fitting.place`, `pipe_accessory.place`,
   `mep_fitting.tee_to_cross`).
+- **Duct accessories, insulation and lining** (Systems › Insulation & Accessories › Duct
+  Accessory `DA`, Add/Edit/Remove Insulation `IN`, Add/Edit/Remove Lining `DL`, Heal): fire,
+  smoke, control, balancing and backdraft dampers, filters, coils and sound attenuators of the
+  duct's size, inserted along a duct (splitting it, both parts connected through them; refused
+  where the straight is too short) or on an open end; Heal rejoins the duct after one is
+  deleted. Insulation on ducts, pipes, fittings and accessories and lining in ducts, by type and
+  thickness, follow their hosts and go with them; lining narrows the section and sets the
+  roughness the pressure-drop calculation uses. IFC `IfcDamper`, `IfcFilter`, `IfcCoil`,
+  `IfcDuctSilencer`; coverings `IfcCovering` INSULATION covering the host, thickness as
+  `Qto_CoveringBaseQuantities.Width` (`duct_accessory.place`, `mep_segment.heal`,
+  `mep_insulation.add`/`set`/`remove`, `duct_lining.add`/`set`/`remove`,
+  `mep_covering_type.create`, `mep_covering.list`). Not built yet: transitions where an
+  accessory cannot take the duct's size, accessories from component types, the in-view
+  thickness error.
 - **Sloped piping and parallel pipes** (Systems › HVAC & Piping › Slope, Parallel Pipes): the
   Slope Editor gives a connected section of pipe one of the project's allowed slopes from a
   control point (the lowest end by default): fittings follow, branches stay connected (their

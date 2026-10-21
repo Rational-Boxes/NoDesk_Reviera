@@ -4558,6 +4558,17 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
             g.start_accessory_tool();
             focus(g);
         }),
+        "duct_accessory.place" => with(gui, |g| {
+            g.start_duct_accessory_tool();
+            focus(g);
+        }),
+        "mep_insulation.add" => with(gui, |g| g.mep_covering(reviera_core::mep_coverings::CoveringKind::Insulation, false)),
+        "mep_insulation.set" => with(gui, |g| g.mep_covering(reviera_core::mep_coverings::CoveringKind::Insulation, true)),
+        "mep_insulation.remove" => with(gui, |g| g.remove_mep_covering(reviera_core::mep_coverings::CoveringKind::Insulation)),
+        "duct_lining.add" => with(gui, |g| g.mep_covering(reviera_core::mep_coverings::CoveringKind::Lining, false)),
+        "duct_lining.set" => with(gui, |g| g.mep_covering(reviera_core::mep_coverings::CoveringKind::Lining, true)),
+        "duct_lining.remove" => with(gui, |g| g.remove_mep_covering(reviera_core::mep_coverings::CoveringKind::Lining)),
+        "mep_segment.heal" => with(gui, Gui::heal_segments),
         "mep_fitting.tee_to_cross" => with(gui, Gui::tee_to_cross),
         "mep_fitting.upgrade" => with(gui, |g| g.fitting_grade(true)),
         "mep_fitting.downgrade" => with(gui, |g| g.fitting_grade(false)),

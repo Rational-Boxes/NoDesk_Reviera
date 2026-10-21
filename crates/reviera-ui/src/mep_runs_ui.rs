@@ -64,6 +64,8 @@ pub(crate) enum Placing {
     Split,
     /// A pipe accessory (MEP-PIPE-004).
     Accessory(reviera_core::mep_runs::AccessoryKind),
+    /// A duct accessory (MEP-DUCT-004).
+    DuctAccessory(reviera_core::mep_runs::DuctAccessoryKind),
 }
 
 fn domain_title(d: Domain) -> &'static str {
@@ -452,6 +454,7 @@ impl Gui {
                 (command, json!({ "part": part, "point": p }))
             }
             Placing::Accessory(kind) => ("pipe_accessory.place", json!({ "kind": kind, "point": p })),
+            Placing::DuctAccessory(kind) => ("duct_accessory.place", json!({ "kind": kind, "point": p })),
             Placing::Split => {
                 let Some(store) = self.store_now() else { return };
                 // The straight segment under the click.
@@ -482,6 +485,8 @@ impl Gui {
                 self.refresh_scene(&frame);
                 let what = if let Placing::Accessory(k) = placing {
                     format!("{} inserted; the pipe is split{}", k.label(), if o.result["flanges"].as_array().is_some_and(|f| !f.is_empty()) { ", with flanges" } else { "" })
+                } else if let Placing::DuctAccessory(k) = placing {
+                    if o.result["split"].is_null() { format!("{} placed on the open end", k.label()) } else { format!("{} inserted; the duct is split", k.label()) }
                 } else if placing == Placing::Split {
                     if o.result["coupling"].is_null() { "Split".to_owned() } else { "Split with a coupling".to_owned() }
                 } else if o.result["split"].is_null() {
@@ -529,6 +534,128 @@ impl Gui {
             placing: Some(Placing::Accessory(kind)),
         });
         frame.set_status_text(&format!("Pipe Accessory: click on a pipe to insert a {}; flanged from 50 mm; Esc ends", kind.label().to_lowercase()), 0);
+    }
+
+    /// Systems › Insulation & Accessories › Duct Accessory (`DA`): the kind, then each click on
+    /// a duct inserts one, or on an open duct end places one there (MEP-DUCT-004).
+    pub(crate) fn start_duct_accessory_tool(&mut self) {
+        use reviera_core::mep_runs::DuctAccessoryKind as K;
+        let frame = self.frame;
+        if !self.ensure_plan(false) {
+            return;
+        }
+        let Some(level) = self.active_view().and_then(|v| v.plan.as_ref()).map(|p| p.level) else { return };
+        let kinds = [K::FireDamper, K::SmokeDamper, K::ControlDamper, K::BalancingDamper, K::BackdraftDamper, K::Filter, K::HeatingCoil, K::CoolingCoil, K::SoundAttenuator];
+        let labels: Vec<&str> = kinds.iter().map(|k| k.label()).collect();
+        let d = SingleChoiceDialog::builder(&frame, "Insert:", "Duct Accessory", &labels).build();
+        if d.show_modal() != ID_OK {
+            return;
+        }
+        let Some(kind) = usize::try_from(d.get_selection()).ok().and_then(|k| kinds.get(k)).copied() else { return };
+        self.end_tool(&frame);
+        self.run_tool = Some(RunTool {
+            domain: Domain::Duct,
+            level,
+            type_id: None,
+            shape: mep::Shape::Round,
+            diameter: 0.0,
+            width: 0.0,
+            height: 0.0,
+            elevation: 0.0,
+            system_type: None,
+            slope: 0.0,
+            points: Vec::new(),
+            cursor: None,
+            bend_radius: None,
+            placing: Some(Placing::DuctAccessory(kind)),
+        });
+        frame.set_status_text(&format!("Duct Accessory: click on a duct to insert a {} ({:.0} mm long), or on an open end; Esc ends", kind.label().to_lowercase(), kind.default_length() * 1000.0), 0);
+    }
+
+    /// Insulation or lining › Add / Edit (MEP-DUCT-004): the type and thickness for the selected
+    /// ducts, pipes, fittings and accessories.
+    pub(crate) fn mep_covering(&mut self, kind: reviera_core::mep_coverings::CoveringKind, edit: bool) {
+        use reviera_core::mep_coverings::{CoveringKind, covering_type};
+        let frame = self.frame;
+        let Some(store) = self.store_now() else { return };
+        let ids = self.selection();
+        let title = match (kind, edit) {
+            (CoveringKind::Insulation, false) => "Add Insulation",
+            (CoveringKind::Insulation, true) => "Edit Insulation",
+            (CoveringKind::Lining, false) => "Add Lining",
+            (CoveringKind::Lining, true) => "Edit Lining",
+        };
+        if ids.is_empty() {
+            return frame.set_status_text(&format!("{title}: select ducts, pipes, fittings or accessories (Tab selects a run)"), 0);
+        }
+        // The types of this kind; the built-in one is made on first use.
+        let mut types: Vec<(Option<ElementId>, String)> = store.iter().filter(|e| covering_type(e).is_some_and(|t| t.covering == kind)).map(|e| (Some(e.id()), e.name.clone().unwrap_or_default())).collect();
+        if types.is_empty() {
+            types.push((None, if kind == CoveringKind::Insulation { "Duct Insulation".into() } else { "Duct Lining".into() }));
+        }
+        let names: Vec<String> = types.iter().map(|t| t.1.clone()).collect();
+        let f = super::reinforcement_ui::Form::new(&frame, title);
+        let ty = f.choice("Type", &names, 0);
+        let thickness = f.text("Thickness (mm)", "25", if kind == CoveringKind::Lining { "Above 0 and less than half the duct's smallest side" } else { "Above 0" });
+        let note = if kind == CoveringKind::Lining { "Lining narrows the section the pressure-drop calculation uses." } else { "Insulation follows its host and is included in clash checks." };
+        let ok = f.show(note, if edit { "Apply" } else { "Add" });
+        let t = thickness.get_value().trim().replace(',', ".").parse::<f64>().map(|v| v / 1000.0);
+        let chosen = ty.get_selection().and_then(|k| types.get(k as usize)).and_then(|t| t.0);
+        f.dialog.destroy();
+        if !ok {
+            return;
+        }
+        let Ok(t) = t else { return error(&frame, "The thickness must be a number of millimetres") };
+        let command = match (kind, edit) {
+            (CoveringKind::Insulation, false) => "mep_insulation.add",
+            (CoveringKind::Insulation, true) => "mep_insulation.set",
+            (CoveringKind::Lining, false) => "duct_lining.add",
+            (CoveringKind::Lining, true) => "duct_lining.set",
+        };
+        let mut args = json!({ "element_ids": ids, "thickness": t });
+        if let Some(c) = chosen {
+            args["type_id"] = json!(c);
+        }
+        match self.app.execute(command, args, &reviera_core::Caller::user()) {
+            Ok(o) => {
+                self.refresh_scene(&frame);
+                let n = o.result.as_array().map_or(0, Vec::len);
+                let skipped = o.warnings.iter().map(|w| w.message.clone()).collect::<Vec<_>>().join("; ");
+                frame.set_status_text(&format!("{title}: {n} element(s){}", if skipped.is_empty() { String::new() } else { format!(". {skipped}") }), 0);
+            }
+            Err(e) => error(&frame, &e.message),
+        }
+    }
+
+    /// Insulation or lining › Remove on the selection (MEP-DUCT-004).
+    pub(crate) fn remove_mep_covering(&mut self, kind: reviera_core::mep_coverings::CoveringKind) {
+        let frame = self.frame;
+        let ids = self.selection();
+        let command = if kind == reviera_core::mep_coverings::CoveringKind::Insulation { "mep_insulation.remove" } else { "duct_lining.remove" };
+        match self.run(command, json!({ "element_ids": ids })) {
+            Ok(v) => {
+                self.refresh_scene(&frame);
+                frame.set_status_text(&format!("{} removed from {} element(s)", kind.label(), v.as_array().map_or(0, Vec::len)), 0);
+            }
+            Err(e) => error(&frame, &e),
+        }
+    }
+
+    /// Heal: the two selected segments, in line with open facing ends, joined into one.
+    pub(crate) fn heal_segments(&mut self) {
+        let frame = self.frame;
+        let Some(store) = self.store_now() else { return };
+        let segs: Vec<ElementId> = self.selection().into_iter().filter(|i| store.get(*i).and_then(reviera_core::mep_runs::segment_recipe).is_some()).collect();
+        let [a, b] = segs[..] else {
+            return frame.set_status_text("Heal: select the two duct or pipe segments either side of the gap", 0);
+        };
+        match self.run("mep_segment.heal", json!({ "first_id": a, "second_id": b })) {
+            Ok(_) => {
+                self.refresh_scene(&frame);
+                frame.set_status_text("Healed into one segment", 0);
+            }
+            Err(e) => error(&frame, &e),
+        }
     }
 
     /// Change Tee to Cross on the selected tees.

@@ -2246,6 +2246,57 @@ keys = "PA"
 help = "Insert a valve, strainer or water meter in a pipe: it splits the pipe, takes its size and gets flanges from the routing preferences when flanged (MEP-PIPE-004)"
 
 [[action]]
+id = "duct_accessory.place"
+label = "Duct Accessory"
+icon = "damper"
+keys = "DA"
+help = "Insert a fire, smoke, control, balancing or backdraft damper, a filter, a coil or a sound attenuator in a duct (splitting it) or on an open duct end; it takes the duct's size and shape (MEP-DUCT-004)"
+
+[[action]]
+id = "mep_insulation.add"
+label = "Add Insulation"
+icon = "insulation"
+keys = "IN"
+help = "Insulate the selected ducts, pipes, fittings and accessories with a type and thickness; it follows them and is deleted with them (MEP-DUCT-004)"
+
+[[action]]
+id = "mep_insulation.set"
+label = "Edit Insulation"
+icon = "insulation"
+help = "Change the type or thickness of the selected elements' insulation (MEP-DUCT-004)"
+
+[[action]]
+id = "mep_insulation.remove"
+label = "Remove Insulation"
+icon = "insulation"
+help = "Delete the selected elements' insulation (MEP-DUCT-004)"
+
+[[action]]
+id = "duct_lining.add"
+label = "Add Lining"
+icon = "duct_lining"
+keys = "DL"
+help = "Line the selected ducts and duct fittings inside; lining narrows the section used for pressure drop (MEP-DUCT-004)"
+
+[[action]]
+id = "duct_lining.set"
+label = "Edit Lining"
+icon = "duct_lining"
+help = "Change the type or thickness of the selected ducts' lining (MEP-DUCT-004)"
+
+[[action]]
+id = "duct_lining.remove"
+label = "Remove Lining"
+icon = "duct_lining"
+help = "Delete the selected ducts' lining (MEP-DUCT-004)"
+
+[[action]]
+id = "mep_segment.heal"
+label = "Heal"
+icon = "heal"
+help = "Rejoin two selected duct or pipe segments in line, of one size, whose facing ends are open, as deleting an inline accessory leaves them (MEP-DUCT-004)"
+
+[[action]]
 id = "hydronic.analyze"
 label = "Hydronic Analysis"
 icon = "hydronic"
@@ -2888,6 +2939,19 @@ tools = [
   { action = "mech_control_device.place", size = "small" },
   { action = "mech_control_device.assign", size = "small" },
   { action = "mep.size", size = "small" },
+]
+
+[[tab.panel]]
+label = "Insulation & Accessories"
+tools = [
+  { action = "duct_accessory.place", size = "large" },
+  { action = "mep_insulation.add", size = "small" },
+  { action = "mep_insulation.set", size = "small" },
+  { action = "mep_insulation.remove", size = "small" },
+  { action = "duct_lining.add", size = "small" },
+  { action = "duct_lining.set", size = "small" },
+  { action = "duct_lining.remove", size = "small" },
+  { action = "mep_segment.heal", size = "small" },
 ]
 
 [[tab.panel]]

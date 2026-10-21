@@ -464,6 +464,7 @@ pub fn dependents_of(store: &crate::store::Store, id: ElementId) -> Vec<ElementI
                 .is_some_and(|rest| rest.starts_with(&format!("{guid}/")))
                 || e.param("@type").and_then(serde_json::Value::as_str) == Some(guid.as_str())
                 || crate::inserts::insert_recipe(e).is_some_and(|r| r.host == guid)
+                || crate::mep_coverings::covering_recipe(e).is_some_and(|r| r.host == guid)
                 || crate::floors::slab_recipe(e).is_some_and(|(_, r)| r.level == guid)
                 || crate::rooms::room_recipe(e).is_some_and(|r| {
                     r.level == guid || r.upper_level.as_deref() == Some(guid.as_str())

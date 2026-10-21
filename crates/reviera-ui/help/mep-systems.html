@@ -242,6 +242,24 @@ click on a pipe. It takes the pipe's size, and from 50 mm it is flanged, with a 
 side. <a href="reviera:action/mep_fitting.tee_to_cross">Change Tee to Cross</a> gives the selected
 tees a fourth open leg.</p>
 
+<h2 id="duct-accessories">Duct accessories, insulation and lining</h2>
+<p><a href="reviera:action/duct_accessory.place">Duct Accessory</a> (<kbd>D</kbd> <kbd>A</kbd>)
+inserts a fire, smoke, control, balancing or backdraft damper, a filter, a heating or cooling
+coil, or a sound attenuator. Choose the kind, then click on a duct: the duct is split and both
+parts connect through the accessory, which takes the duct's size and shape. Click an open duct
+end and the accessory goes on the end instead. If the straight duct between two fittings is
+shorter than the accessory, Reviera says so and leaves the duct as it is. Delete an accessory and
+the duct ends are left open; select the two parts and choose
+<a href="reviera:action/mep_segment.heal">Heal</a> to join them again.</p>
+<p>Select ducts, pipes, fittings or accessories and choose
+<a href="reviera:action/mep_insulation.add">Add Insulation</a> (<kbd>I</kbd> <kbd>N</kbd>), or
+select ducts and choose <a href="reviera:action/duct_lining.add">Add Lining</a> (<kbd>D</kbd>
+<kbd>L</kbd>). Pick a type and a thickness, 25 mm by default. Insulation and lining follow the
+duct when it is resized or moved and are deleted with it. Lining has to be thinner than half the
+duct's smallest side. Lining makes the duct's free section smaller, and the pressure-drop
+calculation uses that smaller section and the lining's roughness. Insulation does not change the
+calculation. Edit and Remove change or delete what the selected elements have.</p>
+
 <h2 id="slopes">Sloped pipes and parallel pipes</h2>
 <p>To give drainage a fall, select the pipes and fittings of a run and choose <a
 href="reviera:action/mep_run.set_slope">Slope</a> (Systems › HVAC &amp; Piping). Pick one of the

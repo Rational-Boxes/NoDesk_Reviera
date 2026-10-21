@@ -525,7 +525,8 @@ pub fn all(store: &Store) -> Vec<Body> {
     let run_colors = crate::mep_runs::colors(store);
     for (id, _, _, solids) in crate::mep_runs::all(store) {
         let class = store.get(id).map_or("IfcDuctSegment", |e| e.class.as_str());
-        let color = run_colors.get(&id).copied().unwrap_or([0.74, 0.76, 0.80, 1.0]);
+        // Insulation and lining (MEP-DUCT-004) in a pale yellow.
+        let color = if class == "IfcCovering" { [0.93, 0.88, 0.66, 1.0] } else { run_colors.get(&id).copied().unwrap_or([0.74, 0.76, 0.80, 1.0]) };
         for s in solids {
             push(id, &format!("{class}:{}", crate::mesh_objects::color_hex(color)), s.mesh(), false);
         }

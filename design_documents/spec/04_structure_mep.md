@@ -2910,12 +2910,14 @@ Each row has a part and a minimum and maximum size. Rows are tried from top to b
 - `duct_lining.add(element_ids[], type_id, thickness)`
 - `duct_lining.remove(element_ids[])`
 
+*Built (2026-10-21):* Systems › Insulation & Accessories (a panel of its own, the HVAC & Piping panel being full) › **Duct Accessory** (`DA`, `duct_accessory.place(kind, duct_id?, point?, length?)`): fire, smoke, control, balancing and backdraft dampers, filters, heating and cooling coils and sound attenuators, of the duct's size and shape and in its system, inserted along a straight duct, which is split and connected through it, or on an open duct end. Lengths face to face: fire and smoke dampers, filters and coils 300 mm, other dampers 200 mm, attenuators 900 mm (E-29), or given. Where the straight is shorter than the accessory plus 10 mm each side the insert is refused ("Not enough straight duct for this accessory"). Pressure drop (MEP-CALC-002): dampers by coefficient, filters, coils and attenuators by a fixed loss (E-29). **Heal** (`mep_segment.heal`) rejoins two in-line segments of one size whose facing ends are open. **Insulation** (`IN`, `mep_insulation.add/set/remove`) on ducts, pipes, fittings and accessories and **Lining** (`DL`, `duct_lining.add/set/remove`) in ducts and duct fittings: a type (`mep_covering_type.create`, material and lining roughness; built-in *Duct Insulation* and *Duct Lining*, 1.5 mm, E-29) and a thickness, 25 mm by default, above 0 and for lining under half the smallest side. Each is an `IfcCovering` (INSULATION, lining named *Duct Lining*) whose body is found afresh from its host, so it follows resizes and moves; it is deleted with the host, copied to a split host's new part and over an inserted accessory (insulation). In IFC it covers its host (`IfcRelCoversBldgElements`) with its thickness as `Qto_CoveringBaseQuantities.Width`. Lining's free section (each side less twice the thickness) and roughness are used by the pressure-drop calculation. `mep_covering.list`. Not yet: transitions where an accessory cannot take the duct's size (accessories are made at the duct's size), accessories from component types with size parameters, Heal in the context menu, the dialog's inline thickness error (refused after OK), insulation's own object style, Tab to select a run for insulation.
+
 **Acceptance criteria.**
-- [ ] A fire damper inserted in a 400 mm round duct splits it into two segments connected through the damper.
-- [ ] Adding 50 mm insulation exports an `IfcCovering` (`INSULATION`) related to the duct.
-- [ ] Resizing an insulated 600 × 300 duct to 800 × 300 regenerates its insulation at the new size with the same thickness.
-- [ ] Adding 25 mm lining to a 400 × 200 duct lowers the free area used by the pressure-drop calculation to 350 × 150.
-- [ ] Inserting a 600 mm long silencer into a 400 mm straight between two elbows is refused with a message.
+- [x] A fire damper inserted in a 400 mm round duct splits it into two segments connected through the damper.
+- [x] Adding 50 mm insulation exports an `IfcCovering` (`INSULATION`) related to the duct.
+- [x] Resizing an insulated 600 × 300 duct to 800 × 300 regenerates its insulation at the new size with the same thickness.
+- [x] Adding 25 mm lining to a 400 × 200 duct lowers the free area used by the pressure-drop calculation to 350 × 150.
+- [x] Inserting a 600 mm long silencer into a 400 mm straight between two elbows is refused with a message.
 
 ### 4.7.5 Flexible duct
 **ID:** MEP-DUCT-005 · **Priority:** P1 · **Ref:** research/03 §8.3

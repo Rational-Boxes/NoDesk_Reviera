@@ -3290,7 +3290,31 @@ impl LocalProject {
             let level = reviera_core::mep_runs::segment_recipe(e)
                 .map(|r| r.level)
                 .or_else(|| reviera_core::mep_runs::fitting_recipe(e).map(|f| f.level))
-                .or_else(|| gutter.as_ref().map(|g| g.level.clone()));
+                .or_else(|| gutter.as_ref().map(|g| g.level.clone()))
+                .or_else(|| reviera_core::mep_coverings::level(store, e));
+            // Insulation and lining cover their host (MEP-DUCT-004).
+            if let Some(host) = reviera_core::mep_coverings::covering_recipe(e)
+                .and_then(|c| GlobalId::parse(&c.host))
+                .and_then(|g| store.find_by_guid(&g))
+                .and_then(|h| self.steps.get(&h).copied())
+            {
+                // One relation per covering (RelatedCoverings is a set).
+                const REL: &str = "IfcRelCoversBldgElements";
+                let rel = match self.ifc.referenced_by(step, REL)?.into_iter().next() {
+                    Some(rel) => rel,
+                    None => {
+                        let rel = self.ifc.create_rooted(REL, &GlobalId::new())?;
+                        if let Some(oh) = owner_history {
+                            self.ifc.set_attribute(rel, "OwnerHistory", &AttrValue::Ref(oh.0))?;
+                        }
+                        self.ifc.set_attribute(rel, "RelatedCoverings", &AttrValue::List(vec![AttrValue::Ref(step.0)]))?;
+                        rel
+                    }
+                };
+                self.ifc.set_attribute(rel, "RelatingBuildingElement", &AttrValue::Ref(host.0))?;
+                let thickness = reviera_core::mep_coverings::covering_recipe(e).map_or(0.0, |c| c.thickness);
+                self.write_covering_width(step, thickness / self.length_scale, owner_history)?;
+            }
             // A gutter hangs on its roof (MEP-PIPE-010).
             if let Some(roof) = gutter
                 .as_ref()
@@ -3317,6 +3341,42 @@ impl LocalProject {
                 geometry::contain(&mut self.ifc, step, storey, owner_history)?;
             }
         }
+        Ok(())
+    }
+
+    /// A covering's thickness as `Qto_CoveringBaseQuantities.Width` (MEP-DUCT-004), in file
+    /// units: the quantity written before is updated.
+    fn write_covering_width(&mut self, step: StepId, width: f64, owner_history: Option<StepId>) -> Result<()> {
+        const QTO: &str = "Qto_CoveringBaseQuantities";
+        for rel in self.ifc.referenced_by(step, "IfcRelDefinesByProperties")? {
+            let AttrValue::Ref(q) = self.ifc.attribute(rel, "RelatingPropertyDefinition")? else { continue };
+            if self.ifc.attribute(StepId(q), "Name")? != AttrValue::String(QTO.into()) {
+                continue;
+            }
+            if let AttrValue::List(items) = self.ifc.attribute(StepId(q), "Quantities")? {
+                for i in items {
+                    if let AttrValue::Ref(i) = i
+                        && self.ifc.attribute(StepId(i), "Name")? == AttrValue::String("Width".into())
+                    {
+                        self.ifc.set_attribute(StepId(i), "LengthValue", &AttrValue::Real(width))?;
+                        return Ok(());
+                    }
+                }
+            }
+        }
+        let len = self.ifc.create("IfcQuantityLength")?;
+        self.ifc.set_attribute(len, "Name", &AttrValue::String("Width".into()))?;
+        self.ifc.set_attribute(len, "LengthValue", &AttrValue::Real(width))?;
+        let q = self.ifc.create_rooted("IfcElementQuantity", &GlobalId::new())?;
+        self.ifc.set_attribute(q, "Name", &AttrValue::String(QTO.into()))?;
+        self.ifc.set_attribute(q, "Quantities", &AttrValue::List(vec![AttrValue::Ref(len.0)]))?;
+        let rel = self.ifc.create_rooted("IfcRelDefinesByProperties", &GlobalId::new())?;
+        if let Some(oh) = owner_history {
+            self.ifc.set_attribute(q, "OwnerHistory", &AttrValue::Ref(oh.0))?;
+            self.ifc.set_attribute(rel, "OwnerHistory", &AttrValue::Ref(oh.0))?;
+        }
+        self.ifc.set_attribute(rel, "RelatedObjects", &AttrValue::List(vec![AttrValue::Ref(step.0)]))?;
+        self.ifc.set_attribute(rel, "RelatingPropertyDefinition", &AttrValue::Ref(q.0))?;
         Ok(())
     }
 

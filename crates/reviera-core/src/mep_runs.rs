@@ -161,12 +161,17 @@ pub enum Part {
     Meter,
     Strainer,
     Flange,
+    /// Duct accessories (MEP-DUCT-004): dampers, filters, coils and sound attenuators.
+    Damper,
+    Filter,
+    Coil,
+    Silencer,
 }
 
 impl Part {
     /// Inline accessories, not fittings (IfcValve, IfcFlowMeter, IfcFilter).
     pub fn is_accessory(self) -> bool {
-        matches!(self, Part::Valve | Part::Meter | Part::Strainer)
+        matches!(self, Part::Valve | Part::Meter | Part::Strainer | Part::Damper | Part::Filter | Part::Coil | Part::Silencer)
     }
 
     pub fn label(self) -> &'static str {
@@ -175,6 +180,10 @@ impl Part {
             Part::Meter => "Meter",
             Part::Strainer => "Strainer",
             Part::Flange => "Flange",
+            Part::Damper => "Damper",
+            Part::Filter => "Filter",
+            Part::Coil => "Coil",
+            Part::Silencer => "Sound Attenuator",
             Part::Elbow => "Elbow",
             Part::Tee => "Tee",
             Part::Tap => "Tap",
@@ -219,7 +228,7 @@ impl Part {
             Part::Cap => "OBSTRUCTION",
             Part::Coupling | Part::Flange => "CONNECTOR",
             Part::Box => "JUNCTION",
-            Part::Valve | Part::Meter | Part::Strainer => "NOTDEFINED",
+            Part::Valve | Part::Meter | Part::Strainer | Part::Damper | Part::Filter | Part::Coil | Part::Silencer => "NOTDEFINED",
         }
     }
 }
@@ -502,7 +511,10 @@ fn fitting_class(domain: Domain, part: Part) -> &'static str {
         (_, Part::Box) => "IfcJunctionBox",
         (_, Part::Valve) => "IfcValve",
         (_, Part::Meter) => "IfcFlowMeter",
-        (_, Part::Strainer) => "IfcFilter",
+        (_, Part::Strainer | Part::Filter) => "IfcFilter",
+        (_, Part::Damper) => "IfcDamper",
+        (_, Part::Coil) => "IfcCoil",
+        (_, Part::Silencer) => "IfcDuctSilencer",
         (Domain::Pipe, _) => "IfcPipeFitting",
         (Domain::CableTray | Domain::Conduit, _) => "IfcCableCarrierFitting",
         _ => "IfcDuctFitting",
@@ -1086,6 +1098,7 @@ pub fn fitting_solids(f: &FittingRecipe) -> Vec<Solid> {
             loft(a, b, &grow(f.legs[0].size), &grow(f.legs[0].size), f.legs[0].across).into_iter().collect()
         }
         Part::Valve | Part::Meter | Part::Strainer if f.legs.len() == 2 => accessory_solids(f),
+        Part::Damper | Part::Filter | Part::Coil | Part::Silencer if f.legs.len() == 2 => duct_accessory_solids(f),
         Part::Cap if !f.legs.is_empty() => {
             let l = f.legs[0];
             let grow = |s: Size| Size { diameter: s.diameter * 1.08, width: s.width * 1.08, height: s.height * 1.08, ..s };
@@ -1141,7 +1154,74 @@ fn accessory_solids(f: &FittingRecipe) -> Vec<Solid> {
     out
 }
 
-/// Every segment and fitting (and gutter) with its solids.
+/// A duct accessory's body: a casing round the duct from end to end, larger for a filter, coil
+/// or attenuator, and a damper's frame collar at its middle (Reviera's own simple shapes).
+fn duct_accessory_solids(f: &FittingRecipe) -> Vec<Solid> {
+    let (l0, l1) = (f.legs[0], f.legs[1]);
+    let a = add(f.centre, mul(l0.direction, l0.length));
+    let b = add(f.centre, mul(l1.direction, l1.length));
+    let grow = |s: Size, by: f64| Size { diameter: s.diameter + by, width: s.width + by, height: s.height + by, ..s };
+    let casing = match f.part {
+        Part::Damper => 0.01,
+        Part::Silencer => (l0.size.nominal() * 0.5).max(0.1),
+        _ => 0.1,
+    };
+    let mut out: Vec<Solid> = loft(a, b, &grow(l0.size, casing), &grow(l0.size, casing), l0.across).into_iter().collect();
+    if f.part == Part::Damper {
+        let half = 0.02;
+        out.extend(loft(add(f.centre, mul(l1.direction, -half)), add(f.centre, mul(l1.direction, half)), &grow(l0.size, 0.08), &grow(l0.size, 0.08), l0.across));
+    }
+    out
+}
+
+/// A hollow prism from `a` to `b`: `outer` round `inner`, of one shape.
+fn tube(a: V3, b: V3, outer: &Size, inner: &Size, across: Option<V3>) -> Option<Solid> {
+    let u = unit(sub(b, a))?;
+    let mut points = section(a, u, outer, across);
+    let n = points.len();
+    points.extend(section(b, u, outer, across));
+    points.extend(section(a, u, inner, across));
+    points.extend(section(b, u, inner, across));
+    let mut faces = Vec::new();
+    for k in 0..n {
+        let j = (k + 1) % n;
+        faces.push(vec![k, j, n + j, n + k]);
+        faces.push(vec![2 * n + k, 3 * n + k, 3 * n + j, 2 * n + j]);
+        faces.push(vec![j, k, 2 * n + k, 2 * n + j]);
+        faces.push(vec![n + k, n + j, 3 * n + j, 3 * n + k]);
+    }
+    Some(Solid { points, faces })
+}
+
+/// A covering's body round a run element (MEP-DUCT-004): a tube from the element's size grown
+/// by `inner` to grown by `outer` (both across the whole section, so twice the thickness),
+/// along a segment, along each of a fitting's legs, or along an accessory end to end.
+pub(crate) fn covering_solids(e: &Element, inner: f64, outer: f64) -> Vec<Solid> {
+    let grow = |s: Size, by: f64| Size { diameter: s.diameter + by, width: s.width + by, height: s.height + by, ..s };
+    if let Some(s) = segment_recipe(e) {
+        if s.corner.is_some() {
+            return Vec::new();
+        }
+        return tube(s.start, s.end, &grow(s.size, outer), &grow(s.size, inner), s.across).into_iter().collect();
+    }
+    let Some(f) = fitting_recipe(e) else { return Vec::new() };
+    if f.part.is_accessory() && f.legs.len() == 2 {
+        let (l0, l1) = (f.legs[0], f.legs[1]);
+        let a = add(f.centre, mul(l0.direction, l0.length));
+        let b = add(f.centre, mul(l1.direction, l1.length));
+        return tube(a, b, &grow(l0.size, outer), &grow(l0.size, inner), l0.across).into_iter().collect();
+    }
+    f.legs
+        .iter()
+        .filter_map(|l| {
+            let back = if f.part == Part::Tap { 0.0 } else { (l.size.nominal() / 2.0).min(l.length * 0.9) };
+            let a = add(f.centre, mul(l.direction, -back));
+            tube(a, add(f.centre, mul(l.direction, l.length)), &grow(l.size, outer), &grow(l.size, inner), l.across)
+        })
+        .collect()
+}
+
+/// Every segment and fitting (and gutter, and insulation and lining) with its solids.
 pub fn all(store: &Store) -> Vec<(ElementId, Domain, bool, Vec<Solid>)> {
     store
         .iter()
@@ -1151,6 +1231,9 @@ pub fn all(store: &Store) -> Vec<(ElementId, Domain, bool, Vec<Solid>)> {
             }
             if let Some(g) = crate::mep_gutters::gutter_recipe(e) {
                 return Some((e.id(), Domain::Pipe, true, crate::mep_gutters::geometry(store, &g).ok()?.solids));
+            }
+            if let Some((host, solids)) = crate::mep_coverings::solids(store, e) {
+                return Some((e.id(), host, false, solids));
             }
             let f = fitting_recipe(e)?;
             Some((e.id(), f.domain, false, fitting_solids(&f)))
@@ -1880,7 +1963,7 @@ pub(crate) fn reapply_type(txn: &mut Transaction<'_>, p: ReapplyParams) -> Resul
             Part::Cap => Role::Cap,
             Part::Coupling | Part::Flange => Role::Union,
             // Boxes and accessories are placed by hand.
-            Part::Box | Part::Valve | Part::Meter | Part::Strainer => continue,
+            Part::Box | Part::Valve | Part::Meter | Part::Strainer | Part::Damper | Part::Filter | Part::Coil | Part::Silencer => continue,
         };
         // The routing of a segment it joins.
         let routing = (0..f.legs.len())
@@ -1983,6 +2066,7 @@ fn cut(txn: &mut Transaction<'_>, host: ElementId, hs: &SegmentRecipe, q: V3, ha
     params.insert(RECIPE_KEY.into(), serde_json::to_value(&second).expect("serialises"));
     let new_half = txn.create(NewElement { class: he.class.clone(), name: he.name.clone(), params, guid: None })?;
     retarget_end(txn, host, new_half)?;
+    crate::mep_coverings::follow_split(txn, host, &[new_half])?;
     Ok(new_half)
 }
 
@@ -2417,6 +2501,237 @@ pub(crate) fn place_accessory(txn: &mut Transaction<'_>, p: AccessoryParams) -> 
     made.extend(&flanges);
     mep::connect_coincident(txn, &made)?;
     Ok(AccessoryReport { accessory: acc, flanges, split: second })
+}
+
+/// The inline duct accessories Reviera makes (MEP-DUCT-004).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum DuctAccessoryKind {
+    FireDamper,
+    SmokeDamper,
+    ControlDamper,
+    BalancingDamper,
+    BackdraftDamper,
+    Filter,
+    HeatingCoil,
+    CoolingCoil,
+    SoundAttenuator,
+}
+
+impl DuctAccessoryKind {
+    fn part(self) -> Part {
+        match self {
+            DuctAccessoryKind::Filter => Part::Filter,
+            DuctAccessoryKind::HeatingCoil | DuctAccessoryKind::CoolingCoil => Part::Coil,
+            DuctAccessoryKind::SoundAttenuator => Part::Silencer,
+            _ => Part::Damper,
+        }
+    }
+
+    pub fn label(self) -> &'static str {
+        match self {
+            DuctAccessoryKind::FireDamper => "Fire Damper",
+            DuctAccessoryKind::SmokeDamper => "Smoke Damper",
+            DuctAccessoryKind::ControlDamper => "Control Damper",
+            DuctAccessoryKind::BalancingDamper => "Balancing Damper",
+            DuctAccessoryKind::BackdraftDamper => "Backdraft Damper",
+            DuctAccessoryKind::Filter => "Filter",
+            DuctAccessoryKind::HeatingCoil => "Heating Coil",
+            DuctAccessoryKind::CoolingCoil => "Cooling Coil",
+            DuctAccessoryKind::SoundAttenuator => "Sound Attenuator",
+        }
+    }
+
+    /// The length along the duct, face to face (E-29).
+    pub fn default_length(self) -> f64 {
+        match self {
+            DuctAccessoryKind::FireDamper | DuctAccessoryKind::SmokeDamper => 0.3,
+            DuctAccessoryKind::ControlDamper | DuctAccessoryKind::BalancingDamper | DuctAccessoryKind::BackdraftDamper => 0.2,
+            DuctAccessoryKind::Filter | DuctAccessoryKind::HeatingCoil | DuctAccessoryKind::CoolingCoil => 0.3,
+            DuctAccessoryKind::SoundAttenuator => 0.9,
+        }
+    }
+
+    /// `IfcDamperTypeEnum`, `IfcFilterTypeEnum`, `IfcCoilTypeEnum`, `IfcDuctSilencerTypeEnum`
+    /// (by the duct's shape).
+    fn predefined(self, shape: Shape) -> &'static str {
+        match self {
+            DuctAccessoryKind::FireDamper => "FIREDAMPER",
+            DuctAccessoryKind::SmokeDamper => "SMOKEDAMPER",
+            DuctAccessoryKind::ControlDamper => "CONTROLDAMPER",
+            DuctAccessoryKind::BalancingDamper => "BALANCINGDAMPER",
+            DuctAccessoryKind::BackdraftDamper => "BACKDRAFTDAMPER",
+            DuctAccessoryKind::Filter => "AIRPARTICLEFILTER",
+            DuctAccessoryKind::HeatingCoil => "WATERHEATINGCOIL",
+            DuctAccessoryKind::CoolingCoil => "WATERCOOLINGCOIL",
+            DuctAccessoryKind::SoundAttenuator => match shape {
+                Shape::Round => "ROUND",
+                Shape::Rectangular => "RECTANGULAR",
+                Shape::Oval => "FLATOVAL",
+            },
+        }
+    }
+
+    fn key(self) -> String {
+        serde_json::to_value(self).ok().and_then(|v| v.as_str().map(str::to_owned)).unwrap_or_default()
+    }
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct DuctAccessoryParams {
+    pub kind: DuctAccessoryKind,
+    /// The duct it goes in; found from `point` when omitted.
+    pub duct_id: Option<ElementRef>,
+    /// Where along it, or an open duct end it goes on (`[x, y]` in plan or `[x, y, z]`); the
+    /// duct's middle when omitted.
+    pub point: Option<Vec<f64>>,
+    /// Face to face along the duct (metres); the kind's default when omitted.
+    #[schemars(extend("x-reviera-data-type" = "length"))]
+    pub length: Option<f64>,
+}
+
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+pub struct DuctAccessoryReport {
+    pub accessory: ElementId,
+    /// The duct's new second half, when it went along a duct.
+    pub split: Option<ElementId>,
+}
+
+/// `duct_accessory.place`: a damper, filter, coil or sound attenuator of the duct's size and
+/// shape, inserted along a straight duct (which is split, both parts connected through it) or
+/// on an open duct end.
+pub(crate) fn place_duct_accessory(txn: &mut Transaction<'_>, p: DuctAccessoryParams) -> Result<DuctAccessoryReport> {
+    let store = txn.store().clone();
+    let host = p.duct_id.as_ref().map(|r| store.resolve(r).ok_or_else(|| bad("element.not_found", "no such duct"))).transpose()?;
+    let point = match p.point.as_deref() {
+        None => None,
+        Some([x, y]) => Some([*x, *y, f64::NAN]),
+        Some([x, y, z]) => Some([*x, *y, *z]),
+        Some(_) => return Err(bad("mep_fitting.point", "a point is [x, y] or [x, y, z]")),
+    };
+    let length = p.length.unwrap_or(p.kind.default_length());
+    if !(length.is_finite() && length > 0.0) {
+        return Err(bad("duct_accessory.length", "the length must be above zero"));
+    }
+    let half = length / 2.0;
+    let part = p.kind.part();
+    let finish = |txn: &mut Transaction<'_>, acc: ElementId, shape: Shape| -> Result<()> {
+        let mut f = fitting_recipe(txn.store().get(acc).expect("made")).expect("a fitting");
+        f.accessory = Some(p.kind.key());
+        let v = serde_json::to_value(&f).expect("serialises");
+        let (label, pre) = (p.kind.label(), p.kind.predefined(shape));
+        txn.modify(acc, |e| {
+            e.params.insert(RECIPE_KEY.into(), v);
+            e.params.insert("@PredefinedType".into(), pre.into());
+            e.name = Some(label.into());
+        })
+    };
+    match target_at(&store, Domain::Duct, host, point)? {
+        Target::Along(id, hs, q) => {
+            let axis = unit(sub(hs.end, hs.start)).expect("a segment");
+            let total = len(sub(hs.end, hs.start));
+            // The straight duct between its fittings must hold it, with a stub each side.
+            if total < length + 0.02 {
+                return Err(bad("duct_accessory.short", "Not enough straight duct for this accessory"));
+            }
+            let along = dot(sub(q, hs.start), axis).clamp(half + 0.01, total - half - 0.01);
+            let q = add(hs.start, mul(axis, along));
+            let cx = Ctx { domain: Domain::Duct, predefined: "", type_guid: String::new(), routing: Routing::default(), level: hs.level.clone(), classification: hs.classification };
+            let second = cut(txn, id, &hs, q, half)?;
+            let legs = vec![Leg { direction: mul(axis, -1.0), length: half, size: hs.size, across: hs.across }, Leg { direction: axis, length: half, size: hs.size, across: hs.across }];
+            let acc = make_fitting(txn, &cx, part, q, legs)?;
+            finish(txn, acc, hs.size.shape)?;
+            mep::connect_coincident(txn, &[acc, id, second])?;
+            crate::mep_coverings::follow_split(txn, id, &[acc])?;
+            Ok(DuctAccessoryReport { accessory: acc, split: Some(second) })
+        }
+        Target::End(port) => {
+            let e = store.get(port.element).expect("listed");
+            let (level, classification) = match (segment_recipe(e), fitting_recipe(e)) {
+                (Some(s), _) => (s.level, s.classification),
+                (_, Some(f)) => (f.level, f.classification),
+                _ => return Err(bad("duct_accessory.where", "accessories go on a duct")),
+            };
+            let size = crate::mep_network::size_of(&port.connector);
+            let dir = port.direction;
+            let across = segment_recipe(e).and_then(|s| s.across);
+            let cx = Ctx { domain: Domain::Duct, predefined: "", type_guid: String::new(), routing: Routing::default(), level, classification };
+            let c = add(port.position, mul(dir, half));
+            let legs = vec![Leg { direction: mul(dir, -1.0), length: half, size, across }, Leg { direction: dir, length: half, size, across }];
+            let acc = make_fitting(txn, &cx, part, c, legs)?;
+            finish(txn, acc, size.shape)?;
+            mep::connect_coincident(txn, &[acc, port.element])?;
+            Ok(DuctAccessoryReport { accessory: acc, split: None })
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct HealParams {
+    pub first_id: ElementRef,
+    pub second_id: ElementRef,
+}
+
+/// `mep_segment.heal`: two straight segments in line, of one size, whose facing ends are open
+/// (as an inline accessory's deletion leaves them), joined into the first; the second is
+/// deleted and the far ends keep their connections.
+pub(crate) fn heal(txn: &mut Transaction<'_>, p: HealParams) -> Result<ElementId> {
+    let store = txn.store().clone();
+    let a = store.resolve(&p.first_id).ok_or_else(|| bad("element.not_found", "no such segment"))?;
+    let b = store.resolve(&p.second_id).ok_or_else(|| bad("element.not_found", "no such segment"))?;
+    let seg = |id: ElementId| store.get(id).and_then(segment_recipe).filter(|s| s.corner.is_none()).ok_or_else(|| bad("mep_run.not_a_segment", format!("element {id} is not a straight segment")));
+    let (sa, sb) = (seg(a)?, seg(b)?);
+    if a == b || sa.domain != sb.domain || sa.size != sb.size {
+        return Err(bad("mep_segment.heal", "the segments must be two of one kind and one size"));
+    }
+    if !sa.taps.is_empty() || !sb.taps.is_empty() {
+        return Err(bad("mep_segment.heal", "segments with taps cannot be joined"));
+    }
+    let ends = |s: &SegmentRecipe| [s.start, s.end];
+    // The facing ends: the nearest pair.
+    let (ia, ib) = [(0, 0), (0, 1), (1, 0), (1, 1)].into_iter().min_by(|x, y| len(sub(ends(&sa)[x.0], ends(&sb)[x.1])).total_cmp(&len(sub(ends(&sa)[y.0], ends(&sb)[y.1])))).expect("four pairs");
+    let (far_a, far_b) = (ends(&sa)[1 - ia], ends(&sb)[1 - ib]);
+    let u = unit(sub(far_b, far_a)).ok_or_else(|| bad("mep_segment.heal", "the segments overlap"))?;
+    let in_line = |q: V3| len(sub(sub(q, far_a), mul(u, dot(sub(q, far_a), u)))) < 1e-4;
+    if !in_line(ends(&sa)[ia]) || !in_line(ends(&sb)[ib]) {
+        return Err(bad("mep_segment.heal", "the segments are not in line"));
+    }
+    let partners = mep::partners(&store);
+    if partners.contains_key(&(a, ia)) || partners.contains_key(&(b, ib)) {
+        return Err(bad("mep_segment.heal", "the facing ends are connected; delete what is between them first"));
+    }
+    // The joined segment runs from the first's far end (port 0) to the second's (port 1).
+    let (ga, gb) = (mep::stored(&store, a, 0).element, mep::stored(&store, b, 0).element);
+    let links: Vec<mep::Link> = mep::stored_links(&store)
+        .into_iter()
+        .filter(|l| l.a.element != gb && l.b.element != gb || [&l.a, &l.b].iter().any(|s| s.element == gb && s.port == 1 - ib))
+        .map(|mut l| {
+            for s in [&mut l.a, &mut l.b] {
+                if s.element == ga && s.port == 1 - ia {
+                    s.port = 0;
+                } else if s.element == gb && s.port == 1 - ib {
+                    s.element = ga.clone();
+                    s.port = 1;
+                }
+            }
+            l
+        })
+        .collect();
+    let mut joined = sa.clone();
+    joined.start = far_a;
+    joined.end = far_b;
+    let v = serde_json::to_value(&joined).expect("serialises");
+    txn.modify(a, |e| {
+        e.params.insert(RECIPE_KEY.into(), v);
+    })?;
+    for c in crate::mep_coverings::of_host(&store, b) {
+        txn.delete(c)?;
+    }
+    txn.delete(b)?;
+    mep::save_links(txn, links)?;
+    Ok(a)
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]

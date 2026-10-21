@@ -160,6 +160,16 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(AnalyticalPipeConnectionCreateAuto),
         registry.add(AnalyticalPipeConnectionSet),
         registry.add(AnalyticalPipeConnectionList),
+        registry.add(DuctAccessoryPlace),
+        registry.add(MepSegmentHeal),
+        registry.add(MepCoveringTypeCreate),
+        registry.add(MepInsulationAdd),
+        registry.add(MepInsulationSet),
+        registry.add(MepInsulationRemove),
+        registry.add(DuctLiningAdd),
+        registry.add(DuctLiningSet),
+        registry.add(DuctLiningRemove),
+        registry.add(MepCoveringList),
         registry.add(MechControlDeviceAssign),
         registry.add(MechControlDeviceList),
         registry.add(MepRunCreateRiser),
@@ -1243,6 +1253,115 @@ read_command!(
     crate::mep_analytical::ListParams,
     Vec<crate::mep_analytical::Resolved>,
     crate::mep_analytical::list
+);
+
+edit_command!(
+    DuctAccessoryPlace,
+    "duct_accessory.place",
+    "Insert a damper, filter, coil or sound attenuator",
+    "Inserts an inline duct accessory (MEP-DUCT-004) `kind` fire_damper, smoke_damper, control_damper, balancing_damper, backdraft_damper, filter, heating_coil, cooling_coil or sound_attenuator, of the duct's size and shape and in its system: along a straight duct (`duct_id`, at `point` or its middle), which is split and connected through it, or on an open duct end at `point`. `length` face to face (default 300 mm for fire and smoke dampers, filters and coils, 200 mm for other dampers, 900 mm for sound attenuators). Refused with \"Not enough straight duct for this accessory\" when the straight duct is shorter than the accessory and two 10 mm stubs. An insulated duct's insulation continues over it. IFC: IfcDamper (FIREDAMPER, SMOKEDAMPER, CONTROLDAMPER, BALANCINGDAMPER, BACKDRAFTDAMPER), IfcFilter AIRPARTICLEFILTER, IfcCoil WATERHEATINGCOIL / WATERCOOLINGCOIL, IfcDuctSilencer ROUND / RECTANGULAR / FLATOVAL.",
+    "Duct Accessory",
+    crate::mep_runs::DuctAccessoryParams,
+    crate::mep_runs::DuctAccessoryReport,
+    crate::mep_runs::place_duct_accessory
+);
+
+edit_command!(
+    MepSegmentHeal,
+    "mep_segment.heal",
+    "Rejoin two segments",
+    "Joins two straight duct or pipe segments in line and of one size, whose facing ends are open (as deleting an inline accessory leaves them), into the first (MEP-DUCT-004 Heal); the second is deleted and the far ends keep their connections. Returns the joined segment.",
+    "Heal",
+    crate::mep_runs::HealParams,
+    crate::ElementId,
+    crate::mep_runs::heal
+);
+
+edit_command!(
+    MepCoveringTypeCreate,
+    "mep_covering_type.create",
+    "Create an insulation or lining type",
+    "Creates an insulation or duct lining type (MEP-DUCT-004): `covering` insulation or lining, a `material`, and for lining the air side's `roughness` (metres; 1.5 mm by default) used by the pressure-drop calculation. IFC: IfcCoveringType INSULATION. Returns its id.",
+    "Create Covering Type",
+    crate::mep_coverings::CreateTypeParams,
+    crate::ElementId,
+    crate::mep_coverings::create_type
+);
+
+edit_command!(
+    MepInsulationAdd,
+    "mep_insulation.add",
+    "Add insulation",
+    "Adds insulation of `type_id` (the built-in Duct Insulation when omitted) and `thickness` (25 mm by default; above 0) outside each duct, pipe, fitting or accessory (MEP-DUCT-004); one already there takes the new type and thickness. Other elements are skipped with the warning `mep_insulation.skipped`. Insulation follows its host's size and position and is deleted with it; it is included in clash checks and does not change pressure drops. IFC: IfcCovering INSULATION covering the host (IfcRelCoversBldgElements), thickness as Qto_CoveringBaseQuantities.Width. Returns the coverings.",
+    "Add Insulation",
+    crate::mep_coverings::AddParams,
+    Vec<crate::ElementId>,
+    crate::mep_coverings::add_insulation
+);
+
+edit_command!(
+    MepInsulationSet,
+    "mep_insulation.set",
+    "Edit insulation",
+    "Changes the type or thickness of the insulation on the elements (or of the given insulation) (MEP-DUCT-004 Edit Insulation). Returns the coverings changed.",
+    "Edit Insulation",
+    crate::mep_coverings::SetParams,
+    Vec<crate::ElementId>,
+    crate::mep_coverings::set_insulation
+);
+
+edit_command!(
+    MepInsulationRemove,
+    "mep_insulation.remove",
+    "Remove insulation",
+    "Deletes the insulation on the elements (or the given insulation) (MEP-DUCT-004). Returns the coverings deleted.",
+    "Remove Insulation",
+    crate::mep_coverings::RemoveParams,
+    Vec<crate::ElementId>,
+    crate::mep_coverings::remove_insulation
+);
+
+edit_command!(
+    DuctLiningAdd,
+    "duct_lining.add",
+    "Add duct lining",
+    "Adds lining of `type_id` (the built-in Duct Lining when omitted) and `thickness` (25 mm by default; above 0 and less than half the duct's smallest side) inside each duct and duct fitting (MEP-DUCT-004); others are skipped with the warning `duct_lining.skipped`. Lining reduces the free section the pressure-drop calculation uses (each side less twice the thickness) and gives it the lining type's roughness. IFC: IfcCovering INSULATION named Duct Lining covering the duct. Returns the coverings.",
+    "Add Lining",
+    crate::mep_coverings::AddParams,
+    Vec<crate::ElementId>,
+    crate::mep_coverings::add_lining
+);
+
+edit_command!(
+    DuctLiningSet,
+    "duct_lining.set",
+    "Edit duct lining",
+    "Changes the type or thickness of the lining in the ducts (or of the given lining) (MEP-DUCT-004). Returns the coverings changed.",
+    "Edit Lining",
+    crate::mep_coverings::SetParams,
+    Vec<crate::ElementId>,
+    crate::mep_coverings::set_lining
+);
+
+edit_command!(
+    DuctLiningRemove,
+    "duct_lining.remove",
+    "Remove duct lining",
+    "Deletes the lining in the ducts (or the given lining) (MEP-DUCT-004). Returns the coverings deleted.",
+    "Remove Lining",
+    crate::mep_coverings::RemoveParams,
+    Vec<crate::ElementId>,
+    crate::mep_coverings::remove_lining
+);
+
+read_command!(
+    MepCoveringList,
+    "mep_covering.list",
+    "List insulation and lining",
+    "Every insulation and duct lining (of the given hosts, when `element_ids` is given): its kind, host, type and thickness (MEP-DUCT-004).",
+    crate::mep_coverings::ListParams,
+    Vec<crate::mep_coverings::CoveringInfo>,
+    crate::mep_coverings::list
 );
 
 edit_command!(

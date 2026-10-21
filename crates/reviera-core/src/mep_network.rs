@@ -64,6 +64,28 @@ const PIPE_JUNCTION: (f64, f64) = (0.4, 1.5);
 const VALVE: f64 = 0.2;
 
 /// A valve's coefficient by its kind.
+/// A duct accessory's coefficient, of its velocity pressure (E-29): open dampers; filters,
+/// coils and attenuators take a fixed loss instead ([`accessory_loss`]).
+pub fn accessory_coefficient(kind: Option<&str>) -> f64 {
+    match kind {
+        Some("fire_damper") | Some("smoke_damper") => 0.2,
+        Some("control_damper") | Some("balancing_damper") => 0.5,
+        Some("backdraft_damper") => 1.0,
+        _ => 0.0,
+    }
+}
+
+/// A duct accessory's fixed loss (Pa), where it has one (E-29).
+pub fn accessory_loss(kind: Option<&str>) -> Option<f64> {
+    match kind {
+        Some("filter") => Some(125.0),
+        Some("heating_coil") => Some(60.0),
+        Some("cooling_coil") => Some(125.0),
+        Some("sound_attenuator") => Some(50.0),
+        _ => None,
+    }
+}
+
 pub fn valve_coefficient(kind: Option<&str>) -> f64 {
     match kind {
         Some("check_valve") => 2.0,
@@ -129,6 +151,8 @@ pub fn coefficient(domain: Domain, part: Part, kin: &mep::Port, kout: &mep::Port
         Part::Cap | Part::Coupling | Part::Box | Part::Flange => 0.0,
         // Open gate or ball valve, meter, strainer (E-24); a valve's kind refines it.
         Part::Valve => VALVE,
+        // A duct accessory's kind sets it (E-29).
+        Part::Damper | Part::Filter | Part::Coil | Part::Silencer => accessory_coefficient(None),
         Part::Meter => 1.0,
         Part::Strainer => 2.0,
     }
@@ -373,11 +397,14 @@ pub fn compute(store: &Store, sys: &SystemInfo, equation: Equation) -> Result<Ne
                 .and_then(|t| store.get(t))
                 .and_then(mep_runs::segment_type)
                 .map_or(0.0, |t| t.roughness);
+            // Lining narrows the duct and sets its roughness (MEP-DUCT-004).
+            let (free, lined) = crate::mep_coverings::free_size(store, x, s.size);
+            let roughness = lined.unwrap_or(roughness);
             let len = match s.corner {
                 Some(c) => length(s.start, c) + length(c, s.end),
                 None => length(s.start, s.end),
             };
-            let (v, f) = flow_in(flow, &s.size, roughness, fluid, equation);
+            let (v, f) = flow_in(flow, &free, roughness, fluid, equation);
             let loss = ov.loss.unwrap_or(f * len);
             own.insert(x, loss);
             let (_, branch) = if s.domain == Domain::Duct { DUCT_JUNCTION } else { PIPE_JUNCTION };
@@ -422,8 +449,14 @@ pub fn compute(store: &Store, sys: &SystemInfo, equation: Equation) -> Result<Ne
             for (c, k) in &children {
                 let (Some(i), Some(o)) = (inlet, ports.iter().find(|p| p.index == *k)) else { continue };
                 let cq = q(*c);
-                let kk = ov.coefficient.unwrap_or_else(|| if fr.part == Part::Valve { valve_coefficient(fr.accessory.as_deref()) } else { coefficient(fr.domain, fr.part, i, o) });
-                let l = ov.loss.unwrap_or(kk * vp(cq, &size_of(&o.connector)));
+                let duct_accessory = matches!(fr.part, Part::Damper | Part::Filter | Part::Coil | Part::Silencer);
+                let kk = ov.coefficient.unwrap_or_else(|| match fr.part {
+                    Part::Valve => valve_coefficient(fr.accessory.as_deref()),
+                    _ if duct_accessory => accessory_coefficient(fr.accessory.as_deref()),
+                    _ => coefficient(fr.domain, fr.part, i, o),
+                });
+                let fixed = if duct_accessory && ov.coefficient.is_none() { accessory_loss(fr.accessory.as_deref()) } else { None };
+                let l = ov.loss.or(fixed).unwrap_or(kk * vp(cq, &size_of(&o.connector)));
                 leaving.insert((x, *c), (kk, l));
                 branches.push(Branch { to: *c, flow: cq, coefficient: kk, loss: l });
             }

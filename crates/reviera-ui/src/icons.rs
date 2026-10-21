@@ -382,6 +382,18 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "pipe_fitting" => format!(
             r#"<path d="M3 20h10a6 6 0 0 0 6-6V3" fill="none" stroke-width="6" {s}/><path d="M3 20h10a6 6 0 0 0 6-6V3" fill="none" stroke-width="4" stroke="{f}"/><path d="M11 16v8M15 10h8" {sa}/>"#
         ),
+        "damper" => format!(
+            r#"<rect x="2" y="9" width="28" height="14" fill="none" stroke-width="3" {s}/><path d="M10 11l4 10M18 11l4 10" stroke-width="3" {sa}/><path d="M16 9V4" {s}/>"#
+        ),
+        "insulation" => format!(
+            r#"<rect x="3" y="7" width="26" height="18" rx="4" fill="{f}" {s}/><rect x="3" y="12" width="26" height="8" fill="none" stroke-width="3" {s}/><path d="M7 9l3 2M13 9l3 2M19 9l3 2M7 22l3 2M13 22l3 2M19 22l3 2" {sa}/>"#
+        ),
+        "duct_lining" => format!(
+            r#"<rect x="3" y="7" width="26" height="18" fill="none" stroke-width="3" {s}/><rect x="7" y="11" width="18" height="10" fill="none" stroke-dasharray="3 2" {sa}/>"#
+        ),
+        "heal" => format!(
+            r#"<path d="M3 16h10M19 16h10" stroke-width="5" {s}/><path d="M13 16h6" stroke-width="5" {sa}/><path d="M16 8v4M16 20v4" {sa}/>"#
+        ),
         "valve" => format!(
             r#"<path d="M2 16h5M25 16h5" stroke-width="4" {s}/><path d="M7 10l18 12V10L7 22z" fill="{f}" {s}/><path d="M16 16V6M11 6h10" {sa}/>"#
         ),
