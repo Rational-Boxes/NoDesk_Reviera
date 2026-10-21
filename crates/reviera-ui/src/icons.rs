@@ -364,6 +364,15 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "assign_control" => format!(
             r#"<rect x="3" y="8" width="8" height="12" rx="2" fill="{f}" {s}/><rect x="19" y="10" width="10" height="10" fill="{f}" {s}/><path d="M11 14h8M16 11l3 3-3 3" fill="none" {sa}/>"#
         ),
+        "pipe_fitting" => format!(
+            r#"<path d="M3 20h10a6 6 0 0 0 6-6V3" fill="none" stroke-width="6" {s}/><path d="M3 20h10a6 6 0 0 0 6-6V3" fill="none" stroke-width="4" stroke="{f}"/><path d="M11 16v8M15 10h8" {sa}/>"#
+        ),
+        "valve" => format!(
+            r#"<path d="M2 16h5M25 16h5" stroke-width="4" {s}/><path d="M7 10l18 12V10L7 22z" fill="{f}" {s}/><path d="M16 16V6M11 6h10" {sa}/>"#
+        ),
+        "tee_to_cross" => format!(
+            r#"<path d="M3 16h26M16 16V3" stroke-width="5" {s}/><path d="M16 16v13" stroke-width="5" stroke-dasharray="3 2" {sa}/>"#
+        ),
         "pipe_slope" => format!(
             r#"<path d="M3 12l26 8" stroke-width="5" {s}/><path d="M3 12l26 8" stroke-width="3" stroke="{f}"/><path d="M6 26h20M26 26v-6" fill="none" {sa}/>"#
         ),

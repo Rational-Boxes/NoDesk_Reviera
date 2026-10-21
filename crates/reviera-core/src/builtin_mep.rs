@@ -142,6 +142,9 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(WiringSet),
         registry.add(MepSize),
         registry.add(MepRunSetSlope),
+        registry.add(PipeFittingPlace),
+        registry.add(PipeAccessoryPlace),
+        registry.add(MepFittingTeeToCross),
         registry.add(PipeCreateParallel),
         registry.add(MepSettingsSetSlopes),
         registry.add(MepSettingsSlopes),
@@ -1142,6 +1145,39 @@ edit_command!(
     crate::mep_slopes::SlopeParams,
     crate::mep_slopes::SlopeReport,
     crate::mep_slopes::set_slope
+);
+
+edit_command!(
+    PipeFittingPlace,
+    "pipe_fitting.place",
+    "Place a pipe fitting",
+    "Places a pipe fitting (MEP-PIPE-004) `part` elbow (`angle`, 90° by default, turning toward `direction`), tee, cross, coupling or cap on an open pipe end (`host_id` or found at `point`), taking its size and connecting; a tee, cross or coupling along a pipe splits it. Elbows along a pipe are refused: \"Elbows must be placed at an open end\".",
+    "Pipe Fitting",
+    crate::mep_runs::PlaceFittingParams,
+    crate::mep_runs::PlaceReport,
+    crate::mep_runs::place_pipe_fitting
+);
+
+edit_command!(
+    PipeAccessoryPlace,
+    "pipe_accessory.place",
+    "Insert a valve, strainer or meter",
+    "Inserts an inline pipe accessory (MEP-PIPE-004) `kind` gate_valve, ball_valve, butterfly_valve, globe_valve, check_valve, pressure_reducing_valve, relief_valve, strainer or water_meter in a pipe (`pipe_id`, at `point` or its middle), which is split; it takes the pipe's size and system; `rotation` turns a valve's handle about the pipe; `connection` flanged (from 50 mm by default) or threaded: a flanged one gets the routing preferences' union-role flange on each side. IFC: IfcValve (ISOLATING for gate, ball and butterfly, REGULATING globe, CHECK, PRESSUREREDUCING, PRESSURERELIEF), IfcFilter STRAINER, IfcFlowMeter WATERMETER; flanges IfcPipeFitting CONNECTOR.",
+    "Pipe Accessory",
+    crate::mep_runs::AccessoryParams,
+    crate::mep_runs::AccessoryReport,
+    crate::mep_runs::place_accessory
+);
+
+edit_command!(
+    MepFittingTeeToCross,
+    "mep_fitting.tee_to_cross",
+    "Change a tee to a cross",
+    "Changes a tee into a cross: a fourth leg opposite the branch, of the run's size, left open (MEP-PIPE-004).",
+    "Tee to Cross",
+    crate::mep_runs::TeeToCrossParams,
+    (),
+    crate::mep_runs::tee_to_cross
 );
 
 edit_command!(

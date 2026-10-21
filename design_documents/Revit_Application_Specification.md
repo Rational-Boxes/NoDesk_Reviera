@@ -18803,11 +18803,11 @@ Allowed values come from Mechanical Settings › Slopes. Fabrication pipework ca
 
 **Acceptance criteria.**
 - [x] Parallel pipes of 3 × 1 at 150 mm on an L-shaped run produce three concentric L-runs with correct elbows.
-- [ ] A run containing a gate valve is refused, and the message names the valve.
+- [x] A run containing a gate valve is refused, and the message names the valve.
 - [x] An offset of 40 mm on a 50 mm pipe is refused.
 - [x] Copies of a 1% sloped run have the same 1% slope.
 
-*Built (2026-10-21):* `pipe.create_parallel(run_ids, h_count, v_count, h_offset, v_offset)` (the parallel-conduit routine of MEP-ELEC-017, generalised): any element finds the whole run, level or sloped (not risers); 1–20 each way, the original included; offsets centre to centre, refused below the pipe's outside size ("Offset smaller than pipe outside size (50 mm)"; insulation is not modelled yet); each copy offset in plan along the bisectors at bends (concentric), its heights rebuilt from the original legs' slopes over its own lengths, elbows by the type's routing preferences, the same type, size, system type and slope (Gradient); copies join a system only through its equipment (warning `pipe.parallel_unassigned`); open ends stay open. A run with a tee, cross or tap is refused naming it (valves are not built yet, so the valve criterion waits). Systems › HVAC & Piping › **Parallel Pipes** (a dialog of the counts and offsets for the selected pipe's run). Not yet: the hover preview on the side of the cursor, Tab to extend the hover, drawing above or below in sections.
+*Built (2026-10-21):* `pipe.create_parallel(run_ids, h_count, v_count, h_offset, v_offset)` (the parallel-conduit routine of MEP-ELEC-017, generalised): any element finds the whole run, level or sloped (not risers); 1–20 each way, the original included; offsets centre to centre, refused below the pipe's outside size ("Offset smaller than pipe outside size (50 mm)"; insulation is not modelled yet); each copy offset in plan along the bisectors at bends (concentric), its heights rebuilt from the original legs' slopes over its own lengths, elbows by the type's routing preferences, the same type, size, system type and slope (Gradient); copies join a system only through its equipment (warning `pipe.parallel_unassigned`); open ends stay open. A run with a tee, cross, tap or an inline valve, meter or strainer is refused naming it. Systems › HVAC & Piping › **Parallel Pipes** (a dialog of the counts and offsets for the selected pipe's run). Not yet: the hover preview on the side of the cursor, Tab to extend the hover, drawing above or below in sections.
 
 ### 4.8.4 Pipe fittings, accessories, flanges, caps and flex
 **ID:** MEP-PIPE-004 · **Priority:** P1 · **Ref:** research/03 §9.1
@@ -18852,10 +18852,12 @@ Allowed values come from Mechanical Settings › Slopes. Fabrication pipework ca
 - Caps use `duct.cap_open_ends`' pipe counterpart `pipe.cap_open_ends(ids[])`; fitting controls use `mep_fitting.*` (MEP-DUCT-003); insulation uses `mep_insulation.*` (MEP-DUCT-004).
 
 **Acceptance criteria.**
-- [ ] Inserting a gate valve into a 65 mm pipe splits the pipe and adds flanges from the union role on both sides.
-- [ ] Placing an elbow on the middle of a pipe is refused with a message.
-- [ ] *Cap Open Ends* on a run with three open ends adds three caps of matching size.
-- [ ] *Change Tee to Cross* on a tee adds a fourth open leg of the run size.
+- [x] Inserting a gate valve into a 65 mm pipe splits the pipe and adds flanges from the union role on both sides.
+- [x] Placing an elbow on the middle of a pipe is refused with a message.
+- [x] *Cap Open Ends* on a run with three open ends adds three caps of matching size.
+- [x] *Change Tee to Cross* on a tee adds a fourth open leg of the run size.
+
+*Built (2026-10-21):* `pipe_fitting.place(part, host_id?, point?, angle?, direction?)`: an elbow (by the routing preferences, mitred), tee, cross, coupling or cap on an open pipe end, taking its size and connecting; a tee, cross or coupling along a pipe splits it; an elbow along a pipe is refused "Elbows must be placed at an open end". `pipe_accessory.place(kind, pipe_id?, point?, rotation, connection?)`: gate, ball, butterfly, globe, check, pressure-reducing and relief valves, strainers and water meters inserted along a pipe, which is split; they take its size, system classification and level; a valve's handle turns about the pipe in `rotation` degrees; flanged from 50 mm (threaded below) by default, a flanged accessory gets the union-role flange of the routing preferences on each side (pipe types' default union role: flanges from 50 mm, E-26); Reviera's own simple bodies (a valve's two cones with stem and handwheel, a meter's box, a strainer's basket leg). IFC: `IfcValve` (IFC4's `IfcValveTypeEnum` has no GATE or GLOBE: gate, ball and butterfly valves are ISOLATING, globe REGULATING, CHECK, PRESSUREREDUCING, PRESSURERELIEF, the kind in its name), `IfcFilter` STRAINER, `IfcFlowMeter` WATERMETER, flanges `IfcPipeFitting` CONNECTOR (object type FLANGE); categories Pipe Fittings, Pipe Accessories, Flow Meters, Filters and Strainers (and Duct Fittings). Network losses: valves 0.2 (check 2, globe and pressure-reducing 6, butterfly 0.5), strainers 2, meters 1, flanges 0 (E-24). `mep_fitting.tee_to_cross(fitting_id)`. `pipe.cap_open_ends` as for ducts. Systems › HVAC & Piping › **Pipe Fitting** (`PF`: the part, then clicks on pipes or their ends), **Pipe Accessory** (`PA`: the kind, then clicks on pipes), **Change Tee to Cross**. Not yet: flex pipe (MEP-DUCT-005's spline rules), insulation, valves from component types and fixed-size accessories with transitions, manual flanges and their keeping through Reapply Type, the fitting controls (flip, rotate on canvas), placing in sections and elevations, Spacebar handle rotation in the tool.
 
 ### 4.8.5 Pipe sizing and fixture units
 **ID:** MEP-PIPE-005 · **Priority:** P2 · **Ref:** research/03 §9.1 ("Pipe sizing")

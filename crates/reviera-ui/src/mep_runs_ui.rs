@@ -62,6 +62,8 @@ pub(crate) struct RunTool {
 pub(crate) enum Placing {
     Part(reviera_core::mep_runs::Part),
     Split,
+    /// A pipe accessory (MEP-PIPE-004).
+    Accessory(reviera_core::mep_runs::AccessoryKind),
 }
 
 fn domain_title(d: Domain) -> &'static str {
@@ -408,7 +410,9 @@ impl Gui {
         if domain == Domain::Conduit {
             parts.push((Placing::Part(Part::Box), "Junction box"));
         }
-        parts.push((Placing::Split, "Split (a coupling where the type has one)"));
+        if domain != Domain::Pipe {
+            parts.push((Placing::Split, "Split (a coupling where the type has one)"));
+        }
         let labels: Vec<&str> = parts.iter().map(|p| p.1).collect();
         let title = format!("{} Fitting", domain_title(domain));
         let d = SingleChoiceDialog::builder(&frame, "Place:", &title, &labels).build();
@@ -440,9 +444,14 @@ impl Gui {
         let frame = self.frame;
         let (command, args) = match placing {
             Placing::Part(part) => {
-                let command = if domain == Domain::Conduit { "conduit_fitting.place" } else { "cable_tray_fitting.place" };
+                let command = match domain {
+                    Domain::Conduit => "conduit_fitting.place",
+                    Domain::Pipe => "pipe_fitting.place",
+                    _ => "cable_tray_fitting.place",
+                };
                 (command, json!({ "part": part, "point": p }))
             }
+            Placing::Accessory(kind) => ("pipe_accessory.place", json!({ "kind": kind, "point": p })),
             Placing::Split => {
                 let Some(store) = self.store_now() else { return };
                 // The straight segment under the click.
@@ -471,7 +480,9 @@ impl Gui {
         match self.app.execute(command, args, &reviera_core::Caller::user()) {
             Ok(o) => {
                 self.refresh_scene(&frame);
-                let what = if placing == Placing::Split {
+                let what = if let Placing::Accessory(k) = placing {
+                    format!("{} inserted; the pipe is split{}", k.label(), if o.result["flanges"].as_array().is_some_and(|f| !f.is_empty()) { ", with flanges" } else { "" })
+                } else if placing == Placing::Split {
                     if o.result["coupling"].is_null() { "Split".to_owned() } else { "Split with a coupling".to_owned() }
                 } else if o.result["split"].is_null() {
                     "Placed on the open end".to_owned()
@@ -482,6 +493,63 @@ impl Gui {
             }
             Err(e) => error(&frame, &e.message),
         }
+    }
+
+    /// Systems › Plumbing & Piping › Pipe Accessory (`PA`): the kind, then each click on a pipe
+    /// inserts one.
+    pub(crate) fn start_accessory_tool(&mut self) {
+        use reviera_core::mep_runs::AccessoryKind as K;
+        let frame = self.frame;
+        if !self.ensure_plan(false) {
+            return;
+        }
+        let Some(level) = self.active_view().and_then(|v| v.plan.as_ref()).map(|p| p.level) else { return };
+        let kinds = [K::GateValve, K::BallValve, K::ButterflyValve, K::GlobeValve, K::CheckValve, K::PressureReducingValve, K::ReliefValve, K::Strainer, K::WaterMeter];
+        let labels: Vec<&str> = kinds.iter().map(|k| k.label()).collect();
+        let d = SingleChoiceDialog::builder(&frame, "Insert:", "Pipe Accessory", &labels).build();
+        if d.show_modal() != ID_OK {
+            return;
+        }
+        let Some(kind) = usize::try_from(d.get_selection()).ok().and_then(|k| kinds.get(k)).copied() else { return };
+        self.end_tool(&frame);
+        self.run_tool = Some(RunTool {
+            domain: Domain::Pipe,
+            level,
+            type_id: None,
+            shape: mep::Shape::Round,
+            diameter: 0.0,
+            width: 0.0,
+            height: 0.0,
+            elevation: 0.0,
+            system_type: None,
+            slope: 0.0,
+            points: Vec::new(),
+            cursor: None,
+            bend_radius: None,
+            placing: Some(Placing::Accessory(kind)),
+        });
+        frame.set_status_text(&format!("Pipe Accessory: click on a pipe to insert a {}; flanged from 50 mm; Esc ends", kind.label().to_lowercase()), 0);
+    }
+
+    /// Change Tee to Cross on the selected tees.
+    pub(crate) fn tee_to_cross(&mut self) {
+        let frame = self.frame;
+        let Some(store) = self.store_now() else { return };
+        let tees: Vec<ElementId> = self
+            .selection()
+            .into_iter()
+            .filter(|i| store.get(*i).and_then(reviera_core::mep_runs::fitting_recipe).is_some_and(|f| f.part == reviera_core::mep_runs::Part::Tee))
+            .collect();
+        if tees.is_empty() {
+            return frame.set_status_text("Change Tee to Cross: select a tee", 0);
+        }
+        for t in &tees {
+            if let Err(e) = self.run("mep_fitting.tee_to_cross", json!({ "fitting_id": t })) {
+                return error(&frame, &e);
+            }
+        }
+        self.refresh_scene(&frame);
+        frame.set_status_text(&format!("{} tee(s) changed to crosses; the new legs are open", tees.len()), 0);
     }
 
     /// "+" and "−" on the selected fitting.

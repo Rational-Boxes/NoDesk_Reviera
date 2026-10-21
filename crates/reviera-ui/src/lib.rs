@@ -4533,6 +4533,15 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
             g.start_fitting_tool(reviera_core::mep::Domain::Conduit);
             focus(g);
         }),
+        "pipe_fitting.place" => with(gui, |g| {
+            g.start_fitting_tool(reviera_core::mep::Domain::Pipe);
+            focus(g);
+        }),
+        "pipe_accessory.place" => with(gui, |g| {
+            g.start_accessory_tool();
+            focus(g);
+        }),
+        "mep_fitting.tee_to_cross" => with(gui, Gui::tee_to_cross),
         "mep_fitting.upgrade" => with(gui, |g| g.fitting_grade(true)),
         "mep_fitting.downgrade" => with(gui, |g| g.fitting_grade(false)),
         "conduit.create_parallel" => with(gui, Gui::parallel_conduits),

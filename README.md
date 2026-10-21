@@ -933,13 +933,20 @@ schedules, circuit paths, cable sizing and voltage drop.
   Velocity, Friction, Pressure Drop, Network ID and Critical Path, and schedules can be filtered;
   flows and velocities go to the IFC ports (`mep_network.calculate`, `analytical_segment.list`,
   `analytical_segment.override`, `mep_settings.set_friction_equation`, `schedule.set_filters`).
+- **Pipe fittings and accessories** (Systems › HVAC & Piping › Pipe Fitting `PF`, Pipe Accessory
+  `PA`, Change Tee to Cross): elbows, tees, crosses, couplings and caps on pipe ends or along
+  pipes (elbows only on ends); gate, ball, butterfly, globe, check, pressure-reducing and relief
+  valves, strainers and water meters inserted in a pipe, splitting it, with flanges from the
+  routing preferences when flanged; tees changed to crosses. IFC `IfcValve`, `IfcFilter`,
+  `IfcFlowMeter`, flanges as `IfcPipeFitting` (`pipe_fitting.place`, `pipe_accessory.place`,
+  `mep_fitting.tee_to_cross`).
 - **Sloped piping and parallel pipes** (Systems › HVAC & Piping › Slope, Parallel Pipes): the
   Slope Editor gives a connected section of pipe one of the project's allowed slopes from a
   control point (the lowest end by default): fittings follow, branches stay connected (their
   slope recalculated), anything that cannot follow refuses it; Gradient written per segment.
   Parallel Pipes copies a level or sloped run into a bank across and up, concentric at bends,
   with the same size, type, system type and slope; offsets under the pipe's size and runs with
-  tees are refused (`mep_run.set_slope`, `mep_settings.set_slopes`, `pipe.create_parallel`).
+  tees or valves are refused (`mep_run.set_slope`, `mep_settings.set_slopes`, `pipe.create_parallel`).
 - **Mechanical control devices** (Systems › HVAC & Piping › Mechanical Control Device, Assign
   Controlled Element): thermostats, humidistats, sensors and controllers (starter types with a
   Controls connector) placed on the nearest wall face at a mounting height, following the wall,

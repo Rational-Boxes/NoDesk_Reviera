@@ -2232,6 +2232,26 @@ keys = "NF"
 help = "Place a conduit fitting or junction box, or split a conduit: on an open end, or along a conduit (splitting it)"
 
 [[action]]
+id = "pipe_fitting.place"
+label = "Pipe Fitting"
+icon = "pipe_fitting"
+keys = "PF"
+help = "Place a pipe elbow, tee, cross, coupling or cap on an open end, or a tee, cross or coupling along a pipe, splitting it (MEP-PIPE-004)"
+
+[[action]]
+id = "pipe_accessory.place"
+label = "Pipe Accessory"
+icon = "valve"
+keys = "PA"
+help = "Insert a valve, strainer or water meter in a pipe: it splits the pipe, takes its size and gets flanges from the routing preferences when flanged (MEP-PIPE-004)"
+
+[[action]]
+id = "mep_fitting.tee_to_cross"
+label = "Change Tee to Cross"
+icon = "tee_to_cross"
+help = "Give the selected tees a fourth, open leg of the run's size (MEP-PIPE-004)"
+
+[[action]]
 id = "pipe.create_parallel"
 label = "Parallel Pipes"
 icon = "parallel_pipes"
@@ -2816,6 +2836,9 @@ tools = [
   { action = "duct.cap_open_ends", size = "small" },
   { action = "mep_run.create_riser", size = "small" },
   { action = "mep_run.bind_riser", size = "small" },
+  { action = "pipe_fitting.place", size = "small" },
+  { action = "pipe_accessory.place", size = "small" },
+  { action = "mep_fitting.tee_to_cross", size = "small" },
   { action = "mep_run.set_slope", size = "small" },
   { action = "pipe.create_parallel", size = "small" },
   { action = "mech_control_device.place", size = "small" },

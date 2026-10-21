@@ -60,6 +60,19 @@ const PIPE_ELBOW: [(f64, f64); 3] = [(0.0, 0.0), (45.0, 0.4), (90.0, 0.75)];
 /// Tees, taps and crosses: (straight through, into the branch), ducts and pipes.
 const DUCT_JUNCTION: (f64, f64) = (0.2, 1.0);
 const PIPE_JUNCTION: (f64, f64) = (0.4, 1.5);
+/// An open isolating valve's coefficient (check and globe valves: see `valve_coefficient`).
+const VALVE: f64 = 0.2;
+
+/// A valve's coefficient by its kind.
+pub fn valve_coefficient(kind: Option<&str>) -> f64 {
+    match kind {
+        Some("check_valve") => 2.0,
+        Some("globe_valve") | Some("pressure_reducing_valve") => 6.0,
+        Some("butterfly_valve") => 0.5,
+        _ => VALVE,
+    }
+}
+
 /// A contraction's coefficient (of the outlet's velocity pressure).
 const CONTRACTION: f64 = 0.05;
 
@@ -113,7 +126,11 @@ pub fn coefficient(domain: Domain, part: Part, kin: &mep::Port, kout: &mep::Port
                 0.5 * (ao / ai - 1.0).powi(2)
             }
         }
-        Part::Cap | Part::Coupling | Part::Box => 0.0,
+        Part::Cap | Part::Coupling | Part::Box | Part::Flange => 0.0,
+        // Open gate or ball valve, meter, strainer (E-24); a valve's kind refines it.
+        Part::Valve => VALVE,
+        Part::Meter => 1.0,
+        Part::Strainer => 2.0,
     }
 }
 
@@ -405,7 +422,7 @@ pub fn compute(store: &Store, sys: &SystemInfo, equation: Equation) -> Result<Ne
             for (c, k) in &children {
                 let (Some(i), Some(o)) = (inlet, ports.iter().find(|p| p.index == *k)) else { continue };
                 let cq = q(*c);
-                let kk = ov.coefficient.unwrap_or_else(|| coefficient(fr.domain, fr.part, i, o));
+                let kk = ov.coefficient.unwrap_or_else(|| if fr.part == Part::Valve { valve_coefficient(fr.accessory.as_deref()) } else { coefficient(fr.domain, fr.part, i, o) });
                 let l = ov.loss.unwrap_or(kk * vp(cq, &size_of(&o.connector)));
                 leaving.insert((x, *c), (kk, l));
                 branches.push(Branch { to: *c, flow: cq, coefficient: kk, loss: l });

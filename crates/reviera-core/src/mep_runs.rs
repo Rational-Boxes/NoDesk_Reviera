@@ -156,11 +156,25 @@ pub enum Part {
     Coupling,
     /// A pull or junction box (conduit).
     Box,
+    /// Pipe accessories (MEP-PIPE-004): inline valves, meters and strainers, and flanges.
+    Valve,
+    Meter,
+    Strainer,
+    Flange,
 }
 
 impl Part {
+    /// Inline accessories, not fittings (IfcValve, IfcFlowMeter, IfcFilter).
+    pub fn is_accessory(self) -> bool {
+        matches!(self, Part::Valve | Part::Meter | Part::Strainer)
+    }
+
     pub fn label(self) -> &'static str {
         match self {
+            Part::Valve => "Valve",
+            Part::Meter => "Meter",
+            Part::Strainer => "Strainer",
+            Part::Flange => "Flange",
             Part::Elbow => "Elbow",
             Part::Tee => "Tee",
             Part::Tap => "Tap",
@@ -183,10 +197,15 @@ impl Part {
                 Part::Cap => ("USERDEFINED", Some("CAP")),
                 Part::Coupling => ("USERDEFINED", Some("COUPLING")),
                 Part::Box => ("POWER", None),
+                _ => ("NOTDEFINED", None),
             };
         }
         match self {
             Part::Coupling => ("CONNECTOR", None),
+            Part::Flange => ("CONNECTOR", Some("FLANGE")),
+            Part::Valve => ("ISOLATING", None),
+            Part::Meter => ("WATERMETER", None),
+            Part::Strainer => ("STRAINER", None),
             p => (p.ifc(), None),
         }
     }
@@ -198,8 +217,9 @@ impl Part {
             Part::Tee | Part::Tap | Part::Cross => "JUNCTION",
             Part::Transition => "TRANSITION",
             Part::Cap => "OBSTRUCTION",
-            Part::Coupling => "CONNECTOR",
+            Part::Coupling | Part::Flange => "CONNECTOR",
             Part::Box => "JUNCTION",
+            Part::Valve | Part::Meter | Part::Strainer => "NOTDEFINED",
         }
     }
 }
@@ -292,7 +312,7 @@ impl Routing {
             ("cross", &self.cross, &[Part::Cross][..]),
             ("transition", &self.transition, &[Part::Transition][..]),
             ("cap", &self.cap, &[Part::Cap][..]),
-            ("union", &self.union, &[Part::Coupling][..]),
+            ("union", &self.union, &[Part::Coupling, Part::Flange][..]),
         ] {
             for r in rows {
                 if !allowed.contains(&r.part) {
@@ -480,6 +500,9 @@ fn segment_class(domain: Domain) -> &'static str {
 fn fitting_class(domain: Domain, part: Part) -> &'static str {
     match (domain, part) {
         (_, Part::Box) => "IfcJunctionBox",
+        (_, Part::Valve) => "IfcValve",
+        (_, Part::Meter) => "IfcFlowMeter",
+        (_, Part::Strainer) => "IfcFilter",
         (Domain::Pipe, _) => "IfcPipeFitting",
         (Domain::CableTray | Domain::Conduit, _) => "IfcCableCarrierFitting",
         _ => "IfcDuctFitting",
@@ -538,6 +561,10 @@ fn default_routing(domain: Domain) -> Routing {
     let mut r = Routing::default();
     if domain == Domain::Conduit {
         r.union = vec![Row { part: Part::Coupling, min: 0.0, max: 0.0 }];
+    }
+    // Pipe: flanges at flanged accessories from DN 50 (E-26).
+    if domain == Domain::Pipe {
+        r.union = vec![Row { part: Part::Flange, min: 0.05, max: 0.0 }];
     }
     r
 }
@@ -786,6 +813,12 @@ pub struct FittingRecipe {
     /// A bend's radius (tray and conduit); none: mitred.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub radius: Option<f64>,
+    /// A valve's handle direction (square to the pipe).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub handle: Option<V3>,
+    /// An accessory's kind (`gate_valve`, `check_valve`, `strainer`, …).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub accessory: Option<String>,
 }
 
 pub fn segment_recipe(e: &Element) -> Option<SegmentRecipe> {
@@ -1046,6 +1079,13 @@ pub fn fitting_solids(f: &FittingRecipe) -> Vec<Solid> {
             let b = add(f.centre, mul(f.legs[1].direction, f.legs[1].length));
             loft(a, b, &f.legs[0].size, &f.legs[1].size, f.legs[1].across).into_iter().collect()
         }
+        Part::Flange if f.legs.len() == 2 => {
+            let grow = |s: Size| Size { diameter: s.diameter * 2.2, width: s.width * 1.6, height: s.height * 1.6, ..s };
+            let a = add(f.centre, mul(f.legs[0].direction, f.legs[0].length));
+            let b = add(f.centre, mul(f.legs[1].direction, f.legs[1].length));
+            loft(a, b, &grow(f.legs[0].size), &grow(f.legs[0].size), f.legs[0].across).into_iter().collect()
+        }
+        Part::Valve | Part::Meter | Part::Strainer if f.legs.len() == 2 => accessory_solids(f),
         Part::Cap if !f.legs.is_empty() => {
             let l = f.legs[0];
             let grow = |s: Size| Size { diameter: s.diameter * 1.08, width: s.width * 1.08, height: s.height * 1.08, ..s };
@@ -1065,6 +1105,40 @@ pub fn fitting_solids(f: &FittingRecipe) -> Vec<Solid> {
             })
             .collect(),
     }
+}
+
+/// An inline accessory's body: a valve's two cones meeting at its seat with a stem and
+/// handwheel, a meter's box, a strainer's body with its basket leg (Reviera's own simple shapes).
+fn accessory_solids(f: &FittingRecipe) -> Vec<Solid> {
+    let (l0, l1) = (f.legs[0], f.legs[1]);
+    let d = l0.size.nominal();
+    let a = add(f.centre, mul(l0.direction, l0.length));
+    let b = add(f.centre, mul(l1.direction, l1.length));
+    let round = |dia: f64| Size { shape: Shape::Round, diameter: dia, width: dia, height: dia };
+    let axis = l1.direction;
+    // The handle's direction: square to the pipe, up unless turned.
+    let up = f.handle.and_then(unit).unwrap_or_else(|| frame(axis).1);
+    let mut out = Vec::new();
+    match f.part {
+        Part::Valve => {
+            out.extend(loft(a, f.centre, &round(d * 1.3), &round(d * 0.7), None));
+            out.extend(loft(f.centre, b, &round(d * 0.7), &round(d * 1.3), None));
+            let top = add(f.centre, mul(up, d * 1.4));
+            out.extend(loft(f.centre, top, &round(d * 0.25), &round(d * 0.25), None));
+            out.extend(loft(top, add(top, mul(up, 0.015)), &round(d * 1.2), &round(d * 1.2), None));
+        }
+        Part::Meter => {
+            let r = Size { shape: Shape::Rectangular, diameter: 0.0, width: d * 1.8, height: d * 1.8 };
+            out.extend(loft(add(a, mul(axis, l0.length * 0.2)), add(b, mul(axis, -l1.length * 0.2)), &r, &r, Some(frame(axis).0)));
+            out.extend(loft(a, b, &round(d), &round(d), None));
+        }
+        _ => {
+            out.extend(loft(a, b, &round(d * 1.3), &round(d * 1.3), None));
+            let basket = unit(add(axis, mul(up, -1.0))).unwrap_or(up);
+            out.extend(loft(f.centre, add(f.centre, mul(basket, d * 1.6)), &round(d * 0.9), &round(d * 0.9), None));
+        }
+    }
+    out
 }
 
 /// Every segment and fitting (and gutter) with its solids.
@@ -1221,6 +1295,8 @@ fn make_fitting_r(txn: &mut Transaction<'_>, cx: &Ctx, part: Part, centre: V3, l
         level: cx.level.clone(),
         classification: cx.classification,
         radius,
+        handle: None,
+        accessory: None,
     };
     let (pre, object) = part.ifc_in(cx.domain);
     let mut e = NewElement::new(fitting_class(cx.domain, part))
@@ -1802,9 +1878,9 @@ pub(crate) fn reapply_type(txn: &mut Transaction<'_>, p: ReapplyParams) -> Resul
             Part::Cross => Role::Cross,
             Part::Transition => Role::Transition,
             Part::Cap => Role::Cap,
-            Part::Coupling => Role::Union,
-            // Boxes are placed by hand.
-            Part::Box => continue,
+            Part::Coupling | Part::Flange => Role::Union,
+            // Boxes and accessories are placed by hand.
+            Part::Box | Part::Valve | Part::Meter | Part::Strainer => continue,
         };
         // The routing of a segment it joins.
         let routing = (0..f.legs.len())
@@ -2017,6 +2093,9 @@ fn place_fitting(txn: &mut Transaction<'_>, domain: Domain, p: PlaceFittingParam
     if matches!(p.part, Part::Tap | Part::Transition) {
         return Err(bad("mep_fitting.part", "taps and transitions are placed by drawing runs"));
     }
+    if p.part.is_accessory() || p.part == Part::Flange {
+        return Err(bad("mep_fitting.part", "valves, meters, strainers and flanges are placed with pipe_accessory.place"));
+    }
     let point = match p.point.as_deref() {
         None => None,
         Some([x, y]) => Some([*x, *y, f64::NAN]),
@@ -2078,6 +2157,7 @@ fn place_fitting(txn: &mut Transaction<'_>, domain: Domain, p: PlaceFittingParam
                     let h = box_side(&size) / 2.0;
                     (h, vec![Leg { direction: mul(axis, -1.0), length: h, size, across: hs.across }, Leg { direction: axis, length: h, size, across: hs.across }])
                 }
+                Part::Elbow => return Err(bad("mep_fitting.elbow_along", "Elbows must be placed at an open end")),
                 _ => return Err(bad("mep_fitting.part", format!("a {} goes on an open end, not along a run", p.part.label().to_lowercase()))),
             };
             if p.part == Part::Box {
@@ -2108,6 +2188,20 @@ fn place_fitting(txn: &mut Transaction<'_>, domain: Domain, p: PlaceFittingParam
                     }
                     let th = theta.to_radians();
                     let out = unit(add(mul(d, th.cos()), mul(side, th.sin()))).expect("turned");
+                    // Ducts and pipes: a mitred elbow by the routing preferences.
+                    if !ty.radius_bends() {
+                        if cx.routing.choose(Role::Elbow, size.nominal()).is_none() {
+                            return Err(bad("mep_fitting.no_part", format!("no elbow in the routing preferences fits {}", size.text())));
+                        }
+                        let l = elbow_leg(&size, d, out, None);
+                        let c = add(port.position, mul(d, l));
+                        let legs = vec![Leg { direction: mul(d, -1.0), length: l, size, across: None }, Leg { direction: out, length: l, size, across: None }];
+                        let f = make_fitting(txn, &cx, Part::Elbow, c, legs)?;
+                        let mut made = vec![f, on];
+                        made.dedup();
+                        mep::connect_coincident(txn, &made)?;
+                        return Ok(PlaceReport { fitting: f, split: None });
+                    }
                     let r = p.bend_radius.unwrap_or_else(|| ty.bend_radius(&store, &size));
                     if domain == Domain::CableTray && r < size.width / 2.0 - 1e-9 {
                         return Err(bad("mep_run.bend_radius", format!("a bend radius of {:.0} mm is below half the tray's width", r * 1000.0)));
@@ -2159,6 +2253,194 @@ fn add_box_legs(legs: &mut Vec<Leg>, n: usize, axis: V3, side: V3, size: Size) -
 /// Places a cable tray fitting (`cable_tray_fitting.place`).
 pub(crate) fn place_tray_fitting(txn: &mut Transaction<'_>, p: PlaceFittingParams) -> Result<PlaceReport> {
     place_fitting(txn, Domain::CableTray, p)
+}
+
+/// Places a pipe fitting (`pipe_fitting.place`): on an open end (elbow, tee, cross, coupling,
+/// cap) or along a pipe (tee, cross, coupling), splitting it.
+pub(crate) fn place_pipe_fitting(txn: &mut Transaction<'_>, p: PlaceFittingParams) -> Result<PlaceReport> {
+    place_fitting(txn, Domain::Pipe, p)
+}
+
+/// The inline accessories Reviera makes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum AccessoryKind {
+    GateValve,
+    BallValve,
+    ButterflyValve,
+    GlobeValve,
+    CheckValve,
+    PressureReducingValve,
+    ReliefValve,
+    Strainer,
+    WaterMeter,
+}
+
+impl AccessoryKind {
+    fn part(self) -> Part {
+        match self {
+            AccessoryKind::Strainer => Part::Strainer,
+            AccessoryKind::WaterMeter => Part::Meter,
+            _ => Part::Valve,
+        }
+    }
+
+    pub fn label(self) -> &'static str {
+        match self {
+            AccessoryKind::GateValve => "Gate Valve",
+            AccessoryKind::BallValve => "Ball Valve",
+            AccessoryKind::ButterflyValve => "Butterfly Valve",
+            AccessoryKind::GlobeValve => "Globe Valve",
+            AccessoryKind::CheckValve => "Check Valve",
+            AccessoryKind::PressureReducingValve => "Pressure Reducing Valve",
+            AccessoryKind::ReliefValve => "Relief Valve",
+            AccessoryKind::Strainer => "Strainer",
+            AccessoryKind::WaterMeter => "Water Meter",
+        }
+    }
+
+    /// `IfcValveTypeEnum` (IFC4 has no gate or globe value: gate, ball and butterfly valves
+    /// isolate, a globe valve regulates), `IfcFlowMeterTypeEnum`, `IfcFilterTypeEnum`.
+    fn predefined(self) -> &'static str {
+        match self {
+            AccessoryKind::GateValve | AccessoryKind::BallValve | AccessoryKind::ButterflyValve => "ISOLATING",
+            AccessoryKind::GlobeValve => "REGULATING",
+            AccessoryKind::CheckValve => "CHECK",
+            AccessoryKind::PressureReducingValve => "PRESSUREREDUCING",
+            AccessoryKind::ReliefValve => "PRESSURERELIEF",
+            AccessoryKind::Strainer => "STRAINER",
+            AccessoryKind::WaterMeter => "WATERMETER",
+        }
+    }
+
+    fn key(self) -> String {
+        serde_json::to_value(self).ok().and_then(|v| v.as_str().map(str::to_owned)).unwrap_or_default()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum Connection {
+    Flanged,
+    Threaded,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct AccessoryParams {
+    pub kind: AccessoryKind,
+    /// The pipe it goes in; found from `point` when omitted.
+    pub pipe_id: Option<ElementRef>,
+    /// Where along it (`[x, y]` in plan or `[x, y, z]`); the pipe's middle when omitted.
+    pub point: Option<Vec<f64>>,
+    /// The handle turned about the pipe, degrees (90° steps; 0: up).
+    #[serde(default)]
+    pub rotation: f64,
+    /// Its ends; flanged from 50 mm, threaded below, by default.
+    pub connection: Option<Connection>,
+}
+
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+pub struct AccessoryReport {
+    pub accessory: ElementId,
+    pub flanges: Vec<ElementId>,
+    /// The pipe's new second half.
+    pub split: ElementId,
+}
+
+/// `pipe_accessory.place`: a valve, strainer or meter inserted in a pipe, which is split; a
+/// flanged accessory gets the routing preferences' union-role flange on each side.
+pub(crate) fn place_accessory(txn: &mut Transaction<'_>, p: AccessoryParams) -> Result<AccessoryReport> {
+    let store = txn.store().clone();
+    let host = p.pipe_id.as_ref().map(|r| store.resolve(r).ok_or_else(|| bad("element.not_found", "no such pipe"))).transpose()?;
+    let point = match p.point.as_deref() {
+        None => None,
+        Some([x, y]) => Some([*x, *y, f64::NAN]),
+        Some([x, y, z]) => Some([*x, *y, *z]),
+        Some(_) => return Err(bad("mep_fitting.point", "a point is [x, y] or [x, y, z]")),
+    };
+    // Along a pipe: an end is not a place for an inline accessory.
+    let target = match (host, point) {
+        (Some(h), None) => {
+            let hs = store.get(h).and_then(segment_recipe).filter(|s| s.domain == Domain::Pipe && s.corner.is_none()).ok_or_else(|| bad("pipe_accessory.where", format!("element {h} is not a straight pipe")))?;
+            let mid = mul(add(hs.start, hs.end), 0.5);
+            Target::Along(h, hs, mid)
+        }
+        _ => target_at(&store, Domain::Pipe, host, point)?,
+    };
+    let Target::Along(id, hs, q) = target else {
+        return Err(bad("pipe_accessory.where", "accessories go along a pipe, not on an open end"));
+    };
+    let (_, ty) = type_of_segment(&store, &hs).ok_or_else(|| bad("pipe_accessory.where", "the pipe has no type"))?;
+    let size = hs.size;
+    let d = size.nominal();
+    let axis = unit(sub(hs.end, hs.start)).expect("a segment");
+    let flanged = p.connection.unwrap_or(if d >= 0.05 - 1e-9 { Connection::Flanged } else { Connection::Threaded }) == Connection::Flanged;
+    let flange = flanged.then(|| ty.routing.choose(Role::Union, d)).flatten().filter(|part| *part == Part::Flange);
+    // The body's half length (face to face about three diameters) and the flanges' thickness.
+    let half = (d * 1.5).max(0.04);
+    let t = (d * 0.25).max(0.016);
+    let total = half + if flange.is_some() { t } else { 0.0 };
+    if len(sub(hs.end, hs.start)) < 2.0 * total + 0.02 {
+        return Err(bad("pipe_accessory.short", format!("the pipe is too short for a {}", p.kind.label().to_lowercase())));
+    }
+    let along = dot(sub(q, hs.start), axis);
+    let total_len = len(sub(hs.end, hs.start));
+    let q = add(hs.start, mul(axis, along.clamp(total + 0.01, total_len - total - 0.01)));
+    let cx = Ctx { domain: Domain::Pipe, predefined: ty.predefined(), type_guid: String::new(), routing: ty.routing.clone(), level: hs.level.clone(), classification: hs.classification };
+    let second = cut(txn, id, &hs, q, total)?;
+    let part = p.kind.part();
+    let acc = make_fitting(txn, &cx, part, q, vec![Leg { direction: mul(axis, -1.0), length: half, size, across: hs.across }, Leg { direction: axis, length: half, size, across: hs.across }])?;
+    // Its kind, name, predefined type and handle.
+    let up = frame(axis).1;
+    let w = frame(axis).0;
+    let turn = p.rotation.to_radians();
+    let handle = add(mul(up, turn.cos()), mul(w, turn.sin()));
+    let mut f = fitting_recipe(txn.store().get(acc).expect("made")).expect("a fitting");
+    f.accessory = Some(p.kind.key());
+    f.handle = Some(handle);
+    let v = serde_json::to_value(&f).expect("serialises");
+    let (label, pre) = (p.kind.label(), p.kind.predefined());
+    txn.modify(acc, |e| {
+        e.params.insert(RECIPE_KEY.into(), v);
+        e.params.insert("@PredefinedType".into(), pre.into());
+        e.name = Some(label.into());
+    })?;
+    let mut flanges = Vec::new();
+    if let Some(part) = flange {
+        for sgn in [-1.0, 1.0] {
+            let c = add(q, mul(axis, sgn * (half + t / 2.0)));
+            flanges.push(make_fitting(txn, &cx, part, c, vec![Leg { direction: mul(axis, -1.0), length: t / 2.0, size, across: hs.across }, Leg { direction: axis, length: t / 2.0, size, across: hs.across }])?);
+        }
+    }
+    let mut made = vec![acc, id, second];
+    made.extend(&flanges);
+    mep::connect_coincident(txn, &made)?;
+    Ok(AccessoryReport { accessory: acc, flanges, split: second })
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct TeeToCrossParams {
+    pub fitting_id: ElementRef,
+}
+
+/// `mep_fitting.tee_to_cross`: a tee gains a fourth leg opposite its branch, of the run's size,
+/// left open.
+pub(crate) fn tee_to_cross(txn: &mut Transaction<'_>, p: TeeToCrossParams) -> Result<()> {
+    let store = txn.store().clone();
+    let id = store.resolve(&p.fitting_id).ok_or_else(|| bad("element.not_found", "no such fitting"))?;
+    let mut f = store.get(id).and_then(fitting_recipe).filter(|f| f.part == Part::Tee && f.legs.len() == 3).ok_or_else(|| bad("mep_fitting.not_a_tee", format!("element {id} is not a tee")))?;
+    let (run, branch) = (f.legs[0], f.legs[2]);
+    f.legs.push(Leg { direction: mul(branch.direction, -1.0), length: branch.length, size: run.size, across: branch.across });
+    f.part = Part::Cross;
+    let v = serde_json::to_value(&f).expect("serialises");
+    let (pre, _) = Part::Cross.ifc_in(f.domain);
+    txn.modify(id, |e| {
+        e.params.insert(RECIPE_KEY.into(), v);
+        e.params.insert("@PredefinedType".into(), pre.into());
+        e.name = Some(Part::Cross.label().into());
+    })
 }
 
 /// Places a conduit fitting or box (`conduit_fitting.place`).
@@ -2375,6 +2657,10 @@ fn run_line(store: &Store, start: ElementId, domain: Domain) -> Result<(Vec<V3>,
     }
     for m in &members {
         let e = store.get(*m).expect("member");
+        if let Some(f) = fitting_recipe(e).filter(|f| f.part.is_accessory()) {
+            let name = e.name.clone().unwrap_or_else(|| f.part.label().to_owned());
+            return Err(bad("mep_run.parallel_accessory", format!("{name} {m} is in the run: parallel runs follow a run without valves, meters or strainers")));
+        }
         if let Some(f) = fitting_recipe(e).filter(|f| f.legs.len() > 2) {
             return Err(bad("mep_run.parallel_branches", format!("{} {m} branches the run: parallel runs follow a run without tees, crosses or taps", f.part.label())));
         }

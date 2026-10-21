@@ -135,6 +135,8 @@ pub fn toolset_of(command: &str) -> String {
             | "system_inspector"
             | "sizing_calculator"
             | "mech_control_device"
+            | "pipe_fitting"
+            | "pipe_accessory"
             | "mounting_part"
             | "cam_writer"
             | "beam_system"
