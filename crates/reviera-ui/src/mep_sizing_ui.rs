@@ -122,3 +122,80 @@ impl Gui {
         }
     }
 }
+
+const SELECT: i32 = 7301;
+const RULES: i32 = 7302;
+
+impl Gui {
+    /// Systems › Penetrations: where runs pass through walls, floors, ceilings and beams; the
+    /// rules.
+    pub(crate) fn penetrations(&mut self) {
+        let frame = self.frame;
+        loop {
+            let list = match self.run("mep.penetrations", json!({})) {
+                Ok(v) => v.as_array().cloned().unwrap_or_default(),
+                Err(e) => return error(&frame, &e),
+            };
+            let rows: Vec<Vec<String>> = list
+                .iter()
+                .map(|c| {
+                    let p = &c["point"];
+                    vec![
+                        c["run"].to_string(),
+                        c["size"].as_str().unwrap_or("").to_owned(),
+                        format!("{} {}", c["host_kind"].as_str().unwrap_or(""), c["host"]),
+                        match c["mode"].as_str() {
+                            Some("create") => "Opened".to_owned(),
+                            Some("flag") => "Flagged (not opened)".to_owned(),
+                            other => other.unwrap_or("").to_owned(),
+                        },
+                        format!("{:.2}, {:.2}, {:.2}", p[0].as_f64().unwrap_or(0.0), p[1].as_f64().unwrap_or(0.0), p[2].as_f64().unwrap_or(0.0)),
+                    ]
+                })
+                .collect();
+            let (code, at) = super::mep_loads_ui::list_dialog(
+                &frame,
+                "Penetrations",
+                "Openings are made where runs pass through walls, floors and ceilings, and follow them; crossings of beams are flagged for an engineer, not opened.",
+                &[("Run", 70), ("Size", 80), ("Host", 140), ("Treatment", 160), ("At (m)", 160)],
+                &rows,
+                &[(SELECT, "Select", "Select the run and its host"), (RULES, "Rules…", "Create, flag or never, and the clearance, per host")],
+                None,
+            );
+            match (code, at.and_then(|k| list.get(k))) {
+                (SELECT, Some(c)) => {
+                    let ids: Vec<reviera_core::ElementId> =
+                        [&c["run"], &c["host"]].iter().filter_map(|v| v.as_u64()).map(reviera_core::ElementId).collect();
+                    self.select_ids(&ids, super::select::Combine::Replace);
+                    return;
+                }
+                (RULES, _) => self.penetration_rules(),
+                (SELECT, None) => {}
+                _ => return,
+            }
+        }
+    }
+
+    fn penetration_rules(&mut self) {
+        let frame = self.frame;
+        let f = super::reinforcement_ui::Form::new(&frame, "Penetration Rules");
+        let modes = ["Create an opening".to_owned(), "Flag only".to_owned(), "Never".to_owned()];
+        let wall = f.choice("Walls", &modes, 0);
+        let floor = f.choice("Floors", &modes, 0);
+        let ceiling = f.choice("Ceilings", &modes, 0);
+        let clearance = f.text("Clearance (mm)", "25", "Around the run's section, for every host");
+        let ok = f.show("Beams are always flagged, not opened. Rules per system classification: mep.set_penetration_rule.", "OK");
+        let pick = |c: &Choice| ["create", "flag", "never"][c.get_selection().map_or(0, |k| k as usize).min(2)];
+        let (w, fl, ce, cl) = (pick(&wall), pick(&floor), pick(&ceiling), num(&clearance).map(|v| v / 1000.0));
+        f.dialog.destroy();
+        if !ok {
+            return;
+        }
+        for (host, mode) in [("wall", w), ("floor", fl), ("ceiling", ce)] {
+            if let Err(e) = self.run("mep.set_penetration_rule", json!({ "host_category": host, "mode": mode, "clearance": cl })) {
+                return error(&frame, &e);
+            }
+        }
+        self.refresh_scene(&frame);
+    }
+}

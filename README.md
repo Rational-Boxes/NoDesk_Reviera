@@ -901,6 +901,12 @@ schedules, circuit paths, cable sizing and voltage drop.
   physical conductor data (resistivity, areas) but no ampacities, which you enter under Manage ›
   MEP Settings › Wiring (`circuit.properties`, `circuit.size_cable`, `circuit.set_path`,
   `cable_type.create`, `conductor_size.create`, `conductor_ampacity.set`, `wiring.set`).
+- **Automatic penetrations** (MEP-PEN-001): where a duct, pipe, tray or conduit passes through a
+  wall, floor or ceiling, an opening (its section plus 25 mm clearance, round or rectangular) is
+  made, follows the run as it moves or resizes and goes with it; crossings of beams are flagged
+  for an engineer, not opened; rules per host and system (create, flag, never, clearance);
+  exported as `IfcOpeningElement`s voiding their hosts (`mep.penetrations`,
+  `mep.set_penetration_rule`; Systems › Check Systems › Penetrations).
 - **Duct and pipe sizing** (Analyze › Sizing): segments sized from the flow beyond them, walked
   from the system's equipment, by Equal Friction, Friction, Velocity or both, with height, width
   and diameter restrictions, branch rules and size locks; Darcy–Weisbach friction with Colebrook

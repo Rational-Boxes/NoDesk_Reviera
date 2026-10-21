@@ -17,6 +17,7 @@ Water 1. The tools are on the <b>Systems</b> tab.</p>
   <a href="#schedules">Panel schedules</a>
   <a href="#loads">Load classifications and demand factors</a>
   <a href="#sizing-ducts">Sizing ducts and pipes</a>
+  <a href="#penetrations">Openings for runs</a>
   <a href="#types">System types</a>
   <a href="#browser">System Browser</a>
   <a href="#checks">Checking systems</a>
@@ -193,6 +194,15 @@ with your code's fixture-unit table. Import it as a CSV of <code>fixture_units, 
 flow_valve</code> rows under Manage › MEP Settings › <a
 href="reviera:action/fixture_unit_method.set">Fixture-Unit Table</a>. Reviera does not yet ship a
 table. Without one, the connectors' own flows are added up and the report says so.</p>
+
+<h2 id="penetrations">Openings for runs</h2>
+<p>Where a duct, pipe, cable tray or conduit passes through a wall, floor or ceiling, Reviera opens
+the host around it automatically, 25 mm clear all round. If you move or resize the run, the
+opening follows; if you delete the run, the opening goes. Where a run passes through a beam, it
+is only flagged, because openings in structure need an engineer's approval. <a
+href="reviera:action/mep.penetrations">Penetrations</a> (Systems › Check Systems) lists every
+crossing. <b>Select</b> picks a run and its host, and <b>Rules…</b> chooses whether walls,
+floors and ceilings are opened, flagged or left alone, and sets the clearance.</p>
 
 <h2 id="types">System types</h2>
 <p>Every classification has a built-in type of its name with an abbreviation (SA, RA, DCW, …) and

@@ -171,6 +171,8 @@ pub fn cut_profiles(store: &Store, host: &Element, profiles: &[Profile]) -> Vec<
         .into_iter()
         .flat_map(|(_, r)| r.loops)
         .collect();
+    // MEP runs passing through (MEP-PEN-001).
+    loops.extend(crate::mep_penetrations::slab_loops(store, host.id()));
     if store.iter().any(|e| shaft_recipe(e).is_some())
         && let Ok(f) = crate::floors::regenerate(store, host)
     {

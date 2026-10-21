@@ -340,6 +340,9 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "panel_settings" => format!(
             r#"<rect x="4" y="4" width="12" height="24" fill="{f}" {s}/><path d="M7 9h6M7 14h6M7 19h6" {s}/><circle cx="24" cy="20" r="4" {sa}/><path d="M24 13v3M24 24v3M17 20h3M28 20h3" {sa}/>"#
         ),
+        "penetrations" => format!(
+            r#"<rect x="12" y="3" width="8" height="26" fill="{f}" {s}/><path d="M3 16h26" stroke-width="4" {sa}/><circle cx="16" cy="16" r="4.5" {s}/>"#
+        ),
         "mep_size" => format!(
             r#"<path d="M3 12h12v8H3zM15 13h8v6h-8z" fill="{f}" {s}/><path d="M26 6v20M23 9l3-3 3 3M23 23l3 3 3-3" {sa}/>"#
         ),

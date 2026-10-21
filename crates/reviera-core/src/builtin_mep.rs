@@ -141,6 +141,8 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(ConductorAmpacitySet),
         registry.add(WiringSet),
         registry.add(MepSize),
+        registry.add(MepPenetrations),
+        registry.add(MepSetPenetrationRule),
         registry.add(MepRunLockSize),
         registry.add(FixtureUnitMethodSet),
         registry.add(FixtureUnitMethodEvaluate),
@@ -1108,4 +1110,25 @@ read_command!(
     crate::mep_sizing::EvaluateFixtureParams,
     f64,
     crate::mep_sizing::evaluate_fixture
+);
+
+read_command!(
+    MepPenetrations,
+    "mep.penetrations",
+    "Where runs pass through walls, floors and beams",
+    "The crossings of ducts, pipes, cable tray and conduit (`run_ids`, or every run) with walls, floors, ceilings and beams (MEP-PEN-001): the run, host and its kind, the mode (create: an opening is made, following the run; flag: reported only, the default for framing), the point, clearance, size and the opening's outline (along and up a wall, or in plan for a slab).",
+    crate::mep_penetrations::PenetrationsParams,
+    Vec<crate::mep_penetrations::Crossing>,
+    crate::mep_penetrations::penetrations
+);
+
+edit_command!(
+    MepSetPenetrationRule,
+    "mep.set_penetration_rule",
+    "Set a penetration rule",
+    "Sets how runs through a `host_category` (wall, floor, ceiling, framing) are treated, for one `system` classification or every one (MEP-PEN-001): `mode` create (an opening, the default for walls, floors and ceilings), flag (reported only; the only choice for framing) or never, and the `clearance` around the run (25 mm by default).",
+    "Penetration Rule",
+    crate::mep_penetrations::RuleParams,
+    (),
+    crate::mep_penetrations::set_rule
 );

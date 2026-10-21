@@ -19035,9 +19035,11 @@ Allowed values come from Mechanical Settings › Slopes. Fabrication pipework ca
 
 **Commands.** `mep.penetrations(run_ids?) -> [crossing]`, `mep.set_penetration_rule(host_category, system?, mode: create|flag|never, clearance?, sleeve_type?) -> ()`.
 
+*Built (2026-10-20):* penetrations are derived, found afresh whenever bodies are built or the model is saved, so openings follow, resize and go with their runs. Each straight duct, pipe, tray or conduit segment's axis is met with straight walls' centre planes (within length and height), floors' and ceilings' mid-planes (inside their outline) and beams' bodies (by bounding box). A wall opening is the run's section plus the clearance projected along the run onto the wall (round, rectangular, or a longer convex outline for a slanted run), cut through the wall in Reviera's display; a slab opening is the section projected onto plan, cut plumb; in IFC each is an `IfcOpeningElement` (OPENING, named *Penetration*) voiding its host, swept along the run through the host and kept as the same entity while the run moves, removed when the run no longer passes through. Rules (`mep.set_penetration_rule(host_category wall | floor | ceiling | framing, system?, mode, clearance?)`): create for walls, floors and ceilings, flag for framing (create is refused for framing), never; clearance 25 mm. `mep.penetrations(run_ids?)` lists every crossing; Systems › Check Systems › **Penetrations** shows them with Select and Rules…. Not yet: sleeves, fire-seal annotations, roofs and curved walls, provisions for voids in linked models (BCF), per-system-type clearance defaults.
+
 **Acceptance criteria.**
-- [ ] A 100 mm pipe through a 200 mm wall gets a 150 mm round opening (25 mm clearance) through the wall, which follows the pipe when it moves 500 mm along the wall.
-- [ ] A duct through a beam is flagged and not opened under the default rules.
+- [x] A 100 mm pipe through a 200 mm wall gets a 150 mm round opening (25 mm clearance) through the wall, which follows the pipe when it moves 500 mm along the wall.
+- [x] A duct through a beam is flagged and not opened under the default rules.
 
 ## 4.9 Electrical
 

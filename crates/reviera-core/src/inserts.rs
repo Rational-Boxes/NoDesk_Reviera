@@ -1173,6 +1173,10 @@ pub fn cuts_by_host(store: &Store) -> std::collections::BTreeMap<ElementId, Vec<
             .or_default()
             .extend(cuts.into_iter().map(|(_, c)| c));
     }
+    // MEP runs passing through (MEP-PEN-001).
+    for (host, cut) in crate::mep_penetrations::wall_cuts(store) {
+        out.entry(host).or_default().push(cut);
+    }
     // Walls joined by Join Geometry are cut by each other's openings (ARC-WALL-015).
     for (wall, cut) in walls::linings::joined_cuts(store, &out.clone()) {
         out.entry(wall).or_default().push(cut);

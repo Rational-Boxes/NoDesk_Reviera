@@ -18,7 +18,7 @@ const DELETE: i32 = 7203;
 const FACTORS: i32 = 7204;
 
 /// A list in a dialog with buttons that close it: which one, and the selected row.
-fn list_dialog(frame: &Frame, title: &str, intro: &str, columns: &[(&str, i32)], rows: &[Vec<String>], buttons: &[(i32, &str, &str)], selected: Option<usize>) -> (i32, Option<usize>) {
+pub(crate) fn list_dialog(frame: &Frame, title: &str, intro: &str, columns: &[(&str, i32)], rows: &[Vec<String>], buttons: &[(i32, &str, &str)], selected: Option<usize>) -> (i32, Option<usize>) {
     let dialog = Dialog::builder(frame, title).with_style(DialogStyle::DefaultDialogStyle | DialogStyle::ResizeBorder).build();
     let text = StaticText::builder(&dialog).with_label(intro).build();
     text.wrap(560);

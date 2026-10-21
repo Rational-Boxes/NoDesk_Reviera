@@ -1399,7 +1399,13 @@ impl LocalProject {
             }
         }
         let shafts = reviera_core::slab_openings::shafts(store);
-        if shafts.is_empty() && derived.is_empty() {
+        // MEP runs through walls, floors and ceilings (MEP-PEN-001).
+        let penetrations: Vec<reviera_core::mep_penetrations::Crossing> =
+            reviera_core::mep_penetrations::crossings(store, None)
+                .into_iter()
+                .filter(|c| c.mode == reviera_core::mep_penetrations::Mode::Create)
+                .collect();
+        if shafts.is_empty() && derived.is_empty() && penetrations.is_empty() {
             return Ok(());
         }
         let contexts = geometry::Contexts::find(&self.ifc)?;
@@ -1474,7 +1480,47 @@ impl LocalProject {
                 )?;
             }
         }
-        // Openings of shafts that are gone, or of hosts they no longer cut.
+        for c in &penetrations {
+            let (Some(&host_step), Some(solid)) = (
+                self.steps.get(&c.host),
+                reviera_core::mep_penetrations::opening_solid(c),
+            ) else {
+                continue;
+            };
+            let (run, host) = (store.get(c.run), store.get(c.host));
+            let (Some(run), Some(host)) = (run, host) else {
+                continue;
+            };
+            let tag = format!("{DERIVED_OPENING} penetration {} {}", run.guid(), host.guid());
+            let opening = match derived.remove(&tag) {
+                Some(o) => o,
+                None => {
+                    let o = self.ifc.create_rooted("IfcOpeningElement", &GlobalId::new())?;
+                    self.ifc.set_attribute(o, "Name", &AttrValue::String("Penetration".into()))?;
+                    self.ifc.set_attribute(o, "Description", &AttrValue::String(tag))?;
+                    if let Some(h) = owner_history {
+                        self.ifc.set_attribute(o, "OwnerHistory", &AttrValue::Ref(h.0))?;
+                    }
+                    if ifc4 {
+                        self.ifc.set_attribute(o, "PredefinedType", &AttrValue::Enum("OPENING".into()))?;
+                    }
+                    geometry::relate_one(
+                        &mut self.ifc,
+                        "IfcRelVoidsElement",
+                        "RelatingBuildingElement",
+                        host_step,
+                        "RelatedOpeningElement",
+                        o,
+                        owner_history,
+                    )?;
+                    o
+                }
+            };
+            let poly = geometry::Polyhedron { points: solid.points, faces: solid.faces };
+            geometry::write_breps(&mut self.ifc, opening, geometry::BrepFrame::WORLD, &[poly], self.length_scale, contexts)?;
+        }
+        // Openings of shafts that are gone, or of hosts they no longer cut, and of runs that no
+        // longer pass through.
         for (_, o) in derived {
             for rel in self.ifc.referenced_by(o, "IfcRelVoidsElement")? {
                 self.ifc.remove(rel)?;

@@ -92,6 +92,8 @@ pub struct MepSettings {
     pub system_types: Vec<SystemType>,
     /// Fixture-unit tables (MEP-PIPE-005); the first is the default.
     pub fixture_unit_tables: Vec<crate::mep_sizing::FixtureTable>,
+    /// Penetration rules (MEP-PEN-001) the user set; defaults otherwise.
+    pub penetration_rules: Vec<crate::mep_penetrations::Rule>,
 }
 
 fn slug(c: Classification) -> String {

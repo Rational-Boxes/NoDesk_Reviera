@@ -4528,6 +4528,7 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "panel.set_supply" => with(gui, Gui::select_supply),
         "circuit.properties" => with(gui, Gui::circuit_properties),
         "mep.size" => with(gui, Gui::size_runs),
+        "mep.penetrations" => with(gui, Gui::penetrations),
         "fixture_unit_method.set" => with(gui, Gui::import_fixture_table),
         "wiring.settings" => with(gui, Gui::wiring_settings),
         "panel.hierarchy" => with(gui, Gui::panel_hierarchy),

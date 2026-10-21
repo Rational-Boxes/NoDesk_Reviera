@@ -2360,6 +2360,12 @@ icon = "system_disconnect"
 help = "Take a circuit off its panel; it keeps its devices and loses its number"
 
 [[action]]
+id = "mep.penetrations"
+label = "Penetrations"
+icon = "penetrations"
+help = "Openings where ducts, pipes, tray and conduit pass through walls, floors and ceilings (made automatically and following the runs), crossings of beams flagged, and the rules (MEP-PEN-001)"
+
+[[action]]
 id = "mep.size"
 label = "Duct/Pipe Sizing"
 icon = "mep_size"
@@ -2767,6 +2773,7 @@ tools = [
   { action = "mep_check.pipe", size = "small" },
   { action = "mep_check.circuits", size = "small" },
   { action = "mep_check.show_disconnects", size = "small" },
+  { action = "mep.penetrations", size = "small" },
 ]
 
 [[tab.panel]]
