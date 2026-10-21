@@ -175,6 +175,7 @@ fn a_floor_plan_shows_cut_walls_dark_on_white() {
         cut: Some(0.5),
         projection: 0.18,
         opacity: 1.0,
+        above: reviera_core::categories::AboveCut::Hide,
     };
     let plan = reviera_render::plan::plan_graphics(
         &scene,

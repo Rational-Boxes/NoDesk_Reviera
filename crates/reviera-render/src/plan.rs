@@ -36,6 +36,8 @@ pub struct Weights {
     pub cut: Option<f32>,
     pub projection: f32,
     pub opacity: f32,
+    /// How it is drawn above the cut plane (DOC-VR-002).
+    pub above: reviera_core::categories::AboveCut,
 }
 
 /// A colour faded toward white paper by `opacity` (1 leaves it as it is).
@@ -383,6 +385,55 @@ pub fn plan_graphics(
     }
 }
 
+/// The edges of elements shown above the cut (between `cut` and `top`): in projection, or
+/// dashed for overhead (DOC-VR-002 step 5). Floor plans only.
+pub fn above_cut_lines(
+    edges: &[Edge],
+    cut: f32,
+    top: f32,
+    scale: f32,
+    weights: &dyn Fn(Option<reviera_core::ElementId>) -> Weights,
+) -> Vec<Lines> {
+    use reviera_core::categories::AboveCut;
+    let mut groups: Vec<Lines> = Vec::new();
+    if top <= cut {
+        return groups;
+    }
+    // Dashes of 3 mm on paper, with 1.5 mm gaps.
+    let (dash, gap) = (0.003 * scale, 0.0015 * scale);
+    for (element, segment) in edges {
+        let w = weights(*element);
+        if w.above == AboveCut::Hide {
+            continue;
+        }
+        // Drawn just above the cut, so it is not lost under the poché.
+        let flat = |p: [f32; 3]| [p[0], p[1], cut + 0.002];
+        for s in clip_segments(&[*segment], cut, top) {
+            let color = fade(PROJECTION_LINE, w.opacity);
+            let mut pieces = Vec::new();
+            if w.above == AboveCut::Overhead {
+                let (a, b) = (flat(s[0]), flat(s[1]));
+                let d = [b[0] - a[0], b[1] - a[1]];
+                let l = (d[0] * d[0] + d[1] * d[1]).sqrt();
+                let mut t = 0.0;
+                while t < l {
+                    let e = (t + dash).min(l);
+                    let at = |u: f32| [a[0] + d[0] * u / l, a[1] + d[1] * u / l, a[2]];
+                    pieces.push([at(t), at(e)]);
+                    t = e + gap;
+                }
+            } else {
+                pieces.push([flat(s[0]), flat(s[1])]);
+            }
+            match groups.iter_mut().find(|g| g.color == color && g.width == w.projection) {
+                Some(g) => g.segments.extend(pieces),
+                None => groups.push(Lines { color, width: w.projection, segments: pieces }),
+            }
+        }
+    }
+    groups
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -391,6 +442,7 @@ mod tests {
         cut: Some(0.5),
         projection: 0.18,
         opacity: 1.0,
+        above: reviera_core::categories::AboveCut::Hide,
     };
 
     /// A closed box as a mesh (8 corners, 12 triangles).
@@ -531,5 +583,26 @@ mod tests {
         let inner = vec![[1.0, 1.0], [3.0, 1.0], [3.0, 3.0], [1.0, 3.0]];
         let m = fill(&[outer, inner], 0.0, None);
         assert!((filled_area(&m) - 12.0).abs() < 1e-4);
+    }
+
+    #[test]
+    fn services_above_the_cut_show_in_projection_or_dashed() {
+        use reviera_core::categories::AboveCut;
+        let duct = Some(reviera_core::ElementId(1));
+        let shelf = Some(reviera_core::ElementId(2));
+        let edges: Vec<Edge> = vec![(duct, [[0.0, 0.0, 2.7], [4.0, 0.0, 2.7]]), (shelf, [[0.0, 1.0, 2.0], [4.0, 1.0, 2.0]]), (duct, [[0.0, 0.0, 3.5], [4.0, 0.0, 3.5]])];
+        let by = |above: AboveCut| {
+            move |e: Option<reviera_core::ElementId>| Weights { above: if e == duct { above } else { AboveCut::Hide }, ..WEIGHTS(e) }
+        };
+        // Projection: the duct's edge between the cut (1.2) and the top (3.0) is drawn whole;
+        // the hidden shelf and the edge above the top are not.
+        let lines = above_cut_lines(&edges, 1.2, 3.0, 100.0, &by(AboveCut::Projection));
+        let segs: Vec<_> = lines.iter().flat_map(|l| l.segments.iter()).collect();
+        assert_eq!(segs.len(), 1);
+        assert!((segs[0][1][0] - 4.0).abs() < 1e-6 && (segs[0][0][2] - 1.202).abs() < 1e-6);
+        // Overhead: dashes of 0.3 m with 0.15 m gaps at 1:100.
+        let lines = above_cut_lines(&edges, 1.2, 3.0, 100.0, &by(AboveCut::Overhead));
+        assert_eq!(lines.iter().map(|l| l.segments.len()).sum::<usize>(), 9);
+        assert!(above_cut_lines(&edges, 1.2, 3.0, 100.0, &by(AboveCut::Hide)).is_empty());
     }
 }

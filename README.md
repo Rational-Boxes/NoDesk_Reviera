@@ -890,7 +890,8 @@ schedules, circuit paths, cable sizing and voltage drop.
   with the same or concentric bends. Exported as `IfcCableCarrierSegment`/`…Fitting` and
   `IfcJunctionBox` with CABLECARRIER ports (`cable_tray.*`, `conduit.*`,
   `cable_tray_fitting.place`, `conduit_fitting.place`, `mep_fitting.upgrade/downgrade`,
-  `conduit_standard.create`).
+  `conduit_standard.create`). Floor plans draw ducts, pipes, tray, conduit and their fittings
+  above the cut plane in projection, up to the view's top (DOC-VR-002).
 - **Cable sizing and voltage drop** (Systems › Electrical › Circuit Properties): each circuit's
   apparent load, power factor, design current, phases and path (Farthest Device, All Devices or
   custom nodes, orthogonal with a path offset, drawn dashed when selected), and its cable: the
@@ -1256,7 +1257,7 @@ area by area (reviewed against the spec on 2026-10-15).
   beams, placing braces in elevations, the connection library's packages and its other
   connection groups, composite decks and span symbols, truss families (a layout shared by types),
   further rebar (two-point, varying sets beyond bars through walls, bent fabric), bilinear and two-way area loads, panel results and external analysis providers.
-- **MEP** (in development): duct and pipe fittings placed and edited in the view, the fitting controls and grips, MEP runs above the cut plane shown in plans, surface connectors for conduit, moving runs, flex duct,
+- **MEP** (in development): duct and pipe fittings placed and edited in the view, the fitting controls and grips, surface connectors for conduit, moving runs, flex duct,
   wires, panel schedule templates and editing (moves, spares, rebalancing), the two-column layout, custom circuit naming, switch systems, the Edit Path tool, duct and pipe sizing
   and calculations, the System Browser's
   zones, columns and search, the System Editor, placing connectors on faces in a component editor, fabrication, P&ID and spaces

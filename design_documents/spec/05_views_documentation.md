@@ -269,6 +269,8 @@ These principles apply to every requirement in this chapter.
 
 **Commands.** `category.set_view_range_behaviour(category, cuttable?, above_cut?: hide|projection|overhead, floor_like?) -> ()`; `settings.set_floor_tolerance(length) -> ()`; `view.classify_element(view_id, element_id) -> zone_report` (query; returns which zones and styles apply, for debugging and for AI agents).
 
+*Built (2026-10-20), the Upper zone for services:* an element's above-cut behaviour (`Hide`, `Projection`, `Overhead`) is Projection for ducts, pipes, cable tray, conduit, their fittings, junction boxes and air terminals and Hide for the rest, built in until the category catalogue carries it; floor plans (on screen and printed) draw those elements' edges between the cut plane and the top in projection, overhead ones dashed (3 mm dashes, 1.5 mm gaps on paper). Not yet: `category.set_view_range_behaviour`, the defaults for windows, casework and generic models (Projection) and ceilings and upper cabinets (Overhead), hidden-line removal of the Upper zone, `view.classify_element`.
+
 **Acceptance criteria.**
 - [ ] A 3000 mm wall from the level, viewed with C = 1200 mm, is drawn as cut poché with cut lines; a 900 mm high wall is drawn in projection.
 - [ ] A window whose head is above C but whose sill is below it shows cut frame lines; a high window entirely above C (but below T) shows in projection; an upper wall cabinet shows dashed `<Overhead>` lines.

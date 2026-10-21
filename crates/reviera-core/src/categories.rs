@@ -463,6 +463,30 @@ fn text<'a>(e: &'a Element, key: &str) -> Option<&'a str> {
 }
 
 /// The category of an element (occurrence or type), inferred from its IFC class and attributes.
+/// How a plan draws an element that lies above its cut plane, below its top (DOC-VR-002 step 5).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AboveCut {
+    /// Not drawn.
+    #[default]
+    Hide,
+    /// Drawn as if below the cut.
+    Projection,
+    /// Drawn dashed, with the overhead line style.
+    Overhead,
+}
+
+/// An element's above-cut behaviour: projection for ducts, pipes, cable tray, conduit, their
+/// fittings and air terminals, so services at ceiling height show in plans; hidden otherwise.
+pub fn above_cut(e: &Element) -> AboveCut {
+    if crate::mep_runs::is_run_element(e)
+        || matches!(e.class.as_str(), "IfcAirTerminal" | "IfcJunctionBox" | "IfcDuctFitting" | "IfcPipeFitting" | "IfcCableCarrierFitting")
+    {
+        return AboveCut::Projection;
+    }
+    AboveCut::Hide
+}
+
 pub fn category_of(e: &Element) -> Option<&'static Category> {
     if crate::grids::is_grid(e) || crate::grids::is_grid_type(e) {
         return category("cat.grids");

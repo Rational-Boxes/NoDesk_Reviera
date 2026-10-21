@@ -93,10 +93,14 @@ impl App {
                 projection: projection as f32,
                 // Printed and exported drawings never show temporary state.
                 opacity: 1.0,
+                above: element
+                    .and_then(|e| store.get(e))
+                    .map(reviera_core::categories::above_cut)
+                    .unwrap_or_default(),
             }
         };
         let edges = feature_edges(scene);
-        let graphics = plan_graphics(
+        let mut graphics = plan_graphics(
             scene,
             &edges,
             range.cut as f32,
@@ -104,6 +108,15 @@ impl App {
             scale as f32,
             &weights,
         );
+        if !ceiling {
+            graphics.lines.extend(reviera_render::plan::above_cut_lines(
+                &edges,
+                range.cut as f32,
+                range.top.min(1e6) as f32,
+                scale as f32,
+                &weights,
+            ));
+        }
         // Dimensions: annotation pen 1, values in project units.
         let settings = units::settings_of(store);
         let mut lines = Lines {
@@ -287,6 +300,7 @@ pub fn section_parts(
             cut: cut.map(|w| w as f32),
             projection: projection as f32,
             opacity: 1.0,
+            above: reviera_core::categories::AboveCut::Hide,
         }
     };
     let edges = feature_edges(&local);

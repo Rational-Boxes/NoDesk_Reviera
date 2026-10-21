@@ -100,6 +100,7 @@ fn a_round_room_of_curved_walls() {
                 cut: Some(0.5),
                 projection: 0.25,
                 opacity: 1.0,
+                above: reviera_core::categories::AboveCut::Hide,
             }
         });
         let walls = [north, south];

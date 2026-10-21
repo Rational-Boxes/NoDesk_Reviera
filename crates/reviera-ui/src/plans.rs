@@ -230,10 +230,21 @@ impl Gui {
                 projection: projection as f32,
                 // Temporarily translucent (or ghosted) elements fade toward the paper.
                 opacity: visibility.opacity(element).unwrap_or(1.0),
+                above: element
+                    .and_then(|e| store.get(e))
+                    .map(reviera_core::categories::above_cut)
+                    .unwrap_or_default(),
             }
         };
         let mut graphics =
             reviera_render::plan::plan_graphics(scene, &edges, cut, bottom, scale, &weights);
+        // Services and the like above the cut, below the top (DOC-VR-002).
+        if !plan.ceiling {
+            let top = plan.range.top.min(1e6) as f32;
+            graphics.lines.extend(reviera_render::plan::above_cut_lines(
+                &edges, cut, top, scale, &weights,
+            ));
+        }
         let cut_edges = Rc::new(std::mem::take(&mut graphics.cut_edges));
         graphics.lines.extend(self.annotation_lines(index));
         graphics.lines.extend(self.note_lines(index));
