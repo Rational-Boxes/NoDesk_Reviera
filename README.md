@@ -933,6 +933,13 @@ schedules, circuit paths, cable sizing and voltage drop.
   Velocity, Friction, Pressure Drop, Network ID and Critical Path, and schedules can be filtered;
   flows and velocities go to the IFC ports (`mep_network.calculate`, `analytical_segment.list`,
   `analytical_segment.override`, `mep_settings.set_friction_equation`, `schedule.set_filters`).
+- **Sloped piping and parallel pipes** (Systems › HVAC & Piping › Slope, Parallel Pipes): the
+  Slope Editor gives a connected section of pipe one of the project's allowed slopes from a
+  control point (the lowest end by default): fittings follow, branches stay connected (their
+  slope recalculated), anything that cannot follow refuses it; Gradient written per segment.
+  Parallel Pipes copies a level or sloped run into a bank across and up, concentric at bends,
+  with the same size, type, system type and slope; offsets under the pipe's size and runs with
+  tees are refused (`mep_run.set_slope`, `mep_settings.set_slopes`, `pipe.create_parallel`).
 - **Mechanical control devices** (Systems › HVAC & Piping › Mechanical Control Device, Assign
   Controlled Element): thermostats, humidistats, sensors and controllers (starter types with a
   Controls connector) placed on the nearest wall face at a mounting height, following the wall,

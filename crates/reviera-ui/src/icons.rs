@@ -364,6 +364,12 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "assign_control" => format!(
             r#"<rect x="3" y="8" width="8" height="12" rx="2" fill="{f}" {s}/><rect x="19" y="10" width="10" height="10" fill="{f}" {s}/><path d="M11 14h8M16 11l3 3-3 3" fill="none" {sa}/>"#
         ),
+        "pipe_slope" => format!(
+            r#"<path d="M3 12l26 8" stroke-width="5" {s}/><path d="M3 12l26 8" stroke-width="3" stroke="{f}"/><path d="M6 26h20M26 26v-6" fill="none" {sa}/>"#
+        ),
+        "parallel_pipes" => format!(
+            r#"<path d="M3 8h18a6 6 0 0 1 6 6v15M3 16h14a4 4 0 0 1 4 4v9M3 24h10v5" fill="none" stroke-width="3" {sa}/>"#
+        ),
         "riser" => format!(
             r#"<path d="M3 24h12a4 4 0 0 0 4-4V6" fill="none" stroke-width="5" {s}/><path d="M3 24h12a4 4 0 0 0 4-4V6" fill="none" stroke-width="3" stroke="{f}"/><path d="M15 9l4-5 4 5" fill="none" {sa}/><path d="M24 4h6" {sa}/>"#
         ),

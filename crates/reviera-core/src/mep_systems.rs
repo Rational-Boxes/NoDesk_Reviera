@@ -98,6 +98,8 @@ pub struct MepSettings {
     pub friction_equation: crate::mep_sizing::Equation,
     /// Pressure loss report presets (MEP-CALC-004).
     pub report_presets: Vec<crate::mep_network::ReportPreset>,
+    /// Allowed pipe slopes, rise over run (MEP-PIPE-002); Reviera's defaults when empty.
+    pub slopes: Vec<f64>,
 }
 
 fn slug(c: Classification) -> String {

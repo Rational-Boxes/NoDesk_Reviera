@@ -16,6 +16,7 @@ Water 1. The tools are on the <b>Systems</b> tab.</p>
   <a href="#sizing">Cable sizing and voltage drop</a>
   <a href="#schedules">Panel schedules</a>
   <a href="#loads">Load classifications and demand factors</a>
+  <a href="#slopes">Sloped pipes and parallel pipes</a>
   <a href="#controls">Thermostats, sensors and controllers</a>
   <a href="#risers">Risers</a>
   <a href="#sizing-ducts">Sizing ducts and pipes</a>
@@ -183,6 +184,18 @@ as <code>from-to: percent</code>, separated by semicolons, for example
 of the load that falls in it, so 25 kVA becomes 10 + 7.5 = 17.5 kVA. Without it, the whole load
 takes the percentage of its range. The <b>largest motor rule</b> weights motor loads, largest
 first (for example 125, 100, 75).</p>
+
+<h2 id="slopes">Sloped pipes and parallel pipes</h2>
+<p>To give drainage a fall, select the pipes and fittings of a run and choose <a
+href="reviera:action/mep_run.set_slope">Slope</a> (Systems › HVAC &amp; Piping). Pick one of the
+project's allowed slopes and which end stays put: the lowest end, or the other one. The pipe rises
+away from that end. Fittings move with it, and branches joined to the run stay connected, with
+their own slope adjusted. If something joined to the run can't move with it, such as a fixture,
+the slope isn't changed, that element is selected, and Reviera tells you why.</p>
+<p><a href="reviera:action/pipe.create_parallel">Parallel Pipes</a> copies the selected pipe's whole
+run into a bank: say how many pipes across and how many rows up, and how far apart (centre to
+centre, at least the pipe's size). The copies stay parallel round bends and keep the same size,
+type and slope. They join a system only once they are connected to its equipment.</p>
 
 <h2 id="controls">Thermostats, sensors and controllers</h2>
 <p><a href="reviera:action/mech_control_device.place">Mechanical Control Device</a> (Systems ›

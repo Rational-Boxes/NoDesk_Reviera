@@ -2375,8 +2375,11 @@ fn run_line(store: &Store, start: ElementId, domain: Domain) -> Result<(Vec<V3>,
     }
     for m in &members {
         let e = store.get(*m).expect("member");
-        if fitting_recipe(e).is_some_and(|f| f.legs.len() > 2) || segment_recipe(e).is_some_and(|s| !s.taps.is_empty()) {
-            return Err(bad("conduit.parallel_branches", "parallel conduits follow a run without branches"));
+        if let Some(f) = fitting_recipe(e).filter(|f| f.legs.len() > 2) {
+            return Err(bad("mep_run.parallel_branches", format!("{} {m} branches the run: parallel runs follow a run without tees, crosses or taps", f.part.label())));
+        }
+        if segment_recipe(e).is_some_and(|s| !s.taps.is_empty()) {
+            return Err(bad("mep_run.parallel_branches", format!("segment {m} has a tap: parallel runs follow a run without tees, crosses or taps")));
         }
     }
     let linked = |x: ElementId, k: usize| partners.get(&(x, k)).into_iter().flatten().find(|(o, _)| members.contains(o)).copied();
@@ -2428,29 +2431,66 @@ fn run_line(store: &Store, start: ElementId, domain: Domain) -> Result<(Vec<V3>,
 /// Parallel conduits (`conduit.create_parallel`): copies of a run offset across and up, bent
 /// at the same radius or concentrically. Returns every element made.
 pub(crate) fn create_parallel(txn: &mut Transaction<'_>, p: ParallelParams) -> Result<Vec<ElementId>> {
+    parallel(txn, p, Domain::Conduit)
+}
+
+/// Parallel pipes (`pipe.create_parallel`, MEP-PIPE-003): copies of a level or sloped pipe run
+/// offset across and up, with elbows by its type's routing preferences, the same size, type,
+/// system type and slope; 1–20 each way, offsets at least the pipe's outside size.
+pub(crate) fn create_parallel_pipes(txn: &mut Transaction<'_>, p: ParallelParams) -> Result<Vec<ElementId>> {
+    parallel(txn, p, Domain::Pipe)
+}
+
+fn parallel(txn: &mut Transaction<'_>, p: ParallelParams, domain: Domain) -> Result<Vec<ElementId>> {
     let store = txn.store().clone();
-    if p.h_count == 0 || p.v_count == 0 || p.h_count * p.v_count < 2 || p.h_count * p.v_count > 64 {
+    let pipe = domain == Domain::Pipe;
+    let noun = if pipe { "pipe" } else { "conduit" };
+    if pipe {
+        if !(1..=20).contains(&p.h_count) || !(1..=20).contains(&p.v_count) || p.h_count * p.v_count < 2 {
+            return Err(bad("pipe.parallel_count", "give 1 to 20 pipes across and up, the original included, 2 or more in all"));
+        }
+    } else if p.h_count == 0 || p.v_count == 0 || p.h_count * p.v_count < 2 || p.h_count * p.v_count > 64 {
         return Err(bad("conduit.parallel_count", "give 1 or more across and up, 2 to 64 conduits in all"));
     }
     if (p.h_count > 1 && p.h_offset.abs() < 1e-6) || (p.v_count > 1 && p.v_offset.abs() < 1e-6) {
-        return Err(bad("conduit.parallel_offset", "give the offset between conduits"));
+        return Err(bad("conduit.parallel_offset", format!("give the offset between {noun}s")));
     }
-    let first = p.run_ids.first().and_then(|r| store.resolve(r)).ok_or_else(|| bad("element.not_found", "no such conduit"))?;
+    let first = p.run_ids.first().and_then(|r| store.resolve(r)).ok_or_else(|| bad("element.not_found", format!("no such {noun}")))?;
     let seg_of = |id: ElementId| store.get(id).and_then(segment_recipe);
-    let (pts, members) = run_line(&store, first, Domain::Conduit)?;
-    let s0 = members.iter().find_map(|m| seg_of(*m)).ok_or_else(|| bad("conduit.not_a_run", "the elements are not a conduit run"))?;
-    if s0.domain != Domain::Conduit {
-        return Err(bad("conduit.not_a_run", "parallel runs are conduit"));
+    let (pts, members) = run_line(&store, first, domain)?;
+    let s0 = members.iter().find_map(|m| seg_of(*m)).ok_or_else(|| bad("mep_run.not_a_run", format!("the elements are not a {noun} run")))?;
+    if s0.domain != domain {
+        return Err(bad("mep_run.not_a_run", format!("parallel runs here are {noun}")));
     }
-    let (type_id, ty) = type_of_segment(&store, &s0).ok_or_else(|| bad("conduit.not_a_run", "the conduit has no type"))?;
-    if p.bend == BendMode::Concentric && ty.with_fittings {
+    if pipe {
+        // Centre to centre, at least the outside size (no insulation is modelled yet).
+        let outside = s0.size.diameter;
+        if (p.h_count > 1 && p.h_offset.abs() < outside - 1e-9) || (p.v_count > 1 && p.v_offset.abs() < outside - 1e-9) {
+            return Err(bad("pipe.parallel_offset", format!("Offset smaller than pipe outside size ({:.0} mm)", outside * 1000.0)));
+        }
+    }
+    let (type_id, ty) = type_of_segment(&store, &s0).ok_or_else(|| bad("mep_run.not_a_run", format!("the {noun} has no type")))?;
+    if !pipe && p.bend == BendMode::Concentric && ty.with_fittings {
         return Err(bad("conduit.concentric", "concentric bends are for conduit types without fittings, whose bends are part of the conduit"));
     }
     let dirs: Vec<V3> = pts.windows(2).map(|w| unit(sub(w[1], w[0])).expect("distinct")).collect();
-    if dirs.iter().any(|d| d[2].abs() > 1e-6) {
+    if !pipe && dirs.iter().any(|d| d[2].abs() > 1e-6) {
         return Err(bad("conduit.parallel_level", "parallel conduits follow level runs"));
     }
-    let left = |d: V3| [-d[1], d[0], 0.0];
+    if pipe && dirs.iter().any(|d| d[0].hypot(d[1]) < 0.7) {
+        return Err(bad("pipe.parallel_level", "parallel pipes follow level or sloped runs, not risers"));
+    }
+    // Across, in plan, to the left of each leg.
+    let left = |d: V3| {
+        let h = d[0].hypot(d[1]).max(1e-12);
+        [-d[1] / h, d[0] / h, 0.0]
+    };
+    // A pipe run's system type, carried over (its system only through equipment).
+    let system_type = if pipe {
+        crate::mep_systems::systems(&store).into_iter().find(|x| x.elements.contains(&first)).map(|x| x.system_type)
+    } else {
+        None
+    };
     let base_r = ty.bend_radius(&store, &s0.size);
     // The level's elevation: points are given above it.
     let lid = store.find_by_guid(&GlobalId::parse(&s0.level).ok_or_else(|| bad("level.not_found", "the run's level"))?).ok_or_else(|| bad("level.not_found", "the run's level"))?;
@@ -2475,7 +2515,7 @@ pub(crate) fn create_parallel(txn: &mut Transaction<'_>, p: ParallelParams) -> R
                     let turn = dirs[k - 1][0] * dirs[k][1] - dirs[k - 1][1] * dirs[k][0];
                     // Inside the turn the radius shrinks by the offset, outside it grows.
                     let r = if p.bend == BendMode::Concentric { base_r - turn.signum() * d } else { base_r };
-                    if r <= s0.size.diameter / 2.0 {
+                    if !pipe && r <= s0.size.diameter / 2.0 {
                         return Err(bad("conduit.concentric", format!("conduit {} would bend tighter than its size allows; offset it the other way", i + 1)));
                     }
                     radii.push(r);
@@ -2483,6 +2523,16 @@ pub(crate) fn create_parallel(txn: &mut Transaction<'_>, p: ParallelParams) -> R
                 };
                 let q = add(pts[k], off);
                 line.push([q[0], q[1], q[2] - z0 + up]);
+            }
+            // Sloped legs keep their slope over their own (offset) length in plan.
+            for k in 1..line.len() {
+                let (a, b) = (pts[k - 1], pts[k]);
+                let h = (b[0] - a[0]).hypot(b[1] - a[1]);
+                if h > 1e-9 {
+                    let g = (b[2] - a[2]) / h;
+                    let hc = (line[k][0] - line[k - 1][0]).hypot(line[k][1] - line[k - 1][1]);
+                    line[k][2] = line[k - 1][2] + g * hc;
+                }
             }
             let params = CreateParams {
                 type_id: Some(ElementRef::Id(type_id)),
@@ -2493,14 +2543,22 @@ pub(crate) fn create_parallel(txn: &mut Transaction<'_>, p: ParallelParams) -> R
                 diameter: Some(s0.size.diameter),
                 width: None,
                 height: None,
-                system_type_id: None,
-                slope: 0.0,
+                system_type_id: system_type.clone(),
+                // The points carry the fall; the slope is recorded on the copies.
+                slope: if pipe { s0.slope } else { 0.0 },
                 bend_radius: None,
             };
-            let r = draw_with(txn, Domain::Conduit, params, Some(radii))?;
+            let r = draw_with(txn, domain, params, (!pipe).then_some(radii))?;
             made.extend(r.segments);
             made.extend(r.fittings);
         }
+    }
+    if pipe && system_type.is_some() {
+        txn.warn(crate::txn::Warning {
+            id: "pipe.parallel_unassigned".into(),
+            message: "The parallel pipes are not in a system: they join one when connected to its equipment".into(),
+            element_ids: made.clone(),
+        });
     }
     Ok(made)
 }

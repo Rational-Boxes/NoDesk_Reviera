@@ -2232,6 +2232,18 @@ keys = "NF"
 help = "Place a conduit fitting or junction box, or split a conduit: on an open end, or along a conduit (splitting it)"
 
 [[action]]
+id = "pipe.create_parallel"
+label = "Parallel Pipes"
+icon = "parallel_pipes"
+help = "Copy the selected pipe's run into a bank of parallel runs across and up, keeping type, size, system type and slope (MEP-PIPE-003)"
+
+[[action]]
+id = "mep_run.set_slope"
+label = "Slope"
+icon = "pipe_slope"
+help = "The Slope Editor: give the selected section of pipe an allowed slope from a control point; fittings follow and branches stay connected (MEP-PIPE-002)"
+
+[[action]]
 id = "conduit.create_parallel"
 label = "Parallel Conduits"
 icon = "parallel_conduits"
@@ -2804,6 +2816,8 @@ tools = [
   { action = "duct.cap_open_ends", size = "small" },
   { action = "mep_run.create_riser", size = "small" },
   { action = "mep_run.bind_riser", size = "small" },
+  { action = "mep_run.set_slope", size = "small" },
+  { action = "pipe.create_parallel", size = "small" },
   { action = "mech_control_device.place", size = "small" },
   { action = "mech_control_device.assign", size = "small" },
   { action = "mep.size", size = "small" },

@@ -27,7 +27,7 @@ use reviera_core::mep::{self, Domain};
 use reviera_core::mep_systems;
 use reviera_render::RenderBackend;
 use reviera_render::plan::Lines;
-use serde_json::json;
+use serde_json::{Value, json};
 use wxdragon::prelude::*;
 
 use super::Gui;
@@ -539,6 +539,115 @@ impl Gui {
                 frame.set_status_text(&format!("{} element(s) made", v.as_array().map_or(0, Vec::len)), 0);
             }
             Err(e) => error(&frame, &format!("No parallel conduits were made:\n{e}")),
+        }
+    }
+}
+
+impl Gui {
+    /// Systems › Plumbing & Piping › Parallel Pipes: copies of the selected pipe's run.
+    pub(crate) fn parallel_pipes(&mut self) {
+        let frame = self.frame;
+        let Some(store) = self.store_now() else { return };
+        let run = self.selection().into_iter().find(|i| {
+            store.get(*i).and_then(reviera_core::mep_runs::segment_recipe).is_some_and(|s| s.domain == Domain::Pipe)
+        });
+        let Some(run) = run else {
+            return frame.set_status_text("Parallel Pipes: select a pipe of the run first", 0);
+        };
+        let f = super::reinforcement_ui::Form::new(&frame, "Parallel Pipes");
+        let across = f.text("Horizontal number", "2", "Pipes side by side, the selected one included (1–20)");
+        let h = f.text("Horizontal offset (mm)", "150", "Centre to centre, to the left of the run's direction (negative: right); at least the pipe's outside size");
+        let up = f.text("Vertical number", "1", "Rows, the selected one included (1–20)");
+        let v = f.text("Vertical offset (mm)", "150", "Centre to centre between rows");
+        let ok = f.show("Copies follow the whole run with the same type, size, system type and slope; a run with tees, crosses or taps is refused.", "Make");
+        let int = |t: &TextCtrl| t.get_value().trim().parse::<usize>().ok();
+        let args = json!({
+            "run_ids": [run],
+            "h_count": int(&across).unwrap_or(1),
+            "v_count": int(&up).unwrap_or(1),
+            "h_offset": number(&h).unwrap_or(150.0) / 1000.0,
+            "v_offset": number(&v).unwrap_or(150.0) / 1000.0,
+        });
+        f.dialog.destroy();
+        if !ok {
+            return;
+        }
+        match self.run("pipe.create_parallel", args) {
+            Ok(v) => {
+                self.refresh_scene(&frame);
+                frame.set_status_text(&format!("{} element(s) made; they join a system when connected to its equipment", v.as_array().map_or(0, Vec::len)), 0);
+            }
+            Err(e) => error(&frame, &format!("No parallel pipes were made:\n{e}")),
+        }
+    }
+
+    /// Systems › Plumbing & Piping › Slope: the Slope Editor for the selected section of pipe.
+    pub(crate) fn slope_editor(&mut self) {
+        let frame = self.frame;
+        let Some(store) = self.store_now() else { return };
+        let section: Vec<ElementId> = self
+            .selection()
+            .into_iter()
+            .filter(|i| {
+                store.get(*i).is_some_and(|e| {
+                    reviera_core::mep_runs::segment_recipe(e).is_some_and(|s| s.domain == Domain::Pipe)
+                        || reviera_core::mep_runs::fitting_recipe(e).is_some_and(|f| f.domain == Domain::Pipe)
+                })
+            })
+            .collect();
+        if section.is_empty() {
+            return frame.set_status_text("Slope: select the section's pipes and fittings (Tab selects a whole run)", 0);
+        }
+        let allowed: Vec<f64> = self.run("mep_settings.slopes", json!({})).ok().and_then(|v| serde_json::from_value(v).ok()).unwrap_or_default();
+        let labels: Vec<String> = allowed.iter().map(|a| format!("{:.2} %", a * 100.0)).collect();
+        let f = super::reinforcement_ui::Form::new(&frame, "Slope Editor");
+        let value = f.choice("Slope value", &labels, allowed.iter().position(|a| (*a - 0.02).abs() < 1e-9).unwrap_or(0));
+        let ends = ["The lowest end (falls toward it)".to_owned(), "The other end".to_owned()];
+        let control = f.choice("Slope control point", &ends, 0);
+        let ok = f.show("The control point stays where it is; the pipe rises away from it. Fittings follow, and branches joined to the section are kept connected.", "Finish");
+        let k = value.get_selection().map_or(0, |k| k as usize);
+        let other = control.get_selection() == Some(1);
+        f.dialog.destroy();
+        let Some(slope) = allowed.get(k).copied().filter(|_| ok) else { return };
+        // The other end: the lowest end found by the command, then the one it did not choose.
+        let mut args = json!({ "element_ids": section, "slope": slope });
+        if other {
+            let ends: Vec<Value> = section
+                .iter()
+                .flat_map(|id| {
+                    let n = store.get(*id).map_or(0, reviera_core::mep_runs::port_count);
+                    (0..n).map(move |k| (*id, k))
+                })
+                .filter(|(id, k)| {
+                    let partners = reviera_core::mep::partners(&store);
+                    !partners.get(&(*id, *k)).into_iter().flatten().any(|(o, _)| section.contains(o))
+                })
+                .filter(|(id, k)| store.get(*id).and_then(reviera_core::mep_runs::segment_recipe).is_some() || *k < 2)
+                .map(|(id, k)| json!({ "element_id": id, "port": k }))
+                .collect();
+            let z = |v: &Value| {
+                reviera_core::mep::port(&store, ElementId(v["element_id"].as_u64().unwrap_or(0)), v["port"].as_u64().unwrap_or(0) as usize).map_or(0.0, |p| p.position[2])
+            };
+            if let Some(high) = ends.iter().max_by(|a, b| z(a).total_cmp(&z(b))) {
+                args["control_point"] = high.clone();
+            }
+        }
+        match self.run("mep_run.set_slope", args) {
+            Ok(r) => {
+                self.refresh_scene(&frame);
+                frame.set_status_text(
+                    &format!("{} segment(s) at {:.2} %; the far end rose {:.0} mm", r["segments"], slope * 100.0, r["rise"].as_f64().unwrap_or(0.0) * 1000.0),
+                    0,
+                );
+            }
+            Err(e) => {
+                // A branch that cannot follow: shown selected.
+                let ids: Vec<ElementId> = e.split(|c: char| !c.is_ascii_digit()).filter_map(|t| t.parse::<u64>().ok()).map(ElementId).filter(|i| store.get(*i).is_some() && !section.contains(i)).collect();
+                if !ids.is_empty() && e.contains("cannot be kept connected") {
+                    self.select_ids(&ids, super::select::Combine::Replace);
+                }
+                error(&frame, &format!("The slope was not changed:\n{e}"));
+            }
         }
     }
 }

@@ -3411,10 +3411,12 @@ Allowed values come from Mechanical Settings › Slopes. Fabrication pipework ca
 **Commands.** `mep_run.set_slope(element_ids[], slope, control_point_ref)`: refused with "Selection is not a single connected section" when the elements do not form one run.
 
 **Acceptance criteria.**
-- [ ] Applying 2% to a 20 m sanitary run with the control point at the downstream end raises the upstream end by 0.4 m, and branch connections remain connected.
-- [ ] Each segment of the run then exports `Gradient` = 0.02.
-- [ ] A slope value not in the allowed list is not offered in the Slope Editor.
-- [ ] A branch that cannot be kept connected blocks *Finish* and is highlighted.
+- [x] Applying 2% to a 20 m sanitary run with the control point at the downstream end raises the upstream end by 0.4 m, and branch connections remain connected.
+- [x] Each segment of the run then exports `Gradient` = 0.02.
+- [x] A slope value not in the allowed list is not offered in the Slope Editor.
+- [x] A branch that cannot be kept connected blocks *Finish* and is highlighted.
+
+*Built (2026-10-21):* `mep_run.set_slope(element_ids, slope, control_point?)` on one connected chain of pipe segments and fittings (refused "Selection is not a single connected section" otherwise; tees in it may branch out): the control point ({element_id, port}, one of the chain's two open ends, the lowest by default) stays and the pipe rises by the slope away from it; each segment's far end is set to its plan length × slope, fittings follow with their run legs tilted to the slope (so a 20 m run with an elbow and a tee rises 0.4 m within a millimetre), vertical segments keep their geometry and move, taps ride on their segments. Joined from outside: a segment's joined end moves and its slope is recalculated; a fitting (a tap, a tee) moves and the segments beyond it follow; anything else (a fixture, equipment) refuses the change naming it (`slope.branch`), nothing changed. Slope (rise ÷ run) on the segment and `Pset_PipeSegmentOccurrence.Gradient`. Allowed slopes: `mep_settings.slopes` and `.set_slopes` (Reviera's provisional defaults 0.5 %, 1 %, 1/8 in per ft, 2 %, 1/4 in per ft, 4 %, EXPERT_REVIEW E-25); another slope is applied with the warning `slope.not_allowed`. Systems › HVAC & Piping › **Slope** (the Slope Editor as a dialog: the allowed values only, and the control point, the lowest end or the other; a branch that cannot follow is selected and the error shown). Not yet: the contextual tab, the on-canvas slope glyph and direction arrow, slope while drawing (`pipe.create(slope)` is built), the 45° warning threshold setting, the micro-operation journal, fabrication parts, displaying slope in the project's slope unit.
 
 ### 4.8.3 Parallel pipes
 **ID:** MEP-PIPE-003 · **Priority:** P1 · **Ref:** research/03 §9.1 ("Parallel Pipes")
@@ -3441,10 +3443,12 @@ Allowed values come from Mechanical Settings › Slopes. Fabrication pipework ca
 **Commands.** `pipe.create_parallel(run_element_ids[], h_count, v_count, h_offset, v_offset) -> element_ids[]`
 
 **Acceptance criteria.**
-- [ ] Parallel pipes of 3 × 1 at 150 mm on an L-shaped run produce three concentric L-runs with correct elbows.
+- [x] Parallel pipes of 3 × 1 at 150 mm on an L-shaped run produce three concentric L-runs with correct elbows.
 - [ ] A run containing a gate valve is refused, and the message names the valve.
-- [ ] An offset of 40 mm on a 50 mm pipe is refused.
-- [ ] Copies of a 1% sloped run have the same 1% slope.
+- [x] An offset of 40 mm on a 50 mm pipe is refused.
+- [x] Copies of a 1% sloped run have the same 1% slope.
+
+*Built (2026-10-21):* `pipe.create_parallel(run_ids, h_count, v_count, h_offset, v_offset)` (the parallel-conduit routine of MEP-ELEC-017, generalised): any element finds the whole run, level or sloped (not risers); 1–20 each way, the original included; offsets centre to centre, refused below the pipe's outside size ("Offset smaller than pipe outside size (50 mm)"; insulation is not modelled yet); each copy offset in plan along the bisectors at bends (concentric), its heights rebuilt from the original legs' slopes over its own lengths, elbows by the type's routing preferences, the same type, size, system type and slope (Gradient); copies join a system only through its equipment (warning `pipe.parallel_unassigned`); open ends stay open. A run with a tee, cross or tap is refused naming it (valves are not built yet, so the valve criterion waits). Systems › HVAC & Piping › **Parallel Pipes** (a dialog of the counts and offsets for the selected pipe's run). Not yet: the hover preview on the side of the cursor, Tab to extend the hover, drawing above or below in sections.
 
 ### 4.8.4 Pipe fittings, accessories, flanges, caps and flex
 **ID:** MEP-PIPE-004 · **Priority:** P1 · **Ref:** research/03 §9.1

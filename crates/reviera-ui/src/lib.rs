@@ -4536,6 +4536,8 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "mep_fitting.upgrade" => with(gui, |g| g.fitting_grade(true)),
         "mep_fitting.downgrade" => with(gui, |g| g.fitting_grade(false)),
         "conduit.create_parallel" => with(gui, Gui::parallel_conduits),
+        "pipe.create_parallel" => with(gui, Gui::parallel_pipes),
+        "mep_run.set_slope" => with(gui, Gui::slope_editor),
         "system.create" => with(gui, Gui::create_system),
         "system.add" => with(gui, |g| g.system_members(true)),
         "system.remove" => with(gui, |g| g.system_members(false)),

@@ -67,6 +67,7 @@ pub mod mep_loads;
 pub mod mep_network;
 pub mod mep_penetrations;
 pub mod mep_sizing;
+pub mod mep_slopes;
 pub mod mep_panel_schedule;
 pub mod mep_systems;
 pub mod model_lines;

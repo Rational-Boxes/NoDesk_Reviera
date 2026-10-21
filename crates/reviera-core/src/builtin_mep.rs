@@ -141,6 +141,10 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(ConductorAmpacitySet),
         registry.add(WiringSet),
         registry.add(MepSize),
+        registry.add(MepRunSetSlope),
+        registry.add(PipeCreateParallel),
+        registry.add(MepSettingsSetSlopes),
+        registry.add(MepSettingsSlopes),
         registry.add(MechControlDevicePlace),
         registry.add(MechControlDeviceAssign),
         registry.add(MechControlDeviceList),
@@ -1127,6 +1131,49 @@ read_command!(
     crate::mep_controls::ListParams,
     Vec<crate::mep_controls::DeviceInfo>,
     crate::mep_controls::list
+);
+
+edit_command!(
+    MepRunSetSlope,
+    "mep_run.set_slope",
+    "Slope a section of pipe",
+    "Sets the slope (rise over run; 0.02 for 2 %) of a connected section of pipe segments and fittings (`element_ids`) from `control_point` ({element_id, port}: one of its two open ends, the lowest by default), which stays; the pipe rises away from it (MEP-PIPE-002). Fittings follow, their run legs tilted; vertical segments keep their geometry; taps ride on their segments. Segments joined from outside (branches, the run beyond) have their joined end moved and their slope recalculated, fittings joined from outside move with them; anything else that cannot follow refuses the change, naming it. Refused \"Selection is not a single connected section\" when the elements are not one run. A slope not in the allowed list is applied with a warning. Writes Pset_PipeSegmentOccurrence.Gradient.",
+    "Slope",
+    crate::mep_slopes::SlopeParams,
+    crate::mep_slopes::SlopeReport,
+    crate::mep_slopes::set_slope
+);
+
+edit_command!(
+    PipeCreateParallel,
+    "pipe.create_parallel",
+    "Parallel pipes",
+    "Copies a pipe run (`run_ids`: any of its elements finds the whole run, level or sloped, without tees, crosses or taps) into a bank (MEP-PIPE-003): `h_count` across and `v_count` up, the original included (1–20 each), `h_offset` (to the left of the run's direction; negative: right) and `v_offset` (upward) centre to centre, at least the pipe's outside size (\"Offset smaller than pipe outside size\"). Each copy stays parallel through the bends with elbows by the type's routing preferences (concentric), the same type, size, system type and slope; copies join a system only through its equipment (reported), open ends stay open. Refused naming the tee, cross or tap that branches the run. Returns the new elements.",
+    "Parallel Pipes",
+    crate::mep_runs::ParallelParams,
+    Vec<crate::ElementId>,
+    crate::mep_runs::create_parallel_pipes
+);
+
+edit_command!(
+    MepSettingsSetSlopes,
+    "mep_settings.set_slopes",
+    "Set the allowed pipe slopes",
+    "Sets the allowed pipe slopes (rise over run, above 0 and at most 1) that the Slope Editor offers (Mechanical Settings › Slopes, MEP-PIPE-002).",
+    "Pipe Slopes",
+    crate::mep_slopes::SlopesParams,
+    (),
+    crate::mep_slopes::set_slopes
+);
+
+read_command!(
+    MepSettingsSlopes,
+    "mep_settings.slopes",
+    "The allowed pipe slopes",
+    "The allowed pipe slopes (rise over run): the project's, else Reviera's defaults (0.5 %, 1 %, 1/8 in per ft, 2 %, 1/4 in per ft, 4 %).",
+    crate::mep_slopes::ListSlopesParams,
+    Vec<f64>,
+    crate::mep_slopes::list_slopes
 );
 
 edit_command!(
