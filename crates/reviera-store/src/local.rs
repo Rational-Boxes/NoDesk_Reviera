@@ -3284,8 +3284,15 @@ impl LocalProject {
                 .iter()
                 .map(|s| geometry::Polyhedron { points: s.points.clone(), faces: s.faces.clone() })
                 .collect();
-            geometry::write_breps(&mut self.ifc, step, geometry::BrepFrame::WORLD, &polys, self.length_scale, contexts)?;
             let e = store.get(*id).expect("listed");
+            // A placeholder is its axis alone (MEP-DUCT-007).
+            match reviera_core::mep_runs::segment_recipe(e) {
+                Some(s) if s.placeholder => geometry::write_axis_line(&mut self.ifc, step, &[s.start, s.end], self.length_scale, contexts)?,
+                _ => {
+                    geometry::remove_axis_line(&mut self.ifc, step)?;
+                    geometry::write_breps(&mut self.ifc, step, geometry::BrepFrame::WORLD, &polys, self.length_scale, contexts)?;
+                }
+            }
             let gutter = reviera_core::mep_gutters::gutter_recipe(e);
             let level = reviera_core::mep_runs::segment_recipe(e)
                 .map(|r| r.level)

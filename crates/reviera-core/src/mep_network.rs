@@ -401,7 +401,8 @@ pub fn compute(store: &Store, sys: &SystemInfo, equation: Equation) -> Result<Ne
             let roughness = lined.unwrap_or(roughness);
             let len = mep_runs::segment_length(&s);
             let (v, f) = flow_in(flow, &free, roughness, fluid, equation);
-            let loss = ov.loss.unwrap_or(f * len * multiplier);
+            // A placeholder has no body to lose pressure in (MEP-DUCT-007).
+            let loss = ov.loss.unwrap_or(if s.placeholder { 0.0 } else { f * len * multiplier });
             own.insert(x, loss);
             let (_, branch) = if s.domain == Domain::Duct { DUCT_JUNCTION } else { PIPE_JUNCTION };
             let mut branches = Vec::new();
@@ -427,7 +428,7 @@ pub fn compute(store: &Store, sys: &SystemInfo, equation: Equation) -> Result<Ne
                     flow,
                     velocity: v,
                     length: Some(len),
-                    friction: Some(f),
+                    friction: (!s.placeholder).then_some(f),
                     coefficient: None,
                     loss: losses.then_some(loss),
                     pressure: None,

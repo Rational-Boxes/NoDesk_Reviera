@@ -831,9 +831,27 @@ pub(crate) fn connect_coincident(txn: &mut Transaction<'_>, ids: &[ElementId]) -
         .collect();
     let mut links = stored_links(&store);
     let mut made = Vec::new();
+    // Placeholders (MEP-DUCT-007) have no fittings to face: their ends join every end at the
+    // same point, of any direction and size; another element's port still takes one partner.
+    let placeholder = |id: ElementId| store.get(id).and_then(crate::mep_runs::segment_recipe).is_some_and(|s| s.placeholder);
+    let near = |a: &Port, b: &Port| (0..3).map(|k| (a.position[k] - b.position[k]).powi(2)).sum::<f64>().sqrt() <= POSITION_TOLERANCE;
     for a in &mine {
         for b in &others {
-            if b.element == a.element || !coincide(a, b) || check_pair(a, b, &taken).is_err() {
+            if b.element == a.element {
+                continue;
+            }
+            let (pa, pb) = (placeholder(a.element), placeholder(b.element));
+            if pa || pb {
+                let used = |p: &Port, t: &HashMap<(ElementId, usize), Vec<(ElementId, usize)>>| t.get(&(p.element, p.index)).is_some_and(|v| !v.is_empty());
+                if !near(a, b)
+                    || a.connector.domain != b.connector.domain
+                    || taken.get(&(a.element, a.index)).is_some_and(|v| v.contains(&(b.element, b.index)))
+                    || (!pa && used(a, &taken))
+                    || (!pb && used(b, &taken))
+                {
+                    continue;
+                }
+            } else if !coincide(a, b) || check_pair(a, b, &taken).is_err() {
                 continue;
             }
             taken.entry((a.element, a.index)).or_default().push((b.element, b.index));

@@ -201,6 +201,9 @@ pub(crate) fn create_type(txn: &mut Transaction<'_>, p: CreateTypeParams) -> Res
 fn check_host(store: &Store, id: ElementId, kind: CoveringKind) -> std::result::Result<f64, String> {
     let e = store.get(id).ok_or_else(|| format!("element {id} does not exist"))?;
     let (domain, size, accessory) = if let Some(s) = mep_runs::segment_recipe(e) {
+        if s.placeholder {
+            return Err("a placeholder has no body to cover".into());
+        }
         (s.domain, s.size, false)
     } else if let Some(f) = mep_runs::fitting_recipe(e) {
         (f.domain, f.legs.first().map(|l| l.size).ok_or("it has no legs")?, f.part.is_accessory())

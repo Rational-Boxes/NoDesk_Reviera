@@ -2137,6 +2137,7 @@ impl Gui {
         let hit = self
             .room_label_at(x, y)
             .or_else(|| self.rebar_line_at(x, y))
+            .or_else(|| self.placeholder_at(x, y))
             .or_else(|| self.element_at(x, y, panel))
             .or_else(|| self.room_inside(x, y));
         match hit {
@@ -4575,6 +4576,15 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
             focus(g);
         }),
         "duct.convert_to_flex" => with(gui, Gui::convert_to_flex),
+        "duct_placeholder.create" => with(gui, |g| {
+            g.start_placeholder_tool(reviera_core::mep::Domain::Duct);
+            focus(g);
+        }),
+        "pipe_placeholder.create" => with(gui, |g| {
+            g.start_placeholder_tool(reviera_core::mep::Domain::Pipe);
+            focus(g);
+        }),
+        "placeholder.convert" => with(gui, Gui::convert_placeholders),
         "mep_fitting.tee_to_cross" => with(gui, Gui::tee_to_cross),
         "mep_fitting.upgrade" => with(gui, |g| g.fitting_grade(true)),
         "mep_fitting.downgrade" => with(gui, |g| g.fitting_grade(false)),

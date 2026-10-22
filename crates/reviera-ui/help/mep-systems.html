@@ -21,6 +21,7 @@ Water 1. The tools are on the <b>Systems</b> tab.</p>
   <a href="#duct-accessories">Duct accessories, insulation and lining</a>
   <a href="#flex-duct">Flexible duct</a>
   <a href="#justify">Justifying a run</a>
+  <a href="#placeholders">Placeholders</a>
   <a href="#slopes">Sloped pipes and parallel pipes</a>
   <a href="#controls">Thermostats, sensors and controllers</a>
   <a href="#risers">Risers</a>
@@ -297,6 +298,24 @@ If an end of the run that would move is joined to equipment or a terminal, choos
 control point.</p>
 <p>To change size along a run, draw the next part from the open end of the last one at its new
 size. Reviera puts in a transition between them.</p>
+
+<h2 id="placeholders">Placeholders</h2>
+<p>Early in design you can lay out routes as single lines and fit them later. Choose <a
+href="reviera:action/duct_placeholder.create">Duct Placeholder</a> (<kbd>D</kbd> <kbd>H</kbd>) or
+<a href="reviera:action/pipe_placeholder.create">Pipe Placeholder</a> (<kbd>P</kbd> <kbd>H</kbd>),
+fill in the type, size, elevation and system type as for a duct or pipe, and click the points.
+Each leg is a placeholder line, with no elbows. Placeholders join where their ends meet, and a line
+ending on the side of another splits it there. They join equipment connectors they end on, and they
+count in the system, but they have no size-based calculations, insulation or justification.</p>
+<p>To make real ducts and pipes, select the placeholders and choose <a
+href="reviera:action/placeholder.convert">Convert Placeholder</a> (<kbd>C</kbd> <kbd>P</kbd>). Press
+<kbd>Tab</kbd> over one to pick it together with every placeholder joined to it. Where two
+lines meet at an angle you get an elbow. Three lines, two of them in line, get a tee, and four
+lines get a cross. Where two lines meet in line at different sizes, you get a transition. The
+fittings come from the type's routing preferences. Each line keeps its identity, size, slope and
+system. Where a point can't be fitted, its ends are left open and Reviera lists them with the
+reason. That happens with more than four lines at a point, or a branch that isn't square to the
+main, or a change of size at a bend. To go back to the placeholders, use Undo.</p>
 
 <h2 id="slopes">Sloped pipes and parallel pipes</h2>
 <p>To give drainage a fall, select the pipes and fittings of a run and choose <a

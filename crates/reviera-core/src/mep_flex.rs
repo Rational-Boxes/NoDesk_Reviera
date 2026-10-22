@@ -286,6 +286,7 @@ fn make(txn: &mut Transaction<'_>, type_id: ElementId, t: &SegmentType, path: Fl
         riser: None,
         flex: Some(path.clone()),
         justification: None,
+        placeholder: false,
     };
     let type_guid = r.segment_type.clone();
     let id = txn.create(

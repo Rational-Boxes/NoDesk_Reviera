@@ -185,6 +185,9 @@ fn chain(store: &Store, ids: &[ElementId]) -> Result<Chain> {
     for id in &set {
         let e = store.get(*id).ok_or_else(|| bad("element.not_found", "no such element"))?;
         if let Some(s) = mep_runs::segment_recipe(e) {
+            if s.placeholder {
+                return Err(bad("mep_run.justify_placeholder", "a placeholder is always on its centreline; convert it first"));
+            }
             if !s.taps.is_empty() {
                 return Err(bad("mep_run.justify_branches", BRANCHES));
             }

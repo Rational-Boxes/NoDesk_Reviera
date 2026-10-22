@@ -2210,3 +2210,84 @@ pub(crate) fn remove_breps(ifc: &mut IfcModel, element: StepId) -> Result<()> {
     }
     Ok(())
 }
+
+/// The entities of an axis written by [`write_axis_line`] and its points in file units.
+fn axis_line(ifc: &IfcModel, element: StepId) -> Result<Option<(Vec<StepId>, Vec<f64>)>> {
+    let e = entity(ifc, element)?;
+    let one = |e: &Entity, attr: &str| e.refs(attr).first().copied();
+    let (Some(placement), Some(shape)) = (one(&e, "ObjectPlacement"), one(&e, "Representation")) else {
+        return Ok(None);
+    };
+    let reps = entity(ifc, shape)?.refs("Representations");
+    let [rep] = reps[..] else { return Ok(None) };
+    let re = entity(ifc, rep)?;
+    if re.string("RepresentationIdentifier") != Some("Axis") || re.string("RepresentationType") != Some("Curve3D") {
+        return Ok(None);
+    }
+    let Some(axes) = one(&entity(ifc, placement)?, "RelativePlacement") else { return Ok(None) };
+    let mut entities = vec![placement, axes, shape, rep];
+    entities.extend(one(&entity(ifc, axes)?, "Location"));
+    let mut coords = Vec::new();
+    for line in re.refs("Items") {
+        entities.push(line);
+        for p in entity(ifc, line)?.refs("Points") {
+            entities.push(p);
+            if let AttrValue::List(c) = ifc.attribute(p, "Coordinates")? {
+                coords.extend(c.iter().filter_map(|v| match v {
+                    AttrValue::Real(r) => Some(*r),
+                    _ => None,
+                }));
+            }
+        }
+    }
+    Ok(Some((entities, coords)))
+}
+
+/// Writes an element's only representation as an `Axis` (`Curve3D`) polyline through `points`
+/// (metres, world coordinates): an MEP placeholder (MEP-DUCT-007) has no body. A body written
+/// before is removed.
+pub(crate) fn write_axis_line(ifc: &mut IfcModel, element: StepId, points: &[[f64; 3]], scale: f64, contexts: Contexts) -> Result<()> {
+    let want: Vec<f64> = points.iter().flat_map(|p| p.map(|v| v / scale)).collect();
+    match axis_line(ifc, element)? {
+        Some((_, have)) if have.len() == want.len() && have.iter().zip(&want).all(|(a, b)| (a - b).abs() < 1e-9) => return Ok(()),
+        Some((old, _)) => {
+            for id in old {
+                ifc.remove(id)?;
+            }
+        }
+        None => remove_breps(ifc, element)?,
+    }
+    let r = |id: StepId| AttrValue::Ref(id.0);
+    let location = create_with(ifc, "IfcCartesianPoint", &[("Coordinates", reals(&[0.0, 0.0, 0.0]))])?;
+    let axes = create_with(ifc, "IfcAxis2Placement3D", &[("Location", r(location))])?;
+    let placement = create_with(ifc, "IfcLocalPlacement", &[("RelativePlacement", r(axes))])?;
+    let pts = points
+        .iter()
+        .map(|p| create_with(ifc, "IfcCartesianPoint", &[("Coordinates", reals(&p.map(|v| v / scale)))]).map(r))
+        .collect::<Result<Vec<_>>>()?;
+    let line = create_with(ifc, "IfcPolyline", &[("Points", AttrValue::List(pts))])?;
+    let rep = create_with(
+        ifc,
+        "IfcShapeRepresentation",
+        &[
+            ("ContextOfItems", r(contexts.axis)),
+            ("RepresentationIdentifier", AttrValue::String("Axis".into())),
+            ("RepresentationType", AttrValue::String("Curve3D".into())),
+            ("Items", AttrValue::List(vec![r(line)])),
+        ],
+    )?;
+    let shape = create_with(ifc, "IfcProductDefinitionShape", &[("Representations", AttrValue::List(vec![r(rep)]))])?;
+    ifc.set_attribute(element, "ObjectPlacement", &r(placement))?;
+    ifc.set_attribute(element, "Representation", &r(shape))?;
+    Ok(())
+}
+
+/// Removes an axis written by [`write_axis_line`] (a placeholder converted to a body).
+pub(crate) fn remove_axis_line(ifc: &mut IfcModel, element: StepId) -> Result<()> {
+    if let Some((old, _)) = axis_line(ifc, element)? {
+        for id in old {
+            ifc.remove(id)?;
+        }
+    }
+    Ok(())
+}

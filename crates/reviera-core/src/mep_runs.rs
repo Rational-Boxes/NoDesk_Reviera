@@ -247,7 +247,7 @@ pub struct Row {
 }
 
 impl Row {
-    fn fits(&self, size: f64) -> bool {
+    pub(crate) fn fits(&self, size: f64) -> bool {
         size + 1e-9 >= self.min && (self.max <= 0.0 || size <= self.max + 1e-9)
     }
 }
@@ -290,7 +290,7 @@ impl Default for Routing {
 }
 
 impl Routing {
-    fn rows(&self, role: Role) -> &[Row] {
+    pub(crate) fn rows(&self, role: Role) -> &[Row] {
         match role {
             Role::Elbow => &self.elbow,
             Role::Junction => &self.junction,
@@ -457,7 +457,7 @@ impl SegmentType {
     }
 
     /// Whether its bends have a radius (tray and conduit).
-    fn radius_bends(&self) -> bool {
+    pub(crate) fn radius_bends(&self) -> bool {
         matches!(self.domain, Domain::CableTray | Domain::Conduit)
     }
 
@@ -830,6 +830,10 @@ pub struct SegmentRecipe {
     /// The face or edge it is aligned on (MEP-DUCT-006): a size change keeps it in place.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub justification: Option<crate::mep_justify::Justification>,
+    /// A placeholder (MEP-DUCT-007): a centreline without fittings or body, joined to other
+    /// placeholders where their ends meet, until converted.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub placeholder: bool,
 }
 
 /// A riser's binding of its end to a level.
@@ -1112,6 +1116,9 @@ fn sweep(a: V3, corner: V3, b: V3, s: &Size, across: Option<V3>) -> Option<Solid
 
 /// A segment's body (a curved one swept along its arc).
 pub fn segment_solid(s: &SegmentRecipe) -> Vec<Solid> {
+    if s.placeholder {
+        return Vec::new();
+    }
     if let Some(f) = &s.flex {
         return crate::mep_flex::solid(f, &s.size).into_iter().collect();
     }
@@ -1333,7 +1340,7 @@ pub(crate) fn leg_length(size: &Size) -> f64 {
 
 /// An elbow's leg length: by the section's extent in the plane of the bend (a rectangular
 /// duct turning up uses its height).
-fn elbow_leg(size: &Size, incoming: V3, outgoing: V3, across: Option<V3>) -> f64 {
+pub(crate) fn elbow_leg(size: &Size, incoming: V3, outgoing: V3, across: Option<V3>) -> f64 {
     let extent = match size.shape {
         Shape::Round => size.diameter,
         _ => {
@@ -1402,18 +1409,18 @@ pub struct RunReport {
     pub system: Option<ElementId>,
 }
 
-struct Ctx {
-    domain: Domain,
+pub(crate) struct Ctx {
+    pub(crate) domain: Domain,
     /// The segments' predefined type.
-    predefined: &'static str,
-    type_guid: String,
-    routing: Routing,
-    level: String,
-    classification: Option<Classification>,
+    pub(crate) predefined: &'static str,
+    pub(crate) type_guid: String,
+    pub(crate) routing: Routing,
+    pub(crate) level: String,
+    pub(crate) classification: Option<Classification>,
 }
 
 #[allow(clippy::too_many_arguments)]
-fn make_segment(txn: &mut Transaction<'_>, cx: &Ctx, a: V3, b: V3, size: Size, slope: f64, across: Option<V3>) -> Result<ElementId> {
+pub(crate) fn make_segment(txn: &mut Transaction<'_>, cx: &Ctx, a: V3, b: V3, size: Size, slope: f64, across: Option<V3>) -> Result<ElementId> {
     make_segment_c(txn, cx, a, b, size, slope, across, None)
 }
 
@@ -1436,6 +1443,7 @@ fn make_segment_c(txn: &mut Transaction<'_>, cx: &Ctx, a: V3, b: V3, size: Size,
         riser: None,
         flex: None,
         justification: None,
+        placeholder: false,
     };
     let mut e = NewElement::new(segment_class(cx.domain))
         .param("@PredefinedType", cx.predefined)
@@ -1450,7 +1458,7 @@ fn make_segment_c(txn: &mut Transaction<'_>, cx: &Ctx, a: V3, b: V3, size: Size,
     txn.create(e)
 }
 
-fn make_fitting(txn: &mut Transaction<'_>, cx: &Ctx, part: Part, centre: V3, legs: Vec<Leg>) -> Result<ElementId> {
+pub(crate) fn make_fitting(txn: &mut Transaction<'_>, cx: &Ctx, part: Part, centre: V3, legs: Vec<Leg>) -> Result<ElementId> {
     make_fitting_r(txn, cx, part, centre, legs, None)
 }
 
@@ -1484,7 +1492,7 @@ fn make_fitting_r(txn: &mut Transaction<'_>, cx: &Ctx, part: Part, centre: V3, l
 fn host_at(store: &Store, domain: Domain, p: V3) -> Option<(ElementId, SegmentRecipe, V3)> {
     store.iter().find_map(|e| {
         let s = segment_recipe(e)?;
-        if s.domain != domain || s.corner.is_some() || s.flex.is_some() {
+        if s.domain != domain || s.corner.is_some() || s.flex.is_some() || s.placeholder {
             return None;
         }
         let d = sub(s.end, s.start);
@@ -1498,7 +1506,7 @@ fn host_at(store: &Store, domain: Domain, p: V3) -> Option<(ElementId, SegmentRe
     })
 }
 
-fn warn(txn: &mut Transaction<'_>, id: &str, msg: String, ids: Vec<ElementId>) {
+pub(crate) fn warn(txn: &mut Transaction<'_>, id: &str, msg: String, ids: Vec<ElementId>) {
     txn.warn(Warning { id: id.into(), message: msg, element_ids: ids });
 }
 
@@ -1507,7 +1515,9 @@ fn draw(txn: &mut Transaction<'_>, domain: Domain, p: CreateParams) -> Result<Ru
 }
 
 /// Draws a run; `radii` gives each corner's bend radius (parallel conduits).
-fn draw_with(txn: &mut Transaction<'_>, domain: Domain, p: CreateParams, radii: Option<Vec<f64>>) -> Result<RunReport> {
+/// What a run is drawn with: its context, type, size and points in project coordinates
+/// (collinear ones dropped; pipes falling along level legs by their slope).
+pub(crate) fn prepare(txn: &mut Transaction<'_>, domain: Domain, p: &CreateParams) -> Result<(Ctx, SegmentType, Size, Vec<V3>)> {
     let store = txn.store().clone();
     let (level, z0) = level_of(&store, &p.level)?;
     let given_type = p.type_id.as_ref().map(|t| resolve_type(&store, t)).transpose()?;
@@ -1609,6 +1619,13 @@ fn draw_with(txn: &mut Transaction<'_>, domain: Domain, p: CreateParams, radii: 
             i += 1;
         }
     }
+    Ok((cx, t, size, pts))
+}
+
+fn draw_with(txn: &mut Transaction<'_>, domain: Domain, p: CreateParams, radii: Option<Vec<f64>>) -> Result<RunReport> {
+    let (cx, t, size, pts) = prepare(txn, domain, &p)?;
+    let classification = cx.classification;
+    let store = txn.store().clone();
     let mut report = RunReport::default();
     // A run ending on an existing segment's side: a junction there.
     let ends_on = host_at(&store, domain, *pts.last().expect("two"));
@@ -1881,7 +1898,7 @@ pub fn type_of(store: &Store, s: &SegmentRecipe) -> Option<SegmentType> {
 }
 
 /// Moves the connection on a split segment's end port (index 1) to the new second half.
-fn retarget_end(txn: &mut Transaction<'_>, from: ElementId, to: ElementId) -> Result<()> {
+pub(crate) fn retarget_end(txn: &mut Transaction<'_>, from: ElementId, to: ElementId) -> Result<()> {
     let store = txn.store().clone();
     let (a, b) = (mep::stored(&store, from, 1), mep::stored(&store, to, 1));
     let links: Vec<mep::Link> = mep::stored_links(&store)
@@ -2067,6 +2084,8 @@ pub(crate) fn cap_open_ends(txn: &mut Transaction<'_>, p: CapParams) -> Result<V
             continue;
         }
         let (domain, level, class_, type_guid) = match (segment_recipe(e), fitting_recipe(e)) {
+            // A placeholder's ends stay open until it is converted (MEP-DUCT-007).
+            (Some(s), _) if s.placeholder => continue,
             (Some(s), _) => (s.domain, s.level, s.classification, Some(s.segment_type)),
             (_, Some(f)) => (f.domain, f.level, f.classification, None),
             _ => continue,

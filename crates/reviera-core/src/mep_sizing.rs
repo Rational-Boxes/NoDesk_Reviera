@@ -466,7 +466,7 @@ pub(crate) fn size(txn: &mut Transaction<'_>, p: SizeParams) -> Result<SizeRepor
             .iter()
             .copied()
             .filter(|e| ids.is_empty() || ids.contains(e) || p.system_id.is_some())
-            .filter(|e| store.get(*e).and_then(mep_runs::segment_recipe).is_some_and(|s| s.corner.is_none()))
+            .filter(|e| store.get(*e).and_then(mep_runs::segment_recipe).is_some_and(|s| s.corner.is_none() && !s.placeholder))
             .collect();
         for sid in segs {
             let s = store.get(sid).and_then(mep_runs::segment_recipe).expect("a segment");

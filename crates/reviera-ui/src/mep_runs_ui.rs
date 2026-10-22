@@ -26,6 +26,11 @@
 //! Flex Duct** (`CV`) asks for the maximum length and converts the selected terminals' final
 //! segments.
 //!
+//! Duct Placeholder (`DH`) and Pipe Placeholder (`PH`, MEP-DUCT-007) draw the same way as Duct
+//! and Pipe, making single lines without fittings (`duct_placeholder.create`,
+//! `pipe_placeholder.create`); they show as lines in the views' MEP overlay. **Convert
+//! Placeholder** (`CP`) converts the selected ones and lists the ends it left open.
+//!
 //! Systems › Risers (MEP-DUCT-011): **Create Riser** rises from an open end of the selected run
 //! (the open connector chosen when there are several) to a level and offset, bound to the level
 //! by default; **Bind Riser** binds or unbinds a selected vertical segment's end.
@@ -91,6 +96,8 @@ pub(crate) struct RunTool {
     /// Flex Duct (MEP-DUCT-005): the points are a spline's; the size may come from the connector.
     pub flex: bool,
     pub size_from_connector: bool,
+    /// Duct or Pipe Placeholder (MEP-DUCT-007): single lines without fittings.
+    pub placeholder: bool,
 }
 
 /// What a click places: a fitting's part, or a split.
@@ -123,18 +130,28 @@ fn number(t: &TextCtrl) -> Option<f64> {
 impl Gui {
     /// Systems › Duct and Pipe: asks for the run's settings, then takes clicked points.
     pub(crate) fn start_run_tool(&mut self, domain: Domain) {
+        self.start_run_tool_as(domain, false);
+    }
+
+    /// Systems › Duct Placeholder and Pipe Placeholder (MEP-DUCT-007): as Duct and Pipe, drawing
+    /// single lines without fittings.
+    pub(crate) fn start_placeholder_tool(&mut self, domain: Domain) {
+        self.start_run_tool_as(domain, true);
+    }
+
+    fn start_run_tool_as(&mut self, domain: Domain, placeholder: bool) {
         let frame = self.frame;
         if !self.ensure_plan(false) {
             return;
         }
         let Some(level) = self.active_view().and_then(|v| v.plan.as_ref()).map(|p| p.level) else { return };
         let Some(store) = self.store_now() else { return };
-        let keep = self.run_tool.as_ref().filter(|t| t.domain == domain).cloned();
+        let keep = self.run_tool.as_ref().filter(|t| t.domain == domain && !t.flex).cloned();
         let types: Vec<(ElementId, String, mep::Shape)> = store
             .iter()
             .filter_map(|e| {
                 let t = reviera_core::mep_runs::segment_type(e)?;
-                (t.domain == domain).then(|| (e.id(), e.name.clone().unwrap_or_default(), t.shape))
+                (t.domain == domain && !t.flexible).then(|| (e.id(), e.name.clone().unwrap_or_default(), t.shape))
             })
             .collect();
         let system_types: Vec<mep_systems::SystemType> = mep_systems::system_types(&store)
@@ -145,7 +162,11 @@ impl Gui {
         let tray = domain == Domain::CableTray;
         let conduit = domain == Domain::Conduit;
         let carrier = tray || conduit;
-        let title = domain_title(domain);
+        let title = match (placeholder, domain) {
+            (true, Domain::Duct) => "Duct Placeholder",
+            (true, _) => "Pipe Placeholder",
+            _ => domain_title(domain),
+        };
         let f = super::reinforcement_ui::Form::new(&frame, title);
         let mut type_labels = vec![match domain {
             Domain::Duct => "Built-in (by shape)".to_owned(),
@@ -245,6 +266,7 @@ impl Gui {
             placing: None,
             flex: false,
             size_from_connector: false,
+            placeholder,
         };
         f.dialog.destroy();
         self.end_tool(&frame);
@@ -358,6 +380,7 @@ impl Gui {
                     placing: None,
                     flex: true,
                     size_from_connector: sess.size_from_connector,
+                    placeholder: false,
                 });
                 self.run_preview();
                 frame.set_status_text(&format!("Flex Duct: resumed with {n} point(s); click the next points, Enter or Esc finishes"), 0);
@@ -413,6 +436,7 @@ impl Gui {
             placing: None,
             flex: true,
             size_from_connector: from_connector.is_checked(),
+            placeholder: false,
         };
         f.dialog.destroy();
         self.end_tool(&frame);
@@ -451,6 +475,33 @@ impl Gui {
                 } else {
                     MessageDialog::builder(&frame, &text, "Convert to Flex Duct").with_style(MessageDialogStyle::OK | MessageDialogStyle::IconInformation).build().show_modal();
                 }
+            }
+            Err(e) => error(&frame, &e),
+        }
+    }
+
+    /// Systems › Convert Placeholder (MEP-DUCT-007): converts the selected placeholders into
+    /// ducts and pipes with fittings; the ends it could not fit are listed.
+    pub(crate) fn convert_placeholders(&mut self) {
+        let frame = self.frame;
+        let Some(store) = self.store_now() else { return };
+        let ids: Vec<ElementId> = self.selection().into_iter().filter(|i| reviera_core::mep_placeholders::is_placeholder(&store, *i)).collect();
+        if ids.is_empty() {
+            return frame.set_status_text("Convert Placeholder: select duct or pipe placeholders (Tab selects a connected set)", 0);
+        }
+        match self.run("placeholder.convert", json!({ "ids": ids })) {
+            Ok(v) => {
+                self.refresh_scene(&frame);
+                let rep: reviera_core::mep_placeholders::ConvertReport = serde_json::from_value(v).unwrap_or_default();
+                let mut text = format!("{} placeholder(s) converted, {} fitting(s) made.", rep.segments.len(), rep.fittings.len());
+                if rep.open.is_empty() {
+                    return frame.set_status_text(&text, 0);
+                }
+                text.push_str(&format!("\n\n{} end(s) were left open:", rep.open.len()));
+                for o in &rep.open {
+                    text.push_str(&format!("\nElement {} at ({:.3}, {:.3}, {:.3}): {}", o.element.0, o.at[0], o.at[1], o.at[2], o.reason));
+                }
+                MessageDialog::builder(&frame, &text, "Convert Placeholder").with_style(MessageDialogStyle::OK | MessageDialogStyle::IconInformation).build().show_modal();
             }
             Err(e) => error(&frame, &e),
         }
@@ -587,6 +638,8 @@ impl Gui {
             args["slope"] = json!(t.slope);
         }
         let command = match t.domain {
+            Domain::Duct if t.placeholder => "duct_placeholder.create",
+            Domain::Pipe if t.placeholder => "pipe_placeholder.create",
             Domain::Duct => "duct.create",
             Domain::CableTray => "cable_tray.create",
             Domain::Conduit => "conduit.create",
@@ -604,11 +657,11 @@ impl Gui {
                 }
                 self.refresh_scene(&frame);
                 let r = &o.result;
-                let mut text = format!(
-                    "{} segment(s), {} fitting(s)",
-                    r["segments"].as_array().map_or(0, Vec::len),
-                    r["fittings"].as_array().map_or(0, Vec::len)
-                );
+                let mut text = if t.placeholder {
+                    format!("{} placeholder(s)", r["segments"].as_array().map_or(0, Vec::len))
+                } else {
+                    format!("{} segment(s), {} fitting(s)", r["segments"].as_array().map_or(0, Vec::len), r["fittings"].as_array().map_or(0, Vec::len))
+                };
                 if !r["system"].is_null() {
                     text.push_str("; joined its system");
                 }
@@ -716,6 +769,7 @@ impl Gui {
             placing: Some(placing),
             flex: false,
             size_from_connector: false,
+            placeholder: false,
         });
         frame.set_status_text(&format!("{title}: click on a {} or its open end to place: {label}; Esc ends", domain_title(domain).to_lowercase()), 0);
     }
@@ -812,6 +866,7 @@ impl Gui {
             placing: Some(Placing::Accessory(kind)),
             flex: false,
             size_from_connector: false,
+            placeholder: false,
         });
         frame.set_status_text(&format!("Pipe Accessory: click on a pipe to insert a {}; flanged from 50 mm; Esc ends", kind.label().to_lowercase()), 0);
     }
@@ -850,6 +905,7 @@ impl Gui {
             placing: Some(Placing::DuctAccessory(kind)),
             flex: false,
             size_from_connector: false,
+            placeholder: false,
         });
         frame.set_status_text(&format!("Duct Accessory: click on a duct to insert a {} ({:.0} mm long), or on an open end; Esc ends", kind.label().to_lowercase(), kind.default_length() * 1000.0), 0);
     }

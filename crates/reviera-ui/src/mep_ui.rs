@@ -147,7 +147,58 @@ fn marker(p: [f64; 3]) -> Vec<Segment> {
     s
 }
 
+/// A placeholder outside any system.
+const PLACEHOLDER: [f32; 4] = [0.45, 0.3, 0.65, 1.0];
+
 impl Gui {
+    /// The placeholder (MEP-DUCT-007) whose line is within a few pixels of (`x`, `y`) in the
+    /// active view.
+    pub(crate) fn placeholder_at(&self, x: i32, y: i32) -> Option<ElementId> {
+        let v = self.active_view()?;
+        let store = self.app.document(v.doc)?.doc.store();
+        let size = v.panel.get_client_size();
+        let (w, h) = (size.width as f32, size.height as f32);
+        let (x, y) = (x as f32, y as f32);
+        let hidden = self.view_visibility(v).hidden;
+        store
+            .iter()
+            .filter(|e| !hidden.contains(&e.id()))
+            .filter_map(|e| {
+                let s = reviera_core::mep_runs::segment_recipe(e).filter(|s| s.placeholder)?;
+                let a = v.camera.project(glam::Vec3::from(f32s(s.start)), w, h)?;
+                let b = v.camera.project(glam::Vec3::from(f32s(s.end)), w, h)?;
+                let (dx, dy) = (b.0 - a.0, b.1 - a.1);
+                let t = (((x - a.0) * dx + (y - a.1) * dy) / (dx * dx + dy * dy).max(1e-6)).clamp(0.0, 1.0);
+                let d = (x - (a.0 + dx * t)).hypot(y - (a.1 + dy * t));
+                (d < 5.0).then_some((e.id(), d))
+            })
+            .min_by(|a, b| a.1.total_cmp(&b.1))
+            .map(|(id, _)| id)
+    }
+
+    /// The placeholders joined to `start`, directly or through others, `start` first.
+    pub(crate) fn placeholder_network(&self, start: ElementId) -> Vec<ElementId> {
+        let Some(store) = self.store_now() else { return vec![start] };
+        let partners = mep::partners(&store);
+        let mut out = vec![start];
+        let mut k = 0;
+        while k < out.len() {
+            let at = out[k];
+            k += 1;
+            for ((e, _), list) in &partners {
+                if *e != at {
+                    continue;
+                }
+                for (o, _) in list {
+                    if !out.contains(o) && reviera_core::mep_placeholders::is_placeholder(&store, *o) {
+                        out.push(*o);
+                    }
+                }
+            }
+        }
+        out
+    }
+
     /// The connector glyphs of the selected elements and the active view's check markers.
     pub(crate) fn mep_lines(&mut self, index: usize) -> Vec<Lines> {
         let Some(store) = self.store_now() else {
@@ -184,6 +235,18 @@ impl Gui {
             if !hidden.contains(&c.id) {
                 add(ANALYTICAL, dashed(c.from, c.point));
             }
+        }
+        // Placeholders (MEP-DUCT-007): a line each, in their system's colour, in every view and
+        // detail level.
+        let run_colours = mep_systems::element_colors(&store);
+        let selected = self.selection();
+        for e in store.iter() {
+            let Some(s) = reviera_core::mep_runs::segment_recipe(e).filter(|s| s.placeholder) else { continue };
+            if hidden.contains(&e.id()) {
+                continue;
+            }
+            let colour = if selected.contains(&e.id()) { reviera_render::HIGHLIGHT } else { run_colours.get(&e.id()).copied().unwrap_or(PLACEHOLDER) };
+            out.push(Lines { color: colour, width: 1.5, segments: vec![[f32s(s.start), f32s(s.end)]] });
         }
         // Circuits of the selection: dashed from the panel's connector to each device's.
         let sel = self.selection();

@@ -173,6 +173,9 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(FlexDuctCreate),
         registry.add(DuctConvertToFlex),
         registry.add(MepRunJustify),
+        registry.add(DuctPlaceholderCreate),
+        registry.add(PipePlaceholderCreate),
+        registry.add(PlaceholderConvert),
         registry.add(MechControlDeviceAssign),
         registry.add(MechControlDeviceList),
         registry.add(MepRunCreateRiser),
@@ -1699,4 +1702,37 @@ read_command!(
     crate::mep_gutters::SizeParams,
     crate::mep_gutters::SizeReport,
     crate::mep_gutters::size
+);
+
+edit_command!(
+    DuctPlaceholderCreate,
+    "duct_placeholder.create",
+    "Draw duct placeholders",
+    "Draws duct placeholders (MEP-DUCT-007): single-line IfcDuctSegments without fittings or body (IFC `Axis` only), one per leg of `points` (`[x, y]` at `middle_elevation` above `level`, 2.7 m by default, or `[x, y, z]`), of `type_id` (its routing preferences are used on conversion), `shape` and size (`width` × `height`, or `diameter`), carrying `system_type_id`. Ends that meet join each other at any angle and size, and connectors of equipment there; an end on another placeholder's side splits it there. Placeholders count in system flow and Check Systems, not in sizing, pressure drop or interference. Convert them with `placeholder.convert`.",
+    "Duct Placeholder",
+    crate::mep_runs::CreateParams,
+    crate::mep_placeholders::PlaceholderReport,
+    crate::mep_placeholders::create_duct
+);
+
+edit_command!(
+    PipePlaceholderCreate,
+    "pipe_placeholder.create",
+    "Draw pipe placeholders",
+    "Draws pipe placeholders (MEP-DUCT-007) as `duct_placeholder.create` does duct placeholders, round only (`diameter`), at 2.4 m by default; `slope` makes level legs fall (rise over run) from the first point, and conversion keeps it.",
+    "Pipe Placeholder",
+    crate::mep_runs::CreateParams,
+    crate::mep_placeholders::PlaceholderReport,
+    crate::mep_placeholders::create_pipe
+);
+
+edit_command!(
+    PlaceholderConvert,
+    "placeholder.convert",
+    "Convert placeholders to ducts or pipes",
+    "Converts the placeholders among `ids` (MEP-DUCT-007) into real ducts or pipes with fittings from each type's routing preferences: legs in line join directly (a transition where the size changes), legs at an angle by an elbow, three legs by a tee (two in line, the branch square), four by a cross. Each placeholder keeps its GlobalId, size, slope and system; the segments are shortened by the fittings' legs. Where a point cannot be fitted (more than four legs, a branch off square, a size change at a bend, no routing row, a placeholder not being converted, a connector not faced at its size) its ends stay open and are listed in `open` with the reason, and a warning names each. Returns `element_ids` (segments then fittings). Undo restores the placeholders.",
+    "Convert Placeholder",
+    crate::mep_placeholders::ConvertParams,
+    crate::mep_placeholders::ConvertReport,
+    crate::mep_placeholders::convert
 );

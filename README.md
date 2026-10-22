@@ -994,6 +994,14 @@ schedules, circuit paths, cable sizing and voltage drop.
   alignment; runs with branches are refused. Runs drawn from or to an open end of another size
   now get a transition (`mep_run.justify`). Not built yet: alignment lines in 3D, keeping
   unselected branches joined.
+- **Duct and pipe placeholders** (Systems › Insulation & Accessories › Duct Placeholder `DH`,
+  Pipe Placeholder `PH`, Convert Placeholder `CP`): single-line ducts and pipes without fittings
+  for fast early layout, joined where their ends meet and counted in system flow and Check
+  Systems but not sizing or pressure drop; exported with an `Axis` only. Conversion fits elbows,
+  tees, crosses and transitions from the routing preferences, keeps each segment's GlobalId,
+  slope and system, and lists the ends it leaves open (`duct_placeholder.create`,
+  `pipe_placeholder.create`, `placeholder.convert`). Not built yet: the Angles setting, split
+  buttons on Duct and Pipe.
 - **Sloped piping and parallel pipes** (Systems › HVAC & Piping › Slope, Parallel Pipes): the
   Slope Editor gives a connected section of pipe one of the project's allowed slopes from a
   control point (the lowest end by default): fittings follow, branches stay connected (their

@@ -400,6 +400,15 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "convert_flex" => format!(
             r#"<path d="M3 8h12" stroke-width="5" {s}/><path d="M18 8l-3-3v6z" fill="{f}" {sa}/><path d="M3 24c4 0 4-6 8-6s4 6 8 6 4-6 10-6" fill="none" stroke-width="5" {s}/><rect x="22" y="3" width="8" height="8" fill="{f}" {s}/>"#
         ),
+        "duct_placeholder" => format!(
+            r#"<path d="M4 24V10h20" fill="none" stroke-width="2" stroke-dasharray="4 2" {sa}/><circle cx="4" cy="24" r="2.5" fill="{f}" {s}/><circle cx="4" cy="10" r="2.5" fill="{f}" {s}/><circle cx="24" cy="10" r="2.5" fill="{f}" {s}/><rect x="19" y="18" width="10" height="8" fill="{f}" {s}/>"#
+        ),
+        "pipe_placeholder" => format!(
+            r#"<path d="M4 24V10h20" fill="none" stroke-width="2" stroke-dasharray="4 2" {sa}/><circle cx="4" cy="24" r="2.5" fill="{f}" {s}/><circle cx="4" cy="10" r="2.5" fill="{f}" {s}/><circle cx="24" cy="10" r="2.5" fill="{f}" {s}/><circle cx="24" cy="22" r="5" fill="{f}" {s}/>"#
+        ),
+        "convert_placeholder" => format!(
+            r#"<path d="M3 9h10" stroke-width="2" stroke-dasharray="3 2" {sa}/><path d="M17 9l-3-3v6z" fill="{f}" {sa}/><path d="M3 24h12a6 6 0 0 0 6-6V4" fill="none" stroke-width="6" {s}/><path d="M3 24h12a6 6 0 0 0 6-6V4" fill="none" stroke-width="3" stroke="{f}"/>"#
+        ),
         "valve" => format!(
             r#"<path d="M2 16h5M25 16h5" stroke-width="4" {s}/><path d="M7 10l18 12V10L7 22z" fill="{f}" {s}/><path d="M16 16V6M11 6h10" {sa}/>"#
         ),

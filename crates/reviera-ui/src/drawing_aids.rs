@@ -553,6 +553,14 @@ impl Gui {
                     push(chain, &mut candidates);
                 }
             }
+            // A placeholder, then its connected set (MEP-DUCT-007).
+            if let Some(p) = self.placeholder_at(x, y) {
+                push(vec![p], &mut candidates);
+                let set = self.placeholder_network(p);
+                if set.len() > 1 {
+                    push(set, &mut candidates);
+                }
+            }
             // Other things at the same place.
             for other in [
                 self.note_at(x, y),
@@ -586,7 +594,9 @@ impl Gui {
         }
         let Some(t) = self.tab.clone() else { return };
         let current = t.candidates[t.index].clone();
-        let what = if current.len() > 1 {
+        let what = if current.len() > 1 && self.store_now().is_some_and(|s| current.iter().all(|i| reviera_core::mep_placeholders::is_placeholder(&s, *i))) {
+            format!("{} connected placeholders", current.len())
+        } else if current.len() > 1 {
             format!("{} walls in a chain", current.len())
         } else {
             self.store_now()
