@@ -9,6 +9,7 @@
 
 #include <wx/wx.h>
 #include <wx/aui/auibook.h>
+#include <wx/aui/framemanager.h>
 #include <wx/aui/serializer.h>
 #include <wx/aui/auibar.h>
 #include <wx/bmpbndl.h>
@@ -282,6 +283,21 @@ wxBitmapBundle svg_bundle(const char* svg, int size) {
 }
 }
 
+namespace {
+// Sizes the AUI pane holding the ribbon's panel to the ribbon's height now.
+void fit_ribbon_pane(wxWindow* panel, wxRibbonBar* bar) {
+    wxAuiManager* m = wxAuiManager::GetManager(panel);
+    if (!m) return;
+    wxAuiPaneInfo& pane = m->GetPane(panel);
+    if (!pane.IsOk()) return;
+    bar->InvalidateBestSize();
+    const int h = bar->GetBestSize().GetHeight();
+    if (pane.min_size.GetHeight() == h) return;
+    pane.MinSize(wxSize(-1, h)).BestSize(wxSize(-1, h)).MaxSize(wxSize(-1, h));
+    m->Update();
+}
+}
+
 // A ribbon filling `parent` (a panel docked by AUI), forwarding button clicks to `callback`.
 void* reviera_rb_new(void* parent, reviera_rb_callback callback, void* user) {
     auto* panel = static_cast<wxWindow*>(parent);
@@ -294,6 +310,22 @@ void* reviera_rb_new(void* parent, reviera_rb_callback callback, void* user) {
     panel->SetSizer(sizer);
     // An action may rebuild the contextual tab, destroying the button bar that sent the click
     // while wx is still handling it; so actions run once the event is done.
+    // Collapsing or expanding the ribbon (its toggle button, or a double click on a tab): the
+    // AUI pane holding it follows its height, else the pane keeps the full height and nothing
+    // seems to happen.
+    bar->Bind(wxEVT_RIBBONBAR_TOGGLED, [=](wxRibbonBarEvent& e) {
+        e.Skip();
+        bar->CallAfter([=] { fit_ribbon_pane(panel, bar); });
+    });
+    // A tab clicked while collapsed shows its page until the ribbon loses focus, and a double
+    // click on the tab pins or collapses it; wx sends no event for these, so refit after them.
+    auto refit = [=](wxEvent& e) {
+        e.Skip();
+        bar->CallAfter([=] { fit_ribbon_pane(panel, bar); });
+    };
+    bar->Bind(wxEVT_LEFT_DOWN, refit);
+    bar->Bind(wxEVT_LEFT_DCLICK, refit);
+    bar->Bind(wxEVT_KILL_FOCUS, refit);
     bar->Bind(wxEVT_RIBBONBUTTONBAR_CLICKED, [=](wxRibbonButtonBarEvent& e) {
         const int id = e.GetId();
         bar->CallAfter([=] { callback(user, id); });
