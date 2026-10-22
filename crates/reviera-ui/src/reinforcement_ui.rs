@@ -45,6 +45,18 @@ impl Form {
         t
     }
 
+    /// A text box with a drop-down of suggestions (any value may be typed).
+    pub(crate) fn combo(&self, label: &str, items: &[String], value: &str, tip: &str) -> ComboBox {
+        row(&self.dialog, &self.grid, label);
+        let c = ComboBox::builder(&self.dialog).with_value(value).with_choices(items.to_vec()).build();
+        if !tip.is_empty() {
+            c.set_tooltip(tip);
+        }
+        c.set_min_size(Size::new(260, -1));
+        self.grid.add(&c, 1, SizerFlag::Expand, 0);
+        c
+    }
+
     /// A masked text box (a secret).
     pub(crate) fn password(&self, label: &str, tip: &str) -> TextCtrl {
         row(&self.dialog, &self.grid, label);

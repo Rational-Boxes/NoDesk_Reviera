@@ -1011,6 +1011,14 @@ schedules, circuit paths, cable sizing and voltage drop.
   main (`air_terminal.place`, `space.airflow`, `mech_equipment.place`, `equipment_set.*`,
   `system.flow_totals`, `mep.connect_into`). Not built yet: Tag on Placement, side-face
   terminals, standby units in sizing.
+- **Mechanical Settings** (Manage › MEP Settings › Mechanical Settings `MS`, Duct Sizes, Pipe
+  Segment, Fluid): hidden-line gaps, air properties, duct and pipe angle rules (runs and
+  placeholder conversion keep to them), friction methods by domain (Colebrook, Haaland,
+  Altshul–Tsal), pipe slopes (zero cannot be removed), duct size tables marked for the size
+  drop-downs and for sizing, pipe segments with nominal, inner and outer diameters (exported as
+  IfcPipeSegmentTypes), and fluid property tables (`mechanical_settings.get`/`.set`,
+  `duct_size_table.set`, `pipe_segment.create`, `fluid.create`). Not built yet: hidden lines and
+  size-label separators in views, conversion's main and branch types.
 - **Sloped piping and parallel pipes** (Systems › HVAC & Piping › Slope, Parallel Pipes): the
   Slope Editor gives a connected section of pipe one of the project's allowed slopes from a
   control point (the lowest end by default): fittings follow, branches stay connected (their

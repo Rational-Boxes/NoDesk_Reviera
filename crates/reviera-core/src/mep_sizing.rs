@@ -74,6 +74,8 @@ pub enum Equation {
     #[default]
     Colebrook,
     Haaland,
+    /// Altshul–Tsal, for ducts (MEP-SET-001).
+    AltshulTsal,
 }
 
 /// The Darcy friction factor at a Reynolds number and relative roughness ε/D.
@@ -85,6 +87,10 @@ pub fn friction_factor(re: f64, rel: f64, eq: Equation) -> f64 {
         return 64.0 / re;
     }
     match eq {
+        Equation::AltshulTsal => {
+            let f = 0.11 * (rel + 68.0 / re).powf(0.25);
+            if f >= 0.018 { f } else { 0.85 * f + 0.0028 }
+        }
         Equation::Haaland => {
             let x = -1.8 * ((rel / 3.7).powf(1.11) + 6.9 / re).log10();
             1.0 / (x * x)
@@ -221,13 +227,13 @@ impl Flows {
 }
 
 /// The fluid of a system: density (kg/m³) and viscosity (Pa·s).
-pub(crate) fn fluid_of(sys: &crate::mep_systems::SystemInfo, st: &crate::mep_systems::SystemType) -> Result<(f64, f64)> {
+pub(crate) fn fluid_of(store: &Store, sys: &crate::mep_systems::SystemInfo, st: &crate::mep_systems::SystemType) -> Result<(f64, f64)> {
     if sys.classification.is_air() {
-        return Ok(AIR);
+        return Ok(crate::mep_mech_settings::air(store));
     }
+    let t = st.fluid_temperature.unwrap_or(20.0);
     match st.fluid.as_deref() {
-        Some(f) if f.eq_ignore_ascii_case("water") => water(st.fluid_temperature.unwrap_or(20.0)),
-        Some(f) => Err(bad("mep_size.fluid", format!("{}: the fluid {f:?} has no property table; only water is built in", sys.name))),
+        Some(f) => crate::mep_mech_settings::fluid(store, f, t),
         None => water(20.0),
     }
 }
@@ -396,8 +402,8 @@ pub struct SizeReport {
 }
 
 /// The sizes of a type's sizing table, smallest area first, that a restriction allows.
-pub(crate) fn candidates(t: &mep_runs::SegmentType, shape: Shape, r: &Restrict) -> Vec<Size> {
-    let sides = t.sizing_sizes(shape);
+pub(crate) fn candidates(store: &Store, t: &mep_runs::SegmentType, shape: Shape, r: &Restrict) -> Vec<Size> {
+    let sides = t.sizing_sizes_in(store, shape);
     let mut out: Vec<Size> = match shape {
         Shape::Round => sides
             .iter()
@@ -448,7 +454,7 @@ pub(crate) fn size(txn: &mut Transaction<'_>, p: SizeParams) -> Result<SizeRepor
             return Err(bad("mep_size.sanitary", format!("{}: sanitary and vent pipes are not sized by flow", sys.name)));
         }
         let air = sys.classification.is_air();
-        let fluid = fluid_of(sys, &st)?;
+        let fluid = fluid_of(&store, sys, &st)?;
         let fl = flows(&store, sys)?;
         let domestic = matches!(sys.classification, Classification::DomesticColdWater | Classification::DomesticHotWater);
         let table = table_of(sys, &st, &tables);
@@ -496,7 +502,7 @@ pub(crate) fn size(txn: &mut Transaction<'_>, p: SizeParams) -> Result<SizeRepor
                     Method::StaticRegain => unreachable!(),
                 }
             };
-            let cands = candidates(&t, s.size.shape, &p.restrict);
+            let cands = candidates(&store, &t, s.size.shape, &p.restrict);
             if cands.is_empty() {
                 report.warnings.push(format!("Segment {}: no size of its type's table fits the restrictions", sid.0));
                 continue;
@@ -690,11 +696,11 @@ mod tests {
     fn restricted_height_widens_rectangles() {
         let t: mep_runs::SegmentType = serde_json::from_value(serde_json::json!({ "kind": "recipe.mep_segment_type", "domain": "duct", "shape": "rectangular", "roughness": 9.0e-5 })).unwrap();
         let ok = |z: &Size| flow_in(1.0, z, 9.0e-5, AIR, Equation::Colebrook).1 <= 1.0;
-        let free = candidates(&t, Shape::Rectangular, &Restrict::default()).into_iter().find(|z| ok(z)).unwrap();
-        let low = candidates(&t, Shape::Rectangular, &Restrict { height: Some(0.3), ..Restrict::default() }).into_iter().find(|z| ok(z)).unwrap();
+        let free = candidates(&Store::default(), &t, Shape::Rectangular, &Restrict::default()).into_iter().find(|z| ok(z)).unwrap();
+        let low = candidates(&Store::default(), &t, Shape::Rectangular, &Restrict { height: Some(0.3), ..Restrict::default() }).into_iter().find(|z| ok(z)).unwrap();
         assert!(low.height <= 0.3 + 1e-9 && low.width > free.width, "{free:?} {low:?}");
         assert!(free.height > 0.3, "{free:?}");
         // Every candidate keeps an aspect ratio up to 4.
-        assert!(candidates(&t, Shape::Rectangular, &Restrict::default()).iter().all(|z| z.width.max(z.height) / z.width.min(z.height) <= 4.0 + 1e-9));
+        assert!(candidates(&Store::default(), &t, Shape::Rectangular, &Restrict::default()).iter().all(|z| z.width.max(z.height) / z.width.min(z.height) <= 4.0 + 1e-9));
     }
 }

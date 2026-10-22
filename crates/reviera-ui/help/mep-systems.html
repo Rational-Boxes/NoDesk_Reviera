@@ -23,6 +23,7 @@ Water 1. The tools are on the <b>Systems</b> tab.</p>
   <a href="#justify">Justifying a run</a>
   <a href="#placeholders">Placeholders</a>
   <a href="#terminals">Air terminals and equipment</a>
+  <a href="#mech-settings">Mechanical Settings</a>
   <a href="#slopes">Sloped pipes and parallel pipes</a>
   <a href="#controls">Thermostats, sensors and controllers</a>
   <a href="#risers">Risers</a>
@@ -338,6 +339,26 @@ href="reviera:action/mep.connect_into">Connect Into</a> (<kbd>C</kbd> <kbd>I</kb
 a duct or pipe at the connector's size out of the connector, up or down to the main's height,
 and square into the main, with a tee or tap there. If the component has more than one free
 connector of that kind, Reviera asks which.</p>
+
+<h2 id="mech-settings">Mechanical Settings</h2>
+<p><a href="reviera:action/mechanical_settings.show">Mechanical Settings</a> (<kbd>M</kbd>
+<kbd>S</kbd>, Manage › MEP Settings) holds the project's duct and pipe settings in one form:
+hidden-line gaps, air density and viscosity, annotation sizes and suffixes, the angles fittings
+may turn, the friction method for ducts and the pressure-drop method for pipes, the allowed pipe
+slopes and hydronic analysis.</p>
+<p>For angles, type <em>Any</em>, an increment such as <em>every 15</em>, or a list such as
+<em>45, 90</em>. Ducts and pipes you draw, and placeholders you convert, then turn only by those
+angles. Type the pipe slopes as percentages. Zero is always one of them and can't be removed, and
+a slope over 100 % (45°) is kept but you're warned.</p>
+<p><a href="reviera:action/duct_size_table.set">Duct Sizes</a> edits the sizes for one duct shape,
+one size a line. Add <em>L</em> to offer the size in the Duct tool's drop-downs, and <em>S</em>
+to let sizing choose it. Ducts you've already drawn keep their size when you take it off.</p>
+<p><a href="reviera:action/pipe_segment.create">Pipe Segment</a> makes a material and schedule,
+such as copper type L, with its roughness and a line per size giving the nominal, inner and outer
+diameter in mm. Pipe sizing chooses from these sizes, and they're exported with the model so other
+tools see the catalogue. <a href="reviera:action/fluid.create">Fluid</a> adds a fluid with a line
+per temperature giving its density and viscosity. A system type that names the fluid uses those
+values at its temperature.</p>
 
 <h2 id="slopes">Sloped pipes and parallel pipes</h2>
 <p>To give drainage a fall, select the pipes and fittings of a run and choose <a

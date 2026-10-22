@@ -229,7 +229,7 @@ fn context(store: &Store, s: &SegmentRecipe) -> Ctx {
 }
 
 /// The fitting a point of `ends` takes, or why it takes none.
-fn plan(cx: &Ctx, ends: &[End]) -> std::result::Result<Option<Plan>, String> {
+fn plan(cx: &Ctx, ends: &[End], allowed: &crate::mep_mech_settings::Angles) -> std::result::Result<Option<Plan>, String> {
     let leg = |e: &End, length: f64, size: Size| Leg { direction: e.away, length, size, across: None };
     let row = |role: Role, part: Option<Part>, size: f64| -> std::result::Result<Part, String> {
         let found = match part {
@@ -259,6 +259,10 @@ fn plan(cx: &Ctx, ends: &[End]) -> std::result::Result<Option<Plan>, String> {
         [a, b] => {
             if !same_size(&a.size, &b.size) {
                 return Err("the size changes at a bend".into());
+            }
+            let turn = (-dot(a.away, b.away)).clamp(-1.0, 1.0).acos().to_degrees();
+            if !allowed.allows(turn) {
+                return Err(format!("the Angles setting allows {}, not a {turn:.1}° bend", allowed.text()));
             }
             let part = row(Role::Elbow, None, a.size.nominal())?;
             // A vertical leg keeps the level leg's across direction.
@@ -357,7 +361,8 @@ pub(crate) fn convert(txn: &mut Transaction<'_>, p: ConvertParams) -> Result<Con
             !ids.contains(&e.id()) && segment_recipe(e).is_some_and(|s| s.placeholder && (len(sub(s.start, *at)) <= 2.0 * NEAR || len(sub(s.end, *at)) <= 2.0 * NEAR))
         });
         let cx = context(&store, &recipes[&ends[0].id]);
-        let outcome = if left_out { Err("it meets a placeholder not being converted".to_string()) } else { plan(&cx, ends) };
+        let allowed = crate::mep_mech_settings::angles(&store, cx.domain);
+        let outcome = if left_out { Err("it meets a placeholder not being converted".to_string()) } else { plan(&cx, ends, &allowed) };
         match outcome {
             Ok(Some(pl)) => {
                 for (e, t) in ends.iter().zip(&pl.trims) {

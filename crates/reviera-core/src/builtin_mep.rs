@@ -186,6 +186,12 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(EquipmentSetList),
         registry.add(SystemFlowTotals),
         registry.add(MepConnectInto),
+        registry.add(MechanicalSettingsGet),
+        registry.add(MechanicalSettingsSet),
+        registry.add(DuctSizeTableGet),
+        registry.add(DuctSizeTableSet),
+        registry.add(PipeSegmentCreate),
+        registry.add(FluidCreate),
         registry.add(MechControlDeviceAssign),
         registry.add(MechControlDeviceList),
         registry.add(MepRunCreateRiser),
@@ -1852,4 +1858,68 @@ edit_command!(
     crate::mep_equipment::ConnectIntoParams,
     crate::mep_runs::RunReport,
     crate::mep_equipment::connect_into
+);
+
+read_command!(
+    MechanicalSettingsGet,
+    "mechanical_settings.get",
+    "Mechanical settings",
+    "The project's Mechanical Settings (MEP-SET-001) at a dotted `path` (the whole tree when empty): `hidden_line` (draw, line_style, inside_gap, outside_gap, single_line_gap in paper mm); `duct` (fitting_annotation_scale, fitting_annotation_size, air_density kg/m³, air_viscosity Pa·s, size_separator, size_suffix, connector_separator, flat_on_top, flat_on_bottom, rise_drop_size, `angles` {mode: any | increment {step} | list {angles}}, `conversion` {main_type, branch_type, main_offset, branch_offset, flex, flex_max_length}, `sizes` {rectangular, oval, round: [{size m, in_lists, in_sizing}]}, `calculation.friction_equation` colebrook | haaland | altshul_tsal); `pipe` (annotation_size, size_prefix, size_suffix, connector_separator, angles, conversion, `segments` [{id, material, schedule, roughness, sizes [{nominal, inner, outer, in_lists, in_sizing}]}], `fluids` [{id, name, table [{temperature °C, density, viscosity Pa·s}]}], `slopes` (rise over run, zero first), `calculation` {hydronic_analysis, pressure_drop}).",
+    crate::mep_mech_settings::GetParams,
+    serde_json::Value,
+    crate::mep_mech_settings::get
+);
+
+edit_command!(
+    MechanicalSettingsSet,
+    "mechanical_settings.set",
+    "Change a mechanical setting",
+    "Sets the Mechanical Setting at the dotted `path` (as `mechanical_settings.get` shows the tree) to `value`, checked before anything is kept: air properties above zero, angle increments above 0° and at most 90°, listed angles 0–180°, sizes above zero and not repeated, fluids' temperatures rising. `pipe.slopes` must keep zero (\"The zero slope cannot be removed\"); a slope over 45° is kept with a warning. Corners of duct and pipe runs, and placeholder conversion, keep to `duct.angles` and `pipe.angles`.",
+    "Mechanical Settings",
+    crate::mep_mech_settings::SetParams,
+    (),
+    crate::mep_mech_settings::set
+);
+
+read_command!(
+    DuctSizeTableGet,
+    "duct_size_table.get",
+    "A duct size table",
+    "A duct shape's size table (`shape`: rectangular, oval, round): each size (metres) with Used in Size Lists and Used in Sizing.",
+    crate::mep_mech_settings::DuctSizesParams,
+    Vec<crate::mep_mech_settings::SizeRow>,
+    crate::mep_mech_settings::get_duct_sizes
+);
+
+edit_command!(
+    DuctSizeTableSet,
+    "duct_size_table.set",
+    "Set a duct size table",
+    "Replaces a duct shape's size table (`shape`, `sizes`: [{size m, in_lists, in_sizing}]). Sizes in lists are offered in the size drop-downs; sizes in sizing are what sizing chooses from for types without their own table. Taking a size off leaves ducts of that size as they are.",
+    "Duct Sizes",
+    crate::mep_mech_settings::DuctSizeTableParams,
+    (),
+    crate::mep_mech_settings::set_duct_sizes
+);
+
+edit_command!(
+    PipeSegmentCreate,
+    "pipe_segment.create",
+    "Make a pipe segment",
+    "Makes a pipe segment (MEP-SET-001): a material (`material_id`, its name) with a `schedule` or class, `roughness` (m) and `sizes` [{nominal, inner, outer (m), in_lists, in_sizing}]. Pipe sizing chooses from the segments' sizes in sizing for types without their own table; the first segment made replaces the built-in Generic one. Each size is exported as an IfcPipeSegmentType with Pset_PipeSegmentTypeCommon. Returns its id.",
+    "Pipe Segment",
+    crate::mep_mech_settings::PipeSegmentParams,
+    String,
+    crate::mep_mech_settings::create_segment
+);
+
+edit_command!(
+    FluidCreate,
+    "fluid.create",
+    "Make a fluid",
+    "Makes a fluid (MEP-SET-001): `name` and a `table` of temperature (°C), density (kg/m³) and dynamic viscosity (Pa·s), interpolated for systems whose type names the fluid at its temperature (outside the table: \"Temperature outside fluid table range\"). Water is built in. Returns its id.",
+    "Fluid",
+    crate::mep_mech_settings::FluidParams,
+    String,
+    crate::mep_mech_settings::create_fluid
 );

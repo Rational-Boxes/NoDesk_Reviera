@@ -430,6 +430,24 @@ impl TrayKind {
 }
 
 impl SegmentType {
+    /// The sizes sizing chooses from: the type's table, else Mechanical Settings' (duct size
+    /// tables and pipe segments marked Used in Sizing, MEP-SET-001).
+    pub fn sizing_sizes_in(&self, store: &Store, shape: Shape) -> Vec<f64> {
+        if !self.sizes.is_empty() {
+            return self.sizes.clone();
+        }
+        match self.domain {
+            Domain::Duct => crate::mep_mech_settings::sizing_sizes(store, shape),
+            Domain::Pipe => {
+                let mut v: Vec<f64> = crate::mep_mech_settings::segments(store).iter().flat_map(|s| s.sizes.iter().filter(|z| z.in_sizing).map(|z| z.nominal)).collect();
+                v.sort_by(f64::total_cmp);
+                v.dedup_by(|a, b| (*a - *b).abs() < 1e-9);
+                v
+            }
+            _ => self.sizing_sizes(shape),
+        }
+    }
+
     /// The sizes sizing chooses from: the type's table, or the domain's series (round ducts
     /// EN 1506's 100–1250 mm, rectangle sides 100–2000 mm, pipes DN 10–300).
     pub fn sizing_sizes(&self, shape: Shape) -> Vec<f64> {
@@ -1652,6 +1670,14 @@ fn draw_with(txn: &mut Transaction<'_>, domain: Domain, p: CreateParams, radii: 
         .collect();
     let across_of = |k: usize| across[k].unwrap_or_else(|| frame(dirs[k]).0);
     let mut corners_made: Vec<(V3, V3, V3, Option<V3>)> = Vec::new();
+    // Corners keep to Mechanical Settings' Angles (MEP-SET-001).
+    let allowed = crate::mep_mech_settings::angles(&store, domain);
+    for k in 1..n - 1 {
+        let turn = dot(dirs[k - 1], dirs[k]).clamp(-1.0, 1.0).acos().to_degrees();
+        if !allowed.allows(turn) {
+            return Err(bad("mep_run.angle", format!("the Angles setting allows {}; this corner turns {turn:.1}°", allowed.text())));
+        }
+    }
     for k in 1..n - 1 {
         let (a, b) = (mul(dirs[k - 1], -1.0), dirs[k]);
         if t.radius_bends() {

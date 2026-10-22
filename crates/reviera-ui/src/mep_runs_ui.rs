@@ -124,7 +124,16 @@ fn domain_title(d: Domain) -> &'static str {
 const PREVIEW: [f32; 4] = [0.05, 0.35, 0.95, 1.0];
 
 fn number(t: &TextCtrl) -> Option<f64> {
-    t.get_value().trim().replace(',', ".").parse::<f64>().ok().filter(|v| v.is_finite())
+    parse(&t.get_value())
+}
+
+fn parse(v: &str) -> Option<f64> {
+    v.trim().replace(',', ".").parse::<f64>().ok().filter(|v| v.is_finite())
+}
+
+/// Millimetre labels of sizes (metres) for a drop-down.
+fn mm_list(sizes: &[f64]) -> Vec<String> {
+    sizes.iter().map(|v| format!("{:.1}", v * 1000.0).trim_end_matches(".0").to_owned()).collect()
 }
 
 impl Gui {
@@ -189,8 +198,10 @@ impl Gui {
         let mm = |v: f64| format!("{:.0}", v * 1000.0);
         let k = keep.as_ref();
         let (w0, h0) = if tray { (0.3, 0.1) } else { (0.6, 0.3) };
-        let width = (duct || tray).then(|| f.text("Width (mm)", &mm(k.map_or(w0, |k| k.width)), if tray { "The tray's width" } else { "Rectangular and oval ducts" }));
-        let height = (duct || tray).then(|| f.text("Height (mm)", &mm(k.map_or(h0, |k| k.height)), if tray { "The tray's side height" } else { "Rectangular and oval ducts" }));
+        // The size lists of Mechanical Settings (MEP-SET-001); any size may be typed.
+        let sides = if duct { mm_list(&reviera_core::mep_mech_settings::list_sizes(&store, mep::Shape::Rectangular)) } else { Vec::new() };
+        let width = (duct || tray).then(|| f.combo("Width (mm)", &sides, &mm(k.map_or(w0, |k| k.width)), if tray { "The tray's width" } else { "Rectangular and oval ducts" }));
+        let height = (duct || tray).then(|| f.combo("Height (mm)", &sides, &mm(k.map_or(h0, |k| k.height)), if tray { "The tray's side height" } else { "Rectangular and oval ducts" }));
         let standard_sizes = {
             let s = reviera_core::mep_electrical::settings(&store);
             s.conduit_standards
@@ -201,7 +212,12 @@ impl Gui {
         };
         let diameter = (!tray).then(|| {
             let tip = if conduit { format!("Outside diameter, one of its standard's sizes (mm) — {standard_sizes}") } else { "Round ducts and pipes".to_owned() };
-            f.text("Diameter (mm)", &mm(k.map_or(if duct { 0.25 } else if conduit { 0.025 } else { 0.05 }, |k| k.diameter)), &tip)
+            let list = match domain {
+                Domain::Duct => mm_list(&reviera_core::mep_mech_settings::list_sizes(&store, mep::Shape::Round)),
+                Domain::Pipe => mm_list(&reviera_core::mep_mech_settings::pipe_list_sizes(&store)),
+                _ => Vec::new(),
+            };
+            f.combo("Diameter (mm)", &list, &mm(k.map_or(if duct { 0.25 } else if conduit { 0.025 } else { 0.05 }, |k| k.diameter)), &tip)
         });
         let default_elevation = match domain {
             Domain::Duct => 2.7,
@@ -235,7 +251,7 @@ impl Gui {
             f.dialog.destroy();
             return;
         }
-        let read = |t: &Option<TextCtrl>, d: f64| t.as_ref().and_then(number).map_or(d, |v| v / 1000.0);
+        let read = |t: &Option<ComboBox>, d: f64| t.as_ref().and_then(|c| parse(&c.get_value())).map_or(d, |v| v / 1000.0);
         let ti = type_choice.get_selection().map_or(0, |i| i as usize);
         let picked = ti.checked_sub(1).and_then(|i| types.get(i));
         let shape = match (&shape_choice, picked) {
@@ -249,7 +265,7 @@ impl Gui {
             level,
             type_id: picked.map(|t| t.0),
             shape,
-            diameter: diameter.as_ref().and_then(number).map_or(0.25, |v| v / 1000.0),
+            diameter: diameter.as_ref().and_then(|c| parse(&c.get_value())).map_or(0.25, |v| v / 1000.0),
             width: read(&width, w0),
             height: read(&height, h0),
             elevation: number(&elevation).unwrap_or(default_elevation),

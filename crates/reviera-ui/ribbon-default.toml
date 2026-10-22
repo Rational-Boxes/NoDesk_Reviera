@@ -1682,6 +1682,31 @@ icon = "rebar_settings"
 help = "Rebar length rounding, hooks in shape definitions, and the project's cover types"
 
 [[action]]
+id = "mechanical_settings.show"
+label = "Mechanical Settings"
+icon = "mechanical_settings"
+keys = "MS"
+help = "The project's Mechanical Settings: hidden lines, duct and pipe annotation, air properties, angles, conversion, pipe slopes and calculation methods (MEP-SET-001)"
+
+[[action]]
+id = "duct_size_table.set"
+label = "Duct Sizes"
+icon = "duct_sizes"
+help = "Edit a duct shape's size table: which sizes the size drop-downs offer and which sizing chooses from (MEP-SET-001)"
+
+[[action]]
+id = "pipe_segment.create"
+label = "Pipe Segment"
+icon = "pipe_segment"
+help = "Make a pipe segment: a material and schedule with its roughness and nominal, inner and outer diameters (MEP-SET-001)"
+
+[[action]]
+id = "fluid.create"
+label = "Fluid"
+icon = "fluid"
+help = "Make a fluid with a table of temperature, density and viscosity for systems to use (MEP-SET-001)"
+
+[[action]]
 id = "structural_settings.show"
 label = "Structural Settings"
 icon = "structural_settings"
@@ -3382,6 +3407,10 @@ tools = [
 [[tab.panel]]
 label = "MEP Settings"
 tools = [
+  { action = "mechanical_settings.show", size = "large" },
+  { action = "duct_size_table.set", size = "small" },
+  { action = "pipe_segment.create", size = "small" },
+  { action = "fluid.create", size = "small" },
   { action = "load_classification.manage", size = "large" },
   { action = "demand_factor.manage", size = "large" },
   { action = "wiring.settings", size = "large" },

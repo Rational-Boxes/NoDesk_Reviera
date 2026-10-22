@@ -65,6 +65,7 @@ pub const UI_ACTIONS: &[&str] = &[
     "tool.modify",
     "wall.create_structural",
     "structural_settings.show",
+    "mechanical_settings.show",
     "reinforcement_settings.show",
     "ui.toggle_analytical",
     "floor.create_structural",

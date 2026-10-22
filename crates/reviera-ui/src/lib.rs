@@ -100,6 +100,7 @@ mod snap;
 mod stack;
 mod stairs;
 mod structural_settings;
+mod mech_settings_ui;
 mod wall_profile;
 mod wall_sweeps;
 mod walls;
@@ -4697,6 +4698,10 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
             g.frame.set_status_text(text, 0);
         }),
         "structural_settings.show" => with(gui, Gui::structural_settings),
+        "mechanical_settings.show" => with(gui, Gui::mechanical_settings),
+        "duct_size_table.set" => with(gui, Gui::duct_sizes),
+        "pipe_segment.create" => with(gui, Gui::new_pipe_segment),
+        "fluid.create" => with(gui, Gui::new_fluid),
         "file.close" => with(gui, Gui::close_model),
         "help.home" => with(gui, Gui::show_help),
         "help.about" => with(gui, |g| g.about()),

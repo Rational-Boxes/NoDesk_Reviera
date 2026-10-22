@@ -93,6 +93,26 @@ fn remove_earlier(ifc: &mut IfcModel) -> Result<()> {
             ifc.remove(rel.id)?;
         }
     }
+    // Pipe segment sizes (MEP-SET-001): tagged types with their property sets.
+    for t in ifc.entities_of_type("IfcPipeSegmentType")? {
+        if !is_ours(ifc, t.id) {
+            continue;
+        }
+        if let AttrValue::List(sets) = ifc.attribute(t.id, "HasPropertySets")? {
+            for set in sets {
+                let AttrValue::Ref(set) = set else { continue };
+                if let AttrValue::List(props) = ifc.attribute(StepId(set), "HasProperties")? {
+                    for p in props {
+                        if let AttrValue::Ref(p) = p {
+                            let _ = ifc.remove(StepId(p));
+                        }
+                    }
+                }
+                let _ = ifc.remove(StepId(set));
+            }
+        }
+        ifc.remove(t.id)?;
+    }
     for rel in ifc.entities_of_type("IfcRelNests")? {
         if !is_ours(ifc, rel.id) {
             continue;
@@ -181,6 +201,40 @@ fn pset(
     Ok(())
 }
 
+/// Each size of the pipe segments made in Mechanical Settings as an `IfcPipeSegmentType` with
+/// `Pset_PipeSegmentTypeCommon` (MEP-SET-001), so other tools see the catalogue.
+fn write_pipe_segments(ifc: &mut IfcModel, store: &reviera_core::Store, owner_history: Option<StepId>, scale: f64) -> Result<()> {
+    let length = |v: f64| typed("IfcPositiveLengthMeasure", AttrValue::Real(v / scale));
+    for seg in reviera_core::mep_mech_settings::get_all(store).pipe.segments {
+        for z in &seg.sizes {
+            let t = ifc.create_rooted("IfcPipeSegmentType", &GlobalId::new())?;
+            if let Some(oh) = owner_history {
+                ifc.set_attribute(t, "OwnerHistory", &r(oh))?;
+            }
+            ifc.set_attribute(t, "Name", &s(&format!("{} DN {:.0}", seg.name(), z.nominal * 1000.0)))?;
+            ifc.set_attribute(t, "Description", &s(TAG))?;
+            ifc.set_attribute(t, "PredefinedType", &e("RIGIDSEGMENT"))?;
+            let mut items = Vec::new();
+            for (n, v) in [
+                ("NominalDiameter", length(z.nominal)),
+                ("InnerDiameter", length(z.inner)),
+                ("OuterDiameter", length(z.outer)),
+                ("Roughness", typed("IfcPositiveLengthMeasure", AttrValue::Real(seg.roughness.max(1e-9) / scale))),
+            ] {
+                items.push(r(create(ifc, "IfcPropertySingleValue", &[("Name", s(n)), ("NominalValue", v)])?));
+            }
+            let set = ifc.create_rooted("IfcPropertySet", &GlobalId::new())?;
+            if let Some(oh) = owner_history {
+                ifc.set_attribute(set, "OwnerHistory", &r(oh))?;
+            }
+            ifc.set_attribute(set, "Name", &s("Pset_PipeSegmentTypeCommon"))?;
+            ifc.set_attribute(set, "HasProperties", &AttrValue::List(items))?;
+            ifc.set_attribute(t, "HasPropertySets", &AttrValue::List(vec![r(set)]))?;
+        }
+    }
+    Ok(())
+}
+
 fn typed(class: &str, v: AttrValue) -> AttrValue {
     AttrValue::Typed {
         type_name: class.into(),
@@ -201,6 +255,7 @@ pub(crate) fn write_mep(
     }
     remove_earlier(ifc)?;
     let store = doc.store();
+    write_pipe_segments(ifc, store, owner_history, scale)?;
     let ports = mep::all_ports(store);
     let in_systems = mep_systems::port_systems(store);
     let systems = mep_systems::systems(store);

@@ -427,6 +427,18 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "connect_into" => format!(
             r#"<path d="M2 6h28" stroke-width="6" {s}/><path d="M16 9v10h-8v8" fill="none" stroke-width="3" {sa}/><rect x="3" y="25" width="10" height="5" fill="{f}" {s}/>"#
         ),
+        "mechanical_settings" => format!(
+            r#"<path d="M3 9h26v14H3z" fill="{f}" {s}/><path d="M7 16h18" stroke-width="4" {sa}/><circle cx="25" cy="25" r="5" fill="{f}" {s}/><path d="M25 21v8M21 25h8" {sa}/>"#
+        ),
+        "duct_sizes" => format!(
+            r#"<path d="M3 6h8v6H3zM3 15h12v6H3zM3 24h16v6H3z" fill="{f}" {s}/><path d="M23 6v24M20 9l3-3 3 3M20 27l3 3 3-3" fill="none" {sa}/>"#
+        ),
+        "pipe_segment" => format!(
+            r#"<circle cx="11" cy="16" r="8" fill="none" stroke-width="4" {s}/><circle cx="11" cy="16" r="5" fill="{f}" {s}/><path d="M19 12h11M19 20h11" {sa}/>"#
+        ),
+        "fluid" => format!(
+            r#"<path d="M16 3c-5 8-9 13-9 18a9 9 0 0 0 18 0c0-5-4-10-9-18z" fill="{f}" {s}/>"#
+        ),
         "valve" => format!(
             r#"<path d="M2 16h5M25 16h5" stroke-width="4" {s}/><path d="M7 10l18 12V10L7 22z" fill="{f}" {s}/><path d="M16 16V6M11 6h10" {sa}/>"#
         ),

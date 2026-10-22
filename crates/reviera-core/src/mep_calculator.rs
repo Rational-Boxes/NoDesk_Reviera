@@ -25,7 +25,7 @@ use crate::error::{Error, Result};
 use crate::id::{ElementId, ElementRef, GlobalId};
 use crate::mep::{Domain, Shape};
 use crate::mep_runs::{self, Size};
-use crate::mep_sizing::{self, AIR, Equation, Restrict, flow_in, section, water};
+use crate::mep_sizing::{self, Equation, Restrict, flow_in, section, water};
 use crate::store::Store;
 
 fn bad(code: &'static str, msg: impl Into<String>) -> Error {
@@ -225,8 +225,8 @@ pub(crate) fn candidates(store: &Store, p: CandidatesParams) -> Result<Candidate
     let friction = p.friction.or((p.velocity.is_none() && p.aspect.is_none()).then_some(Band { target: None, tolerance: 0.1 }));
     let ft = friction.map(|b| b.target.unwrap_or(if pipe { 300.0 } else { 1.0 }));
     let vt = p.velocity.map(|b| b.target.unwrap_or(if pipe { 1.5 } else { 5.0 }));
-    let fluid = if pipe { water(temperature.unwrap_or(20.0))? } else { AIR };
-    let equation = p.equation.unwrap_or_else(|| crate::mep_systems::settings(store).friction_equation);
+    let fluid = if pipe { water(temperature.unwrap_or(20.0))? } else { crate::mep_mech_settings::air(store) };
+    let equation = p.equation.unwrap_or_else(|| crate::mep_mech_settings::equation(store, !pipe));
     let aspect_max = p.aspect.filter(|_| shape != Shape::Round).map(|a| a.max);
     if aspect_max.is_some_and(|m| m.is_nan() || m < 1.0) {
         return Err(bad("sizing_calculator.aspect", "the aspect ratio is 1 or more (3 for 1:3)"));
@@ -234,7 +234,7 @@ pub(crate) fn candidates(store: &Store, p: CandidatesParams) -> Result<Candidate
 
     // The table's sizes, one way round, within the restrictions.
     let mut sizes: Vec<Size> = Vec::new();
-    for mut z in mep_sizing::candidates(&ty, shape, &Restrict::default()) {
+    for mut z in mep_sizing::candidates(store, &ty, shape, &Restrict::default()) {
         if shape != Shape::Round {
             let (long, short) = (z.width.max(z.height), z.width.min(z.height));
             (z.width, z.height) = if p.swap { (short, long) } else { (long, short) };

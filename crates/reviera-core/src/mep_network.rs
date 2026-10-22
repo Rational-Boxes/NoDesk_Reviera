@@ -346,7 +346,7 @@ pub fn compute(store: &Store, sys: &SystemInfo, equation: Equation) -> Result<Ne
         return Err(bad("mep_network.calculations_off", format!("{}: its system type's Calculations is None", sys.name)));
     }
     let losses = matches!(st.calculations, Calculations::All | Calculations::Performance);
-    let fluid = mep_sizing::fluid_of(sys, &st)?;
+    let fluid = mep_sizing::fluid_of(store, sys, &st)?;
     let tables = mep_systems::settings(store).fixture_unit_tables;
     let table = mep_sizing::table_of(sys, &st, &tables);
     let fl = mep_sizing::flows(store, sys)?;
@@ -704,8 +704,9 @@ fn system_of(store: &Store, r: &ElementRef) -> Result<SystemInfo> {
     mep_systems::systems(store).into_iter().find(|s| s.id == id).ok_or_else(|| bad("system.not_found", format!("element {id} is not a system")))
 }
 
-fn equation_of(store: &Store, given: Option<Equation>) -> Equation {
-    given.unwrap_or_else(|| mep_systems::settings(store).friction_equation)
+/// The equation given, or Mechanical Settings' for the system's air or water.
+fn equation_of(store: &Store, given: Option<Equation>, sys: &SystemInfo) -> Equation {
+    given.unwrap_or_else(|| crate::mep_mech_settings::equation(store, sys.classification.is_air()))
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -762,13 +763,13 @@ fn calculate_one(txn: &mut Transaction<'_>, sys: &SystemInfo, equation: Equation
 /// `mep_network.calculate`.
 pub(crate) fn calculate(txn: &mut Transaction<'_>, p: CalculateParams) -> Result<CalculateReport> {
     let store = txn.store().clone();
-    let equation = equation_of(&store, p.equation);
     let mut report = CalculateReport::default();
     let systems: Vec<SystemInfo> = match &p.system_id {
         Some(r) => vec![system_of(&store, r)?],
         None => mep_systems::systems(&store).into_iter().filter(|s| s.classification.fits(Domain::Duct) || s.classification.fits(Domain::Pipe)).collect(),
     };
     for sys in systems {
+        let equation = equation_of(&store, p.equation, &sys);
         match calculate_one(txn, &sys, equation) {
             Ok(r) => {
                 report.warnings.extend(r.warnings.iter().cloned());
@@ -1187,7 +1188,7 @@ pub(crate) fn export_report(txn: &mut Transaction<'_>, p: ReportParams) -> Resul
         match kept(&now, &sys) {
             Some(k) if !k.stale => results.push(k),
             k => {
-                let eq = k.map_or_else(|| equation_of(&now, None), |k| k.equation);
+                let eq = k.map_or_else(|| equation_of(&now, None, &sys), |k| k.equation);
                 results.push(calculate_one(txn, &sys, eq)?);
                 recalculated.push(sys.id);
             }

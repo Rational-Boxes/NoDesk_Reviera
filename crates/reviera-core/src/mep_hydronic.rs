@@ -327,7 +327,7 @@ pub fn analyze(store: &Store, _: AnalyzeParams) -> Result<HydronicReport> {
     if !settings.hydronic_analysis {
         return Err(bad("hydronic.off", "Hydronic network analysis is off: turn it on in Mechanical Settings › Pipe › Calculation (hydronic.set_enabled)"));
     }
-    let equation = settings.friction_equation;
+    let equation = crate::mep_mech_settings::equation(store, false);
     let mut net = Net { store, partners: mep::partners(store), ports: HashMap::new(), group_of: HashMap::new(), groups: Vec::new() };
     for e in store.iter() {
         if role(store, e).is_some() {

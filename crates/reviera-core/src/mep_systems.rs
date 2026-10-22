@@ -102,6 +102,8 @@ pub struct MepSettings {
     pub slopes: Vec<f64>,
     /// Hydronic network analysis (MEP-PIPE-008): Mechanical Settings › Pipe › Calculation.
     pub hydronic_analysis: bool,
+    /// The rest of Mechanical Settings (MEP-SET-001).
+    pub mechanical: crate::mep_mech_settings::MechanicalSettings,
 }
 
 fn slug(c: Classification) -> String {
