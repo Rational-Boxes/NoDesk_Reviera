@@ -176,6 +176,16 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(DuctPlaceholderCreate),
         registry.add(PipePlaceholderCreate),
         registry.add(PlaceholderConvert),
+        registry.add(AirTerminalPlace),
+        registry.add(SpaceAirflow),
+        registry.add(MechEquipmentPlace),
+        registry.add(EquipmentSetCreate),
+        registry.add(EquipmentSetAdd),
+        registry.add(EquipmentSetRemove),
+        registry.add(EquipmentSetSetDuty),
+        registry.add(EquipmentSetList),
+        registry.add(SystemFlowTotals),
+        registry.add(MepConnectInto),
         registry.add(MechControlDeviceAssign),
         registry.add(MechControlDeviceList),
         registry.add(MepRunCreateRiser),
@@ -1735,4 +1745,111 @@ edit_command!(
     crate::mep_placeholders::ConvertParams,
     crate::mep_placeholders::ConvertReport,
     crate::mep_placeholders::convert
+);
+
+edit_command!(
+    AirTerminalPlace,
+    "air_terminal.place",
+    "Place an air terminal",
+    "Places an air terminal (MEP-DUCT-009): a component of an Air Terminal type (`type_id`; diffusers, grilles, registers, louvres) at `point` on `level`, `offset` above it, turned by `rotation`. `flow` (m³/s) becomes its duct connector's preset flow. With `duct_id` (a straight level duct) it goes on the duct's bottom face at the point on its axis nearest `point`, its upward connector joined to a tap port the duct gains there. Its preset flow counts toward the supply, return or exhaust airflow of the room it stands in (`space.airflow`). Returns the terminal, the duct and the room.",
+    "Air Terminal",
+    crate::mep_equipment::AirTerminalParams,
+    crate::mep_equipment::AirTerminalReport,
+    crate::mep_equipment::place_air_terminal
+);
+
+read_command!(
+    SpaceAirflow,
+    "space.airflow",
+    "Rooms' actual airflow",
+    "Each room's actual supply, return and exhaust airflow (m³/s, MEP-DUCT-009): the preset flows of the air terminals standing in it, by their connectors' classification, with the terminals counted. `room_ids` narrows it; every room with terminals when empty. Room schedules show the same as Actual Supply, Return and Exhaust Airflow.",
+    crate::mep_equipment::AirflowParams,
+    Vec<crate::mep_equipment::SpaceAirflow>,
+    crate::mep_equipment::airflow
+);
+
+edit_command!(
+    MechEquipmentPlace,
+    "mech_equipment.place",
+    "Place mechanical equipment",
+    "Places mechanical equipment (MEP-DUCT-009): a component of an air handler or other unitary equipment, VAV box, fan, boiler, chiller, pump or space heater (radiator) type at `point` on `level`, `offset` above it, turned by `rotation`; its connectors join those they meet. Returns its id.",
+    "Mechanical Equipment",
+    crate::mep_equipment::EquipmentParams,
+    crate::id::ElementId,
+    crate::mep_equipment::place_equipment
+);
+
+edit_command!(
+    EquipmentSetCreate,
+    "equipment_set.create",
+    "Make an equipment set",
+    "Groups two or more mechanical equipment units (`equipment_ids`, typically pumps) into a duty/standby set (MEP-DUCT-009): an IfcGroup with ObjectType EquipmentSet; `duty_ids` are on duty and the rest stand by. A unit is in one set at most. Only duty units count in `system.flow_totals`. Returns the set.",
+    "Equipment Set",
+    crate::mep_equipment::CreateSetParams,
+    crate::id::ElementId,
+    crate::mep_equipment::create_set
+);
+
+edit_command!(
+    EquipmentSetAdd,
+    "equipment_set.add",
+    "Add units to an equipment set",
+    "Adds `equipment_ids` to the set `set_id`, standing by unless `duty`.",
+    "Add to Equipment Set",
+    crate::mep_equipment::EditSetParams,
+    (),
+    crate::mep_equipment::add_to_set
+);
+
+edit_command!(
+    EquipmentSetRemove,
+    "equipment_set.remove",
+    "Remove units from an equipment set",
+    "Takes `equipment_ids` out of the set `set_id`; refused if no duty unit would be left.",
+    "Remove from Equipment Set",
+    crate::mep_equipment::EditSetParams,
+    (),
+    crate::mep_equipment::remove_from_set
+);
+
+edit_command!(
+    EquipmentSetSetDuty,
+    "equipment_set.set_duty",
+    "Choose an equipment set's duty units",
+    "Makes `duty_ids` (units of the set `set_id`) the duty units; the others stand by.",
+    "Set Duty Units",
+    crate::mep_equipment::SetDutyParams,
+    (),
+    crate::mep_equipment::set_duty
+);
+
+read_command!(
+    EquipmentSetList,
+    "equipment_set.list",
+    "The equipment sets",
+    "Every equipment set with its duty and standby units.",
+    crate::builtin::NoParams,
+    Vec<crate::mep_equipment::EquipmentSetInfo>,
+    crate::mep_equipment::list_sets
+);
+
+read_command!(
+    SystemFlowTotals,
+    "system.flow_totals",
+    "A system's flow totals",
+    "A system's terminal flow (the preset flows of its terminals and fixtures, m³/s) and equipment flow (each unit's largest connector flow in the system); units standing by in an equipment set are listed but not counted (MEP-DUCT-009).",
+    crate::mep_equipment::TotalsParams,
+    crate::mep_equipment::FlowTotals,
+    crate::mep_equipment::flow_totals
+);
+
+edit_command!(
+    MepConnectInto,
+    "mep.connect_into",
+    "Connect a connector into a main",
+    "Draws a duct or pipe (MEP-DUCT-009) from the open connector `connector_index` of `element_id` into the straight level main `target_id`, at the connector's size and the main's type: out along the connector (straight up or down to the main's height when it faces up or down), then square to the main, ending on its side, where the routing preferences put a tee or tap. Refused when the connector faces away from the main or the main does not pass it. Returns the run as `duct.create` does.",
+    "Connect Into",
+    crate::mep_equipment::ConnectIntoParams,
+    crate::mep_runs::RunReport,
+    crate::mep_equipment::connect_into
 );

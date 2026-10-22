@@ -22,6 +22,7 @@ Water 1. The tools are on the <b>Systems</b> tab.</p>
   <a href="#flex-duct">Flexible duct</a>
   <a href="#justify">Justifying a run</a>
   <a href="#placeholders">Placeholders</a>
+  <a href="#terminals">Air terminals and equipment</a>
   <a href="#slopes">Sloped pipes and parallel pipes</a>
   <a href="#controls">Thermostats, sensors and controllers</a>
   <a href="#risers">Risers</a>
@@ -316,6 +317,27 @@ fittings come from the type's routing preferences. Each line keeps its identity,
 system. Where a point can't be fitted, its ends are left open and Reviera lists them with the
 reason. That happens with more than four lines at a point, or a branch that isn't square to the
 main, or a change of size at a bend. To go back to the placeholders, use Undo.</p>
+
+<h2 id="terminals">Air terminals and equipment</h2>
+<p><a href="reviera:action/air_terminal.place">Air Terminal</a> (<kbd>A</kbd> <kbd>T</kbd>) places
+diffusers and grilles. Choose the type, the height and the flow in litres per second, then click
+where each one goes. Click over a duct in plan to put the terminal on the duct's underside,
+connected to it. Each terminal's flow counts toward the room it's in. Add the Actual Supply,
+Return and Exhaust Airflow fields to a room schedule to compare them with what each room needs.</p>
+<p><a href="reviera:action/mech_equipment.place">Mechanical Equipment</a> (<kbd>M</kbd>
+<kbd>E</kbd>) places air handlers, VAV boxes, fans, boilers, chillers, pumps and radiators. Press
+the Spacebar to turn the next one by 90°.</p>
+<p>For duty and standby pumps, select the pumps and choose <a
+href="reviera:action/equipment_set.create">Equipment Set</a> (<kbd>E</kbd> <kbd>S</kbd>). Tick
+the ones on duty; the others stand by, and only duty units count in the system's flow totals. <a
+href="reviera:action/equipment_set.add">Add to Set</a> adds the selected units to the set of
+another selected unit, standing by, and <a href="reviera:action/equipment_set.remove">Remove from
+Set</a> takes them out. A set always keeps one duty unit.</p>
+<p>To connect a component to a main, select both and choose <a
+href="reviera:action/mep.connect_into">Connect Into</a> (<kbd>C</kbd> <kbd>I</kbd>). Reviera runs
+a duct or pipe at the connector's size out of the connector, up or down to the main's height,
+and square into the main, with a tee or tap there. If the component has more than one free
+connector of that kind, Reviera asks which.</p>
 
 <h2 id="slopes">Sloped pipes and parallel pipes</h2>
 <p>To give drainage a fall, select the pipes and fittings of a run and choose <a

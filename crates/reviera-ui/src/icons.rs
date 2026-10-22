@@ -409,6 +409,24 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "convert_placeholder" => format!(
             r#"<path d="M3 9h10" stroke-width="2" stroke-dasharray="3 2" {sa}/><path d="M17 9l-3-3v6z" fill="{f}" {sa}/><path d="M3 24h12a6 6 0 0 0 6-6V4" fill="none" stroke-width="6" {s}/><path d="M3 24h12a6 6 0 0 0 6-6V4" fill="none" stroke-width="3" stroke="{f}"/>"#
         ),
+        "air_terminal" => format!(
+            r#"<path d="M13 3h6v8h-6z" fill="{f}" {s}/><path d="M4 11h24v6H4z" fill="{f}" {s}/><path d="M8 20l-3 6M16 20v7M24 20l3 6" {sa}/>"#
+        ),
+        "mech_equipment" => format!(
+            r#"<rect x="3" y="8" width="26" height="18" fill="{f}" {s}/><circle cx="12" cy="17" r="5" fill="none" {sa}/><path d="M12 12v10M7 17h10" {sa}/><path d="M21 12h5M21 16h5M21 20h5" {sa}/>"#
+        ),
+        "equipment_set" => format!(
+            r#"<circle cx="10" cy="13" r="6" fill="{f}" {s}/><circle cx="22" cy="13" r="6" fill="none" stroke-dasharray="3 2" {sa}/><path d="M4 27h24" stroke-width="3" {sa}/>"#
+        ),
+        "equipment_set_add" => format!(
+            r#"<circle cx="12" cy="14" r="7" fill="{f}" {s}/><path d="M24 8v12M18 14h12" stroke-width="3" {sa}/>"#
+        ),
+        "equipment_set_remove" => format!(
+            r#"<circle cx="12" cy="14" r="7" fill="{f}" {s}/><path d="M18 14h12" stroke-width="3" {sa}/>"#
+        ),
+        "connect_into" => format!(
+            r#"<path d="M2 6h28" stroke-width="6" {s}/><path d="M16 9v10h-8v8" fill="none" stroke-width="3" {sa}/><rect x="3" y="25" width="10" height="5" fill="{f}" {s}/>"#
+        ),
         "valve" => format!(
             r#"<path d="M2 16h5M25 16h5" stroke-width="4" {s}/><path d="M7 10l18 12V10L7 22z" fill="{f}" {s}/><path d="M16 16V6M11 6h10" {sa}/>"#
         ),

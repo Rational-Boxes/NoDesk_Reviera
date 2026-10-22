@@ -133,6 +133,28 @@ pub(crate) struct PlaceTool {
     /// The component's outline in plan, in its own coordinates (metres).
     outline: Vec<[f64; 2]>,
     scale: f64,
+    /// Air terminals (MEP-DUCT-009): the preset flow each copy gets (m³/s).
+    flow: Option<f64>,
+}
+
+/// A straight level duct whose plan outline holds `p`.
+fn duct_under(store: &Store, p: [f64; 2]) -> Option<ElementId> {
+    store.iter().find_map(|e| {
+        let s = reviera_core::mep_runs::segment_recipe(e)?;
+        if s.domain != reviera_core::mep::Domain::Duct || s.placeholder || s.flex.is_some() || s.corner.is_some() || (s.end[2] - s.start[2]).abs() > 1e-6 {
+            return None;
+        }
+        let d = [s.end[0] - s.start[0], s.end[1] - s.start[1]];
+        let l = d[0].hypot(d[1]);
+        if l < 1e-9 {
+            return None;
+        }
+        let u = [d[0] / l, d[1] / l];
+        let t = (p[0] - s.start[0]) * u[0] + (p[1] - s.start[1]) * u[1];
+        let off = ((p[0] - s.start[0]) * u[1] - (p[1] - s.start[1]) * u[0]).abs();
+        let half = if s.size.shape == reviera_core::mep::Shape::Round { s.size.diameter } else { s.size.width } / 2.0;
+        (t > 0.0 && t < l && off <= half).then(|| e.id())
+    })
 }
 
 /// A convex hull (counter-clockwise) of points in plan.
@@ -873,6 +895,12 @@ impl Gui {
 
     /// Starts the Place Component tool with `source`.
     /// The running Place Component tool's height above the level (metres).
+    pub(crate) fn set_place_flow(&mut self, flow: Option<f64>) {
+        if let Some(t) = &mut self.place_tool {
+            t.flow = flow;
+        }
+    }
+
     pub(crate) fn set_place_offset(&mut self, offset: f64) {
         if let Some(t) = &mut self.place_tool {
             t.offset = offset;
@@ -925,6 +953,7 @@ impl Gui {
             offset,
             outline,
             scale,
+            flow: None,
         });
         self.properties_stale = true;
         frame.set_status_text(
@@ -1091,6 +1120,10 @@ impl Gui {
                     Some("plumbing_fixture.place")
                 } else if ty.category == mesh_objects::Category::Sprinkler {
                     Some("sprinkler.place")
+                } else if ty.category == mesh_objects::Category::AirTerminal {
+                    Some("air_terminal.place")
+                } else if ty.category.is_mechanical_equipment() {
+                    Some("mech_equipment.place")
                 } else {
                     None
                 }
@@ -1102,6 +1135,15 @@ impl Gui {
             // An automatic height (sprinklers): the command chooses it.
             if t.offset.is_nan() {
                 args.as_object_mut().expect("an object").remove("offset");
+            }
+            // Air terminals: their flow, and on a duct when clicked over one (MEP-DUCT-009).
+            if command == "air_terminal.place" {
+                if let Some(f) = t.flow {
+                    args["flow"] = json!(f);
+                }
+                if let Some(d) = self.store_now().and_then(|s| duct_under(&s, p)) {
+                    args["duct_id"] = json!(d);
+                }
             }
             match self.run(command, args) {
                 Ok(_) => {

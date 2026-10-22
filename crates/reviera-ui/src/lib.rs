@@ -4585,6 +4585,18 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
             focus(g);
         }),
         "placeholder.convert" => with(gui, Gui::convert_placeholders),
+        "air_terminal.place" => with(gui, |g| {
+            g.place_air_terminal();
+            focus(g);
+        }),
+        "mech_equipment.place" => with(gui, |g| {
+            g.place_mech_equipment();
+            focus(g);
+        }),
+        "equipment_set.create" => with(gui, Gui::create_equipment_set),
+        "equipment_set.add" => with(gui, |g| g.edit_equipment_set(true)),
+        "equipment_set.remove" => with(gui, |g| g.edit_equipment_set(false)),
+        "mep.connect_into" => with(gui, Gui::connect_into),
         "mep_fitting.tee_to_cross" => with(gui, Gui::tee_to_cross),
         "mep_fitting.upgrade" => with(gui, |g| g.fitting_grade(true)),
         "mep_fitting.downgrade" => with(gui, |g| g.fitting_grade(false)),

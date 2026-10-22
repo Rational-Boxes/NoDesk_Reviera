@@ -11,7 +11,7 @@
 //! - Each connection is an `IfcRelConnectsPorts`; an analytical pipe connection (MEP-PIPE-009)
 //!   connects the equipment's port to a virtual port nested in the pipe, with no realizing element.
 //! - Each system gets its members by `IfcRelAssignsToGroup` and the building it serves by
-//!   `IfcRelServicesBuildings`.
+//!   `IfcRelServicesBuildings`; each equipment set (an `IfcGroup`, MEP-DUCT-009) its units.
 //!
 //! Everything is rewritten on each save and marked with Reviera's tag in its Description, so it
 //! is not read back as elements (the definitions live in the RXD recipes). Ports keep GlobalIds
@@ -386,6 +386,21 @@ pub(crate) fn write_mep(
     for c in reviera_core::mep_electrical::circuits(store) {
         let Some(&step) = steps.get(&c.id) else { continue };
         let members: Vec<AttrValue> = c.elements.iter().filter_map(|e| steps.get(e)).map(|s| r(*s)).collect();
+        if members.is_empty() {
+            continue;
+        }
+        let rel = ifc.create_rooted("IfcRelAssignsToGroup", &GlobalId::new())?;
+        if let Some(oh) = owner_history {
+            ifc.set_attribute(rel, "OwnerHistory", &r(oh))?;
+        }
+        ifc.set_attribute(rel, "Description", &s(TAG))?;
+        ifc.set_attribute(rel, "RelatedObjects", &AttrValue::List(members))?;
+        ifc.set_attribute(rel, "RelatingGroup", &r(step))?;
+    }
+    // Equipment sets: their units by IfcRelAssignsToGroup (MEP-DUCT-009).
+    for set in reviera_core::mep_equipment::sets(store) {
+        let Some(&step) = steps.get(&set.id) else { continue };
+        let members: Vec<AttrValue> = set.duty.iter().chain(&set.standby).filter_map(|e| steps.get(e)).map(|s| r(*s)).collect();
         if members.is_empty() {
             continue;
         }

@@ -147,6 +147,19 @@ fn marker(p: [f64; 3]) -> Vec<Segment> {
     s
 }
 
+fn is_equipment(store: &reviera_core::Store, id: ElementId) -> bool {
+    store
+        .get(id)
+        .filter(|e| reviera_core::mesh_objects::mesh_object_recipe(e).is_some())
+        .and_then(|e| reviera_core::mesh_objects::type_of(store, e))
+        .is_some_and(|(_, t)| t.category.is_mechanical_equipment())
+}
+
+fn unit_label(store: &reviera_core::Store, id: ElementId) -> String {
+    let ty = store.get(id).and_then(|e| reviera_core::mesh_objects::type_of(store, e)).and_then(|(t, _)| store.get(t)).and_then(|t| t.name.clone()).unwrap_or_default();
+    format!("{ty} ({})", id.0)
+}
+
 /// A placeholder outside any system.
 const PLACEHOLDER: [f32; 4] = [0.45, 0.3, 0.65, 1.0];
 
@@ -393,6 +406,12 @@ impl Gui {
     /// near a wall go on its face).
     /// With no default height, a blank height is automatic (`sprinkler.place` chooses it).
     fn place_wall_component(&mut self, accepts: fn(reviera_core::mesh_objects::Category) -> bool, starters: &[&str], title: &str, default_mm: Option<f64>) {
+        self.place_typed_component(accepts, starters, title, default_mm, None);
+    }
+
+    /// As [`Self::place_wall_component`], with a hint of its own; `flow` asks for an air
+    /// terminal's flow.
+    fn place_typed_component(&mut self, accepts: fn(reviera_core::mesh_objects::Category) -> bool, starters: &[&str], title: &str, default_mm: Option<f64>, own: Option<(&str, bool)>) {
         let frame = self.frame;
         let devices = |store: &reviera_core::Store| -> Vec<(ElementId, String)> {
             let mut v: Vec<(ElementId, String)> = store
@@ -423,7 +442,10 @@ impl Gui {
             Some(mm) => f.text("Mounting height (mm)", &format!("{mm:.0}"), "Above the level"),
             None => f.text("Height (mm)", "", "Blank: under the ceiling (pendent), 3000 (upright), 2450 (sidewall)"),
         };
-        let hint = if default_mm.is_some() {
+        let flow = own.is_some_and(|o| o.1).then(|| f.text("Flow (L/s)", "", "Each terminal's preset flow; blank: the type's"));
+        let hint = if let Some((h, _)) = own {
+            h
+        } else if default_mm.is_some() {
             "Click near a wall to put it on that face (it follows the wall); away from walls it stands on the work plane. Spacebar turns it there."
         } else {
             "Click under a ceiling to hang a pendent head from it (it follows the ceiling); sidewall heads go on the nearest wall face."
@@ -432,11 +454,132 @@ impl Gui {
         let k = ty.get_selection().map_or(0, |k| k as usize);
         // Automatic: NaN, which the place tool leaves out.
         let h = height.get_value().trim().replace(',', ".").parse::<f64>().ok().or(default_mm).map_or(f64::NAN, |mm| mm / 1000.0);
+        let flow = flow.and_then(|t| t.get_value().trim().replace(',', ".").parse::<f64>().ok()).filter(|v| v.is_finite() && *v >= 0.0).map(|ls| ls / 1000.0);
         f.dialog.destroy();
         let Some((id, label)) = types.get(k).cloned().filter(|_| ok) else { return };
         let name = label.split(" (").next().unwrap_or(&label).to_owned();
         self.start_place_tool(super::components::Source::Type(id), name);
         self.set_place_offset(h);
+        self.set_place_flow(flow);
+    }
+
+    /// Systems › Air Terminal (`AT`, MEP-DUCT-009): a terminal type, its flow and height; each
+    /// click places one, on a duct's bottom face when clicked over a duct.
+    pub(crate) fn place_air_terminal(&mut self) {
+        let names = ["Supply Diffuser 600", "Return Grille 600"];
+        self.place_typed_component(
+            |c| c == reviera_core::mesh_objects::Category::AirTerminal,
+            &names,
+            "Air Terminal",
+            Some(2700.0),
+            Some(("Click to place a terminal at the height; over a duct it goes on the duct's bottom face, joined to it. Spacebar turns it. Its flow counts toward the room's airflow.", true)),
+        );
+    }
+
+    /// Systems › Mechanical Equipment (`ME`, MEP-DUCT-009): an air handler, VAV box, fan,
+    /// boiler, chiller, pump or radiator type and its height; each click places one.
+    pub(crate) fn place_mech_equipment(&mut self) {
+        let names = ["Air Handling Unit", "VAV Box", "Exhaust Fan", "Boiler", "Chiller", "Circulation Pump", "Radiator", "Fan Coil Unit"];
+        self.place_typed_component(
+            reviera_core::mesh_objects::Category::is_mechanical_equipment,
+            &names,
+            "Mechanical Equipment",
+            Some(0.0),
+            Some(("Click to place it; Spacebar turns the next copy 90°.", false)),
+        );
+    }
+
+    /// Systems › Equipment Set (MEP-DUCT-009): the selected units become a set; the chosen ones
+    /// are on duty, the rest stand by.
+    pub(crate) fn create_equipment_set(&mut self) {
+        let frame = self.frame;
+        let Some(store) = self.store_now() else { return };
+        let units: Vec<ElementId> = self.selection().into_iter().filter(|id| is_equipment(&store, *id)).collect();
+        if units.len() < 2 {
+            return frame.set_status_text("Equipment Set: select two or more pumps, fans or other mechanical equipment", 0);
+        }
+        let labels: Vec<String> = units.iter().map(|id| unit_label(&store, *id)).collect();
+        let refs: Vec<&str> = labels.iter().map(String::as_str).collect();
+        let d = MultiChoiceDialog::builder(&frame, "Duty units (the others stand by):", "Equipment Set", &refs).build();
+        d.set_selections(&[0]);
+        if d.show_modal() != ID_OK {
+            return;
+        }
+        let duty: Vec<ElementId> = d.get_selections().iter().filter_map(|k| units.get(*k as usize).copied()).collect();
+        match self.run("equipment_set.create", json!({ "equipment_ids": units, "duty_ids": duty })) {
+            Ok(_) => frame.set_status_text(&format!("Equipment set made: {} on duty, {} standing by", duty.len(), units.len() - duty.len()), 0),
+            Err(e) => error(&frame, &e),
+        }
+    }
+
+    /// Systems › Add to Set and Remove from Set: the selected units join the set one of them is
+    /// in (standing by), or leave theirs.
+    pub(crate) fn edit_equipment_set(&mut self, add: bool) {
+        let frame = self.frame;
+        let Some(store) = self.store_now() else { return };
+        let units: Vec<ElementId> = self.selection().into_iter().filter(|id| is_equipment(&store, *id)).collect();
+        let sets = reviera_core::mep_equipment::sets(&store);
+        let in_set = |id: &ElementId| sets.iter().find(|s| s.duty.contains(id) || s.standby.contains(id)).map(|s| s.id);
+        let result = if add {
+            let Some(set) = units.iter().find_map(in_set) else {
+                return frame.set_status_text("Add to Set: select a unit of the set and the units to add", 0);
+            };
+            let new: Vec<ElementId> = units.iter().filter(|u| in_set(u).is_none()).copied().collect();
+            if new.is_empty() {
+                return frame.set_status_text("Add to Set: select units that are in no set too", 0);
+            }
+            self.run("equipment_set.add", json!({ "set_id": set, "equipment_ids": new }))
+        } else {
+            let Some(set) = units.iter().find_map(in_set) else {
+                return frame.set_status_text("Remove from Set: select units of an equipment set", 0);
+            };
+            let out: Vec<ElementId> = units.iter().filter(|u| in_set(u) == Some(set)).copied().collect();
+            self.run("equipment_set.remove", json!({ "set_id": set, "equipment_ids": out }))
+        };
+        match result {
+            Ok(_) => frame.set_status_text(if add { "Added to the set, standing by" } else { "Removed from the set" }, 0),
+            Err(e) => error(&frame, &e),
+        }
+    }
+
+    /// Systems › Connect Into (`CI`, MEP-DUCT-009): the selected component's open duct or pipe
+    /// connector is routed into the selected main.
+    pub(crate) fn connect_into(&mut self) {
+        let frame = self.frame;
+        let Some(store) = self.store_now() else { return };
+        let sel = self.selection();
+        let main = sel.iter().copied().find(|id| store.get(*id).and_then(reviera_core::mep_runs::segment_recipe).is_some_and(|s| !s.placeholder));
+        let comp = sel.iter().copied().find(|id| store.get(*id).is_some_and(|e| reviera_core::mesh_objects::mesh_object_recipe(e).is_some()));
+        let (Some(main), Some(comp)) = (main, comp) else {
+            return frame.set_status_text("Connect Into: select a component and the duct or pipe main to connect it into", 0);
+        };
+        let domain = store.get(main).and_then(reviera_core::mep_runs::segment_recipe).map(|s| s.domain);
+        let partners = mep::partners(&store);
+        let open: Vec<mep::Port> = mep::ports(&store, store.get(comp).expect("selected"))
+            .into_iter()
+            .filter(|p| Some(p.connector.domain) == domain && !partners.contains_key(&(comp, p.index)))
+            .collect();
+        let index = match open.len() {
+            0 => return frame.set_status_text("Connect Into: the component has no open connector of the main's kind", 0),
+            1 => open[0].index,
+            _ => {
+                let labels: Vec<String> = open.iter().map(|p| p.connector.name.clone()).collect();
+                let refs: Vec<&str> = labels.iter().map(String::as_str).collect();
+                let d = SingleChoiceDialog::builder(&frame, "Connector:", "Connect Into", &refs).build();
+                if d.show_modal() != ID_OK {
+                    return;
+                }
+                let Some(p) = usize::try_from(d.get_selection()).ok().and_then(|k| open.get(k)) else { return };
+                p.index
+            }
+        };
+        match self.run("mep.connect_into", json!({ "element_id": comp, "connector_index": index, "target_id": main })) {
+            Ok(v) => {
+                self.refresh_scene(&frame);
+                frame.set_status_text(&format!("Connected: {} segment(s), {} fitting(s)", v["segments"].as_array().map_or(0, Vec::len), v["fittings"].as_array().map_or(0, Vec::len)), 0);
+            }
+            Err(e) => error(&frame, &e),
+        }
     }
 
     /// Systems › Mechanical › Assign Controlled Element: the selected control devices control the

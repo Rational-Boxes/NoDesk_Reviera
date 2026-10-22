@@ -156,6 +156,9 @@ pub fn available_fields(store: &Store, category: &str) -> Vec<FieldInfo> {
             info("room.perimeter", "Perimeter", true),
             info("room.height", "Unbounded Height", false),
             info("room.volume", "Volume", true),
+            info("room.supply_airflow", "Actual Supply Airflow", true),
+            info("room.return_airflow", "Actual Return Airflow", true),
+            info("room.exhaust_airflow", "Actual Exhaust Airflow", true),
         ]),
         "cat.doors" | "cat.windows" => out.extend([
             info("insert.width", "Width", false),
@@ -316,6 +319,8 @@ struct Context<'a> {
     settings: crate::units::UnitSettings,
     /// Rebar sets' info, worked out once (STR-RBR-018).
     rebar: HashMap<ElementId, crate::rebar::RebarInfo>,
+    /// Rooms' air terminal flows (MEP-DUCT-009).
+    airflow: std::collections::BTreeMap<ElementId, crate::mep_equipment::SpaceAirflow>,
 }
 
 /// Reads field values of elements as schedules show them (tags label with them, DOC-ANN-010).
@@ -351,6 +356,7 @@ impl<'a> Context<'a> {
             walls: crate::walls::solve(store),
             settings: crate::units::settings_of(store),
             rebar: crate::rebar_docs::infos(store),
+            airflow: crate::mep_equipment::airflows(store),
         }
     }
 }
@@ -443,6 +449,15 @@ impl Context<'_> {
                     value: None,
                     editable: crate::rooms::room_recipe(e).is_some(),
                 }
+            }
+            "room.supply_airflow" | "room.return_airflow" | "room.exhaust_airflow" => {
+                let a = self.airflow.get(&e.id());
+                let v = a.map_or(0.0, |a| match key {
+                    "room.supply_airflow" => a.supply,
+                    "room.return_airflow" => a.return_air,
+                    _ => a.exhaust,
+                }) * 1000.0;
+                Cell { text: format!("{v:.1} L/s"), value: Some(v), editable: false }
             }
             "room.area" | "room.perimeter" | "room.height" | "room.volume" => {
                 let Some(g) = self.rooms.get(&e.id()) else {

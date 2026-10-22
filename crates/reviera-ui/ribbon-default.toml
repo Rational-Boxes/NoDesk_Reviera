@@ -2333,6 +2333,46 @@ keys = "CP"
 help = "Convert the selected duct and pipe placeholders (Tab selects a connected set) into ducts and pipes with fittings from the routing preferences; ends that cannot be fitted stay open and are listed (MEP-DUCT-007)"
 
 [[action]]
+id = "air_terminal.place"
+label = "Air Terminal"
+icon = "air_terminal"
+keys = "AT"
+help = "Place diffusers, grilles and registers at a flow and height; clicked over a duct, one goes on its bottom face joined to it; its flow counts toward the room's actual airflow (MEP-DUCT-009)"
+
+[[action]]
+id = "mech_equipment.place"
+label = "Mechanical Equipment"
+icon = "mech_equipment"
+keys = "ME"
+help = "Place air handlers, VAV boxes, fans, boilers, chillers, pumps and radiators; Spacebar turns the next copy 90° (MEP-DUCT-009)"
+
+[[action]]
+id = "equipment_set.create"
+label = "Equipment Set"
+icon = "equipment_set"
+keys = "ES"
+help = "Group the selected pumps or other units into a duty/standby set; only duty units count in the system's flow totals (MEP-DUCT-009)"
+
+[[action]]
+id = "equipment_set.add"
+label = "Add to Set"
+icon = "equipment_set_add"
+help = "Add the selected units to the equipment set another selected unit is in, standing by"
+
+[[action]]
+id = "equipment_set.remove"
+label = "Remove from Set"
+icon = "equipment_set_remove"
+help = "Take the selected units out of their equipment set"
+
+[[action]]
+id = "mep.connect_into"
+label = "Connect Into"
+icon = "connect_into"
+keys = "CI"
+help = "Route a duct or pipe from the selected component's open connector into the selected main: out of the connector, then square into the main, with a tee or tap there (MEP-DUCT-009)"
+
+[[action]]
 id = "mep_segment.heal"
 label = "Heal"
 icon = "heal"
@@ -3006,6 +3046,12 @@ tools = [
 label = "Components"
 tools = [
   { action = "mep.place_component", size = "large" },
+  { action = "air_terminal.place", size = "large" },
+  { action = "mech_equipment.place", size = "large" },
+  { action = "equipment_set.create", size = "small" },
+  { action = "equipment_set.add", size = "small" },
+  { action = "equipment_set.remove", size = "small" },
+  { action = "mep.connect_into", size = "small" },
   { action = "mep_type.load_starters", size = "small" },
   { action = "mep.connect_touching", size = "small" },
   { action = "analytical_pipe_connection.create_auto", size = "small" },

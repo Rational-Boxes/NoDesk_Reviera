@@ -71,10 +71,13 @@ pub enum Category {
     Pump,
     Boiler,
     Chiller,
+    /// Fans and radiators (MEP-DUCT-009).
+    Fan,
+    SpaceHeater,
 }
 
 impl Category {
-    pub const ALL: [Category; 20] = [
+    pub const ALL: [Category; 22] = [
         Category::GenericModel,
         Category::Furniture,
         Category::Column,
@@ -95,6 +98,8 @@ impl Category {
         Category::Pump,
         Category::Boiler,
         Category::Chiller,
+        Category::Fan,
+        Category::SpaceHeater,
     ];
 
     pub fn label(self) -> &'static str {
@@ -119,6 +124,8 @@ impl Category {
             Category::Pump => "Pump",
             Category::Boiler => "Boiler",
             Category::Chiller => "Chiller",
+            Category::Fan => "Fan",
+            Category::SpaceHeater => "Space Heater",
         }
     }
 
@@ -145,6 +152,8 @@ impl Category {
             Category::Pump => "IfcPump",
             Category::Boiler => "IfcBoiler",
             Category::Chiller => "IfcChiller",
+            Category::Fan => "IfcFan",
+            Category::SpaceHeater => "IfcSpaceHeater",
         }
     }
 
@@ -171,12 +180,23 @@ impl Category {
             Category::Pump => "IfcPumpType",
             Category::Boiler => "IfcBoilerType",
             Category::Chiller => "IfcChillerType",
+            Category::Fan => "IfcFanType",
+            Category::SpaceHeater => "IfcSpaceHeaterType",
         }
     }
 
     /// Plumbing fixtures and waste terminals (MEP-PIPE-006).
     pub fn is_plumbing_fixture(self) -> bool {
         matches!(self, Category::PlumbingFixture | Category::WasteTerminal)
+    }
+
+    /// Mechanical equipment (MEP-DUCT-009): air handlers and other unitary equipment, VAV boxes,
+    /// fans, boilers, chillers, pumps and radiators.
+    pub fn is_mechanical_equipment(self) -> bool {
+        matches!(
+            self,
+            Category::MechanicalEquipment | Category::AirTerminalBox | Category::Fan | Category::Boiler | Category::Chiller | Category::Pump | Category::SpaceHeater
+        )
     }
 
     /// Control devices: thermostats, humidistats, sensors and controllers (MEP-DUCT-012).

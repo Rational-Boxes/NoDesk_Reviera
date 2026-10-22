@@ -1399,7 +1399,7 @@ fn starters() -> Vec<Starter> {
         },
         Starter {
             name: "Exhaust Fan",
-            category: C::MechanicalEquipment,
+            category: C::Fan,
             size: [0.5, 0.5, 0.4],
             color: grey,
             connectors: vec![
@@ -1546,6 +1546,16 @@ fn starters() -> Vec<Starter> {
             ],
         },
         Starter {
+            name: "Radiator",
+            category: C::SpaceHeater,
+            size: [1.0, 0.1, 0.6],
+            color: white,
+            connectors: vec![
+                hydronic("Supply", [-0.5, 0.0, 0.5], [-1.0, 0.0, 0.0], K::HydronicSupply, D::In, 0.015, 0.00005, 5_000.0),
+                hydronic("Return", [0.5, 0.0, 0.05], [1.0, 0.0, 0.0], K::HydronicReturn, D::Out, 0.015, 0.00005, 0.0),
+            ],
+        },
+        Starter {
             name: "Fan Coil Unit",
             category: C::MechanicalEquipment,
             size: [1.0, 0.5, 0.3],
@@ -1656,6 +1666,10 @@ fn starter_predefined(name: &str) -> Option<&'static str> {
         "Urinal" => "URINAL",
         "Floor Drain" => "FLOORTRAP",
         "Circulation Pump" => "CIRCULATOR",
+        "Air Handling Unit" => "AIRHANDLER",
+        "Supply Diffuser 600" => "DIFFUSER",
+        "Return Grille 600" => "GRILLE",
+        "Radiator" => "RADIATOR",
         "Water Heater" => "WATER",
         "Boiler" => "WATER",
         "Chiller" => "WATERCOOLED",

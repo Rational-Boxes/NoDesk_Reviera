@@ -1002,6 +1002,15 @@ schedules, circuit paths, cable sizing and voltage drop.
   slope and system, and lists the ends it leaves open (`duct_placeholder.create`,
   `pipe_placeholder.create`, `placeholder.convert`). Not built yet: the Angles setting, split
   buttons on Duct and Pipe.
+- **Air terminals and mechanical equipment** (Systems › Components › Air Terminal `AT`,
+  Mechanical Equipment `ME`, Equipment Set `ES`, Connect Into `CI`): diffusers and grilles placed
+  at a flow, on a duct's bottom face when clicked over one, their flows totalled per room as its
+  actual supply, return and exhaust airflow (room schedule fields too); air handlers, VAV boxes,
+  fans, boilers, chillers, pumps and radiators with their IFC classes; duty/standby equipment
+  sets, standby units left out of system flow totals; Connect Into routes a connector into a
+  main (`air_terminal.place`, `space.airflow`, `mech_equipment.place`, `equipment_set.*`,
+  `system.flow_totals`, `mep.connect_into`). Not built yet: Tag on Placement, side-face
+  terminals, standby units in sizing.
 - **Sloped piping and parallel pipes** (Systems › HVAC & Piping › Slope, Parallel Pipes): the
   Slope Editor gives a connected section of pipe one of the project's allowed slopes from a
   control point (the lowest end by default): fittings follow, branches stay connected (their
