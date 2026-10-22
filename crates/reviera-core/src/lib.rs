@@ -71,6 +71,7 @@ pub mod mep_sizing;
 pub mod mep_slopes;
 pub mod mep_sprinklers;
 pub mod mep_hydronic;
+pub mod classification;
 pub mod globals;
 pub mod mep_analytical;
 pub mod mep_coverings;

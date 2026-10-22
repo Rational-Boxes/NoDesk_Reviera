@@ -490,6 +490,15 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "parameter_libraries" => format!(
             r#"<path d="M5 5h7v22H5zM14 5h7v22h-7z" fill="{f}" {s}/><path d="M23 7l5 1-3 19-5-1z" fill="{f}" {s}/><path d="M7 10h3M16 10h3" {sa}/>"#
         ),
+        "classification" => format!(
+            r#"<path d="M4 4h10v6H4zM10 10v6h8v-4h6v6h-6M10 16v8h8v-4h6v6h-6" fill="none" {sa}/><path d="M4 4h10v6H4z" fill="{f}" {s}/>"#
+        ),
+        "classify" => format!(
+            r#"<path d="M4 6h16l8 10-8 10H4z" fill="{f}" {s}/><circle cx="20" cy="16" r="2" fill="none" {sa}/>"#
+        ),
+        "keynotes" => format!(
+            r#"<rect x="5" y="4" width="22" height="24" fill="{f}" {s}/><path d="M9 10h4M15 10h8M9 16h4M15 16h8M9 22h4M15 22h8" {sa}/>"#
+        ),
         "fluid" => format!(
             r#"<path d="M16 3c-5 8-9 13-9 18a9 9 0 0 0 18 0c0-5-4-10-9-18z" fill="{f}" {s}/>"#
         ),

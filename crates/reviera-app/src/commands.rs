@@ -106,6 +106,9 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add_host(crate::paramlib::ParamlibSearch),
         registry.add_host(crate::paramlib::ParamlibAddToProject),
         registry.add_host(crate::paramlib::ParamlibManage),
+        registry.add_host(crate::classification_files::ClassificationLoad),
+        registry.add_host(crate::classification_files::KeynotesLoad),
+        registry.add_host(crate::classification_files::KeynotesReload),
         registry.add_host(SelectionRemove),
     ];
     for r in results {

@@ -85,3 +85,17 @@ project already has that GUID under another name, choose whether to keep the pro
 it from the library. <em>Import Legacy…</em> reads an older shared-parameter text file and keeps
 its GUIDs. <em>Export IFC Templates…</em> writes the library as IFC property set templates for
 other tools.</p>
+
+<h2 id="classification">Classification and keynotes</h2>
+<p><a href="reviera:action/classification.list">Classification Systems</a> (Manage › Settings)
+loads a classification table into the project, such as Uniclass, OmniClass, MasterFormat or a
+national system. Use a CSV file with a code, parent code and title on each line, or an IFC file
+that contains a classification. Reviera doesn't come with any tables, because they belong to
+their publishers. Select types or elements and choose <a
+href="reviera:action/classification.assign">Classify</a>, pick the system, search for the code
+and choose it. Each element has at most one code per system. When you save, the codes are
+written as standard IFC classification references, so other tools can read them.</p>
+<p><a href="reviera:action/keynotes.load">Load Keynotes</a> reads a keynote file: a text file
+with a key, a text and a parent key on each line, separated by tabs. Keep it beside the project
+and the project remembers it by name, so it still works when the folder moves.
+<code>keynotes.reload</code> reads it again after you edit it.</p>

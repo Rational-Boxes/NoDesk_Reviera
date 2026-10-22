@@ -220,6 +220,15 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(GlobalList),
         registry.add(GlobalSelectDriven),
         registry.add(FormulaValidate),
+        registry.add(ClassificationCreate),
+        registry.add(ClassificationAssign),
+        registry.add(ClassificationUnassign),
+        registry.add(ClassificationDelete),
+        registry.add(ClassificationList),
+        registry.add(ClassificationSearch),
+        registry.add(ClassificationOf),
+        registry.add(KeynotesSet),
+        registry.add(KeynotesList),
         registry.add(MechControlDeviceAssign),
         registry.add(MechControlDeviceList),
         registry.add(MepRunCreateRiser),
@@ -2252,4 +2261,99 @@ read_command!(
     crate::globals::ValidateParams,
     f64,
     crate::globals::validate
+);
+
+edit_command!(
+    ClassificationCreate,
+    "classification.create",
+    "Add a classification system",
+    "Adds a classification system to the project (DM-CLS-001): `name` (Uniclass 2015, OmniClass, …), `source`, `edition`, `location` and its table `items` [{code, parent?, title}] (parents must be in the table, codes unique). A system of the same name is replaced, keeping assignments whose codes remain. Files are read by `classification.load`. Returns its id.",
+    "Classification System",
+    crate::classification::CreateParams,
+    String,
+    crate::classification::create
+);
+
+edit_command!(
+    ClassificationAssign,
+    "classification.assign",
+    "Classify elements",
+    "Gives types or occurrences (`element_ids`) the `code` of the system `system_id` (id or name), replacing their code in that system; one code per system per element. Exported as IfcClassificationReference associated by IfcRelAssociatesClassification.",
+    "Classify",
+    crate::classification::AssignParams,
+    (),
+    crate::classification::assign
+);
+
+edit_command!(
+    ClassificationUnassign,
+    "classification.unassign",
+    "Remove elements' classification",
+    "Removes the elements' code in the system `system_id`.",
+    "Unclassify",
+    crate::classification::UnassignParams,
+    (),
+    crate::classification::unassign
+);
+
+edit_command!(
+    ClassificationDelete,
+    "classification.delete",
+    "Remove a classification system",
+    "Removes a classification system and every element's code in it; returns how many elements lost a code.",
+    "Remove Classification System",
+    crate::classification::DeleteParams,
+    usize,
+    crate::classification::delete
+);
+
+read_command!(
+    ClassificationList,
+    "classification.list",
+    "The classification systems",
+    "The project's classification systems with their source, edition, location, number of codes and number of elements classified.",
+    crate::builtin::NoParams,
+    Vec<crate::classification::SystemInfo>,
+    crate::classification::list
+);
+
+read_command!(
+    ClassificationSearch,
+    "classification.search",
+    "Search a classification table",
+    "A system's codes whose code or title contains `text` (every code when empty), up to `limit` (500).",
+    crate::classification::SearchParams,
+    Vec<crate::classification::Item>,
+    crate::classification::search
+);
+
+read_command!(
+    ClassificationOf,
+    "classification.of",
+    "An element's classification",
+    "An element's codes, one per system, with the system names and code titles.",
+    crate::classification::OfParams,
+    Vec<crate::classification::Classified>,
+    crate::classification::of
+);
+
+edit_command!(
+    KeynotesSet,
+    "keynotes.set",
+    "Set the keynote table",
+    "Sets the project's keynote table: `path` (the file, relative to the project when beside it) and `entries` [{key, text, parent?}]. Files are read by `keynotes.load`.",
+    "Keynotes",
+    crate::classification::KeynoteTable,
+    (),
+    crate::classification::set_keynotes
+);
+
+read_command!(
+    KeynotesList,
+    "keynotes.list",
+    "The keynote table",
+    "The project's keynote file and entries, those whose key or text contains `text` (every entry when empty).",
+    crate::classification::KeynoteListParams,
+    crate::classification::KeynoteTable,
+    crate::classification::list_keynotes
 );

@@ -102,6 +102,7 @@ mod stairs;
 mod structural_settings;
 mod globals_ui;
 mod paramlib_ui;
+mod classification_ui;
 mod mech_settings_ui;
 mod wall_profile;
 mod wall_sweeps;
@@ -4729,6 +4730,9 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "mechanical_settings.show" => with(gui, Gui::mechanical_settings),
         "global.manage" => with(gui, Gui::global_parameters),
         "paramlib.manage" => with(gui, Gui::parameter_libraries),
+        "classification.list" => with(gui, Gui::classification_systems),
+        "classification.assign" => with(gui, Gui::classify_selection),
+        "keynotes.load" => with(gui, Gui::load_keynotes),
         "global.label_dimension" => with(gui, Gui::label_dimension_with_global),
         "global.associate" => with(gui, Gui::associate_global),
         "building_space_type.manage" => with(gui, Gui::building_space_types),

@@ -757,6 +757,7 @@ impl LocalProject {
             )?;
             crate::groups::write_groups(&mut self.ifc, doc, &self.steps, owner_history)?;
             crate::selection_sets::write_selection_sets(&mut self.ifc, doc, &self.steps, owner_history)?;
+            crate::classification::write_classifications(&mut self.ifc, doc, &self.steps, owner_history)?;
             let owner_history = self.new_owner_history()?;
             crate::mep::write_mep(&mut self.ifc, doc, &self.steps, owner_history, self.length_scale)?;
             let owner_history = self.new_owner_history()?;

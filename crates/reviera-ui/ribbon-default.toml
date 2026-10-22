@@ -1744,6 +1744,24 @@ icon = "parameter_libraries"
 help = "Open and edit shared parameter libraries (.rplib.json): definitions by GUID, legacy import, IFC templates, adding them to the project (DM-SPAR-001)"
 
 [[action]]
+id = "classification.list"
+label = "Classification Systems"
+icon = "classification"
+help = "Load classification tables (Uniclass, OmniClass, MasterFormat, national systems) from CSV or IFC files into the project (DM-CLS-001)"
+
+[[action]]
+id = "classification.assign"
+label = "Classify"
+icon = "classify"
+help = "Give the selected types or elements a code from a classification system, found by searching its table; exported as IfcClassificationReference (DM-CLS-001)"
+
+[[action]]
+id = "keynotes.load"
+label = "Load Keynotes"
+icon = "keynotes"
+help = "Read a tab-separated keynote file (key, text, parent key) into the project (DM-CLS-001)"
+
+[[action]]
 id = "global.manage"
 label = "Global Parameters"
 icon = "global_parameters"
@@ -3535,6 +3553,9 @@ tools = [
   { action = "ui.model_properties", size = "large" },
   { action = "global.manage", size = "large" },
   { action = "paramlib.manage", size = "large" },
+  { action = "classification.list", size = "small" },
+  { action = "classification.assign", size = "small" },
+  { action = "keynotes.load", size = "small" },
   { action = "global.label_dimension", size = "small" },
   { action = "global.associate", size = "small" },
   { action = "clearance.set_rule_set", size = "large" },

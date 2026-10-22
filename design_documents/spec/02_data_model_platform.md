@@ -2888,8 +2888,10 @@ Coordinates ▾: *Acquire Coordinates* (from a link), *Publish Coordinates* (to 
 
 **Commands.** `classification.load(path_or_url, name?) -> system_id` · `classification.assign(element_ids[], system_id, code)` · `classification.unassign(element_ids[], system_id)` · `keynotes.load(path)` · `keynotes.reload()`
 
+*Built (2026-10-22):* Systems are kept on the project (`rxd:classifications`): name, source, edition, location and the table of codes with parents and titles; an element (type or occurrence) has one code per system (`rxd:classification`). Commands: `classification.load(path_or_url, name?, source?, edition?)` (application: a `code,parent_code,title` CSV, quoted fields allowed, or an IFC file's `IfcClassification` tree with its references, Identification or ItemReference, parents first; a system of the same name is replaced keeping its id), `classification.create`, `classification.assign` / `.unassign` (codes checked against the table), `classification.delete` (unclassifies), `classification.list`, `classification.search`, `classification.of`; `keynotes.load(path)` (tab-separated, kept relative to the project when beside it), `keynotes.reload`, `keynotes.set`, `keynotes.list`. On save each system with codes in use is an `IfcClassification` (Name, Source, Edition, Location), each code used and its ancestors an `IfcClassificationReference` (Identification, Name, ReferencedSource up to the classification), associated with its elements by `IfcRelAssociatesClassification`; all tagged `rxd:classification` and rewritten each save; none in IFC2X3. Manage › Settings › **Classification Systems** (Load, Remove), **Classify** (system, search, code for the selection), **Load Keynotes**. Reviera ships no tables. Not yet: the tree picker in Properties' Classification Code and Assembly Code fields, the Data Dictionary (bSDD, P2), keynote tags (DOC).
+
 **Acceptance criteria.**
-- [ ] Assigning Uniclass `Ss_25_10_30` to a wall type writes an `IfcClassificationReference` with Identification `Ss_25_10_30`, linked to an `IfcClassification` named "Uniclass 2015".
+- [x] Assigning Uniclass `Ss_25_10_30` to a wall type writes an `IfcClassificationReference` with Identification `Ss_25_10_30`, linked to an `IfcClassification` named "Uniclass 2015".
 
 ### 2.10.11 Purge unused
 **ID:** DM-PURGE-001 · **Priority:** P0 · **Ref:** research/05 §9.7

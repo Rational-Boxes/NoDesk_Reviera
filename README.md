@@ -1055,6 +1055,11 @@ schedules, circuit paths, cable sizing and voltage drop.
   property set templates, and adding a definition to the project with a full embedded copy
   (`paramlib.*`). Not built yet: libraries from URLs, remembering open libraries between
   sessions.
+- **Classification systems and keynotes** (Manage › Settings › Classification Systems, Classify,
+  Load Keynotes): classification tables from CSV or IFC files, one code per system per type or
+  element, exported as `IfcClassification` with `IfcClassificationReference` chains; keynote
+  files kept relative to the project (`classification.*`, `keynotes.*`). Not built yet: the
+  tree picker in Properties, bSDD, keynote tags.
 - **Sloped piping and parallel pipes** (Systems › HVAC & Piping › Slope, Parallel Pipes): the
   Slope Editor gives a connected section of pipe one of the project's allowed slopes from a
   control point (the lowest end by default): fittings follow, branches stay connected (their
