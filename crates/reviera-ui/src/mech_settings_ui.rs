@@ -386,6 +386,9 @@ impl Gui {
 
     /// Opens the settings dialogs that `mep_settings.show` asked for (MEP-SET-004).
     pub(crate) fn serve_settings_requests(&mut self) {
+        if self.app.take_paramlib_request() {
+            self.parameter_libraries();
+        }
         use reviera_app::settings_dialogs::SettingsKind as K;
         for kind in self.app.take_settings_requests() {
             match kind {

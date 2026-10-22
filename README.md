@@ -1049,6 +1049,12 @@ schedules, circuit paths, cable sizing and voltage drop.
   refused) that drive labelled dimensions and associated instance parameters such as door sill
   heights, each change one undo step (`global.*`, `formula.validate`). Not built yet: the "="
   button in Properties, in-grid editing, the full formula language.
+- **Parameter libraries** (Manage › Settings › Parameter Libraries): shared parameter
+  definitions by GUID in open `.rplib.json` files (JSON Schema published, sorted keys, data types
+  locked, definitions deprecated rather than removed), legacy shared-parameter import, IFC
+  property set templates, and adding a definition to the project with a full embedded copy
+  (`paramlib.*`). Not built yet: libraries from URLs, remembering open libraries between
+  sessions.
 - **Sloped piping and parallel pipes** (Systems › HVAC & Piping › Slope, Parallel Pipes): the
   Slope Editor gives a connected section of pipe one of the project's allowed slopes from a
   control point (the lowest end by default): fittings follow, branches stay connected (their

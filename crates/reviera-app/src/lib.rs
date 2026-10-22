@@ -21,6 +21,7 @@ pub mod overlaps;
 pub mod schedules;
 pub mod scripts;
 pub mod sheets;
+pub mod paramlib;
 pub mod settings_dialogs;
 pub mod structural;
 pub mod subscriptions;
@@ -237,6 +238,9 @@ pub struct App {
     view_requests: Vec<(DocumentId, reviera_core::ElementId)>,
     /// Settings dialogs that commands asked the UI to open (`mep_settings.show`).
     settings_requests: Vec<settings_dialogs::SettingsKind>,
+    /// The parameter libraries open in this session (DM-SPAR-001), by id.
+    libraries: BTreeMap<String, paramlib::OpenLibrary>,
+    paramlib_requested: bool,
     /// Shows scripts' forms as dialogs (set by the window).
     form_handler: Option<scripts::Handler>,
     /// The remote computation client, created on first use (`compute.*`).
@@ -277,6 +281,8 @@ impl App {
             config,
             view_requests: Vec::new(),
             settings_requests: Vec::new(),
+            libraries: BTreeMap::new(),
+            paramlib_requested: false,
             form_handler: None,
             compute: None,
             subscriptions: subscriptions::Subscriptions::default(),

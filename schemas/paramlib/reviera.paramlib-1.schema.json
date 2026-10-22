@@ -1,0 +1,67 @@
+{
+  "$id": "https://reviera.org/schemas/paramlib/reviera.paramlib-1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "definitions": {
+    "definition": {
+      "additionalProperties": false,
+      "properties": {
+        "data_type": { "minLength": 1, "type": "string" },
+        "deprecated": { "type": "boolean" },
+        "discipline": { "type": "string" },
+        "enum": { "items": { "type": ["string", "number", "boolean"] }, "type": "array" },
+        "group": { "type": "string" },
+        "guid": { "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$", "type": "string" },
+        "hide_when_no_value": { "type": "boolean" },
+        "ifc": {
+          "additionalProperties": false,
+          "properties": { "property": { "minLength": 1, "type": "string" }, "pset": { "minLength": 1, "type": "string" } },
+          "required": ["pset", "property"],
+          "type": ["object", "null"]
+        },
+        "labels": { "items": { "type": "string" }, "type": "array" },
+        "max": { "type": ["number", "null"] },
+        "min": { "type": ["number", "null"] },
+        "name": { "maxLength": 255, "minLength": 1, "type": "string" },
+        "param_group": { "type": "string" },
+        "superseded_by": { "type": ["string", "null"] },
+        "tooltip": { "type": "string" },
+        "user_modifiable": { "type": "boolean" },
+        "visible": { "type": "boolean" }
+      },
+      "required": ["guid", "name", "data_type"],
+      "type": "object"
+    }
+  },
+  "description": "A Reviera parameter library: GUID-identified parameter definitions shared across projects (DM-SPAR-001). Written with sorted keys and 2-space indentation.",
+  "properties": {
+    "definitions": { "items": { "$ref": "#/definitions/definition" }, "type": "array" },
+    "groups": {
+      "items": {
+        "additionalProperties": false,
+        "properties": { "id": { "minLength": 1, "type": "string" }, "name": { "minLength": 1, "type": "string" } },
+        "required": ["id", "name"],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "library": {
+      "additionalProperties": false,
+      "properties": {
+        "default_pset": { "type": "string" },
+        "id": { "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$", "type": "string" },
+        "license": { "type": "string" },
+        "name": { "minLength": 1, "type": "string" },
+        "publisher": { "type": "string" },
+        "version": { "type": "string" }
+      },
+      "required": ["id", "name"],
+      "type": "object"
+    },
+    "schema": { "const": "reviera.paramlib" },
+    "schema_version": { "pattern": "^1\\.[0-9]+\\.[0-9]+$", "type": "string" }
+  },
+  "required": ["schema", "schema_version", "library", "definitions"],
+  "title": "reviera.paramlib",
+  "type": "object"
+}

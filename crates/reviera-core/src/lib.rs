@@ -90,6 +90,7 @@ pub mod notes;
 pub mod origin;
 pub mod overlap;
 pub mod overlap_accept;
+pub mod paramlib;
 pub mod parameters;
 pub mod parts;
 pub mod path_arrays;

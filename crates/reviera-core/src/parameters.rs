@@ -421,6 +421,18 @@ pub struct ProjectParameter {
     /// Per-category IFC homes that override `pset_name` (for example `Pset_WallCommon.FireRating`).
     #[serde(default)]
     pub homes: BTreeMap<String, PropertyHome>,
+    /// The parameter library it came from (DM-SPAR-001): the full definition is kept here, so the
+    /// project does not need the library file.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub library: Option<LibrarySource>,
+}
+
+/// Where a shared parameter came from.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct LibrarySource {
+    pub id: String,
+    pub name: String,
+    pub version: String,
 }
 
 impl ProjectParameter {
@@ -497,7 +509,7 @@ fn write_project_parameters(txn: &mut Transaction<'_>, list: &[ProjectParameter]
 #[derive(Debug, Clone)]
 enum Def {
     BuiltIn(&'static BuiltIn),
-    Project(ProjectParameter),
+    Project(Box<ProjectParameter>),
     Native { pset: String, property: String },
 }
 
@@ -594,7 +606,7 @@ fn find(store: &Store, reference: &str, cat: Option<&Category>) -> Result<Def> {
     }
     let project = project_parameters(store);
     if let Some(p) = project.iter().find(|p| p.guid == reference) {
-        return Ok(Def::Project(p.clone()));
+        return Ok(Def::Project(Box::new(p.clone())));
     }
     let named: Vec<_> = project.iter().filter(|p| p.name == reference).collect();
     if let Some(p) = named
@@ -602,7 +614,7 @@ fn find(store: &Store, reference: &str, cat: Option<&Category>) -> Result<Def> {
         .find(|p| cat.is_some_and(|c| p.categories.iter().any(|k| k == c.key)))
         .or(named.first())
     {
-        return Ok(Def::Project((*p).clone()));
+        return Ok(Def::Project(Box::new((*p).clone())));
     }
     if let Some(b) = BUILT_INS
         .iter()
@@ -880,7 +892,7 @@ pub fn list(
             (None, None) => None,
         };
     let mut defs: Vec<Def> = BUILT_INS.iter().map(Def::BuiltIn).collect();
-    defs.extend(project_parameters(store).into_iter().map(Def::Project));
+    defs.extend(project_parameters(store).into_iter().map(|p| Def::Project(Box::new(p))));
     let mut out: Vec<Definition> = defs
         .iter()
         .filter(|d| cat.is_none() || d.applies_to(cat))
@@ -930,6 +942,9 @@ pub struct NewDefinition {
     pub tooltip: Option<String>,
     /// A shared parameter's GUID from its parameter library.
     pub guid: Option<String>,
+    /// The library it comes from.
+    #[serde(default)]
+    pub library: Option<LibrarySource>,
 }
 
 fn default_group() -> String {
@@ -1049,6 +1064,7 @@ pub fn project_add(
         group_behavior,
         pset_name,
         homes: BTreeMap::new(),
+        library: def.library,
     });
     write_project_parameters(txn, &list)?;
     Ok(guid)
@@ -1363,7 +1379,7 @@ pub fn set_ifc_home(
     let moved = move_values(txn, &old, &new)?;
     let mut list = project_parameters(&store);
     if let Some(p) = list.iter_mut().find(|p| p.guid == old.guid) {
-        *p = new;
+        *p = *new;
     }
     write_project_parameters(txn, &list)?;
     Ok(moved)

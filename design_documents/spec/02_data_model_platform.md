@@ -2486,11 +2486,13 @@ The Place Component tool is the UI over `component.place`.
 `paramlib.search(text?, labels?, data_type?) -> definition[]` ·
 `paramlib.manage()` (opens the Parameter Libraries dialog)
 
+*Built (2026-10-22):* The format is `reviera_core::paramlib`, its JSON Schema published (MIT) as `schemas/paramlib/reviera.paramlib-1.schema.json`; every library is checked against it and the rules above on open and before each write, and written with sorted keys and 2-space indentation, atomically. Application commands: `paramlib.open` (files; a copy of each library is cached when opened, so a removed definition or a changed data type is refused next time, and a GUID the open project has with another data type is refused naming both), `paramlib.create`, `paramlib.close`, `paramlib.list`, `paramlib.definition.add` / `.edit` (data type locked) / `.deprecate` (with `superseded_by`), `paramlib.group.add` / `.rename`, `paramlib.import_legacy` (tab-separated `*GROUP`/`*PARAM` files, UTF-8 or UTF-16, GUIDs kept, data-type tokens mapped, unknown ones listed unless `mapping` gives them), `paramlib.export_ifc_templates` (an `IfcProjectLibrary` declaring `IfcPropertySetTemplate`s of `IfcSimplePropertyTemplate`s whose GlobalIds are the GUIDs and whose PrimaryMeasureType is the data type's IFC type), `paramlib.search` (with *in project*), `paramlib.add_to_project` (embeds the definition with the library's id, name and version via `param.project.add`; `on_conflict` keep or update), `paramlib.manage`. Manage › Settings › **Parameter Libraries**: open libraries (Open, New, Close, a lock on read-only files) and each one's definitions (New, Edit, Deprecate, Add to Project with Keep or Update on a conflict, Import Legacy, Export IFC Templates). Not yet: libraries from a URL or git repository, remembering the active libraries between sessions, the group tree, filtering by label and data type in the dialog, edits held until Save, reloading on outside change, `Pset_` property checks against the standard sets, families (so the family half of the legacy-import criterion), legacy export (P2).
+
 **Acceptance criteria.**
-- [ ] A library with 500 definitions opens in under 200 ms, and its JSON Schema validation passes.
+- [x] A library with 500 definitions opens in under 200 ms, and its JSON Schema validation passes.
 - [ ] Importing a reference-product shared-parameter file with 50 parameters gives 50 definitions with identical GUIDs. A family using one of them, after round-tripping through Reviera, schedules in the same column as a project parameter with that GUID.
-- [ ] Changing `data_type` of an existing GUID in a library file is reported as a validation error on open.
-- [ ] A project that uses shared parameters opens and schedules correctly with every library file removed from the machine.
+- [x] Changing `data_type` of an existing GUID in a library file is reported as a validation error on open.
+- [x] A project that uses shared parameters opens and schedules correctly with every library file removed from the machine.
 
 ### 2.9.8 Extended properties (external data)
 **ID:** DM-PARAM-005 · **Priority:** P3 (vendor cloud equivalent) / P2 (open alternative) · **Ref:** research/05 §7.1 (extended properties, 2027), §12.1

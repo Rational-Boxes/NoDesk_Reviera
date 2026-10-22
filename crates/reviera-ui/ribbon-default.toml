@@ -1738,6 +1738,12 @@ icon = "selection_export"
 help = "Choose whether saved selections are exported as IfcGroups (ObjectType SelectionSet) when saving (ARC-SEL-002)"
 
 [[action]]
+id = "paramlib.manage"
+label = "Parameter Libraries"
+icon = "parameter_libraries"
+help = "Open and edit shared parameter libraries (.rplib.json): definitions by GUID, legacy import, IFC templates, adding them to the project (DM-SPAR-001)"
+
+[[action]]
 id = "global.manage"
 label = "Global Parameters"
 icon = "global_parameters"
@@ -3528,6 +3534,7 @@ label = "Settings"
 tools = [
   { action = "ui.model_properties", size = "large" },
   { action = "global.manage", size = "large" },
+  { action = "paramlib.manage", size = "large" },
   { action = "global.label_dimension", size = "small" },
   { action = "global.associate", size = "small" },
   { action = "clearance.set_rule_set", size = "large" },

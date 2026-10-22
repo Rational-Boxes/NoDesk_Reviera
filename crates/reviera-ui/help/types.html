@@ -70,3 +70,18 @@ back.</p>
 <p>A <em>reporting</em> global reads its value from the one dimension it labels, so other
 globals' formulas can use a measured distance. <em>Select Elements</em> selects everything a
 global drives. Deleting a global leaves what it drove at its current value.</p>
+
+<h2 id="paramlib">Parameter libraries</h2>
+<p>A parameter library is a file of shared parameter definitions (<code>.rplib.json</code>), each
+identified by a GUID so that every project using it means the same parameter. Open <a
+href="reviera:action/paramlib.manage">Parameter Libraries</a> (Manage › Settings) to open or
+make libraries. <em>Definitions…</em> shows a library's definitions. There you can add one, edit
+its name, tooltip, labels and IFC home, or deprecate it. A definition's data type never changes
+and definitions are never removed, so files stay compatible. Changes are written to the library
+file straight away, not to the project.</p>
+<p><em>Add to Project…</em> binds a definition to categories as a shared parameter. The project
+keeps a full copy, so it opens and schedules the same on a machine without the library. If the
+project already has that GUID under another name, choose whether to keep the project's or update
+it from the library. <em>Import Legacy…</em> reads an older shared-parameter text file and keeps
+its GUIDs. <em>Export IFC Templates…</em> writes the library as IFC property set templates for
+other tools.</p>
