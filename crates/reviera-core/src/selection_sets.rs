@@ -5,8 +5,12 @@
 //! (`rxd:selection_sets`) as lists of GlobalIds. Deleted members drop out silently; loading a set
 //! changes only the session's selection.
 //!
-//! Not built yet: the shared name space with view filters, sets as view filters, Edit Selection
-//! mode in the window (add and remove work as commands), `IfcGroup` export.
+//! With the project option *Selection sets as IfcGroup* (`selectionset.set_export`), each set is
+//! also written on save as an `IfcGroup` (ObjectType "SelectionSet") whose
+//! `IfcRelAssignsToGroup` lists its members; it is not read back as an element.
+//!
+//! Not built yet: the shared name space with view filters (there are no view filters yet), sets
+//! as view filters.
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -18,6 +22,8 @@ use crate::store::Store;
 use crate::txn::Transaction;
 
 pub const KEY: &str = "rxd:selection_sets";
+/// On the project: whether sets are exported as `IfcGroup`s.
+pub const EXPORT_KEY: &str = "rxd:selection_sets_as_groups";
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct SelectionSet {
@@ -213,4 +219,38 @@ pub(crate) fn list(store: &Store, _: ListParams) -> Result<Vec<SetInfo>> {
         .collect();
     out.sort_by(|a, b| a.name.cmp(&b.name));
     Ok(out)
+}
+
+/// The members of every set that still exist, by set (for export).
+pub fn resolved(store: &Store) -> Vec<(SelectionSet, Vec<ElementId>)> {
+    all(store).into_iter().map(|s| {
+        let m = living(store, &s);
+        (s, m)
+    }).collect()
+}
+
+/// Whether sets are exported as `IfcGroup`s.
+pub fn exported(store: &Store) -> bool {
+    project(store).and_then(|p| p.param(EXPORT_KEY)).and_then(serde_json::Value::as_bool).unwrap_or(false)
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ExportParams {
+    /// Write each set as an `IfcGroup` (ObjectType "SelectionSet") on save.
+    pub as_ifc_group: bool,
+}
+
+/// `selectionset.set_export`: the project option *Selection sets as IfcGroup*.
+pub(crate) fn set_export(txn: &mut Transaction<'_>, p: ExportParams) -> Result<()> {
+    let id = project(txn.store())
+        .map(Element::id)
+        .ok_or_else(|| Error::new("project.missing", "the model has no project"))?;
+    txn.modify(id, |e| {
+        if p.as_ifc_group {
+            e.params.insert(EXPORT_KEY.into(), serde_json::Value::Bool(true));
+        } else {
+            e.params.remove(EXPORT_KEY);
+        }
+    })
 }

@@ -14776,10 +14776,12 @@ These commands are session-only and are not undoable.
 **Acceptance criteria.**
 - [x] A saved set of 12 elements, one of which is later deleted, loads 11 elements without error.
 - [ ] Saving a set with the name of an existing view filter offers Replace or Cancel; Cancel changes nothing.
-- [ ] In Edit Selection mode, window-selecting three walls with *Remove from Selection* active and pressing Finish leaves the set three members smaller, as one undo step.
-- [ ] Exporting with *Selection sets as IfcGroup* gives one `IfcGroup` per set, whose `IfcRelAssignsToGroup` lists exactly the member elements.
+- [x] In Edit Selection mode, window-selecting three walls with *Remove from Selection* active and pressing Finish leaves the set three members smaller, as one undo step.
+- [x] Exporting with *Selection sets as IfcGroup* gives one `IfcGroup` per set, whose `IfcRelAssignsToGroup` lists exactly the member elements.
 
 **Implementation note (2026-10-15, first build).** As built: sets on the project (`rxd:selection_sets`, GlobalIds); `selectionset.save` (a taken name is refused unless `replace`; members of groups join as their group), `selectionset.load`, `selectionset.edit`, `selectionset.delete`, `selectionset.rename`, `selectionset.list`. The window: Manage › Selection › Save Selection (asks to replace a taken name) and Load Selection. Not built yet: the shared name space and use as view filters, Edit Selection mode, the visible-in-view option, `IfcGroup` export.
+
+*Built (2026-10-22):* Manage › Selection › **Edit Selection**: choosing a set selects its members; clicks and window selections (they go through the same selection path) remove members, or add them after **Add to Selection** (`A`; **Remove from Selection** `R`); **Finish Selection** (Enter) records the change as one `selectionset.edit` step, Esc cancels. **Load Selection** asks whether to include members hidden in the current view (temporarily hidden or isolated away) and leaves them out otherwise. **Sets as IfcGroups** (`selectionset.set_export(as_ifc_group)`) is the project option: on save each set is an `IfcGroup` (ObjectType SelectionSet, GlobalId the set's) with one `IfcRelAssignsToGroup` listing exactly its members that still exist, tagged `rxd:selection_set`, rewritten each save and not read back as elements. Not yet: the shared name space with view filters (no view filters exist yet, so the Replace-or-Cancel case for a filter name is not built), use as view filters, the micro-operation journal for an interrupted Edit Selection, the Edit Filters dialog's New, Duplicate, Rename and Delete (rename and delete are commands), search in the Load dialog.
 
 ---
 

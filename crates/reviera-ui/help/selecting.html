@@ -169,9 +169,17 @@ curve).</p>
 <h2 id="selection-sets">Saved selections</h2>
 <p><b>Manage › Selection › Save Selection</b> names the current selection; <b>Load
 Selection</b> selects a saved set again (deleted members are left out). Members of groups are
-saved as their group. <code>selectionset.save</code>, <code>selectionset.load</code>,
-<code>selectionset.edit</code>, <code>selectionset.rename</code>,
-<code>selectionset.delete</code>, <code>selectionset.list</code></p>
+saved as their group. When some members are hidden in the current view, Load Selection asks
+whether to include them.</p>
+<p><b>Edit Selection</b> changes a saved set in place. Its members are selected; click or drag a
+window over elements to take them out, or choose <b>Add to Selection</b> (<kbd>A</kbd>) first to
+put them in (<b>Remove from Selection</b>, <kbd>R</kbd>, switches back). <b>Finish Selection</b>
+(<kbd>Enter</kbd>) keeps the change as one step you can undo; <kbd>Esc</kbd> cancels.</p>
+<p><b>Sets as IfcGroups</b> chooses whether each saved selection is also written to the IFC file
+as a group, so other tools can see it. <code>selectionset.save</code>,
+<code>selectionset.load</code>, <code>selectionset.edit</code>, <code>selectionset.rename</code>,
+<code>selectionset.delete</code>, <code>selectionset.list</code>,
+<code>selectionset.set_export</code></p>
 
 <h2 id="delete">Deleting and pinning</h2>
 <p><b>Delete</b> (<kbd>DE</kbd>, or the <kbd>Delete</kbd> key) deletes the selection along with

@@ -451,6 +451,7 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(GroupList),
         registry.add(SelectionSetLoad),
         registry.add(SelectionSetList),
+        registry.add(SelectionSetSetExport),
         registry.add(ColorSchemeCreate),
         registry.add(ColorSchemeSetRows),
         registry.add(ColorSchemeDuplicate),
@@ -5370,6 +5371,17 @@ read_command!(
     crate::selection_sets::ListParams,
     Vec<crate::selection_sets::SetInfo>,
     |store, p| crate::selection_sets::list(store, p)
+);
+
+edit_command!(
+    SelectionSetSetExport,
+    "selectionset.set_export",
+    "Export selection sets as IfcGroups",
+    "The project option Selection sets as IfcGroup (ARC-SEL-002): with `as_ifc_group`, each saved selection is written on save as an IfcGroup (ObjectType SelectionSet) whose IfcRelAssignsToGroup lists exactly its members that still exist.",
+    "Selection Sets Export",
+    crate::selection_sets::ExportParams,
+    (),
+    crate::selection_sets::set_export
 );
 
 edit_command!(

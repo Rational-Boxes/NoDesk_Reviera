@@ -287,6 +287,8 @@ struct Gui {
     sketch: Option<sketch::SketchSession>,
     ceiling_tool: Option<sketch::CeilingTool>,
     room_tool: Option<rooms::RoomTool>,
+    /// Edit Selection mode (ARC-SEL-002).
+    sel_edit: Option<groups::SelEdit>,
     section_tool: Option<sections::SectionTool>,
     /// The Tag, Room Tag or Text tool.
     note_tool: Option<notes::NoteTool>,
@@ -1562,7 +1564,7 @@ impl Gui {
 
     /// A key handed to the tools in progress; `true` when one used it.
     pub(crate) fn tools_key(&mut self, key: i32, shift: bool, f: &Frame) -> bool {
-        let mut used = self.run_key(key) || self.adjust_key(key) || self.bar_pick_key(key) || self.rebar_host_key(key) || self.coupler_key(key) || self.steel_key(key) || self.rebar_sketch_key(key) || self.walk_key(key, true, shift);
+        let mut used = self.sel_edit_key(key) || self.run_key(key) || self.adjust_key(key) || self.bar_pick_key(key) || self.rebar_host_key(key) || self.coupler_key(key) || self.steel_key(key) || self.rebar_sketch_key(key) || self.walk_key(key, true, shift);
         if !used && self.sketch.is_some() {
             let (mx, my) = self.mouse;
             used = self.sketch_key(key, mx, my);
@@ -3396,6 +3398,8 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                         } else if g.sketch.is_some() {
                             let (mx, my) = g.mouse;
                             g.sketch_key(WXK_ESCAPE, mx, my);
+                        } else if g.sel_edit.is_some() {
+                            g.sel_edit_finish(false);
                         } else if g.ceiling_tool.is_some() {
                             g.end_ceiling_tool();
                             f.set_status_text("Ready", 0);
@@ -3681,6 +3685,7 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 sketch: None,
                 ceiling_tool: None,
                 room_tool: None,
+                sel_edit: None,
                 section_tool: None,
                 note_tool: None,
                 stair_tool: None,
@@ -4481,6 +4486,14 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "group.ungroup" => with(gui, Gui::ungroup),
         "selectionset.save" => with(gui, Gui::save_selection),
         "selectionset.load" => with(gui, Gui::load_selection),
+        "selectionset.edit" => with(gui, |g| {
+            g.edit_selection_set();
+            focus(g);
+        }),
+        "ui.selection_edit.add" => with(gui, |g| g.sel_edit_mode(true)),
+        "ui.selection_edit.remove" => with(gui, |g| g.sel_edit_mode(false)),
+        "ui.selection_edit.finish" => with(gui, |g| g.sel_edit_finish(true)),
+        "selectionset.set_export" => with(gui, Gui::selection_sets_export),
         "roof.create_glazing_type" => with(gui, Gui::sloped_glazing),
         "wallsweep.create" => with(gui, Gui::wall_sweep),
         "wall.create_by_room" => with(gui, Gui::linings),

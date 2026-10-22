@@ -113,6 +113,10 @@ pub(crate) struct QuickPair {
 impl Gui {
     /// Changes the selection by `ids`.
     pub(crate) fn select_ids(&mut self, ids: &[ElementId], combine: Combine) {
+        // In Edit Selection mode picks add to or remove from the set being edited.
+        if self.sel_edit.is_some() {
+            return self.sel_edit_pick(ids);
+        }
         let result = match combine {
             Combine::Replace if ids.is_empty() => self.run("selection.clear", json!({})),
             Combine::Replace => self.run("selection.set", json!({ "ids": ids })),

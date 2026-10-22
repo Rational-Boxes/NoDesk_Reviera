@@ -756,6 +756,7 @@ impl LocalProject {
                 self.length_scale,
             )?;
             crate::groups::write_groups(&mut self.ifc, doc, &self.steps, owner_history)?;
+            crate::selection_sets::write_selection_sets(&mut self.ifc, doc, &self.steps, owner_history)?;
             let owner_history = self.new_owner_history()?;
             crate::mep::write_mep(&mut self.ifc, doc, &self.steps, owner_history, self.length_scale)?;
             let owner_history = self.new_owner_history()?;
@@ -4401,7 +4402,8 @@ fn is_derived(ifc: &IfcModel, id: StepId) -> bool {
             || d == crate::stacked_walls::PART_TAG
             || d == REBAR_TYPE_TAG
             || d == REBAR_PART_TAG
-            || d == crate::mep::TAG)
+            || d == crate::mep::TAG
+            || d == crate::selection_sets::TAG)
 }
 
 /// The lowest and highest points of a floor's, ceiling's or roof's body.

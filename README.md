@@ -445,8 +445,12 @@ Create … Boundary* tab:
   `IfcGroup` with `IfcRelAssignsToGroup` (`group.create`, `group.place`, `group.edit`,
   `group.finish`, `group.cancel`, `group.exclude_member`, `group.ungroup`, …;
   ARC-GRP-001 … 003).
-- **Saved selections** (Manage › Selection): Save and Load Selection (`selectionset.save`,
-  `selectionset.load`, `selectionset.edit`, `selectionset.list`; ARC-SEL-002).
+- **Saved selections** (Manage › Selection): Save and Load Selection (members hidden in the view
+  left out unless asked for), Edit Selection mode (picks and window selections add or remove,
+  Finish is one step), and the project option to export sets as `IfcGroup`s
+  (`selectionset.save`, `selectionset.load`, `selectionset.edit`, `selectionset.list`,
+  `selectionset.set_export`; ARC-SEL-002). Not built yet: the shared name space with view
+  filters.
 - **Room separators** (Room & Area › Room Separator): lines or arcs that split space for rooms
   like walls (`roomseparator.create`; ARC-ROOM-001).
 - **Areas and area schemes** (Architecture › Area): Gross Building and Rentable schemes with area

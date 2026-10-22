@@ -1708,6 +1708,36 @@ icon = "rebar_settings"
 help = "Rebar length rounding, hooks in shape definitions, and the project's cover types"
 
 [[action]]
+id = "selectionset.edit"
+label = "Edit Selection"
+icon = "selection_edit"
+help = "Edit a saved selection: its members are selected; clicks and window selections remove members (or add, with Add to Selection); Finish keeps the change as one step (ARC-SEL-002)"
+
+[[action]]
+id = "ui.selection_edit.add"
+label = "Add to Selection"
+icon = "selection_add"
+help = "In Edit Selection, picks add members (A)"
+
+[[action]]
+id = "ui.selection_edit.remove"
+label = "Remove from Selection"
+icon = "selection_remove"
+help = "In Edit Selection, picks remove members (R)"
+
+[[action]]
+id = "ui.selection_edit.finish"
+label = "Finish Selection"
+icon = "selection_finish"
+help = "Keep the edited selection as one step (Enter); Esc cancels"
+
+[[action]]
+id = "selectionset.set_export"
+label = "Sets as IfcGroups"
+icon = "selection_export"
+help = "Choose whether saved selections are exported as IfcGroups (ObjectType SelectionSet) when saving (ARC-SEL-002)"
+
+[[action]]
 id = "global.manage"
 label = "Global Parameters"
 icon = "global_parameters"
@@ -3486,6 +3516,11 @@ label = "Selection"
 tools = [
   { action = "selectionset.save", size = "large" },
   { action = "selectionset.load", size = "large" },
+  { action = "selectionset.edit", size = "small" },
+  { action = "ui.selection_edit.add", size = "small" },
+  { action = "ui.selection_edit.remove", size = "small" },
+  { action = "ui.selection_edit.finish", size = "small" },
+  { action = "selectionset.set_export", size = "small" },
 ]
 
 [[tab.panel]]

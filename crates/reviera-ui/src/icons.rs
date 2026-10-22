@@ -472,6 +472,21 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "associate_global" => format!(
             r#"<circle cx="10" cy="16" r="7" fill="{f}" {s}/><path d="M17 16h6M20 12h8v8h-8z" fill="none" {sa}/><path d="M3 16h14" {sa}/>"#
         ),
+        "selection_edit" => format!(
+            r#"<path d="M4 4h18v18H4z" fill="none" stroke-dasharray="3 2" {sa}/><path d="M18 28l10-10-4-4-10 10v4z" fill="{f}" {s}/>"#
+        ),
+        "selection_add" => format!(
+            r#"<path d="M4 4h18v18H4z" fill="none" stroke-dasharray="3 2" {sa}/><path d="M24 18v10M19 23h10" stroke-width="3" {sa}/>"#
+        ),
+        "selection_remove" => format!(
+            r#"<path d="M4 4h18v18H4z" fill="none" stroke-dasharray="3 2" {sa}/><path d="M19 23h10" stroke-width="3" {sa}/>"#
+        ),
+        "selection_finish" => format!(
+            r#"<path d="M4 4h18v18H4z" fill="none" stroke-dasharray="3 2" {sa}/><path d="M17 23l4 4 8-9" fill="none" stroke-width="3" {sa}/>"#
+        ),
+        "selection_export" => format!(
+            r#"<path d="M4 4h16v16H4z" fill="none" stroke-dasharray="3 2" {sa}/><path d="M14 22l6 6 8-8M20 28V12" fill="none" stroke-width="2.5" {sa}/>"#
+        ),
         "fluid" => format!(
             r#"<path d="M16 3c-5 8-9 13-9 18a9 9 0 0 0 18 0c0-5-4-10-9-18z" fill="{f}" {s}/>"#
         ),

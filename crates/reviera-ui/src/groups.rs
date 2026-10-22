@@ -275,15 +275,163 @@ impl Gui {
             return;
         };
         if let Ok(v) = self.run("selectionset.load", json!({ "id": id })) {
-            let ids: Vec<ElementId> = v
+            let mut ids: Vec<ElementId> = v
                 .as_array()
                 .into_iter()
                 .flatten()
                 .filter_map(serde_json::Value::as_u64)
                 .map(ElementId)
                 .collect();
+            // Members hidden in this view are left out unless asked for.
+            let hidden = self.active_view().map(|v| self.view_visibility(v).hidden).unwrap_or_default();
+            let n_hidden = ids.iter().filter(|i| hidden.contains(i)).count();
+            if n_hidden > 0 {
+                let ask = MessageDialog::builder(&frame, &format!("{n_hidden} of its members are not visible in this view. Include them?"), "Load Selection")
+                    .with_style(MessageDialogStyle::YesNo | MessageDialogStyle::IconQuestion)
+                    .build();
+                if ask.show_modal() != ID_YES {
+                    ids.retain(|i| !hidden.contains(i));
+                }
+            }
             self.select_ids(&ids, Combine::Replace);
             frame.set_status_text(&format!("{} elements selected", ids.len()), 0);
         }
     }
+
+    /// Manage › Selection › Edit Selection: a saved selection's members are shown selected;
+    /// picks and window selections then remove them (or add, with Add to Selection), and Finish
+    /// (Enter) keeps the change as one step; Esc cancels.
+    pub(crate) fn edit_selection_set(&mut self) {
+        let frame = self.frame;
+        let Some((id, name)) = self.choose_selection_set("Edit Selection") else { return };
+        let Ok(v) = self.run("selectionset.load", json!({ "id": id })) else { return };
+        let members: Vec<ElementId> = serde_json::from_value(v).unwrap_or_default();
+        self.end_tool(&frame);
+        self.sel_edit = Some(SelEdit { id, name, original: members.clone(), members, adding: false });
+        self.sel_edit_show();
+    }
+
+    fn choose_selection_set(&mut self, title: &str) -> Option<(String, String)> {
+        let frame = self.frame;
+        let list = self.run("selectionset.list", json!({})).ok()?;
+        let sets: Vec<(String, String, u64)> = list
+            .as_array()
+            .into_iter()
+            .flatten()
+            .map(|s| (s["id"].as_str().unwrap_or_default().to_owned(), s["name"].as_str().unwrap_or_default().to_owned(), s["count"].as_u64().unwrap_or(0)))
+            .collect();
+        if sets.is_empty() {
+            frame.set_status_text("There are no saved selections", 0);
+            return None;
+        }
+        let labels: Vec<String> = sets.iter().map(|s| format!("{} ({})", s.1, s.2)).collect();
+        let refs: Vec<&str> = labels.iter().map(String::as_str).collect();
+        let d = SingleChoiceDialog::builder(&frame, "Saved selection:", title, &refs).build();
+        if d.show_modal() != ID_OK {
+            return None;
+        }
+        usize::try_from(d.get_selection()).ok().and_then(|i| sets.get(i)).map(|s| (s.0.clone(), s.1.clone()))
+    }
+
+    fn sel_edit_show(&mut self) {
+        let frame = self.frame;
+        let Some(e) = &self.sel_edit else { return };
+        let (ids, text) = (
+            e.members.clone(),
+            format!(
+                "Edit Selection {}: {} member(s). Click or drag to {} (A: add, R: remove); Enter finishes, Esc cancels",
+                e.name,
+                e.members.len(),
+                if e.adding { "add" } else { "remove" }
+            ),
+        );
+        let _ = self.run("selection.set", json!({ "ids": ids }));
+        self.selection_changed();
+        frame.set_status_text(&text, 0);
+    }
+
+    pub(crate) fn sel_edit_pick(&mut self, ids: &[ElementId]) {
+        let Some(e) = &mut self.sel_edit else { return };
+        for id in ids {
+            if e.adding {
+                if !e.members.contains(id) {
+                    e.members.push(*id);
+                }
+            } else {
+                e.members.retain(|m| m != id);
+            }
+        }
+        self.sel_edit_show();
+    }
+
+    /// Add to Selection (`true`) or Remove from Selection.
+    pub(crate) fn sel_edit_mode(&mut self, adding: bool) {
+        let Some(e) = &mut self.sel_edit else {
+            return self.frame.set_status_text("Edit Selection first (Manage › Selection)", 0);
+        };
+        e.adding = adding;
+        self.sel_edit_show();
+    }
+
+    /// Finish (keeping the change as one step) or cancel Edit Selection.
+    pub(crate) fn sel_edit_finish(&mut self, keep: bool) {
+        let frame = self.frame;
+        let Some(e) = self.sel_edit.take() else { return };
+        let _ = self.run("selection.clear", json!({}));
+        self.selection_changed();
+        if !keep {
+            return frame.set_status_text("Edit Selection cancelled", 0);
+        }
+        let add: Vec<ElementId> = e.members.iter().filter(|m| !e.original.contains(m)).copied().collect();
+        let remove: Vec<ElementId> = e.original.iter().filter(|m| !e.members.contains(m)).copied().collect();
+        if add.is_empty() && remove.is_empty() {
+            return frame.set_status_text("Selection unchanged", 0);
+        }
+        match self.run("selectionset.edit", json!({ "id": e.id, "add": add, "remove": remove })) {
+            Ok(_) => frame.set_status_text(&format!("{}: {} added, {} removed", e.name, add.len(), remove.len()), 0),
+            Err(err) => super::error(&frame, &err),
+        }
+    }
+
+    /// Keys in Edit Selection mode: A adds, R removes, Enter finishes.
+    pub(crate) fn sel_edit_key(&mut self, key: i32) -> bool {
+        if self.sel_edit.is_none() {
+            return false;
+        }
+        match key {
+            k if k == 'A' as i32 || k == 'a' as i32 => self.sel_edit_mode(true),
+            k if k == 'R' as i32 || k == 'r' as i32 => self.sel_edit_mode(false),
+            WXK_RETURN | WXK_NUMPAD_ENTER => self.sel_edit_finish(true),
+            _ => return false,
+        }
+        true
+    }
+
+    /// Manage › Selection › Export as IfcGroups: the project option.
+    pub(crate) fn selection_sets_export(&mut self) {
+        let frame = self.frame;
+        let on = self.store_now().is_some_and(|s| reviera_core::selection_sets::exported(&s));
+        let d = MessageDialog::builder(
+            &frame,
+            &format!("Selection sets are {}exported as IfcGroups. Export each saved selection as an IfcGroup (ObjectType SelectionSet) when saving?", if on { "" } else { "not " }),
+            "Selection Sets as IfcGroup",
+        )
+        .with_style(MessageDialogStyle::YesNo | MessageDialogStyle::IconQuestion)
+        .build();
+        let yes = d.show_modal() == ID_YES;
+        match self.run("selectionset.set_export", json!({ "as_ifc_group": yes })) {
+            Ok(_) => frame.set_status_text(if yes { "Selection sets will be exported as IfcGroups" } else { "Selection sets will not be exported" }, 0),
+            Err(e) => super::error(&frame, &e),
+        }
+    }
+}
+
+/// Edit Selection mode: the set, its members as they were and as edited, and whether picks add.
+#[derive(Debug, Clone)]
+pub(crate) struct SelEdit {
+    pub id: String,
+    pub name: String,
+    pub original: Vec<ElementId>,
+    pub members: Vec<ElementId>,
+    pub adding: bool,
 }
