@@ -768,6 +768,7 @@ impl LocalProject {
             )?;
             self.write_railings(doc)?;
             self.write_rooms(doc)?;
+            self.write_spaces(doc)?;
             let owner_history = self.new_owner_history()?;
             crate::curves::write_all(
                 &mut self.ifc,
@@ -3388,6 +3389,99 @@ impl LocalProject {
         }
         self.ifc.set_attribute(rel, "RelatedObjects", &AttrValue::List(vec![AttrValue::Ref(step.0)]))?;
         self.ifc.set_attribute(rel, "RelatingPropertyDefinition", &AttrValue::Ref(q.0))?;
+        Ok(())
+    }
+
+    /// A quantity of `class` (`IfcQuantityLength`, `IfcQuantityArea`, `IfcQuantityVolume`) named
+    /// `name` in the quantity set `qto` of `step`, in file units: updated when written before,
+    /// else added to the set (made when missing).
+    fn write_quantity(&mut self, step: StepId, qto: &str, name: &str, class: &str, value: f64, owner_history: Option<StepId>) -> Result<()> {
+        let attr = match class {
+            "IfcQuantityArea" => "AreaValue",
+            "IfcQuantityVolume" => "VolumeValue",
+            _ => "LengthValue",
+        };
+        let mut set = None;
+        for rel in self.ifc.referenced_by(step, "IfcRelDefinesByProperties")? {
+            let AttrValue::Ref(q) = self.ifc.attribute(rel, "RelatingPropertyDefinition")? else { continue };
+            if self.ifc.attribute(StepId(q), "Name")? != AttrValue::String(qto.into()) {
+                continue;
+            }
+            set = Some(StepId(q));
+            if let AttrValue::List(items) = self.ifc.attribute(StepId(q), "Quantities")? {
+                for i in items {
+                    if let AttrValue::Ref(i) = i
+                        && self.ifc.attribute(StepId(i), "Name")? == AttrValue::String(name.into())
+                    {
+                        self.ifc.set_attribute(StepId(i), attr, &AttrValue::Real(value))?;
+                        return Ok(());
+                    }
+                }
+            }
+        }
+        let quantity = self.ifc.create(class)?;
+        self.ifc.set_attribute(quantity, "Name", &AttrValue::String(name.into()))?;
+        self.ifc.set_attribute(quantity, attr, &AttrValue::Real(value))?;
+        if let Some(q) = set {
+            let mut items = match self.ifc.attribute(q, "Quantities")? {
+                AttrValue::List(v) => v,
+                _ => Vec::new(),
+            };
+            items.push(AttrValue::Ref(quantity.0));
+            self.ifc.set_attribute(q, "Quantities", &AttrValue::List(items))?;
+            return Ok(());
+        }
+        let q = self.ifc.create_rooted("IfcElementQuantity", &GlobalId::new())?;
+        self.ifc.set_attribute(q, "Name", &AttrValue::String(qto.into()))?;
+        self.ifc.set_attribute(q, "Quantities", &AttrValue::List(vec![AttrValue::Ref(quantity.0)]))?;
+        let rel = self.ifc.create_rooted("IfcRelDefinesByProperties", &GlobalId::new())?;
+        if let Some(oh) = owner_history {
+            self.ifc.set_attribute(q, "OwnerHistory", &AttrValue::Ref(oh.0))?;
+            self.ifc.set_attribute(rel, "OwnerHistory", &AttrValue::Ref(oh.0))?;
+        }
+        self.ifc.set_attribute(rel, "RelatedObjects", &AttrValue::List(vec![AttrValue::Ref(step.0)]))?;
+        self.ifc.set_attribute(rel, "RelatingPropertyDefinition", &AttrValue::Ref(q.0))?;
+        Ok(())
+    }
+
+    /// Writes every MEP space (MEP-SPACE-001) as `write_rooms` does a room, with
+    /// `Qto_SpaceBaseQuantities` (NetFloorArea, NetVolume, Height); unplaced spaces have no body.
+    fn write_spaces(&mut self, doc: &Document) -> Result<()> {
+        let store = doc.store();
+        let all = reviera_core::mep_spaces::all(store);
+        if all.is_empty() {
+            return Ok(());
+        }
+        let contexts = geometry::Contexts::find(&self.ifc)?;
+        let owner_history = self.new_owner_history()?;
+        let s = self.length_scale;
+        for (id, recipe, g) in &all {
+            let Some(&step) = self.steps.get(id) else {
+                continue;
+            };
+            match g.as_ref().and_then(|g| g.region.as_ref().map(|r| (g, r))) {
+                Some((g, region)) => {
+                    let outer = region.outer_ring();
+                    let holes = region.hole_rings();
+                    let body = geometry::SlabBody {
+                        rings: vec![(outer.as_slice(), holes.iter().map(Vec::as_slice).collect())],
+                        top: g.z_top,
+                        depth: g.unbounded_height(),
+                    };
+                    geometry::write_slab(&mut self.ifc, step, &body, s, contexts)?;
+                    self.write_quantity(step, "Qto_SpaceBaseQuantities", "NetFloorArea", "IfcQuantityArea", g.area() / (s * s), owner_history)?;
+                    self.write_quantity(step, "Qto_SpaceBaseQuantities", "NetVolume", "IfcQuantityVolume", g.volume() / (s * s * s), owner_history)?;
+                    self.write_quantity(step, "Qto_SpaceBaseQuantities", "Height", "IfcQuantityLength", g.unbounded_height() / s, owner_history)?;
+                }
+                None => geometry::remove_slab(&mut self.ifc, step)?,
+            }
+            let storey = GlobalId::parse(&recipe.level)
+                .and_then(|g| store.find_by_guid(&g))
+                .and_then(|l| self.steps.get(&l).copied());
+            if let Some(storey) = storey {
+                geometry::aggregate(&mut self.ifc, step, storey, owner_history)?;
+            }
+        }
         Ok(())
     }
 

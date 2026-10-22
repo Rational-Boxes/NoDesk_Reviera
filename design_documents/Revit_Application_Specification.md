@@ -20138,10 +20138,12 @@ They are schedulable and filterable, can be used in view filters and tags, and a
 - `space.unplace(ids[])`
 - `space.name_from_rooms(scope, source_link_id?)`
 
+*Built (2026-10-22):* Analyze › Spaces & Zones › **Space** (`SA`, `space.place(level_id, point, upper_limit?, limit_offset?, base_offset?, name?, number?)`): a click places a space in the enclosed region (bounded by walls and room separation lines, as rooms are), its own element apart from any room: an `IfcSpace` with ObjectType MEPSpace and PredefinedType SPACE, its recipe `recipe.mep_space` so room tools and schedules never see it, in its own Spaces category. **Place Spaces Automatically** (`space.place_auto(level_id)`) fills every enclosed region over 0.025 m² that has none, numbered in sequence top to bottom, left to right. A space under a room is *Occupiable*. **Space Naming** (`SN`, `space.name_from_rooms(ids?)`) copies the number and name of the room at each space's location (rooms in the same model; linked models are not built). `space.unplace(ids)` keeps a space without a location (schedules say Not Placed); `space.set` with a point places it again. On export each space has its body (base to upper limit) and `Qto_SpaceBaseQuantities` NetFloorArea, NetVolume and Height, aggregated in its storey. Deleting a level deletes its spaces. Not yet: drawing and picking spaces in plans and sections (they are listed in the Spaces dialog and schedules), Highlight Boundaries, the upper limit by roof, ceiling or plenum and complex vertical extents, space separation lines (room separation lines bound both), combine, divide and move, drag controls, the other space property sets and space boundaries in IFC, room-bounding links.
+
 **Acceptance criteria.**
-- [ ] *Place Spaces Automatically* on a level with 25 enclosed regions creates 25 spaces, and marks occupiable the 20 that are under rooms.
+- [x] *Place Spaces Automatically* on a level with 25 enclosed regions creates 25 spaces, and marks occupiable the 20 that are under rooms.
 - [ ] Space Naming copies "101 Office" from a linked room to the space at the same location.
-- [ ] Each space exports as an `IfcSpace` with `Qto_SpaceBaseQuantities.NetVolume` correct to within 0.5%.
+- [x] Each space exports as an `IfcSpace` with `Qto_SpaceBaseQuantities.NetVolume` correct to within 0.5%.
 
 ### 4.11.2 Space properties and building/space type settings
 **ID:** MEP-SPACE-002 · **Priority:** P1 (properties) / P2 (type settings) · **Ref:** research/03 §12.1 ("Space properties")
@@ -20171,8 +20173,10 @@ They are schedulable and filterable, can be used in view filters and tags, and a
 - `space_type.create(name, params) -> id`
 - `building_type.create(name, params) -> id`
 
+*Built (2026-10-22):* Analyze › Spaces & Zones › **Spaces** lists the spaces (number, name, area or Not Placed, occupiable, type, supply airflow) with Edit (number, name, condition type, return-air plenum, ceiling, wall and floor reflectances, workplane height, specified supply, and overrides of lighting and power density and area per person), Type (a space type from MEP-SET-004) and Unplace. `space.set(ids, …)` sets every property, overrides any of the type's values (people, schedules, set points, outside air too), and a null override returns a value to the type's; `space.info(ids?)` reports the effective values with the overridden ones listed, actual lighting and power loads and densities from the fixtures and devices whose calculation points are in the space, actual supply, return and exhaust airflow from its terminals, and the number of people. Space schedules have Number, Name, Area, Volume, Occupiable, Space Type, Lighting Load Density, Actual Lighting Load, Number of People, Actual and Specified Supply Airflow. Not yet: calculated airflow, average estimated illumination (ANA-LIGHT-001), phase, colour schemes and tags for spaces, building type on spaces, shipped starter type values (none are shipped, see E-33).
+
 **Acceptance criteria.**
-- [ ] Assigning the type "Office" sets lighting density, occupancy and schedules to the type defaults, and each value can be overridden per space.
+- [x] Assigning the type "Office" sets lighting density, occupancy and schedules to the type defaults, and each value can be overridden per space.
 
 ### 4.11.3 System-zones
 **ID:** MEP-ZONE-001 · **Priority:** P2 · **Ref:** research/03 §12.2 · screenshots/structure_mep/system_zones_plan.png

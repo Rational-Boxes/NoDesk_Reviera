@@ -4760,6 +4760,13 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
             g.start_room_tool();
             focus(g);
         }),
+        "space.place" => with(gui, |g| {
+            g.start_space_tool();
+            focus(g);
+        }),
+        "space.place_auto" => with(gui, Gui::place_spaces_automatically),
+        "space.name_from_rooms" => with(gui, Gui::name_spaces_from_rooms),
+        "space.info" => with(gui, Gui::spaces_dialog),
         "room.place_automatically" => with(gui, |g| {
             g.place_rooms_automatically();
             focus(g);

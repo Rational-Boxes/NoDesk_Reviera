@@ -451,6 +451,18 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "photometry" => format!(
             r#"<circle cx="16" cy="9" r="4" fill="{f}" {s}/><path d="M16 13c-9 2-12 10-12 16M16 13c9 2 12 10 12 16M16 13v16" fill="none" {sa}/>"#
         ),
+        "space" => format!(
+            r#"<path d="M4 6h24v20H4z" fill="none" stroke-dasharray="4 2" {sa}/><path d="M9 11h14v10H9z" fill="{f}" {s}/>"#
+        ),
+        "space_auto" => format!(
+            r#"<path d="M3 5h12v10H3zM17 5h12v10H17zM3 17h12v10H3zM17 17h12v10H17z" fill="{f}" stroke-dasharray="3 2" {s}/>"#
+        ),
+        "space_naming" => format!(
+            r#"<path d="M4 6h24v20H4z" fill="none" stroke-dasharray="4 2" {sa}/><path d="M9 13h14M9 19h9" stroke-width="2.5" {sa}/>"#
+        ),
+        "spaces" => format!(
+            r#"<path d="M4 5h24v22H4z" fill="{f}" {s}/><path d="M8 10h16M8 16h16M8 22h16" {sa}/>"#
+        ),
         "fluid" => format!(
             r#"<path d="M16 3c-5 8-9 13-9 18a9 9 0 0 0 18 0c0-5-4-10-9-18z" fill="{f}" {s}/>"#
         ),

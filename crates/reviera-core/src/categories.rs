@@ -257,6 +257,7 @@ pub const CATEGORIES: &[Category] = &[
         Some("Pset_SpaceCommon"),
         true,
     ),
+    cat("cat.spaces", "Spaces", Some("IfcSpace"), None, Some("Pset_SpaceCommon"), true),
     cat(
         "cat.areas",
         "Areas",
@@ -645,6 +646,7 @@ pub fn category_of(e: &Element) -> Option<&'static Category> {
         },
         "IfcFurniture" if object_type == "Casework" => "cat.casework",
         "IfcSpace" if object_type.starts_with("Area:") => "cat.areas",
+        "IfcSpace" if object_type == crate::mep_spaces::OBJECT_TYPE => "cat.spaces",
         "IfcAnnotation" if object_type == crate::ref_planes::OBJECT_TYPE => "cat.reference_planes",
         "IfcAnnotation" if object_type == crate::model_lines::OBJECT_TYPE => "cat.lines",
         "IfcAnnotation" if object_type == crate::scope_boxes::OBJECT_TYPE => "cat.scope_boxes",

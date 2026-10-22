@@ -39,7 +39,7 @@ pub const DEFAULT_LIMIT_OFFSET: f64 = 4.0;
 /// Regions smaller than this get no room when placing automatically (0.25 sq ft).
 pub const MIN_AREA: f64 = 0.023;
 /// How far above the level the walls are cut to find the boundary.
-const COMPUTATION_HEIGHT: f64 = 0.001;
+pub(crate) const COMPUTATION_HEIGHT: f64 = 0.001;
 
 /// The stored recipe of a room.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
@@ -128,7 +128,7 @@ fn elevation(store: &Store, guid: &str, what: &str) -> Result<f64> {
 }
 
 /// The arrangement of wall faces where rooms on a level are computed.
-fn plane_edges(store: &Store, level_z: f64) -> Vec<arrangement::Edge> {
+pub(crate) fn plane_edges(store: &Store, level_z: f64) -> Vec<arrangement::Edge> {
     let mut edges = arrangement::wall_edges(store, level_z + COMPUTATION_HEIGHT);
     // Room separation lines on the level split space too.
     edges.extend(crate::room_separators::edges(store, level_z));
@@ -136,7 +136,7 @@ fn plane_edges(store: &Store, level_z: f64) -> Vec<arrangement::Edge> {
 }
 
 /// Whether `p` lies inside a wall cut at `z`.
-fn in_wall(store: &Store, z: f64, p: [f64; 2]) -> bool {
+pub(crate) fn in_wall(store: &Store, z: f64, p: [f64; 2]) -> bool {
     crate::walls::solve(store).bodies.values().any(|b| {
         let g = &b.geometry;
         z >= g.base_z - 1e-9 && z <= g.base_z + g.height + 1e-9 && inside(p, &b.footprint)
@@ -167,6 +167,11 @@ fn region_at(store: &Store, edges: &[arrangement::Edge], z: f64, p: [f64; 2]) ->
 /// Regenerates a room from its recipe, levels and the walls around it.
 pub fn regenerate(store: &Store, e: &Element) -> Result<RoomGeometry> {
     let r = room_recipe(e).ok_or_else(|| Error::new("room.not_reviera", "not a Reviera room"))?;
+    regenerate_recipe(store, &r)
+}
+
+/// The geometry of a room's recipe (MEP spaces share it, MEP-SPACE-001).
+pub(crate) fn regenerate_recipe(store: &Store, r: &RoomRecipe) -> Result<RoomGeometry> {
     let level_z = elevation(store, &r.level, "level")?;
     let upper_z = match &r.upper_level {
         Some(g) => elevation(store, g, "upper limit level")?,
@@ -269,7 +274,7 @@ pub(crate) fn next_number(store: &Store) -> String {
 }
 
 /// A point well inside a region (the middle of its largest triangle).
-fn interior_point(region: &Region) -> Option<[f64; 2]> {
+pub(crate) fn interior_point(region: &Region) -> Option<[f64; 2]> {
     let outer = region.outer_ring();
     let holes = region.hole_rings();
     let mut points = outer.clone();
@@ -297,7 +302,7 @@ fn interior_point(region: &Region) -> Option<[f64; 2]> {
         .map(|(_, p)| p)
 }
 
-fn resolve_level(store: &Store, r: &ElementRef) -> Result<(ElementId, String)> {
+pub(crate) fn resolve_level(store: &Store, r: &ElementRef) -> Result<(ElementId, String)> {
     let id = store
         .resolve(r)
         .ok_or_else(|| Error::new("element.not_found", "no such level"))?;
@@ -324,7 +329,7 @@ fn resolve_room(store: &Store, r: &ElementRef) -> Result<(ElementId, RoomRecipe)
     Ok((id, recipe))
 }
 
-fn length(store: &Store, v: &Value, what: &str) -> Result<f64> {
+pub(crate) fn length(store: &Store, v: &Value, what: &str) -> Result<f64> {
     match v {
         Value::Number(n) => Ok(n.as_f64().unwrap_or(f64::NAN)),
         Value::String(s) => crate::units::parse(s, "length", &crate::units::settings_of(store)),

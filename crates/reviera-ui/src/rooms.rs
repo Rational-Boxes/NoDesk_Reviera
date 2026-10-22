@@ -28,11 +28,22 @@ const HOVER: [f32; 4] = [0.95, 0.45, 0.9, 1.0];
 #[derive(Debug, Default)]
 pub struct RoomTool {
     hover: Vec<Line>,
+    /// The Space tool (MEP-SPACE-001): clicks place MEP spaces, not rooms.
+    space: bool,
 }
 
 impl Gui {
     /// Architecture › Room.
     pub(crate) fn start_room_tool(&mut self) {
+        self.start_room_tool_as(false);
+    }
+
+    /// Analyze › Spaces & Zones › Space (MEP-SPACE-001).
+    pub(crate) fn start_space_tool(&mut self) {
+        self.start_room_tool_as(true);
+    }
+
+    fn start_room_tool_as(&mut self, space: bool) {
         let frame = self.frame;
         if !self.ensure_plan(false) {
             return frame.set_status_text("Rooms are placed in plan views (View › Floor Plan)", 0);
@@ -46,11 +57,15 @@ impl Gui {
         self.cancel_sketch();
         self.end_ceiling_tool();
         self.leave_walk();
-        self.room_tool = Some(RoomTool::default());
+        self.room_tool = Some(RoomTool { hover: Vec::new(), space });
         let _ = self.run("selection.clear", json!({}));
         self.selection_changed();
         frame.set_status_text(
-            "Room: click inside a region enclosed by walls (or Place Rooms Automatically); Esc ends",
+            if space {
+                "Space: click inside a region enclosed by walls (or Place Spaces Automatically); Esc ends"
+            } else {
+                "Room: click inside a region enclosed by walls (or Place Rooms Automatically); Esc ends"
+            },
             0,
         );
     }
@@ -123,15 +138,17 @@ impl Gui {
         ) else {
             return;
         };
+        let space = self.room_tool.as_ref().is_some_and(|t| t.space);
+        let (command, what) = if space { ("space.place", "Space") } else { ("room.place", "Room") };
         match self.app.execute(
-            "room.place",
+            command,
             json!({ "level_id": plan.level, "point": p }),
             &super::user(),
         ) {
             Ok(out) => {
                 let note = out.warnings.first().map_or(
-                    "Room placed; click another region, or Esc".to_owned(),
-                    |w| format!("Room placed — {}", w.message),
+                    format!("{what} placed; click another region, or Esc"),
+                    |w| format!("{what} placed — {}", w.message),
                 );
                 frame.set_status_text(&note, 0);
                 self.after_room_change();
@@ -397,5 +414,159 @@ impl Gui {
         self.properties_stale = true;
         self.after_room_change();
         true
+    }
+
+    /// Analyze › Spaces & Zones › Place Spaces Automatically on the plan's level.
+    pub(crate) fn place_spaces_automatically(&mut self) {
+        let frame = self.frame;
+        let Some(plan) = self.active_view().and_then(|v| v.plan.clone()) else {
+            return frame.set_status_text("Spaces are placed in plan views", 0);
+        };
+        match self.run("space.place_auto", json!({ "level_id": plan.level })) {
+            Ok(v) => {
+                let n = v.as_array().map_or(0, Vec::len);
+                frame.set_status_text(&format!("{n} space{} placed", if n == 1 { "" } else { "s" }), 0);
+                self.after_room_change();
+            }
+            Err(e) => error(&frame, &format!("Spaces were not placed:\n{e}")),
+        }
+    }
+
+    /// Analyze › Spaces & Zones › Space Naming: every space takes the number and name of the room
+    /// at its location.
+    pub(crate) fn name_spaces_from_rooms(&mut self) {
+        let frame = self.frame;
+        match self.run("space.name_from_rooms", json!({})) {
+            Ok(v) => frame.set_status_text(&format!("{} space(s) named from rooms", v.as_array().map_or(0, Vec::len)), 0),
+            Err(e) => error(&frame, &e),
+        }
+    }
+
+    /// Analyze › Spaces & Zones › Spaces: the spaces with their area, type and airflow; Edit
+    /// changes one's properties and overrides, Type gives it a space type, Unplace keeps it
+    /// without a location.
+    pub(crate) fn spaces_dialog(&mut self) {
+        const EDIT: i32 = 7401;
+        const TYPE: i32 = 7402;
+        const UNPLACE: i32 = 7403;
+        let frame = self.frame;
+        let mut selected = None;
+        loop {
+            let list = match self.run("space.info", json!({})) {
+                Ok(v) => v.as_array().cloned().unwrap_or_default(),
+                Err(e) => return error(&frame, &e),
+            };
+            let rows: Vec<Vec<String>> = list
+                .iter()
+                .map(|s| {
+                    let placed = s["placed"].as_bool().unwrap_or(true);
+                    vec![
+                        s["number"].as_str().unwrap_or("").to_owned(),
+                        s["name"].as_str().unwrap_or("").to_owned(),
+                        if placed { format!("{:.2}", s["area"].as_f64().unwrap_or(0.0)) } else { "Not Placed".into() },
+                        if s["occupiable"].as_bool() == Some(true) { "Yes".into() } else { "No".into() },
+                        s["space_type"].as_str().unwrap_or("").to_owned(),
+                        format!("{:.1}", s["actual_supply"].as_f64().unwrap_or(0.0) * 1000.0),
+                    ]
+                })
+                .collect();
+            let (code, at) = super::mep_loads_ui::list_dialog(
+                &frame,
+                "Spaces",
+                "MEP spaces, separate from rooms: their loads, people and airflow. A space under a room is occupiable.",
+                &[("Number", 70), ("Name", 140), ("Area m²", 80), ("Occupiable", 80), ("Space type", 110), ("Supply L/s", 80)],
+                &rows,
+                &[(EDIT, "Edit…", "Change its properties and override its type's values"), (TYPE, "Type…", "Give it a space type"), (UNPLACE, "Unplace", "Keep it, without a location")],
+                selected,
+            );
+            selected = at;
+            let Some(s) = at.and_then(|k| list.get(k)).cloned() else {
+                if matches!(code, EDIT | TYPE | UNPLACE) {
+                    continue;
+                }
+                break;
+            };
+            let id = s["id"].clone();
+            let result = match code {
+                EDIT => match self.space_form(&s) {
+                    Some(args) => {
+                        let mut args = args;
+                        args["ids"] = json!([id]);
+                        self.run("space.set", args).map(|_| ())
+                    }
+                    None => continue,
+                },
+                TYPE => {
+                    let types = self.run("space_type.list", json!({ "which": "space" })).ok().and_then(|v| v.as_array().cloned()).unwrap_or_default();
+                    let mut labels = vec!["(none)".to_owned()];
+                    labels.extend(types.iter().map(|t| t["name"].as_str().unwrap_or("").to_owned()));
+                    let refs: Vec<&str> = labels.iter().map(String::as_str).collect();
+                    let d = SingleChoiceDialog::builder(&frame, "Space type:", "Space Type", &refs).build();
+                    if d.show_modal() != ID_OK {
+                        continue;
+                    }
+                    let k = usize::try_from(d.get_selection()).unwrap_or(0);
+                    let ty = k.checked_sub(1).and_then(|i| types.get(i)).map(|t| t["id"].clone()).unwrap_or(serde_json::Value::Null);
+                    self.run("space.set_type", json!({ "element_ids": [id], "type_id": ty })).map(|_| ())
+                }
+                UNPLACE => self.run("space.unplace", json!({ "ids": [id] })).map(|_| ()),
+                _ => break,
+            };
+            if let Err(e) = result {
+                error(&frame, &e);
+            }
+            self.after_room_change();
+        }
+    }
+
+    /// A space's properties and overrides in a form: the `space.set` arguments, or none.
+    fn space_form(&mut self, s: &serde_json::Value) -> Option<serde_json::Value> {
+        const CONDITIONS: [(&str, &str); 6] = [
+            ("Heated and cooled", "heated_and_cooled"),
+            ("Heated", "heated"),
+            ("Cooled", "cooled"),
+            ("Unconditioned", "unconditioned"),
+            ("Vented", "vented"),
+            ("Naturally vented only", "naturally_vented_only"),
+        ];
+        let f = super::reinforcement_ui::Form::new(&self.frame, &format!("Space {}", s["number"].as_str().unwrap_or("")));
+        let p = &s["props"];
+        let number = f.text("Number", s["number"].as_str().unwrap_or(""), "");
+        let name = f.text("Name", s["name"].as_str().unwrap_or(""), "");
+        let labels: Vec<String> = CONDITIONS.iter().map(|c| c.0.to_owned()).collect();
+        let at = CONDITIONS.iter().position(|c| Some(c.1) == p["condition"].as_str()).unwrap_or(0);
+        let condition = f.choice("Condition", &labels, at);
+        let plenum = f.check("Plenum", "Return-air plenum", p["return_air_plenum"].as_bool().unwrap_or(false));
+        let num = |v: &serde_json::Value| v.as_f64().map_or(String::new(), |x| format!("{x}"));
+        let refl = f.text("Reflectances", &format!("{}, {}, {}", num(&p["ceiling_reflectance"]), num(&p["wall_reflectance"]), num(&p["floor_reflectance"])), "Ceiling, wall and floor, 0 to 1");
+        let workplane = f.text("Workplane height (m)", &num(&p["workplane_height"]), "Lighting calculation workplane above the floor");
+        let supply = f.text("Specified supply (L/s)", &p["specified_supply"].as_f64().map_or(String::new(), |v| format!("{}", v * 1000.0)), "Blank: none");
+        let over = &p["overrides"];
+        let v = &s["values"];
+        let lighting = f.text("Lighting load (W/m²)", &over["lighting_load_density"].as_f64().map_or(String::new(), |x| x.to_string()), &format!("Blank: the type's ({})", num(&v["lighting_load_density"])));
+        let power = f.text("Power load (W/m²)", &over["power_load_density"].as_f64().map_or(String::new(), |x| x.to_string()), &format!("Blank: the type's ({})", num(&v["power_load_density"])));
+        let people = f.text("Area per person (m²)", &over["area_per_person"].as_f64().map_or(String::new(), |x| x.to_string()), &format!("Blank: the type's ({})", num(&v["area_per_person"])));
+        let ok = f.show("Blank load and people values follow the space type.", "OK");
+        let parse = |t: &TextCtrl| t.get_value().trim().replace(',', ".").parse::<f64>().ok();
+        let opt = |t: &TextCtrl| parse(t).map_or(serde_json::Value::Null, |x| json!(x));
+        let r: Vec<f64> = refl.get_value().split(',').filter_map(|x| x.trim().parse().ok()).collect();
+        let mut args = json!({
+            "number": number.get_value().trim(),
+            "name": name.get_value().trim(),
+            "condition": CONDITIONS[condition.get_selection().map_or(0, |i| i as usize)].1,
+            "return_air_plenum": plenum.get_value(),
+            "specified_supply": parse(&supply).map_or(-1.0, |x| x / 1000.0),
+            "overrides": { "lighting_load_density": opt(&lighting), "power_load_density": opt(&power), "area_per_person": opt(&people) },
+        });
+        if let [c, w, fl] = r[..] {
+            args["ceiling_reflectance"] = json!(c);
+            args["wall_reflectance"] = json!(w);
+            args["floor_reflectance"] = json!(fl);
+        }
+        if let Some(h) = parse(&workplane) {
+            args["workplane_height"] = json!(h);
+        }
+        f.dialog.destroy();
+        ok.then_some(args)
     }
 }

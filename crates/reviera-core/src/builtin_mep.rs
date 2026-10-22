@@ -205,6 +205,12 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(LightingFixtureTypeSetPhotometry),
         registry.add(ComponentTypeSetCalcPoint),
         registry.add(SpaceElements),
+        registry.add(SpacePlace),
+        registry.add(SpacePlaceAuto),
+        registry.add(SpaceUnplace),
+        registry.add(SpaceSet),
+        registry.add(SpaceNameFromRooms),
+        registry.add(SpaceInfo),
         registry.add(MechControlDeviceAssign),
         registry.add(MechControlDeviceList),
         registry.add(MepRunCreateRiser),
@@ -2076,4 +2082,69 @@ read_command!(
     crate::mep_lighting::ContentsParams,
     Vec<crate::id::ElementId>,
     crate::mep_lighting::contents
+);
+
+edit_command!(
+    SpacePlace,
+    "space.place",
+    "Place a space",
+    "Places an MEP space (MEP-SPACE-001): an IfcSpace (ObjectType MEPSpace, SPACE) filling the region around `point` on `level_id`, bounded as rooms are, from `base_offset` to `limit_offset` above `upper_limit` (its own level and 4000 mm by default), numbered in sequence unless `number` is given. Spaces are separate from rooms; a space under a room is occupiable. Returns its id.",
+    "Space",
+    crate::mep_spaces::PlaceParams,
+    crate::id::ElementId,
+    crate::mep_spaces::place
+);
+
+edit_command!(
+    SpacePlaceAuto,
+    "space.place_auto",
+    "Place spaces automatically",
+    "Places a space in every enclosed region of the level `level_id` larger than 0.025 m² that has none, numbered in sequence top to bottom, then left to right. Returns the spaces.",
+    "Place Spaces Automatically",
+    crate::mep_spaces::PlaceAutoParams,
+    Vec<crate::id::ElementId>,
+    crate::mep_spaces::place_auto
+);
+
+edit_command!(
+    SpaceUnplace,
+    "space.unplace",
+    "Unplace spaces",
+    "Unplaces the spaces `ids`: they keep their number, name and properties and stay in schedules as Not Placed until deleted; `space.set` with a `point` places one again.",
+    "Unplace Spaces",
+    crate::mep_spaces::IdsParams,
+    (),
+    crate::mep_spaces::unplace
+);
+
+edit_command!(
+    SpaceSet,
+    "space.set",
+    "Change spaces",
+    "Sets spaces' (`ids`) number, name, `point` (placing an unplaced one), `limit_offset`, `base_offset`, `condition` (heated_and_cooled, heated, cooled, unconditioned, vented, naturally_vented_only), `return_air_plenum`, ceiling, wall and floor reflectances (0–1), `workplane_height`, specified supply, return and exhaust airflow (m³/s; negative clears), and `overrides` of the space type's values (lighting_load_density, power_load_density, area_per_person, sensible_heat_per_person, latent_heat_per_person, occupancy_schedule, lighting_schedule, power_schedule, heating_set_point, cooling_set_point, outside_air_per_person, outside_air_per_area; null returns a value to the type's). The type itself is set with `space.set_type`.",
+    "Space Properties",
+    crate::mep_spaces::SetParams,
+    (),
+    crate::mep_spaces::set
+);
+
+edit_command!(
+    SpaceNameFromRooms,
+    "space.name_from_rooms",
+    "Name spaces from rooms",
+    "Space Naming (MEP-SPACE-001): each space (`ids`, or every space) takes the number and name of the room placed at its location. Returns the spaces named.",
+    "Space Naming",
+    crate::mep_spaces::NameParams,
+    Vec<crate::id::ElementId>,
+    crate::mep_spaces::name_from_rooms
+);
+
+read_command!(
+    SpaceInfo,
+    "space.info",
+    "Spaces' properties",
+    "Each space's (`ids`, or every space) number, name, whether placed and enclosed, area, volume and height, whether occupiable, its space type, properties, the effective values (the type's with the overrides, which are listed), actual lighting and power loads and densities from the fixtures and devices in it, actual supply, return and exhaust airflow from its terminals, and the number of people.",
+    crate::mep_spaces::InfoParams,
+    Vec<crate::mep_spaces::SpaceInfo>,
+    crate::mep_spaces::infos
 );

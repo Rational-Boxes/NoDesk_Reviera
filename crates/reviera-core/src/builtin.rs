@@ -466,7 +466,7 @@ pub fn dependents_of(store: &crate::store::Store, id: ElementId) -> Vec<ElementI
                 || crate::inserts::insert_recipe(e).is_some_and(|r| r.host == guid)
                 || crate::mep_coverings::covering_recipe(e).is_some_and(|r| r.host == guid)
                 || crate::floors::slab_recipe(e).is_some_and(|(_, r)| r.level == guid)
-                || crate::rooms::room_recipe(e).is_some_and(|r| {
+                || crate::rooms::room_recipe(e).or_else(|| crate::mep_spaces::space_recipe(e)).is_some_and(|r| {
                     r.level == guid || r.upper_level.as_deref() == Some(guid.as_str())
                 })
                 || crate::railings::railing_recipe(e).is_some_and(|r| match r.path {

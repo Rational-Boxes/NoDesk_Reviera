@@ -100,7 +100,7 @@ fn raw_parent(store: &Store, e: &Element, imported: &Imported) -> Option<Element
     if let Some(r) = crate::roofs::roof_recipe(e) {
         return by_guid(&r.level);
     }
-    if let Some(r) = crate::rooms::room_recipe(e) {
+    if let Some(r) = crate::rooms::room_recipe(e).or_else(|| crate::mep_spaces::space_recipe(e)) {
         return by_guid(&r.level);
     }
     if let Some(r) = crate::railings::railing_recipe(e) {

@@ -160,6 +160,20 @@ pub fn available_fields(store: &Store, category: &str) -> Vec<FieldInfo> {
             info("room.return_airflow", "Actual Return Airflow", true),
             info("room.exhaust_airflow", "Actual Exhaust Airflow", true),
         ]),
+        // MEP spaces (MEP-SPACE-001/002).
+        "cat.spaces" => out.extend([
+            info("room.number", "Number", false),
+            info("room.name", "Name", false),
+            info("space.area", "Area", true),
+            info("space.volume", "Volume", true),
+            info("space.occupiable", "Occupiable", false),
+            info("space.type", "Space Type", false),
+            info("space.lighting_density", "Lighting Load Density", false),
+            info("space.actual_lighting", "Actual Lighting Load", true),
+            info("space.people", "Number of People", true),
+            info("space.actual_supply", "Actual Supply Airflow", true),
+            info("space.specified_supply", "Specified Supply Airflow", true),
+        ]),
         "cat.doors" | "cat.windows" => out.extend([
             info("insert.width", "Width", false),
             info("insert.height", "Height", false),
@@ -330,6 +344,8 @@ struct Context<'a> {
     settings: crate::units::UnitSettings,
     /// Rebar sets' info, worked out once (STR-RBR-018).
     rebar: HashMap<ElementId, crate::rebar::RebarInfo>,
+    /// Spaces' information (MEP-SPACE-001).
+    spaces: std::collections::BTreeMap<ElementId, crate::mep_spaces::SpaceInfo>,
     /// Rooms' air terminal flows (MEP-DUCT-009).
     airflow: std::collections::BTreeMap<ElementId, crate::mep_equipment::SpaceAirflow>,
 }
@@ -368,6 +384,7 @@ impl<'a> Context<'a> {
             settings: crate::units::settings_of(store),
             rebar: crate::rebar_docs::infos(store),
             airflow: crate::mep_equipment::airflows(store),
+            spaces: crate::mep_spaces::infos_by_id(store),
         }
     }
 }
@@ -459,6 +476,33 @@ impl Context<'_> {
                     text: if key == "room.number" { number } else { name },
                     value: None,
                     editable: crate::rooms::room_recipe(e).is_some(),
+                }
+            }
+            k if k.starts_with("space.") => {
+                let Some(s) = self.spaces.get(&e.id()) else { return none() };
+                let placed = s.placed;
+                match k {
+                    "space.area" if !placed => Context::text("Not Placed"),
+                    "space.area" => self.fmt(s.area, "area"),
+                    "space.volume" if !placed => Context::text("Not Placed"),
+                    "space.volume" => self.fmt(s.volume, "volume"),
+                    "space.occupiable" => Context::text(if s.occupiable { "Yes" } else { "No" }),
+                    "space.type" => Context::text(
+                        s.space_type
+                            .as_deref()
+                            .and_then(|t| crate::space_types::analysis(self.store).space_types.into_iter().find(|x| x.id == t))
+                            .map(|t| t.name)
+                            .unwrap_or_default(),
+                    ),
+                    "space.lighting_density" => Cell { text: format!("{:.1} W/m²", s.values.lighting_load_density), value: Some(s.values.lighting_load_density), editable: false },
+                    "space.actual_lighting" => Cell { text: format!("{:.0} W", s.actual_lighting_load), value: Some(s.actual_lighting_load), editable: false },
+                    "space.people" => Cell { text: format!("{:.1}", s.people), value: Some(s.people), editable: false },
+                    "space.actual_supply" => Cell { text: format!("{:.1} L/s", s.actual_supply * 1000.0), value: Some(s.actual_supply * 1000.0), editable: false },
+                    "space.specified_supply" => match s.props.specified_supply {
+                        Some(v) => Cell { text: format!("{:.1} L/s", v * 1000.0), value: Some(v * 1000.0), editable: false },
+                        None => none(),
+                    },
+                    _ => none(),
                 }
             }
             "component.room" => match crate::mep_lighting::room_of(self.store, e).and_then(|r| self.store.get(r)) {

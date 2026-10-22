@@ -26,6 +26,7 @@ Water 1. The tools are on the <b>Systems</b> tab.</p>
   <a href="#terminals">Air terminals and equipment</a>
   <a href="#mech-settings">Mechanical Settings</a>
   <a href="#space-types">Building and space types</a>
+  <a href="#spaces">Spaces</a>
   <a href="#slopes">Sloped pipes and parallel pipes</a>
   <a href="#controls">Thermostats, sensors and controllers</a>
   <a href="#risers">Risers</a>
@@ -397,6 +398,22 @@ needs with New or Duplicate.</p>
 Reviera tells you how many use it.</p>
 <p>Mechanical Settings applies everything you changed in one step, so a single Undo reverts it.
 Scripts and agents can open any of these dialogs with <code>mep_settings.show</code>.</p>
+
+<h2 id="spaces">Spaces</h2>
+<p>Spaces are the volumes that MEP analysis works with. They're separate from architectural
+rooms, so you can place them in plenums, shafts and other places that aren't rooms. On Analyze ›
+Spaces &amp; Zones, choose <a href="reviera:action/space.place">Space</a> (<kbd>S</kbd>
+<kbd>A</kbd>) and click inside regions enclosed by walls, or choose <a
+href="reviera:action/space.place_auto">Place Spaces Automatically</a> to fill every enclosed
+region on the level. A space with a room at the same place counts as occupiable. <a
+href="reviera:action/space.name_from_rooms">Space Naming</a> (<kbd>S</kbd> <kbd>N</kbd>) gives
+each space the number and name of its room.</p>
+<p><a href="reviera:action/space.info">Spaces</a> lists them with their area, type and supply
+airflow. Use <em>Type</em> to give a space a space type. Its loads, people, schedules and set
+points then come from the type, and <em>Edit</em> overrides any of them for that space alone. Clear
+a value to follow the type again. The list also shows the lighting load of the fixtures in each
+space and the airflow of its terminals. <em>Unplace</em> keeps a space with its data but without a
+location, shown as Not Placed.</p>
 
 <h2 id="slopes">Sloped pipes and parallel pipes</h2>
 <p>To give drainage a fall, select the pipes and fittings of a run and choose <a

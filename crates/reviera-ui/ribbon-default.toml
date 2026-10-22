@@ -887,6 +887,32 @@ icon = "export_csv"
 help = "Export the schedule as CSV or tab-separated text"
 
 [[action]]
+id = "space.place"
+label = "Space"
+icon = "space"
+keys = "SA"
+help = "Place an MEP space in the enclosed region you click: a volume for loads, airflow and lighting, separate from rooms (MEP-SPACE-001)"
+
+[[action]]
+id = "space.place_auto"
+label = "Place Spaces Automatically"
+icon = "space_auto"
+help = "Place a space in every enclosed region of this level larger than 0.025 m² that has none, numbered in sequence (MEP-SPACE-001)"
+
+[[action]]
+id = "space.name_from_rooms"
+label = "Space Naming"
+icon = "space_naming"
+keys = "SN"
+help = "Give each space the number and name of the room at its location (MEP-SPACE-001)"
+
+[[action]]
+id = "space.info"
+label = "Spaces"
+icon = "spaces"
+help = "List the spaces with their area, occupancy, type and airflow; edit their properties and overrides, give them a type, or unplace them (MEP-SPACE-002)"
+
+[[action]]
 id = "room.place"
 label = "Room"
 icon = "room"
@@ -3191,6 +3217,15 @@ tools = [
   { action = "analytical_node.merge", size = "small" },
   { action = "analytical_model.adjust", size = "small" },
   { action = "analytical_model.reset", size = "small" },
+]
+
+[[tab.panel]]
+label = "Spaces & Zones"
+tools = [
+  { action = "space.place", size = "large" },
+  { action = "space.place_auto", size = "small" },
+  { action = "space.name_from_rooms", size = "small" },
+  { action = "space.info", size = "small" },
 ]
 
 [[tab.panel]]

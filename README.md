@@ -1033,6 +1033,13 @@ schedules, circuit paths, cable sizing and voltage drop.
   copy belongs to (schedules' Room field, `space.elements`); IES and EULUMDAT photometry read and
   exported as `IfcLightSourceGoniometric` referencing the file. Not built yet: Tag on Placement,
   ceiling-hosted detectors, photometry in rendering and lighting analysis.
+- **Spaces** (Analyze › Spaces & Zones › Space `SA`, Place Spaces Automatically, Space Naming
+  `SN`, Spaces): MEP spaces separate from rooms, placed by click or automatically, occupiable
+  under rooms, named from rooms, unplaced and re-placed; space types with per-space overrides;
+  actual lighting and power loads and airflow from what is in them; exported as IfcSpace
+  (MEPSpace) with Qto_SpaceBaseQuantities (`space.place`, `space.place_auto`,
+  `space.name_from_rooms`, `space.unplace`, `space.set`, `space.info`). Not built yet: spaces
+  drawn in plans, space separators, upper limits by roof or ceiling, linked rooms.
 - **Sloped piping and parallel pipes** (Systems › HVAC & Piping › Slope, Parallel Pipes): the
   Slope Editor gives a connected section of pipe one of the project's allowed slopes from a
   control point (the lowest end by default): fittings follow, branches stay connected (their
