@@ -1689,6 +1689,13 @@ keys = "MS"
 help = "The project's Mechanical Settings: hidden lines, duct and pipe annotation, air properties, angles, conversion, pipe slopes and calculation methods (MEP-SET-001)"
 
 [[action]]
+id = "building_space_type.manage"
+label = "Building/Space Types"
+icon = "space_types"
+keys = "BT"
+help = "Building and space types: design loads, occupancy, schedules, set points, outside air and hours for load and energy analysis; a type in use cannot be deleted (MEP-SET-004)"
+
+[[action]]
 id = "duct_size_table.set"
 label = "Duct Sizes"
 icon = "duct_sizes"
@@ -3411,6 +3418,7 @@ tools = [
   { action = "duct_size_table.set", size = "small" },
   { action = "pipe_segment.create", size = "small" },
   { action = "fluid.create", size = "small" },
+  { action = "building_space_type.manage", size = "large" },
   { action = "load_classification.manage", size = "large" },
   { action = "demand_factor.manage", size = "large" },
   { action = "wiring.settings", size = "large" },

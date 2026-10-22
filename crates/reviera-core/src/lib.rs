@@ -76,6 +76,7 @@ pub mod mep_flex;
 pub mod mep_justify;
 pub mod mep_equipment;
 pub mod mep_mech_settings;
+pub mod space_types;
 pub mod mep_placeholders;
 pub mod mep_panel_schedule;
 pub mod mep_systems;

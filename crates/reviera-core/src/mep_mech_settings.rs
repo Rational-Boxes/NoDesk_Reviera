@@ -458,11 +458,17 @@ pub struct SetParams {
 pub(crate) fn set(txn: &mut Transaction<'_>, p: SetParams) -> Result<()> {
     let store = txn.store().clone();
     let mut t = tree(&store);
-    {
-        let parts: Vec<&str> = p.path.split('.').filter(|k| !k.is_empty()).collect();
-        let Some((last, head)) = parts.split_last() else {
-            return Err(bad("mechanical_settings.path", "name the setting to change"));
-        };
+    // The empty path: the whole tree at once (a settings dialog's OK, one undo step).
+    let parts: Vec<&str> = p.path.split('.').filter(|k| !k.is_empty()).collect();
+    if parts.is_empty() {
+        for k in ["hidden_line", "duct", "pipe"] {
+            if p.value.get(k).is_none() {
+                return Err(bad("mechanical_settings.value", format!("the whole tree needs `{k}`")));
+            }
+        }
+        t = p.value.clone();
+    } else {
+        let Some((last, head)) = parts.split_last() else { unreachable!("not empty") };
         let mut v = &mut t;
         for k in head {
             v = v.get_mut(*k).ok_or_else(|| bad("mechanical_settings.path", format!("no setting {:?}", p.path)))?;

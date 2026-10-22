@@ -4699,6 +4699,7 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         }),
         "structural_settings.show" => with(gui, Gui::structural_settings),
         "mechanical_settings.show" => with(gui, Gui::mechanical_settings),
+        "building_space_type.manage" => with(gui, Gui::building_space_types),
         "duct_size_table.set" => with(gui, Gui::duct_sizes),
         "pipe_segment.create" => with(gui, Gui::new_pipe_segment),
         "fluid.create" => with(gui, Gui::new_fluid),

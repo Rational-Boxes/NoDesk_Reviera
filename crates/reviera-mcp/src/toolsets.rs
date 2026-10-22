@@ -155,6 +155,8 @@ pub fn toolset_of(command: &str) -> String {
             | "duct_size_table"
             | "pipe_segment"
             | "fluid"
+            | "space_type"
+            | "building_type"
             | "plumbing_fixture"
             | "sprinkler"
             | "sprinkler_type"

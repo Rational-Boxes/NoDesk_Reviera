@@ -436,6 +436,9 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "pipe_segment" => format!(
             r#"<circle cx="11" cy="16" r="8" fill="none" stroke-width="4" {s}/><circle cx="11" cy="16" r="5" fill="{f}" {s}/><path d="M19 12h11M19 20h11" {sa}/>"#
         ),
+        "space_types" => format!(
+            r#"<path d="M3 29V9l8-6 8 6v20z" fill="{f}" {s}/><path d="M19 29V15h10v14z" fill="none" {sa}/><path d="M8 13h6M8 19h6M8 25h6" {sa}/>"#
+        ),
         "fluid" => format!(
             r#"<path d="M16 3c-5 8-9 13-9 18a9 9 0 0 0 18 0c0-5-4-10-9-18z" fill="{f}" {s}/>"#
         ),

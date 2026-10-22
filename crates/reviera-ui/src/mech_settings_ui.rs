@@ -112,24 +112,16 @@ impl Gui {
         if let Err(e) = parsed {
             return error(&frame, &format!("The settings were not changed:\n{e}"));
         }
-        let mut changed = 0;
-        for branch in ["hidden_line", "duct", "pipe"] {
-            if t[branch] == before[branch] {
-                continue;
-            }
-            match self.app.execute("mechanical_settings.set", json!({ "path": branch, "value": t[branch] }), &reviera_core::Caller::user()) {
-                Ok(o) => {
-                    changed += 1;
-                    if let Some(w) = o.warnings.first() {
-                        frame.set_status_text(&w.message, 0);
-                    }
-                }
-                Err(e) => return error(&frame, &format!("The {} settings were not changed:\n{e}", branch.replace('_', " "))),
-            }
+        if t == before {
+            return;
         }
-        if changed > 0 {
-            self.refresh_scene(&frame);
-            frame.set_status_text("Mechanical settings changed", 0);
+        // Every page in one transaction: one undo step (MEP-SET-004).
+        match self.app.execute("mechanical_settings.set", json!({ "path": "", "value": t }), &reviera_core::Caller::user()) {
+            Ok(o) => {
+                self.refresh_scene(&frame);
+                frame.set_status_text(o.warnings.first().map_or("Mechanical settings changed", |w| w.message.as_str()), 0);
+            }
+            Err(e) => error(&frame, &format!("The settings were not changed:\n{e}")),
         }
     }
 
@@ -230,6 +222,187 @@ impl Gui {
         match self.run("fluid.create", json!({ "name": n.trim(), "table": rows })) {
             Ok(_) => frame.set_status_text("Fluid made", 0),
             Err(e) => error(&frame, &e),
+        }
+    }
+}
+
+const ST_NEW: i32 = 7301;
+const ST_DUPLICATE: i32 = 7302;
+const ST_RENAME: i32 = 7303;
+const ST_EDIT: i32 = 7304;
+const ST_DELETE: i32 = 7305;
+const ST_SWITCH: i32 = 7306;
+const ST_ASSIGN: i32 = 7307;
+
+/// The values a type's form edits: (key, label, tip, is text).
+const TYPE_FIELDS: [(&str, &str, &str, bool); 15] = [
+    ("lighting_load_density", "Lighting load (W/m²)", "Lighting load density", false),
+    ("power_load_density", "Power load (W/m²)", "Power load density", false),
+    ("area_per_person", "Area per person (m²)", "Floor area per occupant", false),
+    ("sensible_heat_per_person", "Sensible heat (W/person)", "Sensible heat gain per person", false),
+    ("latent_heat_per_person", "Latent heat (W/person)", "Latent heat gain per person", false),
+    ("plenum_lighting", "Plenum lighting (0–1)", "Share of lighting heat going to the plenum", false),
+    ("occupancy_schedule", "Occupancy schedule", "A schedule name from the schedule library", true),
+    ("lighting_schedule", "Lighting schedule", "A schedule name from the schedule library", true),
+    ("power_schedule", "Power schedule", "A schedule name from the schedule library", true),
+    ("heating_set_point", "Heating set point (°C)", "", false),
+    ("cooling_set_point", "Cooling set point (°C)", "", false),
+    ("outside_air_per_person", "Outside air (L/s per person)", "", false),
+    ("outside_air_per_area", "Outside air (L/s per m²)", "", false),
+    ("opening_time", "Opening time", "Such as 08:00", true),
+    ("closing_time", "Closing time", "Such as 18:00", true),
+];
+
+impl Gui {
+    /// Manage › MEP Settings › Building/Space Types (MEP-SET-004): building types and space
+    /// types with their design loads, occupancy, schedules, set points and hours.
+    pub(crate) fn building_space_types(&mut self) {
+        let frame = self.frame;
+        let mut which = "space";
+        let mut selected = None;
+        loop {
+            let list = match self.run("space_type.list", json!({ "which": which })) {
+                Ok(v) => v.as_array().cloned().unwrap_or_default(),
+                Err(e) => return error(&frame, &e),
+            };
+            let n = |v: &Value, k: &str| v["values"][k].as_f64().map_or(String::new(), |x| format!("{x}"));
+            let rows: Vec<Vec<String>> = list
+                .iter()
+                .map(|t| {
+                    vec![
+                        t["name"].as_str().unwrap_or("").to_owned(),
+                        n(t, "lighting_load_density"),
+                        n(t, "power_load_density"),
+                        n(t, "area_per_person"),
+                        format!("{} / {}", n(t, "heating_set_point"), n(t, "cooling_set_point")),
+                        t["used_by"].as_u64().unwrap_or(0).to_string(),
+                    ]
+                })
+                .collect();
+            let (title, other) = if which == "space" { ("Space Types", "Building Types") } else { ("Building Types", "Space Types") };
+            let (code, at) = super::mep_loads_ui::list_dialog(
+                &frame,
+                title,
+                "Design loads, occupancy, schedules, set points and hours that load and energy analysis read. Assign to Selection gives the selected rooms (or the building) the chosen type; a type in use cannot be deleted.",
+                &[("Name", 160), ("Lighting W/m²", 90), ("Power W/m²", 90), ("m²/person", 80), ("Heat / cool °C", 100), ("Used by", 60)],
+                &rows,
+                &[
+                    (ST_NEW, "New…", "Add a type"),
+                    (ST_DUPLICATE, "Duplicate…", "Copy the selected type"),
+                    (ST_RENAME, "Rename…", "Rename the selected type"),
+                    (ST_EDIT, "Edit…", "Change its values"),
+                    (ST_DELETE, "Delete", "Delete a type nothing uses"),
+                    (ST_ASSIGN, "Assign to Selection", "Give the selected rooms (space types) or buildings (building types) this type"),
+                    (ST_SWITCH, other, "Switch list"),
+                ],
+                selected,
+            );
+            selected = at;
+            let chosen = at.and_then(|k| list.get(k)).cloned();
+            let create = if which == "space" { "space_type.create" } else { "building_type.create" };
+            let ask = |label: &str, value: &str| {
+                let d = TextEntryDialog::builder(&frame, label, title).with_default_value(value).build();
+                (d.show_modal() == ID_OK).then(|| d.get_value()).flatten().filter(|s| !s.trim().is_empty())
+            };
+            let result = match (code, &chosen) {
+                (ST_SWITCH, _) => {
+                    which = if which == "space" { "building" } else { "space" };
+                    selected = None;
+                    continue;
+                }
+                (ST_NEW, _) => match ask("Name:", "") {
+                    Some(name) => self.run(create, json!({ "name": name })).map(|_| ()),
+                    None => continue,
+                },
+                (ST_DUPLICATE, Some(t)) => match ask("Name of the copy:", &format!("{} 2", t["name"].as_str().unwrap_or(""))) {
+                    Some(name) => self.run(create, json!({ "name": name, "from": t["id"] })).map(|_| ()),
+                    None => continue,
+                },
+                (ST_RENAME, Some(t)) => match ask("New name:", t["name"].as_str().unwrap_or("")) {
+                    Some(name) => self.run("space_type.set", json!({ "which": which, "type_id": t["id"], "name": name })).map(|_| ()),
+                    None => continue,
+                },
+                (ST_EDIT, Some(t)) => match self.type_values_form(title, t) {
+                    Some(Ok(values)) => self.run("space_type.set", json!({ "which": which, "type_id": t["id"], "values": values })).map(|_| ()),
+                    Some(Err(e)) => Err(e),
+                    None => continue,
+                },
+                (ST_DELETE, Some(t)) => self.run("space_type.delete", json!({ "which": which, "type_id": t["id"] })).map(|_| ()),
+                (ST_ASSIGN, Some(t)) => {
+                    let class = if which == "space" { "IfcSpace" } else { "IfcBuilding" };
+                    let store = self.store_now();
+                    let targets: Vec<reviera_core::ElementId> = self.selection().into_iter().filter(|id| store.as_ref().and_then(|s| s.get(*id)).is_some_and(|e| e.class == class)).collect();
+                    if targets.is_empty() {
+                        Err(format!("Select the {} to give this type first", if which == "space" { "rooms" } else { "building" }))
+                    } else {
+                        let command = if which == "space" { "space.set_type" } else { "building.set_type" };
+                        self.run(command, json!({ "element_ids": targets, "type_id": t["id"] })).map(|_| ())
+                    }
+                }
+                (ST_DUPLICATE | ST_RENAME | ST_EDIT | ST_DELETE | ST_ASSIGN, None) => continue,
+                _ => break,
+            };
+            if let Err(e) = result {
+                error(&frame, &e);
+            }
+        }
+    }
+
+    /// The values of a type in a form: None when cancelled.
+    fn type_values_form(&mut self, title: &str, t: &Value) -> Option<Result<Value, String>> {
+        let f = Form::new(&self.frame, &format!("{title}: {}", t["name"].as_str().unwrap_or("")));
+        let v = &t["values"];
+        let fields: Vec<(&str, bool, TextCtrl)> = TYPE_FIELDS
+            .iter()
+            .map(|(k, label, tip, text)| {
+                let now = if *text { v[*k].as_str().unwrap_or("").to_owned() } else { v[*k].as_f64().map_or(String::new(), |x| x.to_string()) };
+                (*k, *text, f.text(label, &now, tip))
+            })
+            .collect();
+        let ok = f.show("", "OK");
+        let mut out = serde_json::Map::new();
+        let mut bad = None;
+        for (k, text, c) in &fields {
+            if *text {
+                out.insert((*k).to_owned(), json!(c.get_value().trim()));
+            } else {
+                match num(c) {
+                    Ok(x) => {
+                        out.insert((*k).to_owned(), json!(x));
+                    }
+                    Err(e) => bad = bad.or(Some(e)),
+                }
+            }
+        }
+        f.dialog.destroy();
+        if !ok {
+            return None;
+        }
+        Some(match bad {
+            Some(e) => Err(e),
+            None => Ok(Value::Object(out)),
+        })
+    }
+
+    /// Opens the settings dialogs that `mep_settings.show` asked for (MEP-SET-004).
+    pub(crate) fn serve_settings_requests(&mut self) {
+        use reviera_app::settings_dialogs::SettingsKind as K;
+        for kind in self.app.take_settings_requests() {
+            match kind {
+                K::Mechanical => self.mechanical_settings(),
+                K::Electrical => self.wiring_settings(),
+                K::BuildingSpaceType => self.building_space_types(),
+                K::LoadClassification => self.load_classifications(),
+                K::DemandFactor => self.demand_factors(),
+                K::ConductorCable | K::Fabrication | K::Pid => {
+                    let name = match kind {
+                        K::ConductorCable => "Conductor & Cable Settings",
+                        K::Fabrication => "Fabrication Settings",
+                        _ => "P&ID Settings",
+                    };
+                    self.frame.set_status_text(&format!("{name} are not built yet"), 0);
+                }
+            }
         }
     }
 }

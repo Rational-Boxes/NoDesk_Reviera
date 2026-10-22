@@ -21,6 +21,7 @@ pub mod overlaps;
 pub mod schedules;
 pub mod scripts;
 pub mod sheets;
+pub mod settings_dialogs;
 pub mod structural;
 pub mod subscriptions;
 pub mod views;
@@ -234,6 +235,8 @@ pub struct App {
     config: AppConfig,
     /// Views that commands asked the UI to open.
     view_requests: Vec<(DocumentId, reviera_core::ElementId)>,
+    /// Settings dialogs that commands asked the UI to open (`mep_settings.show`).
+    settings_requests: Vec<settings_dialogs::SettingsKind>,
     /// Shows scripts' forms as dialogs (set by the window).
     form_handler: Option<scripts::Handler>,
     /// The remote computation client, created on first use (`compute.*`).
@@ -273,6 +276,7 @@ impl App {
             active: None,
             config,
             view_requests: Vec::new(),
+            settings_requests: Vec::new(),
             form_handler: None,
             compute: None,
             subscriptions: subscriptions::Subscriptions::default(),

@@ -91,6 +91,7 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add_host(crate::scripts::ScriptImport),
         registry.add_host(crate::scripts::ScriptRemove),
         registry.add_host(SelectionAdd),
+        registry.add_host(crate::settings_dialogs::MepSettingsShow),
         registry.add_host(SelectionRemove),
     ];
     for r in results {

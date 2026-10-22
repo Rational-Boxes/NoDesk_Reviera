@@ -2753,11 +2753,13 @@ The dialog supports both IEC (mm²) and AWG/kcmil conventions. Reviera ships sta
 
 **Commands.** `mep_settings.show(kind: "mechanical"|"electrical"|"conductor_cable"|"building_space_type"|"load_classification"|"demand_factor"|"fabrication"|"pid")`. It only opens the dialog; the edits are recorded as the per-setting commands listed in each requirement, inside one transaction.
 
+*Built (2026-10-22):* `mep_settings.show(kind)` is an application command: with a window it queues the dialog, which the window opens when idle (mechanical, electrical (Wiring Settings), building_space_type, load_classification, demand_factor; conductor_cable, fabrication and pid say they are not built yet), and returns `shown: true`; headless (Lua or MCP without a window) it returns `shown: false, reason: "ui_unavailable"`. Mechanical Settings' OK writes the whole tree with one `mechanical_settings.set` (empty path), one undo step named "Mechanical Settings". Manage › MEP Settings › **Building/Space Types** (`BT`): space and building type lists (switch between them) with New, Duplicate, Rename, Edit (lighting and power density, area per person, sensible and latent heat, plenum lighting, occupancy, lighting and power schedule names, heating and cooling set points, outside air per person and per area, opening and closing times), Delete and Assign to Selection; kept in the RXD document `rxd:analysis`; `space_type.create`, `building_type.create`, `space_type.set`, `.delete`, `.list`, `space.set_type`, `building.set_type`. A type in use is not deleted ("The space type \"Office\" cannot be deleted: 12 spaces use it"). Demand-factor ranges must start at 0 and run on without gaps or overlaps (only the last open-ended); the refusal flags the first offending row ("row 2 (from 12 kVA): a gap after row 1, which ends at 10 kVA"). Not yet: one dialog with a page tree for every kind, field validation as focus leaves with a warning glyph, Search on pages, the BIMserver warning, the shared-standards confirmation when switching kinds, refusing deletion of referenced sizes, slopes and voltages, schedules picked from a schedule library (names are typed), and one transaction for the Electrical, Load Classification and Demand Factor dialogs (each change there is still its own step).
+
 **Acceptance criteria.**
-- [ ] `mep_settings.show("demand_factor")` opens the Demand Factors dialog, and from Lua or MCP the same call returns without error when no UI is attached (headless) by reporting `ui_unavailable`.
-- [ ] Editing three pages of Mechanical Settings and pressing *OK* adds exactly one entry to the undo stack; *Undo* reverts all three pages.
-- [ ] Deleting the space type "Office" while 12 spaces use it is refused with a message that names the count 12.
-- [ ] A demand-factor range grid with a gap between 10 and 12 kVA cannot be saved, and the row at 12 kVA is flagged.
+- [x] `mep_settings.show("demand_factor")` opens the Demand Factors dialog, and from Lua or MCP the same call returns without error when no UI is attached (headless) by reporting `ui_unavailable`.
+- [x] Editing three pages of Mechanical Settings and pressing *OK* adds exactly one entry to the undo stack; *Undo* reverts all three pages.
+- [x] Deleting the space type "Office" while 12 spaces use it is refused with a message that names the count 12.
+- [x] A demand-factor range grid with a gap between 10 and 12 kVA cannot be saved, and the row at 12 kVA is flagged.
 
 ---
 

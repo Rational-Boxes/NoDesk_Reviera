@@ -1019,6 +1019,13 @@ schedules, circuit paths, cable sizing and voltage drop.
   IfcPipeSegmentTypes), and fluid property tables (`mechanical_settings.get`/`.set`,
   `duct_size_table.set`, `pipe_segment.create`, `fluid.create`). Not built yet: hidden lines and
   size-label separators in views, conversion's main and branch types.
+- **MEP settings dialogs** (Manage › MEP Settings, Building/Space Types `BT`): one entry point
+  `mep_settings.show(kind)` for the ribbon, Lua and MCP (headless it reports `ui_unavailable`);
+  Mechanical Settings commits as one undo step; building and space types with design loads,
+  occupancy, set points, outside air and hours, refused for deletion while in use; demand-factor
+  ranges checked for gaps and overlaps with the offending row named (`space_type.*`,
+  `building_type.create`, `space.set_type`, `building.set_type`). Not built yet: one tabbed
+  dialog for every kind, field-by-field validation, Search.
 - **Sloped piping and parallel pipes** (Systems › HVAC & Piping › Slope, Parallel Pipes): the
   Slope Editor gives a connected section of pipe one of the project's allowed slopes from a
   control point (the lowest end by default): fittings follow, branches stay connected (their

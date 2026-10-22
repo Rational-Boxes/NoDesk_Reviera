@@ -192,6 +192,13 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(DuctSizeTableSet),
         registry.add(PipeSegmentCreate),
         registry.add(FluidCreate),
+        registry.add(SpaceTypeCreate),
+        registry.add(BuildingTypeCreate),
+        registry.add(SpaceTypeSet),
+        registry.add(SpaceTypeDelete),
+        registry.add(SpaceTypeList),
+        registry.add(SpaceSetType),
+        registry.add(BuildingSetType),
         registry.add(MechControlDeviceAssign),
         registry.add(MechControlDeviceList),
         registry.add(MepRunCreateRiser),
@@ -1922,4 +1929,80 @@ edit_command!(
     crate::mep_mech_settings::FluidParams,
     String,
     crate::mep_mech_settings::create_fluid
+);
+
+edit_command!(
+    SpaceTypeCreate,
+    "space_type.create",
+    "Make a space type",
+    "Makes a space type (MEP-SET-004) for rooms' design loads: `name`, `values` (lighting_load_density and power_load_density W/m², area_per_person m², sensible_heat_per_person and latent_heat_per_person W, plenum_lighting 0–1, occupancy_schedule, lighting_schedule, power_schedule, heating_set_point and cooling_set_point °C, outside_air_per_person L/s and outside_air_per_area L/s·m², opening_time and closing_time \"08:00\"), or `from` another type's (Duplicate). Kept in the RXD document rxd:analysis. Returns its id.",
+    "Space Type",
+    crate::space_types::CreateParams,
+    String,
+    crate::space_types::create_space
+);
+
+edit_command!(
+    BuildingTypeCreate,
+    "building_type.create",
+    "Make a building type",
+    "Makes a building type (MEP-SET-004) with the same values as `space_type.create`. Returns its id.",
+    "Building Type",
+    crate::space_types::CreateParams,
+    String,
+    crate::space_types::create_building
+);
+
+edit_command!(
+    SpaceTypeSet,
+    "space_type.set",
+    "Change a building or space type",
+    "Renames (`name`) or changes the `values` of a building or space type (`which`: building | space; `type_id`: its id or name).",
+    "Building/Space Type Settings",
+    crate::space_types::SetParams,
+    (),
+    crate::space_types::set
+);
+
+edit_command!(
+    SpaceTypeDelete,
+    "space_type.delete",
+    "Delete a building or space type",
+    "Deletes a building or space type (`which`, `type_id`); refused while rooms or buildings use it, naming how many (\"The space type \\\"Office\\\" cannot be deleted: 12 spaces use it\").",
+    "Delete Space Type",
+    crate::space_types::DeleteParams,
+    (),
+    crate::space_types::delete
+);
+
+read_command!(
+    SpaceTypeList,
+    "space_type.list",
+    "Building or space types",
+    "The building or space types (`which`) with their values and how many buildings or rooms use each.",
+    crate::space_types::ListParams,
+    Vec<crate::space_types::TypeInfo>,
+    crate::space_types::list
+);
+
+edit_command!(
+    SpaceSetType,
+    "space.set_type",
+    "Give rooms a space type",
+    "Gives the rooms `element_ids` the space type `type_id` (id or name); none clears it.",
+    "Set Space Type",
+    crate::space_types::AssignParams,
+    (),
+    crate::space_types::assign_space
+);
+
+edit_command!(
+    BuildingSetType,
+    "building.set_type",
+    "Give a building a building type",
+    "Gives the buildings `element_ids` the building type `type_id` (id or name); none clears it.",
+    "Set Building Type",
+    crate::space_types::AssignParams,
+    (),
+    crate::space_types::assign_building
 );

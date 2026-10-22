@@ -392,5 +392,6 @@ impl Gui {
                 self.open_view(doc, Some(view));
             }
         }
+        self.serve_settings_requests();
     }
 }

@@ -164,12 +164,33 @@ fn check_ranges(method: Method, ranges: &[Range]) -> Result<()> {
     if method == Method::Constant && ranges.len() != 1 {
         return Err(bad("demand_factor.ranges", "a constant demand factor has one percentage"));
     }
-    for r in ranges {
+    // Rows flagged by number and where they start (MEP-SET-004): kVA for loads.
+    let at = |r: &Range| if method == Method::Load { format!("{} kVA", r.from / 1000.0) } else { format!("{}", r.from) };
+    for (k, r) in ranges.iter().enumerate() {
+        let row = k + 1;
         if !(0.0..=1000.0).contains(&r.percent) {
-            return Err(bad("demand_factor.percent", "percentages run from 0 to 1000"));
+            return Err(bad("demand_factor.percent", format!("row {row} (from {}): percentages run from 0 to 1000", at(r))));
         }
         if r.to.is_some_and(|t| t <= r.from) {
-            return Err(bad("demand_factor.ranges", format!("the range from {} must end above where it starts", r.from)));
+            return Err(bad("demand_factor.ranges", format!("row {row} (from {}): the range must end above where it starts", at(r))));
+        }
+        if method == Method::Constant {
+            continue;
+        }
+        match k.checked_sub(1).map(|p| &ranges[p]) {
+            None if r.from.abs() > 1e-9 => return Err(bad("demand_factor.start", format!("row 1 (from {}): the first range starts at 0", at(r)))),
+            Some(prev) => match prev.to {
+                None => return Err(bad("demand_factor.overlap", format!("row {row} (from {}): row {k} has no upper end, so nothing can follow it", at(r)))),
+                Some(t) if (r.from - t).abs() > 1e-9 && r.from > t => {
+                    let end = if method == Method::Load { format!("{} kVA", t / 1000.0) } else { format!("{t}") };
+                    return Err(bad("demand_factor.gap", format!("row {row} (from {}): a gap after row {k}, which ends at {end}", at(r))));
+                }
+                Some(_) if (r.from - prev.to.unwrap_or(0.0)).abs() > 1e-9 => {
+                    return Err(bad("demand_factor.overlap", format!("row {row} (from {}): it overlaps row {k}", at(r))));
+                }
+                _ => {}
+            },
+            None => {}
         }
     }
     Ok(())
