@@ -51,3 +51,22 @@ for them yet. Run them from the <a href="reviera:help/scripting#shell">command s
 script: <code>param.project.add</code>, <code>param.project.modify</code>,
 <code>param.project.remove</code>, <code>param.set_ifc_home</code>, <code>pset.set</code>,
 <code>pset.remove</code>. Once added, a project parameter shows in Properties like any other.</p>
+
+<h2 id="globals">Global parameters</h2>
+<p>Global parameters are named project-wide values, such as a corridor width or a door sill
+height, that drive dimensions and element parameters. Open <a
+href="reviera:action/global.manage">Global Parameters</a> (<kbd>G</kbd> <kbd>L</kbd>, Manage ›
+Settings) to make, edit, copy and delete them. A value can be typed with its unit
+(<em>1800 mm</em>) or worked out by a formula over other globals, such as <em>CorridorWidth * 2
++ 300 mm</em>. Reviera refuses a formula that adds a length to a plain number, and a formula that
+ends up depending on itself.</p>
+<p>To make a dimension keep a global's value, select a dimension with one segment and choose <a
+href="reviera:action/global.label_dimension">Label with Global</a>. The first thing it measures
+from stays put and the second moves, now and whenever the global changes. To drive a parameter,
+select the elements and choose <a href="reviera:action/global.associate">Associate Global</a>,
+then pick the parameter (for doors and windows, <em>Sill Height</em>) and a global of the same
+type. Changing a global updates everything it drives in one step, so a single Undo puts it all
+back.</p>
+<p>A <em>reporting</em> global reads its value from the one dimension it labels, so other
+globals' formulas can use a measured distance. <em>Select Elements</em> selects everything a
+global drives. Deleting a global leaves what it drove at its current value.</p>

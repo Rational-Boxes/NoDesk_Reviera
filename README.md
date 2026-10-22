@@ -1040,6 +1040,11 @@ schedules, circuit paths, cable sizing and voltage drop.
   (MEPSpace) with Qto_SpaceBaseQuantities (`space.place`, `space.place_auto`,
   `space.name_from_rooms`, `space.unplace`, `space.set`, `space.info`). Not built yet: spaces
   drawn in plans, space separators, upper limits by roof or ceiling, linked rooms.
+- **Global parameters** (Manage › Settings › Global Parameters `GL`, Label with Global, Associate
+  Global): project-wide values and unit-checked formulas (`CorridorWidth * 2 + 300 mm`, cycles
+  refused) that drive labelled dimensions and associated instance parameters such as door sill
+  heights, each change one undo step (`global.*`, `formula.validate`). Not built yet: the "="
+  button in Properties, in-grid editing, the full formula language.
 - **Sloped piping and parallel pipes** (Systems › HVAC & Piping › Slope, Parallel Pipes): the
   Slope Editor gives a connected section of pipe one of the project's allowed slopes from a
   control point (the lowest end by default): fittings follow, branches stay connected (their

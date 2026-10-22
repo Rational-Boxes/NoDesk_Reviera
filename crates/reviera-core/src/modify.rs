@@ -934,6 +934,7 @@ pub(crate) fn split_with_gap(
             value: Some(p.gap),
             dimension: None,
             segment: None,
+            global: None,
         },
     )?;
     for id in [a, b] {

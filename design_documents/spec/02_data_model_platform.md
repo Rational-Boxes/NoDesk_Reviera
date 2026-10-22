@@ -2400,10 +2400,12 @@ The Place Component tool is the UI over `component.place`.
 `global.select_driven(global_id) -> element_id[]` ·
 `global.manage()` (opens the Global Parameters dialog)
 
+*Built (2026-10-22):* Manage › Settings › **Global Parameters** (`GL`, `global.manage`): a list grouped by group with Name, Value, Formula, Reporting and Uses, and New and Edit (the Global Parameter Properties form: name, data type, group, reporting, value, formula, tooltip), Duplicate, Delete (asking first when it has uses) and Select Elements. Globals are kept with the project parameters in `standards/parameters` (`globals`). `global.create`, `global.set` (value, formula, name, group, tooltip), `global.delete` (refused while another formula uses it; driven parameters keep their values, labelled dimensions are unlabelled; returns the uses), `global.associate` / `global.dissociate` (any writable instance parameter of the same data type, as `param.set` takes it, or `insert.sill` for doors' and windows' sill height; type and read-only parameters refused), `global.label_dimension` (one-segment dimensions and length globals: a locked distance carrying the global, whose first reference stays and second moves; a reporting global reads the one dimension it labels), `global.list` (values worked out now), `global.select_driven`, `formula.validate`. Formulas: global names (optionally `@Name`), numbers with `mm`, `cm`, `m`, `in`, `ft`, `m²`, `m³`, `°`, `+ - * /` and brackets, with each value's length dimension checked; cycles refused. Every change is one transaction. Modify panel actions **Label with Global** and **Associate Global**. Not yet: the dialog's in-grid editing, Apply, Move Up/Down, sort and search; the "=" button in Properties and greyed driven values; discipline; reporting globals pushing their measured value on to formulas and associations when the model changes (they are worked out when read and when a global is set); the full formula language of §2.8.7 (functions, conditionals); changing a global's data type.
+
 **Acceptance criteria.**
-- [ ] Changing "CorridorWidth" from 1800 mm to 2000 mm moves the labelled walls in one transaction, and undo restores both the value and the walls.
-- [ ] A global formula `CorridorWidth * 2 + 300 mm` updates when CorridorWidth changes. A cycle between two globals is rejected.
-- [ ] 200 doors associated with "DoorSillHeight" update together when it changes.
+- [x] Changing "CorridorWidth" from 1800 mm to 2000 mm moves the labelled walls in one transaction, and undo restores both the value and the walls.
+- [x] A global formula `CorridorWidth * 2 + 300 mm` updates when CorridorWidth changes. A cycle between two globals is rejected.
+- [x] 200 doors associated with "DoorSillHeight" update together when it changes.
 
 ### 2.9.7 Parameter libraries (shared-parameter equivalent)
 **ID:** DM-SPAR-001 · **Priority:** P1 · **Ref:** research/05 §7.2, §7.5, §16.7; screenshots/platform/edit_shared_parameters_dialog.png

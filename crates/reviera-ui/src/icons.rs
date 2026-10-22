@@ -463,6 +463,15 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "spaces" => format!(
             r#"<path d="M4 5h24v22H4z" fill="{f}" {s}/><path d="M8 10h16M8 16h16M8 22h16" {sa}/>"#
         ),
+        "global_parameters" => format!(
+            r#"<circle cx="16" cy="16" r="12" fill="{f}" {s}/><path d="M4 16h24M16 4c-5 4-5 20 0 24M16 4c5 4 5 20 0 24" fill="none" {sa}/>"#
+        ),
+        "label_global" => format!(
+            r#"<path d="M3 22h26M3 18v8M29 18v8" {sa}/><circle cx="16" cy="11" r="7" fill="{f}" {s}/><path d="M9 11h14" {sa}/>"#
+        ),
+        "associate_global" => format!(
+            r#"<circle cx="10" cy="16" r="7" fill="{f}" {s}/><path d="M17 16h6M20 12h8v8h-8z" fill="none" {sa}/><path d="M3 16h14" {sa}/>"#
+        ),
         "fluid" => format!(
             r#"<path d="M16 3c-5 8-9 13-9 18a9 9 0 0 0 18 0c0-5-4-10-9-18z" fill="{f}" {s}/>"#
         ),

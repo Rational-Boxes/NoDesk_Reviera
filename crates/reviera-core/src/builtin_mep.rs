@@ -211,6 +211,15 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(SpaceSet),
         registry.add(SpaceNameFromRooms),
         registry.add(SpaceInfo),
+        registry.add(GlobalCreate),
+        registry.add(GlobalSet),
+        registry.add(GlobalDelete),
+        registry.add(GlobalAssociate),
+        registry.add(GlobalDissociate),
+        registry.add(GlobalLabelDimension),
+        registry.add(GlobalList),
+        registry.add(GlobalSelectDriven),
+        registry.add(FormulaValidate),
         registry.add(MechControlDeviceAssign),
         registry.add(MechControlDeviceList),
         registry.add(MepRunCreateRiser),
@@ -2147,4 +2156,100 @@ read_command!(
     crate::mep_spaces::InfoParams,
     Vec<crate::mep_spaces::SpaceInfo>,
     crate::mep_spaces::infos
+);
+
+edit_command!(
+    GlobalCreate,
+    "global.create",
+    "Make a global parameter",
+    "Makes a global parameter (DM-GPAR-001): `name` (unique, case-insensitive, no [ ] { } | ; < > @), `data_type` (length, area, volume, angle, number, integer, yes_no, text, material), a `value` (SI: metres, radians) or a `formula` over other globals (`CorridorWidth * 2 + 300 mm`; units must agree; cycles refused), `group`, `reporting` (its value read from the one dimension it labels) and `tooltip`. Returns its id.",
+    "Global Parameters",
+    crate::globals::CreateParams,
+    String,
+    crate::globals::create
+);
+
+edit_command!(
+    GlobalSet,
+    "global.set",
+    "Change a global parameter",
+    "Sets a global's (`global_id`: id or name) `value` or `formula` (empty removes it), `name`, `group` or `tooltip`. Formulas are worked out again and every labelled dimension and associated parameter follows, in one transaction: labelled dimensions keep their first reference and move the second.",
+    "Global Parameters",
+    crate::globals::SetParams,
+    (),
+    crate::globals::set
+);
+
+edit_command!(
+    GlobalDelete,
+    "global.delete",
+    "Delete a global parameter",
+    "Deletes a global: associated parameters keep their values, labelled dimensions are unlabelled (their lock removed). Refused while another global's formula uses it. Returns how many uses it had.",
+    "Global Parameters",
+    crate::globals::IdParams,
+    crate::globals::DeleteReport,
+    crate::globals::delete
+);
+
+edit_command!(
+    GlobalAssociate,
+    "global.associate",
+    "Drive element parameters by a global",
+    "Associates the instance parameter `param_ref` (as `param.set` takes it, or `insert.sill` for doors' and windows' sill height) of `element_ids` with the global `global_id` of the same data type: it takes the global's value now and whenever it changes. Type and read-only parameters are refused.",
+    "Associate Global Parameter",
+    crate::globals::AssociateParams,
+    (),
+    crate::globals::associate
+);
+
+edit_command!(
+    GlobalDissociate,
+    "global.dissociate",
+    "Stop a global driving element parameters",
+    "The parameter `param_ref` of `element_ids` keeps its value and is no longer driven by a global.",
+    "Dissociate Global Parameter",
+    crate::globals::DissociateParams,
+    (),
+    crate::globals::dissociate
+);
+
+edit_command!(
+    GlobalLabelDimension,
+    "global.label_dimension",
+    "Label a dimension with a global",
+    "Labels a one-segment dimension with a length global: a driving global locks it at its value (its first reference stays, the second moves, now and whenever the global changes); a reporting global reads its value from it (one dimension only).",
+    "Label Dimension",
+    crate::globals::LabelParams,
+    (),
+    crate::globals::label_dimension
+);
+
+read_command!(
+    GlobalList,
+    "global.list",
+    "The global parameters",
+    "Every global parameter with its value worked out now (formulas evaluated, reporting ones measured), formula, group, reporting flag, tooltip, associations and number of uses.",
+    crate::builtin::NoParams,
+    Vec<crate::globals::GlobalInfo>,
+    crate::globals::list
+);
+
+read_command!(
+    GlobalSelectDriven,
+    "global.select_driven",
+    "What a global drives",
+    "The elements and dimensions the global `global_id` drives.",
+    crate::globals::IdParams,
+    Vec<crate::id::ElementId>,
+    crate::globals::select_driven
+);
+
+read_command!(
+    FormulaValidate,
+    "formula.validate",
+    "Check a formula",
+    "Checks a `formula` over the global parameters (unknown names, units that do not agree, cycles through `global_id` when given) and returns its value now (SI).",
+    crate::globals::ValidateParams,
+    f64,
+    crate::globals::validate
 );

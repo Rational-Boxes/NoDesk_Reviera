@@ -1708,6 +1708,25 @@ icon = "rebar_settings"
 help = "Rebar length rounding, hooks in shape definitions, and the project's cover types"
 
 [[action]]
+id = "global.manage"
+label = "Global Parameters"
+icon = "global_parameters"
+keys = "GL"
+help = "The project's global parameters: values and formulas that drive labelled dimensions and associated element parameters (DM-GPAR-001)"
+
+[[action]]
+id = "global.label_dimension"
+label = "Label with Global"
+icon = "label_global"
+help = "Label the selected one-segment dimension with a length global parameter: the dimension then keeps that value (DM-GPAR-001)"
+
+[[action]]
+id = "global.associate"
+label = "Associate Global"
+icon = "associate_global"
+help = "Make a parameter of the selected elements follow a global parameter of the same type, such as doors' sill height (DM-GPAR-001)"
+
+[[action]]
 id = "mechanical_settings.show"
 label = "Mechanical Settings"
 icon = "mechanical_settings"
@@ -3473,6 +3492,9 @@ tools = [
 label = "Settings"
 tools = [
   { action = "ui.model_properties", size = "large" },
+  { action = "global.manage", size = "large" },
+  { action = "global.label_dimension", size = "small" },
+  { action = "global.associate", size = "small" },
   { action = "clearance.set_rule_set", size = "large" },
   { action = "ui.remote_analysis", size = "large" },
 ]

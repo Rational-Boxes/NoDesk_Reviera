@@ -64,6 +64,9 @@ pub struct ConstraintData {
     pub dimension: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub segment: Option<usize>,
+    /// The global parameter (id) labelling it (DM-GPAR-001): its value follows the global's.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub global: Option<String>,
 }
 
 pub fn is_constraint(e: &Element) -> bool {
@@ -251,6 +254,13 @@ pub(crate) fn enforce(txn: &mut Transaction<'_>) -> Result<()> {
     // moves the inner ones).
     for (id, c) in &cons {
         if changes.added.contains(id) || changes.modified.contains(id) {
+            // A global's new value moves the second reference; the first stays.
+            if c.global.is_some() {
+                if let Some(g) = c.refs.first().and_then(|r| r.element.clone()) {
+                    fixed.insert(g);
+                }
+                continue;
+            }
             for r in [c.refs.first(), c.refs.last()].into_iter().flatten() {
                 if let Some(g) = &r.element {
                     fixed.insert(g.clone());
@@ -456,6 +466,7 @@ pub(crate) fn lock_dimension(txn: &mut Transaction<'_>, p: LockParams) -> Result
             value: Some(m.positions[s + 1] - m.positions[s]),
             dimension: Some(guid.clone()),
             segment: Some(s),
+            global: None,
         };
         out.push(create(txn, &c)?);
     }
@@ -518,6 +529,7 @@ pub(crate) fn set_equality(
         value: None,
         dimension: Some(guid),
         segment: None,
+        global: None,
     };
     create(txn, &c).map(Some)
 }
@@ -560,6 +572,7 @@ pub(crate) fn lock_alignment(txn: &mut Transaction<'_>, p: AlignmentParams) -> R
             value: None,
             dimension: None,
             segment: None,
+            global: None,
         },
     )
 }

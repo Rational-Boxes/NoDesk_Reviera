@@ -100,6 +100,7 @@ mod snap;
 mod stack;
 mod stairs;
 mod structural_settings;
+mod globals_ui;
 mod mech_settings_ui;
 mod wall_profile;
 mod wall_sweeps;
@@ -4712,6 +4713,9 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         }),
         "structural_settings.show" => with(gui, Gui::structural_settings),
         "mechanical_settings.show" => with(gui, Gui::mechanical_settings),
+        "global.manage" => with(gui, Gui::global_parameters),
+        "global.label_dimension" => with(gui, Gui::label_dimension_with_global),
+        "global.associate" => with(gui, Gui::associate_global),
         "building_space_type.manage" => with(gui, Gui::building_space_types),
         "duct_size_table.set" => with(gui, Gui::duct_sizes),
         "pipe_segment.create" => with(gui, Gui::new_pipe_segment),
