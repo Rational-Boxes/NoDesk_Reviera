@@ -30,7 +30,7 @@
 //!
 //! Not built yet: fittings and segments from component types, radius elbows, the Angles
 //! setting, offsets and justification other than the centre, size and elevation locks, moving
-//! and stretching runs with their fittings, flex duct, flip and rotate, the fitting controls in
+//! and stretching runs with their fittings (flex duct is in `mep_flex`), flip and rotate, the fitting controls in
 //! the view ("+" and "−" are commands: [`upgrade`], [`downgrade`]).
 
 use std::collections::BTreeMap;
@@ -388,6 +388,13 @@ pub struct SegmentType {
     /// standard series when empty.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub sizes: Vec<f64>,
+    /// Flexible duct (MEP-DUCT-005): drawn as a spline (`flex_duct.create`);
+    /// `bend_radius_multiplier` is then its minimum bend radius over the diameter (or width).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub flexible: bool,
+    /// Flexible: the friction loss multiplier for compressed flex (MEP-CALC-002).
+    #[serde(default = "one")]
+    pub loss_multiplier: f64,
 }
 
 fn yes() -> bool {
@@ -436,6 +443,9 @@ impl SegmentType {
 
     /// The segment's predefined type.
     fn predefined(&self) -> &'static str {
+        if self.flexible {
+            return "FLEXIBLESEGMENT";
+        }
         match self.domain {
             Domain::CableTray => self.tray_kind.unwrap_or_default().ifc(),
             Domain::Conduit => "CONDUITSEGMENT",
@@ -449,7 +459,7 @@ impl SegmentType {
     }
 
     /// Checks a size against the type: its shape, and for conduit its standard.
-    fn check_size(&self, store: &Store, size: &Size) -> Result<()> {
+    pub(crate) fn check_size(&self, store: &Store, size: &Size) -> Result<()> {
         size.check(self.domain)?;
         if self.domain == Domain::Conduit
             && let Some(id) = &self.standard
@@ -490,7 +500,7 @@ pub fn segment_type(e: &Element) -> Option<SegmentType> {
     (v.get("kind")?.as_str()? == TYPE_RECIPE).then(|| serde_json::from_value(v.clone()).ok())?
 }
 
-fn type_class(domain: Domain) -> &'static str {
+pub(crate) fn type_class(domain: Domain) -> &'static str {
     match domain {
         Domain::Pipe => "IfcPipeSegmentType",
         Domain::CableTray | Domain::Conduit => "IfcCableCarrierSegmentType",
@@ -498,7 +508,7 @@ fn type_class(domain: Domain) -> &'static str {
     }
 }
 
-fn segment_class(domain: Domain) -> &'static str {
+pub(crate) fn segment_class(domain: Domain) -> &'static str {
     match domain {
         Domain::Pipe => "IfcPipeSegment",
         Domain::CableTray | Domain::Conduit => "IfcCableCarrierSegment",
@@ -559,6 +569,8 @@ fn default_type(txn: &mut Transaction<'_>, domain: Domain, shape: Shape) -> Resu
         bend_radius_multiplier: default_multiplier(domain),
         standard: (domain == Domain::Conduit).then(|| "iec_61386".into()),
         sizes: Vec::new(),
+        flexible: false,
+        loss_multiplier: 1.0,
     };
     txn.create(
         NewElement::new(type_class(domain))
@@ -573,6 +585,10 @@ fn default_routing(domain: Domain) -> Routing {
     let mut r = Routing::default();
     if domain == Domain::Conduit {
         r.union = vec![Row { part: Part::Coupling, min: 0.0, max: 0.0 }];
+    }
+    // Duct: a tap where flex duct starts on a duct's side (MEP-DUCT-005); tees stay preferred.
+    if domain == Domain::Duct {
+        r.junction.push(Row { part: Part::Tap, min: 0.0, max: 0.0 });
     }
     // Pipe: flanges at flanged accessories from DN 50 (E-26).
     if domain == Domain::Pipe {
@@ -609,6 +625,11 @@ pub struct CreateTypeParams {
     pub standard: Option<String>,
     /// Duct and pipe: the sizes sizing chooses from (metres; diameters, or rectangle sides).
     pub sizes: Option<Vec<f64>>,
+    /// Duct: a flexible duct type (drawn with `flex_duct.create`; its bend radius multiplier is
+    /// the minimum bend radius over the diameter, default 1).
+    pub flexible: Option<bool>,
+    /// Flexible: the friction loss multiplier for compressed flex (default 1).
+    pub loss_multiplier: Option<f64>,
 }
 
 /// Makes a duct, pipe, cable tray or conduit type (`mep_segment_type.create`).
@@ -648,6 +669,17 @@ pub(crate) fn create_type(txn: &mut Transaction<'_>, p: CreateTypeParams) -> Res
     }
     let routing = p.routing.unwrap_or_else(|| default_routing(p.domain));
     routing.check()?;
+    let flexible = p.flexible.unwrap_or(false);
+    if flexible && p.domain != Domain::Duct {
+        return Err(bad("mep_segment_type.flexible", "flexible types are duct types (flex pipe is not built yet)"));
+    }
+    let loss_multiplier = p.loss_multiplier.unwrap_or(1.0);
+    if !(1.0..=10.0).contains(&loss_multiplier) {
+        return Err(bad("mep_segment_type.loss_multiplier", "the loss multiplier runs from 1 to 10"));
+    }
+    if p.loss_multiplier.is_some() && !flexible {
+        return Err(bad("mep_segment_type.loss_multiplier", "only flexible types have a loss multiplier"));
+    }
     let radius = matches!(p.domain, Domain::CableTray | Domain::Conduit);
     let t = SegmentType {
         kind: TYPE_RECIPE.into(),
@@ -669,6 +701,8 @@ pub(crate) fn create_type(txn: &mut Transaction<'_>, p: CreateTypeParams) -> Res
             v.dedup();
             v
         },
+        flexible,
+        loss_multiplier,
     };
     txn.create(
         NewElement::new(type_class(p.domain))
@@ -703,7 +737,7 @@ pub(crate) fn list_types(store: &Store, p: ListTypesParams) -> Result<Vec<TypeIn
         .collect())
 }
 
-fn resolve_type(store: &Store, r: &ElementRef) -> Result<(ElementId, SegmentType)> {
+pub(crate) fn resolve_type(store: &Store, r: &ElementRef) -> Result<(ElementId, SegmentType)> {
     let id = store.resolve(r).ok_or_else(|| bad("element.not_found", "no such duct or pipe type"))?;
     let t = segment_type(store.get(id).expect("resolved"))
         .ok_or_else(|| bad("mep_segment_type.not_a_type", format!("element {id} is not a duct or pipe type")))?;
@@ -786,6 +820,10 @@ pub struct SegmentRecipe {
     /// (MEP-DUCT-011).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub riser: Option<RiserTop>,
+    /// Flex duct (MEP-DUCT-005): the spline through its points; `start` and `end` are its first
+    /// and last.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub flex: Option<crate::mep_flex::FlexPath>,
 }
 
 /// A riser's binding of its end to a level.
@@ -877,9 +915,10 @@ pub fn ports(_: &Store, e: &Element) -> Vec<Port> {
     if let Some(s) = segment_recipe(e) {
         let Some(axis) = unit(sub(s.end, s.start)) else { return Vec::new() };
         // A curved segment leaves along the lines to its corner.
-        let (out_start, out_end) = match s.corner {
-            Some(c) => (unit(sub(s.start, c)).unwrap_or(mul(axis, -1.0)), unit(sub(s.end, c)).unwrap_or(axis)),
-            None => (mul(axis, -1.0), axis),
+        let (out_start, out_end) = match (s.corner, &s.flex) {
+            (_, Some(f)) => (mul(f.start_tangent, -1.0), f.end_tangent),
+            (Some(c), None) => (unit(sub(s.start, c)).unwrap_or(mul(axis, -1.0)), unit(sub(s.end, c)).unwrap_or(axis)),
+            (None, None) => (mul(axis, -1.0), axis),
         };
         let mut out = vec![
             Port { element: e.id(), index: 0, connector: port_connector(s.domain, &s.size, s.classification, "Start"), position: s.start, direction: out_start },
@@ -934,7 +973,7 @@ impl Solid {
 
 /// The across (`w`) and up (`h`) directions of a section square to `u`: across is level for
 /// level and sloped runs, X for vertical ones.
-fn frame(u: V3) -> (V3, V3) {
+pub(crate) fn frame(u: V3) -> (V3, V3) {
     let w = if u[2].abs() < 0.999 { unit(cross([0.0, 0.0, 1.0], u)).expect("not vertical") } else { [1.0, 0.0, 0.0] };
     (w, cross(u, w))
 }
@@ -948,7 +987,7 @@ fn axes(u: V3, across: Option<V3>) -> (V3, V3) {
 }
 
 /// The section outline of a size at `c`, square to `u`.
-fn section(c: V3, u: V3, s: &Size, across: Option<V3>) -> Vec<V3> {
+pub(crate) fn section(c: V3, u: V3, s: &Size, across: Option<V3>) -> Vec<V3> {
     let (w, h) = axes(u, across);
     match s.shape {
         Shape::Round => (0..16)
@@ -1047,10 +1086,24 @@ fn sweep(a: V3, corner: V3, b: V3, s: &Size, across: Option<V3>) -> Option<Solid
 
 /// A segment's body (a curved one swept along its arc).
 pub fn segment_solid(s: &SegmentRecipe) -> Vec<Solid> {
+    if let Some(f) = &s.flex {
+        return crate::mep_flex::solid(f, &s.size).into_iter().collect();
+    }
     if let Some(c) = s.corner {
         return sweep(s.start, c, s.end, &s.size, s.across).into_iter().collect();
     }
     loft(s.start, s.end, &s.size, &s.size, s.across).into_iter().collect()
+}
+
+/// A segment's length along its axis, arc or spline (metres).
+pub fn segment_length(s: &SegmentRecipe) -> f64 {
+    if let Some(f) = &s.flex {
+        return f.length();
+    }
+    match s.corner {
+        Some(c) => len(sub(c, s.start)) + len(sub(s.end, c)),
+        None => len(sub(s.end, s.start)),
+    }
 }
 
 /// A junction box's side: room round its largest connection.
@@ -1199,6 +1252,9 @@ fn tube(a: V3, b: V3, outer: &Size, inner: &Size, across: Option<V3>) -> Option<
 pub(crate) fn covering_solids(e: &Element, inner: f64, outer: f64) -> Vec<Solid> {
     let grow = |s: Size, by: f64| Size { diameter: s.diameter + by, width: s.width + by, height: s.height + by, ..s };
     if let Some(s) = segment_recipe(e) {
+        if let Some(f) = &s.flex {
+            return crate::mep_flex::tube(f, &grow(s.size, outer), &grow(s.size, inner)).into_iter().collect();
+        }
         if s.corner.is_some() {
             return Vec::new();
         }
@@ -1243,7 +1299,7 @@ pub fn all(store: &Store) -> Vec<(ElementId, Domain, bool, Vec<Solid>)> {
 
 // ---- Drawing runs ----
 
-fn leg_length(size: &Size) -> f64 {
+pub(crate) fn leg_length(size: &Size) -> f64 {
     size.nominal() * 0.6 + 0.05
 }
 
@@ -1263,7 +1319,7 @@ fn elbow_leg(size: &Size, incoming: V3, outgoing: V3, across: Option<V3>) -> f64
     extent * 0.6 + 0.05
 }
 
-fn level_of(store: &Store, r: &ElementRef) -> Result<(String, f64)> {
+pub(crate) fn level_of(store: &Store, r: &ElementRef) -> Result<(String, f64)> {
     let id = store.resolve(r).ok_or_else(|| bad("element.not_found", "no such level"))?;
     let e = store.get(id).expect("resolved");
     if e.class != "IfcBuildingStorey" {
@@ -1350,6 +1406,7 @@ fn make_segment_c(txn: &mut Transaction<'_>, cx: &Ctx, a: V3, b: V3, size: Size,
         corner,
         size_locked: false,
         riser: None,
+        flex: None,
     };
     let mut e = NewElement::new(segment_class(cx.domain))
         .param("@PredefinedType", cx.predefined)
@@ -1397,7 +1454,7 @@ fn make_fitting_r(txn: &mut Transaction<'_>, cx: &Ctx, part: Part, centre: V3, l
 fn host_at(store: &Store, domain: Domain, p: V3) -> Option<(ElementId, SegmentRecipe, V3)> {
     store.iter().find_map(|e| {
         let s = segment_recipe(e)?;
-        if s.domain != domain || s.corner.is_some() {
+        if s.domain != domain || s.corner.is_some() || s.flex.is_some() {
             return None;
         }
         let d = sub(s.end, s.start);
@@ -1447,6 +1504,9 @@ fn draw_with(txn: &mut Transaction<'_>, domain: Domain, p: CreateParams, radii: 
     let store = txn.store().clone();
     let t = segment_type(store.get(type_id).expect("made")).expect("a type");
     t.check_size(&store, &size)?;
+    if t.flexible {
+        return Err(bad("mep_segment_type.flexible", "a flexible type is drawn with Flex Duct (flex_duct.create)"));
+    }
     if p.system_type_id.is_some() && t.radius_bends() {
         return Err(bad("mep_run.classification", "cable tray and conduit carry no system type"));
     }
@@ -1710,6 +1770,42 @@ fn draw_with(txn: &mut Transaction<'_>, domain: Domain, p: CreateParams, radii: 
     Ok(report)
 }
 
+/// A tap (takeoff) on a straight segment's side at `q` on its axis, leaving along `branch`
+/// (square to the axis) with `size`: made in the host's level and the given classification; the
+/// host gets a tap port. Returns the tap and the point its outer leg ends at.
+pub(crate) fn make_tap(txn: &mut Transaction<'_>, host: ElementId, q: V3, branch: V3, size: Size, classification: Option<Classification>) -> Result<(ElementId, V3)> {
+    let hs = txn.store().get(host).and_then(segment_recipe).ok_or_else(|| bad("mep_run.not_a_segment", format!("element {host} is not a segment")))?;
+    let cx = Ctx {
+        domain: hs.domain,
+        predefined: "",
+        type_guid: hs.segment_type.clone(),
+        routing: Routing::default(),
+        level: hs.level.clone(),
+        classification,
+    };
+    let base = add(q, mul(branch, hs.size.nominal() / 2.0));
+    let tap_len = leg_length(&size).max(0.05);
+    let id = make_fitting(
+        txn,
+        &cx,
+        Part::Tap,
+        base,
+        vec![Leg { direction: mul(branch, -1.0), length: 0.0, size, across: None }, Leg { direction: branch, length: tap_len, size, across: None }],
+    )?;
+    let mut h = hs.clone();
+    h.taps.push(TapPort { at: base, direction: branch, size });
+    let v = serde_json::to_value(&h).expect("serialises");
+    txn.modify(host, |e| {
+        e.params.insert(RECIPE_KEY.into(), v);
+    })?;
+    Ok((id, add(base, mul(branch, tap_len))))
+}
+
+/// The type of a segment (its stored GlobalId).
+pub fn type_of(store: &Store, s: &SegmentRecipe) -> Option<SegmentType> {
+    type_of_segment(store, s).map(|t| t.1)
+}
+
 /// Moves the connection on a split segment's end port (index 1) to the new second half.
 fn retarget_end(txn: &mut Transaction<'_>, from: ElementId, to: ElementId) -> Result<()> {
     let store = txn.store().clone();
@@ -1733,7 +1829,7 @@ fn retarget_end(txn: &mut Transaction<'_>, from: ElementId, to: ElementId) -> Re
 
 /// Puts the run in the system of what it is connected to, when one carries its classification
 /// (or the run has none).
-fn join_system(txn: &mut Transaction<'_>, made: &[ElementId], c: Option<Classification>) -> Result<Option<ElementId>> {
+pub(crate) fn join_system(txn: &mut Transaction<'_>, made: &[ElementId], c: Option<Classification>) -> Result<Option<ElementId>> {
     let store = txn.store().clone();
     let Some(first) = made.first() else { return Ok(None) };
     let net: Vec<ElementId> = mep::network(&store, *first);
@@ -1971,7 +2067,8 @@ pub(crate) fn reapply_type(txn: &mut Transaction<'_>, p: ReapplyParams) -> Resul
             .find_map(|(s, _)| {
                 let sr = store.get(*s).and_then(segment_recipe)?;
                 let t = store.find_by_guid(&GlobalId::parse(&sr.segment_type)?)?;
-                store.get(t).and_then(segment_type).map(|t| t.routing)
+                // A flex duct's tap follows the rigid duct's routing.
+                store.get(t).and_then(segment_type).filter(|t| !t.flexible).map(|t| t.routing)
             })
             .unwrap_or_default();
         let size = match role {
@@ -2088,6 +2185,7 @@ fn target_at(store: &Store, domain: Domain, host: Option<ElementId>, point: Opti
             let h = host.ok_or_else(|| bad("mep_fitting.where", "give a point or an element"))?;
             if let Some(s) = store.get(h).and_then(segment_recipe)
                 && s.corner.is_none()
+                && s.flex.is_none()
             {
                 let q = mul(add(s.start, s.end), 0.5);
                 return Ok(Target::Along(h, s, q));
@@ -2107,7 +2205,7 @@ fn target_at(store: &Store, domain: Domain, host: Option<ElementId>, point: Opti
         .filter(|e| ours(e.id()))
         .filter_map(|e| {
             let s = segment_recipe(e)?;
-            if s.domain != domain || s.corner.is_some() {
+            if s.domain != domain || s.corner.is_some() || s.flex.is_some() {
                 return None;
             }
             let u = unit(sub(s.end, s.start))?;
@@ -2681,7 +2779,7 @@ pub(crate) fn heal(txn: &mut Transaction<'_>, p: HealParams) -> Result<ElementId
     let store = txn.store().clone();
     let a = store.resolve(&p.first_id).ok_or_else(|| bad("element.not_found", "no such segment"))?;
     let b = store.resolve(&p.second_id).ok_or_else(|| bad("element.not_found", "no such segment"))?;
-    let seg = |id: ElementId| store.get(id).and_then(segment_recipe).filter(|s| s.corner.is_none()).ok_or_else(|| bad("mep_run.not_a_segment", format!("element {id} is not a straight segment")));
+    let seg = |id: ElementId| store.get(id).and_then(segment_recipe).filter(|s| s.corner.is_none() && s.flex.is_none()).ok_or_else(|| bad("mep_run.not_a_segment", format!("element {id} is not a straight segment")));
     let (sa, sb) = (seg(a)?, seg(b)?);
     if a == b || sa.domain != sb.domain || sa.size != sb.size {
         return Err(bad("mep_segment.heal", "the segments must be two of one kind and one size"));
@@ -3183,6 +3281,13 @@ pub(crate) fn transform(txn: &mut Transaction<'_>, id: ElementId, point: &dyn Fn
         s.end = p3(s.end);
         s.corner = s.corner.map(p3);
         s.across = s.across.map(d3);
+        if let Some(f) = &mut s.flex {
+            for q in &mut f.points {
+                *q = p3(*q);
+            }
+            f.start_tangent = d3(f.start_tangent);
+            f.end_tangent = d3(f.end_tangent);
+        }
         for t in &mut s.taps {
             t.at = p3(t.at);
             t.direction = d3(t.direction);

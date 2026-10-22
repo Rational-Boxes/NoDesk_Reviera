@@ -4569,6 +4569,11 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "duct_lining.set" => with(gui, |g| g.mep_covering(reviera_core::mep_coverings::CoveringKind::Lining, true)),
         "duct_lining.remove" => with(gui, |g| g.remove_mep_covering(reviera_core::mep_coverings::CoveringKind::Lining)),
         "mep_segment.heal" => with(gui, Gui::heal_segments),
+        "flex_duct.create" => with(gui, |g| {
+            g.start_flex_tool();
+            focus(g);
+        }),
+        "duct.convert_to_flex" => with(gui, Gui::convert_to_flex),
         "mep_fitting.tee_to_cross" => with(gui, Gui::tee_to_cross),
         "mep_fitting.upgrade" => with(gui, |g| g.fitting_grade(true)),
         "mep_fitting.downgrade" => with(gui, |g| g.fitting_grade(false)),

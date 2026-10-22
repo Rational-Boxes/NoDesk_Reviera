@@ -18,6 +18,14 @@
 //! "+" and "−" upgrade and downgrade the selected fitting; Parallel Conduits copies the selected
 //! conduit run.
 //!
+//! Systems › HVAC & Piping › Flex Duct (`FD`, MEP-DUCT-005) draws the same way, the points
+//! being a spline's: the first click on an open duct connector or a duct's centreline (a tap is
+//! put there) starts from it, the last on a connector ends on it (`flex_duct.create` with
+//! `snap`). Each pick is written to `<data dir>/Reviera/sessions/flex-duct.json`, so a drawing
+//! cut short by a crash is offered for resumption the next time the tool starts. **Convert to
+//! Flex Duct** (`CV`) asks for the maximum length and converts the selected terminals' final
+//! segments.
+//!
 //! Systems › Risers (MEP-DUCT-011): **Create Riser** rises from an open end of the selected run
 //! (the open connector chosen when there are several) to a level and offset, bound to the level
 //! by default; **Bind Riser** binds or unbinds a selected vertical segment's end.
@@ -31,6 +39,31 @@ use serde_json::{Value, json};
 use wxdragon::prelude::*;
 
 use super::Gui;
+
+/// A Flex Duct drawing in progress, kept on disk so it survives a crash.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+struct FlexSession {
+    /// The model's file.
+    model: String,
+    level: ElementId,
+    type_id: Option<ElementId>,
+    shape: mep::Shape,
+    diameter: f64,
+    width: f64,
+    height: f64,
+    elevation: f64,
+    system_type: Option<String>,
+    size_from_connector: bool,
+    points: Vec<[f64; 3]>,
+}
+
+fn flex_session_path() -> std::path::PathBuf {
+    super::crash::dir().with_file_name("sessions").join("flex-duct.json")
+}
+
+fn forget_flex_session() {
+    let _ = std::fs::remove_file(flex_session_path());
+}
 
 /// The Duct and Pipe tools: the run's settings and the points clicked so far.
 #[derive(Debug, Clone)]
@@ -55,6 +88,9 @@ pub(crate) struct RunTool {
     pub bend_radius: Option<f64>,
     /// Placing fittings by clicking (Cable Tray Fitting, Conduit Fitting) instead of drawing.
     pub placing: Option<Placing>,
+    /// Flex Duct (MEP-DUCT-005): the points are a spline's; the size may come from the connector.
+    pub flex: bool,
+    pub size_from_connector: bool,
 }
 
 /// What a click places: a fitting's part, or a split.
@@ -207,6 +243,8 @@ impl Gui {
             cursor: None,
             bend_radius: radius.as_ref().and_then(number).map(|v| v / 1000.0),
             placing: None,
+            flex: false,
+            size_from_connector: false,
         };
         f.dialog.destroy();
         self.end_tool(&frame);
@@ -246,7 +284,176 @@ impl Gui {
         if t.points.last() != Some(&q) {
             t.points.push(q);
         }
+        if t.flex {
+            self.save_flex_session();
+        }
         self.run_preview();
+    }
+
+    /// Writes the Flex Duct picks so far (the micro-operations of the drawing session).
+    fn save_flex_session(&self) {
+        let Some(t) = self.run_tool.as_ref().filter(|t| t.flex) else { return };
+        let session = FlexSession {
+            model: self.current_path().map(|p| p.display().to_string()).unwrap_or_default(),
+            level: t.level,
+            type_id: t.type_id,
+            shape: t.shape,
+            diameter: t.diameter,
+            width: t.width,
+            height: t.height,
+            elevation: t.elevation,
+            system_type: t.system_type.clone(),
+            size_from_connector: t.size_from_connector,
+            points: t.points.clone(),
+        };
+        let path = flex_session_path();
+        if let Some(dir) = path.parent() {
+            let _ = std::fs::create_dir_all(dir);
+        }
+        if let Ok(text) = serde_json::to_string(&session) {
+            let _ = std::fs::write(path, text);
+        }
+    }
+
+    /// Systems › HVAC & Piping › Flex Duct: resumes a drawing cut short, or asks for the type
+    /// and size, then takes clicked points.
+    pub(crate) fn start_flex_tool(&mut self) {
+        let frame = self.frame;
+        if !self.ensure_plan(false) {
+            return;
+        }
+        let Some(level) = self.active_view().and_then(|v| v.plan.as_ref()).map(|p| p.level) else { return };
+        let Some(store) = self.store_now() else { return };
+        // A drawing cut short (by a crash) in this model.
+        let model = self.current_path().map(|p| p.display().to_string()).unwrap_or_default();
+        if let Some(sess) = std::fs::read_to_string(flex_session_path())
+            .ok()
+            .and_then(|t| serde_json::from_str::<FlexSession>(&t).ok())
+            .filter(|s| s.model == model && !s.points.is_empty() && store.get(s.level).is_some())
+        {
+            let d = MessageDialog::builder(
+                &frame,
+                &format!("A flex duct was being drawn when Reviera last closed ({} point(s) picked).\n\nResume it?", sess.points.len()),
+                "Flex Duct",
+            )
+            .with_style(MessageDialogStyle::YesNo | MessageDialogStyle::IconQuestion)
+            .build();
+            if d.show_modal() == ID_YES {
+                self.end_tool(&frame);
+                let n = sess.points.len();
+                self.run_tool = Some(RunTool {
+                    domain: Domain::Duct,
+                    level: sess.level,
+                    type_id: sess.type_id.filter(|t| store.get(*t).is_some()),
+                    shape: sess.shape,
+                    diameter: sess.diameter,
+                    width: sess.width,
+                    height: sess.height,
+                    elevation: sess.elevation,
+                    system_type: sess.system_type,
+                    slope: 0.0,
+                    points: sess.points,
+                    cursor: None,
+                    bend_radius: None,
+                    placing: None,
+                    flex: true,
+                    size_from_connector: sess.size_from_connector,
+                });
+                self.run_preview();
+                frame.set_status_text(&format!("Flex Duct: resumed with {n} point(s); click the next points, Enter or Esc finishes"), 0);
+                return;
+            }
+            forget_flex_session();
+        }
+        let types: Vec<(ElementId, String, mep::Shape)> = store
+            .iter()
+            .filter_map(|e| {
+                let t = reviera_core::mep_runs::segment_type(e)?;
+                t.flexible.then(|| (e.id(), e.name.clone().unwrap_or_default(), t.shape))
+            })
+            .collect();
+        let system_types: Vec<mep_systems::SystemType> = mep_systems::system_types(&store).into_iter().filter(|t| t.classification.fits(Domain::Duct)).collect();
+        let keep = self.run_tool.as_ref().filter(|t| t.flex).cloned();
+        let k = keep.as_ref();
+        let f = super::reinforcement_ui::Form::new(&frame, "Flex Duct");
+        let mut type_labels = vec!["Built-in Round or Rectangular Flex Duct (by shape)".to_owned()];
+        type_labels.extend(types.iter().map(|t| t.1.clone()));
+        let type_choice = f.choice("Type", &type_labels, k.and_then(|k| k.type_id).and_then(|id| types.iter().position(|t| t.0 == id)).map_or(0, |i| i + 1));
+        let shapes = [mep::Shape::Round, mep::Shape::Rectangular];
+        let shape_choice = f.choice("Shape", &["Round".to_owned(), "Rectangular".to_owned()], k.map_or(0, |k| usize::from(k.shape != mep::Shape::Round)));
+        let from_connector = f.check("Size", "From the connector it starts or ends on", k.is_none_or(|k| k.size_from_connector));
+        let mm = |v: f64| format!("{:.0}", v * 1000.0);
+        let diameter = f.text("Diameter (mm)", &mm(k.map_or(0.25, |k| k.diameter)), "Round flex; used when the size is not taken from a connector");
+        let width = f.text("Width (mm)", &mm(k.map_or(0.4, |k| k.width)), "Rectangular flex");
+        let height = f.text("Height (mm)", &mm(k.map_or(0.2, |k| k.height)), "Rectangular flex");
+        let elevation = f.text("Middle elevation (m)", &format!("{:.3}", k.map_or(2.7, |k| k.elevation)), "Height above the level of points not on a connector or duct");
+        let mut st_labels = vec!["From what it connects to".to_owned()];
+        st_labels.extend(system_types.iter().map(|t| t.name.clone()));
+        let st_choice = f.choice("System type", &st_labels, 0);
+        if !f.show("Click a connector or a duct's centreline, then the points, then the end (a connector ends it); Enter or Esc finishes", "Draw") {
+            f.dialog.destroy();
+            return;
+        }
+        let picked = type_choice.get_selection().and_then(|i| (i as usize).checked_sub(1)).and_then(|i| types.get(i));
+        let shape = picked.map_or_else(|| shapes[shape_choice.get_selection().map_or(0, |i| i as usize).min(1)], |t| t.2);
+        let tool = RunTool {
+            domain: Domain::Duct,
+            level,
+            type_id: picked.map(|t| t.0),
+            shape,
+            diameter: number(&diameter).map_or(0.25, |v| v / 1000.0),
+            width: number(&width).map_or(0.4, |v| v / 1000.0),
+            height: number(&height).map_or(0.2, |v| v / 1000.0),
+            elevation: number(&elevation).unwrap_or(2.7),
+            system_type: st_choice.get_selection().and_then(|i| (i as usize).checked_sub(1)).and_then(|i| system_types.get(i)).map(|t| t.id.clone()),
+            slope: 0.0,
+            points: Vec::new(),
+            cursor: None,
+            bend_radius: None,
+            placing: None,
+            flex: true,
+            size_from_connector: from_connector.is_checked(),
+        };
+        f.dialog.destroy();
+        self.end_tool(&frame);
+        self.run_tool = Some(tool);
+        frame.set_status_text("Flex Duct: click a connector or a duct's centreline, then the points; Enter or Esc finishes", 0);
+    }
+
+    /// Convert to Flex Duct: the selected terminals' final segments, up to a maximum length.
+    pub(crate) fn convert_to_flex(&mut self) {
+        let frame = self.frame;
+        let Some(store) = self.store_now() else { return };
+        let terminals: Vec<ElementId> = self
+            .selection()
+            .into_iter()
+            .filter(|i| store.get(*i).is_some_and(|e| reviera_core::mep::ports(&store, e).iter().any(|p| p.connector.domain == Domain::Duct) && !reviera_core::mep_runs::is_run_element(e)))
+            .collect();
+        if terminals.is_empty() {
+            return frame.set_status_text("Convert to Flex Duct: select air terminals (or equipment) at the ends of duct runs", 0);
+        }
+        let d = TextEntryDialog::builder(&frame, "Convert final segments no longer than (m):", "Convert to Flex Duct").with_default_value("1.5").build();
+        if d.show_modal() != ID_OK {
+            return;
+        }
+        let Some(max) = d.get_value().and_then(|s| s.trim().replace(',', ".").parse::<f64>().ok()) else { return };
+        match self.run("duct.convert_to_flex", json!({ "terminal_ids": terminals, "max_length": max })) {
+            Ok(v) => {
+                self.refresh_scene(&frame);
+                let rep: reviera_core::mep_flex::ConvertReport = serde_json::from_value(v).unwrap_or_default();
+                let mut text = format!("{} converted to flex duct.", rep.ids.len());
+                for s in &rep.skipped {
+                    let name = store.get(s.terminal).and_then(|e| e.name.clone()).unwrap_or_else(|| format!("Element {}", s.terminal.0));
+                    text.push_str(&format!("\n{name}: skipped, {}", s.reason));
+                }
+                if rep.skipped.is_empty() {
+                    frame.set_status_text(&text, 0);
+                } else {
+                    MessageDialog::builder(&frame, &text, "Convert to Flex Duct").with_style(MessageDialogStyle::OK | MessageDialogStyle::IconInformation).build().show_modal();
+                }
+            }
+            Err(e) => error(&frame, &e),
+        }
     }
 
     /// E: a new elevation (the run rises or drops there); Enter: finish.
@@ -292,6 +499,9 @@ impl Gui {
         if self.run_tool.as_ref().is_some_and(|t| t.placing.is_none() && t.points.len() >= 2) {
             self.finish_run();
         } else {
+            if self.run_tool.as_ref().is_some_and(|t| t.flex) {
+                forget_flex_session();
+            }
             self.end_run_tool();
             self.frame.set_status_text("Ready", 0);
         }
@@ -302,6 +512,60 @@ impl Gui {
         let Some(t) = self.run_tool.clone() else { return };
         if t.points.len() < 2 {
             return frame.set_status_text("Click at least two points", 0);
+        }
+        if t.flex {
+            let mut args = json!({ "points": t.points, "level": t.level, "shape": t.shape, "snap": true });
+            if !t.size_from_connector {
+                if t.shape == mep::Shape::Round {
+                    args["diameter"] = json!(t.diameter);
+                } else {
+                    args["width"] = json!(t.width);
+                    args["height"] = json!(t.height);
+                }
+            }
+            if let Some(id) = t.type_id {
+                args["type_id"] = json!(id);
+            }
+            if let Some(st) = &t.system_type {
+                args["system_type_id"] = json!(st);
+            }
+            // A size from the connector needs one; else the form's.
+            let mut out = self.app.execute("flex_duct.create", args.clone(), &reviera_core::Caller::user());
+            if t.size_from_connector && out.as_ref().is_err_and(|e| e.code == "mep_run.size") {
+                if t.shape == mep::Shape::Round {
+                    args["diameter"] = json!(t.diameter);
+                } else {
+                    args["width"] = json!(t.width);
+                    args["height"] = json!(t.height);
+                }
+                out = self.app.execute("flex_duct.create", args, &reviera_core::Caller::user());
+            }
+            return match out {
+                Ok(o) => {
+                    forget_flex_session();
+                    if let Some(tool) = &mut self.run_tool {
+                        tool.points.clear();
+                        tool.cursor = None;
+                    }
+                    if let Some(v) = self.viewport() {
+                        v.set_overlay_lines(&[]);
+                    }
+                    self.refresh_scene(&frame);
+                    let r = &o.result;
+                    let mut text = "Flex duct made".to_owned();
+                    if r["fittings"].as_array().is_some_and(|f| !f.is_empty()) {
+                        text.push_str(" with a tap");
+                    }
+                    if r["connected_to"].as_array().is_some_and(|c| !c.is_empty()) {
+                        text.push_str(", connected");
+                    }
+                    if let Some(w) = o.warnings.first() {
+                        text.push_str(&format!("; {}", w.message));
+                    }
+                    frame.set_status_text(&format!("{text}. Click the next, or Esc"), 0);
+                }
+                Err(e) => error(&frame, &format!("The flex duct was not made:\n{e}")),
+            };
         }
         let mut args = json!({ "points": t.points, "level": t.level, "shape": t.shape });
         if let Some(r) = t.bend_radius {
@@ -364,6 +628,18 @@ impl Gui {
         let mut pts: Vec<[f64; 2]> = t.points.iter().map(|p| [p[0], p[1]]).collect();
         if let Some(c) = t.cursor {
             pts.push(c);
+        }
+        // Flex: the spline through the points.
+        if t.flex && pts.len() >= 2 {
+            let p3: Vec<[f64; 3]> = pts.iter().map(|p| [p[0], p[1], 0.0]).collect();
+            let dir = |a: [f64; 3], b: [f64; 3]| {
+                let d = [b[0] - a[0], b[1] - a[1], 0.0];
+                let l = (d[0] * d[0] + d[1] * d[1]).sqrt().max(1e-9);
+                [d[0] / l, d[1] / l, 0.0]
+            };
+            let n = p3.len();
+            let path = reviera_core::mep_flex::FlexPath { start_tangent: dir(p3[0], p3[1]), end_tangent: dir(p3[n - 2], p3[n - 1]), points: p3 };
+            pts = path.samples(12).into_iter().map(|(p, _)| [p[0], p[1]]).collect();
         }
         let lines = Lines {
             color: PREVIEW,
@@ -438,6 +714,8 @@ impl Gui {
             cursor: None,
             bend_radius: None,
             placing: Some(placing),
+            flex: false,
+            size_from_connector: false,
         });
         frame.set_status_text(&format!("{title}: click on a {} or its open end to place: {label}; Esc ends", domain_title(domain).to_lowercase()), 0);
     }
@@ -532,6 +810,8 @@ impl Gui {
             cursor: None,
             bend_radius: None,
             placing: Some(Placing::Accessory(kind)),
+            flex: false,
+            size_from_connector: false,
         });
         frame.set_status_text(&format!("Pipe Accessory: click on a pipe to insert a {}; flanged from 50 mm; Esc ends", kind.label().to_lowercase()), 0);
     }
@@ -568,6 +848,8 @@ impl Gui {
             cursor: None,
             bend_radius: None,
             placing: Some(Placing::DuctAccessory(kind)),
+            flex: false,
+            size_from_connector: false,
         });
         frame.set_status_text(&format!("Duct Accessory: click on a duct to insert a {} ({:.0} mm long), or on an open end; Esc ends", kind.label().to_lowercase(), kind.default_length() * 1000.0), 0);
     }

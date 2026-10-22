@@ -170,6 +170,8 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(DuctLiningSet),
         registry.add(DuctLiningRemove),
         registry.add(MepCoveringList),
+        registry.add(FlexDuctCreate),
+        registry.add(DuctConvertToFlex),
         registry.add(MechControlDeviceAssign),
         registry.add(MechControlDeviceList),
         registry.add(MepRunCreateRiser),
@@ -536,7 +538,7 @@ edit_command!(
     MepSegmentTypeCreate,
     "mep_segment_type.create",
     "Make a duct, pipe, cable tray or conduit type",
-    "Makes a segment type (`domain` duct, pipe, cable_tray or conduit; `shape` round, rectangular, oval; pipes and conduit round, tray rectangular) named `name` with `routing` preferences (MEP-DUCT-002: rows {part, min, max} per role elbow, junction (tee, tap), cross, transition, cap, union (coupling), and `preferred_junction` tee or tap; one row of each by default, a coupling union for conduit), `material` and `roughness`. Tray and conduit: `with_fittings` (default true; without, bends are curved segments and fittings cannot be placed), `bend_radius_multiplier` (bend radius over width or diameter; 1 for tray, 6 for conduit by default), tray `tray_kind` (ladder, channel, solid_bottom, trough) and conduit `standard` (a conduit standard's id: iec_61386, emt, or one made with conduit_standard.create). Returns the type.",
+    "Makes a segment type (`domain` duct, pipe, cable_tray or conduit; `shape` round, rectangular, oval; pipes and conduit round, tray rectangular) named `name` with `routing` preferences (MEP-DUCT-002: rows {part, min, max} per role elbow, junction (tee, tap), cross, transition, cap, union (coupling), and `preferred_junction` tee or tap; one row of each by default, a coupling union for conduit), `material` and `roughness`. Tray and conduit: `with_fittings` (default true; without, bends are curved segments and fittings cannot be placed), `bend_radius_multiplier` (bend radius over width or diameter; 1 for tray, 6 for conduit by default), tray `tray_kind` (ladder, channel, solid_bottom, trough) and conduit `standard` (a conduit standard's id: iec_61386, emt, or one made with conduit_standard.create). Duct: `flexible` makes a flex duct type (MEP-DUCT-005, drawn with flex_duct.create; its `bend_radius_multiplier` is the minimum bend radius over the diameter, default 1) with a `loss_multiplier` for compressed flex (1 to 10, default 1). Returns the type.",
     "Segment Type",
     crate::mep_runs::CreateTypeParams,
     ElementId,
@@ -1264,6 +1266,28 @@ edit_command!(
     crate::mep_runs::DuctAccessoryParams,
     crate::mep_runs::DuctAccessoryReport,
     crate::mep_runs::place_duct_accessory
+);
+
+edit_command!(
+    FlexDuctCreate,
+    "flex_duct.create",
+    "Draw a flexible duct",
+    "Draws a flex duct (MEP-DUCT-005): an IfcDuctSegment FLEXIBLESEGMENT along a spline through `points` (`[x, y, z]` above `level`, or `[x, y]` at `middle_elevation`, default 2.7 m), of a flexible type (`type_id`; the built-in Round or Rectangular Flex Duct when omitted: 3 mm roughness, minimum bend radius 1 × diameter). It starts on `start_port`, on an open duct connector at the first point, on a rigid duct's centreline (a tap from that duct's routing preferences is inserted; refused naming the size when none fits) or at a free point, and ends on `end_port`, a connector at the last point (joined, its direction followed) or a free point. `snap` finds connectors (and the start a centreline) in plan within 300 mm. Size: `diameter`, or `width` and `height`; else the connector's. System: `system_type_id`, else what it starts or ends on. A bend tighter than the type's minimum radius is drawn with a warning. Its length (for schedules, Qto_DuctSegmentBaseQuantities.Length and the pressure drop, times the type's loss multiplier) is the spline's.",
+    "Flex Duct",
+    crate::mep_flex::CreateParams,
+    crate::mep_runs::RunReport,
+    crate::mep_flex::create
+);
+
+edit_command!(
+    DuctConvertToFlex,
+    "duct.convert_to_flex",
+    "Convert final duct segments to flex",
+    "For each terminal in `terminal_ids` (MEP-DUCT-005 Convert to Flex), replaces the final rigid duct segment (with the elbow at the terminal, if any) by a flex duct of its size, system and level, from the segment's far end to the terminal's connector, when it is no longer than `max_length` (metres). Terminals whose final run is longer, or that do not end in a plain straight duct, are left and listed in `skipped` with the reason. `type_id`: a flexible type (default the built-in of the duct's shape). Returns `ids` (the flex ducts) and `skipped`.",
+    "Convert to Flex Duct",
+    crate::mep_flex::ConvertParams,
+    crate::mep_flex::ConvertReport,
+    crate::mep_flex::convert
 );
 
 edit_command!(

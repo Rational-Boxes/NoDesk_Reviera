@@ -392,20 +392,16 @@ pub fn compute(store: &Store, sys: &SystemInfo, equation: Equation) -> Result<Ne
         let children: Vec<(ElementId, usize)> = order.iter().filter_map(|c| parent.get(c).filter(|p| p.0 == x).map(|p| (*c, p.1))).collect();
         if let Some(s) = mep_runs::segment_recipe(e) {
             let flow = q(x);
-            let roughness = GlobalId::parse(&s.segment_type)
-                .and_then(|g| store.find_by_guid(&g))
-                .and_then(|t| store.get(t))
-                .and_then(mep_runs::segment_type)
-                .map_or(0.0, |t| t.roughness);
+            let st = GlobalId::parse(&s.segment_type).and_then(|g| store.find_by_guid(&g)).and_then(|t| store.get(t)).and_then(mep_runs::segment_type);
+            let roughness = st.as_ref().map_or(0.0, |t| t.roughness);
+            // Flex duct: its loss multiplier for compressed flex (MEP-DUCT-005).
+            let multiplier = st.as_ref().filter(|t| t.flexible).map_or(1.0, |t| t.loss_multiplier);
             // Lining narrows the duct and sets its roughness (MEP-DUCT-004).
             let (free, lined) = crate::mep_coverings::free_size(store, x, s.size);
             let roughness = lined.unwrap_or(roughness);
-            let len = match s.corner {
-                Some(c) => length(s.start, c) + length(c, s.end),
-                None => length(s.start, s.end),
-            };
+            let len = mep_runs::segment_length(&s);
             let (v, f) = flow_in(flow, &free, roughness, fluid, equation);
-            let loss = ov.loss.unwrap_or(f * len);
+            let loss = ov.loss.unwrap_or(f * len * multiplier);
             own.insert(x, loss);
             let (_, branch) = if s.domain == Domain::Duct { DUCT_JUNCTION } else { PIPE_JUNCTION };
             let mut branches = Vec::new();
@@ -595,7 +591,11 @@ pub fn compute(store: &Store, sys: &SystemInfo, equation: Equation) -> Result<Ne
         for e in &chain {
             let Some(el) = store.get(*e) else { continue };
             let pts = if let Some(sr) = mep_runs::segment_recipe(el) {
-                if parent[e].2 == 1 { vec![sr.end, sr.start] } else { vec![sr.start, sr.end] }
+                let mut v = sr.flex.as_ref().map_or_else(|| vec![sr.start, sr.end], |f| f.points.clone());
+                if parent[e].2 == 1 {
+                    v.reverse();
+                }
+                v
             } else if let Some(fr) = mep_runs::fitting_recipe(el) {
                 vec![fr.centre]
             } else {

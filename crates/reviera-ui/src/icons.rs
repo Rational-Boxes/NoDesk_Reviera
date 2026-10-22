@@ -394,6 +394,12 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "heal" => format!(
             r#"<path d="M3 16h10M19 16h10" stroke-width="5" {s}/><path d="M13 16h6" stroke-width="5" {sa}/><path d="M16 8v4M16 20v4" {sa}/>"#
         ),
+        "flex_duct" => format!(
+            r#"<path d="M3 24c6 0 4-16 10-16s4 16 10 16 4-12 6-12" fill="none" stroke-width="6" {s}/><path d="M7 21v4M11 13v4M15 9v4M19 17v4M23 21v4" {sa}/>"#
+        ),
+        "convert_flex" => format!(
+            r#"<path d="M3 8h12" stroke-width="5" {s}/><path d="M18 8l-3-3v6z" fill="{f}" {sa}/><path d="M3 24c4 0 4-6 8-6s4 6 8 6 4-6 10-6" fill="none" stroke-width="5" {s}/><rect x="22" y="3" width="8" height="8" fill="{f}" {s}/>"#
+        ),
         "valve" => format!(
             r#"<path d="M2 16h5M25 16h5" stroke-width="4" {s}/><path d="M7 10l18 12V10L7 22z" fill="{f}" {s}/><path d="M16 16V6M11 6h10" {sa}/>"#
         ),

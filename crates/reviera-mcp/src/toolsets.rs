@@ -143,6 +143,7 @@ pub fn toolset_of(command: &str) -> String {
             | "mep_covering"
             | "mep_insulation"
             | "duct_lining"
+            | "flex_duct"
             | "plumbing_fixture"
             | "sprinkler"
             | "sprinkler_type"

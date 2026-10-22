@@ -18,6 +18,8 @@ Water 1. The tools are on the <b>Systems</b> tab.</p>
   <a href="#loads">Load classifications and demand factors</a>
   <a href="#fixtures">Plumbing fixtures</a>
   <a href="#accessories">Pipe fittings, valves and accessories</a>
+  <a href="#duct-accessories">Duct accessories, insulation and lining</a>
+  <a href="#flex-duct">Flexible duct</a>
   <a href="#slopes">Sloped pipes and parallel pipes</a>
   <a href="#controls">Thermostats, sensors and controllers</a>
   <a href="#risers">Risers</a>
@@ -259,6 +261,27 @@ duct when it is resized or moved and are deleted with it. Lining has to be thinn
 duct's smallest side. Lining makes the duct's free section smaller, and the pressure-drop
 calculation uses that smaller section and the lining's roughness. Insulation does not change the
 calculation. Edit and Remove change or delete what the selected elements have.</p>
+
+<h2 id="flex-duct">Flexible duct</h2>
+<p><a href="reviera:action/flex_duct.create">Flex Duct</a> (<kbd>F</kbd> <kbd>D</kbd>) draws the
+short flexible connections to diffusers and grilles. Pick the type (round or rectangular) and the
+size. Leave <em>From the connector</em> ticked to take the size of the connector you start or end
+on. Then click the start: an open duct connector, the centreline of a duct (Reviera puts a tap on
+the duct there, if the duct type's routing preferences have one for that size), or a free point.
+Click the points the flex passes through, then the end. Ending on a connector joins it, and the
+flex arrives square to it. Press <kbd>Enter</kbd> or <kbd>Esc</kbd> to finish. The flex is drawn
+as a smooth curve through every point. If it bends more tightly than its type allows (by default
+a radius of one diameter), it is still drawn, and Reviera warns you.</p>
+<p>The curve's length is used in schedules, the exported quantities and the pressure drop. A flex
+type has its own roughness (3 mm for the built-in types) and a loss multiplier for compressed flex,
+which multiplies its friction loss.</p>
+<p>If Reviera closes while you are drawing, the points you picked are kept. Start Flex Duct again
+in the same model and Reviera offers to carry on from them.</p>
+<p><a href="reviera:action/duct.convert_to_flex">Convert to Flex</a> (<kbd>C</kbd> <kbd>V</kbd>)
+works on the selected terminals. Enter a maximum length, 1.5 m by default. For each terminal, the
+last straight duct before it, with the elbow at the terminal if there is one, is replaced by flex
+of the same size and system. Terminals whose last duct is longer than the limit are left as they
+are, and Reviera lists them with the reason.</p>
 
 <h2 id="slopes">Sloped pipes and parallel pipes</h2>
 <p>To give drainage a fall, select the pipes and fittings of a run and choose <a

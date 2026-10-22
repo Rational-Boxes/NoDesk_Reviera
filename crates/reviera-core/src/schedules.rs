@@ -369,8 +369,7 @@ impl Context<'_> {
         match key {
             "mep.size" => Context::text(s.size.text()),
             "mep.length" => {
-                let d: f64 = (0..3).map(|i| (s.end[i] - s.start[i]).powi(2)).sum::<f64>().sqrt();
-                self.fmt(d, "length")
+                self.fmt(crate::mep_runs::segment_length(&s), "length")
             }
             "mep.flow" => number("flow", "m³/s", 4),
             "mep.velocity" => number("velocity", "m/s", 2),

@@ -979,6 +979,15 @@ schedules, circuit paths, cable sizing and voltage drop.
   `mep_covering_type.create`, `mep_covering.list`). Not built yet: transitions where an
   accessory cannot take the duct's size, accessories from component types, the in-view
   thickness error.
+- **Flexible duct** (Systems › Insulation & Accessories › Flex Duct `FD`, Convert to Flex `CV`):
+  round and rectangular flex as a spline through the clicked points (`IfcDuctSegment`
+  FLEXIBLESEGMENT, length `Qto_DuctSegmentBaseQuantities.Length`), from an open connector, a
+  duct's centreline (a tap from the routing preferences) or a free point, to a connector or a free
+  point; a bend tighter than the type's minimum radius is warned about; flex types carry a
+  roughness and a loss multiplier used by the pressure drop; picks survive a crash and are
+  offered for resumption; Convert to Flex replaces terminals' final segments up to a maximum
+  length and lists the rest (`flex_duct.create`, `duct.convert_to_flex`). Not built yet: vertex
+  and tangent grips, the flex pattern in plans, flex pipe.
 - **Sloped piping and parallel pipes** (Systems › HVAC & Piping › Slope, Parallel Pipes): the
   Slope Editor gives a connected section of pipe one of the project's allowed slopes from a
   control point (the lowest end by default): fittings follow, branches stay connected (their

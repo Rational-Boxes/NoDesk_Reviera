@@ -3313,7 +3313,11 @@ impl LocalProject {
                 };
                 self.ifc.set_attribute(rel, "RelatingBuildingElement", &AttrValue::Ref(host.0))?;
                 let thickness = reviera_core::mep_coverings::covering_recipe(e).map_or(0.0, |c| c.thickness);
-                self.write_covering_width(step, thickness / self.length_scale, owner_history)?;
+                self.write_quantity_length(step, "Qto_CoveringBaseQuantities", "Width", thickness / self.length_scale, owner_history)?;
+            }
+            // Flex duct: its spline length (MEP-DUCT-005).
+            if let Some(f) = reviera_core::mep_runs::segment_recipe(e).and_then(|s| s.flex) {
+                self.write_quantity_length(step, "Qto_DuctSegmentBaseQuantities", "Length", f.length() / self.length_scale, owner_history)?;
             }
             // A gutter hangs on its roof (MEP-PIPE-010).
             if let Some(roof) = gutter
@@ -3344,19 +3348,19 @@ impl LocalProject {
         Ok(())
     }
 
-    /// A covering's thickness as `Qto_CoveringBaseQuantities.Width` (MEP-DUCT-004), in file
-    /// units: the quantity written before is updated.
-    fn write_covering_width(&mut self, step: StepId, width: f64, owner_history: Option<StepId>) -> Result<()> {
-        const QTO: &str = "Qto_CoveringBaseQuantities";
+    /// A length quantity `name` in the quantity set `qto` (a covering's thickness as
+    /// `Qto_CoveringBaseQuantities.Width`, MEP-DUCT-004; a flex duct's length, MEP-DUCT-005), in
+    /// file units: the quantity written before is updated.
+    fn write_quantity_length(&mut self, step: StepId, qto: &str, name: &str, width: f64, owner_history: Option<StepId>) -> Result<()> {
         for rel in self.ifc.referenced_by(step, "IfcRelDefinesByProperties")? {
             let AttrValue::Ref(q) = self.ifc.attribute(rel, "RelatingPropertyDefinition")? else { continue };
-            if self.ifc.attribute(StepId(q), "Name")? != AttrValue::String(QTO.into()) {
+            if self.ifc.attribute(StepId(q), "Name")? != AttrValue::String(qto.into()) {
                 continue;
             }
             if let AttrValue::List(items) = self.ifc.attribute(StepId(q), "Quantities")? {
                 for i in items {
                     if let AttrValue::Ref(i) = i
-                        && self.ifc.attribute(StepId(i), "Name")? == AttrValue::String("Width".into())
+                        && self.ifc.attribute(StepId(i), "Name")? == AttrValue::String(name.into())
                     {
                         self.ifc.set_attribute(StepId(i), "LengthValue", &AttrValue::Real(width))?;
                         return Ok(());
@@ -3365,10 +3369,10 @@ impl LocalProject {
             }
         }
         let len = self.ifc.create("IfcQuantityLength")?;
-        self.ifc.set_attribute(len, "Name", &AttrValue::String("Width".into()))?;
+        self.ifc.set_attribute(len, "Name", &AttrValue::String(name.into()))?;
         self.ifc.set_attribute(len, "LengthValue", &AttrValue::Real(width))?;
         let q = self.ifc.create_rooted("IfcElementQuantity", &GlobalId::new())?;
-        self.ifc.set_attribute(q, "Name", &AttrValue::String(QTO.into()))?;
+        self.ifc.set_attribute(q, "Name", &AttrValue::String(qto.into()))?;
         self.ifc.set_attribute(q, "Quantities", &AttrValue::List(vec![AttrValue::Ref(len.0)]))?;
         let rel = self.ifc.create_rooted("IfcRelDefinesByProperties", &GlobalId::new())?;
         if let Some(oh) = owner_history {

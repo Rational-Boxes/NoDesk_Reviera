@@ -2291,6 +2291,20 @@ icon = "duct_lining"
 help = "Delete the selected ducts' lining (MEP-DUCT-004)"
 
 [[action]]
+id = "flex_duct.create"
+label = "Flex Duct"
+icon = "flex_duct"
+keys = "FD"
+help = "Draw a flexible duct as a spline through the clicked points, from an open duct connector or a duct's centreline (a tap is inserted) to a connector or a free point; a bend tighter than the type's minimum radius is warned about (MEP-DUCT-005)"
+
+[[action]]
+id = "duct.convert_to_flex"
+label = "Convert to Flex"
+icon = "convert_flex"
+keys = "CV"
+help = "Replace the selected terminals' final rigid duct segments (with the elbow at the terminal) by flex duct of the same size and system, up to a maximum length; longer ones are listed (MEP-DUCT-005)"
+
+[[action]]
 id = "mep_segment.heal"
 label = "Heal"
 icon = "heal"
@@ -2952,6 +2966,8 @@ tools = [
   { action = "duct_lining.set", size = "small" },
   { action = "duct_lining.remove", size = "small" },
   { action = "mep_segment.heal", size = "small" },
+  { action = "flex_duct.create", size = "large" },
+  { action = "duct.convert_to_flex", size = "small" },
 ]
 
 [[tab.panel]]
