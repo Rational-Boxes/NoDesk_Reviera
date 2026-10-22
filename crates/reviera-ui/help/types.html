@@ -99,3 +99,16 @@ written as standard IFC classification references, so other tools can read them.
 with a key, a text and a parent key on each line, separated by tabs. Keep it beside the project
 and the project remembers it by name, so it still works when the folder moves.
 <code>keynotes.reload</code> reads it again after you edit it.</p>
+
+<h2 id="transfer">Transfer Project Standards</h2>
+<p>To reuse another project's types and settings, open it as well, make the project you want to
+change active, and choose <a href="reviera:action/standards.transfer">Transfer Project
+Standards</a> (Manage › Settings). Pick the source project, then tick what to copy: types by
+category, line weights and object styles, units, project and global parameters, classification,
+keynotes, MEP and electrical settings, and more. A type brings the types it uses with it, such
+as a stacked wall's row types. Types this project already has are used as they are, not
+copied.</p>
+<p>For items this project already has, choose <em>Overwrite</em> to take the source's values
+while keeping this project's item (so everything that uses it stays connected), <em>New only</em>
+to leave them alone, or <em>Rename</em> to copy them under a new name. Reviera then lists what
+it copied. A single Undo reverses the whole transfer.</p>

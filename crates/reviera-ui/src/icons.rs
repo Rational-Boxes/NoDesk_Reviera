@@ -499,6 +499,9 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "keynotes" => format!(
             r#"<rect x="5" y="4" width="22" height="24" fill="{f}" {s}/><path d="M9 10h4M15 10h8M9 16h4M15 16h8M9 22h4M15 22h8" {sa}/>"#
         ),
+        "transfer_standards" => format!(
+            r#"<rect x="3" y="5" width="11" height="14" fill="{f}" {s}/><rect x="18" y="13" width="11" height="14" fill="{f}" {s}/><path d="M12 22h4M14 20l2 2-2 2M20 10h-4M18 8l-2 2 2 2" fill="none" {sa}/>"#
+        ),
         "fluid" => format!(
             r#"<path d="M16 3c-5 8-9 13-9 18a9 9 0 0 0 18 0c0-5-4-10-9-18z" fill="{f}" {s}/>"#
         ),

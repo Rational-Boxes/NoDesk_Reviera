@@ -103,6 +103,7 @@ mod structural_settings;
 mod globals_ui;
 mod paramlib_ui;
 mod classification_ui;
+mod standards_ui;
 mod mech_settings_ui;
 mod wall_profile;
 mod wall_sweeps;
@@ -4730,6 +4731,7 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "mechanical_settings.show" => with(gui, Gui::mechanical_settings),
         "global.manage" => with(gui, Gui::global_parameters),
         "paramlib.manage" => with(gui, Gui::parameter_libraries),
+        "standards.transfer" => with(gui, Gui::transfer_standards),
         "classification.list" => with(gui, Gui::classification_systems),
         "classification.assign" => with(gui, Gui::classify_selection),
         "keynotes.load" => with(gui, Gui::load_keynotes),

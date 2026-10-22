@@ -1762,6 +1762,12 @@ icon = "keynotes"
 help = "Read a tab-separated keynote file (key, text, parent key) into the project (DM-CLS-001)"
 
 [[action]]
+id = "standards.transfer"
+label = "Transfer Project Standards"
+icon = "transfer_standards"
+help = "Copy types and settings from another open project into this one, with the types they use; existing items are overwritten, skipped or renamed (DM-XFER-001)"
+
+[[action]]
 id = "global.manage"
 label = "Global Parameters"
 icon = "global_parameters"
@@ -3553,6 +3559,7 @@ tools = [
   { action = "ui.model_properties", size = "large" },
   { action = "global.manage", size = "large" },
   { action = "paramlib.manage", size = "large" },
+  { action = "standards.transfer", size = "large" },
   { action = "classification.list", size = "small" },
   { action = "classification.assign", size = "small" },
   { action = "keynotes.load", size = "small" },

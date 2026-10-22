@@ -1060,6 +1060,11 @@ schedules, circuit paths, cable sizing and voltage drop.
   element, exported as `IfcClassification` with `IfcClassificationReference` chains; keynote
   files kept relative to the project (`classification.*`, `keynotes.*`). Not built yet: the
   tree picker in Properties, bSDD, keynote tags.
+- **Transfer Project Standards** (Manage › Settings): types and settings copied from another
+  open project, with the types they use (references rewritten), overwriting (keeping the
+  target's GlobalIds), skipping or renaming what exists, as one undo step (`standards.list`,
+  `standards.transfer`). Not built yet: materials, patterns, view templates and filters (not
+  project elements yet), item-by-item choice in the dialog.
 - **Sloped piping and parallel pipes** (Systems › HVAC & Piping › Slope, Parallel Pipes): the
   Slope Editor gives a connected section of pipe one of the project's allowed slopes from a
   control point (the lowest end by default): fittings follow, branches stay connected (their

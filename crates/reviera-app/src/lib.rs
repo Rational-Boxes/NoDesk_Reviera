@@ -23,6 +23,7 @@ pub mod scripts;
 pub mod sheets;
 pub mod paramlib;
 pub mod classification_files;
+pub mod standards_transfer;
 pub mod settings_dialogs;
 pub mod structural;
 pub mod subscriptions;

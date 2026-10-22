@@ -109,6 +109,8 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add_host(crate::classification_files::ClassificationLoad),
         registry.add_host(crate::classification_files::KeynotesLoad),
         registry.add_host(crate::classification_files::KeynotesReload),
+        registry.add_host(crate::standards_transfer::StandardsList),
+        registry.add_host(crate::standards_transfer::StandardsTransfer),
         registry.add_host(SelectionRemove),
     ];
     for r in results {

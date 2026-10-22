@@ -229,6 +229,7 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(ClassificationOf),
         registry.add(KeynotesSet),
         registry.add(KeynotesList),
+        registry.add(StandardsApply),
         registry.add(MechControlDeviceAssign),
         registry.add(MechControlDeviceList),
         registry.add(MepRunCreateRiser),
@@ -2356,4 +2357,15 @@ read_command!(
     crate::classification::KeynoteListParams,
     crate::classification::KeynoteTable,
     crate::classification::list_keynotes
+);
+
+edit_command!(
+    StandardsApply,
+    "standards.apply",
+    "Apply transferred project standards",
+    "The target side of Transfer Project Standards (DM-XFER-001), normally called by `standards.transfer`: makes `creates` (elements with their GlobalIds, class, name and parameters), replaces the parameters of `updates` (elements of this project, GlobalIds kept), and writes `settings` (holder project, project_settings, parameters or a standards element class; key; value), as one transaction. Returns the number of changes.",
+    "Transfer Project Standards",
+    crate::standards_transfer::ApplyParams,
+    usize,
+    crate::standards_transfer::apply
 );
