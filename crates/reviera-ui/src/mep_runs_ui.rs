@@ -940,6 +940,38 @@ impl Gui {
         }
     }
 
+    /// Justify (MEP-DUCT-006): the selected run aligned on a face or edge, from its start or end
+    /// segment.
+    pub(crate) fn justify_run(&mut self) {
+        let frame = self.frame;
+        let Some(store) = self.store_now() else { return };
+        let run: Vec<ElementId> = self.selection().into_iter().filter(|i| store.get(*i).is_some_and(reviera_core::mep_runs::is_run_element)).collect();
+        if run.is_empty() {
+            return frame.set_status_text("Justify: select a run's segments and fittings (Tab selects a run)", 0);
+        }
+        use reviera_core::mep_justify::Alignment as A;
+        let f = super::reinforcement_ui::Form::new(&frame, "Justify");
+        let control = f.choice("Control point", &["Start segment".to_owned(), "End segment".to_owned()], 0);
+        let up = f.choice("Vertical", &["Top".to_owned(), "Middle".to_owned(), "Bottom".to_owned()], 2);
+        let across = f.choice("Horizontal", &["Left".to_owned(), "Centre".to_owned(), "Right".to_owned()], 1);
+        if !f.show("The control segment stays; the others align on its face or edge (left and right as seen from it)", "Finish") {
+            f.dialog.destroy();
+            return;
+        }
+        let pick = |c: &Choice| c.get_selection().map_or(0, |i| (i as usize).min(2));
+        let alignment = [[A::TL, A::TC, A::TR], [A::ML, A::MC, A::MR], [A::BL, A::BC, A::BR]][pick(&up)][pick(&across)];
+        let end = if pick(&control) == 1 { "end" } else { "start" };
+        f.dialog.destroy();
+        match self.run("mep_run.justify", json!({ "element_ids": run, "control_end": end, "alignment": alignment })) {
+            Ok(v) => {
+                self.refresh_scene(&frame);
+                let n = v["moved"].as_array().map_or(0, Vec::len);
+                frame.set_status_text(&format!("Justified {}: {n} element(s) moved", alignment.label()), 0);
+            }
+            Err(e) => error(&frame, &e),
+        }
+    }
+
     /// Change Tee to Cross on the selected tees.
     pub(crate) fn tee_to_cross(&mut self) {
         let frame = self.frame;

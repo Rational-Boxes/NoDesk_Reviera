@@ -73,6 +73,7 @@ pub mod mep_hydronic;
 pub mod mep_analytical;
 pub mod mep_coverings;
 pub mod mep_flex;
+pub mod mep_justify;
 pub mod mep_panel_schedule;
 pub mod mep_systems;
 pub mod model_lines;

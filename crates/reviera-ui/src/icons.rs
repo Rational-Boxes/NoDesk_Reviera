@@ -403,6 +403,9 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "valve" => format!(
             r#"<path d="M2 16h5M25 16h5" stroke-width="4" {s}/><path d="M7 10l18 12V10L7 22z" fill="{f}" {s}/><path d="M16 16V6M11 6h10" {sa}/>"#
         ),
+        "justify" => format!(
+            r#"<path d="M3 10h10v14H3zM13 14h6v10h-6zM19 12h10v12H19z" fill="{f}" {s}/><path d="M2 27h28" stroke-width="3" {sa}/>"#
+        ),
         "tee_to_cross" => format!(
             r#"<path d="M3 16h26M16 16V3" stroke-width="5" {s}/><path d="M16 16v13" stroke-width="5" stroke-dasharray="3 2" {sa}/>"#
         ),

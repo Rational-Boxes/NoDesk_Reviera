@@ -172,6 +172,7 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(MepCoveringList),
         registry.add(FlexDuctCreate),
         registry.add(DuctConvertToFlex),
+        registry.add(MepRunJustify),
         registry.add(MechControlDeviceAssign),
         registry.add(MechControlDeviceList),
         registry.add(MepRunCreateRiser),
@@ -1288,6 +1289,17 @@ edit_command!(
     crate::mep_flex::ConvertParams,
     crate::mep_flex::ConvertReport,
     crate::mep_flex::convert
+);
+
+edit_command!(
+    MepRunJustify,
+    "mep_run.justify",
+    "Justify a run on a face or edge",
+    "Aligns a duct, pipe, cable tray or conduit run whose segments change size (MEP-DUCT-006): `element_ids` are its segments and fittings, one chain without branches (else refused: \"Justify needs a single run without branches\"); the `control_end` segment (`start`, the end it was drawn from, or `end`) stays put and every other segment moves square to its axis so its `alignment` point (TL, TC, TR, ML, MC, MR, BL, BC, BR: top, middle or bottom × left, centre or right, as seen travelling from the control; round sections use their diameter) continues the control's line through transitions, couplings and accessories; across elbows segments move with what they follow. Fittings follow, transitions becoming eccentric. Size-locked and sloped segments are only moved. Each segment keeps the justification, so a later size change keeps its aligned face in place. A run end joined to something outside the run that would move is refused, naming it. Returns the control segment and the elements moved.",
+    "Justify",
+    crate::mep_justify::JustifyParams,
+    crate::mep_justify::JustifyReport,
+    crate::mep_justify::justify
 );
 
 edit_command!(

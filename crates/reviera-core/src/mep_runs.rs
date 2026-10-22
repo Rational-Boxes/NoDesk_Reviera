@@ -28,10 +28,13 @@
 //! The parts' sizes are Reviera's own: an elbow's and a tee's legs are 0.6 of the size plus
 //! 50 mm long; a transition is as long as the size change times 2.5 (at least 150 mm).
 //!
+//! A run drawn from or to an open end of another size begins or ends with a transition.
+//! Flex duct is in [`crate::mep_flex`], justification in [`crate::mep_justify`].
+//!
 //! Not built yet: fittings and segments from component types, radius elbows, the Angles
-//! setting, offsets and justification other than the centre, size and elevation locks, moving
-//! and stretching runs with their fittings (flex duct is in `mep_flex`), flip and rotate, the fitting controls in
-//! the view ("+" and "−" are commands: [`upgrade`], [`downgrade`]).
+//! setting, offsets, size and elevation locks, moving and stretching runs with their fittings,
+//! flip and rotate, the fitting controls in the view ("+" and "−" are commands: [`upgrade`],
+//! [`downgrade`]).
 
 use std::collections::BTreeMap;
 
@@ -824,6 +827,9 @@ pub struct SegmentRecipe {
     /// and last.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub flex: Option<crate::mep_flex::FlexPath>,
+    /// The face or edge it is aligned on (MEP-DUCT-006): a size change keeps it in place.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub justification: Option<crate::mep_justify::Justification>,
 }
 
 /// A riser's binding of its end to a level.
@@ -869,6 +875,22 @@ pub struct FittingRecipe {
     /// An accessory's kind (`gate_valve`, `check_valve`, `strainer`, …).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub accessory: Option<String>,
+    /// Each leg's end moved off its line, by leg (an eccentric transition of a justified run,
+    /// MEP-DUCT-006); none: all on their lines.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub offsets: Vec<V3>,
+}
+
+impl FittingRecipe {
+    /// Where leg `k` ends (its port).
+    pub fn leg_end(&self, k: usize) -> V3 {
+        let l = &self.legs[k];
+        add(add(self.centre, mul(l.direction, l.length)), self.offsets.get(k).copied().unwrap_or([0.0; 3]))
+    }
+
+    fn offset(&self, k: usize) -> V3 {
+        self.offsets.get(k).copied().unwrap_or([0.0; 3])
+    }
 }
 
 pub fn segment_recipe(e: &Element) -> Option<SegmentRecipe> {
@@ -943,7 +965,7 @@ pub fn ports(_: &Store, e: &Element) -> Vec<Port> {
             element: e.id(),
             index: k,
             connector: port_connector(f.domain, &l.size, f.classification, &format!("Leg {}", k + 1)),
-            position: add(f.centre, mul(l.direction, l.length)),
+            position: f.leg_end(k),
             direction: l.direction,
         })
         .collect()
@@ -979,7 +1001,7 @@ pub(crate) fn frame(u: V3) -> (V3, V3) {
 }
 
 /// The section's across and up directions for a run along `u`, `across` given or the default.
-fn axes(u: V3, across: Option<V3>) -> (V3, V3) {
+pub(crate) fn axes(u: V3, across: Option<V3>) -> (V3, V3) {
     match across.and_then(|a| unit(sub(a, mul(u, dot(a, u))))) {
         Some(w) => (w, cross(u, w)),
         None => frame(u),
@@ -1005,7 +1027,11 @@ pub(crate) fn section(c: V3, u: V3, s: &Size, across: Option<V3>) -> Vec<V3> {
 
 /// A prism (or a frustum, with two sizes of one shape) from `a` to `b`.
 fn loft(a: V3, b: V3, sa: &Size, sb: &Size, across: Option<V3>) -> Option<Solid> {
-    let u = unit(sub(b, a))?;
+    loft_along(a, b, unit(sub(b, a))?, sa, sb, across)
+}
+
+/// A loft from `a` to `b` with its sections square to `u` (not necessarily along `b − a`).
+fn loft_along(a: V3, b: V3, u: V3, sa: &Size, sb: &Size, across: Option<V3>) -> Option<Solid> {
     let p = section(a, u, sa, across);
     let mut q = section(b, u, sb, across);
     if q.len() != p.len() {
@@ -1140,9 +1166,9 @@ pub fn fitting_solids(f: &FittingRecipe) -> Vec<Solid> {
             loft(a, b, &grow(f.legs[0].size), &grow(f.legs[0].size), f.legs[0].across).into_iter().collect()
         }
         Part::Transition if f.legs.len() == 2 => {
-            let a = add(f.centre, mul(f.legs[0].direction, f.legs[0].length));
-            let b = add(f.centre, mul(f.legs[1].direction, f.legs[1].length));
-            loft(a, b, &f.legs[0].size, &f.legs[1].size, f.legs[1].across).into_iter().collect()
+            // Eccentric when its legs are offset: the sections stay square to the run.
+            let (a, b) = (f.leg_end(0), f.leg_end(1));
+            loft_along(a, b, f.legs[1].direction, &f.legs[0].size, &f.legs[1].size, f.legs[1].across).into_iter().collect()
         }
         Part::Flange if f.legs.len() == 2 => {
             let grow = |s: Size| Size { diameter: s.diameter * 2.2, width: s.width * 1.6, height: s.height * 1.6, ..s };
@@ -1162,12 +1188,14 @@ pub fn fitting_solids(f: &FittingRecipe) -> Vec<Solid> {
         _ => f
             .legs
             .iter()
-            .filter_map(|l| {
+            .enumerate()
+            .filter_map(|(k, l)| {
                 let back = l.size.nominal() / 2.0;
                 let a = add(f.centre, mul(l.direction, -back.min(l.length * 0.9)));
                 // A tap's leg starts at the host's surface, not its axis.
                 let a = if f.part == Part::Tap { f.centre } else { a };
-                loft(a, add(f.centre, mul(l.direction, l.length)), &l.size, &l.size, l.across)
+                let off = f.offset(k);
+                loft(add(a, off), f.leg_end(k), &l.size, &l.size, l.across)
             })
             .collect(),
     }
@@ -1407,6 +1435,7 @@ fn make_segment_c(txn: &mut Transaction<'_>, cx: &Ctx, a: V3, b: V3, size: Size,
         size_locked: false,
         riser: None,
         flex: None,
+        justification: None,
     };
     let mut e = NewElement::new(segment_class(cx.domain))
         .param("@PredefinedType", cx.predefined)
@@ -1437,6 +1466,7 @@ fn make_fitting_r(txn: &mut Transaction<'_>, cx: &Ctx, part: Part, centre: V3, l
         radius,
         handle: None,
         accessory: None,
+        offsets: Vec::new(),
     };
     let (pre, object) = part.ifc_in(cx.domain);
     let mut e = NewElement::new(fitting_class(cx.domain, part))
@@ -1664,6 +1694,7 @@ fn draw_with(txn: &mut Transaction<'_>, domain: Domain, p: CreateParams, radii: 
             ),
         }
     }
+    let (on_side_at_start, on_side_at_end) = (starts_on.is_some(), ends_on.is_some());
     for (end_at, at_end) in [(ends_on, true), (starts_on, false)] {
         let Some((host, hs, q)) = end_at else { continue };
         let k = if at_end { n - 1 } else { 0 };
@@ -1744,6 +1775,49 @@ fn draw_with(txn: &mut Transaction<'_>, domain: Domain, p: CreateParams, radii: 
                 let tip = add(q, mul(branch, surface + leg));
                 if at_end { ends[n - 2] = tip } else { starts[0] = tip }
             }
+        }
+    }
+    // A run started or ended on an open end of another size: a transition there, by the
+    // routing preferences, as long as 2.5 times the size change (at least 150 mm).
+    if !on_side_at_start || !on_side_at_end {
+        let open = mep::open_ports(&store, &[domain]);
+        for at_end in [false, true] {
+            if (at_end && on_side_at_end) || (!at_end && on_side_at_start) {
+                continue;
+            }
+            let (q, d) = if at_end { (pts[n - 1], mul(dirs[n - 2], -1.0)) } else { (pts[0], dirs[0]) };
+            let Some(port) = open
+                .iter()
+                .filter(|o| store.get(o.element).is_some_and(is_run_element))
+                .find(|o| len(sub(o.position, q)) <= mep::POSITION_TOLERANCE * 2.0 && dot(o.direction, d) > 0.999)
+            else {
+                continue;
+            };
+            let theirs = Size { shape: port.connector.shape, diameter: port.connector.diameter, width: port.connector.width, height: port.connector.height };
+            let change = match (theirs.shape, size.shape) {
+                (Shape::Round, Shape::Round) => (theirs.diameter - size.diameter).abs(),
+                _ => (theirs.width.max(theirs.diameter) - size.width.max(size.diameter)).abs().max((theirs.height.max(theirs.diameter) - size.height.max(size.diameter)).abs()),
+            };
+            if change < 1e-6 && theirs.shape == size.shape {
+                continue;
+            }
+            let Some(part) = cx.routing.choose(Role::Transition, size.nominal().max(theirs.nominal())) else {
+                warn(txn, "mep.routing.no_part", format!("no transition in the routing preferences fits {}; the end is left open", size.text()), vec![port.element]);
+                continue;
+            };
+            let l = (2.5 * change).max(0.15);
+            let id = make_fitting(
+                txn,
+                &cx,
+                part,
+                add(q, mul(d, l / 2.0)),
+                vec![
+                    Leg { direction: mul(d, -1.0), length: l / 2.0, size: theirs, across: None },
+                    Leg { direction: d, length: l / 2.0, size, across: None },
+                ],
+            )?;
+            report.fittings.push(id);
+            if at_end { ends[n - 2] = add(q, mul(d, l)) } else { starts[0] = add(q, mul(d, l)) }
         }
     }
     for k in 0..n - 1 {
@@ -1921,6 +1995,7 @@ pub(crate) fn set_size(txn: &mut Transaction<'_>, p: SetSizeParams) -> Result<()
         if s.size_locked {
             return Err(bad("mep_run.size_locked", "Element is size-locked"));
         }
+        let before = s.size;
         if let Some(d) = p.diameter {
             s.size.diameter = d;
         }
@@ -1934,6 +2009,15 @@ pub(crate) fn set_size(txn: &mut Transaction<'_>, p: SetSizeParams) -> Result<()
             Some((_, t)) => t.check_size(&store, &s.size)?,
             None => s.size.check(s.domain)?,
         }
+        // A justified segment keeps its aligned face or edge where it was (MEP-DUCT-006).
+        let shift = s.justification.as_ref().map_or([0.0; 3], |j| crate::mep_justify::resize_shift(&s, &before, j));
+        if len(shift) > 1e-12 {
+            s.start = add(s.start, shift);
+            s.end = add(s.end, shift);
+            for t in &mut s.taps {
+                t.at = add(t.at, shift);
+            }
+        }
         let v = serde_json::to_value(&s).expect("serialises");
         txn.modify(id, |e| {
             e.params.insert(RECIPE_KEY.into(), v);
@@ -1943,6 +2027,10 @@ pub(crate) fn set_size(txn: &mut Transaction<'_>, p: SetSizeParams) -> Result<()
                 let Some(mut f) = txn.store().get(*fid).and_then(fitting_recipe) else { continue };
                 if let Some(l) = f.legs.get_mut(*leg) {
                     l.size = s.size;
+                }
+                if len(shift) > 1e-12 && *leg < f.legs.len() {
+                    f.offsets.resize(f.legs.len(), [0.0; 3]);
+                    f.offsets[*leg] = add(f.offsets[*leg], shift);
                 }
                 let v = serde_json::to_value(&f).expect("serialises");
                 txn.modify(*fid, |e| {
@@ -3295,6 +3383,14 @@ pub(crate) fn transform(txn: &mut Transaction<'_>, id: ElementId, point: &dyn Fn
         serde_json::to_value(&s).expect("serialises")
     } else if let Some(mut f) = fitting_recipe(&e) {
         f.centre = p3(f.centre);
+        // Offsets are vectors: the images of their tips less the image of the origin.
+        let v3 = |v: V3| {
+            let (o, t) = (point([0.0, 0.0]), point([v[0], v[1]]));
+            [t[0] - o[0], t[1] - o[1], v[2]]
+        };
+        for o in &mut f.offsets {
+            *o = v3(*o);
+        }
         for l in &mut f.legs {
             l.direction = d3(l.direction);
             l.across = l.across.map(d3);

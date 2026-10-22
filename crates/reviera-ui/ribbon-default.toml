@@ -2291,6 +2291,13 @@ icon = "duct_lining"
 help = "Delete the selected ducts' lining (MEP-DUCT-004)"
 
 [[action]]
+id = "mep_run.justify"
+label = "Justify"
+icon = "justify"
+keys = "JU"
+help = "Align the selected run, whose segments change size, on a face or edge (top, middle or bottom × left, centre or right) from its start or end segment; fittings follow and later size changes keep the alignment (MEP-DUCT-006)"
+
+[[action]]
 id = "flex_duct.create"
 label = "Flex Duct"
 icon = "flex_duct"
@@ -2968,6 +2975,7 @@ tools = [
   { action = "mep_segment.heal", size = "small" },
   { action = "flex_duct.create", size = "large" },
   { action = "duct.convert_to_flex", size = "small" },
+  { action = "mep_run.justify", size = "small" },
 ]
 
 [[tab.panel]]

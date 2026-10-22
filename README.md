@@ -988,6 +988,12 @@ schedules, circuit paths, cable sizing and voltage drop.
   offered for resumption; Convert to Flex replaces terminals' final segments up to a maximum
   length and lists the rest (`flex_duct.create`, `duct.convert_to_flex`). Not built yet: vertex
   and tangent grips, the flex pattern in plans, flex pipe.
+- **Justification editor** (Systems › Insulation & Accessories › Justify `JU`): a run whose
+  segments change size aligned on a face or edge (top, middle or bottom × left, centre or right)
+  from its start or end segment; transitions become eccentric, and later size changes keep the
+  alignment; runs with branches are refused. Runs drawn from or to an open end of another size
+  now get a transition (`mep_run.justify`). Not built yet: alignment lines in 3D, keeping
+  unselected branches joined.
 - **Sloped piping and parallel pipes** (Systems › HVAC & Piping › Slope, Parallel Pipes): the
   Slope Editor gives a connected section of pipe one of the project's allowed slopes from a
   control point (the lowest end by default): fittings follow, branches stay connected (their

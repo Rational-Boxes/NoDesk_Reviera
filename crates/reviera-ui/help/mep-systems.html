@@ -20,6 +20,7 @@ Water 1. The tools are on the <b>Systems</b> tab.</p>
   <a href="#accessories">Pipe fittings, valves and accessories</a>
   <a href="#duct-accessories">Duct accessories, insulation and lining</a>
   <a href="#flex-duct">Flexible duct</a>
+  <a href="#justify">Justifying a run</a>
   <a href="#slopes">Sloped pipes and parallel pipes</a>
   <a href="#controls">Thermostats, sensors and controllers</a>
   <a href="#risers">Risers</a>
@@ -282,6 +283,20 @@ works on the selected terminals. Enter a maximum length, 1.5 m by default. For e
 last straight duct before it, with the elbow at the terminal if there is one, is replaced by flex
 of the same size and system. Terminals whose last duct is longer than the limit are left as they
 are, and Reviera lists them with the reason.</p>
+
+<h2 id="justify">Justifying a run</h2>
+<p>When a run changes size, its segments are centred on one line by default. To keep a flat bottom
+under a ceiling, or a side flush with a wall, select the run's segments and fittings and choose <a
+href="reviera:action/mep_run.justify">Justify</a> (<kbd>J</kbd> <kbd>U</kbd>). Pick the control
+point, the start or the end segment, which stays where it is. Then pick the face or edge to line up:
+top, middle or bottom, and left, centre or right as seen looking along the run from the control
+segment. The other segments move to line up with it, and the transitions between sizes become
+offset. Each segment remembers the alignment, so if you change its size later it stays flush.</p>
+<p>Justify works on a single run. If the selection includes a tee and its branch, Reviera refuses.
+If an end of the run that would move is joined to equipment or a terminal, choose that end as the
+control point.</p>
+<p>To change size along a run, draw the next part from the open end of the last one at its new
+size. Reviera puts in a transition between them.</p>
 
 <h2 id="slopes">Sloped pipes and parallel pipes</h2>
 <p>To give drainage a fall, select the pipes and fittings of a run and choose <a

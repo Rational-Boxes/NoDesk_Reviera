@@ -18340,10 +18340,12 @@ Each row has a part and a minimum and maximum size. Rows are tried from top to b
 
 **Commands.** `mep_run.justify(element_ids[], control_end, alignment: "TL"|"TC"|…|"BR" | line_ref)`
 
+*Built (2026-10-22):* Systems › Insulation & Accessories › **Justify** (`JU`, `mep_run.justify(element_ids[], control_end: start | end, alignment)`): a dialog takes the control point (the start segment, the end the run was drawn from, or the end segment) and the vertical (top, middle, bottom) and horizontal (left, centre, right) alignment; *Finish* applies it in one transaction. The selection must be one chain of segments and fittings without branches (no fitting of more than two legs, no taps), else "Justify needs a single run without branches". The control segment stays; walking away from it, each segment in line with the one before (directly or through a transition, coupling or accessory) moves square to its axis so its alignment point continues the control's line (left and right as seen travelling from the control; round sections by their diameter); across an elbow a segment moves with what it follows. Fittings move with the segment before them, and a transition whose sides no longer share an axis becomes eccentric (its legs' ends are offset, its sections square to the run). Size-locked and sloped segments are only moved. Each segment keeps its justification, so `duct.set_size` moves a resized segment to keep its aligned face in place and the fittings beside it follow. A run end joined to something outside the run that would have to move is refused, naming the element (choose that end as the control). Drawing a duct, pipe, tray or conduit run from or to an open end of another size now puts in a transition from the routing preferences, 2.5 times the size change long (at least 150 mm), so runs that change size can be drawn. Not yet: alignment lines picked in a wireframe 3D view, the contextual tab with the control-point arrow and the alignment point drawn on the end face (the dialog leaves no pending choice to journal, so there is nothing to recover), stretching or moving unselected branches to keep them joined (runs with branches are refused), transitions where a run's size changes mid-draw.
+
 **Acceptance criteria.**
-- [ ] Justifying a run that transitions from 600 to 400 mm wide to Bottom-Left makes the bottoms and left sides of all segments flush.
-- [ ] Selecting a run that includes a tee and its branch refuses *Justify* with the message above.
-- [ ] After justifying Bottom-Centre, changing one segment's height keeps its bottom flush with the others.
+- [x] Justifying a run that transitions from 600 to 400 mm wide to Bottom-Left makes the bottoms and left sides of all segments flush.
+- [x] Selecting a run that includes a tee and its branch refuses *Justify* with the message above.
+- [x] After justifying Bottom-Centre, changing one segment's height keeps its bottom flush with the others.
 
 ### 4.7.7 Placeholders and conversion
 **ID:** MEP-DUCT-007 · **Priority:** P1 · **Ref:** research/03 §8.2
