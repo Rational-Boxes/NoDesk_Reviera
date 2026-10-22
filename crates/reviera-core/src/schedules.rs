@@ -177,6 +177,17 @@ pub fn available_fields(store: &Store, category: &str) -> Vec<FieldInfo> {
             info("slab.thickness", "Thickness", false),
             info("slab.volume", "Volume", true),
         ]),
+        // Components: the room their calculation point is in (MEP-ELEC-001).
+        "cat.lighting_fixtures"
+        | "cat.electrical_fixtures"
+        | "cat.electrical_equipment"
+        | "cat.switching_devices"
+        | "cat.alarms"
+        | "cat.sensors"
+        | "cat.air_terminals"
+        | "cat.mechanical_equipment"
+        | "cat.plumbing_fixtures"
+        | "cat.furniture" => out.push(info("component.room", "Room", false)),
         "cat.roofs" => out.extend([
             info("roof.area", "Area", true),
             info("roof.volume", "Volume", true),
@@ -450,6 +461,13 @@ impl Context<'_> {
                     editable: crate::rooms::room_recipe(e).is_some(),
                 }
             }
+            "component.room" => match crate::mep_lighting::room_of(self.store, e).and_then(|r| self.store.get(r)) {
+                Some(r) => {
+                    let (number, name) = crate::rooms::number_and_name(r);
+                    Context::text(format!("{number} {name}").trim().to_owned())
+                }
+                None => none(),
+            },
             "room.supply_airflow" | "room.return_airflow" | "room.exhaust_airflow" => {
                 let a = self.airflow.get(&e.id());
                 let v = a.map_or(0.0, |a| match key {

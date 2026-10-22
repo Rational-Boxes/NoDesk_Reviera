@@ -4598,6 +4598,19 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "equipment_set.add" => with(gui, |g| g.edit_equipment_set(true)),
         "equipment_set.remove" => with(gui, |g| g.edit_equipment_set(false)),
         "mep.connect_into" => with(gui, Gui::connect_into),
+        "electrical_equipment.place" => with(gui, |g| {
+            g.place_electrical_equipment();
+            focus(g);
+        }),
+        "device.place" => with(gui, |g| {
+            g.place_device();
+            focus(g);
+        }),
+        "lighting_fixture.place" => with(gui, |g| {
+            g.place_lighting_fixture();
+            focus(g);
+        }),
+        "lighting_fixture_type.set_photometry" => with(gui, Gui::fixture_photometry),
         "mep_fitting.tee_to_cross" => with(gui, Gui::tee_to_cross),
         "mep_fitting.upgrade" => with(gui, |g| g.fitting_grade(true)),
         "mep_fitting.downgrade" => with(gui, |g| g.fitting_grade(false)),

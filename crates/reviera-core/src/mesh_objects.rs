@@ -74,10 +74,13 @@ pub enum Category {
     /// Fans and radiators (MEP-DUCT-009).
     Fan,
     SpaceHeater,
+    /// Switches and dimmers, fire alarm and security devices (MEP-ELEC-001).
+    SwitchingDevice,
+    Alarm,
 }
 
 impl Category {
-    pub const ALL: [Category; 22] = [
+    pub const ALL: [Category; 24] = [
         Category::GenericModel,
         Category::Furniture,
         Category::Column,
@@ -100,6 +103,8 @@ impl Category {
         Category::Chiller,
         Category::Fan,
         Category::SpaceHeater,
+        Category::SwitchingDevice,
+        Category::Alarm,
     ];
 
     pub fn label(self) -> &'static str {
@@ -126,6 +131,8 @@ impl Category {
             Category::Chiller => "Chiller",
             Category::Fan => "Fan",
             Category::SpaceHeater => "Space Heater",
+            Category::SwitchingDevice => "Switching Device",
+            Category::Alarm => "Alarm",
         }
     }
 
@@ -154,6 +161,8 @@ impl Category {
             Category::Chiller => "IfcChiller",
             Category::Fan => "IfcFan",
             Category::SpaceHeater => "IfcSpaceHeater",
+            Category::SwitchingDevice => "IfcSwitchingDevice",
+            Category::Alarm => "IfcAlarm",
         }
     }
 
@@ -182,6 +191,8 @@ impl Category {
             Category::Chiller => "IfcChillerType",
             Category::Fan => "IfcFanType",
             Category::SpaceHeater => "IfcSpaceHeaterType",
+            Category::SwitchingDevice => "IfcSwitchingDeviceType",
+            Category::Alarm => "IfcAlarmType",
         }
     }
 
@@ -197,6 +208,18 @@ impl Category {
             self,
             Category::MechanicalEquipment | Category::AirTerminalBox | Category::Fan | Category::Boiler | Category::Chiller | Category::Pump | Category::SpaceHeater
         )
+    }
+
+    /// Electrical equipment (MEP-ELEC-001): panelboards, switchboards, motor control centres and
+    /// transformers.
+    pub fn is_electrical_equipment(self) -> bool {
+        matches!(self, Category::ElectricalEquipment | Category::Transformer)
+    }
+
+    /// Devices (MEP-ELEC-001): receptacles and data, communication and telephone outlets,
+    /// switches, fire alarm and security devices (alarms and detectors).
+    pub fn is_electrical_device(self) -> bool {
+        matches!(self, Category::ElectricalFixture | Category::SwitchingDevice | Category::Alarm | Category::Sensor)
     }
 
     /// Control devices: thermostats, humidistats, sensors and controllers (MEP-DUCT-012).
@@ -347,6 +370,13 @@ pub struct MeshObjectType {
     /// The IFC predefined type of its copies (THERMOSTAT, CO2SENSOR, …); the category's when none.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub predefined: Option<String>,
+    /// The room calculation point (MEP-ELEC-001), in the type's frame: which room a copy is in
+    /// for schedules and calculations; the insertion point when none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub calc_point: Option<[f64; 3]>,
+    /// Lighting fixtures: the photometric web file (IES LM-63 or EULUMDAT).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub photometry: Option<crate::mep_lighting::Photometry>,
 }
 
 impl MeshObjectType {
@@ -1017,6 +1047,8 @@ fn type_recipe(
         library: None,
         connectors: Vec::new(),
         predefined: None,
+        calc_point: None,
+        photometry: None,
     }
 }
 
@@ -1062,6 +1094,8 @@ pub(crate) fn create_generated_type(
         library: None,
         connectors,
         predefined: predefined.map(str::to_owned),
+        calc_point: None,
+        photometry: None,
     };
     txn.create(
         NewElement::new(category.type_class())

@@ -445,6 +445,8 @@ pub const CATEGORIES: &[Category] = &[
     cat("cat.pumps", "Pumps", Some("IfcPump"), Some("IfcPumpType"), Some("Pset_PumpTypeCommon"), true),
     cat("cat.boilers", "Boilers", Some("IfcBoiler"), Some("IfcBoilerType"), Some("Pset_BoilerTypeCommon"), true),
     cat("cat.chillers", "Chillers", Some("IfcChiller"), Some("IfcChillerType"), Some("Pset_ChillerTypeCommon"), true),
+    cat("cat.switching_devices", "Switching Devices", Some("IfcSwitchingDevice"), Some("IfcSwitchingDeviceType"), Some("Pset_SwitchingDeviceTypeCommon"), true),
+    cat("cat.alarms", "Alarms", Some("IfcAlarm"), Some("IfcAlarmType"), Some("Pset_AlarmTypeCommon"), true),
     cat("cat.fans", "Fans", Some("IfcFan"), Some("IfcFanType"), Some("Pset_FanTypeCommon"), true),
     cat("cat.space_heaters", "Space Heaters", Some("IfcSpaceHeater"), Some("IfcSpaceHeaterType"), Some("Pset_SpaceHeaterTypeCommon"), true),
     cat(

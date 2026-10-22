@@ -264,7 +264,7 @@ pub struct PlaceParams {
 }
 
 /// The Reviera ceilings on `level` over `p`, lowest first.
-fn ceilings_over(store: &Store, level: &str, p: [f64; 2]) -> Vec<ElementId> {
+pub(crate) fn ceilings_over(store: &Store, level: &str, p: [f64; 2]) -> Vec<ElementId> {
     let mut v: Vec<(ElementId, f64)> = store
         .iter()
         .filter_map(|e| {

@@ -235,6 +235,76 @@ fn write_pipe_segments(ifc: &mut IfcModel, store: &reviera_core::Store, owner_hi
     Ok(())
 }
 
+/// Each lighting fixture of a type with photometry gets a `Lighting` (`LightSource`)
+/// representation beside its body: an `IfcLightSourceGoniometric` at the fixture whose
+/// distribution is an `IfcDocumentReference` to the photometric file (MEP-ELEC-001). The one
+/// written before is replaced.
+fn write_light_sources(ifc: &mut IfcModel, store: &reviera_core::Store, steps: &HashMap<ElementId, StepId>, scale: f64) -> Result<()> {
+    use reviera_core::mesh_objects;
+    let mut contexts = None;
+    for el in store.iter() {
+        let Some(&step) = steps.get(&el.id()) else { continue };
+        if mesh_objects::mesh_object_recipe(el).is_none() {
+            continue;
+        }
+        let AttrValue::Ref(shape) = ifc.attribute(step, "Representation")? else { continue };
+        let shape = StepId(shape);
+        let reps: Vec<StepId> = match ifc.attribute(shape, "Representations")? {
+            AttrValue::List(v) => v.iter().filter_map(|a| if let AttrValue::Ref(i) = a { Some(StepId(*i)) } else { None }).collect(),
+            _ => Vec::new(),
+        };
+        let lighting = |ifc: &IfcModel, r: StepId| matches!(ifc.attribute(r, "RepresentationIdentifier"), Ok(AttrValue::String(s)) if s == "Lighting");
+        let (old, mut keep): (Vec<StepId>, Vec<StepId>) = reps.iter().partition(|r| lighting(ifc, **r));
+        for o in &old {
+            for id in crate::mesh_objects::owned_tree(ifc, *o, &std::collections::HashSet::new())? {
+                ifc.remove(id)?;
+            }
+        }
+        let photometry = mesh_objects::type_of(store, el).filter(|(_, t)| t.category == mesh_objects::Category::LightingFixture).and_then(|(_, t)| t.photometry);
+        if let Some(ph) = photometry {
+            let g = mesh_objects::regenerate(store, el)?;
+            let contexts = match contexts {
+                Some(c) => c,
+                None => *contexts.insert(crate::geometry::Contexts::find(ifc)?),
+            };
+            let name = std::path::Path::new(&ph.file).file_name().map_or(ph.file.clone(), |n| n.to_string_lossy().into_owned());
+            let doc = create(ifc, "IfcDocumentReference", &[("Location", s(&ph.file)), ("Name", s(&name))])?;
+            let colour = create(ifc, "IfcColourRgb", &[("Red", AttrValue::Real(1.0)), ("Green", AttrValue::Real(1.0)), ("Blue", AttrValue::Real(1.0))])?;
+            let at = g.placement.apply([0.0; 3]);
+            let point = create(ifc, "IfcCartesianPoint", &[("Coordinates", AttrValue::List(at.iter().map(|v| AttrValue::Real(v / scale)).collect()))])?;
+            let position = create(ifc, "IfcAxis2Placement3D", &[("Location", r(point))])?;
+            let source = create(
+                ifc,
+                "IfcLightSourceGoniometric",
+                &[
+                    ("Name", s(&name)),
+                    ("LightColour", r(colour)),
+                    ("Position", r(position)),
+                    ("ColourTemperature", AttrValue::Real(ph.colour_temperature)),
+                    ("LuminousFlux", AttrValue::Real(ph.lumens.unwrap_or(0.0))),
+                    ("LightEmissionSource", e("NOTDEFINED")),
+                    ("LightDistributionDataSource", r(doc)),
+                ],
+            )?;
+            let rep = create(
+                ifc,
+                "IfcShapeRepresentation",
+                &[
+                    ("ContextOfItems", r(contexts.body)),
+                    ("RepresentationIdentifier", s("Lighting")),
+                    ("RepresentationType", s("LightSource")),
+                    ("Items", AttrValue::List(vec![r(source)])),
+                ],
+            )?;
+            keep.push(rep);
+        } else if old.is_empty() {
+            continue;
+        }
+        ifc.set_attribute(shape, "Representations", &AttrValue::List(keep.into_iter().map(r).collect()))?;
+    }
+    Ok(())
+}
+
 fn typed(class: &str, v: AttrValue) -> AttrValue {
     AttrValue::Typed {
         type_name: class.into(),
@@ -256,6 +326,7 @@ pub(crate) fn write_mep(
     remove_earlier(ifc)?;
     let store = doc.store();
     write_pipe_segments(ifc, store, owner_history, scale)?;
+    write_light_sources(ifc, store, steps, scale)?;
     let ports = mep::all_ports(store);
     let in_systems = mep_systems::port_systems(store);
     let systems = mep_systems::systems(store);

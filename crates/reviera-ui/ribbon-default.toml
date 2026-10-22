@@ -2398,6 +2398,33 @@ icon = "equipment_set_remove"
 help = "Take the selected units out of their equipment set"
 
 [[action]]
+id = "electrical_equipment.place"
+label = "Electrical Equipment"
+icon = "electrical_equipment"
+keys = "EE"
+help = "Place panelboards, switchboards, motor control centres and transformers, against the nearest wall or free (MEP-ELEC-001)"
+
+[[action]]
+id = "device.place"
+label = "Device"
+icon = "device"
+keys = "DV"
+help = "Place receptacles, data and telephone outlets, switches, call points and detectors on a wall face at a height (MEP-ELEC-001)"
+
+[[action]]
+id = "lighting_fixture.place"
+label = "Lighting Fixture"
+icon = "lighting_fixture"
+keys = "LF"
+help = "Hang lighting fixtures under the ceiling over each click, or at a height; the room they belong to is decided by their type's calculation point (MEP-ELEC-001)"
+
+[[action]]
+id = "lighting_fixture_type.set_photometry"
+label = "Photometry"
+icon = "photometry"
+help = "Give the selected lighting fixture's type an IES LM-63 or EULUMDAT photometric file; exported as a goniometric light source (MEP-ELEC-001)"
+
+[[action]]
 id = "mep.connect_into"
 label = "Connect Into"
 icon = "connect_into"
@@ -3116,6 +3143,10 @@ tools = [
 [[tab.panel]]
 label = "Electrical"
 tools = [
+  { action = "electrical_equipment.place", size = "large" },
+  { action = "device.place", size = "large" },
+  { action = "lighting_fixture.place", size = "large" },
+  { action = "lighting_fixture_type.set_photometry", size = "small" },
   { action = "circuit.create", size = "large" },
   { action = "circuit.properties", size = "large" },
   { action = "circuit.add", size = "small" },

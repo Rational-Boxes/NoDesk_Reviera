@@ -157,6 +157,10 @@ pub fn toolset_of(command: &str) -> String {
             | "fluid"
             | "space_type"
             | "building_type"
+            | "device"
+            | "lighting_fixture"
+            | "lighting_fixture_type"
+            | "electrical_equipment"
             | "plumbing_fixture"
             | "sprinkler"
             | "sprinkler_type"
@@ -234,7 +238,7 @@ pub fn toolset_of(command: &str) -> String {
             "view" | "sheet" | "schedule" | "annotate" | "render" | "walkthrough" | "xr" | "ui"
             | "tag" | "text" | "anno" | "dim" | "viewport" | "section" | "inspect"
             | "colorscheme" => "documentation",
-            "family" | "family_doc" | "type" | "instance" | "library" | "component" | "formula"
+            "family" | "family_doc" | "type" | "instance" | "library" | "component" | "component_type" | "formula"
             | "subcategory" => "families",
             "material" | "object_style" | "line_pattern" | "line_style" | "line_weight"
             | "fill_pattern" | "image" | "objectstyle" | "lineweight" => "materials",

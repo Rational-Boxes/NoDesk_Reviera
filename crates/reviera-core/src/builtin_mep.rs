@@ -199,6 +199,12 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(SpaceTypeList),
         registry.add(SpaceSetType),
         registry.add(BuildingSetType),
+        registry.add(ElectricalEquipmentPlace),
+        registry.add(DevicePlace),
+        registry.add(LightingFixturePlace),
+        registry.add(LightingFixtureTypeSetPhotometry),
+        registry.add(ComponentTypeSetCalcPoint),
+        registry.add(SpaceElements),
         registry.add(MechControlDeviceAssign),
         registry.add(MechControlDeviceList),
         registry.add(MepRunCreateRiser),
@@ -2005,4 +2011,69 @@ edit_command!(
     crate::space_types::AssignParams,
     (),
     crate::space_types::assign_building
+);
+
+edit_command!(
+    ElectricalEquipmentPlace,
+    "electrical_equipment.place",
+    "Place electrical equipment",
+    "Places electrical equipment (MEP-ELEC-001): a panelboard, switchboard, motor control centre (IfcElectricDistributionBoard) or transformer type at `point` on `level`: on the face of `host_wall`, or of the nearest wall within 300 mm (its back against it, following it), else standing free (`work_plane`), `offset` above the level (0 by default). Returns its id.",
+    "Electrical Equipment",
+    crate::mep_lighting::PlaceParams,
+    crate::id::ElementId,
+    crate::mep_lighting::place_equipment
+);
+
+edit_command!(
+    DevicePlace,
+    "device.place",
+    "Place an electrical device",
+    "Places a device (MEP-ELEC-001): a receptacle or data, telephone or communications outlet (IfcOutlet), a switch (IfcSwitchingDevice), a fire alarm or security device (IfcAlarm) or a detector (IfcSensor) on the face of `host_wall` or the nearest wall within 300 mm, `offset` above the level (0.3 m by default), following the wall; else free (`work_plane`). Returns its id.",
+    "Device",
+    crate::mep_lighting::PlaceParams,
+    crate::id::ElementId,
+    crate::mep_lighting::place_device
+);
+
+edit_command!(
+    LightingFixturePlace,
+    "lighting_fixture.place",
+    "Place a lighting fixture",
+    "Places a lighting fixture (MEP-ELEC-001): under `host_ceiling` or the ceiling over `point` on `level`, its top at the ceiling's underside and following it; on the face of `host_wall` when given (2.1 m up by default); else at `offset` (2.6 m less its height by default). The room it belongs to is decided by its type's room calculation point (`component_type.set_calc_point`). Returns its id.",
+    "Lighting Fixture",
+    crate::mep_lighting::PlaceParams,
+    crate::id::ElementId,
+    crate::mep_lighting::place_fixture
+);
+
+edit_command!(
+    LightingFixtureTypeSetPhotometry,
+    "lighting_fixture_type.set_photometry",
+    "Give a lighting fixture type a photometric file",
+    "Reads an IES LM-63 (.ies) or EULUMDAT (.ldt) photometric web `file` for the lighting fixture type `type_id` and keeps its name, lumens and peak intensity, with a `colour_temperature` (K, 3000 by default); none clears it. On export each fixture of the type gets an IfcLightSourceGoniometric whose distribution is an IfcDocumentReference to the file. Returns what was read.",
+    "Photometry",
+    crate::mep_lighting::PhotometryParams,
+    Option<crate::mep_lighting::Photometry>,
+    crate::mep_lighting::set_photometry
+);
+
+edit_command!(
+    ComponentTypeSetCalcPoint,
+    "component_type.set_calc_point",
+    "Set a type's room calculation point",
+    "Sets a component type's room calculation point (MEP-ELEC-001), in its own frame (metres; none: the insertion point): the room each copy belongs to for schedules (the Room field), `space.elements` and calculations is the one this point lies in, wherever the body reaches.",
+    "Room Calculation Point",
+    crate::mep_lighting::CalcPointParams,
+    (),
+    crate::mep_lighting::set_calc_point
+);
+
+read_command!(
+    SpaceElements,
+    "space.elements",
+    "The components in a room",
+    "The placed components whose room calculation point lies in the room `room_id`, optionally of `categories` (lighting_fixture, electrical_fixture, …).",
+    crate::mep_lighting::ContentsParams,
+    Vec<crate::id::ElementId>,
+    crate::mep_lighting::contents
 );

@@ -10,6 +10,7 @@ Water 1. The tools are on the <b>Systems</b> tab.</p>
   <a href="#runs">Ducts and pipes</a>
   <a href="#connections">Connections</a>
   <a href="#systems">Systems</a>
+  <a href="#electrical-devices">Electrical equipment, devices and lighting</a>
   <a href="#circuits">Electrical circuits</a>
   <a href="#tray">Cable tray and conduit</a>
   <a href="#feeders">Feeders and transformers</a>
@@ -99,6 +100,28 @@ join a return air system, and a connector is in one system at a time.</p>
     Name 2, and so on.</li>
   <li><b>Disconnect Equipment</b> stops the equipment serving the system.</li>
 </ul>
+
+<h2 id="electrical-devices">Electrical equipment, devices and lighting</h2>
+<p>On Systems › Electrical, <a href="reviera:action/electrical_equipment.place">Electrical
+Equipment</a> (<kbd>E</kbd> <kbd>E</kbd>) places panelboards, switchboards and transformers.
+Click near a wall to put one against it, or away from walls to stand it free. <a
+href="reviera:action/device.place">Device</a> (<kbd>D</kbd> <kbd>V</kbd>) places receptacles,
+data and telephone outlets, light switches, call points and detectors on the nearest wall face
+at the height you give. <a href="reviera:action/lighting_fixture.place">Lighting Fixture</a>
+(<kbd>L</kbd> <kbd>F</kbd>) hangs a luminaire under the ceiling where you click, and it follows
+the ceiling if the ceiling moves. Leave the height blank for that, or give one to place it
+there.</p>
+<p>Which room a fixture belongs to is decided by its type's <em>room calculation point</em>,
+not by where its body reaches. A fixture straddling a wall line is listed under the room its
+point is in. That's the Room field in schedules of fixtures, devices, equipment and furniture.
+Set the point with <code>component_type.set_calc_point</code>. Without it, the insertion point
+is used.</p>
+<p>Select a luminaire and choose <a
+href="reviera:action/lighting_fixture_type.set_photometry">Photometry</a> to give its type an
+IES or EULUMDAT file. Reviera reads its lumens and peak intensity. When you save, each fixture of
+that type is exported with a light source that refers to the file, so lighting tools can find
+it. Keep the file where the model can reach it, because Reviera stores its location, not a
+copy.</p>
 
 <h2 id="circuits">Electrical circuits</h2>
 <p>Select receptacles, luminaires or other devices and choose

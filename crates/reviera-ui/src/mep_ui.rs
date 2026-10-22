@@ -440,6 +440,7 @@ impl Gui {
         let ty = f.choice("Type", &names, 0);
         let height = match default_mm {
             Some(mm) => f.text("Mounting height (mm)", &format!("{mm:.0}"), "Above the level"),
+            None if own.is_some() => f.text("Height (mm)", "", "Blank: under the ceiling over each click (following it)"),
             None => f.text("Height (mm)", "", "Blank: under the ceiling (pendent), 3000 (upright), 2450 (sidewall)"),
         };
         let flow = own.is_some_and(|o| o.1).then(|| f.text("Flow (L/s)", "", "Each terminal's preset flow; blank: the type's"));
@@ -487,6 +488,80 @@ impl Gui {
             Some(0.0),
             Some(("Click to place it; Spacebar turns the next copy 90°.", false)),
         );
+    }
+
+    /// Systems › Electrical › Electrical Equipment (`EE`, MEP-ELEC-001): panelboards,
+    /// switchboards, motor control centres and transformers, on a wall face or free.
+    pub(crate) fn place_electrical_equipment(&mut self) {
+        let names = ["Distribution Board", "Switchboard", "Transformer"];
+        self.place_typed_component(
+            reviera_core::mesh_objects::Category::is_electrical_equipment,
+            &names,
+            "Electrical Equipment",
+            Some(0.0),
+            Some(("Click near a wall to put it against that face (it follows the wall); away from walls it stands free. Spacebar turns it.", false)),
+        );
+    }
+
+    /// Systems › Electrical › Device (`DV`, MEP-ELEC-001): receptacles, data and telephone
+    /// outlets, switches, alarms and detectors on a wall face.
+    pub(crate) fn place_device(&mut self) {
+        let names = ["Receptacle", "Data Outlet", "Telephone Outlet", "Light Switch", "Manual Call Point", "Smoke Detector"];
+        self.place_typed_component(
+            reviera_core::mesh_objects::Category::is_electrical_device,
+            &names,
+            "Device",
+            Some(300.0),
+            Some(("Click near a wall to put it on that face at the height (it follows the wall).", false)),
+        );
+    }
+
+    /// Systems › Electrical › Lighting Fixture (`LF`, MEP-ELEC-001): under the ceiling over each
+    /// click, or at a height.
+    pub(crate) fn place_lighting_fixture(&mut self) {
+        let names = ["Ceiling Luminaire", "Wall Luminaire"];
+        self.place_typed_component(
+            |c| c == reviera_core::mesh_objects::Category::LightingFixture,
+            &names,
+            "Lighting Fixture",
+            None,
+            Some(("Click to hang one under the ceiling there (it follows the ceiling). The room it belongs to is the one its type's calculation point is in.", false)),
+        );
+    }
+
+    /// Systems › Electrical › Photometry (MEP-ELEC-001): an IES or EULUMDAT file for the
+    /// selected lighting fixture's type.
+    pub(crate) fn fixture_photometry(&mut self) {
+        let frame = self.frame;
+        let Some(store) = self.store_now() else { return };
+        let ty = self.selection().into_iter().find_map(|id| {
+            let e = store.get(id)?;
+            let (t, mt) = reviera_core::mesh_objects::type_of(&store, e)?;
+            (mt.category == reviera_core::mesh_objects::Category::LightingFixture).then_some(t)
+        });
+        let Some(ty) = ty else {
+            return frame.set_status_text("Photometry: select a lighting fixture", 0);
+        };
+        let d = FileDialog::builder(&frame)
+            .with_message("Photometric File")
+            .with_wildcard("Photometric files (*.ies;*.ldt)|*.ies;*.IES;*.ldt;*.LDT|All files (*.*)|*.*")
+            .with_style(FileDialogStyle::Open | FileDialogStyle::FileMustExist)
+            .build();
+        if d.show_modal() != ID_OK {
+            return;
+        }
+        let Some(file) = d.get_path() else { return };
+        match self.run("lighting_fixture_type.set_photometry", json!({ "type_id": ty, "file": file })) {
+            Ok(v) => frame.set_status_text(
+                &format!(
+                    "Photometry: {} lm, peak {:.0} cd",
+                    v["lumens"].as_f64().map_or("absolute".to_owned(), |l| format!("{l:.0}")),
+                    v["max_candela"].as_f64().unwrap_or(0.0)
+                ),
+                0,
+            ),
+            Err(e) => error(&frame, &e),
+        }
     }
 
     /// Systems › Equipment Set (MEP-DUCT-009): the selected units become a set; the chosen ones

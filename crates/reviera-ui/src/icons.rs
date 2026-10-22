@@ -439,6 +439,18 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "space_types" => format!(
             r#"<path d="M3 29V9l8-6 8 6v20z" fill="{f}" {s}/><path d="M19 29V15h10v14z" fill="none" {sa}/><path d="M8 13h6M8 19h6M8 25h6" {sa}/>"#
         ),
+        "electrical_equipment" => format!(
+            r#"<rect x="7" y="3" width="18" height="26" fill="{f}" {s}/><path d="M11 8h10M11 13h10M11 18h10M11 23h10" {sa}/>"#
+        ),
+        "device" => format!(
+            r#"<rect x="6" y="6" width="20" height="20" rx="3" fill="{f}" {s}/><path d="M13 12v5M19 12v5M14 21h4" stroke-width="2.5" {sa}/>"#
+        ),
+        "lighting_fixture" => format!(
+            r#"<path d="M4 6h24v5H4z" fill="{f}" {s}/><path d="M8 15l-3 6M16 15v8M24 15l3 6" {sa}/>"#
+        ),
+        "photometry" => format!(
+            r#"<circle cx="16" cy="9" r="4" fill="{f}" {s}/><path d="M16 13c-9 2-12 10-12 16M16 13c9 2 12 10 12 16M16 13v16" fill="none" {sa}/>"#
+        ),
         "fluid" => format!(
             r#"<path d="M16 3c-5 8-9 13-9 18a9 9 0 0 0 18 0c0-5-4-10-9-18z" fill="{f}" {s}/>"#
         ),

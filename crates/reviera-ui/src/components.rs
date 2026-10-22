@@ -1122,6 +1122,12 @@ impl Gui {
                     Some("sprinkler.place")
                 } else if ty.category == mesh_objects::Category::AirTerminal {
                     Some("air_terminal.place")
+                } else if ty.category == mesh_objects::Category::LightingFixture {
+                    Some("lighting_fixture.place")
+                } else if ty.category.is_electrical_equipment() {
+                    Some("electrical_equipment.place")
+                } else if ty.category.is_electrical_device() {
+                    Some("device.place")
                 } else if ty.category.is_mechanical_equipment() {
                     Some("mech_equipment.place")
                 } else {

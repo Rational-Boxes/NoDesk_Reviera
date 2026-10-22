@@ -1026,6 +1026,13 @@ schedules, circuit paths, cable sizing and voltage drop.
   ranges checked for gaps and overlaps with the offending row named (`space_type.*`,
   `building_type.create`, `space.set_type`, `building.set_type`). Not built yet: one tabbed
   dialog for every kind, field-by-field validation, Search.
+- **Electrical equipment, devices and lighting fixtures** (Systems › Electrical › Electrical
+  Equipment `EE`, Device `DV`, Lighting Fixture `LF`, Photometry): panelboards, switchboards and
+  transformers against walls; receptacles, outlets, switches, call points and detectors on wall
+  faces; luminaires hung under ceilings; a type's room calculation point decides the room each
+  copy belongs to (schedules' Room field, `space.elements`); IES and EULUMDAT photometry read and
+  exported as `IfcLightSourceGoniometric` referencing the file. Not built yet: Tag on Placement,
+  ceiling-hosted detectors, photometry in rendering and lighting analysis.
 - **Sloped piping and parallel pipes** (Systems › HVAC & Piping › Slope, Parallel Pipes): the
   Slope Editor gives a connected section of pipe one of the project's allowed slopes from a
   control point (the lowest end by default): fittings follow, branches stay connected (their
