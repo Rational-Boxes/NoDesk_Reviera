@@ -75,6 +75,14 @@ fn settings_dialogs() {
     let e = run(&r, &mut doc, "space_type.delete", json!({ "which": "building", "type_id": "school" })).unwrap_err();
     assert!(e.message.contains("1 building"), "{}", e.message);
 
+    // Structural load settings and space types are kept apart: writing one keeps the other.
+    ok(&r, &mut doc, "space_type.create", json!({ "name": "Lab" }));
+    ok(&r, &mut doc, "load_nature.create", json!({ "name": "Test Nature", "symbol": "TN", "action_type": "variable", "action_source": "user" }));
+    ok(&r, &mut doc, "space_type.create", json!({ "name": "Store" }));
+    let natures = reviera_core::loads::settings(doc.store()).natures;
+    assert!(natures.iter().any(|n| n.name == "Test Nature"), "the nature survived a space type");
+    assert_eq!(reviera_core::space_types::analysis(doc.store()).space_types.iter().filter(|t| t.name == "Lab" || t.name == "Store").count(), 2);
+
     // A gap between 10 and 12 kVA: refused, the row at 12 kVA flagged.
     let e = run(
         &r,

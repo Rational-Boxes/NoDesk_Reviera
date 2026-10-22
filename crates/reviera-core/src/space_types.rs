@@ -4,8 +4,9 @@
 //! Building and space types (MEP-SET-004): the design loads, occupancy and set points that
 //! energy and load analysis read for a building or a room.
 //!
-//! - The types live in the RXD document `rxd:analysis` on the project, as two lists: building
-//!   types and space types. Reviera ships none (published tables of densities are standards'
+//! - The types live on the project (`rxd:space_types`, read from `rxd:analysis` where an earlier
+//!   build kept them, a key structural load settings also use), as two lists: building types and
+//!   space types. Reviera ships none (published tables of densities are standards'
 //!   material); a project makes its own.
 //! - A room takes a space type (`space.set_type`), a building a building type
 //!   (`building.set_type`), as RXD element data naming the type's id.
@@ -23,7 +24,9 @@ fn bad(code: &'static str, msg: impl Into<String>) -> Error {
     Error::new(code, msg)
 }
 
-pub const ANALYSIS_KEY: &str = "rxd:analysis";
+pub const ANALYSIS_KEY: &str = "rxd:space_types";
+/// Where the first build kept them (shared with the structural load settings, so it is only read).
+const OLD_KEY: &str = "rxd:analysis";
 /// On a room: its space type's id; on a building: its building type's id.
 pub const SPACE_TYPE_KEY: &str = "rxd:space_type";
 pub const BUILDING_TYPE_KEY: &str = "rxd:building_type";
@@ -170,7 +173,7 @@ fn project(store: &Store) -> Option<ElementId> {
 pub fn analysis(store: &Store) -> Analysis {
     project(store)
         .and_then(|p| store.get(p))
-        .and_then(|p| p.param(ANALYSIS_KEY))
+        .and_then(|p| p.param(ANALYSIS_KEY).or_else(|| p.param(OLD_KEY).filter(|v| v.get("space_types").is_some() || v.get("building_types").is_some())))
         .and_then(|v| serde_json::from_value(v.clone()).ok())
         .unwrap_or_default()
 }
