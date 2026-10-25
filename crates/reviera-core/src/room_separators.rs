@@ -6,6 +6,10 @@
 //! `recipe.room_separation` (its level and line, or arc through a point); rooms on the level
 //! take them as boundaries at once.
 //!
+//! Space separation lines (MEP-SPACE-001) are the same element with `recipe.space_separation`
+//! and the name "Space Separation": they bound MEP spaces only, while room separation lines
+//! bound rooms and spaces both.
+//!
 //! Not built yet: Pick Lines, the `Room Separation` line style's graphics, `IfcRelSpaceBoundary`
 //! (VIRTUAL) in IFC.
 
@@ -21,6 +25,7 @@ use crate::txn::Transaction;
 use crate::walls::{Line, RECIPE_KEY};
 
 pub const RECIPE: &str = "recipe.room_separation";
+pub const SPACE_RECIPE: &str = "recipe.space_separation";
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct SeparatorRecipe {
@@ -33,9 +38,15 @@ pub struct SeparatorRecipe {
     pub through: Option<[f64; 2]>,
 }
 
+/// A room or space separation line's recipe.
 pub fn recipe(e: &Element) -> Option<SeparatorRecipe> {
     let v = e.param(RECIPE_KEY)?;
-    (v.get("kind")?.as_str()? == RECIPE).then(|| serde_json::from_value(v.clone()).ok())?
+    matches!(v.get("kind")?.as_str()?, RECIPE | SPACE_RECIPE).then(|| serde_json::from_value(v.clone()).ok())?
+}
+
+/// Whether a separator bounds spaces only.
+pub fn is_space(r: &SeparatorRecipe) -> bool {
+    r.kind == SPACE_RECIPE
 }
 
 /// A separator's points (an arc as a polyline).
@@ -48,11 +59,20 @@ pub fn points(r: &SeparatorRecipe) -> Vec<[f64; 2]> {
     pts
 }
 
-/// The separators of the level at elevation `z`, as arrangement edges.
+/// The room separators of the level at elevation `z`, as arrangement edges.
 pub fn edges(store: &Store, z: f64) -> Vec<Edge> {
+    edges_of(store, z, RECIPE)
+}
+
+/// The space separators of the level at elevation `z`.
+pub fn space_edges(store: &Store, z: f64) -> Vec<Edge> {
+    edges_of(store, z, SPACE_RECIPE)
+}
+
+fn edges_of(store: &Store, z: f64, kind: &str) -> Vec<Edge> {
     let mut out = Vec::new();
     for e in store.iter() {
-        let Some(r) = recipe(e) else { continue };
+        let Some(r) = recipe(e).filter(|r| r.kind == kind) else { continue };
         let on_level = GlobalId::parse(&r.level)
             .and_then(|g| store.find_by_guid(&g))
             .and_then(|l| store.get(l))
@@ -85,6 +105,15 @@ pub struct CreateParams {
 
 /// `roomseparator.create`.
 pub(crate) fn create(txn: &mut Transaction<'_>, p: CreateParams) -> Result<Vec<ElementId>> {
+    create_kind(txn, p, RECIPE, "Room Separation", "room")
+}
+
+/// `space_separator.create`.
+pub(crate) fn create_space(txn: &mut Transaction<'_>, p: CreateParams) -> Result<Vec<ElementId>> {
+    create_kind(txn, p, SPACE_RECIPE, "Space Separation", "space")
+}
+
+fn create_kind(txn: &mut Transaction<'_>, p: CreateParams, kind: &str, name: &str, what: &str) -> Result<Vec<ElementId>> {
     let store = txn.store().clone();
     let level = store
         .resolve(&p.level_id)
@@ -98,11 +127,11 @@ pub(crate) fn create(txn: &mut Transaction<'_>, p: CreateParams) -> Result<Vec<E
         if l.length() < 1e-6 {
             return Err(Error::new(
                 "roomseparator.short",
-                "a room separator needs a length",
+                format!("a {what} separator needs a length"),
             ));
         }
         let r = SeparatorRecipe {
-            kind: RECIPE.into(),
+            kind: kind.into(),
             level: level.clone(),
             line: *l,
             through: p.through.get(k).copied().flatten(),
@@ -110,7 +139,7 @@ pub(crate) fn create(txn: &mut Transaction<'_>, p: CreateParams) -> Result<Vec<E
         out.push(
             txn.create(
                 NewElement::new("IfcVirtualElement")
-                    .name("Room Separation")
+                    .name(name)
                     .param(RECIPE_KEY, serde_json::to_value(&r).expect("serialises")),
             )?,
         );

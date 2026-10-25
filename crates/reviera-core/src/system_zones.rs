@@ -119,7 +119,7 @@ impl ZoneGeometry {
 fn level_box(store: &Store, level: ElementId) -> Option<Vec<[f64; 2]>> {
     let z = crate::levels::elevation(store.get(level)?);
     let guid = store.get(level)?.guid().to_string();
-    let mut pts: Vec<[f64; 2]> = crate::rooms::plane_edges(store, z).iter().flat_map(|e| [e.line.start, e.line.end]).collect();
+    let mut pts: Vec<[f64; 2]> = crate::rooms::space_edges(store, z).iter().flat_map(|e| [e.line.start, e.line.end]).collect();
     for (_, r, g) in crate::mep_spaces::all(store) {
         if r.level == guid
             && let Some(reg) = g.as_ref().and_then(|g| g.region.as_ref())

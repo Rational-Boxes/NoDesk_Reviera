@@ -913,6 +913,12 @@ icon = "spaces"
 help = "List the spaces with their area, occupancy, type and airflow; edit their properties and overrides, give them a type, or unplace them (MEP-SPACE-002)"
 
 [[action]]
+id = "space_separator.create"
+label = "Space Separator"
+icon = "space_separator"
+help = "Draw lines (or arcs) on this level that split space for MEP spaces like walls, without bounding rooms (MEP-SPACE-001)"
+
+[[action]]
 id = "system_zone.create"
 label = "System-Zone"
 icon = "system_zone"
@@ -3329,6 +3335,7 @@ tools = [
   { action = "space.place_auto", size = "small" },
   { action = "space.name_from_rooms", size = "small" },
   { action = "space.info", size = "small" },
+  { action = "space_separator.create", size = "small" },
   { action = "system_zone.create", size = "large" },
   { action = "ui.system_zone_by_level", size = "small" },
   { action = "system_zone.info", size = "small" },

@@ -105,6 +105,7 @@ mod paramlib_ui;
 mod classification_ui;
 mod standards_ui;
 mod zones_ui;
+mod spaces_ui;
 mod mech_settings_ui;
 mod wall_profile;
 mod wall_sweeps;
@@ -2144,6 +2145,7 @@ impl Gui {
         // In plans a room is picked by its label, or by its inside where nothing else is.
         let hit = self
             .room_label_at(x, y)
+            .or_else(|| self.space_label_at(x, y))
             .or_else(|| self.rebar_line_at(x, y))
             .or_else(|| self.placeholder_at(x, y))
             .or_else(|| self.element_at(x, y, panel))
@@ -4925,6 +4927,10 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         }),
         "roomseparator.create" => with(gui, |g| {
             g.start_line_tool(datum_tools::LineMode::RoomSeparator);
+            focus(g);
+        }),
+        "space_separator.create" => with(gui, |g| {
+            g.start_line_tool(datum_tools::LineMode::SpaceSeparator);
             focus(g);
         }),
         "workplane.set" => with(gui, Gui::set_work_plane),

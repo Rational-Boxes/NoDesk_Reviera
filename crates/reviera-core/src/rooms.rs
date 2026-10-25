@@ -135,6 +135,14 @@ pub(crate) fn plane_edges(store: &Store, level_z: f64) -> Vec<arrangement::Edge>
     edges
 }
 
+/// The arrangement where MEP spaces on a level are computed: the rooms' (walls and room
+/// separation lines) with the space separation lines (MEP-SPACE-001), which bound only spaces.
+pub(crate) fn space_edges(store: &Store, level_z: f64) -> Vec<arrangement::Edge> {
+    let mut edges = plane_edges(store, level_z);
+    edges.extend(crate::room_separators::space_edges(store, level_z));
+    edges
+}
+
 /// Whether `p` lies inside a wall cut at `z`.
 pub(crate) fn in_wall(store: &Store, z: f64, p: [f64; 2]) -> bool {
     crate::walls::solve(store).bodies.values().any(|b| {
@@ -179,7 +187,7 @@ pub fn regenerate_recipe(store: &Store, r: &RoomRecipe) -> Result<RoomGeometry> 
     };
     let z_base = level_z + r.base_offset;
     let z_top = upper_z + r.limit_offset;
-    let edges = plane_edges(store, level_z);
+    let edges = if r.kind == crate::mep_spaces::SPACE_RECIPE { space_edges(store, level_z) } else { plane_edges(store, level_z) };
     let region = region_at(store, &edges, level_z + COMPUTATION_HEIGHT, r.point);
     let tag_point = region
         .as_ref()

@@ -19,6 +19,7 @@
 #include <wx/ribbon/buttonbar.h>
 #include <wx/ribbon/page.h>
 #include <wx/ribbon/panel.h>
+#include <wx/weakref.h>
 
 #include <map>
 #include <vector>
@@ -328,7 +329,16 @@ void* reviera_rb_new(void* parent, reviera_rb_callback callback, void* user) {
     bar->Bind(wxEVT_KILL_FOCUS, refit);
     bar->Bind(wxEVT_RIBBONBUTTONBAR_CLICKED, [=](wxRibbonButtonBarEvent& e) {
         const int id = e.GetId();
-        bar->CallAfter([=] { callback(user, id); });
+        // A button in a collapsed panel's popup: the popup closes before the action runs (it
+        // stayed open over the dialog the action opened, and after it). The popup is closed
+        // through the panel it came from, which outlives it.
+        wxWeakRef<wxRibbonPanel> origin;
+        if (auto* rp = wxDynamicCast(e.GetBar() ? e.GetBar()->GetParent() : nullptr, wxRibbonPanel))
+            origin = rp->GetExpandedDummy();
+        bar->CallAfter([=] {
+            if (origin) origin->HideExpanded();
+            callback(user, id);
+        });
     });
     return bar;
 }

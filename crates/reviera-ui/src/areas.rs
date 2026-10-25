@@ -523,6 +523,12 @@ impl Gui {
             width: 0.13,
             segments: Vec::new(),
         };
+        // Space separation lines in the spaces' blue.
+        let mut space = Lines {
+            color: crate::spaces_ui::SPACE_COLOR,
+            width: 0.13,
+            segments: Vec::new(),
+        };
         for e in store.iter() {
             let Some(r) = reviera_core::room_separators::recipe(e) else {
                 continue;
@@ -530,13 +536,18 @@ impl Gui {
             if r.level != level {
                 continue;
             }
+            let target = if reviera_core::room_separators::is_space(&r) {
+                &mut space
+            } else {
+                &mut lines
+            };
             for w in reviera_core::room_separators::points(&r).windows(2) {
-                lines.segments.push([
+                target.segments.push([
                     [w[0][0] as f32, w[0][1] as f32, z],
                     [w[1][0] as f32, w[1][1] as f32, z],
                 ]);
             }
         }
-        vec![lines]
+        vec![lines, space]
     }
 }

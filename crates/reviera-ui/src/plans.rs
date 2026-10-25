@@ -277,6 +277,7 @@ impl Gui {
         graphics.lines.extend(self.note_lines(index));
         graphics.lines.extend(self.room_lines(index));
         graphics.lines.extend(self.zone_lines(index));
+        graphics.lines.extend(self.space_lines(index));
         graphics.lines.extend(self.area_lines(index));
         graphics.lines.extend(self.stair_mark_lines(index));
         graphics.lines.extend(self.separator_lines(index));

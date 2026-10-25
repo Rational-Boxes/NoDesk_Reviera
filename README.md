@@ -1044,8 +1044,10 @@ schedules, circuit paths, cable sizing and voltage drop.
   under rooms, named from rooms, unplaced and re-placed; space types with per-space overrides;
   actual lighting and power loads and airflow from what is in them; exported as IfcSpace
   (MEPSpace) with Qto_SpaceBaseQuantities (`space.place`, `space.place_auto`,
-  `space.name_from_rooms`, `space.unplace`, `space.set`, `space.info`). Not built yet: spaces
-  drawn in plans, space separators, upper limits by roof or ceiling, linked rooms.
+  `space.name_from_rooms`, `space.unplace`, `space.set`, `space.info`). Plans show each space
+  as a boxed blue label (picked by clicking it); Space Separator lines bound spaces but not rooms
+  (`space_separator.create`). Not built yet: spaces in sections, upper limits by roof or
+  ceiling, linked rooms.
 - **System-zones** (Analyze › Spaces & Zones › System-Zone, Zone by Level, System-Zones, Convert
   Zones): regions sketched on a level (picked walls, lines, rectangles or typed coordinates) or
   covering a whole level, taking the MEP spaces inside or touching them, served by mechanical

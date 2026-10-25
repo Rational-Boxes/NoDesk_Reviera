@@ -211,6 +211,7 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(SpaceSet),
         registry.add(SpaceNameFromRooms),
         registry.add(SpaceInfo),
+        registry.add(SpaceSeparatorCreate),
         registry.add(SystemZoneCreate),
         registry.add(SystemZoneAssign),
         registry.add(SystemZoneSet),
@@ -2171,6 +2172,17 @@ read_command!(
     crate::mep_spaces::InfoParams,
     Vec<crate::mep_spaces::SpaceInfo>,
     crate::mep_spaces::infos
+);
+
+edit_command!(
+    SpaceSeparatorCreate,
+    "space_separator.create",
+    "Add space separation lines",
+    "Lines on the level `level_id` that split space for MEP spaces (MEP-SPACE-001) like walls, without bounding rooms (room separation lines bound both); `through` gives a point for an arc, per line. Spaces on the level update at once. Returns the lines.",
+    "Space Separator",
+    crate::room_separators::CreateParams,
+    Vec<crate::id::ElementId>,
+    crate::room_separators::create_space
 );
 
 edit_command!(

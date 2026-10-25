@@ -300,6 +300,7 @@ impl Gui {
             .is_some_and(|v| !self.view_visibility(v).is_empty());
         let Some(hit) = self
             .room_label_at(x, y)
+            .or_else(|| self.space_label_at(x, y))
             .or_else(|| self.element_at(x, y, panel))
         else {
             let id = self.ribbon.id_of("inspect.reset").filter(|_| temporary)?;

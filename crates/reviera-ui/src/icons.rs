@@ -463,6 +463,9 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "spaces" => format!(
             r#"<path d="M4 5h24v22H4z" fill="{f}" {s}/><path d="M8 10h16M8 16h16M8 22h16" {sa}/>"#
         ),
+        "space_separator" => format!(
+            r#"<path d="M4 6h24v20H4z" fill="none" stroke-dasharray="4 2" {sa}/><path d="M16 4v24" stroke-width="2.5" {sa}/>"#
+        ),
         "system_zone" => format!(
             r#"<path d="M4 6h24v20H4z" fill="{f}" stroke-dasharray="5 3" {s}/><path d="M10 12h5v8h-5zM17 12h5v8h-5z" fill="none" {sa}/>"#
         ),

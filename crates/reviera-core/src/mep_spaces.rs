@@ -253,7 +253,7 @@ pub(crate) fn place_auto(txn: &mut Transaction<'_>, p: PlaceAutoParams) -> Resul
     let (level, _) = rooms::resolve_level(&store, &p.level_id)?;
     let level_z = crate::levels::elevation(store.get(level).expect("resolved"));
     let z = level_z + rooms::COMPUTATION_HEIGHT;
-    let edges = rooms::plane_edges(&store, level_z);
+    let edges = rooms::space_edges(&store, level_z);
     let mut candidates: Vec<(crate::arrangement::Region, [f64; 2])> = crate::arrangement::regions(&edges)
         .into_iter()
         .filter(|r| r.area() > MIN_AREA)

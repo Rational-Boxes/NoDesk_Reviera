@@ -52,6 +52,8 @@ pub enum LineMode {
     SplitGap,
     /// Room Separator (ARC-ROOM-001): lines (or arcs) on the plan's level.
     RoomSeparator,
+    /// Space Separator (MEP-SPACE-001): lines (or arcs) bounding MEP spaces only.
+    SpaceSeparator,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -272,6 +274,7 @@ impl Gui {
             LineMode::ShapePoint => "Add Point",
             LineMode::SplitGap => "Split with Gap",
             LineMode::RoomSeparator => "Room Separator",
+            LineMode::SpaceSeparator => "Space Separator",
         };
         let mut text = match (t.points.len(), t.shape) {
             _ if t.mode == LineMode::SplitGap => {
@@ -550,11 +553,12 @@ impl Gui {
                     None => Err("The selected roof has no footprint".to_owned()),
                 }
             }
-            LineMode::RoomSeparator => {
+            LineMode::RoomSeparator | LineMode::SpaceSeparator => {
                 let level = self.active_view().and_then(|v| v.plan.as_ref()).map(|p| p.level);
                 let through = through.first().copied();
+                let command = if t.mode == LineMode::SpaceSeparator { "space_separator.create" } else { "roomseparator.create" };
                 self.run(
-                    "roomseparator.create",
+                    command,
                     json!({ "level_id": level, "lines": [{ "start": start, "end": end }], "through": [through] }),
                 )
             }
@@ -701,8 +705,9 @@ impl Gui {
                 grid.append(Property::category("Reference Plane", "c_lt"));
                 grid.append(Property::string("Name", "lt_name", t.name.clone()));
             }
-            LineMode::RoomSeparator => {
-                grid.append(Property::category("Room Separator", "c_lt"));
+            LineMode::RoomSeparator | LineMode::SpaceSeparator => {
+                let what = if t.mode == LineMode::SpaceSeparator { "Space Separator" } else { "Room Separator" };
+                grid.append(Property::category(what, "c_lt"));
                 grid.append(Property::boolean("Chain", "lt_chain", t.chain));
             }
             LineMode::ScopeBox => {
