@@ -62,6 +62,7 @@ pub mod system_zones;
 pub mod mep_illumination;
 pub mod mep_color_fill;
 pub mod mep_renumber;
+pub mod location;
 pub mod mep_risers;
 pub mod mep_electrical;
 pub mod mep_cables;

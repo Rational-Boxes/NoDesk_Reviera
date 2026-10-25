@@ -108,6 +108,7 @@ mod zones_ui;
 mod spaces_ui;
 mod lighting_ui;
 mod mep_fill_ui;
+mod location_ui;
 mod mech_settings_ui;
 mod wall_profile;
 mod wall_sweeps;
@@ -4666,6 +4667,8 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "circuit.remove" => with(gui, |g| g.circuit_members(false)),
         "circuit.select_panel" => with(gui, Gui::select_circuit_panel),
         "circuit.renumber" => with(gui, Gui::renumber_circuits),
+        "location.set_all" => with(gui, Gui::location_dialog),
+        "coordinates.report" => with(gui, Gui::report_coordinates),
         "circuit.set_locked" => with(gui, Gui::toggle_circuit_lock),
         "circuit.disconnect_panel" => with(gui, Gui::disconnect_circuit_panel),
         "panel.settings" => with(gui, Gui::panel_settings),

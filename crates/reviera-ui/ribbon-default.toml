@@ -2806,6 +2806,18 @@ icon = "system_remove"
 help = "Take the selected devices off a circuit"
 
 [[action]]
+id = "location.set_all"
+label = "Location"
+icon = "location"
+help = "The project's latitude, longitude, elevation and time zone, the project base point and angle to true north, the survey point with its shared coordinates, and the CRS (DM-LOC-001)"
+
+[[action]]
+id = "coordinates.report"
+label = "Report Coordinates"
+icon = "report_coordinates"
+help = "A point's project and shared (easting, northing, height) coordinates (DM-LOC-001)"
+
+[[action]]
 id = "circuit.renumber"
 label = "Renumber Circuits"
 icon = "renumber"
@@ -3650,6 +3662,13 @@ tools = [
   { action = "global.associate", size = "small" },
   { action = "clearance.set_rule_set", size = "large" },
   { action = "ui.remote_analysis", size = "large" },
+]
+
+[[tab.panel]]
+label = "Project Location"
+tools = [
+  { action = "location.set_all", size = "large" },
+  { action = "coordinates.report", size = "small" },
 ]
 
 [[tab.panel]]

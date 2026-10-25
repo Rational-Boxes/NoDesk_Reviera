@@ -406,6 +406,14 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(ToposolidGraded),
         registry.add(ToposolidSimplify),
         registry.add(SiteSetSettings),
+        registry.add(LocationSet),
+        registry.add(LocationSetAll),
+        registry.add(LocationGet),
+        registry.add(CoordinatesSetSurveyPoint),
+        registry.add(CoordinatesSetProjectBasePoint),
+        registry.add(CoordinatesSetCrs),
+        registry.add(CoordinatesReport),
+        registry.add(PositionRotateTrueNorth),
         registry.add(PropertyLineCreate),
         registry.add(SiteComponentPlace),
         registry.add(ToposolidCutFill),
@@ -5654,6 +5662,92 @@ edit_command!(
     crate::toposolids::SimplifyParams,
     crate::toposolids::Simplified,
     crate::toposolids::simplify
+);
+
+edit_command!(
+    LocationSet,
+    "location.set",
+    "Set the project location",
+    "The project's place on Earth (DM-LOC-001): `lat` and `lon` (degrees, north and east positive), `elevation` above sea level (m), `time_zone` (hours from UTC), `dst` (daylight saving) and a `place` name. Written to IfcSite RefLatitude, RefLongitude and RefElevation on save. Returns the location.",
+    "Location",
+    crate::location::SetParams,
+    crate::location::Location,
+    crate::location::set
+);
+
+edit_command!(
+    LocationSetAll,
+    "location.set_all",
+    "Set location and coordinates",
+    "Sets every location value at once (`location`: latitude, longitude, elevation, time_zone, daylight_saving, place, project_base_point, survey_point {point, shared}, true_north in degrees counter-clockwise from project north, crs as EPSG:nnnn), as one undo step. Returns the location.",
+    "Location",
+    crate::location::SetAllParams,
+    crate::location::Location,
+    crate::location::set_all
+);
+
+read_command!(
+    LocationGet,
+    "location.get",
+    "Project location",
+    "The project's location and coordinate systems: latitude, longitude, elevation, time zone, daylight saving, place, the project base point, the survey point with its shared coordinates, the angle to true north (degrees, counter-clockwise from project north) and the CRS.",
+    crate::location::Empty,
+    crate::location::Location,
+    crate::location::get_cmd
+);
+
+edit_command!(
+    CoordinatesSetSurveyPoint,
+    "coordinates.set_survey_point",
+    "Set the survey point",
+    "Places the survey point at `point` (internal coordinates, m) with the shared coordinates `shared_coords` there (easting, northing, height, m) (DM-LOC-001). Shared coordinates elsewhere follow it and true north; with a CRS, the IFC map conversion is calculated from it.",
+    "Survey Point",
+    crate::location::SurveyParams,
+    (),
+    crate::location::set_survey
+);
+
+edit_command!(
+    CoordinatesSetProjectBasePoint,
+    "coordinates.set_project_base_point",
+    "Set the project base point",
+    "Places the project base point at `point` (internal coordinates, m): project coordinates are measured from it. `angle_to_true_north` (degrees, counter-clockwise from project north) sets true north too. No element moves.",
+    "Project Base Point",
+    crate::location::BaseParams,
+    (),
+    crate::location::set_base
+);
+
+edit_command!(
+    CoordinatesSetCrs,
+    "coordinates.set_crs",
+    "Set the coordinate reference system",
+    "Names the projected CRS of the shared coordinates by its EPSG code (`epsg_code`, such as EPSG:25832; null clears it). Its form is checked, not its existence. With it, IFC4 files get an IfcMapConversion to an IfcProjectedCRS on save.",
+    "Coordinate System",
+    crate::location::CrsParams,
+    (),
+    crate::location::set_crs
+);
+
+read_command!(
+    CoordinatesReport,
+    "coordinates.report",
+    "Report coordinates",
+    "A point's (`point`, internal coordinates, m) project coordinates (from the project base point) and shared coordinates (easting, northing, height, from the survey point and true north), with the CRS.",
+    crate::location::ReportParams,
+    crate::location::Report,
+    crate::location::report
+);
+
+edit_command!(
+    PositionRotateTrueNorth,
+    "position.rotate_true_north",
+    "Rotate true north",
+    "Turns true north by `angle` degrees counter-clockwise (DM-LOC-001): IFC TrueNorth, shared coordinates and sun directions change, no element moves. Returns the new angle from project north.",
+    "Rotate True North",
+    crate::location::RotateParams,
+    f64,
+    crate::location::rotate_true_north
 );
 
 edit_command!(

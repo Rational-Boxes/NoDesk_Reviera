@@ -130,6 +130,14 @@ impl LocalProject {
         objects.retain(|e| !is_derived(&ifc, e.id));
         let length_scale = geometry::length_scale(&ifc)?;
         let (mut values, sets) = params::load(&ifc, &objects, length_scale)?;
+        // A site's latitude and longitude from another tool, when there is no Reviera location.
+        if let Some(pid) = ifc.entities_of_type("IfcProject")?.first().map(|e| e.id)
+            && let Some((lat, lon, elev)) = crate::location::read_site(&ifc, length_scale)?
+        {
+            values.entry(pid).or_default().entry(reviera_core::location::KEY.to_owned()).or_insert_with(|| {
+                serde_json::json!({ "latitude": lat, "longitude": lon, "elevation": elev })
+            });
+        }
         // Zones from other tools keep what they group, so they can become system-zones.
         for o in objects.iter().filter(|o| o.class.eq_ignore_ascii_case("IfcZone")) {
             let members = crate::system_zones::legacy_members(&ifc, o.id)?;
@@ -784,6 +792,7 @@ impl LocalProject {
             self.write_rooms(doc)?;
             self.write_spaces(doc)?;
             let owner_history = self.new_owner_history()?;
+            crate::location::write_location(&mut self.ifc, &reviera_core::location::get(doc.store()), self.length_scale)?;
             crate::system_zones::write_system_zones(
                 &mut self.ifc,
                 doc,

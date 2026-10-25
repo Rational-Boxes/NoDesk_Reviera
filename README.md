@@ -1099,6 +1099,15 @@ schedules, circuit paths, cable sizing and voltage drop.
   target's GlobalIds), skipping or renaming what exists, as one undo step (`standards.list`,
   `standards.transfer`). Not built yet: materials, patterns, view templates and filters (not
   project elements yet), item-by-item choice in the dialog.
+- **Project location and coordinates** (Manage › Project Location › Location, Report
+  Coordinates): latitude, longitude, elevation, time zone and daylight saving; the project base
+  point and the angle to true north; the survey point with its shared coordinates (easting,
+  northing, height) and the CRS by EPSG code; both points drawn in plans. Written to IFC as the
+  site's RefLatitude/RefLongitude/RefElevation, the context's TrueNorth and an IfcMapConversion
+  to an IfcProjectedCRS; a site location from another tool is read
+  (`location.set`, `location.set_all`, `coordinates.*`, `position.rotate_true_north`;
+  DM-LOC-001). Not built yet: map and city search, weather, named sites, acquire and publish
+  coordinates, relocate and mirror, picking the points in a view, CRS validation.
 - **Sloped piping and parallel pipes** (Systems › HVAC & Piping › Slope, Parallel Pipes): the
   Slope Editor gives a connected section of pipe one of the project's allowed slopes from a
   control point (the lowest end by default): fittings follow, branches stay connected (their

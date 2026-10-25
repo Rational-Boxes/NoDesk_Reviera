@@ -285,6 +285,7 @@ impl Gui {
         graphics.poche.extend(self.color_fills(index));
         graphics.poche.extend(self.mep_fill_meshes(index));
         graphics.lines.extend(self.mep_legend_lines(index));
+        graphics.lines.extend(self.location_lines(index));
         graphics.lines.extend(self.section_markers(index));
         graphics.lines.extend(self.insert_symbol_lines(index));
         graphics.lines.extend(self.opening_lines(index));

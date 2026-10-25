@@ -463,6 +463,12 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "spaces" => format!(
             r#"<path d="M4 5h24v22H4z" fill="{f}" {s}/><path d="M8 10h16M8 16h16M8 22h16" {sa}/>"#
         ),
+        "location" => format!(
+            r#"<circle cx="16" cy="13" r="8" fill="{f}" {s}/><circle cx="16" cy="13" r="3" fill="none" {sa}/><path d="M10 19l6 10 6-10" fill="none" {sa}/>"#
+        ),
+        "report_coordinates" => format!(
+            r#"<path d="M4 28V4M4 28h24" {sa}/><circle cx="18" cy="12" r="3" fill="{f}" {s}/><path d="M18 12H4M18 12v16" stroke-dasharray="2 2" {sa}/>"#
+        ),
         "renumber" => format!(
             r#"<path d="M4 5h10v22H4z" fill="{f}" {s}/><path d="M7 10h4M7 16h4M7 22h4" {sa}/><path d="M18 9h10M18 16h10M18 23h10M24 6l4 3-4 3" fill="none" {sa}/>"#
         ),
