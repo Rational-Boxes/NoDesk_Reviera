@@ -1058,6 +1058,12 @@ schedules, circuit paths, cable sizing and voltage drop.
   imported models convert into system-zones enveloping their spaces (`system_zone.create`,
   `.assign`, `.set`, `.info`, `.convert_legacy`; MEP-ZONE-001). Not built yet: assignment through
   the energy model (ANA-EM-003), zones in links and phases, grips on the outline.
+- **Renumber Circuits** (Systems › Electrical › Renumber Circuits `RI`, Lock Circuits): closes
+  the gaps in a panel's circuit numbers from a start slot, keeping their order and poles, with
+  locked circuits left in place, a preview of the new names and the phase loads before and
+  after, and a warning when the imbalance grows by more than 10 points; refused when a circuit
+  would pass the last slot (`circuit.renumber`, `circuit.renumber_preview`,
+  `circuit.set_locked`; MEP-ELEC-021). Not built yet: spares and spaces.
 - **Duct and pipe colour fill legends** (Analyze › Color Fill › Duct Legend, Pipe Legend): a
   placed legend colours the plan's ducts or pipes by a scheme of flow, velocity, friction,
   pressure drop, size, system type or name (pipes also fluid temperature and slope), by range

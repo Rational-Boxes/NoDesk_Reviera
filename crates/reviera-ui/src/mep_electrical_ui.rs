@@ -392,3 +392,116 @@ fn error(frame: &Frame, message: &str) {
         .build();
     d.show_modal();
 }
+
+impl Gui {
+    /// Systems › Electrical › Renumber Circuits (MEP-ELEC-021) for the selected panel: the start
+    /// number, a preview (old and new number, load name, phases; moved rows marked •) with the
+    /// phase loads before and after; OK renumbers.
+    pub(crate) fn renumber_circuits(&mut self) {
+        let frame = self.frame;
+        let Some(pid) = self.selected_panel("Renumber Circuits") else { return };
+        let mut start = 1u32;
+        loop {
+            let preview = match self.run("circuit.renumber_preview", json!({ "panel_id": pid, "start": start })) {
+                Ok(v) => v,
+                Err(e) => {
+                    error(&frame, &e.to_string());
+                    start = 1;
+                    match ask_start(&frame, start) {
+                        Some(s) => {
+                            start = s;
+                            continue;
+                        }
+                        None => return,
+                    }
+                }
+            };
+            let rows: Vec<Vec<String>> = preview["moves"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .map(|m| {
+                    vec![
+                        if m["changed"] == true { "•".into() } else { String::new() },
+                        m["name_before"].as_str().unwrap_or("").to_owned(),
+                        m["name_after"].as_str().unwrap_or("").to_owned(),
+                        m["load_name"].as_str().unwrap_or("").to_owned(),
+                        m["phases"].as_str().unwrap_or("").to_owned(),
+                        if m["locked"] == true { "Locked".into() } else { String::new() },
+                    ]
+                })
+                .collect();
+            let n = preview["phases"].as_u64().unwrap_or(1).clamp(1, 3) as usize;
+            let va = |k: &str| {
+                preview[k].as_array().map(|a| a.iter().take(n).map(|v| format!("{:.0}", v.as_f64().unwrap_or(0.0))).collect::<Vec<_>>().join(" / ")).unwrap_or_default()
+            };
+            let names = ["A", "B", "C"][..n].join(" / ");
+            let mut intro = format!(
+                "From slot {start}, keeping their order; locked circuits stay. Phase loads {names} (VA): {} before, {} after (imbalance {:.0} % → {:.0} %).",
+                va("phase_before"),
+                va("phase_after"),
+                preview["imbalance_before"].as_f64().unwrap_or(0.0),
+                preview["imbalance_after"].as_f64().unwrap_or(0.0)
+            );
+            if let Some(w) = preview["warning"].as_str() {
+                intro.push_str(&format!("\nWarning: {w}."));
+            }
+            const OK: i32 = 7701;
+            const START: i32 = 7702;
+            let (code, _) = super::mep_loads_ui::list_dialog(
+                &frame,
+                "Renumber Circuits",
+                &intro,
+                &[("", 24), ("Now", 90), ("New", 90), ("Load name", 180), ("Phases", 60), ("", 60)],
+                &rows,
+                &[(OK, "Renumber", "Move the circuits as listed"), (START, "Start…", "Choose the first slot")],
+                None,
+            );
+            match code {
+                OK => {
+                    match self.run("circuit.renumber", json!({ "panel_id": pid, "start": start })) {
+                        Ok(v) => {
+                            let n = v["moves"].as_array().map_or(0, |m| m.iter().filter(|x| x["changed"] == true).count());
+                            frame.set_status_text(&format!("{n} circuit(s) renumbered"), 0);
+                            self.refresh_active();
+                        }
+                        Err(e) => error(&frame, &format!("The circuits were not renumbered:\n{e}")),
+                    }
+                    return;
+                }
+                START => match ask_start(&frame, start) {
+                    Some(s) => start = s,
+                    None => continue,
+                },
+                _ => return,
+            }
+        }
+    }
+
+    /// Systems › Electrical › Lock Circuits: locks the selected circuits (or those of the selected
+    /// devices) in their slots, or unlocks them when all are locked.
+    pub(crate) fn toggle_circuit_lock(&mut self) {
+        let frame = self.frame;
+        let Some(store) = self.store_now() else { return };
+        let all = mep_electrical::circuits(&store);
+        let sel = self.selection();
+        let mut ids: Vec<ElementId> = all.iter().filter(|c| sel.contains(&c.id) || c.elements.iter().any(|e| sel.contains(e))).map(|c| c.id).collect();
+        ids.dedup();
+        if ids.is_empty() {
+            return frame.set_status_text("Lock Circuits: select circuits or their devices", 0);
+        }
+        let lock = !all.iter().filter(|c| ids.contains(&c.id)).all(|c| c.locked);
+        match self.run("circuit.set_locked", json!({ "circuit_ids": ids, "locked": lock })) {
+            Ok(_) => frame.set_status_text(&format!("{} circuit(s) {}", ids.len(), if lock { "locked in their slots" } else { "unlocked" }), 0),
+            Err(e) => error(&frame, &e),
+        }
+    }
+}
+
+/// The first slot for renumbering, asked.
+fn ask_start(frame: &Frame, current: u32) -> Option<u32> {
+    let d = TextEntryDialog::builder(frame, "First slot:", "Renumber Circuits").with_default_value(&current.to_string()).build();
+    let v = (d.show_modal() == ID_OK).then(|| d.get_value()).flatten();
+    d.destroy();
+    v.and_then(|s| s.trim().parse().ok()).filter(|s: &u32| *s >= 1)
+}

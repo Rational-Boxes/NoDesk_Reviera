@@ -4665,6 +4665,8 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "circuit.add" => with(gui, |g| g.circuit_members(true)),
         "circuit.remove" => with(gui, |g| g.circuit_members(false)),
         "circuit.select_panel" => with(gui, Gui::select_circuit_panel),
+        "circuit.renumber" => with(gui, Gui::renumber_circuits),
+        "circuit.set_locked" => with(gui, Gui::toggle_circuit_lock),
         "circuit.disconnect_panel" => with(gui, Gui::disconnect_circuit_panel),
         "panel.settings" => with(gui, Gui::panel_settings),
         "panel.set_supply" => with(gui, Gui::select_supply),

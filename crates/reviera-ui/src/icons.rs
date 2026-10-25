@@ -463,6 +463,12 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "spaces" => format!(
             r#"<path d="M4 5h24v22H4z" fill="{f}" {s}/><path d="M8 10h16M8 16h16M8 22h16" {sa}/>"#
         ),
+        "renumber" => format!(
+            r#"<path d="M4 5h10v22H4z" fill="{f}" {s}/><path d="M7 10h4M7 16h4M7 22h4" {sa}/><path d="M18 9h10M18 16h10M18 23h10M24 6l4 3-4 3" fill="none" {sa}/>"#
+        ),
+        "lock_circuit" => format!(
+            r#"<path d="M8 15h16v12H8z" fill="{f}" {s}/><path d="M11 15v-4a5 5 0 0 1 10 0v4" fill="none" {sa}/>"#
+        ),
         "duct_legend" => format!(
             r##"<path d="M3 8h16v6H3z" fill="#5b9bd5" {s}/><path d="M3 18h16v6H3z" fill="#ed7d31" {s}/><path d="M22 9h7M22 13h5M22 19h7M22 23h5" {sa}/>"##
         ),

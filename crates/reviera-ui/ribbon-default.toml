@@ -2806,6 +2806,19 @@ icon = "system_remove"
 help = "Take the selected devices off a circuit"
 
 [[action]]
+id = "circuit.renumber"
+label = "Renumber Circuits"
+icon = "renumber"
+keys = "RI"
+help = "Close the gaps in the selected panel's circuit numbers from a start slot, keeping their order; locked circuits stay. Previews the new numbers and phase loads (MEP-ELEC-021)"
+
+[[action]]
+id = "circuit.set_locked"
+label = "Lock Circuits"
+icon = "lock_circuit"
+help = "Lock the selected circuits (or those of the selected devices) in their slots so renumbering leaves them, or unlock them (MEP-ELEC-015)"
+
+[[action]]
 id = "circuit.select_panel"
 label = "Select Panel"
 icon = "circuit_panel"
@@ -3317,6 +3330,8 @@ tools = [
   { action = "panel.set_supply", size = "small" },
   { action = "panel.hierarchy", size = "small" },
   { action = "panel_schedule.create", size = "small" },
+  { action = "circuit.renumber", size = "small" },
+  { action = "circuit.set_locked", size = "small" },
 ]
 
 [[tab.panel]]

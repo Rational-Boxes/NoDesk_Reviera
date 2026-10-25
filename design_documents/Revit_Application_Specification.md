@@ -19756,10 +19756,12 @@ The drawing tool uses the micro-operation schema of MEP-ELEC-016 with the `condu
 **Commands.** `circuit.renumber(panel_id, start?)` (renumbers the panel's circuit indexes and closes gaps).
 
 **Acceptance criteria.**
-- [ ] On a single-phase panel with circuits in slots 1, 2, 5 and 9, renumbering gives slots 1, 2, 3 and 4, and the scheme "{Panel}-{Index}" renames the last circuit "LP1-4".
-- [ ] A circuit locked in slot 7 is still in slot 7 after renumbering, and no other circuit is placed in it.
-- [ ] A 3-pole circuit keeps 3 consecutive slots after renumbering.
-- [ ] Renumbering with start 40 on a 42-slot panel holding 5 circuits is refused and names the first circuit that does not fit.
+- [x] On a single-phase panel with circuits in slots 1, 2, 5 and 9, renumbering gives slots 1, 2, 3 and 4, and the scheme "{Panel}-{Index}" renames the last circuit "LP1-4".
+- [x] A circuit locked in slot 7 is still in slot 7 after renumbering, and no other circuit is placed in it.
+- [x] A 3-pole circuit keeps 3 consecutive slots after renumbering.
+- [x] Renumbering with start 40 on a 42-slot panel holding 5 circuits is refused and names the first circuit that does not fit.
+
+*Built (2026-10-25):* Systems › Electrical › **Renumber Circuits** (`RI`) on the selected panel: a list of every circuit's number now and after, load name, phases and lock, moved rows marked •, with the phase loads (the panel's phases only) and imbalance before and after and the warning, *Start…* to change the first slot and *Renumber*. `circuit.renumber(panel_id, start?)` and `circuit.renumber_preview` (the same report, no change). The panel's circuits with slots (branch circuits and feeders, not a feeder on feed-through lugs) move in their current slot order: each to the lowest start slot from the start number (and past the previous circuit's) whose poles' slots (every second slot, as placed) are free of locked circuits and those already placed; the whole command is refused, naming the circuit, when one would pass the last slot. Names are made again by the panel's naming scheme (`rename_all`), load names untouched. Imbalance is the largest phase's excess over the average as a percentage of the average; a growth of more than 10 points is a warning (`circuit.phase_imbalance`), and nothing is rebalanced. Nothing to move changes nothing and adds no undo step. With it, from MEP-ELEC-015: **Lock Circuits** (`circuit.set_locked(circuit_ids, locked)`, kept on the circuit recipe) and `circuit.select_panel(…, slot?)` to choose a circuit's first slot (refused when taken or past the last slot). Not yet: spares and spaces (MEP-ELEC-015), renumbering from the panel schedule's tab, the changed rows highlighted in the panel schedule, wires (not built).
 
 ---
 

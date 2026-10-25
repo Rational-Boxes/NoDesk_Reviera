@@ -575,6 +575,9 @@ pub struct CircuitRecipe {
     /// Its path (MEP-ELEC-004).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub path: Option<crate::mep_cables::PathDef>,
+    /// Locked in its slots: renumbering leaves it there (MEP-ELEC-015, MEP-ELEC-021).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub locked: bool,
 }
 
 fn one() -> u8 {
@@ -611,6 +614,8 @@ pub struct CircuitInfo {
     pub load_name_edited: bool,
     /// Amperes, when set.
     pub rating: Option<f64>,
+    /// Locked in its slots.
+    pub locked: bool,
 }
 
 fn find(store: &Store, guid: &str) -> Option<ElementId> {
@@ -660,6 +665,7 @@ fn info(store: &Store, e: &Element, r: &CircuitRecipe) -> CircuitInfo {
         load_name: auto.unwrap_or_else(|| r.load_name.clone().unwrap_or_default()),
         load_name_edited: r.load_name.as_ref().is_some_and(|n| !n.trim().is_empty()),
         rating: r.rating,
+        locked: r.locked,
     }
 }
 
@@ -784,7 +790,7 @@ fn free_slot(store: &Store, panel_id: ElementId, slots: u32, poles: u8, except: 
 }
 
 /// A circuit's name on its panel by the panel's scheme.
-fn circuit_name(store: &Store, panel_id: ElementId, start: u32, poles: u8) -> String {
+pub(crate) fn circuit_name(store: &Store, panel_id: ElementId, start: u32, poles: u8) -> String {
     let s = settings(store);
     let pe = store.get(panel_id).expect("a panel");
     let scheme = match panel(pe).naming {
@@ -803,7 +809,7 @@ fn circuit_name(store: &Store, panel_id: ElementId, start: u32, poles: u8) -> St
 }
 
 /// Gives every circuit its name by its panel and slots (none without a panel).
-fn rename_all(txn: &mut Transaction<'_>) -> Result<()> {
+pub(crate) fn rename_all(txn: &mut Transaction<'_>) -> Result<()> {
     let store = txn.store().clone();
     for c in circuits(&store) {
         let name = match (c.panel, c.start_slot) {
@@ -927,7 +933,7 @@ fn ids(store: &Store, refs: &[ElementRef]) -> Result<Vec<ElementId>> {
     Ok(out)
 }
 
-fn write(txn: &mut Transaction<'_>, id: ElementId, r: &CircuitRecipe) -> Result<()> {
+pub(crate) fn write(txn: &mut Transaction<'_>, id: ElementId, r: &CircuitRecipe) -> Result<()> {
     let v = serde_json::to_value(r).expect("serialises");
     txn.modify(id, |e| {
         e.params.insert(RECIPE_KEY.into(), v);
@@ -987,6 +993,7 @@ pub(crate) fn create(txn: &mut Transaction<'_>, p: CreateParams) -> Result<Circu
         runs: None,
         max_voltage_drop_percent: None,
         path: None,
+        locked: false,
     };
     let mut report = CircuitReport::default();
     take_members(txn, None, &mut r, &members, &mut report)?;
@@ -1017,7 +1024,7 @@ pub(crate) fn create(txn: &mut Transaction<'_>, p: CreateParams) -> Result<Circu
     Ok(report)
 }
 
-fn circuit(store: &Store, r: &ElementRef) -> Result<(ElementId, CircuitRecipe)> {
+pub(crate) fn circuit(store: &Store, r: &ElementRef) -> Result<(ElementId, CircuitRecipe)> {
     let id = store.resolve(r).ok_or_else(|| bad("element.not_found", "no such circuit"))?;
     let rec = store.get(id).and_then(recipe).ok_or_else(|| bad("circuit.not_a_circuit", format!("element {id} is not a circuit")))?;
     Ok((id, rec))
@@ -1066,6 +1073,8 @@ pub(crate) fn remove(txn: &mut Transaction<'_>, p: MembersParams) -> Result<()> 
 pub struct PanelParams {
     pub circuit_id: ElementRef,
     pub panel_id: ElementRef,
+    /// The first slot to take; the first free slots that fit when omitted.
+    pub slot: Option<u32>,
 }
 
 /// `circuit.select_panel`: the first free slots that fit; refused for an incompatible or full
@@ -1086,8 +1095,21 @@ pub(crate) fn select_panel(txn: &mut Transaction<'_>, p: PanelParams) -> Result<
         bad("distribution_system.not_found", format!("{} has no distribution system to feed circuits from", panel_name(pe)))
     })?;
     fits_system(&ds, r.voltage, r.poles, r.circuit_kind).map_err(|e| bad("panel.incompatible", e))?;
-    let start = free_slot(&store, pid, pn.slots, r.poles, Some(id))
-        .ok_or_else(|| bad("panel.full", format!("{} has no {} free slot(s) for the circuit", panel_name(pe), r.poles)))?;
+    let start = match p.slot {
+        Some(s) => {
+            let used: Vec<u32> = circuits(&store).iter().filter(|c| c.panel == Some(pid) && c.id != id).flat_map(|c| c.slots.clone()).collect();
+            let want = slots_of(s, r.poles);
+            if s == 0 || want.iter().any(|k| *k > pn.slots) {
+                return Err(bad("panel.slots", format!("slot {s} is not on {} (1 to {})", panel_name(pe), pn.slots)));
+            }
+            if let Some(k) = want.iter().find(|k| used.contains(k)) {
+                return Err(bad("panel.slot_taken", format!("slot {k} of {} is taken", panel_name(pe))));
+            }
+            s
+        }
+        None => free_slot(&store, pid, pn.slots, r.poles, Some(id))
+            .ok_or_else(|| bad("panel.full", format!("{} has no {} free slot(s) for the circuit", panel_name(pe), r.poles)))?,
+    };
     r.panel = Some(pe.guid().to_string());
     r.start_slot = Some(start);
     write(txn, id, &r)?;
@@ -1265,6 +1287,7 @@ pub(crate) fn create_feeder(txn: &mut Transaction<'_>, p: FeederParams) -> Resul
         runs: None,
         max_voltage_drop_percent: None,
         path: None,
+        locked: false,
     };
     let id = txn.create(
         NewElement::new(CLASS)

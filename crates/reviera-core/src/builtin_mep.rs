@@ -214,6 +214,9 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(SpaceSeparatorCreate),
         registry.add(LightingCalcAverage),
         registry.add(MepColorLegendPlace),
+        registry.add(CircuitRenumber),
+        registry.add(CircuitRenumberPreview),
+        registry.add(CircuitSetLocked),
         registry.add(LightingFixtureTypeSetLighting),
         registry.add(SystemZoneCreate),
         registry.add(SystemZoneAssign),
@@ -755,7 +758,7 @@ edit_command!(
     CircuitSelectPanel,
     "circuit.select_panel",
     "Put a circuit on a panel",
-    "Puts a circuit on a panel in the first free slots that fit its poles (MEP-ELEC-003): refused when the panel's distribution system does not give the circuit's voltage (line to ground for one pole, line to line for two or three; three poles need three phases) or it is full. The circuit is numbered by the panel's naming scheme. Returns its number.",
+    "Puts a circuit on a panel from `slot` (refused when taken or beyond the last slot) or in the first free slots that fit its poles (MEP-ELEC-003): refused when the panel's distribution system does not give the circuit's voltage (line to ground for one pole, line to line for two or three; three poles need three phases) or it is full. The circuit is numbered by the panel's naming scheme. Returns its number.",
     "Select Panel",
     crate::mep_electrical::PanelParams,
     String,
@@ -2175,6 +2178,38 @@ read_command!(
     crate::mep_spaces::InfoParams,
     Vec<crate::mep_spaces::SpaceInfo>,
     crate::mep_spaces::infos
+);
+
+edit_command!(
+    CircuitRenumber,
+    "circuit.renumber",
+    "Renumber a panel's circuits",
+    "Renumber Circuits (MEP-ELEC-021): the circuits of the panel `panel_id` (feeders too, not one on feed-through lugs) move to the lowest slots from `start` (default 1), keeping their order and poles; locked circuits stay in their slots and the others flow round them. Refused, naming the circuit, when one would pass the last slot. Names follow the panel's naming scheme; hand-typed load names are kept. Reports each circuit before and after with its phases, and the phase loads and imbalance before and after, warning when the imbalance grows by more than 10 points. Nothing to move adds no undo step.",
+    "Renumber Circuits",
+    crate::mep_renumber::RenumberParams,
+    crate::mep_renumber::Renumbering,
+    crate::mep_renumber::renumber
+);
+
+read_command!(
+    CircuitRenumberPreview,
+    "circuit.renumber_preview",
+    "Preview renumbering a panel",
+    "What `circuit.renumber` would do to the panel `panel_id` from `start`, without changing it: each circuit's old and new name and slots, load name, phases and whether it moves, and the phase loads and imbalance before and after.",
+    crate::mep_renumber::RenumberParams,
+    crate::mep_renumber::Renumbering,
+    crate::mep_renumber::preview
+);
+
+edit_command!(
+    CircuitSetLocked,
+    "circuit.set_locked",
+    "Lock circuits in their slots",
+    "Locks (`locked` true) or unlocks circuits (`circuit_ids`) in their slots: renumbering leaves locked circuits where they are (MEP-ELEC-015).",
+    "Lock Circuits",
+    crate::mep_renumber::LockParams,
+    (),
+    crate::mep_renumber::set_locked
 );
 
 edit_command!(
