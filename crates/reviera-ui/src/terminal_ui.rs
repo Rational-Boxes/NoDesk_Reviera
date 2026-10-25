@@ -11,7 +11,7 @@
 //!   Keys are sent as the terminal sequences programs expect (application cursor keys when
 //!   asked); Ctrl+Shift+C copies the screen and Ctrl+Shift+V pastes (bracketed when the program
 //!   asked for it).
-//! - **Agent presets** (Claude Code, Gemini CLI, Qwen Code, Codex CLI) and the user's own in
+//! - **Agent presets** (Claude Code, Antigravity CLI, Qwen Code, Codex CLI) and the user's own in
 //!   `terminal-presets.json` in the settings folder. Each agent tab gets an MCP session on the
 //!   window's [`reviera_mcp::bridge::Endpoint`] and a private session folder with the files its
 //!   agent reads (an MCP config passed on its command line, a settings file named by an
@@ -72,7 +72,7 @@ pub(crate) struct Preset {
 }
 
 /// The built-in presets, from each agent's published documentation (RESEARCH_LOG 2026-10-20,
-/// S0835–S0839).
+/// S0835–S0839; Antigravity CLI 2026-10-25).
 pub(crate) fn builtin_presets() -> Vec<Preset> {
     let shell = if cfg!(windows) {
         std::env::var("COMSPEC").unwrap_or_else(|_| "cmd.exe".into())
@@ -89,13 +89,15 @@ pub(crate) fn builtin_presets() -> Vec<Preset> {
             mcp: McpMethod::JsonArgument,
             setting: String::new(),
         },
+        // Antigravity CLI replaced Gemini CLI (retired 2026-06-18); it reads MCP servers from
+        // `.agents/mcp_config.json` in the workspace it starts in and has no override flag.
         Preset {
-            id: "gemini".into(),
-            name: "Gemini CLI".into(),
-            program: "gemini".into(),
+            id: "antigravity".into(),
+            name: "Antigravity CLI".into(),
+            program: "agy".into(),
             args: Vec::new(),
-            mcp: McpMethod::SettingsEnv,
-            setting: "GEMINI_CLI_SYSTEM_SETTINGS_PATH".into(),
+            mcp: McpMethod::SessionFolder,
+            setting: ".agents/mcp_config.json".into(),
         },
         Preset {
             id: "qwen".into(),
@@ -498,7 +500,13 @@ impl Gui {
             Ok(c) => Some(c),
             Err(e) => {
                 // A missing program: say so in the tab, and change nothing else.
-                let text = format!("\x1b[1m{}\x1b[0m could not be started: {e}\r\n\r\nIs `{}` installed and on your PATH? Presets are in {}.\r\n", preset.name, preset.program, presets_path().map(|p| p.display().to_string()).unwrap_or_default());
+                let where_ = searched(&extra_dirs(home_dir().as_deref(), cfg!(windows)));
+                let text = format!(
+                    "\x1b[1m{}\x1b[0m could not be started: {e}\r\n\r\n`{}` was looked for in {where_}.\r\nIs it installed? A preset can name its full path; presets are in {}.\r\n",
+                    preset.name,
+                    preset.program,
+                    presets_path().map(|p| p.display().to_string()).unwrap_or_default()
+                );
                 parser.lock().expect("parser").process(text.as_bytes());
                 exited.store(true, Ordering::Relaxed);
                 if let Some((secret, folder)) = session.take() {
@@ -914,14 +922,111 @@ impl Gui {
     }
 }
 
+/// Folders where agent installers put their programs that a desktop session's PATH often lacks
+/// (it is set by shell start-up files the desktop never reads): Claude Code's native installer
+/// (`~/.local/bin`), npm, Bun, Volta, Cargo, Deno, nvm and Homebrew; on Windows the user's
+/// `.local\bin` and npm folders.
+fn extra_dirs(home: Option<&Path>, windows: bool) -> Vec<PathBuf> {
+    let mut out = Vec::new();
+    if windows {
+        if let Some(h) = home {
+            out.extend([h.join(".local").join("bin"), h.join(".bun").join("bin"), h.join(".cargo").join("bin")]);
+        }
+        for (var, sub) in [("APPDATA", "npm"), ("LOCALAPPDATA", "Volta\\bin"), ("LOCALAPPDATA", "Microsoft\\WinGet\\Links")] {
+            if let Some(v) = std::env::var_os(var) {
+                out.push(PathBuf::from(v).join(sub));
+            }
+        }
+        return out;
+    }
+    if let Some(h) = home {
+        for sub in [".local/bin", ".claude/local", ".npm-global/bin", ".bun/bin", ".volta/bin", ".cargo/bin", ".deno/bin", "bin"] {
+            out.push(h.join(sub));
+        }
+        // nvm: the newest Node first.
+        if let Ok(rd) = std::fs::read_dir(h.join(".nvm/versions/node")) {
+            let mut v: Vec<PathBuf> = rd.flatten().map(|e| e.path().join("bin")).collect();
+            v.sort();
+            out.extend(v.into_iter().rev());
+        }
+    }
+    out.extend([PathBuf::from("/usr/local/bin"), PathBuf::from("/opt/homebrew/bin")]);
+    out
+}
+
+fn home_dir() -> Option<PathBuf> {
+    std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" }).map(PathBuf::from)
+}
+
+/// The program's full path: as given when it names a path, else the first match on PATH and
+/// then in [`extra_dirs`]; on Windows each PATHEXT extension is tried (`claude.exe`,
+/// `claude.cmd`).
+fn find_program(program: &str, path_var: Option<&std::ffi::OsStr>, extra: &[PathBuf], windows: bool) -> Option<PathBuf> {
+    let p = Path::new(program);
+    if p.components().count() > 1 || p.is_absolute() {
+        return p.is_file().then(|| p.to_path_buf());
+    }
+    let exts: Vec<String> = if windows && p.extension().is_none() {
+        std::env::var("PATHEXT").unwrap_or_else(|_| ".COM;.EXE;.BAT;.CMD".into()).split(';').filter(|e| !e.is_empty()).map(str::to_lowercase).collect()
+    } else {
+        vec![String::new()]
+    };
+    let dirs = path_var.map(|v| std::env::split_paths(v).collect::<Vec<_>>()).unwrap_or_default();
+    for d in dirs.iter().chain(extra) {
+        for e in &exts {
+            let f = d.join(format!("{program}{e}"));
+            if f.is_file() {
+                return Some(f);
+            }
+        }
+    }
+    None
+}
+
+/// Where a program is looked for, for the message when it is not found.
+fn searched(extra: &[PathBuf]) -> String {
+    let mut s = String::from("PATH");
+    for d in extra {
+        s.push_str(", ");
+        s.push_str(&d.display().to_string());
+    }
+    s
+}
+
 /// The command for a tab: its program, or in the Flatpak, `flatpak-spawn --host` running it on
 /// the host (where the user's shell and agents are), with its environment and folder.
 fn command(preset: &Preset, launch: &Launch, cwd: Option<&Path>) -> CommandBuilder {
     let mut env: Vec<(String, String)> = vec![("TERM".into(), "xterm-256color".into()), ("COLORTERM".into(), "truecolor".into())];
     env.extend(launch.1.iter().cloned());
+    let home = home_dir();
     if flatpak_id().is_none() {
-        let mut cmd = CommandBuilder::new(&preset.program);
+        let extra = extra_dirs(home.as_deref(), cfg!(windows));
+        let path_var = std::env::var_os("PATH");
+        let found = find_program(&preset.program, path_var.as_deref(), &extra, cfg!(windows));
+        let program = found.clone().unwrap_or_else(|| PathBuf::from(&preset.program));
+        // A batch file (npm's `claude.cmd`) runs through the command interpreter.
+        let batch = program.extension().and_then(|e| e.to_str()).is_some_and(|e| e.eq_ignore_ascii_case("cmd") || e.eq_ignore_ascii_case("bat"));
+        let mut cmd = if cfg!(windows) && batch {
+            let mut c = CommandBuilder::new(std::env::var("COMSPEC").unwrap_or_else(|_| "cmd.exe".into()));
+            c.args(["/d", "/c"]);
+            c.arg(&program);
+            c
+        } else {
+            CommandBuilder::new(&program)
+        };
         cmd.args(&launch.0);
+        // The agent itself may start helpers (node, the bridge) by name: give it the folders too.
+        if found.is_some() {
+            let mut dirs: Vec<PathBuf> = path_var.as_deref().map(|v| std::env::split_paths(v).collect()).unwrap_or_default();
+            for d in extra.into_iter().filter(|d| d.is_dir()) {
+                if !dirs.contains(&d) {
+                    dirs.push(d);
+                }
+            }
+            if let Ok(joined) = std::env::join_paths(dirs) {
+                cmd.env("PATH", joined);
+            }
+        }
         for (k, v) in &env {
             cmd.env(k, v);
         }
@@ -942,11 +1047,21 @@ fn command(preset: &Preset, launch: &Launch, cwd: Option<&Path>) -> CommandBuild
         // The host's own login shell, not the sandbox's.
         cmd.args(["sh", "-c", "exec \"${SHELL:-/bin/sh}\" -l"]);
     } else {
-        cmd.arg(&preset.program);
+        // The host's PATH comes from the desktop session, which often lacks the folders agents
+        // install into; they are added, and a program found in the home folder (shared with the
+        // sandbox) is run by its full path.
+        let program = find_program(&preset.program, None, &extra_dirs(home.as_deref(), false), false)
+            .filter(|p| home.as_ref().is_some_and(|h| p.starts_with(h)))
+            .map_or_else(|| preset.program.clone(), |p| p.to_string_lossy().into_owned());
+        cmd.args(["sh", "-c", HOST_PATH_WRAPPER, &program]);
         cmd.args(&launch.0);
     }
     cmd
 }
+
+/// Run on the host by `sh -c … program args`: adds the folders agents install into to PATH,
+/// then runs the program.
+const HOST_PATH_WRAPPER: &str = "for d in \"$HOME/.local/bin\" \"$HOME/.claude/local\" \"$HOME/.npm-global/bin\" \"$HOME/.bun/bin\" \"$HOME/.volta/bin\" \"$HOME/.cargo/bin\" \"$HOME/.deno/bin\" /usr/local/bin; do [ -d \"$d\" ] && PATH=\"$PATH:$d\"; done; export PATH; exec \"$0\" \"$@\"";
 
 /// Where the endpoint and session folders live: the user's runtime directory (private to them),
 /// else the temporary directory. In the Flatpak, the app's own runtime directory, which the host
@@ -1011,9 +1126,10 @@ mod tests {
                     assert_eq!(json["mcpServers"]["reviera"]["args"][0], "mcp-bridge");
                     assert!(args.contains(&folder.join("mcp.json").to_string_lossy().into_owned()));
                 }
-                McpMethod::SettingsEnv => assert_eq!(env[0].0, "GEMINI_CLI_SYSTEM_SETTINGS_PATH"),
+                McpMethod::SettingsEnv => assert_eq!(env[0].0, p.setting),
                 McpMethod::SessionFolder => {
-                    assert!(folder.join(".qwen/settings.json").exists());
+                    let json: serde_json::Value = serde_json::from_slice(&std::fs::read(folder.join(&p.setting)).unwrap()).unwrap();
+                    assert_eq!(json["mcpServers"]["reviera"]["args"][0], "mcp-bridge", "{}", p.id);
                     assert_eq!(cwd.as_deref(), Some(folder.as_path()));
                 }
                 McpMethod::Arguments => {
@@ -1036,6 +1152,30 @@ mod tests {
         let d = std::env::temp_dir().join(format!("reviera-term-test-{}", uuid::Uuid::new_v4().simple()));
         std::fs::create_dir_all(&d).unwrap();
         d
+    }
+
+    #[test]
+    fn programs_are_found_outside_the_desktop_path() {
+        let dir = tempfile_dir();
+        let bin = dir.join(".local").join("bin");
+        std::fs::create_dir_all(&bin).unwrap();
+        let name = if cfg!(windows) { "claude.cmd" } else { "claude" };
+        std::fs::write(bin.join(name), "").unwrap();
+        // Not on PATH, found in ~/.local/bin (where Claude Code's installer puts it).
+        let extra = extra_dirs(Some(&dir), cfg!(windows));
+        let path = std::ffi::OsString::from("/nonexistent");
+        assert_eq!(find_program("claude", Some(&path), &extra, cfg!(windows)), Some(bin.join(name)));
+        assert_eq!(find_program("agy", Some(&path), &extra, cfg!(windows)), None);
+        assert!(searched(&extra).contains(".local"));
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn antigravity_replaces_gemini() {
+        let p = builtin_presets();
+        assert!(p.iter().all(|p| p.id != "gemini"));
+        let agy = p.iter().find(|p| p.id == "antigravity").unwrap();
+        assert_eq!((agy.program.as_str(), agy.mcp, agy.setting.as_str()), ("agy", McpMethod::SessionFolder, ".agents/mcp_config.json"));
     }
 
     #[test]
