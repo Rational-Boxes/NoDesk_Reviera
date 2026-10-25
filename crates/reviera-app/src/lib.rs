@@ -24,6 +24,7 @@ pub mod sheets;
 pub mod paramlib;
 pub mod classification_files;
 pub mod standards_transfer;
+pub mod system_zones;
 pub mod settings_dialogs;
 pub mod structural;
 pub mod subscriptions;
@@ -113,6 +114,15 @@ impl OpenDocument {
         ));
         *cache = Some((revision, meshes.clone()));
         Ok(meshes)
+    }
+
+    /// The IFC geometry of the products whose GlobalIds are given (spaces included), as last
+    /// saved; tessellated on every call, so for rare work such as converting legacy zones.
+    pub(crate) fn product_meshes(&self, guids: &std::collections::HashSet<String>) -> Result<Vec<reviera_ifc::Mesh>> {
+        Ok(tessellate(&self.project, &self.doc)?
+            .into_iter()
+            .filter(|m| m.global_id.as_ref().is_some_and(|g| guids.contains(g.as_str())))
+            .collect())
     }
 
     pub fn is_dirty(&self) -> bool {

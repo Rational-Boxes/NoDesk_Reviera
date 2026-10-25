@@ -156,7 +156,8 @@ pub(crate) fn load(
         let Some(name) = set.string("Name").map(str::to_owned) else {
             continue;
         };
-        if name.starts_with("Reviera_") {
+        // Reviera's own sets, and sets derived on save (marked `rxd:…`), are not parameters.
+        if name.starts_with("Reviera_") || set.string("Description").is_some_and(|d| d.starts_with("rxd:")) {
             continue;
         }
         let quantity = set.class.eq_ignore_ascii_case("IfcElementQuantity");

@@ -130,6 +130,16 @@ impl LocalProject {
         objects.retain(|e| !is_derived(&ifc, e.id));
         let length_scale = geometry::length_scale(&ifc)?;
         let (mut values, sets) = params::load(&ifc, &objects, length_scale)?;
+        // Zones from other tools keep what they group, so they can become system-zones.
+        for o in objects.iter().filter(|o| o.class.eq_ignore_ascii_case("IfcZone")) {
+            let members = crate::system_zones::legacy_members(&ifc, o.id)?;
+            if !members.is_empty() {
+                values.entry(o.id).or_default().insert(
+                    reviera_core::system_zones::MEMBERS_KEY.to_owned(),
+                    serde_json::json!(members),
+                );
+            }
+        }
         let types: HashSet<StepId> = ifc
             .entities_of_type("IfcTypeObject")?
             .into_iter()
@@ -547,7 +557,9 @@ impl LocalProject {
             {
                 geometry::remove_breps(&mut self.ifc, step)?;
             }
-            if recipe_kind == Some(rooms::ROOM_RECIPE) {
+            if recipe_kind == Some(rooms::ROOM_RECIPE)
+                || recipe_kind == Some(reviera_core::system_zones::RECIPE)
+            {
                 geometry::remove_slab(&mut self.ifc, step)?;
             }
             if recipe_kind == Some(reviera_core::mesh_objects::RECIPE) {
@@ -771,6 +783,14 @@ impl LocalProject {
             self.write_railings(doc)?;
             self.write_rooms(doc)?;
             self.write_spaces(doc)?;
+            let owner_history = self.new_owner_history()?;
+            crate::system_zones::write_system_zones(
+                &mut self.ifc,
+                doc,
+                &self.steps,
+                owner_history,
+                self.length_scale,
+            )?;
             let owner_history = self.new_owner_history()?;
             crate::curves::write_all(
                 &mut self.ifc,
@@ -4404,7 +4424,8 @@ fn is_derived(ifc: &IfcModel, id: StepId) -> bool {
             || d == REBAR_TYPE_TAG
             || d == REBAR_PART_TAG
             || d == crate::mep::TAG
-            || d == crate::selection_sets::TAG)
+            || d == crate::selection_sets::TAG
+            || d == crate::system_zones::TAG)
 }
 
 /// The lowest and highest points of a floor's, ceiling's or roof's body.

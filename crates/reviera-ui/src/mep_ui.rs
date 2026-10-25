@@ -1158,6 +1158,34 @@ impl Gui {
                 t.expand(&el);
             }
         }
+        // Zones (MEP-ZONE-001): under what serves them, each with its spaces.
+        let zones = reviera_core::system_zones::infos(&store);
+        if !zones.is_empty() {
+            let all: Vec<ElementId> = zones.iter().flat_map(|z| std::iter::once(z.id).chain(z.spaces.iter().copied())).collect();
+            if let Some(zi) = push(&mut b.nodes, &root, &format!("Zones ({})", zones.len()), all) {
+                let mut servers: Vec<Option<ElementId>> = zones.iter().map(|z| z.served_by).collect();
+                servers.sort();
+                servers.dedup();
+                for srv in servers {
+                    let of: Vec<&reviera_core::system_zones::ZoneInfo> = zones.iter().filter(|z| z.served_by == srv).collect();
+                    let text = match srv {
+                        Some(id) => label(id),
+                        None => "Unassigned".into(),
+                    };
+                    let mut ids: Vec<ElementId> = srv.into_iter().collect();
+                    ids.extend(of.iter().map(|z| z.id));
+                    let Some(si) = push(&mut b.nodes, &zi, &text, ids) else { continue };
+                    for z in of {
+                        let Some(zn) = push(&mut b.nodes, &si, &format!("{} ({} spaces)", z.name, z.spaces.len()), vec![z.id]) else { continue };
+                        for (sp, n) in z.spaces.iter().zip(&z.space_numbers) {
+                            push(&mut b.nodes, &zn, &format!("Space {n}"), vec![*sp]);
+                        }
+                    }
+                    t.expand(&si);
+                }
+                t.expand(&zi);
+            }
+        }
         let unassigned = mep_systems::unassigned(&store);
         let on_circuit = reviera_core::mep_electrical::port_circuits(&store);
         let electrical: Vec<mep::Port> = mep::all_ports(&store)

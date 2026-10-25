@@ -839,11 +839,13 @@ tools and the datums.
 
 View › User Interface › **Terminal** (Ctrl+Shift+T) opens a Terminal pane under the views: a real
 terminal (colours, full-screen programs, scrollback, copy and paste) with tabs for your shell and
-for command-line AI agents: **Claude Code**, **Gemini CLI**, **Qwen Code** and **Codex CLI**, plus
+for command-line AI agents: **Claude Code**, **Antigravity CLI** (which replaced Gemini CLI), **Qwen Code** and **Codex CLI**, plus
 your own presets. An agent tab starts the agent already connected to the open model through
 Reviera's MCP server, via `reviera mcp-bridge` over a private local socket with a per-session
 secret; the agent's edits are ordinary undoable commands, destructive ones wait for your approval
-in Reviera, and your own agent settings are never changed (UI-AGENT-004).
+in Reviera, and your own agent settings are never changed (UI-AGENT-004). Agents are found on
+PATH and in the folders their installers use that a desktop session's PATH often lacks
+(`~/.local/bin`, npm, Bun, Volta, nvm; on Windows `.local\bin` and npm's `.cmd` scripts).
 
 ### MEP (in development)
 
@@ -1044,6 +1046,16 @@ schedules, circuit paths, cable sizing and voltage drop.
   (MEPSpace) with Qto_SpaceBaseQuantities (`space.place`, `space.place_auto`,
   `space.name_from_rooms`, `space.unplace`, `space.set`, `space.info`). Not built yet: spaces
   drawn in plans, space separators, upper limits by roof or ceiling, linked rooms.
+- **System-zones** (Analyze › Spaces & Zones › System-Zone, Zone by Level, System-Zones, Convert
+  Zones): regions sketched on a level (picked walls, lines, rectangles or typed coordinates) or
+  covering a whole level, taking the MEP spaces inside or touching them, served by mechanical
+  equipment or an MEP system, with set points, humidity limits and outdoor air; drawn dashed in
+  plans and listed under Zones in the System Browser; exported as IfcSpatialZone (THERMAL) with a
+  derived IfcZone (SystemZone) grouping the spaces and equipment, Pset_ZoneCommon,
+  IfcRelServicesBuildings and Pset_SpaceThermalRequirements on the spaces; legacy IfcZones from
+  imported models convert into system-zones enveloping their spaces (`system_zone.create`,
+  `.assign`, `.set`, `.info`, `.convert_legacy`; MEP-ZONE-001). Not built yet: assignment through
+  the energy model (ANA-EM-003), zones in links and phases, grips on the outline.
 - **Global parameters** (Manage › Settings › Global Parameters `GL`, Label with Global, Associate
   Global): project-wide values and unit-checked formulas (`CorridorWidth * 2 + 300 mm`, cycles
   refused) that drive labelled dimensions and associated instance parameters such as door sill
@@ -1461,8 +1473,7 @@ area by area (reviewed against the spec on 2026-10-15).
 - **MEP** (in development): duct and pipe fittings placed and edited in the view, the fitting controls and grips, surface connectors for conduit, moving runs, flex duct,
   wires, panel schedule templates and editing (moves, spares, rebalancing), the two-column layout, custom circuit naming, switch systems, the Edit Path tool, Static Regain, the System Inspector's on-canvas legend, background network calculation, a built-in fixture-unit curve
   and calculations, the System Browser's
-  zones, columns and search, the System Editor, placing connectors on faces in a component editor, fabrication, P&ID and spaces
-  and zones are specified but not built.
+  zones, columns and search, the System Editor, placing connectors on faces in a component editor, fabrication, and P&ID are specified but not built.
 - **Families and collaboration** (BIMserver, OpenCDE, Godot) are specified but not started.
 - **Remote computation subsystem** (DM-RPC-001 … 010): in development; the first milestone is
   built (see [Analysis and remote computation](#analysis-and-remote-computation-in-development)).

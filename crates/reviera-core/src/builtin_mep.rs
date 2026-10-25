@@ -211,6 +211,11 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(SpaceSet),
         registry.add(SpaceNameFromRooms),
         registry.add(SpaceInfo),
+        registry.add(SystemZoneCreate),
+        registry.add(SystemZoneAssign),
+        registry.add(SystemZoneSet),
+        registry.add(SystemZoneInfo),
+        registry.add(SystemZoneApplyConvert),
         registry.add(GlobalCreate),
         registry.add(GlobalSet),
         registry.add(GlobalDelete),
@@ -2166,6 +2171,60 @@ read_command!(
     crate::mep_spaces::InfoParams,
     Vec<crate::mep_spaces::SpaceInfo>,
     crate::mep_spaces::infos
+);
+
+edit_command!(
+    SystemZoneCreate,
+    "system_zone.create",
+    "Make a system-zone",
+    "Makes a system-zone (MEP-ZONE-001): an IfcSpatialZone (THERMAL) on `level_id` marking the area an air system, water loop or zone equipment serves, either sketched (`boundary`, its corners in plan, metres) or covering the whole level (`whole_level`: the box round everything on it, kept up to date). `height` defaults to the next level (3 m on the top level). Every MEP space on the level inside or touching it is assigned to it. Returns its id.",
+    "System-Zone",
+    crate::system_zones::CreateParams,
+    crate::id::ElementId,
+    crate::system_zones::create
+);
+
+edit_command!(
+    SystemZoneAssign,
+    "system_zone.assign",
+    "Assign a system-zone",
+    "Assigns the system-zone `zone_id` to what serves it, `equipment_or_system_id`: a piece of mechanical equipment or an MEP system (an air system or a water loop); null clears it. In IFC the system serves the zone by IfcRelServicesBuildings, equipment is grouped into its IfcZone.",
+    "Assign System-Zone",
+    crate::system_zones::AssignParams,
+    (),
+    crate::system_zones::assign
+);
+
+edit_command!(
+    SystemZoneSet,
+    "system_zone.set",
+    "Change system-zones",
+    "Changes system-zones (`zone_ids`): `name`, a new `boundary` or `whole_level`, `height` (null follows the levels), the heating and cooling set points (°C), humidity limits (relative, %) and outdoor air per person (m³/s) and per area (m³/s per m²); null clears a value. The heating set point must be below the cooling one. Set points are written to Pset_SpaceThermalRequirements on each assigned space.",
+    "Edit System-Zone",
+    crate::system_zones::SetParams,
+    (),
+    crate::system_zones::set
+);
+
+read_command!(
+    SystemZoneInfo,
+    "system_zone.info",
+    "System-zones",
+    "Each system-zone's (`zone_ids`, or every one) name, level, whether it covers the whole level, outline, area and height, its assigned spaces (MEP spaces on its level inside or touching it) with their numbers, what serves it (equipment or system) and its set points.",
+    crate::system_zones::InfoParams,
+    Vec<crate::system_zones::ZoneInfo>,
+    crate::system_zones::info_cmd
+);
+
+edit_command!(
+    SystemZoneApplyConvert,
+    "system_zone.apply_convert",
+    "Replace legacy zones",
+    "Replaces each legacy IfcZone (`zones[].legacy_id`) with a system-zone of its name on `level_id` with the given `boundary`, `height` and `props` (set points), as `system_zone.convert_legacy` works them out. One undo step. Returns the system-zones.",
+    "Convert Zones",
+    crate::system_zones::ApplyConvertParams,
+    Vec<crate::id::ElementId>,
+    crate::system_zones::apply_convert
 );
 
 edit_command!(

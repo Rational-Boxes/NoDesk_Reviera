@@ -171,7 +171,7 @@ pub fn regenerate(store: &Store, e: &Element) -> Result<RoomGeometry> {
 }
 
 /// The geometry of a room's recipe (MEP spaces share it, MEP-SPACE-001).
-pub(crate) fn regenerate_recipe(store: &Store, r: &RoomRecipe) -> Result<RoomGeometry> {
+pub fn regenerate_recipe(store: &Store, r: &RoomRecipe) -> Result<RoomGeometry> {
     let level_z = elevation(store, &r.level, "level")?;
     let upper_z = match &r.upper_level {
         Some(g) => elevation(store, g, "upper limit level")?,

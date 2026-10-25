@@ -20,6 +20,7 @@ pub mod params;
 mod path_arrays;
 mod psets;
 mod selection_sets;
+mod system_zones;
 mod spatial;
 mod stacked_walls;
 

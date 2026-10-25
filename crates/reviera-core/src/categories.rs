@@ -258,6 +258,7 @@ pub const CATEGORIES: &[Category] = &[
         true,
     ),
     cat("cat.spaces", "Spaces", Some("IfcSpace"), None, Some("Pset_SpaceCommon"), true),
+    cat("cat.system_zones", "System-Zones", Some("IfcSpatialZone"), None, None, true),
     cat(
         "cat.areas",
         "Areas",

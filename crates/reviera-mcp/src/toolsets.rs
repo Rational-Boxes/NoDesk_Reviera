@@ -149,6 +149,7 @@ pub fn toolset_of(command: &str) -> String {
             | "placeholder"
             | "air_terminal"
             | "space"
+            | "system_zone"
             | "mech_equipment"
             | "equipment_set"
             | "mechanical_settings"

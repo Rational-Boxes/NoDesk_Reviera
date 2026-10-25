@@ -463,6 +463,18 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "spaces" => format!(
             r#"<path d="M4 5h24v22H4z" fill="{f}" {s}/><path d="M8 10h16M8 16h16M8 22h16" {sa}/>"#
         ),
+        "system_zone" => format!(
+            r#"<path d="M4 6h24v20H4z" fill="{f}" stroke-dasharray="5 3" {s}/><path d="M10 12h5v8h-5zM17 12h5v8h-5z" fill="none" {sa}/>"#
+        ),
+        "system_zone_level" => format!(
+            r#"<path d="M3 5h26v22H3z" fill="{f}" stroke-dasharray="5 3" {s}/><path d="M3 27h26" stroke-width="2.5" {sa}/><path d="M8 10h7v6H8zM17 10h7v6h-7zM8 18h16v5H8z" fill="none" {sa}/>"#
+        ),
+        "system_zones" => format!(
+            r#"<path d="M4 5h24v22H4z" fill="{f}" stroke-dasharray="5 3" {s}/><path d="M8 11h16M8 16h16M8 21h16" {sa}/>"#
+        ),
+        "zone_convert" => format!(
+            r#"<path d="M3 8h11v14H3z" fill="none" {sa}/><path d="M18 8h11v14H18z" fill="{f}" stroke-dasharray="4 2" {s}/><path d="M11 15h9M17 12l3 3-3 3" fill="none" {sa}/>"#
+        ),
         "global_parameters" => format!(
             r#"<circle cx="16" cy="16" r="12" fill="{f}" {s}/><path d="M4 16h24M16 4c-5 4-5 20 0 24M16 4c5 4 5 20 0 24" fill="none" {sa}/>"#
         ),

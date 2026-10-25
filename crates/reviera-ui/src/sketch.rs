@@ -137,6 +137,10 @@ pub struct SketchSession {
     pub analytical_opening: bool,
     /// A floor finished as a structural floor (STR-FLOOR-001).
     pub structural: bool,
+    /// A boundary finished as a system-zone (MEP-ZONE-001), or as the new boundary of the
+    /// system-zone `zone_edit`.
+    pub system_zone: bool,
+    pub zone_edit: Option<ElementId>,
     /// An opening finished as an opening by face (ARC-OPEN-001): its sides square to the
     /// host's face.
     pub by_face: bool,
@@ -269,6 +273,8 @@ impl Gui {
             analytical_panel: false,
             analytical_opening: false,
             structural: false,
+            system_zone: false,
+            zone_edit: None,
             by_face: false,
             host,
             level,
@@ -323,7 +329,7 @@ impl Gui {
         self.sketch_preview();
     }
 
-    fn sketch_prompt(&mut self) {
+    pub(crate) fn sketch_prompt(&mut self) {
         let Some(s) = &self.sketch else { return };
         let what = match s.mode {
             DrawMode::Select => {
@@ -346,6 +352,8 @@ impl Gui {
             DrawMode::DefinesSlope => "Defines Slope: click a curve to make it slope or a gable",
         };
         let verb = match (s.host, s.kind) {
+            _ if s.zone_edit.is_some() => "Edit System-Zone Boundary",
+            _ if s.system_zone => "System-Zone",
             (Some(_), SketchKind::Roof) => "Edit Footprint",
             (Some(_), _) => "Edit Boundary",
             (None, SketchKind::Slab(SlabKind::Floor)) => "Floor",
@@ -744,6 +752,18 @@ impl Gui {
         let Some(s) = &self.sketch else { return };
         let curves = curves_json(s.kind, &s.curves);
         let (command, args) = match (s.host, s.kind) {
+            _ if s.system_zone => {
+                let Some(mut ring) = sketch_loops(&s.curves).into_iter().next() else {
+                    return frame.set_status_text("Sketch a closed boundary first", 0);
+                };
+                if ring.len() > 1 && ring.first() == ring.last() {
+                    ring.pop();
+                }
+                match s.zone_edit {
+                    Some(z) => ("system_zone.set", json!({ "zone_ids": [z], "boundary": ring })),
+                    None => ("system_zone.create", json!({ "level_id": s.level, "boundary": ring })),
+                }
+            }
             (Some(host), kind) => edit_command(kind, host, curves),
             (None, SketchKind::Roof) => {
                 let mut a = json!({ "curves": curves, "level_id": s.level });
@@ -861,7 +881,7 @@ impl Gui {
         };
         match self.app.execute(command, args, &super::user()) {
             Ok(out) => {
-                let made = s.host.or_else(|| out.result.as_u64().map(ElementId));
+                let made = s.host.or(s.zone_edit).or_else(|| out.result.as_u64().map(ElementId));
                 // A new roof offers to attach the walls under it, so gables fill.
                 let attach: Vec<ElementId> = match made {
                     Some(roof) if s.kind == SketchKind::Roof && s.host.is_none() => self

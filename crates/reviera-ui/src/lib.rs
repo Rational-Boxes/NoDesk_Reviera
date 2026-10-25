@@ -104,6 +104,7 @@ mod globals_ui;
 mod paramlib_ui;
 mod classification_ui;
 mod standards_ui;
+mod zones_ui;
 mod mech_settings_ui;
 mod wall_profile;
 mod wall_sweeps;
@@ -4792,6 +4793,13 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "space.place_auto" => with(gui, Gui::place_spaces_automatically),
         "space.name_from_rooms" => with(gui, Gui::name_spaces_from_rooms),
         "space.info" => with(gui, Gui::spaces_dialog),
+        "system_zone.create" => with(gui, |g| {
+            g.start_system_zone_sketch();
+            focus(g);
+        }),
+        "ui.system_zone_by_level" => with(gui, Gui::system_zone_by_level),
+        "system_zone.info" => with(gui, Gui::system_zones_dialog),
+        "system_zone.convert_legacy" => with(gui, Gui::convert_legacy_zones),
         "room.place_automatically" => with(gui, |g| {
             g.place_rooms_automatically();
             focus(g);
