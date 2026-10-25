@@ -212,6 +212,9 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(SpaceNameFromRooms),
         registry.add(SpaceInfo),
         registry.add(SpaceSeparatorCreate),
+        registry.add(LightingCalcAverage),
+        registry.add(MepColorLegendPlace),
+        registry.add(LightingFixtureTypeSetLighting),
         registry.add(SystemZoneCreate),
         registry.add(SystemZoneAssign),
         registry.add(SystemZoneSet),
@@ -2172,6 +2175,38 @@ read_command!(
     crate::mep_spaces::InfoParams,
     Vec<crate::mep_spaces::SpaceInfo>,
     crate::mep_spaces::infos
+);
+
+edit_command!(
+    MepColorLegendPlace,
+    "mep_color_legend.place",
+    "Place a duct or pipe legend",
+    "Places a duct or pipe colour fill legend (MEP-DUCT-010) in the plan view `view_id` at `point` (its top-left corner): the view then colours that kind's segments, and fittings unless the scheme leaves them out, by the scheme `scheme_id` (a colorscheme of cat.ducts or cat.pipes, made with colorscheme.create: Flow, Velocity, Friction, Pressure Drop, Size, System Type, System Name; for pipes also Fluid Temperature and Slope). One duct and one pipe legend per view; deleting the legend removes the fill from that view only. Elements with no value take the scheme's No value colour. Returns the legend.",
+    "Color Fill Legend",
+    crate::mep_color_fill::PlaceParams,
+    crate::id::ElementId,
+    crate::mep_color_fill::place
+);
+
+read_command!(
+    LightingCalcAverage,
+    "lighting.calc_average",
+    "Average estimated illumination",
+    "The lumen (zonal cavity) method for each space (`space_ids`, or every space; ANA-LIGHT-001): E = N × Φ × CU × LLF ÷ A over the lighting fixtures whose room calculation point is in the space, Φ from the type's photometric file or its own lumens, RCR = 2.5 × h_rc × perimeter ÷ area from the workplane to the fixtures' average height, CU interpolated in the type's CU table at the RCR and the space's reflectances, LLF from the space, else the type, else 0.8. Each result has the illuminance (lx), RCR, fixtures counted, excluded fixtures with their reason (no CU data, no lumen data), the target (Pset_SpaceLightingRequirements.Illuminance) and whether it is met; unplaced or unenclosed spaces are skipped with a reason. Worked out from the model as it is now.",
+    crate::mep_illumination::CalcParams,
+    Vec<crate::mep_illumination::Illumination>,
+    crate::mep_illumination::calc_average
+);
+
+edit_command!(
+    LightingFixtureTypeSetLighting,
+    "lighting_fixture_type.set_lighting",
+    "Set a fixture type's lumen method data",
+    "Sets a lighting fixture type's (`type_id`) data for average estimated illumination (ANA-LIGHT-001): `lumens` per fixture (used when its photometric file states none), `light_loss_factor` (0–1; 0.8 when none) and `cu_table` {rcr: [rising RCR rows], columns: [[ceiling, wall, floor reflectance 0–1]...], values: [[CU per column] per row]}; null clears a value. Reviera ships no CU tables: take them from the manufacturer's data. Returns the type's data.",
+    "Lighting Data",
+    crate::mep_illumination::SetLightingParams,
+    crate::mep_illumination::LightingData,
+    crate::mep_illumination::set_lighting
 );
 
 edit_command!(

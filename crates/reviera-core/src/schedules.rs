@@ -173,6 +173,9 @@ pub fn available_fields(store: &Store, category: &str) -> Vec<FieldInfo> {
             info("space.people", "Number of People", true),
             info("space.actual_supply", "Actual Supply Airflow", true),
             info("space.specified_supply", "Specified Supply Airflow", true),
+            info("space.illuminance", "Average Estimated Illumination", true),
+            info("space.target_illuminance", "Target Illuminance", true),
+            info("space.meets_target", "Meets Target", false),
         ]),
         "cat.doors" | "cat.windows" => out.extend([
             info("insert.width", "Width", false),
@@ -498,6 +501,18 @@ impl Context<'_> {
                     "space.actual_lighting" => Cell { text: format!("{:.0} W", s.actual_lighting_load), value: Some(s.actual_lighting_load), editable: false },
                     "space.people" => Cell { text: format!("{:.1}", s.people), value: Some(s.people), editable: false },
                     "space.actual_supply" => Cell { text: format!("{:.1} L/s", s.actual_supply * 1000.0), value: Some(s.actual_supply * 1000.0), editable: false },
+                    "space.illuminance" => match s.illuminance {
+                        Some(v) => Cell { text: format!("{v:.0} lx"), value: Some(v), editable: false },
+                        None => none(),
+                    },
+                    "space.target_illuminance" => match s.target_illuminance {
+                        Some(v) => Cell { text: format!("{v:.0} lx"), value: Some(v), editable: false },
+                        None => none(),
+                    },
+                    "space.meets_target" => match s.meets_target {
+                        Some(m) => Context::text(if m { "Yes" } else { "No" }),
+                        None => none(),
+                    },
                     "space.specified_supply" => match s.props.specified_supply {
                         Some(v) => Cell { text: format!("{:.1} L/s", v * 1000.0), value: Some(v * 1000.0), editable: false },
                         None => none(),

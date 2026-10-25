@@ -15,8 +15,11 @@
 //! Parameters: `Name`, `Number`, `Area` (m²), `Perimeter` (m), or any parameter of the
 //! category (project parameters too), by its name.
 //!
-//! Not built yet: fill patterns, the legend as a placed annotation, Spaces, HVAC zones, ducts and
-//! pipes, sections, linked models, colour fills in IFC.
+//! Ducts and pipes (`cat.ducts`, `cat.pipes`) are coloured through their placed legends
+//! ([`crate::mep_color_fill`], MEP-DUCT-010), with *Include fittings* and a *No value* colour.
+//!
+//! Not built yet: fill patterns, the room legend as a placed annotation, Spaces, HVAC zones,
+//! sections, linked models, colour fills in IFC.
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -72,6 +75,12 @@ pub struct ColorScheme {
     pub mode: Mode,
     #[serde(default)]
     pub rows: Vec<Row>,
+    /// Ducts and pipes: fill fittings and accessories too.
+    #[serde(default = "yes")]
+    pub include_fittings: bool,
+    /// Ducts and pipes: the colour of elements with no value (`#rrggbb`); none leaves them.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub no_value_color: Option<String>,
 }
 
 /// A row as it applies now.
@@ -155,13 +164,19 @@ fn elements(store: &Store, category: &str) -> Vec<ElementId> {
     match category {
         "cat.rooms" => crate::rooms::all(store).into_iter().map(|r| r.id).collect(),
         "cat.areas" => crate::areas::all(store).into_iter().map(|a| a.id).collect(),
-        _ => Vec::new(),
+        c => match crate::mep_color_fill::Kind::of_category(c) {
+            Some(k) => crate::mep_color_fill::elements(store, k, true),
+            None => Vec::new(),
+        },
     }
 }
 
 /// An element's value of a parameter: its text, and its number for ranges.
 pub fn value_of(store: &Store, id: ElementId, parameter: &str) -> Option<(String, Option<f64>)> {
     let e = store.get(id)?;
+    if crate::mep_color_fill::is_run_element(e) {
+        return crate::mep_color_fill::value_of(store, e, parameter);
+    }
     let region_area = |id: ElementId| -> Option<(f64, f64)> {
         if let Some(r) = crate::rooms::all(store).into_iter().find(|r| r.id == id) {
             return Some((r.geometry.area(), r.geometry.perimeter()));
@@ -345,6 +360,10 @@ pub struct CreateParams {
     #[serde(default)]
     pub ranges: Vec<f64>,
     pub title: Option<String>,
+    /// Ducts and pipes: fill fittings and accessories too (default yes).
+    pub include_fittings: Option<bool>,
+    /// Ducts and pipes: the colour for elements with no value (`#rrggbb`).
+    pub no_value_color: Option<String>,
 }
 
 /// `colorscheme.create`: its key.
@@ -358,16 +377,34 @@ pub(crate) fn create(txn: &mut Transaction<'_>, p: CreateParams) -> Result<Strin
         ));
     }
     let category = p.category.unwrap_or_else(|| "cat.rooms".into());
-    if category != "cat.rooms" && category != "cat.areas" {
+    let mep = crate::mep_color_fill::Kind::of_category(&category);
+    if category != "cat.rooms" && category != "cat.areas" && mep.is_none() {
         return Err(Error::new(
             "colorscheme.category",
-            "colour schemes colour rooms (cat.rooms) or areas (cat.areas) for now",
+            "colour schemes colour rooms (cat.rooms), areas (cat.areas), ducts (cat.ducts) or pipes (cat.pipes)",
         ));
+    }
+    if let Some(k) = mep
+        && !k.offers(&p.parameter)
+    {
+        let mut offered: Vec<&str> = crate::mep_color_fill::DUCT_PARAMETERS.to_vec();
+        if k == crate::mep_color_fill::Kind::Pipe {
+            offered.extend(crate::mep_color_fill::PIPE_PARAMETERS);
+        }
+        return Err(Error::new(
+            "colorscheme.parameter",
+            format!("{:?} is not offered for {category}; one of {}", p.parameter, offered.join(", ")),
+        ));
+    }
+    if let Some(c) = p.no_value_color.as_deref()
+        && rgba(c).is_none()
+    {
+        return Err(Error::new("colorscheme.color", format!("`{c}` is not a #rrggbb colour")));
     }
     let mut ranges = p.ranges.clone();
     ranges.sort_by(f64::total_cmp);
     let id = GlobalId::new().to_string();
-    list.push(ColorScheme {
+    let mut scheme = ColorScheme {
         id: id.clone(),
         title: p.title.unwrap_or_else(|| format!("{} Legend", name)),
         name,
@@ -385,7 +422,18 @@ pub(crate) fn create(txn: &mut Transaction<'_>, p: CreateParams) -> Result<Strin
                 caption: None,
             })
             .collect(),
-    });
+        include_fittings: p.include_fittings.unwrap_or(true),
+        no_value_color: p.no_value_color,
+    };
+    // A duct or pipe range scheme with no bands: five equal ones over the values found now.
+    if mep.is_some() && scheme.mode == Mode::Range && scheme.rows.is_empty() {
+        scheme.rows = crate::mep_color_fill::default_bands(txn.store(), &scheme)
+            .into_iter()
+            .enumerate()
+            .map(|(k, lo)| Row { value: None, at_least: Some(lo), color: palette(k), visible: true, caption: None })
+            .collect();
+    }
+    list.push(scheme);
     write(txn, &list)?;
     Ok(id)
 }
@@ -399,6 +447,9 @@ pub struct SetRowsParams {
     pub title: Option<String>,
     pub parameter: Option<String>,
     pub mode: Option<Mode>,
+    pub include_fittings: Option<bool>,
+    /// `#rrggbb`; an empty string clears it.
+    pub no_value_color: Option<String>,
 }
 
 /// `colorscheme.set_rows`.
@@ -425,6 +476,15 @@ pub(crate) fn set_rows(txn: &mut Transaction<'_>, p: SetRowsParams) -> Result<()
     }
     if let Some(m) = p.mode {
         s.mode = m;
+    }
+    if let Some(f) = p.include_fittings {
+        s.include_fittings = f;
+    }
+    match p.no_value_color.as_deref() {
+        Some("") => s.no_value_color = None,
+        Some(c) if rgba(c).is_none() => return Err(Error::new("colorscheme.color", format!("`{c}` is not a #rrggbb colour"))),
+        Some(c) => s.no_value_color = Some(c.to_owned()),
+        None => {}
     }
     write(txn, &list)
 }

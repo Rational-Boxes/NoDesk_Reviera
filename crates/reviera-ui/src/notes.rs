@@ -28,6 +28,9 @@ pub enum NoteTool {
     Tag,
     RoomTag,
     Text,
+    /// Analyze › Color Fill › Duct Legend / Pipe Legend (MEP-DUCT-010).
+    DuctLegend,
+    PipeLegend,
 }
 
 /// Tag All Not Tagged's categories: key and label.
@@ -96,6 +99,8 @@ impl Gui {
                 }
                 NoteTool::RoomTag => "Room Tag: click inside a room; Esc ends",
                 NoteTool::Text => "Text: click where the text's top-left corner goes; Esc ends",
+                NoteTool::DuctLegend => "Duct Legend: click where the legend's top-left corner goes",
+                NoteTool::PipeLegend => "Pipe Legend: click where the legend's top-left corner goes",
             },
             0,
         );
@@ -139,6 +144,17 @@ impl Gui {
                 self.run(
                     "tag.create_room",
                     json!({ "view_id": plan, "room_id": room, "position": p }),
+                )
+            }
+            NoteTool::DuctLegend | NoteTool::PipeLegend => {
+                let kind = if kind == NoteTool::DuctLegend { reviera_core::mep_color_fill::Kind::Duct } else { reviera_core::mep_color_fill::Kind::Pipe };
+                self.end_note_tool();
+                let Some(scheme) = self.choose_mep_scheme(kind) else {
+                    return;
+                };
+                self.run(
+                    "mep_color_legend.place",
+                    json!({ "view_id": plan, "kind": kind, "scheme_id": scheme, "point": p }),
                 )
             }
             NoteTool::Text => {

@@ -124,6 +124,8 @@ pub struct SpaceProps {
     pub specified_supply: Option<f64>,
     pub specified_return: Option<f64>,
     pub specified_exhaust: Option<f64>,
+    /// The light loss factor for the lumen method (ANA-LIGHT-001), overriding the fixtures'.
+    pub light_loss_factor: Option<f64>,
     pub overrides: Overrides,
 }
 
@@ -140,6 +142,7 @@ impl Default for SpaceProps {
             specified_supply: None,
             specified_return: None,
             specified_exhaust: None,
+            light_loss_factor: None,
             overrides: Overrides::default(),
         }
     }
@@ -342,6 +345,12 @@ pub struct SetParams {
     pub specified_supply: Option<f64>,
     pub specified_return: Option<f64>,
     pub specified_exhaust: Option<f64>,
+    /// The light loss factor for the lumen method (0–1), overriding the fixtures'; a negative
+    /// value clears it.
+    pub light_loss_factor: Option<f64>,
+    /// The target illuminance (lx, `Pset_SpaceLightingRequirements.Illuminance`); a negative
+    /// value clears it.
+    pub target_illuminance: Option<f64>,
     /// Values replacing the space type's; each given value overrides, a `null` one goes back to
     /// the type's.
     #[serde(default)]
@@ -354,6 +363,12 @@ pub(crate) fn set(txn: &mut Transaction<'_>, p: SetParams) -> Result<()> {
     let ids = spaces_of(&store, &p.ids)?;
     if p.number.is_some() && ids.len() > 1 {
         return Err(bad("space.number_not_unique", "several spaces cannot take one number"));
+    }
+    if p.light_loss_factor.is_some_and(|f| f > 1.0 || f == 0.0 || f.is_nan()) {
+        return Err(bad("space.llf", "the light loss factor runs from above 0 to 1"));
+    }
+    if p.target_illuminance.is_some_and(|t| t.is_nan()) {
+        return Err(bad("space.illuminance", "the target illuminance is a number of lux"));
     }
     for r in [p.ceiling_reflectance, p.wall_reflectance, p.floor_reflectance].into_iter().flatten() {
         if !(0.0..=1.0).contains(&r) {
@@ -378,6 +393,9 @@ pub(crate) fn set(txn: &mut Transaction<'_>, p: SetParams) -> Result<()> {
             if let Some(v) = v {
                 *slot = (v >= 0.0).then_some(v);
             }
+        }
+        if let Some(f) = p.light_loss_factor {
+            pr.light_loss_factor = (f > 0.0).then_some(f);
         }
         // Overrides: merged into the stored ones, nulls removing.
         let mut o = serde_json::to_value(&pr.overrides).expect("serialises");
@@ -405,8 +423,18 @@ pub(crate) fn set(txn: &mut Transaction<'_>, p: SetParams) -> Result<()> {
         }
         let rv = serde_json::to_value(&recipe).expect("serialises");
         let (number, name) = (p.number.clone(), p.name.clone());
+        let target = p.target_illuminance;
         txn.modify(id, |e| {
             e.params.insert(RECIPE_KEY.into(), rv);
+            match target {
+                Some(t) if t >= 0.0 => {
+                    e.params.insert(crate::mep_illumination::TARGET_KEY.into(), crate::mep_illumination::target_value(t));
+                }
+                Some(_) => {
+                    e.params.remove(crate::mep_illumination::TARGET_KEY);
+                }
+                None => {}
+            }
             if let Some(n) = number {
                 e.name = Some(n);
             }
@@ -507,6 +535,11 @@ pub struct SpaceInfo {
     pub actual_exhaust: f64,
     /// People by area per person.
     pub people: f64,
+    /// Average estimated illumination (lx, ANA-LIGHT-001); none when skipped.
+    pub illuminance: Option<f64>,
+    /// The target (lx) and whether the average meets it.
+    pub target_illuminance: Option<f64>,
+    pub meets_target: Option<bool>,
 }
 
 /// Information on a space.
@@ -541,7 +574,14 @@ pub fn info(store: &Store, id: ElementId) -> Option<SpaceInfo> {
         actual_supply: 0.0,
         actual_return: 0.0,
         actual_exhaust: 0.0,
+        illuminance: None,
+        target_illuminance: crate::mep_illumination::target(e),
+        meets_target: None,
     };
+    if let Some(i) = crate::mep_illumination::illumination(store, id) {
+        out.illuminance = i.illuminance;
+        out.meets_target = i.meets_target;
+    }
     let (Some(level), Some(region)) = (level, g.as_ref().and_then(|g| g.region.as_ref())) else { return Some(out) };
     for c in store.iter() {
         let Some(cr) = mesh_objects::mesh_object_recipe(c) else { continue };

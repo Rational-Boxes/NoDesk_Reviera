@@ -463,6 +463,18 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "spaces" => format!(
             r#"<path d="M4 5h24v22H4z" fill="{f}" {s}/><path d="M8 10h16M8 16h16M8 22h16" {sa}/>"#
         ),
+        "duct_legend" => format!(
+            r##"<path d="M3 8h16v6H3z" fill="#5b9bd5" {s}/><path d="M3 18h16v6H3z" fill="#ed7d31" {s}/><path d="M22 9h7M22 13h5M22 19h7M22 23h5" {sa}/>"##
+        ),
+        "pipe_legend" => format!(
+            r##"<path d="M3 11h16" stroke="#5b9bd5" stroke-width="4"/><path d="M3 21h16" stroke="#ed7d31" stroke-width="4"/><path d="M22 9h7M22 13h5M22 19h7M22 23h5" {sa}/>"##
+        ),
+        "lighting_data" => format!(
+            r#"<path d="M10 4h12l3 8H7z" fill="{f}" {s}/><path d="M16 12v4M6 20h20M6 24h20M6 28h12" {sa}/>"#
+        ),
+        "illumination" => format!(
+            r#"<path d="M10 4h12l3 6H7z" fill="{f}" {s}/><path d="M9 12l-4 12M16 12v12M23 12l4 12" stroke-dasharray="2 2" {sa}/><path d="M3 27h26" stroke-width="2.5" {sa}/>"#
+        ),
         "space_separator" => format!(
             r#"<path d="M4 6h24v20H4z" fill="none" stroke-dasharray="4 2" {sa}/><path d="M16 4v24" stroke-width="2.5" {sa}/>"#
         ),

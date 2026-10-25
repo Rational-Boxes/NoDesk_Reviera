@@ -50,6 +50,8 @@ pub const UI_ACTIONS: &[&str] = &[
     "analytical_model.adjust",
     "ui.analytical_panel_curved",
     "ui.system_zone_by_level",
+    "ui.duct_legend",
+    "ui.pipe_legend",
     "help.home",
     "wall.edit_assembly",
     "tool.measure",

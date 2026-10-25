@@ -2554,6 +2554,30 @@ keys = "LF"
 help = "Hang lighting fixtures under the ceiling over each click, or at a height; the room they belong to is decided by their type's calculation point (MEP-ELEC-001)"
 
 [[action]]
+id = "ui.duct_legend"
+label = "Duct Legend"
+icon = "duct_legend"
+help = "Place a duct colour fill legend: ducts in this plan are coloured by a scheme of flow, velocity, friction, pressure drop, size or system (MEP-DUCT-010)"
+
+[[action]]
+id = "ui.pipe_legend"
+label = "Pipe Legend"
+icon = "pipe_legend"
+help = "Place a pipe colour fill legend: pipes in this plan are coloured by a scheme of flow, velocity, friction, pressure drop, size, system, fluid temperature or slope (MEP-DUCT-010)"
+
+[[action]]
+id = "lighting_fixture_type.set_lighting"
+label = "Lighting Data"
+icon = "lighting_data"
+help = "Set the selected lighting fixture's type's lumens, light loss factor and CU table (from the manufacturer's data) for average estimated illumination (ANA-LIGHT-001)"
+
+[[action]]
+id = "lighting.calc_average"
+label = "Illumination"
+icon = "illumination"
+help = "Average estimated illumination of every space by the lumen method, with its target, RCR and the fixtures counted or left out; it follows the model as it changes (ANA-LIGHT-001)"
+
+[[action]]
 id = "lighting_fixture_type.set_photometry"
 label = "Photometry"
 icon = "photometry"
@@ -3282,6 +3306,7 @@ tools = [
   { action = "device.place", size = "large" },
   { action = "lighting_fixture.place", size = "large" },
   { action = "lighting_fixture_type.set_photometry", size = "small" },
+  { action = "lighting_fixture_type.set_lighting", size = "small" },
   { action = "circuit.create", size = "large" },
   { action = "circuit.properties", size = "large" },
   { action = "circuit.add", size = "small" },
@@ -3336,10 +3361,18 @@ tools = [
   { action = "space.name_from_rooms", size = "small" },
   { action = "space.info", size = "small" },
   { action = "space_separator.create", size = "small" },
+  { action = "lighting.calc_average", size = "small" },
   { action = "system_zone.create", size = "large" },
   { action = "ui.system_zone_by_level", size = "small" },
   { action = "system_zone.info", size = "small" },
   { action = "system_zone.convert_legacy", size = "small" },
+]
+
+[[tab.panel]]
+label = "Color Fill"
+tools = [
+  { action = "ui.duct_legend", size = "small" },
+  { action = "ui.pipe_legend", size = "small" },
 ]
 
 [[tab.panel]]

@@ -106,6 +106,8 @@ mod classification_ui;
 mod standards_ui;
 mod zones_ui;
 mod spaces_ui;
+mod lighting_ui;
+mod mep_fill_ui;
 mod mech_settings_ui;
 mod wall_profile;
 mod wall_sweeps;
@@ -2146,6 +2148,7 @@ impl Gui {
         let hit = self
             .room_label_at(x, y)
             .or_else(|| self.space_label_at(x, y))
+            .or_else(|| self.mep_legend_at(x, y))
             .or_else(|| self.rebar_line_at(x, y))
             .or_else(|| self.placeholder_at(x, y))
             .or_else(|| self.element_at(x, y, panel))
@@ -4267,6 +4270,14 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
             g.start_note_tool(notes::NoteTool::Text);
             focus(g);
         }),
+        "ui.duct_legend" => with(gui, |g| {
+            g.start_note_tool(notes::NoteTool::DuctLegend);
+            focus(g);
+        }),
+        "ui.pipe_legend" => with(gui, |g| {
+            g.start_note_tool(notes::NoteTool::PipeLegend);
+            focus(g);
+        }),
         "tag.tag_all" => with(gui, Gui::tag_all),
         "stair.create" => with(gui, |g| {
             g.start_stair_tool(false);
@@ -4631,6 +4642,8 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
             focus(g);
         }),
         "lighting_fixture_type.set_photometry" => with(gui, Gui::fixture_photometry),
+        "lighting_fixture_type.set_lighting" => with(gui, Gui::fixture_lighting_data),
+        "lighting.calc_average" => with(gui, Gui::illumination_dialog),
         "mep_fitting.tee_to_cross" => with(gui, Gui::tee_to_cross),
         "mep_fitting.upgrade" => with(gui, |g| g.fitting_grade(true)),
         "mep_fitting.downgrade" => with(gui, |g| g.fitting_grade(false)),

@@ -1058,6 +1058,20 @@ schedules, circuit paths, cable sizing and voltage drop.
   imported models convert into system-zones enveloping their spaces (`system_zone.create`,
   `.assign`, `.set`, `.info`, `.convert_legacy`; MEP-ZONE-001). Not built yet: assignment through
   the energy model (ANA-EM-003), zones in links and phases, grips on the outline.
+- **Duct and pipe colour fill legends** (Analyze › Color Fill › Duct Legend, Pipe Legend): a
+  placed legend colours the plan's ducts or pipes by a scheme of flow, velocity, friction,
+  pressure drop, size, system type or name (pipes also fluid temperature and slope), by range
+  or by value, with fittings and a No value colour; one of each per view, removed with the
+  legend (`mep_color_legend.place`, `colorscheme.create` with `cat.ducts`/`cat.pipes`;
+  MEP-DUCT-010). Not built yet: sections, Edit Scheme from the legend, stale hatching.
+- **Average estimated illumination** (Analyze › Spaces & Zones › Illumination; Systems ›
+  Electrical › Lighting Data): the lumen method for every space from the fixtures whose
+  calculation point is in it, their type's lumens (or photometric file), CU table and light loss
+  factor, with the space's reflectances, workplane and target illuminance
+  (Pset_SpaceLightingRequirements); it follows the model as it changes and appears in space
+  schedules (`lighting.calc_average`, `lighting_fixture_type.set_lighting`; ANA-LIGHT-001). No CU
+  tables are shipped (enter the manufacturer's). Not built yet: CU from photometric
+  distributions, colour schemes by Meets Target.
 - **Global parameters** (Manage › Settings › Global Parameters `GL`, Label with Global, Associate
   Global): project-wide values and unit-checked formulas (`CorridorWidth * 2 + 300 mm`, cycles
   refused) that drive labelled dimensions and associated instance parameters such as door sill

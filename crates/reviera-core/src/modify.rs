@@ -331,6 +331,10 @@ pub fn transform(
             };
             crate::masses::transform(txn, target, &|p| x.point(p), dz)?;
             out.push(target);
+        } else if crate::mep_color_fill::legend_data(e).is_some() {
+            let target = if copy { txn.create(copied(e))? } else { id };
+            crate::mep_color_fill::transform(txn, target, &|p| x.point(p))?;
+            out.push(target);
         } else if crate::room_separators::recipe(e).is_some() {
             let target = if copy { txn.create(copied(e))? } else { id };
             crate::room_separators::transform(txn, target, &|p| x.point(p))?;
