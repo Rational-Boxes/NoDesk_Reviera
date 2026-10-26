@@ -20,7 +20,7 @@ Start with **File › New**, and open a Level 1 plan (View › Floor Plan).
    600*, *Return Grille 600*.
 6. **The air handler.** Systems › Components › **Mechanical Equipment**, *Air Handling Unit* at
    (5500, 1800), rotated 90°, so its supply outlet faces north.
-7. **The supply main.** Systems › HVAC & Piping › **Duct**, round 400, offset 3100, from (1200,
+7. **The supply main.** Systems › HVAC & Piping › **Duct**, rectangular 500 × 300, offset 3100, from (1200,
    5500) to (12800, 5500).
 8. **Connect the unit.** Select the unit, Systems › Components › **Connect Into**, its Supply
    connector, then click the main: out, up and into it, a tee where it lands.

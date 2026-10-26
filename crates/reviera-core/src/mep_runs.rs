@@ -16,9 +16,9 @@
 //!   from the top; and a preferred junction (tee or tap).
 //! - A **segment** (`IfcDuctSegment`, `IfcPipeSegment`, RIGIDSEGMENT) runs straight from `start`
 //!   to `end` with a size, and has a port at each end, plus one per tap on its side.
-//! - A **fitting** (`IfcDuctFitting`, `IfcPipeFitting`) is one of Reviera's own parts: a mitred
-//!   elbow, a tee, a tap, a cross, a transition or a cap. Its legs run from its centre; the end
-//!   of each leg is a port.
+//! - A **fitting** (`IfcDuctFitting`, `IfcPipeFitting`) is one of Reviera's own parts: an elbow
+//!   (a bend swept round the corner, collared at its ends), a tee, a tap, a cross, a transition
+//!   or a cap. Its legs run from its centre; the end of each leg is a port.
 //! - **Drawing** a run along points puts an elbow at each corner (a change of elevation is a
 //!   riser between two elbows), segments between them, and a tee or tap where the run ends on
 //!   an existing segment (chosen by the junction rows); where no row fits, nothing is inserted,
@@ -31,7 +31,7 @@
 //! A run drawn from or to an open end of another size begins or ends with a transition.
 //! Flex duct is in [`crate::mep_flex`], justification in [`crate::mep_justify`].
 //!
-//! Not built yet: fittings and segments from component types, radius elbows, the Angles
+//! Not built yet: fittings and segments from component types, elbows by a radius ratio, the Angles
 //! setting, offsets, size and elevation locks, moving and stretching runs with their fittings,
 //! flip and rotate, the fitting controls in the view ("+" and "−" are commands: [`upgrade`],
 //! [`downgrade`]).
@@ -1166,10 +1166,12 @@ fn box_side(size: &Size) -> f64 {
 /// a cap a short plug.
 pub fn fitting_solids(f: &FittingRecipe) -> Vec<Solid> {
     match f.part {
-        Part::Elbow if f.radius.is_some() && f.legs.len() == 2 => {
-            let a = add(f.centre, mul(f.legs[0].direction, f.legs[0].length));
-            let b = add(f.centre, mul(f.legs[1].direction, f.legs[1].length));
-            sweep(a, f.centre, b, &f.legs[0].size, f.legs[0].across).into_iter().collect()
+        Part::Elbow if f.legs.len() == 2 => {
+            let bent = elbow_solids(f);
+            if !bent.is_empty() {
+                return bent;
+            }
+            mitred(f)
         }
         Part::Box => {
             let side = f.legs.iter().map(|l| box_side(&l.size)).fold(0.1, f64::max);
@@ -1210,20 +1212,60 @@ pub fn fitting_solids(f: &FittingRecipe) -> Vec<Solid> {
             let b = add(f.centre, mul(l.direction, l.length));
             loft(a, b, &grow(l.size), &grow(l.size), l.across).into_iter().collect()
         }
-        _ => f
-            .legs
-            .iter()
-            .enumerate()
-            .filter_map(|(k, l)| {
-                let back = l.size.nominal() / 2.0;
-                let a = add(f.centre, mul(l.direction, -back.min(l.length * 0.9)));
-                // A tap's leg starts at the host's surface, not its axis.
-                let a = if f.part == Part::Tap { f.centre } else { a };
-                let off = f.offset(k);
-                loft(add(a, off), f.leg_end(k), &l.size, &l.size, l.across)
-            })
-            .collect(),
+        _ => mitred(f),
     }
+}
+
+/// Each leg from just behind the centre to its end (tees, crosses, taps; an elbow too sharp to
+/// bend).
+fn mitred(f: &FittingRecipe) -> Vec<Solid> {
+    f.legs
+        .iter()
+        .enumerate()
+        .filter_map(|(k, l)| {
+            let back = l.size.nominal() / 2.0;
+            let a = add(f.centre, mul(l.direction, -back.min(l.length * 0.9)));
+            // A tap's leg starts at the host's surface, not its axis.
+            let a = if f.part == Part::Tap { f.centre } else { a };
+            let off = f.offset(k);
+            loft(add(a, off), f.leg_end(k), &l.size, &l.size, l.across)
+        })
+        .collect()
+}
+
+/// An elbow's body: a bend swept round the corner, tangent to both legs (its radius set by the
+/// shorter leg and the turn), straight on to the longer leg's end, with a collar at each end
+/// where it meets the run. Empty when the turn is too sharp for the bend's inside to stay open
+/// (its radius under half the section's extent in the plane of the bend).
+fn elbow_solids(f: &FittingRecipe) -> Vec<Solid> {
+    let (l0, l1) = (f.legs[0], f.legs[1]);
+    // Leg 0 points from the centre back along the incoming run.
+    let (d0, d1) = (l0.direction, l1.direction);
+    let theta = (-dot(d0, d1)).clamp(-1.0, 1.0).acos();
+    let short = l0.length.min(l1.length);
+    if theta < 1e-3 || short <= 0.0 {
+        return Vec::new();
+    }
+    let radius = short / (theta / 2.0).tan();
+    if radius < bend_extent(&l0.size, mul(d0, -1.0), d1, l0.across) / 2.0 + 1e-3 {
+        return Vec::new();
+    }
+    let (a, b) = (add(f.centre, mul(d0, short)), add(f.centre, mul(d1, short)));
+    let mut out: Vec<Solid> = sweep(a, f.centre, b, &l0.size, l0.across).into_iter().collect();
+    if out.is_empty() {
+        return out;
+    }
+    for l in [l0, l1] {
+        let end = add(f.centre, mul(l.direction, l.length));
+        if l.length > short + 1e-6 {
+            out.extend(loft(add(f.centre, mul(l.direction, short)), end, &l.size, &l.size, l.across));
+        }
+        // A collar: a band a little larger than the run, as a joint or socket.
+        let grow = |s: Size| Size { diameter: s.diameter * 1.08 + 0.004, width: s.width * 1.04 + 0.004, height: s.height * 1.04 + 0.004, ..s };
+        let band = (l.size.nominal() * 0.15).clamp(0.015, 0.05).min(l.length * 0.3);
+        out.extend(loft(add(end, mul(l.direction, -band)), end, &grow(l.size), &grow(l.size), l.across));
+    }
+    out
 }
 
 /// An inline accessory's body: a valve's two cones meeting at its seat with a stem and
@@ -1359,7 +1401,12 @@ pub(crate) fn leg_length(size: &Size) -> f64 {
 /// An elbow's leg length: by the section's extent in the plane of the bend (a rectangular
 /// duct turning up uses its height).
 pub(crate) fn elbow_leg(size: &Size, incoming: V3, outgoing: V3, across: Option<V3>) -> f64 {
-    let extent = match size.shape {
+    bend_extent(size, incoming, outgoing, across) * 0.6 + 0.05
+}
+
+/// A section's extent in the plane of a bend from `incoming` to `outgoing`.
+fn bend_extent(size: &Size, incoming: V3, outgoing: V3, across: Option<V3>) -> f64 {
+    match size.shape {
         Shape::Round => size.diameter,
         _ => {
             let (w, h) = axes(incoming, across);
@@ -1368,8 +1415,7 @@ pub(crate) fn elbow_leg(size: &Size, incoming: V3, outgoing: V3, across: Option<
                 None => size.nominal(),
             }
         }
-    };
-    extent * 0.6 + 0.05
+    }
 }
 
 pub(crate) fn level_of(store: &Store, r: &ElementRef) -> Result<(String, f64)> {

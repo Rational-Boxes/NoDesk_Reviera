@@ -877,7 +877,8 @@ schedules, circuit paths, cable sizing and voltage drop.
 - **Checks**: not well connected, flow and demand mismatches, flow direction mismatches
   (`mep_check.systems`) and open connectors (`mep_check.show_disconnects`).
 - **Ducts and pipes** (Systems › HVAC & Piping › Duct `DT`, Pipe `PL`): click a run's points in a
-  plan at a middle elevation (E changes it, making a riser); elbows go at the corners and a tee or
+  plan at a middle elevation (E changes it, making a riser); elbows (swept bends with collars at
+  their joints) go at the corners and a tee or
   tap where the run ends on another duct or pipe, chosen by the type's routing preferences; pipes
   can slope. Runs connect to the equipment they meet and join its system (`duct.create`,
   `pipe.create`, `duct.set_size`, `duct.cap_open_ends`, `mep_segment_type.*`,
@@ -1477,7 +1478,7 @@ sample:
   girder off its analytical line, missing counterparts, a member pinned at both ends, a slab
   below its beams); its walkthrough says what each reports and how to fix it.
 - **Office air system** (`mep_hvac.ifc`): two Office spaces split by a space separator, two
-  system-zones, an air handling unit and four diffusers joined into a supply main by Connect Into,
+  system-zones, an air handling unit and four diffusers joined into a rectangular supply main by Connect Into,
   a sound attenuator and a return grille; 300 L/s supplied to each room.
 - **Washroom plumbing and sprinklers** (`mep_plumbing.ifc`): fixtures on the wall's face, a floor
   drain and water heater, a sanitary main sloped at 1%, a cold-water main with a gate valve, and a

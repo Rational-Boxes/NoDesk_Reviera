@@ -7,7 +7,7 @@
 -- Reviera sample model (test-data/samples): MEP spaces placed automatically on either side of
 -- a space separator (MEP-SPACE-001), an Office space type with its loads and set points
 -- (MEP-SET-004), a system-zone per space with the air handler assigned (MEP-ZONE-001), an air
--- handling unit joined to a 400 mm round supply main by Connect Into, four 600 diffusers at
+-- handling unit joined to a 500 × 300 rectangular supply main by Connect Into, four 600 diffusers at
 -- 150 L/s each joined to the main the same way, a sound attenuator on the main, a return grille,
 -- and the supply air system (MEP-DUCT-009). Two rooms on the same line: space.airflow (and a
 -- room schedule's Supply Airflow) shows 300 L/s supplied to each; Analyze › Loads and
@@ -58,7 +58,7 @@ reviera.room.place{ level_id = l1, point = { 10.5, 4.5 } }
 -- the middle at 3.1 m.
 local t = reviera.mep_type.load_starters{ names = { "Air Handling Unit", "Supply Diffuser 600", "Return Grille 600" } }
 local ahu = reviera.mech_equipment.place{ type_id = t["Air Handling Unit"], point = { 5.5, 1.8 }, level = l1, rotation = "90°" }
-local main = reviera.duct.create{ points = { { 1.2, 5.5, 3.1 }, { 12.8, 5.5, 3.1 } }, level = l1, shape = "round", diameter = 0.4 }
+local main = reviera.duct.create{ points = { { 1.2, 5.5, 3.1 }, { 12.8, 5.5, 3.1 } }, level = l1, shape = "rectangular", width = 0.5, height = 0.3 }
 local main_id = main.segments[1]
 local pieces = { main_id }
 local rep = reviera.mep.connect_into{ element_id = ahu, connector_index = 0, target_id = main_id }
@@ -94,5 +94,5 @@ for _, b in ipairs({ { { 0, 0 }, { 7, 0 }, { 7, 9 }, { 0, 9 } }, { { 7, 0 }, { 1
   reviera.system_zone.assign{ zone_id = z, equipment_or_system_id = ahu }
 end
 
-label(0.5, -1.2, "Air handler, Connect Into the 400 mm main, attenuator; four diffusers at 150 L/s")
+label(0.5, -1.2, "Air handler, Connect Into the 500 x 300 main, attenuator; four diffusers at 150 L/s")
 label(7.2, 9.6, "Space separator: two spaces, two system-zones (West, East)")
