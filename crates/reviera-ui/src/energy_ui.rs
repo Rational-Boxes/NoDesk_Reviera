@@ -260,3 +260,49 @@ impl Gui {
         super::mep_loads_ui::list_dialog(&frame, "Annual Energy", &intro, &[("Month / space", 110), ("Heat load", 70), ("Cool load", 70), ("Heating", 65), ("Cooling", 65), ("Lighting", 65), ("Equip.", 65), ("Electric", 70), ("Gas", 60), ("CO₂e", 60)], &rows, &[], None);
     }
 }
+
+impl Gui {
+    /// File › Export gbXML… (ANA-EM-004): the energy model as gbXML 8.01.
+    pub(crate) fn gbxml_export(&mut self) {
+        let frame = self.frame;
+        let fd = FileDialog::builder(&frame).with_message("Export gbXML").with_wildcard("gbXML (*.xml)|*.xml").with_style(FileDialogStyle::Save | FileDialogStyle::OverwritePrompt).build();
+        if fd.show_modal() != ID_OK {
+            return;
+        }
+        let Some(path) = fd.get_path() else { return };
+        match self.run("gbxml.export", json!({ "path": path })) {
+            Ok(r) => {
+                let mut msg = format!("Wrote {} spaces, {} surfaces and {} openings to {path}.", r["spaces"], r["surfaces"], r["openings"]);
+                for w in r["warnings"].as_array().into_iter().flatten() {
+                    msg.push_str(&format!("\n• {}", w.as_str().unwrap_or("")));
+                }
+                MessageDialog::builder(&frame, &msg, "Export gbXML").with_style(MessageDialogStyle::OK | MessageDialogStyle::IconInformation).build().show_modal();
+            }
+            Err(e) => error(&frame, &e),
+        }
+    }
+
+    /// File › Import gbXML Loads… (ANA-EM-004): design loads from another tool onto the spaces.
+    pub(crate) fn gbxml_import_loads(&mut self) {
+        let frame = self.frame;
+        let fd = FileDialog::builder(&frame).with_message("Import Loads from gbXML").with_wildcard("gbXML (*.xml;*.gbxml)|*.xml;*.gbxml").with_style(FileDialogStyle::Open | FileDialogStyle::FileMustExist).build();
+        if fd.show_modal() != ID_OK {
+            return;
+        }
+        let Some(path) = fd.get_path() else { return };
+        match self.run("gbxml.import_loads", json!({ "path": path })) {
+            Ok(r) => {
+                let list = |k: &str| r[k].as_array().map(|a| a.iter().filter_map(|v| v.as_str()).collect::<Vec<_>>().join(", ")).unwrap_or_default();
+                let mut msg = format!("Loads written to {} spaces.", r["matched"].as_array().map_or(0, Vec::len));
+                if !list("unmatched").is_empty() {
+                    msg.push_str(&format!("\nNot matched: {}", list("unmatched")));
+                }
+                if !list("without_results").is_empty() {
+                    msg.push_str(&format!("\nNo values in the file for: {}", list("without_results")));
+                }
+                MessageDialog::builder(&frame, &msg, "Import gbXML Loads").with_style(MessageDialogStyle::OK | MessageDialogStyle::IconInformation).build().show_modal();
+            }
+            Err(e) => error(&frame, &e),
+        }
+    }
+}

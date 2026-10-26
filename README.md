@@ -1117,6 +1117,10 @@ schedules, circuit paths, cable sizing and voltage drop.
   air and infiltration by class), run as `analysis.loads` jobs, peaks written to the spaces'
   Pset_SpaceThermalDesign, stale when the model or weather change (`hc_loads.*`; ANA-HCL-001,
   ANA-ENV-004). Not built yet: an RTS or EnergyPlus provider, plenums, reports as documents.
+- **gbXML exchange** (File › Export gbXML…, Import gbXML Loads…): the energy model as gbXML
+  (validated against the official 8.01 schema) with spaces, shared surfaces, openings and
+  U-values for other energy tools; design loads computed elsewhere read back onto the matching
+  spaces (`gbxml.*`; ANA-EM-004, ANA-ENV-009). Not built yet: HBJSON, the export dialog.
 - **Daylight factor** (Sustainability › Daylight & Solar › Daylight Factor, Daylight Results):
   a sensor grid in every enclosed space, the CIE overcast sky by ray casting through the
   windows (their types' visible transmittance) past walls, roofs and other elements, plus the

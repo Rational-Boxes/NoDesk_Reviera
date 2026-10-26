@@ -130,6 +130,8 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add_host(crate::daylight::DaylightRun),
         registry.add_host(crate::daylight::DaylightCollect),
         registry.add_host(crate::daylight::DaylightStatus),
+        registry.add_host(crate::gbxml_files::GbxmlExport),
+        registry.add_host(crate::gbxml_files::GbxmlImportLoads),
         registry.add_host(SelectionRemove),
     ];
     for r in results {

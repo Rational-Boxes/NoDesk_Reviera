@@ -31,6 +31,7 @@ pub mod solar;
 pub mod hc_loads;
 pub mod annual_energy;
 pub mod daylight;
+pub mod gbxml_files;
 pub mod settings_dialogs;
 pub mod structural;
 pub mod subscriptions;

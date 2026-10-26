@@ -3259,6 +3259,7 @@ dependencies = [
  "i_overlay",
  "imbl",
  "jsonschema",
+ "quick-xml",
  "reviera-dstv",
  "reviera-precast-cam",
  "schemars",

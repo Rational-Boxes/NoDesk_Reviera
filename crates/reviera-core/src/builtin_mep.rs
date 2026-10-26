@@ -234,6 +234,7 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(EnergyResultsCmd),
         registry.add(DaylightRecord),
         registry.add(DaylightResultsCmd),
+        registry.add(GbxmlApplyLoads),
         registry.add(EnergyModelSummary),
         registry.add(EnergyModelSetThermal),
         registry.add(SolarResults),
@@ -2371,6 +2372,17 @@ read_command!(
     crate::daylight::ReportParams,
     crate::daylight::Report,
     crate::daylight::report
+);
+
+edit_command!(
+    GbxmlApplyLoads,
+    "gbxml.apply_loads",
+    "Apply gbXML loads",
+    "Writes design loads read from a gbXML file (ANA-EM-004) onto the matching spaces: `spaces` (id, name, heating, cooling, cooling_sensible in W; heating_airflow, cooling_airflow in L/s), matched by id (sp- + GlobalId with $ as -), then by name and number, into Pset_SpaceThermalDesign; keeps the import's record (file, time, matched count, unmatched ids). gbxml.import_loads calls it.",
+    "Import gbXML Loads",
+    crate::gbxml::ApplyParams,
+    crate::gbxml::ImportReport,
+    crate::gbxml::apply
 );
 
 read_command!(

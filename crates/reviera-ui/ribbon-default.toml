@@ -74,6 +74,18 @@ icon = "export_csv"
 help = "Export the facility-management data (spaces, types, components) as a COBie workbook"
 
 [[action]]
+id = "gbxml.export"
+label = "Export gbXML..."
+icon = "export_csv"
+help = "Export the energy model as gbXML for other energy analysis tools (ANA-EM-004)"
+
+[[action]]
+id = "gbxml.import_loads"
+label = "Import gbXML Loads..."
+icon = "loads_report"
+help = "Write design loads computed by another tool, from a gbXML file, onto the matching spaces (ANA-EM-004)"
+
+[[action]]
 id = "app.exit"
 label = "Exit"
 icon = "exit"
@@ -4222,7 +4234,7 @@ panels = [{ label = "Window", tools = [{ action = "insert.flip_facing", size = "
 
 [[menu]]
 label = "&File"
-items = ["file.new", "file.open", "file.save", "file.save_as", "file.close", "-", "ui.model_properties", "ui.remote_analysis", "-", "export.pdf", "export.cobie", "-", "app.exit"]
+items = ["file.new", "file.open", "file.save", "file.save_as", "file.close", "-", "ui.model_properties", "ui.remote_analysis", "-", "export.pdf", "export.cobie", "gbxml.export", "gbxml.import_loads", "-", "app.exit"]
 
 [[menu]]
 label = "&Edit"
