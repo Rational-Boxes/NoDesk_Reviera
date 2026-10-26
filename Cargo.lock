@@ -3202,6 +3202,7 @@ dependencies = [
  "serde_json",
  "tempfile",
  "uuid",
+ "zip",
 ]
 
 [[package]]
