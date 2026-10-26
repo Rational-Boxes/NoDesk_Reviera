@@ -15,6 +15,13 @@ REVIERA_REGEN_SAMPLES=1 cargo test -p reviera-app --test samples
 
 or only some of them, by name: `REVIERA_REGEN_SAMPLES=temple,csg`.
 
+A sample with a `weather` entry has that EPW imported after it is saved, so the file is kept in
+`<name>.resources/weather` beside it; Help copies the folder with the sample. The weather year
+`reviera_synthetic.epw` is synthetic, made by `make_weather.py` (sun positions, a clear-sky model
+dimmed by a repeatable cloud cover, seasonal and daily temperatures): the project's own, not
+measured weather. `crates/reviera-app/tests/sample_analyses.rs` checks that the MEP and
+sustainability samples show their features from their saved files, running their analyses.
+
 Each entry's `group` names the part of the application it shows, as the ribbon's tabs are
 (Architecture, Structure, View, Modify …); Help's landing page lists the samples under those
 headings, in the ribbon's order.
@@ -31,7 +38,13 @@ headings, in the ribbon's order.
 | `structural_checks.ifc` (`structural_checks.lua`) | A small steel frame with deliberate faults, each labelled in the Level 2 plan, for Check Supports and Check Consistency: a floating ring of beams (S2, C2), a beam resting on nothing (S1), a member 40 mm short of a column (C1), members framing mid-span with no node (C1), a girder moved off its analytical line (C3, C4), a beam with no analytical member (C5), a member pinned at both ends (C7), a slab well below its beams (C6). Its six overlaps are part of the faults (`allow_overlaps`). |
 | `wood_frame.ifc` (`wood_frame.lua`) | A two-storey light wood-frame house (IRC, NA lumber): 2x6 stud bearing walls on strip footings, 2x10 joists at 16" with a 4x12 flush beam on 4x6 posts, a 3/4" plywood subfloor, a slab on grade, gable Fink trusses (6:12) of 2x6 and 2x4 at 24"; its analytical model with wall and subfloor panels, supports at the post bases, wall bottoms and bearings, and the ASCE 7 combinations. |
 
-Each sample also has a walkthrough (`house.md`, `observatory.md`, `csg.md`, `manor.md`, `storefront.md`, `steel_frame.md`, `timber.md`, `wood_frame.md`, `structural_checks.md`): the manual steps to
+| `mep_hvac.ifc` (`mep_hvac.lua`) | An open office split by a space separator into two Office spaces (loads and set points) and two system-zones; an air handling unit and four 150 L/s diffusers joined into a 400 mm supply main by Connect Into (tees and elbows made), a sound attenuator, a return grille, the supply air system; rooms on the same line show 300 L/s supplied to each. |
+| `mep_plumbing.ifc` (`mep_plumbing.lua`) | A washroom: lavatories, a urinal and WCs on the wall's face, a floor drain, a water heater; a 100 mm sanitary main sloped at 1% below the floor and the fixtures' sanitary system; a cold-water main with a gate valve; a wet sprinkler branch with three pendent heads joined into it. |
+| `mep_electrical.ifc` (`mep_electrical.lua`) | A main switchboard feeding a distribution board; nine 5 000 lm ceiling luminaires on circuit LP1-1 with a switch, receptacles on LP1-2 and LP1-3, a smoke detector; the space's lumen-method illuminance (about 324 lx). |
+| `energy_house.ifc` (`energy_house.lua`, weather in `energy_house.resources`) | A four-room bungalow ready for the energy tools: a site at 51.5° N with the synthetic weather year, layered insulated exterior walls (U 0.18), large south triple glazing and small north windows with U-values and solar gain, a slab, four Dwelling spaces; for Heating & Cooling Loads, Annual Energy (about 51 kWh/m² a year with a heat pump), Embodied Carbon and the gbXML and HBJSON exports. |
+| `daylight_studio.ifc` (`daylight_studio.lua`, weather in `daylight_studio.resources`) | Two identical studios with large south windows under a roof slab; a neighbouring block 8 m high, 5 m south of the east one. Daylight Factor gives about 3.9% in the west studio and 2.5% in the east; Solar Study and PVGIS Check on the roof. |
+
+Each sample also has a walkthrough (`house.md`, `observatory.md`, `csg.md`, `manor.md`, `storefront.md`, `steel_frame.md`, `timber.md`, `wood_frame.md`, `structural_checks.md`, `mep_hvac.md`, `mep_plumbing.md`, `mep_electrical.md`, `energy_house.md`, `daylight_studio.md`): the manual steps to
 build it in the window. It names the UI path for every operation the script uses, and marks
 the steps the window cannot do yet. Those gaps are missing UI for core features, or scripts
 that need an input form.

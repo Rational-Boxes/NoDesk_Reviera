@@ -106,8 +106,10 @@ ribbon's tools, the command shell, Lua and MCP alike.
 - **Help** (Help › Reviera Help, F1): a help tab beside the views with getting started,
   navigation and selection basics, pages for the Architecture and Structure tools (framing,
   foundations, settings and standards, the analytical model and its checks, loads, analysis and
-  results), and the sample models grouped by the part of the application they show, each opened
-  (as a fresh copy) from its link. Help › About gives the version and licence.
+  results), MEP and energy, daylight and carbon, and the sample models grouped by the part of the
+  application they show, each opened (as a fresh copy, with its weather file) from its link, with
+  a Walkthrough page of how it was built. Help › About gives the version and licence; Help › Data
+  Sources the online services' credits.
 - **Several models at once**: each opens in its own tabs; File › Close Model (Ctrl+Shift+W)
   closes the active one and its views, asking to save changes.
 - **Model Properties** (Manage › Settings, UN; File menu): the model-wide settings in one dialog:
@@ -1428,7 +1430,8 @@ simulation sessions, and the first engine runners (see [Not built yet](#not-buil
 checked by a test (no overlaps beyond those it keeps on purpose, no clearance intrusions, saves
 and reopens), and each has a walkthrough (`house.md`, `observatory.md`, `csg.md`, `manor.md`,
 `manor_before.md`, `storefront.md`, `steel_frame.md`, `timber.md`, `wood_frame.md`,
-`structural_checks.md`) giving the manual steps to build or use it in the
+`structural_checks.md`, `mep_hvac.md`, `mep_plumbing.md`, `mep_electrical.md`,
+`energy_house.md`, `daylight_studio.md`; shown in Help as Walkthrough pages) giving the manual steps to build or use it in the
 window, which confirms that every operation it uses has its UI:
 
 - **Storefront doors** (`storefront.ifc`): a shop front with a revolving door, an automatic
@@ -1471,6 +1474,25 @@ window, which confirms that every operation it uses has its UI:
   ring of beams, a beam resting on nothing, a 40 mm gap, members framing mid-span with no node, a
   girder off its analytical line, missing counterparts, a member pinned at both ends, a slab
   below its beams); its walkthrough says what each reports and how to fix it.
+- **Office air system** (`mep_hvac.ifc`): two Office spaces split by a space separator, two
+  system-zones, an air handling unit and four diffusers joined into a supply main by Connect Into,
+  a sound attenuator and a return grille; 300 L/s supplied to each room.
+- **Washroom plumbing and sprinklers** (`mep_plumbing.ifc`): fixtures on the wall's face, a floor
+  drain and water heater, a sanitary main sloped at 1%, a cold-water main with a gate valve, and a
+  sprinkler branch with three pendent heads joined into it.
+- **Office electrical and lighting** (`mep_electrical.ifc`): a switchboard feeding a distribution
+  board, nine luminaires on a lighting circuit with a switch, receptacles on two circuits, a smoke
+  detector; about 324 lx by the lumen method.
+- **Energy house** (`energy_house.ifc`, weather in `energy_house.resources`): a four-room
+  bungalow with insulated layered walls, south triple glazing and north windows with U-values, a
+  slab and Dwelling spaces at 51.5° N with a synthetic weather year (`make_weather.py`), ready
+  for loads, annual energy (about 51 kWh/m² a year with a heat pump), embodied carbon and the gbXML
+  and HBJSON exports.
+- **Daylight studios** (`daylight_studio.ifc`): two studios with large south windows under a
+  roof slab, the east one facing a block 8 m high; Daylight Factor gives about 3.9% and 2.5%.
+
+`tests/sample_analyses.rs` opens the MEP and sustainability samples from their saved files and
+runs their analyses to check each shows what it says.
 
 Open one with `reviera gui test-data/samples/manor.ifc`, or rebuild them with
 `REVIERA_REGEN_SAMPLES=1 cargo test -p reviera-app --test samples`.

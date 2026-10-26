@@ -3,7 +3,8 @@
 
 //! The sample corpus (`test-data/samples`): each sample is rebuilt from its manifest steps (Lua
 //! scripts, plugin runs, settings) and must have no overlaps (beyond those it leaves on
-//! purpose, `allow_overlaps`) and no intrusions into its clearances, then save and reopen. With `REVIERA_REGEN_SAMPLES=1` the corpus's `.ifc` files
+//! purpose, `allow_overlaps`) and no intrusions into its clearances, then save (importing its
+//! `weather` file into `<name>.resources`) and reopen. With `REVIERA_REGEN_SAMPLES=1` the corpus's `.ifc` files
 //! are rewritten from the rebuild.
 
 use std::path::{Path, PathBuf};
@@ -74,7 +75,16 @@ fn the_sample_corpus_builds_cleanly() {
             out.path().join(format!("{name}.ifc"))
         };
         let _ = std::fs::remove_file(&path);
+        let _ = std::fs::remove_dir_all(path.with_extension("resources"));
         run(&mut app, "file.save_as", json!({ "path": path })).unwrap();
+        // A sample's weather file (`weather`) is imported once it is saved, so it is kept beside
+        // it in `<name>.resources/weather` with a relative path.
+        if let Some(w) = sample["weather"].as_str() {
+            run(&mut app, "weather.import", json!({ "path": dir.join(w) })).unwrap_or_else(|e| panic!("{name}: weather.import: {e:?}"));
+            run(&mut app, "file.save", json!({})).unwrap();
+            let kept = reviera_core::location::get(app.document(app.active().unwrap()).unwrap().doc.store()).weather.file.unwrap();
+            assert_eq!(kept, format!("{name}.resources/weather/{w}"), "{name}: the weather file is kept beside the sample");
+        }
         // Boolean-shaped bodies are written as their result, each relation recorded.
         let relations = {
             let d = app.document(app.active().unwrap()).unwrap();

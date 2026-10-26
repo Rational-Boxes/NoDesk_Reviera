@@ -214,6 +214,8 @@ modules:
       # Sample models for Help (crates/reviera-ui/src/help.rs: <exe>/../share/reviera/samples).
       - install -Dm644 -t /app/share/reviera/samples test-data/samples/samples.json
         test-data/samples/*.ifc test-data/samples/*.lua test-data/samples/*.md
+      # Samples' resources (their weather files), beside them.
+      - cp -r test-data/samples/*.resources /app/share/reviera/samples/
       # The sample Component Library beside them (crates/reviera-ui/src/components.rs).
       - mkdir -p /app/share/reviera/library && cp -r test-data/library/. /app/share/reviera/library/
       - install -Dm644 packaging/THIRD-PARTY-NOTICES.txt -t /app/share/licenses/${FLATPAK_ID}

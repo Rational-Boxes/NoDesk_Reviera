@@ -141,6 +141,73 @@
     ]
   },
   {
+    "name": "mep_hvac",
+    "title": "Office air system",
+    "group": "Systems",
+    "steps": [
+      {
+        "command": "script.run",
+        "args": {
+          "file": "mep_hvac.lua"
+        }
+      }
+    ]
+  },
+  {
+    "name": "mep_plumbing",
+    "title": "Washroom plumbing and sprinklers",
+    "group": "Systems",
+    "steps": [
+      {
+        "command": "script.run",
+        "args": {
+          "file": "mep_plumbing.lua"
+        }
+      }
+    ]
+  },
+  {
+    "name": "mep_electrical",
+    "title": "Office electrical and lighting",
+    "group": "Systems",
+    "steps": [
+      {
+        "command": "script.run",
+        "args": {
+          "file": "mep_electrical.lua"
+        }
+      }
+    ]
+  },
+  {
+    "name": "energy_house",
+    "title": "Energy house",
+    "group": "Sustainability",
+    "weather": "reviera_synthetic.epw",
+    "steps": [
+      {
+        "command": "script.run",
+        "args": {
+          "file": "energy_house.lua"
+        }
+      }
+    ]
+  },
+  {
+    "name": "daylight_studio",
+    "title": "Daylight studios",
+    "group": "Sustainability",
+    "weather": "reviera_synthetic.epw",
+    "steps": [
+      {
+        "command": "script.run",
+        "args": {
+          "file": "daylight_studio.lua"
+        }
+      }
+    ]
+  },
+  {
     "name": "manor_before",
     "title": "Manor before coordination",
     "group": "View",

@@ -1,0 +1,78 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Copyright (C) 2026 Reviera contributors -->
+<h1>Energy, daylight and carbon</h1>
+<p class="lead">The <b>Sustainability</b> tab studies the building's energy, daylight and carbon
+from the model you already have: the MEP spaces become the energy model, the weather file gives
+the climate, and the heavy calculations run as background jobs while you keep working. Results
+are kept with the project and say when the model has changed since.</p>
+<p class="see">Try it on the <a href="reviera:sample/energy_house">Energy house</a> (loads,
+annual energy, carbon, exports) and the <a href="reviera:sample/daylight_studio">Daylight
+studios</a> (daylight factor, solar). Each has a
+<a href="reviera:help/walkthrough-energy_house">walkthrough</a> of how it was built.</p>
+<nav class="toc">
+  <a href="#site">Site and weather</a>
+  <a href="#energy-model">The energy model</a>
+  <a href="#loads">Heating and cooling loads</a>
+  <a href="#annual">Annual energy</a>
+  <a href="#daylight">Daylight factor</a>
+  <a href="#solar">Solar studies</a>
+  <a href="#carbon">Carbon</a>
+  <a href="#exchanges">gbXML and HBJSON</a>
+  <a href="#connectors">Online data</a>
+</nav>
+
+<h2 id="site">Site and weather</h2>
+<p>Set the project's latitude, longitude, elevation and time zone with
+<a href="reviera:action/location.set_all">Location</a>, or find them by name with
+<a href="reviera:action/geocode.search">Find Place</a> and fetch the ground height with
+<a href="reviera:action/elevation.fetch">Site Elevation</a>. Import an EPW weather file with
+<a href="reviera:action/weather.import">Weather</a>: it is copied beside the saved project, and
+its design temperatures are worked out from its hours. Without one, <a
+href="reviera:action/pvgis.tmy">PVGIS Weather</a> fetches a typical year for the site.</p>
+
+<h2 id="energy-model">The energy model</h2>
+<p>Every enclosed MEP space (Analyze › Spaces &amp; Zones) is an analytical space; its walls,
+windows, doors, floor and roof are heat-transfer surfaces, interior where another space lies
+beyond. <a href="reviera:action/energy_model.get">Energy Model</a> lists them with their areas
+and heat loss; its <i>Thermal Values…</i> sets a type's U-value and a window's solar heat gain.
+The space types (Manage › MEP Settings › Building/Space Types) give the loads, people, outdoor
+air, set points and opening hours.</p>
+
+<h2 id="loads">Heating and cooling loads</h2>
+<p><a href="reviera:action/hc_loads.run">Heating &amp; Cooling Loads</a> works out each space's
+and zone's design loads from the weather's design conditions, and writes the peaks to the spaces;
+<a href="reviera:action/hc_loads.report">Loads Report</a> shows them by component.</p>
+
+<h2 id="annual">Annual energy</h2>
+<p><a href="reviera:action/energy.run">Annual Energy</a> runs a year of hours through the
+weather file: heating and cooling loads, delivered energy by end use, energy use intensity and
+operational carbon from your grid factor. The <i>Engine</i> is Reviera's own hourly model, or
+EnergyPlus where it is installed. <a href="reviera:action/energy.results">Energy Results</a>
+lists the months, the year and each space. For Great Britain, <a
+href="reviera:action/grid_intensity.fetch">Grid Carbon (GB)</a> gives a grid factor.</p>
+
+<h2 id="daylight">Daylight factor</h2>
+<p><a href="reviera:action/daylight.run">Daylight Factor</a> puts a grid of sensors in every
+space and works out how much of the overcast sky reaches each through the windows, plus the light
+reflected in the room. <a href="reviera:action/daylight.results">Daylight Results</a> gives each
+space's average, minimum and uniformity, and <i>Show on Model</i> colours the sensors in 3D.</p>
+
+<h2 id="solar">Solar studies</h2>
+<p><a href="reviera:action/solar.run">Solar Study</a> works out the sun on the building's faces
+over a period, with shading, and its PV potential; <a href="reviera:action/pvgis.pv">PVGIS
+Check</a> compares a PV system's yield with PVGIS's.</p>
+
+<h2 id="carbon">Carbon</h2>
+<p><a href="reviera:action/embodied_carbon.run">Embodied Carbon</a> totals the materials' carbon
+from the model's layers and quantities; annual energy adds the operational carbon.</p>
+
+<h2 id="exchanges">gbXML and HBJSON</h2>
+<p>File › <b>Export gbXML…</b> writes the energy model for other energy tools, and <b>Import
+gbXML Loads…</b> reads loads they worked out back onto the spaces. File › <b>Export
+HBJSON…</b> writes it for Ladybug Tools.</p>
+
+<h2 id="connectors">Online data</h2>
+<p>PVGIS, place search, elevation and grid carbon are online services Reviera calls only when
+you ask, and each can be switched off in <a href="reviera:action/connectors.list">Data
+Connectors</a>. <a href="reviera:action/help.data_sources">Help › Data Sources</a> shows the
+credit results made with their data must carry.</p>

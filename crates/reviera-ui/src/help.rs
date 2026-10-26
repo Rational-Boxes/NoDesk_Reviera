@@ -47,6 +47,7 @@ const CORE: Option<&str> = Some("Using Reviera");
 const ARCHITECTURE: Option<&str> = Some("Architecture");
 const STRUCTURE: Option<&str> = Some("Structure");
 const MEP: Option<&str> = Some("MEP");
+const SUSTAINABILITY: Option<&str> = Some("Sustainability");
 
 macro_rules! page {
     ($slug:literal, $title:literal, $group:expr) => {
@@ -106,6 +107,7 @@ pub(crate) const PAGES: &[Page] = &[
     page!("loads", "Loads and supports", STRUCTURE),
     page!("structural-analysis", "Structural analysis and results", STRUCTURE),
     page!("mep-systems", "MEP connectors and systems", MEP),
+    page!("sustainability", "Energy, daylight and carbon", SUSTAINABILITY),
 ];
 
 /// The page with `slug`.
@@ -372,6 +374,23 @@ pub(crate) struct Sample {
     pub title: String,
     pub description: String,
     pub group: String,
+    /// Its walkthrough (`<name>.md`): the steps to build it in the window.
+    pub walkthrough: Option<String>,
+}
+
+/// Copies a folder and everything in it.
+fn copy_dir(from: &Path, to: &Path) -> std::io::Result<()> {
+    std::fs::create_dir_all(to)?;
+    for entry in std::fs::read_dir(from)? {
+        let entry = entry?;
+        let target = to.join(entry.file_name());
+        if entry.file_type()?.is_dir() {
+            copy_dir(&entry.path(), &target)?;
+        } else {
+            std::fs::copy(entry.path(), target)?;
+        }
+    }
+    Ok(())
 }
 
 /// The samples listed in `dir`'s `samples.json` whose `.ifc` exists.
@@ -406,11 +425,13 @@ pub(crate) fn samples(dir: &Path) -> Vec<Sample> {
                         })
                 })
                 .unwrap_or_default();
+            let walkthrough = std::fs::read_to_string(dir.join(format!("{name}.md"))).ok();
             Some(Sample {
                 name,
                 title,
                 description,
                 group: s["group"].as_str().unwrap_or_default().to_owned(),
+                walkthrough,
             })
         })
         .collect()
@@ -449,9 +470,17 @@ fn sample_cards(samples: &[Sample]) -> String {
         out.push_str("<div class=\"samples\">\n");
         for s in samples.iter().filter(|s| s.group == g) {
             out.push_str(&format!(
-                "<div class=\"sample\"><h3>{}</h3><p>{}</p><a class=\"open\" href=\"reviera:sample/{}\">Open</a></div>\n",
+                "<div class=\"sample\"><h3>{}</h3><p>{}</p>{}<a class=\"open\" href=\"reviera:sample/{}\">Open</a></div>\n",
                 escape(&s.title),
                 escape(&s.description),
+                if s.walkthrough.is_some() {
+                    format!(
+                        "<a class=\"walk\" href=\"reviera:help/{WALKTHROUGH}{}\">Walkthrough</a> ",
+                        escape(&s.name)
+                    )
+                } else {
+                    String::new()
+                },
                 escape(&s.name)
             ));
         }
@@ -500,6 +529,11 @@ fn clean_anchor(anchor: &str) -> String {
 /// with a Back link when `back` (there is a page to go back to). The landing page lists
 /// `samples`.
 pub(crate) fn page_html(place: &Place, samples: &[Sample], back: bool) -> Option<String> {
+    if let Some(name) = place.slug.strip_prefix(WALKTHROUGH) {
+        let s = samples.iter().find(|s| s.name == name)?;
+        let body = walkthrough_html(s)?;
+        return Some(frame(&format!("{}: walkthrough", s.title), &body, place, back));
+    }
     let p = page(&place.slug)?;
     let body = if p.slug == "index" {
         p.body
@@ -509,6 +543,11 @@ pub(crate) fn page_html(place: &Place, samples: &[Sample], back: bool) -> Option
     } else {
         p.body.to_owned()
     };
+    Some(frame(p.title, &body, place, back))
+}
+
+/// A body in the page frame, with a Back link when `back`.
+fn frame(title: &str, body: &str, place: &Place, back: bool) -> String {
     let back = if back {
         "<a href=\"reviera:help-back\">Back</a>"
     } else {
@@ -520,13 +559,69 @@ pub(crate) fn page_html(place: &Place, samples: &[Sample], back: bool) -> Option
         .map(clean_anchor)
         .unwrap_or_default();
     // The body goes in last, so nothing in it is taken for a placeholder.
-    Some(
-        SHELL
-            .replace("{{TITLE}}", &escape(p.title))
-            .replace("{{BACK}}", back)
-            .replace("{{ANCHOR}}", &anchor)
-            .replace("{{BODY}}", &body),
-    )
+    SHELL
+        .replace("{{TITLE}}", &escape(title))
+        .replace("{{BACK}}", back)
+        .replace("{{ANCHOR}}", &anchor)
+        .replace("{{BODY}}", body)
+}
+
+/// The slug prefix of a sample's walkthrough page (`reviera:help/walkthrough-<name>`).
+pub(crate) const WALKTHROUGH: &str = "walkthrough-";
+
+/// A sample's walkthrough as a page body: its Markdown as HTML, headings given ids (so
+/// `[gaps](#gaps)` works), and a link to open the sample.
+fn walkthrough_html(s: &Sample) -> Option<String> {
+    use pulldown_cmark::{Options, Parser, html};
+    let md = s.walkthrough.as_deref()?;
+    let mut out = String::new();
+    html::push_html(&mut out, Parser::new_ext(md, Options::ENABLE_TABLES | Options::ENABLE_STRIKETHROUGH));
+    // Another sample's walkthrough (`manor.md`) is its walkthrough page.
+    let mut linked = String::new();
+    let mut rest = out.as_str();
+    while let Some(i) = rest.find("href=\"") {
+        linked.push_str(&rest[..i + 6]);
+        let after = &rest[i + 6..];
+        let end = after.find('"').unwrap_or(after.len());
+        let href = &after[..end];
+        match href.strip_suffix(".md").filter(|n| !n.contains(['/', ':'])) {
+            Some(name) => linked.push_str(&format!("reviera:help/{WALKTHROUGH}{name}")),
+            None => linked.push_str(href),
+        }
+        rest = &after[end..];
+    }
+    linked.push_str(rest);
+    out = linked;
+    // Ids for the headings, from their text.
+    for level in ["h2", "h3"] {
+        let open = format!("<{level}>");
+        let mut done = String::new();
+        let mut rest = out.as_str();
+        while let Some(i) = rest.find(&open) {
+            done.push_str(&rest[..i]);
+            let after = &rest[i + open.len()..];
+            let text = after.split(&format!("</{level}>")).next().unwrap_or("");
+            let id: String = text
+                .to_lowercase()
+                .chars()
+                .map(|c| if c.is_ascii_alphanumeric() { c } else { '-' })
+                .collect::<String>()
+                .split('-')
+                .filter(|w| !w.is_empty())
+                .collect::<Vec<_>>()
+                .join("-");
+            done.push_str(&format!("<{level} id=\"{id}\">"));
+            rest = after;
+        }
+        done.push_str(rest);
+        out = done;
+    }
+    Some(format!(
+        "<p class=\"see\">The steps to build the <b>{}</b> sample in the window. \
+         <a href=\"reviera:sample/{}\">Open the sample</a> to see the result.</p>\n{out}",
+        escape(&s.title),
+        escape(&s.name)
+    ))
 }
 
 /// The landing page's HTML, with the samples found (or a note where there are none).
@@ -593,7 +688,7 @@ impl Gui {
     /// Shows the help page at `place` in the help tab, remembering the page shown for Back.
     pub(crate) fn help_go(&mut self, place: Place) {
         let Some(h) = &mut self.help else { return };
-        if page(&place.slug).is_none() {
+        if page(&place.slug).is_none() && !place.slug.starts_with(WALKTHROUGH) {
             self.frame
                 .set_status_text(&format!("There is no help page {}", place.slug), 0);
             return;
@@ -617,7 +712,7 @@ impl Gui {
     /// Loads the help tab's current page into its webview.
     fn help_show_page(&self) {
         let Some(h) = &self.help else { return };
-        let samples = if h.here.slug == "index" {
+        let samples = if h.here.slug == "index" || h.here.slug.starts_with(WALKTHROUGH) {
             samples_dir().map(|d| samples(&d)).unwrap_or_default()
         } else {
             Vec::new()
@@ -679,7 +774,8 @@ impl Gui {
     }
 
     /// Opens a fresh copy of sample `name` (in the system's temporary folder), so the sample
-    /// stays as shipped. A copy already open is shown.
+    /// stays as shipped, with its resources (`<name>.resources`, such as its weather file). A
+    /// copy already open is shown.
     pub(crate) fn open_sample(&mut self, name: &str) {
         let frame = self.frame;
         let Some(dir) = samples_dir() else {
@@ -695,6 +791,15 @@ impl Gui {
                 return error(
                     &frame,
                     &format!("Could not copy the sample {}:\n{e}", source.display()),
+                );
+            }
+            let resources = dir.join(format!("{name}.resources"));
+            if resources.is_dir()
+                && let Err(e) = copy_dir(&resources, &copies.join(format!("{name}.resources")))
+            {
+                return error(
+                    &frame,
+                    &format!("Could not copy the sample's resources {}:\n{e}", resources.display()),
                 );
             }
         }
@@ -798,6 +903,41 @@ mod tests {
     }
 
     #[test]
+    fn every_walkthrough() {
+        let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data/samples");
+        let list = samples(&dir);
+        let with: Vec<&Sample> = list.iter().filter(|s| s.walkthrough.is_some()).collect();
+        assert_eq!(with.len(), list.len(), "every sample has a walkthrough");
+        let index = landing_html(&list);
+        for s in with {
+            let link = format!("reviera:help/{WALKTHROUGH}{}", s.name);
+            assert!(index.contains(&format!("href=\"{link}\"")), "{}: no link on its card", s.name);
+            let Link::Help(place) = classify(&link) else { panic!("{link}") };
+            let html = page_html(&place, &list, true).expect("the walkthrough");
+            assert_eq!(html.matches("<h1").count(), 1, "{}: one <h1>", s.name);
+            for tag in ["table", "ol", "ul", "pre", "h2", "h3", "main"] {
+                assert_eq!(html.matches(&format!("<{tag}")).count(), html.matches(&format!("</{tag}>")).count(), "{}: <{tag}>", s.name);
+            }
+            for href in hrefs(&html) {
+                match classify(href) {
+                    Link::Sample(n) => assert_eq!(n, s.name),
+                    Link::Page => {
+                        let a = href.strip_prefix('#').unwrap_or_else(|| panic!("{}: link {href}", s.name));
+                        assert!(html.contains(&format!("id=\"{a}\"")), "{}: no #{a}", s.name);
+                    }
+                    Link::Help(to) if page(&to.slug).is_some() => {}
+                    Link::Help(to) => {
+                        let n = to.slug.strip_prefix(WALKTHROUGH).unwrap_or_else(|| panic!("{}: {href}", s.name));
+                        assert!(list.iter().any(|x| x.name == n && x.walkthrough.is_some()), "{}: no walkthrough {n}", s.name);
+                    }
+                    Link::HelpBack | Link::External(_) => {}
+                    Link::Action(id) => panic!("{}: action {id}", s.name),
+                }
+            }
+        }
+    }
+
+    #[test]
     fn every_page() {
         // The actions of the ribbon catalog.
         let catalog: toml_edit::DocumentMut = crate::ribbon::DEFAULT.parse().expect("the catalog");
@@ -836,6 +976,14 @@ mod tests {
             }
             for href in hrefs(&html) {
                 match classify(href) {
+                    Link::Help(to) if to.slug.starts_with(WALKTHROUGH) => {
+                        let name = &to.slug[WALKTHROUGH.len()..];
+                        assert!(
+                            list.iter().any(|s| s.name == name && s.walkthrough.is_some()),
+                            "{}: no walkthrough {name}",
+                            p.slug
+                        );
+                    }
                     Link::Help(to) => {
                         let target = page(&to.slug)
                             .unwrap_or_else(|| panic!("{}: no page {}", p.slug, to.slug));
