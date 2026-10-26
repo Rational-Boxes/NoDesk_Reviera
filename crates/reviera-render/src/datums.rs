@@ -224,7 +224,7 @@ fn site_lines(store: &Store, z: f64, scale: f64, selected: &HashSet<ElementId>) 
     let unit = scale / 1000.0;
     let s = toposolids::settings(store);
     let mut out = Vec::new();
-    for e in store.iter().filter(|e| toposolids::recipe(e).is_some()) {
+    for e in store.iter().filter(|e| toposolids::recipe(e).is_some() && !toposolids::superseded(store, e)) {
         let (mut minor, mut major) = (Vec::new(), Vec::new());
         for (h, line) in toposolids::contours(store, e) {
             let k = ((h - s.passing_elevation) / s.contour_interval).round() as i64;

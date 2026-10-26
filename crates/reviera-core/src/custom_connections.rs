@@ -652,7 +652,8 @@ fn make_instance(txn: &mut crate::txn::Transaction<'_>, ty: &CustomType, members
     let mut r = store.get(id).and_then(connections::recipe).expect("made");
     r.connection_type = ty.id.clone();
     txn.set_param(id, RECIPE_KEY, serde_json::to_value(&r).expect("serialises"))?;
-    txn.set_param(id, "@Name", ty.name.clone())?;
+    let name = ty.name.clone();
+    txn.modify(id, |e| e.name = Some(name))?;
     Ok(id)
 }
 

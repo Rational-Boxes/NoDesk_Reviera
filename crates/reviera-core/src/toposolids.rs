@@ -429,6 +429,13 @@ pub fn all(store: &Store) -> Vec<(ElementId, bool, Mesh)> {
         .collect()
 }
 
+/// Whether a graded region has replaced this toposolid: the original is kept (for cut and
+/// fill, and in the IFC) but hidden, so views and overlap checks see only the graded copy.
+pub fn superseded(store: &Store, e: &Element) -> bool {
+    let guid = e.guid().to_string();
+    store.iter().any(|g| recipe(g).is_some_and(|r| r.graded_from.as_deref() == Some(guid.as_str())))
+}
+
 /// The surface height at a plan point, if a toposolid's top is there.
 pub fn height_at(store: &Store, e: &Element, p: [f64; 2]) -> Option<f64> {
     surface_z(&top(store, e).ok()?, p)

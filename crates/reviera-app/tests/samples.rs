@@ -45,11 +45,20 @@ fn the_sample_corpus_builds_cleanly() {
         {
             continue;
         }
+        // Each sample has its walkthrough (`<name>.md`): the manual steps to build it in the
+        // window, shown in Help.
+        let walkthrough = std::fs::read_to_string(dir.join(format!("{name}.md")))
+            .unwrap_or_else(|e| panic!("{name}: its walkthrough {name}.md: {e}"));
+        assert!(walkthrough.starts_with("# ") && walkthrough.contains(".lua"), "{name}.md: a titled walkthrough naming its script");
         let mut app = App::new(AppConfig {
             live: None,
             untitled_dir: out.path().to_owned(),
         });
         run(&mut app, "file.new", json!({})).unwrap();
+        // What a script writes beside the sample (a component library, say) is removed after a
+        // check run; a regeneration replaces the resources folder with only what is kept.
+        let resources = dir.join(format!("{name}.resources"));
+        let kept = files_under(&resources);
         for step in sample["steps"].as_array().unwrap() {
             let mut args = step["args"].clone();
             // Scripts are named relative to the corpus.
@@ -114,7 +123,37 @@ fn the_sample_corpus_builds_cleanly() {
             reopened["bodies"], overlaps["bodies"],
             "{name}: every body comes back"
         );
+        if !regen_this(name) {
+            for f in files_under(&resources).into_iter().filter(|f| !kept.contains(f)) {
+                std::fs::remove_file(f).unwrap();
+            }
+            remove_empty_dirs(&resources);
+        }
     }
+}
+
+/// Every file under `dir`, at any depth.
+fn files_under(dir: &Path) -> Vec<PathBuf> {
+    let mut out = Vec::new();
+    for e in std::fs::read_dir(dir).into_iter().flatten().flatten() {
+        let p = e.path();
+        if p.is_dir() {
+            out.extend(files_under(&p));
+        } else {
+            out.push(p);
+        }
+    }
+    out
+}
+
+/// Removes `dir`'s empty folders, and `dir` itself when it is left empty.
+fn remove_empty_dirs(dir: &Path) {
+    for e in std::fs::read_dir(dir).into_iter().flatten().flatten() {
+        if e.path().is_dir() {
+            remove_empty_dirs(&e.path());
+        }
+    }
+    let _ = std::fs::remove_dir(dir);
 }
 
 /// The structural problems sample (STR-AM-007) reports exactly the faults it was built with, from

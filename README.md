@@ -1428,11 +1428,10 @@ simulation sessions, and the first engine runners (see [Not built yet](#not-buil
 
 `test-data/samples` holds Reviera's own sample models. Each is rebuilt by a Lua script and
 checked by a test (no overlaps beyond those it keeps on purpose, no clearance intrusions, saves
-and reopens), and each has a walkthrough (`house.md`, `observatory.md`, `csg.md`, `manor.md`,
-`manor_before.md`, `storefront.md`, `steel_frame.md`, `timber.md`, `wood_frame.md`,
-`structural_checks.md`, `mep_hvac.md`, `mep_plumbing.md`, `mep_electrical.md`,
-`energy_house.md`, `daylight_studio.md`; shown in Help as Walkthrough pages) giving the manual steps to build or use it in the
-window, which confirms that every operation it uses has its UI:
+and reopens), and each has a walkthrough (`<name>.md`, shown in Help as its Walkthrough page;
+the test fails a sample without one) giving the manual steps to build or use it in the window,
+which confirms that every operation it uses has its UI. Every ribbon tab has at least one
+sample:
 
 - **Storefront doors** (`storefront.ifc`): a shop front with a revolving door, an automatic
   sliding door, a pair of glass swing doors and an automatic storefront door, under ADA 2010.
@@ -1491,8 +1490,42 @@ window, which confirms that every operation it uses has its UI:
 - **Daylight studios** (`daylight_studio.ifc`): two studios with large south windows under a
   roof slab, the east one facing a block 8 m high; Daylight Factor gives about 3.9% and 2.5%.
 
-`tests/sample_analyses.rs` opens the MEP and sustainability samples from their saved files and
-runs their analyses to check each shows what it says.
+- **Steel connection detailing** (`steel_connections.ifc`): a braced W-shape bay with every join
+  connected (automation, library end plates), a custom connection type placed twice, a shear
+  plate checked and presized, a coped infill; a detailing bench of plates, bolts, welds, corner,
+  contour, miter, saw, cut-through and cut-by cuts; steel numbering.
+- **Reinforced and precast concrete** (`concrete_reinforcement.ifc`): a small frame reinforced
+  with each Concrete tab tool (links, morphed bars, free-form and sketched bars, area, path and
+  fabric reinforcement, covers), and precast wall and slab pieces with their bars, fabric,
+  lifting anchors and shop drawings; rebar tags, a bending detail and the schedule.
+- **Fire protection** (`mep_fire.ifc`): EI 60 walls and FD30S doors, wet and dry sprinkler
+  systems of pendent, sidewall and upright heads typed by K-factor and rating, riser valves, a
+  fire damper in a fire wall and a fire alarm circuit of detectors and call points.
+- **Analysis tools** (`analysis_tools.ifc`): a canopy's analytical model (a panel with an
+  opening, fixed bases, loads, a combination) ready for Run Analysis, a path of travel to the
+  exit, a duct system sized by Equal Friction with its pressure drop and a velocity legend, and
+  a panel schedule.
+- **Massing and site** (`massing_site.ifc`): a podium and a tower as masses with mass floors,
+  modelled by face (walls, floors, roofs, a curtain system updated to a stretched mass) on a
+  sloping site graded to a building pad with cut and fill, sub-divided into a path and lawn,
+  with site components and a property line.
+- **Annotated plan** (`annotated_plan.ifc`): dimension strings, notes with a leader, door,
+  window and room tags and Tag All, door and room schedules, a section and an elevation, all
+  placed on sheet A101.
+- **Views and inspection** (`views_inspection.ifc`): plans, ceiling plans, sections,
+  elevations, a scope box, and 3D views saved with their section boxes, slices, projection,
+  Home and virtual volumes.
+- **Managed project** (`managed_project.ifc`): units and code, global parameters driving a
+  dimension and parameters, a shared parameter, Uniclass codes, keynotes, saved selections as
+  IfcGroups, the project location with a survey point and CRS, an Office space type and a pipe
+  segment.
+- **Editing tools** (`modify_tools.ifc`): every Modify tab tool's result side by side, from align,
+  mirror and the arrays to trim/extend, split and pinning, a component created and placed
+  again, and a layered wall's parts divided, merged and excluded.
+
+`tests/sample_analyses.rs` opens the MEP, sustainability and analysis samples from their saved
+files and runs their analyses (the canopy's structural analysis among them) to check each shows
+what it says; `tests/sample_features.rs` does the same for the other tabs' samples.
 
 Open one with `reviera gui test-data/samples/manor.ifc`, or rebuild them with
 `REVIERA_REGEN_SAMPLES=1 cargo test -p reviera-app --test samples`.

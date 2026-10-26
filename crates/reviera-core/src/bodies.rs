@@ -433,7 +433,11 @@ pub fn all(store: &Store) -> Vec<Body> {
         }
     }
     // Toposolids (ARC-TOPO-001), excavations subtracted through the boolean relations.
+    // An original a graded region replaced is hidden.
     for (id, cut, mesh) in crate::toposolids::all(store) {
+        if store.get(id).is_some_and(|e| crate::toposolids::superseded(store, e)) {
+            continue;
+        }
         push(
             id,
             if cut {
@@ -594,6 +598,10 @@ pub fn related(store: &Store, a: ElementId, b: ElementId) -> bool {
         if let Some(s) = crate::skylights::skylight_recipe(e) {
             hosts.push(s.roof);
         }
+        // A part is cut from its original element (ARC-PART-001).
+        if let Some(r) = crate::parts::recipe(e) {
+            hosts.push(r.source);
+        }
         if let Some(r) = crate::railings::railing_recipe(e) {
             match r.path {
                 crate::railings::RailPath::Host { host, .. } => hosts.push(host),
@@ -632,13 +640,28 @@ pub fn related(store: &Store, a: ElementId, b: ElementId) -> bool {
             .iter()
             .any(|(host, cw, _)| *host == w && *cw == c)
     };
+    // A mass is a conceptual volume, not a physical element: what is modelled in it or on its
+    // faces belongs with it.
+    let conceptual = |id: ElementId| store.get(id).and_then(crate::masses::recipe).is_some();
     ha.contains(&gb)
         || hb.contains(&ga)
+        || conceptual(a)
+        || conceptual(b)
         || same_dormer
         || crate::csg::related(store, a, b)
         || embedded()
         || fabricated_together(store, a, b)
         || reinforcing(store, a, b)
+        || precast_together(store, &ga, &gb)
+}
+
+/// A precast piece's source, parts, reinforcement and mounting parts belong together
+/// (STR-PRE-001, STR-PRE-003, STR-PRE-005).
+fn precast_together(store: &Store, a: &str, b: &str) -> bool {
+    store.iter().filter_map(crate::precast::assembly_recipe).any(|r| {
+        let has = |g: &str| r.source == g || r.parts.iter().chain(&r.reinforcement).chain(&r.mounting).any(|p| p == g);
+        has(a) && has(b)
+    })
 }
 
 /// Rebar sits in its host (STR-RBR-004).

@@ -7,7 +7,8 @@
 //! the washroom has its three sprinklers on a wet system and its fixtures in a sanitary system;
 //! the energy house runs annual energy on its own weather file (kept beside it) to a plausible
 //! result and exports gbXML; the daylight studio's west room, open to the sky, is better daylit
-//! than the east room behind the neighbouring block.
+//! than the east room behind the neighbouring block; the analysis tools' canopy is analysed
+//! (its U1 combination 1.2 D + 1.6 Lr), and its route, duct pressure drop and circuits kept.
 
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
@@ -135,4 +136,26 @@ fn the_mep_and_sustainability_samples_show_their_features() {
     assert_eq!((west.len(), east.len()), (1, 1));
     let (w, e) = (west[0].average, east[0].average);
     assert!(w > e && e > 0.0 && w < 20.0, "west {w}% east {e}%");
+
+    // Analysis tools: the canopy analysed from its saved model, the route to the exit, the duct
+    // system's pressure drop and LP1's loads.
+    let mut app = App::new(AppConfig { live: None, untitled_dir: work.path().join("u6") });
+    open(&mut app, work.path(), "analysis_tools");
+    let r = finish(&mut app, "structural_analysis.run", "structural_analysis.collect", json!({}));
+    let cases = r["cases"].as_array().unwrap();
+    let case = |n: &str| cases.iter().find(|c| c["name"] == n).unwrap_or_else(|| panic!("no case {n}: {r:#}"));
+    assert_eq!(cases.len(), 4, "D, Lr, W and U1");
+    let u1 = f(&case("U1")["max_moment"]);
+    assert!((18_000.0..23_000.0).contains(&u1), "U1 {u1} N·m");
+    let (d, lr) = (f(&case("D")["total_vertical_reaction"]), f(&case("Lr")["total_vertical_reaction"]));
+    assert!((f(&case("U1")["total_vertical_reaction"]) - (1.2 * d + 1.6 * lr)).abs() < 1.0, "U1 is 1.2 D + 1.6 Lr");
+    let paths = ok(&mut app, "path_of_travel.list", json!({}));
+    let paths = paths.as_array().unwrap();
+    assert_eq!(paths.len(), 1);
+    assert!((f(&paths[0]["length"]) - 13.4668).abs() < 0.01, "{paths:#?}");
+    let net = ok(&mut app, "mep_network.calculate", json!({}));
+    assert!((40.0..50.0).contains(&f(&net["systems"][0]["critical_loss"])), "{net:#}");
+    let circuits = ok(&mut app, "circuit.list", json!({}));
+    let names: Vec<&str> = circuits.as_array().unwrap().iter().map(|c| c["name"].as_str().unwrap()).collect();
+    assert_eq!(names, ["LP1-1", "LP1-2"]);
 }

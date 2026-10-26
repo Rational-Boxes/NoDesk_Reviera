@@ -129,13 +129,39 @@
     "name": "structural_checks",
     "title": "Structural model with problems",
     "group": "Structure",
-    "description": "A small steel frame with deliberate faults, each labelled in the Level 2 plan, for Analyze \u203a Checks \u203a Check Supports and Check Consistency to find: a floating ring of beams, a beam resting on nothing, a member 40 mm short of a column, members framing mid-span with no node, a girder moved off its analytical line, a beam with no analytical member, a member pinned at both ends and a slab well below its beams. The ring's beams, the moved girder and the cantilever also overlap where they meet (left on purpose).",
+    "description": "A small steel frame with deliberate faults, each labelled in the Level 2 plan, for Analyze › Checks › Check Supports and Check Consistency to find: a floating ring of beams, a beam resting on nothing, a member 40 mm short of a column, members framing mid-span with no node, a girder moved off its analytical line, a beam with no analytical member, a member pinned at both ends and a slab well below its beams. The ring's beams, the moved girder and the cantilever also overlap where they meet (left on purpose).",
     "allow_overlaps": 6,
     "steps": [
       {
         "command": "script.run",
         "args": {
           "file": "structural_checks.lua"
+        }
+      }
+    ]
+  },
+  {
+    "name": "steel_connections",
+    "title": "Steel connection detailing",
+    "group": "Steel",
+    "steps": [
+      {
+        "command": "script.run",
+        "args": {
+          "file": "steel_connections.lua"
+        }
+      }
+    ]
+  },
+  {
+    "name": "concrete_reinforcement",
+    "title": "Reinforced and precast concrete",
+    "group": "Concrete",
+    "steps": [
+      {
+        "command": "script.run",
+        "args": {
+          "file": "concrete_reinforcement.lua"
         }
       }
     ]
@@ -180,6 +206,32 @@
     ]
   },
   {
+    "name": "mep_fire",
+    "title": "Fire protection",
+    "group": "Systems",
+    "steps": [
+      {
+        "command": "script.run",
+        "args": {
+          "file": "mep_fire.lua"
+        }
+      }
+    ]
+  },
+  {
+    "name": "analysis_tools",
+    "title": "Analysis tools",
+    "group": "Analyze",
+    "steps": [
+      {
+        "command": "script.run",
+        "args": {
+          "file": "analysis_tools.lua"
+        }
+      }
+    ]
+  },
+  {
     "name": "energy_house",
     "title": "Energy house",
     "group": "Sustainability",
@@ -208,10 +260,49 @@
     ]
   },
   {
+    "name": "massing_site",
+    "title": "Massing and site",
+    "group": "Massing & Site",
+    "steps": [
+      {
+        "command": "script.run",
+        "args": {
+          "file": "massing_site.lua"
+        }
+      }
+    ]
+  },
+  {
+    "name": "annotated_plan",
+    "title": "Annotated plan",
+    "group": "Annotate",
+    "steps": [
+      {
+        "command": "script.run",
+        "args": {
+          "file": "annotated_plan.lua"
+        }
+      }
+    ]
+  },
+  {
+    "name": "views_inspection",
+    "title": "Views and inspection",
+    "group": "View",
+    "steps": [
+      {
+        "command": "script.run",
+        "args": {
+          "file": "views_inspection.lua"
+        }
+      }
+    ]
+  },
+  {
     "name": "manor_before",
     "title": "Manor before coordination",
     "group": "View",
-    "description": "The Manor with tower as first modelled, before coordination: the castle towers' walls run through the house's eaves and walls, and the gallery's vault and floor into the round tower. Run a clash test (View \u203a Coordination \u203a Clash Detection) to find, review and resolve them; the Manor sample is the same model after coordination.",
+    "description": "The Manor with tower as first modelled, before coordination: the castle towers' walls run through the house's eaves and walls, and the gallery's vault and floor into the round tower. Run a clash test (View › Coordination › Clash Detection) to find, review and resolve them; the Manor sample is the same model after coordination.",
     "allow_overlaps": 19,
     "steps": [
       {
@@ -221,6 +312,32 @@
           "answers": {
             "coordinate": false
           }
+        }
+      }
+    ]
+  },
+  {
+    "name": "managed_project",
+    "title": "Managed project",
+    "group": "Manage",
+    "steps": [
+      {
+        "command": "script.run",
+        "args": {
+          "file": "managed_project.lua"
+        }
+      }
+    ]
+  },
+  {
+    "name": "modify_tools",
+    "title": "Editing tools",
+    "group": "Modify",
+    "steps": [
+      {
+        "command": "script.run",
+        "args": {
+          "file": "modify_tools.lua"
         }
       }
     ]

@@ -699,12 +699,14 @@ pub fn pattern_parts(store: &Store, r: &PatternRecipe) -> Result<Vec<Part>> {
                 out.push(Part::Stud { start: p, end: add(p, mul(n, l)), diameter: d });
             }
             PatternKind::Bolt => {
+                // The head (0.6 d high, drawn from the start) bears on the face, outside the steel.
                 let l = r.found.length;
+                let head = 0.6 * d;
                 if r.inverted {
                     let exit = add(entry, mul(into, r.found.grip));
-                    out.push(Part::Bolt { start: exit, end: add(exit, mul(n, l)), diameter: d, anchor: false });
+                    out.push(Part::Bolt { start: add(exit, mul(into, head)), end: add(exit, mul(n, l)), diameter: d, anchor: false });
                 } else {
-                    out.push(Part::Bolt { start: entry, end: add(entry, mul(into, l)), diameter: d, anchor: false });
+                    out.push(Part::Bolt { start: add(entry, mul(n, head)), end: add(entry, mul(into, l)), diameter: d, anchor: false });
                 }
             }
             PatternKind::Anchor => {

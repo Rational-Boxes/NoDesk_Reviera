@@ -1360,6 +1360,15 @@ fn power(name: &str, origin: V3, direction: V3, dir: FlowDirection, voltage: f64
     }
 }
 
+/// A fire alarm device's connector: on a fire alarm (signal) circuit, not a power circuit.
+fn fire_alarm(name: &str, origin: V3, direction: V3, va: f64) -> Connector {
+    let mut c = power(name, origin, direction, FlowDirection::In, 24.0, 1, va, "Other");
+    if let Some(e) = c.electrical.as_mut() {
+        e.system = ElectricalSystem::FireAlarm;
+    }
+    c
+}
+
 /// The starter types: Reviera's own simple shapes and provisional sizes and flows, for laying out
 /// systems before manufacturers' content is loaded.
 fn starters() -> Vec<Starter> {
@@ -1490,14 +1499,14 @@ fn starters() -> Vec<Starter> {
             category: C::Sensor,
             size: [0.1, 0.1, 0.05],
             color: white,
-            connectors: vec![power("Power", [0.0, 0.0, 0.05], up, D::In, 24.0, 1, 2.0, "Other")],
+            connectors: vec![fire_alarm("Fire Alarm", [0.0, 0.0, 0.05], up, 2.0)],
         },
         Starter {
             name: "Manual Call Point",
             category: C::Alarm,
             size: [0.09, 0.05, 0.09],
             color: [0.80, 0.15, 0.15, 1.0],
-            connectors: vec![power("Power", [0.0, 0.025, 0.045], [0.0, 1.0, 0.0], D::In, 24.0, 1, 1.0, "Other")],
+            connectors: vec![fire_alarm("Fire Alarm", [0.0, 0.025, 0.045], [0.0, 1.0, 0.0], 1.0)],
         },
         Starter {
             name: "Switchboard",
