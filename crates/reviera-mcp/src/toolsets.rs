@@ -154,6 +154,8 @@ pub fn toolset_of(command: &str) -> String {
             | "lighting"
             | "mep_color_legend"
             | "embodied_carbon"
+            | "path_of_travel"
+            | "route_settings"
             | "mech_equipment"
             | "equipment_set"
             | "mechanical_settings"

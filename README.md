@@ -1108,6 +1108,12 @@ schedules, circuit paths, cable sizing and voltage drop.
   (`location.set`, `location.set_all`, `coordinates.*`, `position.rotate_true_north`;
   DM-LOC-001). Not built yet: map and city search, named sites, acquire and publish
   coordinates, relocate and mirror, picking the points in a view, CRS validation.
+- **Path of travel** (Analyze › Route Analysis): click a start and an end in a plan for the
+  shortest walking route that keeps a clearance from walls and furniture and passes through
+  doors, drawn with its length and time; waypoints, Update Paths after changes, route settings
+  (zone, walking speed, clearance, ignored categories) (`path_of_travel.*`, `route_settings.*`;
+  ANA-ROUTE-001/002). Not built yet: Reveal Obstacles, multiple paths, one-way indicators,
+  people content, spatial grids.
 - **Embodied carbon** (Analyze › Carbon › Embodied Carbon): material quantities of walls,
   floors, ceilings and roofs matched to emission factors from libraries you import (a documented
   CSV format; none are shipped), with proposals to confirm; runs by life-cycle stage (A1–A3, A4,

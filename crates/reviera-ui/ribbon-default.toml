@@ -2812,6 +2812,30 @@ icon = "location"
 help = "The project's latitude, longitude, elevation and time zone, the project base point and angle to true north, the survey point with its shared coordinates, and the CRS (DM-LOC-001)"
 
 [[action]]
+id = "path_of_travel.create"
+label = "Path of Travel"
+icon = "path_of_travel"
+help = "Click a start and an end in a plan: the shortest walking route that keeps clear of walls and furniture and passes through doors, with its length and time (ANA-ROUTE-001)"
+
+[[action]]
+id = "path_of_travel.update"
+label = "Update Paths"
+icon = "update_paths"
+help = "Work every path of travel in this plan out again after the model changed (ANA-ROUTE-001)"
+
+[[action]]
+id = "route_settings.set"
+label = "Route Settings"
+icon = "route_settings"
+help = "The analysis zone, walking speed, clearance and ignored categories for paths of travel (ANA-ROUTE-002)"
+
+[[action]]
+id = "path_of_travel.list"
+label = "Paths of Travel"
+icon = "paths_list"
+help = "Every path of travel with its length and walking time (ANA-ROUTE-001)"
+
+[[action]]
 id = "embodied_carbon.run"
 label = "Embodied Carbon"
 icon = "carbon"
@@ -3405,6 +3429,15 @@ tools = [
   { action = "ui.system_zone_by_level", size = "small" },
   { action = "system_zone.info", size = "small" },
   { action = "system_zone.convert_legacy", size = "small" },
+]
+
+[[tab.panel]]
+label = "Route Analysis"
+tools = [
+  { action = "path_of_travel.create", size = "large" },
+  { action = "path_of_travel.update", size = "small" },
+  { action = "route_settings.set", size = "small" },
+  { action = "path_of_travel.list", size = "small" },
 ]
 
 [[tab.panel]]

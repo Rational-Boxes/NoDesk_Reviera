@@ -65,6 +65,7 @@ pub mod mep_renumber;
 pub mod location;
 pub mod weather;
 pub mod embodied_carbon;
+pub mod path_of_travel;
 pub mod mep_risers;
 pub mod mep_electrical;
 pub mod mep_cables;

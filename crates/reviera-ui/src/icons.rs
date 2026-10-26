@@ -463,6 +463,18 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "spaces" => format!(
             r#"<path d="M4 5h24v22H4z" fill="{f}" {s}/><path d="M8 10h16M8 16h16M8 22h16" {sa}/>"#
         ),
+        "path_of_travel" => format!(
+            r##"<path d="M14 4v10M14 20v8" stroke-width="3" {sa}/><path d="M4 26L12 17h6l8-9" fill="none" stroke="#2e9e4f" stroke-width="2.5"/><path d="M22 8h4v4" fill="none" stroke="#2e9e4f" stroke-width="2.5"/>"##
+        ),
+        "update_paths" => format!(
+            r#"<path d="M4 24L12 15h6l8-9" fill="none" {sa}/><path d="M26 22a8 8 0 1 1-3-6" fill="none" {sa}/><path d="M23 12v4h4" fill="none" {sa}/>"#
+        ),
+        "route_settings" => format!(
+            r#"<path d="M4 26L12 17h6l8-9" fill="none" {sa}/><circle cx="23" cy="23" r="5" fill="{f}" {s}/><circle cx="23" cy="23" r="1.5" {sa}/>"#
+        ),
+        "paths_list" => format!(
+            r#"<path d="M4 5h24v22H4z" fill="{f}" {s}/><path d="M8 11h16M8 16h16M8 21h10" {sa}/>"#
+        ),
         "carbon" => format!(
             r#"<path d="M6 26c0-8 4-14 10-18 6 4 10 10 10 18z" fill="{f}" {s}/><path d="M16 8v18M16 18l-5-4M16 22l5-4" fill="none" {sa}/>"#
         ),

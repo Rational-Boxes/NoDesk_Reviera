@@ -110,6 +110,7 @@ mod lighting_ui;
 mod mep_fill_ui;
 mod location_ui;
 mod carbon_ui;
+mod route_ui;
 mod mech_settings_ui;
 mod wall_profile;
 mod wall_sweeps;
@@ -299,6 +300,8 @@ struct Gui {
     /// Edit Selection mode (ARC-SEL-002).
     sel_edit: Option<groups::SelEdit>,
     section_tool: Option<sections::SectionTool>,
+    /// The Path of Travel tool's start point, once clicked (ANA-ROUTE-001).
+    route_start: Option<[f64; 2]>,
     /// The Tag, Room Tag or Text tool.
     note_tool: Option<notes::NoteTool>,
     /// The Stair tool.
@@ -2151,6 +2154,7 @@ impl Gui {
             .room_label_at(x, y)
             .or_else(|| self.space_label_at(x, y))
             .or_else(|| self.mep_legend_at(x, y))
+            .or_else(|| self.path_at(x, y))
             .or_else(|| self.rebar_line_at(x, y))
             .or_else(|| self.placeholder_at(x, y))
             .or_else(|| self.element_at(x, y, panel))
@@ -3699,6 +3703,7 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 sel_edit: None,
                 section_tool: None,
                 note_tool: None,
+                route_start: None,
                 stair_tool: None,
                 dormer_tool: None,
                 railing_tool: None,
@@ -4672,6 +4677,13 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "coordinates.report" => with(gui, Gui::report_coordinates),
         "weather.import" => with(gui, Gui::weather_dialog),
         "embodied_carbon.run" => with(gui, Gui::embodied_carbon_dialog),
+        "path_of_travel.create" => with(gui, |g| {
+            g.start_note_tool(notes::NoteTool::PathOfTravel);
+            focus(g);
+        }),
+        "path_of_travel.update" => with(gui, Gui::update_paths),
+        "route_settings.set" => with(gui, Gui::route_settings_dialog),
+        "path_of_travel.list" => with(gui, Gui::paths_dialog),
         "circuit.set_locked" => with(gui, Gui::toggle_circuit_lock),
         "circuit.disconnect_panel" => with(gui, Gui::disconnect_circuit_panel),
         "panel.settings" => with(gui, Gui::panel_settings),

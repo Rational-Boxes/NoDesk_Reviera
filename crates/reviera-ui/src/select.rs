@@ -302,6 +302,7 @@ impl Gui {
             .room_label_at(x, y)
             .or_else(|| self.space_label_at(x, y))
             .or_else(|| self.mep_legend_at(x, y))
+            .or_else(|| self.path_at(x, y))
             .or_else(|| self.element_at(x, y, panel))
         else {
             let id = self.ribbon.id_of("inspect.reset").filter(|_| temporary)?;

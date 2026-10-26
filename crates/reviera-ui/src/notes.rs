@@ -31,6 +31,8 @@ pub enum NoteTool {
     /// Analyze › Color Fill › Duct Legend / Pipe Legend (MEP-DUCT-010).
     DuctLegend,
     PipeLegend,
+    /// Analyze › Route Analysis › Path of Travel (ANA-ROUTE-001): a start, then an end.
+    PathOfTravel,
 }
 
 /// Tag All Not Tagged's categories: key and label.
@@ -101,12 +103,14 @@ impl Gui {
                 NoteTool::Text => "Text: click where the text's top-left corner goes; Esc ends",
                 NoteTool::DuctLegend => "Duct Legend: click where the legend's top-left corner goes",
                 NoteTool::PipeLegend => "Pipe Legend: click where the legend's top-left corner goes",
+                NoteTool::PathOfTravel => "Path of Travel: click the start point; Esc ends",
             },
             0,
         );
     }
 
     pub(crate) fn end_note_tool(&mut self) -> bool {
+        self.route_start = None;
         self.note_tool.take().is_some()
     }
 
@@ -145,6 +149,10 @@ impl Gui {
                     "tag.create_room",
                     json!({ "view_id": plan, "room_id": room, "position": p }),
                 )
+            }
+            NoteTool::PathOfTravel => {
+                self.path_click(p);
+                return;
             }
             NoteTool::DuctLegend | NoteTool::PipeLegend => {
                 let kind = if kind == NoteTool::DuctLegend { reviera_core::mep_color_fill::Kind::Duct } else { reviera_core::mep_color_fill::Kind::Pipe };

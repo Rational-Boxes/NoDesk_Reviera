@@ -216,6 +216,12 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(MepColorLegendPlace),
         registry.add(CircuitRenumber),
         registry.add(CarbonAddLibrary),
+        registry.add(PathOfTravelCreate),
+        registry.add(PathOfTravelUpdate),
+        registry.add(PathOfTravelWaypoint),
+        registry.add(PathOfTravelList),
+        registry.add(RouteSettingsSet),
+        registry.add(RouteSettingsGet),
         registry.add(CarbonMatch),
         registry.add(CarbonAutoMatch),
         registry.add(CarbonMaterials),
@@ -2184,6 +2190,70 @@ read_command!(
     crate::mep_spaces::InfoParams,
     Vec<crate::mep_spaces::SpaceInfo>,
     crate::mep_spaces::infos
+);
+
+edit_command!(
+    PathOfTravelCreate,
+    "path_of_travel.create",
+    "Make a path of travel",
+    "The shortest walking route (ANA-ROUTE-001) in the plan view `view_id` from `start` to `end` through `waypoints` in order, keeping the clearance from obstacles in the analysis zone: walls (doors passable, windows not) and components reaching into the zone, except ignored categories (route_settings). One level; stairs and ramps are not followed. Kept as a view annotation with its route, length and time (length ÷ walking speed). Refused when no route keeps clear. Returns the path.",
+    "Path of Travel",
+    crate::path_of_travel::CreateParams,
+    crate::id::ElementId,
+    crate::path_of_travel::create
+);
+
+edit_command!(
+    PathOfTravelUpdate,
+    "path_of_travel.update",
+    "Update paths of travel",
+    "Works the routes of paths of travel out again after the model changed: `ids`, or every path of `view_id` (or of the model) when empty. Returns the paths whose route changed.",
+    "Update Paths of Travel",
+    crate::path_of_travel::UpdateParams,
+    Vec<crate::id::ElementId>,
+    crate::path_of_travel::update
+);
+
+edit_command!(
+    PathOfTravelWaypoint,
+    "path_of_travel.add_waypoint",
+    "Add a waypoint to a path of travel",
+    "Adds the waypoint `point` to the path `id` at `index` among its waypoints (the end when omitted), or with `remove` removes the waypoint at `index`; the route is worked out again. Returns its length.",
+    "Path Waypoint",
+    crate::path_of_travel::WaypointParams,
+    f64,
+    crate::path_of_travel::waypoint
+);
+
+read_command!(
+    PathOfTravelList,
+    "path_of_travel.list",
+    "Paths of travel",
+    "Every path of travel (of `view_id` when given) with its view, length (m), time (s), route and waypoints.",
+    crate::path_of_travel::ListParams,
+    Vec<crate::path_of_travel::PathInfo>,
+    crate::path_of_travel::list
+);
+
+edit_command!(
+    RouteSettingsSet,
+    "route_settings.set",
+    "Set route analysis settings",
+    "Route analysis settings (ANA-ROUTE-002): the analysis zone's `zone_bottom` and `zone_top` above the level (m), `walking_speed` (m/s), `clearance` (m) and `ignored_categories` (category keys whose elements are not obstacles). Run path_of_travel.update afterwards. Returns the settings.",
+    "Route Settings",
+    crate::path_of_travel::SettingsParams,
+    crate::path_of_travel::Settings,
+    crate::path_of_travel::set_settings
+);
+
+read_command!(
+    RouteSettingsGet,
+    "route_settings.get",
+    "Route analysis settings",
+    "The analysis zone offsets, walking speed, clearance and ignored categories.",
+    crate::path_of_travel::Empty,
+    crate::path_of_travel::Settings,
+    crate::path_of_travel::get_settings
 );
 
 edit_command!(
