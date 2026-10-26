@@ -25,10 +25,12 @@ operation can be driven by Lua scripts and by AI agents through the Model Contex
 > railings with gates, rooms, levels and grids. It finds and resolves overlaps with kept
 > booleans (OpenCASCADE), checks door clearances, and draws plans, ceiling plans, sections,
 > elevations, schedules and sheets to PDF and COBie. Every operation is a command that the
-> ribbon, Lua scripts and AI agents (MCP) share. The newest work is components: Component
-> Libraries of ordinary 3D files and IFC components, placed like stamps, made from any selection,
-> and repeated along paths parametrically (see the Greek temple sample). Pre-release packages
-> are built for Linux (Flatpak) and Windows.
+> ribbon, Lua scripts and AI agents (MCP) share. Structure (framing, steel connections,
+> reinforcement, precast, analysis), MEP (ducts, pipes, sprinklers, electrical) and
+> sustainability (energy, daylight, carbon) are in development. The newest work is
+> coordination: BCF issues and viewpoints exchanged as BCF 2.1 and 3.0 files, hidden lines in
+> sections and elevations, and a sample model with a walkthrough for every ribbon tab in Help.
+> Pre-release packages are built for Linux (Flatpak) and Windows.
 
 ## Contents
 
@@ -132,7 +134,8 @@ ribbon's tools, the command shell, Lua and MCP alike.
   and attribution. `registry.list` and `registry.describe` list and explain them; the command
   shell (`reviera shell`) runs them with JSON arguments.
 - **Lua scripting** (LuaJIT): `script.run` runs a script or a `.lua` file against the open model.
-  `reviera.<domain>.<verb>{...}` (or `reviera.call`) runs any command, `reviera.ui.form{...}` asks
+  `reviera.<domain>.<verb>{...}` (or `reviera.call`; longer names nest, as
+  `reviera.param.project.add{...}`) runs any command, `reviera.ui.form{...}` asks
   the user for input (length, number, integer, checkbox, choice and text fields, with defaults,
   ranges and help, validated and asked again until valid), and `print` reports. A run is one undo
   step and rolls back entirely if it fails.
@@ -1361,7 +1364,17 @@ simulation sessions, and the first engine runners (see [Not built yet](#not-buil
   the selection by GlobalId); Show Viewpoint… opens one (BCF 2.1 or 3.0) in the 3D view, its
   camera and cut undoable in one step, its components hidden or isolated and selected
   (`bcf.export_viewpoint`, `bcf.import_viewpoint`, `view.apply_viewpoint`; `view.get` reads a
-  view's settings). BCF topics and `.bcf` archives are not built yet.
+  view's settings).
+- **Issues (BCF topics)**: View › Coordination › New Issue makes a BCF topic from the active 3D
+  view (its viewpoint) and the selection, with a title, description, type, status, priority,
+  labels, assignee, due date and stage; Issues lists them, shows an issue's viewpoint in the 3D
+  view, and edits, comments on, adds views to and deletes them. Issues are kept with the model,
+  one RXD object per topic, so they save, undo and reopen like the rest of it. Import BCF and
+  Export BCF (also in the File menu) read and write `.bcf` archives in BCF 3.0 or 2.1 (both
+  checked against buildingSMART's schemas), merging imports by topic GUID: the fields of whichever
+  copy changed last, comments and viewpoints joined by their GUIDs (`bcf.create_topic`,
+  `bcf.update_topic`, `bcf.add_comment`, `bcf.add_viewpoint`, `bcf.apply_viewpoint`,
+  `bcf.delete_topic`, `bcf.list`, `bcf.get`, `bcf.import`, `bcf.export`, `bcf.lists`; COL-BCF-001).
 - **Model Tree** (MT): Project › Site › Building › storeys › categories › elements, with hosted
   elements under their hosts; its context menu selects, hides, isolates or boxes whole branches
   (`model.tree`).
@@ -1407,9 +1420,12 @@ simulation sessions, and the first engine runners (see [Not built yet](#not-buil
 - **Ribbon**: Architecture (Wall, Arc Wall, Spline Wall, Curtain Wall, Door, Window, Column,
   Floor, Ceiling, Roof, Arched Roof, Dome, Component, Import Object, Component Library, Room,
   Stair, Spiral Stair, Ramp, Railing, Deck, Wall Opening, Vertical, Shaft, Skylight, Level,
-  Grid), Annotate
-  (dimensions, text, tags), View (views, sheets, navigation, coordination, section box and
-  slices, hide/isolate, windows, panes) and Modify tabs, with a Quick Access Toolbar above.
+  Grid), Structure, Steel, Concrete, Systems, Analyze, Sustainability, Massing & Site, Annotate
+  (dimensions, text, tags), View (views, sheets, navigation, coordination and issues, section
+  box and slices, hide/isolate, windows, panes), Manage and Modify tabs, with a Quick Access
+  Toolbar above. Panels too narrow for the window collapse to dropdowns; runs of more than three
+  small buttons keep their labels rather than shrinking to icons, which wxWidgets could draw
+  over the panel's large buttons.
   While elements are selected a contextual *Modify | <category>* tab adds their tools (for
   example Flip Hand for doors, Eaves and Dormer for roofs, Gate for railings). The ribbon,
   toolbar and menus come from one catalog, `ribbon-default.toml`, checked against the command
@@ -1613,7 +1629,10 @@ area by area (reviewed against the spec on 2026-10-15).
 **Other chapters:**
 
 - **Coordination**: clash tests (COL-CLASH), automatic pipe and duct penetrations (MEP-PEN-001),
-  bathroom fixture clear floor spaces and turning spaces, ISO 21542.
+  bathroom fixture clear floor spaces and turning spaces, ISO 21542. For BCF issues: snapshots,
+  the docked Issues pane (COL-BCF-004; a dialog for now), the project's lists as edited
+  extensions, issues from clash results, document references, component colouring, BCF API sync
+  with a server (COL-BCF-002).
 - **Documentation**: crop regions, jogged sections, interior elevation markers, opening a view
   from its marker; schedule filters in the Filter dialog beyond one condition (several are taken by `schedule.set_filters`), grouping and calculated fields; title block families,
   revisions and sheet collections; tags and text in sections and on sheets; the current NBIMS-US

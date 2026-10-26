@@ -3290,6 +3290,7 @@ Every command below is registered once in the command registry and is therefore 
 | `view.rename` | view_id, new_name | () | Yes | DOC-VIEW-001 |
 | `view.delete` | view_ids[] | () | Yes | DOC-VIEW-001 |
 | `view.open` | view_id | () | No | DOC-VIEW-001 |
+| `view.get` | view_id | view_detail | No | DOC-VIEW-001 |
 | `view.list` | filter? | view_summary[] | No | DOC-VIEW-001 |
 | `viewtype.create` | kind, name, default_template_id?, bind_new_views?, marker_type_id? | view_family_type_id | Yes | DOC-VIEW-001 |
 | `view_tag.settings` | kind?: callout\|elevation\|section | () | No | DOC-VIEW-001 |

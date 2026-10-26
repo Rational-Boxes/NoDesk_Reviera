@@ -200,6 +200,16 @@ fn escape(s: &str) -> String {
 
 /// The viewpoint as a BCF 3.0 `.bcfv` document.
 pub fn to_xml(v: &Viewpoint) -> String {
+    write_xml(v, true)
+}
+
+/// The viewpoint as a BCF 2.1 `.bcfv` document (no aspect ratio, which 2.1 does not have).
+pub fn to_xml_2_1(v: &Viewpoint) -> String {
+    write_xml(v, false)
+}
+
+fn write_xml(v: &Viewpoint, aspect: bool) -> String {
+    let ratio = |r: f64| if aspect { format!("<AspectRatio>{r}</AspectRatio>") } else { String::new() };
     let mut s = String::from("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
     match &v.guid {
         Some(g) => s.push_str(&format!("<VisualizationInfo Guid=\"{}\">", escape(g))),
@@ -216,16 +226,18 @@ pub fn to_xml(v: &Viewpoint) -> String {
     s.push_str("</Visibility></Components>");
     match &v.camera {
         Some(Camera::Perspective { eye, direction, up, field_of_view, aspect_ratio }) => s.push_str(&format!(
-            "<PerspectiveCamera>{}{}{}<FieldOfView>{field_of_view}</FieldOfView><AspectRatio>{aspect_ratio}</AspectRatio></PerspectiveCamera>",
+            "<PerspectiveCamera>{}{}{}<FieldOfView>{field_of_view}</FieldOfView>{}</PerspectiveCamera>",
             xyz("CameraViewPoint", *eye),
             xyz("CameraDirection", *direction),
-            xyz("CameraUpVector", *up)
+            xyz("CameraUpVector", *up),
+            ratio(*aspect_ratio)
         )),
         Some(Camera::Orthogonal { eye, direction, up, view_to_world_scale, aspect_ratio }) => s.push_str(&format!(
-            "<OrthogonalCamera>{}{}{}<ViewToWorldScale>{view_to_world_scale}</ViewToWorldScale><AspectRatio>{aspect_ratio}</AspectRatio></OrthogonalCamera>",
+            "<OrthogonalCamera>{}{}{}<ViewToWorldScale>{view_to_world_scale}</ViewToWorldScale>{}</OrthogonalCamera>",
             xyz("CameraViewPoint", *eye),
             xyz("CameraDirection", *direction),
-            xyz("CameraUpVector", *up)
+            xyz("CameraUpVector", *up),
+            ratio(*aspect_ratio)
         )),
         None => {}
     }

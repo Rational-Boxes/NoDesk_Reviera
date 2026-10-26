@@ -848,6 +848,8 @@ The chapter **does not** specify the modelling behaviour behind the tools that a
 - [ ] An add-in tool that names an unregistered command is skipped and reported, while the add-in's other tools appear.
 - [ ] Disabling the add-in removes its tab without restart; re-enabling it restores the tab and any QAT item the user had added from it.
 
+
+*Built (2026-10-26), small buttons that keep their labels:* a run of more than three small buttons in a panel keeps icon and label instead of shrinking to icons alone: wxRibbonButtonBar's collapse of such a run to several icon columns drew them over the panel's large buttons (Systems › Electrical, found in a visual check of every tab at 1400 and 1900 px). Runs of up to three still shrink to icons; a panel without room collapses to its dropdown. Electrical is split into Electrical and Circuits. *(Owner, 2026-10-26: "Do a visual check on the ribbons, one the new ones there was some controlls running over each other.")*
 ---
 
 ## 1.8 Ribbon catalog
@@ -24859,6 +24861,7 @@ Every command below is registered once in the command registry and is therefore 
 | `view.rename` | view_id, new_name | () | Yes | DOC-VIEW-001 |
 | `view.delete` | view_ids[] | () | Yes | DOC-VIEW-001 |
 | `view.open` | view_id | () | No | DOC-VIEW-001 |
+| `view.get` | view_id | view_detail | No | DOC-VIEW-001 |
 | `view.list` | filter? | view_summary[] | No | DOC-VIEW-001 |
 | `viewtype.create` | kind, name, default_template_id?, bind_new_views?, marker_type_id? | view_family_type_id | Yes | DOC-VIEW-001 |
 | `view_tag.settings` | kind?: callout\|elevation\|section | () | No | DOC-VIEW-001 |
@@ -26590,6 +26593,10 @@ Common link fields: `id`, `name`, `source` (see each type), `pathType` (relative
 - [ ] A BCF 2.1 file from another tool imports into Reviera and its viewpoints restore the camera and selection.
 - [ ] Two users commenting on the same topic in BIMserver mode both see both comments after synchronising.
 
+*Built (2026-10-26), topics and archives:* topics are kept with the model as RXD objects (`rxd:coordination/issues/<topic guid>`, one per topic; a topic's comments and viewpoints inside it), so they save, reopen and undo with the model. `bcf.create_topic` (from the active 3D view's viewpoint and the selection or `element_ids`; type Issue and status Open unless given), `bcf.update_topic` (recording the modification date and author), `bcf.add_comment` (optionally on one of its viewpoints), `bcf.add_viewpoint`, `bcf.apply_viewpoint` (COL-BCF-003), `bcf.delete_topic`, `bcf.list` (filters: status, type, priority, assignee, label, text) and `bcf.get`; beneath them `bcf.put_topic`, `bcf.put_viewpoint` and `bcf.merge_topics`. `bcf.export` writes a `.bcf` archive in BCF 3.0 (bcf.version, extensions.xml with the project's lists, per topic markup.bcf and `<guid>.bcfv`) or 2.1 (comments and viewpoints beside the topic, no aspect ratio); `bcf.import` reads either and merges by topic GUID: the fields of whichever changed last, comments and viewpoints joined by GUID (a comment changed later is taken). Exports validate against buildingSMART's BCF 3.0 and 2.1 XSDs. Authors are given or the system's user name (no user identity yet, UI-IDENT-001); the lists (`bcf.lists`) are Reviera's defaults and every value in use. View › Coordination › New Issue, Issues (a dialog: Show, Edit, Comment, Add View, Delete), Import BCF and Export BCF, also in the File menu. *(Owner, 2026-10-26: "commit and push work, continue feature development".)* Not yet: snapshots (named on import, not kept), issues from clash results and review items, document references and project.bcfp, the lists as edited extensions, the docked Issues pane with filters (COL-BCF-004), BIMserver merge (third criterion), BCF API (COL-BCF-002).
+
+*Built (2026-10-26), topics and archives:* topics are kept with the model as RXD objects (`rxd:coordination/issues/<topic guid>`, one per topic; a topic's comments and viewpoints inside it), so they save, reopen and undo with the model. `bcf.create_topic` (from the active 3D view's viewpoint and the selection or `element_ids`; type Issue and status Open unless given), `bcf.update_topic` (recording the modification date and author), `bcf.add_comment` (optionally on one of its viewpoints), `bcf.add_viewpoint`, `bcf.apply_viewpoint` (COL-BCF-003), `bcf.delete_topic`, `bcf.list` (filters: status, type, priority, assignee, label, text) and `bcf.get`; beneath them `bcf.put_topic`, `bcf.put_viewpoint` and `bcf.merge_topics`. `bcf.export` writes a `.bcf` archive in BCF 3.0 (bcf.version, extensions.xml with the project's lists, per topic markup.bcf and `<guid>.bcfv`) or 2.1 (comments and viewpoints beside the topic, no aspect ratio); `bcf.import` reads either and merges by topic GUID: the fields of whichever changed last, comments and viewpoints joined by GUID (a comment changed later is taken). Exports validate against buildingSMART's BCF 3.0 and 2.1 XSDs. The authors are given or the system's user name (no user identity yet, UI-IDENT-001); the lists (`bcf.lists`) are Reviera's defaults and every value in use. View › Coordination › New Issue, Issues (a dialog: Show, Edit, Comment, Add View, Delete), Import BCF and Export BCF, also in the File menu. *(Owner, 2026-10-26: \"commit and push work, continue feature development\".)* Not yet: snapshots (named on import, not kept), issues from clash results and review items, document references and project.bcfp, the lists as edited extensions, the docked Issues pane with filters (COL-BCF-004), BIMserver merge (third criterion), BCF API (COL-BCF-002).
+
 ### BCF issues pane
 **ID:** COL-BCF-004 · **Priority:** P1 · **Ref:** research/04 §6.7 (*Integrated Issues*), §8.5; COL-BCF-001
 
@@ -27181,6 +27188,14 @@ Every command below is registered once and is available from the UI, Lua and MCP
 | `api.log` | profile_id, since? | entry[] (redacted) | No (query) | COL-API-001 |
 | `http.request` | method, url, headers?, body?, profile_id? | response (Lua at trusted/native trust only; not exposed to MCP) | No | COL-API-001 |
 | `bcf.apply_viewpoint` | viewpoint_id, target_view_id? | view_id | No | COL-BCF-003 |
+| `bcf.export_viewpoint` | view_id?, path | export_report | No | COL-BCF-003 |
+| `bcf.get` | topic_id | topic | No (query) | COL-BCF-001 |
+| `bcf.import_viewpoint` | path, view_id? | import_report | Yes | COL-BCF-003 |
+| `bcf.lists` | — | lists | No (query) | COL-BCF-001 |
+| `bcf.merge_topics` | topics[] | merge_report | Yes | COL-BCF-001 |
+| `bcf.put_topic` | topic | element_id | Yes | COL-BCF-001 |
+| `bcf.put_viewpoint` | topic_id, viewpoint | viewpoint_id | Yes | COL-BCF-003 |
+| `view.apply_viewpoint` | view_id, viewpoint | view_id | Yes | COL-BCF-003 |
 | `model.purge_preview` | — | purge_tree | No | COL-MNT-001 |
 | `model.purge` | item_ids[]?\|all? | count | Yes | COL-MNT-001 |
 | `model.audit` | repair? | audit_report | Yes | COL-MNT-002 |
@@ -27826,7 +27841,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**2151 unique commands** in 416 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**2160 unique commands** in 416 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -27862,7 +27877,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `array` | 6 |
 | `assembly` | 16 |
 | `assemblytemplate` | 1 |
-| `bcf` | 25 |
+| `bcf` | 32 |
 | `beam` | 6 |
 | `beam_system` | 5 |
 | `bending_detail` | 1 |
@@ -28220,7 +28235,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `underlay` | 1 |
 | `units` | 7 |
 | `validate` | 2 |
-| `view` | 121 |
+| `view` | 123 |
 | `view_tag` | 1 |
 | `viewport` | 10 |
 | `viewporttype` | 1 |
@@ -28374,12 +28389,19 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `bcf.create_topic` | 6 | title, description?, fields?, view_id?, element_ids[]? | topic_id | Yes | COL-BCF-001 |
 | `bcf.delete_topic` | 6 | topic_ids[] | () | Yes | COL-BCF-001 |
 | `bcf.export` | 6 | path, topic_ids[]?, version: 2.1\ | 3.0 | () | No |
+| `bcf.export_viewpoint` | 6 | view_id?, path | export_report | No | COL-BCF-003 |
 | `bcf.from_clash` | 6 | clash_result_ids[], group_by? | topic_ids[] | Yes | COL-BCF-005 |
+| `bcf.get` | 6 | topic_id | topic | No (query) | COL-BCF-001 |
 | `bcf.import` | 6 | path | import_report | Yes | COL-BCF-001 |
+| `bcf.import_viewpoint` | 6 | path, view_id? | import_report | Yes | COL-BCF-003 |
 | `bcf.issues_for_element` | 6 | element_id | topic_summary[] | No (query) | COL-BCF-005 |
 | `bcf.issues_pane` | 6 | — | () | No | COL-BCF-004 |
 | `bcf.list` | 6 | filter? | topic_summary[] | No | COL-BCF-001 |
+| `bcf.lists` | 6 | — | lists | No (query) | COL-BCF-001 |
+| `bcf.merge_topics` | 6 | topics[] | merge_report | Yes | COL-BCF-001 |
 | `bcf.notifications` | 6 | since? | notification[] | No (query) | COL-BCF-005 |
+| `bcf.put_topic` | 6 | topic | element_id | Yes | COL-BCF-001 |
+| `bcf.put_viewpoint` | 6 | topic_id, viewpoint | viewpoint_id | Yes | COL-BCF-003 |
 | `bcf.report` | 6 | topic_ids[]? \ | filter?, format: pdf\ | html\ | csv\ |
 | `bcf.set_extensions` | 6 | lists{types?, statuses?, priorities?, labels?, stages?, users?}, replacements?{} | () | Yes | COL-BCF-004 |
 | `bcf.set_workflow` | 6 | rules | () | Yes | COL-BCF-005 |
@@ -30171,6 +30193,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `view.activate` | 1 | `view_id`, `{new_window?, float?, monitor?}` | `window_id` | No | UI-VIEWWIN-001 |
 | `view.add_crop_break` | 5 | view_id, axis, position, gap | () | Yes | DOC-GFX-015 |
 | `view.add_filter` | 5 | view_id, filter_id, index?, visible?, enabled?, override? | () | Yes | DOC-GFX-006 |
+| `view.apply_viewpoint` | 6 | view_id, viewpoint | view_id | Yes | COL-BCF-003 |
 | `view.assign_scope_box` | 3 | view_ids, scope_box_id \ | null | — | Yes |
 | `view.blueprint` | 5 | view_id, on: bool, slice? | () | No | DOC-VIEW-013 |
 | `view.blueprint_save_as_view` | 5 | view_id, name? | view_id | Yes | DOC-VIEW-013 |
@@ -30209,6 +30232,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `view.filters` | 5 | — | () | No | DOC-GFX-006 |
 | `view.find_referring` | 5 | view_id | referrer[] | No | DOC-VIEW-001 |
 | `view.fit_section_box` | 5 | element_ids[], view_id?, margin? | view_id | Yes | DOC-VIEW-008 |
+| `view.get` | 5 | view_id | view_detail | No | DOC-VIEW-001 |
 | `view.get_camera` | 1 | `view_id` | `Camera` | No | UI-NAV-001 |
 | `view.get_draw_list` | 5 | view_id, region? | draw_list | No | DOC-HLR-004 |
 | `view.get_temp_state` | 1 | `view_id?` | `{hidden[], isolated[], reveal, constraints}` | No | UI-VCB-001 |

@@ -56,6 +56,15 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(ViewList),
         registry.add(ViewGet),
         registry.add(ViewApplyViewpoint),
+        registry.add(BcfPutTopic),
+        registry.add(BcfUpdateTopic),
+        registry.add(BcfAddComment),
+        registry.add(BcfPutViewpoint),
+        registry.add(BcfDeleteTopic),
+        registry.add(BcfList),
+        registry.add(BcfGet),
+        registry.add(BcfMergeTopics),
+        registry.add(BcfLists),
         registry.add(ViewRename),
         registry.add(ViewDuplicate),
         registry.add(ViewDelete),
@@ -1514,6 +1523,192 @@ impl Command for ViewGet {
     fn run(&self, cx: &mut CommandContext<'_>, p: views::ViewIdParams) -> Result<views::ViewDetail> {
         views::detail(cx.store(), &p.view_id)
     }
+}
+
+#[derive(Debug)]
+struct BcfPutTopic;
+
+impl Command for BcfPutTopic {
+    type Params = crate::issues::PutParams;
+    type Output = ElementId;
+    const META: CommandMeta = CommandMeta {
+        name: "bcf.put_topic",
+        version: 1,
+        summary: "Add or replace a BCF topic",
+        description: "Stores a whole BCF topic (COL-BCF-001) with the model, new or replacing the one with its GUID: title, description, topic_type, status, priority, labels, assigned_to, due_date, stage, authors and dates, related_topics, reference_links, comments and viewpoints. A missing GUID, creation date or author is filled in. Returns its element id. `bcf.create_topic` makes one from the active view.",
+        effects: &[Effect::Edit],
+        transaction_name: "Issue",
+    };
+
+    fn run(&self, cx: &mut CommandContext<'_>, p: crate::issues::PutParams) -> Result<ElementId> {
+        crate::issues::put(cx.edit()?, p)
+    }
+}
+
+#[derive(Debug)]
+struct BcfUpdateTopic;
+
+impl Command for BcfUpdateTopic {
+    type Params = crate::issues::UpdateParams;
+    type Output = ();
+    const META: CommandMeta = CommandMeta {
+        name: "bcf.update_topic",
+        version: 1,
+        summary: "Change a BCF topic",
+        description: "Sets a topic's fields (title, description, topic_type, status, priority, labels, assigned_to, due_date, stage, related_topics, reference_links; an empty text clears one) by GUID or element id, recording the modification date and author.",
+        effects: &[Effect::Edit],
+        transaction_name: "Edit Issue",
+    };
+
+    fn run(&self, cx: &mut CommandContext<'_>, p: crate::issues::UpdateParams) -> Result<()> {
+        crate::issues::update(cx.edit()?, p)
+    }
+}
+
+#[derive(Debug)]
+struct BcfAddComment;
+
+impl Command for BcfAddComment {
+    type Params = crate::issues::CommentParams;
+    type Output = String;
+    const META: CommandMeta = CommandMeta {
+        name: "bcf.add_comment",
+        version: 1,
+        summary: "Comment on a BCF topic",
+        description: "Adds a comment to a topic, optionally referring to one of its viewpoints; returns the comment's GUID.",
+        effects: &[Effect::Edit],
+        transaction_name: "Comment",
+    };
+
+    fn run(&self, cx: &mut CommandContext<'_>, p: crate::issues::CommentParams) -> Result<String> {
+        crate::issues::add_comment(cx.edit()?, p)
+    }
+}
+
+#[derive(Debug)]
+struct BcfPutViewpoint;
+
+impl Command for BcfPutViewpoint {
+    type Params = crate::issues::AddViewpointParams;
+    type Output = String;
+    const META: CommandMeta = CommandMeta {
+        name: "bcf.put_viewpoint",
+        version: 1,
+        summary: "Add a viewpoint to a BCF topic",
+        description: "Adds a viewpoint (camera, clipping planes, components, as `view.apply_viewpoint` takes) to a topic, replacing one with the same GUID; returns its GUID. `bcf.add_viewpoint` captures one from a view.",
+        effects: &[Effect::Edit],
+        transaction_name: "Add Viewpoint",
+    };
+
+    fn run(&self, cx: &mut CommandContext<'_>, p: crate::issues::AddViewpointParams) -> Result<String> {
+        crate::issues::add_viewpoint(cx.edit()?, p)
+    }
+}
+
+#[derive(Debug)]
+struct BcfDeleteTopic;
+
+impl Command for BcfDeleteTopic {
+    type Params = crate::issues::DeleteParams;
+    type Output = usize;
+    const META: CommandMeta = CommandMeta {
+        name: "bcf.delete_topic",
+        version: 1,
+        summary: "Delete BCF topics",
+        description: "Deletes topics by GUID or element id; returns how many.",
+        effects: &[Effect::Edit],
+        transaction_name: "Delete Issues",
+    };
+
+    fn run(&self, cx: &mut CommandContext<'_>, p: crate::issues::DeleteParams) -> Result<usize> {
+        crate::issues::delete(cx.edit()?, p)
+    }
+}
+
+#[derive(Debug)]
+struct BcfList;
+
+impl Command for BcfList {
+    type Params = crate::issues::ListParams;
+    type Output = Vec<crate::issues::Summary>;
+    const META: CommandMeta = CommandMeta {
+        name: "bcf.list",
+        version: 1,
+        summary: "List BCF topics",
+        description: "The model's topics by creation date: title, type, status, priority, labels, assignee, due date, stage, last change and counts of comments and viewpoints, filtered by status, type, priority, assignee, label or text.",
+        effects: &[Effect::Read],
+        transaction_name: "",
+    };
+
+    fn run(&self, cx: &mut CommandContext<'_>, p: crate::issues::ListParams) -> Result<Vec<crate::issues::Summary>> {
+        Ok(crate::issues::list(cx.store(), &p))
+    }
+}
+
+#[derive(Debug)]
+struct BcfGet;
+
+impl Command for BcfGet {
+    type Params = BcfGetParams;
+    type Output = Value;
+    const META: CommandMeta = CommandMeta {
+        name: "bcf.get",
+        version: 1,
+        summary: "Get a BCF topic",
+        description: "A topic in full: its fields, comments and viewpoints, and its element id.",
+        effects: &[Effect::Read],
+        transaction_name: "",
+    };
+
+    fn run(&self, cx: &mut CommandContext<'_>, p: BcfGetParams) -> Result<Value> {
+        crate::issues::get(cx.store(), &p.topic_id)
+    }
+}
+
+#[derive(Debug)]
+struct BcfMergeTopics;
+
+impl Command for BcfMergeTopics {
+    type Params = crate::issues::MergeParams;
+    type Output = crate::issues::MergeReport;
+    const META: CommandMeta = CommandMeta {
+        name: "bcf.merge_topics",
+        version: 1,
+        summary: "Merge BCF topics",
+        description: "Adds topics, or merges them into those with their GUIDs (the fields of whichever changed last; comments and viewpoints joined by GUID, a comment taken when changed later), as one step; `bcf.import` reads them from a .bcf file.",
+        effects: &[Effect::Edit],
+        transaction_name: "Import Issues",
+    };
+
+    fn run(&self, cx: &mut CommandContext<'_>, p: crate::issues::MergeParams) -> Result<crate::issues::MergeReport> {
+        crate::issues::merge_all(cx.edit()?, p)
+    }
+}
+
+#[derive(Debug)]
+struct BcfLists;
+
+impl Command for BcfLists {
+    type Params = NoParams;
+    type Output = crate::issues::Lists;
+    const META: CommandMeta = CommandMeta {
+        name: "bcf.lists",
+        version: 1,
+        summary: "BCF lists",
+        description: "The topic types, statuses, priorities, labels, users and stages the project offers: Reviera's defaults and every value in use.",
+        effects: &[Effect::Read],
+        transaction_name: "",
+    };
+
+    fn run(&self, cx: &mut CommandContext<'_>, _: NoParams) -> Result<crate::issues::Lists> {
+        Ok(crate::issues::lists(cx.store()))
+    }
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct BcfGetParams {
+    pub topic_id: crate::issues::TopicRef,
 }
 
 #[derive(Debug)]

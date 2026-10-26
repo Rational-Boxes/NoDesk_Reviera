@@ -41,6 +41,76 @@ fn three_d(app: &App, view: &Option<ElementRef>) -> Result<Option<ElementId>> {
     }
 }
 
+/// A 3D view as a viewpoint: its camera and cut, the selection, and its temporary hide or
+/// isolate as component visibility.
+pub(crate) fn capture(app: &App, view: ElementId) -> Result<bcf::Viewpoint> {
+    let doc = app.active().ok_or_else(|| bad("document.none", "no document is open"))?;
+    let open = app.get(doc)?;
+    let store = open.doc.store();
+    let (_, mut vp) = bcf::capture(store, &ElementRef::Id(view))?;
+    let guid = |id: &ElementId| store.get(*id).map(|e| e.guid().to_string());
+    vp.guid = Some(uuid::Uuid::new_v4().to_string());
+    vp.selection = open.selection.iter().filter_map(guid).collect();
+    let temp = app.temp_state(doc, Some(view));
+    vp.visibility = match &temp.isolated {
+        Some(i) => Visibility {
+            default_visibility: false,
+            exceptions: i.elements.iter().filter(|e| !temp.hidden.contains(e)).filter_map(guid).collect(),
+        },
+        None => Visibility { default_visibility: true, exceptions: temp.hidden.iter().filter_map(guid).collect() },
+    };
+    Ok(vp)
+}
+
+/// Shows a viewpoint in a 3D view (the one named, the active one when 3D, else the default 3D
+/// view): camera and cut as one undoable step, then its components hidden or isolated and
+/// selected.
+pub(crate) fn show(app: &mut App, caller: &Caller, vp: &bcf::Viewpoint, view: &Option<ElementRef>) -> Result<ImportReport> {
+    let view = match three_d(app, view)? {
+        Some(v) => v,
+        None => {
+            let out = app.execute("view.create_3d", json!({}), caller)?;
+            serde_json::from_value(out.result).map_err(|e| bad("view.not_found", e.to_string()))?
+        }
+    };
+    let doc = app.active().expect("checked");
+    app.execute("view.apply_viewpoint", json!({ "view_id": view, "viewpoint": vp }), caller)?;
+    // Components by GlobalId.
+    let mut not_found = Vec::new();
+    let (selection, exceptions) = {
+        let store = app.get(doc)?.doc.store();
+        let mut find = |gs: &[String]| -> Vec<ElementId> {
+            gs.iter()
+                .filter_map(|g| {
+                    let id = GlobalId::parse(g).and_then(|id| store.find_by_guid(&id));
+                    if id.is_none() && !not_found.contains(g) {
+                        not_found.push(g.clone());
+                    }
+                    id
+                })
+                .collect()
+        };
+        (find(&vp.selection), find(&vp.visibility.exceptions))
+    };
+    app.temp_reset(doc, Some(view));
+    let isolated = !vp.visibility.default_visibility;
+    if !exceptions.is_empty() {
+        let action = if isolated { TempAction::Isolate { ghost_others: false } } else { TempAction::Hide };
+        app.temp_apply(doc, Some(view), action, &exceptions, Scope::Element)?;
+    }
+    app.get_mut(doc)?.selection = selection.iter().copied().collect();
+    let data = app.get(doc)?.doc.store().get(view).and_then(views::view_data);
+    Ok(ImportReport {
+        view_id: view,
+        section_box: data.as_ref().is_some_and(|d| d.section_box.as_ref().is_some_and(|b| b.enabled)),
+        slice_planes: data.map_or(0, |d| d.slice_planes.len()),
+        selected: selection.len(),
+        exceptions: exceptions.len(),
+        isolated,
+        not_found,
+    })
+}
+
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ExportParams {
@@ -84,21 +154,7 @@ impl HostCommand for BcfExportViewpoint {
 
     fn run(&self, app: &mut App, _: &Caller, p: ExportParams) -> Result<ExportReport> {
         let view = three_d(app, &p.view_id)?.ok_or_else(|| bad("bcf.not_3d", "the active view is not a 3D view: give view_id"))?;
-        let doc = app.active().expect("checked");
-        let open = app.get(doc)?;
-        let store = open.doc.store();
-        let (_, mut vp) = bcf::capture(store, &ElementRef::Id(view))?;
-        let guid = |id: &ElementId| store.get(*id).map(|e| e.guid().to_string());
-        vp.guid = Some(uuid::Uuid::new_v4().to_string());
-        vp.selection = open.selection.iter().filter_map(guid).collect();
-        let temp = app.temp_state(doc, Some(view));
-        vp.visibility = match &temp.isolated {
-            Some(i) => Visibility {
-                default_visibility: false,
-                exceptions: i.elements.iter().filter(|e| !temp.hidden.contains(e)).filter_map(guid).collect(),
-            },
-            None => Visibility { default_visibility: true, exceptions: temp.hidden.iter().filter_map(guid).collect() },
-        };
+        let vp = capture(app, view)?;
         std::fs::write(&p.path, bcf::to_xml(&vp)).map_err(|e| bad("bcf.write", format!("{}: {e}", p.path)))?;
         Ok(ExportReport {
             view_id: view,
@@ -155,48 +211,6 @@ impl HostCommand for BcfImportViewpoint {
     fn run(&self, app: &mut App, caller: &Caller, p: ImportParams) -> Result<ImportReport> {
         let text = std::fs::read_to_string(&p.path).map_err(|e| bad("bcf.read", format!("{}: {e}", p.path)))?;
         let vp = bcf::from_xml(&text)?;
-        let view = match three_d(app, &p.view_id)? {
-            Some(v) => v,
-            None => {
-                let out = app.execute("view.create_3d", json!({}), caller)?;
-                serde_json::from_value(out.result).map_err(|e| bad("view.not_found", e.to_string()))?
-            }
-        };
-        let doc = app.active().expect("checked");
-        app.execute("view.apply_viewpoint", json!({ "view_id": view, "viewpoint": vp }), caller)?;
-        // Components by GlobalId.
-        let mut not_found = Vec::new();
-        let (selection, exceptions) = {
-            let store = app.get(doc)?.doc.store();
-            let mut find = |gs: &[String]| -> Vec<ElementId> {
-                gs.iter()
-                    .filter_map(|g| {
-                        let id = GlobalId::parse(g).and_then(|id| store.find_by_guid(&id));
-                        if id.is_none() && !not_found.contains(g) {
-                            not_found.push(g.clone());
-                        }
-                        id
-                    })
-                    .collect()
-            };
-            (find(&vp.selection), find(&vp.visibility.exceptions))
-        };
-        app.temp_reset(doc, Some(view));
-        let isolated = !vp.visibility.default_visibility;
-        if !exceptions.is_empty() {
-            let action = if isolated { TempAction::Isolate { ghost_others: false } } else { TempAction::Hide };
-            app.temp_apply(doc, Some(view), action, &exceptions, Scope::Element)?;
-        }
-        app.get_mut(doc)?.selection = selection.iter().copied().collect();
-        let data = app.get(doc)?.doc.store().get(view).and_then(views::view_data);
-        Ok(ImportReport {
-            view_id: view,
-            section_box: data.as_ref().is_some_and(|d| d.section_box.as_ref().is_some_and(|b| b.enabled)),
-            slice_planes: data.map_or(0, |d| d.slice_planes.len()),
-            selected: selection.len(),
-            exceptions: exceptions.len(),
-            isolated,
-            not_found,
-        })
+        show(app, caller, &vp, &p.view_id)
     }
 }

@@ -684,6 +684,30 @@ icon = "overlaps"
 help = "Find where elements overlap: listed largest first; pick one to select and frame it"
 
 [[action]]
+id = "bcf.create_topic"
+label = "New Issue"
+icon = "issue_new"
+help = "Make a BCF issue from the active 3D view (its camera, cut and hidden or isolated elements) and the selection (COL-BCF-001)"
+
+[[action]]
+id = "bcf.list"
+label = "Issues"
+icon = "issues"
+help = "The model's BCF issues: show an issue's viewpoint, edit it, comment, add the view, delete (COL-BCF-001)"
+
+[[action]]
+id = "bcf.import"
+label = "Import BCF..."
+icon = "bcf_file_import"
+help = "Read BCF issues from a .bcf archive (BCF 2.1 or 3.0), merging them with the model's by GUID"
+
+[[action]]
+id = "bcf.export"
+label = "Export BCF..."
+icon = "bcf_file_export"
+help = "Write the model's BCF issues as a .bcf archive (BCF 3.0 or 2.1)"
+
+[[action]]
 id = "bcf.export_viewpoint"
 label = "Export Viewpoint..."
 icon = "bcf_export"
@@ -3494,6 +3518,11 @@ tools = [
   { action = "lighting_fixture.place", size = "large" },
   { action = "lighting_fixture_type.set_photometry", size = "small" },
   { action = "lighting_fixture_type.set_lighting", size = "small" },
+]
+
+[[tab.panel]]
+label = "Circuits"
+tools = [
   { action = "circuit.create", size = "large" },
   { action = "circuit.properties", size = "large" },
   { action = "circuit.add", size = "small" },
@@ -3794,6 +3823,10 @@ tools = [
   { action = "geometry.remove_boolean", size = "small" },
   { action = "view.set_virtual_volumes", size = "large" },
   { action = "clearance.set_rule_set" },
+  { action = "bcf.create_topic", size = "large" },
+  { action = "bcf.list", size = "large" },
+  { action = "bcf.import", size = "small" },
+  { action = "bcf.export", size = "small" },
   { action = "bcf.export_viewpoint", size = "small" },
   { action = "bcf.import_viewpoint", size = "small" },
 ]
@@ -4302,7 +4335,7 @@ panels = [{ label = "Window", tools = [{ action = "insert.flip_facing", size = "
 
 [[menu]]
 label = "&File"
-items = ["file.new", "file.open", "file.save", "file.save_as", "file.close", "-", "ui.model_properties", "ui.remote_analysis", "-", "export.pdf", "export.cobie", "gbxml.export", "gbxml.import_loads", "hbjson.export", "bcf.export_viewpoint", "bcf.import_viewpoint", "-", "app.exit"]
+items = ["file.new", "file.open", "file.save", "file.save_as", "file.close", "-", "ui.model_properties", "ui.remote_analysis", "-", "export.pdf", "export.cobie", "gbxml.export", "gbxml.import_loads", "hbjson.export", "bcf.import", "bcf.export", "bcf.export_viewpoint", "bcf.import_viewpoint", "-", "app.exit"]
 
 [[menu]]
 label = "&Edit"

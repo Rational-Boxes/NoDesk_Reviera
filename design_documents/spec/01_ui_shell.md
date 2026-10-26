@@ -639,6 +639,8 @@ The chapter **does not** specify the modelling behaviour behind the tools that a
 - [ ] An add-in tool that names an unregistered command is skipped and reported, while the add-in's other tools appear.
 - [ ] Disabling the add-in removes its tab without restart; re-enabling it restores the tab and any QAT item the user had added from it.
 
+
+*Built (2026-10-26), small buttons that keep their labels:* a run of more than three small buttons in a panel keeps icon and label instead of shrinking to icons alone: wxRibbonButtonBar's collapse of such a run to several icon columns drew them over the panel's large buttons (Systems › Electrical, found in a visual check of every tab at 1400 and 1900 px). Runs of up to three still shrink to icons; a panel without room collapses to its dropdown. Electrical is split into Electrical and Circuits. *(Owner, 2026-10-26: "Do a visual check on the ribbons, one the new ones there was some controlls running over each other.")*
 ---
 
 ## 1.8 Ribbon catalog

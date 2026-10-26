@@ -804,6 +804,18 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "section_box" => format!(
             r#"<path d="M6 11l8-5h12v15l-8 5H6z" fill="{f}" {s}/><path d="M6 11h12v15M18 11l8-5" {s}/><path d="M10 20l3-3 3 3" {sa}/><circle cx="12" cy="18.5" r="1.6" fill="{a}"/>"#
         ),
+        "issue_new" => format!(
+            r#"<path d="M5 5h17v13H12l-5 5v-5H5z" fill="{f}" {s}/><path d="M24 20v8M20 24h8" {sa}/>"#
+        ),
+        "issues" => format!(
+            r#"<path d="M4 6h16v11H10l-4 4v-4H4z" fill="{f}" {s}/><path d="M12 13h16v10h-2v4l-4-4h-10z" fill="{paper}" {s}/><path d="M16 17h8M16 20h5" {sa} stroke-width="1.4"/>"#
+        ),
+        "bcf_file_import" => format!(
+            r#"<path d="M8 3h11l6 6v20H8z" fill="{f}" {s}/><path d="M12 14h9" {s}/><path d="M16 27V17M12 21l4-4 4 4" {sa}/>"#
+        ),
+        "bcf_file_export" => format!(
+            r#"<path d="M8 3h11l6 6v20H8z" fill="{f}" {s}/><path d="M12 14h9" {s}/><path d="M16 17v10M12 23l4 4 4-4" {sa}/>"#
+        ),
         "bcf_export" => format!(
             r#"<path d="M4 11h15v12H4z" fill="{f}" {s}/><path d="M19 15l6-4v12l-6-4" {s}/><path d="M8 15h7v5H8z" {s} stroke-dasharray="2 1.5"/><path d="M22 4h7M26 1l3 3-3 3" {sa}/>"#
         ),

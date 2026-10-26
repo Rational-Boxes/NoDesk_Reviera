@@ -105,6 +105,7 @@ mod paramlib_ui;
 mod classification_ui;
 mod standards_ui;
 mod zones_ui;
+mod issues_ui;
 mod spaces_ui;
 mod lighting_ui;
 mod mep_fill_ui;
@@ -4719,6 +4720,10 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "daylight.results" => with(gui, Gui::daylight_results),
         "gbxml.export" => with(gui, Gui::gbxml_export),
         "bcf.export_viewpoint" => with(gui, Gui::bcf_export_viewpoint),
+        "bcf.create_topic" => with(gui, Gui::bcf_new_issue),
+        "bcf.list" => with(gui, Gui::bcf_issues),
+        "bcf.import" => with(gui, Gui::bcf_import),
+        "bcf.export" => with(gui, Gui::bcf_export),
         "bcf.import_viewpoint" => with(gui, Gui::bcf_import_viewpoint),
         "gbxml.import_loads" => with(gui, Gui::gbxml_import_loads),
         "hbjson.export" => with(gui, Gui::hbjson_export),
