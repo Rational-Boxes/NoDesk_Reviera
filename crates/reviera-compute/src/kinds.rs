@@ -31,6 +31,9 @@ pub const JSON: &str = "application/json";
 pub const CARBON: &str = "analysis.carbon";
 pub const CARBON_INPUT: &str = "reviera.carbon.v1.Input";
 pub const CARBON_RESULTS: &str = "reviera.carbon.v1.Results";
+pub const SOLAR: &str = "analysis.solar";
+pub const SOLAR_INPUT: &str = "reviera.solar.v1.Input";
+pub const SOLAR_RESULTS: &str = "reviera.solar.v1.Results";
 
 fn version() -> String {
     env!("CARGO_PKG_VERSION").into()
@@ -299,6 +302,38 @@ impl Kind for CarbonKind {
         ctx.log(format!("{} quantity lines, {} factors, {:.0} kg CO2e A-C, {:.1} % of the volume unmatched", input.lines.len(), input.factors.len(), r.totals.total, r.unmatched_share * 100.0));
         ctx.progress(1.0, "done");
         Ok(Output { bytes: serde_json::to_vec(&r).map_err(|e| JobFailure::new("runner_failed", e.to_string()))?, media_type: JSON.into(), schema: CARBON_RESULTS.into() })
+    }
+}
+
+/// `analysis.solar`: a solar study (ANA-SOLAR-001, ANA-ENV-002): insolation on face grids from
+/// the hourly weather, shaded by the context ([`reviera_core::solar::run`]).
+#[derive(Debug, Default)]
+pub struct SolarKind;
+
+impl Kind for SolarKind {
+    fn info(&self) -> KindInfo {
+        KindInfo {
+            kind: SOLAR.into(),
+            version: 1,
+            runner: "reviera-analysis-builtin".into(),
+            runner_version: version(),
+            licence: LICENCE.into(),
+            capabilities: vec!["batch".into(), "insolation".into(), "pv".into()],
+            accepted_formats: vec![format!("{JSON};schema={SOLAR_INPUT}")],
+            supports_checkpoints: false,
+            supports_sessions: false,
+        }
+    }
+
+    fn run(&self, ctx: &JobContext, _options: Option<&prost_types::Any>, inputs: &[Blob]) -> Result<Output, JobFailure> {
+        ctx.progress(0.0, "reading");
+        let blob = inputs.iter().find(|b| b.reference.schema == SOLAR_INPUT).ok_or_else(|| JobFailure::new("invalid_input", "no solar input in the inputs"))?;
+        let input: reviera_core::solar::SolarInput = serde_json::from_slice(&blob.raw).map_err(|e| JobFailure::new("invalid_input", e.to_string()))?;
+        ctx.progress(0.05, "tracing");
+        let r = reviera_core::solar::run(&input).map_err(|e| JobFailure::new("invalid_input", e))?;
+        ctx.log(format!("{} faces, {} shading triangles, {} sun hours", r.faces.len(), input.shading.len(), r.sun_hours));
+        ctx.progress(1.0, "done");
+        Ok(Output { bytes: serde_json::to_vec(&r).map_err(|e| JobFailure::new("runner_failed", e.to_string()))?, media_type: JSON.into(), schema: SOLAR_RESULTS.into() })
     }
 }
 

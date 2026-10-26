@@ -117,6 +117,10 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add_host(crate::carbon_files::ExportRun),
         registry.add_host(crate::carbon_files::RunCarbon),
         registry.add_host(crate::carbon_files::CollectCarbon),
+        registry.add_host(crate::solar::SolarRun),
+        registry.add_host(crate::solar::SolarCollect),
+        registry.add_host(crate::solar::SolarStatus),
+        registry.add_host(crate::solar::SolarExport),
         registry.add_host(SelectionRemove),
     ];
     for r in results {

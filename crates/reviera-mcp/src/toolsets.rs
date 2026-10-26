@@ -156,6 +156,7 @@ pub fn toolset_of(command: &str) -> String {
             | "embodied_carbon"
             | "path_of_travel"
             | "route_settings"
+            | "solar"
             | "mech_equipment"
             | "equipment_set"
             | "mechanical_settings"

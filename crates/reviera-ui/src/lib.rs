@@ -112,6 +112,7 @@ mod location_ui;
 mod carbon_ui;
 mod route_ui;
 mod jobs_ui;
+mod solar_ui;
 mod mech_settings_ui;
 mod wall_profile;
 mod wall_sweeps;
@@ -305,6 +306,8 @@ struct Gui {
     route_start: Option<[f64; 2]>,
     /// Analysis jobs being watched, and when they were last polled.
     jobs: Vec<jobs_ui::WatchedJob>,
+    /// The solar study drawn on the model (ANA-SOLAR-001).
+    solar_shown: Option<String>,
     jobs_polled: Option<std::time::Instant>,
     /// The Tag, Room Tag or Text tool.
     note_tool: Option<notes::NoteTool>,
@@ -1242,12 +1245,14 @@ impl Gui {
     /// Rebuilds the active model's scene after it changed (edits, undo, redo), in all its views.
     fn refresh_scene(&mut self, frame: &Frame) {
         let Some(id) = self.doc else { return };
-        let scene = match self.app.render_scene(id) {
+        let mut scene = match self.app.render_scene(id) {
             Ok(scene) => scene,
             Err(e) => {
                 return frame.set_status_text(&format!("Could not display the model: {e}"), 0);
             }
         };
+        // An analysis shown on the model (a solar study's grid).
+        scene.meshes.extend(self.solar_meshes());
         let ids = self.selection();
         for view in self.views.iter_mut().filter(|v| v.doc == id) {
             if let Some(s) = &mut view.section {
@@ -3709,6 +3714,7 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 note_tool: None,
                 route_start: None,
                 jobs: Vec::new(),
+                solar_shown: None,
                 jobs_polled: None,
                 stair_tool: None,
                 dormer_tool: None,
@@ -4697,6 +4703,8 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "coordinates.report" => with(gui, Gui::report_coordinates),
         "weather.import" => with(gui, Gui::weather_dialog),
         "embodied_carbon.run" => with(gui, Gui::embodied_carbon_dialog),
+        "solar.run" => with(gui, Gui::solar_dialog),
+        "solar.results" => with(gui, Gui::solar_results),
         "path_of_travel.create" => with(gui, |g| {
             g.start_note_tool(notes::NoteTool::PathOfTravel);
             focus(g);

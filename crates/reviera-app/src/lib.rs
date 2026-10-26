@@ -27,6 +27,7 @@ pub mod standards_transfer;
 pub mod system_zones;
 pub mod weather;
 pub mod carbon_files;
+pub mod solar;
 pub mod settings_dialogs;
 pub mod structural;
 pub mod subscriptions;

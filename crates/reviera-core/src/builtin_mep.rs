@@ -226,6 +226,8 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(CarbonAutoMatch),
         registry.add(CarbonMaterials),
         registry.add(CarbonRecord),
+        registry.add(SolarRecord),
+        registry.add(SolarResults),
         registry.add(CarbonResults),
         registry.add(CircuitRenumberPreview),
         registry.add(CircuitSetLocked),
@@ -2297,6 +2299,27 @@ read_command!(
     crate::embodied_carbon::Empty,
     Vec<crate::embodied_carbon::MaterialRow>,
     crate::embodied_carbon::materials
+);
+
+edit_command!(
+    SolarRecord,
+    "solar.record",
+    "Record a solar study",
+    "Keeps a finished solar study (ANA-SOLAR-001, ANA-ENV-002): the analysis.solar job's `results` (per face: grid points and kWh/m² values, area, mean, total, PV energy, cost and payback), its type, period, grid, PV settings and the hash of its inputs. solar.collect calls it; the last ten studies are kept. Returns the study.",
+    "Solar Study",
+    crate::solar::RecordParams,
+    crate::solar::Study,
+    crate::solar::record
+);
+
+read_command!(
+    SolarResults,
+    "solar.results",
+    "Solar study results",
+    "A solar study's (`study_id`, else the latest) per-face results: element, area (m²), mean insolation (kWh/m²), total (kWh), and for PV studies kWh a year, cost and simple payback; with the period, sun hours and totals.",
+    crate::solar::ResultsParams,
+    crate::solar::StudyReport,
+    crate::solar::results
 );
 
 edit_command!(

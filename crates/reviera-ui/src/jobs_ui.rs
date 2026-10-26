@@ -64,8 +64,10 @@ impl Gui {
 
     /// Opens what a collected job shows.
     fn job_collected(&mut self, collect: &str) {
-        if collect == "embodied_carbon.collect" {
-            self.carbon_results();
+        match collect {
+            "embodied_carbon.collect" => self.carbon_results(),
+            "solar.collect" => self.solar_results(),
+            _ => {}
         }
     }
 }

@@ -1108,6 +1108,12 @@ schedules, circuit paths, cable sizing and voltage drop.
   (`location.set`, `location.set_all`, `coordinates.*`, `position.rotate_true_north`;
   DM-LOC-001). Not built yet: map and city search, named sites, acquire and publish
   coordinates, relocate and mirror, picking the points in a view, CRS validation.
+- **Solar studies** (Analyze › Daylight & Solar › Solar Study, Solar Results): cumulative
+  insolation and PV potential (yield, cost, payback) on roof and mass faces from the site and the
+  weather file, shaded by the whole model, run out of process (`analysis.solar` jobs), shown
+  coloured on the model in 3D, stale when the model, site or weather change, exported as CSV
+  (`solar.*`; ANA-SOLAR-001, ANA-ENV-002). Not built yet: per-view studies with a placed legend,
+  sun studies, the Perez sky.
 - **Path of travel** (Analyze › Route Analysis): click a start and an end in a plan for the
   shortest walking route that keeps a clearance from walls and furniture and passes through
   doors, drawn with its length and time; waypoints, Update Paths after changes, route settings

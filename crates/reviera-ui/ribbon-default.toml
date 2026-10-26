@@ -2812,6 +2812,18 @@ icon = "location"
 help = "The project's latitude, longitude, elevation and time zone, the project base point and angle to true north, the survey point with its shared coordinates, and the CRS (DM-LOC-001)"
 
 [[action]]
+id = "solar.run"
+label = "Solar Study"
+icon = "solar"
+help = "Cumulative insolation or PV potential on roofs or masses from the site and weather file, shaded by the model; runs out of process (ANA-SOLAR-001)"
+
+[[action]]
+id = "solar.results"
+label = "Solar Results"
+icon = "solar_results"
+help = "The latest solar study's results per face, shown coloured on the model (ANA-SOLAR-001)"
+
+[[action]]
 id = "path_of_travel.create"
 label = "Path of Travel"
 icon = "path_of_travel"
@@ -3429,6 +3441,13 @@ tools = [
   { action = "ui.system_zone_by_level", size = "small" },
   { action = "system_zone.info", size = "small" },
   { action = "system_zone.convert_legacy", size = "small" },
+]
+
+[[tab.panel]]
+label = "Daylight & Solar"
+tools = [
+  { action = "solar.run", size = "large" },
+  { action = "solar.results", size = "small" },
 ]
 
 [[tab.panel]]
