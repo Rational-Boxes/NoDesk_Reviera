@@ -194,7 +194,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**2160 unique commands** in 416 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**2161 unique commands** in 416 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -230,7 +230,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `array` | 6 |
 | `assembly` | 16 |
 | `assemblytemplate` | 1 |
-| `bcf` | 32 |
+| `bcf` | 33 |
 | `beam` | 6 |
 | `beam_system` | 5 |
 | `bending_detail` | 1 |
@@ -754,10 +754,11 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `bcf.merge_topics` | 6 | topics[] | merge_report | Yes | COL-BCF-001 |
 | `bcf.notifications` | 6 | since? | notification[] | No (query) | COL-BCF-005 |
 | `bcf.put_topic` | 6 | topic | element_id | Yes | COL-BCF-001 |
-| `bcf.put_viewpoint` | 6 | topic_id, viewpoint | viewpoint_id | Yes | COL-BCF-003 |
+| `bcf.put_viewpoint` | 6 | topic_id, viewpoint, snapshot? | viewpoint_id | Yes | COL-BCF-003 |
 | `bcf.report` | 6 | topic_ids[]? \ | filter?, format: pdf\ | html\ | csv\ |
 | `bcf.set_extensions` | 6 | lists{types?, statuses?, priorities?, labels?, stages?, users?}, replacements?{} | () | Yes | COL-BCF-004 |
 | `bcf.set_workflow` | 6 | rules | () | Yes | COL-BCF-005 |
+| `bcf.snapshot` | 6 | viewpoint_id | png_base64 | No (query) | COL-BCF-001 |
 | `bcf.update_topic` | 6 | topic_id, fields | () | Yes | COL-BCF-001 |
 | `beam.create` | 4 | type_id, curve, reference_level, usage?, orientation?, z_justification?, y_justification? | element_id | Yes | STR-BEAM-001 |
 | `beam.create_on_grids` | 4 | type_id, grid_ids[], level | element_id[] | Yes | STR-BEAM-001 |

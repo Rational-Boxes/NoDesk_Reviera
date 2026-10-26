@@ -1368,13 +1368,15 @@ simulation sessions, and the first engine runners (see [Not built yet](#not-buil
 - **Issues (BCF topics)**: View › Coordination › New Issue makes a BCF topic from the active 3D
   view (its viewpoint) and the selection, with a title, description, type, status, priority,
   labels, assignee, due date and stage; Issues lists them, shows an issue's viewpoint in the 3D
-  view, and edits, comments on, adds views to and deletes them. Issues are kept with the model,
-  one RXD object per topic, so they save, undo and reopen like the rest of it. Import BCF and
+  view, and edits, comments on, adds views to and deletes them. Each viewpoint keeps a snapshot
+  of the view as it showed (its cut and hidden elements too). Issues are kept with the model,
+  one RXD object per topic and snapshot, so they save, undo and reopen like the rest of it. Import BCF and
   Export BCF (also in the File menu) read and write `.bcf` archives in BCF 3.0 or 2.1 (both
   checked against buildingSMART's schemas), merging imports by topic GUID: the fields of whichever
   copy changed last, comments and viewpoints joined by their GUIDs (`bcf.create_topic`,
   `bcf.update_topic`, `bcf.add_comment`, `bcf.add_viewpoint`, `bcf.apply_viewpoint`,
-  `bcf.delete_topic`, `bcf.list`, `bcf.get`, `bcf.import`, `bcf.export`, `bcf.lists`; COL-BCF-001).
+  `bcf.delete_topic`, `bcf.list`, `bcf.get`, `bcf.snapshot`, `bcf.import`, `bcf.export`,
+  `bcf.lists`; COL-BCF-001).
 - **Model Tree** (MT): Project › Site › Building › storeys › categories › elements, with hosted
   elements under their hosts; its context menu selects, hides, isolates or boxes whole branches
   (`model.tree`).
@@ -1629,8 +1631,8 @@ area by area (reviewed against the spec on 2026-10-15).
 **Other chapters:**
 
 - **Coordination**: clash tests (COL-CLASH), automatic pipe and duct penetrations (MEP-PEN-001),
-  bathroom fixture clear floor spaces and turning spaces, ISO 21542. For BCF issues: snapshots,
-  the docked Issues pane (COL-BCF-004; a dialog for now), the project's lists as edited
+  bathroom fixture clear floor spaces and turning spaces, ISO 21542. For BCF issues: the docked
+  Issues pane (COL-BCF-004; a dialog for now), the project's lists as edited
   extensions, issues from clash results, document references, component colouring, BCF API sync
   with a server (COL-BCF-002).
 - **Documentation**: crop regions, jogged sections, interior elevation markers, opening a view

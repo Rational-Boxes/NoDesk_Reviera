@@ -28,6 +28,14 @@ fn store(app: &App) -> Result<&reviera_core::Store> {
     Ok(app.get(doc)?.doc.store())
 }
 
+/// A snapshot of a 3D view as it shows now (base64 PNG), when there is a graphics adapter to
+/// render it with.
+fn snapshot_of(app: &App, view: ElementId) -> Option<String> {
+    use base64::Engine;
+    let img = app.render_view_image(app.active()?, Some(view), 1024).ok()?;
+    Some(base64::engine::general_purpose::STANDARD.encode(img.png))
+}
+
 /// The 3D view to capture: the one named, else the active view when it is 3D.
 fn view_to_capture(app: &App, view: &Option<ElementRef>) -> Result<Option<ElementId>> {
     let doc = app.active().ok_or_else(|| bad("document.none", "no document is open"))?;
@@ -106,10 +114,15 @@ impl HostCommand for BcfCreateTopic {
         t.topic_type.get_or_insert_with(|| "Issue".to_owned());
         t.status.get_or_insert_with(|| "Open".to_owned());
         let keep = view.is_some() || !vp.selection.is_empty();
+        let mut snapshots = issues::Snapshots::new();
         if keep {
-            t.viewpoints.push(TopicViewpoint { guid: vp.guid.clone().unwrap_or_else(issues::new_guid), viewpoint: vp, snapshot: None });
+            let guid = vp.guid.clone().unwrap_or_else(issues::new_guid);
+            if let Some(png) = view.and_then(|v| snapshot_of(app, v)) {
+                snapshots.insert(guid.clone(), png);
+            }
+            t.viewpoints.push(TopicViewpoint { guid, viewpoint: vp, snapshot: None });
         }
-        let out = app.execute("bcf.put_topic", json!({ "topic": t }), caller)?;
+        let out = app.execute("bcf.put_topic", json!({ "topic": t, "snapshots": snapshots }), caller)?;
         serde_json::from_value(out.result).map_err(|e| bad("bcf.put", e.to_string()))
     }
 }
@@ -143,8 +156,9 @@ impl HostCommand for BcfAddViewpoint {
     fn run(&self, app: &mut App, caller: &Caller, p: AddViewpointParams) -> Result<String> {
         let view = view_to_capture(app, &p.view_id)?.ok_or_else(|| bad("bcf.not_3d", "the active view is not a 3D view: give view_id"))?;
         let vp = capture(app, view)?;
+        let snapshot = snapshot_of(app, view);
         let topic = serde_json::to_value(&p.topic_id).unwrap_or_default();
-        let out = app.execute("bcf.put_viewpoint", json!({ "topic_id": topic, "viewpoint": vp, "author": p.author }), caller)?;
+        let out = app.execute("bcf.put_viewpoint", json!({ "topic_id": topic, "viewpoint": vp, "snapshot": snapshot, "author": p.author }), caller)?;
         serde_json::from_value(out.result).map_err(|e| bad("bcf.put", e.to_string()))
     }
 }
@@ -205,6 +219,7 @@ pub struct ExportReport {
     pub topics: usize,
     pub comments: usize,
     pub viewpoints: usize,
+    pub snapshots: usize,
     pub version: String,
 }
 
@@ -248,10 +263,29 @@ impl HostCommand for BcfExport {
             zip.start_file("extensions.xml", opts).map_err(zerr)?;
             zip.write_all(bcf_archive::extensions_xml(&lists).as_bytes()).map_err(io)?;
         }
-        let (mut comments, mut viewpoints) = (0, 0);
+        let (mut comments, mut viewpoints, mut snapshots) = (0, 0, 0);
         for t in &topics {
+            // Each snapshot kept, beside its viewpoint; a name without a picture is left out.
+            let mut t = t.clone();
+            let mut pictures = Vec::new();
+            for v in &mut t.viewpoints {
+                match (issues::snapshot(s, &v.guid), &v.snapshot) {
+                    (Some(bytes), name) => {
+                        let name = name.clone().unwrap_or_else(|| format!("{}.png", v.guid));
+                        v.snapshot = Some(name.clone());
+                        pictures.push((name, bytes));
+                    }
+                    (None, _) => v.snapshot = None,
+                }
+            }
+            let t = &t;
             zip.start_file(format!("{}/markup.bcf", t.guid), opts).map_err(zerr)?;
             zip.write_all(bcf_archive::markup_xml(t, version).as_bytes()).map_err(io)?;
+            for (name, bytes) in &pictures {
+                zip.start_file(format!("{}/{name}", t.guid), zip::write::SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored)).map_err(zerr)?;
+                zip.write_all(bytes).map_err(io)?;
+                snapshots += 1;
+            }
             for v in &t.viewpoints {
                 let mut vp = v.viewpoint.clone();
                 vp.guid = Some(v.guid.clone());
@@ -263,7 +297,7 @@ impl HostCommand for BcfExport {
             viewpoints += t.viewpoints.len();
         }
         zip.finish().map_err(zerr)?;
-        Ok(ExportReport { topics: topics.len(), comments, viewpoints, version: version.id().to_owned() })
+        Ok(ExportReport { topics: topics.len(), comments, viewpoints, snapshots, version: version.id().to_owned() })
     }
 }
 
@@ -282,8 +316,8 @@ pub struct ImportResult {
     pub updated: usize,
     pub unchanged: usize,
     pub viewpoints: usize,
-    /// Snapshots in the file, not kept yet (their names are).
-    pub snapshots_left_out: usize,
+    /// Snapshots read and kept with their viewpoints.
+    pub snapshots: usize,
     /// Viewpoint files the markup names that are missing or unreadable.
     pub problems: Vec<String>,
 }
@@ -301,35 +335,34 @@ impl HostCommand for BcfImport {
         description: "Reads a BCF archive (.bcf or .bcfzip, BCF 2.1 or 3.0) and adds its topics to the model, or \
                       merges them into those with their GUIDs (COL-BCF-001: the fields of whichever changed \
                       last; comments and viewpoints joined by GUID), as one undoable step. Viewpoints keep \
-                      their camera, clipping planes and components; snapshots are not kept yet. Returns the \
-                      counts and any viewpoint files that could not be read.",
+                      their camera, clipping planes, components and snapshots. Returns the counts and any \
+                      viewpoint or snapshot files that could not be read.",
         effects: &[Effect::Edit],
         transaction_name: "",
     };
 
     fn run(&self, app: &mut App, caller: &Caller, p: ImportParams) -> Result<ImportResult> {
+        use base64::Engine;
         let file = std::fs::File::open(&p.path).map_err(|e| bad("bcf.read", format!("{}: {e}", p.path)))?;
         let mut zip = zip::ZipArchive::new(file).map_err(|e| bad("bcf.read", format!("{}: not a BCF archive: {e}", p.path)))?;
-        let mut read = |name: &str| -> Option<String> {
+        let names: Vec<String> = zip.file_names().map(str::to_owned).collect();
+        let mut bytes = |name: &str| -> Option<Vec<u8>> {
             let mut f = zip.by_name(name).ok()?;
-            let mut s = String::new();
-            f.read_to_string(&mut s).ok()?;
-            Some(s)
+            let mut b = Vec::new();
+            f.read_to_end(&mut b).ok()?;
+            Some(b)
         };
-        let version = read("bcf.version").and_then(|v| {
+        let version = bytes("bcf.version").and_then(|v| {
+            let v = String::from_utf8(v).ok()?;
             let at = v.find("VersionId=\"")? + 11;
             Some(v[at..].split('"').next()?.to_owned())
         });
-        let names: Vec<String> = {
-            let file = std::fs::File::open(&p.path).map_err(|e| bad("bcf.read", e.to_string()))?;
-            let z = zip::ZipArchive::new(file).map_err(|e| bad("bcf.read", e.to_string()))?;
-            z.file_names().map(str::to_owned).collect()
-        };
         let mut topics = Vec::new();
-        let (mut viewpoints, mut snapshots, mut problems) = (0, 0, Vec::new());
+        let mut pictures = issues::Snapshots::new();
+        let (mut viewpoints, mut problems) = (0, Vec::new());
         for markup in names.iter().filter(|n| n.ends_with("/markup.bcf")) {
             let dir = &markup[..markup.len() - "markup.bcf".len()];
-            let text = read(markup).ok_or_else(|| bad("bcf.read", format!("{markup}: unreadable")))?;
+            let text = bytes(markup).and_then(|b| String::from_utf8(b).ok()).ok_or_else(|| bad("bcf.read", format!("{markup}: unreadable")))?;
             let (mut t, entries) = bcf_archive::read_markup(&text).map_err(|e| bad("bcf.parse", format!("{markup}: {}", e.message)))?;
             if t.guid.is_empty() {
                 t.guid = dir.trim_end_matches('/').to_owned();
@@ -342,14 +375,19 @@ impl HostCommand for BcfImport {
             }
             for e in entries {
                 let file = e.file.clone().unwrap_or_else(|| format!("{}.bcfv", e.guid));
-                match read(&format!("{dir}{file}")).map(|x| bcf::from_xml(&x)) {
+                match bytes(&format!("{dir}{file}")).and_then(|b| String::from_utf8(b).ok()).map(|x| bcf::from_xml(&x)) {
                     Some(Ok(mut vp)) => {
                         let guid = if e.guid.is_empty() { vp.guid.clone().unwrap_or_else(issues::new_guid) } else { e.guid.clone() };
                         vp.guid = Some(guid.clone());
-                        if e.snapshot.is_some() {
-                            snapshots += 1;
+                        if let Some(name) = &e.snapshot {
+                            match bytes(&format!("{dir}{name}")) {
+                                Some(png) => {
+                                    pictures.insert(guid.clone(), base64::engine::general_purpose::STANDARD.encode(png));
+                                }
+                                None => problems.push(format!("{dir}{name}: missing")),
+                            }
                         }
-                        t.viewpoints.push(TopicViewpoint { guid, viewpoint: vp, snapshot: e.snapshot });
+                        t.viewpoints.push(TopicViewpoint { guid, viewpoint: vp, snapshot: None });
                         viewpoints += 1;
                     }
                     Some(Err(err)) => problems.push(format!("{dir}{file}: {}", err.message)),
@@ -358,9 +396,10 @@ impl HostCommand for BcfImport {
             }
             topics.push(t);
         }
-        let out = app.execute("bcf.merge_topics", json!({ "topics": topics }), caller)?;
+        let snapshots = pictures.len();
+        let out = app.execute("bcf.merge_topics", json!({ "topics": topics, "snapshots": pictures }), caller)?;
         let r = out.result;
         let n = |k: &str| r[k].as_u64().unwrap_or(0) as usize;
-        Ok(ImportResult { version, topics: topics.len(), added: n("added"), updated: n("updated"), unchanged: n("unchanged"), viewpoints, snapshots_left_out: snapshots, problems })
+        Ok(ImportResult { version, topics: topics.len(), added: n("added"), updated: n("updated"), unchanged: n("unchanged"), viewpoints, snapshots, problems })
     }
 }

@@ -11,8 +11,12 @@
 //! `bcf.export`). Topics from a file are merged by GUID ([`merge`]): the newer modification wins,
 //! comments and viewpoints by their GUIDs.
 //!
+//! A viewpoint's snapshot (a PNG) is kept beside its topic as its own RXD object
+//! (`rxd:coordination/snapshots/<viewpoint guid>`), written in the same step as the topic or
+//! viewpoint; the viewpoint keeps the snapshot's file name.
+//!
 //! Not built yet: the project's lists as edited extensions (the defaults and the values in use are
-//! exported), snapshots, document references, the Issues pane, BCF API sync (COL-BCF-002).
+//! exported), document references, the docked Issues pane, BCF API sync (COL-BCF-002).
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -27,6 +31,11 @@ use crate::txn::Transaction;
 
 pub const CLASS_PREFIX: &str = "rxd:coordination/issues/";
 pub const TOPIC_KEY: &str = "rxd:topic";
+/// A viewpoint's snapshot: a PNG kept with the model, one RXD object per viewpoint GUID.
+pub const SNAPSHOT_PREFIX: &str = "rxd:coordination/snapshots/";
+pub const SNAPSHOT_KEY: &str = "rxd:snapshot";
+/// The largest snapshot kept (bytes of PNG).
+pub const MAX_SNAPSHOT: usize = 4 << 20;
 
 /// The lists offered for new topics (BCF extensions); values in use are added when exported.
 pub const TYPES: &[&str] = &["Issue", "Clash", "Request", "Question", "Remark"];
@@ -237,6 +246,46 @@ fn write(txn: &mut Transaction<'_>, id: Option<ElementId>, t: &Topic) -> Result<
     }
 }
 
+/// Snapshots by viewpoint GUID, as base64 PNG.
+pub type Snapshots = std::collections::BTreeMap<String, String>;
+
+fn snapshot_element(store: &Store, viewpoint: &str) -> Option<ElementId> {
+    let class = format!("{SNAPSHOT_PREFIX}{}", viewpoint.to_lowercase());
+    store.iter().find(|e| e.class == class).map(Element::id)
+}
+
+/// A viewpoint's snapshot (PNG bytes), if it has one.
+pub fn snapshot(store: &Store, viewpoint: &str) -> Option<Vec<u8>> {
+    use base64::Engine;
+    let e = store.get(snapshot_element(store, viewpoint)?)?;
+    base64::engine::general_purpose::STANDARD.decode(e.param(SNAPSHOT_KEY)?.as_str()?).ok()
+}
+
+/// Keeps a snapshot for a viewpoint of `t`, naming it on the viewpoint.
+fn put_snapshot(txn: &mut Transaction<'_>, t: &mut Topic, viewpoint: &str, png_base64: &str) -> Result<()> {
+    use base64::Engine;
+    let bytes = base64::engine::general_purpose::STANDARD.decode(png_base64.trim()).map_err(|e| bad("bcf.bad_snapshot", format!("not base64: {e}")))?;
+    if !bytes.starts_with(b"\x89PNG") && !bytes.starts_with(&[0xff, 0xd8]) {
+        return Err(bad("bcf.bad_snapshot", "a snapshot is a PNG or JPEG"));
+    }
+    if bytes.len() > MAX_SNAPSHOT {
+        return Err(bad("bcf.bad_snapshot", format!("a snapshot of {} bytes is larger than {MAX_SNAPSHOT}", bytes.len())));
+    }
+    let Some(v) = t.viewpoints.iter_mut().find(|v| v.guid.eq_ignore_ascii_case(viewpoint)) else {
+        return Err(bad("bcf.no_viewpoint", format!("the topic has no viewpoint {viewpoint}")));
+    };
+    let ext = if bytes.starts_with(&[0xff, 0xd8]) { "jpg" } else { "png" };
+    v.snapshot = Some(format!("{}.{ext}", v.guid));
+    let value = Value::String(png_base64.trim().to_owned());
+    let store = txn.store().clone();
+    match snapshot_element(&store, viewpoint) {
+        Some(id) => txn.modify(id, |e| {
+            e.params.insert(SNAPSHOT_KEY.into(), value);
+        }),
+        None => txn.create(NewElement::new(format!("{SNAPSHOT_PREFIX}{}", viewpoint.to_lowercase())).param(SNAPSHOT_KEY, value)).map(|_| ()),
+    }
+}
+
 fn check(t: &Topic) -> Result<()> {
     if t.title.trim().is_empty() {
         return Err(bad("bcf.no_title", "a topic needs a title"));
@@ -251,6 +300,9 @@ fn check(t: &Topic) -> Result<()> {
 #[serde(deny_unknown_fields)]
 pub struct PutParams {
     pub topic: Topic,
+    /// Snapshots of its viewpoints, by viewpoint GUID (base64 PNG or JPEG).
+    #[serde(default)]
+    pub snapshots: Snapshots,
 }
 
 /// `bcf.put_topic`: a whole topic, new or replacing the one with its GUID.
@@ -266,6 +318,9 @@ pub(crate) fn put(txn: &mut Transaction<'_>, p: PutParams) -> Result<ElementId> 
         t.creation_author = default_author();
     }
     check(&t)?;
+    for (v, png) in &p.snapshots {
+        put_snapshot(txn, &mut t, v, png)?;
+    }
     let store = txn.store().clone();
     let existing = find(&store, &TopicRef::Guid(t.guid.clone())).ok().map(|(id, _)| id);
     write(txn, existing, &t)
@@ -327,6 +382,8 @@ pub(crate) fn add_comment(txn: &mut Transaction<'_>, p: CommentParams) -> Result
 pub struct AddViewpointParams {
     pub topic_id: TopicRef,
     pub viewpoint: Viewpoint,
+    /// Its snapshot (base64 PNG or JPEG).
+    pub snapshot: Option<String>,
     pub author: Option<String>,
 }
 
@@ -339,6 +396,9 @@ pub(crate) fn add_viewpoint(txn: &mut Transaction<'_>, p: AddViewpointParams) ->
     v.guid = Some(guid.clone());
     t.viewpoints.retain(|w| w.guid != guid);
     t.viewpoints.push(TopicViewpoint { guid: guid.clone(), viewpoint: v, snapshot: None });
+    if let Some(png) = &p.snapshot {
+        put_snapshot(txn, &mut t, &guid, png)?;
+    }
     t.modified_date = Some(now());
     t.modified_author = Some(p.author.unwrap_or_else(default_author));
     write(txn, Some(id), &t)?;
@@ -354,11 +414,16 @@ pub struct DeleteParams {
 /// `bcf.delete_topic`.
 pub(crate) fn delete(txn: &mut Transaction<'_>, p: DeleteParams) -> Result<usize> {
     let store = txn.store().clone();
-    let ids: Vec<ElementId> = p.topic_ids.iter().map(|r| find(&store, r).map(|(id, _)| id)).collect::<Result<_>>()?;
-    for id in &ids {
+    let found: Vec<(ElementId, Topic)> = p.topic_ids.iter().map(|r| find(&store, r)).collect::<Result<_>>()?;
+    for (id, t) in &found {
+        for v in &t.viewpoints {
+            if let Some(s) = snapshot_element(&store, &v.guid) {
+                txn.delete(s)?;
+            }
+        }
         txn.delete(*id)?;
     }
-    Ok(ids.len())
+    Ok(found.len())
 }
 
 /// One line of `bcf.list`.
@@ -466,6 +531,10 @@ pub fn merge(mine: &mut Topic, theirs: Topic) -> bool {
 #[serde(deny_unknown_fields)]
 pub struct MergeParams {
     pub topics: Vec<Topic>,
+    /// Snapshots of their viewpoints, by viewpoint GUID (base64); kept for viewpoints that have
+    /// none yet.
+    #[serde(default)]
+    pub snapshots: Snapshots,
 }
 
 /// What `bcf.merge_topics` did.
@@ -482,19 +551,33 @@ pub(crate) fn merge_all(txn: &mut Transaction<'_>, p: MergeParams) -> Result<Mer
     for t in p.topics {
         check(&t)?;
         let store = txn.store().clone();
-        match find(&store, &TopicRef::Guid(t.guid.clone())) {
+        let views: Vec<String> = t.viewpoints.iter().map(|v| v.guid.clone()).collect();
+        let (id, mut topic, changed) = match find(&store, &TopicRef::Guid(t.guid.clone())) {
             Ok((id, mut mine)) => {
-                if merge(&mut mine, t) {
-                    write(txn, Some(id), &mine)?;
-                    r.updated += 1;
-                } else {
-                    r.unchanged += 1;
-                }
+                let changed = merge(&mut mine, t);
+                (Some(id), mine, changed)
             }
-            Err(_) => {
-                write(txn, None, &t)?;
+            Err(_) => (None, t, true),
+        };
+        let mut pictures = false;
+        for v in views {
+            if let Some(png) = p.snapshots.get(&v)
+                && snapshot_element(&store, &v).is_none()
+            {
+                put_snapshot(txn, &mut topic, &v, png)?;
+                pictures = true;
+            }
+        }
+        match id {
+            None => {
+                write(txn, None, &topic)?;
                 r.added += 1;
             }
+            Some(id) if changed || pictures => {
+                write(txn, Some(id), &topic)?;
+                r.updated += 1;
+            }
+            Some(_) => r.unchanged += 1,
         }
     }
     Ok(r)

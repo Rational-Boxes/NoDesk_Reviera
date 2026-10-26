@@ -187,17 +187,15 @@ impl Gui {
         match self.run("bcf.import", json!({ "path": path })) {
             Ok(r) => {
                 let mut msg = format!(
-                    "Read {} issues (BCF {}): {} new, {} updated, {} unchanged; {} viewpoints.",
+                    "Read {} issues (BCF {}): {} new, {} updated, {} unchanged; {} viewpoints, {} snapshots.",
                     r["topics"],
                     r["version"].as_str().unwrap_or("?"),
                     r["added"],
                     r["updated"],
                     r["unchanged"],
-                    r["viewpoints"]
+                    r["viewpoints"],
+                    r["snapshots"]
                 );
-                if r["snapshots_left_out"].as_u64().unwrap_or(0) > 0 {
-                    msg.push_str(&format!("\n{} snapshots are not kept yet.", r["snapshots_left_out"]));
-                }
                 for p in r["problems"].as_array().into_iter().flatten() {
                     msg.push_str(&format!("\n• {}", p.as_str().unwrap_or("")));
                 }
@@ -225,7 +223,7 @@ impl Gui {
         }
         let Some(path) = fd.get_path() else { return };
         match self.run("bcf.export", json!({ "path": path, "version": version })) {
-            Ok(r) => frame.set_status_text(&format!("Wrote {} issues, {} comments and {} viewpoints (BCF {version}) to {path}", r["topics"], r["comments"], r["viewpoints"]), 0),
+            Ok(r) => frame.set_status_text(&format!("Wrote {} issues, {} comments, {} viewpoints and {} snapshots (BCF {version}) to {path}", r["topics"], r["comments"], r["viewpoints"], r["snapshots"]), 0),
             Err(e) => error(&frame, &e),
         }
     }

@@ -101,6 +101,12 @@ impl App {
                 }
             }
             (Some(d), Some(v)) if d.kind == views::KIND_3D => {
+                // As the view shows it: its section box and slices, its temporary hide and
+                // isolate, parts or their originals.
+                vp.set_clipping(&reviera_render::Clipping::of(d.section_box.as_ref(), &d.slice_planes));
+                let mut vis = self.temp_state(doc, Some(v)).visibility();
+                vis.hidden.extend(reviera_core::parts::hidden_in(store, Some(v)));
+                vp.set_visibility(&vis);
                 let c = self.view_camera(doc, v).unwrap_or_else(|| self.fitting_camera(doc));
                 Camera::from_view(&c, aspect)
             }

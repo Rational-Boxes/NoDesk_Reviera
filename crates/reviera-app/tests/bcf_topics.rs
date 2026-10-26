@@ -64,6 +64,10 @@ fn issues_are_kept_exported_imported_and_merged() {
     assert_eq!(topic["viewpoints"].as_array().unwrap().len(), 1);
     assert_eq!(topic["viewpoints"][0]["viewpoint"]["clipping_planes"].as_array().unwrap().len(), 6, "the kitchen's box");
     let vp1 = topic["viewpoints"][0]["guid"].as_str().unwrap().to_owned();
+    // A snapshot of the view, kept with the model.
+    assert_eq!(topic["viewpoints"][0]["snapshot"], json!(format!("{vp1}.png")), "{topic:#}");
+    let png = ok(&mut a, "bcf.snapshot", json!({ "viewpoint_id": vp1 }))["png_base64"].as_str().unwrap().to_owned();
+    assert!(png.starts_with("iVBORw0KGgo"), "a PNG");
     ok(&mut a, "bcf.add_comment", json!({ "topic_id": guid, "text": "Raise the sill to 1100", "viewpoint": vp1, "author": "arch@example.com" }));
     let slice = view(&mut a, "Vertical Slice");
     ok(&mut a, "bcf.add_viewpoint", json!({ "topic_id": guid, "view_id": slice }));
@@ -86,7 +90,8 @@ fn issues_are_kept_exported_imported_and_merged() {
     assert_eq!((r["topics"].as_u64(), r["comments"].as_u64(), r["viewpoints"].as_u64()), (Some(1), Some(1), Some(2)), "{r}");
     let n = names(&bcf3);
     assert!(n.contains(&"bcf.version".to_owned()) && n.contains(&"extensions.xml".to_owned()) && n.contains(&format!("{guid}/markup.bcf")), "{n:?}");
-    assert!(n.contains(&format!("{guid}/{vp1}.bcfv")), "{n:?}");
+    assert!(n.contains(&format!("{guid}/{vp1}.bcfv")) && n.contains(&format!("{guid}/{vp1}.png")), "{n:?}");
+    assert_eq!(r["snapshots"], 2, "both viewpoints' snapshots");
     let markup = entry(&bcf3, &format!("{guid}/markup.bcf"));
     assert!(markup.contains("<Title>Kitchen wall &amp; window clash</Title>") && markup.contains("<Comments>"), "{markup}");
     let bcf2 = work.path().join("issues21.bcfzip");
@@ -97,7 +102,8 @@ fn issues_are_kept_exported_imported_and_merged() {
     // Imported into another copy (from 2.1), its first viewpoint shown in the orthographic view.
     let (mut b, _) = open(work.path(), "b");
     let r = ok(&mut b, "bcf.import", json!({ "path": bcf2 }));
-    assert_eq!((r["version"].as_str(), r["added"].as_u64(), r["viewpoints"].as_u64()), (Some("2.1"), Some(1), Some(2)), "{r}");
+    assert_eq!((r["version"].as_str(), r["added"].as_u64(), r["viewpoints"].as_u64(), r["snapshots"].as_u64()), (Some("2.1"), Some(1), Some(2), Some(2)), "{r}");
+    assert_eq!(ok(&mut b, "bcf.snapshot", json!({ "viewpoint_id": vp1 }))["png_base64"].as_str(), Some(png.as_str()), "the same picture");
     assert_eq!(r["problems"], json!([]));
     let target = view(&mut b, "Orthographic");
     let shown = ok(&mut b, "bcf.apply_viewpoint", json!({ "topic_id": guid, "target_view_id": target }));
@@ -125,11 +131,13 @@ fn issues_are_kept_exported_imported_and_merged() {
     let texts: Vec<&str> = merged["comments"].as_array().unwrap().iter().map(|c| c["text"].as_str().unwrap()).collect();
     assert_eq!(texts, ["Raise the sill to 1100", "Sill raised"]);
 
-    // Deleting is one step to undo.
+    // Deleting is one step to undo, with its snapshots.
     ok(&mut a, "bcf.delete_topic", json!({ "topic_ids": [guid] }));
     assert_eq!(ok(&mut a, "bcf.list", json!({})).as_array().unwrap().len(), 0);
+    assert!(a.execute("bcf.snapshot", json!({ "viewpoint_id": vp1 }), &Caller::user()).is_err());
     ok(&mut a, "edit.undo", json!({}));
     assert_eq!(ok(&mut a, "bcf.list", json!({})).as_array().unwrap().len(), 1);
+    ok(&mut a, "bcf.snapshot", json!({ "viewpoint_id": vp1 }));
     let lists = ok(&mut a, "bcf.lists", json!({}));
     assert!(lists["statuses"].as_array().unwrap().contains(&json!("Resolved")) && lists["users"].as_array().unwrap().contains(&json!("arch@example.com")), "{lists}");
 }

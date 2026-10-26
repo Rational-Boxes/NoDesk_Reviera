@@ -65,6 +65,7 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(BcfGet),
         registry.add(BcfMergeTopics),
         registry.add(BcfLists),
+        registry.add(BcfSnapshot),
         registry.add(ViewRename),
         registry.add(ViewDuplicate),
         registry.add(ViewDelete),
@@ -1702,6 +1703,35 @@ impl Command for BcfLists {
 
     fn run(&self, cx: &mut CommandContext<'_>, _: NoParams) -> Result<crate::issues::Lists> {
         Ok(crate::issues::lists(cx.store()))
+    }
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct BcfSnapshotParams {
+    /// The viewpoint's GUID.
+    pub viewpoint_id: String,
+}
+
+#[derive(Debug)]
+struct BcfSnapshot;
+
+impl Command for BcfSnapshot {
+    type Params = BcfSnapshotParams;
+    type Output = Value;
+    const META: CommandMeta = CommandMeta {
+        name: "bcf.snapshot",
+        version: 1,
+        summary: "A BCF viewpoint's snapshot",
+        description: "The snapshot kept for a topic's viewpoint (by its GUID): `{ \"png_base64\": … }` (PNG, or JPEG from another tool), or an error when it has none.",
+        effects: &[Effect::Read],
+        transaction_name: "",
+    };
+
+    fn run(&self, cx: &mut CommandContext<'_>, p: BcfSnapshotParams) -> Result<Value> {
+        use base64::Engine;
+        let bytes = crate::issues::snapshot(cx.store(), &p.viewpoint_id).ok_or_else(|| Error::new("bcf.no_snapshot", format!("viewpoint {} has no snapshot", p.viewpoint_id)))?;
+        Ok(serde_json::json!({ "png_base64": base64::engine::general_purpose::STANDARD.encode(bytes) }))
     }
 }
 

@@ -13,7 +13,7 @@
 //!   exceptions, by IFC GlobalId. The window's temporary hide and isolate are kept by the
 //!   application, which fills these in ([`Viewpoint::selection`], [`Viewpoint::visibility`]).
 //!
-//! Not built yet: component colouring, snapshots, `ViewSetupHints`, BCF topics and their `.bcf`
+//! Not built yet: component colouring, `ViewSetupHints`, BCF topics and their `.bcf`
 //! archives (COL-BCF-001), 2D views' viewpoints.
 
 use quick_xml::Reader;

@@ -26593,7 +26593,7 @@ Common link fields: `id`, `name`, `source` (see each type), `pathType` (relative
 - [ ] A BCF 2.1 file from another tool imports into Reviera and its viewpoints restore the camera and selection.
 - [ ] Two users commenting on the same topic in BIMserver mode both see both comments after synchronising.
 
-*Built (2026-10-26), topics and archives:* topics are kept with the model as RXD objects (`rxd:coordination/issues/<topic guid>`, one per topic; a topic's comments and viewpoints inside it), so they save, reopen and undo with the model. `bcf.create_topic` (from the active 3D view's viewpoint and the selection or `element_ids`; type Issue and status Open unless given), `bcf.update_topic` (recording the modification date and author), `bcf.add_comment` (optionally on one of its viewpoints), `bcf.add_viewpoint`, `bcf.apply_viewpoint` (COL-BCF-003), `bcf.delete_topic`, `bcf.list` (filters: status, type, priority, assignee, label, text) and `bcf.get`; beneath them `bcf.put_topic`, `bcf.put_viewpoint` and `bcf.merge_topics`. `bcf.export` writes a `.bcf` archive in BCF 3.0 (bcf.version, extensions.xml with the project's lists, per topic markup.bcf and `<guid>.bcfv`) or 2.1 (comments and viewpoints beside the topic, no aspect ratio); `bcf.import` reads either and merges by topic GUID: the fields of whichever changed last, comments and viewpoints joined by GUID (a comment changed later is taken). Exports validate against buildingSMART's BCF 3.0 and 2.1 XSDs. Authors are given or the system's user name (no user identity yet, UI-IDENT-001); the lists (`bcf.lists`) are Reviera's defaults and every value in use. View › Coordination › New Issue, Issues (a dialog: Show, Edit, Comment, Add View, Delete), Import BCF and Export BCF, also in the File menu. *(Owner, 2026-10-26: "commit and push work, continue feature development".)* Not yet: snapshots (named on import, not kept), issues from clash results and review items, document references and project.bcfp, the lists as edited extensions, the docked Issues pane with filters (COL-BCF-004), BIMserver merge (third criterion), BCF API (COL-BCF-002).
+*Built (2026-10-26), topics and archives:* topics are kept with the model as RXD objects (`rxd:coordination/issues/<topic guid>`, one per topic; a topic's comments and viewpoints inside it), so they save, reopen and undo with the model. `bcf.create_topic` (from the active 3D view's viewpoint and the selection or `element_ids`; type Issue and status Open unless given), `bcf.update_topic` (recording the modification date and author), `bcf.add_comment` (optionally on one of its viewpoints), `bcf.add_viewpoint`, `bcf.apply_viewpoint` (COL-BCF-003), `bcf.delete_topic`, `bcf.list` (filters: status, type, priority, assignee, label, text) and `bcf.get`; beneath them `bcf.put_topic`, `bcf.put_viewpoint` and `bcf.merge_topics`. `bcf.export` writes a `.bcf` archive in BCF 3.0 (bcf.version, extensions.xml with the project's lists, per topic markup.bcf and `<guid>.bcfv`) or 2.1 (comments and viewpoints beside the topic, no aspect ratio); `bcf.import` reads either and merges by topic GUID: the fields of whichever changed last, comments and viewpoints joined by GUID (a comment changed later is taken). Exports validate against buildingSMART's BCF 3.0 and 2.1 XSDs. Authors are given or the system's user name (no user identity yet, UI-IDENT-001); the lists (`bcf.lists`) are Reviera's defaults and every value in use. View › Coordination › New Issue, Issues (a dialog: Show, Edit, Comment, Add View, Delete), Import BCF and Export BCF, also in the File menu. *(Owner, 2026-10-26: "commit and push work, continue feature development".)* *Built (2026-10-26), snapshots:* New Issue and Add View render the 3D view as it shows (camera, section box and slices, temporary hide and isolate; 1024 × 768 PNG, offscreen) and keep the picture with the model as its own RXD object per viewpoint (`rxd:coordination/snapshots/<viewpoint guid>`, at most 4 MB), in the same step as the topic or viewpoint; deleting a topic deletes its snapshots. Exports write each beside its viewpoint (`<guid>.png`, the markup's `Snapshot`); imports keep a file's PNG or JPEG snapshots for viewpoints that have none. `bcf.snapshot(viewpoint_id)` returns one (base64). Not yet: issues from clash results and review items, document references and project.bcfp, the lists as edited extensions, the docked Issues pane with filters (COL-BCF-004), BIMserver merge (third criterion), BCF API (COL-BCF-002).
 
 *Built (2026-10-26), topics and archives:* topics are kept with the model as RXD objects (`rxd:coordination/issues/<topic guid>`, one per topic; a topic's comments and viewpoints inside it), so they save, reopen and undo with the model. `bcf.create_topic` (from the active 3D view's viewpoint and the selection or `element_ids`; type Issue and status Open unless given), `bcf.update_topic` (recording the modification date and author), `bcf.add_comment` (optionally on one of its viewpoints), `bcf.add_viewpoint`, `bcf.apply_viewpoint` (COL-BCF-003), `bcf.delete_topic`, `bcf.list` (filters: status, type, priority, assignee, label, text) and `bcf.get`; beneath them `bcf.put_topic`, `bcf.put_viewpoint` and `bcf.merge_topics`. `bcf.export` writes a `.bcf` archive in BCF 3.0 (bcf.version, extensions.xml with the project's lists, per topic markup.bcf and `<guid>.bcfv`) or 2.1 (comments and viewpoints beside the topic, no aspect ratio); `bcf.import` reads either and merges by topic GUID: the fields of whichever changed last, comments and viewpoints joined by GUID (a comment changed later is taken). Exports validate against buildingSMART's BCF 3.0 and 2.1 XSDs. The authors are given or the system's user name (no user identity yet, UI-IDENT-001); the lists (`bcf.lists`) are Reviera's defaults and every value in use. View › Coordination › New Issue, Issues (a dialog: Show, Edit, Comment, Add View, Delete), Import BCF and Export BCF, also in the File menu. *(Owner, 2026-10-26: \"commit and push work, continue feature development\".)* Not yet: snapshots (named on import, not kept), issues from clash results and review items, document references and project.bcfp, the lists as edited extensions, the docked Issues pane with filters (COL-BCF-004), BIMserver merge (third criterion), BCF API (COL-BCF-002).
 
@@ -27194,7 +27194,8 @@ Every command below is registered once and is available from the UI, Lua and MCP
 | `bcf.lists` | — | lists | No (query) | COL-BCF-001 |
 | `bcf.merge_topics` | topics[] | merge_report | Yes | COL-BCF-001 |
 | `bcf.put_topic` | topic | element_id | Yes | COL-BCF-001 |
-| `bcf.put_viewpoint` | topic_id, viewpoint | viewpoint_id | Yes | COL-BCF-003 |
+| `bcf.put_viewpoint` | topic_id, viewpoint, snapshot? | viewpoint_id | Yes | COL-BCF-003 |
+| `bcf.snapshot` | viewpoint_id | png_base64 | No (query) | COL-BCF-001 |
 | `view.apply_viewpoint` | view_id, viewpoint | view_id | Yes | COL-BCF-003 |
 | `model.purge_preview` | — | purge_tree | No | COL-MNT-001 |
 | `model.purge` | item_ids[]?\|all? | count | Yes | COL-MNT-001 |
@@ -27841,7 +27842,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**2160 unique commands** in 416 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**2161 unique commands** in 416 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -27877,7 +27878,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `array` | 6 |
 | `assembly` | 16 |
 | `assemblytemplate` | 1 |
-| `bcf` | 32 |
+| `bcf` | 33 |
 | `beam` | 6 |
 | `beam_system` | 5 |
 | `bending_detail` | 1 |
@@ -28401,10 +28402,11 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `bcf.merge_topics` | 6 | topics[] | merge_report | Yes | COL-BCF-001 |
 | `bcf.notifications` | 6 | since? | notification[] | No (query) | COL-BCF-005 |
 | `bcf.put_topic` | 6 | topic | element_id | Yes | COL-BCF-001 |
-| `bcf.put_viewpoint` | 6 | topic_id, viewpoint | viewpoint_id | Yes | COL-BCF-003 |
+| `bcf.put_viewpoint` | 6 | topic_id, viewpoint, snapshot? | viewpoint_id | Yes | COL-BCF-003 |
 | `bcf.report` | 6 | topic_ids[]? \ | filter?, format: pdf\ | html\ | csv\ |
 | `bcf.set_extensions` | 6 | lists{types?, statuses?, priorities?, labels?, stages?, users?}, replacements?{} | () | Yes | COL-BCF-004 |
 | `bcf.set_workflow` | 6 | rules | () | Yes | COL-BCF-005 |
+| `bcf.snapshot` | 6 | viewpoint_id | png_base64 | No (query) | COL-BCF-001 |
 | `bcf.update_topic` | 6 | topic_id, fields | () | Yes | COL-BCF-001 |
 | `beam.create` | 4 | type_id, curve, reference_level, usage?, orientation?, z_justification?, y_justification? | element_id | Yes | STR-BEAM-001 |
 | `beam.create_on_grids` | 4 | type_id, grid_ids[], level | element_id[] | Yes | STR-BEAM-001 |
