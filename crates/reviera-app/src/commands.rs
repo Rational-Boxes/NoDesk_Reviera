@@ -124,6 +124,9 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add_host(crate::hc_loads::LoadsRun),
         registry.add_host(crate::hc_loads::LoadsCollect),
         registry.add_host(crate::hc_loads::LoadsStatus),
+        registry.add_host(crate::annual_energy::EnergyRunCmd),
+        registry.add_host(crate::annual_energy::EnergyCollect),
+        registry.add_host(crate::annual_energy::EnergyStatus),
         registry.add_host(SelectionRemove),
     ];
     for r in results {

@@ -37,6 +37,9 @@ pub const SOLAR_RESULTS: &str = "reviera.solar.v1.Results";
 pub const LOADS: &str = "analysis.loads";
 pub const LOADS_INPUT: &str = "reviera.loads.v1.Input";
 pub const LOADS_RESULTS: &str = "reviera.loads.v1.Results";
+pub const ENERGY: &str = "analysis.energy";
+pub const ENERGY_INPUT: &str = "reviera.energy.v1.Input";
+pub const ENERGY_RESULTS: &str = "reviera.energy.v1.Results";
 
 fn version() -> String {
     env!("CARGO_PKG_VERSION").into()
@@ -369,6 +372,38 @@ impl Kind for LoadsKind {
         ctx.log(format!("{} spaces: heating {:.0} W, cooling {:.0} W (coincident {:.0} W at {} h)", r.spaces.len(), r.heating_total, r.cooling_total, r.cooling_coincident, r.coincident_hour));
         ctx.progress(1.0, "done");
         Ok(Output { bytes: serde_json::to_vec(&r).map_err(|e| JobFailure::new("runner_failed", e.to_string()))?, media_type: JSON.into(), schema: LOADS_RESULTS.into() })
+    }
+}
+
+/// `analysis.energy`: annual heating and cooling energy (ANA-ENV-005) by the lumped hourly zone
+/// model ([`reviera_core::annual_energy::run`]).
+#[derive(Debug, Default)]
+pub struct EnergyKind;
+
+impl Kind for EnergyKind {
+    fn info(&self) -> KindInfo {
+        KindInfo {
+            kind: ENERGY.into(),
+            version: 1,
+            runner: "reviera-analysis-builtin".into(),
+            runner_version: version(),
+            licence: LICENCE.into(),
+            capabilities: vec!["batch".into(), "annual-energy".into()],
+            accepted_formats: vec![format!("{JSON};schema={ENERGY_INPUT}")],
+            supports_checkpoints: false,
+            supports_sessions: false,
+        }
+    }
+
+    fn run(&self, ctx: &JobContext, _options: Option<&prost_types::Any>, inputs: &[Blob]) -> Result<Output, JobFailure> {
+        ctx.progress(0.0, "reading");
+        let blob = inputs.iter().find(|b| b.reference.schema == ENERGY_INPUT).ok_or_else(|| JobFailure::new("invalid_input", "no energy input in the inputs"))?;
+        let input: reviera_core::annual_energy::EnergyInput = serde_json::from_slice(&blob.raw).map_err(|e| JobFailure::new("invalid_input", e.to_string()))?;
+        ctx.progress(0.1, "simulating");
+        let r = reviera_core::annual_energy::run(&input).map_err(|e| JobFailure::new("invalid_input", e))?;
+        ctx.log(format!("{} spaces, {:.0} m2: heating {:.0} kWh, cooling {:.0} kWh, EUI {:.0} kWh/m2", r.spaces.len(), r.floor_area, r.year.heating_load, r.year.cooling_load, r.eui));
+        ctx.progress(1.0, "done");
+        Ok(Output { bytes: serde_json::to_vec(&r).map_err(|e| JobFailure::new("runner_failed", e.to_string()))?, media_type: JSON.into(), schema: ENERGY_RESULTS.into() })
     }
 }
 

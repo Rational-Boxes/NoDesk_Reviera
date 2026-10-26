@@ -230,6 +230,8 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(EnergyModelGet),
         registry.add(LoadsRecord),
         registry.add(LoadsReport),
+        registry.add(EnergyRecord),
+        registry.add(EnergyResultsCmd),
         registry.add(EnergyModelSummary),
         registry.add(EnergyModelSetThermal),
         registry.add(SolarResults),
@@ -2325,6 +2327,27 @@ read_command!(
     crate::hvac_loads::ReportParams,
     crate::hvac_loads::Report,
     crate::hvac_loads::report
+);
+
+edit_command!(
+    EnergyRecord,
+    "energy.record",
+    "Record an annual energy run",
+    "Keeps a finished annual energy run (ANA-ENV-005) on the project (the last ten): the analysis.energy job's results (monthly and annual heating and cooling loads, delivered heating, cooling, lighting and equipment energy, electricity, gas and operational carbon; EUI; peaks; each space's loads), its options, key map, weather revision and input hash. energy.collect calls it.",
+    "Annual Energy",
+    crate::annual_energy::RecordParams,
+    crate::annual_energy::EnergyRun,
+    crate::annual_energy::record
+);
+
+read_command!(
+    EnergyResultsCmd,
+    "energy.results",
+    "Annual energy results",
+    "An annual energy run's (`run_id`, else the latest) results: the options, the twelve months' and the year's end uses (kWh: heating_load, cooling_load, heating, cooling, lighting, equipment, electricity, gas; carbon kg CO2e, null without a grid factor), floor area, EUI (kWh/m2 a year), building peaks (W) and each space's annual loads and peaks.",
+    crate::annual_energy::ReportParams,
+    crate::annual_energy::Report,
+    crate::annual_energy::report
 );
 
 read_command!(

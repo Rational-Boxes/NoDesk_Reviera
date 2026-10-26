@@ -4708,6 +4708,8 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "energy_model.get" => with(gui, Gui::energy_model_dialog),
         "hc_loads.run" => with(gui, Gui::hc_loads_dialog),
         "hc_loads.report" => with(gui, Gui::hc_loads_report),
+        "energy.run" => with(gui, Gui::annual_energy_dialog),
+        "energy.results" => with(gui, Gui::annual_energy_results),
         "solar.results" => with(gui, Gui::solar_results),
         "path_of_travel.create" => with(gui, |g| {
             g.start_note_tool(notes::NoteTool::PathOfTravel);

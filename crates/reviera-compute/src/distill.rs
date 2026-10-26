@@ -61,6 +61,25 @@ pub fn loads(input: &reviera_core::hvac_loads::LoadsInput, key_map: &BTreeMap<St
     }
 }
 
+/// The `energy.input` distillation (ANA-ENV-005): the spaces (opaque keys), the site, the
+/// weather year and the options as one JSON blob.
+pub fn energy(input: &reviera_core::annual_energy::EnergyInput, key_map: &BTreeMap<String, String>) -> Distilled {
+    let raw = serde_json::to_vec(input).expect("the input serialises");
+    let blob = Blob::new(raw, crate::kinds::JSON, crate::kinds::ENERGY_INPUT);
+    let snapshot_hash = blob.reference.sha256.clone();
+    Distilled {
+        distiller: crate::kinds::ENERGY_INPUT.into(),
+        version: 1,
+        detail: String::new(),
+        anonymised: true,
+        blobs: vec![blob],
+        key_map: key_map.clone(),
+        elements: input.spaces.len(),
+        triangles: 0,
+        snapshot_hash,
+    }
+}
+
 /// The `solar.input` distillation (ANA-ENV-002): the faces, shading triangles, site and hourly
 /// irradiance as one JSON blob (geometry only, no element names).
 pub fn solar(input: &reviera_core::solar::SolarInput) -> Distilled {

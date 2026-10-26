@@ -172,3 +172,91 @@ impl Gui {
         super::mep_loads_ui::list_dialog(&frame, "Heating & Cooling Loads", &intro, &[("Space", 60), ("Name", 110), ("Heat kW", 65), ("Sens. kW", 65), ("Cool kW", 65), ("Peak h", 55), ("W/m²", 55), ("Air L/s c/h", 90)], &rows, &[], None);
     }
 }
+
+impl Gui {
+    /// Sustainability › Energy › Annual Energy (ANA-ENV-005): the infiltration, mass, heating
+    /// source, efficiencies and emission factors, then a compute job; the results open when it is
+    /// collected.
+    pub(crate) fn annual_energy_dialog(&mut self) {
+        let frame = self.frame;
+        let last = self.run("energy.results", json!({})).ok().map(|r| r["options"].clone()).unwrap_or(Value::Null);
+        let pick = |key: &str, items: &[&str], default: usize| last[key].as_str().and_then(|v| items.iter().position(|i| *i == v)).unwrap_or(default);
+        let num = |key: &str, default: &str| last[key].as_f64().filter(|v| *v > 0.0).map_or_else(|| default.to_owned(), |v| format!("{v}"));
+        let f = super::reinforcement_ui::Form::new(&frame, "Annual Energy");
+        let infil_keys = ["loose", "medium", "tight", "none"];
+        let infil = f.choice("Infiltration", &["Loose (0.39 L/s·m²)".to_owned(), "Medium (0.19 L/s·m²)".to_owned(), "Tight (0.10 L/s·m²)".to_owned(), "None".to_owned()], pick("infiltration", &infil_keys, 1));
+        let mass_keys = ["light", "medium", "heavy"];
+        let mass = f.choice("Thermal mass", &["Light (timber, steel)".to_owned(), "Medium".to_owned(), "Heavy (masonry, concrete)".to_owned()], pick("mass", &mass_keys, 1));
+        let source_keys = ["gas", "electric", "heat_pump"];
+        let source = f.choice("Heating", &["Gas boiler".to_owned(), "Electric resistance".to_owned(), "Heat pump".to_owned()], pick("heating", &source_keys, 0));
+        let eff = f.text("Heating efficiency or COP", &num("heating_efficiency", ""), "Blank for the source's default: 0.9 gas, 1.0 electric, COP 3.0 heat pump");
+        let cop = f.text("Cooling COP", &num("cooling_cop", "3.0"), "Seasonal coefficient of performance of the cooling");
+        let grid = f.text("Grid factor (kg CO₂e/kWh)", &last["grid_factor"].as_f64().map_or(String::new(), |v| format!("{v}")), "Your grid's emission factor; electricity carbon is left out when blank");
+        let gas = f.text("Gas factor (kg CO₂e/kWh)", &num("gas_factor", "0.202"), "Natural gas combustion");
+        if !f.show("A year of hourly simulation of the energy model's spaces through the weather file, with the space types' loads, set points and opening hours; runs out of process.", "Run") {
+            f.dialog.destroy();
+            return;
+        }
+        let parse = |t: &TextCtrl| t.get_value().trim().replace(',', ".").parse::<f64>().ok();
+        fn sel(c: &Choice, keys: &[&'static str], d: usize) -> &'static str {
+            keys[c.get_selection().map_or(d, |i| i as usize).min(keys.len() - 1)]
+        }
+        let mut o = json!({
+            "infiltration": sel(&infil, &infil_keys, 1),
+            "mass": sel(&mass, &mass_keys, 1),
+            "heating": sel(&source, &source_keys, 0),
+            "heating_efficiency": parse(&eff).unwrap_or(0.0),
+            "cooling_cop": parse(&cop).unwrap_or(3.0),
+            "gas_factor": parse(&gas).unwrap_or(0.202),
+        });
+        if let Some(g) = parse(&grid) {
+            o["grid_factor"] = json!(g);
+        }
+        f.dialog.destroy();
+        match self.run("energy.run", json!({ "options": o })) {
+            Ok(v) => self.watch_job(v["job_id"].as_str().unwrap_or_default().to_owned(), "energy.collect", "Annual energy"),
+            Err(e) => error(&frame, &format!("The energy run did not start:\n{e}")),
+        }
+    }
+
+    /// The latest annual energy results: monthly end uses, the year, and each space's loads.
+    pub(crate) fn annual_energy_results(&mut self) {
+        let frame = self.frame;
+        let r = match self.run("energy.results", json!({})) {
+            Ok(v) => v,
+            Err(e) => return error(&frame, &e),
+        };
+        let stale = self.run("energy.status", json!({})).ok().is_some_and(|s| s["stale"] == true);
+        let n = |v: &Value| format!("{:.0}", v.as_f64().unwrap_or(0.0));
+        let carbon = |v: &Value| v.as_f64().map_or("—".to_owned(), |c| format!("{c:.0}"));
+        let line = |label: String, m: &Value| vec![label, n(&m["heating_load"]), n(&m["cooling_load"]), n(&m["heating"]), n(&m["cooling"]), n(&m["lighting"]), n(&m["equipment"]), n(&m["electricity"]), n(&m["gas"]), carbon(&m["carbon"])];
+        let names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+        let mut rows: Vec<Vec<String>> = r["months"].as_array().into_iter().flatten().enumerate().map(|(i, m)| line(names[i.min(11)].to_owned(), m)).collect();
+        rows.push(line("Year".into(), &r["year"]));
+        for s in r["spaces"].as_array().into_iter().flatten() {
+            let e = &s["energy"];
+            let label = format!("{} {}", s["number"].as_str().unwrap_or(""), s["name"].as_str().unwrap_or("")).trim().to_owned();
+            rows.push(vec![label, n(&e["heating_load"]), n(&e["cooling_load"]), String::new(), String::new(), String::new(), String::new(), String::new(), String::new(), String::new()]);
+        }
+        let o = &r["options"];
+        let year = &r["year"];
+        let mut intro = format!(
+            "Floor {:.0} m²; delivered {:.0} kWh a year, EUI {:.0} kWh/m²; peaks {:.1} kW heating, {:.1} kW cooling. Heating by {} (efficiency {}), cooling COP {}, infiltration {}, {} mass. Loads and energy in kWh, carbon in kg CO₂e{}. Rows after the year are the spaces' loads.",
+            r["floor_area"].as_f64().unwrap_or(0.0),
+            year["electricity"].as_f64().unwrap_or(0.0) + year["gas"].as_f64().unwrap_or(0.0),
+            r["eui"].as_f64().unwrap_or(0.0),
+            r["peak_heating"].as_f64().unwrap_or(0.0) / 1000.0,
+            r["peak_cooling"].as_f64().unwrap_or(0.0) / 1000.0,
+            o["heating"].as_str().unwrap_or("gas").replace('_', " "),
+            o["heating_efficiency"].as_f64().filter(|v| *v > 0.0).map_or("default".to_owned(), |v| format!("{v}")),
+            o["cooling_cop"],
+            o["infiltration"].as_str().unwrap_or(""),
+            o["mass"].as_str().unwrap_or(""),
+            if year["carbon"].is_null() { " (no grid factor given, so no carbon)" } else { "" }
+        );
+        if stale {
+            intro.push_str(" Stale: the model or the weather changed since; run it again.");
+        }
+        super::mep_loads_ui::list_dialog(&frame, "Annual Energy", &intro, &[("Month / space", 110), ("Heat load", 70), ("Cool load", 70), ("Heating", 65), ("Cooling", 65), ("Lighting", 65), ("Equip.", 65), ("Electric", 70), ("Gas", 60), ("CO₂e", 60)], &rows, &[], None);
+    }
+}

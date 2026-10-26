@@ -1117,6 +1117,12 @@ schedules, circuit paths, cable sizing and voltage drop.
   air and infiltration by class), run as `analysis.loads` jobs, peaks written to the spaces'
   Pset_SpaceThermalDesign, stale when the model or weather change (`hc_loads.*`; ANA-HCL-001,
   ANA-ENV-004). Not built yet: an RTS or EnergyPlus provider, plenums, reports as documents.
+- **Annual energy** (Sustainability › Energy › Annual Energy, Energy Results): a year of hourly
+  simulation of each space as a lumped air–surface–mass network through the weather file, with
+  an ideal thermostat, the space types' loads and opening hours; heating by gas, electric or
+  heat pump, cooling by COP; monthly and annual loads, delivered energy by end use, EUI and
+  operational carbon from the user's grid factor; run as `analysis.energy` jobs (`energy.*`;
+  ANA-ENV-005). Not built yet: schedules, sized systems, fans and hot water, charts and reports.
 - **Energy model** (Sustainability › Energy › Energy Model): analytical spaces and heat-transfer
   surfaces derived from the MEP spaces (exterior and interior walls with corresponding
   boundaries, windows and doors, slabs on grade, interior floors, roofs, air boundaries), with

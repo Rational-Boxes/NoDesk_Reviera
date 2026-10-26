@@ -184,7 +184,7 @@ pub struct LoadsResults {
 }
 
 /// Humidity ratio (g/kg) at a dry-bulb and wet-bulb (sea-level pressure).
-fn humidity_ratio(db: f64, wb: f64) -> f64 {
+pub(crate) fn humidity_ratio(db: f64, wb: f64) -> f64 {
     let ps = |t: f64| 610.94 * (17.625 * t / (t + 243.04)).exp();
     let p = 101_325.0;
     let ws = 621.945 * ps(wb) / (p - ps(wb));

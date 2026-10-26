@@ -469,6 +469,12 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "loads_report" => format!(
             r#"<path d="M5 4h18l4 4v20H5z" fill="{f}" {s}/><path d="M9 22v-6M14 22v-10M19 22v-4M24 22v-8" stroke-width="2.5" {sa}/>"#
         ),
+        "annual_energy" => format!(
+            r#"<path d="M4 8h24v19H4z" fill="{f}" {s}/><path d="M4 13h24M10 5v6M22 5v6" {sa}/><path d="M17 15l-5 6h4l-1 5 5-6h-4z" fill="none" {sa}/>"#
+        ),
+        "energy_results" => format!(
+            r#"<path d="M4 27h24" {sa}/><path d="M6 27V17h3v10M11 27V12h3v15M16 27V9h3v18M21 27V14h3v13" fill="{f}" {s}/>"#
+        ),
         "energy_model" => format!(
             r#"<path d="M4 14L16 5l12 9v14H4z" fill="{f}" {s}/><path d="M10 28v-8h5v8M19 17h5v4h-5z" fill="none" {sa}/>"#
         ),

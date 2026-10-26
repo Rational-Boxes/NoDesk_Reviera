@@ -68,6 +68,7 @@ impl Gui {
             "embodied_carbon.collect" => self.carbon_results(),
             "solar.collect" => self.solar_results(),
             "hc_loads.collect" => self.hc_loads_report(),
+            "energy.collect" => self.annual_energy_results(),
             _ => {}
         }
     }

@@ -69,6 +69,7 @@ pub mod path_of_travel;
 pub mod solar;
 pub mod energy_model;
 pub mod hvac_loads;
+pub mod annual_energy;
 pub mod mep_risers;
 pub mod mep_electrical;
 pub mod mep_cables;

@@ -2830,6 +2830,18 @@ icon = "loads_report"
 help = "The latest heating and cooling loads run: each space's and zone's peaks, components hour and airflows (ANA-HCL-001)"
 
 [[action]]
+id = "energy.run"
+label = "Annual Energy"
+icon = "annual_energy"
+help = "A year of hourly simulation of the energy model's spaces through the weather file: heating, cooling, lighting and equipment energy and operational carbon; runs out of process (ANA-ENV-005)"
+
+[[action]]
+id = "energy.results"
+label = "Energy Results"
+icon = "energy_results"
+help = "The latest annual energy run: monthly end uses, the year's totals, EUI, peaks and operational carbon (ANA-ENV-005)"
+
+[[action]]
 id = "solar.run"
 label = "Solar Study"
 icon = "solar"
@@ -3564,6 +3576,8 @@ tools = [
   { action = "energy_model.get", size = "large" },
   { action = "hc_loads.run", size = "large" },
   { action = "hc_loads.report", size = "large" },
+  { action = "energy.run", size = "large" },
+  { action = "energy.results", size = "large" },
 ]
 
 [[tab.panel]]
