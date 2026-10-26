@@ -10,6 +10,7 @@
 pub mod analytical;
 pub mod analytical_checks;
 pub mod analytical_panels;
+pub mod bcf;
 pub mod annotations;
 pub mod areas;
 pub mod arrangement;

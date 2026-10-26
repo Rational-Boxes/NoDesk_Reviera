@@ -54,6 +54,8 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(WallFlip),
         registry.add(ViewCreate3d),
         registry.add(ViewList),
+        registry.add(ViewGet),
+        registry.add(ViewApplyViewpoint),
         registry.add(ViewRename),
         registry.add(ViewDuplicate),
         registry.add(ViewDelete),
@@ -1487,6 +1489,56 @@ impl Command for ViewList {
             .into_iter()
             .filter(|v| p.kind.as_ref().is_none_or(|k| *k == v.kind))
             .collect())
+    }
+}
+
+#[derive(Debug)]
+struct ViewGet;
+
+impl Command for ViewGet {
+    type Params = views::ViewIdParams;
+    type Output = views::ViewDetail;
+    const META: CommandMeta = CommandMeta {
+        name: "view.get",
+        version: 1,
+        summary: "Get a view's settings",
+        description: "A view in full: its kind, name and GlobalId, camera and Home (3D), level and view range \
+                      (plans), section box and slice planes (3D, DOC-VIEW-008, DOC-VIEW-014), section line and \
+                      depth (sections and elevations), colour and area schemes, detail level, the scope box it \
+                      is assigned to, how it shows virtual volumes and whether it shows parts. Temporary \
+                      hide and isolate are not saved, so they are not here (`view.get_temp_state`).",
+        effects: &[Effect::Read],
+        transaction_name: "",
+    };
+
+    fn run(&self, cx: &mut CommandContext<'_>, p: views::ViewIdParams) -> Result<views::ViewDetail> {
+        views::detail(cx.store(), &p.view_id)
+    }
+}
+
+#[derive(Debug)]
+struct ViewApplyViewpoint;
+
+impl Command for ViewApplyViewpoint {
+    type Params = crate::bcf::ApplyParams;
+    type Output = ElementId;
+    const META: CommandMeta = CommandMeta {
+        name: "view.apply_viewpoint",
+        version: 1,
+        summary: "Set a 3D view's camera and cut from a BCF viewpoint",
+        description: "Sets a 3D view's camera, section box and slice planes from a BCF viewpoint (COL-BCF-003): \
+                      `camera` (perspective: eye, direction, up, vertical field of view in degrees, aspect \
+                      ratio; orthogonal: view_to_world_scale, the view's height in metres) and \
+                      `clipping_planes` (each a location and a direction pointing to the hidden side): six \
+                      that form a box become its section box, the rest slice planes (at most eight). The \
+                      viewpoint's components are not applied here: `bcf.import_viewpoint` reads a .bcfv \
+                      file and hides, isolates and selects them too.",
+        effects: &[Effect::Edit],
+        transaction_name: "Apply Viewpoint",
+    };
+
+    fn run(&self, cx: &mut CommandContext<'_>, p: crate::bcf::ApplyParams) -> Result<ElementId> {
+        crate::bcf::apply(cx.edit()?, &p.view_id, &p.viewpoint)
     }
 }
 

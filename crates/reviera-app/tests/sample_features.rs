@@ -144,18 +144,23 @@ fn the_views_sample_keeps_its_views_and_their_inspection_state() {
     let boxes = ok(&mut app, "scopebox.list", json!({}));
     assert_eq!(boxes.as_array().unwrap().len(), 1);
 
-    let s = store(&app);
-    let data = |name: &str| {
-        let id = all.iter().find(|(n, k, _)| n == name && k == "view.3d").unwrap_or_else(|| panic!("no 3D view {name}")).2;
-        reviera_core::views::view_data(s.get(ElementId(id)).unwrap()).unwrap()
+    // Read back with `view.get`.
+    let mut get = |name: &str, kind: &str| {
+        let id = all.iter().find(|(n, k, _)| n == name && k == kind).unwrap_or_else(|| panic!("no {kind} {name}")).2;
+        ok(&mut app, "view.get", json!({ "view_id": id }))
     };
-    let b = data("Section Box - Kitchen").section_box.unwrap();
-    assert!(b.enabled && near(b.min[0], 4.9, 1e-6) && near(b.max[2], 2.0, 1e-6), "{b:?}");
-    let h = data("Horizontal Slice").slice_planes;
-    assert_eq!(h.len(), 1);
-    assert!(near(h[0].origin[2], 1.5, 1e-9) && near(h[0].normal[2], -1.0, 1e-9), "{h:?}");
-    let v = data("Vertical Slice").slice_planes;
-    assert!(v.len() == 1 && near(v[0].normal[1], 1.0, 1e-9), "{v:?}");
+    let b = get("Section Box - Kitchen", "view.3d")["sectionBox"].clone();
+    assert!(b["enabled"] == true && near(f(&b["min"][0]), 4.9, 1e-6) && near(f(&b["max"][2]), 2.0, 1e-6), "{b}");
+    let h = get("Horizontal Slice", "view.3d")["slicePlanes"].clone();
+    assert_eq!(h.as_array().unwrap().len(), 1);
+    assert!(near(f(&h[0]["origin"][2]), 1.5, 1e-9) && near(f(&h[0]["normal"][2]), -1.0, 1e-9), "{h}");
+    let v = get("Vertical Slice", "view.3d")["slicePlanes"].clone();
+    assert!(v.as_array().unwrap().len() == 1 && near(f(&v[0]["normal"][1]), 1.0, 1e-9), "{v}");
+    assert_eq!(get("Virtual Volumes", "view.3d")["virtualVolumes"], "translucent");
+    let scope = boxes[0]["guid"].clone();
+    let east = get("Level 1 - East Half", "view.plan");
+    assert!(east["scopeBox"].is_string() && (scope.is_null() || east["scopeBox"] == scope), "{east} {boxes}");
+    assert_eq!(get("Level 1", "view.plan")["kind"], "view.plan");
 }
 
 #[test]

@@ -684,6 +684,18 @@ icon = "overlaps"
 help = "Find where elements overlap: listed largest first; pick one to select and frame it"
 
 [[action]]
+id = "bcf.export_viewpoint"
+label = "Export Viewpoint..."
+icon = "bcf_export"
+help = "Save the active 3D view as a BCF viewpoint (.bcfv): its camera, section box and slices, hidden or isolated elements and the selection (COL-BCF-003)"
+
+[[action]]
+id = "bcf.import_viewpoint"
+label = "Show Viewpoint..."
+icon = "bcf_import"
+help = "Open a BCF viewpoint (.bcfv) in the 3D view: its camera, cut, hidden or isolated elements and selection (COL-BCF-003)"
+
+[[action]]
 id = "ui.pane.clash"
 label = "Clash Detection"
 icon = "clash"
@@ -3782,6 +3794,8 @@ tools = [
   { action = "geometry.remove_boolean", size = "small" },
   { action = "view.set_virtual_volumes", size = "large" },
   { action = "clearance.set_rule_set" },
+  { action = "bcf.export_viewpoint", size = "small" },
+  { action = "bcf.import_viewpoint", size = "small" },
 ]
 
 [[tab.panel]]
@@ -4288,7 +4302,7 @@ panels = [{ label = "Window", tools = [{ action = "insert.flip_facing", size = "
 
 [[menu]]
 label = "&File"
-items = ["file.new", "file.open", "file.save", "file.save_as", "file.close", "-", "ui.model_properties", "ui.remote_analysis", "-", "export.pdf", "export.cobie", "gbxml.export", "gbxml.import_loads", "hbjson.export", "-", "app.exit"]
+items = ["file.new", "file.open", "file.save", "file.save_as", "file.close", "-", "ui.model_properties", "ui.remote_analysis", "-", "export.pdf", "export.cobie", "gbxml.export", "gbxml.import_loads", "hbjson.export", "bcf.export_viewpoint", "bcf.import_viewpoint", "-", "app.exit"]
 
 [[menu]]
 label = "&Edit"

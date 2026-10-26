@@ -1356,6 +1356,12 @@ simulation sessions, and the first engine runners (see [Not built yet](#not-buil
 - **Hide and isolate**: Hide, Isolate, Isolate with ghosting and Translucent work on elements,
   on elements with their children, by category or by type (HH, HI, HC, IC, HG, HT; HR resets).
   This is temporary per-view state that is never saved or printed (`view.temp_*`).
+- **BCF viewpoints**: View › Coordination › Export Viewpoint… writes a 3D view as a BCF 3.0
+  `.bcfv` (camera, section box and slices as clipping planes, hidden or isolated elements and
+  the selection by GlobalId); Show Viewpoint… opens one (BCF 2.1 or 3.0) in the 3D view, its
+  camera and cut undoable in one step, its components hidden or isolated and selected
+  (`bcf.export_viewpoint`, `bcf.import_viewpoint`, `view.apply_viewpoint`; `view.get` reads a
+  view's settings). BCF topics and `.bcf` archives are not built yet.
 - **Model Tree** (MT): Project › Site › Building › storeys › categories › elements, with hosted
   elements under their hosts; its context menu selects, hides, isolates or boxes whole branches
   (`model.tree`).

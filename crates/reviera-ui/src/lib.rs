@@ -4718,6 +4718,8 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "daylight.run" => with(gui, Gui::daylight_dialog),
         "daylight.results" => with(gui, Gui::daylight_results),
         "gbxml.export" => with(gui, Gui::gbxml_export),
+        "bcf.export_viewpoint" => with(gui, Gui::bcf_export_viewpoint),
+        "bcf.import_viewpoint" => with(gui, Gui::bcf_import_viewpoint),
         "gbxml.import_loads" => with(gui, Gui::gbxml_import_loads),
         "hbjson.export" => with(gui, Gui::hbjson_export),
         "pvgis.tmy" => with(gui, Gui::pvgis_tmy),

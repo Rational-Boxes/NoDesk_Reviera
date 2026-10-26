@@ -7,6 +7,7 @@
 //! [`App::execute`] is the single entry point for the UI, Lua, MCP and the command shell:
 //! application commands act on the [`App`]; every other command acts on the active document.
 
+pub mod bcf_files;
 pub mod clash;
 pub mod cobie;
 mod steel_nc;

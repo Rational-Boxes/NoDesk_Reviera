@@ -299,6 +299,47 @@ impl Gui {
         }
     }
 
+    /// View › Coordination › Export Viewpoint… (COL-BCF-003): the active 3D view as a .bcfv.
+    pub(crate) fn bcf_export_viewpoint(&mut self) {
+        let frame = self.frame;
+        let fd = FileDialog::builder(&frame).with_message("Export BCF Viewpoint").with_wildcard("BCF viewpoint (*.bcfv)|*.bcfv").with_style(FileDialogStyle::Save | FileDialogStyle::OverwritePrompt).build();
+        if fd.show_modal() != ID_OK {
+            return;
+        }
+        let Some(path) = fd.get_path() else { return };
+        match self.run("bcf.export_viewpoint", json!({ "path": path })) {
+            Ok(r) => {
+                let shown = if r["default_visibility"] == false { format!("{} elements isolated", r["exceptions"]) } else { format!("{} hidden", r["exceptions"]) };
+                let msg = format!("Wrote the view's camera, {} clipping planes, {shown} and {} selected to {path}.", r["clipping_planes"], r["selected"]);
+                MessageDialog::builder(&frame, &msg, "Export BCF Viewpoint").with_style(MessageDialogStyle::OK | MessageDialogStyle::IconInformation).build().show_modal();
+            }
+            Err(e) => error(&frame, &e),
+        }
+    }
+
+    /// View › Coordination › Show Viewpoint… (COL-BCF-003): a .bcfv in the 3D view.
+    pub(crate) fn bcf_import_viewpoint(&mut self) {
+        let frame = self.frame;
+        let fd = FileDialog::builder(&frame).with_message("Show BCF Viewpoint").with_wildcard("BCF viewpoint (*.bcfv)|*.bcfv").with_style(FileDialogStyle::Open | FileDialogStyle::FileMustExist).build();
+        if fd.show_modal() != ID_OK {
+            return;
+        }
+        let Some(path) = fd.get_path() else { return };
+        match self.run("bcf.import_viewpoint", json!({ "path": path })) {
+            Ok(r) => {
+                if let (Some(v), Some(doc)) = (r["view_id"].as_u64(), self.doc) {
+                    self.open_view(doc, Some(reviera_core::ElementId(v)));
+                }
+                let missing = r["not_found"].as_array().map_or(0, Vec::len);
+                if missing > 0 {
+                    let msg = format!("{missing} of the viewpoint's elements are not in this model.");
+                    MessageDialog::builder(&frame, &msg, "Show BCF Viewpoint").with_style(MessageDialogStyle::OK | MessageDialogStyle::IconInformation).build().show_modal();
+                }
+            }
+            Err(e) => error(&frame, &e),
+        }
+    }
+
     /// File › Export HBJSON… (ANA-ENV-009): the energy model for Ladybug Tools.
     pub(crate) fn hbjson_export(&mut self) {
         let frame = self.frame;

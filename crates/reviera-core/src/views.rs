@@ -286,6 +286,41 @@ pub fn list(store: &Store) -> Vec<ViewSummary> {
     views
 }
 
+/// A view in full (`view.get`): its saved data with its scope box, virtual-volume mode and
+/// parts visibility.
+#[derive(Debug, Clone, PartialEq, Serialize, JsonSchema)]
+pub struct ViewDetail {
+    pub id: ElementId,
+    pub guid: String,
+    pub name: String,
+    #[serde(flatten)]
+    pub data: ViewData,
+    /// The scope box it is assigned to (GlobalId), if any.
+    #[serde(rename = "scopeBox", skip_serializing_if = "Option::is_none")]
+    pub scope_box: Option<String>,
+    /// How it shows virtual volumes (`hidden`, `translucent` or `solid`), if set.
+    #[serde(rename = "virtualVolumes", skip_serializing_if = "Option::is_none")]
+    pub virtual_volumes: Option<String>,
+    /// Whether it shows parts or the elements they were made from.
+    #[serde(rename = "partsVisibility")]
+    pub parts_visibility: crate::parts::Visibility,
+}
+
+/// `view.get`.
+pub fn detail(store: &Store, r: &ElementRef) -> Result<ViewDetail> {
+    let (id, data) = resolve_view(store, r)?;
+    let e = store.get(id).expect("resolved");
+    Ok(ViewDetail {
+        id,
+        guid: e.guid().to_string(),
+        name: e.name.clone().unwrap_or_default(),
+        data,
+        scope_box: e.param(crate::scope_boxes::VIEW_KEY).and_then(Value::as_str).map(str::to_owned),
+        virtual_volumes: crate::clearances::view_mode(store, id),
+        parts_visibility: crate::parts::view_mode(store, Some(id)),
+    })
+}
+
 pub fn resolve_view(store: &Store, r: &ElementRef) -> Result<(ElementId, ViewData)> {
     let id = store
         .resolve(r)

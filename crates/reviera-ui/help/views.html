@@ -139,6 +139,17 @@ Select elements first, then:</p>
 <a href="reviera:help/window#tree">Model Tree</a> offer them too. <code>view.temp_hide</code>,
 <code>view.temp_isolate</code>, <code>view.temp_translucent</code>, <code>view.temp_reset</code></p>
 
+<h2 id="bcf">BCF viewpoints</h2>
+<p>A 3D view can be saved as a BCF viewpoint (<code>.bcfv</code>), the format coordination tools
+use for issues: <b>View › Coordination › Export Viewpoint…</b> writes the camera, the section
+box's faces and the slice planes as clipping planes, the hidden or isolated elements and the
+selection, by IFC GlobalId. <b>Show Viewpoint…</b> opens one (BCF 2.1 or 3.0) in the 3D view:
+six planes that form a box become its section box, the others slices; the components are
+hidden or isolated for now and selected. Elements the model does not have are counted. The
+camera and cut are one step to undo. <code>bcf.export_viewpoint</code>,
+<code>bcf.import_viewpoint</code>, <code>view.apply_viewpoint</code>; <code>view.get</code> reads a
+view's settings.</p>
+
 <h2 id="manage">Managing views</h2>
 <p>In the Project Browser, double-click a view to open it, or right-click it to <b>Open</b>,
 <b>Rename</b>, <b>Duplicate</b> or <b>Delete</b> it. <code>view.list</code>,

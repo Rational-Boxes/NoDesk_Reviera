@@ -61,8 +61,11 @@ Start with **File › New**. The model has Level 1 at 0.
     - *Isolate Partition*: select the Level 1 partition, View › **Isolate Element** (HI).
 
     These are temporary: they are not saved with the views **[gap]**.
-19. **BCF viewpoint.** Export a view's section box and slices as a BCF viewpoint's clipping
-    planes **[gap]**.
+19. **BCF viewpoint.** Open *Section Box - Kitchen*, View › Coordination › **Export
+    Viewpoint…** and save `kitchen.bcfv`: its camera, the box's six faces as clipping planes and
+    any hidden or isolated elements. Open the *Orthographic* view and **Show Viewpoint…** the same
+    file: it takes the kitchen's camera and box (Undo puts it back). The views sample is not
+    changed by this; it is a check that the file round-trips.
 
 Check: View › **Check Overlaps** finds none. The Project Browser lists 3 floor plans, 2 ceiling
 plans, 2 sections, 4 elevations and 11 3D views; reopened, each 3D view keeps its camera, Home,
@@ -80,9 +83,5 @@ section box, slices and virtual volumes.
   per view for the session only; nothing saves them with a view (there are no view-level
   visibility settings yet). The script applies them, but the saved sample shows those four views
   whole.
-- **BCF viewpoints.** `views::to_bcf` and `from_bcf` convert a section box and slices to BCF
-  clipping planes and back, but there is no command or menu to export or import a BCF viewpoint
-  (step 19).
-- **Reading a view's state.** `view.list` gives names and kinds only; no command returns a view's
-  section box, slices, scope box or virtual volume mode, so scripts and MCP cannot check them
-  (only `view.get_camera` and `view.get_temp_state` read a view).
+- **BCF topics.** A viewpoint is exported and shown on its own (`bcf.export_viewpoint`,
+  `bcf.import_viewpoint`); issues with their viewpoints in a `.bcf` archive are not built yet.

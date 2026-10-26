@@ -804,6 +804,12 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "section_box" => format!(
             r#"<path d="M6 11l8-5h12v15l-8 5H6z" fill="{f}" {s}/><path d="M6 11h12v15M18 11l8-5" {s}/><path d="M10 20l3-3 3 3" {sa}/><circle cx="12" cy="18.5" r="1.6" fill="{a}"/>"#
         ),
+        "bcf_export" => format!(
+            r#"<path d="M4 11h15v12H4z" fill="{f}" {s}/><path d="M19 15l6-4v12l-6-4" {s}/><path d="M8 15h7v5H8z" {s} stroke-dasharray="2 1.5"/><path d="M22 4h7M26 1l3 3-3 3" {sa}/>"#
+        ),
+        "bcf_import" => format!(
+            r#"<path d="M4 11h15v12H4z" fill="{f}" {s}/><path d="M19 15l6-4v12l-6-4" {s}/><path d="M8 15h7v5H8z" {s} stroke-dasharray="2 1.5"/><path d="M29 4h-7M25 1l-3 3 3 3" {sa}/>"#
+        ),
         "selection_box" => format!(
             r#"<path d="M5 10l7-5h15v14l-7 5H5z" {s} stroke-dasharray="3 2"/><rect x="10" y="11" width="8" height="8" fill="{f}" {sa}/>"#
         ),
