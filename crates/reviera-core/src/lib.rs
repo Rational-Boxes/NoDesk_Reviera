@@ -64,6 +64,7 @@ pub mod mep_color_fill;
 pub mod mep_renumber;
 pub mod location;
 pub mod weather;
+pub mod embodied_carbon;
 pub mod mep_risers;
 pub mod mep_electrical;
 pub mod mep_cables;

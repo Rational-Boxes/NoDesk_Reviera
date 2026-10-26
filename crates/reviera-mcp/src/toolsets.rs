@@ -153,6 +153,7 @@ pub fn toolset_of(command: &str) -> String {
             | "space_separator"
             | "lighting"
             | "mep_color_legend"
+            | "embodied_carbon"
             | "mech_equipment"
             | "equipment_set"
             | "mechanical_settings"

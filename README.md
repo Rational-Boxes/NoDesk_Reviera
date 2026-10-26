@@ -1108,6 +1108,13 @@ schedules, circuit paths, cable sizing and voltage drop.
   (`location.set`, `location.set_all`, `coordinates.*`, `position.rotate_true_north`;
   DM-LOC-001). Not built yet: map and city search, named sites, acquire and publish
   coordinates, relocate and mirror, picking the points in a view, CRS validation.
+- **Embodied carbon** (Analyze › Carbon › Embodied Carbon): material quantities of walls,
+  floors, ceilings and roofs matched to emission factors from libraries you import (a documented
+  CSV format; none are shipped), with proposals to confirm; runs by life-cycle stage (A1–A3, A4,
+  A5, B4 replacements, C1–C4) with module D and biogenic carbon apart, the unmatched share,
+  results by category, material and element, stale detection per element, and CSV or JSON
+  export (`embodied_carbon.*`; ANA-CARB-001). Not built yet: ILCD/openLCA readers, scopes,
+  material carbon assets, charts and compare, results in IFC.
 - **Weather** (Analyze › Energy › Weather): EPW weather files imported and copied beside the
   project, with their station and the design conditions derived from the hours (heating 99.6 %,
   cooling 0.4 % with coincident wet-bulb, daily range, clearness) and your own overrides kept

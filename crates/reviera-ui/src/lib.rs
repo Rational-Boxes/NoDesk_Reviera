@@ -109,6 +109,7 @@ mod spaces_ui;
 mod lighting_ui;
 mod mep_fill_ui;
 mod location_ui;
+mod carbon_ui;
 mod mech_settings_ui;
 mod wall_profile;
 mod wall_sweeps;
@@ -4670,6 +4671,7 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "location.set_all" => with(gui, Gui::location_dialog),
         "coordinates.report" => with(gui, Gui::report_coordinates),
         "weather.import" => with(gui, Gui::weather_dialog),
+        "embodied_carbon.run" => with(gui, Gui::embodied_carbon_dialog),
         "circuit.set_locked" => with(gui, Gui::toggle_circuit_lock),
         "circuit.disconnect_panel" => with(gui, Gui::disconnect_circuit_panel),
         "panel.settings" => with(gui, Gui::panel_settings),

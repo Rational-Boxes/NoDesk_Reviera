@@ -2812,6 +2812,12 @@ icon = "location"
 help = "The project's latitude, longitude, elevation and time zone, the project base point and angle to true north, the survey point with its shared coordinates, and the CRS (DM-LOC-001)"
 
 [[action]]
+id = "embodied_carbon.run"
+label = "Embodied Carbon"
+icon = "carbon"
+help = "Embodied carbon of walls, floors, ceilings and roofs from imported emission factors: match materials, run, and see the totals by stage, category and material (ANA-CARB-001)"
+
+[[action]]
 id = "weather.import"
 label = "Weather"
 icon = "weather"
@@ -3400,6 +3406,10 @@ tools = [
   { action = "system_zone.info", size = "small" },
   { action = "system_zone.convert_legacy", size = "small" },
 ]
+
+[[tab.panel]]
+label = "Carbon"
+tools = [{ action = "embodied_carbon.run", size = "large" }]
 
 [[tab.panel]]
 label = "Energy"

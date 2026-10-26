@@ -463,6 +463,9 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "spaces" => format!(
             r#"<path d="M4 5h24v22H4z" fill="{f}" {s}/><path d="M8 10h16M8 16h16M8 22h16" {sa}/>"#
         ),
+        "carbon" => format!(
+            r#"<path d="M6 26c0-8 4-14 10-18 6 4 10 10 10 18z" fill="{f}" {s}/><path d="M16 8v18M16 18l-5-4M16 22l5-4" fill="none" {sa}/>"#
+        ),
         "weather" => format!(
             r#"<circle cx="12" cy="12" r="5" fill="{f}" {s}/><path d="M12 3v2M12 19v2M3 12h2M5.6 5.6l1.4 1.4M17 7l1.4-1.4" {sa}/><path d="M12 26h14a4 4 0 0 0 0-8 6 6 0 0 0-11-1 5 5 0 0 0-3 9z" fill="{f}" {s}/>"#
         ),

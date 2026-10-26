@@ -5372,11 +5372,13 @@ The job runs in the background with a notification. Spaces that no system serves
 - `embodied_carbon.compare(job_id_a, job_id_b) -> report`
 
 **Acceptance criteria.**
-- [ ] A 10 m³ concrete wall with density 2 400 kg/m³ and a factor of 0.10 kg CO₂e/kg reports 2 400 kg CO₂e for A1–A3.
-- [ ] With a study period of 60 years and a reference service life of 25 years, B4 counts 2 replacements.
-- [ ] A material with no factor is listed as unmatched, and the total states the share of model volume left unmatched.
-- [ ] Module D and biogenic carbon appear in separate columns and are not subtracted from the A–C total.
-- [ ] Editing a wall's thickness after a run marks the run stale; re-running changes only that wall's result.
+- [x] A 10 m³ concrete wall with density 2 400 kg/m³ and a factor of 0.10 kg CO₂e/kg reports 2 400 kg CO₂e for A1–A3.
+- [x] With a study period of 60 years and a reference service life of 25 years, B4 counts 2 replacements.
+- [x] A material with no factor is listed as unmatched, and the total states the share of model volume left unmatched.
+- [x] Module D and biogenic carbon appear in separate columns and are not subtracted from the A–C total.
+- [x] Editing a wall's thickness after a run marks the run stale; re-running changes only that wall's result.
+
+*Built (2026-10-25):* Analyze › **Carbon** › *Embodied Carbon*: the materials grid (material, volume, elements, matched or unmatched, factor or proposal) with *Import Factors…*, *Match…*, *Auto-match* (proposals listed to confirm), *Unmatch*, *Run* and *Results…* (the A–C total and each stage, module D and biogenic apart, the unmatched share, kg CO₂e/m² when a gross floor area is given, a stale notice, by category and by material, excluded materials, *Export…* to CSV or JSON). Quantities: walls (each layer's thickness × length × height less the openings' rectangles), floors and ceilings (each layer × area), roofs (the volume, as the type's material, else "Roof"); other model elements are not quantified yet. Factors come from user libraries (`embodied_carbon.import_factors(path)` in the documented Reviera CSV format: id, name, class, unit kg/m3/m2/piece, a1_a3, a4, a5, c1_c4, d, biogenic, density, service_life, source, valid_until; a library of the same name replaces its factors and keeps the matches; `embodied_carbon.add_library` takes them as JSON); Reviera ships none. Matching by material name (`embodied_carbon.match`, `embodied_carbon.auto_match` by shared words in the factor's name and class, `embodied_carbon.materials`). `embodied_carbon.run(options)` (stages a4, a5, b4, c1_c4; study period, default 50 years; gross floor area) keeps the last ten runs with the factors they used and each element's inputs; `embodied_carbon.results(run_id?)` reports the elements whose inputs changed since (stale) and whether the factors did; `embodied_carbon.export`. Not yet: the ILCD+EPD and openLCA readers, scope (phase, selection, design option, categories, links), material carbon assets on materials (DM-MAT-005) and density from materials, transport distances for A4, B1–B3 and B5, the dockable Carbon Results panel with bar charts, per-element schedulable parameters and colour schemes, compare, writing results to IFC, the background job, the HTML report, columns, beams and other elements.
 
 ---
 

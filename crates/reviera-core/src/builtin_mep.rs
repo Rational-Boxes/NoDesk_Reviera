@@ -215,6 +215,12 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(LightingCalcAverage),
         registry.add(MepColorLegendPlace),
         registry.add(CircuitRenumber),
+        registry.add(CarbonAddLibrary),
+        registry.add(CarbonMatch),
+        registry.add(CarbonAutoMatch),
+        registry.add(CarbonMaterials),
+        registry.add(CarbonRun),
+        registry.add(CarbonResults),
         registry.add(CircuitRenumberPreview),
         registry.add(CircuitSetLocked),
         registry.add(LightingFixtureTypeSetLighting),
@@ -2178,6 +2184,70 @@ read_command!(
     crate::mep_spaces::InfoParams,
     Vec<crate::mep_spaces::SpaceInfo>,
     crate::mep_spaces::infos
+);
+
+edit_command!(
+    CarbonAddLibrary,
+    "embodied_carbon.add_library",
+    "Add an emission factor library",
+    "Adds emission factors to the project (ANA-CARB-001): `name`, `file` and `factors` [{id, name, class, unit (kg, m3, m2, piece), stages {a1_a3, a4, a5, c1_c4, d, biogenic} in kg CO2e per unit, density, service_life, source, valid_until}]. A library of the same name is replaced, keeping its id and the matches. Use embodied_carbon.import_factors to read a CSV. Returns its id.",
+    "Emission Factors",
+    crate::embodied_carbon::AddLibraryParams,
+    String,
+    crate::embodied_carbon::add_library
+);
+
+edit_command!(
+    CarbonMatch,
+    "embodied_carbon.match",
+    "Match a material to a factor",
+    "Matches the project material `material` (by name) to the factor `factor_ref` (library_id/factor_id), or unmatches it with null (ANA-CARB-001).",
+    "Match Material",
+    crate::embodied_carbon::MatchParams,
+    (),
+    crate::embodied_carbon::match_material
+);
+
+edit_command!(
+    CarbonAutoMatch,
+    "embodied_carbon.auto_match",
+    "Propose factors for materials",
+    "Proposes a factor for each unmatched material, the one whose name or class shares the most words with the material's name (ANA-CARB-001); with `apply` the proposals become matches. Materials no factor shares a word with stay unmatched. Returns material → factor_ref.",
+    "Auto-match Materials",
+    crate::embodied_carbon::AutoMatchParams,
+    std::collections::BTreeMap<String, String>,
+    crate::embodied_carbon::auto_match
+);
+
+read_command!(
+    CarbonMaterials,
+    "embodied_carbon.materials",
+    "Materials for embodied carbon",
+    "The project's materials in walls (layers less openings), floors, ceilings and roofs (ANA-CARB-001): each with its volume (m3), the elements it is in, matched or unmatched, its factor, and a proposal when unmatched.",
+    crate::embodied_carbon::Empty,
+    Vec<crate::embodied_carbon::MaterialRow>,
+    crate::embodied_carbon::materials
+);
+
+edit_command!(
+    CarbonRun,
+    "embodied_carbon.run",
+    "Run embodied carbon",
+    "Calculates the embodied carbon (ANA-CARB-001) of walls, floors, ceilings and roofs and keeps the run (the last ten): GWP = quantity × factor per stage, mass = volume × the factor's density for per-kg factors; `options` {stages: any of a4, a5, b4, c1_c4 (A1-A3, D and biogenic always), study_period (years, default 50), gross_floor_area (m2)}. B4 = (A1-A3 + C1-C4) × (ceil(study period ÷ service life) − 1). Module D and biogenic carbon are apart, never netted into the A-C total. Unmatched materials are listed with the share of the volume they are. The factors used and each element's inputs are kept, so the run can tell which elements changed. Returns the run.",
+    "Embodied Carbon",
+    crate::embodied_carbon::RunParams,
+    crate::embodied_carbon::Run,
+    crate::embodied_carbon::run
+);
+
+read_command!(
+    CarbonResults,
+    "embodied_carbon.results",
+    "Embodied carbon results",
+    "A run's (`run_id`, else the latest) totals by stage, results by category, material and element, excluded materials and the unmatched share (ANA-CARB-001), with the elements whose inputs changed since (stale) and whether the matched factors changed.",
+    crate::embodied_carbon::ResultsParams,
+    crate::embodied_carbon::Results,
+    crate::embodied_carbon::results
 );
 
 edit_command!(
