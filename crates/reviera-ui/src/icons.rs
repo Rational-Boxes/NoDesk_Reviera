@@ -463,6 +463,9 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "spaces" => format!(
             r#"<path d="M4 5h24v22H4z" fill="{f}" {s}/><path d="M8 10h16M8 16h16M8 22h16" {sa}/>"#
         ),
+        "energy_model" => format!(
+            r#"<path d="M4 14L16 5l12 9v14H4z" fill="{f}" {s}/><path d="M10 28v-8h5v8M19 17h5v4h-5z" fill="none" {sa}/>"#
+        ),
         "solar" => format!(
             r#"<circle cx="9" cy="9" r="4" fill="{f}" {s}/><path d="M9 1v2M1 9h2M3.3 3.3l1.4 1.4M14.7 3.3l-1.4 1.4" {sa}/><path d="M6 28l6-12h16l-6 12z" fill="{f}" {s}/><path d="M9 22h16M14 16l-4 12M20 16l-4 12" {sa}/>"#
         ),

@@ -1108,6 +1108,12 @@ schedules, circuit paths, cable sizing and voltage drop.
   (`location.set`, `location.set_all`, `coordinates.*`, `position.rotate_true_north`;
   DM-LOC-001). Not built yet: map and city search, named sites, acquire and publish
   coordinates, relocate and mirror, picking the points in a view, CRS validation.
+- **Energy model** (Analyze › Energy › Energy Model): analytical spaces and heat-transfer
+  surfaces derived from the MEP spaces (exterior and interior walls with corresponding
+  boundaries, windows and doors, slabs on grade, interior floors, roofs, air boundaries), with
+  UA and window-to-wall ratio; U-values and SHGC per type written to IFC
+  (`energy_model.get`, `.summary`, `.set_thermal`; ANA-EM-003, ANA-ENV-003). Not built yet:
+  second-level space boundaries in IFC, masses as spaces, sloped roof areas.
 - **Solar studies** (Analyze › Daylight & Solar › Solar Study, Solar Results): cumulative
   insolation and PV potential (yield, cost, payback) on roof and mass faces from the site and the
   weather file, shaded by the whole model, run out of process (`analysis.solar` jobs), shown

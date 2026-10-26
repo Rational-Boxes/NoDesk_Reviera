@@ -2812,6 +2812,12 @@ icon = "location"
 help = "The project's latitude, longitude, elevation and time zone, the project base point and angle to true north, the survey point with its shared coordinates, and the CRS (DM-LOC-001)"
 
 [[action]]
+id = "energy_model.get"
+label = "Energy Model"
+icon = "energy_model"
+help = "The analytical spaces and heat-transfer surfaces derived from the MEP spaces, their areas and UA, and the types' U-values (ANA-EM-003)"
+
+[[action]]
 id = "solar.run"
 label = "Solar Study"
 icon = "solar"
@@ -3468,6 +3474,7 @@ label = "Energy"
 tools = [
   { action = "location.set_all", size = "small" },
   { action = "weather.import", size = "small" },
+  { action = "energy_model.get", size = "small" },
 ]
 
 [[tab.panel]]

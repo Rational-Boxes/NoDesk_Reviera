@@ -67,6 +67,7 @@ pub mod weather;
 pub mod embodied_carbon;
 pub mod path_of_travel;
 pub mod solar;
+pub mod energy_model;
 pub mod mep_risers;
 pub mod mep_electrical;
 pub mod mep_cables;

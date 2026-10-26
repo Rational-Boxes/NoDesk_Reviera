@@ -227,6 +227,9 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(CarbonMaterials),
         registry.add(CarbonRecord),
         registry.add(SolarRecord),
+        registry.add(EnergyModelGet),
+        registry.add(EnergyModelSummary),
+        registry.add(EnergyModelSetThermal),
         registry.add(SolarResults),
         registry.add(CarbonResults),
         registry.add(CircuitRenumberPreview),
@@ -2299,6 +2302,37 @@ read_command!(
     crate::embodied_carbon::Empty,
     Vec<crate::embodied_carbon::MaterialRow>,
     crate::embodied_carbon::materials
+);
+
+read_command!(
+    EnergyModelGet,
+    "energy_model.get",
+    "The energy model",
+    "The simplified energy model (ANA-EM-003, ANA-ENV-003), derived from the MEP spaces now: each placed, enclosed space as an analytical space (area, volume, height, system-zone) with its surfaces: exterior and interior walls (interior when another space lies beyond, with that space as `adjacent`), windows and doors in exterior walls, slab on grade or interior floor, roof or interior ceiling, air boundaries at separation lines; each with area, U-value (the type's ThermalTransmittance, else a class default), outward normal, element and outline.",
+    crate::energy_model::Empty,
+    crate::energy_model::EnergyModel,
+    crate::energy_model::get
+);
+
+read_command!(
+    EnergyModelSummary,
+    "energy_model.summary",
+    "Energy model summary",
+    "The energy model's spaces, skipped spaces, area by surface class, surfaces still on default U-values, UA to the outside (W/K) and window-to-wall ratio.",
+    crate::energy_model::Empty,
+    crate::energy_model::Summary,
+    crate::energy_model::summary
+);
+
+edit_command!(
+    EnergyModelSetThermal,
+    "energy_model.set_thermal",
+    "Set a type's thermal values",
+    "Sets an element type's U-value (`u_value`, W/m²K, written as ThermalTransmittance in its common property set: Pset_WallCommon, Pset_WindowCommon, Pset_DoorCommon, Pset_SlabCommon or Pset_RoofCommon, so it goes to IFC) and, for windows, the solar heat gain coefficient (`shgc`, Pset_DoorWindowGlazingType.SolarHeatGainTransmittance); null clears a value (the class default is used).",
+    "Thermal Values",
+    crate::energy_model::ThermalParams,
+    (),
+    crate::energy_model::set_thermal
 );
 
 edit_command!(

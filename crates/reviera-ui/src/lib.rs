@@ -113,6 +113,7 @@ mod carbon_ui;
 mod route_ui;
 mod jobs_ui;
 mod solar_ui;
+mod energy_ui;
 mod mech_settings_ui;
 mod wall_profile;
 mod wall_sweeps;
@@ -4704,6 +4705,7 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "weather.import" => with(gui, Gui::weather_dialog),
         "embodied_carbon.run" => with(gui, Gui::embodied_carbon_dialog),
         "solar.run" => with(gui, Gui::solar_dialog),
+        "energy_model.get" => with(gui, Gui::energy_model_dialog),
         "solar.results" => with(gui, Gui::solar_results),
         "path_of_travel.create" => with(gui, |g| {
             g.start_note_tool(notes::NoteTool::PathOfTravel);
