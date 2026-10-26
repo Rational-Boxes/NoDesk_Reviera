@@ -72,6 +72,7 @@ pub mod hvac_loads;
 pub mod annual_energy;
 pub mod daylight;
 pub mod gbxml;
+pub mod hbjson;
 pub mod mep_risers;
 pub mod mep_electrical;
 pub mod mep_cables;

@@ -132,6 +132,7 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add_host(crate::daylight::DaylightStatus),
         registry.add_host(crate::gbxml_files::GbxmlExport),
         registry.add_host(crate::gbxml_files::GbxmlImportLoads),
+        registry.add_host(crate::gbxml_files::HbjsonExport),
         registry.add_host(crate::connectors::ConnectorsList),
         registry.add_host(crate::connectors::ConnectorsSet),
         registry.add_host(crate::connectors::PvgisTmy),

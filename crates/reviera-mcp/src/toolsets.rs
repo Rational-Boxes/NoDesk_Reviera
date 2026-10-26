@@ -162,6 +162,7 @@ pub fn toolset_of(command: &str) -> String {
             | "energy"
             | "daylight"
             | "gbxml"
+            | "hbjson"
             | "connectors"
             | "pvgis"
             | "mech_equipment"

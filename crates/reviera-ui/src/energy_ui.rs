@@ -282,6 +282,26 @@ impl Gui {
         }
     }
 
+    /// File › Export HBJSON… (ANA-ENV-009): the energy model for Ladybug Tools.
+    pub(crate) fn hbjson_export(&mut self) {
+        let frame = self.frame;
+        let fd = FileDialog::builder(&frame).with_message("Export HBJSON").with_wildcard("HBJSON (*.hbjson)|*.hbjson").with_style(FileDialogStyle::Save | FileDialogStyle::OverwritePrompt).build();
+        if fd.show_modal() != ID_OK {
+            return;
+        }
+        let Some(path) = fd.get_path() else { return };
+        match self.run("hbjson.export", json!({ "path": path })) {
+            Ok(r) => {
+                let mut msg = format!("Wrote {} rooms, {} faces, {} apertures and {} doors to {path}.", r["rooms"], r["faces"], r["apertures"], r["doors"]);
+                for w in r["warnings"].as_array().into_iter().flatten() {
+                    msg.push_str(&format!("\n• {}", w.as_str().unwrap_or("")));
+                }
+                MessageDialog::builder(&frame, &msg, "Export HBJSON").with_style(MessageDialogStyle::OK | MessageDialogStyle::IconInformation).build().show_modal();
+            }
+            Err(e) => error(&frame, &e),
+        }
+    }
+
     /// File › Import gbXML Loads… (ANA-EM-004): design loads from another tool onto the spaces.
     pub(crate) fn gbxml_import_loads(&mut self) {
         let frame = self.frame;

@@ -1125,7 +1125,11 @@ schedules, circuit paths, cable sizing and voltage drop.
 - **gbXML exchange** (File › Export gbXML…, Import gbXML Loads…): the energy model as gbXML
   (validated against the official 8.01 schema) with spaces, shared surfaces, openings and
   U-values for other energy tools; design loads computed elsewhere read back onto the matching
-  spaces (`gbxml.*`; ANA-EM-004, ANA-ENV-009). Not built yet: HBJSON, the export dialog.
+  spaces (`gbxml.*`; ANA-EM-004, ANA-ENV-009). Not built yet: the export dialog.
+- **HBJSON export** (File › Export HBJSON…): the energy model as a honeybee-schema Model for
+  Ladybug Tools — rooms, outward faces, shared walls paired as Surface boundaries, windows and
+  doors, constructions carrying the U-values (`hbjson.export`; ANA-ENV-009). Not built yet:
+  program types and schedules, detecting the Ladybug Tools runners.
 - **Daylight factor** (Sustainability › Daylight & Solar › Daylight Factor, Daylight Results):
   a sensor grid in every enclosed space, the CIE overcast sky by ray casting through the
   windows (their types' visible transmittance) past walls, roofs and other elements, plus the

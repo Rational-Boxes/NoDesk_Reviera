@@ -283,7 +283,7 @@ fn num(v: &Value) -> Option<f64> {
 }
 
 /// A window's visible transmittance from its type (`Pset_DoorWindowGlazingType.VisibleLightTransmittance`).
-fn transmittance_of(store: &Store, e: &crate::element::Element) -> Option<f64> {
+pub(crate) fn transmittance_of(store: &Store, e: &crate::element::Element) -> Option<f64> {
     let t = e.param("@type").and_then(Value::as_str).and_then(GlobalId::parse).and_then(|g| store.find_by_guid(&g)).and_then(|id| store.get(id)).unwrap_or(e);
     t.param("Pset_DoorWindowGlazingType.VisibleLightTransmittance").and_then(num).filter(|v| (0.0..=1.0).contains(v))
 }

@@ -4719,6 +4719,7 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "daylight.results" => with(gui, Gui::daylight_results),
         "gbxml.export" => with(gui, Gui::gbxml_export),
         "gbxml.import_loads" => with(gui, Gui::gbxml_import_loads),
+        "hbjson.export" => with(gui, Gui::hbjson_export),
         "pvgis.tmy" => with(gui, Gui::pvgis_tmy),
         "pvgis.pv" => with(gui, Gui::pvgis_pv),
         "connectors.list" => with(gui, Gui::connectors_dialog),

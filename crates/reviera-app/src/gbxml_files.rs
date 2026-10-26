@@ -81,3 +81,34 @@ impl HostCommand for GbxmlImportLoads {
         serde_json::from_value(out.result).map_err(|e| bad("gbxml.internal", e.to_string()))
     }
 }
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct HbjsonParams {
+    pub path: String,
+}
+
+pub(crate) struct HbjsonExport;
+
+impl HostCommand for HbjsonExport {
+    type Host = App;
+    type Params = HbjsonParams;
+    type Output = reviera_core::hbjson::ExportReport;
+    const META: CommandMeta = CommandMeta {
+        name: "hbjson.export",
+        version: 1,
+        summary: "Export HBJSON",
+        description: "Writes the energy model (ANA-EM-003) to `path` as an HBJSON Model for Ladybug Tools (ANA-ENV-009, honeybee-schema): a Room per space (identifier sp- + GlobalId with $ as -, story, zone), its Faces counter-clockwise from outside (Wall, Floor, RoofCeiling, AirBoundary) with Outdoors, Ground, Surface (naming the twin face in the room beyond) or Adiabatic boundaries, windows and doors of exterior walls as Apertures and Doors, and constructions carrying the U-values (a no-mass layer; windows a simple glazing system with SHGC and visible transmittance). Returns the counts and warnings (spaces left out, default U-values, interior faces without a twin).",
+        effects: &[Effect::Read],
+        transaction_name: "",
+    };
+
+    fn run(&self, app: &mut App, _: &Caller, p: HbjsonParams) -> Result<reviera_core::hbjson::ExportReport> {
+        let doc = app.active().ok_or_else(|| bad("document.none", "no document is open"))?;
+        let store = app.get(doc)?.doc.store().clone();
+        let (model, report) = reviera_core::hbjson::export(&store)?;
+        let text = serde_json::to_string_pretty(&model).map_err(|e| bad("hbjson.internal", e.to_string()))?;
+        std::fs::write(&p.path, text).map_err(|e| bad("hbjson.write", format!("{}: {e}", p.path)))?;
+        Ok(report)
+    }
+}

@@ -192,7 +192,7 @@ pub fn export(store: &Store) -> Result<(String, ExportReport)> {
 }
 
 /// Whether a point lies in a vertical surface's plane.
-fn on_plane(outline: &[[f64; 3]], n: [f64; 3], p: [f64; 3]) -> bool {
+pub(crate) fn on_plane(outline: &[[f64; 3]], n: [f64; 3], p: [f64; 3]) -> bool {
     let Some(o) = outline.first() else { return false };
     ((p[0] - o[0]) * n[0] + (p[1] - o[1]) * n[1] + (p[2] - o[2]) * n[2]).abs() < 1e-3
 }

@@ -86,6 +86,12 @@ icon = "loads_report"
 help = "Write design loads computed by another tool, from a gbXML file, onto the matching spaces (ANA-EM-004)"
 
 [[action]]
+id = "hbjson.export"
+label = "Export HBJSON..."
+icon = "export_csv"
+help = "Export the energy model as HBJSON for Ladybug Tools (honeybee-schema; ANA-ENV-009)"
+
+[[action]]
 id = "app.exit"
 label = "Exit"
 icon = "exit"
@@ -4255,7 +4261,7 @@ panels = [{ label = "Window", tools = [{ action = "insert.flip_facing", size = "
 
 [[menu]]
 label = "&File"
-items = ["file.new", "file.open", "file.save", "file.save_as", "file.close", "-", "ui.model_properties", "ui.remote_analysis", "-", "export.pdf", "export.cobie", "gbxml.export", "gbxml.import_loads", "-", "app.exit"]
+items = ["file.new", "file.open", "file.save", "file.save_as", "file.close", "-", "ui.model_properties", "ui.remote_analysis", "-", "export.pdf", "export.cobie", "gbxml.export", "gbxml.import_loads", "hbjson.export", "-", "app.exit"]
 
 [[menu]]
 label = "&Edit"
