@@ -2854,6 +2854,18 @@ icon = "solar_results"
 help = "The latest solar study's results per face, shown coloured on the model (ANA-SOLAR-001)"
 
 [[action]]
+id = "daylight.run"
+label = "Daylight Factor"
+icon = "daylight"
+help = "Daylight factor on a sensor grid in every enclosed space under the overcast sky, through the windows, with the light reflected inside; runs out of process (ANA-LIGHT-002, ANA-ENV-006)"
+
+[[action]]
+id = "daylight.results"
+label = "Daylight Results"
+icon = "daylight_results"
+help = "The latest daylight study: each space's average, minimum and uniformity, shown coloured on the model (ANA-ENV-006)"
+
+[[action]]
 id = "path_of_travel.create"
 label = "Path of Travel"
 icon = "path_of_travel"
@@ -3585,6 +3597,8 @@ label = "Daylight & Solar"
 tools = [
   { action = "solar.run", size = "large" },
   { action = "solar.results", size = "large" },
+  { action = "daylight.run", size = "large" },
+  { action = "daylight.results", size = "large" },
 ]
 
 [[tab.panel]]

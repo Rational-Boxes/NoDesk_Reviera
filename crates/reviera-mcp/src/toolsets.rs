@@ -160,6 +160,7 @@ pub fn toolset_of(command: &str) -> String {
             | "energy_model"
             | "hc_loads"
             | "energy"
+            | "daylight"
             | "mech_equipment"
             | "equipment_set"
             | "mechanical_settings"

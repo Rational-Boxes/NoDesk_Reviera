@@ -20,7 +20,7 @@ const HIDE: i32 = 7901;
 const EXPORT: i32 = 7902;
 
 /// Blue → cyan → green → yellow → red at `t` in 0–1.
-fn ramp(t: f64) -> [f32; 4] {
+pub(crate) fn ramp(t: f64) -> [f32; 4] {
     let t = t.clamp(0.0, 1.0) as f32;
     let stops: [[f32; 3]; 5] = [[0.15, 0.25, 0.9], [0.1, 0.8, 0.9], [0.2, 0.8, 0.2], [0.95, 0.85, 0.1], [0.9, 0.15, 0.1]];
     let x = t * 4.0;

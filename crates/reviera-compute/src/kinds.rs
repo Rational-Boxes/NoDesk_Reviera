@@ -40,6 +40,9 @@ pub const LOADS_RESULTS: &str = "reviera.loads.v1.Results";
 pub const ENERGY: &str = "analysis.energy";
 pub const ENERGY_INPUT: &str = "reviera.energy.v1.Input";
 pub const ENERGY_RESULTS: &str = "reviera.energy.v1.Results";
+pub const DAYLIGHT: &str = "analysis.daylight";
+pub const DAYLIGHT_INPUT: &str = "reviera.daylight.v1.Input";
+pub const DAYLIGHT_RESULTS: &str = "reviera.daylight.v1.Results";
 
 fn version() -> String {
     env!("CARGO_PKG_VERSION").into()
@@ -404,6 +407,39 @@ impl Kind for EnergyKind {
         ctx.log(format!("{} spaces, {:.0} m2: heating {:.0} kWh, cooling {:.0} kWh, EUI {:.0} kWh/m2", r.spaces.len(), r.floor_area, r.year.heating_load, r.year.cooling_load, r.eui));
         ctx.progress(1.0, "done");
         Ok(Output { bytes: serde_json::to_vec(&r).map_err(|e| JobFailure::new("runner_failed", e.to_string()))?, media_type: JSON.into(), schema: ENERGY_RESULTS.into() })
+    }
+}
+
+/// `analysis.daylight`: daylight factor on sensor grids (ANA-ENV-006) by ray casting under the
+/// overcast sky ([`reviera_core::daylight::run`]).
+#[derive(Debug, Default)]
+pub struct DaylightKind;
+
+impl Kind for DaylightKind {
+    fn info(&self) -> KindInfo {
+        KindInfo {
+            kind: DAYLIGHT.into(),
+            version: 1,
+            runner: "reviera-analysis-builtin".into(),
+            runner_version: version(),
+            licence: LICENCE.into(),
+            capabilities: vec!["batch".into(), "daylight-factor".into()],
+            accepted_formats: vec![format!("{JSON};schema={DAYLIGHT_INPUT}")],
+            supports_checkpoints: false,
+            supports_sessions: false,
+        }
+    }
+
+    fn run(&self, ctx: &JobContext, _options: Option<&prost_types::Any>, inputs: &[Blob]) -> Result<Output, JobFailure> {
+        ctx.progress(0.0, "reading");
+        let blob = inputs.iter().find(|b| b.reference.schema == DAYLIGHT_INPUT).ok_or_else(|| JobFailure::new("invalid_input", "no daylight input in the inputs"))?;
+        let input: reviera_core::daylight::DaylightInput = serde_json::from_slice(&blob.raw).map_err(|e| JobFailure::new("invalid_input", e.to_string()))?;
+        ctx.progress(0.1, "ray casting");
+        let r = reviera_core::daylight::run(&input).map_err(|e| JobFailure::new("invalid_input", e))?;
+        let n: usize = r.spaces.iter().map(|s| s.values.len()).sum();
+        ctx.log(format!("{} spaces, {n} sensors, {} obstructions", r.spaces.len(), input.obstructions.len()));
+        ctx.progress(1.0, "done");
+        Ok(Output { bytes: serde_json::to_vec(&r).map_err(|e| JobFailure::new("runner_failed", e.to_string()))?, media_type: JSON.into(), schema: DAYLIGHT_RESULTS.into() })
     }
 }
 

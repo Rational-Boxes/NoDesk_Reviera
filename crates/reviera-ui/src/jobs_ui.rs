@@ -69,6 +69,7 @@ impl Gui {
             "solar.collect" => self.solar_results(),
             "hc_loads.collect" => self.hc_loads_report(),
             "energy.collect" => self.annual_energy_results(),
+            "daylight.collect" => self.daylight_results(),
             _ => {}
         }
     }

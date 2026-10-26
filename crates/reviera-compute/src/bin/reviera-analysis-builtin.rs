@@ -6,7 +6,7 @@
 
 use std::sync::Arc;
 
-use reviera_compute::kinds::{CarbonKind, ClashKind, EnergyKind, FaultKind, LoadsKind, SolarKind, StructuralKind};
+use reviera_compute::kinds::{CarbonKind, ClashKind, DaylightKind, EnergyKind, FaultKind, LoadsKind, SolarKind, StructuralKind};
 use reviera_compute_proto::runner::{Runner, main_with};
 
 fn main() -> std::process::ExitCode {
@@ -20,6 +20,7 @@ fn main() -> std::process::ExitCode {
             Arc::new(SolarKind),
             Arc::new(LoadsKind),
             Arc::new(EnergyKind),
+            Arc::new(DaylightKind),
             Arc::new(FaultKind),
         ],
     ))

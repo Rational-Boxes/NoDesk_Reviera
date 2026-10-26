@@ -1117,6 +1117,12 @@ schedules, circuit paths, cable sizing and voltage drop.
   air and infiltration by class), run as `analysis.loads` jobs, peaks written to the spaces'
   Pset_SpaceThermalDesign, stale when the model or weather change (`hc_loads.*`; ANA-HCL-001,
   ANA-ENV-004). Not built yet: an RTS or EnergyPlus provider, plenums, reports as documents.
+- **Daylight factor** (Sustainability › Daylight & Solar › Daylight Factor, Daylight Results):
+  a sensor grid in every enclosed space, the CIE overcast sky by ray casting through the
+  windows (their types' visible transmittance) past walls, roofs and other elements, plus the
+  light reflected inside the room; each space's average, minimum, uniformity and share above
+  the threshold, coloured squares in 3D views; run as `analysis.daylight` jobs (`daylight.*`;
+  ANA-LIGHT-002, ANA-ENV-006). Not built yet: illuminance and sDA/ASE, Radiance, plan legends.
 - **Annual energy** (Sustainability › Energy › Annual Energy, Energy Results): a year of hourly
   simulation of each space as a lumped air–surface–mass network through the weather file, with
   an ideal thermostat, the space types' loads and opening hours; heating by gas, electric or

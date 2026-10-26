@@ -113,6 +113,7 @@ mod carbon_ui;
 mod route_ui;
 mod jobs_ui;
 mod solar_ui;
+mod daylight_ui;
 mod energy_ui;
 mod mech_settings_ui;
 mod wall_profile;
@@ -309,6 +310,8 @@ struct Gui {
     jobs: Vec<jobs_ui::WatchedJob>,
     /// The solar study drawn on the model (ANA-SOLAR-001).
     solar_shown: Option<String>,
+    /// The daylight study shown on the model (ANA-ENV-006).
+    daylight_shown: Option<String>,
     jobs_polled: Option<std::time::Instant>,
     /// The Tag, Room Tag or Text tool.
     note_tool: Option<notes::NoteTool>,
@@ -1254,6 +1257,7 @@ impl Gui {
         };
         // An analysis shown on the model (a solar study's grid).
         scene.meshes.extend(self.solar_meshes());
+        scene.meshes.extend(self.daylight_meshes());
         let ids = self.selection();
         for view in self.views.iter_mut().filter(|v| v.doc == id) {
             if let Some(s) = &mut view.section {
@@ -3716,6 +3720,7 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 route_start: None,
                 jobs: Vec::new(),
                 solar_shown: None,
+                daylight_shown: None,
                 jobs_polled: None,
                 stair_tool: None,
                 dormer_tool: None,
@@ -4710,6 +4715,8 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "hc_loads.report" => with(gui, Gui::hc_loads_report),
         "energy.run" => with(gui, Gui::annual_energy_dialog),
         "energy.results" => with(gui, Gui::annual_energy_results),
+        "daylight.run" => with(gui, Gui::daylight_dialog),
+        "daylight.results" => with(gui, Gui::daylight_results),
         "solar.results" => with(gui, Gui::solar_results),
         "path_of_travel.create" => with(gui, |g| {
             g.start_note_tool(notes::NoteTool::PathOfTravel);

@@ -232,6 +232,8 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(LoadsReport),
         registry.add(EnergyRecord),
         registry.add(EnergyResultsCmd),
+        registry.add(DaylightRecord),
+        registry.add(DaylightResultsCmd),
         registry.add(EnergyModelSummary),
         registry.add(EnergyModelSetThermal),
         registry.add(SolarResults),
@@ -2348,6 +2350,27 @@ read_command!(
     crate::annual_energy::ReportParams,
     crate::annual_energy::Report,
     crate::annual_energy::report
+);
+
+edit_command!(
+    DaylightRecord,
+    "daylight.record",
+    "Record a daylight study",
+    "Keeps a finished daylight factor study (ANA-LIGHT-002, ANA-ENV-006) on the project (the last five): the analysis.daylight job's results (per space: sensor points and daylight factors, average, minimum, maximum, uniformity, share at the threshold, reflected component), its options, key map and input hash. daylight.collect calls it.",
+    "Daylight Factor",
+    crate::daylight::RecordParams,
+    crate::daylight::DaylightStudy,
+    crate::daylight::record
+);
+
+read_command!(
+    DaylightResultsCmd,
+    "daylight.results",
+    "Daylight study results",
+    "A daylight factor study's (`study_id`, else the latest) report: the options, the threshold, the sensor-weighted average and share of sensors at the threshold, and each space's sensor count, average, minimum, maximum, uniformity (minimum ÷ average), share at the threshold and reflected component (per cent).",
+    crate::daylight::ReportParams,
+    crate::daylight::Report,
+    crate::daylight::report
 );
 
 read_command!(
