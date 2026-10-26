@@ -368,25 +368,52 @@ fn run_entry(
             to_lua(lua, &out)
         })?;
         reviera.set("call", call.clone())?;
-        // reviera.<domain>.<verb>, each calling its command.
+        // reviera.<domain>.<verb> (and reviera.<a>.<b>.<verb> for longer names), each calling its
+        // command. A name that is both a command and a prefix of others is a table that can be
+        // called.
+        let callable = |f: mlua::Function| -> mlua::Result<mlua::Table> {
+            let t = lua.create_table()?;
+            let meta = lua.create_table()?;
+            meta.set("__call", lua.create_function(move |_, (_, args): (LuaValue, LuaValue)| f.call::<LuaValue>(args))?)?;
+            t.set_metatable(Some(meta))?;
+            Ok(t)
+        };
         for name in &commands {
-            let Some((domain, verb)) = name.split_once('.') else {
+            let parts: Vec<&str> = name.split('.').collect();
+            let Some((verb, path)) = parts.split_last() else { continue };
+            if path.is_empty() {
                 continue;
-            };
-            let table = match reviera.get::<Option<mlua::Table>>(domain)? {
-                Some(t) => t,
-                None => {
-                    let t = lua.create_table()?;
-                    reviera.set(domain, t.clone())?;
-                    t
-                }
-            };
+            }
+            let mut table = reviera.clone();
+            for part in path {
+                table = match table.get::<LuaValue>(*part)? {
+                    LuaValue::Table(t) => t,
+                    LuaValue::Function(f) => {
+                        let t = callable(f)?;
+                        table.set(*part, t.clone())?;
+                        t
+                    }
+                    _ => {
+                        let t = lua.create_table()?;
+                        table.set(*part, t.clone())?;
+                        t
+                    }
+                };
+            }
             let call = call.clone();
             let name = name.clone();
             let f = lua.create_function(move |_, args: LuaValue| {
                 call.call::<LuaValue>((name.clone(), args))
             })?;
-            table.set(verb, f)?;
+            match table.get::<LuaValue>(*verb)? {
+                // Already a prefix of longer names: calling the table runs this command.
+                LuaValue::Table(t) => {
+                    let meta = lua.create_table()?;
+                    meta.set("__call", lua.create_function(move |_, (_, args): (LuaValue, LuaValue)| f.call::<LuaValue>(args))?)?;
+                    t.set_metatable(Some(meta))?;
+                }
+                _ => table.set(*verb, f)?,
+            }
         }
         let ui = match reviera.get::<Option<mlua::Table>>("ui")? {
             Some(t) => t,
@@ -610,6 +637,7 @@ mod tests {
                 "level.list" => {
                     Ok(serde_json::json!([{ "id": 7, "name": "Level 1", "elevation": 0.0 }]))
                 }
+                "param.project.add" | "zone.edit" | "zone.edit.undo" => Ok(Value::from(command)),
                 _ => Err(reviera_core::Error::new(
                     "registry.unknown_command",
                     "no such command",
@@ -617,7 +645,7 @@ mod tests {
             }
         }
         fn commands(&self) -> Vec<String> {
-            vec!["wall.create".into(), "level.list".into()]
+            ["wall.create", "level.list", "param.project.add", "zone.edit", "zone.edit.undo"].map(String::from).to_vec()
         }
         fn form(
             &mut self,
@@ -644,6 +672,20 @@ mod tests {
             answers: answers.and_then(|v| v.as_object().cloned()),
             out: Vec::new(),
         }
+    }
+
+    /// Commands of three parts are reached through nested tables; a name that is also another's
+    /// prefix can still be called.
+    #[test]
+    fn commands_with_longer_names() {
+        let mut h = fake(None);
+        let v = run(
+            &mut h,
+            "return { reviera.param.project.add{}, reviera.zone.edit{}, reviera.zone.edit.undo{} }",
+            "test",
+        )
+        .unwrap();
+        assert_eq!(v, serde_json::json!(["param.project.add", "zone.edit", "zone.edit.undo"]));
     }
 
     #[test]

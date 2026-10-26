@@ -57,7 +57,7 @@ local windows = {
 -- A shared parameter from the practice's parameter library: its GUID and the library's id, name
 -- and version are kept in the project, so it needs no library file.
 local acoustic = "7c3e9a14-2b6d-4f80-9a1e-5d2c8b4f6a03"
-reviera.call("param.project.add", {
+reviera.param.project.add({
   def = { name = "Acoustic Rating", data_type = "text", tooltip = "Sound insulation, as the specification gives it",
     guid = acoustic, library = { id = "4a8f2c6e-1d3b-4e7a-8c5f-9b0e2d4a6c18", name = "Practice Parameters", version = "1.0.0" } },
   categories = { "cat.walls" }, is_instance = true,

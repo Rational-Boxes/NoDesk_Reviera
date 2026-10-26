@@ -41,7 +41,8 @@ of its own: it does not drive an open window.</p>
 
 <h2 id="lua">Lua scripts</h2>
 <p>Scripts are LuaJIT. In a script, <code>reviera.&lt;domain&gt;.&lt;verb&gt;{...}</code> runs a
-command: <code>reviera.wall.create{...}</code> is <code>wall.create</code>. The arguments are a
+command: <code>reviera.wall.create{...}</code> is <code>wall.create</code>, and longer names nest:
+<code>reviera.param.project.add{...}</code> is <code>param.project.add</code>. The arguments are a
 table, as the command's JSON arguments, and the result comes back as a table or value.
 <code>reviera.call(name, args)</code> runs any command by name. A failed command raises a Lua
 error whose message starts with the error code, so <code>pcall</code> can catch it.</p>
