@@ -702,7 +702,8 @@ tools and the datums.
   clear spacing and custom formulas (`3x100; ?x200; 5x100`); length rounding shown as
   "exact [rounded]"; the region's bar and hook types and an open BS 8666 shape-code catalogue;
   orphaned sets kept, sets deleted with their host; IFC `IfcReinforcingBar` typed with
-  `BendingShapeCode` and `BendingParameters`, aggregated by the host (`rebar.*`,
+  `BendingShapeCode` and `BendingParameters`, its bars `IfcSweptDiskSolid`s along their
+  centrelines (compact files), aggregated by the host (`rebar.*`,
   `rebar_cover_type.*`, `rebar_cover.assign`, `reinforcement_settings.*`,
   `rebar_bar_type.*`, `rebar_hook_type.*`, `rebar_shape.list`; STR-RBR-001…004, 008, 009). On
   a new Concrete tab. Area reinforcement (top and bottom or exterior and interior layers, major
@@ -798,7 +799,8 @@ tools and the datums.
 - **Loads in the window**: Analyze › Loads › Load Cases (design code, natures, cases,
   combinations with Generate…, usages; Cancel undoes the dialog's changes) and Point Load, Line
   Load, Area Load and Point Support tools placed by clicking in plans. Area loads on panels are
-  carried to the members under them by tributary width for analysis (`load.create_area`,
+  carried to the members under them by tributary width, less the panels' openings (partial
+  line loads where an opening crosses a strip), for analysis (`load.create_area`,
   `load.set`, `load_case.set`, `load_combination.set`, `load_combination.delete`).
 - **Analytical panels**: panels for walls, floors and roofs (IfcStructuralSurfaceMember on a
   plane or a cylinder), drawn by boundary or extruded from a line or arc, with openings, split,

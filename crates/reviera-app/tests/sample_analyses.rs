@@ -146,9 +146,11 @@ fn the_mep_and_sustainability_samples_show_their_features() {
     let case = |n: &str| cases.iter().find(|c| c["name"] == n).unwrap_or_else(|| panic!("no case {n}: {r:#}"));
     assert_eq!(cases.len(), 4, "D, Lr, W and U1");
     let u1 = f(&case("U1")["max_moment"]);
-    assert!((18_000.0..23_000.0).contains(&u1), "U1 {u1} N·m");
+    assert!((15_000.0..19_000.0).contains(&u1), "U1 {u1} N·m");
     let (d, lr) = (f(&case("D")["total_vertical_reaction"]), f(&case("Lr")["total_vertical_reaction"]));
     assert!((f(&case("U1")["total_vertical_reaction"]) - (1.2 * d + 1.6 * lr)).abs() < 1.0, "U1 is 1.2 D + 1.6 Lr");
+    // The roof live load on the 24 m² panel less its 1.5 m rooflight: 1 kPa on 21.75 m².
+    assert!((lr - 21_750.0).abs() < 1.0, "Lr {lr} N");
     let paths = ok(&mut app, "path_of_travel.list", json!({}));
     let paths = paths.as_array().unwrap();
     assert_eq!(paths.len(), 1);

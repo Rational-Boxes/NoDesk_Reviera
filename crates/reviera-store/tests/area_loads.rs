@@ -260,3 +260,59 @@ fn area_loads_and_editing() {
     let c2 = carried(&doc2);
     assert_eq!(c2.len(), 3, "{c2:?}");
 }
+
+/// An opening in a panel takes its area off the load the members carry (STR-LOAD-001): the strip
+/// of the beam it lies over narrows where it is, in pieces along the beam.
+#[test]
+fn openings_take_their_area_off_an_area_load() {
+    let dir = tempfile::tempdir().unwrap();
+    let (_project, mut doc) = LocalProject::new(Schema::Ifc4, &dir.path().join("o.ifc")).unwrap();
+    let r = registry();
+    run(&r, &mut doc, "code.set", json!({ "code": "ibc" }));
+    let w12 = run(&r, &mut doc, "beam.load_section", json!({ "catalog": "aisc_w", "designation": "W12X26" }));
+    let member = |r: &CommandRegistry, doc: &mut Document, a: [f64; 3], b: [f64; 3]| {
+        run(r, doc, "analytical_member.create", json!({ "start": a, "end": b, "section_type_id": w12 }))
+    };
+    member(&r, &mut doc, [0.0, 0.0, 0.0], [6.0, 0.0, 0.0]);
+    member(&r, &mut doc, [0.0, 4.0, 0.0], [6.0, 4.0, 0.0]);
+    member(&r, &mut doc, [0.0, 0.0, 0.0], [0.0, 4.0, 0.0]);
+    member(&r, &mut doc, [6.0, 0.0, 0.0], [6.0, 4.0, 0.0]);
+    let slab = run(
+        &r,
+        &mut doc,
+        "analytical_panel.create_by_boundary",
+        json!({ "boundary": [[0.0, 0.0, 0.0], [0.0, 4.0, 0.0], [6.0, 4.0, 0.0], [6.0, 0.0, 0.0]] }),
+    );
+    // 2 m by 1 m, in the south beam's half of the span.
+    run(&r, &mut doc, "analytical_opening.create", json!({ "panel_id": slab, "boundary": [[2.0, 0.5, 0.0], [4.0, 0.5, 0.0], [4.0, 1.5, 0.0], [2.0, 1.5, 0.0]] }));
+    let info = run(&r, &mut doc, "analytical_model.info", json!({}));
+    for n in info["panels"][0]["nodes"].as_array().unwrap() {
+        run(&r, &mut doc, "boundary_condition.create", json!({ "kind": "point", "host_id": n, "state": "pinned" }));
+    }
+    let d = run(&r, &mut doc, "load_case.create", json!({ "name": "DL", "nature": "D" }));
+    run(&r, &mut doc, "load.create_area", json!({ "host_id": slab, "case_id": d, "value": [0.0, 0.0, -5000.0] }));
+
+    let distilled = reviera_core::structural_model::distill(doc.store()).unwrap();
+    assert!(distilled.model.notes.is_empty(), "{:?}", distilled.model.notes);
+    // The south beam: 10 kN/m, 5 kN/m along the opening, 10 kN/m again; the north beam whole.
+    let mut pieces: Vec<(f64, f64, f64, f64)> = distilled
+        .model
+        .loads
+        .iter()
+        .filter_map(|l| match l {
+            Load::Line { start, end, from, to, from_area: Some(_), .. } => Some((*from, *to, start[2], end[2])),
+            _ => None,
+        })
+        .collect();
+    pieces.sort_by(|a, b| (a.2, a.0).partial_cmp(&(b.2, b.0)).unwrap());
+    let near = |a: f64, b: f64| (a - b).abs() < 1e-6;
+    assert_eq!(pieces.len(), 4, "{pieces:?}");
+    let full: Vec<_> = pieces.iter().filter(|p| near(p.2, -10_000.0)).collect();
+    let narrow: Vec<_> = pieces.iter().filter(|p| near(p.2, -5_000.0)).collect();
+    assert_eq!((full.len(), narrow.len()), (3, 1), "{pieces:?}");
+    assert!(near(narrow[0].0, 2.0 / 6.0) && near(narrow[0].1, 4.0 / 6.0) && near(narrow[0].3, -5_000.0), "{pieces:?}");
+    // Solved: the reactions total the 110 kN on the slab less its opening, symmetrically.
+    let solved = reviera_core::frame::solve(&distilled.model).unwrap();
+    let total: f64 = solved.results[0].reactions.iter().map(|(_, f)| f[2]).sum();
+    assert!((total - 110_000.0).abs() < 1.0, "{total}");
+}

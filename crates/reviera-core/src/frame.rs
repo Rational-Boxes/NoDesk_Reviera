@@ -124,7 +124,8 @@ pub enum Load {
         at: f64,
         forces: [f64; 6],
     },
-    /// Along a member, varying linearly from `start` to `end` (N/m, global).
+    /// Along a member, varying linearly from `start` to `end` (N/m, global), over the whole
+    /// member or between `from` and `to` (0 to 1 along it).
     Line {
         case: String,
         member: String,
@@ -132,6 +133,10 @@ pub enum Load {
         end: [f64; 3],
         #[serde(default)]
         projected: bool,
+        #[serde(default, skip_serializing_if = "is_zero")]
+        from: f64,
+        #[serde(default = "one", skip_serializing_if = "is_one")]
+        to: f64,
         /// Carried from this area load (its key): a provider that analyses panels takes the area
         /// load itself and leaves these out.
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -147,6 +152,18 @@ pub enum Load {
         #[serde(default)]
         projected: bool,
     },
+}
+
+fn is_zero(v: &f64) -> bool {
+    *v == 0.0
+}
+
+fn one() -> f64 {
+    1.0
+}
+
+fn is_one(v: &f64) -> bool {
+    *v == 1.0
 }
 
 /// The results.
@@ -277,13 +294,38 @@ struct MemberLoads {
     points: Vec<(f64, [f64; 3])>,
     q1: [f64; 3],
     q2: [f64; 3],
+    /// Partial line loads: from `x0` to `x1` (metres along), varying from `w0` to `w1` (local).
+    parts: Vec<(f64, f64, [f64; 3], [f64; 3])>,
+}
+
+/// Three-point Gauss–Legendre on [-1, 1]: exact for polynomials up to the fifth degree, so for a
+/// linear load times the cubic shape of a fixed-end force.
+const GAUSS3: [(f64, f64); 3] = [(-0.774_596_669_241_483_4, 5.0 / 9.0), (0.0, 8.0 / 9.0), (0.774_596_669_241_483_4, 5.0 / 9.0)];
+
+/// A partial line load on [`x0`, `x1`] as three point loads at the Gauss points, integrating
+/// `[x0, upto]` of it exactly for the polynomial quantities used here.
+fn gauss_points(x0: f64, x1: f64, w0: [f64; 3], w1: [f64; 3], upto: f64) -> Vec<(f64, [f64; 3])> {
+    let e = upto.min(x1);
+    if e <= x0 || x1 <= x0 {
+        return Vec::new();
+    }
+    let (m, h) = ((x0 + e) / 2.0, (e - x0) / 2.0);
+    GAUSS3
+        .iter()
+        .map(|(g, wt)| {
+            let a = m + h * g;
+            let t = (a - x0) / (x1 - x0);
+            (a, [0, 1, 2].map(|k| (w0[k] + (w1[k] - w0[k]) * t) * wt * h))
+        })
+        .collect()
 }
 
 impl MemberLoads {
     /// The consistent nodal loads (local, 12) of these loads on a fixed-ended member.
     fn nodal(&self, l: f64) -> [f64; 12] {
         let mut q = [0.0; 12];
-        for &(a, f) in &self.points {
+        let partial = self.parts.iter().flat_map(|&(x0, x1, w0, w1)| gauss_points(x0, x1, w0, w1, x1));
+        for (a, f) in self.points.iter().copied().chain(partial) {
             let b = l - a;
             q[0] += f[0] * b / l;
             q[6] += f[0] * a / l;
@@ -533,6 +575,8 @@ pub fn solve(model: &Model) -> std::result::Result<Results, String> {
                 start,
                 end,
                 projected,
+                from,
+                to,
                 ..
             } => {
                 let Some(&mi) = member_index.get(member.as_str()) else {
@@ -549,9 +593,14 @@ pub fn solve(model: &Model) -> std::result::Result<Results, String> {
                 };
                 let e = loads.entry((mi, case.as_str())).or_default();
                 let (a, b) = (to_local(&p.r, scale(*start)), to_local(&p.r, scale(*end)));
-                for k in 0..3 {
-                    e.q1[k] += a[k];
-                    e.q2[k] += b[k];
+                let (f, t) = (from.clamp(0.0, 1.0), to.clamp(0.0, 1.0));
+                if f <= 0.0 && t >= 1.0 {
+                    for k in 0..3 {
+                        e.q1[k] += a[k];
+                        e.q2[k] += b[k];
+                    }
+                } else if t > f {
+                    e.parts.push((f * p.l, t * p.l, a, b));
                 }
             }
         }
@@ -891,7 +940,8 @@ fn stations(p: &Prepared, u: &[f64], q: &[f64; 12], ml: &MemberLoads) -> Vec<Sta
             // Loads on [0, x]: their resultant and moment about the cut (lever s − x).
             let mut sum = [0.0; 3];
             let mut lever = [0.0; 3];
-            for &(a, f) in &ml.points {
+            let partial = ml.parts.iter().flat_map(|&(x0, x1, w0, w1)| gauss_points(x0, x1, w0, w1, x));
+            for (a, f) in ml.points.iter().copied().chain(partial) {
                 if a <= x + 1e-12 {
                     for k in 0..3 {
                         sum[k] += f[k];
@@ -982,6 +1032,8 @@ mod tests {
                 start: [0.0, 0.0, -10_000.0],
                 end: [0.0, 0.0, -10_000.0],
                 projected: false,
+                from: 0.0,
+                to: 1.0,
                 from_area: None,
             }],
         };
@@ -997,6 +1049,53 @@ mod tests {
         assert!((r.results[1].members[0].stations[5].forces[4] - 1.5 * mid).abs() < 1e-6);
         // Pinned supports leave the beam's own rotation free: held, with a warning.
         assert!(!r.warnings.is_empty());
+    }
+
+    /// A partial line load: 10 kN/m over the first third of a 6 m simple span takes 20 kN; the
+    /// reactions share it by lever (5/6 and 1/6), and the moment at mid-span is 1/6 of 20 kN × 3 m.
+    #[test]
+    fn a_partial_line_load_on_a_simple_span() {
+        let model = Model {
+            units: "SI".into(),
+            panels: Vec::new(),
+            notes: Vec::new(),
+            nodes: vec![
+                Node { key: "a".into(), xyz: [0.0, 0.0, 0.0], support: Some(pinned()) },
+                Node { key: "b".into(), xyz: [6.0, 0.0, 0.0], support: Some(pinned()) },
+            ],
+            members: vec![beam([[true; 6]; 2])],
+            cases: vec![Case { key: "c".into(), name: "D".into() }],
+            combinations: Vec::new(),
+            loads: vec![Load::Line {
+                case: "c".into(),
+                member: "m".into(),
+                start: [0.0, 0.0, -10_000.0],
+                end: [0.0, 0.0, -10_000.0],
+                projected: false,
+                from: 0.0,
+                to: 1.0 / 3.0,
+                from_area: None,
+            }],
+        };
+        let r = solve(&model).unwrap();
+        let mut re: Vec<f64> = r.results[0].reactions.iter().map(|(_, f)| f[2]).collect();
+        re.sort_by(f64::total_cmp);
+        assert!((re[0] - 20_000.0 / 6.0).abs() < 1.0 && (re[1] - 20_000.0 * 5.0 / 6.0).abs() < 1.0, "{re:?}");
+        let mid = r.results[0].members[0].stations[5].forces[4];
+        assert!((mid.abs() - 10_000.0).abs() < 10.0, "{mid}");
+        // Serialised, a whole-length load says nothing of its extent.
+        let whole = serde_json::to_value(Load::Line {
+            case: "c".into(),
+            member: "m".into(),
+            start: [0.0; 3],
+            end: [0.0; 3],
+            projected: false,
+            from: 0.0,
+            to: 1.0,
+            from_area: None,
+        })
+        .unwrap();
+        assert!(whole.get("from").is_none() && whole.get("to").is_none(), "{whole}");
     }
 
     #[test]
@@ -1064,6 +1163,8 @@ mod tests {
                 start: [0.0, 0.0, -10_000.0],
                 end: [0.0, 0.0, -10_000.0],
                 projected: false,
+                from: 0.0,
+                to: 1.0,
                 from_area: None,
             }],
             ..model
