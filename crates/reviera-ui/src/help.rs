@@ -650,7 +650,12 @@ impl Gui {
              product. Its workflows follow conventions familiar to the industry; its features \
              and enhancements are its own.\n\n\
              IFC through IfcOpenShell; geometry through Open CASCADE; the window through \
-             wxWidgets (wxDragon); drawing through wgpu; scripting through LuaJIT.",
+             wxWidgets (wxDragon); drawing through wgpu; scripting through LuaJIT.\n\n\
+             Annual energy can run EnergyPlus where it is installed (it is not bundled): \
+             EnergyPlus, Copyright (c) 1996-present, The Board of Trustees of the University of \
+             Illinois, The Regents of the University of California, through Lawrence Berkeley \
+             National Laboratory, Oak Ridge National Laboratory, managed by UT-Battelle, Alliance \
+             for Energy Innovation, LLC, and other contributors. All rights reserved.",
             env!("CARGO_PKG_VERSION")
         );
         let dialog = MessageDialog::builder(&self.frame, &text, "About BIM Reviera")

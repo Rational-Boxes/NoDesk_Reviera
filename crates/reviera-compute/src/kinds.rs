@@ -43,6 +43,8 @@ pub const ENERGY_RESULTS: &str = "reviera.energy.v1.Results";
 pub const DAYLIGHT: &str = "analysis.daylight";
 pub const DAYLIGHT_INPUT: &str = "reviera.daylight.v1.Input";
 pub const DAYLIGHT_RESULTS: &str = "reviera.daylight.v1.Results";
+pub const EPLUS: &str = "analysis.energy.energyplus";
+pub const EPLUS_INPUT: &str = "reviera.energyplus.v1.Input";
 
 fn version() -> String {
     env!("CARGO_PKG_VERSION").into()

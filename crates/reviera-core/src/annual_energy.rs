@@ -232,7 +232,7 @@ impl EndUses {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct SpaceEnergy {
     pub key: String,
     pub zone: Option<String>,
@@ -439,6 +439,14 @@ pub fn run(input: &EnergyInput) -> std::result::Result<EnergyResults, String> {
         }
         spaces.push(se);
     }
+    let floor_area: f64 = input.spaces.iter().map(|s| s.area).sum();
+    Ok(finish(months, spaces, floor_area, building_heat.iter().copied().fold(0.0, f64::max), building_cool.iter().copied().fold(0.0, f64::max), o))
+}
+
+/// The results from each month's loads, lighting and equipment (kWh): delivered heating by the
+/// heating source's efficiency, cooling by its COP, electricity and gas, carbon, the year and
+/// the EUI. Shared with the EnergyPlus provider.
+pub fn finish(mut months: Vec<EndUses>, spaces: Vec<SpaceEnergy>, floor_area: f64, peak_heating: f64, peak_cooling: f64, o: &EnergyOptions) -> EnergyResults {
     let eff = o.efficiency();
     let mut year = EndUses::default();
     for m in &mut months {
@@ -450,17 +458,8 @@ pub fn run(input: &EnergyInput) -> std::result::Result<EnergyResults, String> {
         m.carbon = o.grid_factor.map(|g| g * m.electricity + o.gas_factor * m.gas);
         year.add(m);
     }
-    let floor_area: f64 = input.spaces.iter().map(|s| s.area).sum();
     let delivered = year.electricity + year.gas;
-    Ok(EnergyResults {
-        months,
-        year,
-        spaces,
-        floor_area,
-        eui: if floor_area > 0.0 { delivered / floor_area } else { 0.0 },
-        peak_heating: building_heat.iter().copied().fold(0.0, f64::max),
-        peak_cooling: building_cool.iter().copied().fold(0.0, f64::max),
-    })
+    EnergyResults { months, year, spaces, floor_area, eui: if floor_area > 0.0 { delivered / floor_area } else { 0.0 }, peak_heating, peak_cooling }
 }
 
 // ---- In the editor ----
@@ -476,6 +475,9 @@ pub struct EnergyRun {
     pub key_map: BTreeMap<String, String>,
     pub weather_revision: u64,
     pub inputs_hash: String,
+    /// The engine: empty for the built-in model, `energyplus`.
+    #[serde(default)]
+    pub provider: String,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
@@ -499,11 +501,14 @@ pub struct RecordParams {
     pub inputs_hash: String,
     #[serde(default)]
     pub at: i64,
+    /// The engine: empty for the built-in model, `energyplus`.
+    #[serde(default)]
+    pub provider: String,
 }
 
 /// `energy.record`: keeps a run (the last ten) on the project.
 pub(crate) fn record(txn: &mut Transaction<'_>, p: RecordParams) -> Result<EnergyRun> {
-    let run = EnergyRun { id: p.job_id, at: p.at, options: p.options, results: p.results, key_map: p.key_map, weather_revision: p.weather_revision, inputs_hash: p.inputs_hash };
+    let run = EnergyRun { id: p.job_id, at: p.at, options: p.options, results: p.results, key_map: p.key_map, weather_revision: p.weather_revision, inputs_hash: p.inputs_hash, provider: p.provider };
     let store = txn.store().clone();
     let mut d = data(&store);
     d.runs.retain(|x| x.id != run.id);
@@ -531,6 +536,8 @@ pub struct ReportSpace {
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct Report {
     pub id: String,
+    /// The engine: empty for the built-in model, `energyplus`.
+    pub provider: String,
     pub options: EnergyOptions,
     pub months: Vec<EndUses>,
     pub year: EndUses,
@@ -558,6 +565,7 @@ pub(crate) fn report(store: &Store, p: ReportParams) -> Result<Report> {
     let find = |k: &str| r.key_map.get(k).and_then(|g| crate::id::GlobalId::parse(g)).and_then(|g| store.find_by_guid(&g));
     Ok(Report {
         id: r.id.clone(),
+        provider: r.provider.clone(),
         options: r.options.clone(),
         months: r.results.months.clone(),
         year: r.results.year.clone(),

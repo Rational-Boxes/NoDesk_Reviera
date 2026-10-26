@@ -193,6 +193,14 @@ impl Gui {
         let cop = f.text("Cooling COP", &num("cooling_cop", "3.0"), "Seasonal coefficient of performance of the cooling");
         let grid = f.text("Grid factor (kg CO₂e/kWh)", &last["grid_factor"].as_f64().map_or(String::new(), |v| format!("{v}")), "Your grid's emission factor; electricity carbon is left out when blank");
         let gas = f.text("Gas factor (kg CO₂e/kWh)", &num("gas_factor", "0.202"), "Natural gas combustion");
+        // The engine: EnergyPlus when it is installed (never bundled).
+        let eplus = self.run("energy.providers", json!({})).ok().and_then(|p| p.as_array().and_then(|a| a.iter().find(|x| x["name"] == "energyplus").cloned())).unwrap_or(Value::Null);
+        let eplus_label = match eplus["version"].as_str() {
+            Some(v) if eplus["available"] == true => format!("EnergyPlus {v}"),
+            _ => "EnergyPlus (not found on this computer)".to_owned(),
+        };
+        let last_engine = self.run("energy.results", json!({})).ok().is_some_and(|r| r["provider"] == "energyplus");
+        let engine = f.choice("Engine", &["Built-in hourly model".to_owned(), eplus_label], usize::from(last_engine && eplus["available"] == true));
         if !f.show("A year of hourly simulation of the energy model's spaces through the weather file, with the space types' loads, set points and opening hours; runs out of process.", "Run") {
             f.dialog.destroy();
             return;
@@ -212,9 +220,17 @@ impl Gui {
         if let Some(g) = parse(&grid) {
             o["grid_factor"] = json!(g);
         }
+        let provider = if engine.get_selection() == Some(1) { "energyplus" } else { "builtin" };
         f.dialog.destroy();
-        match self.run("energy.run", json!({ "options": o })) {
-            Ok(v) => self.watch_job(v["job_id"].as_str().unwrap_or_default().to_owned(), "energy.collect", "Annual energy"),
+        match self.run("energy.run", json!({ "options": o, "provider": provider })) {
+            Ok(v) => {
+                let warnings: Vec<&str> = v["warnings"].as_array().into_iter().flatten().filter_map(Value::as_str).collect();
+                if !warnings.is_empty() {
+                    self.frame.set_status_text(&format!("EnergyPlus input: {}", warnings.join("; ")), 0);
+                }
+                let what = if provider == "energyplus" { "Annual energy (EnergyPlus)" } else { "Annual energy" };
+                self.watch_job(v["job_id"].as_str().unwrap_or_default().to_owned(), "energy.collect", what)
+            }
             Err(e) => error(&frame, &format!("The energy run did not start:\n{e}")),
         }
     }
@@ -240,8 +256,9 @@ impl Gui {
         }
         let o = &r["options"];
         let year = &r["year"];
+        let engine = if r["provider"] == "energyplus" { "EnergyPlus (constructions without thermal mass, so the mass setting is not used)" } else { "the built-in hourly model" };
         let mut intro = format!(
-            "Floor {:.0} m²; delivered {:.0} kWh a year, EUI {:.0} kWh/m²; peaks {:.1} kW heating, {:.1} kW cooling. Heating by {} (efficiency {}), cooling COP {}, infiltration {}, {} mass. Loads and energy in kWh, carbon in kg CO₂e{}. Rows after the year are the spaces' loads.",
+            "By {engine}. Floor {:.0} m²; delivered {:.0} kWh a year, EUI {:.0} kWh/m²; peaks {:.1} kW heating, {:.1} kW cooling. Heating by {} (efficiency {}), cooling COP {}, infiltration {}, {} mass. Loads and energy in kWh, carbon in kg CO₂e{}. Rows after the year are the spaces' loads.",
             r["floor_area"].as_f64().unwrap_or(0.0),
             year["electricity"].as_f64().unwrap_or(0.0) + year["gas"].as_f64().unwrap_or(0.0),
             r["eui"].as_f64().unwrap_or(0.0),

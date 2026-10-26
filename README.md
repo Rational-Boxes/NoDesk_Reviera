@@ -1142,6 +1142,11 @@ schedules, circuit paths, cable sizing and voltage drop.
   heat pump, cooling by COP; monthly and annual loads, delivered energy by end use, EUI and
   operational carbon from the user's grid factor; run as `analysis.energy` jobs (`energy.*`;
   ANA-ENV-005). Not built yet: schedules, sized systems, fans and hot water, charts and reports.
+- **EnergyPlus provider** (Annual Energy › Engine): the same run written as epJSON (zones,
+  paired surfaces, windows, gains, schedules, ideal loads) for EnergyPlus where it is
+  installed — never bundled — read back from its SQLite output into the same results
+  (`energy.run` with `provider: energyplus`, `energy.providers`; ANA-ENV-007). Not built yet:
+  design-day loads from EnergyPlus, real HVAC systems, materials with mass.
 - **Energy model** (Sustainability › Energy › Energy Model): analytical spaces and heat-transfer
   surfaces derived from the MEP spaces (exterior and interior walls with corresponding
   boundaries, windows and doors, slabs on grade, interior floors, roofs, air boundaries), with

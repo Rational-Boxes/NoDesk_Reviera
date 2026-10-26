@@ -68,6 +68,7 @@ pub mod embodied_carbon;
 pub mod path_of_travel;
 pub mod solar;
 pub mod energy_model;
+pub mod energyplus;
 pub mod hvac_loads;
 pub mod annual_energy;
 pub mod daylight;

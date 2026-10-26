@@ -127,6 +127,7 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add_host(crate::annual_energy::EnergyRunCmd),
         registry.add_host(crate::annual_energy::EnergyCollect),
         registry.add_host(crate::annual_energy::EnergyStatus),
+        registry.add_host(crate::annual_energy::EnergyProviders),
         registry.add_host(crate::daylight::DaylightRun),
         registry.add_host(crate::daylight::DaylightCollect),
         registry.add_host(crate::daylight::DaylightStatus),

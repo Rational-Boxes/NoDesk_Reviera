@@ -3,8 +3,10 @@
 
 //! Annual energy (ANA-ENV-005) as compute jobs: `energy.run` distils the energy model's spaces
 //! (opaque keys), their loads, set points and opening hours, the weather year and the options,
-//! and submits an `analysis.energy` job; `energy.collect` records it (`energy.record`);
-//! `energy.status` tells whether the latest run is stale.
+//! and submits an `analysis.energy` job — or, with `provider: energyplus`, writes it as epJSON
+//! for an installed EnergyPlus (`analysis.energy.energyplus`, ANA-ENV-007); `energy.collect`
+//! records either (`energy.record`); `energy.status` tells whether the latest run is stale;
+//! `energy.providers` lists the engines and whether EnergyPlus is installed.
 
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -26,15 +28,25 @@ fn bad(code: &'static str, msg: impl Into<String>) -> Error {
 pub struct RunParams {
     #[serde(default)]
     pub options: Option<EnergyOptions>,
+    /// `builtin` (the default) or `energyplus`.
+    #[serde(default)]
+    pub provider: Option<String>,
 }
 
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct RunOut {
     pub job_id: String,
     pub spaces: usize,
+    pub provider: String,
+    /// What the EnergyPlus input left out or defaulted.
+    pub warnings: Vec<String>,
 }
 
 fn distill(app: &App, store: &Store, options: &EnergyOptions) -> Result<(EnergyInput, BTreeMap<String, String>, u64)> {
+    distill_with_epw(app, store, options).map(|(i, k, r, _)| (i, k, r))
+}
+
+fn distill_with_epw(app: &App, store: &Store, options: &EnergyOptions) -> Result<(EnergyInput, BTreeMap<String, String>, u64, String)> {
     options.check()?;
     let loc = reviera_core::location::get(store);
     let (Some(lat), Some(lon)) = (loc.latitude, loc.longitude) else {
@@ -53,7 +65,7 @@ fn distill(app: &App, store: &Store, options: &EnergyOptions) -> Result<(EnergyI
         return Err(bad("energy.no_spaces", "place MEP spaces first: the model is by space (Analyze › Spaces & Zones)"));
     }
     let input = EnergyInput { spaces, latitude: lat, longitude: lon, time_zone: loc.time_zone.unwrap_or((lon / 15.0).round()), true_north: loc.true_north, weather, first_weekday, options: options.clone() };
-    Ok((input, key_map, w.revision))
+    Ok((input, key_map, w.revision, text))
 }
 
 pub(crate) struct EnergyRunCmd;
@@ -66,22 +78,37 @@ impl HostCommand for EnergyRunCmd {
         name: "energy.run",
         version: 1,
         summary: "Run annual energy",
-        description: "Starts an annual energy run (ANA-ENV-005) as an analysis.energy compute job: each of the energy model's spaces as a lumped hourly network (air, surfaces, thermal mass) through the weather file's year with an ideal thermostat (set points from the space types, set back 4 K when unoccupied; occupied from opening to closing time on weekdays). `options`: infiltration (loose, medium, tight, none), mass (light, medium, heavy), heating (gas, electric, heat_pump), heating_efficiency (0 = the source's default: 0.9, 1.0, COP 3.0), cooling_cop (3.0), grid_factor (kg CO2e/kWh; electricity carbon left out without it), gas_factor (0.202). Needs the location, a weather file and spaces. Returns the job; follow it with compute.status, then energy.collect.",
+        description: "Starts an annual energy run (ANA-ENV-005) as an analysis.energy compute job: each of the energy model's spaces as a lumped hourly network (air, surfaces, thermal mass) through the weather file's year with an ideal thermostat (set points from the space types, set back 4 K when unoccupied; occupied from opening to closing time on weekdays). `options`: infiltration (loose, medium, tight, none), mass (light, medium, heavy), heating (gas, electric, heat_pump), heating_efficiency (0 = the source's default: 0.9, 1.0, COP 3.0), cooling_cop (3.0), grid_factor (kg CO2e/kWh; electricity carbon left out without it), gas_factor (0.202). `provider`: builtin (the default) or energyplus — the same spaces, loads, schedules and options written as epJSON for EnergyPlus (geometry from the HBJSON export, ideal loads air systems, Output:SQLite) and run where EnergyPlus is installed (energy.providers), as an analysis.energy.energyplus job. Needs the location, a weather file and spaces. Returns the job and, for EnergyPlus, what its input left out; follow it with compute.status, then energy.collect.",
         effects: &[Effect::Read],
         transaction_name: "",
     };
 
     fn run(&self, app: &mut App, _: &Caller, p: Option<RunParams>) -> Result<RunOut> {
-        let options = p.and_then(|p| p.options).unwrap_or_default();
+        let (options, provider) = p.map(|p| (p.options.unwrap_or_default(), p.provider)).unwrap_or_default();
+        let provider = match provider.as_deref() {
+            None | Some("" | "builtin") => "builtin",
+            Some("energyplus") => "energyplus",
+            Some(o) => return Err(bad("energy.bad_provider", format!("{o}: the provider is builtin or energyplus"))),
+        };
         let doc = app.active().ok_or_else(|| bad("document.none", "no document is open"))?;
         let store = app.get(doc)?.doc.store().clone();
-        let (input, key_map, rev) = distill(app, &store, &options)?;
+        let (input, key_map, rev, epw) = distill_with_epw(app, &store, &options)?;
         let hash = reviera_core::solar::hash_of(&input);
-        let distilled = reviera_compute::distill::energy(&input, &key_map);
+        let mut warnings = Vec::new();
+        let (kind, distilled) = if provider == "energyplus" {
+            let (epjson, w) = reviera_core::energyplus::build(&store, &input, &key_map)?;
+            warnings = w;
+            let areas = input.spaces.iter().map(|s| (s.key.clone(), s.area)).collect();
+            let zones = input.spaces.iter().filter_map(|s| Some((s.key.clone(), s.zone.clone()?))).collect();
+            let e = reviera_core::energyplus::EplusInput { epjson, epw, options: options.clone(), areas, zones };
+            (reviera_compute::kinds::EPLUS, reviera_compute::distill::energyplus(&e, &key_map))
+        } else {
+            (reviera_compute::kinds::ENERGY, reviera_compute::distill::energy(&input, &key_map))
+        };
         let client = app.compute();
-        let job_id = client.submit(reviera_compute::kinds::ENERGY, None, &distilled, "", None).map_err(crate::compute::failed)?;
-        client.set_context(&job_id, json!({ "energy": { "options": options, "weather_revision": rev, "inputs_hash": hash } }));
-        Ok(RunOut { job_id, spaces: input.spaces.len() })
+        let job_id = client.submit(kind, None, &distilled, "", None).map_err(crate::compute::failed)?;
+        client.set_context(&job_id, json!({ "energy": { "options": options, "weather_revision": rev, "inputs_hash": hash, "provider": if provider == "builtin" { "" } else { provider } } }));
+        Ok(RunOut { job_id, spaces: input.spaces.len(), provider: provider.into(), warnings })
     }
 }
 
@@ -101,18 +128,18 @@ impl HostCommand for EnergyCollect {
         name: "energy.collect",
         version: 1,
         summary: "Collect an annual energy run",
-        description: "Fetches a finished analysis.energy job and keeps it with the model (energy.record, one undoable step). Returns the report (energy.results): monthly and annual heating and cooling loads, delivered energy by end use, electricity and gas, operational carbon, EUI, peaks and each space's loads.",
+        description: "Fetches a finished analysis.energy or analysis.energy.energyplus job and keeps it with the model (energy.record, one undoable step). Returns the report (energy.results): monthly and annual heating and cooling loads, delivered energy by end use, electricity and gas, operational carbon, EUI, peaks and each space's loads.",
         effects: &[Effect::Edit],
         transaction_name: "",
     };
 
     fn run(&self, app: &mut App, caller: &Caller, p: Option<CollectParams>) -> Result<ae::Report> {
-        use reviera_compute::kinds::{ENERGY, ENERGY_RESULTS};
+        use reviera_compute::kinds::{ENERGY, ENERGY_RESULTS, EPLUS};
         let client = app.compute();
         let job = match p.and_then(|p| p.job_id) {
             Some(id) => client.status(&id),
             None => {
-                let mut jobs: Vec<_> = client.jobs().into_iter().filter(|j| j.kind == ENERGY && j.state == "succeeded" && !j.results_fetched).collect();
+                let mut jobs: Vec<_> = client.jobs().into_iter().filter(|j| (j.kind == ENERGY || j.kind == EPLUS) && j.state == "succeeded" && !j.results_fetched).collect();
                 jobs.sort_by_key(|j| j.submitted_ms);
                 jobs.pop()
             }
@@ -132,7 +159,7 @@ impl HostCommand for EnergyCollect {
         let at = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_millis() as i64);
         app.execute(
             "energy.record",
-            json!({ "job_id": job.job_id, "options": c["options"], "results": results, "key_map": job.key_map, "weather_revision": c["weather_revision"], "inputs_hash": c["inputs_hash"], "at": at }),
+            json!({ "job_id": job.job_id, "options": c["options"], "results": results, "key_map": job.key_map, "weather_revision": c["weather_revision"], "inputs_hash": c["inputs_hash"], "at": at, "provider": c["provider"].as_str().unwrap_or("") }),
             caller,
         )?;
         let out = app.execute("energy.results", json!({ "run_id": job.job_id }), caller)?;
@@ -175,5 +202,45 @@ impl HostCommand for EnergyStatus {
             Err(_) => true,
         };
         Ok(StatusOut { run_id: r.id, stale })
+    }
+}
+
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct Provider {
+    pub name: String,
+    pub available: bool,
+    /// EnergyPlus: its `major.minor` version and program.
+    pub version: Option<String>,
+    pub path: Option<String>,
+    pub description: String,
+}
+
+pub(crate) struct EnergyProviders;
+
+impl HostCommand for EnergyProviders {
+    type Host = App;
+    type Params = Option<serde_json::Value>;
+    type Output = Vec<Provider>;
+    const META: CommandMeta = CommandMeta {
+        name: "energy.providers",
+        version: 1,
+        summary: "Annual energy engines",
+        description: "The engines energy.run can use: builtin (always) and energyplus, with whether EnergyPlus is installed on this computer (REVIERA_ENERGYPLUS, the PATH or its default folders), its version and program (ANA-ENV-007). EnergyPlus is never bundled; install it from energyplus.net.",
+        effects: &[Effect::Read],
+        transaction_name: "",
+    };
+
+    fn run(&self, _: &mut App, _: &Caller, _: Option<serde_json::Value>) -> Result<Vec<Provider>> {
+        let found = reviera_compute::energyplus::find();
+        Ok(vec![
+            Provider { name: "builtin".into(), available: true, version: None, path: None, description: "Reviera's lumped hourly zone model".into() },
+            Provider {
+                name: "energyplus".into(),
+                available: found.is_some(),
+                version: found.as_ref().map(|f| f.1.clone()),
+                path: found.as_ref().map(|f| f.0.display().to_string()),
+                description: "EnergyPlus (U.S. Department of Energy), run where it is installed".into(),
+            },
+        ])
     }
 }

@@ -7,6 +7,7 @@
 
 pub mod client;
 pub mod distill;
+pub mod energyplus;
 pub mod host;
 pub mod kinds;
 pub mod paths;

@@ -80,6 +80,24 @@ pub fn energy(input: &reviera_core::annual_energy::EnergyInput, key_map: &BTreeM
     }
 }
 
+/// The EnergyPlus provider's input (ANA-ENV-007): the epJSON, the weather file and the options.
+pub fn energyplus(input: &reviera_core::energyplus::EplusInput, key_map: &BTreeMap<String, String>) -> Distilled {
+    let raw = serde_json::to_vec(input).expect("the input serialises");
+    let blob = Blob::new(raw, crate::kinds::JSON, crate::kinds::EPLUS_INPUT);
+    let snapshot_hash = blob.reference.sha256.clone();
+    Distilled {
+        distiller: crate::kinds::EPLUS_INPUT.into(),
+        version: 1,
+        detail: String::new(),
+        anonymised: true,
+        blobs: vec![blob],
+        key_map: key_map.clone(),
+        elements: input.areas.len(),
+        triangles: 0,
+        snapshot_hash,
+    }
+}
+
 /// The `daylight.input` distillation (ANA-ENV-006): the spaces' sensors and room values (opaque
 /// keys) and the obstructions as triangles, one JSON blob (geometry only, no element names).
 pub fn daylight(input: &reviera_core::daylight::DaylightInput, key_map: &BTreeMap<String, String>) -> Distilled {
