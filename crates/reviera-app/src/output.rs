@@ -19,7 +19,7 @@ use reviera_core::{annotations, grids, plans, standards, units, views};
 use reviera_render::annotation::{
     Dimension, GridMark, GridStyle, Label, dimension_parts, grid_parts,
 };
-use reviera_render::plan::{Lines, PlanGraphics, Weights, feature_edges, plan_graphics};
+use reviera_render::plan::{Lines, PlanGraphics, Weights, feature_edges, plan_graphics, visible_edges};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -303,7 +303,8 @@ pub fn section_parts(
             above: reviera_core::categories::AboveCut::Hide,
         }
     };
-    let edges = feature_edges(&local);
+    // Hidden edges are left out (DOC-VIEW-003, DOC-VIEW-004; on the CPU until DOC-HLR-003).
+    let edges = visible_edges(&local, &feature_edges(&local), 0.0, 0.05);
     let graphics = plan_graphics(&local, &edges, 0.0, -frame.far as f32, scale, &weights);
     // Levels: a line across the view at each elevation, with the name and elevation at the
     // right end.

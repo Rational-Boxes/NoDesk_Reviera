@@ -1306,7 +1306,8 @@ simulation sessions, and the first engine runners (see [Not built yet](#not-buil
   `view.get_view_range`).
 - **Sections and elevations**: View › Section draws a section line with two clicks; Building
   Elevations makes North, South, East and West elevations. They draw cut walls and floors as
-  poché, everything up to the far clip in projection, level lines and grid bubbles. Properties
+  poché, what is seen up to the far clip in projection (edges behind nearer faces left out, on
+  screen and printed), level lines and grid bubbles. Properties
   set the far clip and flip the view (`view.create_section`, `view.create_elevation`,
   `section.edit`).
 - **Schedules**: View › Schedules makes a live schedule of doors, windows, rooms, walls, floors,

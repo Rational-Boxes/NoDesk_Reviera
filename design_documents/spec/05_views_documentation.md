@@ -430,6 +430,8 @@ These principles apply to every requirement in this chapter.
 - [ ] Splitting a segment and dragging it 2 m produces one view with a jog line where the two cuts meet.
 - [ ] A reference section pointing to a drafting view shows that view's detail and sheet numbers in its head.
 
+*Built (2026-10-26), hidden lines in sections and elevations:* the projection linework of sections and elevations (DOC-VIEW-003, DOC-VIEW-004), on screen and printed, leaves out edges behind nearer faces: each feature edge is sampled every 50 mm against the faces between it and the view plane (binned on a grid in the view's plane), and the changes between seen and hidden are found to a millimetre. Before, every edge out to the far clip was drawn, so a far wall's windows showed through the near wall. This is the CPU form of the visibility DOC-HLR-003 resolves on the GPU; it serves until that and the exact OCCT drawing (DOC-HLR-002). *(Owner, 2026-10-26: "Fix the elevation hidden-line bug too.")* Not yet: hidden edges in the `<Hidden>` style, plans' projection below the cut (still drawn without occlusion).
+
 ---
 
 ## 5.6 Callouts

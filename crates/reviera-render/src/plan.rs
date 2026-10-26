@@ -309,6 +309,134 @@ fn fill(loops: &[Vec<[f32; 2]>], z: f32, element: Option<reviera_core::ElementId
 /// The plan graphics of `scene` cut at `cut`, showing geometry down to `bottom` (or up to it,
 /// when it is above the cut: a reflected ceiling plan). `edges` are the scene's
 /// [`feature_edges`] (computed once per scene).
+/// Occluders binned on a grid in plan (x, y), for the visibility test.
+struct Occluders {
+    tris: Vec<[[f32; 3]; 3]>,
+    origin: [f32; 2],
+    cell: f32,
+    dims: [usize; 2],
+    bins: Vec<Vec<u32>>,
+}
+
+impl Occluders {
+    /// The triangles of `scene` that lie at least partly at or below `cut`.
+    fn new(scene: &RenderScene, cut: f32) -> Occluders {
+        let mut tris = Vec::new();
+        for m in scene
+            .meshes
+            .iter()
+            .filter(|m| !m.class.ends_with(crate::PLAN_HIDDEN))
+        {
+            for t in m.indices.as_chunks::<3>().0 {
+                let p = t.map(|i| m.positions[i as usize]);
+                if p.iter().any(|q| q[2] <= cut) {
+                    tris.push(p);
+                }
+            }
+        }
+        let (mut lo, mut hi) = ([f32::MAX; 2], [f32::MIN; 2]);
+        for p in tris.iter().flatten() {
+            for k in 0..2 {
+                lo[k] = lo[k].min(p[k]);
+                hi[k] = hi[k].max(p[k]);
+            }
+        }
+        // About as many cells as triangles, so each holds a few.
+        let area = ((hi[0] - lo[0]) * (hi[1] - lo[1])).max(1e-6);
+        let cell = (area / tris.len().max(1) as f32).sqrt().max(0.05);
+        let dims = [0, 1].map(|k| (((hi[k] - lo[k]) / cell).ceil() as usize).clamp(1, 2048));
+        let mut bins = vec![Vec::new(); dims[0] * dims[1]];
+        for (i, t) in tris.iter().enumerate() {
+            let c = |k: usize, v: f32| (((v - lo[k]) / cell) as usize).min(dims[k] - 1);
+            let (x0, x1) = (c(0, t.iter().map(|p| p[0]).fold(f32::MAX, f32::min)), c(0, t.iter().map(|p| p[0]).fold(f32::MIN, f32::max)));
+            let (y0, y1) = (c(1, t.iter().map(|p| p[1]).fold(f32::MAX, f32::min)), c(1, t.iter().map(|p| p[1]).fold(f32::MIN, f32::max)));
+            for y in y0..=y1 {
+                for x in x0..=x1 {
+                    bins[y * dims[0] + x].push(i as u32);
+                }
+            }
+        }
+        Occluders { tris, origin: lo, cell, dims, bins }
+    }
+
+    /// Whether a face nearer the viewer (higher z, at or below `cut`) covers point `p`.
+    fn hides(&self, p: [f32; 3], cut: f32) -> bool {
+        let c = |k: usize| ((p[k] - self.origin[k]) / self.cell).floor();
+        let (x, y) = (c(0), c(1));
+        if x < 0.0 || y < 0.0 || x as usize >= self.dims[0] || y as usize >= self.dims[1] {
+            return false;
+        }
+        // Faces through the point itself (the edge's own) do not hide it: they are no nearer.
+        // Points on a face's boundary count as covered, so the seams between a face's triangles
+        // do not let hidden edges show through.
+        const DEPTH: f32 = 1e-3;
+        const INSIDE: f32 = -1e-5;
+        self.bins[y as usize * self.dims[0] + x as usize].iter().any(|&i| {
+            let [a, b, q] = self.tris[i as usize];
+            let d = (b[1] - q[1]) * (a[0] - q[0]) + (q[0] - b[0]) * (a[1] - q[1]);
+            if d.abs() < 1e-12 {
+                return false; // seen edge on
+            }
+            let l1 = ((b[1] - q[1]) * (p[0] - q[0]) + (q[0] - b[0]) * (p[1] - q[1])) / d;
+            let l2 = ((q[1] - a[1]) * (p[0] - q[0]) + (a[0] - q[0]) * (p[1] - q[1])) / d;
+            let l3 = 1.0 - l1 - l2;
+            if l1 < INSIDE || l2 < INSIDE || l3 < INSIDE {
+                return false;
+            }
+            let z = l1 * a[2] + l2 * b[2] + l3 * q[2];
+            z > p[2] + DEPTH && z <= cut + DEPTH
+        })
+    }
+}
+
+/// The parts of `edges` not hidden behind the faces of `scene`, seen from above (+z, looking
+/// down) with everything above `cut` cut away: hidden-line removal for sections and elevations,
+/// whose frame looks down its z. Each edge is sampled every `step` (model metres) and the
+/// changes between seen and hidden are found to a millimetre.
+pub fn visible_edges(scene: &RenderScene, edges: &[Edge], cut: f32, step: f32) -> Vec<Edge> {
+    let occ = Occluders::new(scene, cut);
+    let at = |s: &[[f32; 3]; 2], t: f32| {
+        let [a, b] = s;
+        [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t]
+    };
+    let mut out = Vec::new();
+    for (element, s) in edges {
+        let len = (0..3).map(|k| (s[1][k] - s[0][k]).powi(2)).sum::<f32>().sqrt();
+        let n = ((len / step).ceil() as usize).clamp(1, 4096);
+        let seen = |t: f32| !occ.hides(at(s, t), cut);
+        // Where visibility changes between t0 (seen = v0) and t1, to a millimetre.
+        let change = |mut t0: f32, mut t1: f32, v0: bool| {
+            while (t1 - t0) * len > 1e-3 {
+                let m = 0.5 * (t0 + t1);
+                if seen(m) == v0 {
+                    t0 = m;
+                } else {
+                    t1 = m;
+                }
+            }
+            0.5 * (t0 + t1)
+        };
+        let mut start = seen(0.0).then_some(0.0);
+        let mut prev = (0.0, start.is_some());
+        for i in 1..=n {
+            let t = i as f32 / n as f32;
+            let v = seen(t);
+            if v != prev.1 {
+                let x = change(prev.0, t, prev.1);
+                match start.take() {
+                    Some(t0) => out.push((*element, [at(s, t0), at(s, x)])),
+                    None => start = Some(x),
+                }
+            }
+            prev = (t, v);
+        }
+        if let Some(t0) = start {
+            out.push((*element, [at(s, t0), s[1]]));
+        }
+    }
+    out
+}
+
 pub fn plan_graphics(
     scene: &RenderScene,
     edges: &[Edge],
@@ -506,6 +634,30 @@ mod tests {
             g.lines
         );
         assert_eq!(fade(CUT_LINE, 1.0), CUT_LINE);
+    }
+
+    /// Seen from above (+z): a near slab over part of a far one hides that part's edges; the
+    /// slab's own edges, and the far edges beside it, stay.
+    #[test]
+    fn edges_behind_nearer_faces_are_hidden() {
+        let near = cube([0.0, 0.0, -1.0], [2.0, 2.0, -0.5]);
+        let far = cube([1.0, 1.0, -5.0], [4.0, 4.0, -4.0]);
+        let scene = RenderScene { meshes: vec![near.clone(), far.clone()] };
+        let shown = visible_edges(&scene, &feature_edges(&scene), 0.0, 0.05);
+        let total = |edges: &[Edge], z: f32| -> f32 {
+            edges
+                .iter()
+                .filter(|(_, s)| s[0][2] == z && s[1][2] == z)
+                .map(|(_, s)| ((s[1][0] - s[0][0]).powi(2) + (s[1][1] - s[0][1]).powi(2)).sqrt())
+                .sum()
+        };
+        // The near slab's top outline is seen whole: 8 m.
+        assert!((total(&shown, -0.5) - 8.0).abs() < 1e-3, "{}", total(&shown, -0.5));
+        // The far box's top outline (12 m) loses the 1 m + 1 m under the near slab.
+        assert!((total(&shown, -4.0) - 10.0).abs() < 0.01, "{}", total(&shown, -4.0));
+        // With everything above -2 cut away, the near slab hides nothing.
+        let shown = visible_edges(&scene, &feature_edges(&scene), -2.0, 0.05);
+        assert!((total(&shown, -4.0) - 12.0).abs() < 1e-3);
     }
 
     #[test]
