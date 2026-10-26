@@ -475,6 +475,18 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "pvgis_pv" => format!(
             r#"<path d="M4 22l6-12h18l-6 12z" fill="{f}" {s}/><path d="M7 16h18M13 10l-6 12M19 10l-6 12" {sa}/><path d="M16 22v6M11 28h10" {sa}/>"#
         ),
+        "geocode" => format!(
+            r#"<path d="M16 29s-9-9-9-16a9 9 0 0 1 18 0c0 7-9 16-9 16z" fill="{f}" {s}/><circle cx="16" cy="13" r="3.5" fill="none" {sa}/>"#
+        ),
+        "site_elevation" => format!(
+            r#"<path d="M3 26l9-14 5 7 4-5 8 12z" fill="{f}" {s}/><path d="M26 4v12M23 7l3-3 3 3M23 13l3 3 3-3" fill="none" {sa}/>"#
+        ),
+        "grid_carbon" => format!(
+            r#"<path d="M12 4h8l4 24H8z" fill="{f}" {s}/><path d="M10 14h12M9 20h14M12 4l8 10M20 4l-8 10M11 14l11 6M21 14l-11 6" fill="none" {sa}/>"#
+        ),
+        "data_sources" => format!(
+            r#"<ellipse cx="16" cy="8" rx="10" ry="4" fill="{f}" {s}/><path d="M6 8v16c0 2 4.5 4 10 4s10-2 10-4V8M6 16c0 2 4.5 4 10 4s10-2 10-4" fill="none" {sa}/>"#
+        ),
         "connectors" => format!(
             r#"<path d="M6 12h8v8H6zM18 12h8v8h-8z" fill="{f}" {s}/><path d="M14 16h4M10 12V6M22 12V6M10 20v6M22 20v6" {sa}/>"#
         ),

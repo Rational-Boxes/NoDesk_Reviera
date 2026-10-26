@@ -398,6 +398,117 @@ impl Gui {
         }
     }
 
+    /// Sustainability › Site › Find Place (ANA-ENV-010): a place or address looked up with
+    /// Nominatim; the chosen one becomes the project location.
+    pub(crate) fn geocode_dialog(&mut self) {
+        const USE: i32 = 7311;
+        let frame = self.frame;
+        let f = super::reinforcement_ui::Form::new(&frame, "Find Place");
+        let query = f.text("Place or address", "", "A city, a street address or a landmark");
+        if !f.show("Looks the text up with OpenStreetMap's Nominatim: the text you type is sent to it. Data © OpenStreetMap contributors, ODbL.", "Search") {
+            f.dialog.destroy();
+            return;
+        }
+        let q = query.get_value();
+        f.dialog.destroy();
+        let r = match self.run("geocode.search", json!({ "query": q })) {
+            Ok(v) => v,
+            Err(e) => return error(&frame, &e),
+        };
+        let places: Vec<Value> = r["places"].as_array().cloned().unwrap_or_default();
+        if places.is_empty() {
+            return error(&frame, &format!("Nothing was found for \"{}\".", q.trim()));
+        }
+        let rows: Vec<Vec<String>> = places.iter().map(|p| vec![p["name"].as_str().unwrap_or("").to_owned(), p["kind"].as_str().unwrap_or("").to_owned(), format!("{:.5}", p["lat"].as_f64().unwrap_or(0.0)), format!("{:.5}", p["lon"].as_f64().unwrap_or(0.0))]).collect();
+        let intro = format!("Places found for \"{}\". {}", q.trim(), r["attribution"].as_str().unwrap_or(""));
+        let (code, sel) = super::mep_loads_ui::list_dialog(&frame, "Find Place", &intro, &[("Place", 330), ("Kind", 80), ("Latitude", 80), ("Longitude", 80)], &rows, &[(USE, "Use as Location", "Set the project's latitude and longitude to this place")], Some(0));
+        if code != USE {
+            return;
+        }
+        let Some(p) = sel.and_then(|i| places.get(i)) else { return };
+        let place = p["name"].as_str().unwrap_or("").split(',').next().unwrap_or("").trim().to_owned();
+        match self.run("location.set", json!({ "lat": p["lat"], "lon": p["lon"], "place": place })) {
+            Ok(_) => self.frame.set_status_text(&format!("Location set to {place}; check the time zone and the elevation (Site Elevation)"), 0),
+            Err(e) => error(&frame, &e),
+        }
+    }
+
+    /// Sustainability › Site › Site Elevation (ANA-ENV-010): Open-Meteo's ground elevation.
+    pub(crate) fn site_elevation(&mut self) {
+        let frame = self.frame;
+        let ask = MessageDialog::builder(&frame, "Fetch the ground elevation at the project location from Open-Meteo and set it?\n\nThis sends the site's latitude and longitude to Open-Meteo. Data: Copernicus DEM GLO-90, CC BY 4.0.", "Site Elevation")
+            .with_style(MessageDialogStyle::YesNo | MessageDialogStyle::IconQuestion)
+            .build();
+        if ask.show_modal() != ID_YES {
+            return;
+        }
+        match self.run("elevation.fetch", json!({})) {
+            Ok(r) => {
+                let msg = format!("The site is {:.1} m above sea level; the location now says so.\n\n{}", r["elevation"].as_f64().unwrap_or(0.0), r["attribution"].as_str().unwrap_or(""));
+                MessageDialog::builder(&frame, &msg, "Site Elevation").with_style(MessageDialogStyle::OK | MessageDialogStyle::IconInformation).build().show_modal();
+            }
+            Err(e) => error(&frame, &e),
+        }
+    }
+
+    /// Sustainability › Energy › Grid Carbon (GB) (ANA-ENV-010): a grid factor from the Carbon
+    /// Intensity API.
+    pub(crate) fn grid_intensity(&mut self) {
+        let frame = self.frame;
+        let f = super::reinforcement_ui::Form::new(&frame, "Grid Carbon (GB)");
+        let period = f.choice("Period", &["Last 30 days".to_owned(), "Last year".to_owned()], 1);
+        if !f.show("Great Britain's average grid carbon intensity from the National Energy System Operator's Carbon Intensity API (no data about the project is sent). For other grids, enter your supplier's or your country's factor.", "Fetch") {
+            f.dialog.destroy();
+            return;
+        }
+        let p = if period.get_selection() == Some(0) { "month" } else { "year" };
+        f.dialog.destroy();
+        match self.run("grid_intensity.fetch", json!({ "period": p })) {
+            Ok(r) => {
+                let msg = format!(
+                    "{}: {:.3} kg CO₂e/kWh on average from {} to {} (half-hours from {:.3} to {:.3}).\n\nEnter it as the grid factor in Annual Energy to count the electricity's carbon.\n\n{}",
+                    r["region"].as_str().unwrap_or(""),
+                    r["average"].as_f64().unwrap_or(0.0),
+                    &r["from"].as_str().unwrap_or("")[..10.min(r["from"].as_str().unwrap_or("").len())],
+                    &r["to"].as_str().unwrap_or("")[..10.min(r["to"].as_str().unwrap_or("").len())],
+                    r["min"].as_f64().unwrap_or(0.0),
+                    r["max"].as_f64().unwrap_or(0.0),
+                    r["attribution"].as_str().unwrap_or("")
+                );
+                MessageDialog::builder(&frame, &msg, "Grid Carbon (GB)").with_style(MessageDialogStyle::OK | MessageDialogStyle::IconInformation).build().show_modal();
+            }
+            Err(e) => error(&frame, &e),
+        }
+    }
+
+    /// Help › Data Sources (ANA-ENV-010): each online service, whether it is on, and its credit.
+    pub(crate) fn data_sources(&mut self) {
+        let frame = self.frame;
+        let list = match self.run("connectors.list", json!({})) {
+            Ok(v) => v,
+            Err(e) => return error(&frame, &e),
+        };
+        let rows: Vec<Vec<String>> = list
+            .as_array()
+            .into_iter()
+            .flatten()
+            .map(|c| {
+                let d = c["description"].as_str().unwrap_or("");
+                let service = d.split(':').next().unwrap_or(d);
+                vec![service.split(" (").next().unwrap_or(service).to_owned(), if c["enabled"] == true { "On" } else { "Off" }.to_owned(), c["attribution"].as_str().unwrap_or("").to_owned()]
+            })
+            .collect();
+        super::mep_loads_ui::list_dialog(
+            &frame,
+            "Data Sources",
+            "Online services Reviera calls only when you ask (Sustainability › Site › Data Connectors switches them). Results made with their data must carry the credit shown. Annual energy can also run EnergyPlus where it is installed; see Help › About.",
+            &[("Service", 140), ("", 36), ("Credit", 480)],
+            &rows,
+            &[],
+            None,
+        );
+    }
+
     /// Sustainability › Site › Data Connectors: each online connector, switched on or off.
     pub(crate) fn connectors_dialog(&mut self) {
         let frame = self.frame;

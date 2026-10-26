@@ -9,6 +9,8 @@
 //!   PVcalc for a fixed PV system's yearly and monthly yield, a cross-check of the solar study's
 //!   PV potential (ANA-ENV-002).
 //!
+//! Geocoding, elevation and grid carbon intensity are in [`crate::site_connectors`].
+//!
 //! The service address is PVGIS's own; `REVIERA_PVGIS_URL` replaces it (tests, mirrors), and
 //! plain http is accepted only for a local address.
 
@@ -40,11 +42,28 @@ pub struct Connector {
     pub needs_key: bool,
 }
 
-const KNOWN: &[(&str, &str, &str)] = &[(
-    "pvgis",
-    "PVGIS (European Commission Joint Research Centre): typical meteorological years as EPW and PV yield estimates, worldwide except polar regions; no key",
-    "PVGIS © European Union, 2001–2026; data under CC BY 4.0",
-)];
+const KNOWN: &[(&str, &str, &str)] = &[
+    (
+        "pvgis",
+        "PVGIS (European Commission Joint Research Centre): typical meteorological years as EPW and PV yield estimates, worldwide except polar regions; no key",
+        "PVGIS © European Union, 2001–2026; data under CC BY 4.0",
+    ),
+    (
+        "nominatim",
+        "Nominatim (OpenStreetMap): place names and addresses to coordinates, for searches you start; no key",
+        "Data © OpenStreetMap contributors, ODbL 1.0 (openstreetmap.org/copyright)",
+    ),
+    (
+        "open_meteo",
+        "Open-Meteo: ground elevation at the site; free for non-commercial use",
+        "Elevation: Copernicus DEM GLO-90 via Open-Meteo.com, CC BY 4.0",
+    ),
+    (
+        "uk_carbon_intensity",
+        "Carbon Intensity API (National Energy System Operator): Great Britain's grid carbon intensity; no key",
+        "Carbon Intensity API, National Energy System Operator (carbonintensity.org.uk), CC BY 4.0",
+    ),
+];
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 #[serde(default)]
@@ -64,7 +83,7 @@ fn enabled(name: &str) -> bool {
     load().enabled.get(name).copied().unwrap_or(true)
 }
 
-fn require(name: &str) -> Result<()> {
+pub(crate) fn require(name: &str) -> Result<()> {
     if enabled(name) { Ok(()) } else { Err(bad("connectors.off", format!("the {name} connector is switched off (connectors.set)"))) }
 }
 
@@ -151,7 +170,7 @@ fn pvgis_get(tool: &str, query: &[(&str, String)]) -> Result<String> {
     Ok(text)
 }
 
-fn site(app: &App) -> Result<(f64, f64)> {
+pub(crate) fn site(app: &App) -> Result<(f64, f64)> {
     let doc = app.active().ok_or_else(|| bad("document.none", "no document is open"))?;
     let loc = reviera_core::location::get(app.document(doc).expect("active").doc.store());
     match (loc.latitude, loc.longitude) {

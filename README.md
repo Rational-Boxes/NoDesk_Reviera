@@ -1120,8 +1120,11 @@ schedules, circuit paths, cable sizing and voltage drop.
 - **Data connectors** (Sustainability › Site › PVGIS Weather, Data Connectors; Daylight &
   Solar › PVGIS Check): a typical weather year for the site from PVGIS imported as the
   project's EPW, and PVGIS's PV yield as a cross-check of the solar study; only when the user
-  asks, each switchable off (`pvgis.*`, `connectors.*`; ANA-ENV-010). Not built yet: station
-  picker, geocoding, grid carbon intensity, emission factor services.
+  asks, each switchable off (`pvgis.*`, `connectors.*`; ANA-ENV-010). Also Find Place
+  (OpenStreetMap's Nominatim, rate-limited and cached), Site Elevation (Open-Meteo) and Grid
+  Carbon (GB) from the Carbon Intensity API, with Help › Data Sources crediting each
+  (`geocode.search`, `elevation.fetch`, `grid_intensity.fetch`). Not built yet: station picker,
+  other grids' carbon intensity (user keys), emission factor services.
 - **gbXML exchange** (File › Export gbXML…, Import gbXML Loads…): the energy model as gbXML
   (validated against the official 8.01 schema) with spaces, shared surfaces, openings and
   U-values for other energy tools; design loads computed elsewhere read back onto the matching

@@ -2932,6 +2932,30 @@ icon = "pvgis_pv"
 help = "Ask PVGIS for the yield of a fixed PV system at the site, to cross-check the solar study (ANA-ENV-010)"
 
 [[action]]
+id = "geocode.search"
+label = "Find Place"
+icon = "geocode"
+help = "Look a place name or address up with OpenStreetMap's Nominatim and set the project location from it (ANA-ENV-010)"
+
+[[action]]
+id = "elevation.fetch"
+label = "Site Elevation"
+icon = "site_elevation"
+help = "Fetch the ground elevation at the project location from Open-Meteo (Copernicus DEM, CC BY 4.0) and set it (ANA-ENV-010)"
+
+[[action]]
+id = "grid_intensity.fetch"
+label = "Grid Carbon (GB)"
+icon = "grid_carbon"
+help = "Great Britain's average grid carbon intensity over the last month or year, as a grid factor for annual energy (ANA-ENV-010)"
+
+[[action]]
+id = "help.data_sources"
+label = "Data Sources"
+icon = "data_sources"
+help = "The online data services Reviera can use, whether each is on, and what results made with them must credit"
+
+[[action]]
 id = "connectors.list"
 label = "Data Connectors"
 icon = "connectors"
@@ -3616,6 +3640,8 @@ label = "Site"
 tools = [
   { action = "location.set_all", size = "large" },
   { action = "weather.import", size = "large" },
+  { action = "geocode.search", size = "large" },
+  { action = "elevation.fetch", size = "large" },
   { action = "pvgis.tmy", size = "large" },
   { action = "connectors.list", size = "large" },
 ]
@@ -3628,6 +3654,7 @@ tools = [
   { action = "hc_loads.report", size = "large" },
   { action = "energy.run", size = "large" },
   { action = "energy.results", size = "large" },
+  { action = "grid_intensity.fetch", size = "large" },
 ]
 
 [[tab.panel]]
@@ -4323,4 +4350,4 @@ items = [
 
 [[menu]]
 label = "&Help"
-items = ["help.home", "-", "help.about"]
+items = ["help.home", "-", "help.data_sources", "help.about"]

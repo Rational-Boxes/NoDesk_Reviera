@@ -4723,6 +4723,10 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "pvgis.tmy" => with(gui, Gui::pvgis_tmy),
         "pvgis.pv" => with(gui, Gui::pvgis_pv),
         "connectors.list" => with(gui, Gui::connectors_dialog),
+        "geocode.search" => with(gui, Gui::geocode_dialog),
+        "elevation.fetch" => with(gui, Gui::site_elevation),
+        "grid_intensity.fetch" => with(gui, Gui::grid_intensity),
+        "help.data_sources" => with(gui, Gui::data_sources),
         "solar.results" => with(gui, Gui::solar_results),
         "path_of_travel.create" => with(gui, |g| {
             g.start_note_tool(notes::NoteTool::PathOfTravel);

@@ -138,6 +138,9 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add_host(crate::connectors::ConnectorsSet),
         registry.add_host(crate::connectors::PvgisTmy),
         registry.add_host(crate::connectors::PvgisPv),
+        registry.add_host(crate::site_connectors::GeocodeSearch),
+        registry.add_host(crate::site_connectors::ElevationFetch),
+        registry.add_host(crate::site_connectors::GridIntensityFetch),
         registry.add_host(SelectionRemove),
     ];
     for r in results {
