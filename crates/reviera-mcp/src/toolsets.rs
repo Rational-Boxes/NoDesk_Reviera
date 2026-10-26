@@ -162,6 +162,8 @@ pub fn toolset_of(command: &str) -> String {
             | "energy"
             | "daylight"
             | "gbxml"
+            | "connectors"
+            | "pvgis"
             | "mech_equipment"
             | "equipment_set"
             | "mechanical_settings"

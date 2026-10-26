@@ -87,7 +87,7 @@ impl std::fmt::Debug for Subscriptions {
 
 /// The per-user settings folder: `%APPDATA%\Reviera`, else `$XDG_CONFIG_HOME/reviera` (or
 /// `~/.config/reviera`), as the window's.
-fn config_dir() -> Option<PathBuf> {
+pub(crate) fn config_dir() -> Option<PathBuf> {
     if let Some(a) = std::env::var_os("APPDATA") {
         return Some(Path::new(&a).join("Reviera"));
     }

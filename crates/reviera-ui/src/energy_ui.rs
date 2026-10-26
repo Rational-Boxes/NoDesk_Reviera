@@ -306,3 +306,91 @@ impl Gui {
         }
     }
 }
+
+impl Gui {
+    /// Sustainability › Site › PVGIS Weather (ANA-ENV-010): a typical year for the site, imported.
+    pub(crate) fn pvgis_tmy(&mut self) {
+        let frame = self.frame;
+        let ask = MessageDialog::builder(&frame, "Fetch a typical meteorological year for the project location from PVGIS (European Commission JRC) and import it as the project's weather?\n\nThis sends the site's latitude and longitude to PVGIS. Data: PVGIS © European Union, CC BY 4.0.", "PVGIS Weather")
+            .with_style(MessageDialogStyle::YesNo | MessageDialogStyle::IconQuestion)
+            .build();
+        if ask.show_modal() != ID_YES {
+            return;
+        }
+        match self.run("pvgis.tmy", json!({})) {
+            Ok(r) => {
+                let mut msg = format!("Imported {}.", r["file"].as_str().unwrap_or(""));
+                for w in r["warnings"].as_array().into_iter().flatten() {
+                    msg.push_str(&format!("\n• {}", w.as_str().unwrap_or("")));
+                }
+                MessageDialog::builder(&frame, &msg, "PVGIS Weather").with_style(MessageDialogStyle::OK | MessageDialogStyle::IconInformation).build().show_modal();
+            }
+            Err(e) => error(&frame, &e),
+        }
+    }
+
+    /// Sustainability › Daylight & Solar › PVGIS Check (ANA-ENV-010): PVcalc's yield for a system.
+    pub(crate) fn pvgis_pv(&mut self) {
+        let frame = self.frame;
+        let f = super::reinforcement_ui::Form::new(&frame, "PVGIS PV Check");
+        let kwp = f.text("Peak power (kWp)", "1", "The PV system's rated power");
+        let tilt = f.text("Tilt (°)", "35", "From horizontal");
+        let azimuth = f.text("Azimuth (°)", "180", "Clockwise from north: 180 faces south");
+        let loss = f.text("System losses (%)", "14", "Cables, inverter, soiling");
+        if !f.show("Asks PVGIS (European Commission JRC) for the yield of a fixed PV system at the project location, to cross-check the solar study. Sends the site's latitude and longitude.", "Ask PVGIS") {
+            f.dialog.destroy();
+            return;
+        }
+        let num = |t: &TextCtrl, d: f64| t.get_value().trim().replace(',', ".").parse::<f64>().unwrap_or(d);
+        let args = json!({ "peak_power": num(&kwp, 1.0), "tilt": num(&tilt, 35.0), "azimuth": num(&azimuth, 180.0), "loss": num(&loss, 14.0) });
+        f.dialog.destroy();
+        match self.run("pvgis.pv", args) {
+            Ok(r) => {
+                let months: Vec<String> = r["monthly"].as_array().into_iter().flatten().map(|m| format!("{:.0}", m.as_f64().unwrap_or(0.0))).collect();
+                let msg = format!(
+                    "{:.0} kWh a year ({:.0} kWh/kWp){}.\nMonthly kWh: {}\n\n{}",
+                    r["yearly"].as_f64().unwrap_or(0.0),
+                    r["specific"].as_f64().unwrap_or(0.0),
+                    r["irradiation"].as_f64().map_or(String::new(), |h| format!("; {h:.0} kWh/m² on the panels")),
+                    months.join(", "),
+                    r["attribution"].as_str().unwrap_or("")
+                );
+                MessageDialog::builder(&frame, &msg, "PVGIS PV Check").with_style(MessageDialogStyle::OK | MessageDialogStyle::IconInformation).build().show_modal();
+            }
+            Err(e) => error(&frame, &e),
+        }
+    }
+
+    /// Sustainability › Site › Data Connectors: each online connector, switched on or off.
+    pub(crate) fn connectors_dialog(&mut self) {
+        let frame = self.frame;
+        let list = match self.run("connectors.list", json!({})) {
+            Ok(v) => v,
+            Err(e) => return error(&frame, &e),
+        };
+        let f = super::reinforcement_ui::Form::new(&frame, "Data Connectors");
+        let boxes: Vec<(String, CheckBox)> = list
+            .as_array()
+            .into_iter()
+            .flatten()
+            .map(|c| {
+                let name = c["name"].as_str().unwrap_or("").to_owned();
+                // The service's name; the description after it is too long for a checkbox.
+                let d = c["description"].as_str().unwrap_or("");
+                let b = f.check(&name.to_uppercase(), d.split(':').next().unwrap_or(d), c["enabled"] == true);
+                (name, b)
+            })
+            .collect();
+        if !f.show("Online data services Reviera calls only when you ask. Switch one off to stop it being used.", "OK") {
+            f.dialog.destroy();
+            return;
+        }
+        let values: Vec<(String, bool)> = boxes.iter().map(|(n, b)| (n.clone(), b.get_value())).collect();
+        f.dialog.destroy();
+        for (name, on) in values {
+            if let Err(e) = self.run("connectors.set", json!({ "name": name, "enabled": on })) {
+                error(&frame, &e);
+            }
+        }
+    }
+}

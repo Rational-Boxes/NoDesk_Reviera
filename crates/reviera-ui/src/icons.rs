@@ -469,6 +469,15 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "loads_report" => format!(
             r#"<path d="M5 4h18l4 4v20H5z" fill="{f}" {s}/><path d="M9 22v-6M14 22v-10M19 22v-4M24 22v-8" stroke-width="2.5" {sa}/>"#
         ),
+        "pvgis_weather" => format!(
+            r#"<circle cx="16" cy="16" r="11" fill="{f}" {s}/><path d="M5 16h22M16 5c-4 4-4 18 0 22M16 5c4 4 4 18 0 22" fill="none" {sa}/><path d="M22 4l6 0 0 6" fill="none" {sa}/>"#
+        ),
+        "pvgis_pv" => format!(
+            r#"<path d="M4 22l6-12h18l-6 12z" fill="{f}" {s}/><path d="M7 16h18M13 10l-6 12M19 10l-6 12" {sa}/><path d="M16 22v6M11 28h10" {sa}/>"#
+        ),
+        "connectors" => format!(
+            r#"<path d="M6 12h8v8H6zM18 12h8v8h-8z" fill="{f}" {s}/><path d="M14 16h4M10 12V6M22 12V6M10 20v6M22 20v6" {sa}/>"#
+        ),
         "daylight" => format!(
             r#"<path d="M4 28V12l12-8 12 8v16z" fill="{f}" {s}/><path d="M11 14h10v8H11zM16 14v8M11 18h10" fill="none" {sa}/><path d="M8 26l3-4M24 26l-3-4" {sa}/>"#
         ),

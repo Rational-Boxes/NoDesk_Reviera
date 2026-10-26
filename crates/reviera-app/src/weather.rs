@@ -32,7 +32,7 @@ pub struct ImportParams {
     pub path: String,
 }
 
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
 pub struct ImportReport {
     /// The file as kept with the project.
     pub file: String,
@@ -44,7 +44,7 @@ pub struct ImportReport {
 
 pub(crate) struct WeatherImport;
 
-fn resource_dir(app: &App) -> Option<PathBuf> {
+pub(crate) fn resource_dir(app: &App) -> Option<PathBuf> {
     let d = app.document(app.active()?)?;
     if d.untitled {
         return None;

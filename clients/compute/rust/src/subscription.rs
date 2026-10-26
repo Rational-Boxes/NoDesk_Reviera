@@ -299,6 +299,26 @@ impl std::fmt::Debug for Client {
     }
 }
 
+/// A client for public https services (data connectors): the platform's certificate roots,
+/// TLS 1.2 and 1.3, redirects followed, Reviera's user agent.
+pub fn public_client(timeout: Duration) -> Result<reqwest::blocking::Client, Error> {
+    let provider: Arc<CryptoProvider> = Arc::new(rustls::crypto::ring::default_provider());
+    let verifier = rustls_platform_verifier::Verifier::new_with_extra_roots(Vec::new(), provider.clone()).map_err(|e| Error::new("certificate", format!("The certificates could not be loaded: {e}")))?;
+    let mut tls = rustls::ClientConfig::builder_with_provider(provider)
+        .with_safe_default_protocol_versions()
+        .map_err(|e| Error::new("tls", e.to_string()))?
+        .dangerous()
+        .with_custom_certificate_verifier(Arc::new(verifier))
+        .with_no_client_auth();
+    tls.alpn_protocols = vec![b"http/1.1".to_vec()];
+    reqwest::blocking::Client::builder()
+        .tls_backend_preconfigured(tls)
+        .timeout(timeout)
+        .user_agent(concat!("BIM-Reviera/", env!("CARGO_PKG_VERSION")))
+        .build()
+        .map_err(|e| Error::new("tls", format!("The connection could not be set up: {e}")))
+}
+
 impl Client {
     pub fn new(ep: &Endpoint) -> Result<Self, Error> {
         let base = check_url(&ep.url, ep.development)?;

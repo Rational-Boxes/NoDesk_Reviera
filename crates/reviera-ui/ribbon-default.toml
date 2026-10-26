@@ -2914,6 +2914,24 @@ icon = "weather"
 help = "The project's weather file (EPW) and design conditions: import a file, see its station, and override the heating and cooling design temperatures (ANA-EM-001)"
 
 [[action]]
+id = "pvgis.tmy"
+label = "PVGIS Weather"
+icon = "pvgis_weather"
+help = "Fetch a typical meteorological year for the site from PVGIS (EU JRC, CC BY 4.0) and import it as the project's weather (ANA-ENV-010)"
+
+[[action]]
+id = "pvgis.pv"
+label = "PVGIS Check"
+icon = "pvgis_pv"
+help = "Ask PVGIS for the yield of a fixed PV system at the site, to cross-check the solar study (ANA-ENV-010)"
+
+[[action]]
+id = "connectors.list"
+label = "Data Connectors"
+icon = "connectors"
+help = "The online data services Reviera can call when you ask, each switchable off (ANA-ENV-010)"
+
+[[action]]
 id = "coordinates.report"
 label = "Report Coordinates"
 icon = "report_coordinates"
@@ -3592,6 +3610,8 @@ label = "Site"
 tools = [
   { action = "location.set_all", size = "large" },
   { action = "weather.import", size = "large" },
+  { action = "pvgis.tmy", size = "large" },
+  { action = "connectors.list", size = "large" },
 ]
 
 [[tab.panel]]
@@ -3611,6 +3631,7 @@ tools = [
   { action = "solar.results", size = "large" },
   { action = "daylight.run", size = "large" },
   { action = "daylight.results", size = "large" },
+  { action = "pvgis.pv", size = "large" },
 ]
 
 [[tab.panel]]

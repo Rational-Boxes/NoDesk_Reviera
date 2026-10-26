@@ -4719,6 +4719,9 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "daylight.results" => with(gui, Gui::daylight_results),
         "gbxml.export" => with(gui, Gui::gbxml_export),
         "gbxml.import_loads" => with(gui, Gui::gbxml_import_loads),
+        "pvgis.tmy" => with(gui, Gui::pvgis_tmy),
+        "pvgis.pv" => with(gui, Gui::pvgis_pv),
+        "connectors.list" => with(gui, Gui::connectors_dialog),
         "solar.results" => with(gui, Gui::solar_results),
         "path_of_travel.create" => with(gui, |g| {
             g.start_note_tool(notes::NoteTool::PathOfTravel);
