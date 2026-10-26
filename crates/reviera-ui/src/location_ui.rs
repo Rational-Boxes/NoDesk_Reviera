@@ -67,6 +67,7 @@ impl Gui {
                 },
                 true_north: opt(&north).unwrap_or(0.0),
                 crs: Some(crs.get_value().trim().to_owned()).filter(|s| !s.is_empty()),
+                weather: l.weather.clone(),
             })
         };
         let l = read();
@@ -125,5 +126,75 @@ impl Gui {
             survey.segments.push([[a[0], a[1], z], [b[0], b[1], z]]);
         }
         vec![base, survey]
+    }
+}
+
+impl Gui {
+    /// Analyze › Energy › Weather (ANA-EM-001): the weather file and station, Import EPW…, and
+    /// the design conditions (the file's shown beside; a typed value overrides it).
+    pub(crate) fn weather_dialog(&mut self) {
+        let frame = self.frame;
+        loop {
+            let Some(store) = self.store_now() else { return };
+            let w = reviera_core::weather::get(&store);
+            let station = w.station.as_ref().map_or("None — import an EPW file".to_owned(), |s| {
+                format!("{} {} {} (WMO {}), {:.3}°, {:.3}°, {:.0} m", s.name, s.region, s.country, s.wmo, s.latitude, s.longitude, s.elevation)
+            });
+            let period = w.period.map_or(String::new(), |p| if p[0] == p[1] { format!("{}", p[0]) } else { format!("{}–{}", p[0], p[1]) });
+            let f = super::reinforcement_ui::Form::new(&frame, "Weather");
+            let file = f.text("Weather file", w.file.as_deref().unwrap_or(""), "Copied into the project's resource folder");
+            file.set_editable(false);
+            let st = f.text("Station", &station, &format!("Period of record: {period}"));
+            st.set_editable(false);
+            let d = &w.derived;
+            let o = &w.overrides;
+            // The file's value in the label; a typed value is the user's override.
+            let field = |label: &str, over: Option<f64>, from: Option<f64>, unit: &str| {
+                let shown = format!("{label} — file: {}{unit}", from.map_or("none".to_owned(), |v| format!("{v}")));
+                f.text(&shown, &over.map_or(String::new(), |v| format!("{v}")), "Blank: the file's value; a typed value is kept as your override")
+            };
+            let heat = field("Heating dry-bulb 99.6 %", o.heating_dry_bulb, d.heating_dry_bulb, " °C");
+            let cool = field("Cooling dry-bulb 0.4 %", o.cooling_dry_bulb, d.cooling_dry_bulb, " °C");
+            let wet = field("Coincident wet-bulb", o.cooling_wet_bulb, d.cooling_wet_bulb, " °C");
+            let range = field("Daily range", o.daily_range, d.daily_range, " K");
+            let clear = field("Clearness", o.clearness, d.clearness, "");
+            let import = f.check("Import", "Import an EPW file after OK", w.file.is_none());
+            if !f.show("Typed values are kept as your overrides, also when the file is imported again.", "OK") {
+                f.dialog.destroy();
+                return;
+            }
+            let opt = |t: &TextCtrl| t.get_value().trim().replace(',', ".").parse::<f64>().ok();
+            let overrides = json!({
+                "heating_dry_bulb": opt(&heat), "cooling_dry_bulb": opt(&cool), "cooling_wet_bulb": opt(&wet),
+                "daily_range": opt(&range), "clearness": opt(&clear),
+            });
+            let want_import = import.get_value();
+            f.dialog.destroy();
+            if let Err(e) = self.run("weather.set_design", json!({ "overrides": overrides })) {
+                error(&frame, &e);
+                continue;
+            }
+            if !want_import {
+                return;
+            }
+            let fd = FileDialog::builder(&frame)
+                .with_message("Import EPW Weather File")
+                .with_wildcard("EnergyPlus weather (*.epw)|*.epw;*.EPW|All files (*.*)|*.*")
+                .with_style(FileDialogStyle::Open | FileDialogStyle::FileMustExist)
+                .build();
+            if fd.show_modal() != ID_OK {
+                return;
+            }
+            let Some(path) = fd.get_path() else { return };
+            match self.run("weather.import", json!({ "path": path })) {
+                Ok(r) => {
+                    let warns: Vec<String> = r["warnings"].as_array().into_iter().flatten().filter_map(|w| w.as_str().map(str::to_owned)).collect();
+                    if !warns.is_empty() {
+                        error(&frame, &format!("Imported, with warnings:\n{}", warns.join("\n")));
+                    }
+                }
+                Err(e) => error(&frame, &format!("The weather file was not imported:\n{e}")),
+            }
+        }
     }
 }

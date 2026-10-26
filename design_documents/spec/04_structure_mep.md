@@ -4893,10 +4893,12 @@ The analysis services in this section are **P2** unless stated otherwise. They a
 - `weather.import(path) -> id`
 
 **Acceptance criteria.**
-- [ ] Loading an EPW file fills the location and design temperatures, and they are shown in Energy Settings.
-- [ ] An EPW file truncated at 8 000 records is refused, and the message names the line where it ends.
-- [ ] Changing the weather file after a heating and cooling loads run marks that run stale.
-- [ ] A user override of the heating design temperature survives re-import of the same EPW file and is marked as an override.
+- [x] Loading an EPW file fills the location and design temperatures, and they are shown in Energy Settings. *(Shown in Analyze › Energy › Weather; Energy Settings are not built.)*
+- [x] An EPW file truncated at 8 000 records is refused, and the message names the line where it ends.
+- [ ] Changing the weather file after a heating and cooling loads run marks that run stale. *(Loads runs are not built; the weather's revision, bumped on every change, is what they will compare.)*
+- [x] A user override of the heating design temperature survives re-import of the same EPW file and is marked as an override.
+
+*Built (2026-10-25):* Analyze › **Energy** › *Location* (DM-LOC-001's dialog) and *Weather*: the weather file and station (name, region, country, WMO number, position, elevation, period of record), the design conditions with the file's value beside each and a field for the user's override, and *Import an EPW file*. `weather.import(path)` (an app command) reads the file, refuses one without 8 760 hourly records (8 784 with 29 February in a leap year) or with a malformed line, naming the line ("the hourly records end at line 8008 after 8000 of 8760 records"), copies it into `<project>.resources/weather/` (an untitled project keeps the path given) and applies it with `weather.apply`; a project with no location takes the station's latitude, longitude, elevation and time zone. A station more than 50 km from the site or more than 300 m above or below it is a warning. Derived from the hours: heating dry-bulb 99.6 % (the sorted hour at 0.4 %), cooling dry-bulb 0.4 % (the hour at 99.6 %) with the mean wet-bulb of the hours at or above it (wet-bulb by the psychrometric balance, Magnus saturation pressure, solved by bisection), the warmest month's mean daily range and its clearness (global over extraterrestrial horizontal radiation over daylight hours). `weather.set_design(overrides)` keeps the user's values over the file's (heating below cooling, clearness 0–1.2, range 0–40 K); `weather.get`. The weather is kept with the location (`rxd:location`, `weather`) with a revision bumped on every change for staleness. Not yet: importing from a configured URL, picking a previously imported file, the IFC document reference to the weather file, stale marking of results (no loads runs yet), a geocoder and city list.
 
 ### 4.12.2 Energy settings
 **ID:** ANA-EM-002 · **Priority:** P2 · **Ref:** research/03 §13.1 ("Energy Settings", 2027 Energy Model Guide), §12.1

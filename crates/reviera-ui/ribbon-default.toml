@@ -2812,6 +2812,12 @@ icon = "location"
 help = "The project's latitude, longitude, elevation and time zone, the project base point and angle to true north, the survey point with its shared coordinates, and the CRS (DM-LOC-001)"
 
 [[action]]
+id = "weather.import"
+label = "Weather"
+icon = "weather"
+help = "The project's weather file (EPW) and design conditions: import a file, see its station, and override the heating and cooling design temperatures (ANA-EM-001)"
+
+[[action]]
 id = "coordinates.report"
 label = "Report Coordinates"
 icon = "report_coordinates"
@@ -3393,6 +3399,13 @@ tools = [
   { action = "ui.system_zone_by_level", size = "small" },
   { action = "system_zone.info", size = "small" },
   { action = "system_zone.convert_legacy", size = "small" },
+]
+
+[[tab.panel]]
+label = "Energy"
+tools = [
+  { action = "location.set_all", size = "small" },
+  { action = "weather.import", size = "small" },
 ]
 
 [[tab.panel]]

@@ -1106,8 +1106,13 @@ schedules, circuit paths, cable sizing and voltage drop.
   site's RefLatitude/RefLongitude/RefElevation, the context's TrueNorth and an IfcMapConversion
   to an IfcProjectedCRS; a site location from another tool is read
   (`location.set`, `location.set_all`, `coordinates.*`, `position.rotate_true_north`;
-  DM-LOC-001). Not built yet: map and city search, weather, named sites, acquire and publish
+  DM-LOC-001). Not built yet: map and city search, named sites, acquire and publish
   coordinates, relocate and mirror, picking the points in a view, CRS validation.
+- **Weather** (Analyze › Energy › Weather): EPW weather files imported and copied beside the
+  project, with their station and the design conditions derived from the hours (heating 99.6 %,
+  cooling 0.4 % with coincident wet-bulb, daily range, clearness) and your own overrides kept
+  over them; a far station is warned about (`weather.import`, `weather.set_design`,
+  `weather.get`; ANA-EM-001). Not built yet: weather from URLs, results marked stale.
 - **Sloped piping and parallel pipes** (Systems › HVAC & Piping › Slope, Parallel Pipes): the
   Slope Editor gives a connected section of pipe one of the project's allowed slopes from a
   control point (the lowest end by default): fittings follow, branches stay connected (their

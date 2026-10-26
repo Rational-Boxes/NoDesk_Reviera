@@ -4669,6 +4669,7 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "circuit.renumber" => with(gui, Gui::renumber_circuits),
         "location.set_all" => with(gui, Gui::location_dialog),
         "coordinates.report" => with(gui, Gui::report_coordinates),
+        "weather.import" => with(gui, Gui::weather_dialog),
         "circuit.set_locked" => with(gui, Gui::toggle_circuit_lock),
         "circuit.disconnect_panel" => with(gui, Gui::disconnect_circuit_panel),
         "panel.settings" => with(gui, Gui::panel_settings),

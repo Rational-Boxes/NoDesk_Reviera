@@ -246,7 +246,7 @@ pub fn toolset_of(command: &str) -> String {
             | "subcategory" => "families",
             "material" | "object_style" | "line_pattern" | "line_style" | "line_weight"
             | "fill_pattern" | "image" | "objectstyle" | "lineweight" => "materials",
-            "project" | "location" | "coordinates" | "position" | "phase" | "standards"
+            "project" | "location" | "coordinates" | "position" | "weather" | "phase" | "standards"
             | "units" | "code" | "purge" | "classification" | "keynotes" | "paramlib"
             | "external_props" => "project_setup",
             "file" | "import" | "export" | "live" | "recovery" | "validate" | "rxd" | "journal"

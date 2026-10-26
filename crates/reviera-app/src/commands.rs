@@ -112,6 +112,7 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add_host(crate::standards_transfer::StandardsList),
         registry.add_host(crate::standards_transfer::StandardsTransfer),
         registry.add_host(crate::system_zones::ConvertLegacy),
+        registry.add_host(crate::weather::WeatherImport),
         registry.add_host(SelectionRemove),
     ];
     for r in results {

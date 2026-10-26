@@ -414,6 +414,9 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(CoordinatesSetCrs),
         registry.add(CoordinatesReport),
         registry.add(PositionRotateTrueNorth),
+        registry.add(WeatherApply),
+        registry.add(WeatherSetDesign),
+        registry.add(WeatherGet),
         registry.add(PropertyLineCreate),
         registry.add(SiteComponentPlace),
         registry.add(ToposolidCutFill),
@@ -5748,6 +5751,38 @@ edit_command!(
     crate::location::RotateParams,
     f64,
     crate::location::rotate_true_north
+);
+
+edit_command!(
+    WeatherApply,
+    "weather.apply",
+    "Apply a weather file",
+    "Keeps an imported weather file (`file`) with its station, period and derived design conditions (`epw`, as `weather.import` reads them) (ANA-EM-001); the user's overrides stay. With `set_location`, the project takes the station's latitude, longitude, elevation and time zone. Use `weather.import` to read a file.",
+    "Weather",
+    crate::weather::ApplyParams,
+    crate::weather::Weather,
+    crate::weather::apply
+);
+
+edit_command!(
+    WeatherSetDesign,
+    "weather.set_design",
+    "Set design conditions",
+    "The user's design conditions over the weather file's (`overrides`: heating_dry_bulb, cooling_dry_bulb, cooling_wet_bulb in °C, daily_range in K, clearness 0–1; a missing value follows the file). Overrides survive importing the file again. Returns the weather.",
+    "Design Conditions",
+    crate::weather::DesignParams,
+    crate::weather::Weather,
+    crate::weather::set_design
+);
+
+read_command!(
+    WeatherGet,
+    "weather.get",
+    "Weather and design conditions",
+    "The project's weather file, station, period of record, the design conditions derived from the file, the user's overrides, and a revision bumped on every change (ANA-EM-001).",
+    crate::weather::Empty,
+    crate::weather::Weather,
+    crate::weather::get_cmd
 );
 
 edit_command!(

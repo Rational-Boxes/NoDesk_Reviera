@@ -63,6 +63,8 @@ pub struct Location {
     pub true_north: f64,
     /// `EPSG:nnnn`.
     pub crs: Option<String>,
+    /// The weather file and design conditions (ANA-EM-001).
+    pub weather: crate::weather::Weather,
 }
 
 fn project(store: &Store) -> Option<&Element> {
@@ -73,7 +75,7 @@ pub fn get(store: &Store) -> Location {
     project(store).and_then(|p| p.param(KEY)).and_then(|v| serde_json::from_value(v.clone()).ok()).unwrap_or_default()
 }
 
-fn put(txn: &mut Transaction<'_>, l: &Location) -> Result<()> {
+pub(crate) fn put(txn: &mut Transaction<'_>, l: &Location) -> Result<()> {
     let p = project(txn.store()).map(Element::id).ok_or_else(|| bad("project.missing", "the model has no project"))?;
     let v = serde_json::to_value(l).expect("serialises");
     txn.modify(p, |e| {
