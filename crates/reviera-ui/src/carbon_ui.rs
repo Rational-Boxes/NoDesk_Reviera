@@ -129,16 +129,14 @@ impl Gui {
                     let Some(m) = material else { continue };
                     self.run("embodied_carbon.match", json!({ "material": m, "factor_ref": Value::Null })).map(|_| ())
                 }
-                RUN => {
-                    let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_millis() as i64);
-                    match self.run("embodied_carbon.run", json!({ "at": now })) {
-                        Ok(_) => {
-                            self.carbon_results();
-                            continue;
-                        }
-                        Err(e) => Err(e),
+                // A compute job: the results open when it is collected.
+                RUN => match self.run("embodied_carbon.run", json!({})) {
+                    Ok(v) => {
+                        self.watch_job(v["job_id"].as_str().unwrap_or_default().to_owned(), "embodied_carbon.collect", "Embodied carbon");
+                        return;
                     }
-                }
+                    Err(e) => Err(e),
+                },
                 RESULTS => {
                     self.carbon_results();
                     continue;
@@ -152,7 +150,7 @@ impl Gui {
     }
 
     /// The latest run: totals, then by category and by material.
-    fn carbon_results(&mut self) {
+    pub(crate) fn carbon_results(&mut self) {
         let frame = self.frame;
         let res = match self.run("embodied_carbon.results", json!({})) {
             Ok(v) => v,

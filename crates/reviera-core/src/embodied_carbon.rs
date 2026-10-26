@@ -19,8 +19,11 @@
 //!   else none: the line is excluded with the reason); B4 = (A1–A3 + C1–C4) × replacements,
 //!   replacements = ceil(study period ÷ service life) − 1. Module D and biogenic carbon are
 //!   reported apart and never netted into the A–C total.
-//! - **Runs** are kept with the factors they used (snapshotted) and each element's inputs, so a
-//!   run reports itself stale for exactly the elements whose quantities or matches changed.
+//! - **Runs** are compute jobs (`analysis.carbon`, ANA-ENV-001): the editor distils the
+//!   quantities and matched factors ([`distill`]), the built-in runner calculates ([`compute`]),
+//!   and the editor records the results (`embodied_carbon.record`) with the factors they used
+//!   and each element's inputs, so a run reports itself stale for exactly the elements whose
+//!   quantities or matches changed.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -307,50 +310,105 @@ fn signature(qs: &[&Quantity], d: &CarbonData) -> String {
     qs.iter().map(|q| format!("{}:{:.6}:{:.6}:{}", q.material, q.volume, q.area, d.matches.get(&q.material).cloned().unwrap_or_default())).collect::<Vec<_>>().join(";")
 }
 
-/// Works out a run.
-pub fn calculate(store: &Store, o: &Options) -> Run {
+/// One quantity line of a carbon job, keyed by an opaque element key.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct InputLine {
+    pub key: String,
+    pub category: String,
+    pub material: String,
+    pub volume: f64,
+    pub area: f64,
+}
+
+/// What an `analysis.carbon` job needs: the quantities, the factor matched to each material
+/// (unmatched materials have none) and the options. Element keys are opaque; the map back to
+/// GlobalIds stays in the editor.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct CarbonInput {
+    pub lines: Vec<InputLine>,
+    pub factors: BTreeMap<String, Factor>,
+    pub options: Options,
+}
+
+/// What a carbon job returns: totals, breakdowns, element results by key, exclusions.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct CarbonResults {
+    pub totals: Gwp,
+    pub per_m2: Option<f64>,
+    pub by_category: Vec<Line>,
+    pub by_material: Vec<Line>,
+    /// By element key.
+    pub by_element: BTreeMap<String, Gwp>,
+    pub excluded: Vec<Excluded>,
+    pub unmatched_share: f64,
+}
+
+/// A distillation: the job's input, the element key → GlobalId map and each element's inputs.
+#[derive(Debug, Clone)]
+pub struct Distilled {
+    pub input: CarbonInput,
+    pub key_map: BTreeMap<String, String>,
+    pub inputs: BTreeMap<String, String>,
+}
+
+/// Distils the model for a carbon job.
+pub fn distill(store: &Store, o: &Options) -> Distilled {
     let d = data(store);
     let (qs, _) = quantities(store);
+    let mut keys: BTreeMap<ElementId, String> = BTreeMap::new();
+    let mut key_map = BTreeMap::new();
+    let mut lines = Vec::new();
+    let mut factors = BTreeMap::new();
+    for q in &qs {
+        let n = keys.len();
+        let key = keys.entry(q.element).or_insert_with(|| format!("e{}", n + 1)).clone();
+        if let Some(e) = store.get(q.element) {
+            key_map.insert(key.clone(), e.guid().to_string());
+        }
+        if let Some(f) = factor_for(&d, &q.material) {
+            factors.insert(q.material.clone(), f.clone());
+        }
+        lines.push(InputLine { key, category: q.category.clone(), material: q.material.clone(), volume: q.volume, area: q.area });
+    }
+    let mut per: BTreeMap<ElementId, Vec<&Quantity>> = BTreeMap::new();
+    for q in &qs {
+        per.entry(q.element).or_default().push(q);
+    }
+    let inputs = per.into_iter().filter_map(|(id, v)| Some((store.get(id)?.guid().to_string(), signature(&v, &d)))).collect();
+    Distilled { input: CarbonInput { lines, factors, options: o.clone() }, key_map, inputs }
+}
+
+/// Calculates a carbon job (the runner's side; pure).
+pub fn compute(input: &CarbonInput) -> CarbonResults {
+    let o = &input.options;
     let mut totals = Gwp::default();
     let mut by_cat: BTreeMap<String, Line> = BTreeMap::new();
     let mut by_mat: BTreeMap<String, Line> = BTreeMap::new();
     let mut by_el: BTreeMap<String, Gwp> = BTreeMap::new();
     let mut excluded: BTreeMap<(String, String), f64> = BTreeMap::new();
-    let mut factors = BTreeMap::new();
     let (mut vol, mut unmatched) = (0.0, 0.0);
-    for q in &qs {
-        vol += q.volume;
-        let Some(f) = factor_for(&d, &q.material) else {
-            unmatched += q.volume;
-            *excluded.entry((q.material.clone(), "unmatched".into())).or_default() += q.volume;
+    for l in &input.lines {
+        vol += l.volume;
+        let q = Quantity { element: ElementId(0), category: l.category.clone(), material: l.material.clone(), volume: l.volume, area: l.area };
+        let Some(f) = input.factors.get(&l.material) else {
+            unmatched += l.volume;
+            *excluded.entry((l.material.clone(), "unmatched".into())).or_default() += l.volume;
             continue;
         };
-        match gwp(q, f, o) {
+        match gwp(&q, f, o) {
             Ok(g) => {
-                factors.insert(q.material.clone(), f.clone());
                 totals.add(&g);
-                let guid = store.get(q.element).map(|e| e.guid().to_string()).unwrap_or_default();
-                by_el.entry(guid).or_default().add(&g);
-                for (map, key) in [(&mut by_cat, q.category.clone()), (&mut by_mat, q.material.clone())] {
-                    let l = map.entry(key.clone()).or_insert_with(|| Line { key, gwp: Gwp::default(), volume: 0.0 });
-                    l.gwp.add(&g);
-                    l.volume += q.volume;
+                by_el.entry(l.key.clone()).or_default().add(&g);
+                for (map, key) in [(&mut by_cat, l.category.clone()), (&mut by_mat, l.material.clone())] {
+                    let line = map.entry(key.clone()).or_insert_with(|| Line { key, gwp: Gwp::default(), volume: 0.0 });
+                    line.gwp.add(&g);
+                    line.volume += l.volume;
                 }
             }
             Err(why) => {
-                unmatched += q.volume;
-                *excluded.entry((q.material.clone(), why)).or_default() += q.volume;
+                unmatched += l.volume;
+                *excluded.entry((l.material.clone(), why)).or_default() += l.volume;
             }
-        }
-    }
-    let mut inputs = BTreeMap::new();
-    let mut per: BTreeMap<ElementId, Vec<&Quantity>> = BTreeMap::new();
-    for q in &qs {
-        per.entry(q.element).or_default().push(q);
-    }
-    for (id, v) in per {
-        if let Some(e) = store.get(id) {
-            inputs.insert(e.guid().to_string(), signature(&v, &d));
         }
     }
     let sort = |m: BTreeMap<String, Line>| {
@@ -358,20 +416,40 @@ pub fn calculate(store: &Store, o: &Options) -> Run {
         v.sort_by(|a, b| b.gwp.total.total_cmp(&a.gwp.total));
         v
     };
-    Run {
-        id: String::new(),
-        at: 0,
+    CarbonResults {
         per_m2: o.gross_floor_area.filter(|a| *a > 0.0).map(|a| totals.total / a),
-        options: o.clone(),
         totals,
         by_category: sort(by_cat),
         by_material: sort(by_mat),
         by_element: by_el,
         excluded: excluded.into_iter().map(|((material, reason), volume)| Excluded { material, volume, reason }).collect(),
         unmatched_share: if vol > 0.0 { unmatched / vol } else { 0.0 },
-        factors,
+    }
+}
+
+/// A run from a job's results and its distillation.
+pub fn to_run(r: CarbonResults, key_map: &BTreeMap<String, String>, inputs: BTreeMap<String, String>, input: &CarbonInput) -> Run {
+    Run {
+        id: String::new(),
+        at: 0,
+        options: input.options.clone(),
+        totals: r.totals,
+        per_m2: r.per_m2,
+        by_category: r.by_category,
+        by_material: r.by_material,
+        by_element: r.by_element.into_iter().filter_map(|(k, g)| Some((key_map.get(&k)?.clone(), g))).collect(),
+        excluded: r.excluded,
+        unmatched_share: r.unmatched_share,
+        factors: input.factors.clone(),
         inputs,
     }
+}
+
+/// Works out a run in the editor (for staleness checks; runs proper are compute jobs).
+pub fn calculate(store: &Store, o: &Options) -> Run {
+    let d = distill(store, o);
+    let r = compute(&d.input);
+    to_run(r, &d.key_map, d.inputs, &d.input)
 }
 
 /// The elements whose inputs changed since a run (GlobalIds), and whether the factors did.
@@ -611,25 +689,32 @@ pub(crate) fn auto_match(txn: &mut Transaction<'_>, p: AutoMatchParams) -> Resul
 
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
-pub struct RunParams {
+pub struct RecordParams {
+    /// The compute job it came from.
     #[serde(default)]
-    pub options: Option<Options>,
-    /// Milliseconds since 1970, for the run's time.
+    pub job_id: Option<String>,
+    pub results: CarbonResults,
+    /// Element key → GlobalId (the distillation's).
+    pub key_map: BTreeMap<String, String>,
+    /// Each element's inputs at distillation (GlobalId → signature).
+    pub inputs: BTreeMap<String, String>,
+    /// The factors used, by material.
+    pub factors: BTreeMap<String, Factor>,
+    #[serde(default)]
+    pub options: Options,
+    /// Milliseconds since 1970.
     #[serde(default)]
     pub at: i64,
 }
 
-/// `embodied_carbon.run`: calculated and kept (the last ten runs are kept).
-pub(crate) fn run(txn: &mut Transaction<'_>, p: RunParams) -> Result<Run> {
-    let o = p.options.unwrap_or_default();
-    if !(o.study_period > 0.0 && o.study_period <= 200.0) {
-        return Err(bad("carbon.options", "the study period runs from 1 to 200 years"));
-    }
-    let store = txn.store().clone();
-    let mut r = calculate(&store, &o);
-    let mut d = data(&store);
-    r.id = format!("run{}", d.runs.iter().filter_map(|x| x.id.strip_prefix("run")?.parse::<u64>().ok()).max().unwrap_or(0) + 1);
+/// `embodied_carbon.record`: keeps a finished run (the last ten are kept).
+pub(crate) fn record(txn: &mut Transaction<'_>, p: RecordParams) -> Result<Run> {
+    let input = CarbonInput { lines: Vec::new(), factors: p.factors, options: p.options };
+    let mut r = to_run(p.results, &p.key_map, p.inputs, &input);
+    let mut d = data(txn.store());
+    r.id = p.job_id.unwrap_or_else(|| format!("run{}", d.runs.iter().filter_map(|x| x.id.strip_prefix("run")?.parse::<u64>().ok()).max().unwrap_or(0) + 1));
     r.at = p.at;
+    d.runs.retain(|x| x.id != r.id);
     d.runs.push(r.clone());
     if d.runs.len() > 10 {
         let n = d.runs.len() - 10;
@@ -637,6 +722,14 @@ pub(crate) fn run(txn: &mut Transaction<'_>, p: RunParams) -> Result<Run> {
     }
     put(txn, &d)?;
     Ok(r)
+}
+
+/// Checks a run's options.
+pub fn check_options(o: &Options) -> Result<()> {
+    if !(o.study_period > 0.0 && o.study_period <= 200.0) {
+        return Err(bad("carbon.options", "the study period runs from 1 to 200 years"));
+    }
+    Ok(())
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]

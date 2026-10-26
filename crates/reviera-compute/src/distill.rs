@@ -38,6 +38,26 @@ pub fn structural_model(d: &reviera_core::structural_model::Distilled) -> Distil
     }
 }
 pub const CLASH_BODIES_VERSION: u32 = 1;
+pub const CARBON_QUANTITIES: &str = "carbon.quantities";
+
+/// The `carbon.quantities` distillation (ANA-ENV-001): quantity lines with opaque element keys,
+/// the matched factors and the options, as one JSON blob.
+pub fn carbon(d: &reviera_core::embodied_carbon::Distilled) -> Distilled {
+    let raw = serde_json::to_vec(&d.input).expect("the input serialises");
+    let blob = Blob::new(raw, crate::kinds::JSON, crate::kinds::CARBON_INPUT);
+    let snapshot_hash = blob.reference.sha256.clone();
+    Distilled {
+        distiller: CARBON_QUANTITIES.into(),
+        version: 1,
+        detail: String::new(),
+        anonymised: false,
+        blobs: vec![blob],
+        key_map: d.key_map.clone(),
+        elements: d.key_map.len(),
+        triangles: 0,
+        snapshot_hash,
+    }
+}
 
 /// Target size of one chunk before encoding.
 const CHUNK_TARGET: usize = 2 << 20;

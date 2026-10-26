@@ -111,6 +111,7 @@ mod mep_fill_ui;
 mod location_ui;
 mod carbon_ui;
 mod route_ui;
+mod jobs_ui;
 mod mech_settings_ui;
 mod wall_profile;
 mod wall_sweeps;
@@ -302,6 +303,9 @@ struct Gui {
     section_tool: Option<sections::SectionTool>,
     /// The Path of Travel tool's start point, once clicked (ANA-ROUTE-001).
     route_start: Option<[f64; 2]>,
+    /// Analysis jobs being watched, and when they were last polled.
+    jobs: Vec<jobs_ui::WatchedJob>,
+    jobs_polled: Option<std::time::Instant>,
     /// The Tag, Room Tag or Text tool.
     note_tool: Option<notes::NoteTool>,
     /// The Stair tool.
@@ -3704,6 +3708,8 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 section_tool: None,
                 note_tool: None,
                 route_start: None,
+                jobs: Vec::new(),
+                jobs_polled: None,
                 stair_tool: None,
                 dormer_tool: None,
                 railing_tool: None,
@@ -3947,6 +3953,19 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
             });
         }
         {
+            // Analysis jobs are watched every half second, also while the window is quiet (idle
+            // events need other events to come first).
+            let timer = Timer::new(&frame);
+            let gg = gui.clone();
+            timer.on_tick(move |_| {
+                if let Ok(mut g) = gg.try_borrow_mut() {
+                    g.jobs_idle();
+                }
+            });
+            timer.start(500, false);
+            std::mem::forget(timer);
+        }
+        {
             // Refresh the palette outside its own event handlers.
             let (gui, g) = (gui.clone(), grid);
             frame.on_idle(move |e| {
@@ -3966,6 +3985,7 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                     }
                     gui.sync_views();
                     gui.system_browser_idle();
+                    gui.jobs_idle();
                     gui.inspector_idle();
                     gui.calculator_sync(false);
                     if gui.browser_stale {

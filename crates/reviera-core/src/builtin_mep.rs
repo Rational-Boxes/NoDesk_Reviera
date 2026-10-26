@@ -225,7 +225,7 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(CarbonMatch),
         registry.add(CarbonAutoMatch),
         registry.add(CarbonMaterials),
-        registry.add(CarbonRun),
+        registry.add(CarbonRecord),
         registry.add(CarbonResults),
         registry.add(CircuitRenumberPreview),
         registry.add(CircuitSetLocked),
@@ -2300,14 +2300,14 @@ read_command!(
 );
 
 edit_command!(
-    CarbonRun,
-    "embodied_carbon.run",
-    "Run embodied carbon",
-    "Calculates the embodied carbon (ANA-CARB-001) of walls, floors, ceilings and roofs and keeps the run (the last ten): GWP = quantity × factor per stage, mass = volume × the factor's density for per-kg factors; `options` {stages: any of a4, a5, b4, c1_c4 (A1-A3, D and biogenic always), study_period (years, default 50), gross_floor_area (m2)}. B4 = (A1-A3 + C1-C4) × (ceil(study period ÷ service life) − 1). Module D and biogenic carbon are apart, never netted into the A-C total. Unmatched materials are listed with the share of the volume they are. The factors used and each element's inputs are kept, so the run can tell which elements changed. Returns the run.",
+    CarbonRecord,
+    "embodied_carbon.record",
+    "Record an embodied carbon run",
+    "Keeps a finished embodied carbon run (ANA-CARB-001, ANA-ENV-001): the `results` of an analysis.carbon job, its distillation's `key_map` (element key → GlobalId) and `inputs`, the `factors` used and the `options`. embodied_carbon.collect calls it; the last ten runs are kept. Returns the run.",
     "Embodied Carbon",
-    crate::embodied_carbon::RunParams,
+    crate::embodied_carbon::RecordParams,
     crate::embodied_carbon::Run,
-    crate::embodied_carbon::run
+    crate::embodied_carbon::record
 );
 
 read_command!(

@@ -124,3 +124,106 @@ impl HostCommand for ExportRun {
         Ok(p.path)
     }
 }
+
+#[derive(Debug, Default, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct RunParams {
+    #[serde(default)]
+    pub options: Option<ec::Options>,
+}
+
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct RunOut {
+    pub job_id: String,
+    pub lines: usize,
+    pub elements: usize,
+    pub matched_materials: usize,
+}
+
+pub(crate) struct RunCarbon;
+
+impl HostCommand for RunCarbon {
+    type Host = App;
+    type Params = Option<RunParams>;
+    type Output = RunOut;
+    const META: CommandMeta = CommandMeta {
+        name: "embodied_carbon.run",
+        version: 1,
+        summary: "Run embodied carbon",
+        description: "Starts an embodied carbon run (ANA-CARB-001, ANA-ENV-001) as an analysis.carbon compute job: the quantities of walls, floors, ceilings and roofs and the factors matched to their materials are distilled (element keys opaque) and calculated out of process by the built-in runner. `options`: stages (a4, a5, b4, c1_c4), study_period (years, default 50), gross_floor_area (m2). Returns the job at once; follow it with compute.status, then embodied_carbon.collect.",
+        effects: &[Effect::Read],
+        transaction_name: "",
+    };
+
+    fn run(&self, app: &mut App, _: &Caller, p: Option<RunParams>) -> Result<RunOut> {
+        let o = p.and_then(|p| p.options).unwrap_or_default();
+        ec::check_options(&o)?;
+        let doc = app.active().ok_or_else(|| bad("document.none", "no document is open"))?;
+        let store = app.get(doc)?.doc.store();
+        let d = ec::distill(store, &o);
+        if d.input.lines.is_empty() {
+            return Err(bad("carbon.nothing", "the model has no walls, floors, ceilings or roofs to quantify"));
+        }
+        let out = RunOut { job_id: String::new(), lines: d.input.lines.len(), elements: d.key_map.len(), matched_materials: d.input.factors.len() };
+        let distilled = reviera_compute::distill::carbon(&d);
+        let client = app.compute();
+        let job_id = client.submit(reviera_compute::kinds::CARBON, None, &distilled, "", None).map_err(crate::compute::failed)?;
+        client.set_context(&job_id, json!({ "carbon": { "inputs": d.inputs, "factors": d.input.factors, "options": o } }));
+        Ok(RunOut { job_id, ..out })
+    }
+}
+
+#[derive(Debug, Default, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct CollectParams {
+    /// Default the latest finished carbon run not yet collected.
+    pub job_id: Option<String>,
+}
+
+pub(crate) struct CollectCarbon;
+
+impl HostCommand for CollectCarbon {
+    type Host = App;
+    type Params = Option<CollectParams>;
+    type Output = ec::Run;
+    const META: CommandMeta = CommandMeta {
+        name: "embodied_carbon.collect",
+        version: 1,
+        summary: "Collect an embodied carbon run",
+        description: "Fetches a finished analysis.carbon job's results from the compute host and keeps them with the model (embodied_carbon.record, one undoable step). Returns the run.",
+        effects: &[Effect::Edit],
+        transaction_name: "",
+    };
+
+    fn run(&self, app: &mut App, caller: &Caller, p: Option<CollectParams>) -> Result<ec::Run> {
+        use reviera_compute::kinds::{CARBON, CARBON_RESULTS};
+        let client = app.compute();
+        let job = match p.and_then(|p| p.job_id) {
+            Some(id) => client.status(&id),
+            None => {
+                let mut jobs: Vec<_> = client.jobs().into_iter().filter(|j| j.kind == CARBON && j.state == "succeeded" && !j.results_fetched).collect();
+                jobs.sort_by_key(|j| j.submitted_ms);
+                jobs.pop()
+            }
+        }
+        .ok_or_else(|| bad("carbon.no_job", "there is no finished embodied carbon run to collect"))?;
+        if job.state != "succeeded" {
+            let why = job.failure.as_ref().map(|f| format!(": {}", f.message)).unwrap_or_default();
+            return Err(bad("compute.not_ready", format!("the run is {}{why}", job.state)));
+        }
+        let (m, raw) = client.results(&job.job_id).map_err(crate::compute::failed)?;
+        if m.schema != CARBON_RESULTS {
+            return Err(bad("carbon.not_a_carbon_run", m.schema));
+        }
+        let results: ec::CarbonResults = serde_json::from_slice(&raw).map_err(|e| bad("compute.invalid_input", e.to_string()))?;
+        let ctx = job.context.clone().unwrap_or_default();
+        let c = &ctx["carbon"];
+        let at = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_millis() as i64);
+        let out = app.execute(
+            "embodied_carbon.record",
+            json!({ "job_id": job.job_id, "results": results, "key_map": job.key_map, "inputs": c["inputs"], "factors": c["factors"], "options": c["options"], "at": at }),
+            caller,
+        )?;
+        serde_json::from_value(out.result).map_err(|e| bad("carbon.internal", e.to_string()))
+    }
+}

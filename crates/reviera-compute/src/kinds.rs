@@ -28,6 +28,9 @@ pub const STRUCTURAL: &str = "analysis.structural";
 pub const STRUCTURAL_MODEL: &str = "reviera.structural.v1.Model";
 pub const STRUCTURAL_RESULTS: &str = "reviera.structural.v1.Results";
 pub const JSON: &str = "application/json";
+pub const CARBON: &str = "analysis.carbon";
+pub const CARBON_INPUT: &str = "reviera.carbon.v1.Input";
+pub const CARBON_RESULTS: &str = "reviera.carbon.v1.Results";
 
 fn version() -> String {
     env!("CARGO_PKG_VERSION").into()
@@ -264,6 +267,38 @@ impl Kind for StructuralKind {
             media_type: JSON.into(),
             schema: STRUCTURAL_RESULTS.into(),
         })
+    }
+}
+
+/// `analysis.carbon`: an embodied carbon run (ANA-CARB-001, ANA-ENV-001) from distilled
+/// quantities and matched factors ([`reviera_core::embodied_carbon::compute`]).
+#[derive(Debug, Default)]
+pub struct CarbonKind;
+
+impl Kind for CarbonKind {
+    fn info(&self) -> KindInfo {
+        KindInfo {
+            kind: CARBON.into(),
+            version: 1,
+            runner: "reviera-analysis-builtin".into(),
+            runner_version: version(),
+            licence: LICENCE.into(),
+            capabilities: vec!["batch".into(), "embodied-carbon".into()],
+            accepted_formats: vec![format!("{JSON};schema={CARBON_INPUT}")],
+            supports_checkpoints: false,
+            supports_sessions: false,
+        }
+    }
+
+    fn run(&self, ctx: &JobContext, _options: Option<&prost_types::Any>, inputs: &[Blob]) -> Result<Output, JobFailure> {
+        ctx.progress(0.0, "reading");
+        let blob = inputs.iter().find(|b| b.reference.schema == CARBON_INPUT).ok_or_else(|| JobFailure::new("invalid_input", "no carbon input in the inputs"))?;
+        let input: reviera_core::embodied_carbon::CarbonInput = serde_json::from_slice(&blob.raw).map_err(|e| JobFailure::new("invalid_input", e.to_string()))?;
+        ctx.progress(0.2, "calculating");
+        let r = reviera_core::embodied_carbon::compute(&input);
+        ctx.log(format!("{} quantity lines, {} factors, {:.0} kg CO2e A-C, {:.1} % of the volume unmatched", input.lines.len(), input.factors.len(), r.totals.total, r.unmatched_share * 100.0));
+        ctx.progress(1.0, "done");
+        Ok(Output { bytes: serde_json::to_vec(&r).map_err(|e| JobFailure::new("runner_failed", e.to_string()))?, media_type: JSON.into(), schema: CARBON_RESULTS.into() })
     }
 }
 

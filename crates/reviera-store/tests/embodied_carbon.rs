@@ -26,6 +26,14 @@ fn ok(r: &CommandRegistry, doc: &mut Document, name: &str, args: Value) -> Value
     run(r, doc, name, args).unwrap_or_else(|e| panic!("{name}: {e:?}"))
 }
 
+/// A run as the compute job does it: distilled, calculated by the runner's function, recorded.
+fn run_carbon(r: &CommandRegistry, doc: &mut Document, options: Value) -> Value {
+    let o: reviera_core::embodied_carbon::Options = serde_json::from_value(options).unwrap();
+    let d = reviera_core::embodied_carbon::distill(doc.store(), &o);
+    let res = reviera_core::embodied_carbon::compute(&d.input);
+    ok(r, doc, "embodied_carbon.record", json!({ "results": res, "key_map": d.key_map, "inputs": d.inputs, "factors": d.input.factors, "options": o }))
+}
+
 fn id(v: &Value) -> ElementId {
     ElementId(v.as_u64().unwrap_or_else(|| panic!("{v}")))
 }
@@ -68,7 +76,7 @@ fn embodied_carbon() {
     ok(&r, &mut doc, "embodied_carbon.match", json!({ "material": "Concrete C30/37", "factor_ref": format!("{}/c30", lib.as_str().unwrap()) }));
 
     // A 60-year study: 2 replacements of A1–A3 + C1–C4.
-    let res = ok(&r, &mut doc, "embodied_carbon.run", json!({ "options": { "stages": ["b4", "c1_c4"], "study_period": 60.0 } }));
+    let res = run_carbon(&r, &mut doc, json!({ "stages": ["b4", "c1_c4"], "study_period": 60.0 }));
     let w1_guid = doc.store().get(w1).unwrap().guid().to_string();
     let e1 = &res["by_element"][&w1_guid];
     assert!((e1["a1_a3"].as_f64().unwrap() - 2400.0).abs() < 1e-6, "10 m³ × 2400 kg/m³ × 0.10: {e1}");
@@ -93,7 +101,7 @@ fn embodied_carbon() {
     let w2_guid = doc.store().get(w2).unwrap().guid().to_string();
     assert_eq!(now["stale"], true);
     assert_eq!(now["stale_elements"], json!([w2_guid]));
-    let again = ok(&r, &mut doc, "embodied_carbon.run", json!({ "options": { "stages": ["b4", "c1_c4"], "study_period": 60.0 } }));
+    let again = run_carbon(&r, &mut doc, json!({ "stages": ["b4", "c1_c4"], "study_period": 60.0 }));
     assert_eq!(again["by_element"][&w1_guid], res["by_element"][&w1_guid], "the first wall's result is unchanged");
     assert_ne!(again["by_element"][&w2_guid], res["by_element"][&w2_guid]);
     assert!(again["totals"]["total"].as_f64().unwrap() > first_total);
