@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Reviera contributors
 
-//! Analyze › Carbon › **Embodied Carbon** (ANA-CARB-001): the project's materials with their
+//! Sustainability › Carbon › **Embodied Carbon** (ANA-CARB-001): the project's materials with their
 //! volume and match (Import Factors… reads a CSV library, Match… picks a factor, Auto-match
 //! proposes by name to confirm, Unmatch), then Run: the totals by stage (module D and biogenic
 //! apart), the share left unmatched, and the results by category and by material, with Export….

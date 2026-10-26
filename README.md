@@ -1108,13 +1108,22 @@ schedules, circuit paths, cable sizing and voltage drop.
   (`location.set`, `location.set_all`, `coordinates.*`, `position.rotate_true_north`;
   DM-LOC-001). Not built yet: map and city search, named sites, acquire and publish
   coordinates, relocate and mirror, picking the points in a view, CRS validation.
-- **Energy model** (Analyze › Energy › Energy Model): analytical spaces and heat-transfer
+- **Sustainability tab**: Site (Location, Weather), Energy (Energy Model, Heating & Cooling
+  Loads, Loads Report), Daylight & Solar (Solar Study, Solar Results) and Carbon (Embodied
+  Carbon); the heavier analyses run out of process as compute jobs the window watches.
+- **Heating and cooling loads** (Sustainability › Energy): design-day loads of the energy
+  model's spaces and system-zones by a simplified built-in method (steady-state heating; hourly
+  cooling with sol-air transmission, solar through glazing, people, lighting, equipment, outdoor
+  air and infiltration by class), run as `analysis.loads` jobs, peaks written to the spaces'
+  Pset_SpaceThermalDesign, stale when the model or weather change (`hc_loads.*`; ANA-HCL-001,
+  ANA-ENV-004). Not built yet: an RTS or EnergyPlus provider, plenums, reports as documents.
+- **Energy model** (Sustainability › Energy › Energy Model): analytical spaces and heat-transfer
   surfaces derived from the MEP spaces (exterior and interior walls with corresponding
   boundaries, windows and doors, slabs on grade, interior floors, roofs, air boundaries), with
   UA and window-to-wall ratio; U-values and SHGC per type written to IFC
   (`energy_model.get`, `.summary`, `.set_thermal`; ANA-EM-003, ANA-ENV-003). Not built yet:
   second-level space boundaries in IFC, masses as spaces, sloped roof areas.
-- **Solar studies** (Analyze › Daylight & Solar › Solar Study, Solar Results): cumulative
+- **Solar studies** (Sustainability › Daylight & Solar › Solar Study, Solar Results): cumulative
   insolation and PV potential (yield, cost, payback) on roof and mass faces from the site and the
   weather file, shaded by the whole model, run out of process (`analysis.solar` jobs), shown
   coloured on the model in 3D, stale when the model, site or weather change, exported as CSV
@@ -1126,7 +1135,7 @@ schedules, circuit paths, cable sizing and voltage drop.
   (zone, walking speed, clearance, ignored categories) (`path_of_travel.*`, `route_settings.*`;
   ANA-ROUTE-001/002). Not built yet: Reveal Obstacles, multiple paths, one-way indicators,
   people content, spatial grids.
-- **Embodied carbon** (Analyze › Carbon › Embodied Carbon): material quantities of walls,
+- **Embodied carbon** (Sustainability › Carbon › Embodied Carbon): material quantities of walls,
   floors, ceilings and roofs matched to emission factors from libraries you import (a documented
   CSV format; none are shipped), with proposals to confirm; runs by life-cycle stage (A1–A3, A4,
   A5, B4 replacements, C1–C4) with module D and biogenic carbon apart, the unmatched share,
@@ -1134,7 +1143,7 @@ schedules, circuit paths, cable sizing and voltage drop.
   export; runs are compute jobs of the built-in runner (`analysis.carbon`), watched by the
   window and collected when done (`embodied_carbon.*`; ANA-CARB-001, ANA-ENV-001). Not built yet: ILCD/openLCA readers, scopes,
   material carbon assets, charts and compare, results in IFC.
-- **Weather** (Analyze › Energy › Weather): EPW weather files imported and copied beside the
+- **Weather** (Sustainability › Site › Weather): EPW weather files imported and copied beside the
   project, with their station and the design conditions derived from the hours (heating 99.6 %,
   cooling 0.4 % with coincident wet-bulb, daily range, clearness) and your own overrides kept
   over them; a far station is warned about (`weather.import`, `weather.set_design`,

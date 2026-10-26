@@ -130,7 +130,7 @@ impl Gui {
 }
 
 impl Gui {
-    /// Analyze › Energy › Weather (ANA-EM-001): the weather file and station, Import EPW…, and
+    /// Sustainability › Site › Weather (ANA-EM-001): the weather file and station, Import EPW…, and
     /// the design conditions (the file's shown beside; a typed value overrides it).
     pub(crate) fn weather_dialog(&mut self) {
         let frame = self.frame;

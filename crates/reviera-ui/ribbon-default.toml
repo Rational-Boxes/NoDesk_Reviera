@@ -2818,6 +2818,18 @@ icon = "energy_model"
 help = "The analytical spaces and heat-transfer surfaces derived from the MEP spaces, their areas and UA, and the types' U-values (ANA-EM-003)"
 
 [[action]]
+id = "hc_loads.run"
+label = "Heating & Cooling Loads"
+icon = "hc_loads"
+help = "Design heating and cooling loads of the energy model's spaces and zones from the weather and the space types; runs out of process and writes the peaks to the spaces (ANA-HCL-001)"
+
+[[action]]
+id = "hc_loads.report"
+label = "Loads Report"
+icon = "loads_report"
+help = "The latest heating and cooling loads run: each space's and zone's peaks, components hour and airflows (ANA-HCL-001)"
+
+[[action]]
 id = "solar.run"
 label = "Solar Study"
 icon = "solar"
@@ -3450,31 +3462,12 @@ tools = [
 ]
 
 [[tab.panel]]
-label = "Daylight & Solar"
-tools = [
-  { action = "solar.run", size = "large" },
-  { action = "solar.results", size = "small" },
-]
-
-[[tab.panel]]
 label = "Route Analysis"
 tools = [
   { action = "path_of_travel.create", size = "large" },
   { action = "path_of_travel.update", size = "small" },
   { action = "route_settings.set", size = "small" },
   { action = "path_of_travel.list", size = "small" },
-]
-
-[[tab.panel]]
-label = "Carbon"
-tools = [{ action = "embodied_carbon.run", size = "large" }]
-
-[[tab.panel]]
-label = "Energy"
-tools = [
-  { action = "location.set_all", size = "small" },
-  { action = "weather.import", size = "small" },
-  { action = "energy_model.get", size = "small" },
 ]
 
 [[tab.panel]]
@@ -3549,6 +3542,40 @@ tools = [
 [[tab.panel]]
 label = "Remote Analysis"
 tools = [{ action = "ui.remote_analysis", size = "large" }]
+
+[[tab]]
+id = "sustainability"
+label = "Sustainability"
+
+[[tab.panel]]
+label = "Select"
+tools = [{ action = "tool.modify", size = "large" }]
+
+[[tab.panel]]
+label = "Site"
+tools = [
+  { action = "location.set_all", size = "large" },
+  { action = "weather.import", size = "large" },
+]
+
+[[tab.panel]]
+label = "Energy"
+tools = [
+  { action = "energy_model.get", size = "large" },
+  { action = "hc_loads.run", size = "large" },
+  { action = "hc_loads.report", size = "large" },
+]
+
+[[tab.panel]]
+label = "Daylight & Solar"
+tools = [
+  { action = "solar.run", size = "large" },
+  { action = "solar.results", size = "large" },
+]
+
+[[tab.panel]]
+label = "Carbon"
+tools = [{ action = "embodied_carbon.run", size = "large" }]
 
 [[tab]]
 id = "massing"

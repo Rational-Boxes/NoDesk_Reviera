@@ -228,6 +228,8 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(CarbonRecord),
         registry.add(SolarRecord),
         registry.add(EnergyModelGet),
+        registry.add(LoadsRecord),
+        registry.add(LoadsReport),
         registry.add(EnergyModelSummary),
         registry.add(EnergyModelSetThermal),
         registry.add(SolarResults),
@@ -2302,6 +2304,27 @@ read_command!(
     crate::embodied_carbon::Empty,
     Vec<crate::embodied_carbon::MaterialRow>,
     crate::embodied_carbon::materials
+);
+
+edit_command!(
+    LoadsRecord,
+    "hc_loads.record",
+    "Record a loads run",
+    "Keeps a finished heating and cooling loads run (ANA-HCL-001, ANA-ENV-004): the analysis.loads job's results (per space: heating, cooling sensible, latent and total, peak hour, components, airflows; per system-zone; the building's coincident peak), its key map, design temperatures, infiltration class, weather revision and input hash; writes each space's Pset_SpaceThermalDesign (CoolingDesignAirflow, HeatingDesignAirflow, TotalSensibleHeatGain, TotalHeatGain, TotalHeatLoss). hc_loads.collect calls it.",
+    "Heating and Cooling Loads",
+    crate::hvac_loads::RecordParams,
+    crate::hvac_loads::LoadsRun,
+    crate::hvac_loads::record
+);
+
+read_command!(
+    LoadsReport,
+    "hc_loads.report",
+    "Loads report",
+    "A loads run's (`run_id`, else the latest) report: design temperatures, infiltration class, heating and cooling totals, the coincident cooling peak and hour, each space's loads with components and airflows, and each system-zone's heating, cooling and peak hour.",
+    crate::hvac_loads::ReportParams,
+    crate::hvac_loads::Report,
+    crate::hvac_loads::report
 );
 
 read_command!(

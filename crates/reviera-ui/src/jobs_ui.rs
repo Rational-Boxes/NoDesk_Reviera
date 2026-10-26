@@ -67,6 +67,7 @@ impl Gui {
         match collect {
             "embodied_carbon.collect" => self.carbon_results(),
             "solar.collect" => self.solar_results(),
+            "hc_loads.collect" => self.hc_loads_report(),
             _ => {}
         }
     }

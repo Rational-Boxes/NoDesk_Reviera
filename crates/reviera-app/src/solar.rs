@@ -67,7 +67,7 @@ fn distill(app: &App, store: &Store, p: &RunParams) -> Result<(SolarInput, u64)>
         return Err(bad("solar.no_location", "set the project location first (Manage › Project Location)"));
     };
     let w = &loc.weather;
-    let file = w.file.as_ref().ok_or_else(|| bad("solar.no_weather", "import a weather file first (Analyze › Energy › Weather)"))?;
+    let file = w.file.as_ref().ok_or_else(|| bad("solar.no_weather", "import a weather file first (Sustainability › Site › Weather)"))?;
     let path = weather_path(app, file);
     let text = std::fs::read_to_string(&path).map_err(|e| bad("solar.weather_read", format!("{}: {e}", path.display())))?;
     let hours = solar::epw_hours(&text)?;

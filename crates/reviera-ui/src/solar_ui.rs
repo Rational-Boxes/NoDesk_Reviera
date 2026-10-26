@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Reviera contributors
 
-//! Analyze › Daylight & Solar › **Solar Study** (ANA-SOLAR-001, ANA-ENV-002): the study type
+//! Sustainability › Daylight & Solar › **Solar Study** (ANA-SOLAR-001, ANA-ENV-002): the study type
 //! (insolation or PV potential), period, surfaces (roofs, masses or the selection), grid spacing
 //! and PV settings, then Run: a compute job the window watches. When it is collected, *Solar
 //! Results* lists each face's area, mean insolation, total and (PV) yield and payback, says

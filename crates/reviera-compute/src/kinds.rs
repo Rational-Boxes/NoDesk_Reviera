@@ -34,6 +34,9 @@ pub const CARBON_RESULTS: &str = "reviera.carbon.v1.Results";
 pub const SOLAR: &str = "analysis.solar";
 pub const SOLAR_INPUT: &str = "reviera.solar.v1.Input";
 pub const SOLAR_RESULTS: &str = "reviera.solar.v1.Results";
+pub const LOADS: &str = "analysis.loads";
+pub const LOADS_INPUT: &str = "reviera.loads.v1.Input";
+pub const LOADS_RESULTS: &str = "reviera.loads.v1.Results";
 
 fn version() -> String {
     env!("CARGO_PKG_VERSION").into()
@@ -334,6 +337,38 @@ impl Kind for SolarKind {
         ctx.log(format!("{} faces, {} shading triangles, {} sun hours", r.faces.len(), input.shading.len(), r.sun_hours));
         ctx.progress(1.0, "done");
         Ok(Output { bytes: serde_json::to_vec(&r).map_err(|e| JobFailure::new("runner_failed", e.to_string()))?, media_type: JSON.into(), schema: SOLAR_RESULTS.into() })
+    }
+}
+
+/// `analysis.loads`: design heating and cooling loads (ANA-HCL-001, ANA-ENV-004) by the
+/// simplified design-day method ([`reviera_core::hvac_loads::run`]).
+#[derive(Debug, Default)]
+pub struct LoadsKind;
+
+impl Kind for LoadsKind {
+    fn info(&self) -> KindInfo {
+        KindInfo {
+            kind: LOADS.into(),
+            version: 1,
+            runner: "reviera-analysis-builtin".into(),
+            runner_version: version(),
+            licence: LICENCE.into(),
+            capabilities: vec!["batch".into(), "design-loads".into()],
+            accepted_formats: vec![format!("{JSON};schema={LOADS_INPUT}")],
+            supports_checkpoints: false,
+            supports_sessions: false,
+        }
+    }
+
+    fn run(&self, ctx: &JobContext, _options: Option<&prost_types::Any>, inputs: &[Blob]) -> Result<Output, JobFailure> {
+        ctx.progress(0.0, "reading");
+        let blob = inputs.iter().find(|b| b.reference.schema == LOADS_INPUT).ok_or_else(|| JobFailure::new("invalid_input", "no loads input in the inputs"))?;
+        let input: reviera_core::hvac_loads::LoadsInput = serde_json::from_slice(&blob.raw).map_err(|e| JobFailure::new("invalid_input", e.to_string()))?;
+        ctx.progress(0.1, "calculating");
+        let r = reviera_core::hvac_loads::run(&input).map_err(|e| JobFailure::new("invalid_input", e))?;
+        ctx.log(format!("{} spaces: heating {:.0} W, cooling {:.0} W (coincident {:.0} W at {} h)", r.spaces.len(), r.heating_total, r.cooling_total, r.cooling_coincident, r.coincident_hour));
+        ctx.progress(1.0, "done");
+        Ok(Output { bytes: serde_json::to_vec(&r).map_err(|e| JobFailure::new("runner_failed", e.to_string()))?, media_type: JSON.into(), schema: LOADS_RESULTS.into() })
     }
 }
 

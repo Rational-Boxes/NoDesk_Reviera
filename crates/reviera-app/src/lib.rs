@@ -28,6 +28,7 @@ pub mod system_zones;
 pub mod weather;
 pub mod carbon_files;
 pub mod solar;
+pub mod hc_loads;
 pub mod settings_dialogs;
 pub mod structural;
 pub mod subscriptions;

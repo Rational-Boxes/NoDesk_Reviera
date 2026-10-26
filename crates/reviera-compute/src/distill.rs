@@ -40,6 +40,26 @@ pub fn structural_model(d: &reviera_core::structural_model::Distilled) -> Distil
 pub const CLASH_BODIES_VERSION: u32 = 1;
 pub const CARBON_QUANTITIES: &str = "carbon.quantities";
 pub const SOLAR_INPUT: &str = "solar.input";
+pub const LOADS_INPUT: &str = "loads.input";
+
+/// The `loads.input` distillation (ANA-ENV-004): the spaces' surfaces and loads under opaque
+/// keys, the design conditions and design day, as one JSON blob.
+pub fn loads(input: &reviera_core::hvac_loads::LoadsInput, key_map: &BTreeMap<String, String>) -> Distilled {
+    let raw = serde_json::to_vec(input).expect("the input serialises");
+    let blob = Blob::new(raw, crate::kinds::JSON, crate::kinds::LOADS_INPUT);
+    let snapshot_hash = blob.reference.sha256.clone();
+    Distilled {
+        distiller: LOADS_INPUT.into(),
+        version: 1,
+        detail: String::new(),
+        anonymised: true,
+        blobs: vec![blob],
+        key_map: key_map.clone(),
+        elements: input.spaces.len(),
+        triangles: 0,
+        snapshot_hash,
+    }
+}
 
 /// The `solar.input` distillation (ANA-ENV-002): the faces, shading triangles, site and hourly
 /// irradiance as one JSON blob (geometry only, no element names).

@@ -121,6 +121,9 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add_host(crate::solar::SolarCollect),
         registry.add_host(crate::solar::SolarStatus),
         registry.add_host(crate::solar::SolarExport),
+        registry.add_host(crate::hc_loads::LoadsRun),
+        registry.add_host(crate::hc_loads::LoadsCollect),
+        registry.add_host(crate::hc_loads::LoadsStatus),
         registry.add_host(SelectionRemove),
     ];
     for r in results {
