@@ -477,7 +477,8 @@ impl Ribbon {
     fn fill(&self, page: *mut c_void, panels: &[PanelDef]) {
         for p in panels {
             let bar = unsafe { reviera_rb_panel(page, c(&p.label).as_ptr()) };
-            for t in &p.tools {
+            let sizes = size_classes(&p.tools);
+            for (t, size) in p.tools.iter().zip(sizes) {
                 let (Some(a), Some(id)) = (
                     self.catalog.action(&t.action),
                     self.catalog.id_of(&t.action),
@@ -494,7 +495,7 @@ impl Ribbon {
                         label.as_ptr(),
                         svg.as_ptr(),
                         help.as_ptr(),
-                        c_int::from(t.large),
+                        size,
                         0,
                     );
                 }
@@ -502,7 +503,7 @@ impl Ribbon {
         }
     }
 
-    /// The ribbon's height for its pane.
+        /// The ribbon's height for its pane.
     pub fn height(&self) -> i32 {
         unsafe { reviera_rb_best_height(self.bar) }
     }
@@ -613,6 +614,27 @@ impl Ribbon {
     }
 }
 
+/// Each tool's size class for the native ribbon: 1 large; 2 small, shrinking to its icon alone
+/// when the panel is short of room; 0 small, keeping its label. A run of more than three small
+/// buttons keeps its labels: collapsed to icons it takes several columns, which
+/// wxRibbonButtonBar can draw over the panel's large buttons; without room the panel collapses to
+/// its dropdown instead.
+fn size_classes(tools: &[Tool]) -> Vec<c_int> {
+    let mut out = vec![1; tools.len()];
+    let mut k = 0;
+    while k < tools.len() {
+        if tools[k].large {
+            k += 1;
+            continue;
+        }
+        let end = (k..tools.len()).find(|&j| tools[j].large).unwrap_or(tools.len());
+        let class = if end - k <= 3 { 2 } else { 0 };
+        out[k..end].fill(class);
+        k = end;
+    }
+    out
+}
+
 /// Builds the Quick Access Toolbar: the catalog's actions, with their icons.
 pub fn quick_access(frame: &Frame, catalog: &Catalog) -> AuiToolBar {
     let tb = AuiToolBar::builder(frame).build();
@@ -684,6 +706,14 @@ pub fn key_sequences() -> &'static [(String, String)] {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn short_runs_of_small_buttons_may_shrink_to_icons() {
+        let t = |large: bool| Tool { action: String::new(), large };
+        let tools = [t(true), t(false), t(false), t(true), t(true), t(false), t(false), t(false), t(false), t(false)];
+        assert_eq!(size_classes(&tools), [1, 2, 2, 1, 1, 0, 0, 0, 0, 0]);
+        assert_eq!(size_classes(&[t(false), t(false), t(false)]), [2, 2, 2]);
+    }
 
     #[test]
     fn key_sequences_are_unique() {

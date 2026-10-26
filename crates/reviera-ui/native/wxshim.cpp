@@ -358,8 +358,9 @@ void* reviera_rb_panel(void* page, const char* label) {
     return buttons;
 }
 
-// A button: `large` keeps icon-above-label when there is room; small buttons are icon beside
-// label, stacked. `kind` 0 normal, 1 toggle.
+// A button: `large` 1 keeps icon-above-label; small buttons (0, 2) are icon beside label,
+// stacked, and 2 may shrink to the icon alone (see ribbon.rs size_classes). `kind` 0 normal,
+// 1 toggle.
 void reviera_rb_button(void* bar, int id, const char* label, const char* svg, const char* help,
                        int large, int kind) {
     auto* b = static_cast<wxRibbonButtonBar*>(bar);
@@ -368,7 +369,12 @@ void reviera_rb_button(void* bar, int id, const char* label, const char* svg, co
     auto k = kind == 1 ? wxRIBBON_BUTTON_TOGGLE : wxRIBBON_BUTTON_NORMAL;
     b->AddButton(id, wxString::FromUTF8(label), big, small, wxNullBitmap, wxNullBitmap, k,
                  wxString::FromUTF8(help));
-    if (!large) {
+    if (large == 0) {
+        // Icon beside label, never icon alone: wxRibbonButtonBar's collapse of a long run to
+        // icon-only columns can place them over the panel's large buttons.
+        b->SetButtonMaxSizeClass(id, wxRIBBON_BUTTONBAR_BUTTON_MEDIUM);
+        b->SetButtonMinSizeClass(id, wxRIBBON_BUTTONBAR_BUTTON_MEDIUM);
+    } else if (large == 2) {
         b->SetButtonMaxSizeClass(id, wxRIBBON_BUTTONBAR_BUTTON_MEDIUM);
     } else {
         b->SetButtonMinSizeClass(id, wxRIBBON_BUTTONBAR_BUTTON_LARGE);
