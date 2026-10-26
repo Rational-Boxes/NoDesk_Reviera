@@ -214,6 +214,10 @@ fn the_concrete_sample_keeps_its_reinforcement_and_precast_pieces() {
     assert_eq!(ifc_count("concrete_reinforcement", "IfcReinforcingBar"), 32);
     assert_eq!(ifc_count("concrete_reinforcement", "IfcReinforcingMesh"), 6);
     assert_eq!(ifc_count("concrete_reinforcement", "IfcMechanicalFastener"), 4, "lifting anchors");
+    // Bars are swept disks, not faceted tubes: the file stays small (it was 16 MB with tubes).
+    assert!(ifc_count("concrete_reinforcement", "IfcSweptDiskSolid") > 0);
+    let size = std::fs::metadata(samples().join("concrete_reinforcement.ifc")).unwrap().len();
+    assert!(size < 3_000_000, "{size} bytes");
     let work = tempfile::tempdir().unwrap();
     let mut app = open(work.path(), "concrete_reinforcement");
     let s = store(&app);

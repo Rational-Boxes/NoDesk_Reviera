@@ -239,6 +239,12 @@ fn rebar_in_columns_floors_and_walls() {
     project.save(&doc).unwrap();
     let again = std::fs::read_to_string(&path).unwrap();
     assert_eq!(again.matches("IFCREINFORCINGBARTYPE(").count(), text.matches("IFCREINFORCINGBARTYPE(").count(), "types rewritten, not added");
+    // Bars are swept disks along their centrelines, not faceted tubes; a second save keeps the
+    // same bodies, and the bending parameters are lengths.
+    let disks = text.matches("IFCSWEPTDISKSOLID(").count();
+    assert!(disks > 0 && text.contains("'AdvancedSweptSolid'"));
+    assert_eq!(again.matches("IFCSWEPTDISKSOLID(").count(), disks, "bodies kept, not added");
+    assert!(!text.contains("(IFCPOSITIVELENGTHMEASURE(") && text.contains("(IFCLENGTHMEASURE("));
 
     // A floor no longer structural: its bars are kept, orphaned.
     run(&r, &mut doc, "floor.set_structural", json!({ "floor_ids": [f.0], "structural": false }));

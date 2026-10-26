@@ -2201,13 +2201,131 @@ pub(crate) fn write_breps(
     Ok(())
 }
 
-/// Removes a body written by [`write_breps`] (before the element itself is removed).
+/// Removes a body written by [`write_breps`] or [`write_swept_disks`] (before the element
+/// itself is removed).
 pub(crate) fn remove_breps(ifc: &mut IfcModel, element: StepId) -> Result<()> {
     if let Some(shape) = BrepShape::read(ifc, element)? {
         for id in shape.entities {
             ifc.remove(id)?;
         }
+    } else if let Some(shape) = SweptDisks::read(ifc, element)? {
+        for id in shape.entities {
+            ifc.remove(id)?;
+        }
     }
+    Ok(())
+}
+
+/// A body of swept disks written by [`write_swept_disks`]: its entities and a signature of its
+/// radii and centreline points (file units).
+struct SweptDisks {
+    entities: Vec<StepId>,
+    signature: Vec<f64>,
+}
+
+impl SweptDisks {
+    fn read(ifc: &IfcModel, element: StepId) -> Result<Option<Self>> {
+        let e = entity(ifc, element)?;
+        let one = |e: &Entity, attr: &str| e.refs(attr).first().copied();
+        let (Some(placement), Some(shape)) = (one(&e, "ObjectPlacement"), one(&e, "Representation")) else {
+            return Ok(None);
+        };
+        let reps = entity(ifc, shape)?.refs("Representations");
+        let [rep] = reps[..] else { return Ok(None) };
+        let re = entity(ifc, rep)?;
+        if re.string("RepresentationType") != Some("AdvancedSweptSolid") {
+            return Ok(None);
+        }
+        let Some(axes) = one(&entity(ifc, placement)?, "RelativePlacement") else { return Ok(None) };
+        let mut entities = vec![placement, axes, shape, rep];
+        entities.extend(one(&entity(ifc, axes)?, "Location"));
+        let mut signature = Vec::new();
+        for item in re.refs("Items") {
+            let ie = entity(ifc, item)?;
+            if !ie.class.eq_ignore_ascii_case("IfcSweptDiskSolid") {
+                return Ok(None);
+            }
+            let Some(line) = one(&ie, "Directrix") else { return Ok(None) };
+            entities.extend([item, line]);
+            if let AttrValue::Real(r) = ifc.attribute(item, "Radius")? {
+                signature.push(r);
+            }
+            let points = entity(ifc, line)?.refs("Points");
+            signature.push(points.len() as f64);
+            for p in points {
+                entities.push(p);
+                if let AttrValue::List(c) = ifc.attribute(p, "Coordinates")? {
+                    signature.extend(c.iter().filter_map(|v| match v {
+                        AttrValue::Real(r) => Some(*r),
+                        _ => None,
+                    }));
+                }
+            }
+        }
+        entities.sort_by_key(|s| s.0);
+        entities.dedup();
+        Ok(Some(Self { entities, signature }))
+    }
+}
+
+/// Writes an element's body as solid circular bars swept along centrelines (`IfcSweptDiskSolid`
+/// along an `IfcPolyline`, an `AdvancedSweptSolid` representation): reinforcing bars and mesh
+/// wires (STR-RBR-004), each `(diameter, points)` in metres and world coordinates. Unless it
+/// already has exactly this body; any other body written before is removed.
+pub(crate) fn write_swept_disks(ifc: &mut IfcModel, element: StepId, bars: &[(f64, Vec<[f64; 3]>)], scale: f64, contexts: Contexts) -> Result<()> {
+    let want: Vec<f64> = bars
+        .iter()
+        .flat_map(|(d, pts)| {
+            let mut v = vec![d / 2.0 / scale, pts.len() as f64];
+            v.extend(pts.iter().flat_map(|p| p.map(|c| c / scale)));
+            v
+        })
+        .collect();
+    match SweptDisks::read(ifc, element)? {
+        Some(have) if have.signature.len() == want.len() && have.signature.iter().zip(&want).all(|(a, b)| (a - b).abs() < 1e-9) => return Ok(()),
+        Some(old) => {
+            for id in old.entities {
+                ifc.remove(id)?;
+            }
+        }
+        None => remove_breps(ifc, element)?,
+    }
+    let r = |id: StepId| AttrValue::Ref(id.0);
+    let location = create_with(ifc, "IfcCartesianPoint", &[("Coordinates", reals(&[0.0, 0.0, 0.0]))])?;
+    let axes = create_with(ifc, "IfcAxis2Placement3D", &[("Location", r(location))])?;
+    let placement = create_with(ifc, "IfcLocalPlacement", &[("RelativePlacement", r(axes))])?;
+    let mut items = Vec::new();
+    for (d, pts) in bars.iter().filter(|(_, pts)| pts.len() >= 2) {
+        let points = pts
+            .iter()
+            .map(|p| create_with(ifc, "IfcCartesianPoint", &[("Coordinates", reals(&p.map(|c| c / scale)))]).map(r))
+            .collect::<Result<Vec<_>>>()?;
+        let line = create_with(ifc, "IfcPolyline", &[("Points", AttrValue::List(points))])?;
+        // A polyline's parameter runs 0 to 1 along each segment; IFC2X3 needs both ends.
+        items.push(r(create_with(
+            ifc,
+            "IfcSweptDiskSolid",
+            &[
+                ("Directrix", r(line)),
+                ("Radius", AttrValue::Real(d / 2.0 / scale)),
+                ("StartParam", AttrValue::Real(0.0)),
+                ("EndParam", AttrValue::Real((pts.len() - 1) as f64)),
+            ],
+        )?));
+    }
+    let rep = create_with(
+        ifc,
+        "IfcShapeRepresentation",
+        &[
+            ("ContextOfItems", r(contexts.body)),
+            ("RepresentationIdentifier", AttrValue::String("Body".into())),
+            ("RepresentationType", AttrValue::String("AdvancedSweptSolid".into())),
+            ("Items", AttrValue::List(items)),
+        ],
+    )?;
+    let shape = create_with(ifc, "IfcProductDefinitionShape", &[("Representations", AttrValue::List(vec![r(rep)]))])?;
+    ifc.set_attribute(element, "ObjectPlacement", &r(placement))?;
+    ifc.set_attribute(element, "Representation", &r(shape))?;
     Ok(())
 }
 

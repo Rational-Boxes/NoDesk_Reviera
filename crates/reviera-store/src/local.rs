@@ -2610,7 +2610,8 @@ impl LocalProject {
         Ok(())
     }
 
-    /// Writes rebar sets (STR-RBR-004): each `IfcReinforcingBar` gets a tube body along its bars,
+    /// Writes rebar sets (STR-RBR-004): each `IfcReinforcingBar` gets a body of swept disks along
+    /// its bars' centrelines (`IfcSweptDiskSolid`),
     /// its diameter, cross-section area and bar length, and a synthesized `IfcReinforcingBarType`
     /// (marked `rxd:rebar_type`, rewritten on every save) with its shape code and dimensions as
     /// `BendingShapeCode` and `BendingParameters`; each host aggregates its sets (`rxd:rebar`).
@@ -2637,21 +2638,17 @@ impl LocalProject {
         let contexts = geometry::Contexts::find(&self.ifc)?;
         let infos = reviera_core::rebar::info(store, reviera_core::rebar::InfoParams { rebar_ids: sets.iter().map(|i| reviera_core::ElementRef::Id(*i)).collect() })
             .unwrap_or_default();
-        let len = |v: f64| AttrValue::Typed { type_name: "IfcPositiveLengthMeasure".into(), value: Box::new(AttrValue::Real(v)) };
         let mut by_host: BTreeMap<ElementId, Vec<AttrValue>> = BTreeMap::new();
         for i in &infos {
             let Some(&step) = self.steps.get(&i.id) else { continue };
             let e = store.get(i.id).expect("a set");
             // A varying set (STR-RBR-005): the set is its first length group.
             let groups = reviera_core::rebar::varying_parts(store, e).unwrap_or_default();
-            if let Some((_, _, mesh)) = groups.first().cloned() {
-                let (points, indices) = mesh;
-                let faces: Vec<Vec<usize>> = indices.chunks(3).map(|t| t.iter().map(|k| *k as usize).collect()).collect();
-                geometry::write_breps(&mut self.ifc, step, geometry::BrepFrame::WORLD, &[geometry::Polyhedron { points, faces }], self.length_scale, contexts)?;
-            } else if let Some(mesh) = reviera_core::rebar::mesh(store, e) {
-                let (points, indices) = mesh;
-                let faces: Vec<Vec<usize>> = indices.chunks(3).map(|t| t.iter().map(|k| *k as usize).collect()).collect();
-                geometry::write_breps(&mut self.ifc, step, geometry::BrepFrame::WORLD, &[geometry::Polyhedron { points, faces }], self.length_scale, contexts)?;
+            // Bars as swept disks along their centrelines.
+            if let Some((_, _, lines)) = groups.first() {
+                geometry::write_swept_disks(&mut self.ifc, step, lines, self.length_scale, contexts)?;
+            } else if let Some(lines) = reviera_core::rebar::lines(store, e) {
+                geometry::write_swept_disks(&mut self.ifc, step, &lines, self.length_scale, contexts)?;
             }
             let sc = self.length_scale;
             let area = std::f64::consts::PI * i.diameter * i.diameter / 4.0;
@@ -2679,16 +2676,14 @@ impl LocalProject {
                 }
                 self.ifc.set_attribute(unit, "PredefinedType", &AttrValue::Enum("REINFORCEMENT_UNIT".into()))?;
                 let mut members = vec![AttrValue::Ref(step.0)];
-                for (l, n, mesh) in groups.iter().skip(1).cloned() {
+                for (l, n, lines) in groups.iter().skip(1).cloned() {
                     let p = self.ifc.create_rooted("IfcReinforcingBar", &GlobalId::new())?;
                     self.ifc.set_attribute(p, "Name", &AttrValue::String(format!("{} {:.0}", i.bar_type, l * 1000.0)))?;
                     self.ifc.set_attribute(p, "Description", &AttrValue::String(REBAR_PART_TAG.into()))?;
                     if let Some(h) = owner_history {
                         self.ifc.set_attribute(p, "OwnerHistory", &AttrValue::Ref(h.0))?;
                     }
-                    let (points, indices) = mesh;
-                    let faces: Vec<Vec<usize>> = indices.chunks(3).map(|t| t.iter().map(|k| *k as usize).collect()).collect();
-                    geometry::write_breps(&mut self.ifc, p, geometry::BrepFrame::WORLD, &[geometry::Polyhedron { points, faces }], sc, contexts)?;
+                    geometry::write_swept_disks(&mut self.ifc, p, &lines, sc, contexts)?;
                     self.ifc.set_attribute(p, "NominalDiameter", &AttrValue::Real(i.diameter / sc))?;
                     self.ifc.set_attribute(p, "CrossSectionArea", &AttrValue::Real(area / sc / sc))?;
                     self.ifc.set_attribute(p, "BarLength", &AttrValue::Real(l / sc))?;
@@ -2722,7 +2717,12 @@ impl LocalProject {
             }
             self.ifc.set_attribute(ty, "BarSurface", &AttrValue::Enum("TEXTURED".into()))?;
             self.ifc.set_attribute(ty, "BendingShapeCode", &AttrValue::String(i.shape.clone()))?;
-            let params: Vec<AttrValue> = i.dimensions.iter().map(|(_, v)| len(v / sc)).collect();
+            // IfcBendingParameterSelect takes IfcLengthMeasure (or an angle), not a positive length.
+            let params: Vec<AttrValue> = i
+                .dimensions
+                .iter()
+                .map(|(_, v)| AttrValue::Typed { type_name: "IfcLengthMeasure".into(), value: Box::new(AttrValue::Real(v / sc)) })
+                .collect();
             self.ifc.set_attribute(ty, "BendingParameters", &AttrValue::List(params))?;
             let typing = self.ifc.create_rooted("IfcRelDefinesByType", &GlobalId::new())?;
             self.ifc.set_attribute(typing, "Description", &AttrValue::String(REBAR_TYPE_TAG.into()))?;
@@ -2941,14 +2941,10 @@ impl LocalProject {
     ) -> Result<()> {
         use reviera_core::rebar_systems::{self as rs, Part};
         let sc = self.length_scale;
-        let poly = |(points, indices): reviera_core::bodies::Mesh| geometry::Polyhedron {
-            points,
-            faces: indices.chunks(3).map(|t| t.iter().map(|k| *k as usize).collect()).collect(),
-        };
         let numbers = reviera_core::rebar_numbers::number_of(store, e.id());
         if let Some((t, da, db)) = rs::single_sheet_type(store, e) {
-            if let Some(m) = rs::mesh(store, e) {
-                geometry::write_breps(&mut self.ifc, step, geometry::BrepFrame::WORLD, &[poly(m)], sc, contexts)?;
+            if let Some(lines) = rs::lines(store, e) {
+                geometry::write_swept_disks(&mut self.ifc, step, &lines, sc, contexts)?;
             }
             if let Some(n) = numbers.first() {
                 self.ifc.set_attribute(step, "Tag", &AttrValue::String(n.to_string()))?;
@@ -2959,7 +2955,7 @@ impl LocalProject {
         let mut sheet = 0;
         for part in rs::parts(store, e) {
             match part {
-                Part::Bars { group, mesh } => {
+                Part::Bars { group, lines } => {
                     if group.bars.is_empty() {
                         continue;
                     }
@@ -2969,7 +2965,7 @@ impl LocalProject {
                     if let Some(h) = owner_history {
                         self.ifc.set_attribute(p, "OwnerHistory", &AttrValue::Ref(h.0))?;
                     }
-                    geometry::write_breps(&mut self.ifc, p, geometry::BrepFrame::WORLD, &[poly(mesh)], sc, contexts)?;
+                    geometry::write_swept_disks(&mut self.ifc, p, &lines, sc, contexts)?;
                     let area = std::f64::consts::PI * group.diameter * group.diameter / 4.0;
                     self.ifc.set_attribute(p, "NominalDiameter", &AttrValue::Real(group.diameter / sc))?;
                     self.ifc.set_attribute(p, "CrossSectionArea", &AttrValue::Real(area / sc / sc))?;
@@ -2984,14 +2980,14 @@ impl LocalProject {
                     self.ifc.set_attribute(p, "BarSurface", &AttrValue::Enum("TEXTURED".into()))?;
                     parts.push(AttrValue::Ref(p.0));
                 }
-                Part::Sheet { sheet_type, major_diameter, minor_diameter, mesh, name } => {
+                Part::Sheet { sheet_type, major_diameter, minor_diameter, lines, name } => {
                     let p = self.ifc.create_rooted("IfcReinforcingMesh", &GlobalId::new())?;
                     self.ifc.set_attribute(p, "Name", &AttrValue::String(name))?;
                     self.ifc.set_attribute(p, "Description", &AttrValue::String(REBAR_PART_TAG.into()))?;
                     if let Some(h) = owner_history {
                         self.ifc.set_attribute(p, "OwnerHistory", &AttrValue::Ref(h.0))?;
                     }
-                    geometry::write_breps(&mut self.ifc, p, geometry::BrepFrame::WORLD, &[poly(mesh)], sc, contexts)?;
+                    geometry::write_swept_disks(&mut self.ifc, p, &lines, sc, contexts)?;
                     if let Some(n) = numbers.get(sheet) {
                         self.ifc.set_attribute(p, "Tag", &AttrValue::String(n.to_string()))?;
                     }

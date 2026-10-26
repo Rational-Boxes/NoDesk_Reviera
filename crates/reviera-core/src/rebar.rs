@@ -1941,6 +1941,34 @@ pub fn mesh(store: &Store, e: &Element) -> Option<crate::bodies::Mesh> {
     Some(bars_mesh(&g.bars.iter().collect::<Vec<_>>(), bt.model_diameter))
 }
 
+/// Bars as their diameters and centrelines (bends as the points along their arcs), for IFC
+/// swept-disk bodies: much smaller than the tubes' faceted B-reps.
+pub type BarLines = Vec<(f64, Vec<V3>)>;
+
+/// The centrelines of bars of a diameter.
+pub fn bar_lines(bars: &[&Bar], diameter: f64) -> BarLines {
+    bars.iter()
+        .map(|b| {
+            let mut pts: Vec<V3> = Vec::with_capacity(b.points.len());
+            for p in &b.points {
+                if pts.last().is_none_or(|q| len(sub(*p, *q)) > 1e-6) {
+                    pts.push(*p);
+                }
+            }
+            (diameter, pts)
+        })
+        .filter(|(_, pts)| pts.len() >= 2)
+        .collect()
+}
+
+/// A set's bars as centrelines (see [`BarLines`]).
+pub fn lines(store: &Store, e: &Element) -> Option<BarLines> {
+    let r = rebar_recipe(e)?;
+    let bt = bar_type(store, &r.bar_type).ok()?;
+    let g = geometry(store, &r).ok()?;
+    Some(bar_lines(&g.bars.iter().collect::<Vec<_>>(), bt.model_diameter))
+}
+
 /// Tubes along bars of a diameter.
 pub fn bars_mesh(bars: &[&Bar], diameter: f64) -> crate::bodies::Mesh {
     let mut parts = Vec::new();
@@ -1955,8 +1983,8 @@ pub fn bars_mesh(bars: &[&Bar], diameter: f64) -> crate::bodies::Mesh {
 }
 
 /// A varying set's length groups for IFC (STR-RBR-005): each group's rounded length, number and
-/// body.
-pub fn varying_parts(store: &Store, e: &Element) -> Option<Vec<(f64, Option<u32>, crate::bodies::Mesh)>> {
+/// bars.
+pub fn varying_parts(store: &Store, e: &Element) -> Option<Vec<(f64, Option<u32>, BarLines)>> {
     let r = rebar_recipe(e).filter(|r| r.varying)?;
     let bt = bar_type(store, &r.bar_type).ok()?;
     let g = geometry(store, &r).ok()?;
@@ -1965,7 +1993,7 @@ pub fn varying_parts(store: &Store, e: &Element) -> Option<Vec<(f64, Option<u32>
         length_groups(store, &g)
             .into_iter()
             .enumerate()
-            .map(|(k, (l, idx))| (l, numbers.get(k).copied(), bars_mesh(&idx.iter().map(|i| &g.bars[*i]).collect::<Vec<_>>(), bt.model_diameter)))
+            .map(|(k, (l, idx))| (l, numbers.get(k).copied(), bar_lines(&idx.iter().map(|i| &g.bars[*i]).collect::<Vec<_>>(), bt.model_diameter)))
             .collect(),
     )
 }

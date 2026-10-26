@@ -1419,21 +1419,39 @@ pub fn mesh(store: &Store, e: &Element) -> Option<crate::bodies::Mesh> {
     Some(tubes(&bars, 6))
 }
 
+/// A system's bars or a sheet's wires as centrelines, for its IFC body.
+pub fn lines(store: &Store, e: &Element) -> Option<crate::rebar::BarLines> {
+    system_kind(e)?;
+    let of = |bars: &[(f64, &Bar)]| bars.iter().flat_map(|(d, b)| crate::rebar::bar_lines(&[*b], *d)).collect::<crate::rebar::BarLines>();
+    if let Ok(groups) = groups_of(store, e)
+        && !groups.is_empty()
+    {
+        let bars: Vec<(f64, &Bar)> = groups.iter().flat_map(|g| g.bars.iter().map(move |b| (g.diameter, b))).collect();
+        return Some(of(&bars));
+    }
+    let (t, sheets) = sheets_of(store, e).ok()?;
+    let (da, db) = sheet_type_lookup(store, t.as_deref()?)?;
+    let bars: Vec<(f64, &Bar)> = sheets
+        .iter()
+        .flat_map(|s| s.major.iter().map(move |b| (da, b)).chain(s.minor.iter().map(move |b| (db, b))))
+        .collect();
+    Some(of(&bars))
+}
+
 /// The IFC parts a system's export writes under it: bars by group (`IfcReinforcingBar`) or
-/// sheets (`IfcReinforcingMesh`), each with its body and attributes.
+/// sheets (`IfcReinforcingMesh`), each with its bars' centrelines and attributes.
 #[derive(Debug)]
 pub enum Part {
-    Bars { group: BarGroup, mesh: crate::bodies::Mesh },
-    Sheet { sheet_type: SheetType, major_diameter: f64, minor_diameter: f64, mesh: crate::bodies::Mesh, name: String },
+    Bars { group: BarGroup, lines: crate::rebar::BarLines },
+    Sheet { sheet_type: SheetType, major_diameter: f64, minor_diameter: f64, lines: crate::rebar::BarLines, name: String },
 }
 
 pub fn parts(store: &Store, e: &Element) -> Vec<Part> {
     let mut out = Vec::new();
     if let Ok(groups) = groups_of(store, e) {
         for g in groups {
-            let bars: Vec<(f64, &Bar)> = g.bars.iter().map(|b| (g.diameter, b)).collect();
-            let mesh = tubes(&bars, 8);
-            out.push(Part::Bars { group: g, mesh });
+            let lines = crate::rebar::bar_lines(&g.bars.iter().collect::<Vec<_>>(), g.diameter);
+            out.push(Part::Bars { group: g, lines });
         }
     }
     if fabric_area_recipe(e).is_some()
@@ -1441,12 +1459,13 @@ pub fn parts(store: &Store, e: &Element) -> Vec<Part> {
         && let (Ok(t), Some((da, db))) = (sheet_type(store, &t), sheet_type_lookup(store, &t))
     {
         for s in sheets {
-            let bars: Vec<(f64, &Bar)> = s.major.iter().map(|b| (da, b)).chain(s.minor.iter().map(|b| (db, b))).collect();
+            let mut lines = crate::rebar::bar_lines(&s.major.iter().collect::<Vec<_>>(), da);
+            lines.extend(crate::rebar::bar_lines(&s.minor.iter().collect::<Vec<_>>(), db));
             out.push(Part::Sheet {
                 sheet_type: t.clone(),
                 major_diameter: da,
                 minor_diameter: db,
-                mesh: tubes(&bars, 6),
+                lines,
                 name: format!("{} r{} c{}", t.name, s.row + 1, s.column + 1),
             });
         }
