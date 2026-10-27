@@ -1329,7 +1329,10 @@ simulation sessions, and the first engine runners (see [Not built yet](#not-buil
   writes the parameter (undoable); selecting a row selects its elements. The Schedule tab
   chooses fields and sorting and exports CSV or tab-separated text with formulas escaped
   (`schedule.create`, `schedule.fields`, `schedule.get_table`, `schedule.set_fields`,
-  `schedule.set_sort`, `schedule.set_cell`, `schedule.export`).
+  `schedule.set_sort`, `schedule.set_cell`, `schedule.export`). View › Keynote Legend lists the
+  keys the model's keynote tags show with their text; with *Filter by sheet*, each copy placed on
+  a sheet lists only that sheet's (`view.create_keynote_legend`, `view.set_keynote_legend`;
+  DOC-VIEW-010). Not built yet: legend views with legend components.
 - **Sheets**: View › Sheet makes an ISO A0–A4 sheet, numbered A101, A102, …, with Reviera's
   title block (project, sheet, date, people and scale, *As indicated* when scales differ).
   Place View puts a plan, section or elevation on it at its scale with a numbered title; Place
@@ -1663,6 +1666,12 @@ area by area (reviewed against the spec on 2026-10-15).
   or a host face, alternate mirroring, arrays of IFC components (ARC-MOD-033).
 
 **Other chapters:**
+
+- **FileEngine integration** (`design_documents/FILEENGINE_INTEGRATION.md`): open, save and
+  version models on the owner's FileEngine server through its REST API; BCF issues through its
+  BCF and discussion services; publishing reports and exports to it, with share links made in
+  Reviera; Component Libraries hosted on it; product documentation folders linked to types and
+  materials. Designed, not built: deferred until the FileEngine improvements it asks for land.
 
 - **Coordination**: clash tests (COL-CLASH), automatic pipe and duct penetrations (MEP-PEN-001),
   bathroom fixture clear floor spaces and turning spaces, ISO 21542. For BCF issues: the docked

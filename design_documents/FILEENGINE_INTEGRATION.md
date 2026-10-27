@@ -1,6 +1,8 @@
 # Integration with the FileEngine project
 
-**Status:** Draft 0.3 · 2026-10-27 · for the owner's review (open questions in §10, requests to FileEngine in §11)
+**Status:** Draft 0.3 · 2026-10-27 · for the owner's review (open questions in §10, requests to FileEngine in §11).
+**Implementation deferred (owner, 2026-10-27):** the owner is making the FileEngine improvements
+of §11 first; Reviera's side starts once they land.
 **Related:**
 - Chapter 2 DM-FILE-007 (WebDAV, kept for other servers);
 - Chapter 6 COL-BCF-001 … 004 (BCF issues), COL-API-001 (shared REST client and credentials);
