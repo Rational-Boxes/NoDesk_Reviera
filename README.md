@@ -1366,7 +1366,7 @@ simulation sessions, and the first engine runners (see [Not built yet](#not-buil
   Annotation › Annotation in 3D turns them on and off for the view (a toggle button that shows its
   state); Annotation Visibility… has a check box for each class (text notes, dimensions, door,
   window, room and other tags), each on its own, kept with the view. Clicking a label selects its
-  annotation; double-clicking it opens the plan it is drawn in with it selected
+  annotation; double-clicking it opens the plan it is drawn in, zoomed to it and with it selected
   (`view.annotations_3d`, `view.set_3d_annotations`; DOC-ANN-025).
 - **BCF viewpoints**: View › Coordination › Export Viewpoint… writes a 3D view as a BCF 3.0
   `.bcfv` (camera, section box and slices as clipping planes, hidden or isolated elements and

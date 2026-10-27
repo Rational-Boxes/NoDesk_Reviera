@@ -235,7 +235,7 @@ impl Gui {
     }
 
     /// The tags and notes of view `index`, as drawn.
-    fn view_notes(&self, index: usize) -> Vec<reviera_app::notes::NoteGraphic> {
+    pub(crate) fn view_notes(&self, index: usize) -> Vec<reviera_app::notes::NoteGraphic> {
         let v = &self.views[index];
         let (Some(element), Some(plan)) = (v.element, v.plan.as_ref()) else {
             return Vec::new();

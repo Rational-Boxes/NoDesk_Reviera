@@ -210,7 +210,7 @@ impl Gui {
         self.start_timer();
     }
 
-    /// Frames the model, or the selection when there is one (Zoom to Fit).
+    /// Frames the model, or the selection when there is one, annotation included (Zoom to Fit).
     pub(crate) fn zoom_to_fit(&mut self) {
         // A sheet fits its paper.
         if let Some(v) = self.active_view()
@@ -225,7 +225,18 @@ impl Gui {
             );
             return self.animate_to(to);
         }
-        let bounds = self.selection_bounds().or_else(|| self.scene().bounds());
+        // Selected annotation alone is framed with room around it, so where it is stays clear.
+        let selected: HashSet<_> = self.selection().into_iter().collect();
+        let annotation = self.annotation_bounds(&selected);
+        let model = self.selection_bounds();
+        if let (Some((lo, hi)), None) = (annotation, model) {
+            return self.zoom_to_box(lo.to_array().map(f64::from), hi.to_array().map(f64::from));
+        }
+        let selection = match (model, annotation) {
+            (Some(m), Some(a)) => Some((m.0.min(a.0), m.1.max(a.1))),
+            (m, a) => m.or(a),
+        };
+        let bounds = selection.or_else(|| self.scene().bounds());
         let (Some(b), Some(v)) = (bounds, self.active_view()) else {
             return;
         };

@@ -180,6 +180,39 @@ impl Gui {
         best.map(|b| b.1)
     }
 
+    /// The extent of the selected annotation in the active view: in a plan, its notes', tags' and
+    /// dimensions' outlines as drawn; in a 3D view, the points of their floating labels. `None`
+    /// when no annotation is selected there.
+    pub(crate) fn annotation_bounds(&self, selected: &std::collections::HashSet<ElementId>) -> Option<(glam::Vec3, glam::Vec3)> {
+        let index = self.views.iter().position(|v| Some(v.id) == self.active)?;
+        let v = &self.views[index];
+        let mut points: Vec<glam::Vec3> = Vec::new();
+        if let Some(plan) = v.plan.as_ref() {
+            let z = plan.range.cut as f32;
+            for n in self.view_notes(index).into_iter().filter(|n| selected.contains(&n.id)) {
+                points.extend(n.parts.outline.iter().map(|p| glam::Vec3::new(p[0], p[1], z)));
+            }
+            let store = self.app.document(v.doc)?.doc.store();
+            let view = store.get(v.element?)?;
+            for (id, data) in annotations::of_view(store, view.guid().as_str()) {
+                if !selected.contains(&id) {
+                    continue;
+                }
+                let Some(m) = annotations::measure(store, &data) else { continue };
+                let d = Dimension { points: m.points, along: m.along, line: data.line, texts: Vec::new() };
+                for s in dimension_lines(&d, plan.scale, z) {
+                    points.extend(s.map(glam::Vec3::from));
+                }
+            }
+        } else if let Some(labels) = self.tip_boxes.get(&v.id) {
+            points.extend(labels.iter().filter(|(l, _)| selected.contains(&l.id)).map(|(l, _)| l.tip.anchor));
+        }
+        points.iter().fold(None, |acc, p| match acc {
+            None => Some((*p, *p)),
+            Some((lo, hi)) => Some((lo.min(*p), hi.max(*p))),
+        })
+    }
+
     /// The dimension under pixel (`x`, `y`) of the active plan, if any.
     pub(crate) fn dim_at(&self, x: i32, y: i32) -> Option<ElementId> {
         let v = self.active_view()?;

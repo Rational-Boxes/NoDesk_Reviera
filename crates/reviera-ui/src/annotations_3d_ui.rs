@@ -62,7 +62,7 @@ impl Gui {
 
     /// A click at (`x`, `y`) on a floating label of the active 3D view: selects its annotation,
     /// or, the second click on one within 0.45 s, opens the plan it is drawn in with the
-    /// annotation selected. False when no label is there.
+    /// annotation selected and framed. False when no label is there.
     pub(crate) fn tip_click(&mut self, x: i32, y: i32, combine: select::Combine) -> bool {
         const DOUBLE: std::time::Duration = std::time::Duration::from_millis(450);
         let Some(v) = self.active_view().filter(|v| !v.is_2d()) else { return false };
@@ -86,6 +86,7 @@ impl Gui {
                 Some(plan) => {
                     self.open_view(doc, Some(plan));
                     self.select_ids(&[label.id], select::Combine::Replace);
+                    self.zoom_to_fit();
                     frame.set_status_text(&format!("{what}: opened its plan"), 0);
                 }
                 None => frame.set_status_text(&format!("{what}: its plan is not in the model"), 0),
