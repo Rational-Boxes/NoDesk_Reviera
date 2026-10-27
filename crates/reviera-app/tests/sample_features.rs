@@ -297,11 +297,23 @@ fn the_annotated_plan_floats_its_annotation_in_3d() {
     assert_eq!(shown(&app), 0);
     ok(&mut app, "edit.undo", json!({}));
     assert_eq!(shown(&app), 25);
-    // Room tags stand over their rooms, a little above the floor.
+    // Labels attach to their elements: a room's 1.2 m above its floor, a door's at its centre
+    // (half its height up, on its wall), a window's at the middle of its opening.
     let s = store(&app);
     let tips = reviera_core::annotations_3d::tips(&s);
     let living = tips.iter().find(|t| t.lines.first().map(String::as_str) == Some("Living")).unwrap();
-    assert!((living.anchor[2] - 0.3).abs() < 1e-9, "{living:?}");
+    assert!((living.anchor[2] - 1.2).abs() < 1e-9, "{living:?}");
+    for (class, kind) in [("tags:Doors", reviera_core::inserts::Kind::Door), ("tags:Windows", reviera_core::inserts::Kind::Window)] {
+        for t in tips.iter().filter(|t| t.class == class) {
+            let host = reviera_core::GlobalId::parse(t.host.as_deref().unwrap()).and_then(|g| s.find_by_guid(&g)).unwrap();
+            let p = reviera_core::inserts::placed(&s).into_iter().find(|p| p.id == host).unwrap();
+            assert_eq!(p.kind, kind);
+            let z = p.cut().z;
+            assert!((t.anchor[2] - (z[0] + z[1]) / 2.0).abs() < 1e-9, "{class} {t:?} opening {z:?}");
+            let c = p.world([0.0, 0.0, 0.0]);
+            assert!((t.anchor[0] - c[0]).hypot(t.anchor[1] - c[1]) < 1e-9, "{class} at its insert in plan: {t:?}");
+        }
+    }
     // Each names the view it is drawn in, which double-clicking its label opens: a plan, or the
     // section or elevation.
     for t in &tips {

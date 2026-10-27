@@ -2,8 +2,8 @@
 // Copyright (C) 2026 Reviera contributors
 
 //! Floating labels over a 3D view (DOC-ANN-025): each a boxed block of text drawn flat to the
-//! screen like a tooltip, beside a dot at its point in the model with a short leader to it, so it
-//! reads the same from any angle. Nearer labels are placed first; one that would cover another
+//! screen like a tooltip, centred above a dot at its point in the model, with a short leader up
+//! to the middle of the box's bottom edge, so it reads the same from any angle. Nearer labels are placed first; one that would cover another
 //! moves up a step or two, and is left out when it still would. At most [`MAX_TIPS`]. The boxes
 //! placed are returned too, so a click on one picks its annotation ([`hit`]).
 
@@ -17,8 +17,8 @@ pub const MAX_TIPS: usize = 150;
 /// Text height in pixels at scale 1.
 const TEXT: f32 = 11.0;
 const PAD: f32 = 4.0;
-/// From the anchor to the box's corner.
-const OFFSET: Vec2 = Vec2::new(10.0, -14.0);
+/// How far above its point a label's box stands (pixels at scale 1).
+const LIFT: f32 = 14.0;
 
 /// A label: lines of text at a point of the model.
 #[derive(Debug, Clone, PartialEq)]
@@ -86,8 +86,8 @@ pub fn layout(tips: &[Tip], camera: &Camera, width: f32, height: f32, scale: f32
         let lines: Vec<&str> = t.lines.iter().map(String::as_str).take(4).collect();
         let tw = lines.iter().map(|l| crate::font::width(l, text_h)).fold(0.0, f32::max);
         let size = Vec2::new(tw + 2.0 * pad, lines.len() as f32 * text_h * 1.45 + pad);
-        // Above and to the right of the anchor, moved up a step while it covers another.
-        let mut corner = *p + OFFSET * scale + Vec2::new(0.0, -size.y);
+        // Centred above the anchor, moved up a step while it covers another.
+        let mut corner = *p + Vec2::new(-size.x / 2.0, -LIFT * scale - size.y);
         let overlaps = |c: Vec2, placed: &[(Vec2, Vec2)]| placed.iter().any(|(a, b)| c.x < b.x && c.x + size.x > a.x && c.y < b.y && c.y + size.y > a.y);
         let mut tries = 0;
         while overlaps(corner, &placed) && tries < 3 {
@@ -106,8 +106,8 @@ pub fn layout(tips: &[Tip], camera: &Camera, width: f32, height: f32, scale: f32
         let (lo, hi) = (corner, corner + size);
         mesh.quad([at(lo - Vec2::splat(b), z_box + 0.001), at(Vec2::new(hi.x + b, lo.y - b), z_box + 0.001), at(hi + Vec2::splat(b), z_box + 0.001), at(Vec2::new(lo.x - b, hi.y + b), z_box + 0.001)], edge);
         mesh.quad([at(lo, z_box), at(Vec2::new(hi.x, lo.y), z_box), at(hi, z_box), at(Vec2::new(lo.x, hi.y), z_box)], paper);
-        // The leader, from the anchor's dot to the box's lower left corner.
-        let corner_pt = Vec2::new(lo.x, hi.y);
+        // The leader, from the anchor's dot up to the middle of the box's bottom edge.
+        let corner_pt = Vec2::new((lo.x + hi.x) / 2.0, hi.y);
         let d = (corner_pt - *p).normalize_or_zero();
         let n = Vec2::new(-d.y, d.x) * (0.6 * scale);
         mesh.quad([at(*p - n, z_box + 0.002), at(corner_pt - n, z_box + 0.002), at(corner_pt + n, z_box + 0.002), at(*p + n, z_box + 0.002)], edge);

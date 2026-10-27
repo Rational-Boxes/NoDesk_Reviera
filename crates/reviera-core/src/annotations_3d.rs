@@ -5,11 +5,12 @@
 //! sections and elevations, shown in a 3D view as floating labels at their place in the model,
 //! drawn flat to the screen like tooltips (the window draws them, `reviera_render::tooltips`).
 //!
-//! - **Where:** a plan's annotation stands on its level: a text note 1 m above it, a door's or
-//!   window's tag at the insert's centre, a wall's tag 1.5 m up its middle, a room's tag 0.3 m
-//!   above its tag point, a dimension's values on its line at the level. A section's annotation
-//!   stands on its view plane; an elevation's is moved back along its view onto the model (the
-//!   window casts the ray, [`Tip::probe`]); their tags stand at the host. A host tagged in
+//! - **Where:** a tag or keynote stands at its element ([`crate::notes::host_point`]): a door's or
+//!   window's at the middle of its opening, a wall's at its middle half its height up, a room's
+//!   1.2 m above its tag point. A plan's text note stands 1 m above its level and a dimension's
+//!   values on its line at the level. A section's notes and dimensions stand on its view plane;
+//!   an elevation's are moved back along its view onto the model (the window casts the ray,
+//!   [`Tip::probe`]). A host tagged in
 //!   several views is labelled once.
 //! - **From:** a view shows the plans' annotation, and the sections' and elevations' when chosen.
 //! - **Classes:** each label has a class: `text`, `dimensions`, `spots` (spot elevations and
@@ -200,27 +201,15 @@ pub fn tips(store: &Store) -> Vec<Tip> {
             if !tagged.insert((place.source(), class.clone(), r.data.host.clone())) {
                 continue;
             }
-            let anchor = match place {
-                Place::Plan(z) => match crate::inserts::resolve(store, host) {
-                    Ok(p) => p.world([0.0, 0.0, 0.0]),
-                    Err(_) if crate::rooms::room_recipe(host).is_some() => [r.anchor[0], r.anchor[1], z + 0.3],
-                    Err(_) => [r.anchor[0], r.anchor[1], z + 1.5],
-                },
-                // At the host itself: on the model already.
-                Place::Section(..) => crate::notes::host_point(store, host).unwrap_or_else(|| place.world(r.anchor, 0.0)),
-            };
+            // At the host itself (a door's or window's middle, a wall's middle at half height, a
+            // room 1.2 m up), else where the tag points.
+            let anchor = crate::notes::host_point(store, host).unwrap_or_else(|| place.world(r.anchor, 1.5));
             out.push(Tip { id: e.id(), class, anchor, lines: r.lines, view: r.data.view.clone(), source: place.source().into(), host: Some(r.data.host.clone()), probe: None });
         } else if let Some(d) = crate::keynote_tags::keynote_data(e) {
             // At its element, else where it stands.
             let Some(place) = places.get(&d.view) else { continue };
             let k = crate::keynote_tags::resolve(store, e.id(), d);
-            let at_host = k.host.and_then(|h| store.get(h)).and_then(|h| match place {
-                Place::Plan(z) => crate::notes::host_point(store, h).map(|p| match crate::inserts::resolve(store, h) {
-                    Ok(_) => p,
-                    Err(_) => [p[0], p[1], z + 1.5],
-                }),
-                Place::Section(..) => crate::notes::host_point(store, h),
-            });
+            let at_host = k.host.and_then(|h| store.get(h)).and_then(|h| crate::notes::host_point(store, h));
             let anchor = at_host.unwrap_or_else(|| place.world(k.data.position, 1.0));
             let lines = match (&k.key, &k.text) {
                 (Some(key), Some(text)) => vec![format!("{key} {text}")],

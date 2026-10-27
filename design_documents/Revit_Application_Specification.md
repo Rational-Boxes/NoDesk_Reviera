@@ -23806,9 +23806,9 @@ All annotation tools are on the **Annotate** tab, in the panels Dimension, Detai
 
 **Behaviour & rules.**
 - A 3D view shows the annotation of the model's plans as floating labels: each a boxed block of text drawn flat to the screen like a tooltip, with a dot at its point in the model and a short leader, so it reads the same from any angle.
-- Points: a text note 1 m above its plan's level; a door's or window's tag at the insert's centre; a wall's 1.5 m up its middle; a room's 0.3 m above its tag point; a dimension's segment values on its dimension line at the level. A host tagged in several plans is labelled once.
+- Points: a text note 1 m above its plan's level; a tag (and a keynote) at its element: a door's or window's at the middle of its opening, half its height up; a wall's at its middle, half its height up; a room's 1.2 m above its tag point; a dimension's segment values on its dimension line at the level. A host tagged in several plans is labelled once. *(Corrected 2026-10-27, owner: labels had attached at a door's or window's sill, and a wall's at a fixed height.)*
 - Classes: text notes, dimensions, and tags by the category they tag (door tags, window tags, room tags, …). A view shows annotation or not, and each class on its own; a new view shows every class but dimensions.
-- Nearer labels are placed first; one that would cover another moves up, and is left out after three steps. At most 150 at once.
+- Each label's box is centred above its point, with a short leader up to the middle of the box's bottom edge (owner, 2026-10-27). Nearer labels are placed first; one that would cover another moves up, and is left out after three steps. At most 150 at once.
 - View tab › Annotation (and Annotate tab › 3D, and the View menu): *Annotation in 3D* (a toggle button showing whether the active view shows them) and *Annotation Visibility…* (a check box for annotation in the view and one for each class with its count).
 
 **Data (RXD).** The view's `rxd:annotations_3d`: `{ shown, hidden: [class…], occlude, hidden_from: [plans | sections | elevations …] }`.

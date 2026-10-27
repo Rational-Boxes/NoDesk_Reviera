@@ -291,12 +291,14 @@ pub fn host_anchor(store: &Store, host: &Element) -> Option<[f64; 2]> {
     None
 }
 
-/// The host's point in the model a tag in a section or elevation hangs from: a door's or
-/// window's centre, a wall's middle at half its height, a room's tag point 1.2 m above its
+/// The host's point in the model that its annotation attaches to (a tag in a section or
+/// elevation, a floating label in 3D): a door's or window's centre (the middle of its opening,
+/// half its height up), a wall's middle at half its height, a room's tag point 1.2 m above its
 /// level (EXPERT_REVIEW E-43).
 pub fn host_point(store: &Store, host: &Element) -> Option<[f64; 3]> {
     if let Ok(p) = crate::inserts::resolve(store, host) {
-        return Some(p.world([0.0, 0.0, 0.0]));
+        let z = p.cut().z;
+        return Some(p.world([0.0, 0.0, (z[1] - z[0]) / 2.0]));
     }
     if crate::walls::wall_recipe(host).is_some() {
         let g = crate::walls::regenerate(store, host).ok()?;
