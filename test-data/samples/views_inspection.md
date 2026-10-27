@@ -33,8 +33,8 @@ Start with **File › New**. The model has Level 1 at 0.
 9. **Scope box.** Level 1 plan, View › **Scope Box**: Name *East Half*, two corners (4600, -1000)
    and (11000, 8000). Select it; Properties › Height 9000.
 10. **A plan for the scope box.** Project Browser, right-click Floor Plans › Level 1 ›
-    **Duplicate**, then **Rename** it *Level 1 - East Half*. Assign it the scope box **[gap]**,
-    so that its crop follows the box **[gap]**.
+    **Duplicate**, then **Rename** it *Level 1 - East Half*. In Properties › Extents set **Scope
+    Box** to *East Half*: the plan is cropped to the box, and follows it when the box moves.
 11. **Default 3D view and Home.** View › **Default 3D View**; click the Orientation Cube's
     south-east top corner, then View › **Set as Home** (Alt+Home returns to it).
 12. **Orthographic.** View › **New 3D View**, renamed *Orthographic* in the Project Browser;
@@ -77,9 +77,6 @@ section box, slices and virtual volumes.
 
 ## Gaps
 
-- **Scope boxes on views.** `view.assign_scope_box` (step 10) has no UI: no Properties row on a
-  view chooses its scope box (the assigned plan is cropped to its box, and grids and levels follow
-  it).
 - **Exact section box and slice positions.** The section box and slice planes are placed by
   grips and clicks only; `view.set_section_box` and `view.set_slice_planes` take exact values
   (steps 13, 15, 16), the window has no typed extents or heights.

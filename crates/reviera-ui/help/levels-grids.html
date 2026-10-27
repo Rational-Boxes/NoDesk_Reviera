@@ -86,7 +86,8 @@ corners. It reaches from below the lowest level to above the highest; set its <b
 <p>Choose a datum's <b>Scope Box</b> in its Properties: it then shows only in the views that
 cross the box, and a grid's or reference plane's line is clipped to the box's footprint.
 Moving, turning or resizing the box carries them with it. Clearing the box keeps the datum's
-extent. Saved as an <code>IfcAnnotation</code> (ObjectType <i>ScopeBox</i>) with an
+extent. A plan's, section's or elevation's <b>Scope Box</b> (Properties › Extents) crops the view
+to the box (see <a href="reviera:help/views#crop">Crop regions</a>). Saved as an <code>IfcAnnotation</code> (ObjectType <i>ScopeBox</i>) with an
 <code>IfcBoundingBox</code>.</p>
 <p><code>scopebox.create</code>, <code>scopebox.set_extents</code>, <code>scopebox.list</code>,
 <code>datum.assign_scope_box</code>, <code>view.assign_scope_box</code></p>

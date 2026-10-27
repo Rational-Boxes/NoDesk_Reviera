@@ -22,6 +22,11 @@ impl Gui {
         let boxed = reviera_core::crop::follows_scope_box(store, e);
         let annotation = reviera_core::crop::annotation_crop_of(e);
         grid.append(Property::category("Extents", "c_crop"));
+        let (labels, current) = scope_box_choices(store, e);
+        let index = current.map_or(0, |i| i as i32 + 1);
+        let names: Vec<_> = std::iter::once("None".to_owned()).chain(labels).enumerate().map(|(i, l)| (l, i as i32)).collect();
+        grid.append(Property::enumeration("Scope Box", "crop_scope_box", names, index));
+        grid.set_help_string("crop_scope_box", "The scope box the view's crop (and its grids' and levels' extents) follows");
         grid.append(Property::boolean("Crop View", "crop_on", crop.is_some_and(|c| c.enabled)));
         grid.append(Property::boolean("Crop Region Visible", "crop_visible", crop.is_some_and(|c| c.visible)));
         grid.append(Property::boolean("Annotation Crop", "crop_annotation", annotation.enabled));
@@ -42,6 +47,20 @@ impl Gui {
             return false;
         }
         let Some(view) = self.active_view().filter(|v| v.plan.is_some() || v.section.is_some()).and_then(|v| v.element) else { return false };
+        if property == "crop_scope_box" {
+            let Some(store) = self.store_now() else { return true };
+            let Some(e) = store.get(view) else { return true };
+            let boxes = reviera_core::scope_boxes::list(&store);
+            let (labels, _) = scope_box_choices(&store, e);
+            let chosen = text.as_deref().and_then(|t| labels.iter().position(|l| l == t)).map(|i| boxes[i].id);
+            if let Err(e) = self.run("view.assign_scope_box", json!({ "view_ids": [view], "scope_box_id": chosen })) {
+                error(&self.frame, &format!("The scope box was not assigned:\n{e}"));
+            }
+            let f = self.frame;
+            self.refresh_scene(&f);
+            self.properties_stale = true;
+            return true;
+        }
         let on = text.as_deref().is_some_and(|t| matches!(t, "True" | "true" | "1" | "Yes" | "yes"));
         let result = match property {
             "crop_on" => self.run("view.set_crop", json!({ "view_id": view, "enabled": on })),
@@ -125,6 +144,21 @@ impl Gui {
         self.refresh_scene(&frame);
         self.properties_stale = true;
     }
+}
+
+/// The scope boxes' labels (their names, told apart by id when two share one) and which one
+/// view `e` follows.
+fn scope_box_choices(store: &reviera_core::Store, e: &reviera_core::Element) -> (Vec<String>, Option<usize>) {
+    let boxes = reviera_core::scope_boxes::list(store);
+    let assigned = e.param(reviera_core::scope_boxes::VIEW_KEY).and_then(|v| v.as_str());
+    let labels = boxes
+        .iter()
+        .map(|b| {
+            let name = if b.name.is_empty() { "Scope Box" } else { b.name.as_str() };
+            if boxes.iter().filter(|o| o.name == b.name).count() > 1 { format!("{name} ({})", b.id.0) } else { name.to_owned() }
+        })
+        .collect();
+    (labels, boxes.iter().position(|b| Some(b.guid.as_str()) == assigned))
 }
 
 /// The size typed in Size Crop, `was` before: in proportion, the size left as it was follows

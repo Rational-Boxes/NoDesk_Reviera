@@ -515,7 +515,8 @@ Create … Boundary* tab:
   `datum.propagate_extents`, `datum.set_bubble`, `datum.add_elbow`, `datum.get`;
   ARC-DATUM-001).
 - **Scope boxes** (View › Scope Box): named, turnable boxes; datums assigned to one show only in
-  views that cross it and are clipped to it, following it as it moves. Saved as `IfcAnnotation`
+  views that cross it and are clipped to it, following it as it moves; a plan, section or
+  elevation chooses its box in Properties › Extents › Scope Box and is cropped to it. Saved as `IfcAnnotation`
   with an `IfcBoundingBox` (`scopebox.create`, `scopebox.set_extents`, `scopebox.list`,
   `datum.assign_scope_box`, `view.assign_scope_box`; ARC-SCOPE-001).
 - **Reference planes** (RP): unbounded construction planes drawn as a line in a plan, named to
