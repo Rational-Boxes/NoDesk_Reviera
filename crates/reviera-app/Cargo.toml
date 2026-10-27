@@ -33,6 +33,7 @@ base64.workspace = true
 zip = { version = "8.3", default-features = false, features = ["deflate"] }
 
 [dev-dependencies]
+glam.workspace = true
 tempfile.workspace = true
 
 [lints]

@@ -2,15 +2,15 @@
 -- Copyright (C) 2026 Reviera contributors
 
 -- title: Annotated plan
--- description: A three-room bungalow documented with the Annotate tab: dimension strings, notes, door, window and room tags, Tag All, door and room schedules, a section, an elevation and a sheet.
+-- description: A three-room bungalow documented with the Annotate tab: dimension strings, notes, door, window and room tags, Tag All, door and room schedules, a section and an elevation with their own dimensions, tags and notes, and a sheet.
 --
 -- Reviera sample model (test-data/samples): a 10 × 6 m bungalow (living room, bedroom, kitchen)
 -- with three doors and five windows, documented in its Level 1 plan: aligned dimension strings
 -- to wall faces and partitions, and to the openings' jambs (DOC-ANN); a title note and a note
 -- with a leader; a door tag with a leader and a window tag (Tag by Category), a room tag, then
 -- Tag All Not Tagged for the rest (DOC-ANN-010); door and room schedules (DOC-SCH); a section
--- through the bedroom and the south elevation; sheet A101 with the plan, section, elevation and
--- both schedules placed (DOC-SHT).
+-- through the bedroom and the south elevation, each with its own dimensions, a tag and a note;
+-- sheet A101 with the plan, section, elevation and both schedules placed (DOC-SHT).
 
 local l1 = reviera.level.list()[1].id
 reviera.view.create_plan{ level_ids = { l1 } }
@@ -91,6 +91,24 @@ local rooms = reviera.schedule.create{ category = "cat.rooms" }
 -- A section through the bedroom door, looking north, and the south elevation.
 local sec = reviera.view.create_section{ start = { 11, 1.5 }, ["end"] = { -1, 1.5 }, far_offset = 8, name = "Section A" }
 local elev = reviera.view.create_elevation{ point = { 5, -5 }, look = { 0, 1 }, width = 14, name = "South" }
+
+-- Their annotation, in each view's own coordinates: x to the viewer's right from the view's left
+-- end, and height (the elevation starts at x = -2 m, the section at x = -1 m). In the south
+-- elevation, the wall's height above Level 1, the overall width between the end walls' outer
+-- faces (seen edge on), a tag on the living window and a note on the facade; in Section A, the
+-- partition's height, the living room's clear width where the section cuts it, a tag on the
+-- bedroom door and a note. A 3D view floats them too when chosen (DOC-ANN-025).
+local function at_level(x) return { element = l1, sub = "level", point = { x, 0 } } end
+reviera.dim.create_aligned{ view_id = elev, line_point = { 0.8, 1.5 }, refs = { at_level(1), face(south, "top", { 1, 3 }) } }
+reviera.dim.create_aligned{ view_id = elev, line_point = { 7, 4.0 }, refs = {
+  face(west, "face:ext", { 2, 1 }), face(east, "face:ext", { 12, 1 }) } }
+reviera.tag.create{ view_id = elev, host_ref = w_living_s, position = { 4.0, 2.6 } }
+reviera.text.create{ view_id = elev, position = { 7.0, 2.8 }, content = "RENDERED BLOCKWORK" }
+reviera.dim.create_aligned{ view_id = sec, line_point = { 0.3, 1.5 }, refs = { at_level(4), face(cross, "top", { 7, 3 }) } }
+reviera.dim.create_aligned{ view_id = sec, line_point = { 4, 2.4 }, refs = {
+  face(west, "face:int", { 1, 2 }), face(cross, "face:ext", { 7, 2 }) } }
+reviera.tag.create{ view_id = sec, host_ref = d_bed, position = { 7.6, 2.4 } }
+reviera.text.create{ view_id = sec, position = { 7.4, 3.6 }, content = "BEDROOM" }
 
 -- Sheet A101 (A2): the plan, section and elevation at 1 : 100, and both schedules.
 local sheet = reviera.sheet.create{ name = "Ground Floor", size = "A2" }

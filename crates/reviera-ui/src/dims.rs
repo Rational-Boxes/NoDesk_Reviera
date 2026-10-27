@@ -58,6 +58,23 @@ fn cross(a: [f64; 2], b: [f64; 2]) -> f64 {
 }
 
 impl Gui {
+    /// The scale and drawing depth of view `index`'s annotation: a plan's at its cut, a section's
+    /// or elevation's just in front of its view plane (its frame's z = 0). `None` for other
+    /// views.
+    pub(crate) fn annotation_space(&self, index: usize) -> Option<(f32, f32)> {
+        let v = self.views.get(index)?;
+        if let Some(p) = &v.plan {
+            return Some((p.scale, p.range.cut as f32));
+        }
+        v.section.as_ref().map(|s| (s.scale, 0.0))
+    }
+
+    /// [`Gui::annotation_space`] of the active view.
+    pub(crate) fn active_annotation_space(&self) -> Option<(f32, f32)> {
+        let index = self.views.iter().position(|v| Some(v.id) == self.active)?;
+        self.annotation_space(index)
+    }
+
     /// Formats a length in project units.
     pub(crate) fn format_length(&mut self, v: f64) -> String {
         self.run("units.format", json!({ "value": v, "data_type": "length" }))
@@ -69,9 +86,10 @@ impl Gui {
     /// The lines of the dimensions of view `index` (drawn with the plan).
     pub(crate) fn annotation_lines(&mut self, index: usize) -> Vec<Lines> {
         let v = &self.views[index];
-        let (Some(element), Some(plan)) = (v.element, v.plan.clone()) else {
+        let (Some(element), Some((scale, z))) = (v.element, self.annotation_space(index)) else {
             return Vec::new();
         };
+        let plan = v.plan.clone();
         let doc = v.doc;
         let Some(store) = self.app.document(doc).map(|d| d.doc.store().clone()) else {
             return Vec::new();
@@ -79,7 +97,7 @@ impl Gui {
         let Some(view) = store.get(element) else {
             return Vec::new();
         };
-        let z = plan.range.cut as f32 + 0.002;
+        let z = z + 0.002;
         // Dimensions use annotation pen 1 (DOC-GFX-009).
         let width = reviera_core::standards::pen_set(&store).annotation_width(1) as f32;
         let mut normal = Lines {
@@ -133,8 +151,12 @@ impl Gui {
             } else {
                 &mut normal
             };
-            target.segments.extend(dimension_lines(&d, plan.scale, z));
+            target.segments.extend(dimension_lines(&d, scale, z));
         }
+        // Sections and elevations draw their grids with the model.
+        let Some(plan) = plan else {
+            return vec![normal, orphaned, highlighted];
+        };
         // Grids show in every plan, in their types' styles; selected ones highlighted.
         let mut grids = Vec::new();
         for (id, mark) in grid_marks(&store, Some(view.guid().as_str()), plan.range.cut) {
@@ -180,15 +202,14 @@ impl Gui {
         best.map(|b| b.1)
     }
 
-    /// The extent of the selected annotation in the active view: in a plan, its notes', tags' and
-    /// dimensions' outlines as drawn; in a 3D view, the points of their floating labels. `None`
+    /// The extent of the selected annotation in the active view: in a plan, section or elevation,
+    /// its notes', tags' and dimensions' outlines as drawn; in a 3D view, the points of their floating labels. `None`
     /// when no annotation is selected there.
     pub(crate) fn annotation_bounds(&self, selected: &std::collections::HashSet<ElementId>) -> Option<(glam::Vec3, glam::Vec3)> {
         let index = self.views.iter().position(|v| Some(v.id) == self.active)?;
         let v = &self.views[index];
         let mut points: Vec<glam::Vec3> = Vec::new();
-        if let Some(plan) = v.plan.as_ref() {
-            let z = plan.range.cut as f32;
+        if let Some((scale, z)) = self.annotation_space(index) {
             for n in self.view_notes(index).into_iter().filter(|n| selected.contains(&n.id)) {
                 points.extend(n.parts.outline.iter().map(|p| glam::Vec3::new(p[0], p[1], z)));
             }
@@ -200,7 +221,7 @@ impl Gui {
                 }
                 let Some(m) = annotations::measure(store, &data) else { continue };
                 let d = Dimension { points: m.points, along: m.along, line: data.line, texts: Vec::new() };
-                for s in dimension_lines(&d, plan.scale, z) {
+                for s in dimension_lines(&d, scale, z) {
                     points.extend(s.map(glam::Vec3::from));
                 }
             }
@@ -213,13 +234,12 @@ impl Gui {
         })
     }
 
-    /// The dimension under pixel (`x`, `y`) of the active plan, if any.
+    /// The dimension under pixel (`x`, `y`) of the active plan, section or elevation, if any.
     pub(crate) fn dim_at(&self, x: i32, y: i32) -> Option<ElementId> {
+        let (scale, z) = self.active_annotation_space()?;
         let v = self.active_view()?;
-        let plan = v.plan.as_ref()?;
         let store = self.app.document(v.doc)?.doc.store();
         let view = store.get(v.element?)?;
-        let z = plan.range.cut as f32;
         let mut best: Option<(f32, ElementId)> = None;
         for (id, data) in annotations::of_view(store, view.guid().as_str()) {
             let Some(m) = annotations::measure(store, &data) else {
@@ -232,7 +252,7 @@ impl Gui {
                 line: data.line,
                 texts: Vec::new(),
             };
-            for s in dimension_lines(&d, plan.scale, z) {
+            for s in dimension_lines(&d, scale, z) {
                 let seg = [s[0], s[1]].map(|p| [f64::from(p[0]), f64::from(p[1])]);
                 let dist = self.pixel_distance(x, y, seg, z);
                 if dist <= PICK_PX && best.is_none_or(|b| dist < b.0) {
@@ -269,9 +289,9 @@ impl Gui {
 
     /// Starts the Dimension tool (plans only).
     pub(crate) fn start_dim_tool(&mut self, frame: &Frame) {
-        if !self.in_plan() {
+        if self.active_annotation_space().is_none() {
             return frame.set_status_text(
-                "Dimensions are placed in plan views (View › New Floor Plan)",
+                "Dimensions are placed in plans, sections and elevations (View › New Floor Plan)",
                 0,
             );
         }
@@ -379,6 +399,9 @@ impl Gui {
         first: Option<[f64; 2]>,
     ) -> Option<Candidate> {
         let v = self.active_view()?;
+        if v.section.is_some() {
+            return self.section_reference_at(x, y, first);
+        }
         let plan = v.plan.as_ref()?;
         let store = self.app.document(v.doc)?.doc.store();
         let level_guid = store.get(plan.level)?.guid().to_string();
@@ -490,6 +513,78 @@ impl Gui {
         best.map(|b| b.1)
     }
 
+    /// The reference line under pixel (`x`, `y`) of the active section or elevation, parallel to
+    /// `first` if given, in the view's frame: levels across the view; Reviera walls' bases and
+    /// tops, and their faces, axes and ends where the view shows them as lines; grids crossing
+    /// the view; else cut edges.
+    fn section_reference_at(&self, x: i32, y: i32, first: Option<[f64; 2]>) -> Option<Candidate> {
+        let v = self.active_view()?;
+        let s = v.section.as_ref()?;
+        let store = self.app.document(v.doc)?.doc.store();
+        let frame = s.def.frame();
+        let cursor = self.plan_xy(x, y)?;
+        let parallel = |d: [f64; 2]| first.is_none_or(|f| cross(f, d).abs() < 1e-3);
+        let mut best: Option<(f32, Candidate)> = None;
+        let offer = |best: &mut Option<(f32, Candidate)>, arg: Value, seg: [[f64; 2]; 2], dir: [f64; 2]| {
+            let d = self.pixel_distance(x, y, seg, 0.0);
+            if d > PICK_PX || !parallel(dir) || best.as_ref().is_some_and(|b| b.0 <= d) {
+                return;
+            }
+            let t = (cursor[0] - seg[0][0]) * dir[0] + (cursor[1] - seg[0][1]) * dir[1];
+            let point = [seg[0][0] + dir[0] * t, seg[0][1] + dir[1] * t];
+            let mut arg = arg;
+            arg["point"] = json!(point);
+            *best = Some((d, Candidate { arg, point, direction: dir, segment: seg }));
+        };
+        let levels = reviera_core::levels::list(store);
+        let (lo, hi) = levels.iter().fold((0.0f64, 3.0f64), |(a, b), l| (a.min(l.elevation), b.max(l.elevation + 3.0)));
+        for l in &levels {
+            offer(&mut best, json!({ "element": l.id, "sub": "level" }), [[0.0, l.elevation], [frame.width, l.elevation]], [1.0, 0.0]);
+        }
+        let x_of = |p: [f64; 2]| frame.to_local([p[0], p[1], 0.0]);
+        for e in store.iter() {
+            if reviera_core::walls::wall_recipe(e).is_none() {
+                continue;
+            }
+            let Ok(g) = reviera_core::walls::regenerate(store, e) else { continue };
+            // In the view's depth and width.
+            let (a, b) = (x_of(g.start), x_of(g.end));
+            // A wall the view crosses square on still shows its thickness.
+            let (x0, x1) = ((a[0].min(b[0]) - g.width / 2.0).max(0.0), (a[0].max(b[0]) + g.width / 2.0).min(frame.width));
+            if x1 < x0 || a[2].min(b[2]) > 1e-6 || a[2].max(b[2]) < -frame.far {
+                continue;
+            }
+            let (z0, z1) = (g.base_z, g.base_z + g.height);
+            for sub in ["base", "top", "face:ext", "axis", "face:int", "end:start", "end:end"] {
+                let r = reviera_core::annotations::DimRef { element: Some(e.guid().to_string()), sub: sub.into(), point: [0.0, 0.0], direction: [1.0, 0.0] };
+                let Some((p, dir)) = reviera_core::annotations::resolve_ref_in_section(store, &r, &frame) else { continue };
+                let seg = if dir[1].abs() < 0.5 { [[x0, p[1]], [x1, p[1]]] } else { [[p[0], z0], [p[0], z1]] };
+                offer(&mut best, json!({ "element": e.id(), "sub": sub }), seg, dir);
+            }
+        }
+        for g in reviera_core::grids::list(store) {
+            if let Some(gx) = frame.grid_crossing(g.curve.start, g.curve.end) {
+                offer(&mut best, json!({ "element": g.id, "sub": "axis" }), [[gx, lo - 1.0], [gx, hi]], [0.0, 1.0]);
+            }
+        }
+        if best.is_some() {
+            return best.map(|b| b.1);
+        }
+        // Cut and projected edges of other elements, as free lines.
+        for (element, seg) in s.cut_edges.iter() {
+            let seg = seg.map(|p| [f64::from(p[0]), f64::from(p[1])]);
+            let (dx, dy) = (seg[1][0] - seg[0][0], seg[1][1] - seg[0][1]);
+            let len = dx.hypot(dy);
+            if len < 1e-4 {
+                continue;
+            }
+            let dir = [dx / len, dy / len];
+            let element: Option<ElementId> = *element;
+            offer(&mut best, json!({ "element": element, "sub": "line", "direction": dir }), seg, dir);
+        }
+        best.map(|b| b.1)
+    }
+
     /// Mouse movement in the tool: the hovered reference and the dimension preview.
     pub(crate) fn dim_motion(&mut self, x: i32, y: i32) {
         let hover = self.dim_candidate(x, y);
@@ -543,10 +638,10 @@ impl Gui {
     /// Draws the tool's state: picked references, the hovered one, and the dimension so far.
     fn dim_preview(&mut self) {
         let Some(t) = &self.dim_tool else { return };
-        let Some(plan) = self.active_view().and_then(|v| v.plan.clone()) else {
+        let Some((scale, z)) = self.active_annotation_space() else {
             return;
         };
-        let z = plan.range.cut as f32 + 0.003;
+        let z = z + 0.003;
         let seg3 = |s: [[f64; 2]; 2]| s.map(|p| [p[0] as f32, p[1] as f32, z]);
         let mut lines = Lines {
             color: PREVIEW_COLOR,
@@ -588,7 +683,7 @@ impl Gui {
                 line,
                 texts,
             };
-            lines.segments.extend(dimension_lines(&d, plan.scale, z));
+            lines.segments.extend(dimension_lines(&d, scale, z));
         }
         if let Some(v) = self.viewport() {
             v.set_overlay_lines(&[lines]);

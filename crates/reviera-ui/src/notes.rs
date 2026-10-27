@@ -79,7 +79,9 @@ pub(crate) fn ask_text(frame: &Frame, title: &str, current: &str) -> Option<Stri
 impl Gui {
     pub(crate) fn start_note_tool(&mut self, kind: NoteTool) {
         let frame = self.frame;
-        if !self.ensure_plan(false) {
+        // Tags and text go in sections and elevations too.
+        let in_section = self.active_view().is_some_and(|v| v.section.is_some());
+        if !(in_section && matches!(kind, NoteTool::Tag | NoteTool::Text)) && !self.ensure_plan(false) {
             return;
         }
         self.end_tool(&frame);
@@ -121,12 +123,21 @@ impl Gui {
             .and_then(|v| v.element)
     }
 
+    /// The active plan's, section's or elevation's element id: the views tags and text go in.
+    fn active_annotation_view(&self) -> Option<ElementId> {
+        self.active_view()
+            .filter(|v| v.plan.is_some() || v.section.is_some())
+            .and_then(|v| v.element)
+    }
+
     /// A click with a note tool.
     pub(crate) fn note_click(&mut self, x: i32, y: i32, panel: &Panel) {
         let frame = self.frame;
-        let (Some(kind), Some(plan), Some(p)) =
-            (self.note_tool, self.active_plan(), self.plan_xy(x, y))
-        else {
+        let view = match self.note_tool {
+            Some(NoteTool::Tag | NoteTool::Text) => self.active_annotation_view(),
+            _ => self.active_plan(),
+        };
+        let (Some(kind), Some(plan), Some(p)) = (self.note_tool, view, self.plan_xy(x, y)) else {
             return;
         };
         let result = match kind {
@@ -190,16 +201,21 @@ impl Gui {
     /// Annotate › Tag All Not Tagged.
     pub(crate) fn tag_all(&mut self) {
         let frame = self.frame;
-        if !self.ensure_plan(false) {
+        let in_section = self.active_view().is_some_and(|v| v.section.is_some());
+        if !in_section && !self.ensure_plan(false) {
             return;
         }
-        let Some(plan) = self.active_plan() else {
+        let Some(plan) = self.active_annotation_view() else {
             return;
         };
         let labels: Vec<&str> = TAG_ALL.iter().map(|c| c.1).collect();
         let dialog = MultiChoiceDialog::builder(
             &frame,
-            "Tag every element of these categories on the plan's level that has no tag yet:",
+            if in_section {
+                "Tag every element of these categories the view shows that has no tag yet:"
+            } else {
+                "Tag every element of these categories on the plan's level that has no tag yet:"
+            },
             "Tag All Not Tagged",
             &labels,
         )
@@ -234,10 +250,10 @@ impl Gui {
             .is_some_and(|e| notes::tag_data(e).is_some() || notes::text_data(e).is_some())
     }
 
-    /// The tags and notes of view `index`, as drawn.
+    /// The tags and notes of view `index` (a plan, section or elevation), as drawn.
     pub(crate) fn view_notes(&self, index: usize) -> Vec<reviera_app::notes::NoteGraphic> {
         let v = &self.views[index];
-        let (Some(element), Some(plan)) = (v.element, v.plan.as_ref()) else {
+        let (Some(element), Some((scale, z))) = (v.element, self.annotation_space(index)) else {
             return Vec::new();
         };
         let Some(store) = self.app.document(v.doc).map(|d| d.doc.store()) else {
@@ -246,7 +262,7 @@ impl Gui {
         let Some(view) = store.get(element) else {
             return Vec::new();
         };
-        reviera_app::notes::view_notes(store, view, plan.scale, plan.range.cut as f32 + 0.002)
+        reviera_app::notes::view_notes(store, view, scale, z + 0.002)
     }
 
     /// The lines of the tags and notes of view `index` (drawn with the plan).

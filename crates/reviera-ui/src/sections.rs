@@ -34,6 +34,13 @@ pub struct SectionState {
     pub stale: bool,
     /// The model in the view's frame, for picking.
     pub scene: Rc<RenderScene>,
+    /// The model's drawing as last built, under the annotation (which is redrawn on its own, as
+    /// the selection changes).
+    pub base: Option<Rc<reviera_render::plan::PlanGraphics>>,
+    /// The annotation must be redrawn.
+    pub redraw: bool,
+    /// The cut edges with their element, for dimension references.
+    pub cut_edges: Rc<Vec<reviera_render::plan::CutEdge>>,
 }
 
 /// The Section tool: the first point, once clicked.
@@ -61,60 +68,81 @@ impl Gui {
                 .unwrap_or(100.0) as f32,
             stale: true,
             scene: Rc::default(),
+            base: None,
+            redraw: true,
+            cut_edges: Rc::default(),
         })
     }
 
     /// Rebuilds a section view's drawing when stale: its model in the view frame, cut and
-    /// projection, levels and grids.
+    /// projection, levels and grids; and draws its dimensions, tags and text notes over it
+    /// (selected ones highlighted) when they changed.
     pub(crate) fn update_section_graphics(&mut self, index: usize) {
         let v = &self.views[index];
         let Some(s) = &v.section else { return };
-        if !s.stale || v.viewport.is_none() {
+        if !(s.stale || s.redraw) || v.viewport.is_none() {
             return;
         }
         let doc = v.doc;
-        let visibility = self.view_visibility(v);
-        let (Some(scene), Some(store)) = (
-            self.scenes.get(&doc),
-            self.app.document(doc).map(|d| d.doc.store().clone()),
-        ) else {
-            return;
-        };
-        let def = s.def;
-        let scale = s.scale;
-        let view_guid = v
-            .element
-            .and_then(|e| store.get(e))
-            .map(|e| e.guid().to_string());
-        let parts = reviera_app::output::section_parts(
-            &store,
-            view_guid.as_deref(),
-            scene,
-            &def,
-            scale,
-            &|e| visibility.opacity(e).is_some(),
-        );
-        let mut graphics = parts.graphics;
-        graphics.lines.extend(parts.annotation);
-        graphics.lines.push(Lines {
-            color: [0.0, 0.0, 0.0, 1.0],
-            width: 0.18,
-            segments: label_strokes(&parts.labels),
-        });
         let highlight = if Some(doc) == self.doc {
             self.selection()
         } else {
             Vec::new()
         };
+        let v = &self.views[index];
+        let Some(s) = &v.section else { return };
+        if s.stale || s.base.is_none() {
+            let visibility = self.view_visibility(v);
+            let (Some(scene), Some(store)) = (
+                self.scenes.get(&doc),
+                self.app.document(doc).map(|d| d.doc.store().clone()),
+            ) else {
+                return;
+            };
+            let def = s.def;
+            let scale = s.scale;
+            let view_guid = v
+                .element
+                .and_then(|e| store.get(e))
+                .map(|e| e.guid().to_string());
+            let parts = reviera_app::output::section_parts(
+                &store,
+                view_guid.as_deref(),
+                scene,
+                &def,
+                scale,
+                &|e| visibility.opacity(e).is_some(),
+            );
+            let mut graphics = parts.graphics;
+            graphics.lines.extend(parts.annotation);
+            graphics.lines.push(Lines {
+                color: [0.0, 0.0, 0.0, 1.0],
+                width: 0.18,
+                segments: label_strokes(&parts.labels),
+            });
+            let cut_edges = Rc::new(std::mem::take(&mut graphics.cut_edges));
+            let v = &mut self.views[index];
+            if let Some(vp) = &mut v.viewport {
+                vp.set_scene(&parts.scene);
+            }
+            if let Some(s) = &mut v.section {
+                s.stale = false;
+                s.scene = Rc::new(parts.scene);
+                s.base = Some(Rc::new(graphics));
+                s.cut_edges = cut_edges;
+            }
+        }
+        let Some(base) = self.views[index].section.as_ref().and_then(|s| s.base.clone()) else { return };
+        let mut graphics = (*base).clone();
+        graphics.lines.extend(self.annotation_lines(index));
+        graphics.lines.extend(self.note_lines(index));
         let v = &mut self.views[index];
         if let Some(vp) = &mut v.viewport {
-            vp.set_scene(&parts.scene);
             vp.set_highlight(&highlight);
             vp.set_plan(Some(graphics));
         }
         if let Some(s) = &mut v.section {
-            s.stale = false;
-            s.scene = Rc::new(parts.scene);
+            s.redraw = false;
         }
     }
 

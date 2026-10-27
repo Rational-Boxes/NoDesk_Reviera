@@ -46,7 +46,17 @@ Start with **File › New**, and open a Level 1 plan (View › **Floor Plan**).
     *South* and delete the other three in the Project Browser. **[gap]** The script places one
     elevation by its point and width (5 m south of the house, 14 m wide); the window places all
     four from the model's extents.
-11. **Sheet.** View › **Sheet**, *A2*: it is numbered A101. In Properties name it *Ground
+11. **Section and elevation annotation.** Open *South* (Project Browser). Annotate › **Aligned
+    Dimension** (DI): click the Level 1 line, then the wall's top edge, then click in empty space
+    left of the house (3000); again from the west wall's outer edge to the east wall's, placed
+    above the roof line (10200). **Tag by Category** (TG): click the living-room window and drag
+    its tag up beside it. **Text** (TX): click on the wall between the door and the east window
+    and type *RENDERED BLOCKWORK*. Open *Section A*: dimension the Level 1 line to the partition's
+    top (3000) left of the house, and the living room's west wall's inner face to the partition's
+    face (5800); tag the bedroom door; and put a text note *BEDROOM* above the bedroom. In the
+    Default 3D View, View › Annotation › **Annotation Visibility…** › *From*: tick Sections and
+    Elevations to see their annotation float in 3D; the elevation's note sits on the south wall.
+12. **Sheet.** View › **Sheet**, *A2*: it is numbered A101. In Properties name it *Ground
     Floor*, Drawn By *Reviera*, Issue Date *2026-10-26*. Its Sheet tab › **Place View**: the
     Level 1 plan, then *Section A*, then *South*; **Place Schedule**: the door and room
     schedules. Drag them into place: the plan at the left, the section and elevation to its

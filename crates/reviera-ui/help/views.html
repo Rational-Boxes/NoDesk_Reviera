@@ -140,18 +140,22 @@ Select elements first, then:</p>
 <code>view.temp_isolate</code>, <code>view.temp_translucent</code>, <code>view.temp_reset</code></p>
 
 <h2 id="annotation-3d">Annotation in 3D</h2>
-<p>A 3D view shows the plans' text notes, tags and dimensions as floating labels at their places
-in the model, drawn flat to the screen like tooltips so they read from any angle: a note above
+<p>A 3D view shows the text notes, tags and dimensions of the plans, sections and elevations as
+floating labels at their places in the model, drawn flat to the screen like tooltips so they read from any angle: a note above
 its level, a door's or window's tag at the insert, a room's tag over the room, a dimension's
 values along its line. <b>View › Annotation › Annotation in 3D</b> turns them on and off for the
 view; the button shows whether they are on. <b>Annotation Visibility…</b> has a check box for
 each class (text notes, dimensions, door tags, window tags, room tags and the other tagged
-categories) to show or hide each on its own; a new view shows all but dimensions. The choice is
+categories) to show or hide each on its own, and under <b>From</b> one for each kind of view the
+annotation is drawn in (plans, sections, elevations); a new view shows all but dimensions, from
+the plans. A section's notes and dimensions stand on its cut; an elevation's are moved back
+along its view onto the facade they describe (or stay on its line when nothing is behind them);
+a tagged element is labelled once. The choice is
 kept with the view, and is one step to undo. Labels that would cover nearer ones move up or are
 left out, and so are labels whose place the model hides (seen through glass counts as seen);
 clear <b>Hide labels behind the model</b> to show them all. Click a label to select its
 annotation (its label is then edged in blue, and its properties show); double-click it to open
-the plan it is drawn in, zoomed to the annotation and with it selected. <b>Zoom to Fit</b> (ZF) with
+the plan, section or elevation it is drawn in, zoomed to the annotation and with it selected. <b>Zoom to Fit</b> (ZF) with
 annotation selected frames it, in a plan or a 3D view. <code>view.annotations_3d</code>, <code>view.set_3d_annotations</code></p>
 
 <h2 id="bcf">BCF viewpoints</h2>

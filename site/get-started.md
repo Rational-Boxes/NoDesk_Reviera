@@ -7,6 +7,9 @@
 
 ## Install a package
 
+The current packages are pre-release 2 (`0.1.0-pre.2`), on the
+[GitHub releases page](https://github.com/Rational-Boxes/NoDesk_Reviera/releases).
+
 | Platform | Package | Status |
 |---|---|---|
 | Linux | `BIM-Reviera-<version>-x86_64.flatpak` | Built and tested on Fedora 43 |
@@ -26,7 +29,8 @@ Every package includes the sample models and the sample Component Library.
 ## Your first model
 
 1. Open **Help › Reviera Help** (F1). The Samples section opens each sample model as a fresh
-   copy, grouped by part of the application: Architecture, Structure, View and Modify.
+   copy, grouped by ribbon tab: Architecture, Structure, Steel, Concrete, Systems, Analyze,
+   Sustainability, Massing & Site, Annotate, View, Manage and Modify.
 2. Try the **Manor** for architecture, or the **Steel-framed office** for structure. Each sample
    has a walkthrough showing how to build it by hand.
 3. Or start from **File › New**, set your units and building code in **Manage › Settings ›

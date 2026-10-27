@@ -454,6 +454,8 @@ struct Gui {
     tip_boxes: std::collections::HashMap<u32, Vec<(radial::TipLabel, reviera_render::tooltips::Placed)>>,
     /// The last label clicked and when, to tell a double click (which opens its plan).
     tip_click: Option<(reviera_core::ElementId, std::time::Instant)>,
+    /// Each document's surfaces, for moving elevations' labels onto the model, by version.
+    surfaces: std::collections::HashMap<DocumentId, (reviera_core::document::ModelVersion, std::rc::Rc<reviera_render::bvh::Bvh>)>,
     /// Each document's triangles for testing whether labels are behind the model, by version.
     occluders: std::collections::HashMap<DocumentId, (reviera_core::document::ModelVersion, std::rc::Rc<reviera_render::bvh::Bvh>)>,
     /// Per-user interface settings (the experimental radial menu, the reveal dwell).
@@ -2199,8 +2201,9 @@ impl Gui {
 
     /// The element under pixel (`x`, `y`): in plans dimensions and grids first, then the model.
     fn element_at(&self, x: i32, y: i32, panel: &Panel) -> Option<ElementId> {
+        // In sections and elevations, their annotation before the model.
         if self.active_view().is_some_and(|v| v.section.is_some()) {
-            return self.section_pick(x, y);
+            return self.note_at(x, y).or_else(|| self.dim_at(x, y)).or_else(|| self.section_pick(x, y));
         }
         let size = panel.get_client_size();
         let (origin, dir) =
@@ -3796,6 +3799,7 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 tip_boxes: std::collections::HashMap::new(),
                 tip_click: None,
                 occluders: std::collections::HashMap::new(),
+                surfaces: std::collections::HashMap::new(),
                 ui_settings: radial::UiSettings::load(),
                 chrome: fullscreen::Chrome::default(),
                 system_browser: None,

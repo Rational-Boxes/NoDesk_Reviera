@@ -275,10 +275,12 @@ fn the_annotated_plan_floats_its_annotation_in_3d() {
     let info = ok(&mut app, "view.annotations_3d", json!({ "view_id": view }));
     let count = |info: &Value, c: &str| info["classes"].as_array().unwrap().iter().find(|x| x["class"] == c).map(|x| (x["count"].as_u64().unwrap(), x["visible"].as_bool().unwrap()));
     assert_eq!((info["shown"].as_bool(), info["occlude"].as_bool()), (Some(true), Some(true)), "labels behind the model left out unless set");
-    assert_eq!(count(&info, "text"), Some((2, true)));
-    assert_eq!(count(&info, "dimensions"), Some((13, false)), "dimensions hidden unless chosen");
-    assert_eq!(count(&info, "tags:Doors"), Some((3, true)));
-    assert_eq!(count(&info, "tags:Windows"), Some((5, true)));
+    // Counted over the plans, the section and the elevation (each with a note, two dimensions and
+    // a tag).
+    assert_eq!(count(&info, "text"), Some((4, true)));
+    assert_eq!(count(&info, "dimensions"), Some((17, false)), "dimensions hidden unless chosen");
+    assert_eq!(count(&info, "tags:Doors"), Some((4, true)));
+    assert_eq!(count(&info, "tags:Windows"), Some((6, true)));
     assert_eq!(count(&info, "tags:Rooms"), Some((3, true)));
     let shown = |app: &App| {
         let s = store(app);
@@ -297,12 +299,94 @@ fn the_annotated_plan_floats_its_annotation_in_3d() {
     let tips = reviera_core::annotations_3d::tips(&s);
     let living = tips.iter().find(|t| t.lines.first().map(String::as_str) == Some("Living")).unwrap();
     assert!((living.anchor[2] - 0.3).abs() < 1e-9, "{living:?}");
-    // Each names the plan it is drawn in, which double-clicking its label opens.
+    // Each names the view it is drawn in, which double-clicking its label opens: a plan, or the
+    // section or elevation.
     for t in &tips {
-        let plan = reviera_core::GlobalId::parse(&t.plan).and_then(|g| s.find_by_guid(&g)).unwrap_or_else(|| panic!("{t:?}"));
-        assert!(reviera_core::views::view_data(s.get(plan).unwrap()).is_some_and(|d| reviera_core::plans::is_plan(&d.kind)));
+        let owner = reviera_core::GlobalId::parse(&t.view).and_then(|g| s.find_by_guid(&g)).unwrap_or_else(|| panic!("{t:?}"));
+        let kind = reviera_core::views::view_data(s.get(owner).unwrap()).unwrap().kind;
+        let expected = match t.source.as_str() {
+            "plans" => reviera_core::plans::is_plan(&kind),
+            "sections" => kind == reviera_core::sections::KIND_SECTION,
+            _ => kind == reviera_core::sections::KIND_ELEVATION,
+        };
+        assert!(expected, "{t:?} in {kind}");
     }
     assert!(app.execute("view.set_3d_annotations", json!({ "view_id": view, "classes": { "nonsense": true } }), &Caller::user()).is_err());
     ok(&mut app, "view.set_3d_annotations", json!({ "view_id": view, "occlude": false }));
     assert_eq!(ok(&mut app, "view.annotations_3d", json!({ "view_id": view }))["occlude"], false);
+}
+
+#[test]
+fn the_annotated_plan_floats_its_section_and_elevation_annotation() {
+    let work = tempfile::tempdir().unwrap();
+    let mut app = open(work.path(), "annotated_plan");
+    let (sec, elev) = (view_id(&mut app, "Section A", "view.section"), view_id(&mut app, "South", "view.elevation"));
+    // The section and elevation hold their own dimensions, measured in their frames: the wall's
+    // and partition's 3 m height above Level 1, the overall width between the end walls' outer
+    // faces and the living room's clear width.
+    let values = |app: &mut App, view: u64| -> Vec<f64> {
+        let list = ok(app, "anno.list", json!({ "view_id": view }));
+        let mut v: Vec<f64> = list.as_array().unwrap().iter().flat_map(|d| d["measured"]["values"].as_array().unwrap().iter().map(f)).collect();
+        v.sort_by(f64::total_cmp);
+        v
+    };
+    let ev = values(&mut app, elev);
+    assert_eq!(ev.len(), 2, "{ev:?}");
+    assert!(near(ev[0], 3.0, 1e-6) && ev[1] > 10.0 && ev[1] < 10.6, "{ev:?}");
+    let sv = values(&mut app, sec);
+    assert_eq!(sv.len(), 2, "{sv:?}");
+    assert!(near(sv[0], 3.0, 1e-6) && sv[1] > 5.4 && sv[1] < 6.0, "{sv:?}");
+    // Their tags and notes are drawn with them, for output too.
+    let doc = app.active().unwrap();
+    let drawing = app.section_drawing(doc, ElementId(sec)).unwrap();
+    assert!(drawing.labels.iter().any(|l| l.text == "BEDROOM"), "the section's note");
+    let drawing = app.section_drawing(doc, ElementId(elev)).unwrap();
+    assert!(drawing.labels.iter().any(|l| l.text == "RENDERED BLOCKWORK"), "the elevation's note");
+    // Tag All in the section tags what it shows: the kitchen door, 3 m beyond the cut (the
+    // bedroom door has its tag; the front door is behind the section).
+    let tagged = ok(&mut app, "tag.tag_all", json!({ "view_id": sec, "categories": ["cat.doors"] }));
+    assert_eq!(tagged.as_array().unwrap().len(), 1, "{tagged}");
+    ok(&mut app, "edit.undo", json!({}));
+
+    // In 3D, the sections' and elevations' annotation shows when chosen.
+    let view = ok(&mut app, "view.create_3d", json!({}));
+    let info = ok(&mut app, "view.annotations_3d", json!({ "view_id": view }));
+    let from: Vec<(String, u64, bool)> = info["sources"].as_array().unwrap().iter().map(|s| (s["source"].as_str().unwrap().to_owned(), s["count"].as_u64().unwrap(), s["visible"].as_bool().unwrap())).collect();
+    assert_eq!(from, vec![("plans".to_owned(), 26, true), ("sections".to_owned(), 4, false), ("elevations".to_owned(), 4, false)]);
+    let shown = |app: &App| {
+        let s = store(app);
+        reviera_core::annotations_3d::shown(&s, s.get(ElementId(view.as_u64().unwrap())).unwrap())
+    };
+    assert_eq!(shown(&app).len(), 13, "the plans' notes and tags, as before");
+    ok(&mut app, "view.set_3d_annotations", json!({ "view_id": view, "sources": { "sections": true, "elevations": true } }));
+    // Their two notes; their tags' hosts are tagged in the plan already, so labelled once.
+    assert_eq!(shown(&app).len(), 15);
+    ok(&mut app, "view.set_3d_annotations", json!({ "view_id": view, "classes": { "dimensions": true } }));
+    assert_eq!(shown(&app).len(), 15 + 13 + 4);
+    ok(&mut app, "view.set_3d_annotations", json!({ "view_id": view, "sources": { "plans": false } }));
+    let tips = shown(&app);
+    // Without the plans, the section's and elevation's tags show, at their hosts.
+    assert_eq!(tips.len(), 8, "{tips:?}");
+    assert!(tips.iter().all(|t| t.source != "plans"));
+    assert_eq!(tips.iter().filter(|t| t.class.starts_with("tags:")).count(), 2);
+    assert!(app.execute("view.set_3d_annotations", json!({ "view_id": view, "sources": { "sheets": true } }), &Caller::user()).is_err());
+
+    // The section's note stands on its plane (y = 1.5 m); the elevation's is moved back along its
+    // view onto the south wall's outer face, by the ray the window casts.
+    let s = store(&app);
+    let note = |text: &str| tips.iter().find(|t| t.lines == [text]).unwrap_or_else(|| panic!("{text}: {tips:?}")).clone();
+    let bedroom = note("BEDROOM");
+    assert!(near(bedroom.anchor[1], 1.5, 1e-6) && bedroom.probe.is_none(), "{bedroom:?}");
+    assert_eq!(bedroom.view, s.get(ElementId(sec)).unwrap().guid().to_string(), "double-clicking it opens the section");
+    let render = note("RENDERED BLOCKWORK");
+    assert!(near(render.anchor[0], 5.0, 1e-6) && near(render.anchor[1], -5.0, 1e-6) && near(render.anchor[2], 2.8, 1e-6), "{render:?}");
+    let probe = render.probe.expect("an elevation's label finds the model");
+    let scene = app.render_scene(doc).unwrap();
+    let bvh = reviera_render::bvh::Bvh::build(&scene);
+    let v3 = |p: [f64; 3]| glam::Vec3::new(p[0] as f32, p[1] as f32, p[2] as f32);
+    let (mesh, t) = bvh.nearest(v3(render.anchor), v3(probe), 1.0, &|_, _| true).expect("the facade");
+    let on = v3(render.anchor) + v3(probe) * t;
+    let wall = scene.meshes[mesh].element.and_then(|e| s.get(e)).expect("a model element");
+    assert!(reviera_core::walls::wall_recipe(wall).is_some(), "{}", wall.class);
+    assert!(on.y > -0.3 && on.y < 0.0, "on the south wall's outer face: {on}");
 }

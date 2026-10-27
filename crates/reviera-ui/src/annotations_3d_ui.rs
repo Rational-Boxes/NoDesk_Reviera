@@ -3,8 +3,9 @@
 
 //! Annotation in 3D views (DOC-ANN-025): View › Annotation › *Annotation in 3D* turns the active
 //! 3D view's floating labels on and off; *Annotation Visibility* shows or hides each class (text
-//! notes, dimensions, tags by category) on its own. The labels are drawn in the HUD layer
-//! (`radial::update_hud`). A click on a label selects its annotation; a double click opens the plan
+//! notes, dimensions, tags by category) and each kind of view it comes from (plans, sections,
+//! elevations) on its own. The labels are drawn in the HUD layer
+//! (`radial::update_hud`). A click on a label selects its annotation; a double click opens the view
 //! it is drawn in with it selected ([`Gui::tip_click`]). Also: the ribbon's toggle buttons are kept
 //! showing their settings ([`Gui::sync_toggles`]).
 
@@ -61,8 +62,8 @@ impl Gui {
     }
 
     /// A click at (`x`, `y`) on a floating label of the active 3D view: selects its annotation,
-    /// or, the second click on one within 0.45 s, opens the plan it is drawn in with the
-    /// annotation selected and framed. False when no label is there.
+    /// or, the second click on one within 0.45 s, opens the view it is drawn in (a plan, section
+    /// or elevation) with the annotation selected and framed. False when no label is there.
     pub(crate) fn tip_click(&mut self, x: i32, y: i32, combine: select::Combine) -> bool {
         const DOUBLE: std::time::Duration = std::time::Duration::from_millis(450);
         let Some(v) = self.active_view().filter(|v| !v.is_2d()) else { return false };
@@ -78,23 +79,23 @@ impl Gui {
         let frame = self.frame;
         let what = label.tip.lines.join(" ");
         if double {
-            let plan = self.app.document(doc).and_then(|d| {
+            let owner = self.app.document(doc).and_then(|d| {
                 let store = d.doc.store();
-                reviera_core::GlobalId::parse(&label.plan).and_then(|g| store.find_by_guid(&g))
+                reviera_core::GlobalId::parse(&label.view).and_then(|g| store.find_by_guid(&g))
             });
-            match plan {
-                Some(plan) => {
-                    self.open_view(doc, Some(plan));
+            match owner {
+                Some(owner) => {
+                    self.open_view(doc, Some(owner));
                     self.select_ids(&[label.id], select::Combine::Replace);
                     self.zoom_to_fit();
-                    frame.set_status_text(&format!("{what}: opened its plan"), 0);
+                    frame.set_status_text(&format!("{what}: opened its view"), 0);
                 }
-                None => frame.set_status_text(&format!("{what}: its plan is not in the model"), 0),
+                None => frame.set_status_text(&format!("{what}: its view is not in the model"), 0),
             }
             return true;
         }
         self.select_ids(&[label.id], combine);
-        frame.set_status_text(&format!("{what} selected; double-click to open its plan"), 0);
+        frame.set_status_text(&format!("{what} selected; double-click to open its view"), 0);
         true
     }
 
@@ -125,7 +126,7 @@ impl Gui {
         let dialog = Dialog::builder(&frame, "Annotation in 3D").build();
         let sizer = BoxSizer::builder(Orientation::Vertical).build();
         let note = StaticText::builder(&dialog)
-            .with_label("The plans' annotation, floating in this 3D view as labels. Each class is shown or hidden on its own.")
+            .with_label("The annotation of the plans, sections and elevations, floating in this 3D view as labels. Each class, and each kind of view it comes from, is shown or hidden on its own.")
             .build();
         note.wrap(340);
         sizer.add(&note, 0, SizerFlag::All, 10);
@@ -144,12 +145,26 @@ impl Gui {
             boxes.push((c["class"].as_str().unwrap_or("").to_owned(), b));
         }
         sizer.add_sizer(&grid, 0, SizerFlag::Left | SizerFlag::Right, 22);
+        // The kinds of views it comes from.
+        let from_label = StaticText::builder(&dialog).with_label("From:").build();
+        sizer.add(&from_label, 0, SizerFlag::Left | SizerFlag::Right | SizerFlag::Top, 10);
+        let from_grid = BoxSizer::builder(Orientation::Vertical).build();
+        let mut sources = Vec::new();
+        for c in info["sources"].as_array().cloned().unwrap_or_default() {
+            let label = format!("{} ({})", c["label"].as_str().unwrap_or(""), c["count"]);
+            let b = CheckBox::builder(&dialog).with_label(&label).build();
+            b.set_value(c["visible"] == true);
+            b.enable(info["shown"] == true);
+            from_grid.add(&b, 0, SizerFlag::Left | SizerFlag::Top, 4);
+            sources.push((c["source"].as_str().unwrap_or("").to_owned(), b));
+        }
+        sizer.add_sizer(&from_grid, 0, SizerFlag::Left | SizerFlag::Right, 22);
         let behind = CheckBox::builder(&dialog).with_label("Hide labels behind the model").build();
         behind.set_value(info["occlude"] != false);
         behind.enable(info["shown"] == true);
         sizer.add(&behind, 0, SizerFlag::Left | SizerFlag::Right | SizerFlag::Top, 10);
         {
-            let mut boxes: Vec<CheckBox> = boxes.iter().map(|(_, b)| *b).collect();
+            let mut boxes: Vec<CheckBox> = boxes.iter().chain(&sources).map(|(_, b)| *b).collect();
             boxes.push(behind);
             all.on_toggled(move |e| {
                 for b in &boxes {
@@ -170,11 +185,12 @@ impl Gui {
         let shown = all.get_value();
         let occlude = behind.get_value();
         let set: serde_json::Map<String, serde_json::Value> = boxes.iter().map(|(c, b)| (c.clone(), json!(b.get_value()))).collect();
+        let from: serde_json::Map<String, serde_json::Value> = sources.iter().map(|(c, b)| (c.clone(), json!(b.get_value()))).collect();
         dialog.destroy();
         if code != ID_OK {
             return;
         }
-        if let Err(e) = self.run("view.set_3d_annotations", json!({ "view_id": view, "shown": shown, "occlude": occlude, "classes": set })) {
+        if let Err(e) = self.run("view.set_3d_annotations", json!({ "view_id": view, "shown": shown, "occlude": occlude, "classes": set, "sources": from })) {
             error(&frame, &e);
         }
         self.refresh_active();

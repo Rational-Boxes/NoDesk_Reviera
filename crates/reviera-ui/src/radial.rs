@@ -530,7 +530,8 @@ impl crate::Gui {
     }
 
     /// The floating annotation labels a 3D view shows now, and whether it leaves out those behind
-    /// the model; made again when the model changes.
+    /// the model; made again when the model changes. An elevation's labels are moved back along
+    /// the view onto the model, where the first surface meets their ray (DOC-ANN-025).
     fn view_tips(&mut self, index: usize) -> (bool, Vec<TipLabel>) {
         let v = &self.views[index];
         if v.is_2d() {
@@ -547,20 +548,37 @@ impl crate::Gui {
         let store = d.doc.store();
         // The unsaved {3D} view shows the defaults.
         let settings = element.and_then(|e| store.get(e)).map(reviera_core::annotations_3d::settings).unwrap_or_default();
-        let tips: Vec<TipLabel> = if settings.shown {
-            reviera_core::annotations_3d::tips(store).into_iter().filter(|t| settings.shows(&t.class)).collect()
-        } else {
-            Vec::new()
-        }
-        .into_iter()
-        .map(|t| TipLabel {
-            id: t.id,
-            plan: t.plan,
-            tip: reviera_render::tooltips::Tip { anchor: glam::Vec3::new(t.anchor[0] as f32, t.anchor[1] as f32, t.anchor[2] as f32), lines: t.lines, selected: false },
-        })
-        .collect();
+        let tips = if settings.shown { reviera_core::annotations_3d::visible(reviera_core::annotations_3d::tips(store), &settings) } else { Vec::new() };
+        let surfaces = if tips.iter().any(|t| t.probe.is_some()) { self.surfaces(doc) } else { None };
+        let v3 = |p: [f64; 3]| glam::Vec3::new(p[0] as f32, p[1] as f32, p[2] as f32);
+        let tips: Vec<TipLabel> = tips
+            .into_iter()
+            .map(|t| {
+                let mut anchor = v3(t.anchor);
+                if let (Some(probe), Some(bvh)) = (t.probe, &surfaces)
+                    && let Some((_, along)) = bvh.nearest(anchor, v3(probe), 1.0, &|_, _| true)
+                {
+                    anchor += v3(probe) * along;
+                }
+                TipLabel { id: t.id, view: t.view, tip: reviera_render::tooltips::Tip { anchor, lines: t.lines, selected: false } }
+            })
+            .collect();
         self.tips.insert(id, (version, settings.occlude, tips.clone()));
         (settings.occlude, tips)
+    }
+
+    /// Every surface of the model of `doc` but virtual volumes, for moving labels onto it; built
+    /// once per model version.
+    fn surfaces(&mut self, doc: reviera_app::DocumentId) -> Option<std::rc::Rc<reviera_render::bvh::Bvh>> {
+        let version = self.app.document(doc)?.doc.version();
+        if let Some((at, b)) = self.surfaces.get(&doc)
+            && *at == version
+        {
+            return Some(b.clone());
+        }
+        let b = std::rc::Rc::new(reviera_render::bvh::Bvh::build(self.scenes.get(&doc)?));
+        self.surfaces.insert(doc, (version, b.clone()));
+        Some(b)
     }
 
     /// The labels whose points the view's model does not hide from the eye (DOC-ANN-025): a ray
@@ -612,8 +630,8 @@ impl crate::Gui {
 #[derive(Debug, Clone)]
 pub(crate) struct TipLabel {
     pub id: reviera_core::ElementId,
-    /// The GlobalId of the plan the annotation is drawn in.
-    pub plan: String,
+    /// The GlobalId of the view (plan, section or elevation) the annotation is drawn in.
+    pub view: String,
     pub tip: reviera_render::tooltips::Tip,
 }
 

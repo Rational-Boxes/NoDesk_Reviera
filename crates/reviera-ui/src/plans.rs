@@ -367,6 +367,10 @@ impl Gui {
             if let Some(p) = &mut v.plan {
                 p.stale = true;
                 v.panel.refresh(false, None);
+            } else if let Some(s) = &mut v.section {
+                // Sections and elevations redraw their annotation, not their model.
+                s.redraw = true;
+                v.panel.refresh(false, None);
             }
         }
     }

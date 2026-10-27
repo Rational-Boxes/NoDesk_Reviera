@@ -74,6 +74,11 @@
   </supports>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.1.0~pre.2" date="2026-10-26" type="development">
+      <description>
+        <p>Second pre-release (tag 0.1.0-pre.2), for testing: structure, steel and concrete detailing, MEP systems, analysis, coordination (BCF issues), annotation in sections, elevations and 3D, and a sample with a walkthrough for every ribbon tab.</p>
+      </description>
+    </release>
     <release version="0.1.0~pre.1" date="2026-10-14" type="development">
       <description>
         <p>First pre-release (tag 0.1.0-pre.1), for testing.</p>

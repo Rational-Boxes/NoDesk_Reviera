@@ -4,15 +4,16 @@
 
 ![A laptop showing a building model on a beach table, next to a "Beach Life" mug](../design_documents/beach_life.jpg)
 
-Reviera is a parametric Building Information Modeling application for architecture and
-structure, with MEP to follow. Your model is an ordinary IFC file, not a proprietary container.
+Reviera is a parametric Building Information Modeling application for architecture,
+structure and MEP. Your model is an ordinary IFC file, not a proprietary container.
 Every tool is a command that the ribbon, Lua scripts and AI agents share.
 
 **[Get started](get-started.md)** · **[See it in action](screenshots.md)** · **[What it does](features.md)** · **[Source on GitHub](https://github.com/Rational-Boxes/NoDesk_Reviera)**
 
 > **Pre-release.** Reviera is in early development. It already models a small building end to
-> end, frames and analyses a steel or timber structure, and draws plans, sections and sheets.
-> Pre-release packages are available for Linux (Flatpak) and Windows.
+> end, frames, details and analyses a steel, timber or concrete structure, lays out air,
+> plumbing, fire protection and electrical systems, and draws plans, sections, elevations and
+> sheets. Pre-release 2 (0.1.0-pre.2) packages are available for Linux (Flatpak) and Windows.
 
 ---
 

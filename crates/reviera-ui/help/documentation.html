@@ -51,7 +51,9 @@ values. <code>sheet.create</code>, <code>sheet.set_parameter</code>,
 <code>viewport.remove</code></p>
 
 <h2 id="tags">Tags</h2>
-<p>Tags show values read live from the element they tag. They are placed in plans.</p>
+<p>Tags show values read live from the element they tag. They are placed in plans, sections and
+elevations; in a section or elevation a tag hangs from its element as the view sees it (a door's
+or window's centre, a wall's middle).</p>
 <table>
   <tr><td><b>Annotate › Tag by Category</b> <kbd>TG</kbd></td><td>Click a door, window, room,
     wall or other element to tag it. <kbd>Esc</kbd> ends.
@@ -59,7 +61,8 @@ values. <code>sheet.create</code>, <code>sheet.set_parameter</code>,
   <tr><td><b>Room Tag</b> <kbd>RT</kbd></td><td>Click inside a room: its name, number and
     area.</td></tr>
   <tr><td><b>Tag All Not Tagged</b></td><td>Tick the categories: every element of them on the
-    plan's level that has no tag yet gets one.</td></tr>
+    plan's level (in a section or elevation, that the view shows) that has no tag yet gets
+    one.</td></tr>
 </table>
 <p>Drag a tag to move it. In Properties, change its type, leader and orientation, or edit its
 value: that changes the element itself. Tags follow their elements; a tag whose element was
@@ -67,19 +70,21 @@ deleted stays, drawn in orange. <code>tag.create</code>, <code>tag.create_room</
 <code>tag.tag_all</code>, <code>tag.set_type</code>, <code>tag.set_leader</code></p>
 
 <h2 id="text">Text</h2>
-<p><b>Annotate › Text</b> (<kbd>TX</kbd>): click in a plan where the text's top-left corner
-goes, then type the text. Text types are 2.5, 3.5 and 5 mm high on paper. Properties edit a
+<p><b>Annotate › Text</b> (<kbd>TX</kbd>): click in a plan, section or elevation where the
+text's top-left corner goes, then type the text. Text types are 2.5, 3.5 and 5 mm high on paper. Properties edit a
 note's text, type, width (it wraps) and rotation; notes can have leaders.
 <code>text.create</code>, <code>text.set</code>, <code>text.add_leader</code></p>
 
 <h2 id="dimensions">Dimensions</h2>
-<p><b>Annotate › Aligned Dimension</b> (<kbd>DI</kbd>) dimensions in plans:</p>
+<p><b>Annotate › Aligned Dimension</b> (<kbd>DI</kbd>) dimensions in plans, sections and
+elevations:</p>
 <ol>
-  <li>Click a wall face, wall centreline, grid or cut edge.</li>
+  <li>Click a wall face, wall centreline, grid or cut edge; in a section or elevation also a level,
+    a wall's base or top, or a wall's end.</li>
   <li>Click the next parallel reference; repeat for a string of dimensions.</li>
   <li>Click in empty space to place the dimension line through the cursor.</li>
 </ol>
-<p>Dimensions to Reviera walls, grids and reference planes follow them when they move.
+<p>Dimensions to Reviera walls, grids, levels and reference planes follow them when they move.
 <code>dim.create_aligned</code>, <code>anno.list</code></p>
 
 <h3 id="constraints">Locks and EQ</h3>

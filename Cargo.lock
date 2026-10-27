@@ -3182,6 +3182,7 @@ name = "reviera-app"
 version = "0.1.0"
 dependencies = [
  "base64 0.23.1",
+ "glam",
  "keyring",
  "pdf-writer",
  "prost",

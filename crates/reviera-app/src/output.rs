@@ -403,6 +403,28 @@ pub fn section_parts(
     }
 }
 
+/// The dimensions, tags and text notes of section or elevation `view` in its frame at 1:`scale`,
+/// drawn at depth `z`, in annotation pen 1 (DOC-ANN-001, DOC-ANN-009…011).
+pub fn section_annotation(store: &reviera_core::Store, view: &reviera_core::Element, scale: f32, z: f32) -> (Lines, Vec<Label>) {
+    let pens = standards::pen_set(store);
+    let settings = units::settings_of(store);
+    let mut lines = Lines { color: [0.0, 0.0, 0.0, 1.0], width: pens.annotation_width(1) as f32, segments: Vec::new() };
+    let mut labels = Vec::new();
+    for (_, d) in annotations::of_view(store, view.guid().as_str()) {
+        let Some(m) = annotations::measure(store, &d) else { continue };
+        let texts = m.values.iter().map(|v| units::format(*v, "length", &settings, None).unwrap_or_else(|_| format!("{v:.3}"))).collect();
+        let dim = Dimension { points: m.points, along: m.along, line: d.line, texts };
+        let (l, t) = dimension_parts(&dim, scale, z);
+        lines.segments.extend(l);
+        labels.extend(t);
+    }
+    for n in crate::notes::view_notes(store, view, scale, z) {
+        lines.segments.extend(n.parts.segments);
+        labels.extend(n.parts.labels);
+    }
+    (lines, labels)
+}
+
 impl App {
     /// The drawing of section or elevation view `view` of `doc`, for output.
     pub fn section_drawing(&self, doc: DocumentId, view: ElementId) -> Result<PlanDrawing> {
@@ -434,12 +456,16 @@ impl App {
         let parts = section_parts(store, Some(e.guid().as_str()), scene, &def, scale, &|_| {
             true
         });
+        let (mut annotation, mut labels) = (parts.annotation, parts.labels);
+        let (lines, more) = section_annotation(store, e, scale, 0.002);
+        annotation.push(lines);
+        labels.extend(more);
         Ok(PlanDrawing {
             name: e.name.clone().unwrap_or_default(),
             scale,
             graphics: parts.graphics,
-            annotation: parts.annotation,
-            labels: parts.labels,
+            annotation,
+            labels,
             paper: None,
         })
     }

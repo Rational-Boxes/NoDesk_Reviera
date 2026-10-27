@@ -1359,14 +1359,17 @@ simulation sessions, and the first engine runners (see [Not built yet](#not-buil
 - **Hide and isolate**: Hide, Isolate, Isolate with ghosting and Translucent work on elements,
   on elements with their children, by category or by type (HH, HI, HC, IC, HG, HT; HR resets).
   This is temporary per-view state that is never saved or printed (`view.temp_*`).
-- **Annotation in 3D**: a 3D view shows the plans' text notes, tags and dimensions as floating,
+- **Annotation in 3D**: a 3D view shows the text notes, tags and dimensions of the plans (and,
+  when chosen, of the sections and elevations) as floating,
   tooltip-style labels at their places in the model (a note above its level, a door's tag at the
   door, a room's over the room), readable from any angle, kept from covering each other and left
   out where the model hides their place (unless the view is set to show them all). View ›
   Annotation › Annotation in 3D turns them on and off for the view (a toggle button that shows its
   state); Annotation Visibility… has a check box for each class (text notes, dimensions, door,
-  window, room and other tags), each on its own, kept with the view. Clicking a label selects its
-  annotation; double-clicking it opens the plan it is drawn in, zoomed to it and with it selected
+  window, room and other tags) and for each kind of view it comes from, each on its own, kept with
+  the view; an elevation's labels are moved back onto the facade they describe. Clicking a label
+  selects its annotation; double-clicking it opens the view it is drawn in, zoomed to it and with
+  it selected
   (`view.annotations_3d`, `view.set_3d_annotations`; DOC-ANN-025).
 - **BCF viewpoints**: View › Coordination › Export Viewpoint… writes a 3D view as a BCF 3.0
   `.bcfv` (camera, section box and slices as clipping planes, hidden or isolated elements and

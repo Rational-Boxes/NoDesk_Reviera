@@ -13,6 +13,9 @@
 //!   A tag whose host is gone is *orphaned*: it stays where it was (DOC-ANN-000).
 //! - **Text notes** (`anno.text`) are free text at a plan position, with a text type (its size
 //!   on paper), an optional wrapping width, a rotation and leaders.
+//! - **Views:** both go in floor and ceiling plans, sections and elevations. Positions are in
+//!   the view's 2D coordinates: plan x and y, or in a section or elevation the frame's x (to the
+//!   viewer's right) and height; a tag's host is anchored through the frame there.
 //!
 //! Tag and text types are built in for now (tag families and the text type editor come later);
 //! each category's default tag type can be changed (`tag.set_default_type`).
@@ -288,6 +291,37 @@ pub fn host_anchor(store: &Store, host: &Element) -> Option<[f64; 2]> {
     None
 }
 
+/// The host's point in the model a tag in a section or elevation hangs from: a door's or
+/// window's centre, a wall's middle at half its height, a room's tag point 1.2 m above its
+/// level (EXPERT_REVIEW E-43).
+pub fn host_point(store: &Store, host: &Element) -> Option<[f64; 3]> {
+    if let Ok(p) = crate::inserts::resolve(store, host) {
+        return Some(p.world([0.0, 0.0, 0.0]));
+    }
+    if crate::walls::wall_recipe(host).is_some() {
+        let g = crate::walls::regenerate(store, host).ok()?;
+        return Some([(g.start[0] + g.end[0]) / 2.0, (g.start[1] + g.end[1]) / 2.0, g.base_z + g.height / 2.0]);
+    }
+    if let Some(r) = crate::rooms::room_recipe(host) {
+        let z = crate::levels::elevation_of(store, &r.level).ok()?;
+        let p = crate::rooms::regenerate(store, host).ok()?.tag_point;
+        return Some([p[0], p[1], z + 1.2]);
+    }
+    None
+}
+
+/// Where a host's tag hangs from in view `view` (GlobalId): in plan ([`host_anchor`]), or its
+/// [`host_point`] in a section's or elevation's frame.
+pub fn host_anchor_in(store: &Store, host: &Element, view: &str) -> Option<[f64; 2]> {
+    match crate::sections::frame_of_view(store, view) {
+        Some((frame, _)) => host_point(store, host).map(|p| {
+            let q = frame.to_local(p);
+            [q[0], q[1]]
+        }),
+        None => host_anchor(store, host),
+    }
+}
+
 /// A tag as it is now.
 #[derive(Debug, Clone, PartialEq, Serialize, JsonSchema)]
 pub struct ResolvedTag {
@@ -325,7 +359,7 @@ pub fn resolve_tag(
     let host_e = host.and_then(|h| store.get(h));
     let t = tag_type(&data.tag_type).unwrap_or(&TAG_TYPES[TAG_TYPES.len() - 1]);
     let anchor = host_e
-        .and_then(|h| host_anchor(store, h))
+        .and_then(|h| host_anchor_in(store, h, &data.view))
         .unwrap_or(data.anchor);
     let head = [anchor[0] + data.offset[0], anchor[1] + data.offset[1]];
     let lines = match host_e {
@@ -366,13 +400,14 @@ pub fn texts_of_view(store: &Store, view_guid: &str) -> Vec<(ElementId, TextData
         .collect()
 }
 
-/// A plan that can hold tags and text: its GlobalId, level (GlobalId) and scale.
+/// A view that can hold tags and text: a floor or ceiling plan, a section or an elevation. Its
+/// GlobalId, level (GlobalId; plans) and scale.
 fn plan_of(store: &Store, r: &ElementRef) -> Result<(String, Option<String>, f64)> {
     let (id, data) = crate::views::resolve_view(store, r)?;
-    if !crate::plans::is_plan(&data.kind) {
+    if !crate::plans::is_plan(&data.kind) && !crate::sections::is_section(&data.kind) {
         return Err(Error::new(
             "anno.view_not_supported",
-            "tags and text notes are placed in plans for now (sections, elevations and sheets come later)",
+            "tags and text notes are placed in plans, sections and elevations (sheets come later)",
         ));
     }
     let e = store.get(id).expect("resolved");
@@ -381,6 +416,15 @@ fn plan_of(store: &Store, r: &ElementRef) -> Result<(String, Option<String>, f64
         .and_then(|v| v.get("scale")?.as_f64())
         .unwrap_or(100.0);
     Ok((e.guid().to_string(), data.level, scale))
+}
+
+/// Whether an element shows in a section's or elevation's depth: its tag point between the view
+/// plane and the far clip, within the view's width.
+fn in_section(store: &Store, e: &Element, frame: &crate::sections::SectionFrame) -> bool {
+    host_point(store, e).is_some_and(|p| {
+        let q = frame.to_local(p);
+        (-1e-6..=frame.width + 1e-6).contains(&q[0]) && q[2] <= 1e-6 && q[2] >= -frame.far
+    })
 }
 
 /// Whether a Reviera element stands on level `level` (GlobalId): walls by their base level,
@@ -456,7 +500,7 @@ pub enum Orientation {
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct CreateTagParams {
-    /// A floor or ceiling plan.
+    /// A floor or ceiling plan, a section or an elevation.
     pub view_id: ElementRef,
     /// The element to tag.
     pub host_ref: ElementRef,
@@ -503,7 +547,7 @@ fn new_tag(
         }
         None => default_tag_type(store, category.key),
     };
-    let anchor = match (host_anchor(store, host), position) {
+    let anchor = match (host_anchor_in(store, host, view), position) {
         (Some(a), _) => a,
         (None, Some(p)) => p,
         (None, None) => {
@@ -516,7 +560,7 @@ fn new_tag(
     let offset = match position {
         Some(p) => [p[0] - anchor[0], p[1] - anchor[1]],
         // A wall's tag sits beside the wall, clear of it on paper.
-        None => match crate::walls::wall_recipe(host) {
+        None => match crate::walls::wall_recipe(host).filter(|_| crate::sections::frame_of_view(store, view).is_none()) {
             Some(r) => {
                 let (s, e) = (r.curve.start, r.curve.end);
                 let len = (e[0] - s[0]).hypot(e[1] - s[1]).max(f64::EPSILON);
@@ -646,10 +690,15 @@ pub(crate) fn tag_all(
             ));
         }
     }
+    let frame = crate::sections::frame_of_view(&store, &view).map(|(f, _)| f);
     let candidates: Vec<&Element> = match p.scope {
+        // In a section or elevation, what shows in its depth.
         TagScope::View => store
             .iter()
-            .filter(|e| level.as_deref().is_some_and(|l| on_level(&store, e, l)))
+            .filter(|e| match &frame {
+                Some(f) => in_section(&store, e, f),
+                None => level.as_deref().is_some_and(|l| on_level(&store, e, l)),
+            })
             .collect(),
         TagScope::Selection => p
             .element_ids
@@ -706,7 +755,7 @@ pub(crate) fn set_leader(txn: &mut crate::txn::Transaction<'_>, p: SetLeaderPara
                 || {
                     GlobalId::parse(&d.host)
                         .and_then(|g| store.get(store.find_by_guid(&g)?))
-                        .and_then(|h| host_anchor(&store, h))
+                        .and_then(|h| host_anchor_in(&store, h, &d.view))
                         .unwrap_or(d.anchor)
                 },
             )),
@@ -1064,7 +1113,7 @@ pub(crate) fn transform(
         }
         let anchor = GlobalId::parse(&d.host)
             .and_then(|g| store.get(store.find_by_guid(&g)?))
-            .and_then(|h| host_anchor(&store, h))
+            .and_then(|h| host_anchor_in(&store, h, &d.view))
             .unwrap_or(d.anchor);
         let head = x.point([anchor[0] + d.offset[0], anchor[1] + d.offset[1]]);
         d.offset = [head[0] - anchor[0], head[1] - anchor[1]];

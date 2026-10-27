@@ -2548,7 +2548,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `view.activate` | 1 | `view_id`, `{new_window?, float?, monitor?}` | `window_id` | No | UI-VIEWWIN-001 |
 | `view.add_crop_break` | 5 | view_id, axis, position, gap | () | Yes | DOC-GFX-015 |
 | `view.add_filter` | 5 | view_id, filter_id, index?, visible?, enabled?, override? | () | Yes | DOC-GFX-006 |
-| `view.annotations_3d` | 5 | view_id | {shown, classes[]} | No | DOC-ANN-025 |
+| `view.annotations_3d` | 5 | view_id | {shown, occlude, classes[], sources[]} | No | DOC-ANN-025 |
 | `view.apply_viewpoint` | 6 | view_id, viewpoint | view_id | Yes | COL-BCF-003 |
 | `view.assign_scope_box` | 3 | view_ids, scope_box_id \ | null | — | Yes |
 | `view.blueprint` | 5 | view_id, on: bool, slice? | () | No | DOC-VIEW-013 |
@@ -2623,7 +2623,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `view.reveal_hidden` | 5 | view_id, on | () | No | DOC-GFX-008 |
 | `view.reveal_hidden.toggle` | 1 | `view_id?` | `bool` | No | UI-VCB-001 |
 | `view.save_to_library` | 5 | view_ids[], path | () | No | DOC-VIEW-009 |
-| `view.set_3d_annotations` | 5 | view_id, shown?, occlude?, classes? | () | Yes | DOC-ANN-025 |
+| `view.set_3d_annotations` | 5 | view_id, shown?, occlude?, classes?, sources? | () | Yes | DOC-ANN-025 |
 | `view.set_annotation_crop` | 5 | view_id, enabled, offsets? | () | Yes | DOC-GFX-015 |
 | `view.set_camera` | 1 | view_id, eye, target, up, projection?: orthographic\ | perspective, fov? | () | Yes (explicit calls; interactive navigation is not, §1.19) |
 | `view.set_category_override` | 5 | view_id, category, subcategory?, override | () | Yes | DOC-GFX-003 |

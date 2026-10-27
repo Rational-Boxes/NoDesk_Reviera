@@ -28,17 +28,19 @@ pub const CLASS_PREFIX: &str = "rxd:views/annotation/";
 pub const ANNO_KEY: &str = "rxd:anno";
 pub const KIND_DIMENSION: &str = "anno.dimension";
 
-/// A reference of a dimension: a straight line in plan (all references of an aligned dimension
-/// are parallel).
+/// A reference of a dimension: a straight line in the view's 2D coordinates, plan x and y in plans
+/// and the frame's x (to the right) and height in sections and elevations (all references of an
+/// aligned dimension are parallel).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct DimRef {
     /// The model element (GlobalId), if any.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub element: Option<String>,
     /// `face:ext`, `face:int`, `axis`, `end:start`, `end:end` (Reviera walls; `axis` for grids
-    /// too), or `line`.
+    /// too), or `line`; in sections and elevations also `base` and `top` (walls) and `level`
+    /// (levels).
     pub sub: String,
-    /// A point on the reference line where it was picked (metres, plan).
+    /// A point on the reference line where it was picked (metres, the view's coordinates).
     pub point: [f64; 2],
     /// The reference line's direction, unit length.
     pub direction: [f64; 2],
@@ -136,15 +138,80 @@ pub fn resolve_ref(store: &Store, r: &DimRef) -> Option<([f64; 2], [f64; 2])> {
     Some((start, g.direction()))
 }
 
+/// The current line of a reference in a section's or elevation's frame (x to the right, y up),
+/// `None` when its element is gone or does not show there as a line:
+/// - a level: across the view at its elevation (`level`);
+/// - a Reviera wall: its base and top (`base`, `top`); a face or its axis where it meets the
+///   view plane, or, seen edge on, where it stands (`face:ext`, `face:int`, `axis`); its ends
+///   (`end:start`, `end:end`);
+/// - a grid where it crosses the view (`axis`), and a free `line` as it is.
+pub fn resolve_ref_in_section(store: &Store, r: &DimRef, frame: &crate::sections::SectionFrame) -> Option<([f64; 2], [f64; 2])> {
+    const ACROSS: [f64; 2] = [1.0, 0.0];
+    const UP: [f64; 2] = [0.0, 1.0];
+    let Some(guid) = &r.element else {
+        return Some((r.point, r.direction));
+    };
+    let e = store.get(store.find_by_guid(&GlobalId::parse(guid)?)?)?;
+    if r.sub == "line" {
+        return Some((r.point, r.direction));
+    }
+    if e.class == crate::levels::CLASS {
+        return (r.sub == "level").then(|| ([0.0, crate::levels::elevation(e)], ACROSS));
+    }
+    if let Some(g) = crate::grids::grid_data(e) {
+        let x = frame.grid_crossing(g.curve.start, g.curve.end)?;
+        return (r.sub == "axis").then_some(([x, 0.0], UP));
+    }
+    let recipe = walls::wall_recipe(e)?;
+    let g = walls::regenerate(store, e).ok()?;
+    let x_of = |p: [f64; 2]| frame.to_local([p[0], p[1], 0.0])[0];
+    match r.sub.as_str() {
+        "base" => return Some(([0.0, g.base_z], ACROSS)),
+        "top" => return Some(([0.0, g.base_z + g.height], ACROSS)),
+        "end:start" => return Some(([x_of(g.start), 0.0], UP)),
+        "end:end" => return Some(([x_of(g.end), 0.0], UP)),
+        _ => {}
+    }
+    let ext = if recipe.flip { -1.0 } else { 1.0 };
+    let offset = match r.sub.as_str() {
+        "face:ext" => ext * g.width / 2.0,
+        "face:int" => -ext * g.width / 2.0,
+        "axis" => 0.0,
+        _ => return None,
+    };
+    let n = g.normal();
+    let shift = |p: [f64; 2]| [p[0] + n[0] * offset, p[1] + n[1] * offset];
+    let (a, b) = (shift(g.start), shift(g.end));
+    if let Some(x) = frame.crossing(a, b) {
+        return Some(([x, 0.0], UP));
+    }
+    // Seen edge on: the face runs along the view direction.
+    let dir = g.direction();
+    (dot(dir, frame.look).abs() > 1.0 - 1e-6).then(|| ([x_of(a), 0.0], UP))
+}
+
+/// The line of a reference in the view `view` (GlobalId): in plan, or in a section's frame.
+pub fn resolve_ref_in(store: &Store, r: &DimRef, view: &str) -> Option<([f64; 2], [f64; 2])> {
+    match crate::sections::frame_of_view(store, view) {
+        Some((frame, _)) => resolve_ref_in_section(store, r, &frame),
+        None => resolve_ref(store, r),
+    }
+}
+
 /// Measures a dimension against the current model.
 pub fn measure(store: &Store, d: &DimensionData) -> Option<Measured> {
+    let frame = crate::sections::frame_of_view(store, &d.view).map(|(f, _)| f);
+    let resolve = |r: &DimRef| match &frame {
+        Some(f) => resolve_ref_in_section(store, r, f),
+        None => resolve_ref(store, r),
+    };
     let first = d.refs.first()?;
     let along = first.direction;
     let across = [-along[1], along[0]];
     let mut points = Vec::new();
     let mut orphaned = Vec::new();
     for r in &d.refs {
-        let (p, dir) = match resolve_ref(store, r) {
+        let (p, dir) = match resolve(r) {
             Some(line) => {
                 orphaned.push(false);
                 line
@@ -189,17 +256,23 @@ pub fn of_view(store: &Store, view_guid: &str) -> Vec<(ElementId, DimensionData)
 pub struct DimRefArg {
     /// The element (ID or GlobalId); omitted for a free line.
     pub element: Option<ElementRef>,
-    /// `face:ext`, `face:int`, `axis` (Reviera walls), or `line` (with `point` and `direction`).
+    /// `face:ext`, `face:int`, `axis` (Reviera walls), or `line` (with `point` and `direction`);
+    /// in sections and elevations also `base`, `top` (walls), `end:start`, `end:end` and `level`.
     pub sub: String,
-    /// Where the reference was picked (plan, metres).
+    /// Where the reference was picked (metres; plan, or the section's x and height).
     pub point: [f64; 2],
     /// Direction of a `line` reference; taken from the wall for wall references.
     pub direction: Option<[f64; 2]>,
 }
 
 /// A stored reference from its argument: the element's GlobalId, and the direction taken from
-/// the element (or normalised, for a `line`).
+/// the element (or normalised, for a `line`), in plan.
 pub fn ref_of(store: &Store, a: &DimRefArg) -> Result<DimRef> {
+    ref_in(store, a, None)
+}
+
+/// A stored reference in view `view` (GlobalId), a plan or a section.
+pub fn ref_in(store: &Store, a: &DimRefArg, view: Option<&str>) -> Result<DimRef> {
     let element = match &a.element {
         Some(r) => {
             let id = store
@@ -216,7 +289,11 @@ pub fn ref_of(store: &Store, a: &DimRefArg) -> Result<DimRef> {
         direction: a.direction.unwrap_or([1.0, 0.0]),
     };
     if r.sub != "line" {
-        let (_, dir) = resolve_ref(store, &r).ok_or_else(|| {
+        let line = match view {
+            Some(v) => resolve_ref_in(store, &r, v),
+            None => resolve_ref(store, &r),
+        };
+        let (_, dir) = line.ok_or_else(|| {
             Error::new(
                 "dim.bad_ref",
                 format!("`{}` is not a reference of that element", r.sub),
@@ -253,6 +330,7 @@ pub(crate) fn create_aligned(
 ) -> Result<ElementId> {
     let store = txn.store().clone();
     let (view_id, _) = views::resolve_view(&store, &p.view_id)?;
+    let view_guid = store.get(view_id).expect("resolved").guid().to_string();
     if p.refs.len() < 2 {
         return Err(Error::new(
             "dim.too_few_refs",
@@ -262,7 +340,7 @@ pub(crate) fn create_aligned(
     let refs = p
         .refs
         .iter()
-        .map(|a| ref_of(&store, a))
+        .map(|a| ref_in(&store, a, Some(&view_guid)))
         .collect::<Result<Vec<_>>>()?;
     let along = refs[0].direction;
     if refs
@@ -274,7 +352,6 @@ pub(crate) fn create_aligned(
             "the references of an aligned dimension must be parallel",
         ));
     }
-    let view_guid = store.get(view_id).expect("resolved").guid().to_string();
     let data = DimensionData {
         kind: KIND_DIMENSION.into(),
         mode: "aligned".into(),

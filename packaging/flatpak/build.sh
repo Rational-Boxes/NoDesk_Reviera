@@ -24,7 +24,7 @@ BUILD_DIR="$HERE/build-dir"
 REPO="$HERE/repo"
 DIST="$ROOT/dist"
 ARCH="$(flatpak --default-arch)"
-VERSION="${REVIERA_VERSION:-0.1.0-pre.1}"
+VERSION="${REVIERA_VERSION:-0.1.0-pre.2}"
 BUNDLE="$DIST/BIM-Reviera-$VERSION-$ARCH.flatpak"
 
 INSTALL=0

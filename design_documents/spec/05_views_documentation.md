@@ -1659,6 +1659,8 @@ All annotation tools are on the **Annotate** tab, in the panels Dimension, Detai
 - [ ] An aligned dimension between two wall faces updates its value when one wall moves.
 - [ ] Picking an entire wall with *opening widths* creates a string that includes every door and window opening.
 
+*Built (2026-10-26), in sections and elevations:* aligned dimensions go in sections and elevations too, measured in the view's frame (x to the viewer's right, height up). The Dimension tool there offers, nearest first: levels (`level`, across the view at their elevation); Reviera walls' bases and tops (`base`, `top`), their faces and axes where the view plane cuts them or, seen edge on, where they stand (`face:ext`, `face:int`, `axis`), and their ends (`end:start`, `end:end`); grids crossing the view (`axis`); else the drawing's cut and projected edges as fixed lines. Wall and level references follow the model as in plans. Not yet: floors', roofs' and slabs' tops and bottoms as references (their edges are fixed lines), and references in linked models.
+
 ### Linear dimensions
 **ID:** DOC-ANN-002 · **Priority:** P0 · **Ref:** research/04 §4.1
 
@@ -1847,6 +1849,8 @@ All annotation tools are on the **Annotate** tab, in the panels Dimension, Detai
 - [ ] `text.check_spelling` on a view with the note "Concret slab" returns one issue for "Concret" with "Concrete" among the suggestions.
 - [ ] A text type with size 0 cannot be saved in the type editor.
 
+*Built (2026-10-26), in sections and elevations:* text notes go in sections and elevations, at a position in the view's frame (x to the right, height up), drawn and picked there and printed with the view.
+
 ### Tags by category, tag all and loaded tags
 **ID:** DOC-ANN-010 · **Priority:** P0 · **Ref:** research/04 §4.3
 
@@ -1873,6 +1877,8 @@ All annotation tools are on the **Annotate** tab, in the panels Dimension, Detai
 - [ ] Changing a door's Mark from 101 to 102 updates every tag of that door at once.
 - [ ] Typing a new value into a door tag changes the door's Mark parameter.
 - [ ] Running *Tag All Not Tagged* twice creates no duplicates.
+
+*Built (2026-10-26), in sections and elevations:* tags go in sections and elevations; a tag hangs from its host's point in the model seen through the view's frame (a door's or window's centre, a wall's middle at half its height, a room's tag point 1.2 m above its level, EXPERT_REVIEW E-43). *Tag All Not Tagged* there tags what the view shows: elements of the categories between the view plane and the far clip, within its width.
 
 ### Multi-category, material, room, area and space tags
 **ID:** DOC-ANN-011 · **Priority:** P0 (room tags), P1 (others) · **Ref:** research/04 §4.3
@@ -2199,19 +2205,22 @@ All annotation tools are on the **Annotate** tab, in the panels Dimension, Detai
 - Nearer labels are placed first; one that would cover another moves up, and is left out after three steps. At most 150 at once.
 - View tab › Annotation (and Annotate tab › 3D, and the View menu): *Annotation in 3D* (a toggle button showing whether the active view shows them) and *Annotation Visibility…* (a check box for annotation in the view and one for each class with its count).
 
-**Data (RXD).** The view's `rxd:annotations_3d`: `{ shown, hidden: [class…], occlude }`.
+**Data (RXD).** The view's `rxd:annotations_3d`: `{ shown, hidden: [class…], occlude, hidden_from: [plans | sections | elevations …] }`.
 
-**Commands.** `view.annotations_3d(view_id) -> { shown, classes[] }`; `view.set_3d_annotations(view_id, shown?, classes?: {class: bool}) -> ()`
+**Commands.** `view.annotations_3d(view_id) -> { shown, occlude, classes[], sources[] }`; `view.set_3d_annotations(view_id, shown?, occlude?, classes?: {class: bool}, sources?: {plans|sections|elevations: bool}) -> ()`
 
 **Acceptance criteria.**
 - [x] The annotated plan sample's 3D view shows its two notes and its door, window and room tags, and its dimensions when chosen; hiding door tags leaves the others; undo brings back the previous choice. *(Built 2026-10-26, `tests/sample_features.rs`.)*
+- [x] The annotated plan sample's section and elevation hold their own dimensions (3 m heights, the overall and clear widths), tags and notes, drawn and printed with them; shown in 3D when chosen, the elevation's note sits on the south wall's face and double-clicking the section's opens Section A. *(Built 2026-10-26, `tests/sample_features.rs`; checked in the window, with the Dimension tool in the elevation.)*
 - [x] Clicking the Kitchen tag's label selects the tag; double-clicking it opens Level 1 with the tag selected and framed; Zoom to Fit with it selected frames it in a plan and in 3D. *(Built 2026-10-26: label hit tests in `reviera_render::tooltips`, each label's plan in `tests/sample_features.rs`; checked in the window.)*
 
 *Built (2026-10-26):* as above. *(Owner, 2026-10-26: "On the 3D annotations should float as tool-tip style display. There needs to be a toggle to turn it on and off." "Visibility controls should be independent visibility, a control with a visibility check for each class of annotation.")* 
 
 *Built (2026-10-26), labels behind the model:* a label is left out while the model hides its place: rays from the eye (or, in a parallel view, from far back along the view direction) to three points up from its anchor (at it, 1.2 m and 2.4 m above) meet what one cannot see through (opaque meshes: not glass, room and space volumes, openings or virtual volumes) more than 0.4 m before the point; what the section box and slices cut away and what is hidden in the view do not count. The test runs every frame on a bounding volume hierarchy of the model's triangles, built once per change (`reviera_render::bvh`). Per view, on unless set (`occlude`, *Hide labels behind the model* in Annotation Visibility).
 
-*Built (2026-10-26), picking labels:* a click on a label (its box or its dot) selects its annotation, before the model under it; nearer labels, drawn in front, are picked first; Ctrl and Shift add and remove as elsewhere. A selected annotation's label is edged in the selection colour. A double click (the second click on the same label within 0.45 s) opens the plan the annotation is drawn in, with it selected. *(Also: a double click's second press now reaches the views as a press on every toolkit; wxWidgets sends it only as a double-click event, so the second of two quick clicks had been dropped.)* *Built (2026-10-26), framing:* the plan opened is zoomed to the annotation: Zoom to Fit (ZF) counts selected annotation, measured as drawn in the active plan (a note's or tag's outline, a dimension's lines) or, in a 3D view, at its labels' points; annotation selected alone is framed with room around it (1.5 times its size, at least 1.5 m), as a clash's box is. Not yet: labels of sections' and elevations' annotation, keynotes and spot dimensions.
+*Built (2026-10-26), picking labels:* a click on a label (its box or its dot) selects its annotation, before the model under it; nearer labels, drawn in front, are picked first; Ctrl and Shift add and remove as elsewhere. A selected annotation's label is edged in the selection colour. A double click (the second click on the same label within 0.45 s) opens the plan the annotation is drawn in, with it selected. *(Also: a double click's second press now reaches the views as a press on every toolkit; wxWidgets sends it only as a double-click event, so the second of two quick clicks had been dropped.)* *Built (2026-10-26), framing:* the plan opened is zoomed to the annotation: Zoom to Fit (ZF) counts selected annotation, measured as drawn in the active plan (a note's or tag's outline, a dimension's lines) or, in a 3D view, at its labels' points; annotation selected alone is framed with room around it (1.5 times its size, at least 1.5 m), as a clash's box is. Not yet: keynotes and spot dimensions.
+
+*Built (2026-10-26), sections and elevations:* their annotation floats too (DOC-ANN-001, -009, -010 there). A section's notes and dimensions stand on its view plane, mapped from the view's frame; an elevation's, which stands in front of what it shows, are moved back along its view onto the model, where the first surface (glass included) meets the ray within its depth, and stay on its plane when nothing is met; tags stand at their hosts. *From* in Annotation Visibility shows each kind of view's annotation (plans, sections, elevations) on its own; a view shows the plans' only unless set, so existing 3D views look as before (`hidden_from`). A host tagged in several kinds of views shown is labelled once, from the plans first. A double click on a label opens the view it is drawn in, section or elevation too.
 ---
 
 ## 5.14 Schedules
@@ -3316,9 +3325,9 @@ Every command below is registered once in the command registry and is therefore 
 | `view.rename` | view_id, new_name | () | Yes | DOC-VIEW-001 |
 | `view.delete` | view_ids[] | () | Yes | DOC-VIEW-001 |
 | `view.open` | view_id | () | No | DOC-VIEW-001 |
-| `view.annotations_3d` | view_id | {shown, classes[]} | No | DOC-ANN-025 |
+| `view.annotations_3d` | view_id | {shown, occlude, classes[], sources[]} | No | DOC-ANN-025 |
 | `view.get` | view_id | view_detail | No | DOC-VIEW-001 |
-| `view.set_3d_annotations` | view_id, shown?, occlude?, classes? | () | Yes | DOC-ANN-025 |
+| `view.set_3d_annotations` | view_id, shown?, occlude?, classes?, sources? | () | Yes | DOC-ANN-025 |
 | `view.list` | filter? | view_summary[] | No | DOC-VIEW-001 |
 | `viewtype.create` | kind, name, default_template_id?, bind_new_views?, marker_type_id? | view_family_type_id | Yes | DOC-VIEW-001 |
 | `view_tag.settings` | kind?: callout\|elevation\|section | () | No | DOC-VIEW-001 |

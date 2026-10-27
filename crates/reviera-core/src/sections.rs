@@ -154,6 +154,14 @@ impl SectionFrame {
     }
 }
 
+/// The frame of the section or elevation view with GlobalId `guid`, and whether it is an
+/// elevation; `None` for other views.
+pub fn frame_of_view(store: &Store, guid: &str) -> Option<(SectionFrame, bool)> {
+    let e = store.get(store.find_by_guid(&GlobalId::parse(guid)?)?)?;
+    let (kind, def) = section_of(e)?;
+    Some((def.frame(), kind == KIND_ELEVATION))
+}
+
 /// The section block of a view element.
 pub fn section_of(e: &crate::Element) -> Option<(String, SectionDef)> {
     let v = e.param(VIEW_KEY)?;
