@@ -7,6 +7,7 @@
 // Pointers are the values wxDragon hands out (`WxWidget::handle_ptr`): the address of the object
 // as created (`wxAuiNotebook*` for a notebook, `wxPanel*` for a panel).
 
+#include <memory>
 #include <wx/wx.h>
 #include <wx/aui/auibook.h>
 #include <wx/aui/framemanager.h>
@@ -347,6 +348,34 @@ void* reviera_rb_page(void* bar, const char* label) {
     return new wxRibbonPage(static_cast<wxRibbonBar*>(bar), wxID_ANY, wxString::FromUTF8(label));
 }
 
+// A collapsed panel's popup at the size of its buttons. wxRibbonPanel::ShowExpanded makes a
+// borderless frame at the panel's best size, but under a window manager the frame can come up
+// smaller (the size of the collapsed button), and the panel in it then draws itself collapsed
+// again: its label and icon, no buttons. Once shown, the frame and panel are given the best size,
+// and again when the window manager resizes the frame smaller, a few times.
+static void fit_expanded(wxRibbonPanel* panel) {
+    wxRibbonPanel* expanded = panel->GetExpandedPanel();
+    if (!expanded) return;
+    wxWindow* frame = expanded->GetParent();
+    expanded->InvalidateBestSize();
+    const wxSize want = expanded->GetBestSize();
+    if (want.x <= 0 || want.y <= 0) return;
+    auto apply = [frame, expanded, want] {
+        frame->SetMinClientSize(want);
+        frame->SetClientSize(want);
+        expanded->SetSize(0, 0, want.x, want.y);
+        expanded->Layout();
+        expanded->Refresh();
+    };
+    apply();
+    auto tries = std::make_shared<int>(0);
+    frame->Bind(wxEVT_SIZE, [frame, apply, want, tries](wxSizeEvent& e) {
+        e.Skip();
+        const wxSize now = frame->GetClientSize();
+        if ((now.x < want.x || now.y < want.y) && (*tries)++ < 4) frame->CallAfter(apply);
+    });
+}
+
 // A panel on `page`, returning its button bar; `svg` is the icon it shows when collapsed to its
 // dropdown (empty for none).
 void* reviera_rb_panel(void* page, const char* label, const char* svg) {
@@ -355,6 +384,12 @@ void* reviera_rb_panel(void* page, const char* label, const char* svg) {
     auto* panel = new wxRibbonPanel(p, wxID_ANY, wxString::FromUTF8(label), icon,
                                     wxDefaultPosition, wxDefaultSize,
                                     wxRIBBON_PANEL_DEFAULT_STYLE & ~wxRIBBON_PANEL_EXT_BUTTON);
+    // A click on the collapsed panel opens its popup (wxRibbonPanel's own handler runs after
+    // this one); its size is put right once it is shown.
+    panel->Bind(wxEVT_LEFT_DOWN, [panel](wxMouseEvent& e) {
+        e.Skip();
+        panel->CallAfter([panel] { fit_expanded(panel); });
+    });
     auto* buttons = new wxRibbonButtonBar(panel);
     g_page_bars[p].push_back(buttons);
     return buttons;
