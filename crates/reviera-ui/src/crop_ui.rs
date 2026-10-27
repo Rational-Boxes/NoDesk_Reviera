@@ -14,16 +14,22 @@ use super::{Gui, error};
 impl Gui {
     /// Appends the crop rows of view `element`.
     pub(crate) fn crop_rows(&self, grid: &PropertyGrid, element: ElementId) {
-        let Some(e) = self.doc.and_then(|d| self.app.document(d)).and_then(|d| d.doc.store().get(element)) else { return };
-        let crop = reviera_core::crop::crop_of(e);
+        let Some(store) = self.doc.and_then(|d| self.app.document(d)).map(|d| d.doc.store()) else { return };
+        let Some(e) = store.get(element) else { return };
+        let crop = reviera_core::crop::effective(store, e);
+        let boxed = reviera_core::crop::follows_scope_box(store, e);
         let annotation = reviera_core::crop::annotation_crop_of(e);
         grid.append(Property::category("Extents", "c_crop"));
         grid.append(Property::boolean("Crop View", "crop_on", crop.is_some_and(|c| c.enabled)));
         grid.append(Property::boolean("Crop Region Visible", "crop_visible", crop.is_some_and(|c| c.visible)));
         grid.append(Property::boolean("Annotation Crop", "crop_annotation", annotation.enabled));
         grid.set_help_string("crop_annotation", "Annotation crossing the annotation crop is clipped; annotation outside it is hidden");
-        grid.append(Property::boolean("Reset Crop", "crop_reset", false));
-        grid.set_help_string("crop_reset", "Tick to fit the crop region to the model again");
+        if boxed {
+            grid.set_help_string("crop_on", "The crop follows the view's scope box; move or resize the box to change it");
+        } else {
+            grid.append(Property::boolean("Reset Crop", "crop_reset", false));
+            grid.set_help_string("crop_reset", "Tick to fit the crop region to the model again");
+        }
     }
 
     /// An edit of a crop row of the active view; `false` if `property` is not one.

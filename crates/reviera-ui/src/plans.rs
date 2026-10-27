@@ -276,7 +276,10 @@ impl Gui {
             }
         }
         // The crop region (DOC-GFX-015): the model's lines here, its annotation below.
-        let crop = view_element.and_then(|e| model.as_ref()?.get(e)).and_then(reviera_core::crop::rects);
+        let crop = view_element.and_then(|e| {
+            let st = model.as_ref()?;
+            reviera_core::crop::rects(st, st.get(e)?)
+        });
         if let Some(c) = &crop {
             reviera_render::crop::crop_graphics(&mut graphics, c.model);
         }
@@ -369,7 +372,13 @@ impl Gui {
             if let Some(a) = c.annotation {
                 reviera_render::crop::crop_lines(&mut graphics.lines[annotation_from..annotation_to], a);
             }
-            if view_element.and_then(|e| model.as_ref()?.get(e)).and_then(reviera_core::crop::crop_of).is_some_and(|k| k.visible) {
+            if view_element
+                .and_then(|e| {
+                    let st = model.as_ref()?;
+                    reviera_core::crop::effective(st, st.get(e)?)
+                })
+                .is_some_and(|k| k.visible)
+            {
                 graphics.lines.push(reviera_render::plan::Lines { color: CROP_COLOR, width: 0.25, segments: reviera_render::crop::outline(c.model, cut + 0.005) });
             }
         }

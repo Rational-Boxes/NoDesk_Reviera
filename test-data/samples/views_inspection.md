@@ -78,8 +78,8 @@ section box, slices and virtual volumes.
 ## Gaps
 
 - **Scope boxes on views.** `view.assign_scope_box` (step 10) has no UI: no Properties row on a
-  view chooses its scope box. A view's crop region does not follow its scope box yet, so an
-  assigned view is not cropped to its box; only grids and levels follow a scope box.
+  view chooses its scope box (the assigned plan is cropped to its box, and grids and levels follow
+  it).
 - **Dragging the crop region** (step 20): its edges have no grips yet; `view.set_crop` sets it.
 - **Exact section box and slice positions.** The section box and slice planes are placed by
   grips and clicks only; `view.set_section_box` and `view.set_slice_planes` take exact values

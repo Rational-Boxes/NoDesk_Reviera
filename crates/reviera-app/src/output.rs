@@ -240,7 +240,7 @@ impl App {
             labels,
             paper: None,
         };
-        apply_crop(e, &mut d, range.cut as f32);
+        apply_crop(store, e, &mut d, range.cut as f32);
         Ok(d)
     }
 }
@@ -408,14 +408,14 @@ pub fn section_parts(
 /// Crops a plan's or section's drawing to its crop region (DOC-GFX-015): the model graphics to
 /// the region, annotation lines to the annotation crop when it is on (labels not wholly inside it
 /// hidden), and the region drawn at `z` when it is visible.
-pub fn apply_crop(view: &reviera_core::Element, d: &mut PlanDrawing, z: f32) {
-    let Some(rects) = reviera_core::crop::rects(view) else { return };
+pub fn apply_crop(store: &reviera_core::Store, view: &reviera_core::Element, d: &mut PlanDrawing, z: f32) {
+    let Some(rects) = reviera_core::crop::rects(store, view) else { return };
     reviera_render::crop::crop_graphics(&mut d.graphics, rects.model);
     if let Some(a) = rects.annotation {
         reviera_render::crop::crop_lines(&mut d.annotation, a);
         d.labels.retain(|l| reviera_render::crop::label_inside(l, a));
     }
-    if reviera_core::crop::crop_of(view).is_some_and(|c| c.visible) {
+    if reviera_core::crop::effective(store, view).is_some_and(|c| c.visible) {
         d.annotation.push(Lines { color: [0.0, 0.0, 0.0, 1.0], width: 0.13, segments: reviera_render::crop::outline(rects.model, z) });
     }
 }
@@ -485,7 +485,7 @@ impl App {
             labels,
             paper: None,
         };
-        apply_crop(e, &mut d, 0.002);
+        apply_crop(store, e, &mut d, 0.002);
         Ok(d)
     }
 }

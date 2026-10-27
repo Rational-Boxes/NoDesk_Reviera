@@ -673,3 +673,31 @@ fn cropped_views_draw_only_their_crop_region() {
     let v3 = ok(&mut app, "view.create_3d", json!({}));
     assert!(app.execute("view.set_crop", json!({ "view_id": v3, "enabled": true }), &Caller::user()).is_err());
 }
+
+#[test]
+fn a_plan_assigned_to_a_scope_box_is_cropped_to_it() {
+    let work = tempfile::tempdir().unwrap();
+    let mut app = open(work.path(), "views_inspection");
+    let doc = app.active().unwrap();
+    // The East Half box runs from x = 4.6 to 11 m (y −1 to 8): its plan draws only there.
+    let east = view_id(&mut app, "Level 1 - East Half", "view.plan");
+    let xs = |app: &App| {
+        let d = app.plan_drawing(doc, ElementId(east)).unwrap();
+        d.graphics.lines.iter().flat_map(|l| l.segments.iter().flat_map(|s| [s[0][0], s[1][0]])).fold((f32::MAX, f32::MIN), |(a, b), x| (a.min(x), b.max(x)))
+    };
+    let (lo, hi) = xs(&app);
+    assert!(lo >= 4.6 - 1e-3 && hi <= 11.0 + 1e-3, "{lo} .. {hi}");
+    // Its region cannot be set by hand; switching the crop off shows the whole plan.
+    let err = app.execute("view.set_crop", json!({ "view_id": east, "shape": { "min": [0, 0], "max": [3, 3] } }), &Caller::user()).unwrap_err();
+    assert!(format!("{err:?}").contains("view.crop_follows_scope_box"), "{err:?}");
+    ok(&mut app, "view.set_crop", json!({ "view_id": east, "enabled": false }));
+    let (lo, _) = xs(&app);
+    assert!(lo < 1.0, "the whole plan: from {lo}");
+    // On again, and the box moved west: the crop follows it.
+    ok(&mut app, "view.set_crop", json!({ "view_id": east, "enabled": true }));
+    let s = store(&app);
+    let b = s.iter().find(|e| e.name.as_deref() == Some("East Half")).unwrap().id();
+    ok(&mut app, "element.move", json!({ "element_ids": [b], "vector": [-2.0, 0.0, 0.0] }));
+    let (lo, hi) = xs(&app);
+    assert!(lo >= 2.6 - 1e-3 && hi <= 9.0 + 1e-3 && lo < 4.0, "{lo} .. {hi}");
+}

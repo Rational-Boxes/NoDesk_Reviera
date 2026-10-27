@@ -121,7 +121,7 @@ impl Gui {
                 segments: label_strokes(&parts.labels),
             });
             // The crop region (DOC-GFX-015).
-            if let Some(c) = v.element.and_then(|e| store.get(e)).and_then(reviera_core::crop::rects) {
+            if let Some(c) = v.element.and_then(|e| reviera_core::crop::rects(&store, store.get(e)?)) {
                 reviera_render::crop::crop_graphics(&mut graphics, c.model);
             }
             let cut_edges = Rc::new(std::mem::take(&mut graphics.cut_edges));
@@ -142,14 +142,15 @@ impl Gui {
         graphics.lines.extend(self.annotation_lines(index));
         graphics.lines.extend(self.note_lines(index));
         let (doc, element) = (self.views[index].doc, self.views[index].element);
-        let view = self.app.document(doc).and_then(|d| d.doc.store().get(element?).cloned());
-        if let Some(view) = view
-            && let Some(c) = reviera_core::crop::rects(&view)
+        let st = self.app.document(doc).map(|d| d.doc.store().clone());
+        let view = st.as_ref().and_then(|s| s.get(element?).cloned());
+        if let (Some(view), Some(st)) = (view, st)
+            && let Some(c) = reviera_core::crop::rects(&st, &view)
         {
             if let Some(a) = c.annotation {
                 reviera_render::crop::crop_lines(&mut graphics.lines[from..], a);
             }
-            if reviera_core::crop::crop_of(&view).is_some_and(|k| k.visible) {
+            if reviera_core::crop::effective(&st, &view).is_some_and(|k| k.visible) {
                 graphics.lines.push(Lines { color: crate::plans::CROP_COLOR, width: 0.25, segments: reviera_render::crop::outline(c.model, 0.005) });
             }
         }

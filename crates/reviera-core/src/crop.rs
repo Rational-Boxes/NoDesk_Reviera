@@ -12,6 +12,10 @@
 //! `{enabled, offsets: [left, right, bottom, top]}`. The drawing is clipped by
 //! `reviera_render::crop`, in the window and in output alike.
 //!
+//! A plan assigned to a scope box (ARC-SCOPE-001) is cropped to the box's footprint (its bounding
+//! rectangle while crops cannot turn), on unless its crop has been switched off; its region then
+//! cannot be set by hand.
+//!
 //! Not yet: non-rectangular crops (*Edit Crop*), crop breaks, rotation, dragging the edges in
 //! the window.
 
@@ -80,9 +84,40 @@ fn scale_of(e: &Element) -> f64 {
     e.param(VIEW_KEY).and_then(|v| v.get("scale")?.as_f64()).unwrap_or(100.0)
 }
 
+/// The scope box a plan follows, if it has one that exists.
+fn scope_box(store: &Store, e: &Element) -> Option<crate::scope_boxes::ScopeBox> {
+    let kind = crate::views::view_data(e)?.kind;
+    if !(crate::plans::is_plan(&kind) || kind == crate::areas::KIND_AREA_PLAN) {
+        return None;
+    }
+    let guid = e.param(crate::scope_boxes::VIEW_KEY)?.as_str()?;
+    let b = store.get(store.find_by_guid(&crate::id::GlobalId::parse(guid)?)?)?;
+    crate::scope_boxes::recipe(b)
+}
+
+/// The crop a view uses: its own, or (for a plan assigned to a scope box) the box's footprint,
+/// on unless the view's crop was switched off.
+pub fn effective(store: &Store, e: &Element) -> Option<Crop> {
+    let own = crop_of(e);
+    match scope_box(store, e) {
+        Some(b) => {
+            let corners = b.corners();
+            let lo = corners.iter().fold([f64::MAX; 2], |a, c| [a[0].min(c[0]), a[1].min(c[1])]);
+            let hi = corners.iter().fold([f64::MIN; 2], |a, c| [a[0].max(c[0]), a[1].max(c[1])]);
+            Some(Crop { enabled: own.is_none_or(|c| c.enabled), visible: own.is_some_and(|c| c.visible), min: lo, max: hi })
+        }
+        None => own,
+    }
+}
+
+/// Whether a view's crop follows a scope box.
+pub fn follows_scope_box(store: &Store, e: &Element) -> bool {
+    scope_box(store, e).is_some()
+}
+
 /// The rectangles a view is cropped to, when its crop is on.
-pub fn rects(e: &Element) -> Option<CropRects> {
-    let c = crop_of(e).filter(|c| c.enabled)?;
+pub fn rects(store: &Store, e: &Element) -> Option<CropRects> {
+    let c = effective(store, e).filter(|c| c.enabled)?;
     let a = annotation_crop_of(e);
     let mm = scale_of(e) / 1000.0;
     let annotation = a.enabled.then(|| {
@@ -169,7 +204,10 @@ pub(crate) fn set_crop(txn: &mut Transaction<'_>, p: SetCropParams) -> Result<()
     let store = txn.store().clone();
     let id = resolve(&store, &p.view_id)?;
     let e = store.get(id).expect("resolved");
-    let current = crop_of(e);
+    if p.shape.is_some() && follows_scope_box(&store, e) {
+        return Err(Error::new("view.crop_follows_scope_box", "the view's crop follows its scope box; move or resize the box"));
+    }
+    let current = effective(&store, e);
     let (min, max) = match (p.shape, current) {
         (Some(r), _) => {
             let (lo, hi) = ([r.min[0].min(r.max[0]), r.min[1].min(r.max[1])], [r.min[0].max(r.max[0]), r.min[1].max(r.max[1])]);
@@ -201,6 +239,9 @@ pub(crate) fn reset_crop(txn: &mut Transaction<'_>, p: ResetCropParams) -> Resul
     let store = txn.store().clone();
     let id = resolve(&store, &p.view_id)?;
     let e = store.get(id).expect("resolved");
+    if follows_scope_box(&store, e) {
+        return Err(Error::new("view.crop_follows_scope_box", "the view's crop follows its scope box; move or resize the box"));
+    }
     let (min, max) = model_extent(&store, e).ok_or_else(|| Error::new("view.empty", "the view shows nothing to fit"))?;
     let current = crop_of(e);
     let c = Crop { enabled: current.is_none_or(|c| c.enabled), visible: current.is_none_or(|c| c.visible), min, max };

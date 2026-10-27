@@ -199,7 +199,10 @@ impl Gui {
         // A cropped plan or section clips its shaded model to the crop region (DOC-GFX-015), in
         // the view's own coordinates (a section's scene is in its frame).
         if (v.plan.is_some() || v.section.is_some())
-            && let Some(c) = v.element.and_then(|e| self.app.document(v.doc)?.doc.store().get(e)).and_then(reviera_core::crop::rects)
+            && let Some(c) = v.element.and_then(|e| {
+                let st = self.app.document(v.doc)?.doc.store();
+                reviera_core::crop::rects(st, st.get(e)?)
+            })
         {
             let (lo, hi) = (c.model.0.map(|x| x as f32), c.model.1.map(|x| x as f32));
             clipping.planes.extend([[1.0, 0.0, 0.0, lo[0]], [-1.0, 0.0, 0.0, -hi[0]], [0.0, 1.0, 0.0, lo[1]], [0.0, -1.0, 0.0, -hi[1]]]);

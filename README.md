@@ -1356,7 +1356,8 @@ simulation sessions, and the first engine runners (see [Not built yet](#not-buil
   Annotation Crop and Reset Crop in Properties: the model (lines, fills and the shaded model) is
   drawn only inside the rectangle, tags of elements outside it are hidden, and with the
   annotation crop on, annotation is clipped to a margin round it; printed and sheet drawings
-  crop alike (`view.set_crop`, `view.reset_crop`, `view.set_annotation_crop`; DOC-GFX-015).
+  crop alike; a plan assigned to a scope box is cropped to the box, and follows it when the box
+  moves (`view.set_crop`, `view.reset_crop`, `view.set_annotation_crop`; DOC-GFX-015).
 - **Spot elevations, coordinates and slopes**: Annotate › Spot Elevation (EL), Spot Coordinate and Spot Slope, in
   plans, sections and elevations: click a point on an element, then where the text goes. A spot
   reads the point's height (or its element's top and bottom there) from the project base point,
@@ -1612,8 +1613,8 @@ area by area (reviewed against the spec on 2026-10-15).
 
 **Still to build in the areas begun (architecture):**
 
-- **Datums and work planes**: alignment locks between datum ends, level elbows, view crops that
-  follow a scope box, picking a face as the work plane, Go To View and the Work Plane Viewer
+- **Datums and work planes**: alignment locks between datum ends, level elbows, rotated view
+  crops from a turned scope box, picking a face as the work plane, Go To View and the Work Plane Viewer
   (ARC-DATUM-001, ARC-SCOPE-001, ARC-WP-001).
 - **Drawing aids**: dragging a temporary dimension's witness line to another reference and its
   Make Permanent icon (the command exists), angular and radial constraints, constraints on
@@ -1688,7 +1689,7 @@ area by area (reviewed against the spec on 2026-10-15).
   extensions, issues from review items and warnings, document references, component colouring, BCF API sync
   with a server (COL-BCF-002).
 - **Documentation**: crop regions beyond rectangles (dragged edges, sketched shapes, breaks,
-  rotation, following a scope box), jogged sections, interior elevation markers, opening a view
+  rotation), jogged sections, interior elevation markers, opening a view
   from its marker; schedule filters in the Filter dialog beyond one condition (several are taken by `schedule.set_filters`), grouping and calculated fields; title block families,
   revisions and sheet collections; tags and text on sheets; spot types; the current NBIMS-US
   COBie layout and a COBie settings dialog.

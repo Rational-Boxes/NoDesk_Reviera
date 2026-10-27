@@ -31,7 +31,7 @@ pub fn view_notes(store: &Store, view: &Element, scale: f32, z: f32, scene: Opti
     let reader = FieldReader::new(store, &parents);
     let mut out = Vec::new();
     // A cropped view hides the tags and spots of elements outside its crop (DOC-GFX-015).
-    let crop = reviera_core::crop::rects(view);
+    let crop = reviera_core::crop::rects(store, view);
     let outside = |p: Option<[f64; 2]>| crop.is_some_and(|c| p.is_some_and(|p| !c.contains(p)));
     for (id, data) in notes::tags_of_view(store, &guid) {
         let t = notes::resolve_tag(store, &reader, id, data);

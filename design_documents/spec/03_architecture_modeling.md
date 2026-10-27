@@ -541,6 +541,8 @@ Dragging a control issues the matching command once, on mouse-up. The preview du
 - [ ] Rotating a scope box by 30° rotates the crop region of every assigned view by 30°. (Crop regions are not built.)
 - [x] A grid assigned to a box that does not reach Level 3 is not shown on the Level 3 plan.
 
+*Built (2026-10-27):* views assigned to a scope box are cropped to it: a plan's crop region is the box's footprint (its bounding rectangle until crops can turn) and follows the box (DOC-GFX-015).
+
 ### 3.2.6 Work planes
 **ID:** ARC-WP-001 · **Priority:** P0 · **Ref:** research/02 §3.6 · web: Edit with the Workplane Viewer; Zoom to Fit Workplane Viewer
 
