@@ -105,8 +105,13 @@ impl Gui {
             boxes.push((c["class"].as_str().unwrap_or("").to_owned(), b));
         }
         sizer.add_sizer(&grid, 0, SizerFlag::Left | SizerFlag::Right, 22);
+        let behind = CheckBox::builder(&dialog).with_label("Hide labels behind the model").build();
+        behind.set_value(info["occlude"] != false);
+        behind.enable(info["shown"] == true);
+        sizer.add(&behind, 0, SizerFlag::Left | SizerFlag::Right | SizerFlag::Top, 10);
         {
-            let boxes: Vec<CheckBox> = boxes.iter().map(|(_, b)| *b).collect();
+            let mut boxes: Vec<CheckBox> = boxes.iter().map(|(_, b)| *b).collect();
+            boxes.push(behind);
             all.on_toggled(move |e| {
                 for b in &boxes {
                     b.enable(e.is_checked());
@@ -124,12 +129,13 @@ impl Gui {
         dialog.set_escape_id(ID_CANCEL);
         let code = dialog.show_modal();
         let shown = all.get_value();
+        let occlude = behind.get_value();
         let set: serde_json::Map<String, serde_json::Value> = boxes.iter().map(|(c, b)| (c.clone(), json!(b.get_value()))).collect();
         dialog.destroy();
         if code != ID_OK {
             return;
         }
-        if let Err(e) = self.run("view.set_3d_annotations", json!({ "view_id": view, "shown": shown, "classes": set })) {
+        if let Err(e) = self.run("view.set_3d_annotations", json!({ "view_id": view, "shown": shown, "occlude": occlude, "classes": set })) {
             error(&frame, &e);
         }
         self.refresh_active();

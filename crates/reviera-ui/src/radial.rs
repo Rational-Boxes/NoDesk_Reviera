@@ -491,6 +491,7 @@ impl crate::Gui {
         use wxdragon::prelude::WxWidget;
         let dark = crate::ribbon::dark();
         let tips = self.view_tips(index);
+        let tips = self.unhidden_tips(index, tips);
         let v = &mut self.views[index];
         let ring = self.radial.as_ref().filter(|r| r.view == v.id).map(|r| r.drawn(dark));
         let size = v.panel.get_client_size();
@@ -518,34 +519,78 @@ impl crate::Gui {
         viewport.set_hud(hud);
     }
 
-    /// The floating annotation labels a 3D view shows now, made again when the model changes.
-    fn view_tips(&mut self, index: usize) -> Vec<reviera_render::tooltips::Tip> {
+    /// The floating annotation labels a 3D view shows now, and whether it leaves out those behind
+    /// the model; made again when the model changes.
+    fn view_tips(&mut self, index: usize) -> (bool, Vec<reviera_render::tooltips::Tip>) {
         let v = &self.views[index];
         if v.is_2d() {
-            return Vec::new();
+            return (false, Vec::new());
         }
         let (id, doc, element) = (v.id, v.doc, v.element);
-        let Some(d) = self.app.document(doc) else { return Vec::new() };
+        let Some(d) = self.app.document(doc) else { return (false, Vec::new()) };
         let version = d.doc.version();
-        if let Some((at, tips)) = self.tips.get(&id)
+        if let Some((at, occlude, tips)) = self.tips.get(&id)
             && *at == version
         {
-            return tips.clone();
+            return (*occlude, tips.clone());
         }
         let store = d.doc.store();
         // The unsaved {3D} view shows the defaults.
-        let tips: Vec<reviera_render::tooltips::Tip> = match element.and_then(|e| store.get(e)) {
-            Some(view) => reviera_core::annotations_3d::shown(store, view),
-            None => {
-                let s = reviera_core::annotations_3d::Settings::default();
-                reviera_core::annotations_3d::tips(store).into_iter().filter(|t| s.shows(&t.class)).collect()
-            }
+        let settings = element.and_then(|e| store.get(e)).map(reviera_core::annotations_3d::settings).unwrap_or_default();
+        let tips: Vec<reviera_render::tooltips::Tip> = if settings.shown {
+            reviera_core::annotations_3d::tips(store).into_iter().filter(|t| settings.shows(&t.class)).collect()
+        } else {
+            Vec::new()
         }
         .into_iter()
         .map(|t| reviera_render::tooltips::Tip { anchor: glam::Vec3::new(t.anchor[0] as f32, t.anchor[1] as f32, t.anchor[2] as f32), lines: t.lines })
         .collect();
-        self.tips.insert(id, (version, tips.clone()));
-        tips
+        self.tips.insert(id, (version, settings.occlude, tips.clone()));
+        (settings.occlude, tips)
+    }
+
+    /// The labels whose points the view's model does not hide from the eye (DOC-ANN-025): a ray
+    /// from the eye (or, in a parallel view, from far back along the view) meeting what one cannot
+    /// see through more than 0.4 m before a point hides it; what the section box and slices cut
+    /// away and what is hidden in the view do not.
+    fn unhidden_tips(&mut self, index: usize, (occlude, tips): (bool, Vec<reviera_render::tooltips::Tip>)) -> Vec<reviera_render::tooltips::Tip> {
+        if !occlude || tips.is_empty() {
+            return tips;
+        }
+        let doc = self.views[index].doc;
+        let Some(version) = self.app.document(doc).map(|d| d.doc.version()) else { return tips };
+        let bvh = match self.occluders.get(&doc) {
+            Some((at, b)) if *at == version => b.clone(),
+            _ => {
+                let Some(scene) = self.scenes.get(&doc) else { return tips };
+                let b = std::rc::Rc::new(reviera_render::bvh::Bvh::build_opaque(scene));
+                self.occluders.insert(doc, (version, b.clone()));
+                b
+            }
+        };
+        let v = &self.views[index];
+        let (section_box, slices) = self.view_clip(v);
+        let clipping = reviera_render::Clipping::of(section_box.as_ref(), &slices);
+        let visibility = self.view_visibility(v);
+        let Some(scene) = self.scenes.get(&doc) else { return tips };
+        let camera = &v.camera;
+        let back = camera.direction();
+        // A label stands for a room, an opening or a note's place: it shows while any of three
+        // points up from its anchor (at it, 1.2 m and 2.4 m above) can be seen.
+        let seen = |p: glam::Vec3| {
+            let origin = if camera.perspective { camera.eye() } else { p + back * (camera.distance + 1000.0) };
+            let to = p - origin;
+            let length = to.length();
+            if length < 0.5 {
+                return true;
+            }
+            let before = 1.0 - 0.4 / length;
+            let accept = |mesh: usize, q: glam::Vec3| clipping.keeps(q) && scene.meshes.get(mesh).is_some_and(|m| visibility.opacity(m.element).is_some());
+            bvh.nearest(origin, to, before, &accept).is_none()
+        };
+        tips.into_iter()
+            .filter(|t| [0.0, 1.2, 2.4].iter().any(|h| seen(t.anchor + glam::Vec3::Z * *h)))
+            .collect()
     }
 }
 

@@ -18,6 +18,7 @@ pub mod font;
 pub mod notes;
 pub mod plan;
 pub mod radial;
+pub mod bvh;
 pub mod solid;
 pub mod tooltips;
 pub mod viewcube;

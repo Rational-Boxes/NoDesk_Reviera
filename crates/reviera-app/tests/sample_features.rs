@@ -274,7 +274,7 @@ fn the_annotated_plan_floats_its_annotation_in_3d() {
     let view = ok(&mut app, "view.create_3d", json!({}));
     let info = ok(&mut app, "view.annotations_3d", json!({ "view_id": view }));
     let count = |info: &Value, c: &str| info["classes"].as_array().unwrap().iter().find(|x| x["class"] == c).map(|x| (x["count"].as_u64().unwrap(), x["visible"].as_bool().unwrap()));
-    assert_eq!(info["shown"], true);
+    assert_eq!((info["shown"].as_bool(), info["occlude"].as_bool()), (Some(true), Some(true)), "labels behind the model left out unless set");
     assert_eq!(count(&info, "text"), Some((2, true)));
     assert_eq!(count(&info, "dimensions"), Some((13, false)), "dimensions hidden unless chosen");
     assert_eq!(count(&info, "tags:Doors"), Some((3, true)));
@@ -298,4 +298,6 @@ fn the_annotated_plan_floats_its_annotation_in_3d() {
     let living = tips.iter().find(|t| t.lines.first().map(String::as_str) == Some("Living")).unwrap();
     assert!((living.anchor[2] - 0.3).abs() < 1e-9, "{living:?}");
     assert!(app.execute("view.set_3d_annotations", json!({ "view_id": view, "classes": { "nonsense": true } }), &Caller::user()).is_err());
+    ok(&mut app, "view.set_3d_annotations", json!({ "view_id": view, "occlude": false }));
+    assert_eq!(ok(&mut app, "view.annotations_3d", json!({ "view_id": view }))["occlude"], false);
 }

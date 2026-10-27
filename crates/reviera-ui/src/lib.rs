@@ -449,7 +449,9 @@ struct Gui {
     radial: Option<radial::RadialMenu>,
     /// Each 3D view's floating annotation labels and the model version they were made for
     /// (DOC-ANN-025), by view id.
-    tips: std::collections::HashMap<u32, (reviera_core::document::ModelVersion, Vec<reviera_render::tooltips::Tip>)>,
+    tips: std::collections::HashMap<u32, (reviera_core::document::ModelVersion, bool, Vec<reviera_render::tooltips::Tip>)>,
+    /// Each document's triangles for testing whether labels are behind the model, by version.
+    occluders: std::collections::HashMap<DocumentId, (reviera_core::document::ModelVersion, std::rc::Rc<reviera_render::bvh::Bvh>)>,
     /// Per-user interface settings (the experimental radial menu, the reveal dwell).
     ui_settings: radial::UiSettings,
     /// Full-screen and focus mode (UI-DOCK-004).
@@ -3782,6 +3784,7 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 menu_runner: None,
                 radial: None,
                 tips: std::collections::HashMap::new(),
+                occluders: std::collections::HashMap::new(),
                 ui_settings: radial::UiSettings::load(),
                 chrome: fullscreen::Chrome::default(),
                 system_browser: None,

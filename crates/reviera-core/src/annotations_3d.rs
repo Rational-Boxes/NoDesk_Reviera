@@ -13,6 +13,9 @@
 //!   Windows, Rooms, …), so a view can show some and not others.
 //! - **Per view:** a 3D view keeps whether it shows annotation at all and which classes it hides
 //!   (`rxd:annotations_3d`): shown, with dimensions hidden, unless set (`view.set_3d_annotations`).
+//! - **Behind the model:** a label whose point the model hides from the eye (by more than 0.4 m,
+//!   so a tag inside its door still shows) is left out unless the view says otherwise
+//!   (`occlude`); what the section box and slices cut away and what is hidden do not hide it.
 
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 
@@ -42,11 +45,18 @@ pub struct Settings {
     pub shown: bool,
     /// Classes not shown.
     pub hidden: BTreeSet<String>,
+    /// Labels whose point is behind the model are left out.
+    #[serde(default = "yes")]
+    pub occlude: bool,
+}
+
+fn yes() -> bool {
+    true
 }
 
 impl Default for Settings {
     fn default() -> Self {
-        Self { shown: true, hidden: ["dimensions".to_owned()].into() }
+        Self { shown: true, hidden: ["dimensions".to_owned()].into(), occlude: true }
     }
 }
 
@@ -150,6 +160,8 @@ pub struct ClassInfo {
 #[derive(Debug, Clone, PartialEq, Serialize, JsonSchema)]
 pub struct Info {
     pub shown: bool,
+    /// Labels behind the model are left out.
+    pub occlude: bool,
     pub classes: Vec<ClassInfo>,
 }
 
@@ -186,7 +198,7 @@ pub fn info(store: &Store, p: InfoParams) -> Result<Info> {
         .map(|(class, count)| ClassInfo { label: label(&class), visible: !s.hidden.contains(&class), count, class })
         .collect();
     classes.sort_by(|a, b| (order(&a.class), &a.label).cmp(&(order(&b.class), &b.label)));
-    Ok(Info { shown: s.shown, classes })
+    Ok(Info { shown: s.shown, occlude: s.occlude, classes })
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -195,6 +207,8 @@ pub struct SetParams {
     pub view_id: ElementRef,
     /// Annotation on or off in the view.
     pub shown: Option<bool>,
+    /// Leave out labels whose point is behind the model (on unless set).
+    pub occlude: Option<bool>,
     /// Classes to show (`true`) or hide (`false`): `text`, `dimensions`, `tags:<category>`.
     #[serde(default)]
     pub classes: BTreeMap<String, bool>,
@@ -207,6 +221,9 @@ pub(crate) fn set(txn: &mut crate::txn::Transaction<'_>, p: SetParams) -> Result
     let mut s = settings(store.get(id).expect("resolved"));
     if let Some(v) = p.shown {
         s.shown = v;
+    }
+    if let Some(v) = p.occlude {
+        s.occlude = v;
     }
     for (class, visible) in p.classes {
         let known = class == "text" || class == "dimensions" || class.strip_prefix("tags:").is_some_and(|c| !c.is_empty());

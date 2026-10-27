@@ -1361,7 +1361,8 @@ simulation sessions, and the first engine runners (see [Not built yet](#not-buil
   This is temporary per-view state that is never saved or printed (`view.temp_*`).
 - **Annotation in 3D**: a 3D view shows the plans' text notes, tags and dimensions as floating,
   tooltip-style labels at their places in the model (a note above its level, a door's tag at the
-  door, a room's over the room), readable from any angle and kept from covering each other. View ›
+  door, a room's over the room), readable from any angle, kept from covering each other and left
+  out where the model hides their place (unless the view is set to show them all). View ›
   Annotation › Annotation in 3D turns them on and off for the view (a toggle button that shows its
   state); Annotation Visibility… has a check box for each class (text notes, dimensions, door,
   window, room and other tags), each on its own, kept with the view (`view.annotations_3d`,

@@ -23770,14 +23770,16 @@ All annotation tools are on the **Annotate** tab, in the panels Dimension, Detai
 - Nearer labels are placed first; one that would cover another moves up, and is left out after three steps. At most 150 at once.
 - View tab › Annotation (and Annotate tab › 3D, and the View menu): *Annotation in 3D* (a toggle button showing whether the active view shows them) and *Annotation Visibility…* (a check box for annotation in the view and one for each class with its count).
 
-**Data (RXD).** The view's `rxd:annotations_3d`: `{ shown, hidden: [class…] }`.
+**Data (RXD).** The view's `rxd:annotations_3d`: `{ shown, hidden: [class…], occlude }`.
 
 **Commands.** `view.annotations_3d(view_id) -> { shown, classes[] }`; `view.set_3d_annotations(view_id, shown?, classes?: {class: bool}) -> ()`
 
 **Acceptance criteria.**
 - [x] The annotated plan sample's 3D view shows its two notes and its door, window and room tags, and its dimensions when chosen; hiding door tags leaves the others; undo brings back the previous choice. *(Built 2026-10-26, `tests/sample_features.rs`.)*
 
-*Built (2026-10-26):* as above. *(Owner, 2026-10-26: "On the 3D annotations should float as tool-tip style display. There needs to be a toggle to turn it on and off." "Visibility controls should be independent visibility, a control with a visibility check for each class of annotation.")* Not yet: hiding labels behind the model (they are always drawn), clicking a label to select its annotation, labels of sections' and elevations' annotation, keynotes and spot dimensions.
+*Built (2026-10-26):* as above. *(Owner, 2026-10-26: "On the 3D annotations should float as tool-tip style display. There needs to be a toggle to turn it on and off." "Visibility controls should be independent visibility, a control with a visibility check for each class of annotation.")* 
+
+*Built (2026-10-26), labels behind the model:* a label is left out while the model hides its place: rays from the eye (or, in a parallel view, from far back along the view direction) to three points up from its anchor (at it, 1.2 m and 2.4 m above) meet what one cannot see through (opaque meshes: not glass, room and space volumes, openings or virtual volumes) more than 0.4 m before the point; what the section box and slices cut away and what is hidden in the view do not count. The test runs every frame on a bounding volume hierarchy of the model's triangles, built once per change (`reviera_render::bvh`). Per view, on unless set (`occlude`, *Hide labels behind the model* in Annotation Visibility). Not yet: clicking a label to select its annotation, labels of sections' and elevations' annotation, keynotes and spot dimensions.
 ---
 
 ## 5.14 Schedules
@@ -24884,7 +24886,7 @@ Every command below is registered once in the command registry and is therefore 
 | `view.open` | view_id | () | No | DOC-VIEW-001 |
 | `view.annotations_3d` | view_id | {shown, classes[]} | No | DOC-ANN-025 |
 | `view.get` | view_id | view_detail | No | DOC-VIEW-001 |
-| `view.set_3d_annotations` | view_id, shown?, classes? | () | Yes | DOC-ANN-025 |
+| `view.set_3d_annotations` | view_id, shown?, occlude?, classes? | () | Yes | DOC-ANN-025 |
 | `view.list` | filter? | view_summary[] | No | DOC-VIEW-001 |
 | `viewtype.create` | kind, name, default_template_id?, bind_new_views?, marker_type_id? | view_family_type_id | Yes | DOC-VIEW-001 |
 | `view_tag.settings` | kind?: callout\|elevation\|section | () | No | DOC-VIEW-001 |
@@ -30296,7 +30298,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `view.reveal_hidden` | 5 | view_id, on | () | No | DOC-GFX-008 |
 | `view.reveal_hidden.toggle` | 1 | `view_id?` | `bool` | No | UI-VCB-001 |
 | `view.save_to_library` | 5 | view_ids[], path | () | No | DOC-VIEW-009 |
-| `view.set_3d_annotations` | 5 | view_id, shown?, classes? | () | Yes | DOC-ANN-025 |
+| `view.set_3d_annotations` | 5 | view_id, shown?, occlude?, classes? | () | Yes | DOC-ANN-025 |
 | `view.set_annotation_crop` | 5 | view_id, enabled, offsets? | () | Yes | DOC-GFX-015 |
 | `view.set_camera` | 1 | view_id, eye, target, up, projection?: orthographic\ | perspective, fov? | () | Yes (explicit calls; interactive navigation is not, §1.19) |
 | `view.set_category_override` | 5 | view_id, category, subcategory?, override | () | Yes | DOC-GFX-003 |
