@@ -566,9 +566,10 @@ Commands. The existing library commands (`library.open`, `library.create`,
 8. **Master of product data.** Should the folder's metadata be the master for manufacturer,
    model, code and classification (Reviera offers to update the type), or the model (Reviera
    writes the folder), or neither, with a comparison either way?
-9. **"CLI/MF division".** Does this mean the CSI MasterFormat division and section (`08 11 13`)?
-   Should Uniclass and OmniClass codes be kept too? Which other fields does the folder need:
-   GTIN, EPD values, certifications and expiries, warranty?
+9. **Product fields.** *Answered (owner, 2026-10-27): "CLI/MF division" is the **CSI
+   MasterFormat** division and section (`08 11 13`), kept as `class.masterformat`.* Still open:
+   should Uniclass and OmniClass codes be kept too, and which other fields does a folder need
+   (GTIN, EPD values, certifications and their expiries, warranty)?
 10. **Instance documents.** Should individual elements (one installed unit with a serial
     number) have their own folders as well as their type's, or only types and materials?
 11. **Materials.** Should materials link to folders the same way as types (an EPD per
