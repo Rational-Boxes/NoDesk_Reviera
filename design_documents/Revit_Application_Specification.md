@@ -22362,6 +22362,10 @@ These principles apply to every requirement in this chapter.
 
 ## 5.11 Graphics control
 
+*Built (2026-10-27), keynote legends:* View › *Keynote Legend* creates a schedule of kind `schedule.keynotelegend` and opens it: one row per key the model's keynote tags show (DOC-ANN-014), in natural order, with its text from the keynote table (*(not in the keynote table)* for a missing one); columns *Key Value* and *Keynote Text*, or one of them. *Filter by sheet* (asked on creation; `view.set_keynote_legend`) makes each copy placed on a sheet list only the keynotes of the views placed on that sheet; in its own tab it lists them all. Its columns, filters and sorting are its own: `schedule.set_fields` and the like refuse it (`schedule.keynote_legend`). `schedule.get_table(schedule_id, sheet_id?)` gives it as one sheet shows it. Commands: `view.create_keynote_legend(name?, fields?: [key, text], filter_by_sheet?)`, `view.set_keynote_legend(schedule_id, filter_by_sheet?, fields?)`. Not yet: legend views (`view.legend`) and legend components.
+
+- [x] *(Built 2026-10-27, `tests/sample_features.rs`.)* The managed project's keynote legend, filtering by sheet, lists its plan's three keys on sheet *Plan and Keynotes*; placed again on a second sheet with a section carrying keynote `09`, that copy lists only `09`, and the first keeps its three; without the filter every copy lists all four.
+
 ### The graphics override precedence model
 **ID:** DOC-GFX-001 · **Priority:** P0 (layers 0–1, 3, 6), P1 (layers 2, 4–5) · **Ref:** research/04 §3.1, §11 *Key behaviours* 5–6
 
@@ -24971,7 +24975,8 @@ Every command below is registered once in the command registry and is therefore 
 | `detail.insert_from_file` | path, source_view_name, target_view_id, position? | annotation_id[] | Yes | DOC-VIEW-009 |
 | `view.create_legend` | name, scale | view_id | Yes | DOC-VIEW-010 |
 | `legend.place_component` | view_id, type_id, direction, detail_level?, host_length?, point | element_id | Yes | DOC-VIEW-010 |
-| `view.create_keynote_legend` | name, fields[]?, filter_by_sheet? | schedule_id | Yes | DOC-VIEW-010 |
+| `view.create_keynote_legend` | name?, fields[]?, filter_by_sheet? | schedule_id | Yes | DOC-VIEW-010 |
+| `view.set_keynote_legend` | schedule_id, filter_by_sheet?, fields[]? | () | Yes | DOC-VIEW-010 |
 | `view.duplicate` | view_id, mode: plain\|with_detailing\|dependent, name? | view_id | Yes | DOC-VIEW-011 |
 | `view.convert_to_independent` | view_id | () | Yes | DOC-VIEW-011 |
 | `graphics.explain` | view_id, element_id, subcategory? | layer_trace | No | DOC-GFX-001 |
@@ -27903,7 +27908,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**2168 unique commands** in 416 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**2169 unique commands** in 416 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -28297,7 +28302,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `underlay` | 1 |
 | `units` | 7 |
 | `validate` | 2 |
-| `view` | 125 |
+| `view` | 126 |
 | `view_tag` | 1 |
 | `viewport` | 10 |
 | `viewporttype` | 1 |
@@ -30288,7 +30293,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `view.create_drafting` | 5 | name, scale | view_id | Yes | DOC-VIEW-009 |
 | `view.create_elevation` | 5 | host_view_id, point, elevation_type_id, directions[], rotation? | {marker_id, view_ids[]} | Yes | DOC-VIEW-003 |
 | `view.create_framing_elevation` | 5 | host_view_id, datum_id, elevation_type_id, bay? | view_id | Yes | DOC-VIEW-003 |
-| `view.create_keynote_legend` | 5 | name, fields[]?, filter_by_sheet? | schedule_id | Yes | DOC-VIEW-010 |
+| `view.create_keynote_legend` | 5 | name?, fields[]?, filter_by_sheet? | schedule_id | Yes | DOC-VIEW-010 |
 | `view.create_legend` | 5 | name, scale | view_id | Yes | DOC-VIEW-010 |
 | `view.create_plan` | 5 | kind, level_ids[], view_family_type_id?, scale?, allow_duplicates?, area_scheme_id? | view_id[] | Yes | DOC-VIEW-002 |
 | `view.create_plan_region` | 5 | view_id, loops[], view_range | element_id | Yes | DOC-VR-003 |
@@ -30352,6 +30357,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `view.set_graphic_display` | 5 | view_id, options | () | Yes | DOC-GFX-012 |
 | `view.set_home` | 1 | `view_id?` | `()` | No | UI-NAV-002 |
 | `view.set_host_layer_cut_styles` | 5 | view_id, function_styles{} | () | Yes | DOC-GFX-003 |
+| `view.set_keynote_legend` | 5 | schedule_id, filter_by_sheet?, fields[]? | () | Yes | DOC-VIEW-010 |
 | `view.set_linework` | 5 | view_id, edge_refs[], line_style_id? | () | Yes | DOC-GFX-007 |
 | `view.set_link_display` | 6 | view_id, instance_id, mode: host\ | linked_view\ | custom, linked_view_id?, custom?, visible?, halftone?, underlay?, line_weights_from?: host\ | link |
 | `view.set_parts_visibility` | 3 | view_id, mode: ShowParts\ | ShowOriginal\ | ShowBoth | () |

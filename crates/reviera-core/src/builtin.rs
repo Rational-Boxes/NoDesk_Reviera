@@ -165,6 +165,8 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(KeynoteCreate),
         registry.add(KeynoteSet),
         registry.add(KeynoteList),
+        registry.add(ViewCreateKeynoteLegend),
+        registry.add(ViewSetKeynoteLegend),
         registry.add(TextSetContent),
         registry.add(TextSet),
         registry.add(TextAddLeader),
@@ -3865,6 +3867,28 @@ modify_command!(
     crate::keynote_tags::CreateParams,
     ElementId,
     crate::keynote_tags::create
+);
+modify_command!(
+    ViewCreateKeynoteLegend,
+    "view.create_keynote_legend",
+    "Create a keynote legend",
+    "Creates a keynote legend (DOC-VIEW-010): a schedule listing the keys the model's keynote tags show, \
+     in natural order, with their text (`fields`: `key`, `text`, both by default). With `filter_by_sheet`, \
+     each copy placed on a sheet lists only the keynotes of that sheet's views. Returns the schedule.",
+    "Keynote Legend",
+    crate::keynote_legend::CreateParams,
+    ElementId,
+    crate::keynote_legend::create
+);
+modify_command!(
+    ViewSetKeynoteLegend,
+    "view.set_keynote_legend",
+    "Change a keynote legend",
+    "Sets a keynote legend's Filter by sheet and its columns (`key`, `text`, or both).",
+    "Keynote Legend",
+    crate::keynote_legend::SetParams,
+    (),
+    crate::keynote_legend::set
 );
 modify_command!(
     KeynoteSet,

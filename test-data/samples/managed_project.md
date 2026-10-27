@@ -51,7 +51,9 @@ Start with **File › New**, and open a Level 1 plan (View › Floor Plan).
    **Element Keynote**: click the front door, then just below it, right of its swing (a boxed
    08 11 13 with a leader); the same for the window. **User Keynote**: choose *09 21 16 — Gypsum
    board assemblies*, click the partition, then a point in the store; in Properties set Style
-   *Number*.
+   *Number*. View › **Keynote Legend**, *Yes* to Filter by sheet; View › **Sheet** (*A3*, named
+   *Plan and Keynotes*), Place View the Level 1 plan and Place Schedule the legend: it lists the
+   three keys with their text.
 10. **Saved selections.** Select the four exterior walls, Manage › Selection › **Save
     Selection** (*Exterior walls*); the doors and windows (*Doors and windows*). Manage ›
     Selection › **Sets as IfcGroups**: *Yes*.

@@ -894,6 +894,9 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "spot_elevation" => format!(
             r#"<path d="M3 27h26" {s}/><path d="M9 27l-4-6h8z" fill="{a}" {sa}/><path d="M9 21l6-9h13" {s}/><path d="M16 8h11" {s} stroke-width="2.4"/>"#
         ),
+        "keynote_legend" => format!(
+            r#"<rect x="4" y="4" width="24" height="24" fill="{f}" {s}/><rect x="7" y="8" width="6" height="4" {sa}/><rect x="7" y="15" width="6" height="4" {sa}/><rect x="7" y="22" width="6" height="3" {sa}/><path d="M16 10h9M16 17h9M16 23.5h9" {s} stroke-width="1.4"/>"#
+        ),
         "keynote" => format!(
             r#"<rect x="13" y="4" width="16" height="11" fill="{f}" {s}/><path d="M17 9.5h8" {s} stroke-width="1.6"/><path d="M13 13L4 25" {sa}/><circle cx="4" cy="25" r="1.6" fill="{a}"/><path d="M6 28h20" {s} stroke-width="1"/>"#
         ),

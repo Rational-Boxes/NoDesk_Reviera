@@ -224,7 +224,7 @@ impl App {
             else {
                 continue;
             };
-            let Ok(table) = self.schedule_table(doc, id) else {
+            let Ok(table) = self.schedule_table_on(doc, id, Some(sheet)) else {
                 continue;
             };
             let (x, y) = (inst.position[0] as f32, inst.position[1] as f32);

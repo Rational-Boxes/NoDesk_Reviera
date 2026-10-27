@@ -18,12 +18,22 @@ use crate::{App, DocumentId};
 impl App {
     /// The table of a schedule as it is now.
     pub fn schedule_table(&self, doc: DocumentId, schedule: ElementId) -> Result<Table> {
+        self.schedule_table_on(doc, schedule, None)
+    }
+
+    /// The table of a schedule as it shows on `sheet` (a keynote legend that filters by sheet
+    /// lists only the keynotes of the sheet's views, DOC-VIEW-010); `None`, on its own.
+    pub fn schedule_table_on(&self, doc: DocumentId, schedule: ElementId, sheet: Option<ElementId>) -> Result<Table> {
         let parents = self.model_parents(doc)?;
         let store = self.get(doc)?.doc.store();
         let e = store
             .get(schedule)
             .ok_or_else(|| Error::new("schedule.not_found", format!("no schedule {schedule}")))?;
-        schedules::table(store, e, &parents)
+        let views: Option<Vec<String>> = sheet
+            .and_then(|s| store.get(s))
+            .and_then(reviera_core::sheets::sheet_data)
+            .map(|d| d.viewports.into_iter().map(|vp| vp.view).collect());
+        schedules::table_on_sheet(store, e, &parents, views.as_deref())
     }
 }
 
@@ -59,6 +69,9 @@ const fn meta(
 #[serde(deny_unknown_fields)]
 pub struct TableParams {
     pub schedule_id: ElementRef,
+    /// As placed on this sheet (a keynote legend that filters by sheet lists that sheet's
+    /// keynotes).
+    pub sheet_id: Option<ElementRef>,
 }
 
 pub(crate) struct ScheduleGetTable;
@@ -75,7 +88,11 @@ impl HostCommand for ScheduleGetTable {
 
     fn run(&self, app: &mut App, _: &Caller, p: TableParams) -> Result<Table> {
         let (doc, id) = resolve(app, &p.schedule_id)?;
-        app.schedule_table(doc, id)
+        let sheet = match &p.sheet_id {
+            Some(r) => Some(app.get(doc)?.doc.store().resolve(r).ok_or_else(|| Error::new("sheet.not_found", "no such sheet"))?),
+            None => None,
+        };
+        app.schedule_table_on(doc, id, sheet)
     }
 }
 

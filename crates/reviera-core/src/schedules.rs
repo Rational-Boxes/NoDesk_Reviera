@@ -78,6 +78,9 @@ pub struct ScheduleDef {
     /// Rows must pass every filter.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub filters: Vec<Filter>,
+    /// A keynote legend placed on a sheet lists only that sheet's keynotes (DOC-VIEW-010).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub filter_by_sheet: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -677,10 +680,24 @@ pub fn table(
     schedule: &Element,
     parents: &HashMap<ElementId, ElementId>,
 ) -> Result<Table> {
+    table_on_sheet(store, schedule, parents, None)
+}
+
+/// The table of a schedule as placed on a sheet whose views are `sheet_views` (GlobalIds): a
+/// keynote legend that filters by sheet lists only their keynotes (DOC-VIEW-010).
+pub fn table_on_sheet(
+    store: &Store,
+    schedule: &Element,
+    parents: &HashMap<ElementId, ElementId>,
+    sheet_views: Option<&[String]>,
+) -> Result<Table> {
     let def =
         schedule_def(schedule).ok_or_else(|| Error::new("schedule.not_found", "not a schedule"))?;
     if def.kind == crate::mep_panel_schedule::KIND_PANEL {
         return crate::mep_panel_schedule::table(store, schedule, &def);
+    }
+    if crate::keynote_legend::is_keynote_legend(&def) {
+        return crate::keynote_legend::table(store, schedule, &def, sheet_views);
     }
     let elements: Vec<&Element> = store
         .iter()
@@ -865,6 +882,12 @@ fn resolve(store: &Store, r: &ElementRef) -> Result<(ElementId, ScheduleDef)> {
             "a panel schedule's columns are set by its template",
         ));
     }
+    if crate::keynote_legend::is_keynote_legend(&def) {
+        return Err(Error::new(
+            "schedule.keynote_legend",
+            "a keynote legend's columns are its keys and texts (view.set_keynote_legend)",
+        ));
+    }
     Ok((id, def))
 }
 
@@ -950,6 +973,7 @@ pub(crate) fn create(txn: &mut crate::txn::Transaction<'_>, p: CreateParams) -> 
         grand_totals: true,
         panel: None,
         filters: Vec::new(),
+        filter_by_sheet: false,
     };
     let guid = GlobalId::new();
     txn.create(

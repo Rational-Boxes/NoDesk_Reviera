@@ -322,6 +322,7 @@ pub(crate) fn create(txn: &mut Transaction<'_>, p: CreateParams) -> Result<Vec<E
             grand_totals: false,
             panel: Some(e.guid().to_string()),
             filters: Vec::new(),
+            filter_by_sheet: false,
         };
         let guid = GlobalId::new();
         out.push(txn.create(

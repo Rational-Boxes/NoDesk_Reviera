@@ -222,6 +222,31 @@ impl Gui {
         }
     }
 
+    /// View › Keynote Legend (DOC-VIEW-010): a legend of the keynotes used, opened; asked whether
+    /// copies on sheets list only their own sheet's keynotes.
+    pub(crate) fn new_keynote_legend(&mut self) {
+        let frame = self.frame;
+        let Some(doc) = self.doc else { return };
+        let ask = MessageDialog::builder(
+            &frame,
+            "List only the keynotes of the sheet each copy of the legend is placed on (Filter by sheet)?\n\nNo lists every keynote of the model.",
+            "Keynote Legend",
+        )
+        .with_style(MessageDialogStyle::YesNo | MessageDialogStyle::Cancel | MessageDialogStyle::IconQuestion)
+        .build();
+        let answer = ask.show_modal();
+        if answer != ID_YES && answer != ID_NO {
+            return;
+        }
+        match self.run("view.create_keynote_legend", json!({ "filter_by_sheet": answer == ID_YES })) {
+            Ok(v) => {
+                self.browser_stale = true;
+                self.open_view(doc, v.as_u64().map(ElementId));
+            }
+            Err(e) => error(&frame, &format!("The keynote legend was not created:\n{e}")),
+        }
+    }
+
     /// The active schedule view's schedule and definition.
     fn active_schedule(&self) -> Option<(ElementId, schedules::ScheduleDef)> {
         let v = self.active_view().filter(|v| v.schedule.is_some())?;

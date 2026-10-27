@@ -195,7 +195,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**2168 unique commands** in 416 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**2169 unique commands** in 416 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -589,7 +589,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `underlay` | 1 |
 | `units` | 7 |
 | `validate` | 2 |
-| `view` | 125 |
+| `view` | 126 |
 | `view_tag` | 1 |
 | `viewport` | 10 |
 | `viewporttype` | 1 |
@@ -2580,7 +2580,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `view.create_drafting` | 5 | name, scale | view_id | Yes | DOC-VIEW-009 |
 | `view.create_elevation` | 5 | host_view_id, point, elevation_type_id, directions[], rotation? | {marker_id, view_ids[]} | Yes | DOC-VIEW-003 |
 | `view.create_framing_elevation` | 5 | host_view_id, datum_id, elevation_type_id, bay? | view_id | Yes | DOC-VIEW-003 |
-| `view.create_keynote_legend` | 5 | name, fields[]?, filter_by_sheet? | schedule_id | Yes | DOC-VIEW-010 |
+| `view.create_keynote_legend` | 5 | name?, fields[]?, filter_by_sheet? | schedule_id | Yes | DOC-VIEW-010 |
 | `view.create_legend` | 5 | name, scale | view_id | Yes | DOC-VIEW-010 |
 | `view.create_plan` | 5 | kind, level_ids[], view_family_type_id?, scale?, allow_duplicates?, area_scheme_id? | view_id[] | Yes | DOC-VIEW-002 |
 | `view.create_plan_region` | 5 | view_id, loops[], view_range | element_id | Yes | DOC-VR-003 |
@@ -2644,6 +2644,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `view.set_graphic_display` | 5 | view_id, options | () | Yes | DOC-GFX-012 |
 | `view.set_home` | 1 | `view_id?` | `()` | No | UI-NAV-002 |
 | `view.set_host_layer_cut_styles` | 5 | view_id, function_styles{} | () | Yes | DOC-GFX-003 |
+| `view.set_keynote_legend` | 5 | schedule_id, filter_by_sheet?, fields[]? | () | Yes | DOC-VIEW-010 |
 | `view.set_linework` | 5 | view_id, edge_refs[], line_style_id? | () | Yes | DOC-GFX-007 |
 | `view.set_link_display` | 6 | view_id, instance_id, mode: host\ | linked_view\ | custom, linked_view_id?, custom?, visible?, halftone?, underlay?, line_weights_from?: host\ | link |
 | `view.set_parts_visibility` | 3 | view_id, mode: ShowParts\ | ShowOriginal\ | ShowBoth | () |

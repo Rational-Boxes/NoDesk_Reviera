@@ -4341,6 +4341,7 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         }),
         "view.building_elevations" => with(gui, Gui::building_elevations),
         "view.new_schedule" => with(gui, Gui::new_schedule),
+        "view.new_keynote_legend" => with(gui, Gui::new_keynote_legend),
         "view.new_sheet" => with(gui, Gui::new_sheet),
         "tag.create" => with(gui, |g| {
             g.start_note_tool(notes::NoteTool::Tag);

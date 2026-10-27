@@ -520,3 +520,46 @@ fn the_managed_project_keynotes_its_door_window_and_partition() {
     assert_eq!(tips.len(), 3);
     assert!(tips.iter().any(|t| t.lines == ["08 51 13 Aluminium windows"]), "{tips:?}");
 }
+
+#[test]
+fn the_managed_project_lists_its_keynotes_per_sheet() {
+    let work = tempfile::tempdir().unwrap();
+    let mut app = open(work.path(), "managed_project");
+    let s = store(&app);
+    let legend = s.iter().find(|e| e.name.as_deref() == Some("Keynote Legend")).expect("the legend").id();
+    let sheet = s.iter().find(|e| e.name.as_deref() == Some("Plan and Keynotes")).expect("the sheet").id();
+    let rows = |app: &mut App, sheet: Option<ElementId>| {
+        let mut args = json!({ "schedule_id": legend });
+        if let Some(s) = sheet {
+            args["sheet_id"] = json!(s);
+        }
+        let t = ok(app, "schedule.get_table", args);
+        t["rows"].as_array().unwrap().iter().map(|r| r["cells"].as_array().unwrap().iter().map(|c| c["text"].as_str().unwrap().to_owned()).collect::<Vec<_>>()).collect::<Vec<_>>()
+    };
+    // Every key the plan's keynotes show, in order, with its text.
+    let all = rows(&mut app, None);
+    assert_eq!(all, vec![
+        vec!["08 11 13".to_owned(), "Hollow metal doors and frames".to_owned()],
+        vec!["08 51 13".to_owned(), "Aluminium windows".to_owned()],
+        vec!["09 21 16".to_owned(), "Gypsum board assemblies".to_owned()],
+    ]);
+    assert_eq!(rows(&mut app, Some(sheet)), all, "the sheet has the plan");
+    // A second sheet with a section and its own keynote lists only that one.
+    let plan = view_id(&mut app, "Level 1", "view.plan");
+    let section = ok(&mut app, "view.create_section", json!({ "start": [-1.0, 4.0], "end": [13.0, 4.0] }));
+    let st = store(&app);
+    let partition = st.iter().find(|w| reviera_core::walls::wall_recipe(w).is_some_and(|r| near(r.curve.start[1], 0.0, 1e-9) && near(r.curve.end[1], 8.0, 1e-9))).unwrap().id();
+    ok(&mut app, "keynote.create", json!({ "view_id": section, "mode": "user", "key": "09", "host_ref": partition, "position": [9.0, 2.0] }));
+    let other = ok(&mut app, "sheet.create", json!({ "name": "Section", "size": "A3" }));
+    ok(&mut app, "sheet.place_view", json!({ "sheet_id": other, "view_id": section, "position": [200, 150] }));
+    ok(&mut app, "sheet.place_schedule", json!({ "sheet_id": other, "schedule_id": legend, "position": [320, 250] }));
+    assert_eq!(rows(&mut app, Some(ElementId(other.as_u64().unwrap()))), vec![vec!["09".to_owned(), "Finishes".to_owned()]]);
+    assert_eq!(rows(&mut app, Some(sheet)).len(), 3, "the first sheet's are unchanged");
+    assert_eq!(rows(&mut app, None).len(), 4, "on its own it lists them all");
+    // Not filtering by sheet, every copy lists them all; its columns are its own.
+    ok(&mut app, "view.set_keynote_legend", json!({ "schedule_id": legend, "filter_by_sheet": false }));
+    assert_eq!(rows(&mut app, Some(ElementId(other.as_u64().unwrap()))).len(), 4);
+    let err = app.execute("schedule.set_fields", json!({ "schedule_id": legend, "fields": ["type"] }), &Caller::user()).unwrap_err();
+    assert!(format!("{err:?}").contains("schedule.keynote_legend"), "{err:?}");
+    let _ = plan;
+}

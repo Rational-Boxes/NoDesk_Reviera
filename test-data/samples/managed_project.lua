@@ -11,7 +11,8 @@
 -- OfficeArea is a formula over it, SillHeight drives the windows' sills and PartitionAcoustic the
 -- partition's shared Acoustic Rating; a shared parameter with its library's identity embedded
 -- (DM-SPAR-001); Uniclass 2015 element codes on the walls, doors and windows (DM-CLS-001);
--- a keynote table with element and user keynotes on the plan; two saved selections written as IfcGroups (ARC-SEL-002); the location,
+-- a keynote table with element and user keynotes on the plan and a keynote legend on a sheet;
+-- two saved selections written as IfcGroups (ARC-SEL-002); the location,
 -- true north, survey point and CRS (DM-LOC-001); an Office space type and a copper pipe segment
 -- (MEP-SET-001, MEP-SET-004).
 
@@ -107,6 +108,12 @@ reviera.param.set{ element_ids = { windows[1] }, param_ref = "type.keynote", val
 reviera.keynote.create{ view_id = plan, host_ref = doors[1], position = { 7.0, -0.6 } }
 reviera.keynote.create{ view_id = plan, host_ref = windows[1], position = { 3.6, -0.6 } }
 reviera.keynote.create{ view_id = plan, mode = "user", key = "09 21 16", host_ref = partition, position = { 9.6, 2.4 }, style = "number" }
+-- A keynote legend (DOC-VIEW-010) filtering by sheet, on sheet A101 with the plan: it lists the
+-- three keys the plan's keynotes show, with their text.
+local legend = reviera.view.create_keynote_legend{ filter_by_sheet = true }
+local sheet = reviera.sheet.create{ name = "Plan and Keynotes", size = "A3" }
+reviera.sheet.place_view{ sheet_id = sheet, view_id = plan, position = { 180, 150 } }
+reviera.sheet.place_schedule{ sheet_id = sheet, schedule_id = legend, position = { 310, 250 } }
 
 -- Saved selections, written on save as IfcGroups.
 reviera.selectionset.save{ name = "Exterior walls", element_ids = outer }

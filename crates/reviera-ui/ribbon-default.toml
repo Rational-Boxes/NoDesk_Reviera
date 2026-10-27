@@ -938,6 +938,12 @@ icon = "elevation"
 help = "Create North, South, East and West elevations around the model"
 
 [[action]]
+id = "view.new_keynote_legend"
+label = "Keynote Legend"
+icon = "keynote_legend"
+help = "A legend of the keynotes the model's keynote tags show, with their text; placed on a sheet it can list that sheet's only"
+
+[[action]]
 id = "view.new_schedule"
 label = "Schedules"
 icon = "schedule"
@@ -3870,6 +3876,7 @@ tools = [
   { action = "view.create_section", size = "large" },
   { action = "view.building_elevations", size = "small" },
   { action = "view.new_schedule", size = "large" },
+  { action = "view.new_keynote_legend", size = "small" },
   { action = "view.default_3d", size = "large" },
   { action = "view.create_3d", size = "small" },
   { action = "scopebox.create", size = "small" },
@@ -4429,7 +4436,7 @@ items = ["edit.undo", "edit.redo", "-", "element.delete"]
 label = "&View"
 items = [
   "view.default_3d", "view.create_plan", "view.create_ceiling_plan", "view.create_section",
-  "view.building_elevations", "view.new_schedule", "view.new_sheet", "-",
+  "view.building_elevations", "view.new_schedule", "view.new_keynote_legend", "view.new_sheet", "-",
   "view.zoom_fit", "view.zoom_previous", "view.zoom_next", "-",
   "view.home", "view.set_home", "@orient", "view.set_projection", "-", "view.walk", "-",
   "inspect.section_box", "inspect.selection_box", "inspect.slice_horizontal",
