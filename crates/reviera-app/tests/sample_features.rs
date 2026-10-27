@@ -73,7 +73,9 @@ fn the_annotated_plan_keeps_its_documentation() {
     let work = tempfile::tempdir().unwrap();
     let mut app = open(work.path(), "annotated_plan");
     let kinds: Vec<String> = views(&mut app).into_iter().map(|(_, k, _)| k).collect();
-    assert_eq!(kinds.len(), 3, "{kinds:?}");
+    // The plan, the section, the elevation and the types legend.
+    assert_eq!(kinds.len(), 4, "{kinds:?}");
+    assert!(kinds.iter().any(|k| k == "view.legend"));
     let plan = view_id(&mut app, "Level 1", "view.plan");
 
     let dims = ok(&mut app, "anno.list", json!({ "view_id": plan }));
@@ -102,7 +104,7 @@ fn the_annotated_plan_keeps_its_documentation() {
     let sheets: Vec<_> = s.iter().filter_map(reviera_core::sheets::sheet_data).collect();
     assert_eq!(sheets.len(), 1);
     assert_eq!((sheets[0].number.as_str(), sheets[0].size.as_str()), ("A101", "A2"));
-    assert_eq!((sheets[0].viewports.len(), sheets[0].schedules.len()), (3, 2), "plan, section, elevation and both schedules");
+    assert_eq!((sheets[0].viewports.len(), sheets[0].schedules.len()), (4, 2), "plan, section, elevation, legend and both schedules");
 }
 
 #[test]
