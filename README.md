@@ -1354,10 +1354,10 @@ simulation sessions, and the first engine runners (see [Not built yet](#not-buil
   dimensions to Reviera walls, levels and grids follow them (`dim.create_aligned`, `anno.list`).
 - **Crop regions**: plans, sections and elevations have Crop View, Crop Region Visible,
   Annotation Crop and Reset Crop in Properties: the model (lines, fills and the shaded model) is
-  drawn only inside the rectangle (whose edges and corners are dragged in the view), tags of elements outside it are hidden, and with the
+  drawn only inside the rectangle (whose edges and corners are dragged in the view, or sized in *Size Crop…*), tags of elements outside it are hidden, and with the
   annotation crop on, annotation is clipped to a margin round it; printed and sheet drawings
   crop alike; a plan assigned to a scope box is cropped to the box, and follows it when the box
-  moves (`view.set_crop`, `view.reset_crop`, `view.set_annotation_crop`; DOC-GFX-015).
+  moves (`view.set_crop`, `view.reset_crop`, `view.set_annotation_crop`, `view.size_crop`; DOC-GFX-015).
 - **Spot elevations, coordinates and slopes**: Annotate › Spot Elevation (EL), Spot Coordinate and Spot Slope, in
   plans, sections and elevations: click a point on an element, then where the text goes. A spot
   reads the point's height (or its element's top and bottom there) from the project base point,
@@ -1688,7 +1688,7 @@ area by area (reviewed against the spec on 2026-10-15).
   Issues pane (COL-BCF-004; a dialog for now), the project's lists as edited
   extensions, issues from review items and warnings, document references, component colouring, BCF API sync
   with a server (COL-BCF-002).
-- **Documentation**: crop regions beyond rectangles (typed sizes, sketched shapes, breaks,
+- **Documentation**: crop regions beyond rectangles (sketched shapes, breaks,
   rotation), jogged sections, interior elevation markers, opening a view
   from its marker; schedule filters in the Filter dialog beyond one condition (several are taken by `schedule.set_filters`), grouping and calculated fields; title block families,
   revisions and sheet collections; tags and text on sheets; spot types; the current NBIMS-US

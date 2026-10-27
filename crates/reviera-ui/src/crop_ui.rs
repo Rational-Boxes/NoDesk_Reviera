@@ -2,8 +2,9 @@
 // Copyright (C) 2026 Reviera contributors
 
 //! Crop rows in a plan's, section's or elevation's Properties (DOC-GFX-015): Crop View, Crop
-//! Region Visible, Annotation Crop, and Reset Crop (fit the model). The drawing is cropped in
-//! `plans`, `sections` and `inspect`.
+//! Region Visible, Annotation Crop, Size Crop (typed sizes) and Reset Crop (fit the model); and
+//! dragging a visible region's edges in the view. The drawing is cropped in `plans`, `sections`
+//! and `inspect`.
 
 use reviera_core::ElementId;
 use reviera_render::RenderBackend;
@@ -28,6 +29,8 @@ impl Gui {
         if boxed {
             grid.set_help_string("crop_on", "The crop follows the view's scope box; move or resize the box to change it");
         } else {
+            grid.append(Property::boolean("Size Crop…", "crop_size", false));
+            grid.set_help_string("crop_size", "Tick to type the crop region's width and height and the annotation crop's offsets");
             grid.append(Property::boolean("Reset Crop", "crop_reset", false));
             grid.set_help_string("crop_reset", "Tick to fit the crop region to the model again");
         }
@@ -45,6 +48,11 @@ impl Gui {
             "crop_visible" => self.run("view.set_crop", json!({ "view_id": view, "visible": on })),
             "crop_annotation" => self.run("view.set_annotation_crop", json!({ "view_id": view, "enabled": on })),
             "crop_reset" if on => self.run("view.reset_crop", json!({ "view_id": view })),
+            "crop_size" if on => {
+                self.properties_stale = true;
+                self.size_crop_dialog(view);
+                return true;
+            }
             _ => return true,
         };
         if let Err(e) = result {
@@ -54,6 +62,79 @@ impl Gui {
         self.refresh_scene(&f);
         self.properties_stale = true;
         true
+    }
+}
+
+impl Gui {
+    /// *Size Crop*: the crop region's width and height (model millimetres, about its centre),
+    /// optionally in proportion, and the annotation crop's offsets (paper millimetres).
+    pub(crate) fn size_crop_dialog(&mut self, view: ElementId) {
+        let frame = self.frame;
+        let Some(store) = self.store_now() else { return };
+        let Some(e) = store.get(view) else { return };
+        let Some(c) = reviera_core::crop::effective(&store, e) else {
+            return frame.set_status_text("Size Crop: tick Crop View first", 0);
+        };
+        let size = [(c.max[0] - c.min[0]) * 1000.0, (c.max[1] - c.min[1]) * 1000.0];
+        let offsets = reviera_core::crop::annotation_crop_of(e).offsets;
+        let dialog = Dialog::builder(&frame, "Size Crop").build();
+        let sizer = BoxSizer::builder(Orientation::Vertical).build();
+        let grid = FlexGridSizer::builder(0, 2).with_vgap(6).with_hgap(10).build();
+        grid.add_growable_col(1, 1);
+        let field = |label: &str, value: f64| {
+            let l = StaticText::builder(&dialog).with_label(label).build();
+            let t = TextCtrl::builder(&dialog).with_value(&format!("{}", (value * 10.0).round() / 10.0)).build();
+            grid.add(&l, 0, SizerFlag::AlignCenterVertical, 0);
+            grid.add(&t, 1, SizerFlag::Expand, 0);
+            t
+        };
+        let width = field("Width (mm, model)", size[0]);
+        let height = field("Height (mm, model)", size[1]);
+        let sides: Vec<TextCtrl> =
+            ["Left", "Right", "Bottom", "Top"].iter().zip(offsets).map(|(s, o)| field(&format!("Annotation crop, {s} (mm, paper)"), o)).collect();
+        sizer.add_sizer(&grid, 1, SizerFlag::All | SizerFlag::Expand, 10);
+        let proportional = CheckBox::builder(&dialog).with_label("Scale proportionally (the size left unchanged follows the other)").build();
+        sizer.add(&proportional, 0, SizerFlag::Left | SizerFlag::Right | SizerFlag::Bottom, 10);
+        let buttons = BoxSizer::builder(Orientation::Horizontal).build();
+        buttons.add_stretch_spacer(1);
+        let cancel = Button::builder(&dialog).with_id(ID_CANCEL).with_label("Cancel").build();
+        let ok = Button::builder(&dialog).with_id(ID_OK).with_label("OK").build();
+        buttons.add(&cancel, 0, SizerFlag::All, 6);
+        buttons.add(&ok, 0, SizerFlag::All, 6);
+        sizer.add_sizer(&buttons, 0, SizerFlag::Expand, 0);
+        dialog.set_sizer_and_fit(sizer, true);
+        dialog.set_affirmative_id(ID_OK);
+        dialog.set_escape_id(ID_CANCEL);
+        let code = dialog.show_modal();
+        let number = |t: &TextCtrl| t.get_value().trim().parse::<f64>().ok();
+        let typed = [number(&width), number(&height)];
+        let sides: Option<Vec<f64>> = sides.iter().map(number).collect();
+        let proportional = proportional.get_value();
+        dialog.destroy();
+        if code != ID_OK {
+            return;
+        }
+        let (Some(w), Some(h), Some(sides)) = (typed[0], typed[1], sides) else {
+            return error(&frame, "Size Crop: the sizes are numbers of millimetres");
+        };
+        let [w, h] = sized([w, h], size, proportional);
+        let args = json!({ "view_id": view, "width": w / 1000.0, "height": h / 1000.0, "annotation_offsets": sides });
+        if let Err(e) = self.run("view.size_crop", args) {
+            error(&frame, &format!("The crop was not changed:\n{e}"));
+        }
+        self.refresh_scene(&frame);
+        self.properties_stale = true;
+    }
+}
+
+/// The size typed in Size Crop, `was` before: in proportion, the size left as it was follows
+/// the one changed.
+fn sized(typed: [f64; 2], was: [f64; 2], proportional: bool) -> [f64; 2] {
+    let changed = |i: usize| (typed[i] - was[i]).abs() > 0.05;
+    match (proportional, changed(0), changed(1)) {
+        (true, true, false) => [typed[0], was[1] * typed[0] / was[0]],
+        (true, false, true) => [was[0] * typed[1] / was[1], typed[1]],
+        _ => typed,
     }
 }
 
@@ -148,6 +229,14 @@ impl Gui {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn size_crop_in_proportion_follows_the_size_changed() {
+        assert_eq!(sized([8000.0, 4000.0], [4000.0, 2000.0], true), [8000.0, 4000.0]);
+        assert_eq!(sized([8000.0, 2000.0], [4000.0, 2000.0], true), [8000.0, 4000.0]);
+        assert_eq!(sized([4000.0, 1000.0], [4000.0, 2000.0], true), [2000.0, 1000.0]);
+        assert_eq!(sized([8000.0, 2000.0], [4000.0, 2000.0], false), [8000.0, 2000.0]);
+    }
 
     #[test]
     fn dragging_crop_edges_moves_only_them() {

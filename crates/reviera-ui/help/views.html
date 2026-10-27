@@ -56,12 +56,13 @@ look the other way. <code>view.create_section</code>, <code>view.create_elevatio
 <p>A plan, section or elevation can be cropped: in Properties › <b>Extents</b>, tick <b>Crop
 View</b>, and the view draws only what lies inside its crop region, which first fits the model.
 <b>Crop Region Visible</b> draws the rectangle (and prints it); drag its edges or corners to
-resize it. Tags of elements outside the crop
+resize it, or tick <b>Size Crop…</b> to type its width and height (about its centre, optionally
+in proportion) and the annotation crop's offsets. Tags of elements outside the crop
 are hidden. <b>Annotation Crop</b> adds a margin round it (5 mm on paper): dimensions and notes
 crossing it are cut, and those outside it hidden. <b>Reset Crop</b> fits the region to the model
 again. A plan assigned to a scope box is cropped to the box, and follows it when the box moves.
 Sheets show a cropped view at its cropped size.
-<code>view.set_crop</code>, <code>view.reset_crop</code>, <code>view.set_annotation_crop</code></p>
+<code>view.set_crop</code>, <code>view.reset_crop</code>, <code>view.set_annotation_crop</code>, <code>view.size_crop</code></p>
 
 <h2 id="3d">3D views</h2>
 <p><b>View › Default 3D View</b> opens the model's default 3D view; <b>New 3D View</b> opens

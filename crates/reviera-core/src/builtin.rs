@@ -173,6 +173,7 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(ViewSetCrop),
         registry.add(ViewResetCrop),
         registry.add(ViewSetAnnotationCrop),
+        registry.add(ViewSizeCrop),
         registry.add(TextSetContent),
         registry.add(TextSet),
         registry.add(TextAddLeader),
@@ -3919,6 +3920,19 @@ modify_command!(
     crate::crop::SetAnnotationCropParams,
     (),
     crate::crop::set_annotation_crop
+);
+modify_command!(
+    ViewSizeCrop,
+    "view.size_crop",
+    "Size a view's crop",
+    "Size Crop (DOC-GFX-015): resizes a plan's, section's or elevation's crop region about its centre to \
+     `width` and `height` (metres in the model; either kept when absent), and sets the annotation crop's \
+     `annotation_offsets` (left, right, bottom, top; paper millimetres), in one step. A view following a scope \
+     box keeps the box's size.",
+    "Size Crop",
+    crate::crop::SizeCropParams,
+    (),
+    crate::crop::size_crop
 );
 modify_command!(
     ViewCreateLegend,

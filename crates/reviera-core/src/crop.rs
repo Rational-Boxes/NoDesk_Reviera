@@ -271,3 +271,48 @@ pub(crate) fn set_annotation_crop(txn: &mut Transaction<'_>, p: SetAnnotationCro
     }
     write(txn, id, "annotationCrop", serde_json::to_value(a).expect("serialises"))
 }
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SizeCropParams {
+    pub view_id: ElementRef,
+    /// The crop region's width (metres in the model); kept when absent.
+    pub width: Option<f64>,
+    /// Its height (metres in the model); kept when absent.
+    pub height: Option<f64>,
+    /// The annotation crop's offsets outside the region (left, right, bottom, top; paper
+    /// millimetres, 0–100); kept when absent.
+    pub annotation_offsets: Option<[f64; 4]>,
+}
+
+/// `view.size_crop` (*Size Crop*): the crop region resized about its centre, and the annotation
+/// crop's offsets, in one step.
+pub(crate) fn size_crop(txn: &mut Transaction<'_>, p: SizeCropParams) -> Result<()> {
+    let store = txn.store().clone();
+    let id = resolve(&store, &p.view_id)?;
+    let e = store.get(id).expect("resolved");
+    let current = effective(&store, e);
+    if p.width.is_some() || p.height.is_some() {
+        if follows_scope_box(&store, e) {
+            return Err(Error::new("view.crop_follows_scope_box", "the view's crop follows its scope box; move or resize the box"));
+        }
+        let (lo, hi) = current.map(|c| (c.min, c.max)).or_else(|| model_extent(&store, e)).unwrap_or(([-10.0, -10.0], [10.0, 10.0]));
+        let size = [p.width.unwrap_or(hi[0] - lo[0]), p.height.unwrap_or(hi[1] - lo[1])];
+        if size.iter().any(|s| !s.is_finite() || *s < 0.01) {
+            return Err(Error::new("view.bad_crop", "the crop region must be at least 10 mm each way"));
+        }
+        let c = [(lo[0] + hi[0]) / 2.0, (lo[1] + hi[1]) / 2.0];
+        let crop = Crop {
+            enabled: current.is_none_or(|c| c.enabled),
+            visible: current.is_none_or(|c| c.visible),
+            min: [c[0] - size[0] / 2.0, c[1] - size[1] / 2.0],
+            max: [c[0] + size[0] / 2.0, c[1] + size[1] / 2.0],
+        };
+        write(txn, id, "crop", serde_json::to_value(crop).expect("serialises"))?;
+    }
+    if let Some(o) = p.annotation_offsets {
+        let enabled = annotation_crop_of(e).enabled;
+        set_annotation_crop(txn, SetAnnotationCropParams { view_id: p.view_id, enabled, offsets: Some(o) })?;
+    }
+    Ok(())
+}

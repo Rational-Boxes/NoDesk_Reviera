@@ -670,6 +670,20 @@ fn cropped_views_draw_only_their_crop_region() {
     let s = store(&app);
     let c = reviera_core::crop::crop_of(s.get(ElementId(plan)).unwrap()).unwrap();
     assert!(c.min[0] < -0.5 && c.max[0] > 10.5 && c.max[1] > 6.5, "{c:?}");
+    // Size Crop: about the centre, one step, with the annotation crop's offsets.
+    let centre = [(c.min[0] + c.max[0]) / 2.0, (c.min[1] + c.max[1]) / 2.0];
+    ok(&mut app, "view.size_crop", json!({ "view_id": plan, "width": 4.0, "height": 3.0, "annotation_offsets": [2, 3, 4, 5] }));
+    let s = store(&app);
+    let e = s.get(ElementId(plan)).unwrap();
+    let sized = reviera_core::crop::crop_of(e).unwrap();
+    for (i, c) in centre.iter().enumerate() {
+        assert!(((sized.min[i] + sized.max[i]) / 2.0 - c).abs() < 1e-9, "{sized:?}");
+    }
+    assert!((sized.max[0] - sized.min[0] - 4.0).abs() < 1e-9 && (sized.max[1] - sized.min[1] - 3.0).abs() < 1e-9);
+    assert_eq!(reviera_core::crop::annotation_crop_of(e).offsets, [2.0, 3.0, 4.0, 5.0]);
+    assert!(app.execute("view.size_crop", json!({ "view_id": plan, "width": 0.0 }), &Caller::user()).is_err());
+    ok(&mut app, "edit.undo", json!({}));
+    assert_eq!(reviera_core::crop::crop_of(store(&app).get(ElementId(plan)).unwrap()).unwrap(), c, "one undo step");
     let v3 = ok(&mut app, "view.create_3d", json!({}));
     assert!(app.execute("view.set_crop", json!({ "view_id": v3, "enabled": true }), &Caller::user()).is_err());
 }
