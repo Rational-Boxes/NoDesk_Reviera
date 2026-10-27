@@ -197,6 +197,8 @@ enum Drag {
     Sketch,
     /// Dragging a footprint grip of a roof, floor or ceiling.
     Footprint(footprint::FootprintDrag),
+    /// Dragging a visible crop region's edges (DOC-GFX-015).
+    Crop(crop_ui::CropDrag),
     /// Dragging a selection box from a pixel (UI-SEL-002).
     SelectBox {
         from: (i32, i32),
@@ -3149,6 +3151,8 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                         Some(Drag::Footprint(d))
                     } else if let Some((id, end, other)) = g.grip_at(x, y) {
                         Some(Drag::Grip { id, end, other })
+                    } else if let Some(d) = g.crop_grip_at(x, y) {
+                        Some(Drag::Crop(d))
                     } else if let Some(from) = g.selection_drag_start(x, y, &p) {
                         Some(Drag::MoveSelection { from })
                     } else if g.picking_free() && cube.is_none() && (plan || ctrl || shift) {
@@ -3267,6 +3271,12 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                             return;
                         }
                     }
+                    Some((Drag::Crop(d), _, _)) => {
+                        g.crop_drag_end(d, x, y, click);
+                        if !click {
+                            return;
+                        }
+                    }
                     Some((Drag::SelectBox { from, combine }, _, _)) => {
                         if !click {
                             return g.box_select(from, (x, y), combine, &p);
@@ -3368,6 +3378,11 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                         redraw = true;
                         return;
                     }
+                    Drag::Crop(d) => {
+                        g.crop_drag_motion(d, x, y);
+                        redraw = true;
+                        return;
+                    }
                     Drag::SelectBox { from, .. } => {
                         g.box_motion(from, (x, y), &p);
                         redraw = true;
@@ -3393,6 +3408,7 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                     | Drag::SheetItem { .. }
                     | Drag::Sketch
                     | Drag::Footprint(_)
+                    | Drag::Crop(_)
                     | Drag::SelectBox { .. } => {}
                 }
                 v.drag = Some((kind, x, y));
