@@ -7481,7 +7481,7 @@ Coordinates ▾: *Acquire Coordinates* (from a link), *Publish Coordinates* (to 
 ### 2.11.9 Remote file locations (WebDAV)
 **ID:** DM-FILE-007 · **Priority:** P3 · **Ref:** owner requirement (2026-10-12); RFC 4918 (HTTP Extensions for WebDAV)
 
-**Purpose.** Open and save models directly on a WebDAV server, without a sync client or a mapped drive. This allows direct integration with document servers that speak WebDAV, including the owner's FileEngine project, as well as common cloud and NAS file services.
+**Purpose.** Open and save models directly on a WebDAV server, without a sync client or a mapped drive. This allows direct integration with document servers that speak WebDAV, such as common cloud and NAS file services. The owner's FileEngine server is reached through its own REST API instead (owner decision 2026-10-27; `design_documents/FILEENGINE_INTEGRATION.md`), which carries UIDs, versions, metadata, ACLs and its issue services.
 
 **Workflow.**
 1. **File › Open › From Server…** (or a *Places* entry in the Open dialog) lists configured WebDAV locations. **Add Location…** asks for a URL (`https://…` or `webdav://…`), a display name and the credentials.
@@ -7505,7 +7505,7 @@ Coordinates ▾: *Acquire Coordinates* (from a link), *Publish Coordinates* (to 
   - Locations are per-user settings: URL, name, authentication kind and keyring reference.
 - **Offline.** A model whose server cannot be reached opens from its last working copy only when the user asks for it explicitly, with a banner saying it is offline. Saving while offline keeps the working copy and retries the upload when the server is reachable again, and the status bar shows the pending upload.
 - **Paths everywhere.** `file.open`, `file.save_as`, recent files, links and the Lua and MCP APIs accept `https://` and `webdav://` URLs wherever they accept a path.
-- **Integrations.** Server-specific behaviour (for example FileEngine metadata, sharing or version history) is out of scope here. It belongs in an add-in built on the same location API.
+- **Integrations.** Server-specific behaviour (metadata, sharing or version history) is out of scope here. FileEngine has its own integration over its REST API (`design_documents/FILEENGINE_INTEGRATION.md`).
 
 **Data (storage).** Locations live in the user's settings, with credentials in the keyring. Nothing about the server is written into the IFC file, apart from the usual `Reviera_Manifest` fields.
 
