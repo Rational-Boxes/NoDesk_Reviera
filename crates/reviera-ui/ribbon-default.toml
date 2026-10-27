@@ -55,6 +55,12 @@ accel = "F1"
 help = "Open the help: getting started, navigating, and the sample models"
 
 [[action]]
+id = "help.website"
+label = "BIM Reviera Website"
+icon = "website"
+help = "Open bimreviera.com in the browser: downloads, features and getting started"
+
+[[action]]
 id = "help.about"
 label = "About BIM Reviera"
 icon = "about"
@@ -281,6 +287,19 @@ id = "workplane.show"
 label = "Show"
 icon = "work_plane_show"
 help = "Show or hide the view's work plane as a grid"
+
+[[action]]
+id = "spot.create_elevation"
+label = "Spot Elevation"
+icon = "spot_elevation"
+keys = "EL"
+help = "The height of a point on an element, in a plan, section or elevation: click the point, then where the text goes"
+
+[[action]]
+id = "spot.create_coordinate"
+label = "Spot Coordinate"
+icon = "spot_coordinate"
+help = "North and east of a point on an element, in a plan, section or elevation: click the point, then where the text goes"
 
 [[action]]
 id = "text.create"
@@ -3789,7 +3808,11 @@ tools = [{ action = "tool.modify", size = "large" }]
 
 [[tab.panel]]
 label = "Dimension"
-tools = [{ action = "dim.create_aligned", size = "large" }]
+tools = [
+  { action = "dim.create_aligned", size = "large" },
+  { action = "spot.create_elevation", size = "small" },
+  { action = "spot.create_coordinate", size = "small" },
+]
 
 [[tab.panel]]
 label = "Text"
@@ -4437,4 +4460,4 @@ items = [
 
 [[menu]]
 label = "&Help"
-items = ["help.home", "-", "help.data_sources", "help.about"]
+items = ["help.home", "-", "help.data_sources", "help.website", "help.about"]

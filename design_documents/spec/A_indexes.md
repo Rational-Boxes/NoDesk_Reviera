@@ -195,7 +195,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**2163 unique commands** in 416 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**2165 unique commands** in 416 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -540,7 +540,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `space_type` | 1 |
 | `spatial` | 1 |
 | `spatial_grid` | 1 |
-| `spot` | 4 |
+| `spot` | 6 |
 | `sprinkler` | 1 |
 | `stackedwall` | 1 |
 | `stair` | 15 |
@@ -2185,6 +2185,8 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `spot.create_coordinate` | 5 | view_id, ref, point, leader_point?, type_id?, base? | annotation_id | Yes | DOC-ANN-007 |
 | `spot.create_elevation` | 5 | view_id, ref, point, leader_point?, type_id?, base?, display? | annotation_id | Yes | DOC-ANN-006 |
 | `spot.create_slope` | 5 | view_id, ref, point, type_id?, representation?: arrow\ | triangle | annotation_id | Yes |
+| `spot.list` | 5 | view_id | [{id, data, picked, point, bottom?, lines, orphaned}] | No | DOC-ANN-006 |
+| `spot.set` | 5 | annotation_ids, base?, display?, include_elevation?, prefix?, suffix?, leader_point? | () | Yes | DOC-ANN-006 |
 | `spot.settings` | 5 | — | () | No | DOC-ANN-006 |
 | `sprinkler.place` | 4 | type_id, point \ | host_face_ref, level | id | Yes |
 | `stackedwall.set_rows` | 3 | type_id, offset_reference, rows: [{wall_type_id, height \ | Variable, offset, flip, top_ext?, base_ext?}] | — | Yes |

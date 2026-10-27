@@ -2,8 +2,9 @@
 // Copyright (C) 2026 Reviera contributors
 
 //! Drawing tags and text notes (DOC-ANN-009…011): their text in the stroke font, a tag's
-//! outline and leader, and a note's wrapped lines and leaders with arrowheads. Sizes are paper
-//! millimetres scaled by the view scale.
+//! outline and leader, and a note's wrapped lines and leaders with arrowheads; and spot
+//! elevations and coordinates (DOC-ANN-006/007): a symbol at the point, a leader to a shoulder
+//! and the values above it. Sizes are paper millimetres scaled by the view scale.
 
 use reviera_core::notes::{Attach, Frame, Side, TextLeader};
 
@@ -55,6 +56,71 @@ pub struct TextMark {
     pub width_mm: Option<f32>,
     pub content: String,
     pub leaders: Vec<TextLeader>,
+}
+
+/// The mark at a spot's point.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SpotSymbol {
+    /// A spot elevation: a triangle standing on its point.
+    Triangle,
+    /// A spot coordinate: a cross on it.
+    Cross,
+}
+
+/// A spot to draw: its point and the shoulder's start in the view's 2D coordinates, and its
+/// values, one per line.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SpotMark {
+    pub point: [f64; 2],
+    pub text: [f64; 2],
+    pub lines: Vec<String>,
+    pub symbol: SpotSymbol,
+    pub text_mm: f32,
+}
+
+/// A spot's symbol, leader and shoulder, and its values written above the shoulder (on the side
+/// away from the point), at elevation `z` for a view at 1:`scale`.
+pub fn spot_parts(s: &SpotMark, scale: f32, z: f32) -> NoteParts {
+    let mm = scale / 1000.0;
+    let h = s.text_mm * mm;
+    let step = h * LINE_SPACING;
+    let p = [s.point[0] as f32, s.point[1] as f32];
+    let t = [s.text[0] as f32, s.text[1] as f32];
+    let mut segments = Vec::new();
+    match s.symbol {
+        SpotSymbol::Triangle => {
+            let (w, ht) = (1.2 * mm, 2.0 * mm);
+            let (a, b) = ([p[0] - w, p[1] + ht], [p[0] + w, p[1] + ht]);
+            segments.extend([seg(p, a, z), seg(a, b, z), seg(b, p, z)]);
+        }
+        SpotSymbol::Cross => {
+            let r = 1.5 * mm;
+            segments.extend([seg([p[0] - r, p[1] - r], [p[0] + r, p[1] + r], z), seg([p[0] - r, p[1] + r], [p[0] + r, p[1] - r], z)]);
+        }
+    }
+    let width = s.lines.iter().map(|l| font::width(l, h)).fold(0.0, f32::max) + 1.0 * mm;
+    // The shoulder runs away from the point.
+    let dir = if t[0] >= p[0] { 1.0 } else { -1.0 };
+    let end = [t[0] + dir * width, t[1]];
+    segments.push(seg(p, t, z));
+    segments.push(seg(t, end, z));
+    let left = t[0].min(end[0]) + 0.5 * mm;
+    let n = s.lines.len().max(1) as f32;
+    let labels = s
+        .lines
+        .iter()
+        .enumerate()
+        .map(|(k, text)| Label {
+            origin: [left, t[1] + 0.8 * mm + (n - 1.0 - k as f32) * step, z],
+            right: [1.0, 0.0, 0.0],
+            up: [0.0, 1.0, 0.0],
+            height: h,
+            text: text.clone(),
+        })
+        .collect();
+    let (x0, x1) = (t[0].min(end[0]), t[0].max(end[0]));
+    let (y0, y1) = (t[1] - 0.5 * mm, t[1] + 0.8 * mm + (n - 1.0) * step + h + 0.5 * mm);
+    NoteParts { segments, labels, outline: [[x0, y0], [x1, y0], [x1, y1], [x0, y1]] }
 }
 
 fn seg(a: [f32; 2], b: [f32; 2], z: f32) -> [[f32; 3]; 2] {

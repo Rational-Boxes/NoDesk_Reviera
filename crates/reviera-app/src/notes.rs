@@ -22,8 +22,9 @@ pub struct NoteGraphic {
     pub orphaned: bool,
 }
 
-/// The tags and text notes of `view` at 1:`scale`, at elevation `z`.
-pub fn view_notes(store: &Store, view: &Element, scale: f32, z: f32) -> Vec<NoteGraphic> {
+/// The tags, text notes and spots of `view` at 1:`scale`, at elevation `z`; spots measured
+/// against the model's `scene` (as stored without one).
+pub fn view_notes(store: &Store, view: &Element, scale: f32, z: f32, scene: Option<&reviera_render::RenderScene>) -> Vec<NoteGraphic> {
     let guid = view.guid().to_string();
     let parents = HashMap::new();
     let reader = FieldReader::new(store, &parents);
@@ -66,6 +67,21 @@ pub fn view_notes(store: &Store, view: &Element, scale: f32, z: f32) -> Vec<Note
             parts: text_parts(&mark, scale, z),
             orphaned: false,
         });
+    }
+    // Spot elevations and coordinates (DOC-ANN-006/007), their element as their host.
+    for m in crate::spots::of_view(store, scene, &guid) {
+        let mark = reviera_render::notes::SpotMark {
+            point: reviera_core::spots::in_view(store, &guid, m.picked),
+            text: m.data.text,
+            lines: m.lines,
+            symbol: match m.data.spot_kind {
+                reviera_core::spots::SpotKind::Elevation => reviera_render::notes::SpotSymbol::Triangle,
+                reviera_core::spots::SpotKind::Coordinate => reviera_render::notes::SpotSymbol::Cross,
+            },
+            text_mm: notes::TAG_TEXT_MM as f32,
+        };
+        let host = m.data.element.as_deref().and_then(reviera_core::GlobalId::parse).and_then(|g| store.find_by_guid(&g));
+        out.push(NoteGraphic { id: m.id, host, parts: reviera_render::notes::spot_parts(&mark, scale, z), orphaned: m.orphaned });
     }
     out
 }

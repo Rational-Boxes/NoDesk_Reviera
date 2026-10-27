@@ -343,6 +343,35 @@ pub(crate) fn classify(url: &str) -> Link {
     Link::Page
 }
 
+/// The project's website and its source repository.
+pub(crate) const WEBSITE: &str = "https://bimreviera.com/";
+pub(crate) const SOURCE: &str = "https://github.com/Rational-Boxes/NoDesk_Reviera";
+
+/// The About box's picture: a laptop with a building model on a beach table (from
+/// `design_documents/beach_life.jpg`, 480 pixels wide).
+fn about_picture() -> Option<Bitmap> {
+    let (rgba, w, h) = decode_png(include_bytes!("../assets/about-beach.png"))?;
+    Bitmap::from_rgba(&rgba, w, h)
+}
+
+/// A PNG's pixels as RGBA, with its width and height.
+fn decode_png(bytes: &[u8]) -> Option<(Vec<u8>, u32, u32)> {
+    let mut decoder = png::Decoder::new(std::io::Cursor::new(bytes));
+    decoder.set_transformations(png::Transformations::normalize_to_color8());
+    let mut reader = decoder.read_info().ok()?;
+    let mut buf = vec![0; reader.output_buffer_size()?];
+    let info = reader.next_frame(&mut buf).ok()?;
+    let pixels = &buf[..info.buffer_size()];
+    let rgba = match info.color_type {
+        png::ColorType::Rgba => pixels.to_vec(),
+        png::ColorType::Rgb => pixels.as_chunks::<3>().0.iter().flat_map(|p| [p[0], p[1], p[2], 255]).collect(),
+        png::ColorType::GrayscaleAlpha => pixels.as_chunks::<2>().0.iter().flat_map(|p| [p[0], p[0], p[0], p[1]]).collect(),
+        png::ColorType::Grayscale => pixels.iter().flat_map(|g| [*g, *g, *g, 255]).collect(),
+        png::ColorType::Indexed => return None,
+    };
+    Some((rgba, info.width, info.height))
+}
+
 /// The folder of sample models: `REVIERA_SAMPLES`, beside the program (`samples`, or
 /// `../share/reviera/samples`), or the source tree's `test-data/samples` in a development build.
 pub(crate) fn samples_dir() -> Option<PathBuf> {
@@ -736,10 +765,16 @@ impl Gui {
         }
     }
 
-    /// Help › About: the version, licence and main components.
+    /// Help › BIM Reviera Website: opens bimreviera.com in the browser.
+    pub(crate) fn open_website(&mut self) {
+        launch_default_browser(WEBSITE, BrowserLaunchFlags::Default);
+    }
+
+    /// Help › About: the beach picture, the version, licence and main components, and links to
+    /// the website and the source.
     pub(crate) fn about(&mut self) {
         let text = format!(
-            "BIM Reviera {}\n\nOpen-source building information modelling on IFC.\n\
+            "BIM Reviera {}\n\nOpen-source building information modelling on IFC. \
              Licensed under the GNU GPL v3 or later.\n\n\
              An independent, original application: not a copy or clone of any existing \
              product. Its workflows follow conventions familiar to the industry; its features \
@@ -753,10 +788,32 @@ impl Gui {
              for Energy Innovation, LLC, and other contributors. All rights reserved.",
             env!("CARGO_PKG_VERSION")
         );
-        let dialog = MessageDialog::builder(&self.frame, &text, "About BIM Reviera")
-            .with_style(MessageDialogStyle::OK | MessageDialogStyle::IconInformation)
-            .build();
+        let dialog = Dialog::builder(&self.frame, "About BIM Reviera").build();
+        let sizer = BoxSizer::builder(Orientation::Vertical).build();
+        if let Some(bitmap) = about_picture() {
+            let picture = StaticBitmap::builder(&dialog).with_bitmap(Some(bitmap)).build();
+            sizer.add(&picture, 0, SizerFlag::AlignCenterHorizontal | SizerFlag::All, 10);
+        }
+        let label = StaticText::builder(&dialog).with_label(&text).build();
+        label.wrap(480);
+        sizer.add(&label, 0, SizerFlag::Left | SizerFlag::Right, 12);
+        let links = BoxSizer::builder(Orientation::Horizontal).build();
+        let site = HyperlinkCtrl::builder(&dialog).with_label("bimreviera.com").with_url(WEBSITE).build();
+        let source = HyperlinkCtrl::builder(&dialog).with_label("Source and issues on GitHub").with_url(SOURCE).build();
+        links.add(&site, 0, SizerFlag::Right, 24);
+        links.add(&source, 0, SizerFlag::empty(), 0);
+        sizer.add_sizer(&links, 0, SizerFlag::All, 12);
+        let buttons = BoxSizer::builder(Orientation::Horizontal).build();
+        buttons.add_stretch_spacer(1);
+        let ok = Button::builder(&dialog).with_id(ID_OK).with_label("OK").build();
+        buttons.add(&ok, 0, SizerFlag::All, 8);
+        sizer.add_sizer(&buttons, 0, SizerFlag::Expand, 0);
+        dialog.set_sizer_and_fit(sizer, true);
+        dialog.set_affirmative_id(ID_OK);
+        dialog.set_escape_id(ID_OK);
+        ok.set_focus();
         dialog.show_modal();
+        dialog.destroy();
     }
 
     /// Closes the help tab shown in notebook page `index`; returns whether it was it.
@@ -879,6 +936,13 @@ mod tests {
             .skip(1)
             .filter_map(|rest| rest.split_once('"').map(|(href, _)| href))
             .collect()
+    }
+
+    #[test]
+    fn the_about_picture_decodes() {
+        let (rgba, w, h) = decode_png(include_bytes!("../assets/about-beach.png")).expect("a PNG");
+        assert_eq!((w, h), (480, 262));
+        assert_eq!(rgba.len(), (w * h * 4) as usize);
     }
 
     #[test]

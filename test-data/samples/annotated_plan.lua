@@ -2,7 +2,7 @@
 -- Copyright (C) 2026 Reviera contributors
 
 -- title: Annotated plan
--- description: A three-room bungalow documented with the Annotate tab: dimension strings, notes, door, window and room tags, Tag All, door and room schedules, a section and an elevation with their own dimensions, tags and notes, and a sheet.
+-- description: A three-room bungalow documented with the Annotate tab: dimension strings, notes, door, window and room tags, Tag All, door and room schedules, a section and an elevation with their own dimensions, tags and notes, spot elevations and a spot coordinate, and a sheet.
 --
 -- Reviera sample model (test-data/samples): a 10 × 6 m bungalow (living room, bedroom, kitchen)
 -- with three doors and five windows, documented in its Level 1 plan: aligned dimension strings
@@ -10,6 +10,7 @@
 -- with a leader; a door tag with a leader and a window tag (Tag by Category), a room tag, then
 -- Tag All Not Tagged for the rest (DOC-ANN-010); door and room schedules (DOC-SCH); a section
 -- through the bedroom and the south elevation, each with its own dimensions, a tag and a note;
+-- spot elevations in the plan and the elevation, and a spot coordinate;
 -- sheet A101 with the plan, section, elevation and both schedules placed (DOC-SHT).
 
 local l1 = reviera.level.list()[1].id
@@ -109,6 +110,14 @@ reviera.dim.create_aligned{ view_id = sec, line_point = { 4, 2.4 }, refs = {
   face(west, "face:int", { 1, 2 }), face(cross, "face:ext", { 7, 2 }) } }
 reviera.tag.create{ view_id = sec, host_ref = d_bed, position = { 7.6, 2.4 } }
 reviera.text.create{ view_id = sec, position = { 7.4, 3.6 }, content = "BEDROOM" }
+
+-- Spot elevations and a spot coordinate (DOC-ANN-006/007), from the project base point: the
+-- north wall's top in the plan; the north-east corner's coordinates; and, in the elevation, the
+-- south wall's top and bottom by the east end (picked on the elevation's plane: the spot finds
+-- the wall's face along the view, and its top and bottom straight up and down there).
+reviera.spot.create_elevation{ view_id = plan, ref = north, point = { 1.5, 6, 3 }, leader_point = { 2.2, 6.9 } }
+reviera.spot.create_coordinate{ view_id = plan, ref = east, point = { 10, 6, 3 }, leader_point = { 11.2, 7.4 } }
+reviera.spot.create_elevation{ view_id = elev, ref = south, point = { 9.3, -5, 1.0 }, leader_point = { 12.6, 1.6 }, display = "top_and_bottom" }
 
 -- Sheet A101 (A2): the plan, section and elevation at 1 : 100, and both schedules.
 local sheet = reviera.sheet.create{ name = "Ground Floor", size = "A2" }

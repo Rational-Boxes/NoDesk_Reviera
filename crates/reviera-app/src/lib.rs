@@ -9,6 +9,7 @@
 
 pub mod bcf_files;
 pub mod bcf_topics;
+pub mod spots;
 pub mod clash;
 pub mod cobie;
 mod steel_nc;

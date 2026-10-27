@@ -34,7 +34,7 @@
     <binary>reviera</binary>
     <mediatype>application/x-ifc</mediatype>
   </provides>
-  <url type="homepage">https://github.com/Rational-Boxes/NoDesk_Reviera</url>
+  <url type="homepage">https://bimreviera.com/</url>
   <url type="bugtracker">https://github.com/Rational-Boxes/NoDesk_Reviera/issues</url>
   <url type="vcs-browser">https://github.com/Rational-Boxes/NoDesk_Reviera</url>
   <screenshots>

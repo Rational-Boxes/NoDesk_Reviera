@@ -158,6 +158,9 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(TagSetDefaultType),
         registry.add(TagList),
         registry.add(TextCreate),
+        registry.add(SpotCreateElevation),
+        registry.add(SpotCreateCoordinate),
+        registry.add(SpotSet),
         registry.add(TextSetContent),
         registry.add(TextSet),
         registry.add(TextAddLeader),
@@ -3816,6 +3819,45 @@ modify_command!(
     crate::notes::CreateTextParams,
     ElementId,
     crate::notes::create_text
+);
+modify_command!(
+    SpotCreateElevation,
+    "spot.create_elevation",
+    "Place a spot elevation",
+    "Places a spot elevation in a plan, section or elevation (DOC-ANN-006): the height of `point` (model \
+     coordinates) on the element `ref`, measured from the project base point (`base: \"project\"`, the default), \
+     the survey point (`\"survey\"`, shared height) or a level (`{\"level\": id}`). It follows the element's \
+     surface as the model changes. `display`: `actual` (the point), `top`, `bottom` or `top_and_bottom` of the \
+     element there. The text stands at `leader_point` (the view's 2D coordinates: plan x, y, or a section's x \
+     and height).",
+    "Spot Elevation",
+    crate::spots::CreateSpotParams,
+    ElementId,
+    crate::spots::create_elevation
+);
+modify_command!(
+    SpotCreateCoordinate,
+    "spot.create_coordinate",
+    "Place a spot coordinate",
+    "Places a spot coordinate in a plan, section or elevation (DOC-ANN-007): north and east of `point` on the \
+     element `ref`, from the project base point along project north (`base: \"project\"`, the default) or in \
+     shared coordinates from the survey point (`\"survey\"`), turned with true north; `include_elevation` adds \
+     its elevation.",
+    "Spot Coordinate",
+    crate::spots::CreateSpotParams,
+    ElementId,
+    crate::spots::create_coordinate
+);
+modify_command!(
+    SpotSet,
+    "spot.set",
+    "Change spots",
+    "Sets spots' base, display (elevations), include_elevation (coordinates), prefix and suffix, or moves their \
+     text to `leader_point`.",
+    "Spot Properties",
+    crate::spots::SetSpotParams,
+    (),
+    crate::spots::set
 );
 modify_command!(
     TextSetContent,

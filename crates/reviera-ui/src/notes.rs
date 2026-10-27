@@ -33,6 +33,10 @@ pub enum NoteTool {
     PipeLegend,
     /// Analyze › Route Analysis › Path of Travel (ANA-ROUTE-001): a start, then an end.
     PathOfTravel,
+    /// Annotate › Spot Elevation and Spot Coordinate (DOC-ANN-006/007): a point on the model,
+    /// then where the text goes.
+    SpotElevation,
+    SpotCoordinate,
 }
 
 /// Tag All Not Tagged's categories: key and label.
@@ -76,12 +80,50 @@ pub(crate) fn ask_text(frame: &Frame, title: &str, current: &str) -> Option<Stri
     answer.filter(|t| !t.trim().is_empty())
 }
 
+impl NoteTool {
+    /// Whether the tool works in sections and elevations too.
+    fn in_sections(self) -> bool {
+        matches!(self, NoteTool::Tag | NoteTool::Text | NoteTool::SpotElevation | NoteTool::SpotCoordinate)
+    }
+}
+
 impl Gui {
+    /// The point of the model under pixel (`x`, `y`) of the active plan, section or elevation,
+    /// with its element and the direction the view looks there: what the view shows (its range,
+    /// clipping and hidden elements as for picking); in a plan, the element's top there.
+    pub(crate) fn model_point_at(&self, x: i32, y: i32, panel: &Panel) -> Option<(Option<ElementId>, [f64; 3], [f64; 3])> {
+        let v = self.active_view()?;
+        let size = panel.get_client_size();
+        let (origin, dir) = v.camera.ray(x as f32, y as f32, size.width as f32, size.height as f32);
+        let visibility = self.view_visibility(v);
+        if let Some(s) = &v.section {
+            let far = -(s.def.far as f32);
+            let (i, t) = s.scene.pick_visible(origin, dir, &|p| p.z <= 1e-4 && p.z >= far, &visibility)?;
+            let local = origin + dir * t;
+            let frame = s.def.frame();
+            let p = frame.to_world([f64::from(local.x), f64::from(local.y), f64::from(local.z)]);
+            return Some((s.scene.meshes[i].element, p, [frame.look[0], frame.look[1], 0.0]));
+        }
+        let plan = v.plan.as_ref()?;
+        let (bottom, top) = plan.drawn();
+        let (b, slices) = self.view_clip(v);
+        let clipping = reviera_render::Clipping::of(b.as_ref(), &slices);
+        let keep = |p: glam::Vec3| (bottom..=top).contains(&p.z) && clipping.keeps(p);
+        let scene = self.scenes.get(&v.doc)?;
+        let (i, t) = scene.pick_visible(origin, dir, &keep, &visibility)?;
+        let p = origin + dir * t;
+        let element = scene.meshes[i].element;
+        // A plan reads the top of what is there: a slab's top, the top of a wall it cuts.
+        let (x, y) = (f64::from(p.x), f64::from(p.y));
+        let top = element.and_then(|e| reviera_app::spots::top_at(scene, e, x, y));
+        Some((element, top.unwrap_or([x, y, f64::from(p.z)]), [0.0, 0.0, -1.0]))
+    }
+
     pub(crate) fn start_note_tool(&mut self, kind: NoteTool) {
         let frame = self.frame;
         // Tags and text go in sections and elevations too.
         let in_section = self.active_view().is_some_and(|v| v.section.is_some());
-        if !(in_section && matches!(kind, NoteTool::Tag | NoteTool::Text)) && !self.ensure_plan(false) {
+        if !(in_section && kind.in_sections()) && !self.ensure_plan(false) {
             return;
         }
         self.end_tool(&frame);
@@ -106,6 +148,8 @@ impl Gui {
                 NoteTool::DuctLegend => "Duct Legend: click where the legend's top-left corner goes",
                 NoteTool::PipeLegend => "Pipe Legend: click where the legend's top-left corner goes",
                 NoteTool::PathOfTravel => "Path of Travel: click the start point; Esc ends",
+                NoteTool::SpotElevation => "Spot Elevation: click a point on an element; Esc ends",
+                NoteTool::SpotCoordinate => "Spot Coordinate: click a point on an element; Esc ends",
             },
             0,
         );
@@ -113,6 +157,7 @@ impl Gui {
 
     pub(crate) fn end_note_tool(&mut self) -> bool {
         self.route_start = None;
+        self.spot_pick = None;
         self.note_tool.take().is_some()
     }
 
@@ -134,7 +179,7 @@ impl Gui {
     pub(crate) fn note_click(&mut self, x: i32, y: i32, panel: &Panel) {
         let frame = self.frame;
         let view = match self.note_tool {
-            Some(NoteTool::Tag | NoteTool::Text) => self.active_annotation_view(),
+            Some(k) if k.in_sections() => self.active_annotation_view(),
             _ => self.active_plan(),
         };
         let (Some(kind), Some(plan), Some(p)) = (self.note_tool, view, self.plan_xy(x, y)) else {
@@ -176,6 +221,18 @@ impl Gui {
                     json!({ "view_id": plan, "kind": kind, "scheme_id": scheme, "point": p }),
                 )
             }
+            NoteTool::SpotElevation | NoteTool::SpotCoordinate => {
+                // First the point on the model, then where the text goes.
+                let Some((element, point, direction)) = self.spot_pick.take() else {
+                    let Some(hit) = self.model_point_at(x, y, panel) else {
+                        return frame.set_status_text("Click a point on an element", 0);
+                    };
+                    self.spot_pick = Some(hit);
+                    return frame.set_status_text("Click where the text goes", 0);
+                };
+                let command = if kind == NoteTool::SpotElevation { "spot.create_elevation" } else { "spot.create_coordinate" };
+                self.run(command, json!({ "view_id": plan, "ref": element, "point": point, "direction": direction, "leader_point": p }))
+            }
             NoteTool::Text => {
                 let Some(content) = ask_text(&frame, "Text", "") else {
                     return;
@@ -187,7 +244,13 @@ impl Gui {
             }
         };
         match result {
-            Ok(_) => self.notes_changed(),
+            Ok(_) => {
+                self.notes_changed();
+                // The Spot tools go on: the next point.
+                if matches!(kind, NoteTool::SpotElevation | NoteTool::SpotCoordinate) {
+                    frame.set_status_text("Spot placed; click a point on an element for the next, or Esc", 0);
+                }
+            }
             Err(e) => error(&frame, &format!("Nothing was placed:\n{e}")),
         }
     }
@@ -242,12 +305,12 @@ impl Gui {
         }
     }
 
-    /// Whether an element is a tag or text note.
+    /// Whether an element is a tag, text note or spot.
     pub(crate) fn is_note(&self, id: ElementId) -> bool {
         self.doc
             .and_then(|d| self.app.document(d))
             .and_then(|d| d.doc.store().get(id))
-            .is_some_and(|e| notes::tag_data(e).is_some() || notes::text_data(e).is_some())
+            .is_some_and(|e| notes::tag_data(e).is_some() || notes::text_data(e).is_some() || reviera_core::spots::spot_data(e).is_some())
     }
 
     /// The tags and notes of view `index` (a plan, section or elevation), as drawn.
@@ -262,7 +325,7 @@ impl Gui {
         let Some(view) = store.get(element) else {
             return Vec::new();
         };
-        reviera_app::notes::view_notes(store, view, scale, z + 0.002)
+        reviera_app::notes::view_notes(store, view, scale, z + 0.002, self.scenes.get(&v.doc))
     }
 
     /// The lines of the tags and notes of view `index` (drawn with the plan).
@@ -430,10 +493,40 @@ impl Gui {
             grid.set_property_read_only("txt_leaders", true);
             return true;
         }
+        if let Some(d) = reviera_core::spots::spot_data(e) {
+            use reviera_core::spots::{Base, Display, SpotKind};
+            let elevation = d.spot_kind == SpotKind::Elevation;
+            grid.append(Property::category(if elevation { "Spot Elevation" } else { "Spot Coordinate" }, "c_spot"));
+            // The value as it reads now, on the model.
+            let scene = self.doc.and_then(|doc| self.scenes.get(&doc));
+            let m = reviera_app::spots::measure(&store, scene, id, d.clone());
+            let value = if m.orphaned { format!("{} (orphaned)", m.lines.join(", ")) } else { m.lines.join(", ") };
+            grid.append(Property::string("Value", "spot_value", value));
+            grid.set_property_read_only("spot_value", true);
+            let mut bases: Vec<(String, Base)> = vec![("Project Base Point".into(), Base::Project), ("Survey Point".into(), Base::Survey)];
+            if elevation {
+                for l in reviera_core::levels::list(&store) {
+                    bases.push((format!("Level: {}", l.name), Base::Level(l.guid.to_string())));
+                }
+            }
+            let index = bases.iter().position(|(_, b)| *b == d.base).map_or(-1, |i| i as i32);
+            grid.append(Property::enumeration("Relative Base", "spot_base", bases.iter().enumerate().map(|(i, (n, _))| (n.clone(), i as i32)).collect::<Vec<(String, i32)>>(), index));
+            if elevation {
+                let displays = [Display::Actual, Display::Top, Display::Bottom, Display::TopAndBottom];
+                let names = ["Actual (Selected) Elevation", "Top Elevation", "Bottom Elevation", "Top & Bottom Elevations"];
+                let index = displays.iter().position(|x| *x == d.display).map_or(0, |i| i as i32);
+                grid.append(Property::enumeration("Display Elevations", "spot_display", names.iter().enumerate().map(|(i, n)| ((*n).to_owned(), i as i32)).collect::<Vec<(String, i32)>>(), index));
+            } else {
+                grid.append(Property::enumeration("Include Elevation", "spot_include", vec![("No".to_owned(), 0), ("Yes".to_owned(), 1)], i32::from(d.include_elevation)));
+            }
+            grid.append(Property::string("Prefix", "spot_prefix", d.prefix.clone()));
+            grid.append(Property::string("Suffix", "spot_suffix", d.suffix.clone()));
+            return true;
+        }
         false
     }
 
-    /// An edit of a tag or text note row; `false` if `property` is not one.
+    /// An edit of a tag, text note or spot row; `false` if `property` is not one.
     pub(crate) fn note_edit(&mut self, property: &str, text: Option<String>) -> bool {
         let frame = self.frame;
         let Some(&id) = self.selection().first() else {
@@ -511,6 +604,34 @@ impl Gui {
                 "text.set",
                 json!({ "annotation_ids": [id], "rotation": text }),
             ),
+            "spot_base" => {
+                let base = match text.as_str() {
+                    "Project Base Point" => json!("project"),
+                    "Survey Point" => json!("survey"),
+                    t => {
+                        let Some(name) = t.strip_prefix("Level: ") else { return true };
+                        let level = self
+                            .doc
+                            .and_then(|d| self.app.document(d))
+                            .and_then(|d| reviera_core::levels::list(d.doc.store()).into_iter().find(|l| l.name == name));
+                        let Some(l) = level else { return true };
+                        json!({ "level": l.id })
+                    }
+                };
+                self.run("spot.set", json!({ "annotation_ids": [id], "base": base }))
+            }
+            "spot_display" => {
+                let display = match text.as_str() {
+                    "Top Elevation" => "top",
+                    "Bottom Elevation" => "bottom",
+                    "Top & Bottom Elevations" => "top_and_bottom",
+                    _ => "actual",
+                };
+                self.run("spot.set", json!({ "annotation_ids": [id], "display": display }))
+            }
+            "spot_include" => self.run("spot.set", json!({ "annotation_ids": [id], "include_elevation": text == "Yes" })),
+            "spot_prefix" => self.run("spot.set", json!({ "annotation_ids": [id], "prefix": text })),
+            "spot_suffix" => self.run("spot.set", json!({ "annotation_ids": [id], "suffix": text })),
             _ => return false,
         };
         if let Err(e) = result {

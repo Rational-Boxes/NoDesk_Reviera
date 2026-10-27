@@ -286,14 +286,14 @@ fn the_annotated_plan_floats_its_annotation_in_3d() {
         let s = store(app);
         reviera_core::annotations_3d::shown(&s, s.get(ElementId(view.as_u64().unwrap())).unwrap()).len()
     };
-    assert_eq!(shown(&app), 13, "notes and tags");
+    assert_eq!(shown(&app), 15, "notes, tags and the plan's two spots");
     // Door tags off, dimensions on; then everything off; undo brings the classes back.
     ok(&mut app, "view.set_3d_annotations", json!({ "view_id": view, "classes": { "tags:Doors": false, "dimensions": true } }));
-    assert_eq!(shown(&app), 10 + 13);
+    assert_eq!(shown(&app), 12 + 13);
     ok(&mut app, "view.set_3d_annotations", json!({ "view_id": view, "shown": false }));
     assert_eq!(shown(&app), 0);
     ok(&mut app, "edit.undo", json!({}));
-    assert_eq!(shown(&app), 23);
+    assert_eq!(shown(&app), 25);
     // Room tags stand over their rooms, a little above the floor.
     let s = store(&app);
     let tips = reviera_core::annotations_3d::tips(&s);
@@ -352,21 +352,22 @@ fn the_annotated_plan_floats_its_section_and_elevation_annotation() {
     let view = ok(&mut app, "view.create_3d", json!({}));
     let info = ok(&mut app, "view.annotations_3d", json!({ "view_id": view }));
     let from: Vec<(String, u64, bool)> = info["sources"].as_array().unwrap().iter().map(|s| (s["source"].as_str().unwrap().to_owned(), s["count"].as_u64().unwrap(), s["visible"].as_bool().unwrap())).collect();
-    assert_eq!(from, vec![("plans".to_owned(), 26, true), ("sections".to_owned(), 4, false), ("elevations".to_owned(), 4, false)]);
+    assert_eq!(from, vec![("plans".to_owned(), 28, true), ("sections".to_owned(), 4, false), ("elevations".to_owned(), 5, false)]);
     let shown = |app: &App| {
         let s = store(app);
         reviera_core::annotations_3d::shown(&s, s.get(ElementId(view.as_u64().unwrap())).unwrap())
     };
-    assert_eq!(shown(&app).len(), 13, "the plans' notes and tags, as before");
+    assert_eq!(shown(&app).len(), 15, "the plans' notes, tags and spots, as before");
     ok(&mut app, "view.set_3d_annotations", json!({ "view_id": view, "sources": { "sections": true, "elevations": true } }));
-    // Their two notes; their tags' hosts are tagged in the plan already, so labelled once.
-    assert_eq!(shown(&app).len(), 15);
+    // Their two notes and the elevation's spot; their tags' hosts are tagged in the plan
+    // already, so labelled once.
+    assert_eq!(shown(&app).len(), 18);
     ok(&mut app, "view.set_3d_annotations", json!({ "view_id": view, "classes": { "dimensions": true } }));
-    assert_eq!(shown(&app).len(), 15 + 13 + 4);
+    assert_eq!(shown(&app).len(), 18 + 13 + 4);
     ok(&mut app, "view.set_3d_annotations", json!({ "view_id": view, "sources": { "plans": false } }));
     let tips = shown(&app);
     // Without the plans, the section's and elevation's tags show, at their hosts.
-    assert_eq!(tips.len(), 8, "{tips:?}");
+    assert_eq!(tips.len(), 9, "{tips:?}");
     assert!(tips.iter().all(|t| t.source != "plans"));
     assert_eq!(tips.iter().filter(|t| t.class.starts_with("tags:")).count(), 2);
     assert!(app.execute("view.set_3d_annotations", json!({ "view_id": view, "sources": { "sheets": true } }), &Caller::user()).is_err());
@@ -389,4 +390,55 @@ fn the_annotated_plan_floats_its_section_and_elevation_annotation() {
     let wall = scene.meshes[mesh].element.and_then(|e| s.get(e)).expect("a model element");
     assert!(reviera_core::walls::wall_recipe(wall).is_some(), "{}", wall.class);
     assert!(on.y > -0.3 && on.y < 0.0, "on the south wall's outer face: {on}");
+}
+
+#[test]
+fn the_annotated_plan_reads_its_spots_from_the_model() {
+    let work = tempfile::tempdir().unwrap();
+    let mut app = open(work.path(), "annotated_plan");
+    let (plan, elev) = (view_id(&mut app, "Level 1", "view.plan"), view_id(&mut app, "South", "view.elevation"));
+    let spots = |app: &mut App, view: u64| ok(app, "spot.list", json!({ "view_id": view })).as_array().unwrap().clone();
+    let lines = |s: &Value| s["lines"].as_array().unwrap().iter().map(|l| l.as_str().unwrap().to_owned()).collect::<Vec<_>>();
+    // In the plan: the north wall's top at 3 m, and the north-east corner's coordinates, from the
+    // project base point (millimetres).
+    let p = spots(&mut app, plan);
+    assert_eq!(p.len(), 2, "{p:?}");
+    let elevation = p.iter().find(|s| s["data"]["spotKind"] == "elevation").unwrap();
+    assert_eq!(lines(elevation), ["+3000"]);
+    let coordinate = p.iter().find(|s| s["data"]["spotKind"] == "coordinate").unwrap();
+    assert_eq!(lines(coordinate), ["N 6000", "E 10000"]);
+    // In the elevation: the wall's top and bottom where its face was found along the view.
+    let e = spots(&mut app, elev);
+    assert_eq!(lines(&e[0]), ["T +3000", "B ±0"], "{e:?}");
+    assert!(f(&e[0]["point"][1]) > -0.3 && f(&e[0]["point"][1]) < 0.0, "on the wall's outer face: {}", e[0]["point"]);
+    // Drawn with the plan and printed.
+    let doc = app.active().unwrap();
+    let drawing = app.plan_drawing(doc, ElementId(plan)).unwrap();
+    assert!(drawing.labels.iter().any(|l| l.text == "+3000") && drawing.labels.iter().any(|l| l.text == "E 10000"));
+    // They follow the model: a taller north wall reads higher; relative to the survey point, the
+    // shared height.
+    let s = store(&app);
+    let north = s.iter().find(|w| reviera_core::walls::wall_recipe(w).is_some_and(|r| near(r.curve.start[1], 6.0, 1e-9) && near(r.curve.end[1], 6.0, 1e-9))).unwrap().id();
+    ok(&mut app, "wall.set_constraints", json!({ "wall_id": north, "top_constraint": { "unconnected": 3.5 } }));
+    let p = spots(&mut app, plan);
+    let elevation = p.iter().find(|s| s["data"]["spotKind"] == "elevation").unwrap().clone();
+    assert_eq!(lines(&elevation), ["+3500"]);
+    ok(&mut app, "coordinates.set_survey_point", json!({ "point": [0.0, 0.0, 0.0], "shared_coords": [500000.0, 200000.0, 45.0] }));
+    ok(&mut app, "spot.set", json!({ "annotation_ids": [elevation["id"]], "base": "survey" }));
+    let p = spots(&mut app, plan);
+    let elevation = p.iter().find(|s| s["data"]["spotKind"] == "elevation").unwrap().clone();
+    assert_eq!(lines(&elevation), ["+48500"]);
+    // A spot whose element is no longer under it keeps its place and is orphaned.
+    ok(&mut app, "element.move", json!({ "element_ids": [north], "vector": [0.0, 2.0, 0.0] }));
+    let p = spots(&mut app, plan);
+    let elevation = p.iter().find(|s| s["data"]["spotKind"] == "elevation").unwrap();
+    assert_eq!(elevation["orphaned"], true, "{elevation}");
+    // Only in plans, sections and elevations, and on model elements.
+    let view = ok(&mut app, "view.create_3d", json!({}));
+    assert!(app.execute("spot.create_elevation", json!({ "view_id": view, "point": [0, 0, 0] }), &Caller::user()).is_err());
+    assert!(app.execute("spot.create_elevation", json!({ "view_id": plan, "ref": plan, "point": [0, 0, 0] }), &Caller::user()).is_err());
+    // In 3D, at the point they read.
+    let s = store(&app);
+    let tips = reviera_core::annotations_3d::tips(&s);
+    assert_eq!(tips.iter().filter(|t| t.class == "spots").count(), 3);
 }

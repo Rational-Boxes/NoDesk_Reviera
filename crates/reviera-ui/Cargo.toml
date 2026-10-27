@@ -11,6 +11,7 @@ publish.workspace = true
 
 [dependencies]
 glam.workspace = true
+png = "0.18"
 pulldown-cmark = { version = "0.13", default-features = false, features = ["html"] }
 reviera-core.workspace = true
 wxdragon = { workspace = true, features = ["aui", "webview"] }

@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Reviera contributors
 
 //! A small built-in stroke font for labels and annotation drawn by the renderer: capital
-//! letters, digits and the punctuation of lengths (`. , ' " - /`). Lower-case letters use the
+//! letters, digits and the punctuation of lengths and levels (`. , ' " - / + − ±`). Lower-case letters use the
 //! capital shapes, except `m`. No font files are needed, so labels look the same everywhere.
 //! (Annotation text with real fonts comes with the text renderer, DOC-ANN-000.)
 

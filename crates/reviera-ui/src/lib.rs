@@ -452,6 +452,8 @@ struct Gui {
     tips: std::collections::HashMap<u32, (reviera_core::document::ModelVersion, bool, Vec<radial::TipLabel>)>,
     /// Each 3D view's labels as last drawn, nearest first, for clicks on them.
     tip_boxes: std::collections::HashMap<u32, Vec<(radial::TipLabel, reviera_render::tooltips::Placed)>>,
+    /// The Spot tools' point, once picked: its element, the point and the view's direction there.
+    spot_pick: Option<(Option<ElementId>, [f64; 3], [f64; 3])>,
     /// The last label clicked and when, to tell a double click (which opens its plan).
     tip_click: Option<(reviera_core::ElementId, std::time::Instant)>,
     /// Each document's surfaces, for moving elevations' labels onto the model, by version.
@@ -2337,6 +2339,9 @@ impl Gui {
                         if reviera_core::notes::text_data(e).is_some() {
                             return Some("cat.text_notes");
                         }
+                        if reviera_core::spots::spot_data(e).is_some() {
+                            return Some("cat.spot_dimensions");
+                        }
                         // Placed components and path arrays have their own tools, whatever
                         // category their component gives them.
                         if reviera_core::mesh_objects::mesh_object_recipe(e).is_some() {
@@ -2361,6 +2366,7 @@ impl Gui {
                 Some("cat.dimensions") => "Dimensions".to_owned(),
                 Some("cat.tags") => "Tags".to_owned(),
                 Some("cat.text_notes") => "Text Notes".to_owned(),
+                Some("cat.spot_dimensions") => "Spot Dimensions".to_owned(),
                 Some(k) => self
                     .ribbon
                     .context_label(Some(k))
@@ -2478,6 +2484,7 @@ impl Gui {
                 reviera_core::notes::tag_data(&e)
                     .map(|_| "Tags".to_owned())
                     .or_else(|| reviera_core::notes::text_data(&e).map(|_| "Text Notes".to_owned()))
+                    .or_else(|| reviera_core::spots::spot_data(&e).map(|_| "Spot Dimensions".to_owned()))
             })
             .unwrap_or_else(|| "—".to_owned());
         let type_name = e
@@ -3798,6 +3805,7 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 tips: std::collections::HashMap::new(),
                 tip_boxes: std::collections::HashMap::new(),
                 tip_click: None,
+                spot_pick: None,
                 occluders: std::collections::HashMap::new(),
                 surfaces: std::collections::HashMap::new(),
                 ui_settings: radial::UiSettings::load(),
@@ -4332,6 +4340,8 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
             g.start_note_tool(notes::NoteTool::RoomTag);
             focus(g);
         }),
+        "spot.create_elevation" => with(gui, |g| g.start_note_tool(notes::NoteTool::SpotElevation)),
+        "spot.create_coordinate" => with(gui, |g| g.start_note_tool(notes::NoteTool::SpotCoordinate)),
         "text.create" => with(gui, |g| {
             g.start_note_tool(notes::NoteTool::Text);
             focus(g);
@@ -4866,6 +4876,7 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "file.close" => with(gui, Gui::close_model),
         "help.home" => with(gui, Gui::show_help),
         "help.about" => with(gui, |g| g.about()),
+        "help.website" => with(gui, |g| g.open_website()),
         "stair.create_openings" => with(gui, |g| {
             let store = g.store_now();
             let stairs: Vec<ElementId> = g

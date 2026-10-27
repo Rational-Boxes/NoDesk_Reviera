@@ -8,6 +8,9 @@ Reviera is a parametric Building Information Modeling (BIM) application for arch
 structure and MEP. IFC is its native file format, so there is no proprietary container. Every
 operation can be driven by Lua scripts and by AI agents through the Model Context Protocol (MCP).
 
+**Website: [bimreviera.com](https://bimreviera.com/)**: downloads, features and getting started.
+Pre-release packages are also on the [GitHub releases page](https://github.com/Rational-Boxes/NoDesk_Reviera/releases).
+
 > **Independence.** BIM Reviera is an independent, original application. It is in no way a copy or clone of
 > any existing product, and it does not set out to read or write any existing product's
 > closed, proprietary formats (such as RVT and RFA); IFC is its native format. An existing
@@ -1333,10 +1336,18 @@ simulation sessions, and the first engine runners (see [Not built yet](#not-buil
   elements with values read live from them; Room Tag (RT) tags rooms; Tag All Not Tagged tags
   whole categories without duplicates. Editing a tag's value changes the element; tags follow
   their elements and stay, in orange, when it is deleted. Text (TX) places notes (2.5, 3.5 or
-  5 mm, wrapped, rotated, with leaders) (`tag.*`, `text.*`).
+  5 mm, wrapped, rotated, with leaders) (`tag.*`, `text.*`). Both go in plans, sections and
+  elevations.
 - **Dimensions**: Annotate › Aligned Dimension (DI) dimensions parallel wall faces, centrelines,
-  grids and cut edges; dimensions to Reviera walls and grids follow them (`dim.create_aligned`,
-  `anno.list`).
+  grids and cut edges, and in sections and elevations levels and walls' bases, tops and ends;
+  dimensions to Reviera walls, levels and grids follow them (`dim.create_aligned`, `anno.list`).
+- **Spot elevations and coordinates**: Annotate › Spot Elevation (EL) and Spot Coordinate, in
+  plans, sections and elevations: click a point on an element, then where the text goes. A spot
+  reads the point's height (or its element's top and bottom there) from the project base point,
+  the survey point or a level, or its north and east, and follows the surface as the model
+  changes; one whose element has gone shows in orange (`spot.create_elevation`,
+  `spot.create_coordinate`, `spot.set`, `spot.list`; DOC-ANN-006/007). Not built yet: spot
+  types and the Spot Dimensions settings, spot slopes.
 - **Line weights**: plans draw cut and projection lines with each category's pens at paper widths
   for the view scale, so a plan on screen at 100 % matches its print (`objectstyle.set`,
   `lineweight.set`, `lineweight.add_scale`, `lineweight.remove_scale`).
@@ -1359,7 +1370,7 @@ simulation sessions, and the first engine runners (see [Not built yet](#not-buil
 - **Hide and isolate**: Hide, Isolate, Isolate with ghosting and Translucent work on elements,
   on elements with their children, by category or by type (HH, HI, HC, IC, HG, HT; HR resets).
   This is temporary per-view state that is never saved or printed (`view.temp_*`).
-- **Annotation in 3D**: a 3D view shows the text notes, tags and dimensions of the plans (and,
+- **Annotation in 3D**: a 3D view shows the text notes, tags, dimensions and spots of the plans (and,
   when chosen, of the sections and elevations) as floating,
   tooltip-style labels at their places in the model (a note above its level, a door's tag at the
   door, a room's over the room), readable from any angle, kept from covering each other and left
@@ -1653,7 +1664,7 @@ area by area (reviewed against the spec on 2026-10-15).
   with a server (COL-BCF-002).
 - **Documentation**: crop regions, jogged sections, interior elevation markers, opening a view
   from its marker; schedule filters in the Filter dialog beyond one condition (several are taken by `schedule.set_filters`), grouping and calculated fields; title block families,
-  revisions and sheet collections; tags and text in sections and on sheets; the current NBIMS-US
+  revisions and sheet collections; tags and text on sheets; spot types, spot slopes; the current NBIMS-US
   COBie layout and a COBie settings dialog.
 - **Interface**: general shape tools; a macOS build (the script is written, not yet run on a
   Mac); for the radial menu, its commands for Lua and MCP, icons and the accessibility

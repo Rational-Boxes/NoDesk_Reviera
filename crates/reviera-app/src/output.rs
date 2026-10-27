@@ -181,7 +181,7 @@ impl App {
             width: pens.annotation_width(1) as f32,
             segments: Vec::new(),
         };
-        for n in crate::notes::view_notes(store, e, scale as f32, range.cut as f32) {
+        for n in crate::notes::view_notes(store, e, scale as f32, range.cut as f32, Some(scene)) {
             note_lines.segments.extend(n.parts.segments);
             labels.extend(n.parts.labels);
         }
@@ -403,9 +403,9 @@ pub fn section_parts(
     }
 }
 
-/// The dimensions, tags and text notes of section or elevation `view` in its frame at 1:`scale`,
+/// The dimensions, tags, text notes and spots of section or elevation `view` in its frame at 1:`scale`,
 /// drawn at depth `z`, in annotation pen 1 (DOC-ANN-001, DOC-ANN-009…011).
-pub fn section_annotation(store: &reviera_core::Store, view: &reviera_core::Element, scale: f32, z: f32) -> (Lines, Vec<Label>) {
+pub fn section_annotation(store: &reviera_core::Store, view: &reviera_core::Element, scale: f32, z: f32, scene: Option<&reviera_render::RenderScene>) -> (Lines, Vec<Label>) {
     let pens = standards::pen_set(store);
     let settings = units::settings_of(store);
     let mut lines = Lines { color: [0.0, 0.0, 0.0, 1.0], width: pens.annotation_width(1) as f32, segments: Vec::new() };
@@ -418,7 +418,7 @@ pub fn section_annotation(store: &reviera_core::Store, view: &reviera_core::Elem
         lines.segments.extend(l);
         labels.extend(t);
     }
-    for n in crate::notes::view_notes(store, view, scale, z) {
+    for n in crate::notes::view_notes(store, view, scale, z, scene) {
         lines.segments.extend(n.parts.segments);
         labels.extend(n.parts.labels);
     }
@@ -457,7 +457,7 @@ impl App {
             true
         });
         let (mut annotation, mut labels) = (parts.annotation, parts.labels);
-        let (lines, more) = section_annotation(store, e, scale, 0.002);
+        let (lines, more) = section_annotation(store, e, scale, 0.002, Some(scene));
         annotation.push(lines);
         labels.extend(more);
         Ok(PlanDrawing {

@@ -56,7 +56,12 @@ Start with **File › New**, and open a Level 1 plan (View › **Floor Plan**).
     face (5800); tag the bedroom door; and put a text note *BEDROOM* above the bedroom. In the
     Default 3D View, View › Annotation › **Annotation Visibility…** › *From*: tick Sections and
     Elevations to see their annotation float in 3D; the elevation's note sits on the south wall.
-12. **Sheet.** View › **Sheet**, *A2*: it is numbered A101. In Properties name it *Ground
+12. **Spots.** In the Level 1 plan, Annotate › **Spot Elevation** (EL): click the north wall's
+    top near its west end, then click above the wall for the text (+3000). **Spot Coordinate**:
+    click the north-east corner, then up and to the right (N 6000, E 10000). In *South*, Spot
+    Elevation on the wall between the east window and the east end, text to the right of the
+    house; in Properties set Display Elevations to *Top & Bottom Elevations* (T +3000, B ±0).
+13. **Sheet.** View › **Sheet**, *A2*: it is numbered A101. In Properties name it *Ground
     Floor*, Drawn By *Reviera*, Issue Date *2026-10-26*. Its Sheet tab › **Place View**: the
     Level 1 plan, then *Section A*, then *South*; **Place Schedule**: the door and room
     schedules. Drag them into place: the plan at the left, the section and elevation to its

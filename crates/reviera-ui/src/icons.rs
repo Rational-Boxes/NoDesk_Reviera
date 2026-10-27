@@ -888,6 +888,15 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "text" => format!(
             r#"<path d="M6 7h20M16 7v19M11 26h10" {s} stroke-width="2.6"/><path d="M6 7v3M26 7v3" {sa}/>"#
         ),
+        "website" => format!(
+            r#"<circle cx="16" cy="16" r="12" fill="{f}" {s}/><path d="M4 16h24M16 4c-5 6-5 18 0 24M16 4c5 6 5 18 0 24" {s} stroke-width="1.3"/><path d="M7 10h18M7 22h18" {sa} stroke-width="1.1"/>"#
+        ),
+        "spot_elevation" => format!(
+            r#"<path d="M3 27h26" {s}/><path d="M9 27l-4-6h8z" fill="{a}" {sa}/><path d="M9 21l6-9h13" {s}/><path d="M16 8h11" {s} stroke-width="2.4"/>"#
+        ),
+        "spot_coordinate" => format!(
+            r#"<path d="M4 22l8 8M12 22l-8 8" {sa} stroke-width="2"/><path d="M8 26l7-12h13" {s}/><path d="M16 6h11M16 10h11" {s} stroke-width="2.2"/>"#
+        ),
         "tag" => format!(
             r#"<rect x="3" y="9" width="17" height="11" fill="{f}" {s}/><path d="M7 15h9" {s}/><path d="M20 14l9 9" {sa}/><circle cx="29" cy="23" r="1.5" fill="{a}"/>"#
         ),

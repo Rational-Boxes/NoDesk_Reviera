@@ -66,6 +66,7 @@ pub const UI_ACTIONS: &[&str] = &[
     "rebar_view.multi_linear",
     "reinforcement_numbering.show",
     "help.about",
+    "help.website",
     "help.data_sources",
     "tool.modify",
     "wall.create_structural",

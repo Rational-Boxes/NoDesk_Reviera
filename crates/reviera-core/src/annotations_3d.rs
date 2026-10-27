@@ -12,8 +12,9 @@
 //!   window casts the ray, [`Tip::probe`]); their tags stand at the host. A host tagged in
 //!   several views is labelled once.
 //! - **From:** a view shows the plans' annotation, and the sections' and elevations' when chosen.
-//! - **Classes:** each label has a class: `text`, `dimensions`, or `tags:<category>` (Doors,
-//!   Windows, Rooms, …), so a view can show some and not others.
+//! - **Classes:** each label has a class: `text`, `dimensions`, `spots` (spot elevations and
+//!   coordinates, at the point they read), or `tags:<category>` (Doors, Windows, Rooms, …), so a
+//!   view can show some and not others.
 //! - **Per view:** a 3D view keeps whether it shows annotation at all and which classes it hides
 //!   (`rxd:annotations_3d`): shown, with dimensions hidden, unless set (`view.set_3d_annotations`).
 //! - **Behind the model:** a label whose point the model hides from the eye (by more than 0.4 m,
@@ -106,6 +107,7 @@ pub fn label(class: &str) -> String {
     match class {
         "text" => "Text notes".into(),
         "dimensions" => "Dimensions".into(),
+        "spots" => "Spot elevations and coordinates".into(),
         c => match c.strip_prefix("tags:") {
             Some(cat) => format!("{} tags", cat.strip_suffix('s').unwrap_or(cat)),
             None => c.to_owned(),
@@ -206,6 +208,11 @@ pub fn tips(store: &Store) -> Vec<Tip> {
                 Place::Section(..) => crate::notes::host_point(store, host).unwrap_or_else(|| place.world(r.anchor, 0.0)),
             };
             out.push(Tip { id: e.id(), class, anchor, lines: r.lines, view: r.data.view.clone(), source: place.source().into(), host: Some(r.data.host.clone()), probe: None });
+        } else if let Some(d) = crate::spots::spot_data(e) {
+            // At the point it reads, as stored (the window reads it again on the model).
+            let Some(place) = places.get(&d.view) else { continue };
+            let lines = crate::spots::lines(store, &d, d.point, None);
+            out.push(Tip { id: e.id(), class: "spots".into(), anchor: d.point, lines, view: d.view.clone(), source: place.source().into(), host: None, probe: None });
         } else if let Some(d) = crate::annotations::dimension_data(e) {
             let Some(place) = places.get(&d.view) else { continue };
             let Some(m) = crate::annotations::measure(store, &d) else { continue };
@@ -301,7 +308,7 @@ pub struct InfoParams {
 pub fn info(store: &Store, p: InfoParams) -> Result<Info> {
     let id = view_3d(store, &p.view_id)?;
     let s = settings(store.get(id).expect("resolved"));
-    let mut counts: BTreeMap<String, usize> = ["text", "dimensions", "tags:Doors", "tags:Windows", "tags:Rooms"].iter().map(|c| ((*c).to_owned(), 0)).collect();
+    let mut counts: BTreeMap<String, usize> = ["text", "dimensions", "spots", "tags:Doors", "tags:Windows", "tags:Rooms"].iter().map(|c| ((*c).to_owned(), 0)).collect();
     let mut from: BTreeMap<String, usize> = BTreeMap::new();
     for t in tips(store) {
         *from.entry(t.source).or_default() += 1;
@@ -314,7 +321,8 @@ pub fn info(store: &Store, p: InfoParams) -> Result<Info> {
     let order = |c: &str| match c {
         "text" => 0,
         "dimensions" => 1,
-        _ => 2,
+        "spots" => 2,
+        _ => 3,
     };
     let mut classes: Vec<ClassInfo> = counts
         .into_iter()
@@ -353,9 +361,9 @@ pub(crate) fn set(txn: &mut crate::txn::Transaction<'_>, p: SetParams) -> Result
         s.occlude = v;
     }
     for (class, visible) in p.classes {
-        let known = class == "text" || class == "dimensions" || class.strip_prefix("tags:").is_some_and(|c| !c.is_empty());
+        let known = ["text", "dimensions", "spots"].contains(&class.as_str()) || class.strip_prefix("tags:").is_some_and(|c| !c.is_empty());
         if !known {
-            return Err(Error::new("view.bad_class", format!("{class:?}: a class is text, dimensions or tags:<category>")));
+            return Err(Error::new("view.bad_class", format!("{class:?}: a class is text, dimensions, spots or tags:<category>")));
         }
         if visible {
             s.hidden.remove(&class);

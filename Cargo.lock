@@ -3456,6 +3456,7 @@ dependencies = [
  "cc",
  "glam",
  "pkg-config",
+ "png",
  "portable-pty",
  "pulldown-cmark",
  "raw-window-handle",

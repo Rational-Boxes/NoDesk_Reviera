@@ -1769,6 +1769,10 @@ All annotation tools are on the **Annotate** tab, in the panels Dimension, Detai
 - [ ] A spot type with *Display = Top and Bottom* on a 250 mm slab shows two values 250 mm apart, each with its indicator text.
 - [ ] Changing the text location of a spot type to *In line with leader* hides the symbol on every spot of that type.
 
+*Built (2026-10-27):* Annotate › Dimension › *Spot Elevation* (EL) in plans, ceiling plans, sections and elevations: click a point on an element, then where the text goes (the leader's shoulder, which runs away from the point). A spot keeps the element, the point (model coordinates) and the direction it was picked along (down in plans, the view direction in sections and elevations); each time it is drawn the application finds the point again on the element's surface along that direction (`reviera_app::spots`), so on a moved or reshaped surface the value follows; *Top* and *Bottom* are the first and last surface of the element on the vertical there. In a plan the pick reads the top of what is there (a slab's top, the top of a wall the plan cuts). Values are signed in project length units (`+3000`, `−450`, `±0`), relative to the project base point (default), the survey point (shared height) or a level; *Top and Bottom* shows `T` and `B` lines; prefix and suffix. A spot whose element is gone, or no longer under its point, keeps its place and is drawn orphaned (orange, DOC-ANN-000). Drawn with the view and in PDF output, picked and highlighted like tags, with its value, base, display, prefix and suffix in Properties, and floating in 3D views as class *Spot elevations and coordinates* (DOC-ANN-025). Commands: `spot.create_elevation(view_id, ref?, point, leader_point?, direction?, base?: project|survey|{level}, display?, prefix?, suffix?)`, `spot.set(annotation_ids, base?, display?, include_elevation?, prefix?, suffix?, leader_point?)`, `spot.list(view_id) -> [{ id, data, picked, point, bottom?, lines, orphaned }]`. Not yet: spot types (`dimtype` kinds, symbols, text styles and indicator texts other than `T`/`B`), the Spot Dimensions dialog, spots in locked 3D views, on linked elements and toposolid points, and dragging a spot's text in the window (`spot.set` moves it).
+
+- [x] *(Built 2026-10-27, `tests/sample_features.rs`.)* The annotated plan sample's spot on the north wall reads `+3000`, then `+3500` after the wall is raised, and `+48500` relative to a survey point at 45 m shared height; its elevation's *Top and Bottom* spot reads `T +3000` / `B ±0`, found on the wall's outer face; moving the wall away orphans the plan spot.
+
 ### Spot coordinates
 **ID:** DOC-ANN-007 · **Priority:** P1 · **Ref:** research/04 §4.1 *Spot Coordinate*
 
@@ -1790,6 +1794,10 @@ All annotation tools are on the **Annotate** tab, in the panels Dimension, Detai
 **Acceptance criteria.**
 - [ ] A spot coordinate on a grid intersection matches the value reported by `coord.report_point` (Chapter 6).
 - [ ] Rotating the project to true north by 10° changes the spot coordinate values without moving the spot in the view.
+
+*Built (2026-10-27):* Annotate › Dimension › *Spot Coordinate* in plans, sections and elevations, placed and kept like spot elevations (DOC-ANN-006): `N` and `E` lines from the project base point along project north (default), or shared coordinates from the survey point turned with true north (`base: survey`); `include_elevation` adds an `EL` line. `spot.create_coordinate(view_id, ref?, point, leader_point?, direction?, base?, include_elevation?, prefix?, suffix?)`. Not yet: spot coordinate types (order and indicator texts), grid-intersection and toposolid references, alternate units.
+
+- [x] *(Built 2026-10-27, `tests/sample_features.rs`.)* The annotated plan sample's spot coordinate on the north-east corner reads `N 6000` / `E 10000`.
 
 ### Spot slopes
 **ID:** DOC-ANN-008 · **Priority:** P1 · **Ref:** research/04 §4.1 *Spot Slope*
@@ -3498,6 +3506,8 @@ Every command below is registered once in the command registry and is therefore 
 | `dim.set_label` | dimension_id, global_parameter_id? | () | Yes | DOC-ANN-005 |
 | `spot.create_elevation` | view_id, ref, point, leader_point?, type_id?, base?, display? | annotation_id | Yes | DOC-ANN-006 |
 | `spot.create_coordinate` | view_id, ref, point, leader_point?, type_id?, base? | annotation_id | Yes | DOC-ANN-007 |
+| `spot.set` | annotation_ids, base?, display?, include_elevation?, prefix?, suffix?, leader_point? | () | Yes | DOC-ANN-006 |
+| `spot.list` | view_id | [{id, data, picked, point, bottom?, lines, orphaned}] | No | DOC-ANN-006 |
 | `spot.create_slope` | view_id, ref, point, type_id?, representation?: arrow\|triangle | annotation_id | Yes | DOC-ANN-008 |
 | `spot.settings` | — | () | No | DOC-ANN-006 |
 | `text.create` | view_id, position, content, type_id?, width?, rotation? | annotation_id | Yes | DOC-ANN-009 |

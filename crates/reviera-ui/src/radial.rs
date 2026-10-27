@@ -548,7 +548,16 @@ impl crate::Gui {
         let store = d.doc.store();
         // The unsaved {3D} view shows the defaults.
         let settings = element.and_then(|e| store.get(e)).map(reviera_core::annotations_3d::settings).unwrap_or_default();
-        let tips = if settings.shown { reviera_core::annotations_3d::visible(reviera_core::annotations_3d::tips(store), &settings) } else { Vec::new() };
+        let mut tips = if settings.shown { reviera_core::annotations_3d::visible(reviera_core::annotations_3d::tips(store), &settings) } else { Vec::new() };
+        // Spots read again on the model as it is now.
+        let scene = self.scenes.get(&doc);
+        for t in tips.iter_mut().filter(|t| t.class == "spots") {
+            if let Some(data) = store.get(t.id).and_then(reviera_core::spots::spot_data) {
+                let m = reviera_app::spots::measure(store, scene, t.id, data);
+                t.anchor = m.picked;
+                t.lines = m.lines;
+            }
+        }
         let surfaces = if tips.iter().any(|t| t.probe.is_some()) { self.surfaces(doc) } else { None };
         let v3 = |p: [f64; 3]| glam::Vec3::new(p[0] as f32, p[1] as f32, p[2] as f32);
         let tips: Vec<TipLabel> = tips

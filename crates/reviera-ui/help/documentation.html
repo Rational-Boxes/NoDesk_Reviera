@@ -87,6 +87,18 @@ elevations:</p>
 <p>Dimensions to Reviera walls, grids, levels and reference planes follow them when they move.
 <code>dim.create_aligned</code>, <code>anno.list</code></p>
 
+<h2 id="spots">Spot elevations and coordinates</h2>
+<p><b>Annotate › Spot Elevation</b> (<kbd>EL</kbd>) and <b>Spot Coordinate</b> work in plans,
+sections and elevations: click a point on an element, then where the text goes. A spot
+elevation reads the point's height; in a plan, the top of what is there (a slab's top, the top of
+a wall the plan cuts). A spot coordinate reads its north and east. Values are measured from the
+project base point, unless set to the survey point (shared coordinates, turned with true north)
+or, for elevations, a level. <i>Top and Bottom</i> shows the element's top and bottom where the
+spot is. Spots follow their element: raise a wall and its spot reads higher; a spot whose element
+has gone stays where it was, in orange.
+<code>spot.create_elevation</code>, <code>spot.create_coordinate</code>, <code>spot.set</code>,
+<code>spot.list</code></p>
+
 <h3 id="constraints">Locks and EQ</h3>
 <p>A selected dimension's Properties have <b>Lock Segment</b> for each segment and, with two or
 more segments, <b>EQ</b> (also <b>Modify | Dimensions › Lock</b> and <b>EQ</b>):</p>

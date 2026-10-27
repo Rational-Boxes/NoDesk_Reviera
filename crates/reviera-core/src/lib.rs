@@ -108,6 +108,7 @@ pub mod model_lines;
 pub mod model_text;
 pub mod modify;
 pub mod notes;
+pub mod spots;
 pub mod origin;
 pub mod overlap;
 pub mod overlap_accept;

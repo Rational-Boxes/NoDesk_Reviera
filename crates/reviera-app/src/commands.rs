@@ -135,6 +135,7 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add_host(crate::bcf_files::BcfExportViewpoint),
         registry.add_host(crate::bcf_files::BcfImportViewpoint),
         registry.add_host(crate::bcf_topics::BcfCreateTopic),
+        registry.add_host(crate::spots::SpotList),
         registry.add_host(crate::bcf_topics::BcfAddViewpoint),
         registry.add_host(crate::bcf_topics::BcfApplyViewpoint),
         registry.add_host(crate::bcf_topics::BcfExport),
