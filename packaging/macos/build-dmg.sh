@@ -5,7 +5,7 @@
 # Builds "BIM Reviera.app" and a .dmg on macOS (run it on a Mac; it cannot cross-build).
 #
 #   packaging/macos/build-dmg.sh
-#   REVIERA_VERSION=0.1.0-pre.2 packaging/macos/build-dmg.sh
+#   REVIERA_VERSION=0.1.0-pre.3 packaging/macos/build-dmg.sh
 #   SKIP_BREW=1 SKIP_IFCOS=1 packaging/macos/build-dmg.sh      # reuse deps and IfcOpenShell
 #
 # Prerequisites: Xcode command-line tools (clang, libclang for bindgen, codesign, hdiutil,
@@ -27,7 +27,7 @@ set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$HERE/../.." && pwd)"
-VERSION="${REVIERA_VERSION:-0.1.0-pre.2}"
+VERSION="${REVIERA_VERSION:-0.1.0-pre.3}"
 # CFBundleVersion must be numbers and dots.
 BUNDLE_VERSION="${VERSION%%-*}"
 BUNDLE_ID="io.github.rational_boxes.Reviera"

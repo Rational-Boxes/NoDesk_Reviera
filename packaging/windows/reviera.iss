@@ -2,12 +2,12 @@
 ; Copyright (C) 2026 Reviera contributors
 ;
 ; Inno Setup script (Inno Setup 7, or 6.3 and later) for BIM Reviera. build-installer.ps1 compiles it with:
-;   ISCC /DAppVersion=0.1.0-pre.2 /DAppVersionNumeric=0.1.0 /DStageDir=<stage> /DOutputDir=<dist> reviera.iss
+;   ISCC /DAppVersion=0.1.0-pre.3 /DAppVersionNumeric=0.1.0 /DStageDir=<stage> /DOutputDir=<dist> reviera.iss
 ; The stage folder holds reviera.exe, its DLLs, samples\, COPYING.txt, THIRD-PARTY-NOTICES.txt
 ; and reviera.ico.
 
 #ifndef AppVersion
-  #define AppVersion "0.1.0-pre.2"
+  #define AppVersion "0.1.0-pre.3"
 #endif
 #ifndef AppVersionNumeric
   #define AppVersionNumeric "0.1.0"

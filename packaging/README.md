@@ -2,7 +2,7 @@
 
 Builders for the three desktop packages of TECH_STACK §5.4. Each one is a script that runs on its
 own platform; there is no hosted CI. The version in file names defaults to the first
-pre-release, `0.1.0-pre.2` (the workspace `Cargo.toml` says `0.1.0`), and every script takes
+pre-release, `0.1.0-pre.3` (the workspace `Cargo.toml` says `0.1.0`), and every script takes
 another one (`REVIERA_VERSION=…` or `-Version …`).
 
 | Package | Builder | Output in `dist/` | Status |
@@ -33,7 +33,7 @@ Windows: `%LOCALAPPDATA%\Reviera\compute`).
 ## Linux: Flatpak
 
 ```sh
-packaging/flatpak/build.sh              # build, then dist/BIM-Reviera-0.1.0-pre.2-x86_64.flatpak
+packaging/flatpak/build.sh              # build, then dist/BIM-Reviera-0.1.0-pre.3-x86_64.flatpak
 packaging/flatpak/build.sh --install    # ... and install the bundle for this user
 flatpak run io.github.rational_boxes.Reviera gui            # the window
 flatpak run io.github.rational_boxes.Reviera shell m.ifc    # the command shell
@@ -166,7 +166,7 @@ Inno Setup under Wine in its own prefix. What it needed:
   OpenGL.
 
 To test under Wine: `WINEPREFIX=$PWD/packaging/windows/cross/build/wine wine
-dist/BIM-Reviera-0.1.0-pre.2-windows-x64-setup.exe`. Wine maps the prefix's Documents folder
+dist/BIM-Reviera-0.1.0-pre.3-windows-x64-setup.exe`. Wine maps the prefix's Documents folder
 to your real home folder, so keep test files elsewhere (`C:\reviera-test`).
 
 ### Built on Windows (MSVC)
@@ -231,7 +231,7 @@ bundle.
 
 ## Releasing a pre-release
 
-The current one is `0.1.0-pre.2` (2026-10-26; `0.1.0-pre.1` was 2026-10-15). The tag is
+The current one is `0.1.0-pre.3` (2026-10-27; `0.1.0-pre.2` was 2026-10-26, `0.1.0-pre.1` 2026-10-15). The tag is
 `0.1.0-pre.N`; the AppStream release is `0.1.0~pre.N` (so that it sorts before `0.1.0`), with a
 new `<release>` entry at the top of the metainfo, and the macOS and Windows version fields, which
 take numbers only, say `0.1.0`. The version is the default `VERSION` in the Flatpak, Windows and
