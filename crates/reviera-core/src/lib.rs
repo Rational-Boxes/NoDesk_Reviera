@@ -10,6 +10,7 @@
 pub mod analytical;
 pub mod analytical_checks;
 pub mod analytical_panels;
+pub mod annotations_3d;
 pub mod bcf;
 pub mod bcf_archive;
 pub mod issues;

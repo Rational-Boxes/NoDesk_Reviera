@@ -804,6 +804,12 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "section_box" => format!(
             r#"<path d="M6 11l8-5h12v15l-8 5H6z" fill="{f}" {s}/><path d="M6 11h12v15M18 11l8-5" {s}/><path d="M10 20l3-3 3 3" {sa}/><circle cx="12" cy="18.5" r="1.6" fill="{a}"/>"#
         ),
+        "annotation_3d" => format!(
+            r#"<path d="M5 22l8-4 8 4-8 4z" fill="{f}" {s}/><path d="M13 18V9" {s} stroke-dasharray="2 1.5"/><path d="M13 4h14v8H17l-3 3v-3h-1z" fill="{paper}" {sa}/><path d="M17 8h7" {sa} stroke-width="1.4"/>"#
+        ),
+        "annotation_visibility" => format!(
+            r#"<path d="M3 16c4-6 9-8 13-8s9 2 13 8c-4 6-9 8-13 8s-9-2-13-8z" fill="{f}" {s}/><circle cx="16" cy="16" r="4" fill="{a}"/><path d="M21 25h8M21 28h6" {sa} stroke-width="1.4"/>"#
+        ),
         "issue_new" => format!(
             r#"<path d="M5 5h17v13H12l-5 5v-5H5z" fill="{f}" {s}/><path d="M24 20v8M20 24h8" {sa}/>"#
         ),

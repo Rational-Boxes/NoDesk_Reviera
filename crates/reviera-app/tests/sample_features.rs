@@ -264,3 +264,38 @@ fn the_fire_protection_sample_keeps_its_systems_and_alarm_circuit() {
     assert_eq!(alarm.len(), 1, "{circuits:#}");
     assert_eq!(alarm[0]["kind"], "fire_alarm");
 }
+
+/// The annotated plan's notes, tags and dimensions float in a 3D view (DOC-ANN-025), each class
+/// shown or hidden on its own, the view keeping its choice.
+#[test]
+fn the_annotated_plan_floats_its_annotation_in_3d() {
+    let work = tempfile::tempdir().unwrap();
+    let mut app = open(work.path(), "annotated_plan");
+    let view = ok(&mut app, "view.create_3d", json!({}));
+    let info = ok(&mut app, "view.annotations_3d", json!({ "view_id": view }));
+    let count = |info: &Value, c: &str| info["classes"].as_array().unwrap().iter().find(|x| x["class"] == c).map(|x| (x["count"].as_u64().unwrap(), x["visible"].as_bool().unwrap()));
+    assert_eq!(info["shown"], true);
+    assert_eq!(count(&info, "text"), Some((2, true)));
+    assert_eq!(count(&info, "dimensions"), Some((13, false)), "dimensions hidden unless chosen");
+    assert_eq!(count(&info, "tags:Doors"), Some((3, true)));
+    assert_eq!(count(&info, "tags:Windows"), Some((5, true)));
+    assert_eq!(count(&info, "tags:Rooms"), Some((3, true)));
+    let shown = |app: &App| {
+        let s = store(app);
+        reviera_core::annotations_3d::shown(&s, s.get(ElementId(view.as_u64().unwrap())).unwrap()).len()
+    };
+    assert_eq!(shown(&app), 13, "notes and tags");
+    // Door tags off, dimensions on; then everything off; undo brings the classes back.
+    ok(&mut app, "view.set_3d_annotations", json!({ "view_id": view, "classes": { "tags:Doors": false, "dimensions": true } }));
+    assert_eq!(shown(&app), 10 + 13);
+    ok(&mut app, "view.set_3d_annotations", json!({ "view_id": view, "shown": false }));
+    assert_eq!(shown(&app), 0);
+    ok(&mut app, "edit.undo", json!({}));
+    assert_eq!(shown(&app), 23);
+    // Room tags stand over their rooms, a little above the floor.
+    let s = store(&app);
+    let tips = reviera_core::annotations_3d::tips(&s);
+    let living = tips.iter().find(|t| t.lines.first().map(String::as_str) == Some("Living")).unwrap();
+    assert!((living.anchor[2] - 0.3).abs() < 1e-9, "{living:?}");
+    assert!(app.execute("view.set_3d_annotations", json!({ "view_id": view, "classes": { "nonsense": true } }), &Caller::user()).is_err());
+}

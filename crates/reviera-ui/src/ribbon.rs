@@ -30,6 +30,7 @@ pub const UI_ACTIONS: &[&str] = &[
     "ui.fullscreen.toggle",
     "ui.focus_mode.toggle",
     "ui.radial.toggle",
+    "view.toggle_3d_annotations",
     "ui.pane.system_browser",
     "ui.pane.terminal",
     "ui.pane.sizing_calculator",
@@ -155,6 +156,8 @@ pub struct Action {
     /// A key sequence typed in a view (`WA`).
     pub keys: Option<String>,
     pub help: String,
+    /// A toggle button that shows whether its setting is on (`toggle = true`).
+    pub toggle: bool,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -256,6 +259,7 @@ impl Catalog {
                 accel: get("accel"),
                 keys: get("keys"),
                 help: get("help").unwrap_or_default(),
+                toggle: a.get("toggle").and_then(Item::as_bool).unwrap_or(false),
             });
         }
         c.quick_access = strings(doc.get("quick_access").and_then(|q| q.get("actions")));
@@ -383,7 +387,7 @@ unsafe extern "C" {
         user: *mut c_void,
     ) -> *mut c_void;
     fn reviera_rb_page(bar: *mut c_void, label: *const i8) -> *mut c_void;
-    fn reviera_rb_panel(page: *mut c_void, label: *const i8) -> *mut c_void;
+    fn reviera_rb_panel(page: *mut c_void, label: *const i8, svg: *const i8) -> *mut c_void;
     fn reviera_rb_button(
         bar: *mut c_void,
         id: c_int,
@@ -397,6 +401,7 @@ unsafe extern "C" {
     fn reviera_rb_set_page_label(page: *mut c_void, label: *const i8);
     fn reviera_rb_realize(bar: *mut c_void);
     fn reviera_rb_enable(id: c_int, enable: c_int);
+    fn reviera_rb_toggle(id: c_int, on: c_int);
     fn reviera_rb_show_page(bar: *mut c_void, index: c_int, show: c_int, highlight: c_int);
     fn reviera_rb_set_active(bar: *mut c_void, index: c_int);
     fn reviera_rb_active(bar: *mut c_void) -> c_int;
@@ -476,7 +481,10 @@ impl Ribbon {
 
     fn fill(&self, page: *mut c_void, panels: &[PanelDef]) {
         for p in panels {
-            let bar = unsafe { reviera_rb_panel(page, c(&p.label).as_ptr()) };
+            // A collapsed panel shows its first large tool's icon (else its first tool's).
+            let first = p.tools.iter().find(|t| t.large).or(p.tools.first()).and_then(|t| self.catalog.action(&t.action));
+            let icon = c(&first.map_or(String::new(), |a| icons::svg(&a.icon, dark())));
+            let bar = unsafe { reviera_rb_panel(page, c(&p.label).as_ptr(), icon.as_ptr()) };
             let sizes = size_classes(&p.tools);
             for (t, size) in p.tools.iter().zip(sizes) {
                 let (Some(a), Some(id)) = (
@@ -496,7 +504,7 @@ impl Ribbon {
                         svg.as_ptr(),
                         help.as_ptr(),
                         size,
-                        0,
+                        c_int::from(a.toggle),
                     );
                 }
             }
@@ -594,6 +602,13 @@ impl Ribbon {
     }
 
     /// Whether an action is enabled now.
+    /// Shows a toggle button pressed (its setting on) or not, wherever it is.
+    pub fn set_toggled(&self, action: &str, on: bool) {
+        if let Some(id) = self.catalog.id_of(action) {
+            unsafe { reviera_rb_toggle(id, c_int::from(on)) };
+        }
+    }
+
     pub fn enabled(&self, action: &str) -> bool {
         !self.disabled.borrow().contains(action)
     }

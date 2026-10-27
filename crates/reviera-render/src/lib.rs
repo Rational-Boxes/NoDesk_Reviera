@@ -19,6 +19,7 @@ pub mod notes;
 pub mod plan;
 pub mod radial;
 pub mod solid;
+pub mod tooltips;
 pub mod viewcube;
 
 /// Class suffix of meshes drawn in 3D but not in plans (a door's closed panel, whose plan symbol

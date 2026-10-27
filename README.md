@@ -1359,6 +1359,13 @@ simulation sessions, and the first engine runners (see [Not built yet](#not-buil
 - **Hide and isolate**: Hide, Isolate, Isolate with ghosting and Translucent work on elements,
   on elements with their children, by category or by type (HH, HI, HC, IC, HG, HT; HR resets).
   This is temporary per-view state that is never saved or printed (`view.temp_*`).
+- **Annotation in 3D**: a 3D view shows the plans' text notes, tags and dimensions as floating,
+  tooltip-style labels at their places in the model (a note above its level, a door's tag at the
+  door, a room's over the room), readable from any angle and kept from covering each other. View ›
+  Annotation › Annotation in 3D turns them on and off for the view (a toggle button that shows its
+  state); Annotation Visibility… has a check box for each class (text notes, dimensions, door,
+  window, room and other tags), each on its own, kept with the view (`view.annotations_3d`,
+  `view.set_3d_annotations`; DOC-ANN-025).
 - **BCF viewpoints**: View › Coordination › Export Viewpoint… writes a 3D view as a BCF 3.0
   `.bcfv` (camera, section box and slices as clipping planes, hidden or isolated elements and
   the selection by GlobalId); Show Viewpoint… opens one (BCF 2.1 or 3.0) in the 3D view, its
@@ -1425,7 +1432,9 @@ simulation sessions, and the first engine runners (see [Not built yet](#not-buil
   Grid), Structure, Steel, Concrete, Systems, Analyze, Sustainability, Massing & Site, Annotate
   (dimensions, text, tags), View (views, sheets, navigation, coordination and issues, section
   box and slices, hide/isolate, windows, panes), Manage and Modify tabs, with a Quick Access
-  Toolbar above. Panels too narrow for the window collapse to dropdowns; runs of more than three
+  Toolbar above. Settings that switch on and off (the panes, Full Screen, Focus Mode, Annotation
+  in 3D) are toggle buttons that show their state. Panels too narrow for the window collapse to
+  dropdowns showing their first tool's icon; runs of more than three
   small buttons keep their labels rather than shrinking to icons, which wxWidgets could draw
   over the panel's large buttons.
   While elements are selected a contextual *Modify | <category>* tab adds their tools (for

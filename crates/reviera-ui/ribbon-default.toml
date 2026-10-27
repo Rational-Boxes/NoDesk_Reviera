@@ -417,6 +417,7 @@ help = "Put every view back in one tab group"
 
 [[action]]
 id = "ui.fullscreen.toggle"
+toggle = true
 label = "Full Screen"
 icon = "full_screen"
 accel = "F11"
@@ -424,6 +425,7 @@ help = "Full-screen with only the views: push the pointer to the top for the men
 
 [[action]]
 id = "ui.focus_mode.toggle"
+toggle = true
 label = "Focus Mode"
 icon = "focus_mode"
 accel = "Ctrl+Shift+F11"
@@ -431,12 +433,14 @@ help = "Hide all chrome without going full-screen; the edges reveal it as in ful
 
 [[action]]
 id = "ui.radial.toggle"
+toggle = true
 label = "Radial Menu (Experimental)"
 icon = "radial_menu"
 help = "Middle click opens a ring menu at the pointer instead of the popup quick menu (UI-SEL-007); remembered per user"
 
 [[action]]
 id = "ui.pane.properties"
+toggle = true
 label = "Properties"
 icon = "properties"
 keys = "PP"
@@ -444,6 +448,7 @@ help = "Show or hide the Properties palette"
 
 [[action]]
 id = "ui.pane.browser"
+toggle = true
 label = "Project Browser"
 icon = "browser"
 help = "Show or hide the Project Browser"
@@ -684,6 +689,19 @@ icon = "overlaps"
 help = "Find where elements overlap: listed largest first; pick one to select and frame it"
 
 [[action]]
+id = "view.toggle_3d_annotations"
+label = "Annotation in 3D"
+icon = "annotation_3d"
+toggle = true
+help = "Show the plans' text notes, tags and dimensions in this 3D view as floating labels, or hide them (DOC-ANN-025)"
+
+[[action]]
+id = "view.annotations_3d"
+label = "Annotation Visibility..."
+icon = "annotation_visibility"
+help = "Choose which annotation this 3D view shows as floating labels: text notes, dimensions, and tags by category, each on its own"
+
+[[action]]
 id = "bcf.create_topic"
 label = "New Issue"
 icon = "issue_new"
@@ -721,6 +739,7 @@ help = "Open a BCF viewpoint (.bcfv) in the 3D view: its camera, cut, hidden or 
 
 [[action]]
 id = "ui.pane.clash"
+toggle = true
 label = "Clash Detection"
 icon = "clash"
 help = "Run clash tests out of process and step through the results: select and frame each clash, isolate or box it, set its status, comment, resolve and export"
@@ -863,6 +882,7 @@ help = "Show everything again in this view"
 
 [[action]]
 id = "ui.pane.model_tree"
+toggle = true
 label = "Model Tree"
 icon = "tree"
 keys = "MT"
@@ -1381,6 +1401,7 @@ help = "Import a mesh file (OBJ, STL, PLY, glTF, GLB) as a component type, with 
 
 [[action]]
 id = "ui.pane.components"
+toggle = true
 label = "Component Library"
 icon = "library"
 keys = "CL"
@@ -2175,12 +2196,14 @@ help = "Choose pinned, fixed or roller, then click near analytical nodes in a pl
 
 [[action]]
 id = "ui.pane.results"
+toggle = true
 label = "Results Explorer"
 icon = "results_explorer"
 help = "Show analysis results in the 3D view: force diagrams, the deformed shape or reactions for a load case or combination, presets, and the largest values"
 
 [[action]]
 id = "ui.pane.analytical_checks"
+toggle = true
 label = "Analytical Checks"
 icon = "analytical_checks"
 help = "Show or hide the Analytical Checks pane: the last check's issues, to select, zoom to, isolate or ignore"
@@ -2400,6 +2423,7 @@ help = "Subscriptions to remote analysis services: add one with its https:// URL
 
 [[action]]
 id = "ui.pane.terminal"
+toggle = true
 label = "Terminal"
 icon = "terminal"
 accel = "Ctrl+Shift+T"
@@ -2407,12 +2431,14 @@ help = "Show or hide the Terminal pane: a shell and CLI AI agents (Claude Code, 
 
 [[action]]
 id = "ui.pane.sizing_calculator"
+toggle = true
 label = "Sizing Calculator"
 icon = "sizing_calculator"
 help = "Show or hide the Sizing Calculator: candidate sizes for the selected duct or pipe, or a flow typed in, against friction, velocity and aspect-ratio targets; Apply resizes the selection (MEP-CALC-005)"
 
 [[action]]
 id = "ui.pane.system_browser"
+toggle = true
 label = "System Browser"
 icon = "system_browser"
 accel = "F9"
@@ -3777,6 +3803,13 @@ tools = [
   { action = "tag.tag_all", size = "large" },
 ]
 
+[[tab.panel]]
+label = "3D"
+tools = [
+  { action = "view.toggle_3d_annotations", size = "large" },
+  { action = "view.annotations_3d", size = "small" },
+]
+
 [[tab]]
 id = "view"
 label = "View"
@@ -3829,6 +3862,13 @@ tools = [
   { action = "bcf.export", size = "small" },
   { action = "bcf.export_viewpoint", size = "small" },
   { action = "bcf.import_viewpoint", size = "small" },
+]
+
+[[tab.panel]]
+label = "Annotation"
+tools = [
+  { action = "view.toggle_3d_annotations", size = "large" },
+  { action = "view.annotations_3d", size = "small" },
 ]
 
 [[tab.panel]]
@@ -4391,7 +4431,7 @@ items = ["script.run", "script.import", "ui.scripts.manage", "-"]
 label = "&Window"
 items = [
   "view.create_3d", "window.close", "-", "window.next", "window.previous", "-",
-  "window.tile", "window.tab_all", "-", "ui.pane.properties", "ui.pane.browser", "ui.pane.model_tree", "ui.pane.components", "ui.pane.system_browser", "ui.pane.sizing_calculator", "ui.pane.terminal", "-",
+  "window.tile", "window.tab_all", "-", "view.toggle_3d_annotations", "view.annotations_3d", "-", "ui.pane.properties", "ui.pane.browser", "ui.pane.model_tree", "ui.pane.components", "ui.pane.system_browser", "ui.pane.sizing_calculator", "ui.pane.terminal", "-",
   "ui.fullscreen.toggle", "ui.focus_mode.toggle", "ui.radial.toggle",
 ]
 

@@ -849,7 +849,7 @@ The chapter **does not** specify the modelling behaviour behind the tools that a
 - [ ] Disabling the add-in removes its tab without restart; re-enabling it restores the tab and any QAT item the user had added from it.
 
 
-*Built (2026-10-26), small buttons that keep their labels:* a run of more than three small buttons in a panel keeps icon and label instead of shrinking to icons alone: wxRibbonButtonBar's collapse of such a run to several icon columns drew them over the panel's large buttons (Systems › Electrical, found in a visual check of every tab at 1400 and 1900 px). Runs of up to three still shrink to icons; a panel without room collapses to its dropdown. Electrical is split into Electrical and Circuits. *(Owner, 2026-10-26: "Do a visual check on the ribbons, one the new ones there was some controlls running over each other.")*
+*Built (2026-10-26), small buttons that keep their labels:* a run of more than three small buttons in a panel keeps icon and label instead of shrinking to icons alone: wxRibbonButtonBar's collapse of such a run to several icon columns drew them over the panel's large buttons (Systems › Electrical, found in a visual check of every tab at 1400 and 1900 px). Runs of up to three still shrink to icons; a panel without room collapses to its dropdown. Electrical is split into Electrical and Circuits. A collapsed panel's dropdown shows its first tool's icon (it showed an empty box), and settings that switch on and off are toggle buttons that show their state (the panes, Full Screen, Focus Mode, the radial menu, Annotation in 3D), kept in step after every action and on changing view. *(Owner, 2026-10-26: "what does View -> User Interface -> User Interface do? It does not appear to be showing any useful options.") *(Owner, 2026-10-26: "Do a visual check on the ribbons, one the new ones there was some controlls running over each other.")*
 ---
 
 ## 1.8 Ribbon catalog
@@ -23757,6 +23757,27 @@ All annotation tools are on the **Annotate** tab, in the panels Dimension, Detai
 - [ ] Deleting the target view shows "?" in the symbol and lists it in the warnings.
 - [ ] In a combined PDF, clicking the view reference opens sheet A103.
 
+
+### Annotation floating in 3D views
+**ID:** DOC-ANN-025 · **Priority:** P2 · **Ref:** owner request (2026-10-26)
+
+**Purpose.** See the plans' notes, tags and dimensions in 3D, where they apply, without annotating the 3D view itself.
+
+**Behaviour & rules.**
+- A 3D view shows the annotation of the model's plans as floating labels: each a boxed block of text drawn flat to the screen like a tooltip, with a dot at its point in the model and a short leader, so it reads the same from any angle.
+- Points: a text note 1 m above its plan's level; a door's or window's tag at the insert's centre; a wall's 1.5 m up its middle; a room's 0.3 m above its tag point; a dimension's segment values on its dimension line at the level. A host tagged in several plans is labelled once.
+- Classes: text notes, dimensions, and tags by the category they tag (door tags, window tags, room tags, …). A view shows annotation or not, and each class on its own; a new view shows every class but dimensions.
+- Nearer labels are placed first; one that would cover another moves up, and is left out after three steps. At most 150 at once.
+- View tab › Annotation (and Annotate tab › 3D, and the View menu): *Annotation in 3D* (a toggle button showing whether the active view shows them) and *Annotation Visibility…* (a check box for annotation in the view and one for each class with its count).
+
+**Data (RXD).** The view's `rxd:annotations_3d`: `{ shown, hidden: [class…] }`.
+
+**Commands.** `view.annotations_3d(view_id) -> { shown, classes[] }`; `view.set_3d_annotations(view_id, shown?, classes?: {class: bool}) -> ()`
+
+**Acceptance criteria.**
+- [x] The annotated plan sample's 3D view shows its two notes and its door, window and room tags, and its dimensions when chosen; hiding door tags leaves the others; undo brings back the previous choice. *(Built 2026-10-26, `tests/sample_features.rs`.)*
+
+*Built (2026-10-26):* as above. *(Owner, 2026-10-26: "On the 3D annotations should float as tool-tip style display. There needs to be a toggle to turn it on and off." "Visibility controls should be independent visibility, a control with a visibility check for each class of annotation.")* Not yet: hiding labels behind the model (they are always drawn), clicking a label to select its annotation, labels of sections' and elevations' annotation, keynotes and spot dimensions.
 ---
 
 ## 5.14 Schedules
@@ -24861,7 +24882,9 @@ Every command below is registered once in the command registry and is therefore 
 | `view.rename` | view_id, new_name | () | Yes | DOC-VIEW-001 |
 | `view.delete` | view_ids[] | () | Yes | DOC-VIEW-001 |
 | `view.open` | view_id | () | No | DOC-VIEW-001 |
+| `view.annotations_3d` | view_id | {shown, classes[]} | No | DOC-ANN-025 |
 | `view.get` | view_id | view_detail | No | DOC-VIEW-001 |
+| `view.set_3d_annotations` | view_id, shown?, classes? | () | Yes | DOC-ANN-025 |
 | `view.list` | filter? | view_summary[] | No | DOC-VIEW-001 |
 | `viewtype.create` | kind, name, default_template_id?, bind_new_views?, marker_type_id? | view_family_type_id | Yes | DOC-VIEW-001 |
 | `view_tag.settings` | kind?: callout\|elevation\|section | () | No | DOC-VIEW-001 |
@@ -27660,10 +27683,10 @@ Generated by `tools/build_spec.py` from the chapter command catalogs and require
 | STR | 0 | 15 | 47 | 0 | 62 |
 | MEP | 0 | 30 | 42 | 0 | 72 |
 | ANA | 0 | 1 | 28 | 0 | 29 |
-| DOC | 68 | 40 | 12 | 1 | 121 |
+| DOC | 68 | 40 | 13 | 1 | 122 |
 | COL | 8 | 45 | 6 | 1 | 60 |
 | ADV | 0 | 0 | 4 | 1 | 5 |
-| **Total** | **320** | **294** | **191** | **7** | **812** |
+| **Total** | **320** | **294** | **192** | **7** | **813** |
 
 Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver)"), it is counted under the first. The non-functional requirements (NFR-…) are in Chapter 0 §0.7 and are not counted here.
 
@@ -27718,7 +27741,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.2a Reviera-originated features
 
-117 requirements are Reviera's own design: owner directives, the technology stack (IFC/RXD storage, live store, BIMserver, MCP, scripting) and extensions beyond the reference product's feature set. Their Ref lines cite no research on the reference product. Listing them separately keeps the clean-room provenance clear: every other requirement traces to public research on the reference product.
+118 requirements are Reviera's own design: owner directives, the technology stack (IFC/RXD storage, live store, BIMserver, MCP, scripting) and extensions beyond the reference product's feature set. Their Ref lines cite no research on the reference product. Listing them separately keeps the clean-room provenance clear: every other requirement traces to public research on the reference product.
 
 | Requirement | Ch | Feature |
 |-------------|----|---------|
@@ -27827,6 +27850,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | DOC-VIEW-013 | 5 | Blueprint mode (3D slice to 2D drawing) |
 | DOC-RBE-001 | 5 | Pluggable render backends |
 | DOC-RBE-002 | 5 | Backend hosting and licensing |
+| DOC-ANN-025 | 5 | Annotation floating in 3D views |
 | DOC-OUT-015 | 5 | COBie export |
 | COL-BIM-001 | 6 | Server profiles and login |
 | COL-BIM-002 | 6 | Project and revision browser |
@@ -27842,7 +27866,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**2161 unique commands** in 416 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**2163 unique commands** in 416 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -28236,7 +28260,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `underlay` | 1 |
 | `units` | 7 |
 | `validate` | 2 |
-| `view` | 123 |
+| `view` | 125 |
 | `view_tag` | 1 |
 | `viewport` | 10 |
 | `viewporttype` | 1 |
@@ -30195,6 +30219,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `view.activate` | 1 | `view_id`, `{new_window?, float?, monitor?}` | `window_id` | No | UI-VIEWWIN-001 |
 | `view.add_crop_break` | 5 | view_id, axis, position, gap | () | Yes | DOC-GFX-015 |
 | `view.add_filter` | 5 | view_id, filter_id, index?, visible?, enabled?, override? | () | Yes | DOC-GFX-006 |
+| `view.annotations_3d` | 5 | view_id | {shown, classes[]} | No | DOC-ANN-025 |
 | `view.apply_viewpoint` | 6 | view_id, viewpoint | view_id | Yes | COL-BCF-003 |
 | `view.assign_scope_box` | 3 | view_ids, scope_box_id \ | null | — | Yes |
 | `view.blueprint` | 5 | view_id, on: bool, slice? | () | No | DOC-VIEW-013 |
@@ -30269,6 +30294,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `view.reveal_hidden` | 5 | view_id, on | () | No | DOC-GFX-008 |
 | `view.reveal_hidden.toggle` | 1 | `view_id?` | `bool` | No | UI-VCB-001 |
 | `view.save_to_library` | 5 | view_ids[], path | () | No | DOC-VIEW-009 |
+| `view.set_3d_annotations` | 5 | view_id, shown?, classes? | () | Yes | DOC-ANN-025 |
 | `view.set_annotation_crop` | 5 | view_id, enabled, offsets? | () | Yes | DOC-GFX-015 |
 | `view.set_camera` | 1 | view_id, eye, target, up, projection?: orthographic\ | perspective, fov? | () | Yes (explicit calls; interactive navigation is not, §1.19) |
 | `view.set_category_override` | 5 | view_id, category, subcategory?, override | () | Yes | DOC-GFX-003 |

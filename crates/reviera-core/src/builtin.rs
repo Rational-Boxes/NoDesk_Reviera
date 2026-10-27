@@ -55,6 +55,8 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(ViewCreate3d),
         registry.add(ViewList),
         registry.add(ViewGet),
+        registry.add(ViewAnnotations3d),
+        registry.add(ViewSet3dAnnotations),
         registry.add(ViewApplyViewpoint),
         registry.add(BcfPutTopic),
         registry.add(BcfUpdateTopic),
@@ -1739,6 +1741,50 @@ impl Command for BcfSnapshot {
 #[serde(deny_unknown_fields)]
 pub struct BcfGetParams {
     pub topic_id: crate::issues::TopicRef,
+}
+
+#[derive(Debug)]
+struct ViewAnnotations3d;
+
+impl Command for ViewAnnotations3d {
+    type Params = crate::annotations_3d::InfoParams;
+    type Output = crate::annotations_3d::Info;
+    const META: CommandMeta = CommandMeta {
+        name: "view.annotations_3d",
+        version: 1,
+        summary: "A 3D view's annotation settings",
+        description: "Whether a 3D view shows the plans' annotation as floating labels (DOC-ANN-025), and each class \
+                      of it (text notes, dimensions, tags by the category they tag) with its count in the model and \
+                      whether the view shows it.",
+        effects: &[Effect::Read],
+        transaction_name: "",
+    };
+
+    fn run(&self, cx: &mut CommandContext<'_>, p: crate::annotations_3d::InfoParams) -> Result<crate::annotations_3d::Info> {
+        crate::annotations_3d::info(cx.store(), p)
+    }
+}
+
+#[derive(Debug)]
+struct ViewSet3dAnnotations;
+
+impl Command for ViewSet3dAnnotations {
+    type Params = crate::annotations_3d::SetParams;
+    type Output = ();
+    const META: CommandMeta = CommandMeta {
+        name: "view.set_3d_annotations",
+        version: 1,
+        summary: "Show or hide annotation in a 3D view",
+        description: "Turns a 3D view's floating annotation labels on or off (`shown`) and shows or hides each class \
+                      independently (`classes`: `text`, `dimensions`, `tags:Doors`, `tags:Windows`, `tags:Rooms`, … \
+                      to true or false), kept with the view (DOC-ANN-025).",
+        effects: &[Effect::Edit],
+        transaction_name: "Annotation in 3D",
+    };
+
+    fn run(&self, cx: &mut CommandContext<'_>, p: crate::annotations_3d::SetParams) -> Result<()> {
+        crate::annotations_3d::set(cx.edit()?, p)
+    }
 }
 
 #[derive(Debug)]

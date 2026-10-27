@@ -106,6 +106,7 @@ mod classification_ui;
 mod standards_ui;
 mod zones_ui;
 mod issues_ui;
+mod annotations_3d_ui;
 mod spaces_ui;
 mod lighting_ui;
 mod mep_fill_ui;
@@ -446,6 +447,9 @@ struct Gui {
     menu_runner: Option<MenuRunner>,
     /// The open radial menu (UI-SEL-007).
     radial: Option<radial::RadialMenu>,
+    /// Each 3D view's floating annotation labels and the model version they were made for
+    /// (DOC-ANN-025), by view id.
+    tips: std::collections::HashMap<u32, (reviera_core::document::ModelVersion, Vec<reviera_render::tooltips::Tip>)>,
     /// Per-user interface settings (the experimental radial menu, the reveal dwell).
     ui_settings: radial::UiSettings,
     /// Full-screen and focus mode (UI-DOCK-004).
@@ -994,6 +998,7 @@ impl Gui {
             self.active = Some(id);
             self.doc = Some(doc);
             let _ = self.app.activate(doc);
+            self.sync_toggles();
             let element = self.view(id).and_then(|v| v.element);
             self.app.set_active_view(doc, element);
             self.tree.stale = true;
@@ -3518,6 +3523,7 @@ fn attach_view_handlers(gui: &Rc<RefCell<Gui>>, id: u32, panel: Panel, frame: Fr
                 with(&gui, |g| action = g.key_action.take());
                 if let Some(a) = action {
                     perform(&gui, &f, &a);
+                    with(&gui, Gui::sync_toggles);
                 }
             }
             if used {
@@ -3775,6 +3781,7 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 quick_pair: None,
                 menu_runner: None,
                 radial: None,
+                tips: std::collections::HashMap::new(),
                 ui_settings: radial::UiSettings::load(),
                 chrome: fullscreen::Chrome::default(),
                 system_browser: None,
@@ -4030,6 +4037,7 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 *dispatch.borrow_mut() = Some(Box::new(move |id| {
                     if let Some(a) = catalog.action_of(id) {
                         perform(&gui, &f, &a.id);
+                        with(&gui, Gui::sync_toggles);
                     }
                 }));
             }
@@ -4721,6 +4729,8 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "gbxml.export" => with(gui, Gui::gbxml_export),
         "bcf.export_viewpoint" => with(gui, Gui::bcf_export_viewpoint),
         "bcf.create_topic" => with(gui, Gui::bcf_new_issue),
+        "view.toggle_3d_annotations" => with(gui, Gui::toggle_3d_annotations),
+        "view.annotations_3d" => with(gui, Gui::annotations_3d_dialog),
         "bcf.list" => with(gui, Gui::bcf_issues),
         "bcf.import" => with(gui, Gui::bcf_import),
         "bcf.export" => with(gui, Gui::bcf_export),

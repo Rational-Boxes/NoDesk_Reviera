@@ -2186,6 +2186,27 @@ All annotation tools are on the **Annotate** tab, in the panels Dimension, Detai
 - [ ] Deleting the target view shows "?" in the symbol and lists it in the warnings.
 - [ ] In a combined PDF, clicking the view reference opens sheet A103.
 
+
+### Annotation floating in 3D views
+**ID:** DOC-ANN-025 · **Priority:** P2 · **Ref:** owner request (2026-10-26)
+
+**Purpose.** See the plans' notes, tags and dimensions in 3D, where they apply, without annotating the 3D view itself.
+
+**Behaviour & rules.**
+- A 3D view shows the annotation of the model's plans as floating labels: each a boxed block of text drawn flat to the screen like a tooltip, with a dot at its point in the model and a short leader, so it reads the same from any angle.
+- Points: a text note 1 m above its plan's level; a door's or window's tag at the insert's centre; a wall's 1.5 m up its middle; a room's 0.3 m above its tag point; a dimension's segment values on its dimension line at the level. A host tagged in several plans is labelled once.
+- Classes: text notes, dimensions, and tags by the category they tag (door tags, window tags, room tags, …). A view shows annotation or not, and each class on its own; a new view shows every class but dimensions.
+- Nearer labels are placed first; one that would cover another moves up, and is left out after three steps. At most 150 at once.
+- View tab › Annotation (and Annotate tab › 3D, and the View menu): *Annotation in 3D* (a toggle button showing whether the active view shows them) and *Annotation Visibility…* (a check box for annotation in the view and one for each class with its count).
+
+**Data (RXD).** The view's `rxd:annotations_3d`: `{ shown, hidden: [class…] }`.
+
+**Commands.** `view.annotations_3d(view_id) -> { shown, classes[] }`; `view.set_3d_annotations(view_id, shown?, classes?: {class: bool}) -> ()`
+
+**Acceptance criteria.**
+- [x] The annotated plan sample's 3D view shows its two notes and its door, window and room tags, and its dimensions when chosen; hiding door tags leaves the others; undo brings back the previous choice. *(Built 2026-10-26, `tests/sample_features.rs`.)*
+
+*Built (2026-10-26):* as above. *(Owner, 2026-10-26: "On the 3D annotations should float as tool-tip style display. There needs to be a toggle to turn it on and off." "Visibility controls should be independent visibility, a control with a visibility check for each class of annotation.")* Not yet: hiding labels behind the model (they are always drawn), clicking a label to select its annotation, labels of sections' and elevations' annotation, keynotes and spot dimensions.
 ---
 
 ## 5.14 Schedules
@@ -3290,7 +3311,9 @@ Every command below is registered once in the command registry and is therefore 
 | `view.rename` | view_id, new_name | () | Yes | DOC-VIEW-001 |
 | `view.delete` | view_ids[] | () | Yes | DOC-VIEW-001 |
 | `view.open` | view_id | () | No | DOC-VIEW-001 |
+| `view.annotations_3d` | view_id | {shown, classes[]} | No | DOC-ANN-025 |
 | `view.get` | view_id | view_detail | No | DOC-VIEW-001 |
+| `view.set_3d_annotations` | view_id, shown?, classes? | () | Yes | DOC-ANN-025 |
 | `view.list` | filter? | view_summary[] | No | DOC-VIEW-001 |
 | `viewtype.create` | kind, name, default_template_id?, bind_new_views?, marker_type_id? | view_family_type_id | Yes | DOC-VIEW-001 |
 | `view_tag.settings` | kind?: callout\|elevation\|section | () | No | DOC-VIEW-001 |

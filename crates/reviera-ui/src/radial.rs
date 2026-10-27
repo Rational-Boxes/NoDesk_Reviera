@@ -484,22 +484,68 @@ impl crate::Gui {
         }
     }
 
-    /// Draws the ring over view `index` when it is open there.
+    /// Draws the HUD over view `index`: a 3D view's floating annotation labels (DOC-ANN-025), and
+    /// the ring over them when it is open there.
     pub(crate) fn update_hud(&mut self, index: usize, scale: f64) {
         use reviera_render::RenderBackend;
         use wxdragon::prelude::WxWidget;
         let dark = crate::ribbon::dark();
+        let tips = self.view_tips(index);
         let v = &mut self.views[index];
         let ring = self.radial.as_ref().filter(|r| r.view == v.id).map(|r| r.drawn(dark));
         let size = v.panel.get_client_size();
+        let (w, h) = (size.width as f32, size.height as f32);
+        let labels = (!tips.is_empty()).then(|| reviera_render::tooltips::layout(&tips, &v.camera, w, h, 1.0, dark));
         let Some(viewport) = &mut v.viewport else {
             return;
         };
-        viewport.set_hud(ring.map(|ring| {
-            let mut g = radial::gizmo(&ring, size.width as f32, size.height as f32);
-            g.rect = g.rect.map(|c| c * scale as f32);
-            g
-        }));
+        let hud = match (ring, labels) {
+            (None, None) => None,
+            (ring, labels) => {
+                let mut g = match ring {
+                    Some(ring) => radial::gizmo(&ring, w, h),
+                    None => reviera_render::Gizmo { rect: [0.0, 0.0, w.max(1.0), h.max(1.0)], view_proj: glam::Mat4::IDENTITY, eye: glam::Vec3::Z, meshes: Vec::new(), flat: Vec::new() },
+                };
+                // The labels under the ring.
+                if let Some(mut l) = labels {
+                    l.append(&mut g.flat);
+                    g.flat = l;
+                }
+                g.rect = g.rect.map(|c| c * scale as f32);
+                Some(g)
+            }
+        };
+        viewport.set_hud(hud);
+    }
+
+    /// The floating annotation labels a 3D view shows now, made again when the model changes.
+    fn view_tips(&mut self, index: usize) -> Vec<reviera_render::tooltips::Tip> {
+        let v = &self.views[index];
+        if v.is_2d() {
+            return Vec::new();
+        }
+        let (id, doc, element) = (v.id, v.doc, v.element);
+        let Some(d) = self.app.document(doc) else { return Vec::new() };
+        let version = d.doc.version();
+        if let Some((at, tips)) = self.tips.get(&id)
+            && *at == version
+        {
+            return tips.clone();
+        }
+        let store = d.doc.store();
+        // The unsaved {3D} view shows the defaults.
+        let tips: Vec<reviera_render::tooltips::Tip> = match element.and_then(|e| store.get(e)) {
+            Some(view) => reviera_core::annotations_3d::shown(store, view),
+            None => {
+                let s = reviera_core::annotations_3d::Settings::default();
+                reviera_core::annotations_3d::tips(store).into_iter().filter(|t| s.shows(&t.class)).collect()
+            }
+        }
+        .into_iter()
+        .map(|t| reviera_render::tooltips::Tip { anchor: glam::Vec3::new(t.anchor[0] as f32, t.anchor[1] as f32, t.anchor[2] as f32), lines: t.lines })
+        .collect();
+        self.tips.insert(id, (version, tips.clone()));
+        tips
     }
 }
 

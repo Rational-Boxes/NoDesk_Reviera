@@ -347,10 +347,12 @@ void* reviera_rb_page(void* bar, const char* label) {
     return new wxRibbonPage(static_cast<wxRibbonBar*>(bar), wxID_ANY, wxString::FromUTF8(label));
 }
 
-// A panel on `page`, returning its button bar.
-void* reviera_rb_panel(void* page, const char* label) {
+// A panel on `page`, returning its button bar; `svg` is the icon it shows when collapsed to its
+// dropdown (empty for none).
+void* reviera_rb_panel(void* page, const char* label, const char* svg) {
     auto* p = static_cast<wxRibbonPage*>(page);
-    auto* panel = new wxRibbonPanel(p, wxID_ANY, wxString::FromUTF8(label), wxNullBitmap,
+    wxBitmap icon = (svg && *svg) ? svg_bundle(svg, 32).GetBitmap(wxSize(32, 32)) : wxNullBitmap;
+    auto* panel = new wxRibbonPanel(p, wxID_ANY, wxString::FromUTF8(label), icon,
                                     wxDefaultPosition, wxDefaultSize,
                                     wxRIBBON_PANEL_DEFAULT_STYLE & ~wxRIBBON_PANEL_EXT_BUTTON);
     auto* buttons = new wxRibbonButtonBar(panel);
