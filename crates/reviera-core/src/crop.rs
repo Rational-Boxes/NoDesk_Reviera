@@ -84,10 +84,9 @@ fn scale_of(e: &Element) -> f64 {
     e.param(VIEW_KEY).and_then(|v| v.get("scale")?.as_f64()).unwrap_or(100.0)
 }
 
-/// The scope box a plan follows, if it has one that exists.
+/// The scope box a view follows, if it has one that exists.
 fn scope_box(store: &Store, e: &Element) -> Option<crate::scope_boxes::ScopeBox> {
-    let kind = crate::views::view_data(e)?.kind;
-    if !(crate::plans::is_plan(&kind) || kind == crate::areas::KIND_AREA_PLAN) {
+    if !croppable(e) {
         return None;
     }
     let guid = e.param(crate::scope_boxes::VIEW_KEY)?.as_str()?;
@@ -95,19 +94,28 @@ fn scope_box(store: &Store, e: &Element) -> Option<crate::scope_boxes::ScopeBox>
     crate::scope_boxes::recipe(b)
 }
 
-/// The crop a view uses: its own, or (for a plan assigned to a scope box) the box's footprint,
-/// on unless the view's crop was switched off.
+/// The crop a view uses: its own, or (for a view assigned to a scope box) the rectangle round
+/// the box as the view sees it (a plan its footprint, a section or elevation the box seen from
+/// the side, from its bottom to its top), on unless the view's crop was switched off.
 pub fn effective(store: &Store, e: &Element) -> Option<Crop> {
     let own = crop_of(e);
-    match scope_box(store, e) {
-        Some(b) => {
-            let corners = b.corners();
-            let lo = corners.iter().fold([f64::MAX; 2], |a, c| [a[0].min(c[0]), a[1].min(c[1])]);
-            let hi = corners.iter().fold([f64::MIN; 2], |a, c| [a[0].max(c[0]), a[1].max(c[1])]);
-            Some(Crop { enabled: own.is_none_or(|c| c.enabled), visible: own.is_some_and(|c| c.visible), min: lo, max: hi })
+    let Some(b) = scope_box(store, e) else { return own };
+    let frame = crate::sections::section_of(e).map(|(_, d)| d.frame());
+    let (mut lo, mut hi) = ([f64::MAX; 2], [f64::MIN; 2]);
+    for c in b.corners() {
+        for z in [b.bottom, b.bottom + b.height] {
+            let q = match &frame {
+                Some(f) => {
+                    let l = f.to_local([c[0], c[1], z]);
+                    [l[0], l[1]]
+                }
+                None => c,
+            };
+            lo = [lo[0].min(q[0]), lo[1].min(q[1])];
+            hi = [hi[0].max(q[0]), hi[1].max(q[1])];
         }
-        None => own,
     }
+    Some(Crop { enabled: own.is_none_or(|c| c.enabled), visible: own.is_some_and(|c| c.visible), min: lo, max: hi })
 }
 
 /// Whether a view's crop follows a scope box.

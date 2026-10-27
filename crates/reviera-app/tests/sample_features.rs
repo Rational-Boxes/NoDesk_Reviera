@@ -714,4 +714,22 @@ fn a_plan_assigned_to_a_scope_box_is_cropped_to_it() {
     ok(&mut app, "element.move", json!({ "element_ids": [b], "vector": [-2.0, 0.0, 0.0] }));
     let (lo, hi) = xs(&app);
     assert!(lo >= 2.6 - 1e-3 && hi <= 9.0 + 1e-3 && lo < 4.0, "{lo} .. {hi}");
+
+    // An elevation assigned to the box is cropped to it seen from the side: the South elevation
+    // (looking north, x to the east) shows only the box's width, from its bottom to its top.
+    let south = view_id(&mut app, "South", "view.elevation");
+    let whole = app.section_drawing(doc, ElementId(south)).unwrap();
+    let span = |d: &reviera_app::output::PlanDrawing| d.graphics.lines.iter().flat_map(|l| l.segments.iter().flat_map(|s| [s[0][0], s[1][0]])).fold((f32::MAX, f32::MIN), |(a, b), x| (a.min(x), b.max(x)));
+    let (wlo, whi) = span(&whole);
+    ok(&mut app, "view.assign_scope_box", json!({ "view_ids": [south], "scope_box_id": b }));
+    let s = store(&app);
+    let e = s.get(ElementId(south)).unwrap();
+    assert!(reviera_core::crop::follows_scope_box(&s, e));
+    let c = reviera_core::crop::effective(&s, e).unwrap();
+    assert!((c.max[0] - c.min[0] - 6.4).abs() < 1e-6, "the box's width: {c:?}");
+    let sb = reviera_core::scope_boxes::recipe(s.get(b).unwrap()).unwrap();
+    assert!((c.min[1] - sb.bottom).abs() < 1e-6 && (c.max[1] - sb.bottom - sb.height).abs() < 1e-6, "{c:?} {sb:?}");
+    let (lo, hi) = span(&app.section_drawing(doc, ElementId(south)).unwrap());
+    assert!(lo >= c.min[0] as f32 - 1e-3 && hi <= c.max[0] as f32 + 1e-3, "{lo} .. {hi} in {c:?}");
+    assert!(hi - lo < whi - wlo - 1.0, "narrower than the whole elevation ({wlo} .. {whi})");
 }

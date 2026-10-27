@@ -1356,8 +1356,8 @@ simulation sessions, and the first engine runners (see [Not built yet](#not-buil
   Annotation Crop and Reset Crop in Properties: the model (lines, fills and the shaded model) is
   drawn only inside the rectangle (whose edges and corners are dragged in the view, or sized in *Size Crop…*), tags of elements outside it are hidden, and with the
   annotation crop on, annotation is clipped to a margin round it; printed and sheet drawings
-  crop alike; a plan assigned to a scope box is cropped to the box, and follows it when the box
-  moves (`view.set_crop`, `view.reset_crop`, `view.set_annotation_crop`, `view.size_crop`; DOC-GFX-015).
+  crop alike; a plan, section or elevation assigned to a scope box is cropped to the box (seen
+  from the side in a section), and follows it when the box moves (`view.set_crop`, `view.reset_crop`, `view.set_annotation_crop`, `view.size_crop`; DOC-GFX-015).
 - **Spot elevations, coordinates and slopes**: Annotate › Spot Elevation (EL), Spot Coordinate and Spot Slope, in
   plans, sections and elevations: click a point on an element, then where the text goes. A spot
   reads the point's height (or its element's top and bottom there) from the project base point,
