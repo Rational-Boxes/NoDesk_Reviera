@@ -89,6 +89,7 @@ impl Gui {
         );
         let refresh = button(&panel, "Run Again", "Run the last clash test again");
         let export = button(&panel, "Export…", "Write the clash report as CSV or HTML");
+        let issues = button(&panel, "Issues", "Make a BCF issue for each open clash: boxed round it, both elements selected, with a snapshot (clashes that have one already are skipped)");
         let gauge = Gauge::builder(&panel).with_range(100).build();
         let info = StaticText::builder(&panel)
             .with_label("No clash test has run yet.")
@@ -151,7 +152,8 @@ impl Gui {
         let row = BoxSizer::builder(Orientation::Horizontal).build();
         row.add(&run, 1, SizerFlag::Right, 2);
         row.add(&refresh, 1, SizerFlag::Right, 2);
-        row.add(&export, 1, SizerFlag::Right, 8);
+        row.add(&export, 1, SizerFlag::Right, 2);
+        row.add(&issues, 1, SizerFlag::Right, 8);
         let show = StaticText::builder(&panel).with_label("Show").build();
         row.add(
             &show,
@@ -229,6 +231,10 @@ impl Gui {
         {
             let g = gui.clone();
             export.on_click(move |_| with(&g, Gui::export_clash_report));
+        }
+        {
+            let g = gui.clone();
+            issues.on_click(move |_| with(&g, Gui::clash_issues));
         }
         {
             let g = gui.clone();
@@ -657,6 +663,25 @@ impl Gui {
                 json!({ "result_ids": [item["id"]], "comment": format!("Resolved in Reviera: {}", actions.iter().find(|x| x.1 == action).map_or("", |x| x.0.as_str())) }),
             );
             self.refresh_clash_list();
+        }
+    }
+
+    /// Issues: a BCF topic for each open clash (COL-BCF-005).
+    fn clash_issues(&mut self) {
+        let frame = self.frame;
+        match self.run("bcf.from_clash", json!({})) {
+            Ok(r) => {
+                let made = r["topic_ids"].as_array().map_or(0, Vec::len);
+                let already = r["already"].as_u64().unwrap_or(0);
+                let msg = match (made, already) {
+                    (0, 0) => "No open clashes to make issues of".to_owned(),
+                    (0, a) => format!("Every open clash has an issue already ({a}); View › Coordination › Issues lists them"),
+                    (m, 0) => format!("{m} issues made from the clashes; View › Coordination › Issues lists them"),
+                    (m, a) => format!("{m} issues made; {a} clashes had one already"),
+                };
+                frame.set_status_text(&msg, 0);
+            }
+            Err(e) => error(&frame, &e),
         }
     }
 

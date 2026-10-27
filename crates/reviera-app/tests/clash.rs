@@ -139,6 +139,23 @@ fn clash_tests_keep_statuses_between_runs_and_navigate_by_element() {
     let local = run(&mut app, "overlap.find", json!({ "limit": 10000 }));
     assert_eq!(local["overlaps"].as_array().unwrap().len() as u64, n);
 
+    // An issue per clash (COL-BCF-005): boxed round it, both elements selected, with a snapshot;
+    // made again, nothing is added.
+    let made = run(&mut app, "bcf.from_clash", json!({}));
+    assert_eq!(made["topic_ids"].as_array().unwrap().len() as u64, n, "{made:#}");
+    assert_eq!(made["snapshots"].as_u64(), Some(n));
+    let t = run(&mut app, "bcf.get", json!({ "topic_id": made["topic_ids"][0] }));
+    assert!(t["title"].as_str().unwrap().starts_with("Clash: ") && t["title"].as_str().unwrap().contains(" × "), "{t:#}");
+    assert_eq!((t["topic_type"].as_str(), t["labels"][0].as_str()), (Some("Clash"), Some("Clash")));
+    let vp = &t["viewpoints"][0];
+    assert_eq!(vp["viewpoint"]["clipping_planes"].as_array().unwrap().len(), 6, "a section box");
+    assert_eq!(vp["viewpoint"]["selection"].as_array().unwrap().len(), 2);
+    assert!(vp["snapshot"].is_string());
+    let again = run(&mut app, "bcf.from_clash", json!({}));
+    assert_eq!((again["topic_ids"].as_array().unwrap().len(), again["already"].as_u64()), (0, Some(n)), "{again:#}");
+    run(&mut app, "edit.undo", json!({}));
+    assert_eq!(run(&mut app, "bcf.list", json!({})).as_array().unwrap().len(), 0, "one step to undo");
+
     // Review one, with a comment.
     let reviewed = items[0]["id"].as_str().unwrap().to_owned();
     run(

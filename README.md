@@ -1383,7 +1383,9 @@ simulation sessions, and the first engine runners (see [Not built yet](#not-buil
   copy changed last, comments and viewpoints joined by their GUIDs (`bcf.create_topic`,
   `bcf.update_topic`, `bcf.add_comment`, `bcf.add_viewpoint`, `bcf.apply_viewpoint`,
   `bcf.delete_topic`, `bcf.list`, `bcf.get`, `bcf.snapshot`, `bcf.import`, `bcf.export`,
-  `bcf.lists`; COL-BCF-001).
+  `bcf.lists`; COL-BCF-001). The Clash Detection pane's Issues button makes an issue of each open
+  clash, boxed round it with both elements selected and a snapshot; made again, it adds only the
+  new clashes (`bcf.from_clash`, COL-BCF-005).
 - **Model Tree** (MT): Project › Site › Building › storeys › categories › elements, with hosted
   elements under their hosts; its context menu selects, hides, isolates or boxes whole branches
   (`model.tree`).
@@ -1642,7 +1644,7 @@ area by area (reviewed against the spec on 2026-10-15).
 - **Coordination**: clash tests (COL-CLASH), automatic pipe and duct penetrations (MEP-PEN-001),
   bathroom fixture clear floor spaces and turning spaces, ISO 21542. For BCF issues: the docked
   Issues pane (COL-BCF-004; a dialog for now), the project's lists as edited
-  extensions, issues from clash results, document references, component colouring, BCF API sync
+  extensions, issues from review items and warnings, document references, component colouring, BCF API sync
   with a server (COL-BCF-002).
 - **Documentation**: crop regions, jogged sections, interior elevation markers, opening a view
   from its marker; schedule filters in the Filter dialog beyond one condition (several are taken by `schedule.set_filters`), grouping and calculated fields; title block families,

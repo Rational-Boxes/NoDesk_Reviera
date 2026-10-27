@@ -403,3 +403,178 @@ impl HostCommand for BcfImport {
         Ok(ImportResult { version, topics: topics.len(), added: n("added"), updated: n("updated"), unchanged: n("unchanged"), viewpoints, snapshots, problems })
     }
 }
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct FromClashParams {
+    /// Clash result ids (`clash.results`); every open clash (new, active or reviewed) when
+    /// omitted.
+    pub clash_ids: Option<Vec<String>>,
+    /// `clash` (the default): a topic per clash; `element`: a topic per element of set A with
+    /// all its clashes.
+    pub group_by: Option<String>,
+    /// Space round the clash in its section box, metres (default 1).
+    pub margin: Option<f64>,
+    pub fields: Option<TopicFields>,
+    pub author: Option<String>,
+}
+
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct FromClashReport {
+    /// The topics made (their GUIDs).
+    pub topic_ids: Vec<String>,
+    /// Clashes that already had an issue.
+    pub already: usize,
+    pub snapshots: usize,
+}
+
+/// A topic GUID that is the same for the same clashes: a hash of their ids as a UUID.
+fn clash_guid(ids: &[&str]) -> String {
+    let fnv = |seed: u64| ids.iter().flat_map(|s| s.bytes().chain([0u8])).fold(seed, |h, b| (h ^ u64::from(b)).wrapping_mul(0x0100_0000_01b3));
+    let n = (u128::from(fnv(0xcbf2_9ce4_8422_2325)) << 64) | u128::from(fnv(0x8422_2325_cbf2_9ce4));
+    // Version 8 (custom), RFC 9562 variant.
+    let n = (n & !(0xf << 76)) | (0x8 << 76);
+    let n = (n & !(0x3 << 62)) | (0x2 << 62);
+    uuid::Uuid::from_u128(n).to_string()
+}
+
+pub(crate) struct BcfFromClash;
+
+impl HostCommand for BcfFromClash {
+    type Host = App;
+    type Params = FromClashParams;
+    type Output = FromClashReport;
+    const META: CommandMeta = CommandMeta {
+        name: "bcf.from_clash",
+        version: 1,
+        summary: "Make BCF issues from clash results",
+        description: "Makes a BCF topic (COL-BCF-005) for each clash result (`clash_ids`, or every open one), or for \
+                      each element of set A with all its clashes (`group_by: \"element\"`): type Clash, status Open, \
+                      titled by the two elements, described by volume, depth and status, labelled Clash, with a \
+                      viewpoint boxed round the clash (`margin`, default 1 m), looking at it, both elements selected, \
+                      and its snapshot. A clash that already has an issue is skipped, so running it again only adds \
+                      the new ones. One undoable step. Returns the topics made.",
+        effects: &[Effect::Edit],
+        transaction_name: "",
+    };
+
+    fn run(&self, app: &mut App, caller: &Caller, p: FromClashParams) -> Result<FromClashReport> {
+        use reviera_core::clashes::Status;
+        let s = store(app)?.clone();
+        let doc = app.active().expect("checked");
+        let margin = p.margin.unwrap_or(1.0).clamp(0.0, 50.0);
+        let all = reviera_core::clashes::results(&s);
+        let chosen: Vec<&reviera_core::clashes::Record> = match &p.clash_ids {
+            Some(ids) => ids
+                .iter()
+                .map(|id| all.iter().find(|r| &r.id == id).ok_or_else(|| bad("clash.not_found", format!("no clash result {id}"))))
+                .collect::<Result<_>>()?,
+            None => all.iter().filter(|r| matches!(r.status, Status::New | Status::Active | Status::Reviewed)).collect(),
+        };
+        if chosen.is_empty() {
+            return Err(bad("bcf.no_clashes", "there are no open clash results: run a clash test first"));
+        }
+        let by_element = match p.group_by.as_deref() {
+            None | Some("clash") => false,
+            Some("element") => true,
+            Some(o) => return Err(bad("bcf.bad_group", format!("group_by is clash or element, not {o}"))),
+        };
+        let mut groups: Vec<Vec<&reviera_core::clashes::Record>> = Vec::new();
+        for r in chosen {
+            match groups.iter_mut().find(|g| by_element && g[0].a == r.a) {
+                Some(g) => g.push(r),
+                None => groups.push(vec![r]),
+            }
+        }
+        let label = |guid: &str| -> String {
+            let e = reviera_core::id::GlobalId::parse(guid).and_then(|g| s.find_by_guid(&g)).and_then(|id| s.get(id));
+            match e {
+                Some(e) => {
+                    let cat = reviera_core::categories::category_of(e).map_or(e.class.trim_start_matches("Ifc").to_owned(), |c| c.name.trim_end_matches('s').to_owned());
+                    match &e.name {
+                        Some(n) if !n.is_empty() => format!("{cat} {n}"),
+                        _ => cat,
+                    }
+                }
+                None => format!("element {guid}"),
+            }
+        };
+        let existing: std::collections::HashSet<String> = issues::all(&s).into_iter().map(|(_, t)| t.guid.to_lowercase()).collect();
+        let (mut topics, mut snapshots, mut made, mut already) = (Vec::new(), issues::Snapshots::new(), Vec::new(), 0);
+        for g in groups {
+            let ids: Vec<&str> = g.iter().map(|r| r.id.as_str()).collect();
+            let guid = clash_guid(&ids);
+            if existing.contains(&guid) {
+                already += g.len();
+                continue;
+            }
+            let (mut lo, mut hi) = ([f64::MAX; 3], [f64::MIN; 3]);
+            for r in &g {
+                for k in 0..3 {
+                    lo[k] = lo[k].min(r.min[k]);
+                    hi[k] = hi[k].max(r.max[k]);
+                }
+            }
+            let (lo, hi) = (lo.map(|v| v - margin), hi.map(|v| v + margin));
+            let centre = [0, 1, 2].map(|k| (lo[k] + hi[k]) / 2.0);
+            let radius = (0..3).map(|k| (hi[k] - lo[k]).powi(2)).sum::<f64>().sqrt() / 2.0;
+            // From the south-east, above, far enough to see the box at a 45° vertical view.
+            let dir = [1.0, -1.0, 0.8].map(|v: f64| v / (2.64f64).sqrt());
+            let distance = radius.max(1.0) / (22.5f64.to_radians()).sin() * 1.1;
+            let eye = [0, 1, 2].map(|k| centre[k] + dir[k] * distance);
+            let section = reviera_core::views::SectionBox { enabled: true, transform: None, min: lo, max: hi, show_cut_faces: true };
+            let mut selection: Vec<String> = Vec::new();
+            for r in &g {
+                for x in [&r.a, &r.b] {
+                    if !selection.contains(x) {
+                        selection.push(x.clone());
+                    }
+                }
+            }
+            let vp = bcf::Viewpoint {
+                guid: Some(issues::new_guid()),
+                camera: Some(bcf::Camera::Perspective { eye, direction: dir.map(|v| -v), up: [0.0, 0.0, 1.0], field_of_view: 45.0, aspect_ratio: bcf::ASPECT }),
+                clipping_planes: reviera_core::views::to_bcf(Some(&section), &[]),
+                selection,
+                visibility: bcf::Visibility::default(),
+            };
+            let first = g[0];
+            let title = if g.len() == 1 {
+                format!("Clash: {} × {}", label(&first.a), label(&first.b))
+            } else {
+                format!("Clashes: {} × {} elements", label(&first.a), g.len())
+            };
+            let description = g
+                .iter()
+                .map(|r| format!("{} × {}: {:.4} m³, {:.0} mm deep, {} (clash {})", label(&r.a), label(&r.b), r.volume, r.depth * 1000.0, r.status.name(), r.id))
+                .collect::<Vec<_>>()
+                .join("\n");
+            let mut t = Topic {
+                guid: guid.clone(),
+                title,
+                description: Some(description),
+                topic_type: Some("Clash".into()),
+                status: Some("Open".into()),
+                labels: vec!["Clash".into()],
+                creation_date: issues::now(),
+                creation_author: p.author.clone().unwrap_or_else(issues::default_author),
+                ..Topic::default()
+            };
+            if let Some(f) = p.fields.clone() {
+                f.apply_to(&mut t);
+            }
+            let vguid = vp.guid.clone().expect("set");
+            if let Ok(img) = app.render_viewpoint(doc, &vp, 1024) {
+                use base64::Engine;
+                snapshots.insert(vguid.clone(), base64::engine::general_purpose::STANDARD.encode(img.png));
+            }
+            t.viewpoints.push(TopicViewpoint { guid: vguid, viewpoint: vp, snapshot: None });
+            made.push(guid);
+            topics.push(t);
+        }
+        if !topics.is_empty() {
+            app.execute("bcf.merge_topics", json!({ "topics": topics, "snapshots": snapshots }), caller)?;
+        }
+        Ok(FromClashReport { topic_ids: made, already, snapshots: snapshots.len() })
+    }
+}

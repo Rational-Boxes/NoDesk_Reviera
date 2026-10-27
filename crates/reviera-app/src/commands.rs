@@ -139,6 +139,7 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add_host(crate::bcf_topics::BcfApplyViewpoint),
         registry.add_host(crate::bcf_topics::BcfExport),
         registry.add_host(crate::bcf_topics::BcfImport),
+        registry.add_host(crate::bcf_topics::BcfFromClash),
         registry.add_host(crate::gbxml_files::GbxmlImportLoads),
         registry.add_host(crate::gbxml_files::HbjsonExport),
         registry.add_host(crate::connectors::ConnectorsList),

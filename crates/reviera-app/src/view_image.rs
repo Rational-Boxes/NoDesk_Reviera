@@ -123,4 +123,38 @@ impl App {
         let png = reviera_render_wgpu::encode_png(w, h, &px).map_err(|e| Error::new("view_image.png", e))?;
         Ok(ViewImage { png, width: w, height: h, view: name, source: "offscreen" })
     }
+
+    /// A BCF viewpoint rendered offscreen (COL-BCF-001): its camera, its clipping planes as the
+    /// section box and slices they form, its selection highlighted and its hidden or isolated
+    /// components, as a PNG.
+    pub fn render_viewpoint(&self, doc: DocumentId, vp: &reviera_core::bcf::Viewpoint, max_size: u32) -> Result<ViewImage> {
+        use reviera_core::id::GlobalId;
+        let store = self.get(doc)?.doc.store();
+        let size = max_size.clamp(64, 4096);
+        let (w, h) = (size, (size * 3 / 4).max(48));
+        let mut viewport = WgpuViewport::offscreen(w, h).map_err(|e| Error::new("view_image.gpu", format!("no graphics adapter to render with: {e}")))?;
+        let scene = self.render_scene(doc)?;
+        viewport.set_scene(&scene);
+        let (section_box, slices) = views::from_bcf(&vp.clipping_planes);
+        viewport.set_clipping(&reviera_render::Clipping::of(section_box.as_ref(), &slices));
+        let find = |gs: &[String]| -> Vec<ElementId> { gs.iter().filter_map(|g| GlobalId::parse(g).and_then(|g| store.find_by_guid(&g))).collect() };
+        viewport.set_highlight(&find(&vp.selection));
+        let exceptions = find(&vp.visibility.exceptions);
+        let mut vis = reviera_render::Visibility::default();
+        if vp.visibility.default_visibility {
+            vis.hidden.extend(exceptions);
+        } else {
+            let keep: std::collections::HashSet<ElementId> = exceptions.into_iter().collect();
+            vis.hidden.extend(store.iter().map(|e| e.id()).filter(|id| !keep.contains(id)));
+        }
+        viewport.set_visibility(&vis);
+        let c = match &vp.camera {
+            Some(c) => reviera_core::bcf::view_camera(c, 10.0)?,
+            None => self.fitting_camera(doc),
+        };
+        viewport.render(&Camera::from_view(&c, w as f32 / h as f32)).map_err(|e| Error::new("view_image.render", e))?;
+        let px = viewport.read_pixels().ok_or_else(|| Error::new("view_image.render", "the frame could not be read back"))?;
+        let png = reviera_render_wgpu::encode_png(w, h, &px).map_err(|e| Error::new("view_image.png", e))?;
+        Ok(ViewImage { png, width: w, height: h, view: "viewpoint".into(), source: "offscreen" })
+    }
 }
