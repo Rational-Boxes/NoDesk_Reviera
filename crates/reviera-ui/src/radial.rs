@@ -490,13 +490,23 @@ impl crate::Gui {
         use reviera_render::RenderBackend;
         use wxdragon::prelude::WxWidget;
         let dark = crate::ribbon::dark();
-        let tips = self.view_tips(index);
-        let tips = self.unhidden_tips(index, tips);
+        let labels = self.view_tips(index);
+        let labels = self.unhidden_tips(index, labels);
         let v = &mut self.views[index];
         let ring = self.radial.as_ref().filter(|r| r.view == v.id).map(|r| r.drawn(dark));
         let size = v.panel.get_client_size();
         let (w, h) = (size.width as f32, size.height as f32);
-        let labels = (!tips.is_empty()).then(|| reviera_render::tooltips::layout(&tips, &v.camera, w, h, 1.0, dark));
+        // A selected annotation's label is drawn so.
+        let selection = self.app.document(v.doc).map(|d| d.selection.clone()).unwrap_or_default();
+        let tips: Vec<reviera_render::tooltips::Tip> =
+            labels.iter().map(|l| reviera_render::tooltips::Tip { selected: selection.contains(&l.id), ..l.tip.clone() }).collect();
+        let labels_drawn = (!tips.is_empty()).then(|| reviera_render::tooltips::layout(&tips, &v.camera, w, h, 1.0, dark));
+        // Where each label is now, for clicks on it.
+        let placed = labels_drawn.as_ref().map(|(_, boxes)| boxes.iter().map(|b| (labels[b.tip].clone(), *b)).collect()).unwrap_or_default();
+        let view_id = v.id;
+        let labels = labels_drawn.map(|(meshes, _)| meshes);
+        self.tip_boxes.insert(view_id, placed);
+        let v = &mut self.views[index];
         let Some(viewport) = &mut v.viewport else {
             return;
         };
@@ -521,7 +531,7 @@ impl crate::Gui {
 
     /// The floating annotation labels a 3D view shows now, and whether it leaves out those behind
     /// the model; made again when the model changes.
-    fn view_tips(&mut self, index: usize) -> (bool, Vec<reviera_render::tooltips::Tip>) {
+    fn view_tips(&mut self, index: usize) -> (bool, Vec<TipLabel>) {
         let v = &self.views[index];
         if v.is_2d() {
             return (false, Vec::new());
@@ -537,13 +547,17 @@ impl crate::Gui {
         let store = d.doc.store();
         // The unsaved {3D} view shows the defaults.
         let settings = element.and_then(|e| store.get(e)).map(reviera_core::annotations_3d::settings).unwrap_or_default();
-        let tips: Vec<reviera_render::tooltips::Tip> = if settings.shown {
+        let tips: Vec<TipLabel> = if settings.shown {
             reviera_core::annotations_3d::tips(store).into_iter().filter(|t| settings.shows(&t.class)).collect()
         } else {
             Vec::new()
         }
         .into_iter()
-        .map(|t| reviera_render::tooltips::Tip { anchor: glam::Vec3::new(t.anchor[0] as f32, t.anchor[1] as f32, t.anchor[2] as f32), lines: t.lines })
+        .map(|t| TipLabel {
+            id: t.id,
+            plan: t.plan,
+            tip: reviera_render::tooltips::Tip { anchor: glam::Vec3::new(t.anchor[0] as f32, t.anchor[1] as f32, t.anchor[2] as f32), lines: t.lines, selected: false },
+        })
         .collect();
         self.tips.insert(id, (version, settings.occlude, tips.clone()));
         (settings.occlude, tips)
@@ -553,7 +567,7 @@ impl crate::Gui {
     /// from the eye (or, in a parallel view, from far back along the view) meeting what one cannot
     /// see through more than 0.4 m before a point hides it; what the section box and slices cut
     /// away and what is hidden in the view do not.
-    fn unhidden_tips(&mut self, index: usize, (occlude, tips): (bool, Vec<reviera_render::tooltips::Tip>)) -> Vec<reviera_render::tooltips::Tip> {
+    fn unhidden_tips(&mut self, index: usize, (occlude, tips): (bool, Vec<TipLabel>)) -> Vec<TipLabel> {
         if !occlude || tips.is_empty() {
             return tips;
         }
@@ -589,9 +603,18 @@ impl crate::Gui {
             bvh.nearest(origin, to, before, &accept).is_none()
         };
         tips.into_iter()
-            .filter(|t| [0.0, 1.2, 2.4].iter().any(|h| seen(t.anchor + glam::Vec3::Z * *h)))
+            .filter(|t| [0.0, 1.2, 2.4].iter().any(|h| seen(t.tip.anchor + glam::Vec3::Z * *h)))
             .collect()
     }
+}
+
+/// A floating label of a 3D view and the annotation it stands for (DOC-ANN-025).
+#[derive(Debug, Clone)]
+pub(crate) struct TipLabel {
+    pub id: reviera_core::ElementId,
+    /// The GlobalId of the plan the annotation is drawn in.
+    pub plan: String,
+    pub tip: reviera_render::tooltips::Tip,
 }
 
 // ---- The experimental setting ----

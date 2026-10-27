@@ -297,6 +297,11 @@ fn the_annotated_plan_floats_its_annotation_in_3d() {
     let tips = reviera_core::annotations_3d::tips(&s);
     let living = tips.iter().find(|t| t.lines.first().map(String::as_str) == Some("Living")).unwrap();
     assert!((living.anchor[2] - 0.3).abs() < 1e-9, "{living:?}");
+    // Each names the plan it is drawn in, which double-clicking its label opens.
+    for t in &tips {
+        let plan = reviera_core::GlobalId::parse(&t.plan).and_then(|g| s.find_by_guid(&g)).unwrap_or_else(|| panic!("{t:?}"));
+        assert!(reviera_core::views::view_data(s.get(plan).unwrap()).is_some_and(|d| reviera_core::plans::is_plan(&d.kind)));
+    }
     assert!(app.execute("view.set_3d_annotations", json!({ "view_id": view, "classes": { "nonsense": true } }), &Caller::user()).is_err());
     ok(&mut app, "view.set_3d_annotations", json!({ "view_id": view, "occlude": false }));
     assert_eq!(ok(&mut app, "view.annotations_3d", json!({ "view_id": view }))["occlude"], false);

@@ -4,14 +4,15 @@
 //! Annotation in 3D views (DOC-ANN-025): View › Annotation › *Annotation in 3D* turns the active
 //! 3D view's floating labels on and off; *Annotation Visibility* shows or hides each class (text
 //! notes, dimensions, tags by category) on its own. The labels are drawn in the HUD layer
-//! (`radial::update_hud`). Also: the ribbon's toggle buttons are kept showing their settings
-//! ([`Gui::sync_toggles`]).
+//! (`radial::update_hud`). A click on a label selects its annotation; a double click opens the plan
+//! it is drawn in with it selected ([`Gui::tip_click`]). Also: the ribbon's toggle buttons are kept
+//! showing their settings ([`Gui::sync_toggles`]).
 
 use reviera_core::ElementId;
 use serde_json::json;
 use wxdragon::prelude::*;
 
-use super::{Gui, error};
+use super::{Gui, error, select};
 use crate::fullscreen;
 
 /// Panes the View tab shows and hides, by action and pane name.
@@ -57,6 +58,43 @@ impl Gui {
         self.ribbon.set_toggled("ui.radial.toggle", self.ui_settings.radial_menu);
         let shown = self.active_3d_settings().is_some_and(|s| s.shown);
         self.ribbon.set_toggled("view.toggle_3d_annotations", shown);
+    }
+
+    /// A click at (`x`, `y`) on a floating label of the active 3D view: selects its annotation,
+    /// or, the second click on one within 0.45 s, opens the plan it is drawn in with the
+    /// annotation selected. False when no label is there.
+    pub(crate) fn tip_click(&mut self, x: i32, y: i32, combine: select::Combine) -> bool {
+        const DOUBLE: std::time::Duration = std::time::Duration::from_millis(450);
+        let Some(v) = self.active_view().filter(|v| !v.is_2d()) else { return false };
+        let (view, doc) = (v.id, v.doc);
+        let Some(boxes) = self.tip_boxes.get(&view) else { return false };
+        let placed: Vec<reviera_render::tooltips::Placed> = boxes.iter().map(|(_, b)| *b).collect();
+        let Some(k) = reviera_render::tooltips::hit(&placed, glam::Vec2::new(x as f32, y as f32)) else { return false };
+        let Some((label, _)) = boxes.iter().find(|(_, b)| b.tip == k) else { return false };
+        let label = label.clone();
+        let now = std::time::Instant::now();
+        let double = self.tip_click.is_some_and(|(id, at)| id == label.id && now.duration_since(at) < DOUBLE);
+        self.tip_click = (!double).then_some((label.id, now));
+        let frame = self.frame;
+        let what = label.tip.lines.join(" ");
+        if double {
+            let plan = self.app.document(doc).and_then(|d| {
+                let store = d.doc.store();
+                reviera_core::GlobalId::parse(&label.plan).and_then(|g| store.find_by_guid(&g))
+            });
+            match plan {
+                Some(plan) => {
+                    self.open_view(doc, Some(plan));
+                    self.select_ids(&[label.id], select::Combine::Replace);
+                    frame.set_status_text(&format!("{what}: opened its plan"), 0);
+                }
+                None => frame.set_status_text(&format!("{what}: its plan is not in the model"), 0),
+            }
+            return true;
+        }
+        self.select_ids(&[label.id], combine);
+        frame.set_status_text(&format!("{what} selected; double-click to open its plan"), 0);
+        true
     }
 
     /// View › Annotation › Annotation in 3D.

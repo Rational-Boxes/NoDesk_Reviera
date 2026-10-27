@@ -57,6 +57,24 @@ void reviera_wants_chars(void* window) {
     w->SetWindowStyleFlag((w->GetWindowStyleFlag() | wxWANTS_CHARS) & ~wxTAB_TRAVERSAL);
 }
 
+// A double click's second press reaches a view's press handlers as a press. wxWidgets sends it
+// only as a double click event (wxGTK drops GDK's extra press), which would drop the second of two
+// quick clicks.
+void reviera_dclick_as_press(void* window) {
+    auto* w = static_cast<wxWindow*>(window);
+    auto pass = [w](const wxEventTypeTag<wxMouseEvent>& dclick, wxEventType down) {
+        w->Bind(dclick, [w, down](wxMouseEvent& e) {
+            wxMouseEvent press(e);
+            press.SetEventType(down);
+            press.SetEventObject(w);
+            w->GetEventHandler()->ProcessEvent(press);
+        });
+    };
+    pass(wxEVT_LEFT_DCLICK, wxEVT_LEFT_DOWN);
+    pass(wxEVT_MIDDLE_DCLICK, wxEVT_MIDDLE_DOWN);
+    pass(wxEVT_RIGHT_DCLICK, wxEVT_RIGHT_DOWN);
+}
+
 // Tab pressed while a view has the focus goes to `callback` (it cycles what is under the cursor)
 // before wxWidgets moves the focus to the next control; elsewhere Tab navigates as usual.
 void reviera_bind_tab(void* frame, reviera_tab_callback callback, void* user) {

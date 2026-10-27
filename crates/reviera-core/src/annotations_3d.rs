@@ -37,6 +37,8 @@ pub struct Tip {
     pub class: String,
     pub anchor: [f64; 3],
     pub lines: Vec<String>,
+    /// The GlobalId of the plan the annotation is drawn in.
+    pub plan: String,
 }
 
 /// How a 3D view shows annotation.
@@ -105,7 +107,7 @@ pub fn tips(store: &Store) -> Vec<Tip> {
             let Some(z) = levels.get(&t.view) else { continue };
             let lines: Vec<String> = t.content.lines().map(str::to_owned).filter(|l| !l.trim().is_empty()).collect();
             if !lines.is_empty() {
-                out.push(Tip { id: e.id(), class: "text".into(), anchor: [t.position[0], t.position[1], z + 1.0], lines });
+                out.push(Tip { id: e.id(), class: "text".into(), anchor: [t.position[0], t.position[1], z + 1.0], lines, plan: t.view.clone() });
             }
         } else if let Some(d) = crate::notes::tag_data(e) {
             let Some(z) = levels.get(&d.view) else { continue };
@@ -121,7 +123,7 @@ pub fn tips(store: &Store) -> Vec<Tip> {
                 Err(_) if crate::rooms::room_recipe(host).is_some() => [r.anchor[0], r.anchor[1], z + 0.3],
                 Err(_) => [r.anchor[0], r.anchor[1], z + 1.5],
             };
-            out.push(Tip { id: e.id(), class, anchor, lines: r.lines });
+            out.push(Tip { id: e.id(), class, anchor, lines: r.lines, plan: r.data.view.clone() });
         } else if let Some(d) = crate::annotations::dimension_data(e) {
             let Some(z) = levels.get(&d.view) else { continue };
             let Some(m) = crate::annotations::measure(store, &d) else { continue };
@@ -130,7 +132,7 @@ pub fn tips(store: &Store) -> Vec<Tip> {
                 let mid = (m.positions[k] + m.positions[k + 1]) / 2.0 - base;
                 let p = [d.line[0] + m.across[0] * mid, d.line[1] + m.across[1] * mid];
                 let text = crate::units::format(*v, "length", &settings, None).unwrap_or_else(|_| format!("{v:.3}"));
-                out.push(Tip { id: e.id(), class: "dimensions".into(), anchor: [p[0], p[1], *z], lines: vec![text] });
+                out.push(Tip { id: e.id(), class: "dimensions".into(), anchor: [p[0], p[1], *z], lines: vec![text], plan: d.view.clone() });
             }
         }
     }

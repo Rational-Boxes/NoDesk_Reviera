@@ -449,7 +449,11 @@ struct Gui {
     radial: Option<radial::RadialMenu>,
     /// Each 3D view's floating annotation labels and the model version they were made for
     /// (DOC-ANN-025), by view id.
-    tips: std::collections::HashMap<u32, (reviera_core::document::ModelVersion, bool, Vec<reviera_render::tooltips::Tip>)>,
+    tips: std::collections::HashMap<u32, (reviera_core::document::ModelVersion, bool, Vec<radial::TipLabel>)>,
+    /// Each 3D view's labels as last drawn, nearest first, for clicks on them.
+    tip_boxes: std::collections::HashMap<u32, Vec<(radial::TipLabel, reviera_render::tooltips::Placed)>>,
+    /// The last label clicked and when, to tell a double click (which opens its plan).
+    tip_click: Option<(reviera_core::ElementId, std::time::Instant)>,
     /// Each document's triangles for testing whether labels are behind the model, by version.
     occluders: std::collections::HashMap<DocumentId, (reviera_core::document::ModelVersion, std::rc::Rc<reviera_render::bvh::Bvh>)>,
     /// Per-user interface settings (the experimental radial menu, the reveal dwell).
@@ -863,6 +867,7 @@ impl Gui {
         }
         let panel = Panel::builder(&self.notebook).build();
         wx::wants_chars(&panel);
+        wx::dclick_as_press(&panel);
         panel.set_background_style(BackgroundStyle::Paint);
         let id = self.next_view;
         self.next_view += 1;
@@ -2170,6 +2175,10 @@ impl Gui {
         // The candidate Tab shows here (ARC-KEY-001).
         if let Some(ids) = self.tab_pick(x, y) {
             return self.select_ids(&ids, combine);
+        }
+        // A 3D view's floating labels are drawn over the model (DOC-ANN-025).
+        if self.tip_click(x, y, combine) {
+            return;
         }
         // In plans a room is picked by its label, or by its inside where nothing else is.
         let hit = self
@@ -3784,6 +3793,8 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 menu_runner: None,
                 radial: None,
                 tips: std::collections::HashMap::new(),
+                tip_boxes: std::collections::HashMap::new(),
+                tip_click: None,
                 occluders: std::collections::HashMap::new(),
                 ui_settings: radial::UiSettings::load(),
                 chrome: fullscreen::Chrome::default(),

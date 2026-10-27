@@ -23,6 +23,7 @@ unsafe extern "C" {
     fn reviera_nb_free_layout(layout: *mut c_void);
     fn reviera_html_create(panel: *mut c_void) -> *mut c_void;
     fn reviera_wants_chars(window: *mut c_void);
+    fn reviera_dclick_as_press(window: *mut c_void);
     fn reviera_bind_tab(
         frame: *mut c_void,
         callback: extern "C" fn(*mut c_void, c_int),
@@ -208,6 +209,12 @@ pub fn on_view_tab(frame: &Frame, f: impl Fn(bool) + 'static) {
 /// Lets a view panel take Tab and arrow keys itself (not move the focus).
 pub fn wants_chars(w: &impl WxWidget) {
     unsafe { reviera_wants_chars(ptr(w)) }
+}
+
+/// Gives a view panel's press handlers a double click's second press (wxWidgets sends it only as
+/// a double click).
+pub fn dclick_as_press(w: &impl WxWidget) {
+    unsafe { reviera_dclick_as_press(ptr(w)) }
 }
 
 /// Gives every view tab a close button, and lets the tabs be dragged: reordered within a tab
