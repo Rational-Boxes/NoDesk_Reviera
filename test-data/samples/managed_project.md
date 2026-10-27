@@ -46,7 +46,12 @@ Start with **File › New**, and open a Level 1 plan (View › Floor Plan).
 9. **Keynotes.** Save the project, and beside it write `keynotes.txt`, a tab-separated key,
    text and parent key a line: `08` Openings; `08 11 13` Hollow metal doors and frames (parent
    `08`); `08 51 13` Aluminium windows (`08`); `09` Finishes; `09 21 16` Gypsum board assemblies
-   (`09`). Manage › Settings › **Load Keynotes**.
+   (`09`). Manage › Settings › **Load Keynotes**. Select the front door, Edit Type, and set
+   Keynote to `08 11 13`; the south-wall window's type to `08 51 13`. Annotate › Tag ›
+   **Element Keynote**: click the front door, then just below it, right of its swing (a boxed
+   08 11 13 with a leader); the same for the window. **User Keynote**: choose *09 21 16 — Gypsum
+   board assemblies*, click the partition, then a point in the store; in Properties set Style
+   *Number*.
 10. **Saved selections.** Select the four exterior walls, Manage › Selection › **Save
     Selection** (*Exterior walls*); the doors and windows (*Doors and windows*). Manage ›
     Selection › **Sets as IfcGroups**: *Yes*.

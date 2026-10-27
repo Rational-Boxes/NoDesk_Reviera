@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Reviera contributors
 
-//! Tags and text notes of a view, resolved against the model and laid out (DOC-ANN-009…011).
+//! Tags, text notes, keynotes and spots of a view, resolved against the model and laid out
+//! (DOC-ANN-006 … 011, DOC-ANN-014).
 //! The window and PDF output draw the same parts.
 
 use std::collections::HashMap;
@@ -67,6 +68,19 @@ pub fn view_notes(store: &Store, view: &Element, scale: f32, z: f32, scene: Opti
             parts: text_parts(&mark, scale, z),
             orphaned: false,
         });
+    }
+    // Keynote tags (DOC-ANN-014), drawn as tags.
+    for (id, d) in reviera_core::keynote_tags::of_view(store, &guid) {
+        let k = reviera_core::keynote_tags::resolve(store, id, d);
+        let mark = TagMark {
+            head: k.data.position,
+            lines: k.lines,
+            frame: k.frame,
+            vertical: false,
+            leader: k.anchor.filter(|_| k.data.leader),
+            text_mm: notes::TAG_TEXT_MM as f32,
+        };
+        out.push(NoteGraphic { id, host: k.host, parts: tag_parts(&mark, scale, z), orphaned: k.missing });
     }
     // Spot elevations and coordinates (DOC-ANN-006/007), their element as their host.
     for m in crate::spots::of_view(store, scene, &guid) {

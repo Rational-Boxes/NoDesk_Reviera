@@ -77,5 +77,4 @@ prints it with its title block.
   leaders read-only.
 - **One elevation at a chosen place** (step 10): `view.create_elevation` takes a point, a
   direction and a width; the window has only Building Elevations, all four round the model.
-- **Keynotes**: Manage › Settings › Load Keynotes reads a keynote file, but there is no keynote tag to show
-  them in a plan, so the sample has none.
+- **Keynotes**: this sample has none; the Managed project sample shows keynote tags.

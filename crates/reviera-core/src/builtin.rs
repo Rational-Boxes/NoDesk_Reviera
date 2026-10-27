@@ -162,6 +162,9 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(SpotCreateCoordinate),
         registry.add(SpotSet),
         registry.add(SpotPutSlope),
+        registry.add(KeynoteCreate),
+        registry.add(KeynoteSet),
+        registry.add(KeynoteList),
         registry.add(TextSetContent),
         registry.add(TextSet),
         registry.add(TextAddLeader),
@@ -3849,6 +3852,52 @@ modify_command!(
     ElementId,
     crate::spots::create_coordinate
 );
+modify_command!(
+    KeynoteCreate,
+    "keynote.create",
+    "Place a keynote",
+    "Places a keynote tag in a plan, section or elevation (DOC-ANN-014): `mode` `element` (the default) shows \
+     the keynote of `host_ref`'s type (`type.keynote`), read live; `user` shows `key` from the keynote table. \
+     `style`: `boxed_number` (the key in a box, default), `number` or `text` (the keynote's text). It stands at \
+     `position` (the view's 2D coordinates; default on the element), with a leader to the element when placed \
+     off it. A key the table does not have shows `?`.",
+    "Keynote",
+    crate::keynote_tags::CreateParams,
+    ElementId,
+    crate::keynote_tags::create
+);
+modify_command!(
+    KeynoteSet,
+    "keynote.set",
+    "Change keynote tags",
+    "Sets keynote tags' style, a user keynote's key, the leader, or moves them to `position`.",
+    "Keynote Properties",
+    crate::keynote_tags::SetParams,
+    (),
+    crate::keynote_tags::set
+);
+
+#[derive(Debug)]
+struct KeynoteList;
+
+impl Command for KeynoteList {
+    type Params = crate::keynote_tags::ListParams;
+    type Output = Vec<crate::keynote_tags::Resolved>;
+    const META: CommandMeta = CommandMeta {
+        name: "keynote.list",
+        version: 1,
+        summary: "List keynote tags",
+        description: "The keynote tags of a view (or of the model) as they read now: each one's key and text, and \
+                      whether its key is missing (no key, or one the keynote table does not have; shown as `?`).",
+        effects: &[Effect::Read],
+        transaction_name: "",
+    };
+
+    fn run(&self, cx: &mut CommandContext<'_>, p: crate::keynote_tags::ListParams) -> Result<Vec<crate::keynote_tags::Resolved>> {
+        crate::keynote_tags::list(cx.store(), p)
+    }
+}
+
 modify_command!(
     SpotPutSlope,
     "spot.put_slope",

@@ -255,7 +255,7 @@ pub fn toolset_of(command: &str) -> String {
             | "sitecomponent"
             | "parts" => "modeling",
             "view" | "sheet" | "schedule" | "annotate" | "render" | "walkthrough" | "xr" | "ui"
-            | "tag" | "text" | "anno" | "dim" | "spot" | "viewport" | "section" | "inspect"
+            | "tag" | "text" | "anno" | "dim" | "spot" | "keynote" | "viewport" | "section" | "inspect"
             | "colorscheme" => "documentation",
             "family" | "family_doc" | "type" | "instance" | "library" | "component" | "component_type" | "formula"
             | "subcategory" => "families",

@@ -894,6 +894,12 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "spot_elevation" => format!(
             r#"<path d="M3 27h26" {s}/><path d="M9 27l-4-6h8z" fill="{a}" {sa}/><path d="M9 21l6-9h13" {s}/><path d="M16 8h11" {s} stroke-width="2.4"/>"#
         ),
+        "keynote" => format!(
+            r#"<rect x="13" y="4" width="16" height="11" fill="{f}" {s}/><path d="M17 9.5h8" {s} stroke-width="1.6"/><path d="M13 13L4 25" {sa}/><circle cx="4" cy="25" r="1.6" fill="{a}"/><path d="M6 28h20" {s} stroke-width="1"/>"#
+        ),
+        "keynote_user" => format!(
+            r#"<rect x="13" y="4" width="16" height="11" fill="{f}" {s}/><path d="M17 9.5h8" {s} stroke-width="1.6"/><path d="M13 13L4 25" {sa}/><circle cx="4" cy="25" r="1.6" fill="{a}"/><circle cx="23" cy="22" r="3" {sa}/><path d="M17 30a6 5 0 0 1 12 0" {sa}/>"#
+        ),
         "spot_slope" => format!(
             r#"<path d="M3 26L29 14" {s} stroke-width="2"/><path d="M8 17l14-6M22 11l-4 4.5M22 11l-6-0.5" {sa}/><path d="M3 26h26" {s} stroke-width="1"/>"#
         ),

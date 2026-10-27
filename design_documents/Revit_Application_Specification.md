@@ -23575,6 +23575,10 @@ All annotation tools are on the **Annotate** tab, in the panels Dimension, Detai
 - [ ] Editing a key's text in the table and reloading updates every keynote showing that key.
 - [ ] With *By sheet* numbering, the same key shows different numbers on two sheets, matching each sheet's keynote legend.
 
+*Built (2026-10-27):* Annotate › Tag › *Element Keynote* and *User Keynote*, in plans, ceiling plans, sections and elevations: click the element, then where the keynote goes (a user keynote's key is chosen from the table first). An element keynote shows the keynote of the element's type (`type.keynote`, Identity Data), read live: changing the type's keynote, or the table's text, changes every keynote showing it. Styles: *Boxed Number* (default), *Number*, *Text*. A leader runs to the element's tag point when the keynote is placed off it. A key missing from the table (or a type without one) shows `?`, is drawn orphaned (orange) and is listed as missing by `keynote.list`. Keynotes pick, highlight, print, list in Properties (keynote and its text, key for user keynotes, style, leader) and float in 3D views as class *Keynotes* with key and text (DOC-ANN-025). Commands: `keynote.create(view_id, mode?: element|user, host_ref?, key?, position?, style?, leader?)`, `keynote.set(annotation_ids, style?, key?, leader?, position?)`, `keynote.list(view_id?)`. The table is the project's embedded one (`keynotes.load`, `keynotes.set`, DM-CLS-001). Not yet: material keynotes (materials carry no keynote), *By sheet* numbering and keynote legends (DOC-VIEW-010), Keynoting Settings with an external file kept linked, and `keynote.reload` (`keynotes.load` reads the file again).
+
+- [x] *(Built 2026-10-27, `tests/sample_features.rs`.)* The managed project's element keynotes read their types' keys (08 11 13, 08 51 13) and follow a type's change; the Text style reads the table; a user keynote with a key the table lacks shows `?` and is listed as missing.
+
 ### Symbols
 **ID:** DOC-ANN-015 · **Priority:** P0 · **Ref:** research/04 §4.5
 
@@ -23801,7 +23805,7 @@ All annotation tools are on the **Annotate** tab, in the panels Dimension, Detai
 
 *Built (2026-10-26), labels behind the model:* a label is left out while the model hides its place: rays from the eye (or, in a parallel view, from far back along the view direction) to three points up from its anchor (at it, 1.2 m and 2.4 m above) meet what one cannot see through (opaque meshes: not glass, room and space volumes, openings or virtual volumes) more than 0.4 m before the point; what the section box and slices cut away and what is hidden in the view do not count. The test runs every frame on a bounding volume hierarchy of the model's triangles, built once per change (`reviera_render::bvh`). Per view, on unless set (`occlude`, *Hide labels behind the model* in Annotation Visibility).
 
-*Built (2026-10-26), picking labels:* a click on a label (its box or its dot) selects its annotation, before the model under it; nearer labels, drawn in front, are picked first; Ctrl and Shift add and remove as elsewhere. A selected annotation's label is edged in the selection colour. A double click (the second click on the same label within 0.45 s) opens the plan the annotation is drawn in, with it selected. *(Also: a double click's second press now reaches the views as a press on every toolkit; wxWidgets sends it only as a double-click event, so the second of two quick clicks had been dropped.)* *Built (2026-10-26), framing:* the plan opened is zoomed to the annotation: Zoom to Fit (ZF) counts selected annotation, measured as drawn in the active plan (a note's or tag's outline, a dimension's lines) or, in a 3D view, at its labels' points; annotation selected alone is framed with room around it (1.5 times its size, at least 1.5 m), as a clash's box is. Not yet: keynotes and spot dimensions.
+*Built (2026-10-26), picking labels:* a click on a label (its box or its dot) selects its annotation, before the model under it; nearer labels, drawn in front, are picked first; Ctrl and Shift add and remove as elsewhere. A selected annotation's label is edged in the selection colour. A double click (the second click on the same label within 0.45 s) opens the plan the annotation is drawn in, with it selected. *(Also: a double click's second press now reaches the views as a press on every toolkit; wxWidgets sends it only as a double-click event, so the second of two quick clicks had been dropped.)* *Built (2026-10-26), framing:* the plan opened is zoomed to the annotation: Zoom to Fit (ZF) counts selected annotation, measured as drawn in the active plan (a note's or tag's outline, a dimension's lines) or, in a 3D view, at its labels' points; annotation selected alone is framed with room around it (1.5 times its size, at least 1.5 m), as a clash's box is. *Built (2026-10-27):* spots (class *Spot elevations and coordinates*, at the point each reads, read again on the model) and keynotes (class *Keynotes*, key and text at their element) float too (DOC-ANN-006 … 008, DOC-ANN-014).
 
 *Built (2026-10-26), sections and elevations:* their annotation floats too (DOC-ANN-001, -009, -010 there). A section's notes and dimensions stand on its view plane, mapped from the view's frame; an elevation's, which stands in front of what it shows, are moved back along its view onto the model, where the first surface (glass included) meets the ray within its depth, and stay on its plane when nothing is met; tags stand at their hosts. *From* in Annotation Visibility shows each kind of view's annotation (plans, sections, elevations) on its own; a view shows the plans' only unless set, so existing 3D views look as before (`hidden_from`). A host tagged in several kinds of views shown is labelled once, from the plans first. A double click on a label opens the view it is drawn in, section or elevation too.
 ---
@@ -25114,7 +25118,9 @@ Every command below is registered once in the command registry and is therefore 
 | `tag.reinforcement_symbol` | view_id, system_id, kind: area\|path\|fabric, type_id?, position? | annotation_id | Yes | DOC-ANN-013 |
 | `keynote.settings` | source?, path_type?, numbering?: by_keynote\|by_sheet, embed? | () | Yes | DOC-ANN-014 |
 | `keynote.reload` | — | () | Yes | DOC-ANN-014 |
-| `keynote.create` | view_id, mode, host_ref?, key?, position, tag_type_id? | annotation_id | Yes | DOC-ANN-014 |
+| `keynote.create` | view_id, mode?, host_ref?, key?, position?, style?, leader? | annotation_id | Yes | DOC-ANN-014 |
+| `keynote.set` | annotation_ids, style?, key?, leader?, position? | () | Yes | DOC-ANN-014 |
+| `keynote.list` | view_id? | [{id, data, host, key, text, lines, frame, anchor, missing}] | No | DOC-ANN-014 |
 | `symbol.place` | view_id, type_id, position, rotation?, parameters? | annotation_id | Yes | DOC-ANN-015 |
 | `detail.line` | view_id, curves[], line_style_id? | annotation_id[] | Yes | DOC-ANN-016 |
 | `detail.set_line_style` | annotation_ids[], line_style_id | () | Yes | DOC-ANN-016 |
@@ -27897,7 +27903,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**2166 unique commands** in 416 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**2168 unique commands** in 416 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -28085,7 +28091,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `instance` | 5 |
 | `job` | 4 |
 | `journal` | 1 |
-| `keynote` | 3 |
+| `keynote` | 5 |
 | `keynotes` | 2 |
 | `legend` | 1 |
 | `level` | 5 |
@@ -29189,8 +29195,10 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `job.status` | 5 | job_id | status | No | DOC-OUT-013 |
 | `job.wait` | 5 | job_id, timeout? | status | No | DOC-OUT-013 |
 | `journal.replay` | 2 | path, stop_on_error=true | — | Yes (one item per entry) | DM-TXN-003 |
-| `keynote.create` | 5 | view_id, mode, host_ref?, key?, position, tag_type_id? | annotation_id | Yes | DOC-ANN-014 |
+| `keynote.create` | 5 | view_id, mode?, host_ref?, key?, position?, style?, leader? | annotation_id | Yes | DOC-ANN-014 |
+| `keynote.list` | 5 | view_id? | [{id, data, host, key, text, lines, frame, anchor, missing}] | No | DOC-ANN-014 |
 | `keynote.reload` | 5 | — | () | Yes | DOC-ANN-014 |
+| `keynote.set` | 5 | annotation_ids, style?, key?, leader?, position? | () | Yes | DOC-ANN-014 |
 | `keynote.settings` | 5 | source?, path_type?, numbering?: by_keynote\ | by_sheet, embed? | () | Yes |
 | `keynotes.load` | 2 | path | — | Yes | DM-CLS-001 |
 | `keynotes.reload` | 2 | — | — | Yes | DM-CLS-001 |

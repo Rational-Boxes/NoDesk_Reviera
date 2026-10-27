@@ -1103,8 +1103,12 @@ schedules, circuit paths, cable sizing and voltage drop.
 - **Classification systems and keynotes** (Manage › Settings › Classification Systems, Classify,
   Load Keynotes): classification tables from CSV or IFC files, one code per system per type or
   element, exported as `IfcClassification` with `IfcClassificationReference` chains; keynote
-  files kept relative to the project (`classification.*`, `keynotes.*`). Not built yet: the
-  tree picker in Properties, bSDD, keynote tags.
+  files kept relative to the project (`classification.*`, `keynotes.*`). Keynote tags
+  (Annotate › Tag › Element Keynote, User Keynote) show a type's keynote, read live, or a key
+  picked from the table, boxed, as the key alone or as its text, in plans, sections and
+  elevations and floating in 3D; a key the table lacks shows `?` (`keynote.create`,
+  `keynote.set`, `keynote.list`; DOC-ANN-014). Not built yet: the tree picker in Properties,
+  bSDD, material keynotes, numbering by sheet and keynote legends.
 - **Transfer Project Standards** (Manage › Settings): types and settings copied from another
   open project, with the types they use (references rewritten), overwriting (keeping the
   target's GlobalIds), skipping or renaming what exists, as one undo step (`standards.list`,

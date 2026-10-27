@@ -195,7 +195,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**2166 unique commands** in 416 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**2168 unique commands** in 416 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -383,7 +383,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `instance` | 5 |
 | `job` | 4 |
 | `journal` | 1 |
-| `keynote` | 3 |
+| `keynote` | 5 |
 | `keynotes` | 2 |
 | `legend` | 1 |
 | `level` | 5 |
@@ -1487,8 +1487,10 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `job.status` | 5 | job_id | status | No | DOC-OUT-013 |
 | `job.wait` | 5 | job_id, timeout? | status | No | DOC-OUT-013 |
 | `journal.replay` | 2 | path, stop_on_error=true | — | Yes (one item per entry) | DM-TXN-003 |
-| `keynote.create` | 5 | view_id, mode, host_ref?, key?, position, tag_type_id? | annotation_id | Yes | DOC-ANN-014 |
+| `keynote.create` | 5 | view_id, mode?, host_ref?, key?, position?, style?, leader? | annotation_id | Yes | DOC-ANN-014 |
+| `keynote.list` | 5 | view_id? | [{id, data, host, key, text, lines, frame, anchor, missing}] | No | DOC-ANN-014 |
 | `keynote.reload` | 5 | — | () | Yes | DOC-ANN-014 |
+| `keynote.set` | 5 | annotation_ids, style?, key?, leader?, position? | () | Yes | DOC-ANN-014 |
 | `keynote.settings` | 5 | source?, path_type?, numbering?: by_keynote\ | by_sheet, embed? | () | Yes |
 | `keynotes.load` | 2 | path | — | Yes | DM-CLS-001 |
 | `keynotes.reload` | 2 | — | — | Yes | DM-CLS-001 |

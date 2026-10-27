@@ -11,7 +11,7 @@
 -- OfficeArea is a formula over it, SillHeight drives the windows' sills and PartitionAcoustic the
 -- partition's shared Acoustic Rating; a shared parameter with its library's identity embedded
 -- (DM-SPAR-001); Uniclass 2015 element codes on the walls, doors and windows (DM-CLS-001);
--- a keynote table; two saved selections written as IfcGroups (ARC-SEL-002); the location,
+-- a keynote table with element and user keynotes on the plan; two saved selections written as IfcGroups (ARC-SEL-002); the location,
 -- true north, survey point and CRS (DM-LOC-001); an Office space type and a copper pipe segment
 -- (MEP-SET-001, MEP-SET-004).
 
@@ -99,6 +99,14 @@ reviera.keynotes.set{ path = "keynotes.txt", entries = {
   { key = "09", text = "Finishes" },
   { key = "09 21 16", text = "Gypsum board assemblies", parent = "09" },
 } }
+-- Keynote tags (DOC-ANN-014): the door and window types carry their keys (Type Properties ›
+-- Keynote), shown by element keynotes on the front door and the south window; the partition
+-- has a user keynote picked from the table, the key alone.
+reviera.param.set{ element_ids = { doors[1] }, param_ref = "type.keynote", value = "08 11 13" }
+reviera.param.set{ element_ids = { windows[1] }, param_ref = "type.keynote", value = "08 51 13" }
+reviera.keynote.create{ view_id = plan, host_ref = doors[1], position = { 7.0, -0.6 } }
+reviera.keynote.create{ view_id = plan, host_ref = windows[1], position = { 3.6, -0.6 } }
+reviera.keynote.create{ view_id = plan, mode = "user", key = "09 21 16", host_ref = partition, position = { 9.6, 2.4 }, style = "number" }
 
 -- Saved selections, written on save as IfcGroups.
 reviera.selectionset.save{ name = "Exterior walls", element_ids = outer }

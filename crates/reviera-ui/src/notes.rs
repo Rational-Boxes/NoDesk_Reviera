@@ -39,6 +39,10 @@ pub enum NoteTool {
     SpotCoordinate,
     /// Annotate › Spot Slope (DOC-ANN-008): one click on a sloped face.
     SpotSlope,
+    /// Annotate › Keynote (DOC-ANN-014): the element, then where the keynote goes; a user
+    /// keynote's key is chosen first.
+    KeynoteElement,
+    KeynoteUser,
 }
 
 /// Tag All Not Tagged's categories: key and label.
@@ -85,7 +89,10 @@ pub(crate) fn ask_text(frame: &Frame, title: &str, current: &str) -> Option<Stri
 impl NoteTool {
     /// Whether the tool works in sections and elevations too.
     fn in_sections(self) -> bool {
-        matches!(self, NoteTool::Tag | NoteTool::Text | NoteTool::SpotElevation | NoteTool::SpotCoordinate | NoteTool::SpotSlope)
+        matches!(
+            self,
+            NoteTool::Tag | NoteTool::Text | NoteTool::SpotElevation | NoteTool::SpotCoordinate | NoteTool::SpotSlope | NoteTool::KeynoteElement | NoteTool::KeynoteUser
+        )
     }
 }
 
@@ -139,6 +146,11 @@ impl Gui {
         self.end_room_tool();
         self.end_section_tool();
         self.leave_walk();
+        // A user keynote's key, from the keynote table.
+        if kind == NoteTool::KeynoteUser {
+            let Some(key) = self.choose_keynote() else { return };
+            self.keynote_key = Some(key);
+        }
         self.note_tool = Some(kind);
         frame.set_status_text(
             match kind {
@@ -153,6 +165,8 @@ impl Gui {
                 NoteTool::SpotElevation => "Spot Elevation: click a point on an element; Esc ends",
                 NoteTool::SpotCoordinate => "Spot Coordinate: click a point on an element; Esc ends",
                 NoteTool::SpotSlope => "Spot Slope: click a sloped face; Esc ends",
+                NoteTool::KeynoteElement => "Element Keynote: click an element; Esc ends",
+                NoteTool::KeynoteUser => "User Keynote: click the element it is for; Esc ends",
             },
             0,
         );
@@ -161,6 +175,7 @@ impl Gui {
     pub(crate) fn end_note_tool(&mut self) -> bool {
         self.route_start = None;
         self.spot_pick = None;
+        self.keynote_pick = None;
         self.note_tool.take().is_some()
     }
 
@@ -224,6 +239,23 @@ impl Gui {
                     json!({ "view_id": plan, "kind": kind, "scheme_id": scheme, "point": p }),
                 )
             }
+            NoteTool::KeynoteElement | NoteTool::KeynoteUser => {
+                // First the element, then where the keynote goes.
+                let Some(host) = self.keynote_pick.take() else {
+                    let hit = self.element_at(x, y, panel).or_else(|| self.room_inside(x, y)).filter(|h| !self.is_note(*h));
+                    let Some(host) = hit else {
+                        return frame.set_status_text("Click an element", 0);
+                    };
+                    self.keynote_pick = Some(host);
+                    return frame.set_status_text("Click where the keynote goes", 0);
+                };
+                let mut args = json!({ "view_id": plan, "host_ref": host, "position": p });
+                if kind == NoteTool::KeynoteUser {
+                    args["mode"] = json!("user");
+                    args["key"] = json!(self.keynote_key.clone());
+                }
+                self.run("keynote.create", args)
+            }
             NoteTool::SpotSlope => {
                 let Some((element, mut point, direction)) = self.model_point_at(x, y, panel) else {
                     return frame.set_status_text("Click a sloped face of an element", 0);
@@ -262,6 +294,9 @@ impl Gui {
                 // The Spot tools go on: the next point.
                 if matches!(kind, NoteTool::SpotElevation | NoteTool::SpotCoordinate | NoteTool::SpotSlope) {
                     frame.set_status_text("Spot placed; click a point on an element for the next, or Esc", 0);
+                }
+                if matches!(kind, NoteTool::KeynoteElement | NoteTool::KeynoteUser) {
+                    frame.set_status_text("Keynote placed; click the next element, or Esc", 0);
                 }
             }
             Err(e) => error(&frame, &format!("Nothing was placed:\n{e}")),
@@ -318,12 +353,36 @@ impl Gui {
         }
     }
 
-    /// Whether an element is a tag, text note or spot.
+    /// A key from the keynote table, chosen in a list (`None` when cancelled or there is none).
+    fn choose_keynote(&mut self) -> Option<String> {
+        let frame = self.frame;
+        let table = self.run("keynotes.list", json!({})).ok()?;
+        let entries = table["entries"].as_array().cloned().unwrap_or_default();
+        if entries.is_empty() {
+            frame.set_status_text("User Keynote: the project has no keynote table (Manage › Load Keynotes)", 0);
+            return None;
+        }
+        let labels: Vec<String> = entries.iter().map(|k| format!("{} — {}", k["key"].as_str().unwrap_or(""), k["text"].as_str().unwrap_or(""))).collect();
+        let refs: Vec<&str> = labels.iter().map(String::as_str).collect();
+        let d = SingleChoiceDialog::builder(&frame, "Keynote:", "User Keynote", &refs).build();
+        if d.show_modal() != ID_OK {
+            return None;
+        }
+        let k = usize::try_from(d.get_selection()).ok().and_then(|i| entries.get(i))?;
+        k["key"].as_str().map(str::to_owned)
+    }
+
+    /// Whether an element is a tag, text note, keynote or spot.
     pub(crate) fn is_note(&self, id: ElementId) -> bool {
         self.doc
             .and_then(|d| self.app.document(d))
             .and_then(|d| d.doc.store().get(id))
-            .is_some_and(|e| notes::tag_data(e).is_some() || notes::text_data(e).is_some() || reviera_core::spots::spot_data(e).is_some())
+            .is_some_and(|e| {
+                notes::tag_data(e).is_some()
+                    || notes::text_data(e).is_some()
+                    || reviera_core::spots::spot_data(e).is_some()
+                    || reviera_core::keynote_tags::keynote_data(e).is_some()
+            })
     }
 
     /// The tags and notes of view `index` (a plan, section or elevation), as drawn.
@@ -506,6 +565,28 @@ impl Gui {
             grid.set_property_read_only("txt_leaders", true);
             return true;
         }
+        if let Some(d) = reviera_core::keynote_tags::keynote_data(e) {
+            use reviera_core::keynote_tags::{Mode, Style};
+            let user = d.mode == Mode::User;
+            grid.append(Property::category(if user { "User Keynote" } else { "Element Keynote" }, "c_keynote"));
+            let k = reviera_core::keynote_tags::resolve(&store, id, d.clone());
+            let value = match (&k.key, &k.text) {
+                (Some(key), Some(text)) => format!("{key} — {text}"),
+                (Some(key), None) => format!("{key} (not in the keynote table)"),
+                _ => "? (the element's type has no keynote)".to_owned(),
+            };
+            grid.append(Property::string("Keynote", "kn_value", value));
+            grid.set_property_read_only("kn_value", true);
+            if user {
+                grid.append(Property::string("Key", "kn_key", d.key.clone().unwrap_or_default()));
+            }
+            let styles = [Style::BoxedNumber, Style::Number, Style::Text];
+            let names = ["Boxed Number", "Number", "Text"];
+            let index = styles.iter().position(|s| *s == d.style).unwrap_or(0) as i32;
+            grid.append(Property::enumeration("Style", "kn_style", names.iter().enumerate().map(|(i, n)| ((*n).to_owned(), i as i32)).collect::<Vec<(String, i32)>>(), index));
+            grid.append(Property::enumeration("Leader", "kn_leader", vec![("None".to_owned(), 0), ("Attached".to_owned(), 1)], i32::from(d.leader)));
+            return true;
+        }
         if let Some(d) = reviera_core::spots::spot_data(e) {
             use reviera_core::spots::{Base, Display, Representation, SlopeFormat, SpotKind};
             let elevation = d.spot_kind == SpotKind::Elevation;
@@ -661,6 +742,16 @@ impl Gui {
                 };
                 self.run("spot.set", json!({ "annotation_ids": [id], "display": display }))
             }
+            "kn_key" => self.run("keynote.set", json!({ "annotation_ids": [id], "key": text })),
+            "kn_style" => {
+                let style = match text.as_str() {
+                    "Number" => "number",
+                    "Text" => "text",
+                    _ => "boxed_number",
+                };
+                self.run("keynote.set", json!({ "annotation_ids": [id], "style": style }))
+            }
+            "kn_leader" => self.run("keynote.set", json!({ "annotation_ids": [id], "leader": text == "Attached" })),
             "spot_format" => {
                 let format = match text.as_str() {
                     "Ratio (1 : n)" => "ratio",

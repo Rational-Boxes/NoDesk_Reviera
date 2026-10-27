@@ -67,6 +67,8 @@ pub const UI_ACTIONS: &[&str] = &[
     "reinforcement_numbering.show",
     "help.about",
     "help.website",
+    "keynote.element",
+    "keynote.user",
     "help.data_sources",
     "tool.modify",
     "wall.create_structural",

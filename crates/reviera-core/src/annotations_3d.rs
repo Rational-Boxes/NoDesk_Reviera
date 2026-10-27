@@ -13,7 +13,8 @@
 //!   several views is labelled once.
 //! - **From:** a view shows the plans' annotation, and the sections' and elevations' when chosen.
 //! - **Classes:** each label has a class: `text`, `dimensions`, `spots` (spot elevations and
-//!   coordinates, at the point they read), or `tags:<category>` (Doors, Windows, Rooms, …), so a
+//!   coordinates, at the point they read), `keynotes` (key and text, at their element), or
+//!   `tags:<category>` (Doors, Windows, Rooms, …), so a
 //!   view can show some and not others.
 //! - **Per view:** a 3D view keeps whether it shows annotation at all and which classes it hides
 //!   (`rxd:annotations_3d`): shown, with dimensions hidden, unless set (`view.set_3d_annotations`).
@@ -108,6 +109,7 @@ pub fn label(class: &str) -> String {
         "text" => "Text notes".into(),
         "dimensions" => "Dimensions".into(),
         "spots" => "Spot elevations and coordinates".into(),
+        "keynotes" => "Keynotes".into(),
         c => match c.strip_prefix("tags:") {
             Some(cat) => format!("{} tags", cat.strip_suffix('s').unwrap_or(cat)),
             None => c.to_owned(),
@@ -208,6 +210,23 @@ pub fn tips(store: &Store) -> Vec<Tip> {
                 Place::Section(..) => crate::notes::host_point(store, host).unwrap_or_else(|| place.world(r.anchor, 0.0)),
             };
             out.push(Tip { id: e.id(), class, anchor, lines: r.lines, view: r.data.view.clone(), source: place.source().into(), host: Some(r.data.host.clone()), probe: None });
+        } else if let Some(d) = crate::keynote_tags::keynote_data(e) {
+            // At its element, else where it stands.
+            let Some(place) = places.get(&d.view) else { continue };
+            let k = crate::keynote_tags::resolve(store, e.id(), d);
+            let at_host = k.host.and_then(|h| store.get(h)).and_then(|h| match place {
+                Place::Plan(z) => crate::notes::host_point(store, h).map(|p| match crate::inserts::resolve(store, h) {
+                    Ok(_) => p,
+                    Err(_) => [p[0], p[1], z + 1.5],
+                }),
+                Place::Section(..) => crate::notes::host_point(store, h),
+            });
+            let anchor = at_host.unwrap_or_else(|| place.world(k.data.position, 1.0));
+            let lines = match (&k.key, &k.text) {
+                (Some(key), Some(text)) => vec![format!("{key} {text}")],
+                _ => k.lines.clone(),
+            };
+            out.push(Tip { id: e.id(), class: "keynotes".into(), anchor, lines, view: k.data.view.clone(), source: place.source().into(), host: None, probe: None });
         } else if let Some(d) = crate::spots::spot_data(e) {
             // At the point it reads, as stored (the window reads it again on the model).
             let Some(place) = places.get(&d.view) else { continue };
@@ -308,7 +327,7 @@ pub struct InfoParams {
 pub fn info(store: &Store, p: InfoParams) -> Result<Info> {
     let id = view_3d(store, &p.view_id)?;
     let s = settings(store.get(id).expect("resolved"));
-    let mut counts: BTreeMap<String, usize> = ["text", "dimensions", "spots", "tags:Doors", "tags:Windows", "tags:Rooms"].iter().map(|c| ((*c).to_owned(), 0)).collect();
+    let mut counts: BTreeMap<String, usize> = ["text", "dimensions", "spots", "keynotes", "tags:Doors", "tags:Windows", "tags:Rooms"].iter().map(|c| ((*c).to_owned(), 0)).collect();
     let mut from: BTreeMap<String, usize> = BTreeMap::new();
     for t in tips(store) {
         *from.entry(t.source).or_default() += 1;
@@ -322,7 +341,8 @@ pub fn info(store: &Store, p: InfoParams) -> Result<Info> {
         "text" => 0,
         "dimensions" => 1,
         "spots" => 2,
-        _ => 3,
+        "keynotes" => 3,
+        _ => 4,
     };
     let mut classes: Vec<ClassInfo> = counts
         .into_iter()
@@ -361,9 +381,9 @@ pub(crate) fn set(txn: &mut crate::txn::Transaction<'_>, p: SetParams) -> Result
         s.occlude = v;
     }
     for (class, visible) in p.classes {
-        let known = ["text", "dimensions", "spots"].contains(&class.as_str()) || class.strip_prefix("tags:").is_some_and(|c| !c.is_empty());
+        let known = ["text", "dimensions", "spots", "keynotes"].contains(&class.as_str()) || class.strip_prefix("tags:").is_some_and(|c| !c.is_empty());
         if !known {
-            return Err(Error::new("view.bad_class", format!("{class:?}: a class is text, dimensions, spots or tags:<category>")));
+            return Err(Error::new("view.bad_class", format!("{class:?}: a class is text, dimensions, spots, keynotes or tags:<category>")));
         }
         if visible {
             s.hidden.remove(&class);

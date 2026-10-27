@@ -109,6 +109,7 @@ pub mod model_text;
 pub mod modify;
 pub mod notes;
 pub mod spots;
+pub mod keynote_tags;
 pub mod origin;
 pub mod overlap;
 pub mod overlap_accept;

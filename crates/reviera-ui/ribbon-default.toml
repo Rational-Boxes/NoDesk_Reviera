@@ -308,6 +308,18 @@ icon = "spot_slope"
 help = "The slope of a face, in a plan (an arrow pointing downhill) or a section or elevation: click the face"
 
 [[action]]
+id = "keynote.element"
+label = "Element Keynote"
+icon = "keynote"
+help = "The keynote of an element's type: click the element, then where the keynote goes"
+
+[[action]]
+id = "keynote.user"
+label = "User Keynote"
+icon = "keynote_user"
+help = "A keynote picked from the project's keynote table: choose it, click the element, then where it goes"
+
+[[action]]
 id = "text.create"
 label = "Text"
 icon = "text"
@@ -3831,6 +3843,8 @@ tools = [
   { action = "tag.create", size = "large" },
   { action = "tag.create_room", size = "large" },
   { action = "tag.tag_all", size = "large" },
+  { action = "keynote.element", size = "small" },
+  { action = "keynote.user", size = "small" },
 ]
 
 [[tab.panel]]

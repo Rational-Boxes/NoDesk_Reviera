@@ -83,6 +83,8 @@ pub const RESERVED_DOMAINS: &[&str] = &[
     "purge",
     "classification",
     "keynotes",
+    "keynote",
+    "spot",
     "file",
     "import",
     "export",

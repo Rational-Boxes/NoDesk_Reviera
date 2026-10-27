@@ -478,3 +478,45 @@ fn the_house_reads_its_roof_slope() {
     ok(&mut app, "roof.set_slope", json!({ "roof_id": roof, "slope": "45°" }));
     assert_eq!(spots(&mut app, plan)[0]["lines"], json!(["1 : 1"]));
 }
+
+#[test]
+fn the_managed_project_keynotes_its_door_window_and_partition() {
+    let work = tempfile::tempdir().unwrap();
+    let mut app = open(work.path(), "managed_project");
+    let plan = view_id(&mut app, "Level 1", "view.plan");
+    let list = |app: &mut App| ok(app, "keynote.list", json!({ "view_id": plan })).as_array().unwrap().clone();
+    let by_key = |l: &[Value], key: &str| l.iter().find(|k| k["key"] == key).cloned().unwrap_or_else(|| panic!("{key}: {l:?}"));
+    let k = list(&mut app);
+    assert_eq!(k.len(), 3, "{k:?}");
+    // The door's and window's from their types; the partition's picked from the table.
+    let door = by_key(&k, "08 11 13");
+    assert_eq!((door["lines"].clone(), door["text"].clone(), door["missing"].clone()), (json!(["08 11 13"]), json!("Hollow metal doors and frames"), json!(false)));
+    assert_eq!(door["frame"], "box");
+    assert_eq!(by_key(&k, "08 51 13")["lines"], json!(["08 51 13"]));
+    let user = by_key(&k, "09 21 16");
+    assert_eq!((user["data"]["mode"].clone(), user["frame"].clone()), (json!("user"), json!("none")));
+    // Drawn with the plan, a leader to each element.
+    let doc = app.active().unwrap();
+    let drawing = app.plan_drawing(doc, ElementId(plan)).unwrap();
+    assert!(drawing.labels.iter().any(|l| l.text == "08 11 13") && drawing.labels.iter().any(|l| l.text == "09 21 16"));
+    // Live: the door type's keynote changes, and the text style reads the table, which edits
+    // and reloads.
+    let host = door["host"].as_u64().unwrap();
+    ok(&mut app, "param.set", json!({ "element_ids": [host], "param_ref": "type.keynote", "value": "09 21 16" }));
+    ok(&mut app, "keynote.set", json!({ "annotation_ids": [door["id"]], "style": "text" }));
+    let k = list(&mut app);
+    let door = k.iter().find(|x| x["id"] == door["id"]).unwrap();
+    assert_eq!(door["lines"], json!(["Gypsum board assemblies"]));
+    // A key the table does not have reads "?" and is listed as missing.
+    ok(&mut app, "keynote.set", json!({ "annotation_ids": [user["id"]], "key": "99 99 99" }));
+    let user = list(&mut app).into_iter().find(|x| x["id"] == user["id"]).unwrap();
+    assert_eq!((user["lines"].clone(), user["missing"].clone()), (json!(["?"]), json!(true)));
+    // An element keynote needs its element; a user keynote its key.
+    assert!(app.execute("keynote.create", json!({ "view_id": plan, "position": [0, 0] }), &Caller::user()).is_err());
+    assert!(app.execute("keynote.create", json!({ "view_id": plan, "mode": "user", "host_ref": host, "position": [0, 0] }), &Caller::user()).is_err());
+    // In 3D, key and text at their elements.
+    let s = store(&app);
+    let tips: Vec<_> = reviera_core::annotations_3d::tips(&s).into_iter().filter(|t| t.class == "keynotes").collect();
+    assert_eq!(tips.len(), 3);
+    assert!(tips.iter().any(|t| t.lines == ["08 51 13 Aluminium windows"]), "{tips:?}");
+}
