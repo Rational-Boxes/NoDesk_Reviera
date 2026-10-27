@@ -1,6 +1,6 @@
 # Integration with the FileEngine project
 
-**Status:** Draft 0.2 · 2026-10-27 · for the owner's review (open questions in §10)
+**Status:** Draft 0.3 · 2026-10-27 · for the owner's review (open questions in §10, requests to FileEngine in §11)
 **Related:**
 - Chapter 2 DM-FILE-007 (WebDAV, kept for other servers);
 - Chapter 6 COL-BCF-001 … 004 (BCF issues), COL-API-001 (shared REST client and credentials);
@@ -539,11 +539,11 @@ Commands. The existing library commands (`library.open`, `library.create`,
 1. **Packaging.** DM-FILE-007 said server-specific behaviour belongs in an add-in. Should
    FileEngine support be built in (shipped, off until a connection is added), or an optional
    add-in?
-2. **Concurrent saves.** The REST door has no lock and no conditional `PUT`, so two people can
+2. **Concurrent saves** (§11, items 1 and 2). The REST door has no lock and no conditional `PUT`, so two people can
    overwrite each other between Reviera's version check and its upload. Can FileEngine add
    `If-Match` on `PUT /v1/files/{uid}/content` (or a check-out lock), or is check-then-put with
    FileEngine's versions as the safety net enough?
-3. **Single sign-on for a desktop app.** The door's OAuth flow returns the token in a URL
+3. **Single sign-on for a desktop app** (§11, item 15). The door's OAuth flow returns the token in a URL
    fragment to an allow-listed web address; a native app's loopback listener never sees
    fragments. Options:
    - allow-list `http://127.0.0.1` with a query-string return;
@@ -551,12 +551,12 @@ Commands. The existing library commands (`library.open`, `library.create`,
    - accept only username and password for desktop clients for now.
 
    Which do you prefer?
-4. **One token for every service.** Do the BCF and discussion services accept the REST door's
+4. **One token for every service** (§11, item 17). Do the BCF and discussion services accept the REST door's
    bearer token (the discussion service says it does; the BCF service uses a shared HS256
    secret), so Reviera signs in once per connection?
 5. **What a "model" is on FileEngine.** A single `.ifc`/`.ifczip` file, or a folder (the model
    plus its `.resources`, linked models and exports)?
-6. **Thumbnails.** Can a client upload a rendition for a file, or should Reviera keep its
+6. **Thumbnails** (§11, item 10). Can a client upload a rendition for a file, or should Reviera keep its
    thumbnail as a separate hidden file or as metadata?
 7. **The product library.** Is there one shared product library per tenant, or per project?
    Where should Reviera create new documentation folders by default, and should it ship a
@@ -589,6 +589,153 @@ Commands. The existing library commands (`library.open`, `library.create`,
     - Should an item's details stay in the shared `reviera-library.json`, merged on save as
       proposed, or move to per-file FileEngine metadata? Per-file metadata means no merging,
       but a library copied to a local folder would then need its manifest rebuilt.
+
+## 11. Improvements on the FileEngine side
+
+What FileEngine would need to change or add so the integration works well, found while
+surveying its services (§2). Each item says what Reviera needs, a suggested shape for the API,
+and which Reviera phase (§9) waits on it. *Needed* means the phase cannot ship without it;
+*wanted* means Reviera can work around its absence, less well.
+
+### 11.1 REST door (`fileengine_http_proxy`)
+
+1. **Conditional writes** (*needed* for phase 1).
+   - Return the file's version as an `ETag` on `GET …/content` and `GET /v1/nodes/{uid}`.
+   - Accept `If-Match` on `PUT /v1/files/{uid}/content` and on metadata writes, answering
+     `412 Precondition Failed` when the version has moved on.
+
+   This closes the race between Reviera's version check and its upload (§5), and makes the
+   Component Library manifest merge safe (§7b).
+2. **Check-out locks** (*wanted*, phase 1).
+   - `POST /v1/files/{uid}/lock` (owner, time to live, renewable), `DELETE …/lock` to release,
+     and the lock's holder and expiry shown in `stat`.
+   - A write by anyone else answers `423 Locked`.
+
+   Reviera would take the lock while a model is open for editing and open a locked model
+   read-only, as DM-FILE-007 does with WebDAV locks.
+3. **Large and resumable uploads** (*needed* for phase 1). Models and publish packages often
+   exceed the 100 MB default request cap. Needed:
+   - chunked uploads that resume after a dropped connection, such as
+     `PUT …/content` with `Content-Range` into an upload session that is committed as one
+     version (`POST /v1/files/{uid}/uploads`, `PUT …/uploads/{id}`, `POST …/uploads/{id}/commit`);
+   - or a per-route cap high enough for models, with resumable sessions later.
+4. **Version details** (*needed* for phase 1, version history).
+   - `GET /v1/files/{uid}/versions` returning each version's author, size, content hash and
+     comment, not only its timestamp.
+   - `PUT …/content` accepting a comment (an `X-Version-Comment` header, or a field on the
+     upload session's commit).
+
+   Today a save comment could only be file-level metadata, which the next save overwrites.
+5. **Content hash in `stat`** (*wanted*, phases 1 and 4). The SHA-256 the core already keeps,
+   so Reviera can check a cached model or library item without downloading it.
+6. **Effective permissions for the caller** (*wanted*, phase 1). `GET /v1/nodes/{uid}/access`
+   answering, for the signed-in user, `{read, write, delete, share, manage_acl}`. Today the
+   permissions endpoint lists ACL entries, which a client would have to evaluate itself (roles,
+   claims, DENY precedence), and Reviera must not second-guess the core.
+7. **Batch and listed metadata** (*wanted*, phases 2, 4 and 5).
+   - `PATCH /v1/nodes/{uid}/metadata` setting several keys in one call (publishing writes about
+     eight).
+   - A directory listing with chosen metadata keys included
+     (`GET /v1/dirs/{uid}?metadata=doc.type,doc.expires`), so the Documents pane and the library
+     browser don't make one call per file.
+8. **Metadata queries** (*wanted*, phases 5 and 7). Finding nodes by metadata (`product.code =
+   X`, `doc.expires < date`, `reviera.source_uid = Y`) within a subtree, either in the REST door
+   or through the search service.
+9. **Paging and change lists** (*wanted*, phase 4).
+   - Paging on directory listings (`?limit=&cursor=`).
+   - A subtree change list (`GET /v1/dirs/{uid}/changes?since=<cursor>`) listing what was
+     added, changed, moved or deleted, so Reviera can index a large library incrementally
+     instead of walking it.
+10. **Client-made renditions** (*wanted*, phases 1 and 4). `PUT /v1/files/{uid}/renditions/{name}`
+    for a thumbnail or preview Reviera renders (a model's 3D view, a component's preview).
+    Today renditions can be listed but only the conversion service makes them.
+11. **Folder downloads as zip** (*wanted*, phase 2). `GET /v1/dirs/{uid}/zip` (optionally
+    recursive, at the latest versions) for handover packages and for copying a library to a
+    local folder. The share service already builds such zips for outside links.
+12. **Change events for clients** (*wanted*, phases 1 and 4). A server-sent events or WebSocket
+    feed of the core's `fileengine:events` for chosen folders, filtered by what the user can
+    read. Reviera could then say *"Someone saved a newer version of this model"* while it is
+    open, and offer library updates without polling.
+13. **Folder templates** (*wanted*, phases 2 and 5). Instantiating a stored folder tree with its
+    metadata keys in one call, for product documentation folders, publish folders and new
+    libraries. Otherwise Reviera creates them call by call.
+14. **Service discovery** (*wanted*, all phases). `GET /v1/services` listing the base URLs (and
+    versions) of the BCF, discussion, search and share services for the tenant, so a Reviera
+    connection needs only the REST door's address.
+
+### 11.2 Sign-in and tokens
+
+15. **Native-app sign-in** (*needed* for single sign-on).
+    - Today the OAuth flow returns the token in a URL fragment to an allow-listed web address,
+      and a desktop app's loopback listener never receives fragments.
+    - Needed: OAuth for native apps as RFC 8252 describes. The return address
+      `http://127.0.0.1:<any port>/` is allowed, and a one-time authorization code (not the
+      token) comes back in the query string. The app exchanges it, with its PKCE verifier, at a
+      token endpoint.
+    - Or a device-authorization flow (RFC 8628): the user signs in on any browser with a short
+      code.
+16. **Refresh** (*wanted*). A refresh token (or longer-lived app tokens that can be revoked), so
+    Reviera does not ask for the password every hour.
+17. **One token for every service** (*needed* for phases 3 and 6). The BCF, discussion, search
+    and share services all accept the REST door's bearer token (or one token exchange gives
+    tokens for each), with an audience claim per service. The discussion service already
+    accepts bridge tokens; the BCF service uses a shared HS256 secret.
+
+### 11.3 BCF service (`fileengine_bcf_services`)
+
+18. **Persistent store** (*needed* for phase 3): the pending swap from the in-memory store to
+    the per-tenant projection over the discussion service, with BCF-XML imports persisted.
+19. **BCF-API 3.0** (*wanted*). Reviera's client targets 3.0 with 2.1 as the fallback
+    (COL-BCF-002); 3.0 adds topic and comment events, which make incremental sync exact.
+20. **Incremental sync** (*needed* for phase 3). OData `$filter` on `modified_date` for topics,
+    comments and viewpoints (or events), and server-assigned modification dates on every
+    change.
+21. **Files and versions** (*wanted*). A topic's *Header/Files* naming the model's FileEngine UID
+    and the version it was raised on, so Reviera opens the right version (§6).
+22. **Document references** (*wanted*), linking a topic to FileEngine documents (a
+    specification sheet, a published report).
+
+### 11.4 Discussion service (`fileengine_threaded_communication`)
+
+23. **A published anchor schema** (*wanted*, phase 6). The `fileengine.anchor.v1`
+    `model-viewpoint` shape as a versioned JSON Schema, under a permissive licence, so Reviera
+    can validate what it reads and writes (see 11.6).
+24. **Threads on a model version** (*wanted*). Anchoring a thread to the version of the model it
+    was raised on, with a *"raised on an earlier version"* marker when the model moves on.
+25. **Live feed per folder** (*wanted*, phase 6). The `WS /files/{uid}/live` feed for every model
+    in a project folder at once, so Reviera does not open one socket per file.
+
+### 11.5 Share service (`fileengine_external_share`)
+
+26. **The public door** (*needed* for in-app share links): link redemption with the recipient's
+    one-time code, deployed with the stack.
+27. **Links per node** (*wanted*). Listing the links on a file or folder (target, recipient,
+    expiry, downloads so far, state) and revoking them, for Reviera's *Shared links* list.
+28. **Redemption notices** (*wanted*). Telling the creator when a link is first used, through the
+    attention feed (already planned) and an event Reviera can show.
+
+### 11.6 Licensing and contracts
+
+29. **Permissive API descriptions** (*needed* before Reviera's client is published). The OpenAPI
+    contract (`openapi.yaml`), the anchor schema and the BCF extensions sit in AGPL repositories.
+    Publishing these interface descriptions under MIT or Apache-2.0, as Reviera does for its own
+    interfaces, puts beyond doubt that Reviera's MIT client, written against them, is not a
+    derivative of the AGPL services.
+30. **A versioned contract** (*wanted*). The REST door's version in `/v1/version` or a header,
+    and a change log of the contract, so Reviera can tell users when a server is too old for a
+    feature.
+
+### 11.7 Summary by Reviera phase
+
+| Reviera phase (§9) | Needs | Wants |
+|---|---|---|
+| 1. Storage | 1, 3, 4, 29 | 2, 5, 6, 10, 12, 14, 16 |
+| 2. Publishing | 26 (share links only) | 7, 11, 13, 27, 28 |
+| 3. Issues over BCF-API | 17, 18, 20 | 19, 21, 22 |
+| 4. Component Libraries | 1 | 5, 7, 9, 10, 12 |
+| 5. Documentation folders | — | 7, 8, 13 |
+| 6. Discussion service | 17 | 23, 24, 25 |
+| Single sign-on | 15 | 16 |
 
 ## Sources
 
