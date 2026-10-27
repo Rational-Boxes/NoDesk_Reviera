@@ -23,7 +23,10 @@ ACLs, threaded discussion, BCF issues, search and conversion
 3. **Publishing.** Save reports and exports (PDF sheets, schedules, COBie, clash and analysis
    reports, BCF archives, IFC copies) straight to a FileEngine folder, for simple sharing with
    people who never open Reviera (owner request, 2026-10-27).
-4. **Product documentation.** Link materials, products and equipment in the model to FileEngine
+4. **Component Libraries on FileEngine.** Host an organisation's Component Libraries in
+   FileEngine folders, browsed, placed from and added to from Reviera's Component Library panel,
+   with FileEngine's permissions and versions (owner idea, 2026-10-27).
+5. **Product documentation.** Link materials, products and equipment in the model to FileEngine
    folders of support documents: technical specifications, sustainability certifications,
    installation and O&M manuals, warranties, safety data sheets. Each folder keeps the product's
    identifying metadata (product code or SKU, MasterFormat division, …), and Reviera embeds file
@@ -420,6 +423,81 @@ Commands:
   Agents may list links. Making or revoking a public link is the user's decision, through the
   window or Lua, as with credentials.
 
+## 7b. Component Libraries hosted on FileEngine
+
+A Component Library is already a plain folder:
+- mesh files (OBJ with MTL and textures, STL, PLY, glTF, GLB) and IFC model fragments;
+- sub-folders as the library's folders;
+- one JSON manifest, `reviera-library.json`, at its root (DM-LIB-001 … 004).
+
+A FileEngine folder with the same layout **is** a library, so an organisation keeps one shared,
+permissioned, versioned library on its FileEngine server instead of copies on every machine.
+This is a fuller form of DM-LIB-001's *organisation libraries*, which the spec plans only as a
+read-only static index over HTTPS or git.
+
+- **Opening.**
+  - In the Component Library panel, *Open…* gains *From FileEngine…*: pick a connection and a
+    folder holding a `reviera-library.json`, or create one there (*New…*).
+  - The library then appears under the panel's *Organisation* sources, with its state
+    (indexed, indexing, offline, error).
+  - An administrator can pre-configure FileEngine libraries for everyone, as DM-LIB-001's
+    policy file allows.
+- **Reading.**
+  - The manifest and the folder listing are read through the REST door.
+  - Items download on demand into the per-user library cache, keyed by their UID and version.
+    A new version on the server replaces the cached one the next time the item is used.
+  - Thumbnails come from the manifest's preview images, or from FileEngine's renditions when it
+    makes them for 3D files.
+  - Cached items can be placed offline; uncached ones show greyed.
+  - The panel's background index (DM-LIB-001) covers FileEngine libraries like local ones, so
+    search stays instant.
+- **Placing.**
+  - *Place Component* works as for a local library: the item is loaded into the project as a
+    type the first time and embedded in the model, so the model opens anywhere without the
+    server.
+  - The type records where it came from: connection, library folder UID, item UID and version.
+- **Updates.**
+  - When the library has a newer version of an item a model uses, the panel and the type's
+    Properties show *Update available*.
+  - *Reload from library* brings it in, with the comparison DM-LIB-001 shows before reloading.
+  - Nothing changes in a model until someone reloads.
+- **Adding and editing (by permission).** Users FileEngine lets write to the library can:
+  - *Import into Library* (files and their textures and buffers);
+  - *Create Component* from a selection, straight into a library folder;
+  - edit an item's manifest entry (name, category, tags, units, insertion point, product data);
+  - move and rename items;
+  - delete items into `.deleted` (FileEngine's own history keeps every version as well).
+
+  Everyone else sees the library read-only.
+- **The manifest and concurrent edits.** The manifest is one file that several people may edit
+  at once. Its entries are keyed by item path and written with sorted keys, so Reviera saves it
+  as a three-way merge:
+  - it re-reads the server's current manifest;
+  - applies its own changes entry by entry;
+  - uploads only if the server's version is still the one it merged with, retrying otherwise.
+
+  Two people adding different items never conflict. Two editing the same item's entry get the
+  usual conflict choice. (§10 Q14 asks whether per-item FileEngine metadata should replace the
+  manifest's item entries instead.)
+- **Curation (FileEngine's side).** A library can have an *Incoming* folder bound to
+  FileEngine's folder actions: a review raised on each new component, moved into the library
+  when approved. Reviera shows the review state on incoming items.
+- **Products and documents.** A library item's product data (manufacturer, model, code,
+  classification) and its documentation folder (§7) live in its manifest entry. Placing the
+  component therefore links the new type to the same documentation folder: a door placed from
+  the library arrives with its specification sheet, certifications and warranty.
+- **Sharing a library.**
+  - A share link (§7a) for the library folder gives outsiders a zip, which opens as a local
+    library.
+  - Another tenant's library can be added read-only when FileEngine grants it.
+
+Commands. The existing library commands (`library.open`, `library.create`,
+`library.import_files`, `library.set_meta`, `library.delete_items`, `library.restore_items`,
+`component.place`, and Create Component) accept a FileEngine library root,
+`fileengine://<connection>/<folder_uid>`, wherever they take a folder. Two more:
+- `library.updates(library_id?) -> [{type, item, used_version, latest_version}]`;
+- `library.reload_item(type_id)`.
+
 ## 8. Permissions, credentials and agents
 
 - FileEngine decides every permission. Reviera shows read-only states and disables actions the
@@ -450,9 +528,11 @@ Commands:
   2. publishing: FileEngine destinations for every export, publish sets, and public share links
      made in the window (once FileEngine's share door is live);
   3. BCF issues over BCF-API, once FileEngine's persistent BCF store lands;
-  4. documentation folders, the Documents pane and COBie *Document*;
-  5. the discussion service: live updates, mentions and reviews;
-  6. search, sharing and automation views.
+  4. Component Libraries on FileEngine (read, place, cache, updates; then writing, with the
+     manifest merge);
+  5. documentation folders, the Documents pane and COBie *Document*;
+  6. the discussion service: live updates, mentions and reviews;
+  7. search, sharing and automation views.
 
 ## 10. Questions for the owner
 
@@ -502,6 +582,13 @@ Commands:
       but there is no public door yet that redeems them. In-app links therefore depend on that
       door being deployed. Is a default expiry of 14 days right, and should a download limit be
       on by default?
+14. **Component Libraries.**
+    - Is there one organisation library per tenant, or several (per discipline or client)?
+    - Should new components go through a review (an *Incoming* folder with folder actions)
+      before they appear in the library?
+    - Should an item's details stay in the shared `reviera-library.json`, merged on save as
+      proposed, or move to per-file FileEngine metadata? Per-file metadata means no merging,
+      but a library copied to a local folder would then need its manifest rebuilt.
 
 ## Sources
 
