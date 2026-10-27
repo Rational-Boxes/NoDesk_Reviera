@@ -1281,8 +1281,19 @@ Further rules:
 **Commands.** `view.set_crop(view_id, enabled?, visible?, shape?) -> ()`; `view.reset_crop(view_id) -> ()`; `view.set_annotation_crop(view_id, enabled, offsets?) -> ()`; `view.add_crop_break(view_id, axis, position, gap) -> ()`; `view.remove_crop_break(view_id, index) -> ()`
 
 **Acceptance criteria.**
-- [ ] A tag whose host is outside the model crop is hidden even when the tag itself lies inside the annotation crop.
+- [x] A tag whose host is outside the model crop is hidden even when the tag itself lies inside the annotation crop. *(Built 2026-10-27, above.)*
 - [ ] A crop break shortens a 60 m elevation by the gap distance and draws break lines at both cut edges.
+
+*Built (2026-10-27), rectangular crops:* plans (floor, ceiling and area plans), sections and elevations have *Crop View*, *Crop Region Visible* and *Annotation Crop* in Properties › Extents, and *Reset Crop* (fit the model as the view sees it, with a 1 m margin; turning the crop on with no region does the same). The crop region is a rectangle in the view's 2D coordinates (plan x and y; a section's x and height). With the crop on:
+- the model is drawn only inside it: cut and projection lines clipped, filled cuts and colour fills clipped triangle by triangle, cut edges (for snapping) clipped, and the shaded model clipped by four clip planes;
+- tags, keynotes and spots of elements outside it are hidden wherever they stand;
+- with the annotation crop on (offsets per side in paper mm, default 5), annotation lines are clipped to the annotation crop and text that is not wholly inside it is hidden; without it annotation is not clipped;
+- a visible region is drawn, and prints;
+- printed, exported and sheet drawings are cropped alike (`reviera_render::crop`), so a viewport on a sheet takes the cropped extent.
+
+Data: `crop` `{enabled, visible, min, max}` and `annotationCrop` `{enabled, offsets: [left, right, bottom, top]}` in the view payload. Commands: `view.set_crop(view_id, enabled?, visible?, shape?: {min, max})`, `view.reset_crop(view_id)`, `view.set_annotation_crop(view_id, enabled, offsets?)`. Not yet: dragging the region's edges and *Size Crop* in the window, non-rectangular crops (*Edit Crop*), crop breaks, rotation, crops of 3D views, and crops that follow a scope box (ARC-SCOPE-001).
+
+- [x] *(Built 2026-10-27, `tests/sample_features.rs`.)* The views sample's *Level 1 - Cropped* draws nothing east of its region while *Level 1* runs on; the annotated plan cropped to its living room hides the kitchen's and bedroom's tags (their rooms are outside), and with a 5 mm annotation crop hides the title note and keeps the dimension lines within the annotation crop; turning the crop off brings everything back.
 
 ### Discipline display
 **ID:** DOC-GFX-016 · **Priority:** P1 · **Ref:** research/04 §1 (Discipline property)

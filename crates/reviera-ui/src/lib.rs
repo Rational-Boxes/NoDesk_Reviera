@@ -90,6 +90,7 @@ mod schedules;
 mod scripts;
 mod sections;
 mod legends_ui;
+mod crop_ui;
 mod select;
 mod sheets;
 mod site;
@@ -2809,6 +2810,7 @@ impl Gui {
                 grid.append(Property::string(label, &key, value));
                 grid.set_property_read_only(&key, true);
             }
+            self.crop_rows(grid, element);
             return true;
         }
         grid.append(Property::category("3D View", "c_view"));
@@ -2944,6 +2946,7 @@ impl Gui {
             || self.sheet_view_edit(property, text.clone())
             || self.note_edit(property, text.clone())
             || self.legend_edit(property, text.clone())
+            || self.crop_edit(property, text.clone())
             || self.sketch_edit(property, text.clone())
             || self.stair_edit(property, text.clone())
             || self.dormer_edit(property, text.clone())

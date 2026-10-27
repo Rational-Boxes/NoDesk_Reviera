@@ -170,6 +170,9 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(ViewCreateLegend),
         registry.add(LegendPlaceComponent),
         registry.add(LegendSetComponent),
+        registry.add(ViewSetCrop),
+        registry.add(ViewResetCrop),
+        registry.add(ViewSetAnnotationCrop),
         registry.add(TextSetContent),
         registry.add(TextSet),
         registry.add(TextAddLeader),
@@ -3882,6 +3885,40 @@ modify_command!(
     crate::keynote_legend::CreateParams,
     ElementId,
     crate::keynote_legend::create
+);
+modify_command!(
+    ViewSetCrop,
+    "view.set_crop",
+    "Crop a view",
+    "Sets a plan's, section's or elevation's crop (DOC-GFX-015): `enabled` (Crop View: only what lies inside \
+     the crop region is drawn), `visible` (Crop Region Visible) and `shape` (`{min, max}`, the rectangle in the \
+     view's 2D coordinates: plan x and y, or a section's x and height). Turning the crop on without a shape fits \
+     the model.",
+    "Crop View",
+    crate::crop::SetCropParams,
+    (),
+    crate::crop::set_crop
+);
+modify_command!(
+    ViewResetCrop,
+    "view.reset_crop",
+    "Reset a view's crop region",
+    "Fits a plan's, section's or elevation's crop region to the model as the view sees it, with a 1 m margin.",
+    "Reset Crop",
+    crate::crop::ResetCropParams,
+    (),
+    crate::crop::reset_crop
+);
+modify_command!(
+    ViewSetAnnotationCrop,
+    "view.set_annotation_crop",
+    "Set a view's annotation crop",
+    "Turns a cropped view's annotation crop on or off, with its `offsets` outside the crop region (left, right, \
+     bottom, top; paper millimetres): annotation crossing it is clipped and annotation entirely outside it hidden.",
+    "Annotation Crop",
+    crate::crop::SetAnnotationCropParams,
+    (),
+    crate::crop::set_annotation_crop
 );
 modify_command!(
     ViewCreateLegend,

@@ -1068,14 +1068,13 @@ impl WgpuViewport {
             px_per_m * scale / 1000.0,
             0.0,
         ];
-        // Clip planes apply to 3D views only; plans have their own range.
+        // Clip planes: a 3D view's section box and slices; in plans and sections, which have their
+        // own range, only the crop region's (DOC-GFX-015), which the window sends alone there.
         let mut planes = [[0.0; 4]; PLANES];
         let mut count = 0;
-        if self.plan.is_none() {
-            for (slot, p) in planes.iter_mut().zip(&self.clipping.planes) {
-                *slot = *p;
-                count += 1;
-            }
+        for (slot, p) in planes.iter_mut().zip(&self.clipping.planes) {
+            *slot = *p;
+            count += 1;
         }
         let u = Uniforms {
             view_proj,

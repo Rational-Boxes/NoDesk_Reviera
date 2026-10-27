@@ -108,6 +108,11 @@ local east = reviera.scopebox.create{
 }
 local plan_east = reviera.view.duplicate{ view_id = plan1, name = "Level 1 - East Half" }
 reviera.view.assign_scope_box{ view_ids = { plan_east }, scope_box_id = east }
+-- A cropped plan (DOC-GFX-015): the west half, its crop region shown, the annotation crop on
+-- (5 mm on paper round it), so what lies outside is not drawn.
+local plan_crop = reviera.view.duplicate{ view_id = plan1, name = "Level 1 - Cropped" }
+reviera.view.set_crop{ view_id = plan_crop, shape = { min = { -1.0, -1.0 }, max = { 5.0, 8.0 } }, visible = true }
+reviera.view.set_annotation_crop{ view_id = plan_crop, enabled = true, offsets = { 5, 5, 5, 5 } }
 
 -- ---- 3D views, each with its camera and inspection state ----
 -- Cameras look at the house's middle from the south-east (iso) or the south (front).

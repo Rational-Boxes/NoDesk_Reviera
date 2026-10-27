@@ -232,14 +232,16 @@ impl App {
                     .collect(),
             });
         }
-        Ok(PlanDrawing {
+        let mut d = PlanDrawing {
             name: e.name.clone().unwrap_or_default(),
             scale: scale as f32,
             graphics,
             annotation,
             labels,
             paper: None,
-        })
+        };
+        apply_crop(e, &mut d, range.cut as f32);
+        Ok(d)
     }
 }
 
@@ -403,6 +405,21 @@ pub fn section_parts(
     }
 }
 
+/// Crops a plan's or section's drawing to its crop region (DOC-GFX-015): the model graphics to
+/// the region, annotation lines to the annotation crop when it is on (labels not wholly inside it
+/// hidden), and the region drawn at `z` when it is visible.
+pub fn apply_crop(view: &reviera_core::Element, d: &mut PlanDrawing, z: f32) {
+    let Some(rects) = reviera_core::crop::rects(view) else { return };
+    reviera_render::crop::crop_graphics(&mut d.graphics, rects.model);
+    if let Some(a) = rects.annotation {
+        reviera_render::crop::crop_lines(&mut d.annotation, a);
+        d.labels.retain(|l| reviera_render::crop::label_inside(l, a));
+    }
+    if reviera_core::crop::crop_of(view).is_some_and(|c| c.visible) {
+        d.annotation.push(Lines { color: [0.0, 0.0, 0.0, 1.0], width: 0.13, segments: reviera_render::crop::outline(rects.model, z) });
+    }
+}
+
 /// The dimensions, tags, text notes and spots of section or elevation `view` in its frame at 1:`scale`,
 /// drawn at depth `z`, in annotation pen 1 (DOC-ANN-001, DOC-ANN-009…011).
 pub fn section_annotation(store: &reviera_core::Store, view: &reviera_core::Element, scale: f32, z: f32, scene: Option<&reviera_render::RenderScene>) -> (Lines, Vec<Label>) {
@@ -460,14 +477,16 @@ impl App {
         let (lines, more) = section_annotation(store, e, scale, 0.002, Some(scene));
         annotation.push(lines);
         labels.extend(more);
-        Ok(PlanDrawing {
+        let mut d = PlanDrawing {
             name: e.name.clone().unwrap_or_default(),
             scale,
             graphics: parts.graphics,
             annotation,
             labels,
             paper: None,
-        })
+        };
+        apply_crop(e, &mut d, 0.002);
+        Ok(d)
     }
 }
 

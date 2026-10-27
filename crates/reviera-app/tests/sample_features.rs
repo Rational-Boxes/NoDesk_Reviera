@@ -140,7 +140,8 @@ fn the_views_sample_keeps_its_views_and_their_inspection_state() {
     let count = |k: &str| all.iter().filter(|(_, kind, _)| kind == k).count();
     assert_eq!(
         [count("view.plan"), count("view.ceiling_plan"), count("view.section"), count("view.elevation"), count("view.3d")],
-        [3, 2, 2, 4, 11],
+        // Level 1, Level 2, the scope-boxed East Half and the cropped plan.
+        [4, 2, 2, 4, 11],
         "{all:#?}"
     );
     let boxes = ok(&mut app, "scopebox.list", json!({}));
@@ -612,4 +613,51 @@ fn the_annotated_plan_legend_draws_its_types() {
     assert!(app.execute("legend.place_component", json!({ "view_id": plan, "type_id": wall_type, "point": [0, 0] }), &Caller::user()).is_err());
     let level = s.iter().find(|e| e.class == "IfcBuildingStorey").unwrap().id();
     assert!(app.execute("legend.place_component", json!({ "view_id": legend, "type_id": level, "point": [0, 0] }), &Caller::user()).is_err());
+}
+
+#[test]
+fn cropped_views_draw_only_their_crop_region() {
+    let work = tempfile::tempdir().unwrap();
+    // The views sample's cropped plan: nothing drawn east of x = 5 m.
+    let mut app = open(work.path(), "views_inspection");
+    let doc = app.active().unwrap();
+    let cropped = view_id(&mut app, "Level 1 - Cropped", "view.plan");
+    let d = app.plan_drawing(doc, ElementId(cropped)).unwrap();
+    let xs: Vec<f32> = d.graphics.lines.iter().flat_map(|l| l.segments.iter().flat_map(|s| [s[0][0], s[1][0]])).collect();
+    assert!(!xs.is_empty() && xs.iter().all(|x| *x >= -1.0 - 1e-4 && *x <= 5.0 + 1e-4), "{:?}", xs.iter().cloned().fold(f32::MIN, f32::max));
+    let level1 = view_id(&mut app, "Level 1", "view.plan");
+    let whole = app.plan_drawing(doc, ElementId(level1)).unwrap();
+    let wx = whole.graphics.lines.iter().flat_map(|l| l.segments.iter().flat_map(|s| [s[0][0], s[1][0]])).fold(f32::MIN, f32::max);
+    assert!(wx > 9.0, "the uncropped plan runs east: {wx}");
+    // The crop region is drawn (visible), its fills clipped too.
+    assert!(d.graphics.poche.iter().flat_map(|m| &m.positions).all(|p| p[0] <= 5.0 + 1e-4));
+
+    // The annotated plan cropped to its living room (0..6 × 0..6): the kitchen's and bedroom's
+    // tags go with their rooms; the annotation crop (5 mm at 1 : 100) hides the title note below
+    // the plan and the dimension values outside it, and cuts the dimension lines.
+    let mut app = open(work.path(), "annotated_plan");
+    let doc = app.active().unwrap();
+    let plan = view_id(&mut app, "Level 1", "view.plan");
+    ok(&mut app, "view.set_crop", json!({ "view_id": plan, "shape": { "min": [0.0, 0.0], "max": [6.0, 6.0] }, "visible": false }));
+    let d = app.plan_drawing(doc, ElementId(plan)).unwrap();
+    let texts: Vec<&str> = d.labels.iter().map(|l| l.text.as_str()).collect();
+    assert!(texts.contains(&"LIVING") || texts.contains(&"Living"), "{texts:?}");
+    assert!(!texts.iter().any(|t| t.eq_ignore_ascii_case("kitchen") || t.eq_ignore_ascii_case("bedroom")), "{texts:?}");
+    ok(&mut app, "view.set_annotation_crop", json!({ "view_id": plan, "enabled": true, "offsets": [5, 5, 5, 5] }));
+    let d = app.plan_drawing(doc, ElementId(plan)).unwrap();
+    let texts: Vec<&str> = d.labels.iter().map(|l| l.text.as_str()).collect();
+    assert!(!texts.iter().any(|t| t.contains("GROUND FLOOR PLAN")), "the title note is outside: {texts:?}");
+    let ys: Vec<f32> = d.annotation.iter().flat_map(|l| l.segments.iter().flat_map(|s| [s[0][1], s[1][1]])).collect();
+    assert!(ys.iter().all(|y| *y >= -0.5 - 1e-4 && *y <= 6.5 + 1e-4), "annotation inside the annotation crop");
+    // Off again: everything back.
+    ok(&mut app, "view.set_crop", json!({ "view_id": plan, "enabled": false }));
+    let d = app.plan_drawing(doc, ElementId(plan)).unwrap();
+    assert!(d.labels.iter().any(|l| l.text.contains("GROUND FLOOR PLAN")));
+    // Reset fits the model; 3D views cannot be cropped.
+    ok(&mut app, "view.reset_crop", json!({ "view_id": plan }));
+    let s = store(&app);
+    let c = reviera_core::crop::crop_of(s.get(ElementId(plan)).unwrap()).unwrap();
+    assert!(c.min[0] < -0.5 && c.max[0] > 10.5 && c.max[1] > 6.5, "{c:?}");
+    let v3 = ok(&mut app, "view.create_3d", json!({}));
+    assert!(app.execute("view.set_crop", json!({ "view_id": v3, "enabled": true }), &Caller::user()).is_err());
 }

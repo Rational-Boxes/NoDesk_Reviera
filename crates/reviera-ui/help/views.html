@@ -52,6 +52,15 @@ In Properties, <b>Far Clip Offset</b> sets how far the view sees and <b>Flipped<
 look the other way. <code>view.create_section</code>, <code>view.create_elevation</code>,
 <code>section.edit</code></p>
 
+<h3 id="crop">Crop regions</h3>
+<p>A plan, section or elevation can be cropped: in Properties › <b>Extents</b>, tick <b>Crop
+View</b>, and the view draws only what lies inside its crop region, which first fits the model.
+<b>Crop Region Visible</b> draws the rectangle (and prints it). Tags of elements outside the crop
+are hidden. <b>Annotation Crop</b> adds a margin round it (5 mm on paper): dimensions and notes
+crossing it are cut, and those outside it hidden. <b>Reset Crop</b> fits the region to the model
+again. Sheets show a cropped view at its cropped size.
+<code>view.set_crop</code>, <code>view.reset_crop</code>, <code>view.set_annotation_crop</code></p>
+
 <h2 id="3d">3D views</h2>
 <p><b>View › Default 3D View</b> opens the model's default 3D view; <b>New 3D View</b> opens
 another, with its own camera. Each 3D view keeps its camera, Home, section box and slices in the

@@ -55,6 +55,9 @@ impl PlanState {
     }
 }
 
+/// A visible crop region's outline in the window.
+pub(crate) const CROP_COLOR: [f32; 4] = [0.35, 0.35, 0.4, 1.0];
+
 impl Gui {
     /// The plan state of a view element, if it is a plan.
     pub(crate) fn plan_info(
@@ -272,7 +275,13 @@ impl Gui {
                 }
             }
         }
+        // The crop region (DOC-GFX-015): the model's lines here, its annotation below.
+        let crop = view_element.and_then(|e| model.as_ref()?.get(e)).and_then(reviera_core::crop::rects);
+        if let Some(c) = &crop {
+            reviera_render::crop::crop_graphics(&mut graphics, c.model);
+        }
         let cut_edges = Rc::new(std::mem::take(&mut graphics.cut_edges));
+        let annotation_from = graphics.lines.len();
         graphics.lines.extend(self.annotation_lines(index));
         graphics.lines.extend(self.note_lines(index));
         graphics.lines.extend(self.room_lines(index));
@@ -295,6 +304,7 @@ impl Gui {
         graphics.lines.extend(self.work_plane_grid(index));
         graphics.lines.extend(self.constraint_lines(index));
         graphics.lines.extend(self.temp_dim_lines(index));
+        let annotation_to = graphics.lines.len();
         // Structural connections at Coarse and Medium: a circle with a spoke toward each member.
         let fine = model.as_ref().is_some_and(|st| {
             view_element
@@ -350,6 +360,18 @@ impl Gui {
                 width: w.projection.max(0.5),
                 segments: vec![[p(line.segment[0]), p(line.segment[1])]],
             });
+        }
+        if let Some(c) = &crop {
+            // Fills and the framing and connection symbols are model; annotation keeps to the
+            // annotation crop when it is on.
+            reviera_render::crop::crop_meshes(&mut graphics.poche, c.model);
+            reviera_render::crop::crop_lines(&mut graphics.lines[annotation_to..], c.model);
+            if let Some(a) = c.annotation {
+                reviera_render::crop::crop_lines(&mut graphics.lines[annotation_from..annotation_to], a);
+            }
+            if view_element.and_then(|e| model.as_ref()?.get(e)).and_then(reviera_core::crop::crop_of).is_some_and(|k| k.visible) {
+                graphics.lines.push(reviera_render::plan::Lines { color: CROP_COLOR, width: 0.25, segments: reviera_render::crop::outline(c.model, cut + 0.005) });
+            }
         }
         let v = &mut self.views[index];
         if let Some(viewport) = &mut v.viewport {

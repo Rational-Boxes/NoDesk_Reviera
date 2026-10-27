@@ -120,6 +120,10 @@ impl Gui {
                 width: 0.18,
                 segments: label_strokes(&parts.labels),
             });
+            // The crop region (DOC-GFX-015).
+            if let Some(c) = v.element.and_then(|e| store.get(e)).and_then(reviera_core::crop::rects) {
+                reviera_render::crop::crop_graphics(&mut graphics, c.model);
+            }
             let cut_edges = Rc::new(std::mem::take(&mut graphics.cut_edges));
             let v = &mut self.views[index];
             if let Some(vp) = &mut v.viewport {
@@ -134,8 +138,21 @@ impl Gui {
         }
         let Some(base) = self.views[index].section.as_ref().and_then(|s| s.base.clone()) else { return };
         let mut graphics = (*base).clone();
+        let from = graphics.lines.len();
         graphics.lines.extend(self.annotation_lines(index));
         graphics.lines.extend(self.note_lines(index));
+        let (doc, element) = (self.views[index].doc, self.views[index].element);
+        let view = self.app.document(doc).and_then(|d| d.doc.store().get(element?).cloned());
+        if let Some(view) = view
+            && let Some(c) = reviera_core::crop::rects(&view)
+        {
+            if let Some(a) = c.annotation {
+                reviera_render::crop::crop_lines(&mut graphics.lines[from..], a);
+            }
+            if reviera_core::crop::crop_of(&view).is_some_and(|k| k.visible) {
+                graphics.lines.push(Lines { color: crate::plans::CROP_COLOR, width: 0.25, segments: reviera_render::crop::outline(c.model, 0.005) });
+            }
+        }
         let v = &mut self.views[index];
         if let Some(vp) = &mut v.viewport {
             vp.set_highlight(&highlight);
@@ -328,6 +345,7 @@ impl Gui {
         grid.append(Property::boolean("Flipped", "sec_flip", s.def.flipped));
         grid.append(Property::string("ID", "v0", element.to_string()));
         grid.set_property_read_only("v0", true);
+        self.crop_rows(grid, element);
         true
     }
 

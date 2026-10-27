@@ -30,8 +30,14 @@ pub fn view_notes(store: &Store, view: &Element, scale: f32, z: f32, scene: Opti
     let parents = HashMap::new();
     let reader = FieldReader::new(store, &parents);
     let mut out = Vec::new();
+    // A cropped view hides the tags and spots of elements outside its crop (DOC-GFX-015).
+    let crop = reviera_core::crop::rects(view);
+    let outside = |p: Option<[f64; 2]>| crop.is_some_and(|c| p.is_some_and(|p| !c.contains(p)));
     for (id, data) in notes::tags_of_view(store, &guid) {
         let t = notes::resolve_tag(store, &reader, id, data);
+        if t.host.is_some() && outside(Some(t.anchor)) {
+            continue;
+        }
         let leader = match t.data.leader {
             LeaderMode::None => None,
             LeaderMode::Attached => Some(t.anchor),
@@ -72,6 +78,9 @@ pub fn view_notes(store: &Store, view: &Element, scale: f32, z: f32, scene: Opti
     // Keynote tags (DOC-ANN-014), drawn as tags.
     for (id, d) in reviera_core::keynote_tags::of_view(store, &guid) {
         let k = reviera_core::keynote_tags::resolve(store, id, d);
+        if outside(k.anchor) {
+            continue;
+        }
         let mark = TagMark {
             head: k.data.position,
             lines: k.lines,
@@ -84,6 +93,9 @@ pub fn view_notes(store: &Store, view: &Element, scale: f32, z: f32, scene: Opti
     }
     // Spot elevations and coordinates (DOC-ANN-006/007), their element as their host.
     for m in crate::spots::of_view(store, scene, &guid) {
+        if m.data.element.is_some() && outside(Some(reviera_core::spots::in_view(store, &guid, m.picked))) {
+            continue;
+        }
         let mark = reviera_render::notes::SpotMark {
             point: reviera_core::spots::in_view(store, &guid, m.picked),
             text: m.data.text,

@@ -13,6 +13,7 @@ use glam::{Mat4, Vec3};
 use reviera_core::ElementId;
 
 pub mod annotation;
+pub mod crop;
 pub mod datums;
 pub mod font;
 pub mod notes;

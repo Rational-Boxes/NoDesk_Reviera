@@ -66,6 +66,10 @@ Start with **File › New**. The model has Level 1 at 0.
     any hidden or isolated elements. Open the *Orthographic* view and **Show Viewpoint…** the same
     file: it takes the kitchen's camera and box (Undo puts it back). The views sample is not
     changed by this; it is a check that the file round-trips.
+20. **Cropped plan.** Project Browser › right-click *Level 1* › Duplicate View, rename it *Level 1 -
+    Cropped*. In Properties › Extents tick **Crop View** and **Crop Region Visible**: the crop
+    region fits the model. **[gap]** Its edges cannot be dragged yet; the script sets the region
+    to (−1000, −1000)–(5000, 8000) with `view.set_crop`. Tick **Annotation Crop**.
 
 Check: View › **Check Overlaps** finds none. The Project Browser lists 3 floor plans, 2 ceiling
 plans, 2 sections, 4 elevations and 11 3D views; reopened, each 3D view keeps its camera, Home,
@@ -74,8 +78,9 @@ section box, slices and virtual volumes.
 ## Gaps
 
 - **Scope boxes on views.** `view.assign_scope_box` (step 10) has no UI: no Properties row on a
-  view chooses its scope box. Views have no crop region yet either, so an assigned view is not
-  cropped to its box; only grids and levels follow a scope box.
+  view chooses its scope box. A view's crop region does not follow its scope box yet, so an
+  assigned view is not cropped to its box; only grids and levels follow a scope box.
+- **Dragging the crop region** (step 20): its edges have no grips yet; `view.set_crop` sets it.
 - **Exact section box and slice positions.** The section box and slice planes are placed by
   grips and clicks only; `view.set_section_box` and `view.set_slice_planes` take exact values
   (steps 13, 15, 16), the window has no typed extents or heights.
