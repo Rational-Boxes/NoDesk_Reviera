@@ -20,7 +20,10 @@ ACLs, threaded discussion, BCF issues, search and conversion
 2. **Issues.** Read and write the BCF issues that FileEngine users raise on a model (in its
    web viewer, or from other BIM tools through its BCF service), so an issue opens in Reviera
    with the same camera, cut and selection, and replies go back to the same thread.
-3. **Product documentation.** Link materials, products and equipment in the model to FileEngine
+3. **Publishing.** Save reports and exports (PDF sheets, schedules, COBie, clash and analysis
+   reports, BCF archives, IFC copies) straight to a FileEngine folder, for simple sharing with
+   people who never open Reviera (owner request, 2026-10-27).
+4. **Product documentation.** Link materials, products and equipment in the model to FileEngine
    folders of support documents: technical specifications, sustainability certifications,
    installation and O&M manuals, warranties, safety data sheets. Each folder keeps the product's
    identifying metadata (product code or SKU, MasterFormat division, …), and Reviera embeds file
@@ -328,6 +331,95 @@ Commands:
 - `docs.report()`;
 - `docs.share(document_uid, recipient, expires)`.
 
+## 7a. Publishing reports and exports
+
+Anything Reviera writes to a file can be written to FileEngine instead, so sharing a set of
+drawings or a report is one step: publish, and FileEngine's people, links and notifications do
+the rest.
+
+- **One destination for every output.** Every command that writes a file accepts a FileEngine
+  destination, `fileengine://<connection>/<folder_uid>/<file name>`, wherever it accepts a path.
+  That covers:
+  - `export.pdf` (plans, sections, sheets);
+  - `export.cobie`;
+  - `schedule.export`;
+  - `clash.export_report`;
+  - `embodied_carbon.export`, `pressure_loss_report.export`, `results.export_package` and the
+    other analysis reports;
+  - `bcf.export`;
+  - `gbxml.export`, `hbjson.export`, `steel_nc.export`;
+  - `file.save_as` (an IFC copy).
+
+  Reviera writes the file locally first, as it does now, then uploads it. A failed upload keeps
+  the local file and says where it is, and the status bar retries it.
+- **In the window.** Every export dialog's location has a *FileEngine…* place beside the local
+  folders, remembering the last folder used per connection and model.
+- **Same name, new version.** Publishing to a name that already exists in the folder adds a
+  version of that file, not a second file, so a link to *Ground Floor.pdf* always shows the
+  latest. FileEngine keeps every earlier issue in its history. *Publish as a new file* is the
+  other choice.
+- **What a published file says about itself.** Metadata written on each published file:
+
+  | Key | Value |
+  |---|---|
+  | `reviera.source_uid` and `reviera.source_version` | the model it came from, when that model is on FileEngine |
+  | `reviera.source_name` | the model's file name |
+  | `reviera.output` | `pdf`, `cobie`, `schedule`, `clash_report`, `carbon_report`, `bcf`, `ifc`, … |
+  | `reviera.views` | the sheets or views it contains |
+  | `reviera.published_by` and `reviera.published_at` | who published it, and when |
+
+  FileEngine can therefore list "everything published from this model", and a reader can get
+  back to the model from a PDF.
+- **Publish sets.** *File › Publish to FileEngine…* picks several outputs at once, publishes
+  them together, and can save the choice as a *publish set* kept with the model, to run again
+  with one click (*Publish again*). For example:
+  - the issue sheets as one PDF;
+  - the door and room schedules;
+  - COBie;
+  - the latest clash report.
+
+  This is the simple form of an issue: the sheet revisions and transmittals of the
+  documentation chapter can build on it later.
+- **Public share links, made in Reviera (owner decision, 2026-10-27).** The Publish dialog has
+  a *Share* step, and every FileEngine file and folder in Reviera has a *Share link…* command:
+  in the FileEngine browser, the Documents pane, the list of published outputs, and
+  *File › Share Link…* for a model opened from FileEngine. The *Share link…* dialog makes an
+  outside share link through FileEngine's share service, for people without an account:
+  - **What:** one file (pinned to the version being shared), a folder's files as one zip, or a
+    folder with its subfolders. A publish set shares as one folder link.
+  - **Who:** the recipient's email address. FileEngine sends a one-time code to that address,
+    so the link alone is inert.
+  - **Limits:** an expiry (default 14 days) and an optional download count.
+  - **Result:** the link, shown with *Copy* and *Open in browser*, and kept in the model's
+    *Shared links* list. That list shows each link's target, recipient, expiry and downloads so
+    far, and has *Revoke*.
+  - **Permissions:** a link conveys at most what its creator can read, now and at redemption,
+    as FileEngine enforces.
+
+  Besides the public link, the Share step can also:
+  - copy the file's internal FileEngine link, for colleagues with accounts;
+  - post a note to the file's discussion thread with `@mentions`, which FileEngine notifies.
+
+  Each is chosen per publish; nothing is shared unless asked.
+- **Folder automation.** A publish folder can carry FileEngine folder actions (a review raised
+  on each new PDF, a notification to the client, a webhook). That is configured in FileEngine;
+  Reviera only publishes into it.
+
+Commands:
+- every exporting command's `path` accepts `fileengine://…`;
+- `publish.run(outputs[] | set_id, connection_id, folder_uid, as_new_file?, share?: {link?,
+  outside?: {recipient, expires}, note?})` returns what was published, with each file's UID and
+  version;
+- `publish.save_set(name, outputs[], connection_id, folder_uid)`, `publish.list_sets()` and
+  `publish.remove_set(set_id)`;
+- `fileengine.share_link(connection_id, uid, recipient, expires?, max_downloads?, scope?:
+  file|folder|subtree) -> {link, expires}`;
+- `fileengine.list_links(connection_id, uid?)` and `fileengine.revoke_link(connection_id,
+  link_id)`.
+
+  Agents may list links. Making or revoking a public link is the user's decision, through the
+  window or Lua, as with credentials.
+
 ## 8. Permissions, credentials and agents
 
 - FileEngine decides every permission. Reviera shows read-only states and disables actions the
@@ -355,10 +447,12 @@ Commands:
   the OpenAPI contract with a mock server.
 - **Phases:**
   1. connections, browse, open, save and versions;
-  2. BCF issues over BCF-API, once FileEngine's persistent BCF store lands;
-  3. documentation folders, the Documents pane and COBie *Document*;
-  4. the discussion service: live updates, mentions and reviews;
-  5. search, sharing and automation views.
+  2. publishing: FileEngine destinations for every export, publish sets, and public share links
+     made in the window (once FileEngine's share door is live);
+  3. BCF issues over BCF-API, once FileEngine's persistent BCF store lands;
+  4. documentation folders, the Documents pane and COBie *Document*;
+  5. the discussion service: live updates, mentions and reviews;
+  6. search, sharing and automation views.
 
 ## 10. Questions for the owner
 
@@ -399,6 +493,15 @@ Commands:
     material), and should an EPD's embodied-carbon value feed Reviera's carbon calculation?
 12. **Issues route.** Start with BCF-API through the BCF service (standard, waits for its
     persistent store), or go straight to the discussion service (live, FileEngine-only)?
+13. **Publishing.**
+    - Should republishing to the same name add a version (the proposal) or keep each issue as
+      its own file?
+    - Is there a default publish folder per project (for example `<project>/Published`)?
+    - Which outputs belong in a first publish set?
+    - **Share links:** FileEngine's share service is at M0. Links can be minted and revoked,
+      but there is no public door yet that redeems them. In-app links therefore depend on that
+      door being deployed. Is a default expiry of 14 days right, and should a download limit be
+      on by default?
 
 ## Sources
 
