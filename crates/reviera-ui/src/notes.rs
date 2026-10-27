@@ -37,6 +37,8 @@ pub enum NoteTool {
     /// then where the text goes.
     SpotElevation,
     SpotCoordinate,
+    /// Annotate › Spot Slope (DOC-ANN-008): one click on a sloped face.
+    SpotSlope,
 }
 
 /// Tag All Not Tagged's categories: key and label.
@@ -83,7 +85,7 @@ pub(crate) fn ask_text(frame: &Frame, title: &str, current: &str) -> Option<Stri
 impl NoteTool {
     /// Whether the tool works in sections and elevations too.
     fn in_sections(self) -> bool {
-        matches!(self, NoteTool::Tag | NoteTool::Text | NoteTool::SpotElevation | NoteTool::SpotCoordinate)
+        matches!(self, NoteTool::Tag | NoteTool::Text | NoteTool::SpotElevation | NoteTool::SpotCoordinate | NoteTool::SpotSlope)
     }
 }
 
@@ -150,6 +152,7 @@ impl Gui {
                 NoteTool::PathOfTravel => "Path of Travel: click the start point; Esc ends",
                 NoteTool::SpotElevation => "Spot Elevation: click a point on an element; Esc ends",
                 NoteTool::SpotCoordinate => "Spot Coordinate: click a point on an element; Esc ends",
+                NoteTool::SpotSlope => "Spot Slope: click a sloped face; Esc ends",
             },
             0,
         );
@@ -221,6 +224,16 @@ impl Gui {
                     json!({ "view_id": plan, "kind": kind, "scheme_id": scheme, "point": p }),
                 )
             }
+            NoteTool::SpotSlope => {
+                let Some((element, mut point, direction)) = self.model_point_at(x, y, panel) else {
+                    return frame.set_status_text("Click a sloped face of an element", 0);
+                };
+                // A section shows a slope as its cut profile: the point clicked on the cut plane.
+                if let Some(s) = self.active_view().and_then(|v| v.section.as_ref()).filter(|s| !s.elevation) {
+                    point = s.def.frame().to_world([p[0], p[1], 0.0]);
+                }
+                self.run("spot.create_slope", json!({ "view_id": plan, "ref": element, "point": point, "direction": direction }))
+            }
             NoteTool::SpotElevation | NoteTool::SpotCoordinate => {
                 // First the point on the model, then where the text goes.
                 let Some((element, point, direction)) = self.spot_pick.take() else {
@@ -247,7 +260,7 @@ impl Gui {
             Ok(_) => {
                 self.notes_changed();
                 // The Spot tools go on: the next point.
-                if matches!(kind, NoteTool::SpotElevation | NoteTool::SpotCoordinate) {
+                if matches!(kind, NoteTool::SpotElevation | NoteTool::SpotCoordinate | NoteTool::SpotSlope) {
                     frame.set_status_text("Spot placed; click a point on an element for the next, or Esc", 0);
                 }
             }
@@ -494,15 +507,34 @@ impl Gui {
             return true;
         }
         if let Some(d) = reviera_core::spots::spot_data(e) {
-            use reviera_core::spots::{Base, Display, SpotKind};
+            use reviera_core::spots::{Base, Display, Representation, SlopeFormat, SpotKind};
             let elevation = d.spot_kind == SpotKind::Elevation;
-            grid.append(Property::category(if elevation { "Spot Elevation" } else { "Spot Coordinate" }, "c_spot"));
+            let title = match d.spot_kind {
+                SpotKind::Elevation => "Spot Elevation",
+                SpotKind::Coordinate => "Spot Coordinate",
+                SpotKind::Slope => "Spot Slope",
+            };
+            grid.append(Property::category(title, "c_spot"));
             // The value as it reads now, on the model.
             let scene = self.doc.and_then(|doc| self.scenes.get(&doc));
             let m = reviera_app::spots::measure(&store, scene, id, d.clone());
             let value = if m.orphaned { format!("{} (orphaned)", m.lines.join(", ")) } else { m.lines.join(", ") };
             grid.append(Property::string("Value", "spot_value", value));
             grid.set_property_read_only("spot_value", true);
+            if d.spot_kind == SpotKind::Slope {
+                let formats = [SlopeFormat::Percent, SlopeFormat::Ratio, SlopeFormat::Degrees];
+                let names = ["Percent", "Ratio (1 : n)", "Degrees"];
+                let index = formats.iter().position(|f| *f == d.slope_format).unwrap_or(0) as i32;
+                grid.append(Property::enumeration("Slope Units", "spot_format", names.iter().enumerate().map(|(i, n)| ((*n).to_owned(), i as i32)).collect::<Vec<(String, i32)>>(), index));
+                // The triangle is for sections and elevations.
+                if reviera_core::sections::frame_of_view(&store, &d.view).is_some() {
+                    let index = i32::from(d.representation == Representation::Triangle);
+                    grid.append(Property::enumeration("Representation", "spot_repr", vec![("Arrow".to_owned(), 0), ("Triangle".to_owned(), 1)], index));
+                }
+                grid.append(Property::string("Prefix", "spot_prefix", d.prefix.clone()));
+                grid.append(Property::string("Suffix", "spot_suffix", d.suffix.clone()));
+                return true;
+            }
             let mut bases: Vec<(String, Base)> = vec![("Project Base Point".into(), Base::Project), ("Survey Point".into(), Base::Survey)];
             if elevation {
                 for l in reviera_core::levels::list(&store) {
@@ -629,6 +661,15 @@ impl Gui {
                 };
                 self.run("spot.set", json!({ "annotation_ids": [id], "display": display }))
             }
+            "spot_format" => {
+                let format = match text.as_str() {
+                    "Ratio (1 : n)" => "ratio",
+                    "Degrees" => "degrees",
+                    _ => "percent",
+                };
+                self.run("spot.set", json!({ "annotation_ids": [id], "slope_format": format }))
+            }
+            "spot_repr" => self.run("spot.set", json!({ "annotation_ids": [id], "representation": text.to_lowercase() })),
             "spot_include" => self.run("spot.set", json!({ "annotation_ids": [id], "include_elevation": text == "Yes" })),
             "spot_prefix" => self.run("spot.set", json!({ "annotation_ids": [id], "prefix": text })),
             "spot_suffix" => self.run("spot.set", json!({ "annotation_ids": [id], "suffix": text })),

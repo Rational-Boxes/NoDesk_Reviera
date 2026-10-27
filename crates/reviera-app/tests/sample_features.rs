@@ -442,3 +442,39 @@ fn the_annotated_plan_reads_its_spots_from_the_model() {
     let tips = reviera_core::annotations_3d::tips(&s);
     assert_eq!(tips.iter().filter(|t| t.class == "spots").count(), 3);
 }
+
+#[test]
+fn the_house_reads_its_roof_slope() {
+    let work = tempfile::tempdir().unwrap();
+    let mut app = open(work.path(), "house");
+    let plan = view_id(&mut app, "Level 2", "view.plan");
+    let spots = |app: &mut App, view: u64| ok(app, "spot.list", json!({ "view_id": view })).as_array().unwrap().clone();
+    // The east hip of the 30° roof, from the plan: 57.7 %, downhill to the east.
+    let s = spots(&mut app, plan);
+    assert_eq!(s.len(), 1, "{s:?}");
+    assert_eq!(s[0]["lines"], json!(["57.7 %"]));
+    assert!(near(f(&s[0]["downhill"][0]), 1.0, 1e-6) && near(f(&s[0]["downhill"][1]), 0.0, 1e-6), "{}", s[0]["downhill"]);
+    ok(&mut app, "spot.set", json!({ "annotation_ids": [s[0]["id"]], "slope_format": "degrees" }));
+    assert_eq!(spots(&mut app, plan)[0]["lines"], json!(["30°"]));
+    ok(&mut app, "spot.set", json!({ "annotation_ids": [s[0]["id"]], "slope_format": "ratio" }));
+    assert_eq!(spots(&mut app, plan)[0]["lines"], json!(["1 : 1.7"]));
+    // The triangle is for sections and elevations.
+    assert!(app.execute("spot.set", json!({ "annotation_ids": [s[0]["id"]], "representation": "triangle" }), &Caller::user()).is_err());
+    // In a section across the house, looking south, the roof's cut profile reads the same
+    // slope as a triangle; downhill (east) is to the viewer's left, and down.
+    let top = s[0]["point"].as_array().unwrap().iter().map(f).collect::<Vec<_>>();
+    let section = ok(&mut app, "view.create_section", json!({ "start": [-2.0, 3.5], "end": [12.0, 3.5] }));
+    let roof = s[0]["data"]["element"].as_str().unwrap().to_owned();
+    ok(&mut app, "spot.create_slope", json!({ "view_id": section, "ref": roof, "point": [top[0], 3.5, top[2]], "representation": "triangle" }));
+    let cut = spots(&mut app, section.as_u64().unwrap());
+    assert_eq!(cut[0]["lines"], json!(["57.7 %"]), "{cut:?}");
+    assert!(f(&cut[0]["downhill"][0]) < 0.0 && f(&cut[0]["downhill"][1]) < 0.0, "{}", cut[0]["downhill"]);
+    // A wall's cut face is vertical: refused.
+    let st = store(&app);
+    let west = st.iter().find(|w| reviera_core::walls::wall_recipe(w).is_some_and(|r| near(r.curve.start[0], 0.0, 1e-9) && near(r.curve.end[0], 0.0, 1e-9))).unwrap().id();
+    let err = app.execute("spot.create_slope", json!({ "view_id": section, "ref": west, "point": [0.0, 3.5, 1.5] }), &Caller::user()).unwrap_err();
+    assert!(format!("{err:?}").contains("spot.vertical"), "{err:?}");
+    // It follows the roof: a 45° roof reads 100 %.
+    ok(&mut app, "roof.set_slope", json!({ "roof_id": roof, "slope": "45°" }));
+    assert_eq!(spots(&mut app, plan)[0]["lines"], json!(["1 : 1"]));
+}

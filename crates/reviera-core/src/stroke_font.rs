@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Reviera contributors
 
-//! Reviera's built-in stroke font (capital letters, digits and the punctuation of lengths):
+//! Reviera's built-in stroke font (capital letters, digits and the punctuation of lengths,
+//! levels and slopes):
 //! the glyph strokes the renderer draws labels with, and model text is built from
 //! (ARC-MTXT-001). No font files are needed, so text looks the same everywhere.
 
@@ -20,6 +21,13 @@ pub fn glyph(c: char) -> &'static [&'static [(f32, f32)]] {
         // "@" for spacings: a ring with a tail.
         '@' => &[&[(3., 2.), (3., 4.), (1.5, 4.), (1.5, 2.), (3., 2.), (4., 2.5), (4., 5.), (3., 6.), (1., 6.), (0., 5.), (0., 1.), (1., 0.), (4., 0.)]],
         ':' => &[&[(2., 1.), (2., 1.6)], &[(2., 4.), (2., 4.6)]],
+        // Slopes (DOC-ANN-008): a percent sign and a degree ring.
+        '%' => &[
+            &[(0., 0.), (4., 6.)],
+            &[(0.4, 4.4), (1.2, 4.4), (1.2, 5.6), (0.4, 5.6), (0.4, 4.4)],
+            &[(2.8, 0.4), (3.6, 0.4), (3.6, 1.6), (2.8, 1.6), (2.8, 0.4)],
+        ],
+        '°' => &[&[(0.6, 4.6), (1.6, 4.6), (1.6, 5.8), (0.6, 5.8), (0.6, 4.6)]],
         // A padlock, for locked dimensions (ARC-CNST-001).
         '\u{1F512}' => &[
             &[(0.3, 0.), (3.7, 0.), (3.7, 3.4), (0.3, 3.4), (0.3, 0.)],
@@ -154,6 +162,7 @@ pub fn advance(c: char) -> f32 {
         '1' => 4.5,
         '/' => 4.0,
         ':' => 3.0,
+        '°' => 3.0,
         '(' | ')' | '|' => 4.0,
         '²' | '³' => 3.5,
         _ => 5.5,

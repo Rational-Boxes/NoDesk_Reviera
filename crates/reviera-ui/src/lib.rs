@@ -4342,6 +4342,7 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         }),
         "spot.create_elevation" => with(gui, |g| g.start_note_tool(notes::NoteTool::SpotElevation)),
         "spot.create_coordinate" => with(gui, |g| g.start_note_tool(notes::NoteTool::SpotCoordinate)),
+        "spot.create_slope" => with(gui, |g| g.start_note_tool(notes::NoteTool::SpotSlope)),
         "text.create" => with(gui, |g| {
             g.start_note_tool(notes::NoteTool::Text);
             focus(g);

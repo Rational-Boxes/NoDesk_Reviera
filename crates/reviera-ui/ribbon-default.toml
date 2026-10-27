@@ -302,6 +302,12 @@ icon = "spot_coordinate"
 help = "North and east of a point on an element, in a plan, section or elevation: click the point, then where the text goes"
 
 [[action]]
+id = "spot.create_slope"
+label = "Spot Slope"
+icon = "spot_slope"
+help = "The slope of a face, in a plan (an arrow pointing downhill) or a section or elevation: click the face"
+
+[[action]]
 id = "text.create"
 label = "Text"
 icon = "text"
@@ -3812,6 +3818,7 @@ tools = [
   { action = "dim.create_aligned", size = "large" },
   { action = "spot.create_elevation", size = "small" },
   { action = "spot.create_coordinate", size = "small" },
+  { action = "spot.create_slope", size = "small" },
 ]
 
 [[tab.panel]]

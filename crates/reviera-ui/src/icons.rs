@@ -894,6 +894,9 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "spot_elevation" => format!(
             r#"<path d="M3 27h26" {s}/><path d="M9 27l-4-6h8z" fill="{a}" {sa}/><path d="M9 21l6-9h13" {s}/><path d="M16 8h11" {s} stroke-width="2.4"/>"#
         ),
+        "spot_slope" => format!(
+            r#"<path d="M3 26L29 14" {s} stroke-width="2"/><path d="M8 17l14-6M22 11l-4 4.5M22 11l-6-0.5" {sa}/><path d="M3 26h26" {s} stroke-width="1"/>"#
+        ),
         "spot_coordinate" => format!(
             r#"<path d="M4 22l8 8M12 22l-8 8" {sa} stroke-width="2"/><path d="M8 26l7-12h13" {s}/><path d="M16 6h11M16 10h11" {s} stroke-width="2.2"/>"#
         ),

@@ -7,7 +7,8 @@
 -- Reviera sample model (test-data/samples): walls, doors and windows; a hip roof with eaves
 -- bearing on the walls (fascia, soffits) and the walls attached; a gable and a shed dormer
 -- joined flush; a U-shaped and an L-shaped stair with railings; a free railing with a single
--- gate, a double gate and an opening; a deck with a railing on its boards.
+-- gate, a double gate and an opening; a deck with a railing on its boards; a spot slope on the
+-- roof.
 
 local l1 = reviera.level.list()[1].id
 local l2 = reviera.level.create{ elevation = 3.0 }
@@ -67,5 +68,13 @@ reviera.deck.create{ outline = { outline }, level_id = l1 }
 reviera.railing.create{ path = { {18.05, 0.05}, {21.95, 0.05}, {21.95, 2.95} }, base_level = l1 }
 
 reviera.view.create_plan{ level_ids = { l1, l2 } }
+
+-- A spot slope on the roof's east hip in the Level 2 plan (DOC-ANN-008): the roof's 30° pitch
+-- as a percentage, with an arrow pointing downhill (east).
+local plan2
+for _, v in ipairs(reviera.view.list()) do
+  if v.name == "Level 2" and v.kind ~= "3d" then plan2 = v.id end
+end
+reviera.spot.create_slope{ view_id = plan2, ref = roof, point = { 9.4, 3.5, 4.0 } }
 print("House built")
 return true

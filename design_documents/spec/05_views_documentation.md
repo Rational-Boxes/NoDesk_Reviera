@@ -1822,6 +1822,10 @@ All annotation tools are on the **Annotate** tab, in the panels Dimension, Detai
 - [ ] A spot slope on a roof plane in plan points downhill and flips when the roof's slope direction is reversed.
 - [ ] Placing a spot slope on a vertical wall face is refused.
 
+*Built (2026-10-27):* Annotate › Dimension › *Spot Slope* in plans, sections and elevations: one click on a sloped face. The spot reads its element's top surface at the point, found from above each time it is drawn, so it follows the face: in a plan its steepest slope, with a 12 mm arrow through the point pointing downhill and the value above it; in a section or elevation the slope of that face's line in the view plane (a roof's or ramp's profile as cut or seen), as an arrow or a right triangle 10 mm along the horizontal. In a section the click is taken on the cut plane, where the profile is drawn. Units per spot: percent (default, `57.7 %`), ratio (`1 : 1.7`, run per unit of rise) or degrees (`30°`); a flat face reads `0 %`. A point well below its element's top (more than 0.15 m) is on a vertical face, such as a wall's side, and `spot.create_slope` refuses it (`spot.vertical`); a point over no surface of the element is refused too (`spot.no_face`). `spot.create_slope` is the application's (it checks the faces) and stores the spot with `spot.put_slope`; Properties show the value, Slope Units, Representation (sections and elevations), prefix and suffix. The stroke font gains `%` and `°`. Not yet: spot slope types (arrowhead, leader length, flat text), MEP segments' own slopes (Chapter 4), the hover preview of the downhill direction, and an offset from the reference other than moving the text (`spot.set` `leader_point`).
+
+- [x] *(Built 2026-10-27, `tests/sample_features.rs`.)* The house sample's spot slope on its 30° hip roof reads `57.7 %` downhill to the east, `30°` and `1 : 1.7` in the other units, and `1 : 1` once the roof is set to 45°; a section's triangle on the cut roof reads the same slope; a point on a wall's cut face is refused; the triangle is refused in a plan.
+
 ### Text notes and leaders
 **ID:** DOC-ANN-009 · **Priority:** P0 · **Ref:** research/04 §4.2; web: Edit a Text Note, Text Note Type Properties, Check Spelling in Text Notes, Options Dialog: Check Spelling Tab
 
@@ -3508,7 +3512,8 @@ Every command below is registered once in the command registry and is therefore 
 | `spot.create_coordinate` | view_id, ref, point, leader_point?, type_id?, base? | annotation_id | Yes | DOC-ANN-007 |
 | `spot.set` | annotation_ids, base?, display?, include_elevation?, prefix?, suffix?, leader_point? | () | Yes | DOC-ANN-006 |
 | `spot.list` | view_id | [{id, data, picked, point, bottom?, lines, orphaned}] | No | DOC-ANN-006 |
-| `spot.create_slope` | view_id, ref, point, type_id?, representation?: arrow\|triangle | annotation_id | Yes | DOC-ANN-008 |
+| `spot.create_slope` | view_id, ref, point, direction?, representation?: arrow\|triangle, slope_format?, prefix?, suffix? | annotation_id | Yes | DOC-ANN-008 |
+| `spot.put_slope` | view_id, ref, point, … (as spot.create_slope) | annotation_id | Yes | DOC-ANN-008 |
 | `spot.settings` | — | () | No | DOC-ANN-006 |
 | `text.create` | view_id, position, content, type_id?, width?, rotation? | annotation_id | Yes | DOC-ANN-009 |
 | `text.format` | style: bold\|italic\|underline\|all_caps\|subscript\|superscript (applies to the open text editor's selection) | () | Yes | DOC-ANN-009 |

@@ -77,6 +77,14 @@ pub fn view_notes(store: &Store, view: &Element, scale: f32, z: f32, scene: Opti
             symbol: match m.data.spot_kind {
                 reviera_core::spots::SpotKind::Elevation => reviera_render::notes::SpotSymbol::Triangle,
                 reviera_core::spots::SpotKind::Coordinate => reviera_render::notes::SpotSymbol::Cross,
+                // Downhill as found on the face (along x when it is not known).
+                reviera_core::spots::SpotKind::Slope => {
+                    let d = m.downhill.filter(|d| d[0] != 0.0 || d[1] != 0.0).unwrap_or([1.0, 0.0]);
+                    match m.data.representation {
+                        reviera_core::spots::Representation::Triangle => reviera_render::notes::SpotSymbol::SlopeTriangle(d, m.slope.unwrap_or(0.0)),
+                        reviera_core::spots::Representation::Arrow => reviera_render::notes::SpotSymbol::SlopeArrow(d),
+                    }
+                }
             },
             text_mm: notes::TAG_TEXT_MM as f32,
         };

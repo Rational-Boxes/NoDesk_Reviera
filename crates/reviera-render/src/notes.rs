@@ -4,7 +4,8 @@
 //! Drawing tags and text notes (DOC-ANN-009…011): their text in the stroke font, a tag's
 //! outline and leader, and a note's wrapped lines and leaders with arrowheads; and spot
 //! elevations and coordinates (DOC-ANN-006/007): a symbol at the point, a leader to a shoulder
-//! and the values above it. Sizes are paper millimetres scaled by the view scale.
+//! and the values above it; spot slopes (DOC-ANN-008): an arrow pointing downhill, or a triangle,
+//! with the value beside it. Sizes are paper millimetres scaled by the view scale.
 
 use reviera_core::notes::{Attach, Frame, Side, TextLeader};
 
@@ -59,12 +60,18 @@ pub struct TextMark {
 }
 
 /// The mark at a spot's point.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum SpotSymbol {
     /// A spot elevation: a triangle standing on its point.
     Triangle,
     /// A spot coordinate: a cross on it.
     Cross,
+    /// A spot slope: an arrow through its point pointing downhill (a unit vector in the view),
+    /// the value above its middle.
+    SlopeArrow([f64; 2]),
+    /// A spot slope in a section or elevation: a right triangle on the slope's line at its
+    /// point, 10 mm along, with downhill and the slope (rise over run).
+    SlopeTriangle([f64; 2], f64),
 }
 
 /// A spot to draw: its point and the shoulder's start in the view's 2D coordinates, and its
@@ -87,7 +94,11 @@ pub fn spot_parts(s: &SpotMark, scale: f32, z: f32) -> NoteParts {
     let p = [s.point[0] as f32, s.point[1] as f32];
     let t = [s.text[0] as f32, s.text[1] as f32];
     let mut segments = Vec::new();
+    if let SpotSymbol::SlopeArrow(d) | SpotSymbol::SlopeTriangle(d, _) = s.symbol {
+        return slope_parts(s, [d[0] as f32, d[1] as f32], p, t, mm, h, z);
+    }
     match s.symbol {
+        SpotSymbol::SlopeArrow(_) | SpotSymbol::SlopeTriangle(..) => {}
         SpotSymbol::Triangle => {
             let (w, ht) = (1.2 * mm, 2.0 * mm);
             let (a, b) = ([p[0] - w, p[1] + ht], [p[0] + w, p[1] + ht]);
@@ -120,6 +131,40 @@ pub fn spot_parts(s: &SpotMark, scale: f32, z: f32) -> NoteParts {
         .collect();
     let (x0, x1) = (t[0].min(end[0]), t[0].max(end[0]));
     let (y0, y1) = (t[1] - 0.5 * mm, t[1] + 0.8 * mm + (n - 1.0) * step + h + 0.5 * mm);
+    NoteParts { segments, labels, outline: [[x0, y0], [x1, y0], [x1, y1], [x0, y1]] }
+}
+
+/// A spot slope: its arrow (or triangle) at `p` along downhill `d`, its value at `t`.
+fn slope_parts(s: &SpotMark, d: [f32; 2], p: [f32; 2], t: [f32; 2], mm: f32, h: f32, z: f32) -> NoteParts {
+    let mut segments = Vec::new();
+    let text = s.lines.first().cloned().unwrap_or_default();
+    let w = font::width(&text, h);
+    match s.symbol {
+        SpotSymbol::SlopeTriangle(_, slope) => {
+            // Run 10 mm along the horizontal, rise by the slope, from the point uphill.
+            let run = 10.0 * mm * d[0].signum();
+            let rise = (10.0 * mm * slope as f32).min(30.0 * mm);
+            let a = p;
+            let b = [p[0] - run, p[1]];
+            let c = [p[0] - run, p[1] + rise];
+            segments.extend([seg(a, b, z), seg(b, c, z), seg(c, a, z)]);
+        }
+        _ => {
+            // 12 mm through the point, arrowhead at the downhill end.
+            let half = 6.0 * mm;
+            let (a, b) = ([p[0] - d[0] * half, p[1] - d[1] * half], [p[0] + d[0] * half, p[1] + d[1] * half]);
+            segments.push(seg(a, b, z));
+            let (len, wid) = (ARROW_MM[0] * mm, ARROW_MM[1] * mm);
+            let back = [b[0] - d[0] * len, b[1] - d[1] * len];
+            let n = [-d[1] * wid, d[0] * wid];
+            segments.push(seg(b, [back[0] + n[0], back[1] + n[1]], z));
+            segments.push(seg(b, [back[0] - n[0], back[1] - n[1]], z));
+        }
+    }
+    let origin = [t[0] - w / 2.0, t[1] + 0.5 * mm];
+    let labels = vec![Label { origin: [origin[0], origin[1], z], right: [1.0, 0.0, 0.0], up: [0.0, 1.0, 0.0], height: h, text }];
+    let (x0, x1) = (origin[0].min(p[0] - 6.0 * mm), (origin[0] + w).max(p[0] + 6.0 * mm));
+    let (y0, y1) = ((p[1] - 6.0 * mm).min(origin[1]), (origin[1] + h + 0.5 * mm).max(p[1] + 6.0 * mm));
     NoteParts { segments, labels, outline: [[x0, y0], [x1, y0], [x1, y1], [x0, y1]] }
 }
 

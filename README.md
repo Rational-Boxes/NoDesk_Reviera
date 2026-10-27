@@ -1341,13 +1341,16 @@ simulation sessions, and the first engine runners (see [Not built yet](#not-buil
 - **Dimensions**: Annotate › Aligned Dimension (DI) dimensions parallel wall faces, centrelines,
   grids and cut edges, and in sections and elevations levels and walls' bases, tops and ends;
   dimensions to Reviera walls, levels and grids follow them (`dim.create_aligned`, `anno.list`).
-- **Spot elevations and coordinates**: Annotate › Spot Elevation (EL) and Spot Coordinate, in
+- **Spot elevations, coordinates and slopes**: Annotate › Spot Elevation (EL), Spot Coordinate and Spot Slope, in
   plans, sections and elevations: click a point on an element, then where the text goes. A spot
   reads the point's height (or its element's top and bottom there) from the project base point,
   the survey point or a level, or its north and east, and follows the surface as the model
   changes; one whose element has gone shows in orange (`spot.create_elevation`,
-  `spot.create_coordinate`, `spot.set`, `spot.list`; DOC-ANN-006/007). Not built yet: spot
-  types and the Spot Dimensions settings, spot slopes.
+  `spot.create_coordinate`, `spot.set`, `spot.list`; DOC-ANN-006/007). Spot Slope reads a
+  face's slope with one click (percent, ratio or degrees): in plans with an arrow pointing
+  downhill, in sections and elevations along the roof's or ramp's profile as an arrow or a
+  triangle; vertical faces are refused (`spot.create_slope`; DOC-ANN-008). Not built yet: spot
+  types and the Spot Dimensions settings.
 - **Line weights**: plans draw cut and projection lines with each category's pens at paper widths
   for the view scale, so a plan on screen at 100 % matches its print (`objectstyle.set`,
   `lineweight.set`, `lineweight.add_scale`, `lineweight.remove_scale`).
@@ -1664,7 +1667,7 @@ area by area (reviewed against the spec on 2026-10-15).
   with a server (COL-BCF-002).
 - **Documentation**: crop regions, jogged sections, interior elevation markers, opening a view
   from its marker; schedule filters in the Filter dialog beyond one condition (several are taken by `schedule.set_filters`), grouping and calculated fields; title block families,
-  revisions and sheet collections; tags and text on sheets; spot types, spot slopes; the current NBIMS-US
+  revisions and sheet collections; tags and text on sheets; spot types; the current NBIMS-US
   COBie layout and a COBie settings dialog.
 - **Interface**: general shape tools; a macOS build (the script is written, not yet run on a
   Mac); for the radial menu, its commands for Lua and MCP, icons and the accessibility

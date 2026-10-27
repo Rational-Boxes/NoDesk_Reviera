@@ -87,7 +87,7 @@ elevations:</p>
 <p>Dimensions to Reviera walls, grids, levels and reference planes follow them when they move.
 <code>dim.create_aligned</code>, <code>anno.list</code></p>
 
-<h2 id="spots">Spot elevations and coordinates</h2>
+<h2 id="spots">Spot elevations, coordinates and slopes</h2>
 <p><b>Annotate › Spot Elevation</b> (<kbd>EL</kbd>) and <b>Spot Coordinate</b> work in plans,
 sections and elevations: click a point on an element, then where the text goes. A spot
 elevation reads the point's height; in a plan, the top of what is there (a slab's top, the top of
@@ -98,6 +98,11 @@ spot is. Spots follow their element: raise a wall and its spot reads higher; a s
 has gone stays where it was, in orange.
 <code>spot.create_elevation</code>, <code>spot.create_coordinate</code>, <code>spot.set</code>,
 <code>spot.list</code></p>
+<p><b>Spot Slope</b>: click a sloped face (a roof, a ramp). In a plan it shows the face's
+steepest slope with an arrow pointing downhill; in a section or elevation the slope of the
+profile the view shows, as an arrow or, set in Properties, a triangle. Properties choose percent,
+ratio (1 : n) or degrees. A vertical face has no slope and is refused. Like other spots, it
+follows its face when the model changes. <code>spot.create_slope</code></p>
 
 <h3 id="constraints">Locks and EQ</h3>
 <p>A selected dimension's Properties have <b>Lock Segment</b> for each segment and, with two or

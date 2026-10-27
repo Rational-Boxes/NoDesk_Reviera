@@ -161,6 +161,7 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(SpotCreateElevation),
         registry.add(SpotCreateCoordinate),
         registry.add(SpotSet),
+        registry.add(SpotPutSlope),
         registry.add(TextSetContent),
         registry.add(TextSet),
         registry.add(TextAddLeader),
@@ -3847,6 +3848,19 @@ modify_command!(
     crate::spots::CreateSpotParams,
     ElementId,
     crate::spots::create_coordinate
+);
+modify_command!(
+    SpotPutSlope,
+    "spot.put_slope",
+    "Store a spot slope as given",
+    "Stores a spot slope at `point` on `ref` without checking the model's faces (DOC-ANN-008); \
+     `spot.create_slope` checks that the face there has a slope first and is the command to use. \
+     `representation`: `arrow` or `triangle` (sections and elevations); `slope_format`: `percent`, \
+     `ratio` or `degrees`.",
+    "Spot Slope",
+    crate::spots::CreateSpotParams,
+    ElementId,
+    crate::spots::put_slope
 );
 modify_command!(
     SpotSet,

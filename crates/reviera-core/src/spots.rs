@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Reviera contributors
 
-//! Spot elevations and spot coordinates (spec Ch 5 §5.13, DOC-ANN-006, DOC-ANN-007): view
-//! annotation (`anno.spot`, see `annotations`) that reads the height, or the plan coordinates, of
-//! a point on a model element.
+//! Spot elevations, coordinates and slopes (spec Ch 5 §5.13, DOC-ANN-006 … 008): view annotation
+//! (`anno.spot`, see `annotations`) that reads the height, the plan coordinates or the slope of a
+//! point on a model element.
 //!
 //! - **Where:** plans, ceiling plans, sections and elevations. A spot keeps the element, the
 //!   point picked on it (model coordinates) and the direction it was picked along (down in a
@@ -17,9 +17,13 @@
 //! - **Coordinates** read north and east (and, when asked, the elevation) from the project base
 //!   point along project north, or from the survey point in shared coordinates, turned with
 //!   true north (DM-LOC-001).
+//! - **Slopes** read the slope of the face at the point: in a plan its steepest, with an arrow
+//!   pointing downhill; in a section or elevation along the face's line as the view sees it, as
+//!   an arrow or a triangle. A vertical face has none: `spot.create_slope` (the application,
+//!   which has the faces) refuses it. Percent, ratio (1 : n) or degrees.
 //!
 //! Not yet: spot types (`dimtype`, symbols, text styles), the Spot Dimensions settings dialog,
-//! spot slopes (DOC-ANN-008), linked elements and locked 3D views.
+//! linked elements and locked 3D views.
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -39,6 +43,31 @@ pub enum SpotKind {
     #[default]
     Elevation,
     Coordinate,
+    Slope,
+}
+
+/// How a spot slope is drawn.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum Representation {
+    /// An arrow pointing downhill, the value beside it.
+    #[default]
+    Arrow,
+    /// A right triangle along the slope (sections and elevations).
+    Triangle,
+}
+
+/// The units a spot slope reads in.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum SlopeFormat {
+    /// `2.5 %`.
+    #[default]
+    Percent,
+    /// `1 : 40` (run per unit of rise).
+    Ratio,
+    /// `1.43°`.
+    Degrees,
 }
 
 /// Which heights a spot elevation shows.
@@ -97,6 +126,12 @@ pub struct SpotData {
     pub prefix: String,
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub suffix: String,
+    /// Slopes: arrow or triangle.
+    #[serde(default)]
+    pub representation: Representation,
+    /// Slopes: the units.
+    #[serde(default)]
+    pub slope_format: SlopeFormat,
 }
 
 pub fn spot_data(e: &Element) -> Option<SpotData> {
@@ -170,6 +205,8 @@ pub fn lines(store: &Store, d: &SpotData, top: [f64; 3], bottom: Option<[f64; 3]
                 (Display::TopAndBottom, b) => vec![wrap(format!("T {}", at(top))), wrap(format!("B {}", at(b.unwrap_or(top))))],
             }
         }
+        // The application reads a slope from its face (`slope_lines`).
+        SpotKind::Slope => Vec::new(),
         SpotKind::Coordinate => {
             let loc = crate::location::get(store);
             let c = match d.base {
@@ -185,6 +222,21 @@ pub fn lines(store: &Store, d: &SpotData, top: [f64; 3], bottom: Option<[f64; 3]
             out
         }
     }
+}
+
+/// A slope (rise over run) as a spot slope reads it: `0 %` when flat.
+pub fn slope_lines(d: &SpotData, slope: f64) -> Vec<String> {
+    let trim = |v: f64, places: usize| {
+        let t = format!("{v:.places$}");
+        if t.contains('.') { t.trim_end_matches('0').trim_end_matches('.').to_owned() } else { t }
+    };
+    let text = match d.slope_format {
+        SlopeFormat::Percent => format!("{} %", trim(slope * 100.0, 1)),
+        SlopeFormat::Ratio if slope < 1e-9 => "0".to_owned(),
+        SlopeFormat::Ratio => format!("1 : {}", trim(1.0 / slope, 1)),
+        SlopeFormat::Degrees => format!("{}°", trim(slope.atan().to_degrees(), 2)),
+    };
+    vec![format!("{}{text}{}", d.prefix, d.suffix)]
 }
 
 // ---- Commands ----
@@ -208,13 +260,13 @@ fn spot_view(store: &Store, r: &ElementRef) -> Result<(String, [f64; 3])> {
     }
 }
 
-#[derive(Debug, Deserialize, JsonSchema)]
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct CreateSpotParams {
     /// A floor or ceiling plan, a section or an elevation.
     pub view_id: ElementRef,
     /// The element whose surface the point is on.
-    #[serde(rename = "ref")]
+    #[serde(rename = "ref", skip_serializing_if = "Option::is_none")]
     pub element_ref: Option<ElementRef>,
     /// The point on it, in model coordinates (metres).
     pub point: [f64; 3],
@@ -232,10 +284,14 @@ pub struct CreateSpotParams {
     pub include_elevation: Option<bool>,
     pub prefix: Option<String>,
     pub suffix: Option<String>,
+    /// Spot slopes: `arrow` (default) or `triangle` (sections and elevations).
+    pub representation: Option<Representation>,
+    /// Spot slopes: `percent` (default), `ratio` or `degrees`.
+    pub slope_format: Option<SlopeFormat>,
 }
 
 /// A `base` argument: `project`, `survey`, or a level.
-#[derive(Debug, Clone, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum BaseArg {
     Project,
@@ -284,7 +340,14 @@ fn create(txn: &mut crate::txn::Transaction<'_>, p: CreateSpotParams, kind: Spot
         .ok()
         .and_then(|(id, _)| store.get(id)?.param(crate::views::VIEW_KEY)?.get("scale")?.as_f64())
         .unwrap_or(100.0);
-    let text = p.leader_point.unwrap_or([at[0] + 0.003 * scale, at[1] + 0.004 * scale]);
+    // A slope's value stands just above its arrow; the others' text up and to the right.
+    let text = p.leader_point.unwrap_or(match kind {
+        SpotKind::Slope => [at[0], at[1] + 0.003 * scale],
+        _ => [at[0] + 0.003 * scale, at[1] + 0.004 * scale],
+    });
+    if p.representation == Some(Representation::Triangle) && crate::sections::frame_of_view(&store, &view).is_none() {
+        return Err(Error::new("spot.bad_option", "the triangle form is for sections and elevations"));
+    }
     let data = SpotData {
         kind: KIND_SPOT.into(),
         spot_kind: kind,
@@ -298,6 +361,8 @@ fn create(txn: &mut crate::txn::Transaction<'_>, p: CreateSpotParams, kind: Spot
         include_elevation: p.include_elevation.unwrap_or(false),
         prefix: p.prefix.unwrap_or_default(),
         suffix: p.suffix.unwrap_or_default(),
+        representation: p.representation.unwrap_or_default(),
+        slope_format: p.slope_format.unwrap_or_default(),
     };
     let guid = GlobalId::new();
     txn.create(
@@ -307,18 +372,34 @@ fn create(txn: &mut crate::txn::Transaction<'_>, p: CreateSpotParams, kind: Spot
     )
 }
 
-pub(crate) fn create_elevation(txn: &mut crate::txn::Transaction<'_>, p: CreateSpotParams) -> Result<ElementId> {
-    if p.include_elevation.is_some() {
-        return Err(Error::new("spot.bad_option", "include_elevation is for spot coordinates"));
+/// Refuses the options of other kinds of spot.
+fn only(p: &CreateSpotParams, kind: SpotKind) -> Result<()> {
+    let wrong = match kind {
+        SpotKind::Elevation => p.include_elevation.is_some() || p.representation.is_some() || p.slope_format.is_some(),
+        SpotKind::Coordinate => p.display.is_some() || p.representation.is_some() || p.slope_format.is_some(),
+        SpotKind::Slope => p.display.is_some() || p.include_elevation.is_some() || p.base.is_some(),
+    };
+    if wrong {
+        return Err(Error::new("spot.bad_option", "display is for spot elevations, include_elevation for coordinates, representation and slope_format for slopes, base not for slopes"));
     }
+    Ok(())
+}
+
+pub(crate) fn create_elevation(txn: &mut crate::txn::Transaction<'_>, p: CreateSpotParams) -> Result<ElementId> {
+    only(&p, SpotKind::Elevation)?;
     create(txn, p, SpotKind::Elevation)
 }
 
 pub(crate) fn create_coordinate(txn: &mut crate::txn::Transaction<'_>, p: CreateSpotParams) -> Result<ElementId> {
-    if p.display.is_some() {
-        return Err(Error::new("spot.bad_option", "display is for spot elevations"));
-    }
+    only(&p, SpotKind::Coordinate)?;
     create(txn, p, SpotKind::Coordinate)
+}
+
+/// `spot.put_slope`: stores a spot slope as given, unchecked against the model's faces
+/// (`spot.create_slope` checks it first).
+pub(crate) fn put_slope(txn: &mut crate::txn::Transaction<'_>, p: CreateSpotParams) -> Result<ElementId> {
+    only(&p, SpotKind::Slope)?;
+    create(txn, p, SpotKind::Slope)
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -332,6 +413,8 @@ pub struct SetSpotParams {
     pub suffix: Option<String>,
     /// Moves the text (the leader's shoulder), in the view's 2D coordinates.
     pub leader_point: Option<[f64; 2]>,
+    pub representation: Option<Representation>,
+    pub slope_format: Option<SlopeFormat>,
 }
 
 /// `spot.set`: changes spots' base, display, prefix and suffix, or moves their text.
@@ -362,6 +445,16 @@ pub(crate) fn set(txn: &mut crate::txn::Transaction<'_>, p: SetSpotParams) -> Re
         if let Some(v) = p.leader_point {
             d.text = v;
         }
+        if p.representation.is_some() || p.slope_format.is_some() {
+            if d.spot_kind != SpotKind::Slope {
+                return Err(Error::new("spot.bad_option", "representation and slope_format are for spot slopes"));
+            }
+            if p.representation == Some(Representation::Triangle) && crate::sections::frame_of_view(&store, &d.view).is_none() {
+                return Err(Error::new("spot.bad_option", "the triangle form is for sections and elevations"));
+            }
+            d.representation = p.representation.unwrap_or(d.representation);
+            d.slope_format = p.slope_format.unwrap_or(d.slope_format);
+        }
         let value = serde_json::to_value(&d).expect("serialises");
         txn.modify(id, |e| {
             e.params.insert(ANNO_KEY.into(), value);
@@ -388,6 +481,8 @@ mod tests {
             include_elevation: true,
             prefix: String::new(),
             suffix: String::new(),
+            representation: Representation::Arrow,
+            slope_format: SlopeFormat::Percent,
         }
     }
 
@@ -406,5 +501,12 @@ mod tests {
         let c = lines(&store, &data(SpotKind::Coordinate, Base::Project, Display::Actual), [4.0, 7.0, 1.0], None);
         assert_eq!(c.len(), 3);
         assert!(c[0].starts_with("N ") && c[1].starts_with("E ") && c[2].starts_with("EL +"), "{c:?}");
+        let mut s = data(SpotKind::Slope, Base::Project, Display::Actual);
+        assert_eq!(slope_lines(&s, 0.02), ["2 %"]);
+        assert_eq!(slope_lines(&s, 0.0), ["0 %"]);
+        s.slope_format = SlopeFormat::Ratio;
+        assert_eq!(slope_lines(&s, 0.025), ["1 : 40"]);
+        s.slope_format = SlopeFormat::Degrees;
+        assert_eq!(slope_lines(&s, 1.0), ["45°"]);
     }
 }

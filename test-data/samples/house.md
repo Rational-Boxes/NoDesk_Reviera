@@ -38,6 +38,9 @@ Start with **File › New**. The model has Level 1 at 0.
 11. **Deck railing.** Railing: click (18050, 50), (21950, 50), (21950, 2950), Esc. Sketched
     over the deck, it stands on the boards.
 12. **Plans.** View › **Floor Plan**: Level 1 and Level 2.
+13. **Spot slope.** In the Level 2 plan, Annotate › **Spot Slope**: click the roof's east hip
+    face (east of the ridge, around (9400, 3500)). It reads 57.7 % (the 30° pitch), with an
+    arrow pointing east, downhill; in Properties, Slope Units *Degrees* reads 30°.
 
 Check: View › **Check Overlaps** reports none.
 
