@@ -220,6 +220,8 @@ struct Spec {
 struct RunnerProc {
     child: tokio::process::Child,
     client: Client,
+    // Its socket, removed when it stops (Unix sockets; Windows' pipes go by themselves).
+    #[cfg_attr(not(unix), allow(dead_code))]
     address: Address,
     log: PathBuf,
     running: u32,

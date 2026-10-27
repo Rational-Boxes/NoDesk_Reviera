@@ -39,7 +39,8 @@ mod gtk {
 pub struct NativeView {
     pub display: RawDisplayHandle,
     pub window: RawWindowHandle,
-    /// The toolkit widget the surface belongs to.
+    /// The toolkit widget the surface belongs to (read for GTK's scale factor).
+    #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
     widget: *mut c_void,
     /// The Wayland subsurface, owned by this view.
     #[cfg(target_os = "linux")]

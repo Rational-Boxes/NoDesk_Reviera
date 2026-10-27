@@ -196,24 +196,10 @@ pub fn reason(s: &Status) -> Option<String> {
         .map(str::to_owned)
 }
 
-/// A random token: 32 bytes from the operating system, as hex.
+/// A random token: 32 bytes from the operating system's random source (getrandom on Linux and
+/// macOS, ProcessPrng on Windows), as hex.
 pub fn new_token() -> String {
-    use std::io::Read;
     let mut b = [0u8; 32];
-    #[cfg(unix)]
-    {
-        if let Ok(mut f) = std::fs::File::open("/dev/urandom")
-            && f.read_exact(&mut b).is_ok()
-        {
-            return hex::encode(b);
-        }
-    }
-    // Fallback: hash of time, process and address entropy.
-    let seed = format!(
-        "{:?}{}{:p}",
-        std::time::SystemTime::now(),
-        std::process::id(),
-        &b
-    );
-    crate::blob::sha256_hex(seed.as_bytes())
+    getrandom::fill(&mut b).expect("the operating system's random source");
+    hex::encode(b)
 }
