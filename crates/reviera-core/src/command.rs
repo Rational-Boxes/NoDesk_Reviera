@@ -85,6 +85,7 @@ pub const RESERVED_DOMAINS: &[&str] = &[
     "keynotes",
     "keynote",
     "spot",
+    "legend",
     "file",
     "import",
     "export",

@@ -116,6 +116,7 @@ pub const UI_ACTIONS: &[&str] = &[
     "ui.scripts.manage",
     "view.new_schedule",
     "view.new_keynote_legend",
+    "view.new_legend",
     "view.new_sheet",
     "sheet.open_view",
     "schedule.edit_fields",

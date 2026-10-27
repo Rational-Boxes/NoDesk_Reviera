@@ -371,6 +371,9 @@ impl Gui {
                 // Sections and elevations redraw their annotation, not their model.
                 s.redraw = true;
                 v.panel.refresh(false, None);
+            } else if let Some(l) = &mut v.legend {
+                l.redraw = true;
+                v.panel.refresh(false, None);
             }
         }
     }

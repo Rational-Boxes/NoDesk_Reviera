@@ -148,7 +148,10 @@ impl App {
                 .get(view)
                 .and_then(reviera_core::sections::section_of)
                 .is_some();
-            let drawing = if section {
+            let legend = store.get(view).filter(|e| reviera_core::legends::is_legend(e));
+            let drawing = if let Some(l) = legend {
+                crate::legends::legend_drawing(store, l).map(|d| d.drawing)
+            } else if section {
                 self.section_drawing_of(scene, doc, view)
             } else {
                 self.plan_drawing_of(scene, doc, view)

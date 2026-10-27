@@ -938,6 +938,18 @@ icon = "elevation"
 help = "Create North, South, East and West elevations around the model"
 
 [[action]]
+id = "view.new_legend"
+label = "Legend"
+icon = "legend"
+help = "A legend view: drawings of wall, floor, door, window and component types, with text, to place on sheets"
+
+[[action]]
+id = "legend.place_component"
+label = "Legend Component"
+icon = "legend_component"
+help = "Draw a type in the open legend: choose the type and view direction, then click where it goes"
+
+[[action]]
 id = "view.new_keynote_legend"
 label = "Keynote Legend"
 icon = "keynote_legend"
@@ -3854,6 +3866,10 @@ tools = [
 ]
 
 [[tab.panel]]
+label = "Component"
+tools = [{ action = "legend.place_component", size = "large" }]
+
+[[tab.panel]]
 label = "3D"
 tools = [
   { action = "view.toggle_3d_annotations", size = "large" },
@@ -3877,6 +3893,7 @@ tools = [
   { action = "view.building_elevations", size = "small" },
   { action = "view.new_schedule", size = "large" },
   { action = "view.new_keynote_legend", size = "small" },
+  { action = "view.new_legend", size = "small" },
   { action = "view.default_3d", size = "large" },
   { action = "view.create_3d", size = "small" },
   { action = "scopebox.create", size = "small" },
@@ -4436,7 +4453,7 @@ items = ["edit.undo", "edit.redo", "-", "element.delete"]
 label = "&View"
 items = [
   "view.default_3d", "view.create_plan", "view.create_ceiling_plan", "view.create_section",
-  "view.building_elevations", "view.new_schedule", "view.new_keynote_legend", "view.new_sheet", "-",
+  "view.building_elevations", "view.new_schedule", "view.new_keynote_legend", "view.new_legend", "view.new_sheet", "-",
   "view.zoom_fit", "view.zoom_previous", "view.zoom_next", "-",
   "view.home", "view.set_home", "@orient", "view.set_projection", "-", "view.walk", "-",
   "inspect.section_box", "inspect.selection_box", "inspect.slice_horizontal",

@@ -61,7 +61,12 @@ Start with **File › New**, and open a Level 1 plan (View › **Floor Plan**).
     click the north-east corner, then up and to the right (N 6000, E 10000). In *South*, Spot
     Elevation on the wall between the east window and the east end, text to the right of the
     house; in Properties set Display Elevations to *Top & Bottom Elevations* (T +3000, B ±0).
-13. **Sheet.** View › **Sheet**, *A2*: it is numbered A101. In Properties name it *Ground
+13. **Legend.** View › **Legend**; rename it *Types Legend*. Annotate › **Legend Component**:
+    the wall type, *Plan*, click near the top left; again *Section*, to its right; the door type,
+    *Plan*, below the first; the door type, *Front Elevation*; the window type, *Front
+    Elevation*. Select the first wall and set Host Length 1500 in Properties. **Text** above them:
+    *WALL, DOOR AND WINDOW TYPES*. (Placed on sheet A101 in the next step, with Place View.)
+14. **Sheet.** View › **Sheet**, *A2*: it is numbered A101. In Properties name it *Ground
     Floor*, Drawn By *Reviera*, Issue Date *2026-10-26*. Its Sheet tab › **Place View**: the
     Level 1 plan, then *Section A*, then *South*; **Place Schedule**: the door and room
     schedules. Drag them into place: the plan at the left, the section and elevation to its

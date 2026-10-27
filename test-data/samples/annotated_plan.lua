@@ -11,7 +11,8 @@
 -- Tag All Not Tagged for the rest (DOC-ANN-010); door and room schedules (DOC-SCH); a section
 -- through the bedroom and the south elevation, each with its own dimensions, a tag and a note;
 -- spot elevations in the plan and the elevation, and a spot coordinate;
--- sheet A101 with the plan, section, elevation and both schedules placed (DOC-SHT).
+-- sheet A101 with the plan, section, elevation and both schedules placed (DOC-SHT), and a legend
+-- of the wall, door and window types (DOC-VIEW-010).
 
 local l1 = reviera.level.list()[1].id
 reviera.view.create_plan{ level_ids = { l1 } }
@@ -127,6 +128,19 @@ reviera.sheet.place_view{ sheet_id = sheet, view_id = sec, position = { 400, 340
 reviera.sheet.place_view{ sheet_id = sheet, view_id = elev, position = { 400, 240 } }
 reviera.sheet.place_schedule{ sheet_id = sheet, schedule_id = doors, position = { 40, 160 } }
 reviera.sheet.place_schedule{ sheet_id = sheet, schedule_id = rooms, position = { 250, 160 } }
+
+-- A legend (DOC-VIEW-010) of the types used, drawn from the types themselves: the wall type in
+-- plan and in section, the door in plan (with its swing) and from the front, the window from the
+-- front. It goes on the sheet too; a legend can go on many sheets.
+local function first(class) return reviera.type.list{ class = class }[1].id end
+local legend = reviera.view.create_legend{ name = "Types Legend", scale = 50 }
+reviera.legend.place_component{ view_id = legend, type_id = first("IfcWallType"), direction = "plan", host_length = 1.5, point = { 0, 3.0 } }
+reviera.legend.place_component{ view_id = legend, type_id = first("IfcWallType"), direction = "section", point = { 2.5, 0 } }
+reviera.legend.place_component{ view_id = legend, type_id = first("IfcDoorType"), direction = "plan", point = { 0, 0.5 } }
+reviera.legend.place_component{ view_id = legend, type_id = first("IfcDoorType"), direction = "front", point = { 4.0, 0 } }
+reviera.legend.place_component{ view_id = legend, type_id = first("IfcWindowType"), direction = "front", point = { 7.0, 0 } }
+reviera.text.create{ view_id = legend, position = { 0, 4.4 }, content = "WALL, DOOR AND WINDOW TYPES" }
+reviera.sheet.place_view{ sheet_id = sheet, view_id = legend, position = { 250, 80 } }
 
 print("Annotated plan built")
 return true

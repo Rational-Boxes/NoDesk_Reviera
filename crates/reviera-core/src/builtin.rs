@@ -167,6 +167,9 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(KeynoteList),
         registry.add(ViewCreateKeynoteLegend),
         registry.add(ViewSetKeynoteLegend),
+        registry.add(ViewCreateLegend),
+        registry.add(LegendPlaceComponent),
+        registry.add(LegendSetComponent),
         registry.add(TextSetContent),
         registry.add(TextSet),
         registry.add(TextAddLeader),
@@ -3879,6 +3882,41 @@ modify_command!(
     crate::keynote_legend::CreateParams,
     ElementId,
     crate::keynote_legend::create
+);
+modify_command!(
+    ViewCreateLegend,
+    "view.create_legend",
+    "Create a legend view",
+    "Creates a legend (DOC-VIEW-010): a drawing at `scale` (default 1 : 50) for legend components \
+     (`legend.place_component`) and text notes. Returns the view.",
+    "Legend",
+    crate::legends::CreateLegendParams,
+    ElementId,
+    crate::legends::create_legend
+);
+modify_command!(
+    LegendPlaceComponent,
+    "legend.place_component",
+    "Place a legend component",
+    "Places a legend component in a legend (DOC-VIEW-010): the geometry of a wall, floor, door, window or \
+     component type, drawn from a sample of the type alone, `direction` `plan` (cut at 1.2 m), `front`, \
+     `back` or `section` (across the wall or floor), its drawing's lower-left corner at `point` (metres at \
+     full size). `host_length` sets the sample's length (walls and floors, and the wall a door or window \
+     sits in). It follows the type as it changes, and appears in no schedule or count.",
+    "Legend Component",
+    crate::legends::PlaceComponentParams,
+    ElementId,
+    crate::legends::place_component
+);
+modify_command!(
+    LegendSetComponent,
+    "legend.set_component",
+    "Change legend components",
+    "Sets legend components' direction and host length, or moves them to `point`.",
+    "Legend Component",
+    crate::legends::SetComponentParams,
+    (),
+    crate::legends::set_component
 );
 modify_command!(
     ViewSetKeynoteLegend,

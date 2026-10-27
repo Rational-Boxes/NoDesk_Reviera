@@ -195,7 +195,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**2169 unique commands** in 416 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**2171 unique commands** in 416 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -385,7 +385,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `journal` | 1 |
 | `keynote` | 5 |
 | `keynotes` | 2 |
-| `legend` | 1 |
+| `legend` | 3 |
 | `level` | 5 |
 | `library` | 27 |
 | `lighting` | 1 |
@@ -1494,7 +1494,9 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `keynote.settings` | 5 | source?, path_type?, numbering?: by_keynote\ | by_sheet, embed? | () | Yes |
 | `keynotes.load` | 2 | path | — | Yes | DM-CLS-001 |
 | `keynotes.reload` | 2 | — | — | Yes | DM-CLS-001 |
-| `legend.place_component` | 5 | view_id, type_id, direction, detail_level?, host_length?, point | element_id | Yes | DOC-VIEW-010 |
+| `legend.list` | 5 | view_id | {items, failed} | No | DOC-VIEW-010 |
+| `legend.place_component` | 5 | view_id, type_id, direction?, host_length?, point | element_id | Yes | DOC-VIEW-010 |
+| `legend.set_component` | 5 | component_ids, direction?, host_length?, point? | () | Yes | DOC-VIEW-010 |
 | `level.create` | 3 | elevation, name?, type_id?, make_plan_views?: bool, plan_view_types?: [view_type_id], extent?: Line | element_id | Yes | ARC-LVL-001 |
 | `level.create_plan_views` | 3 | level_ids, view_type_ids | [view_id] | Yes | ARC-LVL-001 |
 | `level.rename` | 3 | level_id, name, rename_views?: bool | — | Yes | ARC-LVL-001 |
@@ -2581,7 +2583,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `view.create_elevation` | 5 | host_view_id, point, elevation_type_id, directions[], rotation? | {marker_id, view_ids[]} | Yes | DOC-VIEW-003 |
 | `view.create_framing_elevation` | 5 | host_view_id, datum_id, elevation_type_id, bay? | view_id | Yes | DOC-VIEW-003 |
 | `view.create_keynote_legend` | 5 | name?, fields[]?, filter_by_sheet? | schedule_id | Yes | DOC-VIEW-010 |
-| `view.create_legend` | 5 | name, scale | view_id | Yes | DOC-VIEW-010 |
+| `view.create_legend` | 5 | name?, scale? | view_id | Yes | DOC-VIEW-010 |
 | `view.create_plan` | 5 | kind, level_ids[], view_family_type_id?, scale?, allow_duplicates?, area_scheme_id? | view_id[] | Yes | DOC-VIEW-002 |
 | `view.create_plan_region` | 5 | view_id, loops[], view_range | element_id | Yes | DOC-VR-003 |
 | `view.create_section` | 5 | host_view_id, start, end, section_type_id, width?, far_offset?, reference_view_id? | view_id | Yes | DOC-VIEW-004 |

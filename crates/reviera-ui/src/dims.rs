@@ -66,6 +66,9 @@ impl Gui {
         if let Some(p) = &v.plan {
             return Some((p.scale, p.range.cut as f32));
         }
+        if let Some(l) = &v.legend {
+            return Some((l.scale, 0.0));
+        }
         v.section.as_ref().map(|s| (s.scale, 0.0))
     }
 

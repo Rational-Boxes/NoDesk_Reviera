@@ -894,6 +894,12 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "spot_elevation" => format!(
             r#"<path d="M3 27h26" {s}/><path d="M9 27l-4-6h8z" fill="{a}" {sa}/><path d="M9 21l6-9h13" {s}/><path d="M16 8h11" {s} stroke-width="2.4"/>"#
         ),
+        "legend" => format!(
+            r#"<rect x="4" y="4" width="24" height="24" fill="{f}" {s}/><rect x="7" y="8" width="8" height="3" fill="{a}" {sa}/><path d="M18 9.5h7" {s} stroke-width="1.4"/><path d="M7 16h2.5a2.5 2.5 0 0 1 2.5 2.5V19" {sa}/><path d="M7 16v3h5" {s}/><path d="M18 17.5h7" {s} stroke-width="1.4"/><rect x="7" y="22" width="8" height="3" {sa}/><path d="M18 23.5h7" {s} stroke-width="1.4"/>"#
+        ),
+        "legend_component" => format!(
+            r#"<rect x="3" y="12" width="20" height="5" fill="{f}" {s}/><path d="M3 14.5h20" {sa} stroke-width="0.9"/><path d="M26 5v8M22 9h8" {sa} stroke-width="2"/><path d="M3 22h20" {s} stroke-width="1"/>"#
+        ),
         "keynote_legend" => format!(
             r#"<rect x="4" y="4" width="24" height="24" fill="{f}" {s}/><rect x="7" y="8" width="6" height="4" {sa}/><rect x="7" y="15" width="6" height="4" {sa}/><rect x="7" y="22" width="6" height="3" {sa}/><path d="M16 10h9M16 17h9M16 23.5h9" {s} stroke-width="1.4"/>"#
         ),

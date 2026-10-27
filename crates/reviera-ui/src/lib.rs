@@ -89,6 +89,7 @@ mod rooms;
 mod schedules;
 mod scripts;
 mod sections;
+mod legends_ui;
 mod select;
 mod sheets;
 mod site;
@@ -259,6 +260,8 @@ struct View {
     schedule: Option<schedules::ScheduleState>,
     /// Set for sheet views.
     sheet: Option<sheets::SheetState>,
+    /// Set for legend views (DOC-VIEW-010).
+    legend: Option<legends_ui::LegendState>,
     panel: Panel,
     viewport: Option<WgpuViewport>,
     /// The native surface under the viewport; declared after it so it is dropped after it.
@@ -452,6 +455,8 @@ struct Gui {
     tips: std::collections::HashMap<u32, (reviera_core::document::ModelVersion, bool, Vec<radial::TipLabel>)>,
     /// Each 3D view's labels as last drawn, nearest first, for clicks on them.
     tip_boxes: std::collections::HashMap<u32, Vec<(radial::TipLabel, reviera_render::tooltips::Placed)>>,
+    /// The Legend Component tool (DOC-VIEW-010).
+    legend_tool: Option<legends_ui::ComponentTool>,
     /// The Keynote tools' element, once picked, and a user keynote's key.
     keynote_pick: Option<ElementId>,
     keynote_key: Option<String>,
@@ -482,7 +487,7 @@ struct Gui {
 impl View {
     /// A plan, section, elevation or sheet: a 2D drawing navigated by pan and zoom.
     fn is_2d(&self) -> bool {
-        self.plan.is_some() || self.section.is_some() || self.sheet.is_some()
+        self.plan.is_some() || self.section.is_some() || self.sheet.is_some() || self.legend.is_some()
     }
 }
 
@@ -595,6 +600,7 @@ impl Gui {
         self.update_plan_graphics(index);
         self.update_section_graphics(index);
         self.update_sheet_graphics(index);
+        self.update_legend_graphics(index);
         self.update_inspection(index);
         self.update_gizmo(index, scale);
         self.update_hud(index, scale);
@@ -892,11 +898,17 @@ impl Gui {
         let plan = self.plan_info(doc, element);
         let section = self.section_info(doc, element);
         let sheet = self.sheet_info(doc, element);
+        let legend = self.legend_info(doc, element);
         let schedule = self
             .is_schedule(doc, element)
             .then(|| Gui::schedule_grid(&panel));
-        if plan.is_some() || section.is_some() || sheet.is_some() {
+        if plan.is_some() || section.is_some() || sheet.is_some() || legend.is_some() {
             camera.perspective = false;
+            camera.orient(glam::Vec3::Z);
+        }
+        // A legend frames its components.
+        if legend.is_some() {
+            camera.fit(self.legend_bounds(doc, element));
             camera.orient(glam::Vec3::Z);
         }
         // A sheet shows its whole paper.
@@ -947,6 +959,7 @@ impl Gui {
             section,
             schedule,
             sheet,
+            legend,
             panel,
             viewport: None,
             native: None,
@@ -1286,6 +1299,9 @@ impl Gui {
             } else if let Some(s) = &mut view.sheet {
                 // Sheets draw their viewports, rebuilt when drawn.
                 s.stale = true;
+            } else if let Some(l) = &mut view.legend {
+                // Legends draw their types' samples, rebuilt when drawn.
+                l.stale = true;
             } else if let Some(v) = &mut view.viewport {
                 v.set_scene(&scene);
                 v.set_highlight(&ids);
@@ -1439,6 +1455,7 @@ impl Gui {
     }
 
     fn end_tool(&mut self, frame: &Frame) {
+        self.end_legend_tool();
         self.end_stair_tool();
         self.end_dormer_tool();
         self.end_railing_tool();
@@ -1482,6 +1499,9 @@ impl Gui {
             return frame.set_status_text("Section cancelled", 0);
         }
         if self.end_note_tool() {
+            return frame.set_status_text("Ready", 0);
+        }
+        if self.end_legend_tool() {
             return frame.set_status_text("Ready", 0);
         }
         if self.stair_tool.is_some() {
@@ -1640,6 +1660,9 @@ impl Gui {
     /// A click handed to the tool in progress (or a typed point fed to it, as if clicked);
     /// `false` when no tool takes clicks.
     pub(crate) fn tools_click(&mut self, x: i32, y: i32, p: &Panel, f: &Frame) -> bool {
+        if self.legend_tool.is_some() {
+            return self.legend_click(x, y);
+        }
         if self.adjust.is_some() {
             self.adjust_click(x, y);
         } else if self.bar_pick.is_some() {
@@ -2206,6 +2229,10 @@ impl Gui {
 
     /// The element under pixel (`x`, `y`): in plans dimensions and grids first, then the model.
     fn element_at(&self, x: i32, y: i32, panel: &Panel) -> Option<ElementId> {
+        // In legends, their notes, then their components.
+        if self.active_view().is_some_and(|v| v.legend.is_some()) {
+            return self.note_at(x, y).or_else(|| self.legend_component_at(x, y));
+        }
         // In sections and elevations, their annotation before the model.
         if self.active_view().is_some_and(|v| v.section.is_some()) {
             return self.note_at(x, y).or_else(|| self.dim_at(x, y)).or_else(|| self.section_pick(x, y));
@@ -2348,6 +2375,9 @@ impl Gui {
                         if reviera_core::keynote_tags::keynote_data(e).is_some() {
                             return Some("cat.keynote_tags");
                         }
+                        if reviera_core::legends::component_data(e).is_some() {
+                            return Some("cat.legend_components");
+                        }
                         // Placed components and path arrays have their own tools, whatever
                         // category their component gives them.
                         if reviera_core::mesh_objects::mesh_object_recipe(e).is_some() {
@@ -2374,6 +2404,7 @@ impl Gui {
                 Some("cat.text_notes") => "Text Notes".to_owned(),
                 Some("cat.spot_dimensions") => "Spot Dimensions".to_owned(),
                 Some("cat.keynote_tags") => "Keynote Tags".to_owned(),
+                Some("cat.legend_components") => "Legend Components".to_owned(),
                 Some(k) => self
                     .ribbon
                     .context_label(Some(k))
@@ -2493,6 +2524,7 @@ impl Gui {
                     .or_else(|| reviera_core::notes::text_data(&e).map(|_| "Text Notes".to_owned()))
                     .or_else(|| reviera_core::spots::spot_data(&e).map(|_| "Spot Dimensions".to_owned()))
                     .or_else(|| reviera_core::keynote_tags::keynote_data(&e).map(|_| "Keynote Tags".to_owned()))
+                    .or_else(|| reviera_core::legends::component_data(&e).map(|_| "Legend Components".to_owned()))
             })
             .unwrap_or_else(|| "—".to_owned());
         let type_name = e
@@ -2595,6 +2627,7 @@ impl Gui {
         }
         self.steel_mark_rows(grid, id);
         if self.note_rows(grid, id)
+            || self.legend_rows(grid, id)
             || self.stair_rows(grid, id)
             || self.opening_rows(grid, id)
             || self.column_rows(grid, id)
@@ -2690,7 +2723,7 @@ impl Gui {
 
     /// The active view's properties; `false` when the active view is not a model view.
     fn view_properties(&mut self, grid: &PropertyGrid) -> bool {
-        if self.section_view_rows(grid) || self.sheet_view_rows(grid) {
+        if self.section_view_rows(grid) || self.sheet_view_rows(grid) || self.legend_view_rows(grid) {
             return true;
         }
         if let Some(v) = self.active_view().filter(|v| v.schedule.is_some()) {
@@ -2910,6 +2943,7 @@ impl Gui {
             || self.section_view_edit(property, text.clone())
             || self.sheet_view_edit(property, text.clone())
             || self.note_edit(property, text.clone())
+            || self.legend_edit(property, text.clone())
             || self.sketch_edit(property, text.clone())
             || self.stair_edit(property, text.clone())
             || self.dormer_edit(property, text.clone())
@@ -3815,6 +3849,7 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 tip_click: None,
                 spot_pick: None,
                 keynote_pick: None,
+                legend_tool: None,
                 keynote_key: None,
                 occluders: std::collections::HashMap::new(),
                 surfaces: std::collections::HashMap::new(),
@@ -4342,6 +4377,8 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "view.building_elevations" => with(gui, Gui::building_elevations),
         "view.new_schedule" => with(gui, Gui::new_schedule),
         "view.new_keynote_legend" => with(gui, Gui::new_keynote_legend),
+        "view.new_legend" => with(gui, Gui::new_legend),
+        "legend.place_component" => with(gui, Gui::start_legend_component),
         "view.new_sheet" => with(gui, Gui::new_sheet),
         "tag.create" => with(gui, |g| {
             g.start_note_tool(notes::NoteTool::Tag);

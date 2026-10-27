@@ -111,6 +111,7 @@ pub mod notes;
 pub mod spots;
 pub mod keynote_tags;
 pub mod keynote_legend;
+pub mod legends;
 pub mod origin;
 pub mod overlap;
 pub mod overlap_accept;

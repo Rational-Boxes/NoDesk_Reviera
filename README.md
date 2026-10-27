@@ -1332,7 +1332,11 @@ simulation sessions, and the first engine runners (see [Not built yet](#not-buil
   `schedule.set_sort`, `schedule.set_cell`, `schedule.export`). View › Keynote Legend lists the
   keys the model's keynote tags show with their text; with *Filter by sheet*, each copy placed on
   a sheet lists only that sheet's (`view.create_keynote_legend`, `view.set_keynote_legend`;
-  DOC-VIEW-010). Not built yet: legend views with legend components.
+  DOC-VIEW-010). View › Legend makes a legend view, and Annotate › Legend Component draws a
+  wall, floor, door, window or component type in it, in plan, front, back or section: drawn from
+  a sample of the type, so it changes when the type does. Legends hold text, print, and go on
+  many sheets (`view.create_legend`, `legend.place_component`, `legend.set_component`,
+  `legend.list`).
 - **Sheets**: View › Sheet makes an ISO A0–A4 sheet, numbered A101, A102, …, with Reviera's
   title block (project, sheet, date, people and scale, *As indicated* when scales differ).
   Place View puts a plan, section or elevation on it at its scale with a numbered title; Place

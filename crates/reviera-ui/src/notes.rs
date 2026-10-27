@@ -131,8 +131,10 @@ impl Gui {
     pub(crate) fn start_note_tool(&mut self, kind: NoteTool) {
         let frame = self.frame;
         // Tags and text go in sections and elevations too.
+        // Text goes in legends too.
+        let in_legend = self.active_view().is_some_and(|v| v.legend.is_some());
         let in_section = self.active_view().is_some_and(|v| v.section.is_some());
-        if !(in_section && kind.in_sections()) && !self.ensure_plan(false) {
+        if !(in_section && kind.in_sections()) && !(in_legend && kind == NoteTool::Text) && !self.ensure_plan(false) {
             return;
         }
         self.end_tool(&frame);
@@ -186,10 +188,11 @@ impl Gui {
             .and_then(|v| v.element)
     }
 
-    /// The active plan's, section's or elevation's element id: the views tags and text go in.
+    /// The active plan's, section's, elevation's or legend's element id: the views tags and text
+    /// go in.
     fn active_annotation_view(&self) -> Option<ElementId> {
         self.active_view()
-            .filter(|v| v.plan.is_some() || v.section.is_some())
+            .filter(|v| v.plan.is_some() || v.section.is_some() || v.legend.is_some())
             .and_then(|v| v.element)
     }
 

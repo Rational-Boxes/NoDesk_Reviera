@@ -563,3 +563,51 @@ fn the_managed_project_lists_its_keynotes_per_sheet() {
     assert!(format!("{err:?}").contains("schedule.keynote_legend"), "{err:?}");
     let _ = plan;
 }
+
+#[test]
+fn the_annotated_plan_legend_draws_its_types() {
+    let work = tempfile::tempdir().unwrap();
+    let mut app = open(work.path(), "annotated_plan");
+    let legend = view_id(&mut app, "Types Legend", "view.legend");
+    let items = |app: &mut App| {
+        let l = ok(app, "legend.list", json!({ "view_id": legend }));
+        assert_eq!(l["failed"], json!([]), "{l}");
+        l["items"].as_array().unwrap().iter().map(|i| {
+            let (lo, hi) = (&i["lo"], &i["hi"]);
+            (i["id"].as_u64().unwrap(), f(&hi[0]) - f(&lo[0]), f(&hi[1]) - f(&lo[1]))
+        }).collect::<Vec<_>>()
+    };
+    let i = items(&mut app);
+    assert_eq!(i.len(), 5, "{i:?}");
+    let s = store(&app);
+    let wall_type = s.iter().find(|e| e.class == "IfcWallType").unwrap().id();
+    let width = reviera_core::walls::regenerate(&s, s.iter().find(|w| reviera_core::walls::wall_recipe(w).is_some()).unwrap()).unwrap().width;
+    // The wall in plan: 1.5 m long, as wide as the type; in section: as wide, 3 m high.
+    let (_, pw, ph) = i[0];
+    assert!(near(pw, 1.5, 0.02) && near(ph, width, 0.02), "plan {pw} × {ph}, the wall {width} wide");
+    let (_, sw, sh) = i[1];
+    assert!(near(sw, width, 0.02) && near(sh, 3.0, 0.02), "section {sw} × {sh}");
+    // The door in plan shows its swing (deeper than the wall); from the front its wall, 3 m high.
+    let (_, _, dh) = i[2];
+    assert!(dh > width + 0.5, "the swing: {dh}");
+    let (_, fw, fh) = i[3];
+    assert!(near(fh, 3.0, 0.02) && fw > 1.5, "door front {fw} × {fh}");
+    // Drawn on the sheet and in PDF output, and it can go on a second sheet too.
+    let doc = app.active().unwrap();
+    let drawing = reviera_app::legends::legend_drawing(&s, s.get(ElementId(legend)).unwrap()).unwrap();
+    assert!(drawing.drawing.labels.iter().any(|l| l.text == "WALL, DOOR AND WINDOW TYPES"));
+    assert!(drawing.drawing.graphics.lines.iter().map(|l| l.segments.len()).sum::<usize>() > 20);
+    let other = ok(&mut app, "sheet.create", json!({ "name": "Legends", "size": "A3" }));
+    ok(&mut app, "sheet.place_view", json!({ "sheet_id": other, "view_id": legend }));
+    assert!(app.sheet_drawing(doc, ElementId(other.as_u64().unwrap())).is_ok());
+    // A thicker wall type draws thicker: the type, not a model element.
+    ok(&mut app, "compound.set_layers", json!({ "type_id": wall_type, "layers": [
+        { "function": "finish1", "thickness": "20 mm" }, { "function": "structure", "thickness": "200 mm" }, { "function": "finish1", "thickness": "20 mm" }] }));
+    let (_, pw2, ph2) = items(&mut app)[0];
+    assert!(near(pw2, 1.5, 0.02) && near(ph2, 0.24, 0.01), "after layering: {pw2} × {ph2}");
+    // Legend components only in legends, of types a legend can draw.
+    let plan = view_id(&mut app, "Level 1", "view.plan");
+    assert!(app.execute("legend.place_component", json!({ "view_id": plan, "type_id": wall_type, "point": [0, 0] }), &Caller::user()).is_err());
+    let level = s.iter().find(|e| e.class == "IfcBuildingStorey").unwrap().id();
+    assert!(app.execute("legend.place_component", json!({ "view_id": legend, "type_id": level, "point": [0, 0] }), &Caller::user()).is_err());
+}

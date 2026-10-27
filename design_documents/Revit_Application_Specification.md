@@ -22362,7 +22362,11 @@ These principles apply to every requirement in this chapter.
 
 ## 5.11 Graphics control
 
-*Built (2026-10-27), keynote legends:* View › *Keynote Legend* creates a schedule of kind `schedule.keynotelegend` and opens it: one row per key the model's keynote tags show (DOC-ANN-014), in natural order, with its text from the keynote table (*(not in the keynote table)* for a missing one); columns *Key Value* and *Keynote Text*, or one of them. *Filter by sheet* (asked on creation; `view.set_keynote_legend`) makes each copy placed on a sheet list only the keynotes of the views placed on that sheet; in its own tab it lists them all. Its columns, filters and sorting are its own: `schedule.set_fields` and the like refuse it (`schedule.keynote_legend`). `schedule.get_table(schedule_id, sheet_id?)` gives it as one sheet shows it. Commands: `view.create_keynote_legend(name?, fields?: [key, text], filter_by_sheet?)`, `view.set_keynote_legend(schedule_id, filter_by_sheet?, fields?)`. Not yet: legend views (`view.legend`) and legend components.
+*Built (2026-10-27), keynote legends:* View › *Keynote Legend* creates a schedule of kind `schedule.keynotelegend` and opens it: one row per key the model's keynote tags show (DOC-ANN-014), in natural order, with its text from the keynote table (*(not in the keynote table)* for a missing one); columns *Key Value* and *Keynote Text*, or one of them. *Filter by sheet* (asked on creation; `view.set_keynote_legend`) makes each copy placed on a sheet list only the keynotes of the views placed on that sheet; in its own tab it lists them all. Its columns, filters and sorting are its own: `schedule.set_fields` and the like refuse it (`schedule.keynote_legend`). `schedule.get_table(schedule_id, sheet_id?)` gives it as one sheet shows it. Commands: `view.create_keynote_legend(name?, fields?: [key, text], filter_by_sheet?)`, `view.set_keynote_legend(schedule_id, filter_by_sheet?, fields?)`. Legend views follow (below).
+
+*Built (2026-10-27), legend views and legend components:* View › *Legend* makes a legend (`view.legend`, default 1 : 50) and opens it; Annotate › *Legend Component* places a type's drawing in it: choose the type (any wall, floor, door, window or component type of the model) and the view direction (plan, front elevation, back elevation, or section for walls and floors), then click where the drawing's lower-left corner goes. A legend component draws the **type**, not a model element: Reviera builds a sample of the type alone in a scratch copy of the model's types, levels and settings (a wall `host_length` long, default 2 m, 3 m high; a floor `host_length` × 1 m; a door or window in the middle of a wall `host_length` long, default its width plus 1.2 m; a component at the origin), regenerates it, and draws it: in plan cut at 1.2 m with a door's swing, from the front or back as an elevation, or in section across the wall or floor, hidden edges left out, in the elements' pens at the legend's scale. Editing the type (its layers, its size) changes every legend component of it at once. Legend components are annotation (`anno.legendcomponent`): in no schedule, count or IFC export. Legends hold text notes too, are picked and selected like other views (a component inside its drawing's extent, outlined when selected; Properties: type, view direction, host length), print to PDF, and can be placed on many sheets (DOC-CORE-005), which other views cannot. Commands: `view.create_legend(name?, scale?)`, `legend.place_component(view_id, type_id, direction?, host_length?, point)`, `legend.set_component(component_ids, direction?, host_length?, point?)`, `legend.list(view_id) -> {items, failed}`. Not yet: roof, ceiling, column, beam and stair types; a detail level per component; changing a legend's scale in the window; dragging components (`legend.set_component` moves them); legend components in model views.
+
+- [x] *(Built 2026-10-27, `tests/sample_features.rs`.)* The annotated plan sample's *Types Legend* draws its wall type 1.5 m long in plan and 3 m high in section, its door in plan with the swing and from the front, and its window; layering the wall type to 240 mm redraws its plan swatch 240 mm thick; it goes on two sheets; a legend component cannot go in a plan or draw a level.
 
 - [x] *(Built 2026-10-27, `tests/sample_features.rs`.)* The managed project's keynote legend, filtering by sheet, lists its plan's three keys on sheet *Plan and Keynotes*; placed again on a second sheet with a section carrying keynote `09`, that copy lists only `09`, and the first keeps its three; without the filter every copy lists all four.
 
@@ -24973,8 +24977,10 @@ Every command below is registered once in the command registry and is therefore 
 | `view.insert_from_file` | path, view_names[]? | view_id[] | Yes | DOC-VIEW-009 |
 | `view.save_to_library` | view_ids[], path | () | No | DOC-VIEW-009 |
 | `detail.insert_from_file` | path, source_view_name, target_view_id, position? | annotation_id[] | Yes | DOC-VIEW-009 |
-| `view.create_legend` | name, scale | view_id | Yes | DOC-VIEW-010 |
-| `legend.place_component` | view_id, type_id, direction, detail_level?, host_length?, point | element_id | Yes | DOC-VIEW-010 |
+| `view.create_legend` | name?, scale? | view_id | Yes | DOC-VIEW-010 |
+| `legend.place_component` | view_id, type_id, direction?, host_length?, point | element_id | Yes | DOC-VIEW-010 |
+| `legend.set_component` | component_ids, direction?, host_length?, point? | () | Yes | DOC-VIEW-010 |
+| `legend.list` | view_id | {items, failed} | No | DOC-VIEW-010 |
 | `view.create_keynote_legend` | name?, fields[]?, filter_by_sheet? | schedule_id | Yes | DOC-VIEW-010 |
 | `view.set_keynote_legend` | schedule_id, filter_by_sheet?, fields[]? | () | Yes | DOC-VIEW-010 |
 | `view.duplicate` | view_id, mode: plain\|with_detailing\|dependent, name? | view_id | Yes | DOC-VIEW-011 |
@@ -27908,7 +27914,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**2169 unique commands** in 416 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**2171 unique commands** in 416 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -28098,7 +28104,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `journal` | 1 |
 | `keynote` | 5 |
 | `keynotes` | 2 |
-| `legend` | 1 |
+| `legend` | 3 |
 | `level` | 5 |
 | `library` | 27 |
 | `lighting` | 1 |
@@ -29207,7 +29213,9 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `keynote.settings` | 5 | source?, path_type?, numbering?: by_keynote\ | by_sheet, embed? | () | Yes |
 | `keynotes.load` | 2 | path | — | Yes | DM-CLS-001 |
 | `keynotes.reload` | 2 | — | — | Yes | DM-CLS-001 |
-| `legend.place_component` | 5 | view_id, type_id, direction, detail_level?, host_length?, point | element_id | Yes | DOC-VIEW-010 |
+| `legend.list` | 5 | view_id | {items, failed} | No | DOC-VIEW-010 |
+| `legend.place_component` | 5 | view_id, type_id, direction?, host_length?, point | element_id | Yes | DOC-VIEW-010 |
+| `legend.set_component` | 5 | component_ids, direction?, host_length?, point? | () | Yes | DOC-VIEW-010 |
 | `level.create` | 3 | elevation, name?, type_id?, make_plan_views?: bool, plan_view_types?: [view_type_id], extent?: Line | element_id | Yes | ARC-LVL-001 |
 | `level.create_plan_views` | 3 | level_ids, view_type_ids | [view_id] | Yes | ARC-LVL-001 |
 | `level.rename` | 3 | level_id, name, rename_views?: bool | — | Yes | ARC-LVL-001 |
@@ -30294,7 +30302,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `view.create_elevation` | 5 | host_view_id, point, elevation_type_id, directions[], rotation? | {marker_id, view_ids[]} | Yes | DOC-VIEW-003 |
 | `view.create_framing_elevation` | 5 | host_view_id, datum_id, elevation_type_id, bay? | view_id | Yes | DOC-VIEW-003 |
 | `view.create_keynote_legend` | 5 | name?, fields[]?, filter_by_sheet? | schedule_id | Yes | DOC-VIEW-010 |
-| `view.create_legend` | 5 | name, scale | view_id | Yes | DOC-VIEW-010 |
+| `view.create_legend` | 5 | name?, scale? | view_id | Yes | DOC-VIEW-010 |
 | `view.create_plan` | 5 | kind, level_ids[], view_family_type_id?, scale?, allow_duplicates?, area_scheme_id? | view_id[] | Yes | DOC-VIEW-002 |
 | `view.create_plan_region` | 5 | view_id, loops[], view_range | element_id | Yes | DOC-VR-003 |
 | `view.create_section` | 5 | host_view_id, start, end, section_type_id, width?, far_offset?, reference_view_id? | view_id | Yes | DOC-VIEW-004 |

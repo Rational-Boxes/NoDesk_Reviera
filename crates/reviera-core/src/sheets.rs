@@ -299,13 +299,15 @@ pub(crate) fn place_view(txn: &mut crate::txn::Transaction<'_>, p: PlaceViewPara
     let kind = crate::views::view_data(view)
         .map(|d| d.kind)
         .unwrap_or_default();
-    if !(crate::plans::is_plan(&kind) || crate::sections::is_section(&kind)) {
+    let legend = kind == crate::legends::KIND_LEGEND;
+    if !(crate::plans::is_plan(&kind) || crate::sections::is_section(&kind) || legend) {
         return Err(Error::new(
             "sheet.not_placeable",
-            "plans, sections and elevations can be placed on sheets (3D views come later)",
+            "plans, sections, elevations and legends can be placed on sheets (3D views come later)",
         ));
     }
-    if let Some(other) = sheet_of_view(&store, view.guid()) {
+    // A legend can go on many sheets (DOC-CORE-005); other views on one.
+    if let Some(other) = sheet_of_view(&store, view.guid()).filter(|_| !legend) {
         let number = store
             .get(other)
             .and_then(sheet_data)

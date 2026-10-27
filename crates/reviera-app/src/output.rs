@@ -818,6 +818,8 @@ impl HostCommand for ExportPdf {
                 let section = e.and_then(reviera_core::sections::section_of).is_some();
                 let d = if e.is_some_and(reviera_core::sheets::is_sheet) {
                     app.sheet_drawing(doc, *v)?.drawing
+                } else if let Some(l) = e.filter(|e| reviera_core::legends::is_legend(e)) {
+                    crate::legends::legend_drawing(store, l)?.drawing
                 } else if section {
                     app.section_drawing(doc, *v)?
                 } else {

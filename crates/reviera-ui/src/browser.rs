@@ -46,6 +46,7 @@ impl Gui {
             (reviera_core::areas::KIND_AREA_PLAN, "Area Plans"),
             (reviera_core::sections::KIND_ELEVATION, "Elevations"),
             (reviera_core::sections::KIND_SECTION, "Sections"),
+            (reviera_core::legends::KIND_LEGEND, "Legends"),
         ] {
             let plans: Vec<_> = list.iter().filter(|v| v.kind == kind).collect();
             if !plans.is_empty()

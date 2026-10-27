@@ -404,10 +404,10 @@ pub fn texts_of_view(store: &Store, view_guid: &str) -> Vec<(ElementId, TextData
 /// GlobalId, level (GlobalId; plans) and scale.
 fn plan_of(store: &Store, r: &ElementRef) -> Result<(String, Option<String>, f64)> {
     let (id, data) = crate::views::resolve_view(store, r)?;
-    if !crate::plans::is_plan(&data.kind) && !crate::sections::is_section(&data.kind) {
+    if !crate::plans::is_plan(&data.kind) && !crate::sections::is_section(&data.kind) && data.kind != crate::legends::KIND_LEGEND {
         return Err(Error::new(
             "anno.view_not_supported",
-            "tags and text notes are placed in plans, sections and elevations (sheets come later)",
+            "tags and text notes are placed in plans, sections, elevations and legends (sheets come later)",
         ));
     }
     let e = store.get(id).expect("resolved");
