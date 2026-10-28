@@ -461,12 +461,26 @@ impl Gui {
             let text = self.format_length(v);
             grid.append(Property::string(format!("Slice {} {label}", i + 1), &key, text));
             grid.set_help_string(&key, "Where the slice plane is: type a position to move it");
+            let key = format!("clip_on_{i}");
+            grid.append(Property::boolean(format!("Slice {} Enabled", i + 1), &key, s.enabled));
+            grid.set_help_string(&key, "Untick to keep the slice plane but stop it cutting the view");
         }
     }
 
     /// An edit of a typed box face or slice position; `false` if `property` is not one.
     pub(crate) fn clip_row_edit(&mut self, property: &str, text: Option<&str>) -> bool {
         let Some(rest) = property.strip_prefix("clip_") else { return false };
+        if let Some(i) = rest.strip_prefix("on_").and_then(|i| i.parse::<usize>().ok()) {
+            let Some(view) = self.active_view().filter(|v| !v.is_2d()).and_then(|v| v.element) else { return true };
+            let (_, mut slices) = self.view_clip(self.active_view().expect("checked"));
+            let Some(s) = slices.get_mut(i) else { return true };
+            s.enabled = text.is_some_and(|t| matches!(t, "True" | "true" | "1"));
+            if let Err(e) = self.run("view.set_slice_planes", json!({ "view_id": view, "planes": slices })) {
+                self.frame.set_status_text(&e, 0);
+            }
+            self.after_view_edit();
+            return true;
+        }
         let (Some(view), Some(text)) = (self.active_view().filter(|v| !v.is_2d()).and_then(|v| v.element), text) else { return true };
         let at = match self.run("units.parse", json!({ "text": text, "data_type": "length" })) {
             Ok(v) => v.as_f64().unwrap_or_default(),
