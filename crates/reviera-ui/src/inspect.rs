@@ -442,6 +442,64 @@ impl Gui {
         self.after_view_edit();
     }
 
+    /// The typed extents under a 3D view's Section Box and Slice Planes rows: the box's six faces
+    /// (in its own axes) and each slice's position (along the axis it faces, or its normal).
+    pub(crate) fn clip_rows(&mut self, grid: &PropertyGrid, section_box: Option<SectionBox>, slices: &[SlicePlane]) {
+        if let Some(b) = section_box.filter(|b| b.enabled) {
+            for (k, axis) in ["X", "Y", "Z"].iter().enumerate() {
+                for (end, side, v) in [("min", "From", b.min[k]), ("max", "To", b.max[k])] {
+                    let key = format!("clip_box_{end}_{k}");
+                    let text = self.format_length(v);
+                    grid.append(Property::string(format!("Box {axis} {side}"), &key, text));
+                    grid.set_help_string(&key, "A face of the section box, in the box's own axes");
+                }
+            }
+        }
+        for (i, s) in slices.iter().enumerate() {
+            let (label, v) = slice_position(s);
+            let key = format!("clip_slice_{i}");
+            let text = self.format_length(v);
+            grid.append(Property::string(format!("Slice {} {label}", i + 1), &key, text));
+            grid.set_help_string(&key, "Where the slice plane is: type a position to move it");
+        }
+    }
+
+    /// An edit of a typed box face or slice position; `false` if `property` is not one.
+    pub(crate) fn clip_row_edit(&mut self, property: &str, text: Option<&str>) -> bool {
+        let Some(rest) = property.strip_prefix("clip_") else { return false };
+        let (Some(view), Some(text)) = (self.active_view().filter(|v| !v.is_2d()).and_then(|v| v.element), text) else { return true };
+        let at = match self.run("units.parse", json!({ "text": text, "data_type": "length" })) {
+            Ok(v) => v.as_f64().unwrap_or_default(),
+            Err(e) => {
+                super::error(&self.frame, &format!("Invalid length:\n{e}"));
+                self.properties_stale = true;
+                return true;
+            }
+        };
+        let (b, mut slices) = self.view_clip(self.active_view().expect("checked"));
+        let result = if let Some(face) = rest.strip_prefix("box_") {
+            let Some(mut b) = b else { return true };
+            let (end, k) = face.split_once('_').unwrap_or_default();
+            let k: usize = k.parse().unwrap_or(0).min(2);
+            if end == "min" {
+                b.min[k] = at.min(b.max[k] - MIN_BOX);
+            } else {
+                b.max[k] = at.max(b.min[k] + MIN_BOX);
+            }
+            self.run("view.set_section_box", json!({ "view_id": view, "enabled": b.enabled, "transform": b.frame(), "min": b.min, "max": b.max }))
+        } else if let Some(i) = rest.strip_prefix("slice_").and_then(|i| i.parse::<usize>().ok()).filter(|i| *i < slices.len()) {
+            move_slice(&mut slices[i], at);
+            self.run("view.set_slice_planes", json!({ "view_id": view, "planes": slices }))
+        } else {
+            return true;
+        };
+        if let Err(e) = result {
+            self.frame.set_status_text(&e, 0);
+        }
+        self.after_view_edit();
+        true
+    }
+
     /// After a change to a view's definition: captions (modified mark), palette and redraw.
     fn after_view_edit(&mut self) {
         self.update_captions();
@@ -893,5 +951,45 @@ impl Gui {
             "box" => self.selection_box(),
             _ => self.refresh_active(),
         }
+    }
+}
+
+/// The axis a slice plane faces (X, Y or Z) and its origin's coordinate on it; or, for a plane
+/// turned off the axes, its distance from the origin along its normal.
+fn slice_position(s: &SlicePlane) -> (&'static str, f64) {
+    let len = s.normal.iter().map(|n| n * n).sum::<f64>().sqrt().max(1e-12);
+    match s.normal.iter().position(|n| (n / len).abs() > 0.9999) {
+        Some(k) => (["(X)", "(Y)", "(Z)"][k], s.origin[k]),
+        None => ("(along normal)", s.origin.iter().zip(s.normal).map(|(o, n)| o * n).sum::<f64>() / len),
+    }
+}
+
+/// Moves a slice plane, along its normal, to position `at` (as `slice_position` gives it).
+fn move_slice(s: &mut SlicePlane, at: f64) {
+    let (_, now) = slice_position(s);
+    let len = s.normal.iter().map(|n| n * n).sum::<f64>().sqrt().max(1e-12);
+    // Along an axis the coordinate is the origin's (the normal may point either way).
+    let step = match s.normal.iter().position(|n| (n / len).abs() > 0.9999) {
+        Some(k) => (at - now) * s.normal[k].signum(),
+        None => at - now,
+    };
+    for k in 0..3 {
+        s.origin[k] += s.normal[k] / len * step;
+    }
+}
+
+#[cfg(test)]
+mod typed_clip_tests {
+    use super::*;
+
+    #[test]
+    fn typing_a_slice_position_moves_it_along_its_normal() {
+        let mut down = SlicePlane { origin: [1.0, 2.0, 3.0], normal: [0.0, 0.0, -1.0], enabled: true };
+        assert_eq!(slice_position(&down), ("(Z)", 3.0));
+        move_slice(&mut down, 1.5);
+        assert_eq!(down.origin, [1.0, 2.0, 1.5]);
+        let mut turned = SlicePlane { origin: [0.0, 0.0, 0.0], normal: [0.6, 0.8, 0.0], enabled: true };
+        move_slice(&mut turned, 2.0);
+        assert!((slice_position(&turned).1 - 2.0).abs() < 1e-12, "{turned:?}");
     }
 }

@@ -1384,8 +1384,9 @@ simulation sessions, and the first engine runners (see [Not built yet](#not-buil
 ### Inspecting and editing
 
 - **Section box and slices**: View › Section Box clips a 3D view to a box whose face grips drag in
-  real time; Selection Box (BX) fits it around the selection. Horizontal and Vertical Slice cut
-  the view at a clicked point (up to eight planes, each with a grip). Cut solids are capped.
+  real time, or whose faces are typed in Properties › Extents; Selection Box (BX) fits it around
+  the selection. Horizontal and Vertical Slice cut the view at a clicked point (up to eight
+  planes, each with a grip and a typed position in Properties). Cut solids are capped.
   They are saved with the view and map exactly to BCF clipping planes (`view.set_section_box`,
   `view.fit_section_box`, `view.set_slice_planes`).
 - **Hide and isolate**: Hide, Isolate, Isolate with ghosting and Translucent work on elements,

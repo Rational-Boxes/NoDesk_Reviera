@@ -2879,6 +2879,7 @@ impl Gui {
             count.to_string(),
         ));
         grid.set_property_read_only("view_slices", true);
+        self.clip_rows(grid, section_box, &slices);
         true
     }
 
@@ -2886,6 +2887,9 @@ impl Gui {
     fn edit(&mut self, property: &str, text: Option<String>, frame: &Frame) {
         if property == "view_box" {
             return self.toggle_section_box();
+        }
+        if self.clip_row_edit(property, text.as_deref()) {
+            return;
         }
         if property == "view_cut" {
             if let Some(t) = text {

@@ -115,8 +115,9 @@ view, and a button switches perspective and isometric. Right-click the cube for 
 view and match BCF clipping planes.</p>
 <table>
   <tr><td><b>View › Section Box</b> <kbd>SX</kbd></td><td>Turns the view's section box on or off.
-    Drag its orange face grips to resize it. Properties › Extents › Section Box also turns it on
-    and off. <a class="run" href="reviera:action/inspect.section_box">Section Box</a></td></tr>
+    Drag its orange face grips to resize it, or type its faces in Properties › Extents (<b>Box X
+    From</b> … <b>Box Z To</b>, in the box's own axes). Properties › Extents › Section Box also
+    turns it on and off. <a class="run" href="reviera:action/inspect.section_box">Section Box</a></td></tr>
   <tr><td><b>Selection Box</b> <kbd>BX</kbd></td><td>Fits the section box around the selected
     elements.</td></tr>
   <tr><td><b>Horizontal Slice</b></td><td>Click a point: the model above its height is cut
@@ -125,7 +126,9 @@ view and match BCF clipping planes.</p>
   </td></tr>
   <tr><td><b>Clear Slices</b></td><td>Removes the view's slice planes.</td></tr>
 </table>
-<p>A view holds up to eight slice planes, each with a grip to drag it. <code>view.set_section_box</code>,
+<p>A view holds up to eight slice planes, each with a grip to drag it. Properties › Extents
+shows where each one is (<b>Slice 1 (Z)</b>: its height; <b>(X)</b> or <b>(Y)</b> for a vertical one):
+type a position to move it there. <code>view.set_section_box</code>,
 <code>view.fit_section_box</code>, <code>view.set_slice_planes</code></p>
 
 <h2 id="hide">Temporary hide and isolate</h2>

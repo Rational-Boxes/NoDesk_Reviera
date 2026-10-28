@@ -542,6 +542,7 @@ These principles apply to every requirement in this chapter.
 1. Properties › Extents › Section Box ✓ shows a box around the model.
 2. Selecting the box shows six face grips and a rotation grip; dragging them clips the view in real time.
 3. *Selection Box* (default shortcut BX): with elements selected, fits a section box tightly around them in the active 3D view, or in the user's default 3D view when the active view is not 3D.
+4. Typed extents: while the box is on, Properties › Extents shows *Box X From*, *Box X To*, *Box Y From*, *Box Y To*, *Box Z From* and *Box Z To* (the faces in the box's own axes, in project length units); typing one moves that face (never past the opposite face). *Built (2026-10-28).*
 
 **Behaviour & rules.**
 - The box is an oriented box (a transform plus extents). The GPU viewport clips with six clip planes and fills cut faces with caps (DOC-HLR-006); hidden-line output cuts solids with OCCT and draws section poché on the cut faces when the view's *Show cut faces* property is on (default on).
@@ -568,6 +569,7 @@ These principles apply to every requirement in this chapter.
 1. View tab › Inspect › Slice Plane ▾: *Horizontal* (at the elevation of the point clicked in the view, or at a level's cut plane chosen from the drop-down), *Vertical* (through the clicked point, facing the camera, snapped to the nearest model axis when within 10°), or *On Face* (the plane of the picked planar face, keeping the side the camera is on).
 2. Each slice plane shows a translucent outline over the model bounds and an arrow grip at its origin. Dragging the grip moves the plane along its normal in real time; Ctrl+drag rotates it about the vertical. Clicking the arrow flips which side is kept.
 3. Inspect › Clear Slices removes them; Properties › Extents › Slice Planes lists them, each with an *Enabled* check box.
+4. Typed positions: Properties › Extents shows each slice's position, *Slice n (X)*, *(Y)* or *(Z)* for a plane facing an axis (its coordinate on that axis), *Slice n (along normal)* otherwise (its distance from the origin along its normal); typing one moves the plane along its normal. *Built (2026-10-28);* the *Enabled* check box per slice is not built yet.
 
 **Behaviour & rules.**
 - A 3D view has at most eight slice planes, in addition to the six planes of its section box (DOC-HLR-006 raises its clip-plane budget to fifteen: six box, eight slice, one far clip). Eight covers the clipping planes of BCF viewpoints in practice; a viewpoint with more is restored with the first eight and a warning. A slice plane removes everything on its far side; several planes intersect (what remains is kept by all of them).

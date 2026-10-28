@@ -41,16 +41,15 @@ Start with **File › New**. The model has Level 1 at 0.
     south-east corner on the cube, then View › **Perspective / Isometric** (PI).
 13. **Section box.** A new 3D view *Section Box - Kitchen*, south-east corner. View › **Section
     Box** (SX) and drag its orange grips to (4900, -500, -400)–(10500, 7500, 2000): the east room
-    on Level 1, cut at 2 m through its windows. The grips give the extents only roughly; they
-    cannot be typed **[gap]**.
+    on Level 1, cut at 2 m through its windows. The grips give the extents only roughly: type
+    them exactly in Properties › Extents › *Box X From* … *Box Z To*.
 14. **Selection Box.** A new 3D view *Selection Box - Level 2*: select the five Level 2 walls
     (Ctrl+click), View › **Selection Box** (BX). The box fits round them with 300 mm to spare.
 15. **Horizontal slice.** A new 3D view *Horizontal Slice*: View › **Horizontal Slice**, click a
-    Level 1 window halfway up (1500): the model above is cut away, a plan in 3D. Drag the
-    slice's grip to 1500 exactly; its height cannot be typed **[gap]**.
+    Level 1 window halfway up (1500): the model above is cut away, a plan in 3D. Type 1500
+    in Properties › Extents › *Slice 1 (Z)* to put it there exactly.
 16. **Vertical slice.** A new 3D view *Vertical Slice*, the cube's Front face: View › **Vertical
-    Slice**, click the south wall, then drag the slice's grip north to y = 3500 **[gap]** (as
-    in step 15): the south half is cut away, a section in 3D.
+    Slice**, click the south wall, then drag the slice's grip north, or type 3500 in *Slice 1 (Y)*: the south half is cut away, a section in 3D.
 17. **Virtual volumes.** A new 3D view *Virtual Volumes*: View › **Virtual Volumes** once (hidden
     to translucent): the doors' swings show.
 18. **Temporary hide and isolate.** Four more 3D views, each with one state:
@@ -77,9 +76,6 @@ section box, slices and virtual volumes.
 
 ## Gaps
 
-- **Exact section box and slice positions.** The section box and slice planes are placed by
-  grips and clicks only; `view.set_section_box` and `view.set_slice_planes` take exact values
-  (steps 13, 15, 16), the window has no typed extents or heights.
 - **Saved hide and isolate.** Temporary hide, isolate, ghost and translucency (step 18) are kept
   per view for the session only; nothing saves them with a view (there are no view-level
   visibility settings yet). The script applies them, but the saved sample shows those four views
