@@ -1396,8 +1396,8 @@ simulation sessions, and the first engine runners (see [Not built yet](#not-buil
   printed so; Override Graphics in View sets elements' or categories' transparency and halftone
   in one view, saved and printed; and Apply Hide/Isolate to View makes the temporary state
   permanent (`view.hide`, `view.unhide`, `view.override_elements`, `view.set_category_override`,
-  `view.temp_apply`; DOC-GFX-007). Hiding by filter, and line and pattern overrides, are not
-  built yet.
+  `view.temp_apply`; DOC-GFX-007). A hidden element's tags, keynotes, spots and 3D labels
+  go with it. Hiding by filter, and line and pattern overrides, are not built yet.
 - **Annotation in 3D**: a 3D view shows the text notes, tags, dimensions and spots of the plans (and,
   when chosen, of the sections and elevations) as floating,
   tooltip-style labels at their places in the model (a note above its level, a door's tag at the

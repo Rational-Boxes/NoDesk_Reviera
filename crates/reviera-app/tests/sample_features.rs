@@ -858,3 +858,22 @@ fn graphic_overrides_are_saved_with_the_view_and_printed_so() {
     assert!(!r.contains_key(&walls[2]) && r.contains_key(&walls[3]), "the others ghosted for good");
     assert!(app.temp_state(doc, Some(ElementId(plan))).is_empty());
 }
+
+#[test]
+fn hiding_an_element_in_a_view_hides_its_tags_there() {
+    let work = tempfile::tempdir().unwrap();
+    let mut app = open(work.path(), "annotated_plan");
+    let plan = view_id(&mut app, "Level 1", "view.plan");
+    let s = store(&app);
+    let view = s.get(ElementId(plan)).unwrap().clone();
+    let tagged = |s: &reviera_core::Store| reviera_app::notes::view_notes(s, &view, 100.0, 0.0, None).into_iter().filter_map(|n| n.host).collect::<Vec<_>>();
+    let before = tagged(&s);
+    let door = *before.iter().find(|h| reviera_core::inserts::kind_of(s.get(**h).unwrap()) == Some(reviera_core::inserts::Kind::Door)).expect("a tagged door");
+    ok(&mut app, "view.hide", json!({ "view_id": plan, "element_ids": [door] }));
+    let after = tagged(&store(&app));
+    assert!(!after.contains(&door), "the door's tag goes with it");
+    assert_eq!(after.len(), before.iter().filter(|h| **h != door).count(), "the other tags stay");
+    // Another view's tags of it are not touched.
+    let other = store(&app).iter().filter(|e| reviera_core::views::is_view(e) && e.id() != ElementId(plan)).map(|e| e.id()).collect::<Vec<_>>();
+    assert!(other.iter().all(|v| reviera_core::view_hiding::hidden_in(&store(&app), Some(*v)).is_empty()));
+}

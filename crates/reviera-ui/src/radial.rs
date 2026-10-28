@@ -549,6 +549,13 @@ impl crate::Gui {
         // The unsaved {3D} view shows the defaults.
         let settings = element.and_then(|e| store.get(e)).map(reviera_core::annotations_3d::settings).unwrap_or_default();
         let mut tips = if settings.shown { reviera_core::annotations_3d::visible(reviera_core::annotations_3d::tips(store), &settings) } else { Vec::new() };
+        // Labels of elements hidden in this view go with them (DOC-GFX-007).
+        let hidden = reviera_core::view_hiding::hidden_in(store, element);
+        if !hidden.is_empty() {
+            tips.retain(|t| {
+                !t.host.as_deref().and_then(reviera_core::GlobalId::parse).and_then(|g| store.find_by_guid(&g)).is_some_and(|h| hidden.contains(&h))
+            });
+        }
         // Spots read again on the model as it is now.
         let scene = self.scenes.get(&doc);
         for t in tips.iter_mut().filter(|t| t.class == "spots") {

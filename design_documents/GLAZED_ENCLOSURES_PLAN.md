@@ -1,14 +1,16 @@
 # Glazed enclosures: greenhouses, solariums and atriums
 
-**Status:** Draft 0.1 · 2026-10-28 · a plan for the owner's review (questions in §10). Nothing here
-is built yet; the spec sections follow once the plan is agreed.
+**Status:** Draft 0.2 · 2026-10-28 · the owner answered §10 (commercial first, codes for common
+jurisdictions, full load modelling with the analysis tools, commercial growing, both dome kinds).
+Nothing here is built yet; the spec sections follow from this plan.
 **Owner's requests (2026-10-28):** "a bespoke greenhouse and solarium set of tools"; "integrating
 the existing tools for the greenhouse specialization"; "also suitable for large integrated
 atriums in offices, hotels, etc."; "with calculations on HVAC, energy, etc. impacts"; "louvres,
 baffles, etc. for advanced sunlight management".
 **Research:** `research/09_greenhouses_solariums.md` (sources G001–G087) and
-`research/10_atriums_solar_shading.md` (sources A001–…), both public sources only and logged in
-`RESEARCH_LOG.md`. Source IDs are cited in square brackets.
+`research/10_atriums_solar_shading.md` (sources A001–…) and
+`research/11_glazed_enclosure_codes_growing.md` (sources C001–…, codes by jurisdiction and
+commercial growing), all public sources only and logged in `RESEARCH_LOG.md`. Source IDs are cited in square brackets.
 
 ---
 
@@ -198,37 +200,50 @@ Analysis pane and in reports, and go stale when the model or weather change.
 
 ## 9. Building it, in phases
 
-Each phase ends with a sample model and a walkthrough on the Help page (as every ribbon tab has),
-the spec and README updated, and the defaults recorded for expert review.
+Commercial cases come first, then residential (owner, 2026-10-28). Each phase ends with a sample
+model and a walkthrough on the Help page (as every ribbon tab has), the spec and README updated,
+and the defaults recorded for expert review.
 
-1. **Domestic glazed rooms.** The enclosure element and tool; the glazing and frame library;
-   lean-to, gable, Edwardian, Victorian (3/5 facets) and orangery with a lantern; knee walls,
-   doors, gutters; the UK and U.S. code checks for conservatories and sunrooms. *Sample: a
-   Victorian conservatory and an orangery on the energy house.*
-2. **Greenhouses.** Hoop, gothic, gutter-connected multispan, Venlo, sawtooth and dome forms;
-   vents; benches and aisles; the quick heat-loss and ventilation sizing; condensation and the
-   simple snow check. *Sample: a hobby greenhouse and a small commercial range.*
-3. **Sunlight management.** Shading devices on any face, with the sun-path design aid; their
-   effect in daylight, solar studies and loads; greenhouse shade and energy screens.
-4. **Atriums.** Atrium roofs over floor openings, atrium spaces through storeys, smoke vents and
-   the code summaries; stratification and stack ventilation. *Sample: a hotel atrium.*
-5. **Energy and HVAC impact.** Shading control and vents in the annual energy run and the
-   EnergyPlus provider; the buffer-space comparison; overheating; pad-and-fan cooling; a report
-   per enclosure.
+1. **The enclosure and commercial greenhouses.** The enclosure element and tool; the glazing and
+   frame library; gable, gutter-connected multispan, Venlo, hoop and gothic tunnels and sawtooth
+   forms; gutters (with internal valley gutters), vents, doors; benches, rolling benches and
+   aisles, growing gutters (NFT and high-wire); the quick heat loss and ventilation sizing.
+   *Sample: a Venlo glasshouse range with a headhouse.*
+2. **Hothouse climate and growing.** Heating (pipe rail, under-bench), energy and shade screens,
+   pad-and-fan cooling, supplemental lighting laid out for a target daily light integral, CO₂
+   enrichment, climate setpoints by crop; crop light (DLI) through the glazing, screens and
+   lamps; growing-area schedules.
+3. **Sunlight management.** Shading devices on any face (louvres, fins, brise-soleil, baffles,
+   light shelves, screens), with the sun-path design aid; their effect in daylight, solar studies
+   and loads; operable devices and their control.
+4. **Atriums.** Atrium roofs over floor openings (ridge, pyramid, barrel vault, space frame),
+   atrium spaces through storeys, smoke vents and the code summaries; stratification and stack
+   ventilation. *Sample: a hotel atrium.*
+5. **Loads, energy and structure.** Full load modelling, integrated with the environmental,
+   sustainability and structural analysis tools (owner, 2026-10-28): the glazed enclosure in the
+   energy model (sloped and curved glazed surfaces, shading devices and their control, vents,
+   screens) for design loads, annual energy and the EnergyPlus provider; the buffer-space
+   comparison against the host building; overheating; and the frame in the structural analysis
+   tools with snow (drift and sliding off glazing), wind and crop loads by the greenhouse
+   structural standards' structure (design life classes), with load combinations from the
+   project's code.
+6. **Residential glazed rooms.** Lean-to, Edwardian, Victorian (3 and 5 facets), P- and T-shapes,
+   orangery with a roof lantern, solariums on knee walls. *Sample: a Victorian conservatory and
+   an orangery on the energy house.*
+7. **Building codes.** Rule sets for the common jurisdictions researched (U.S. IBC/IRC/IECC, UK,
+   Canada, EU and Eurocodes, Netherlands, Australia, New Zealand), checking occupancy, areas,
+   heights, separation, plastics and skylight limits, safety glazing zones, and energy limits.
+   Each rule set is data, so more jurisdictions can be added. The checks for each phase's forms
+   ship with that phase; this phase completes the set.
 
-Phases 3 and 5 can overlap with 2 and 4; phase 1 comes first because the others build on its
-enclosure element and glazing library.
+**Domes:** both faceted geodesic domes (frequency 2V–4V, struts and hubs) and glazing on the smooth
+domes and vaults that exist now (owner, 2026-10-28), in phase 1 for vaults and phase 6 for domes.
 
-## 10. Questions for the owner
+## 10. The owner's answers (2026-10-28)
 
-1. **Scope of the first phase.** Start with domestic conservatories and solariums (phase 1), or
-   with greenhouses?
-2. **Jurisdictions for the code checks.** UK and U.S. as researched, or others too (EU, Canada,
-   Australia, New Zealand)?
-3. **Structural checks.** Simplified snow and wind checks flagged as preliminary, plus the frame in
-   the structural analysis tools — or should greenhouse structural design (EN 13031-1, NGMA) be a
-   fuller module later?
-4. **Commercial growing.** How far into production growing should it go: benches and climate
-   equipment only, or crop light (DLI) and growing-area schedules too?
-5. **Dome glazing.** Faceted geodesic glazing, or also glazing on the smooth domes and vaults that
-   exist now?
+1. **First phase:** "Start with commercial, then continue to residential cases."
+2. **Jurisdictions:** "Yes, research and encode common building codes." (research/11; phase 7.)
+3. **Structural and loads:** "Yes, advanced load modeling integrates with
+   environmental/sustainability/structure analysis tools." (phase 5.)
+4. **Commercial growing:** "Yes, include commercial grows/hothouse cases." (phase 2.)
+5. **Domes:** "Support both": faceted geodesic glazing and glazing on smooth domes and vaults.

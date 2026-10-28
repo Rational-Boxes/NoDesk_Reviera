@@ -8,7 +8,11 @@
 //! Kept in the view's payload: `hidden` `{elements: [GlobalId], categories: [category key]}`.
 //! An element is hidden in the view when it is listed, or its category is.
 //!
-//! Not yet: hiding by filter, hiding an element's tags and dimensions with it, and Reveal Hidden.
+//! An element's tags, keynotes and spots in the view, and its floating labels in a 3D view, are
+//! hidden with it (in `reviera_app::notes` and the window).
+//!
+//! Not yet: hiding by filter, hiding dimensions that reference only hidden elements, and Reveal
+//! Hidden.
 
 use std::collections::HashSet;
 

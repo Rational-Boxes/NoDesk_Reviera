@@ -33,9 +33,12 @@ pub fn view_notes(store: &Store, view: &Element, scale: f32, z: f32, scene: Opti
     // A cropped view hides the tags and spots of elements outside its crop (DOC-GFX-015).
     let crop = reviera_core::crop::rects(store, view);
     let outside = |p: Option<[f64; 2]>| crop.is_some_and(|c| p.is_some_and(|p| !c.contains(p)));
+    // Hiding an element in the view hides its tags, keynotes and spots there (DOC-GFX-007).
+    let hidden = reviera_core::view_hiding::hidden_in(store, Some(view.id()));
+    let gone = |host: Option<ElementId>| host.is_some_and(|h| hidden.contains(&h));
     for (id, data) in notes::tags_of_view(store, &guid) {
         let t = notes::resolve_tag(store, &reader, id, data);
-        if t.host.is_some() && outside(Some(t.anchor)) {
+        if (t.host.is_some() && outside(Some(t.anchor))) || gone(t.host) {
             continue;
         }
         let leader = match t.data.leader {
@@ -78,7 +81,7 @@ pub fn view_notes(store: &Store, view: &Element, scale: f32, z: f32, scene: Opti
     // Keynote tags (DOC-ANN-014), drawn as tags.
     for (id, d) in reviera_core::keynote_tags::of_view(store, &guid) {
         let k = reviera_core::keynote_tags::resolve(store, id, d);
-        if outside(k.anchor) {
+        if outside(k.anchor) || gone(k.host) {
             continue;
         }
         let mark = TagMark {
@@ -115,6 +118,9 @@ pub fn view_notes(store: &Store, view: &Element, scale: f32, z: f32, scene: Opti
             text_mm: notes::TAG_TEXT_MM as f32,
         };
         let host = m.data.element.as_deref().and_then(reviera_core::GlobalId::parse).and_then(|g| store.find_by_guid(&g));
+        if gone(host) {
+            continue;
+        }
         out.push(NoteGraphic { id: m.id, host, parts: reviera_render::notes::spot_parts(&mark, scale, z), orphaned: m.orphaned });
     }
     out
