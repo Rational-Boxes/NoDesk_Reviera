@@ -40,6 +40,9 @@ macro_rules! edit_command {
 
 pub(crate) fn register(registry: &mut CommandRegistry) {
     let results = [
+        registry.add(ViewHide),
+        registry.add(ViewUnhide),
+        registry.add(ViewHidden),
         registry.add(OpeningCreateWall),
         registry.add(OpeningEditWall),
         registry.add(OpeningCreateShaft),
@@ -4419,6 +4422,42 @@ read_command!(
     crate::builtin::NoParams,
     Vec<crate::scope_boxes::ScopeBoxInfo>,
     crate::scope_boxes::list_command
+);
+
+edit_command!(
+    ViewHide,
+    "view.hide",
+    "Hide elements or categories in a view",
+    "Hide in View (DOC-GFX-007): hides `element_ids` (or, with `by_category`, their categories) and \
+     `categories` (keys such as `cat.walls`) in one view, saved with it and printed so. \
+     `view.unhide` shows them again; `view.temp_apply` turns temporary hiding into this.",
+    "Hide in View",
+    crate::view_hiding::HideParams,
+    (),
+    crate::view_hiding::hide
+);
+
+edit_command!(
+    ViewUnhide,
+    "view.unhide",
+    "Show hidden elements or categories in a view",
+    "Shows `element_ids` and `categories` hidden in a view by `view.hide` again, or (`all`) everything \
+     the view hides.",
+    "Unhide in View",
+    crate::view_hiding::UnhideParams,
+    (),
+    crate::view_hiding::unhide
+);
+
+read_command!(
+    ViewHidden,
+    "view.hidden",
+    "List what a view hides",
+    "The elements (GlobalId, id and name; `id` null when deleted) and categories a view hides by \
+     `view.hide`, and how many elements that hides in all.",
+    crate::view_hiding::HiddenParams,
+    crate::view_hiding::HiddenList,
+    crate::view_hiding::hidden
 );
 
 edit_command!(

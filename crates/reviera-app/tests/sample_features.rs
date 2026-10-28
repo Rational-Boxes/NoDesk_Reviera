@@ -164,6 +164,17 @@ fn the_views_sample_keeps_its_views_and_their_inspection_state() {
     let east = get("Level 1 - East Half", "view.plan");
     assert!(east["scopeBox"].is_string() && (scope.is_null() || east["scopeBox"] == scope), "{east} {boxes}");
     assert_eq!(get("Level 1", "view.plan")["kind"], "view.plan");
+    // Hide and isolate applied to their views are saved with them: the roof hidden, and in
+    // Isolate Partition everything but the partition.
+    let roof_view = all.iter().find(|(n, _, _)| n == "Hide Roof").unwrap().2;
+    let partition = all.iter().find(|(n, _, _)| n == "Isolate Partition").unwrap().2;
+    let s = store(&app);
+    let roofs: Vec<ElementId> = s.iter().filter(|e| e.class == "IfcRoof" || e.class == "IfcSlab" && reviera_core::roofs::roof_recipe(e).is_some()).map(|e| e.id()).collect();
+    let hidden = reviera_core::view_hiding::hidden_in(&s, Some(ElementId(roof_view)));
+    assert!(!roofs.is_empty() && roofs.iter().all(|r| hidden.contains(r)), "{roofs:?} {hidden:?}");
+    let hidden = reviera_core::view_hiding::hidden_in(&s, Some(ElementId(partition)));
+    let walls = s.iter().filter(|e| reviera_core::walls::wall_recipe(e).is_some()).count();
+    assert!(hidden.len() >= walls - 1, "all but the partition: {} of {walls} walls and more", hidden.len());
 }
 
 #[test]
@@ -732,4 +743,64 @@ fn a_plan_assigned_to_a_scope_box_is_cropped_to_it() {
     let (lo, hi) = span(&app.section_drawing(doc, ElementId(south)).unwrap());
     assert!(lo >= c.min[0] as f32 - 1e-3 && hi <= c.max[0] as f32 + 1e-3, "{lo} .. {hi} in {c:?}");
     assert!(hi - lo < whi - wlo - 1.0, "narrower than the whole elevation ({wlo} .. {whi})");
+}
+
+#[test]
+fn hide_in_view_is_saved_with_the_view_and_printed_so() {
+    let work = tempfile::tempdir().unwrap();
+    let mut app = open(work.path(), "views_inspection");
+    let doc = app.active().unwrap();
+    let plan = view_id(&mut app, "Level 1", "view.plan");
+    let s = store(&app);
+    let walls: Vec<ElementId> = s.iter().filter(|e| reviera_core::walls::wall_recipe(e).is_some()).map(|e| e.id()).collect();
+    let doors: Vec<ElementId> = s.iter().filter(|e| reviera_core::inserts::kind_of(e) == Some(reviera_core::inserts::Kind::Door)).map(|e| e.id()).collect();
+    assert!(walls.len() > 2 && !doors.is_empty());
+    let segments = |app: &App| app.plan_drawing(doc, ElementId(plan)).unwrap().graphics.lines.iter().map(|l| l.segments.len()).sum::<usize>();
+    let whole = segments(&app);
+
+    // One wall hidden: the printed plan loses its lines; the view lists it.
+    ok(&mut app, "view.hide", json!({ "view_id": plan, "element_ids": [walls[0]] }));
+    let one = segments(&app);
+    assert!(one < whole, "{one} < {whole}");
+    let listed = ok(&mut app, "view.hidden", json!({ "view_id": plan }));
+    assert_eq!(listed["count"], 1, "{listed}");
+    assert_eq!(listed["elements"][0]["id"], json!(walls[0]));
+    // Other views are not touched.
+    let level2 = view_id(&mut app, "Level 2", "view.plan");
+    assert!(reviera_core::view_hiding::hidden_in(&store(&app), Some(ElementId(level2))).is_empty());
+
+    // The doors' category: every door goes.
+    ok(&mut app, "view.hide", json!({ "view_id": plan, "element_ids": [doors[0]], "by_category": true }));
+    let hidden = reviera_core::view_hiding::hidden_in(&store(&app), Some(ElementId(plan)));
+    assert!(doors.iter().all(|d| hidden.contains(d)) && hidden.contains(&walls[0]));
+    assert!(app.execute("view.hide", json!({ "view_id": plan, "categories": ["cat.nonsense"] }), &Caller::user()).is_err());
+
+    // Undo is one step each; Unhide All shows everything.
+    ok(&mut app, "edit.undo", json!({}));
+    assert_eq!(reviera_core::view_hiding::hidden_in(&store(&app), Some(ElementId(plan))).len(), 1);
+    ok(&mut app, "view.unhide", json!({ "view_id": plan, "all": true }));
+    assert_eq!(segments(&app), whole);
+
+    // Apply Hide/Isolate to View: a temporary hide becomes Hide in View and the temporary state
+    // clears; an isolation hides everything else that has geometry.
+    ok(&mut app, "view.temp_hide", json!({ "view_id": plan, "element_ids": [walls[1]] }));
+    let applied = ok(&mut app, "view.temp_apply", json!({ "view_id": plan }));
+    assert_eq!(applied["hidden"], 1, "{applied}");
+    assert!(app.temp_state(doc, Some(ElementId(plan))).is_empty());
+    assert!(reviera_core::view_hiding::hidden_in(&store(&app), Some(ElementId(plan))).contains(&walls[1]));
+    ok(&mut app, "view.temp_isolate", json!({ "view_id": plan, "element_ids": [walls[2]] }));
+    let applied = ok(&mut app, "view.temp_apply", json!({ "view_id": plan }));
+    let hidden = reviera_core::view_hiding::hidden_in(&store(&app), Some(ElementId(plan)));
+    assert!(!hidden.contains(&walls[2]) && walls.iter().filter(|w| **w != walls[2]).all(|w| hidden.contains(w)), "{applied}");
+    assert!(app.execute("view.temp_apply", json!({ "view_id": plan }), &Caller::user()).is_err(), "nothing left to apply");
+
+    // Saved with the view: it comes back on reopen.
+    let path = work.path().join("hidden.ifc");
+    ok(&mut app, "file.save_as", json!({ "path": path }));
+    let mut again = App::new(AppConfig { live: None, untitled_dir: work.path().join("u-again") });
+    ok(&mut again, "file.open", json!({ "path": path }));
+    let reopened = store(&again);
+    let plan = reopened.iter().find(|e| e.name.as_deref() == Some("Level 1") && reviera_core::views::view_data(e).is_some_and(|d| d.kind == "view.plan")).unwrap().id();
+    let guids = |s: &reviera_core::Store, ids: &std::collections::HashSet<ElementId>| ids.iter().map(|i| s.get(*i).unwrap().guid().to_string()).collect::<std::collections::BTreeSet<_>>();
+    assert_eq!(guids(&reopened, &reviera_core::view_hiding::hidden_in(&reopened, Some(plan))), guids(&store(&app), &hidden));
 }

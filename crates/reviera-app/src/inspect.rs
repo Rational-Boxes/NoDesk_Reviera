@@ -422,6 +422,63 @@ impl HostCommand for ViewTempReset {
     }
 }
 
+/// What `view.temp_apply` did.
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct TempApplyResult {
+    /// How many elements are now hidden in the view by it.
+    pub hidden: usize,
+    /// Whether temporary translucency or ghosting was left as it was (it is not hiding).
+    pub kept_translucency: bool,
+}
+
+pub(crate) struct ViewTempApply;
+
+impl HostCommand for ViewTempApply {
+    type Host = App;
+    type Params = crate::views::OptionalViewParams;
+    type Output = TempApplyResult;
+    const META: CommandMeta = CommandMeta {
+        name: "view.temp_apply",
+        version: 1,
+        summary: "Apply a view's temporary hide and isolate to the view (Apply Hide/Isolate to View)",
+        description: "Turns a saved view's temporary hiding into Hide in View (`view.hide`): its temporarily \
+                      hidden elements, and with an isolation everything outside it that has geometry, are \
+                      hidden in the view for good (saved and printed). The temporary hide and isolation are \
+                      then cleared; translucency and ghosting stay temporary.",
+        effects: &[Effect::Edit],
+        transaction_name: "Apply Hide/Isolate to View",
+    };
+
+    fn run(&self, app: &mut App, caller: &Caller, p: crate::views::OptionalViewParams) -> Result<TempApplyResult> {
+        let (doc, view) = app.temp_view(&p.view_id)?;
+        let view = view.ok_or_else(|| Error::new("view.unsaved", "save the view first: the default 3D view keeps no hiding"))?;
+        let state = app.temp_state(doc, Some(view));
+        let mut hide: BTreeSet<ElementId> = state.hidden.clone();
+        let ghosted = state.isolated.as_ref().is_some_and(|i| i.ghost_others.is_some());
+        if let Some(i) = state.isolated.as_ref().filter(|i| i.ghost_others.is_none()) {
+            let scene = app.render_scene(doc)?;
+            hide.extend(scene.meshes.iter().filter_map(|m| m.element).filter(|e| !i.elements.contains(e) && *e < i.after));
+        }
+        if hide.is_empty() {
+            return Err(Error::new("view.nothing_to_apply", "the view has no temporary hide or isolate to apply"));
+        }
+        app.execute("view.hide", json!({ "view_id": view, "element_ids": hide }), caller)?;
+        let kept = ghosted || !state.translucent.is_empty();
+        let open = app.get_mut(doc)?;
+        if let Some(t) = open.temp.get_mut(&Some(view)) {
+            t.hidden.clear();
+            if !ghosted {
+                t.isolated = None;
+            }
+            if t.is_empty() {
+                open.temp.remove(&Some(view));
+            }
+        }
+        let hidden = reviera_core::view_hiding::hidden_in(app.get(doc)?.doc.store(), Some(view)).len();
+        Ok(TempApplyResult { hidden, kept_translucency: kept })
+    }
+}
+
 pub(crate) struct ViewGetTempState;
 
 impl HostCommand for ViewGetTempState {

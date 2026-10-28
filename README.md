@@ -1391,7 +1391,10 @@ simulation sessions, and the first engine runners (see [Not built yet](#not-buil
   `view.fit_section_box`, `view.set_slice_planes`).
 - **Hide and isolate**: Hide, Isolate, Isolate with ghosting and Translucent work on elements,
   on elements with their children, by category or by type (HH, HI, HC, IC, HG, HT; HR resets).
-  This is temporary per-view state that is never saved or printed (`view.temp_*`).
+  This is temporary per-view state that is never saved or printed (`view.temp_*`). Hide in View
+  (EH) and Hide Category in View (VH) hide elements or categories in one view for good, saved and
+  printed so, and Apply Hide/Isolate to View makes the temporary hiding permanent (`view.hide`,
+  `view.unhide`, `view.hidden`, `view.temp_apply`; DOC-GFX-007). Hiding by filter is not built yet.
 - **Annotation in 3D**: a 3D view shows the text notes, tags, dimensions and spots of the plans (and,
   when chosen, of the sections and elevations) as floating,
   tooltip-style labels at their places in the model (a note above its level, a door's tag at the

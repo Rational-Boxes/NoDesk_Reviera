@@ -59,7 +59,11 @@ Start with **File › New**. The model has Level 1 at 0.
     - *Translucent Walls*: select every wall, View › **Translucent** (HT).
     - *Isolate Partition*: select the Level 1 partition, View › **Isolate Element** (HI).
 
-    These are temporary: they are not saved with the views **[gap]**.
+    These are temporary. In *Hide Roof* and *Isolate Partition*, View › **Apply Hide/Isolate to
+    View** makes them permanent: saved with the views and printed so (Hide in View, EH, and Hide
+    Category in View, VH, do it directly; Unhide All in View undoes it). Ghosting and
+    translucency stay temporary: *Isolate South Wall* and *Translucent Walls* open whole
+    **[gap]**.
 19. **BCF viewpoint.** Open *Section Box - Kitchen*, View › Coordination › **Export
     Viewpoint…** and save `kitchen.bcfv`: its camera, the box's six faces as clipping planes and
     any hidden or isolated elements. Open the *Orthographic* view and **Show Viewpoint…** the same
@@ -76,9 +80,8 @@ section box, slices and virtual volumes.
 
 ## Gaps
 
-- **Saved hide and isolate.** Temporary hide, isolate, ghost and translucency (step 18) are kept
-  per view for the session only; nothing saves them with a view (there are no view-level
-  visibility settings yet). The script applies them, but the saved sample shows those four views
-  whole.
+- **Saved ghosting and translucency.** Hiding and isolating can be applied to a view (step 18),
+  but ghosting and translucency stay temporary: there are no view-level graphic overrides
+  (transparency) yet, so *Isolate South Wall* and *Translucent Walls* open whole.
 - **BCF topics.** A viewpoint is exported and shown on its own (`bcf.export_viewpoint`,
   `bcf.import_viewpoint`); issues with their viewpoints in a `.bcf` archive are not built yet.

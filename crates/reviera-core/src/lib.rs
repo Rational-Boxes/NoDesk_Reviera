@@ -113,6 +113,7 @@ pub mod keynote_tags;
 pub mod keynote_legend;
 pub mod legends;
 pub mod crop;
+pub mod view_hiding;
 pub mod origin;
 pub mod overlap;
 pub mod overlap_accept;

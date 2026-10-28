@@ -732,6 +732,10 @@ impl Gui {
                 self.temp_reset();
                 true
             }
+            "EH" | "VH" => {
+                self.hide_in_view(self.keys.0 == "VH");
+                true
+            }
             "RM" => {
                 self.start_room_tool();
                 true
@@ -5255,6 +5259,10 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         }),
         "inspect.clear_slices" => with(gui, Gui::clear_slices),
         "inspect.reset" => with(gui, Gui::temp_reset),
+        "inspect.hide_in_view" => with(gui, |g| g.hide_in_view(false)),
+        "inspect.hide_category_in_view" => with(gui, |g| g.hide_in_view(true)),
+        "inspect.unhide_all_in_view" => with(gui, Gui::unhide_all_in_view),
+        "inspect.apply_to_view" => with(gui, Gui::apply_temp_to_view),
         a if a.starts_with("inspect.") => with(gui, |g| g.temp_action(a)),
         other => f.set_status_text(&format!("{other} is not available yet"), 0),
     }

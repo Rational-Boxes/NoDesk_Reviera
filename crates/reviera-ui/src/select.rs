@@ -297,7 +297,7 @@ impl Gui {
         // hidden elements cannot be clicked.
         let temporary = self
             .active_view()
-            .is_some_and(|v| !self.view_visibility(v).is_empty());
+            .is_some_and(|v| self.app.temp_active(v.doc, v.element));
         let Some(hit) = self
             .room_label_at(x, y)
             .or_else(|| self.space_label_at(x, y))
@@ -350,7 +350,8 @@ impl Gui {
         {
             item("ui.pane.sizing_calculator", "&Sizing Calculator", Transform);
         }
-        item("inspect.hide", "&Hide in View", Visibility);
+        item("inspect.hide", "&Hide Temporarily", Visibility);
+        item("inspect.hide_in_view", "Hide in &View (saved)", Visibility);
         let label = if self.all_translucent(&ids) {
             "Make &Opaque"
         } else {
@@ -365,6 +366,7 @@ impl Gui {
         item("inspect.isolate", "&Isolate", Visibility);
         if temporary {
             item("inspect.reset", "&Reset Hide/Isolate (show all)", Visibility);
+            item("inspect.apply_to_view", "&Apply Hide/Isolate to View", Visibility);
         }
         item("inspect.selection_box", "Section &Box", Visibility);
         item("component.create", "Create &Component…", Element);

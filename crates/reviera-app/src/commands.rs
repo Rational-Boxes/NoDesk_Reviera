@@ -43,6 +43,7 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add_host(crate::inspect::ViewTempTranslucent),
         registry.add_host(crate::inspect::ViewTempShow),
         registry.add_host(crate::inspect::ViewTempReset),
+        registry.add_host(crate::inspect::ViewTempApply),
         registry.add_host(crate::inspect::ViewGetTempState),
         registry.add_host(crate::inspect::ModelTree),
         registry.add_host(crate::inspect::ViewFitSectionBox),

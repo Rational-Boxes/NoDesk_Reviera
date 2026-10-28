@@ -67,6 +67,8 @@ impl App {
         let e = store
             .get(view)
             .ok_or_else(|| Error::new("view.not_found", format!("no view {view}")))?;
+        let mut filtered = None;
+        let scene = without_hidden(store, view, scene, &mut filtered);
         let ceiling = views::view_data(e).is_some_and(|d| d.kind == plans::KIND_CEILING_PLAN);
         views::view_data(e)
             .filter(|d| plans::is_plan(&d.kind))
@@ -470,6 +472,8 @@ impl App {
             .param(views::VIEW_KEY)
             .and_then(|v| v.get("scale")?.as_f64())
             .unwrap_or(100.0) as f32;
+        let mut filtered = None;
+        let scene = without_hidden(store, view, scene, &mut filtered);
         let parts = section_parts(store, Some(e.guid().as_str()), scene, &def, scale, &|_| {
             true
         });
@@ -488,6 +492,22 @@ impl App {
         apply_crop(store, e, &mut d, 0.002);
         Ok(d)
     }
+}
+
+/// `scene` without what view `view` hides (DOC-GFX-007), kept in `filtered` when anything is.
+fn without_hidden<'a>(
+    store: &reviera_core::Store,
+    view: ElementId,
+    scene: &'a reviera_render::RenderScene,
+    filtered: &'a mut Option<reviera_render::RenderScene>,
+) -> &'a reviera_render::RenderScene {
+    let hidden = reviera_core::view_hiding::hidden_in(store, Some(view));
+    if hidden.is_empty() {
+        return scene;
+    }
+    filtered.insert(reviera_render::RenderScene {
+        meshes: scene.meshes.iter().filter(|m| !m.element.is_some_and(|e| hidden.contains(&e))).cloned().collect(),
+    })
 }
 
 /// ISO A sheets, landscape, in millimetres.

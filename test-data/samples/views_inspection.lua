@@ -154,17 +154,19 @@ reviera.view.set_slice_planes{ view_id = vslice, planes = { { origin = {0, 3.5, 
 local volumes = view3d("Virtual Volumes", se)
 reviera.view.set_virtual_volumes{ view_id = volumes, mode = "translucent" }
 
--- Temporary visibility (not saved): the roof hidden by category, the south wall isolated with
--- its doors and windows and the rest ghosted, the walls translucent, the Level 1 partition
--- isolated.
+-- Hide and isolate: the roof hidden by category and the Level 1 partition isolated, each then
+-- applied to its view (saved, DOC-GFX-007); the south wall isolated with its doors and windows
+-- and the rest ghosted, and the walls translucent, which stay temporary (not saved).
 local noroof = view3d("Hide Roof", se)
 reviera.view.temp_hide{ view_id = noroof, element_ids = { roof }, by = "category" }
+reviera.view.temp_apply{ view_id = noroof }
 local ghost = view3d("Isolate South Wall", front)
 reviera.view.temp_isolate{ view_id = ghost, element_ids = { ground[1] }, by = "subtree", ghost_others = true }
 local glass = view3d("Translucent Walls", se)
 reviera.view.temp_translucent{ view_id = glass, element_ids = { ground[1] }, by = "category" }
 local only = view3d("Isolate Partition", se)
 reviera.view.temp_isolate{ view_id = only, element_ids = { hall } }
+reviera.view.temp_apply{ view_id = only }
 
 print("Views and inspection built")
 return true

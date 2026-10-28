@@ -147,6 +147,9 @@ impl Gui {
             let store = d.doc.store();
             vis.hidden
                 .extend(reviera_core::parts::hidden_in(store, v.element));
+            // Hidden in the view for good (DOC-GFX-007).
+            vis.hidden
+                .extend(reviera_core::view_hiding::hidden_in(store, v.element));
             // A Coarse plan draws structural framing as single lines, not bodies (STR-SET-001).
             let coarse = v.plan.is_some()
                 && v.element
@@ -756,6 +759,52 @@ impl Gui {
         if command == "view.temp_hide" {
             self.clear_selection();
         }
+    }
+
+    /// Hide in View (EH), or Hide Category in View (VH): the selection hidden in the active view
+    /// for good.
+    pub(crate) fn hide_in_view(&mut self, by_category: bool) {
+        let Some(view) = self.active_view().and_then(|v| v.element) else {
+            return self.frame.set_status_text("Hide in View: open a saved view (the default 3D view keeps no hiding)", 0);
+        };
+        let ids = self.selection();
+        if ids.is_empty() {
+            return self.frame.set_status_text("Hide in View: select the elements to hide first", 0);
+        }
+        match self.run("view.hide", json!({ "view_id": view, "element_ids": ids, "by_category": by_category })) {
+            Ok(_) => self.frame.set_status_text("Hidden in this view (Unhide All in View shows them again)", 0),
+            Err(e) => self.frame.set_status_text(&e, 0),
+        }
+        self.clear_selection();
+        self.after_temp_change();
+        self.after_view_edit();
+    }
+
+    /// Unhide All in View: everything the active view hides shown again.
+    pub(crate) fn unhide_all_in_view(&mut self) {
+        let Some(view) = self.active_view().and_then(|v| v.element) else { return };
+        if let Err(e) = self.run("view.unhide", json!({ "view_id": view, "all": true })) {
+            self.frame.set_status_text(&e, 0);
+        }
+        self.after_temp_change();
+        self.after_view_edit();
+    }
+
+    /// Apply Hide/Isolate to View: the temporary hide and isolate made permanent.
+    pub(crate) fn apply_temp_to_view(&mut self) {
+        let Some(view) = self.active_view().and_then(|v| v.element) else {
+            return self.frame.set_status_text("Apply Hide/Isolate to View: open a saved view first", 0);
+        };
+        match self.run("view.temp_apply", json!({ "view_id": view })) {
+            Ok(r) => {
+                let n = r["hidden"].as_u64().unwrap_or(0);
+                let kept = if r["kept_translucency"] == true { "; translucency stays temporary" } else { "" };
+                self.frame.set_status_text(&format!("Hidden in this view for good: {n} element{}{kept}", if n == 1 { "" } else { "s" }), 0);
+            }
+            Err(e) => self.frame.set_status_text(&e, 0),
+        }
+        self.after_temp_change();
+        self.after_view_edit();
     }
 
     pub(crate) fn temp_reset(&mut self) {

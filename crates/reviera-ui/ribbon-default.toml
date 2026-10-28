@@ -918,6 +918,32 @@ keys = "HR"
 help = "Show everything again in this view"
 
 [[action]]
+id = "inspect.hide_in_view"
+label = "Hide in View"
+icon = "hide"
+keys = "EH"
+help = "Hide the selected elements in this view for good: saved with the view and printed so"
+
+[[action]]
+id = "inspect.hide_category_in_view"
+label = "Hide Category in View"
+icon = "hide_category"
+keys = "VH"
+help = "Hide the selected elements' categories in this view for good"
+
+[[action]]
+id = "inspect.unhide_all_in_view"
+label = "Unhide All in View"
+icon = "reset_temp"
+help = "Show again everything this view hides with Hide in View"
+
+[[action]]
+id = "inspect.apply_to_view"
+label = "Apply Hide/Isolate to View"
+icon = "hide"
+help = "Make this view's temporary hide and isolate permanent (Hide in View)"
+
+[[action]]
 id = "ui.pane.model_tree"
 toggle = true
 label = "Model Tree"
@@ -3961,6 +3987,10 @@ tools = [
   { action = "inspect.ghost_others", size = "small" },
   { action = "inspect.translucent", size = "small" },
   { action = "inspect.reset", size = "small" },
+  { action = "inspect.apply_to_view", size = "small" },
+  { action = "inspect.hide_in_view", size = "small" },
+  { action = "inspect.hide_category_in_view", size = "small" },
+  { action = "inspect.unhide_all_in_view", size = "small" },
 ]
 
 [[tab.panel]]
@@ -4460,7 +4490,8 @@ items = [
   "inspect.slice_vertical", "inspect.clear_slices", "-",
   "inspect.hide", "inspect.hide_subtree", "inspect.hide_category", "inspect.hide_type",
   "inspect.isolate", "inspect.isolate_subtree", "inspect.isolate_category", "inspect.isolate_type",
-  "inspect.ghost_others", "inspect.translucent", "inspect.translucent_subtree", "inspect.reset", "-",
+  "inspect.ghost_others", "inspect.translucent", "inspect.translucent_subtree", "inspect.reset", "inspect.apply_to_view", "-",
+  "inspect.hide_in_view", "inspect.hide_category_in_view", "inspect.unhide_all_in_view", "-",
   "ui.pane.clash", "overlap.find", "view.set_virtual_volumes", "clearance.set_rule_set",
 ]
 
