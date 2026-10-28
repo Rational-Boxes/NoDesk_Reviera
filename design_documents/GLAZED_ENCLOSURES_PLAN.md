@@ -1,8 +1,9 @@
 # Glazed enclosures: greenhouses, solariums and atriums
 
-**Status:** Draft 0.2 · 2026-10-28 · the owner answered §10 (commercial first, codes for common
+**Status:** Draft 0.3 · 2026-10-28 · the owner answered §10 (commercial first, codes for common
 jurisdictions, full load modelling with the analysis tools, commercial growing, both dome kinds).
-Nothing here is built yet; the spec sections follow from this plan.
+Nothing here is built yet; the spec sections follow from this plan. Reviera-defined types and
+property sets in its own namespace for what IFC lacks (owner, 2026-10-28) are in §8a.
 **Owner's requests (2026-10-28):** "a bespoke greenhouse and solarium set of tools"; "integrating
 the existing tools for the greenhouse specialization"; "also suitable for large integrated
 atriums in offices, hotels, etc."; "with calculations on HVAC, energy, etc. impacts"; "louvres,
