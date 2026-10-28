@@ -132,8 +132,7 @@ pad area by airflow ÷ 250 for 100 mm pads or ÷ 400 for 150 mm pads [§4 of res
 
 ### 5.2 Sunlight management (louvres, baffles, screens)
 
-*(To be completed from research/10: device geometry rules, effect on solar gain and daylight,
-control logic and IFC mapping.)* Planned devices:
+Planned devices:
 
 - **External fixed:** horizontal louvres and brise-soleil, vertical fins, egg-crate, overhangs,
   perforated and fritted screens.
@@ -148,18 +147,55 @@ tools), with its blade depth, spacing, angle and length, and a **design aid** th
 path at the site and the cut-off angle the blades give. Its effect is carried into the analyses
 (§7) as a shading factor that changes over the day, not a fixed number.
 
+- **Geometry.** The profile (vertical shadow) angle follows from the sun's altitude and its
+  azimuth relative to the façade, tan VSA = tan(altitude) / cos(γ). An overhang's projection for
+  full shading of a height h is h / tan VSA, and a fin's depth for a spacing s is s / tan HSA. A
+  louvre's cut-off angle follows from its spacing and depth [A038–A040]. Public sources disagree on
+  the louvre formula's sign convention, so it goes to expert review.
+- **Effect on solar gain.** The total solar energy transmittance of glazing with a device (g_tot),
+  or a reduction factor F_c on the glazing's own g-value. Published tables give about 0.05–0.30
+  g_tot for external devices, and F_c ≈ 0.25 for ventilated external louvres against 0.75–0.9 for
+  interior blinds [A035, A036]. A detailed calculation follows the public summaries of EN 13363
+  and EN ISO 52022 [A037].
+- **Effect on daylight.** The device is geometry in the daylight ray casting, with its slats'
+  reflectance and transmittance (IFC's `Pset_ShadingDeviceCommon` has these) [A001].
+- **Control.** For operable devices and vents, a small rule set the energy and daylight runs
+  follow hour by hour:
+  - track the sun to the cut-off slat angle (solar position to NREL's SPA accuracy);
+  - deploy above an irradiance or light threshold, after a delay (2 min is typical);
+  - retract in wind by the device's EN 13659 wind class, with a hold (12 min);
+  - close vents in rain and open smoke vents on a fire alarm;
+  - limit sun penetration into the floor (0.9 m at desks, 1.8 m near circulation in one tested
+    building) and window luminance (about 1,800–2,200 cd/m²) [A036, A047–A049].
+
 ## 6. Atriums
 
-*(To be completed from research/10: forms, smoke control and code summaries, stack effect and
-stratification, daylight to adjacent floors.)* Planned:
-
-- **Atrium roof** over an opening in a building's floors: ridge, pyramid, barrel vault and
-  space-frame forms, using the same parts as above but sized for larger spans.
-- **Atrium space:** an `IfcSpace` spanning the storeys it passes through, with its balconies,
-  railings and edge glazing, marked as an atrium so analyses treat it as one tall stratified
-  volume.
-- **Smoke ventilation:** automatic opening vents and their free area, with the checks that public
-  summaries of the codes allow.
+- **Forms.** Central (surrounded by floors), linear (a glazed street), attached (along one side of
+  the building) and edge atriums; roofs as ridge, pyramid, barrel vault, space frame or ETFE
+  cushions, over an opening through the building's floors [A045, A055, A059].
+- **Atrium roof** over the opening, using the enclosure's parts sized for larger spans, with the
+  frame in the structural analysis tools.
+- **Atrium space:** an `IfcSpace` spanning the storeys it passes through, grouped by
+  `IfcSpatialZone` (fire safety, thermal, ventilation zones), with its balconies, railings and edge
+  glazing, so analyses treat it as one tall stratified volume [A001].
+- **Fire and smoke checks** from public sources:
+  - IBC §404: smoke control when an atrium connects more than two storeys; no ceiling sprinklers
+    needed above 55 ft; 1 h separation, or glass walls wetted by sprinklers 100–300 mm from the
+    glass at ≤ 1.8 m spacing; at most three storeys open to it; 200 ft travel within it [A003];
+  - smoke filling, plume and exhaust rates by the published NFPA 92B (1991) equations with t² design
+    fires of 2, 5 or 25 MW [A004, A006]; the current edition's plugholing and spill-plume constants are
+    paywalled, so the user enters them with the edition named;
+  - UK: Approved Document B points to BS 9999 for atriums; the NHS guide's roof vents of 10 % of
+    plan area up to 18 m high, mechanical extract above; smoke vents rated by their declared
+    discharge coefficient (EN 12101-2), not an assumed 0.6 [A008–A010, A012].
+- **Environmental behaviour:** stack ventilation through the atrium (neutral plane, opening areas);
+  stratification; daylight to the floors around it (a glazed roof cuts the daylight factor by about
+  45 %, and its well index sets how far down it reaches); cold downdraught from tall glazing, with
+  the published correlations and the effect of mullions and transoms [A013–A018].
+- **Energy-code checks:** ASHRAE 90.1 window-to-wall (40 %) and skylight-to-roof (3 %) limits per
+  space-conditioning category; IECC's minimum skylight area for large high spaces, which names
+  atriums, by its effective-aperture formula; UK Part L's top-lit reference for zones above 6 m
+  [A026, A027, A029, A030].
 
 ## 7. Analyses: HVAC, energy and the rest
 
@@ -194,9 +230,48 @@ Analysis pane and in reports, and go stale when the model or weather change.
 | Frame members | `IfcMember`, `IfcColumn`, `IfcBeam`; IFC4.3 adds ARCH_SEGMENT and TIEBAR | [G056] |
 | Vents | `IfcWindow` (roof or wall) with operation type; `IfcActuator` for motorised ones | |
 | Gutters | `IfcPipeSegment` GUTTER with `Pset_PipeSegmentTypeGutter`; `IfcStackTerminal` RAINWATERHOPPER | As MEP-PIPE-010 |
-| Shading devices | `IfcShadingDevice` (LOUVER, SHUTTER, AWNING, …) with its common property set | research/10 |
-| Atrium | `IfcSpace` spanning storeys | research/10 |
-| Glazing optics | `Pset_MaterialOptical`; Reviera property set for safety class and wall structure | [G056] |
+| Shading devices | `IfcShadingDevice`: JALOUSIE (louvres), SHUTTER, AWNING, or USERDEFINED with ObjectType `Fin`, `BriseSoleil`, `Baffle`, `LightShelf`, `Screen` (IFC has no LOUVER type) | [A001]; §8a |
+| Motorised devices, sensors | `IfcActuator` (SUNBLINDACTUATOR; FailPosition, ManualOverride), `IfcSensor` (RADIATION, WIND, RAIN, LIGHT), assigned to the device | [A001] |
+| Atrium | `IfcSpace` spanning storeys, in `IfcSpatialZone`s (FIRESAFETY, THERMAL, VENTILATION) | [A001] |
+| Glazing optics | `Pset_MaterialOptical` on the material; §8a for what IFC lacks | [G056] |
+
+## 8a. Reviera's own types and properties
+
+IFC has no entity for a glazed enclosure, a growing gutter or a light shelf, and no property for a
+shading device's g_tot or a glazing unit's safety class. A valid IFC file cannot add entity
+classes, so, as the owner suggests, the toolset defines **its own types in Reviera's namespace**,
+each carried by the nearest IFC entity, following the rules Reviera already uses (spec Ch 2:
+categories from the IFC class, `PredefinedType` and `ObjectType`; Reviera data in `Reviera_*`
+property sets; the building still readable by a tool that ignores them):
+
+- **Types.** New categories in the category registry, each with its IFC carrier:
+
+  | Reviera type | IFC carrier |
+  |---|---|
+  | Glazed enclosure | `IfcElementAssembly` USERDEFINED, ObjectType `GlazedEnclosure` |
+  | Louvre, fin, brise-soleil, baffle, light shelf, screen | `IfcShadingDevice` (as §8) |
+  | Growing gutter (NFT, high-wire), bench, rolling bench | `IfcFurniture` or `IfcBuildingElementProxy` USERDEFINED, ObjectType `GrowingGutter`, `Bench`, `RollingBench` |
+  | Pad wall, energy curtain, shade screen | `IfcBuildingElementProxy` / `IfcShadingDevice` USERDEFINED |
+  | Vent | `IfcWindow` with `Reviera_Vent` |
+  | Atrium | `IfcSpace` with ObjectType `Atrium` |
+
+- **Property sets** in Reviera's namespace for the engineering data IFC has no home for, shown in
+  Properties and schedules like any other, for example:
+  - `Reviera_GlazingUnit`: safety class, polycarbonate wall structure, light transmission,
+    horticultural diffusion (haze);
+  - `Reviera_ShadingPerformance`: g_tot, F_c, cut-off angle, blade depth, spacing, tilt and tilt
+    range, wind class, control mode;
+  - `Reviera_EnclosureDesign`: form, design life class, importance factor, vent ratio;
+  - `Reviera_GrowingClimate`: crop, temperature and humidity setpoints, target daily light
+    integral, CO₂ setpoint;
+  - `Reviera_Vent`: free area, discharge coefficient, actuator, smoke-vent rating.
+- **Published definitions.** Each property set is defined once, machine-readably, with names,
+  types, units and descriptions, published under the MIT licence with Reviera's other schemas (as
+  the interfaces policy asks), so other tools can read them. Publishing them in the buildingSMART
+  Data Dictionary (bSDD) under a Reviera domain is a later option.
+- **Standard first.** Where a standard property exists it is used instead (`Pset_ShadingDeviceCommon`
+  transmittance and reflectance, `Pset_MaterialOptical`, `Pset_PipeSegmentTypeGutter`,
+  `Pset_SpaceThermalDesign`), and a Reviera property never repeats one.
 
 ## 9. Building it, in phases
 
