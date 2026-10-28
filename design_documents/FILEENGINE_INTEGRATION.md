@@ -2,7 +2,9 @@
 
 **Status:** Draft 0.3 · 2026-10-27 · for the owner's review (open questions in §10, requests to FileEngine in §11).
 **Implementation deferred (owner, 2026-10-27):** the owner is making the FileEngine improvements
-of §11 first; Reviera's side starts once they land.
+of §11 first; Reviera's side starts once they land. **Update (owner, 2026-10-28):** the
+improvements in progress include strong generated credentials on the REST door, like
+FileEngine's other doors (§4, §11.2); the owner will say when FileEngine is deployed with them.
 **Related:**
 - Chapter 2 DM-FILE-007 (WebDAV, kept for other servers);
 - Chapter 6 COL-BCF-001 … 004 (BCF issues), COL-API-001 (shared REST client and credentials);
@@ -116,6 +118,13 @@ A **FileEngine connection** is a per-user setting, never stored in a model:
     expires.
   - **Single sign-on:** the door's OAuth flow in the system browser, returning to Reviera. This
     needs a native-app return path on the FileEngine side (§10, Q3).
+  - **Generated credentials** (coming, owner 2026-10-28): a strong credential generated on the
+    FileEngine side for this app, as FileEngine's other doors already take, pasted into
+    Reviera's connection settings. It is kept in the OS keyring and exchanged for a short-lived
+    bearer token as the remote-analysis subscriptions do (DM-RPC-011), so there is no hourly
+    password prompt, and it can be revoked on the server. This is expected to be the default
+    for desktop use; the exact form (key and secret, or one token) follows FileEngine's
+    deployment.
 - plain `http://` is refused unless the connection is marked as a trusted local network.
 
 Commands (UI, Lua and MCP; credential commands are UI and Lua only, never offered to agents):
@@ -678,7 +687,9 @@ and which Reviera phase (§9) waits on it. *Needed* means the phase cannot ship 
     - Or a device-authorization flow (RFC 8628): the user signs in on any browser with a short
       code.
 16. **Refresh** (*wanted*). A refresh token (or longer-lived app tokens that can be revoked), so
-    Reviera does not ask for the password every hour.
+    Reviera does not ask for the password every hour. *In progress (owner, 2026-10-28):* the
+    REST door is getting strong generated credentials like the other doors, which covers this
+    (§4).
 17. **One token for every service** (*needed* for phases 3 and 6). The BCF, discussion, search
     and share services all accept the REST door's bearer token (or one token exchange gives
     tokens for each), with an audience claim per service. The discussion service already
