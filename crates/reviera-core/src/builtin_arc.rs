@@ -40,6 +40,11 @@ macro_rules! edit_command {
 
 pub(crate) fn register(registry: &mut CommandRegistry) {
     let results = [
+        registry.add(EnclosureCreate),
+        registry.add(EnclosureSet),
+        registry.add(EnclosureDetach),
+        registry.add(EnclosureGet),
+        registry.add(EnclosureForms),
         registry.add(ViewHide),
         registry.add(ViewUnhide),
         registry.add(ViewHidden),
@@ -4427,6 +4432,64 @@ read_command!(
     crate::builtin::NoParams,
     Vec<crate::scope_boxes::ScopeBoxInfo>,
     crate::scope_boxes::list_command
+);
+
+edit_command!(
+    EnclosureCreate,
+    "enclosure.create",
+    "Create a glazed enclosure",
+    "Glazed Enclosure (ARC-GLZ-001/002): a greenhouse made of ordinary elements from a `form` (gable, \
+     multispan, venlo) on a level: `length` along the ridges from `origin` at `rotation`, `span` of each \
+     roof (Venlo: the truss width) and `spans` (Venlo: trusses; `peaks` roofs per truss), `bay`, `eave` \
+     (gutter) height, `pitch`, optional `knee` wall and `gutters`. Makes sloped-glazing roofs, curtain-wall \
+     sides and ends (the ends filling the gables), knee walls and eaves and valley gutters, and returns the \
+     enclosure.",
+    "Glazed Enclosure",
+    crate::enclosures::CreateParams,
+    crate::id::ElementId,
+    crate::enclosures::create
+);
+
+edit_command!(
+    EnclosureSet,
+    "enclosure.set",
+    "Change a glazed enclosure",
+    "Changes an enclosure's parameters (as `enclosure.create`); its parts are built again.",
+    "Edit Glazed Enclosure",
+    crate::enclosures::SetParams,
+    (),
+    crate::enclosures::set
+);
+
+edit_command!(
+    EnclosureDetach,
+    "enclosure.detach",
+    "Detach parts from their enclosure",
+    "Leaves the parts as they are, no longer rebuilt (or deleted) with their enclosure.",
+    "Detach from Enclosure",
+    crate::enclosures::DetachParams,
+    (),
+    crate::enclosures::detach
+);
+
+read_command!(
+    EnclosureGet,
+    "enclosure.get",
+    "Read a glazed enclosure",
+    "An enclosure's form and parameters, width, ridge height and floor area, and its parts by kind.",
+    crate::enclosures::GetParams,
+    crate::enclosures::Info,
+    crate::enclosures::get
+);
+
+read_command!(
+    EnclosureForms,
+    "enclosure.forms",
+    "List glazed enclosure forms",
+    "The forms `enclosure.create` takes and each one's defaults (provisional, EXPERT_REVIEW E-44).",
+    crate::builtin::NoParams,
+    Vec<crate::enclosures::FormInfo>,
+    crate::enclosures::forms
 );
 
 edit_command!(

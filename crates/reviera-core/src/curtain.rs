@@ -13,7 +13,13 @@
 //! thickness.
 //!
 //! A curtain wall drawn along a basic wall is embedded in it: it cuts its own opening through
-//! the wall (ARC-WALL-013). In IFC the curtain wall has its base line as its axis and aggregates
+//! the wall (ARC-WALL-013).
+//!
+//! **Attached tops** (`wall.attach`; ARC-GLZ-001): a curtain wall's top can follow the
+//! underside of one or more roofs over its base line (a gable end, or a multispan greenhouse's
+//! end wall under several roofs). Its grid is laid out up to the highest point of that profile;
+//! panels and mullions are clipped to it ([`CurtainPart::outline`]) and the top border mullion
+//! follows it. In IFC the curtain wall has its base line as its axis and aggregates
 //! its panels (`IfcPlate`, `CURTAIN_PANEL`) and mullions (`IfcMember`, `MULLION`).
 
 use schemars::JsonSchema;
@@ -253,6 +259,9 @@ pub struct CurtainRecipe {
     /// Panels swapped cell by cell.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub panels: Vec<PanelOverride>,
+    /// The roofs (GlobalIds) whose underside the top follows.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub attach_top: Vec<String>,
 }
 
 impl CurtainRecipe {
@@ -285,6 +294,9 @@ pub struct CurtainPart {
     pub x: [f64; 2],
     pub y: [f64; 2],
     pub z: [f64; 2],
+    /// Where an attached top clips the part: its outline in the wall's plane (along the wall,
+    /// absolute height), counter-clockwise; `None` for the plain box.
+    pub outline: Option<Vec<[f64; 2]>>,
 }
 
 /// A curtain wall as it is now.
@@ -315,6 +327,12 @@ impl CurtainGeometry {
     pub fn mesh(&self, p: &CurtainPart) -> crate::bodies::Mesh {
         let (o, u, n) = self.frame();
         let at = |x: f64, y: f64| [o[0] + u[0] * x + n[0] * y, o[1] + u[1] * x + n[1] * y];
+        if let Some(outline) = &p.outline {
+            return extrude_outline(outline, p.y, &|x, y, z| {
+                let q = at(x, y);
+                [q[0], q[1], z]
+            });
+        }
         let f = [
             at(p.x[0], p.y[0]),
             at(p.x[1], p.y[0]),
@@ -352,8 +370,13 @@ pub fn regenerate(store: &Store, e: &Element) -> Result<CurtainGeometry> {
     let r = curtain_recipe(e)
         .ok_or_else(|| Error::new("curtain.not_reviera", "not a Reviera curtain wall"))?;
     let ty = type_of(store, e);
-    let (z0, z1) = r.extent.z(store)?;
+    let (z0, mut z1) = r.extent.z(store)?;
     let length = r.curve.length();
+    // An attached top: the roofs' underside along the base line, the grid up to its highest point.
+    let profile = top_profile(store, &r, length, z1).filter(|p| p.iter().any(|q| q[1] > z0 + TOL));
+    if let Some(p) = &profile {
+        z1 = p.iter().map(|q| q[1]).fold(f64::MIN, f64::max);
+    }
     if length < crate::walls::TOL_SHORT {
         return Err(Error::new(
             "curtain.too_short",
@@ -499,6 +522,7 @@ pub fn regenerate(store: &Store, e: &Element) -> Result<CurtainGeometry> {
                     x: [x0, x1],
                     y: [-t, t],
                     z: [z0 + za, z0 + zb],
+                    outline: None,
                 });
             }
         }
@@ -510,6 +534,7 @@ pub fn regenerate(store: &Store, e: &Element) -> Result<CurtainGeometry> {
         x,
         y: [-m.depth / 2.0, m.depth / 2.0],
         z,
+        outline: None,
     };
     // Vertical mullions: the borders full height, interior lines segment by segment.
     if let Some(m) = ty.border {
@@ -535,7 +560,9 @@ pub fn regenerate(store: &Store, e: &Element) -> Result<CurtainGeometry> {
     let mut horizontals: Vec<(Option<usize>, f64, Mullion)> = Vec::new();
     if let Some(m) = ty.border {
         horizontals.push((None, m.width / 2.0, m));
-        horizontals.push((None, height - m.width / 2.0, m));
+        if profile.is_none() {
+            horizontals.push((None, height - m.width / 2.0, m));
+        }
     }
     if let Some(m) = ty.interior {
         horizontals.extend((0..nz.saturating_sub(1)).map(|j| (Some(j), zs[j + 1], m)));
@@ -556,6 +583,33 @@ pub fn regenerate(store: &Store, e: &Element) -> Result<CurtainGeometry> {
             }
         }
     }
+    if let Some(top) = &profile {
+        // Panels stop under the sloped border mullion; mullions at the profile itself.
+        let band = ty.border.map_or(0.0, |m| m.width);
+        parts = parts
+            .into_iter()
+            .filter_map(|p| {
+                let under = if p.mullion { 0.0 } else { band };
+                clip_to_profile(p, top, under)
+            })
+            .collect();
+        if let Some(m) = ty.border {
+            for w in top.windows(2) {
+                let ([xa, za], [xb, zb]) = (w[0], w[1]);
+                if xb - xa > TOL && za.max(zb) > z0 + m.width {
+                    parts.push(CurtainPart {
+                        mullion: true,
+                        panel: ty.panel,
+                        cell: [0, 0],
+                        x: [xa, xb],
+                        y: [-m.depth / 2.0, m.depth / 2.0],
+                        z: [za.min(zb) - m.width, za.max(zb)],
+                        outline: Some(vec![[xa, za - m.width], [xb, zb - m.width], [xb, zb], [xa, za]]),
+                    });
+                }
+            }
+        }
+    }
     Ok(CurtainGeometry {
         ty,
         line: r.curve,
@@ -564,6 +618,185 @@ pub fn regenerate(store: &Store, e: &Element) -> Result<CurtainGeometry> {
         v_lines,
         parts,
     })
+}
+
+/// Attaches a curtain wall's top to a roof as well as those it follows (`wall.attach`), or (with
+/// `None`) detaches it from `only` roofs or all.
+pub(crate) fn set_attached(txn: &mut crate::txn::Transaction<'_>, id: ElementId, add: Option<String>, only: Option<&[String]>) -> Result<()> {
+    let mut r = curtain_recipe(txn.store().get(id).expect("exists")).expect("a curtain wall");
+    match add {
+        Some(g) if !r.attach_top.contains(&g) => r.attach_top.push(g),
+        Some(_) => return Ok(()),
+        None => r.attach_top.retain(|g| only.is_some_and(|o| !o.contains(g))),
+    }
+    write(txn, id, &r)?;
+    if r.attach_top.is_empty() {
+        return Ok(());
+    }
+    let store = txn.store();
+    let length = r.curve.length();
+    let (_, own) = r.extent.z(store)?;
+    if top_profile(store, &r, length, own).is_none() {
+        return Err(Error::new(
+            "wall.attach_not_covered",
+            format!("curtain wall {id}: no roof it is attached to covers it"),
+        ));
+    }
+    Ok(())
+}
+
+/// The underside of the roofs a curtain wall's top is attached to, along its base line: points
+/// (distance along the wall, absolute height) where the profile bends, from 0 to `length`.
+/// Stretches no roof covers keep the wall's own top `own`. `None` when it is attached to nothing
+/// that regenerates, or no roof covers any of it.
+fn top_profile(store: &Store, r: &CurtainRecipe, length: f64, own: f64) -> Option<Vec<[f64; 2]>> {
+    // Each roof with how far below its underside the top stops: a glazed roof's bars hang
+    // below its plane by half their depth (measured square to the plane).
+    let roofs: Vec<(crate::roofs::RoofGeometry, f64)> = r
+        .attach_top
+        .iter()
+        .filter_map(|g| store.get(find(store, g)?))
+        .filter_map(|e| {
+            let g = crate::roofs::regenerate(store, e).ok()?;
+            let bars = crate::roofs::glazing::of_roof(store, e).map_or(0.0, |t| {
+                t.border.iter().chain(&t.interior).map(|m| m.depth).fold(0.0, f64::max) / 2.0
+            });
+            let steepest = g.faces.iter().map(|f| f.normal[2].abs()).fold(1.0, f64::min).max(0.1);
+            Some((g, bars / steepest))
+        })
+        .collect();
+    if roofs.is_empty() {
+        return None;
+    }
+    let (a, b) = (r.curve.start, r.curve.end);
+    let d = [(b[0] - a[0]) / length, (b[1] - a[1]) / length];
+    let at = |x: f64| [a[0] + d[0] * x, a[1] + d[1] * x];
+    // The faces are planar, so the profile bends only where the line crosses a face's edge.
+    let mut xs = vec![0.0, length];
+    for (g, _) in &roofs {
+        for f in &g.faces {
+            let ring: Vec<[f64; 2]> = f.bottom.iter().map(|q| [q[0], q[1]]).collect();
+            for k in 0..ring.len() {
+                let (p, q) = (ring[k], ring[(k + 1) % ring.len()]);
+                let e = [q[0] - p[0], q[1] - p[1]];
+                let den = d[0] * e[1] - d[1] * e[0];
+                if den.abs() < 1e-12 {
+                    continue;
+                }
+                let w = [p[0] - a[0], p[1] - a[1]];
+                let t = (w[0] * e[1] - w[1] * e[0]) / den;
+                let s = (w[0] * d[1] - w[1] * d[0]) / den;
+                if (-1e-9..=1.0 + 1e-9).contains(&s) && t > 0.0 && t < length {
+                    // Either side too, so the profile steps where a roof's cover ends.
+                    xs.extend([t - 1e-4, t, t + 1e-4].into_iter().filter(|x| *x > 0.0 && *x < length));
+                }
+            }
+        }
+    }
+    xs.sort_by(f64::total_cmp);
+    xs.dedup_by(|p, q| (*p - *q).abs() < 1e-6);
+    // Between bends a stretch is wholly covered or not: its middle tells.
+    let mids: Vec<f64> = xs.windows(2).map(|w| (w[0] + w[1]) / 2.0).collect();
+    xs.extend(mids);
+    xs.sort_by(f64::total_cmp);
+    let mut out: Vec<[f64; 2]> = Vec::new();
+    let mut covered = false;
+    let under = |x: f64| roofs.iter().filter_map(|(g, drop)| Some(g.underside(at(x))? - drop)).reduce(f64::min);
+    for x in xs {
+        // Just inside each end, so a gable wall on the roof's edge is still covered, and
+        // carried out to the end along the face.
+        let probe = x.clamp(1e-5, length - 1e-5);
+        let inward = if probe > x { 1e-5 } else { -1e-5 };
+        let z = match (under(probe), under(probe + inward)) {
+            (Some(z1), Some(z2)) if probe != x => Some(z1 + (z1 - z2) * (probe - x) / inward),
+            (z, _) => z,
+        };
+        covered |= z.is_some();
+        out.push([x, z.unwrap_or(own)]);
+    }
+    covered.then_some(out)
+}
+
+/// The profile's height at `x` (linear between its points).
+fn profile_at(top: &[[f64; 2]], x: f64) -> f64 {
+    let k = top.partition_point(|q| q[0] < x).clamp(1, top.len() - 1);
+    let ([xa, za], [xb, zb]) = (top[k - 1], top[k]);
+    if xb - xa < 1e-12 { za.min(zb) } else { za + (zb - za) * (x - xa) / (xb - xa) }
+}
+
+/// A part clipped to `under` below the profile: kept as it is when it fits, given an outline
+/// when the profile cuts it, dropped when it lies above.
+fn clip_to_profile(mut p: CurtainPart, top: &[[f64; 2]], under: f64) -> Option<CurtainPart> {
+    let limit = |x: f64| profile_at(top, x) - under;
+    let mut xs = vec![p.x[0]];
+    xs.extend(top.iter().map(|q| q[0]).filter(|x| *x > p.x[0] + TOL && *x < p.x[1] - TOL));
+    xs.push(p.x[1]);
+    if xs.iter().all(|x| limit(*x) >= p.z[1] - 1e-9) {
+        return Some(p);
+    }
+    if xs.iter().all(|x| limit(*x) <= p.z[0] + TOL) {
+        return None;
+    }
+    // Where the limit crosses the part's top or bottom, the outline bends too.
+    let mut cuts = xs.clone();
+    for w in xs.windows(2) {
+        let (fa, fb) = (limit(w[0]), limit(w[1]));
+        for level in [p.z[0], p.z[1]] {
+            if (fa - level) * (fb - level) < 0.0 {
+                cuts.push(w[0] + (w[1] - w[0]) * (level - fa) / (fb - fa));
+            }
+        }
+    }
+    cuts.sort_by(f64::total_cmp);
+    cuts.dedup_by(|a, b| (*a - *b).abs() < 1e-9);
+    // Only the stretch where the part stands above its bottom.
+    let tops: Vec<[f64; 2]> = cuts.iter().map(|x| [*x, limit(*x).clamp(p.z[0], p.z[1])]).collect();
+    let first = tops.iter().position(|q| q[1] > p.z[0] + 1e-9)?;
+    let last = tops.iter().rposition(|q| q[1] > p.z[0] + 1e-9)?;
+    let (from, to) = (first.saturating_sub(1), (last + 1).min(tops.len() - 1));
+    let run = &tops[from..=to];
+    let mut outline = vec![[run[0][0], p.z[0]], [run[run.len() - 1][0], p.z[0]]];
+    outline.extend(run.iter().rev().copied());
+    outline.dedup_by(|a, b| (a[0] - b[0]).abs() < 1e-9 && (a[1] - b[1]).abs() < 1e-9);
+    let area = outline.iter().zip(outline.iter().cycle().skip(1)).map(|(a, b)| a[0] * b[1] - b[0] * a[1]).sum::<f64>() / 2.0;
+    if area.abs() < 1e-6 {
+        return None;
+    }
+    p.x = [run[0][0], run[run.len() - 1][0]];
+    p.z[1] = run.iter().map(|q| q[1]).fold(p.z[0], f64::max);
+    p.outline = Some(outline);
+    Some(p)
+}
+
+/// A closed mesh of an outline in a wall's plane (along, up), between two depths through it;
+/// `at` places (along, through, up) in the project.
+fn extrude_outline(outline: &[[f64; 2]], y: [f64; 2], at: &dyn Fn(f64, f64, f64) -> [f64; 3]) -> crate::bodies::Mesh {
+    let n = outline.len();
+    let mut tris: Vec<u32> = Vec::new();
+    earcut::Earcut::new().earcut(outline.iter().copied(), &[], &mut tris);
+    let mut positions: Vec<[f64; 3]> = outline.iter().map(|q| at(q[0], y[0], q[1])).collect();
+    positions.extend(outline.iter().map(|q| at(q[0], y[1], q[1])));
+    let ccw = outline.iter().zip(outline.iter().cycle().skip(1)).map(|(a, b)| a[0] * b[1] - b[0] * a[1]).sum::<f64>() > 0.0;
+    let mut indices: Vec<u32> = Vec::new();
+    let nn = n as u32;
+    for t in tris.chunks(3) {
+        // The face at y[0] looks toward -y, the one at y[1] toward +y.
+        let (a, b, c) = (t[0], t[1], t[2]);
+        if ccw {
+            indices.extend([a, b, c, a + nn, c + nn, b + nn]);
+        } else {
+            indices.extend([a, c, b, a + nn, b + nn, c + nn]);
+        }
+    }
+    for k in 0..nn {
+        let j = (k + 1) % nn;
+        if ccw {
+            indices.extend([k, j + nn, j, k, k + nn, j + nn]);
+        } else {
+            indices.extend([k, j, j + nn, k, j + nn, k + nn]);
+        }
+    }
+    (positions, indices)
 }
 
 /// Every Reviera curtain wall that regenerates.
@@ -703,6 +936,7 @@ pub(crate) fn create(txn: &mut crate::txn::Transaction<'_>, p: CreateParams) -> 
         grids: Vec::new(),
         removed: Vec::new(),
         panels: Vec::new(),
+        attach_top: Vec::new(),
     };
     let guid = store.get(type_id).expect("resolved").guid().to_string();
     let id = txn.create(

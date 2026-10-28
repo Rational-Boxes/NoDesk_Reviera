@@ -288,3 +288,61 @@ fn manual_grid_lines_segments_and_doors() {
     .unwrap();
     assert!(g(&doc).v_lines.is_empty());
 }
+
+/// A gable roof over x 0..10 m, `y0`..`y0 + 6`, its long sides sloping at 30° from a 3 m plate.
+fn gable(r: &CommandRegistry, doc: &mut Document, level: ElementId, y0: f64) -> ElementId {
+    let outer = [[0.0, y0], [10.0, y0], [10.0, y0 + 6.0], [0.0, y0 + 6.0]];
+    let curves: Vec<Value> = (0..4)
+        .map(|i| json!({ "line": { "start": outer[i], "end": outer[(i + 1) % 4] }, "defines_slope": i % 2 == 0 }))
+        .collect();
+    id(run(r, doc, "roof.create_footprint", json!({ "curves": curves, "level_id": level.0, "base_offset": 3.0, "slope": "30°" })).unwrap())
+}
+
+#[test]
+fn a_curtain_wall_attached_to_roofs_fills_the_gables() {
+    let dir = tempfile::tempdir().unwrap();
+    let (_project, mut doc) = LocalProject::new(Schema::Ifc4, &dir.path().join("g.ifc")).unwrap();
+    let r = registry();
+    let l1 = doc.store().iter().find(|e| e.class == "IfcBuildingStorey").unwrap().id();
+    // Two spans side by side, as a gutter-connected greenhouse: one end wall under both.
+    let a = gable(&r, &mut doc, l1, 0.0);
+    let b = gable(&r, &mut doc, l1, 6.0);
+    let cw = id(run(&r, &mut doc, "curtain.create", json!({
+        "curve": { "start": [0, 0], "end": [0, 12] }, "base_level": l1.0, "top_constraint": { "unconnected": 3.0 },
+    })).unwrap());
+    let roof_under = |doc: &Document, roof: ElementId, p: [f64; 2]| {
+        reviera_core::roofs::regenerate(doc.store(), doc.store().get(roof).unwrap()).unwrap().underside(p).unwrap()
+    };
+    let ridge = roof_under(&doc, a, [0.001, 3.0]);
+    let valley = roof_under(&doc, a, [0.001, 6.0]);
+    assert!(ridge > valley + 1.5, "{ridge} {valley}");
+    for roof in [a, b] {
+        run(&r, &mut doc, "wall.attach", json!({ "wall_ids": [cw.0], "target_id": roof.0 })).unwrap();
+    }
+    let g = curtain::regenerate(doc.store(), doc.store().get(cw).unwrap()).unwrap();
+    // Laid out up to the ridges, every part under the roofs' underside.
+    assert!((g.z[1] - ridge).abs() < 1e-6, "{:?} vs {ridge}", g.z);
+    let profile = |y: f64| roof_under(&doc, if y < 6.0 { a } else { b }, [0.001, y.clamp(0.001, 11.999)]);
+    let clipped = g.parts.iter().filter(|p| p.outline.is_some()).count();
+    assert!(clipped > 4, "the gables clip panels and mullions: {clipped}");
+    for p in &g.parts {
+        let points: Vec<[f64; 2]> = p.outline.clone().unwrap_or_else(|| vec![[p.x[0], p.z[1]], [p.x[1], p.z[1]]]);
+        for q in points {
+            assert!(q[1] <= profile(q[0]) + 1e-6, "part {p:?} pokes through the roof at {q:?}");
+        }
+        let (pos, idx) = g.mesh(p);
+        assert!(!pos.is_empty() && idx.len() % 3 == 0 && idx.len() >= 36);
+    }
+    // Some glass reaches up near the ridge, and none stands over the valley's height there.
+    assert!(g.parts.iter().any(|p| !p.mullion && p.z[1] > ridge - 0.3), "glass up into the gable");
+    // Detached, it is a plain 3 m wall again.
+    run(&r, &mut doc, "wall.detach", json!({ "wall_ids": [cw.0] })).unwrap();
+    let g = curtain::regenerate(doc.store(), doc.store().get(cw).unwrap()).unwrap();
+    assert!((g.z[1] - 3.0).abs() < 1e-9 && g.parts.iter().all(|p| p.outline.is_none()));
+    // A wall the roofs do not cover is refused.
+    let out = id(run(&r, &mut doc, "curtain.create", json!({
+        "curve": { "start": [20, 0], "end": [20, 6] }, "base_level": l1.0, "top_constraint": { "unconnected": 3.0 },
+    })).unwrap());
+    let err = run(&r, &mut doc, "wall.attach", json!({ "wall_ids": [out.0], "target_id": a.0 })).unwrap_err();
+    assert!(format!("{err:?}").contains("wall.attach_not_covered"), "{err:?}");
+}

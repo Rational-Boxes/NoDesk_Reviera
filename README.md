@@ -1695,7 +1695,11 @@ area by area (reviewed against the spec on 2026-10-15).
   louvres, baffles and other shading devices with sun-tracking control, atriums with smoke and
   stack-ventilation checks, HVAC, energy and structural load modelling, residential forms, and
   building-code rule sets for the US, UK, Canada, EU, Australia and New Zealand. Specified (phase
-  1), not built yet.
+  1). **Built so far:** the Glazed Enclosure tool (Architecture › Build) with the gable,
+  gutter-connected multispan and Venlo forms, of sloped-glazing roofs, glass curtain walls (end
+  walls attached to the roofs, filling the gables), knee walls and gutters, edited in Properties
+  (`enclosure.*`); the `greenhouses` sample. Curtain walls' tops attach to one or more roofs
+  (`wall.attach`).
 - **FileEngine integration** (`design_documents/FILEENGINE_INTEGRATION.md`): open, save and
   version models on the owner's FileEngine server through its REST API; BCF issues through its
   BCF and discussion services; publishing reports and exports to it, with share links made in

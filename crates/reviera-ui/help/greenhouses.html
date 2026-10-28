@@ -1,0 +1,51 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Copyright (C) 2026 Reviera contributors -->
+<h1>Greenhouses and glazed enclosures</h1>
+<p class="lead">A glazed enclosure is one element that lays out a whole greenhouse from a form and
+a few sizes: glass roofs, glass walls, knee walls and gutters, all ordinary Reviera elements. Change
+a size and its parts are made again.</p>
+<p class="see">See it in the <a href="reviera:sample/greenhouses">Greenhouses</a> sample (a Venlo
+range, a gutter-connected range and a hobby greenhouse), with its
+<a href="reviera:help/walkthrough-greenhouses">walkthrough</a>.</p>
+
+<h2 id="make">Making one</h2>
+<ol>
+  <li>Open a plan of the level it stands on and click <b>Architecture › Build › Glazed
+    Enclosure</b> <a class="run" href="reviera:action/enclosure.create">Glazed Enclosure</a>.</li>
+  <li>Choose the form and type its sizes. Blank fields keep the form's usual values.</li>
+  <li>Leave <i>Place by clicking</i> ticked and click its corner, then a point the length runs
+    toward; or untick it to place it at the origin.</li>
+</ol>
+
+<h2 id="forms">Forms</h2>
+<table>
+  <tr><td><b>Gable</b></td><td>One span with two roof slopes and glazed gable ends.</td></tr>
+  <tr><td><b>Gutter-connected multispan</b></td><td>Several gable spans side by side, a valley
+    gutter between each pair.</td></tr>
+  <tr><td><b>Venlo</b></td><td>A glass range of trusses, each carrying two (or more) narrow
+    roofs. Type the truss width and the number of trusses.</td></tr>
+</table>
+<p>The sizes: the length along the ridges, the span (or truss width), the number of spans (or
+trusses), the bay spacing, the eave (gutter) height, the roof pitch, and an optional knee wall
+under the glass. The usual values are provisional and listed for expert review.</p>
+
+<h2 id="parts">What it is made of</h2>
+<ul>
+  <li><b>Roofs</b>: one sloped-glazing roof per span, of <i>Greenhouse Roof Glass</i> (1,125 mm
+    panes on 40 × 80 mm bars).</li>
+  <li><b>Walls</b>: curtain walls of <i>Greenhouse Wall Glass</i> (800 mm panes). The end walls
+    are attached to every roof, so their glass rises into the gables; any curtain wall can be
+    attached to roofs this way with <b>Attach Top</b> (<code>wall.attach</code>).</li>
+  <li><b>Knee walls</b> when a height is set.</li>
+  <li><b>Gutters</b> on the outer eaves and between the spans, laid level.</li>
+</ul>
+<p>Select the enclosure, or any of its parts, and Properties › <b>Glazed Enclosure</b> shows its
+form and sizes, its ridge height and floor area. Editing a size makes the parts again, so edits
+made to a part by hand are lost; <code>enclosure.detach</code> keeps a part as it is.</p>
+<p><code>enclosure.create</code>, <code>enclosure.set</code>, <code>enclosure.get</code>,
+<code>enclosure.detach</code>, <code>enclosure.forms</code></p>
+
+<h2 id="later">Coming later</h2>
+<p>Hoop, gothic and sawtooth forms; glazed vaults and geodesic domes; frame members, doors and
+vents; growing layouts; shading devices; atriums; heating, cooling and energy analysis of the
+enclosure; residential conservatories and orangeries; and building-code checks.</p>

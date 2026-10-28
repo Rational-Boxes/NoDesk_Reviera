@@ -2736,13 +2736,15 @@ Owner requirement (2026-10-28), planned in `GLAZED_ENCLOSURES_PLAN.md`, research
 
 **Data (IFC mapping).** The enclosure is an `IfcElementAssembly` with `PredefinedType = USERDEFINED` and `ObjectType = GlazedEnclosure` aggregating its parts (`IfcRelAggregates`), in category `cat.glazed_enclosures`. Its form and parameters are RXD element data (`recipe.enclosure`) and the user-visible design values are the `Reviera_EnclosureDesign` property set (ARC-GLZ-007). Parts keep their own IFC classes.
 
-**Commands.** `enclosure.create(form, footprint | host_wall_ids, level_id, params) -> element_id`, `enclosure.set(enclosure_id, params) -> ()`, `enclosure.get(enclosure_id) -> {form, params, parts[]}`, `enclosure.detach(part_ids[]) -> ()`, `enclosure.forms() -> [{form, params schema, defaults}]`.
+**Commands.** `enclosure.create(form, footprint | host_wall_ids, level_id, params) -> element_id` (built: `form`, `level_id`, `origin`, `rotation`, `length`, `span`, `spans`, `peaks`, `bay`, `eave`, `pitch`, `knee`, `gutters`), `enclosure.set(enclosure_id, params) -> ()`, `enclosure.get(enclosure_id) -> {form, params, parts[]}`, `enclosure.detach(part_ids[]) -> ()`, `enclosure.forms() -> [{form, params schema, defaults}]`.
 
 **Acceptance criteria.**
 - [ ] A 9.6 m × 20 m gable greenhouse at 22° with 4 m bays and a 4.5 m eave height creates knee-less glazed side walls, a sloped-glazing gable roof, posts and rafters at each bay, two eaves gutters with downspouts, and gable ends with a double door, as one undo step.
 - [ ] Changing the bay spacing to 3.2 m regenerates the posts, rafters and glazing grid; a door moved 2 m along the gable end stays where it was moved.
 - [ ] A detached gutter is not changed when the enclosure's eave height changes.
 - [ ] `enclosure.create` from Lua and from MCP makes the same enclosure as the dialog.
+
+*Built (2026-10-28), first part:* `reviera_core::enclosures` with the gable, multispan and Venlo forms (ARC-GLZ-002), on a level from a typed corner and direction or two clicks in a plan (Architecture › Build › Glazed Enclosure), and Properties › Glazed Enclosure editing the sizes. Parts: sloped-glazing roofs per span of *Greenhouse Roof Glass*; curtain walls of *Greenhouse Wall Glass*, the end walls attached to every span's roof (**curtain walls' tops attach to roofs**, `wall.attach`, several roofs at once, panels and mullions clipped to the roof line, stopping under a glazed roof's bars; uncovered stretches keep the wall's own top); knee walls; level gutters on the outer eaves and in each valley, the roofs stopping half a gutter's width short of a valley so the gutter sits between them, and the outer eaves overhanging the side glass by half a bar. `enclosure.create`, `.set`, `.get`, `.detach`, `.forms`; category `cat.glazed_enclosures`. Not yet: frame members, doors, vents, the headhouse, keeping a part's own edits on regeneration (a change rebuilds every part), Detach from Enclosure in the menu, and the other forms. Sample: `greenhouses`.
 
 ### 3.6a.2 Commercial greenhouse forms
 **ID:** ARC-GLZ-002 · **Priority:** P1 · **Ref:** owner requirement (2026-10-28); research/09 §1.1, §2
@@ -2768,7 +2770,7 @@ Owner requirement (2026-10-28), planned in `GLAZED_ENCLOSURES_PLAN.md`, research
 - Minimum roof pitch for glazed roofs is checked against the glazing type's minimum (ARC-GLZ-003) and the condensate-drip guideline (E-45).
 
 **Acceptance criteria.**
-- [ ] A Venlo range of 6 trusses × 8.0 m and 20 bays × 4.0 m gives 12 roof peaks, 5 internal valley gutters and 2 eaves gutters, a total footprint of 48 × 80 m, and an IFC export in which each roof span is an `IfcRoof` GABLE_ROOF aggregated by the enclosure.
+- [ ] A Venlo range of 6 trusses × 8.0 m and 20 bays × 4.0 m gives 12 roof peaks, 11 valley gutters (one between each pair of roofs) and 2 eaves gutters, a total footprint of 48 × 80 m, and an IFC export in which each roof span is an `IfcRoof` GABLE_ROOF aggregated by the enclosure.
 - [ ] A 9.1 m hoop tunnel on 1.2 m sidewalls with hoops at 1.5 m along 30 m has 21 hoops and a crown height of 5.75 m.
 - [ ] A gothic arch of the same width has a pointed crown and more height at 1 m from the sides than the hoop.
 

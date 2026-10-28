@@ -40,6 +40,7 @@ pub mod datum_extents;
 pub mod decks;
 pub mod document;
 pub mod dormers;
+pub mod enclosures;
 pub mod element;
 pub mod error;
 pub mod floors;

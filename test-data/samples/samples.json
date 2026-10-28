@@ -13,6 +13,19 @@
     ]
   },
   {
+    "name": "greenhouses",
+    "title": "Greenhouses",
+    "group": "Architecture",
+    "steps": [
+      {
+        "command": "script.run",
+        "args": {
+          "file": "greenhouses.lua"
+        }
+      }
+    ]
+  },
+  {
     "name": "observatory",
     "title": "Observatory",
     "group": "Architecture",

@@ -2448,6 +2448,12 @@ icon = "winder_stair"
 help = "Draw an L-shaped winder stair in a plan: click the start of its walking line, its corner, then the side it turns to"
 
 [[action]]
+id = "enclosure.create"
+label = "Glazed Enclosure"
+icon = "sloped_glazing"
+help = "A greenhouse: gable, gutter-connected multispan or Venlo, of glazed roofs and walls, knee walls and gutters"
+
+[[action]]
 id = "dormer.create"
 label = "Dormer"
 icon = "dormer"
@@ -3291,6 +3297,7 @@ tools = [
   { action = "roof.create_arched", size = "small" },
   { action = "roof.create_dome", size = "small" },
   { action = "roof.create_extrusion", size = "small" },
+  { action = "enclosure.create", size = "large" },
 ]
 
 [[tab.panel]]
@@ -4509,7 +4516,7 @@ items = [
   "wall.create", "curtain.create", "door.place", "window.place", "column.place_architectural", "floor.create", "floor.edit_boundary",
   "ceiling.create", "ceiling.edit_boundary", "roof.create_footprint", "roof.edit_footprint", "-",
   "room.place", "room.place_automatically", "-",
-  "roof.create_extrusion", "slabedge.create", "-",
+  "roof.create_extrusion", "slabedge.create", "enclosure.create", "-",
   "opening.create_wall", "opening.create_vertical", "opening.create_by_face", "opening.create_shaft", "-",
   "grid.create", "level.create", "refplane.create", "modelline.create", "-",
   "workplane.set", "workplane.show",

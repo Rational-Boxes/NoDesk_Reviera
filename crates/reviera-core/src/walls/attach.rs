@@ -324,6 +324,11 @@ pub(crate) fn attach(txn: &mut crate::txn::Transaction<'_>, p: AttachParams) -> 
             .resolve(r)
             .ok_or_else(|| Error::new("element.not_found", "no such wall"))?;
         crate::modify::check_unpinned(&store, id)?;
+        // A curtain wall follows every roof it is attached to (a multispan's end wall).
+        if store.get(id).and_then(crate::curtain::curtain_recipe).is_some() {
+            crate::curtain::set_attached(txn, id, Some(guid.clone()), None)?;
+            continue;
+        }
         set_target(txn, id, Some(guid.clone()))?;
         ids.push(id);
     }
@@ -543,6 +548,10 @@ pub(crate) fn detach(txn: &mut crate::txn::Transaction<'_>, p: DetachParams) -> 
             .resolve(r)
             .ok_or_else(|| Error::new("element.not_found", "no such wall"))?;
         crate::modify::check_unpinned(&store, id)?;
+        if store.get(id).and_then(crate::curtain::curtain_recipe).is_some() {
+            crate::curtain::set_attached(txn, id, None, only.as_deref())?;
+            continue;
+        }
         let current = store
             .get(id)
             .and_then(super::wall_recipe)

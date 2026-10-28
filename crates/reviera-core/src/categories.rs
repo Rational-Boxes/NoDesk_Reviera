@@ -531,6 +531,15 @@ pub const CATEGORIES: &[Category] = &[
         None,
         true,
     ),
+    // Reviera-defined (ARC-GLZ-007): an IfcElementAssembly with ObjectType GlazedEnclosure.
+    cat(
+        "cat.glazed_enclosures",
+        "Glazed Enclosures",
+        Some("IfcElementAssembly"),
+        Some("IfcElementAssemblyType"),
+        None,
+        true,
+    ),
 ];
 
 pub fn category(key: &str) -> Option<&'static Category> {
@@ -578,6 +587,9 @@ pub fn above_cut(e: &Element) -> AboveCut {
 }
 
 pub fn category_of(e: &Element) -> Option<&'static Category> {
+    if crate::enclosures::recipe(e).is_some() {
+        return category("cat.glazed_enclosures");
+    }
     if crate::grids::is_grid(e) || crate::grids::is_grid_type(e) {
         return category("cat.grids");
     }

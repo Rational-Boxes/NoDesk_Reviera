@@ -877,3 +877,30 @@ fn hiding_an_element_in_a_view_hides_its_tags_there() {
     let other = store(&app).iter().filter(|e| reviera_core::views::is_view(e) && e.id() != ElementId(plan)).map(|e| e.id()).collect::<Vec<_>>();
     assert!(other.iter().all(|v| reviera_core::view_hiding::hidden_in(&store(&app), Some(*v)).is_empty()));
 }
+
+#[test]
+fn the_greenhouses_sample_keeps_its_enclosures() {
+    let work = tempfile::tempdir().unwrap();
+    let mut app = open(work.path(), "greenhouses");
+    let s = store(&app);
+    let enclosures: Vec<_> = s.iter().filter_map(|e| reviera_core::enclosures::recipe(e).map(|r| (e.id(), r))).collect();
+    assert_eq!(enclosures.len(), 3);
+    let mut seen = Vec::new();
+    for (id, r) in &enclosures {
+        let info = ok(&mut app, "enclosure.get", json!({ "enclosure_id": id }));
+        let n = |k: &str| info[k].as_array().map_or(0, Vec::len);
+        seen.push((r.form, n("roofs"), n("curtain_walls"), n("walls"), n("gutters")));
+        // Every part is still there and names its enclosure.
+        assert_eq!(n("roofs") + n("curtain_walls") + n("walls") + n("gutters"), r.parts.len(), "{info}");
+    }
+    seen.sort_by_key(|s| s.1);
+    use reviera_core::enclosures::Form;
+    assert_eq!(seen, vec![(Form::Gable, 1, 4, 0, 2), (Form::Multispan, 3, 4, 0, 4), (Form::Venlo, 6, 4, 4, 7)]);
+    // The Venlo's end walls rise into its gables.
+    let venlo = enclosures.iter().find(|(_, r)| r.form == Form::Venlo).unwrap();
+    let ends: Vec<_> = s.iter().filter(|e| reviera_core::curtain::curtain_recipe(e).is_some_and(|c| !c.attach_top.is_empty())).filter(|e| reviera_core::enclosures::enclosure_of(e) == Some(s.get(venlo.0).unwrap().guid().as_str())).collect();
+    assert_eq!(ends.len(), 2);
+    let g = reviera_core::curtain::regenerate(&s, ends[0]).unwrap();
+    // Up under the ridges (5.5 m + 2 m × tan 22°), short of them by the roof's glazing bars.
+    assert!(g.z[1] > venlo.1.ridge() - 0.1 && g.z[1] < venlo.1.ridge(), "{:?} vs ridge {}", g.z, venlo.1.ridge());
+}

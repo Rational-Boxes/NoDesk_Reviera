@@ -28,6 +28,7 @@ mod datum_tools;
 mod decks;
 mod dims;
 mod dormers;
+mod enclosures_ui;
 mod drawing_aids;
 mod footprint;
 mod foundations;
@@ -327,6 +328,7 @@ struct Gui {
     stair_tool: Option<stairs::StairTool>,
     /// The Dormer tool.
     dormer_tool: Option<dormers::DormerTool>,
+    enclosure_tool: Option<enclosures_ui::EnclosureTool>,
     /// The Railing tool.
     railing_tool: Option<railings::RailingTool>,
     /// The Duct or Pipe tool (MEP-DUCT-001, MEP-PIPE-001).
@@ -1465,6 +1467,7 @@ impl Gui {
         self.end_legend_tool();
         self.end_stair_tool();
         self.end_dormer_tool();
+        self.end_enclosure_tool();
         self.end_railing_tool();
         self.end_run_tool();
         self.end_feature_tool();
@@ -1514,7 +1517,7 @@ impl Gui {
         if self.stair_tool.is_some() {
             return self.stair_escape();
         }
-        if self.end_dormer_tool() {
+        if self.end_dormer_tool() || self.end_enclosure_tool() {
             return frame.set_status_text("Ready", 0);
         }
         if self.railing_tool.is_some() {
@@ -1608,6 +1611,7 @@ impl Gui {
             || self.note_tool.is_some()
             || self.stair_tool.is_some()
             || self.dormer_tool.is_some()
+            || self.enclosure_tool.is_some()
             || self.railing_tool.is_some()
             || self.run_tool.is_some()
             || self.feature_tool.is_some()
@@ -1708,6 +1712,8 @@ impl Gui {
             self.stair_click(x, y);
         } else if self.dormer_tool.is_some() {
             self.dormer_click(x, y, p);
+        } else if self.enclosure_tool.is_some() {
+            self.enclosure_click(x, y);
         } else if self.railing_tool.is_some() {
             self.railing_click(x, y);
         } else if self.run_tool.is_some() {
@@ -2593,6 +2599,7 @@ impl Gui {
         }
         // A dormer's parts show the dormer's own rows, which rebuild it.
         self.dormer_rows(grid, id);
+        self.enclosure_rows(grid, id);
         if is_grid {
             let current = self
                 .app
@@ -2960,6 +2967,7 @@ impl Gui {
             || self.sketch_edit(property, text.clone())
             || self.stair_edit(property, text.clone())
             || self.dormer_edit(property, text.clone())
+            || self.enclosure_edit(property, text.clone())
             || self.curved_roof_edit(property, text.clone())
             || self.deck_edit(property, text.clone())
         {
@@ -3821,6 +3829,7 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 jobs_polled: None,
                 stair_tool: None,
                 dormer_tool: None,
+                enclosure_tool: None,
                 railing_tool: None,
                 run_tool: None,
                 feature_tool: None,
@@ -5049,6 +5058,7 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
             g.start_feature_tool(railings::FeatureKind::Gate { leaves: 2 });
             focus(g);
         }),
+        "enclosure.create" => with(gui, Gui::enclosure_dialog),
         "dormer.create" => with(gui, |g| {
             g.start_dormer_tool();
             focus(g);

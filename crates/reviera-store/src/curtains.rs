@@ -26,7 +26,7 @@ fn signature(g: &CurtainGeometry, scale: f64) -> String {
     for p in &g.parts {
         p.mullion.hash(&mut h);
         (p.panel as u8).hash(&mut h);
-        for v in p.x.iter().chain(&p.y).chain(&p.z) {
+        for v in p.x.iter().chain(&p.y).chain(&p.z).chain(p.outline.iter().flatten().flatten()) {
             v.to_bits().hash(&mut h);
         }
     }
@@ -120,16 +120,21 @@ pub(crate) fn write_curtains(
             if ifc4 {
                 ifc.set_attribute(e, "PredefinedType", &AttrValue::Enum(predefined.into()))?;
             }
-            let (points, _) = g.mesh(p);
-            // The box's eight corners: bottom ring then top ring.
-            let faces = vec![
-                vec![3, 2, 1, 0],
-                vec![4, 5, 6, 7],
-                vec![0, 1, 5, 4],
-                vec![1, 2, 6, 5],
-                vec![2, 3, 7, 6],
-                vec![3, 0, 4, 7],
-            ];
+            let (points, triangles) = g.mesh(p);
+            // A box's eight corners: bottom ring then top ring; a part clipped by an attached
+            // top (ARC-GLZ-001) by its mesh's triangles.
+            let faces = if p.outline.is_some() {
+                triangles.chunks(3).map(|t| t.iter().map(|i| *i as usize).collect()).collect()
+            } else {
+                vec![
+                    vec![3, 2, 1, 0],
+                    vec![4, 5, 6, 7],
+                    vec![0, 1, 5, 4],
+                    vec![1, 2, 6, 5],
+                    vec![2, 3, 7, 6],
+                    vec![3, 0, 4, 7],
+                ]
+            };
             geometry::write_breps(
                 ifc,
                 e,

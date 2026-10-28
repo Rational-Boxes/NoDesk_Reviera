@@ -40,6 +40,11 @@ pub enum Effect {
 /// Domains reserved for Reviera's own commands; add-in commands cannot use them (DM-CMD-002).
 pub const RESERVED_DOMAINS: &[&str] = &[
     "ui",
+    "enclosure",
+    "glazing",
+    "frame",
+    "growing",
+    "vent",
     "view",
     "sheet",
     "schedule",
