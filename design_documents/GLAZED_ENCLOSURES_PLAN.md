@@ -1,0 +1,234 @@
+# Glazed enclosures: greenhouses, solariums and atriums
+
+**Status:** Draft 0.1 · 2026-10-28 · a plan for the owner's review (questions in §10). Nothing here
+is built yet; the spec sections follow once the plan is agreed.
+**Owner's requests (2026-10-28):** "a bespoke greenhouse and solarium set of tools"; "integrating
+the existing tools for the greenhouse specialization"; "also suitable for large integrated
+atriums in offices, hotels, etc."; "with calculations on HVAC, energy, etc. impacts"; "louvres,
+baffles, etc. for advanced sunlight management".
+**Research:** `research/09_greenhouses_solariums.md` (sources G001–G087) and
+`research/10_atriums_solar_shading.md` (sources A001–…), both public sources only and logged in
+`RESEARCH_LOG.md`. Source IDs are cited in square brackets.
+
+---
+
+## 1. What the toolset is for
+
+One family of tools for **glazed enclosures**: rooms and buildings whose roof, and often walls,
+are mostly glass or clear plastic. They share one structure (a light frame carrying glazing,
+gutters and vents) and one set of problems (heat gained and lost through glass, light,
+ventilation, condensation, snow and wind on a light frame, safety glazing), so one toolset can
+serve:
+
+- **Greenhouses:** hobby houses, lean-tos, tunnels and commercial ranges.
+- **Solariums, sunrooms and conservatories** on houses, and **orangeries** with roof lanterns.
+- **Atriums:** glazed courtyards and streets inside offices, hotels, malls and hospitals.
+
+Each tool is built from Reviera's existing elements, not a parallel set of them. A greenhouse made
+with the new tool is made of ordinary walls, sloped-glazing roofs, curtain walls, gutters, doors
+and railings, which every other tool, schedule, analysis and IFC export already understands. The
+new part is the **enclosure**: one element that knows the form and its parameters, lays out its
+parts, keeps them consistent when a parameter changes, and runs the checks and analyses that
+apply to glazed rooms.
+
+## 2. What Reviera already has
+
+| Need | Existing tool | Status |
+|---|---|---|
+| Glazed roof planes | Sloped glazing: a roof of a Sloped Glazing type becomes panels and mullions (ARC-CW-008) | Built |
+| Vertical glazing, doors in it | Curtain walls, grids, curtain doors (ARC-CW-001…006) | Built |
+| Curved roofs | Arched and vaulted roofs, tapering vaults (ARC-ROOF-008); domes (ARC-ROOF-009) | Built (solid; not glazed yet) |
+| Roof planes, eaves | Footprint and extrusion roofs, eaves bearing (ARC-ROOF-001, -010) | Built |
+| Knee (dwarf) walls | Walls, wall tops attaching to roofs | Built |
+| Gutters, downspouts, sizing | Gutters and outlets, sized against draining roof area (MEP-PIPE-010) | Built |
+| Decks, railings, cresting-like rails | Decks, railings, gates (ARC-…, 3.7.7–3.7.8b) | Built |
+| Members | Structural framing, columns, connections | Built |
+| Components (benches, fans, heaters) | Component Libraries, mesh objects | Built |
+| Heating and cooling loads | Design-day loads, run as jobs (ANA-HCL-001, ANA-ENV-004) | Built; sloped roof areas missing from the energy model |
+| Annual energy | Hourly lumped model; EnergyPlus provider (ANA-ENV-005, -007) | Built; no shading devices |
+| Daylight, sun | Daylight factor; solar studies on faces (ANA-LIGHT-002, ANA-SOLAR-001) | Built |
+| Remote compute | Heavy runs as compute jobs (DM-RPC-011) | Built |
+
+So the plan is mostly integration: one enclosure tool driving these, a glazing and frame type
+library, vents and shading devices, and analyses that know about glass.
+
+## 3. The Glazed Enclosure tool
+
+**Architecture › Glazed Enclosure** (and `enclosure.create`): choose a form, draw or pick its
+footprint (sketch, pick walls of the host building, or typed corners, as every tool takes), and
+set its parameters in a dialog with a live preview. The enclosure then owns its parts:
+
+- **Parts it lays out:**
+  - knee walls (a wall type and height, or none);
+  - the glazed roof: sloped-glazing roof planes, or a glazed arch, gothic arch or dome;
+  - glazed walls as curtain walls;
+  - corner and ridge posts, rafters or glazing bars, purlins, ridge and eaves beams, as structural
+    members or as the glazing system's mullions;
+  - gutters and downspouts on the eaves, internal valley gutters in multispans;
+  - doors in the glazed walls;
+  - vents (§5), and optionally cresting and finials.
+- **Edits:** changing a parameter regenerates the parts and keeps the user's edits to them where it
+  can (a door moved along a wall, a changed panel type). A part can be **detached** to edit it
+  freely; the enclosure then leaves it alone.
+- **Grips:** in plans and 3D, the footprint edges, the eaves and ridge heights, and the facet count
+  of a Victorian end.
+
+### 3.1 Forms
+
+| Form | Roof | Typical values to start from | IFC roof type |
+|---|---|---|---|
+| Lean-to | One slope against a host wall | 10° roof, 600 mm dwarf wall [G072]; 2.5°–30° range [G048] | SHED_ROOF |
+| Gable (even span) | Two slopes, gable ends | 4:12–6:12 (18°–27°) [G002] | GABLE_ROOF |
+| Uneven span | Two slopes, own pitch each | as gable [G067] | GABLE_ROOF |
+| Edwardian / Georgian | Hipped, square front | as gable [G052] | HIP_ROOF |
+| Victorian | Hipped with a 3- or 5-facet bay end | 3 or 5 facets [G052] | HIP_ROOF |
+| P-shape, T-shape | Combinations of the above | [G052] | (aggregate) |
+| Orangery | Flat perimeter with a roof lantern | perimeter ≥ 400 mm; lantern 25° on a ≥ 150 mm kerb [G050, G051] | FLAT_ROOF + PAVILION_ROOF |
+| Hoop / Quonset tunnel | Half-round or raised-sidewall arch | 6–9 m wide, hoops at 1.2–1.8 m [G004, G069] | BARREL_ROOF |
+| Gothic arch | Pointed arch | as hoop [G070] | RAINBOW_ROOF |
+| Gutter-connected multispan | Repeated gable or arch bays sharing gutters | gutter height 4.3–4.9 m [G005] | GABLE_ROOF / BARREL_ROOF per bay |
+| Venlo | Narrow-roof glass multispan | ≈22° pitch, 4 m bays, 6.4/8/12 m trusses [G006, G007, G009] | GABLE_ROOF |
+| Sawtooth | Serrated multispan with vertical vents | [G003, G059] | (per bay) |
+| Dome / geodesic | Faceted dome | 2V, 3V, 4V frequency [G060] | DOME_ROOF |
+| Atrium roof | Over a courtyard between building wings | §6 | by form |
+
+Defaults are the research's typical values and go in `EXPERT_REVIEW.md` for an expert to confirm
+(the minimum glazed pitch especially: 2.5° system minimum, 5° for polycarbonate run-off, about 10°
+against condensate drip [G048, G034, G043]).
+
+### 3.2 Glazing and frame types
+
+A library of **glazing build-ups**, each with its light transmission, U-value, solar heat gain
+coefficient (g-value), safety class and weight: horticultural float, toughened, laminated, low-e
+double and triple units, twin- and multiwall polycarbonate, acrylic, and single or inflated double
+polyethylene film [§3 of research 09]. Optical values go in `Pset_MaterialOptical` on the material;
+the safety class and polycarbonate wall structure, which IFC has no property for on plates, go in
+a Reviera property set [G056 et al.].
+
+**Frame types:** aluminium glazing-bar systems, galvanised steel tube, timber and uPVC, each with
+member sections and the deflection limits that apply (for example L/60, or L/175 per lite where a
+member carries glass edges, for U.S. sunroom aluminium [§5.2]).
+
+## 4. Interior: growing and use
+
+- **Benches and aisles:** a layout tool that fills the floor with benches of a chosen width and
+  aisles between them (Component Library benches), reporting growing area against floor area.
+- **Climate equipment** as components: fans, pad walls for evaporative cooling, heaters,
+  horizontal energy curtains and shade screens (§5.2), circulation fans, irrigation lines later.
+- **Solariums and atriums** use rooms and spaces as now; the enclosure tells the energy model the
+  space is a glazed one (§7).
+
+## 5. Vents and sunlight management
+
+### 5.1 Vents
+
+Ridge vents, side and gable vents, roll-up sides on tunnels, and roof louvres, each an operable
+part of the glazing (`IfcWindow` in the roof or wall, or `IfcPlate` with an actuator), sized as a
+share of floor area. The rule of thumb is roof vents and side vents each 15–20 % of floor area;
+fan ventilation at 8 cfm/ft² (about one air change a minute) with inlets at least 1.25 × fan area;
+pad area by airflow ÷ 250 for 100 mm pads or ÷ 400 for 150 mm pads [§4 of research 09].
+
+### 5.2 Sunlight management (louvres, baffles, screens)
+
+*(To be completed from research/10: device geometry rules, effect on solar gain and daylight,
+control logic and IFC mapping.)* Planned devices:
+
+- **External fixed:** horizontal louvres and brise-soleil, vertical fins, egg-crate, overhangs,
+  perforated and fritted screens.
+- **Operable:** motorised louvres and shutters, sun-tracking blades.
+- **Roof devices:** baffles and light-diffusing blades under atrium and greenhouse roofs, light
+  shelves at the edges of floors facing an atrium.
+- **Screens and blinds:** greenhouse shade and energy screens (by shade percentage), interior and
+  exterior blinds, electrochromic glazing as a glazing state.
+
+Each device is placed on a face of an enclosure, curtain wall, window or roof (by face, like other
+tools), with its blade depth, spacing, angle and length, and a **design aid** that shows the sun
+path at the site and the cut-off angle the blades give. Its effect is carried into the analyses
+(§7) as a shading factor that changes over the day, not a fixed number.
+
+## 6. Atriums
+
+*(To be completed from research/10: forms, smoke control and code summaries, stack effect and
+stratification, daylight to adjacent floors.)* Planned:
+
+- **Atrium roof** over an opening in a building's floors: ridge, pyramid, barrel vault and
+  space-frame forms, using the same parts as above but sized for larger spans.
+- **Atrium space:** an `IfcSpace` spanning the storeys it passes through, with its balconies,
+  railings and edge glazing, marked as an atrium so analyses treat it as one tall stratified
+  volume.
+- **Smoke ventilation:** automatic opening vents and their free area, with the checks that public
+  summaries of the codes allow.
+
+## 7. Analyses: HVAC, energy and the rest
+
+The enclosure feeds Reviera's existing engines rather than adding new solvers wherever it can.
+Heavy runs go out of process as compute jobs, as the other analyses do.
+
+| Analysis | How | Builds on |
+|---|---|---|
+| Quick heat loss of a greenhouse | The published table method: Q = U·A·ΔT·(construction and wind factors) + 0.018·N·V·ΔT for air leakage [G011, G013] | New, instant |
+| Design heating and cooling loads | The existing loads with glazed roofs and walls, sloped roof areas and shading devices | `hc_loads.*`; fills the energy model's *sloped roof areas* gap |
+| Annual energy and running cost | The existing hourly model and EnergyPlus provider, with shading devices and their control, vents, energy curtains | `energy.*` |
+| Impact on the host building | A buffer-space comparison: the house or office with and without the enclosure, heated or unheated, open or separated | `energy.*` (two runs) |
+| Overheating | Hours above a threshold in the enclosure, with and without shading and ventilation | `energy.*` |
+| Ventilation sizing | Vent area, fan airflow and pad area by the rules in §5.1; natural ventilation by stack and wind | New |
+| Daylight and light transmission | Daylight factor through the glazing types and shading devices; for greenhouses, light reaching the crop | `daylight.*` |
+| Sun and shading | Solar study on the enclosure; shading masks of the devices | `solar.*` |
+| Condensation | Surface temperature of the glazing against the inside dew point; roof pitch against drip | New |
+| Snow and wind on the frame | Simplified checks with slope factors from the public tables, flagged as preliminary, with the structural analysis tools for the frame | New + structural analysis |
+| Gutter and downspout sizing | Existing check, with internal valley gutters | `MEP-PIPE-010` |
+| Code checks | UK conservatory exemption (≤ 30 m², ground level, thermal separation, no heating from the house), UK permitted heights, IRC sunroom (> 40 % glazed; category I–V), safety glazing in sloped and overhead positions and critical zones, IECC isolated-sunroom U-values | New (rule sets, per jurisdiction) |
+
+Results are written to the spaces and the enclosure (as the loads already are), shown in the
+Analysis pane and in reports, and go stale when the model or weather change.
+
+## 8. IFC
+
+| Part | IFC | Notes |
+|---|---|---|
+| Enclosure | `IfcElementAssembly` (or `IfcBuildingElementProxy` until an assembly type fits) aggregating its parts | Reviera recipe for the form and parameters |
+| Glazed roof | `IfcRoof` (type by form) aggregating `IfcPlate` (CURTAIN_PANEL or SHEET) and `IfcMember` (RAFTER, PURLIN, MULLION) | As sloped glazing is now |
+| Glazed walls | `IfcCurtainWall` with `IfcPlate`, `IfcMember` | As now |
+| Frame members | `IfcMember`, `IfcColumn`, `IfcBeam`; IFC4.3 adds ARCH_SEGMENT and TIEBAR | [G056] |
+| Vents | `IfcWindow` (roof or wall) with operation type; `IfcActuator` for motorised ones | |
+| Gutters | `IfcPipeSegment` GUTTER with `Pset_PipeSegmentTypeGutter`; `IfcStackTerminal` RAINWATERHOPPER | As MEP-PIPE-010 |
+| Shading devices | `IfcShadingDevice` (LOUVER, SHUTTER, AWNING, …) with its common property set | research/10 |
+| Atrium | `IfcSpace` spanning storeys | research/10 |
+| Glazing optics | `Pset_MaterialOptical`; Reviera property set for safety class and wall structure | [G056] |
+
+## 9. Building it, in phases
+
+Each phase ends with a sample model and a walkthrough on the Help page (as every ribbon tab has),
+the spec and README updated, and the defaults recorded for expert review.
+
+1. **Domestic glazed rooms.** The enclosure element and tool; the glazing and frame library;
+   lean-to, gable, Edwardian, Victorian (3/5 facets) and orangery with a lantern; knee walls,
+   doors, gutters; the UK and U.S. code checks for conservatories and sunrooms. *Sample: a
+   Victorian conservatory and an orangery on the energy house.*
+2. **Greenhouses.** Hoop, gothic, gutter-connected multispan, Venlo, sawtooth and dome forms;
+   vents; benches and aisles; the quick heat-loss and ventilation sizing; condensation and the
+   simple snow check. *Sample: a hobby greenhouse and a small commercial range.*
+3. **Sunlight management.** Shading devices on any face, with the sun-path design aid; their
+   effect in daylight, solar studies and loads; greenhouse shade and energy screens.
+4. **Atriums.** Atrium roofs over floor openings, atrium spaces through storeys, smoke vents and
+   the code summaries; stratification and stack ventilation. *Sample: a hotel atrium.*
+5. **Energy and HVAC impact.** Shading control and vents in the annual energy run and the
+   EnergyPlus provider; the buffer-space comparison; overheating; pad-and-fan cooling; a report
+   per enclosure.
+
+Phases 3 and 5 can overlap with 2 and 4; phase 1 comes first because the others build on its
+enclosure element and glazing library.
+
+## 10. Questions for the owner
+
+1. **Scope of the first phase.** Start with domestic conservatories and solariums (phase 1), or
+   with greenhouses?
+2. **Jurisdictions for the code checks.** UK and U.S. as researched, or others too (EU, Canada,
+   Australia, New Zealand)?
+3. **Structural checks.** Simplified snow and wind checks flagged as preliminary, plus the frame in
+   the structural analysis tools — or should greenhouse structural design (EN 13031-1, NGMA) be a
+   fuller module later?
+4. **Commercial growing.** How far into production growing should it go: benches and climate
+   equipment only, or crop light (DLI) and growing-area schedules too?
+5. **Dome glazing.** Faceted geodesic glazing, or also glazing on the smooth domes and vaults that
+   exist now?
