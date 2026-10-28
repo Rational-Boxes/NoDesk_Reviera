@@ -18,6 +18,9 @@
 //! - glazed side walls and end walls: curtain walls, the ends attached to every span's roof so
 //!   their gables fill (`curtain` attached tops), dropping under the valley gutters;
 //! - knee walls under the glazing when `knee` is set;
+//! - a door in the middle of each end wall (`doors`): the panes round its middle merged into one
+//!   curtain-wall door at least 1.5 m wide and 2.1 m high (EXPERT_REVIEW E-50); with a knee
+//!   wall, the end walls are glazed to the ground so the doors stand on the floor;
 //! - gutters, laid level, on the outer eaves and in each valley (MEP-PIPE-010).
 //!
 //! In the enclosure's own frame `x` runs along its length (the ridges) from `origin`, turned by
@@ -25,8 +28,7 @@
 //! `IfcElementAssembly` (ObjectType `GlazedEnclosure`) whose recipe lists its parts; each part
 //! names its enclosure (`rxd:enclosure`) and goes with it.
 //!
-//! Not yet: hoop, gothic and sawtooth forms; frame members (posts, rafters, trusses); doors and
-//! vents; keeping a user's edits to a part when the enclosure regenerates; a headhouse.
+//! Not yet: hoop, gothic and sawtooth forms; frame members (posts, rafters, trusses); vents; keeping a user's edits to a part when the enclosure regenerates; a headhouse.
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -57,6 +59,9 @@ const WALL_BAR: Mullion = Mullion { width: 0.04, depth: 0.08 };
 const GUTTER_DROP: f64 = 0.02 + 0.0625;
 /// The gutter's width: the gap between two spans' roofs at a valley, the gutter in it.
 const GUTTER_WIDTH: f64 = 0.125;
+/// The least clear width and height of an end wall's door (provisional, EXPERT_REVIEW E-50).
+const DOOR_WIDTH: f64 = 1.5;
+const DOOR_HEIGHT: f64 = 2.1;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
@@ -97,6 +102,9 @@ pub struct EnclosureRecipe {
     pub knee: Option<f64>,
     #[serde(default = "yes")]
     pub gutters: bool,
+    /// A door in each end wall.
+    #[serde(default = "yes")]
+    pub doors: bool,
     /// The parts (GlobalIds).
     #[serde(default)]
     pub parts: Vec<String>,
@@ -265,9 +273,16 @@ fn build(txn: &mut Transaction<'_>, guid: &str, r: &EnclosureRecipe) -> Result<V
         (r.at(l, w), r.at(0.0, w)),
         (r.at(0.0, w), r.at(0.0, 0.0)),
     ];
+    // The end walls are glazed to the ground where they have doors, between the side knee walls.
+    let base_of = |k: usize| if k % 2 == 1 && r.doors { 0.0 } else { base };
+    let mut knee_half = 0.0;
     if let Some(k) = r.knee {
         let wt = walls::default_type(txn)?;
-        for (a, b) in perimeter {
+        knee_half = txn.store().get(wt).and_then(walls::type_width).unwrap_or(0.2) / 2.0;
+        for (side, (a, b)) in perimeter.into_iter().enumerate() {
+            if base_of(side) == 0.0 {
+                continue;
+            }
             parts.push(walls::create(
                 txn,
                 walls::CreateParams {
@@ -289,9 +304,10 @@ fn build(txn: &mut Transaction<'_>, guid: &str, r: &EnclosureRecipe) -> Result<V
     // The end walls stand between the side walls' corner posts and rise into the gables,
     // dropping under the valley gutters between the roofs; the side walls stop under the roof's
     // eave bars.
-    let inset = WALL_BAR.depth / 2.0;
+    let inset = if r.doors { (WALL_BAR.depth / 2.0).max(knee_half) } else { WALL_BAR.depth / 2.0 };
     let under_bars = ROOF_BAR.depth / 2.0 / r.pitch.cos();
     for (k, (a, b)) in perimeter.into_iter().enumerate() {
+        let base = base_of(k);
         let (a, b, top) = if k % 2 == 1 {
             let d = [(b[0] - a[0]) / w, (b[1] - a[1]) / w];
             let own = if r.spans > 1 { r.eave - GUTTER_DROP } else { r.eave };
@@ -313,6 +329,10 @@ fn build(txn: &mut Transaction<'_>, guid: &str, r: &EnclosureRecipe) -> Result<V
         if k % 2 == 1 {
             for roof in &roofs_made {
                 crate::curtain::set_attached(txn, cw, Some(txn.store().get(*roof).expect("made").guid().to_string()), None)?;
+            }
+            if r.doors {
+                let along = (b[0] - a[0]).hypot(b[1] - a[1]);
+                crate::curtain::make_door(txn, cw, along / 2.0, DOOR_WIDTH, DOOR_HEIGHT)?;
             }
         }
         parts.push(cw);
@@ -404,6 +424,8 @@ pub struct Params {
     #[schemars(extend("x-reviera-data-type" = "length"))]
     pub knee: Option<Value>,
     pub gutters: Option<bool>,
+    /// A door in each end wall (default on).
+    pub doors: Option<bool>,
     /// The corner laid out from, and the direction of the length (radians or "90°").
     pub origin: Option<[f64; 2]>,
     #[schemars(extend("x-reviera-data-type" = "angle"))]
@@ -436,6 +458,7 @@ pub fn defaults(form: Form) -> EnclosureRecipe {
         pitch: (5.0f64 / 12.0).atan(),
         knee: None,
         gutters: true,
+        doors: true,
         parts: Vec::new(),
     };
     match form {
@@ -482,6 +505,9 @@ fn apply(store: &Store, r: &mut EnclosureRecipe, p: &Params) -> Result<()> {
     }
     if let Some(g) = p.gutters {
         r.gutters = g;
+    }
+    if let Some(d) = p.doors {
+        r.doors = d;
     }
     if let Some(o) = p.origin {
         r.origin = o;

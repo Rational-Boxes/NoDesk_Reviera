@@ -895,7 +895,7 @@ fn the_greenhouses_sample_keeps_its_enclosures() {
     }
     seen.sort_by_key(|s| s.1);
     use reviera_core::enclosures::Form;
-    assert_eq!(seen, vec![(Form::Gable, 1, 4, 0, 2), (Form::Multispan, 3, 4, 0, 4), (Form::Venlo, 6, 4, 4, 7)]);
+    assert_eq!(seen, vec![(Form::Gable, 1, 4, 0, 2), (Form::Multispan, 3, 4, 0, 4), (Form::Venlo, 6, 4, 2, 7)]);
     // The Venlo's end walls rise into its gables.
     let venlo = enclosures.iter().find(|(_, r)| r.form == Form::Venlo).unwrap();
     let ends: Vec<_> = s.iter().filter(|e| reviera_core::curtain::curtain_recipe(e).is_some_and(|c| !c.attach_top.is_empty())).filter(|e| reviera_core::enclosures::enclosure_of(e) == Some(s.get(venlo.0).unwrap().guid().as_str())).collect();

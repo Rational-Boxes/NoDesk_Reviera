@@ -10,8 +10,9 @@ Start with **File › New**. The model has Level 1 at 0. Open the Level 1 plan.
    width 8 m, Trusses 3, Bay spacing 4 m, Eave height 5.5 m, Roof pitch 22°, Knee wall 600 mm.
    Untick *Place by clicking* to place it at the origin, or leave it ticked and click (0, 0),
    then a point east of it. The range is 24 × 24 m: six 4 m glass roofs with a valley gutter
-   between each pair, glass walls on a knee wall, the end walls' glass filling up into all six
-   gables and dropping under the valley gutters, and two eaves gutters.
+   between each pair, glass side walls on a knee wall, end walls glazed to the ground with a door
+   in the middle of each, their glass filling up into all six gables and dropping under the
+   valley gutters, and two eaves gutters.
 2. **Change it.** With the range selected, Properties › Glazed Enclosure shows its form and
    sizes; set Trusses to 4 and back to 3, or the Eave Height, and the parts are made again.
    (The script leaves it at 3 trusses.)
@@ -27,15 +28,16 @@ Start with **File › New**. The model has Level 1 at 0. Open the Level 1 plan.
    when the enclosure changes.
 
 Check: three enclosures (category *Glazed Enclosures*); the Venlo range has 6 roofs, 4 glass
-walls, 4 knee walls and 7 gutters; the multispan 3 roofs and 4 gutters; the hobby house 1 roof
+walls (a door in each end wall), 2 knee walls and 7 gutters; the multispan 3 roofs and 4 gutters; the hobby house 1 roof
 and 2 gutters. Saved, each is an `IfcElementAssembly` (ObjectType *GlazedEnclosure*) aggregating
 its parts.
 
 ## Gaps
 
 - **Detach from Enclosure** has no menu entry yet; `enclosure.detach` does it.
-- **Frame members, doors and vents.** The enclosures have no posts, rafters or trusses (the
-  glazing bars stand in), no doors in the glass walls and no vents yet (ARC-GLZ-001, -004).
+- **Frame members and vents.** The enclosures have no posts, rafters or trusses (the glazing
+  bars stand in) and no vents yet (ARC-GLZ-001, -004); the doors are plain hinged curtain-wall
+  doors (no sliding doors or door types yet).
 - **Hoop, gothic and sawtooth forms**, glazed vaults and geodesic domes (ARC-GLZ-002, -006).
 - **Headhouse**, growing layouts (ARC-GLZ-005), and the glazing and frame type library
   (ARC-GLZ-003): the two glass types are made on first use with provisional values.

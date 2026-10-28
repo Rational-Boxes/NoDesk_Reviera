@@ -620,6 +620,50 @@ pub fn regenerate(store: &Store, e: &Element) -> Result<CurtainGeometry> {
     })
 }
 
+/// A door in a curtain wall (ARC-CW-006) made of the cells round `centre` along it: as many
+/// columns as reach `width` and rows as reach `height`, merged into one door panel. Returns the
+/// door's width and height.
+pub(crate) fn make_door(txn: &mut crate::txn::Transaction<'_>, id: ElementId, centre: f64, width: f64, height: f64) -> Result<(f64, f64)> {
+    let store = txn.store().clone();
+    let e = store.get(id).expect("exists");
+    let mut r = curtain_recipe(e).expect("a curtain wall");
+    let g = regenerate(&store, e)?;
+    let mut xs = vec![0.0];
+    xs.extend(g.u_lines.iter().copied());
+    xs.push(g.length());
+    let mut zs = vec![0.0];
+    zs.extend(g.v_lines.iter().copied());
+    zs.push(g.z[1] - g.z[0]);
+    let (nx, nz) = (xs.len() - 1, zs.len() - 1);
+    let c = (0..nx).find(|i| xs[i + 1] > centre).unwrap_or(nx - 1);
+    // Grow toward the side whose next column keeps the door most nearly centred.
+    let (mut i0, mut i1) = (c, c);
+    while xs[i1 + 1] - xs[i0] < width - 1e-9 && (i0 > 0 || i1 + 1 < nx) {
+        let left = (i0 > 0).then(|| ((xs[i0 - 1] + xs[i1 + 1]) / 2.0 - centre).abs());
+        let right = (i1 + 1 < nx).then(|| ((xs[i0] + xs[i1 + 2]) / 2.0 - centre).abs());
+        match (left, right) {
+            (Some(l), Some(rr)) if l < rr => i0 -= 1,
+            (_, Some(_)) => i1 += 1,
+            _ => i0 -= 1,
+        }
+    }
+    let k = (0..nz).find(|j| zs[j + 1] >= height - 1e-9).unwrap_or(nz - 1);
+    for i in i0..i1 {
+        for segment in 0..=k {
+            r.removed.push(SegmentOff { dir: Dir::U, at: xs[i + 1], segment });
+        }
+    }
+    for j in 0..k {
+        for segment in i0..=i1 {
+            r.removed.push(SegmentOff { dir: Dir::V, at: zs[j + 1], segment });
+        }
+    }
+    r.panels.retain(|o| !(o.cell[0] >= i0 && o.cell[0] <= i1 && o.cell[1] <= k));
+    r.panels.push(PanelOverride { cell: [i0, 0], panel: Panel::Door });
+    write(txn, id, &r)?;
+    Ok((xs[i1 + 1] - xs[i0], zs[k + 1]))
+}
+
 /// Attaches a curtain wall's top to a roof as well as those it follows (`wall.attach`), or (with
 /// `None`) detaches it from `only` roofs or all.
 pub(crate) fn set_attached(txn: &mut crate::txn::Transaction<'_>, id: ElementId, add: Option<String>, only: Option<&[String]>) -> Result<()> {

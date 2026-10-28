@@ -177,6 +177,8 @@ impl Gui {
             grid.set_property_read_only("gh_spans", true);
         }
         grid.append(Property::boolean("Gutters", "gh_gutters", r.gutters));
+        grid.append(Property::boolean("Doors", "gh_doors", r.doors));
+        grid.set_help_string("gh_doors", "A door in the middle of each end wall");
         let ridge = self.format_length(r.ridge());
         grid.append(Property::string("Ridge Height", "gh_ridge", ridge));
         grid.set_property_read_only("gh_ridge", true);
@@ -206,6 +208,7 @@ impl Gui {
             "gh_pitch" => args["pitch"] = json!(text),
             "gh_knee" => args["knee"] = json!(text),
             "gh_gutters" => args["gutters"] = json!(matches!(text.as_str(), "True" | "true" | "1")),
+            "gh_doors" => args["doors"] = json!(matches!(text.as_str(), "True" | "true" | "1")),
             _ => return true,
         }
         if let Err(e) = self.run("enclosure.set", args) {

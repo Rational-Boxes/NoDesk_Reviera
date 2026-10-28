@@ -62,8 +62,19 @@ fn a_venlo_range_is_roofs_walls_and_gutters_rebuilt_on_change() {
     // Three trusses and a knee wall: the parts are made again.
     run(&r, &mut doc, "enclosure.set", json!({ "enclosure_id": id.0, "spans": 3, "knee": 0.6 })).unwrap();
     let info = run(&r, &mut doc, "enclosure.get", json!({ "enclosure_id": id.0 })).unwrap();
-    assert_eq!((count(&info, "roofs"), count(&info, "gutters"), count(&info, "walls")), (6, 7, 4), "{info}");
-    assert_eq!(doc.store().iter().filter(|p| reviera_core::enclosures::enclosure_of(p) == Some(guid.as_str())).count(), 6 + 7 + 4 + 4, "the old parts are gone");
+    // Knee walls along the sides only: the end walls stand on the floor with their doors.
+    assert_eq!((count(&info, "roofs"), count(&info, "gutters"), count(&info, "walls")), (6, 7, 2), "{info}");
+    assert_eq!(doc.store().iter().filter(|p| reviera_core::enclosures::enclosure_of(p) == Some(guid.as_str())).count(), 6 + 7 + 2 + 4, "the old parts are gone");
+    for k in [1, 3] {
+        let cw = ElementId(info["curtain_walls"][k].as_u64().unwrap());
+        let g = reviera_core::curtain::regenerate(doc.store(), doc.store().get(cw).unwrap()).unwrap();
+        let doors: Vec<_> = g.parts.iter().filter(|p| p.panel == reviera_core::curtain::Panel::Door && !p.mullion).collect();
+        assert_eq!(doors.len(), 1, "one door in each end wall");
+        let d = doors[0];
+        assert!(d.x[1] - d.x[0] >= 1.4 && d.z[1] - d.z[0] >= 2.0 && d.z[0].abs() < 1e-9, "{d:?}");
+        // Centred: its middle within half a pane of the wall's.
+        assert!(((d.x[0] + d.x[1]) / 2.0 - g.length() / 2.0).abs() < 0.45, "{d:?} in {}", g.length());
+    }
     // A detached gutter stays when the enclosure changes.
     let kept = info["gutters"][0].as_u64().unwrap();
     run(&r, &mut doc, "enclosure.detach", json!({ "part_ids": [kept] })).unwrap();
