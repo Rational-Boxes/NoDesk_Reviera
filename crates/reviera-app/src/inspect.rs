@@ -425,10 +425,10 @@ impl HostCommand for ViewTempReset {
 /// What `view.temp_apply` did.
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct TempApplyResult {
-    /// How many elements are now hidden in the view by it.
+    /// How many elements are now hidden in the view.
     pub hidden: usize,
-    /// Whether temporary translucency or ghosting was left as it was (it is not hiding).
-    pub kept_translucency: bool,
+    /// How many elements it gave a transparency override (translucent or ghosted ones).
+    pub overridden: usize,
 }
 
 pub(crate) struct ViewTempApply;
@@ -441,10 +441,11 @@ impl HostCommand for ViewTempApply {
         name: "view.temp_apply",
         version: 1,
         summary: "Apply a view's temporary hide and isolate to the view (Apply Hide/Isolate to View)",
-        description: "Turns a saved view's temporary hiding into Hide in View (`view.hide`): its temporarily \
-                      hidden elements, and with an isolation everything outside it that has geometry, are \
-                      hidden in the view for good (saved and printed). The temporary hide and isolation are \
-                      then cleared; translucency and ghosting stay temporary.",
+        description: "Makes a saved view's temporary state permanent: its temporarily hidden elements, and with \
+                      an isolation everything outside it that has geometry, are hidden in the view \
+                      (`view.hide`); translucent elements, and with a ghosting isolation everything outside it, \
+                      get a transparency override (`view.override_elements`). Saved and printed so; the \
+                      temporary state is then cleared.",
         effects: &[Effect::Edit],
         transaction_name: "Apply Hide/Isolate to View",
     };
@@ -454,28 +455,36 @@ impl HostCommand for ViewTempApply {
         let view = view.ok_or_else(|| Error::new("view.unsaved", "save the view first: the default 3D view keeps no hiding"))?;
         let state = app.temp_state(doc, Some(view));
         let mut hide: BTreeSet<ElementId> = state.hidden.clone();
-        let ghosted = state.isolated.as_ref().is_some_and(|i| i.ghost_others.is_some());
-        if let Some(i) = state.isolated.as_ref().filter(|i| i.ghost_others.is_none()) {
+        // Transparency (0–100 %) by opacity, rounded to whole percent.
+        let mut fade: BTreeMap<u32, BTreeSet<ElementId>> = BTreeMap::new();
+        let percent = |opacity: f32| ((1.0 - opacity.clamp(0.0, 1.0)) * 100.0).round() as u32;
+        for (e, o) in &state.translucent {
+            if !hide.contains(e) {
+                fade.entry(percent(*o)).or_default().insert(*e);
+            }
+        }
+        if let Some(i) = &state.isolated {
             let scene = app.render_scene(doc)?;
-            hide.extend(scene.meshes.iter().filter_map(|m| m.element).filter(|e| !i.elements.contains(e) && *e < i.after));
-        }
-        if hide.is_empty() {
-            return Err(Error::new("view.nothing_to_apply", "the view has no temporary hide or isolate to apply"));
-        }
-        app.execute("view.hide", json!({ "view_id": view, "element_ids": hide }), caller)?;
-        let kept = ghosted || !state.translucent.is_empty();
-        let open = app.get_mut(doc)?;
-        if let Some(t) = open.temp.get_mut(&Some(view)) {
-            t.hidden.clear();
-            if !ghosted {
-                t.isolated = None;
-            }
-            if t.is_empty() {
-                open.temp.remove(&Some(view));
+            let others = scene.meshes.iter().filter_map(|m| m.element).filter(|e| !i.elements.contains(e) && *e < i.after);
+            match i.ghost_others {
+                None => hide.extend(others),
+                Some(o) => fade.entry(percent(o)).or_default().extend(others.filter(|e| !hide.contains(e))),
             }
         }
+        if hide.is_empty() && fade.is_empty() {
+            return Err(Error::new("view.nothing_to_apply", "the view has no temporary hide, isolate or translucency to apply"));
+        }
+        if !hide.is_empty() {
+            app.execute("view.hide", json!({ "view_id": view, "element_ids": hide }), caller)?;
+        }
+        let mut overridden = 0;
+        for (t, ids) in &fade {
+            overridden += ids.len();
+            app.execute("view.override_elements", json!({ "view_id": view, "element_ids": ids, "override": { "transparency": t } }), caller)?;
+        }
+        app.get_mut(doc)?.temp.remove(&Some(view));
         let hidden = reviera_core::view_hiding::hidden_in(app.get(doc)?.doc.store(), Some(view)).len();
-        Ok(TempApplyResult { hidden, kept_translucency: kept })
+        Ok(TempApplyResult { hidden, overridden })
     }
 }
 

@@ -147,9 +147,17 @@ impl Gui {
             let store = d.doc.store();
             vis.hidden
                 .extend(reviera_core::parts::hidden_in(store, v.element));
-            // Hidden in the view for good (DOC-GFX-007).
+            // Hidden in the view for good, and its halftone and transparency overrides: surfaces
+            // translucent in 3D, lines faded in 2D (DOC-GFX-007).
             vis.hidden
                 .extend(reviera_core::view_hiding::hidden_in(store, v.element));
+            let flat = v.is_2d();
+            for (e, o) in reviera_core::view_overrides::resolved_in(store, v.element) {
+                let opacity = if flat { o.line_strength() } else { o.opacity };
+                if opacity < 1.0 {
+                    vis.translucent.entry(e).or_insert(opacity);
+                }
+            }
             // A Coarse plan draws structural framing as single lines, not bodies (STR-SET-001).
             let coarse = v.plan.is_some()
                 && v.element
@@ -797,11 +805,91 @@ impl Gui {
         };
         match self.run("view.temp_apply", json!({ "view_id": view })) {
             Ok(r) => {
-                let n = r["hidden"].as_u64().unwrap_or(0);
-                let kept = if r["kept_translucency"] == true { "; translucency stays temporary" } else { "" };
-                self.frame.set_status_text(&format!("Hidden in this view for good: {n} element{}{kept}", if n == 1 { "" } else { "s" }), 0);
+                let (n, t) = (r["hidden"].as_u64().unwrap_or(0), r["overridden"].as_u64().unwrap_or(0));
+                self.frame.set_status_text(&format!("Applied to this view: {n} hidden, {t} transparent (saved and printed)"), 0);
             }
             Err(e) => self.frame.set_status_text(&e, 0),
+        }
+        self.after_temp_change();
+        self.after_view_edit();
+    }
+
+    /// Override Graphics in View: transparency and halftone for the selection, or for its
+    /// categories, in the active view (DOC-GFX-007).
+    pub(crate) fn override_dialog(&mut self) {
+        let frame = self.frame;
+        let Some(view) = self.active_view().and_then(|v| v.element) else {
+            return frame.set_status_text("Override Graphics in View: open a saved view first", 0);
+        };
+        let ids = self.selection();
+        if ids.is_empty() {
+            return frame.set_status_text("Override Graphics in View: select the elements first", 0);
+        }
+        let store = self.store_now();
+        let current = store.as_ref().and_then(|s| {
+            let g = s.get(ids[0])?.guid().to_string();
+            reviera_core::view_overrides::element_overrides(s.get(view)?).get(&g).copied()
+        });
+        let dialog = Dialog::builder(&frame, "Override Graphics in View").build();
+        let sizer = BoxSizer::builder(Orientation::Vertical).build();
+        let note = StaticText::builder(&dialog)
+            .with_label(&format!("{} selected element{}, in this view only. Saved with the view and printed.", ids.len(), if ids.len() == 1 { "" } else { "s" }))
+            .build();
+        sizer.add(&note, 0, SizerFlag::All, 10);
+        let grid = FlexGridSizer::builder(0, 2).with_vgap(6).with_hgap(10).build();
+        let l = StaticText::builder(&dialog).with_label("Surface transparency (%)").build();
+        let t = current.and_then(|o| o.transparency).unwrap_or(0.0);
+        let transparency = TextCtrl::builder(&dialog).with_value(&format!("{}", t.round())).build();
+        grid.add(&l, 0, SizerFlag::AlignCenterVertical, 0);
+        grid.add(&transparency, 0, SizerFlag::Expand, 0);
+        sizer.add_sizer(&grid, 0, SizerFlag::Left | SizerFlag::Right, 10);
+        let halftone = CheckBox::builder(&dialog).with_label("Halftone (lines at half strength in plans, sections and elevations)").build();
+        halftone.set_value(current.and_then(|o| o.halftone).unwrap_or(false));
+        sizer.add(&halftone, 0, SizerFlag::All, 10);
+        let by_category = CheckBox::builder(&dialog).with_label("For their whole categories").build();
+        sizer.add(&by_category, 0, SizerFlag::Left | SizerFlag::Right | SizerFlag::Bottom, 10);
+        let buttons = BoxSizer::builder(Orientation::Horizontal).build();
+        buttons.add_stretch_spacer(1);
+        let clear = Button::builder(&dialog).with_label("Clear Overrides").build();
+        let cancel = Button::builder(&dialog).with_id(ID_CANCEL).with_label("Cancel").build();
+        let ok = Button::builder(&dialog).with_id(ID_OK).with_label("OK").build();
+        buttons.add(&clear, 0, SizerFlag::All, 6);
+        buttons.add(&cancel, 0, SizerFlag::All, 6);
+        buttons.add(&ok, 0, SizerFlag::All, 6);
+        sizer.add_sizer(&buttons, 0, SizerFlag::Expand, 0);
+        const CLEAR: i32 = 5101;
+        clear.on_click(move |_| dialog.end_modal(CLEAR));
+        dialog.set_sizer_and_fit(sizer, true);
+        dialog.set_affirmative_id(ID_OK);
+        dialog.set_escape_id(ID_CANCEL);
+        let code = dialog.show_modal();
+        let typed = transparency.get_value().trim().trim_end_matches('%').trim().parse::<f64>();
+        let with = json!({ "transparency": typed.as_ref().map_or(0.0, |t| *t), "halftone": halftone.get_value() });
+        let by_category = by_category.get_value();
+        dialog.destroy();
+        if code == ID_OK && typed.is_err() {
+            return super::error(&frame, "Surface transparency is a number of percent, 0 to 100");
+        }
+        let result = match (code, by_category) {
+            (ID_OK, false) => self.run("view.override_elements", json!({ "view_id": view, "element_ids": ids, "override": with })),
+            (CLEAR, false) => self.run("view.clear_element_overrides", json!({ "view_id": view, "element_ids": ids })),
+            (ID_OK | CLEAR, true) => {
+                let Some(store) = store else { return };
+                let mut keys: Vec<&str> = ids.iter().filter_map(|i| store.get(*i)).filter_map(reviera_core::categories::category_of).map(|c| c.key).collect();
+                keys.sort_unstable();
+                keys.dedup();
+                keys.iter()
+                    .map(|k| match code {
+                        ID_OK => self.run("view.set_category_override", json!({ "view_id": view, "category": k, "override": with })),
+                        _ => self.run("view.clear_category_override", json!({ "view_id": view, "category": k })),
+                    })
+                    .find(Result::is_err)
+                    .unwrap_or(Ok(serde_json::Value::Null))
+            }
+            _ => return,
+        };
+        if let Err(e) = result {
+            super::error(&frame, &format!("The overrides were not changed:\n{e}"));
         }
         self.after_temp_change();
         self.after_view_edit();

@@ -5263,6 +5263,7 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "inspect.hide_category_in_view" => with(gui, |g| g.hide_in_view(true)),
         "inspect.unhide_all_in_view" => with(gui, Gui::unhide_all_in_view),
         "inspect.apply_to_view" => with(gui, Gui::apply_temp_to_view),
+        "inspect.override_in_view" => with(gui, Gui::override_dialog),
         a if a.starts_with("inspect.") => with(gui, |g| g.temp_action(a)),
         other => f.set_status_text(&format!("{other} is not available yet"), 0),
     }

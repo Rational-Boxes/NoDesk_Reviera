@@ -87,14 +87,16 @@ impl App {
         };
         let pens = standards::pen_set(store);
         let styles = standards::object_styles(store);
+        let overrides = reviera_core::view_overrides::resolved_in(store, Some(view));
         let weights = |element: Option<ElementId>| {
             let (cut, projection) =
                 standards::element_widths(store, &pens, &styles, element, scale);
             Weights {
                 cut: cut.map(|w| w as f32),
                 projection: projection as f32,
-                // Printed and exported drawings never show temporary state.
-                opacity: 1.0,
+                // Printed and exported drawings never show temporary state, but do show the
+                // view's halftone and transparency overrides (DOC-GFX-007).
+                opacity: element.and_then(|e| overrides.get(&e)).map_or(1.0, |o| o.line_strength()),
                 above: element
                     .and_then(|e| store.get(e))
                     .map(reviera_core::categories::above_cut)
@@ -297,13 +299,15 @@ pub fn section_parts(
     let local = reviera_render::RenderScene { meshes };
     let pens = standards::pen_set(store);
     let styles = standards::object_styles(store);
+    // The view's halftone and transparency overrides (DOC-GFX-007).
+    let overrides = reviera_core::view_overrides::resolved_in_guid(store, view);
     let weights = |element: Option<ElementId>| {
         let (cut, projection) =
             standards::element_widths(store, &pens, &styles, element, f64::from(scale));
         Weights {
             cut: cut.map(|w| w as f32),
             projection: projection as f32,
-            opacity: 1.0,
+            opacity: element.and_then(|e| overrides.get(&e)).map_or(1.0, |o| o.line_strength()),
             above: reviera_core::categories::AboveCut::Hide,
         }
     };

@@ -938,6 +938,12 @@ icon = "reset_temp"
 help = "Show again everything this view hides with Hide in View"
 
 [[action]]
+id = "inspect.override_in_view"
+label = "Override Graphics in View…"
+icon = "translucent"
+help = "Set the selected elements' (or their categories') transparency and halftone in this view, saved and printed"
+
+[[action]]
 id = "inspect.apply_to_view"
 label = "Apply Hide/Isolate to View"
 icon = "hide"
@@ -3991,6 +3997,7 @@ tools = [
   { action = "inspect.hide_in_view", size = "small" },
   { action = "inspect.hide_category_in_view", size = "small" },
   { action = "inspect.unhide_all_in_view", size = "small" },
+  { action = "inspect.override_in_view", size = "small" },
 ]
 
 [[tab.panel]]
@@ -4491,7 +4498,8 @@ items = [
   "inspect.hide", "inspect.hide_subtree", "inspect.hide_category", "inspect.hide_type",
   "inspect.isolate", "inspect.isolate_subtree", "inspect.isolate_category", "inspect.isolate_type",
   "inspect.ghost_others", "inspect.translucent", "inspect.translucent_subtree", "inspect.reset", "inspect.apply_to_view", "-",
-  "inspect.hide_in_view", "inspect.hide_category_in_view", "inspect.unhide_all_in_view", "-",
+  "inspect.hide_in_view", "inspect.hide_category_in_view", "inspect.unhide_all_in_view",
+  "inspect.override_in_view", "-",
   "ui.pane.clash", "overlap.find", "view.set_virtual_volumes", "clearance.set_rule_set",
 ]
 

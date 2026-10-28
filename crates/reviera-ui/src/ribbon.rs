@@ -148,6 +148,7 @@ pub const UI_ACTIONS: &[&str] = &[
     "inspect.hide_category_in_view",
     "inspect.unhide_all_in_view",
     "inspect.apply_to_view",
+    "inspect.override_in_view",
     "ui.pane.model_tree",
     "ui.pane.components",
 ];

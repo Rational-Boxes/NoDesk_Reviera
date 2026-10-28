@@ -175,6 +175,11 @@ fn the_views_sample_keeps_its_views_and_their_inspection_state() {
     let hidden = reviera_core::view_hiding::hidden_in(&s, Some(ElementId(partition)));
     let walls = s.iter().filter(|e| reviera_core::walls::wall_recipe(e).is_some()).count();
     assert!(hidden.len() >= walls - 1, "all but the partition: {} of {walls} walls and more", hidden.len());
+    // Ghosting and translucency are kept as transparency overrides.
+    for name in ["Isolate South Wall", "Translucent Walls"] {
+        let v = all.iter().find(|(n, _, _)| n == name).unwrap().2;
+        assert!(!reviera_core::view_overrides::resolved_in(&s, Some(ElementId(v))).is_empty(), "{name}");
+    }
 }
 
 #[test]
@@ -803,4 +808,53 @@ fn hide_in_view_is_saved_with_the_view_and_printed_so() {
     let plan = reopened.iter().find(|e| e.name.as_deref() == Some("Level 1") && reviera_core::views::view_data(e).is_some_and(|d| d.kind == "view.plan")).unwrap().id();
     let guids = |s: &reviera_core::Store, ids: &std::collections::HashSet<ElementId>| ids.iter().map(|i| s.get(*i).unwrap().guid().to_string()).collect::<std::collections::BTreeSet<_>>();
     assert_eq!(guids(&reopened, &reviera_core::view_hiding::hidden_in(&reopened, Some(plan))), guids(&store(&app), &hidden));
+}
+
+#[test]
+fn graphic_overrides_are_saved_with_the_view_and_printed_so() {
+    let work = tempfile::tempdir().unwrap();
+    let mut app = open(work.path(), "views_inspection");
+    let doc = app.active().unwrap();
+    let plan = view_id(&mut app, "Level 1", "view.plan");
+    let s = store(&app);
+    let walls: Vec<ElementId> = s.iter().filter(|e| reviera_core::walls::wall_recipe(e).is_some()).map(|e| e.id()).collect();
+    // The colours the printed plan draws lines in (a faded one for a halftone element).
+    let drawing = |app: &App| {
+        let g = app.plan_drawing(doc, ElementId(plan)).unwrap().graphics;
+        g.lines.iter().filter(|l| !l.segments.is_empty()).map(|l| l.color.map(|c| (c * 1000.0).round() as i32)).collect::<std::collections::BTreeSet<_>>()
+    };
+    let before = drawing(&app);
+
+    // Halftone on one wall: the printed plan draws its lines fainter; nothing else changes.
+    ok(&mut app, "view.override_elements", json!({ "view_id": plan, "element_ids": [walls[0]], "override": { "halftone": true } }));
+    let r = reviera_core::view_overrides::resolved_in(&store(&app), Some(ElementId(plan)));
+    assert_eq!(r.len(), 1);
+    assert!((r[&walls[0]].line_strength() - 0.5).abs() < 1e-6);
+    let faded = drawing(&app);
+    assert!(faded.difference(&before).next().is_some(), "the halftone wall prints fainter: {faded:?} vs {before:?}");
+    // A category override reaches every wall; the wall's own transparency wins over it.
+    ok(&mut app, "view.set_category_override", json!({ "view_id": plan, "category": "cat.walls", "override": { "transparency": 40 } }));
+    ok(&mut app, "view.override_elements", json!({ "view_id": plan, "element_ids": [walls[0]], "override": { "transparency": 90 } }));
+    let r = reviera_core::view_overrides::resolved_in(&store(&app), Some(ElementId(plan)));
+    assert!(walls.iter().all(|w| r.contains_key(w)));
+    assert!((r[&walls[0]].opacity - 0.1).abs() < 1e-6 && r[&walls[0]].halftone);
+    assert!((r[&walls[1]].opacity - 0.6).abs() < 1e-6 && !r[&walls[1]].halftone);
+    assert!(app.execute("view.override_elements", json!({ "view_id": plan, "element_ids": [walls[0]], "override": { "transparency": 140 } }), &Caller::user()).is_err());
+    let listed = ok(&mut app, "view.overrides", json!({ "view_id": plan }));
+    assert_eq!(listed["elements"].as_array().unwrap().len(), 1, "{listed}");
+    ok(&mut app, "view.clear_category_override", json!({ "view_id": plan, "category": "cat.walls" }));
+    ok(&mut app, "view.clear_element_overrides", json!({ "view_id": plan, "all": true }));
+    assert_eq!(drawing(&app), before);
+
+    // Apply Hide/Isolate to View keeps translucency and ghosting as transparency overrides.
+    ok(&mut app, "view.temp_translucent", json!({ "view_id": plan, "element_ids": [walls[1]] }));
+    let applied = ok(&mut app, "view.temp_apply", json!({ "view_id": plan }));
+    assert_eq!(applied["overridden"], 1, "{applied}");
+    let r = reviera_core::view_overrides::resolved_in(&store(&app), Some(ElementId(plan)));
+    assert!((r[&walls[1]].opacity - reviera_app::inspect::TRANSLUCENT).abs() < 0.01, "{r:?}");
+    ok(&mut app, "view.temp_isolate", json!({ "view_id": plan, "element_ids": [walls[2]], "ghost_others": true }));
+    ok(&mut app, "view.temp_apply", json!({ "view_id": plan }));
+    let r = reviera_core::view_overrides::resolved_in(&store(&app), Some(ElementId(plan)));
+    assert!(!r.contains_key(&walls[2]) && r.contains_key(&walls[3]), "the others ghosted for good");
+    assert!(app.temp_state(doc, Some(ElementId(plan))).is_empty());
 }

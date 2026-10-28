@@ -161,10 +161,16 @@ Select elements first, then:</p>
 use <b>Hide in View</b> <kbd>EH</kbd>, or <b>Hide Category in View</b> <kbd>VH</kbd> for every
 element of its categories (also <i>Hide in View (saved)</i> in the quick menu). It is saved with
 the view, undoable, and printed and placed on sheets so; other views are not changed.
-<b>Apply Hide/Isolate to View</b> turns the view's temporary hide and isolate into this (ghosting
-and translucency stay temporary). <b>Unhide All in View</b> shows everything again.
+<b>Unhide All in View</b> shows everything again.</p>
+<p><b>Override Graphics in View…</b> sets the selection's <b>surface transparency</b> (translucent in
+3D, fainter lines in plans, sections and elevations) and <b>halftone</b> (lines at half strength
+in 2D) in this view, or, ticking <i>For their whole categories</i>, every element of their
+categories. <i>Clear Overrides</i> removes them. These are saved with the view and printed.</p>
+<p><b>Apply Hide/Isolate to View</b> makes the view's temporary state permanent: hiding becomes Hide
+in View, and translucency and ghosting become transparency overrides.
 <code>view.hide</code>, <code>view.unhide</code>, <code>view.hidden</code>,
-<code>view.temp_apply</code></p>
+<code>view.override_elements</code>, <code>view.set_category_override</code>,
+<code>view.overrides</code>, <code>view.temp_apply</code></p>
 
 <h2 id="annotation-3d">Annotation in 3D</h2>
 <p>A 3D view shows the text notes, tags, dimensions and spots of the plans, sections and elevations as

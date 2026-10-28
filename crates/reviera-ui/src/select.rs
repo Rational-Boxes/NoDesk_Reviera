@@ -352,6 +352,7 @@ impl Gui {
         }
         item("inspect.hide", "&Hide Temporarily", Visibility);
         item("inspect.hide_in_view", "Hide in &View (saved)", Visibility);
+        item("inspect.override_in_view", "Override &Graphics in View…", Visibility);
         let label = if self.all_translucent(&ids) {
             "Make &Opaque"
         } else {

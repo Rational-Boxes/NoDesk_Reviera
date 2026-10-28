@@ -43,6 +43,11 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(ViewHide),
         registry.add(ViewUnhide),
         registry.add(ViewHidden),
+        registry.add(ViewOverrideElements),
+        registry.add(ViewClearElementOverrides),
+        registry.add(ViewSetCategoryOverride),
+        registry.add(ViewClearCategoryOverride),
+        registry.add(ViewOverrides),
         registry.add(OpeningCreateWall),
         registry.add(OpeningEditWall),
         registry.add(OpeningCreateShaft),
@@ -4447,6 +4452,64 @@ edit_command!(
     crate::view_hiding::UnhideParams,
     (),
     crate::view_hiding::unhide
+);
+
+edit_command!(
+    ViewOverrideElements,
+    "view.override_elements",
+    "Override elements' graphics in a view",
+    "Override Graphics in View by element (DOC-GFX-007): sets `override` attributes on elements in one \
+     view, saved with it and printed so: `transparency` (0–100 %: translucent in 3D, lines faded in 2D) and \
+     `halftone` (lines at half strength in plans, sections and elevations). Attributes left out keep \
+     their value; an element's own override wins over its category's.",
+    "Override Graphics in View",
+    crate::view_overrides::OverrideElementsParams,
+    (),
+    crate::view_overrides::override_elements
+);
+
+edit_command!(
+    ViewClearElementOverrides,
+    "view.clear_element_overrides",
+    "Clear elements' graphic overrides in a view",
+    "Removes the element overrides of `element_ids` (or `all`) in one view.",
+    "Clear Graphic Overrides",
+    crate::view_overrides::ClearElementOverridesParams,
+    (),
+    crate::view_overrides::clear_element_overrides
+);
+
+edit_command!(
+    ViewSetCategoryOverride,
+    "view.set_category_override",
+    "Override a category's graphics in a view",
+    "Sets `override` attributes (`transparency`, `halftone`) for every element of a category (`cat.walls`) \
+     in one view; elements' own overrides win over it.",
+    "Override Category in View",
+    crate::view_overrides::CategoryOverrideParams,
+    (),
+    crate::view_overrides::set_category_override
+);
+
+edit_command!(
+    ViewClearCategoryOverride,
+    "view.clear_category_override",
+    "Clear a category's graphic override in a view",
+    "Removes a category's override in one view.",
+    "Clear Category Override",
+    crate::view_overrides::ClearCategoryOverrideParams,
+    (),
+    crate::view_overrides::clear_category_override
+);
+
+read_command!(
+    ViewOverrides,
+    "view.overrides",
+    "List a view's graphic overrides",
+    "A view's element overrides (GlobalId, id, override; `id` null when deleted) and category overrides.",
+    crate::view_overrides::OverridesParams,
+    crate::view_overrides::Overrides,
+    crate::view_overrides::overrides
 );
 
 read_command!(

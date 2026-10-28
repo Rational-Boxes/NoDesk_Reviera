@@ -107,6 +107,9 @@ impl App {
                 let mut vis = self.temp_state(doc, Some(v)).visibility();
                 vis.hidden.extend(reviera_core::parts::hidden_in(store, Some(v)));
                 vis.hidden.extend(reviera_core::view_hiding::hidden_in(store, Some(v)));
+                for (e, o) in reviera_core::view_overrides::resolved_in(store, Some(v)) {
+                    vis.translucent.entry(e).or_insert(o.opacity);
+                }
                 vp.set_visibility(&vis);
                 let c = self.view_camera(doc, v).unwrap_or_else(|| self.fitting_camera(doc));
                 Camera::from_view(&c, aspect)
