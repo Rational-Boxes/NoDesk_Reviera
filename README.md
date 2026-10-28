@@ -1685,6 +1685,17 @@ area by area (reviewed against the spec on 2026-10-15).
 
 **Other chapters:**
 
+- **Glazed enclosures** (`design_documents/GLAZED_ENCLOSURES_PLAN.md`; spec §3.6a,
+  ARC-GLZ-001 … 007): greenhouses, hothouses, solariums, conservatories and atriums built from the
+  existing roofs, sloped glazing, curtain walls, gutters and members by one Glazed Enclosure
+  tool: commercial forms first (gable, gutter-connected multispan, Venlo, hoop, gothic, sawtooth),
+  a glazing and frame library, vents, growing layouts (benches, rolling benches, NFT and
+  high-wire gutters), glazed vaults, domes and geodesic domes, and Reviera-defined types and
+  `Reviera_*` property sets for what IFC lacks. Later phases: hothouse climate and crop light,
+  louvres, baffles and other shading devices with sun-tracking control, atriums with smoke and
+  stack-ventilation checks, HVAC, energy and structural load modelling, residential forms, and
+  building-code rule sets for the US, UK, Canada, EU, Australia and New Zealand. Specified (phase
+  1), not built yet.
 - **FileEngine integration** (`design_documents/FILEENGINE_INTEGRATION.md`): open, save and
   version models on the owner's FileEngine server through its REST API; BCF issues through its
   BCF and discussion services; publishing reports and exports to it, with share links made in

@@ -2712,6 +2712,163 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 
 ---
 
+## 3.6a Glazed enclosures (greenhouses, solariums, atriums)
+
+Owner requirement (2026-10-28), planned in `GLAZED_ENCLOSURES_PLAN.md`, researched in `research/09`–`11`. A **glazed enclosure** is one element that lays out and keeps consistent a glazed building or room made of Reviera's ordinary elements: knee walls, glazed roofs (sloped glazing, glazed vaults and domes), curtain walls, members, gutters, doors and vents. This section covers phase 1 of the plan: the enclosure, commercial greenhouse forms, glazing and frame types, vents, growing layouts and glazing on curved roofs. Climate and growing equipment, sunlight management, atriums, loads, residential forms and code rule sets follow in later phases and get their own sections then.
+
+### 3.6a.1 Glazed enclosure element and tool
+**ID:** ARC-GLZ-001 · **Priority:** P1 · **Ref:** owner requirement (2026-10-28); Reviera's own design (Appendix A.2a); research/09 §1–2
+
+**Purpose.** Create a whole glazed enclosure in one step, from a form and a few parameters, and keep its parts consistent when the parameters change, while each part stays an ordinary element that other tools, schedules and analyses understand.
+
+**Workflow.**
+1. Architecture › Build › **Glazed Enclosure** (or `enclosure.create`).
+2. Choose a **form** (ARC-GLZ-002; residential forms in a later phase) and its **footprint**: sketch it, pick walls of the host building for a lean-to or attached enclosure, or type its corners (§3.1 sketch and coordinate input).
+3. Set the parameters in the Glazed Enclosure dialog, with a live preview in the view: span and bay spacing, number of spans, eave or gutter height, roof pitch or rise, knee-wall type and height (or none), glazing type for roof and walls (ARC-GLZ-003), frame type, gable-end and side glazing, doors, vents (ARC-GLZ-004).
+4. Finish. The enclosure is selected; Properties shows its form and parameters; grips in plans and 3D move the footprint edges and the eave and ridge heights.
+
+**Behaviour & rules.**
+- **Parts it makes and owns:** knee walls (walls of the chosen type); the glazed roof as sloped-glazing roofs (ARC-CW-008) for planar forms or as glazed vaults and domes (ARC-GLZ-006) for curved ones; glazed walls as curtain walls (ARC-CW-001) on the sides and gable ends; frame members (posts, rafters, purlins, ridge and eaves beams, trusses for wide spans) as structural framing or as the glazing system's mullions, by the frame type; gutters and downspouts on the eaves and **valley gutters** between spans (MEP-PIPE-010); doors in the glazed walls; vents.
+- **Regeneration.** Changing a parameter regenerates the parts. Edits the user made to a part survive where they still apply: a door moved along its wall, a changed panel type, a gutter outlet moved. A part can be **detached** (Modify › Detach from Enclosure); the enclosure then leaves it as it is and stops regenerating it.
+- Deleting the enclosure offers to delete its parts or keep them as independent elements.
+- **Host building.** An attached enclosure (lean-to, or along a façade) joins the host walls: its roof meets the host wall with a flashing line, and its knee and end walls join the host's.
+- Parts are created in one transaction; Undo removes the whole enclosure.
+
+**Data (IFC mapping).** The enclosure is an `IfcElementAssembly` with `PredefinedType = USERDEFINED` and `ObjectType = GlazedEnclosure` aggregating its parts (`IfcRelAggregates`), in category `cat.glazed_enclosures`. Its form and parameters are RXD element data (`recipe.enclosure`) and the user-visible design values are the `Reviera_EnclosureDesign` property set (ARC-GLZ-007). Parts keep their own IFC classes.
+
+**Commands.** `enclosure.create(form, footprint | host_wall_ids, level_id, params) -> element_id`, `enclosure.set(enclosure_id, params) -> ()`, `enclosure.get(enclosure_id) -> {form, params, parts[]}`, `enclosure.detach(part_ids[]) -> ()`, `enclosure.forms() -> [{form, params schema, defaults}]`.
+
+**Acceptance criteria.**
+- [ ] A 9.6 m × 20 m gable greenhouse at 22° with 4 m bays and a 4.5 m eave height creates knee-less glazed side walls, a sloped-glazing gable roof, posts and rafters at each bay, two eaves gutters with downspouts, and gable ends with a double door, as one undo step.
+- [ ] Changing the bay spacing to 3.2 m regenerates the posts, rafters and glazing grid; a door moved 2 m along the gable end stays where it was moved.
+- [ ] A detached gutter is not changed when the enclosure's eave height changes.
+- [ ] `enclosure.create` from Lua and from MCP makes the same enclosure as the dialog.
+
+### 3.6a.2 Commercial greenhouse forms
+**ID:** ARC-GLZ-002 · **Priority:** P1 · **Ref:** owner requirement (2026-10-28); research/09 §1.1, §2
+
+**Purpose.** The forms of commercial greenhouses and hothouses, with their usual proportions as defaults.
+
+**Behaviour & rules.**
+
+| Form | Geometry | Defaults (provisional, EXPERT_REVIEW E-44) | IFC roof type |
+|---|---|---|---|
+| Gable (even span) | Two slopes, gable ends | pitch 22.6° (5:12), span 9.6 m, bays 3.0 m, eave 3.0 m | GABLE_ROOF |
+| Uneven span | Two slopes, own pitch and run each | as gable | GABLE_ROOF |
+| Gutter-connected multispan | *n* gable or arch spans sharing valley gutters | span 9.6 m, gutter height 4.5 m, bays 4.0 m | GABLE_ROOF / BARREL_ROOF per span |
+| Venlo | Narrow-roof glass multispan: each truss carries 2 (or 3) roof peaks | truss width 8.0 m (2 peaks), pitch 22°, bays 4.0 m, gutter height 5.5 m | GABLE_ROOF |
+| Hoop / Quonset tunnel | Ground-to-ground semicircular arch, or arch on raised sidewalls | width 9.1 m, hoops at 1.5 m, sidewall 0 or 1.2 m | BARREL_ROOF |
+| Gothic arch | Two circular arcs meeting at a pointed crown | as hoop, crown angle from the arc radius (default 1.0 × span) | RAINBOW_ROOF |
+| Sawtooth | Multispan, each span one slope with a vertical vent face at the high side | span 6.4 m, slope 25°, vent face 1.0 m | SHED_ROOF per span |
+
+- Spans, bays and heights are typed, or dragged by grips; the defaults come from the public sources' typical values and are provisional.
+- A **range** (multispan) can be sized by total width and length, and the tool fits whole spans and bays (reporting the leftover), or by count.
+- **Headhouse.** A multispan can be given a solid-walled headhouse (workroom, boiler, packing) along one end, as a normal building part with walls and a roof, joined to the range.
+- **Orientation.** The dialog shows the ridge direction against north and recommends east–west ridges for single spans north of 40° latitude and north–south for multispans, from the project's site (provisional, E-44) [G002, G040].
+- Minimum roof pitch for glazed roofs is checked against the glazing type's minimum (ARC-GLZ-003) and the condensate-drip guideline (E-45).
+
+**Acceptance criteria.**
+- [ ] A Venlo range of 6 trusses × 8.0 m and 20 bays × 4.0 m gives 12 roof peaks, 5 internal valley gutters and 2 eaves gutters, a total footprint of 48 × 80 m, and an IFC export in which each roof span is an `IfcRoof` GABLE_ROOF aggregated by the enclosure.
+- [ ] A 9.1 m hoop tunnel on 1.2 m sidewalls with hoops at 1.5 m along 30 m has 21 hoops and a crown height of 5.75 m.
+- [ ] A gothic arch of the same width has a pointed crown and more height at 1 m from the sides than the hoop.
+
+### 3.6a.3 Glazing and frame types
+**ID:** ARC-GLZ-003 · **Priority:** P1 · **Ref:** owner requirement (2026-10-28); research/09 §3, §5; research/10 §5
+
+**Purpose.** A library of glazing build-ups and frame systems with the values analyses and checks need.
+
+**Behaviour & rules.**
+- **Glazing types** (panel types for sloped glazing and curtain walls) carry: visible light transmission, PAR transmission, haze (diffusion), U-value, solar heat gain coefficient (g-value), safety class (annealed, toughened, laminated with its interlayer, plastic), thickness and weight, minimum roof pitch, and for multiwall plastics the wall structure (twin, triple, five-wall; cell size).
+- **Shipped types** (provisional values, E-46): 4 mm horticultural float; 4 mm toughened; 6.4 mm laminated; low-e double unit; 4 mm diffuse glass (haze 70 %); twin-wall polycarbonate 8, 10, 16 mm; five-wall polycarbonate 16, 25 mm; 3 mm acrylic; single and inflated double polyethylene film.
+- **Frame types** carry member sections, material (aluminium glazing bar, galvanised steel tube, timber, uPVC), finish, and the deflection limits for members supporting glass, used by the structural checks of a later phase.
+- Light transmission of the glazing type, frame shading (the share of roof area the frame covers) and the glazing's haze feed daylight and crop-light analyses; U and g feed loads and energy.
+
+**Data (IFC mapping).** Glazing types are `IfcPlateType` (CURTAIN_PANEL or SHEET) with a material whose optics are `Pset_MaterialOptical` (VisibleTransmittance, SolarTransmittance, …), and `Reviera_GlazingUnit` for the values IFC has no property for (ARC-GLZ-007). Frame types are `IfcMemberType` with profiles and `Reviera_FrameSystem`.
+
+**Commands.** `glazing.list_types() -> [type]`, `glazing.create_type(name, base?, values) -> type_id`, `glazing.set_type(type_id, values) -> ()`, `frame.list_types()`, `frame.create_type(...)`, `frame.set_type(...)`.
+
+**Acceptance criteria.**
+- [ ] Changing an enclosure's roof glazing to twin-wall polycarbonate 10 mm updates the panels and the roof's U-value in the energy model.
+- [ ] A glazing type's light transmission and haze are written to `Pset_MaterialOptical` and `Reviera_GlazingUnit` on export and read back on import.
+- [ ] A roof pitch below the glazing type's minimum shows a warning on the enclosure.
+
+### 3.6a.4 Vents
+**ID:** ARC-GLZ-004 · **Priority:** P1 · **Ref:** research/09 §4.1–4.2; research/10 §6
+
+**Purpose.** Ventilation openings of glazed enclosures, laid out and sized as a share of the floor area.
+
+**Behaviour & rules.**
+- **Kinds:** ridge vents (continuous or alternating, hinged at the ridge), gutter vents, side and gable vents, roll-up sides on tunnels, roof louvres, and (in atriums, later) smoke vents.
+- The enclosure lays vents out by kind and **target vent area** as a percentage of floor area (default roof 18 %, sides 15 %; provisional, E-47), and reports the achieved free area of roof and side vents.
+- Each vent has an opening angle, its free (aerodynamic) area and an actuator (manual, motor; rack-and-pinion, chain); vents close in the view by an *Open* parameter used by analyses and shown in 3D.
+- Vent area and the floor area feed the ventilation sizing check of the climate phase.
+
+**Data (IFC mapping).** A vent is an `IfcWindow` (roof or wall) with its operation type, hosted in the glazing, with `Reviera_Vent` (free area, discharge coefficient, actuator, opening angle); a motor is an `IfcActuator` assigned to it.
+
+**Commands.** `enclosure.set_vents(enclosure_id, kind, target_percent? | count?, opening_angle?) -> [vent_id]`, `vent.set(vent_id, open?, angle?) -> ()`.
+
+**Acceptance criteria.**
+- [ ] A 9.6 × 40 m gable greenhouse with continuous ridge vents at a 18 % target reports roof vent area ≥ 69 m² (18 % of 384 m²) and places vents in whole bays.
+- [ ] A vent's free area is in `Reviera_Vent` on export.
+
+### 3.6a.5 Growing layouts: benches, rolling benches, aisles and growing gutters
+**ID:** ARC-GLZ-005 · **Priority:** P1 · **Ref:** owner requirement (2026-10-28, commercial grows); research/09 §4.6; research/11 Part B
+
+**Purpose.** Fill a greenhouse floor with growing systems and aisles, and report the growing area.
+
+**Workflow.**
+1. Select an enclosure (or a room) › **Growing Layout**.
+2. Choose a system: fixed benches, rolling benches, ebb-and-flow tables, NFT gutters, or high-wire gutters; its component type (Component Library); the aisle width, main aisle width and position, the run direction, and the clearances to walls.
+3. The tool fills the floor and reports the growing area, the share of floor area it covers, and the count of each component.
+
+**Behaviour & rules.**
+- The layout is one element owning its components (like the enclosure owns its parts); changing the floor, aisle widths or system regenerates it.
+- Defaults (provisional, E-48): bench width 1.8 m, aisle 0.6 m, main aisle 1.2 m; rolling benches with one 0.6 m shared aisle per bay (81–90 % of the floor); NFT gutter slope 2 % (1.2–3 %) and run length at most 12 m; ebb-and-flow tables level; high-wire gutter height and slope from the component type [G081, research/11 §B6].
+- Growing gutters have a slope and a drain end; their outlets connect to drainage like other plumbing fixtures (a later phase).
+
+**Data (IFC mapping).** Benches and tables are `IfcFurniture` (ObjectType `Bench`, `RollingBench`, `EbbFlowTable`); growing gutters `IfcBuildingElementProxy` USERDEFINED (ObjectType `GrowingGutter`, `HighWireGutter`); the layout an `IfcElementAssembly` (ObjectType `GrowingLayout`); recipe RXD element data (`recipe.growing_layout`).
+
+**Commands.** `growing.layout(host_id, system, component_type_id?, aisle?, main_aisle?, direction?, clearance?) -> element_id`, `growing.set_layout(layout_id, ...) -> ()`, `growing.summary(layout_id) -> {growing_area, floor_area, share, counts}`.
+
+**Acceptance criteria.**
+- [ ] A 9.6 × 40 m floor with 1.8 m benches, 0.6 m aisles and a 1.2 m central main aisle along the length reports the growing area and a share between 60 % and 75 %; rolling benches on the same floor report a share above 80 %.
+- [ ] An NFT layout refuses a gutter run longer than 12 m, splitting it with a feed in the middle.
+- [ ] Moving a wall of the host room regenerates the layout to the new floor.
+
+### 3.6a.6 Glazing on vaults and domes; geodesic domes
+**ID:** ARC-GLZ-006 · **Priority:** P1 · **Ref:** owner decision (2026-10-28: "support both"); research/09 §1.1 (domes)
+
+**Purpose.** Glazed curved roofs: glazing panels and mullions on the smooth arched roofs and domes that exist (ARC-ROOF-008/009), and faceted geodesic domes.
+
+**Behaviour & rules.**
+- **Glazed vaults and domes.** An arched roof or dome of a *Glazed* type is divided into panels by two grids on its surface: for a vault, along the vault (bays) and around the arch (divisions); for a dome, meridians and parallels (rings). Each panel is planar (a quadrilateral split into two triangles where it cannot be planar, by a setting), with mullions along the grid lines and the crown or oculus edge. Panel size limits come from the glazing type.
+- **Geodesic dome.** A dome of a chosen **frequency** (2V, 3V, 4V; class I icosahedral) and radius, truncated at a chosen fraction (for example 3/8 or 5/8) with a level base ring where the frequency allows: struts as members, hubs as connections, triangular panels of the glazing type; the strut lengths and counts are reported for fabrication.
+- Vents can be set in glazed vault panels; doors go in the end or base walls.
+
+**Data (IFC mapping).** `IfcRoof` (BARREL_ROOF or DOME_ROOF) aggregating `IfcPlate` panels and `IfcMember` mullions or struts, as sloped glazing is; the grid or frequency is RXD element data.
+
+**Commands.** `roof.set_glazing(roof_id, grid_u, grid_v, triangulate?) -> ()`, `roof.create_geodesic(center, radius, frequency, truncation, level_id, glazing_type_id?, frame_type_id?) -> element_id`.
+
+**Acceptance criteria.**
+- [ ] A 9 m-span glazed barrel vault with 1.5 m bays and 12 divisions has planar panels whose corners lie on the arch.
+- [ ] A 3V geodesic dome of 5 m radius at 5/8 truncation reports its strut length classes and counts, and its panels close without gaps.
+
+### 3.6a.7 Reviera types and property sets for glazed enclosures
+**ID:** ARC-GLZ-007 · **Priority:** P1 · **Ref:** owner direction (2026-10-28: "defining entity types outside of IFC and adding custom properties in our namespace"); Chapter 2 §2.2.2 category registry
+
+**Purpose.** Represent what IFC has no entity or property for, in Reviera's own namespace, without breaking the file for other tools.
+
+**Behaviour & rules.**
+- New **categories** in the category registry, each with its IFC carrier (class, `PredefinedType` USERDEFINED where needed, `ObjectType`): `cat.glazed_enclosures` (`IfcElementAssembly`, `GlazedEnclosure`), `cat.growing_systems` (`IfcFurniture` / `IfcBuildingElementProxy`, `Bench`, `RollingBench`, `GrowingGutter`, `HighWireGutter`), `cat.vents` (`IfcWindow` with `Reviera_Vent`); later phases add `cat.shading_devices` (`IfcShadingDevice`: JALOUSIE for louvres, SHUTTER, AWNING, USERDEFINED `Fin`, `BriseSoleil`, `Baffle`, `LightShelf`, `Screen`) and atrium spaces (`IfcSpace`, ObjectType `Atrium`).
+- **Property sets** in Reviera's namespace, named `Reviera_<Name>`, for engineering values with no standard property: `Reviera_EnclosureDesign` (form, spans, bays, heights, pitch, design life class), `Reviera_GlazingUnit` (safety class, PAR transmission, haze, wall structure, minimum pitch), `Reviera_FrameSystem`, `Reviera_Vent`, and later `Reviera_ShadingPerformance` and `Reviera_GrowingClimate`. They appear in Properties and schedules like any property set.
+- **Standard first:** a standard property is used where one exists (`Pset_MaterialOptical`, `Pset_ShadingDeviceCommon`, `Pset_PipeSegmentTypeGutter`, `Pset_SpaceThermalDesign`), and no Reviera property repeats one.
+- **Published definitions.** Each `Reviera_*` set is defined once, machine-readably (names, data types, units, descriptions, applicable classes), as `schemas/psets/reviera-psets-1.json` under the MIT licence (interop components are MIT), so other tools can read them; publishing them in the buildingSMART Data Dictionary under a Reviera domain is a later option.
+- A file stripped of RXD keeps the enclosure's parts and their `Reviera_*` property sets; a file stripped of those too is still a valid building (Chapter 2 principle 5).
+
+**Acceptance criteria.**
+- [ ] The published property-set definition file validates as JSON Schema and lists every `Reviera_*` property the glazed enclosure tools write.
+- [ ] An enclosure exported, stripped of `Reviera_Element` RXD and reopened shows its parts and their `Reviera_GlazingUnit` values; *Reattach* rebuilds the enclosure from them where it can.
+
 ## 3.7 Stairs, railings and ramps
 
 ### 3.7.1 Stair assembly model
@@ -4763,6 +4920,24 @@ All commands below are registered once in the command registry and exposed autom
 | `scopebox.set_extents` | id, min, max, rotation? | — | Yes | ARC-SCOPE-001 |
 | `datum.assign_scope_box` | datum_ids, scope_box_id \| null | — | Yes | ARC-SCOPE-001 |
 | `view.assign_scope_box` | view_ids, scope_box_id \| null | — | Yes | ARC-SCOPE-001 |
+| `enclosure.create` | form, footprint \| host_wall_ids, level_id, params | element_id | Yes | ARC-GLZ-001 |
+| `enclosure.set` | enclosure_id, params | — | Yes | ARC-GLZ-001 |
+| `enclosure.get` | enclosure_id | {form, params, parts} | No (query) | ARC-GLZ-001 |
+| `enclosure.detach` | part_ids | — | Yes | ARC-GLZ-001 |
+| `enclosure.forms` | — | [{form, schema, defaults}] | No (query) | ARC-GLZ-001, ARC-GLZ-002 |
+| `glazing.list_types` | — | [type] | No (query) | ARC-GLZ-003 |
+| `glazing.create_type` | name, base?, values | type_id | Yes | ARC-GLZ-003 |
+| `glazing.set_type` | type_id, values | — | Yes | ARC-GLZ-003 |
+| `frame.list_types` | — | [type] | No (query) | ARC-GLZ-003 |
+| `frame.create_type` | name, base?, values | type_id | Yes | ARC-GLZ-003 |
+| `frame.set_type` | type_id, values | — | Yes | ARC-GLZ-003 |
+| `enclosure.set_vents` | enclosure_id, kind, target_percent? \| count?, opening_angle? | [vent_id] | Yes | ARC-GLZ-004 |
+| `vent.set` | vent_id, open?, angle? | — | Yes | ARC-GLZ-004 |
+| `growing.layout` | host_id, system, component_type_id?, aisle?, main_aisle?, direction?, clearance? | element_id | Yes | ARC-GLZ-005 |
+| `growing.set_layout` | layout_id, params | — | Yes | ARC-GLZ-005 |
+| `growing.summary` | layout_id | {growing_area, floor_area, share, counts} | No (query) | ARC-GLZ-005 |
+| `roof.set_glazing` | roof_id, grid_u, grid_v, triangulate? | — | Yes | ARC-GLZ-006 |
+| `roof.create_geodesic` | center, radius, frequency, truncation, level_id, glazing_type_id?, frame_type_id? | element_id | Yes | ARC-GLZ-006 |
 | `workplane.set` | view_id, by: Name(datum_id) \| Face(host_ref) \| Line(element_id) \| Plane(origin, normal, xdir) | plane | Yes | ARC-WP-001 |
 | `workplane.show` | view_id, on | — | No (session state) | ARC-WP-001 |
 | `workplane.viewer` | view_id? (default: the active view) | view_id | No (session state) | ARC-WP-001 |

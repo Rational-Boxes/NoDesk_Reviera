@@ -114,11 +114,23 @@ Any source that fails this test is rejected. Rejections are noted in the session
 - **Methods used:** public web search and HTTP fetch of public pages. No images were downloaded, Revit was not installed or run, and no file formats were examined.
 - **Finding to check:** "Reload Latest" is a worksharing command (Collaborate › Synchronize), not a family command; the wording in `research/05` §4.9 needs checking.
 
+### 2026-10-28 — Session 3: Glazed enclosures (greenhouses, solariums, atriums)
+
+- **Purpose:** background for the owner's request for greenhouse, solarium and atrium tools with HVAC, energy and sunlight-management analysis (`GLAZED_ENCLOSURES_PLAN.md`, spec §3.6a). This is building-industry research, not research into a reference application: no BIM product's tools or content were used.
+- **Output:** three research files, each with its own Sources table:
+  - `research/09_greenhouses_solariums.md`: forms, components, glazing, environmental systems, structural standards and sunroom/conservatory codes, analyses, IFC mapping (G001–G087, G063 unused; 26 read in full);
+  - `research/10_atriums_solar_shading.md`: atrium forms, fire and smoke, environmental behaviour, HVAC and energy methods, shading devices, control logic, IFC mapping (A001–A064, A067; 31 read in full);
+  - `research/11_glazed_enclosure_codes_growing.md`: building codes by jurisdiction (US, Canada, EU and Netherlands, Germany, Australia, New Zealand) as rule-check thresholds, and commercial growing (light, CO₂, heating, screens, setpoints, hydroponic and bench systems, water) (C001–C072; 29 read in full).
+- **Sources:** 223, added to `SOURCE_REGISTER.md` §A (area GLZ) with their original IDs. Extension-service, university, government, code-adoption, standards-body scope pages, buildingSMART's public GitHub sources, and manufacturers' public literature. Sources known only from search-engine summaries are marked as such and their figures treated as secondary.
+- **Rejected or not used (clean-room):** a full copy of ANSI/ASAE EP406.4 on a university server (paid standard; cited from scope summaries only); Scribd and Slideshare copies of EN 13031-1, BS 5502, AS 1288, NFPA material and a lettuce handbook; MBIE's full-text copies of NZS 4223 were not opened; paywalled code text (ICC 2021 IECC, current NFPA 92) cited only from public adoptions, interpretations or scope pages. Sites that answered automated fetches with 403 (standards.buildingsmart.org, some repositories) were not worked around; their content came from public mirrors such as buildingSMART's GitHub or from search summaries.
+- **Methods used:** public web search and HTTP fetch of public pages and PDFs by three automated research agents (Claude Code subagents). No images were downloaded and no software was installed or run.
+- **For expert review:** the provisional defaults taken from this research are EXPERT_REVIEW E-44 … E-48 (forms, minimum glazed pitch, glazing values, vent areas, growing layouts); the plan lists more for later phases (design fires, smoke-vent discharge coefficients, the louvre cut-off formula's sign convention).
+
 ---
 
 ## 5. Source Register
 
-The full register is in **`SOURCE_REGISTER.md` §A**. It has 577 sources, each with an ID, area, type, URL, HTTP status and public-availability verdict. It was generated from the research files' Sources sections on 2026-10-12, and every URL was re-checked with an unauthenticated request.
+The full register is in **`SOURCE_REGISTER.md` §A**. It had 577 sources at first (1,054 after Session 3), each with an ID, area, type, URL, HTTP status and public-availability verdict. It was generated from the research files' Sources sections on 2026-10-12, and every URL was re-checked with an unauthenticated request.
 
 | Type | Count |
 |------|------:|
