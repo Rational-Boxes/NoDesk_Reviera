@@ -357,3 +357,40 @@ fn roll_up_sides_and_gable_vents() {
     project.save(&doc).unwrap();
     assert!(std::fs::read_to_string(&path).unwrap().contains("'Roll-up Side 1'") || std::fs::read_to_string(&path).unwrap().contains("Roll-up Side"));
 }
+
+#[test]
+fn a_headhouse_across_one_end() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("hh.ifc");
+    let (mut project, mut doc) = LocalProject::new(Schema::Ifc4, &path).unwrap();
+    let r = registry();
+    let level = doc.store().iter().find(|e| e.class == "IfcBuildingStorey").unwrap().id();
+    // A 9.6 × 40 m gable house; a headhouse at its start, the defaults: 10 % of the floor (4 m
+    // deep), as high as the eaves (3 m).
+    let gh = run(&r, &mut doc, "enclosure.create", json!({ "form": "gable", "level_id": level.0, "length": 40.0, "headhouse": {} })).unwrap();
+    let info = run(&r, &mut doc, "enclosure.get", json!({ "enclosure_id": gh })).unwrap();
+    assert_eq!((count(&info, "walls"), count(&info, "roofs"), count(&info, "doors")), (3, 2, 1), "{info}");
+    assert!((info["headhouse_percent"].as_f64().unwrap() - 10.0).abs() < 1e-6, "{info}");
+    // The end wall into it has a 3 m door; the far end's stays 1.6 m.
+    let store = doc.store();
+    let door_width = |id: u64| {
+        let g = reviera_core::curtain::regenerate(store, store.get(ElementId(id)).unwrap()).unwrap();
+        let d = g.parts.iter().find(|p| p.panel == reviera_core::curtain::Panel::Door).unwrap();
+        d.x[1] - d.x[0]
+    };
+    let (far, near) = (door_width(info["curtain_walls"][1].as_u64().unwrap()), door_width(info["curtain_walls"][3].as_u64().unwrap()));
+    assert!(near >= 3.0 - 0.1 && far < 2.0, "{near} {far}");
+    // Its walls stand outside the range, at x ≤ 0.
+    for w in info["walls"].as_array().unwrap() {
+        let rec = reviera_core::walls::wall_recipe(store.get(ElementId(w.as_u64().unwrap())).unwrap()).unwrap();
+        assert!(rec.curve.start[0] <= 0.0 && rec.curve.end[0] <= 0.0, "{rec:?}");
+    }
+    // At the far end instead, then removed.
+    run(&r, &mut doc, "enclosure.set", json!({ "enclosure_id": gh, "headhouse": { "at": "end", "depth": "6 m" } })).unwrap();
+    let info = run(&r, &mut doc, "enclosure.get", json!({ "enclosure_id": gh })).unwrap();
+    assert!((info["headhouse_area"].as_f64().unwrap() - 6.0 * 9.6).abs() < 1e-6);
+    project.save(&doc).unwrap();
+    run(&r, &mut doc, "enclosure.set", json!({ "enclosure_id": gh, "headhouse": { "enabled": false } })).unwrap();
+    let info = run(&r, &mut doc, "enclosure.get", json!({ "enclosure_id": gh })).unwrap();
+    assert_eq!((count(&info, "walls"), count(&info, "roofs"), count(&info, "doors")), (0, 1, 0), "{info}");
+}

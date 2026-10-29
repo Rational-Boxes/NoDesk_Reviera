@@ -235,6 +235,15 @@ impl Gui {
             grid.append(Property::string("Side Vents (% of floor)", "gh_side_vents", format!("{}", r.side_vents)));
             grid.set_help_string("gh_side_vents", "Vent bands along the side walls' tops, as a share of the floor area; 0 for none");
         }
+        grid.append(Property::boolean("Headhouse", "gh_headhouse", r.headhouse.is_some()));
+        grid.set_help_string("gh_headhouse", "A solid-walled workroom across one end, with a door; the end wall's door into the range widened to 3 m");
+        if let Some(h) = r.headhouse {
+            let (d, ht) = (self.format_length(h.depth), self.format_length(h.height));
+            grid.append(Property::string("Headhouse Depth", "gh_hh_depth", d));
+            grid.append(Property::string("Headhouse Height", "gh_hh_height", ht));
+            let at = if h.at == enclosures::End::End { 1 } else { 0 };
+            grid.append(Property::enumeration("Headhouse At", "gh_hh_at", vec![("Start".to_owned(), 0), ("End".to_owned(), 1)], at));
+        }
         let roll = self.format_length(r.roll_up);
         grid.append(Property::string("Roll-up Sides", "gh_roll_up", roll));
         grid.set_help_string("gh_roll_up", "How far up the side walls open, their film rolled up; 0 for none");
@@ -304,6 +313,10 @@ impl Gui {
             },
             "gh_vent_angle" => args["vent_angle"] = json!(text),
             "gh_roll_up" => args["roll_up"] = json!(text),
+            "gh_headhouse" => args["headhouse"] = json!({ "enabled": matches!(text.as_str(), "True" | "true" | "1") }),
+            "gh_hh_depth" => args["headhouse"] = json!({ "depth": text }),
+            "gh_hh_height" => args["headhouse"] = json!({ "height": text }),
+            "gh_hh_at" => args["headhouse"] = json!({ "at": if text == "End" { "end" } else { "start" } }),
             "gh_gable_vents" => args["gable_vents"] = json!(text),
             "gh_vent_actuator" => match ACTUATORS.iter().find(|a| a.1 == text) {
                 Some(a) => args["vent_actuator"] = json!(a.0),

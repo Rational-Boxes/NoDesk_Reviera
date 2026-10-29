@@ -48,6 +48,10 @@
 //! enclosure reports the share of the roof they shade, and warns when the roof is flatter than
 //! its glazing allows or than the condensate guideline.
 //!
+//! A **headhouse** (`headhouse`): a solid-walled workroom across one end (walls of the default
+//! type on its three outer sides, a flat roof, a door in its front wall), the range's end-wall
+//! door on that side widened for equipment (E-56).
+//!
 //! Not yet: rafters, purlins and Venlo trusses; side
 //! vents and roll-up sides; vents as their own `IfcWindow` in a glazed roof's IFC (the roof's
 //! glazing is one body there); keeping a user's edits to a part when the enclosure regenerates; a headhouse.
@@ -92,6 +96,8 @@ const POST_LIGHT: &str = "HSS3X3X1/4";
 const POST_HEAVY: &str = "HSS4X4X1/4";
 /// The least clear width and height of an end wall's door (provisional, EXPERT_REVIEW E-50).
 const DOOR_WIDTH: f64 = 1.5;
+/// An end wall's door into a headhouse: wide enough for equipment (research/11 §B7, E-56).
+const HEADHOUSE_DOOR: f64 = 3.0;
 const DOOR_HEIGHT: f64 = 2.1;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -161,6 +167,9 @@ pub struct EnclosureRecipe {
     /// How the vents open (ARC-GLZ-004).
     #[serde(default)]
     pub vent: crate::vents::VentSettings,
+    /// A headhouse across one end.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub headhouse: Option<Headhouse>,
     /// Steel posts at the bays.
     #[serde(default = "yes")]
     pub frame: bool,
@@ -184,6 +193,34 @@ pub struct EnclosureRecipe {
 
 fn yes() -> bool {
     true
+}
+
+/// Which end of the range a headhouse stands at.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum End {
+    /// At the enclosure's origin.
+    #[default]
+    Start,
+    End,
+}
+
+/// A headhouse: how deep it is along the range, how high its walls are, and which end.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct Headhouse {
+    pub depth: f64,
+    pub height: f64,
+    #[serde(default)]
+    pub at: End,
+}
+
+impl EnclosureRecipe {
+    /// A headhouse's defaults: 10 % of the growing floor (at least 4 m deep) and the eave height
+    /// (2.7 to 4 m; 3 m on a tunnel) (provisional, E-56).
+    pub fn default_headhouse(&self) -> Headhouse {
+        let height = if self.form.tunnel() { 3.0 } else { self.eave.clamp(2.7, 4.0) };
+        Headhouse { depth: (0.1 * self.length).max(4.0), height, at: End::Start }
+    }
 }
 
 fn vent_percent() -> f64 {
@@ -697,7 +734,9 @@ fn build(txn: &mut Transaction<'_>, guid: &str, r: &EnclosureRecipe) -> Result<V
             }
             if r.doors {
                 let along = (b[0] - a[0]).hypot(b[1] - a[1]);
-                crate::curtain::make_door(txn, cw, along / 2.0, DOOR_WIDTH, DOOR_HEIGHT)?;
+                // Into a headhouse: wide enough for equipment.
+                let into = r.headhouse.is_some_and(|h| (h.at == End::Start) == (k == 3));
+                crate::curtain::make_door(txn, cw, along / 2.0, if into { HEADHOUSE_DOOR } else { DOOR_WIDTH }, DOOR_HEIGHT)?;
             }
         }
         if saw && k == 2 && vent_band > 0.0 {
@@ -787,6 +826,73 @@ fn build(txn: &mut Transaction<'_>, guid: &str, r: &EnclosureRecipe) -> Result<V
                 )?);
             }
         }
+    }
+    // The headhouse: walls on its three outer sides (the range's end wall is the fourth), a flat
+    // roof over them, a door in the middle of its front wall.
+    if let Some(h) = r.headhouse {
+        let wt = walls::default_type(txn)?;
+        let half = txn.store().get(wt).and_then(walls::type_width).unwrap_or(0.2) / 2.0;
+        // Clear of the end wall's glass.
+        let near = wall_bar.depth / 2.0 + 0.005;
+        let (x_near, x_far) = match h.at {
+            End::Start => (-near, -h.depth),
+            End::End => (l + near, l + h.depth),
+        };
+        let wall = |txn: &mut Transaction<'_>, a: [f64; 2], b: [f64; 2]| {
+            walls::create(
+                txn,
+                walls::CreateParams {
+                    type_id: Some(ElementRef::Id(wt)),
+                    curve: walls::CurveArg { line: Line { start: r.at(a[0], a[1]), end: r.at(b[0], b[1]) }, through: Vec::new() },
+                    base_level: ElementRef::Id(level),
+                    top_constraint: walls::TopConstraint::Unconnected(h.height),
+                    base_offset: 0.0,
+                    top_offset: 0.0,
+                    location_line: walls::LocationLine::WallCenterline,
+                    flip: false,
+                    auto_join: Default::default(),
+                    structural: false,
+                    structural_usage: None,
+                },
+            )
+        };
+        // Wound so each wall's exterior faces out of the headhouse.
+        let (ends, front) = if h.at == End::Start {
+            ([([x_near, 0.0], [x_far, 0.0]), ([x_far, w], [x_near, w])], ([x_far, 0.0], [x_far, w]))
+        } else {
+            ([([x_far, 0.0], [x_near, 0.0]), ([x_near, w], [x_far, w])], ([x_far, w], [x_far, 0.0]))
+        };
+        for (a, b) in ends {
+            parts.push(wall(txn, a, b)?);
+        }
+        let front_wall = wall(txn, front.0, front.1)?;
+        parts.push(front_wall);
+        // The roof over the walls' outer faces, stopping short of the end wall.
+        let (x0, x1) = if h.at == End::Start { (x_far - half, x_near) } else { (x_near, x_far + half) };
+        let corners = [r.at(x0, -half), r.at(x1, -half), r.at(x1, w + half), r.at(x0, w + half)];
+        let curves = (0..4)
+            .map(|k| RoofCurveArg { line: Line { start: corners[k], end: corners[(k + 1) % 4] }, lock: None, defines_slope: Some(false), slope: None, overhang: None, eave: None })
+            .collect();
+        parts.push(roofs::create(
+            txn,
+            roofs::CreateParams { type_id: None, curves, level_id: ElementRef::Id(level), base_offset: Some(h.height.into()), slope: None, cutoff_level_id: None, cutoff_offset: None },
+        )?);
+        parts.push(crate::inserts::place(
+            txn,
+            crate::inserts::Kind::Door,
+            crate::inserts::PlaceParams {
+                type_id: None,
+                host_wall_id: Some(ElementRef::Id(front_wall)),
+                point_along: Some(w / 2.0),
+                point: None,
+                sill_height: None,
+                flip_hand: false,
+                flip_facing: false,
+                width: None,
+                height: None,
+                fit: None,
+            },
+        )?);
     }
     // Gutters: both eaves of the outer spans, and one valley gutter between each pair.
     if r.gutters && !r.form.tunnel() {
@@ -926,6 +1032,9 @@ pub struct Params {
     /// Gable vents' band depth under the end walls' tops (0 for none).
     #[schemars(extend("x-reviera-data-type" = "length"))]
     pub gable_vents: Option<Value>,
+    /// A headhouse across one end: its sizes (each its default when absent), or `enabled: false`
+    /// to remove it.
+    pub headhouse: Option<HeadhouseArgs>,
     /// The vents' design opening angle (radians or "30°"), discharge coefficient and actuator.
     #[schemars(extend("x-reviera-data-type" = "angle"))]
     pub vent_angle: Option<Value>,
@@ -944,6 +1053,19 @@ pub struct Params {
     pub origin: Option<[f64; 2]>,
     #[schemars(extend("x-reviera-data-type" = "angle"))]
     pub rotation: Option<Value>,
+}
+
+/// A headhouse's arguments.
+#[derive(Debug, Default, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct HeadhouseArgs {
+    /// False removes the headhouse (default true).
+    pub enabled: Option<bool>,
+    #[schemars(extend("x-reviera-data-type" = "length"))]
+    pub depth: Option<Value>,
+    #[schemars(extend("x-reviera-data-type" = "length"))]
+    pub height: Option<Value>,
+    pub at: Option<End>,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -978,6 +1100,7 @@ pub fn defaults(form: Form) -> EnclosureRecipe {
         roll_up: 0.0,
         gable_vents: 0.0,
         vent: Default::default(),
+        headhouse: None,
         frame: true,
         arc: gothic_arc(),
         roof_glazing: None,
@@ -1066,6 +1189,26 @@ fn apply(store: &Store, r: &mut EnclosureRecipe, p: &Params) -> Result<()> {
             return Err(Error::new("enclosure.bad_value", "the side vent area is 0 to 60 % of the floor area"));
         }
         r.side_vents = v;
+    }
+    if let Some(a) = &p.headhouse {
+        if a.enabled == Some(false) {
+            r.headhouse = None;
+        } else {
+            let mut h = r.headhouse.unwrap_or_else(|| r.default_headhouse());
+            if let Some(v) = num(&a.depth, "length", "the headhouse depth")? {
+                h.depth = v;
+            }
+            if let Some(v) = num(&a.height, "length", "the headhouse height")? {
+                h.height = v;
+            }
+            if let Some(at) = a.at {
+                h.at = at;
+            }
+            if !(2.0..=50.0).contains(&h.depth) || !(2.4..=12.0).contains(&h.height) {
+                return Err(Error::new("enclosure.bad_value", "a headhouse is 2 to 50 m deep and 2.4 to 12 m high"));
+            }
+            r.headhouse = Some(h);
+        }
     }
     if let Some(v) = num(&p.roll_up, "length", "the roll-up height")? {
         if !(v == 0.0 || (0.2..=5.0).contains(&v)) {
@@ -1235,6 +1378,10 @@ pub struct Info {
     pub gutters: Vec<ElementId>,
     pub posts: Vec<ElementId>,
     pub beams: Vec<ElementId>,
+    pub doors: Vec<ElementId>,
+    /// The headhouse's floor, and as a share of the growing floor (percent).
+    pub headhouse_area: f64,
+    pub headhouse_percent: f64,
     /// What the enclosure should be checked for: a roof flatter than its glazing allows, or
     /// flat enough for condensate to drip (ARC-GLZ-002, EXPERT_REVIEW E-45).
     pub warnings: Vec<String>,
@@ -1273,7 +1420,7 @@ fn pitch_warnings(store: &Store, r: &EnclosureRecipe, roof: Option<&Element>) ->
 /// `enclosure.get`.
 pub(crate) fn get(store: &Store, p: GetParams) -> Result<Info> {
     let (_, r) = resolve(store, &p.enclosure_id)?;
-    let mut info = Info { width: r.width(), ridge: r.ridge(), floor_area: r.width() * r.length, frame_shading: r.frame_shading(), vent_area: 0.0, free_vent_area: 0.0, effective_vent_area: 0.0, side_vent_area: 0.0, gable_vent_area: 0.0, vent_percent: 0.0, recipe: r.clone(), roofs: vec![], curtain_walls: vec![], walls: vec![], gutters: vec![], posts: vec![], beams: vec![], warnings: vec![] };
+    let mut info = Info { width: r.width(), ridge: r.ridge(), floor_area: r.width() * r.length, frame_shading: r.frame_shading(), vent_area: 0.0, free_vent_area: 0.0, effective_vent_area: 0.0, side_vent_area: 0.0, gable_vent_area: 0.0, vent_percent: 0.0, recipe: r.clone(), roofs: vec![], curtain_walls: vec![], walls: vec![], gutters: vec![], posts: vec![], beams: vec![], doors: vec![], headhouse_area: 0.0, headhouse_percent: 0.0, warnings: vec![] };
     for g in &r.parts {
         let Some(e) = GlobalId::parse(g).and_then(|g| store.find_by_guid(&g)).and_then(|i| store.get(i)) else { continue };
         let list = if roofs::roof_recipe(e).is_some() {
@@ -1286,6 +1433,8 @@ pub(crate) fn get(store: &Store, p: GetParams) -> Result<Info> {
             &mut info.posts
         } else if e.class == "IfcBeam" {
             &mut info.beams
+        } else if e.class == "IfcDoor" {
+            &mut info.doors
         } else {
             &mut info.gutters
         };
@@ -1310,6 +1459,10 @@ pub(crate) fn get(store: &Store, p: GetParams) -> Result<Info> {
                 info.gable_vent_area += t.pane_area;
             }
         }
+    }
+    if let Some(h) = r.headhouse {
+        info.headhouse_area = h.depth * r.width();
+        info.headhouse_percent = 100.0 * info.headhouse_area / info.floor_area.max(1e-9);
     }
     info.warnings = pitch_warnings(store, &r, info.roofs.first().and_then(|id| store.get(*id)));
     Ok(info)

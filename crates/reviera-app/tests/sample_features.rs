@@ -891,7 +891,7 @@ fn the_greenhouses_sample_keeps_its_enclosures() {
         let n = |k: &str| info[k].as_array().map_or(0, Vec::len);
         seen.push((r.form, n("roofs"), n("curtain_walls"), n("walls"), n("gutters"), n("posts") + n("beams")));
         // Every part is still there and names its enclosure.
-        assert_eq!(n("roofs") + n("curtain_walls") + n("walls") + n("gutters") + n("posts") + n("beams"), r.parts.len(), "{info}");
+        assert_eq!(n("roofs") + n("curtain_walls") + n("walls") + n("gutters") + n("posts") + n("beams") + n("doors"), r.parts.len(), "{info}");
     }
     seen.sort_by_key(|s| (s.1, s.5, format!("{:?}", s.0)));
     use reviera_core::enclosures::Form;
@@ -907,7 +907,7 @@ fn the_greenhouses_sample_keeps_its_enclosures() {
             (Form::Gable, 1, 4, 0, 2, 14),
             (Form::Sawtooth, 3, 6, 0, 3, 16),
             (Form::Multispan, 3, 4, 0, 4, 24),
-            (Form::Venlo, 4, 4, 2, 5, 24),
+            (Form::Venlo, 5, 4, 5, 5, 24),
         ]
     );
     // Five growing layouts, each with its pieces; the Venlo's NFT runs are 12 m at most.

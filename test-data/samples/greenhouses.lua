@@ -22,6 +22,9 @@ local venlo = reviera.enclosure.create{
   form = "venlo", level_id = l1, origin = {0, 0},
   span = "8 m", spans = 2, length = "24 m", bay = "4 m", eave = "5.5 m", pitch = "22°",
   knee = "600 mm",
+  -- A headhouse across its west end for potting and packing: 4 m deep, 4 m high, with a 3 m
+  -- door into the range for trolleys.
+  headhouse = { depth = "4 m", height = "4 m" },
 }
 
 -- Glazing comes from the library (ARC-GLZ-003, `glazing.list_types`): diffuse glass on the

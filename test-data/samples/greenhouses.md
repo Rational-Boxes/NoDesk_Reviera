@@ -13,7 +13,9 @@ Start with **File › New**. The model has Level 1 at 0. Open the Level 1 plan.
    between each pair, glass side walls on a knee wall, end walls glazed to the ground with a door
    in the middle of each, their glass filling up into all four gables and dropping under the
    valley gutters, two eaves gutters, and ridge vents (hung open) on alternate sides of each
-   ridge, 18 % of the floor area.
+   ridge, 18 % of the floor area. In Properties set **Headhouse** on (Depth 4 m, Height 4 m): a
+   solid-walled workroom across the west end with a flat roof and a door, the end wall's door
+   into the range widened to 3 m.
 2. **Change it.** With the range selected, Properties › Glazed Enclosure shows its form and
    sizes; set Trusses to 3 and back to 2, or the Eave Height, and the parts are made again.
    (The script leaves it at 2 trusses.)
@@ -69,11 +71,10 @@ its parts.
 
 - **Detach from Enclosure** has no menu entry yet; `enclosure.detach` does it.
 - **Frame members and vents.** The frame is posts and gutter beams only: no rafters, purlins or trusses yet
-  (the glazing bars stand in), and only ridge vents (no side vents or roll-up sides, ARC-GLZ-004); the doors are plain hinged curtain-wall
-  doors (no sliding doors or door types yet).
-- Gutter-connected arch ranges, glazed smooth vaults and geodesic domes
-  (ARC-GLZ-002, -006); the tunnels' arches are faceted, and they have no roll-up sides yet.
-- **Headhouse**, high-wire gutters, layouts in rooms, and the glazing and frame type library
-  (ARC-GLZ-003): the two glass types are made on first use with provisional values.
+  (the glazing bars stand in); vents are drawn always open (no opening and closing them in the
+  view), and there are no gutter vents; the doors are plain hinged curtain-wall doors (no sliding
+  doors or door types yet).
+- Gutter-connected arch ranges (ARC-GLZ-002); the tunnels' arches are faceted.
+- The headhouse has a flat roof only, and no floor slab or loading door.
 - **Keeping edits.** A change rebuilds every part, so hand edits to a part are lost unless the
   part is detached first.
