@@ -13,7 +13,7 @@ Every tool is a command that the ribbon, Lua scripts and AI agents share.
 > **Pre-release.** Reviera is in early development. It already models a small building end to
 > end, frames, details and analyses a steel, timber or concrete structure, lays out air,
 > plumbing, fire protection and electrical systems, and draws plans, sections, elevations and
-> sheets. Pre-release 3 (0.1.0-pre.3) packages are available for Linux (Flatpak) and Windows.
+> sheets. Pre-release 4 (0.1.0-pre.4) packages are available for Linux (Flatpak) and Windows.
 
 ---
 

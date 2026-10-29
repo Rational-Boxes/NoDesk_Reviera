@@ -7,7 +7,7 @@
 
 ## Install a package
 
-The current packages are pre-release 3 (`0.1.0-pre.3`), on the
+The current packages are pre-release 4 (`0.1.0-pre.4`), on the
 [GitHub releases page](https://github.com/Rational-Boxes/NoDesk_Reviera/releases).
 
 | Platform | Package | Status |

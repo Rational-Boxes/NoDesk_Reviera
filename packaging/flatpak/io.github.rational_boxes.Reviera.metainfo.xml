@@ -74,6 +74,11 @@
   </supports>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.1.0~pre.4" date="2026-10-28" type="development">
+      <description>
+        <p>Fourth pre-release (tag 0.1.0-pre.4), for testing: greenhouses (gable, gutter-connected multispan, Venlo, hoop and gothic tunnels) made by one Glazed Enclosure tool, with glass walls filling the gables, doors, ridge vents, gutters and a steel frame; saved Hide in View and graphic overrides; crop regions sized and dragged, and cropped to scope boxes in sections and elevations; typed section box and slice positions.</p>
+      </description>
+    </release>
     <release version="0.1.0~pre.3" date="2026-10-27" type="development">
       <description>
         <p>Third pre-release (tag 0.1.0-pre.3), for testing: spot elevations, coordinates and slopes, keynote tags and legends, legend views, crop regions with annotation crop (dragged, sized or following a scope box), and labels in 3D attached to their elements.</p>
