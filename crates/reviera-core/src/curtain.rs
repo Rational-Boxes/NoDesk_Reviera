@@ -707,8 +707,7 @@ fn top_profile(store: &Store, r: &CurtainRecipe, length: f64, own: f64) -> Optio
             let bars = crate::roofs::glazing::of_roof(store, e).map_or(0.0, |t| {
                 t.border.iter().chain(&t.interior).map(|m| m.depth).fold(0.0, f64::max) / 2.0
             });
-            let steepest = g.faces.iter().map(|f| f.normal[2].abs()).fold(1.0, f64::min).max(0.1);
-            Some((g, bars / steepest))
+            Some((g, bars))
         })
         .collect();
     if roofs.is_empty() {
@@ -747,7 +746,18 @@ fn top_profile(store: &Store, r: &CurtainRecipe, length: f64, own: f64) -> Optio
     xs.sort_by(f64::total_cmp);
     let mut out: Vec<[f64; 2]> = Vec::new();
     let mut covered = false;
-    let under = |x: f64| roofs.iter().filter_map(|(g, drop)| Some(g.underside(at(x))? - drop)).reduce(f64::min);
+    // The bars' depth is square to the face over the point, so it drops by more on a steep one.
+    let under = |x: f64| {
+        roofs
+            .iter()
+            .filter_map(|(g, bars)| {
+                let p = at(x);
+                let z = g.underside(p)?;
+                let steep = g.face_at(p).map_or(1.0, |f| f.normal[2].abs().max(0.1));
+                Some(z - bars / steep)
+            })
+            .reduce(f64::min)
+    };
     for x in xs {
         // Just inside each end, so a gable wall on the roof's edge is still covered, and
         // carried out to the end along the face.

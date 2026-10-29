@@ -13,7 +13,13 @@ use wxdragon::prelude::*;
 
 use super::{Gui, error};
 
-const FORMS: [(Form, &str); 3] = [(Form::Gable, "Gable"), (Form::Multispan, "Gutter-connected multispan"), (Form::Venlo, "Venlo")];
+const FORMS: [(Form, &str); 5] = [
+    (Form::Gable, "Gable"),
+    (Form::Multispan, "Gutter-connected multispan"),
+    (Form::Venlo, "Venlo"),
+    (Form::Hoop, "Hoop tunnel"),
+    (Form::Gothic, "Gothic tunnel"),
+];
 
 /// The tool placing an enclosure by two clicks: its arguments, and the corner once clicked.
 #[derive(Debug, Clone)]
@@ -89,8 +95,21 @@ impl Gui {
         if code != ID_OK {
             return;
         }
-        if chosen == Some(Form::Gable) {
+        // One span, and a tunnel takes the form's own sizes for what only a range has.
+        if matches!(chosen, Some(Form::Gable | Form::Hoop | Form::Gothic)) {
             args.as_object_mut().expect("an object").remove("spans");
+        }
+        if matches!(chosen, Some(Form::Hoop | Form::Gothic)) {
+            let o = args.as_object_mut().expect("an object");
+            for k in ["pitch", "bay"] {
+                o.remove(k);
+            }
+            if o.get("span").and_then(Value::as_str) == Some("8 m") {
+                o.remove("span");
+            }
+            if o.get("eave").and_then(Value::as_str) == Some("5.5 m") {
+                o.remove("eave");
+            }
         }
         if by_click {
             self.enclosure_tool = Some(EnclosureTool { args, corner: None });

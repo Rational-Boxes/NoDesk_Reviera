@@ -117,5 +117,42 @@ fn a_gable_greenhouse_has_one_span() {
     assert_eq!((count(&info, "roofs"), count(&info, "gutters")), (1, 2));
     assert!(run(&r, &mut doc, "enclosure.create", json!({ "form": "gable", "level_id": level.0, "spans": 2 })).is_err());
     let forms = run(&r, &mut doc, "enclosure.forms", json!({})).unwrap();
-    assert_eq!(forms.as_array().unwrap().len(), 3);
+    assert_eq!(forms.as_array().unwrap().len(), 5);
+}
+
+#[test]
+fn hoop_and_gothic_tunnels_are_arched_film_roofs() {
+    let dir = tempfile::tempdir().unwrap();
+    let (_project, mut doc) = LocalProject::new(Schema::Ifc4, &dir.path().join("t.ifc")).unwrap();
+    let r = registry();
+    let level = doc.store().iter().find(|e| e.class == "IfcBuildingStorey").unwrap().id();
+    // A 9.1 m hoop on 1.2 m sidewalls, 30 m long, hoops at most 1.5 m apart.
+    let hoop = run(&r, &mut doc, "enclosure.create", json!({ "form": "hoop", "level_id": level.0, "span": 9.1, "eave": 1.2, "length": 30.0 })).unwrap();
+    let info = run(&r, &mut doc, "enclosure.get", json!({ "enclosure_id": hoop })).unwrap();
+    assert!((info["ridge"].as_f64().unwrap() - 5.75).abs() < 1e-9, "{info}");
+    assert_eq!((count(&info, "roofs"), count(&info, "gutters"), count(&info, "posts"), count(&info, "curtain_walls")), (1, 0, 0, 4));
+    let roof = ElementId(info["roofs"][0].as_u64().unwrap());
+    let store = doc.store();
+    let e = store.get(roof).unwrap();
+    assert!(reviera_core::roofs::roof_recipe(e).unwrap().extrusion.is_some(), "a roof by extrusion");
+    let g = reviera_core::roofs::regenerate(store, e).unwrap();
+    let top = g.faces.iter().flat_map(|f| f.bottom.iter().map(|p| p[2])).fold(f64::MIN, f64::max);
+    assert!((top - 5.75).abs() < 0.05, "the crown: {top}");
+    // 20 bays of film between 21 hoops on every facet.
+    let gl = reviera_core::roofs::glazing::of(store, e).unwrap();
+    assert!(gl.planes.iter().all(|p| p.grid2.len() == 19), "{:?}", gl.planes.iter().map(|p| p.grid2.len()).collect::<Vec<_>>());
+    // The end walls rise into the arch.
+    let end = ElementId(info["curtain_walls"][1].as_u64().unwrap());
+    let cw = reviera_core::curtain::regenerate(store, store.get(end).unwrap()).unwrap();
+    assert!(cw.z[1] > 5.5 && cw.z[1] < 5.75, "{:?}", cw.z);
+    // A gothic tunnel beside it: a pointed crown, more height 1 m in from the side.
+    let gothic = run(&r, &mut doc, "enclosure.create", json!({ "form": "gothic", "level_id": level.0, "span": 9.1, "eave": 1.2, "length": 30.0, "origin": [0, 20] })).unwrap();
+    let ginfo = run(&r, &mut doc, "enclosure.get", json!({ "enclosure_id": gothic })).unwrap();
+    assert!(ginfo["ridge"].as_f64().unwrap() > 5.75, "{ginfo}");
+    let height_at = |info: &Value, y: f64| {
+        let roof = ElementId(info["roofs"][0].as_u64().unwrap());
+        let g = reviera_core::roofs::regenerate(doc.store(), doc.store().get(roof).unwrap()).unwrap();
+        g.underside([15.0, y]).unwrap()
+    };
+    assert!(height_at(&ginfo, 21.0) > height_at(&info, 1.0), "the gothic is fuller near its sides");
 }

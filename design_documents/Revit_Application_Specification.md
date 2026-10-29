@@ -12936,7 +12936,7 @@ Owner requirement (2026-10-28), planned in `GLAZED_ENCLOSURES_PLAN.md`, research
 | Gutter-connected multispan | *n* gable or arch spans sharing valley gutters | span 9.6 m, gutter height 4.5 m, bays 4.0 m | GABLE_ROOF / BARREL_ROOF per span |
 | Venlo | Narrow-roof glass multispan: each truss carries 2 (or 3) roof peaks | truss width 8.0 m (2 peaks), pitch 22°, bays 4.0 m, gutter height 5.5 m | GABLE_ROOF |
 | Hoop / Quonset tunnel | Ground-to-ground semicircular arch, or arch on raised sidewalls | width 9.1 m, hoops at 1.5 m, sidewall 0 or 1.2 m | BARREL_ROOF |
-| Gothic arch | Two circular arcs meeting at a pointed crown | as hoop, crown angle from the arc radius (default 1.0 × span) | RAINBOW_ROOF |
+| Gothic arch | Two circular arcs meeting at a pointed crown | as hoop, each arc's radius 0.6 × the span (crown about 0.59 × the width above the sidewall) | RAINBOW_ROOF |
 | Sawtooth | Multispan, each span one slope with a vertical vent face at the high side | span 6.4 m, slope 25°, vent face 1.0 m | SHED_ROOF per span |
 
 - Spans, bays and heights are typed, or dragged by grips; the defaults come from the public sources' typical values and are provisional.
@@ -12949,6 +12949,8 @@ Owner requirement (2026-10-28), planned in `GLAZED_ENCLOSURES_PLAN.md`, research
 - [ ] A Venlo range of 6 trusses × 8.0 m and 20 bays × 4.0 m gives 12 roof peaks, 11 valley gutters (one between each pair of roofs) and 2 eaves gutters, a total footprint of 48 × 80 m, and an IFC export in which each roof span is an `IfcRoof` GABLE_ROOF aggregated by the enclosure.
 - [ ] A 9.1 m hoop tunnel on 1.2 m sidewalls with hoops at 1.5 m along 30 m has 21 hoops and a crown height of 5.75 m.
 - [ ] A gothic arch of the same width has a pointed crown and more height at 1 m from the sides than the hoop.
+
+*Built (2026-10-28):* gable, multispan and Venlo (see ARC-GLZ-001), and the **hoop** and **gothic** tunnels: one roof by extrusion (ARC-ROOF-002) along the length, its arch in 16 straight facets on an explicit vertical plane at the enclosure's start, glazed with *Greenhouse Tunnel Film* (a Sloped Glazing type whose 50 × 50 mm bars stand for hoops at most 1.5 m apart), on sidewalls `eave` high (curtain walls when 0.3 m or more; 0 for ground to ground), the end walls attached to the arch with their doors; tunnels have no gutters, vents or posts; the gothic arc radius is `arc` × the span (default 0.6). An attached curtain top now drops for a glazed roof's bars by each face's own slope (an arch's springing is steep). The roof is still `NOTDEFINED` in IFC rather than BARREL_ROOF or RAINBOW_ROOF. Not yet: sawtooth, gutter-connected arch ranges, the headhouse, smooth (unfaceted) vaults, roll-up sides.
 
 ### 3.6a.3 Glazing and frame types
 **ID:** ARC-GLZ-003 · **Priority:** P1 · **Ref:** owner requirement (2026-10-28); research/09 §3, §5; research/10 §5

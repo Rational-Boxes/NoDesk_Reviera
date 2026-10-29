@@ -5,10 +5,16 @@
 //! building from a form and a few parameters, made of Reviera's ordinary elements, and builds
 //! them again when a parameter changes.
 //!
-//! Forms built so far, all as rows of gable spans side by side along the enclosure's length:
-//! - **Gable**: one span;
-//! - **Multispan** (gutter-connected): `spans` spans sharing valley gutters;
-//! - **Venlo**: `trusses` trusses of `peaks` narrow roofs each.
+//! Forms built so far:
+//! - as rows of gable spans side by side along the enclosure's length:
+//!   - **Gable**: one span;
+//!   - **Multispan** (gutter-connected): `spans` spans sharing valley gutters;
+//!   - **Venlo**: `trusses` trusses of `peaks` narrow roofs each;
+//! - as tunnels, one roof by extrusion (ARC-ROOF-002) whose profile is the arch in 16 straight
+//!   facets, glazed with a film-like Sloped Glazing type whose bars stand for the hoops, on
+//!   sidewalls `eave` high (0: ground to ground), without gutters, vents or posts:
+//!   - **Hoop** (Quonset): a semicircle across the span;
+//!   - **Gothic**: two arcs of radius `arc` × the span meeting in a pointed crown.
 //!
 //! Parts:
 //! - each span's roof: a footprint roof of a Sloped Glazing type (ARC-CW-008), its two long
@@ -60,6 +66,9 @@ pub const PART_KEY: &str = "rxd:enclosure";
 /// The glazing types the enclosure makes on first use (provisional, EXPERT_REVIEW E-46).
 pub const ROOF_GLAZING: &str = "Greenhouse Roof Glass";
 pub const WALL_GLAZING: &str = "Greenhouse Wall Glass";
+pub const TUNNEL_FILM: &str = "Greenhouse Tunnel Film";
+/// The facets of a tunnel's arch.
+const ARCH_FACETS: usize = 16;
 /// The glazing bars of both glass types.
 const ROOF_BAR: Mullion = Mullion { width: 0.04, depth: 0.08 };
 const WALL_BAR: Mullion = Mullion { width: 0.04, depth: 0.08 };
@@ -82,6 +91,15 @@ pub enum Form {
     Gable,
     Multispan,
     Venlo,
+    Hoop,
+    Gothic,
+}
+
+impl Form {
+    /// A tunnel: one arched roof by extrusion.
+    pub fn tunnel(self) -> bool {
+        matches!(self, Form::Hoop | Form::Gothic)
+    }
 }
 
 /// The stored recipe of a glazed enclosure.
@@ -124,6 +142,9 @@ pub struct EnclosureRecipe {
     /// Steel posts at the bays.
     #[serde(default = "yes")]
     pub frame: bool,
+    /// Gothic: each arc's radius as a share of the span.
+    #[serde(default = "gothic_arc")]
+    pub arc: f64,
     /// The parts (GlobalIds).
     #[serde(default)]
     pub parts: Vec<String>,
@@ -135,6 +156,10 @@ fn yes() -> bool {
 
 fn vent_percent() -> f64 {
     18.0
+}
+
+fn gothic_arc() -> f64 {
+    0.6
 }
 
 /// Ridge vents in a glazed roof: panes of the top row of each sloping plane swapped for vents,
@@ -217,11 +242,48 @@ impl EnclosureRecipe {
         [self.origin[0] + c * x - s * y, self.origin[1] + s * x + c * y]
     }
 
-    /// The highest ridge above the level: an outer span's, which loses half a gutter's width
-    /// to its one valley (the inner ones lose a whole gutter's).
+    /// The highest ridge (a tunnel's crown) above the level: an outer span's, which loses half
+    /// a gutter's width to its one valley (the inner ones lose a whole gutter's).
     pub fn ridge(&self) -> f64 {
-        let width = if self.spans > 1 { self.span - GUTTER_WIDTH / 2.0 } else { self.span };
-        self.eave + width / 2.0 * self.pitch.tan()
+        match self.form {
+            Form::Hoop => self.eave + self.span / 2.0,
+            Form::Gothic => {
+                let rr = self.arc * self.span;
+                self.eave + (rr * rr - (rr - self.span / 2.0).powi(2)).sqrt()
+            }
+            _ => {
+                let width = if self.spans > 1 { self.span - GUTTER_WIDTH / 2.0 } else { self.span };
+                self.eave + width / 2.0 * self.pitch.tan()
+            }
+        }
+    }
+
+    /// A tunnel's arch across the span: points (across, up from the level) at its facets' ends.
+    pub fn arch(&self) -> Vec<[f64; 2]> {
+        let (w, h) = (self.span, self.eave);
+        let n = ARCH_FACETS;
+        match self.form {
+            Form::Gothic => {
+                // The left arc about (R, h) from the ground up to the crown, then its mirror.
+                let rr = self.arc * w;
+                let top = ((w / 2.0 - rr) / rr).clamp(-1.0, 1.0).acos();
+                let half: Vec<[f64; 2]> = (0..=n / 2)
+                    .map(|k| {
+                        let a = std::f64::consts::PI + (top - std::f64::consts::PI) * k as f64 / (n / 2) as f64;
+                        [rr + rr * a.cos(), h + rr * a.sin()]
+                    })
+                    .collect();
+                let mut pts = half.clone();
+                pts.extend(half.iter().rev().skip(1).map(|p| [w - p[0], p[1]]));
+                pts
+            }
+            _ => (0..=n)
+                .map(|k| {
+                    let a = std::f64::consts::PI * (1.0 - k as f64 / n as f64);
+                    [w / 2.0 + w / 2.0 * a.cos(), h + w / 2.0 * a.sin()]
+                })
+                .collect(),
+        }
     }
 
     fn check(&self) -> Result<()> {
@@ -232,13 +294,23 @@ impl EnclosureRecipe {
         if !(self.bay >= 0.3 && self.bay <= self.length) {
             return bad("the bay spacing must be at least 300 mm and no longer than the enclosure");
         }
-        if !(self.eave >= 0.5 && self.eave <= 30.0) {
+        if self.form.tunnel() {
+            if !(0.0..=10.0).contains(&self.eave) {
+                return bad("a tunnel's sidewalls are 0 to 10 m high");
+            }
+            if self.spans != 1 {
+                return bad("a tunnel has one span");
+            }
+            if self.form == Form::Gothic && !(0.5..=2.0).contains(&self.arc) {
+                return bad("a gothic arch's radius is 0.5 to 2 times the span");
+            }
+        } else if !(self.eave >= 0.5 && self.eave <= 30.0) {
             return bad("the eave height must be between 0.5 and 30 m");
         }
-        if !(self.pitch >= 1f64.to_radians() && self.pitch <= 60f64.to_radians()) {
+        if !self.form.tunnel() && !(self.pitch >= 1f64.to_radians() && self.pitch <= 60f64.to_radians()) {
             return bad("the roof pitch must be between 1° and 60°");
         }
-        if self.knee.is_some_and(|k| !(k > 0.0 && k < self.eave - 0.3)) {
+        if self.knee.is_some_and(|k| !(k > 0.0 && (k < self.eave - 0.3 || self.form.tunnel() && k < self.ridge() - 1.0))) {
             return bad("a knee wall must be lower than the eave by at least 300 mm");
         }
         if self.form == Form::Gable && self.spans != 1 {
@@ -289,6 +361,30 @@ fn roof_glazing(txn: &mut Transaction<'_>) -> Result<ElementId> {
     )
 }
 
+fn tunnel_film(txn: &mut Transaction<'_>) -> Result<ElementId> {
+    type_named(
+        txn,
+        TUNNEL_FILM,
+        |e| roofs::glazing::of_type(e).is_some(),
+        || {
+            // Film on hoops at most 1.5 m apart (50 × 50 mm bars stand for them), no purlins.
+            let hoop = Mullion { width: 0.05, depth: 0.05 };
+            let ty = CurtainType {
+                u: Rule { layout: Layout::MaximumSpacing, spacing: 1.5, number: 0 },
+                v: Rule { layout: Layout::None, spacing: 0.0, number: 0 },
+                interior: Some(hoop),
+                border: Some(hoop),
+                panel_thickness: 0.002,
+                ..CurtainType::default()
+            };
+            NewElement::new(roofs::TYPE_CLASS).name(TUNNEL_FILM).param("@PredefinedType", "NOTDEFINED").param(
+                RECIPE_KEY,
+                json!({ "kind": roofs::ROOF_TYPE_RECIPE, "thickness": ty.panel_thickness, "glazing": serde_json::to_value(&ty).expect("serialises") }),
+            )
+        },
+    )
+}
+
 fn wall_glazing(txn: &mut Transaction<'_>) -> Result<ElementId> {
     type_named(
         txn,
@@ -319,13 +415,39 @@ fn build(txn: &mut Transaction<'_>, guid: &str, r: &EnclosureRecipe) -> Result<V
     let level = GlobalId::parse(&r.level)
         .and_then(|g| store.find_by_guid(&g))
         .ok_or_else(|| Error::new("enclosure.no_level", "the enclosure's level no longer exists"))?;
-    let roof_type = roof_glazing(txn)?;
+    let roof_type = if r.form.tunnel() { tunnel_film(txn)? } else { roof_glazing(txn)? };
     let wall_type = wall_glazing(txn)?;
     let (l, w) = (r.length, r.width());
     let mut parts = Vec::new();
-    // The roofs: one gable span each, its eaves along the length.
     let mut roofs_made = Vec::new();
-    for i in 0..r.spans {
+    // A tunnel: its arch extruded along the length, on a plane at the enclosure's start.
+    if r.form.tunnel() {
+        let o = r.at(0.0, 0.0);
+        let (s, c) = r.rotation.sin_cos();
+        let arch = r.arch();
+        let profile = arch
+            .windows(2)
+            .map(|p| walls::CurveArg { line: Line { start: p[0], end: p[1] }, through: Vec::new() })
+            .collect();
+        let level_z = crate::levels::elevation_of(&store, &r.level).unwrap_or(0.0);
+        roofs_made.push(roofs::extrusion::create(
+            txn,
+            roofs::extrusion::CreateParams {
+                type_id: Some(ElementRef::Id(roof_type)),
+                plane: crate::work_planes::PlaneArgs {
+                    plane: Some(crate::work_planes::ExplicitPlane { origin: [o[0], o[1], level_z], x_dir: [-s, c, 0.0], normal: [c, s, 0.0] }),
+                    ..Default::default()
+                },
+                profile,
+                ref_level: Some(ElementRef::Id(level)),
+                level_offset: 0.0,
+                start: Some(0.0),
+                end: Some(l),
+            },
+        )?);
+    }
+    // The roofs: one gable span each, its eaves along the length.
+    for i in (0..r.spans).filter(|_| !r.form.tunnel()) {
         // At a valley each roof stops half a gutter short, the valley gutter between them.
         let half = GUTTER_WIDTH / 2.0;
         let y0 = r.span * f64::from(i) + if i > 0 { half } else { 0.0 };
@@ -402,12 +524,16 @@ fn build(txn: &mut Transaction<'_>, guid: &str, r: &EnclosureRecipe) -> Result<V
     let under_bars = ROOF_BAR.depth / 2.0 / r.pitch.cos();
     for (k, (a, b)) in perimeter.into_iter().enumerate() {
         let base = base_of(k);
+        // A tunnel's sidewalls only when it has them.
+        if k % 2 == 0 && r.form.tunnel() && r.eave - base < 0.3 {
+            continue;
+        }
         let (a, b, top) = if k % 2 == 1 {
             let d = [(b[0] - a[0]) / w, (b[1] - a[1]) / w];
-            let own = if r.spans > 1 { r.eave - GUTTER_DROP } else { r.eave };
+            let own = if r.form.tunnel() { r.ridge() } else if r.spans > 1 { r.eave - GUTTER_DROP } else { r.eave };
             ([a[0] + d[0] * inset, a[1] + d[1] * inset], [b[0] - d[0] * inset, b[1] - d[1] * inset], own - base)
         } else {
-            (a, b, r.eave - base - under_bars)
+            (a, b, r.eave - base - if r.form.tunnel() { 0.05 } else { under_bars })
         };
         let cw = crate::curtain::create(
             txn,
@@ -433,7 +559,7 @@ fn build(txn: &mut Transaction<'_>, guid: &str, r: &EnclosureRecipe) -> Result<V
     }
     // The posts: every bay along each gutter line (a Venlo's truss lines only), the outer lines
     // inside the glass and knee walls, the ends inside the end walls.
-    if r.frame {
+    if r.frame && !r.form.tunnel() {
         let designation = if r.span < 6.0 { POST_LIGHT } else { POST_HEAVY };
         let post = crate::steel_sections::load_column_section(
             txn,
@@ -495,7 +621,7 @@ fn build(txn: &mut Transaction<'_>, guid: &str, r: &EnclosureRecipe) -> Result<V
         }
     }
     // Gutters: both eaves of the outer spans, and one valley gutter between each pair.
-    if r.gutters {
+    if r.gutters && !r.form.tunnel() {
         for (i, roof) in roofs_made.iter().enumerate() {
             // Curve keys: 1 the eave at y0, 3 the eave at y1; each span's y1 eave carries the
             // valley gutter it shares with the next.
@@ -587,6 +713,8 @@ pub struct Params {
     pub vents: Option<f64>,
     /// Steel posts at the bays (default on).
     pub frame: Option<bool>,
+    /// Gothic: each arc's radius as a share of the span (default 0.6).
+    pub arc: Option<f64>,
     /// The corner laid out from, and the direction of the length (radians or "90°").
     pub origin: Option<[f64; 2]>,
     #[schemars(extend("x-reviera-data-type" = "angle"))]
@@ -622,12 +750,14 @@ pub fn defaults(form: Form) -> EnclosureRecipe {
         doors: true,
         vents: vent_percent(),
         frame: true,
+        arc: gothic_arc(),
         parts: Vec::new(),
     };
     match form {
         Form::Gable => base,
         Form::Multispan => EnclosureRecipe { spans: 3, bay: 4.0, eave: 4.5, length: 40.0, ..base },
         Form::Venlo => EnclosureRecipe { span: 4.0, spans: 6, peaks: Some(2), bay: 4.0, eave: 5.5, length: 40.0, pitch: 22f64.to_radians(), ..base },
+        Form::Hoop | Form::Gothic => EnclosureRecipe { span: 9.1, bay: 1.5, eave: 1.2, length: 30.0, gutters: false, frame: false, vents: 0.0, ..base },
     }
 }
 
@@ -675,6 +805,9 @@ fn apply(store: &Store, r: &mut EnclosureRecipe, p: &Params) -> Result<()> {
     if let Some(f) = p.frame {
         r.frame = f;
     }
+    if let Some(a) = p.arc {
+        r.arc = a;
+    }
     if let Some(v) = p.vents {
         if !(0.0..=60.0).contains(&v) {
             return Err(Error::new("enclosure.bad_value", "the vent area is 0 to 60 % of the floor area"));
@@ -706,6 +839,8 @@ pub(crate) fn create(txn: &mut Transaction<'_>, p: CreateParams) -> Result<Eleme
         Form::Gable => "Gable Greenhouse",
         Form::Multispan => "Multispan Greenhouse",
         Form::Venlo => "Venlo Greenhouse",
+        Form::Hoop => "Hoop Tunnel",
+        Form::Gothic => "Gothic Tunnel",
     };
     let id = txn.create(
         NewElement::new(CLASS)
@@ -830,7 +965,7 @@ pub struct FormInfo {
 
 /// `enclosure.forms`.
 pub(crate) fn forms(_: &Store, _: crate::builtin::NoParams) -> Result<Vec<FormInfo>> {
-    Ok([Form::Gable, Form::Multispan, Form::Venlo].into_iter().map(|form| FormInfo { form, defaults: defaults(form) }).collect())
+    Ok([Form::Gable, Form::Multispan, Form::Venlo, Form::Hoop, Form::Gothic].into_iter().map(|form| FormInfo { form, defaults: defaults(form) }).collect())
 }
 
 #[cfg(test)]

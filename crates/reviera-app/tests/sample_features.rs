@@ -884,7 +884,7 @@ fn the_greenhouses_sample_keeps_its_enclosures() {
     let mut app = open(work.path(), "greenhouses");
     let s = store(&app);
     let enclosures: Vec<_> = s.iter().filter_map(|e| reviera_core::enclosures::recipe(e).map(|r| (e.id(), r))).collect();
-    assert_eq!(enclosures.len(), 3);
+    assert_eq!(enclosures.len(), 5);
     let mut seen = Vec::new();
     for (id, r) in &enclosures {
         let info = ok(&mut app, "enclosure.get", json!({ "enclosure_id": id }));
@@ -893,12 +893,22 @@ fn the_greenhouses_sample_keeps_its_enclosures() {
         // Every part is still there and names its enclosure.
         assert_eq!(n("roofs") + n("curtain_walls") + n("walls") + n("gutters") + n("posts") + n("beams"), r.parts.len(), "{info}");
     }
-    seen.sort_by_key(|s| s.1);
+    seen.sort_by_key(|s| (s.1, s.5, format!("{:?}", s.0)));
     use reviera_core::enclosures::Form;
     // Posts at every bay line and a gutter beam on each line: the hobby house's 6 m in 1.2 m bays
     // on its two eaves (6 × 2 + 2), the multispan's 16 m in 4 m bays on 4 lines (5 × 4 + 4), the
-    // Venlo's 24 m on 4 lines (7 × 4 + 4).
-    assert_eq!(seen, vec![(Form::Gable, 1, 4, 0, 2, 14), (Form::Multispan, 3, 4, 0, 4, 24), (Form::Venlo, 6, 4, 2, 7, 32)]);
+    // Venlo's 24 m on 4 lines (7 × 4 + 4). The tunnels: one roof each, four glass walls, no
+    // gutters or frame.
+    assert_eq!(
+        seen,
+        vec![
+            (Form::Gothic, 1, 4, 0, 0, 0),
+            (Form::Hoop, 1, 4, 0, 0, 0),
+            (Form::Gable, 1, 4, 0, 2, 14),
+            (Form::Multispan, 3, 4, 0, 4, 24),
+            (Form::Venlo, 6, 4, 2, 7, 32),
+        ]
+    );
     // The Venlo's end walls rise into its gables.
     let venlo = enclosures.iter().find(|(_, r)| r.form == Form::Venlo).unwrap();
     let ends: Vec<_> = s.iter().filter(|e| reviera_core::curtain::curtain_recipe(e).is_some_and(|c| !c.attach_top.is_empty())).filter(|e| reviera_core::enclosures::enclosure_of(e) == Some(s.get(venlo.0).unwrap().guid().as_str())).collect();
