@@ -130,9 +130,20 @@ Any source that fails this test is rejected. Rejections are noted in the session
 
 ---
 
+### 2026-10-29 — Session 4: Digital twins, operational data and smart cities
+
+- **Purpose:** background for the owner's request to research "digital-twin, operational data acquisition, and 'smart city' features integrated with greater BIM workflows and propose advanced features". Industry and standards research only; no BIM product's tools, UI or workflows were studied.
+- **Output:** `research/12_digital_twin_smart_city.md`: digital-twin frameworks (ISO 23247, ISO/IEC 30173/30186/30188 scope pages, ISO 19650-3, the UK NDTP and Gemini Principles, maturity models), IFC for operations (control elements, IfcPerformanceHistory, time series, asset and maintenance psets, IFC 4.3 = ISO 16739-1:2024), semantic models (Brick 1.4/1.5, Haystack 5 and Xeto, ASHRAE 223P draft, RealEstateCore, BOT, SAREF, SOSA/SSN, DTDL), acquisition (BACnet 135-2024 and BACnet/SC, Modbus, KNX, OPC UA, MQTT 5 and Sparkplug B, LoRaWAN, LwM2M, DALI-2, open-source time-series stores), smart city and GeoBIM (CityGML 3.0 Dynamizer, CityJSON 2.0, SensorThings 1.1, OGC APIs, 3D Tiles 1.1, LoGeoRef, NGSI-LD and Smart Data Models, ISO 37120 family, IDS), integration patterns and platforms, and the analyses a twin enables (calibration to Guideline 14 limits via the public FEMP guide, FDD, comfort, IAQ, operational carbon, city scenarios).
+- **Sources:** 189 (D001–D187, D058b, D138b), added to `SOURCE_REGISTER.md` §A (area DTW); 66 read in full or in their relevant sections, 36 public GitHub licence and metadata reads, the rest search-engine summaries marked *snippet*.
+- **Rejected or not used (clean-room):** Scribd and Slideshare copies of standards; paywalled standard text (ISO, ASHRAE, IEC 62443, IPMVP behind a login) described from scope pages and public government guides only. Sites refusing automated fetches (the buildingSMART IFC documentation site and bSDD pages, an ASHRAE news page, EUR-Lex) were not worked around: buildingSMART's public GitHub sources and REHVA's EPBD summary were used instead (file §9).
+- **Methods used:** public web search and HTTP fetch of public pages, specifications and GitHub repositories by one automated research agent (a Claude Code subagent). Nothing was downloaded beyond pages and schema files read in place; no software was installed or run.
+- **Licence notes for design:** AGPL-3.0 (Grafana, FIWARE Orion/Orion-LD), BSL-1.1 (EMQX ≥ 5.9, ThingsBoard ≥ 4.4), Timescale License (TimescaleDB `tsl/`), LGPL/GPL servers (FROST-Server, urban-model-platform) only over a network; AFL-3.0 Haystack/Xeto libraries read as data, never vendored; EPL-2.0 (Ditto, Tahu, Sparkplug) kept out of GPL binaries; bacnet-stack (GPL with linking exception) only in GPL code, never in MIT interface crates.
+
+---
+
 ## 5. Source Register
 
-The full register is in **`SOURCE_REGISTER.md` §A**. It had 577 sources at first (1,058 after Session 3 and its follow-up), each with an ID, area, type, URL, HTTP status and public-availability verdict. It was generated from the research files' Sources sections on 2026-10-12, and every URL was re-checked with an unauthenticated request.
+The full register is in **`SOURCE_REGISTER.md` §A**. It had 577 sources at first (1,247 after Session 4), each with an ID, area, type, URL, HTTP status and public-availability verdict. It was generated from the research files' Sources sections on 2026-10-12, and every URL was re-checked with an unauthenticated request.
 
 | Type | Count |
 |------|------:|

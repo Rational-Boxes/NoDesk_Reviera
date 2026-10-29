@@ -1711,6 +1711,14 @@ area by area (reviewed against the spec on 2026-10-15).
   `Reviera_EnclosureDesign`
   (`enclosure.*`); the `greenhouses` sample. Curtain walls' tops attach to one or more roofs
   (`wall.attach`).
+- **Digital twins, operational data and smart-city features** (`design_documents/DIGITAL_TWIN_PLAN.md`):
+  sensor and controls design with points schedules, bindings from model elements to live BACnet,
+  MQTT/Sparkplug, SensorThings, Haystack and time-series points, live comfort and energy overlays
+  on plans and 3D, energy-model calibration against meters (ASHRAE Guideline 14), fault detection
+  filed as BCF issues, operational carbon, an O&M register with COBie round-trip, twin-ready IDS
+  checks, a georeferencing checker, CityJSON/CityGML 3.0/3D Tiles export, and publishing to
+  NGSI-LD, Ditto, DTDL and AAS. Proposed (draft 0.1, awaiting the owner's answers); not specified
+  or built.
 - **FileEngine integration** (`design_documents/FILEENGINE_INTEGRATION.md`): open, save and
   version models on the owner's FileEngine server through its REST API; BCF issues through its
   BCF and discussion services; publishing reports and exports to it, with share links made in
