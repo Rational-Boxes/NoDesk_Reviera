@@ -29,7 +29,7 @@
         { "name": "Finish", "measure": "IfcLabel", "description": "The members' finish (mill finish, anodised, hot-dip galvanised, stained, white …)." },
         { "name": "BarWidth", "measure": "IfcPositiveLengthMeasure", "unit": "m", "description": "The glazing bar's width across the glazing's face." },
         { "name": "BarDepth", "measure": "IfcPositiveLengthMeasure", "unit": "m", "description": "The glazing bar's depth through the glazing." },
-        { "name": "DeflectionRatio", "measure": "IfcPositiveRatioMeasure", "description": "Members carrying glass deflect at most their span divided by this (175 for L/175)." },
+        { "name": "DeflectionRatio", "measure": "IfcReal", "description": "Members carrying glass deflect at most their span divided by this (175 for L/175)." },
         { "name": "MaximumDeflection", "measure": "IfcPositiveLengthMeasure", "unit": "m", "description": "An absolute cap on that deflection, when the system sets one." }
       ]
     }

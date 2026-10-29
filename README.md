@@ -1702,7 +1702,9 @@ area by area (reviewed against the spec on 2026-10-15).
   library (glass, polycarbonate, acrylic, film) whose types carry light, U, g and safety values in the
   published `Reviera_GlazingUnit` property set (`glazing.*`, `schemas/psets`); frame systems
   (aluminium, steel, timber, uPVC bars) with their deflection limit in `Reviera_FrameSystem`
-  (`frame.*`), and a warning when a roof is flatter than its glazing allows
+  (`frame.*`), and a warning when a roof is flatter than its glazing allows; glazed geodesic
+  domes of any frequency and truncation, with their struts by length class for fabrication
+  (`roof.create_geodesic`, `roof.geodesic`)
   (`enclosure.*`); the `greenhouses` sample. Curtain walls' tops attach to one or more roofs
   (`wall.attach`).
 - **FileEngine integration** (`design_documents/FILEENGINE_INTEGRATION.md`): open, save and

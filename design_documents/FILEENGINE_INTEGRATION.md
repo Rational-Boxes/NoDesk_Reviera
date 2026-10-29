@@ -1,6 +1,10 @@
 # Integration with the FileEngine project
 
-**Status:** Draft 0.3 · 2026-10-27 · for the owner's review (open questions in §10, requests to FileEngine in §11).
+**Status:** Draft 0.4 · 2026-10-29 · for the owner's review (open questions in §10, requests to FileEngine in §11).
+**Update (2026-10-29):** §7c uses the conversion/search/AI service's planned **headless research
+API** (`convert_search_ai/design_documents/HEADLESS_RESEARCH_API.md`, branch
+`research/headless-research-api` at 0db3dd3) to fill product data from documentation folders;
+the review of that design from Reviera's side is §11.7.
 **Implementation deferred (owner, 2026-10-27):** the owner is making the FileEngine improvements
 of §11 first; Reviera's side starts once they land. **Update (owner, 2026-10-28):** the
 improvements in progress include strong generated credentials on the REST door, like
@@ -120,7 +124,10 @@ A **FileEngine connection** is a per-user setting, never stored in a model:
     needs a native-app return path on the FileEngine side (§10, Q3).
   - **Generated credentials** (coming, owner 2026-10-28): a strong credential generated on the
     FileEngine side for this app, as FileEngine's other doors already take, pasted into
-    Reviera's connection settings. It is kept in the OS keyring and exchanged for a short-lived
+    Reviera's connection settings. Its form, per the headless research design (2026-10-29): a
+    key and secret (`fesk_…:fesks_…`) holding the `api` scope, exchanged at the bridge's token
+    route for a session bearer and renewed at its refresh route while the key is live; the same
+    bearer reaches the REST door and the conversion/search/AI service's headless routes (§7c). It is kept in the OS keyring and exchanged for a short-lived
     bearer token as the remote-analysis subscriptions do (DM-RPC-011), so there is no hourly
     password prompt, and it can be revoked on the server. This is expected to be the default
     for desktop use; the exact form (key and secret, or one token) follows FileEngine's
@@ -509,6 +516,74 @@ Commands. The existing library commands (`library.open`, `library.create`,
 - `library.updates(library_id?) -> [{type, item, used_version, latest_version}]`;
 - `library.reload_item(type_id)`.
 
+## 7c. Extracting product data from documents
+
+The documentation folders of §7 hold the values a model's types need: manufacturer, model and
+code, sizes, fire rating, U-value and g-value, EPD figures, certificate numbers and expiry
+dates. The conversion/search/AI service's planned **headless research API** reads them out of
+the documents (HEADLESS_RESEARCH_API.md §3.1), and Reviera puts what the user accepts into
+the model. It is the same comparison as §7's folder metadata, with each value backed by a quote.
+
+**Flow.**
+1. *Fill from Documents…* in the Documents pane (or `docs.extract`) for the selected types or
+   materials: their linked folders, or files picked in the pane. Optionally a search first
+   (`POST /csai/search` with `folder_uids`, §3.10) to find the datasheets, then extraction by
+   file id.
+2. Reviera sends `POST /csai/v1/extract` with a **field set** as the JSON Schema and streams the
+   result (`plan`, `item`, `error`, `usage`, `done`). Progress shows per file; cancelling closes
+   the stream.
+3. A review table: for each type and field, the current value beside the extracted one with
+   its unit, the evidence quote and page, the document and version, and whether it came from
+   the cache. Fields with `found: false` are listed as not found. Skipped files are listed with
+   their reasons (no text, budget, not readable), so "no text" means *check by hand*.
+4. The user accepts values field by field (or all found). Reviera writes them as parameters in
+   one undo step, through the same commands a user would use (`element.set_param`,
+   `glazing.set_type`, `frame.set_type`, the carbon factors). Optionally it writes the product
+   record's folder metadata too (§7's `product.*`, `cert.*`, `epd.*` keys) through the REST
+   door. Nothing is written without the user accepting it; the service never writes values
+   anywhere.
+
+**Field sets** ship as JSON Schemas (MIT, `schemas/extract/`), each field naming the Reviera
+parameter it fills and its data type, so units are parsed by Reviera's own unit parser:
+
+| Set | Fields | Fills |
+|---|---|---|
+| Product | manufacturer, model, product code, GTIN, URL | *Manufacturer*, *Model*, *Product Code*, *URL* |
+| Dimensions | width, height, depth, weight | type sizes (shown, applied only on request: a size change moves geometry) |
+| Fire | fire rating (EI/REI or hours), reaction to fire class | `Pset_*Common.FireRating`, … |
+| Thermal | U-value, g-value, light transmission | `ThermalTransmittance`; glazing types' `Reviera_GlazingUnit` (ARC-GLZ-003) |
+| Glazing (horticultural) | light and PAR transmission, haze, U, g, thickness, weight, least pitch | `glazing.set_type` |
+| EPD | EPD number, programme operator, declared unit, GWP A1–A3, valid until | embodied carbon (ANA-CARB-001), `epd.*` folder keys |
+| Certification | scheme (FSC, PEFC, C2C, …), certificate number, holder, valid until | `cert.*` folder keys, the Documents pane's expiry warnings |
+| Warranty | duration, start condition | COBie *Type.WarrantyDuration…* |
+
+Each schema field is a plain value (string, number, date); the service wraps it with `unit`,
+`evidence` and `found` (§3.1), so Reviera's schemas stay small.
+
+**Provenance in the model.** An accepted value records where it came from, in RXD beside the
+parameter: `{file_uid, version, run_id, field, cached}`. The quote is not copied into the model
+by default: the run record in FileEngine holds it, erasure reaches it there, and a model copied
+outside the tenant does not carry document text (this follows the parked PII question, §6 of the
+csai design). The Documents pane shows the quote by fetching the run. When a document gets a new
+version, the pane marks the values taken from the old one as *from an earlier version* and
+offers to extract again.
+
+**Limits and usage.** Reviera reads the usage state the service returns (headers, the `usage`
+event, `GET /csai/v1/usage`) and shows it in the Documents pane, warning at `warning` and
+explaining a `429` or `skipped: budget` with its reset time. Re-asking the same question of the
+same version hits the service's cache (§3.7), so *Fill from Documents* is cheap to repeat;
+*Extract again* sends `cache: "refresh"`.
+
+**Agents.** MCP agents can run `docs.extract` (it acts as the signed-in user and writes nothing)
+and propose values with `docs.apply_extracted`, which writes like any other command and can be
+undone. The service's own MCP tools are never needed: extraction answers from the documents only.
+
+Commands:
+- `docs.extract(target_ids | file_uids, sets, cache?: use|refresh) -> run` (streams progress to the
+  window; returns the items);
+- `docs.extract_status(run_id)`, `docs.usage(connection_id)`;
+- `docs.apply_extracted(run_id, accepted: [{target_id, field}], to_folder?: bool)`.
+
 ## 8. Permissions, credentials and agents
 
 - FileEngine decides every permission. Reviera shows read-only states and disables actions the
@@ -541,7 +616,8 @@ Commands. The existing library commands (`library.open`, `library.create`,
   3. BCF issues over BCF-API, once FileEngine's persistent BCF store lands;
   4. Component Libraries on FileEngine (read, place, cache, updates; then writing, with the
      manifest merge);
-  5. documentation folders, the Documents pane and COBie *Document*;
+  5. documentation folders, the Documents pane and COBie *Document*; then extraction of product
+     data (§7c), once the headless research API is deployed;
   6. the discussion service: live updates, mentions and reviews;
   7. search, sharing and automation views.
 
@@ -739,7 +815,57 @@ and which Reviera phase (§9) waits on it. *Needed* means the phase cannot ship 
     and a change log of the contract, so Reviera can tell users when a server is too old for a
     feature.
 
-### 11.7 Summary by Reviera phase
+### 11.7 Headless research API (`fileengine_convert_search_ai`), reviewed 2026-10-29
+
+Reviewed against HEADLESS_RESEARCH_API.md (investigation, branch `research/headless-research-api`,
+0db3dd3). The shape fits §7c well: extraction per document rather than RAG, the evidence rule,
+version stamps, results that are never written by the service, the cache keyed by version, and
+one key and scope shared with the REST door. Points from the desktop side:
+
+31. **Fetch a run after the stream** (*needed* for §7c). A 200-file extraction can outlive the
+    window, a laptop's sleep or a network change. Since runs are stored (§3.5), let the client
+    read one back: `run_id` in the `plan` and `done` events and on every `item`, and
+    `GET /csai/v1/runs/{run_id}` returning the request, the items so far and the state
+    (running, done, cancelled). Reviera then resumes the review table instead of paying again
+    (cache hits make a rerun cheaper, but not free of requests).
+32. **Where the page comes from** (*needed*). `evidence.page` is read from `content_md`; does the
+    stored Markdown keep page breaks (for example a marker per page from the PDF extractor)?
+    If not, give `page: null` rather than a guess, and add a stable locator (heading path or
+    table and row) Reviera can show. Reviera opens the document at the page when there is one.
+33. **Units as printed, never converted** (*wanted*). `unit` is the unit the document prints
+    (`W/m²K`, `Btu/h·ft²·°F`, `mm`), and `value` its number as printed (decimal comma kept as
+    found, or normalised: say which). Reviera converts with its own unit parser and shows the
+    original. A `x-unit-kind` hint in the schema (length, thermal transmittance, mass) could
+    let the service reject a quote whose unit does not fit.
+34. **Dates in ISO 8601** (*wanted*). Certificate and EPD validity as `YYYY-MM-DD` beside the
+    quote, so expiry warnings need no parsing of `31.12.2027` or `Dec 2027`. When only a month
+    or year is printed, say so (`precision: month`).
+35. **Datasheets that cover a range** (*needed*). One datasheet often lists several models or
+    sizes. The `instructions` field can name the product, but the answer needs to say when the
+    document holds several candidates: `ambiguous: true` with the alternatives (each with its
+    own quote), not a pick. Reviera then asks the user which row is theirs.
+36. **The schema contract** (*wanted*). Which JSON Schema dialect (2020-12 suggested), which
+    keywords are honoured (`type`, `enum`, `format: date`, `description`, nested objects,
+    arrays), the largest schema accepted, and how a field's `description` reaches the prompt.
+    Reviera's field sets are small and flat, so a documented subset is enough.
+37. **A permissive contract for the headless routes** (*needed* before Reviera's client is
+    published; as item 29). The OpenAPI description of §3.10, extended to `/csai/v1/*`, under
+    MIT or Apache-2.0, including the SSE event schemas.
+38. **Token route path** (*check*). The design names `POST /api/v1/auth/token` and
+    `/api/v1/auth/refresh` at the bridge with Basic `fesk_…:fesks_…`; this document (§4) assumed
+    `/v1/auth/token` at the REST door. Reviera will take the token URL from the connection's
+    server (a discovery document or `/v1/version`, item 30) rather than hard-coding either.
+39. **Usage per key in the client's terms** (*wanted*). The `usage.message` text is helpful;
+    please also keep `state` and the limit names stable (they are what Reviera keys its
+    warnings on), and include `resets_at` on the 429 body as on the event.
+40. **Cancel means stop** (*wanted*, already a §5 task). Closing the stream stops after the
+    current file and the run is stored as `cancelled` with its items, so item 31 can resume it.
+41. **Consent stays off for Reviera** (*note*). Reviera will call `extract` and, later, `research`
+    with `tools.mcp: "deny"`; it does not need the consent relay (§3.9) for §7c. If a desktop
+    research panel is added later, it would show the consent request in a dialog as §3.9
+    proposes.
+
+### 11.8 Summary by Reviera phase
 
 | Reviera phase (§9) | Needs | Wants |
 |---|---|---|
@@ -750,6 +876,7 @@ and which Reviera phase (§9) waits on it. *Needed* means the phase cannot ship 
 | 5. Documentation folders | — | 7, 8, 13 |
 | 6. Discussion service | 17 | 23, 24, 25 |
 | Single sign-on | 15 | 16 |
+| 5b. Extraction (§7c) | 31, 32, 35, 37 | 33, 34, 36, 38–40 |
 
 ## Sources
 
@@ -760,3 +887,7 @@ FileEngine repositories read on 2026-10-27:
   `fileengine_external_share` and `fileengine_convert_search_ai`;
 - `file_engine_frontend/design_documents/XEOKIT_UPGRADE_MARKUP_BCF_PLAN.md` (§4 viewpoint
   anchor, §10 BCF mapping).
+
+Read on 2026-10-29: `fileengine_convert_search_ai/design_documents/HEADLESS_RESEARCH_API.md`
+(branch `research/headless-research-api`, 0db3dd3), the owner's own design, read as a
+consumer's interface; nothing copied.

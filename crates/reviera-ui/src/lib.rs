@@ -2601,6 +2601,9 @@ impl Gui {
         self.dormer_rows(grid, id);
         self.enclosure_rows(grid, id);
         self.growing_rows(grid, id);
+        if self.doc.and_then(|d| self.app.document(d)).and_then(|d| d.doc.store().get(id)).and_then(reviera_core::geodesic::recipe).is_some() {
+            self.geodesic_rows(grid, id);
+        }
         if is_grid {
             let current = self
                 .app
@@ -2970,6 +2973,7 @@ impl Gui {
             || self.dormer_edit(property, text.clone())
             || self.enclosure_edit(property, text.clone())
             || self.growing_edit(property, text.clone())
+            || self.geodesic_edit(property, text.clone())
             || self.curved_roof_edit(property, text.clone())
             || self.deck_edit(property, text.clone())
         {
@@ -5035,6 +5039,10 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         }),
         "roof.create_dome" => with(gui, |g| {
             g.start_dome_tool();
+            focus(g);
+        }),
+        "roof.create_geodesic" => with(gui, |g| {
+            g.start_geodesic_tool();
             focus(g);
         }),
         "roof.edit_footprint" => with(gui, |g| {

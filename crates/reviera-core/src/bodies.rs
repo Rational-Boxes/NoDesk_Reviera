@@ -507,6 +507,15 @@ pub fn all(store: &Store) -> Vec<Body> {
             }
         }
     }
+    // Geodesic domes (ARC-GLZ-006): glass panels on metal struts.
+    for (id, panels, struts) in crate::geodesic::all(store) {
+        for m in panels {
+            push(id, "IfcPlate:glass", m, false);
+        }
+        for m in struts {
+            push(id, "IfcMember:metal", m, false);
+        }
+    }
     // Growing benches and tables (ARC-GLZ-005), galvanised grey; NFT channels white.
     for (id, class, meshes) in crate::growing::all(store) {
         let color = if class == "IfcBuildingElementProxy" { [0.92, 0.92, 0.90, 1.0] } else { [0.62, 0.64, 0.66, 1.0] };

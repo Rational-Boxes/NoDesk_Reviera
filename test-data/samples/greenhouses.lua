@@ -2,7 +2,7 @@
 -- Copyright (C) 2026 Reviera contributors
 
 -- title: Greenhouses
--- description: A Venlo glasshouse range on a knee wall, a three-span gutter-connected range turned to run north–south, a small gable greenhouse, a sawtooth range with vents in its vertical faces, and a hoop and a gothic film tunnel, each one Glazed Enclosure of glazed roofs, glazed walls, gutters, vents and a steel frame.
+-- description: A Venlo glasshouse range on a knee wall, a three-span gutter-connected range turned to run north–south, a small gable greenhouse, a sawtooth range with vents in its vertical faces, a geodesic dome, and a hoop and a gothic film tunnel, each one Glazed Enclosure of glazed roofs, glazed walls, gutters, vents and a steel frame.
 --
 -- Reviera sample model (test-data/samples): the Glazed Enclosure tool (ARC-GLZ-001/002). Each
 -- greenhouse is one element (`enclosure.create`) that lays out ordinary Reviera elements and
@@ -58,6 +58,17 @@ local tunnel = reviera.enclosure.create{
 local gothic = reviera.enclosure.create{
   form = "gothic", level_id = l1, origin = {12, 52}, span = "9.1 m", length = "12 m", eave = "1.2 m",
 }
+
+-- A glazed geodesic dome (ARC-GLZ-006): 3V, 4 m radius, cut at 5/8 of the sphere, toughened
+-- glass on 50 × 100 mm aluminium struts; its report gives the strut lengths for fabrication.
+local dome = reviera.roof.create_geodesic{
+  level_id = l1, center = {50, 40}, radius = "4 m", frequency = 3, truncation = "5/8",
+}
+local d = reviera.roof.geodesic{ roof_id = dome }
+for _, c in ipairs(d.strut_classes) do
+  print(string.format("strut %s: %d × %.3f m", c.label, c.count, c.length))
+end
+print(string.format("dome: %d hubs, %d panels, height %.2f m", d.hubs, d.panels, d.height))
 
 -- Growing layouts (ARC-GLZ-005), clear of the posts: NFT tables along the Venlo range (runs of
 -- at most 12 m falling 2 %), rolling benches in the multispan, benches across the hobby house,

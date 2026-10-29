@@ -39,13 +39,19 @@ Start with **File › New**. The model has Level 1 at 0. Open the Level 1 plan.
    facets, under *Greenhouse Tunnel Film* with a hoop every 1.5 m at most; the gothic one's two
    arcs (radius 0.6 × the span) meet in a pointed crown. Their end walls rise into the arches,
    each with a door; tunnels have no gutters, vents or posts.
-7. **Growing layouts.** Select the Venlo range, Architecture › **Growing Layout**: System *NFT
+7. **A geodesic dome.** Architecture › **Geodesic Dome**: Frequency *3V*, Truncation *5/8*;
+   click (50, 40), then a point 4 m away. The dome is triangular glass panels on struts,
+   cut at the ring of hubs nearest 5/8 of the sphere. Properties › Geodesic Dome shows its
+   height, base radius, whether its base is level, its hub, panel and strut counts, and the
+   struts by length class (A, B, C, shortest first) for fabrication; change the Frequency or
+   Glazing there.
+8. **Growing layouts.** Select the Venlo range, Architecture › **Growing Layout**: System *NFT
    tables*, Runs *Along the length*; the tables stand clear of the posts, in runs of at most 12 m
    falling 2 %. Then the multispan with *Rolling benches* along its length, the hobby house with
    *Benches* across it (width 0.9 m, aisle 0.6 m, main aisle 0.9 m), and the hoop tunnel with
    *Ebb-and-flow tables* along it. Properties › Growing Layout shows each one's growing area and
    share of the floor; change a size there, or the enclosure's, and the layout is laid out again.
-8. **Look at it.** In a 3D view the glass is translucent; select a roof to see its glazing grid,
+9. **Look at it.** In a 3D view the glass is translucent; select a roof to see its glazing grid,
    or an end wall to see the glass clipped to the gables. Each part says which enclosure it
    belongs to; Modify › **Detach from Enclosure** **[gap]** (`enclosure.detach`) keeps a part
    when the enclosure changes.

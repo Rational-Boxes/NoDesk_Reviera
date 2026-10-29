@@ -6,8 +6,11 @@
 //!   Finish makes an arched roof springing from the longer pair of sides (`roof.create_arched`).
 //! - **Dome**: choose the plan (circle or a polygon) and profile, then in a plan click the
 //!   centre and a point on the springing (`roof.create_dome`). Esc ends.
+//! - **Geodesic Dome** (ARC-GLZ-006): choose the frequency and truncation, then click the
+//!   centre and a point on the base ring (`roof.create_geodesic`).
 //! - A selected arched roof or dome shows its own rows in Properties (`roof.set_arch`,
-//!   `roof.set_dome`).
+//!   `roof.set_dome`), and a geodesic dome its sizes, glazing, frame and struts
+//!   (`roof.set_geodesic`, `roof.geodesic`).
 
 use reviera_core::ElementId;
 use reviera_core::roofs;
@@ -43,12 +46,16 @@ const TAPERS: &[(&str, &str)] = &[
     ("Constant Slope", "constant_slope"),
 ];
 
+const FREQUENCIES: &[(&str, u32)] = &[("2V", 2), ("3V", 3), ("4V", 4), ("5V", 5), ("6V", 6)];
+const TRUNCATIONS: &[(&str, &str)] = &[("1/2 (hemisphere)", "1/2"), ("3/8", "3/8"), ("5/8", "5/8"), ("3/4", "3/4")];
+
 /// The Dome tool: the plan's sides (0 a circle), the profile, the level, and the centre once
-/// clicked.
+/// clicked; or a geodesic dome's frequency and truncation.
 #[derive(Debug, Clone)]
 pub struct DomeTool {
     sides: u32,
     profile: &'static str,
+    geodesic: Option<(u32, &'static str)>,
     level: ElementId,
     center: Option<[f64; 2]>,
     cursor: Option<[f64; 2]>,
@@ -100,11 +107,34 @@ impl Gui {
         self.dome_tool = Some(DomeTool {
             sides: PLANS[plan].1,
             profile: DOME_PROFILES[profile].1,
+            geodesic: None,
             level,
             center: None,
             cursor: None,
         });
         frame.set_status_text("Dome: click the centre", 0);
+    }
+
+    /// Architecture › Geodesic Dome: the frequency and truncation, then the dome tool's clicks.
+    pub(crate) fn start_geodesic_tool(&mut self) {
+        let frame = self.frame;
+        if !self.ensure_plan(false) {
+            return;
+        }
+        let Some(level) = self.active_view().and_then(|v| v.plan.as_ref()).map(|p| p.level) else {
+            return;
+        };
+        let labels: Vec<&str> = FREQUENCIES.iter().map(|f| f.0).collect();
+        let Some(f) = pick(&frame, "Frequency (more, shorter struts and a rounder dome):", &labels) else {
+            return;
+        };
+        let labels: Vec<&str> = TRUNCATIONS.iter().map(|t| t.0).collect();
+        let Some(t) = pick(&frame, "Truncation (the share of the sphere kept):", &labels) else {
+            return;
+        };
+        self.end_tool(&frame);
+        self.dome_tool = Some(DomeTool { sides: 0, profile: "hemisphere", geodesic: Some((FREQUENCIES[f].1, TRUNCATIONS[t].1)), level, center: None, cursor: None });
+        frame.set_status_text("Geodesic Dome: click the centre", 0);
     }
 
     pub(crate) fn end_dome_tool(&mut self) -> bool {
@@ -156,10 +186,26 @@ impl Gui {
             if let Some(t) = &mut self.dome_tool {
                 t.center = Some(p);
             }
-            return frame.set_status_text("Dome: click a point on the springing (the radius)", 0);
+            return frame.set_status_text(if t.geodesic.is_some() { "Geodesic Dome: click a point at the sphere's radius" } else { "Dome: click a point on the springing (the radius)" }, 0);
         };
         let r = (p[0] - c[0]).hypot(p[1] - c[1]);
         let rotation = (p[1] - c[1]).atan2(p[0] - c[0]);
+        // A geodesic dome: the click is on its base ring, which for a cut above the equator is
+        // inside the sphere; the radius is the sphere's.
+        if let Some((frequency, truncation)) = t.geodesic {
+            let args = json!({ "level_id": t.level, "center": c, "radius": r.max(0.5), "frequency": frequency, "truncation": truncation, "rotation": rotation });
+            match self.run("roof.create_geodesic", args) {
+                Ok(v) => {
+                    self.end_dome_tool();
+                    self.refresh_scene(&frame);
+                    let _ = self.run("selection.set", json!({ "ids": [v] }));
+                    self.selection_changed();
+                    frame.set_status_text("Geodesic dome placed", 0);
+                }
+                Err(e) => error(&frame, &format!("The dome was not made:\n{e}")),
+            }
+            return;
+        }
         let plan = if t.sides == 0 {
             json!({ "circle": { "radius": r } })
         } else {
@@ -382,6 +428,82 @@ impl Gui {
         args[field] = value;
         if let Err(e) = self.run(command, args) {
             error(&frame, &format!("The roof was not changed:\n{e}"));
+        }
+        self.properties_stale = true;
+        self.refresh_scene(&frame);
+        true
+    }
+
+    /// A geodesic dome's rows (ARC-GLZ-006): sizes, glazing and frame, and the fabrication report.
+    pub(crate) fn geodesic_rows(&mut self, grid: &PropertyGrid, id: ElementId) {
+        let Some(info) = self.run("roof.geodesic", json!({ "roof_id": id })).ok() else { return };
+        let Ok(r) = serde_json::from_value::<reviera_core::geodesic::DomeRecipe>(info["recipe"].clone()) else { return };
+        grid.append(Property::category("Geodesic Dome", "c_geodesic"));
+        grid.append(Property::string("Radius", "gd_radius", self.format_length(r.radius)));
+        let freq = FREQUENCIES.iter().position(|f| f.1 == r.frequency);
+        let mut freqs: Vec<(String, i32)> = FREQUENCIES.iter().enumerate().map(|(i, f)| (f.0.to_owned(), i as i32)).collect();
+        if freq.is_none() {
+            freqs.push((format!("{}V", r.frequency), freqs.len() as i32));
+        }
+        let at = freq.map_or(freqs.len() as i32 - 1, |i| i as i32);
+        grid.append(Property::enumeration("Frequency", "gd_frequency", freqs, at));
+        grid.append(Property::string("Truncation", "gd_truncation", format!("{}", r.truncation)));
+        grid.set_help_string("gd_truncation", "The share of the sphere's diameter kept: 0.5 a hemisphere, 0.625 (5/8) taller; cut at the nearest ring of hubs");
+        grid.append(Property::string("Base Offset", "gd_base_offset", self.format_length(r.base_offset)));
+        let names = |list: Vec<&'static str>, current: &Option<String>| {
+            let mut v = vec!["Default".to_owned()];
+            v.extend(list.into_iter().map(str::to_owned));
+            let at = current.as_ref().and_then(|c| v.iter().position(|n| n.eq_ignore_ascii_case(c))).unwrap_or(0) as i32;
+            (v.into_iter().enumerate().map(|(i, n)| (n, i as i32)).collect::<Vec<_>>(), at)
+        };
+        let (g, gi) = names(reviera_core::glazing_library::library().iter().map(|e| e.name).collect(), &r.glazing);
+        grid.append(Property::enumeration("Glazing", "gd_glazing", g, gi));
+        let (f, fi) = names(reviera_core::frame_library::library().iter().map(|e| e.name).collect(), &r.frame_system);
+        grid.append(Property::enumeration("Frame System", "gd_frame_system", f, fi));
+        let read_only = [
+            ("Height", "gd_height", self.format_length(info["height"].as_f64().unwrap_or(0.0))),
+            ("Base Radius", "gd_base_radius", self.format_length(info["base_radius"].as_f64().unwrap_or(0.0))),
+            ("Level Base", "gd_level_base", if info["level_base"].as_bool() == Some(true) { "Yes".to_owned() } else { "No (steps between hub rings)".to_owned() }),
+            ("Hubs / Panels / Struts", "gd_counts", format!("{} / {} / {}", info["hubs"], info["panels"], info["struts"])),
+            ("Glass Area", "gd_glass", format!("{:.1} m²", info["glass_area"].as_f64().unwrap_or(0.0))),
+        ];
+        for (label, key, value) in read_only {
+            grid.append(Property::string(label, key, value));
+            grid.set_property_read_only(key, true);
+        }
+        let classes: Vec<String> = info["strut_classes"]
+            .as_array()
+            .map(|a| a.iter().map(|c| format!("{} {} × {}", c["label"].as_str().unwrap_or(""), c["count"], self.format_length(c["length"].as_f64().unwrap_or(0.0)))).collect())
+            .unwrap_or_default();
+        grid.append(Property::string("Struts", "gd_struts", classes.join(", ")));
+        grid.set_property_read_only("gd_struts", true);
+        grid.set_help_string("gd_struts", "Strut length classes, shortest first: label, count, hub-to-hub length");
+    }
+
+    /// An edit of a geodesic dome row; `false` if `property` is not one.
+    pub(crate) fn geodesic_edit(&mut self, property: &str, text: Option<String>) -> bool {
+        if !property.starts_with("gd_") {
+            return false;
+        }
+        let frame = self.frame;
+        let Some(roof) = self.selection().first().copied() else { return true };
+        let text = text.unwrap_or_default();
+        let default = |t: &str| if t == "Default" { String::new() } else { t.to_owned() };
+        let mut args = json!({ "roof_id": roof });
+        match property {
+            "gd_radius" => args["radius"] = json!(text),
+            "gd_frequency" => match FREQUENCIES.iter().find(|f| f.0 == text) {
+                Some(f) => args["frequency"] = json!(f.1),
+                None => return true,
+            },
+            "gd_truncation" => args["truncation"] = json!(text.trim()),
+            "gd_base_offset" => args["base_offset"] = json!(text),
+            "gd_glazing" => args["glazing"] = json!(default(&text)),
+            "gd_frame_system" => args["frame_system"] = json!(default(&text)),
+            _ => return true,
+        }
+        if let Err(e) = self.run("roof.set_geodesic", args) {
+            error(&frame, &format!("The dome was not changed:\n{e}"));
         }
         self.properties_stale = true;
         self.refresh_scene(&frame);

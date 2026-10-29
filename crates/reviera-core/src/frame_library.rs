@@ -114,7 +114,7 @@ fn params(f: &Frame) -> Vec<(String, Value)> {
         (k("Finish"), typed("IfcLabel", json!(f.finish))),
         (k("BarWidth"), typed("IfcPositiveLengthMeasure", json!(f.bar_width))),
         (k("BarDepth"), typed("IfcPositiveLengthMeasure", json!(f.bar_depth))),
-        (k("DeflectionRatio"), typed("IfcPositiveRatioMeasure", json!(f.deflection_ratio))),
+        (k("DeflectionRatio"), typed("IfcReal", json!(f.deflection_ratio))),
     ];
     if let Some(m) = f.deflection_max {
         out.push((k("MaximumDeflection"), typed("IfcPositiveLengthMeasure", json!(m))));

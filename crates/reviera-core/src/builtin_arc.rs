@@ -46,6 +46,9 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(FrameListTypes),
         registry.add(FrameCreateType),
         registry.add(FrameSetType),
+        registry.add(RoofCreateGeodesic),
+        registry.add(RoofSetGeodesic),
+        registry.add(RoofGeodesic),
         registry.add(GrowingLayout),
         registry.add(GrowingSetLayout),
         registry.add(GrowingSummary),
@@ -4515,6 +4518,44 @@ edit_command!(
     crate::frame_library::SetParams,
     (),
     crate::frame_library::set_type
+);
+
+edit_command!(
+    RoofCreateGeodesic,
+    "roof.create_geodesic",
+    "Make a glazed geodesic dome",
+    "A geodesic dome (ARC-GLZ-006) on a level: an icosahedron's faces divided `frequency` times (class I) \
+     onto a sphere of `radius` centred over `center`, cut at the hub ring nearest `truncation` (the share \
+     of the diameter kept: 0.5, \"3/8\", \"5/8\"), standing at `base_offset`; triangular panels of the \
+     `glazing` on struts of the `frame_system` (library names). Defaults 3V, 5 m, 5/8.",
+    "Geodesic Dome",
+    crate::geodesic::CreateParams,
+    crate::id::ElementId,
+    crate::geodesic::create
+);
+
+edit_command!(
+    RoofSetGeodesic,
+    "roof.set_geodesic",
+    "Change a geodesic dome",
+    "Changes a geodesic dome's centre, radius, frequency, truncation, base offset, rotation, glazing or \
+     frame system; its panels and struts follow.",
+    "Geodesic Dome",
+    crate::geodesic::SetParams,
+    (),
+    crate::geodesic::set
+);
+
+read_command!(
+    RoofGeodesic,
+    "roof.geodesic",
+    "Report a geodesic dome",
+    "A geodesic dome's fabrication report: its height, base radius and whether the base is level; the \
+     hubs, panels and struts, the struts by length class (A, B, C … from the shortest) with their counts; \
+     the glass and floor areas.",
+    crate::geodesic::InfoParams,
+    crate::geodesic::Info,
+    crate::geodesic::info
 );
 
 edit_command!(

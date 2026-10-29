@@ -920,6 +920,10 @@ fn the_greenhouses_sample_keeps_its_enclosures() {
             assert!(sum["longest_run"].as_f64().unwrap() <= 12.0 + 1e-9, "{sum}");
         }
     }
+    // The geodesic dome: 3V at 5/8, three strut lengths.
+    let dome = s.iter().find(|e| reviera_core::geodesic::recipe(e).is_some()).expect("a dome");
+    let d = ok(&mut app, "roof.geodesic", json!({ "roof_id": dome.id() }));
+    assert_eq!(d["strut_classes"].as_array().unwrap().len(), 3, "{d}");
     // The Venlo's end walls rise into its gables.
     let venlo = enclosures.iter().find(|(_, r)| r.form == Form::Venlo).unwrap();
     let ends: Vec<_> = s.iter().filter(|e| reviera_core::curtain::curtain_recipe(e).is_some_and(|c| !c.attach_top.is_empty())).filter(|e| reviera_core::enclosures::enclosure_of(e) == Some(s.get(venlo.0).unwrap().guid().as_str())).collect();
