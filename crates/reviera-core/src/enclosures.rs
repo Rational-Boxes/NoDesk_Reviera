@@ -22,10 +22,10 @@
 //!   curtain-wall door at least 1.5 m wide and 2.1 m high (EXPERT_REVIEW E-50); with a knee
 //!   wall, the end walls are glazed to the ground so the doors stand on the floor;
 //! - gutters, laid level, on the outer eaves and in each valley (MEP-PIPE-010);
-//! - a frame of steel posts (`frame`): structural columns of square hollow section at every bay
-//!   on each gutter line, the outer ones just inside the glass and knee walls, the valley ones
-//!   under the valley gutters (on a Venlo only the truss lines), up to the gutters' underside
-//!   (EXPERT_REVIEW E-51);
+//! - a frame (`frame`): structural steel posts of square hollow section at every bay on each
+//!   gutter line, the outer ones just inside the glass and knee walls, the valley ones under the
+//!   valley gutters (on a Venlo only the truss lines), and on each line a gutter beam of the
+//!   same section along the posts' tops, carrying the gutter just above it (EXPERT_REVIEW E-51);
 //! - ridge vents (ARC-GLZ-004): panes of each roof's top row swapped for vents (top-hung,
 //!   drawn open), alternating side to side along the ridge and spread evenly, as many as reach
 //!   `vents` percent of the roof's floor area (default 18 %, EXPERT_REVIEW E-47).
@@ -35,7 +35,7 @@
 //! `IfcElementAssembly` (ObjectType `GlazedEnclosure`) whose recipe lists its parts; each part
 //! names its enclosure (`rxd:enclosure`) and goes with it.
 //!
-//! Not yet: hoop, gothic and sawtooth forms; gutter beams, rafters, purlins and trusses; side
+//! Not yet: hoop, gothic and sawtooth forms; rafters, purlins and Venlo trusses; side
 //! vents and roll-up sides; vents as their own `IfcWindow` in a glazed roof's IFC (the roof's
 //! glazing is one body there); keeping a user's edits to a part when the enclosure regenerates; a headhouse.
 
@@ -439,7 +439,11 @@ fn build(txn: &mut Transaction<'_>, guid: &str, r: &EnclosureRecipe) -> Result<V
             txn,
             crate::steel_sections::LoadParams { catalog: "aisc_hss_rect".into(), designation: designation.into(), material: None },
         )?;
-        let half = txn.store().get(post).and_then(crate::columns::column_type).map_or(0.05, |t| t.width.max(t.depth) / 2.0);
+        let (half, depth) = txn.store().get(post).and_then(crate::columns::column_type).map_or((0.05, 0.1), |t| (t.width.max(t.depth) / 2.0, t.depth));
+        let beam = crate::beams::load_section(
+            txn,
+            crate::steel_sections::LoadParams { catalog: "aisc_hss_rect".into(), designation: designation.into(), material: None },
+        )?;
         let clear = (WALL_BAR.depth / 2.0).max(knee_half) + half + 0.005;
         let every = if r.form == Form::Venlo { r.peaks.unwrap_or(2).max(1) } else { 1 };
         let lines: Vec<f64> = (0..=r.spans)
@@ -451,7 +455,27 @@ fn build(txn: &mut Transaction<'_>, guid: &str, r: &EnclosureRecipe) -> Result<V
             })
             .collect();
         let bays = (l / r.bay).round().max(1.0) as u32;
-        let height = r.eave - GUTTER_DROP - 0.005;
+        // The beam's top just under the gutter, the posts up to its underside.
+        let beam_top = r.eave - GUTTER_DROP - 0.005;
+        let height = beam_top - depth;
+        let (first, last) = (clear, l - clear);
+        for y in &lines {
+            parts.push(crate::beams::create(
+                txn,
+                crate::beams::CreateParams {
+                    type_id: Some(ElementRef::Id(beam)),
+                    curve: Line { start: r.at(first, *y), end: r.at(last, *y) },
+                    reference_level: ElementRef::Id(level),
+                    start_offset: beam_top,
+                    end_offset: beam_top,
+                    usage: crate::beams::Usage::Girder,
+                    orientation: Default::default(),
+                    y_justification: None,
+                    z_justification: Some(crate::beams::ZJustification::Top),
+                    rotation: 0.0,
+                },
+            )?);
+        }
         for k in 0..=bays {
             let x = (l * f64::from(k) / f64::from(bays)).clamp(clear, l - clear);
             for y in &lines {
@@ -742,12 +766,13 @@ pub struct Info {
     pub walls: Vec<ElementId>,
     pub gutters: Vec<ElementId>,
     pub posts: Vec<ElementId>,
+    pub beams: Vec<ElementId>,
 }
 
 /// `enclosure.get`.
 pub(crate) fn get(store: &Store, p: GetParams) -> Result<Info> {
     let (_, r) = resolve(store, &p.enclosure_id)?;
-    let mut info = Info { width: r.width(), ridge: r.ridge(), floor_area: r.width() * r.length, vent_area: 0.0, vent_percent: 0.0, recipe: r.clone(), roofs: vec![], curtain_walls: vec![], walls: vec![], gutters: vec![], posts: vec![] };
+    let mut info = Info { width: r.width(), ridge: r.ridge(), floor_area: r.width() * r.length, vent_area: 0.0, vent_percent: 0.0, recipe: r.clone(), roofs: vec![], curtain_walls: vec![], walls: vec![], gutters: vec![], posts: vec![], beams: vec![] };
     for g in &r.parts {
         let Some(e) = GlobalId::parse(g).and_then(|g| store.find_by_guid(&g)).and_then(|i| store.get(i)) else { continue };
         let list = if roofs::roof_recipe(e).is_some() {
@@ -758,6 +783,8 @@ pub(crate) fn get(store: &Store, p: GetParams) -> Result<Info> {
             &mut info.walls
         } else if e.class == "IfcColumn" {
             &mut info.posts
+        } else if e.class == "IfcBeam" {
+            &mut info.beams
         } else {
             &mut info.gutters
         };

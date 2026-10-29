@@ -29,14 +29,14 @@ Start with **File › New**. The model has Level 1 at 0. Open the Level 1 plan.
    when the enclosure changes.
 
 Check: three enclosures (category *Glazed Enclosures*); the Venlo range has 6 roofs, 4 glass
-walls (a door in each end wall), 2 knee walls, 7 gutters and 28 steel posts; the multispan 3 roofs and 4 gutters; the hobby house 1 roof
+walls (a door in each end wall), 2 knee walls, 7 gutters, 28 steel posts and 4 gutter beams; the multispan 3 roofs and 4 gutters; the hobby house 1 roof
 and 2 gutters. Saved, each is an `IfcElementAssembly` (ObjectType *GlazedEnclosure*) aggregating
 its parts.
 
 ## Gaps
 
 - **Detach from Enclosure** has no menu entry yet; `enclosure.detach` does it.
-- **Frame members and vents.** The frame is posts only: no gutter beams, rafters or trusses yet
+- **Frame members and vents.** The frame is posts and gutter beams only: no rafters, purlins or trusses yet
   (the glazing bars stand in), and only ridge vents (no side vents or roll-up sides, ARC-GLZ-004); the doors are plain hinged curtain-wall
   doors (no sliding doors or door types yet).
 - **Hoop, gothic and sawtooth forms**, glazed vaults and geodesic domes (ARC-GLZ-002, -006).

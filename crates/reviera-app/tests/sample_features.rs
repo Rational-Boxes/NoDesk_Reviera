@@ -889,15 +889,16 @@ fn the_greenhouses_sample_keeps_its_enclosures() {
     for (id, r) in &enclosures {
         let info = ok(&mut app, "enclosure.get", json!({ "enclosure_id": id }));
         let n = |k: &str| info[k].as_array().map_or(0, Vec::len);
-        seen.push((r.form, n("roofs"), n("curtain_walls"), n("walls"), n("gutters"), n("posts")));
+        seen.push((r.form, n("roofs"), n("curtain_walls"), n("walls"), n("gutters"), n("posts") + n("beams")));
         // Every part is still there and names its enclosure.
-        assert_eq!(n("roofs") + n("curtain_walls") + n("walls") + n("gutters") + n("posts"), r.parts.len(), "{info}");
+        assert_eq!(n("roofs") + n("curtain_walls") + n("walls") + n("gutters") + n("posts") + n("beams"), r.parts.len(), "{info}");
     }
     seen.sort_by_key(|s| s.1);
     use reviera_core::enclosures::Form;
-    // Posts at every bay line: the hobby house's 6 m in 1.2 m bays on its two eaves (6 × 2), the
-    // multispan's 16 m in 4 m bays on 4 lines (5 × 4), the Venlo's 24 m on 4 lines (7 × 4).
-    assert_eq!(seen, vec![(Form::Gable, 1, 4, 0, 2, 12), (Form::Multispan, 3, 4, 0, 4, 20), (Form::Venlo, 6, 4, 2, 7, 28)]);
+    // Posts at every bay line and a gutter beam on each line: the hobby house's 6 m in 1.2 m bays
+    // on its two eaves (6 × 2 + 2), the multispan's 16 m in 4 m bays on 4 lines (5 × 4 + 4), the
+    // Venlo's 24 m on 4 lines (7 × 4 + 4).
+    assert_eq!(seen, vec![(Form::Gable, 1, 4, 0, 2, 14), (Form::Multispan, 3, 4, 0, 4, 24), (Form::Venlo, 6, 4, 2, 7, 32)]);
     // The Venlo's end walls rise into its gables.
     let venlo = enclosures.iter().find(|(_, r)| r.form == Form::Venlo).unwrap();
     let ends: Vec<_> = s.iter().filter(|e| reviera_core::curtain::curtain_recipe(e).is_some_and(|c| !c.attach_top.is_empty())).filter(|e| reviera_core::enclosures::enclosure_of(e) == Some(s.get(venlo.0).unwrap().guid().as_str())).collect();

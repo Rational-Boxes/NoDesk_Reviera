@@ -63,7 +63,9 @@ fn a_venlo_range_is_roofs_walls_and_gutters_rebuilt_on_change() {
     // Posts at the 21 bay lines (80 m in 4 m bays) on the 7 truss and outer lines.
     assert_eq!(count(&info, "posts"), 21 * 7);
     assert!(store.get(ElementId(info["posts"][0].as_u64().unwrap())).is_some_and(|c| c.class == "IfcColumn"));
-    assert_eq!(store.iter().filter(|p| reviera_core::enclosures::enclosure_of(p) == Some(guid.as_str())).count(), 12 + 13 + 4 + 21 * 7);
+    // A gutter beam on each line of posts.
+    assert_eq!(count(&info, "beams"), 7);
+    assert_eq!(store.iter().filter(|p| reviera_core::enclosures::enclosure_of(p) == Some(guid.as_str())).count(), 12 + 13 + 4 + 21 * 7 + 7);
 
     // Three trusses and a knee wall: the parts are made again.
     run(&r, &mut doc, "enclosure.set", json!({ "enclosure_id": id.0, "spans": 3, "knee": 0.6 })).unwrap();
@@ -71,7 +73,7 @@ fn a_venlo_range_is_roofs_walls_and_gutters_rebuilt_on_change() {
     // Knee walls along the sides only: the end walls stand on the floor with their doors.
     assert_eq!((count(&info, "roofs"), count(&info, "gutters"), count(&info, "walls")), (6, 7, 2), "{info}");
     assert_eq!(count(&info, "posts"), 21 * 4);
-    assert_eq!(doc.store().iter().filter(|p| reviera_core::enclosures::enclosure_of(p) == Some(guid.as_str())).count(), 6 + 7 + 2 + 4 + 21 * 4, "the old parts are gone");
+    assert_eq!(doc.store().iter().filter(|p| reviera_core::enclosures::enclosure_of(p) == Some(guid.as_str())).count(), 6 + 7 + 2 + 4 + 21 * 4 + 4, "the old parts are gone");
     for k in [1, 3] {
         let cw = ElementId(info["curtain_walls"][k].as_u64().unwrap());
         let g = reviera_core::curtain::regenerate(doc.store(), doc.store().get(cw).unwrap()).unwrap();
