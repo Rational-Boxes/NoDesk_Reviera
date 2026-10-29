@@ -156,3 +156,35 @@ fn hoop_and_gothic_tunnels_are_arched_film_roofs() {
     };
     assert!(height_at(&ginfo, 21.0) > height_at(&info, 1.0), "the gothic is fuller near its sides");
 }
+
+#[test]
+fn glazing_types_carry_their_values_to_ifc_and_back() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("gl.ifc");
+    let (mut project, mut doc) = LocalProject::new(Schema::Ifc4, &path).unwrap();
+    let r = registry();
+    let level = doc.store().iter().find(|e| e.class == "IfcBuildingStorey").unwrap().id();
+    let listing = run(&r, &mut doc, "glazing.list_types", json!({})).unwrap();
+    assert!(listing["library"].as_array().unwrap().len() >= 10);
+    // A gable greenhouse under twin-wall polycarbonate, glass walls.
+    let gh = run(&r, &mut doc, "enclosure.create", json!({ "form": "gable", "level_id": level.0, "roof_glazing": "Twin-Wall Polycarbonate 10 mm" })).unwrap();
+    let info = run(&r, &mut doc, "enclosure.get", json!({ "enclosure_id": gh })).unwrap();
+    let roof = ElementId(info["roofs"][0].as_u64().unwrap());
+    let store = doc.store();
+    let ty = store.get(store.find_by_guid(&reviera_core::GlobalId::parse(store.get(roof).unwrap().param("@type").unwrap().as_str().unwrap()).unwrap()).unwrap()).unwrap();
+    let g = reviera_core::glazing_library::of_type(ty).unwrap();
+    assert!((g.u - 3.2).abs() < 1e-9 && (g.light - 0.88).abs() < 1e-9, "{g:?}");
+    // The energy model reads its U-value.
+    assert_eq!(ty.param("Pset_RoofCommon.ThermalTransmittance").and_then(|v| v["value"].as_f64()), Some(3.2));
+    // Changed by hand, then saved and read back.
+    let ty_id = ty.id();
+    assert!(run(&r, &mut doc, "enclosure.set", json!({ "enclosure_id": gh, "roof_glazing": "Unobtainium" })).is_err());
+    run(&r, &mut doc, "glazing.set_type", json!({ "type_id": ty_id.0, "values": { "u": 3.0, "haze": 0.5 } })).unwrap();
+    project.save(&doc).unwrap();
+    let text = std::fs::read_to_string(&path).unwrap();
+    assert!(text.contains("Reviera_GlazingUnit") && text.contains("ParTransmittance"));
+    let (_p2, doc2, _) = LocalProject::open(&path).unwrap();
+    let back = doc2.store().iter().find(|e| e.name.as_deref() == Some("Twin-Wall Polycarbonate 10 mm (roof)")).expect("the type comes back");
+    let g = reviera_core::glazing_library::of_type(back).unwrap_or_else(|| panic!("{:?}", back.params.iter().filter(|(k, _)| k.starts_with("Reviera_")).collect::<Vec<_>>()));
+    assert!((g.u - 3.0).abs() < 1e-9 && (g.haze - 0.5).abs() < 1e-9, "{g:?}");
+}

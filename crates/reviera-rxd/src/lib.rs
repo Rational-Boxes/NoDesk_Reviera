@@ -22,6 +22,13 @@ pub const TYPE_PSET: &str = "Reviera_Type";
 /// Prefix of the property set holding one project-level document: `Reviera_Doc:<path>`.
 pub const DOC_PSET_PREFIX: &str = "Reviera_Doc:";
 
+/// Whether a property set carries RXD (the manifest, element, type and document sets), as
+/// against Reviera's published property sets of user-visible values (`Reviera_GlazingUnit`, …;
+/// spec ARC-GLZ-007), which are read as parameters like any other set.
+pub fn is_carrier(name: &str) -> bool {
+    name == MANIFEST_PSET || name == ELEMENT_PSET || name == TYPE_PSET || name.starts_with(DOC_PSET_PREFIX)
+}
+
 pub const FORMAT: &str = "reviera-rxd";
 pub const FORMAT_VERSION: &str = "1.0";
 pub const SCHEMA_VERSION: &str = "1.0";

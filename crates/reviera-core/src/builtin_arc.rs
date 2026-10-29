@@ -40,6 +40,9 @@ macro_rules! edit_command {
 
 pub(crate) fn register(registry: &mut CommandRegistry) {
     let results = [
+        registry.add(GlazingListTypes),
+        registry.add(GlazingCreateType),
+        registry.add(GlazingSetType),
         registry.add(GrowingLayout),
         registry.add(GrowingSetLayout),
         registry.add(GrowingSummary),
@@ -4435,6 +4438,43 @@ read_command!(
     crate::builtin::NoParams,
     Vec<crate::scope_boxes::ScopeBoxInfo>,
     crate::scope_boxes::list_command
+);
+
+read_command!(
+    GlazingListTypes,
+    "glazing.list_types",
+    "List glazing build-ups and types",
+    "The glazing library (ARC-GLZ-003): build-ups with light and PAR transmission, haze, U-value, g-value, \
+     safety class, thickness, weight and least pitch, and their sources; and the project's glazing types \
+     with their values (Reviera_GlazingUnit).",
+    crate::builtin::NoParams,
+    crate::glazing_library::Listing,
+    crate::glazing_library::list
+);
+
+edit_command!(
+    GlazingCreateType,
+    "glazing.create_type",
+    "Make a glazing type from the library",
+    "Makes (or finds) a glazing type of a library build-up (`glazing`), `for` a roof (Sloped Glazing) or a \
+     wall (curtain wall), with bars `spacing` apart along and `rise` up; its values go in \
+     Reviera_GlazingUnit and its U-value in the common property set the energy model reads.",
+    "Glazing Type",
+    crate::glazing_library::CreateParams,
+    crate::id::ElementId,
+    crate::glazing_library::create_type
+);
+
+edit_command!(
+    GlazingSetType,
+    "glazing.set_type",
+    "Change a glazing type's values",
+    "Sets a sloped glazing or curtain wall type's glazing values from a library build-up (`glazing`) and/or \
+     `values` (`light`, `par`, `haze`, `u`, `g`, `safety`, `thickness`, `weight`, `min_pitch`, `structure`).",
+    "Glazing Values",
+    crate::glazing_library::SetParams,
+    (),
+    crate::glazing_library::set_type
 );
 
 edit_command!(

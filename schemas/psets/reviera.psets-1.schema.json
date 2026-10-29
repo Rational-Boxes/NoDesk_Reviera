@@ -1,0 +1,41 @@
+{
+  "$id": "https://reviera.org/schemas/psets/reviera.psets-1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Reviera property set definitions",
+  "description": "Property sets in Reviera's namespace (Reviera_*) for values IFC has no standard property for (spec ARC-GLZ-007). Published under the MIT licence so other tools can read them.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["format", "version", "property_sets"],
+  "properties": {
+    "format": { "const": "reviera-psets" },
+    "version": { "type": "string" },
+    "property_sets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "description", "applicable_classes", "properties"],
+        "properties": {
+          "name": { "type": "string", "pattern": "^Reviera_[A-Za-z]+$" },
+          "description": { "type": "string" },
+          "applicable_classes": { "type": "array", "items": { "type": "string", "pattern": "^Ifc[A-Za-z]+$" } },
+          "properties": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["name", "measure", "description"],
+              "properties": {
+                "name": { "type": "string", "pattern": "^[A-Za-z]+$" },
+                "measure": { "type": "string", "pattern": "^Ifc[A-Za-z]+$" },
+                "unit": { "type": "string" },
+                "description": { "type": "string" },
+                "values": { "type": "array", "items": { "type": "string" } }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

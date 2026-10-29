@@ -20,9 +20,11 @@ Start with **File › New**. The model has Level 1 at 0. Open the Level 1 plan.
 3. **A gutter-connected range.** Glazed Enclosure again: Form *Gutter-connected multispan*,
    Length 16 m, Span 9.6 m, Spans 3, Bay spacing 4 m, Eave height 4.5 m, Roof pitch 22.6°
    (5:12), Knee wall 0. Click (60, 0), then a point due north: the length runs north and the
-   three spans step west.
+   three spans step west. In Properties set **Roof Glazing** to *Diffuse AR Glass 4 mm*.
 4. **A hobby greenhouse.** Glazed Enclosure: Form *Gable*, Length 6 m, Span 3.6 m, Bay spacing
-   1.2 m, Eave height 2.2 m, Roof pitch 25°. Place it at (0, 32).
+   1.2 m, Eave height 2.2 m, Roof pitch 25°. Place it at (0, 32), and set its Roof Glazing to
+   *Twin-Wall Polycarbonate 10 mm*. Each glazing type carries its light transmission, U-value,
+   g-value and safety class (`Reviera_GlazingUnit`).
 5. **Two tunnels.** Glazed Enclosure: Form *Hoop tunnel*, Length 12 m, Span 9.1 m, Eave
    (sidewall) height 1.2 m; place it at (12, 40), its length running east. Then Form *Gothic
    tunnel* with the same sizes at (12, 52). Each is one roof by extrusion, its arch in 16 straight

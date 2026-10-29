@@ -24,17 +24,21 @@ local venlo = reviera.enclosure.create{
   knee = "600 mm",
 }
 
+-- Glazing comes from the library (ARC-GLZ-003, `glazing.list_types`): diffuse glass on the
+-- multispan, twin-wall polycarbonate on the hobby house, the greenhouse glass elsewhere.
 -- A gutter-connected range of three 9.6 m gable spans at 5:12, its length turned to run
 -- north from (60, 0): the spans step west from there.
 local range = reviera.enclosure.create{
   form = "multispan", level_id = l1, origin = {60, 0}, rotation = "90°",
   span = "9.6 m", spans = 3, length = "16 m", bay = "4 m", eave = "4.5 m",
+  roof_glazing = "Diffuse AR Glass 4 mm",
 }
 
 -- A hobby greenhouse: one 3.6 m gable span, 6 m long, eaves at 2.2 m, roof at 25°.
 local hobby = reviera.enclosure.create{
   form = "gable", level_id = l1, origin = {0, 32},
   span = "3.6 m", length = "6 m", bay = "1.2 m", eave = "2.2 m", pitch = "25°",
+  roof_glazing = "Twin-Wall Polycarbonate 10 mm",
 }
 
 -- Two film tunnels, 9.1 m wide and 12 m long on 1.2 m sidewalls, hoops at most 1.5 m apart: a

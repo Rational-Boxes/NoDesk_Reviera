@@ -1,0 +1,24 @@
+{
+  "format": "reviera-psets",
+  "version": "1.0",
+  "property_sets": [
+    {
+      "name": "Reviera_GlazingUnit",
+      "description": "A glazing build-up's light, thermal and safety values (spec ARC-GLZ-003), on glazing types: sloped glazing roof types and curtain wall types. Typical values come from Reviera's glazing library and are replaced by the specified product's.",
+      "applicable_classes": ["IfcRoofType", "IfcCurtainWallType", "IfcPlateType"],
+      "properties": [
+        { "name": "VisibleTransmittance", "measure": "IfcNormalisedRatioMeasure", "description": "Share of visible light the glazing lets through at normal incidence." },
+        { "name": "ParTransmittance", "measure": "IfcNormalisedRatioMeasure", "description": "Share of photosynthetically active radiation (400–700 nm) let through, for crop-light analysis." },
+        { "name": "Haze", "measure": "IfcNormalisedRatioMeasure", "description": "Share of the transmitted light that is diffused (horticultural diffuse glass, multiwall sheet)." },
+        { "name": "ThermalTransmittance", "measure": "IfcThermalTransmittanceMeasure", "unit": "W/(m2·K)", "description": "Centre-of-pane U-value." },
+        { "name": "SolarHeatGainCoefficient", "measure": "IfcNormalisedRatioMeasure", "description": "Total solar energy transmittance (g-value)." },
+        { "name": "SafetyClass", "measure": "IfcLabel", "description": "How the glazing breaks.", "values": ["annealed", "toughened", "laminated", "plastic"] },
+        { "name": "Interlayer", "measure": "IfcPositiveLengthMeasure", "unit": "m", "description": "A laminate's interlayer thickness (0.38 mm, 0.76 mm …)." },
+        { "name": "Thickness", "measure": "IfcPositiveLengthMeasure", "unit": "m", "description": "The glazing's overall thickness." },
+        { "name": "MassPerArea", "measure": "IfcMassPerLengthMeasure", "unit": "kg/m2", "description": "Weight per area of glazing (stored with the per-length measure, as IFC has no per-area mass measure)." },
+        { "name": "MinimumPitch", "measure": "IfcPlaneAngleMeasure", "unit": "rad", "description": "The least roof pitch the glazing is laid at." },
+        { "name": "Structure", "measure": "IfcLabel", "description": "Multiwall sheet's or film's structure: twin-wall, five-wall, multi-skin, single film, double inflated film." }
+      ]
+    }
+  ]
+}

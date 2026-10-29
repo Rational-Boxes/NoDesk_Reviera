@@ -1698,7 +1698,9 @@ area by area (reviewed against the spec on 2026-10-15).
   1). **Built so far:** the Glazed Enclosure tool (Architecture › Build) with the gable,
   gutter-connected multispan, Venlo, hoop-tunnel and gothic-tunnel forms, of sloped-glazing roofs, glass curtain walls (end
   walls attached to the roofs, filling the gables, a door in each), knee walls, gutters, ridge vents (a share of the floor area), and steel posts and gutter beams, edited in Properties; growing layouts of benches, rolling benches,
-  ebb-and-flow or NFT tables clear of the posts, with their growing area (`growing.*`)
+  ebb-and-flow or NFT tables clear of the posts, with their growing area (`growing.*`); a glazing
+  library (glass, polycarbonate, acrylic, film) whose types carry light, U, g and safety values in the
+  published `Reviera_GlazingUnit` property set (`glazing.*`, `schemas/psets`)
   (`enclosure.*`); the `greenhouses` sample. Curtain walls' tops attach to one or more roofs
   (`wall.attach`).
 - **FileEngine integration** (`design_documents/FILEENGINE_INTEGRATION.md`): open, save and

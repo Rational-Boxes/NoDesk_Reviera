@@ -195,6 +195,13 @@ impl Gui {
         if r.form == Form::Gable {
             grid.set_property_read_only("gh_spans", true);
         }
+        // Glazing from the library (ARC-GLZ-003); the first choice is the greenhouse default.
+        let names: Vec<String> = std::iter::once("Greenhouse default".to_owned()).chain(reviera_core::glazing_library::library().iter().map(|e| e.name.to_owned())).collect();
+        let at = |g: &Option<String>| g.as_ref().and_then(|g| names.iter().position(|n| n.eq_ignore_ascii_case(g))).unwrap_or(0) as i32;
+        let choices = || names.iter().enumerate().map(|(i, n)| (n.clone(), i as i32)).collect::<Vec<_>>();
+        grid.append(Property::enumeration("Roof Glazing", "gh_roof_glazing", choices(), at(&r.roof_glazing)));
+        grid.append(Property::enumeration("Wall Glazing", "gh_wall_glazing", choices(), at(&r.wall_glazing)));
+        grid.set_help_string("gh_roof_glazing", "The glazing build-up (light, U-value, safety) of the roof; glazing.list_types lists them");
         grid.append(Property::boolean("Gutters", "gh_gutters", r.gutters));
         grid.append(Property::boolean("Doors", "gh_doors", r.doors));
         grid.append(Property::boolean("Frame", "gh_frame", r.frame));
@@ -237,6 +244,10 @@ impl Gui {
             "gh_pitch" => args["pitch"] = json!(text),
             "gh_knee" => args["knee"] = json!(text),
             "gh_gutters" => args["gutters"] = json!(matches!(text.as_str(), "True" | "true" | "1")),
+            "gh_roof_glazing" | "gh_wall_glazing" => {
+                let key = if property == "gh_roof_glazing" { "roof_glazing" } else { "wall_glazing" };
+                args[key] = json!(if text == "Greenhouse default" { String::new() } else { text });
+            }
             "gh_doors" => args["doors"] = json!(matches!(text.as_str(), "True" | "true" | "1")),
             "gh_frame" => args["frame"] = json!(matches!(text.as_str(), "True" | "true" | "1")),
             "gh_vents" => match text.trim().trim_end_matches('%').trim().parse::<f64>() {

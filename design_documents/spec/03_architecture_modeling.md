@@ -2796,6 +2796,8 @@ Owner requirement (2026-10-28), planned in `GLAZED_ENCLOSURES_PLAN.md`, research
 - [ ] A glazing type's light transmission and haze are written to `Pset_MaterialOptical` and `Reviera_GlazingUnit` on export and read back on import.
 - [ ] A roof pitch below the glazing type's minimum shows a warning on the enclosure.
 
+*Built (2026-10-28), glazing:* `reviera_core::glazing_library`: twelve build-ups (horticultural float, toughened, diffuse AR and laminated glass, a low-e double unit, twin- and five-wall polycarbonate, multi-skin acrylic, single and double inflated polyethylene) with light and PAR transmission, haze, U, g, safety class, interlayer, thickness, weight, least pitch and structure, each citing its sources (E-46); `glazing.list_types`, `glazing.create_type` (`for` roof or wall, bar spacing), `glazing.set_type`; an enclosure's `roof_glazing` and `wall_glazing` (Properties › Roof Glazing, Wall Glazing), the greenhouse defaults carrying the float glass's and the tunnel film the double polyethylene's values. Values are the `Reviera_GlazingUnit` property set on the type; the U-value is also the type's common `ThermalTransmittance`, which the energy model reads. Not yet: frame types (`frame.*`), `Pset_MaterialOptical` on the material, the minimum-pitch warning, light and g in the energy and crop-light analyses.
+
 ### 3.6a.4 Vents
 **ID:** ARC-GLZ-004 · **Priority:** P1 · **Ref:** research/09 §4.1–4.2; research/10 §6
 
@@ -2873,8 +2875,10 @@ Owner requirement (2026-10-28), planned in `GLAZED_ENCLOSURES_PLAN.md`, research
 - **Published definitions.** Each `Reviera_*` set is defined once, machine-readably (names, data types, units, descriptions, applicable classes), as `schemas/psets/reviera-psets-1.json` under the MIT licence (interop components are MIT), so other tools can read them; publishing them in the buildingSMART Data Dictionary under a Reviera domain is a later option.
 - A file stripped of RXD keeps the enclosure's parts and their `Reviera_*` property sets; a file stripped of those too is still a valid building (Chapter 2 principle 5).
 
+*Built (2026-10-28):* categories `cat.glazed_enclosures` and `cat.growing_systems`; `Reviera_GlazingUnit`, defined in `schemas/psets/reviera-psets-1.json` with its schema `reviera.psets-1.schema.json` (MIT). Published `Reviera_*` sets are read back from IFC as parameters like any property set; only the RXD carriers (`Reviera_Manifest`, `Reviera_Element`, `Reviera_Type`, `Reviera_Doc:*`) are not. Not yet: `Reviera_EnclosureDesign`, `Reviera_FrameSystem`, `Reviera_Vent`, `Reviera_ShadingPerformance`, `Reviera_GrowingClimate`, and *Reattach*.
+
 **Acceptance criteria.**
-- [ ] The published property-set definition file validates as JSON Schema and lists every `Reviera_*` property the glazed enclosure tools write.
+- [x] The published property-set definition file validates against its JSON Schema and lists every `Reviera_*` property the glazed enclosure tools write.
 - [ ] An enclosure exported, stripped of `Reviera_Element` RXD and reopened shows its parts and their `Reviera_GlazingUnit` values; *Reattach* rebuilds the enclosure from them where it can.
 
 ## 3.7 Stairs, railings and ramps

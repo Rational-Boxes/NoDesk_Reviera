@@ -62,6 +62,15 @@ made to a part by hand are lost; <code>enclosure.detach</code> keeps a part as i
 <p><code>enclosure.create</code>, <code>enclosure.set</code>, <code>enclosure.get</code>,
 <code>enclosure.detach</code>, <code>enclosure.forms</code></p>
 
+<h2 id="glazing">Glazing</h2>
+<p>Properties › <b>Roof Glazing</b> and <b>Wall Glazing</b> choose the glazing from Reviera's library:
+horticultural float, toughened, diffuse and laminated glass, a low-e double unit, twin- and five-wall
+polycarbonate, multi-skin acrylic, and single or inflated double polyethylene film. Each glazing type
+carries its light and PAR transmission, haze, U-value, g-value, safety class and weight (the
+<i>Reviera_GlazingUnit</i> property set, published so other tools can read it), and the energy model
+takes its U-value. The values are typical ones; set the specified product's with
+<code>glazing.set_type</code>. <code>glazing.list_types</code>, <code>glazing.create_type</code></p>
+
 <h2 id="growing">Growing layouts</h2>
 <p>Select a greenhouse and click <b>Architecture › Build › Growing Layout</b>
 <a class="run" href="reviera:action/growing.layout">Growing Layout</a>. Choose the system and how

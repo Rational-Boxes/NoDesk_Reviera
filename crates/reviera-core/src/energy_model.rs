@@ -128,7 +128,7 @@ pub struct EnergyModel {
 }
 
 /// The common property set of an element type's class.
-fn common_pset(class: &str) -> &'static str {
+pub(crate) fn common_pset(class: &str) -> &'static str {
     match class.trim_start_matches("Ifc").trim_end_matches("Type") {
         "Window" => "Pset_WindowCommon",
         "Door" => "Pset_DoorCommon",

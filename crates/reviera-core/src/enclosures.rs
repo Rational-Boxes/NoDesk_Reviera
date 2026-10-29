@@ -145,6 +145,12 @@ pub struct EnclosureRecipe {
     /// Gothic: each arc's radius as a share of the span.
     #[serde(default = "gothic_arc")]
     pub arc: f64,
+    /// The roof's and the walls' glazing: library entries (`glazing.list_types`); the
+    /// greenhouse glass (a tunnel's film) when absent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub roof_glazing: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub wall_glazing: Option<String>,
     /// The parts (GlobalIds).
     #[serde(default)]
     pub parts: Vec<String>,
@@ -330,12 +336,17 @@ pub fn enclosure_of(e: &Element) -> Option<&str> {
     e.param(PART_KEY)?.as_str()
 }
 
-/// The named type, made by `make` on first use.
-fn type_named(txn: &mut Transaction<'_>, name: &str, is: fn(&Element) -> bool, make: impl FnOnce() -> NewElement) -> Result<ElementId> {
+/// The named type, made by `make` on first use with the glazing values of library entry
+/// `glazing` (ARC-GLZ-003).
+fn type_named(txn: &mut Transaction<'_>, name: &str, is: fn(&Element) -> bool, glazing: &str, make: impl FnOnce() -> NewElement) -> Result<ElementId> {
     if let Some(e) = txn.store().iter().find(|e| e.name.as_deref() == Some(name) && is(e)) {
         return Ok(e.id());
     }
-    txn.create(make())
+    let id = txn.create(make())?;
+    if let Some(entry) = crate::glazing_library::entry(glazing) {
+        crate::glazing_library::write(txn, id, &entry.glazing)?;
+    }
+    Ok(id)
 }
 
 fn roof_glazing(txn: &mut Transaction<'_>) -> Result<ElementId> {
@@ -343,6 +354,7 @@ fn roof_glazing(txn: &mut Transaction<'_>) -> Result<ElementId> {
         txn,
         ROOF_GLAZING,
         |e| roofs::glazing::of_type(e).is_some(),
+        "Horticultural Float 4 mm",
         || {
             // Panes 1,125 mm wide up the slope, one per 2.0 m of slope, on 40 × 80 mm bars.
             let ty = CurtainType {
@@ -366,6 +378,7 @@ fn tunnel_film(txn: &mut Transaction<'_>) -> Result<ElementId> {
         txn,
         TUNNEL_FILM,
         |e| roofs::glazing::of_type(e).is_some(),
+        "Double Inflated Polyethylene",
         || {
             // Film on hoops at most 1.5 m apart (50 × 50 mm bars stand for them), no purlins.
             let hoop = Mullion { width: 0.05, depth: 0.05 };
@@ -390,6 +403,7 @@ fn wall_glazing(txn: &mut Transaction<'_>) -> Result<ElementId> {
         txn,
         WALL_GLAZING,
         |e| crate::curtain::curtain_type(e).is_some(),
+        "Horticultural Float 4 mm",
         || {
             // Panes 800 mm wide, a transom every 1.5 m, on 40 × 80 mm bars.
             let ty = CurtainType {
@@ -415,8 +429,17 @@ fn build(txn: &mut Transaction<'_>, guid: &str, r: &EnclosureRecipe) -> Result<V
     let level = GlobalId::parse(&r.level)
         .and_then(|g| store.find_by_guid(&g))
         .ok_or_else(|| Error::new("enclosure.no_level", "the enclosure's level no longer exists"))?;
-    let roof_type = if r.form.tunnel() { tunnel_film(txn)? } else { roof_glazing(txn)? };
-    let wall_type = wall_glazing(txn)?;
+    use crate::glazing_library::{Use, type_for};
+    let roof_type = match (&r.roof_glazing, r.form.tunnel()) {
+        (Some(g), true) => type_for(txn, g, Use::Roof, [1.5, 0.0], Mullion { width: 0.05, depth: 0.05 })?,
+        (Some(g), false) => type_for(txn, g, Use::Roof, [1.125, 2.0], ROOF_BAR)?,
+        (None, true) => tunnel_film(txn)?,
+        (None, false) => roof_glazing(txn)?,
+    };
+    let wall_type = match &r.wall_glazing {
+        Some(g) => type_for(txn, g, Use::Wall, [0.8, 1.5], WALL_BAR)?,
+        None => wall_glazing(txn)?,
+    };
     let (l, w) = (r.length, r.width());
     let mut parts = Vec::new();
     let mut roofs_made = Vec::new();
@@ -717,6 +740,9 @@ pub struct Params {
     pub frame: Option<bool>,
     /// Gothic: each arc's radius as a share of the span (default 0.6).
     pub arc: Option<f64>,
+    /// The roof's and walls' glazing, by library name (`glazing.list_types`); "" for the default.
+    pub roof_glazing: Option<String>,
+    pub wall_glazing: Option<String>,
     /// The corner laid out from, and the direction of the length (radians or "90°").
     pub origin: Option<[f64; 2]>,
     #[schemars(extend("x-reviera-data-type" = "angle"))]
@@ -753,6 +779,8 @@ pub fn defaults(form: Form) -> EnclosureRecipe {
         vents: vent_percent(),
         frame: true,
         arc: gothic_arc(),
+        roof_glazing: None,
+        wall_glazing: None,
         parts: Vec::new(),
     };
     match form {
@@ -809,6 +837,14 @@ fn apply(store: &Store, r: &mut EnclosureRecipe, p: &Params) -> Result<()> {
     }
     if let Some(a) = p.arc {
         r.arc = a;
+    }
+    for (given, slot) in [(&p.roof_glazing, &mut r.roof_glazing), (&p.wall_glazing, &mut r.wall_glazing)] {
+        if let Some(g) = given {
+            if !g.is_empty() && crate::glazing_library::entry(g).is_none() {
+                return Err(Error::new("glazing.unknown", format!("no glazing {g} in the library (glazing.list_types)")));
+            }
+            *slot = (!g.is_empty()).then(|| g.clone());
+        }
     }
     if let Some(v) = p.vents {
         if !(0.0..=60.0).contains(&v) {
