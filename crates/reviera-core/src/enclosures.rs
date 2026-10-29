@@ -22,6 +22,10 @@
 //!   curtain-wall door at least 1.5 m wide and 2.1 m high (EXPERT_REVIEW E-50); with a knee
 //!   wall, the end walls are glazed to the ground so the doors stand on the floor;
 //! - gutters, laid level, on the outer eaves and in each valley (MEP-PIPE-010);
+//! - a frame of steel posts (`frame`): structural columns of square hollow section at every bay
+//!   on each gutter line, the outer ones just inside the glass and knee walls, the valley ones
+//!   under the valley gutters (on a Venlo only the truss lines), up to the gutters' underside
+//!   (EXPERT_REVIEW E-51);
 //! - ridge vents (ARC-GLZ-004): panes of each roof's top row swapped for vents (top-hung,
 //!   drawn open), alternating side to side along the ridge and spread evenly, as many as reach
 //!   `vents` percent of the roof's floor area (default 18 %, EXPERT_REVIEW E-47).
@@ -31,7 +35,7 @@
 //! `IfcElementAssembly` (ObjectType `GlazedEnclosure`) whose recipe lists its parts; each part
 //! names its enclosure (`rxd:enclosure`) and goes with it.
 //!
-//! Not yet: hoop, gothic and sawtooth forms; frame members (posts, rafters, trusses); side
+//! Not yet: hoop, gothic and sawtooth forms; gutter beams, rafters, purlins and trusses; side
 //! vents and roll-up sides; vents as their own `IfcWindow` in a glazed roof's IFC (the roof's
 //! glazing is one body there); keeping a user's edits to a part when the enclosure regenerates; a headhouse.
 
@@ -64,6 +68,10 @@ const WALL_BAR: Mullion = Mullion { width: 0.04, depth: 0.08 };
 const GUTTER_DROP: f64 = 0.02 + 0.0625;
 /// The gutter's width: the gap between two spans' roofs at a valley, the gutter in it.
 const GUTTER_WIDTH: f64 = 0.125;
+/// The posts' sections: light for a span under 6 m, heavier for commercial ranges
+/// (provisional, EXPERT_REVIEW E-51).
+const POST_LIGHT: &str = "HSS3X3X1/4";
+const POST_HEAVY: &str = "HSS4X4X1/4";
 /// The least clear width and height of an end wall's door (provisional, EXPERT_REVIEW E-50).
 const DOOR_WIDTH: f64 = 1.5;
 const DOOR_HEIGHT: f64 = 2.1;
@@ -113,6 +121,9 @@ pub struct EnclosureRecipe {
     /// Ridge vents' target area, percent of the floor area (0 for none).
     #[serde(default = "vent_percent")]
     pub vents: f64,
+    /// Steel posts at the bays.
+    #[serde(default = "yes")]
+    pub frame: bool,
     /// The parts (GlobalIds).
     #[serde(default)]
     pub parts: Vec<String>,
@@ -420,6 +431,45 @@ fn build(txn: &mut Transaction<'_>, guid: &str, r: &EnclosureRecipe) -> Result<V
         }
         parts.push(cw);
     }
+    // The posts: every bay along each gutter line (a Venlo's truss lines only), the outer lines
+    // inside the glass and knee walls, the ends inside the end walls.
+    if r.frame {
+        let designation = if r.span < 6.0 { POST_LIGHT } else { POST_HEAVY };
+        let post = crate::steel_sections::load_column_section(
+            txn,
+            crate::steel_sections::LoadParams { catalog: "aisc_hss_rect".into(), designation: designation.into(), material: None },
+        )?;
+        let half = txn.store().get(post).and_then(crate::columns::column_type).map_or(0.05, |t| t.width.max(t.depth) / 2.0);
+        let clear = (WALL_BAR.depth / 2.0).max(knee_half) + half + 0.005;
+        let every = if r.form == Form::Venlo { r.peaks.unwrap_or(2).max(1) } else { 1 };
+        let lines: Vec<f64> = (0..=r.spans)
+            .filter(|i| i % every == 0)
+            .map(|i| match i {
+                0 => clear,
+                i if i == r.spans => w - clear,
+                i => r.span * f64::from(i),
+            })
+            .collect();
+        let bays = (l / r.bay).round().max(1.0) as u32;
+        let height = r.eave - GUTTER_DROP - 0.005;
+        for k in 0..=bays {
+            let x = (l * f64::from(k) / f64::from(bays)).clamp(clear, l - clear);
+            for y in &lines {
+                parts.push(crate::columns::place_structural(
+                    txn,
+                    crate::columns::PlaceParams {
+                        type_id: Some(ElementRef::Id(post)),
+                        point: r.at(x, *y),
+                        base_level: ElementRef::Id(level),
+                        base_offset: 0.0,
+                        top_constraint: walls::TopConstraint::Unconnected(height),
+                        top_offset: 0.0,
+                        rotation: r.rotation,
+                    },
+                )?);
+            }
+        }
+    }
     // Gutters: both eaves of the outer spans, and one valley gutter between each pair.
     if r.gutters {
         for (i, roof) in roofs_made.iter().enumerate() {
@@ -511,6 +561,8 @@ pub struct Params {
     pub doors: Option<bool>,
     /// Ridge vents' area, percent of the floor area (default 18; 0 for none).
     pub vents: Option<f64>,
+    /// Steel posts at the bays (default on).
+    pub frame: Option<bool>,
     /// The corner laid out from, and the direction of the length (radians or "90°").
     pub origin: Option<[f64; 2]>,
     #[schemars(extend("x-reviera-data-type" = "angle"))]
@@ -545,6 +597,7 @@ pub fn defaults(form: Form) -> EnclosureRecipe {
         gutters: true,
         doors: true,
         vents: vent_percent(),
+        frame: true,
         parts: Vec::new(),
     };
     match form {
@@ -594,6 +647,9 @@ fn apply(store: &Store, r: &mut EnclosureRecipe, p: &Params) -> Result<()> {
     }
     if let Some(d) = p.doors {
         r.doors = d;
+    }
+    if let Some(f) = p.frame {
+        r.frame = f;
     }
     if let Some(v) = p.vents {
         if !(0.0..=60.0).contains(&v) {
@@ -685,12 +741,13 @@ pub struct Info {
     pub curtain_walls: Vec<ElementId>,
     pub walls: Vec<ElementId>,
     pub gutters: Vec<ElementId>,
+    pub posts: Vec<ElementId>,
 }
 
 /// `enclosure.get`.
 pub(crate) fn get(store: &Store, p: GetParams) -> Result<Info> {
     let (_, r) = resolve(store, &p.enclosure_id)?;
-    let mut info = Info { width: r.width(), ridge: r.ridge(), floor_area: r.width() * r.length, vent_area: 0.0, vent_percent: 0.0, recipe: r.clone(), roofs: vec![], curtain_walls: vec![], walls: vec![], gutters: vec![] };
+    let mut info = Info { width: r.width(), ridge: r.ridge(), floor_area: r.width() * r.length, vent_area: 0.0, vent_percent: 0.0, recipe: r.clone(), roofs: vec![], curtain_walls: vec![], walls: vec![], gutters: vec![], posts: vec![] };
     for g in &r.parts {
         let Some(e) = GlobalId::parse(g).and_then(|g| store.find_by_guid(&g)).and_then(|i| store.get(i)) else { continue };
         let list = if roofs::roof_recipe(e).is_some() {
@@ -699,6 +756,8 @@ pub(crate) fn get(store: &Store, p: GetParams) -> Result<Info> {
             &mut info.curtain_walls
         } else if walls::wall_recipe(e).is_some() {
             &mut info.walls
+        } else if e.class == "IfcColumn" {
+            &mut info.posts
         } else {
             &mut info.gutters
         };

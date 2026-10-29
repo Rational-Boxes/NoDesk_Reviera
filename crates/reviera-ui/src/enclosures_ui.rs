@@ -178,6 +178,8 @@ impl Gui {
         }
         grid.append(Property::boolean("Gutters", "gh_gutters", r.gutters));
         grid.append(Property::boolean("Doors", "gh_doors", r.doors));
+        grid.append(Property::boolean("Frame", "gh_frame", r.frame));
+        grid.set_help_string("gh_frame", "Steel posts at every bay on each gutter line");
         grid.append(Property::string("Ridge Vents (% of floor)", "gh_vents", format!("{}", r.vents)));
         grid.set_help_string("gh_vents", "The ridge vents' target area as a share of the floor area; 0 for none");
         grid.set_help_string("gh_doors", "A door in the middle of each end wall");
@@ -217,6 +219,7 @@ impl Gui {
             "gh_knee" => args["knee"] = json!(text),
             "gh_gutters" => args["gutters"] = json!(matches!(text.as_str(), "True" | "true" | "1")),
             "gh_doors" => args["doors"] = json!(matches!(text.as_str(), "True" | "true" | "1")),
+            "gh_frame" => args["frame"] = json!(matches!(text.as_str(), "True" | "true" | "1")),
             "gh_vents" => match text.trim().trim_end_matches('%').trim().parse::<f64>() {
                 Ok(v) => args["vents"] = json!(v),
                 Err(_) => return true,
