@@ -19,6 +19,19 @@
         { "name": "MinimumPitch", "measure": "IfcPlaneAngleMeasure", "unit": "rad", "description": "The least roof pitch the glazing is laid at." },
         { "name": "Structure", "measure": "IfcLabel", "description": "Multiwall sheet's or film's structure: twin-wall, five-wall, multi-skin, single film, double inflated film." }
       ]
+    },
+    {
+      "name": "Reviera_FrameSystem",
+      "description": "A glazing frame system's material, glazing bar section and the deflection limit of its members carrying glass (spec ARC-GLZ-003), on frame types and on glazing types made on the frame. Typical values come from Reviera's frame library and are replaced by the specified system's.",
+      "applicable_classes": ["IfcMemberType", "IfcRoofType", "IfcCurtainWallType", "IfcPlateType"],
+      "properties": [
+        { "name": "Material", "measure": "IfcLabel", "description": "The members' material.", "values": ["aluminium", "steel", "timber", "upvc"] },
+        { "name": "Finish", "measure": "IfcLabel", "description": "The members' finish (mill finish, anodised, hot-dip galvanised, stained, white …)." },
+        { "name": "BarWidth", "measure": "IfcPositiveLengthMeasure", "unit": "m", "description": "The glazing bar's width across the glazing's face." },
+        { "name": "BarDepth", "measure": "IfcPositiveLengthMeasure", "unit": "m", "description": "The glazing bar's depth through the glazing." },
+        { "name": "DeflectionRatio", "measure": "IfcPositiveRatioMeasure", "description": "Members carrying glass deflect at most their span divided by this (175 for L/175)." },
+        { "name": "MaximumDeflection", "measure": "IfcPositiveLengthMeasure", "unit": "m", "description": "An absolute cap on that deflection, when the system sets one." }
+      ]
     }
   ]
 }

@@ -38,6 +38,10 @@ range, a gutter-connected range and a hobby greenhouse), with its
 trusses), the bay spacing, the eave (gutter) height, the roof pitch, and an optional knee wall
 under the glass. The usual values are provisional and listed for expert review.</p>
 
+<p>If the roof is flatter than its glazing may be laid at (2.5° for glass systems, 5° for
+polycarbonate and film), or under 10°, where condensate drips onto the crop instead of running
+to the gutters, Properties shows a <b>Warnings</b> row.</p>
+
 <h2 id="parts">What it is made of</h2>
 <ul>
   <li><b>Roofs</b>: one sloped-glazing roof per span, of <i>Greenhouse Roof Glass</i> (1,125 mm
@@ -74,6 +78,12 @@ carries its light and PAR transmission, haze, U-value, g-value, safety class and
 <i>Reviera_GlazingUnit</i> property set, published so other tools can read it), and the energy model
 takes its U-value. The values are typical ones; set the specified product's with
 <code>glazing.set_type</code>. <code>glazing.list_types</code>, <code>glazing.create_type</code></p>
+<p>Properties › <b>Frame System</b> chooses the glazing bars: aluminium 40 × 80 mm (the default for
+glass) or 50 × 100 mm, galvanised steel hoops (the tunnels' default), timber 50 × 100 mm, or uPVC
+60 × 90 mm. The glazing types are made with that frame's bars and carry its material, finish and the
+deflection limit of members carrying glass (L/175, at most 15 mm; the <i>Reviera_FrameSystem</i>
+property set). <b>Frame Shading</b> shows the share of the roof the bars shade.
+<code>frame.list_types</code>, <code>frame.create_type</code>, <code>frame.set_type</code></p>
 
 <h2 id="growing">Growing layouts</h2>
 <p>Select a greenhouse and click <b>Architecture › Build › Growing Layout</b>

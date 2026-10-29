@@ -23,8 +23,10 @@ Start with **File › New**. The model has Level 1 at 0. Open the Level 1 plan.
    three spans step west. In Properties set **Roof Glazing** to *Diffuse AR Glass 4 mm*.
 4. **A hobby greenhouse.** Glazed Enclosure: Form *Gable*, Length 6 m, Span 3.6 m, Bay spacing
    1.2 m, Eave height 2.2 m, Roof pitch 25°. Place it at (0, 32), and set its Roof Glazing to
-   *Twin-Wall Polycarbonate 10 mm*. Each glazing type carries its light transmission, U-value,
-   g-value and safety class (`Reviera_GlazingUnit`).
+   *Twin-Wall Polycarbonate 10 mm* and its **Frame System** to *Timber Glazing Bar 50×100*. Each
+   glazing type carries its light transmission, U-value, g-value and safety class
+   (`Reviera_GlazingUnit`), and its frame's material, bar section and deflection limit
+   (`Reviera_FrameSystem`); Frame Shading shows the share of the roof the bars shade.
 5. **A sawtooth range.** Glazed Enclosure: Form *Sawtooth*, Length 8 m, Span 6.4 m, Spans 3,
    Bay spacing 4 m (the eave height 4 m and slope 25° are the form's own when the Venlo's
    values are left). Place it at (30, 32). Each span is one glass slope rising from its gutter

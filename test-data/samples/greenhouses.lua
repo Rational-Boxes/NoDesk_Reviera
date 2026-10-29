@@ -34,11 +34,12 @@ local range = reviera.enclosure.create{
   roof_glazing = "Diffuse AR Glass 4 mm",
 }
 
--- A hobby greenhouse: one 3.6 m gable span, 6 m long, eaves at 2.2 m, roof at 25°.
+-- A hobby greenhouse: one 3.6 m gable span, 6 m long, eaves at 2.2 m, roof at 25°, on timber
+-- glazing bars 50 × 100 mm from the frame library (`frame.list_types`).
 local hobby = reviera.enclosure.create{
   form = "gable", level_id = l1, origin = {0, 32},
   span = "3.6 m", length = "6 m", bay = "1.2 m", eave = "2.2 m", pitch = "25°",
-  roof_glazing = "Twin-Wall Polycarbonate 10 mm",
+  roof_glazing = "Twin-Wall Polycarbonate 10 mm", frame_system = "Timber Glazing Bar 50×100",
 }
 
 -- A sawtooth range for a warm climate: three 6.4 m spans, each one 25° slope rising from its

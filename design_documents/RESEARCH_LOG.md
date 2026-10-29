@@ -125,12 +125,13 @@ Any source that fails this test is rejected. Rejections are noted in the session
 - **Rejected or not used (clean-room):** a full copy of ANSI/ASAE EP406.4 on a university server (paid standard; cited from scope summaries only); Scribd and Slideshare copies of EN 13031-1, BS 5502, AS 1288, NFPA material and a lettuce handbook; MBIE's full-text copies of NZS 4223 were not opened; paywalled code text (ICC 2021 IECC, current NFPA 92) cited only from public adoptions, interpretations or scope pages. Sites that answered automated fetches with 403 (standards.buildingsmart.org, some repositories) were not worked around; their content came from public mirrors such as buildingSMART's GitHub or from search summaries.
 - **Methods used:** public web search and HTTP fetch of public pages and PDFs by three automated research agents (Claude Code subagents). No images were downloaded and no software was installed or run.
 - **For expert review:** the provisional defaults taken from this research are EXPERT_REVIEW E-44 … E-48 (forms, minimum glazed pitch, glazing values, vent areas, growing layouts); the plan lists more for later phases (design fires, smoke-vent discharge coefficients, the louvre cut-off formula's sign convention).
+- **Follow-up (2026-10-29), frame types (ARC-GLZ-003):** two public web searches for deflection limits of members carrying glass (G088–G091, search summaries and public maker charts). L/175 of the span is the common baseline (CWCT's standard for four-edge-supported double glazing, L/175 or 15 mm; AAMA TIR-A11 as quoted in a maker's public charts, L/175 to 13 ft 6 in and L/240 + 1/4 in beyond). EN 13031-1's own limits (clause 11) were not found in public text and were not sought in copies of the paid standard. Values recorded as E-52. Nothing copied.
 
 ---
 
 ## 5. Source Register
 
-The full register is in **`SOURCE_REGISTER.md` §A**. It had 577 sources at first (1,054 after Session 3), each with an ID, area, type, URL, HTTP status and public-availability verdict. It was generated from the research files' Sources sections on 2026-10-12, and every URL was re-checked with an unauthenticated request.
+The full register is in **`SOURCE_REGISTER.md` §A**. It had 577 sources at first (1,058 after Session 3 and its follow-up), each with an ID, area, type, URL, HTTP status and public-availability verdict. It was generated from the research files' Sources sections on 2026-10-12, and every URL was re-checked with an unauthenticated request.
 
 | Type | Count |
 |------|------:|

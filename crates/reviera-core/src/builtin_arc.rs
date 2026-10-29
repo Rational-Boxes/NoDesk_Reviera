@@ -43,6 +43,9 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(GlazingListTypes),
         registry.add(GlazingCreateType),
         registry.add(GlazingSetType),
+        registry.add(FrameListTypes),
+        registry.add(FrameCreateType),
+        registry.add(FrameSetType),
         registry.add(GrowingLayout),
         registry.add(GrowingSetLayout),
         registry.add(GrowingSummary),
@@ -4475,6 +4478,43 @@ edit_command!(
     crate::glazing_library::SetParams,
     (),
     crate::glazing_library::set_type
+);
+
+read_command!(
+    FrameListTypes,
+    "frame.list_types",
+    "List frame systems and types",
+    "The frame library (ARC-GLZ-003): glazing bar systems (aluminium, galvanised steel, timber, uPVC) with \
+     their material, finish, bar section and the deflection limit of members carrying glass, and their \
+     sources; and the project's types with frame values (Reviera_FrameSystem): frame types and glazing \
+     types made on a frame.",
+    crate::builtin::NoParams,
+    crate::frame_library::Listing,
+    crate::frame_library::list
+);
+
+edit_command!(
+    FrameCreateType,
+    "frame.create_type",
+    "Make a frame type from the library",
+    "Makes (or finds, by `name`) an IfcMemberType of a library frame system (`frame`), its values in \
+     Reviera_FrameSystem. A glazed enclosure's `frame_system` puts the same frame on its glazing types.",
+    "Frame Type",
+    crate::frame_library::CreateParams,
+    crate::id::ElementId,
+    crate::frame_library::create_type
+);
+
+edit_command!(
+    FrameSetType,
+    "frame.set_type",
+    "Change a frame type's values",
+    "Sets a frame type's values from a library frame system (`frame`) and/or `values` (`material`, \
+     `finish`, `bar_width`, `bar_depth`, `deflection_ratio`, `deflection_max`).",
+    "Frame Values",
+    crate::frame_library::SetParams,
+    (),
+    crate::frame_library::set_type
 );
 
 edit_command!(

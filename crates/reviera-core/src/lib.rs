@@ -42,6 +42,7 @@ pub mod document;
 pub mod dormers;
 pub mod enclosures;
 pub mod growing;
+pub mod frame_library;
 pub mod glazing_library;
 pub mod element;
 pub mod error;

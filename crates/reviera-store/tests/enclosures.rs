@@ -115,6 +115,16 @@ fn a_gable_greenhouse_has_one_span() {
     let v = run(&r, &mut doc, "enclosure.create", json!({ "form": "gable", "level_id": level.0, "length": "20 m", "bay": 3.0, "eave": 3.0 })).unwrap();
     let info = run(&r, &mut doc, "enclosure.get", json!({ "enclosure_id": v })).unwrap();
     assert_eq!((count(&info, "roofs"), count(&info, "gutters")), (1, 2));
+    assert_eq!(count(&info, "warnings"), 0, "{info}");
+    // A 4° roof is below twin-wall polycarbonate's 5° and flat enough to drip; at 7° glass may
+    // be laid (2.5°) but still drips.
+    run(&r, &mut doc, "enclosure.set", json!({ "enclosure_id": v, "pitch": "4°", "roof_glazing": "Twin-Wall Polycarbonate 10 mm" })).unwrap();
+    let info = run(&r, &mut doc, "enclosure.get", json!({ "enclosure_id": v })).unwrap();
+    assert_eq!(count(&info, "warnings"), 2, "{info}");
+    assert!(info["warnings"][0].as_str().unwrap().contains("below the 5.0°"), "{info}");
+    run(&r, &mut doc, "enclosure.set", json!({ "enclosure_id": v, "pitch": "7°", "roof_glazing": "" })).unwrap();
+    let info = run(&r, &mut doc, "enclosure.get", json!({ "enclosure_id": v })).unwrap();
+    assert_eq!(count(&info, "warnings"), 1, "{info}");
     assert!(run(&r, &mut doc, "enclosure.create", json!({ "form": "gable", "level_id": level.0, "spans": 2 })).is_err());
     let forms = run(&r, &mut doc, "enclosure.forms", json!({})).unwrap();
     assert_eq!(forms.as_array().unwrap().len(), 6);
@@ -222,4 +232,48 @@ fn glazing_types_carry_their_values_to_ifc_and_back() {
     let back = doc2.store().iter().find(|e| e.name.as_deref() == Some("Twin-Wall Polycarbonate 10 mm (roof)")).expect("the type comes back");
     let g = reviera_core::glazing_library::of_type(back).unwrap_or_else(|| panic!("{:?}", back.params.iter().filter(|(k, _)| k.starts_with("Reviera_")).collect::<Vec<_>>()));
     assert!((g.u - 3.0).abs() < 1e-9 && (g.haze - 0.5).abs() < 1e-9, "{g:?}");
+}
+
+#[test]
+fn frame_systems_set_the_bars_and_come_back_from_ifc() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("fr.ifc");
+    let (mut project, mut doc) = LocalProject::new(Schema::Ifc4, &path).unwrap();
+    let r = registry();
+    let level = doc.store().iter().find(|e| e.class == "IfcBuildingStorey").unwrap().id();
+    let listing = run(&r, &mut doc, "frame.list_types", json!({})).unwrap();
+    assert_eq!(listing["library"].as_array().unwrap().len(), 5);
+    // A gable greenhouse on timber bars, 50 × 100 mm: both its glazing types carry the frame and
+    // are made with its bars; the bars shade more of the roof than the default aluminium's.
+    let gh = run(&r, &mut doc, "enclosure.create", json!({ "form": "gable", "level_id": level.0 })).unwrap();
+    let before = run(&r, &mut doc, "enclosure.get", json!({ "enclosure_id": gh })).unwrap()["frame_shading"].as_f64().unwrap();
+    assert!(run(&r, &mut doc, "enclosure.set", json!({ "enclosure_id": gh, "frame_system": "Bamboo" })).is_err());
+    run(&r, &mut doc, "enclosure.set", json!({ "enclosure_id": gh, "frame_system": "Timber Glazing Bar 50×100" })).unwrap();
+    let info = run(&r, &mut doc, "enclosure.get", json!({ "enclosure_id": gh })).unwrap();
+    let after = info["frame_shading"].as_f64().unwrap();
+    // 40 mm bars on a 1.125 × 2.0 m grid shade about 5.5 %; 50 mm ones about 6.8 %.
+    assert!((before - 0.0545).abs() < 0.001 && (after - 0.0677).abs() < 0.001, "{before} {after}");
+    let store = doc.store();
+    let type_of = |id: u64| {
+        let e = store.get(ElementId(id)).unwrap();
+        store.get(store.find_by_guid(&reviera_core::GlobalId::parse(e.param("@type").unwrap().as_str().unwrap()).unwrap()).unwrap()).unwrap()
+    };
+    let roof_type = type_of(info["roofs"][0].as_u64().unwrap());
+    assert_eq!(roof_type.name.as_deref(), Some("Horticultural Float 4 mm on Timber Glazing Bar 50×100 (roof)"));
+    let f = reviera_core::frame_library::of_type(roof_type).unwrap();
+    assert_eq!((f.material, f.bar_depth), (reviera_core::frame_library::Material::Timber, 0.10));
+    let wall_type = type_of(info["curtain_walls"][0].as_u64().unwrap());
+    assert_eq!(reviera_core::curtain::curtain_type(wall_type).unwrap().interior.unwrap().depth, 0.10);
+    // A frame type of its own, changed by hand, saved and read back.
+    let ft = run(&r, &mut doc, "frame.create_type", json!({ "frame": "uPVC Glazing Bar 60×90" })).unwrap();
+    assert_eq!(run(&r, &mut doc, "frame.create_type", json!({ "frame": "uPVC Glazing Bar 60×90" })).unwrap(), ft);
+    run(&r, &mut doc, "frame.set_type", json!({ "type_id": ft, "values": { "deflection_ratio": 240.0, "finish": "anthracite" } })).unwrap();
+    assert!(run(&r, &mut doc, "frame.set_type", json!({ "type_id": ft, "values": { "bar_width": 2.0 } })).is_err());
+    project.save(&doc).unwrap();
+    let text = std::fs::read_to_string(&path).unwrap();
+    assert!(text.contains("Reviera_FrameSystem") && text.contains("IFCMEMBERTYPE"));
+    let (_p2, doc2, _) = LocalProject::open(&path).unwrap();
+    let back = doc2.store().iter().find(|e| e.name.as_deref() == Some("uPVC Glazing Bar 60×90")).expect("the type comes back");
+    let f = reviera_core::frame_library::of_type(back).unwrap();
+    assert!((f.deflection_ratio - 240.0).abs() < 1e-9 && f.finish == "anthracite" && f.material == reviera_core::frame_library::Material::Upvc, "{f:?}");
 }

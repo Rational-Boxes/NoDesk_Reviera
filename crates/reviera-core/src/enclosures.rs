@@ -44,6 +44,10 @@
 //! `IfcElementAssembly` (ObjectType `GlazedEnclosure`) whose recipe lists its parts; each part
 //! names its enclosure (`rxd:enclosure`) and goes with it.
 //!
+//! The glazing's bars come from the frame system (`frame_system`, `crate::frame_library`); the
+//! enclosure reports the share of the roof they shade, and warns when the roof is flatter than
+//! its glazing allows or than the condensate guideline.
+//!
 //! Not yet: rafters, purlins and Venlo trusses; side
 //! vents and roll-up sides; vents as their own `IfcWindow` in a glazed roof's IFC (the roof's
 //! glazing is one body there); keeping a user's edits to a part when the enclosure regenerates; a headhouse.
@@ -72,9 +76,11 @@ pub const WALL_GLAZING: &str = "Greenhouse Wall Glass";
 pub const TUNNEL_FILM: &str = "Greenhouse Tunnel Film";
 /// The facets of a tunnel's arch.
 const ARCH_FACETS: usize = 16;
-/// The glazing bars of both glass types.
+/// The glazing bars of both glass types, and the tunnel film's hoops (the frame library's
+/// defaults, ARC-GLZ-003).
 const ROOF_BAR: Mullion = Mullion { width: 0.04, depth: 0.08 };
 const WALL_BAR: Mullion = Mullion { width: 0.04, depth: 0.08 };
+const HOOP: Mullion = Mullion { width: 0.05, depth: 0.05 };
 /// How far below the eave a gutter's bottom hangs: its top 20 mm under the roof and its depth
 /// (MEP-PIPE-010's default, half its 125 mm width), laid level (EXPERT_REVIEW E-49).
 const GUTTER_DROP: f64 = 0.02 + 0.0625;
@@ -87,9 +93,6 @@ const POST_HEAVY: &str = "HSS4X4X1/4";
 /// The least clear width and height of an end wall's door (provisional, EXPERT_REVIEW E-50).
 const DOOR_WIDTH: f64 = 1.5;
 const DOOR_HEIGHT: f64 = 2.1;
-/// A sawtooth: the clearance between a vertical face's glass and the gutter at its foot, and
-/// from the face's top to the bars of the roof over it.
-const SAW_FACE_GAP: f64 = WALL_BAR.depth / 2.0 + 0.005;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
@@ -158,6 +161,10 @@ pub struct EnclosureRecipe {
     pub roof_glazing: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub wall_glazing: Option<String>,
+    /// The glazing bars' frame system: a library entry (`frame.list_types`); aluminium 40 × 80 mm
+    /// bars (a tunnel's 50 mm steel hoops) when absent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub frame_system: Option<String>,
     /// The parts (GlobalIds).
     #[serde(default)]
     pub parts: Vec<String>,
@@ -260,7 +267,32 @@ impl EnclosureRecipe {
     /// vertical face before it, a gap, then its gutter.
     fn low_side(&self, i: u32) -> f64 {
         let y = self.span * f64::from(i);
-        if i == 0 { y } else { y + SAW_FACE_GAP + GUTTER_WIDTH }
+        if i == 0 { y } else { y + self.face_gap() + GUTTER_WIDTH }
+    }
+
+    /// The roof's glazing bars (and, on a frame system, the walls'), from the frame system.
+    pub fn bar(&self) -> Mullion {
+        match self.frame_system.as_deref().and_then(crate::frame_library::entry) {
+            Some(e) => e.frame.bar(),
+            None if self.form.tunnel() => HOOP,
+            None => WALL_BAR,
+        }
+    }
+
+    /// A sawtooth: the clearance between a vertical face's glass and the gutter at its foot, and
+    /// at the end walls.
+    fn face_gap(&self) -> f64 {
+        let wall = if self.frame_system.is_some() { self.bar() } else { WALL_BAR };
+        wall.depth / 2.0 + 0.005
+    }
+
+    /// The share of the roof the glazing bars shade, seen square to it: bars on the glazing
+    /// grid's lines (across the slope `along` apart, up it `up` apart, 0 for none).
+    pub fn frame_shading(&self) -> f64 {
+        let w = self.bar().width;
+        let (along, up) = if self.form.tunnel() { (1.5, 0.0) } else { (1.125, 2.0) };
+        let open = |s: f64| if s > 0.0 { (1.0 - w / s).max(0.0) } else { 1.0 };
+        1.0 - open(along) * open(up)
     }
 
     /// The inner gutter lines across (where the inner posts stand): the valleys, a Venlo's truss
@@ -382,6 +414,11 @@ fn type_named(txn: &mut Transaction<'_>, name: &str, is: fn(&Element) -> bool, g
     if let Some(entry) = crate::glazing_library::entry(glazing) {
         crate::glazing_library::write(txn, id, &entry.glazing)?;
     }
+    // The bars' frame system: the film's steel hoops, the glass's aluminium bars.
+    let frame = if name == TUNNEL_FILM { crate::frame_library::TUNNEL_DEFAULT } else { crate::frame_library::DEFAULT };
+    if let Some(entry) = crate::frame_library::entry(frame) {
+        crate::frame_library::write(txn, id, &entry.frame)?;
+    }
     Ok(id)
 }
 
@@ -417,7 +454,7 @@ fn tunnel_film(txn: &mut Transaction<'_>) -> Result<ElementId> {
         "Double Inflated Polyethylene",
         || {
             // Film on hoops at most 1.5 m apart (50 × 50 mm bars stand for them), no purlins.
-            let hoop = Mullion { width: 0.05, depth: 0.05 };
+            let hoop = HOOP;
             let ty = CurtainType {
                 u: Rule { layout: Layout::MaximumSpacing, spacing: 1.5, number: 0 },
                 v: Rule { layout: Layout::None, spacing: 0.0, number: 0 },
@@ -466,15 +503,23 @@ fn build(txn: &mut Transaction<'_>, guid: &str, r: &EnclosureRecipe) -> Result<V
         .and_then(|g| store.find_by_guid(&g))
         .ok_or_else(|| Error::new("enclosure.no_level", "the enclosure's level no longer exists"))?;
     use crate::glazing_library::{Use, type_for};
-    let roof_type = match (&r.roof_glazing, r.form.tunnel()) {
-        (Some(g), true) => type_for(txn, g, Use::Roof, [1.5, 0.0], Mullion { width: 0.05, depth: 0.05 })?,
-        (Some(g), false) => type_for(txn, g, Use::Roof, [1.125, 2.0], ROOF_BAR)?,
-        (None, true) => tunnel_film(txn)?,
-        (None, false) => roof_glazing(txn)?,
+    // On a frame system the glazing types are made with its bars (the default glazing's when
+    // none is chosen).
+    let bar = r.bar();
+    let frame = r.frame_system.as_deref();
+    let wall_bar = if frame.is_some() { bar } else { WALL_BAR };
+    let (roof_default, wall_default) = (if r.form.tunnel() { "Double Inflated Polyethylene" } else { "Horticultural Float 4 mm" }, "Horticultural Float 4 mm");
+    let grid = if r.form.tunnel() { [1.5, 0.0] } else { [1.125, 2.0] };
+    let roof_type = match (&r.roof_glazing, frame, r.form.tunnel()) {
+        (Some(g), _, _) => type_for(txn, g, Use::Roof, grid, bar, frame)?,
+        (None, Some(_), _) => type_for(txn, roof_default, Use::Roof, grid, bar, frame)?,
+        (None, None, true) => tunnel_film(txn)?,
+        (None, None, false) => roof_glazing(txn)?,
     };
-    let wall_type = match &r.wall_glazing {
-        Some(g) => type_for(txn, g, Use::Wall, [0.8, 1.5], WALL_BAR)?,
-        None => wall_glazing(txn)?,
+    let wall_type = match (&r.wall_glazing, frame) {
+        (Some(g), _) => type_for(txn, g, Use::Wall, [0.8, 1.5], wall_bar, frame)?,
+        (None, Some(_)) => type_for(txn, wall_default, Use::Wall, [0.8, 1.5], wall_bar, frame)?,
+        (None, None) => wall_glazing(txn)?,
     };
     let (l, w) = (r.length, r.width());
     let mut parts = Vec::new();
@@ -526,7 +571,7 @@ fn build(txn: &mut Transaction<'_>, guid: &str, r: &EnclosureRecipe) -> Result<V
                 slope: None,
                 // The outer eaves reach past the side walls' glass so the gutters hang clear, and
                 // a sawtooth's high side over its vertical face.
-                overhang: Some(if (k == 0 && i == 0) || (k == 2 && (saw || i + 1 == r.spans)) { WALL_BAR.depth / 2.0 } else { 0.0 }.into()),
+                overhang: Some(if (k == 0 && i == 0) || (k == 2 && (saw || i + 1 == r.spans)) { wall_bar.depth / 2.0 } else { 0.0 }.into()),
                 eave: None,
             })
             .collect();
@@ -589,11 +634,11 @@ fn build(txn: &mut Transaction<'_>, guid: &str, r: &EnclosureRecipe) -> Result<V
     // The end walls stand between the side walls' corner posts and rise into the gables,
     // dropping under the valley gutters between the roofs; the side walls stop under the roof's
     // eave bars.
-    let inset = if r.doors { (WALL_BAR.depth / 2.0).max(knee_half) } else { WALL_BAR.depth / 2.0 };
-    let under_bars = ROOF_BAR.depth / 2.0 / r.pitch.cos();
+    let inset = if r.doors { (wall_bar.depth / 2.0).max(knee_half) } else { wall_bar.depth / 2.0 };
+    let under_bars = bar.depth / 2.0 / r.pitch.cos();
     // A sawtooth's vertical face under span `i`'s high side: its top (absolute) clear of the
     // roof's bars over the face's glass, and its vents (`vents` percent of the span's floor).
-    let face_top = |i: u32| r.eave + (r.span * f64::from(i + 1) - r.low_side(i) - SAW_FACE_GAP) * r.pitch.tan() - under_bars - 0.005;
+    let face_top = |i: u32| r.eave + (r.span * f64::from(i + 1) - r.low_side(i) - r.face_gap()) * r.pitch.tan() - under_bars - 0.005;
     let vent_band = r.vents / 100.0 * r.span;
     for (k, (a, b)) in perimeter.into_iter().enumerate() {
         let base = base_of(k);
@@ -608,7 +653,7 @@ fn build(txn: &mut Transaction<'_>, guid: &str, r: &EnclosureRecipe) -> Result<V
         } else if saw && k == 2 {
             (a, b, face_top(r.spans - 1) - base)
         } else {
-            (a, b, r.eave - base - if r.form.tunnel() { 0.05 } else { under_bars })
+            (a, b, r.eave - base - if r.form.tunnel() { bar.depth } else { under_bars })
         };
         let cw = crate::curtain::create(
             txn,
@@ -642,7 +687,7 @@ fn build(txn: &mut Transaction<'_>, guid: &str, r: &EnclosureRecipe) -> Result<V
             txn,
             crate::curtain::CreateParams {
                 type_id: Some(ElementRef::Id(wall_type)),
-                curve: Line { start: r.at(l - SAW_FACE_GAP, y), end: r.at(SAW_FACE_GAP, y) },
+                curve: Line { start: r.at(l - r.face_gap(), y), end: r.at(r.face_gap(), y) },
                 base_level: ElementRef::Id(level),
                 base_offset: r.eave,
                 top_constraint: walls::TopConstraint::Unconnected(face_top(i) - r.eave),
@@ -667,7 +712,7 @@ fn build(txn: &mut Transaction<'_>, guid: &str, r: &EnclosureRecipe) -> Result<V
             txn,
             crate::steel_sections::LoadParams { catalog: "aisc_hss_rect".into(), designation: designation.into(), material: None },
         )?;
-        let clear = (WALL_BAR.depth / 2.0).max(knee_half) + half + 0.005;
+        let clear = (wall_bar.depth / 2.0).max(knee_half) + half + 0.005;
         let mut lines = vec![clear];
         lines.extend(r.gutter_lines());
         lines.push(w - clear);
@@ -812,6 +857,8 @@ pub struct Params {
     /// The roof's and walls' glazing, by library name (`glazing.list_types`); "" for the default.
     pub roof_glazing: Option<String>,
     pub wall_glazing: Option<String>,
+    /// The glazing bars' frame system, by library name (`frame.list_types`); "" for the default.
+    pub frame_system: Option<String>,
     /// The corner laid out from, and the direction of the length (radians or "90°").
     pub origin: Option<[f64; 2]>,
     #[schemars(extend("x-reviera-data-type" = "angle"))]
@@ -850,6 +897,7 @@ pub fn defaults(form: Form) -> EnclosureRecipe {
         arc: gothic_arc(),
         roof_glazing: None,
         wall_glazing: None,
+        frame_system: None,
         parts: Vec::new(),
     };
     match form {
@@ -915,6 +963,12 @@ fn apply(store: &Store, r: &mut EnclosureRecipe, p: &Params) -> Result<()> {
             }
             *slot = (!g.is_empty()).then(|| g.clone());
         }
+    }
+    if let Some(f) = &p.frame_system {
+        if !f.is_empty() && crate::frame_library::entry(f).is_none() {
+            return Err(Error::new("frame.unknown", format!("no frame system {f} in the library (frame.list_types)")));
+        }
+        r.frame_system = (!f.is_empty()).then(|| f.clone());
     }
     if let Some(v) = p.vents {
         if !(0.0..=60.0).contains(&v) {
@@ -1005,6 +1059,8 @@ pub struct Info {
     /// area (percent).
     pub vent_area: f64,
     pub vent_percent: f64,
+    /// The share of the roof its glazing bars shade (for the crop-light and daylight analyses).
+    pub frame_shading: f64,
     /// The parts that still exist, by kind.
     pub roofs: Vec<ElementId>,
     pub curtain_walls: Vec<ElementId>,
@@ -1012,12 +1068,45 @@ pub struct Info {
     pub gutters: Vec<ElementId>,
     pub posts: Vec<ElementId>,
     pub beams: Vec<ElementId>,
+    /// What the enclosure should be checked for: a roof flatter than its glazing allows, or
+    /// flat enough for condensate to drip (ARC-GLZ-002, EXPERT_REVIEW E-45).
+    pub warnings: Vec<String>,
+}
+
+/// Below this pitch condensate drips from the glazing instead of running down it (provisional,
+/// EXPERT_REVIEW E-45).
+const DRIP_PITCH: f64 = 10.0;
+
+/// The roof pitch checked against its glazing's least pitch and the condensate guideline.
+fn pitch_warnings(store: &Store, r: &EnclosureRecipe, roof: Option<&Element>) -> Vec<String> {
+    // A tunnel's arch is steep but at its crown; its film sheds on the curve.
+    if r.form.tunnel() {
+        return Vec::new();
+    }
+    let deg = r.pitch.to_degrees();
+    let mut out = Vec::new();
+    let ty = roof.and_then(|e| store.find_by_guid(&GlobalId::parse(e.param("@type")?.as_str()?)?)).and_then(|t| store.get(t));
+    if let Some(t) = ty
+        && let Some(g) = crate::glazing_library::of_type(t)
+        && g.min_pitch > 0.0
+        && r.pitch < g.min_pitch - 1e-9
+    {
+        out.push(format!(
+            "the roof pitch {deg:.1}° is below the {:.1}° its glazing ({}) may be laid at",
+            g.min_pitch.to_degrees(),
+            t.name.as_deref().unwrap_or("its type")
+        ));
+    }
+    if deg < DRIP_PITCH {
+        out.push(format!("at {deg:.1}° condensate may drip from the roof onto the crop; {DRIP_PITCH}° or more lets it run to the gutters"));
+    }
+    out
 }
 
 /// `enclosure.get`.
 pub(crate) fn get(store: &Store, p: GetParams) -> Result<Info> {
     let (_, r) = resolve(store, &p.enclosure_id)?;
-    let mut info = Info { width: r.width(), ridge: r.ridge(), floor_area: r.width() * r.length, vent_area: 0.0, vent_percent: 0.0, recipe: r.clone(), roofs: vec![], curtain_walls: vec![], walls: vec![], gutters: vec![], posts: vec![], beams: vec![] };
+    let mut info = Info { width: r.width(), ridge: r.ridge(), floor_area: r.width() * r.length, frame_shading: r.frame_shading(), vent_area: 0.0, vent_percent: 0.0, recipe: r.clone(), roofs: vec![], curtain_walls: vec![], walls: vec![], gutters: vec![], posts: vec![], beams: vec![], warnings: vec![] };
     for g in &r.parts {
         let Some(e) = GlobalId::parse(g).and_then(|g| store.find_by_guid(&g)).and_then(|i| store.get(i)) else { continue };
         let list = if roofs::roof_recipe(e).is_some() {
@@ -1038,6 +1127,7 @@ pub(crate) fn get(store: &Store, p: GetParams) -> Result<Info> {
     info.vent_area = info.roofs.iter().filter_map(|id| store.get(*id)).map(|e| vent_area(store, e)).sum::<f64>()
         + info.curtain_walls.iter().filter_map(|id| store.get(*id)).map(|e| wall_vent_area(store, e)).sum::<f64>();
     info.vent_percent = 100.0 * info.vent_area / info.floor_area.max(1e-9);
+    info.warnings = pitch_warnings(store, &r, info.roofs.first().and_then(|id| store.get(*id)));
     Ok(info)
 }
 

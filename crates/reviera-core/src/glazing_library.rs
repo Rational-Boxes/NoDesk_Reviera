@@ -13,7 +13,7 @@
 //! ones from public maker and extension data (research/09 §3), provisional (EXPERT_REVIEW E-46),
 //! to be replaced by the specified product's.
 //!
-//! Not yet: frame types (`frame.*`), optical values on the material (`Pset_MaterialOptical`),
+//! Frame systems (the bars) are `crate::frame_library`'s. Not yet: optical values on the material (`Pset_MaterialOptical`),
 //! and the energy model's use of light transmission and SHGC for glazed roofs.
 
 use schemars::JsonSchema;
@@ -218,10 +218,12 @@ pub enum Use {
 }
 
 /// Makes (or finds) a glazing type of library entry `name` for `use_`, with `grid` the bars'
-/// spacing (along, up) and `bar` their section.
-pub(crate) fn type_for(txn: &mut Transaction<'_>, name: &str, use_: Use, grid: [f64; 2], bar: Mullion) -> Result<ElementId> {
+/// spacing (along, up) and `bar` their section, on library frame system `frame` if given.
+pub(crate) fn type_for(txn: &mut Transaction<'_>, name: &str, use_: Use, grid: [f64; 2], bar: Mullion, frame: Option<&str>) -> Result<ElementId> {
     let e = entry(name).ok_or_else(|| Error::new("glazing.unknown", format!("no glazing {name} in the library (glazing.list_types)")))?;
-    let label = format!("{} ({})", e.name, if use_ == Use::Roof { "roof" } else { "wall" });
+    let frame = frame.map(|f| crate::frame_library::entry(f).ok_or_else(|| Error::new("frame.unknown", format!("no frame system {f} in the library (frame.list_types)")))).transpose()?;
+    let on = frame.as_ref().map_or(String::new(), |f| format!(" on {}", f.name));
+    let label = format!("{}{on} ({})", e.name, if use_ == Use::Roof { "roof" } else { "wall" });
     let is = |x: &Element| x.name.as_deref() == Some(label.as_str()) && of_type(x).is_some();
     if let Some(x) = txn.store().iter().find(|x| is(x)) {
         return Ok(x.id());
@@ -247,6 +249,9 @@ pub(crate) fn type_for(txn: &mut Transaction<'_>, name: &str, use_: Use, grid: [
         )?,
     };
     write(txn, id, &e.glazing)?;
+    if let Some(f) = frame {
+        crate::frame_library::write(txn, id, &f.frame)?;
+    }
     Ok(id)
 }
 
@@ -299,7 +304,7 @@ pub(crate) fn create_type(txn: &mut Transaction<'_>, p: CreateParams) -> Result<
     if !(0.2..=5.0).contains(&along) || !(up == 0.0 || (0.2..=10.0).contains(&up)) {
         return Err(Error::new("glazing.bad_spacing", "bars are 0.2 to 5 m apart along, and 0 (none) or 0.2 to 10 m up"));
     }
-    type_for(txn, &p.glazing, p.use_, [along, up], Mullion { width: 0.04, depth: 0.08 })
+    type_for(txn, &p.glazing, p.use_, [along, up], Mullion { width: 0.04, depth: 0.08 }, None)
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]

@@ -1700,7 +1700,9 @@ area by area (reviewed against the spec on 2026-10-15).
   walls attached to the roofs, filling the gables, a door in each), knee walls, gutters, ridge vents (a share of the floor area), and steel posts and gutter beams, edited in Properties; growing layouts of benches, rolling benches,
   ebb-and-flow or NFT tables clear of the posts, with their growing area (`growing.*`); a glazing
   library (glass, polycarbonate, acrylic, film) whose types carry light, U, g and safety values in the
-  published `Reviera_GlazingUnit` property set (`glazing.*`, `schemas/psets`)
+  published `Reviera_GlazingUnit` property set (`glazing.*`, `schemas/psets`); frame systems
+  (aluminium, steel, timber, uPVC bars) with their deflection limit in `Reviera_FrameSystem`
+  (`frame.*`), and a warning when a roof is flatter than its glazing allows
   (`enclosure.*`); the `greenhouses` sample. Curtain walls' tops attach to one or more roofs
   (`wall.attach`).
 - **FileEngine integration** (`design_documents/FILEENGINE_INTEGRATION.md`): open, save and

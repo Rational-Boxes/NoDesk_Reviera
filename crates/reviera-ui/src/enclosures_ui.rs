@@ -212,6 +212,10 @@ impl Gui {
         grid.append(Property::enumeration("Roof Glazing", "gh_roof_glazing", choices(), at(&r.roof_glazing)));
         grid.append(Property::enumeration("Wall Glazing", "gh_wall_glazing", choices(), at(&r.wall_glazing)));
         grid.set_help_string("gh_roof_glazing", "The glazing build-up (light, U-value, safety) of the roof; glazing.list_types lists them");
+        let frames: Vec<String> = std::iter::once("Greenhouse default".to_owned()).chain(reviera_core::frame_library::library().iter().map(|e| e.name.to_owned())).collect();
+        let at_frame = r.frame_system.as_ref().and_then(|f| frames.iter().position(|n| n.eq_ignore_ascii_case(f))).unwrap_or(0) as i32;
+        grid.append(Property::enumeration("Frame System", "gh_frame_system", frames.iter().enumerate().map(|(i, n)| (n.clone(), i as i32)).collect::<Vec<_>>(), at_frame));
+        grid.set_help_string("gh_frame_system", "The glazing bars' material, section and deflection limit; frame.list_types lists them");
         grid.append(Property::boolean("Gutters", "gh_gutters", r.gutters));
         grid.append(Property::boolean("Doors", "gh_doors", r.doors));
         grid.append(Property::boolean("Frame", "gh_frame", r.frame));
@@ -231,6 +235,15 @@ impl Gui {
             let (a, pc) = (v["vent_area"].as_f64().unwrap_or(0.0), v["vent_percent"].as_f64().unwrap_or(0.0));
             grid.append(Property::string(if saw { "Vent Area" } else { "Ridge Vent Area" }, "gh_vent_area", format!("{a:.1} m² ({pc:.1} %)")));
             grid.set_property_read_only("gh_vent_area", true);
+            let shade = v["frame_shading"].as_f64().unwrap_or(0.0);
+            grid.append(Property::string("Frame Shading", "gh_frame_shading", format!("{:.1} % of the roof", shade * 100.0)));
+            grid.set_property_read_only("gh_frame_shading", true);
+            let warnings: Vec<&str> = v["warnings"].as_array().map(|w| w.iter().filter_map(Value::as_str).collect()).unwrap_or_default();
+            if !warnings.is_empty() {
+                grid.append(Property::string("Warnings", "gh_warnings", warnings.join("; ")));
+                grid.set_property_read_only("gh_warnings", true);
+                grid.set_help_string("gh_warnings", &warnings.join("\n"));
+            }
         }
     }
 
@@ -259,6 +272,7 @@ impl Gui {
                 let key = if property == "gh_roof_glazing" { "roof_glazing" } else { "wall_glazing" };
                 args[key] = json!(if text == "Greenhouse default" { String::new() } else { text });
             }
+            "gh_frame_system" => args["frame_system"] = json!(if text == "Greenhouse default" { String::new() } else { text }),
             "gh_doors" => args["doors"] = json!(matches!(text.as_str(), "True" | "true" | "1")),
             "gh_frame" => args["frame"] = json!(matches!(text.as_str(), "True" | "true" | "1")),
             "gh_vents" => match text.trim().trim_end_matches('%').trim().parse::<f64>() {
