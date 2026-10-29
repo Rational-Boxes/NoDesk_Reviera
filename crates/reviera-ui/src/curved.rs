@@ -46,6 +46,11 @@ const TAPERS: &[(&str, &str)] = &[
     ("Constant Slope", "constant_slope"),
 ];
 
+const TRIANGULATE: [(&str, roofs::curved::Triangulate); 3] = [
+    ("Where not flat", roofs::curved::Triangulate::Auto),
+    ("Always", roofs::curved::Triangulate::Always),
+    ("Never", roofs::curved::Triangulate::Never),
+];
 const FREQUENCIES: &[(&str, u32)] = &[("2V", 2), ("3V", 3), ("4V", 4), ("5V", 5), ("6V", 6)];
 const TRUNCATIONS: &[(&str, &str)] = &[("1/2 (hemisphere)", "1/2"), ("3/8", "3/8"), ("5/8", "5/8"), ("3/4", "3/4")];
 
@@ -255,6 +260,7 @@ impl Gui {
         &mut self,
         grid: &PropertyGrid,
         recipe: &roofs::RoofRecipe,
+        glazed: bool,
     ) -> bool {
         let enumeration = |label: &str, key: &str, list: &[(&str, &str)], value: &str| {
             let index = list
@@ -298,6 +304,9 @@ impl Gui {
                 "ar_taper",
                 "Over a tapering footprint: keep the rise, or scale it with the span",
             );
+            if glazed {
+                self.curved_glazing_rows(grid, recipe, true);
+            }
             return true;
         }
         if let Some(d) = &recipe.dome {
@@ -373,9 +382,57 @@ impl Gui {
                 "do_oculus",
                 "The opening's diameter at the crown; 0 for none",
             );
+            if glazed {
+                self.curved_glazing_rows(grid, recipe, false);
+            }
             return true;
         }
         false
+    }
+
+    /// A glazed vault's or dome's panel grid (ARC-GLZ-006).
+    fn curved_glazing_rows(&mut self, grid: &PropertyGrid, recipe: &roofs::RoofRecipe, vault: bool) {
+        let g = recipe.curved_glazing.unwrap_or_default();
+        grid.append(Property::category("Glazing Grid", "c_curved_glazing"));
+        let auto = || "(from the glazing type)".to_owned();
+        let u = if vault { g.u.map_or_else(auto, |v| self.format_length(v)) } else { g.u.map_or_else(auto, |v| format!("{v}")) };
+        grid.append(Property::string(if vault { "Bay Spacing" } else { "Meridians" }, "cg_u", u));
+        grid.append(Property::string(if vault { "Divisions" } else { "Rings" }, "cg_v", g.v.map_or_else(auto, |v| format!("{v}"))));
+        let at = TRIANGULATE.iter().position(|t| t.1 == g.triangulate).unwrap_or(0) as i32;
+        grid.append(Property::enumeration("Triangulate", "cg_triangulate", TRIANGULATE.iter().enumerate().map(|(i, t)| (t.0.to_owned(), i as i32)).collect::<Vec<_>>(), at));
+        grid.set_help_string("cg_triangulate", "Split four-cornered panels into two triangles: only where they cannot be flat, always, or never");
+        grid.set_help_string("cg_u", if vault { "The bays along the vault, at most this far apart; empty for the glazing type's spacing" } else { "The meridians round the dome; empty for the glazing type's spacing" });
+    }
+
+    /// An edit of a glazed vault's or dome's grid row; `false` if `property` is not one.
+    pub(crate) fn curved_glazing_edit(&mut self, property: &str, text: Option<String>) -> bool {
+        if !property.starts_with("cg_") {
+            return false;
+        }
+        let frame = self.frame;
+        let Some(roof) = self.selection().first().copied() else { return true };
+        let text = text.unwrap_or_default();
+        let blank = text.trim().is_empty() || text.starts_with('(');
+        let mut args = json!({ "roof_id": roof });
+        match property {
+            "cg_u" => args["grid_u"] = if blank { serde_json::Value::Null } else { text.trim().parse::<f64>().map_or_else(|_| json!(text.trim()), |n| json!(n)) },
+            "cg_v" => match text.trim().parse::<f64>() {
+                Ok(n) if !blank => args["grid_v"] = json!(n),
+                _ => return true,
+            },
+            "cg_triangulate" => match TRIANGULATE.iter().find(|t| t.0 == text) {
+                Some(t) => args["triangulate"] = json!(t.1),
+                None => return true,
+            },
+            _ => return true,
+        }
+        match self.run("roof.set_glazing", args) {
+            Ok(v) => frame.set_status_text(&format!("Glazing: {} panels ({} triangles), {} bars", v["panels"], v["triangles"], v["bars"]), 0),
+            Err(e) => error(&frame, &format!("The glazing was not changed:\n{e}")),
+        }
+        self.properties_stale = true;
+        self.refresh_scene(&frame);
+        true
     }
 
     /// An edit of an arch or dome row; `false` if `property` is not one.

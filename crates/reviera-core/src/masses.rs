@@ -893,6 +893,7 @@ pub fn system_parts(r: &SystemRecipe) -> crate::roofs::glazing::Glazing {
         predefined: "NOTDEFINED",
         trims: Vec::new(),
         uncut: 0,
+        surface: None,
     };
     crate::roofs::glazing::regenerate(&g, &r.layout, &[])
 }

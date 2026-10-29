@@ -280,6 +280,7 @@ pub fn geometry(store: &Store, x: &Extrusion, base: f64, thickness: f64) -> Resu
         predefined: x.predefined(),
         trims: Vec::new(),
         uncut: 0,
+        surface: None,
     })
 }
 
@@ -394,6 +395,7 @@ pub(crate) fn create(txn: &mut crate::txn::Transaction<'_>, p: CreateParams) -> 
         extrusion: Some(x.clone()),
         joins: Default::default(),
         panes: Vec::new(),
+        curved_glazing: None,
     };
     let type_guid = txn.store().get(type_id).expect("exists").guid().to_string();
     let id = txn.create(

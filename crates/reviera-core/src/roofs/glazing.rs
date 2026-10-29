@@ -108,7 +108,7 @@ fn unit(a: [f64; 3]) -> [f64; 3] {
 }
 
 /// A box along `a`→`b`, `width` across (square to `up`) and `depth` along `up`, centred.
-fn bar(a: [f64; 3], b: [f64; 3], up: [f64; 3], width: f64, depth: f64) -> Mesh {
+pub(super) fn bar(a: [f64; 3], b: [f64; 3], up: [f64; 3], width: f64, depth: f64) -> Mesh {
     let d = unit(sub(b, a));
     let up = unit(sub(
         up,
@@ -331,12 +331,22 @@ pub fn regenerate(g: &RoofGeometry, ty: &CurtainType, panes: &[PaneOverride]) ->
     Glazing { planes, parts }
 }
 
+/// A roof's glazing from its geometry: a vault's or dome's on its curved surface (ARC-GLZ-006),
+/// else plane by plane with its swapped panes.
+pub fn of_geometry(g: &super::RoofGeometry, e: &Element, ty: &CurtainType) -> Glazing {
+    let r = super::roof_recipe(e);
+    if let Some(surface) = &g.surface {
+        let grid = r.as_ref().and_then(|r| r.curved_glazing).unwrap_or_default();
+        return super::curved::glazing(surface, &grid, ty);
+    }
+    regenerate(g, ty, &r.map(|r| r.panes).unwrap_or_default())
+}
+
 /// A roof's glazing, when its type is sloped glazing and it regenerates.
 pub fn of(store: &Store, e: &Element) -> Option<Glazing> {
     let ty = of_roof(store, e)?;
     let g = super::regenerate(store, e).ok()?;
-    let panes = super::roof_recipe(e).map(|r| r.panes).unwrap_or_default();
-    Some(regenerate(&g, &ty, &panes))
+    Some(of_geometry(&g, e, &ty))
 }
 
 // ---- Commands ----

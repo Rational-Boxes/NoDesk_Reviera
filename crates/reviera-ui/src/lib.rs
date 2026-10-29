@@ -2974,6 +2974,7 @@ impl Gui {
             || self.enclosure_edit(property, text.clone())
             || self.growing_edit(property, text.clone())
             || self.geodesic_edit(property, text.clone())
+            || self.curved_glazing_edit(property, text.clone())
             || self.curved_roof_edit(property, text.clone())
             || self.deck_edit(property, text.clone())
         {

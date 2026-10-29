@@ -197,7 +197,9 @@ pub struct RoofRecipe {
     pub joins: BTreeMap<String, String>,
     /// Sloped glazing (ARC-CW-008): panes swapped plane by plane (vents, ARC-GLZ-004).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub panes: Vec<glazing::PaneOverride>,
+    pub panes: Vec<glazing::PaneOverride>,    /// A glazed vault's or dome's panel grid (ARC-GLZ-006).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub curved_glazing: Option<curved::CurvedGrid>,
 }
 
 impl RoofRecipe {
@@ -268,6 +270,8 @@ pub struct RoofGeometry {
     pub trims: Vec<eaves::RoofTrim>,
     /// Openings that could not be cut (across faces, or in a clipped face).
     pub uncut: usize,
+    /// A curved roof's exact surface (its faces are a fine grid over it), for glazing it.
+    pub surface: Option<curved::Surface>,
 }
 
 impl RoofGeometry {
@@ -1138,6 +1142,7 @@ pub fn generate_loops(
             keys: keys[..outer_len].to_vec(),
             predefined: "FLAT_ROOF",
             trims: Vec::new(),
+            surface: None,
             uncut: 0,
         });
     }
@@ -1371,6 +1376,7 @@ pub fn generate_loops(
         predefined,
         trims: Vec::new(),
         uncut: 0,
+        surface: None,
     })
 }
 
@@ -1734,6 +1740,7 @@ pub(crate) fn create(txn: &mut crate::txn::Transaction<'_>, p: CreateParams) -> 
         extrusion: None,
         joins: BTreeMap::new(),
         panes: Vec::new(),
+        curved_glazing: None,
     };
     let type_guid = txn.store().get(type_id).expect("exists").guid().to_string();
     let id = txn.create(

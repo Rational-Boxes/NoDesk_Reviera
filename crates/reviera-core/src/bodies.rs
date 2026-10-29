@@ -319,8 +319,8 @@ pub fn all(store: &Store) -> Vec<Body> {
             .get(id)
             .and_then(|e| crate::roofs::glazing::of_roof(store, e))
         {
-            let panes = store.get(id).and_then(crate::roofs::roof_recipe).map(|r| r.panes).unwrap_or_default();
-            for p in crate::roofs::glazing::regenerate(&g, &ty, &panes).parts {
+            let e = store.get(id).expect("listed");
+            for p in crate::roofs::glazing::of_geometry(&g, e, &ty).parts {
                 let class = if p.mullion {
                     "IfcMember:metal"
                 } else if matches!(p.panel, crate::curtain::Panel::Glazed | crate::curtain::Panel::Vent) {

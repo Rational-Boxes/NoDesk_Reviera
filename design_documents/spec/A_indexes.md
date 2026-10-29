@@ -2019,7 +2019,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `roof.set_arch` | 3 | roof_id, rise?, radius?, profile?, taper? | — | Yes | ARC-ROOF-008 |
 | `roof.set_dome` | 3 | roof_id, rise?, profile?, oculus?, polygon_mode? | — | Yes | ARC-ROOF-009 |
 | `roof.set_eaves` | 3 | roof_id, edges?, bearing?, heel?, overhang?, cut?, fascia_depth?, fascia?, soffit?, attach_walls?, remove? | — | Yes | ARC-ROOF-010 |
-| `roof.set_glazing` | 3 | roof_id, grid_u, grid_v, triangulate? | — | Yes | ARC-GLZ-006 |
+| `roof.set_glazing` | 3 | roof_id, grid_u?, grid_v?, triangulate? | {panels, triangles, bars, max_warp} | Yes | ARC-GLZ-006 |
 | `roof.set_shape` | 3 | roof_id, shape: hip\ | gable\ | gable_rotated\ | shed\ |
 | `roof.set_slope` | 3 | roof_id, slope, edge_keys? | — | Yes | ARC-ROOF-001 |
 | `roof.unjoin` | 3 | roof_id, edge_ref? | — | Yes | ARC-ROOF-006 |

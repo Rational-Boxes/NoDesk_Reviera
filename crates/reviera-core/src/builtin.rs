@@ -99,6 +99,7 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(RoofSetArch),
         registry.add(RoofCreateDome),
         registry.add(RoofSetDome),
+        registry.add(RoofSetGlazing),
         registry.add(RoofEaves),
         registry.add(RoofSetSlope),
         registry.add(RoofSetShape),
@@ -3025,6 +3026,21 @@ modify_command!(
     roofs::curved::SetDomeParams,
     (),
     roofs::curved::set_dome
+);
+modify_command!(
+    RoofSetGlazing,
+    "roof.set_glazing",
+    "Divide a glazed vault or dome into panels",
+    "Glazing on vaults and domes (ARC-GLZ-006): for an arched roof or dome of a Sloped Glazing type, \
+     the panel grid on its surface: a vault's bays `grid_u` apart at most along it and `grid_v` \
+     divisions round the arch; a dome's `grid_u` meridians and `grid_v` rings (each from the glazing \
+     type's spacing when null). Four-cornered panels are split into two triangles by `triangulate`: \
+     auto (only those not planar), always or never. Returns the panel, triangle and bar counts and the \
+     largest warp.",
+    "Roof Glazing",
+    roofs::curved::SetGlazingParams,
+    roofs::curved::GlazingInfo,
+    roofs::curved::set_glazing
 );
 
 modify_command!(

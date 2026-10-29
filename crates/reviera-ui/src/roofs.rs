@@ -207,7 +207,8 @@ impl Gui {
             grid.append(Property::string("Cutoff Offset", "rf_cutoff_offset", o));
         }
         // Arched roofs and domes have their own rows; footprint roofs their shape and eaves.
-        if !self.curved_roof_rows(grid, &recipe) {
+        let glazed = roofs::glazing::of_roof(&store, e).is_some();
+        if !self.curved_roof_rows(grid, &recipe, glazed) {
             grid.append(Property::category("Shape", "c_roof_shape"));
             let mut shapes: Vec<(String, i32)> = roofs::ROOF_SHAPES
                 .iter()

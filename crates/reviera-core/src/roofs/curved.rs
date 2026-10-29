@@ -314,6 +314,7 @@ pub(super) fn roof_of(
         predefined,
         trims: Vec::new(),
         uncut: 0,
+        surface: None,
     }
 }
 
@@ -435,13 +436,15 @@ pub fn arch(
         }
         rows.push(row);
     }
-    Ok(roof_of(
+    let mut geo = roof_of(
         &Grid { rows, wrap: false },
         plate,
         thickness,
         ring.to_vec(),
         "BARREL_ROOF",
-    ))
+    );
+    geo.surface = Some(Surface::Vault(ArchFrame { a0, a1, b0, b1, plate, profile: a.profile, rise: a.rise, taper: a.taper }));
+    Ok(geo)
 }
 
 /// A dome profile point at `s` (0 the springing, 1 the crown): the plan radius as a fraction of
@@ -584,13 +587,393 @@ pub fn dome(d: &Dome, plate: f64, thickness: f64) -> Result<RoofGeometry> {
         .iter()
         .map(|p| [d.center[0] + p[0], d.center[1] + p[1]])
         .collect();
-    Ok(roof_of(
+    let mut geo = roof_of(
         &Grid { rows, wrap: true },
         plate,
         thickness,
         footprint,
         "DOME_ROOF",
-    ))
+    );
+    geo.surface = Some(Surface::Dome { dome: d.clone(), plate });
+    Ok(geo)
+}
+
+// ---- Glazing on vaults and domes (ARC-GLZ-006) ----
+
+/// A vault's springing edges and section, to evaluate its surface anywhere.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ArchFrame {
+    /// Spring edge A runs `a0` → `a1`, edge B `b0` → `b1`, the same way.
+    pub a0: [f64; 2],
+    pub a1: [f64; 2],
+    pub b0: [f64; 2],
+    pub b1: [f64; 2],
+    pub plate: f64,
+    pub profile: ArchProfile,
+    pub rise: f64,
+    pub taper: Taper,
+}
+
+impl ArchFrame {
+    fn ends(&self, t: f64) -> ([f64; 2], [f64; 2]) {
+        let lerp = |p: [f64; 2], q: [f64; 2]| [p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t];
+        (lerp(self.a0, self.a1), lerp(self.b0, self.b1))
+    }
+
+    fn span(&self, t: f64) -> f64 {
+        let (l, r) = self.ends(t);
+        (r[0] - l[0]).hypot(r[1] - l[1])
+    }
+
+    /// The point `t` along the vault (0 to 1 between its ends) and `u` across (0 to 1 between
+    /// the springings).
+    pub fn point(&self, t: f64, u: f64) -> [f64; 3] {
+        let (l, r) = self.ends(t);
+        let s = self.span(t);
+        let h = match self.taper {
+            Taper::ConstantRise => self.rise,
+            Taper::ConstantSlope => self.rise * s / self.span(0.0).max(1e-9),
+        };
+        [l[0] + (r[0] - l[0]) * u, l[1] + (r[1] - l[1]) * u, self.plate + arch_z(self.profile, u, s, h)]
+    }
+
+    /// A point inside, under the surface at `t`.
+    fn inside(&self, t: f64) -> [f64; 3] {
+        let (l, r) = self.ends(t);
+        [(l[0] + r[0]) / 2.0, (l[1] + r[1]) / 2.0, self.plate]
+    }
+
+    fn length(&self) -> f64 {
+        ((self.a1[0] - self.a0[0]).hypot(self.a1[1] - self.a0[1]) + (self.b1[0] - self.b0[0]).hypot(self.b1[1] - self.b0[1])) / 2.0
+    }
+}
+
+/// A curved roof's exact surface.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Surface {
+    Vault(ArchFrame),
+    Dome { dome: Dome, plate: f64 },
+}
+
+/// When a glazed vault's or dome's four-cornered panels are split into two triangles.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum Triangulate {
+    /// Only those whose corners are not in one plane (a tapering vault's, say).
+    #[default]
+    Auto,
+    Always,
+    /// Never: a warped panel stays one (bent) pane.
+    Never,
+}
+
+/// How a glazed vault or dome is divided (in the roof's recipe); each count follows the
+/// glazing type's spacing when absent.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct CurvedGrid {
+    /// A vault: the bays along it (metres apart at most); a dome: its meridians (a count).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub u: Option<f64>,
+    /// A vault: the divisions round the arch; a dome: its rings (counts).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub v: Option<f64>,
+    #[serde(default)]
+    pub triangulate: Triangulate,
+}
+
+/// Panels within this of their plane are planar.
+const PLANAR: f64 = 0.001;
+
+fn dot(a: [f64; 3], b: [f64; 3]) -> f64 {
+    a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+}
+
+fn add(a: [f64; 3], b: [f64; 3]) -> [f64; 3] {
+    [a[0] + b[0], a[1] + b[1], a[2] + b[2]]
+}
+
+fn scale(a: [f64; 3], k: f64) -> [f64; 3] {
+    [a[0] * k, a[1] * k, a[2] * k]
+}
+
+/// Parameters 0..=1 at equal lengths along a curve sampled by `f`.
+fn equal_lengths(n: usize, f: impl Fn(f64) -> [f64; 3]) -> (Vec<f64>, f64) {
+    const FINE: usize = 400;
+    let pts: Vec<[f64; 3]> = (0..=FINE).map(|k| f(k as f64 / FINE as f64)).collect();
+    let mut acc = vec![0.0];
+    for w in pts.windows(2) {
+        let d = sub(w[1], w[0]);
+        acc.push(acc.last().copied().unwrap_or(0.0) + dot(d, d).sqrt());
+    }
+    let total = *acc.last().unwrap_or(&0.0);
+    let params = (0..=n)
+        .map(|k| {
+            let want = total * k as f64 / n as f64;
+            let i = acc.iter().position(|a| *a >= want - 1e-12).unwrap_or(FINE).max(1);
+            let (a0, a1) = (acc[i - 1], acc[i]);
+            let f = if a1 > a0 { (want - a0) / (a1 - a0) } else { 0.0 };
+            ((i - 1) as f64 + f) / FINE as f64
+        })
+        .collect();
+    (params, total)
+}
+
+/// A planar polygon's corners moved in by `d` from every edge (`n` its normal, the corners
+/// counter-clockwise about it).
+fn inset(poly: &[[f64; 3]], n: [f64; 3], d: f64) -> Vec<[f64; 3]> {
+    let k = poly.len();
+    let inward = |i: usize| unit(cross(n, sub(poly[(i + 1) % k], poly[i])));
+    (0..k)
+        .map(|i| {
+            let (m0, m1) = (inward((i + k - 1) % k), inward(i));
+            let s = d / (1.0 + dot(m0, m1)).max(0.2);
+            add(poly[i], scale(add(m0, m1), s))
+        })
+        .collect()
+}
+
+/// A point inside a curved roof under row `r` of its grid (to tell outward from inward).
+type Inside = Box<dyn Fn(usize) -> [f64; 3]>;
+
+/// A glazed vault's or dome's panels and bars, on the glazing type's bars and thickness.
+pub fn glazing(surface: &Surface, grid: &CurvedGrid, ty: &crate::curtain::CurtainType) -> super::glazing::Glazing {
+    let spacing = |r: crate::curtain::Rule, default: f64| if r.spacing > 0.0 { r.spacing } else { default };
+    let (rows, wrap, inside): (Vec<Vec<[f64; 3]>>, bool, Inside) = match surface {
+        Surface::Vault(f) => {
+            let bays = grid.u.map_or_else(|| (f.length() / spacing(ty.u, 1.125)).ceil(), |m| (f.length() / m.max(0.2)).ceil()).max(1.0) as usize;
+            let (_, arc) = equal_lengths(ACROSS * 4, |u| f.point(0.0, u));
+            let divisions = grid.v.map_or_else(|| (arc / spacing(ty.v, 2.0)).ceil(), |n| n.round()).max(2.0) as usize;
+            let (us, _) = equal_lengths(divisions, |u| f.point(0.0, u));
+            let ts: Vec<f64> = (0..=bays).map(|k| k as f64 / bays as f64).collect();
+            let rows = ts.iter().map(|t| us.iter().map(|u| f.point(*t, *u)).collect()).collect();
+            let f2 = f.clone();
+            let ts2 = ts.clone();
+            (rows, false, Box::new(move |r: usize| f2.inside(ts2[r.min(ts2.len() - 1)])))
+        }
+        Surface::Dome { dome: d, plate } => {
+            let r = d.radius();
+            let meridians = grid.u.map_or_else(|| (std::f64::consts::TAU * r / spacing(ty.u, 1.125)).ceil(), f64::round).max(3.0) as usize;
+            let (_, arc) = equal_lengths(64, |s| {
+                let (x, z) = dome_point(d, s);
+                [x * r, 0.0, z]
+            });
+            let rings = grid.v.map_or_else(|| (arc / spacing(ty.v, 2.0)).ceil(), f64::round).max(1.0) as usize;
+            let dirs: Vec<[f64; 2]> = match &d.plan {
+                DomePlan::Polygon { radius, sides, rotation } => {
+                    let n = *sides as usize;
+                    let per = (meridians / n).max(1);
+                    let corner = |j: usize| {
+                        let t = rotation + std::f64::consts::TAU * j as f64 / n as f64;
+                        [radius * t.cos(), radius * t.sin()]
+                    };
+                    (0..n)
+                        .flat_map(|j| {
+                            let (p, q) = (corner(j), corner(j + 1));
+                            (0..per).map(move |k| {
+                                let f = k as f64 / per as f64;
+                                [p[0] + (q[0] - p[0]) * f, p[1] + (q[1] - p[1]) * f]
+                            })
+                        })
+                        .collect()
+                }
+                DomePlan::Ellipse { radii, rotation } => {
+                    let (c, s) = (rotation.cos(), rotation.sin());
+                    (0..meridians)
+                        .map(|j| {
+                            let t = std::f64::consts::TAU * j as f64 / meridians as f64;
+                            let (x, y) = (radii[0] * t.cos(), radii[1] * t.sin());
+                            [x * c - y * s, x * s + y * c]
+                        })
+                        .collect()
+                }
+                DomePlan::Circle { radius } => (0..meridians)
+                    .map(|j| {
+                        let t = std::f64::consts::TAU * j as f64 / meridians as f64;
+                        [radius * t.cos(), radius * t.sin()]
+                    })
+                    .collect(),
+            };
+            // Rings at equal lengths up the profile, stopping at the oculus.
+            let (ss, _) = equal_lengths(rings, |s| {
+                let (x, z) = dome_point(d, s);
+                [x * r, 0.0, z]
+            });
+            let open = (d.oculus / 2.0 / r).clamp(0.0, 0.95);
+            let mut samples: Vec<(f64, f64)> = ss.iter().map(|s| dome_point(d, *s)).collect();
+            if open > 0.0
+                && let Some(k) = samples.iter().position(|(x, _)| *x <= open)
+                && k > 0
+            {
+                samples.truncate(k);
+                samples.push((open, samples[k - 1].1));
+            }
+            let rows = samples
+                .iter()
+                .map(|(x, z)| dirs.iter().map(|p| [d.center[0] + p[0] * x, d.center[1] + p[1] * x, plate + z]).collect())
+                .collect();
+            let centre = [d.center[0], d.center[1], *plate];
+            (rows, true, Box::new(move |_| centre))
+        }
+    };
+    let (nr, nc) = (rows.len(), rows[0].len());
+    let spans = if wrap { nc } else { nc - 1 };
+    let t = ty.panel_thickness;
+    let mut parts = Vec::new();
+    // Each edge's cell normals, for the bar along it.
+    let mut edge_normals: std::collections::BTreeMap<[(usize, usize); 2], [f64; 3]> = Default::default();
+    let key = |a: (usize, usize), b: (usize, usize)| if a <= b { [a, b] } else { [b, a] };
+    let same = |p: [f64; 3], q: [f64; 3]| dot(sub(p, q), sub(p, q)) < 1e-12;
+    let edges_of = |poly: &[(usize, usize)], n: [f64; 3], edge_normals: &mut std::collections::BTreeMap<[(usize, usize); 2], [f64; 3]>| {
+        for k in 0..poly.len() {
+            let e = edge_normals.entry(key(poly[k], poly[(k + 1) % poly.len()])).or_insert([0.0; 3]);
+            *e = add(*e, n);
+        }
+    };
+    let width = ty.interior.or(ty.border).map_or(0.0, |m| m.width);
+    for r in 0..nr - 1 {
+        for c in 0..spans {
+            let c1 = (c + 1) % nc;
+            let mut cell = vec![(r, c), (r, c1), (r + 1, c1), (r + 1, c)];
+            // A crown (or a degenerate edge) makes it a triangle.
+            cell.dedup_by(|a, b| same(rows[a.0][a.1], rows[b.0][b.1]));
+            if cell.len() > 3 && same(rows[cell[0].0][cell[0].1], rows[cell[cell.len() - 1].0][cell[cell.len() - 1].1]) {
+                cell.pop();
+            }
+            if cell.len() < 3 {
+                continue;
+            }
+            let at = |v: (usize, usize)| rows[v.0][v.1];
+            let mut n = unit(cross(sub(at(cell[1]), at(cell[0])), sub(at(cell[cell.len() - 1]), at(cell[0]))));
+            // Outward: away from the inside.
+            let centroid = scale(cell.iter().fold([0.0; 3], |s, v| add(s, at(*v))), 1.0 / cell.len() as f64);
+            if dot(n, sub(centroid, inside(r))) < 0.0 {
+                cell.reverse();
+                n = scale(n, -1.0);
+            }
+            let warp = if cell.len() == 4 { dot(sub(at(cell[3]), at(cell[0])), n).abs() } else { 0.0 };
+            let split = cell.len() == 4
+                && match grid.triangulate {
+                    Triangulate::Always => true,
+                    Triangulate::Never => false,
+                    Triangulate::Auto => warp > PLANAR,
+                };
+            let polys: Vec<Vec<(usize, usize)>> = if split { vec![vec![cell[0], cell[1], cell[2]], vec![cell[0], cell[2], cell[3]]] } else { vec![cell.clone()] };
+            for poly in polys {
+                let pts: Vec<[f64; 3]> = poly.iter().map(|v| at(*v)).collect();
+                let pn = unit(cross(sub(pts[1], pts[0]), sub(pts[pts.len() - 1], pts[0])));
+                edges_of(&poly, pn, &mut edge_normals);
+                let inner = inset(&pts, pn, width / 2.0);
+                let k = inner.len() as u32;
+                let mut mesh_pts = inner.clone();
+                mesh_pts.extend(inner.iter().map(|p| add(*p, scale(pn, t))));
+                let mut idx = Vec::new();
+                for i in 1..k - 1 {
+                    idx.extend([0, i + 1, i]);
+                    idx.extend([k, k + i, k + i + 1]);
+                }
+                for i in 0..k {
+                    let j = (i + 1) % k;
+                    idx.extend([i, j, k + j, i, k + j, k + i]);
+                }
+                let size = [(dot(sub(pts[1], pts[0]), sub(pts[1], pts[0]))).sqrt(), (dot(sub(pts[pts.len() - 1], pts[0]), sub(pts[pts.len() - 1], pts[0]))).sqrt()];
+                parts.push(super::glazing::GlazingPart { mullion: false, panel: ty.panel, mesh: (mesh_pts, idx), axis: None, size: Some(size) });
+            }
+        }
+    }
+    // A bar along every panel edge, turned to the panels' mean normal there; the border's on the
+    // grid's outer edges.
+    for ([a, b], n) in edge_normals {
+        let (pa, pb) = (rows[a.0][a.1], rows[b.0][b.1]);
+        if same(pa, pb) {
+            continue;
+        }
+        let up = unit(n);
+        let outer = (a.0 == b.0 && (a.0 == 0 || a.0 == nr - 1)) || (!wrap && a.1 == b.1 && (a.1 == 0 || a.1 == nc - 1));
+        let Some(m) = (if outer { ty.border.or(ty.interior) } else { ty.interior }) else { continue };
+        let lift = |p: [f64; 3]| add(p, scale(up, t / 2.0));
+        let (la, lb) = (lift(pa), lift(pb));
+        parts.push(super::glazing::GlazingPart { mullion: true, panel: ty.panel, mesh: super::glazing::bar(la, lb, up, m.width, m.depth), axis: Some([la, lb]), size: None });
+    }
+    super::glazing::Glazing { planes: Vec::new(), parts }
+}
+
+/// What `roof.set_glazing` returns: the panels and how flat they are.
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+pub struct GlazingInfo {
+    pub panels: usize,
+    pub triangles: usize,
+    pub bars: usize,
+    /// The largest distance of a four-cornered panel's corner from its plane, metres (0 when
+    /// every panel is planar).
+    pub max_warp: f64,
+}
+
+fn info_of(gl: &super::glazing::Glazing) -> GlazingInfo {
+    let panels: Vec<_> = gl.parts.iter().filter(|p| !p.mullion).collect();
+    let corners = |p: &&super::glazing::GlazingPart| p.mesh.0.len() / 2;
+    let max_warp = panels
+        .iter()
+        .filter(|p| corners(p) == 4)
+        .map(|p| {
+            let q = &p.mesh.0;
+            let n = unit(cross(sub(q[1], q[0]), sub(q[3], q[0])));
+            dot(sub(q[2], q[0]), n).abs()
+        })
+        .fold(0.0, f64::max);
+    GlazingInfo { panels: panels.len(), triangles: panels.iter().filter(|p| corners(p) == 3).count(), bars: gl.parts.len() - panels.len(), max_warp }
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SetGlazingParams {
+    pub roof_id: ElementRef,
+    /// A vault: bay spacing along it (a length); a dome: the number of meridians. Null for the
+    /// glazing type's spacing.
+    pub grid_u: Option<Value>,
+    /// A vault: divisions round the arch; a dome: rings (counts).
+    pub grid_v: Option<f64>,
+    pub triangulate: Option<Triangulate>,
+}
+
+/// `roof.set_glazing`: how a glazed vault or dome is divided into panels (ARC-GLZ-006).
+pub(crate) fn set_glazing(txn: &mut crate::txn::Transaction<'_>, p: SetGlazingParams) -> Result<GlazingInfo> {
+    let store = txn.store().clone();
+    let id = store.resolve(&p.roof_id).ok_or_else(|| Error::new("element.not_found", "no such roof"))?;
+    let e = store.get(id).expect("resolved");
+    let mut r = super::roof_recipe(e).ok_or_else(|| Error::new("roof.not_reviera", format!("element {id} is not a Reviera roof")))?;
+    if r.arch.is_none() && r.dome.is_none() {
+        return Err(Error::new("roof.not_curved", "glazing grids are for arched roofs and domes; a footprint roof's glazing follows its type"));
+    }
+    let ty = super::glazing::of_roof(&store, e).ok_or_else(|| {
+        Error::new("roof.not_glazed", "give the roof a Sloped Glazing type first (Modify | Roofs › Sloped Glazing)")
+    })?;
+    let mut g = r.curved_glazing.unwrap_or_default();
+    if let Some(v) = &p.grid_u {
+        g.u = match v {
+            Value::Null => None,
+            v if r.arch.is_some() => Some(length(&store, v, "the bay spacing")?),
+            v => Some(v.as_f64().ok_or_else(|| Error::new("roof.bad_grid", "a dome's meridians are a count"))?),
+        };
+    }
+    if let Some(v) = p.grid_v {
+        g.v = Some(v);
+    }
+    if let Some(t) = p.triangulate {
+        g.triangulate = t;
+    }
+    let (min_u, max_u) = if r.arch.is_some() { (0.2, 20.0) } else { (3.0, 400.0) };
+    if g.u.is_some_and(|u| !(min_u..=max_u).contains(&u)) || g.v.is_some_and(|v| !(1.0..=200.0).contains(&v)) {
+        return Err(Error::new("roof.bad_grid", "the glazing grid is out of range (a vault's bays 0.2–20 m apart, a dome's 3–400 meridians, 1–200 divisions or rings)"));
+    }
+    r.curved_glazing = Some(g);
+    let value = serde_json::to_value(&r).expect("serialises");
+    txn.modify(id, |e| {
+        e.params.insert(crate::walls::RECIPE_KEY.into(), value);
+    })?;
+    let store = txn.store().clone();
+    let geo = super::regenerate(&store, store.get(id).expect("exists"))?;
+    let surface = geo.surface.as_ref().ok_or_else(|| Error::new("roof.not_curved", "the roof has no curved surface"))?;
+    Ok(info_of(&glazing(surface, &g, &ty)))
 }
 
 // ---- Commands ----
@@ -903,6 +1286,7 @@ pub(crate) fn create_dome(
         extrusion: None,
         joins: Default::default(),
         panes: Vec::new(),
+        curved_glazing: None,
     };
     let type_guid = txn.store().get(type_id).expect("exists").guid().to_string();
     let id = txn.create(

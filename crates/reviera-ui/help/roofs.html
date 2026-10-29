@@ -140,6 +140,14 @@ The roof keeps its footprint, slopes and joins, so Edit Footprint still works an
 follows. Change the roof's type back to a basic roof type to undo.
 <code>roof.create_glazing_type</code>, <code>roof.set_glazing_type</code>,
 <code>element.set_type</code></p>
+<p><b>Glazed vaults and domes.</b> An arched roof or dome given a Sloped Glazing type the same
+way is divided on its curved surface: a vault into bays along it and divisions round the arch, a
+dome into meridians and rings, with a ring of triangles at the crown. Properties › <b>Glazing
+Grid</b> sets the <b>Bay Spacing</b> and <b>Divisions</b> (a dome's <b>Meridians</b> and
+<b>Rings</b>; empty follows the glazing type's spacing) and <b>Triangulate</b>: a panel whose four
+corners cannot lie in one plane (on a tapering vault, say) is split into two triangles, or every
+panel is, or none. A barrel vault's and a round dome's panels are flat.
+<code>roof.set_glazing</code></p>
 
 <h2 id="extrusion">Roofs by extrusion</h2>
 <p>A roof by extrusion is a profile drawn in a section or elevation, carried across the view:</p>
