@@ -81,6 +81,9 @@ local layouts = {
   reviera.growing.layout{ enclosure_id = range, system = "rolling_benches", direction = "along" },
   reviera.growing.layout{ enclosure_id = hobby, system = "benches", width = 0.9, aisle = 0.6, main_aisle = 0.9 },
   reviera.growing.layout{ enclosure_id = tunnel, system = "ebb_flow", direction = "along" },
+  -- High-wire gutters for tomatoes in the sawtooth range: hanging gutters 1.25 m apart falling
+  -- 0.5 % to their drain ends, under crop wires at 3.25 m.
+  reviera.growing.layout{ host_id = saw, system = "high_wire" },
 }
 for _, l in ipairs(layouts) do
   local s = reviera.growing.summary{ layout_id = l }

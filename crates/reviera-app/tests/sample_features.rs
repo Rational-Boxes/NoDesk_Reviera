@@ -910,12 +910,14 @@ fn the_greenhouses_sample_keeps_its_enclosures() {
             (Form::Venlo, 4, 4, 2, 5, 24),
         ]
     );
-    // Four growing layouts, each with its pieces; the Venlo's NFT runs are 12 m at most.
+    // Five growing layouts, each with its pieces; the Venlo's NFT runs are 12 m at most.
     let layouts: Vec<_> = s.iter().filter_map(|e| reviera_core::growing::recipe(e).map(|r| (e.id(), r))).collect();
-    assert_eq!(layouts.len(), 4);
+    assert_eq!(layouts.len(), 5);
     for (id, r) in &layouts {
         let sum = ok(&mut app, "growing.summary", json!({ "layout_id": id }));
-        assert!(sum["pieces"].as_u64().unwrap() > 0 && sum["share"].as_f64().unwrap() > 20.0, "{:?}: {sum}", r.system);
+        // High-wire gutters' growing surface is the narrow gutters, not the rows of crop.
+        let least = if r.system == reviera_core::growing::System::HighWire { 10.0 } else { 20.0 };
+        assert!(sum["pieces"].as_u64().unwrap() > 0 && sum["share"].as_f64().unwrap() > least, "{:?}: {sum}", r.system);
         if r.system == reviera_core::growing::System::Nft {
             assert!(sum["longest_run"].as_f64().unwrap() <= 12.0 + 1e-9, "{sum}");
         }

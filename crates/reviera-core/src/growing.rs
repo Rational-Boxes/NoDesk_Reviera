@@ -1,17 +1,20 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Reviera contributors
 
-//! Growing layouts (spec Ch 3 §3.6a.5, ARC-GLZ-005): a glazed enclosure's floor filled with
-//! growing systems and aisles, and its growing area reported.
+//! Growing layouts (spec Ch 3 §3.6a.5, ARC-GLZ-005): a glazed enclosure's or a room's floor
+//! filled with growing systems and aisles, and its growing area reported.
 //!
-//! A layout is an `IfcElementAssembly` (ObjectType `GrowingLayout`) on an enclosure, whose
+//! A layout is an `IfcElementAssembly` (ObjectType `GrowingLayout`) on its host, whose
 //! recipe gives the system and its sizes; it owns its pieces, each its own element with a
 //! `recipe.growing_part` (so schedules count them):
 //! - **benches** and **rolling benches**: `IfcFurniture` (ObjectType `Bench`, `RollingBench`), a
 //!   40 mm top on four legs;
 //! - **ebb-and-flow tables**: `IfcFurniture` (`EbbFlowTable`), a 100 mm tray on legs;
 //! - **NFT tables**: `IfcBuildingElementProxy` (`GrowingGutter`), channels 100 mm wide at 200 mm
-//!   centres falling `slope` along their run, on legs, no run longer than 12 m.
+//!   centres falling `slope` along their run, on legs, no run longer than 12 m;
+//! - **high-wire gutters**: `IfcBuildingElementProxy` (`HighWireGutter`), a hanging substrate
+//!   gutter falling `slope` to its drain end, on hangers from the crop wire `wire` above the
+//!   floor (below the eaves or the room's top), one per row.
 //!
 //! The pieces stand clear of the walls by `clearance` (never less than the outer posts need) and
 //! are split where an inner gutter line's posts stand (a valley's; a Venlo's truss lines), so
@@ -25,8 +28,13 @@
 //! Rolling benches stand in groups with a 50 mm gap and one `aisle` per group, the aisle opened
 //! by rolling them. A layout is laid out again when its enclosure changes.
 //!
-//! Not yet: layouts in rooms, high-wire gutters, drainage of NFT and ebb-and-flow systems to
-//! plumbing, benches from Component Library types.
+//! In a **room** the frame runs along the room's longest edge, and each row's run is the part
+//! of it inside the room's boundary (courtyards and columns' cut-outs too), clear of it by
+//! `clearance`, split by the main aisle across the middle; it is laid out again with
+//! `growing.set_layout` when the room changes.
+//!
+//! Not yet: drainage of NFT, ebb-and-flow and high-wire systems to plumbing, benches from
+//! Component Library types.
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -51,6 +59,9 @@ pub const NFT_RUN: f64 = 12.0;
 const LEG: f64 = 0.05;
 const ROLLING_GAP: f64 = 0.05;
 const ROLLING_GROUP: usize = 5;
+/// A high-wire gutter's crop wire and hangers.
+const WIRE: f64 = 0.01;
+const HANGER: f64 = 0.012;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
@@ -59,6 +70,7 @@ pub enum System {
     RollingBenches,
     EbbFlow,
     Nft,
+    HighWire,
 }
 
 impl System {
@@ -68,11 +80,17 @@ impl System {
             System::RollingBenches => "RollingBench",
             System::EbbFlow => "EbbFlowTable",
             System::Nft => "GrowingGutter",
+            System::HighWire => "HighWireGutter",
         }
     }
 
     fn class(self) -> &'static str {
-        if self == System::Nft { "IfcBuildingElementProxy" } else { "IfcFurniture" }
+        if matches!(self, System::Nft | System::HighWire) { "IfcBuildingElementProxy" } else { "IfcFurniture" }
+    }
+
+    /// Its runs fall along their length.
+    fn falls(self) -> bool {
+        matches!(self, System::Nft | System::HighWire)
     }
 }
 
@@ -88,7 +106,7 @@ pub enum Direction {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct LayoutRecipe {
     pub kind: String,
-    /// The enclosure (GlobalId).
+    /// The host: a glazed enclosure or a room (GlobalId).
     pub enclosure: String,
     pub system: System,
     #[serde(default)]
@@ -101,10 +119,17 @@ pub struct LayoutRecipe {
     pub clearance: f64,
     /// The growing surface's height above the floor.
     pub height: f64,
-    /// NFT channels' fall along their run (rise over run).
+    /// NFT channels' and high-wire gutters' fall along their run (rise over run).
     pub slope: f64,
+    /// High-wire: the crop wire's height above the floor.
+    #[serde(default = "wire_height")]
+    pub wire: f64,
     #[serde(default)]
     pub parts: Vec<String>,
+}
+
+fn wire_height() -> f64 {
+    3.25
 }
 
 /// One piece's stored recipe: its outline in plan, its top's height at each end of its run.
@@ -119,6 +144,9 @@ pub struct PartRecipe {
     pub width: f64,
     /// The growing surface's height at the start and the end.
     pub top: [f64; 2],
+    /// High-wire: the crop wire's height (above the level).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub wire: Option<f64>,
 }
 
 pub fn recipe(e: &Element) -> Option<LayoutRecipe> {
@@ -156,8 +184,23 @@ pub fn meshes(p: &PartRecipe, level_z: f64) -> Vec<Mesh> {
     let depth = match p.system {
         System::Benches | System::RollingBenches => 0.04,
         System::EbbFlow | System::Nft => 0.1,
+        System::HighWire => 0.12,
     };
     let mut out = Vec::new();
+    if p.system == System::HighWire {
+        // The gutter, the crop wire over it, and hangers at most 3 m apart between them.
+        out.push(slab(a, b, w, t0 - depth, [t0, t1]));
+        let wire = level_z + p.wire.unwrap_or(p.top[0] + 2.0);
+        out.push(slab(a, b, WIRE, wire - WIRE, [wire, wire]));
+        let steps = (l / 3.0).ceil().max(1.0) as usize;
+        for k in 0..=steps {
+            let s = (l * k as f64 / steps as f64).clamp(HANGER, l - HANGER);
+            let z = t0 + (t1 - t0) * s / l;
+            let q = at(s, 0.0);
+            out.push(slab([q[0] - HANGER / 2.0, q[1]], [q[0] + HANGER / 2.0, q[1]], HANGER, z + 0.001, [wire - WIRE - 0.001, wire - WIRE - 0.001]));
+        }
+        return out;
+    }
     if p.system == System::Nft {
         // Channels 100 mm wide at 200 mm centres across the table.
         let count = ((w / 0.2).floor() as usize).max(1);
@@ -249,19 +292,9 @@ pub fn plan(r: &LayoutRecipe, e: &EnclosureRecipe, level: &str) -> Vec<PartRecip
     let at = |x: f64, y: f64| [e.origin[0] + c * x - s * y, e.origin[1] + s * x + c * y];
     let rolling = r.system == System::RollingBenches;
     let mut out = Vec::new();
-    let mut push = |a: [f64; 2], b: [f64; 2], len: f64| {
-        // NFT runs no longer than 12 m, each falling from its feed end.
-        let pieces = if r.system == System::Nft { (len / NFT_RUN).ceil().max(1.0) as usize } else { 1 };
-        for k in 0..pieces {
-            let f0 = k as f64 / pieces as f64;
-            let f1 = (k + 1) as f64 / pieces as f64;
-            let p0 = [a[0] + (b[0] - a[0]) * f0, a[1] + (b[1] - a[1]) * f0];
-            let p1 = [a[0] + (b[0] - a[0]) * f1, a[1] + (b[1] - a[1]) * f1];
-            let run = len / pieces as f64;
-            let fall = if r.system == System::Nft { r.slope * run } else { 0.0 };
-            out.push(PartRecipe { kind: PART_RECIPE.into(), system: r.system, level: level.to_owned(), start: p0, end: p1, width: r.width, top: [r.height, r.height - fall] });
-        }
-    };
+    // The crop wire under the gutter beams.
+    let wire = r.wire.min(if e.form.tunnel() { e.ridge() - 1.0 } else { e.eave - 0.4 });
+    let mut push = |a: [f64; 2], b: [f64; 2], len: f64| pieces(r, level, 0.0, wire, a, b, len, &mut out);
     match r.direction {
         // Across the span, from the side walls to the main aisle, bay by bay.
         Direction::Across => {
@@ -292,16 +325,138 @@ pub fn plan(r: &LayoutRecipe, e: &EnclosureRecipe, level: &str) -> Vec<PartRecip
     out
 }
 
+/// A run from `a` to `b` (`len` long) as pieces: NFT runs no longer than 12 m, each falling
+/// from its feed end; high-wire gutters falling to their drain end, under the crop wire at
+/// `wire`. Heights are above the level, the floor `base` above it.
+#[allow(clippy::too_many_arguments)]
+fn pieces(r: &LayoutRecipe, level: &str, base: f64, wire: f64, a: [f64; 2], b: [f64; 2], len: f64, out: &mut Vec<PartRecipe>) {
+    let n = if r.system == System::Nft { (len / NFT_RUN).ceil().max(1.0) as usize } else { 1 };
+    for k in 0..n {
+        let f0 = k as f64 / n as f64;
+        let f1 = (k + 1) as f64 / n as f64;
+        let p0 = [a[0] + (b[0] - a[0]) * f0, a[1] + (b[1] - a[1]) * f0];
+        let p1 = [a[0] + (b[0] - a[0]) * f1, a[1] + (b[1] - a[1]) * f1];
+        let run = len / n as f64;
+        let fall = if r.system.falls() { r.slope * run } else { 0.0 };
+        let top = base + r.height;
+        out.push(PartRecipe {
+            kind: PART_RECIPE.into(),
+            system: r.system,
+            level: level.to_owned(),
+            start: p0,
+            end: p1,
+            width: r.width,
+            top: [top, top - fall],
+            wire: (r.system == System::HighWire).then_some(base + wire),
+        });
+    }
+}
+
+/// The intervals of the line `y` (in a frame) inside `rings` (even-odd), sorted.
+fn scan(rings: &[Vec<[f64; 2]>], y: f64) -> Vec<(f64, f64)> {
+    let mut xs = Vec::new();
+    for ring in rings {
+        for k in 0..ring.len() {
+            let (p, q) = (ring[k], ring[(k + 1) % ring.len()]);
+            if (p[1] > y) != (q[1] > y) {
+                xs.push(p[0] + (q[0] - p[0]) * (y - p[1]) / (q[1] - p[1]));
+            }
+        }
+    }
+    xs.sort_by(f64::total_cmp);
+    xs.chunks(2).filter(|c| c.len() == 2).map(|c| (c[0], c[1])).collect()
+}
+
+/// The overlap of two interval lists.
+fn overlap(a: &[(f64, f64)], b: &[(f64, f64)]) -> Vec<(f64, f64)> {
+    let mut out = Vec::new();
+    for (a0, a1) in a {
+        for (b0, b1) in b {
+            let (lo, hi) = (a0.max(*b0), a1.min(*b1));
+            if hi > lo {
+                out.push((lo, hi));
+            }
+        }
+    }
+    out
+}
+
+/// The pieces of a layout over a room's floor: `rings` its boundary (outer first, then holes)
+/// in plan, the floor `base` above the level, the crop wire under its top `height`.
+pub fn room_plan(r: &LayoutRecipe, rings: &[Vec<[f64; 2]>], level: &str, base: f64, height: f64) -> Vec<PartRecipe> {
+    let Some(outer) = rings.first().filter(|o| o.len() >= 3) else { return Vec::new() };
+    // A frame along the longest edge, swapped so the pieces always run along its x axis.
+    let k = (0..outer.len())
+        .max_by(|i, j| {
+            let d = |i: usize| (outer[(i + 1) % outer.len()][0] - outer[i][0]).hypot(outer[(i + 1) % outer.len()][1] - outer[i][1]);
+            d(*i).total_cmp(&d(*j))
+        })
+        .unwrap_or(0);
+    let (o, q) = (outer[k], outer[(k + 1) % outer.len()]);
+    let mut angle = (q[1] - o[1]).atan2(q[0] - o[0]);
+    if r.direction == Direction::Across {
+        angle += std::f64::consts::FRAC_PI_2;
+    }
+    let (s, c) = angle.sin_cos();
+    let to = |p: [f64; 2]| [c * (p[0] - o[0]) + s * (p[1] - o[1]), -s * (p[0] - o[0]) + c * (p[1] - o[1])];
+    let back = |x: f64, y: f64| [o[0] + c * x - s * y, o[1] + s * x + c * y];
+    let local: Vec<Vec<[f64; 2]>> = rings.iter().map(|ring| ring.iter().map(|p| to(*p)).collect()).collect();
+    let (mut x0, mut x1, mut y0, mut y1) = (f64::MAX, f64::MIN, f64::MAX, f64::MIN);
+    for p in &local[0] {
+        (x0, x1, y0, y1) = (x0.min(p[0]), x1.max(p[0]), y0.min(p[1]), y1.max(p[1]));
+    }
+    let (w, cl) = (r.width, r.clearance);
+    let mid = (x0 + x1) / 2.0;
+    let aisle = [(f64::MIN, mid - r.main_aisle / 2.0), (mid + r.main_aisle / 2.0, f64::MAX)];
+    let wire = r.wire.min(height - 0.3);
+    let mut out = Vec::new();
+    for y in rows(y0 + cl, y1 - cl, w, r.aisle, r.system == System::RollingBenches) {
+        // Inside along both long edges of the piece (with the clearance) and its centre line.
+        let inside = overlap(&overlap(&scan(&local, y - w / 2.0 - cl), &scan(&local, y + w / 2.0 + cl)), &scan(&local, y));
+        for (a, b) in overlap(&inside.iter().map(|(a, b)| (a + cl, b - cl)).collect::<Vec<_>>(), &aisle) {
+            if b - a > 0.3 {
+                pieces(r, level, base, wire, back(a, y), back(b, y), b - a, &mut out);
+            }
+        }
+    }
+    out
+}
+
+/// A room's floor: its level, boundary rings, and its floor and height above the level.
+struct RoomFloor {
+    level: String,
+    rings: Vec<Vec<[f64; 2]>>,
+    base: f64,
+    height: f64,
+}
+
+fn room_floor(store: &Store, e: &Element) -> Option<RoomFloor> {
+    let rr = crate::rooms::room_recipe(e)?;
+    let g = crate::rooms::regenerate(store, e).ok()?;
+    let region = g.region.as_ref()?;
+    let mut rings = vec![region.outer.iter().map(|x| x.line.start).collect::<Vec<_>>()];
+    rings.extend(region.holes.iter().map(|h| h.iter().map(|x| x.line.start).collect()));
+    let level_z = crate::levels::elevation_of(store, &rr.level).unwrap_or(0.0);
+    let (base, top) = (g.z_base - level_z, g.z_top - level_z);
+    Some(RoomFloor { level: rr.level, rings, base, height: top - base })
+}
+
 /// Makes a layout's pieces from its recipe.
 fn build(txn: &mut Transaction<'_>, guid: &str, r: &LayoutRecipe) -> Result<Vec<ElementId>> {
     let store = txn.store().clone();
     let owner = GlobalId::parse(&r.enclosure)
         .and_then(|g| store.find_by_guid(&g))
         .and_then(|id| store.get(id))
-        .ok_or_else(|| Error::new("growing.no_enclosure", "the layout's enclosure no longer exists"))?;
-    let e = enclosures::recipe(owner).ok_or_else(|| Error::new("growing.no_enclosure", "not a glazed enclosure"))?;
+        .ok_or_else(|| Error::new("growing.no_enclosure", "the layout's enclosure or room no longer exists"))?;
+    let planned = if let Some(e) = enclosures::recipe(owner) {
+        plan(r, &e, &e.level)
+    } else if let Some(f) = room_floor(&store, owner) {
+        room_plan(r, &f.rings, &f.level, f.base, f.height)
+    } else {
+        return Err(Error::new("growing.no_enclosure", "growing layouts go in a glazed enclosure or an enclosed room"));
+    };
     let mut ids = Vec::new();
-    for p in plan(r, &e, &e.level) {
+    for p in planned {
         ids.push(txn.create(
             NewElement::new(r.system.class())
                 .name(match r.system {
@@ -309,6 +464,7 @@ fn build(txn: &mut Transaction<'_>, guid: &str, r: &LayoutRecipe) -> Result<Vec<
                     System::RollingBenches => "Rolling Bench",
                     System::EbbFlow => "Ebb and Flow Table",
                     System::Nft => "NFT Table",
+                    System::HighWire => "High-Wire Gutter",
                 })
                 .param("@PredefinedType", "USERDEFINED")
                 .param("@ObjectType", r.system.object_type())
@@ -368,15 +524,19 @@ pub struct Sizes {
     pub clearance: Option<f64>,
     #[schemars(extend("x-reviera-data-type" = "length"))]
     pub height: Option<f64>,
-    /// NFT: the channels' fall, rise over run (default 0.02).
+    /// NFT and high-wire: the fall, rise over run (default 0.02; high-wire 0.005).
     pub slope: Option<f64>,
+    /// High-wire: the crop wire's height above the floor (default 3.25 m).
+    #[schemars(extend("x-reviera-data-type" = "length"))]
+    pub wire: Option<f64>,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct LayoutParams {
-    /// The glazed enclosure to fill.
-    pub enclosure_id: ElementRef,
+    /// The glazed enclosure or enclosed room to fill (`enclosure_id`, the older name, too).
+    pub host_id: Option<ElementRef>,
+    pub enclosure_id: Option<ElementRef>,
     pub system: System,
     #[serde(flatten)]
     pub sizes: Sizes,
@@ -389,8 +549,11 @@ fn defaults(system: System, enclosure: String) -> LayoutRecipe {
         System::RollingBenches => (1.8, 0.6, 0.8),
         System::EbbFlow => (1.8, 0.6, 0.75),
         System::Nft => (1.2, 0.6, 0.9),
+        // Hanging gutters 250 mm wide, one per row 1.25 m apart (E-55).
+        System::HighWire => (0.25, 1.0, 0.6),
     };
-    LayoutRecipe { kind: RECIPE.into(), enclosure, system, direction: Direction::Across, width, aisle, main_aisle: 1.2, clearance: 0.2, height, slope: 0.02, parts: Vec::new() }
+    let (direction, slope) = if system == System::HighWire { (Direction::Along, 0.005) } else { (Direction::Across, 0.02) };
+    LayoutRecipe { kind: RECIPE.into(), enclosure, system, direction, width, aisle, main_aisle: 1.2, clearance: 0.2, height, slope, wire: wire_height(), parts: Vec::new() }
 }
 
 fn apply(r: &mut LayoutRecipe, s: &Sizes) -> Result<()> {
@@ -405,9 +568,18 @@ fn apply(r: &mut LayoutRecipe, s: &Sizes) -> Result<()> {
     if let Some(v) = s.slope {
         r.slope = v;
     }
+    if let Some(v) = s.wire {
+        r.wire = v;
+    }
     let bad = |m: &str| Err(Error::new("growing.bad_value", m.to_owned()));
-    if !(0.3..=5.0).contains(&r.width) {
-        return bad("a piece is 0.3 to 5 m wide");
+    if !(0.1..=5.0).contains(&r.width) {
+        return bad("a piece is 0.1 to 5 m wide");
+    }
+    if r.system == System::HighWire && !(0.001..=0.02).contains(&r.slope) {
+        return bad("high-wire gutters fall 0.1 to 2 %");
+    }
+    if r.system == System::HighWire && !(r.wire > r.height + 0.5 && r.wire <= 10.0) {
+        return bad("the crop wire is at least 0.5 m above the gutter and at most 10 m high");
     }
     if !(0.3..=5.0).contains(&r.aisle) || !(0.0..=10.0).contains(&r.main_aisle) || !(0.0..=3.0).contains(&r.clearance) {
         return bad("aisles are 0.3 to 5 m, the main aisle 0 to 10 m and the clearance 0 to 3 m");
@@ -424,10 +596,11 @@ fn apply(r: &mut LayoutRecipe, s: &Sizes) -> Result<()> {
 /// `growing.layout`.
 pub(crate) fn layout(txn: &mut Transaction<'_>, p: LayoutParams) -> Result<ElementId> {
     let store = txn.store().clone();
+    let host = p.host_id.as_ref().or(p.enclosure_id.as_ref()).ok_or_else(|| Error::new("growing.no_enclosure", "give the host_id: a glazed enclosure or a room"))?;
     let owner = store
-        .resolve(&p.enclosure_id)
-        .filter(|id| store.get(*id).and_then(enclosures::recipe).is_some())
-        .ok_or_else(|| Error::new("growing.no_enclosure", "growing layouts go in a glazed enclosure"))?;
+        .resolve(host)
+        .filter(|id| store.get(*id).is_some_and(|e| enclosures::recipe(e).is_some() || crate::rooms::room_recipe(e).is_some()))
+        .ok_or_else(|| Error::new("growing.no_enclosure", "growing layouts go in a glazed enclosure or a room"))?;
     let mut r = defaults(p.system, store.get(owner).expect("resolved").guid().to_string());
     apply(&mut r, &p.sizes)?;
     let guid = GlobalId::new();
@@ -441,7 +614,7 @@ pub(crate) fn layout(txn: &mut Transaction<'_>, p: LayoutParams) -> Result<Eleme
     )?;
     let parts = build(txn, guid.as_str(), &r)?;
     if parts.is_empty() {
-        return Err(Error::new("growing.nothing_fits", "nothing of that size fits in the enclosure"));
+        return Err(Error::new("growing.nothing_fits", "nothing of that size fits there"));
     }
     r.parts = parts.iter().map(|p| txn.store().get(*p).expect("made").guid().to_string()).collect();
     write(txn, id, &r)?;
@@ -490,7 +663,7 @@ pub struct Summary {
     pub growing_area: f64,
     pub floor_area: f64,
     pub share: f64,
-    /// NFT: the longest run and its fall.
+    /// NFT and high-wire: the longest run.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub longest_run: Option<f64>,
 }
@@ -499,9 +672,13 @@ pub struct Summary {
 pub(crate) fn summary(store: &Store, p: SummaryParams) -> Result<Summary> {
     let (_, r) = resolve(store, &p.layout_id)?;
     let parts: Vec<PartRecipe> = r.parts.iter().filter_map(|g| store.get(store.find_by_guid(&GlobalId::parse(g)?)?)).filter_map(part_recipe).collect();
-    let floor = GlobalId::parse(&r.enclosure).and_then(|g| store.get(store.find_by_guid(&g)?)).and_then(enclosures::recipe).map_or(0.0, |e| e.width() * e.length);
+    let host = GlobalId::parse(&r.enclosure).and_then(|g| store.get(store.find_by_guid(&g)?));
+    let floor = host.map_or(0.0, |h| match enclosures::recipe(h) {
+        Some(e) => e.width() * e.length,
+        None => crate::rooms::regenerate(store, h).map_or(0.0, |g| g.area()),
+    });
     let area = growing_area(&parts);
-    let longest = (r.system == System::Nft).then(|| parts.iter().map(|p| (p.end[0] - p.start[0]).hypot(p.end[1] - p.start[1])).fold(0.0, f64::max));
+    let longest = r.system.falls().then(|| parts.iter().map(|p| (p.end[0] - p.start[0]).hypot(p.end[1] - p.start[1])).fold(0.0, f64::max));
     Ok(Summary { system: r.system, pieces: parts.len(), growing_area: area, floor_area: floor, share: 100.0 * area / floor.max(1e-9), longest_run: longest })
 }
 

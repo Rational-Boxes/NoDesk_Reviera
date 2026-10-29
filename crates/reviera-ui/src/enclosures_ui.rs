@@ -321,19 +321,23 @@ impl Gui {
     }
 }
 
-const SYSTEMS: [(reviera_core::growing::System, &str); 4] = [
+const SYSTEMS: [(reviera_core::growing::System, &str); 5] = [
     (reviera_core::growing::System::Benches, "Benches"),
     (reviera_core::growing::System::RollingBenches, "Rolling benches"),
     (reviera_core::growing::System::EbbFlow, "Ebb-and-flow tables"),
     (reviera_core::growing::System::Nft, "NFT tables"),
+    (reviera_core::growing::System::HighWire, "High-wire gutters"),
 ];
 
 impl Gui {
-    /// Architecture › Growing Layout: fill the selected enclosure with a growing system.
+    /// Architecture › Growing Layout: fill the selected enclosure (or room) with a growing system.
     pub(crate) fn growing_dialog(&mut self) {
         let frame = self.frame;
-        let Some((owner, _)) = self.selection().first().and_then(|id| self.enclosure_of_selection(*id)) else {
-            return frame.set_status_text("Growing Layout: select a glazed enclosure first", 0);
+        let room = |g: &Gui, id: ElementId| {
+            g.doc.and_then(|d| g.app.document(d)).and_then(|d| d.doc.store().get(id)).and_then(reviera_core::rooms::room_recipe).map(|_| id)
+        };
+        let Some(owner) = self.selection().first().and_then(|id| self.enclosure_of_selection(*id).map(|(o, _)| o).or_else(|| room(self, *id))) else {
+            return frame.set_status_text("Growing Layout: select a glazed enclosure or a room first", 0);
         };
         let dialog = Dialog::builder(&frame, "Growing Layout").build();
         let sizer = BoxSizer::builder(Orientation::Vertical).build();
@@ -360,6 +364,7 @@ impl Gui {
         let aisle = field("Aisle");
         let main = field("Main aisle");
         let height = field("Growing surface height");
+        let wire = field("High-wire: crop wire height");
         sizer.add_sizer(&grid, 1, SizerFlag::All | SizerFlag::Expand, 10);
         let buttons = BoxSizer::builder(Orientation::Horizontal).build();
         buttons.add_stretch_spacer(1);
@@ -378,7 +383,7 @@ impl Gui {
             "direction": if direction.get_selection() == Some(1) { "along" } else { "across" },
         });
         let mut bad = false;
-        for (key, t) in [("width", &width), ("aisle", &aisle), ("main_aisle", &main), ("height", &height)] {
+        for (key, t) in [("width", &width), ("aisle", &aisle), ("main_aisle", &main), ("height", &height), ("wire", &wire)] {
             let v = t.get_value();
             if v.trim().is_empty() {
                 continue;
@@ -431,6 +436,11 @@ impl Gui {
             let text = self.format_length(v);
             grid.append(Property::string(label, key, text));
         }
+        if r.system == reviera_core::growing::System::HighWire {
+            let text = self.format_length(r.wire);
+            grid.append(Property::string("Crop Wire", "gl_wire", text));
+            grid.set_help_string("gl_wire", "The crop wire's height above the floor (kept under the eaves or the room's top)");
+        }
         if let Ok(s) = self.run("growing.summary", json!({ "layout_id": owner })) {
             let text = format!("{} pieces, {:.1} m² ({:.0} % of the floor)", s["pieces"], s["growing_area"].as_f64().unwrap_or(0.0), s["share"].as_f64().unwrap_or(0.0));
             grid.append(Property::string("Growing Area", "gl_area", text));
@@ -454,11 +464,12 @@ impl Gui {
                 None => return true,
             },
             "gl_direction" => args["direction"] = json!(if text == "Along" { "along" } else { "across" }),
-            "gl_width" | "gl_aisle" | "gl_main" | "gl_height" => {
+            "gl_width" | "gl_aisle" | "gl_main" | "gl_height" | "gl_wire" => {
                 let key = match property {
                     "gl_width" => "width",
                     "gl_aisle" => "aisle",
                     "gl_main" => "main_aisle",
+                    "gl_wire" => "wire",
                     _ => "height",
                 };
                 match length(self, &text) {

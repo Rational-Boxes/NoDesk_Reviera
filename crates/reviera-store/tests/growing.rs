@@ -84,3 +84,56 @@ fn benches_fill_a_greenhouse_and_follow_it() {
     let text = std::fs::read_to_string(&path).unwrap();
     assert!(text.contains("IFCFURNITURE(") && text.contains("GrowingLayout"));
 }
+
+#[test]
+fn high_wire_gutters_hang_in_rows_under_the_crop_wire() {
+    let dir = tempfile::tempdir().unwrap();
+    let (_project, mut doc) = LocalProject::new(Schema::Ifc4, &dir.path().join("hw.ifc")).unwrap();
+    let r = registry();
+    let level = doc.store().iter().find(|e| e.class == "IfcBuildingStorey").unwrap().id();
+    // A Venlo range, gutters at 5.5 m: high-wire gutters along it, the wire at 3.25 m.
+    let gh = run(&r, &mut doc, "enclosure.create", json!({ "form": "venlo", "level_id": level.0, "span": 8.0, "spans": 2, "length": 24.0 })).unwrap();
+    let layout = run(&r, &mut doc, "growing.layout", json!({ "host_id": gh, "system": "high_wire" })).unwrap();
+    let s = run(&r, &mut doc, "growing.summary", json!({ "layout_id": layout })).unwrap();
+    // Rows 1.25 m apart across each truss, split by the main aisle and the truss posts.
+    assert!(s["pieces"].as_u64().unwrap() >= 20, "{s}");
+    let store = doc.store();
+    let parts: Vec<_> = store.iter().filter_map(reviera_core::growing::part_recipe).collect();
+    assert!(parts.iter().all(|p| p.wire == Some(3.25) && p.top[1] < p.top[0]), "falling to their drain ends under the wire");
+    // A gutter, its wire and its hangers.
+    let (_, class, meshes) = reviera_core::growing::all(store).into_iter().next().unwrap();
+    assert_eq!(class, "IfcBuildingElementProxy");
+    assert!(meshes.len() >= 4);
+    // A wire too low for the gutter is refused.
+    assert!(run(&r, &mut doc, "growing.set_layout", json!({ "layout_id": layout, "wire": 0.8 })).is_err());
+}
+
+#[test]
+fn a_layout_fills_a_room() {
+    let dir = tempfile::tempdir().unwrap();
+    let (_project, mut doc) = LocalProject::new(Schema::Ifc4, &dir.path().join("room.ifc")).unwrap();
+    let r = registry();
+    let level = doc.store().iter().find(|e| e.class == "IfcBuildingStorey").unwrap().id();
+    // A 12 × 7 m grow room.
+    let pts = [[0.0, 0.0], [12.0, 0.0], [12.0, 7.0], [0.0, 7.0]];
+    for i in 0..4 {
+        run(&r, &mut doc, "wall.create", json!({ "curve": { "line": { "start": pts[i], "end": pts[(i + 1) % 4] } }, "base_level": level.0, "top_constraint": { "unconnected": 3.0 } })).unwrap();
+    }
+    let room = run(&r, &mut doc, "room.place", json!({ "level_id": level.0, "point": [6.0, 3.5], "limit_offset": 3.0 })).unwrap();
+    let layout = run(&r, &mut doc, "growing.layout", json!({ "host_id": room, "system": "benches", "direction": "along" })).unwrap();
+    let s = run(&r, &mut doc, "growing.summary", json!({ "layout_id": layout })).unwrap();
+    // Benches along the 12 m, split by the main aisle: rows of 1.8 m in the room's 7 m less the
+    // walls and the clearance.
+    assert!(s["pieces"].as_u64().unwrap() >= 4 && s["share"].as_f64().unwrap() > 40.0, "{s}");
+    // Every piece inside the room, clear of the walls (their inner faces 100 mm in).
+    let store = doc.store();
+    for p in store.iter().filter_map(reviera_core::growing::part_recipe) {
+        for q in [p.start, p.end] {
+            assert!(q[0] > 0.29 && q[0] < 11.71 && q[1] > 0.29 + p.width / 2.0 - 1e-6 && q[1] < 6.71 - p.width / 2.0 + 1e-6, "{p:?}");
+        }
+    }
+    // High-wire gutters in a 3 m room keep their wire under its top.
+    run(&r, &mut doc, "growing.set_layout", json!({ "layout_id": layout, "system": "high_wire" })).unwrap();
+    let store = doc.store();
+    assert!(store.iter().filter_map(reviera_core::growing::part_recipe).all(|p| p.wire.is_some_and(|w| w <= 2.7 + 1e-9)));
+}

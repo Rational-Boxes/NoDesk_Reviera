@@ -51,7 +51,9 @@ Start with **File › New**. The model has Level 1 at 0. Open the Level 1 plan.
    tables*, Runs *Along the length*; the tables stand clear of the posts, in runs of at most 12 m
    falling 2 %. Then the multispan with *Rolling benches* along its length, the hobby house with
    *Benches* across it (width 0.9 m, aisle 0.6 m, main aisle 0.9 m), and the hoop tunnel with
-   *Ebb-and-flow tables* along it. Properties › Growing Layout shows each one's growing area and
+   *Ebb-and-flow tables* along it, and the sawtooth range with *High-wire gutters* (hanging
+   gutters 1.25 m apart under crop wires at 3.25 m; Properties › Crop Wire). A layout can fill a
+   room too: select the room, then Growing Layout. Properties › Growing Layout shows each one's growing area and
    share of the floor; change a size there, or the enclosure's, and the layout is laid out again.
 9. **Look at it.** In a 3D view the glass is translucent; select a roof to see its glazing grid,
    or an end wall to see the glass clipped to the gables. Each part says which enclosure it
