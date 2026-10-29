@@ -376,6 +376,7 @@ pub fn all(store: &Store) -> Vec<Body> {
                 match p.panel {
                     crate::curtain::Panel::Glazed | crate::curtain::Panel::Vent => "IfcPlate:glass",
                     crate::curtain::Panel::Door => "IfcDoor",
+                    crate::curtain::Panel::RollUp => "IfcWindow:film",
                     _ => "IfcPlate",
                 }
             };

@@ -15,6 +15,9 @@
 //! on every roof or curtain wall that has vents (their count and totals; a glazed roof's vents
 //! are part of its one body in IFC).
 //!
+//! A **roll-up side** (`Panel::RollUp`) is a band of a side wall left open, its film rolled up
+//! on a tube at its top; its free area is the whole opening.
+//!
 //! Not yet: opening and closing vents in the view (they are drawn 15° open), the actuator as an
 //! `IfcActuator`, and roof vents as their own `IfcWindow`.
 
@@ -68,6 +71,12 @@ impl Default for VentSettings {
     }
 }
 
+/// An opening's free area: a top-hung sash's, `w` along its hinge and `h` from it, open at
+/// `angle`; a roll-up side's whole opening.
+pub fn opening_area(panel: Panel, w: f64, h: f64, angle: f64) -> f64 {
+    if panel == Panel::RollUp { w * h } else { free_area(w, h, angle) }
+}
+
 /// A top-hung sash's free area, `w` along its hinge and `h` from it, open at `angle`.
 pub fn free_area(w: f64, h: f64, angle: f64) -> f64 {
     let a = angle.clamp(0.0, std::f64::consts::FRAC_PI_2);
@@ -84,8 +93,8 @@ pub struct VentTotals {
 }
 
 impl VentTotals {
-    fn add(&mut self, w: f64, h: f64, s: &VentSettings) {
-        let free = free_area(w, h, s.opening_angle);
+    fn add(&mut self, panel: Panel, w: f64, h: f64, s: &VentSettings) {
+        let free = opening_area(panel, w, h, s.opening_angle);
         self.count += 1;
         self.pane_area += w * h;
         self.free_area += free;
@@ -99,14 +108,14 @@ pub fn totals(store: &Store, e: &Element, s: &VentSettings) -> VentTotals {
     let mut t = VentTotals::default();
     if crate::curtain::curtain_recipe(e).is_some() {
         if let Ok(g) = crate::curtain::regenerate(store, e) {
-            for p in g.parts.iter().filter(|p| !p.mullion && p.panel == Panel::Vent) {
-                t.add(p.x[1] - p.x[0], p.z[1] - p.z[0], s);
+            for p in g.parts.iter().filter(|p| !p.mullion && matches!(p.panel, Panel::Vent | Panel::RollUp)) {
+                t.add(p.panel, p.x[1] - p.x[0], p.z[1] - p.z[0], s);
             }
         }
     } else if let Some(g) = crate::roofs::glazing::of(store, e) {
         for p in g.parts.iter().filter(|p| !p.mullion && p.panel == Panel::Vent) {
             if let Some([w, h]) = p.size {
-                t.add(w, h, s);
+                t.add(p.panel, w, h, s);
             }
         }
     }
@@ -127,9 +136,9 @@ fn setting_params(s: &VentSettings) -> Vec<(String, Value)> {
     ]
 }
 
-/// One vent's `Reviera_Vent` values (for a curtain wall's vent windows in IFC).
-pub fn vent_params(w: f64, h: f64, s: &VentSettings) -> Vec<(String, Value)> {
-    let free = free_area(w, h, s.opening_angle);
+/// One vent's `Reviera_Vent` values (for a curtain wall's vent windows and roll-up sides in IFC).
+pub fn vent_params(panel: Panel, w: f64, h: f64, s: &VentSettings) -> Vec<(String, Value)> {
+    let free = opening_area(panel, w, h, s.opening_angle);
     let k = |p: &str| format!("{PSET}.{p}");
     let mut out = setting_params(s);
     out.push((k("FreeArea"), typed("IfcAreaMeasure", json!(free))));
@@ -187,7 +196,7 @@ mod tests {
         let defs: Value = serde_json::from_str(crate::glazing_library::DEFINITIONS).unwrap();
         let set = defs["property_sets"].as_array().unwrap().iter().find(|s| s["name"] == PSET).expect("Reviera_Vent");
         let props = set["properties"].as_array().unwrap();
-        let mut written = vent_params(1.0, 1.0, &VentSettings::default());
+        let mut written = vent_params(Panel::Vent, 1.0, 1.0, &VentSettings::default());
         written.push((format!("{PSET}.VentCount"), typed("IfcCountMeasure", json!(1))));
         for (key, value) in written {
             let name = key.strip_prefix(&format!("{PSET}.")).unwrap();

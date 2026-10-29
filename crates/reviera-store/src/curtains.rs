@@ -158,6 +158,8 @@ pub(crate) fn write_curtains(
             } else if p.panel == curtain::Panel::Vent {
                 // An opening pane (ARC-GLZ-004).
                 ("IfcWindow", "Vent", "WINDOW")
+            } else if p.panel == curtain::Panel::RollUp {
+                ("IfcWindow", "Roll-up Side", "WINDOW")
             } else {
                 ("IfcPlate", "Panel", "CURTAIN_PANEL")
             };
@@ -193,10 +195,10 @@ pub(crate) fn write_curtains(
                 scale,
                 contexts,
             )?;
-            if p.panel == curtain::Panel::Vent && !p.mullion
+            if matches!(p.panel, curtain::Panel::Vent | curtain::Panel::RollUp) && !p.mullion
                 && let Some(s) = &vents
             {
-                let values = reviera_core::vents::vent_params(p.x[1] - p.x[0], p.z[1] - p.z[0], s);
+                let values = reviera_core::vents::vent_params(p.panel, p.x[1] - p.x[0], p.z[1] - p.z[0], s);
                 vent_pset(ifc, e, owner_history, &values)?;
             }
             parts.push(AttrValue::Ref(e.0));

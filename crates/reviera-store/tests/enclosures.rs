@@ -317,3 +317,43 @@ fn side_vents_and_vent_values_reach_ifc() {
     let again = doc2.store().iter().find(|x| Some(x.guid().to_string()) == back).expect("the side wall comes back");
     assert!(reviera_core::vents::settings_of(again).is_some_and(|s| (s.opening_angle - 45f64.to_radians()).abs() < 1e-9));
 }
+
+#[test]
+fn roll_up_sides_and_gable_vents() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("ru.ifc");
+    let (mut project, mut doc) = LocalProject::new(Schema::Ifc4, &path).unwrap();
+    let r = registry();
+    let level = doc.store().iter().find(|e| e.class == "IfcBuildingStorey").unwrap().id();
+    // A hoop tunnel on 1.5 m sidewalls with 1 m roll-up sides along its 30 m.
+    let t = run(&r, &mut doc, "enclosure.create", json!({ "form": "hoop", "level_id": level.0, "eave": 1.5, "length": 30.0 })).unwrap();
+    run(&r, &mut doc, "enclosure.set_vents", json!({ "enclosure_id": t, "kind": "roll_up", "height": "1 m" })).unwrap();
+    let info = run(&r, &mut doc, "enclosure.get", json!({ "enclosure_id": t })).unwrap();
+    // Two walls, 1 m up less the bars: a little under 2 × 30 × 1 m open; the free area is the
+    // whole opening (× 0.6 effective).
+    let side = info["side_vent_area"].as_f64().unwrap();
+    assert!((50.0..60.0).contains(&side), "{info}");
+    let (free, eff) = (info["free_vent_area"].as_f64().unwrap(), info["effective_vent_area"].as_f64().unwrap());
+    assert!((free - side).abs() < 1e-6 && (eff - 0.6 * free).abs() < 1e-9, "{info}");
+    // The rolled film is drawn at the opening's top.
+    let store = doc.store();
+    let wall = store.get(ElementId(info["curtain_walls"][0].as_u64().unwrap())).unwrap();
+    let g = reviera_core::curtain::regenerate(store, wall).unwrap();
+    let roll = g.parts.iter().find(|p| p.panel == reviera_core::curtain::Panel::RollUp).expect("a roll-up cell");
+    let (pts, _) = g.mesh(roll);
+    let low = pts.iter().map(|p| p[2]).fold(f64::MAX, f64::min);
+    assert!((low - (roll.z[1] - reviera_core::curtain::ROLL)).abs() < 1e-9);
+    // Too tall for the sidewall: no roll-up.
+    assert!(run(&r, &mut doc, "enclosure.set_vents", json!({ "enclosure_id": t, "kind": "roll_up", "height": "9 m" })).is_err());
+    // A gable house with 1 m gable vents in both end walls, above their doors.
+    let gh = run(&r, &mut doc, "enclosure.create", json!({ "form": "gable", "level_id": level.0, "origin": [0, 20], "length": 20.0 })).unwrap();
+    run(&r, &mut doc, "enclosure.set_vents", json!({ "enclosure_id": gh, "kind": "gable", "height": "1 m" })).unwrap();
+    let info = run(&r, &mut doc, "enclosure.get", json!({ "enclosure_id": gh })).unwrap();
+    assert!(info["gable_vent_area"].as_f64().unwrap() > 2.0, "{info}");
+    let store = doc.store();
+    let end = store.get(ElementId(info["curtain_walls"][1].as_u64().unwrap())).unwrap();
+    let g = reviera_core::curtain::regenerate(store, end).unwrap();
+    assert!(g.parts.iter().any(|p| p.panel == reviera_core::curtain::Panel::Door), "the door is kept");
+    project.save(&doc).unwrap();
+    assert!(std::fs::read_to_string(&path).unwrap().contains("'Roll-up Side 1'") || std::fs::read_to_string(&path).unwrap().contains("Roll-up Side"));
+}

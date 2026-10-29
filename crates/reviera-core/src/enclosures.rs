@@ -152,6 +152,12 @@ pub struct EnclosureRecipe {
     /// Side vents along the side walls' tops, percent of the floor area (0 for none).
     #[serde(default)]
     pub side_vents: f64,
+    /// Roll-up sides: the opening's height up each side wall from its foot (0 for none).
+    #[serde(default)]
+    pub roll_up: f64,
+    /// Gable vents: a band of vents this deep under the top of each end wall (0 for none).
+    #[serde(default)]
+    pub gable_vents: f64,
     /// How the vents open (ARC-GLZ-004).
     #[serde(default)]
     pub vent: crate::vents::VentSettings,
@@ -237,7 +243,7 @@ fn ridge_vents(txn: &mut Transaction<'_>, roof: ElementId, target: f64) -> Resul
 /// The area of a curtain wall's vent panes.
 pub fn wall_vent_area(store: &Store, wall: &Element) -> f64 {
     crate::curtain::regenerate(store, wall).map_or(0.0, |g| {
-        g.parts.iter().filter(|p| !p.mullion && p.panel == crate::curtain::Panel::Vent).map(|p| (p.x[1] - p.x[0]) * (p.z[1] - p.z[0])).sum()
+        g.parts.iter().filter(|p| !p.mullion && matches!(p.panel, crate::curtain::Panel::Vent | crate::curtain::Panel::RollUp)).map(|p| (p.x[1] - p.x[0]) * (p.z[1] - p.z[0])).sum()
     })
 }
 
@@ -682,6 +688,13 @@ fn build(txn: &mut Transaction<'_>, guid: &str, r: &EnclosureRecipe) -> Result<V
             for roof in &roofs_made {
                 crate::curtain::set_attached(txn, cw, Some(txn.store().get(*roof).expect("made").guid().to_string()), None)?;
             }
+            // Gable vents under the top, kept above the door.
+            if r.gable_vents > 0.0 {
+                let g = crate::curtain::regenerate(txn.store(), txn.store().get(cw).expect("made"))?;
+                if g.z[1] - g.z[0] - r.gable_vents > DOOR_HEIGHT + 0.4 {
+                    crate::curtain::make_vent_band(txn, cw, r.gable_vents)?;
+                }
+            }
             if r.doors {
                 let along = (b[0] - a[0]).hypot(b[1] - a[1]);
                 crate::curtain::make_door(txn, cw, along / 2.0, DOOR_WIDTH, DOOR_HEIGHT)?;
@@ -691,6 +704,11 @@ fn build(txn: &mut Transaction<'_>, guid: &str, r: &EnclosureRecipe) -> Result<V
             crate::curtain::make_vent_band(txn, cw, vent_band)?;
         } else if k % 2 == 0 && !r.form.tunnel() && side_band > 0.0 {
             crate::curtain::make_vent_band(txn, cw, side_band)?;
+        }
+        // Roll-up sides along the side walls' feet (not a sawtooth's high face), clear of a
+        // vent band over them.
+        if k % 2 == 0 && r.roll_up > 0.0 && !(saw && k == 2) && (side_band == 0.0 || r.form.tunnel() || r.roll_up < top - side_band - 0.3) {
+            crate::curtain::make_roll_up(txn, cw, r.roll_up)?;
         }
         parts.push(cw);
     }
@@ -902,6 +920,12 @@ pub struct Params {
     pub vents: Option<f64>,
     /// Side vents' area, percent of the floor area (default 0, none).
     pub side_vents: Option<f64>,
+    /// Roll-up sides' opening height up the side walls (0 for none).
+    #[schemars(extend("x-reviera-data-type" = "length"))]
+    pub roll_up: Option<Value>,
+    /// Gable vents' band depth under the end walls' tops (0 for none).
+    #[schemars(extend("x-reviera-data-type" = "length"))]
+    pub gable_vents: Option<Value>,
     /// The vents' design opening angle (radians or "30°"), discharge coefficient and actuator.
     #[schemars(extend("x-reviera-data-type" = "angle"))]
     pub vent_angle: Option<Value>,
@@ -951,6 +975,8 @@ pub fn defaults(form: Form) -> EnclosureRecipe {
         doors: true,
         vents: vent_percent(),
         side_vents: 0.0,
+        roll_up: 0.0,
+        gable_vents: 0.0,
         vent: Default::default(),
         frame: true,
         arc: gothic_arc(),
@@ -1041,6 +1067,18 @@ fn apply(store: &Store, r: &mut EnclosureRecipe, p: &Params) -> Result<()> {
         }
         r.side_vents = v;
     }
+    if let Some(v) = num(&p.roll_up, "length", "the roll-up height")? {
+        if !(v == 0.0 || (0.2..=5.0).contains(&v)) {
+            return Err(Error::new("enclosure.bad_value", "a roll-up side opens 0.2 to 5 m (0 for none)"));
+        }
+        r.roll_up = v;
+    }
+    if let Some(v) = num(&p.gable_vents, "length", "the gable vents' depth")? {
+        if !(v == 0.0 || (0.2..=3.0).contains(&v)) {
+            return Err(Error::new("enclosure.bad_value", "gable vents are a band 0.2 to 3 m deep (0 for none)"));
+        }
+        r.gable_vents = v;
+    }
     if let Some(v) = num(&p.vent_angle, "angle", "the vent opening angle")? {
         if !(v > 0.0 && v <= std::f64::consts::FRAC_PI_2) {
             return Err(Error::new("enclosure.bad_value", "vents open 0 to 90°"));
@@ -1130,6 +1168,10 @@ pub enum VentKind {
     Roof,
     /// Bands along the side walls' tops.
     Side,
+    /// Roll-up sides along the side walls' feet, `height` up.
+    RollUp,
+    /// Bands `height` deep under the end walls' tops.
+    Gable,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -1137,8 +1179,11 @@ pub enum VentKind {
 pub struct SetVentsParams {
     pub enclosure_id: ElementRef,
     pub kind: VentKind,
-    /// Percent of the floor area (0 for none).
+    /// Roof and side vents: percent of the floor area (0 for none).
     pub target_percent: Option<f64>,
+    /// Roll-up sides and gable vents: the opening's height or the band's depth (0 for none).
+    #[schemars(extend("x-reviera-data-type" = "length"))]
+    pub height: Option<Value>,
     #[schemars(extend("x-reviera-data-type" = "angle"))]
     pub opening_angle: Option<Value>,
     pub discharge: Option<f64>,
@@ -1151,6 +1196,8 @@ pub(crate) fn set_vents(txn: &mut Transaction<'_>, p: SetVentsParams) -> Result<
     match p.kind {
         VentKind::Roof => params.vents = p.target_percent,
         VentKind::Side => params.side_vents = p.target_percent,
+        VentKind::RollUp => params.roll_up = p.height,
+        VentKind::Gable => params.gable_vents = p.height,
     }
     set(txn, SetParams { enclosure_id: p.enclosure_id, params })
 }
@@ -1177,6 +1224,8 @@ pub struct Info {
     pub free_vent_area: f64,
     pub effective_vent_area: f64,
     pub side_vent_area: f64,
+    /// The end walls' gable vents' pane area.
+    pub gable_vent_area: f64,
     /// The share of the roof its glazing bars shade (for the crop-light and daylight analyses).
     pub frame_shading: f64,
     /// The parts that still exist, by kind.
@@ -1224,7 +1273,7 @@ fn pitch_warnings(store: &Store, r: &EnclosureRecipe, roof: Option<&Element>) ->
 /// `enclosure.get`.
 pub(crate) fn get(store: &Store, p: GetParams) -> Result<Info> {
     let (_, r) = resolve(store, &p.enclosure_id)?;
-    let mut info = Info { width: r.width(), ridge: r.ridge(), floor_area: r.width() * r.length, frame_shading: r.frame_shading(), vent_area: 0.0, free_vent_area: 0.0, effective_vent_area: 0.0, side_vent_area: 0.0, vent_percent: 0.0, recipe: r.clone(), roofs: vec![], curtain_walls: vec![], walls: vec![], gutters: vec![], posts: vec![], beams: vec![], warnings: vec![] };
+    let mut info = Info { width: r.width(), ridge: r.ridge(), floor_area: r.width() * r.length, frame_shading: r.frame_shading(), vent_area: 0.0, free_vent_area: 0.0, effective_vent_area: 0.0, side_vent_area: 0.0, gable_vent_area: 0.0, vent_percent: 0.0, recipe: r.clone(), roofs: vec![], curtain_walls: vec![], walls: vec![], gutters: vec![], posts: vec![], beams: vec![], warnings: vec![] };
     for g in &r.parts {
         let Some(e) = GlobalId::parse(g).and_then(|g| store.find_by_guid(&g)).and_then(|i| store.get(i)) else { continue };
         let list = if roofs::roof_recipe(e).is_some() {
@@ -1257,6 +1306,8 @@ pub(crate) fn get(store: &Store, p: GetParams) -> Result<Info> {
             let side = along.abs() > 0.5 * r.length && !(r.form == Form::Sawtooth && across > 1e-6);
             if side {
                 info.side_vent_area += t.pane_area;
+            } else if !c.attach_top.is_empty() {
+                info.gable_vent_area += t.pane_area;
             }
         }
     }

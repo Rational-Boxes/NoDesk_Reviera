@@ -133,7 +133,12 @@ pub enum Panel {
     Door,
     /// An opening pane: a vent (ARC-GLZ-004), top-hung, drawn open.
     Vent,
+    /// A roll-up side (ARC-GLZ-004): the cell open, its film rolled up on a tube at its top.
+    RollUp,
 }
+
+/// A roll-up side's rolled film: its diameter, drawn at the top of the open cell.
+pub const ROLL: f64 = 0.06;
 
 /// A grid direction: `u` lines are vertical, along the wall; `v` lines horizontal, up it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -335,13 +340,10 @@ impl CurtainGeometry {
                 [q[0], q[1], z]
             });
         }
-        let f = [
-            at(p.x[0], p.y[0]),
-            at(p.x[1], p.y[0]),
-            at(p.x[1], p.y[1]),
-            at(p.x[0], p.y[1]),
-        ];
-        crate::walls::prism(&f, p.z[0], p.z[1])
+        // A roll-up side's part spans its opening; its body is the rolled film at the top.
+        let (y, z) = if p.panel == Panel::RollUp { ([-ROLL / 2.0, ROLL / 2.0], [p.z[1] - ROLL, p.z[1]]) } else { (p.y, p.z) };
+        let f = [at(p.x[0], y[0]), at(p.x[1], y[0]), at(p.x[1], y[1]), at(p.x[0], y[1])];
+        crate::walls::prism(&f, z[0], z[1])
     }
 
     /// The plan outline: the deepest part's band over the wall's length.
@@ -678,7 +680,8 @@ pub(crate) fn make_vent_band(txn: &mut crate::txn::Transaction<'_>, id: ElementI
     let nx = g.u_lines.len() + 1;
     let at = tall - height;
     if at < 0.3 {
-        r.panels = (0..nx).map(|c| PanelOverride { cell: [c, 0], panel: Panel::Vent }).collect();
+        r.panels.retain(|o| o.panel == Panel::Door);
+        r.panels.extend((0..nx).map(|c| PanelOverride { cell: [c, 0], panel: Panel::Vent }));
         r.removed.extend(g.v_lines.iter().flat_map(|v| (0..nx).map(|segment| SegmentOff { dir: Dir::V, at: *v, segment })));
         write(txn, id, &r)?;
         return Ok(tall);
@@ -691,9 +694,34 @@ pub(crate) fn make_vent_band(txn: &mut crate::txn::Transaction<'_>, id: ElementI
     write(txn, id, &r)?;
     let g = regenerate(txn.store(), txn.store().get(id).expect("exists"))?;
     let row = g.v_lines.iter().position(|v| (v - at).abs() < 1e-6).map_or(0, |k| k + 1);
-    r.panels = (0..nx).map(|c| PanelOverride { cell: [c, row], panel: Panel::Vent }).collect();
+    r.panels.retain(|o| o.cell[1] != row);
+    r.panels.extend((0..nx).map(|c| PanelOverride { cell: [c, row], panel: Panel::Vent }));
     write(txn, id, &r)?;
     Ok(height)
+}
+
+/// A roll-up side along a curtain wall's foot (ARC-GLZ-004): a horizontal line `height` up, the
+/// type's lines under it and within 400 mm over it removed, and every cell under it open, its
+/// film rolled up. Returns the opening's height, or `None` when the wall is too short for it.
+pub(crate) fn make_roll_up(txn: &mut crate::txn::Transaction<'_>, id: ElementId, height: f64) -> Result<Option<f64>> {
+    let store = txn.store().clone();
+    let e = store.get(id).expect("exists");
+    let mut r = curtain_recipe(e).expect("a curtain wall");
+    let g = regenerate(&store, e)?;
+    let tall = g.z[1] - g.z[0];
+    if height < 0.2 || height > tall - 0.3 {
+        return Ok(None);
+    }
+    let nx = g.u_lines.len() + 1;
+    for v in g.v_lines.iter().filter(|v| **v < height + 0.4) {
+        r.removed.extend((0..nx).map(|segment| SegmentOff { dir: Dir::V, at: *v, segment }));
+    }
+    let key = r.grids.iter().map(|g| g.key + 1).max().unwrap_or(1);
+    r.grids.push(ManualGrid { key, dir: Dir::V, at: height });
+    r.panels.retain(|o| o.cell[1] != 0);
+    r.panels.extend((0..nx).map(|c| PanelOverride { cell: [c, 0], panel: Panel::RollUp }));
+    write(txn, id, &r)?;
+    Ok(Some(height))
 }
 
 /// Attaches a curtain wall's top to a roof as well as those it follows (`wall.attach`), or (with

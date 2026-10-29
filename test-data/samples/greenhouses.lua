@@ -61,6 +61,8 @@ local tunnel = reviera.enclosure.create{
 local gothic = reviera.enclosure.create{
   form = "gothic", level_id = l1, origin = {12, 52}, span = "9.1 m", length = "12 m", eave = "1.2 m",
 }
+-- Roll-up sides on the hoop tunnel's sidewalls, open 0.8 m from the ground (ARC-GLZ-004).
+reviera.enclosure.set_vents{ enclosure_id = tunnel, kind = "roll_up", height = "800 mm" }
 
 -- A glazed geodesic dome (ARC-GLZ-006): 3V, 4 m radius, cut at 5/8 of the sphere, toughened
 -- glass on 50 × 100 mm aluminium struts; its report gives the strut lengths for fabrication.

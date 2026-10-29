@@ -235,6 +235,12 @@ impl Gui {
             grid.append(Property::string("Side Vents (% of floor)", "gh_side_vents", format!("{}", r.side_vents)));
             grid.set_help_string("gh_side_vents", "Vent bands along the side walls' tops, as a share of the floor area; 0 for none");
         }
+        let roll = self.format_length(r.roll_up);
+        grid.append(Property::string("Roll-up Sides", "gh_roll_up", roll));
+        grid.set_help_string("gh_roll_up", "How far up the side walls open, their film rolled up; 0 for none");
+        let gable = self.format_length(r.gable_vents);
+        grid.append(Property::string("Gable Vents", "gh_gable_vents", gable));
+        grid.set_help_string("gh_gable_vents", "A band of vents this deep under the top of each end wall, kept above the doors; 0 for none");
         let opening = angle(self, r.vent.opening_angle);
         grid.append(Property::string("Vent Opening Angle", "gh_vent_angle", opening));
         grid.set_help_string("gh_vent_angle", "The vents' design opening angle, for their free area");
@@ -297,6 +303,8 @@ impl Gui {
                 Err(_) => return true,
             },
             "gh_vent_angle" => args["vent_angle"] = json!(text),
+            "gh_roll_up" => args["roll_up"] = json!(text),
+            "gh_gable_vents" => args["gable_vents"] = json!(text),
             "gh_vent_actuator" => match ACTUATORS.iter().find(|a| a.1 == text) {
                 Some(a) => args["vent_actuator"] = json!(a.0),
                 None => return true,

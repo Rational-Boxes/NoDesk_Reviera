@@ -1170,7 +1170,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `enclosure.forms` | 3 | — | [{form, schema, defaults}] | No (query) | ARC-GLZ-001, ARC-GLZ-002 |
 | `enclosure.get` | 3 | enclosure_id | {form, params, parts} | No (query) | ARC-GLZ-001 |
 | `enclosure.set` | 3 | enclosure_id, params | — | Yes | ARC-GLZ-001 |
-| `enclosure.set_vents` | 3 | enclosure_id, kind (roof\ | side), target_percent?, opening_angle?, discharge?, actuator? | — | Yes |
+| `enclosure.set_vents` | 3 | enclosure_id, kind (roof\ | side\ | roll_up\ | gable), target_percent?, height?, opening_angle?, discharge?, actuator? |
 | `energy_location.set` | 4 | lat, lon, elevation?, weather_file? | — | Yes | ANA-EM-001 |
 | `energy_model.create` | 4 | options? | job_id | Yes | ANA-EM-003 |
 | `energy_model.delete` | 4 | — | — | Yes | ANA-EM-003 |
