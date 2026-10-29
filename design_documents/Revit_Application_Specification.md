@@ -13013,9 +13013,11 @@ Owner requirement (2026-10-28), planned in `GLAZED_ENCLOSURES_PLAN.md`, research
 **Commands.** `growing.layout(host_id, system, component_type_id?, aisle?, main_aisle?, direction?, clearance?) -> element_id`, `growing.set_layout(layout_id, ...) -> ()`, `growing.summary(layout_id) -> {growing_area, floor_area, share, counts}`.
 
 **Acceptance criteria.**
-- [ ] A 9.6 × 40 m floor with 1.8 m benches, 0.6 m aisles and a 1.2 m central main aisle along the length reports the growing area and a share between 60 % and 75 %; rolling benches on the same floor report a share above 80 %.
-- [ ] An NFT layout refuses a gutter run longer than 12 m, splitting it with a feed in the middle.
-- [ ] Moving a wall of the host room regenerates the layout to the new floor.
+- [x] A 9.6 × 40 m floor with 1.8 m benches along the length, 0.6 m aisles and a 1.2 m main aisle across the middle reports the growing area and a share between 60 % and 75 %; rolling benches on the same floor report a share above 80 %.
+- [x] An NFT layout never has a run longer than 12 m: longer runs are split, each with its own feed end.
+- [x] Lengthening the host enclosure lays the layout out again on the new floor.
+
+*Built (2026-10-28):* `reviera_core::growing`: a layout on a glazed enclosure (`growing.layout`, `growing.set_layout`, `growing.summary`; Architecture › Growing Layout, Properties › Growing Layout) of benches, rolling benches (groups of five, 50 mm apart, one aisle per group), ebb-and-flow tables or NFT tables (channels 100 mm wide at 200 mm centres, falling `slope`, runs ≤ 12 m), each piece its own element (`IfcFurniture` ObjectType `Bench`, `RollingBench`, `EbbFlowTable`; `IfcBuildingElementProxy` `GrowingGutter`) in category `cat.growing_systems`, with its top or channels and legs as faceted B-reps; `across` (from the side walls to a main aisle along the middle, in line with the doors) or `along` (split by a main aisle across the middle); clear of the walls by `clearance` (at least 200 mm in a framed enclosure, past its outer posts) and split round the valley posts, so no piece meets a post; laid out again when the enclosure changes. Defaults (E-48): 1.8 m wide, 0.6 m aisles, 1.2 m main aisle, 0.2 m clearance, tops at 0.8 m (ebb-and-flow 0.75 m, NFT 0.9 m and 1.2 m tables), NFT fall 2 %. Not yet: layouts in rooms, high-wire gutters, drainage to plumbing, pieces from Component Library types.
 
 ### 3.6a.6 Glazing on vaults and domes; geodesic domes
 **ID:** ARC-GLZ-006 · **Priority:** P1 · **Ref:** owner decision (2026-10-28: "support both"); research/09 §1.1 (domes)

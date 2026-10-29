@@ -2600,6 +2600,7 @@ impl Gui {
         // A dormer's parts show the dormer's own rows, which rebuild it.
         self.dormer_rows(grid, id);
         self.enclosure_rows(grid, id);
+        self.growing_rows(grid, id);
         if is_grid {
             let current = self
                 .app
@@ -2968,6 +2969,7 @@ impl Gui {
             || self.stair_edit(property, text.clone())
             || self.dormer_edit(property, text.clone())
             || self.enclosure_edit(property, text.clone())
+            || self.growing_edit(property, text.clone())
             || self.curved_roof_edit(property, text.clone())
             || self.deck_edit(property, text.clone())
         {
@@ -5059,6 +5061,7 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
             focus(g);
         }),
         "enclosure.create" => with(gui, Gui::enclosure_dialog),
+        "growing.layout" => with(gui, Gui::growing_dialog),
         "dormer.create" => with(gui, |g| {
             g.start_dormer_tool();
             focus(g);

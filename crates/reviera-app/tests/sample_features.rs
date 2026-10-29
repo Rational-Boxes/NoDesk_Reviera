@@ -897,7 +897,7 @@ fn the_greenhouses_sample_keeps_its_enclosures() {
     use reviera_core::enclosures::Form;
     // Posts at every bay line and a gutter beam on each line: the hobby house's 6 m in 1.2 m bays
     // on its two eaves (6 × 2 + 2), the multispan's 16 m in 4 m bays on 4 lines (5 × 4 + 4), the
-    // Venlo's 24 m on 4 lines (7 × 4 + 4). The tunnels: one roof each, four glass walls, no
+    // Venlo's 24 m on 3 lines (7 × 3 + 3). The tunnels: one roof each, four glass walls, no
     // gutters or frame.
     assert_eq!(
         seen,
@@ -906,9 +906,19 @@ fn the_greenhouses_sample_keeps_its_enclosures() {
             (Form::Hoop, 1, 4, 0, 0, 0),
             (Form::Gable, 1, 4, 0, 2, 14),
             (Form::Multispan, 3, 4, 0, 4, 24),
-            (Form::Venlo, 6, 4, 2, 7, 32),
+            (Form::Venlo, 4, 4, 2, 5, 24),
         ]
     );
+    // Four growing layouts, each with its pieces; the Venlo's NFT runs are 12 m at most.
+    let layouts: Vec<_> = s.iter().filter_map(|e| reviera_core::growing::recipe(e).map(|r| (e.id(), r))).collect();
+    assert_eq!(layouts.len(), 4);
+    for (id, r) in &layouts {
+        let sum = ok(&mut app, "growing.summary", json!({ "layout_id": id }));
+        assert!(sum["pieces"].as_u64().unwrap() > 0 && sum["share"].as_f64().unwrap() > 20.0, "{:?}: {sum}", r.system);
+        if r.system == reviera_core::growing::System::Nft {
+            assert!(sum["longest_run"].as_f64().unwrap() <= 12.0 + 1e-9, "{sum}");
+        }
+    }
     // The Venlo's end walls rise into its gables.
     let venlo = enclosures.iter().find(|(_, r)| r.form == Form::Venlo).unwrap();
     let ends: Vec<_> = s.iter().filter(|e| reviera_core::curtain::curtain_recipe(e).is_some_and(|c| !c.attach_top.is_empty())).filter(|e| reviera_core::enclosures::enclosure_of(e) == Some(s.get(venlo.0).unwrap().guid().as_str())).collect();

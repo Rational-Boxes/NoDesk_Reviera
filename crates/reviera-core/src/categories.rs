@@ -531,6 +531,15 @@ pub const CATEGORIES: &[Category] = &[
         None,
         true,
     ),
+    // Reviera-defined (ARC-GLZ-007): growing benches, tables and NFT tables, and their layouts.
+    cat(
+        "cat.growing_systems",
+        "Growing Systems",
+        Some("IfcFurniture"),
+        Some("IfcFurnitureType"),
+        None,
+        true,
+    ),
     // Reviera-defined (ARC-GLZ-007): an IfcElementAssembly with ObjectType GlazedEnclosure.
     cat(
         "cat.glazed_enclosures",
@@ -589,6 +598,9 @@ pub fn above_cut(e: &Element) -> AboveCut {
 pub fn category_of(e: &Element) -> Option<&'static Category> {
     if crate::enclosures::recipe(e).is_some() {
         return category("cat.glazed_enclosures");
+    }
+    if crate::growing::recipe(e).is_some() || crate::growing::part_recipe(e).is_some() {
+        return category("cat.growing_systems");
     }
     if crate::grids::is_grid(e) || crate::grids::is_grid_type(e) {
         return category("cat.grids");

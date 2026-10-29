@@ -16,11 +16,11 @@
 
 local l1 = reviera.level.list()[1].id
 
--- A Venlo range: 3 trusses of 8 m, each with two 4 m roofs at 22°, 24 m long in 4 m bays, the
+-- A Venlo range: 2 trusses of 8 m, each with two 4 m roofs at 22°, 24 m long in 4 m bays, the
 -- gutters at 5.5 m on a 600 mm knee wall.
 local venlo = reviera.enclosure.create{
   form = "venlo", level_id = l1, origin = {0, 0},
-  span = "8 m", spans = 3, length = "24 m", bay = "4 m", eave = "5.5 m", pitch = "22°",
+  span = "8 m", spans = 2, length = "24 m", bay = "4 m", eave = "5.5 m", pitch = "22°",
   knee = "600 mm",
 }
 
@@ -37,15 +37,29 @@ local hobby = reviera.enclosure.create{
   span = "3.6 m", length = "6 m", bay = "1.2 m", eave = "2.2 m", pitch = "25°",
 }
 
--- Two film tunnels, 9.1 m wide and 20 m long on 1.2 m sidewalls, hoops at most 1.5 m apart: a
+-- Two film tunnels, 9.1 m wide and 12 m long on 1.2 m sidewalls, hoops at most 1.5 m apart: a
 -- semicircular hoop house, and a gothic one whose two arcs (radius 0.6 × the span) meet in a
 -- pointed crown that sheds condensation and snow.
 local tunnel = reviera.enclosure.create{
-  form = "hoop", level_id = l1, origin = {12, 40}, span = "9.1 m", length = "20 m", eave = "1.2 m",
+  form = "hoop", level_id = l1, origin = {12, 40}, span = "9.1 m", length = "12 m", eave = "1.2 m",
 }
 local gothic = reviera.enclosure.create{
-  form = "gothic", level_id = l1, origin = {12, 52}, span = "9.1 m", length = "20 m", eave = "1.2 m",
+  form = "gothic", level_id = l1, origin = {12, 52}, span = "9.1 m", length = "12 m", eave = "1.2 m",
 }
+
+-- Growing layouts (ARC-GLZ-005), clear of the posts: NFT tables along the Venlo range (runs of
+-- at most 12 m falling 2 %), rolling benches in the multispan, benches across the hobby house,
+-- ebb-and-flow tables in the hoop tunnel.
+local layouts = {
+  reviera.growing.layout{ enclosure_id = venlo, system = "nft", direction = "along" },
+  reviera.growing.layout{ enclosure_id = range, system = "rolling_benches", direction = "along" },
+  reviera.growing.layout{ enclosure_id = hobby, system = "benches", width = 0.9, aisle = 0.6, main_aisle = 0.9 },
+  reviera.growing.layout{ enclosure_id = tunnel, system = "ebb_flow", direction = "along" },
+}
+for _, l in ipairs(layouts) do
+  local s = reviera.growing.summary{ layout_id = l }
+  print(string.format("%s: %d pieces, %.0f m² growing (%.0f %% of the floor)", s.system, s.pieces, s.growing_area, s.share))
+end
 
 for _, e in ipairs({ venlo, range, hobby, tunnel, gothic }) do
   local info = reviera.enclosure.get{ enclosure_id = e }

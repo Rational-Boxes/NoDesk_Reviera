@@ -255,3 +255,160 @@ impl Gui {
         true
     }
 }
+
+const SYSTEMS: [(reviera_core::growing::System, &str); 4] = [
+    (reviera_core::growing::System::Benches, "Benches"),
+    (reviera_core::growing::System::RollingBenches, "Rolling benches"),
+    (reviera_core::growing::System::EbbFlow, "Ebb-and-flow tables"),
+    (reviera_core::growing::System::Nft, "NFT tables"),
+];
+
+impl Gui {
+    /// Architecture › Growing Layout: fill the selected enclosure with a growing system.
+    pub(crate) fn growing_dialog(&mut self) {
+        let frame = self.frame;
+        let Some((owner, _)) = self.selection().first().and_then(|id| self.enclosure_of_selection(*id)) else {
+            return frame.set_status_text("Growing Layout: select a glazed enclosure first", 0);
+        };
+        let dialog = Dialog::builder(&frame, "Growing Layout").build();
+        let sizer = BoxSizer::builder(Orientation::Vertical).build();
+        let grid = FlexGridSizer::builder(0, 2).with_vgap(6).with_hgap(10).build();
+        grid.add_growable_col(1, 1);
+        let choice = |label: &str, items: Vec<String>, at: u32| {
+            let l = StaticText::builder(&dialog).with_label(label).build();
+            let c = Choice::builder(&dialog).with_choices(items).build();
+            c.set_selection(at);
+            grid.add(&l, 0, SizerFlag::AlignCenterVertical, 0);
+            grid.add(&c, 1, SizerFlag::Expand, 0);
+            c
+        };
+        let system = choice("System", SYSTEMS.iter().map(|s| s.1.to_owned()).collect(), 0);
+        let direction = choice("Runs", vec!["Across the span, main aisle along the middle".into(), "Along the length, main aisle across the middle".into()], 0);
+        let field = |label: &str| {
+            let l = StaticText::builder(&dialog).with_label(label).build();
+            let t = TextCtrl::builder(&dialog).with_value("").build();
+            grid.add(&l, 0, SizerFlag::AlignCenterVertical, 0);
+            grid.add(&t, 1, SizerFlag::Expand, 0);
+            t
+        };
+        let width = field("Width (blank: the system's)");
+        let aisle = field("Aisle");
+        let main = field("Main aisle");
+        let height = field("Growing surface height");
+        sizer.add_sizer(&grid, 1, SizerFlag::All | SizerFlag::Expand, 10);
+        let buttons = BoxSizer::builder(Orientation::Horizontal).build();
+        buttons.add_stretch_spacer(1);
+        let cancel = Button::builder(&dialog).with_id(ID_CANCEL).with_label("Cancel").build();
+        let ok = Button::builder(&dialog).with_id(ID_OK).with_label("OK").build();
+        buttons.add(&cancel, 0, SizerFlag::All, 6);
+        buttons.add(&ok, 0, SizerFlag::All, 6);
+        sizer.add_sizer(&buttons, 0, SizerFlag::Expand, 0);
+        dialog.set_sizer_and_fit(sizer, true);
+        dialog.set_affirmative_id(ID_OK);
+        dialog.set_escape_id(ID_CANCEL);
+        let code = dialog.show_modal();
+        let mut args = json!({
+            "enclosure_id": owner,
+            "system": system.get_selection().and_then(|i| SYSTEMS.get(i as usize)).map(|s| s.0),
+            "direction": if direction.get_selection() == Some(1) { "along" } else { "across" },
+        });
+        let mut bad = false;
+        for (key, t) in [("width", &width), ("aisle", &aisle), ("main_aisle", &main), ("height", &height)] {
+            let v = t.get_value();
+            if v.trim().is_empty() {
+                continue;
+            }
+            match self.run("units.parse", json!({ "text": v, "data_type": "length" })) {
+                Ok(m) => args[key] = m,
+                Err(_) => bad = true,
+            }
+        }
+        dialog.destroy();
+        if code != ID_OK {
+            return;
+        }
+        if bad {
+            return error(&frame, "Growing Layout: the sizes are lengths");
+        }
+        match self.run("growing.layout", args) {
+            Ok(v) => {
+                let s = self.run("growing.summary", json!({ "layout_id": v })).unwrap_or_default();
+                frame.set_status_text(
+                    &format!("Growing layout: {} pieces, {:.0} m² growing ({:.0} % of the floor)", s["pieces"], s["growing_area"].as_f64().unwrap_or(0.0), s["share"].as_f64().unwrap_or(0.0)),
+                    0,
+                );
+            }
+            Err(e) => error(&frame, &format!("The layout was not made:\n{e}")),
+        }
+        self.refresh_scene(&frame);
+    }
+
+    /// The layout of a selected layout or piece.
+    fn layout_of_selection(&self, id: ElementId) -> Option<(ElementId, reviera_core::growing::LayoutRecipe)> {
+        let store = self.doc.and_then(|d| self.app.document(d))?.doc.store();
+        let e = store.get(id)?;
+        let owner = match e.param(reviera_core::growing::PART_KEY).and_then(|v| v.as_str()) {
+            Some(g) => store.find_by_guid(&reviera_core::GlobalId::parse(g)?)?,
+            None => id,
+        };
+        Some((owner, reviera_core::growing::recipe(store.get(owner)?)?))
+    }
+
+    /// A growing layout's rows, for a selected layout or piece.
+    pub(crate) fn growing_rows(&mut self, grid: &PropertyGrid, id: ElementId) {
+        let Some((owner, r)) = self.layout_of_selection(id) else { return };
+        grid.append(Property::category("Growing Layout", "c_growing"));
+        let index = SYSTEMS.iter().position(|s| s.0 == r.system).map_or(-1, |i| i as i32);
+        grid.append(Property::enumeration("System", "gl_system", SYSTEMS.iter().enumerate().map(|(i, s)| (s.1.to_owned(), i as i32)).collect::<Vec<_>>(), index));
+        let dir = if r.direction == reviera_core::growing::Direction::Along { 1 } else { 0 };
+        grid.append(Property::enumeration("Runs", "gl_direction", vec![("Across".to_owned(), 0), ("Along".to_owned(), 1)], dir));
+        for (label, key, v) in [("Width", "gl_width", r.width), ("Aisle", "gl_aisle", r.aisle), ("Main Aisle", "gl_main", r.main_aisle), ("Height", "gl_height", r.height)] {
+            let text = self.format_length(v);
+            grid.append(Property::string(label, key, text));
+        }
+        if let Ok(s) = self.run("growing.summary", json!({ "layout_id": owner })) {
+            let text = format!("{} pieces, {:.1} m² ({:.0} % of the floor)", s["pieces"], s["growing_area"].as_f64().unwrap_or(0.0), s["share"].as_f64().unwrap_or(0.0));
+            grid.append(Property::string("Growing Area", "gl_area", text));
+            grid.set_property_read_only("gl_area", true);
+        }
+    }
+
+    /// An edit of a growing layout row; `false` if `property` is not one.
+    pub(crate) fn growing_edit(&mut self, property: &str, text: Option<String>) -> bool {
+        if !property.starts_with("gl_") {
+            return false;
+        }
+        let frame = self.frame;
+        let Some((owner, _)) = self.selection().first().and_then(|id| self.layout_of_selection(*id)) else { return true };
+        let text = text.unwrap_or_default();
+        let mut args = json!({ "layout_id": owner });
+        let length = |g: &mut Gui, t: &str| g.run("units.parse", json!({ "text": t, "data_type": "length" })).ok();
+        match property {
+            "gl_system" => match SYSTEMS.iter().find(|s| s.1 == text) {
+                Some(s) => args["system"] = json!(s.0),
+                None => return true,
+            },
+            "gl_direction" => args["direction"] = json!(if text == "Along" { "along" } else { "across" }),
+            "gl_width" | "gl_aisle" | "gl_main" | "gl_height" => {
+                let key = match property {
+                    "gl_width" => "width",
+                    "gl_aisle" => "aisle",
+                    "gl_main" => "main_aisle",
+                    _ => "height",
+                };
+                match length(self, &text) {
+                    Some(v) => args[key] = v,
+                    None => return true,
+                }
+            }
+            _ => return true,
+        }
+        if let Err(e) = self.run("growing.set_layout", args) {
+            error(&frame, &format!("The layout was not changed:\n{e}"));
+        }
+        let _ = self.run("selection.set", json!({ "ids": [owner] }));
+        self.selection_changed();
+        self.refresh_scene(&frame);
+        true
+    }
+}

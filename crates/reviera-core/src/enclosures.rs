@@ -677,7 +677,9 @@ fn rebuild(txn: &mut Transaction<'_>, id: ElementId, mut r: EnclosureRecipe) -> 
     let guid = store.get(id).expect("exists").guid().to_string();
     let parts = build(txn, &guid, &r)?;
     r.parts = parts.iter().map(|p| txn.store().get(*p).expect("made").guid().to_string()).collect();
-    write_recipe(txn, id, &r)
+    write_recipe(txn, id, &r)?;
+    // Its growing layouts are laid out again on the new floor.
+    crate::growing::follow(txn, &guid)
 }
 
 // ---- Commands ----

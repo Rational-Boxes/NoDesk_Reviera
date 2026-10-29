@@ -40,6 +40,9 @@ macro_rules! edit_command {
 
 pub(crate) fn register(registry: &mut CommandRegistry) {
     let results = [
+        registry.add(GrowingLayout),
+        registry.add(GrowingSetLayout),
+        registry.add(GrowingSummary),
         registry.add(EnclosureCreate),
         registry.add(EnclosureSet),
         registry.add(EnclosureDetach),
@@ -4432,6 +4435,43 @@ read_command!(
     crate::builtin::NoParams,
     Vec<crate::scope_boxes::ScopeBoxInfo>,
     crate::scope_boxes::list_command
+);
+
+edit_command!(
+    GrowingLayout,
+    "growing.layout",
+    "Lay out a growing system in a glazed enclosure",
+    "Growing Layout (ARC-GLZ-005): fills an enclosure's floor with a `system` (benches, rolling_benches, \
+     ebb_flow, nft) bay by bay between its posts: pieces `width` wide, `aisle` apart, run `direction` \
+     across (from the side walls to a `main_aisle` along the middle) or along the length, `clearance` from \
+     walls and posts, the growing surface `height` up; NFT channels fall `slope` and run at most 12 m. \
+     Each piece is its own element; the layout follows its enclosure. Returns the layout.",
+    "Growing Layout",
+    crate::growing::LayoutParams,
+    crate::id::ElementId,
+    crate::growing::layout
+);
+
+edit_command!(
+    GrowingSetLayout,
+    "growing.set_layout",
+    "Change a growing layout",
+    "Changes a layout's system or sizes (as `growing.layout`); its pieces are laid out again.",
+    "Edit Growing Layout",
+    crate::growing::SetParams,
+    (),
+    crate::growing::set_layout
+);
+
+read_command!(
+    GrowingSummary,
+    "growing.summary",
+    "Summarise a growing layout",
+    "A layout's system, number of pieces, growing area, floor area and share (percent), and for NFT the \
+     longest run.",
+    crate::growing::SummaryParams,
+    crate::growing::Summary,
+    crate::growing::summary
 );
 
 edit_command!(

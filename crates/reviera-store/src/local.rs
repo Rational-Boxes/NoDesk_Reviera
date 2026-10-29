@@ -549,6 +549,7 @@ impl LocalProject {
                 || recipe_kind == Some(reviera_core::foundations::WALL_FOUNDATION_RECIPE)
                 || recipe_kind == Some(reviera_core::ramps::RAMP_RECIPE)
                 || recipe_kind == Some(reviera_core::skylights::SKYLIGHT_RECIPE)
+                || recipe_kind == Some(reviera_core::growing::PART_RECIPE)
                 || recipe_kind == Some(stairs::STAIR_RECIPE)
                 || recipe_kind == Some(railings::RAILING_RECIPE)
                 || recipe_kind == Some(railings::GATE_RECIPE)
@@ -760,6 +761,7 @@ impl LocalProject {
             self.write_model_texts(doc)?;
             self.write_parts(doc)?;
             self.write_skylights(doc)?;
+            self.write_growing(doc)?;
             let owner_history = self.new_owner_history()?;
             crate::mesh_objects::write_mesh_objects(
                 &mut self.ifc,
@@ -3859,6 +3861,39 @@ impl LocalProject {
                 .and_then(|g| store.find_by_guid(&g))
                 .and_then(|r| roofs::roof_recipe(store.get(r)?))
                 .and_then(|r| GlobalId::parse(&r.level))
+                .and_then(|g| store.find_by_guid(&g))
+                .and_then(|l| self.steps.get(&l).copied());
+            if let Some(storey) = storey {
+                geometry::contain(&mut self.ifc, step, storey, owner_history)?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Writes every growing bench and table (ARC-GLZ-005): one faceted B-rep per top, channel and
+    /// leg, contained in its level.
+    fn write_growing(&mut self, doc: &Document) -> Result<()> {
+        let store = doc.store();
+        let all = reviera_core::growing::all(store);
+        if all.is_empty() {
+            return Ok(());
+        }
+        let contexts = geometry::Contexts::find(&self.ifc)?;
+        let owner_history = self.new_owner_history()?;
+        for (id, _, meshes) in &all {
+            let Some(&step) = self.steps.get(id) else {
+                continue;
+            };
+            let solids: Vec<geometry::Polyhedron> = meshes
+                .iter()
+                .map(|(points, idx)| geometry::Polyhedron {
+                    points: points.clone(),
+                    faces: idx.chunks(3).map(|t| t.iter().map(|i| *i as usize).collect()).collect(),
+                })
+                .collect();
+            geometry::write_breps(&mut self.ifc, step, geometry::BrepFrame::WORLD, &solids, self.length_scale, contexts)?;
+            let storey = reviera_core::growing::part_recipe(store.get(*id).expect("listed"))
+                .and_then(|p| GlobalId::parse(&p.level))
                 .and_then(|g| store.find_by_guid(&g))
                 .and_then(|l| self.steps.get(&l).copied());
             if let Some(storey) = storey {

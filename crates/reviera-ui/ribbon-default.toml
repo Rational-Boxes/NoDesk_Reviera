@@ -2454,6 +2454,12 @@ icon = "sloped_glazing"
 help = "A greenhouse: gable, gutter-connected multispan or Venlo, of glazed roofs and walls, knee walls and gutters"
 
 [[action]]
+id = "growing.layout"
+label = "Growing Layout"
+icon = "grid"
+help = "Fill the selected greenhouse with benches, rolling benches, ebb-and-flow tables or NFT tables, clear of its posts"
+
+[[action]]
 id = "dormer.create"
 label = "Dormer"
 icon = "dormer"
@@ -3298,6 +3304,7 @@ tools = [
   { action = "roof.create_dome", size = "small" },
   { action = "roof.create_extrusion", size = "small" },
   { action = "enclosure.create", size = "large" },
+  { action = "growing.layout", size = "small" },
 ]
 
 [[tab.panel]]
@@ -4516,7 +4523,7 @@ items = [
   "wall.create", "curtain.create", "door.place", "window.place", "column.place_architectural", "floor.create", "floor.edit_boundary",
   "ceiling.create", "ceiling.edit_boundary", "roof.create_footprint", "roof.edit_footprint", "-",
   "room.place", "room.place_automatically", "-",
-  "roof.create_extrusion", "slabedge.create", "enclosure.create", "-",
+  "roof.create_extrusion", "slabedge.create", "enclosure.create", "growing.layout", "-",
   "opening.create_wall", "opening.create_vertical", "opening.create_by_face", "opening.create_shaft", "-",
   "grid.create", "level.create", "refplane.create", "modelline.create", "-",
   "workplane.set", "workplane.show",
