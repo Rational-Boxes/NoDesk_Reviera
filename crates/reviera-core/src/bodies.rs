@@ -319,10 +319,11 @@ pub fn all(store: &Store) -> Vec<Body> {
             .get(id)
             .and_then(|e| crate::roofs::glazing::of_roof(store, e))
         {
-            for p in crate::roofs::glazing::regenerate(&g, &ty).parts {
+            let panes = store.get(id).and_then(crate::roofs::roof_recipe).map(|r| r.panes).unwrap_or_default();
+            for p in crate::roofs::glazing::regenerate(&g, &ty, &panes).parts {
                 let class = if p.mullion {
                     "IfcMember:metal"
-                } else if p.panel == crate::curtain::Panel::Glazed {
+                } else if matches!(p.panel, crate::curtain::Panel::Glazed | crate::curtain::Panel::Vent) {
                     "IfcPlate:glass"
                 } else {
                     "IfcPlate"
@@ -373,7 +374,7 @@ pub fn all(store: &Store) -> Vec<Body> {
                 "IfcMember:metal"
             } else {
                 match p.panel {
-                    crate::curtain::Panel::Glazed => "IfcPlate:glass",
+                    crate::curtain::Panel::Glazed | crate::curtain::Panel::Vent => "IfcPlate:glass",
                     crate::curtain::Panel::Door => "IfcDoor",
                     _ => "IfcPlate",
                 }

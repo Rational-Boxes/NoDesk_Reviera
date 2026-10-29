@@ -18,11 +18,12 @@ use super::Gui;
 
 const LINE_COLS: [&str; 4] = ["Direction", "Position", "Manual", "Segments"];
 const PANEL_COLS: [&str; 3] = ["Column", "Row", "Panel"];
-const PANELS: [(Panel, &str); 4] = [
+const PANELS: [(Panel, &str); 5] = [
     (Panel::Glazed, "Glazed"),
     (Panel::Solid, "Solid"),
     (Panel::Empty, "Empty"),
     (Panel::Door, "Door"),
+    (Panel::Vent, "Vent"),
 ];
 
 impl Gui {

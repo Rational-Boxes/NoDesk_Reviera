@@ -1698,7 +1698,7 @@ impl LocalProject {
             let glazing = store
                 .get(*id)
                 .and_then(|e| roofs::glazing::of_roof(store, e))
-                .map(|ty| roofs::glazing::regenerate(g, &ty));
+                .map(|ty| roofs::glazing::regenerate(g, &ty, &store.get(*id).and_then(roofs::roof_recipe).map(|r| r.panes).unwrap_or_default()));
             let glazed: Option<Vec<geometry::Polyhedron>> = glazing.map(|gl| {
                 gl.parts
                     .iter()

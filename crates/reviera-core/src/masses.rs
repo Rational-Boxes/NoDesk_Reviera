@@ -894,7 +894,7 @@ pub fn system_parts(r: &SystemRecipe) -> crate::roofs::glazing::Glazing {
         trims: Vec::new(),
         uncut: 0,
     };
-    crate::roofs::glazing::regenerate(&g, &r.layout)
+    crate::roofs::glazing::regenerate(&g, &r.layout, &[])
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]

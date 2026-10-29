@@ -2809,6 +2809,8 @@ Owner requirement (2026-10-28), planned in `GLAZED_ENCLOSURES_PLAN.md`, research
 
 **Commands.** `enclosure.set_vents(enclosure_id, kind, target_percent? | count?, opening_angle?) -> [vent_id]`, `vent.set(vent_id, open?, angle?) -> ()`.
 
+*Built (2026-10-28), ridge vents:* an enclosure's `vents` (percent of the floor area, default 18, 0 for none; Properties › Ridge Vents) swaps panes of each roof's top row for vents, alternating side to side along the ridge and spread evenly until the target is reached; `enclosure.get` reports the vent area and share. A vent is a new panel kind (`Vent`) of curtain walls and sloped glazing, drawn hung from its upper edge and open 15°; sloped glazing now takes pane overrides plane by plane (`recipe.roof.panes`: plane key, cell, panel). A curtain-wall vent is written to IFC as an `IfcWindow`. Not yet: side and gable vents, roll-up sides, vents' free area and actuators (`Reviera_Vent`), opening and closing them, a glazed roof's vents as their own `IfcWindow` (its glazing is one body in IFC), and `enclosure.set_vents` / `vent.set`.
+
 **Acceptance criteria.**
 - [ ] A 9.6 × 40 m gable greenhouse with continuous ridge vents at a 18 % target reports roof vent area ≥ 69 m² (18 % of 384 m²) and places vents in whole bays.
 - [ ] A vent's free area is in `Reviera_Vent` on export.

@@ -21,14 +21,19 @@
 //! - a door in the middle of each end wall (`doors`): the panes round its middle merged into one
 //!   curtain-wall door at least 1.5 m wide and 2.1 m high (EXPERT_REVIEW E-50); with a knee
 //!   wall, the end walls are glazed to the ground so the doors stand on the floor;
-//! - gutters, laid level, on the outer eaves and in each valley (MEP-PIPE-010).
+//! - gutters, laid level, on the outer eaves and in each valley (MEP-PIPE-010);
+//! - ridge vents (ARC-GLZ-004): panes of each roof's top row swapped for vents (top-hung,
+//!   drawn open), alternating side to side along the ridge and spread evenly, as many as reach
+//!   `vents` percent of the roof's floor area (default 18 %, EXPERT_REVIEW E-47).
 //!
 //! In the enclosure's own frame `x` runs along its length (the ridges) from `origin`, turned by
 //! `rotation` from the project's x axis, and `y` across the spans. The enclosure is an
 //! `IfcElementAssembly` (ObjectType `GlazedEnclosure`) whose recipe lists its parts; each part
 //! names its enclosure (`rxd:enclosure`) and goes with it.
 //!
-//! Not yet: hoop, gothic and sawtooth forms; frame members (posts, rafters, trusses); vents; keeping a user's edits to a part when the enclosure regenerates; a headhouse.
+//! Not yet: hoop, gothic and sawtooth forms; frame members (posts, rafters, trusses); side
+//! vents and roll-up sides; vents as their own `IfcWindow` in a glazed roof's IFC (the roof's
+//! glazing is one body there); keeping a user's edits to a part when the enclosure regenerates; a headhouse.
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -105,6 +110,9 @@ pub struct EnclosureRecipe {
     /// A door in each end wall.
     #[serde(default = "yes")]
     pub doors: bool,
+    /// Ridge vents' target area, percent of the floor area (0 for none).
+    #[serde(default = "vent_percent")]
+    pub vents: f64,
     /// The parts (GlobalIds).
     #[serde(default)]
     pub parts: Vec<String>,
@@ -112,6 +120,79 @@ pub struct EnclosureRecipe {
 
 fn yes() -> bool {
     true
+}
+
+fn vent_percent() -> f64 {
+    18.0
+}
+
+/// Ridge vents in a glazed roof: panes of the top row of each sloping plane swapped for vents,
+/// alternating plane by plane along the ridge, spread evenly, until their area reaches `target`.
+fn ridge_vents(txn: &mut Transaction<'_>, roof: ElementId, target: f64) -> Result<()> {
+    let store = txn.store().clone();
+    let e = store.get(roof).expect("made");
+    let Some(glazing) = roofs::glazing::of(&store, e) else { return Ok(()) };
+    let planes: Vec<(u32, usize, usize)> = glazing
+        .planes
+        .iter()
+        .filter_map(|p| Some((p.key?, p.grid2.len() + 1, p.grid1.len() + 1)))
+        .collect();
+    if planes.is_empty() || target <= 0.0 {
+        return Ok(());
+    }
+    // The panes' area, plane by plane: the glazed area shared among its cells.
+    let g = roofs::regenerate(&store, e)?;
+    let mut sizes = Vec::new();
+    for (key, cols, rows) in &planes {
+        let area: f64 = g.faces.iter().filter(|f| f.key == Some(*key)).map(|f| {
+            let ring: Vec<[f64; 2]> = f.bottom.iter().map(|q| [q[0], q[1]]).collect();
+            crate::sketch::signed_area(&ring).abs() / f.normal[2].abs().max(0.1)
+        }).sum();
+        sizes.push(area / (*cols * *rows) as f64);
+    }
+    let pane = sizes.iter().copied().fold(f64::MAX, f64::min).max(1e-6);
+    let most: usize = planes.iter().map(|p| p.1).sum();
+    let count = ((target / pane).ceil() as usize).clamp(1, most);
+    let mut panes = Vec::new();
+    for (k, (key, cols, rows)) in planes.iter().enumerate() {
+        // This plane's share, alternating so the vents stagger along the ridge.
+        let n = count / planes.len() + usize::from(k < count % planes.len());
+        let n = n.min(*cols);
+        for m in 0..n {
+            let shift = if k % 2 == 0 { 0.25 } else { 0.75 };
+            let c = (((m as f64 + shift) * *cols as f64 / n as f64) as usize).min(cols - 1);
+            panes.push(roofs::glazing::PaneOverride { plane: *key, cell: [c, rows - 1], panel: crate::curtain::Panel::Vent });
+        }
+    }
+    let mut r = roofs::roof_recipe(e).expect("a roof");
+    r.panes = panes;
+    let value = serde_json::to_value(&r).expect("serialises");
+    txn.modify(roof, |e| {
+        e.params.insert(RECIPE_KEY.into(), value);
+    })
+}
+
+/// The area of a roof's vent panes.
+pub fn vent_area(store: &Store, roof: &Element) -> f64 {
+    roofs::glazing::of(store, roof).map_or(0.0, |g| {
+        g.parts
+            .iter()
+            .filter(|p| !p.mullion && p.panel == crate::curtain::Panel::Vent)
+            .map(|p| {
+                let (pts, idx) = &p.mesh;
+                // Both faces of a thin pane: half the surface.
+                idx.chunks(3)
+                    .map(|t| {
+                        let [a, b, c] = [pts[t[0] as usize], pts[t[1] as usize], pts[t[2] as usize]];
+                        let (u, v) = ([b[0] - a[0], b[1] - a[1], b[2] - a[2]], [c[0] - a[0], c[1] - a[1], c[2] - a[2]]);
+                        let n = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]];
+                        (n[0] * n[0] + n[1] * n[1] + n[2] * n[2]).sqrt() / 2.0
+                    })
+                    .sum::<f64>()
+                    / 2.0
+            })
+            .sum()
+    })
 }
 
 impl EnclosureRecipe {
@@ -262,6 +343,8 @@ fn build(txn: &mut Transaction<'_>, guid: &str, r: &EnclosureRecipe) -> Result<V
                 cutoff_offset: None,
             },
         )?;
+        // The share of the floor under this span, valley gutters included.
+        ridge_vents(txn, roof, r.vents / 100.0 * r.span * l)?;
         roofs_made.push(roof);
     }
     parts.extend(&roofs_made);
@@ -426,6 +509,8 @@ pub struct Params {
     pub gutters: Option<bool>,
     /// A door in each end wall (default on).
     pub doors: Option<bool>,
+    /// Ridge vents' area, percent of the floor area (default 18; 0 for none).
+    pub vents: Option<f64>,
     /// The corner laid out from, and the direction of the length (radians or "90°").
     pub origin: Option<[f64; 2]>,
     #[schemars(extend("x-reviera-data-type" = "angle"))]
@@ -459,6 +544,7 @@ pub fn defaults(form: Form) -> EnclosureRecipe {
         knee: None,
         gutters: true,
         doors: true,
+        vents: vent_percent(),
         parts: Vec::new(),
     };
     match form {
@@ -508,6 +594,12 @@ fn apply(store: &Store, r: &mut EnclosureRecipe, p: &Params) -> Result<()> {
     }
     if let Some(d) = p.doors {
         r.doors = d;
+    }
+    if let Some(v) = p.vents {
+        if !(0.0..=60.0).contains(&v) {
+            return Err(Error::new("enclosure.bad_value", "the vent area is 0 to 60 % of the floor area"));
+        }
+        r.vents = v;
     }
     if let Some(o) = p.origin {
         r.origin = o;
@@ -585,6 +677,9 @@ pub struct Info {
     pub width: f64,
     pub ridge: f64,
     pub floor_area: f64,
+    /// The ridge vents' area, and as a share of the floor area (percent).
+    pub vent_area: f64,
+    pub vent_percent: f64,
     /// The parts that still exist, by kind.
     pub roofs: Vec<ElementId>,
     pub curtain_walls: Vec<ElementId>,
@@ -595,7 +690,7 @@ pub struct Info {
 /// `enclosure.get`.
 pub(crate) fn get(store: &Store, p: GetParams) -> Result<Info> {
     let (_, r) = resolve(store, &p.enclosure_id)?;
-    let mut info = Info { width: r.width(), ridge: r.ridge(), floor_area: r.width() * r.length, recipe: r.clone(), roofs: vec![], curtain_walls: vec![], walls: vec![], gutters: vec![] };
+    let mut info = Info { width: r.width(), ridge: r.ridge(), floor_area: r.width() * r.length, vent_area: 0.0, vent_percent: 0.0, recipe: r.clone(), roofs: vec![], curtain_walls: vec![], walls: vec![], gutters: vec![] };
     for g in &r.parts {
         let Some(e) = GlobalId::parse(g).and_then(|g| store.find_by_guid(&g)).and_then(|i| store.get(i)) else { continue };
         let list = if roofs::roof_recipe(e).is_some() {
@@ -609,6 +704,8 @@ pub(crate) fn get(store: &Store, p: GetParams) -> Result<Info> {
         };
         list.push(e.id());
     }
+    info.vent_area = info.roofs.iter().filter_map(|id| store.get(*id)).map(|e| vent_area(store, e)).sum();
+    info.vent_percent = 100.0 * info.vent_area / info.floor_area.max(1e-9);
     Ok(info)
 }
 

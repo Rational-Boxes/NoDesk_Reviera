@@ -16,7 +16,7 @@
 //! (the roof's body is the glazing's B-rep).
 
 use schemars::JsonSchema;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::bodies::Mesh;
 use crate::curtain::{CurtainType, Justification, Mullion, Panel, Rule, solve};
@@ -53,6 +53,19 @@ pub struct PlaneGrid {
     pub grid1: Vec<f64>,
     /// Grid 2, along the eave.
     pub grid2: Vec<f64>,
+}
+
+/// How far a vent pane is drawn open, about its upper edge.
+pub const VENT_OPEN: f64 = 15.0 * std::f64::consts::PI / 180.0;
+
+/// A pane of one plane instead of the type's: the plane by the footprint curve it rises from,
+/// the cell by column (along the eave, from the plane's start) and row (up the slope, from the
+/// eave).
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct PaneOverride {
+    pub plane: u32,
+    pub cell: [usize; 2],
+    pub panel: Panel,
 }
 
 /// A glazing part: a panel or a mullion.
@@ -133,8 +146,8 @@ fn bar(a: [f64; 3], b: [f64; 3], up: [f64; 3], width: f64, depth: f64) -> Mesh {
 /// A plane edge and the normals of the planes it bounds.
 type SharedEdge = ([f64; 3], [f64; 3], Vec<[f64; 3]>);
 
-/// The glazing of a roof of a sloped glazing type.
-pub fn regenerate(g: &RoofGeometry, ty: &CurtainType) -> Glazing {
+/// The glazing of a roof of a sloped glazing type, with its swapped panes.
+pub fn regenerate(g: &RoofGeometry, ty: &CurtainType, panes: &[PaneOverride]) -> Glazing {
     let mut planes = Vec::new();
     let mut parts = Vec::new();
     let border = ty.border;
@@ -196,15 +209,32 @@ pub fn regenerate(g: &RoofGeometry, ty: &CurtainType) -> Glazing {
                         [ss[i + 1], ts[j + 1]],
                         [ss[i], ts[j + 1]],
                     ]]);
+                    let kind = f
+                        .key
+                        .and_then(|k| panes.iter().rev().find(|o| o.plane == k && o.cell == [i, j]))
+                        .map_or(ty.panel, |o| o.panel);
+                    if kind == Panel::Empty {
+                        continue;
+                    }
                     for piece in crate::polygons::intersection(&face, &cell) {
                         if piece.area() < 1e-6 {
                             continue;
                         }
                         let (pts, idx) = crate::bodies::extrude(&piece.outer, &piece.holes, 0.0, t);
+                        // A vent hangs from its upper edge, opened out of the plane.
+                        let hinge = ts[j + 1];
+                        let (c, sn) = (VENT_OPEN.cos(), VENT_OPEN.sin());
+                        let place = |p: &[f64; 3]| {
+                            if kind != Panel::Vent {
+                                return world(p[0], p[1], p[2]);
+                            }
+                            let (dt, dz) = (p[1] - hinge, p[2]);
+                            world(p[0], hinge + dt * c - dz * sn, dt * -sn + dz * c)
+                        };
                         parts.push(GlazingPart {
                             mullion: false,
-                            panel: ty.panel,
-                            mesh: (pts.iter().map(|p| world(p[0], p[1], p[2])).collect(), idx),
+                            panel: kind,
+                            mesh: (pts.iter().map(place).collect(), idx),
                             axis: None,
                         });
                     }
@@ -300,7 +330,8 @@ pub fn regenerate(g: &RoofGeometry, ty: &CurtainType) -> Glazing {
 pub fn of(store: &Store, e: &Element) -> Option<Glazing> {
     let ty = of_roof(store, e)?;
     let g = super::regenerate(store, e).ok()?;
-    Some(regenerate(&g, &ty))
+    let panes = super::roof_recipe(e).map(|r| r.panes).unwrap_or_default();
+    Some(regenerate(&g, &ty, &panes))
 }
 
 // ---- Commands ----

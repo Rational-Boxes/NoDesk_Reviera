@@ -393,6 +393,7 @@ pub(crate) fn create(txn: &mut crate::txn::Transaction<'_>, p: CreateParams) -> 
         dome: None,
         extrusion: Some(x.clone()),
         joins: Default::default(),
+        panes: Vec::new(),
     };
     let type_guid = txn.store().get(type_id).expect("exists").guid().to_string();
     let id = txn.create(

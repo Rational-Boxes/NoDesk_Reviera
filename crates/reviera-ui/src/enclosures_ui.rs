@@ -178,6 +178,8 @@ impl Gui {
         }
         grid.append(Property::boolean("Gutters", "gh_gutters", r.gutters));
         grid.append(Property::boolean("Doors", "gh_doors", r.doors));
+        grid.append(Property::string("Ridge Vents (% of floor)", "gh_vents", format!("{}", r.vents)));
+        grid.set_help_string("gh_vents", "The ridge vents' target area as a share of the floor area; 0 for none");
         grid.set_help_string("gh_doors", "A door in the middle of each end wall");
         let ridge = self.format_length(r.ridge());
         grid.append(Property::string("Ridge Height", "gh_ridge", ridge));
@@ -185,6 +187,12 @@ impl Gui {
         let area = r.width() * r.length;
         grid.append(Property::string("Floor Area", "gh_area", format!("{area:.1} m²")));
         grid.set_property_read_only("gh_area", true);
+        let vents = self.enclosure_of_selection(id).and_then(|(owner, _)| self.run("enclosure.get", json!({ "enclosure_id": owner })).ok());
+        if let Some(v) = vents {
+            let (a, pc) = (v["vent_area"].as_f64().unwrap_or(0.0), v["vent_percent"].as_f64().unwrap_or(0.0));
+            grid.append(Property::string("Ridge Vent Area", "gh_vent_area", format!("{a:.1} m² ({pc:.1} %)")));
+            grid.set_property_read_only("gh_vent_area", true);
+        }
     }
 
     /// An edit of an enclosure row; `false` if `property` is not one.
@@ -209,6 +217,10 @@ impl Gui {
             "gh_knee" => args["knee"] = json!(text),
             "gh_gutters" => args["gutters"] = json!(matches!(text.as_str(), "True" | "true" | "1")),
             "gh_doors" => args["doors"] = json!(matches!(text.as_str(), "True" | "true" | "1")),
+            "gh_vents" => match text.trim().trim_end_matches('%').trim().parse::<f64>() {
+                Ok(v) => args["vents"] = json!(v),
+                Err(_) => return true,
+            },
             _ => return true,
         }
         if let Err(e) = self.run("enclosure.set", args) {

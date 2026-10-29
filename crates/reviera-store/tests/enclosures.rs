@@ -39,6 +39,9 @@ fn a_venlo_range_is_roofs_walls_and_gutters_rebuilt_on_change() {
     );
     let info = run(&r, &mut doc, "enclosure.get", json!({ "enclosure_id": id.0 })).unwrap();
     assert_eq!(count(&info, "roofs"), 12, "{info}");
+    // Ridge vents reach the 18 % target, and not by much more than a pane per roof.
+    let vents = info["vent_percent"].as_f64().unwrap();
+    assert!((18.0..24.0).contains(&vents), "ridge vents {vents} %");
     assert_eq!(count(&info, "gutters"), 13, "2 eaves and 11 valleys");
     assert_eq!(count(&info, "curtain_walls"), 4);
     assert!((info["width"].as_f64().unwrap() - 48.0).abs() < 1e-9 && (info["floor_area"].as_f64().unwrap() - 3840.0).abs() < 1e-6);
@@ -75,6 +78,12 @@ fn a_venlo_range_is_roofs_walls_and_gutters_rebuilt_on_change() {
         // Centred: its middle within half a pane of the wall's.
         assert!(((d.x[0] + d.x[1]) / 2.0 - g.length() / 2.0).abs() < 0.45, "{d:?} in {}", g.length());
     }
+    // No vents when asked for none.
+    run(&r, &mut doc, "enclosure.set", json!({ "enclosure_id": id.0, "vents": 0 })).unwrap();
+    let none = run(&r, &mut doc, "enclosure.get", json!({ "enclosure_id": id.0 })).unwrap();
+    assert_eq!(none["vent_area"].as_f64().unwrap(), 0.0);
+    run(&r, &mut doc, "enclosure.set", json!({ "enclosure_id": id.0, "vents": 18 })).unwrap();
+    let info = run(&r, &mut doc, "enclosure.get", json!({ "enclosure_id": id.0 })).unwrap();
     // A detached gutter stays when the enclosure changes.
     let kept = info["gutters"][0].as_u64().unwrap();
     run(&r, &mut doc, "enclosure.detach", json!({ "part_ids": [kept] })).unwrap();

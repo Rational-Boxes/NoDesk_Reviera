@@ -12,7 +12,8 @@ Start with **File › New**. The model has Level 1 at 0. Open the Level 1 plan.
    then a point east of it. The range is 24 × 24 m: six 4 m glass roofs with a valley gutter
    between each pair, glass side walls on a knee wall, end walls glazed to the ground with a door
    in the middle of each, their glass filling up into all six gables and dropping under the
-   valley gutters, and two eaves gutters.
+   valley gutters, two eaves gutters, and ridge vents (hung open) on alternate sides of each
+   ridge, 18 % of the floor area.
 2. **Change it.** With the range selected, Properties › Glazed Enclosure shows its form and
    sizes; set Trusses to 4 and back to 3, or the Eave Height, and the parts are made again.
    (The script leaves it at 3 trusses.)
@@ -36,7 +37,7 @@ its parts.
 
 - **Detach from Enclosure** has no menu entry yet; `enclosure.detach` does it.
 - **Frame members and vents.** The enclosures have no posts, rafters or trusses (the glazing
-  bars stand in) and no vents yet (ARC-GLZ-001, -004); the doors are plain hinged curtain-wall
+  bars stand in), only ridge vents (no side vents or roll-up sides, ARC-GLZ-004); the doors are plain hinged curtain-wall
   doors (no sliding doors or door types yet).
 - **Hoop, gothic and sawtooth forms**, glazed vaults and geodesic domes (ARC-GLZ-002, -006).
 - **Headhouse**, growing layouts (ARC-GLZ-005), and the glazing and frame type library

@@ -195,6 +195,9 @@ pub struct RoofRecipe {
     /// extended to.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub joins: BTreeMap<String, String>,
+    /// Sloped glazing (ARC-CW-008): panes swapped plane by plane (vents, ARC-GLZ-004).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub panes: Vec<glazing::PaneOverride>,
 }
 
 impl RoofRecipe {
@@ -1730,6 +1733,7 @@ pub(crate) fn create(txn: &mut crate::txn::Transaction<'_>, p: CreateParams) -> 
         dome: None,
         extrusion: None,
         joins: BTreeMap::new(),
+        panes: Vec::new(),
     };
     let type_guid = txn.store().get(type_id).expect("exists").guid().to_string();
     let id = txn.create(

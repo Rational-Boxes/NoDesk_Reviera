@@ -131,6 +131,8 @@ pub enum Panel {
     Empty,
     /// A curtain-wall door filling the cell (ARC-CW-006).
     Door,
+    /// An opening pane: a vent (ARC-GLZ-004), top-hung, drawn open.
+    Vent,
 }
 
 /// A grid direction: `u` lines are vertical, along the wall; `v` lines horizontal, up it.

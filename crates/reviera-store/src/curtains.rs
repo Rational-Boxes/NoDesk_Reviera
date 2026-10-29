@@ -108,6 +108,9 @@ pub(crate) fn write_curtains(
             } else if p.panel == curtain::Panel::Door {
                 // A curtain-wall door (ARC-CW-006).
                 ("IfcDoor", "Curtain Wall Door", "DOOR")
+            } else if p.panel == curtain::Panel::Vent {
+                // An opening pane (ARC-GLZ-004).
+                ("IfcWindow", "Vent", "WINDOW")
             } else {
                 ("IfcPlate", "Panel", "CURTAIN_PANEL")
             };
