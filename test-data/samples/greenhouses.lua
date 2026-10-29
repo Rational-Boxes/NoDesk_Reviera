@@ -33,6 +33,9 @@ local range = reviera.enclosure.create{
   span = "9.6 m", spans = 3, length = "16 m", bay = "4 m", eave = "4.5 m",
   roof_glazing = "Diffuse AR Glass 4 mm",
 }
+-- Side vents along its walls' tops as well as the ridge vents (ARC-GLZ-004): 10 % of the
+-- floor, opening to 40° on chain actuators.
+reviera.enclosure.set_vents{ enclosure_id = range, kind = "side", target_percent = 10, opening_angle = "40°", actuator = "chain" }
 
 -- A hobby greenhouse: one 3.6 m gable span, 6 m long, eaves at 2.2 m, roof at 25°, on timber
 -- glazing bars 50 × 100 mm from the frame library (`frame.list_types`).

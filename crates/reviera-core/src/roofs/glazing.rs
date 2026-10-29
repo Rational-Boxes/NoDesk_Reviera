@@ -76,6 +76,8 @@ pub struct GlazingPart {
     pub mesh: Mesh,
     /// A mullion's axis (for checks), start and end.
     pub axis: Option<[[f64; 3]; 2]>,
+    /// A panel's cell: along the eave and up the slope (a vent's hinge length and height).
+    pub size: Option<[f64; 2]>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -236,6 +238,7 @@ pub fn regenerate(g: &RoofGeometry, ty: &CurtainType, panes: &[PaneOverride]) ->
                             panel: kind,
                             mesh: (pts.iter().map(place).collect(), idx),
                             axis: None,
+                            size: Some([ss[i + 1] - ss[i], ts[j + 1] - ts[j]]),
                         });
                     }
                 }
@@ -277,6 +280,7 @@ pub fn regenerate(g: &RoofGeometry, ty: &CurtainType, panes: &[PaneOverride]) ->
                     panel: ty.panel,
                     mesh: bar(pa, pb, n, m.width, m.depth),
                     axis: Some([pa, pb]),
+                    size: None,
                 });
             }
         }
@@ -320,6 +324,7 @@ pub fn regenerate(g: &RoofGeometry, ty: &CurtainType, panes: &[PaneOverride]) ->
                 panel: ty.panel,
                 mesh: bar(pa, pb, up, width, depth),
                 axis: Some([a, b]),
+                size: None,
             });
         }
     }

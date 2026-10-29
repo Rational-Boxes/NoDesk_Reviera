@@ -21,8 +21,14 @@ use crate::{Result, geometry};
 
 pub(crate) const PART_TAG: &str = "rxd:curtain";
 
-fn signature(g: &CurtainGeometry, scale: f64) -> String {
+fn signature(g: &CurtainGeometry, vents: Option<&reviera_core::vents::VentSettings>, scale: f64) -> String {
     let mut h = std::collections::hash_map::DefaultHasher::new();
+    if let Some(v) = vents {
+        for x in [v.opening_angle, v.discharge] {
+            x.to_bits().hash(&mut h);
+        }
+        (v.actuator as u8).hash(&mut h);
+    }
     for p in &g.parts {
         p.mullion.hash(&mut h);
         (p.panel as u8).hash(&mut h);
@@ -62,12 +68,52 @@ pub(crate) fn remove_parts(ifc: &mut IfcModel, whole: StepId) -> Result<()> {
     if let AttrValue::List(parts) = ifc.attribute(rel, "RelatedObjects")? {
         for p in parts {
             if let AttrValue::Ref(p) = p {
+                // A vent's Reviera_Vent (ARC-GLZ-004).
+                for rel in ifc.referenced_by(StepId(p), "IfcRelDefinesByProperties")? {
+                    if let AttrValue::Ref(set) = ifc.attribute(rel, "RelatingPropertyDefinition")? {
+                        if let AttrValue::List(props) = ifc.attribute(StepId(set), "HasProperties")? {
+                            for q in props {
+                                if let AttrValue::Ref(q) = q {
+                                    ifc.remove(StepId(q))?;
+                                }
+                            }
+                        }
+                        ifc.remove(StepId(set))?;
+                    }
+                    ifc.remove(rel)?;
+                }
                 geometry::remove_breps(ifc, StepId(p))?;
                 ifc.remove(StepId(p))?;
             }
         }
     }
     Ok(ifc.remove(rel)?)
+}
+
+/// A vent window's `Reviera_Vent` (ARC-GLZ-004).
+fn vent_pset(ifc: &mut IfcModel, target: StepId, owner_history: Option<StepId>, values: &[(String, serde_json::Value)]) -> Result<()> {
+    let mut items = Vec::new();
+    let mut name = String::new();
+    for (key, v) in values {
+        let Some((set, prop)) = key.split_once('.') else { continue };
+        name = set.to_owned();
+        let ty = v["type"].as_str().unwrap_or("IfcLabel");
+        let p = ifc.create("IfcPropertySingleValue")?;
+        ifc.set_attribute(p, "Name", &AttrValue::String(prop.to_owned()))?;
+        ifc.set_attribute(p, "NominalValue", &crate::params::to_attr(ty, &v["value"])?)?;
+        items.push(AttrValue::Ref(p.0));
+    }
+    let set = ifc.create_rooted("IfcPropertySet", &GlobalId::new())?;
+    ifc.set_attribute(set, "Name", &AttrValue::String(name))?;
+    ifc.set_attribute(set, "HasProperties", &AttrValue::List(items))?;
+    let rel = ifc.create_rooted("IfcRelDefinesByProperties", &GlobalId::new())?;
+    if let Some(oh) = owner_history {
+        ifc.set_attribute(set, "OwnerHistory", &AttrValue::Ref(oh.0))?;
+        ifc.set_attribute(rel, "OwnerHistory", &AttrValue::Ref(oh.0))?;
+    }
+    ifc.set_attribute(rel, "RelatedObjects", &AttrValue::List(vec![AttrValue::Ref(target.0)]))?;
+    ifc.set_attribute(rel, "RelatingPropertyDefinition", &AttrValue::Ref(set.0))?;
+    Ok(())
 }
 
 /// Writes every curtain wall's parts.
@@ -96,7 +142,8 @@ pub(crate) fn write_curtains(
         {
             geometry::contain(ifc, step, storey, owner_history)?;
         }
-        let tag = format!("{PART_TAG}:{}", signature(&g, scale));
+        let vents = reviera_core::vents::settings_of(store.get(id).expect("listed"));
+        let tag = format!("{PART_TAG}:{}", signature(&g, vents.as_ref(), scale));
         if our_aggregate(ifc, step)?.is_some_and(|(_, d)| d == tag) {
             continue;
         }
@@ -146,6 +193,12 @@ pub(crate) fn write_curtains(
                 scale,
                 contexts,
             )?;
+            if p.panel == curtain::Panel::Vent && !p.mullion
+                && let Some(s) = &vents
+            {
+                let values = reviera_core::vents::vent_params(p.x[1] - p.x[0], p.z[1] - p.z[0], s);
+                vent_pset(ifc, e, owner_history, &values)?;
+            }
             parts.push(AttrValue::Ref(e.0));
         }
         let rel = ifc.create_rooted("IfcRelAggregates", &GlobalId::new())?;

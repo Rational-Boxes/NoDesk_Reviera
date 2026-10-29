@@ -32,6 +32,38 @@
         { "name": "DeflectionRatio", "measure": "IfcReal", "description": "Members carrying glass deflect at most their span divided by this (175 for L/175)." },
         { "name": "MaximumDeflection", "measure": "IfcPositiveLengthMeasure", "unit": "m", "description": "An absolute cap on that deflection, when the system sets one." }
       ]
+    },
+    {
+      "name": "Reviera_Vent",
+      "description": "A ventilation opening's design values (spec ARC-GLZ-004): on a vent window, that vent's; on a roof or curtain wall with vents, their count and totals. Free area is the opening of a top-hung sash at its design angle (the slot under it and its two side triangles, at most the pane); effective area is that times the discharge coefficient.",
+      "applicable_classes": ["IfcWindow", "IfcRoof", "IfcCurtainWall"],
+      "properties": [
+        { "name": "OpeningAngle", "measure": "IfcPlaneAngleMeasure", "unit": "rad", "description": "The design opening angle." },
+        { "name": "DischargeCoefficient", "measure": "IfcNormalisedRatioMeasure", "description": "Effective over free area." },
+        { "name": "Actuator", "measure": "IfcLabel", "description": "How the vent is opened.", "values": ["manual", "rack_and_pinion", "chain", "linear"] },
+        { "name": "FreeArea", "measure": "IfcAreaMeasure", "unit": "m2", "description": "The geometric opening at the design angle (a host's: its vents' sum)." },
+        { "name": "EffectiveArea", "measure": "IfcAreaMeasure", "unit": "m2", "description": "The free area times the discharge coefficient (a host's: its vents' sum)." },
+        { "name": "VentCount", "measure": "IfcCountMeasure", "description": "On a host: how many vents it has." }
+      ]
+    },
+    {
+      "name": "Reviera_EnclosureDesign",
+      "description": "A glazed enclosure's design values (spec ARC-GLZ-001, -002), on its IfcElementAssembly (ObjectType GlazedEnclosure).",
+      "applicable_classes": ["IfcElementAssembly"],
+      "properties": [
+        { "name": "Form", "measure": "IfcLabel", "description": "The form.", "values": ["gable", "multispan", "venlo", "sawtooth", "hoop", "gothic"] },
+        { "name": "Length", "measure": "IfcPositiveLengthMeasure", "unit": "m", "description": "Along the ridges." },
+        { "name": "Width", "measure": "IfcPositiveLengthMeasure", "unit": "m", "description": "Across the spans." },
+        { "name": "Span", "measure": "IfcPositiveLengthMeasure", "unit": "m", "description": "Each roof's span (a Venlo's narrow roof)." },
+        { "name": "Spans", "measure": "IfcCountMeasure", "description": "How many roofs side by side." },
+        { "name": "BaySpacing", "measure": "IfcPositiveLengthMeasure", "unit": "m", "description": "The bays along the length." },
+        { "name": "EaveHeight", "measure": "IfcLengthMeasure", "unit": "m", "description": "The eave (gutter) height above the level; a tunnel's sidewall." },
+        { "name": "RidgeHeight", "measure": "IfcPositiveLengthMeasure", "unit": "m", "description": "The highest ridge or crown above the level." },
+        { "name": "Pitch", "measure": "IfcPlaneAngleMeasure", "unit": "rad", "description": "The roof slope (not for tunnels)." },
+        { "name": "FloorArea", "measure": "IfcAreaMeasure", "unit": "m2", "description": "Length times width." },
+        { "name": "RoofVentTarget", "measure": "IfcPositiveRatioMeasure", "description": "Roof vents' target area over the floor area." },
+        { "name": "SideVentTarget", "measure": "IfcPositiveRatioMeasure", "description": "Side vents' target area over the floor area." }
+      ]
     }
   ]
 }

@@ -2825,6 +2825,8 @@ Owner requirement (2026-10-28), planned in `GLAZED_ENCLOSURES_PLAN.md`, research
 - [ ] A 9.6 × 40 m gable greenhouse with continuous ridge vents at a 18 % target reports roof vent area ≥ 69 m² (18 % of 384 m²) and places vents in whole bays.
 - [ ] A vent's free area is in `Reviera_Vent` on export.
 
+*Built (2026-10-29), side vents and vent values:* `reviera_core::vents`: an enclosure's `vent` settings (design opening angle, default 30°; discharge coefficient 0.6; actuator manual, rack and pinion, chain or linear; E-54) and each vent's **free area**, the opening of a top-hung sash `w` × `h` at angle θ (`w·2h·sin(θ/2) + h²·sin θ`, at most `w·h`), and **effective area** (× the discharge coefficient). **Side vents** (`side_vents`, percent of the floor, default 0): a vent band along each side wall's top (`curtain::make_vent_band`; a sawtooth's low side only), sized so its panes between the bars make the target. `enclosure.set_vents(enclosure_id, kind: roof|side, target_percent?, opening_angle?, discharge?, actuator?)`; `enclosure.get` adds `free_vent_area`, `effective_vent_area`, `side_vent_area` (`vent_area` counts every vent pane). `Reviera_Vent` (OpeningAngle, DischargeCoefficient, Actuator, FreeArea, EffectiveArea) on each curtain-wall vent `IfcWindow`, and with VentCount and the totals on every roof and curtain wall with vents; read back from IFC. Properties › Side Vents, Vent Opening Angle, Vent Actuator, Free / Effective Vent Area. Not yet: gable and gutter vents, roll-up sides, `vent.set` and opening vents in the view (drawn 15° open), the actuator as an `IfcActuator`, a glazed roof's vents as their own `IfcWindow`.
+
 ### 3.6a.5 Growing layouts: benches, rolling benches, aisles and growing gutters
 **ID:** ARC-GLZ-005 · **Priority:** P1 · **Ref:** owner requirement (2026-10-28, commercial grows); research/09 §4.6; research/11 Part B
 
@@ -2883,7 +2885,7 @@ Owner requirement (2026-10-28), planned in `GLAZED_ENCLOSURES_PLAN.md`, research
 - **Published definitions.** Each `Reviera_*` set is defined once, machine-readably (names, data types, units, descriptions, applicable classes), as `schemas/psets/reviera-psets-1.json` under the MIT licence (interop components are MIT), so other tools can read them; publishing them in the buildingSMART Data Dictionary under a Reviera domain is a later option.
 - A file stripped of RXD keeps the enclosure's parts and their `Reviera_*` property sets; a file stripped of those too is still a valid building (Chapter 2 principle 5).
 
-*Built (2026-10-28):* categories `cat.glazed_enclosures` and `cat.growing_systems`; `Reviera_GlazingUnit`, defined in `schemas/psets/reviera-psets-1.json` with its schema `reviera.psets-1.schema.json` (MIT). Published `Reviera_*` sets are read back from IFC as parameters like any property set; only the RXD carriers (`Reviera_Manifest`, `Reviera_Element`, `Reviera_Type`, `Reviera_Doc:*`) are not. Not yet: `Reviera_EnclosureDesign`, `Reviera_FrameSystem`, `Reviera_Vent`, `Reviera_ShadingPerformance`, `Reviera_GrowingClimate`, and *Reattach*.
+*Built (2026-10-28):* categories `cat.glazed_enclosures` and `cat.growing_systems`; `Reviera_GlazingUnit`, defined in `schemas/psets/reviera-psets-1.json` with its schema `reviera.psets-1.schema.json` (MIT). Published `Reviera_*` sets are read back from IFC as parameters like any property set; only the RXD carriers (`Reviera_Manifest`, `Reviera_Element`, `Reviera_Type`, `Reviera_Doc:*`) are not. *Since (2026-10-29):* `Reviera_FrameSystem` (ARC-GLZ-003), `Reviera_Vent` (ARC-GLZ-004), and `Reviera_EnclosureDesign` on the enclosure (form, length, width, span, spans, bay spacing, eave and ridge height, pitch, floor area, roof and side vent targets), all in the published file. Not yet: `Reviera_ShadingPerformance`, `Reviera_GrowingClimate`, a design life class, and *Reattach*.
 
 **Acceptance criteria.**
 - [x] The published property-set definition file validates against its JSON Schema and lists every `Reviera_*` property the glazed enclosure tools write.
@@ -4951,7 +4953,7 @@ All commands below are registered once in the command registry and exposed autom
 | `frame.list_types` | — | [type] | No (query) | ARC-GLZ-003 |
 | `frame.create_type` | name, base?, values | type_id | Yes | ARC-GLZ-003 |
 | `frame.set_type` | type_id, values | — | Yes | ARC-GLZ-003 |
-| `enclosure.set_vents` | enclosure_id, kind, target_percent? \| count?, opening_angle? | [vent_id] | Yes | ARC-GLZ-004 |
+| `enclosure.set_vents` | enclosure_id, kind (roof\|side), target_percent?, opening_angle?, discharge?, actuator? | — | Yes | ARC-GLZ-004 |
 | `vent.set` | vent_id, open?, angle? | — | Yes | ARC-GLZ-004 |
 | `growing.layout` | host_id, system, component_type_id?, aisle?, main_aisle?, direction?, clearance? | element_id | Yes | ARC-GLZ-005 |
 | `growing.set_layout` | layout_id, params | — | Yes | ARC-GLZ-005 |

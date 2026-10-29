@@ -308,7 +308,7 @@ pub fn split_key(key: &str) -> Option<(&str, &str)> {
     key.split_once('.')
 }
 
-fn to_attr(ifc_type: &str, v: &Value) -> Result<AttrValue> {
+pub(crate) fn to_attr(ifc_type: &str, v: &Value) -> Result<AttrValue> {
     let inner = match v {
         Value::Null => return Ok(AttrValue::Null),
         Value::String(s) => AttrValue::String(s.clone()),

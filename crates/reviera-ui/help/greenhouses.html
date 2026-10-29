@@ -85,6 +85,14 @@ deflection limit of members carrying glass (L/175, at most 15 mm; the <i>Reviera
 property set). <b>Frame Shading</b> shows the share of the roof the bars shade.
 <code>frame.list_types</code>, <code>frame.create_type</code>, <code>frame.set_type</code></p>
 
+<h2 id="vents">Vents</h2>
+<p>Ridge vents (Properties › <b>Ridge Vents</b>, a share of the floor area) and <b>Side Vents</b>
+(a band along each side wall's top) are panes that open, hung from their upper edge. <b>Vent
+Opening Angle</b> and <b>Vent Actuator</b> set how they open; <b>Free / Effective Vent Area</b> shows
+the opening at that angle and the opening times its discharge coefficient (0.6), which is what
+airflow sees. Each vent window carries its values in IFC (<i>Reviera_Vent</i>).
+<code>enclosure.set_vents</code></p>
+
 <h2 id="geodesic">Geodesic domes</h2>
 <p>Architecture › <b>Geodesic Dome</b>: choose the <b>frequency</b> (2V to 6V: more, shorter struts
 and a rounder dome) and the <b>truncation</b> (the share of the sphere kept: 1/2 a hemisphere, 5/8

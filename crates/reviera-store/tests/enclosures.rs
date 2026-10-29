@@ -277,3 +277,43 @@ fn frame_systems_set_the_bars_and_come_back_from_ifc() {
     let f = reviera_core::frame_library::of_type(back).unwrap();
     assert!((f.deflection_ratio - 240.0).abs() < 1e-9 && f.finish == "anthracite" && f.material == reviera_core::frame_library::Material::Upvc, "{f:?}");
 }
+
+#[test]
+fn side_vents_and_vent_values_reach_ifc() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("vents.ifc");
+    let (mut project, mut doc) = LocalProject::new(Schema::Ifc4, &path).unwrap();
+    let r = registry();
+    let level = doc.store().iter().find(|e| e.class == "IfcBuildingStorey").unwrap().id();
+    // A 9.6 × 20 m gable house, its eaves at 3 m: ridge vents 18 %, side vents 10 %.
+    let gh = run(&r, &mut doc, "enclosure.create", json!({ "form": "gable", "level_id": level.0, "length": 20.0, "eave": 3.0 })).unwrap();
+    let before = run(&r, &mut doc, "enclosure.get", json!({ "enclosure_id": gh })).unwrap();
+    assert_eq!(before["side_vent_area"].as_f64(), Some(0.0));
+    run(&r, &mut doc, "enclosure.set_vents", json!({ "enclosure_id": gh, "kind": "side", "target_percent": 10.0, "opening_angle": "45°", "actuator": "chain" })).unwrap();
+    let info = run(&r, &mut doc, "enclosure.get", json!({ "enclosure_id": gh })).unwrap();
+    // Two bands of 10 % × 192 m² / 2 / 20 m = 0.48 m along the walls' tops.
+    let side = info["side_vent_area"].as_f64().unwrap();
+    assert!((side - 19.2).abs() < 0.5, "{info}");
+    // Open at 45°, the free area is less than the panes, the effective less again (× 0.6).
+    let (pane, free, eff) = (info["vent_area"].as_f64().unwrap(), info["free_vent_area"].as_f64().unwrap(), info["effective_vent_area"].as_f64().unwrap());
+    assert!(free > 0.0 && free < pane && (eff - 0.6 * free).abs() < 1e-9, "{info}");
+    // The hosts carry their vents' totals; the enclosure its design values.
+    let store = doc.store();
+    let wall = store.get(ElementId(info["curtain_walls"][0].as_u64().unwrap())).unwrap();
+    assert_eq!(wall.param("Reviera_Vent.Actuator").and_then(|v| v["value"].as_str()), Some("chain"));
+    assert!(wall.param("Reviera_Vent.VentCount").and_then(|v| v["value"].as_u64()).unwrap() > 0);
+    let end = store.get(ElementId(info["curtain_walls"][1].as_u64().unwrap())).unwrap();
+    assert!(end.param("Reviera_Vent.VentCount").is_none(), "an end wall has no vents");
+    let e = store.get(ElementId(gh.as_u64().unwrap())).unwrap();
+    assert_eq!(e.param("Reviera_EnclosureDesign.SideVentTarget").and_then(|v| v["value"].as_f64()), Some(0.1));
+    project.save(&doc).unwrap();
+    let text = std::fs::read_to_string(&path).unwrap();
+    assert!(text.contains("'Reviera_Vent'") && text.contains("'EffectiveArea'") && text.contains("'Reviera_EnclosureDesign'"));
+    // Each vent window has its own set.
+    let windows = text.matches("IFCWINDOW(").count();
+    assert!(windows > 0 && text.matches("'Reviera_Vent'").count() >= windows, "{windows} vent windows");
+    let (_p2, doc2, _) = LocalProject::open(&path).unwrap();
+    let back = doc2.store().get(ElementId(info["curtain_walls"][0].as_u64().unwrap())).map(|e| e.guid().to_string());
+    let again = doc2.store().iter().find(|x| Some(x.guid().to_string()) == back).expect("the side wall comes back");
+    assert!(reviera_core::vents::settings_of(again).is_some_and(|s| (s.opening_angle - 45f64.to_radians()).abs() < 1e-9));
+}

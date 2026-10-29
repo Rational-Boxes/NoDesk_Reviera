@@ -1704,7 +1704,9 @@ area by area (reviewed against the spec on 2026-10-15).
   (aluminium, steel, timber, uPVC bars) with their deflection limit in `Reviera_FrameSystem`
   (`frame.*`), and a warning when a roof is flatter than its glazing allows; glazed geodesic
   domes of any frequency and truncation, with their struts by length class for fabrication
-  (`roof.create_geodesic`, `roof.geodesic`)
+  (`roof.create_geodesic`, `roof.geodesic`); side vents and each vent's free and effective area
+  in `Reviera_Vent` (`enclosure.set_vents`), and the enclosure's design values in
+  `Reviera_EnclosureDesign`
   (`enclosure.*`); the `greenhouses` sample. Curtain walls' tops attach to one or more roofs
   (`wall.attach`).
 - **FileEngine integration** (`design_documents/FILEENGINE_INTEGRATION.md`): open, save and

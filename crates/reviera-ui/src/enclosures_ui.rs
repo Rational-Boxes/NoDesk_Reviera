@@ -22,6 +22,13 @@ const FORMS: [(Form, &str); 6] = [
     (Form::Gothic, "Gothic tunnel"),
 ];
 
+const ACTUATORS: [(reviera_core::vents::Actuator, &str); 4] = [
+    (reviera_core::vents::Actuator::Manual, "Manual"),
+    (reviera_core::vents::Actuator::RackAndPinion, "Rack and pinion"),
+    (reviera_core::vents::Actuator::Chain, "Chain"),
+    (reviera_core::vents::Actuator::Linear, "Linear"),
+];
+
 /// The tool placing an enclosure by two clicks: its arguments, and the corner once clicked.
 #[derive(Debug, Clone)]
 pub struct EnclosureTool {
@@ -224,6 +231,15 @@ impl Gui {
         grid.append(Property::string(if saw { "Face Vents (% of floor)" } else { "Ridge Vents (% of floor)" }, "gh_vents", format!("{}", r.vents)));
         grid.set_help_string("gh_vents", if saw { "The vent band along each vertical face's top, as a share of the span's floor; 0 for none" } else { "The ridge vents' target area as a share of the floor area; 0 for none" });
         grid.set_help_string("gh_doors", "A door in the middle of each end wall");
+        if !r.form.tunnel() {
+            grid.append(Property::string("Side Vents (% of floor)", "gh_side_vents", format!("{}", r.side_vents)));
+            grid.set_help_string("gh_side_vents", "Vent bands along the side walls' tops, as a share of the floor area; 0 for none");
+        }
+        let opening = angle(self, r.vent.opening_angle);
+        grid.append(Property::string("Vent Opening Angle", "gh_vent_angle", opening));
+        grid.set_help_string("gh_vent_angle", "The vents' design opening angle, for their free area");
+        let at = ACTUATORS.iter().position(|a| a.0 == r.vent.actuator).unwrap_or(0) as i32;
+        grid.append(Property::enumeration("Vent Actuator", "gh_vent_actuator", ACTUATORS.iter().enumerate().map(|(i, a)| (a.1.to_owned(), i as i32)).collect::<Vec<_>>(), at));
         let ridge = self.format_length(r.ridge());
         grid.append(Property::string("Ridge Height", "gh_ridge", ridge));
         grid.set_property_read_only("gh_ridge", true);
@@ -233,8 +249,12 @@ impl Gui {
         let vents = self.enclosure_of_selection(id).and_then(|(owner, _)| self.run("enclosure.get", json!({ "enclosure_id": owner })).ok());
         if let Some(v) = vents {
             let (a, pc) = (v["vent_area"].as_f64().unwrap_or(0.0), v["vent_percent"].as_f64().unwrap_or(0.0));
-            grid.append(Property::string(if saw { "Vent Area" } else { "Ridge Vent Area" }, "gh_vent_area", format!("{a:.1} m² ({pc:.1} %)")));
+            grid.append(Property::string("Vent Area", "gh_vent_area", format!("{a:.1} m² ({pc:.1} %)")));
             grid.set_property_read_only("gh_vent_area", true);
+            let (free, eff) = (v["free_vent_area"].as_f64().unwrap_or(0.0), v["effective_vent_area"].as_f64().unwrap_or(0.0));
+            grid.append(Property::string("Free / Effective Vent Area", "gh_vent_free", format!("{free:.1} / {eff:.1} m²")));
+            grid.set_property_read_only("gh_vent_free", true);
+            grid.set_help_string("gh_vent_free", "The vents open at their design angle; effective is the free area times the discharge coefficient (0.6)");
             let shade = v["frame_shading"].as_f64().unwrap_or(0.0);
             grid.append(Property::string("Frame Shading", "gh_frame_shading", format!("{:.1} % of the roof", shade * 100.0)));
             grid.set_property_read_only("gh_frame_shading", true);
@@ -272,6 +292,15 @@ impl Gui {
                 let key = if property == "gh_roof_glazing" { "roof_glazing" } else { "wall_glazing" };
                 args[key] = json!(if text == "Greenhouse default" { String::new() } else { text });
             }
+            "gh_side_vents" => match text.trim().trim_end_matches('%').trim().parse::<f64>() {
+                Ok(v) => args["side_vents"] = json!(v),
+                Err(_) => return true,
+            },
+            "gh_vent_angle" => args["vent_angle"] = json!(text),
+            "gh_vent_actuator" => match ACTUATORS.iter().find(|a| a.1 == text) {
+                Some(a) => args["vent_actuator"] = json!(a.0),
+                None => return true,
+            },
             "gh_frame_system" => args["frame_system"] = json!(if text == "Greenhouse default" { String::new() } else { text }),
             "gh_doors" => args["doors"] = json!(matches!(text.as_str(), "True" | "true" | "1")),
             "gh_frame" => args["frame"] = json!(matches!(text.as_str(), "True" | "true" | "1")),

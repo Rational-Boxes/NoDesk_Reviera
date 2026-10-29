@@ -57,6 +57,7 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(EnclosureDetach),
         registry.add(EnclosureGet),
         registry.add(EnclosureForms),
+        registry.add(EnclosureSetVents),
         registry.add(ViewHide),
         registry.add(ViewUnhide),
         registry.add(ViewHidden),
@@ -4641,6 +4642,20 @@ read_command!(
     crate::enclosures::GetParams,
     crate::enclosures::Info,
     crate::enclosures::get
+);
+
+edit_command!(
+    EnclosureSetVents,
+    "enclosure.set_vents",
+    "Lay out an enclosure's vents",
+    "Vents (ARC-GLZ-004): `kind` roof (ridge vents; a sawtooth's vertical faces) or side (bands along \
+     the side walls' tops) laid out to `target_percent` of the floor area (0 for none), and how every \
+     vent opens: the design `opening_angle`, `discharge` coefficient and `actuator`. The free and \
+     effective vent areas are in `enclosure.get` and Reviera_Vent.",
+    "Vents",
+    crate::enclosures::SetVentsParams,
+    (),
+    crate::enclosures::set_vents
 );
 
 read_command!(

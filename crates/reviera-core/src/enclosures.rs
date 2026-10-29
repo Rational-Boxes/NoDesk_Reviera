@@ -146,9 +146,15 @@ pub struct EnclosureRecipe {
     /// A door in each end wall.
     #[serde(default = "yes")]
     pub doors: bool,
-    /// Ridge vents' target area, percent of the floor area (0 for none).
+    /// Ridge vents' target area, percent of the floor area (0 for none); a sawtooth's face vents.
     #[serde(default = "vent_percent")]
     pub vents: f64,
+    /// Side vents along the side walls' tops, percent of the floor area (0 for none).
+    #[serde(default)]
+    pub side_vents: f64,
+    /// How the vents open (ARC-GLZ-004).
+    #[serde(default)]
+    pub vent: crate::vents::VentSettings,
     /// Steel posts at the bays.
     #[serde(default = "yes")]
     pub frame: bool,
@@ -640,6 +646,12 @@ fn build(txn: &mut Transaction<'_>, guid: &str, r: &EnclosureRecipe) -> Result<V
     // roof's bars over the face's glass, and its vents (`vents` percent of the span's floor).
     let face_top = |i: u32| r.eave + (r.span * f64::from(i + 1) - r.low_side(i) - r.face_gap()) * r.pitch.tan() - under_bars - 0.005;
     let vent_band = r.vents / 100.0 * r.span;
+    // Side vents: the target shared by the side walls (a sawtooth's one low side; its high side
+    // is a vent face), each band along a wall's top.
+    let side_walls = if saw { 1.0 } else { 2.0 };
+    // The band is sized so its panes, between the bars, make the target.
+    let panes = 1.0 - wall_bar.width / 0.8;
+    let side_band = if r.side_vents > 0.0 { r.side_vents / 100.0 * w / side_walls / panes + wall_bar.width } else { 0.0 };
     for (k, (a, b)) in perimeter.into_iter().enumerate() {
         let base = base_of(k);
         // A tunnel's sidewalls only when it has them.
@@ -677,6 +689,8 @@ fn build(txn: &mut Transaction<'_>, guid: &str, r: &EnclosureRecipe) -> Result<V
         }
         if saw && k == 2 && vent_band > 0.0 {
             crate::curtain::make_vent_band(txn, cw, vent_band)?;
+        } else if k % 2 == 0 && !r.form.tunnel() && side_band > 0.0 {
+            crate::curtain::make_vent_band(txn, cw, side_band)?;
         }
         parts.push(cw);
     }
@@ -782,14 +796,50 @@ fn build(txn: &mut Transaction<'_>, guid: &str, r: &EnclosureRecipe) -> Result<V
         txn.modify(*id, |e| {
             e.params.insert(PART_KEY.into(), json!(guid));
         })?;
+        // The vents' settings and totals on the roofs and walls that have them.
+        let host = txn.store().get(*id).is_some_and(|e| roofs::roof_recipe(e).is_some() || crate::curtain::curtain_recipe(e).is_some());
+        if host {
+            crate::vents::write_host(txn, *id, &r.vent)?;
+        }
     }
     Ok(parts)
 }
 
+/// The published design values of an enclosure (ARC-GLZ-007).
+pub const DESIGN_PSET: &str = "Reviera_EnclosureDesign";
+
+fn design_params(r: &EnclosureRecipe) -> Vec<(String, Value)> {
+    let k = |p: &str| format!("{DESIGN_PSET}.{p}");
+    let t = |ty: &str, v: Value| json!({ "type": ty, "value": v });
+    let length = |v: f64| t("IfcPositiveLengthMeasure", json!(v));
+    let mut out = vec![
+        (k("Form"), t("IfcLabel", serde_json::to_value(r.form).expect("serialises"))),
+        (k("Length"), length(r.length)),
+        (k("Width"), length(r.width())),
+        (k("Span"), length(r.span)),
+        (k("Spans"), t("IfcCountMeasure", json!(r.spans))),
+        (k("BaySpacing"), length(r.bay)),
+        (k("EaveHeight"), t("IfcLengthMeasure", json!(r.eave))),
+        (k("RidgeHeight"), length(r.ridge())),
+        (k("FloorArea"), t("IfcAreaMeasure", json!(r.width() * r.length))),
+        (k("RoofVentTarget"), t("IfcPositiveRatioMeasure", json!(r.vents / 100.0))),
+        (k("SideVentTarget"), t("IfcPositiveRatioMeasure", json!(r.side_vents / 100.0))),
+    ];
+    if !r.form.tunnel() {
+        out.push((k("Pitch"), t("IfcPlaneAngleMeasure", json!(r.pitch))));
+    }
+    out
+}
+
 fn write_recipe(txn: &mut Transaction<'_>, id: ElementId, r: &EnclosureRecipe) -> Result<()> {
     let value = serde_json::to_value(r).expect("serialises");
+    let design = design_params(r);
     txn.modify(id, |e| {
         e.params.insert(RECIPE_KEY.into(), value);
+        e.params.retain(|key, _| !key.starts_with(&format!("{DESIGN_PSET}.")));
+        for (key, v) in design {
+            e.params.insert(key, v);
+        }
     })
 }
 
@@ -850,6 +900,13 @@ pub struct Params {
     pub doors: Option<bool>,
     /// Ridge vents' area, percent of the floor area (default 18; 0 for none).
     pub vents: Option<f64>,
+    /// Side vents' area, percent of the floor area (default 0, none).
+    pub side_vents: Option<f64>,
+    /// The vents' design opening angle (radians or "30°"), discharge coefficient and actuator.
+    #[schemars(extend("x-reviera-data-type" = "angle"))]
+    pub vent_angle: Option<Value>,
+    pub vent_discharge: Option<f64>,
+    pub vent_actuator: Option<crate::vents::Actuator>,
     /// Steel posts at the bays (default on).
     pub frame: Option<bool>,
     /// Gothic: each arc's radius as a share of the span (default 0.6).
@@ -893,6 +950,8 @@ pub fn defaults(form: Form) -> EnclosureRecipe {
         gutters: true,
         doors: true,
         vents: vent_percent(),
+        side_vents: 0.0,
+        vent: Default::default(),
         frame: true,
         arc: gothic_arc(),
         roof_glazing: None,
@@ -976,6 +1035,27 @@ fn apply(store: &Store, r: &mut EnclosureRecipe, p: &Params) -> Result<()> {
         }
         r.vents = v;
     }
+    if let Some(v) = p.side_vents {
+        if !(0.0..=60.0).contains(&v) {
+            return Err(Error::new("enclosure.bad_value", "the side vent area is 0 to 60 % of the floor area"));
+        }
+        r.side_vents = v;
+    }
+    if let Some(v) = num(&p.vent_angle, "angle", "the vent opening angle")? {
+        if !(v > 0.0 && v <= std::f64::consts::FRAC_PI_2) {
+            return Err(Error::new("enclosure.bad_value", "vents open 0 to 90°"));
+        }
+        r.vent.opening_angle = v;
+    }
+    if let Some(c) = p.vent_discharge {
+        if !(c > 0.0 && c <= 1.0) {
+            return Err(Error::new("enclosure.bad_value", "the discharge coefficient is above 0 and at most 1"));
+        }
+        r.vent.discharge = c;
+    }
+    if let Some(a) = p.vent_actuator {
+        r.vent.actuator = a;
+    }
     if let Some(o) = p.origin {
         r.origin = o;
     }
@@ -1042,6 +1122,39 @@ pub(crate) fn set(txn: &mut Transaction<'_>, p: SetParams) -> Result<()> {
     rebuild(txn, id, r)
 }
 
+/// Which vents `enclosure.set_vents` lays out.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum VentKind {
+    /// Ridge vents (a sawtooth's vertical faces).
+    Roof,
+    /// Bands along the side walls' tops.
+    Side,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SetVentsParams {
+    pub enclosure_id: ElementRef,
+    pub kind: VentKind,
+    /// Percent of the floor area (0 for none).
+    pub target_percent: Option<f64>,
+    #[schemars(extend("x-reviera-data-type" = "angle"))]
+    pub opening_angle: Option<Value>,
+    pub discharge: Option<f64>,
+    pub actuator: Option<crate::vents::Actuator>,
+}
+
+/// `enclosure.set_vents`: a kind of vents laid out to a target, and how all the vents open.
+pub(crate) fn set_vents(txn: &mut Transaction<'_>, p: SetVentsParams) -> Result<()> {
+    let mut params = Params { vent_angle: p.opening_angle, vent_discharge: p.discharge, vent_actuator: p.actuator, ..Default::default() };
+    match p.kind {
+        VentKind::Roof => params.vents = p.target_percent,
+        VentKind::Side => params.side_vents = p.target_percent,
+    }
+    set(txn, SetParams { enclosure_id: p.enclosure_id, params })
+}
+
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct GetParams {
@@ -1059,6 +1172,11 @@ pub struct Info {
     /// area (percent).
     pub vent_area: f64,
     pub vent_percent: f64,
+    /// The vents open at their design angle: free and effective (× the discharge coefficient)
+    /// area, and the side walls' share of the free area.
+    pub free_vent_area: f64,
+    pub effective_vent_area: f64,
+    pub side_vent_area: f64,
     /// The share of the roof its glazing bars shade (for the crop-light and daylight analyses).
     pub frame_shading: f64,
     /// The parts that still exist, by kind.
@@ -1106,7 +1224,7 @@ fn pitch_warnings(store: &Store, r: &EnclosureRecipe, roof: Option<&Element>) ->
 /// `enclosure.get`.
 pub(crate) fn get(store: &Store, p: GetParams) -> Result<Info> {
     let (_, r) = resolve(store, &p.enclosure_id)?;
-    let mut info = Info { width: r.width(), ridge: r.ridge(), floor_area: r.width() * r.length, frame_shading: r.frame_shading(), vent_area: 0.0, vent_percent: 0.0, recipe: r.clone(), roofs: vec![], curtain_walls: vec![], walls: vec![], gutters: vec![], posts: vec![], beams: vec![], warnings: vec![] };
+    let mut info = Info { width: r.width(), ridge: r.ridge(), floor_area: r.width() * r.length, frame_shading: r.frame_shading(), vent_area: 0.0, free_vent_area: 0.0, effective_vent_area: 0.0, side_vent_area: 0.0, vent_percent: 0.0, recipe: r.clone(), roofs: vec![], curtain_walls: vec![], walls: vec![], gutters: vec![], posts: vec![], beams: vec![], warnings: vec![] };
     for g in &r.parts {
         let Some(e) = GlobalId::parse(g).and_then(|g| store.find_by_guid(&g)).and_then(|i| store.get(i)) else { continue };
         let list = if roofs::roof_recipe(e).is_some() {
@@ -1127,6 +1245,21 @@ pub(crate) fn get(store: &Store, p: GetParams) -> Result<Info> {
     info.vent_area = info.roofs.iter().filter_map(|id| store.get(*id)).map(|e| vent_area(store, e)).sum::<f64>()
         + info.curtain_walls.iter().filter_map(|id| store.get(*id)).map(|e| wall_vent_area(store, e)).sum::<f64>();
     info.vent_percent = 100.0 * info.vent_area / info.floor_area.max(1e-9);
+    for id in info.roofs.iter().chain(&info.curtain_walls) {
+        let Some(e) = store.get(*id) else { continue };
+        let t = crate::vents::totals(store, e, &r.vent);
+        info.free_vent_area += t.free_area;
+        info.effective_vent_area += t.effective_area;
+        // A side wall: a curtain wall along the length, low (not a sawtooth's high face).
+        if let Some(c) = crate::curtain::curtain_recipe(e) {
+            let along = (c.curve.end[0] - c.curve.start[0]) * r.rotation.cos() + (c.curve.end[1] - c.curve.start[1]) * r.rotation.sin();
+            let across = r.rotation.cos() * (c.curve.start[1] - r.origin[1]) - r.rotation.sin() * (c.curve.start[0] - r.origin[0]);
+            let side = along.abs() > 0.5 * r.length && !(r.form == Form::Sawtooth && across > 1e-6);
+            if side {
+                info.side_vent_area += t.pane_area;
+            }
+        }
+    }
     info.warnings = pitch_warnings(store, &r, info.roofs.first().and_then(|id| store.get(*id)));
     Ok(info)
 }
@@ -1172,6 +1305,20 @@ pub(crate) fn forms(_: &Store, _: crate::builtin::NoParams) -> Result<Vec<FormIn
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_published_definitions_cover_the_design_values() {
+        let defs: Value = serde_json::from_str(crate::glazing_library::DEFINITIONS).unwrap();
+        let schema: Value = serde_json::from_str(crate::glazing_library::DEFINITIONS_SCHEMA).unwrap();
+        assert!(jsonschema::validator_for(&schema).unwrap().is_valid(&defs));
+        let set = defs["property_sets"].as_array().unwrap().iter().find(|s| s["name"] == DESIGN_PSET).expect("Reviera_EnclosureDesign");
+        let props = set["properties"].as_array().unwrap();
+        for (key, value) in design_params(&defaults(Form::Venlo)) {
+            let name = key.strip_prefix(&format!("{DESIGN_PSET}.")).unwrap();
+            let def = props.iter().find(|p| p["name"] == name).unwrap_or_else(|| panic!("{name} is not published"));
+            assert_eq!(def["measure"], value["type"], "{name}");
+        }
+    }
 
     #[test]
     fn a_venlo_is_trusses_of_narrow_spans() {
