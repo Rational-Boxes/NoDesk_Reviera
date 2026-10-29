@@ -10,6 +10,9 @@
 //!   - **Gable**: one span;
 //!   - **Multispan** (gutter-connected): `spans` spans sharing valley gutters;
 //!   - **Venlo**: `trusses` trusses of `peaks` narrow roofs each;
+//!   - **Sawtooth**: `spans` single-slope roofs rising across the span to a glazed vertical face
+//!     at the high side, its top band vents (`vents` percent of the span's floor), the next
+//!     span's gutter at its foot;
 //! - as tunnels, one roof by extrusion (ARC-ROOF-002) whose profile is the arch in 16 straight
 //!   facets, glazed with a film-like Sloped Glazing type whose bars stand for the hoops, on
 //!   sidewalls `eave` high (0: ground to ground), without gutters, vents or posts:
@@ -41,7 +44,7 @@
 //! `IfcElementAssembly` (ObjectType `GlazedEnclosure`) whose recipe lists its parts; each part
 //! names its enclosure (`rxd:enclosure`) and goes with it.
 //!
-//! Not yet: hoop, gothic and sawtooth forms; rafters, purlins and Venlo trusses; side
+//! Not yet: rafters, purlins and Venlo trusses; side
 //! vents and roll-up sides; vents as their own `IfcWindow` in a glazed roof's IFC (the roof's
 //! glazing is one body there); keeping a user's edits to a part when the enclosure regenerates; a headhouse.
 
@@ -84,6 +87,9 @@ const POST_HEAVY: &str = "HSS4X4X1/4";
 /// The least clear width and height of an end wall's door (provisional, EXPERT_REVIEW E-50).
 const DOOR_WIDTH: f64 = 1.5;
 const DOOR_HEIGHT: f64 = 2.1;
+/// A sawtooth: the clearance between a vertical face's glass and the gutter at its foot, and
+/// from the face's top to the bars of the roof over it.
+const SAW_FACE_GAP: f64 = WALL_BAR.depth / 2.0 + 0.005;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
@@ -93,6 +99,7 @@ pub enum Form {
     Venlo,
     Hoop,
     Gothic,
+    Sawtooth,
 }
 
 impl Form {
@@ -214,6 +221,13 @@ fn ridge_vents(txn: &mut Transaction<'_>, roof: ElementId, target: f64) -> Resul
     })
 }
 
+/// The area of a curtain wall's vent panes.
+pub fn wall_vent_area(store: &Store, wall: &Element) -> f64 {
+    crate::curtain::regenerate(store, wall).map_or(0.0, |g| {
+        g.parts.iter().filter(|p| !p.mullion && p.panel == crate::curtain::Panel::Vent).map(|p| (p.x[1] - p.x[0]) * (p.z[1] - p.z[0])).sum()
+    })
+}
+
 /// The area of a roof's vent panes.
 pub fn vent_area(store: &Store, roof: &Element) -> f64 {
     roofs::glazing::of(store, roof).map_or(0.0, |g| {
@@ -242,6 +256,26 @@ impl EnclosureRecipe {
         self.span * f64::from(self.spans)
     }
 
+    /// Where a sawtooth span's roof starts across (its low eave): the next span's from the
+    /// vertical face before it, a gap, then its gutter.
+    fn low_side(&self, i: u32) -> f64 {
+        let y = self.span * f64::from(i);
+        if i == 0 { y } else { y + SAW_FACE_GAP + GUTTER_WIDTH }
+    }
+
+    /// The inner gutter lines across (where the inner posts stand): the valleys, a Venlo's truss
+    /// lines, a sawtooth's gutters at the foot of each vertical face.
+    pub fn gutter_lines(&self) -> Vec<f64> {
+        if self.form.tunnel() {
+            return Vec::new();
+        }
+        let every = if self.form == Form::Venlo { self.peaks.unwrap_or(2).max(1) } else { 1 };
+        (1..self.spans)
+            .filter(|i| i % every == 0)
+            .map(|i| if self.form == Form::Sawtooth { self.low_side(i) - GUTTER_WIDTH / 2.0 } else { self.span * f64::from(i) })
+            .collect()
+    }
+
     /// A point of the enclosure's frame in the project's plan.
     fn at(&self, x: f64, y: f64) -> [f64; 2] {
         let (s, c) = self.rotation.sin_cos();
@@ -257,6 +291,8 @@ impl EnclosureRecipe {
                 let rr = self.arc * self.span;
                 self.eave + (rr * rr - (rr - self.span / 2.0).powi(2)).sqrt()
             }
+            // The first span's high side, which has no gutter at its foot.
+            Form::Sawtooth => self.eave + self.span * self.pitch.tan(),
             _ => {
                 let width = if self.spans > 1 { self.span - GUTTER_WIDTH / 2.0 } else { self.span };
                 self.eave + width / 2.0 * self.pitch.tan()
@@ -469,21 +505,28 @@ fn build(txn: &mut Transaction<'_>, guid: &str, r: &EnclosureRecipe) -> Result<V
             },
         )?);
     }
-    // The roofs: one gable span each, its eaves along the length.
+    // The roofs: one gable span each, its eaves along the length (a sawtooth's one slope rising
+    // to the high side).
+    let saw = r.form == Form::Sawtooth;
     for i in (0..r.spans).filter(|_| !r.form.tunnel()) {
-        // At a valley each roof stops half a gutter short, the valley gutter between them.
+        // At a valley each roof stops half a gutter short, the valley gutter between them; a
+        // sawtooth's starts past the gutter at the foot of the face before it.
         let half = GUTTER_WIDTH / 2.0;
-        let y0 = r.span * f64::from(i) + if i > 0 { half } else { 0.0 };
-        let y1 = r.span * f64::from(i + 1) - if i + 1 < r.spans { half } else { 0.0 };
+        let (y0, y1) = if saw {
+            (r.low_side(i), r.span * f64::from(i + 1))
+        } else {
+            (r.span * f64::from(i) + if i > 0 { half } else { 0.0 }, r.span * f64::from(i + 1) - if i + 1 < r.spans { half } else { 0.0 })
+        };
         let corners = [r.at(0.0, y0), r.at(l, y0), r.at(l, y1), r.at(0.0, y1)];
         let curves = (0..4)
             .map(|k| RoofCurveArg {
                 line: Line { start: corners[k], end: corners[(k + 1) % 4] },
                 lock: None,
-                defines_slope: Some(k % 2 == 0),
+                defines_slope: Some(if saw { k == 0 } else { k % 2 == 0 }),
                 slope: None,
-                // The outer eaves reach past the side walls' glass so the gutters hang clear.
-                overhang: Some(if (k == 0 && i == 0) || (k == 2 && i + 1 == r.spans) { WALL_BAR.depth / 2.0 } else { 0.0 }.into()),
+                // The outer eaves reach past the side walls' glass so the gutters hang clear, and
+                // a sawtooth's high side over its vertical face.
+                overhang: Some(if (k == 0 && i == 0) || (k == 2 && (saw || i + 1 == r.spans)) { WALL_BAR.depth / 2.0 } else { 0.0 }.into()),
                 eave: None,
             })
             .collect();
@@ -499,8 +542,11 @@ fn build(txn: &mut Transaction<'_>, guid: &str, r: &EnclosureRecipe) -> Result<V
                 cutoff_offset: None,
             },
         )?;
-        // The share of the floor under this span, valley gutters included.
-        ridge_vents(txn, roof, r.vents / 100.0 * r.span * l)?;
+        // The share of the floor under this span, valley gutters included (a sawtooth's vents
+        // are in its vertical faces).
+        if !saw {
+            ridge_vents(txn, roof, r.vents / 100.0 * r.span * l)?;
+        }
         roofs_made.push(roof);
     }
     parts.extend(&roofs_made);
@@ -545,6 +591,10 @@ fn build(txn: &mut Transaction<'_>, guid: &str, r: &EnclosureRecipe) -> Result<V
     // eave bars.
     let inset = if r.doors { (WALL_BAR.depth / 2.0).max(knee_half) } else { WALL_BAR.depth / 2.0 };
     let under_bars = ROOF_BAR.depth / 2.0 / r.pitch.cos();
+    // A sawtooth's vertical face under span `i`'s high side: its top (absolute) clear of the
+    // roof's bars over the face's glass, and its vents (`vents` percent of the span's floor).
+    let face_top = |i: u32| r.eave + (r.span * f64::from(i + 1) - r.low_side(i) - SAW_FACE_GAP) * r.pitch.tan() - under_bars - 0.005;
+    let vent_band = r.vents / 100.0 * r.span;
     for (k, (a, b)) in perimeter.into_iter().enumerate() {
         let base = base_of(k);
         // A tunnel's sidewalls only when it has them.
@@ -555,6 +605,8 @@ fn build(txn: &mut Transaction<'_>, guid: &str, r: &EnclosureRecipe) -> Result<V
             let d = [(b[0] - a[0]) / w, (b[1] - a[1]) / w];
             let own = if r.form.tunnel() { r.ridge() } else if r.spans > 1 { r.eave - GUTTER_DROP } else { r.eave };
             ([a[0] + d[0] * inset, a[1] + d[1] * inset], [b[0] - d[0] * inset, b[1] - d[1] * inset], own - base)
+        } else if saw && k == 2 {
+            (a, b, face_top(r.spans - 1) - base)
         } else {
             (a, b, r.eave - base - if r.form.tunnel() { 0.05 } else { under_bars })
         };
@@ -578,6 +630,28 @@ fn build(txn: &mut Transaction<'_>, guid: &str, r: &EnclosureRecipe) -> Result<V
                 crate::curtain::make_door(txn, cw, along / 2.0, DOOR_WIDTH, DOOR_HEIGHT)?;
             }
         }
+        if saw && k == 2 && vent_band > 0.0 {
+            crate::curtain::make_vent_band(txn, cw, vent_band)?;
+        }
+        parts.push(cw);
+    }
+    // A sawtooth's inner vertical faces, standing on the eave between the end walls.
+    for i in (0..r.spans.saturating_sub(1)).filter(|_| saw) {
+        let y = r.span * f64::from(i + 1);
+        let cw = crate::curtain::create(
+            txn,
+            crate::curtain::CreateParams {
+                type_id: Some(ElementRef::Id(wall_type)),
+                curve: Line { start: r.at(l - SAW_FACE_GAP, y), end: r.at(SAW_FACE_GAP, y) },
+                base_level: ElementRef::Id(level),
+                base_offset: r.eave,
+                top_constraint: walls::TopConstraint::Unconnected(face_top(i) - r.eave),
+                top_offset: 0.0,
+            },
+        )?;
+        if vent_band > 0.0 {
+            crate::curtain::make_vent_band(txn, cw, vent_band)?;
+        }
         parts.push(cw);
     }
     // The posts: every bay along each gutter line (a Venlo's truss lines only), the outer lines
@@ -594,15 +668,9 @@ fn build(txn: &mut Transaction<'_>, guid: &str, r: &EnclosureRecipe) -> Result<V
             crate::steel_sections::LoadParams { catalog: "aisc_hss_rect".into(), designation: designation.into(), material: None },
         )?;
         let clear = (WALL_BAR.depth / 2.0).max(knee_half) + half + 0.005;
-        let every = if r.form == Form::Venlo { r.peaks.unwrap_or(2).max(1) } else { 1 };
-        let lines: Vec<f64> = (0..=r.spans)
-            .filter(|i| i % every == 0)
-            .map(|i| match i {
-                0 => clear,
-                i if i == r.spans => w - clear,
-                i => r.span * f64::from(i),
-            })
-            .collect();
+        let mut lines = vec![clear];
+        lines.extend(r.gutter_lines());
+        lines.push(w - clear);
         let bays = (l / r.bay).round().max(1.0) as u32;
         // The beam's top just under the gutter, the posts up to its underside.
         let beam_top = r.eave - GUTTER_DROP - 0.005;
@@ -648,7 +716,8 @@ fn build(txn: &mut Transaction<'_>, guid: &str, r: &EnclosureRecipe) -> Result<V
         for (i, roof) in roofs_made.iter().enumerate() {
             // Curve keys: 1 the eave at y0, 3 the eave at y1; each span's y1 eave carries the
             // valley gutter it shares with the next.
-            let edges: &[u32] = if i == 0 { &[1, 3] } else { &[3] };
+            // A sawtooth's at each low eave only.
+            let edges: &[u32] = if saw { &[1] } else if i == 0 { &[1, 3] } else { &[3] };
             for edge in edges {
                 parts.push(crate::mep_gutters::create(
                     txn,
@@ -787,6 +856,7 @@ pub fn defaults(form: Form) -> EnclosureRecipe {
         Form::Gable => base,
         Form::Multispan => EnclosureRecipe { spans: 3, bay: 4.0, eave: 4.5, length: 40.0, ..base },
         Form::Venlo => EnclosureRecipe { span: 4.0, spans: 6, peaks: Some(2), bay: 4.0, eave: 5.5, length: 40.0, pitch: 22f64.to_radians(), ..base },
+        Form::Sawtooth => EnclosureRecipe { span: 6.4, spans: 3, bay: 4.0, eave: 4.0, length: 40.0, pitch: 25f64.to_radians(), ..base },
         Form::Hoop | Form::Gothic => EnclosureRecipe { span: 9.1, bay: 1.5, eave: 1.2, length: 30.0, gutters: false, frame: false, vents: 0.0, ..base },
     }
 }
@@ -879,6 +949,7 @@ pub(crate) fn create(txn: &mut Transaction<'_>, p: CreateParams) -> Result<Eleme
         Form::Venlo => "Venlo Greenhouse",
         Form::Hoop => "Hoop Tunnel",
         Form::Gothic => "Gothic Tunnel",
+        Form::Sawtooth => "Sawtooth Greenhouse",
     };
     let id = txn.create(
         NewElement::new(CLASS)
@@ -930,7 +1001,8 @@ pub struct Info {
     pub width: f64,
     pub ridge: f64,
     pub floor_area: f64,
-    /// The ridge vents' area, and as a share of the floor area (percent).
+    /// The vents' area (ridge vents, a sawtooth's face vents), and as a share of the floor
+    /// area (percent).
     pub vent_area: f64,
     pub vent_percent: f64,
     /// The parts that still exist, by kind.
@@ -963,7 +1035,8 @@ pub(crate) fn get(store: &Store, p: GetParams) -> Result<Info> {
         };
         list.push(e.id());
     }
-    info.vent_area = info.roofs.iter().filter_map(|id| store.get(*id)).map(|e| vent_area(store, e)).sum();
+    info.vent_area = info.roofs.iter().filter_map(|id| store.get(*id)).map(|e| vent_area(store, e)).sum::<f64>()
+        + info.curtain_walls.iter().filter_map(|id| store.get(*id)).map(|e| wall_vent_area(store, e)).sum::<f64>();
     info.vent_percent = 100.0 * info.vent_area / info.floor_area.max(1e-9);
     Ok(info)
 }
@@ -1003,7 +1076,7 @@ pub struct FormInfo {
 
 /// `enclosure.forms`.
 pub(crate) fn forms(_: &Store, _: crate::builtin::NoParams) -> Result<Vec<FormInfo>> {
-    Ok([Form::Gable, Form::Multispan, Form::Venlo, Form::Hoop, Form::Gothic].into_iter().map(|form| FormInfo { form, defaults: defaults(form) }).collect())
+    Ok([Form::Gable, Form::Multispan, Form::Venlo, Form::Sawtooth, Form::Hoop, Form::Gothic].into_iter().map(|form| FormInfo { form, defaults: defaults(form) }).collect())
 }
 
 #[cfg(test)]

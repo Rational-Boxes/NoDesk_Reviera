@@ -1696,7 +1696,7 @@ area by area (reviewed against the spec on 2026-10-15).
   stack-ventilation checks, HVAC, energy and structural load modelling, residential forms, and
   building-code rule sets for the US, UK, Canada, EU, Australia and New Zealand. Specified (phase
   1). **Built so far:** the Glazed Enclosure tool (Architecture › Build) with the gable,
-  gutter-connected multispan, Venlo, hoop-tunnel and gothic-tunnel forms, of sloped-glazing roofs, glass curtain walls (end
+  gutter-connected multispan, Venlo, sawtooth (one slope per span to a vertical face with a vent band), hoop-tunnel and gothic-tunnel forms, of sloped-glazing roofs, glass curtain walls (end
   walls attached to the roofs, filling the gables, a door in each), knee walls, gutters, ridge vents (a share of the floor area), and steel posts and gutter beams, edited in Properties; growing layouts of benches, rolling benches,
   ebb-and-flow or NFT tables clear of the posts, with their growing area (`growing.*`); a glazing
   library (glass, polycarbonate, acrylic, film) whose types carry light, U, g and safety values in the

@@ -666,6 +666,36 @@ pub(crate) fn make_door(txn: &mut crate::txn::Transaction<'_>, id: ElementId, ce
     Ok((xs[i1 + 1] - xs[i0], zs[k + 1]))
 }
 
+/// A band of vents along a curtain wall's top (ARC-GLZ-004): a horizontal line `height` below
+/// the top, the type's lines above it and within 400 mm under it removed, and every pane above
+/// it a vent. Returns the band's height (the whole wall's when it is shorter).
+pub(crate) fn make_vent_band(txn: &mut crate::txn::Transaction<'_>, id: ElementId, height: f64) -> Result<f64> {
+    let store = txn.store().clone();
+    let e = store.get(id).expect("exists");
+    let mut r = curtain_recipe(e).expect("a curtain wall");
+    let g = regenerate(&store, e)?;
+    let tall = g.z[1] - g.z[0];
+    let nx = g.u_lines.len() + 1;
+    let at = tall - height;
+    if at < 0.3 {
+        r.panels = (0..nx).map(|c| PanelOverride { cell: [c, 0], panel: Panel::Vent }).collect();
+        r.removed.extend(g.v_lines.iter().flat_map(|v| (0..nx).map(|segment| SegmentOff { dir: Dir::V, at: *v, segment })));
+        write(txn, id, &r)?;
+        return Ok(tall);
+    }
+    for v in g.v_lines.iter().filter(|v| **v > at - 0.4) {
+        r.removed.extend((0..nx).map(|segment| SegmentOff { dir: Dir::V, at: *v, segment }));
+    }
+    let key = r.grids.iter().map(|g| g.key + 1).max().unwrap_or(1);
+    r.grids.push(ManualGrid { key, dir: Dir::V, at });
+    write(txn, id, &r)?;
+    let g = regenerate(txn.store(), txn.store().get(id).expect("exists"))?;
+    let row = g.v_lines.iter().position(|v| (v - at).abs() < 1e-6).map_or(0, |k| k + 1);
+    r.panels = (0..nx).map(|c| PanelOverride { cell: [c, row], panel: Panel::Vent }).collect();
+    write(txn, id, &r)?;
+    Ok(height)
+}
+
 /// Attaches a curtain wall's top to a roof as well as those it follows (`wall.attach`), or (with
 /// `None`) detaches it from `only` roofs or all.
 pub(crate) fn set_attached(txn: &mut crate::txn::Transaction<'_>, id: ElementId, add: Option<String>, only: Option<&[String]>) -> Result<()> {

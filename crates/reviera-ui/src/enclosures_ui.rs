@@ -13,10 +13,11 @@ use wxdragon::prelude::*;
 
 use super::{Gui, error};
 
-const FORMS: [(Form, &str); 5] = [
+const FORMS: [(Form, &str); 6] = [
     (Form::Gable, "Gable"),
     (Form::Multispan, "Gutter-connected multispan"),
     (Form::Venlo, "Venlo"),
+    (Form::Sawtooth, "Sawtooth"),
     (Form::Hoop, "Hoop tunnel"),
     (Form::Gothic, "Gothic tunnel"),
 ];
@@ -109,6 +110,15 @@ impl Gui {
             }
             if o.get("eave").and_then(Value::as_str) == Some("5.5 m") {
                 o.remove("eave");
+            }
+        }
+        // A sawtooth takes its own span, height and slope for the Venlo's left unchanged.
+        if chosen == Some(Form::Sawtooth) {
+            let o = args.as_object_mut().expect("an object");
+            for (k, venlo) in [("span", "8 m"), ("eave", "5.5 m"), ("pitch", "22°")] {
+                if o.get(k).and_then(Value::as_str) == Some(venlo) {
+                    o.remove(k);
+                }
             }
         }
         if by_click {
@@ -206,8 +216,9 @@ impl Gui {
         grid.append(Property::boolean("Doors", "gh_doors", r.doors));
         grid.append(Property::boolean("Frame", "gh_frame", r.frame));
         grid.set_help_string("gh_frame", "Steel posts at every bay on each gutter line");
-        grid.append(Property::string("Ridge Vents (% of floor)", "gh_vents", format!("{}", r.vents)));
-        grid.set_help_string("gh_vents", "The ridge vents' target area as a share of the floor area; 0 for none");
+        let saw = r.form == Form::Sawtooth;
+        grid.append(Property::string(if saw { "Face Vents (% of floor)" } else { "Ridge Vents (% of floor)" }, "gh_vents", format!("{}", r.vents)));
+        grid.set_help_string("gh_vents", if saw { "The vent band along each vertical face's top, as a share of the span's floor; 0 for none" } else { "The ridge vents' target area as a share of the floor area; 0 for none" });
         grid.set_help_string("gh_doors", "A door in the middle of each end wall");
         let ridge = self.format_length(r.ridge());
         grid.append(Property::string("Ridge Height", "gh_ridge", ridge));
@@ -218,7 +229,7 @@ impl Gui {
         let vents = self.enclosure_of_selection(id).and_then(|(owner, _)| self.run("enclosure.get", json!({ "enclosure_id": owner })).ok());
         if let Some(v) = vents {
             let (a, pc) = (v["vent_area"].as_f64().unwrap_or(0.0), v["vent_percent"].as_f64().unwrap_or(0.0));
-            grid.append(Property::string("Ridge Vent Area", "gh_vent_area", format!("{a:.1} m² ({pc:.1} %)")));
+            grid.append(Property::string(if saw { "Vent Area" } else { "Ridge Vent Area" }, "gh_vent_area", format!("{a:.1} m² ({pc:.1} %)")));
             grid.set_property_read_only("gh_vent_area", true);
         }
     }

@@ -244,8 +244,7 @@ pub fn plan(r: &LayoutRecipe, e: &EnclosureRecipe, level: &str) -> Vec<PartRecip
     let framed = e.frame && !e.form.tunnel();
     let post = if framed { 0.06 + r.clearance / 2.0 } else { 0.0 };
     let wall = if framed { r.clearance.max(0.2) } else { r.clearance };
-    let every = if e.form == enclosures::Form::Venlo { e.peaks.unwrap_or(2).max(1) } else { 1 };
-    let gutter_lines: Vec<f64> = if post > 0.0 { (1..e.spans).filter(|i| i % every == 0).map(|i| e.span * f64::from(i)).collect() } else { Vec::new() };
+    let gutter_lines: Vec<f64> = if post > 0.0 { e.gutter_lines() } else { Vec::new() };
     let (s, c) = e.rotation.sin_cos();
     let at = |x: f64, y: f64| [e.origin[0] + c * x - s * y, e.origin[1] + s * x + c * y];
     let rolling = r.system == System::RollingBenches;

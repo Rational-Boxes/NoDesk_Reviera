@@ -884,7 +884,7 @@ fn the_greenhouses_sample_keeps_its_enclosures() {
     let mut app = open(work.path(), "greenhouses");
     let s = store(&app);
     let enclosures: Vec<_> = s.iter().filter_map(|e| reviera_core::enclosures::recipe(e).map(|r| (e.id(), r))).collect();
-    assert_eq!(enclosures.len(), 5);
+    assert_eq!(enclosures.len(), 6);
     let mut seen = Vec::new();
     for (id, r) in &enclosures {
         let info = ok(&mut app, "enclosure.get", json!({ "enclosure_id": id }));
@@ -897,7 +897,7 @@ fn the_greenhouses_sample_keeps_its_enclosures() {
     use reviera_core::enclosures::Form;
     // Posts at every bay line and a gutter beam on each line: the hobby house's 6 m in 1.2 m bays
     // on its two eaves (6 × 2 + 2), the multispan's 16 m in 4 m bays on 4 lines (5 × 4 + 4), the
-    // Venlo's 24 m on 3 lines (7 × 3 + 3). The tunnels: one roof each, four glass walls, no
+    // Venlo's 24 m on 3 lines (7 × 3 + 3), the sawtooth's 8 m on 4 lines (3 × 4 + 4). The tunnels: one roof each, four glass walls, no
     // gutters or frame.
     assert_eq!(
         seen,
@@ -905,6 +905,7 @@ fn the_greenhouses_sample_keeps_its_enclosures() {
             (Form::Gothic, 1, 4, 0, 0, 0),
             (Form::Hoop, 1, 4, 0, 0, 0),
             (Form::Gable, 1, 4, 0, 2, 14),
+            (Form::Sawtooth, 3, 6, 0, 3, 16),
             (Form::Multispan, 3, 4, 0, 4, 24),
             (Form::Venlo, 4, 4, 2, 5, 24),
         ]

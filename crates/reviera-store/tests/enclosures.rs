@@ -117,7 +117,42 @@ fn a_gable_greenhouse_has_one_span() {
     assert_eq!((count(&info, "roofs"), count(&info, "gutters")), (1, 2));
     assert!(run(&r, &mut doc, "enclosure.create", json!({ "form": "gable", "level_id": level.0, "spans": 2 })).is_err());
     let forms = run(&r, &mut doc, "enclosure.forms", json!({})).unwrap();
-    assert_eq!(forms.as_array().unwrap().len(), 5);
+    assert_eq!(forms.as_array().unwrap().len(), 6);
+}
+
+#[test]
+fn a_sawtooth_range_has_vertical_vent_faces() {
+    let dir = tempfile::tempdir().unwrap();
+    let (_project, mut doc) = LocalProject::new(Schema::Ifc4, &dir.path().join("s.ifc")).unwrap();
+    let r = registry();
+    let level = doc.store().iter().find(|e| e.class == "IfcBuildingStorey").unwrap().id();
+    // The defaults: three 6.4 m spans at 25° from 4 m gutters, here 20 m long in 4 m bays.
+    let v = run(&r, &mut doc, "enclosure.create", json!({ "form": "sawtooth", "level_id": level.0, "length": 20.0 })).unwrap();
+    let info = run(&r, &mut doc, "enclosure.get", json!({ "enclosure_id": v })).unwrap();
+    // A gutter at each span's low eave; two side walls, two end walls and two inner faces; posts
+    // at 6 bay lines on the 4 gutter lines, a beam on each.
+    assert_eq!(
+        (count(&info, "roofs"), count(&info, "gutters"), count(&info, "curtain_walls"), count(&info, "posts"), count(&info, "beams")),
+        (3, 3, 6, 24, 4),
+        "{info}"
+    );
+    let rise = 6.4 * 25f64.to_radians().tan();
+    assert!((info["ridge"].as_f64().unwrap() - (4.0 + rise)).abs() < 1e-9);
+    // One slope each: low at the span's start, high at its end.
+    let store = doc.store();
+    let first = store.get(ElementId(info["roofs"][0].as_u64().unwrap())).unwrap();
+    let g = reviera_core::roofs::regenerate(store, first).unwrap();
+    assert!((g.underside([10.0, 0.5]).unwrap() - (4.0 + 0.5 * rise / 6.4)).abs() < 0.1);
+    assert!((g.underside([10.0, 6.3]).unwrap() - (4.0 + 6.3 * rise / 6.4)).abs() < 0.1);
+    // The faces' vent bands: 18 % of each span's floor (1.15 m along their tops).
+    let vents = info["vent_percent"].as_f64().unwrap();
+    assert!((16.0..19.0).contains(&vents), "face vents {vents} %");
+    // An inner face stands on the eave and reaches up under the roof's bars.
+    let faces: Vec<_> = info["curtain_walls"].as_array().unwrap().iter().filter_map(|i| store.get(ElementId(i.as_u64().unwrap()))).filter(|e| reviera_core::curtain::curtain_recipe(e).is_some_and(|c| (c.curve.start[1] - 6.4).abs() < 1e-9)).collect();
+    assert_eq!(faces.len(), 1);
+    let cw = reviera_core::curtain::regenerate(store, faces[0]).unwrap();
+    assert!((cw.z[0] - 4.0).abs() < 1e-9 && cw.z[1] < 4.0 + rise - 0.04 && cw.z[1] > 4.0 + rise - 0.15, "{:?}", cw.z);
+    assert!(cw.parts.iter().any(|p| p.panel == reviera_core::curtain::Panel::Vent));
 }
 
 #[test]

@@ -2,7 +2,7 @@
 -- Copyright (C) 2026 Reviera contributors
 
 -- title: Greenhouses
--- description: A Venlo glasshouse range on a knee wall, a three-span gutter-connected range turned to run north–south, a small gable greenhouse, and a hoop and a gothic film tunnel, each one Glazed Enclosure of glazed roofs, glazed walls, gutters, vents and a steel frame.
+-- description: A Venlo glasshouse range on a knee wall, a three-span gutter-connected range turned to run north–south, a small gable greenhouse, a sawtooth range with vents in its vertical faces, and a hoop and a gothic film tunnel, each one Glazed Enclosure of glazed roofs, glazed walls, gutters, vents and a steel frame.
 --
 -- Reviera sample model (test-data/samples): the Glazed Enclosure tool (ARC-GLZ-001/002). Each
 -- greenhouse is one element (`enclosure.create`) that lays out ordinary Reviera elements and
@@ -41,6 +41,13 @@ local hobby = reviera.enclosure.create{
   roof_glazing = "Twin-Wall Polycarbonate 10 mm",
 }
 
+-- A sawtooth range for a warm climate: three 6.4 m spans, each one 25° slope rising from its
+-- gutter at 4 m to a glazed vertical face whose top band of vents (18 % of the span's floor)
+-- lets the hot air out on the lee side; 8 m long in 4 m bays.
+local saw = reviera.enclosure.create{
+  form = "sawtooth", level_id = l1, origin = {30, 32}, span = "6.4 m", spans = 3, length = "8 m", bay = "4 m",
+}
+
 -- Two film tunnels, 9.1 m wide and 12 m long on 1.2 m sidewalls, hoops at most 1.5 m apart: a
 -- semicircular hoop house, and a gothic one whose two arcs (radius 0.6 × the span) meet in a
 -- pointed crown that sheds condensation and snow.
@@ -65,7 +72,7 @@ for _, l in ipairs(layouts) do
   print(string.format("%s: %d pieces, %.0f m² growing (%.0f %% of the floor)", s.system, s.pieces, s.growing_area, s.share))
 end
 
-for _, e in ipairs({ venlo, range, hobby, tunnel, gothic }) do
+for _, e in ipairs({ venlo, range, hobby, saw, tunnel, gothic }) do
   local info = reviera.enclosure.get{ enclosure_id = e }
   print(string.format("%s: %.0f m², ridge %.2f m, %d roofs, %d gutters",
     info.recipe.form, info.floor_area, info.ridge, #info.roofs, #info.gutters))
