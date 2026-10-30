@@ -562,6 +562,7 @@ impl LocalProject {
                 || recipe_kind == Some(reviera_core::skylights::SKYLIGHT_RECIPE)
                 || recipe_kind == Some(reviera_core::growing::PART_RECIPE)
                 || recipe_kind == Some(reviera_core::hothouse::LIGHT_RECIPE)
+                || recipe_kind == Some(reviera_core::hothouse::SCREEN_RECIPE)
                 || recipe_kind == Some(reviera_core::geodesic::RECIPE)
                 || recipe_kind == Some(stairs::STAIR_RECIPE)
                 || recipe_kind == Some(railings::RAILING_RECIPE)
@@ -3918,10 +3919,13 @@ impl LocalProject {
         Ok(())
     }
 
-    /// Writes every grow light (ARC-GLZ-009): one faceted B-rep, contained in its level.
+    /// Writes every grow light (ARC-GLZ-009) and greenhouse screen (ARC-GLZ-010): one faceted
+    /// B-rep each, contained in its level.
     fn write_grow_lights(&mut self, doc: &Document) -> Result<()> {
         let store = doc.store();
-        let all = reviera_core::hothouse::all(store);
+        let level_of = |e: &reviera_core::Element| reviera_core::hothouse::light_recipe(e).map(|p| p.level).or_else(|| reviera_core::hothouse::screen_recipe(e).map(|p| p.level));
+        let mut all = reviera_core::hothouse::all(store);
+        all.extend(reviera_core::hothouse::all_screens(store));
         if all.is_empty() {
             return Ok(());
         }
@@ -3933,8 +3937,8 @@ impl LocalProject {
             };
             let solid = geometry::Polyhedron { points: points.clone(), faces: idx.chunks(3).map(|t| t.iter().map(|i| *i as usize).collect()).collect() };
             geometry::write_breps(&mut self.ifc, step, geometry::BrepFrame::WORLD, &[solid], self.length_scale, contexts)?;
-            let storey = reviera_core::hothouse::light_recipe(store.get(*id).expect("listed"))
-                .and_then(|p| GlobalId::parse(&p.level))
+            let storey = level_of(store.get(*id).expect("listed"))
+                .and_then(|l| GlobalId::parse(&l))
                 .and_then(|g| store.find_by_guid(&g))
                 .and_then(|l| self.steps.get(&l).copied());
             if let Some(storey) = storey {

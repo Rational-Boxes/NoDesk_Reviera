@@ -94,6 +94,18 @@
         { "name": "PowerDensity", "measure": "IfcReal", "unit": "W/m2", "description": "On a layout: the fixtures' power over the growing floor." },
         { "name": "MaintenanceFactor", "measure": "IfcNormalisedRatioMeasure", "description": "On a layout: the output kept after lamp ageing and dirt." }
       ]
+    },
+    {
+      "name": "Reviera_Screen",
+      "description": "A greenhouse energy, shade or blackout screen (spec ARC-GLZ-010), on its IfcShadingDevice (ObjectType EnergyScreen, ShadeScreen or BlackoutScreen). Typical values from Reviera's screen library, to be replaced by the specified product's.",
+      "applicable_classes": ["IfcShadingDevice", "IfcShadingDeviceType"],
+      "properties": [
+        { "name": "Kind", "measure": "IfcLabel", "description": "What the screen is for.", "values": ["energy", "shade", "blackout"] },
+        { "name": "Material", "measure": "IfcLabel", "description": "The screen material." },
+        { "name": "LightTransmission", "measure": "IfcNormalisedRatioMeasure", "description": "Share of light let through when closed." },
+        { "name": "EnergySaving", "measure": "IfcNormalisedRatioMeasure", "description": "Share of the heating energy saved while closed (published, at night)." },
+        { "name": "Porous", "measure": "IfcBoolean", "description": "Air passes through the fabric." }
+      ]
     }
   ]
 }

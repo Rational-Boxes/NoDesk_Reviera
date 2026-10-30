@@ -1686,7 +1686,7 @@ area by area (reviewed against the spec on 2026-10-15).
 **Other chapters:**
 
 - **Glazed enclosures** (`design_documents/GLAZED_ENCLOSURES_PLAN.md`; spec §3.6a,
-  ARC-GLZ-001 … 009): greenhouses, hothouses, solariums, conservatories and atriums built from the
+  ARC-GLZ-001 … 011): greenhouses, hothouses, solariums, conservatories and atriums built from the
   existing roofs, sloped glazing, curtain walls, gutters and members by one Glazed Enclosure
   tool: commercial forms first (gable, gutter-connected multispan, Venlo, hoop, gothic, sawtooth),
   a glazing and frame library, vents, growing layouts (benches, rolling benches, NFT and
@@ -1712,7 +1712,10 @@ area by area (reviewed against the spec on 2026-10-15).
   (`enclosure.*`); a growing climate from crop presets (`Reviera_GrowingClimate`,
   `enclosure.set_climate`), the crop's daily light integral month by month through the glazing
   from the weather file or the latitude (`enclosure.crop_light`), and grow lights laid out to make
-  up the darkest month (`growing.lights`, `Reviera_GrowLight`); the `greenhouses` sample. Curtain walls' tops attach to one or more roofs
+  up the darkest month (`growing.lights`, `Reviera_GrowLight`); energy, shade and blackout
+  screens under the gutters (`enclosure.set_screens`, `Reviera_Screen`) and the quick heat loss by
+  the greenhouse table method, with an energy screen closed too (`enclosure.heat_loss`); the
+  `greenhouses` sample. Curtain walls' tops attach to one or more roofs
   (`wall.attach`).
 - **Digital twins, operational data and smart-city features** (`design_documents/DIGITAL_TWIN_PLAN.md`):
   sensor and controls design with points schedules, bindings from model elements to live BACnet,

@@ -891,7 +891,7 @@ fn the_greenhouses_sample_keeps_its_enclosures() {
         let n = |k: &str| info[k].as_array().map_or(0, Vec::len);
         seen.push((r.form, n("roofs"), n("curtain_walls"), n("walls"), n("gutters"), n("posts") + n("beams")));
         // Every part is still there and names its enclosure.
-        assert_eq!(n("roofs") + n("curtain_walls") + n("walls") + n("gutters") + n("posts") + n("beams") + n("doors"), r.parts.len(), "{info}");
+        assert_eq!(n("roofs") + n("curtain_walls") + n("walls") + n("gutters") + n("posts") + n("beams") + n("doors") + n("screens"), r.parts.len(), "{info}");
     }
     seen.sort_by_key(|s| (s.1, s.5, format!("{:?}", s.0)));
     use reviera_core::enclosures::Form;
@@ -931,6 +931,13 @@ fn the_greenhouses_sample_keeps_its_enclosures() {
         assert!(l["lamp_ppfd"].as_f64().unwrap() > 100.0 && l["months"].as_array().unwrap().iter().all(|m| m["meets_target"] == true), "{l}");
     }
     assert_eq!(s.iter().filter(|e| reviera_core::hothouse::lights_recipe(e).is_some()).count(), 2);
+    // The Venlo's energy and shade screens, a sheet per span (5 roofs: 2 trusses of 2 and 1).
+    let venlo_rec = &enclosures.iter().find(|(_, r)| r.form == reviera_core::enclosures::Form::Venlo).unwrap().1;
+    let sheets = s.iter().filter(|e| reviera_core::hothouse::screen_recipe(e).is_some()).count();
+    assert_eq!(sheets, 2 * venlo_rec.spans as usize);
+    let venlo_id = enclosures.iter().find(|(_, r)| r.form == reviera_core::enclosures::Form::Venlo).unwrap().0;
+    let h = ok(&mut app, "enclosure.heat_loss", json!({ "enclosure_id": venlo_id, "outside": -7.0 }));
+    assert!(h["with_screen"].as_f64().unwrap() < h["total"].as_f64().unwrap(), "{h}");
     // The geodesic dome: 3V at 5/8, three strut lengths.
     let dome = s.iter().find(|e| reviera_core::geodesic::recipe(e).is_some()).expect("a dome");
     let d = ok(&mut app, "roof.geodesic", json!({ "roof_id": dome.id() }));

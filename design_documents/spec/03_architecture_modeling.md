@@ -2940,6 +2940,51 @@ Owner requirement (2026-10-28), planned in `GLAZED_ENCLOSURES_PLAN.md`, research
 
 *Built (2026-10-29):* `reviera_core::hothouse`; `weather.import` keeps each month's mean daily global radiation (`monthly_global`, a file imported before has none and the estimate is used). Architecture › Build › Grow Lights lays them out in the selected enclosure; Properties › Growing Climate shows the darkest month, the roof's transmission, the lamp PPFD needed and laid out, and the months short of target; Properties › Grow Lights edits the fixture, target, height and maintenance factor. Sample: `greenhouses` (lettuce in the Venlo, tomatoes in the sawtooth, at a site in the western Netherlands). Not yet: energy and shade screens in the light path, the glazing's hemispherical (diffuse) transmission, lamps switched off in bright sun (450/400 µmol·m⁻²·s⁻¹ thresholds), a uniformity map from photometry, grow lights in rooms, the lamps' heat in the loads, and photoperiod blackout.
 
+### 3.6a.10 Energy, shade and blackout screens
+**ID:** ARC-GLZ-010 · **Priority:** P1 · **Ref:** owner requirement (2026-10-28, commercial grows); research/11 §B4, §B10 item 4; research/09 §4.4–4.5
+
+**Purpose.** Model the movable screens of a commercial greenhouse: energy (heat-retention) screens closed at night, shade screens closed in bright sun, and blackout screens for short-day crops, with the values the crop-light and heat-loss analyses need.
+
+**Behaviour & rules.**
+- A **screen library** of generic materials, from public extension data (research/11 §B4): porous shade screens (50 % and 30 % light), a semi-porous screen (27 %), non-porous energy screens (35 % and 25 % light) and a 99.9 % blackout screen, each with its light transmission, its energy saving while closed, whether it is porous, and its sources. Provisional (EXPERT_REVIEW E-59).
+- An enclosure carries up to three screens, each a **kind** (energy, shade, blackout) and a library material. They are drawn as flat (gutter-to-gutter) screens under the gutters, one per span, clear of the inner gutter lines' posts (80 mm) and of the outer and end posts (350 mm from the walls), the first 250 mm under the eaves and each next 50 mm lower, leaving the grow lights' height below them. They are the enclosure's parts and follow it. Not on tunnels yet (their curved roofs need a curved or slope-flat-slope layout).
+- **Crop light.** With a shade screen, each month also reports the natural light with it closed, and whether it would be closed (natural light above the target by more than 30 %).
+- **Heat loss.** With an energy or blackout screen, the night heat loss (ARC-GLZ-011) is also given with the screen closed: the loss × (1 − its energy saving). The published savings are of heating energy at night, so they apply to the whole loss.
+
+**Data (IFC mapping).** Each screen is an `IfcShadingDevice` (USERDEFINED, ObjectType `EnergyScreen`, `ShadeScreen` or `BlackoutScreen`) with `Reviera_Screen` (Kind, Material, LightTransmission, EnergySaving, Porous); the enclosure's recipe holds the screens.
+
+**Commands.** `enclosure.set_screens(enclosure_id, screens: [{kind, material?}]) -> ()`, `enclosure.screen_library() -> [entry]`.
+
+**Acceptance criteria.**
+- [x] A Venlo range with an energy screen and a shade screen has one of each per span under the gutters, clear of the posts and the grow lights, as `IfcShadingDevice`s with their values.
+- [x] The crop light in July at 52° N with a 50 % shade screen reports the shaded light and the screen closed; the heat loss with a 35 % energy screen is 62 % lower.
+
+*Built (2026-10-30):* `reviera_core::hothouse` (screens): the library (`enclosure.screen_library`), `screens` on the enclosure's recipe (`enclosure.set_screens`, also `screens` in `enclosure.set`), sheets as enclosure parts with `recipe.greenhouse_screen` (faceted in IFC, hidden in plan), listed by `enclosure.get` as `screens`; the crop light's `shaded` and `shade_closed` per month; Properties › Growing Climate › Screens (none, energy, shade, both, all three) and *Shade Screen Closed*. Sample: `greenhouses` (energy and shade screens in the Venlo). Not yet: screens in tunnels (slope-flat-slope or curved), screen materials as types, their open and closed states in the view, light leaks for blackout, and the screens' effect on ventilation.
+
+### 3.6a.11 Quick heat loss of a glazed enclosure
+**ID:** ARC-GLZ-011 · **Priority:** P1 · **Ref:** research/09 §4.5, §6.3 (G011); GLAZED_ENCLOSURES_PLAN §7 (*Quick heat loss of a greenhouse*)
+
+**Purpose.** An instant design heat loss of a greenhouse for sizing its heating, by the published greenhouse table method, before (and as a check on) the full loads of phase 5.
+
+**Behaviour & rules.**
+- **Method** (SI form of the NGMA table method): Q = Σ(U·A) · C · W · ΔT + 0.33 · N · V · ΔT, in watts:
+  - U·A for each part: roof glazing and glazed walls from their glazing types' U-values (`Reviera_GlazingUnit`), knee walls and the headhouse's shared wall from their wall types' `Pset_WallCommon.ThermalTransmittance` (1.0 W/m²K where none is given);
+  - **C**, the construction factor, by frame: 1.08 for glass on metal bars at most 0.6 m apart, 1.05 at wider spacings, 1.02 for film on metal, 1.00 for film or sheet on timber (glass on timber 1.00);
+  - **W**, the wind factor, 1.00 up to 15 mph (6.7 m/s), rising 0.008 per mph to 1.16 at 35 mph;
+  - **N**, air changes per hour, by glazing: 1.0 for sealed glass and multiwall sheet, 0.8 for film (0.6–1.0 published), or the value given; **V** the enclosed volume;
+  - **ΔT** between the inside set point (the growing climate's night temperature, else 15 °C) and the outside design temperature (the weather's heating design dry-bulb; required otherwise).
+- The result lists the parts' U·A, C, W, N, V, ΔT, the transmission and infiltration loss, the total, per floor area (W/m²), and with an energy screen closed (ARC-GLZ-010).
+- Values provisional (EXPERT_REVIEW E-59, E-60); the full loads (`hc_loads.*`, phase 5) remain the design method.
+
+**Commands.** `enclosure.heat_loss(enclosure_id, inside?, outside?, wind?, air_changes?) -> heat_loss`.
+
+**Acceptance criteria.**
+- [x] A 9.6 × 40 m gable glasshouse at 15 °C inside and −10 °C outside reports its U·A by part, C = 1.05 (its glass's bars are 1.125 m apart), its total in kW and W/m² within the published method's arithmetic.
+- [x] A film tunnel uses C = 1.02 (steel hoops) and N = 0.8.
+
+*Built (2026-10-30):* `enclosure.heat_loss` (`reviera_core::hothouse`): parts' U·A (roof glazing by its regenerated area, glazed walls by their panels and mullions, knee walls by their regenerated faces), C, W (`wind_factor`), N, V, ΔT, transmission, infiltration, total, W/m², and `with_screen`. Properties › Growing Climate › *Heat Loss*. The construction factor follows the roofs' glazing-bar spacing (1.125 m: 1.05). Not yet: a bar spacing from the glazing type itself, the headhouse's shared wall, the gable areas of arched ends by the tables (the arch is regenerated instead), and radiation to a clear sky.
+
+
 ## 3.7 Stairs, railings and ramps
 
 ### 3.7.1 Stair assembly model
@@ -5009,6 +5054,9 @@ All commands below are registered once in the command registry and exposed autom
 | `growing.summary` | layout_id | {growing_area, floor_area, share, counts} | No (query) | ARC-GLZ-005 |
 | `roof.set_glazing` | roof_id, grid_u?, grid_v?, triangulate? | {panels, triangles, bars, max_warp} | Yes | ARC-GLZ-006 |
 | `roof.create_geodesic` | center, radius, frequency, truncation, level_id, glazing_type_id?, frame_type_id? | element_id | Yes | ARC-GLZ-006 |
+| `enclosure.set_screens` | enclosure_id, screens: [{kind, material?}] | — | Yes | ARC-GLZ-010 |
+| `enclosure.screen_library` | — | [entry] | No (query) | ARC-GLZ-010 |
+| `enclosure.heat_loss` | enclosure_id, inside?, outside?, wind?, air_changes? | heat_loss | No (query) | ARC-GLZ-011 |
 | `growing.crops` | — | [crop] | No (query) | ARC-GLZ-008 |
 | `enclosure.set_climate` | enclosure_id, crop?, target_dli?, day_temperature?, night_temperature?, humidity?, co2?, photoperiod?, clear? | — | Yes | ARC-GLZ-008 |
 | `enclosure.crop_light` | enclosure_id, clearness?, outdoor_dli? | {source, transmission, months, darkest_month, required_ppfd, lamp_ppfd} | No (query) | ARC-GLZ-009 |

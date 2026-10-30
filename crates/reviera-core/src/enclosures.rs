@@ -186,6 +186,9 @@ pub struct EnclosureRecipe {
     /// bars (a tunnel's 50 mm steel hoops) when absent.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub frame_system: Option<String>,
+    /// Energy, shade and blackout screens under the gutters (ARC-GLZ-010).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub screens: Vec<crate::hothouse::Screen>,
     /// The parts (GlobalIds).
     #[serde(default)]
     pub parts: Vec<String>,
@@ -916,6 +919,7 @@ fn build(txn: &mut Transaction<'_>, guid: &str, r: &EnclosureRecipe) -> Result<V
             }
         }
     }
+    parts.extend(crate::hothouse::build_screens(txn, r)?);
     for id in &parts {
         txn.modify(*id, |e| {
             e.params.insert(PART_KEY.into(), json!(guid));
@@ -1036,6 +1040,8 @@ pub struct Params {
     /// A headhouse across one end: its sizes (each its default when absent), or `enabled: false`
     /// to remove it.
     pub headhouse: Option<HeadhouseArgs>,
+    /// Energy, shade and blackout screens (ARC-GLZ-010), replacing those it has ([] for none).
+    pub screens: Option<Vec<crate::hothouse::Screen>>,
     /// The vents' design opening angle (radians or "30°"), discharge coefficient and actuator.
     #[schemars(extend("x-reviera-data-type" = "angle"))]
     pub vent_angle: Option<Value>,
@@ -1107,6 +1113,7 @@ pub fn defaults(form: Form) -> EnclosureRecipe {
         roof_glazing: None,
         wall_glazing: None,
         frame_system: None,
+        screens: Vec::new(),
         parts: Vec::new(),
     };
     match form {
@@ -1190,6 +1197,10 @@ fn apply(store: &Store, r: &mut EnclosureRecipe, p: &Params) -> Result<()> {
             return Err(Error::new("enclosure.bad_value", "the side vent area is 0 to 60 % of the floor area"));
         }
         r.side_vents = v;
+    }
+    if let Some(sc) = &p.screens {
+        crate::hothouse::check_screens(r, sc)?;
+        r.screens = sc.clone();
     }
     if let Some(a) = &p.headhouse {
         if a.enabled == Some(false) {
@@ -1380,6 +1391,8 @@ pub struct Info {
     pub posts: Vec<ElementId>,
     pub beams: Vec<ElementId>,
     pub doors: Vec<ElementId>,
+    /// Energy, shade and blackout screen sheets (ARC-GLZ-010).
+    pub screens: Vec<ElementId>,
     /// The headhouse's floor, and as a share of the growing floor (percent).
     pub headhouse_area: f64,
     pub headhouse_percent: f64,
@@ -1421,7 +1434,7 @@ fn pitch_warnings(store: &Store, r: &EnclosureRecipe, roof: Option<&Element>) ->
 /// `enclosure.get`.
 pub(crate) fn get(store: &Store, p: GetParams) -> Result<Info> {
     let (_, r) = resolve(store, &p.enclosure_id)?;
-    let mut info = Info { width: r.width(), ridge: r.ridge(), floor_area: r.width() * r.length, frame_shading: r.frame_shading(), vent_area: 0.0, free_vent_area: 0.0, effective_vent_area: 0.0, side_vent_area: 0.0, gable_vent_area: 0.0, vent_percent: 0.0, recipe: r.clone(), roofs: vec![], curtain_walls: vec![], walls: vec![], gutters: vec![], posts: vec![], beams: vec![], doors: vec![], headhouse_area: 0.0, headhouse_percent: 0.0, warnings: vec![] };
+    let mut info = Info { width: r.width(), ridge: r.ridge(), floor_area: r.width() * r.length, frame_shading: r.frame_shading(), vent_area: 0.0, free_vent_area: 0.0, effective_vent_area: 0.0, side_vent_area: 0.0, gable_vent_area: 0.0, vent_percent: 0.0, recipe: r.clone(), roofs: vec![], curtain_walls: vec![], walls: vec![], gutters: vec![], posts: vec![], beams: vec![], doors: vec![], screens: vec![], headhouse_area: 0.0, headhouse_percent: 0.0, warnings: vec![] };
     for g in &r.parts {
         let Some(e) = GlobalId::parse(g).and_then(|g| store.find_by_guid(&g)).and_then(|i| store.get(i)) else { continue };
         let list = if roofs::roof_recipe(e).is_some() {
@@ -1436,6 +1449,8 @@ pub(crate) fn get(store: &Store, p: GetParams) -> Result<Info> {
             &mut info.beams
         } else if e.class == "IfcDoor" {
             &mut info.doors
+        } else if crate::hothouse::screen_recipe(e).is_some() {
+            &mut info.screens
         } else {
             &mut info.gutters
         };

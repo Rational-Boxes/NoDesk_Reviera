@@ -530,6 +530,10 @@ pub fn all(store: &Store) -> Vec<Body> {
     for (id, m) in crate::hothouse::all(store) {
         push(id, &format!("IfcLightFixture:{}", crate::mesh_objects::color_hex([0.22, 0.23, 0.25, 1.0])), m, false);
     }
+    // Greenhouse screens (ARC-GLZ-010): light fabric, hidden in plan.
+    for (id, m) in crate::hothouse::all_screens(store) {
+        push(id, &format!("IfcShadingDevice:{}", crate::mesh_objects::color_hex([0.86, 0.87, 0.84, 0.55])), m, true);
+    }
     // Custom objects (DM-IMP-015): one part per material slot, in its colour; members of MEP
     // systems in their system type's colour (MEP-SYS-001).
     let system_colors = crate::mep_systems::element_colors(store);

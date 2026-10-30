@@ -62,7 +62,11 @@ Start with **File › New**. The model has Level 1 at 0. Open the Level 1 plan.
    range *Tomato (high-wire)*. The rows below show December as the darkest month, far short of
    the target. With each selected, Architecture › **Grow Lights**: the fixtures hang under the
    gutters and Months Short of Target drops to 0.
-10. **Look at it.** In a 3D view the glass is translucent; select a roof to see its glazing grid,
+10. **Screens and heat loss.** Select the Venlo range: Properties › Growing Climate › Screens
+   *Energy and shade*. The two screens hang under the gutters above the grow lights; Shade Screen
+   Closed counts the months the shade screen would be drawn, and Heat Loss gives the design loss
+   and the loss with the energy screen closed.
+11. **Look at it.** In a 3D view the glass is translucent; select a roof to see its glazing grid,
    or an end wall to see the glass clipped to the gables. Each part says which enclosure it
    belongs to; Modify › **Detach from Enclosure** **[gap]** (`enclosure.detach`) keeps a part
    when the enclosure changes.

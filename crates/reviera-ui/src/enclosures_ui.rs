@@ -22,6 +22,15 @@ const FORMS: [(Form, &str); 6] = [
     (Form::Gothic, "Gothic tunnel"),
 ];
 
+/// The screen sets offered in Properties.
+const SCREEN_SETS: [(&str, &[&str]); 5] = [
+    ("None", &[]),
+    ("Energy", &["energy"]),
+    ("Shade", &["shade"]),
+    ("Energy and shade", &["energy", "shade"]),
+    ("Energy, shade and blackout", &["energy", "shade", "blackout"]),
+];
+
 const ACTUATORS: [(reviera_core::vents::Actuator, &str); 4] = [
     (reviera_core::vents::Actuator::Manual, "Manual"),
     (reviera_core::vents::Actuator::RackAndPinion, "Rack and pinion"),
@@ -313,6 +322,28 @@ impl Gui {
             grid.append(Property::string(label, key, value));
         }
         grid.set_help_string("gc_photoperiod", "Hours of light a day, lamps included (tomato needs 4–6 h of dark)");
+        // Screens (ARC-GLZ-010) and the quick heat loss (ARC-GLZ-011).
+        let kinds: Vec<String> = store.get(owner).and_then(reviera_core::enclosures::recipe).map(|r| r.screens.iter().map(|s| serde_json::to_value(s.kind).ok().and_then(|v| v.as_str().map(str::to_owned)).unwrap_or_default()).collect()).unwrap_or_default();
+        let at = SCREEN_SETS.iter().position(|(_, k)| k.iter().map(|x| x.to_string()).collect::<Vec<_>>() == kinds).unwrap_or(0) as i32;
+        grid.append(Property::enumeration("Screens", "gc_screens", SCREEN_SETS.iter().enumerate().map(|(i, s)| (s.0.to_owned(), i as i32)).collect::<Vec<_>>(), at));
+        grid.set_help_string("gc_screens", "Energy, shade and blackout screens under the gutters (enclosure.set_screens chooses their materials)");
+        match self.run("enclosure.heat_loss", json!({ "enclosure_id": owner })) {
+            Ok(h) => {
+                let kw = h["total"].as_f64().unwrap_or(0.0) / 1000.0;
+                let mut text = format!("{kw:.1} kW ({:.0} W/m²) at {:.0} K", h["per_area"].as_f64().unwrap_or(0.0), h["delta_t"].as_f64().unwrap_or(0.0));
+                if let Some(s) = h["with_screen"].as_f64() {
+                    text.push_str(&format!("; {:.1} kW with the energy screen closed", s / 1000.0));
+                }
+                grid.append(Property::string("Heat Loss", "gc_heat_loss", text));
+                grid.set_help_string("gc_heat_loss", "The quick heat loss by the greenhouse table method: glazing U·A × construction and wind factors, plus air leakage, at the night set point against the weather's heating design temperature");
+            }
+            Err(e) => {
+                // The reason only (without its error code): usually the weather to set.
+                let why = e.split_once(": ").map_or(e.as_str(), |(_, m)| m).to_owned();
+                grid.append(Property::string("Heat Loss", "gc_heat_loss", why));
+            }
+        }
+        grid.set_property_read_only("gc_heat_loss", true);
         match self.run("enclosure.crop_light", json!({ "enclosure_id": owner })) {
             Ok(l) => {
                 let m = &l["months"][l["darkest_month"].as_u64().unwrap_or(1) as usize - 1];
@@ -328,6 +359,10 @@ impl Gui {
                 let text = format!("{need:.0} µmol/m²·s needed, {:.0} laid out", l["lamp_ppfd"].as_f64().unwrap_or(0.0));
                 grid.append(Property::string("Lamp PPFD", "gc_ppfd", text));
                 grid.set_property_read_only("gc_ppfd", true);
+                if let Some(closed) = l["months"].as_array().map(|a| a.iter().filter(|m| m["shade_closed"] == true).count()).filter(|_| l["months"][0].get("shaded").is_some()) {
+                    grid.append(Property::string("Shade Screen Closed", "gc_shade", format!("{closed} month(s) (natural light 30 % over the target)")));
+                    grid.set_property_read_only("gc_shade", true);
+                }
                 let short = l["months"].as_array().map_or(0, |a| a.iter().filter(|m| m["meets_target"] == false).count());
                 grid.append(Property::string("Months Short of Target", "gc_short", short.to_string()));
                 grid.set_property_read_only("gc_short", true);
@@ -352,6 +387,16 @@ impl Gui {
         let mut args = json!({ "enclosure_id": owner });
         let number = |t: &str| t.trim().trim_end_matches("°C").trim().parse::<f64>().ok();
         match property {
+            "gc_screens" => {
+                let Some((_, kinds)) = SCREEN_SETS.iter().find(|s| s.0 == text) else { return true };
+                let screens: Vec<_> = kinds.iter().map(|k| json!({ "kind": k })).collect();
+                if let Err(e) = self.run("enclosure.set_screens", json!({ "enclosure_id": owner, "screens": screens })) {
+                    error(&frame, &format!("The screens were not changed:\n{e}"));
+                }
+                self.selection_changed();
+                self.refresh_scene(&frame);
+                return true;
+            }
             "gc_crop" if text == "None" => args["clear"] = json!(true),
             "gc_crop" => match reviera_core::hothouse::crops().iter().find(|c| c.name == text) {
                 Some(c) => args["crop"] = json!(c.id),

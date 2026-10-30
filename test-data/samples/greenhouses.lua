@@ -2,7 +2,7 @@
 -- Copyright (C) 2026 Reviera contributors
 
 -- title: Greenhouses
--- description: A Venlo glasshouse range on a knee wall, a three-span gutter-connected range turned to run north–south, a small gable greenhouse, a sawtooth range with vents in its vertical faces, a geodesic dome, and a hoop and a gothic film tunnel, each one Glazed Enclosure of glazed roofs, glazed walls, gutters, vents and a steel frame; lettuce and tomatoes grown under grow lights sized for December.
+-- description: A Venlo glasshouse range on a knee wall, a three-span gutter-connected range turned to run north–south, a small gable greenhouse, a sawtooth range with vents in its vertical faces, a geodesic dome, and a hoop and a gothic film tunnel, each one Glazed Enclosure of glazed roofs, glazed walls, gutters, vents and a steel frame; lettuce and tomatoes grown under grow lights sized for December, the lettuce range with energy and shade screens.
 --
 -- Reviera sample model (test-data/samples): the Glazed Enclosure tool (ARC-GLZ-001/002). Each
 -- greenhouse is one element (`enclosure.create`) that lays out ordinary Reviera elements and
@@ -102,6 +102,13 @@ end
 reviera.location.set{ lat = 52.0, lon = 4.4, place = "Westland" }
 reviera.enclosure.set_climate{ enclosure_id = venlo, crop = "lettuce" }
 reviera.enclosure.set_climate{ enclosure_id = saw, crop = "tomato" }
+-- Screens in the Venlo range (ARC-GLZ-010): a non-porous energy screen closed at night and a
+-- 50 % shade screen closed in bright sun, under the gutters above the grow lights.
+reviera.enclosure.set_screens{ enclosure_id = venlo, screens = { { kind = "energy" }, { kind = "shade" } } }
+-- Its quick heat loss (ARC-GLZ-011) at 19 °C inside (the lettuce's night) and -7 °C outside.
+local loss = reviera.enclosure.heat_loss{ enclosure_id = venlo, outside = -7 }
+print(string.format("Venlo heat loss: %.0f kW (%.0f W/m2), %.0f kW with the energy screen closed",
+  loss.total / 1000, loss.per_area, loss.with_screen / 1000))
 for _, e in ipairs({ venlo, saw }) do
   local lights = reviera.growing.lights{ enclosure_id = e }
   local s = reviera.growing.lights_summary{ lights_id = lights }

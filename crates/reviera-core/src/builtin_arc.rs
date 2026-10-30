@@ -58,6 +58,9 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(GrowingLights),
         registry.add(GrowingSetLights),
         registry.add(GrowingLightsSummary),
+        registry.add(EnclosureSetScreens),
+        registry.add(EnclosureScreenLibrary),
+        registry.add(EnclosureHeatLoss),
         registry.add(EnclosureCreate),
         registry.add(EnclosureSet),
         registry.add(EnclosureDetach),
@@ -4678,6 +4681,46 @@ read_command!(
     crate::hothouse::LightsSummaryParams,
     crate::hothouse::LightsSummary,
     crate::hothouse::lights_summary
+);
+
+edit_command!(
+    EnclosureSetScreens,
+    "enclosure.set_screens",
+    "Set a glazed enclosure's screens",
+    "Screens (ARC-GLZ-010): up to three energy, shade or blackout `screens` ({kind, material?}; a library \
+     material, the kind's default when absent), drawn flat under the gutters span by span (IfcShadingDevice \
+     with Reviera_Screen), the first 250 mm under the eaves and each next 50 mm lower. [] removes them. Not \
+     in tunnels yet.",
+    "Set Screens",
+    crate::hothouse::SetScreensParams,
+    (),
+    crate::hothouse::set_screens
+);
+
+read_command!(
+    EnclosureScreenLibrary,
+    "enclosure.screen_library",
+    "List the screen materials",
+    "The screen materials (ARC-GLZ-010): name, kind, light transmission, energy saving while closed, porous, \
+     sources. Provisional values from public extension data.",
+    crate::builtin::NoParams,
+    Vec<crate::hothouse::ScreenMaterial>,
+    crate::hothouse::list_screens
+);
+
+read_command!(
+    EnclosureHeatLoss,
+    "enclosure.heat_loss",
+    "Estimate a glazed enclosure's heat loss",
+    "Quick heat loss (ARC-GLZ-011) by the published greenhouse table method: Q = Σ(U·A)·C·W·ΔT + \
+     0.33·N·V·ΔT watts, U·A by part (roof and wall glazing from their types, knee walls from their wall \
+     types), C the frame's construction factor, W the wind factor for `wind` m/s, N air changes per hour \
+     (`air_changes`, else by glazing), V the volume, ΔT from `inside` (the climate's night temperature, \
+     else 15 °C) and `outside` (the weather's heating design temperature) in °C. With an energy screen, the \
+     loss with it closed too.",
+    crate::hothouse::HeatLossParams,
+    crate::hothouse::HeatLoss,
+    crate::hothouse::heat_loss
 );
 
 edit_command!(

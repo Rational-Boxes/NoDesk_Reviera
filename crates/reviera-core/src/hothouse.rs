@@ -29,12 +29,20 @@
 //!   fixture below 2.3 µmol/J (DLC's current minimum) is flagged. The layout follows its
 //!   enclosure.
 //!
-//! Not yet: screens in the light path, the hemispherical (diffuse) transmission of the
+//! - **Screens** (ARC-GLZ-010): energy, shade and blackout screens from a small library,
+//!   drawn flat under the gutters span by span (`IfcShadingDevice`, `Reviera_Screen`); a shade
+//!   screen's light in the crop light, an energy screen's saving in the heat loss.
+//! - **Quick heat loss** (ARC-GLZ-011): Q = Σ(U·A)·C·W·ΔT + 0.33·N·V·ΔT by the published table
+//!   method, with an energy screen closed too.
+//!
+//! Not yet: screens on tunnels, the hemispherical (diffuse) transmission of the
 //! glazing, lamps switched off in bright sun, a uniformity map from photometry, lights in
 //! rooms, and the lamps' heat in the loads.
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
+
 use serde_json::{Value, json};
 
 use crate::bodies::Mesh;
@@ -337,6 +345,12 @@ pub struct Month {
     pub lamps: f64,
     pub total: f64,
     pub meets_target: bool,
+    /// With the shade screen closed (when there is one), and whether it would be (the natural
+    /// light above the target by more than 30 %).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub shaded: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub shade_closed: Option<bool>,
 }
 
 /// What `enclosure.crop_light` returns.
@@ -401,6 +415,7 @@ pub(crate) fn crop_light(store: &Store, p: CropLightParams) -> Result<CropLight>
     let guid = e.guid().to_string();
     let lamp_ppfd: f64 = layouts_on(store, &guid).iter().map(|(_, l)| summarise(store, l, &r).average_ppfd).sum();
     let hours = c.as_ref().map_or(16.0, |c| c.photoperiod);
+    let shade = r.screens.iter().find(|s| s.kind == ScreenKind::Shade).map(|s| material_of(s).light);
     let months: Vec<Month> = out
         .iter()
         .enumerate()
@@ -408,7 +423,9 @@ pub(crate) fn crop_light(store: &Store, p: CropLightParams) -> Result<CropLight>
             let natural = o * t.total;
             let lamps = lamp_ppfd * hours * HOUR;
             let total = natural + lamps;
-            Month { month: m as u8 + 1, outdoor: *o, natural, lamps, total, meets_target: c.as_ref().is_none_or(|c| total >= c.target_dli - 1e-9) }
+            let shaded = shade.map(|light| natural * light);
+            let closed = shade.map(|_| c.as_ref().is_some_and(|c| natural > 1.3 * c.target_dli));
+            Month { month: m as u8 + 1, outdoor: *o, natural, lamps, total, meets_target: c.as_ref().is_none_or(|c| total >= c.target_dli - 1e-9), shaded, shade_closed: closed }
         })
         .collect();
     let darkest = months.iter().min_by(|a, b| a.natural.total_cmp(&b.natural)).map_or(1, |m| m.month);
@@ -769,7 +786,8 @@ mod tests {
         let c = Climate { humidity: Some([50.0, 70.0]), ..Climate::of_crop(&crop("lettuce").unwrap()) };
         let r = LightsRecipe { kind: LIGHTS_RECIPE.into(), enclosure: String::new(), photon_flux: 1500.0, power: 600.0, target_ppfd: 110.0, height: 3.0, maintenance: 0.9, parts: vec![] };
         let s = LightsSummary { fixtures: 1, target_ppfd: 1.0, average_ppfd: 1.0, maintenance: 0.9, power: 1.0, power_density: 1.0, efficacy: 2.5, lamp_dli: 1.0, warnings: vec![] };
-        for (pset, written) in [(CLIMATE_PSET, climate_params(&c)), (LIGHT_PSET, fixture_params(&r).into_iter().chain(layout_params(&s)).collect())] {
+        let screen = screen_params(&screen_library()[0]);
+        for (pset, written) in [(CLIMATE_PSET, climate_params(&c)), (LIGHT_PSET, fixture_params(&r).into_iter().chain(layout_params(&s)).collect()), (SCREEN_PSET, screen)] {
             let set = sets.iter().find(|s| s["name"] == pset).unwrap_or_else(|| panic!("{pset}"));
             let props = set["properties"].as_array().unwrap();
             for (key, value) in written {
@@ -779,4 +797,360 @@ mod tests {
             }
         }
     }
+}
+
+// ---- Screens (ARC-GLZ-010) ----
+
+pub const SCREEN_RECIPE: &str = "recipe.greenhouse_screen";
+pub const SCREEN_PSET: &str = "Reviera_Screen";
+/// A screen's thickness as drawn.
+const SCREEN_THICKNESS: f64 = 0.002;
+
+/// What a screen is for.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ScreenKind {
+    /// Closed at night to keep the heat in.
+    Energy,
+    /// Closed in bright sun.
+    Shade,
+    /// Closed to shorten the day for short-day crops.
+    Blackout,
+}
+
+impl ScreenKind {
+    fn object_type(self) -> &'static str {
+        match self {
+            ScreenKind::Energy => "EnergyScreen",
+            ScreenKind::Shade => "ShadeScreen",
+            ScreenKind::Blackout => "BlackoutScreen",
+        }
+    }
+}
+
+/// A screen of an enclosure: its kind and its material (a library entry; the kind's default
+/// when absent).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct Screen {
+    pub kind: ScreenKind,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub material: Option<String>,
+}
+
+/// A screen material.
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+pub struct ScreenMaterial {
+    pub name: &'static str,
+    pub kind: ScreenKind,
+    /// Light let through (0–1), and the heating energy saved while closed (0–1).
+    pub light: f64,
+    pub saving: f64,
+    /// Air passes through (porous fabrics).
+    pub porous: bool,
+    pub sources: &'static str,
+}
+
+/// The screen library (provisional, EXPERT_REVIEW E-59), from research/11 §B4.
+pub fn screen_library() -> Vec<ScreenMaterial> {
+    let m = |name, kind, light, saving, porous| ScreenMaterial { name, kind, light, saving, porous, sources: "C047 C048" };
+    vec![
+        m("Shade screen 50 % (porous, aluminised)", ScreenKind::Shade, 0.50, 0.20, true),
+        m("Shade screen 70 % (porous, aluminised)", ScreenKind::Shade, 0.30, 0.50, true),
+        m("Energy screen, semi-porous 27 % light", ScreenKind::Energy, 0.27, 0.30, true),
+        m("Energy screen 35 % light (non-porous)", ScreenKind::Energy, 0.35, 0.62, false),
+        m("Energy screen 25 % light (non-porous)", ScreenKind::Energy, 0.25, 0.67, false),
+        m("Blackout screen 99.9 %", ScreenKind::Blackout, 0.001, 0.70, false),
+    ]
+}
+
+/// The kind's default material.
+fn default_material(kind: ScreenKind) -> &'static str {
+    match kind {
+        ScreenKind::Energy => "Energy screen 35 % light (non-porous)",
+        ScreenKind::Shade => "Shade screen 50 % (porous, aluminised)",
+        ScreenKind::Blackout => "Blackout screen 99.9 %",
+    }
+}
+
+/// A screen's material.
+pub fn material_of(s: &Screen) -> ScreenMaterial {
+    let name = s.material.as_deref().unwrap_or(default_material(s.kind));
+    screen_library().into_iter().find(|m| m.name.eq_ignore_ascii_case(name)).unwrap_or_else(|| screen_library().into_iter().find(|m| m.name == default_material(s.kind)).expect("in the library"))
+}
+
+/// `enclosure.screen_library`.
+pub(crate) fn list_screens(_: &Store, _: crate::builtin::NoParams) -> Result<Vec<ScreenMaterial>> {
+    Ok(screen_library())
+}
+
+/// The highest a screen hangs below the eaves, and the step between screens.
+const SCREEN_DROP: f64 = 0.25;
+const SCREEN_STEP: f64 = 0.05;
+
+/// Whether `screens` suit enclosure `r`.
+pub(crate) fn check_screens(r: &EnclosureRecipe, screens: &[Screen]) -> Result<()> {
+    if screens.is_empty() {
+        return Ok(());
+    }
+    if r.form.tunnel() {
+        return Err(bad("enclosure.bad_value", "screens go under the gutters of a glasshouse; not yet in tunnels"));
+    }
+    if screens.len() > 3 {
+        return Err(bad("enclosure.bad_value", "an enclosure has at most three screens"));
+    }
+    if r.eave - SCREEN_DROP - SCREEN_STEP * (screens.len() as f64 - 1.0) < 2.2 {
+        return Err(bad("enclosure.bad_value", "the eaves are too low for screens (they hang 250 mm under the gutters, at least 2.2 m up)"));
+    }
+    for s in screens {
+        if let Some(m) = &s.material
+            && !screen_library().iter().any(|x| x.name.eq_ignore_ascii_case(m))
+        {
+            return Err(bad("enclosure.bad_value", format!("no screen material {m:?}; enclosure.screen_library lists them")));
+        }
+    }
+    Ok(())
+}
+
+/// One screen sheet's stored recipe: its corners in plan and its height above the level.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct ScreenRecipe {
+    pub kind: String,
+    pub level: String,
+    pub corners: [[f64; 2]; 4],
+    pub z: f64,
+}
+
+pub fn screen_recipe(e: &Element) -> Option<ScreenRecipe> {
+    let v = e.param(RECIPE_KEY)?;
+    (v.get("kind")?.as_str()? == SCREEN_RECIPE).then(|| serde_json::from_value(v.clone()).ok())?
+}
+
+fn screen_mesh(p: &ScreenRecipe, level_z: f64) -> Mesh {
+    let z0 = level_z + p.z;
+    let mut pts = Vec::with_capacity(8);
+    for z in [z0, z0 + SCREEN_THICKNESS] {
+        for q in p.corners {
+            pts.push([q[0], q[1], z]);
+        }
+    }
+    let idx: Vec<u32> = vec![0, 2, 1, 0, 3, 2, 4, 5, 6, 4, 6, 7, 0, 1, 5, 0, 5, 4, 1, 2, 6, 1, 6, 5, 2, 3, 7, 2, 7, 6, 3, 0, 4, 3, 4, 7];
+    (pts, idx)
+}
+
+/// Every screen sheet with its body.
+pub fn all_screens(store: &Store) -> Vec<(ElementId, Mesh)> {
+    store
+        .iter()
+        .filter_map(|e| {
+            let p = screen_recipe(e)?;
+            let z = crate::levels::elevation_of(store, &p.level).unwrap_or(0.0);
+            Some((e.id(), screen_mesh(&p, z)))
+        })
+        .collect()
+}
+
+fn screen_params(m: &ScreenMaterial) -> Vec<(String, Value)> {
+    let k = |p: &str| format!("{SCREEN_PSET}.{p}");
+    vec![
+        (k("Kind"), typed("IfcLabel", serde_json::to_value(m.kind).expect("serialises"))),
+        (k("Material"), typed("IfcLabel", json!(m.name))),
+        (k("LightTransmission"), typed("IfcNormalisedRatioMeasure", json!(m.light))),
+        (k("EnergySaving"), typed("IfcNormalisedRatioMeasure", json!(m.saving))),
+        (k("Porous"), typed("IfcBoolean", json!(m.porous))),
+    ]
+}
+
+/// The screens of enclosure `r`: a sheet per screen and span, under the gutters, inset clear
+/// of the posts on the inner gutter lines (80 mm) and of the outer and end posts, which stand
+/// inside the walls (350 mm from the walls).
+pub(crate) fn build_screens(txn: &mut Transaction<'_>, r: &EnclosureRecipe) -> Result<Vec<ElementId>> {
+    let mut out = Vec::new();
+    if r.screens.is_empty() || r.form.tunnel() {
+        return Ok(out);
+    }
+    let (wall, post) = (0.35, 0.08);
+    for (k, sc) in r.screens.iter().enumerate() {
+        let m = material_of(sc);
+        let z = r.eave - SCREEN_DROP - SCREEN_STEP * k as f64;
+        for i in 0..r.spans {
+            let y0 = r.span * f64::from(i) + if i == 0 { wall } else { post };
+            let y1 = r.span * f64::from(i + 1) - if i + 1 == r.spans { wall } else { post };
+            let (x0, x1) = (wall, r.length - wall);
+            let corners = [r.at(x0, y0), r.at(x1, y0), r.at(x1, y1), r.at(x0, y1)];
+            let recipe = ScreenRecipe { kind: SCREEN_RECIPE.into(), level: r.level.clone(), corners, z };
+            let mut n = NewElement::new("IfcShadingDevice")
+                .name(m.name)
+                .param("@PredefinedType", "USERDEFINED")
+                .param("@ObjectType", sc.kind.object_type())
+                .param(RECIPE_KEY, serde_json::to_value(&recipe).expect("serialises"));
+            for (key, v) in screen_params(&m) {
+                n = n.param(&key, v);
+            }
+            out.push(txn.create(n)?);
+        }
+    }
+    Ok(out)
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SetScreensParams {
+    pub enclosure_id: ElementRef,
+    /// The screens, replacing those it has ([] for none).
+    pub screens: Vec<Screen>,
+}
+
+/// `enclosure.set_screens`.
+pub(crate) fn set_screens(txn: &mut Transaction<'_>, p: SetScreensParams) -> Result<()> {
+    crate::enclosures::set(txn, crate::enclosures::SetParams { enclosure_id: p.enclosure_id, params: crate::enclosures::Params { screens: Some(p.screens), ..Default::default() } })
+}
+
+// ---- Quick heat loss (ARC-GLZ-011) ----
+
+/// One part's transmission.
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+pub struct HeatPart {
+    /// roof, glazed walls, knee walls.
+    pub part: String,
+    pub area: f64,
+    /// Area-weighted U (W/m²K) and U·A (W/K).
+    pub u: f64,
+    pub ua: f64,
+}
+
+/// What `enclosure.heat_loss` returns (W unless said).
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+pub struct HeatLoss {
+    pub parts: Vec<HeatPart>,
+    /// The construction factor, the wind factor, air changes per hour, volume (m³).
+    pub construction_factor: f64,
+    pub wind_factor: f64,
+    pub air_changes: f64,
+    pub volume: f64,
+    /// Inside and outside temperatures (°C) and their difference (K).
+    pub inside: f64,
+    pub outside: f64,
+    pub delta_t: f64,
+    pub transmission: f64,
+    pub infiltration: f64,
+    pub total: f64,
+    pub floor_area: f64,
+    /// W per m² of floor.
+    pub per_area: f64,
+    /// With the energy (or blackout) screen closed: the material, its saving and the loss.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub screen: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub with_screen: Option<f64>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct HeatLossParams {
+    pub enclosure_id: ElementRef,
+    /// °C: the inside set point (default the climate's night temperature, else 15) and the
+    /// outside design temperature (default the weather's heating design dry-bulb).
+    pub inside: Option<f64>,
+    pub outside: Option<f64>,
+    /// The design wind speed, m/s (default 6.7, 15 mph: no wind factor).
+    pub wind: Option<f64>,
+    /// Air changes per hour (default by the glazing).
+    pub air_changes: Option<f64>,
+}
+
+/// The glazed roofs' bar spacing across the slope (their glazing grid).
+const ROOF_BAR_SPACING: f64 = 1.125;
+
+/// The wind factor of the table method: 1.00 to 15 mph, rising 0.008 per mph, at most 1.16.
+pub fn wind_factor(speed: f64) -> f64 {
+    let mph = speed / 0.44704;
+    (1.0 + 0.008 * (mph - 15.0).max(0.0)).min(1.16)
+}
+
+/// `enclosure.heat_loss`.
+pub(crate) fn heat_loss(store: &Store, p: HeatLossParams) -> Result<HeatLoss> {
+    let (id, r) = enclosure(store, &p.enclosure_id)?;
+    let e = store.get(id).expect("resolved");
+    let climate = climate(e);
+    let inside = p.inside.or(climate.as_ref().and_then(|c| c.night_temperature)).unwrap_or(15.0);
+    let outside = match p.outside.or(crate::weather::get(store).design().heating_dry_bulb) {
+        Some(t) => t,
+        None => return Err(bad("growing.no_design", "give the outside design temperature, or import a weather file (Sustainability › Site › Weather)")),
+    };
+    if inside.partial_cmp(&outside) != Some(std::cmp::Ordering::Greater) {
+        return Err(bad("growing.bad_value", "the inside temperature must be above the outside one"));
+    }
+    let type_of = |x: &Element| x.param("@type").and_then(|v| store.get(store.find_by_guid(&GlobalId::parse(v.as_str()?)?)?));
+    let mut sums: BTreeMap<&'static str, (f64, f64)> = BTreeMap::new();
+    let mut plastic = false;
+    for part in r.parts.iter().filter_map(|g| store.get(store.find_by_guid(&GlobalId::parse(g)?)?)) {
+        let (key, area, u) = if crate::roofs::roof_recipe(part).is_some() {
+            let g = type_of(part).and_then(crate::glazing_library::of_type);
+            plastic |= g.as_ref().is_some_and(|g| g.safety == crate::glazing_library::Safety::Plastic);
+            let a = crate::roofs::regenerate(store, part).map_or(0.0, |g| g.area());
+            ("roof", a, g.map_or(5.8, |g| g.u))
+        } else if crate::curtain::curtain_recipe(part).is_some() {
+            let g = type_of(part).and_then(crate::glazing_library::of_type);
+            // Panels and mullions together: the wall's face.
+            let a = crate::curtain::regenerate(store, part).map_or(0.0, |g| g.parts.iter().map(|q| (q.x[1] - q.x[0]) * (q.z[1] - q.z[0])).sum());
+            ("glazed walls", a, g.map_or(5.8, |g| g.u))
+        } else if crate::walls::wall_recipe(part).is_some() {
+            let Ok(g) = crate::walls::regenerate(store, part) else { continue };
+            let u = type_of(part).and_then(|t| t.param("Pset_WallCommon.ThermalTransmittance")).and_then(|v| v.get("value")?.as_f64()).unwrap_or(1.0);
+            ("knee walls", g.length() * g.height, u)
+        } else {
+            continue;
+        };
+        let s = sums.entry(key).or_default();
+        s.0 += area;
+        s.1 += area * u;
+    }
+    let parts: Vec<HeatPart> = sums.into_iter().map(|(k, (a, ua))| HeatPart { part: k.into(), area: a, u: if a > 0.0 { ua / a } else { 0.0 }, ua }).collect();
+    let ua: f64 = parts.iter().map(|x| x.ua).sum();
+    // The construction factor by frame: glass on metal bars 1.08 when they are at most 0.6 m
+    // apart (16–24 in), 1.05 wider (48 in; the greenhouse glass's bars are 1.125 m apart); film
+    // or sheet on metal 1.02; anything on timber 1.00 (E-60).
+    let timber = r.frame_system.as_deref().and_then(crate::frame_library::entry).is_some_and(|f| f.frame.material == crate::frame_library::Material::Timber);
+    let construction_factor = if timber {
+        1.0
+    } else if r.form.tunnel() || plastic {
+        1.02
+    } else if ROOF_BAR_SPACING <= 0.6 {
+        1.08
+    } else {
+        1.05
+    };
+    let wind = p.wind.unwrap_or(6.7);
+    if !(0.0..=60.0).contains(&wind) {
+        return Err(bad("growing.bad_value", "the design wind speed is 0 to 60 m/s"));
+    }
+    let wind_factor = wind_factor(wind);
+    let air_changes = p.air_changes.unwrap_or(if r.form.tunnel() { 0.8 } else { 1.0 });
+    if !(0.0..=10.0).contains(&air_changes) {
+        return Err(bad("growing.bad_value", "air changes are 0 to 10 an hour"));
+    }
+    let floor_area = r.width() * r.length;
+    let volume = floor_area * (r.eave + 0.5 * (r.ridge() - r.eave));
+    let delta_t = inside - outside;
+    let transmission = ua * construction_factor * wind_factor * delta_t;
+    let infiltration = 0.33 * air_changes * volume * delta_t;
+    let total = transmission + infiltration;
+    let screen = r.screens.iter().find(|s| matches!(s.kind, ScreenKind::Energy | ScreenKind::Blackout)).map(material_of);
+    Ok(HeatLoss {
+        parts,
+        construction_factor,
+        wind_factor,
+        air_changes,
+        volume,
+        inside,
+        outside,
+        delta_t,
+        transmission,
+        infiltration,
+        total,
+        floor_area,
+        per_area: total / floor_area.max(1e-9),
+        with_screen: screen.as_ref().map(|m| total * (1.0 - m.saving)),
+        screen: screen.map(|m| m.name.to_owned()),
+    })
 }

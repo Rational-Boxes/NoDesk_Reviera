@@ -163,8 +163,22 @@ maintenance factor, and shows the count, mean PPFD, the DLI the lamps add, the l
 and a warning for fixtures below 2.3 µmol/J. They are laid out again when the greenhouse changes.
 <code>growing.lights</code>, <code>growing.set_lights</code>, <code>growing.lights_summary</code></p>
 
+<h2 id="screens">Screens and heat loss</h2>
+<p>In Properties › <b>Growing Climate</b>, <b>Screens</b> adds an energy screen (closed at night to
+keep the heat in), a shade screen (closed in bright sun), or both, and a blackout screen for
+short-day crops. They hang flat under the gutters, span by span, above the grow lights
+(<code>enclosure.set_screens</code> chooses their materials from <code>enclosure.screen_library</code>:
+porous shade screens of 50 % and 30 % light, energy screens of 35 % and 25 % light, a blackout
+screen). With a shade screen, the crop light says in how many months it would be closed.</p>
+<p><b>Heat Loss</b> shows the greenhouse's design heat loss by the published table method: the
+glazing's U-values times their areas, a construction factor for the frame and a wind factor, plus
+air leakage, between the crop's night temperature and the weather's heating design temperature
+(<code>enclosure.heat_loss</code> takes other temperatures, wind speeds and air changes). With an
+energy screen it also gives the loss with the screen closed. It is a quick estimate for sizing
+the heating; the full heating and cooling loads come later.</p>
+
 <h2 id="later">Coming later</h2>
 <p>Gutter-connected arch ranges; rafters, purlins and Venlo trusses; opening and closing vents in
-the view, and gutter vents; energy, shade and blackout screens, heating pipes, pad-and-fan cooling
+the view, and gutter vents; screens in tunnels, heating pipes, pad-and-fan cooling
 and CO₂ enrichment; shading devices; atriums; heating, cooling and energy analysis of the
 enclosure; residential conservatories and orangeries; and building-code checks.</p>
