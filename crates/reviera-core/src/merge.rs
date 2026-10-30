@@ -259,6 +259,62 @@ pub fn three_way(base: &Store, local: &Store, remote: &Store, policy: Policy) ->
     plan
 }
 
+/// An element in a change set.
+#[derive(Debug, Clone, PartialEq, Serialize, JsonSchema)]
+pub struct Changed {
+    pub guid: String,
+    pub class: String,
+    pub name: Option<String>,
+    /// For a modified element: the facets that differ (`class`, `name`, parameter names).
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub facets: Vec<String>,
+}
+
+/// What changed from one model to another (COL-BIM-008).
+#[derive(Debug, Clone, Default, Serialize, JsonSchema)]
+pub struct ChangeSet {
+    pub added: Vec<Changed>,
+    pub deleted: Vec<Changed>,
+    pub modified: Vec<Changed>,
+}
+
+impl ChangeSet {
+    pub fn is_empty(&self) -> bool {
+        self.added.is_empty() && self.deleted.is_empty() && self.modified.is_empty()
+    }
+}
+
+/// The changes from `a` to `b`, by GlobalId, ordered by GlobalId.
+pub fn diff(a: &Store, b: &Store) -> ChangeSet {
+    let index = |s: &Store| -> BTreeMap<String, Snap> { s.iter().map(|e| (e.guid().to_string(), Snap::of(e))).collect() };
+    let (ai, bi) = (index(a), index(b));
+    let item = |g: &String, s: &Snap, facets: Vec<String>| Changed { guid: g.clone(), class: s.class.clone(), name: s.name.clone(), facets };
+    let mut out = ChangeSet::default();
+    for g in ai.keys().chain(bi.keys()).collect::<BTreeSet<_>>() {
+        match (ai.get(g), bi.get(g)) {
+            (None, Some(y)) => out.added.push(item(g, y, Vec::new())),
+            (Some(x), None) => out.deleted.push(item(g, x, Vec::new())),
+            (Some(x), Some(y)) if !same_snap(x, y) => {
+                let mut facets = Vec::new();
+                if x.class != y.class {
+                    facets.push("class".to_owned());
+                }
+                if x.name != y.name {
+                    facets.push("name".to_owned());
+                }
+                for k in x.params.keys().chain(y.params.keys()).collect::<BTreeSet<_>>() {
+                    if !same_opt(x.params.get(k), y.params.get(k)) {
+                        facets.push(k.clone());
+                    }
+                }
+                out.modified.push(item(g, y, facets));
+            }
+            _ => {}
+        }
+    }
+    out
+}
+
 /// What applying a plan did.
 #[derive(Debug, Clone, Default, Serialize, JsonSchema)]
 pub struct Applied {
@@ -325,5 +381,28 @@ mod tests {
         assert!(same(&json!(3), &json!(3.0000000000001)));
         assert_eq!(value(Some(&json!(1)), Some(&json!(2)), Some(&json!(3)), "x", &mut c, Policy::Remote), Some(json!(3)));
         assert_eq!(c.len(), 1);
+    }
+
+    #[test]
+    fn a_diff_lists_what_was_added_deleted_and_changed() {
+        let mut a = crate::document::Document::new();
+        let mut t = a.transaction("x", crate::Origin::ui());
+        let w = t.create(NewElement::new("IfcWall").name("W").param("Pset_WallCommon.FireRating", json!("1h"))).unwrap();
+        let d = t.create(NewElement::new("IfcDoor")).unwrap();
+        t.commit();
+        let before = a.store().clone();
+        let mut t = a.transaction("y", crate::Origin::ui());
+        t.modify(w, |e| {
+            e.params.insert("Pset_WallCommon.FireRating".into(), json!("2h"));
+        })
+        .unwrap();
+        t.delete(d).unwrap();
+        t.create(NewElement::new("IfcWindow")).unwrap();
+        t.commit();
+        let c = diff(&before, a.store());
+        assert_eq!((c.added.len(), c.deleted.len(), c.modified.len()), (1, 1, 1));
+        assert_eq!(c.modified[0].facets, vec!["Pset_WallCommon.FireRating".to_owned()]);
+        assert_eq!((c.added[0].class.as_str(), c.deleted[0].class.as_str()), ("IfcWindow", "IfcDoor"));
+        assert!(diff(&before, &before).is_empty());
     }
 }

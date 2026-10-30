@@ -310,7 +310,9 @@ The MCP tool for `bimserver.login` never accepts a password from an agent; it ca
 
 **Acceptance criteria.**
 - [ ] Comparing two revisions lists exactly the elements changed between them, including a dimension text change in a view.
-- [ ] Restoring revision 12 creates revision 20 identical in content to revision 12, and revisions 13–19 remain in the history.
+- [x] Restoring revision 12 creates revision 20 identical in content to revision 12, and revisions 13–19 remain in the history.
+
+*Built (2026-10-29):* `bimserver.history(document_id?)` (newest first, with Reviera's `restore` label and the working copy's base marked); `bimserver.compare(roid_a?, roid_b?, document_id?) -> {added, deleted, modified}` by the merge's element-store diff (`reviera_core::merge::diff`): modified elements list the facets that changed (class, name, parameters); `roid_a` defaults to the base and `roid_b` to the working copy, so with neither it lists the local changes; `bimserver.restore(roid, reason, document_id?)`: refused unless the working copy is up to date with no local changes; the working copy becomes the revision (one undoable step) and is checked in with `[reviera:restore] Restored revision n: <reason>`. File › BIMserver… › Compare with Working Copy and Restore…. Not yet: the changes palette, highlighting in views, CSV and BCF export, *Open read-only*.
 
 ---
 
@@ -1710,9 +1712,9 @@ Every command below is registered once and is available from the UI, Lua and MCP
 | `bimserver.subscribe` | events[]? | () | No | COL-BIM-007 |
 | `bimserver.unsubscribe` | — | () | No | COL-BIM-007 |
 | `bimserver.set_update_frequency` | seconds_or_manual | () | No | COL-BIM-007 |
-| `bimserver.history` | — | revision_summary[] | No | COL-BIM-008 |
-| `bimserver.compare` | roid_a, roid_b | change_set | No | COL-BIM-008 |
-| `bimserver.restore` | roid, reason | roid | No | COL-BIM-008 |
+| `bimserver.history` | document_id? | revision_summary[] | No (query) | COL-BIM-008 |
+| `bimserver.compare` | roid_a?, roid_b?, document_id? | change_set | No (query) | COL-BIM-008 |
+| `bimserver.restore` | roid, reason, document_id? | {poid, roid, revision} | No | COL-BIM-008 |
 | `merge.preview` | base_path?, remote_path? | merge_summary | No | COL-MRG-001 |
 | `merge.three_way` | base_path, local_path, remote_path, out_path, policy? | merge_report | No | COL-MRG-001 |
 | `merge.list_conflicts` | — | conflict[] | No | COL-MRG-002 |

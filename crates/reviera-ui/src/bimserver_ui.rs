@@ -23,6 +23,8 @@ const CHECK_IN: i32 = 7208;
 const RELOAD: i32 = 7209;
 const GET_LATEST: i32 = 7210;
 const SYNC: i32 = 7211;
+const COMPARE: i32 = 7212;
+const RESTORE: i32 = 7213;
 
 /// What the dialog shows: the servers, the chosen one's projects and the chosen project's
 /// revisions (newest first), and a note under them.
@@ -140,8 +142,20 @@ fn browser(frame: &Frame, s: &Shown<'_>) -> Closed {
     let connected = s.server.and_then(|k| s.servers.get(k)).is_some_and(|x| x["connected"].as_bool() == Some(true));
     let has_server = s.server.is_some_and(|k| k < s.servers.len());
     let has_project = s.project.is_some_and(|k| k < s.projects.len());
-    let buttons = BoxSizer::builder(Orientation::Horizontal).build();
-    for (code, label, tip, on) in [
+    let has_revision = connected && s.working_copy && !s.revisions.is_empty();
+    let row = |items: &[(i32, &str, &str, bool)]| {
+        let r = BoxSizer::builder(Orientation::Horizontal).build();
+        for (code, label, tip, on) in items {
+            let b = Button::builder(&dialog).with_label(label).build();
+            b.set_tooltip(tip);
+            b.enable(*on);
+            let (d, code) = (dialog, *code);
+            b.on_click(move |_| d.end_modal(code));
+            r.add(&b, 0, SizerFlag::Right, 4);
+        }
+        r
+    };
+    let servers = row(&[
         (ADD, "Add Server…", "Add a BIMserver by its address", true),
         (LOGIN, "Log In…", "Log in with a user name and password, or a user token", has_server),
         (LOGOUT, "Log Out", "End the session; the stored password or token can be forgotten too", connected),
@@ -149,20 +163,22 @@ fn browser(frame: &Frame, s: &Shown<'_>) -> Closed {
         (OPEN_LATEST, "Open Latest", "Open the project's latest revision as a working copy (or its working copy here)", connected && has_project),
         (OPEN_REVISION, "Open Revision", "Open the chosen revision as a new working copy", connected && has_project && !s.revisions.is_empty()),
         (PUBLISH, "Publish Current Project…", "Check the open Local project in to the chosen project, making it that project's working copy", connected && has_project && !s.working_copy),
+    ]);
+    let copy = row(&[
         (GET_LATEST, "Get Latest", "Merge the newest revision into the open working copy; your changes stay local", connected && s.working_copy),
         (SYNC, "Synchronise…", "Get the latest revision, merge it, and check the working copy in", connected && s.working_copy),
         (CHECK_IN, "Check In…", "Upload the open working copy as a new revision of its project", connected && s.working_copy),
-    ] {
-        let b = Button::builder(&dialog).with_label(label).build();
-        b.set_tooltip(tip);
-        b.enable(on);
-        let d = dialog;
-        b.on_click(move |_| d.end_modal(code));
-        buttons.add(&b, 0, SizerFlag::Right, 4);
-    }
-    buttons.add_stretch_spacer(1);
+        (COMPARE, "Compare with Working Copy", "What differs between the chosen revision and the open working copy", has_revision),
+        (RESTORE, "Restore…", "Check the chosen revision in again as the latest (the history is kept)", has_revision),
+    ]);
+    let buttons = BoxSizer::builder(Orientation::Vertical).build();
+    buttons.add_sizer(&servers, 0, SizerFlag::Bottom, 6);
+    let last = BoxSizer::builder(Orientation::Horizontal).build();
+    last.add_sizer(&copy, 0, SizerFlag::empty(), 0);
+    last.add_stretch_spacer(1);
     let close = Button::builder(&dialog).with_id(ID_CANCEL).with_label("Close").build();
-    buttons.add(&close, 0, SizerFlag::Expand, 0);
+    last.add(&close, 0, SizerFlag::Expand, 0);
+    buttons.add_sizer(&last, 0, SizerFlag::Expand, 0);
 
     let sizer = BoxSizer::builder(Orientation::Vertical).build();
     sizer.add_sizer(&top, 0, SizerFlag::Expand | SizerFlag::All, 12);
@@ -326,6 +342,32 @@ impl Gui {
                     }
                 }
                 GET_LATEST => note = self.merge_latest(None),
+                COMPARE => {
+                    if let Some(r) = closed.revision.and_then(|k| revisions.get(k)) {
+                        note = self.compare_revision(r);
+                    }
+                }
+                RESTORE => {
+                    if let Some(r) = closed.revision.and_then(|k| revisions.get(k)) {
+                        let f = super::reinforcement_ui::Form::new(&frame, &format!("Restore Revision {}", r["number"]));
+                        let reason = f.text("Reason", "", "Why this revision is restored (required)");
+                        let ok = f.show("Checked in again as the latest revision; later ones stay in the history.", "Restore");
+                        let why = reason.get_value();
+                        f.dialog.destroy();
+                        if ok {
+                            frame.set_status_text("Restoring…", 0);
+                            note = match self.run("bimserver.restore", json!({ "roid": r["roid"], "reason": why })) {
+                                Ok(o) => {
+                                    self.refresh_scene(&frame);
+                                    self.update_title(&frame);
+                                    format!("Revision {} restored as revision {}.", r["number"], o["revision"])
+                                }
+                                Err(e) => format!("Not restored: {e}"),
+                            };
+                            frame.set_status_text("", 0);
+                        }
+                    }
+                }
                 SYNC => {
                     let f = super::reinforcement_ui::Form::new(&frame, "Synchronise");
                     let comment = f.text("Comment", "", "What changed (required)");
@@ -434,6 +476,7 @@ impl Gui {
         frame.set_status_text("", 0);
         Some(match out {
             Ok(o) => {
+                self.refresh_scene(&frame);
                 self.update_title(&frame);
                 format!("Published as revision {} of {name}; the open project is now its working copy.", o["revision"])
             }
@@ -503,6 +546,36 @@ impl Gui {
                 }
             };
         }
+    }
+
+    /// Compare with Working Copy: the changes from revision `r` to the open working copy, shown
+    /// in a message; a summary for the dialog's note.
+    fn compare_revision(&mut self, r: &Value) -> String {
+        let frame = self.frame;
+        frame.set_status_text("Comparing…", 0);
+        let out = self.run("bimserver.compare", json!({ "roid_a": r["roid"] }));
+        frame.set_status_text("", 0);
+        let c = match out {
+            Ok(c) => c,
+            Err(e) => return format!("Not compared: {e}"),
+        };
+        let list = |k: &str| c[k].as_array().cloned().unwrap_or_default();
+        let (added, deleted, modified) = (list("added"), list("deleted"), list("modified"));
+        let summary = format!("Since revision {}: {} added, {} deleted, {} modified.", r["number"], added.len(), deleted.len(), modified.len());
+        if added.is_empty() && deleted.is_empty() && modified.is_empty() {
+            return format!("The working copy is the same as revision {}.", r["number"]);
+        }
+        let line = |e: &Value, what: &str| {
+            let facets: Vec<&str> = e["facets"].as_array().into_iter().flatten().filter_map(Value::as_str).take(4).collect();
+            let more = if facets.is_empty() { String::new() } else { format!(" ({})", facets.join(", ")) };
+            format!("{what} {} {}{more}", e["class"].as_str().unwrap_or(""), e["name"].as_str().unwrap_or(""))
+        };
+        let mut lines: Vec<String> = added.iter().map(|e| line(e, "+")).chain(deleted.iter().map(|e| line(e, "−"))).chain(modified.iter().map(|e| line(e, "~"))).collect();
+        let total = lines.len();
+        lines.truncate(25);
+        let more = if total > 25 { format!("\n… and {} more", total - 25) } else { String::new() };
+        MessageDialog::builder(&frame, &format!("{summary}\n\n{}{more}", lines.join("\n")), "Compare").with_style(MessageDialogStyle::OK | MessageDialogStyle::IconInformation).build().show_modal();
+        summary
     }
 
     /// Check In…: a message for the dialog's note.

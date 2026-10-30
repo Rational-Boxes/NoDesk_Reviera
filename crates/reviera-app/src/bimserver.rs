@@ -1039,3 +1039,120 @@ host!(MergeThreeWay, "merge.three_way", "Merge three IFC files",
     out.written = true;
     Ok(out)
 });
+
+// ---- History, compare and restore (COL-BIM-008) ----
+
+/// A revision's label from its comment: `restore` or `ownership` for Reviera's own kinds.
+fn label(comment: &str) -> Option<String> {
+    let c = comment.trim_start();
+    c.strip_prefix("[reviera:").and_then(|r| r.split_once(']')).map(|(k, _)| k.to_owned())
+}
+
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct HistoryRow {
+    #[serde(flatten)]
+    pub revision: RevisionOut,
+    /// `restore` for a restored revision (comment `[reviera:restore] …`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+    /// The working copy's base.
+    pub base: bool,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct HistoryParams {
+    pub document_id: Option<DocumentId>,
+}
+
+host!(BimHistory, "bimserver.history", "List the working copy's revisions",
+    "The revisions of the open working copy's project, newest first (COL-BIM-008): number, date, user, \
+     comment, size, Reviera's label (restore), and which one is the working copy's base.",
+    [Read, Network], Option<HistoryParams>, Vec<HistoryRow>, |app, caller, p| {
+    let (_, _, st) = app.working_copy(p.and_then(|p| p.document_id))?;
+    let revs = BimListRevisions.run(app, caller, ProjectParams { server_id: st.server_id.clone(), poid: st.poid })?;
+    Ok(revs.into_iter().rev().map(|r| HistoryRow { label: label(&r.comment), base: r.roid == st.base_roid, revision: r }).collect())
+});
+
+/// Revision `roid` of the working copy's project, downloaded to `path` and read.
+fn revision_store(app: &mut App, st: &WorkingState, roid: i64, path: &Path) -> Result<reviera_core::Store> {
+    let schema = st.schema.clone();
+    let bytes = app.bimserver.with(&st.server_id, |c| {
+        let s = c.ifc_serializer(&schema)?;
+        c.download(roid, s.oid)
+    })?;
+    std::fs::write(path, &bytes).map_err(|e| bad("bimserver.working_copy", e.to_string()))?;
+    let store = open_store(path);
+    let _ = std::fs::remove_file(path);
+    store
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct CompareParams {
+    /// The older revision; the working copy's base when absent.
+    pub roid_a: Option<i64>,
+    /// The newer revision; the working copy itself (its local changes) when absent.
+    pub roid_b: Option<i64>,
+    pub document_id: Option<DocumentId>,
+}
+
+host!(BimCompare, "bimserver.compare", "Compare revisions",
+    "The changes between two revisions of the working copy's project (COL-BIM-008): elements added, \
+     deleted and modified (with the class, name or parameters that changed), by GlobalId. `roid_a` defaults \
+     to the working copy's base and `roid_b` to the working copy itself, so with neither it lists the local \
+     changes not yet checked in.",
+    [Read, Network], CompareParams, reviera_core::merge::ChangeSet, |app, caller, p| {
+    let (id, path, st) = app.working_copy(p.document_id)?;
+    let folder = path.parent().expect("in its folder").to_owned();
+    let a = match p.roid_a.filter(|r| *r != st.base_roid) {
+        Some(r) => revision_store(app, &st, r, &folder.join("compare-a.ifc"))?,
+        None => open_store(&folder.join(BASE))?,
+    };
+    let b = match p.roid_b {
+        Some(r) => revision_store(app, &st, r, &folder.join("compare-b.ifc"))?,
+        None => app.get(id)?.doc.store().clone(),
+    };
+    Ok(reviera_core::merge::diff(&a, &b))
+});
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct RestoreParams {
+    pub roid: i64,
+    pub reason: String,
+    pub document_id: Option<DocumentId>,
+}
+
+host!(BimRestore, "bimserver.restore", "Restore a revision as the latest",
+    "Restore as latest (COL-BIM-008): checks revision `roid`'s content in as a new revision, with the \
+     comment `[reviera:restore] Restored revision n: <reason>`; the history is kept. The open working copy \
+     must be up to date and have no local changes (synchronise or discard them first); it then becomes the \
+     restored model, as one undoable step. Returns the new revision.",
+    [Network, Edit, FileWrite], RestoreParams, CheckInOut, |app, caller, p| {
+    let reason = p.reason.trim().to_owned();
+    if reason.is_empty() {
+        return Err(bad("bimserver.no_comment", "say why the revision is restored"));
+    }
+    let (id, path, st) = app.working_copy(p.document_id)?;
+    let folder = path.parent().expect("in its folder").to_owned();
+    let poid = st.poid;
+    let (project, revs) = app.bimserver.with(&st.server_id, |c| Ok((c.project(poid)?, c.revisions(poid)?)))?;
+    if project.last_revision.is_some_and(|r| r != st.base_roid) {
+        return Err(bad("bimserver.out_of_date", "get the latest revision first: the restore is checked in over it"));
+    }
+    let base = open_store(&folder.join(BASE))?;
+    if !reviera_core::merge::diff(&base, app.get(id)?.doc.store()).is_empty() {
+        return Err(bad("bimserver.local_changes", "the working copy has changes not checked in; synchronise them or undo them first"));
+    }
+    let number = revs.iter().find(|r| r.oid == p.roid).map(|r| r.number).ok_or_else(|| bad("bimserver.no_revision", format!("revision {} is not one of {}'s", p.roid, st.project)))?;
+    let restored = revision_store(app, &st, p.roid, &folder.join("restore.ifc"))?;
+    // The working copy becomes the restored model (base == local, so the merge takes it all).
+    let plan = reviera_core::merge::three_way(&base, app.get(id)?.doc.store(), &restored, reviera_core::merge::Policy::Remote);
+    let doc = &mut app.get_mut(id)?.doc;
+    let mut txn = doc.transaction(format!("Restore Revision {number}"), reviera_core::Origin::ui());
+    reviera_core::merge::apply(&mut txn, &plan)?;
+    txn.commit();
+    app.save(id, None)?;
+    check_in(app, id, &folder, st, &format!("[reviera:restore] Restored revision {number}: {reason}"))
+});

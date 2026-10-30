@@ -382,6 +382,41 @@ fn three_files_merge_into_a_fourth() {
     assert_eq!(wall_start(&app, &guid), [0.0, 2.0]);
 }
 
+#[test]
+fn revisions_are_compared_and_restored() {
+    let (url, _fake) = server();
+    let dir = tempfile::tempdir().unwrap();
+    let mut a = new_app(dir.path());
+    let id = run(&mut a, "bimserver.add_server", json!({ "name": "Office", "url": url })).unwrap()["id"].as_str().unwrap().to_owned();
+    run(&mut a, "bimserver.login", json!({ "server_id": id, "username": "anna@example.org", "password": "right" })).unwrap();
+    run(&mut a, "file.new", json!({})).unwrap();
+    let level = run(&mut a, "level.list", json!({})).unwrap()[0]["id"].clone();
+    let w = run(&mut a, "wall.create", json!({ "curve": { "line": { "start": [0, 0], "end": [6, 0] } }, "base_level": level, "top_constraint": { "unconnected": 3.0 } })).unwrap();
+    run(&mut a, "file.save_as", json!({ "path": dir.path().join("a.ifc") })).unwrap();
+    let r1 = run(&mut a, "bimserver.publish_local", json!({ "server_id": id, "poid": 131073, "comment": "One wall" })).unwrap()["roid"].clone();
+    run(&mut a, "wall.create", json!({ "curve": { "line": { "start": [0, 9], "end": [6, 9] } }, "base_level": level, "top_constraint": { "unconnected": 3.0 } })).unwrap();
+    let r2 = run(&mut a, "bimserver.check_in", json!({ "comment": "Two walls" })).unwrap()["roid"].clone();
+    let c = run(&mut a, "bimserver.compare", json!({ "roid_a": r1, "roid_b": r2 })).unwrap();
+    assert_eq!((c["added"].as_array().unwrap().len(), c["deleted"].as_array().unwrap().len()), (1, 0), "{c}");
+    assert_eq!(c["added"][0]["class"], "IfcWall");
+    // Local changes not yet checked in: the moved wall.
+    run(&mut a, "element.move", json!({ "element_ids": [w], "vector": [0, 1, 0] })).unwrap();
+    let c = run(&mut a, "bimserver.compare", json!({})).unwrap();
+    assert!(c["modified"].as_array().unwrap().iter().any(|m| m["class"] == "IfcWall"), "{c}");
+    // A restore over local changes is refused; undone, the first revision is restored as the third.
+    assert_eq!(run(&mut a, "bimserver.restore", json!({ "roid": r1, "reason": "back" })).unwrap_err().code, "bimserver.local_changes");
+    run(&mut a, "edit.undo", json!({})).unwrap();
+    assert_eq!(run(&mut a, "bimserver.restore", json!({ "roid": r1, "reason": " " })).unwrap_err().code, "bimserver.no_comment");
+    let r3 = run(&mut a, "bimserver.restore", json!({ "roid": r1, "reason": "the second wall was a mistake" })).unwrap();
+    assert_eq!(r3["revision"], 3);
+    assert_eq!(walls(&a), 1);
+    let h = run(&mut a, "bimserver.history", json!({})).unwrap();
+    let h = h.as_array().unwrap();
+    assert_eq!(h.len(), 3);
+    assert!(h[0]["label"] == "restore" && h[0]["base"] == true && h[0]["comment"].as_str().unwrap().starts_with("[reviera:restore] Restored revision 1: the second wall was a mistake"), "{:?}", h[0]);
+    assert!(run(&mut a, "bimserver.compare", json!({ "roid_a": r1, "roid_b": r3["roid"] })).unwrap()["modified"].as_array().unwrap().is_empty());
+}
+
 fn var(k: &str) -> Option<String> {
     std::env::var(k).ok().filter(|v| !v.trim().is_empty())
 }

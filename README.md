@@ -1770,10 +1770,11 @@ area by area (reviewed against the spec on 2026-10-15).
   working copy; opening a project as a working copy (`<data>/reviera/bimserver/<server>/<poid>/`,
   never overwriting local work); checking in, refused while the server has a newer revision;
   downloading a revision as IFC; Get Latest and Synchronise, merging other users' changes three-way
-  element by element and parameter by parameter, stopping at conflicts for a choice of side
+  element by element and parameter by parameter, stopping at conflicts for a choice of side;
+  the revision history, comparing revisions and restoring one as the latest
   (`bimserver.*`, `merge.three_way`, `model.mode`; the client is `clients/bimserver`, MIT).
   Checked against BIMserver 1.6.1. **Not yet:** the sync lock, conflicts decided one by one,
-  notifications, history, worksets and ownership, streamed
+  notifications, worksets and ownership, streamed
   upload of large models, and calls off the UI thread. File › BIMserver... lists servers, projects and revisions, logs in, opens, publishes and checks in.
 - **Families and collaboration** (OpenCDE, Godot) are specified but not started.
 - **Remote computation subsystem** (DM-RPC-001 … 010): in development; the first milestone is

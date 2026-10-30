@@ -10,6 +10,7 @@ project as a working copy on your computer, and check your changes in as new rev
   <a href="#publish">Publishing a project</a>
   <a href="#checkin">Checking in</a>
   <a href="#sync">Get Latest and Synchronise</a>
+  <a href="#history">Comparing and restoring revisions</a>
   <a href="#security">How passwords are kept</a>
   <a href="#later">Coming later</a>
 </nav>
@@ -55,6 +56,12 @@ or one of you deleted what the other changed, is there a <b>conflict</b>. Revier
 conflicts and changes nothing until you choose: keep your changes, take the server's, or
 cancel.</p>
 
+<h2 id="history">Comparing and restoring revisions</h2>
+<p>Choose a revision and <b>Compare with Working Copy</b> to see what differs between it and the
+open working copy: the elements added, deleted and changed, with the properties that changed.
+<b>Restore…</b> checks the chosen revision in again as the newest one, with your reason; the
+revisions after it stay in the history. Synchronise or undo your own changes first.</p>
+
 <h2 id="security">How passwords are kept</h2>
 <p>Your password or user token is kept in the system keychain (or, where there is none, only until
 Reviera closes), never in a Reviera file or a project. Server addresses and user names are your own
@@ -63,9 +70,10 @@ session you started, but can never log in with a password or remove a server.</p
 <p><code>bimserver.add_server</code>, <code>bimserver.login</code>, <code>bimserver.list_projects</code>,
 <code>bimserver.list_revisions</code>, <code>bimserver.open</code>, <code>bimserver.publish_local</code>,
 <code>bimserver.check_in</code>, <code>bimserver.get_latest</code>, <code>bimserver.sync</code>,
+<code>bimserver.history</code>, <code>bimserver.compare</code>, <code>bimserver.restore</code>,
 <code>bimserver.download_revision</code>, <code>merge.three_way</code>, <code>model.mode</code></p>
 
 <h2 id="later">Coming later</h2>
 <p>Choosing a side conflict by conflict, a lock so two people cannot synchronise at the same
-moment, change notifications, the revision history and restore, worksets and element ownership,
+moment, change notifications, worksets and element ownership,
 progress and cancel for large downloads and uploads.</p>
