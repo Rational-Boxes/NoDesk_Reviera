@@ -785,7 +785,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `bimserver.compare` | 6 | roid_a, roid_b | change_set | No | COL-BIM-008 |
 | `bimserver.create_project` | 6 | server_id, name, schema?, parent_poid? | poid | No | COL-BIM-002 |
 | `bimserver.download_revision` | 6 | server_id, roid, path, schema? | bytes | No | COL-BIM-003 |
-| `bimserver.get_latest` | 6 | — | sync_report | No | COL-BIM-005 |
+| `bimserver.get_latest` | 6 | document_id?, conflicts? | sync_report | No | COL-BIM-005 |
 | `bimserver.history` | 6 | — | revision_summary[] | No | COL-BIM-008 |
 | `bimserver.list_projects` | 6 | server_id | project_summary[] | No | COL-BIM-002 |
 | `bimserver.list_revisions` | 6 | server_id, poid | revision_summary[] | No | COL-BIM-002 |
@@ -799,7 +799,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `bimserver.set_sync_reminder` | 6 | minutes? | () | No | COL-BIM-006 |
 | `bimserver.set_update_frequency` | 6 | seconds_or_manual | () | No | COL-BIM-007 |
 | `bimserver.subscribe` | 6 | events[]? | () | No | COL-BIM-007 |
-| `bimserver.sync` | 6 | comment, relinquish?: {worksets?, elements?}, save_before?, save_after? | sync_report | No | COL-BIM-006 |
+| `bimserver.sync` | 6 | comment, document_id?, conflicts? (relinquish?, save_before?, save_after? not yet) | sync_report | No | COL-BIM-006 |
 | `bimserver.unsubscribe` | 6 | — | () | No | COL-BIM-007 |
 | `bolt_pattern.create` | 4 | element_ids[], face_ref, pattern: "rect"\ | "circle", params | id | Yes |
 | `boundary_condition.at_column_bases` | 4 | state? | node_ids[] | Yes | STR-BC-001 |

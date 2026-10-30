@@ -274,6 +274,114 @@ fn publish_open_and_check_in_through_a_server() {
     assert!(fake.lock().unwrap().calls.iter().any(|c| c == "cleanupLongAction"));
 }
 
+/// The start of the wall with GlobalId `guid` in the active document.
+fn wall_start(app: &App, guid: &str) -> [f64; 2] {
+    let store = app.document(app.active().unwrap()).unwrap().doc.store();
+    let id = store.find_by_guid(&reviera_core::GlobalId::parse(guid).unwrap()).expect("the wall is there");
+    reviera_core::walls::wall_recipe(store.get(id).unwrap()).unwrap().curve.start
+}
+
+fn walls(app: &App) -> usize {
+    count(app, "IfcWall").0
+}
+
+#[test]
+fn two_users_synchronise_and_their_changes_merge() {
+    let (url, _fake) = server();
+    let dir_a = tempfile::tempdir().unwrap();
+    let dir_b = tempfile::tempdir().unwrap();
+    let mut a = new_app(dir_a.path());
+    let mut b = new_app(dir_b.path());
+    let mut ids = Vec::new();
+    for app in [&mut a, &mut b] {
+        let id = run(app, "bimserver.add_server", json!({ "name": "Office", "url": url })).unwrap()["id"].as_str().unwrap().to_owned();
+        run(app, "bimserver.login", json!({ "server_id": id, "username": "anna@example.org", "password": "right" })).unwrap();
+        ids.push(id);
+    }
+    // A publishes two walls 10 m apart.
+    run(&mut a, "file.new", json!({})).unwrap();
+    let level = run(&mut a, "level.list", json!({})).unwrap()[0]["id"].clone();
+    let wall = |app: &mut App, y: f64| {
+        let id = run(app, "wall.create", json!({ "curve": { "line": { "start": [0, y], "end": [6, y] } }, "base_level": level, "top_constraint": { "unconnected": 3.0 } })).unwrap();
+        let store = app.document(app.active().unwrap()).unwrap().doc.store();
+        (id.clone(), store.get(reviera_core::ElementId(id.as_u64().unwrap())).unwrap().guid().to_string())
+    };
+    let (w1, g1) = wall(&mut a, 0.0);
+    let (_, g2) = wall(&mut a, 10.0);
+    run(&mut a, "file.save_as", json!({ "path": dir_a.path().join("a.ifc") })).unwrap();
+    run(&mut a, "bimserver.publish_local", json!({ "server_id": ids[0], "poid": 131073, "comment": "Two walls" })).unwrap();
+    assert!(run(&mut a, "bimserver.get_latest", json!({})).unwrap()["up_to_date"].as_bool().unwrap());
+    run(&mut b, "bimserver.open", json!({ "server_id": ids[1], "poid": 131073 })).unwrap();
+
+    // A moves the first wall and synchronises; B moves the second and synchronises.
+    run(&mut a, "element.move", json!({ "element_ids": [w1], "vector": [0, 1, 0] })).unwrap();
+    let r = run(&mut a, "bimserver.sync", json!({ "comment": "Wall 1 north" })).unwrap();
+    assert!(r["up_to_date"].as_bool().unwrap() && r["checked_in"]["revision"] == 2, "{r}");
+    let store = b.document(b.active().unwrap()).unwrap().doc.store();
+    let w2b = store.find_by_guid(&reviera_core::GlobalId::parse(&g2).unwrap()).unwrap();
+    run(&mut b, "element.move", json!({ "element_ids": [w2b.0], "vector": [0, 1, 0] })).unwrap();
+    // B's check-in alone is refused: the server moved on.
+    assert_eq!(run(&mut b, "bimserver.check_in", json!({ "comment": "x" })).unwrap_err().code, "bimserver.out_of_date");
+    let r = run(&mut b, "bimserver.sync", json!({ "comment": "Wall 2 north" })).unwrap();
+    assert!(!r["up_to_date"].as_bool().unwrap() && r["applied"].as_bool().unwrap() && r["conflicts"].as_array().unwrap().is_empty(), "{r}");
+    assert_eq!(r["checked_in"]["revision"], 3);
+    assert_eq!((wall_start(&b, &g1), wall_start(&b, &g2)), ([0.0, 1.0], [0.0, 11.0]), "B has both moves");
+    // A gets B's move, keeping its own.
+    let r = run(&mut a, "bimserver.get_latest", json!({})).unwrap();
+    assert!(r["applied"].as_bool().unwrap() && r["updated"].as_u64().unwrap() >= 1, "{r}");
+    assert_eq!((wall_start(&a, &g1), wall_start(&a, &g2)), ([0.0, 1.0], [0.0, 11.0]), "A has both moves");
+    // Get Latest is one undoable step.
+    assert_eq!(run(&mut a, "bimserver.get_latest", json!({})).unwrap()["up_to_date"], true);
+
+    // Each adds a wall: both arrive, on the one level.
+    wall(&mut a, 20.0);
+    run(&mut a, "bimserver.sync", json!({ "comment": "Wall 3" })).unwrap();
+    wall(&mut b, 30.0);
+    let r = run(&mut b, "bimserver.sync", json!({ "comment": "Wall 4" })).unwrap();
+    assert!(r["conflicts"].as_array().unwrap().is_empty(), "{r}");
+    assert_eq!(walls(&b), 4);
+    run(&mut a, "bimserver.get_latest", json!({})).unwrap();
+    assert_eq!(walls(&a), 4);
+
+    // Both move the first wall, differently: a conflict, and nothing changes until a side is chosen.
+    run(&mut a, "element.move", json!({ "element_ids": [w1], "vector": [2, 0, 0] })).unwrap();
+    run(&mut a, "bimserver.sync", json!({ "comment": "Wall 1 east" })).unwrap();
+    let store = b.document(b.active().unwrap()).unwrap().doc.store();
+    let w1b = store.find_by_guid(&reviera_core::GlobalId::parse(&g1).unwrap()).unwrap();
+    run(&mut b, "element.move", json!({ "element_ids": [w1b.0], "vector": [-2, 0, 0] })).unwrap();
+    let r = run(&mut b, "bimserver.sync", json!({ "comment": "Wall 1 west" })).unwrap();
+    let conflicts = r["conflicts"].as_array().unwrap();
+    assert!(!conflicts.is_empty() && !r["applied"].as_bool().unwrap() && r["checked_in"].is_null(), "{r}");
+    assert_eq!(conflicts[0]["guid"], g1.as_str());
+    assert_eq!(wall_start(&b, &g1), [-2.0, 1.0], "unchanged while the conflict waits");
+    let r = run(&mut b, "bimserver.get_latest", json!({ "conflicts": "remote" })).unwrap();
+    assert!(r["applied"].as_bool().unwrap(), "{r}");
+    assert_eq!(wall_start(&b, &g1), [2.0, 1.0], "A's move won");
+}
+
+#[test]
+fn three_files_merge_into_a_fourth() {
+    let dir = tempfile::tempdir().unwrap();
+    let f = |n: &str| dir.path().join(n);
+    let mut app = new_app(dir.path());
+    run(&mut app, "file.new", json!({})).unwrap();
+    let level = run(&mut app, "level.list", json!({})).unwrap()[0]["id"].clone();
+    let w = run(&mut app, "wall.create", json!({ "curve": { "line": { "start": [0, 0], "end": [6, 0] } }, "base_level": level, "top_constraint": { "unconnected": 3.0 } })).unwrap();
+    let guid = app.document(app.active().unwrap()).unwrap().doc.store().get(reviera_core::ElementId(w.as_u64().unwrap())).unwrap().guid().to_string();
+    run(&mut app, "file.save_as", json!({ "path": f("base.ifc") })).unwrap();
+    // Local: the wall moved. Remote: another wall added.
+    run(&mut app, "element.move", json!({ "element_ids": [w], "vector": [0, 2, 0] })).unwrap();
+    run(&mut app, "file.save_as", json!({ "path": f("local.ifc") })).unwrap();
+    run(&mut app, "file.open", json!({ "path": f("base.ifc") })).unwrap();
+    run(&mut app, "wall.create", json!({ "curve": { "line": { "start": [0, 9], "end": [6, 9] } }, "base_level": level, "top_constraint": { "unconnected": 3.0 } })).unwrap();
+    run(&mut app, "file.save_as", json!({ "path": f("remote.ifc") })).unwrap();
+    let r = run(&mut app, "merge.three_way", json!({ "base_path": f("base.ifc"), "local_path": f("local.ifc"), "remote_path": f("remote.ifc"), "out_path": f("out.ifc") })).unwrap();
+    assert!(r["written"].as_bool().unwrap() && r["conflicts"].as_array().unwrap().is_empty() && r["created"].as_u64().unwrap() >= 1, "{r}");
+    run(&mut app, "file.open", json!({ "path": f("out.ifc") })).unwrap();
+    assert_eq!(walls(&app), 2);
+    assert_eq!(wall_start(&app, &guid), [0.0, 2.0]);
+}
+
 fn var(k: &str) -> Option<String> {
     std::env::var(k).ok().filter(|v| !v.trim().is_empty())
 }
@@ -323,6 +431,16 @@ fn a_real_server_round_trip() {
     run(&mut b, "wall.create", json!({ "curve": { "line": { "start": [30, 30], "end": [34, 30] } }, "base_level": level, "top_constraint": { "unconnected": 3.0 } })).unwrap();
     let r = run(&mut b, "bimserver.check_in", json!({ "comment": "Reviera live test: a wall" })).unwrap();
     assert!(r["revision"].as_i64().unwrap() > published["revision"].as_i64().unwrap());
-    // The first computer is behind now.
+    // The first computer is behind now: a check-in is refused, synchronising merges B's wall in.
     assert_eq!(run(&mut a, "bimserver.check_in", json!({ "comment": "x" })).unwrap_err().code, "bimserver.out_of_date");
+    let level = run(&mut a, "level.list", json!({})).unwrap()[0]["id"].clone();
+    run(&mut a, "wall.create", json!({ "curve": { "line": { "start": [30, 40], "end": [34, 40] } }, "base_level": level, "top_constraint": { "unconnected": 3.0 } })).unwrap();
+    let r = run(&mut a, "bimserver.sync", json!({ "comment": "Reviera live test: a wall from A" })).unwrap();
+    eprintln!("sync report: created {} updated {} deleted {} remote {} merged {} conflicts {}", r["created"], r["updated"], r["deleted"], r["remote_changes"], r["merged"], r["conflicts"].as_array().map_or(0, Vec::len));
+    assert!(r["applied"].as_bool().unwrap() && r["conflicts"].as_array().unwrap().is_empty(), "{r}");
+    assert_eq!(count(&a, "IfcWall").0, walls.0 + 2, "both computers' walls");
+    // B gets A's wall.
+    let r = run(&mut b, "bimserver.get_latest", json!({})).unwrap();
+    eprintln!("get latest report: created {} updated {} deleted {} remote {} conflicts {}", r["created"], r["updated"], r["deleted"], r["remote_changes"], r["conflicts"].as_array().map_or(0, Vec::len));
+    assert_eq!(count(&b, "IfcWall").0, walls.0 + 2);
 }

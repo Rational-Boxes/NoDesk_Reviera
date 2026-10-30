@@ -1763,15 +1763,17 @@ area by area (reviewed against the spec on 2026-10-15).
   wires, panel schedule templates and editing (moves, spares, rebalancing), the two-column layout, custom circuit naming, switch systems, the Edit Path tool, Static Regain, the System Inspector's on-canvas legend, background network calculation, a built-in fixture-unit curve
   and calculations, the System Browser's
   zones, columns and search, the System Editor, placing connectors on faces in a component editor, fabrication, and P&ID are specified but not built.
-- **BIMserver client mode** (spec Ch 6, COL-MODE-001/002, COL-BIM-001 … 004): in development.
+- **BIMserver client mode** (spec Ch 6, COL-MODE-001/002, COL-BIM-001 … 006, COL-MRG-001): in development.
   **Built:** server profiles and login by password or user token, kept in the OS keychain, with a
   silent re-login when the server drops the session; project and revision lists, new projects and
   sub-projects; *Publish to BIMserver*, which checks a Local model in and makes it the project's
   working copy; opening a project as a working copy (`<data>/reviera/bimserver/<server>/<poid>/`,
   never overwriting local work); checking in, refused while the server has a newer revision;
-  downloading a revision as IFC (`bimserver.*`, `model.mode`; the client is
-  `clients/bimserver`, MIT). Checked against BIMserver 1.6.1. **Not yet:** get latest and
-  synchronise with the three-way merge, notifications, history, worksets and ownership, streamed
+  downloading a revision as IFC; Get Latest and Synchronise, merging other users' changes three-way
+  element by element and parameter by parameter, stopping at conflicts for a choice of side
+  (`bimserver.*`, `merge.three_way`, `model.mode`; the client is `clients/bimserver`, MIT).
+  Checked against BIMserver 1.6.1. **Not yet:** the sync lock, conflicts decided one by one,
+  notifications, history, worksets and ownership, streamed
   upload of large models, and calls off the UI thread. File › BIMserver... lists servers, projects and revisions, logs in, opens, publishes and checks in.
 - **Families and collaboration** (OpenCDE, Godot) are specified but not started.
 - **Remote computation subsystem** (DM-RPC-001 … 010): in development; the first milestone is

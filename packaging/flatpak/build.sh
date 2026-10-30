@@ -6,7 +6,7 @@
 #
 #   packaging/flatpak/build.sh                  # build, then dist/BIM-Reviera-<ver>-<arch>.flatpak
 #   packaging/flatpak/build.sh --install        # ... and install the bundle for this user
-#   REVIERA_VERSION=0.1.0-pre.4 packaging/flatpak/build.sh
+#   REVIERA_VERSION=0.1.0-pre.5 packaging/flatpak/build.sh
 #
 # Needs flatpak and flatpak-builder, plus python3 (to refresh cargo-sources.json when Cargo.lock
 # changes). The GNOME 51 SDK and the LLVM extension are installed from Flathub (user
@@ -24,7 +24,7 @@ BUILD_DIR="$HERE/build-dir"
 REPO="$HERE/repo"
 DIST="$ROOT/dist"
 ARCH="$(flatpak --default-arch)"
-VERSION="${REVIERA_VERSION:-0.1.0-pre.4}"
+VERSION="${REVIERA_VERSION:-0.1.0-pre.5}"
 BUNDLE="$DIST/BIM-Reviera-$VERSION-$ARCH.flatpak"
 
 INSTALL=0

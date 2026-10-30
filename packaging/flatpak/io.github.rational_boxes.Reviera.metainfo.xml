@@ -74,6 +74,11 @@
   </supports>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.1.0~pre.5" date="2026-10-29" type="development">
+      <description>
+        <p>Fifth pre-release (tag 0.1.0-pre.5), for testing: BIMserver projects (File › BIMserver…): servers and login, publishing a project, opening a server project as a working copy, checking in, and Get Latest and Synchronise, which merge other users' changes element by element and parameter by parameter and stop at conflicts for a choice. Greenhouses gain sawtooth ranges, frame systems, side and gable vents, roll-up sides, a headhouse, glazed vaults and domes, geodesic domes, high-wire gutters, growing layouts in rooms, crop climates, crop light by month and grow lights. The Flatpak may now use the network, for the servers the user adds.</p>
+      </description>
+    </release>
     <release version="0.1.0~pre.4" date="2026-10-28" type="development">
       <description>
         <p>Fourth pre-release (tag 0.1.0-pre.4), for testing: greenhouses (gable, gutter-connected multispan, Venlo, hoop and gothic tunnels) made by one Glazed Enclosure tool, with glass walls filling the gables, doors, ridge vents, gutters and a steel frame; saved Hide in View and graphic overrides; crop regions sized and dragged, and cropped to scope boxes in sections and elevations; typed section box and slice positions.</p>

@@ -9,6 +9,7 @@ project as a working copy on your computer, and check your changes in as new rev
   <a href="#open">Opening a server project</a>
   <a href="#publish">Publishing a project</a>
   <a href="#checkin">Checking in</a>
+  <a href="#sync">Get Latest and Synchronise</a>
   <a href="#security">How passwords are kept</a>
   <a href="#later">Coming later</a>
 </nav>
@@ -40,7 +41,19 @@ the server gives (by default only administrators make new top-level projects).</
 <h2 id="checkin">Checking in</h2>
 <p><b>Check In…</b> saves the working copy and uploads it as a new revision, with your comment.
 If someone else checked in a newer revision since yours was downloaded, Reviera refuses rather
-than overwrite their work; merging their changes into yours comes with <i>Synchronise</i>.</p>
+than overwrite their work: use <b>Synchronise…</b> instead.</p>
+
+<h2 id="sync">Get Latest and Synchronise</h2>
+<p><b>Get Latest</b> brings the server's newest revision into your working copy without sending
+anything: other people's changes are merged with yours, and your own changes stay local. It is
+one step on the undo list. <b>Synchronise…</b> does the same and then checks the merged working
+copy in, with your comment.</p>
+<p>The merge goes element by element and, within an element, property by property: if you
+changed a wall's height and a colleague its fire rating, the wall gets both; if you each added
+walls to a level, all of them are there. Only when you both changed the same thing differently,
+or one of you deleted what the other changed, is there a <b>conflict</b>. Reviera then lists the
+conflicts and changes nothing until you choose: keep your changes, take the server's, or
+cancel.</p>
 
 <h2 id="security">How passwords are kept</h2>
 <p>Your password or user token is kept in the system keychain (or, where there is none, only until
@@ -49,9 +62,10 @@ settings, not part of any project. AI agents connected to Reviera can list proje
 session you started, but can never log in with a password or remove a server.</p>
 <p><code>bimserver.add_server</code>, <code>bimserver.login</code>, <code>bimserver.list_projects</code>,
 <code>bimserver.list_revisions</code>, <code>bimserver.open</code>, <code>bimserver.publish_local</code>,
-<code>bimserver.check_in</code>, <code>bimserver.download_revision</code>, <code>model.mode</code></p>
+<code>bimserver.check_in</code>, <code>bimserver.get_latest</code>, <code>bimserver.sync</code>,
+<code>bimserver.download_revision</code>, <code>merge.three_way</code>, <code>model.mode</code></p>
 
 <h2 id="later">Coming later</h2>
-<p>Get Latest and Synchronise with merging of other users' changes, change notifications, the
-revision history and restore, worksets and element ownership, progress and cancel for large
-downloads and uploads.</p>
+<p>Choosing a side conflict by conflict, a lock so two people cannot synchronise at the same
+moment, change notifications, the revision history and restore, worksets and element ownership,
+progress and cancel for large downloads and uploads.</p>

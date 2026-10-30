@@ -21,6 +21,8 @@ const OPEN_REVISION: i32 = 7206;
 const PUBLISH: i32 = 7207;
 const CHECK_IN: i32 = 7208;
 const RELOAD: i32 = 7209;
+const GET_LATEST: i32 = 7210;
+const SYNC: i32 = 7211;
 
 /// What the dialog shows: the servers, the chosen one's projects and the chosen project's
 /// revisions (newest first), and a note under them.
@@ -147,6 +149,8 @@ fn browser(frame: &Frame, s: &Shown<'_>) -> Closed {
         (OPEN_LATEST, "Open Latest", "Open the project's latest revision as a working copy (or its working copy here)", connected && has_project),
         (OPEN_REVISION, "Open Revision", "Open the chosen revision as a new working copy", connected && has_project && !s.revisions.is_empty()),
         (PUBLISH, "Publish Current Project…", "Check the open Local project in to the chosen project, making it that project's working copy", connected && has_project && !s.working_copy),
+        (GET_LATEST, "Get Latest", "Merge the newest revision into the open working copy; your changes stay local", connected && s.working_copy),
+        (SYNC, "Synchronise…", "Get the latest revision, merge it, and check the working copy in", connected && s.working_copy),
         (CHECK_IN, "Check In…", "Upload the open working copy as a new revision of its project", connected && s.working_copy),
     ] {
         let b = Button::builder(&dialog).with_label(label).build();
@@ -321,6 +325,17 @@ impl Gui {
                         note = msg;
                     }
                 }
+                GET_LATEST => note = self.merge_latest(None),
+                SYNC => {
+                    let f = super::reinforcement_ui::Form::new(&frame, "Synchronise");
+                    let comment = f.text("Comment", "", "What changed (required)");
+                    let ok = f.show("Others' changes are merged into the working copy, then it is checked in.", "Synchronise");
+                    let c = comment.get_value();
+                    f.dialog.destroy();
+                    if ok {
+                        note = self.merge_latest(Some(c));
+                    }
+                }
                 RELOAD => {}
                 _ => return,
             }
@@ -424,6 +439,70 @@ impl Gui {
             }
             Err(e) => format!("Not published: {e}"),
         })
+    }
+
+    /// Get Latest, or Synchronise with `comment`: runs it, and on conflicts lists them and asks
+    /// which side wins (or stops). A message for the dialog's note.
+    fn merge_latest(&mut self, comment: Option<String>) -> String {
+        let frame = self.frame;
+        let (name, mut args) = match &comment {
+            Some(c) => ("bimserver.sync", json!({ "comment": c })),
+            None => ("bimserver.get_latest", json!({})),
+        };
+        loop {
+            frame.set_status_text("Merging the latest revision…", 0);
+            let r = self.run(name, args.clone());
+            frame.set_status_text("", 0);
+            let r = match r {
+                Ok(r) => r,
+                Err(e) => return format!("Not done: {e}"),
+            };
+            let conflicts = r["conflicts"].as_array().cloned().unwrap_or_default();
+            if r["applied"] == false && r["up_to_date"] == false && !conflicts.is_empty() {
+                let lines: Vec<String> = conflicts
+                    .iter()
+                    .take(12)
+                    .map(|c| {
+                        let what = match c["kind"].as_str() {
+                            Some("delete_modify") => "deleted here, changed on the server".to_owned(),
+                            Some("modify_delete") => "changed here, deleted on the server".to_owned(),
+                            Some("both_added") => "added on both sides".to_owned(),
+                            _ => format!("both changed {}", c["facet"].as_str().unwrap_or("")),
+                        };
+                        format!("• {} {}: {what}", c["class"].as_str().unwrap_or(""), c["name"].as_str().unwrap_or(""))
+                    })
+                    .collect();
+                let more = if conflicts.len() > 12 { format!("\n… and {} more", conflicts.len() - 12) } else { String::new() };
+                let msg = format!(
+                    "{} conflict(s) with the server's latest revision:\n\n{}{more}\n\nYes keeps your changes, No takes the server's, Cancel stops (nothing has changed).",
+                    conflicts.len(),
+                    lines.join("\n")
+                );
+                let choice = MessageDialog::builder(&frame, &msg, "Conflicts")
+                    .with_style(MessageDialogStyle::YesNo | MessageDialogStyle::Cancel | MessageDialogStyle::IconWarning)
+                    .build()
+                    .show_modal();
+                let side = match choice {
+                    ID_YES => "local",
+                    ID_NO => "remote",
+                    _ => return format!("Stopped at {} conflict(s); the working copy is unchanged.", conflicts.len()),
+                };
+                args["conflicts"] = json!(side);
+                continue;
+            }
+            self.refresh_scene(&frame);
+            self.update_title(&frame);
+            return if r["up_to_date"] == true && r["checked_in"].is_null() {
+                "Up to date: the working copy is based on the latest revision.".into()
+            } else {
+                let merged = format!("{} created, {} updated, {} deleted", r["created"], r["updated"], r["deleted"]);
+                match r["checked_in"]["revision"].as_i64() {
+                    Some(n) if r["up_to_date"] == true => format!("Checked in as revision {n}."),
+                    Some(n) => format!("Merged the server's changes ({merged}) and checked in as revision {n}."),
+                    None => format!("Merged revision {} into the working copy: {merged}.", r["base_revision"]),
+                }
+            };
+        }
     }
 
     /// Check In…: a message for the dialog's note.

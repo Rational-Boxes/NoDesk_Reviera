@@ -234,7 +234,9 @@ The MCP tool for `bimserver.login` never accepts a password from an agent; it ca
 **Commands.** `bimserver.get_latest() -> sync_report`
 
 **Acceptance criteria.**
-- [ ] User B gets the 5 walls user A checked in, while B's own unsynchronised door edits stay in B's working copy and are not uploaded.
+- [x] User B gets the 5 walls user A checked in, while B's own unsynchronised door edits stay in B's working copy and are not uploaded.
+
+*Built (2026-10-29):* `bimserver.get_latest(document_id?, conflicts?: fail|local|remote) -> sync_report` (up_to_date, base revision, created/updated/deleted, remote changes, merged elements, conflicts, applied): the newest revision downloaded as `remote.ifc`, merged into the open working copy (COL-MRG-001) as one undoable *Get Latest (revision n)* step; the working copy is saved, `remote.ifc` becomes `base.ifc` and the state's base moves on. With conflicts under `fail` (the default) nothing changes. File › BIMserver… › Get Latest asks, on conflicts, whether to keep the local or take the server's side. Checked live: a revision re-serialised by BIMserver 1.6.1 merges as exactly the other user's change (no spurious updates).
 
 ### Synchronise
 **ID:** COL-BIM-006 · **Priority:** P1 · **Ref:** research/04 §7.4 · screenshots/documentation/synchronize_with_central_dialog.png
@@ -262,9 +264,11 @@ The MCP tool for `bimserver.login` never accepts a password from an agent; it ca
 **Commands.** `bimserver.sync(comment, relinquish?: {worksets?, elements?}, save_before?, save_after?) -> sync_report`; `bimserver.set_sync_reminder(minutes?) -> ()`
 
 **Acceptance criteria.**
-- [ ] Two users each move different walls and synchronise in turn; afterwards both working copies contain both moves.
+- [x] Two users each move different walls and synchronise in turn; afterwards both working copies contain both moves.
 - [ ] While user A is synchronising, user B's synchronise waits and completes after A's, with B's revision based on A's.
 - [ ] If a foreign client checks in during Reviera's synchronise, the sync report shows a corrective merge and the final latest revision contains all three users' changes.
+
+*Built (2026-10-29), in part:* `bimserver.sync(comment, document_id?, conflicts?) -> sync_report` (with `checked_in`): save, get latest and merge when the server moved on (stopping at conflicts unless a side is chosen), check in; File › BIMserver… › Synchronise…. Not yet: the sync lock and the race check (COL-OWN-002), relinquishing, *save before/after* options, reminders, and the close-project choices.
 
 ### Notifications
 **ID:** COL-BIM-007 · **Priority:** P1 · **Ref:** TECH_STACK §3.7.1 (*Notification interfaces*); research/04 §7.5 (update frequency)
@@ -367,11 +371,13 @@ Ownership is advisory, so step 7 is what gives it force at merge time.
 
 **Acceptance criteria.**
 - [ ] User A changes a wall's fire rating property; user B changes the same wall's height. After both synchronise, the wall has both changes and no conflict was raised.
-- [ ] Users A and B both add new walls to Level 1; the merged containment relationship contains all walls from both, with no conflict.
+- [x] Users A and B both add new walls to Level 1; the merged containment relationship contains all walls from both, with no conflict.
 - [ ] A deletes a wall that B modified; the sync raises one delete/modify conflict.
-- [ ] Merging an unchanged model that was re-serialised by another tool produces zero changes.
+- [x] Merging an unchanged model that was re-serialised by another tool produces zero changes.
 - [ ] Merging 100 000 elements with 1 000 changes on each side completes in under 30 seconds on the reference machine.
 - [ ] Running the same merge twice gives byte-identical output.
+
+*Built (2026-10-29), by the element store:* `reviera_core::merge` merges Reviera's element store rather than the IFC entity closures: each element (by GlobalId) is its class, name and parameters (properties, IFC attributes, the Reviera recipe and RXD records), which is what both sides edit and what a server's re-serialisation reads back unchanged. Classification as the table above; facets are the class, the name and each parameter; a parameter changed on both sides merges key by key when it is a JSON object (recursively) and as a set when it is a list of strings (members, parts); numbers equal within 1e-9 relative; conflicts by `policy` (fail, local, remote). The plan is ordered by GlobalId (deterministic) and applied as one transaction. `merge.three_way(base_path, local_path, remote_path, out_path, policy?) -> {created, updated, deleted, remote_changes, merged, conflicts, written}`. Checked: two users moving different walls, each adding walls, and both moving the same wall (one conflict on the recipe's curve). Not yet: `merge.preview`, the exclusivity checks (step 5), ownership-aware resolution (step 7), host/hosted repair (step 8), conflicts decided one by one (COL-MRG-002), geometry of elements that exist only in IFC (imported, without a recipe) when added remotely, and regeneration of generated parts changed on both sides (an enclosure's parts).
 
 ### Conflict resolution
 **ID:** COL-MRG-002 · **Priority:** P1 · **Ref:** research/04 §7.1 (*Editing request*, as the reference's way of avoiding conflicts)
@@ -1698,8 +1704,8 @@ Every command below is registered once and is available from the UI, Lua and MCP
 | `bimserver.open` | server_id, poid, roid?, as_working_copy? | model_id | No | COL-BIM-003 |
 | `bimserver.download_revision` | server_id, roid, path, schema? | bytes | No | COL-BIM-003 |
 | `bimserver.check_in` | comment, document_id? | {poid, roid, revision, warnings, document_id} | No | COL-BIM-004 |
-| `bimserver.get_latest` | — | sync_report | No | COL-BIM-005 |
-| `bimserver.sync` | comment, relinquish?: {worksets?, elements?}, save_before?, save_after? | sync_report | No | COL-BIM-006 |
+| `bimserver.get_latest` | document_id?, conflicts? | sync_report | No | COL-BIM-005 |
+| `bimserver.sync` | comment, document_id?, conflicts? (relinquish?, save_before?, save_after? not yet) | sync_report | No | COL-BIM-006 |
 | `bimserver.set_sync_reminder` | minutes? | () | No | COL-BIM-006 |
 | `bimserver.subscribe` | events[]? | () | No | COL-BIM-007 |
 | `bimserver.unsubscribe` | — | () | No | COL-BIM-007 |

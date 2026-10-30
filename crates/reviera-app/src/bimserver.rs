@@ -20,9 +20,15 @@
 //!   checks a Local model in as a project's first revision (or, with `replace`, a newer one) and
 //!   turns it into that project's working copy.
 //!
+//! - **Get latest** downloads the newest revision as `remote.ifc` and merges it into the open
+//!   working copy three-way (`reviera_core::merge`, base = `base.ifc`), as one undoable
+//!   transaction; the downloaded revision becomes the base and the merged working copy is
+//!   saved. Conflicts are reported and nothing is changed unless `conflicts` says which side
+//!   wins. **Synchronise** is get latest (when the server moved on) and check-in.
+//!
 //! `bimserver.login` refuses a password or token from an agent (MCP), and
-//! `bimserver.remove_server` is not offered to agents. Not yet: get latest and synchronise
-//! with the three-way merge (COL-BIM-005/006, COL-MRG-*), notifications, history and restore,
+//! `bimserver.remove_server` is not offered to agents. Not yet: the sync lock and the race
+//! check (COL-OWN-002), conflicts decided one by one (COL-MRG-002), notifications, history and restore,
 //! ownership, the streamed upload for large models, the calls off the UI thread, and the File ›
 //! Open › From BIMserver dialog.
 
@@ -863,4 +869,173 @@ host!(ModelMode, "model.mode", "Tell the project's mode",
     let st = state_of(&path);
     let connected = st.as_ref().is_some_and(|s| app.bimserver.clients.get(&s.server_id).is_some_and(Client::logged_in));
     Ok(ModeOut { mode: if st.is_some() { "bimserver" } else { "local" }.into(), path, working_copy: st, connected })
+});
+
+// ---- Get latest, synchronise and merge (COL-BIM-005/006, COL-MRG-001) ----
+
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct SyncReport {
+    /// The base was already the server's latest revision.
+    pub up_to_date: bool,
+    pub base_roid: i64,
+    pub base_revision: i64,
+    /// The merge: elements created, updated and deleted in the working copy, the remote
+    /// changes taken, the elements merged facet by facet, and the conflicts.
+    pub created: usize,
+    pub updated: usize,
+    pub deleted: usize,
+    pub remote_changes: usize,
+    pub merged: usize,
+    pub conflicts: Vec<reviera_core::merge::Conflict>,
+    /// The merge was applied (false while conflicts wait for a decision).
+    pub applied: bool,
+    /// Elements deleted here this session that the merge could not bring back.
+    pub skipped: Vec<String>,
+    /// Synchronise: the revision checked in.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub checked_in: Option<CheckInOut>,
+}
+
+fn open_store(path: &Path) -> Result<reviera_core::Store> {
+    let (_, doc, _) = reviera_store::LocalProject::open(path).map_err(|e| bad("bimserver.working_copy", format!("{}: {e}", path.display())))?;
+    Ok(doc.store().clone())
+}
+
+/// Merges the server's latest revision into working copy `id` (saved first).
+fn get_latest(app: &mut App, id: DocumentId, path: &Path, mut st: WorkingState, policy: reviera_core::merge::Policy) -> Result<SyncReport> {
+    let folder = path.parent().expect("a working copy is in its folder").to_owned();
+    let poid = st.poid;
+    let project = app.bimserver.with(&st.server_id, |c| c.project(poid))?;
+    let mut report = SyncReport { up_to_date: true, base_roid: st.base_roid, base_revision: st.base_revision, created: 0, updated: 0, deleted: 0, remote_changes: 0, merged: 0, conflicts: Vec::new(), applied: false, skipped: Vec::new(), checked_in: None };
+    let Some(latest) = project.last_revision.filter(|r| *r != st.base_roid) else { return Ok(report) };
+    report.up_to_date = false;
+    let schema = st.schema.clone();
+    let (bytes, revs) = app.bimserver.with(&st.server_id, |c| {
+        let s = c.ifc_serializer(&schema)?;
+        Ok((c.download(latest, s.oid)?, c.revisions(poid)?))
+    })?;
+    let remote_path = folder.join("remote.ifc");
+    std::fs::write(&remote_path, &bytes).map_err(|e| bad("bimserver.working_copy", e.to_string()))?;
+    let base = open_store(&folder.join(BASE))?;
+    let remote = open_store(&remote_path)?;
+    let plan = reviera_core::merge::three_way(&base, app.get(id)?.doc.store(), &remote, policy);
+    report.remote_changes = plan.remote_changes;
+    report.merged = plan.merged;
+    report.conflicts = plan.conflicts.clone();
+    if !plan.conflicts.is_empty() && policy == reviera_core::merge::Policy::Fail {
+        return Ok(report);
+    }
+    let number = revs.iter().find(|r| r.oid == latest).map_or(st.base_revision, |r| r.number);
+    let doc = &mut app.get_mut(id)?.doc;
+    let mut txn = doc.transaction(format!("Get Latest (revision {number})"), reviera_core::Origin::ui());
+    let applied = reviera_core::merge::apply(&mut txn, &plan)?;
+    txn.commit();
+    (report.created, report.updated, report.deleted, report.skipped) = (applied.created, applied.updated, applied.deleted, applied.skipped);
+    report.applied = true;
+    app.save(id, None)?;
+    std::fs::rename(&remote_path, folder.join(BASE)).map_err(|e| bad("bimserver.working_copy", e.to_string()))?;
+    st.base_roid = latest;
+    st.base_revision = number;
+    st.synced_at = now();
+    write_state(&folder, &st)?;
+    report.base_roid = latest;
+    report.base_revision = number;
+    Ok(report)
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct GetLatestParams {
+    pub document_id: Option<DocumentId>,
+    /// Conflicts: `fail` (report them and change nothing, the default), `local` or `remote`
+    /// (that side wins).
+    #[serde(default)]
+    pub conflicts: reviera_core::merge::Policy,
+}
+
+host!(BimGetLatest, "bimserver.get_latest", "Get the latest revision",
+    "Get Latest (COL-BIM-005): merges the project's newest revision into the open working copy, three-way \
+     against its base, element by element and parameter by parameter (recipes key by key, member lists as \
+     sets), as one undoable step; local changes stay local (nothing is uploaded). The revision becomes the \
+     base and the working copy is saved. Conflicts (both sides changed the same thing differently, or one \
+     deleted what the other changed) are reported and nothing changes unless `conflicts` is local or \
+     remote. Returns the sync report.",
+    [Network, Edit, FileWrite], GetLatestParams, SyncReport, |app, caller, p| {
+    let (id, path, st) = app.working_copy(p.document_id)?;
+    app.save(id, None)?;
+    get_latest(app, id, &path, st, p.conflicts)
+});
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SyncParams {
+    pub comment: String,
+    pub document_id: Option<DocumentId>,
+    #[serde(default)]
+    pub conflicts: reviera_core::merge::Policy,
+}
+
+host!(BimSync, "bimserver.sync", "Synchronise with the server",
+    "Synchronise (COL-BIM-006): saves the working copy, gets the latest revision and merges it (as \
+     bimserver.get_latest; stopping at conflicts unless `conflicts` says which side wins), then checks the \
+     merged working copy in with the comment. Returns the sync report with the revision checked in.",
+    [Network, Edit, FileWrite], SyncParams, SyncReport, |app, caller, p| {
+    comment_with_trailer(&p.comment)?;
+    let (id, path, st) = app.working_copy(p.document_id)?;
+    app.save(id, None)?;
+    let mut report = get_latest(app, id, &path, st, p.conflicts)?;
+    if !report.up_to_date && !report.applied {
+        return Ok(report);
+    }
+    let st = state_of(&path).expect("still a working copy");
+    let folder = path.parent().expect("in its folder").to_owned();
+    report.checked_in = Some(check_in(app, id, &folder, st, &p.comment)?);
+    let c = report.checked_in.as_ref().expect("set");
+    (report.base_roid, report.base_revision) = (c.roid, c.revision);
+    Ok(report)
+});
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ThreeWayParams {
+    pub base_path: PathBuf,
+    pub local_path: PathBuf,
+    pub remote_path: PathBuf,
+    pub out_path: PathBuf,
+    #[serde(default)]
+    pub policy: reviera_core::merge::Policy,
+}
+
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct MergeReport {
+    pub created: usize,
+    pub updated: usize,
+    pub deleted: usize,
+    pub remote_changes: usize,
+    pub merged: usize,
+    pub conflicts: Vec<reviera_core::merge::Conflict>,
+    /// The merged model was written (not while conflicts wait under the `fail` policy).
+    pub written: bool,
+}
+
+host!(MergeThreeWay, "merge.three_way", "Merge three IFC files",
+    "Three-way merge of files (COL-MRG-001), for scripts and tests: the changes from `base_path` to \
+     `remote_path` merged into `local_path`, element by element and parameter by parameter, written to \
+     `out_path`. Conflicts: `policy` fail (report them; nothing written), local or remote.",
+    [FileRead, FileWrite], ThreeWayParams, MergeReport, |app, caller, p| {
+    let base = open_store(&p.base_path)?;
+    let remote = open_store(&p.remote_path)?;
+    let (mut project, mut doc, _) = reviera_store::LocalProject::open(&p.local_path).map_err(|e| bad("merge.read", format!("{}: {e}", p.local_path.display())))?;
+    let plan = reviera_core::merge::three_way(&base, doc.store(), &remote, p.policy);
+    let mut out = MergeReport { created: 0, updated: 0, deleted: 0, remote_changes: plan.remote_changes, merged: plan.merged, conflicts: plan.conflicts.clone(), written: false };
+    if !plan.conflicts.is_empty() && p.policy == reviera_core::merge::Policy::Fail {
+        return Ok(out);
+    }
+    let mut txn = doc.transaction("Merge", reviera_core::Origin::ui());
+    let a = reviera_core::merge::apply(&mut txn, &plan)?;
+    txn.commit();
+    (out.created, out.updated, out.deleted) = (a.created, a.updated, a.deleted);
+    project.save_as(&doc, &p.out_path).map_err(|e| bad("merge.write", format!("{}: {e}", p.out_path.display())))?;
+    out.written = true;
+    Ok(out)
 });

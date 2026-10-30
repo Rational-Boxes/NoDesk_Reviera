@@ -271,7 +271,7 @@ pub fn toolset_of(command: &str) -> String {
             | "external_props" => "project_setup",
             "file" | "import" | "export" | "live" | "recovery" | "validate" | "rxd" | "journal"
             | "history" | "snapshot" | "cobie" => "io",
-            "bimserver" | "link" | "workset" | "bcf" | "cde" | "api" | "http" | "overlap"
+            "bimserver" | "merge" | "link" | "workset" | "bcf" | "cde" | "api" | "http" | "overlap"
             | "clash" | "clearance" => "collaboration",
             "analysis"
             | "analysis_provider"

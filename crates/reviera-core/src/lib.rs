@@ -43,6 +43,7 @@ pub mod dormers;
 pub mod enclosures;
 pub mod growing;
 pub mod hothouse;
+pub mod merge;
 pub mod frame_library;
 pub mod geodesic;
 pub mod vents;
