@@ -136,6 +136,18 @@ pub struct CheckIn {
     pub warnings: Vec<String>,
 }
 
+/// Extended data attached to a revision (`SExtendedData`).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ExtendedData {
+    pub oid: i64,
+    pub schema: i64,
+    pub file: i64,
+    pub title: String,
+    /// Milliseconds since the Unix epoch.
+    pub added: i64,
+    pub user: i64,
+}
+
 /// Whether `url` may be used: https, or http for loopback (or anything, when `allow_http`).
 pub fn check_url(url: &str, allow_http: bool) -> Result<Url> {
     let u = Url::parse(url.trim()).map_err(|e| Error::new(ErrorKind::Url, format!("{url:?} is not a URL: {e}")))?;
@@ -396,6 +408,7 @@ impl Client {
     /// waiting until the server has stored it. Never asks the server to merge.
     pub fn check_in(&self, poid: i64, comment: &str, file_name: &str, data: &[u8], deserializer: i64) -> Result<CheckIn> {
         self.session()?;
+        let before = self.project(poid)?.last_revision;
         let v = self.call(
             "ServiceInterface",
             "checkinSync",
@@ -414,11 +427,90 @@ impl Client {
         if text(&v, "state") == "AS_ERROR" || !errors.is_empty() {
             return Err(Error::new(ErrorKind::Server, format!("the check-in failed: {}", if errors.is_empty() { "the server gave no reason".into() } else { errors.join("; ") })));
         }
-        let roid = int(&v, "roid");
+        let mut roid = int(&v, "roid");
+        // The server may answer before it has stored the revision: follow the check-in's progress,
+        // then take the project's new latest revision.
+        if roid <= 0 && int(&v, "topicId") > 0 {
+            roid = self.wait_for_revision(poid, int(&v, "topicId"), before)?;
+        }
         if roid <= 0 {
-            return Err(Error::new(ErrorKind::Protocol, "the check-in gave no revision"));
+            return Err(Error::new(ErrorKind::Protocol, format!("the check-in gave no revision (state {}, stage {}, progress {})", text(&v, "state"), int(&v, "stage"), int(&v, "progress"))));
         }
         Ok(CheckIn { roid, warnings: messages("warnings") })
+    }
+
+    /// Polls check-in `topic` (up to 5 minutes) until it ends; the project's new latest revision.
+    fn wait_for_revision(&self, poid: i64, topic: i64, before: Option<i64>) -> Result<i64> {
+        let started = std::time::Instant::now();
+        loop {
+            let p = self.call("NotificationRegistryInterface", "getProgress", json!({ "topicId": topic }))?;
+            let state = text(&p, "state");
+            if state == "AS_ERROR" {
+                let errors: Vec<String> = p.get("errors").and_then(Value::as_array).map(|a| a.iter().filter_map(Value::as_str).map(str::to_owned).collect()).unwrap_or_default();
+                return Err(Error::new(ErrorKind::Server, format!("the check-in failed: {}", errors.join("; "))));
+            }
+            if state == "FINISHED" || p.is_null() {
+                let latest = self.project(poid)?.last_revision;
+                if let Some(r) = latest.filter(|r| Some(*r) != before) {
+                    return Ok(r);
+                }
+            }
+            if started.elapsed() > Duration::from_secs(300) {
+                return Err(Error::new(ErrorKind::Protocol, "the check-in did not finish within 5 minutes"));
+            }
+            std::thread::sleep(Duration::from_millis(500));
+        }
+    }
+
+    /// The extended-data schema named `name`, if the server has it.
+    pub fn extended_schema(&self, name: &str) -> Result<Option<i64>> {
+        self.session()?;
+        match self.call("ServiceInterface", "getExtendedDataSchemaByName", json!({ "name": name })) {
+            Ok(v) => Ok(v.get("oid").and_then(Value::as_i64)),
+            // BIMserver says "No ExtendedDataSchema found" as a user exception.
+            Err(e) if e.kind == ErrorKind::Server => Ok(None),
+            Err(e) => Err(e),
+        }
+    }
+
+    /// Registers an extended-data schema; its oid.
+    pub fn add_extended_schema(&self, name: &str, content_type: &str, description: &str) -> Result<i64> {
+        self.session()?;
+        let v = self.call("ServiceInterface", "addExtendedDataSchema", json!({ "extendedDataSchema": { "__type": "SExtendedDataSchema", "name": name, "contentType": content_type, "description": description } }))?;
+        v.as_i64().ok_or_else(|| Error::new(ErrorKind::Protocol, "the schema got no id"))
+    }
+
+    /// Attaches `data` to revision `roid` as extended data of `schema` (no new revision).
+    pub fn add_extended_data(&self, roid: i64, schema: i64, title: &str, file_name: &str, mime: &str, data: &[u8]) -> Result<()> {
+        self.session()?;
+        let f = self.call(
+            "ServiceInterface",
+            "uploadFile",
+            json!({ "file": { "__type": "SFile", "data": base64::engine::general_purpose::STANDARD.encode(data), "filename": file_name, "mime": mime, "size": data.len() } }),
+        )?;
+        let file = f.as_i64().ok_or_else(|| Error::new(ErrorKind::Protocol, "the upload gave no file"))?;
+        self.call("ServiceInterface", "addExtendedDataToRevision", json!({ "roid": roid, "extendedData": { "__type": "SExtendedData", "title": title, "schemaId": schema, "fileId": file } }))?;
+        Ok(())
+    }
+
+    /// Every extended data item of revision `roid`, oldest first.
+    pub fn extended_data(&self, roid: i64) -> Result<Vec<ExtendedData>> {
+        self.session()?;
+        let v = self.call("ServiceInterface", "getAllExtendedDataOfRevision", json!({ "roid": roid }))?;
+        let mut out: Vec<ExtendedData> = v
+            .as_array()
+            .map(|a| a.iter().map(|x| ExtendedData { oid: int(x, "oid"), schema: int(x, "schemaId"), file: int(x, "fileId"), title: text(x, "title"), added: int(x, "added"), user: int(x, "userId") }).collect())
+            .unwrap_or_default();
+        out.sort_by_key(|x| x.oid);
+        Ok(out)
+    }
+
+    /// A stored file's content.
+    pub fn file(&self, file_id: i64) -> Result<Vec<u8>> {
+        self.session()?;
+        let v = self.call("ServiceInterface", "getFile", json!({ "fileId": file_id }))?;
+        let data = v.get("data").and_then(Value::as_str).ok_or_else(|| Error::new(ErrorKind::Protocol, "the file has no data"))?;
+        base64::engine::general_purpose::STANDARD.decode(data).map_err(|e| Error::new(ErrorKind::Protocol, format!("the file's data is not base64: {e}")))
     }
 
     /// Revision `roid` serialised by `serializer`, as bytes.
@@ -513,18 +605,29 @@ mod tests {
 
     #[test]
     fn a_check_in_sends_the_file_and_reads_the_revision() {
+        let project = |last: i64| format!(r#"{{"response":{{"result":{{"oid":131073,"name":"P","schema":"ifc4","parentId":-1,"subProjects":[],"lastRevisionId":{last},"revisions":[]}}}}}}"#);
         let (url, rx) = serve(vec![
             (200, r#"{"response":{"result":"T"}}"#.into()),
+            (200, project(-1)),
             (200, r#"{"response":{"result":{"__type":"SLongCheckinActionState","errors":[],"warnings":["w"],"roid":65539,"state":"FINISHED"}}}"#.into()),
+            (200, project(65539)),
             (200, r#"{"response":{"result":{"errors":["bad file"],"state":"AS_ERROR","roid":-1}}}"#.into()),
+            // Answered before the revision is stored: followed to the end.
+            (200, project(65539)),
+            (200, r#"{"response":{"result":{"errors":[],"warnings":[],"roid":-1,"state":"STARTED","topicId":5}}}"#.into()),
+            (200, r#"{"response":{"result":{"state":"STARTED"}}}"#.into()),
+            (200, r#"{"response":{"result":{"state":"FINISHED"}}}"#.into()),
+            (200, project(70000)),
         ]);
         let mut c = Client::new(&url, false).unwrap();
         c.login_user_token("USERTOKEN").unwrap();
         assert!(rx.recv().unwrap().contains(r#""method":"loginUserToken""#));
         let r = c.check_in(131073, "first", "m.ifc", b"ISO-10303-21;", 9).unwrap();
         assert_eq!((r.roid, r.warnings), (65539, vec!["w".to_owned()]));
+        let _ = rx.recv().unwrap();
         let sent = rx.recv().unwrap();
         assert!(sent.contains(r#""data":"SVNPLTEwMzAzLTIxOw==""#) && sent.contains(r#""merge":false"#) && sent.contains(r#""fileSize":13"#), "{sent}");
-        assert!(c.check_in(1, "x", "m.ifc", b"x", 9).unwrap_err().message.contains("bad file"));
+        assert!(c.check_in(131073, "x", "m.ifc", b"x", 9).unwrap_err().message.contains("bad file"));
+        assert_eq!(c.check_in(131073, "late", "m.ifc", b"x", 9).unwrap().roid, 70000);
     }
 }

@@ -88,6 +88,7 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add_host(crate::bimserver::BimHistory),
         registry.add_host(crate::bimserver::BimCompare),
         registry.add_host(crate::bimserver::BimRestore),
+        registry.add_host(crate::bimserver::BimLockStatus),
         registry.add_host(crate::subscriptions::SubscriptionAdd),
         registry.add_host(crate::subscriptions::SubscriptionSet),
         registry.add_host(crate::subscriptions::SubscriptionRemove),

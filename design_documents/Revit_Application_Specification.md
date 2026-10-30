@@ -25949,10 +25949,10 @@ The MCP tool for `bimserver.login` never accepts a password from an agent; it ca
 
 **Acceptance criteria.**
 - [x] Two users each move different walls and synchronise in turn; afterwards both working copies contain both moves.
-- [ ] While user A is synchronising, user B's synchronise waits and completes after A's, with B's revision based on A's.
-- [ ] If a foreign client checks in during Reviera's synchronise, the sync report shows a corrective merge and the final latest revision contains all three users' changes.
+- [x] While user A is synchronising, user B's synchronise waits and completes after A's, with B's revision based on A's. *(Refused with the holder named; the user retries.)*
+- [x] If a foreign client checks in during Reviera's synchronise, the sync report shows a corrective merge and the final latest revision contains all three users' changes.
 
-*Built (2026-10-29), in part:* `bimserver.sync(comment, document_id?, conflicts?) -> sync_report` (with `checked_in`): save, get latest and merge when the server moved on (stopping at conflicts unless a side is chosen), check in; File › BIMserver… › Synchronise…. Not yet: the sync lock and the race check (COL-OWN-002), relinquishing, *save before/after* options, reminders, and the close-project choices.
+*Built (2026-10-29), in part:* `bimserver.sync(comment, document_id?, conflicts?) -> sync_report` (with `checked_in`): save, get latest and merge when the server moved on (stopping at conflicts unless a side is chosen), check in; File › BIMserver… › Synchronise…. *Since (2026-10-29):* the **sync lock** (COL-OWN-002) and the **race check**: `bimserver.sync` takes the lock in the ownership document on the latest revision (10 minutes) and is refused with `bimserver.sync_locked`, naming the holder, while another session holds an unexpired one; after its check-in, revisions that appeared between the merged one and its own are merged in (the local side winning, or the remote under `conflicts: remote`) and checked in as `[reviera:merge] Corrective merge of revision n …`; the new revision starts a fresh, unlocked ownership chain. `bimserver.lock_status`. Where the server will not register the ownership schema the sync runs unlocked and says so (`lock: unavailable`). Not yet: waiting and retrying automatically while locked, renewing the lock during a long sync, relinquishing, *save before/after* options, reminders, and the close-project choices.
 
 ### Notifications
 **ID:** COL-BIM-007 · **Priority:** P1 · **Ref:** TECH_STACK §3.7.1 (*Notification interfaces*); research/04 §7.5 (update frequency)
@@ -26249,9 +26249,11 @@ Ownership is advisory, so step 7 is what gives it force at merge time.
 
 **Acceptance criteria.**
 - [ ] Two clients borrowing the same element within 100 ms of each other: exactly one succeeds, and both clients agree on which one.
-- [ ] A client that crashes while holding the sync lock blocks others for no longer than the lock's time-to-live.
+- [x] A client that crashes while holding the sync lock blocks others for no longer than the lock's time-to-live.
 - [ ] Borrowing and relinquishing elements does not create any new model revision.
 - [ ] After user A checks in, user B (who still has base = previous revision) still sees A's remaining borrows.
+
+*Built (2026-10-29), the sync lock:* the ownership document `org.reviera.ownership/1.0` (version, parentVersion, baseRoid, entries, requests, syncLock with owner {userId, userName, session}, acquired, expires) in BIMserver extended data: the schema registered on first use (`getExtendedDataSchemaByName`, `addExtendedDataSchema`), written by `uploadFile` and `addExtendedDataToRevision`, read by `getAllExtendedDataOfRevision` and `getFile`, the current state the chain from the root through the earliest child of each version (oid order). All verified on BIMserver 1.6.1. Entries and requests are carried forward but not yet used (borrowing, COL-OWN-001/003).
 
 ### Editing requests
 **ID:** COL-OWN-003 · **Priority:** P1 · **Ref:** research/04 §7.1, §7.5; web: Grant a Request to Borrow an Element; web: Granted, Denied, and Retracted Requests · screenshots/documentation/editing_request_received.png
@@ -27396,6 +27398,7 @@ Every command below is registered once and is available from the UI, Lua and MCP
 | `bimserver.subscribe` | events[]? | () | No | COL-BIM-007 |
 | `bimserver.unsubscribe` | — | () | No | COL-BIM-007 |
 | `bimserver.set_update_frequency` | seconds_or_manual | () | No | COL-BIM-007 |
+| `bimserver.lock_status` | document_id? | {available, locked, holder?, expires?, mine} | No (query) | COL-OWN-002 |
 | `bimserver.history` | document_id? | revision_summary[] | No (query) | COL-BIM-008 |
 | `bimserver.compare` | roid_a?, roid_b?, document_id? | change_set | No (query) | COL-BIM-008 |
 | `bimserver.restore` | roid, reason, document_id? | {poid, roid, revision} | No | COL-BIM-008 |
@@ -28210,7 +28213,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**2196 unique commands** in 421 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**2197 unique commands** in 421 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -28250,7 +28253,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `beam` | 6 |
 | `beam_system` | 5 |
 | `bending_detail` | 1 |
-| `bimserver` | 22 |
+| `bimserver` | 23 |
 | `bolt_pattern` | 1 |
 | `boundary_condition` | 3 |
 | `brace` | 2 |
@@ -28804,6 +28807,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `bimserver.list_projects` | 6 | server_id | project_summary[] | No | COL-BIM-002 |
 | `bimserver.list_revisions` | 6 | server_id, poid | revision_summary[] | No | COL-BIM-002 |
 | `bimserver.list_servers` | 6 | — | server[] | No (query) | COL-BIM-001 |
+| `bimserver.lock_status` | 6 | document_id? | {available, locked, holder?, expires?, mine} | No (query) | COL-OWN-002 |
 | `bimserver.login` | 6 | server_id, username?, password?, user_token?, remember? | session_info | No | COL-BIM-001 |
 | `bimserver.logout` | 6 | server_id, forget? | () | No | COL-BIM-001 |
 | `bimserver.open` | 6 | server_id, poid, roid?, as_working_copy? | model_id | No | COL-BIM-003 |

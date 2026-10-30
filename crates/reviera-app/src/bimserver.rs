@@ -117,6 +117,8 @@ pub struct Servers {
     session_only: bool,
     session: HashMap<String, String>,
     clients: HashMap<String, Client>,
+    /// This Reviera's session, as the sync lock names it.
+    session_id: Option<String>,
 }
 
 impl std::fmt::Debug for Servers {
@@ -894,6 +896,16 @@ pub struct SyncReport {
     /// Synchronise: the revision checked in.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub checked_in: Option<CheckInOut>,
+    /// Synchronise: whether the sync lock was taken (`taken`), or the server could not keep it
+    /// (`unavailable`: Reviera's schema could not be registered there).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub lock: Option<String>,
+    /// Synchronise: revisions another client checked in while this one synchronised, and the
+    /// corrective revision that merged them in.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub intruders: Vec<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub corrective: Option<CheckInOut>,
 }
 
 fn open_store(path: &Path) -> Result<reviera_core::Store> {
@@ -906,7 +918,7 @@ fn get_latest(app: &mut App, id: DocumentId, path: &Path, mut st: WorkingState, 
     let folder = path.parent().expect("a working copy is in its folder").to_owned();
     let poid = st.poid;
     let project = app.bimserver.with(&st.server_id, |c| c.project(poid))?;
-    let mut report = SyncReport { up_to_date: true, base_roid: st.base_roid, base_revision: st.base_revision, created: 0, updated: 0, deleted: 0, remote_changes: 0, merged: 0, conflicts: Vec::new(), applied: false, skipped: Vec::new(), checked_in: None };
+    let mut report = SyncReport { up_to_date: true, base_roid: st.base_roid, base_revision: st.base_revision, created: 0, updated: 0, deleted: 0, remote_changes: 0, merged: 0, conflicts: Vec::new(), applied: false, skipped: Vec::new(), checked_in: None, lock: None, intruders: Vec::new(), corrective: None };
     let Some(latest) = project.last_revision.filter(|r| *r != st.base_roid) else { return Ok(report) };
     report.up_to_date = false;
     let schema = st.schema.clone();
@@ -976,23 +988,241 @@ pub struct SyncParams {
 }
 
 host!(BimSync, "bimserver.sync", "Synchronise with the server",
-    "Synchronise (COL-BIM-006): saves the working copy, gets the latest revision and merges it (as \
-     bimserver.get_latest; stopping at conflicts unless `conflicts` says which side wins), then checks the \
-     merged working copy in with the comment. Returns the sync report with the revision checked in.",
+    "Synchronise (COL-BIM-006, COL-OWN-002): saves the working copy and takes the project's sync lock (an \
+     ownership document in the server's extended data, 10 minutes, refused while another session holds \
+     it), gets the latest revision and merges it (as bimserver.get_latest; stopping at conflicts unless \
+     `conflicts` says which side wins), checks the merged working copy in with the comment, merges in any \
+     revision another client checked in meanwhile as a corrective revision, and releases the lock. Where \
+     the server cannot keep Reviera's ownership document the sync runs without the lock (`lock: \
+     unavailable`). Returns the sync report with the revision checked in.",
     [Network, Edit, FileWrite], SyncParams, SyncReport, |app, caller, p| {
     comment_with_trailer(&p.comment)?;
     let (id, path, st) = app.working_copy(p.document_id)?;
     app.save(id, None)?;
-    let mut report = get_latest(app, id, &path, st, p.conflicts)?;
+    let lock = acquire_lock(app, &st)?;
+    let result = sync_locked(app, id, &path, st.clone(), &p);
+    let mut report = match result {
+        Ok(r) => r,
+        Err(e) => {
+            if let Some(l) = &lock {
+                let _ = release_lock(app, &st, l);
+            }
+            return Err(e);
+        }
+    };
+    match (&lock, &report.checked_in) {
+        (Some(l), None) => release_lock(app, &st, l)?,
+        // The new revision starts a fresh ownership chain with no lock.
+        (Some(l), Some(c)) => {
+            let roid = report.corrective.as_ref().map_or(c.roid, |x| x.roid);
+            write_ownership(app, &st, l.schema, roid, &Ownership { version: 1, parent_version: None, base_roid: roid, entries: l.state.entries.clone(), requests: l.state.requests.clone(), sync_lock: None })?;
+        }
+        _ => {}
+    }
+    report.lock = Some(if lock.is_some() { "taken" } else { "unavailable" }.to_owned());
+    Ok(report)
+});
+
+/// Get latest, check in and the race check, under the lock.
+fn sync_locked(app: &mut App, id: DocumentId, path: &Path, st: WorkingState, p: &SyncParams) -> Result<SyncReport> {
+    let mut report = get_latest(app, id, path, st, p.conflicts)?;
     if !report.up_to_date && !report.applied {
         return Ok(report);
     }
-    let st = state_of(&path).expect("still a working copy");
+    let st = state_of(path).expect("still a working copy");
     let folder = path.parent().expect("in its folder").to_owned();
-    report.checked_in = Some(check_in(app, id, &folder, st, &p.comment)?);
-    let c = report.checked_in.as_ref().expect("set");
-    (report.base_roid, report.base_revision) = (c.roid, c.revision);
+    // The revision merged, kept for the race check.
+    let prior = open_store(&folder.join(BASE))?;
+    let prior_number = st.base_revision;
+    let ours = check_in(app, id, &folder, st, &p.comment)?;
+    (report.base_roid, report.base_revision) = (ours.roid, ours.revision);
+    // Race check: revisions between the one merged and ours came from a client that did not wait
+    // for the lock; merge them in and check in a corrective revision.
+    let st = state_of(path).expect("still a working copy");
+    let poid = st.poid;
+    let revs = app.bimserver.with(&st.server_id, |c| c.revisions(poid))?;
+    let intruders: Vec<(i64, i64)> = revs.iter().filter(|r| r.number > prior_number && r.number < ours.revision).map(|r| (r.oid, r.number)).collect();
+    report.checked_in = Some(ours);
+    if intruders.is_empty() {
+        return Ok(report);
+    }
+    let mut numbers = Vec::new();
+    for (roid, number) in &intruders {
+        let remote = revision_store(app, &st, *roid, &folder.join("intruder.ifc"))?;
+        let plan = reviera_core::merge::three_way(&prior, app.get(id)?.doc.store(), &remote, if p.conflicts == reviera_core::merge::Policy::Remote { reviera_core::merge::Policy::Remote } else { reviera_core::merge::Policy::Local });
+        report.conflicts.extend(plan.conflicts.clone());
+        let doc = &mut app.get_mut(id)?.doc;
+        let mut txn = doc.transaction(format!("Corrective Merge (revision {number})"), reviera_core::Origin::ui());
+        reviera_core::merge::apply(&mut txn, &plan)?;
+        txn.commit();
+        report.intruders.push(*roid);
+        numbers.push(number.to_string());
+    }
+    app.save(id, None)?;
+    let comment = format!("[reviera:merge] Corrective merge of revision {} checked in during a synchronise", numbers.join(", "));
+    let fixed = check_in(app, id, &folder, st, &comment)?;
+    (report.base_roid, report.base_revision) = (fixed.roid, fixed.revision);
+    report.corrective = Some(fixed);
     Ok(report)
+}
+
+// ---- The ownership document and the sync lock (COL-OWN-002) ----
+
+/// The extended-data schema of the ownership document.
+pub const OWNERSHIP_SCHEMA: &str = "org.reviera.ownership/1.0";
+/// How long a sync lock holds without renewal (seconds).
+pub const LOCK_SECONDS: i64 = 600;
+
+/// Who holds something: the server's user, and the Reviera session.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct Owner {
+    pub user_id: i64,
+    pub user_name: String,
+    pub session: String,
+}
+
+/// The sync lock: who holds it, and when it was taken and expires (Unix seconds).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct SyncLock {
+    pub owner: Owner,
+    pub acquired: i64,
+    pub expires: i64,
+}
+
+/// The ownership document (`org.reviera.ownership/1.0`).
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase", default)]
+pub struct Ownership {
+    pub version: i64,
+    pub parent_version: Option<i64>,
+    pub base_roid: i64,
+    pub entries: Vec<serde_json::Value>,
+    pub requests: Vec<serde_json::Value>,
+    pub sync_lock: Option<SyncLock>,
+}
+
+/// The lock this session took: on which revision, under which schema, and the state it wrote.
+struct Held {
+    schema: i64,
+    roid: i64,
+    state: Ownership,
+}
+
+impl Servers {
+    fn session_id(&mut self) -> String {
+        self.session_id
+            .get_or_insert_with(|| {
+                let n = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_nanos());
+                format!("{:x}-{:x}", n as u64, std::process::id())
+            })
+            .clone()
+    }
+}
+
+/// The ownership schema's oid on the server, registering it on first use; `None` where the
+/// server will not register it.
+fn ownership_schema(app: &mut App, server: &str) -> Result<Option<i64>> {
+    if let Some(id) = app.bimserver.with(server, |c| c.extended_schema(OWNERSHIP_SCHEMA))? {
+        return Ok(Some(id));
+    }
+    match app.bimserver.with(server, |c| c.add_extended_schema(OWNERSHIP_SCHEMA, "application/json", "BIM Reviera: element ownership and the sync lock (COL-OWN-002)")) {
+        Ok(id) => Ok(Some(id)),
+        Err(e) if e.code == "bimserver.refused" => Ok(None),
+        Err(e) => Err(e),
+    }
+}
+
+/// The current ownership state on revision `roid`: from the root, the earliest child of each
+/// version (the deterministic chain of COL-OWN-002).
+fn read_ownership(app: &mut App, server: &str, schema: i64, roid: i64) -> Result<Option<Ownership>> {
+    let items = app.bimserver.with(server, |c| c.extended_data(roid))?;
+    let mut docs: Vec<Ownership> = Vec::new();
+    for x in items.iter().filter(|x| x.schema == schema) {
+        let bytes = app.bimserver.with(server, |c| c.file(x.file))?;
+        if let Ok(d) = serde_json::from_slice::<Ownership>(&bytes) {
+            docs.push(d);
+        }
+    }
+    let Some(mut current) = docs.iter().find(|d| d.parent_version.is_none()).cloned() else { return Ok(None) };
+    while let Some(next) = docs.iter().find(|d| d.parent_version == Some(current.version)) {
+        current = next.clone();
+    }
+    Ok(Some(current))
+}
+
+fn write_ownership(app: &mut App, st: &WorkingState, schema: i64, roid: i64, doc: &Ownership) -> Result<()> {
+    let data = serde_json::to_vec(doc).expect("serialises");
+    let title = format!("ownership v{}", doc.version);
+    app.bimserver.with(&st.server_id, |c| c.add_extended_data(roid, schema, &title, "ownership.json", "application/json", &data))
+}
+
+/// Takes the project's sync lock on its latest revision; `None` where the server cannot keep
+/// the ownership document.
+fn acquire_lock(app: &mut App, st: &WorkingState) -> Result<Option<Held>> {
+    let Some(schema) = ownership_schema(app, &st.server_id)? else { return Ok(None) };
+    let poid = st.poid;
+    let Some(roid) = app.bimserver.with(&st.server_id, |c| c.project(poid))?.last_revision else { return Ok(None) };
+    let me = app.bimserver.with(&st.server_id, Client::logged_in_user)?;
+    let session = app.bimserver.session_id();
+    let current = read_ownership(app, &st.server_id, schema, roid)?;
+    let t = now();
+    if let Some(l) = current.as_ref().and_then(|c| c.sync_lock.as_ref()).filter(|l| l.expires > t && l.owner.session != session) {
+        return Err(locked(l, t));
+    }
+    let base = current.unwrap_or(Ownership { version: 0, base_roid: roid, ..Ownership::default() });
+    let mine = SyncLock { owner: Owner { user_id: me.oid, user_name: if me.name.is_empty() { me.username } else { me.name }, session: session.clone() }, acquired: t, expires: t + LOCK_SECONDS };
+    let state = Ownership { version: base.version + 1, parent_version: (base.version > 0).then_some(base.version), sync_lock: Some(mine), ..base };
+    write_ownership(app, st, schema, roid, &state)?;
+    // Another session may have written a child of the same version first: the chain decides.
+    let after = read_ownership(app, &st.server_id, schema, roid)?.unwrap_or_default();
+    match &after.sync_lock {
+        Some(l) if l.owner.session == session => Ok(Some(Held { schema, roid, state: after })),
+        Some(l) => Err(locked(l, t)),
+        None => Err(bad("bimserver.sync_locked", "the sync lock could not be taken; try again")),
+    }
+}
+
+fn locked(l: &SyncLock, t: i64) -> Error {
+    let mins = ((l.expires - t) as f64 / 60.0).ceil().max(1.0);
+    Error::new("bimserver.sync_locked", format!("the project is being synchronised by {} (the lock lapses within {mins:.0} min); try again shortly", l.owner.user_name))
+        .with_details(serde_json::json!({ "holder": l.owner.user_name, "expires": l.expires }))
+}
+
+/// Releases a lock this session holds, on the revision it was taken on.
+fn release_lock(app: &mut App, st: &WorkingState, held: &Held) -> Result<()> {
+    let state = Ownership { version: held.state.version + 1, parent_version: Some(held.state.version), sync_lock: None, ..held.state.clone() };
+    write_ownership(app, st, held.schema, held.roid, &state)
+}
+
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct LockStatus {
+    /// The server keeps Reviera's ownership document.
+    pub available: bool,
+    pub locked: bool,
+    pub holder: Option<String>,
+    /// Unix seconds.
+    pub expires: Option<i64>,
+    /// The lock is this session's.
+    pub mine: bool,
+}
+
+host!(BimLockStatus, "bimserver.lock_status", "Tell whether the project is being synchronised",
+    "The sync lock of the open working copy's project (COL-OWN-002): whether the server keeps Reviera's \
+     ownership document, whether someone holds the lock, who and until when.",
+    [Read, Network], Option<HistoryParams>, LockStatus, |app, caller, p| {
+    let (_, _, st) = app.working_copy(p.and_then(|p| p.document_id))?;
+    let schema = app.bimserver.with(&st.server_id, |c| c.extended_schema(OWNERSHIP_SCHEMA))?;
+    let poid = st.poid;
+    let roid = app.bimserver.with(&st.server_id, |c| c.project(poid))?.last_revision;
+    let mut out = LockStatus { available: schema.is_some(), locked: false, holder: None, expires: None, mine: false };
+    if let (Some(schema), Some(roid)) = (schema, roid)
+        && let Some(l) = read_ownership(app, &st.server_id, schema, roid)?.and_then(|o| o.sync_lock).filter(|l| l.expires > now())
+    {
+        out.mine = l.owner.session == app.bimserver.session_id();
+        (out.locked, out.holder, out.expires) = (true, Some(l.owner.user_name), Some(l.expires));
+    }
+    Ok(out)
 });
 
 #[derive(Debug, Deserialize, JsonSchema)]

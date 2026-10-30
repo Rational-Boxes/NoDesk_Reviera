@@ -196,7 +196,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**2196 unique commands** in 421 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**2197 unique commands** in 421 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -236,7 +236,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `beam` | 6 |
 | `beam_system` | 5 |
 | `bending_detail` | 1 |
-| `bimserver` | 22 |
+| `bimserver` | 23 |
 | `bolt_pattern` | 1 |
 | `boundary_condition` | 3 |
 | `brace` | 2 |
@@ -790,6 +790,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `bimserver.list_projects` | 6 | server_id | project_summary[] | No | COL-BIM-002 |
 | `bimserver.list_revisions` | 6 | server_id, poid | revision_summary[] | No | COL-BIM-002 |
 | `bimserver.list_servers` | 6 | — | server[] | No (query) | COL-BIM-001 |
+| `bimserver.lock_status` | 6 | document_id? | {available, locked, holder?, expires?, mine} | No (query) | COL-OWN-002 |
 | `bimserver.login` | 6 | server_id, username?, password?, user_token?, remember? | session_info | No | COL-BIM-001 |
 | `bimserver.logout` | 6 | server_id, forget? | () | No | COL-BIM-001 |
 | `bimserver.open` | 6 | server_id, poid, roid?, as_working_copy? | model_id | No | COL-BIM-003 |

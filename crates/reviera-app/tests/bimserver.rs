@@ -31,6 +31,12 @@ struct Fake {
     /// Refuse the next call's token once (as a restarted server does).
     expire_once: bool,
     calls: Vec<String>,
+    /// Extended data: schemas by name, files, and items as (oid, roid, schema, file).
+    schemas: HashMap<String, i64>,
+    files: HashMap<i64, Vec<u8>>,
+    extended: Vec<(i64, i64, i64, i64)>,
+    /// A foreign client's file, checked in just before Reviera's next check-in.
+    intrude: Option<Vec<u8>>,
 }
 
 fn ok(v: Value) -> Value {
@@ -101,7 +107,39 @@ fn answer(f: &mut Fake, body: &Value) -> Value {
         }
         "getSuggestedDeserializerForExtension" => ok(json!({ "oid": 11, "name": "Ifc4 (Streaming)" })),
         "getSerializerByName" => ok(json!({ "oid": 12, "name": p["serializerName"] })),
+        "getExtendedDataSchemaByName" => match f.schemas.get(p["name"].as_str().unwrap()) {
+            Some(id) => ok(json!({ "oid": id, "name": p["name"] })),
+            None => exception("UserException", "No ExtendedDataSchema found"),
+        },
+        "addExtendedDataSchema" => {
+            f.next += 1;
+            let id = 500 + f.next;
+            f.schemas.insert(p["extendedDataSchema"]["name"].as_str().unwrap().to_owned(), id);
+            ok(json!(id))
+        }
+        "uploadFile" => {
+            f.next += 1;
+            let id = 700 + f.next;
+            f.files.insert(id, base64::engine::general_purpose::STANDARD.decode(p["file"]["data"].as_str().unwrap()).unwrap());
+            ok(json!(id))
+        }
+        "addExtendedDataToRevision" => {
+            f.next += 1;
+            let oid = 900 + f.next;
+            f.extended.push((oid, p["roid"].as_i64().unwrap(), p["extendedData"]["schemaId"].as_i64().unwrap(), p["extendedData"]["fileId"].as_i64().unwrap()));
+            ok(json!({}))
+        }
+        "getAllExtendedDataOfRevision" => {
+            let roid = p["roid"].as_i64().unwrap();
+            ok(Value::Array(f.extended.iter().filter(|x| x.1 == roid).map(|x| json!({ "oid": x.0, "revisionId": x.1, "schemaId": x.2, "fileId": x.3, "title": "ownership", "added": 0, "userId": 7 })).collect()))
+        }
+        "getFile" => ok(json!({ "data": base64::engine::general_purpose::STANDARD.encode(&f.files[&p["fileId"].as_i64().unwrap()]) })),
         "checkinSync" => {
+            if let Some(foreign) = f.intrude.take() {
+                f.next += 1;
+                let roid = 60_000 + f.next;
+                f.projects.get_mut(&p["poid"].as_i64().unwrap()).unwrap().2.push((roid, "Another tool".into(), foreign));
+            }
             let data = base64::engine::general_purpose::STANDARD.decode(p["data"].as_str().unwrap()).unwrap();
             assert_eq!(p["merge"], false);
             assert_eq!(p["fileSize"].as_u64().unwrap() as usize, data.len());
@@ -417,6 +455,79 @@ fn revisions_are_compared_and_restored() {
     assert!(run(&mut a, "bimserver.compare", json!({ "roid_a": r1, "roid_b": r3["roid"] })).unwrap()["modified"].as_array().unwrap().is_empty());
 }
 
+/// A sync lock written into the fake server's latest revision of project 131073 by another
+/// session, expiring `expires` (Unix seconds).
+fn foreign_lock(fake: &Arc<Mutex<Fake>>, expires: i64) {
+    let mut f = fake.lock().unwrap();
+    let schema = *f.schemas.entry("org.reviera.ownership/1.0".into()).or_insert(555);
+    let roid = f.projects[&131073].2.last().unwrap().0;
+    let doc = json!({ "version": 1, "parentVersion": null, "baseRoid": roid, "entries": [], "requests": [], "syncLock": { "owner": { "userId": 9, "userName": "Ben", "session": "other" }, "acquired": 0, "expires": expires } });
+    f.files.insert(4242, serde_json::to_vec(&doc).unwrap());
+    f.extended.push((1, roid, schema, 4242));
+}
+
+#[test]
+fn synchronising_takes_the_lock_and_merges_an_intruder() {
+    let (url, fake) = server();
+    let dir_a = tempfile::tempdir().unwrap();
+    let dir_b = tempfile::tempdir().unwrap();
+    let mut a = new_app(dir_a.path());
+    let mut b = new_app(dir_b.path());
+    let mut ids = Vec::new();
+    for app in [&mut a, &mut b] {
+        let id = run(app, "bimserver.add_server", json!({ "name": "Office", "url": url })).unwrap()["id"].as_str().unwrap().to_owned();
+        run(app, "bimserver.login", json!({ "server_id": id, "username": "anna@example.org", "password": "right" })).unwrap();
+        ids.push(id);
+    }
+    run(&mut a, "file.new", json!({})).unwrap();
+    let level = run(&mut a, "level.list", json!({})).unwrap()[0]["id"].clone();
+    let wall = |app: &mut App, y: f64| run(app, "wall.create", json!({ "curve": { "line": { "start": [0, y], "end": [6, y] } }, "base_level": level, "top_constraint": { "unconnected": 3.0 } })).unwrap();
+    wall(&mut a, 0.0);
+    run(&mut a, "file.save_as", json!({ "path": dir_a.path().join("a.ifc") })).unwrap();
+    run(&mut a, "bimserver.publish_local", json!({ "server_id": ids[0], "poid": 131073, "comment": "One wall" })).unwrap();
+    run(&mut b, "bimserver.open", json!({ "server_id": ids[1], "poid": 131073 })).unwrap();
+
+    // A synchronises: the lock is taken, and released on the new revision.
+    wall(&mut a, 5.0);
+    let r = run(&mut a, "bimserver.sync", json!({ "comment": "Second wall" })).unwrap();
+    assert_eq!(r["lock"], "taken", "{r}");
+    assert_eq!(run(&mut a, "bimserver.lock_status", json!({})).unwrap()["locked"], false);
+    assert!(fake.lock().unwrap().schemas.contains_key("org.reviera.ownership/1.0"));
+
+    // Ben holds the lock: B's synchronise waits for him (refused, naming him).
+    foreign_lock(&fake, 4_000_000_000);
+    let st = run(&mut b, "bimserver.lock_status", json!({})).unwrap();
+    assert_eq!((st["locked"].as_bool(), st["holder"].as_str(), st["mine"].as_bool()), (Some(true), Some("Ben"), Some(false)));
+    wall(&mut b, 10.0);
+    let e = run(&mut b, "bimserver.sync", json!({ "comment": "B's wall" })).unwrap_err();
+    assert!(e.code == "bimserver.sync_locked" && e.message.contains("Ben"), "{e:?}");
+    // His lock lapses (he crashed): B synchronises.
+    foreign_lock(&fake, 1);
+    let r = run(&mut b, "bimserver.sync", json!({ "comment": "B's wall" })).unwrap();
+    assert!(r["lock"] == "taken" && r["checked_in"]["revision"] == 3, "{r}");
+    assert_eq!(walls(&b), 3);
+
+    // Another tool checks in while A synchronises: A merges it in as a corrective revision.
+    run(&mut a, "bimserver.get_latest", json!({})).unwrap();
+    let foreign = {
+        // The other tool's model: B's latest plus a wall of its own.
+        wall(&mut b, 20.0);
+        run(&mut b, "file.save", json!({})).unwrap();
+        let path = run(&mut b, "model.mode", json!({})).unwrap()["path"].as_str().unwrap().to_owned();
+        let bytes = std::fs::read(&path).unwrap();
+        run(&mut b, "edit.undo", json!({})).unwrap();
+        bytes
+    };
+    fake.lock().unwrap().intrude = Some(foreign);
+    wall(&mut a, 30.0);
+    let r = run(&mut a, "bimserver.sync", json!({ "comment": "A's wall" })).unwrap();
+    assert_eq!(r["intruders"].as_array().map(Vec::len), Some(1), "{r}");
+    assert!(r["corrective"]["comment"].is_null() && r["corrective"]["revision"] == 6, "{r}");
+    assert_eq!(walls(&a), 5, "A's walls, B's, and the other tool's");
+    let last = fake.lock().unwrap().projects[&131073].2.last().unwrap().1.clone();
+    assert!(last.starts_with("[reviera:merge] Corrective merge of revision 4"), "{last}");
+}
+
 fn var(k: &str) -> Option<String> {
     std::env::var(k).ok().filter(|v| !v.trim().is_empty())
 }
@@ -471,6 +582,8 @@ fn a_real_server_round_trip() {
     let level = run(&mut a, "level.list", json!({})).unwrap()[0]["id"].clone();
     run(&mut a, "wall.create", json!({ "curve": { "line": { "start": [30, 40], "end": [34, 40] } }, "base_level": level, "top_constraint": { "unconnected": 3.0 } })).unwrap();
     let r = run(&mut a, "bimserver.sync", json!({ "comment": "Reviera live test: a wall from A" })).unwrap();
+    assert_eq!(r["lock"], "taken", "the server keeps the ownership document: {r}");
+    assert_eq!(run(&mut a, "bimserver.lock_status", json!({})).unwrap()["locked"], false, "released");
     eprintln!("sync report: created {} updated {} deleted {} remote {} merged {} conflicts {}", r["created"], r["updated"], r["deleted"], r["remote_changes"], r["merged"], r["conflicts"].as_array().map_or(0, Vec::len));
     assert!(r["applied"].as_bool().unwrap() && r["conflicts"].as_array().unwrap().is_empty(), "{r}");
     assert_eq!(count(&a, "IfcWall").0, walls.0 + 2, "both computers' walls");

@@ -1773,7 +1773,8 @@ area by area (reviewed against the spec on 2026-10-15).
   element by element and parameter by parameter, stopping at conflicts for a choice of side;
   the revision history, comparing revisions and restoring one as the latest
   (`bimserver.*`, `merge.three_way`, `model.mode`; the client is `clients/bimserver`, MIT).
-  Checked against BIMserver 1.6.1. **Not yet:** the sync lock, conflicts decided one by one,
+  Synchronise takes a sync lock in the server's extended data and merges in any revision checked in
+  meanwhile as a corrective revision. Checked against BIMserver 1.6.1. **Not yet:** conflicts decided one by one,
   notifications, worksets and ownership, streamed
   upload of large models, and calls off the UI thread. File › BIMserver... lists servers, projects and revisions, logs in, opens, publishes and checks in.
 - **Families and collaboration** (OpenCDE, Godot) are specified but not started.
