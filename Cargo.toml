@@ -11,7 +11,7 @@ members = [
     "crates/reviera-store",
     "crates/reviera-livestore",
     "crates/reviera-net",
-    "crates/reviera-bimserver",
+    "clients/bimserver/rust",
     "crates/reviera-opencde",
     "crates/reviera-render",
     "crates/reviera-render-wgpu",
@@ -46,7 +46,7 @@ reviera-rxd = { path = "crates/reviera-rxd" }
 reviera-store = { path = "crates/reviera-store" }
 reviera-livestore = { path = "crates/reviera-livestore" }
 reviera-net = { path = "crates/reviera-net" }
-reviera-bimserver = { path = "crates/reviera-bimserver" }
+reviera-bimserver = { path = "clients/bimserver/rust" }
 reviera-opencde = { path = "crates/reviera-opencde" }
 reviera-render = { path = "crates/reviera-render" }
 reviera-render-wgpu = { path = "crates/reviera-render-wgpu" }

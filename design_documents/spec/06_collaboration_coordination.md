@@ -65,6 +65,8 @@ This chapter specifies how several people and several models work together in Re
 - [ ] A second user opening a Local project already open elsewhere is warned with the first user's name and can open it read-only.
 - [ ] `bimserver.sync` in Local mode returns `mode.not_available` and changes nothing.
 
+*Built (2026-10-29), in part:* a document is in BIMserver mode when its file is a working copy (`working.ifc` beside its `state.json`, COL-OFF-001); `model.mode(document_id?) -> {mode, path, working_copy?, connected}`; `bimserver.check_in` in Local mode fails with `mode.not_available`. Not yet: the title-bar and status-bar mode display, the `ModelStore` trait over both stores, the shared-folder lock file, `model.open_file`.
+
 ### Moving between modes
 **ID:** COL-MODE-002 · **Priority:** P1 · **Ref:** TECH_STACK §3.7 (*Moving between modes*); research/04 §7.2, §7.4 (*Detach from central*)
 
@@ -83,6 +85,8 @@ This chapter specifies how several people and several models work together in Re
 **Acceptance criteria.**
 - [ ] Publishing a Local project creates a server project whose first revision, downloaded by another user, opens with all views, sheets and annotation.
 - [ ] Exporting a local copy with *Discard worksets* produces a file that opens in Local mode with no worksets and no ownership data.
+
+*Built (2026-10-29), Publish:* `bimserver.publish_local(server_id, poid? | new_name + parent_poid?, comment, replace?, document_id?) -> {poid, roid, revision, warnings, document_id}`: the model is saved as the project's working copy and checked in; a project with revisions needs `replace`; the schemas must match (IFC4 or IFC2X3; IFC4X3 is refused, no conversion offered yet). Not yet: *Export local copy* and the menu entries.
 
 ---
 
@@ -123,8 +127,10 @@ The MCP tool for `bimserver.login` never accepts a password from an agent; it ca
 
 **Acceptance criteria.**
 - [ ] After *Remember me*, restarting Reviera reconnects without a prompt, and the password is not present in any Reviera file.
-- [ ] An expired token is renewed transparently during a long session.
-- [ ] Calling the MCP login tool with a password parameter is rejected.
+- [x] An expired token is renewed transparently during a long session.
+- [x] Calling the MCP login tool with a password parameter is rejected.
+
+*Built (2026-10-29):* `clients/bimserver` (MIT, `reqwest` with rustls on the platform's certificates, blocking with a 60 s timeout rather than on `tokio`); profiles in the per-user `bimserver.json` (name, URL, user name, login kind, server version); the password or a **user token** (`AuthInterface.loginUserToken`, an addition: BIMserver shows one per user) in the OS keychain under `org.bimreviera.bimserver` (session memory where there is none); `bimserver.add_server(name, url, allow_http?)` asks the server for its version first; `bimserver.login(server_id, username?, password?, user_token?, remember?)`, refused from MCP when it carries a secret; `bimserver.logout(server_id, forget?)`; `bimserver.remove_server` (not offered to agents); `bimserver.list_servers`. A refused session is renewed once from the stored secret. BIMserver answers a wrong password with a `UserException`, taken as an authentication failure. Checked live against BIMserver 1.6.1-SNAPSHOT. Not yet: client certificates and *Verify TLS* off, the status-bar connection state, the Servers dialog, and the method lookup through the server's service metadata.
 
 ### Project and revision browser
 **ID:** COL-BIM-002 · **Priority:** P1 · **Ref:** TECH_STACK §3.7 (*Open*)
@@ -150,6 +156,8 @@ The MCP tool for `bimserver.login` never accepts a password from an agent; it ca
 **Acceptance criteria.**
 - [ ] The browser lists projects and sub-projects as a tree matching the server's structure.
 - [ ] Creating a sub-project under "Hospital" shows it nested under that project immediately.
+
+*Built (2026-10-29):* `bimserver.list_projects` (with `working_copy` marking projects that have one here), `bimserver.list_revisions` (user names resolved and cached per call), `bimserver.create_project`. Not yet: the browser dialog and the `[reviera:…]` revision labels.
 
 ### Open and download
 **ID:** COL-BIM-003 · **Priority:** P1 · **Ref:** TECH_STACK §3.7.1 (*Download*)
@@ -180,6 +188,8 @@ The MCP tool for `bimserver.login` never accepts a password from an agent; it ca
 - [ ] Opening a 200 MB project shows download progress, can be cancelled, and leaves no partial working copy after cancel.
 - [ ] Re-opening a project with unsynchronised local changes opens the local working copy with those changes intact.
 
+*Built (2026-10-29):* `bimserver.open(server_id, poid, roid?)`: an existing working copy is opened as it is (with `newer_on_server`); otherwise the revision is downloaded (`download` with `sync`, `GET /download`, `cleanupLongAction`) with the IFC4 (or IFC2X3) serialiser into `base.ifc` and `working.ifc` and opened; `bimserver.download_revision(server_id, roid, path, schema?)`. The Reviera recipes come back through the server: a sample published and reopened on a second machine had the same walls and windows, rebuilt from their recipes. Not yet: progress and cancel, resumed downloads, read-only opening of an older revision, the ownership document and notifications.
+
 ### Check in
 **ID:** COL-BIM-004 · **Priority:** P1 · **Ref:** TECH_STACK §3.7.1 (*Check-in*)
 
@@ -204,6 +214,8 @@ The MCP tool for `bimserver.login` never accepts a password from an agent; it ca
 **Acceptance criteria.**
 - [ ] A 300 MB model checks in through the streamed endpoint without loading the whole file into memory twice (peak memory below model size + 100 MB).
 - [ ] After a successful check-in, the status bar shows the new revision number as base.
+
+*Built (2026-10-29):* `bimserver.check_in(comment, document_id?) -> {poid, roid, revision, warnings, document_id}`: saves the working copy, uploads it with `checkinSync` (base64, `merge: false`) through the deserialiser the server suggests for `.ifc`, then makes it the base; refused while the server's latest revision is not the base (`bimserver.out_of_date`, until synchronise can merge). The comment gets a trailer line `[reviera] BIM Reviera <version>`. Not yet: the streamed upload for large models and the RXD format version in the trailer.
 
 ### Get latest
 **ID:** COL-BIM-005 · **Priority:** P1 · **Ref:** research/04 §7.1 (*Reload Latest*); TECH_STACK §3.7.2
@@ -1675,16 +1687,17 @@ Every command below is registered once and is available from the UI, Lua and MCP
 | `model.mode` | — | {mode, server?, poid?, base_roid?, connected?} | No | COL-MODE-001 |
 | `bimserver.publish_local` | project: {poid}\|{new_name, parent_poid?}, comment, replace? | {poid, roid} | No | COL-MODE-002 |
 | `model.export_local_copy` | path, keep_worksets? | () | No | COL-MODE-002 |
-| `bimserver.add_server` | name, url, verify_tls? | server_id | No | COL-BIM-001 |
+| `bimserver.add_server` | name, url, allow_http? | server | No | COL-BIM-001 |
 | `bimserver.remove_server` | server_id | () | No | COL-BIM-001 |
-| `bimserver.login` | server_id, username, password?, remember? | session_info | No | COL-BIM-001 |
-| `bimserver.logout` | server_id | () | No | COL-BIM-001 |
+| `bimserver.login` | server_id, username?, password?, user_token?, remember? | session_info | No | COL-BIM-001 |
+| `bimserver.logout` | server_id, forget? | () | No | COL-BIM-001 |
+| `bimserver.list_servers` | — | server[] | No (query) | COL-BIM-001 |
 | `bimserver.list_projects` | server_id | project_summary[] | No | COL-BIM-002 |
 | `bimserver.list_revisions` | server_id, poid | revision_summary[] | No | COL-BIM-002 |
 | `bimserver.create_project` | server_id, name, schema?, parent_poid? | poid | No | COL-BIM-002 |
 | `bimserver.open` | server_id, poid, roid?, as_working_copy? | model_id | No | COL-BIM-003 |
-| `bimserver.download_revision` | server_id, roid, path | () | No | COL-BIM-003 |
-| `bimserver.check_in` | comment | roid | No | COL-BIM-004 |
+| `bimserver.download_revision` | server_id, roid, path, schema? | bytes | No | COL-BIM-003 |
+| `bimserver.check_in` | comment, document_id? | {poid, roid, revision, warnings, document_id} | No | COL-BIM-004 |
 | `bimserver.get_latest` | — | sync_report | No | COL-BIM-005 |
 | `bimserver.sync` | comment, relinquish?: {worksets?, elements?}, save_before?, save_after? | sync_report | No | COL-BIM-006 |
 | `bimserver.set_sync_reminder` | minutes? | () | No | COL-BIM-006 |

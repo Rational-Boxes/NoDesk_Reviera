@@ -18,6 +18,7 @@ reviera-dstv.workspace = true
 reviera-compute.workspace = true
 reviera-compute-proto = { workspace = true, features = ["subscription"] }
 keyring.workspace = true
+reviera-bimserver.workspace = true
 prost = "0.14.4"
 reviera-ifc.workspace = true
 reviera-store.workspace = true

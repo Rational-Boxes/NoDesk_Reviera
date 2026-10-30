@@ -142,6 +142,14 @@ Any source that fails this test is rejected. Rejections are noted in the session
 
 ---
 
+### 2026-10-29 — BIMserver client: API verification (no new research)
+
+- **Purpose:** check the BIMserver JSON API calls the spec names (Ch 6 §6.2, taken in Session 1 from the public BIMserver source and wiki) before building the client.
+- **Method:** calls sent to the owner's own BIMserver 1.6.1-SNAPSHOT test server (an ngrok tunnel the owner set up for this), with a test account the owner provided: `getServerInfo`, `login`, `loginUserToken`, `getLoggedInUser`, `getAllProjects`, `getProjectByPoid`, `getAllRevisionsOfProject`, `getUserByUoid`, `addProject` (refused for a non-administrator, as documented), `getSuggestedDeserializerForExtension`, `getSerializerByName`, `checkinSync`, `download`, `GET /download`, `cleanupLongAction`, `logout`. Findings: a refused login is a `UserException`, not an `AuthenticationException`; the user token is exchanged with `loginUserToken`.
+- **Clean-room:** no BIMserver code was read or copied for the client (`clients/bimserver`, MIT); it talks to the AGPL server over the network only. No new sources.
+
+---
+
 ## 5. Source Register
 
 The full register is in **`SOURCE_REGISTER.md` §A**. It had 577 sources at first (1,250 after Session 4 and its follow-ups), each with an ID, area, type, URL, HTTP status and public-availability verdict. It was generated from the research files' Sources sections on 2026-10-12, and every URL was re-checked with an unauthenticated request.

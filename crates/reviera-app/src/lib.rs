@@ -8,6 +8,7 @@
 //! application commands act on the [`App`]; every other command acts on the active document.
 
 pub mod bcf_files;
+pub mod bimserver;
 pub mod bcf_topics;
 pub mod spots;
 pub mod legends;
@@ -272,6 +273,8 @@ pub struct App {
     compute: Option<reviera_compute::ComputeClient>,
     /// Remote analysis subscriptions: settings, secrets and connections (`subscription.*`).
     subscriptions: subscriptions::Subscriptions,
+    /// BIMserver profiles, secrets and sessions (`bimserver.*`).
+    bimserver: bimserver::Servers,
     /// A window is there to capture views (DM-MCP-004).
     window: bool,
     /// View captures asked of the window.
@@ -311,6 +314,7 @@ impl App {
             form_handler: None,
             compute: None,
             subscriptions: subscriptions::Subscriptions::default(),
+            bimserver: bimserver::Servers::default(),
             window: false,
             image_requests: Vec::new(),
         }

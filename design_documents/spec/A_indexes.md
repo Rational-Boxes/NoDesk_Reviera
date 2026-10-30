@@ -196,7 +196,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**2195 unique commands** in 421 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**2196 unique commands** in 421 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -236,7 +236,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `beam` | 6 |
 | `beam_system` | 5 |
 | `bending_detail` | 1 |
-| `bimserver` | 21 |
+| `bimserver` | 22 |
 | `bolt_pattern` | 1 |
 | `boundary_condition` | 3 |
 | `brace` | 2 |
@@ -779,18 +779,19 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `beam_system.remove` | 4 | system_id | beam_ids[] | Yes | STR-BSYS-001 |
 | `beam_system.set_layout` | 4 | system_id, rule, value, justification | — | Yes | STR-BSYS-001 |
 | `bending_detail.place` | 4 | rebar_id, view_id, point, scale? | id | Yes | STR-RBR-018 |
-| `bimserver.add_server` | 6 | name, url, verify_tls? | server_id | No | COL-BIM-001 |
+| `bimserver.add_server` | 6 | name, url, allow_http? | server | No | COL-BIM-001 |
 | `bimserver.capabilities` | 6 | — | capability_set | No | COL-OWN-004 |
-| `bimserver.check_in` | 6 | comment | roid | No | COL-BIM-004 |
+| `bimserver.check_in` | 6 | comment, document_id? | {poid, roid, revision, warnings, document_id} | No | COL-BIM-004 |
 | `bimserver.compare` | 6 | roid_a, roid_b | change_set | No | COL-BIM-008 |
 | `bimserver.create_project` | 6 | server_id, name, schema?, parent_poid? | poid | No | COL-BIM-002 |
-| `bimserver.download_revision` | 6 | server_id, roid, path | () | No | COL-BIM-003 |
+| `bimserver.download_revision` | 6 | server_id, roid, path, schema? | bytes | No | COL-BIM-003 |
 | `bimserver.get_latest` | 6 | — | sync_report | No | COL-BIM-005 |
 | `bimserver.history` | 6 | — | revision_summary[] | No | COL-BIM-008 |
 | `bimserver.list_projects` | 6 | server_id | project_summary[] | No | COL-BIM-002 |
 | `bimserver.list_revisions` | 6 | server_id, poid | revision_summary[] | No | COL-BIM-002 |
-| `bimserver.login` | 6 | server_id, username, password?, remember? | session_info | No | COL-BIM-001 |
-| `bimserver.logout` | 6 | server_id | () | No | COL-BIM-001 |
+| `bimserver.list_servers` | 6 | — | server[] | No (query) | COL-BIM-001 |
+| `bimserver.login` | 6 | server_id, username?, password?, user_token?, remember? | session_info | No | COL-BIM-001 |
+| `bimserver.logout` | 6 | server_id, forget? | () | No | COL-BIM-001 |
 | `bimserver.open` | 6 | server_id, poid, roid?, as_working_copy? | model_id | No | COL-BIM-003 |
 | `bimserver.publish_local` | 6 | project: {poid}\ | {new_name, parent_poid?}, comment, replace? | {poid, roid} | No |
 | `bimserver.remove_server` | 6 | server_id | () | No | COL-BIM-001 |

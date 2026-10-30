@@ -8,9 +8,9 @@ use std::sync::{Arc, Mutex};
 
 use reviera_app::App;
 
-/// Whether agents may see and call a command: not those that take or test credentials.
+/// Whether agents may see and call a command: not those that take, test or remove credentials.
 fn for_agents(command: &str) -> bool {
-    !reviera_app::subscriptions::NOT_FOR_AGENTS.contains(&command)
+    !reviera_app::subscriptions::NOT_FOR_AGENTS.contains(&command) && !reviera_app::bimserver::NOT_FOR_AGENTS.contains(&command)
 }
 use reviera_core::{
     Caller, CommandSpec, Effect, Element, ElementRef, GroupEnd, Origin, Permission,

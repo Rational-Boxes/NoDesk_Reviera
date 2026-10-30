@@ -3186,6 +3186,7 @@ dependencies = [
  "keyring",
  "pdf-writer",
  "prost",
+ "reviera-bimserver",
  "reviera-compute",
  "reviera-compute-proto",
  "reviera-core",
@@ -3210,8 +3211,12 @@ dependencies = [
 name = "reviera-bimserver"
 version = "0.1.0"
 dependencies = [
- "reviera-core",
- "reviera-net",
+ "base64 0.23.1",
+ "reqwest",
+ "rustls",
+ "rustls-platform-verifier 0.6.2",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

@@ -1763,7 +1763,17 @@ area by area (reviewed against the spec on 2026-10-15).
   wires, panel schedule templates and editing (moves, spares, rebalancing), the two-column layout, custom circuit naming, switch systems, the Edit Path tool, Static Regain, the System Inspector's on-canvas legend, background network calculation, a built-in fixture-unit curve
   and calculations, the System Browser's
   zones, columns and search, the System Editor, placing connectors on faces in a component editor, fabrication, and P&ID are specified but not built.
-- **Families and collaboration** (BIMserver, OpenCDE, Godot) are specified but not started.
+- **BIMserver client mode** (spec Ch 6, COL-MODE-001/002, COL-BIM-001 … 004): in development.
+  **Built:** server profiles and login by password or user token, kept in the OS keychain, with a
+  silent re-login when the server drops the session; project and revision lists, new projects and
+  sub-projects; *Publish to BIMserver*, which checks a Local model in and makes it the project's
+  working copy; opening a project as a working copy (`<data>/reviera/bimserver/<server>/<poid>/`,
+  never overwriting local work); checking in, refused while the server has a newer revision;
+  downloading a revision as IFC (`bimserver.*`, `model.mode`; the client is
+  `clients/bimserver`, MIT). Checked against BIMserver 1.6.1. **Not yet:** get latest and
+  synchronise with the three-way merge, notifications, history, worksets and ownership, streamed
+  upload of large models, calls off the UI thread, and the File › Open › From BIMserver dialog.
+- **Families and collaboration** (OpenCDE, Godot) are specified but not started.
 - **Remote computation subsystem** (DM-RPC-001 … 010): in development; the first milestone is
   built (see [Analysis and remote computation](#analysis-and-remote-computation-in-development)).
   Still to build: the Compute Jobs panel; IFC filter-profile distillations; dictionary-trained and
@@ -1848,9 +1858,9 @@ Permission levels are `read_only` (the default), `model_edit` and `full_scriptin
 | `crates/reviera-lua` | The LuaJIT scripting host: the `reviera` API, forms, plugin discovery, the built-in plugins |
 | `crates/reviera-geom` | OpenCASCADE solid kernel (`cxx`): booleans and their cache |
 | `crates/reviera-compute` | Remote computation: the client, distillations, the local compute host (`reviera-compute-host`) and the built-in runner (`reviera-analysis-builtin`) |
-| `crates/reviera-godot`, `reviera-net`, `reviera-bimserver`, `reviera-opencde` | Placeholders for the Godot viewer, networking, BIMserver and OpenCDE |
+| `crates/reviera-godot`, `reviera-net`, `reviera-opencde` | Placeholders for the Godot viewer, networking and OpenCDE |
 | `design_documents/` | The specification (`spec/`), technology stack, research log and source register |
-| `schemas/`, `clients/` | Open data formats, protocols and their clients (MIT): RXD, the Reviera Scene Protocol, the remote computation contract (`schemas/compute`, `clients/compute`) and the DSTV NC1 writer (`clients/dstv`) |
+| `schemas/`, `clients/` | Open data formats, protocols and their clients (MIT): RXD, the Reviera Scene Protocol, the remote computation contract (`schemas/compute`, `clients/compute`), the DSTV NC1 writer (`clients/dstv`) and the BIMserver JSON API client (`clients/bimserver`) |
 | `test-data/ifc/` | Third-party IFC models for tests (see their README for provenance) |
 | `test-data/samples/` | Reviera's own sample models, their Lua scripts and walkthroughs |
 | `test-data/library/` | The sample Component Library (a public-domain Doric column; see its README) |
