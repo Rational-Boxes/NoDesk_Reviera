@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bimreviera.com/schemas/extract/epd-1.json",
+  "title": "EPD",
+  "description": "An Environmental Product Declaration (ISO 14025 with ISO 21930 or EN 15804): the declaration's identity, its declared unit and the product's GWP for modules A1-A3.",
+  "type": "object",
+  "x-reviera": {
+    "pset": "Reviera_EPD",
+    "doc_type": "EPD",
+    "instructions": "Values of the product this EPD declares, as printed. Give numbers as printed in the results table and dates as YYYY-MM-DD."
+  },
+  "properties": {
+    "manufacturer": {
+      "type": "string",
+      "description": "The company that makes the declared product",
+      "x-reviera": { "label": "Manufacturer", "property": "Manufacturer", "folder_key": "product.manufacturer" }
+    },
+    "product": {
+      "type": "string",
+      "description": "The declared product's name",
+      "x-reviera": { "label": "Product", "property": "Product", "folder_key": "product.model" }
+    },
+    "epd_number": {
+      "type": "string",
+      "description": "The EPD's declaration or registration number",
+      "x-reviera": { "label": "EPD number", "property": "DeclarationNumber", "folder_key": "epd.number" }
+    },
+    "program_operator": {
+      "type": "string",
+      "description": "The EPD programme operator",
+      "x-reviera": { "label": "Programme operator", "property": "ProgramOperator", "folder_key": "epd.operator" }
+    },
+    "declared_unit": {
+      "type": "string",
+      "description": "The declared or functional unit the results are given per, as printed, for example 1 m2 or 1,000 ft2",
+      "x-reviera": { "label": "Declared unit", "property": "DeclaredUnit", "folder_key": "epd.declared_unit" }
+    },
+    "gwp_a1a3": {
+      "type": "number",
+      "description": "GWP-total for modules A1-A3 combined, in kg CO2 eq per declared unit; where several are given, the IPCC AR6 (or EN 15804+A2) GWP-total including biogenic carbon",
+      "x-reviera": { "label": "GWP A1-A3", "property": "GWP_A1A3", "folder_key": "epd.gwp_a1a3", "unit": "kg CO2e per declared unit" }
+    },
+    "valid_until": {
+      "type": "string",
+      "format": "date",
+      "description": "The date the EPD expires",
+      "x-reviera": { "label": "Valid until", "property": "ValidUntil", "folder_key": "epd.valid_until" }
+    }
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bimreviera.com/schemas/extract/hpd-1.json",
+  "title": "HPD",
+  "description": "A Health Product Declaration (HPD Open Standard): the declaration's identity, its content inventory threshold, the highest hazard found in its contents, and its dates.",
+  "type": "object",
+  "x-reviera": {
+    "pset": "Reviera_HPD",
+    "doc_type": "HPD",
+    "instructions": "Values of this Health Product Declaration itself, from its summary and verification sections, as printed. Dates as YYYY-MM-DD."
+  },
+  "properties": {
+    "hpd_id": {
+      "type": "string",
+      "description": "The HPD unique identifier",
+      "x-reviera": { "label": "HPD identifier", "property": "Identifier", "folder_key": "hpd.id" }
+    },
+    "standard_version": {
+      "type": "string",
+      "description": "The HPD Open Standard version, printed as 'HPD v2.3' or 'Health Product Declaration v2.3' in the header or footer; quote those words exactly",
+      "x-reviera": { "label": "HPD version", "property": "StandardVersion", "folder_key": "hpd.version" }
+    },
+    "classification": {
+      "type": "string",
+      "description": "The CSI MasterFormat classification code, for example 09 29 00",
+      "x-reviera": { "label": "MasterFormat", "property": "Classification", "folder_key": "class.masterformat" }
+    },
+    "threshold_ppm": {
+      "type": "number",
+      "description": "The content inventory threshold, printed as 'PRODUCT THRESHOLD: 100 ppm' or as the threshold level of the reporting format; quote those words exactly",
+      "x-reviera": { "label": "Threshold (ppm)", "property": "ThresholdPpm", "folder_key": "hpd.threshold_ppm" }
+    },
+    "highest_concern": {
+      "type": "string",
+      "description": "The scores listed after 'Contents highest-concern GreenScreen score(s) (BM-1, LT-1, LT-P1)' in the summary, for example 'BM-1, LT-P1' or 'None'; quote the scores as printed",
+      "x-reviera": { "label": "Highest concern", "property": "HighestConcern", "folder_key": "hpd.highest_concern" }
+    },
+    "voc_emissions": {
+      "type": "string",
+      "description": "The VOC emissions certification held, if any",
+      "x-reviera": { "label": "VOC emissions", "property": "VOCEmissions", "folder_key": "cert.voc_emissions" }
+    },
+    "published": {
+      "type": "string",
+      "format": "date",
+      "description": "The HPD's publication date",
+      "x-reviera": { "label": "Published", "property": "Published", "folder_key": "hpd.published" }
+    },
+    "valid_until": {
+      "type": "string",
+      "format": "date",
+      "description": "The HPD's own expiry date (not a certificate's)",
+      "x-reviera": { "label": "Valid until", "property": "ValidUntil", "folder_key": "hpd.valid_until" }
+    }
+  }
+}

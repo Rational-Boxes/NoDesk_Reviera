@@ -167,6 +167,20 @@ Any source that fails this test is rejected. Rejections are noted in the session
 
 ---
 
+### 2026-10-30 — Product documents and headless extraction (EPD, HPD)
+
+- **Purpose:** find public example product documents, an EPD and an HPD, to build and demonstrate documenting a material from its documents and extracting values into the model (`FILEENGINE_INTEGRATION.md` §7 and §7c).
+- **Method:**
+  - Web search for public gypsum board EPDs and HPDs, then downloads of three manufacturer-published PDFs (S0863–S0865) to the session scratch folder. They are uploaded only to the owner's demonstration tenant (*Engineering › Reviera test › Product Library*) for the live tests, and never committed to the repository.
+  - The extraction API read in the owner's own design (`HEADLESS_RESEARCH_API.md` in the owner's checkout of the conversion/search/AI service), for the interface only. Live calls, signed in with the owner's service credential: `GET /csai/v1/usage`, `POST /csai/v1/extract` (JSON answers) and `GET /csai/documents/{uid}/text`.
+- **Findings:**
+  - Both EPDs gave all five values, each with a quote found in the stored text: CertainTeed Type X 5/8″ (SmartEPD-2025-001-0692-02, Smart EPD, 1,000 ft², GWP-total A1–A3 126 kg CO₂e including biogenic carbon, valid until 2030-12-15) and Siniat Standard Board 12.5 mm (HUB-0691, EPD Hub, 1 m², 1.35 kg CO₂e). Each was checked by hand against the PDF text.
+  - The HPD (v2.3, 266332053504) gave five to six of eight values. The others were dropped for want of a quote that matched the stored text: the PDF's two-column layout interleaves the passages, and the model's quotes did not match them closely enough. The field descriptions were reworded to name the printed label each value sits beside, so the model quotes that label.
+  - Answers come back in about 25 s per document; usage is limited per key (60 requests a minute, 2 M tokens a day).
+- **Clean-room:** the documents are read as data for the tests; nothing from them is copied into Reviera's code or data. No conversion-service code was read or copied; Reviera talks to it over HTTP only. The field sets in `schemas/extract/` (MIT) are Reviera's own wording.
+
+---
+
 ## 5. Source Register
 
 The full register is in **`SOURCE_REGISTER.md` §A**. It had 577 sources at first (1,250 after Session 4 and its follow-ups), each with an ID, area, type, URL, HTTP status and public-availability verdict. It was generated from the research files' Sources sections on 2026-10-12, and every URL was re-checked with an unauthenticated request.
