@@ -61,6 +61,7 @@ pub const RESERVED_DOMAINS: &[&str] = &[
     "merge",
     "stash",
     "ownership",
+    "profiler",
     "link",
     "workset",
     "element",

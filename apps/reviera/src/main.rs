@@ -22,6 +22,8 @@ use serde_json::{Value, json};
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
+    // REVIERA_PROFILE=1 records from the start (DM-PERF-001).
+    reviera_core::profiler::start_from_env();
     if args.first().map(String::as_str) == Some("--mcp-stdio") {
         return mcp_stdio(&args[1..]);
     }

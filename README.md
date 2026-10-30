@@ -1777,6 +1777,12 @@ area by area (reviewed against the spec on 2026-10-15).
   meanwhile as a corrective revision. Editing an element borrows it: others are told who is editing it, and it is relinquished at
   synchronise. Checked against BIMserver 1.6.1. **Not yet:** notifications, worksets, streamed
   upload of large models, and calls off the UI thread. File › BIMserver... lists servers, projects and revisions, logs in, opens, publishes and checks in.
+- **Performance profiler** (spec Ch 2 §2.18, DM-PERF-001; development support): **built.** Off
+  until started (Manage › Settings › Performance Profiler, `profiler.start`, or `REVIERA_PROFILE=1`),
+  it times every command, commit, regeneration, scene build, IFC open and save, recovery-store
+  write, merge, BIMserver call and viewport frame, with self time and call paths; a live window
+  (frame time, fps, memory, latest and slow operations, hottest scopes and paths) refreshed every
+  second; a Markdown report for development and a Chrome trace for Perfetto (`profiler.*`).
 - **Families and collaboration** (OpenCDE, Godot) are specified but not started.
 - **Remote computation subsystem** (DM-RPC-001 … 010): in development; the first milestone is
   built (see [Analysis and remote computation](#analysis-and-remote-computation-in-development)).

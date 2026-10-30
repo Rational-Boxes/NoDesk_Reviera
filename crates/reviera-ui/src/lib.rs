@@ -56,6 +56,7 @@ mod radial;
 mod mep_ui;
 mod remote_analysis_ui;
 mod bimserver_ui;
+mod profiler_ui;
 mod terminal_ui;
 mod mep_electrical_ui;
 mod mep_cables_ui;
@@ -380,6 +381,8 @@ struct Gui {
     library_pane: Option<components::LibraryPane>,
     /// The Clash Detection pane, once opened.
     clash_pane: Option<clash::ClashPane>,
+    /// Manage › Performance Profiler's live window, while open (DM-PERF-001).
+    profiler: Option<profiler_ui::ProfilerWindow>,
     checks_pane: Option<analytical_checks::ChecksPane>,
     results_pane: Option<results_explorer::ResultsPane>,
     /// Issue keys the automatic analytical checks last saw (STR-AM-007).
@@ -543,6 +546,7 @@ impl Gui {
 
     /// Draws a view, creating its surface on first use (the panel must be realised by then).
     fn draw(&mut self, id: u32) {
+        let _p = reviera_core::profiler::scope(reviera_core::profiler::FRAME);
         let frame = self.frame;
         let Some(index) = self.views.iter().position(|v| v.id == id) else {
             return;
@@ -3877,6 +3881,7 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 array_tool: None,
                 library_pane: None,
                 clash_pane: None,
+                profiler: None,
                 checks_pane: None,
                 results_pane: None,
                 auto_check_keys: None,
@@ -4732,6 +4737,7 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "ui.pane.sizing_calculator" => Gui::toggle_sizing_calculator(gui),
         "ui.remote_analysis" => with(gui, Gui::remote_analysis),
         "ui.bimserver" => with(gui, Gui::bimserver_dialog),
+        "ui.profiler" => with(gui, Gui::profiler_window),
         "mep_type.load_starters" => with(gui, Gui::load_mep_types),
         "mep.place_component" => with(gui, Gui::place_mep_component),
         "mep.connect_touching" => with(gui, Gui::connect_touching),

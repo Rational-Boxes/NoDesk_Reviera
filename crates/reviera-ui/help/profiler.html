@@ -1,0 +1,47 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Copyright (C) 2026 Reviera contributors -->
+<h1>Performance profiler</h1>
+<p class="lead">When Reviera feels slow on a large model, the profiler shows where the time goes,
+live while you work, and writes a report the developers can use to make it faster.</p>
+<nav class="toc">
+  <a href="#start">Starting it</a>
+  <a href="#live">The live window</a>
+  <a href="#report">Reports for development</a>
+  <a href="#private">What it records</a>
+</nav>
+
+<h2 id="start">Starting it</h2>
+<p><a href="reviera:action/ui.profiler">Manage › Settings › Performance Profiler</a> (also on the
+File menu) opens the profiler's window; <b>Start</b> begins recording. It is off until started, and
+costs next to nothing while off. To record from the moment Reviera starts (for example to time
+opening a large file), start Reviera with the environment variable <code>REVIERA_PROFILE=1</code>
+(and <code>REVIERA_PROFILE_SLOW_MS=50</code> for another slow threshold).</p>
+
+<h2 id="live">The live window</h2>
+<p>Refreshed every second while it is open:</p>
+<ul>
+  <li>the viewport's frame time (mean and worst) and frames per second, the memory in use and the
+    model's size;</li>
+  <li>the <b>latest operations</b>, each command with how long it took;</li>
+  <li>the <b>hottest scopes</b> by self time: commands, commits, geometry regeneration, scene
+    builds, IFC open and save, the recovery store, merges, server calls and frames, with their
+    calls, total, 95th percentile and maximum;</li>
+  <li>the heaviest <b>call paths</b>, such as <code>command:wall.create › commit</code>, which show
+    where the time goes inside an operation.</li>
+</ul>
+<p>An operation slower than the threshold (100 ms unless changed) is listed as slow and shown on
+the status bar.</p>
+
+<h2 id="report">Reports for development</h2>
+<p><b>Export Report…</b> writes a Markdown report: the build and machine, the model's size, the
+hottest operations with their share of the time, the heaviest call paths, the slow operations and
+the counters. Attach it to an issue to describe a slowdown. <b>Export Trace…</b> writes the
+timeline as a trace file to open in <a href="https://ui.perfetto.dev">Perfetto</a>, which shows every
+operation per thread on a timeline. <b>Reset</b> clears what was recorded.</p>
+<p><code>profiler.start</code>, <code>profiler.stop</code>, <code>profiler.live</code>,
+<code>profiler.report</code>, <code>profiler.export_report</code>,
+<code>profiler.export_trace</code>, <code>profiler.reset</code></p>
+
+<h2 id="private">What it records</h2>
+<p>Only the names of operations (commands by their names), counts and times. No element names,
+property values, file contents, paths or passwords are recorded, so a report can be shared.</p>

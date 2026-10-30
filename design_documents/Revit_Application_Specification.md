@@ -8766,10 +8766,12 @@ Reviera shall have a foundational subsystem, built on one general contract, that
 **Acceptance criteria.**
 - [ ] With the profiler off, a full regeneration of a 100 000-element model is no more than 1 % slower than a build without the instrumentation.
 - [ ] Opening, editing and saving a model with the profiler on gives a report whose top scopes by self time account for at least 90 % of the measured wall time of those operations.
-- [ ] A command that takes longer than the slow threshold appears in the slow list with its name and duration.
-- [ ] The exported trace opens in Perfetto and shows nested scopes per thread in time order.
+- [x] A command that takes longer than the slow threshold appears in the slow list with its name and duration.
+- [ ] The exported trace opens in Perfetto and shows nested scopes per thread in time order. *(Trace Event JSON written and checked for well-formed complete events; not yet opened in Perfetto.)*
 - [ ] While the profiler runs, orbiting a large model shows its frame time in the live view within a second, and a slow command appears there as it finishes.
-- [ ] The exported report names the heaviest call path of a slow command (for example the regeneration inside it) with its share of the time.
+- [x] The exported report names the heaviest call path of a slow command (for example the regeneration inside it) with its share of the time.
+
+*Built (2026-10-30):* `reviera_core::profiler` (a scope reads one relaxed atomic flag while off); scopes on every command (`command:<name>`, in `App::execute`: document and application commands, so Lua and MCP calls too), `commit`, `regenerate` (with the model's element count), `render scene`, `tessellate IFC`, `IFC open` and `IFC read`, `IFC save`, `live store write` (with its batch size), `merge` (elements compared), `bimserver call` and `frame` (each viewport draw). Per-scope statistics with median and p95 over up to 100 000 kept durations, call paths joined by ` › `, the slow list, counters, the live metrics (the last 120 frames, the last 30 top-level operations, the resident set size on Linux) and the 200 000-event timeline. Commands as specified (`profiler.live` adds the active model's elements and IFC entities). Manage › Settings › **Performance Profiler** (also the File menu): the live window refreshed every second (Start/Stop, slow threshold, live line, latest operations, hottest scopes, heaviest paths; Reset, Export Report…, Export Trace…), a new slow operation shown on the status bar; help page *Performance profiler*. Not yet: memory on Windows and macOS, triangle counts in the report, per-element-kind regeneration scopes, the sortable columns, *Copy Report*, and measuring the off-state overhead against the 1 % criterion.
 
 
 ## Appendix A — Reference evolution (release history and version notes)

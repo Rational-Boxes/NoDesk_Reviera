@@ -215,6 +215,8 @@ pub fn three_way(base: &Store, local: &Store, remote: &Store, policy: Policy) ->
 /// Merges as [`three_way`], each conflict with a decision in `decisions` decided so (the
 /// others by `policy`); every conflict is still listed, with its decision.
 pub fn three_way_decided(base: &Store, local: &Store, remote: &Store, policy: Policy, decisions: &Decisions) -> Plan {
+    let _p = crate::profiler::scope("merge");
+    crate::profiler::count("merge: elements compared", (base.len() + local.len() + remote.len()) as u64);
     let index = |s: &Store| -> BTreeMap<String, Snap> { s.iter().map(|e| (e.guid().to_string(), Snap::of(e))).collect() };
     let (bi, li, ri) = (index(base), index(local), index(remote));
     let guids: BTreeSet<&String> = bi.keys().chain(li.keys()).chain(ri.keys()).collect();

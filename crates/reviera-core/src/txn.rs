@@ -191,6 +191,7 @@ impl<'d> Transaction<'d> {
 
     /// Commits the transaction. A transaction whose edits cancel out changes nothing and adds no undo item.
     pub fn commit(self) -> Commit {
+        let _p = crate::profiler::scope("commit");
         let changes = ChangeSet::diff(self.doc.store(), &self.working, self.touched);
         self.doc
             .commit_changes(self.name, self.origin, changes, self.warnings)

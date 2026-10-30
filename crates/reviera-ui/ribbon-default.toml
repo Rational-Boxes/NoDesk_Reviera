@@ -2533,6 +2533,12 @@ icon = "remote_analysis"
 help = "BIMserver projects: add a server and log in, open a project as a working copy, publish the open project to one, or check the working copy in (COL-BIM-001)"
 
 [[action]]
+id = "ui.profiler"
+label = "Performance Profiler"
+icon = "daylight_results"
+help = "Time what Reviera does while you work, to find slowdowns on large models: live metrics, the hottest operations and a report for development (DM-PERF-001)"
+
+[[action]]
 id = "ui.remote_analysis"
 label = "Remote Analysis"
 icon = "remote_analysis"
@@ -4091,6 +4097,7 @@ tools = [
   { action = "global.associate", size = "small" },
   { action = "clearance.set_rule_set", size = "large" },
   { action = "ui.remote_analysis", size = "large" },
+  { action = "ui.profiler", size = "small" },
 ]
 
 [[tab.panel]]
@@ -4514,7 +4521,7 @@ panels = [{ label = "Window", tools = [{ action = "insert.flip_facing", size = "
 
 [[menu]]
 label = "&File"
-items = ["file.new", "file.open", "file.save", "file.save_as", "file.close", "-", "ui.bimserver", "-", "ui.model_properties", "ui.remote_analysis", "-", "export.pdf", "export.cobie", "gbxml.export", "gbxml.import_loads", "hbjson.export", "bcf.import", "bcf.export", "bcf.export_viewpoint", "bcf.import_viewpoint", "-", "app.exit"]
+items = ["file.new", "file.open", "file.save", "file.save_as", "file.close", "-", "ui.bimserver", "-", "ui.model_properties", "ui.remote_analysis", "ui.profiler", "-", "export.pdf", "export.cobie", "gbxml.export", "gbxml.import_loads", "hbjson.export", "bcf.import", "bcf.export", "bcf.export_viewpoint", "bcf.import_viewpoint", "-", "app.exit"]
 
 [[menu]]
 label = "&Edit"

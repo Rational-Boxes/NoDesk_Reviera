@@ -114,7 +114,12 @@ impl LocalProject {
     }
 
     pub fn open(path: &Path) -> Result<(Self, Document, OpenReport)> {
-        Self::from_model(IfcModel::open(path)?, path)
+        let _p = reviera_core::profiler::scope("IFC open");
+        let ifc = {
+            let _r = reviera_core::profiler::scope("IFC read");
+            IfcModel::open(path)?
+        };
+        Self::from_model(ifc, path)
     }
 
     fn from_model(ifc: IfcModel, path: &Path) -> Result<(Self, Document, OpenReport)> {
@@ -129,7 +134,11 @@ impl LocalProject {
         // a component may have; only elements carry the mark).
         objects.retain(|e| !is_derived(&ifc, e.id));
         let length_scale = geometry::length_scale(&ifc)?;
-        let (mut values, sets) = params::load(&ifc, &objects, length_scale)?;
+        let (mut values, sets) = {
+            let _p = reviera_core::profiler::scope("IFC open: properties");
+            reviera_core::profiler::count("IFC open: objects", objects.len() as u64);
+            params::load(&ifc, &objects, length_scale)?
+        };
         // A site's latitude and longitude from another tool, when there is no Reviera location.
         if let Some(pid) = ifc.entities_of_type("IfcProject")?.first().map(|e| e.id)
             && let Some((lat, lon, elev)) = crate::location::read_site(&ifc, length_scale)?
@@ -162,6 +171,7 @@ impl LocalProject {
         let mut manifest = None;
         let mut doc_psets = BTreeMap::new();
         let mut data_by_step: HashMap<StepId, (ElementData, Pset)> = HashMap::new();
+        let _rxd = reviera_core::profiler::scope("IFC open: Reviera data and elements");
         for pset in psets::reviera_psets(&ifc)? {
             if pset.name == MANIFEST_PSET {
                 manifest = Some(pset);
@@ -444,6 +454,7 @@ impl LocalProject {
     }
 
     pub fn save_as(&mut self, doc: &Document, path: &Path) -> Result<SaveReport> {
+        let _p = reviera_core::profiler::scope("IFC save");
         let mut since = doc.changed_since(self.synced);
         if since.stale_episode {
             return Err(unsupported("the document was not opened from this project"));

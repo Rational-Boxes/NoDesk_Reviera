@@ -36,6 +36,7 @@ pub const UI_ACTIONS: &[&str] = &[
     "ui.pane.sizing_calculator",
     "ui.remote_analysis",
     "ui.bimserver",
+    "ui.profiler",
     "load_classification.manage",
     "demand_factor.manage",
     "wiring.settings",

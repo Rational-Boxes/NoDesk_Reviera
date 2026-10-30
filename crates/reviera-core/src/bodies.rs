@@ -138,6 +138,8 @@ pub fn all_but_reinforcement(store: &Store) -> Vec<Body> {
 /// The bodies of every Reviera element that regenerates, in a stable order (walls, decks,
 /// floors and ceilings, roofs, railings, gates, stairs, doors and windows).
 pub fn all(store: &Store) -> Vec<Body> {
+    let _p = crate::profiler::scope("regenerate");
+    crate::profiler::count("regenerate: elements in model", store.len() as u64);
     let reinforcement = !WITHOUT_REINFORCEMENT.with(std::cell::Cell::get);
     let mut out: Vec<Body> = Vec::new();
     let mut push = |element: ElementId, class: &str, mesh: Mesh, plan_hidden: bool| {

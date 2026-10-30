@@ -77,6 +77,7 @@ pub(crate) const PAGES: &[Page] = &[
     page!("terminal", "Terminal and AI agents", CORE),
     page!("remote-analysis", "Remote analysis subscriptions", CORE),
     page!("bimserver", "BIMserver projects", CORE),
+    page!("profiler", "Performance profiler", CORE),
     page!("levels-grids", "Levels and grids", ARCHITECTURE),
     page!("walls", "Walls", ARCHITECTURE),
     page!("curtain-walls", "Curtain walls", ARCHITECTURE),

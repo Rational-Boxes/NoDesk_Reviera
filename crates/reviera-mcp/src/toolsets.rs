@@ -297,7 +297,7 @@ pub fn toolset_of(command: &str) -> String {
             | "load"
             | "boundary_condition" => "analysis",
             "script" | "plugin" | "addin" | "lua" => "scripting",
-            "app" | "mcp" | "settings" | "txn" => "admin",
+            "app" | "mcp" | "settings" | "txn" | "profiler" => "admin",
             _ => "other",
         };
     set.to_owned()

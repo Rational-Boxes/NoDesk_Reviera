@@ -255,6 +255,7 @@ impl Servers {
     /// Runs `f` on a logged-in client for server `id`, logging in again once if the server
     /// refuses the session.
     fn with<T>(&mut self, id: &str, f: impl Fn(&Client) -> reviera_bimserver::Result<T>) -> Result<T> {
+        let _p = reviera_core::profiler::scope("bimserver call");
         let p = self.profile(id)?;
         if !self.client_for(&p)?.logged_in() {
             self.relogin(&p)?;

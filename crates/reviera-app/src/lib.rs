@@ -9,6 +9,7 @@
 
 pub mod bcf_files;
 pub mod bimserver;
+pub mod profiling;
 pub mod bcf_topics;
 pub mod spots;
 pub mod legends;
@@ -147,6 +148,7 @@ impl OpenDocument {
 /// Tessellates a project's IFC geometry with OpenCASCADE, on every core: the elements Reviera
 /// does not regenerate itself (their bodies come from their recipes instead).
 fn tessellate(project: &LocalProject, doc: &Document) -> Result<Vec<reviera_ifc::Mesh>> {
+    let _p = reviera_core::profiler::scope("tessellate IFC");
     let threads = std::thread::available_parallelism().map_or(1, |n| n.get() as u32);
     let skip: Vec<reviera_ifc::StepId> = doc
         .store()
@@ -336,6 +338,9 @@ impl App {
         args: serde_json::Value,
         caller: &Caller,
     ) -> Result<Outcome> {
+        // Every command is a scope of its own (DM-PERF-001); its name is the only detail.
+        // The profiler's own commands are left out, so its window does not measure itself.
+        let _p = (reviera_core::profiler::enabled() && !name.starts_with("profiler.")).then(|| reviera_core::profiler::scope(format!("command:{name}")));
         let registry = self.registry.clone();
         if registry.is_host(name) {
             return registry.execute_host(self, name, args, caller);
@@ -439,6 +444,7 @@ impl App {
     /// from the IFC population, tessellated with OpenCASCADE and cached until the next save;
     /// deleted elements disappear at once. Spaces and openings are left out of the default 3D view.
     pub fn render_scene(&self, id: DocumentId) -> Result<reviera_render::RenderScene> {
+        let _p = reviera_core::profiler::scope("render scene");
         let open = self.get(id)?;
         let store = open.doc.store();
         // Elements in booleans are drawn from their (shaped) bodies.

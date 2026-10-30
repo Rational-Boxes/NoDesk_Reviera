@@ -140,6 +140,8 @@ impl Writer {
 
             let data = batch.iter().filter(|m| m.is_data()).count();
             let mut saved_seq = None;
+            let _p = reviera_core::profiler::scope("live store write");
+            reviera_core::profiler::count("live store: messages", batch.len() as u64);
             let tx = self.conn.transaction()?;
             let mut flushes = Vec::new();
             let mut close = false;
