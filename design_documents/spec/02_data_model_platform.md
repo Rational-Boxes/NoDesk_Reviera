@@ -4642,6 +4642,42 @@ Reviera shall have a foundational subsystem, built on one general contract, that
 
 ---
 
+## 2.18 Performance profiling (development support)
+
+> **Owner requirement (2026-10-30):** "Add a performance profiler that can be enabled to detect performance problems when working with large models and data sets." — "New requirement, development support for performance optimization." — "Goal is gather real-time metrics to identify slowdowns using the software and present a report for development to investigate improvements."
+
+### 2.18.1 Built-in performance profiler
+**ID:** DM-PERF-001 · **Priority:** P1 · **Ref:** owner requirement (2026-10-30); NFR-PERF-001 … 004 (Ch 0); Reviera-originated design
+
+**Purpose.** Gather **real-time metrics** while Reviera is used on large models and data sets, so slowdowns are seen as they happen, and present a **report for development** that says where the time went, so improvements can be investigated and measured against the performance targets (NFR-PERF-001 … 004). Users can attach the report to an issue.
+
+**Behaviour & rules.**
+- **Off by default, nearly free when off.** The profiler is switched on by `profiler.start`, by Manage › Performance Profiler, or for a whole session by the environment variable `REVIERA_PROFILE=1` (also `REVIERA_PROFILE_SLOW_MS`). While off, an instrumented operation costs one atomic read; nothing is recorded or allocated.
+- **Scopes.** The code is instrumented with named, nested timing scopes on the operations that grow with model size: every command (by name; document commands, application commands, MCP and Lua calls alike), transaction commit and change diff, geometry regeneration of recipe elements (`bodies`), render-scene builds, IFC open (read, tessellation) and save (IFC write, RXD encoding), the live store's journal writes, three-way merges, BIMserver calls, and the viewport's frame rendering. A scope records its wall time, its **self time** (less the time of the scopes nested in it), its thread and, where useful, a short detail (the command's name, an element count).
+- **Counters** record sizes alongside the times (elements regenerated, triangles in a scene, bytes written, elements merged), so a slow operation can be related to the data it handled.
+- **Statistics** per scope name: calls, total, self total, mean, median, 95th percentile, maximum. Durations are kept per name up to a cap (default 100 000) for the percentiles; beyond it they are sampled.
+- **Slow operations.** Any scope at or over the **slow threshold** (default 100 ms; set by `profiler.start`) is kept in a slow list (up to 1 000, newest kept) with its detail, time and thread, and flagged on the status bar while the profiler runs.
+- **Call tree.** Time is also aggregated by **path** (the chain of enclosing scopes, for example `command:wall.create › commit › regenerate`), with calls, total and self time per path, so a report shows where the time goes inside an operation, not only which operation was slow.
+- **Live metrics.** While the profiler runs, a live view refreshes about once a second: the viewport's frame time and frames per second, the most recent operations with their durations, slow operations as they happen, the memory in use, and the model's size; a slow operation also shows on the status bar.
+- **Timeline.** The last 200 000 scope events are kept in a ring buffer and can be exported as a **Chrome trace** (the Trace Event JSON format, readable by chrome://tracing, Perfetto and Speedscope), so a session's work can be inspected on a timeline, thread by thread.
+- **Context.** A report states the model's size (elements, IFC entities, triangles), the memory in use where the platform tells it (resident set size), the build (debug or release), the number of CPU threads, and how long the profiler ran.
+- **Privacy.** A report and a trace hold operation names, counts and times only: no element names, property values, file contents, paths or credentials. Command details are command names.
+
+- **Report for development.** `profiler.export_report` writes a Markdown report: the context (build, platform, CPU threads, memory, model size, how long it ran), the hottest scopes by self time, the call tree's heaviest paths, the slow operations (each with its path and detail), the counters, and how to open the exported trace; it is meant to be attached to an issue and read by a developer.
+
+**UI.** Manage › Settings › **Performance Profiler** opens a live window: Start / Stop, the slow threshold, the live metrics (refreshed every second while running), a table of scopes (name, calls, total, self, mean, p95, max) by self time, the heaviest call paths and the slow operations; Reset, Export Report… and Export Trace….
+
+**Commands.** `profiler.start(slow_ms?) -> status`, `profiler.stop() -> status`, `profiler.status() -> {enabled, since, events, slow_ms}` (query), `profiler.live() -> live_metrics` (query: frame time, fps, recent operations, memory, model size), `profiler.report(top?, sort?) -> report` (query; with the call tree), `profiler.reset() -> ()`, `profiler.export_report(path) -> {bytes}`, `profiler.export_trace(path) -> {events, bytes}`.
+
+**Acceptance criteria.**
+- [ ] With the profiler off, a full regeneration of a 100 000-element model is no more than 1 % slower than a build without the instrumentation.
+- [ ] Opening, editing and saving a model with the profiler on gives a report whose top scopes by self time account for at least 90 % of the measured wall time of those operations.
+- [ ] A command that takes longer than the slow threshold appears in the slow list with its name and duration.
+- [ ] The exported trace opens in Perfetto and shows nested scopes per thread in time order.
+- [ ] While the profiler runs, orbiting a large model shows its frame time in the live view within a second, and a slow command appears there as it finishes.
+- [ ] The exported report names the heaviest call path of a slow command (for example the regeneration inside it) with its share of the time.
+
+
 ## Appendix A — Reference evolution (release history and version notes)
 
 **Ref:** research/05 §14, §15, §13.1, §11.2 · screenshots/platform/wall_tool_ribbon_no_options_bar_2027.png, screenshots/platform/autodesk_assistant_2027.png
@@ -5112,6 +5148,14 @@ All commands defined in this chapter. Every command in this table is also a Lua 
 | `compute.set_location` | kind, location, detail? | — | Yes | DM-RPC-005 |
 | `compute_host.add` | url, auth, token? | host_id | No | DM-RPC-006 |
 | `subscription.add` | name, url, key, secret (UI and Lua only) | subscription_id | No | DM-RPC-011 |
+| `profiler.start` | slow_ms? | status | No | DM-PERF-001 |
+| `profiler.stop` | — | status | No | DM-PERF-001 |
+| `profiler.status` | — | {enabled, since, events, slow_ms} | No (query) | DM-PERF-001 |
+| `profiler.live` | — | live_metrics | No (query) | DM-PERF-001 |
+| `profiler.report` | top?, sort? | report | No (query) | DM-PERF-001 |
+| `profiler.export_report` | path | {bytes} | No | DM-PERF-001 |
+| `profiler.reset` | — | — | No | DM-PERF-001 |
+| `profiler.export_trace` | path | {events, bytes} | No | DM-PERF-001 |
 | `subscription.set` | subscription_id, name?, url?, key?, secret?, ca?, pin? (UI and Lua only) | — | No | DM-RPC-011 |
 | `subscription.remove` | subscription_id (UI and Lua only) | — | No | DM-RPC-011 |
 | `subscription.list` | — | subscriptions[] (no secrets) | No | DM-RPC-011 |

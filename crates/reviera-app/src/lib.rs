@@ -344,7 +344,18 @@ impl App {
             .active
             .ok_or_else(|| Error::new("document.none", "no document is open"))?;
         let open = self.docs.get_mut(&id).expect("the active document is open");
-        registry.execute(&mut open.doc, name, args, caller)
+        // A BIMserver working copy borrows what an edit touches (COL-OWN-001).
+        let before = (!matches!(name, "edit.undo" | "edit.redo") && bimserver::state_of(open.project.path()).is_some()).then(|| open.doc.store().clone());
+        let out = registry.execute(&mut open.doc, name, args, caller)?;
+        if let Some(before) = before
+            && !out.changed.is_empty()
+            && let Err(e) = self.claim_edit(id, &before, &out.changed)
+        {
+            let open = self.docs.get_mut(&id).expect("still open");
+            let _ = open.doc.undo(1, &reviera_core::UndoScope::All, &caller.origin);
+            return Err(e);
+        }
+        Ok(out)
     }
 
     /// Runs a document command and rolls it back, reporting what it would change.

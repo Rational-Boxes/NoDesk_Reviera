@@ -1774,7 +1774,8 @@ area by area (reviewed against the spec on 2026-10-15).
   the revision history, comparing revisions and restoring one as the latest
   (`bimserver.*`, `merge.three_way`, `model.mode`; the client is `clients/bimserver`, MIT).
   Synchronise takes a sync lock in the server's extended data and merges in any revision checked in
-  meanwhile as a corrective revision. Checked against BIMserver 1.6.1. **Not yet:** notifications, worksets and ownership, streamed
+  meanwhile as a corrective revision. Editing an element borrows it: others are told who is editing it, and it is relinquished at
+  synchronise. Checked against BIMserver 1.6.1. **Not yet:** notifications, worksets, streamed
   upload of large models, and calls off the UI thread. File › BIMserver... lists servers, projects and revisions, logs in, opens, publishes and checks in.
 - **Families and collaboration** (OpenCDE, Godot) are specified but not started.
 - **Remote computation subsystem** (DM-RPC-001 … 010): in development; the first milestone is

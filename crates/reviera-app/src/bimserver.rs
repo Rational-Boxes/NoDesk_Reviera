@@ -90,6 +90,9 @@ struct Profile {
     url: String,
     /// Plain http to a host other than this computer, accepted by the user.
     allow_http: bool,
+    /// Borrow elements automatically on edit (COL-OWN-001); on unless turned off.
+    #[serde(default = "yes")]
+    ownership: bool,
     username: Option<String>,
     login: LoginKind,
     /// The server's version when last reached.
@@ -121,6 +124,10 @@ pub struct Servers {
     session_id: Option<String>,
     /// Merges waiting for conflict decisions, by document (COL-MRG-002).
     pending: HashMap<DocumentId, Pending>,
+    /// Ownership documents read, by their extended-data oid (files never change).
+    owner_cache: HashMap<i64, Option<Ownership>>,
+    /// Each server's ownership schema, once looked up (`None`: the server cannot keep it).
+    schemas: HashMap<String, Option<i64>>,
 }
 
 /// A merge stopped at its conflicts: the revision downloaded (`remote.ifc`), the conflicts, the
@@ -374,6 +381,9 @@ pub struct AddServerParams {
     /// Accept plain http:// to another computer (the password then crosses the network unencrypted).
     #[serde(default)]
     pub allow_http: bool,
+    /// Borrow elements automatically when they are edited (default true).
+    #[serde(default = "yes")]
+    pub ownership: bool,
 }
 
 host!(BimAddServer, "bimserver.add_server", "Add a BIMserver",
@@ -408,7 +418,7 @@ host!(BimAddServer, "bimserver.add_server", "Add a BIMserver",
         n += 1;
     };
     s.delete_secret(&id);
-    let profile = Profile { id: id.clone(), name, url, allow_http: p.allow_http, username: None, login: LoginKind::Password, version: Some(info.version) };
+    let profile = Profile { id: id.clone(), name, url, allow_http: p.allow_http, ownership: p.ownership, username: None, login: LoginKind::Password, version: Some(info.version) };
     settings.servers.push(profile.clone());
     s.save(&settings)?;
     s.clients.insert(id, c);
@@ -1012,6 +1022,9 @@ pub struct SyncParams {
     pub document_id: Option<DocumentId>,
     #[serde(default)]
     pub conflicts: reviera_core::merge::Policy,
+    /// Keep the elements this session borrowed (default: relinquish them).
+    #[serde(default)]
+    pub keep_borrowed: bool,
 }
 
 host!(BimSync, "bimserver.sync", "Synchronise with the server",
@@ -1041,8 +1054,23 @@ host!(BimSync, "bimserver.sync", "Synchronise with the server",
         (Some(l), None) => release_lock(app, &st, l)?,
         // The new revision starts a fresh ownership chain with no lock.
         (Some(l), Some(c)) => {
-            let roid = report.corrective.as_ref().map_or(c.roid, |x| x.roid);
-            write_ownership(app, &st, l.schema, roid, &Ownership { version: 1, parent_version: None, base_roid: roid, entries: l.state.entries.clone(), requests: l.state.requests.clone(), sync_lock: None })?;
+            let (roid, number) = report.corrective.as_ref().map_or((c.roid, c.revision), |x| (x.roid, x.revision));
+            // The borrows made since the lock was taken, then this session's relinquished (unless
+            // kept), the revision they changed in recorded.
+            let me = app.bimserver.session_id();
+            let latest = read_ownership(app, &st.server_id, l.schema, l.roid)?.unwrap_or_else(|| l.state.clone());
+            let entries = latest
+                .entries
+                .into_iter()
+                .map(|mut e| {
+                    if !p.keep_borrowed && e.owner.as_ref().is_some_and(|o| o.session == me) {
+                        e.owner = None;
+                        e.last_changed_revision = number;
+                    }
+                    e
+                })
+                .collect();
+            write_ownership(app, &st, l.schema, roid, &Ownership { version: 1, parent_version: None, base_roid: roid, entries, requests: latest.requests, sync_lock: None })?;
         }
         _ => {}
     }
@@ -1129,9 +1157,22 @@ pub struct Ownership {
     pub version: i64,
     pub parent_version: Option<i64>,
     pub base_roid: i64,
-    pub entries: Vec<serde_json::Value>,
+    pub entries: Vec<Entry>,
     pub requests: Vec<serde_json::Value>,
     pub sync_lock: Option<SyncLock>,
+}
+
+/// One owned (or once owned) thing: `ifc:<GlobalId>`; its owner (none once relinquished), since
+/// when, and the revision in which it last changed.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct Entry {
+    pub target: String,
+    pub owner: Option<Owner>,
+    #[serde(default)]
+    pub since: i64,
+    #[serde(default)]
+    pub last_changed_revision: i64,
 }
 
 /// The lock this session took: on which revision, under which schema, and the state it wrote.
@@ -1155,14 +1196,19 @@ impl Servers {
 /// The ownership schema's oid on the server, registering it on first use; `None` where the
 /// server will not register it.
 fn ownership_schema(app: &mut App, server: &str) -> Result<Option<i64>> {
-    if let Some(id) = app.bimserver.with(server, |c| c.extended_schema(OWNERSHIP_SCHEMA))? {
-        return Ok(Some(id));
+    if let Some(known) = app.bimserver.schemas.get(server) {
+        return Ok(*known);
     }
-    match app.bimserver.with(server, |c| c.add_extended_schema(OWNERSHIP_SCHEMA, "application/json", "BIM Reviera: element ownership and the sync lock (COL-OWN-002)")) {
-        Ok(id) => Ok(Some(id)),
-        Err(e) if e.code == "bimserver.refused" => Ok(None),
-        Err(e) => Err(e),
-    }
+    let found = match app.bimserver.with(server, |c| c.extended_schema(OWNERSHIP_SCHEMA))? {
+        Some(id) => Some(id),
+        None => match app.bimserver.with(server, |c| c.add_extended_schema(OWNERSHIP_SCHEMA, "application/json", "BIM Reviera: element ownership and the sync lock (COL-OWN-002)")) {
+            Ok(id) => Some(id),
+            Err(e) if e.code == "bimserver.refused" => None,
+            Err(e) => return Err(e),
+        },
+    };
+    app.bimserver.schemas.insert(server.to_owned(), found);
+    Ok(found)
 }
 
 /// The current ownership state on revision `roid`: from the root, the earliest child of each
@@ -1171,9 +1217,12 @@ fn read_ownership(app: &mut App, server: &str, schema: i64, roid: i64) -> Result
     let items = app.bimserver.with(server, |c| c.extended_data(roid))?;
     let mut docs: Vec<Ownership> = Vec::new();
     for x in items.iter().filter(|x| x.schema == schema) {
-        let bytes = app.bimserver.with(server, |c| c.file(x.file))?;
-        if let Ok(d) = serde_json::from_slice::<Ownership>(&bytes) {
-            docs.push(d);
+        if !app.bimserver.owner_cache.contains_key(&x.oid) {
+            let bytes = app.bimserver.with(server, |c| c.file(x.file))?;
+            app.bimserver.owner_cache.insert(x.oid, serde_json::from_slice::<Ownership>(&bytes).ok());
+        }
+        if let Some(Some(d)) = app.bimserver.owner_cache.get(&x.oid) {
+            docs.push(d.clone());
         }
     }
     let Some(mut current) = docs.iter().find(|d| d.parent_version.is_none()).cloned() else { return Ok(None) };
@@ -1619,7 +1668,7 @@ host!(MergeFinish, "merge.finish", "Apply the conflict decisions",
     let report = finish_merge(app, id, &folder, st, plan, pm.latest, pm.number, report)?;
     match pm.sync_comment {
         Some(comment) => {
-            let mut synced = BimSync.run(app, caller, SyncParams { comment, document_id: Some(id), conflicts: reviera_core::merge::Policy::Fail })?;
+            let mut synced = BimSync.run(app, caller, SyncParams { comment, document_id: Some(id), conflicts: reviera_core::merge::Policy::Fail, keep_borrowed: false })?;
             (synced.created, synced.updated, synced.deleted, synced.conflicts) = (report.created, report.updated, report.deleted, report.conflicts);
             Ok(synced)
         }
@@ -1764,4 +1813,194 @@ host!(StashDiscard, "stash.discard", "Discard stashed changes",
     stash.retain(|e| !p.entry_ids.contains(&e.id));
     write_stash(&path, &stash)?;
     Ok(before - stash.len())
+});
+
+// ---- Advisory ownership: borrowing on edit (COL-OWN-001) ----
+
+/// What the ownership check needs of an edit: the GlobalIds of the elements it modified or
+/// deleted (added ones are new and nobody else's).
+pub fn touched(before: &reviera_core::Store, after: &reviera_core::Store, changed: &reviera_core::ChangedSummary) -> Vec<String> {
+    let mut out: Vec<String> = changed.modified.iter().filter_map(|id| after.get(*id).map(|e| e.guid().to_string())).collect();
+    out.extend(changed.deleted.iter().filter_map(|id| before.get(*id).map(|e| e.guid().to_string())));
+    out.sort();
+    out.dedup();
+    out
+}
+
+/// Borrows `guids` for this session on working copy `st`'s project (COL-OWN-001): refused when
+/// another session owns one, or one changed in a revision newer than the base. Nothing to do
+/// where ownership is off or the server cannot keep the document.
+fn borrow(app: &mut App, st: &WorkingState, guids: &[String]) -> Result<()> {
+    if guids.is_empty() || !app.bimserver.profile(&st.server_id)?.ownership {
+        return Ok(());
+    }
+    let Some(schema) = ownership_schema(app, &st.server_id)? else { return Ok(()) };
+    let poid = st.poid;
+    let Some(roid) = app.bimserver.with(&st.server_id, |c| c.project(poid))?.last_revision else { return Ok(()) };
+    let me = app.bimserver.session_id();
+    for attempt in 0..2 {
+        let current = read_ownership(app, &st.server_id, schema, roid)?.unwrap_or(Ownership { version: 0, base_roid: roid, ..Ownership::default() });
+        let mut wanted = Vec::new();
+        for g in guids {
+            let target = format!("ifc:{g}");
+            match current.entries.iter().find(|e| e.target == target) {
+                Some(e) if e.owner.as_ref().is_some_and(|o| o.session != me) => {
+                    let who = e.owner.as_ref().map(|o| o.user_name.clone()).unwrap_or_default();
+                    return Err(Error::new("ownership.owned_by_other", format!("{who} is editing this element; ask them to synchronise and relinquish it, then try again")).with_details(serde_json::json!({ "guid": g, "owner": who })));
+                }
+                Some(e) if e.owner.is_none() && e.last_changed_revision > st.base_revision => {
+                    return Err(Error::new("ownership.not_latest", format!("this element changed in revision {}, newer than the working copy's {}; get the latest revision first", e.last_changed_revision, st.base_revision)).with_details(serde_json::json!({ "guid": g, "revision": e.last_changed_revision })));
+                }
+                Some(e) if e.owner.is_some() => {}
+                _ => wanted.push(target),
+            }
+        }
+        if wanted.is_empty() {
+            return Ok(());
+        }
+        let user = app.bimserver.with(&st.server_id, Client::logged_in_user)?;
+        let owner = Owner { user_id: user.oid, user_name: if user.name.is_empty() { user.username } else { user.name }, session: me.clone() };
+        let t = now();
+        let mut entries = current.entries.clone();
+        for w in &wanted {
+            match entries.iter_mut().find(|e| &e.target == w) {
+                Some(e) => {
+                    e.owner = Some(owner.clone());
+                    e.since = t;
+                }
+                None => entries.push(Entry { target: w.clone(), owner: Some(owner.clone()), since: t, last_changed_revision: 0 }),
+            }
+        }
+        let next = Ownership { version: current.version + 1, parent_version: (current.version > 0).then_some(current.version), entries, ..current.clone() };
+        write_ownership(app, st, schema, roid, &next)?;
+        // Another session may have written a child of the same version first: the chain decides.
+        let after = read_ownership(app, &st.server_id, schema, roid)?.unwrap_or_default();
+        let ours = wanted.iter().all(|w| after.entries.iter().any(|e| &e.target == w && e.owner.as_ref().is_some_and(|o| o.session == me)));
+        if ours {
+            return Ok(());
+        }
+        if attempt == 1 {
+            return Err(bad("ownership.busy", "someone else claimed elements at the same moment; try again"));
+        }
+    }
+    Ok(())
+}
+
+impl App {
+    /// After an edit of working copy `id`: borrows what it modified or deleted, or says why it
+    /// may not (the caller then undoes the edit). Offline, the edit stands.
+    pub(crate) fn claim_edit(&mut self, id: DocumentId, before: &reviera_core::Store, changed: &reviera_core::ChangedSummary) -> Result<()> {
+        let Some(st) = self.docs.get(&id).and_then(|d| state_of(d.project.path())) else { return Ok(()) };
+        let guids = touched(before, self.get(id)?.doc.store(), changed);
+        match borrow(self, &st, &guids) {
+            Err(e) if e.code == "bimserver.unreachable" || e.code == "bimserver.not_logged_in" => Ok(()),
+            r => r,
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct OwnershipIdsParams {
+    pub element_ids: Vec<reviera_core::ElementRef>,
+    pub document_id: Option<DocumentId>,
+}
+
+fn guids_of(app: &App, id: DocumentId, refs: &[reviera_core::ElementRef]) -> Result<Vec<String>> {
+    let store = app.get(id)?.doc.store();
+    refs.iter().map(|r| store.resolve(r).and_then(|i| store.get(i)).map(|e| e.guid().to_string()).ok_or_else(|| bad("element.not_found", "no such element"))).collect()
+}
+
+host!(OwnershipBorrow, "ownership.borrow", "Borrow elements",
+    "Borrows elements of the open working copy for this session (COL-OWN-001), as editing them does \
+     automatically: refused when another session owns one (naming them) or one changed in a revision \
+     newer than the base.",
+    [Network], OwnershipIdsParams, (), |app, caller, p| {
+    let (id, _, st) = app.working_copy(p.document_id)?;
+    let guids = guids_of(app, id, &p.element_ids)?;
+    borrow(app, &st, &guids)
+});
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct RelinquishParams {
+    /// The elements to relinquish; all this session's when absent.
+    pub element_ids: Option<Vec<reviera_core::ElementRef>>,
+    pub document_id: Option<DocumentId>,
+}
+
+host!(OwnershipRelinquish, "ownership.relinquish", "Relinquish borrowed elements",
+    "Gives up this session's borrows (all, or `element_ids`) without synchronising (COL-OWN-001); \
+     synchronise relinquishes them too. Returns how many were relinquished.",
+    [Network], RelinquishParams, usize, |app, caller, p| {
+    let (id, _, st) = app.working_copy(p.document_id)?;
+    let only = p.element_ids.as_ref().map(|r| guids_of(app, id, r)).transpose()?;
+    let Some(schema) = ownership_schema(app, &st.server_id)? else { return Ok(0) };
+    let poid = st.poid;
+    let Some(roid) = app.bimserver.with(&st.server_id, |c| c.project(poid))?.last_revision else { return Ok(0) };
+    let Some(current) = read_ownership(app, &st.server_id, schema, roid)? else { return Ok(0) };
+    let me = app.bimserver.session_id();
+    let mut n = 0;
+    let entries = current
+        .entries
+        .iter()
+        .cloned()
+        .map(|mut e| {
+            let pick = only.as_ref().is_none_or(|o| o.iter().any(|g| e.target == format!("ifc:{g}")));
+            if pick && e.owner.as_ref().is_some_and(|o| o.session == me) {
+                e.owner = None;
+                n += 1;
+            }
+            e
+        })
+        .collect();
+    if n > 0 {
+        let next = Ownership { version: current.version + 1, parent_version: Some(current.version), entries, ..current.clone() };
+        write_ownership(app, &st, schema, roid, &next)?;
+    }
+    Ok(n)
+});
+
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct OwnershipInfo {
+    pub guid: String,
+    /// Who holds it, if anyone.
+    pub owner: Option<String>,
+    pub mine: bool,
+    /// Unix seconds.
+    pub since: Option<i64>,
+    /// The revision it last changed in (when relinquished after a change).
+    pub last_changed_revision: Option<i64>,
+}
+
+host!(OwnershipQuery, "ownership.query", "Tell who is editing elements",
+    "For each element of the open working copy (COL-OWN-001): who has it borrowed (if anyone), whether it \
+     is this session, since when, and the revision it last changed in.",
+    [Read, Network], OwnershipIdsParams, Vec<OwnershipInfo>, |app, caller, p| {
+    let (id, _, st) = app.working_copy(p.document_id)?;
+    let guids = guids_of(app, id, &p.element_ids)?;
+    let me = app.bimserver.session_id();
+    let current = match ownership_schema(app, &st.server_id)? {
+        Some(schema) => {
+            let poid = st.poid;
+            match app.bimserver.with(&st.server_id, |c| c.project(poid))?.last_revision {
+                Some(roid) => read_ownership(app, &st.server_id, schema, roid)?.unwrap_or_default(),
+                None => Ownership::default(),
+            }
+        }
+        None => Ownership::default(),
+    };
+    Ok(guids
+        .into_iter()
+        .map(|g| {
+            let e = current.entries.iter().find(|e| e.target == format!("ifc:{g}"));
+            OwnershipInfo {
+                owner: e.and_then(|e| e.owner.as_ref()).map(|o| o.user_name.clone()),
+                mine: e.and_then(|e| e.owner.as_ref()).is_some_and(|o| o.session == me),
+                since: e.and_then(|e| e.owner.as_ref().map(|_| e.since)),
+                last_changed_revision: e.map(|e| e.last_changed_revision).filter(|r| *r > 0),
+                guid: g,
+            }
+        })
+        .collect())
 });

@@ -332,7 +332,7 @@ fn two_users_synchronise_and_their_changes_merge() {
     let mut b = new_app(dir_b.path());
     let mut ids = Vec::new();
     for app in [&mut a, &mut b] {
-        let id = run(app, "bimserver.add_server", json!({ "name": "Office", "url": url })).unwrap()["id"].as_str().unwrap().to_owned();
+        let id = run(app, "bimserver.add_server", json!({ "name": "Office", "url": url, "ownership": false })).unwrap()["id"].as_str().unwrap().to_owned();
         run(app, "bimserver.login", json!({ "server_id": id, "username": "anna@example.org", "password": "right" })).unwrap();
         ids.push(id);
     }
@@ -456,14 +456,19 @@ fn revisions_are_compared_and_restored() {
 }
 
 /// A sync lock written into the fake server's latest revision of project 131073 by another
-/// session, expiring `expires` (Unix seconds).
+/// session, expiring `expires` (Unix seconds): the next child of the chain there.
 fn foreign_lock(fake: &Arc<Mutex<Fake>>, expires: i64) {
     let mut f = fake.lock().unwrap();
     let schema = *f.schemas.entry("org.reviera.ownership/1.0".into()).or_insert(555);
     let roid = f.projects[&131073].2.last().unwrap().0;
-    let doc = json!({ "version": 1, "parentVersion": null, "baseRoid": roid, "entries": [], "requests": [], "syncLock": { "owner": { "userId": 9, "userName": "Ben", "session": "other" }, "acquired": 0, "expires": expires } });
-    f.files.insert(4242, serde_json::to_vec(&doc).unwrap());
-    f.extended.push((1, roid, schema, 4242));
+    // Each item there is one version of the chain (no concurrent writers in this test).
+    let version = f.extended.iter().filter(|x| x.1 == roid && x.2 == schema).count() as i64 + 1;
+    let parent = if version > 1 { json!(version - 1) } else { Value::Null };
+    let doc = json!({ "version": version, "parentVersion": parent, "baseRoid": roid, "entries": [], "requests": [], "syncLock": { "owner": { "userId": 9, "userName": "Ben", "session": "other" }, "acquired": 0, "expires": expires } });
+    f.next += 1;
+    let (file, oid) = (4000 + f.next, 8000 + f.next);
+    f.files.insert(file, serde_json::to_vec(&doc).unwrap());
+    f.extended.push((oid, roid, schema, file));
 }
 
 #[test]
@@ -537,7 +542,7 @@ fn conflicts_are_decided_one_by_one_and_the_losers_stashed() {
     let mut b = new_app(dir_b.path());
     let mut ids = Vec::new();
     for app in [&mut a, &mut b] {
-        let id = run(app, "bimserver.add_server", json!({ "name": "Office", "url": url })).unwrap()["id"].as_str().unwrap().to_owned();
+        let id = run(app, "bimserver.add_server", json!({ "name": "Office", "url": url, "ownership": false })).unwrap()["id"].as_str().unwrap().to_owned();
         run(app, "bimserver.login", json!({ "server_id": id, "username": "anna@example.org", "password": "right" })).unwrap();
         ids.push(id);
     }
@@ -594,6 +599,51 @@ fn conflicts_are_decided_one_by_one_and_the_losers_stashed() {
     let ids: Vec<Value> = run(&mut b, "stash.list", json!({})).unwrap().as_array().unwrap().iter().map(|e| e["id"].clone()).collect();
     assert_eq!(run(&mut b, "stash.discard", json!({ "entry_ids": ids })).unwrap(), json!(left));
     assert!(run(&mut b, "stash.list", json!({})).unwrap().as_array().unwrap().is_empty());
+}
+
+#[test]
+fn editing_borrows_and_others_wait_their_turn() {
+    let (url, _fake) = server();
+    let dir_a = tempfile::tempdir().unwrap();
+    let dir_b = tempfile::tempdir().unwrap();
+    let mut a = new_app(dir_a.path());
+    let mut b = new_app(dir_b.path());
+    let mut ids = Vec::new();
+    for app in [&mut a, &mut b] {
+        let id = run(app, "bimserver.add_server", json!({ "name": "Office", "url": url })).unwrap()["id"].as_str().unwrap().to_owned();
+        run(app, "bimserver.login", json!({ "server_id": id, "username": "anna@example.org", "password": "right" })).unwrap();
+        ids.push(id);
+    }
+    run(&mut a, "file.new", json!({})).unwrap();
+    let level = run(&mut a, "level.list", json!({})).unwrap()[0]["id"].clone();
+    let w = run(&mut a, "wall.create", json!({ "curve": { "line": { "start": [0, 0], "end": [6, 0] } }, "base_level": level, "top_constraint": { "unconnected": 3.0 } })).unwrap();
+    let g = a.document(a.active().unwrap()).unwrap().doc.store().get(reviera_core::ElementId(w.as_u64().unwrap())).unwrap().guid().to_string();
+    run(&mut a, "file.save_as", json!({ "path": dir_a.path().join("a.ifc") })).unwrap();
+    run(&mut a, "bimserver.publish_local", json!({ "server_id": ids[0], "poid": 131073, "comment": "A wall" })).unwrap();
+    run(&mut b, "bimserver.open", json!({ "server_id": ids[1], "poid": 131073 })).unwrap();
+    let wb = b.document(b.active().unwrap()).unwrap().doc.store().find_by_guid(&reviera_core::GlobalId::parse(&g).unwrap()).unwrap().0;
+
+    // A moves the wall: borrowed.
+    run(&mut a, "element.move", json!({ "element_ids": [w], "vector": [0, 1, 0] })).unwrap();
+    let q = run(&mut a, "ownership.query", json!({ "element_ids": [w] })).unwrap();
+    assert_eq!((q[0]["owner"].as_str(), q[0]["mine"].as_bool()), (Some("Anna"), Some(true)), "{q}");
+    // B may not move it: refused, naming A, and undone.
+    let e = run(&mut b, "element.move", json!({ "element_ids": [wb], "vector": [0, -1, 0] })).unwrap_err();
+    assert!(e.code == "ownership.owned_by_other" && e.message.contains("Anna"), "{e:?}");
+    assert_eq!(wall_start(&b, &g), [0.0, 0.0], "the edit was undone");
+    let q = run(&mut b, "ownership.query", json!({ "element_ids": [wb] })).unwrap();
+    assert_eq!(q[0]["mine"], false);
+    // A synchronises and relinquishes; B must get the latest revision before editing.
+    run(&mut a, "bimserver.sync", json!({ "comment": "Wall north" })).unwrap();
+    let e = run(&mut b, "element.move", json!({ "element_ids": [wb], "vector": [0, -1, 0] })).unwrap_err();
+    assert_eq!(e.code, "ownership.not_latest", "{e:?}");
+    run(&mut b, "bimserver.get_latest", json!({})).unwrap();
+    assert_eq!(wall_start(&b, &g), [0.0, 1.0]);
+    run(&mut b, "element.move", json!({ "element_ids": [wb], "vector": [0, -1, 0] })).unwrap();
+    assert_eq!(wall_start(&b, &g), [0.0, 0.0]);
+    // B relinquishes without synchronising; A can borrow again once up to date.
+    assert_eq!(run(&mut b, "ownership.relinquish", json!({})).unwrap(), json!(1));
+    run(&mut a, "ownership.borrow", json!({ "element_ids": [w] })).unwrap();
 }
 
 fn var(k: &str) -> Option<String> {

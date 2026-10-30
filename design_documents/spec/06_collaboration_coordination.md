@@ -543,9 +543,11 @@ Ownership is advisory, so step 7 is what gives it force at merge time.
 **Commands.** `ownership.borrow(element_or_object_ids[]) -> result` (normally implicit); `ownership.relinquish(scope: all|elements|worksets, ids[]?) -> ()`; `ownership.query(ids[]) -> ownership_info[]` (query); `ownership.force_relinquish(owner, ids[]?) -> ()` (administrators)
 
 **Acceptance criteria.**
-- [ ] User A moves a wall (borrowing it); user B trying to move it sees "A is editing this element" within the notification latency.
-- [ ] After A synchronises with *relinquish*, B can move the wall without a request.
-- [ ] B cannot borrow a wall changed in a revision B has not got yet; B is offered *Get latest*.
+- [x] User A moves a wall (borrowing it); user B trying to move it sees "A is editing this element" within the notification latency.
+- [x] After A synchronises with *relinquish*, B can move the wall without a request. *(After Get Latest, by the up-to-date rule.)*
+- [x] B cannot borrow a wall changed in a revision B has not got yet; B is offered *Get latest*.
+
+*Built (2026-10-30), elements:* every edit of a working copy (any document command, not undo or redo) borrows the elements it modified or deleted in the ownership document (COL-OWN-002) on the project's latest revision; if another session owns one (`ownership.owned_by_other`, naming the holder) or one changed in a revision newer than the base (`ownership.not_latest`, *Get latest* first), the edit is undone and refused. The borrow is written after the edit's transaction and before the command returns (the spec's "before commit" with an undo on refusal); a concurrent claim of the same version is settled by the chain, retried once. Entries are `{target: ifc:<GlobalId>, owner, since, lastChangedRevision}`. Synchronise relinquishes this session's borrows (unless `keep_borrowed`) and records the revision they changed in; the next revision's root carries every entry. `ownership.borrow(element_ids)`, `ownership.relinquish(element_ids?) -> count`, `ownership.query(element_ids) -> [{guid, owner, mine, since, last_changed_revision}]`. A profile's `ownership: false` turns borrowing off; offline (server unreachable) edits stand unborrowed. Ownership documents are cached by their extended-data id. Not yet: worksets and RXD objects as ownership units, provisional borrows queued offline, *Force relinquish*, *Relinquish All Mine* in the UI, and showing the owner on selection (worksharing display, COL-WS-004).
 
 ### Live ownership document and sync lock
 **ID:** COL-OWN-002 · **Priority:** P1 · **Ref:** TECH_STACK §3.7.1–3.7.2; spec/02a (BIMserver transport)
@@ -568,7 +570,7 @@ Ownership is advisory, so step 7 is what gives it force at merge time.
 **Acceptance criteria.**
 - [ ] Two clients borrowing the same element within 100 ms of each other: exactly one succeeds, and both clients agree on which one.
 - [x] A client that crashes while holding the sync lock blocks others for no longer than the lock's time-to-live.
-- [ ] Borrowing and relinquishing elements does not create any new model revision.
+- [x] Borrowing and relinquishing elements does not create any new model revision.
 - [ ] After user A checks in, user B (who still has base = previous revision) still sees A's remaining borrows.
 
 *Built (2026-10-29), the sync lock:* the ownership document `org.reviera.ownership/1.0` (version, parentVersion, baseRoid, entries, requests, syncLock with owner {userId, userName, session}, acquired, expires) in BIMserver extended data: the schema registered on first use (`getExtendedDataSchemaByName`, `addExtendedDataSchema`), written by `uploadFile` and `addExtendedDataToRevision`, read by `getAllExtendedDataOfRevision` and `getFile`, the current state the chain from the root through the earliest child of each version (oid order). All verified on BIMserver 1.6.1. Entries and requests are carried forward but not yet used (borrowing, COL-OWN-001/003).
@@ -1699,7 +1701,7 @@ Every command below is registered once and is available from the UI, Lua and MCP
 | `model.mode` | — | {mode, server?, poid?, base_roid?, connected?} | No | COL-MODE-001 |
 | `bimserver.publish_local` | project: {poid}\|{new_name, parent_poid?}, comment, replace? | {poid, roid} | No | COL-MODE-002 |
 | `model.export_local_copy` | path, keep_worksets? | () | No | COL-MODE-002 |
-| `bimserver.add_server` | name, url, allow_http? | server | No | COL-BIM-001 |
+| `bimserver.add_server` | name, url, allow_http?, ownership? | server | No | COL-BIM-001 |
 | `bimserver.remove_server` | server_id | () | No | COL-BIM-001 |
 | `bimserver.login` | server_id, username?, password?, user_token?, remember? | session_info | No | COL-BIM-001 |
 | `bimserver.logout` | server_id, forget? | () | No | COL-BIM-001 |
@@ -1711,7 +1713,7 @@ Every command below is registered once and is available from the UI, Lua and MCP
 | `bimserver.download_revision` | server_id, roid, path, schema? | bytes | No | COL-BIM-003 |
 | `bimserver.check_in` | comment, document_id? | {poid, roid, revision, warnings, document_id} | No | COL-BIM-004 |
 | `bimserver.get_latest` | document_id?, conflicts? | sync_report | No | COL-BIM-005 |
-| `bimserver.sync` | comment, document_id?, conflicts? (relinquish?, save_before?, save_after? not yet) | sync_report | No | COL-BIM-006 |
+| `bimserver.sync` | comment, document_id?, conflicts?, keep_borrowed? | sync_report | No | COL-BIM-006 |
 | `bimserver.set_sync_reminder` | minutes? | () | No | COL-BIM-006 |
 | `bimserver.subscribe` | events[]? | () | No | COL-BIM-007 |
 | `bimserver.unsubscribe` | — | () | No | COL-BIM-007 |
@@ -1743,9 +1745,9 @@ Every command below is registered once and is available from the UI, Lua and MCP
 | `workset.open` | workset_ids[] | () | No | COL-WS-003 |
 | `workset.close` | workset_ids[] | () | No | COL-WS-003 |
 | `workset.manage` | — | () | No | COL-WS-002 |
-| `ownership.borrow` | element_or_object_ids[] | result | No | COL-OWN-001 |
-| `ownership.relinquish` | scope: all\|elements\|worksets, ids[]? | () | No | COL-OWN-001 |
-| `ownership.query` | ids[] | ownership_info[] | No | COL-OWN-001 |
+| `ownership.borrow` | element_ids, document_id? | — | No | COL-OWN-001 |
+| `ownership.relinquish` | element_ids?, document_id? | count | No | COL-OWN-001 |
+| `ownership.query` | element_ids, document_id? | ownership_info[] | No (query) | COL-OWN-001 |
 | `ownership.force_relinquish` | owner, ids[]? | () | No | COL-OWN-001 |
 | `ownership.request` | element_or_object_ids[], message?, whole_workset? | {borrowed[], requests[], skipped[]} | No | COL-OWN-005 |
 | `editrequest.create` | targets[], message? | request_id | No | COL-OWN-003 |

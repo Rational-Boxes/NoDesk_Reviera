@@ -8736,6 +8736,42 @@ Reviera shall have a foundational subsystem, built on one general contract, that
 
 ---
 
+## 2.18 Performance profiling (development support)
+
+> **Owner requirement (2026-10-30):** "Add a performance profiler that can be enabled to detect performance problems when working with large models and data sets." — "New requirement, development support for performance optimization." — "Goal is gather real-time metrics to identify slowdowns using the software and present a report for development to investigate improvements."
+
+### 2.18.1 Built-in performance profiler
+**ID:** DM-PERF-001 · **Priority:** P1 · **Ref:** owner requirement (2026-10-30); NFR-PERF-001 … 004 (Ch 0); Reviera-originated design
+
+**Purpose.** Gather **real-time metrics** while Reviera is used on large models and data sets, so slowdowns are seen as they happen, and present a **report for development** that says where the time went, so improvements can be investigated and measured against the performance targets (NFR-PERF-001 … 004). Users can attach the report to an issue.
+
+**Behaviour & rules.**
+- **Off by default, nearly free when off.** The profiler is switched on by `profiler.start`, by Manage › Performance Profiler, or for a whole session by the environment variable `REVIERA_PROFILE=1` (also `REVIERA_PROFILE_SLOW_MS`). While off, an instrumented operation costs one atomic read; nothing is recorded or allocated.
+- **Scopes.** The code is instrumented with named, nested timing scopes on the operations that grow with model size: every command (by name; document commands, application commands, MCP and Lua calls alike), transaction commit and change diff, geometry regeneration of recipe elements (`bodies`), render-scene builds, IFC open (read, tessellation) and save (IFC write, RXD encoding), the live store's journal writes, three-way merges, BIMserver calls, and the viewport's frame rendering. A scope records its wall time, its **self time** (less the time of the scopes nested in it), its thread and, where useful, a short detail (the command's name, an element count).
+- **Counters** record sizes alongside the times (elements regenerated, triangles in a scene, bytes written, elements merged), so a slow operation can be related to the data it handled.
+- **Statistics** per scope name: calls, total, self total, mean, median, 95th percentile, maximum. Durations are kept per name up to a cap (default 100 000) for the percentiles; beyond it they are sampled.
+- **Slow operations.** Any scope at or over the **slow threshold** (default 100 ms; set by `profiler.start`) is kept in a slow list (up to 1 000, newest kept) with its detail, time and thread, and flagged on the status bar while the profiler runs.
+- **Call tree.** Time is also aggregated by **path** (the chain of enclosing scopes, for example `command:wall.create › commit › regenerate`), with calls, total and self time per path, so a report shows where the time goes inside an operation, not only which operation was slow.
+- **Live metrics.** While the profiler runs, a live view refreshes about once a second: the viewport's frame time and frames per second, the most recent operations with their durations, slow operations as they happen, the memory in use, and the model's size; a slow operation also shows on the status bar.
+- **Timeline.** The last 200 000 scope events are kept in a ring buffer and can be exported as a **Chrome trace** (the Trace Event JSON format, readable by chrome://tracing, Perfetto and Speedscope), so a session's work can be inspected on a timeline, thread by thread.
+- **Context.** A report states the model's size (elements, IFC entities, triangles), the memory in use where the platform tells it (resident set size), the build (debug or release), the number of CPU threads, and how long the profiler ran.
+- **Privacy.** A report and a trace hold operation names, counts and times only: no element names, property values, file contents, paths or credentials. Command details are command names.
+
+- **Report for development.** `profiler.export_report` writes a Markdown report: the context (build, platform, CPU threads, memory, model size, how long it ran), the hottest scopes by self time, the call tree's heaviest paths, the slow operations (each with its path and detail), the counters, and how to open the exported trace; it is meant to be attached to an issue and read by a developer.
+
+**UI.** Manage › Settings › **Performance Profiler** opens a live window: Start / Stop, the slow threshold, the live metrics (refreshed every second while running), a table of scopes (name, calls, total, self, mean, p95, max) by self time, the heaviest call paths and the slow operations; Reset, Export Report… and Export Trace….
+
+**Commands.** `profiler.start(slow_ms?) -> status`, `profiler.stop() -> status`, `profiler.status() -> {enabled, since, events, slow_ms}` (query), `profiler.live() -> live_metrics` (query: frame time, fps, recent operations, memory, model size), `profiler.report(top?, sort?) -> report` (query; with the call tree), `profiler.reset() -> ()`, `profiler.export_report(path) -> {bytes}`, `profiler.export_trace(path) -> {events, bytes}`.
+
+**Acceptance criteria.**
+- [ ] With the profiler off, a full regeneration of a 100 000-element model is no more than 1 % slower than a build without the instrumentation.
+- [ ] Opening, editing and saving a model with the profiler on gives a report whose top scopes by self time account for at least 90 % of the measured wall time of those operations.
+- [ ] A command that takes longer than the slow threshold appears in the slow list with its name and duration.
+- [ ] The exported trace opens in Perfetto and shows nested scopes per thread in time order.
+- [ ] While the profiler runs, orbiting a large model shows its frame time in the live view within a second, and a slow command appears there as it finishes.
+- [ ] The exported report names the heaviest call path of a slow command (for example the regeneration inside it) with its share of the time.
+
+
 ## Appendix A — Reference evolution (release history and version notes)
 
 **Ref:** research/05 §14, §15, §13.1, §11.2 · screenshots/platform/wall_tool_ribbon_no_options_bar_2027.png, screenshots/platform/autodesk_assistant_2027.png
@@ -9206,6 +9242,14 @@ All commands defined in this chapter. Every command in this table is also a Lua 
 | `compute.set_location` | kind, location, detail? | — | Yes | DM-RPC-005 |
 | `compute_host.add` | url, auth, token? | host_id | No | DM-RPC-006 |
 | `subscription.add` | name, url, key, secret (UI and Lua only) | subscription_id | No | DM-RPC-011 |
+| `profiler.start` | slow_ms? | status | No | DM-PERF-001 |
+| `profiler.stop` | — | status | No | DM-PERF-001 |
+| `profiler.status` | — | {enabled, since, events, slow_ms} | No (query) | DM-PERF-001 |
+| `profiler.live` | — | live_metrics | No (query) | DM-PERF-001 |
+| `profiler.report` | top?, sort? | report | No (query) | DM-PERF-001 |
+| `profiler.export_report` | path | {bytes} | No | DM-PERF-001 |
+| `profiler.reset` | — | — | No | DM-PERF-001 |
+| `profiler.export_trace` | path | {events, bytes} | No | DM-PERF-001 |
 | `subscription.set` | subscription_id, name?, url?, key?, secret?, ca?, pin? (UI and Lua only) | — | No | DM-RPC-011 |
 | `subscription.remove` | subscription_id (UI and Lua only) | — | No | DM-RPC-011 |
 | `subscription.list` | — | subscriptions[] (no secrets) | No | DM-RPC-011 |
@@ -26227,9 +26271,11 @@ Ownership is advisory, so step 7 is what gives it force at merge time.
 **Commands.** `ownership.borrow(element_or_object_ids[]) -> result` (normally implicit); `ownership.relinquish(scope: all|elements|worksets, ids[]?) -> ()`; `ownership.query(ids[]) -> ownership_info[]` (query); `ownership.force_relinquish(owner, ids[]?) -> ()` (administrators)
 
 **Acceptance criteria.**
-- [ ] User A moves a wall (borrowing it); user B trying to move it sees "A is editing this element" within the notification latency.
-- [ ] After A synchronises with *relinquish*, B can move the wall without a request.
-- [ ] B cannot borrow a wall changed in a revision B has not got yet; B is offered *Get latest*.
+- [x] User A moves a wall (borrowing it); user B trying to move it sees "A is editing this element" within the notification latency.
+- [x] After A synchronises with *relinquish*, B can move the wall without a request. *(After Get Latest, by the up-to-date rule.)*
+- [x] B cannot borrow a wall changed in a revision B has not got yet; B is offered *Get latest*.
+
+*Built (2026-10-30), elements:* every edit of a working copy (any document command, not undo or redo) borrows the elements it modified or deleted in the ownership document (COL-OWN-002) on the project's latest revision; if another session owns one (`ownership.owned_by_other`, naming the holder) or one changed in a revision newer than the base (`ownership.not_latest`, *Get latest* first), the edit is undone and refused. The borrow is written after the edit's transaction and before the command returns (the spec's "before commit" with an undo on refusal); a concurrent claim of the same version is settled by the chain, retried once. Entries are `{target: ifc:<GlobalId>, owner, since, lastChangedRevision}`. Synchronise relinquishes this session's borrows (unless `keep_borrowed`) and records the revision they changed in; the next revision's root carries every entry. `ownership.borrow(element_ids)`, `ownership.relinquish(element_ids?) -> count`, `ownership.query(element_ids) -> [{guid, owner, mine, since, last_changed_revision}]`. A profile's `ownership: false` turns borrowing off; offline (server unreachable) edits stand unborrowed. Ownership documents are cached by their extended-data id. Not yet: worksets and RXD objects as ownership units, provisional borrows queued offline, *Force relinquish*, *Relinquish All Mine* in the UI, and showing the owner on selection (worksharing display, COL-WS-004).
 
 ### Live ownership document and sync lock
 **ID:** COL-OWN-002 · **Priority:** P1 · **Ref:** TECH_STACK §3.7.1–3.7.2; spec/02a (BIMserver transport)
@@ -26252,7 +26298,7 @@ Ownership is advisory, so step 7 is what gives it force at merge time.
 **Acceptance criteria.**
 - [ ] Two clients borrowing the same element within 100 ms of each other: exactly one succeeds, and both clients agree on which one.
 - [x] A client that crashes while holding the sync lock blocks others for no longer than the lock's time-to-live.
-- [ ] Borrowing and relinquishing elements does not create any new model revision.
+- [x] Borrowing and relinquishing elements does not create any new model revision.
 - [ ] After user A checks in, user B (who still has base = previous revision) still sees A's remaining borrows.
 
 *Built (2026-10-29), the sync lock:* the ownership document `org.reviera.ownership/1.0` (version, parentVersion, baseRoid, entries, requests, syncLock with owner {userId, userName, session}, acquired, expires) in BIMserver extended data: the schema registered on first use (`getExtendedDataSchemaByName`, `addExtendedDataSchema`), written by `uploadFile` and `addExtendedDataToRevision`, read by `getAllExtendedDataOfRevision` and `getFile`, the current state the chain from the root through the earliest child of each version (oid order). All verified on BIMserver 1.6.1. Entries and requests are carried forward but not yet used (borrowing, COL-OWN-001/003).
@@ -27383,7 +27429,7 @@ Every command below is registered once and is available from the UI, Lua and MCP
 | `model.mode` | — | {mode, server?, poid?, base_roid?, connected?} | No | COL-MODE-001 |
 | `bimserver.publish_local` | project: {poid}\|{new_name, parent_poid?}, comment, replace? | {poid, roid} | No | COL-MODE-002 |
 | `model.export_local_copy` | path, keep_worksets? | () | No | COL-MODE-002 |
-| `bimserver.add_server` | name, url, allow_http? | server | No | COL-BIM-001 |
+| `bimserver.add_server` | name, url, allow_http?, ownership? | server | No | COL-BIM-001 |
 | `bimserver.remove_server` | server_id | () | No | COL-BIM-001 |
 | `bimserver.login` | server_id, username?, password?, user_token?, remember? | session_info | No | COL-BIM-001 |
 | `bimserver.logout` | server_id, forget? | () | No | COL-BIM-001 |
@@ -27395,7 +27441,7 @@ Every command below is registered once and is available from the UI, Lua and MCP
 | `bimserver.download_revision` | server_id, roid, path, schema? | bytes | No | COL-BIM-003 |
 | `bimserver.check_in` | comment, document_id? | {poid, roid, revision, warnings, document_id} | No | COL-BIM-004 |
 | `bimserver.get_latest` | document_id?, conflicts? | sync_report | No | COL-BIM-005 |
-| `bimserver.sync` | comment, document_id?, conflicts? (relinquish?, save_before?, save_after? not yet) | sync_report | No | COL-BIM-006 |
+| `bimserver.sync` | comment, document_id?, conflicts?, keep_borrowed? | sync_report | No | COL-BIM-006 |
 | `bimserver.set_sync_reminder` | minutes? | () | No | COL-BIM-006 |
 | `bimserver.subscribe` | events[]? | () | No | COL-BIM-007 |
 | `bimserver.unsubscribe` | — | () | No | COL-BIM-007 |
@@ -27427,9 +27473,9 @@ Every command below is registered once and is available from the UI, Lua and MCP
 | `workset.open` | workset_ids[] | () | No | COL-WS-003 |
 | `workset.close` | workset_ids[] | () | No | COL-WS-003 |
 | `workset.manage` | — | () | No | COL-WS-002 |
-| `ownership.borrow` | element_or_object_ids[] | result | No | COL-OWN-001 |
-| `ownership.relinquish` | scope: all\|elements\|worksets, ids[]? | () | No | COL-OWN-001 |
-| `ownership.query` | ids[] | ownership_info[] | No | COL-OWN-001 |
+| `ownership.borrow` | element_ids, document_id? | — | No | COL-OWN-001 |
+| `ownership.relinquish` | element_ids?, document_id? | count | No | COL-OWN-001 |
+| `ownership.query` | element_ids, document_id? | ownership_info[] | No (query) | COL-OWN-001 |
 | `ownership.force_relinquish` | owner, ids[]? | () | No | COL-OWN-001 |
 | `ownership.request` | element_or_object_ids[], message?, whole_workset? | {borrowed[], requests[], skipped[]} | No | COL-OWN-005 |
 | `editrequest.create` | targets[], message? | request_id | No | COL-OWN-003 |
@@ -28026,7 +28072,7 @@ Generated by `tools/build_spec.py` from the chapter command catalogs and require
 | Area | P0 | P1 | P2 | P3 | Total |
 |------|---:|---:|---:|---:|------:|
 | UI | 76 | 39 | 8 | 0 | 123 |
-| DM | 91 | 64 | 34 | 3 | 192 |
+| DM | 91 | 65 | 34 | 3 | 193 |
 | ARC | 77 | 69 | 10 | 1 | 157 |
 | STR | 0 | 15 | 47 | 0 | 62 |
 | MEP | 0 | 30 | 42 | 0 | 72 |
@@ -28034,7 +28080,7 @@ Generated by `tools/build_spec.py` from the chapter command catalogs and require
 | DOC | 68 | 40 | 13 | 1 | 122 |
 | COL | 8 | 45 | 6 | 1 | 60 |
 | ADV | 0 | 0 | 4 | 1 | 5 |
-| **Total** | **320** | **303** | **192** | **7** | **822** |
+| **Total** | **320** | **304** | **192** | **7** | **823** |
 
 Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver)"), it is counted under the first. The non-functional requirements (NFR-…) are in Chapter 0 §0.7 and are not counted here.
 
@@ -28089,7 +28135,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.2a Reviera-originated features
 
-119 requirements are Reviera's own design: owner directives, the technology stack (IFC/RXD storage, live store, BIMserver, MCP, scripting) and extensions beyond the reference product's feature set. Their Ref lines cite no research on the reference product. Listing them separately keeps the clean-room provenance clear: every other requirement traces to public research on the reference product.
+120 requirements are Reviera's own design: owner directives, the technology stack (IFC/RXD storage, live store, BIMserver, MCP, scripting) and extensions beyond the reference product's feature set. Their Ref lines cite no research on the reference product. Listing them separately keeps the clean-room provenance clear: every other requirement traces to public research on the reference product.
 
 | Requirement | Ch | Feature |
 |-------------|----|---------|
@@ -28148,6 +28194,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | DM-RPC-009 | 2 | 2.17.9 Job registry and reconnection |
 | DM-RPC-010 | 2 | 2.17.10 Real-time simulation sessions |
 | DM-RPC-011 | 2 | 2.17.11 Remote analysis subscriptions |
+| DM-PERF-001 | 2 | 2.18.1 Built-in performance profiler |
 | DM-RXD-001 | 2a | store non-IFC data only as RXD documents and element data, using the schemas defined in … |
 | DM-RXD-002 | 2a | By default, Reviera shall embed RXD in the IFC file using only `Reviera_*` property sets … |
 | DM-RXD-004 | 2a | support the external carrier (`.reviera` file or folder, `.rvb` bundle) holding identical … |
@@ -28215,7 +28262,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**2197 unique commands** in 421 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**2205 unique commands** in 422 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -28493,6 +28540,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `precast_config` | 7 |
 | `pressure_loss_report` | 1 |
 | `print` | 4 |
+| `profiler` | 8 |
 | `project` | 6 |
 | `propertyline` | 2 |
 | `pset` | 2 |
@@ -28798,7 +28846,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `beam_system.remove` | 4 | system_id | beam_ids[] | Yes | STR-BSYS-001 |
 | `beam_system.set_layout` | 4 | system_id, rule, value, justification | — | Yes | STR-BSYS-001 |
 | `bending_detail.place` | 4 | rebar_id, view_id, point, scale? | id | Yes | STR-RBR-018 |
-| `bimserver.add_server` | 6 | name, url, allow_http? | server | No | COL-BIM-001 |
+| `bimserver.add_server` | 6 | name, url, allow_http?, ownership? | server | No | COL-BIM-001 |
 | `bimserver.capabilities` | 6 | — | capability_set | No | COL-OWN-004 |
 | `bimserver.check_in` | 6 | comment, document_id? | {poid, roid, revision, warnings, document_id} | No | COL-BIM-004 |
 | `bimserver.compare` | 6 | roid_a?, roid_b?, document_id? | change_set | No (query) | COL-BIM-008 |
@@ -28819,7 +28867,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `bimserver.set_sync_reminder` | 6 | minutes? | () | No | COL-BIM-006 |
 | `bimserver.set_update_frequency` | 6 | seconds_or_manual | () | No | COL-BIM-007 |
 | `bimserver.subscribe` | 6 | events[]? | () | No | COL-BIM-007 |
-| `bimserver.sync` | 6 | comment, document_id?, conflicts? (relinquish?, save_before?, save_after? not yet) | sync_report | No | COL-BIM-006 |
+| `bimserver.sync` | 6 | comment, document_id?, conflicts?, keep_borrowed? | sync_report | No | COL-BIM-006 |
 | `bimserver.unsubscribe` | 6 | — | () | No | COL-BIM-007 |
 | `bolt_pattern.create` | 4 | element_ids[], face_ref, pattern: "rect"\ | "circle", params | id | Yes |
 | `boundary_condition.at_column_bases` | 4 | state? | node_ids[] | Yes | STR-BC-001 |
@@ -29768,10 +29816,10 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `overlap.accepted` | 3 | — | [pair] | No | ARC-MOD-032 |
 | `overlap.find` | 3 | element_ids?, against?, tolerance?, min_volume?, resolution?, include_related?, limit? | {overlaps, bodies} | No | ARC-MOD-030 |
 | `overlap.resolve` | 3 | a, b, mode: cut_a\ | cut_b\ | join\ | subtract\ |
-| `ownership.borrow` | 6 | element_or_object_ids[] | result | No | COL-OWN-001 |
+| `ownership.borrow` | 6 | element_ids, document_id? | — | No | COL-OWN-001 |
 | `ownership.force_relinquish` | 6 | owner, ids[]? | () | No | COL-OWN-001 |
-| `ownership.query` | 6 | ids[] | ownership_info[] | No | COL-OWN-001 |
-| `ownership.relinquish` | 6 | scope: all\ | elements\ | worksets, ids[]? | () |
+| `ownership.query` | 6 | element_ids, document_id? | ownership_info[] | No (query) | COL-OWN-001 |
+| `ownership.relinquish` | 6 | element_ids?, document_id? | count | No | COL-OWN-001 |
 | `ownership.request` | 6 | element_or_object_ids[], message?, whole_workset? | {borrowed[], requests[], skipped[]} | No | COL-OWN-005 |
 | `panel.create_feeder` | 4 | child_panel_id, parent_panel_id, connection: "breaker"\ | "lugs" | circuit_id | Yes |
 | `panel.hierarchy` | 4 | root_id? | tree | No | MEP-ELEC-006 |
@@ -29904,6 +29952,14 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `print.run` | 5 | range, set_id?, printer?, setup_id?, copies?, combine? | job_id | No | DOC-OUT-002 |
 | `print.setup_delete` | 5 | setup_id | () | Yes | DOC-OUT-002 |
 | `print.setup_save` | 5 | name, settings | setup_id | Yes | DOC-OUT-002 |
+| `profiler.export_report` | 2 | path | {bytes} | No | DM-PERF-001 |
+| `profiler.export_trace` | 2 | path | {events, bytes} | No | DM-PERF-001 |
+| `profiler.live` | 2 | — | live_metrics | No (query) | DM-PERF-001 |
+| `profiler.report` | 2 | top?, sort? | report | No (query) | DM-PERF-001 |
+| `profiler.reset` | 2 | — | — | No | DM-PERF-001 |
+| `profiler.start` | 2 | slow_ms? | status | No | DM-PERF-001 |
+| `profiler.status` | 2 | — | {enabled, since, events, slow_ms} | No (query) | DM-PERF-001 |
+| `profiler.stop` | 2 | — | status | No | DM-PERF-001 |
 | `project.info.edit` | 2 | — | — | No | DM-SET-002 |
 | `project.info.get` | 2 | — | info | No | DM-SET-002 |
 | `project.info.set` | 2 | fields | — | Yes | DM-SET-002 |
