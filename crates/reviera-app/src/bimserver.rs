@@ -119,6 +119,19 @@ pub struct Servers {
     clients: HashMap<String, Client>,
     /// This Reviera's session, as the sync lock names it.
     session_id: Option<String>,
+    /// Merges waiting for conflict decisions, by document (COL-MRG-002).
+    pending: HashMap<DocumentId, Pending>,
+}
+
+/// A merge stopped at its conflicts: the revision downloaded (`remote.ifc`), the conflicts, the
+/// decisions taken so far, and, for a synchronise, its comment.
+#[derive(Debug, Clone)]
+struct Pending {
+    latest: i64,
+    number: i64,
+    conflicts: Vec<reviera_core::merge::Conflict>,
+    decisions: reviera_core::merge::Decisions,
+    sync_comment: Option<String>,
 }
 
 impl std::fmt::Debug for Servers {
@@ -906,6 +919,8 @@ pub struct SyncReport {
     pub intruders: Vec<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub corrective: Option<CheckInOut>,
+    /// The merge waits for conflict decisions (merge.list_conflicts, merge.resolve, merge.finish).
+    pub pending: bool,
 }
 
 fn open_store(path: &Path) -> Result<reviera_core::Store> {
@@ -914,11 +929,11 @@ fn open_store(path: &Path) -> Result<reviera_core::Store> {
 }
 
 /// Merges the server's latest revision into working copy `id` (saved first).
-fn get_latest(app: &mut App, id: DocumentId, path: &Path, mut st: WorkingState, policy: reviera_core::merge::Policy) -> Result<SyncReport> {
+fn get_latest(app: &mut App, id: DocumentId, path: &Path, st: WorkingState, policy: reviera_core::merge::Policy) -> Result<SyncReport> {
     let folder = path.parent().expect("a working copy is in its folder").to_owned();
     let poid = st.poid;
     let project = app.bimserver.with(&st.server_id, |c| c.project(poid))?;
-    let mut report = SyncReport { up_to_date: true, base_roid: st.base_roid, base_revision: st.base_revision, created: 0, updated: 0, deleted: 0, remote_changes: 0, merged: 0, conflicts: Vec::new(), applied: false, skipped: Vec::new(), checked_in: None, lock: None, intruders: Vec::new(), corrective: None };
+    let mut report = SyncReport { up_to_date: true, base_roid: st.base_roid, base_revision: st.base_revision, created: 0, updated: 0, deleted: 0, remote_changes: 0, merged: 0, conflicts: Vec::new(), applied: false, skipped: Vec::new(), checked_in: None, lock: None, intruders: Vec::new(), corrective: None, pending: false };
     let Some(latest) = project.last_revision.filter(|r| *r != st.base_roid) else { return Ok(report) };
     report.up_to_date = false;
     let schema = st.schema.clone();
@@ -934,10 +949,21 @@ fn get_latest(app: &mut App, id: DocumentId, path: &Path, mut st: WorkingState, 
     report.remote_changes = plan.remote_changes;
     report.merged = plan.merged;
     report.conflicts = plan.conflicts.clone();
+    let number = revs.iter().find(|r| r.oid == latest).map_or(st.base_revision, |r| r.number);
     if !plan.conflicts.is_empty() && policy == reviera_core::merge::Policy::Fail {
+        // Kept for decisions, conflict by conflict (COL-MRG-002).
+        app.bimserver.pending.insert(id, Pending { latest, number, conflicts: plan.conflicts.clone(), decisions: Default::default(), sync_comment: None });
+        report.pending = true;
         return Ok(report);
     }
-    let number = revs.iter().find(|r| r.oid == latest).map_or(st.base_revision, |r| r.number);
+    app.bimserver.pending.remove(&id);
+    finish_merge(app, id, &folder, st, plan, latest, number, report)
+}
+
+/// Applies a merge plan to working copy `id`, saves it, and makes revision `latest` its base.
+#[allow(clippy::too_many_arguments)]
+fn finish_merge(app: &mut App, id: DocumentId, folder: &Path, mut st: WorkingState, plan: reviera_core::merge::Plan, latest: i64, number: i64, mut report: SyncReport) -> Result<SyncReport> {
+    let remote_path = folder.join("remote.ifc");
     let doc = &mut app.get_mut(id)?.doc;
     let mut txn = doc.transaction(format!("Get Latest (revision {number})"), reviera_core::Origin::ui());
     let applied = reviera_core::merge::apply(&mut txn, &plan)?;
@@ -949,9 +975,10 @@ fn get_latest(app: &mut App, id: DocumentId, path: &Path, mut st: WorkingState, 
     st.base_roid = latest;
     st.base_revision = number;
     st.synced_at = now();
-    write_state(&folder, &st)?;
+    write_state(folder, &st)?;
     report.base_roid = latest;
     report.base_revision = number;
+    report.conflicts = plan.conflicts;
     Ok(report)
 }
 
@@ -1020,6 +1047,11 @@ host!(BimSync, "bimserver.sync", "Synchronise with the server",
         _ => {}
     }
     report.lock = Some(if lock.is_some() { "taken" } else { "unavailable" }.to_owned());
+    if report.pending
+        && let Some(pm) = app.bimserver.pending.get_mut(&id)
+    {
+        pm.sync_comment = Some(p.comment.clone());
+    }
     Ok(report)
 });
 
@@ -1385,4 +1417,351 @@ host!(BimRestore, "bimserver.restore", "Restore a revision as the latest",
     txn.commit();
     app.save(id, None)?;
     check_in(app, id, &folder, st, &format!("[reviera:restore] Restored revision {number}: {reason}"))
+});
+
+// ---- Conflicts one by one, and the stash (COL-MRG-002) ----
+
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct ConflictRow {
+    /// Its id for merge.resolve: `c1`, `c2` …
+    pub id: String,
+    #[serde(flatten)]
+    pub conflict: reviera_core::merge::Conflict,
+}
+
+fn pending_of(app: &App, id: DocumentId) -> Result<&Pending> {
+    app.bimserver.pending.get(&id).ok_or_else(|| bad("merge.none_pending", "no merge waits for decisions (Get Latest or Synchronise found no conflicts, or it was finished or cancelled)"))
+}
+
+fn rows(p: &Pending) -> Vec<ConflictRow> {
+    p.conflicts
+        .iter()
+        .enumerate()
+        .map(|(k, c)| ConflictRow { id: format!("c{}", k + 1), conflict: reviera_core::merge::Conflict { decision: p.decisions.get(&c.key()).cloned(), ..c.clone() } })
+        .collect()
+}
+
+#[derive(Debug, Default, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct DocParams {
+    pub document_id: Option<DocumentId>,
+}
+
+host!(MergeListConflicts, "merge.list_conflicts", "List the conflicts waiting for decisions",
+    "The pending merge's conflicts (COL-MRG-002): id, element (GlobalId, class, name), kind, facet, the \
+     local and remote values, and the decision taken so far.",
+    [Read], Option<DocParams>, Vec<ConflictRow>, |app, caller, p| {
+    let id = app.resolve(p.and_then(|p| p.document_id))?;
+    Ok(rows(pending_of(app, id)?))
+});
+
+/// mine, theirs or value.
+#[derive(Debug, Clone, Copy, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ChoiceKind {
+    Mine,
+    Theirs,
+    Value,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ResolveParams {
+    pub conflict_id: String,
+    pub choice: ChoiceKind,
+    /// For `value`: the merged value (null removes the facet).
+    pub value: Option<serde_json::Value>,
+    /// Mine or theirs for every conflict on that element (so a wall's curve is never half one
+    /// side's, half the other's).
+    #[serde(default)]
+    pub element: bool,
+    pub document_id: Option<DocumentId>,
+}
+
+host!(MergeResolve, "merge.resolve", "Decide one conflict",
+    "Decides conflict `conflict_id` of the pending merge (COL-MRG-002): keep `mine`, take `theirs`, or a \
+     `value` of its own (a property's merged value; not for a whole element); with `element`, mine or \
+     theirs for every conflict on the same element. Nothing changes until merge.finish.",
+    [Edit], ResolveParams, (), |app, caller, p| {
+    let id = app.resolve(p.document_id)?;
+    let pm = app.bimserver.pending.get_mut(&id).ok_or_else(|| bad("merge.none_pending", "no merge waits for decisions"))?;
+    let k: usize = p.conflict_id.trim_start_matches('c').parse().ok().filter(|k| *k >= 1 && *k <= pm.conflicts.len()).ok_or_else(|| bad("merge.no_conflict", format!("no conflict {:?}; merge.list_conflicts lists them", p.conflict_id)))?;
+    let c = &pm.conflicts[k - 1];
+    let choice = match p.choice {
+        ChoiceKind::Mine => reviera_core::merge::Choice::Mine,
+        ChoiceKind::Theirs => reviera_core::merge::Choice::Theirs,
+        ChoiceKind::Value if c.facet == "element" => return Err(bad("merge.bad_choice", "a whole element is kept or taken, not given a value")),
+        ChoiceKind::Value => reviera_core::merge::Choice::Value(p.value.clone().ok_or_else(|| bad("merge.bad_choice", "give the value"))?),
+    };
+    if p.element {
+        if matches!(choice, reviera_core::merge::Choice::Value(_)) {
+            return Err(bad("merge.bad_choice", "a whole element is kept or taken, not given a value"));
+        }
+        let g = c.guid.clone();
+        for k in pm.conflicts.iter().filter(|x| x.guid == g).map(reviera_core::merge::Conflict::key).collect::<Vec<_>>() {
+            pm.decisions.insert(k, choice.clone());
+        }
+    } else {
+        pm.decisions.insert(c.key(), choice);
+    }
+    Ok(())
+});
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ResolveAllParams {
+    pub choice: ChoiceKind,
+    /// Only conflicts on elements of this IFC class.
+    pub class: Option<String>,
+    /// Also those already decided (default: only the undecided).
+    #[serde(default)]
+    pub all: bool,
+    pub document_id: Option<DocumentId>,
+}
+
+host!(MergeResolveAll, "merge.resolve_all", "Decide many conflicts",
+    "Keep `mine` or take `theirs` for every undecided conflict of the pending merge (or every one, with \
+     `all`), optionally only on elements of `class` (COL-MRG-002). Returns how many were decided.",
+    [Edit], ResolveAllParams, usize, |app, caller, p| {
+    let id = app.resolve(p.document_id)?;
+    let pm = app.bimserver.pending.get_mut(&id).ok_or_else(|| bad("merge.none_pending", "no merge waits for decisions"))?;
+    let choice = match p.choice {
+        ChoiceKind::Mine => reviera_core::merge::Choice::Mine,
+        ChoiceKind::Theirs => reviera_core::merge::Choice::Theirs,
+        ChoiceKind::Value => return Err(bad("merge.bad_choice", "decide many conflicts as mine or theirs")),
+    };
+    let mut n = 0;
+    for c in &pm.conflicts {
+        if p.class.as_deref().is_some_and(|k| !c.class.eq_ignore_ascii_case(k)) || (!p.all && pm.decisions.contains_key(&c.key())) {
+            continue;
+        }
+        pm.decisions.insert(c.key(), choice.clone());
+        n += 1;
+    }
+    Ok(n)
+});
+
+/// One change the merge set aside: the losing side of a decided conflict.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct StashEntry {
+    pub id: u64,
+    pub guid: String,
+    pub class: String,
+    pub name: Option<String>,
+    pub facet: String,
+    /// The value set aside (for a whole element, its content; absent for a deletion).
+    pub value: Option<serde_json::Value>,
+    /// Whose change it was: `mine` or `theirs`.
+    pub side: String,
+    /// The revision merged.
+    pub revision: i64,
+    /// Unix seconds.
+    pub at: i64,
+}
+
+fn stash_path(path: &Path) -> PathBuf {
+    path.with_file_name("stash.json")
+}
+
+fn read_stash(path: &Path) -> Vec<StashEntry> {
+    std::fs::read(stash_path(path)).ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or_default()
+}
+
+fn write_stash(path: &Path, s: &[StashEntry]) -> Result<()> {
+    std::fs::write(stash_path(path), serde_json::to_vec_pretty(s).expect("serialises")).map_err(|e| bad("bimserver.working_copy", e.to_string()))
+}
+
+host!(MergeFinish, "merge.finish", "Apply the conflict decisions",
+    "Finishes the pending merge (COL-MRG-002): every conflict must be decided (or `rest` says mine or theirs \
+     for the undecided). The merge is applied as one undoable step and the revision becomes the base; the \
+     losing side of each conflict goes to the stash (stash.list). A pending synchronise then checks in. \
+     Returns the sync report.",
+    [Network, Edit, FileWrite], FinishParams, SyncReport, |app, caller, p| {
+    let (id, path, st) = app.working_copy(p.document_id)?;
+    let mut pm = pending_of(app, id)?.clone();
+    if let Some(rest) = p.rest {
+        let c = match rest {
+            ChoiceKind::Mine => reviera_core::merge::Choice::Mine,
+            ChoiceKind::Theirs => reviera_core::merge::Choice::Theirs,
+            ChoiceKind::Value => return Err(bad("merge.bad_choice", "the rest are mine or theirs")),
+        };
+        for k in pm.conflicts.iter().map(reviera_core::merge::Conflict::key) {
+            pm.decisions.entry(k).or_insert_with(|| c.clone());
+        }
+    }
+    let folder = path.parent().expect("in its folder").to_owned();
+    let base = open_store(&folder.join(BASE))?;
+    let remote = open_store(&folder.join("remote.ifc"))?;
+    let plan = reviera_core::merge::three_way_decided(&base, app.get(id)?.doc.store(), &remote, reviera_core::merge::Policy::Fail, &pm.decisions);
+    let open: Vec<&reviera_core::merge::Conflict> = plan.conflicts.iter().filter(|c| c.decision.is_none()).collect();
+    if !open.is_empty() {
+        // The working copy changed since: new conflicts join the list.
+        let known: std::collections::BTreeSet<_> = pm.conflicts.iter().map(reviera_core::merge::Conflict::key).collect();
+        let fresh: Vec<_> = plan.conflicts.iter().filter(|c| !known.contains(&c.key())).cloned().collect();
+        let n = open.len();
+        let p2 = app.bimserver.pending.get_mut(&id).expect("pending");
+        p2.conflicts.extend(fresh);
+        return Err(bad("merge.undecided", format!("{n} conflict(s) still need a decision (merge.list_conflicts)")));
+    }
+    // The losing sides, to the stash.
+    let mut stash = read_stash(&path);
+    let first = stash.iter().map(|e| e.id).max().unwrap_or(0) + 1;
+    for (id, c) in (first..).zip(&plan.conflicts) {
+        let (side, value) = match c.decision.as_ref().expect("decided") {
+            reviera_core::merge::Choice::Mine => ("theirs", c.remote.clone()),
+            _ => ("mine", c.local.clone()),
+        };
+        stash.push(StashEntry { id, guid: c.guid.clone(), class: c.class.clone(), name: c.name.clone(), facet: c.facet.clone(), value, side: side.into(), revision: pm.number, at: now() });
+    }
+    write_stash(&path, &stash)?;
+    app.bimserver.pending.remove(&id);
+    let report = SyncReport { up_to_date: false, base_roid: st.base_roid, base_revision: st.base_revision, created: 0, updated: 0, deleted: 0, remote_changes: plan.remote_changes, merged: plan.merged, conflicts: Vec::new(), applied: false, skipped: Vec::new(), checked_in: None, lock: None, intruders: Vec::new(), corrective: None, pending: false };
+    let report = finish_merge(app, id, &folder, st, plan, pm.latest, pm.number, report)?;
+    match pm.sync_comment {
+        Some(comment) => {
+            let mut synced = BimSync.run(app, caller, SyncParams { comment, document_id: Some(id), conflicts: reviera_core::merge::Policy::Fail })?;
+            (synced.created, synced.updated, synced.deleted, synced.conflicts) = (report.created, report.updated, report.deleted, report.conflicts);
+            Ok(synced)
+        }
+        None => Ok(report),
+    }
+});
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct FinishParams {
+    /// Mine or theirs for the conflicts not yet decided.
+    pub rest: Option<ChoiceKind>,
+    pub document_id: Option<DocumentId>,
+}
+
+host!(MergeCancel, "merge.cancel", "Abandon the pending merge",
+    "Abandons the pending merge (COL-MRG-002): the working copy stays exactly as it was and its base is \
+     unchanged.",
+    [Edit], Option<DocParams>, (), |app, caller, p| {
+    let (id, path, _) = app.working_copy(p.and_then(|p| p.document_id))?;
+    pending_of(app, id)?;
+    app.bimserver.pending.remove(&id);
+    let _ = std::fs::remove_file(path.with_file_name("remote.ifc"));
+    Ok(())
+});
+
+host!(StashList, "stash.list", "List the conflict stash",
+    "The changes merges set aside (COL-MRG-002): the losing side of each decided conflict, with the element, \
+     facet, value, whose it was and the revision merged. The stash stays on this computer.",
+    [Read], Option<DocParams>, Vec<StashEntry>, |app, caller, p| {
+    let (_, path, _) = app.working_copy(p.and_then(|p| p.document_id))?;
+    Ok(read_stash(&path))
+});
+
+/// Sets the JSON value at `path` (`key/sub/sub`) inside `params`, removing it for `None`.
+fn set_facet(e: &mut reviera_core::Element, facet: &str, value: Option<serde_json::Value>) {
+    match facet {
+        "class" => {
+            if let Some(serde_json::Value::String(c)) = value {
+                e.class = c;
+            }
+        }
+        "name" => e.name = value.and_then(|v| v.as_str().map(str::to_owned)),
+        _ => {
+            let mut parts = facet.split('/');
+            let key = parts.next().unwrap_or_default().to_owned();
+            let rest: Vec<&str> = parts.collect();
+            if rest.is_empty() {
+                match value {
+                    Some(v) => e.params.insert(key, v),
+                    None => e.params.remove(&key),
+                };
+                return;
+            }
+            let root = e.params.entry(key).or_insert_with(|| serde_json::json!({}));
+            let mut at = root;
+            for (k, part) in rest.iter().enumerate() {
+                let last = k + 1 == rest.len();
+                let Some(obj) = at.as_object_mut() else { return };
+                if last {
+                    match value {
+                        Some(v) => obj.insert((*part).to_owned(), v),
+                        None => obj.remove(*part),
+                    };
+                    return;
+                }
+                at = obj.entry((*part).to_owned()).or_insert_with(|| serde_json::json!({}));
+            }
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct StashEntryParams {
+    pub entry_id: u64,
+    /// Also the element's other entries from the same side (a curve's start and end together).
+    #[serde(default)]
+    pub element: bool,
+    pub document_id: Option<DocumentId>,
+}
+
+host!(StashReapply, "stash.reapply", "Re-apply a stashed change",
+    "Re-applies stash entry `entry_id` to the working copy as a new, undoable local edit (COL-MRG-002): the \
+     property or name set to the value set aside, or a whole element brought back (with a new GlobalId if \
+     its own was retired in this session); with `element`, the element's other entries from the same side \
+     too, in the same edit. The entries leave the stash.",
+    [Edit, FileWrite], StashEntryParams, (), |app, caller, p| {
+    let (id, path, _) = app.working_copy(p.document_id)?;
+    let mut stash = read_stash(&path);
+    let first = stash.iter().find(|e| e.id == p.entry_id).cloned().ok_or_else(|| bad("stash.no_entry", format!("no stash entry {}", p.entry_id)))?;
+    let take = |e: &StashEntry| e.id == first.id || (p.element && e.guid == first.guid && e.side == first.side && e.revision == first.revision);
+    let entries: Vec<StashEntry> = stash.iter().filter(|e| take(e)).cloned().collect();
+    stash.retain(|e| !take(e));
+    let doc = &mut app.get_mut(id)?.doc;
+    let mut txn = doc.transaction("Re-apply Stashed Change", reviera_core::Origin::ui());
+    for entry in entries {
+        let existing = reviera_core::GlobalId::parse(&entry.guid).and_then(|g| txn.store().find_by_guid(&g));
+        if entry.facet == "element" {
+            let snap: Option<reviera_core::merge::Snap> = entry.value.clone().and_then(|v| serde_json::from_value(v).ok());
+            match (existing, snap) {
+                (Some(eid), Some(s)) => txn.modify(eid, |e| {
+                    e.class = s.class;
+                    e.name = s.name;
+                    e.params = s.params;
+                })?,
+                (Some(eid), None) => txn.delete(eid)?,
+                (None, Some(s)) => {
+                    let mut n = reviera_core::NewElement::new(&s.class);
+                    n.name = s.name.clone();
+                    n.params = s.params.clone();
+                    let with_guid = reviera_core::GlobalId::parse(&entry.guid).map(|g| n.clone().guid(g));
+                    if with_guid.map(|w| txn.create(w)).is_none_or(|r| r.is_err()) {
+                        txn.create(n)?;
+                    }
+                }
+                (None, None) => {}
+            }
+        } else {
+            let eid = existing.ok_or_else(|| bad("stash.no_element", "the element is no longer in the model"))?;
+            let (facet, value) = (entry.facet.clone(), entry.value.clone());
+            txn.modify(eid, |e| set_facet(e, &facet, value))?;
+        }
+    }
+    txn.commit();
+    write_stash(&path, &stash)
+});
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct StashDiscardParams {
+    pub entry_ids: Vec<u64>,
+    pub document_id: Option<DocumentId>,
+}
+
+host!(StashDiscard, "stash.discard", "Discard stashed changes",
+    "Deletes stash entries (COL-MRG-002). Returns how many were removed.",
+    [Edit, FileWrite], StashDiscardParams, usize, |app, caller, p| {
+    let (_, path, _) = app.working_copy(p.document_id)?;
+    let mut stash = read_stash(&path);
+    let before = stash.len();
+    stash.retain(|e| !p.entry_ids.contains(&e.id));
+    write_stash(&path, &stash)?;
+    Ok(before - stash.len())
 });

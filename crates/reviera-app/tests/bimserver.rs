@@ -528,6 +528,74 @@ fn synchronising_takes_the_lock_and_merges_an_intruder() {
     assert!(last.starts_with("[reviera:merge] Corrective merge of revision 4"), "{last}");
 }
 
+#[test]
+fn conflicts_are_decided_one_by_one_and_the_losers_stashed() {
+    let (url, _fake) = server();
+    let dir_a = tempfile::tempdir().unwrap();
+    let dir_b = tempfile::tempdir().unwrap();
+    let mut a = new_app(dir_a.path());
+    let mut b = new_app(dir_b.path());
+    let mut ids = Vec::new();
+    for app in [&mut a, &mut b] {
+        let id = run(app, "bimserver.add_server", json!({ "name": "Office", "url": url })).unwrap()["id"].as_str().unwrap().to_owned();
+        run(app, "bimserver.login", json!({ "server_id": id, "username": "anna@example.org", "password": "right" })).unwrap();
+        ids.push(id);
+    }
+    run(&mut a, "file.new", json!({})).unwrap();
+    let level = run(&mut a, "level.list", json!({})).unwrap()[0]["id"].clone();
+    let mk = |app: &mut App, y: f64| run(app, "wall.create", json!({ "curve": { "line": { "start": [0, y], "end": [6, y] } }, "base_level": level, "top_constraint": { "unconnected": 3.0 } })).unwrap();
+    let w1 = mk(&mut a, 0.0);
+    let w2 = mk(&mut a, 10.0);
+    let guid = |app: &App, id: &Value| app.document(app.active().unwrap()).unwrap().doc.store().get(reviera_core::ElementId(id.as_u64().unwrap())).unwrap().guid().to_string();
+    let (g1, g2) = (guid(&a, &w1), guid(&a, &w2));
+    run(&mut a, "file.save_as", json!({ "path": dir_a.path().join("a.ifc") })).unwrap();
+    run(&mut a, "bimserver.publish_local", json!({ "server_id": ids[0], "poid": 131073, "comment": "Two walls" })).unwrap();
+    run(&mut b, "bimserver.open", json!({ "server_id": ids[1], "poid": 131073 })).unwrap();
+    let id_of = |app: &App, g: &str| app.document(app.active().unwrap()).unwrap().doc.store().find_by_guid(&reviera_core::GlobalId::parse(g).unwrap()).unwrap().0;
+    // Both move both walls, differently.
+    run(&mut a, "element.move", json!({ "element_ids": [w1, w2], "vector": [0, 1, 0] })).unwrap();
+    run(&mut a, "bimserver.sync", json!({ "comment": "A moves north" })).unwrap();
+    let (b1, b2) = (id_of(&b, &g1), id_of(&b, &g2));
+    run(&mut b, "element.move", json!({ "element_ids": [b1, b2], "vector": [0, -1, 0] })).unwrap();
+    assert_eq!(run(&mut b, "merge.list_conflicts", json!({})).unwrap_err().code, "merge.none_pending");
+
+    // B's synchronise stops at the conflicts and keeps them for decisions.
+    let r = run(&mut b, "bimserver.sync", json!({ "comment": "B moves south" })).unwrap();
+    assert!(r["pending"].as_bool().unwrap() && r["checked_in"].is_null(), "{r}");
+    let list = run(&mut b, "merge.list_conflicts", json!({})).unwrap();
+    let rows = list.as_array().unwrap().clone();
+    assert!(rows.len() >= 2, "{list}");
+    let row_of = |g: &str| rows.iter().find(|r| r["guid"] == g).unwrap()["id"].as_str().unwrap().to_owned();
+    // Cancel leaves B's working copy as it was.
+    run(&mut b, "merge.cancel", json!({})).unwrap();
+    assert_eq!((wall_start(&b, &g1), wall_start(&b, &g2)), ([0.0, -1.0], [0.0, 9.0]));
+    run(&mut b, "bimserver.sync", json!({ "comment": "B moves south" })).unwrap();
+    // Mine for the first wall, theirs for the second; finish checks in.
+    run(&mut b, "merge.resolve", json!({ "conflict_id": row_of(&g1), "choice": "mine", "element": true })).unwrap();
+    assert_eq!(run(&mut b, "merge.finish", json!({})).unwrap_err().code, "merge.undecided");
+    assert_eq!(run(&mut b, "merge.resolve", json!({ "conflict_id": "c99", "choice": "mine" })).unwrap_err().code, "merge.no_conflict");
+    run(&mut b, "merge.resolve", json!({ "conflict_id": row_of(&g2), "choice": "theirs", "element": true })).unwrap();
+    let decided = run(&mut b, "merge.list_conflicts", json!({})).unwrap();
+    assert!(decided.as_array().unwrap().iter().all(|r| !r["decision"].is_null()), "{decided}");
+    let r = run(&mut b, "merge.finish", json!({})).unwrap();
+    assert!(r["checked_in"]["revision"] == 3, "{r}");
+    assert_eq!((wall_start(&b, &g1), wall_start(&b, &g2)), ([0.0, -1.0], [0.0, 11.0]), "mine for the first, theirs for the second");
+    // The losers are in the stash: A's move of the first wall, B's own move of the second.
+    let stash = run(&mut b, "stash.list", json!({})).unwrap();
+    let entries = stash.as_array().unwrap();
+    assert!(entries.iter().any(|e| e["guid"] == g1.as_str() && e["side"] == "theirs") && entries.iter().any(|e| e["guid"] == g2.as_str() && e["side"] == "mine"), "{stash}");
+    // Re-applying B's own move of the second wall brings it back as an undoable edit.
+    let mine = entries.iter().find(|e| e["guid"] == g2.as_str() && e["side"] == "mine").unwrap()["id"].clone();
+    run(&mut b, "stash.reapply", json!({ "entry_id": mine, "element": true })).unwrap();
+    assert_eq!(wall_start(&b, &g2), [0.0, 9.0]);
+    run(&mut b, "edit.undo", json!({})).unwrap();
+    assert_eq!(wall_start(&b, &g2), [0.0, 11.0]);
+    let left = run(&mut b, "stash.list", json!({})).unwrap().as_array().unwrap().len();
+    let ids: Vec<Value> = run(&mut b, "stash.list", json!({})).unwrap().as_array().unwrap().iter().map(|e| e["id"].clone()).collect();
+    assert_eq!(run(&mut b, "stash.discard", json!({ "entry_ids": ids })).unwrap(), json!(left));
+    assert!(run(&mut b, "stash.list", json!({})).unwrap().as_array().unwrap().is_empty());
+}
+
 fn var(k: &str) -> Option<String> {
     std::env::var(k).ok().filter(|v| !v.trim().is_empty())
 }

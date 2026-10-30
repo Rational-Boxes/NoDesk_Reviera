@@ -52,9 +52,12 @@ copy in, with your comment.</p>
 <p>The merge goes element by element and, within an element, property by property: if you
 changed a wall's height and a colleague its fire rating, the wall gets both; if you each added
 walls to a level, all of them are there. Only when you both changed the same thing differently,
-or one of you deleted what the other changed, is there a <b>conflict</b>. Reviera then lists the
-conflicts and changes nothing until you choose: keep your changes, take the server's, or
-cancel.</p>
+or one of you deleted what the other changed, is there a <b>conflict</b>. Reviera then opens the
+<b>Conflicts</b> dialog and changes nothing until you finish: for each element, <b>Keep Mine</b> or
+<b>Take Theirs</b> (or all at once), then <b>Finish</b>; <b>Cancel Merge</b> leaves your working
+copy exactly as it was. The side you did not choose is kept in the <b>stash</b> on this computer,
+so nothing is lost: <code>stash.list</code> shows it and <code>stash.reapply</code> puts a change
+back as an edit you can undo.</p>
 <p>While you synchronise, Reviera holds the project's <b>sync lock</b> on the server for up to ten
 minutes, so a colleague's Synchronise waits for yours: theirs is refused, saying who is
 synchronising, and works once yours is done (or the lock lapses, if your computer stopped). If
@@ -76,8 +79,10 @@ session you started, but can never log in with a password or remove a server.</p
 <code>bimserver.list_revisions</code>, <code>bimserver.open</code>, <code>bimserver.publish_local</code>,
 <code>bimserver.check_in</code>, <code>bimserver.get_latest</code>, <code>bimserver.sync</code>,
 <code>bimserver.history</code>, <code>bimserver.compare</code>, <code>bimserver.restore</code>,
-<code>bimserver.download_revision</code>, <code>merge.three_way</code>, <code>model.mode</code></p>
+<code>bimserver.download_revision</code>, <code>merge.list_conflicts</code>, <code>merge.resolve</code>,
+<code>merge.finish</code>, <code>merge.cancel</code>, <code>stash.list</code>, <code>stash.reapply</code>,
+<code>merge.three_way</code>, <code>model.mode</code></p>
 
 <h2 id="later">Coming later</h2>
-<p>Choosing a side conflict by conflict, change notifications, worksets and element ownership,
+<p>Zooming to a conflict with both versions shown, a Conflict Stash panel, change notifications, worksets and element ownership,
 progress and cancel for large downloads and uploads.</p>

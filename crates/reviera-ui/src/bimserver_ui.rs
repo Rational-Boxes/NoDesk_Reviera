@@ -488,63 +488,36 @@ impl Gui {
     /// which side wins (or stops). A message for the dialog's note.
     fn merge_latest(&mut self, comment: Option<String>) -> String {
         let frame = self.frame;
-        let (name, mut args) = match &comment {
+        let (name, args) = match &comment {
             Some(c) => ("bimserver.sync", json!({ "comment": c })),
             None => ("bimserver.get_latest", json!({})),
         };
-        loop {
-            frame.set_status_text("Merging the latest revision…", 0);
-            let r = self.run(name, args.clone());
-            frame.set_status_text("", 0);
-            let r = match r {
-                Ok(r) => r,
-                Err(e) => return format!("Not done: {e}"),
-            };
-            let conflicts = r["conflicts"].as_array().cloned().unwrap_or_default();
-            if r["applied"] == false && r["up_to_date"] == false && !conflicts.is_empty() {
-                let lines: Vec<String> = conflicts
-                    .iter()
-                    .take(12)
-                    .map(|c| {
-                        let what = match c["kind"].as_str() {
-                            Some("delete_modify") => "deleted here, changed on the server".to_owned(),
-                            Some("modify_delete") => "changed here, deleted on the server".to_owned(),
-                            Some("both_added") => "added on both sides".to_owned(),
-                            _ => format!("both changed {}", c["facet"].as_str().unwrap_or("")),
-                        };
-                        format!("• {} {}: {what}", c["class"].as_str().unwrap_or(""), c["name"].as_str().unwrap_or(""))
-                    })
-                    .collect();
-                let more = if conflicts.len() > 12 { format!("\n… and {} more", conflicts.len() - 12) } else { String::new() };
-                let msg = format!(
-                    "{} conflict(s) with the server's latest revision:\n\n{}{more}\n\nYes keeps your changes, No takes the server's, Cancel stops (nothing has changed).",
-                    conflicts.len(),
-                    lines.join("\n")
-                );
-                let choice = MessageDialog::builder(&frame, &msg, "Conflicts")
-                    .with_style(MessageDialogStyle::YesNo | MessageDialogStyle::Cancel | MessageDialogStyle::IconWarning)
-                    .build()
-                    .show_modal();
-                let side = match choice {
-                    ID_YES => "local",
-                    ID_NO => "remote",
-                    _ => return format!("Stopped at {} conflict(s); the working copy is unchanged.", conflicts.len()),
-                };
-                args["conflicts"] = json!(side);
-                continue;
+        frame.set_status_text("Merging the latest revision…", 0);
+        let r = self.run(name, args);
+        frame.set_status_text("", 0);
+        let r = match r {
+            Ok(r) => r,
+            Err(e) => return format!("Not done: {e}"),
+        };
+        // Conflicts: decided in the Conflicts dialog, then finished (a synchronise then checks in).
+        let r = if r["pending"] == true {
+            match self.conflicts_dialog() {
+                Some(done) => done,
+                None => return "Merge cancelled; the working copy is unchanged.".into(),
             }
-            self.refresh_scene(&frame);
-            self.update_title(&frame);
-            return if r["up_to_date"] == true && r["checked_in"].is_null() {
-                "Up to date: the working copy is based on the latest revision.".into()
-            } else {
-                let merged = format!("{} created, {} updated, {} deleted", r["created"], r["updated"], r["deleted"]);
-                match r["checked_in"]["revision"].as_i64() {
-                    Some(n) if r["up_to_date"] == true => format!("Checked in as revision {n}."),
-                    Some(n) => format!("Merged the server's changes ({merged}) and checked in as revision {n}."),
-                    None => format!("Merged revision {} into the working copy: {merged}.", r["base_revision"]),
-                }
-            };
+        } else {
+            r
+        };
+        self.refresh_scene(&frame);
+        self.update_title(&frame);
+        if r["up_to_date"] == true && r["checked_in"].is_null() {
+            return "Up to date: the working copy is based on the latest revision.".into();
+        }
+        let merged = format!("{} created, {} updated, {} deleted", r["created"], r["updated"], r["deleted"]);
+        match r["checked_in"]["revision"].as_i64() {
+            Some(n) if r["up_to_date"] == true => format!("Checked in as revision {n}."),
+            Some(n) => format!("Merged the server's changes ({merged}) and checked in as revision {n}."),
+            None => format!("Merged revision {} into the working copy: {merged}.", r["base_revision"]),
         }
     }
 
@@ -576,6 +549,129 @@ impl Gui {
         let more = if total > 25 { format!("\n… and {} more", total - 25) } else { String::new() };
         MessageDialog::builder(&frame, &format!("{summary}\n\n{}{more}", lines.join("\n")), "Compare").with_style(MessageDialogStyle::OK | MessageDialogStyle::IconInformation).build().show_modal();
         summary
+    }
+
+    /// The Conflicts dialog (COL-MRG-002): one row per element with conflicts, what changed on each
+    /// side and the decision; Keep Mine, Take Theirs (the whole element), Keep All Mine, Take All
+    /// Theirs, Finish, Cancel. The finished merge's report, or `None` when cancelled.
+    fn conflicts_dialog(&mut self) -> Option<Value> {
+        const MINE: i32 = 7301;
+        const THEIRS: i32 = 7302;
+        const ALL_MINE: i32 = 7303;
+        const ALL_THEIRS: i32 = 7304;
+        const FINISH: i32 = 7305;
+        let frame = self.frame;
+        let mut selected = 0usize;
+        let mut note = String::new();
+        loop {
+            let list = self.run("merge.list_conflicts", Value::Null).ok()?.as_array().cloned().unwrap_or_default();
+            // Grouped by element, in the order listed.
+            let mut groups: Vec<(String, Vec<Value>)> = Vec::new();
+            for c in list {
+                let g = c["guid"].as_str().unwrap_or("").to_owned();
+                match groups.iter_mut().find(|x| x.0 == g) {
+                    Some(x) => x.1.push(c),
+                    None => groups.push((g, vec![c])),
+                }
+            }
+            let dialog = Dialog::builder(&frame, "Conflicts").with_style(DialogStyle::DefaultDialogStyle | DialogStyle::ResizeBorder).build();
+            let intro = StaticText::builder(&dialog)
+                .with_label("You and the server's latest revision changed these elements differently. Choose for each whether to keep your change or take the server's; nothing changes until Finish. The side not chosen is kept in the stash.")
+                .build();
+            intro.wrap(820);
+            let l = ListCtrl::builder(&dialog).with_style(ListCtrlStyle::Report | ListCtrlStyle::SingleSel).build();
+            for (k, (h, w)) in [("Element", 220), ("What", 330), ("Decision", 120)].into_iter().enumerate() {
+                l.insert_column(k as i64, h, ListColumnFormat::Left, w);
+            }
+            let mut open = 0;
+            for (k, (_, cs)) in groups.iter().enumerate() {
+                let c0 = &cs[0];
+                // Unnamed elements are told apart by the end of their GlobalId.
+                let label = match c0["name"].as_str().filter(|n| !n.is_empty()) {
+                    Some(n) => format!("{} {n}", c0["class"].as_str().unwrap_or("")),
+                    None => {
+                        let g = c0["guid"].as_str().unwrap_or("");
+                        format!("{} …{}", c0["class"].as_str().unwrap_or(""), &g[g.len().saturating_sub(6)..])
+                    }
+                };
+                let what = match c0["kind"].as_str() {
+                    Some("delete_modify") => "deleted here, changed on the server".to_owned(),
+                    Some("modify_delete") => "changed here, deleted on the server".to_owned(),
+                    Some("both_added") => "added on both sides".to_owned(),
+                    _ => {
+                        let facets: Vec<String> = cs.iter().map(|c| c["facet"].as_str().unwrap_or("").split('/').next_back().unwrap_or("").to_owned()).collect();
+                        format!("both changed: {}", facets.join(", "))
+                    }
+                };
+                let decisions: std::collections::BTreeSet<&str> = cs.iter().map(|c| c["decision"].as_str().unwrap_or(if c["decision"].is_null() { "" } else { "value" })).collect();
+                let decision = match decisions.iter().copied().collect::<Vec<_>>().as_slice() {
+                    ["mine"] => "Keep mine",
+                    ["theirs"] => "Take theirs",
+                    [""] => "",
+                    _ => "Mixed",
+                };
+                if decisions.contains("") {
+                    open += 1;
+                }
+                l.insert_item(k as i64, &label, None);
+                l.set_item_text_by_column(k as i64, 1, &what);
+                l.set_item_text_by_column(k as i64, 2, decision);
+            }
+            if selected < groups.len() {
+                l.set_item_state(selected as i64, ListItemState::Selected, ListItemState::Selected);
+            }
+            l.set_min_size(Size::new(700, 260));
+            let status = StaticText::builder(&dialog).with_label(&if note.is_empty() { format!("{} element(s); {open} still to decide.", groups.len()) } else { note.clone() }).build();
+            let buttons = BoxSizer::builder(Orientation::Horizontal).build();
+            for (code, label, on) in [(MINE, "Keep Mine", true), (THEIRS, "Take Theirs", true), (ALL_MINE, "Keep All Mine", true), (ALL_THEIRS, "Take All Theirs", true), (FINISH, "Finish", open == 0)] {
+                let b = Button::builder(&dialog).with_label(label).build();
+                b.enable(on && !groups.is_empty());
+                let d = dialog;
+                b.on_click(move |_| d.end_modal(code));
+                buttons.add(&b, 0, SizerFlag::Right, 4);
+            }
+            buttons.add_stretch_spacer(1);
+            let cancel = Button::builder(&dialog).with_id(ID_CANCEL).with_label("Cancel Merge").build();
+            buttons.add(&cancel, 0, SizerFlag::Expand, 0);
+            let sizer = BoxSizer::builder(Orientation::Vertical).build();
+            sizer.add(&intro, 0, SizerFlag::Expand | SizerFlag::All, 12);
+            sizer.add(&l, 1, SizerFlag::Expand | SizerFlag::Left | SizerFlag::Right, 12);
+            sizer.add(&status, 0, SizerFlag::Expand | SizerFlag::All, 12);
+            sizer.add_sizer(&buttons, 0, SizerFlag::Expand | SizerFlag::Left | SizerFlag::Right | SizerFlag::Bottom, 12);
+            dialog.set_sizer_and_fit(sizer, true);
+            dialog.set_escape_id(ID_CANCEL);
+            let code = dialog.show_modal();
+            selected = usize::try_from(l.get_first_selected_item()).unwrap_or(selected);
+            dialog.destroy();
+            note.clear();
+            let row = groups.get(selected).map(|g| g.1[0]["id"].clone());
+            let r = match (code, row) {
+                (MINE, Some(id)) => self.run("merge.resolve", json!({ "conflict_id": id, "choice": "mine", "element": true })).map(|_| Value::Null),
+                (THEIRS, Some(id)) => self.run("merge.resolve", json!({ "conflict_id": id, "choice": "theirs", "element": true })).map(|_| Value::Null),
+                (ALL_MINE, _) => self.run("merge.resolve_all", json!({ "choice": "mine", "all": true })).map(|_| Value::Null),
+                (ALL_THEIRS, _) => self.run("merge.resolve_all", json!({ "choice": "theirs", "all": true })).map(|_| Value::Null),
+                (FINISH, _) => {
+                    frame.set_status_text("Applying the merge…", 0);
+                    let done = self.run("merge.finish", json!({}));
+                    frame.set_status_text("", 0);
+                    match done {
+                        Ok(report) => return Some(report),
+                        Err(e) => Err(e),
+                    }
+                }
+                (MINE | THEIRS, None) => Ok(Value::Null),
+                _ => {
+                    let _ = self.run("merge.cancel", Value::Null);
+                    return None;
+                }
+            };
+            if let Err(e) = r {
+                note = e;
+            }
+            if matches!(code, MINE | THEIRS) && selected + 1 < groups.len() {
+                selected += 1;
+            }
+        }
     }
 
     /// Check In…: a message for the dialog's note.

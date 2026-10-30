@@ -21,7 +21,8 @@
 //! - Numbers are equal within 1e-9 (relative), so a value written as `3.` and read back as
 //!   `3.0` is no change.
 //! - Conflicts are resolved by the **policy**: `fail` (report them and change nothing),
-//!   `local` or `remote` (that side wins every conflict).
+//!   `local` or `remote` (that side wins every conflict), or one by one by [`Decisions`] (keep
+//!   mine, take theirs, or a value of its own).
 //!
 //! The result is a [`Plan`] of the creates, updates and deletes that turn L into the merged
 //! model; applying it is one transaction. Deterministic: the same B, L, R and policy give the
@@ -56,6 +57,21 @@ pub enum Policy {
     Remote,
 }
 
+/// A decision on one conflict.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum Choice {
+    /// Keep the local side.
+    Mine,
+    /// Take the remote side.
+    Theirs,
+    /// A value of its own (a facet only; JSON null removes it).
+    Value(Value),
+}
+
+/// Decisions by (GlobalId, facet).
+pub type Decisions = BTreeMap<(String, String), Choice>;
+
 /// What kind of conflict.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
@@ -81,10 +97,20 @@ pub struct Conflict {
     pub facet: String,
     pub local: Option<Value>,
     pub remote: Option<Value>,
+    /// The decision taken on it, if any.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub decision: Option<Choice>,
+}
+
+impl Conflict {
+    /// Its key in [`Decisions`].
+    pub fn key(&self) -> (String, String) {
+        (self.guid.clone(), self.facet.clone())
+    }
 }
 
 /// An element's content.
-#[derive(Debug, Clone, PartialEq, Serialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct Snap {
     pub class: String,
     pub name: Option<String>,
@@ -145,7 +171,7 @@ fn strings(v: &Value) -> Option<Vec<&str>> {
 }
 
 /// The merged value of one facet (absent when `None`), or a conflict at `path`.
-fn value(b: Option<&Value>, l: Option<&Value>, r: Option<&Value>, path: &str, out: &mut Vec<(String, Option<Value>, Option<Value>)>, policy: Policy) -> Option<Value> {
+fn value(b: Option<&Value>, l: Option<&Value>, r: Option<&Value>, path: &str, out: &mut Vec<(String, Option<Value>, Option<Value>)>, decide: &dyn Fn(&str) -> Choice) -> Option<Value> {
     if same_opt(l, r) || same_opt(r, b) {
         return l.cloned();
     }
@@ -158,7 +184,7 @@ fn value(b: Option<&Value>, l: Option<&Value>, r: Option<&Value>, path: &str, ou
         let keys: BTreeSet<&String> = lo.keys().chain(ro.keys()).chain(bo.into_iter().flat_map(|o| o.keys())).collect();
         let mut m = serde_json::Map::new();
         for k in keys {
-            if let Some(v) = value(bo.and_then(|o| o.get(k)), lo.get(k), ro.get(k), &format!("{path}/{k}"), out, policy) {
+            if let Some(v) = value(bo.and_then(|o| o.get(k)), lo.get(k), ro.get(k), &format!("{path}/{k}"), out, decide) {
                 m.insert(k.clone(), v);
             }
         }
@@ -173,21 +199,30 @@ fn value(b: Option<&Value>, l: Option<&Value>, r: Option<&Value>, path: &str, ou
         return Some(Value::Array(merged.into_iter().map(|s| Value::String(s.to_owned())).collect()));
     }
     out.push((path.to_owned(), l.cloned(), r.cloned()));
-    match policy {
-        Policy::Remote => r.cloned(),
-        _ => l.cloned(),
+    match decide(path) {
+        Choice::Theirs => r.cloned(),
+        Choice::Mine => l.cloned(),
+        Choice::Value(Value::Null) => None,
+        Choice::Value(v) => Some(v),
     }
 }
 
 /// Merges `b`, `l` and `r` element by element.
 pub fn three_way(base: &Store, local: &Store, remote: &Store, policy: Policy) -> Plan {
+    three_way_decided(base, local, remote, policy, &Decisions::new())
+}
+
+/// Merges as [`three_way`], each conflict with a decision in `decisions` decided so (the
+/// others by `policy`); every conflict is still listed, with its decision.
+pub fn three_way_decided(base: &Store, local: &Store, remote: &Store, policy: Policy, decisions: &Decisions) -> Plan {
     let index = |s: &Store| -> BTreeMap<String, Snap> { s.iter().map(|e| (e.guid().to_string(), Snap::of(e))).collect() };
     let (bi, li, ri) = (index(base), index(local), index(remote));
     let guids: BTreeSet<&String> = bi.keys().chain(li.keys()).chain(ri.keys()).collect();
     let mut plan = Plan::default();
     for g in guids {
         let (b, l, r) = (bi.get(g), li.get(g), ri.get(g));
-        let conflict = |kind, facet: &str, lv: Option<Value>, rv: Option<Value>, s: &Snap| Conflict { guid: g.clone(), class: s.class.clone(), name: s.name.clone(), kind, facet: facet.to_owned(), local: lv, remote: rv };
+        let decide = |facet: &str| decisions.get(&(g.clone(), facet.to_owned())).cloned().unwrap_or(if policy == Policy::Remote { Choice::Theirs } else { Choice::Mine });
+        let conflict = |kind, facet: &str, lv: Option<Value>, rv: Option<Value>, s: &Snap| Conflict { guid: g.clone(), class: s.class.clone(), name: s.name.clone(), kind, facet: facet.to_owned(), local: lv, remote: rv, decision: decisions.get(&(g.clone(), facet.to_owned())).cloned() };
         let changed = |x: &Snap| b.is_none_or(|b| !same_snap(b, x));
         // The merged element (None: absent).
         let result: Option<Snap> = match (b, l, r) {
@@ -200,16 +235,16 @@ pub fn three_way(base: &Store, local: &Store, remote: &Store, policy: Policy) ->
             (Some(b), Some(l), Some(r)) => {
                 // Facet by facet.
                 let mut found = Vec::new();
-                let class = match value(Some(&Value::String(b.class.clone())), Some(&Value::String(l.class.clone())), Some(&Value::String(r.class.clone())), "class", &mut found, policy) {
+                let class = match value(Some(&Value::String(b.class.clone())), Some(&Value::String(l.class.clone())), Some(&Value::String(r.class.clone())), "class", &mut found, &decide) {
                     Some(Value::String(c)) => c,
                     _ => l.class.clone(),
                 };
                 let opt = |n: &Option<String>| n.clone().map(Value::String);
-                let name = value(opt(&b.name).as_ref(), opt(&l.name).as_ref(), opt(&r.name).as_ref(), "name", &mut found, policy).and_then(|v| v.as_str().map(str::to_owned));
+                let name = value(opt(&b.name).as_ref(), opt(&l.name).as_ref(), opt(&r.name).as_ref(), "name", &mut found, &decide).and_then(|v| v.as_str().map(str::to_owned));
                 let keys: BTreeSet<&String> = b.params.keys().chain(l.params.keys()).chain(r.params.keys()).collect();
                 let mut params = BTreeMap::new();
                 for k in keys {
-                    if let Some(v) = value(b.params.get(k), l.params.get(k), r.params.get(k), k, &mut found, policy) {
+                    if let Some(v) = value(b.params.get(k), l.params.get(k), r.params.get(k), k, &mut found, &decide) {
                         params.insert(k.clone(), v);
                     }
                 }
@@ -227,7 +262,7 @@ pub fn three_way(base: &Store, local: &Store, remote: &Store, policy: Policy) ->
             }
             (None, Some(l), Some(r)) => {
                 plan.conflicts.push(conflict(ConflictKind::BothAdded, "element", serde_json::to_value(l).ok(), serde_json::to_value(r).ok(), l));
-                Some(if policy == Policy::Remote { r.clone() } else { l.clone() })
+                Some(if decide("element") == Choice::Theirs { r.clone() } else { l.clone() })
             }
             // Deleted on one side.
             (Some(_), None, None) | (None, None, None) => None,
@@ -236,7 +271,7 @@ pub fn three_way(base: &Store, local: &Store, remote: &Store, policy: Policy) ->
                     None
                 } else {
                     plan.conflicts.push(conflict(ConflictKind::DeleteModify, "element", None, serde_json::to_value(r).ok(), r));
-                    (policy == Policy::Remote).then(|| r.clone())
+                    (decide("element") == Choice::Theirs).then(|| r.clone())
                 }
             }
             (Some(b), Some(l), None) => {
@@ -245,7 +280,7 @@ pub fn three_way(base: &Store, local: &Store, remote: &Store, policy: Policy) ->
                     None
                 } else {
                     plan.conflicts.push(conflict(ConflictKind::ModifyDelete, "element", serde_json::to_value(l).ok(), None, l));
-                    (policy != Policy::Remote).then(|| l.clone())
+                    (decide("element") != Choice::Theirs).then(|| l.clone())
                 }
             }
         };
@@ -370,16 +405,16 @@ mod tests {
         let b = json!({ "height": 3.0, "thickness": 0.2, "kind": "w" });
         let l = json!({ "height": 3.5, "thickness": 0.2, "kind": "w" });
         let r = json!({ "height": 3.0, "thickness": 0.25, "kind": "w" });
-        assert_eq!(value(Some(&b), Some(&l), Some(&r), "rxd", &mut c, Policy::Fail), Some(json!({ "height": 3.5, "thickness": 0.25, "kind": "w" })));
+        assert_eq!(value(Some(&b), Some(&l), Some(&r), "rxd", &mut c, &|_| Choice::Mine), Some(json!({ "height": 3.5, "thickness": 0.25, "kind": "w" })));
         assert!(c.is_empty());
         // Members: each side added one and one removed another.
         let b = json!(["a", "b", "c"]);
         let l = json!(["a", "b", "c", "l"]);
         let r = json!(["a", "c", "r"]);
-        assert_eq!(value(Some(&b), Some(&l), Some(&r), "parts", &mut c, Policy::Fail), Some(json!(["a", "c", "l", "r"])));
+        assert_eq!(value(Some(&b), Some(&l), Some(&r), "parts", &mut c, &|_| Choice::Mine), Some(json!(["a", "c", "l", "r"])));
         // The same number written differently is no change; a real clash is a conflict.
         assert!(same(&json!(3), &json!(3.0000000000001)));
-        assert_eq!(value(Some(&json!(1)), Some(&json!(2)), Some(&json!(3)), "x", &mut c, Policy::Remote), Some(json!(3)));
+        assert_eq!(value(Some(&json!(1)), Some(&json!(2)), Some(&json!(3)), "x", &mut c, &|_| Choice::Theirs), Some(json!(3)));
         assert_eq!(c.len(), 1);
     }
 

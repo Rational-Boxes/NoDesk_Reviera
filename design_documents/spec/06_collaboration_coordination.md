@@ -396,8 +396,10 @@ Ownership is advisory, so step 7 is what gives it force at merge time.
 **Commands.** `merge.list_conflicts() -> conflict[]` (query); `merge.resolve(conflict_id, choice: mine|theirs|value, value?) -> ()`; `merge.resolve_all(filter?, choice: mine|theirs) -> count`; `merge.finish() -> sync_report`; `merge.cancel() -> ()`; `stash.list() -> stash_entry[]` (query); `stash.reapply(entry_id) -> ()`; `stash.discard(entry_ids[]) -> ()`
 
 **Acceptance criteria.**
-- [ ] Choosing *Take theirs* for a conflict puts the local value in the stash; *Re-apply* from the stash restores the local value as an undoable edit.
-- [ ] *Cancel* in the Conflicts dialog leaves the working copy exactly as it was before the merge.
+- [x] Choosing *Take theirs* for a conflict puts the local value in the stash; *Re-apply* from the stash restores the local value as an undoable edit.
+- [x] *Cancel* in the Conflicts dialog leaves the working copy exactly as it was before the merge.
+
+*Built (2026-10-30):* a merge that meets conflicts under the `fail` policy is kept **pending** for the document (the downloaded revision stays as `remote.ifc`); `merge.list_conflicts(document_id?)` (ids `c1` …, with the local and remote values and the decision so far), `merge.resolve(conflict_id, choice: mine|theirs|value, value?, element?)` (`element` decides every conflict on that element, so a curve's start and end never come from different sides), `merge.resolve_all(choice, class?, all?) -> count`, `merge.finish(rest?, document_id?) -> sync_report` (refused while any conflict is undecided; conflicts that appeared since the working copy changed join the list), `merge.cancel(document_id?)`; a pending synchronise checks in after finish. The losing side of each decided conflict goes to the **stash** (`stash.json` in the working-copy folder, never uploaded): `stash.list`, `stash.reapply(entry_id, element?)` (an undoable edit; `element` takes the element's other entries from the same side too), `stash.discard(entry_ids)`. File › BIMserver… › Get Latest and Synchronise open the **Conflicts** dialog: one row per element (what changed, the decision), Keep Mine, Take Theirs, Keep All Mine, Take All Theirs, Finish, Cancel Merge. Not yet: *Show* (zoom with ghosts), *Edit merged value* in the dialog (the command takes one), the remote user and revision comment per conflict, recording decisions with user and time in the report, and Collaborate › Conflict Stash.
 
 ### Post-merge regeneration and validation
 **ID:** COL-MRG-003 · **Priority:** P1 · **Ref:** research/04 §9 (*Review Warnings*)
@@ -1721,12 +1723,12 @@ Every command below is registered once and is available from the UI, Lua and MCP
 | `merge.preview` | base_path?, remote_path? | merge_summary | No | COL-MRG-001 |
 | `merge.three_way` | base_path, local_path, remote_path, out_path, policy? | merge_report | No | COL-MRG-001 |
 | `merge.list_conflicts` | — | conflict[] | No | COL-MRG-002 |
-| `merge.resolve` | conflict_id, choice: mine\|theirs\|value, value? | () | No | COL-MRG-002 |
-| `merge.resolve_all` | filter?, choice: mine\|theirs | count | No | COL-MRG-002 |
-| `merge.finish` | — | sync_report | No | COL-MRG-002 |
+| `merge.resolve` | conflict_id, choice: mine\|theirs\|value, value?, element?, document_id? | — | No | COL-MRG-002 |
+| `merge.resolve_all` | choice: mine\|theirs, class?, all?, document_id? | count | No | COL-MRG-002 |
+| `merge.finish` | rest?, document_id? | sync_report | No | COL-MRG-002 |
 | `merge.cancel` | — | () | No | COL-MRG-002 |
 | `stash.list` | — | stash_entry[] | No | COL-MRG-002 |
-| `stash.reapply` | entry_id | () | Yes | COL-MRG-002 |
+| `stash.reapply` | entry_id, element?, document_id? | — | No | COL-MRG-002 |
 | `stash.discard` | entry_ids[] | () | No | COL-MRG-002 |
 | `workset.create` | name, visible_by_default?, open_by_default? | workset_id | Yes | COL-WS-001 |
 | `workset.rename` | workset_id, name | () | Yes | COL-WS-001 |

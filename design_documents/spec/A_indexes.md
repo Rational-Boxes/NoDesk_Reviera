@@ -1696,11 +1696,11 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `mep_run.set_slope` | 4 | element_ids[], slope, control_point_ref | — | Yes | MEP-PIPE-002 |
 | `mep_settings.show` | 4 | kind: mechanical, electrical, conductor_cable, building_space_type, load_classification, demand_factor, fabrication or pid | — | No | MEP-SET-004 |
 | `merge.cancel` | 6 | — | () | No | COL-MRG-002 |
-| `merge.finish` | 6 | — | sync_report | No | COL-MRG-002 |
+| `merge.finish` | 6 | rest?, document_id? | sync_report | No | COL-MRG-002 |
 | `merge.list_conflicts` | 6 | — | conflict[] | No | COL-MRG-002 |
 | `merge.preview` | 6 | base_path?, remote_path? | merge_summary | No | COL-MRG-001 |
-| `merge.resolve` | 6 | conflict_id, choice: mine\ | theirs\ | value, value? | () |
-| `merge.resolve_all` | 6 | filter?, choice: mine\ | theirs | count | No |
+| `merge.resolve` | 6 | conflict_id, choice: mine\ | theirs\ | value, value?, element?, document_id? | — |
+| `merge.resolve_all` | 6 | choice: mine\ | theirs, class?, all?, document_id? | count | No |
 | `merge.three_way` | 6 | base_path, local_path, remote_path, out_path, policy? | merge_report | No | COL-MRG-001 |
 | `mesh_object.import` | 2 | path, options | type_id | Yes | DM-IMP-015 |
 | `mesh_object.inspect` | 2 | path, options? | report | No | DM-IMP-015 |
@@ -2245,7 +2245,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `standards.transfer` | 2 | source_document_id, selection[{kind, item_ids?}], on_conflict: overwrite\ | new_only\ | rename | transfer_report |
 | `stash.discard` | 6 | entry_ids[] | () | No | COL-MRG-002 |
 | `stash.list` | 6 | — | stash_entry[] | No | COL-MRG-002 |
-| `stash.reapply` | 6 | entry_id | () | Yes | COL-MRG-002 |
+| `stash.reapply` | 6 | entry_id, element?, document_id? | — | No | COL-MRG-002 |
 | `steel_cut.cope` | 4 | member_ids[], cut_member_id? | — | Yes | STR-STL-008 |
 | `steel_cut.cut_by` | 4 | cut_id, cutter_id | — | Yes | STR-STL-008 |
 | `steel_cut.cut_through` | 4 | cut_id, cutter_id, gap | — | Yes | STR-STL-008 |
